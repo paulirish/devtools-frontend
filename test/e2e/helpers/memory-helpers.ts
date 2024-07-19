@@ -7,14 +7,15 @@ import type * as puppeteer from 'puppeteer-core';
 
 import {
   $,
-  platform,
-  waitForElementWithTextContent,
   $$,
   click,
   clickElement,
   getBrowserAndPages,
   pasteText,
+  platform,
   waitFor,
+  waitForAria,
+  waitForElementWithTextContent,
   waitForFunction,
   waitForNone,
 } from '../../shared/helper.js';
@@ -22,7 +23,7 @@ import {
 const NEW_HEAP_SNAPSHOT_BUTTON = 'button[aria-label="Take heap snapshot"]';
 const MEMORY_PANEL_CONTENT = 'div[aria-label="Memory panel"]';
 const PROFILE_TREE_SIDEBAR = 'div.profiles-tree-sidebar';
-export const MEMORY_TAB_ID = '#tab-heap_profiler';
+export const MEMORY_TAB_ID = '#tab-heap-profiler';
 const CLASS_FILTER_INPUT = 'div[aria-placeholder="Class filter"]';
 const SELECTED_RESULT = '#profile-views table.data tr.data-grid-data-grid-node.revealed.parent.selected';
 
@@ -281,4 +282,62 @@ export async function changeAllocationSampleViewViaDropdown(newPerspective: stri
     throw new Error(`Could not find heap snapshot perspective option: ${newPerspective}`);
   }
   await dropdown.select(optionValue);
+}
+
+export async function focusTableRow(text: string) {
+  const row = await waitFor(`//span[text()="${text}"]/ancestor::tr`, undefined, undefined, 'xpath');
+  // Click in a numeric cell, to avoid accidentally clicking a link.
+  const cell = await waitFor('.numeric-column', row);
+  await clickElement(cell);
+}
+
+export async function expandFocusedRow() {
+  const {frontend} = getBrowserAndPages();
+  await frontend.keyboard.press('ArrowRight');
+  await waitFor('.selected.data-grid-data-grid-node.expanded');
+}
+
+async function getSizesFromRow(row: puppeteer.ElementHandle<Element>) {
+  const numericData = await $$('.numeric-column>.profile-multiple-values>span', row);
+  assert.strictEqual(numericData.length, 4);
+  function readNumber(e: Element) {
+    return parseInt((e.textContent as string).replaceAll('\xa0', ''), 10);
+  }
+  const shallowSize = await numericData[0].evaluate(readNumber);
+  const retainedSize = await numericData[2].evaluate(readNumber);
+  assert.isTrue(retainedSize >= shallowSize);
+  return {shallowSize, retainedSize};
+}
+
+export async function getSizesFromSelectedRow() {
+  const row = await waitFor('.selected.data-grid-data-grid-node');
+  return await getSizesFromRow(row);
+}
+
+async function getCategoryRow(text: string) {
+  return await waitFor(`//td[text()="${text}"]/ancestor::tr`, undefined, undefined, 'xpath');
+}
+
+export async function getSizesFromCategoryRow(text: string) {
+  const row = await getCategoryRow(text);
+  return await getSizesFromRow(row);
+}
+
+export async function getDistanceFromCategoryRow(text: string) {
+  const row = await getCategoryRow(text);
+  const numericColumns = await $$('.numeric-column', row);
+  return await numericColumns[0].evaluate(e => parseInt(e.textContent as string, 10));
+}
+
+export async function clickOnContextMenuForRetainer(retainerName: string, menuItem: string) {
+  const retainersPane = await waitFor('.retaining-paths-view');
+  const element = await waitFor(`//span[text()="${retainerName}"]`, retainersPane, undefined, 'xpath');
+  await clickElement(element, {clickOptions: {button: 'right'}});
+  const button = await waitForAria(menuItem);
+  await clickElement(button);
+}
+
+export async function restoreIgnoredRetainers() {
+  const element = await waitFor('button[aria-label="Restore ignored retainers"]');
+  await clickElement(element);
 }

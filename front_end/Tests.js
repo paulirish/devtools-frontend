@@ -316,7 +316,7 @@
    * Tests that Recorder tab can be open.
    */
   TestSuite.prototype.testShowRecorderTab = function() {
-    this.showPanel('chrome_recorder')
+    this.showPanel('chrome-recorder')
         .then(() => {
           this.releaseControl();
         })
@@ -802,7 +802,7 @@
       this.releaseControl();
     });
 
-    Common.Settings.moduleSetting('activeKeybindSet').set('vsCode');
+    Common.Settings.moduleSetting('active-keybind-set').set('vsCode');
   };
 
   TestSuite.prototype.testDispatchKeyEventDoesNotCrash = function() {
@@ -989,7 +989,7 @@
     }
 
     const captureFilmStripSetting =
-        Common.Settings.Settings.instance().createSetting('timelineCaptureFilmStrip', false);
+        Common.Settings.Settings.instance().createSetting('timeline-capture-film-strip', false);
     captureFilmStripSetting.set(true);
     test.evaluateInConsole_(performActionsInPage.toString(), function() {});
     test.invokeAsyncWithTimeline_('performActionsInPage', onTimelineDone);
@@ -1008,11 +1008,11 @@
         frame.imageDataPromise().then(onGotImageData);
       }
 
-      function onGotImageData(data) {
+      function onGotImageData(dataUri) {
         const image = new Image();
-        test.assertTrue(Boolean(data), 'No image data for frame');
+        test.assertTrue(Boolean(dataUri), 'No image data for frame');
         image.addEventListener('load', onLoad);
-        image.src = 'data:image/jpg;base64,' + data;
+        image.src = dataUri;
       }
 
       function onLoad(event) {

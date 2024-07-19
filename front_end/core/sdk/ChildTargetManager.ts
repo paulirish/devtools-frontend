@@ -116,8 +116,7 @@ export class ChildTargetManager extends SDKModel<EventTypes> implements Protocol
     this.dispatchEventToListeners(Events.TargetDestroyed, targetId);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  targetCrashed({targetId, status, errorCode}: Protocol.Target.TargetCrashedEvent): void {
+  targetCrashed(_event: Protocol.Target.TargetCrashedEvent): void {
   }
 
   private fireAvailableTargetsChanged(): void {
@@ -173,6 +172,8 @@ export class ChildTargetManager extends SDKModel<EventTypes> implements Protocol
       type = Type.Frame;
     } else if (targetInfo.type === 'worker') {
       type = Type.Worker;
+    } else if (targetInfo.type === 'worklet') {
+      type = Type.Worklet;
     } else if (targetInfo.type === 'shared_worker') {
       type = Type.SharedWorker;
     } else if (targetInfo.type === 'shared_storage_worklet') {
@@ -256,9 +257,7 @@ export class ChildTargetManager extends SDKModel<EventTypes> implements Protocol
                                    }) => Promise<void>);
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum Events {
+export const enum Events {
   TargetCreated = 'TargetCreated',
   TargetDestroyed = 'TargetDestroyed',
   TargetInfoChanged = 'TargetInfoChanged',

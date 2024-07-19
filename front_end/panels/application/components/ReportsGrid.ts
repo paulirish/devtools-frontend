@@ -6,7 +6,6 @@ import * as i18n from '../../../core/i18n/i18n.js';
 import * as Root from '../../../core/root/root.js';
 import type * as Protocol from '../../../generated/protocol.js';
 import * as DataGrid from '../../../ui/components/data_grid/data_grid.js';
-import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as IconButton from '../../../ui/components/icon_button/icon_button.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
@@ -55,7 +54,7 @@ export class ReportsGridStatusHeader extends HTMLElement {
     render(html`
       ${i18nString(UIStrings.status)}
       <x-link href="https://web.dev/reporting-api/#report-status"
-      jslog=${VisualLogging.link().track({click: true}).context('report-status')}>
+      jslog=${VisualLogging.link('report-status').track({click: true})}>
         <${IconButton.Icon.Icon.litTagName} class="inline-icon" .data=${{
           iconName: 'help',
           color: 'var(--icon-link)',
@@ -81,7 +80,7 @@ export class ReportsGrid extends HTMLElement {
 
   connectedCallback(): void {
     this.#shadow.adoptedStyleSheets = [reportingApiGridStyles];
-    this.#protocolMonitorExperimentEnabled = Root.Runtime.experiments.isEnabled('protocolMonitor');
+    this.#protocolMonitorExperimentEnabled = Root.Runtime.experiments.isEnabled('protocol-monitor');
     this.#render();
   }
 
@@ -151,7 +150,7 @@ export class ReportsGrid extends HTMLElement {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     render(html`
-      <div class="reporting-container" jslog=${VisualLogging.section().context('reports')}>
+      <div class="reporting-container" jslog=${VisualLogging.section('reports')}>
         <div class="reporting-header">${i18n.i18n.lockedString('Reports')}</div>
         ${this.#reports.length > 0 ? html`
           <${DataGrid.DataGridController.DataGridController.litTagName} .data=${
@@ -182,9 +181,8 @@ export class ReportsGrid extends HTMLElement {
   }
 }
 
-ComponentHelpers.CustomElements.defineComponent(
-    'devtools-resources-reports-grid-status-header', ReportsGridStatusHeader);
-ComponentHelpers.CustomElements.defineComponent('devtools-resources-reports-grid', ReportsGrid);
+customElements.define('devtools-resources-reports-grid-status-header', ReportsGridStatusHeader);
+customElements.define('devtools-resources-reports-grid', ReportsGrid);
 
 declare global {
   interface HTMLElementTagNameMap {

@@ -112,7 +112,7 @@ export class TimelineHistoryManager {
     this.allOverviews = [
       {
 
-        constructor: (traceParsedData): TimelineEventOverviewResponsiveness => {
+        constructor: traceParsedData => {
           const responsivenessOverviewFromMinimap =
               this.#minimapComponent?.getControls().find(
                   control => control instanceof TimelineEventOverviewResponsiveness) as
@@ -122,7 +122,7 @@ export class TimelineHistoryManager {
         height: 3,
       },
       {
-        constructor: (traceParsedData): TimelineEventOverviewCPUActivity => {
+        constructor: traceParsedData => {
           const cpuOverviewFromMinimap =
               this.#minimapComponent?.getControls().find(
                   control => control instanceof TimelineEventOverviewCPUActivity) as TimelineEventOverviewCPUActivity;
@@ -134,7 +134,7 @@ export class TimelineHistoryManager {
         height: 20,
       },
       {
-        constructor: (traceParsedData): TimelineEventOverviewNetwork => {
+        constructor: traceParsedData => {
           const networkOverviewFromMinimap =
               this.#minimapComponent?.getControls().find(control => control instanceof TimelineEventOverviewNetwork) as
               TimelineEventOverviewNetwork;
@@ -344,7 +344,7 @@ export class TimelineHistoryManager {
     if (!lastFrame) {
       return container;
     }
-    void UI.UIUtils.loadImageFromData(lastFrame.screenshotAsString).then(img => {
+    void UI.UIUtils.loadImage(lastFrame.screenshotEvent.args.dataUri).then(img => {
       if (img) {
         container.appendChild(img);
       }
@@ -409,7 +409,7 @@ export class DropDown implements UI.ListControl.ListDelegate<number> {
     this.glassPane.setAnchorBehavior(UI.GlassPane.AnchorBehavior.PreferBottom);
     this.glassPane.element.addEventListener('blur', () => this.close(null));
 
-    const shadowRoot = UI.Utils.createShadowRootWithCoreStyles(this.glassPane.contentElement, {
+    const shadowRoot = UI.UIUtils.createShadowRootWithCoreStyles(this.glassPane.contentElement, {
       cssFile: [timelineHistoryManagerStyles],
       delegatesFocus: undefined,
     });

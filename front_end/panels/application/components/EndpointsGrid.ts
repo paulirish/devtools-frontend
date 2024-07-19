@@ -5,7 +5,6 @@
 import * as i18n from '../../../core/i18n/i18n.js';
 import type * as Protocol from '../../../generated/protocol.js';
 import * as DataGrid from '../../../ui/components/data_grid/data_grid.js';
-import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
@@ -74,7 +73,7 @@ export class EndpointsGrid extends HTMLElement {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     render(html`
-      <div class="reporting-container" jslog=${VisualLogging.section().context('endpoints')}>
+      <div class="reporting-container" jslog=${VisualLogging.section('endpoints')}>
         <div class="reporting-header">${i18n.i18n.lockedString('Endpoints')}</div>
         ${this.#endpoints.size > 0 ? html`
           <${DataGrid.DataGridController.DataGridController.litTagName} .data=${
@@ -105,7 +104,7 @@ export class EndpointsGrid extends HTMLElement {
   }
 }
 
-ComponentHelpers.CustomElements.defineComponent('devtools-resources-endpoints-grid', EndpointsGrid);
+customElements.define('devtools-resources-endpoints-grid', EndpointsGrid);
 
 declare global {
   interface HTMLElementTagNameMap {

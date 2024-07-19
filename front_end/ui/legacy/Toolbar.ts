@@ -47,8 +47,7 @@ import {type Suggestion} from './SuggestBox.js';
 import {Events as TextPromptEvents, TextPrompt} from './TextPrompt.js';
 import toolbarStyles from './toolbar.css.legacy.js';
 import {Tooltip} from './Tooltip.js';
-import {CheckboxLabel, LongClickController} from './UIUtils.js';
-import * as Utils from './utils/utils.js';
+import {CheckboxLabel, createShadowRootWithCoreStyles, LongClickController} from './UIUtils.js';
 
 const UIStrings = {
   /**
@@ -81,8 +80,7 @@ export class Toolbar {
     this.element.className = className;
     this.element.classList.add('toolbar');
     this.enabled = true;
-    this.shadowRoot =
-        Utils.createShadowRootWithCoreStyles(this.element, {cssFile: toolbarStyles, delegatesFocus: undefined});
+    this.shadowRoot = createShadowRootWithCoreStyles(this.element, {cssFile: toolbarStyles, delegatesFocus: undefined});
     this.contentElement = this.shadowRoot.createChild('div', 'toolbar-shadow');
   }
 
@@ -224,16 +222,12 @@ export class Toolbar {
       button.setText(options.label?.() || action.title());
     }
 
-    let handler = (_event: {
-      // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      data: any,
-    }): void => {
+    let handler = (): void => {
       void action.execute();
     };
     if (options.userActionCode) {
       const actionCode = options.userActionCode;
-      handler = (): void => {
+      handler = () => {
         Host.userMetrics.actionTaken(actionCode);
         void action.execute();
       };
@@ -657,9 +651,7 @@ export class ToolbarButton extends ToolbarItem<ToolbarButton.EventTypes> {
 }
 
 export namespace ToolbarButton {
-  // TODO(crbug.com/1167717): Make this a const enum again
-  // eslint-disable-next-line rulesdir/const_enum
-  export enum Events {
+  export const enum Events {
     Click = 'Click',
     MouseDown = 'MouseDown',
   }
@@ -693,7 +685,7 @@ export class ToolbarInput extends ToolbarItem<ToolbarInput.EventTypes> {
     this.proxyElement.classList.add('toolbar-prompt-proxy');
     this.proxyElement.addEventListener('keydown', (event: Event) => this.onKeydownCallback(event as KeyboardEvent));
     this.prompt.initialize(
-        completions || ((): Promise<never[]> => Promise.resolve([])),
+        completions || (() => Promise.resolve([])),
         ' ',
         dynamicCompletions,
     );
@@ -765,9 +757,7 @@ export class ToolbarInput extends ToolbarItem<ToolbarInput.EventTypes> {
 }
 
 export namespace ToolbarInput {
-  // TODO(crbug.com/1167717): Make this a const enum again
-  // eslint-disable-next-line rulesdir/const_enum
-  export enum Event {
+  export const enum Event {
     TextChanged = 'TextChanged',
     EnterPressed = 'EnterPressed',
   }
@@ -831,6 +821,9 @@ export class ToolbarMenuButton extends ToolbarButton {
   private triggerTimeout?: number;
   constructor(contextMenuHandler: (arg0: ContextMenu) => void, useSoftMenu?: boolean, jslogContext?: string) {
     super('', 'dots-vertical', undefined, jslogContext);
+    if (jslogContext) {
+      this.element.setAttribute('jslog', `${VisualLogging.dropDown().track({click: true}).context(jslogContext)}`);
+    }
     this.contextMenuHandler = contextMenuHandler;
     this.useSoftMenu = Boolean(useSoftMenu);
     ARIAUtils.markAsMenuButton(this.element);
@@ -965,6 +958,8 @@ export class ToolbarComboBox extends ToolbarItem<void> {
     if (typeof value !== 'undefined') {
       option.value = value;
     }
+    const jslogContext = value ? Platform.StringUtilities.toKebabCase(value) : undefined;
+    option.setAttribute('jslog', `${VisualLogging.item(jslogContext).track({click: true})}`);
     return option;
   }
 
@@ -989,10 +984,7 @@ export class ToolbarComboBox extends ToolbarItem<void> {
   }
 
   select(option: Element): void {
-    this.selectElementInternal.selectedIndex =
-        // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        Array.prototype.indexOf.call((this.selectElementInternal as any), option);
+    this.selectElementInternal.selectedIndex = Array.prototype.indexOf.call(this.selectElementInternal, option);
   }
 
   setSelectedIndex(index: number): void {
@@ -1132,15 +1124,13 @@ export interface ToolbarItemRegistration {
   label?: () => Platform.UIString.LocalizedString;
   showLabel?: boolean;
   actionId?: string;
-  condition?: string;
+  condition?: Root.Runtime.Condition;
   loadItem?: (() => Promise<Provider>);
   experiment?: string;
   jslog?: string;
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum ToolbarItemLocation {
+export const enum ToolbarItemLocation {
   FILES_NAVIGATION_TOOLBAR = 'files-navigator-toolbar',
   MAIN_TOOLBAR_RIGHT = 'main-toolbar-right',
   MAIN_TOOLBAR_LEFT = 'main-toolbar-left',

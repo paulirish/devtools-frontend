@@ -89,6 +89,8 @@ export namespace PrivateAPI {
     RegisterRecorderExtensionPlugin = 'registerRecorderExtensionPlugin',
     CreateRecorderView = 'createRecorderView',
     ShowRecorderView = 'showRecorderView',
+    ShowNetworkPanel = 'showNetworkPanel',
+    ReportResourceLoad = 'reportResourceLoad',
   }
 
   export const enum LanguageExtensionPluginCommands {
@@ -226,6 +228,13 @@ export namespace PrivateAPI {
     stopId: unknown,
   };
   type GetWasmOpRequest = {command: Commands.GetWasmOp, op: number, stopId: unknown};
+  type ShowNetworkPanelRequest = {command: Commands.ShowNetworkPanel, filter: string|undefined};
+  type ReportResourceLoadRequest = {
+    command: Commands.ReportResourceLoad,
+    extensionId: string,
+    resourceUrl: string,
+    status: {success: boolean, errorMessage?: string, size?: number},
+  };
 
   export type ServerRequests = ShowRecorderViewRequest|CreateRecorderViewRequest|RegisterRecorderExtensionPluginRequest|
       RegisterLanguageExtensionPluginRequest|SubscribeRequest|UnsubscribeRequest|AddRequestHeadersRequest|
@@ -234,7 +243,7 @@ export namespace PrivateAPI {
       OpenResourceRequest|SetOpenResourceHandlerRequest|SetThemeChangeHandlerRequest|ReloadRequest|
       EvaluateOnInspectedPageRequest|GetRequestContentRequest|GetResourceContentRequest|SetResourceContentRequest|
       ForwardKeyboardEventRequest|GetHARRequest|GetPageResourcesRequest|GetWasmLinearMemoryRequest|GetWasmLocalRequest|
-      GetWasmGlobalRequest|GetWasmOpRequest;
+      GetWasmGlobalRequest|GetWasmOpRequest|ShowNetworkPanelRequest|ReportResourceLoadRequest;
   export type ExtensionServerRequestMessage = PrivateAPI.ServerRequests&{requestId?: number};
 
   type AddRawModuleRequest = {
@@ -360,12 +369,7 @@ namespace APIImpl {
     nextObjectId(): string;
   }
 
-  // We cannot use the stronger `unknown` type in place of `any` in the following type definition. The type is used as
-  // the right-hand side of `extends` in a few places, which doesn't narrow `unknown`. Without narrowing, overload
-  // resolution and meaningful type inference of arguments break, for example.
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  export type Callable = (...args: any) => void;
+  export type Callable = (...args: any[]) => void;
 
   export interface EventSink<ListenerT extends Callable> extends PublicAPI.Chrome.DevTools.EventSink<ListenerT> {
     _type: string;
@@ -575,12 +579,13 @@ self.injectedExtensionAPI = function(
   };
 
   function Panels(this: APIImpl.Panels): void {
-    const panels: {[key: string]: ElementsPanel|SourcesPanel} = {
+    const panels: {[key: string]: ElementsPanel|SourcesPanel|PublicAPI.Chrome.DevTools.NetworkPanel} = {
       elements: new ElementsPanel(),
       sources: new SourcesPanel(),
+      network: new (Constructor(NetworkPanel))(),
     };
 
-    function panelGetter(name: string): ElementsPanel|SourcesPanel {
+    function panelGetter(name: string): ElementsPanel|SourcesPanel|PublicAPI.Chrome.DevTools.NetworkPanel {
       return panels[name];
     }
     for (const panel in panels) {
@@ -599,7 +604,7 @@ self.injectedExtensionAPI = function(
       const id = 'extension-panel-' + extensionServer.nextObjectId();
       extensionServer.sendRequest(
           {command: PrivateAPI.Commands.CreatePanel, id, title, page},
-          callback && ((): unknown => callback.call(this, new (Constructor(ExtensionPanel))(id))));
+          callback && (() => callback.call(this, new (Constructor(ExtensionPanel))(id))));
     },
 
     setOpenResourceHandler: function(
@@ -932,6 +937,31 @@ self.injectedExtensionAPI = function(
           return new Promise(
               resolve => extensionServer.sendRequest({command: PrivateAPI.Commands.GetWasmOp, op, stopId}, resolve));
         },
+
+    reportResourceLoad: function(resourceUrl: string, status: {success: boolean, errorMessage?: string, size?: number}):
+        Promise<void> {
+          return new Promise(
+              resolve => extensionServer.sendRequest(
+                  {
+                    command: PrivateAPI.Commands.ReportResourceLoad,
+                    extensionId: window.location.origin,
+                    resourceUrl,
+                    status,
+                  },
+                  resolve));
+        },
+
+  };
+
+  function NetworkPanelImpl(this: PublicAPI.Chrome.DevTools.NetworkPanel): void {
+  }
+
+  (NetworkPanelImpl.prototype as Pick<PublicAPI.Chrome.DevTools.NetworkPanel, 'show'>) = {
+    show: function(options?: {filter: string}): Promise<void> {
+      return new Promise<void>(
+          resolve => extensionServer.sendRequest(
+              {command: PrivateAPI.Commands.ShowNetworkPanel, filter: options?.filter}, () => resolve()));
+    },
   };
 
   function declareInterfaceClass<ImplT extends APIImpl.Callable>(implConstructor: ImplT): (
@@ -971,6 +1001,7 @@ self.injectedExtensionAPI = function(
   const PanelWithSidebarClass = declareInterfaceClass(PanelWithSidebarImpl);
   const Request = declareInterfaceClass(RequestImpl);
   const Resource = declareInterfaceClass(ResourceImpl);
+  const NetworkPanel = declareInterfaceClass(NetworkPanelImpl);
 
   class ElementsPanel extends (Constructor(PanelWithSidebarClass)) {
     constructor() {

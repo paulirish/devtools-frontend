@@ -42,13 +42,13 @@ export class NetworkWaterfallColumn extends UI.Widget.VBox {
   private nodes: NetworkNode[];
   private hoveredNode: NetworkNode|null;
   private eventDividers: Map<string, number[]>;
-  private readonly styleForTimeRangeName: Map<RequestTimeRangeNames, _LayerStyle>;
-  private readonly styleForWaitingResourceType: Map<Common.ResourceType.ResourceType, _LayerStyle>;
-  private readonly styleForDownloadingResourceType: Map<Common.ResourceType.ResourceType, _LayerStyle>;
-  private readonly wiskerStyle: _LayerStyle;
-  private readonly hoverDetailsStyle: _LayerStyle;
-  private readonly pathForStyle: Map<_LayerStyle, Path2D>;
-  private textLayers: _TextLayer[];
+  private readonly styleForTimeRangeName: Map<RequestTimeRangeNames, LayerStyle>;
+  private readonly styleForWaitingResourceType: Map<Common.ResourceType.ResourceType, LayerStyle>;
+  private readonly styleForDownloadingResourceType: Map<Common.ResourceType.ResourceType, LayerStyle>;
+  private readonly wiskerStyle: LayerStyle;
+  private readonly hoverDetailsStyle: LayerStyle;
+  private readonly pathForStyle: Map<LayerStyle, Path2D>;
+  private textLayers: TextLayer[];
 
   constructor(calculator: NetworkTimeCalculator) {
     // TODO(allada) Make this a shadowDOM when the NetworkWaterfallColumn gets moved into NetworkLogViewColumns.
@@ -78,7 +78,8 @@ export class NetworkWaterfallColumn extends UI.Widget.VBox {
     this.startTime = this.calculator.minimumBoundary();
     this.endTime = this.calculator.maximumBoundary();
 
-    this.popoverHelper = new UI.PopoverHelper.PopoverHelper(this.element, this.getPopoverRequest.bind(this));
+    this.popoverHelper =
+        new UI.PopoverHelper.PopoverHelper(this.element, this.getPopoverRequest.bind(this), 'network.timing');
     this.popoverHelper.setHasPadding(true);
     this.popoverHelper.setTimeout(300, 300);
 
@@ -106,36 +107,45 @@ export class NetworkWaterfallColumn extends UI.Widget.VBox {
     this.textLayers = [];
   }
 
-  private static buildRequestTimeRangeStyle(): Map<RequestTimeRangeNames, _LayerStyle> {
-    const types = RequestTimeRangeNames;
-    const styleMap = new Map<RequestTimeRangeNames, _LayerStyle>();
-    styleMap.set(types.Connecting, {fillStyle: RequestTimeRangeNameToColor[types.Connecting]});
-    styleMap.set(types.SSL, {fillStyle: RequestTimeRangeNameToColor[types.SSL]});
-    styleMap.set(types.DNS, {fillStyle: RequestTimeRangeNameToColor[types.DNS]});
-    styleMap.set(types.Proxy, {fillStyle: RequestTimeRangeNameToColor[types.Proxy]});
-    styleMap.set(types.Blocking, {fillStyle: RequestTimeRangeNameToColor[types.Blocking]});
-    styleMap.set(types.Push, {fillStyle: RequestTimeRangeNameToColor[types.Push]});
+  private static buildRequestTimeRangeStyle(): Map<RequestTimeRangeNames, LayerStyle> {
+    const styleMap = new Map<RequestTimeRangeNames, LayerStyle>();
     styleMap.set(
-        types.Queueing,
-        {fillStyle: RequestTimeRangeNameToColor[types.Queueing], lineWidth: 2, borderColor: 'lightgrey'});
+        RequestTimeRangeNames.Connecting, {fillStyle: RequestTimeRangeNameToColor[RequestTimeRangeNames.Connecting]});
+    styleMap.set(RequestTimeRangeNames.SSL, {fillStyle: RequestTimeRangeNameToColor[RequestTimeRangeNames.SSL]});
+    styleMap.set(RequestTimeRangeNames.DNS, {fillStyle: RequestTimeRangeNameToColor[RequestTimeRangeNames.DNS]});
+    styleMap.set(RequestTimeRangeNames.Proxy, {fillStyle: RequestTimeRangeNameToColor[RequestTimeRangeNames.Proxy]});
+    styleMap.set(
+        RequestTimeRangeNames.Blocking, {fillStyle: RequestTimeRangeNameToColor[RequestTimeRangeNames.Blocking]});
+    styleMap.set(RequestTimeRangeNames.Push, {fillStyle: RequestTimeRangeNameToColor[RequestTimeRangeNames.Push]});
+    styleMap.set(RequestTimeRangeNames.Queueing, {
+      fillStyle: RequestTimeRangeNameToColor[RequestTimeRangeNames.Queueing],
+      lineWidth: 2,
+      borderColor: 'lightgrey',
+    });
     // This ensures we always show at least 2 px for a request.
-    styleMap.set(types.Receiving, {
-      fillStyle: RequestTimeRangeNameToColor[types.Receiving],
+    styleMap.set(RequestTimeRangeNames.Receiving, {
+      fillStyle: RequestTimeRangeNameToColor[RequestTimeRangeNames.Receiving],
       lineWidth: 2,
       borderColor: '#03A9F4',
     });
-    styleMap.set(types.Waiting, {fillStyle: RequestTimeRangeNameToColor[types.Waiting]});
-    styleMap.set(types.ReceivingPush, {fillStyle: RequestTimeRangeNameToColor[types.ReceivingPush]});
-    styleMap.set(types.ServiceWorker, {fillStyle: RequestTimeRangeNameToColor[types.ServiceWorker]});
     styleMap.set(
-        types.ServiceWorkerPreparation, {fillStyle: RequestTimeRangeNameToColor[types.ServiceWorkerPreparation]});
-    styleMap.set(types.ServiceWorkerRespondWith, {
-      fillStyle: RequestTimeRangeNameToColor[types.ServiceWorkerRespondWith],
+        RequestTimeRangeNames.Waiting, {fillStyle: RequestTimeRangeNameToColor[RequestTimeRangeNames.Waiting]});
+    styleMap.set(
+        RequestTimeRangeNames.ReceivingPush,
+        {fillStyle: RequestTimeRangeNameToColor[RequestTimeRangeNames.ReceivingPush]});
+    styleMap.set(
+        RequestTimeRangeNames.ServiceWorker,
+        {fillStyle: RequestTimeRangeNameToColor[RequestTimeRangeNames.ServiceWorker]});
+    styleMap.set(
+        RequestTimeRangeNames.ServiceWorkerPreparation,
+        {fillStyle: RequestTimeRangeNameToColor[RequestTimeRangeNames.ServiceWorkerPreparation]});
+    styleMap.set(RequestTimeRangeNames.ServiceWorkerRespondWith, {
+      fillStyle: RequestTimeRangeNameToColor[RequestTimeRangeNames.ServiceWorkerRespondWith],
     });
     return styleMap;
   }
 
-  private static buildResourceTypeStyle(): Map<Common.ResourceType.ResourceType, _LayerStyle>[] {
+  private static buildResourceTypeStyle(): Map<Common.ResourceType.ResourceType, LayerStyle>[] {
     const baseResourceTypeColors = new Map([
       ['document', 'hsl(215, 100%, 80%)'],
       ['font', 'hsl(8, 100%, 80%)'],
@@ -149,8 +159,8 @@ export class NetworkWaterfallColumn extends UI.Widget.VBox {
       ['fetch', 'hsl(53, 100%, 80%)'],
       ['other', 'hsl(0, 0%, 95%)'],
     ]);
-    const waitingStyleMap = new Map<Common.ResourceType.ResourceType, _LayerStyle>();
-    const downloadingStyleMap = new Map<Common.ResourceType.ResourceType, _LayerStyle>();
+    const waitingStyleMap = new Map<Common.ResourceType.ResourceType, LayerStyle>();
+    const downloadingStyleMap = new Map<Common.ResourceType.ResourceType, LayerStyle>();
 
     for (const resourceType of Object.values(Common.ResourceType.resourceTypes)) {
       let color = baseResourceTypeColors.get(resourceType.name());
@@ -228,7 +238,8 @@ export class NetworkWaterfallColumn extends UI.Widget.VBox {
     if (!request) {
       return null;
     }
-    const useTimingBars = !Common.Settings.Settings.instance().moduleSetting('networkColorCodeResourceTypes').get() &&
+    const useTimingBars =
+        !Common.Settings.Settings.instance().moduleSetting('network-color-code-resource-types').get() &&
         !this.calculator.startAtZero;
     let range;
     let start;
@@ -270,7 +281,7 @@ export class NetworkWaterfallColumn extends UI.Widget.VBox {
 
     return {
       box: anchorBox,
-      show: (popover: UI.GlassPane.GlassPane): Promise<true> => {
+      show: (popover: UI.GlassPane.GlassPane) => {
         const content =
             RequestTimingView.createTimingTable((request as SDK.NetworkRequest.NetworkRequest), this.calculator);
         popover.registerCSSFiles([networkingTimingTableStyles]);
@@ -386,7 +397,8 @@ export class NetworkWaterfallColumn extends UI.Widget.VBox {
   }
 
   private draw(): void {
-    const useTimingBars = !Common.Settings.Settings.instance().moduleSetting('networkColorCodeResourceTypes').get() &&
+    const useTimingBars =
+        !Common.Settings.Settings.instance().moduleSetting('network-color-code-resource-types').get() &&
         !this.calculator.startAtZero;
     const nodes = this.nodes;
     const context = (this.canvas.getContext('2d') as CanvasRenderingContext2D | null);
@@ -445,7 +457,7 @@ export class NetworkWaterfallColumn extends UI.Widget.VBox {
 
   private drawLayers(context: CanvasRenderingContext2D, useTimingBars: boolean): void {
     for (const entry of this.pathForStyle) {
-      const style = (entry[0] as _LayerStyle);
+      const style = (entry[0] as LayerStyle);
       const path = (entry[1] as Path2D);
       context.save();
       context.beginPath();
@@ -482,15 +494,14 @@ export class NetworkWaterfallColumn extends UI.Widget.VBox {
   }
 
   private getBarHeight(type?: RequestTimeRangeNames): number {
-    const types = RequestTimeRangeNames;
     switch (type) {
-      case types.Connecting:
-      case types.SSL:
-      case types.DNS:
-      case types.Proxy:
-      case types.Blocking:
-      case types.Push:
-      case types.Queueing:
+      case RequestTimeRangeNames.Connecting:
+      case RequestTimeRangeNames.SSL:
+      case RequestTimeRangeNames.DNS:
+      case RequestTimeRangeNames.Proxy:
+      case RequestTimeRangeNames.Blocking:
+      case RequestTimeRangeNames.Push:
+      case RequestTimeRangeNames.Queueing:
         return 7;
       default:
         return 13;
@@ -523,12 +534,12 @@ export class NetworkWaterfallColumn extends UI.Widget.VBox {
     const height = this.getBarHeight();
     y += Math.floor(this.rowHeight / 2 - height / 2 + borderWidth) - borderWidth / 2;
 
-    const waitingStyle = (this.styleForWaitingResourceType.get(request.resourceType()) as _LayerStyle);
+    const waitingStyle = (this.styleForWaitingResourceType.get(request.resourceType()) as LayerStyle);
     const waitingPath = (this.pathForStyle.get(waitingStyle) as Path2D);
     waitingPath.rect(ranges.start, y, ranges.mid - ranges.start, height - borderWidth);
 
     const barWidth = Math.max(2, ranges.end - ranges.mid);
-    const downloadingStyle = (this.styleForDownloadingResourceType.get(request.resourceType()) as _LayerStyle);
+    const downloadingStyle = (this.styleForDownloadingResourceType.get(request.resourceType()) as LayerStyle);
     const downloadingPath = (this.pathForStyle.get(downloadingStyle) as Path2D);
     downloadingPath.rect(ranges.mid, y, barWidth, height - borderWidth);
 
@@ -600,7 +611,7 @@ export class NetworkWaterfallColumn extends UI.Widget.VBox {
         continue;
       }
 
-      const style = (this.styleForTimeRangeName.get(range.name) as _LayerStyle);
+      const style = (this.styleForTimeRangeName.get(range.name) as LayerStyle);
       const path = (this.pathForStyle.get(style) as Path2D);
       const lineWidth = style.lineWidth || 0;
       const height = this.getBarHeight(range.name);
@@ -622,17 +633,14 @@ export class NetworkWaterfallColumn extends UI.Widget.VBox {
     context.restore();
   }
 }
-// TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-// eslint-disable-next-line @typescript-eslint/naming-convention
-export interface _TextLayer {
+
+interface TextLayer {
   x: number;
   y: number;
   text: string;
 }
 
-// TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-// eslint-disable-next-line @typescript-eslint/naming-convention
-export interface _LayerStyle {
+interface LayerStyle {
   fillStyle?: string;
   lineWidth?: number;
   borderColor?: string;

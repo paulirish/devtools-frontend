@@ -13,6 +13,7 @@ import * as Workspace from '../../models/workspace/workspace.js';
 import * as QuickOpen from '../../ui/legacy/components/quick_open/quick_open.js';
 import * as SourceFrame from '../../ui/legacy/components/source_frame/source_frame.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import * as Components from './components/components.js';
 import {EditingLocationHistoryManager} from './EditingLocationHistoryManager.js';
@@ -62,7 +63,6 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
   private readonly scriptViewToolbar: UI.Toolbar.Toolbar;
   private readonly bottomToolbarInternal: UI.Toolbar.Toolbar;
   private toolbarChangedListener: Common.EventTarget.EventDescriptor|null;
-  private readonly shortcuts: Map<number, () => boolean>;
   private readonly focusedPlaceholderElement?: HTMLElement;
   private searchView?: UISourceCodeFrame;
   private searchConfig?: UI.SearchableView.SearchConfig;
@@ -71,20 +71,21 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
     super();
 
     this.element.id = 'sources-panel-sources-view';
+    this.element.setAttribute('jslog', `${VisualLogging.pane('editor').track({keydown: 'Escape'})}`);
     this.setMinimumAndPreferredSizes(88, 52, 150, 100);
 
     this.selectedIndex = 0;
 
     const workspace = Workspace.Workspace.WorkspaceImpl.instance();
 
-    this.searchableViewInternal = new UI.SearchableView.SearchableView(this, this, 'sourcesViewSearchConfig');
+    this.searchableViewInternal = new UI.SearchableView.SearchableView(this, this, 'sources-view-search-config');
     this.searchableViewInternal.setMinimalSearchQuerySize(0);
     this.searchableViewInternal.show(this.element);
 
     this.sourceViewByUISourceCode = new Map();
 
     this.editorContainer = new TabbedEditorContainer(
-        this, Common.Settings.Settings.instance().createLocalSetting('previouslyViewedFiles', []),
+        this, Common.Settings.Settings.instance().createLocalSetting('previously-viewed-files', []),
         this.placeholderElement(), this.focusedPlaceholderElement);
     this.editorContainer.show(this.searchableViewInternal.element);
     this.editorContainer.addEventListener(TabbedEditorContainerEvents.EditorSelected, this.editorSelected, this);
@@ -93,6 +94,7 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
     this.historyManager = new EditingLocationHistoryManager(this);
 
     this.toolbarContainerElementInternal = this.element.createChild('div', 'sources-toolbar');
+    this.toolbarContainerElementInternal.setAttribute('jslog', `${VisualLogging.toolbar('bottom')}`);
     this.scriptViewToolbar = new UI.Toolbar.Toolbar('', this.toolbarContainerElementInternal);
     this.scriptViewToolbar.element.style.flex = 'auto';
     this.bottomToolbarInternal = new UI.Toolbar.Toolbar('', this.toolbarContainerElementInternal);
@@ -138,15 +140,12 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
     if (!window.opener) {
       window.addEventListener('beforeunload', handleBeforeUnload, true);
     }
-
-    this.shortcuts = new Map();
-    this.element.addEventListener('keydown', this.handleKeyDown.bind(this), false);
   }
 
   private placeholderElement(): Element {
     const shortcuts = [
-      {actionId: 'quickOpen.show', description: i18nString(UIStrings.openFile)},
-      {actionId: 'commandMenu.show', description: i18nString(UIStrings.runCommand)},
+      {actionId: 'quick-open.show', description: i18nString(UIStrings.openFile)},
+      {actionId: 'quick-open.show-command-menu', description: i18nString(UIStrings.runCommand)},
       {
         actionId: 'sources.add-folder-to-workspace',
         description: i18nString(UIStrings.workspaceDropInAFolderToSyncSources),
@@ -219,21 +218,6 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
     return this.bottomToolbarInternal;
   }
 
-  private registerShortcuts(keys: UI.KeyboardShortcut.Descriptor[], handler: (arg0?: Event|undefined) => boolean):
-      void {
-    for (let i = 0; i < keys.length; ++i) {
-      this.shortcuts.set(keys[i].key, handler);
-    }
-  }
-
-  private handleKeyDown(event: Event): void {
-    const shortcutKey = UI.KeyboardShortcut.KeyboardShortcut.makeKeyFromEvent((event as KeyboardEvent));
-    const handler = this.shortcuts.get(shortcutKey);
-    if (handler && handler()) {
-      event.consume(true);
-    }
-  }
-
   override wasShown(): void {
     super.wasShown();
     this.registerCSSFiles([sourcesViewStyles]);
@@ -289,6 +273,9 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
   #onScopeChange(): void {
     const workspace = Workspace.Workspace.WorkspaceImpl.instance();
     for (const uiSourceCode of workspace.uiSourceCodes()) {
+      if (uiSourceCode.project().type() !== Workspace.Workspace.projectTypes.Network) {
+        continue;
+      }
       const target = Bindings.NetworkProject.NetworkProject.targetForUISourceCode(uiSourceCode);
       if (SDK.TargetManager.TargetManager.instance().isInScope(target)) {
         this.addUISourceCode(uiSourceCode);
@@ -304,17 +291,23 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
   }
 
   private addUISourceCode(uiSourceCode: Workspace.UISourceCode.UISourceCode): void {
-    if (uiSourceCode.project().isServiceProject()) {
+    const project = uiSourceCode.project();
+    if (project.isServiceProject()) {
       return;
     }
-    if (uiSourceCode.project().type() === Workspace.Workspace.projectTypes.FileSystem &&
-        Persistence.FileSystemWorkspaceBinding.FileSystemWorkspaceBinding.fileSystemType(uiSourceCode.project()) ===
-            'overrides') {
-      return;
-    }
-    const target = Bindings.NetworkProject.NetworkProject.targetForUISourceCode(uiSourceCode);
-    if (!SDK.TargetManager.TargetManager.instance().isInScope(target)) {
-      return;
+    switch (project.type()) {
+      case Workspace.Workspace.projectTypes.FileSystem: {
+        if (Persistence.FileSystemWorkspaceBinding.FileSystemWorkspaceBinding.fileSystemType(project) === 'overrides') {
+          return;
+        }
+        break;
+      }
+      case Workspace.Workspace.projectTypes.Network: {
+        const target = Bindings.NetworkProject.NetworkProject.targetForUISourceCode(uiSourceCode);
+        if (!SDK.TargetManager.TargetManager.instance().isInScope(target)) {
+          return;
+        }
+      }
     }
     this.editorContainer.addUISourceCode(uiSourceCode);
   }
@@ -628,12 +621,10 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
   }
 }
 
-export  // TODO(crbug.com/1167717): Make this a const enum again
-    // eslint-disable-next-line rulesdir/const_enum
-    enum Events {
-      EditorClosed = 'EditorClosed',
-      EditorSelected = 'EditorSelected',
-    }
+export const enum Events {
+  EditorClosed = 'EditorClosed',
+  EditorSelected = 'EditorSelected',
+}
 
 export interface EditorClosedEvent {
   uiSourceCode: Workspace.UISourceCode.UISourceCode;
@@ -752,8 +743,7 @@ export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
 
 const HEADER_OVERRIDES_FILENAME = '.headers';
 
-// eslint-disable-next-line rulesdir/const_enum
-enum SourceViewType {
+const enum SourceViewType {
   ImageView = 'ImageView',
   FontView = 'FontView',
   HeadersView = 'HeadersView',

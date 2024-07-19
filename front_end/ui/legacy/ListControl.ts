@@ -23,8 +23,6 @@ export interface ListDelegate<T> {
   updateSelectedItemARIA(fromElement: Element|null, toElement: Element|null): boolean;
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
 export enum ListMode {
   NonViewport = 'UI.ListMode.NonViewport',
   EqualHeightItems = 'UI.ListMode.EqualHeightItems',
@@ -362,7 +360,10 @@ export class ListControl<T> {
     let element = this.itemToElement.get(item);
     if (!element) {
       element = this.delegate.createElementForItem(item);
-      element.setAttribute('jslog', `${VisualLogging.item().track({click: true})}`);
+      if (!element.hasAttribute('jslog')) {
+        element.setAttribute(
+            'jslog', `${VisualLogging.item().track({click: true, keydown: 'ArrowUp|ArrowDown|PageUp|PageDown'})}`);
+      }
       this.itemToElement.set(item, element);
       this.updateElementARIA(element, index);
     }

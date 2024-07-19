@@ -32,10 +32,14 @@ const compositorTileWorkers = Array<{
   pid: Types.TraceEvents.ProcessID,
   tid: Types.TraceEvents.ThreadID,
 }>();
-const entryToNode: Map<Types.TraceEvents.TraceEntry, Helpers.TreeHelpers.TraceEntryNode> = new Map();
-let allTraceEntries: Types.TraceEvents.TraceEntry[] = [];
+const entryToNode: Map<Types.TraceEvents.SyntheticTraceEntry, Helpers.TreeHelpers.TraceEntryNode> = new Map();
+let allTraceEntries: Types.TraceEvents.SyntheticTraceEntry[] = [];
+const flowStartById:
+    Map<number, {flowStart: Types.TraceEvents.TraceEventData, flowEnd: Types.TraceEvents.TraceEventData}> = new Map();
+// For a given event, tell me what its initiator was (via flow events). An event can only have one initiator.
+const endToBeginViaFlow = new Map<Types.TraceEvents.TraceEventData, Types.TraceEvents.TraceEventData>();
 
-const completeEventStack: (Types.TraceEvents.TraceEventSyntheticCompleteEvent)[] = [];
+const completeEventStack: (Types.TraceEvents.SyntheticCompleteEvent)[] = [];
 
 let handlerState = HandlerState.UNINITIALIZED;
 let config: Types.Configuration.Configuration = Types.Configuration.DEFAULT;
@@ -68,6 +72,9 @@ export function handleUserConfig(userConfig: Types.Configuration.Configuration):
 export function reset(): void {
   processes.clear();
   entryToNode.clear();
+  flowStartById.clear();
+  endToBeginViaFlow.clear();
+
   allTraceEntries.length = 0;
   completeEventStack.length = 0;
   compositorTileWorkers.length = 0;
@@ -111,6 +118,31 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
     const thread = getOrCreateRendererThread(process, event.tid);
     thread.entries.push(event);
     allTraceEntries.push(event);
+    return;
+  }
+
+  if (event.ph === Types.TraceEvents.Phase.FLOW_START || event.ph === Types.TraceEvents.Phase.FLOW_END) {
+    const process = getOrCreateRendererProcess(processes, event.pid);
+    const thread = getOrCreateRendererThread(process, event.tid);
+    thread.entries.push(event);
+    allTraceEntries.push(event);
+
+    if (event.ph === Types.TraceEvents.Phase.FLOW_START) {
+      // const lastEvent = thread.entries.at(-1); // a bit of an assumption…
+      flowStartById.set(event.id, {flowStart: event});
+
+      // lastEvent.
+    } else if (event.ph === Types.TraceEvents.Phase.FLOW_END) {
+      // const flowCompletion = thread.entries.at(-1);
+      const {flowStart} = flowStartById.get(event.id);
+      flowStartById.set(event.id, {flowStart, flowEnd: event});
+      // if (flowCompletion) {
+      //   endToBeginViaFlow.set(flowCompletion, flowOpening);
+      //   // console.log('got pair', flowOpening, flowCompletion);
+      // } else {
+      //   console.log('NOOOOOOOOOOPE');
+      // }
+    }
   }
 }
 
@@ -123,6 +155,7 @@ export async function finalize(): Promise<void> {
   assignMeta(processes, mainFrameId, rendererProcessesByFrame, threadsInProcess);
   sanitizeProcesses(processes);
   buildHierarchy(processes);
+  mapFlows(processes);
   sanitizeThreads(processes);
   Helpers.Trace.sortTraceEventsInPlace(allTraceEntries);
   handlerState = HandlerState.FINALIZED;
@@ -138,6 +171,7 @@ export function data(): RendererHandlerData {
     compositorTileWorkers: new Map(gatherCompositorThreads()),
     entryToNode: new Map(entryToNode),
     allTraceEntries: [...allTraceEntries],
+    endToBeginViaFlow: new Map(endToBeginViaFlow),
   };
 }
 
@@ -314,6 +348,7 @@ export function sanitizeThreads(processes: Map<Types.TraceEvents.ProcessID, Rend
 export function buildHierarchy(
     processes: Map<Types.TraceEvents.ProcessID, RendererProcess>,
     options?: {filter: {has: (name: Types.TraceEvents.KnownEventName) => boolean}}): void {
+  const samplesData = samplesHandlerData();
   for (const [pid, process] of processes) {
     for (const [tid, thread] of process.threads) {
       if (!thread.entries.length) {
@@ -323,7 +358,7 @@ export function buildHierarchy(
       // Step 1. Massage the data.
       Helpers.Trace.sortTraceEventsInPlace(thread.entries);
       // Step 2. Inject profile calls from samples
-      const cpuProfile = samplesHandlerData().profilesInProcess.get(pid)?.get(tid)?.parsedProfile;
+      const cpuProfile = samplesData.profilesInProcess.get(pid)?.get(tid)?.parsedProfile;
       const samplesIntegrator =
           cpuProfile && new Helpers.SamplesIntegrator.SamplesIntegrator(cpuProfile, pid, tid, config);
       const profileCalls = samplesIntegrator?.buildProfileCalls(thread.entries);
@@ -342,8 +377,23 @@ export function buildHierarchy(
   }
 }
 
-export function makeCompleteEvent(event: Types.TraceEvents.TraceEventBegin|Types.TraceEvents.TraceEventEnd):
-    Types.TraceEvents.TraceEventSyntheticCompleteEvent|null {
+function mapFlows(processes: Map<Types.TraceEvents.ProcessID, RendererProcess>): void {
+  for (const {flowStart, flowEnd} of flowStartById.values()) {
+    if (flowEnd.ts < flowStart.ts) {
+      console.warn('wrong order flows');
+    }
+    const flowStartParent = entryToNode.get(flowStart)?.parent?.entry;
+    const flowEndParent = entryToNode.get(flowEnd)?.parent?.entry;
+    if (flowStartParent && flowEndParent) {
+      endToBeginViaFlow.set(flowEndParent, flowStartParent);
+    } else {
+      // something?
+    }
+  }
+}
+
+export function makeCompleteEvent(event: Types.TraceEvents.TraceEventBegin|
+                                  Types.TraceEvents.TraceEventEnd): Types.TraceEvents.SyntheticCompleteEvent|null {
   if (Types.TraceEvents.isTraceEventEnd(event)) {
     // Quietly ignore unbalanced close events, they're legit (we could
     // have missed start one).
@@ -365,7 +415,7 @@ export function makeCompleteEvent(event: Types.TraceEvents.TraceEventBegin|Types
 
   // Create a synthetic event using the begin event, when we find the
   // matching end event later we will update its duration.
-  const syntheticComplete: Types.TraceEvents.TraceEventSyntheticCompleteEvent = {
+  const syntheticComplete: Types.TraceEvents.SyntheticCompleteEvent = {
     ...event,
     ph: Types.TraceEvents.Phase.COMPLETE,
     dur: Types.Timing.MicroSeconds(0),
@@ -386,12 +436,13 @@ export interface RendererHandlerData {
    * by the process ID.
    */
   compositorTileWorkers: Map<Types.TraceEvents.ProcessID, Types.TraceEvents.ThreadID[]>;
-  entryToNode: Map<Types.TraceEvents.TraceEntry, Helpers.TreeHelpers.TraceEntryNode>;
+  entryToNode: Map<Types.TraceEvents.SyntheticTraceEntry, Helpers.TreeHelpers.TraceEntryNode>;
   /**
    * All trace events and synthetic profile calls made from
    * samples.
    */
-  allTraceEntries: Types.TraceEvents.TraceEntry[];
+  allTraceEntries: Types.TraceEvents.SyntheticTraceEntry[];
+  endToBeginViaFlow: Map<Types.TraceEvents.TraceEventData, Types.TraceEvents.TraceEventData>;
 }
 
 export interface RendererProcess {
@@ -408,6 +459,6 @@ export interface RendererThread {
    * Contains trace events and synthetic profile calls made from
    * samples.
    */
-  entries: Types.TraceEvents.TraceEntry[];
+  entries: Types.TraceEvents.SyntheticTraceEntry[];
   tree?: Helpers.TreeHelpers.TraceEntryTree;
 }

@@ -39,14 +39,9 @@ import {type DOMPinnedWebIDLProp, type DOMPinnedWebIDLType} from '../common/Java
 import {type DebuggerModel, type FunctionDetails} from './DebuggerModel.js';
 import {type RuntimeModel} from './RuntimeModel.js';
 
+// This cannot be an interface due to "instanceof RemoteObject" checks in the code.
 export class RemoteObject {
-  /**
-   * This may not be an interface due to "instanceof RemoteObject" checks in the code.
-   */
-
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  static fromLocalObject(value: any): RemoteObject {
+  static fromLocalObject(value: unknown): RemoteObject {
     return new LocalJSONObject(value);
   }
 
@@ -78,7 +73,7 @@ export class RemoteObject {
   }
 
   static arrayNameFromDescription(description: string): string {
-    return description.replace(_descriptionLengthParenRegex, '').replace(_descriptionLengthSquareRegex, '');
+    return description.replace(descriptionLengthParenRegex, '').replace(descriptionLengthSquareRegex, '');
   }
 
   static arrayLength(object: RemoteObject|Protocol.Runtime.RemoteObject|Protocol.Runtime.ObjectPreview): number {
@@ -87,8 +82,8 @@ export class RemoteObject {
     }
     // Array lengths in V8-generated descriptions switched from square brackets to parentheses.
     // Both formats are checked in case the front end is dealing with an old version of V8.
-    const parenMatches = object.description && object.description.match(_descriptionLengthParenRegex);
-    const squareMatches = object.description && object.description.match(_descriptionLengthSquareRegex);
+    const parenMatches = object.description && object.description.match(descriptionLengthParenRegex);
+    const squareMatches = object.description && object.description.match(descriptionLengthSquareRegex);
     return parenMatches ? parseInt(parenMatches[1], 10) : (squareMatches ? parseInt(squareMatches[1], 10) : 0);
   }
 
@@ -97,15 +92,12 @@ export class RemoteObject {
     if (object.subtype !== 'arraybuffer') {
       return 0;
     }
-    const matches = object.description && object.description.match(_descriptionLengthParenRegex);
+    const matches = object.description && object.description.match(descriptionLengthParenRegex);
     return matches ? parseInt(matches[1], 10) : 0;
   }
 
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  static unserializableDescription(object: any): string|null {
-    const type = typeof object;
-    if (type === 'number') {
+  static unserializableDescription(object: unknown): string|null {
+    if (typeof object === 'number') {
       const description = String(object);
       if (object === 0 && 1 / object < 0) {
         return UnserializableNumber.Negative0;
@@ -115,7 +107,7 @@ export class RemoteObject {
         return description;
       }
     }
-    if (type === 'bigint') {
+    if (typeof object === 'bigint') {
       return object + 'n';
     }
     return null;
@@ -278,14 +270,13 @@ export class RemoteObject {
     throw 'Not implemented';
   }
 
-  callFunction<T>(
-      _functionDeclaration: (this: Object, ...arg1: unknown[]) => T,
-      _args?: Protocol.Runtime.CallArgument[]): Promise<CallFunctionResult> {
+  callFunction<T, U>(_functionDeclaration: (this: U, ...args: any[]) => T, _args?: Protocol.Runtime.CallArgument[]):
+      Promise<CallFunctionResult> {
     throw 'Not implemented';
   }
 
-  callFunctionJSON<T>(
-      _functionDeclaration: (this: Object, ...arg1: unknown[]) => T,
+  callFunctionJSON<T, U>(
+      _functionDeclaration: (this: U, ...args: any[]) => T,
       _args: Protocol.Runtime.CallArgument[]|undefined): Promise<T> {
     throw 'Not implemented';
   }
@@ -326,18 +317,15 @@ export class RemoteObjectImpl extends RemoteObject {
   hasChildrenInternal: boolean;
   readonly #previewInternal: Protocol.Runtime.ObjectPreview|undefined;
   readonly #unserializableValueInternal: string|undefined;
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  readonly #valueInternal: any;
+  readonly #valueInternal: typeof RemoteObject.prototype.value;
   readonly #customPreviewInternal: Protocol.Runtime.CustomPreview|null;
   readonly #classNameInternal: string|null;
 
   constructor(
       runtimeModel: RuntimeModel, objectId: Protocol.Runtime.RemoteObjectId|undefined, type: string,
-      // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      subtype: string|undefined, value: any, unserializableValue?: string, description?: string,
-      preview?: Protocol.Runtime.ObjectPreview, customPreview?: Protocol.Runtime.CustomPreview, className?: string) {
+      subtype: string|undefined, value: typeof RemoteObject.prototype.value, unserializableValue?: string,
+      description?: string, preview?: Protocol.Runtime.ObjectPreview, customPreview?: Protocol.Runtime.CustomPreview,
+      className?: string) {
     super();
 
     this.runtimeModelInternal = runtimeModel;
@@ -397,9 +385,7 @@ export class RemoteObjectImpl extends RemoteObject {
     return this.#subtypeInternal;
   }
 
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  override get value(): any {
+  override get value(): typeof RemoteObject.prototype.value {
     return this.#valueInternal;
   }
 
@@ -581,8 +567,8 @@ export class RemoteObjectImpl extends RemoteObject {
     return undefined;
   }
 
-  override async callFunction<T>(
-      functionDeclaration: (this: Object, ...arg1: unknown[]) => T,
+  override async callFunction<T, U>(
+      functionDeclaration: (this: U, ...args: any[]) => T,
       args?: Protocol.Runtime.CallArgument[]): Promise<CallFunctionResult> {
     const response = await this.#runtimeAgent.invoke_callFunctionOn({
       objectId: this.#objectIdInternal,
@@ -600,8 +586,8 @@ export class RemoteObjectImpl extends RemoteObject {
     };
   }
 
-  override async callFunctionJSON<T>(
-      functionDeclaration: (this: Object, ...arg1: unknown[]) => T,
+  override async callFunctionJSON<T, U>(
+      functionDeclaration: (this: U, ...args: any[]) => T,
       args: Protocol.Runtime.CallArgument[]|undefined): Promise<T> {
     const response = await this.#runtimeAgent.invoke_callFunctionOn({
       objectId: this.#objectIdInternal,
@@ -653,10 +639,8 @@ export class ScopeRemoteObject extends RemoteObjectImpl {
 
   constructor(
       runtimeModel: RuntimeModel, objectId: Protocol.Runtime.RemoteObjectId|undefined, scopeRef: ScopeRef, type: string,
-      // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      subtype: string|undefined, value: any, unserializableValue?: string, description?: string,
-      preview?: Protocol.Runtime.ObjectPreview) {
+      subtype: string|undefined, value: typeof RemoteObjectImpl.prototype.value, unserializableValue?: string,
+      description?: string, preview?: Protocol.Runtime.ObjectPreview) {
     super(runtimeModel, objectId, type, subtype, value, unserializableValue, description, preview);
     this.#scopeRef = scopeRef;
     this.#savedScopeProperties = undefined;
@@ -801,15 +785,11 @@ export class RemoteObjectProperty {
 // or functions.
 
 export class LocalJSONObject extends RemoteObject {
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  valueInternal: any;
+  valueInternal: typeof RemoteObject.prototype.value;
   #cachedDescription!: string;
   #cachedChildren!: RemoteObjectProperty[];
 
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  constructor(value: any) {
+  constructor(value: typeof RemoteObject.prototype.value) {
     super();
     this.valueInternal = value;
   }
@@ -818,9 +798,7 @@ export class LocalJSONObject extends RemoteObject {
     return undefined;
   }
 
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  override get value(): any {
+  override get value(): typeof RemoteObject.prototype.value {
     return this.valueInternal;
   }
 
@@ -952,19 +930,11 @@ export class LocalJSONObject extends RemoteObject {
     if (!this.hasChildren) {
       return [];
     }
-    // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const value = (this.valueInternal as any);
-
-    function buildProperty(propName: string): RemoteObjectProperty {
-      let propValue = value[propName];
-      if (!(propValue instanceof RemoteObject)) {
-        propValue = RemoteObject.fromLocalObject(propValue);
-      }
-      return new RemoteObjectProperty(propName, propValue);
-    }
     if (!this.#cachedChildren) {
-      this.#cachedChildren = Object.keys((value as Object)).map(buildProperty);
+      this.#cachedChildren = Object.entries(this.valueInternal).map(([name, value]) => {
+        return new RemoteObjectProperty(
+            name, value instanceof RemoteObject ? value : RemoteObject.fromLocalObject(value));
+      });
     }
     return this.#cachedChildren;
   }
@@ -973,10 +943,10 @@ export class LocalJSONObject extends RemoteObject {
     return Array.isArray(this.valueInternal) ? this.valueInternal.length : 0;
   }
 
-  override async callFunction<T>(
-      functionDeclaration: (this: Object, ...arg1: unknown[]) => T,
+  override async callFunction<T, U>(
+      functionDeclaration: (this: U, ...args: any[]) => T,
       args?: Protocol.Runtime.CallArgument[]): Promise<CallFunctionResult> {
-    const target = (this.valueInternal as Object);
+    const target = this.valueInternal as U;
     const rawArgs = args ? args.map(arg => arg.value) : [];
 
     let result;
@@ -992,10 +962,10 @@ export class LocalJSONObject extends RemoteObject {
     return {object, wasThrown} as CallFunctionResult;
   }
 
-  override async callFunctionJSON<T>(
-      functionDeclaration: (this: Object, ...arg1: unknown[]) => T,
+  override async callFunctionJSON<T, U>(
+      functionDeclaration: (this: U, ...args: any[]) => T,
       args: Protocol.Runtime.CallArgument[]|undefined): Promise<T> {
-    const target = (this.valueInternal as Object);
+    const target = this.valueInternal as U;
     const rawArgs = args ? args.map(arg => arg.value) : [];
 
     let result;
@@ -1022,22 +992,16 @@ export class RemoteArrayBuffer {
     return this.#objectInternal.arrayBufferByteLength();
   }
 
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async bytes(start: any = 0, end: any = this.byteLength()): Promise<number[]> {
+  async bytes(start = 0, end = this.byteLength()): Promise<number[]> {
     if (start < 0 || start >= this.byteLength()) {
       throw new RangeError('start is out of range');
     }
     if (end < start || end > this.byteLength()) {
       throw new RangeError('end is out of range');
     }
-    // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-    // @ts-expect-error
     return await this.#objectInternal.callFunctionJSON(bytes, [{value: start}, {value: end - start}]);
 
-    // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    function bytes(this: any, offset: number, length: number): number[] {
+    function bytes(this: ArrayBuffer, offset: number, length: number): number[] {
       return [...new Uint8Array(this, offset, length)];
     }
   }
@@ -1060,52 +1024,34 @@ export class RemoteArray {
     return new RemoteArray(object);
   }
 
-  static createFromRemoteObjects(objects: RemoteObject[]): Promise<RemoteArray> {
+  static async createFromRemoteObjects(objects: RemoteObject[]): Promise<RemoteArray> {
     if (!objects.length) {
       throw new Error('Input array is empty');
     }
-    const objectArguments = [];
-    for (let i = 0; i < objects.length; ++i) {
-      objectArguments.push(RemoteObject.toCallArgument(objects[i]));
+    const result = await objects[0].callFunction(createArray, objects.map(RemoteObject.toCallArgument));
+    if (result.wasThrown || !result.object) {
+      throw new Error('Call function throws exceptions or returns empty value');
     }
-    return objects[0].callFunction(createArray, objectArguments).then(returnRemoteArray);
+    return RemoteArray.objectAsArray(result.object);
 
-    // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    function createArray(): any[] {
-      if (arguments.length > 1) {
-        return new Array(arguments);
-      }
-      return [arguments[0]];
-    }
-
-    function returnRemoteArray(result: CallFunctionResult): RemoteArray {
-      if (result.wasThrown || !result.object) {
-        throw new Error('Call function throws exceptions or returns empty value');
-      }
-      return RemoteArray.objectAsArray(result.object);
+    function createArray<T>(...args: T[]): T[] {
+      return args;
     }
   }
 
-  at(index: number): Promise<RemoteObject> {
+  async at(index: number): Promise<RemoteObject> {
     if (index < 0 || index > this.#objectInternal.arrayLength()) {
       throw new Error('Out of range');
     }
-    // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-    // @ts-expect-error
-    return this.#objectInternal.callFunction(at, [RemoteObject.toCallArgument(index)]).then(assertCallFunctionResult);
-
-    // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    function at(this: any, index: number): any {
-      return this[index];
+    const result =
+        await this.#objectInternal.callFunction<unknown, Array<unknown>>(at, [RemoteObject.toCallArgument(index)]);
+    if (result.wasThrown || !result.object) {
+      throw new Error('Exception in callFunction or result value is empty');
     }
+    return result.object;
 
-    function assertCallFunctionResult(result: CallFunctionResult): RemoteObject {
-      if (result.wasThrown || !result.object) {
-        throw new Error('Exception in callFunction or result value is empty');
-      }
-      return result.object;
+    function at<T>(this: T[], index: number): T {
+      return this[index];
     }
   }
 
@@ -1180,16 +1126,65 @@ export class RemoteFunction {
   }
 }
 
-// TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-// eslint-disable-next-line @typescript-eslint/naming-convention
-const _descriptionLengthParenRegex: RegExp = /\(([0-9]+)\)/;
-// TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-// eslint-disable-next-line @typescript-eslint/naming-convention
-const _descriptionLengthSquareRegex: RegExp = /\[([0-9]+)\]/;
+export class RemoteError {
+  readonly #object: RemoteObject;
+
+  #exceptionDetails?: Promise<Protocol.Runtime.ExceptionDetails|undefined>;
+  #cause?: Promise<RemoteObject|undefined>;
+
+  private constructor(object: RemoteObject) {
+    this.#object = object;
+  }
+
+  static objectAsError(object: RemoteObject): RemoteError {
+    if (object.subtype !== 'error') {
+      throw new Error(`Object of type ${object.subtype} is not an error`);
+    }
+    return new RemoteError(object);
+  }
+
+  get errorStack(): string {
+    return this.#object.description ?? '';
+  }
+
+  exceptionDetails(): Promise<Protocol.Runtime.ExceptionDetails|undefined> {
+    if (!this.#exceptionDetails) {
+      this.#exceptionDetails = this.#lookupExceptionDetails();
+    }
+    return this.#exceptionDetails;
+  }
+
+  #lookupExceptionDetails(): Promise<Protocol.Runtime.ExceptionDetails|undefined> {
+    if (this.#object.objectId) {
+      return this.#object.runtimeModel().getExceptionDetails(this.#object.objectId);
+    }
+    return Promise.resolve(undefined);
+  }
+
+  cause(): Promise<RemoteObject|undefined> {
+    if (!this.#cause) {
+      this.#cause = this.#lookupCause();
+    }
+    return this.#cause;
+  }
+
+  async #lookupCause(): Promise<RemoteObject|undefined> {
+    const allProperties =
+        await this.#object.getAllProperties(false /* accessorPropertiesOnly */, false /* generatePreview */);
+    const cause = allProperties.properties?.find(prop => prop.name === 'cause');
+
+    return cause?.value;
+  }
+}
+
+const descriptionLengthParenRegex = /\(([0-9]+)\)/;
+const descriptionLengthSquareRegex = /\[([0-9]+)\]/;
 
 const enum UnserializableNumber {
   Negative0 = ('-0'),
+  // @ts-expect-error
   NaN = ('NaN'),
+  // @ts-expect-error
   Infinity = ('Infinity'),
   NegativeInfinity = ('-Infinity'),
 }

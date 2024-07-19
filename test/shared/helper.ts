@@ -66,13 +66,12 @@ export const withControlOrMetaKey = async (action: () => Promise<void>, root = g
   });
 };
 
-export const click = async(selector: string, options?: ClickOptions): Promise<puppeteer.ElementHandle> => {
+export const click = async (selector: string, options?: ClickOptions) => {
   return await performActionOnSelector(
       selector, {root: options?.root}, element => element.click(options?.clickOptions));
 };
 
-export const hover =
-    async(selector: string, options?: {root?: puppeteer.JSHandle}): Promise<puppeteer.ElementHandle> => {
+export const hover = async (selector: string, options?: {root?: puppeteer.JSHandle}) => {
   return await performActionOnSelector(selector, {root: options?.root}, element => element.hover());
 };
 
@@ -242,9 +241,16 @@ export const $$textContent = async (textContent: string, root?: puppeteer.JSHand
 
 export const timeout = (duration: number) => new Promise(resolve => setTimeout(resolve, duration));
 
-export const getTextContent = async<ElementType extends Element = Element>(selector: string) => {
-  const text = await (await $<ElementType>(selector))?.evaluate(node => node.textContent);
+export const getTextContent =
+    async<ElementType extends Element = Element>(selector: string, root?: puppeteer.JSHandle) => {
+  const text = await (await $<ElementType>(selector, root))?.evaluate(node => node.textContent);
   return text ?? undefined;
+};
+
+export const getAllTextContents =
+    async(selector: string, root?: puppeteer.JSHandle, handler = 'pierce'): Promise<Array<string|null>> => {
+  const allElements = await $$(selector, root, handler);
+  return Promise.all(allElements.map(e => e.evaluate(e => e.textContent)));
 };
 
 /**
@@ -334,12 +340,14 @@ export const waitForNoElementsWithTextContent =
                              }, asyncScope), `Waiting for no elements with textContent '${textContent}'`);
     };
 
+export const TIMEOUT_ERROR_MESSAGE = 'Test timed out';
+
 export const waitForFunction =
-    async<T>(fn: () => Promise<T|undefined>, asyncScope = new AsyncScope(), description?: string): Promise<T> => {
+    async<T>(fn: () => Promise<T|undefined>, asyncScope = new AsyncScope(), description?: string) => {
   const innerFunction = async () => {
     while (true) {
       if (asyncScope.isCanceled()) {
-        throw new Error('Test timed out');
+        throw new Error(TIMEOUT_ERROR_MESSAGE);
       }
       const result = await fn();
       if (result) {
@@ -355,7 +363,7 @@ export const waitForFunctionWithTries = async<T>(
     fn: () => Promise<T|undefined>, options: {tries: number} = {
       tries: Number.MAX_SAFE_INTEGER,
     },
-    asyncScope = new AsyncScope()): Promise<T|undefined> => {
+    asyncScope = new AsyncScope()) => {
   return await asyncScope.exec(async () => {
     let tries = 0;
     while (tries++ < options.tries) {
@@ -433,6 +441,10 @@ export const setDevToolsSettings = async (settings: Record<string, string>) => {
   }, settings);
   await reloadDevTools();
 };
+
+export function goToHtml(html: string): Promise<void> {
+  return goTo(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+}
 
 export const goTo = async (url: string, options: puppeteer.WaitForOptions = {}) => {
   const {target} = getBrowserAndPages();
@@ -579,6 +591,10 @@ export const selectTextFromNodeToNode = async (
   }, await from, await to, direction);
 };
 
+export const clickMoreTabsButton = async (root?: puppeteer.ElementHandle<Element>) => {
+  await click('aria/More tabs', {root});
+};
+
 export const closePanelTab = async (panelTabSelector: string) => {
   // Get close button from tab element
   const selector = `${panelTabSelector} > .tabbed-pane-close-button`;
@@ -722,11 +738,11 @@ export function waitForEvent(element: puppeteer.ElementHandle, eventType: string
   }, eventType);
 }
 
-export const hasClass = async(element: puppeteer.ElementHandle<Element>, classname: string): Promise<boolean> => {
+export const hasClass = async (element: puppeteer.ElementHandle<Element>, classname: string) => {
   return await element.evaluate((el, classname) => el.classList.contains(classname), classname);
 };
 
-export const waitForClass = async(element: puppeteer.ElementHandle<Element>, classname: string): Promise<void> => {
+export const waitForClass = async (element: puppeteer.ElementHandle<Element>, classname: string) => {
   await waitForFunction(async () => {
     return hasClass(element, classname);
   });
@@ -820,7 +836,7 @@ export const summonSearchBox = async () => {
   await pressKey('f', {control: true});
 };
 
-export const replacePuppeteerUrl = (value: string): string => {
+export const replacePuppeteerUrl = (value: string) => {
   return value.replace(/pptr:.*:([0-9]+)$/, (_, match) => {
     return `(index):${match}`;
   });

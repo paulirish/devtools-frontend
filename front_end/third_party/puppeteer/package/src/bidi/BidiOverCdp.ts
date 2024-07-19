@@ -25,9 +25,7 @@ const bidiServerLogger = (prefix: string, ...args: unknown[]): void => {
  */
 export async function connectBidiOverCdp(
   cdp: CdpConnection,
-  // TODO: replace with `BidiMapper.MapperOptions`, once it's exported in
-  //  https://github.com/puppeteer/puppeteer/pull/11415.
-  options: {acceptInsecureCerts: boolean}
+  options: BidiMapper.MapperOptions
 ): Promise<BidiConnection> {
   const transportBiDi = new NoOpTransport();
   const cdpConnectionAdapter = new CdpConnectionAdapter(cdp);
@@ -166,7 +164,7 @@ class CDPClientAdapter<T extends CDPSession | CdpConnection>
     this.#closed = true;
   }
 
-  isCloseError(error: any): boolean {
+  isCloseError(error: unknown): boolean {
     return error instanceof TargetCloseError;
   }
 }
@@ -177,7 +175,9 @@ class CDPClientAdapter<T extends CDPSession | CdpConnection>
  * @internal
  */
 class NoOpTransport
-  extends BidiMapper.EventEmitter<any>
+  extends BidiMapper.EventEmitter<{
+    bidiResponse: Bidi.ChromiumBidi.Message;
+  }>
   implements BidiMapper.BidiTransport
 {
   #onMessage: (message: Bidi.ChromiumBidi.Command) => Promise<void> | void =

@@ -13,6 +13,7 @@ import {
   CSSFontPaletteValuesRule,
   CSSKeyframesRule,
   CSSPositionFallbackRule,
+  CSSPositionTryRule,
   CSSPropertyRule,
   CSSStyleRule,
 } from './CSSRule.js';
@@ -37,6 +38,11 @@ function containsStyle(styles: CSSStyleDeclaration[]|Set<CSSStyleDeclaration>, q
     }
   }
   return false;
+}
+
+function containsCustomProperties(style: CSSStyleDeclaration): boolean {
+  const properties = style.allProperties();
+  return properties.some(property => cssMetadata().isCustomProperty(property.name));
 }
 
 function containsInherited(style: CSSStyleDeclaration): boolean {
@@ -177,6 +183,7 @@ export interface CSSMatchedStylesPayload {
   animationsPayload: Protocol.CSS.CSSKeyframesRule[];
   parentLayoutNodeId: Protocol.DOM.NodeId|undefined;
   positionFallbackRules: Protocol.CSS.CSSPositionFallbackRule[];
+  positionTryRules: Protocol.CSS.CSSPositionTryRule[];
   propertyRules: Protocol.CSS.CSSPropertyRule[];
   cssPropertyRegistrations: Protocol.CSS.CSSPropertyRegistration[];
   fontPaletteValuesRule: Protocol.CSS.CSSFontPaletteValuesRule|undefined;
@@ -253,6 +260,7 @@ export class CSSMatchedStyles {
   #styleToDOMCascade: Map<CSSStyleDeclaration, DOMInheritanceCascade>;
   #parentLayoutNodeId: Protocol.DOM.NodeId|undefined;
   #positionFallbackRules: CSSPositionFallbackRule[];
+  #positionTryRules: CSSPositionTryRule[];
   #mainDOMCascade?: DOMInheritanceCascade;
   #pseudoDOMCascades?: Map<Protocol.DOM.PseudoType, DOMInheritanceCascade>;
   #customHighlightPseudoDOMCascades?: Map<string, DOMInheritanceCascade>;
@@ -270,6 +278,7 @@ export class CSSMatchedStyles {
     animationsPayload,
     parentLayoutNodeId,
     positionFallbackRules,
+    positionTryRules,
     propertyRules,
     cssPropertyRegistrations,
     fontPaletteValuesRule,
@@ -287,6 +296,7 @@ export class CSSMatchedStyles {
       this.#keyframesInternal = animationsPayload.map(rule => new CSSKeyframesRule(cssModel, rule));
     }
     this.#positionFallbackRules = positionFallbackRules.map(rule => new CSSPositionFallbackRule(cssModel, rule));
+    this.#positionTryRules = positionTryRules.map(rule => new CSSPositionTryRule(cssModel, rule));
     this.#parentLayoutNodeId = parentLayoutNodeId;
     this.#fontPaletteValuesRule =
         fontPaletteValuesRule ? new CSSFontPaletteValuesRule(cssModel, fontPaletteValuesRule) : undefined;
@@ -400,9 +410,11 @@ export class CSSMatchedStyles {
         if (!containsInherited(inheritedRule.style)) {
           continue;
         }
-        if (containsStyle(nodeStyles, inheritedRule.style) ||
-            containsStyle(this.#inheritedStyles, inheritedRule.style)) {
-          continue;
+        if (!containsCustomProperties(inheritedRule.style)) {
+          if (containsStyle(nodeStyles, inheritedRule.style) ||
+              containsStyle(this.#inheritedStyles, inheritedRule.style)) {
+            continue;
+          }
         }
         this.#nodeForStyleInternal.set(inheritedRule.style, parentNode);
         inheritedStyles.push(inheritedRule.style);
@@ -677,6 +689,10 @@ export class CSSMatchedStyles {
     return this.#positionFallbackRules;
   }
 
+  positionTryRules(): CSSPositionTryRule[] {
+    return this.#positionTryRules;
+  }
+
   pseudoStyles(pseudoType: Protocol.DOM.PseudoType): CSSStyleDeclaration[] {
     Platform.assertNotNullOrUndefined(this.#pseudoDOMCascades);
     const domCascade = this.#pseudoDOMCascades.get(pseudoType);
@@ -843,7 +859,7 @@ class NodeCascade {
   }
 }
 
-interface CSSVariableValue {
+export interface CSSVariableValue {
   value: string;
   declaration: CSSProperty|CSSRegisteredProperty|null;
 }
@@ -1085,9 +1101,7 @@ class DOMInheritanceCascade {
   }
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum PropertyState {
+export const enum PropertyState {
   Active = 'Active',
   Overloaded = 'Overloaded',
 }

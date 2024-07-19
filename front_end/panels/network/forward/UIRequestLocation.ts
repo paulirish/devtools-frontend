@@ -5,12 +5,11 @@
 import type * as SDK from '../../../core/sdk/sdk.js';
 import type * as TextUtils from '../../../models/text_utils/text_utils.js';
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum UIHeaderSection {
+export const enum UIHeaderSection {
   General = 'General',
   Request = 'Request',
   Response = 'Response',
+  EarlyHints = 'EarlyHints',
 }
 
 interface UIHeaderLocation {
@@ -18,19 +17,17 @@ interface UIHeaderLocation {
   header: SDK.NetworkRequest.NameValue|null;
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum UIRequestTabs {
+export const enum UIRequestTabs {
   Cookies = 'cookies',
   EventSource = 'eventSource',
-  HeadersComponent = 'headersComponent',
+  HeadersComponent = 'headers-component',
   Payload = 'payload',
   Initiator = 'initiator',
   Preview = 'preview',
   Response = 'response',
   Timing = 'timing',
-  TrustTokens = 'trustTokens',
-  WsFrames = 'webSocketFrames',
+  TrustTokens = 'trust-tokens',
+  WsFrames = 'web-socket-frames',
 }
 
 export interface FilterOptions {

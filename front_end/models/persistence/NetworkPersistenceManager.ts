@@ -9,9 +9,10 @@ import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as Breakpoints from '../breakpoints/breakpoints.js';
+import * as TextUtils from '../text_utils/text_utils.js';
 import * as Workspace from '../workspace/workspace.js';
 
-import {FileSystemWorkspaceBinding, type FileSystem} from './FileSystemWorkspaceBinding.js';
+import {type FileSystem, FileSystemWorkspaceBinding} from './FileSystemWorkspaceBinding.js';
 import {IsolatedFileSystemManager} from './IsolatedFileSystemManager.js';
 import {PersistenceBinding, PersistenceImpl} from './PersistenceImpl.js';
 
@@ -47,7 +48,7 @@ export class NetworkPersistenceManager extends Common.ObjectWrapper.ObjectWrappe
     this.savingForOverrides = new WeakSet();
     this.savingSymbol = Symbol('SavingForOverrides');
 
-    this.enabledSetting = Common.Settings.Settings.instance().moduleSetting('persistenceNetworkOverridesEnabled');
+    this.enabledSetting = Common.Settings.Settings.instance().moduleSetting('persistence-network-overrides-enabled');
     this.enabledSetting.addChangeListener(this.enabledChanged, this);
 
     this.workspace = workspace;
@@ -931,16 +932,7 @@ export class NetworkPersistenceManager extends Common.ObjectWrapper.ObjectWrappe
       responseHeaders = interceptedRequest.responseHeaders || [];
     }
 
-    let mimeType = '';
-    if (interceptedRequest.responseHeaders) {
-      for (const header of interceptedRequest.responseHeaders) {
-        if (header.name.toLowerCase() === 'content-type') {
-          mimeType = header.value;
-          break;
-        }
-      }
-    }
-
+    let {mimeType} = interceptedRequest.getMimeTypeAndCharset();
     if (!mimeType) {
       const expectedResourceType =
           Common.ResourceType.resourceTypes[interceptedRequest.resourceType] || Common.ResourceType.resourceTypes.Other;
@@ -953,18 +945,10 @@ export class NetworkPersistenceManager extends Common.ObjectWrapper.ObjectWrappe
     if (fileSystemUISourceCode) {
       this.originalResponseContentPromises.set(
           fileSystemUISourceCode, interceptedRequest.responseBody().then(response => {
-            if (response.error || response.content === null) {
+            if (TextUtils.ContentData.ContentData.isError(response) || !response.isTextContent) {
               return null;
             }
-            if (response.encoded) {
-              const text = atob(response.content);
-              const data = new Uint8Array(text.length);
-              for (let i = 0; i < text.length; ++i) {
-                data[i] = text.charCodeAt(i);
-              }
-              return new TextDecoder('utf-8').decode(data);
-            }
-            return response.content;
+            return response.text;
           }));
 
       const project = fileSystemUISourceCode.project() as FileSystem;
@@ -978,9 +962,10 @@ export class NetworkPersistenceManager extends Common.ObjectWrapper.ObjectWrappe
           new Blob([], {type: mimeType}), /* encoded */ true, responseHeaders, /* isBodyOverridden */ false);
     } else {
       const responseBody = await interceptedRequest.responseBody();
-      if (!responseBody.error && responseBody.content) {
+      if (!TextUtils.ContentData.ContentData.isError(responseBody)) {
+        const content = responseBody.isTextContent ? responseBody.text : responseBody.base64;
         void interceptedRequest.continueRequestWithContent(
-            new Blob([responseBody.content], {type: mimeType}), /* encoded */ true, responseHeaders,
+            new Blob([content], {type: mimeType}), /* encoded */ !responseBody.isTextContent, responseHeaders,
             /* isBodyOverridden */ false);
       }
     }
@@ -994,9 +979,7 @@ const RESERVED_FILENAMES = new Set<string>([
 
 export const HEADERS_FILENAME = '.headers';
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum Events {
+export const enum Events {
   ProjectChanged = 'ProjectChanged',
   RequestsForHeaderOverridesFileChanged = 'RequestsForHeaderOverridesFileChanged',
   LocalOverridesProjectUpdated = 'LocalOverridesProjectUpdated',

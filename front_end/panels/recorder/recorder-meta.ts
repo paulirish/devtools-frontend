@@ -69,16 +69,13 @@ function maybeRetrieveContextTypes<T = unknown>(
   return [];
 }
 
-(UI.ViewManager.defaultOptionsForTabs as {[key: string]: boolean}).chrome_recorder = true;
-
 UI.ViewManager.registerViewExtension({
   location: UI.ViewManager.ViewLocationValues.PANEL,
-  id: 'chrome_recorder',
+  id: 'chrome-recorder',
   commandPrompt: i18nLazyString(UIStrings.showRecorder),
   title: i18nLazyString(UIStrings.recorder),
   order: 90,
   persistence: UI.ViewManager.ViewPersistence.CLOSEABLE,
-  isPreviewFeature: true,
   async loadView() {
     const Recorder = await loadRecorderModule();
     return Recorder.RecorderPanel.RecorderPanel.instance();

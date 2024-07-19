@@ -92,7 +92,7 @@ export class ProfileLauncherView extends Common.ObjectWrapper.eventMixin<EventTy
         this.element.createChild('div', 'profile-launcher-view-content vbox') as HTMLDivElement;
 
     const profileTypeSelectorElement = this.contentElementInternal.createChild('div', 'vbox');
-    this.selectedProfileTypeSetting = Common.Settings.Settings.instance().createSetting('selectedProfileType', 'CPU');
+    this.selectedProfileTypeSetting = Common.Settings.Settings.instance().createSetting('selected-profile-type', 'CPU');
     this.profileTypeHeaderElement = profileTypeSelectorElement.createChild('h1');
     this.profileTypeSelectorForm = profileTypeSelectorElement.createChild('form');
     UI.ARIAUtils.markAsRadioGroup(this.profileTypeSelectorForm);
@@ -236,9 +236,7 @@ export class ProfileLauncherView extends Common.ObjectWrapper.eventMixin<EventTy
   }
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum Events {
+export const enum Events {
   ProfileTypeSelected = 'ProfileTypeSelected',
 }
 

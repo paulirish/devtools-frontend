@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// eslint-disable-next-line rulesdir/es_modules_import
 import type Protocol from 'devtools-protocol';
-// eslint-disable-next-line rulesdir/es_modules_import
 import {type ProtocolMapping} from 'devtools-protocol/types/protocol-mapping.js';
-import {type WasmValue} from '../src/WasmTypes.js';
+
 import {type Chrome} from '../../../extension-api/ExtensionAPI.js';
+import {type WasmValue} from '../src/WasmTypes.js';
+
 import {makeURL, relativePathname} from './TestUtils.js';
 
 type PauseLocation = {
@@ -49,9 +49,11 @@ export class Debugger {
   private readonly targetId: string;
   private connected: boolean;
   private readonly queue: string[];
-  private readonly callbacks:
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      Map<number, {method: string, resolve: (r: any) => unknown, reject: (r: unknown) => unknown}> = new Map();
+  private readonly callbacks: Map<number, {
+    method: string,
+    resolve: (r: ProtocolMapping.Commands[keyof ProtocolMapping.Commands]['returnType']) => unknown,
+    reject: (r: unknown) => unknown
+  }> = new Map();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private readonly eventHandlers: Map<string, Set<Handler<any>>> = new Map();
   private nextMessageId = 0;

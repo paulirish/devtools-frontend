@@ -97,7 +97,7 @@ export class SourcesSearchScope implements Search.SearchScope.SearchScope {
 
   private projects(): Workspace.Workspace.Project[] {
     const searchInAnonymousAndContentScripts =
-        Common.Settings.Settings.instance().moduleSetting('searchInAnonymousAndContentScripts').get();
+        Common.Settings.Settings.instance().moduleSetting('search-in-anonymous-and-content-scripts').get();
 
     return Workspace.Workspace.WorkspaceImpl.instance().projects().filter(project => {
       if (project.type() === Workspace.Workspace.projectTypes.Service) {
@@ -313,10 +313,8 @@ export class FileBasedSearchResult implements Search.SearchScope.SearchResult {
     return new Workspace.UISourceCode.UILocationRange(this.uiSourceCode, range);
   }
 
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  matchLabel(index: number): any {
-    return this.searchMatches[index].lineNumber + 1;
+  matchLabel(index: number): string {
+    return String(this.searchMatches[index].lineNumber + 1);
   }
 
   matchColumn(index: number): number {

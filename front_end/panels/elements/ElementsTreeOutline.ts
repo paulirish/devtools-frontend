@@ -130,7 +130,7 @@ export class ElementsTreeOutline extends
 
     this.treeElementByNode = new WeakMap();
     const shadowContainer = document.createElement('div');
-    this.shadowRoot = UI.Utils.createShadowRootWithCoreStyles(
+    this.shadowRoot = UI.UIUtils.createShadowRootWithCoreStyles(
         shadowContainer,
         {cssFile: [elementsTreeOutlineStyles, CodeHighlighter.Style.default], delegatesFocus: undefined});
     const outlineDisclosureElement = this.shadowRoot.createChild('div', 'elements-disclosure');
@@ -159,7 +159,7 @@ export class ElementsTreeOutline extends
 
     outlineDisclosureElement.appendChild(this.elementInternal);
     this.element = shadowContainer;
-    this.element.setAttribute('jslog', `${VisualLogging.tree().context('elements-tree-outline')}`);
+    this.contentElement.setAttribute('jslog', `${VisualLogging.tree('elements')}`);
 
     this.includeRootDOMNode = !omitRootDOMNode;
     this.selectEnabled = selectEnabled;
@@ -196,7 +196,7 @@ export class ElementsTreeOutline extends
 
     this.decoratorExtensions = null;
 
-    this.showHTMLCommentsSetting = Common.Settings.Settings.instance().moduleSetting('showHTMLComments');
+    this.showHTMLCommentsSetting = Common.Settings.Settings.instance().moduleSetting('show-html-comments');
     this.showHTMLCommentsSetting.addChangeListener(this.onShowHTMLCommentsChange.bind(this));
     this.setUseLightSelectionColor(true);
     if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.HIGHLIGHT_ERRORS_ELEMENTS_PANEL)) {
@@ -233,7 +233,7 @@ export class ElementsTreeOutline extends
 
         return {
           box: hoveredNode.boxInWindow(),
-          show: async(popover: UI.GlassPane.GlassPane): Promise<boolean> => {
+          show: async (popover: UI.GlassPane.GlassPane) => {
             popover.setIgnoreLeftMargin(true);
             const openIssueEvent = (): Promise<void> => Common.Revealer.reveal(issue);
             viewIssueElement.addEventListener('click', () => openIssueEvent());
@@ -242,7 +242,7 @@ export class ElementsTreeOutline extends
             return true;
           },
         };
-      });
+      }, 'elements.issue');
       this.#popupHelper.setTimeout(300);
       this.#popupHelper.setHasPadding(true);
     }
@@ -930,7 +930,7 @@ export class ElementsTreeOutline extends
     const commentNode = node.enclosingNodeOrSelfWithClass('webkit-html-comment');
     contextMenu.saveSection().appendItem(
         i18nString(UIStrings.storeAsGlobalVariable), this.saveNodeToTempVariable.bind(this, treeElement.node()),
-        {jslogContext: 'storeAsGlobalVariable'});
+        {jslogContext: 'store-as-global-variable'});
     if (textNode) {
       treeElement.populateTextContextMenu(contextMenu, textNode);
     } else if (isTag) {
@@ -943,7 +943,7 @@ export class ElementsTreeOutline extends
 
     contextMenu.viewSection().appendItem(i18nString(UIStrings.adornerSettings), () => {
       ElementsPanel.instance().showAdornerSettingsPane();
-    }, {jslogContext: 'showAdornerSettings'});
+    }, {jslogContext: 'show-adorner-settings'});
 
     contextMenu.appendApplicableItems(treeElement.node());
     void contextMenu.show();
@@ -1612,8 +1612,6 @@ export class ElementsTreeOutline extends
 }
 
 export namespace ElementsTreeOutline {
-  // TODO(crbug.com/1167717): Make this a const enum again
-  // eslint-disable-next-line rulesdir/const_enum
   export enum Events {
     SelectedNodeChanged = 'SelectedNodeChanged',
     ElementsTreeUpdated = 'ElementsTreeUpdated',
@@ -1793,9 +1791,10 @@ export class ShortcutTreeElement extends UI.TreeOutline.TreeElement {
     adorner.data = {
       name,
       content: adornerContent,
+      jslogContext: 'reveal',
     };
     this.listItemElement.appendChild(adorner);
-    const onClick = (((): void => {
+    const onClick = ((() => {
                        Host.userMetrics.badgeActivated(Host.UserMetrics.BadgeType.REVEAL);
                        this.nodeShortcut.deferredNode.resolve(
                            node => {

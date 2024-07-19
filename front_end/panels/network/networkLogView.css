@@ -141,8 +141,12 @@
   color: inherit;
 }
 
-.initiator-column .devtools-link {
+.initiator-column .text-button.devtools-link,
+.initiator-column .text-button.devtools-link:focus-visible {
   color: inherit;
+  background-color: transparent;
+  outline-offset: 0;
+  height: 16px;
 }
 
 .network-error-row,
@@ -237,6 +241,7 @@
 .network-log-grid.data-grid.small .icon {
   width: 16px;
   height: 16px;
+  vertical-align: sub;
 }
 
 .image-network-icon-preview {
@@ -281,7 +286,7 @@
   visibility: hidden;
 }
 
-#network-container:not(.brief-mode) .data-container {
+#network-container.grid-mode .data-container {
   overflow: hidden;
 }
 
@@ -371,6 +376,7 @@
 .network-frame-group-icon {
   display: inline-block;
   margin: -7px 1px;
+  vertical-align: baseline;
 }
 
 .network-frame-group-badge {
@@ -384,7 +390,7 @@
 
 .network-override-marker::before {
   background-color: var(--sys-color-purple-bright);
-  content: url("Images/empty.svg");
+  content: var(--image-file-empty);
   width: 6px;
   height: 6px;
   border-radius: 50%;

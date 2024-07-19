@@ -4,11 +4,10 @@
 
 import type * as Platform from '../../core/platform/platform.js';
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
 export enum Events {
   AppendedToURL = 'appendedToURL',
   CanceledSaveURL = 'canceledSaveURL',
+  ColorThemeChanged = 'colorThemeChanged',
   ContextMenuCleared = 'contextMenuCleared',
   ContextMenuItemSelected = 'contextMenuItemSelected',
   DeviceCountUpdated = 'deviceCountUpdated',
@@ -37,11 +36,10 @@ export enum Events {
   ShowPanel = 'showPanel',
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
 export const EventDescriptors = [
   [Events.AppendedToURL, 'appendedToURL', ['url']],
   [Events.CanceledSaveURL, 'canceledSaveURL', ['url']],
+  [Events.ColorThemeChanged, 'colorThemeChanged', []],
   [Events.ContextMenuCleared, 'contextMenuCleared', []],
   [Events.ContextMenuItemSelected, 'contextMenuItemSelected', ['id']],
   [Events.DeviceCountUpdated, 'deviceCountUpdated', ['count']],
@@ -137,7 +135,14 @@ export interface SearchCompletedEvent {
 }
 
 export interface DoAidaConversationResult {
-  response: string;
+  statusCode?: number;
+  headers?: {
+    [x: string]: string,
+  };
+  netError?: number;
+  netErrorName?: string;
+  error?: string;
+  detail?: string;
 }
 
 export interface VisualElementImpression {
@@ -145,15 +150,23 @@ export interface VisualElementImpression {
   type: number;
   parent?: number;
   context?: number;
+  width?: number;
+  height?: number;
 }
 
 export interface ImpressionEvent {
   impressions: VisualElementImpression[];
 }
 
+export interface ResizeEvent {
+  veid: number;
+  width?: number;
+  height?: number;
+}
+
 export interface ClickEvent {
   veid: number;
-  mouseButton: number;
+  mouseButton?: number;
   context?: number;
   doubleClick: boolean;
 }
@@ -175,7 +188,7 @@ export interface ChangeEvent {
 }
 
 export interface KeyDownEvent {
-  veid: number;
+  veid?: number;
   context?: number;
 }
 
@@ -187,6 +200,7 @@ export interface KeyDownEvent {
 export type EventTypes = {
   [Events.AppendedToURL]: Platform.DevToolsPath.RawPathString|Platform.DevToolsPath.UrlString,
   [Events.CanceledSaveURL]: Platform.DevToolsPath.UrlString,
+  [Events.ColorThemeChanged]: void,
   [Events.ContextMenuCleared]: void,
   [Events.ContextMenuItemSelected]: number,
   [Events.DeviceCountUpdated]: number,
@@ -241,6 +255,8 @@ export interface InspectorFrontendHostAPI {
   inspectElementCompleted(): void;
 
   openInNewTab(url: Platform.DevToolsPath.UrlString): void;
+
+  openSearchResultsInNewTab(query: string): void;
 
   showItemInFolder(fileSystemPath: Platform.DevToolsPath.RawPathString): void;
 
@@ -344,7 +360,8 @@ export interface InspectorFrontendHostAPI {
 
   initialTargetId(): Promise<string|null>;
 
-  doAidaConversation: (request: string, cb: (result: DoAidaConversationResult) => void) => void;
+  doAidaConversation: (request: string, streamId: number, cb: (result: DoAidaConversationResult) => void) => void;
+  registerAidaClientEvent: (request: string) => void;
 
   recordImpression(event: ImpressionEvent): void;
   recordClick(event: ClickEvent): void;
@@ -408,14 +425,12 @@ export interface SyncInformation {
  * front_end/devtools_compatibility.js
  * @readonly
  */
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum EnumeratedHistogram {
+export const enum EnumeratedHistogram {
   ActionTaken = 'DevTools.ActionTaken',
-  BreakpointWithConditionAdded = 'DevTools.BreakpointWithConditionAdded',
   BreakpointEditDialogRevealedFrom = 'DevTools.BreakpointEditDialogRevealedFrom',
   PanelClosed = 'DevTools.PanelClosed',
   PanelShown = 'DevTools.PanelShown',
+  PanelShownInLocation = 'DevTools.PanelShownInLocation',
   SidebarPaneShown = 'DevTools.SidebarPaneShown',
   KeyboardShortcutFired = 'DevTools.KeyboardShortcutFired',
   IssueCreated = 'DevTools.IssueCreated',
@@ -430,8 +445,6 @@ export enum EnumeratedHistogram {
   ExperimentDisabled = 'DevTools.ExperimentDisabled',
   DeveloperResourceLoaded = 'DevTools.DeveloperResourceLoaded',
   DeveloperResourceScheme = 'DevTools.DeveloperResourceScheme',
-  LinearMemoryInspectorRevealedFrom = 'DevTools.LinearMemoryInspector.RevealedFrom',
-  LinearMemoryInspectorTarget = 'DevTools.LinearMemoryInspector.Target',
   Language = 'DevTools.Language',
   SyncSetting = 'DevTools.SyncSetting',
   RecordingAssertion = 'DevTools.RecordingAssertion',
@@ -455,9 +468,6 @@ export enum EnumeratedHistogram {
   ColorConvertedFrom = 'DevTools.ColorConvertedFrom',
   ColorPickerOpenedFrom = 'DevTools.ColorPickerOpenedFrom',
   CSSPropertyDocumentation = 'DevTools.CSSPropertyDocumentation',
-  InlineScriptParsed = 'DevTools.InlineScriptParsed',
-  VMInlineScriptTypeShown = 'DevTools.VMInlineScriptShown',
-  BreakpointsRestoredFromStorageCount = 'DevTools.BreakpointsRestoredFromStorageCount',
   SwatchActivated = 'DevTools.SwatchActivated',
   BadgeActivated = 'DevTools.BadgeActivated',
   AnimationPlaybackRateChanged = 'DevTools.AnimationPlaybackRateChanged',

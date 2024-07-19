@@ -12,13 +12,13 @@ vars = {
   'build_with_chromium': False,
 
   'build_url': 'https://chromium.googlesource.com/chromium/src/build.git',
-  'build_revision': 'eba30cc9090708c7c7d5ea405a44a6464e781173',
+  'build_revision': 'd9a06c2351df36ad1c1b1979c7468302c1a2c85f',
 
   'buildtools_url': 'https://chromium.googlesource.com/chromium/src/buildtools.git',
-  'buildtools_revision': 'a656fc7fe0d4121e6729cd11fd3e9480d61c4318',
+  'buildtools_revision': '8919328651a559f8a974641d40fe712062cc6718',
 
   'depot_tools_url': 'https://chromium.googlesource.com/chromium/tools/depot_tools.git',
-  'depot_tools_revision': 'ad697e33c117b4bf4f9b405dd7bb51ba1f1d5280',
+  'depot_tools_revision': '5dc83f8b3757067167666a63cee5da1cda2878d1',
 
   'inspector_protocol_url': 'https://chromium.googlesource.com/deps/inspector_protocol',
   'inspector_protocol_revision': '916f43c554c65ebf4ccd896b0f4e2ac99a67c434',
@@ -29,7 +29,7 @@ vars = {
   'emscripten_tag': 'ade9d780ff17c88d81aa13860361743e3c1e1396',
 
   # GN CIPD package version.
-  'gn_version': 'git_revision:71305b07d708830ed7b96006dfa773a79ff313fe',
+  'gn_version': 'git_revision:415b3b19e094cd4b6982147693485df65037f942',
 
   'cmake_version': 'version:3.16.1',
 
@@ -46,7 +46,7 @@ vars = {
   # Chrome version used for tests. It should be regularly updated to
   # match the Canary version listed here:
   # https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json
-  'chrome': '122.0.6239.2',
+  'chrome': '125.0.6400.0',
 
   # 'magic' text to tell depot_tools that git submodules should be accepted but
   # but parity with DEPS file is expected.
@@ -160,7 +160,7 @@ hooks = [
                 '--no_resume',
                 '--extract',
                 '--no_auth',
-                '--bucket', 'chromium-nodejs/16.13.0',
+                '--bucket', 'chromium-nodejs/20.11.0',
                 '-s', 'third_party/node/linux/node-linux-x64.tar.gz.sha1',
     ],
   },
@@ -173,7 +173,7 @@ hooks = [
                 '--no_resume',
                 '--extract',
                 '--no_auth',
-                '--bucket', 'chromium-nodejs/16.13.0',
+                '--bucket', 'chromium-nodejs/20.11.0',
                 '-s', 'third_party/node/mac/node-darwin-x64.tar.gz.sha1',
     ],
   },
@@ -186,7 +186,7 @@ hooks = [
                 '--no_resume',
                 '--extract',
                 '--no_auth',
-                '--bucket', 'chromium-nodejs/16.13.0',
+                '--bucket', 'chromium-nodejs/20.11.0',
                 '-s', 'third_party/node/mac/node-darwin-arm64.tar.gz.sha1',
     ],
   },
@@ -198,7 +198,7 @@ hooks = [
                 'third_party/depot_tools/download_from_google_storage.py',
                 '--no_resume',
                 '--no_auth',
-                '--bucket', 'chromium-nodejs/16.13.0',
+                '--bucket', 'chromium-nodejs/20.11.0',
                 '-s', 'third_party/node/win/node.exe.sha1',
     ],
   },
@@ -275,7 +275,7 @@ hooks = [
     'condition': 'host_os == "win" and build_with_chromium == False',
     'action': [ 'python3',
                 'scripts/deps/download_chrome.py',
-                '--url=https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/' + Var('chrome') + '/win64/chrome-win64.zip',
+                '--url=https://storage.googleapis.com/chrome-for-testing-public/' + Var('chrome') + '/win64/chrome-win64.zip',
                 '--target=third_party/chrome',
                 '--rename_from=chrome-win64',
                 '--rename_to=chrome-win',
@@ -289,7 +289,7 @@ hooks = [
     'condition': 'host_os == "mac" and build_with_chromium == False and host_cpu != "arm64"',
     'action': [ 'python3',
                 'scripts/deps/download_chrome.py',
-                '--url=https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/' + Var('chrome') + '/mac-x64/chrome-mac-x64.zip',
+                '--url=https://storage.googleapis.com/chrome-for-testing-public/' + Var('chrome') + '/mac-x64/chrome-mac-x64.zip',
                 '--target=third_party/chrome',
                 '--rename_from=chrome-mac-x64',
                 '--rename_to=chrome-mac',
@@ -303,7 +303,7 @@ hooks = [
     'condition': 'host_os == "mac" and build_with_chromium == False and host_cpu == "arm64"',
     'action': [ 'python3',
                 'scripts/deps/download_chrome.py',
-                '--url=https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/' + Var('chrome') + '/mac-arm64/chrome-mac-arm64.zip',
+                '--url=https://storage.googleapis.com/chrome-for-testing-public/' + Var('chrome') + '/mac-arm64/chrome-mac-arm64.zip',
                 '--target=third_party/chrome',
                 '--rename_from=chrome-mac-arm64',
                 '--rename_to=chrome-mac',
@@ -317,7 +317,7 @@ hooks = [
     'condition': 'host_os == "linux" and build_with_chromium == False',
     'action': [ 'python3',
                 'scripts/deps/download_chrome.py',
-                '--url=https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/' + Var('chrome') + '/linux64/chrome-linux64.zip',
+                '--url=https://storage.googleapis.com/chrome-for-testing-public/' + Var('chrome') + '/linux64/chrome-linux64.zip',
                 '--target=third_party/chrome',
                 '--rename_from=chrome-linux64',
                 '--rename_to=chrome-linux',

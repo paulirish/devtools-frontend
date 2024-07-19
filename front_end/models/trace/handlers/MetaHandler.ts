@@ -218,8 +218,10 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
         continue;
       }
 
-      mainFrameId = frame.frame;
-      mainFrameURL = frame.url;
+      if (frame.url) {
+        mainFrameId = frame.frame;
+        mainFrameURL = frame.url;
+      }
       topLevelRendererIds.add(frame.processId);
     }
     return;
@@ -429,19 +431,19 @@ export function data(): MetaHandlerData {
     traceBounds: {...traceBounds},
     browserProcessId,
     browserThreadId,
-    processNames: new Map(processNames),
+    processNames,
     gpuProcessId,
     gpuThreadId: gpuThreadId === Types.TraceEvents.ThreadID(-1) ? undefined : gpuThreadId,
     viewportRect: viewportRect || undefined,
     mainFrameId,
     mainFrameURL,
-    navigationsByFrameId: new Map(navigationsByFrameId),
-    navigationsByNavigationId: new Map(navigationsByNavigationId),
-    threadsInProcess: new Map(threadsInProcess),
-    rendererProcessesByFrame: new Map(rendererProcessesByFrameId),
-    topLevelRendererIds: new Set(topLevelRendererIds),
-    frameByProcessId: new Map(framesByProcessId),
-    mainFrameNavigations: [...mainFrameNavigations],
+    navigationsByFrameId,
+    navigationsByNavigationId,
+    threadsInProcess,
+    rendererProcessesByFrame: rendererProcessesByFrameId,
+    topLevelRendererIds,
+    frameByProcessId: framesByProcessId,
+    mainFrameNavigations,
     traceIsGeneric,
   };
 }

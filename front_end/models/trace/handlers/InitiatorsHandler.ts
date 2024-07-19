@@ -24,8 +24,11 @@ const lastInvalidationEventForFrame = new Map<string, Types.TraceEvents.TraceEve
 // is called.
 const lastUpdateLayoutTreeByFrame = new Map<string, Types.TraceEvents.TraceEventUpdateLayoutTree>();
 
+// This tracks postmessage dispatch and handler events for creating initiator association
+const postMessageHandlerEvents: Types.TraceEvents.TraceEventHandlePostMessage[] = [];
+const schedulePostMessageEventByTraceId: Map<string, Types.TraceEvents.TraceEventSchedulePostMessage> = new Map();
+
 // These two maps store the same data but in different directions.
-//
 // For a given event, tell me what its initiator was. An event can only have one initiator.
 const eventToInitiatorMap = new Map<Types.TraceEvents.TraceEventData, Types.TraceEvents.TraceEventData>();
 // For a given event, tell me what events it initiated. An event can initiate
@@ -49,6 +52,8 @@ export function reset(): void {
   requestIdleCallbackEventsById.clear();
   flowStartById.clear();
   webSocketCreateEventsById.clear();
+  schedulePostMessageEventByTraceId.clear();
+  postMessageHandlerEvents.length = 0;
 
   handlerState = HandlerState.UNINITIALIZED;
 }
@@ -92,7 +97,7 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
       }
     }
   } else if (Types.TraceEvents.isTraceEventInvalidateLayout(event)) {
-    return; // skip this for now.
+    return;  // skip this for now.
     // By default, the InvalidateLayout event is what triggered the layout invalidation for this frame.
     let invalidationInitiator: Types.TraceEvents.TraceEventData = event;
 
@@ -182,14 +187,35 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
     // eg {"args":{},"cat":"flowy","id":24418,"name":"DoStuff","ph":"s","pid":1,"tid":1,"ts":3679},
     flowStartById.set(event.id, event);
 
-  } else if (event.ph === Types.TraceEvents.Phase.FLOW_END) { // perfetto also needs `bp:e` on this. shrug.
+  } else if (event.ph === Types.TraceEvents.Phase.FLOW_END) {  // perfetto also needs `bp:e` on this. shrug.
     // eg {"args":{},"bp":"e","cat":"flowy","id":24418,"name":"DoStuff","ph":"f","pid":1,"tid":2,"ts":3681},
     const matchingStartEvent = flowStartById.get(event.id);
-     storeInitiator({
-        event,
-        initiator: matchingStartEvent,
-      });
-    console.log('got pair', event, matchingStartEvent)
+    storeInitiator({
+      event,
+      initiator: matchingStartEvent,
+    });
+    // console.log('got pair', event, matchingStartEvent)
+  }
+  // Store schedulePostMessage Events by their traceIds.
+  // so they can be reconciled later with matching handlePostMessage events with same traceIds.
+  else if (Types.TraceEvents.isTraceEventHandlePostMessage(event)) {
+    postMessageHandlerEvents.push(event);
+  } else if (Types.TraceEvents.isTraceEventSchedulePostMessage(event)) {
+    const traceId = event.args.data?.traceId;
+    if (traceId) {
+      schedulePostMessageEventByTraceId.set(traceId, event);
+    }
+  }
+}
+
+function finalizeInitiatorRelationship(): void {
+  for (const handlerEvent of postMessageHandlerEvents) {
+    const traceId = handlerEvent.args.data?.traceId;
+    const matchingSchedulePostMesssageEvent = schedulePostMessageEventByTraceId.get(traceId);
+    if (matchingSchedulePostMesssageEvent) {
+      // Set schedulePostMesssage events as initiators for handler events.
+      storeInitiator({event: handlerEvent, initiator: matchingSchedulePostMesssageEvent});
+    }
   }
 }
 
@@ -198,6 +224,11 @@ export async function finalize(): Promise<void> {
     throw new Error('InitiatorsHandler is not initialized');
   }
 
+  // During event processing, we may encounter initiators before the handler events themselves
+  // (e.g dispatch events on worker and handler events on the main thread)
+  // we don't want to miss out on events whose initiators haven't been processed yet
+  finalizeInitiatorRelationship();
+
   handlerState = HandlerState.FINALIZED;
 }
 
@@ -205,9 +236,10 @@ export interface InitiatorsData {
   eventToInitiator: Map<Types.TraceEvents.TraceEventData, Types.TraceEvents.TraceEventData>;
   initiatorToEvents: Map<Types.TraceEvents.TraceEventData, Types.TraceEvents.TraceEventData[]>;
 }
+
 export function data(): InitiatorsData {
   return {
-    eventToInitiator: new Map(eventToInitiatorMap),
-    initiatorToEvents: new Map(initiatorToEventsMap),
+    eventToInitiator: eventToInitiatorMap,
+    initiatorToEvents: initiatorToEventsMap,
   };
 }

@@ -182,24 +182,25 @@ interface SplitColorFunctionParametersOptions {
 }
 
 export function parse(text: string): Color|null {
-  // Simple - #hex, nickname
-  const value = text.toLowerCase().replace(/\s+/g, '');
-  const simple = /^(?:#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})|(\w+))$/i;
-  let match = value.match(simple);
-  if (match) {
-    if (match[1]) {
-      return Legacy.fromHex(match[1], text);
-    }
+  // #hex, nickname
+  if (!text.match(/\s/)) {
+    const match = text.toLowerCase().match(/^(?:#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})|(\w+))$/i);
+    if (match) {
+      if (match[1]) {
+        return Legacy.fromHex(match[1], text);
+      }
 
-    if (match[2]) {
-      return Legacy.fromName(match[2], text);
-    }
+      if (match[2]) {
+        return Legacy.fromName(match[2], text);
+      }
 
-    return null;
+      return null;
+    }
   }
 
   // rgb/rgba(), hsl/hsla(), hwb/hwba(), lch(), oklch(), lab(), oklab() and color()
-  match = text.toLowerCase().match(/^\s*(?:(rgba?)|(hsla?)|(hwba?)|(lch)|(oklch)|(lab)|(oklab)|(color))\((.*)\)\s*$/);
+  const match =
+      text.toLowerCase().match(/^\s*(?:(rgba?)|(hsla?)|(hwba?)|(lch)|(oklch)|(lab)|(oklab)|(color))\((.*)\)\s*$/);
   if (match) {
     const isRgbaMatch = Boolean(match[1]);   // rgb/rgba()
     const isHslaMatch = Boolean(match[2]);   // hsl/hsla()
@@ -370,7 +371,7 @@ function parseRgbNumeric(value: string): number|null {
   return parsed / 255;
 }
 
-function parseHueNumeric(value: string): number|null {
+export function parseHueNumeric(value: string): number|null {
   const angle = value.replace(/(deg|g?rad|turn)$/, '');
   // @ts-ignore: isNaN can accept strings
   if (isNaN(angle) || value.match(/\s+(deg|g?rad|turn)/)) {
@@ -657,6 +658,7 @@ export interface Color {
   setAlpha(alpha: number): Color;
   format(): Format;
   as<T extends Format>(format: T): ReturnType<ColorConversions[T]>;
+  is<T extends Format>(format: T): this is ReturnType<ColorConversions[T]>;
   asLegacyColor(): Legacy;
   getAuthoredText(): string|null;
 
@@ -789,6 +791,9 @@ export class Lab implements Color {
     this.b = b;
     this.alpha = clamp(alpha, {min: 0, max: 1});
     this.#authoredText = authoredText;
+  }
+  is<T extends Format>(format: T): this is ReturnType<ColorConversions[T]> {
+    return format === this.format();
   }
   as<T extends Format>(format: T): ReturnType<ColorConversions[T]> {
     return Lab.#conversions[format](this) as ReturnType<ColorConversions[T]>;
@@ -928,6 +933,9 @@ export class LCH implements Color {
   }
   asLegacyColor(): Legacy {
     return this.as(Format.RGBA);
+  }
+  is<T extends Format>(format: T): this is ReturnType<ColorConversions[T]> {
+    return format === this.format();
   }
   as<T extends Format>(format: T): ReturnType<ColorConversions[T]> {
     return LCH.#conversions[format](this) as ReturnType<ColorConversions[T]>;
@@ -1070,6 +1078,9 @@ export class Oklab implements Color {
   asLegacyColor(): Legacy {
     return this.as(Format.RGBA);
   }
+  is<T extends Format>(format: T): this is ReturnType<ColorConversions[T]> {
+    return format === this.format();
+  }
   as<T extends Format>(format: T): ReturnType<ColorConversions[T]> {
     return Oklab.#conversions[format](this) as ReturnType<ColorConversions[T]>;
   }
@@ -1205,6 +1216,9 @@ export class Oklch implements Color {
   }
   asLegacyColor(): Legacy {
     return this.as(Format.RGBA);
+  }
+  is<T extends Format>(format: T): this is ReturnType<ColorConversions[T]> {
+    return format === this.format();
   }
   as<T extends Format>(format: T): ReturnType<ColorConversions[T]> {
     return Oklch.#conversions[format](this) as ReturnType<ColorConversions[T]>;
@@ -1374,6 +1388,9 @@ export class ColorFunction implements Color {
   }
   asLegacyColor(): Legacy {
     return this.as(Format.RGBA);
+  }
+  is<T extends Format>(format: T): this is ReturnType<ColorConversions[T]> {
+    return format === this.format();
   }
   as<T extends Format>(format: T): ReturnType<ColorConversions[T]> {
     if (this.colorSpace === format) {
@@ -1592,6 +1609,9 @@ export class HSL implements Color {
   format(): Format {
     return this.alpha === null || this.alpha === 1 ? Format.HSL : Format.HSLA;
   }
+  is<T extends Format>(format: T): this is ReturnType<ColorConversions[T]> {
+    return format === this.format();
+  }
   as<T extends Format>(format: T): ReturnType<ColorConversions[T]> {
     if (format === this.format()) {
       return this as ReturnType<ColorConversions[T]>;
@@ -1745,6 +1765,9 @@ export class HWB implements Color {
   }
   format(): Format {
     return this.alpha !== null && !equals(this.alpha, 1) ? Format.HWBA : Format.HWB;
+  }
+  is<T extends Format>(format: T): this is ReturnType<ColorConversions[T]> {
+    return format === this.format();
   }
   as<T extends Format>(format: T): ReturnType<ColorConversions[T]> {
     if (format === this.format()) {
@@ -1944,6 +1967,9 @@ export class Legacy implements Color {
     return new Legacy(rgba, Format.RGBA);
   }
 
+  is<T extends Format>(format: T): this is ReturnType<ColorConversions[T]> {
+    return format === this.format();
+  }
   as<T extends Format>(format: T): ReturnType<ColorConversions[T]> {
     if (format === this.format()) {
       return this as ReturnType<ColorConversions[T]>;
@@ -2296,9 +2322,9 @@ const COLOR_TO_RGBA_ENTRIES: Array<readonly[string, number[]]> = [
   ['transparent', [0, 0, 0, 0]],
 ];
 
-Platform.DCHECK(() => {
-  return COLOR_TO_RGBA_ENTRIES.every(([nickname]) => nickname.toLowerCase() === nickname);
-}, 'All color nicknames must be lowercase.');
+console.assert(
+    COLOR_TO_RGBA_ENTRIES.every(([nickname]) => nickname.toLowerCase() === nickname),
+    'All color nicknames must be lowercase.');
 
 export const Nicknames = new Map(COLOR_TO_RGBA_ENTRIES);
 

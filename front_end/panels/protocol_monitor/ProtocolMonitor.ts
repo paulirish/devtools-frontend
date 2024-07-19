@@ -190,6 +190,7 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
     this.dataGridRowForId = new Map();
     this.requestTimeForId = new Map();
     const topToolbar = new UI.Toolbar.Toolbar('protocol-monitor-toolbar', this.contentElement);
+    topToolbar.element.setAttribute('jslog', `${VisualLogging.toolbar('top')}`);
     this.contentElement.classList.add('protocol-monitor');
     const recordButton = new UI.Toolbar.ToolbarToggle(
         i18nString(UIStrings.record), 'record-start', 'record-stop', 'protocol-monitor.toggle-recording');
@@ -257,7 +258,7 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
           hideable: true,
         },
         {
-          id: 'elapsedTime',
+          id: 'elapsed-time',
           title: i18nString(UIStrings.elapsedTime),
           sortable: true,
           widthWeighting: 2,
@@ -293,7 +294,7 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
       contextMenus: {
         bodyRow:
             (menu: UI.ContextMenu.ContextMenu, columns: readonly DataGrid.DataGridUtils.Column[],
-             row: Readonly<DataGrid.DataGridUtils.Row>): void => {
+             row: Readonly<DataGrid.DataGridUtils.Row>) => {
               const methodColumn = DataGrid.DataGridUtils.getRowEntryForColumnId(row, 'method');
               const typeColumn = DataGrid.DataGridUtils.getRowEntryForColumnId(row, 'type');
               /**
@@ -311,7 +312,7 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
                   splitWidget.toggleSidebar();
                 }
                 this.dispatchEventToListeners(Events.CommandChange, {command, parameters, targetId});
-              });
+              }, {jslogContext: 'edit-and-resend'});
 
               /**
                * You can click the "Filter" item in the context menu to filter the
@@ -321,7 +322,7 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
               menu.editSection().appendItem(i18nString(UIStrings.filter), () => {
                 const methodColumn = DataGrid.DataGridUtils.getRowEntryForColumnId(row, 'method');
                 this.textFilterUI.setValue(`method:${methodColumn.value}`, true);
-              });
+              }, {jslogContext: 'filter'});
 
               /**
                * You can click the "Documentation" item in the context menu to be
@@ -336,7 +337,7 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
                 Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(
                     `https://chromedevtools.github.io/devtools-protocol/tot/${domain}#${type}-${method}` as
                     Platform.DevToolsPath.UrlString);
-              });
+              }, {jslogContext: 'documentation'});
             },
       },
     };
@@ -379,6 +380,7 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
       this.dataGridIntegrator.update({...this.dataGridIntegrator.data(), filters});
     });
     const bottomToolbar = new UI.Toolbar.Toolbar('protocol-monitor-bottom-toolbar', this.contentElement);
+    bottomToolbar.element.setAttribute('jslog', `${VisualLogging.toolbar('bottom')}`);
     bottomToolbar.appendToolbarItem(splitWidget.createShowHideSidebarButton(
         i18nString(UIStrings.showCDPCommandEditor), i18nString(UIStrings.hideCDPCommandEditor),
         i18nString(UIStrings.CDPCommandEditorShown), i18nString(UIStrings.CDPCommandEditorHidden),
@@ -532,7 +534,7 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
             };
           }
 
-          if (cell.columnId === 'elapsedTime') {
+          if (cell.columnId === 'elapsed-time') {
             const requestTime = this.requestTimeForId.get(message.id as number);
             if (requestTime) {
               return {
@@ -576,7 +578,7 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
           value: Date.now() - this.startTime,
           renderer: timeRenderer,
         },
-        {columnId: 'elapsedTime', value: ''},
+        {columnId: 'elapsed-time', value: ''},
         {columnId: 'type', value: responseIcon, title: 'received', renderer: DataGrid.DataGridRenderers.iconRenderer},
         {columnId: 'target', value: this.targetToString(sdkTarget)},
         {columnId: 'session', value: message.sessionId || ''},
@@ -614,7 +616,7 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
           value: Date.now() - this.startTime,
           renderer: timeRenderer,
         },
-        {columnId: 'elapsedTime', value: '(pending)'},
+        {columnId: 'elapsed-time', value: '(pending)'},
         {
           columnId: 'type',
           value: requestResponseIcon,
@@ -665,7 +667,7 @@ export class ProtocolMonitorImpl extends UI.Widget.VBox {
   #sideBarMinWidth = 400;
   constructor() {
     super(true);
-    this.element.setAttribute('jslog', `${VisualLogging.panel().context('protocol-monitor')}`);
+    this.element.setAttribute('jslog', `${VisualLogging.panel('protocol-monitor').track({resize: true})}`);
     this.#split =
         new UI.SplitWidget.SplitWidget(true, false, 'protocol-monitor-split-container', this.#sideBarMinWidth);
     this.#split.show(this.contentElement);
@@ -767,9 +769,7 @@ export class InfoWidget extends UI.Widget.VBox {
   }
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum Events {
+export const enum Events {
   CommandSent = 'CommandSent',
   CommandChange = 'CommandChange',
 }
@@ -783,7 +783,7 @@ export class EditorWidget extends Common.ObjectWrapper.eventMixin<EventTypes, ty
   readonly jsonEditor: Components.JSONEditor.JSONEditor;
   constructor() {
     super();
-    this.element.setAttribute('jslog', `${VisualLogging.pane().context('command-editor')}`);
+    this.element.setAttribute('jslog', `${VisualLogging.pane('command-editor').track({resize: true})}`);
     this.jsonEditor = new Components.JSONEditor.JSONEditor();
     this.jsonEditor.metadataByCommand = metadataByCommand;
     this.jsonEditor.typesByName = typesByName as Map<string, Components.JSONEditor.Parameter[]>;

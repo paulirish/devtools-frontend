@@ -85,7 +85,9 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
   }
 
   enableCreateBreadcrumbsButton(): void {
-    this.overviewGrid.enableCreateBreadcrumbsButton();
+    const breacrumbsElement = this.overviewGrid.enableCreateBreadcrumbsButton();
+    breacrumbsElement.addEventListener('mousemove', this.onMouseMove.bind(this), true);
+    breacrumbsElement.addEventListener('mouseleave', this.hideCursor.bind(this), true);
   }
 
   private onMouseMove(event: Event): void {
@@ -94,7 +96,9 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
     }
     const mouseEvent = (event as MouseEvent);
     const target = (event.target as HTMLElement);
-    this.cursorPosition = mouseEvent.offsetX + target.offsetLeft;
+    const offsetLeftRelativeToCursorArea =
+        target.getBoundingClientRect().left - this.cursorArea.getBoundingClientRect().left;
+    this.cursorPosition = mouseEvent.offsetX + offsetLeftRelativeToCursorArea;
     this.cursorElement.style.left = this.cursorPosition + 'px';
     this.cursorElement.style.visibility = 'visible';
     void this.overviewInfo.setContent(this.buildOverviewInfo());
@@ -286,9 +290,7 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
   }
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum Events {
+export const enum Events {
   OverviewPaneWindowChanged = 'OverviewPaneWindowChanged',
   OverviewPaneBreadcrumbAdded = 'OverviewPaneBreadcrumbAdded',
 }
@@ -398,7 +400,7 @@ export class OverviewInfo {
     this.glassPane.setMarginBehavior(UI.GlassPane.MarginBehavior.Arrow);
     this.glassPane.setSizeBehavior(UI.GlassPane.SizeBehavior.MeasureContent);
     this.visible = false;
-    this.element = UI.Utils
+    this.element = UI.UIUtils
                        .createShadowRootWithCoreStyles(this.glassPane.contentElement, {
                          cssFile: [timelineOverviewInfoStyles],
                          delegatesFocus: undefined,
