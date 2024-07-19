@@ -1027,7 +1027,10 @@ export class TimelineUIUtils {
      * map them to the viewport dimensions, which we get in CSS pixels. We do that by dividing the values by the devicePixelRatio.
      * See https://crbug.com/1300309
     */
-    const dpr = traceParseData.Meta.devicePixelRatio ?? 1;
+    const currentDprWithoutPagezoom = window.devicePixelRatio % 1 === 0 ?
+        window.devicePixelRatio : Math.round(window.devicePixelRatio);
+    const dpr = traceParseData.Meta.devicePixelRatio ?? currentDprWithoutPagezoom;
+
     const affectedElementsOldRects =
         event.args.data?.impacted_nodes?.map(
             node => new DOMRect(
