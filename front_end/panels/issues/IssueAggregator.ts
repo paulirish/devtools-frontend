@@ -40,6 +40,8 @@ export class AggregatedIssue extends IssuesManager.Issue.Issue {
   #deprecationIssues = new Set<IssuesManager.DeprecationIssue.DeprecationIssue>();
   #issueKind = IssuesManager.Issue.IssueKind.Improvement;
   #lowContrastIssues = new Set<IssuesManager.LowTextContrastIssue.LowTextContrastIssue>();
+  #cookieDeprecationMetadataIssues =
+      new Set<IssuesManager.CookieDeprecationMetadataIssue.CookieDeprecationMetadataIssue>();
   #mixedContentIssues = new Set<IssuesManager.MixedContentIssue.MixedContentIssue>();
   #sharedArrayBufferIssues = new Set<IssuesManager.SharedArrayBufferIssue.SharedArrayBufferIssue>();
   #quirksModeIssues = new Set<IssuesManager.QuirksModeIssue.QuirksModeIssue>();
@@ -91,6 +93,11 @@ export class AggregatedIssue extends IssuesManager.Issue.Issue {
 
   getHeavyAdIssues(): Iterable<IssuesManager.HeavyAdIssue.HeavyAdIssue> {
     return this.#heavyAdIssues;
+  }
+
+  getCookieDeprecationMetadataIssues():
+      Iterable<IssuesManager.CookieDeprecationMetadataIssue.CookieDeprecationMetadataIssue> {
+    return this.#cookieDeprecationMetadataIssues;
   }
 
   getMixedContentIssues(): Iterable<IssuesManager.MixedContentIssue.MixedContentIssue> {
@@ -194,6 +201,9 @@ export class AggregatedIssue extends IssuesManager.Issue.Issue {
       if (!this.#affectedLocations.has(key)) {
         this.#affectedLocations.set(key, location);
       }
+    }
+    if (issue instanceof IssuesManager.CookieDeprecationMetadataIssue.CookieDeprecationMetadataIssue) {
+      this.#cookieDeprecationMetadataIssues.add(issue);
     }
     if (issue instanceof IssuesManager.MixedContentIssue.MixedContentIssue) {
       this.#mixedContentIssues.add(issue);

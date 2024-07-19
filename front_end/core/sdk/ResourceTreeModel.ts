@@ -32,25 +32,23 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+import type * as ProtocolProxyApi from '../../generated/protocol-proxy-api.js';
+import * as Protocol from '../../generated/protocol.js';
 import * as Common from '../common/common.js';
 import * as i18n from '../i18n/i18n.js';
 import * as Platform from '../platform/platform.js';
-import type * as ProtocolProxyApi from '../../generated/protocol-proxy-api.js';
-import * as Protocol from '../../generated/protocol.js';
 
-import {DOMModel, type DeferredDOMNode, type DOMNode} from './DOMModel.js';
-
+import {type DeferredDOMNode, DOMModel, type DOMNode} from './DOMModel.js';
+import {FrameManager} from './FrameManager.js';
 import {Events as NetworkManagerEvents, NetworkManager, type RequestUpdateDroppedEventData} from './NetworkManager.js';
 import {type NetworkRequest} from './NetworkRequest.js';
 import {Resource} from './Resource.js';
 import {ExecutionContext, RuntimeModel} from './RuntimeModel.js';
-
-import {Capability, Type, type Target} from './Target.js';
 import {SDKModel} from './SDKModel.js';
-import {TargetManager} from './TargetManager.js';
 import {SecurityOriginManager} from './SecurityOriginManager.js';
 import {StorageKeyManager} from './StorageKeyManager.js';
-import {FrameManager} from './FrameManager.js';
+import {Capability, type Target, Type} from './Target.js';
+import {TargetManager} from './TargetManager.js';
 
 export class ResourceTreeModel extends SDKModel<EventTypes> {
   readonly agent: ProtocolProxyApi.PageApi;
@@ -67,7 +65,6 @@ export class ResourceTreeModel extends SDKModel<EventTypes> {
   isInterstitialShowing: boolean;
   mainFrame: ResourceTreeFrame|null;
   #pendingBackForwardCacheNotUsedEvents: Set<Protocol.Page.BackForwardCacheNotUsedEvent>;
-  #pendingPrerenderAttemptCompletedEvents: Set<Protocol.Preload.PrerenderAttemptCompletedEvent>;
 
   constructor(target: Target) {
     super(target);
@@ -83,9 +80,7 @@ export class ResourceTreeModel extends SDKModel<EventTypes> {
     this.#securityOriginManager = (target.model(SecurityOriginManager) as SecurityOriginManager);
     this.#storageKeyManager = (target.model(StorageKeyManager) as StorageKeyManager);
     this.#pendingBackForwardCacheNotUsedEvents = new Set<Protocol.Page.BackForwardCacheNotUsedEvent>();
-    this.#pendingPrerenderAttemptCompletedEvents = new Set<Protocol.Preload.PrerenderAttemptCompletedEvent>();
     target.registerPageDispatcher(new PageDispatcher(this));
-    target.registerPreloadDispatcher(new PreloadDispatcher(this));
 
     this.framesInternal = new Map();
     this.#cachedResourcesProcessed = false;
@@ -237,6 +232,9 @@ export class ResourceTreeModel extends SDKModel<EventTypes> {
     if (type) {
       frame.backForwardCacheDetails.restoredFromCache = type === Protocol.Page.NavigationType.BackForwardCacheRestore;
     }
+    if (frame.isMainFrame()) {
+      this.target().setInspectedURL(frame.url);
+    }
     this.dispatchEventToListeners(Events.FrameNavigated, frame);
 
     if (frame.isPrimaryFrame()) {
@@ -249,9 +247,6 @@ export class ResourceTreeModel extends SDKModel<EventTypes> {
       this.dispatchEventToListeners(Events.ResourceAdded, resources[i]);
     }
 
-    if (frame.isMainFrame()) {
-      this.target().setInspectedURL(frame.url);
-    }
     this.updateSecurityOrigins();
     void this.updateStorageKeys();
 
@@ -422,6 +417,10 @@ export class ResourceTreeModel extends SDKModel<EventTypes> {
   }
 
   reloadPage(ignoreCache?: boolean, scriptToEvaluateOnLoad?: string): void {
+    const loaderId = this.mainFrame?.loaderId;
+    if (!loaderId) {
+      return;
+    }
     // Only dispatch PageReloadRequested upon first reload request to simplify client logic.
     if (!this.#pendingReloadOptions) {
       this.dispatchEventToListeners(Events.PageReloadRequested, this);
@@ -436,12 +435,10 @@ export class ResourceTreeModel extends SDKModel<EventTypes> {
       networkManager.clearRequests();
     }
     this.dispatchEventToListeners(Events.WillReloadPage);
-    void this.agent.invoke_reload({ignoreCache, scriptToEvaluateOnLoad});
+    void this.agent.invoke_reload({ignoreCache, scriptToEvaluateOnLoad, loaderId});
   }
 
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  navigate(url: Platform.DevToolsPath.UrlString): Promise<any> {
+  navigate(url: Platform.DevToolsPath.UrlString): Promise<Protocol.Page.NavigateResponse> {
     return this.agent.invoke_navigate({url});
   }
 
@@ -469,7 +466,7 @@ export class ResourceTreeModel extends SDKModel<EventTypes> {
     data: string|null,
     errors: Array<Protocol.Page.AppManifestError>,
   }> {
-    const response = await this.agent.invoke_getAppManifest();
+    const response = await this.agent.invoke_getAppManifest({});
     if (response.getError()) {
       return {url: response.url as Platform.DevToolsPath.UrlString, data: null, errors: []};
     }
@@ -604,20 +601,6 @@ export class ResourceTreeModel extends SDKModel<EventTypes> {
     }
   }
 
-  onPrerenderAttemptCompleted(event: Protocol.Preload.PrerenderAttemptCompletedEvent): void {
-    if (this.mainFrame && this.mainFrame.id === event.initiatingFrameId) {
-      this.mainFrame.setPrerenderFinalStatus(event.finalStatus);
-      this.dispatchEventToListeners(Events.PrerenderingStatusUpdated, this.mainFrame);
-      if (event.disallowedApiMethod) {
-        this.mainFrame.setPrerenderDisallowedApiMethod(event.disallowedApiMethod);
-      }
-    } else {
-      this.#pendingPrerenderAttemptCompletedEvents.add(event);
-    }
-
-    this.dispatchEventToListeners(Events.PrerenderAttemptCompleted, event);
-  }
-
   processPendingEvents(frame: ResourceTreeFrame): void {
     if (!frame.isMainFrame()) {
       return;
@@ -629,32 +612,16 @@ export class ResourceTreeModel extends SDKModel<EventTypes> {
         break;
       }
     }
-    for (const event of this.#pendingPrerenderAttemptCompletedEvents) {
-      if (frame.id === event.initiatingFrameId) {
-        frame.setPrerenderFinalStatus(event.finalStatus);
-
-        if (event.disallowedApiMethod) {
-          frame.setPrerenderDisallowedApiMethod(event.disallowedApiMethod);
-        }
-
-        this.#pendingPrerenderAttemptCompletedEvents.delete(event);
-        break;
-      }
-    }
     // No need to dispatch events here as this method call is followed by a `PrimaryPageChanged` event.
   }
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
 export enum Events {
   FrameAdded = 'FrameAdded',
   FrameNavigated = 'FrameNavigated',
   FrameDetached = 'FrameDetached',
   FrameResized = 'FrameResized',
   FrameWillNavigate = 'FrameWillNavigate',
-  // Primary page changes can be either main frame navigations or activations of a background frame.
-  // TODO(crbug.com/1393057): Let frame activations trigger this event.
   PrimaryPageChanged = 'PrimaryPageChanged',
   ResourceAdded = 'ResourceAdded',
   WillLoadCachedResources = 'WillLoadCachedResources',
@@ -667,8 +634,6 @@ export enum Events {
   InterstitialShown = 'InterstitialShown',
   InterstitialHidden = 'InterstitialHidden',
   BackForwardCacheDetailsUpdated = 'BackForwardCacheDetailsUpdated',
-  PrerenderingStatusUpdated = 'PrerenderingStatusUpdated',
-  PrerenderAttemptCompleted = 'PrerenderAttemptCompleted',
   JavaScriptDialogOpening = 'JavaScriptDialogOpening',
 }
 
@@ -690,8 +655,6 @@ export type EventTypes = {
   [Events.InterstitialShown]: void,
   [Events.InterstitialHidden]: void,
   [Events.BackForwardCacheDetailsUpdated]: ResourceTreeFrame,
-  [Events.PrerenderingStatusUpdated]: ResourceTreeFrame,
-  [Events.PrerenderAttemptCompleted]: Protocol.Preload.PrerenderAttemptCompletedEvent,
   [Events.JavaScriptDialogOpening]: Protocol.Page.JavascriptDialogOpeningEvent,
 };
 
@@ -700,7 +663,7 @@ export class ResourceTreeFrame {
   #sameTargetParentFrameInternal: ResourceTreeFrame|null;
   readonly #idInternal: Protocol.Page.FrameId;
   crossTargetParentFrameId: string|null;
-  #loaderIdInternal: string;
+  #loaderIdInternal: Protocol.Network.LoaderId;
   #nameInternal: string|null|undefined;
   #urlInternal: Platform.DevToolsPath.UrlString;
   #domainAndRegistryInternal: string;
@@ -724,8 +687,6 @@ export class ResourceTreeFrame {
     explanations: [],
     explanationsTree: undefined,
   };
-  prerenderFinalStatus: Protocol.Preload.PrerenderFinalStatus|null;
-  prerenderDisallowedApiMethod: string|null;
 
   constructor(
       model: ResourceTreeModel, parentFrame: ResourceTreeFrame|null, frameId: Protocol.Page.FrameId,
@@ -735,7 +696,7 @@ export class ResourceTreeFrame {
     this.#idInternal = frameId;
     this.crossTargetParentFrameId = null;
 
-    this.#loaderIdInternal = (payload && payload.loaderId) || '';
+    this.#loaderIdInternal = payload?.loaderId ?? '' as Protocol.Network.LoaderId;
     this.#nameInternal = payload && payload.name;
     this.#urlInternal =
         payload && payload.url as Platform.DevToolsPath.UrlString || Platform.DevToolsPath.EmptyUrlString;
@@ -754,8 +715,6 @@ export class ResourceTreeFrame {
     this.#childFramesInternal = new Set();
 
     this.resourcesMap = new Map();
-    this.prerenderFinalStatus = null;
-    this.prerenderDisallowedApiMethod = null;
 
     if (this.#sameTargetParentFrameInternal) {
       this.#sameTargetParentFrameInternal.#childFramesInternal.add(this);
@@ -857,7 +816,7 @@ export class ResourceTreeFrame {
     return this.#unreachableUrlInternal;
   }
 
-  get loaderId(): string {
+  get loaderId(): Protocol.Network.LoaderId {
     return this.#loaderIdInternal;
   }
 
@@ -932,7 +891,7 @@ export class ResourceTreeFrame {
   }
 
   /**
-   * Returns true is this is the primary frame of the browser tab. There can only be one primary frame for each
+   * Returns true if this is the primary frame of the browser tab. There can only be one primary frame for each
    * browser tab. It is the outermost frame being actively displayed in the browser tab.
    * https://chromium.googlesource.com/chromium/src/+/HEAD/docs/frame_trees.md
    */
@@ -1062,7 +1021,7 @@ export class ResourceTreeFrame {
       return highlightFrameOwner(parentFrame.resourceTreeModel().domModel());
     }
 
-    // Portals.
+    // Fenced frames.
     if (parentTarget?.type() === Type.Frame) {
       const domModel = parentTarget.model(DOMModel);
       if (domModel) {
@@ -1111,14 +1070,6 @@ export class ResourceTreeFrame {
 
   getResourcesMap(): Map<string, Resource> {
     return this.resourcesMap;
-  }
-
-  setPrerenderFinalStatus(status: Protocol.Preload.PrerenderFinalStatus): void {
-    this.prerenderFinalStatus = status;
-  }
-
-  setPrerenderDisallowedApiMethod(disallowedApiMethod: string): void {
-    this.prerenderDisallowedApiMethod = disallowedApiMethod;
   }
 }
 
@@ -1221,35 +1172,6 @@ export class PageDispatcher implements ProtocolProxyApi.PageDispatcher {
   }
 
   downloadProgress(): void {
-  }
-}
-
-class PreloadDispatcher implements ProtocolProxyApi.PreloadDispatcher {
-  #resourceTreeModel: ResourceTreeModel;
-  constructor(resourceTreeModel: ResourceTreeModel) {
-    this.#resourceTreeModel = resourceTreeModel;
-  }
-
-  ruleSetUpdated(_event: Protocol.Preload.RuleSetUpdatedEvent): void {
-  }
-
-  ruleSetRemoved(_event: Protocol.Preload.RuleSetRemovedEvent): void {
-  }
-
-  prerenderAttemptCompleted(params: Protocol.Preload.PrerenderAttemptCompletedEvent): void {
-    this.#resourceTreeModel.onPrerenderAttemptCompleted(params);
-  }
-
-  prefetchStatusUpdated(_event: Protocol.Preload.PrefetchStatusUpdatedEvent): void {
-  }
-
-  prerenderStatusUpdated(_event: Protocol.Preload.PrerenderStatusUpdatedEvent): void {
-  }
-
-  preloadEnabledStateUpdated(_event: Protocol.Preload.PreloadEnabledStateUpdatedEvent): void {
-  }
-
-  preloadingAttemptSourcesUpdated(): void {
   }
 }
 

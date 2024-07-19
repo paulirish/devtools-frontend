@@ -4,8 +4,6 @@ Interaction tests are used to test individual pieces of DevTools in isolation - 
 
 Interaction tests are run against examples on the [Components Server](../../scripts/component_server/README.md), so your first step to writing an Interaction test is to create the required examples you want to test against.
 
-You can run the interaction tests with `npm run auto-interactionstest`. This will automatically run the components server and then the tests.
-
 When writing an interactions test, you should use the `loadComponentDocExample()` helper to instruct the test to navigate to a particular example within the component server. Any pages that you load must also be passed into the `preloadForCodeCoverage` function, which enables the coverage instrumentation.
 
 ```ts
@@ -35,11 +33,25 @@ itScreenshot('loads a trace file and renders it in the timeline', async () => {
 
 The first time this test runs, it will create a new stored image in `test/interactions/goldens`. On any future runs, it will compare the generated screenshot against that golden, and fail if there is a difference.
 
-### Generating and/or updating screenshots on all platforms via CQ bots
+We store and assert golden screenshots from Linux. Mac and Windows are deliberately excluded as web content rarely changes has platform-specific bugs. Developers can update screenshots locally or use screenshots generated from the CQ bots.
 
-We store golden screenshots on 3 platforms: Mac, Linux and Windows. Rather than require a developer to have access to all 3, we are able to run and use screenshots generated from the CQ bots.
+### Updating screenshots locally
 
-Note: you must be a Google employee to follow this process.
+When you need to update a screenshot because you have purposefully changed the UI:
+
+```sh
+npm run test -- $TESTPATH --on-diff=update
+```
+
+This tells the test runner to update any screenshots that fail. Once you've done this, the process is identical to when you add a new screenshot:
+
+1. Commit the changes for your platform locally.
+2. Trigger a CQ run and wait for it to finish.
+3. Fetch the new screenshots from the bots by using `./scripts/tools/update_goldens_v2.py`.
+
+Note that if you do this step on Linux, you shouldn't need to then get the updates from the bot, because the bots also test and run on Linux.
+
+### Generating and/or updating screenshots via CQ bots
 
 Once you have generated your screenshot locally on your platform, you should upload your CL and trigger a dry-run. This will fail due to missing screenshots, but once it is complete we can then fetch the screenshots from the server.
 
@@ -57,17 +69,3 @@ And then call the script to update the golden screenshots:
 ```
 
 This will fetch any relevant screenshots locally. You can then commit these and update your CL. Please manually check the screenshots to ensure they are as expected on all platforms!
-
-### Updating screenshots locally
-
-When you need to update a screenshot because you have purposefully changed the UI, you need to run the interactions tests with a flag:
-
-```
-FORCE_UPDATE_ALL_GOLDENS=1 npm run auto-interactionstest
-```
-
-This tells the test runner to update any screenshots that fail. Once you've done this, the process is identical to when you add a new screenshot:
-
-1. Commit the changes for your platform locally.
-2. Trigger a CQ run and wait for it to finish.
-3. Fetch the new screenshots from the bots by using `./scripts/tools/update_goldens_v2.py`.

@@ -37,6 +37,7 @@ import * as SDK from '../../core/sdk/sdk.js';
 import * as IssuesManager from '../../models/issues_manager/issues_manager.js';
 import * as CookieTable from '../../ui/legacy/components/cookie_table/cookie_table.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import cookieItemsViewStyles from './cookieItemsView.css.js';
 import {StorageItemsView} from './StorageItemsView.js';
@@ -88,7 +89,7 @@ class CookiePreviewWidget extends UI.Widget.VBox {
     super();
     this.setMinimumSize(230, 45);
     this.cookie = null;
-    this.showDecodedSetting = Common.Settings.Settings.instance().createSetting('cookieViewShowDecoded', false);
+    this.showDecodedSetting = Common.Settings.Settings.instance().createSetting('cookie-view-show-decoded', false);
 
     const header = document.createElement('div');
     header.classList.add('cookie-preview-widget-header');
@@ -98,7 +99,8 @@ class CookiePreviewWidget extends UI.Widget.VBox {
     header.appendChild(span);
     this.contentElement.appendChild(header);
 
-    const toggle = UI.UIUtils.CheckboxLabel.create(i18nString(UIStrings.showUrlDecoded), this.showDecodedSetting.get());
+    const toggle = UI.UIUtils.CheckboxLabel.create(
+        i18nString(UIStrings.showUrlDecoded), this.showDecodedSetting.get(), undefined, 'show-url-decoded');
     toggle.classList.add('cookie-preview-widget-toggle');
     toggle.checkboxElement.addEventListener('click', () => this.showDecoded(!this.showDecodedSetting.get()));
     header.appendChild(toggle);
@@ -111,6 +113,7 @@ class CookiePreviewWidget extends UI.Widget.VBox {
     this.value = value;
 
     this.contentElement.classList.add('cookie-preview-widget');
+    this.contentElement.setAttribute('jslog', `${VisualLogging.section('cookie-preview')}`);
     this.contentElement.appendChild(value);
   }
 
@@ -163,8 +166,6 @@ export class CookieItemsView extends StorageItemsView {
   private readonly previewWidget: CookiePreviewWidget;
   private readonly emptyWidget: UI.EmptyWidget.EmptyWidget;
   private onlyIssuesFilterUI: UI.Toolbar.ToolbarCheckbox;
-  private readonly refreshThrottler: Common.Throttler.Throttler;
-  private eventDescriptors: Common.EventTarget.EventDescriptor[];
   private allCookies: SDK.Cookie.Cookie[];
   private shownCookies: SDK.Cookie.Cookie[];
   private selectedCookie: SDK.Cookie.Cookie|null;
@@ -172,6 +173,7 @@ export class CookieItemsView extends StorageItemsView {
     super(i18nString(UIStrings.cookies), 'cookiesPanel');
 
     this.element.classList.add('storage-view');
+    this.element.setAttribute('jslog', `${VisualLogging.pane('cookies-data')}`);
 
     this.model = model;
     this.cookieDomain = cookieDomain;
@@ -184,10 +186,11 @@ export class CookieItemsView extends StorageItemsView {
     this.cookiesTable.setMinimumSize(0, 50);
 
     this.splitWidget = new UI.SplitWidget.SplitWidget(
-        /* isVertical: */ false, /* secondIsSidebar: */ true, 'cookieItemsSplitViewState');
+        /* isVertical: */ false, /* secondIsSidebar: */ true, 'cookie-items-split-view-state');
     this.splitWidget.show(this.element);
 
     this.previewPanel = new UI.Widget.VBox();
+    this.previewPanel.element.setAttribute('jslog', `${VisualLogging.pane('preview').track({resize: true})}`);
     const resizer = this.previewPanel.element.createChild('div', 'preview-panel-resizer');
 
     this.splitWidget.setMainWidget(this.cookiesTable);
@@ -201,11 +204,8 @@ export class CookieItemsView extends StorageItemsView {
     this.onlyIssuesFilterUI = new UI.Toolbar.ToolbarCheckbox(
         i18nString(UIStrings.onlyShowCookiesWithAnIssue), i18nString(UIStrings.onlyShowCookiesWhichHaveAn), () => {
           this.updateWithCookies(this.allCookies);
-        });
+        }, 'only-show-cookies-with-issues');
     this.appendToolbarItem(this.onlyIssuesFilterUI);
-
-    this.refreshThrottler = new Common.Throttler.Throttler(300);
-    this.eventDescriptors = [];
 
     this.allCookies = [];
     this.shownCookies = [];
@@ -215,17 +215,11 @@ export class CookieItemsView extends StorageItemsView {
   }
 
   setCookiesDomain(model: SDK.CookieModel.CookieModel, domain: string): void {
+    this.model.removeEventListener(SDK.CookieModel.Events.CookieListUpdated, this.onCookieListUpdate, this);
     this.model = model;
     this.cookieDomain = domain;
     this.refreshItems();
-    Common.EventTarget.removeEventListeners(this.eventDescriptors);
-    const networkManager = model.target().model(SDK.NetworkManager.NetworkManager);
-    if (networkManager) {
-      this.eventDescriptors = [
-        networkManager.addEventListener(SDK.NetworkManager.Events.ResponseReceived, this.onResponseReceived, this),
-        networkManager.addEventListener(SDK.NetworkManager.Events.LoadingFinished, this.onLoadingFinished, this),
-      ];
-    }
+    this.model.addEventListener(SDK.CookieModel.Events.CookieListUpdated, this.onCookieListUpdate, this);
   }
 
   private showPreview(cookie: SDK.Cookie.Cookie|null): void {
@@ -307,32 +301,25 @@ export class CookieItemsView extends StorageItemsView {
    */
   override deleteAllItems(): void {
     this.showPreview(null);
-    void this.model.deleteCookies(this.shownCookies).then(() => this.refreshItems());
+    void this.model.deleteCookies(this.shownCookies);
   }
 
   override deleteSelectedItem(): void {
     const selectedCookie = this.cookiesTable.selectedCookie();
     if (selectedCookie) {
       this.showPreview(null);
-      void this.model.deleteCookie(selectedCookie).then(() => this.refreshItems());
+      void this.model.deleteCookie(selectedCookie);
     }
   }
 
-  override refreshItems(): void {
+  private onCookieListUpdate(): void {
     void this.model.getCookiesForDomain(this.cookieDomain).then(this.updateWithCookies.bind(this));
   }
 
-  refreshItemsThrottled(): void {
-    void this.refreshThrottler.schedule(() => Promise.resolve(this.refreshItems()));
+  override refreshItems(): void {
+    void this.model.getCookiesForDomain(this.cookieDomain, true).then(this.updateWithCookies.bind(this));
   }
 
-  private onResponseReceived(): void {
-    this.refreshItemsThrottled();
-  }
-
-  private onLoadingFinished(): void {
-    this.refreshItemsThrottled();
-  }
   override wasShown(): void {
     super.wasShown();
     this.registerCSSFiles([cookieItemsViewStyles]);

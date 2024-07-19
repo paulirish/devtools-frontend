@@ -20,7 +20,7 @@ var SelectorType;
     SelectorType["Text"] = "text";
     SelectorType["XPath"] = "xpath";
     SelectorType["Pierce"] = "pierce";
-})(SelectorType = SelectorType || (SelectorType = {}));
+})(SelectorType || (SelectorType = {}));
 var StepType;
 (function (StepType) {
     StepType["Change"] = "change";
@@ -37,17 +37,17 @@ var StepType;
     StepType["SetViewport"] = "setViewport";
     StepType["WaitForElement"] = "waitForElement";
     StepType["WaitForExpression"] = "waitForExpression";
-})(StepType = StepType || (StepType = {}));
+})(StepType || (StepType = {}));
 var AssertedEventType;
 (function (AssertedEventType) {
     AssertedEventType["Navigation"] = "navigation";
-})(AssertedEventType = AssertedEventType || (AssertedEventType = {}));
+})(AssertedEventType || (AssertedEventType = {}));
 
 var Schema = /*#__PURE__*/Object.freeze({
     __proto__: null,
+    get AssertedEventType () { return AssertedEventType; },
     get SelectorType () { return SelectorType; },
-    get StepType () { return StepType; },
-    get AssertedEventType () { return AssertedEventType; }
+    get StepType () { return StepType; }
 });
 
 /**
@@ -868,10 +868,10 @@ const formatAsJSLiteral = (content) => {
 class PuppeteerStringifyExtension extends StringifyExtension {
     #shouldAppendWaitForElementHelper = false;
     async beforeAllSteps(out, flow) {
-        out.appendLine("const puppeteer = require('puppeteer'); // v20.7.4 or later");
+        out.appendLine("const puppeteer = require('puppeteer'); // v22.0.0 or later");
         out.appendLine('');
         out.appendLine('(async () => {').startBlock();
-        out.appendLine("const browser = await puppeteer.launch({headless: 'new'});");
+        out.appendLine('const browser = await puppeteer.launch();');
         out.appendLine('const page = await browser.newPage();');
         out.appendLine(`const timeout = ${flow.timeout || defaultTimeout};`);
         out.appendLine('page.setDefaultTimeout(timeout);');
@@ -1400,6 +1400,11 @@ const comparators = {
     '>=': (a, b) => a >= b,
     '<=': (a, b) => a <= b,
 };
+function waitForTimeout(timeout) {
+    return new Promise((resolve) => {
+        setTimeout(resolve, timeout);
+    });
+}
 class PuppeteerRunnerExtension extends RunnerExtension {
     browser;
     page;
@@ -1508,14 +1513,14 @@ class PuppeteerRunnerExtension extends RunnerExtension {
                 {
                     startWaitingForEvents();
                     await mainPage.keyboard.down(step.key);
-                    await mainPage.waitForTimeout(100);
+                    await waitForTimeout(100);
                 }
                 break;
             case StepType.KeyUp:
                 {
                     startWaitingForEvents();
                     await mainPage.keyboard.up(step.key);
-                    await mainPage.waitForTimeout(100);
+                    await waitForTimeout(100);
                 }
                 break;
             case StepType.Close:
@@ -1837,9 +1842,7 @@ async function createRunner(flowOrExtension, maybeExtension) {
 }
 async function createPuppeteerRunnerOwningBrowserExtension() {
     const { default: puppeteer } = await import('puppeteer');
-    const browser = await puppeteer.launch({
-        headless: 'new',
-    });
+    const browser = await puppeteer.launch();
     const page = await browser.newPage();
     return new PuppeteerRunnerOwningBrowserExtension(browser, page);
 }

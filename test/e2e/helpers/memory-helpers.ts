@@ -7,14 +7,15 @@ import type * as puppeteer from 'puppeteer-core';
 
 import {
   $,
-  platform,
-  waitForElementWithTextContent,
   $$,
   click,
   clickElement,
   getBrowserAndPages,
   pasteText,
+  platform,
   waitFor,
+  waitForAria,
+  waitForElementWithTextContent,
   waitForFunction,
   waitForNone,
 } from '../../shared/helper.js';
@@ -22,8 +23,8 @@ import {
 const NEW_HEAP_SNAPSHOT_BUTTON = 'button[aria-label="Take heap snapshot"]';
 const MEMORY_PANEL_CONTENT = 'div[aria-label="Memory panel"]';
 const PROFILE_TREE_SIDEBAR = 'div.profiles-tree-sidebar';
-export const MEMORY_TAB_ID = '#tab-heap_profiler';
-const CLASS_FILTER_INPUT = 'div[aria-placeholder="Class filter"]';
+export const MEMORY_TAB_ID = '#tab-heap-profiler';
+const CLASS_FILTER_INPUT = 'div[aria-placeholder="Filter by class"]';
 const SELECTED_RESULT = '#profile-views table.data tr.data-grid-data-grid-node.revealed.parent.selected';
 
 export async function navigateToMemoryTab() {
@@ -131,7 +132,7 @@ export async function setSearchFilter(text: string) {
 
 export async function waitForSearchResultNumber(results: number) {
   const findMatch = async () => {
-    const currentMatch = await waitFor('label[for=\'search-input-field\']');
+    const currentMatch = await waitFor('.search-results-matches');
     const currentTextContent = currentMatch && await currentMatch.evaluate(el => el.textContent);
     if (currentTextContent && currentTextContent.endsWith(` ${results}`)) {
       return currentMatch;
@@ -144,7 +145,7 @@ export async function waitForSearchResultNumber(results: number) {
 export async function findSearchResult(searchResult: string, pollIntrerval: number = 500) {
   const {frontend} = getBrowserAndPages();
   const match = await waitFor('#profile-views table.data');
-  const matches = await waitFor('label.search-results-matches');
+  const matches = await waitFor(' .search-results-matches');
   const matchesText = await matches.evaluate(async element => {
     return element.textContent;
   });
@@ -153,7 +154,7 @@ export async function findSearchResult(searchResult: string, pollIntrerval: numb
   } else {
     await waitForFunction(async () => {
       const selectedBefore = await waitFor(SELECTED_RESULT);
-      await click('[aria-label="Search next"]');
+      await click('[aria-label="Show next result"]');
       // Wait until the click has taken effect by checking that the selected
       // result has changed. This is done to prevent the assertion afterwards
       // from happening before the next result is fully loaded.
@@ -281,4 +282,80 @@ export async function changeAllocationSampleViewViaDropdown(newPerspective: stri
     throw new Error(`Could not find heap snapshot perspective option: ${newPerspective}`);
   }
   await dropdown.select(optionValue);
+}
+
+export async function focusTableRow(text: string) {
+  const row = await waitFor(`//span[text()="${text}"]/ancestor::tr`, undefined, undefined, 'xpath');
+  // Click in a numeric cell, to avoid accidentally clicking a link.
+  const cell = await waitFor('.numeric-column', row);
+  await clickElement(cell);
+}
+
+export async function expandFocusedRow() {
+  const {frontend} = getBrowserAndPages();
+  await frontend.keyboard.press('ArrowRight');
+  await waitFor('.selected.data-grid-data-grid-node.expanded');
+}
+
+async function getSizesFromRow(row: puppeteer.ElementHandle<Element>) {
+  const numericData = await $$('.numeric-column>.profile-multiple-values>span', row);
+  assert.strictEqual(numericData.length, 4);
+  function readNumber(e: Element) {
+    return parseInt((e.textContent as string).replaceAll('\xa0', ''), 10);
+  }
+  const shallowSize = await numericData[0].evaluate(readNumber);
+  const retainedSize = await numericData[2].evaluate(readNumber);
+  assert.isTrue(retainedSize >= shallowSize);
+  return {shallowSize, retainedSize};
+}
+
+export async function getSizesFromSelectedRow() {
+  const row = await waitFor('.selected.data-grid-data-grid-node');
+  return await getSizesFromRow(row);
+}
+
+export async function getCategoryRow(text: string, wait: boolean = true) {
+  const selector = `//td[text()="${text}"]/ancestor::tr`;
+  return await (wait ? waitFor(selector, undefined, undefined, 'xpath') : $(selector, undefined, 'xpath'));
+}
+
+export async function getSizesFromCategoryRow(text: string) {
+  const row = await getCategoryRow(text);
+  return await getSizesFromRow(row);
+}
+
+export async function getDistanceFromCategoryRow(text: string) {
+  const row = await getCategoryRow(text);
+  const numericColumns = await $$('.numeric-column', row);
+  return await numericColumns[0].evaluate(e => parseInt(e.textContent as string, 10));
+}
+
+export async function getCountFromCategoryRow(text: string) {
+  const row = await getCategoryRow(text);
+  const countSpan = await waitFor('.objects-count', row);
+  return await countSpan.evaluate(e => parseInt((e.textContent ?? '').substring(1), 10));
+}
+
+export async function clickOnContextMenuForRetainer(retainerName: string, menuItem: string) {
+  const retainersPane = await waitFor('.retaining-paths-view');
+  const element = await waitFor(`//span[text()="${retainerName}"]`, retainersPane, undefined, 'xpath');
+  await clickElement(element, {clickOptions: {button: 'right'}});
+  const button = await waitForAria(menuItem);
+  await clickElement(button);
+}
+
+export async function restoreIgnoredRetainers() {
+  const element = await waitFor('button[aria-label="Restore ignored retainers"]');
+  await clickElement(element);
+}
+
+export async function setFilterDropdown(filter: string) {
+  const select = await waitFor('select.toolbar-item[aria-label="Filter"]');
+  await select.select(filter);
+}
+
+export async function checkExposeInternals() {
+  const element =
+      await waitForElementWithTextContent('Expose internals (includes additional implementation-specific details)');
+  await clickElement(element);
 }

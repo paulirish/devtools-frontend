@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import type * as Common from '../../../../core/common/common.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
-import {assertNotNullOrUndefined} from '../../../../core/platform/platform.js';
-import type * as SDK from '../../../../core/sdk/sdk.js';
-import * as Protocol from '../../../../generated/protocol.js';
-
 import type * as Platform from '../../../../core/platform/platform.js';
+import {assertNotNullOrUndefined} from '../../../../core/platform/platform.js';
+import * as SDK from '../../../../core/sdk/sdk.js';
+import * as Protocol from '../../../../generated/protocol.js';
+import * as Bindings from '../../../../models/bindings/bindings.js';
 
 const UIStrings = {
   /**
@@ -108,9 +109,15 @@ const UIStrings = {
    */
   PrefetchNotUsedProbeFailed: 'The prefetch was blocked by your Internet Service Provider or network administrator.',
   /**
-   *@description  Description text for Prefetch status PrefetchEvicted.
+   *@description  Description text for Prefetch status PrefetchEvictedForNewerPrefetch.
    */
-  PrefetchEvicted: 'The prefetch was discarded for a newer prefetch because |kPrefetchNewLimits| is enabled',
+  PrefetchEvictedForNewerPrefetch:
+      'The prefetch was discarded because the initiating page has too many prefetches ongoing, and this was one of the oldest.',
+  /**
+   *@description Description text for Prefetch status PrefetchEvictedAfterCandidateRemoved.
+   */
+  PrefetchEvictedAfterCandidateRemoved:
+      'The prefetch was discarded because no speculation rule in the initating page triggers a prefetch for this URL anymore.',
   /**
    *@description  Description text for Prefetch status PrefetchNotEligibleBatterySaverEnabled.
    */
@@ -119,7 +126,7 @@ const UIStrings = {
   /**
    *@description  Description text for Prefetch status PrefetchNotEligiblePreloadingDisabled.
    */
-  PrefetchNotEligiblePreloadingDisabled: 'The prefetch was not performed because preloading was disabled.',
+  PrefetchNotEligiblePreloadingDisabled: 'The prefetch was not performed because speculative loading was disabled.',
 
   /**
    *  Description text for PrerenderFinalStatus::kLowEndDevice.
@@ -179,11 +186,6 @@ const UIStrings = {
    */
   prerenderFinalStatusNavigationRequestNetworkError: 'The prerendering navigation encountered a network error.',
   /**
-   *  Description text for PrerenderFinalStatus::kMaxNumOfRunningPrerendersExceeded.
-   */
-  prerenderFinalStatusMaxNumOfRunningPrerendersExceeded:
-      'The prerender was not performed because the initiating page already has too many prerenders ongoing. Remove other speculation rules to enable further prerendering.',
-  /**
    *  Description text for PrerenderFinalStatus::kSslCertificateError.
    */
   prerenderFinalStatusSslCertificateError: 'The prerendering navigation failed because of an invalid SSL certificate.',
@@ -220,17 +222,12 @@ const UIStrings = {
   prerenderFinalStatusMemoryLimitExceeded:
       'The prerender was not performed because the browser exceeded the prerendering memory limit.',
   /**
-   *  Description text for PrerenderFinalStatus::kFailToGetMemoryUsage.
-   */
-  prerenderFinalStatusFailToGetMemoryUsage:
-      'The prerender was not performed because the browser encountered an internal error attempting to determine current memory usage.',
-  /**
    *  Description text for PrerenderFinalStatus::kDataSaverEnabled.
    */
   prerenderFinalStatusDataSaverEnabled:
       'The prerender was not performed because the user requested that the browser use less data.',
   /**
-   *  Description text for PrerenderFinalStatus::kHasEffectiveUrl.
+   *  Description text for PrerenderFinalStatus::TriggerUrlHasEffectiveUrl.
    */
   prerenderFinalStatusHasEffectiveUrl:
       'The initiating page cannot perform prerendering, because it has an effective URL that is different from its normal URL. (For example, the New Tab Page, or hosted apps.)',
@@ -258,7 +255,7 @@ const UIStrings = {
    *  Description text for PrerenderFinalStatus::kSameSiteCrossOriginNavigationNotOptInInInitialNavigation.
    */
   prerenderFinalStatusSameSiteCrossOriginNavigationNotOptInInInitialNavigation:
-      'The prerendered page navigated itself to a cross-origin same-site URL, but the destination response did not include the appropriate Supports-Loading-Mode header.',
+      'The prerendering navigation failed because it was to a cross-origin same-site URL, but the destination response did not include the appropriate Supports-Loading-Mode header.',
   /**
    *  Description text for PrerenderFinalStatus::kActivationNavigationParameterMismatch.
    */
@@ -327,15 +324,85 @@ const UIStrings = {
   prerenderFinalStatusPrerenderingDisabledByDevTools:
       'The prerender was not performed because DevTools has been used to disable prerendering.',
   /**
-   *  Description text for PrerenderFinalStatus::kResourceLoadBlockedByClient.
-   */
-  prerenderFinalStatusResourceLoadBlockedByClient: 'Some resource load was blocked.',
-
-  // TODO(kprokopenko): Please provide meaningful description.
-  /**
    * Description text for PrerenderFinalStatus::kSpeculationRuleRemoved.
    */
-  prerenderFinalStatusSpeculationRuleRemoved: 'Unknown',
+  prerenderFinalStatusSpeculationRuleRemoved:
+      'The prerendered page was unloaded because the initiating page removed the corresponding prerender rule from <script type="speculationrules">.',
+  /**
+   * Description text for PrerenderFinalStatus::kActivatedWithAuxiliaryBrowsingContexts.
+   */
+  prerenderFinalStatusActivatedWithAuxiliaryBrowsingContexts:
+      'The prerender was not used because during activation time, there were other windows with an active opener reference to the initiating page, which is currently not supported.',
+  /**
+   * Description text for PrerenderFinalStatus::kMaxNumOfRunningEagerPrerendersExceeded.
+   */
+  prerenderFinalStatusMaxNumOfRunningEagerPrerendersExceeded:
+      'The prerender whose eagerness is "eager" was not performed because the initiating page already has too many prerenders ongoing. Remove other speculation rules with "eager" to enable further prerendering.',
+  /**
+   * Description text for PrerenderFinalStatus::kMaxNumOfRunningEmbedderPrerendersExceeded.
+   */
+  prerenderFinalStatusMaxNumOfRunningEmbedderPrerendersExceeded:
+      'The browser-triggered prerender was not performed because the initiating page already has too many prerenders ongoing.',
+  /**
+   * Description text for PrerenderFinalStatus::kMaxNumOfRunningNonEagerPrerendersExceeded.
+   */
+  prerenderFinalStatusMaxNumOfRunningNonEagerPrerendersExceeded:
+      'The old non-eager prerender (with a "moderate" or "conservative" eagerness and triggered by hovering or clicking links) was automatically canceled due to starting a new non-eager prerender. It can be retriggered by interacting with the link again.',
+  /**
+   * Description text for PrenderFinalStatus::kPrerenderingUrlHasEffectiveUrl.
+   */
+  prerenderFinalStatusPrerenderingUrlHasEffectiveUrl:
+      'The prerendering navigation failed because it has an effective URL that is different from its normal URL. (For example, the New Tab Page, or hosted apps.)',
+  /**
+   * Description text for PrenderFinalStatus::kRedirectedPrerenderingUrlHasEffectiveUrl.
+   */
+  prerenderFinalStatusRedirectedPrerenderingUrlHasEffectiveUrl:
+      'The prerendering navigation failed because it redirected to an effective URL that is different from its normal URL. (For example, the New Tab Page, or hosted apps.)',
+  /**
+   * Description text for PrenderFinalStatus::kActivationUrlHasEffectiveUrl.
+   */
+  prerenderFinalStatusActivationUrlHasEffectiveUrl:
+      'The prerender was not used because during activation time, navigation has an effective URL that is different from its normal URL. (For example, the New Tab Page, or hosted apps.)',
+  /**
+   * Description text for PrenderFinalStatus::kJavaScriptInterfaceAdded.
+   */
+  prerenderFinalStatusJavaScriptInterfaceAdded:
+      'The prerendered page was unloaded because a new JavaScript interface has been injected by WebView.addJavascriptInterface().',
+  /**
+   * Description text for PrenderFinalStatus::kJavaScriptInterfaceRemoved.
+   */
+  prerenderFinalStatusJavaScriptInterfaceRemoved:
+      'The prerendered page was unloaded because a JavaScript interface has been removed by WebView.removeJavascriptInterface().',
+  /**
+   * Description text for PrenderFinalStatus::kAllPrerenderingCanceled.
+   */
+  prerenderFinalStatusAllPrerenderingCanceled:
+      'All prerendered pages were unloaded by the browser for some reason (For example, WebViewCompat.addWebMessageListener() was called during prerendering.)',
+
+  /**
+   *@description Text in grid and details: Preloading attempt is not yet triggered.
+   */
+  statusNotTriggered: 'Not triggered',
+  /**
+   *@description Text in grid and details: Preloading attempt is eligible but pending.
+   */
+  statusPending: 'Pending',
+  /**
+   *@description Text in grid and details: Preloading is running.
+   */
+  statusRunning: 'Running',
+  /**
+   *@description Text in grid and details: Preloading finished and the result is ready for the next navigation.
+   */
+  statusReady: 'Ready',
+  /**
+   *@description Text in grid and details: Ready, then used.
+   */
+  statusSuccess: 'Success',
+  /**
+   *@description Text in grid and details: Preloading failed.
+   */
+  statusFailure: 'Failure',
 };
 
 const str_ = i18n.i18n.registerUIStrings('panels/application/preloading/components/PreloadingString.ts', UIStrings);
@@ -367,7 +434,8 @@ export const PrefetchReasonDescription: {[key: string]: {name: () => Platform.UI
   'PrefetchNotUsedCookiesChanged': {name: i18nLazyString(UIStrings.PrefetchNotUsedCookiesChanged)},
   'PrefetchProxyNotAvailable': {name: i18nLazyString(UIStrings.PrefetchProxyNotAvailable)},
   'PrefetchNotUsedProbeFailed': {name: i18nLazyString(UIStrings.PrefetchNotUsedProbeFailed)},
-  'PrefetchEvicted': {name: i18nLazyString(UIStrings.PrefetchEvicted)},
+  'PrefetchEvictedForNewerPrefetch': {name: i18nLazyString(UIStrings.PrefetchEvictedForNewerPrefetch)},
+  'PrefetchEvictedAfterCandidateRemoved': {name: i18nLazyString(UIStrings.PrefetchEvictedAfterCandidateRemoved)},
   'PrefetchNotEligibleBatterySaverEnabled': {name: i18nLazyString(UIStrings.PrefetchNotEligibleBatterySaverEnabled)},
   'PrefetchNotEligiblePreloadingDisabled': {name: i18nLazyString(UIStrings.PrefetchNotEligiblePreloadingDisabled)},
 };
@@ -410,8 +478,10 @@ export function prefetchFailureReason({prefetchStatus}: SDK.PreloadingModel.Pref
       return PrefetchReasonDescription['PrefetchFailedPerPageLimitExceeded'].name();
     case Protocol.Preload.PrefetchStatus.PrefetchIneligibleRetryAfter:
       return PrefetchReasonDescription['PrefetchIneligibleRetryAfter'].name();
-    case Protocol.Preload.PrefetchStatus.PrefetchEvicted:
-      return PrefetchReasonDescription['PrefetchEvicted'].name();
+    case Protocol.Preload.PrefetchStatus.PrefetchEvictedForNewerPrefetch:
+      return PrefetchReasonDescription['PrefetchEvictedForNewerPrefetch'].name();
+    case Protocol.Preload.PrefetchStatus.PrefetchEvictedAfterCandidateRemoved:
+      return PrefetchReasonDescription['PrefetchEvictedAfterCandidateRemoved'].name();
     case Protocol.Preload.PrefetchStatus.PrefetchIsPrivacyDecoy:
       return PrefetchReasonDescription['PrefetchIsPrivacyDecoy'].name();
     case Protocol.Preload.PrefetchStatus.PrefetchIsStale:
@@ -470,9 +540,6 @@ export function prerenderFailureReason(attempt: SDK.PreloadingModel.PrerenderAtt
       return i18nString(UIStrings.prerenderFinalStatusInvalidSchemeRedirect);
     case Protocol.Preload.PrerenderFinalStatus.InvalidSchemeNavigation:
       return i18nString(UIStrings.prerenderFinalStatusInvalidSchemeNavigation);
-    case Protocol.Preload.PrerenderFinalStatus.InProgressNavigation:
-      // Not used.
-      return i18n.i18n.lockedString('Internal error');
     case Protocol.Preload.PrerenderFinalStatus.NavigationRequestBlockedByCsp:
       return i18nString(UIStrings.prerenderFinalStatusNavigationRequestBlockedByCsp);
     case Protocol.Preload.PrerenderFinalStatus.MainFrameNavigation:
@@ -500,8 +567,6 @@ export function prerenderFailureReason(attempt: SDK.PreloadingModel.PrerenderAtt
       return i18nString(UIStrings.prerenderFinalStatusClientCertRequested);
     case Protocol.Preload.PrerenderFinalStatus.NavigationRequestNetworkError:
       return i18nString(UIStrings.prerenderFinalStatusNavigationRequestNetworkError);
-    case Protocol.Preload.PrerenderFinalStatus.MaxNumOfRunningPrerendersExceeded:
-      return i18nString(UIStrings.prerenderFinalStatusMaxNumOfRunningPrerendersExceeded);
     case Protocol.Preload.PrerenderFinalStatus.CancelAllHostsForTesting:
       // Used only in tests.
       throw new Error('unreachable');
@@ -525,16 +590,11 @@ export function prerenderFailureReason(attempt: SDK.PreloadingModel.PrerenderAtt
       return i18nString(UIStrings.prerenderFinalStatusMixedContent);
     case Protocol.Preload.PrerenderFinalStatus.TriggerBackgrounded:
       return i18nString(UIStrings.prerenderFinalStatusTriggerBackgrounded);
-    case Protocol.Preload.PrerenderFinalStatus.EmbedderTriggeredAndCrossOriginRedirected:
-      // Not used.
-      return i18n.i18n.lockedString('Internal error');
     case Protocol.Preload.PrerenderFinalStatus.MemoryLimitExceeded:
       return i18nString(UIStrings.prerenderFinalStatusMemoryLimitExceeded);
-    case Protocol.Preload.PrerenderFinalStatus.FailToGetMemoryUsage:
-      return i18nString(UIStrings.prerenderFinalStatusFailToGetMemoryUsage);
     case Protocol.Preload.PrerenderFinalStatus.DataSaverEnabled:
       return i18nString(UIStrings.prerenderFinalStatusDataSaverEnabled);
-    case Protocol.Preload.PrerenderFinalStatus.HasEffectiveUrl:
+    case Protocol.Preload.PrerenderFinalStatus.TriggerUrlHasEffectiveUrl:
       return i18nString(UIStrings.prerenderFinalStatusHasEffectiveUrl);
     case Protocol.Preload.PrerenderFinalStatus.ActivatedBeforeStarted:
       // Status for debugging.
@@ -605,10 +665,31 @@ export function prerenderFailureReason(attempt: SDK.PreloadingModel.PrerenderAtt
       return i18nString(UIStrings.prerenderFinalStatusMemoryPressureAfterTriggered);
     case Protocol.Preload.PrerenderFinalStatus.PrerenderingDisabledByDevTools:
       return i18nString(UIStrings.prerenderFinalStatusPrerenderingDisabledByDevTools);
-    case Protocol.Preload.PrerenderFinalStatus.ResourceLoadBlockedByClient:
-      return i18nString(UIStrings.prerenderFinalStatusResourceLoadBlockedByClient);
     case Protocol.Preload.PrerenderFinalStatus.SpeculationRuleRemoved:
       return i18nString(UIStrings.prerenderFinalStatusSpeculationRuleRemoved);
+    case Protocol.Preload.PrerenderFinalStatus.ActivatedWithAuxiliaryBrowsingContexts:
+      return i18nString(UIStrings.prerenderFinalStatusActivatedWithAuxiliaryBrowsingContexts);
+    case Protocol.Preload.PrerenderFinalStatus.MaxNumOfRunningEagerPrerendersExceeded:
+      return i18nString(UIStrings.prerenderFinalStatusMaxNumOfRunningEagerPrerendersExceeded);
+    case Protocol.Preload.PrerenderFinalStatus.MaxNumOfRunningEmbedderPrerendersExceeded:
+      return i18nString(UIStrings.prerenderFinalStatusMaxNumOfRunningEmbedderPrerendersExceeded);
+    case Protocol.Preload.PrerenderFinalStatus.MaxNumOfRunningNonEagerPrerendersExceeded:
+      return i18nString(UIStrings.prerenderFinalStatusMaxNumOfRunningNonEagerPrerendersExceeded);
+    case Protocol.Preload.PrerenderFinalStatus.PrerenderingUrlHasEffectiveUrl:
+      return i18nString(UIStrings.prerenderFinalStatusPrerenderingUrlHasEffectiveUrl);
+    case Protocol.Preload.PrerenderFinalStatus.RedirectedPrerenderingUrlHasEffectiveUrl:
+      return i18nString(UIStrings.prerenderFinalStatusRedirectedPrerenderingUrlHasEffectiveUrl);
+    case Protocol.Preload.PrerenderFinalStatus.ActivationUrlHasEffectiveUrl:
+      return i18nString(UIStrings.prerenderFinalStatusActivationUrlHasEffectiveUrl);
+    case Protocol.Preload.PrerenderFinalStatus.JavaScriptInterfaceAdded:
+      return i18nString(UIStrings.prerenderFinalStatusJavaScriptInterfaceAdded);
+    case Protocol.Preload.PrerenderFinalStatus.JavaScriptInterfaceRemoved:
+      return i18nString(UIStrings.prerenderFinalStatusJavaScriptInterfaceRemoved);
+    case Protocol.Preload.PrerenderFinalStatus.AllPrerenderingCanceled:
+      return i18nString(UIStrings.prerenderFinalStatusAllPrerenderingCanceled);
+    case Protocol.Preload.PrerenderFinalStatus.WindowClosed:
+      // TODO(crbug.com/350870118): Add message for this.
+      return '';
     default:
       // Note that we use switch and exhaustiveness check to prevent to
       // forget updating these strings, but allow to handle unknown
@@ -616,5 +697,66 @@ export function prerenderFailureReason(attempt: SDK.PreloadingModel.PrerenderAtt
       return i18n.i18n.lockedString(`Unknown failure reason: ${
           attempt.prerenderStatus as
           'See https://docs.google.com/document/d/1PnrfowsZMt62PX1EvvTp2Nqs3ji1zrklrAEe1JYbkTk'}`);
+  }
+}
+
+export function ruleSetLocationShort(
+    ruleSet: Protocol.Preload.RuleSet, pageURL: Platform.DevToolsPath.UrlString): string {
+  const url = ruleSet.url === undefined ? pageURL : ruleSet.url as Platform.DevToolsPath.UrlString;
+  return Bindings.ResourceUtils.displayNameForURL(url);
+}
+
+export function capitalizedAction(action: Protocol.Preload.SpeculationAction): Common.UIString.LocalizedString {
+  // Use "prefetch"/"prerender" as is in SpeculationRules.
+  switch (action) {
+    case Protocol.Preload.SpeculationAction.Prefetch:
+      return i18n.i18n.lockedString('Prefetch');
+    case Protocol.Preload.SpeculationAction.Prerender:
+      return i18n.i18n.lockedString('Prerender');
+  }
+}
+
+export function status(status: SDK.PreloadingModel.PreloadingStatus): string {
+  // See content/public/browser/preloading.h PreloadingAttemptOutcome.
+  switch (status) {
+    case SDK.PreloadingModel.PreloadingStatus.NotTriggered:
+      return i18nString(UIStrings.statusNotTriggered);
+    case SDK.PreloadingModel.PreloadingStatus.Pending:
+      return i18nString(UIStrings.statusPending);
+    case SDK.PreloadingModel.PreloadingStatus.Running:
+      return i18nString(UIStrings.statusRunning);
+    case SDK.PreloadingModel.PreloadingStatus.Ready:
+      return i18nString(UIStrings.statusReady);
+    case SDK.PreloadingModel.PreloadingStatus.Success:
+      return i18nString(UIStrings.statusSuccess);
+    case SDK.PreloadingModel.PreloadingStatus.Failure:
+      return i18nString(UIStrings.statusFailure);
+      // NotSupported is used to handle unreachable case. For example,
+      // there is no code path for
+      // PreloadingTriggeringOutcome::kTriggeredButPending in prefetch,
+      // which is mapped to NotSupported. So, we regard it as an
+      // internal error.
+    case SDK.PreloadingModel.PreloadingStatus.NotSupported:
+      return i18n.i18n.lockedString('Internal error');
+  }
+}
+
+export function composedStatus(attempt: SDK.PreloadingModel.PreloadingAttempt): string {
+  const short = status(attempt.status);
+
+  if (attempt.status !== SDK.PreloadingModel.PreloadingStatus.Failure) {
+    return short;
+  }
+
+  switch (attempt.action) {
+    case Protocol.Preload.SpeculationAction.Prefetch: {
+      const detail = prefetchFailureReason(attempt) ?? i18n.i18n.lockedString('Internal error');
+      return short + ' - ' + detail;
+    }
+    case Protocol.Preload.SpeculationAction.Prerender: {
+      const detail = prerenderFailureReason(attempt);
+      assertNotNullOrUndefined(detail);
+      return short + ' - ' + detail;
+    }
   }
 }

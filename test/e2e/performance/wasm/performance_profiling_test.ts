@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import * as path from 'path';
 import type * as puppeteer from 'puppeteer-core';
 
+import {GEN_DIR} from '../../../conductor/paths.js';
 import {
   $,
   getBrowserAndPages,
@@ -52,7 +54,7 @@ async function expandAndCheckActivityTree(frontend: puppeteer.Page, expectedActi
   } while (index < expectedActivities.length);
 }
 
-describe('The Performance panel', async function() {
+describe('The Performance panel', function() {
   it('is able to record performance', async () => {
     const {target, frontend} = getBrowserAndPages();
 
@@ -102,7 +104,7 @@ async function searchForWasmCall() {
   });
 }
 
-describe('The Performance panel', async function() {
+describe('The Performance panel', function() {
   // These tests have lots of waiting which might take more time to execute
   if (this.timeout() !== 0) {
     this.timeout(20000);
@@ -114,7 +116,8 @@ describe('The Performance panel', async function() {
 
       const uploadProfileHandle = await waitFor<HTMLInputElement>('input[type=file]');
       assert.isNotNull(uploadProfileHandle, 'unable to upload the performance profile');
-      await uploadProfileHandle.uploadFile('test/e2e/resources/performance/wasm/mainWasm_profile.json');
+      await uploadProfileHandle.uploadFile(
+          path.join(GEN_DIR, 'test/e2e/resources/performance/wasm/mainWasm_profile.json'));
     });
 
     await step('search for "mainWasm"', async () => {
@@ -129,50 +132,57 @@ describe('The Performance panel', async function() {
     });
   });
 
-  it('is able to inspect the call stack for a wasm function from the bottom up', async () => {
-    const {frontend} = getBrowserAndPages();
-    const expectedActivities = ['mainWasm', 'js-to-wasm::i', '(anonymous)', 'Run Microtasks'];
+  // Flaky test
+  it.skipOnPlatforms(
+      ['mac'], '[crbug.com/1510890]: is able to inspect the call stack for a wasm function from the bottom up',
+      async () => {
+        const {frontend} = getBrowserAndPages();
+        const expectedActivities = ['mainWasm', 'js-to-wasm::i', '(anonymous)', 'Run Microtasks'];
 
-    await step('navigate to the Bottom Up tab', async () => {
-      await navigateToBottomUpTab();
-    });
-
-    await step(
-        'expand the tree for the "mainWasm" activity and check that it displays the correct values', async () => {
-          const timelineTree = await $('.timeline-tree-view') as puppeteer.ElementHandle<HTMLSelectElement>;
-          const rootActivity = await waitForElementWithTextContent(expectedActivities[0], timelineTree);
-          if (!rootActivity) {
-            assert.fail(`Could not find ${expectedActivities[0]} in frontend.`);
-          }
-          await rootActivity.click();
-          await expandAndCheckActivityTree(frontend, expectedActivities);
+        await step('navigate to the Bottom Up tab', async () => {
+          await navigateToBottomUpTab();
         });
-  });
 
-  it('is able to inspect the call stack for a wasm function from the call tree', async () => {
-    const {frontend} = getBrowserAndPages();
-    const expectedActivities = [
-      'Run Microtasks',
-      '(anonymous)',
-      'js-to-wasm::i',
-      'mainWasm',
-      'wasm-to-js::l-imports.getTime',
-      'getTime',
-    ];
+        await step(
+            'expand the tree for the "mainWasm" activity and check that it displays the correct values', async () => {
+              const timelineTree = await $('.timeline-tree-view') as puppeteer.ElementHandle<HTMLSelectElement>;
+              const rootActivity = await waitForElementWithTextContent(expectedActivities[0], timelineTree);
+              if (!rootActivity) {
+                assert.fail(`Could not find ${expectedActivities[0]} in frontend.`);
+              }
+              await rootActivity.click();
+              await expandAndCheckActivityTree(frontend, expectedActivities);
+            });
+      });
 
-    await step('navigate to the Call Tree tab', async () => {
-      await navigateToCallTreeTab();
-    });
+  // Flaky test
+  it.skipOnPlatforms(
+      ['mac'], '[crbug.com/1510890]: is able to inspect the call stack for a wasm function from the call tree',
+      async () => {
+        const {frontend} = getBrowserAndPages();
+        const expectedActivities = [
+          'Run Microtasks',
+          '(anonymous)',
+          'js-to-wasm::i',
+          'mainWasm',
+          'wasm-to-js::l-imports.getTime',
+          'getTime',
+        ];
 
-    await step(
-        'expand the tree for the "Run Microtasks" activity and check that it displays the correct values', async () => {
-          const timelineTree = await $('.timeline-tree-view') as puppeteer.ElementHandle<HTMLSelectElement>;
-          const rootActivity = await waitForElementWithTextContent(expectedActivities[0], timelineTree);
-          if (!rootActivity) {
-            assert.fail(`Could not find ${expectedActivities[0]} in frontend.`);
-          }
-          await rootActivity.click();
-          await expandAndCheckActivityTree(frontend, expectedActivities);
+        await step('navigate to the Call Tree tab', async () => {
+          await navigateToCallTreeTab();
         });
-  });
+
+        await step(
+            'expand the tree for the "Run Microtasks" activity and check that it displays the correct values',
+            async () => {
+              const timelineTree = await $('.timeline-tree-view') as puppeteer.ElementHandle<HTMLSelectElement>;
+              const rootActivity = await waitForElementWithTextContent(expectedActivities[0], timelineTree);
+              if (!rootActivity) {
+                assert.fail(`Could not find ${expectedActivities[0]} in frontend.`);
+              }
+              await rootActivity.click();
+              await expandAndCheckActivityTree(frontend, expectedActivities);
+            });
+      });
 });

@@ -13,7 +13,7 @@ import {
   typeIntoConsoleAndWaitForResult,
 } from '../helpers/console-helpers.js';
 
-describe('The Console Tab', async () => {
+describe('The Console Tab', () => {
   it('is able to log uncaught promise rejections into console', async () => {
     await goToResource('../resources/console/console-uncaught-promise.html');
     await navigateToConsoleTab();
@@ -23,7 +23,7 @@ describe('The Console Tab', async () => {
         `
         promiseTest1 @ console-uncaught-promise.html:3
         (anonymous) @ VM26:1
-        Promise.then (async)
+        Promise.then
         promiseTest1 @ console-uncaught-promise.html:6
         (anonymous) @ VM26:1
       `,
@@ -35,13 +35,13 @@ describe('The Console Tab', async () => {
         `
         promiseTest2 @ console-uncaught-promise.html:23
         (anonymous) @ VM44:1
-        Promise.then (async)
+        Promise.then
         (anonymous) @ console-uncaught-promise.html:19
-        Promise.catch (async)
+        Promise.catch
         (anonymous) @ console-uncaught-promise.html:18
-        Promise.catch (async)
+        Promise.catch
         (anonymous) @ console-uncaught-promise.html:17
-        Promise.catch (async)
+        Promise.catch
         promiseTest2 @ console-uncaught-promise.html:16
         (anonymous) @ VM44:1
       `,
@@ -53,7 +53,7 @@ describe('The Console Tab', async () => {
         `
         throwDOMException	@	console-uncaught-promise.html:39
         catcher	@	console-uncaught-promise.html:32
-        Promise.catch (async)
+        Promise.catch
         promiseTest3	@	console-uncaught-promise.html:31
         (anonymous)	@	VM66:1
       `,

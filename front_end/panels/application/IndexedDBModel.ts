@@ -443,6 +443,8 @@ export class IndexedDBModel extends SDK.SDKModel.SDKModel<EventTypes> implements
           Events.IndexedDBContentUpdated, {databaseId: databaseId, objectStoreName: objectStoreName, model: this});
     }
   }
+  attributionReportingTriggerRegistered(_event: Protocol.Storage.AttributionReportingTriggerRegisteredEvent): void {
+  }
 
   cacheStorageListUpdated(_event: Protocol.Storage.CacheStorageListUpdatedEvent): void {
   }
@@ -451,6 +453,13 @@ export class IndexedDBModel extends SDK.SDKModel.SDKModel<EventTypes> implements
   }
 
   interestGroupAccessed(_event: Protocol.Storage.InterestGroupAccessedEvent): void {
+  }
+
+  interestGroupAuctionEventOccurred(_event: Protocol.Storage.InterestGroupAuctionEventOccurredEvent): void {
+  }
+
+  interestGroupAuctionNetworkRequestCreated(_event: Protocol.Storage.InterestGroupAuctionNetworkRequestCreatedEvent):
+      void {
   }
 
   sharedStorageAccessed(_event: Protocol.Storage.SharedStorageAccessedEvent): void {
@@ -468,8 +477,6 @@ export class IndexedDBModel extends SDK.SDKModel.SDKModel<EventTypes> implements
 
 SDK.SDKModel.SDKModel.register(IndexedDBModel, {capabilities: SDK.Target.Capability.Storage, autostart: false});
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
 export enum Events {
   DatabaseAdded = 'DatabaseAdded',
   DatabaseRemoved = 'DatabaseRemoved',
@@ -506,6 +513,10 @@ export class DatabaseId {
   constructor(storageBucket: Protocol.Storage.StorageBucket, name: string) {
     this.storageBucket = storageBucket;
     this.name = name;
+  }
+
+  inBucket(storageBucket: Protocol.Storage.StorageBucket): boolean {
+    return this.storageBucket.name === storageBucket.name;
   }
 
   equals(databaseId: DatabaseId): boolean {

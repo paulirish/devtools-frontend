@@ -9,39 +9,10 @@
   flex-shrink: 0;
 }
 
-.styles-sidebar-pane-filter-box {
-  flex: auto;
-  display: flex;
-
-  & > input {
-    border: solid 1px var(--sys-color-neutral-outline);
-    border-radius: 4px;
-    width: 100%;
-    background: var(--color-background);
-    padding-left: 4px;
-    margin: 3px;
-  }
-
-  & > input:hover {
-    box-shadow: 0 0 0 1px var(--ref-palette-neutral90);
-  }
-
-  & > input:focus,
-  & > input:not(:placeholder-shown) {
-    box-shadow: var(--legacy-focus-ring-active-shadow);
-  }
-
-  & > input::placeholder {
-    color: var(--color-text-secondary);
-  }
-
-  @media (forced-colors: active) {
-    & > input {
-      border: 1px solid ButtonText;
-    }
-  }
-}
-
 .styles-sidebar-computed-style-widget {
   min-height: auto;
+}
+
+.styles-pane-toolbar {
+  width: 100%;
 }

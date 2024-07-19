@@ -151,6 +151,16 @@
       ],
     },
     {
+      name: "CSSCustomStateDeprecatedSyntax",
+      message: "`:--customstatename` is deprecated. Please use the `:state(customstatename)` syntax instead.",
+      translation_note: "Warning displayed to developers when their website uses `:--customstatename` in CSS. They can simply switch their CSS to `:state(customstatename)` and it will be the same.",
+      web_features: [
+        "kCSSCustomStateDeprecatedSyntax",
+      ],
+      milestone: 122,
+      chrome_status_feature: 5140610730426368,
+    },
+    {
       name: "CSSSelectorInternalMediaControlsOverlayCastButton",
       message: "The `disableRemotePlayback` attribute should be used in order to disable the default Cast integration instead of using `-internal-media-controls-overlay-cast-button` selector.",
       translation_note: "Warning displayed to developers when they hide the Cast button on a video element using the deprecated CSS selector instead of using the disableRemotePlayback attribute on the element.",
@@ -158,6 +168,24 @@
         "kCSSSelectorInternalMediaControlsOverlayCastButton",
       ],
       chrome_status_feature: 5714245488476160,
+    },
+    {
+      name: "CSSValueAppearanceNonStandard",
+      message: "CSS appearance values  `inner-spin-button`, `media-slider`, `media-sliderthumb`, `media-volume-slider`, `media-volume-sliderthumb`, `push-button`, `searchfield-cancel-button`, `slider-horizontal`, `sliderthumb-horizontal`, `sliderthumb-vertical`, `square-button` are not standardized and will be removed.",
+      translation_note: "Warning displayed to developers to let them know the CSS appearance property values they used are deprecated and will be removed.",
+      web_features: [
+        "kCSSValueAppearanceNonStandard",
+      ],
+      chrome_status_feature: 5066630972833792,
+    },
+    {
+      name: "CSSValueAppearanceSliderVertical",
+      message: "CSS appearance value `slider-vertical` is not standardized and will be removed.",
+      translation_note: "Warning displayed to developers to let them know the CSS appearance property value they used is not standard and will be removed.",
+      web_features: [
+        "kCSSValueAppearanceSliderVertical",
+      ],
+      chrome_status_feature: 6001359429566464,
     },
     {
       name: "DataUrlInSvgUse",
@@ -168,6 +196,14 @@
       ],
       chrome_status_feature: 5128825141198848,
       milestone: 119,
+    },
+    {
+      name: "DelegatedInkExpectedImprovement",
+      message: "`DelegatedInkTrailPresenter.expectedImprovement` is deprecated due to potential fingerprinting concerns.",
+      translation_note: "Warning displayed to developers that they should not be using `DelegatedInkTrailPresenter.expectedImprovement`.",
+      web_features: [
+        "kDelegatedInkExpectedImprovement",
+      ],
     },
     {
       name: "DocumentDomainSettingWithoutOriginAgentClusterHeader",
@@ -205,16 +241,6 @@
       obsolete_to_be_removed_after_milestone: 127,
     },
     {
-      name: "ExpectCTHeader",
-      message: "The `Expect-CT` header is deprecated and will be removed. Chrome requires Certificate Transparency for all publicly trusted certificates issued after April 30, 2018.",
-      translation_note: "This message is shown when the deprecated Expect-CT header is present.",
-      web_features: [
-        "kExpectCTHeader",
-      ],
-      chrome_status_feature: 6244547273687040,
-      milestone: 107,
-    },
-    {
       name: "GeolocationInsecureOrigin",
       message: "`getCurrentPosition()` and `watchPosition()` no longer work on insecure origins. To use this feature, you should consider switching your application to a secure origin, such as HTTPS. See https://goo.gle/chrome-insecure-origins for more details.",
       translation_note: "Warning displayed to developers when the Geolocation API is used from an insecure origin (one that isn't localhost or doesn't use HTTPS) to notify them that this use is no longer supported.",
@@ -231,6 +257,15 @@
         "kGeolocationInsecureOriginDeprecatedNotRemoved",
         "kGeolocationInsecureOriginIframeDeprecatedNotRemoved",
       ],
+    },
+    {
+      name: "GetInnerHTML",
+      message: "The getInnerHTML() function is deprecated, and will be removed from this browser very soon. Please use getHTML() instead.",
+      translation_note: "Warning displayed to developers when non-standard getInnerHTML function is called. This function is deprecated and will be removed.",
+      web_features: [
+        "kElementGetInnerHTML",
+      ],
+      chrome_status_feature: 5081733588582400,
     },
     {
       name: "GetUserMediaInsecureOrigin",
@@ -314,6 +349,7 @@
       ],
       chrome_status_feature: 6239658726391808,
       milestone: 119,
+      obsolete_to_be_removed_after_milestone: 132,
     },
     {
       name: "NoSysexWebMIDIWithoutPermission",
@@ -555,6 +591,33 @@
       milestone: 71,
     },
     {
+      name: "ThirdPartyCookieAccessError",
+      message: "Cookies marked with `SameSite=None; Secure` and not `Partitioned` are blocked in cross-site contexts.",
+      translation_note: "This error occurs when the website attempts to access third-party cookies and the browser blocks them.",
+      web_features: [
+        // This deprecation is used for Legacy Technology Report generation only.
+      ],
+      chrome_status_feature: 5133113939722240,
+    },
+    {
+      name: "ThirdPartyCookieAccessWarning",
+      message: "In a future version of the browser, cookies marked with `SameSite=None; Secure` and not `Partitioned` will be blocked in cross-site context.",
+      translation_note: "This warning occurs when the website attempts to access third-party cookies but the browser does not block them yet.",
+      web_features: [
+        // This deprecation is used for Legacy Technology Report generation only.
+      ],
+      chrome_status_feature: 5133113939722240,
+    },
+    {
+      name: "UnloadHandler",
+      message: "Unload event listeners are deprecated and will be removed.",
+      translation_note: "A deprecation warning shown in the DevTools Issues tab. It's shown when a listener for the `unload` event is added.",
+      web_features: [
+        "kDocumentUnloadRegistered",
+      ],
+      chrome_status_feature: 5579556305502208,
+    },
+    {
       name: "V8SharedArrayBufferConstructedInExtensionWithoutIsolation",
       message: "Extensions should opt into cross-origin isolation to continue using `SharedArrayBuffer`. See https://developer.chrome.com/docs/extensions/mv3/cross-origin-isolation/.",
       translation_note: "A deprecation warning shown in the DevTools Issues tab. The placeholder is always the noun 'SharedArrayBuffer' which refers to a JavaScript construct. 'Extensions' refers to Chrome extensions. The warning is shown when Chrome Extensions attempt to use 'SharedArrayBuffer's under insecure circumstances.",
@@ -572,26 +635,6 @@
       ],
       chrome_status_feature: 5134293578285056,
       milestone: 115,
-    },
-    {
-      name: "WindowPlacementPermissionDescriptorUsed",
-      message: "The permission descriptor `window-placement` is deprecated. Use `window-management` instead. For more help, check https://bit.ly/window-placement-rename.",
-      translation_note: "A deprecation warning shown in the DevTools Issues tab. 'window-placement' and 'window-management' are the name of the javascript descriptors (do not translate). The warning is shown when web pages attempt to use 'window-placement' in permission APIs (e.g. navigator.permissions.query(...))",
-      web_features: [
-        "kWindowPlacementPermissionDescriptorUsed",
-      ],
-      milestone: 112,
-      chrome_status_feature: 5137018030391296,
-    },
-    {
-      name: "WindowPlacementPermissionPolicyParsed",
-      message: "The permission policy `window-placement` is deprecated. Use `window-management` instead. For more help, check https://bit.ly/window-placement-rename.",
-      translation_note: "A deprecation warning shown in the DevTools Issues tab. 'window-placement' and 'window-management' are the name of the policy descriptors (do not translate). The warning is shown when web pages attempt to use 'window-placement' as a permission policy (parsed in iframe or header).",
-      web_features: [
-        "kWindowPlacementPermissionPolicyParsed",
-      ],
-      milestone: 112,
-      chrome_status_feature: 5137018030391296,
     },
     {
       name: "XHRJSONEncodingDetection",

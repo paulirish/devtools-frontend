@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as Common from '../../core/common/common.js';
 import * as Platform from '../../core/platform/platform.js';
 import type * as Protocol from '../../generated/protocol.js';
 
@@ -96,7 +95,7 @@ export class CPUProfileDataModel extends ProfileTreeModel {
     this.profileHead = this.translateProfileTree(profile.nodes);
     this.initialize(this.profileHead);
     this.extractMetaNodes();
-    if (this.samples) {
+    if (this.samples?.length) {
       this.sortSamples();
       this.normalizeTimestamps();
       this.fixMissingSamples();
@@ -150,14 +149,6 @@ export class CPUProfileDataModel extends ProfileTreeModel {
    * type.
    */
   private translateProfileTree(nodes: Protocol.Profiler.ProfileNode[]): CPUProfileNode {
-    function isNativeNode(node: Protocol.Profiler.ProfileNode): boolean {
-      if (node.callFrame) {
-        return Boolean(node.callFrame.url) && node.callFrame.url.startsWith('native ');
-      }
-      // @ts-ignore Legacy types
-      return Boolean(node['url']) && node['url'].startsWith('native ');
-    }
-
     function buildChildrenFromParents(nodes: Protocol.Profiler.ProfileNode[]): void {
       if (nodes[0].children) {
         return;
@@ -167,12 +158,12 @@ export class CPUProfileDataModel extends ProfileTreeModel {
         const node = nodes[i];
         // @ts-ignore Legacy types
         const parentNode = protocolNodeById.get(node.parent);
-        // @ts-ignore Legacy types
+        if (!parentNode) {
+          continue;
+        }
         if (parentNode.children) {
-          // @ts-ignore Legacy types
           parentNode.children.push(node.id);
         } else {
-          // @ts-ignore Legacy types
           parentNode.children = [node.id];
         }
       }
@@ -214,9 +205,6 @@ export class CPUProfileDataModel extends ProfileTreeModel {
     buildChildrenFromParents(nodes);
     this.totalHitCount = nodes.reduce((acc, node) => acc + (node.hitCount || 0), 0);
     const sampleTime = (this.profileEndTime - this.profileStartTime) / this.totalHitCount;
-    const keepNatives = Boolean(
-        Common.Settings.Settings.hasInstance() &&
-        Common.Settings.Settings.instance().moduleSetting('showNativeFunctionsInJSProfile').get());
     const root = nodes[0];
     // If a node is filtered out, its samples are replaced with its parent,
     // so we keep track of the which id to use in the samples data.
@@ -240,12 +228,8 @@ export class CPUProfileDataModel extends ProfileTreeModel {
         sourceNode.children = [];
       }
       const targetNode = new CPUProfileNode(sourceNode, sampleTime);
-      if (keepNatives || !isNativeNode(sourceNode)) {
-        parentNode.children.push(targetNode);
-        parentNode = targetNode;
-      } else {
-        parentNode.self += targetNode.self;
-      }
+      parentNode.children.push(targetNode);
+      parentNode = targetNode;
 
       idToUseForRemovedNode.set(sourceNode.id, parentNode.id);
       parentNodeStack.push.apply(parentNodeStack, sourceNode.children.map(() => parentNode as CPUProfileNode));
@@ -389,8 +373,10 @@ export class CPUProfileDataModel extends ProfileTreeModel {
    * and when it's closed
    */
   forEachFrame(
-      openFrameCallback: (depth: number, node: ProfileNode, timestamp: number) => void,
-      closeFrameCallback: (depth: number, node: ProfileNode, timestamp: number, dur: number, selfTime: number) => void,
+      openFrameCallback: (depth: number, node: ProfileNode, sampleIndex: number, timestamp: number) => void,
+      closeFrameCallback:
+          (depth: number, node: ProfileNode, sampleIndex: number, timestamp: number, dur: number,
+           selfTime: number) => void,
       startTime?: number, stopTime?: number): void {
     if (!this.profileHead || !this.samples) {
       return;
@@ -443,7 +429,7 @@ export class CPUProfileDataModel extends ProfileTreeModel {
       if (gcNode && node === gcNode) {
         // GC samples have no stack, so we just put GC node on top of the last recorded sample.
         gcParentNode = prevNode;
-        openFrameCallback(gcParentNode.depth + 1, gcNode, sampleTime);
+        openFrameCallback(gcParentNode.depth + 1, gcNode, sampleIndex, sampleTime);
         stackStartTimes[++stackTop] = sampleTime;
         stackChildrenDuration[stackTop] = 0;
         prevId = id;
@@ -454,7 +440,8 @@ export class CPUProfileDataModel extends ProfileTreeModel {
         const start = stackStartTimes[stackTop];
         const duration = sampleTime - start;
         stackChildrenDuration[stackTop - 1] += duration;
-        closeFrameCallback(gcParentNode.depth + 1, gcNode, start, duration, duration - stackChildrenDuration[stackTop]);
+        closeFrameCallback(
+            gcParentNode.depth + 1, gcNode, sampleIndex, start, duration, duration - stackChildrenDuration[stackTop]);
         --stackTop;
         prevNode = gcParentNode;
         prevId = prevNode.id;
@@ -491,7 +478,8 @@ export class CPUProfileDataModel extends ProfileTreeModel {
         const start = stackStartTimes[stackTop];
         const duration = sampleTime - start;
         stackChildrenDuration[stackTop - 1] += duration;
-        closeFrameCallback(prevNode.depth, prevNode, start, duration, duration - stackChildrenDuration[stackTop]);
+        closeFrameCallback(
+            prevNode.depth, prevNode, sampleIndex, start, duration, duration - stackChildrenDuration[stackTop]);
         --stackTop;
         // Track calls to open after previous calls were closed
         // In the example above, this would add E to the tracking stack.
@@ -509,7 +497,7 @@ export class CPUProfileDataModel extends ProfileTreeModel {
           break;
         }
         node = currentNode;
-        openFrameCallback(currentNode.depth, currentNode, sampleTime);
+        openFrameCallback(currentNode.depth, currentNode, sampleIndex, sampleTime);
         stackStartTimes[++stackTop] = sampleTime;
         stackChildrenDuration[stackTop] = 0;
       }
@@ -523,7 +511,8 @@ export class CPUProfileDataModel extends ProfileTreeModel {
       const start = stackStartTimes[stackTop];
       const duration = sampleTime - start;
       stackChildrenDuration[stackTop - 1] += duration;
-      closeFrameCallback(gcParentNode.depth + 1, node, start, duration, duration - stackChildrenDuration[stackTop]);
+      closeFrameCallback(
+          gcParentNode.depth + 1, node, sampleIndex, start, duration, duration - stackChildrenDuration[stackTop]);
       --stackTop;
       prevId = gcParentNode.id;
     }
@@ -531,7 +520,7 @@ export class CPUProfileDataModel extends ProfileTreeModel {
       const start = stackStartTimes[stackTop];
       const duration = sampleTime - start;
       stackChildrenDuration[stackTop - 1] += duration;
-      closeFrameCallback(node.depth, node, start, duration, duration - stackChildrenDuration[stackTop]);
+      closeFrameCallback(node.depth, node, sampleIndex, start, duration, duration - stackChildrenDuration[stackTop]);
       --stackTop;
     }
   }

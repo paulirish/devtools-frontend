@@ -1,30 +1,17 @@
 /**
- * Copyright 2017 Google Inc. All rights reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * @license
+ * Copyright 2017 Google Inc.
+ * SPDX-License-Identifier: Apache-2.0
  */
 /// <reference types="node" />
 /// <reference types="node" />
 /// <reference types="node" />
-import type { Readable } from 'stream';
-import type { Protocol } from 'devtools-protocol';
-import type { ElementHandle } from '../api/ElementHandle.js';
-import type { JSHandle } from '../api/JSHandle.js';
-import { Page } from '../api/Page.js';
-import { Deferred } from '../util/Deferred.js';
-import type { CDPSession } from './Connection.js';
-import type { CommonEventEmitter } from './EventEmitter.js';
-import type { ExecutionContext } from './ExecutionContext.js';
+import type FS from 'fs/promises';
+import type { OperatorFunction } from '../../third_party/rxjs/rxjs.js';
+import { Observable } from '../../third_party/rxjs/rxjs.js';
+import type { CDPSession } from '../api/CDPSession.js';
+import type { EventEmitter, EventType } from './EventEmitter.js';
+import type { ParsedPDFOptions, PDFOptions } from './PDFOptions.js';
 /**
  * @internal
  */
@@ -32,11 +19,10 @@ export declare const debugError: (...args: unknown[]) => void;
 /**
  * @internal
  */
-export declare function createEvaluationError(details: Protocol.Runtime.ExceptionDetails): unknown;
-/**
- * @internal
- */
-export declare function createClientError(details: Protocol.Runtime.ExceptionDetails): unknown;
+export declare const DEFAULT_VIEWPORT: Readonly<{
+    width: 800;
+    height: 600;
+}>;
 /**
  * @internal
  */
@@ -61,34 +47,6 @@ export declare const getSourcePuppeteerURLIfAvailable: <T extends {}>(object: T)
 /**
  * @internal
  */
-export declare function valueFromRemoteObject(remoteObject: Protocol.Runtime.RemoteObject): any;
-/**
- * @internal
- */
-export declare function releaseObject(client: CDPSession, remoteObject: Protocol.Runtime.RemoteObject): Promise<void>;
-/**
- * @internal
- */
-export interface PuppeteerEventListener {
-    emitter: CommonEventEmitter;
-    eventName: string | symbol;
-    handler: (...args: any[]) => void;
-}
-/**
- * @internal
- */
-export declare function addEventListener(emitter: CommonEventEmitter, eventName: string | symbol, handler: (...args: any[]) => void): PuppeteerEventListener;
-/**
- * @internal
- */
-export declare function removeEventListeners(listeners: Array<{
-    emitter: CommonEventEmitter;
-    eventName: string | symbol;
-    handler: (...args: any[]) => void;
-}>): void;
-/**
- * @internal
- */
 export declare const isString: (obj: unknown) => obj is string;
 /**
  * @internal
@@ -109,45 +67,65 @@ export declare const isDate: (obj: unknown) => obj is Date;
 /**
  * @internal
  */
-export declare function waitForEvent<T>(emitter: CommonEventEmitter, eventName: string | symbol, predicate: (event: T) => Promise<boolean> | boolean, timeout: number, abortPromise: Promise<Error> | Deferred<Error>): Promise<T>;
-/**
- * @internal
- */
-export declare function createJSHandle(context: ExecutionContext, remoteObject: Protocol.Runtime.RemoteObject): JSHandle | ElementHandle<Node>;
-/**
- * @internal
- */
 export declare function evaluationString(fun: Function | string, ...args: unknown[]): string;
 /**
  * @internal
  */
-export declare function addPageBinding(type: string, name: string): void;
+export declare function importFSPromises(): Promise<typeof FS>;
 /**
  * @internal
  */
-export declare function pageBindingInitString(type: string, name: string): string;
+export declare function getReadableAsBuffer(readable: ReadableStream<Uint8Array>, path?: string): Promise<Buffer | null>;
 /**
  * @internal
  */
-export declare function waitWithTimeout<T>(promise: Promise<T>, taskName: string, timeout: number): Promise<T>;
 /**
  * @internal
  */
-export declare function importFSPromises(): Promise<typeof import('fs/promises')>;
+export declare function getReadableFromProtocolStream(client: CDPSession, handle: string): Promise<ReadableStream<Uint8Array>>;
 /**
  * @internal
  */
-export declare function getReadableAsBuffer(readable: Readable, path?: string): Promise<Buffer | null>;
+export declare function validateDialogType(type: string): 'alert' | 'confirm' | 'prompt' | 'beforeunload';
 /**
  * @internal
  */
-export declare function getReadableFromProtocolStream(client: CDPSession, handle: string): Promise<Readable>;
+export declare function timeout(ms: number, cause?: Error): Observable<never>;
 /**
  * @internal
  */
-export declare function setPageContent(page: Pick<Page, 'evaluate'>, content: string): Promise<void>;
+export declare const UTILITY_WORLD_NAME = "__puppeteer_utility_world__";
 /**
  * @internal
  */
-export declare function getPageContent(): string;
+export declare const SOURCE_URL_REGEX: RegExp;
+/**
+ * @internal
+ */
+export declare function getSourceUrlComment(url: string): string;
+/**
+ * @internal
+ */
+export declare const NETWORK_IDLE_TIME = 500;
+/**
+ * @internal
+ */
+export declare function parsePDFOptions(options?: PDFOptions, lengthUnit?: 'in' | 'cm'): ParsedPDFOptions;
+/**
+ * @internal
+ */
+export declare const unitToPixels: {
+    px: number;
+    in: number;
+    cm: number;
+    mm: number;
+};
+/**
+ * @internal
+ */
+export declare function fromEmitterEvent<Events extends Record<EventType, unknown>, Event extends keyof Events>(emitter: EventEmitter<Events>, eventName: Event): Observable<Events[Event]>;
+/**
+ * @internal
+ */
+export declare function filterAsync<T>(predicate: (value: T) => boolean | PromiseLike<boolean>): OperatorFunction<T, T>;
 //# sourceMappingURL=util.d.ts.map

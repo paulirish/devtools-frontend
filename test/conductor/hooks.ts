@@ -17,7 +17,6 @@ import {
   setBrowserAndPages,
   setTestServerPort,
 } from './puppeteer-state.js';
-import {getTestRunnerConfigSetting} from './test_runner_config.js';
 import {
   loadEmptyPageAndWaitForContent,
   DevToolsFrontendTab,
@@ -29,6 +28,7 @@ import {
   setupBrowserProcessIO,
 } from './events.js';
 import {TargetTab} from './target_tab.js';
+import {TestConfig} from './test_config.js';
 
 // Workaround for mismatching versions of puppeteer types and puppeteer library.
 declare module 'puppeteer-core' {
@@ -48,21 +48,46 @@ const viewportHeight = 720;
 const windowWidth = viewportWidth + 50;
 const windowHeight = viewportHeight + 200;
 
-const headless = !process.env['DEBUG_TEST'];
+const headless = !TestConfig.debug;
 const envSlowMo = process.env['STRESS'] ? 50 : undefined;
 const envThrottleRate = process.env['STRESS'] ? 3 : 1;
 const envLatePromises = process.env['LATE_PROMISES'] !== undefined ?
     ['true', ''].includes(process.env['LATE_PROMISES'].toLowerCase()) ? 10 : Number(process.env['LATE_PROMISES']) :
     0;
 
-const TEST_SERVER_TYPE = getTestRunnerConfigSetting<string>('test-server-type', 'hosted-mode');
-
 let browser: puppeteer.Browser;
 let frontendTab: DevToolsFrontendTab;
 let targetTab: TargetTab;
 
-const envChromeBinary = getTestRunnerConfigSetting<string>('chrome-binary-path', process.env['CHROME_BIN'] || '');
-const envChromeFeatures = getTestRunnerConfigSetting<string>('chrome-features', process.env['CHROME_FEATURES'] || '');
+const envChromeFeatures = process.env['CHROME_FEATURES'];
+
+export async function watchForHang<T>(
+    currentTest: string|undefined, stepFn: (currentTest: string|undefined) => Promise<T>): Promise<T> {
+  const stepName = stepFn.name || stepFn.toString();
+  const stackTrace = new Error().stack;
+  function logTime(label: string) {
+    const end = performance.now();
+    console.error(`\n${stepName} ${label} ${end - start}ms\nTrace: ${stackTrace}\nTest: ${currentTest}\n`);
+  }
+  let tripped = false;
+  const timerId = setTimeout(() => {
+    logTime('takes at least');
+    tripped = true;
+  }, 10000);
+  const start = performance.now();
+  try {
+    const result = await stepFn(currentTest);
+    if (tripped) {
+      logTime('succeded after');
+    }
+    return result;
+  } catch (err) {
+    logTime('errored after');
+    throw err;
+  } finally {
+    clearTimeout(timerId);
+  }
+}
 
 function launchChrome() {
   // Use port 0 to request any free port.
@@ -83,11 +108,12 @@ function launchChrome() {
     '--site-per-process',  // Default on Desktop anyway, but ensure that we always use out-of-process frames when we intend to.
     '--host-resolver-rules=MAP *.test 127.0.0.1', '--disable-gpu',
     '--enable-blink-features=CSSContainerQueries,HighlightInheritance',  // TODO(crbug.com/1218390) Remove globally enabled flags and conditionally enable them
+    '--disable-blink-features=WebAssemblyJSPromiseIntegration',  // TODO(crbug.com/325123665) Remove once heap snapshots work again with JSPI
   ];
   const opts: puppeteer.LaunchOptions&puppeteer.BrowserLaunchArgumentOptions&puppeteer.BrowserConnectOptions = {
     headless,
-    executablePath: envChromeBinary,
-    dumpio: !headless,
+    executablePath: TestConfig.chromeBinary,
+    dumpio: !headless || Boolean(process.env['LUCI_CONTEXT']),
     slowMo: envSlowMo,
   };
 
@@ -119,7 +145,7 @@ async function loadTargetPageAndFrontend(testServerPort: number) {
   // DevTools Frontend in hosted mode, or the component docs in docs test mode.
   let frontend: puppeteer.Page;
 
-  if (TEST_SERVER_TYPE === 'hosted-mode') {
+  if (TestConfig.serverType === 'hosted-mode') {
     /**
      * In hosted mode we run the DevTools and test against it.
      */
@@ -129,7 +155,7 @@ async function loadTargetPageAndFrontend(testServerPort: number) {
       targetId: targetTab.targetId(),
     });
     frontend = frontendTab.page;
-  } else if (TEST_SERVER_TYPE === 'component-docs') {
+  } else if (TestConfig.serverType === 'component-docs') {
     /**
      * In the component docs mode it points to the page where we load component
      * doc examples, so let's just set it to an empty page for now.
@@ -138,7 +164,7 @@ async function loadTargetPageAndFrontend(testServerPort: number) {
     installPageErrorHandlers(frontend);
     await loadEmptyPageAndWaitForContent(frontend);
   } else {
-    throw new Error(`Unknown TEST_SERVER_TYPE "${TEST_SERVER_TYPE}"`);
+    throw new Error(`Unknown TEST_SERVER_TYPE "${TestConfig.serverType}"`);
   }
 
   setBrowserAndPages({target: targetTab.page, frontend, browser});
@@ -155,18 +181,21 @@ export async function unregisterAllServiceWorkers() {
   });
 }
 
-export async function resetPages() {
-  await targetTab.reset();
+export async function resetPages(currentTest: string|undefined) {
+  const {frontend, target} = getBrowserAndPages();
 
-  const {frontend} = getBrowserAndPages();
-  await throttleCPUIfRequired(frontend);
-  await delayPromisesIfRequired(frontend);
+  await watchForHang(currentTest, () => target.bringToFront());
+  await watchForHang(currentTest, () => targetTab.reset());
 
-  if (TEST_SERVER_TYPE === 'hosted-mode') {
-    await frontendTab.reset();
-  } else if (TEST_SERVER_TYPE === 'component-docs') {
+  await watchForHang(currentTest, () => frontend.bringToFront());
+  await watchForHang(currentTest, () => throttleCPUIfRequired(frontend));
+  await watchForHang(currentTest, () => delayPromisesIfRequired(frontend));
+
+  if (TestConfig.serverType === 'hosted-mode') {
+    await watchForHang(currentTest, () => frontendTab.reset());
+  } else if (TestConfig.serverType === 'component-docs') {
     // Reset the frontend back to an empty page for the component docs server.
-    await loadEmptyPageAndWaitForContent(frontend);
+    await watchForHang(currentTest, () => loadEmptyPageAndWaitForContent(frontend));
   }
 }
 

@@ -4,11 +4,11 @@
 
 import type * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
+import type * as Protocol from '../../generated/protocol.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import playerMessagesViewStyles from './playerMessagesView.css.js';
-
-import type * as Protocol from '../../generated/protocol.js';
 
 const UIStrings = {
   /**
@@ -46,7 +46,7 @@ const UIStrings = {
   /**
    *@description Default text for user-text-entry for searching log messages.
    */
-  filterLogMessages: 'Filter log messages',
+  filterByLogMessages: 'Filter by log messages',
   /**
    *@description The label for the group name that this error belongs to.
    */
@@ -221,7 +221,7 @@ class MessageLevelSelector implements UI.SoftDropDown.Delegate<SelectableLevel> 
 
   createElementForItem(item: SelectableLevel): Element {
     const element = document.createElement('div');
-    const shadowRoot = UI.Utils.createShadowRootWithCoreStyles(
+    const shadowRoot = UI.UIUtils.createShadowRootWithCoreStyles(
         element, {cssFile: [playerMessagesViewStyles], delegatesFocus: undefined});
     const container = shadowRoot.createChild('div', 'media-messages-level-dropdown-element');
     const checkBox = container.createChild('div', 'media-messages-level-dropdown-checkbox') as HTMLElement;
@@ -257,6 +257,8 @@ export class PlayerMessagesView extends UI.Widget.VBox {
   constructor() {
     super();
 
+    this.element.setAttribute('jslog', `${VisualLogging.pane('messages')}`);
+
     this.headerPanel = this.contentElement.createChild('div', 'media-messages-header');
     this.bodyPanel = this.contentElement.createChild('div', 'media-messages-body');
 
@@ -274,7 +276,7 @@ export class PlayerMessagesView extends UI.Widget.VBox {
   private createDropdown(): UI.Toolbar.ToolbarItem {
     const items = new UI.ListModel.ListModel<SelectableLevel>();
     this.messageLevelSelector = new MessageLevelSelector(items, this);
-    const dropDown = new UI.SoftDropDown.SoftDropDown<SelectableLevel>(items, this.messageLevelSelector);
+    const dropDown = new UI.SoftDropDown.SoftDropDown<SelectableLevel>(items, this.messageLevelSelector, 'log-level');
     dropDown.setRowHeight(18);
 
     this.messageLevelSelector.populate();
@@ -290,7 +292,7 @@ export class PlayerMessagesView extends UI.Widget.VBox {
   }
 
   private createFilterInput(): UI.Toolbar.ToolbarInput {
-    const filterInput = new UI.Toolbar.ToolbarInput(i18nString(UIStrings.filterLogMessages));
+    const filterInput = new UI.Toolbar.ToolbarFilter(i18nString(UIStrings.filterByLogMessages), 1, 1);
     filterInput.addEventListener(UI.Toolbar.ToolbarInput.Event.TextChanged, (data: {data: string}) => {
       this.filterByString(data as {
         data: string,

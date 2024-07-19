@@ -211,7 +211,7 @@ const folderlessGroupedExpectedTree = [
   'multi-workers.min.js',
 ];
 
-describe('Source Panel grouping', async function() {
+describe('Source Panel grouping', function() {
   const targetPage = 'sources/multi-workers-sourcemap.html';
   const scriptFile = 'multi-workers.min.js';
   function workerFileSelectors(workerIndex: number) {
@@ -324,28 +324,30 @@ describe('Source Panel grouping', async function() {
     assert.deepEqual(await readSourcesTreeView(), groupedExpectedTree);
   });
 
-  it('can mix group by authored/deployed and group by folder', async () => {
-    // Have the target load the page.
-    await goToResource(targetPage);
-    await openSourcesPanel();
+  // Flaky on Mac
+  it.skipOnPlatforms(
+      ['mac'], '[crbug.com/1481690] can mix group by authored/deployed and group by folder', async () => {
+        // Have the target load the page.
+        await goToResource(targetPage);
+        await openSourcesPanel();
 
-    // Switch to folderless
-    await disableGroupByFolder();
-    await expandSourceTreeItem(workerFileSelectors(6).rootSelector);
-    await expandSourceTreeItem(
-        workerFileSelectors(6).rootSelector + ' + ol > [aria-label="test/e2e/resources/sources, nw-folder"]');
-    assert.deepEqual(await readSourcesTreeView(), folderlessExpectedTree);
+        // Switch to folderless
+        await disableGroupByFolder();
+        await expandSourceTreeItem(workerFileSelectors(6).rootSelector);
+        await expandSourceTreeItem(
+            workerFileSelectors(6).rootSelector + ' + ol > [aria-label="test/e2e/resources/sources, nw-folder"]');
+        assert.deepEqual(await readSourcesTreeView(), folderlessExpectedTree);
 
-    // Switch to group by authored, folderless
-    await enableGroupByAuthored();
-    await expandSourceTreeItem('[aria-label="test/e2e/resources/sources, nw-folder"]');
-    await expandSourceTreeItem(workerFileSelectors(6).rootSelector);
-    assert.deepEqual(await readSourcesTreeView(), folderlessGroupedExpectedTree);
+        // Switch to group by authored, folderless
+        await enableGroupByAuthored();
+        await expandSourceTreeItem('[aria-label="test/e2e/resources/sources, nw-folder"]');
+        await expandSourceTreeItem(workerFileSelectors(6).rootSelector);
+        assert.deepEqual(await readSourcesTreeView(), folderlessGroupedExpectedTree);
 
-    // Reenable folders
-    await enableGroupByFolder();
-    await expandSourceTreeItem('[aria-label="test/e2e/resources/sources, nw-folder"]');
-    await expandFileTree(workerFileSelectors(6));
-    assert.deepEqual(await readSourcesTreeView(), groupedExpectedTree);
-  });
+        // Reenable folders
+        await enableGroupByFolder();
+        await expandSourceTreeItem('[aria-label="test/e2e/resources/sources, nw-folder"]');
+        await expandFileTree(workerFileSelectors(6));
+        assert.deepEqual(await readSourcesTreeView(), groupedExpectedTree);
+      });
 });

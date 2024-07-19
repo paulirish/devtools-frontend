@@ -7,9 +7,10 @@ import * as Host from '../../core/host/host.js';
 import type * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Bindings from '../bindings/bindings.js';
+import * as TextUtils from '../text_utils/text_utils.js';
 import * as Workspace from '../workspace/workspace.js';
 
-import {FileSystemWorkspaceBinding, type FileSystem} from './FileSystemWorkspaceBinding.js';
+import {type FileSystem, FileSystemWorkspaceBinding} from './FileSystemWorkspaceBinding.js';
 import {PersistenceImpl} from './PersistenceImpl.js';
 
 export class Automapping {
@@ -184,7 +185,7 @@ export class Automapping {
     if (this.interceptors.some(interceptor => interceptor(networkSourceCode))) {
       return Promise.resolve();
     }
-    if (networkSourceCode.url().startsWith('wasm://')) {
+    if (Common.ParsedURL.schemeIs(networkSourceCode.url(), 'wasm:')) {
       return Promise.resolve();
     }
     const createBindingPromise =
@@ -224,8 +225,10 @@ export class Automapping {
         return null;
       }
 
-      const [fileSystemContent, networkContent] = await Promise.all(
-          [status.fileSystem.requestContent(), status.network.project().requestFileContent(status.network)]);
+      const [fileSystemContent, networkContent] = (await Promise.all([
+                                                    status.fileSystem.requestContentData(),
+                                                    status.network.project().requestFileContent(status.network),
+                                                  ])).map(TextUtils.ContentData.ContentData.asDeferredContent);
       if (fileSystemContent.content === null || networkContent === null) {
         return null;
       }
@@ -317,7 +320,7 @@ export class Automapping {
 
   private async createBinding(networkSourceCode: Workspace.UISourceCode.UISourceCode): Promise<AutomappingStatus|null> {
     const url = networkSourceCode.url();
-    if (url.startsWith('file://') || url.startsWith('snippet://')) {
+    if (Common.ParsedURL.schemeIs(url, 'file:') || Common.ParsedURL.schemeIs(url, 'snippet:')) {
       const fileSourceCode = this.fileSystemUISourceCodes.get(url);
       const status = fileSourceCode ? new AutomappingStatus(networkSourceCode, fileSourceCode, false) : null;
       return status;

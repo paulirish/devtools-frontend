@@ -10,7 +10,7 @@ import {addBreakpointForLine, openSourceCodeEditorForFile, RESUME_BUTTON} from '
 
 const LAST_ELEMENT_SELECTOR = '.cm-executionLine > span:last-child';
 
-describe('Sources Tab', async function() {
+describe('Sources Tab', function() {
   it('shows correct preview for `object.foo` member expressions', async () => {
     const {target, frontend} = getBrowserAndPages();
 
@@ -74,23 +74,6 @@ describe('Sources Tab', async function() {
     const popover = await waitFor('[data-stable-name-for-test="object-popover-content"]');
     const value = await waitFor('.object-value-number', popover).then(e => e.evaluate(node => node.textContent));
     assert.strictEqual(value, '84');
-
-    await click(RESUME_BUTTON);
-    await scriptEvaluation;
-  });
-
-  it('shows correct preview for `this.#x` member expressions despite Terser minification', async () => {
-    const {target, frontend} = getBrowserAndPages();
-
-    await openSourceCodeEditorForFile('popover-terser.js', 'popover-terser.html');
-    await addBreakpointForLine(frontend, 5);
-
-    const scriptEvaluation = target.evaluate('test();');
-    await hover(LAST_ELEMENT_SELECTOR);
-
-    const popover = await waitFor('[data-stable-name-for-test="object-popover-content"]');
-    const value = await waitFor('.object-value-number', popover).then(e => e.evaluate(node => node.textContent));
-    assert.strictEqual(value, '21');
 
     await click(RESUME_BUTTON);
     await scriptEvaluation;

@@ -30,11 +30,12 @@
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
+import type * as Platform from '../../core/platform/platform.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
-import type * as Platform from '../../core/platform/platform.js';
 import * as SourceFrame from '../../ui/legacy/components/source_frame/source_frame.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {DOMStorage} from './DOMStorageModel.js';
 import {StorageItemsView} from './StorageItemsView.js';
@@ -97,7 +98,7 @@ export class DOMStorageItemsView extends StorageItemsView {
     this.element.classList.add('storage-view', 'table');
 
     const columns = ([
-      {id: 'key', title: i18nString(UIStrings.key), sortable: false, editable: true, longText: true, weight: 50},
+      {id: 'key', title: i18nString(UIStrings.key), sortable: true, editable: true, longText: true, weight: 50},
       {id: 'value', title: i18nString(UIStrings.value), sortable: false, editable: true, longText: true, weight: 50},
     ] as DataGrid.DataGrid.ColumnDescriptor[]);
     this.dataGrid = new DataGrid.DataGrid.DataGridImpl({
@@ -113,15 +114,17 @@ export class DOMStorageItemsView extends StorageItemsView {
     this.dataGrid.addEventListener(DataGrid.DataGrid.Events.DeselectedNode, () => {
       void this.previewEntry(null);
     });
+    this.dataGrid.addEventListener(DataGrid.DataGrid.Events.SortingChanged, this.refreshItems, this);
     this.dataGrid.setStriped(true);
-    this.dataGrid.setName('DOMStorageItemsView');
+    this.dataGrid.setName('dom-storage-items-view');
 
     this.splitWidget = new UI.SplitWidget.SplitWidget(
-        /* isVertical: */ false, /* secondIsSidebar: */ true, 'domStorageSplitViewState');
+        /* isVertical: */ false, /* secondIsSidebar: */ true, 'dom-storage-split-view-state');
     this.splitWidget.show(this.element);
 
     this.previewPanel = new UI.Widget.VBox();
     this.previewPanel.setMinimumSize(0, 50);
+    this.previewPanel.element.setAttribute('jslog', `${VisualLogging.pane('preview').track({resize: true})}`);
     const resizer = this.previewPanel.element.createChild('div', 'preview-panel-resizer');
     const dataGridWidget = this.dataGrid.asWidget();
     dataGridWidget.setMinimumSize(0, 50);
@@ -141,6 +144,8 @@ export class DOMStorageItemsView extends StorageItemsView {
   setStorage(domStorage: DOMStorage): void {
     Common.EventTarget.removeEventListeners(this.eventListeners);
     this.domStorage = domStorage;
+    const storageKind = domStorage.isLocalStorage ? 'local-storage-data' : 'session-storage-data';
+    this.element.setAttribute('jslog', `${VisualLogging.pane().context(storageKind)}`);
     if (domStorage.storageKey) {
       this.setStorageKey(domStorage.storageKey);
     }
@@ -241,7 +246,10 @@ export class DOMStorageItemsView extends StorageItemsView {
     rootNode.removeChildren();
     let selectedNode: DataGrid.DataGrid.DataGridNode<unknown>|null = null;
     const filteredItems = (item: string[]): string => `${item[0]} ${item[1]}`;
-    const filteredList = this.filter(items, filteredItems);
+    const sortDirection = this.dataGrid.isSortOrderAscending() ? 1 : -1;
+    const filteredList = this.filter(items, filteredItems).sort(function(item1: string[], item2: string[]): number {
+      return sortDirection * (item1[0] > item2[0] ? 1 : -1);
+    });
     for (const item of filteredList) {
       const key = item[0];
       const value = item[1];

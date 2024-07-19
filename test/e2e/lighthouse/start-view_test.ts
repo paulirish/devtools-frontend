@@ -15,7 +15,7 @@ import {
   waitForStorageUsage,
 } from '../helpers/lighthouse-helpers.js';
 
-describe('The Lighthouse start view', async () => {
+describe('The Lighthouse start view', () => {
   it('shows a button to generate a new report', async () => {
     await navigateToLighthouseTab('empty.html');
 
@@ -66,8 +66,9 @@ describe('The Lighthouse start view', async () => {
     assert.isTrue(disabled, 'The Generate Report button should be disabled');
   });
 
-  it('displays warning if important data may affect performance', async () => {
-    // e2e tests in application/ create websql and indexeddb items and don't clean up after themselves
+  // Broken in local builds and stressor jobs
+  it.skip('[crbug.com/347114248] displays warning if important data may affect performance', async () => {
+    // e2e tests in application/ create indexeddb items and don't clean up after themselves
     await clearSiteData();
 
     await navigateToLighthouseTab('empty.html');

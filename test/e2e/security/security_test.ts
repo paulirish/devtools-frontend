@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {reloadDevTools} from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
+import {reloadDevTools} from '../helpers/cross-tool-helper.js';
 import {
   closeSecurityTab,
   navigateToSecurityTab,
@@ -14,14 +14,14 @@ import {
   securityTabExists,
 } from '../helpers/security-helpers.js';
 
-describe('The Security Panel', async function() {
+describe('The Security Panel', function() {
   it('is open by default when devtools initializes', async () => {
     await navigateToSecurityTab();
   });
 
   it('closes without crashing and stays closed after reloading tools', async () => {
     await closeSecurityTab();
-    await reloadDevTools();
+    await reloadDevTools({expectClosedPanels: ['security']});
     await securityTabDoesNotExist();
   });
 

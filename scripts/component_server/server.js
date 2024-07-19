@@ -18,7 +18,21 @@ const match = require('minimatch');
 
 const tracesMode = argv.traces || false;
 const serverPort = parseInt(process.env.PORT, 10) || (tracesMode ? 11010 : 8090);
-const target = argv.target || process.env.TARGET || 'Default';
+
+/**
+ * When you run npm run components-server we run the script as is from scripts/,
+ * but when this server is run as part of a test suite it's run from
+ * out/Default/gen/scripts, so we have to do a bit of path mangling to figure
+ * out where we are.
+ */
+const [target, isRunningInGen] = (() => {
+  const regex = new RegExp(`out\\${path.sep}(.*)\\${path.sep}gen`);
+  const match = regex.exec(__dirname);
+  if (match) {
+    return [match[1], true];
+  }
+  return [argv.target || process.env.TARGET || 'Default', false];
+})();
 
 /**
  * This configures the base of the URLs that are injected into each component
@@ -37,14 +51,6 @@ const sharedResourcesBase =
 const componentDocsBaseArg = argv.componentDocsBase || process.env.COMPONENT_DOCS_BASE ||
     getTestRunnerConfigSetting('component-server-base-path', '');
 
-/**
- * When you run npm run components-server we run the script as is from scripts/,
- * but when this server is run as part of a test suite it's run from
- * out/Default/gen/scripts, so we have to do a bit of path mangling to figure
- * out where we are.
- */
-const isRunningInGen = __dirname.includes(path.join('out', path.sep, target));
-
 let pathToOutTargetDir = __dirname;
 /**
  * If we are in the gen directory, we need to find the out/Default folder to use
@@ -60,7 +66,12 @@ while (isRunningInGen && !pathToOutTargetDir.endsWith(`out${path.sep}${target}`)
 const pathToBuiltOutTargetDirectory =
     isRunningInGen ? pathToOutTargetDir : path.resolve(path.join(process.cwd(), 'out', target));
 
-const devtoolsRootFolder = path.resolve(path.join(pathToBuiltOutTargetDirectory, 'gen'));
+let devtoolsRootFolder = path.resolve(path.join(pathToBuiltOutTargetDirectory, 'gen'));
+const fullCheckoutDevtoolsRootFolder = path.join(devtoolsRootFolder, 'third_party', 'devtools-frontend', 'src');
+if (__dirname.startsWith(fullCheckoutDevtoolsRootFolder)) {
+  devtoolsRootFolder = fullCheckoutDevtoolsRootFolder;
+}
+
 const componentDocsBaseFolder = path.join(devtoolsRootFolder, componentDocsBaseArg);
 
 if (!fs.existsSync(devtoolsRootFolder)) {
@@ -71,8 +82,15 @@ if (!fs.existsSync(devtoolsRootFolder)) {
   process.exit(1);
 }
 
-const server = http.createServer(requestHandler);
-server.listen(serverPort);
+process.on('uncaughtException', error => {
+  console.error('uncaughtException', error);
+});
+process.on('unhandledRejection', error => {
+  console.error('unhandledRejection', error);
+});
+
+const server = http.createServer((req, res) => requestHandler(req, res).catch(err => send500(res, err)));
+server.listen(serverPort, 'localhost');
 server.once('listening', () => {
   if (process.send) {
     process.send(serverPort);
@@ -89,11 +107,16 @@ server.once('error', error => {
   throw error;
 });
 
+// All paths that are injected globally into real DevTools, so we do the same
+// to avoid styles being broken in the component server.
 const styleSheetPaths = [
   'front_end/ui/legacy/themeColors.css',
   'front_end/ui/legacy/tokens.css',
   'front_end/ui/legacy/applicationColorTokens.css',
+  'front_end/ui/legacy/designTokens.css',
   'front_end/ui/legacy/inspectorCommon.css',
+  'front_end/ui/legacy/inspectorSyntaxHighlight.css',
+  'front_end/ui/legacy/textButton.css',
   'front_end/ui/components/docs/component_docs_styles.css',
 ];
 
@@ -183,6 +206,9 @@ function createServerIndexFile(componentNames) {
 
 async function getExamplesForPath(filePath) {
   const componentDirectory = path.join(componentDocsBaseFolder, filePath);
+  if (!await checkFileExists(componentDirectory)) {
+    return null;
+  }
   const allFiles = await fs.promises.readdir(componentDirectory);
   const htmlExampleFiles = allFiles.filter(file => {
     return path.extname(file) === '.html';
@@ -201,6 +227,12 @@ function respondWithHtml(response, html) {
 function send404(response, message) {
   response.writeHead(404);
   response.write(message, 'utf8');
+  response.end();
+}
+
+function send500(response, error) {
+  response.writeHead(500);
+  response.write(error.toString(), 'utf8');
   response.end();
 }
 
@@ -245,8 +277,6 @@ const COVERAGE_INSTRUMENTER = createInstrumenter({
 
 const instrumentedSourceCacheForFilePaths = new Map();
 
-const SHOULD_GATHER_COVERAGE_INFORMATION = process.env.COVERAGE === '1';
-
 /**
  * @param {http.IncomingMessage} request
  * @param {http.ServerResponse} response
@@ -269,7 +299,11 @@ async function requestHandler(request, response) {
   } else if (filePath.startsWith('/front_end/ui/components/docs') && path.extname(filePath) === '') {
     // This means it's a component path like /breadcrumbs.
     const componentHtml = await getExamplesForPath(filePath);
-    respondWithHtml(response, componentHtml);
+    if (componentHtml !== null) {
+      respondWithHtml(response, componentHtml);
+    } else {
+      send404(response, '404, not a valid component');
+    }
     return;
   } else if (tracesMode) {
     return handleTracesModeRequest(request, response, filePath);
@@ -292,7 +326,12 @@ async function requestHandler(request, response) {
      */
     const baseUrlForSharedResource =
         componentDocsBaseArg && componentDocsBaseArg.endsWith(sharedResourcesBase) ? '/' : `/${sharedResourcesBase}`;
-    const fileContents = await fs.promises.readFile(path.join(componentDocsBaseFolder, filePath), {encoding: 'utf8'});
+    const fullPath = path.join(componentDocsBaseFolder, filePath);
+    if (!(await checkFileExists(fullPath))) {
+      send404(response, '404, File not found');
+      return;
+    }
+    const fileContents = await fs.promises.readFile(fullPath, {encoding: 'utf8'});
 
     const linksToStyleSheets =
         styleSheetPaths
@@ -365,7 +404,7 @@ async function requestHandler(request, response) {
     let fileContents = await fs.promises.readFile(fullPath, encoding);
     const isComputingCoverageRequest = request.headers['devtools-compute-coverage'] === '1';
 
-    if (SHOULD_GATHER_COVERAGE_INFORMATION && fullPath.endsWith('.js') && filePath.startsWith('/front_end/') &&
+    if (argv.coverage && fullPath.endsWith('.js') && filePath.startsWith('/front_end/') &&
         isIncludedForCoverageComputation(filePath)) {
       const previouslyGeneratedInstrumentedSource = instrumentedSourceCacheForFilePaths.get(fullPath);
 
@@ -501,7 +540,7 @@ function createTracesIndexFile(traceFilenames) {
  * @param {string|null} filePath
  */
 async function handleTracesModeRequest(request, response, filePath) {
-  const traceFolder = path.resolve(path.join(process.cwd(), 'test/unittests/fixtures/traces/'));
+  const traceFolder = path.resolve(path.join(process.cwd(), 'front_end/panels/timeline/fixtures/traces/'));
   if (filePath === '/') {
     const traceFilenames = fs.readdirSync(traceFolder).filter(f => f.includes('json'));
     const html = createTracesIndexFile(traceFilenames);

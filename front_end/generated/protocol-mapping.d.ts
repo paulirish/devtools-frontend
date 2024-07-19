@@ -33,7 +33,15 @@ export namespace ProtocolMapping {
      * Event for animation that has been started.
      */
     'Animation.animationStarted': [Protocol.Animation.AnimationStartedEvent];
+    /**
+     * Event for animation that has been updated.
+     */
+    'Animation.animationUpdated': [Protocol.Animation.AnimationUpdatedEvent];
     'Audits.issueAdded': [Protocol.Audits.IssueAddedEvent];
+    /**
+     * Emitted when an address form is filled.
+     */
+    'Autofill.addressFormFilled': [Protocol.Autofill.AddressFormFilledEvent];
     /**
      * Called when the recording state for the service has been updated.
      */
@@ -272,12 +280,22 @@ export namespace ProtocolMapping {
      */
     'Network.responseReceivedExtraInfo': [Protocol.Network.ResponseReceivedExtraInfoEvent];
     /**
+     * Fired when 103 Early Hints headers is received in addition to the common response.
+     * Not every responseReceived event will have an responseReceivedEarlyHints fired.
+     * Only one responseReceivedEarlyHints may be fired for eached responseReceived event.
+     */
+    'Network.responseReceivedEarlyHints': [Protocol.Network.ResponseReceivedEarlyHintsEvent];
+    /**
      * Fired exactly once for each Trust Token operation. Depending on
      * the type of the operation and whether the operation succeeded or
      * failed, the event is fired before the corresponding request was sent
      * or after the response was received.
      */
     'Network.trustTokenOperationDone': [Protocol.Network.TrustTokenOperationDoneEvent];
+    /**
+     * Fired once security policy has been updated.
+     */
+    'Network.policyUpdated': [];
     /**
      * Fired once when parsing the .wbn file has succeeded.
      * The event contains the information about the web bundle contents.
@@ -468,9 +486,22 @@ export namespace ProtocolMapping {
      */
     'Storage.indexedDBListUpdated': [Protocol.Storage.IndexedDBListUpdatedEvent];
     /**
-     * One of the interest groups was accessed by the associated page.
+     * One of the interest groups was accessed. Note that these events are global
+     * to all targets sharing an interest group store.
      */
     'Storage.interestGroupAccessed': [Protocol.Storage.InterestGroupAccessedEvent];
+    /**
+     * An auction involving interest groups is taking place. These events are
+     * target-specific.
+     */
+    'Storage.interestGroupAuctionEventOccurred': [Protocol.Storage.InterestGroupAuctionEventOccurredEvent];
+    /**
+     * Specifies which auctions a particular network fetch may be related to, and
+     * in what role. Note that it is not ordered with respect to
+     * Network.requestWillBeSent (but will happen before loadingFinished
+     * loadingFailed).
+     */
+    'Storage.interestGroupAuctionNetworkRequestCreated': [Protocol.Storage.InterestGroupAuctionNetworkRequestCreatedEvent];
     /**
      * Shared storage was accessed by the associated page.
      * The following parameters are included in all events.
@@ -478,11 +509,8 @@ export namespace ProtocolMapping {
     'Storage.sharedStorageAccessed': [Protocol.Storage.SharedStorageAccessedEvent];
     'Storage.storageBucketCreatedOrUpdated': [Protocol.Storage.StorageBucketCreatedOrUpdatedEvent];
     'Storage.storageBucketDeleted': [Protocol.Storage.StorageBucketDeletedEvent];
-    /**
-     * TODO(crbug.com/1458532): Add other Attribution Reporting events, e.g.
-     * trigger registration.
-     */
     'Storage.attributionReportingSourceRegistered': [Protocol.Storage.AttributionReportingSourceRegisteredEvent];
+    'Storage.attributionReportingTriggerRegistered': [Protocol.Storage.AttributionReportingTriggerRegisteredEvent];
     /**
      * Issued when attached to target because of auto-attach or `attachToTarget` command.
      */
@@ -536,6 +564,11 @@ export namespace ProtocolMapping {
      * The stage of the request can be determined by presence of responseErrorReason
      * and responseStatusCode -- the request is at the response stage if either
      * of these fields is present and in the request stage otherwise.
+     * Redirect responses and subsequent requests are reported similarly to regular
+     * responses and requests. Redirect responses may be distinguished by the value
+     * of `responseStatusCode` (which is one of 301, 302, 303, 307, 308) along with
+     * presence of the `location` header. Requests resulting from a redirect will
+     * have `redirectedRequestId` field set.
      */
     'Fetch.requestPaused': [Protocol.Fetch.RequestPausedEvent];
     /**
@@ -638,10 +671,6 @@ export namespace ProtocolMapping {
     'Preload.ruleSetUpdated': [Protocol.Preload.RuleSetUpdatedEvent];
     'Preload.ruleSetRemoved': [Protocol.Preload.RuleSetRemovedEvent];
     /**
-     * Fired when a prerender attempt is completed.
-     */
-    'Preload.prerenderAttemptCompleted': [Protocol.Preload.PrerenderAttemptCompletedEvent];
-    /**
      * Fired when a preload enabled state is updated.
      */
     'Preload.preloadEnabledStateUpdated': [Protocol.Preload.PreloadEnabledStateUpdatedEvent];
@@ -658,6 +687,11 @@ export namespace ProtocolMapping {
      */
     'Preload.preloadingAttemptSourcesUpdated': [Protocol.Preload.PreloadingAttemptSourcesUpdatedEvent];
     'FedCm.dialogShown': [Protocol.FedCm.DialogShownEvent];
+    /**
+     * Triggered when a dialog is closed, either by user action, JS abort,
+     * or a command below.
+     */
+    'FedCm.dialogClosed': [Protocol.FedCm.DialogClosedEvent];
     /**
      * Fired when breakpoint is resolved to an actual script and location.
      */
@@ -796,7 +830,7 @@ export namespace ProtocolMapping {
     /**
      * Query a DOM node's accessibility subtree for accessible name and role.
      * This command computes the name and role for all nodes in the subtree, including those that are
-     * ignored for accessibility, and returns those that mactch the specified name and role. If no DOM
+     * ignored for accessibility, and returns those that match the specified name and role. If no DOM
      * node is specified, or the DOM node does not exist, the command returns an error. If neither
      * `accessibleName` or `role` is specified, it returns all the accessibility nodes in the subtree.
      */
@@ -914,6 +948,15 @@ export namespace ProtocolMapping {
       returnType: Protocol.Audits.CheckFormsIssuesResponse;
     };
     /**
+     * Installs an unpacked extension from the filesystem similar to
+     * --load-extension CLI flags. Returns extension ID once the extension
+     * has been installed.
+     */
+    'Extensions.loadUnpacked': {
+      paramsType: [Protocol.Extensions.LoadUnpackedRequest];
+      returnType: Protocol.Extensions.LoadUnpackedResponse;
+    };
+    /**
      * Trigger autofill on a form identified by the fieldId.
      * If the field and related form cannot be autofilled, returns an error.
      */
@@ -926,6 +969,20 @@ export namespace ProtocolMapping {
      */
     'Autofill.setAddresses': {
       paramsType: [Protocol.Autofill.SetAddressesRequest];
+      returnType: void;
+    };
+    /**
+     * Disables autofill domain notifications.
+     */
+    'Autofill.disable': {
+      paramsType: [];
+      returnType: void;
+    };
+    /**
+     * Enables autofill domain notifications.
+     */
+    'Autofill.enable': {
+      paramsType: [];
       returnType: void;
     };
     /**
@@ -1188,6 +1245,14 @@ export namespace ProtocolMapping {
       returnType: Protocol.CSS.GetLayersForNodeResponse;
     };
     /**
+     * Given a CSS selector text and a style sheet ID, getLocationForSelector
+     * returns an array of locations of the CSS selector in the style sheet.
+     */
+    'CSS.getLocationForSelector': {
+      paramsType: [Protocol.CSS.GetLocationForSelectorRequest];
+      returnType: Protocol.CSS.GetLocationForSelectorResponse;
+    };
+    /**
      * Starts tracking the given computed styles for updates. The specified array of properties
      * replaces the one previously specified. Pass empty array to disable tracking.
      * Use takeComputedStyleUpdates to retrieve the list of nodes that had properties modified.
@@ -1213,6 +1278,13 @@ export namespace ProtocolMapping {
     'CSS.setEffectivePropertyValueForNode': {
       paramsType: [Protocol.CSS.SetEffectivePropertyValueForNodeRequest];
       returnType: void;
+    };
+    /**
+     * Modifies the property rule property name.
+     */
+    'CSS.setPropertyRulePropertyName': {
+      paramsType: [Protocol.CSS.SetPropertyRulePropertyNameRequest];
+      returnType: Protocol.CSS.SetPropertyRulePropertyNameResponse;
     };
     /**
      * Modifies the keyframe rule key text.
@@ -1600,6 +1672,13 @@ export namespace ProtocolMapping {
       returnType: Protocol.DOM.GetTopLayerElementsResponse;
     };
     /**
+     * Returns the NodeId of the matched element according to certain relations.
+     */
+    'DOM.getElementByRelation': {
+      paramsType: [Protocol.DOM.GetElementByRelationRequest];
+      returnType: Protocol.DOM.GetElementByRelationResponse;
+    };
+    /**
      * Re-does the last undone action.
      */
     'DOM.redo': {
@@ -1751,6 +1830,14 @@ export namespace ProtocolMapping {
       returnType: Protocol.DOM.GetQueryingDescendantsForContainerResponse;
     };
     /**
+     * Returns the target anchor element of the given anchor query according to
+     * https://www.w3.org/TR/css-anchor-position-1/#target.
+     */
+    'DOM.getAnchorElement': {
+      paramsType: [Protocol.DOM.GetAnchorElementRequest];
+      returnType: Protocol.DOM.GetAnchorElementResponse;
+    };
+    /**
      * Returns event listeners of the given object.
      */
     'DOMDebugger.getEventListeners': {
@@ -1832,6 +1919,13 @@ export namespace ProtocolMapping {
      */
     'EventBreakpoints.removeInstrumentationBreakpoint': {
       paramsType: [Protocol.EventBreakpoints.RemoveInstrumentationBreakpointRequest];
+      returnType: void;
+    };
+    /**
+     * Removes all breakpoints
+     */
+    'EventBreakpoints.disable': {
+      paramsType: [];
       returnType: void;
     };
     /**
@@ -2000,6 +2094,24 @@ export namespace ProtocolMapping {
       paramsType: [Protocol.Emulation.SetDeviceMetricsOverrideRequest];
       returnType: void;
     };
+    /**
+     * Start reporting the given posture value to the Device Posture API.
+     * This override can also be set in setDeviceMetricsOverride().
+     */
+    'Emulation.setDevicePostureOverride': {
+      paramsType: [Protocol.Emulation.SetDevicePostureOverrideRequest];
+      returnType: void;
+    };
+    /**
+     * Clears a device posture override set with either setDeviceMetricsOverride()
+     * or setDevicePostureOverride() and starts using posture information from the
+     * platform again.
+     * Does nothing if no override is set.
+     */
+    'Emulation.clearDevicePostureOverride': {
+      paramsType: [];
+      returnType: void;
+    };
     'Emulation.setScrollbarsHidden': {
       paramsType: [Protocol.Emulation.SetScrollbarsHiddenRequest];
       returnType: void;
@@ -2032,6 +2144,29 @@ export namespace ProtocolMapping {
      */
     'Emulation.setGeolocationOverride': {
       paramsType: [Protocol.Emulation.SetGeolocationOverrideRequest?];
+      returnType: void;
+    };
+    'Emulation.getOverriddenSensorInformation': {
+      paramsType: [Protocol.Emulation.GetOverriddenSensorInformationRequest];
+      returnType: Protocol.Emulation.GetOverriddenSensorInformationResponse;
+    };
+    /**
+     * Overrides a platform sensor of a given type. If |enabled| is true, calls to
+     * Sensor.start() will use a virtual sensor as backend rather than fetching
+     * data from a real hardware sensor. Otherwise, existing virtual
+     * sensor-backend Sensor objects will fire an error event and new calls to
+     * Sensor.start() will attempt to use a real sensor instead.
+     */
+    'Emulation.setSensorOverrideEnabled': {
+      paramsType: [Protocol.Emulation.SetSensorOverrideEnabledRequest];
+      returnType: void;
+    };
+    /**
+     * Updates the sensor readings reported by a sensor type previously overridden
+     * by setSensorOverrideEnabled.
+     */
+    'Emulation.setSensorOverrideReadings': {
+      paramsType: [Protocol.Emulation.SetSensorOverrideReadingsRequest];
       returnType: void;
     };
     /**
@@ -2117,6 +2252,7 @@ export namespace ProtocolMapping {
     };
     /**
      * Allows overriding user agent with the given string.
+     * `userAgentMetadata` must be set for Client Hint headers to be sent.
      */
     'Emulation.setUserAgentOverride': {
       paramsType: [Protocol.Emulation.SetUserAgentOverrideRequest];
@@ -2173,6 +2309,10 @@ export namespace ProtocolMapping {
     'IO.resolveBlob': {
       paramsType: [Protocol.IO.ResolveBlobRequest];
       returnType: Protocol.IO.ResolveBlobResponse;
+    };
+    'FileSystem.getDirectory': {
+      paramsType: [Protocol.FileSystem.GetDirectoryRequest];
+      returnType: Protocol.FileSystem.GetDirectoryResponse;
     };
     /**
      * Clears all entries from an object store.
@@ -2260,7 +2400,7 @@ export namespace ProtocolMapping {
       returnType: void;
     };
     /**
-     * This method sets the current candidate text for ime.
+     * This method sets the current candidate text for IME.
      * Use imeCommitComposition to commit the final text.
      * Use imeSetComposition with empty string as text to cancel composition.
      */
@@ -2570,7 +2710,7 @@ export namespace ProtocolMapping {
       returnType: void;
     };
     /**
-     * Deletes browser cookies with matching name and url or domain/path pair.
+     * Deletes browser cookies with matching name and url or domain/path/partitionKey pair.
      */
     'Network.deleteCookies': {
       paramsType: [Protocol.Network.DeleteCookiesRequest];
@@ -2733,6 +2873,14 @@ export namespace ProtocolMapping {
       returnType: void;
     };
     /**
+     * Enables streaming of the response for the given requestId.
+     * If enabled, the dataReceived event contains the data that was received during streaming.
+     */
+    'Network.streamResourceContent': {
+      paramsType: [Protocol.Network.StreamResourceContentRequest];
+      returnType: Protocol.Network.StreamResourceContentResponse;
+    };
+    /**
      * Returns information about the COEP/COOP isolation status.
      */
     'Network.getSecurityIsolationStatus': {
@@ -2798,8 +2946,8 @@ export namespace ProtocolMapping {
     };
     /**
      * Highlights owner element of the frame with given id.
-     * Deprecated: Doesn't work reliablity and cannot be fixed due to process
-     * separatation (the owner node might be in a different process). Determine
+     * Deprecated: Doesn't work reliably and cannot be fixed due to process
+     * separation (the owner node might be in a different process). Determine
      * the owner node in the client and use highlightNode.
      */
     'Overlay.highlightFrame': {
@@ -2945,6 +3093,13 @@ export namespace ProtocolMapping {
       returnType: void;
     };
     /**
+     * Show Window Controls Overlay for PWA
+     */
+    'Overlay.setShowWindowControlsOverlay': {
+      paramsType: [Protocol.Overlay.SetShowWindowControlsOverlayRequest?];
+      returnType: void;
+    };
+    /**
      * Deprecated, please use addScriptToEvaluateOnNewDocument instead.
      */
     'Page.addScriptToEvaluateOnLoad': {
@@ -3029,8 +3184,15 @@ export namespace ProtocolMapping {
       paramsType: [];
       returnType: void;
     };
+    /**
+     * Gets the processed manifest for this current document.
+     *   This API always waits for the manifest to be loaded.
+     *   If manifestId is provided, and it does not match the manifest of the
+     *     current document, this API errors out.
+     *   If there is not a loaded page, this API errors out immediately.
+     */
     'Page.getAppManifest': {
-      paramsType: [];
+      paramsType: [Protocol.Page.GetAppManifestRequest?];
       returnType: Protocol.Page.GetAppManifestResponse;
     };
     'Page.getInstallabilityErrors': {
@@ -3055,15 +3217,6 @@ export namespace ProtocolMapping {
     'Page.getAdScriptId': {
       paramsType: [Protocol.Page.GetAdScriptIdRequest];
       returnType: Protocol.Page.GetAdScriptIdResponse;
-    };
-    /**
-     * Returns all browser cookies for the page and all of its subframes. Depending
-     * on the backend support, will return detailed cookie information in the
-     * `cookies` field.
-     */
-    'Page.getCookies': {
-      paramsType: [];
-      returnType: Protocol.Page.GetCookiesResponse;
     };
     /**
      * Returns present frame tree structure.
@@ -3310,7 +3463,7 @@ export namespace ProtocolMapping {
     };
     /**
      * Requests backend to produce compilation cache for the specified scripts.
-     * `scripts` are appeneded to the list of scripts for which the cache
+     * `scripts` are appended to the list of scripts for which the cache
      * would be produced. The list may be reset during page navigation.
      * When script with a matching URL is encountered, the cache is optionally
      * produced upon backend discretion, based on internal heuristics.
@@ -3656,6 +3809,14 @@ export namespace ProtocolMapping {
       returnType: void;
     };
     /**
+     * Enables/Disables issuing of interestGroupAuctionEventOccurred and
+     * interestGroupAuctionNetworkRequestCreated.
+     */
+    'Storage.setInterestGroupAuctionTracking': {
+      paramsType: [Protocol.Storage.SetInterestGroupAuctionTrackingRequest];
+      returnType: void;
+    };
+    /**
      * Gets metadata for an origin's shared storage.
      */
     'Storage.getSharedStorageMetadata': {
@@ -3740,6 +3901,22 @@ export namespace ProtocolMapping {
       returnType: void;
     };
     /**
+     * Sends all pending Attribution Reports immediately, regardless of their
+     * scheduled report time.
+     */
+    'Storage.sendPendingAttributionReports': {
+      paramsType: [];
+      returnType: Protocol.Storage.SendPendingAttributionReportsResponse;
+    };
+    /**
+     * Returns the effective Related Website Sets in use by this profile for the browser
+     * session. The effective Related Website Sets will not change during a browser session.
+     */
+    'Storage.getRelatedWebsiteSets': {
+      paramsType: [];
+      returnType: Protocol.Storage.GetRelatedWebsiteSetsResponse;
+    };
+    /**
      * Returns information about the system.
      */
     'SystemInfo.getInfo': {
@@ -3794,7 +3971,7 @@ export namespace ProtocolMapping {
      *
      * Injected object will be available as `window[bindingName]`.
      *
-     * The object has the follwing API:
+     * The object has the following API:
      * - `binding.send(json)` - a method to send messages over the remote debugging protocol
      * - `binding.onmessage = json => handleMessage(json)` - a callback that will be called for the protocol notifications and command responses.
      */
@@ -4008,6 +4185,10 @@ export namespace ProtocolMapping {
      * takeResponseBodyForInterceptionAsStream. Calling other methods that
      * affect the request or disabling fetch domain before body is received
      * results in an undefined behavior.
+     * Note that the response body is not available for redirects. Requests
+     * paused in the _redirect received_ state may be differentiated by
+     * `responseCode` and presence of `location` response header, see
+     * comments to `requestPaused` for details.
      */
     'Fetch.getResponseBody': {
       paramsType: [Protocol.Fetch.GetResponseBodyRequest];
@@ -4139,6 +4320,14 @@ export namespace ProtocolMapping {
       returnType: void;
     };
     /**
+     * Allows setting credential properties.
+     * https://w3c.github.io/webauthn/#sctn-automation-set-credential-properties
+     */
+    'WebAuthn.setCredentialProperties': {
+      paramsType: [Protocol.WebAuthn.SetCredentialPropertiesRequest];
+      returnType: void;
+    };
+    /**
      * Enables the Media domain
      */
     'Media.enable': {
@@ -4200,6 +4389,14 @@ export namespace ProtocolMapping {
       paramsType: [Protocol.FedCm.SelectAccountRequest];
       returnType: void;
     };
+    'FedCm.clickDialogButton': {
+      paramsType: [Protocol.FedCm.ClickDialogButtonRequest];
+      returnType: void;
+    };
+    'FedCm.openUrl': {
+      paramsType: [Protocol.FedCm.OpenUrlRequest];
+      returnType: void;
+    };
     'FedCm.dismissDialog': {
       paramsType: [Protocol.FedCm.DismissDialogRequest];
       returnType: void;
@@ -4210,6 +4407,88 @@ export namespace ProtocolMapping {
      */
     'FedCm.resetCooldown': {
       paramsType: [];
+      returnType: void;
+    };
+    /**
+     * Returns the following OS state for the given manifest id.
+     */
+    'PWA.getOsAppState': {
+      paramsType: [Protocol.PWA.GetOsAppStateRequest];
+      returnType: Protocol.PWA.GetOsAppStateResponse;
+    };
+    /**
+     * Installs the given manifest identity, optionally using the given install_url
+     * or IWA bundle location.
+     *
+     * TODO(crbug.com/337872319) Support IWA to meet the following specific
+     * requirement.
+     * IWA-specific install description: If the manifest_id is isolated-app://,
+     * install_url_or_bundle_url is required, and can be either an http(s) URL or
+     * file:// URL pointing to a signed web bundle (.swbn). The .swbn file's
+     * signing key must correspond to manifest_id. If Chrome is not in IWA dev
+     * mode, the installation will fail, regardless of the state of the allowlist.
+     */
+    'PWA.install': {
+      paramsType: [Protocol.PWA.InstallRequest];
+      returnType: void;
+    };
+    /**
+     * Uninstalls the given manifest_id and closes any opened app windows.
+     */
+    'PWA.uninstall': {
+      paramsType: [Protocol.PWA.UninstallRequest];
+      returnType: void;
+    };
+    /**
+     * Launches the installed web app, or an url in the same web app instead of the
+     * default start url if it is provided. Returns a page Target.TargetID which
+     * can be used to attach to via Target.attachToTarget or similar APIs.
+     */
+    'PWA.launch': {
+      paramsType: [Protocol.PWA.LaunchRequest];
+      returnType: Protocol.PWA.LaunchResponse;
+    };
+    /**
+     * Opens one or more local files from an installed web app identified by its
+     * manifestId. The web app needs to have file handlers registered to process
+     * the files. The API returns one or more page Target.TargetIDs which can be
+     * used to attach to via Target.attachToTarget or similar APIs.
+     * If some files in the parameters cannot be handled by the web app, they will
+     * be ignored. If none of the files can be handled, this API returns an error.
+     * If no files are provided as the parameter, this API also returns an error.
+     *
+     * According to the definition of the file handlers in the manifest file, one
+     * Target.TargetID may represent a page handling one or more files. The order
+     * of the returned Target.TargetIDs is not guaranteed.
+     *
+     * TODO(crbug.com/339454034): Check the existences of the input files.
+     */
+    'PWA.launchFilesInApp': {
+      paramsType: [Protocol.PWA.LaunchFilesInAppRequest];
+      returnType: Protocol.PWA.LaunchFilesInAppResponse;
+    };
+    /**
+     * Opens the current page in its web app identified by the manifest id, needs
+     * to be called on a page target. This function returns immediately without
+     * waiting for the app to finish loading.
+     */
+    'PWA.openCurrentPageInApp': {
+      paramsType: [Protocol.PWA.OpenCurrentPageInAppRequest];
+      returnType: void;
+    };
+    /**
+     * Changes user settings of the web app identified by its manifestId. If the
+     * app was not installed, this command returns an error. Unset parameters will
+     * be ignored; unrecognized values will cause an error.
+     *
+     * Unlike the ones defined in the manifest files of the web apps, these
+     * settings are provided by the browser and controlled by the users, they
+     * impact the way the browser handling the web apps.
+     *
+     * See the comment of each parameter.
+     */
+    'PWA.changeAppUserSettings': {
+      paramsType: [Protocol.PWA.ChangeAppUserSettingsRequest];
       returnType: void;
     };
     /**

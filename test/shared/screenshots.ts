@@ -11,15 +11,15 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type * as puppeteer from 'puppeteer-core';
 
-import {getTestRunnerConfigSetting} from '../conductor/test_runner_config.js';
-import {makeCustomWrappedIt} from '../shared/mocha-extensions.js';
-
+import {SOURCE_ROOT} from '../conductor/paths.js';
+import {TestConfig} from '../conductor/test_config.js';
 import {
-  platform,
   getBrowserAndPages,
-  waitFor,
+  platform,
   timeout,
+  waitFor,
 } from '../shared/helper.js';
+import {ScreenshotError} from '../shared/screenshot-error.js';
 
 /**
  * The goldens screenshot folder is always taken from the source directory (NOT
@@ -27,12 +27,8 @@ import {
  * flags from the test runner config to locate the source directory and read our
  * goldens from there.
  */
-const testRunnerCWD = getTestRunnerConfigSetting<string>('cwd', '');
-const testSuiteSourceDir = getTestRunnerConfigSetting<string>('test-suite-source-dir', '');
-if (!testRunnerCWD || !testSuiteSourceDir) {
-  throw new Error('--cwd and --test-suite-source-dir must be provided when running the screenshot tests.');
-}
-const GOLDENS_FOLDER = path.join(testRunnerCWD, testSuiteSourceDir, 'goldens', platform);
+const testRunnerCWD = SOURCE_ROOT;
+const GOLDENS_FOLDER = path.join(testRunnerCWD, 'test', 'interactions', 'goldens', platform);
 
 /**
  * It's assumed that the image_diff binaries are in CWD/third_party/image_diff/{platform}/image_diff
@@ -78,6 +74,11 @@ export const assertElementScreenshotUnchanged = async (
   if (!element) {
     assert.fail(`Given element for test ${fileName} was not found.`);
   }
+  // Only assert screenshots on Linux. We don't observe platform-specific differences enough to justify
+  // the costs of asserting 3 platforms per screenshot.
+  if (platform !== 'linux') {
+    return;
+  }
   return assertScreenshotUnchangedWithRetries(element, fileName, maximumDiffThreshold, DEFAULT_RETRIES_COUNT, options);
 };
 
@@ -96,7 +97,11 @@ const assertScreenshotUnchangedWithRetries = async (
     const goldenScreenshotPath = path.join(GOLDENS_FOLDER, fileNameForPlatform);
     const generatedScreenshotPath = path.join(generatedScreenshotFolder, fileNameForPlatform);
 
-    if (fs.existsSync(generatedScreenshotPath)) {
+    // You can run the tests with ITERATIONS=2 to run each test twice. In that
+    // case we would expect the generated screenshots to already exists, so if
+    // we are running more than 1 iteration, we do not error.
+    const testIterations = TestConfig.repetitions;
+    if (fs.existsSync(generatedScreenshotPath) && testIterations < 2) {
       // If this happened something went wrong during the clean-up at the start of the test run, so let's bail.
       throw new Error(`${generatedScreenshotPath} already exists.`);
     }
@@ -118,8 +123,6 @@ const assertScreenshotUnchangedWithRetries = async (
       maximumDiffThreshold,
       maximumRetries,
     });
-  } catch (e) {
-    throw new Error(`Error occurred when comparing screenshots:\n${e.stack}`);
   } finally {
     await frontend.evaluate(() => window.dispatchEvent(new Event('showcomponentdocsui')));
   }
@@ -136,7 +139,7 @@ interface ScreenshotAssertionOptions {
   retryCount?: number;
 }
 
-const assertScreenshotUnchanged = async(options: ScreenshotAssertionOptions): Promise<void> => {
+const assertScreenshotUnchanged = async (options: ScreenshotAssertionOptions) => {
   const {
     elementOrPage,
     generatedScreenshotPath,
@@ -154,9 +157,9 @@ const assertScreenshotUnchanged = async(options: ScreenshotAssertionOptions): Pr
    * to update the golden image. This is useful if work has caused the
    * screenshot to change and therefore the test goldens need to be updated.
    */
-  const shouldUpdate = Boolean(process.env.FORCE_UPDATE_ALL_GOLDENS) ||
-      Boolean(process.env.UPDATE_GOLDEN && process.env.UPDATE_GOLDEN === fileName);
-  const throwAfterGoldensUpdate = Boolean(process.env.THROW_AFTER_GOLDENS_UPDATE);
+  const shouldUpdate =
+      TestConfig.onDiff.update && (TestConfig.onDiff.update === true || TestConfig.onDiff.update.includes(fileName));
+  const throwAfterGoldensUpdate = TestConfig.onDiff.throw;
 
   let onBotAndImageNotFound = false;
 
@@ -166,14 +169,16 @@ const assertScreenshotUnchanged = async(options: ScreenshotAssertionOptions): Pr
     if (process.env.LUCI_CONTEXT !== undefined && !shouldUpdate) {
       // If the image is missing, there's no point retrying the test N more times.
       onBotAndImageNotFound = true;
-      assert.fail(`Failing test: in an environment with LUCI_CONTEXT and did not find a golden screenshot.
+      throw ScreenshotError.fromMessage(
+          `Failing test: in an environment with LUCI_CONTEXT and did not find a golden screenshot.
 
         Here's the image that this test generated as a base64:
 
         data:image/png;base64,${fs.readFileSync(generatedScreenshotPath, {
-        encoding: 'base64',
-      })}
-        `);
+            encoding: 'base64',
+          })}
+        `,
+          generatedScreenshotPath);
     }
 
     console.log('Golden does not exist, using generated screenshot.');
@@ -272,7 +277,6 @@ async function execImageDiffCommand(cmd: string) {
 
 async function compare(golden: string, generated: string, maximumDiffThreshold: number) {
   const isOnBot = process.env.LUCI_CONTEXT !== undefined;
-
   if (!isOnBot && process.env.SKIP_SCREENSHOT_COMPARISONS_FOR_FAST_COVERAGE) {
     // When checking test coverage locally the tests get sped up significantly
     // if we do not do the actual image comparison. Obviously this makes the
@@ -319,7 +323,7 @@ async function compare(golden: string, generated: string, maximumDiffThreshold: 
     }
 
   } catch (assertionError) {
-    throw assertionError;
+    throw ScreenshotError.fromError(assertionError, golden, generated, diffPath);
   }
 }
 
@@ -334,8 +338,6 @@ function setGeneratedFileAsGolden(golden: string, generated: string) {
     assert.fail(`Error setting golden, ${e}`);
   }
 }
-
-export const itScreenshot = makeCustomWrappedIt('[screenshot]:');
 
 export async function waitForDialogAnimationEnd(root?: puppeteer.ElementHandle) {
   const ANIMATION_TIMEOUT = 2000;

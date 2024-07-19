@@ -22,17 +22,12 @@
 }
 
 .breakpoint-entry:focus-visible {
-  background-color: var(--legacy-focus-bg-color);
-}
-
-.breakpoint-list .breakpoint-entry:hover {
-  background-color: var(--color-background-elevation-2);
+  background-color: var(--sys-color-tonal-container);
 }
 
 .breakpoint-hit {
-  background-color: var(--color-background-elevation-2);
-  border-right: 3px solid var(--color-details-hairline);
-  color: var(--color-text-primary);
+  background-color: var(--sys-color-neutral-container);
+  color: var(--sys-color-on-surface);
 }
 
 @media (forced-colors: active) {

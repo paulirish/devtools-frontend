@@ -36,9 +36,9 @@ import * as Protocol from '../../generated/protocol.js';
 import * as Logs from '../../models/logs/logs.js';
 import * as ObjectUI from '../../ui/legacy/components/object_ui/object_ui.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {Events, type NetworkTimeCalculator} from './NetworkTimeCalculator.js';
-
 import networkingTimingTableStyles from './networkTimingTable.css.js';
 
 const UIStrings = {
@@ -295,6 +295,14 @@ export class RequestTimingView extends UI.Widget.VBox {
       }
     }
 
+    // In some situations, argument `start` may come before `startTime` (`timing.requestStart`). This is especially true
+    // in cases such as SW static routing API where fields like `workerRouterEvaluationStart` or `workerCacheLookupStart`
+    // is set before setting `timing.requestStart`. If the `start` and `end` is known to be a valid value (i.e. not default
+    // invalid value -1 or undefined), we allow adding the range.
+    function addMaybeNegativeOffsetRange(name: RequestTimeRangeNames, start: number, end: number): void {
+      addRange(name, startTime + (start / 1000), startTime + (end / 1000));
+    }
+
     const timing = request.timing;
     if (!timing) {
       const start = request.issueTime() !== -1 ? request.issueTime() : request.startTime !== -1 ? request.startTime : 0;
@@ -351,6 +359,34 @@ export class RequestTimingView extends UI.Widget.VBox {
           Math.max(timing.sendEnd, timing.connectEnd, timing.dnsEnd, timing.proxyEnd, blockingEnd), responseReceived);
     }
 
+    const {serviceWorkerRouterInfo} = request;
+    if (serviceWorkerRouterInfo) {
+      if (timing.workerRouterEvaluationStart) {
+        // Depending on the source,the next timestamp will be different. Determine the timestamp by checking
+        // the matched and actual source.
+        let routerEvaluationEnd = timing.sendStart;
+        if (serviceWorkerRouterInfo?.matchedSourceType === Protocol.Network.ServiceWorkerRouterSource.Cache &&
+            timing.workerCacheLookupStart) {
+          routerEvaluationEnd = timing.workerCacheLookupStart;
+        } else if (
+            serviceWorkerRouterInfo?.actualSourceType === Protocol.Network.ServiceWorkerRouterSource.FetchEvent) {
+          routerEvaluationEnd = timing.workerStart;
+        }
+        addMaybeNegativeOffsetRange(
+            RequestTimeRangeNames.ServiceWorkerRouterEvaluation, timing.workerRouterEvaluationStart,
+            routerEvaluationEnd);
+      }
+
+      if (timing.workerCacheLookupStart) {
+        let cacheLookupEnd = timing.sendStart;
+        if (serviceWorkerRouterInfo?.actualSourceType === Protocol.Network.ServiceWorkerRouterSource.Cache) {
+          cacheLookupEnd = timing.receiveHeadersStart;
+        }
+        addMaybeNegativeOffsetRange(
+            RequestTimeRangeNames.ServiceWorkerCacheLookup, timing.workerCacheLookupStart, cacheLookupEnd);
+      }
+    }
+
     if (request.endTime !== -1) {
       addRange(
           timing.pushStart ? RequestTimeRangeNames.ReceivingPush : RequestTimeRangeNames.Receiving,
@@ -363,6 +399,7 @@ export class RequestTimingView extends UI.Widget.VBox {
   static createTimingTable(request: SDK.NetworkRequest.NetworkRequest, calculator: NetworkTimeCalculator): Element {
     const tableElement = document.createElement('table');
     tableElement.classList.add('network-timing-table');
+    tableElement.setAttribute('jslog', `${VisualLogging.pane('timing').track({resize: true})}`);
     const colgroup = tableElement.createChild('colgroup');
     colgroup.createChild('col', 'labels');
     colgroup.createChild('col', 'bars');
@@ -433,8 +470,8 @@ export class RequestTimingView extends UI.Widget.VBox {
       const duration = range.end - range.start;
 
       const tr = tableElement.createChild('tr');
-      const timingBarTitleEement = tr.createChild('td');
-      UI.UIUtils.createTextChild(timingBarTitleEement, RequestTimingView.timeRangeTitle(rangeName));
+      const timingBarTitleElement = tr.createChild('td');
+      UI.UIUtils.createTextChild(timingBarTitleElement, RequestTimingView.timeRangeTitle(rangeName));
 
       const row = tr.createChild('td').createChild('div', 'network-timing-row');
       const bar = row.createChild('span', 'network-timing-bar ' + rangeName);
@@ -446,12 +483,12 @@ export class RequestTimingView extends UI.Widget.VBox {
       label.textContent = i18n.TimeUtilities.secondsToString(duration, true);
 
       if (range.name === 'serviceworker-respondwith') {
-        timingBarTitleEement.classList.add('network-fetch-timing-bar-clickable');
+        timingBarTitleElement.classList.add('network-fetch-timing-bar-clickable');
         tableElement.createChild('tr', 'network-fetch-timing-bar-details');
 
-        timingBarTitleEement.setAttribute('tabindex', '0');
-        timingBarTitleEement.setAttribute('role', 'switch');
-        UI.ARIAUtils.setChecked(timingBarTitleEement, false);
+        timingBarTitleElement.setAttribute('tabindex', '0');
+        timingBarTitleElement.setAttribute('role', 'switch');
+        UI.ARIAUtils.setChecked(timingBarTitleElement, false);
       }
     }
 
@@ -464,9 +501,10 @@ export class RequestTimingView extends UI.Widget.VBox {
     const footer = tableElement.createChild('tr', 'network-timing-footer');
     const note = (footer.createChild('td') as HTMLTableCellElement);
     note.colSpan = 1;
-    note.appendChild(UI.XLink.XLink.create(
+    const explanationLink = UI.XLink.XLink.create(
         'https://developer.chrome.com/docs/devtools/network/reference/#timing-explanation',
-        i18nString(UIStrings.explanation)));
+        i18nString(UIStrings.explanation), undefined, undefined, 'explanation');
+    note.appendChild(explanationLink);
     footer.createChild('td');
     UI.UIUtils.createTextChild(footer.createChild('td'), i18n.TimeUtilities.secondsToString(totalDuration, true));
 
@@ -490,7 +528,8 @@ export class RequestTimingView extends UI.Widget.VBox {
       information.colSpan = 3;
 
       const link = UI.XLink.XLink.create(
-          'https://web.dev/custom-metrics/#server-timing-api', i18nString(UIStrings.theServerTimingApi));
+          'https://web.dev/custom-metrics/#server-timing-api', i18nString(UIStrings.theServerTimingApi), undefined,
+          undefined, 'server-timing-api');
       information.appendChild(
           i18n.i18n.getFormatLocalizedString(str_, UIStrings.duringDevelopmentYouCanUseSToAdd, {PH1: link}));
 
@@ -681,9 +720,7 @@ export class RequestTimingView extends UI.Widget.VBox {
   }
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum RequestTimeRangeNames {
+export const enum RequestTimeRangeNames {
   Push = 'push',
   Queueing = 'queueing',
   Blocking = 'blocking',
@@ -696,6 +733,8 @@ export enum RequestTimeRangeNames {
   ServiceWorker = 'serviceworker',
   ServiceWorkerPreparation = 'serviceworker-preparation',
   ServiceWorkerRespondWith = 'serviceworker-respondwith',
+  ServiceWorkerRouterEvaluation = 'serviceworker-routerevaluation',
+  ServiceWorkerCacheLookup = 'serviceworker-cachelookup',
   SSL = 'ssl',
   Total = 'total',
   Waiting = 'waiting',
@@ -705,6 +744,8 @@ export const ServiceWorkerRangeNames = new Set<RequestTimeRangeNames>([
   RequestTimeRangeNames.ServiceWorker,
   RequestTimeRangeNames.ServiceWorkerPreparation,
   RequestTimeRangeNames.ServiceWorkerRespondWith,
+  RequestTimeRangeNames.ServiceWorkerRouterEvaluation,
+  RequestTimeRangeNames.ServiceWorkerCacheLookup,
 ]);
 
 export const ConnectionSetupRangeNames = new Set<RequestTimeRangeNames>([

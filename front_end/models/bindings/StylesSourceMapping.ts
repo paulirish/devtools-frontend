@@ -31,7 +31,7 @@
 import * as Common from '../../core/common/common.js';
 import type * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
-import type * as TextUtils from '../text_utils/text_utils.js';
+import * as TextUtils from '../text_utils/text_utils.js';
 import * as Workspace from '../workspace/workspace.js';
 
 import {ContentProviderBasedProject} from './ContentProviderBasedProject.js';
@@ -60,6 +60,10 @@ export class StylesSourceMapping implements SourceMapping {
       this.#cssModel.addEventListener(SDK.CSSModel.Events.StyleSheetRemoved, this.styleSheetRemoved, this),
       this.#cssModel.addEventListener(SDK.CSSModel.Events.StyleSheetChanged, this.styleSheetChanged, this),
     ];
+  }
+
+  addSourceMap(sourceUrl: Platform.DevToolsPath.UrlString, sourceMapUrl: Platform.DevToolsPath.UrlString): void {
+    this.#styleFiles.get(sourceUrl)?.addSourceMap(sourceUrl, sourceMapUrl);
   }
 
   rawLocationToUILocation(rawLocation: SDK.CSSModel.CSSLocation): Workspace.UISourceCode.UILocation|null {
@@ -227,7 +231,7 @@ export class StyleFile implements TextUtils.ContentProvider.ContentProvider {
       return;
     }
     const mirrorContentBound = this.mirrorContent.bind(this, header, true /* majorChange */);
-    void this.#throttler.schedule(mirrorContentBound, false /* asSoonAsPossible */);
+    void this.#throttler.schedule(mirrorContentBound, Common.Throttler.Scheduling.Default);
   }
 
   private workingCopyCommitted(): void {
@@ -235,7 +239,7 @@ export class StyleFile implements TextUtils.ContentProvider.ContentProvider {
       return;
     }
     const mirrorContentBound = this.mirrorContent.bind(this, this.uiSourceCode, true /* majorChange */);
-    void this.#throttler.schedule(mirrorContentBound, true /* asSoonAsPossible */);
+    void this.#throttler.schedule(mirrorContentBound, Common.Throttler.Scheduling.AsSoonAsPossible);
   }
 
   private workingCopyChanged(): void {
@@ -243,7 +247,7 @@ export class StyleFile implements TextUtils.ContentProvider.ContentProvider {
       return;
     }
     const mirrorContentBound = this.mirrorContent.bind(this, this.uiSourceCode, false /* majorChange */);
-    void this.#throttler.schedule(mirrorContentBound, false /* asSoonAsPossible */);
+    void this.#throttler.schedule(mirrorContentBound, Common.Throttler.Scheduling.Default);
   }
 
   private async mirrorContent(fromProvider: TextUtils.ContentProvider.ContentProvider, majorChange: boolean):
@@ -253,12 +257,11 @@ export class StyleFile implements TextUtils.ContentProvider.ContentProvider {
       return;
     }
 
-    let newContent: string|(string | null)|null = null;
+    let newContent: string|null = null;
     if (fromProvider === this.uiSourceCode) {
       newContent = this.uiSourceCode.workingCopy();
     } else {
-      const deferredContent = await fromProvider.requestContent();
-      newContent = deferredContent.content;
+      newContent = TextUtils.ContentData.ContentData.textOr(await fromProvider.requestContentData(), null);
     }
 
     if (newContent === null || this.#terminated) {
@@ -313,13 +316,17 @@ export class StyleFile implements TextUtils.ContentProvider.ContentProvider {
     return this.headers.values().next().value.originalContentProvider().requestContent();
   }
 
+  requestContentData(): Promise<TextUtils.ContentData.ContentDataOrError> {
+    console.assert(this.headers.size > 0);
+    return this.headers.values().next().value.originalContentProvider().requestContentData();
+  }
+
   searchInContent(query: string, caseSensitive: boolean, isRegex: boolean):
       Promise<TextUtils.ContentProvider.SearchMatch[]> {
     console.assert(this.headers.size > 0);
     return this.headers.values().next().value.originalContentProvider().searchInContent(query, caseSensitive, isRegex);
   }
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-  // eslint-disable-next-line @typescript-eslint/naming-convention
+
   static readonly updateTimeout = 200;
 
   getHeaders(): Set<SDK.CSSStyleSheetHeader.CSSStyleSheetHeader> {
@@ -328,5 +335,13 @@ export class StyleFile implements TextUtils.ContentProvider.ContentProvider {
 
   getUiSourceCode(): Workspace.UISourceCode.UISourceCode {
     return this.uiSourceCode;
+  }
+
+  addSourceMap(sourceUrl: Platform.DevToolsPath.UrlString, sourceMapUrl: Platform.DevToolsPath.UrlString): void {
+    const sourceMapManager = this.#cssModel.sourceMapManager();
+    this.headers.forEach(header => {
+      sourceMapManager.detachSourceMap(header);
+      sourceMapManager.attachSourceMap(header, sourceUrl, sourceMapUrl);
+    });
   }
 }

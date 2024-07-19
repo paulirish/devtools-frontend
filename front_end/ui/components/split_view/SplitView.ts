@@ -43,7 +43,7 @@ const styles = `
   }
 
   #resizer {
-    background-color: var(--color-background-elevation-1);
+    background-color: var(--sys-color-surface1);
     position: absolute;
     user-select: none;
 
@@ -195,7 +195,7 @@ export class SplitView extends HTMLElement {
   };
 }
 
-ComponentHelpers.CustomElements.defineComponent(
+customElements.define(
     'devtools-split-view',
     SplitView,
 );

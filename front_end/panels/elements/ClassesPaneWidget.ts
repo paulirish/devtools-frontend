@@ -7,6 +7,7 @@ import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import classesPaneWidgetStyles from './classesPaneWidget.css.js';
 import {ElementsPanel} from './ElementsPanel.js';
@@ -47,6 +48,7 @@ export class ClassesPaneWidget extends UI.Widget.Widget {
   constructor() {
     super(true);
     this.contentElement.className = 'styles-element-classes-pane';
+    this.contentElement.setAttribute('jslog', `${VisualLogging.pane('elements-classes')}`);
     const container = this.contentElement.createChild('div', 'title-container');
     this.input = container.createChild('div', 'new-class-input monospace');
     this.setDefaultFocusedElement(this.input);
@@ -177,7 +179,8 @@ export class ClassesPaneWidget extends UI.Widget.Widget {
     const keys = [...classes.keys()];
     keys.sort(Platform.StringUtilities.caseInsensetiveComparator);
     for (const className of keys) {
-      const label = UI.UIUtils.CheckboxLabel.create(className, classes.get(className));
+      const label =
+          UI.UIUtils.CheckboxLabel.create(className, classes.get(className), undefined, 'element-class', true);
       label.classList.add('monospace');
       label.checkboxElement.addEventListener('click', this.onClick.bind(this, className), false);
       this.classesContainer.appendChild(label);
@@ -265,6 +268,8 @@ export class ButtonProvider implements UI.Toolbar.Provider {
     this.button = new UI.Toolbar.ToolbarToggle(i18nString(UIStrings.elementClasses), '');
     this.button.setText('.cls');
     this.button.element.classList.add('monospace');
+    this.button.element.setAttribute(
+        'jslog', `${VisualLogging.toggleSubpane('elements-classes').track({click: true})}`);
     this.button.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.clicked, this);
     this.view = new ClassesPaneWidget();
   }

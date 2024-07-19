@@ -4,12 +4,14 @@
 
 /* eslint-disable no-console */
 
+import * as fs from 'fs';
+import * as path from 'path';
 // use require here due to
 // https://github.com/evanw/esbuild/issues/587#issuecomment-901397213
 import puppeteer = require('puppeteer-core');
 
 import {installPageErrorHandlers} from './events.js';
-import {getTestRunnerConfigSetting} from './test_runner_config.js';
+import {BUILD_ROOT} from './paths.js';
 
 // When loading DevTools with target.goto, we wait for it to be fully loaded using these events.
 const DEVTOOLS_WAITUNTIL_EVENTS: puppeteer.PuppeteerLifeCycleEvent[] = ['networkidle2', 'domcontentloaded'];
@@ -50,10 +52,10 @@ export class DevToolsFrontendTab {
 
   static async create({browser, testServerPort, targetId}: DevToolsFrontendCreationOptions):
       Promise<DevToolsFrontendTab> {
-    const devToolsAppURL =
-        getTestRunnerConfigSetting<string>('hosted-server-devtools-url', 'front_end/devtools_app.html');
-    if (!devToolsAppURL) {
-      throw new Error('Could not load DevTools. hosted-server-devtools-url config not found.');
+    // TODO(pfaffe): Remove the distinction once it's uniform in chrome-branded builds
+    let devToolsAppURL = 'devtools_app.html';
+    if (!fs.existsSync(path.join(BUILD_ROOT, 'gen', devToolsAppURL))) {
+      devToolsAppURL = 'front_end/devtools_app.html';
     }
 
     // We load the DevTools frontend on a unique origin. Otherwise we would share 'localhost' with
@@ -63,11 +65,15 @@ export class DevToolsFrontendTab {
     // frontend instances.
     const id = DevToolsFrontendTab.tabCounter++;
     const frontendUrl = `https://i${id}.devtools-frontend.test:${testServerPort}/${devToolsAppURL}?ws=localhost:${
-        getDebugPort(browser)}/devtools/page/${targetId}&targetType=tab`;
+        getDebugPort(browser)}/devtools/page/${targetId}&targetType=tab&veLogging=true`;
 
     const frontend = await browser.newPage();
     installPageErrorHandlers(frontend);
     await frontend.goto(frontendUrl, {waitUntil: DEVTOOLS_WAITUNTIL_EVENTS});
+    await frontend.evaluate(() => {
+      // @ts-ignore
+      globalThis.startTestLogging();
+    });
 
     const tab = new DevToolsFrontendTab(frontend, frontendUrl);
     return tab;
@@ -78,6 +84,11 @@ export class DevToolsFrontendTab {
     // Clear any local storage settings.
     await this.page.evaluate(() => localStorage.clear());
 
+    // Test logging needs debug event logging, which is controlled via localStorage, hence we need to restart test logging here
+    await this.page.evaluate(() => {
+      // @ts-ignore
+      globalThis.startTestLogging();
+    });
     await this.reload();
   }
 
@@ -88,13 +99,13 @@ export class DevToolsFrontendTab {
 
     if (selectedPanel.name !== DevToolsFrontendTab.DEFAULT_TAB.name) {
       await this.page.evaluate(name => {
-        globalThis.localStorage.setItem('panel-selectedTab', `"${name}"`);
+        globalThis.localStorage.setItem('panel-selected-tab', `"${name}"`);
       }, selectedPanel.name);
     }
 
     if (drawerShown) {
       await this.page.evaluate(() => {
-        globalThis.localStorage.setItem('Inspector.drawerSplitViewState', '{"horizontal" : {"showMode": "Both"}}');
+        globalThis.localStorage.setItem('inspector.drawer-split-view-state', '{"horizontal" : {"showMode": "Both"}}');
       });
     }
 

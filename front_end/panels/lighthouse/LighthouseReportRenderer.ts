@@ -12,11 +12,12 @@ import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
 import * as Timeline from '../timeline/timeline.js';
+
 import {
-  type RunnerResultArtifacts,
   type NodeDetailsJSON,
-  type SourceLocationDetailsJSON,
   type ReportJSON,
+  type RunnerResultArtifacts,
+  type SourceLocationDetailsJSON,
 } from './LighthouseReporterTypes.js';
 
 const MaxLengthForLinks = 40;
@@ -31,7 +32,7 @@ export class LighthouseReportRenderer {
       HTMLElement {
     let onViewTrace: (() => Promise<void>)|undefined = undefined;
     if (artifacts) {
-      onViewTrace = async(): Promise<void> => {
+      onViewTrace = async () => {
         const defaultPassTrace = artifacts.traces.defaultPass;
         Host.userMetrics.actionTaken(Host.UserMetrics.Action.LighthouseViewTrace);
         await UI.InspectorView.InspectorView.instance().showPanel('timeline');
@@ -46,7 +47,9 @@ export class LighthouseReportRenderer {
       const ext = blob.type.match('json') ? '.json' : '.html';
       const basename = `${sanitizedDomain}-${timestamp}${ext}` as Platform.DevToolsPath.RawPathString;
       const text = await blob.text();
-      void Workspace.FileManager.FileManager.instance().save(basename, text, true /* forceSaveAs */);
+      await Workspace.FileManager.FileManager.instance().save(
+          basename, text, true /* forceSaveAs */, false /* isBase64 */);
+      Workspace.FileManager.FileManager.instance().close(basename);
     }
 
     async function onPrintOverride(rootEl: HTMLElement): Promise<void> {

@@ -1,53 +1,36 @@
 /**
- * Copyright 2023 Google Inc. All rights reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * @license
+ * Copyright 2023 Google Inc.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
-import {ARIAQueryHandler} from './AriaQueryHandler.js';
+import {ARIAQueryHandler} from '../cdp/AriaQueryHandler.js';
+
+import {CSSQueryHandler} from './CSSQueryHandler.js';
 import {customQueryHandlers} from './CustomQueryHandler.js';
 import {PierceQueryHandler} from './PierceQueryHandler.js';
 import {PQueryHandler} from './PQueryHandler.js';
+import {parsePSelectors} from './PSelectorParser.js';
 import type {QueryHandler} from './QueryHandler.js';
+import {PollingOptions} from './QueryHandler.js';
 import {TextQueryHandler} from './TextQueryHandler.js';
 import {XPathQueryHandler} from './XPathQueryHandler.js';
 
-export const BUILTIN_QUERY_HANDLERS = Object.freeze({
+const BUILTIN_QUERY_HANDLERS = {
   aria: ARIAQueryHandler,
   pierce: PierceQueryHandler,
   xpath: XPathQueryHandler,
   text: TextQueryHandler,
-});
+} as const;
 
 const QUERY_SEPARATORS = ['=', '/'];
 
 /**
  * @internal
  */
-export function getQueryHandlerByName(
-  name: string
-): typeof QueryHandler | undefined {
-  if (name in BUILTIN_QUERY_HANDLERS) {
-    return BUILTIN_QUERY_HANDLERS[name as 'aria'];
-  }
-  return customQueryHandlers.get(name);
-}
-
-/**
- * @internal
- */
 export function getQueryHandlerAndSelector(selector: string): {
   updatedSelector: string;
+  polling: PollingOptions;
   QueryHandler: typeof QueryHandler;
 } {
   for (const handlerMap of [
@@ -61,10 +44,38 @@ export function getQueryHandlerAndSelector(selector: string): {
         const prefix = `${name}${separator}`;
         if (selector.startsWith(prefix)) {
           selector = selector.slice(prefix.length);
-          return {updatedSelector: selector, QueryHandler};
+          return {
+            updatedSelector: selector,
+            polling:
+              name === 'aria' ? PollingOptions.RAF : PollingOptions.MUTATION,
+            QueryHandler,
+          };
         }
       }
     }
   }
-  return {updatedSelector: selector, QueryHandler: PQueryHandler};
+  try {
+    const [pSelector, isPureCSS, hasPseudoClasses, hasAria] =
+      parsePSelectors(selector);
+    if (isPureCSS) {
+      return {
+        updatedSelector: selector,
+        polling: hasPseudoClasses
+          ? PollingOptions.RAF
+          : PollingOptions.MUTATION,
+        QueryHandler: CSSQueryHandler,
+      };
+    }
+    return {
+      updatedSelector: JSON.stringify(pSelector),
+      polling: hasAria ? PollingOptions.RAF : PollingOptions.MUTATION,
+      QueryHandler: PQueryHandler,
+    };
+  } catch {
+    return {
+      updatedSelector: selector,
+      polling: PollingOptions.MUTATION,
+      QueryHandler: CSSQueryHandler,
+    };
+  }
 }

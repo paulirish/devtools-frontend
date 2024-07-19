@@ -21,30 +21,9 @@ ts_library("legacy_test_runner-source") {
   sources = [ "legacy_test_runner.ts" ]
 
   deps = [
-    "../core/common:legacy",
-    "../core/host:legacy",
-    "../core/protocol_client:legacy",
-    "../core/root:legacy",
-    "../core/sdk:legacy",
     "../entrypoints/devtools_app:entrypoint",
-    "../models/bindings:legacy",
-    "../models/breakpoints:legacy",
-    "../models/extensions:legacy",
-    "../models/formatter:legacy",
-    "../models/persistence:legacy",
-    "../models/text_utils:legacy",
-    "../models/trace:legacy",
-    "../models/workspace:legacy",
-    "../panels/accessibility:legacy",
-    "../panels/animation:legacy",
     "../panels/console_counters:bundle",
     "../panels/event_listeners:bundle",
-    "../third_party/diff:legacy",
-    "../ui/legacy:legacy",
-    "../ui/legacy/components/color_picker:legacy",
-    "../ui/legacy/components/data_grid:legacy",
-    "../ui/legacy/components/inline_editor:legacy",
-    "../ui/legacy/components/utils:legacy",
     "test_runner:bundle",
   ]
 }
@@ -57,7 +36,6 @@ group("legacy_test_runner-resources") {
     "bindings_test_runner:bundle",
     "console_test_runner:bundle",
     "coverage_test_runner:bundle",
-    "cpu_profiler_test_runner:bundle",
     "data_grid_test_runner:bundle",
     "device_mode_test_runner:bundle",
     "elements_test_runner:bundle",

@@ -11,7 +11,7 @@
 
 .network-config-group {
   display: flex;
-  margin-bottom: 10px;
+  padding-bottom: 10px;
   flex-wrap: wrap;
   flex: 0 0 auto;
   min-height: 30px;
@@ -24,6 +24,11 @@
 
 .network-config-fields {
   flex: 2 0 200px;
+}
+
+.network-config-fields span:first-of-type,
+.network-config-fields .network-config-accepted-encoding-custom {
+  padding: 3px 0;
 }
 
 .panel-section-separator {
@@ -40,7 +45,7 @@
 }
 
 .network-config-input-validation-error {
-  color: var(--legacy-input-validation-error);
+  color: var(--sys-color-error);
   margin: 5px 0;
 }
 
@@ -102,5 +107,5 @@
 
 .status-text {
   padding: 10px;
-  color: var(--color-accent-green);
+  color: var(--sys-color-tertiary);
 }

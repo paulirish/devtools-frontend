@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as SDK from '../../core/sdk/sdk.js';
 import type * as ProtocolProxyApi from '../../generated/protocol-proxy-api.js';
 import * as Protocol from '../../generated/protocol.js';
 
-import * as SDK from '../../core/sdk/sdk.js';
-import {type ObjectSnapshot} from './LegacyTracingModel.js';
 import type * as Types from './types/types.js';
 
 export class TracingManager extends SDK.SDKModel.SDKModel<void> {
@@ -32,7 +31,7 @@ export class TracingManager extends SDK.SDKModel.SDKModel<void> {
     }
   }
 
-  eventsCollected(events: EventPayload[]): void {
+  eventsCollected(events: Types.TraceEvents.TraceEventData[]): void {
     if (!this.#activeClient) {
       return;
     }
@@ -56,6 +55,23 @@ export class TracingManager extends SDK.SDKModel.SDKModel<void> {
       this.#activeClient.tracingComplete();
       this.#activeClient = null;
     }
+    this.#finishing = false;
+  }
+
+  async reset(): Promise<void> {
+    // If we have an active client, we should try to stop
+    // it before resetting it, else we will leave the
+    // backend in a broken state where it thinks we are in
+    // the middle of tracing, but we think we are not.
+    // Then, any subsequent attempts to record will fail
+    // because the backend will not let us start a second
+    // tracing session.
+    if (this.#activeClient) {
+      await this.#tracingAgent.invoke_end();
+    }
+    this.#eventBufferSize = 0;
+    this.#eventsRetrieved = 0;
+    this.#activeClient = null;
     this.#finishing = false;
   }
 
@@ -94,7 +110,7 @@ export class TracingManager extends SDK.SDKModel.SDKModel<void> {
 }
 
 export interface TracingManagerClient {
-  traceEventsCollected(events: EventPayload[]): void;
+  traceEventsCollected(events: Types.TraceEvents.TraceEventData[]): void;
 
   tracingComplete(): void;
   tracingBufferUsage(usage: number): void;
@@ -121,26 +137,3 @@ class TracingDispatcher implements ProtocolProxyApi.TracingDispatcher {
 }
 
 SDK.SDKModel.SDKModel.register(TracingManager, {capabilities: SDK.Target.Capability.Tracing, autostart: false});
-export interface EventPayload {
-  cat?: string;
-  pid: number;
-  tid: number;
-  ts: number;
-  ph: Types.TraceEvents.Phase;
-  name: string;
-  args: {
-    // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-    sort_index: number,
-    name: string,
-    snapshot: ObjectSnapshot,
-    data: Object|null,
-  };
-  dur: number;
-  id: string;
-  id2?: {
-    global: (string|undefined),
-    local: (string|undefined),
-  };
-  scope: string;
-}

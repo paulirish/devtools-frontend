@@ -2,17 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as SDK from '../../../core/sdk/sdk.js';
-import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
-import * as LitHtml from '../../../ui/lit-html/lit-html.js';
-
-import type * as Protocol from '../../../generated/protocol.js';
-import * as i18n from '../../../core/i18n/i18n.js';
 import * as Host from '../../../core/host/host.js';
-import * as IconButton from '../../../ui/components/icon_button/icon_button.js';
-import * as ClientVariations from '../../../third_party/chromium/client-variations/client-variations.js';
+import * as i18n from '../../../core/i18n/i18n.js';
 import * as Platform from '../../../core/platform/platform.js';
+import * as SDK from '../../../core/sdk/sdk.js';
+import type * as Protocol from '../../../generated/protocol.js';
+import * as ClientVariations from '../../../third_party/chromium/client-variations/client-variations.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
+import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
+import * as IconButton from '../../../ui/components/icon_button/icon_button.js';
+import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import {EditableSpan, type EditableSpanData} from './EditableSpan.js';
 import headerSectionRowStyles from './HeaderSectionRow.css.js';
@@ -148,7 +148,7 @@ export class HeaderSectionRow extends HTMLElement {
       row: true,
       'header-highlight': Boolean(this.#header.highlight),
       'header-overridden': Boolean(this.#header.isOverride) || this.#isHeaderValueEdited,
-      'header-editable': Boolean(this.#header.valueEditable),
+      'header-editable': this.#header.valueEditable === EditingAllowedStatus.Enabled,
       'header-deleted': Boolean(this.#header.isDeleted),
     });
 
@@ -166,7 +166,8 @@ export class HeaderSectionRow extends HTMLElement {
     // The header name is only editable when the header value is editable as well.
     // This ensures the header name's editability reacts correctly to enabling or
     // disabling local overrides.
-    const isHeaderNameEditable = this.#header.nameEditable && this.#header.valueEditable;
+    const isHeaderNameEditable =
+        this.#header.nameEditable && this.#header.valueEditable === EditingAllowedStatus.Enabled;
 
     // Case 1: Headers which were just now added via the 'Add header button'.
     //         'nameEditable' is true only for such headers.
@@ -198,7 +199,7 @@ export class HeaderSectionRow extends HTMLElement {
               @focusout=${this.#onHeaderNameFocusOut}
               @keydown=${this.#onKeyDown}
               @input=${this.#onHeaderNameEdit}
-              @paste=${this.#onHeaderNameEdit}
+              @paste=${this.#onHeaderNamePaste}
               .data=${{value: this.#header.name} as EditableSpanData}
             ></${EditableSpan.litTagName}>` :
             this.#header.name}:
@@ -222,6 +223,10 @@ export class HeaderSectionRow extends HTMLElement {
       ${this.#maybeRenderBlockedDetails(this.#header.blockedDetails)}
     `, this.#shadow, {host: this});
     // clang-format on
+
+    if (this.#header.highlight) {
+      this.scrollIntoView({behavior: 'auto'});
+    }
   }
 
   #renderHeaderValue(): LitHtml.LitTemplate {
@@ -232,22 +237,23 @@ export class HeaderSectionRow extends HTMLElement {
       return this.#renderXClientDataHeader(this.#header);
     }
 
-    if (this.#header.isDeleted || !this.#header.valueEditable) {
+    if (this.#header.isDeleted || this.#header.valueEditable !== EditingAllowedStatus.Enabled) {
+      const showEditHeaderButton = this.#header.isResponseHeader && !this.#header.isDeleted &&
+          this.#header.valueEditable !== EditingAllowedStatus.Forbidden;
       // clang-format off
       return html`
       ${this.#header.value || ''}
       ${this.#maybeRenderHeaderValueSuffix(this.#header)}
-      ${this.#header.isResponseHeader && !this.#header.isDeleted ? html`
+      ${showEditHeaderButton ? html`
         <${Buttons.Button.Button.litTagName}
           title=${i18nString(UIStrings.editHeader)}
-          .size=${Buttons.Button.Size.TINY}
+          .size=${Buttons.Button.Size.SMALL}
           .iconUrl=${editIconUrl}
-          .variant=${Buttons.Button.Variant.ROUND}
-          .iconWidth=${'16px'}
-          .iconHeight=${'16px'}
-          @click=${(): void => {
+          .variant=${Buttons.Button.Variant.ICON}
+          @click=${() => {
             this.dispatchEvent(new EnableHeaderEditingEvent());
           }}
+          jslog=${VisualLogging.action('enable-header-overrides').track({click: true})}
           class="enable-editing inline-button"
         ></${Buttons.Button.Button.litTagName}>
       ` : LitHtml.nothing}
@@ -264,13 +270,12 @@ export class HeaderSectionRow extends HTMLElement {
       ${this.#maybeRenderHeaderValueSuffix(this.#header)}
       <${Buttons.Button.Button.litTagName}
         title=${i18nString(UIStrings.removeOverride)}
-        .size=${Buttons.Button.Size.TINY}
+        .size=${Buttons.Button.Size.SMALL}
         .iconUrl=${trashIconUrl}
-        .variant=${Buttons.Button.Variant.ROUND}
-        .iconWidth=${'13px'}
-        .iconHeight=${'13px'}
+        .variant=${Buttons.Button.Variant.ICON}
         class="remove-header inline-button"
         @click=${this.#onRemoveOverrideClick}
+        jslog=${VisualLogging.action('remove-header-override').track({click: true})}
       ></${Buttons.Button.Button.litTagName}>
     `;
     // clang-format on
@@ -395,6 +400,9 @@ export class HeaderSectionRow extends HTMLElement {
     // Clear selection (needed when pressing 'enter' in editable span).
     const selection = window.getSelection();
     selection?.removeAllRanges();
+
+    // Reset pasted header name
+    this.#header.originalName = '';
   }
 
   #onHeaderNameFocusOut(event: Event): void {
@@ -439,6 +447,15 @@ export class HeaderSectionRow extends HTMLElement {
       } else if (target.matches('.header-value devtools-editable-span')) {
         target.value = this.#header?.value || '';
         this.#onHeaderValueEdit(event);
+
+        if (this.#header?.originalName) {
+          const headerNameElement = this.#shadow.querySelector('.header-name devtools-editable-span') as EditableSpan;
+          headerNameElement.value = this.#header.originalName;
+          this.#header.originalName = '';
+          headerNameElement.dispatchEvent(new Event('input'));
+          headerNameElement.focus();
+          return;
+        }
       }
       target.blur();
     }
@@ -465,9 +482,44 @@ export class HeaderSectionRow extends HTMLElement {
       void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
     }
   }
+
+  #onHeaderNamePaste(event: ClipboardEvent): void {
+    if (!event.clipboardData) {
+      return;
+    }
+
+    const nameEl = event.target as EditableSpan;
+    const clipboardText = event.clipboardData.getData('text/plain') || '';
+    const separatorPosition = clipboardText.indexOf(':');
+
+    if (separatorPosition < 1) {
+      // Not processing further either case 'abc' or ':abc'
+      nameEl.value = clipboardText;
+      nameEl.dispatchEvent(new Event('input', {bubbles: true}));
+      return;
+    }
+
+    if (this.#header) {
+      this.#header.originalName = this.#header.name;
+    }
+
+    const headerValue = clipboardText.substring(separatorPosition + 1, clipboardText.length).trim();
+    const headerName = clipboardText.substring(0, separatorPosition);
+
+    nameEl.value = headerName;
+    nameEl.dispatchEvent(new Event('input'));
+
+    const valueEL = this.#shadow.querySelector<HTMLElement>('.header-value devtools-editable-span');
+    if (valueEL) {
+      valueEL.focus();
+      (valueEL as EditableSpan).value = headerValue;
+      valueEL.dispatchEvent(new Event('input'));
+    }
+    event.preventDefault();
+  }
 }
 
-ComponentHelpers.CustomElements.defineComponent('devtools-header-section-row', HeaderSectionRow);
+customElements.define('devtools-header-section-row', HeaderSectionRow);
 
 declare global {
   interface HTMLElementTagNameMap {
@@ -492,6 +544,12 @@ interface BlockedDetailsDescriptor {
   reveal?: () => void;
 }
 
+export const enum EditingAllowedStatus {
+  Disabled = 0,   // Local overrides are currently disabled.
+  Enabled = 1,    // The header is free to be edited.
+  Forbidden = 2,  // Editing this header is forbidden even when local overrides are enabled.
+}
+
 export interface HeaderDetailsDescriptor {
   name: Platform.StringUtilities.LowerCaseString;
   value: string|null;
@@ -506,9 +564,10 @@ export interface HeaderDetailsDescriptor {
 export interface HeaderEditorDescriptor {
   name: Platform.StringUtilities.LowerCaseString;
   value: string|null;
+  originalName?: string|null;
   originalValue?: string|null;
   isOverride?: boolean;
-  valueEditable?: boolean;
+  valueEditable: EditingAllowedStatus;
   nameEditable?: boolean;
   isDeleted?: boolean;
 }

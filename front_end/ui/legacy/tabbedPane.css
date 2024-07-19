@@ -49,39 +49,42 @@
   font-size: 14px;
   text-align: center;
   width: fit-content;
-  margin: 20px auto 0;
+  margin: 40px auto 0;
   text-shadow: var(--color-background-opacity-80) 0 1px 0;
   line-height: 28px;
 }
 
 .tabbed-pane-placeholder-row {
-  display: flex;
-  white-space: nowrap;
-  padding: 0 5px;
-  margin: 2px;
-}
+  margin-inline: 10px;
 
-.tabbed-pane-placeholder-row:focus-visible {
-  outline-width: unset;
-}
+  & span {
+    display: inline-block;
+    padding-inline: 10px;
+  }
 
-.tabbed-pane-placeholder-key {
-  flex: 1;
-  text-align: right;
-  padding-right: 14px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+  &:has(.workspace) {
+    max-width: 400px;
+    border: 2px dashed var(--sys-color-neutral-outline);
+    margin-block-start: 20px;
+    padding: 10px;
+    margin-inline: 20px;
+  }
 
-.tabbed-pane-no-shortcut {
-  flex: 1;
-  text-align: center;
-}
+  & button {
+    cursor: pointer;
+    color: var(--text-link);
+    background: transparent;
+    border: none;
+    padding: 0;
+    text-decoration: underline;
+    margin-inline: 5px;
 
-.tabbed-pane-placeholder-value {
-  flex: 1;
-  text-align: left;
-  padding-left: 14px;
+    &:focus-visible {
+      outline: 2px solid var(--sys-color-state-focus-ring);
+      outline-offset: 2px;
+      border-radius: 2px;
+    }
+  }
 }
 
 .tabbed-pane-header {
@@ -90,7 +93,11 @@
   border-bottom: 1px solid var(--sys-color-divider);
   overflow: visible;
   width: 100%;
-  background-color: var(--sys-color-cdt-base);
+  background-color: var(--app-color-toolbar-background);
+
+  & > * {
+    cursor: initial;
+  }
 }
 
 .tabbed-pane-header-contents {
@@ -144,9 +151,9 @@
   outline-color: var(--icon-gap-toolbar-hover);
 }
 
-.tabbed-pane-header-tab:hover,
+.tabbed-pane-header-tab:not(.vertical-tab-layout):hover,
 .tabbed-pane-shadow .tabbed-pane-header-tab:focus-visible {
-  color: var(--color-text-primary);
+  color: var(--sys-color-on-surface);
   background-color: var(--sys-color-state-hover-on-subtle);
 }
 
@@ -164,33 +171,16 @@
   color: var(--sys-color-primary);
 }
 
-/**
- * In light-mode we have a blue border to show the active pane, and we don't change the background color. In dark mode we do not show the border, so we instead change the background color.
- */
-/* stylelint-disable no-descending-specificity */
-.-theme-with-dark-background .tabbed-pane-header-tab.selected,
-:host-context(.-theme-with-dark-background) .tabbed-pane-header-tab.selected {
-  --override-tabbed-dark-mode-bg-color: rgb(0 0 0);
-
-  background-color: var(--override-tabbed-dark-mode-bg-color);
-}
-
-.-theme-with-dark-background .tabbed-pane-header-tab.selected,
-:host-context(.-theme-with-dark-background) .tabbed-pane-header-tab.selected:focus-visible {
-  background-color: var(--color-background-elevation-0);
-}
-/* stylelint-enable no-descending-specificity */
-
 .tabbed-pane-header-tab.dragging {
   --override-dragging-box-shadow-color: rgb(0 0 0 / 37%);
 
   position: relative;
   box-shadow: 0 1px 4px 0 var(--override-dragging-box-shadow-color);
-  background-color: var(--color-background-elevation-2);
+  background-color: var(--sys-color-state-hover-on-subtle);
 }
 
-.-theme-with-dark-background .tabbed-pane-header-tab.dragging,
-:host-context(.-theme-with-dark-background) .tabbed-pane-header-tab.dragging {
+.theme-with-dark-background .tabbed-pane-header-tab.dragging,
+:host-context(.theme-with-dark-background) .tabbed-pane-header-tab.dragging {
   --override-dragging-box-shadow-color: rgb(230 230 230 / 37%);
 }
 
@@ -212,20 +202,14 @@
   height: 100%;
 }
 
-.tabbed-pane-header-tabs-drop-down-container > .chevron-icon {
-  background-color: var(--icon-default);
-  display: block;
-}
-
 .tabbed-pane-header-tabs-drop-down-container > .chevron-icon:hover,
 .tabbed-pane-header-tabs-drop-down-container > .chevron-icon:focus-visible {
-  background-color: var(--icon-default-hover);
-  display: block;
+  color: var(--icon-default-hover);
 }
 
 .tabbed-pane-header-tabs-drop-down-container:hover,
 .tabbed-pane-header-tabs-drop-down-container:focus-visible {
-  background-color: var(--color-background-elevation-2);
+  background-color: var(--sys-color-state-hover-on-subtle);
 }
 
 .tabbed-pane-header-tabs-drop-down-container.measuring {
@@ -247,13 +231,12 @@
   width: auto;
   flex: 0 0 auto;
   flex-direction: column;
-  padding-top: 10px;
-  padding-right: 4px;
+  padding-top: 5px;
   overflow: hidden;
 }
 
 .tabbed-pane-shadow.vertical-tab-layout .tabbed-pane-content {
-  padding: 10px 10px 10px 4px;
+  padding: var(--sys-size-10);
   overflow-x: hidden;
 }
 
@@ -265,37 +248,46 @@
 .tabbed-pane-shadow.vertical-tab-layout .tabbed-pane-header-tabs {
   display: flex;
   flex-direction: column;
-  width: 120px;
+  width: var(--sys-size-24);
+  margin-right: var(--sys-size-5);
 }
 
 .tabbed-pane-shadow.vertical-tab-layout .tabbed-pane-header-tab {
-  border: none transparent;
-  font-weight: normal;
-  text-shadow: none;
-  color: var(--color-text-secondary);
-  height: 26px;
-  padding-left: 10px;
-  border-left: 6px solid transparent;
-  margin: 0;
-  display: flex;
-  align-items: center;
-}
+  height: var(--size-12, 28px);
+  padding: 0 var(--size-8, 16px) 0 var(--size-7, 14px);
+  border-radius: 0 100px 100px 0;
+  color: var(--sys-color-on-surface);
+  position: relative;
 
-/* stylelint-disable no-descending-specificity */
-.tabbed-pane-shadow.vertical-tab-layout .tabbed-pane-header-tab.selected {
-  --override-vertical-tab-selected-border-color: #666;
+  & > .tabbed-pane-header-tab-icon devtools-icon {
+    margin: 0;
+    margin-right: var(--sys-size-6);
+  }
 
-  color: inherit;
-  border: none transparent;
-  border-left: 6px solid var(--override-vertical-tab-selected-border-color);
-  background-color: var(--color-background-elevation-1);
-}
+  &.selected {
+    color: var(--app-color-navigation-drawer-label-selected);
+    background-color: var(--app-color-navigation-drawer-background-selected);
 
-.-theme-with-dark-background .tabbed-pane-shadow.vertical-tab-layout .tabbed-pane-header-tab.selected,
-:host-context(.-theme-with-dark-background) .tabbed-pane-shadow.vertical-tab-layout .tabbed-pane-header-tab.selected {
-  --override-vertical-tab-selected-border-color: rgb(153 153 153);
+    & > .tabbed-pane-header-tab-icon devtools-icon {
+      color: var(--app-color-navigation-drawer-label-selected);
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sys-color-state-focus-ring);
+  }
+
+  &:active::before {
+    background-color: var(--sys-color-state-ripple-neutral-on-subtle);
+    content: "";
+    height: 100%;
+    width: 100%;
+    border-radius: inherit;
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
 }
-/* stylelint-enable no-descending-specificity */
 
 .tabbed-pane-tab-slider {
   height: 2px;
@@ -354,11 +346,14 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
+  background-color: transparent;
+  border: none;
 }
 
 .close-button:hover,
-.close-button:active {
-  background-color: var(--color-details-hairline);
+.close-button:active,
+.close-button:focus {
+  background-color: var(--sys-color-state-hover-on-subtle);
 }
 
 .tabbed-pane-header-tab.preview.closeable .close-button {
@@ -400,7 +395,7 @@
 
   .tabbed-pane-header-tab:hover .tabbed-pane-close-button,
   .tabbed-pane-shadow .tabbed-pane-header-tab:focus-visible .tabbed-pane-close-button {
-    --icon-color: HighlightText;
+    color: HighlightText;
   }
 
   .tabbed-pane-header-tabs-drop-down-container {
@@ -413,12 +408,12 @@
   }
 
   .tabbed-pane-header-tabs-drop-down-container > .chevron-icon {
-    background-color: ButtonText;
+    color: ButtonText;
   }
 
   .tabbed-pane-header-tabs-drop-down-container:hover > .chevron-icon,
   .tabbed-pane-header-tabs-drop-down-container:focus-visible > .chevron-icon {
-    background-color: HighlightText;
+    color: HighlightText;
   }
 
   .tabbed-pane-header-tabs .tabbed-pane-header-tab .preview-icon {

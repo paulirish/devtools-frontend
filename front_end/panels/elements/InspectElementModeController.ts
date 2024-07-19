@@ -33,18 +33,19 @@ import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {ElementsPanel} from './ElementsPanel.js';
 
 let inspectElementModeController: InspectElementModeController;
 
 export class InspectElementModeController implements SDK.TargetManager.SDKModelObserver<SDK.OverlayModel.OverlayModel> {
-  private readonly toggleSearchAction: UI.ActionRegistration.Action|null;
+  private readonly toggleSearchAction: UI.ActionRegistration.Action;
   private mode: Protocol.Overlay.InspectMode;
   private readonly showDetailedInspectTooltipSetting: Common.Settings.Setting<boolean>;
 
   constructor() {
-    this.toggleSearchAction = UI.ActionRegistry.ActionRegistry.instance().action('elements.toggle-element-search');
+    this.toggleSearchAction = UI.ActionRegistry.ActionRegistry.instance().getAction('elements.toggle-element-search');
     this.mode = Protocol.Overlay.InspectMode.None;
     SDK.TargetManager.TargetManager.instance().addEventListener(
         SDK.TargetManager.Events.SuspendStateChanged, this.suspendStateChanged, this);
@@ -55,7 +56,7 @@ export class InspectElementModeController implements SDK.TargetManager.SDKModelO
     SDK.TargetManager.TargetManager.instance().observeModels(SDK.OverlayModel.OverlayModel, this, {scoped: true});
 
     this.showDetailedInspectTooltipSetting =
-        Common.Settings.Settings.instance().moduleSetting('showDetailedInspectTooltip');
+        Common.Settings.Settings.instance().moduleSetting('show-detailed-inspect-tooltip');
     this.showDetailedInspectTooltipSetting.addChangeListener(this.showDetailedInspectTooltipChanged.bind(this));
 
     document.addEventListener('keydown', event => {
@@ -67,6 +68,7 @@ export class InspectElementModeController implements SDK.TargetManager.SDKModelO
       }
       this.setMode(Protocol.Overlay.InspectMode.None);
       event.consume(true);
+      void VisualLogging.logKeyDown(null, event, 'cancel-inspect-mode');
     }, true);
   }
 
@@ -101,7 +103,7 @@ export class InspectElementModeController implements SDK.TargetManager.SDKModelO
     if (this.isInInspectElementMode()) {
       mode = Protocol.Overlay.InspectMode.None;
     } else {
-      mode = Common.Settings.Settings.instance().moduleSetting('showUAShadowDOM').get() ?
+      mode = Common.Settings.Settings.instance().moduleSetting('show-ua-shadow-dom').get() ?
           Protocol.Overlay.InspectMode.SearchForUAShadowDOM :
           Protocol.Overlay.InspectMode.SearchForNode;
     }
@@ -121,9 +123,7 @@ export class InspectElementModeController implements SDK.TargetManager.SDKModelO
              SDK.OverlayModel.OverlayModel, {scoped: true})) {
       void overlayModel.setInspectMode(mode, this.showDetailedInspectTooltipSetting.get());
     }
-    if (this.toggleSearchAction) {
-      this.toggleSearchAction.setToggled(this.isInInspectElementMode());
-    }
+    this.toggleSearchAction.setToggled(this.isInInspectElementMode());
   }
 
   private suspendStateChanged(): void {
@@ -132,9 +132,7 @@ export class InspectElementModeController implements SDK.TargetManager.SDKModelO
     }
 
     this.mode = Protocol.Overlay.InspectMode.None;
-    if (this.toggleSearchAction) {
-      this.toggleSearchAction.setToggled(false);
-    }
+    this.toggleSearchAction.setToggled(false);
   }
 
   private inspectNode(node: SDK.DOMModel.DOMNode): void {
@@ -146,10 +144,8 @@ export class InspectElementModeController implements SDK.TargetManager.SDKModelO
   }
 }
 
-let toggleSearchActionDelegateInstance: ToggleSearchActionDelegate;
-
 export class ToggleSearchActionDelegate implements UI.ActionRegistration.ActionDelegate {
-  handleAction(context: UI.Context.Context, actionId: string): boolean {
+  handleAction(_context: UI.Context.Context, actionId: string): boolean {
     if (Root.Runtime.Runtime.queryParam('isSharedWorker')) {
       return false;
     }
@@ -164,16 +160,5 @@ export class ToggleSearchActionDelegate implements UI.ActionRegistration.ActionD
       inspectElementModeController.captureScreenshotMode();
     }
     return true;
-  }
-
-  static instance(opts: {
-    forceNew: boolean|null,
-  }|undefined = {forceNew: null}): ToggleSearchActionDelegate {
-    const {forceNew} = opts;
-    if (!toggleSearchActionDelegateInstance || forceNew) {
-      toggleSearchActionDelegateInstance = new ToggleSearchActionDelegate();
-    }
-
-    return toggleSearchActionDelegateInstance;
   }
 }

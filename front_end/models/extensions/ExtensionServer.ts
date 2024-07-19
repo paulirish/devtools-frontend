@@ -31,7 +31,7 @@
 // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
 /* eslint-disable @typescript-eslint/naming-convention */
 
-import {type Chrome} from '../../../extension-api/ExtensionAPI.js';  // eslint-disable-line rulesdir/es_modules_import
+import {type Chrome} from '../../../extension-api/ExtensionAPI.js';
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -115,14 +115,19 @@ class RegisteredExtension {
       inspectedURL = SDK.TargetManager.TargetManager.instance().primaryPageTarget()?.inspectedURL();
     }
 
+    if (!inspectedURL) {
+      return false;
+    }
+
+    if (!ExtensionServer.canInspectURL(inspectedURL)) {
+      return false;
+    }
+
     if (!this.hostsPolicy.isAllowedOnURL(inspectedURL)) {
       return false;
     }
 
     if (!this.allowFileAccess) {
-      if (!inspectedURL) {
-        return false;
-      }
       let parsedURL;
       try {
         parsedURL = new URL(inspectedURL);
@@ -133,6 +138,11 @@ class RegisteredExtension {
     }
 
     return true;
+  }
+}
+
+export class RevealableNetworkRequestFilter {
+  constructor(readonly filter: string|undefined) {
   }
 }
 
@@ -204,8 +214,10 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     this.registerHandler(PrivateAPI.Commands.GetWasmOp, this.onGetWasmOp.bind(this));
     this.registerHandler(
         PrivateAPI.Commands.RegisterRecorderExtensionPlugin, this.registerRecorderExtensionEndpoint.bind(this));
+    this.registerHandler(PrivateAPI.Commands.ReportResourceLoad, this.onReportResourceLoad.bind(this));
     this.registerHandler(PrivateAPI.Commands.CreateRecorderView, this.onCreateRecorderView.bind(this));
     this.registerHandler(PrivateAPI.Commands.ShowRecorderView, this.onShowRecorderView.bind(this));
+    this.registerHandler(PrivateAPI.Commands.ShowNetworkPanel, this.onShowNetworkPanel.bind(this));
     window.addEventListener('message', this.onWindowMessage, false);  // Only for main window.
 
     const existingTabId =
@@ -220,6 +232,10 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     this.initExtensions();
 
     ThemeSupport.ThemeSupport.instance().addEventListener(ThemeSupport.ThemeChangeEvent.eventName, this.#onThemeChange);
+  }
+
+  get isEnabledForTest(): boolean {
+    return this.extensionsEnabled;
   }
 
   dispose(): void {
@@ -282,30 +298,34 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     this.postNotification(PrivateAPI.Events.ButtonClicked + identifier);
   }
 
+  profilingStarted(): void {
+    this.postNotification(PrivateAPI.Events.ProfilingStarted);
+  }
+
+  profilingStopped(): void {
+    this.postNotification(PrivateAPI.Events.ProfilingStopped);
+  }
+
   private registerLanguageExtensionEndpoint(
       message: PrivateAPI.ExtensionServerRequestMessage, _shared_port: MessagePort): Record {
     if (message.command !== PrivateAPI.Commands.RegisterLanguageExtensionPlugin) {
       return this.status.E_BADARG('command', `expected ${PrivateAPI.Commands.RegisterLanguageExtensionPlugin}`);
     }
     const {pluginManager} = Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance();
-    if (!pluginManager) {
-      return this.status.E_FAILED('WebAssembly DWARF support needs to be enabled to use this extension');
-    }
-
     const {pluginName, port, supportedScriptTypes: {language, symbol_types}} = message;
     const symbol_types_array =
         (Array.isArray(symbol_types) && symbol_types.every(e => typeof e === 'string') ? symbol_types : []);
-    const endpoint = new LanguageExtensionEndpoint(pluginName, {language, symbol_types: symbol_types_array}, port);
+    const extensionOrigin = this.getExtensionOrigin(_shared_port);
+    const endpoint =
+        new LanguageExtensionEndpoint(extensionOrigin, pluginName, {language, symbol_types: symbol_types_array}, port);
     pluginManager.addPlugin(endpoint);
     return this.status.OK();
   }
 
-  private async loadWasmValue<T>(expression: string, stopId: unknown): Promise<Record|T> {
+  private async loadWasmValue<T>(
+      expectValue: boolean, convert: (result: Protocol.Runtime.RemoteObject) => Record | T, expression: string,
+      stopId: unknown): Promise<Record|T> {
     const {pluginManager} = Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance();
-    if (!pluginManager) {
-      return this.status.E_FAILED('WebAssembly DWARF support needs to be enabled to use this extension');
-    }
-
     const callFrame = pluginManager.callFrameForStopId(stopId as Bindings.DebuggerLanguagePlugins.StopId);
     if (!callFrame) {
       return this.status.E_BADARG('stopId', 'Unknown stop id');
@@ -314,12 +334,13 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
       callFrameId: callFrame.id,
       expression,
       silent: true,
-      returnByValue: true,
+      returnByValue: !expectValue,
+      generatePreview: expectValue,
       throwOnSideEffect: true,
     });
 
     if (!result.exceptionDetails && !result.getError()) {
-      return result.result.value;
+      return convert(result.result);
     }
 
     return this.status.E_FAILED('Failed');
@@ -330,8 +351,35 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
       return this.status.E_BADARG('command', `expected ${PrivateAPI.Commands.GetWasmLinearMemory}`);
     }
     return await this.loadWasmValue<number[]>(
+        false, result => result.value,
         `[].slice.call(new Uint8Array(memories[0].buffer, ${Number(message.offset)}, ${Number(message.length)}))`,
         message.stopId);
+  }
+
+  private convertWasmValue(valueClass: 'local'|'global'|'operand', index: number):
+      (obj: Protocol.Runtime.RemoteObject) => Chrome.DevTools.WasmValue | undefined | Record {
+    return obj => {
+      if (obj.type === 'undefined') {
+        return;
+      }
+      if (obj.type !== 'object' || obj.subtype !== 'wasmvalue') {
+        return this.status.E_FAILED('Bad object type');
+      }
+      const type = obj?.description;
+      const value: string = obj.preview?.properties?.find(o => o.name === 'value')?.value ?? '';
+      switch (type) {
+        case 'i32':
+        case 'f32':
+        case 'f64':
+          return {type, value: Number(value)};
+        case 'i64':
+          return {type, value: BigInt(value)};
+        case 'v128':
+          return {type, value};
+        default:
+          return {type: 'reftype', valueClass, index};
+      }
+    };
   }
 
   private async onGetWasmGlobal(message: PrivateAPI.ExtensionServerRequestMessage):
@@ -339,7 +387,10 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     if (message.command !== PrivateAPI.Commands.GetWasmGlobal) {
       return this.status.E_BADARG('command', `expected ${PrivateAPI.Commands.GetWasmGlobal}`);
     }
-    return this.loadWasmValue(`globals[${Number(message.global)}]`, message.stopId);
+    const global = Number(message.global);
+    const result = await this.loadWasmValue<Chrome.DevTools.WasmValue|undefined>(
+        true, this.convertWasmValue('global', global), `globals[${global}]`, message.stopId);
+    return result ?? this.status.E_BADARG('global', `No global with index ${global}`);
   }
 
   private async onGetWasmLocal(message: PrivateAPI.ExtensionServerRequestMessage):
@@ -347,14 +398,21 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     if (message.command !== PrivateAPI.Commands.GetWasmLocal) {
       return this.status.E_BADARG('command', `expected ${PrivateAPI.Commands.GetWasmLocal}`);
     }
-    return this.loadWasmValue(`locals[${Number(message.local)}]`, message.stopId);
+    const local = Number(message.local);
+    const result = await this.loadWasmValue<Chrome.DevTools.WasmValue|undefined>(
+        true, this.convertWasmValue('local', local), `locals[${local}]`, message.stopId);
+    return result ?? this.status.E_BADARG('local', `No local with index ${local}`);
   }
+
   private async onGetWasmOp(message: PrivateAPI.ExtensionServerRequestMessage):
       Promise<Record|Chrome.DevTools.WasmValue> {
     if (message.command !== PrivateAPI.Commands.GetWasmOp) {
       return this.status.E_BADARG('command', `expected ${PrivateAPI.Commands.GetWasmOp}`);
     }
-    return this.loadWasmValue(`stack[${Number(message.op)}]`, message.stopId);
+    const op = Number(message.op);
+    const result = await this.loadWasmValue<Chrome.DevTools.WasmValue|undefined>(
+        true, this.convertWasmValue('operand', op), `stack[${op}]`, message.stopId);
+    return result ?? this.status.E_BADARG('op', `No operand with index ${op}`);
   }
 
   private registerRecorderExtensionEndpoint(
@@ -368,12 +426,40 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     return this.status.OK();
   }
 
+  private onReportResourceLoad(message: PrivateAPI.ExtensionServerRequestMessage): Record {
+    if (message.command !== PrivateAPI.Commands.ReportResourceLoad) {
+      return this.status.E_BADARG('command', `expected ${PrivateAPI.Commands.ReportResourceLoad}`);
+    }
+    const {resourceUrl, extensionId, status} = message;
+    const url = resourceUrl as Platform.DevToolsPath.UrlString;
+    const initiator: SDK.PageResourceLoader.ExtensionInitiator =
+        {target: null, frameId: null, initiatorUrl: extensionId as Platform.DevToolsPath.UrlString, extensionId};
+
+    const pageResource: SDK.PageResourceLoader.PageResource = {
+      url,
+      initiator,
+      errorMessage: status.errorMessage,
+      success: status.success ?? null,
+      size: status.size ?? null,
+    };
+    SDK.PageResourceLoader.PageResourceLoader.instance().resourceLoadedThroughExtension(pageResource);
+    return this.status.OK();
+  }
+
   private onShowRecorderView(message: PrivateAPI.ExtensionServerRequestMessage): Record|undefined {
     if (message.command !== PrivateAPI.Commands.ShowRecorderView) {
       return this.status.E_BADARG('command', `expected ${PrivateAPI.Commands.ShowRecorderView}`);
     }
     RecorderPluginManager.instance().showView(message.id);
     return undefined;
+  }
+
+  private onShowNetworkPanel(message: PrivateAPI.ExtensionServerRequestMessage): Record|undefined {
+    if (message.command !== PrivateAPI.Commands.ShowNetworkPanel) {
+      return this.status.E_BADARG('command', `expected ${PrivateAPI.Commands.ShowNetworkPanel}`);
+    }
+    void Common.Revealer.reveal(new RevealableNetworkRequestFilter(message.filter));
+    return this.status.OK();
   }
 
   private onCreateRecorderView(message: PrivateAPI.ExtensionServerRequestMessage, port: MessagePort): Record {
@@ -404,7 +490,7 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
   }
 
   private inspectedURLChanged(event: Common.EventTarget.EventTargetEvent<SDK.Target.Target>): void {
-    if (!this.canInspectURL(event.data.inspectedURL())) {
+    if (!ExtensionServer.canInspectURL(event.data.inspectedURL())) {
       this.disableExtensions();
       return;
     }
@@ -412,14 +498,28 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
       return;
     }
     this.requests = new Map();
+    this.enableExtensions();
     const url = event.data.inspectedURL();
     this.postNotification(PrivateAPI.Events.InspectedURLChanged, url);
-    this.#pendingExtensions.forEach(e => this.addExtension(e));
-    this.#pendingExtensions.splice(0);
+    const extensions = this.#pendingExtensions.splice(0);
+    extensions.forEach(e => this.addExtension(e));
   }
 
   hasSubscribers(type: string): boolean {
     return this.subscribers.has(type);
+  }
+
+  private isNotificationAllowedForExtension(port: MessagePort, type: string, ..._args: unknown[]): boolean {
+    if (type === PrivateAPI.Events.NetworkRequestFinished) {
+      const entry = _args[1] as HAR.Log.EntryDTO;
+      const origin = extensionOrigins.get(port);
+      const extension = origin && this.registeredExtensions.get(origin);
+      if (extension?.isAllowedOnTarget(entry.request.url)) {
+        return true;
+      }
+      return false;
+    }
+    return true;
   }
 
   private postNotification(type: string, ..._vararg: unknown[]): void {
@@ -432,7 +532,7 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     }
     const message = {command: 'notify-' + type, arguments: Array.prototype.slice.call(arguments, 1)};
     for (const subscriber of subscribers) {
-      if (this.extensionEnabled(subscriber)) {
+      if (this.extensionEnabled(subscriber) && this.isNotificationAllowedForExtension(subscriber, type, ..._vararg)) {
         subscriber.postMessage(message);
       }
     }
@@ -507,7 +607,7 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     if (message.command !== PrivateAPI.Commands.ApplyStyleSheet) {
       return this.status.E_BADARG('command', `expected ${PrivateAPI.Commands.ApplyStyleSheet}`);
     }
-    if (!Root.Runtime.experiments.isEnabled('applyCustomStylesheet')) {
+    if (!Root.Runtime.experiments.isEnabled('apply-custom-stylesheet')) {
       return;
     }
 
@@ -747,7 +847,17 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
         {command: 'open-resource', resource: this.makeResource(contentProvider), lineNumber: lineNumber + 1});
   }
 
-  private onReload(message: PrivateAPI.ExtensionServerRequestMessage): Record {
+  private extensionAllowedOnURL(url: Platform.DevToolsPath.UrlString, port: MessagePort): boolean {
+    const origin = extensionOrigins.get(port);
+    const extension = origin && this.registeredExtensions.get(origin);
+    return Boolean(extension?.isAllowedOnTarget(url));
+  }
+
+  private extensionAllowedOnTarget(target: SDK.Target.Target, port: MessagePort): boolean {
+    return this.extensionAllowedOnURL(target.inspectedURL(), port);
+  }
+
+  private onReload(message: PrivateAPI.ExtensionServerRequestMessage, port: MessagePort): Record {
     if (message.command !== PrivateAPI.Commands.Reload) {
       return this.status.E_BADARG('command', `expected ${PrivateAPI.Commands.Reload}`);
     }
@@ -759,7 +869,15 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     if (options.injectedScript) {
       injectedScript = '(function(){' + options.injectedScript + '})()';
     }
-    SDK.ResourceTreeModel.ResourceTreeModel.reloadAllPages(Boolean(options.ignoreCache), injectedScript);
+    const target = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
+    if (!target) {
+      return this.status.OK();
+    }
+    const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
+    if (!this.extensionAllowedOnTarget(target, port)) {
+      return this.status.E_FAILED('Permission denied');
+    }
+    resourceTreeModel?.reloadPage(Boolean(options.ignoreCache), injectedScript);
     return this.status.OK();
   }
 
@@ -787,11 +905,13 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     return this.evaluate(expression, true, true, evaluateOptions, this.getExtensionOrigin(port), callback.bind(this));
   }
 
-  private async onGetHAR(message: PrivateAPI.ExtensionServerRequestMessage): Promise<Record|HAR.Log.LogDTO> {
+  private async onGetHAR(message: PrivateAPI.ExtensionServerRequestMessage, port: MessagePort):
+      Promise<Record|HAR.Log.LogDTO> {
     if (message.command !== PrivateAPI.Commands.GetHAR) {
       return this.status.E_BADARG('command', `expected ${PrivateAPI.Commands.GetHAR}`);
     }
-    const requests = Logs.NetworkLog.NetworkLog.instance().requests();
+    const requests =
+        Logs.NetworkLog.NetworkLog.instance().requests().filter(r => this.extensionAllowedOnURL(r.url(), port));
     const harLog = await HAR.Log.Log.build(requests);
     for (let i = 0; i < harLog.entries.length; ++i) {
       // @ts-ignore
@@ -800,19 +920,15 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     return harLog;
   }
 
-  private makeResource(contentProvider: TextUtils.ContentProvider.ContentProvider): {
-    url: string,
-    type: string,
-  } {
+  private makeResource(contentProvider: TextUtils.ContentProvider.ContentProvider): {url: string, type: string} {
     return {url: contentProvider.contentURL(), type: contentProvider.contentType().name()};
   }
 
-  private onGetPageResources(): {url: string, type: string}[] {
+  private onGetPageResources(_message: unknown, port: MessagePort): {url: string, type: string}[] {
     const resources = new Map<unknown, {
       url: string,
       type: string,
     }>();
-
     function pushResourceData(
         this: ExtensionServer, contentProvider: TextUtils.ContentProvider.ContentProvider): boolean {
       if (!resources.has(contentProvider.contentURL())) {
@@ -827,7 +943,9 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     uiSourceCodes.forEach(pushResourceData.bind(this));
     for (const resourceTreeModel of SDK.TargetManager.TargetManager.instance().models(
              SDK.ResourceTreeModel.ResourceTreeModel)) {
-      resourceTreeModel.forAllResources(pushResourceData.bind(this));
+      if (this.extensionAllowedOnTarget(resourceTreeModel.target(), port)) {
+        resourceTreeModel.forAllResources(pushResourceData.bind(this));
+      }
     }
 
     return [...resources.values()];
@@ -836,6 +954,10 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
   private async getResourceContent(
       contentProvider: TextUtils.ContentProvider.ContentProvider, message: PrivateAPI.ExtensionServerRequestMessage,
       port: MessagePort): Promise<void> {
+    if (!this.extensionAllowedOnURL(contentProvider.contentURL(), port)) {
+      this.dispatchCallback(message.requestId, port, this.status.E_FAILED('Permission denied'));
+      return undefined;
+    }
     const {content, isEncoded} = await contentProvider.requestContent();
     this.dispatchCallback(message.requestId, port, {encoding: isEncoded ? 'base64' : '', content: content});
   }
@@ -875,6 +997,9 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     function callbackWrapper(this: ExtensionServer, error: string|null): void {
       const response = error ? this.status.E_FAILED(error) : this.status.OK();
       this.dispatchCallback(requestId, port, response);
+    }
+    if (!this.extensionAllowedOnURL(url as Platform.DevToolsPath.UrlString, port)) {
+      return this.status.E_FAILED('Permission denied');
     }
 
     const uiSourceCode =
@@ -1037,10 +1162,11 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
       this.#pendingExtensions.push(extensionInfo);
       return;
     }
-    if (!this.canInspectURL(inspectedURL)) {
+    if (!ExtensionServer.canInspectURL(inspectedURL)) {
       this.disableExtensions();
     }
     if (!this.extensionsEnabled) {
+      this.#pendingExtensions.push(extensionInfo);
       return;
     }
     const hostsPolicy = HostsPolicy.create(extensionInfo.hostsPolicy);
@@ -1053,6 +1179,7 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
       const name = extensionInfo.name || `Extension ${extensionOrigin}`;
       const extensionRegistration = new RegisteredExtension(name, hostsPolicy, Boolean(extensionInfo.allowFileAccess));
       if (!extensionRegistration.isAllowedOnTarget(inspectedURL)) {
+        this.#pendingExtensions.push(extensionInfo);
         return;
       }
       if (!this.registeredExtensions.get(extensionOrigin)) {
@@ -1225,7 +1352,7 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     // We shouldn't get here if the outermost frame can't be inspected by an extension, but
     // let's double check for subframes.
     const extension = this.registeredExtensions.get(securityOrigin);
-    if (!this.canInspectURL(frame.url) || !extension?.isAllowedOnTarget(frame.url)) {
+    if (!extension?.isAllowedOnTarget(frame.url)) {
       return this.status.E_FAILED('Permission denied');
     }
 
@@ -1261,7 +1388,7 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
         return this.status.E_FAILED(frame.url + ' has no execution context');
       }
     }
-    if (!this.canInspectURL(context.origin) || !extension?.isAllowedOnTarget(context.origin)) {
+    if (!extension?.isAllowedOnTarget(context.origin)) {
       return this.status.E_FAILED('Permission denied');
     }
 
@@ -1288,7 +1415,7 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     return undefined;
   }
 
-  private canInspectURL(url: Platform.DevToolsPath.UrlString): boolean {
+  static canInspectURL(url: Platform.DevToolsPath.UrlString): boolean {
     let parsedURL;
     // This is only to work around invalid URLs we're occasionally getting from some tests.
     // TODO(caseq): make sure tests supply valid URLs or we specifically handle invalid ones.
@@ -1301,14 +1428,15 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
       return true;
     }
     if (parsedURL.protocol === 'chrome:' || parsedURL.protocol === 'devtools:' ||
-        parsedURL.protocol === 'chrome-untrusted:') {
+        parsedURL.protocol === 'chrome-untrusted:' || parsedURL.protocol === 'chrome-error:' ||
+        parsedURL.protocol === 'chrome-search:') {
       return false;
     }
-    if (parsedURL.protocol.startsWith('http') && parsedURL.hostname === 'chrome.google.com' &&
+    if (parsedURL.protocol.startsWith('http') && parsedURL.hostname.match(/^chrome\.google\.com\.?$/) &&
         parsedURL.pathname.startsWith('/webstore')) {
       return false;
     }
-    if (parsedURL.protocol.startsWith('http') && parsedURL.hostname === 'chromewebstore.google.com') {
+    if (parsedURL.protocol.startsWith('http') && parsedURL.hostname.match(/^chromewebstore\.google\.com\.?$/)) {
       return false;
     }
 
@@ -1324,13 +1452,14 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
   private disableExtensions(): void {
     this.extensionsEnabled = false;
   }
+
+  private enableExtensions(): void {
+    this.extensionsEnabled = true;
+  }
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum Events {
+export const enum Events {
   SidebarPaneAdded = 'SidebarPaneAdded',
-  TraceProviderAdded = 'TraceProviderAdded',
 }
 
 export type EventTypes = {

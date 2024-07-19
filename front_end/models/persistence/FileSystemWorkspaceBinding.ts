@@ -236,7 +236,7 @@ export class FileSystem extends Workspace.Workspace.ProjectStore {
   }
 
   requestFileContent(uiSourceCode: Workspace.UISourceCode.UISourceCode):
-      Promise<TextUtils.ContentProvider.DeferredContent> {
+      Promise<TextUtils.ContentData.ContentDataOrError> {
     const filePath = this.filePathForUISourceCode(uiSourceCode);
     return this.fileSystemInternal.requestFileContent(filePath);
   }
@@ -294,17 +294,18 @@ export class FileSystem extends Workspace.Workspace.ProjectStore {
       uiSourceCode: Workspace.UISourceCode.UISourceCode, query: string, caseSensitive: boolean,
       isRegex: boolean): Promise<TextUtils.ContentProvider.SearchMatch[]> {
     const filePath = this.filePathForUISourceCode(uiSourceCode);
-    const {content} = await this.fileSystemInternal.requestFileContent(filePath);
-    if (content) {
-      return TextUtils.TextUtils.performSearchInContent(content, query, caseSensitive, isRegex);
+    const content = await this.fileSystemInternal.requestFileContent(filePath);
+    if (!TextUtils.ContentData.ContentData.isError(content) && content.isTextContent) {
+      return TextUtils.TextUtils.performSearchInContent(content.text, query, caseSensitive, isRegex);
     }
     return [];
   }
 
   async findFilesMatchingSearchRequest(
-      searchConfig: Workspace.Workspace.ProjectSearchConfig, filesMatchingFileQuery: Platform.DevToolsPath.UrlString[],
-      progress: Common.Progress.Progress): Promise<string[]> {
-    let result: string[] = filesMatchingFileQuery;
+      searchConfig: Workspace.SearchConfig.SearchConfig, filesMatchingFileQuery: Workspace.UISourceCode.UISourceCode[],
+      progress: Common.Progress.Progress):
+      Promise<Map<Workspace.UISourceCode.UISourceCode, TextUtils.ContentProvider.SearchMatch[]|null>> {
+    let workingFileSet: string[] = filesMatchingFileQuery.map(uiSoureCode => uiSoureCode.url());
     const queriesToRun = searchConfig.queries().slice();
     if (!queriesToRun.length) {
       queriesToRun.push('');
@@ -314,8 +315,17 @@ export class FileSystem extends Workspace.Workspace.ProjectStore {
     for (const query of queriesToRun) {
       const files = await this.fileSystemInternal.searchInPath(searchConfig.isRegex() ? '' : query, progress);
       files.sort(Platform.StringUtilities.naturalOrderComparator);
-      result = Platform.ArrayUtilities.intersectOrdered(result, files, Platform.StringUtilities.naturalOrderComparator);
+      workingFileSet = Platform.ArrayUtilities.intersectOrdered(
+          workingFileSet, files, Platform.StringUtilities.naturalOrderComparator);
       progress.incrementWorked(1);
+    }
+
+    const result = new Map();
+    for (const file of workingFileSet) {
+      const uiSourceCode = this.uiSourceCodeForURL(file as Platform.DevToolsPath.UrlString);
+      if (uiSourceCode) {
+        result.set(uiSourceCode, null);
+      }
     }
 
     progress.done();
@@ -383,8 +393,7 @@ export class FileSystem extends Workspace.Workspace.ProjectStore {
     if (!filePath) {
       return null;
     }
-    const uiSourceCode = this.addFile(filePath);
-    uiSourceCode.setContent(content, Boolean(isBase64));
+    const uiSourceCode = this.addFile(filePath, content, isBase64);
     this.creatingFilesGuard.delete(guardFileName);
     return uiSourceCode;
   }
@@ -398,14 +407,22 @@ export class FileSystem extends Workspace.Workspace.ProjectStore {
     });
   }
 
+  override deleteDirectoryRecursively(path: Platform.DevToolsPath.EncodedPathString): Promise<boolean> {
+    return this.fileSystemInternal.deleteDirectoryRecursively(path);
+  }
+
   override remove(): void {
     this.fileSystemWorkspaceBinding.isolatedFileSystemManager.removeFileSystem(this.fileSystemInternal);
   }
 
-  private addFile(filePath: Platform.DevToolsPath.EncodedPathString): Workspace.UISourceCode.UISourceCode {
+  private addFile(filePath: Platform.DevToolsPath.EncodedPathString, content?: string, isBase64?: boolean):
+      Workspace.UISourceCode.UISourceCode {
     const contentType = this.fileSystemInternal.contentType(filePath);
     const uiSourceCode =
         this.createUISourceCode(Common.ParsedURL.ParsedURL.concatenate(this.fileSystemBaseURL, filePath), contentType);
+    if (content !== undefined) {
+      uiSourceCode.setContent(content, Boolean(isBase64));
+    }
     this.addUISourceCode(uiSourceCode);
     return uiSourceCode;
   }

@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 import {assert} from 'chai';
 import type * as puppeteer from 'puppeteer-core';
+
 import {
   click,
+  clickElement,
   getBrowserAndPages,
   goToResource,
   pressKey,
@@ -12,7 +14,7 @@ import {
   typeText,
   waitFor,
   waitForAria,
-  clickElement,
+  waitForNone,
 } from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
 import {waitForDomNodeToBeVisible} from '../helpers/elements-helpers.js';
@@ -27,8 +29,7 @@ import {
 
 const ADD_DEVICE_BUTTON_SELECTOR = '#custom-device-add-button';
 const FOCUSED_DEVICE_NAME_FIELD_SELECTOR = '#custom-device-name-field:focus';
-const EDITOR_ADD_BUTTON_SELECTOR = '.editor-buttons > button:first-child';
-const FOCUSED_SELECTOR = '*:focus';
+const EDITOR_ADD_BUTTON_SELECTOR = '.editor-buttons > devtools-button:nth-of-type(2)';
 
 async function elementTextContent(element: puppeteer.ElementHandle): Promise<string> {
   return await element.evaluate(node => node.textContent || '');
@@ -43,7 +44,7 @@ async function targetTextContent(selector: string): Promise<string> {
   return elementTextContent(handle);
 }
 
-describe('Custom devices', async () => {
+describe('Custom devices', () => {
   beforeEach(async function() {
     await reloadDockableFrontEnd();
     await goToResource('emulation/custom-ua-ch.html');
@@ -110,12 +111,16 @@ describe('Custom devices', async () => {
     await tabForward();  // Focus device model.
     await typeText('C-1-Gardener');
 
+    await tabForward();  // Focus cancel button.
     await tabForward();  // Focus add button.
 
-    const finishAdd = await waitFor(FOCUSED_SELECTOR);
-    const finishAddText = await elementTextContent(finishAdd);
+    const addDevToolsButton = await waitFor('.editor-buttons devtools-button:nth-of-type(2)');
+    const addButton = await addDevToolsButton.waitForSelector('>>> button:focus');
+    assert.isNotNull(addButton);  // Check that the devtools-buttons is focus
+
+    const finishAddText = await elementTextContent(addDevToolsButton);
     assert.strictEqual(finishAddText, 'Add');
-    await clickElement(finishAdd);
+    await clickElement(addDevToolsButton);
 
     // Select the device in the menu.
     await selectTestDevice();
@@ -200,6 +205,7 @@ describe('Custom devices', async () => {
     const finishAddText = await elementTextContent(finishAdd);
     assert.strictEqual(finishAddText, 'Add');
     await clickElement(finishAdd);
+    await waitForNone(FOCUSED_DEVICE_NAME_FIELD_SELECTOR);
 
     // Select the device in the menu.
     await selectDevice('Prime numbers');

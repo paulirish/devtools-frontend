@@ -8,8 +8,7 @@ import * as UI from '../../ui/legacy/legacy.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
 
 import {DeviceModeWrapper} from './DeviceModeWrapper.js';
-
-import {Events, InspectedPagePlaceholder, type Bounds} from './InspectedPagePlaceholder.js';
+import {type Bounds, Events, InspectedPagePlaceholder} from './InspectedPagePlaceholder.js';
 
 let appInstance: AdvancedApp;
 
@@ -20,6 +19,7 @@ export class AdvancedApp implements Common.App.App {
   private toolboxWindow?: Window|null;
   private toolboxRootView?: UI.RootView.RootView;
   private changingDockSide?: boolean;
+  private toolboxDocument?: Document;
 
   constructor() {
     UI.DockController.DockController.instance().addEventListener(
@@ -39,7 +39,8 @@ export class AdvancedApp implements Common.App.App {
   presentUI(document: Document): void {
     const rootView = new UI.RootView.RootView();
 
-    this.rootSplitWidget = new UI.SplitWidget.SplitWidget(false, true, 'InspectorView.splitViewState', 555, 300, true);
+    this.rootSplitWidget =
+        new UI.SplitWidget.SplitWidget(false, true, 'inspector-view.split-view-state', 555, 300, true);
     this.rootSplitWidget.show(rootView.element);
     this.rootSplitWidget.setSidebarWidget(UI.InspectorView.InspectorView.instance());
     this.rootSplitWidget.setDefaultFocusedChild(UI.InspectorView.InspectorView.instance());
@@ -78,16 +79,15 @@ export class AdvancedApp implements Common.App.App {
   }
 
   deviceModeEmulationFrameLoaded(toolboxDocument: Document): void {
-    ThemeSupport.ThemeSupport.instance().applyTheme(toolboxDocument);
-    ThemeSupport.ThemeSupport.instance().addEventListener(ThemeSupport.ThemeChangeEvent.eventName, () => {
-      ThemeSupport.ThemeSupport.instance().applyTheme(toolboxDocument);
-    });
+    ThemeSupport.ThemeSupport.instance().addDocumentToTheme(toolboxDocument);
     UI.UIUtils.initializeUIUtils(toolboxDocument);
     UI.UIUtils.installComponentRootStyles((toolboxDocument.body as Element));
     UI.ContextMenu.ContextMenu.installHandler(toolboxDocument);
 
     this.toolboxRootView = new UI.RootView.RootView();
     this.toolboxRootView.attachToDocument(toolboxDocument);
+
+    this.toolboxDocument = toolboxDocument;
 
     this.updateDeviceModeView();
   }
@@ -141,9 +141,9 @@ export class AdvancedApp implements Common.App.App {
 
   private updateForDocked(dockSide: UI.DockController.DockState): void {
     const resizerElement = (this.rootSplitWidget.resizerElement() as HTMLElement);
-    resizerElement.style.transform = dockSide === UI.DockController.DockState.RIGHT ?
-        'translateX(2px)' :
-        dockSide === UI.DockController.DockState.LEFT ? 'translateX(-2px)' : '';
+    resizerElement.style.transform = dockSide === UI.DockController.DockState.RIGHT ? 'translateX(2px)' :
+        dockSide === UI.DockController.DockState.LEFT                               ? 'translateX(-2px)' :
+                                                                                      '';
     this.rootSplitWidget.setVertical(
         dockSide === UI.DockController.DockState.RIGHT || dockSide === UI.DockController.DockState.LEFT);
     this.rootSplitWidget.setSecondIsSidebar(

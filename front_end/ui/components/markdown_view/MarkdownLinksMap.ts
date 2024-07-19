@@ -50,6 +50,9 @@ export const markdownLinks = new Map<string, string>([
     'https://developer.chrome.com/docs/extensions/reference/privacy/#property-websites-privacySandboxEnabled',
   ],
   ['PNASecureContextRestrictionFeatureStatus', 'https://chromestatus.com/feature/5954091755241472'],
+  ['https://w3c.github.io/uievents/#legacy-event-types', 'https://w3c.github.io/uievents/#legacy-event-types'],
+  ['manageCookiesHelpPage', 'https://support.google.com/chrome/answer/95647'],
+  ['gracePeriodStagedControlExplainer', 'https://developers.google.com/privacy-sandbox/blog/grace-period-opt-out'],
 ]);
 
 export const getMarkdownLink = (key: string): string => {

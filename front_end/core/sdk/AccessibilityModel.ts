@@ -10,9 +10,7 @@ import {DeferredDOMNode, type DOMNode} from './DOMModel.js';
 import {Capability, type Target} from './Target.js';
 import {SDKModel} from './SDKModel.js';
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum CoreAxPropertyName {
+export const enum CoreAxPropertyName {
   Name = 'name',
   Description = 'description',
   Value = 'value',
@@ -63,7 +61,7 @@ export class AccessibilityNode {
     this.#descriptionInternal = payload.description || null;
     this.#valueInternal = payload.value || null;
     this.#propertiesInternal = payload.properties || null;
-    this.#childIds = payload.childIds || null;
+    this.#childIds = [...new Set(payload.childIds)] || null;
     this.#parentId = payload.parentId || null;
     if (payload.frameId && !payload.parentId) {
       this.#frameId = payload.frameId;
@@ -195,9 +193,7 @@ export class AccessibilityNode {
   }
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum Events {
+export const enum Events {
   TreeUpdated = 'TreeUpdated',
 }
 

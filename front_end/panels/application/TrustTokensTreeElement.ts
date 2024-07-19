@@ -2,15 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import type * as Platform from '../../core/platform/platform.js';
-import * as UI from '../../ui/legacy/legacy.js';
+import * as IconButton from '../../ui/components/icon_button/icon_button.js';
 import * as LegacyWrapper from '../../ui/components/legacy_wrapper/legacy_wrapper.js';
+import * as UI from '../../ui/legacy/legacy.js';
 
 import {ApplicationPanelTreeElement} from './ApplicationPanelTreeElement.js';
 import * as ApplicationComponents from './components/components.js';
 import {type ResourcesPanel} from './ResourcesPanel.js';
-import * as Host from '../../core/host/host.js';
 
 const UIStrings = {
   /**
@@ -27,8 +28,8 @@ export class TrustTokensTreeElement extends ApplicationPanelTreeElement {
       .LegacyWrapper<UI.Widget.Widget, ApplicationComponents.TrustTokensView.TrustTokensView>;
 
   constructor(storagePanel: ResourcesPanel) {
-    super(storagePanel, i18nString(UIStrings.trustTokens), false);
-    const icon = UI.Icon.Icon.create('database', 'resource-tree-item');
+    super(storagePanel, i18nString(UIStrings.trustTokens), false, 'private-state-tokens');
+    const icon = IconButton.Icon.create('database');
     this.setLeadingIcons([icon]);
   }
 
@@ -40,10 +41,10 @@ export class TrustTokensTreeElement extends ApplicationPanelTreeElement {
     super.onselect(selectedByUser);
     if (!this.view) {
       this.view = LegacyWrapper.LegacyWrapper.legacyWrapper(
-          UI.Widget.Widget, new ApplicationComponents.TrustTokensView.TrustTokensView());
+          UI.Widget.Widget, new ApplicationComponents.TrustTokensView.TrustTokensView(), 'trust-tokens');
     }
     this.showView(this.view);
-    Host.userMetrics.panelShown(Host.UserMetrics.PanelCodes[Host.UserMetrics.PanelCodes.trust_tokens]);
+    Host.userMetrics.panelShown('trust-tokens');
     return false;
   }
 }

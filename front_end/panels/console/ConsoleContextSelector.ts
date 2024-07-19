@@ -35,7 +35,7 @@ export class ConsoleContextSelector implements SDK.TargetManager.SDKModelObserve
 
   constructor() {
     this.items = new UI.ListModel.ListModel();
-    this.dropDown = new UI.SoftDropDown.SoftDropDown(this.items, this);
+    this.dropDown = new UI.SoftDropDown.SoftDropDown(this.items, this, 'javascript-context');
     this.dropDown.setRowHeight(36);
     this.toolbarItemInternal = new UI.Toolbar.ToolbarItem(this.dropDown.element);
     this.toolbarItemInternal.setEnabled(false);
@@ -212,7 +212,7 @@ export class ConsoleContextSelector implements SDK.TargetManager.SDKModelObserve
 
   createElementForItem(item: SDK.RuntimeModel.ExecutionContext): Element {
     const element = document.createElement('div');
-    const shadowRoot = UI.Utils.createShadowRootWithCoreStyles(
+    const shadowRoot = UI.UIUtils.createShadowRootWithCoreStyles(
         element, {cssFile: [consoleContextSelectorStyles], delegatesFocus: undefined});
     const title = shadowRoot.createChild('div', 'title');
     UI.UIUtils.createTextChild(title, Platform.StringUtilities.trimEndWithMaxLength(this.titleFor(item), 100));
@@ -229,7 +229,7 @@ export class ConsoleContextSelector implements SDK.TargetManager.SDKModelObserve
       const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
       frame = resourceTreeModel && resourceTreeModel.frameForId(executionContext.frameId);
     }
-    if (executionContext.origin.startsWith('chrome-extension://')) {
+    if (Common.ParsedURL.schemeIs(executionContext.origin, 'chrome-extension:')) {
       return i18nString(UIStrings.extension);
     }
     const sameTargetParentFrame = frame && frame.sameTargetParentFrame();

@@ -61,11 +61,13 @@ export class FileManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
     return fileManagerInstance;
   }
 
-  save(url: Platform.DevToolsPath.RawPathString|Platform.DevToolsPath.UrlString, content: string, forceSaveAs: boolean):
-      Promise<SaveCallbackParam|null> {
+  // close() *must* be called, for the InspectorFrontendHostStub case, to complete the saving.
+  save(
+      url: Platform.DevToolsPath.RawPathString|Platform.DevToolsPath.UrlString, content: string, forceSaveAs: boolean,
+      isBase64: boolean): Promise<SaveCallbackParam|null> {
     // Remove this url from the saved URLs while it is being saved.
     const result = new Promise<SaveCallbackParam|null>(resolve => this.saveCallbacks.set(url, resolve));
-    Host.InspectorFrontendHost.InspectorFrontendHostInstance.save(url, content, forceSaveAs);
+    Host.InspectorFrontendHost.InspectorFrontendHostInstance.save(url, content, forceSaveAs, isBase64);
     return result;
   }
 
@@ -99,9 +101,7 @@ export class FileManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
   }
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum Events {
+export const enum Events {
   AppendedToURL = 'AppendedToURL',
 }
 

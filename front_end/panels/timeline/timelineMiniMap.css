@@ -4,17 +4,37 @@
  * found in the LICENSE file.
  */
 
+.timeline-minimap {
+  position: relative;
+}
+
+.timeline-sidebar-floating-icon {
+  position: absolute;
+  top: 5px;
+  left: 10px;
+  z-index: 999;
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--sys-color-cdt-base-container);
+
+  &:hover {
+    background: var(--sys-color-base-container-elevated);
+  }
+}
+
 .timeline-minimap .overview-strip {
   margin-top: 2px;
   justify-content: center;
 }
 
 .timeline-minimap .overview-strip .timeline-overview-strip-title {
-  color: var(--color-text-secondary);
+  color: var(--sys-color-token-subtle);
   font-size: 10px;
   font-weight: bold;
   z-index: 100;
-  background-color: var(--color-background-opacity-80);
+  background-color: var(--sys-color-cdt-base-container);
   padding: 0 4px;
   position: absolute;
   top: -2px;
@@ -85,8 +105,8 @@
   right: 0;
   bottom: 0;
   font-size: 9px;
-  color: var(--color-text-secondary);
+  color: var(--sys-color-token-subtle);
   white-space: nowrap;
   padding: 0 4px;
-  background-color: var(--color-background-opacity-80);
+  background-color: var(--sys-color-cdt-base-container);
 }

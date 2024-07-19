@@ -7,6 +7,7 @@ import * as CheckFormsIssuesTrigger from './CheckFormsIssuesTrigger.js';
 import * as ClientHintIssue from './ClientHintIssue.js';
 import * as ContentSecurityPolicyIssue from './ContentSecurityPolicyIssue.js';
 import * as ContrastCheckTrigger from './ContrastCheckTrigger.js';
+import * as CookieDeprecationMetadataIssue from './CookieDeprecationMetadataIssue.js';
 import * as CookieIssue from './CookieIssue.js';
 import * as CorsIssue from './CorsIssue.js';
 import * as CrossOriginEmbedderPolicyIssue from './CrossOriginEmbedderPolicyIssue.js';
@@ -20,9 +21,11 @@ import * as IssuesManager from './IssuesManager.js';
 import * as LowTextContrastIssue from './LowTextContrastIssue.js';
 import * as MarkdownIssueDescription from './MarkdownIssueDescription.js';
 import * as MixedContentIssue from './MixedContentIssue.js';
+import * as PropertyRuleIssue from './PropertyRuleIssue.js';
 import * as QuirksModeIssue from './QuirksModeIssue.js';
 import * as RelatedIssue from './RelatedIssue.js';
 import * as SharedArrayBufferIssue from './SharedArrayBufferIssue.js';
+import * as SharedDictionaryIssue from './SharedDictionaryIssue.js';
 import * as SourceFrameIssuesManager from './SourceFrameIssuesManager.js';
 import * as StylesheetLoadingIssue from './StylesheetLoadingIssue.js';
 
@@ -32,6 +35,7 @@ export {
   ClientHintIssue,
   ContentSecurityPolicyIssue,
   ContrastCheckTrigger,
+  CookieDeprecationMetadataIssue,
   CookieIssue,
   CorsIssue,
   CrossOriginEmbedderPolicyIssue,
@@ -45,9 +49,11 @@ export {
   LowTextContrastIssue,
   MarkdownIssueDescription,
   MixedContentIssue,
+  PropertyRuleIssue,
   QuirksModeIssue,
   RelatedIssue,
   SharedArrayBufferIssue,
+  SharedDictionaryIssue,
   SourceFrameIssuesManager,
   StylesheetLoadingIssue,
 };

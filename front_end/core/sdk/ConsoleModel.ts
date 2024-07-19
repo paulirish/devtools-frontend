@@ -34,39 +34,36 @@ import * as Host from '../host/host.js';
 import * as i18n from '../i18n/i18n.js';
 import * as Platform from '../platform/platform.js';
 
-import {FrontendMessageSource, FrontendMessageType} from './ConsoleModelTypes.js';
-
-export {FrontendMessageSource, FrontendMessageType} from './ConsoleModelTypes.js';
-
-import {CPUProfilerModel, Events as CPUProfilerModelEvents, type EventData} from './CPUProfilerModel.js';
-
+import {FrontendMessageType} from './ConsoleModelTypes.js';
+import {CPUProfilerModel, type EventData, Events as CPUProfilerModelEvents} from './CPUProfilerModel.js';
 import {
-  Events as DebuggerModelEvents,
-  type Location,
   BreakpointType,
   COND_BREAKPOINT_SOURCE_URL,
+  Events as DebuggerModelEvents,
+  type Location,
   LOGPOINT_SOURCE_URL,
 } from './DebuggerModel.js';
 import {LogModel} from './LogModel.js';
 import {RemoteObject} from './RemoteObject.js';
 import {
   Events as ResourceTreeModelEvents,
-  ResourceTreeModel,
-  type ResourceTreeFrame,
   type PrimaryPageChangeType,
+  type ResourceTreeFrame,
+  ResourceTreeModel,
 } from './ResourceTreeModel.js';
-
 import {
-  Events as RuntimeModelEvents,
-  RuntimeModel,
   type ConsoleAPICall,
+  Events as RuntimeModelEvents,
   type ExceptionWithTimestamp,
   type ExecutionContext,
   type QueryObjectRequestedEvent,
+  RuntimeModel,
 } from './RuntimeModel.js';
+import {SDKModel} from './SDKModel.js';
 import {Capability, type Target, Type} from './Target.js';
 import {TargetManager} from './TargetManager.js';
-import {SDKModel} from './SDKModel.js';
+
+export {FrontendMessageType} from './ConsoleModelTypes.js';
 
 const UIStrings = {
   /**
@@ -191,7 +188,8 @@ export class ConsoleModel extends SDKModel<EventTypes> {
           replMode: true,
           allowUnsafeEvalBlockedByCSP: false,
         },
-        Common.Settings.Settings.instance().moduleSetting('consoleUserActivationEval').get(), /* awaitPromise */ false);
+        Common.Settings.Settings.instance().moduleSetting('console-user-activation-eval').get(),
+        /* awaitPromise */ false);
     Host.userMetrics.actionTaken(Host.UserMetrics.Action.ConsoleEvaluated);
     if ('error' in result) {
       return;
@@ -213,7 +211,7 @@ export class ConsoleModel extends SDKModel<EventTypes> {
 
   addMessage(msg: ConsoleMessage): void {
     msg.setPageLoadSequenceNumber(this.#pageLoadSequenceNumber);
-    if (msg.source === FrontendMessageSource.ConsoleAPI &&
+    if (msg.source === Common.Console.FrontendMessageSource.ConsoleAPI &&
         msg.type === Protocol.Runtime.ConsoleAPICalledEventType.Clear) {
       this.clearIfNecessary();
     }
@@ -277,7 +275,10 @@ export class ConsoleModel extends SDKModel<EventTypes> {
     let message = '';
     if (call.args.length && call.args[0].unserializableValue) {
       message = call.args[0].unserializableValue;
-    } else if (call.args.length && (typeof call.args[0].value !== 'object' || call.args[0].value === null)) {
+    } else if (
+        call.args.length &&
+        ((typeof call.args[0].value !== 'object' && typeof call.args[0].value !== 'undefined') ||
+         call.args[0].value === null)) {
       message = String(call.args[0].value);
     } else if (call.args.length && call.args[0].description) {
       message = call.args[0].description;
@@ -294,8 +295,8 @@ export class ConsoleModel extends SDKModel<EventTypes> {
       executionContextId: call.executionContextId,
       context: call.context,
     };
-    const consoleMessage =
-        new ConsoleMessage(runtimeModel, FrontendMessageSource.ConsoleAPI, level, (message as string), details);
+    const consoleMessage = new ConsoleMessage(
+        runtimeModel, Common.Console.FrontendMessageSource.ConsoleAPI, level, (message as string), details);
     for (const msg of this.#messagesByTimestamp.get(consoleMessage.timestamp).values()) {
       if (consoleMessage.isEqual(msg)) {
         return;
@@ -313,12 +314,12 @@ export class ConsoleModel extends SDKModel<EventTypes> {
       executionContextId,
     };
     const consoleMessage = new ConsoleMessage(
-        runtimeModel, FrontendMessageSource.ConsoleAPI, Protocol.Log.LogEntryLevel.Info, '', details);
+        runtimeModel, Common.Console.FrontendMessageSource.ConsoleAPI, Protocol.Log.LogEntryLevel.Info, '', details);
     this.addMessage(consoleMessage);
   }
 
   private clearIfNecessary(): void {
-    if (!Common.Settings.Settings.instance().moduleSetting('preserveConsoleLog').get()) {
+    if (!Common.Settings.Settings.instance().moduleSetting('preserve-console-log').get()) {
       this.clear();
     }
     ++this.#pageLoadSequenceNumber;
@@ -326,7 +327,7 @@ export class ConsoleModel extends SDKModel<EventTypes> {
 
   private primaryPageChanged(
       event: Common.EventTarget.EventTargetEvent<{frame: ResourceTreeFrame, type: PrimaryPageChangeType}>): void {
-    if (Common.Settings.Settings.instance().moduleSetting('preserveConsoleLog').get()) {
+    if (Common.Settings.Settings.instance().moduleSetting('preserve-console-log').get()) {
       const {frame} = event.data;
       if (frame.backForwardCacheDetails.restoredFromCache) {
         Common.Console.Console.instance().log(i18nString(UIStrings.bfcacheNavigation, {PH1: frame.url}));
@@ -363,8 +364,8 @@ export class ConsoleModel extends SDKModel<EventTypes> {
       columnNumber: scriptLocation.columnNumber || 0,
     }];
     this.addMessage(new ConsoleMessage(
-        cpuProfilerModel.runtimeModel(), FrontendMessageSource.ConsoleAPI, Protocol.Log.LogEntryLevel.Info, messageText,
-        {type, stackTrace: {callFrames}}));
+        cpuProfilerModel.runtimeModel(), Common.Console.FrontendMessageSource.ConsoleAPI,
+        Protocol.Log.LogEntryLevel.Info, messageText, {type, stackTrace: {callFrames}}));
   }
 
   private incrementErrorWarningCount(msg: ConsoleMessage): void {
@@ -470,8 +471,6 @@ export class ConsoleModel extends SDKModel<EventTypes> {
 
     const globalObject = result.object;
     const callFunctionResult =
-        // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-        // @ts-expect-error
         await globalObject.callFunction(saveVariable, [RemoteObject.toCallArgument(remoteObject)]);
     globalObject.release();
     if (callFunctionResult.wasThrown || !callFunctionResult.object || callFunctionResult.object.type !== 'string') {
@@ -507,8 +506,6 @@ export class ConsoleModel extends SDKModel<EventTypes> {
   }
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
 export enum Events {
   ConsoleCleared = 'ConsoleCleared',
   MessageAdded = 'MessageAdded',
@@ -534,8 +531,10 @@ export interface AffectedResources {
   issueId?: Protocol.Audits.IssueId;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function extractExceptionMetaData(metaData: any|undefined): AffectedResources|undefined {
+function extractExceptionMetaData(metaData?: {
+  requestId?: Protocol.Network.RequestId,
+  issueId?: Protocol.Audits.IssueId,
+}): AffectedResources|undefined {
   if (!metaData) {
     return undefined;
   }
@@ -742,7 +741,7 @@ export class ConsoleMessage {
     const isUngroupableError = this.level === Protocol.Log.LogEntryLevel.Error &&
         (this.source === Protocol.Log.LogEntrySource.Javascript || this.source === Protocol.Log.LogEntrySource.Network);
     return (
-        this.source !== FrontendMessageSource.ConsoleAPI && this.type !== FrontendMessageType.Command &&
+        this.source !== Common.Console.FrontendMessageSource.ConsoleAPI && this.type !== FrontendMessageType.Command &&
         this.type !== FrontendMessageType.Result && this.type !== FrontendMessageType.System && !isUngroupableError);
   }
 
@@ -767,10 +766,10 @@ export class ConsoleMessage {
           // TODO(chromium:1136435): Remove this case.
           return false;
         }
-        // Never treat objects as equal - their properties might change over time. Errors can be treated as equal
-        // since they are always formatted as strings.
         if (msgParam.type === 'object' && msgParam.subtype !== 'error') {
-          return false;
+          if (!msgParam.objectId || msgParam.objectId !== param.objectId || msg.timestamp !== this.timestamp) {
+            return false;
+          }
         }
         if (param.type !== msgParam.type || param.value !== msgParam.value ||
             param.description !== msgParam.description) {
@@ -821,7 +820,7 @@ export class ConsoleMessage {
 
 SDKModel.register(ConsoleModel, {capabilities: Capability.JS, autostart: true});
 
-export type MessageSource = Protocol.Log.LogEntrySource|FrontendMessageSource;
+export type MessageSource = Protocol.Log.LogEntrySource|Common.Console.FrontendMessageSource;
 export type MessageLevel = Protocol.Log.LogEntryLevel;
 export type MessageType = Protocol.Runtime.ConsoleAPICalledEventType|FrontendMessageType;
 
@@ -829,11 +828,11 @@ export const MessageSourceDisplayName = new Map<MessageSource, string>(([
   [Protocol.Log.LogEntrySource.XML, 'xml'],
   [Protocol.Log.LogEntrySource.Javascript, 'javascript'],
   [Protocol.Log.LogEntrySource.Network, 'network'],
-  [FrontendMessageSource.ConsoleAPI, 'console-api'],
+  [Common.Console.FrontendMessageSource.ConsoleAPI, 'console-api'],
   [Protocol.Log.LogEntrySource.Storage, 'storage'],
   [Protocol.Log.LogEntrySource.Appcache, 'appcache'],
   [Protocol.Log.LogEntrySource.Rendering, 'rendering'],
-  [FrontendMessageSource.CSS, 'css'],
+  [Common.Console.FrontendMessageSource.CSS, 'css'],
   [Protocol.Log.LogEntrySource.Security, 'security'],
   [Protocol.Log.LogEntrySource.Deprecation, 'deprecation'],
   [Protocol.Log.LogEntrySource.Worker, 'worker'],
@@ -841,4 +840,5 @@ export const MessageSourceDisplayName = new Map<MessageSource, string>(([
   [Protocol.Log.LogEntrySource.Intervention, 'intervention'],
   [Protocol.Log.LogEntrySource.Recommendation, 'recommendation'],
   [Protocol.Log.LogEntrySource.Other, 'other'],
+  [Common.Console.FrontendMessageSource.IssuePanel, 'issue-panel'],
 ]));

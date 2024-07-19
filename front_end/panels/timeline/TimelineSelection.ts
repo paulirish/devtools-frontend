@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 import * as TraceEngine from '../../models/trace/trace.js';
 
-type PermittedObjectTypes = TimelineModel.TimelineFrameModel.TimelineFrame|TraceEngine.Legacy.Event|
-                            TraceEngine.Types.TraceEvents.TraceEventData|SelectionRange;
+type PermittedObjectTypes =
+    TraceEngine.Handlers.ModelHandlers.Frames.TimelineFrame|TraceEngine.Types.TraceEvents.TraceEventData|SelectionRange;
 
 const SelectionRangeSymbol = Symbol('SelectionRange');
 export type SelectionRange = typeof SelectionRangeSymbol;
@@ -24,49 +23,53 @@ export class TimelineSelection {
     this.object = object;
   }
 
-  static isFrameObject(object: PermittedObjectTypes): object is TimelineModel.TimelineFrameModel.TimelineFrame {
-    return object instanceof TimelineModel.TimelineFrameModel.TimelineFrame;
+  static isFrameObject(object: PermittedObjectTypes):
+      object is TraceEngine.Handlers.ModelHandlers.Frames.TimelineFrame {
+    return object instanceof TraceEngine.Handlers.ModelHandlers.Frames.TimelineFrame;
   }
 
-  static fromFrame(frame: TimelineModel.TimelineFrameModel.TimelineFrame): TimelineSelection {
+  static fromFrame(frame: TraceEngine.Handlers.ModelHandlers.Frames.TimelineFrame): TimelineSelection {
     return new TimelineSelection(
-        TraceEngine.Types.Timing.MilliSeconds(frame.startTime), TraceEngine.Types.Timing.MilliSeconds(frame.endTime),
-        frame);
+        TraceEngine.Helpers.Timing.microSecondsToMilliseconds(frame.startTime),
+        TraceEngine.Helpers.Timing.microSecondsToMilliseconds(frame.endTime), frame);
   }
 
   static isSyntheticNetworkRequestDetailsEventSelection(object: PermittedObjectTypes):
-      object is TraceEngine.Types.TraceEvents.TraceEventSyntheticNetworkRequest {
-    if (object instanceof TraceEngine.Legacy.Event) {
-      return false;
-    }
-    // Sadly new trace events are just raw objects, so now we have to confirm it is a trace event by ruling everything else out.
+      object is TraceEngine.Types.TraceEvents.SyntheticNetworkRequest {
     if (TimelineSelection.isFrameObject(object) || TimelineSelection.isRangeSelection(object)) {
       return false;
     }
-    if (TraceEngine.Legacy.eventIsFromNewEngine(object)) {
-      return TraceEngine.Types.TraceEvents.isSyntheticNetworkRequestDetailsEvent(object);
-    }
-    return false;
+    // At this point we know the selection is a raw trace event, so we just
+    // need to check it's the right type of raw event.
+    return TraceEngine.Types.TraceEvents.isSyntheticNetworkRequestEvent(object);
   }
 
-  static isTraceEventSelection(object: PermittedObjectTypes): object is TraceEngine.Legacy.Event
-      |TraceEngine.Types.TraceEvents.TraceEventData {
-    if (object instanceof TraceEngine.Legacy.Event) {
-      return true;
-    }
-    // Sadly new trace events are just raw objects, so now we have to confirm it is a trace event by ruling everything else out.
+  static isNetworkEventSelection(object: PermittedObjectTypes):
+      object is TraceEngine.Types.TraceEvents.SyntheticNetworkRequest|TraceEngine.Types.TraceEvents.WebSocketEvent {
     if (TimelineSelection.isFrameObject(object) || TimelineSelection.isRangeSelection(object)) {
       return false;
     }
-    // Now the network request will be handled separately, so return false here.
-    if (TraceEngine.Types.TraceEvents.isSyntheticNetworkRequestDetailsEvent(object)) {
-      return false;
-    }
-    return TraceEngine.Legacy.eventIsFromNewEngine(object);
+    // At this point we know the selection is a raw trace event, so we just
+    // need to check it's the right type of raw event.
+    return TraceEngine.Types.TraceEvents.isNetworkTrackEntry(object);
   }
 
-  static fromTraceEvent(event: TraceEngine.Legacy.CompatibleTraceEvent): TimelineSelection {
-    const {startTime, endTime} = TraceEngine.Legacy.timesForEventInMilliseconds(event);
+  static isTraceEventSelection(object: PermittedObjectTypes): object is TraceEngine.Types.TraceEvents.TraceEventData {
+    // Trace events are just raw objects, so now we have to confirm it is a trace event by ruling everything else out.
+    if (TimelineSelection.isFrameObject(object) || TimelineSelection.isRangeSelection(object)) {
+      return false;
+    }
+
+    // Although Network Requests are trace events, in TimelineSelection we
+    // treat Network requests distinctly
+    if (TraceEngine.Types.TraceEvents.isSyntheticNetworkRequestEvent(object)) {
+      return false;
+    }
+    return true;
+  }
+
+  static fromTraceEvent(event: TraceEngine.Types.TraceEvents.TraceEventData): TimelineSelection {
+    const {startTime, endTime} = TraceEngine.Helpers.Timing.eventTimingsMilliSeconds(event);
     return new TimelineSelection(startTime, TraceEngine.Types.Timing.MilliSeconds(endTime || (startTime + 1)), event);
   }
 

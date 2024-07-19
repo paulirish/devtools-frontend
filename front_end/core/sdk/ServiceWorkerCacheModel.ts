@@ -251,11 +251,15 @@ export class ServiceWorkerCacheModel extends SDKModel<EventTypes> implements Pro
     if (storageBucket) {
       this.#storageBucketsUpdated.add(storageBucket);
 
-      void this.#throttler.schedule(() => {
-        const promises = Array.from(this.#storageBucketsUpdated, storageBucket => this.loadCacheNames(storageBucket));
-        this.#storageBucketsUpdated.clear();
-        return Promise.all(promises);
-      }, this.#scheduleAsSoonAsPossible);
+      void this.#throttler.schedule(
+          () => {
+            const promises =
+                Array.from(this.#storageBucketsUpdated, storageBucket => this.loadCacheNames(storageBucket));
+            this.#storageBucketsUpdated.clear();
+            return Promise.all(promises);
+          },
+          this.#scheduleAsSoonAsPossible ? Common.Throttler.Scheduling.AsSoonAsPossible :
+                                           Common.Throttler.Scheduling.Default);
     }
   }
 
@@ -266,13 +270,23 @@ export class ServiceWorkerCacheModel extends SDKModel<EventTypes> implements Pro
     }
   }
 
+  attributionReportingTriggerRegistered(_event: Protocol.Storage.AttributionReportingTriggerRegisteredEvent): void {
+  }
+
   indexedDBListUpdated(_event: Protocol.Storage.IndexedDBListUpdatedEvent): void {
   }
 
   indexedDBContentUpdated(_event: Protocol.Storage.IndexedDBContentUpdatedEvent): void {
   }
 
+  interestGroupAuctionEventOccurred(_event: Protocol.Storage.InterestGroupAuctionEventOccurredEvent): void {
+  }
+
   interestGroupAccessed(_event: Protocol.Storage.InterestGroupAccessedEvent): void {
+  }
+
+  interestGroupAuctionNetworkRequestCreated(_event: Protocol.Storage.InterestGroupAuctionNetworkRequestCreatedEvent):
+      void {
   }
 
   sharedStorageAccessed(_event: Protocol.Storage.SharedStorageAccessedEvent): void {
@@ -292,9 +306,7 @@ export class ServiceWorkerCacheModel extends SDKModel<EventTypes> implements Pro
   }
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum Events {
+export const enum Events {
   CacheAdded = 'CacheAdded',
   CacheRemoved = 'CacheRemoved',
   CacheStorageContentUpdated = 'CacheStorageContentUpdated',

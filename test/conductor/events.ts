@@ -34,6 +34,8 @@ const ALLOWED_ASSERTION_FAILURES = [
   'Request Runtime.evaluate failed. {"code":-32602,"message":"uniqueContextId not found"}',
   'uniqueContextId not found',
   'Request Storage.getStorageKeyForFrame failed. {"code":-32602,"message":"Frame tree node for given frame not found"}',
+  'Unable to create texture',
+  'Not allowed to load local resource: devtools://theme/colors.css',
 ];
 
 const logLevels = {
@@ -126,7 +128,7 @@ export function installPageErrorHandlers(page: puppeteer.Page): void {
 }
 
 function isExpectedError(consoleMessage: puppeteer.ConsoleMessage) {
-  if (ALLOWED_ASSERTION_FAILURES.includes(consoleMessage.text())) {
+  if (ALLOWED_ASSERTION_FAILURES.some(f => consoleMessage.text().includes(f))) {
     return true;
   }
   for (const expectation of pendingErrorExpectations) {

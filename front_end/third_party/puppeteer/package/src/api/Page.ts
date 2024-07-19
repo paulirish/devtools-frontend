@@ -1,79 +1,117 @@
 /**
- * Copyright 2017 Google Inc. All rights reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * @license
+ * Copyright 2017 Google Inc.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Readable} from 'stream';
+import type {Protocol} from 'devtools-protocol';
 
-import {Protocol} from 'devtools-protocol';
-
+import {
+  concat,
+  EMPTY,
+  filter,
+  first,
+  firstValueFrom,
+  from,
+  map,
+  merge,
+  mergeMap,
+  mergeScan,
+  of,
+  raceWith,
+  ReplaySubject,
+  startWith,
+  switchMap,
+  take,
+  takeUntil,
+  timer,
+  type Observable,
+} from '../../third_party/rxjs/rxjs.js';
 import type {HTTPRequest} from '../api/HTTPRequest.js';
 import type {HTTPResponse} from '../api/HTTPResponse.js';
-import type {Accessibility} from '../common/Accessibility.js';
+import type {Accessibility} from '../cdp/Accessibility.js';
+import type {Coverage} from '../cdp/Coverage.js';
+import type {DeviceRequestPrompt} from '../cdp/DeviceRequestPrompt.js';
+import type {NetworkConditions} from '../cdp/NetworkManager.js';
+import type {Tracing} from '../cdp/Tracing.js';
 import type {ConsoleMessage} from '../common/ConsoleMessage.js';
-import type {Coverage} from '../common/Coverage.js';
-import {Device} from '../common/Device.js';
-import {DeviceRequestPrompt} from '../common/DeviceRequestPrompt.js';
-import type {Dialog} from '../common/Dialog.js';
-import {TargetCloseError} from '../common/Errors.js';
-import {EventEmitter, Handler} from '../common/EventEmitter.js';
-import type {FileChooser} from '../common/FileChooser.js';
-import type {WaitForSelectorOptions} from '../common/IsolatedWorld.js';
-import type {PuppeteerLifeCycleEvent} from '../common/LifecycleWatcher.js';
-import {
-  Credentials,
-  NetworkConditions,
-  NetworkManagerEmittedEvents,
-} from '../common/NetworkManager.js';
-import {
-  LowerCasePaperFormat,
-  paperFormats,
-  ParsedPDFOptions,
-  PDFOptions,
-} from '../common/PDFOptions.js';
-import type {Viewport} from '../common/PuppeteerViewport.js';
-import type {Target} from '../common/Target.js';
-import type {Tracing} from '../common/Tracing.js';
 import type {
+  Cookie,
+  CookieParam,
+  DeleteCookiesRequest,
+} from '../common/Cookie.js';
+import type {Device} from '../common/Device.js';
+import {TargetCloseError} from '../common/Errors.js';
+import {
+  EventEmitter,
+  type EventsWithWildcard,
+  type EventType,
+  type Handler,
+} from '../common/EventEmitter.js';
+import type {FileChooser} from '../common/FileChooser.js';
+import type {PDFOptions} from '../common/PDFOptions.js';
+import {TimeoutSettings} from '../common/TimeoutSettings.js';
+import type {
+  Awaitable,
+  AwaitablePredicate,
   EvaluateFunc,
   EvaluateFuncWith,
   HandleFor,
   NodeFor,
 } from '../common/types.js';
 import {
+  debugError,
+  fromEmitterEvent,
+  filterAsync,
   importFSPromises,
-  isNumber,
   isString,
-  waitForEvent,
+  NETWORK_IDLE_TIME,
+  timeout,
   withSourcePuppeteerURLIfNone,
+  fromAbortSignal,
 } from '../common/util.js';
-import type {WebWorker} from '../common/WebWorker.js';
-import {assert} from '../util/assert.js';
-import {Deferred} from '../util/Deferred.js';
+import type {Viewport} from '../common/Viewport.js';
+import type {ScreenRecorder} from '../node/ScreenRecorder.js';
+import {guarded} from '../util/decorators.js';
+import {
+  AsyncDisposableStack,
+  asyncDisposeSymbol,
+  DisposableStack,
+  disposeSymbol,
+} from '../util/disposable.js';
 
 import type {Browser} from './Browser.js';
 import type {BrowserContext} from './BrowserContext.js';
-import type {ClickOptions, ElementHandle} from './ElementHandle.js';
+import type {CDPSession} from './CDPSession.js';
+import type {Dialog} from './Dialog.js';
+import type {
+  BoundingBox,
+  ClickOptions,
+  ElementHandle,
+} from './ElementHandle.js';
 import type {
   Frame,
   FrameAddScriptTagOptions,
   FrameAddStyleTagOptions,
   FrameWaitForFunctionOptions,
+  GoToOptions,
+  WaitForOptions,
 } from './Frame.js';
-import {Keyboard, Mouse, Touchscreen, KeyboardTypeOptions} from './Input.js';
+import type {
+  Keyboard,
+  KeyboardTypeOptions,
+  Mouse,
+  Touchscreen,
+} from './Input.js';
 import type {JSHandle} from './JSHandle.js';
-import {Locator} from './Locator.js';
+import {
+  FunctionLocator,
+  Locator,
+  NodeLocator,
+  type AwaitedLocator,
+} from './locators/locators.js';
+import type {Target} from './Target.js';
+import type {WebWorker} from './WebWorker.js';
 
 /**
  * @public
@@ -97,6 +135,32 @@ export interface Metrics {
 /**
  * @public
  */
+export interface Credentials {
+  username: string;
+  password: string;
+}
+
+/**
+ * @public
+ */
+export interface WaitForNetworkIdleOptions extends WaitTimeoutOptions {
+  /**
+   * Time (in milliseconds) the network should be idle.
+   *
+   * @defaultValue `500`
+   */
+  idleTime?: number;
+  /**
+   * Maximum number concurrent of network connections to be considered inactive.
+   *
+   * @defaultValue `0`
+   */
+  concurrency?: number;
+}
+
+/**
+ * @public
+ */
 export interface WaitTimeoutOptions {
   /**
    * Maximum wait time in milliseconds. Pass 0 to disable the timeout.
@@ -104,26 +168,46 @@ export interface WaitTimeoutOptions {
    * The default value can be changed by using the
    * {@link Page.setDefaultTimeout} method.
    *
-   * @defaultValue `30000`
+   * @defaultValue `30_000`
    */
   timeout?: number;
+  /**
+   * A signal object that allows you to cancel a waitFor call.
+   */
+  signal?: AbortSignal;
 }
 
 /**
  * @public
  */
-export interface WaitForOptions {
+export interface WaitForSelectorOptions {
   /**
-   * Maximum wait time in milliseconds. Pass 0 to disable the timeout.
+   * Wait for the selected element to be present in DOM and to be visible. See
+   * {@link ElementHandle.isVisible} for the definition of element visibility.
    *
-   * The default value can be changed by using the
-   * {@link Page.setDefaultTimeout} or {@link Page.setDefaultNavigationTimeout}
-   * methods.
+   * @defaultValue `false`
+   */
+  visible?: boolean;
+  /**
+   * Wait for the selected element to not be found in the DOM or to be hidden.
+   * See {@link ElementHandle.isHidden} for the definition of element
+   * invisibility.
    *
-   * @defaultValue `30000`
+   * @defaultValue `false`
+   */
+  hidden?: boolean;
+  /**
+   * Maximum time to wait in milliseconds. Pass `0` to disable timeout.
+   *
+   * The default value can be changed by using {@link Page.setDefaultTimeout}
+   *
+   * @defaultValue `30_000` (30 seconds)
    */
   timeout?: number;
-  waitUntil?: PuppeteerLifeCycleEvent | PuppeteerLifeCycleEvent[];
+  /**
+   * A signal object that allows you to cancel a waitForSelector call.
+   */
+  signal?: AbortSignal;
 }
 
 /**
@@ -145,21 +229,25 @@ export interface GeolocationOptions {
 }
 
 /**
+ * A media feature to emulate.
+ *
  * @public
  */
 export interface MediaFeature {
+  /**
+   * A name of the feature, for example, 'prefers-reduced-motion'.
+   */
   name: string;
+  /**
+   * A value for the feature, for example, 'reduce'.
+   */
   value: string;
 }
 
 /**
  * @public
  */
-export interface ScreenshotClip {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+export interface ScreenshotClip extends BoundingBox {
   /**
    * @defaultValue `1`
    */
@@ -175,9 +263,31 @@ export interface ScreenshotOptions {
    */
   optimizeForSpeed?: boolean;
   /**
-   * @defaultValue `png`
+   * @defaultValue `'png'`
    */
   type?: 'png' | 'jpeg' | 'webp';
+  /**
+   * Quality of the image, between 0-100. Not applicable to `png` images.
+   */
+  quality?: number;
+  /**
+   * Capture the screenshot from the surface, rather than the view.
+   *
+   * @defaultValue `true`
+   */
+  fromSurface?: boolean;
+  /**
+   * When `true`, takes a screenshot of the full page.
+   *
+   * @defaultValue `false`
+   */
+  fullPage?: boolean;
+  /**
+   * Hides default white background and allows capturing screenshots with transparency.
+   *
+   * @defaultValue `false`
+   */
+  omitBackground?: boolean;
   /**
    * The file path to save the image to. The screenshot type will be inferred
    * from file extension. If path is a relative path, then it is resolved
@@ -186,38 +296,75 @@ export interface ScreenshotOptions {
    */
   path?: string;
   /**
-   * When `true`, takes a screenshot of the full page.
-   * @defaultValue `false`
-   */
-  fullPage?: boolean;
-  /**
-   * An object which specifies the clipping region of the page.
+   * Specifies the region of the page/element to clip.
    */
   clip?: ScreenshotClip;
   /**
-   * Quality of the image, between 0-100. Not applicable to `png` images.
-   */
-  quality?: number;
-  /**
-   * Hides default white background and allows capturing screenshots with transparency.
-   * @defaultValue `false`
-   */
-  omitBackground?: boolean;
-  /**
    * Encoding of the image.
-   * @defaultValue `binary`
+   *
+   * @defaultValue `'binary'`
    */
   encoding?: 'base64' | 'binary';
   /**
    * Capture the screenshot beyond the viewport.
-   * @defaultValue `true`
+   *
+   * @defaultValue `false` if there is no `clip`. `true` otherwise.
    */
   captureBeyondViewport?: boolean;
+}
+
+/**
+ * @public
+ * @experimental
+ */
+export interface ScreencastOptions {
   /**
-   * Capture the screenshot from the surface, rather than the view.
+   * File path to save the screencast to.
+   */
+  path?: `${string}.webm`;
+  /**
+   * Specifies the region of the viewport to crop.
+   */
+  crop?: BoundingBox;
+  /**
+   * Scales the output video.
+   *
+   * For example, `0.5` will shrink the width and height of the output video by
+   * half. `2` will double the width and height of the output video.
+   *
+   * @defaultValue `1`
+   */
+  scale?: number;
+  /**
+   * Specifies the speed to record at.
+   *
+   * For example, `0.5` will slowdown the output video by 50%. `2` will double the
+   * speed of the output video.
+   *
+   * @defaultValue `1`
+   */
+  speed?: number;
+  /**
+   * Path to the {@link https://ffmpeg.org/ | ffmpeg}.
+   *
+   * Required if `ffmpeg` is not in your PATH.
+   */
+  ffmpegPath?: string;
+}
+
+/**
+ * @public
+ */
+export interface QueryOptions {
+  /**
+   * Whether to run the query in isolation. When returning many elements
+   * from {@link Page.$$} or similar methods, it might be useful to turn
+   * off the isolation to improve performance. By default, the querying
+   * code will be executed in a separate sandbox realm.
+   *
    * @defaultValue `true`
    */
-  fromSurface?: boolean;
+  isolate: boolean;
 }
 
 /**
@@ -225,7 +372,7 @@ export interface ScreenshotOptions {
  *
  * @public
  */
-export const enum PageEmittedEvents {
+export const enum PageEvent {
   /**
    * Emitted when the page closes.
    */
@@ -375,31 +522,31 @@ export const enum PageEmittedEvents {
 /**
  * Denotes the objects received by callback functions for page events.
  *
- * See {@link PageEmittedEvents} for more detail on the events and when they are
+ * See {@link PageEvent} for more detail on the events and when they are
  * emitted.
  *
  * @public
  */
-export interface PageEventObject {
-  close: never;
-  console: ConsoleMessage;
-  dialog: Dialog;
-  domcontentloaded: never;
-  error: Error;
-  frameattached: Frame;
-  framedetached: Frame;
-  framenavigated: Frame;
-  load: never;
-  metrics: {title: string; metrics: Metrics};
-  pageerror: Error;
-  popup: Page;
-  request: HTTPRequest;
-  response: HTTPResponse;
-  requestfailed: HTTPRequest;
-  requestfinished: HTTPRequest;
-  requestservedfromcache: HTTPRequest;
-  workercreated: WebWorker;
-  workerdestroyed: WebWorker;
+export interface PageEvents extends Record<EventType, unknown> {
+  [PageEvent.Close]: undefined;
+  [PageEvent.Console]: ConsoleMessage;
+  [PageEvent.Dialog]: Dialog;
+  [PageEvent.DOMContentLoaded]: undefined;
+  [PageEvent.Error]: Error;
+  [PageEvent.FrameAttached]: Frame;
+  [PageEvent.FrameDetached]: Frame;
+  [PageEvent.FrameNavigated]: Frame;
+  [PageEvent.Load]: undefined;
+  [PageEvent.Metrics]: {title: string; metrics: Metrics};
+  [PageEvent.PageError]: Error;
+  [PageEvent.Popup]: Page | null;
+  [PageEvent.Request]: HTTPRequest;
+  [PageEvent.Response]: HTTPResponse;
+  [PageEvent.RequestFailed]: HTTPRequest;
+  [PageEvent.RequestFinished]: HTTPRequest;
+  [PageEvent.RequestServedFromCache]: HTTPRequest;
+  [PageEvent.WorkerCreated]: WebWorker;
+  [PageEvent.WorkerDestroyed]: WebWorker;
 }
 
 /**
@@ -407,6 +554,19 @@ export interface PageEventObject {
  */
 export interface NewDocumentScriptEvaluation {
   identifier: string;
+}
+
+/**
+ * @internal
+ */
+export function setDefaultScreenshotOptions(options: ScreenshotOptions): void {
+  options.optimizeForSpeed ??= false;
+  options.type ??= 'png';
+  options.fromSurface ??= true;
+  options.fullPage ??= false;
+  options.omitBackground ??= false;
+  options.encoding ??= 'binary';
+  options.captureBeyondViewport ??= true;
 }
 
 /**
@@ -436,7 +596,7 @@ export interface NewDocumentScriptEvaluation {
  * ```
  *
  * The Page class extends from Puppeteer's {@link EventEmitter} class and will
- * emit various events which are documented in the {@link PageEmittedEvents} enum.
+ * emit various events which are documented in the {@link PageEvent} enum.
  *
  * @example
  * This example logs a message for a single page `load` event:
@@ -445,7 +605,7 @@ export interface NewDocumentScriptEvaluation {
  * page.once('load', () => console.log('Page loaded!'));
  * ```
  *
- * To unsubscribe from events use the {@link Page.off} method:
+ * To unsubscribe from events use the {@link EventEmitter.off} method:
  *
  * ```ts
  * function logRequest(interceptedRequest) {
@@ -458,86 +618,131 @@ export interface NewDocumentScriptEvaluation {
  *
  * @public
  */
-export class Page extends EventEmitter {
-  #handlerMap = new WeakMap<Handler<any>, Handler<any>>();
+export abstract class Page extends EventEmitter<PageEvents> {
+  /**
+   * @internal
+   */
+  _isDragging = false;
+  /**
+   * @internal
+   */
+  _timeoutSettings = new TimeoutSettings();
+
+  #requestHandlers = new WeakMap<Handler<HTTPRequest>, Handler<HTTPRequest>>();
+
+  #inflight$ = new ReplaySubject<number>(1);
 
   /**
    * @internal
    */
   constructor() {
     super();
+
+    fromEmitterEvent(this, PageEvent.Request)
+      .pipe(
+        mergeMap(originalRequest => {
+          return concat(
+            of(1),
+            merge(
+              fromEmitterEvent(this, PageEvent.RequestFailed),
+              fromEmitterEvent(this, PageEvent.RequestFinished),
+              fromEmitterEvent(this, PageEvent.Response).pipe(
+                map(response => {
+                  return response.request();
+                })
+              )
+            ).pipe(
+              filter(request => {
+                return request.id === originalRequest.id;
+              }),
+              take(1),
+              map(() => {
+                return -1;
+              })
+            )
+          );
+        }),
+        mergeScan((acc, addend) => {
+          return of(acc + addend);
+        }, 0),
+        takeUntil(fromEmitterEvent(this, PageEvent.Close)),
+        startWith(0)
+      )
+      .subscribe(this.#inflight$);
   }
 
   /**
    * `true` if the service worker are being bypassed, `false` otherwise.
    */
-  isServiceWorkerBypassed(): boolean {
-    throw new Error('Not implemented');
-  }
+  abstract isServiceWorkerBypassed(): boolean;
 
   /**
    * `true` if drag events are being intercepted, `false` otherwise.
+   *
+   * @deprecated We no longer support intercepting drag payloads. Use the new
+   * drag APIs found on {@link ElementHandle} to drag (or just use the
+   * {@link Page.mouse}).
    */
-  isDragInterceptionEnabled(): boolean {
-    throw new Error('Not implemented');
-  }
+  abstract isDragInterceptionEnabled(): boolean;
 
   /**
    * `true` if the page has JavaScript enabled, `false` otherwise.
    */
-  isJavaScriptEnabled(): boolean {
-    throw new Error('Not implemented');
-  }
+  abstract isJavaScriptEnabled(): boolean;
 
   /**
    * Listen to page events.
    *
-   * :::note
-   *
+   * @remarks
    * This method exists to define event typings and handle proper wireup of
    * cooperative request interception. Actual event listening and dispatching is
    * delegated to {@link EventEmitter}.
    *
-   * :::
+   * @internal
    */
-  override on<K extends keyof PageEventObject>(
-    eventName: K,
-    handler: (event: PageEventObject[K]) => void
+  override on<K extends keyof EventsWithWildcard<PageEvents>>(
+    type: K,
+    handler: (event: EventsWithWildcard<PageEvents>[K]) => void
   ): this {
-    if (eventName === 'request') {
-      const wrap =
-        this.#handlerMap.get(handler) ||
-        ((event: HTTPRequest) => {
-          event.enqueueInterceptAction(() => {
-            return handler(event as PageEventObject[K]);
-          });
+    if (type !== PageEvent.Request) {
+      return super.on(type, handler);
+    }
+    let wrapper = this.#requestHandlers.get(
+      handler as (event: PageEvents[PageEvent.Request]) => void
+    );
+    if (wrapper === undefined) {
+      wrapper = (event: HTTPRequest) => {
+        event.enqueueInterceptAction(() => {
+          return handler(event as EventsWithWildcard<PageEvents>[K]);
         });
-
-      this.#handlerMap.set(handler, wrap);
-
-      return super.on(eventName, wrap);
+      };
+      this.#requestHandlers.set(
+        handler as (event: PageEvents[PageEvent.Request]) => void,
+        wrapper
+      );
     }
-    return super.on(eventName, handler);
+    return super.on(
+      type,
+      wrapper as (event: EventsWithWildcard<PageEvents>[K]) => void
+    );
   }
 
-  override once<K extends keyof PageEventObject>(
-    eventName: K,
-    handler: (event: PageEventObject[K]) => void
+  /**
+   * @internal
+   */
+  override off<K extends keyof EventsWithWildcard<PageEvents>>(
+    type: K,
+    handler: (event: EventsWithWildcard<PageEvents>[K]) => void
   ): this {
-    // Note: this method only exists to define the types; we delegate the impl
-    // to EventEmitter.
-    return super.once(eventName, handler);
-  }
-
-  override off<K extends keyof PageEventObject>(
-    eventName: K,
-    handler: (event: PageEventObject[K]) => void
-  ): this {
-    if (eventName === 'request') {
-      handler = this.#handlerMap.get(handler) || handler;
+    if (type === PageEvent.Request) {
+      handler =
+        (this.#requestHandlers.get(
+          handler as (
+            event: EventsWithWildcard<PageEvents>[PageEvent.Request]
+          ) => void
+        ) as (event: EventsWithWildcard<PageEvents>[K]) => void) || handler;
     }
-
-    return super.off(eventName, handler);
+    return super.off(type, handler);
   }
 
   /**
@@ -548,6 +753,13 @@ export class Page extends EventEmitter {
    *
    * This must be called before the file chooser is launched. It will not return
    * a currently active file chooser.
+   *
+   * :::
+   *
+   * :::caution
+   *
+   * Interception of file dialogs triggered via DOM APIs such as
+   * window.showOpenFilePicker is currently not supported.
    *
    * :::
    *
@@ -568,10 +780,9 @@ export class Page extends EventEmitter {
    * await fileChooser.accept(['/tmp/myfile.pdf']);
    * ```
    */
-  waitForFileChooser(options?: WaitTimeoutOptions): Promise<FileChooser>;
-  waitForFileChooser(): Promise<FileChooser> {
-    throw new Error('Not implemented');
-  }
+  abstract waitForFileChooser(
+    options?: WaitTimeoutOptions
+  ): Promise<FileChooser>;
 
   /**
    * Sets the page's geolocation.
@@ -586,83 +797,66 @@ export class Page extends EventEmitter {
    * await page.setGeolocation({latitude: 59.95, longitude: 30.31667});
    * ```
    */
-  async setGeolocation(options: GeolocationOptions): Promise<void>;
-  async setGeolocation(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract setGeolocation(options: GeolocationOptions): Promise<void>;
 
   /**
    * A target this page was created from.
+   *
+   * @deprecated Use {@link Page.createCDPSession} directly.
    */
-  target(): Target {
-    throw new Error('Not implemented');
-  }
+  abstract target(): Target;
 
   /**
    * Get the browser the page belongs to.
    */
-  browser(): Browser {
-    throw new Error('Not implemented');
-  }
+  abstract browser(): Browser;
 
   /**
    * Get the browser context that the page belongs to.
    */
-  browserContext(): BrowserContext {
-    throw new Error('Not implemented');
-  }
+  abstract browserContext(): BrowserContext;
 
   /**
    * The page's main frame.
-   *
-   * @remarks
-   * Page is guaranteed to have a main frame which persists during navigations.
    */
-  mainFrame(): Frame {
-    throw new Error('Not implemented');
-  }
+  abstract mainFrame(): Frame;
+
+  /**
+   * Creates a Chrome Devtools Protocol session attached to the page.
+   */
+  abstract createCDPSession(): Promise<CDPSession>;
 
   /**
    * {@inheritDoc Keyboard}
    */
-  get keyboard(): Keyboard {
-    throw new Error('Not implemented');
-  }
+  abstract get keyboard(): Keyboard;
 
   /**
    * {@inheritDoc Touchscreen}
    */
-  get touchscreen(): Touchscreen {
-    throw new Error('Not implemented');
-  }
+  abstract get touchscreen(): Touchscreen;
 
   /**
    * {@inheritDoc Coverage}
    */
-  get coverage(): Coverage {
-    throw new Error('Not implemented');
-  }
+  abstract get coverage(): Coverage;
 
   /**
    * {@inheritDoc Tracing}
    */
-  get tracing(): Tracing {
-    throw new Error('Not implemented');
-  }
+  abstract get tracing(): Tracing;
 
   /**
    * {@inheritDoc Accessibility}
    */
   get accessibility(): Accessibility {
-    throw new Error('Not implemented');
+    return this.mainFrame().accessibility;
   }
 
   /**
    * An array of all frames attached to the page.
    */
-  frames(): Frame[] {
-    throw new Error('Not implemented');
-  }
+  abstract frames(): Frame[];
 
   /**
    * All of the dedicated {@link
@@ -672,9 +866,7 @@ export class Page extends EventEmitter {
    * @remarks
    * This does not contain ServiceWorkers
    */
-  workers(): WebWorker[] {
-    throw new Error('Not implemented');
-  }
+  abstract workers(): WebWorker[];
 
   /**
    * Activating request interception enables {@link HTTPRequest.abort},
@@ -685,7 +877,7 @@ export class Page extends EventEmitter {
    * continued, responded or aborted; or completed using the browser cache.
    *
    * See the
-   * {@link https://pptr.dev/next/guides/request-interception|Request interception guide}
+   * {@link https://pptr.dev/guides/network-interception|Request interception guide}
    * for more details.
    *
    * @example
@@ -712,33 +904,23 @@ export class Page extends EventEmitter {
    *
    * @param value - Whether to enable request interception.
    */
-  async setRequestInterception(value: boolean): Promise<void>;
-  async setRequestInterception(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract setRequestInterception(value: boolean): Promise<void>;
 
   /**
    * Toggles ignoring of service worker for each request.
    *
    * @param bypass - Whether to bypass service worker and load from network.
    */
-  async setBypassServiceWorker(bypass: boolean): Promise<void>;
-  async setBypassServiceWorker(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract setBypassServiceWorker(bypass: boolean): Promise<void>;
 
   /**
    * @param enabled - Whether to enable drag interception.
    *
-   * @remarks
-   * Activating drag interception enables the `Input.drag`,
-   * methods This provides the capability to capture drag events emitted
-   * on the page, which can then be used to simulate drag-and-drop.
+   * @deprecated We no longer support intercepting drag payloads. Use the new
+   * drag APIs found on {@link ElementHandle} to drag (or just use the
+   * {@link Page.mouse}).
    */
-  async setDragInterception(enabled: boolean): Promise<void>;
-  async setDragInterception(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract setDragInterception(enabled: boolean): Promise<void>;
 
   /**
    * Sets the network connection to offline.
@@ -747,10 +929,7 @@ export class Page extends EventEmitter {
    *
    * @param enabled - When `true`, enables offline mode for the page.
    */
-  setOfflineMode(enabled: boolean): Promise<void>;
-  setOfflineMode(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract setOfflineMode(enabled: boolean): Promise<void>;
 
   /**
    * This does not affect WebSockets and WebRTC PeerConnections (see
@@ -779,12 +958,9 @@ export class Page extends EventEmitter {
    * @param networkConditions - Passing `null` disables network condition
    * emulation.
    */
-  emulateNetworkConditions(
+  abstract emulateNetworkConditions(
     networkConditions: NetworkConditions | null
   ): Promise<void>;
-  emulateNetworkConditions(): Promise<void> {
-    throw new Error('Not implemented');
-  }
 
   /**
    * This setting will change the default maximum navigation time for the
@@ -803,36 +979,71 @@ export class Page extends EventEmitter {
    * - {@link Page.waitForNavigation | page.waitForNavigation(options)}
    *   @param timeout - Maximum navigation time in milliseconds.
    */
-  setDefaultNavigationTimeout(timeout: number): void;
-  setDefaultNavigationTimeout(): void {
-    throw new Error('Not implemented');
-  }
+  abstract setDefaultNavigationTimeout(timeout: number): void;
 
   /**
    * @param timeout - Maximum time in milliseconds.
    */
-  setDefaultTimeout(timeout: number): void;
-  setDefaultTimeout(): void {
-    throw new Error('Not implemented');
-  }
+  abstract setDefaultTimeout(timeout: number): void;
 
   /**
    * Maximum time in milliseconds.
    */
-  getDefaultTimeout(): number {
-    throw new Error('Not implemented');
-  }
+  abstract getDefaultTimeout(): number;
 
   /**
-   * Creates a locator for the provided `selector`. See {@link Locator} for
+   * Creates a locator for the provided selector. See {@link Locator} for
    * details and supported actions.
    *
-   * @remarks
-   * Locators API is experimental and we will not follow semver for breaking
-   * change in the Locators API.
+   * @param selector -
+   * {@link https://pptr.dev/guides/page-interactions#selectors | selector}
+   * to query page for.
+   * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
+   * can be passed as-is and a
+   * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
+   * allows quering by
+   * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
+   * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
+   * and
+   * {@link https://pptr.dev/guides/page-interactions#xpath-selectors--p-xpath | xpath}
+   * and
+   * {@link https://pptr.dev/guides/page-interactions#querying-elements-in-shadow-dom | combining these queries across shadow roots}.
+   * Alternatively, you can specify the selector type using a
+   * {@link https://pptr.dev/guides/page-interactions#prefixed-selector-syntax | prefix}.
    */
-  locator(selector: string): Locator {
-    return Locator.create(this, selector);
+  locator<Selector extends string>(
+    selector: Selector
+  ): Locator<NodeFor<Selector>>;
+
+  /**
+   * Creates a locator for the provided function. See {@link Locator} for
+   * details and supported actions.
+   *
+   * @param selector -
+   * {@link https://pptr.dev/guides/page-interactions#selectors | selector}
+   * to query page for.
+   * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
+   * can be passed as-is and a
+   * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
+   * allows quering by
+   * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
+   * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
+   * and
+   * {@link https://pptr.dev/guides/page-interactions#xpath-selectors--p-xpath | xpath}
+   * and
+   * {@link https://pptr.dev/guides/page-interactions#querying-elements-in-shadow-dom | combining these queries across shadow roots}.
+   * Alternatively, you can specify the selector type using a
+   * {@link https://pptr.dev/guides/page-interactions#prefixed-selector-syntax | prefix}.
+   */
+  locator<Ret>(func: () => Awaitable<Ret>): Locator<Ret>;
+  locator<Selector extends string, Ret>(
+    selectorOrFunc: Selector | (() => Awaitable<Ret>)
+  ): Locator<NodeFor<Selector>> | Locator<Ret> {
+    if (typeof selectorOrFunc === 'string') {
+      return NodeLocator.create(this, selectorOrFunc);
+    } else {
+      return FunctionLocator.create(this, selectorOrFunc);
+    }
   }
 
   /**
@@ -840,35 +1051,71 @@ export class Page extends EventEmitter {
    *
    * @internal
    */
-  locatorRace(locators: Locator[]): Locator {
+  locatorRace<Locators extends readonly unknown[] | []>(
+    locators: Locators
+  ): Locator<AwaitedLocator<Locators[number]>> {
     return Locator.race(locators);
   }
 
   /**
-   * Runs `document.querySelector` within the page. If no element matches the
-   * selector, the return value resolves to `null`.
+   * Finds the first element that matches the selector. If no element matches
+   * the selector, the return value resolves to `null`.
    *
-   * @param selector - A `selector` to query page for
-   * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | selector}
+   * @param selector -
+   * {@link https://pptr.dev/guides/page-interactions#selectors | selector}
    * to query page for.
+   * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
+   * can be passed as-is and a
+   * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
+   * allows quering by
+   * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
+   * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
+   * and
+   * {@link https://pptr.dev/guides/page-interactions#xpath-selectors--p-xpath | xpath}
+   * and
+   * {@link https://pptr.dev/guides/page-interactions#querying-elements-in-shadow-dom | combining these queries across shadow roots}.
+   * Alternatively, you can specify the selector type using a
+   * {@link https://pptr.dev/guides/page-interactions#prefixed-selector-syntax | prefix}.
+   *
+   * @remarks
+   *
+   * Shortcut for {@link Frame.$ | Page.mainFrame().$(selector) }.
    */
   async $<Selector extends string>(
     selector: Selector
   ): Promise<ElementHandle<NodeFor<Selector>> | null> {
-    return this.mainFrame().$(selector);
+    return await this.mainFrame().$(selector);
   }
 
   /**
-   * The method runs `document.querySelectorAll` within the page. If no elements
+   * Finds elements on the page that match the selector. If no elements
    * match the selector, the return value resolves to `[]`.
+   *
+   * @param selector -
+   * {@link https://pptr.dev/guides/page-interactions#selectors | selector}
+   * to query page for.
+   * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
+   * can be passed as-is and a
+   * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
+   * allows quering by
+   * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
+   * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
+   * and
+   * {@link https://pptr.dev/guides/page-interactions#xpath-selectors--p-xpath | xpath}
+   * and
+   * {@link https://pptr.dev/guides/page-interactions#querying-elements-in-shadow-dom | combining these queries across shadow roots}.
+   * Alternatively, you can specify the selector type using a
+   * {@link https://pptr.dev/guides/page-interactions#prefixed-selector-syntax | prefix}.
+   *
    * @remarks
+   *
    * Shortcut for {@link Frame.$$ | Page.mainFrame().$$(selector) }.
-   * @param selector - A `selector` to query page for
    */
   async $$<Selector extends string>(
-    selector: Selector
+    selector: Selector,
+    options?: QueryOptions
   ): Promise<Array<ElementHandle<NodeFor<Selector>>>> {
-    return this.mainFrame().$$(selector);
+    return await this.mainFrame().$$(selector, options);
   }
 
   /**
@@ -934,12 +1181,12 @@ export class Page extends EventEmitter {
   >(
     pageFunction: Func | string,
     ...args: Params
-  ): Promise<HandleFor<Awaited<ReturnType<Func>>>>;
-  async evaluateHandle<
-    Params extends unknown[],
-    Func extends EvaluateFunc<Params> = EvaluateFunc<Params>,
-  >(): Promise<HandleFor<Awaited<ReturnType<Func>>>> {
-    throw new Error('Not implemented');
+  ): Promise<HandleFor<Awaited<ReturnType<Func>>>> {
+    pageFunction = withSourcePuppeteerURLIfNone(
+      this.evaluateHandle.name,
+      pageFunction
+    );
+    return await this.mainFrame().evaluateHandle(pageFunction, ...args);
   }
 
   /**
@@ -965,16 +1212,13 @@ export class Page extends EventEmitter {
    * @returns Promise which resolves to a handle to an array of objects with
    * this prototype.
    */
-  async queryObjects<Prototype>(
+  abstract queryObjects<Prototype>(
     prototypeHandle: JSHandle<Prototype>
   ): Promise<JSHandle<Prototype[]>>;
-  async queryObjects<Prototype>(): Promise<JSHandle<Prototype[]>> {
-    throw new Error('Not implemented');
-  }
 
   /**
-   * This method runs `document.querySelector` within the page and passes the
-   * result as the first argument to the `pageFunction`.
+   * This method finds the first element within the page that matches the selector
+   * and passes the result as the first argument to the `pageFunction`.
    *
    * @remarks
    *
@@ -1022,11 +1266,23 @@ export class Page extends EventEmitter {
    * );
    * ```
    *
-   * @param selector - the
-   * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | selector}
-   * to query for
+   * @param selector -
+   * {@link https://pptr.dev/guides/page-interactions#selectors | selector}
+   * to query page for.
+   * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
+   * can be passed as-is and a
+   * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
+   * allows quering by
+   * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
+   * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
+   * and
+   * {@link https://pptr.dev/guides/page-interactions#xpath-selectors--p-xpath | xpath}
+   * and
+   * {@link https://pptr.dev/guides/page-interactions#querying-elements-in-shadow-dom | combining these queries across shadow roots}.
+   * Alternatively, you can specify the selector type using a
+   * {@link https://pptr.dev/guides/page-interactions#prefixed-selector-syntax | prefix}.
    * @param pageFunction - the function to be evaluated in the page context.
-   * Will be passed the result of `document.querySelector(selector)` as its
+   * Will be passed the result of the element matching the selector as its
    * first argument.
    * @param args - any additional arguments to pass through to `pageFunction`.
    *
@@ -1047,12 +1303,12 @@ export class Page extends EventEmitter {
     ...args: Params
   ): Promise<Awaited<ReturnType<Func>>> {
     pageFunction = withSourcePuppeteerURLIfNone(this.$eval.name, pageFunction);
-    return this.mainFrame().$eval(selector, pageFunction, ...args);
+    return await this.mainFrame().$eval(selector, pageFunction, ...args);
   }
 
   /**
-   * This method runs `Array.from(document.querySelectorAll(selector))` within
-   * the page and passes the result as the first argument to the `pageFunction`.
+   * This method returns all elements matching the selector and passes the
+   * resulting array as the first argument to the `pageFunction`.
    *
    * @remarks
    * If `pageFunction` returns a promise `$$eval` will wait for the promise to
@@ -1078,9 +1334,7 @@ export class Page extends EventEmitter {
    * @example
    *
    * ```ts
-   * // if you don't provide HTMLInputElement here, TS will error
-   * // as `value` is not on `Element`
-   * await page.$$eval('input', (elements: HTMLInputElement[]) => {
+   * await page.$$eval('input', elements => {
    *   return elements.map(e => e.value);
    * });
    * ```
@@ -1092,20 +1346,28 @@ export class Page extends EventEmitter {
    * @example
    *
    * ```ts
-   * // The compiler can infer the return type in this case, but if it can't
-   * // or if you want to be more explicit, provide it as the generic type.
-   * const allInputValues = await page.$$eval<string[]>(
-   *   'input',
-   *   (elements: HTMLInputElement[]) => elements.map(e => e.textContent)
+   * const allInputValues = await page.$$eval('input', elements =>
+   *   elements.map(e => e.textContent)
    * );
    * ```
    *
-   * @param selector - the
-   * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | selector}
-   * to query for
+   * @param selector -
+   * {@link https://pptr.dev/guides/page-interactions#selectors | selector}
+   * to query page for.
+   * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
+   * can be passed as-is and a
+   * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
+   * allows quering by
+   * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
+   * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
+   * and
+   * {@link https://pptr.dev/guides/page-interactions#xpath-selectors--p-xpath | xpath}
+   * and
+   * {@link https://pptr.dev/guides/page-interactions#querying-elements-in-shadow-dom | combining these queries across shadow roots}.
+   * Alternatively, you can specify the selector type using a
+   * {@link https://pptr.dev/guides/page-interactions#prefixed-selector-syntax | prefix}.
    * @param pageFunction - the function to be evaluated in the page context.
-   * Will be passed the result of
-   * `Array.from(document.querySelectorAll(selector))` as its first argument.
+   * Will be passed an array of matching elements as its first argument.
    * @param args - any additional arguments to pass through to `pageFunction`.
    *
    * @returns The result of calling `pageFunction`. If it returns an element it
@@ -1125,38 +1387,16 @@ export class Page extends EventEmitter {
     ...args: Params
   ): Promise<Awaited<ReturnType<Func>>> {
     pageFunction = withSourcePuppeteerURLIfNone(this.$$eval.name, pageFunction);
-    return this.mainFrame().$$eval(selector, pageFunction, ...args);
-  }
-
-  /**
-   * The method evaluates the XPath expression relative to the page document as
-   * its context node. If there are no such elements, the method resolves to an
-   * empty array.
-   *
-   * @remarks
-   * Shortcut for {@link Frame.$x | Page.mainFrame().$x(expression) }.
-   *
-   * @param expression - Expression to evaluate
-   */
-  async $x(expression: string): Promise<Array<ElementHandle<Node>>> {
-    return this.mainFrame().$x(expression);
+    return await this.mainFrame().$$eval(selector, pageFunction, ...args);
   }
 
   /**
    * If no URLs are specified, this method returns cookies for the current page
    * URL. If URLs are specified, only cookies for those URLs are returned.
    */
-  async cookies(...urls: string[]): Promise<Protocol.Network.Cookie[]>;
-  async cookies(): Promise<Protocol.Network.Cookie[]> {
-    throw new Error('Not implemented');
-  }
+  abstract cookies(...urls: string[]): Promise<Cookie[]>;
 
-  async deleteCookie(
-    ...cookies: Protocol.Network.DeleteCookiesRequest[]
-  ): Promise<void>;
-  async deleteCookie(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract deleteCookie(...cookies: DeleteCookiesRequest[]): Promise<void>;
 
   /**
    * @example
@@ -1165,10 +1405,7 @@ export class Page extends EventEmitter {
    * await page.setCookie(cookieObject1, cookieObject2);
    * ```
    */
-  async setCookie(...cookies: Protocol.Network.CookieParam[]): Promise<void>;
-  async setCookie(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract setCookie(...cookies: CookieParam[]): Promise<void>;
 
   /**
    * Adds a `<script>` tag into the page with the desired URL or content.
@@ -1183,9 +1420,8 @@ export class Page extends EventEmitter {
    */
   async addScriptTag(
     options: FrameAddScriptTagOptions
-  ): Promise<ElementHandle<HTMLScriptElement>>;
-  async addScriptTag(): Promise<ElementHandle<HTMLScriptElement>> {
-    throw new Error('Not implemented');
+  ): Promise<ElementHandle<HTMLScriptElement>> {
+    return await this.mainFrame().addScriptTag(options);
   }
 
   /**
@@ -1206,11 +1442,8 @@ export class Page extends EventEmitter {
   ): Promise<ElementHandle<HTMLLinkElement>>;
   async addStyleTag(
     options: FrameAddStyleTagOptions
-  ): Promise<ElementHandle<HTMLStyleElement | HTMLLinkElement>>;
-  async addStyleTag(): Promise<
-    ElementHandle<HTMLStyleElement | HTMLLinkElement>
-  > {
-    throw new Error('Not implemented');
+  ): Promise<ElementHandle<HTMLStyleElement | HTMLLinkElement>> {
+    return await this.mainFrame().addStyleTag(options);
   }
 
   /**
@@ -1225,7 +1458,7 @@ export class Page extends EventEmitter {
    *
    * Functions installed via `page.exposeFunction` survive navigations.
    *
-   * :::note
+   * :::
    *
    * @example
    * An example of adding an `md5` function into the page:
@@ -1283,33 +1516,31 @@ export class Page extends EventEmitter {
    * @param pptrFunction - Callback function which will be called in Puppeteer's
    * context.
    */
-  async exposeFunction(
+  abstract exposeFunction(
     name: string,
     pptrFunction: Function | {default: Function}
   ): Promise<void>;
-  async exposeFunction(): Promise<void> {
-    throw new Error('Not implemented');
-  }
 
   /**
    * The method removes a previously added function via ${@link Page.exposeFunction}
    * called `name` from the page's `window` object.
    */
-  async removeExposedFunction(name: string): Promise<void>;
-  async removeExposedFunction(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract removeExposedFunction(name: string): Promise<void>;
 
   /**
    * Provide credentials for `HTTP authentication`.
    *
+   * :::note
+   *
+   * Request interception will be turned on behind the scenes to
+   * implement authentication. This might affect performance.
+   *
+   * :::
+   *
    * @remarks
    * To disable authentication, pass `null`.
    */
-  async authenticate(credentials: Credentials): Promise<void>;
-  async authenticate(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract authenticate(credentials: Credentials | null): Promise<void>;
 
   /**
    * The extra HTTP headers will be sent with every request the page initiates.
@@ -1331,10 +1562,7 @@ export class Page extends EventEmitter {
    * @param headers - An object containing additional HTTP headers to be sent
    * with every request. All header values must be strings.
    */
-  async setExtraHTTPHeaders(headers: Record<string, string>): Promise<void>;
-  async setExtraHTTPHeaders(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract setExtraHTTPHeaders(headers: Record<string, string>): Promise<void>;
 
   /**
    * @param userAgent - Specific user agent to use in this page
@@ -1342,13 +1570,10 @@ export class Page extends EventEmitter {
    * page
    * @returns Promise which resolves when the user agent is set.
    */
-  async setUserAgent(
+  abstract setUserAgent(
     userAgent: string,
     userAgentMetadata?: Protocol.Emulation.UserAgentMetadata
   ): Promise<void>;
-  async setUserAgent(): Promise<void> {
-    throw new Error('Not implemented');
-  }
 
   /**
    * Object containing metrics as key/value pairs.
@@ -1386,24 +1611,24 @@ export class Page extends EventEmitter {
    * All timestamps are in monotonic time: monotonically increasing time
    * in seconds since an arbitrary point in the past.
    */
-  async metrics(): Promise<Metrics> {
-    throw new Error('Not implemented');
-  }
+  abstract metrics(): Promise<Metrics>;
 
   /**
    * The page's URL.
-   * @remarks Shortcut for
-   * {@link Frame.url | page.mainFrame().url()}.
+   *
+   * @remarks
+   *
+   * Shortcut for {@link Frame.url | page.mainFrame().url()}.
    */
   url(): string {
-    throw new Error('Not implemented');
+    return this.mainFrame().url();
   }
 
   /**
    * The full HTML contents of the page, including the DOCTYPE.
    */
   async content(): Promise<string> {
-    throw new Error('Not implemented');
+    return await this.mainFrame().content();
   }
 
   /**
@@ -1411,127 +1636,27 @@ export class Page extends EventEmitter {
    *
    * @param html - HTML markup to assign to the page.
    * @param options - Parameters that has some properties.
-   * @remarks
-   * The parameter `options` might have the following options.
-   *
-   * - `timeout` : Maximum time in milliseconds for resources to load, defaults
-   *   to 30 seconds, pass `0` to disable timeout. The default value can be
-   *   changed by using the {@link Page.setDefaultNavigationTimeout} or
-   *   {@link Page.setDefaultTimeout} methods.
-   *
-   * - `waitUntil`: When to consider setting markup succeeded, defaults to
-   *   `load`. Given an array of event strings, setting content is considered
-   *   to be successful after all events have been fired. Events can be
-   *   either:<br/>
-   * - `load` : consider setting content to be finished when the `load` event
-   *   is fired.<br/>
-   * - `domcontentloaded` : consider setting content to be finished when the
-   *   `DOMContentLoaded` event is fired.<br/>
-   * - `networkidle0` : consider setting content to be finished when there are
-   *   no more than 0 network connections for at least `500` ms.<br/>
-   * - `networkidle2` : consider setting content to be finished when there are
-   *   no more than 2 network connections for at least `500` ms.
    */
-  async setContent(html: string, options?: WaitForOptions): Promise<void>;
-  async setContent(): Promise<void> {
-    throw new Error('Not implemented');
+  async setContent(html: string, options?: WaitForOptions): Promise<void> {
+    await this.mainFrame().setContent(html, options);
   }
 
   /**
-   * @param url - URL to navigate page to. The URL should include scheme, e.g.
-   * `https://`
-   * @param options - Navigation Parameter
-   * @returns Promise which resolves to the main resource response. In case of
-   * multiple redirects, the navigation will resolve with the response of the
-   * last redirect.
-   * @remarks
-   * The argument `options` might have the following properties:
-   *
-   * - `timeout` : Maximum navigation time in milliseconds, defaults to 30
-   *   seconds, pass 0 to disable timeout. The default value can be changed by
-   *   using the {@link Page.setDefaultNavigationTimeout} or
-   *   {@link Page.setDefaultTimeout} methods.
-   *
-   * - `waitUntil`:When to consider navigation succeeded, defaults to `load`.
-   *   Given an array of event strings, navigation is considered to be
-   *   successful after all events have been fired. Events can be either:<br/>
-   * - `load` : consider navigation to be finished when the load event is
-   *   fired.<br/>
-   * - `domcontentloaded` : consider navigation to be finished when the
-   *   DOMContentLoaded event is fired.<br/>
-   * - `networkidle0` : consider navigation to be finished when there are no
-   *   more than 0 network connections for at least `500` ms.<br/>
-   * - `networkidle2` : consider navigation to be finished when there are no
-   *   more than 2 network connections for at least `500` ms.
-   *
-   * - `referer` : Referer header value. If provided it will take preference
-   *   over the referer header value set by
-   *   {@link Page.setExtraHTTPHeaders |page.setExtraHTTPHeaders()}.<br/>
-   * - `referrerPolicy` : ReferrerPolicy. If provided it will take preference
-   *   over the referer-policy header value set by
-   *   {@link Page.setExtraHTTPHeaders |page.setExtraHTTPHeaders()}.
-   *
-   * `page.goto` will throw an error if:
-   *
-   * - there's an SSL error (e.g. in case of self-signed certificates).
-   * - target URL is invalid.
-   * - the timeout is exceeded during navigation.
-   * - the remote server does not respond or is unreachable.
-   * - the main resource failed to load.
-   *
-   * `page.goto` will not throw an error when any valid HTTP status code is
-   * returned by the remote server, including 404 "Not Found" and 500
-   * "Internal Server Error". The status code for such responses can be
-   * retrieved by calling response.status().
-   *
-   * NOTE: `page.goto` either throws an error or returns a main resource
-   * response. The only exceptions are navigation to about:blank or navigation
-   * to the same URL with a different hash, which would succeed and return null.
-   *
-   * NOTE: Headless mode doesn't support navigation to a PDF document. See the
-   * {@link https://bugs.chromium.org/p/chromium/issues/detail?id=761295 |
-   * upstream issue}.
-   *
-   * Shortcut for {@link Frame.goto | page.mainFrame().goto(url, options)}.
+   * {@inheritDoc Frame.goto}
    */
-  async goto(
-    url: string,
-    options?: WaitForOptions & {referer?: string; referrerPolicy?: string}
-  ): Promise<HTTPResponse | null>;
-  async goto(): Promise<HTTPResponse | null> {
-    throw new Error('Not implemented');
+  async goto(url: string, options?: GoToOptions): Promise<HTTPResponse | null> {
+    return await this.mainFrame().goto(url, options);
   }
 
   /**
-   * @param options - Navigation parameters which might have the following
-   * properties:
-   * @returns Promise which resolves to the main resource response. In case of
+   * Reloads the page.
+   *
+   * @param options - Options to configure waiting behavior.
+   * @returns A promise which resolves to the main resource response. In case of
    * multiple redirects, the navigation will resolve with the response of the
    * last redirect.
-   * @remarks
-   * The argument `options` might have the following properties:
-   *
-   * - `timeout` : Maximum navigation time in milliseconds, defaults to 30
-   *   seconds, pass 0 to disable timeout. The default value can be changed by
-   *   using the {@link Page.setDefaultNavigationTimeout} or
-   *   {@link Page.setDefaultTimeout} methods.
-   *
-   * - `waitUntil`: When to consider navigation succeeded, defaults to `load`.
-   *   Given an array of event strings, navigation is considered to be
-   *   successful after all events have been fired. Events can be either:<br/>
-   * - `load` : consider navigation to be finished when the load event is
-   *   fired.<br/>
-   * - `domcontentloaded` : consider navigation to be finished when the
-   *   DOMContentLoaded event is fired.<br/>
-   * - `networkidle0` : consider navigation to be finished when there are no
-   *   more than 0 network connections for at least `500` ms.<br/>
-   * - `networkidle2` : consider navigation to be finished when there are no
-   *   more than 2 network connections for at least `500` ms.
    */
-  async reload(options?: WaitForOptions): Promise<HTTPResponse | null>;
-  async reload(): Promise<HTTPResponse | null> {
-    throw new Error('Not implemented');
-  }
+  abstract reload(options?: WaitForOptions): Promise<HTTPResponse | null>;
 
   /**
    * Waits for the page to navigate to a new URL or to reload. It is useful when
@@ -1547,6 +1672,7 @@ export class Page extends EventEmitter {
    * ```
    *
    * @remarks
+   *
    * Usage of the
    * {@link https://developer.mozilla.org/en-US/docs/Web/API/History_API | History API}
    * to change the URL is considered a navigation.
@@ -1589,12 +1715,30 @@ export class Page extends EventEmitter {
    *   `0` to disable the timeout. The default value can be changed by using the
    *   {@link Page.setDefaultTimeout} method.
    */
-  async waitForRequest(
-    urlOrPredicate: string | ((req: HTTPRequest) => boolean | Promise<boolean>),
-    options?: {timeout?: number}
-  ): Promise<HTTPRequest>;
-  async waitForRequest(): Promise<HTTPRequest> {
-    throw new Error('Not implemented');
+  waitForRequest(
+    urlOrPredicate: string | AwaitablePredicate<HTTPRequest>,
+    options: WaitTimeoutOptions = {}
+  ): Promise<HTTPRequest> {
+    const {timeout: ms = this._timeoutSettings.timeout(), signal} = options;
+    if (typeof urlOrPredicate === 'string') {
+      const url = urlOrPredicate;
+      urlOrPredicate = (request: HTTPRequest) => {
+        return request.url() === url;
+      };
+    }
+    const observable$ = fromEmitterEvent(this, PageEvent.Request).pipe(
+      filterAsync(urlOrPredicate),
+      raceWith(
+        timeout(ms),
+        fromAbortSignal(signal),
+        fromEmitterEvent(this, PageEvent.Close).pipe(
+          map(() => {
+            throw new TargetCloseError('Page closed!');
+          })
+        )
+      )
+    );
+    return firstValueFrom(observable$);
   }
 
   /**
@@ -1624,99 +1768,78 @@ export class Page extends EventEmitter {
    *   pass `0` to disable the timeout. The default value can be changed by using
    *   the {@link Page.setDefaultTimeout} method.
    */
-  async waitForResponse(
-    urlOrPredicate:
-      | string
-      | ((res: HTTPResponse) => boolean | Promise<boolean>),
-    options?: {timeout?: number}
-  ): Promise<HTTPResponse>;
-  async waitForResponse(): Promise<HTTPResponse> {
-    throw new Error('Not implemented');
+  waitForResponse(
+    urlOrPredicate: string | AwaitablePredicate<HTTPResponse>,
+    options: WaitTimeoutOptions = {}
+  ): Promise<HTTPResponse> {
+    const {timeout: ms = this._timeoutSettings.timeout(), signal} = options;
+    if (typeof urlOrPredicate === 'string') {
+      const url = urlOrPredicate;
+      urlOrPredicate = (response: HTTPResponse) => {
+        return response.url() === url;
+      };
+    }
+    const observable$ = fromEmitterEvent(this, PageEvent.Response).pipe(
+      filterAsync(urlOrPredicate),
+      raceWith(
+        timeout(ms),
+        fromAbortSignal(signal),
+        fromEmitterEvent(this, PageEvent.Close).pipe(
+          map(() => {
+            throw new TargetCloseError('Page closed!');
+          })
+        )
+      )
+    );
+    return firstValueFrom(observable$);
   }
 
   /**
-   * @param options - Optional waiting parameters
-   * @returns Promise which resolves when network is idle
+   * Waits for the network to be idle.
+   *
+   * @param options - Options to configure waiting behavior.
+   * @returns A promise which resolves once the network is idle.
    */
-  async waitForNetworkIdle(options?: {
-    idleTime?: number;
-    timeout?: number;
-  }): Promise<void>;
-  async waitForNetworkIdle(): Promise<void> {
-    throw new Error('Not implemented');
+  waitForNetworkIdle(options: WaitForNetworkIdleOptions = {}): Promise<void> {
+    return firstValueFrom(this.waitForNetworkIdle$(options));
   }
 
   /**
    * @internal
    */
-  protected async _waitForNetworkIdle(
-    networkManager: EventEmitter & {
-      inFlightRequestsCount: () => number;
-    },
-    idleTime: number,
-    timeout: number,
-    closedDeferred: Deferred<TargetCloseError>
-  ): Promise<void> {
-    const idleDeferred = Deferred.create<void>();
-    const abortDeferred = Deferred.create<Error>();
+  waitForNetworkIdle$(
+    options: WaitForNetworkIdleOptions = {}
+  ): Observable<void> {
+    const {
+      timeout: ms = this._timeoutSettings.timeout(),
+      idleTime = NETWORK_IDLE_TIME,
+      concurrency = 0,
+      signal,
+    } = options;
 
-    let idleTimer: NodeJS.Timeout | undefined;
-    const cleanup = () => {
-      clearTimeout(idleTimer);
-      abortDeferred.reject(new Error('abort'));
-    };
-
-    const evaluate = () => {
-      clearTimeout(idleTimer);
-
-      if (networkManager.inFlightRequestsCount() === 0) {
-        idleTimer = setTimeout(() => {
-          return idleDeferred.resolve();
-        }, idleTime);
-      }
-    };
-
-    const listenToEvent = (event: symbol) => {
-      return waitForEvent(
-        networkManager,
-        event,
-        () => {
-          evaluate();
-          return false;
-        },
-        timeout,
-        abortDeferred
-      );
-    };
-
-    const eventPromises = [
-      listenToEvent(NetworkManagerEmittedEvents.Request),
-      listenToEvent(NetworkManagerEmittedEvents.Response),
-      listenToEvent(NetworkManagerEmittedEvents.RequestFailed),
-    ];
-
-    evaluate();
-
-    // We don't want to reject the closed deferred when
-    // the race if finished so we pass the Promise instead
-    const closedPromise = closedDeferred.valueOrThrow();
-
-    await Deferred.race([idleDeferred, ...eventPromises, closedPromise]).then(
-      r => {
-        cleanup();
-        return r;
-      },
-      error => {
-        cleanup();
-        throw error;
-      }
+    return this.#inflight$.pipe(
+      switchMap(inflight => {
+        if (inflight > concurrency) {
+          return EMPTY;
+        }
+        return timer(idleTime);
+      }),
+      map(() => {}),
+      raceWith(
+        timeout(ms),
+        fromAbortSignal(signal),
+        fromEmitterEvent(this, PageEvent.Close).pipe(
+          map(() => {
+            throw new TargetCloseError('Page closed!');
+          })
+        )
+      )
     );
   }
 
   /**
-   * @param urlOrPredicate - A URL or predicate to wait for.
-   * @param options - Optional waiting parameters
-   * @returns Promise which resolves to the matched frame.
+   * Waits for a frame matching the given conditions to appear.
+   *
    * @example
    *
    * ```ts
@@ -1724,20 +1847,38 @@ export class Page extends EventEmitter {
    *   return frame.name() === 'Test';
    * });
    * ```
-   *
-   * @remarks
-   * Optional Parameter have:
-   *
-   * - `timeout`: Maximum wait time in milliseconds, defaults to `30` seconds,
-   *   pass `0` to disable the timeout. The default value can be changed by using
-   *   the {@link Page.setDefaultTimeout} method.
    */
   async waitForFrame(
-    urlOrPredicate: string | ((frame: Frame) => boolean | Promise<boolean>),
-    options?: {timeout?: number}
-  ): Promise<Frame>;
-  async waitForFrame(): Promise<Frame> {
-    throw new Error('Not implemented');
+    urlOrPredicate: string | ((frame: Frame) => Awaitable<boolean>),
+    options: WaitTimeoutOptions = {}
+  ): Promise<Frame> {
+    const {timeout: ms = this.getDefaultTimeout(), signal} = options;
+
+    if (isString(urlOrPredicate)) {
+      urlOrPredicate = (frame: Frame) => {
+        return urlOrPredicate === frame.url();
+      };
+    }
+
+    return await firstValueFrom(
+      merge(
+        fromEmitterEvent(this, PageEvent.FrameAttached),
+        fromEmitterEvent(this, PageEvent.FrameNavigated),
+        from(this.frames())
+      ).pipe(
+        filterAsync(urlOrPredicate),
+        first(),
+        raceWith(
+          timeout(ms),
+          fromAbortSignal(signal),
+          fromEmitterEvent(this, PageEvent.Close).pipe(
+            map(() => {
+              throw new TargetCloseError('Page closed.');
+            })
+          )
+        )
+      )
+    );
   }
 
   /**
@@ -1746,30 +1887,8 @@ export class Page extends EventEmitter {
    * @returns Promise which resolves to the main resource response. In case of
    * multiple redirects, the navigation will resolve with the response of the
    * last redirect. If can not go back, resolves to `null`.
-   * @remarks
-   * The argument `options` might have the following properties:
-   *
-   * - `timeout` : Maximum navigation time in milliseconds, defaults to 30
-   *   seconds, pass 0 to disable timeout. The default value can be changed by
-   *   using the {@link Page.setDefaultNavigationTimeout} or
-   *   {@link Page.setDefaultTimeout} methods.
-   *
-   * - `waitUntil` : When to consider navigation succeeded, defaults to `load`.
-   *   Given an array of event strings, navigation is considered to be
-   *   successful after all events have been fired. Events can be either:<br/>
-   * - `load` : consider navigation to be finished when the load event is
-   *   fired.<br/>
-   * - `domcontentloaded` : consider navigation to be finished when the
-   *   DOMContentLoaded event is fired.<br/>
-   * - `networkidle0` : consider navigation to be finished when there are no
-   *   more than 0 network connections for at least `500` ms.<br/>
-   * - `networkidle2` : consider navigation to be finished when there are no
-   *   more than 2 network connections for at least `500` ms.
    */
-  async goBack(options?: WaitForOptions): Promise<HTTPResponse | null>;
-  async goBack(): Promise<HTTPResponse | null> {
-    throw new Error('Not implemented');
-  }
+  abstract goBack(options?: WaitForOptions): Promise<HTTPResponse | null>;
 
   /**
    * This method navigate to the next page in history.
@@ -1777,37 +1896,13 @@ export class Page extends EventEmitter {
    * @returns Promise which resolves to the main resource response. In case of
    * multiple redirects, the navigation will resolve with the response of the
    * last redirect. If can not go forward, resolves to `null`.
-   * @remarks
-   * The argument `options` might have the following properties:
-   *
-   * - `timeout` : Maximum navigation time in milliseconds, defaults to 30
-   *   seconds, pass 0 to disable timeout. The default value can be changed by
-   *   using the {@link Page.setDefaultNavigationTimeout} or
-   *   {@link Page.setDefaultTimeout} methods.
-   *
-   * - `waitUntil`: When to consider navigation succeeded, defaults to `load`.
-   *   Given an array of event strings, navigation is considered to be
-   *   successful after all events have been fired. Events can be either:<br/>
-   * - `load` : consider navigation to be finished when the load event is
-   *   fired.<br/>
-   * - `domcontentloaded` : consider navigation to be finished when the
-   *   DOMContentLoaded event is fired.<br/>
-   * - `networkidle0` : consider navigation to be finished when there are no
-   *   more than 0 network connections for at least `500` ms.<br/>
-   * - `networkidle2` : consider navigation to be finished when there are no
-   *   more than 2 network connections for at least `500` ms.
    */
-  async goForward(options?: WaitForOptions): Promise<HTTPResponse | null>;
-  async goForward(): Promise<HTTPResponse | null> {
-    throw new Error('Not implemented');
-  }
+  abstract goForward(options?: WaitForOptions): Promise<HTTPResponse | null>;
 
   /**
    * Brings page to front (activates tab).
    */
-  async bringToFront(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract bringToFront(): Promise<void>;
 
   /**
    * Emulates a given device's metrics and user agent.
@@ -1819,7 +1914,6 @@ export class Page extends EventEmitter {
    * This method is a shortcut for calling two methods:
    * {@link Page.setUserAgent} and {@link Page.setViewport}.
    *
-   * @remarks
    * This method will resize the page. A lot of websites don't expect phones to
    * change size, so you should emulate before navigating to the page.
    *
@@ -1852,10 +1946,7 @@ export class Page extends EventEmitter {
    * NOTE: changing this value won't affect scripts that have already been run.
    * It will take full effect on the next navigation.
    */
-  async setJavaScriptEnabled(enabled: boolean): Promise<void>;
-  async setJavaScriptEnabled(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract setJavaScriptEnabled(enabled: boolean): Promise<void>;
 
   /**
    * Toggles bypassing page's Content-Security-Policy.
@@ -1865,10 +1956,7 @@ export class Page extends EventEmitter {
    * evaluation. Usually, this means that `page.setBypassCSP` should be called
    * before navigating to the domain.
    */
-  async setBypassCSP(enabled: boolean): Promise<void>;
-  async setBypassCSP(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract setBypassCSP(enabled: boolean): Promise<void>;
 
   /**
    * @param type - Changes the CSS media type of the page. The only allowed
@@ -1895,19 +1983,13 @@ export class Page extends EventEmitter {
    * // → false
    * ```
    */
-  async emulateMediaType(type?: string): Promise<void>;
-  async emulateMediaType(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract emulateMediaType(type?: string): Promise<void>;
 
   /**
    * Enables CPU throttling to emulate slow CPUs.
    * @param factor - slowdown factor (1 is no throttle, 2 is 2x slowdown, etc).
    */
-  async emulateCPUThrottling(factor: number | null): Promise<void>;
-  async emulateCPUThrottling(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract emulateCPUThrottling(factor: number | null): Promise<void>;
 
   /**
    * @param features - `<?Array<Object>>` Given an array of media feature
@@ -1970,10 +2052,7 @@ export class Page extends EventEmitter {
    * // → false
    * ```
    */
-  async emulateMediaFeatures(features?: MediaFeature[]): Promise<void>;
-  async emulateMediaFeatures(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract emulateMediaFeatures(features?: MediaFeature[]): Promise<void>;
 
   /**
    * @param timezoneId - Changes the timezone of the page. See
@@ -1981,10 +2060,7 @@ export class Page extends EventEmitter {
    * for a list of supported timezone IDs. Passing
    * `null` disables timezone emulation.
    */
-  async emulateTimezone(timezoneId?: string): Promise<void>;
-  async emulateTimezone(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract emulateTimezone(timezoneId?: string): Promise<void>;
 
   /**
    * Emulates the idle state.
@@ -2005,13 +2081,10 @@ export class Page extends EventEmitter {
    *
    * @param overrides - Mock idle state. If not set, clears idle overrides
    */
-  async emulateIdleState(overrides?: {
+  abstract emulateIdleState(overrides?: {
     isUserActive: boolean;
     isScreenUnlocked: boolean;
   }): Promise<void>;
-  async emulateIdleState(): Promise<void> {
-    throw new Error('Not implemented');
-  }
 
   /**
    * Simulates the given vision deficiency on the page.
@@ -2041,12 +2114,9 @@ export class Page extends EventEmitter {
    *
    * @param type - the type of deficiency to simulate, or `'none'` to reset.
    */
-  async emulateVisionDeficiency(
+  abstract emulateVisionDeficiency(
     type?: Protocol.Emulation.SetEmulatedVisionDeficiencyRequest['type']
   ): Promise<void>;
-  async emulateVisionDeficiency(): Promise<void> {
-    throw new Error('Not implemented');
-  }
 
   /**
    * `page.setViewport` will resize the page. A lot of websites don't expect
@@ -2054,7 +2124,9 @@ export class Page extends EventEmitter {
    * the page.
    *
    * In the case of multiple pages in a single browser, each page can have its
-   * own viewport size.
+   * own viewport size. Setting the viewport to `null` resets the viewport to
+   * its default value.
+   *
    * @example
    *
    * ```ts
@@ -2069,54 +2141,21 @@ export class Page extends EventEmitter {
    *
    * @param viewport -
    * @remarks
-   * Argument viewport have following properties:
-   *
-   * - `width`: page width in pixels. required
-   *
-   * - `height`: page height in pixels. required
-   *
-   * - `deviceScaleFactor`: Specify device scale factor (can be thought of as
-   *   DPR). Defaults to `1`.
-   *
-   * - `isMobile`: Whether the meta viewport tag is taken into account. Defaults
-   *   to `false`.
-   *
-   * - `hasTouch`: Specifies if viewport supports touch events. Defaults to `false`
-   *
-   * - `isLandScape`: Specifies if viewport is in landscape mode. Defaults to false.
-   *
    * NOTE: in certain cases, setting viewport will reload the page in order to
    * set the isMobile or hasTouch properties.
    */
-  async setViewport(viewport: Viewport): Promise<void>;
-  async setViewport(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract setViewport(viewport: Viewport | null): Promise<void>;
 
   /**
-   * Current page viewport settings.
+   * Returns the current page viewport settings without checking the actual page
+   * viewport.
    *
-   * @returns
-   *
-   * - `width`: page's width in pixels
-   *
-   * - `height`: page's height in pixels
-   *
-   * - `deviceScaleFactor`: Specify device scale factor (can be though of as
-   *   dpr). Defaults to `1`.
-   *
-   * - `isMobile`: Whether the meta viewport tag is taken into account. Defaults
-   *   to `false`.
-   *
-   * - `hasTouch`: Specifies if viewport supports touch events. Defaults to
-   *   `false`.
-   *
-   * - `isLandScape`: Specifies if viewport is in landscape mode. Defaults to
-   *   `false`.
+   * This is either the viewport set with the previous {@link Page.setViewport}
+   * call or the default viewport set via
+   * {@link BrowserConnectOptions.defaultViewport |
+   * BrowserConnectOptions.defaultViewport}.
    */
-  viewport(): Viewport | null {
-    throw new Error('Not implemented');
-  }
+  abstract viewport(): Viewport | null;
 
   /**
    * Evaluates a function in the page's context and returns the result.
@@ -2171,12 +2210,12 @@ export class Page extends EventEmitter {
   >(
     pageFunction: Func | string,
     ...args: Params
-  ): Promise<Awaited<ReturnType<Func>>>;
-  async evaluate<
-    Params extends unknown[],
-    Func extends EvaluateFunc<Params> = EvaluateFunc<Params>,
-  >(): Promise<Awaited<ReturnType<Func>>> {
-    throw new Error('Not implemented');
+  ): Promise<Awaited<ReturnType<Func>>> {
+    pageFunction = withSourcePuppeteerURLIfNone(
+      this.evaluate.name,
+      pageFunction
+    );
+    return await this.mainFrame().evaluate(pageFunction, ...args);
   }
 
   /**
@@ -2211,26 +2250,22 @@ export class Page extends EventEmitter {
    * await page.evaluateOnNewDocument(preloadFile);
    * ```
    */
-  async evaluateOnNewDocument<
+  abstract evaluateOnNewDocument<
     Params extends unknown[],
     Func extends (...args: Params) => unknown = (...args: Params) => unknown,
   >(
     pageFunction: Func | string,
     ...args: Params
   ): Promise<NewDocumentScriptEvaluation>;
-  async evaluateOnNewDocument(): Promise<NewDocumentScriptEvaluation> {
-    throw new Error('Not implemented');
-  }
 
   /**
    * Removes script that injected into page by Page.evaluateOnNewDocument.
    *
    * @param identifier - script identifier
    */
-  async removeScriptToEvaluateOnNewDocument(identifier: string): Promise<void>;
-  async removeScriptToEvaluateOnNewDocument(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract removeScriptToEvaluateOnNewDocument(
+    identifier: string
+  ): Promise<void>;
 
   /**
    * Toggles ignoring cache for each request based on the enabled state. By
@@ -2238,10 +2273,7 @@ export class Page extends EventEmitter {
    * @param enabled - sets the `enabled` state of cache
    * @defaultValue `true`
    */
-  async setCacheEnabled(enabled?: boolean): Promise<void>;
-  async setCacheEnabled(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract setCacheEnabled(enabled?: boolean): Promise<void>;
 
   /**
    * @internal
@@ -2260,122 +2292,307 @@ export class Page extends EventEmitter {
   }
 
   /**
-   * Captures screenshot of the current page.
+   * Captures a screencast of this {@link Page | page}.
+   *
+   * @example
+   * Recording a {@link Page | page}:
+   *
+   * ```
+   * import puppeteer from 'puppeteer';
+   *
+   * // Launch a browser
+   * const browser = await puppeteer.launch();
+   *
+   * // Create a new page
+   * const page = await browser.newPage();
+   *
+   * // Go to your site.
+   * await page.goto("https://www.example.com");
+   *
+   * // Start recording.
+   * const recorder = await page.screencast({path: 'recording.webm'});
+   *
+   * // Do something.
+   *
+   * // Stop recording.
+   * await recorder.stop();
+   *
+   * browser.close();
+   * ```
+   *
+   * @param options - Configures screencast behavior.
+   *
+   * @experimental
    *
    * @remarks
-   * Options object which might have the following properties:
    *
-   * - `path` : The file path to save the image to. The screenshot type
-   *   will be inferred from file extension. If `path` is a relative path, then
-   *   it is resolved relative to
-   *   {@link https://nodejs.org/api/process.html#process_process_cwd
-   *   | current working directory}.
-   *   If no path is provided, the image won't be saved to the disk.
+   * All recordings will be {@link https://www.webmproject.org/ | WebM} format using
+   * the {@link https://www.webmproject.org/vp9/ | VP9} video codec. The FPS is 30.
    *
-   * - `type` : Specify screenshot type, can be `jpeg`, `png` or `webp`.
-   *   Defaults to 'png'.
-   *
-   * - `quality` : The quality of the image, between 0-100. Not
-   *   applicable to `png` images.
-   *
-   * - `fullPage` : When true, takes a screenshot of the full
-   *   scrollable page. Defaults to `false`.
-   *
-   * - `clip` : An object which specifies clipping region of the page.
-   *   Should have the following fields:<br/>
-   * - `x` : x-coordinate of top-left corner of clip area.<br/>
-   * - `y` : y-coordinate of top-left corner of clip area.<br/>
-   * - `width` : width of clipping area.<br/>
-   * - `height` : height of clipping area.
-   *
-   * - `omitBackground` : Hides default white background and allows
-   *   capturing screenshots with transparency. Defaults to `false`.
-   *
-   * - `encoding` : The encoding of the image, can be either base64 or
-   *   binary. Defaults to `binary`.
-   *
-   * - `captureBeyondViewport` : When true, captures screenshot
-   *   {@link https://chromedevtools.github.io/devtools-protocol/tot/Page/#method-captureScreenshot
-   *   | beyond the viewport}. When false, falls back to old behaviour,
-   *   and cuts the screenshot by the viewport size. Defaults to `true`.
-   *
-   * - `fromSurface` : When true, captures screenshot
-   *   {@link https://chromedevtools.github.io/devtools-protocol/tot/Page/#method-captureScreenshot
-   *   | from the surface rather than the view}. When false, works only in
-   *   headful mode and ignores page viewport (but not browser window's
-   *   bounds). Defaults to `true`.
-   *
-   * @returns Promise which resolves to buffer or a base64 string (depending on
-   * the value of `encoding`) with captured screenshot.
+   * You must have {@link https://ffmpeg.org/ | ffmpeg} installed on your system.
    */
-  screenshot(
-    options: ScreenshotOptions & {encoding: 'base64'}
-  ): Promise<string>;
-  screenshot(
-    options?: ScreenshotOptions & {encoding?: 'binary'}
-  ): Promise<Buffer>;
-  async screenshot(options?: ScreenshotOptions): Promise<Buffer | string>;
-  async screenshot(): Promise<Buffer | string> {
-    throw new Error('Not implemented');
+  async screencast(
+    options: Readonly<ScreencastOptions> = {}
+  ): Promise<ScreenRecorder> {
+    const [{ScreenRecorder}, [width, height, devicePixelRatio]] =
+      await Promise.all([
+        import('../node/ScreenRecorder.js'),
+        this.#getNativePixelDimensions(),
+      ]);
+
+    let crop: BoundingBox | undefined;
+    if (options.crop) {
+      const {
+        x,
+        y,
+        width: cropWidth,
+        height: cropHeight,
+      } = roundRectangle(normalizeRectangle(options.crop));
+      if (x < 0 || y < 0) {
+        throw new Error(
+          `\`crop.x\` and \`crop.y\` must be greater than or equal to 0.`
+        );
+      }
+      if (cropWidth <= 0 || cropHeight <= 0) {
+        throw new Error(
+          `\`crop.height\` and \`crop.width\` must be greater than or equal to 0.`
+        );
+      }
+
+      const viewportWidth = width / devicePixelRatio;
+      const viewportHeight = height / devicePixelRatio;
+      if (x + cropWidth > viewportWidth) {
+        throw new Error(
+          `\`crop.width\` cannot be larger than the viewport width (${viewportWidth}).`
+        );
+      }
+      if (y + cropHeight > viewportHeight) {
+        throw new Error(
+          `\`crop.height\` cannot be larger than the viewport height (${viewportHeight}).`
+        );
+      }
+
+      crop = {
+        x: x * devicePixelRatio,
+        y: y * devicePixelRatio,
+        width: cropWidth * devicePixelRatio,
+        height: cropHeight * devicePixelRatio,
+      };
+    }
+    if (options.speed !== undefined && options.speed <= 0) {
+      throw new Error(`\`speed\` must be greater than 0.`);
+    }
+    if (options.scale !== undefined && options.scale <= 0) {
+      throw new Error(`\`scale\` must be greater than 0.`);
+    }
+
+    const recorder = new ScreenRecorder(this, width, height, {
+      ...options,
+      path: options.ffmpegPath,
+      crop,
+    });
+    try {
+      await this._startScreencast();
+    } catch (error) {
+      void recorder.stop();
+      throw error;
+    }
+    if (options.path) {
+      const {createWriteStream} = await import('fs');
+      const stream = createWriteStream(options.path, 'binary');
+      recorder.pipe(stream);
+    }
+    return recorder;
+  }
+
+  #screencastSessionCount = 0;
+  #startScreencastPromise: Promise<void> | undefined;
+
+  /**
+   * @internal
+   */
+  async _startScreencast(): Promise<void> {
+    ++this.#screencastSessionCount;
+    if (!this.#startScreencastPromise) {
+      this.#startScreencastPromise = this.mainFrame()
+        .client.send('Page.startScreencast', {format: 'png'})
+        .then(() => {
+          // Wait for the first frame.
+          return new Promise(resolve => {
+            return this.mainFrame().client.once('Page.screencastFrame', () => {
+              return resolve();
+            });
+          });
+        });
+    }
+    await this.#startScreencastPromise;
   }
 
   /**
    * @internal
    */
-  _getPDFOptions(
-    options: PDFOptions = {},
-    lengthUnit: 'in' | 'cm' = 'in'
-  ): ParsedPDFOptions {
-    const defaults = {
-      scale: 1,
-      displayHeaderFooter: false,
-      headerTemplate: '',
-      footerTemplate: '',
-      printBackground: false,
-      landscape: false,
-      pageRanges: '',
-      preferCSSPageSize: false,
-      omitBackground: false,
-      timeout: 30000,
-    };
-
-    let width = 8.5;
-    let height = 11;
-    if (options.format) {
-      const format =
-        paperFormats[options.format.toLowerCase() as LowerCasePaperFormat];
-      assert(format, 'Unknown paper format: ' + options.format);
-      width = format.width;
-      height = format.height;
-    } else {
-      width = convertPrintParameterToInches(options.width, lengthUnit) ?? width;
-      height =
-        convertPrintParameterToInches(options.height, lengthUnit) ?? height;
+  async _stopScreencast(): Promise<void> {
+    --this.#screencastSessionCount;
+    if (!this.#startScreencastPromise) {
+      return;
     }
-
-    const margin = {
-      top: convertPrintParameterToInches(options.margin?.top, lengthUnit) || 0,
-      left:
-        convertPrintParameterToInches(options.margin?.left, lengthUnit) || 0,
-      bottom:
-        convertPrintParameterToInches(options.margin?.bottom, lengthUnit) || 0,
-      right:
-        convertPrintParameterToInches(options.margin?.right, lengthUnit) || 0,
-    };
-
-    const output = {
-      ...defaults,
-      ...options,
-      width,
-      height,
-      margin,
-    };
-
-    return output;
+    this.#startScreencastPromise = undefined;
+    if (this.#screencastSessionCount === 0) {
+      await this.mainFrame().client.send('Page.stopScreencast');
+    }
   }
 
   /**
+   * Gets the native, non-emulated dimensions of the viewport.
+   */
+  async #getNativePixelDimensions(): Promise<
+    readonly [width: number, height: number, devicePixelRatio: number]
+  > {
+    const viewport = this.viewport();
+    using stack = new DisposableStack();
+    if (viewport && viewport.deviceScaleFactor !== 0) {
+      await this.setViewport({...viewport, deviceScaleFactor: 0});
+      stack.defer(() => {
+        void this.setViewport(viewport).catch(debugError);
+      });
+    }
+    return await this.mainFrame()
+      .isolatedRealm()
+      .evaluate(() => {
+        return [
+          window.visualViewport!.width * window.devicePixelRatio,
+          window.visualViewport!.height * window.devicePixelRatio,
+          window.devicePixelRatio,
+        ] as const;
+      });
+  }
+
+  /**
+   * Captures a screenshot of this {@link Page | page}.
+   *
+   * @param options - Configures screenshot behavior.
+   */
+  async screenshot(
+    options: Readonly<ScreenshotOptions> & {encoding: 'base64'}
+  ): Promise<string>;
+  async screenshot(options?: Readonly<ScreenshotOptions>): Promise<Buffer>;
+  @guarded(function () {
+    return this.browser();
+  })
+  async screenshot(
+    userOptions: Readonly<ScreenshotOptions> = {}
+  ): Promise<Buffer | string> {
+    await this.bringToFront();
+
+    // TODO: use structuredClone after Node 16 support is dropped.
+    const options = {
+      ...userOptions,
+      clip: userOptions.clip
+        ? {
+            ...userOptions.clip,
+          }
+        : undefined,
+    };
+    if (options.type === undefined && options.path !== undefined) {
+      const filePath = options.path;
+      // Note we cannot use Node.js here due to browser compatibility.
+      const extension = filePath
+        .slice(filePath.lastIndexOf('.') + 1)
+        .toLowerCase();
+      switch (extension) {
+        case 'png':
+          options.type = 'png';
+          break;
+        case 'jpeg':
+        case 'jpg':
+          options.type = 'jpeg';
+          break;
+        case 'webp':
+          options.type = 'webp';
+          break;
+      }
+    }
+    if (options.quality !== undefined) {
+      if (options.quality < 0 && options.quality > 100) {
+        throw new Error(
+          `Expected 'quality' (${options.quality}) to be between 0 and 100, inclusive.`
+        );
+      }
+      if (
+        options.type === undefined ||
+        !['jpeg', 'webp'].includes(options.type)
+      ) {
+        throw new Error(
+          `${options.type ?? 'png'} screenshots do not support 'quality'.`
+        );
+      }
+    }
+    if (options.clip) {
+      if (options.clip.width <= 0) {
+        throw new Error("'width' in 'clip' must be positive.");
+      }
+      if (options.clip.height <= 0) {
+        throw new Error("'height' in 'clip' must be positive.");
+      }
+    }
+
+    setDefaultScreenshotOptions(options);
+
+    await using stack = new AsyncDisposableStack();
+    if (options.clip) {
+      if (options.fullPage) {
+        throw new Error("'clip' and 'fullPage' are mutually exclusive");
+      }
+
+      options.clip = roundRectangle(normalizeRectangle(options.clip));
+    } else {
+      if (options.fullPage) {
+        // If `captureBeyondViewport` is `false`, then we set the viewport to
+        // capture the full page. Note this may be affected by on-page CSS and
+        // JavaScript.
+        if (!options.captureBeyondViewport) {
+          const scrollDimensions = await this.mainFrame()
+            .isolatedRealm()
+            .evaluate(() => {
+              const element = document.documentElement;
+              return {
+                width: element.scrollWidth,
+                height: element.scrollHeight,
+              };
+            });
+          const viewport = this.viewport();
+          await this.setViewport({
+            ...viewport,
+            ...scrollDimensions,
+          });
+          stack.defer(async () => {
+            await this.setViewport(viewport).catch(debugError);
+          });
+        }
+      } else {
+        options.captureBeyondViewport = false;
+      }
+    }
+
+    const data = await this._screenshot(options);
+    if (options.encoding === 'base64') {
+      return data;
+    }
+    const buffer = Buffer.from(data, 'base64');
+    await this._maybeWriteBufferToFile(options.path, buffer);
+    return buffer;
+  }
+
+  /**
+   * @internal
+   */
+  abstract _screenshot(options: Readonly<ScreenshotOptions>): Promise<string>;
+
+  /**
    * Generates a PDF of the page with the `print` CSS media type.
+   *
+   * @param options - options for generating the PDF.
+   *
    * @remarks
    *
    * To generate a PDF with the `screen` media type, call
@@ -2386,58 +2603,49 @@ export class Page extends EventEmitter {
    * Use the
    * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/-webkit-print-color-adjust | `-webkit-print-color-adjust`}
    * property to force rendering of exact colors.
-   *
-   * @param options - options for generating the PDF.
    */
-  async createPDFStream(options?: PDFOptions): Promise<Readable>;
-  async createPDFStream(): Promise<Readable> {
-    throw new Error('Not implemented');
-  }
+  abstract createPDFStream(
+    options?: PDFOptions
+  ): Promise<ReadableStream<Uint8Array>>;
 
   /**
    * {@inheritDoc Page.createPDFStream}
    */
-  async pdf(options?: PDFOptions): Promise<Buffer>;
-  async pdf(): Promise<Buffer> {
-    throw new Error('Not implemented');
-  }
+  abstract pdf(options?: PDFOptions): Promise<Buffer>;
 
   /**
    * The page's title
    *
    * @remarks
+   *
    * Shortcut for {@link Frame.title | page.mainFrame().title()}.
    */
   async title(): Promise<string> {
-    throw new Error('Not implemented');
+    return await this.mainFrame().title();
   }
 
-  async close(options?: {runBeforeUnload?: boolean}): Promise<void>;
-  async close(): Promise<void> {
-    throw new Error('Not implemented');
-  }
+  abstract close(options?: {runBeforeUnload?: boolean}): Promise<void>;
 
   /**
    * Indicates that the page has been closed.
    * @returns
    */
-  isClosed(): boolean {
-    throw new Error('Not implemented');
-  }
+  abstract isClosed(): boolean;
 
   /**
    * {@inheritDoc Mouse}
    */
-  get mouse(): Mouse {
-    throw new Error('Not implemented');
-  }
+  abstract get mouse(): Mouse;
 
   /**
    * This method fetches an element with `selector`, scrolls it into view if
-   * needed, and then uses {@link Page | Page.mouse} to click in the center of the
+   * needed, and then uses {@link Page.mouse} to click in the center of the
    * element. If there's no element matching `selector`, the method throws an
    * error.
-   * @remarks Bear in mind that if `click()` triggers a navigation event and
+   *
+   * @remarks
+   *
+   * Bear in mind that if `click()` triggers a navigation event and
    * there's a separate `page.waitForNavigation()` promise to be resolved, you
    * may end up with a race condition that yields unexpected results. The
    * correct pattern for click and wait for navigation is the following:
@@ -2471,7 +2679,9 @@ export class Page extends EventEmitter {
    * @returns Promise which resolves when the element matching selector is
    * successfully focused. The promise will be rejected if there is no element
    * matching selector.
+   *
    * @remarks
+   *
    * Shortcut for {@link Frame.focus | page.mainFrame().focus(selector)}.
    */
   focus(selector: string): Promise<void> {
@@ -2480,7 +2690,7 @@ export class Page extends EventEmitter {
 
   /**
    * This method fetches an element with `selector`, scrolls it into view if
-   * needed, and then uses {@link Page | Page.mouse}
+   * needed, and then uses {@link Page.mouse}
    * to hover over the center of the element.
    * If there's no element matching `selector`, the method throws an error.
    * @param selector - A
@@ -2490,7 +2700,9 @@ export class Page extends EventEmitter {
    * @returns Promise which resolves when the element matching `selector` is
    * successfully hovered. Promise gets rejected if there's no element matching
    * `selector`.
+   *
    * @remarks
+   *
    * Shortcut for {@link Page.hover | page.mainFrame().hover(selector)}.
    */
   hover(selector: string): Promise<void> {
@@ -2518,6 +2730,7 @@ export class Page extends EventEmitter {
    * @returns
    *
    * @remarks
+   *
    * Shortcut for {@link Frame.select | page.mainFrame().select()}
    */
   select(selector: string, ...values: string[]): Promise<string[]> {
@@ -2526,15 +2739,16 @@ export class Page extends EventEmitter {
 
   /**
    * This method fetches an element with `selector`, scrolls it into view if
-   * needed, and then uses {@link Page | Page.touchscreen}
+   * needed, and then uses {@link Page.touchscreen}
    * to tap in the center of the element.
    * If there's no element matching `selector`, the method throws an error.
    * @param selector - A
    * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | Selector}
    * to search for element to tap. If there are multiple elements satisfying the
    * selector, the first will be tapped.
-   * @returns
+   *
    * @remarks
+   *
    * Shortcut for {@link Frame.tap | page.mainFrame().tap(selector)}.
    */
   tap(selector: string): Promise<void> {
@@ -2563,7 +2777,6 @@ export class Page extends EventEmitter {
    * @param options - have property `delay` which is the Time to wait between
    * key presses in milliseconds. Defaults to `0`.
    * @returns
-   * @remarks
    */
   type(
     selector: string,
@@ -2571,30 +2784,6 @@ export class Page extends EventEmitter {
     options?: Readonly<KeyboardTypeOptions>
   ): Promise<void> {
     return this.mainFrame().type(selector, text, options);
-  }
-
-  /**
-   * @deprecated Replace with `new Promise(r => setTimeout(r, milliseconds));`.
-   *
-   * Causes your script to wait for the given number of milliseconds.
-   *
-   * @remarks
-   * It's generally recommended to not wait for a number of seconds, but instead
-   * use {@link Frame.waitForSelector}, {@link Frame.waitForXPath} or
-   * {@link Frame.waitForFunction} to wait for exactly the conditions you want.
-   *
-   * @example
-   *
-   * Wait for 1 second:
-   *
-   * ```ts
-   * await page.waitForTimeout(1000);
-   * ```
-   *
-   * @param milliseconds - the number of milliseconds to wait.
-   */
-  waitForTimeout(milliseconds: number): Promise<void> {
-    return this.mainFrame().waitForTimeout(milliseconds);
   }
 
   /**
@@ -2633,6 +2822,7 @@ export class Page extends EventEmitter {
    * @returns Promise which resolves when element specified by selector string
    * is added to DOM. Resolves to `null` if waiting for hidden: `true` and
    * selector is not found in DOM.
+   *
    * @remarks
    * The optional Parameter in Arguments `options` are:
    *
@@ -2656,69 +2846,11 @@ export class Page extends EventEmitter {
   }
 
   /**
-   * Wait for the `xpath` to appear in page. If at the moment of calling the
-   * method the `xpath` already exists, the method will return immediately. If
-   * the `xpath` doesn't appear after the `timeout` milliseconds of waiting, the
-   * function will throw.
+   * Waits for the provided function, `pageFunction`, to return a truthy value when
+   * evaluated in the page's context.
    *
    * @example
-   * This method works across navigation
-   *
-   * ```ts
-   * import puppeteer from 'puppeteer';
-   * (async () => {
-   *   const browser = await puppeteer.launch();
-   *   const page = await browser.newPage();
-   *   let currentURL;
-   *   page
-   *     .waitForXPath('//img')
-   *     .then(() => console.log('First URL with image: ' + currentURL));
-   *   for (currentURL of [
-   *     'https://example.com',
-   *     'https://google.com',
-   *     'https://bbc.com',
-   *   ]) {
-   *     await page.goto(currentURL);
-   *   }
-   *   await browser.close();
-   * })();
-   * ```
-   *
-   * @param xpath - A
-   * {@link https://developer.mozilla.org/en-US/docs/Web/XPath | xpath} of an
-   * element to wait for
-   * @param options - Optional waiting parameters
-   * @returns Promise which resolves when element specified by xpath string is
-   * added to DOM. Resolves to `null` if waiting for `hidden: true` and xpath is
-   * not found in DOM, otherwise resolves to `ElementHandle`.
-   * @remarks
-   * The optional Argument `options` have properties:
-   *
-   * - `visible`: A boolean to wait for element to be present in DOM and to be
-   *   visible, i.e. to not have `display: none` or `visibility: hidden` CSS
-   *   properties. Defaults to `false`.
-   *
-   * - `hidden`: A boolean wait for element to not be found in the DOM or to be
-   *   hidden, i.e. have `display: none` or `visibility: hidden` CSS properties.
-   *   Defaults to `false`.
-   *
-   * - `timeout`: A number which is maximum time to wait for in milliseconds.
-   *   Defaults to `30000` (30 seconds). Pass `0` to disable timeout. The default
-   *   value can be changed by using the {@link Page.setDefaultTimeout} method.
-   */
-  waitForXPath(
-    xpath: string,
-    options?: WaitForSelectorOptions
-  ): Promise<ElementHandle<Node> | null>;
-  waitForXPath(): Promise<ElementHandle<Node> | null> {
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Waits for a function to finish evaluating in the page's context.
-   *
-   * @example
-   * The {@link Page.waitForFunction} can be used to observe viewport size change:
+   * {@link Page.waitForFunction} can be used to observe a viewport size change:
    *
    * ```ts
    * import puppeteer from 'puppeteer';
@@ -2733,8 +2865,7 @@ export class Page extends EventEmitter {
    * ```
    *
    * @example
-   * To pass arguments from node.js to the predicate of
-   * {@link Page.waitForFunction} function:
+   * Arguments can be passed from Node.js to `pageFunction`:
    *
    * ```ts
    * const selector = '.foo';
@@ -2746,7 +2877,7 @@ export class Page extends EventEmitter {
    * ```
    *
    * @example
-   * The predicate of {@link Page.waitForFunction} can be asynchronous too:
+   * The provided `pageFunction` can be asynchronous:
    *
    * ```ts
    * const username = 'github-username';
@@ -2768,7 +2899,8 @@ export class Page extends EventEmitter {
    * );
    * ```
    *
-   * @param pageFunction - Function to be evaluated in browser context
+   * @param pageFunction - Function to be evaluated in browser context until it returns a
+   * truthy value.
    * @param options - Options for configuring waiting behavior.
    */
   waitForFunction<
@@ -2805,11 +2937,18 @@ export class Page extends EventEmitter {
    * );
    * ```
    */
-  waitForDevicePrompt(
+  abstract waitForDevicePrompt(
     options?: WaitTimeoutOptions
   ): Promise<DeviceRequestPrompt>;
-  waitForDevicePrompt(): Promise<DeviceRequestPrompt> {
-    throw new Error('Not implemented');
+
+  /** @internal */
+  [disposeSymbol](): void {
+    return void this.close().catch(debugError);
+  }
+
+  /** @internal */
+  [asyncDisposeSymbol](): Promise<void> {
+    return this.close();
   }
 }
 
@@ -2832,46 +2971,39 @@ export const supportedMetrics = new Set<string>([
   'JSHeapTotalSize',
 ]);
 
-/**
- * @internal
- */
-export const unitToPixels = {
-  px: 1,
-  in: 96,
-  cm: 37.8,
-  mm: 3.78,
-};
+/** @see https://w3c.github.io/webdriver-bidi/#normalize-rect */
+function normalizeRectangle<BoundingBoxType extends BoundingBox>(
+  clip: Readonly<BoundingBoxType>
+): BoundingBoxType {
+  return {
+    ...clip,
+    ...(clip.width < 0
+      ? {
+          x: clip.x + clip.width,
+          width: -clip.width,
+        }
+      : {
+          x: clip.x,
+          width: clip.width,
+        }),
+    ...(clip.height < 0
+      ? {
+          y: clip.y + clip.height,
+          height: -clip.height,
+        }
+      : {
+          y: clip.y,
+          height: clip.height,
+        }),
+  };
+}
 
-function convertPrintParameterToInches(
-  parameter?: string | number,
-  lengthUnit: 'in' | 'cm' = 'in'
-): number | undefined {
-  if (typeof parameter === 'undefined') {
-    return undefined;
-  }
-  let pixels;
-  if (isNumber(parameter)) {
-    // Treat numbers as pixel values to be aligned with phantom's paperSize.
-    pixels = parameter;
-  } else if (isString(parameter)) {
-    const text = parameter;
-    let unit = text.substring(text.length - 2).toLowerCase();
-    let valueText = '';
-    if (unit in unitToPixels) {
-      valueText = text.substring(0, text.length - 2);
-    } else {
-      // In case of unknown unit try to parse the whole parameter as number of pixels.
-      // This is consistent with phantom's paperSize behavior.
-      unit = 'px';
-      valueText = text;
-    }
-    const value = Number(valueText);
-    assert(!isNaN(value), 'Failed to parse parameter value: ' + text);
-    pixels = value * unitToPixels[unit as keyof typeof unitToPixels];
-  } else {
-    throw new Error(
-      'page.pdf() Cannot handle parameter type: ' + typeof parameter
-    );
-  }
-  return pixels / unitToPixels[lengthUnit];
+function roundRectangle<BoundingBoxType extends BoundingBox>(
+  clip: Readonly<BoundingBoxType>
+): BoundingBoxType {
+  const x = Math.round(clip.x);
+  const y = Math.round(clip.y);
+  const width = Math.round(clip.width + clip.x - x);
+  const height = Math.round(clip.height + clip.y - y);
+  return {...clip, x, y, width, height};
 }

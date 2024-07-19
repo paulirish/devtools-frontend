@@ -28,17 +28,23 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+import type * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
 import requestHTMLViewStyles from './requestHTMLView.css.js';
 
 export class RequestHTMLView extends UI.Widget.VBox {
   private readonly dataURL: string;
-  constructor(dataURL: string) {
+  private constructor(dataURL: string) {
     super(true);
 
-    this.dataURL = encodeURI(dataURL).replace(/#/g, '%23');
+    this.dataURL = dataURL;
     this.contentElement.classList.add('html', 'request-view');
+  }
+
+  static create(contentData: TextUtils.ContentData.ContentData): RequestHTMLView|null {
+    const dataURL = contentData.asDataUrl();
+    return dataURL ? new RequestHTMLView(dataURL) : null;
   }
 
   override wasShown(): void {
@@ -57,7 +63,7 @@ export class RequestHTMLView extends UI.Widget.VBox {
     const iframe = document.createElement('iframe');
     iframe.className = 'html-preview-frame';
     iframe.setAttribute('sandbox', '');  // Forbid to run JavaScript and set unique origin.
-    iframe.setAttribute('csp', 'default-src \'none\';style-src \'unsafe-inline\'');
+    iframe.setAttribute('csp', 'default-src \'none\';img-src data:;style-src \'unsafe-inline\'');
     iframe.setAttribute('src', this.dataURL);
     iframe.tabIndex = -1;
     UI.ARIAUtils.markAsPresentation(iframe);

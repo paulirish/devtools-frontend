@@ -28,16 +28,15 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import type * as Platform from '../platform/platform.js';
+import * as Platform from '../platform/platform.js';
 import * as Root from '../root/root.js';
 
-import {Format, type Color} from './Color.js';
 import {Console} from './Console.js';
-import {type GenericEvents, type EventDescriptor, type EventTargetEvent} from './EventTarget.js';
+import {type EventDescriptor, type EventTargetEvent, type GenericEvents} from './EventTarget.js';
 import {ObjectWrapper} from './Object.js';
 import {
   getLocalizedSettingsCategory,
-  getRegisteredSettings,
+  getRegisteredSettings as getRegisteredSettingsInternal,
   maybeRemoveSettingExtension,
   type RegExpSettingItem,
   registerSettingExtension,
@@ -58,10 +57,11 @@ export class Settings {
   #eventSupport: ObjectWrapper<GenericEvents>;
   #registry: Map<string, Setting<unknown>>;
   readonly moduleSettings: Map<string, Setting<unknown>>;
+  readonly #config?: Root.Runtime.HostConfig;
 
   private constructor(
-      private readonly syncedStorage: SettingsStorage, readonly globalStorage: SettingsStorage,
-      private readonly localStorage: SettingsStorage) {
+      readonly syncedStorage: SettingsStorage, readonly globalStorage: SettingsStorage,
+      readonly localStorage: SettingsStorage, config?: Root.Runtime.HostConfig) {
     this.#sessionStorage = new SettingsStorage({});
 
     this.settingNameSet = new Set();
@@ -72,19 +72,17 @@ export class Settings {
     this.#registry = new Map();
     this.moduleSettings = new Map();
 
-    for (const registration of getRegisteredSettings()) {
+    this.#config = config;
+    for (const registration of this.getRegisteredSettings()) {
       const {settingName, defaultValue, storageType} = registration;
       const isRegex = registration.settingType === SettingType.REGEX;
 
-      const setting = isRegex && typeof defaultValue === 'string' ?
-          this.createRegExpSetting(settingName, defaultValue, undefined, storageType) :
-          this.createSetting(settingName, defaultValue, storageType);
+      const evaluatedDefaultValue = typeof defaultValue === 'function' ? defaultValue(this.#config) : defaultValue;
+      const setting = isRegex && typeof evaluatedDefaultValue === 'string' ?
+          this.createRegExpSetting(settingName, evaluatedDefaultValue, undefined, storageType) :
+          this.createSetting(settingName, evaluatedDefaultValue, storageType);
 
-      if (Root.Runtime.Runtime.platform() === 'mac' && registration.titleMac) {
-        setting.setTitleFunction(registration.titleMac);
-      } else {
-        setting.setTitleFunction(registration.title);
-      }
+      setting.setTitleFunction(registration.title);
       if (registration.userActionCondition) {
         setting.setRequiresUserAction(Boolean(Root.Runtime.Runtime.queryParam(registration.userActionCondition)));
       }
@@ -92,6 +90,10 @@ export class Settings {
 
       this.registerModuleSetting(setting);
     }
+  }
+
+  getRegisteredSettings(): SettingRegistration[] {
+    return getRegisteredSettingsInternal(this.#config);
   }
 
   static hasInstance(): boolean {
@@ -103,14 +105,15 @@ export class Settings {
     syncedStorage: SettingsStorage|null,
     globalStorage: SettingsStorage|null,
     localStorage: SettingsStorage|null,
+    config?: Root.Runtime.HostConfig,
   } = {forceNew: null, syncedStorage: null, globalStorage: null, localStorage: null}): Settings {
-    const {forceNew, syncedStorage, globalStorage, localStorage} = opts;
+    const {forceNew, syncedStorage, globalStorage, localStorage, config} = opts;
     if (!settingsInstance || forceNew) {
       if (!syncedStorage || !globalStorage || !localStorage) {
         throw new Error(`Unable to create settings: global and local storage must be provided: ${new Error().stack}`);
       }
 
-      settingsInstance = new Settings(syncedStorage, globalStorage, localStorage);
+      settingsInstance = new Settings(syncedStorage, globalStorage, localStorage, config);
     }
 
     return settingsInstance;
@@ -118,6 +121,10 @@ export class Settings {
 
   static removeInstance(): void {
     settingsInstance = undefined;
+  }
+
+  getHostConfig(): Root.Runtime.HostConfig|undefined {
+    return this.#config;
   }
 
   private registerModuleSetting(setting: Setting<unknown>): void {
@@ -139,6 +146,19 @@ export class Settings {
     this.moduleSettings.set(setting.name, setting);
   }
 
+  static normalizeSettingName(name: string): string {
+    if ([
+          VersionController.GLOBAL_VERSION_SETTING_NAME,
+          VersionController.SYNCED_VERSION_SETTING_NAME,
+          VersionController.LOCAL_VERSION_SETTING_NAME,
+          'currentDockState',
+          'isUnderTest',
+        ].includes(name)) {
+      return name;
+    }
+    return Platform.StringUtilities.toKebabCase(name);
+  }
+
   // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   moduleSetting<T = any>(settingName: string): Setting<T> {
@@ -157,6 +177,9 @@ export class Settings {
     return setting;
   }
 
+  /**
+   * Get setting via key, and create a new setting if the requested setting does not exist.
+   */
   createSetting<T>(key: string, defaultValue: T, storageType?: SettingStorageType): Setting<T> {
     const storage = this.storageFromType(storageType);
     let setting = (this.#registry.get(key) as Setting<T>);
@@ -271,6 +294,10 @@ export class SettingsStorage {
     this.backingStore.clear();
   }
 
+  keys(): string[] {
+    return Object.keys(this.object);
+  }
+
   dumpSizes(): void {
     Console.instance().log('Ten largest settings: ');
 
@@ -295,7 +322,7 @@ export class SettingsStorage {
   }
 }
 
-function removeSetting(setting: Setting<unknown>): void {
+function removeSetting(setting: {name: string, storage: SettingsStorage}): void {
   const name = setting.name;
   const settings = Settings.instance();
 
@@ -337,7 +364,7 @@ export class Setting<V> {
   constructor(
       readonly name: string, readonly defaultValue: V, private readonly eventSupport: ObjectWrapper<GenericEvents>,
       readonly storage: SettingsStorage) {
-    storage.register(name);
+    storage.register(this.name);
   }
 
   setSerializer(serializer: Serializer<unknown, V>): void {
@@ -377,7 +404,25 @@ export class Setting<V> {
   }
 
   disabled(): boolean {
+    if (this.#registration?.disabledCondition) {
+      const {disabled} = this.#registration.disabledCondition(Settings.instance().getHostConfig());
+      // If registration does not disable it, pass through to #disabled
+      // attribute check.
+      if (disabled) {
+        return true;
+      }
+    }
     return this.#disabled || false;
+  }
+
+  disabledReason(): string|undefined {
+    if (this.#registration?.disabledCondition) {
+      const result = this.#registration.disabledCondition(Settings.instance().getHostConfig());
+      if (result.disabled) {
+        return result.reason;
+      }
+    }
+    return undefined;
   }
 
   setDisabled(disabled: boolean): void {
@@ -584,7 +629,7 @@ export class VersionController {
   static readonly SYNCED_VERSION_SETTING_NAME = 'syncedInspectorVersion';
   static readonly LOCAL_VERSION_SETTING_NAME = 'localInspectorVersion';
 
-  static readonly CURRENT_VERSION = 35;
+  static readonly CURRENT_VERSION = 37;
 
   readonly #globalVersionSetting: Setting<number>;
   readonly #syncedVersionSetting: Setting<number>;
@@ -1197,6 +1242,39 @@ export class VersionController {
     breakpointsSetting.set(breakpoints);
   }
 
+  updateVersionFrom35To36(): void {
+    // We have changed the default from 'false' to 'true' and this updates the existing setting just for once.
+    Settings.instance().createSetting('showThirdPartyIssues', true).set(true);
+  }
+
+  updateVersionFrom36To37(): void {
+    const updateStorage = (storage: SettingsStorage): void => {
+      for (const key of storage.keys()) {
+        const normalizedKey = Settings.normalizeSettingName(key);
+        if (normalizedKey !== key) {
+          const value = storage.get(key);
+          removeSetting({name: key, storage});
+          storage.set(normalizedKey, value);
+        }
+      }
+    };
+    updateStorage(Settings.instance().globalStorage);
+    updateStorage(Settings.instance().syncedStorage);
+    updateStorage(Settings.instance().localStorage);
+
+    for (const key of Settings.instance().globalStorage.keys()) {
+      if ((key.startsWith('data-grid-') && key.endsWith('-column-weights')) || key.endsWith('-tab-order') ||
+          key === 'views-location-override' || key === 'closeable-tabs') {
+        const setting = Settings.instance().createSetting(key, {});
+        setting.set(Platform.StringUtilities.toKebabCaseKeys(setting.get()));
+      }
+      if (key.endsWith('-selected-tab')) {
+        const setting = Settings.instance().createSetting(key, '');
+        setting.set(Platform.StringUtilities.toKebabCase(setting.get()));
+      }
+    }
+  }
+
   /*
    * Any new migration should be added before this comment.
    *
@@ -1244,9 +1322,7 @@ export class VersionController {
   }
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum SettingStorageType {
+export const enum SettingStorageType {
   /**
    * Synced storage persists settings with the active Chrome profile but also
    * syncs the settings across devices via Chrome Sync.
@@ -1268,27 +1344,8 @@ export function settingForTest(settingName: string): Setting<unknown> {
   return Settings.instance().settingForTest(settingName);
 }
 
-export function detectColorFormat(color: Color): Format {
-  let format;
-  const formatSetting = Settings.instance().moduleSetting('colorFormat').get();
-  if (formatSetting === Format.RGB) {
-    format = Format.RGB;
-  } else if (formatSetting === Format.HSL) {
-    format = Format.HSL;
-  } else if (formatSetting === Format.HWB) {
-    format = Format.HWB;
-  } else if (formatSetting === Format.HEX) {
-    format = color.asLegacyColor().detectHEXFormat();
-  } else {
-    format = color.format();
-  }
-
-  return format;
-}
-
 export {
   getLocalizedSettingsCategory,
-  getRegisteredSettings,
   maybeRemoveSettingExtension,
   registerSettingExtension,
   RegExpSettingItem,

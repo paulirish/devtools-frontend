@@ -10,12 +10,20 @@
   display: inline-flex;
   flex-shrink: 0;
   align-items: center !important; /* stylelint-disable-line declaration-no-important */
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 input {
   height: 12px;
   width: 12px;
   flex-shrink: 0;
+  accent-color: var(--sys-color-primary-bright);
+  color: var(--sys-color-on-primary);
+
+  &:not(.small) {
+    margin: 6px;
+  }
 }
 
 input.inside-datagrid {
@@ -23,22 +31,14 @@ input.inside-datagrid {
   width: 10px;
 }
 
-input:focus {
-  outline: auto 5px -webkit-focus-ring-color;
-}
-
-:host-context(.-theme-with-dark-background) input {
-  accent-color: var(--color-checkbox-accent-color);
-}
-
 .dt-checkbox-text {
-  margin-left: 3px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .dt-checkbox-subtitle {
-  color: var(--color-text-secondary);
+  color: var(--sys-color-token-subtle);
+  white-space: break-spaces;
 }
 
 @media (forced-colors: active) {

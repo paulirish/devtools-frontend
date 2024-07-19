@@ -32,12 +32,12 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+import type * as ProtocolProxyApi from '../../generated/protocol-proxy-api.js';
+import type * as Protocol from '../../generated/protocol.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as Common from '../common/common.js';
 import * as Host from '../host/host.js';
 import * as Platform from '../platform/platform.js';
-import type * as ProtocolProxyApi from '../../generated/protocol-proxy-api.js';
-import type * as Protocol from '../../generated/protocol.js';
 
 import {CSSFontFace} from './CSSFontFace.js';
 import {CSSMatchedStyles} from './CSSMatchedStyles.js';
@@ -45,19 +45,21 @@ import {CSSMedia} from './CSSMedia.js';
 import {CSSStyleRule} from './CSSRule.js';
 import {CSSStyleDeclaration, Type} from './CSSStyleDeclaration.js';
 import {CSSStyleSheetHeader} from './CSSStyleSheetHeader.js';
-
 import {DOMModel, type DOMNode} from './DOMModel.js';
-
 import {
   Events as ResourceTreeModelEvents,
-  ResourceTreeModel,
+  PrimaryPageChangeType,
   type ResourceTreeFrame,
-  type PrimaryPageChangeType,
+  ResourceTreeModel,
 } from './ResourceTreeModel.js';
-
-import {Capability, type Target} from './Target.js';
 import {SDKModel} from './SDKModel.js';
 import {SourceMapManager} from './SourceMapManager.js';
+import {Capability, type Target} from './Target.js';
+
+export const enum ColorScheme {
+  Light = 'light',
+  Dark = 'dark',
+}
 
 export class CSSModel extends SDKModel<EventTypes> {
   readonly agent: ProtocolProxyApi.CSSApi;
@@ -77,6 +79,7 @@ export class CSSModel extends SDKModel<EventTypes> {
   #isEnabled: boolean;
   #isRuleUsageTrackingEnabled: boolean;
   #isTrackingRequestPending: boolean;
+  #colorScheme: ColorScheme|undefined;
 
   constructor(target: Target) {
     super(target);
@@ -110,10 +113,22 @@ export class CSSModel extends SDKModel<EventTypes> {
     this.#isTrackingRequestPending = false;
     this.#stylePollingThrottler = new Common.Throttler.Throttler(StylePollingInterval);
 
-    this.#sourceMapManager.setEnabled(Common.Settings.Settings.instance().moduleSetting('cssSourceMapsEnabled').get());
+    this.#sourceMapManager.setEnabled(
+        Common.Settings.Settings.instance().moduleSetting('css-source-maps-enabled').get());
     Common.Settings.Settings.instance()
-        .moduleSetting('cssSourceMapsEnabled')
+        .moduleSetting('css-source-maps-enabled')
         .addChangeListener(event => this.#sourceMapManager.setEnabled((event.data as boolean)));
+  }
+
+  async colorScheme(): Promise<ColorScheme|undefined> {
+    if (!this.#colorScheme) {
+      const colorSchemeResponse = await this.domModel()?.target().runtimeAgent().invoke_evaluate(
+          {expression: 'window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches'});
+      if (colorSchemeResponse && !colorSchemeResponse.exceptionDetails && !colorSchemeResponse.getError()) {
+        this.#colorScheme = colorSchemeResponse.result.value ? ColorScheme.Dark : ColorScheme.Light;
+      }
+    }
+    return this.#colorScheme;
   }
 
   headersForSourceURL(sourceURL: Platform.DevToolsPath.UrlString): CSSStyleSheetHeader[] {
@@ -174,7 +189,7 @@ export class CSSModel extends SDKModel<EventTypes> {
       return text;
     }
     const sourceURLLine = text.substr(sourceURLLineIndex + 1).split('\n', 1)[0];
-    const sourceURLRegex = /[\040\t]*\/\*[#@] sourceURL=[\040\t]*([^\s]*)[\040\t]*\*\/[\040\t]*$/;
+    const sourceURLRegex = /[\x20\t]*\/\*[#@] sourceURL=[\x20\t]*([^\s]*)[\x20\t]*\*\/[\x20\t]*$/;
     if (sourceURLLine.search(sourceURLRegex) === -1) {
       return text;
     }
@@ -202,6 +217,7 @@ export class CSSModel extends SDKModel<EventTypes> {
       this.fireStyleSheetChanged(styleSheetId, edit);
       return true;
     } catch (e) {
+      console.error(e);
       return false;
     }
   }
@@ -222,6 +238,29 @@ export class CSSModel extends SDKModel<EventTypes> {
       this.fireStyleSheetChanged(styleSheetId, edit);
       return true;
     } catch (e) {
+      console.error(e);
+      return false;
+    }
+  }
+
+  async setPropertyRulePropertyName(
+      styleSheetId: Protocol.CSS.StyleSheetId, range: TextUtils.TextRange.TextRange, text: string): Promise<boolean> {
+    Host.userMetrics.actionTaken(Host.UserMetrics.Action.StyleRuleEdited);
+
+    try {
+      await this.ensureOriginalStyleSheetText(styleSheetId);
+      const {propertyName} =
+          await this.agent.invoke_setPropertyRulePropertyName({styleSheetId, range, propertyName: text});
+
+      if (!propertyName) {
+        return false;
+      }
+      this.#domModel.markUndoableState();
+      const edit = new Edit(styleSheetId, range, text, propertyName);
+      this.fireStyleSheetChanged(styleSheetId, edit);
+      return true;
+    } catch (e) {
+      console.error(e);
       return false;
     }
   }
@@ -242,6 +281,7 @@ export class CSSModel extends SDKModel<EventTypes> {
       this.fireStyleSheetChanged(styleSheetId, edit);
       return true;
     } catch (e) {
+      console.error(e);
       return false;
     }
   }
@@ -307,7 +347,7 @@ export class CSSModel extends SDKModel<EventTypes> {
       return null;
     }
 
-    return new CSSMatchedStyles({
+    return await CSSMatchedStyles.create({
       cssModel: this,
       node: (node as DOMNode),
       inlinePayload: response.inlineStyle || null,
@@ -319,6 +359,10 @@ export class CSSModel extends SDKModel<EventTypes> {
       animationsPayload: response.cssKeyframesRules || [],
       parentLayoutNodeId: response.parentLayoutNodeId,
       positionFallbackRules: response.cssPositionFallbackRules || [],
+      positionTryRules: response.cssPositionTryRules || [],
+      propertyRules: response.cssPropertyRules ?? [],
+      cssPropertyRegistrations: response.cssPropertyRegistrations ?? [],
+      fontPaletteValuesRule: response.cssFontPaletteValuesRule,
     });
   }
 
@@ -431,6 +475,7 @@ export class CSSModel extends SDKModel<EventTypes> {
       this.fireStyleSheetChanged(styleSheetId, edit);
       return true;
     } catch (e) {
+      console.error(e);
       return false;
     }
   }
@@ -453,6 +498,7 @@ export class CSSModel extends SDKModel<EventTypes> {
       this.fireStyleSheetChanged(styleSheetId, edit);
       return true;
     } catch (e) {
+      console.error(e);
       return false;
     }
   }
@@ -474,6 +520,7 @@ export class CSSModel extends SDKModel<EventTypes> {
       this.fireStyleSheetChanged(styleSheetId, edit);
       return true;
     } catch (e) {
+      console.error(e);
       return false;
     }
   }
@@ -514,6 +561,7 @@ export class CSSModel extends SDKModel<EventTypes> {
       this.fireStyleSheetChanged(styleSheetId, edit);
       return new CSSStyleRule(this, rule);
     } catch (e) {
+      console.error(e);
       return null;
     }
   }
@@ -537,11 +585,13 @@ export class CSSModel extends SDKModel<EventTypes> {
       }
       return this.#styleSheetIdToHeader.get(styleSheetId) || null;
     } catch (e) {
+      console.error(e);
       return null;
     }
   }
 
   mediaQueryResultChanged(): void {
+    this.#colorScheme = undefined;
     this.dispatchEventToListeners(Events.MediaQueryResultChanged);
   }
 
@@ -719,7 +769,7 @@ export class CSSModel extends SDKModel<EventTypes> {
     if (event.data.frame.backForwardCacheDetails.restoredFromCache) {
       await this.suspendModel();
       await this.resumeModel();
-    } else {
+    } else if (event.data.type !== PrimaryPageChangeType.Activation) {
       this.resetStyleSheets();
       this.resetFontFaces();
     }
@@ -836,8 +886,6 @@ export class CSSModel extends SDKModel<EventTypes> {
   }
 }
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
 export enum Events {
   FontsUpdated = 'FontsUpdated',
   MediaQueryResultChanged = 'MediaQueryResultChanged',
@@ -998,9 +1046,7 @@ export class CSSPropertyTracker extends Common.ObjectWrapper.ObjectWrapper<CSSPr
 
 const StylePollingInterval = 1000;  // throttling interval for style polling, in milliseconds
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
-export enum CSSPropertyTrackerEvents {
+export const enum CSSPropertyTrackerEvents {
   TrackedCSSPropertiesUpdated = 'TrackedCSSPropertiesUpdated',
 }
 

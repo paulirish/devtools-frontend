@@ -35,26 +35,25 @@
 
 import * as Common from '../../core/common/common.js';
 import * as Platform from '../../core/platform/platform.js';
+import type * as Buttons from '../components/buttons/buttons.js';
+import type * as IconButton from '../components/icon_button/icon_button.js';
+import * as VisualLogging from '../visual_logging/visual_logging.js';
 
 import * as ARIAUtils from './ARIAUtils.js';
-import * as ThemeSupport from './theme_support/theme_support.js';
-import * as Utils from './utils/utils.js';
-
-import type * as IconButton from '../components/icon_button/icon_button.js';
-import {type Icon} from './Icon.js';
-
-import {InplaceEditor, type Config} from './InplaceEditor.js';
+import {type Config, InplaceEditor} from './InplaceEditor.js';
 import {Keys} from './KeyboardShortcut.js';
+import * as ThemeSupport from './theme_support/theme_support.js';
 import {Tooltip} from './Tooltip.js';
-import {deepElementFromPoint, enclosingNodeOrSelfWithNodeNameInArray, isEditing} from './UIUtils.js';
 import treeoutlineStyles from './treeoutline.css.legacy.js';
-
-type AnyIcon = Icon|IconButton.Icon.Icon;
+import {
+  createShadowRootWithCoreStyles,
+  deepElementFromPoint,
+  enclosingNodeOrSelfWithNodeNameInArray,
+  isEditing,
+} from './UIUtils.js';
 
 const nodeToParentTreeElementMap = new WeakMap<Node, TreeElement>();
 
-// TODO(crbug.com/1167717): Make this a const enum again
-// eslint-disable-next-line rulesdir/const_enum
 export enum Events {
   ElementAttached = 'ElementAttached',
   ElementsDetached = 'ElementsDetached',
@@ -103,6 +102,7 @@ export class TreeOutline extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
     this.focusable = true;
     this.setFocusable(true);
     this.element = this.contentElement;
+    this.element.setAttribute('jslog', `${VisualLogging.tree()}`);
     ARIAUtils.markAsTree(this.element);
     this.useLightSelectionColor = false;
     this.treeElementToScrollIntoView = null;
@@ -397,7 +397,7 @@ export class TreeOutlineInShadow extends TreeOutline {
     this.contentElement.classList.add('tree-outline');
     this.element = document.createElement('div');
     this.shadowRoot =
-        Utils.createShadowRootWithCoreStyles(this.element, {cssFile: treeoutlineStyles, delegatesFocus: undefined});
+        createShadowRootWithCoreStyles(this.element, {cssFile: treeoutlineStyles, delegatesFocus: undefined});
     this.disclosureElement = this.shadowRoot.createChild('div', 'tree-outline-disclosure');
     this.disclosureElement.appendChild(this.contentElement);
     this.renderSelection = true;
@@ -440,6 +440,7 @@ export class TreeElement {
   titleInternal: string|Node;
   private childrenInternal: TreeElement[]|null;
   childrenListNode: HTMLOListElement;
+  private expandLoggable = {};
   private hiddenInternal: boolean;
   private selectableInternal: boolean;
   expanded: boolean;
@@ -448,14 +449,14 @@ export class TreeElement {
   #expandRecursively: boolean = true;
   private collapsible: boolean;
   toggleOnClick: boolean;
-  button: HTMLButtonElement|null;
+  button: Buttons.Button.Button|null;
   root: boolean;
   private tooltipInternal: string;
   private leadingIconsElement: HTMLElement|null;
   private trailingIconsElement: HTMLElement|null;
   protected selectionElementInternal: HTMLElement|null;
   private disableSelectFocus: boolean;
-  constructor(title?: string|Node, expandable?: boolean) {
+  constructor(title?: string|Node, expandable?: boolean, jslogContext?: string|number) {
     this.treeOutline = null;
     this.parent = null;
     this.previousSibling = null;
@@ -473,6 +474,11 @@ export class TreeElement {
     this.listItemNode.addEventListener('mousedown', (this.handleMouseDown.bind(this) as EventListener), false);
     this.listItemNode.addEventListener('click', (this.treeElementToggled.bind(this) as EventListener), false);
     this.listItemNode.addEventListener('dblclick', this.handleDoubleClick.bind(this), false);
+    this.listItemNode.setAttribute(
+        'jslog', `${VisualLogging.treeItem().parent('parentTreeItem').context(jslogContext).track({
+          click: true,
+          keydown: 'ArrowUp|ArrowDown|ArrowLeft|ArrowRight|Backspace|Delete|Enter|Space|Home|End',
+        })}`);
     ARIAUtils.markAsTreeitem(this.listItemNode);
 
     this.childrenInternal = null;
@@ -784,7 +790,7 @@ export class TreeElement {
     }
   }
 
-  setLeadingIcons(icons: AnyIcon[]): void {
+  setLeadingIcons(icons: IconButton.Icon.Icon[]): void {
     if (!this.leadingIconsElement && !icons.length) {
       return;
     }
@@ -801,7 +807,7 @@ export class TreeElement {
     }
   }
 
-  setTrailingIcons(icons: AnyIcon[]): void {
+  setTrailingIcons(icons: IconButton.Icon.Icon[]): void {
     if (!this.trailingIconsElement && !icons.length) {
       return;
     }
@@ -846,6 +852,7 @@ export class TreeElement {
       this.collapse();
       ARIAUtils.unsetExpandable(this.listItemNode);
     } else {
+      VisualLogging.registerLoggable(this.expandLoggable, `${VisualLogging.expand()}`, this.listItemNode);
       ARIAUtils.setExpanded(this.listItemNode, false);
     }
   }
@@ -942,6 +949,7 @@ export class TreeElement {
         this.expand();
       }
     }
+    void VisualLogging.logClick(this.expandLoggable, event);
     event.consume();
   }
 
@@ -1268,6 +1276,14 @@ export class TreeElement {
   }
 
   onenter(): boolean {
+    if (this.expandable && !this.expanded) {
+      this.expand();
+      return true;
+    }
+    if (this.collapsible && this.expanded) {
+      this.collapse();
+      return true;
+    }
     return false;
   }
 
@@ -1391,3 +1407,11 @@ export class TreeElement {
     this.disableSelectFocus = toggle;
   }
 }
+
+function loggingParentProvider(e: Element): Element|undefined {
+  const treeElement = TreeElement.getTreeElementBylistItemNode(e);
+  const parentElement = treeElement?.parent?.listItemElement;
+  return parentElement?.isConnected && parentElement || treeElement?.treeOutline?.contentElement;
+}
+
+VisualLogging.registerParentProvider('parentTreeItem', loggingParentProvider);

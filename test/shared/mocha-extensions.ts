@@ -2,60 +2,38 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as FS from 'fs';
 import * as Mocha from 'mocha';
 import * as Path from 'path';
 
 import {getBrowserAndPages} from '../conductor/puppeteer-state.js';
+import {TestConfig} from '../conductor/test_config.js';
+import {ScreenshotError} from '../shared/screenshot-error.js';
 
 import {AsyncScope} from './async-scope.js';
-import {getEnvVar} from './config.js';
+import {platform, type Platform, TIMEOUT_ERROR_MESSAGE} from './helper.js';
 
-import {platform, type Platform} from './helper.js';
+export {after, beforeEach} from 'mocha';
 
-export {beforeEach} from 'mocha';
-
-let didInitializeHtmlOutputFile = false;
-
-function htmlEscape(raw: string) {
-  return raw.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
-}
-
-export async function takeScreenshots(testName: string) {
+export async function takeScreenshots(): Promise<{target?: string, frontend?: string}> {
   try {
     const {target, frontend} = getBrowserAndPages();
     const opts = {
       encoding: 'base64' as 'base64',
     };
+    await target.bringToFront();
     const targetScreenshot = await target.screenshot(opts);
+    await frontend.bringToFront();
     const frontendScreenshot = await frontend.screenshot(opts);
-    const prefix = 'data:image/png;base64,';
-    const screenshotFile = getEnvVar('HTML_OUTPUT_FILE');
-    if (screenshotFile) {
-      try {
-        FS.appendFileSync(
-            screenshotFile,
-            `<div><h3>${htmlEscape(testName)}</h3><p>Target page screenshot</p><p><img src="${
-                prefix + targetScreenshot}"/></p><p>Frontend screenshot</p><p><img src="${
-                prefix + frontendScreenshot}"/></p></div>\n`);
-        console.error(`Screenshots saved to "${screenshotFile}"`);
-      } catch (err) {
-        console.error(`Error saving to file "${screenshotFile}": `, err);
-      }
-    } else {
-      console.error('Target page screenshot (copy the next line and open in the browser):');
-      console.error(prefix + targetScreenshot);
-      console.error('Frontend screenshot (copy the next line and open in the browser):');
-      console.error(prefix + frontendScreenshot);
-    }
+    return {target: targetScreenshot, frontend: frontendScreenshot};
   } catch (err) {
     console.error('Error taking a screenshot', err);
+    return {};
   }
 }
 
 function wrapSuiteFunction(fn: (this: Mocha.Suite) => void) {
   return function(this: Mocha.Suite): void {
-    const hookCreationHook = (hook: Mocha.Hook): void => {
+    const hookCreationHook = (hook: Mocha.Hook) => {
       const originalFn = hook.fn;
       if (!originalFn) {
         return;
@@ -92,7 +70,7 @@ export function wrapDescribe<ReturnT>(
         const directories = parsedPath.dir.split(Path.sep);
         const index = directories.lastIndexOf('e2e');
         if (index >= 0) {
-          return Path.join(...directories.slice(index + 1), `${parsedPath.name}.ts`);
+          return [...directories.slice(index + 1), `${parsedPath.name}.ts`].join('/');
         }
         if (!fallback) {
           fallback = parsedPath.name;
@@ -129,18 +107,18 @@ describe.skipOnPlatforms = function(platforms: Array<Platform>, name: string, fn
   }
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function timeoutHook(this: Mocha.Runnable, done: Mocha.Done|undefined, err?: any) {
+async function timeoutHook(this: Mocha.Runnable, done: Mocha.Done|undefined, err?: unknown) {
   function* joinStacks() {
     const scopes = AsyncScope.scopes;
     if (scopes.size === 0) {
       return;
     }
     for (const scope of scopes.values()) {
-      const stack = scope.stack;
+      const {descriptions, stack} = scope;
       scope.setCanceled();
       if (stack) {
-        yield `${stack.join('\n')}\n`;
+        const stepDescription = descriptions ? `${descriptions.join(' > ')}:\n` : '';
+        yield `${stepDescription}${stack.join('\n')}\n`;
       }
     }
   }
@@ -149,12 +127,14 @@ async function timeoutHook(this: Mocha.Runnable, done: Mocha.Done|undefined, err
   if (stacks.length > 0) {
     const msg = `Pending async operations during timeout:\n${stacks.join('\n\n')}`;
     console.error(msg);
+
     if (err && err instanceof Error) {
       err.cause = new Error(msg);
     }
   }
-  if (err && !getEnvVar('DEBUG_TEST')) {
-    await takeScreenshots(this.fullTitle());
+  if (err && !TestConfig.debug && !(err instanceof ScreenshotError)) {
+    const {target, frontend} = await takeScreenshots();
+    err = ScreenshotError.fromBase64Images(err, target, frontend);
   }
   if (done) {
     // This workaround is needed to allow timeoutHook to be async.
@@ -168,8 +148,6 @@ export const it = makeCustomWrappedIt();
 
 type MochaCallback = Mocha.Func|Mocha.AsyncFunc;
 
-const iterations = getEnvVar('ITERATIONS', 1);
-
 function iterationSuffix(iteration: number): string {
   if (iteration === 0) {
     return '';
@@ -179,7 +157,7 @@ function iterationSuffix(iteration: number): string {
 
 export function makeCustomWrappedIt(namePrefix: string = '') {
   const newMochaItFunc = function(name: string, callback: MochaCallback) {
-    for (let i = 0; i < iterations; i++) {
+    for (let i = 0; i < TestConfig.repetitions; i++) {
       const testName = namePrefix ? `${namePrefix} ${name}` : name;
       wrapMochaCall(Mocha.it, testName + iterationSuffix(i), callback);
     }
@@ -200,7 +178,7 @@ export function makeCustomWrappedIt(namePrefix: string = '') {
   };
 
   newMochaItFunc.only = function(name: string, callback: Mocha.Func|Mocha.AsyncFunc) {
-    for (let i = 0; i < iterations; i++) {
+    for (let i = 0; i < TestConfig.repetitions; i++) {
       wrapMochaCall(Mocha.it.only, name + iterationSuffix(i), callback);
     }
   };
@@ -212,20 +190,6 @@ export function makeCustomWrappedIt(namePrefix: string = '') {
   };
 
   return newMochaItFunc;
-}
-
-function initializeHtmlOutputFile() {
-  if (didInitializeHtmlOutputFile) {
-    return;
-  }
-  didInitializeHtmlOutputFile = true;
-  const filename = getEnvVar('HTML_OUTPUT_FILE');
-
-  if (filename) {
-    // We can add styles or scripts or UI here, but for
-    // now we will start with a blank file.
-    FS.writeFileSync(filename, '');
-  }
 }
 
 function hookTestTimeout(test?: Mocha.Runnable) {
@@ -241,13 +205,17 @@ function wrapMochaCall(
     call: Mocha.TestFunction|Mocha.PendingTestFunction|Mocha.ExclusiveTestFunction, name: string,
     callback: Mocha.Func|Mocha.AsyncFunc) {
   const test = call(name, function(done: Mocha.Done) {
-    initializeHtmlOutputFile();
-    hookTestTimeout(test);
+    // If this is a test retry, the current test will be a clone of the original test, and
+    // we need to find it and hook that instead of the original test.
+    const currentTest = test?.ctx?.test ?? test;
+    hookTestTimeout(currentTest);
 
     if (callback.length === 0) {
       async function onError(this: unknown, err?: unknown) {
-        if (err && !getEnvVar('DEBUG_TEST')) {
-          await takeScreenshots(name);
+        const isTimeoutError = err instanceof Error && err.message?.includes(TIMEOUT_ERROR_MESSAGE);
+        if (err && !TestConfig.debug && !(err instanceof ScreenshotError) && !isTimeoutError) {
+          const {target, frontend} = await takeScreenshots();
+          err = ScreenshotError.fromBase64Images(err, target, frontend);
         }
         done.call(this, err);
       }
@@ -257,3 +225,5 @@ function wrapMochaCall(
     }
   });
 }
+
+export const itScreenshot = makeCustomWrappedIt('[screenshot]:');

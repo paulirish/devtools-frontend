@@ -10,20 +10,22 @@ import {AttributionReportingIssue} from './AttributionReportingIssue.js';
 import {BounceTrackingIssue} from './BounceTrackingIssue.js';
 import {ClientHintIssue} from './ClientHintIssue.js';
 import {ContentSecurityPolicyIssue} from './ContentSecurityPolicyIssue.js';
+import {CookieDeprecationMetadataIssue} from './CookieDeprecationMetadataIssue.js';
+import {CookieIssue} from './CookieIssue.js';
 import {CorsIssue} from './CorsIssue.js';
 import {CrossOriginEmbedderPolicyIssue, isCrossOriginEmbedderPolicyIssue} from './CrossOriginEmbedderPolicyIssue.js';
 import {DeprecationIssue} from './DeprecationIssue.js';
 import {FederatedAuthRequestIssue} from './FederatedAuthRequestIssue.js';
-import {FederatedAuthUserInfoRequestIssue} from './FederatedAuthUserInfoRequestIssue.js';
 import {GenericIssue} from './GenericIssue.js';
 import {HeavyAdIssue} from './HeavyAdIssue.js';
 import {type Issue, type IssueKind} from './Issue.js';
 import {Events} from './IssuesManagerEvents.js';
 import {LowTextContrastIssue} from './LowTextContrastIssue.js';
 import {MixedContentIssue} from './MixedContentIssue.js';
+import {PropertyRuleIssue} from './PropertyRuleIssue.js';
 import {QuirksModeIssue} from './QuirksModeIssue.js';
-import {CookieIssue} from './CookieIssue.js';
 import {SharedArrayBufferIssue} from './SharedArrayBufferIssue.js';
+import {SharedDictionaryIssue} from './SharedDictionaryIssue.js';
 import {SourceFrameIssuesManager} from './SourceFrameIssuesManager.js';
 import {StylesheetLoadingIssue} from './StylesheetLoadingIssue.js';
 
@@ -70,6 +72,10 @@ const issueCodeHandlers = new Map<
     SharedArrayBufferIssue.fromInspectorIssue,
   ],
   [
+    Protocol.Audits.InspectorIssueCode.SharedDictionaryIssue,
+    SharedDictionaryIssue.fromInspectorIssue,
+  ],
+  [
     Protocol.Audits.InspectorIssueCode.LowTextContrastIssue,
     LowTextContrastIssue.fromInspectorIssue,
   ],
@@ -110,8 +116,12 @@ const issueCodeHandlers = new Map<
     StylesheetLoadingIssue.fromInspectorIssue,
   ],
   [
-    Protocol.Audits.InspectorIssueCode.FederatedAuthUserInfoRequestIssue,
-    FederatedAuthUserInfoRequestIssue.fromInspectorIssue,
+    Protocol.Audits.InspectorIssueCode.PropertyRuleIssue,
+    PropertyRuleIssue.fromInspectorIssue,
+  ],
+  [
+    Protocol.Audits.InspectorIssueCode.CookieDeprecationMetadataIssue,
+    CookieDeprecationMetadataIssue.fromInspectorIssue,
   ],
 ]);
 
@@ -153,7 +163,7 @@ export function defaultHideIssueByCodeSetting(): HideIssueMenuSetting {
 
 export function getHideIssueByCodeSetting(): Common.Settings.Setting<HideIssueMenuSetting> {
   return Common.Settings.Settings.instance().createSetting(
-      'HideIssueByCodeSetting-Experiment-2021', defaultHideIssueByCodeSetting());
+      'hide-issue-by-code-setting-experiment-2021', defaultHideIssueByCodeSetting());
 }
 
 /**
@@ -190,7 +200,7 @@ export class IssuesManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes
     SDK.FrameManager.FrameManager.instance().addEventListener(
         SDK.FrameManager.Events.FrameAddedToTarget, this.#onFrameAddedToTarget, this);
 
-    // issueFilter uses the 'showThirdPartyIssues' setting. Clients of IssuesManager need
+    // issueFilter uses the 'show-third-party-issues' setting. Clients of IssuesManager need
     // a full update when the setting changes to get an up-to-date issues list.
     this.showThirdPartyIssuesSetting?.addChangeListener(() => this.#updateFilteredIssues());
     this.hideIssueSetting?.addChangeListener(() => this.#updateFilteredIssues());
@@ -250,7 +260,9 @@ export class IssuesManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes
           (frame.resourceTreeModel().target() === issue.model()?.target())) {
         keptIssues.set(key, issue);
         // Keep BounceTrackingIssues alive for non-user-initiated navigations.
-      } else if (issue.code() === Protocol.Audits.InspectorIssueCode.BounceTrackingIssue) {
+      } else if (
+          issue.code() === Protocol.Audits.InspectorIssueCode.BounceTrackingIssue ||
+          issue.code() === Protocol.Audits.InspectorIssueCode.CookieIssue) {
         const networkManager = frame.resourceTreeModel().target().model(SDK.NetworkManager.NetworkManager);
         if (networkManager?.requestForLoaderId(frame.loaderId as Protocol.Network.LoaderId)?.hasUserGesture() ===
             false) {
@@ -292,6 +304,10 @@ export class IssuesManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes
     const issues = createIssuesFromProtocolIssue(issuesModel, inspectorIssue);
     for (const issue of issues) {
       this.addIssue(issuesModel, issue);
+      const message = issue.maybeCreateConsoleMessage();
+      if (message) {
+        issuesModel.target().model(SDK.ConsoleModel.ConsoleModel)?.addMessage(message);
+      }
     }
   }
 
@@ -437,7 +453,7 @@ export type EventTypes = {
 };
 
 // @ts-ignore
-globalThis.addIssueForTest = (issue: Protocol.Audits.InspectorIssue): void => {
+globalThis.addIssueForTest = (issue: Protocol.Audits.InspectorIssue) => {
   const mainTarget = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
   const issuesModel = mainTarget?.model(SDK.IssuesModel.IssuesModel);
   issuesModel?.issueAdded({issue});

@@ -13,7 +13,7 @@ import {
   waitForStackTopMatch,
 } from '../helpers/sources-helpers.js';
 
-describe('Watch Expression Pane', async () => {
+describe('Watch Expression Pane', () => {
   it('collapses children when editing', async () => {
     const {frontend} = getBrowserAndPages();
     await openSourcesPanel();
@@ -44,11 +44,6 @@ describe('Watch Expression Pane', async () => {
 
   it('deobfuscates variable names', async () => {
     const {target, frontend} = getBrowserAndPages();
-
-    await frontend.evaluate(() => {
-      // @ts-ignore
-      globalThis.Root.Runtime.experiments.setEnabled('evaluateExpressionsWithSourceMaps', true);
-    });
 
     await openSourceCodeEditorForFile('sourcemap-scopes-minified.js', 'sourcemap-scopes-minified.html');
 

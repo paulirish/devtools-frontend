@@ -4,7 +4,6 @@
 
 import {assert} from 'chai';
 
-import {getTestServerPort} from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
 import {
   getConsoleMessages,
@@ -12,7 +11,7 @@ import {
   waitForConsoleMessagesToBeNonEmpty,
 } from '../helpers/console-helpers.js';
 
-describe('The Console Tab', async () => {
+describe('The Console Tab', () => {
   it('shows BigInts formatted', async () => {
     const messages = await getConsoleMessages('big-int', false, () => waitForConsoleMessagesToBeNonEmpty(5));
 
@@ -33,10 +32,9 @@ describe('The Console Tab', async () => {
     at uncaught-promise.html:7:18`,
       `Uncaught (in promise) Error: err2
     at uncaught-promise.html:25:10`,
-      `Uncaught (in promise) DOMException: Failed to execute 'removeChild' on 'Node': The node to be removed is not a child of this node.
-    at throwDOMException (https://localhost:${
-          getTestServerPort()}/test/e2e/resources/console/uncaught-promise.html:40:7)
-    at catcher (https://localhost:${getTestServerPort()}/test/e2e/resources/console/uncaught-promise.html:33:5)`,
+      `Uncaught (in promise) NotFoundError: Failed to execute 'removeChild' on 'Node': The node to be removed is not a child of this node.
+    at throwDOMException (uncaught-promise.html:40:7)
+    at catcher (uncaught-promise.html:33:5)`,
     ]);
   });
 
@@ -46,7 +44,7 @@ describe('The Console Tab', async () => {
     assert.deepEqual(messages, [
       '{}',
       'ƒ Object() { [native code] }',
-      '{constructor: ƒ, __defineGetter__: ƒ, __defineSetter__: ƒ, hasOwnProperty: ƒ, __lookupGetter__: ƒ,\xA0…}',
+      '{__defineGetter__: ƒ, __defineSetter__: ƒ, hasOwnProperty: ƒ, __lookupGetter__: ƒ, __lookupSetter__: ƒ,\xA0…}',
       '{foo: \'foo\'}',
       '{bar: \'bar\'}',
       '[\'test\']',
@@ -140,8 +138,8 @@ describe('The Console Tab', async () => {
       '{longSubNamespace: {…}}',
       'namespace.longSubNamespace.x.className\xA0{}',
       '{}',
-      'ArrayLike(5)\xA0[empty × 5]',
-      'ArrayLike(4294967295)\xA0[empty × 4294967295]',
+      'ArrayLike\xA0{length: 5}',
+      'ArrayLike\xA0{length: 4294967295}',
       'ArrayLike\xA0{length: -5}',
       'ArrayLike\xA0{length: 5.6}',
       'ArrayLike\xA0{length: NaN}',
@@ -168,7 +166,7 @@ describe('The Console Tab', async () => {
       'HTMLFormControlsCollection(3)\xA0[select, input, input, sel: select, input: RadioNodeList(2)]',
       'RadioNodeList(2)\xA0[input, input, value: \'\']',
       'DOMTokenList(3)\xA0[\'c1\', \'c2\', \'c3\', value: \'c1 c2 c3\']',
-      'DOMException: Failed to execute \'removeChild\' on \'Node\': The node to be removed is not a child of this node.',
+      'NotFoundError: Failed to execute \'removeChild\' on \'Node\': The node to be removed is not a child of this node.',
     ]);
   });
 
@@ -243,7 +241,7 @@ describe('The Console Tab', async () => {
     ]);
   });
 
-  describe('shows messages from before', async () => {
+  describe('shows messages from before', () => {
     it('iframe removal', async () => {
       const messages =
           await getConsoleMessages('navigation/after-removal', false, () => waitForConsoleMessagesToBeNonEmpty(3));

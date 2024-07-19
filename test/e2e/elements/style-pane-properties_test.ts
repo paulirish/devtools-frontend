@@ -9,31 +9,37 @@ import {
   $$,
   assertNotNullOrUndefined,
   click,
-  getBrowserAndPages,
-  waitFor,
   clickElement,
-  waitForFunction,
+  getBrowserAndPages,
+  goToHtml,
   hover,
+  waitFor,
+  waitForFunction,
+  waitForMany,
 } from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
 import {
   editQueryRuleText,
+  expandSelectedNodeRecursively,
+  focusCSSPropertyValue,
   getComputedStylesForDomNode,
-  getDisplayedCSSPropertyNames,
+  getCSSPropertyInRule,
   getDisplayedCSSDeclarations,
+  getDisplayedCSSPropertyNames,
   getDisplayedStyleRules,
   getDisplayedStyleRulesCompact,
   getStyleRule,
   getStyleSectionSubtitles,
   goToResourceAndWaitForStyleSection,
+  waitForAndClickTreeElementWithPartialText,
   waitForContentOfSelectedElementsNode,
+  waitForCSSPropertyValue,
+  waitForElementsStyleSection,
+  waitForPartialContentOfSelectedElementsNode,
   waitForPropertyToHighlight,
   waitForStyleRule,
-  expandSelectedNodeRecursively,
-  waitForAndClickTreeElementWithPartialText,
-  focusCSSPropertyValue,
-  waitForCSSPropertyValue,
 } from '../helpers/elements-helpers.js';
+import {openPanelViaMoreTools} from '../helpers/settings-helpers.js';
 
 const PROPERTIES_TO_DELETE_SELECTOR = '#properties-to-delete';
 const PROPERTIES_TO_INSPECT_SELECTOR = '#properties-to-inspect';
@@ -55,39 +61,38 @@ const deletePropertyByBackspace = async (selector: string, root?: puppeteer.Elem
   await waitFor('.tree-outline .child-editing', root);
 };
 
-describe('The Styles pane', async () => {
-  it(
-      'can display the CSS properties of the selected element', async () => {
-        await goToResourceAndWaitForStyleSection('elements/simple-styled-page.html');
+describe('The Styles pane', () => {
+  it('can display the CSS properties of the selected element', async () => {
+    await goToResourceAndWaitForStyleSection('elements/simple-styled-page.html');
 
-        const onH1RuleAppeared = waitForStyleRule('h1');
+    const onH1RuleAppeared = waitForStyleRule('h1');
 
-        await waitForAndClickTreeElementWithPartialText('<h1>');
-        await onH1RuleAppeared;
+    await waitForAndClickTreeElementWithPartialText('<h1>');
+    await onH1RuleAppeared;
 
-        await waitForFunction(async () => (await getDisplayedStyleRules()).length === 4);
-        const h1Rules = await getDisplayedStyleRules();
-        // Waiting for the first h1 rule, that's the authored rule, right after the element style.
-        assert.deepEqual(h1Rules[1], {
-          selectorText: 'body h1',
-          propertyData: [{propertyName: 'color', isOverLoaded: false, isInherited: false}],
-        });
+    await waitForFunction(async () => (await getDisplayedStyleRules()).length === 4);
+    const h1Rules = await getDisplayedStyleRules();
+    // Waiting for the first h1 rule, that's the authored rule, right after the element style.
+    assert.deepEqual(h1Rules[1], {
+      selectorText: 'body h1',
+      propertyData: [{propertyName: 'color', isOverLoaded: false, isInherited: false}],
+    });
 
-        const onH2RuleAppeared = waitForStyleRule('h2');
-        await waitForAndClickTreeElementWithPartialText('<h2>');
-        await onH2RuleAppeared;
+    const onH2RuleAppeared = waitForStyleRule('h2');
+    await waitForAndClickTreeElementWithPartialText('<h2>');
+    await onH2RuleAppeared;
 
-        await waitForFunction(async () => (await getDisplayedStyleRules()).length === 3);
-        // Waiting for the first h2 rule, that's the authored rule, right after the element style.
-        const h2Rules = await getDisplayedStyleRules();
-        assert.deepEqual(h2Rules[1], {
-          selectorText: 'h2',
-          propertyData: [
-            {propertyName: 'background-color', isOverLoaded: false, isInherited: false},
-            {propertyName: 'color', isOverLoaded: false, isInherited: false},
-          ],
-        });
-      });
+    await waitForFunction(async () => (await getDisplayedStyleRules()).length === 3);
+    // Waiting for the first h2 rule, that's the authored rule, right after the element style.
+    const h2Rules = await getDisplayedStyleRules();
+    assert.deepEqual(h2Rules[1], {
+      selectorText: 'h2',
+      propertyData: [
+        {propertyName: 'background-color', isOverLoaded: false, isInherited: false},
+        {propertyName: 'color', isOverLoaded: false, isInherited: false},
+      ],
+    });
+  });
 
   it('can jump to a CSS variable definition', async () => {
     await goToResourceAndWaitForStyleSection('elements/css-variables.html');
@@ -216,7 +221,7 @@ describe('The Styles pane', async () => {
         subtitles,
         [
           '',
-          'css-module.css:1',
+          'css-module.css:7',
           'constructed stylesheet',
           'stylesheets…ces.html:10',
           'stylesheets…rces.html:7',
@@ -245,7 +250,13 @@ describe('The Styles pane', async () => {
             selectorText: '#properties-to-inspect',
             propertyData: [{propertyName: 'width', isOverLoaded: false, isInherited: false}],
           },
-          {selectorText: 'div', propertyData: [{propertyName: 'display', isOverLoaded: false, isInherited: false}]},
+          {
+            selectorText: 'div',
+            propertyData: [
+              {propertyName: 'display', isOverLoaded: false, isInherited: false},
+              {propertyName: 'unicode-bidi', isOverLoaded: false, isInherited: false},
+            ],
+          },
         ],
         'The correct rule is displayed');
   });
@@ -383,7 +394,7 @@ describe('The Styles pane', async () => {
     const rule1PropertiesSection = await getStyleRule(RULE1_SELECTOR);
     const supportsQuery = await waitFor('.query.editable', rule1PropertiesSection);
     const supportsQueryText = await supportsQuery.evaluate(node => (node as HTMLElement).innerText as string);
-    assert.deepEqual(supportsQueryText, '@supports (width: 10px)', 'incorrectly displayed @supports rule');
+    assert.deepEqual(supportsQueryText, '@supports (width: 10px) {', 'incorrectly displayed @supports rule');
   });
 
   it('can display @layer separators', async () => {
@@ -397,7 +408,6 @@ describe('The Styles pane', async () => {
       const layers = await $$(LAYER_SEPARATOR_SELECTOR);
       return layers.length === 6 ? layers : null;
     });
-    assertNotNullOrUndefined(layerSeparators);
 
     const layerText = await Promise.all(layerSeparators.map(element => element.evaluate(node => node.textContent)));
     assert.deepEqual(layerText, [
@@ -522,7 +532,6 @@ describe('The Styles pane', async () => {
       const separators = await $$(SIDEBAR_SEPARATOR_SELECTOR);
       return separators.length === 8 ? separators : null;
     });
-    assertNotNullOrUndefined(sidebarSeparators);
 
     const layerText = await Promise.all(sidebarSeparators.map(element => element.evaluate(node => node.textContent)));
     assert.deepEqual(layerText, [
@@ -800,19 +809,14 @@ describe('The Styles pane', async () => {
 
     const inspectedRules = await getDisplayedCSSDeclarations();
     assert.deepStrictEqual(inspectedRules, [
-      'background: black;',
-      'background-image: initial;',
-      'background-position-x: initial;',
-      'background-position-y: initial;',
-      'background-size: initial;',
-      'background-repeat-x: initial;',
-      'background-repeat-y: initial;',
-      'background-attachment: initial;',
-      'background-origin: initial;',
-      'background-clip: initial;',
-      'background-color: black;',
-      'background-color: yellow;',
+      'margin: 10px;',
+      'margin-top: 10px;',
+      'margin-right: 10px;',
+      'margin-bottom: 10px;',
+      'margin-left: 10px;',
+      'margin-left: 20px;',
       'display: block;',
+      'unicode-bidi: isolate;',
     ]);
   });
 
@@ -1155,5 +1159,62 @@ describe('The Styles pane', async () => {
       await assertBodyColor(green);
       await assertIsEditing(false);
     });
+  });
+
+  it('correctly renders and updates light-dark properties using UA color scheme', async () => {
+    await goToHtml(`
+     <style>
+     body {
+       color-scheme: light dark;
+       color: light-dark(red, blue);
+     }
+     </style>`);
+    await waitForElementsStyleSection();
+    await waitForPartialContentOfSelectedElementsNode('<body>\u200B');
+
+    const {target} = getBrowserAndPages();
+
+    const color = await target.evaluate(() => {
+      return getComputedStyle(document.body).color;
+    });
+
+    const red = 'rgb(255, 0, 0)';
+    const blue = 'rgb(0, 0, 255)';
+    assert.isTrue(color === red || color === blue, 'light-dark color is neither red nor blue');
+
+    await openPanelViaMoreTools('Rendering');
+
+    let isLight = color === red;
+
+    await waitForLightDark(isLight);
+    isLight = await toggleColorScheme(!isLight);
+    await waitForLightDark(isLight);
+    isLight = await toggleColorScheme(!isLight);
+    await waitForLightDark(isLight);
+    isLight = await toggleColorScheme(!isLight);
+    await waitForLightDark(isLight);
+
+    async function toggleColorScheme(isLight: boolean): Promise<boolean> {
+      const select = await waitFor('select:has(> option[value="light"])');
+      return await select.evaluate((select, isLight) => {
+        (select as HTMLSelectElement).selectedIndex = isLight ? 2 : 1;
+        return !isLight;
+      }, isLight);
+    }
+
+    async function waitForLightDark(isLight: boolean): Promise<void> {
+      await waitForFunction(async () => {
+        const property = await getCSSPropertyInRule('body', 'color');
+        if (!property) {
+          return undefined;
+        }
+        const swatches = await waitForMany('.color-swatch-inner', 3);
+        const swatchColors = await Promise.all(
+            swatches.map(swatch => swatch.evaluate(swatch => getComputedStyle(swatch).backgroundColor)));
+        assert.deepStrictEqual(swatchColors.slice(1), [red, blue]);
+
+        return isLight ? swatchColors[0] === red : swatchColors[0] === blue;
+      });
+    }
   });
 });

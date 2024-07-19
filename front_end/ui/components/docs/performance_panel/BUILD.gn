@@ -10,11 +10,13 @@ ts_library("ts") {
   sources = [
     "basic.ts",
     "flamechart.ts",
+    "network_request_details.ts",
+    "network_request_tooltip.ts",
     "overview.ts",
+    "timeline_history_manager.ts",
     "track_example.ts",
   ]
   deps = [
-    "../../../../../test/unittests/front_end/helpers",
     "../../../../core/common:bundle",
     "../../../../core/sdk:bundle",
     "../../../../models/bindings:bundle",
@@ -22,6 +24,7 @@ ts_library("ts") {
     "../../../../models/trace:bundle",
     "../../../../models/workspace:bundle",
     "../../../../panels/timeline:bundle",
+    "../../../../testing",
     "../../../legacy:bundle",
     "../../../legacy/components/perf_ui:bundle",
     "../../helpers:bundle",
@@ -33,7 +36,10 @@ copy_to_gen("performance_panel") {
   sources = [
     "basic.html",
     "flamechart.html",
+    "network_request_details.html",
+    "network_request_tooltip.html",
     "overview.html",
+    "timeline_history_manager.html",
     "track_example.html",
   ]
 

@@ -7,17 +7,18 @@ import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import type * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import type * as Protocol from '../../generated/protocol.js';
 import type * as IssuesManager from '../../models/issues_manager/issues_manager.js';
 import * as Logs from '../../models/logs/logs.js';
+import type * as NetworkForward from '../../panels/network/forward/forward.js';
 import * as IconButton from '../../ui/components/icon_button/icon_button.js';
+import * as RequestLinkIcon from '../../ui/components/request_link_icon/request_link_icon.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
-import type * as NetworkForward from '../../panels/network/forward/forward.js';
-import type * as Protocol from '../../generated/protocol.js';
-import * as RequestLinkIcon from '../../ui/components/request_link_icon/request_link_icon.js';
+import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
-import {type IssueView} from './IssueView.js';
 import {type AggregatedIssue} from './IssueAggregator.js';
+import {type IssueView} from './IssueView.js';
 
 const UIStrings = {
   /**
@@ -40,7 +41,6 @@ export const enum AffectedItem {
   Cookie = 'Cookie',
   Directive = 'Directive',
   Element = 'Element',
-  LearnMore = 'LearnMore',
   Request = 'Request',
   Source = 'Source',
 }
@@ -72,8 +72,8 @@ export abstract class AffectedResourcesView extends UI.TreeOutline.TreeElement {
   #unresolvedFrameIds: Set<string>;
   protected requestResolver: Logs.RequestResolver.RequestResolver;
 
-  constructor(parent: IssueView, issue: AggregatedIssue) {
-    super();
+  constructor(parent: IssueView, issue: AggregatedIssue, jslogContext: string) {
+    super(/* title */ undefined, /* expandable */ undefined, jslogContext);
     this.#parentView = parent;
     this.issue = issue;
     this.toggleOnClick = true;
@@ -182,7 +182,7 @@ export abstract class AffectedResourcesView extends UI.TreeOutline.TreeElement {
       const icon = new IconButton.Icon.Icon();
       icon.data = {iconName: 'code-circle', color: 'var(--icon-link)', width: '16px', height: '16px'};
       icon.classList.add('link', 'elements-panel');
-      icon.onclick = async(): Promise<void> => {
+      icon.onclick = async () => {
         Host.userMetrics.issuesPanelResourceOpened(issueCategory, AffectedItem.Element);
         const frame = SDK.FrameManager.FrameManager.instance().getFrame(frameId);
         if (frame) {
@@ -196,13 +196,13 @@ export abstract class AffectedResourcesView extends UI.TreeOutline.TreeElement {
       frameCell.appendChild(icon);
     }
     frameCell.appendChild(document.createTextNode(url));
-    frameCell.onmouseenter = (): void => {
+    frameCell.onmouseenter = () => {
       const frame = SDK.FrameManager.FrameManager.instance().getFrame(frameId);
       if (frame) {
         void frame.highlight();
       }
     };
-    frameCell.onmouseleave = (): void => SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight();
+    frameCell.onmouseleave = () => SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight();
     return frameCell;
   }
 
@@ -258,6 +258,7 @@ export abstract class AffectedResourcesView extends UI.TreeOutline.TreeElement {
       const sourceAnchor = linkifier.linkifyScriptLocation(
           target || null, sourceLocation.scriptId || null, sourceLocation.url as Platform.DevToolsPath.UrlString,
           sourceLocation.lineNumber, {columnNumber: sourceLocation.columnNumber, inlineFrameIndex: 0});
+      sourceAnchor.setAttribute('jslog', `${VisualLogging.link('source-location').track({click: true})}`);
       sourceCodeLocation.appendChild(sourceAnchor);
     }
     element.appendChild(sourceCodeLocation);
@@ -273,17 +274,25 @@ export abstract class AffectedResourcesView extends UI.TreeOutline.TreeElement {
     header.appendChild(info);
   }
 
-  protected createIssueDetailCell(textContent: string, additionalClass: string|null = null): HTMLTableDataCellElement {
+  protected createIssueDetailCell(textContent: string|HTMLElement, additionalClass: string|null = null):
+      HTMLTableDataCellElement {
     const cell = document.createElement('td');
-    cell.textContent = textContent;
+
+    if (typeof textContent === 'string') {
+      cell.textContent = textContent;
+    } else {
+      cell.appendChild(textContent);
+    }
+
     if (additionalClass) {
       cell.classList.add(additionalClass);
     }
     return cell;
   }
 
-  protected appendIssueDetailCell(element: HTMLElement, textContent: string, additionalClass: string|null = null):
-      HTMLTableDataCellElement {
+  protected appendIssueDetailCell(
+      element: HTMLElement, textContent: string|HTMLElement,
+      additionalClass: string|null = null): HTMLTableDataCellElement {
     const cell = this.createIssueDetailCell(textContent, additionalClass);
     element.appendChild(cell);
     return cell;

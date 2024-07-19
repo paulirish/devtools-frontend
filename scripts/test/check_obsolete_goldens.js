@@ -10,12 +10,13 @@ const exec = util.promisify(childProcess.exec);
 
 const yargsObject =
     require('yargs')
-        .option('interaction-test-root', {type: 'string', desc: 'file path of the interaction test root directory.'})
+        .option(
+            'remove-files', {type: 'boolean', desc: 'Set to true to have obsolete goldens removed.', default: false})
         .argv;
 
-const shouldRemoveFiles = process.argv[2] === '--remove-files';
-const interactionTestRoot = yargsObject['interaction-test-root'];
-
+const shouldRemoveFiles = yargsObject['remove-files'] === true;
+const SOURCE_ROOT = path.resolve(__dirname, path.join('..', '..'));
+const interactionTestRoot = path.join(SOURCE_ROOT, 'test', 'interactions');
 const GOLDENS_LOCATION = path.join(interactionTestRoot, 'goldens');
 
 function findScreenshotsToCheck(folder) {
@@ -81,7 +82,7 @@ async function run() {
     for (const image of obsoleteImages) {
       const imagePath = path.relative(process.cwd(), path.join(GOLDENS_LOCATION, image));
       // eslint-disable-next-line no-console
-      console.log(imagePath);
+      console.log(shouldRemoveFiles ? 'Removing: ' : '', imagePath);
       if (shouldRemoveFiles) {
         await exec(`rm ${imagePath}`);
       }

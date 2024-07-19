@@ -201,7 +201,8 @@ export class Entry {
       httpVersion: this.request.requestHttpVersion(),
       headers: this.request.requestHeaders(),
       queryString: this.buildParameters(this.request.queryParameters || []),
-      cookies: this.buildCookies(this.request.includedRequestCookies()),
+      cookies: this.buildCookies(
+          this.request.includedRequestCookies().map(includedRequestCookie => includedRequestCookie.cookie)),
       headersSize: headersText ? headersText.length : -1,
       bodySize: await this.requestBodySize(),
       postData: undefined,
@@ -230,6 +231,9 @@ export class Entry {
       bodySize: this.responseBodySize,
       _transferSize: this.request.transferSize,
       _error: this.request.localizedFailDescription,
+      _fetchedViaServiceWorker: this.request.fetchedViaServiceWorker,
+      _responseCacheStorageCacheName: this.request.getResponseCacheStorageCacheName(),
+      _serviceWorkerResponseSource: this.request.serviceWorkerResponseSource(),
     };
   }
 
@@ -309,6 +313,12 @@ export class Entry {
         result.send = 0;
       }
       highestTime = Math.max(sendEnd, connectEnd, sslEnd, dnsEnd, blockedStart, 0);
+
+      // Custom fields for service worker timings.
+      result._workerStart = timing.workerStart;
+      result._workerReady = timing.workerReady;
+      result._workerFetchStart = timing.workerFetchStart;
+      result._workerRespondWithSettled = timing.workerRespondWithSettled;
     } else if (this.request.responseReceivedTime === -1) {
       // Means that we don't have any more details after blocked, so attribute all to blocked.
       result.blocked = Entry.toMilliseconds(this.request.endTime - issueTime);
@@ -368,11 +378,17 @@ export class Entry {
       httpOnly: cookie.httpOnly(),
       secure: cookie.secure(),
       sameSite: undefined,
+      partitionKey: undefined,
     };
     if (cookie.sameSite()) {
       c.sameSite = cookie.sameSite();
     } else {
       delete c.sameSite;
+    }
+    if (cookie.partitionKey()) {
+      c.partitionKey = cookie.partitionKey();
+    } else {
+      delete c.partitionKey;
     }
     return c;
   }
@@ -425,6 +441,12 @@ export interface Timing {
   // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
   // eslint-disable-next-line @typescript-eslint/naming-convention
   _blocked_proxy?: number;
+
+  // Custom fields for service workers.
+  _workerStart?: number;
+  _workerReady?: number;
+  _workerFetchStart?: number;
+  _workerRespondWithSettled?: number;
 }
 
 export interface Parameter {
@@ -464,6 +486,9 @@ export interface Response {
   bodySize: number;
   _transferSize: number;
   _error: string|null;
+  _fetchedViaServiceWorker: boolean;
+  _responseCacheStorageCacheName: string|undefined;
+  _serviceWorkerResponseSource: Protocol.Network.ServiceWorkerResponseSource|undefined;
 }
 
 export interface EntryDTO {
@@ -498,6 +523,7 @@ export interface CookieDTO {
   httpOnly: boolean;
   secure: boolean;
   sameSite?: Protocol.Network.CookieSameSite;
+  partitionKey?: Protocol.Network.CookiePartitionKey;
 }
 
 export interface Page {

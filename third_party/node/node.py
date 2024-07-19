@@ -10,15 +10,29 @@ import sys
 import os
 
 
-def GetBinaryPath():
-    return os_path.join(
-        os_path.dirname(__file__), *{
-            'Darwin': ('mac', 'node-darwin-arm64' if platform.machine()
-                       == 'arm64' else 'node-darwin-x64', 'bin', 'node'),
-            'Linux': ('linux', 'node-linux-x64', 'bin', 'node'),
-            'Windows': ('win', 'node.exe'),
-        }[platform.system()])
+def get_mac_architecture():
+    if platform.machine() == "x86_64":
+        is_translated = subprocess.run(
+            ["sysctl", "-n", "sysctl.proc_translated"],
+            capture_output=True,
+            text=True).stdout.strip() == "1"
+        return "arm64" if is_translated else "x86_64"
+    return platform.machine()
 
+
+def GetBinaryPath():
+    relative = {
+        'Darwin': ('mac', 'node-darwin-arm64' if get_mac_architecture()
+                   == 'arm64' else 'node-darwin-x64', 'bin', 'node'),
+        'Linux': ('linux', 'node-linux-x64', 'bin', 'node'),
+        'Windows': ('win', 'node.exe'),
+    }[platform.system()]
+    devtools_checkout_path = os.path.join(os.path.dirname(__file__), *relative)
+    if os_path.exists(devtools_checkout_path):
+        return devtools_checkout_path
+    # Assume we are in a chromium checkout.
+    return os_path.join(os.path.dirname(__file__), '..', '..', '..', '..',
+                        'node', *relative)
 
 def RunNode(cmd_parts, output=subprocess.PIPE):
     cmd = [GetBinaryPath()] + cmd_parts

@@ -3,13 +3,12 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
-
 import type * as puppeteer from 'puppeteer-core';
 
+import {AsyncScope} from '../../shared/async-scope.js';
 import {
   $,
   $$,
-  assertNotNullOrUndefined,
   click,
   getBrowserAndPages,
   goToResource,
@@ -19,7 +18,8 @@ import {
   waitForAria,
   waitForFunction,
 } from '../../shared/helper.js';
-import {AsyncScope} from '../../shared/async-scope.js';
+
+import {veImpression} from './visual-logging-helpers.js';
 
 export const CONSOLE_TAB_SELECTOR = '#tab-console';
 export const CONSOLE_MESSAGES_SELECTOR = '.console-group-messages';
@@ -55,7 +55,7 @@ export async function deleteConsoleMessagesFilter(frontend: puppeteer.Page) {
   await waitFor('.console-main-toolbar');
   const main = await $('.console-main-toolbar');
   await frontend.evaluate(n => {
-    const deleteButton = n.shadowRoot?.querySelector('.search-cancel-button') as HTMLElement;
+    const deleteButton = n.shadowRoot?.querySelector('.toolbar-input-clear-button') as HTMLElement;
     if (deleteButton) {
       deleteButton.click();
     }
@@ -203,7 +203,6 @@ export async function getStructuredConsoleMessages() {
 }
 
 export async function focusConsolePrompt() {
-  await waitFor(CONSOLE_PROMPT_SELECTOR);
   await click(CONSOLE_PROMPT_SELECTOR);
   await waitFor('[aria-label="Console prompt"]');
   // FIXME(crbug/1112692): Refactor test to remove the timeout.
@@ -256,9 +255,7 @@ export async function unifyLogVM(actualLog: string, expectedLog: string) {
   const actualLogArray = actualLog.trim().split('\n').map(s => s.trim());
   const expectedLogArray = expectedLog.trim().split('\n').map(s => s.trim());
 
-  if (actualLogArray.length !== expectedLogArray.length) {
-    throw 'logs are not the same length';
-  }
+  assert.strictEqual(actualLogArray.length, expectedLogArray.length, 'logs are not the same length');
 
   for (let index = 0; index < actualLogArray.length; index++) {
     const repl = actualLogArray[index].match(/VM\d+:/g);
@@ -288,32 +285,20 @@ export async function navigateToConsoleTab() {
 
 export async function waitForConsoleInfoMessageAndClickOnLink() {
   const consoleMessage = await waitFor('div.console-group-messages .console-info-level span.source-code');
-  await click('span.devtools-link', {root: consoleMessage});
-}
-
-export async function navigateToIssuesPanelViaInfoBar() {
-  // Navigate to Issues panel
-  await waitFor('#console-issues-counter');
-  await click('#console-issues-counter');
-  await waitFor('.issues-pane');
+  await click('button.devtools-link', {root: consoleMessage});
 }
 
 export async function turnOffHistoryAutocomplete() {
   await click(CONSOLE_SETTINGS_SELECTOR);
-  await waitFor(AUTOCOMPLETE_FROM_HISTORY_SELECTOR);
   await click(AUTOCOMPLETE_FROM_HISTORY_SELECTOR);
 }
 
 export async function toggleShowCorsErrors() {
-  await click(CONSOLE_SETTINGS_SELECTOR);
-  await waitFor(SHOW_CORS_ERRORS_SELECTOR);
-  await click(SHOW_CORS_ERRORS_SELECTOR);
-  await click(CONSOLE_SETTINGS_SELECTOR);
+  await toggleConsoleSetting(SHOW_CORS_ERRORS_SELECTOR);
 }
 
 export async function toggleConsoleSetting(settingSelector: string) {
   await click(CONSOLE_SETTINGS_SELECTOR);
-  await waitFor(settingSelector);
   await click(settingSelector);
   await click(CONSOLE_SETTINGS_SELECTOR);
 }
@@ -322,7 +307,6 @@ async function getIssueButtonLabel(): Promise<string|null> {
   const infobarButton = await waitFor('#console-issues-counter');
   const iconButton = await waitFor('icon-button', infobarButton);
   const titleElement = await waitFor('.icon-button-title', iconButton);
-  assertNotNullOrUndefined(titleElement);
   const infobarButtonText = await titleElement.evaluate(node => (node as HTMLElement).textContent);
   return infobarButtonText;
 }
@@ -359,4 +343,22 @@ export async function checkCommandStacktrace(
     command: string, expected: string, leastMessages: number = 1, offset: number = 0) {
   await typeIntoConsoleAndWaitForResult(getBrowserAndPages().frontend, command, leastMessages);
   await unifyLogVM(await getLastConsoleStacktrace(offset), expected);
+}
+
+export function veImpressionForConsolePanel() {
+  return veImpression('Panel', 'console', [
+    veImpression(
+        'Toolbar', undefined,
+        [
+          veImpression('ToggleSubpane', 'console-sidebar'),
+          veImpression('Action', 'console.clear'),
+          veImpression('DropDown', 'javascript-context'),
+          veImpression('Action', 'console.create-pin'),
+          veImpression('DropDown', 'log-level'),
+          veImpression('Counter', 'issues'),
+          veImpression('ToggleSubpane', 'console-settings'),
+          veImpression('TextField'),
+        ]),
+    veImpression('TextField', 'console-prompt'),
+  ]);
 }

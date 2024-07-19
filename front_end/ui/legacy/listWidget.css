@@ -7,19 +7,19 @@
 .list {
   flex: auto 0 1;
   overflow-y: auto;
-  border: 1px solid var(--color-details-hairline);
+  border: 1px solid var(--sys-color-divider);
   flex-direction: column;
 
   --override-background-list-item-color: hsl(0deg 0% 96%);
 }
 
-.-theme-with-dark-background .list,
-:host-context(.-theme-with-dark-background) .list {
+.theme-with-dark-background .list,
+:host-context(.theme-with-dark-background) .list {
   --override-background-list-item-color: hsl(0deg 0% 16%);
 }
 
 .list-separator {
-  background: var(--color-background-elevation-1);
+  background: var(--sys-color-divider);
   height: 1px;
 }
 
@@ -32,13 +32,12 @@
   overflow: hidden;
 }
 
-.list-item:focus-within,
-.list-item:hover {
+.list-item:focus-within:not(:active) {
   background: var(--sys-color-state-hover-on-subtle);
 }
 
 .list-widget-input-validation-error {
-  color: var(--legacy-input-validation-error);
+  color: var(--sys-color-error);
   margin: 0 5px;
 }
 
@@ -54,8 +53,7 @@
   flex: 0 1 50px;
 }
 
-.list-item:focus-within .controls-gradient,
-.list-item:hover .controls-gradient {
+.list-item:focus-within:not(:active) .controls-gradient {
   background-image: linear-gradient(90deg, transparent, var(--override-background-list-item-color));
 }
 
@@ -66,10 +64,14 @@
   align-items: center;
   pointer-events: auto;
   visibility: hidden;
+  background-color: var(--sys-color-cdt-base-container);
+
+  .list-item:hover & {
+    visibility: visible;
+  }
 }
 
-.list-item:focus-within .controls-buttons,
-.list-item:hover .controls-buttons {
+.list-item:focus-within:not(:active) .controls-buttons {
   background-color: var(--override-background-list-item-color);
   visibility: visible;
 }
@@ -79,8 +81,7 @@
   flex-direction: column;
   align-items: stretch;
   flex: none;
-  background: var(--sys-color-cdt-base-container);
-  border-bottom: 1px solid var(--sys-color-divider);
+  background: var(--sys-color-surface3);
   overflow: hidden;
 }
 
@@ -98,6 +99,7 @@
   align-items: center;
   justify-content: flex-start;
   padding: 5px;
+  gap: var(--sys-size-6);
 }
 
 .editor-buttons > button {
@@ -110,7 +112,7 @@
 }
 
 .editor-content input.error-input {
-  background-color: var(--color-background);
+  background-color: var(--sys-color-cdt-base-container);
 }
 
 .text-prompt-container {
@@ -120,15 +122,15 @@
   box-shadow: var(--legacy-focus-ring-inactive-shadow);
   border-radius: 2px;
   width: 100%;
-  background-color: var(--color-background);
-}
+  background-color: var(--sys-color-cdt-base-container);
 
-.text-prompt-container:focus {
-  box-shadow: var(--legacy-focus-ring-active-shadow);
-}
+  &:focus {
+    border: 1px solid var(--sys-color-state-focus-ring);
+  }
 
-.text-prompt-container .text-prompt {
-  width: 100%;
+  & .text-prompt {
+    width: 100%;
+  }
 }
 
 @media (forced-colors: active) {

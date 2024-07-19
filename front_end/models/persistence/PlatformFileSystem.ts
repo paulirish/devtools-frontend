@@ -57,13 +57,17 @@ export class PlatformFileSystem {
     return Promise.resolve(false);
   }
 
+  deleteDirectoryRecursively(_path: Platform.DevToolsPath.EncodedPathString): Promise<boolean> {
+    return Promise.resolve(false);
+  }
+
   requestFileBlob(_path: Platform.DevToolsPath.EncodedPathString): Promise<Blob|null> {
     return Promise.resolve(null as Blob | null);
   }
 
   async requestFileContent(_path: Platform.DevToolsPath.EncodedPathString):
-      Promise<TextUtils.ContentProvider.DeferredContent> {
-    return {content: null, error: i18nString(UIStrings.unableToReadFilesWithThis), isEncoded: false};
+      Promise<TextUtils.ContentData.ContentDataOrError> {
+    return {error: i18nString(UIStrings.unableToReadFilesWithThis)};
   }
 
   setFileContent(_path: Platform.DevToolsPath.EncodedPathString, _content: string, _isBase64: boolean): void {

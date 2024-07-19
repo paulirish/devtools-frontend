@@ -3,8572 +3,9005 @@
 // found in the LICENSE file.
 // Generated from javascript_natives/helpers.js
 
+// clang-format off
+
 export const NativeFunctions = [
   {
-    name: 'eval',
-    signatures: [['x']]
+    name: "eval",
+    signatures: [["x"]]
   },
   {
-    name: 'parseInt',
-    signatures: [['string','?radix']]
+    name: "parseInt",
+    signatures: [["string","?radix"]]
   },
   {
-    name: 'parseFloat',
-    signatures: [['string']]
+    name: "parseFloat",
+    signatures: [["string"]]
   },
   {
-    name: 'isNaN',
-    signatures: [['number']]
+    name: "isNaN",
+    signatures: [["number"]]
   },
   {
-    name: 'isFinite',
-    signatures: [['number']]
+    name: "isFinite",
+    signatures: [["number"]]
   },
   {
-    name: 'decodeURI',
-    signatures: [['encodedURI']]
+    name: "decodeURI",
+    signatures: [["encodedURI"]]
   },
   {
-    name: 'decodeURIComponent',
-    signatures: [['encodedURIComponent']]
+    name: "decodeURIComponent",
+    signatures: [["encodedURIComponent"]]
   },
   {
-    name: 'encodeURI',
-    signatures: [['uri']]
+    name: "encodeURI",
+    signatures: [["uri"]]
   },
   {
-    name: 'encodeURIComponent',
-    signatures: [['uriComponent']]
+    name: "encodeURIComponent",
+    signatures: [["uriComponent"]]
   },
   {
-    name: 'escape',
-    signatures: [['string']],
-    receivers: ['Window']
+    name: "escape",
+    signatures: [["string"]],
+    receivers: ["Window"]
   },
   {
-    name: 'escape',
-    signatures: [['ident']],
-    receivers: ['CSS']
+    name: "escape",
+    signatures: [["ident"]],
+    receivers: ["CSS"]
   },
   {
-    name: 'unescape',
-    signatures: [['string']]
+    name: "unescape",
+    signatures: [["string"]]
   },
   {
-    name: 'toString',
-    signatures: [['?radix']],
-    receivers: ['Number','BigInt']
+    name: "toString",
+    signatures: [["?radix"]],
+    receivers: ["Number","BigInt"]
   },
   {
-    name: 'get',
-    signatures: [['?options']],
-    receivers: ['CredentialsContainer']
+    name: "get",
+    signatures: [["?options"]],
+    receivers: ["CredentialsContainer"]
   },
   {
-    name: 'get',
-    signatures: [['name']],
-    receivers: ['CustomElementRegistry','FormData','URLSearchParams']
+    name: "get",
+    signatures: [["name"]],
+    receivers: ["CustomElementRegistry","FormData","URLSearchParams"]
   },
   {
-    name: 'get',
-    signatures: [['name'],['key']],
-    receivers: ['Headers']
+    name: "get",
+    signatures: [["name"],["key"]],
+    receivers: ["Headers"]
   },
   {
-    name: 'get',
-    signatures: [['query'],['key']],
-    receivers: ['IDBIndex','IDBObjectStore']
+    name: "get",
+    signatures: [["query"],["key"]],
+    receivers: ["IDBIndex","IDBObjectStore"]
   },
   {
-    name: 'get',
-    signatures: [['keyId']],
-    receivers: ['MediaKeyStatusMap']
+    name: "get",
+    signatures: [["keyId"]],
+    receivers: ["MediaKeyStatusMap"]
   },
   {
-    name: 'get',
-    signatures: [['property']],
-    receivers: ['StylePropertyMapReadOnly']
+    name: "get",
+    signatures: [["property"]],
+    receivers: ["StylePropertyMapReadOnly"]
   },
   {
-    name: 'get',
-    signatures: [['target','p','receiver']],
-    receivers: ['ProxyHandler']
+    name: "get",
+    signatures: [["target","p","receiver"]],
+    receivers: ["ProxyHandler"]
   },
   {
-    name: 'get',
-    signatures: [['key']],
-    receivers: ['Map','ReadonlyMap','WeakMap','XRHand']
+    name: "get",
+    signatures: [["key"]],
+    receivers: ["Map","ReadonlyMap","WeakMap","XRHand"]
   },
   {
-    name: 'get',
-    signatures: [['id']],
-    receivers: ['Clients','BackgroundFetchManager']
+    name: "get",
+    signatures: [["id"]],
+    receivers: ["Clients","BackgroundFetchManager"]
   },
   {
-    name: 'get',
-    signatures: [['name'],['?options']],
-    receivers: ['CookieStore']
+    name: "get",
+    signatures: [["name"],["?options"]],
+    receivers: ["CookieStore"]
   },
   {
-    name: 'get',
-    signatures: [['instrumentKey']],
-    receivers: ['PaymentInstruments']
+    name: "get",
+    signatures: [["instrumentKey"]],
+    receivers: ["PaymentInstruments"]
   },
   {
-    name: 'set',
-    signatures: [['v']],
-    receivers: ['PropertyDescriptor']
+    name: "set",
+    signatures: [["v"]],
+    receivers: ["PropertyDescriptor"]
   },
   {
-    name: 'set',
-    signatures: [['array','?offset']],
-    receivers: ['Int8Array','Uint8Array','Uint8ClampedArray','Int16Array','Uint16Array','Int32Array','Uint32Array','Float32Array','Float64Array','BigInt64Array','BigUint64Array']
+    name: "set",
+    signatures: [["array","?offset"]],
+    receivers: ["Int8Array","Uint8Array","Uint8ClampedArray","Int16Array","Uint16Array","Int32Array","Uint32Array","Float32Array","Float64Array","BigInt64Array","BigUint64Array"]
   },
   {
-    name: 'set',
-    signatures: [['name','value','?filename'],['name','blobValue','?filename']],
-    receivers: ['FormData']
+    name: "set",
+    signatures: [["name","value","?filename"],["name","blobValue","?filename"]],
+    receivers: ["FormData"]
   },
   {
-    name: 'set',
-    signatures: [['name','value'],['key','value']],
-    receivers: ['Headers']
+    name: "set",
+    signatures: [["name","value"],["key","value"]],
+    receivers: ["Headers"]
   },
   {
-    name: 'set',
-    signatures: [['property','...values']],
-    receivers: ['StylePropertyMap']
+    name: "set",
+    signatures: [["property","...values"]],
+    receivers: ["StylePropertyMap"]
   },
   {
-    name: 'set',
-    signatures: [['name','value']],
-    receivers: ['URLSearchParams']
+    name: "set",
+    signatures: [["name","value"]],
+    receivers: ["URLSearchParams"]
   },
   {
-    name: 'set',
-    signatures: [['target','p','newValue','receiver']],
-    receivers: ['ProxyHandler']
+    name: "set",
+    signatures: [["target","p","newValue","receiver"]],
+    receivers: ["ProxyHandler"]
   },
   {
-    name: 'set',
-    signatures: [['value']],
-    receivers: ['ClassAccessorDecoratorTarget','ClassAccessorDecoratorResult']
+    name: "set",
+    signatures: [["value"]],
+    receivers: ["ClassAccessorDecoratorTarget","ClassAccessorDecoratorResult"]
   },
   {
-    name: 'set',
-    signatures: [['key','value']],
-    receivers: ['Map','WeakMap','CSSToggleMap']
+    name: "set",
+    signatures: [["key","value"]],
+    receivers: ["Map","WeakMap"]
   },
   {
-    name: 'set',
-    signatures: [['featureValueName','values']],
-    receivers: ['CSSFontFeatureValuesMap']
+    name: "set",
+    signatures: [["featureValueName","values"]],
+    receivers: ["CSSFontFeatureValuesMap"]
   },
   {
-    name: 'set',
-    signatures: [['cookieInit'],['name','value']],
-    receivers: ['CookieStore']
+    name: "set",
+    signatures: [["cookieInit"],["name","value"]],
+    receivers: ["CookieStore"]
   },
   {
-    name: 'set',
-    signatures: [['instrumentKey','details']],
-    receivers: ['PaymentInstruments']
+    name: "set",
+    signatures: [["instrumentKey","details"]],
+    receivers: ["PaymentInstruments"]
   },
   {
-    name: 'toLocaleString',
-    signatures: [['?locales','?options']],
-    receivers: ['Date','Number','BigInt']
+    name: "toLocaleString",
+    signatures: [["?locales","?options"]],
+    receivers: ["Date","ReadonlyArray","Array","Int8Array","Uint8Array","Uint8ClampedArray","Int16Array","Uint16Array","Int32Array","Uint32Array","Float32Array","Float64Array","Number","BigInt","BigInt64Array","BigUint64Array"]
   },
   {
-    name: 'hasOwnProperty',
-    signatures: [['v']]
+    name: "hasOwnProperty",
+    signatures: [["v"]]
   },
   {
-    name: 'isPrototypeOf',
-    signatures: [['v']]
+    name: "isPrototypeOf",
+    signatures: [["v"]]
   },
   {
-    name: 'propertyIsEnumerable',
-    signatures: [['v']]
+    name: "propertyIsEnumerable",
+    signatures: [["v"]]
   },
   {
-    name: 'getPrototypeOf',
-    signatures: [['o']],
-    receivers: ['ObjectConstructor']
+    name: "getPrototypeOf",
+    signatures: [["o"]],
+    receivers: ["ObjectConstructor"]
   },
   {
-    name: 'getPrototypeOf',
-    signatures: [['target']],
-    receivers: ['ProxyHandler']
+    name: "getPrototypeOf",
+    signatures: [["target"]],
+    receivers: ["ProxyHandler"]
   },
   {
-    name: 'getOwnPropertyDescriptor',
-    signatures: [['o','p']],
-    receivers: ['ObjectConstructor']
+    name: "getOwnPropertyDescriptor",
+    signatures: [["o","p"]],
+    receivers: ["ObjectConstructor"]
   },
   {
-    name: 'getOwnPropertyDescriptor',
-    signatures: [['target','p']],
-    receivers: ['ProxyHandler']
+    name: "getOwnPropertyDescriptor",
+    signatures: [["target","p"]],
+    receivers: ["ProxyHandler"]
   },
   {
-    name: 'getOwnPropertyNames',
-    signatures: [['o']]
+    name: "getOwnPropertyNames",
+    signatures: [["o"]]
   },
   {
-    name: 'create',
-    signatures: [['o','?properties']],
-    receivers: ['ObjectConstructor']
+    name: "create",
+    signatures: [["o","?properties"]],
+    receivers: ["ObjectConstructor"]
   },
   {
-    name: 'create',
-    signatures: [['?options']],
-    receivers: ['CredentialsContainer']
+    name: "create",
+    signatures: [["?options"]],
+    receivers: ["CredentialsContainer"]
   },
   {
-    name: 'defineProperty',
-    signatures: [['o','p','attributes']],
-    receivers: ['ObjectConstructor']
+    name: "defineProperty",
+    signatures: [["o","p","attributes"]],
+    receivers: ["ObjectConstructor"]
   },
   {
-    name: 'defineProperty',
-    signatures: [['target','property','attributes']],
-    receivers: ['ProxyHandler']
+    name: "defineProperty",
+    signatures: [["target","property","attributes"]],
+    receivers: ["ProxyHandler"]
   },
   {
-    name: 'defineProperties',
-    signatures: [['o','properties']]
+    name: "defineProperties",
+    signatures: [["o","properties"]]
   },
   {
-    name: 'seal',
-    signatures: [['o']]
+    name: "seal",
+    signatures: [["o"]]
   },
   {
-    name: 'freeze',
-    signatures: [['f'],['o']]
+    name: "freeze",
+    signatures: [["f"],["o"]]
   },
   {
-    name: 'preventExtensions',
-    signatures: [['o']],
-    receivers: ['ObjectConstructor']
+    name: "preventExtensions",
+    signatures: [["o"]],
+    receivers: ["ObjectConstructor"]
   },
   {
-    name: 'preventExtensions',
-    signatures: [['target']],
-    receivers: ['ProxyHandler']
+    name: "preventExtensions",
+    signatures: [["target"]],
+    receivers: ["ProxyHandler"]
   },
   {
-    name: 'isSealed',
-    signatures: [['o']]
+    name: "isSealed",
+    signatures: [["o"]]
   },
   {
-    name: 'isFrozen',
-    signatures: [['o']]
+    name: "isFrozen",
+    signatures: [["o"]]
   },
   {
-    name: 'isExtensible',
-    signatures: [['o']],
-    receivers: ['ObjectConstructor']
+    name: "isExtensible",
+    signatures: [["o"]],
+    receivers: ["ObjectConstructor"]
   },
   {
-    name: 'isExtensible',
-    signatures: [['target']],
-    receivers: ['ProxyHandler']
+    name: "isExtensible",
+    signatures: [["target"]],
+    receivers: ["ProxyHandler"]
   },
   {
-    name: 'keys',
-    signatures: [['o']],
-    receivers: ['ObjectConstructor']
+    name: "keys",
+    signatures: [["o"]],
+    receivers: ["ObjectConstructor"]
   },
   {
-    name: 'keys',
-    signatures: [['?request','?options']],
-    receivers: ['Cache']
+    name: "keys",
+    signatures: [["?request","?options"]],
+    receivers: ["Cache"]
   },
   {
-    name: 'apply',
-    signatures: [['thisArg','?argArray']],
-    receivers: ['Function']
+    name: "apply",
+    signatures: [["thisArg","?argArray"]],
+    receivers: ["Function"]
   },
   {
-    name: 'apply',
-    signatures: [['thisArg','?args']],
-    receivers: ['CallableFunction','NewableFunction']
+    name: "apply",
+    signatures: [["thisArg","?args"]],
+    receivers: ["CallableFunction","NewableFunction"]
   },
   {
-    name: 'apply',
-    signatures: [['target','thisArg','argArray']],
-    receivers: ['ProxyHandler']
+    name: "apply",
+    signatures: [["target","thisArg","argArray"]],
+    receivers: ["ProxyHandler"]
   },
   {
-    name: 'call',
-    signatures: [['thisArg','...argArray']],
-    receivers: ['Function']
+    name: "call",
+    signatures: [["thisArg","...argArray"]],
+    receivers: ["Function"]
   },
   {
-    name: 'call',
-    signatures: [['thisArg','...args']],
-    receivers: ['CallableFunction','NewableFunction']
+    name: "call",
+    signatures: [["thisArg","...args"]],
+    receivers: ["CallableFunction","NewableFunction"]
   },
   {
-    name: 'bind',
-    signatures: [['thisArg','...argArray']],
-    receivers: ['Function']
+    name: "bind",
+    signatures: [["thisArg","...argArray"]],
+    receivers: ["Function"]
   },
   {
-    name: 'bind',
-    signatures: [['thisArg','...args']],
-    receivers: ['CallableFunction','NewableFunction']
+    name: "bind",
+    signatures: [["thisArg","...args"]],
+    receivers: ["CallableFunction","NewableFunction"]
   },
   {
-    name: 'charAt',
-    signatures: [['pos']]
+    name: "charAt",
+    signatures: [["pos"]]
   },
   {
-    name: 'charCodeAt',
-    signatures: [['index']]
+    name: "charCodeAt",
+    signatures: [["index"]]
   },
   {
-    name: 'concat',
-    signatures: [['...strings']],
-    receivers: ['String']
+    name: "concat",
+    signatures: [["...strings"]],
+    receivers: ["String"]
   },
   {
-    name: 'concat',
-    signatures: [['...items']],
-    receivers: ['ReadonlyArray','Array']
+    name: "concat",
+    signatures: [["...items"]],
+    receivers: ["ReadonlyArray","Array"]
   },
   {
-    name: 'concat',
-    signatures: [['inputs','axis']],
-    receivers: ['MLGraphBuilder']
+    name: "concat",
+    signatures: [["inputs","axis"]],
+    receivers: ["MLGraphBuilder"]
   },
   {
-    name: 'indexOf',
-    signatures: [['searchString','?position']],
-    receivers: ['String']
+    name: "indexOf",
+    signatures: [["searchString","?position"]],
+    receivers: ["String"]
   },
   {
-    name: 'indexOf',
-    signatures: [['searchElement','?fromIndex']],
-    receivers: ['ReadonlyArray','Array','Int8Array','Uint8Array','Uint8ClampedArray','Int16Array','Uint16Array','Int32Array','Uint32Array','Float32Array','Float64Array','BigInt64Array','BigUint64Array']
+    name: "indexOf",
+    signatures: [["searchElement","?fromIndex"]],
+    receivers: ["ReadonlyArray","Array","Int8Array","Uint8Array","Uint8ClampedArray","Int16Array","Uint16Array","Int32Array","Uint32Array","Float32Array","Float64Array","BigInt64Array","BigUint64Array"]
   },
   {
-    name: 'lastIndexOf',
-    signatures: [['searchString','?position']],
-    receivers: ['String']
+    name: "lastIndexOf",
+    signatures: [["searchString","?position"]],
+    receivers: ["String"]
   },
   {
-    name: 'lastIndexOf',
-    signatures: [['searchElement','?fromIndex']],
-    receivers: ['ReadonlyArray','Array','Int8Array','Uint8Array','Uint8ClampedArray','Int16Array','Uint16Array','Int32Array','Uint32Array','Float32Array','Float64Array','BigInt64Array','BigUint64Array']
+    name: "lastIndexOf",
+    signatures: [["searchElement","?fromIndex"]],
+    receivers: ["ReadonlyArray","Array","Int8Array","Uint8Array","Uint8ClampedArray","Int16Array","Uint16Array","Int32Array","Uint32Array","Float32Array","Float64Array","BigInt64Array","BigUint64Array"]
   },
   {
-    name: 'localeCompare',
-    signatures: [['that','?locales','?options']]
+    name: "localeCompare",
+    signatures: [["that","?locales","?options"]]
   },
   {
-    name: 'match',
-    signatures: [['regexp'],['matcher']],
-    receivers: ['String']
+    name: "match",
+    signatures: [["regexp"],["matcher"]],
+    receivers: ["String"]
   },
   {
-    name: 'match',
-    signatures: [['request','?options']],
-    receivers: ['Cache','CacheStorage','BackgroundFetchRegistration']
+    name: "match",
+    signatures: [["request","?options"]],
+    receivers: ["Cache","CacheStorage","BackgroundFetchRegistration"]
   },
   {
-    name: 'replace',
-    signatures: [['searchValue','replaceValue'],['searchValue','replacer']],
-    receivers: ['String']
+    name: "replace",
+    signatures: [["searchValue","replaceValue"],["searchValue","replacer"]],
+    receivers: ["String"]
   },
   {
-    name: 'replace',
-    signatures: [['text']],
-    receivers: ['CSSStyleSheet']
+    name: "replace",
+    signatures: [["text"]],
+    receivers: ["CSSStyleSheet"]
   },
   {
-    name: 'replace',
-    signatures: [['token','newToken']],
-    receivers: ['DOMTokenList']
+    name: "replace",
+    signatures: [["token","newToken"]],
+    receivers: ["DOMTokenList"]
   },
   {
-    name: 'replace',
-    signatures: [['url']],
-    receivers: ['Location']
+    name: "replace",
+    signatures: [["url"]],
+    receivers: ["Location"]
   },
   {
-    name: 'search',
-    signatures: [['regexp'],['searcher']]
+    name: "search",
+    signatures: [["regexp"],["searcher"]]
   },
   {
-    name: 'slice',
-    signatures: [['?start','?end']],
-    receivers: ['String','ReadonlyArray','ConcatArray','Array','Int8Array','Uint8Array','Uint8ClampedArray','Int16Array','Uint16Array','Int32Array','Uint32Array','Float32Array','Float64Array','BigInt64Array','BigUint64Array']
+    name: "slice",
+    signatures: [["?start","?end"]],
+    receivers: ["String","ReadonlyArray","ConcatArray","Array","Int8Array","Uint8Array","Uint8ClampedArray","Int16Array","Uint16Array","Int32Array","Uint32Array","Float32Array","Float64Array","BigInt64Array","BigUint64Array"]
   },
   {
-    name: 'slice',
-    signatures: [['begin','?end']],
-    receivers: ['ArrayBuffer','SharedArrayBuffer']
+    name: "slice",
+    signatures: [["begin","?end"]],
+    receivers: ["ArrayBuffer","SharedArrayBuffer"]
   },
   {
-    name: 'slice',
-    signatures: [['?start','?end','?contentType']],
-    receivers: ['Blob']
+    name: "slice",
+    signatures: [["?start","?end","?contentType"]],
+    receivers: ["Blob"]
   },
   {
-    name: 'slice',
-    signatures: [['input','starts','sizes']],
-    receivers: ['MLGraphBuilder']
+    name: "slice",
+    signatures: [["input","starts","sizes"]],
+    receivers: ["MLGraphBuilder"]
   },
   {
-    name: 'split',
-    signatures: [['separator','?limit'],['splitter','?limit']],
-    receivers: ['String']
+    name: "split",
+    signatures: [["separator","?limit"],["splitter","?limit"]],
+    receivers: ["String"]
   },
   {
-    name: 'split',
-    signatures: [['input','splits','?options']],
-    receivers: ['MLGraphBuilder']
+    name: "split",
+    signatures: [["input","splits","?options"]],
+    receivers: ["MLGraphBuilder"]
   },
   {
-    name: 'substring',
-    signatures: [['start','?end']]
+    name: "substring",
+    signatures: [["start","?end"]]
   },
   {
-    name: 'toLocaleLowerCase',
-    signatures: [['?locales']]
+    name: "toLocaleLowerCase",
+    signatures: [["?locales"]]
   },
   {
-    name: 'toLocaleUpperCase',
-    signatures: [['?locales']]
+    name: "toLocaleUpperCase",
+    signatures: [["?locales"]]
   },
   {
-    name: 'substr',
-    signatures: [['from','?length']]
+    name: "substr",
+    signatures: [["from","?length"]]
   },
   {
-    name: 'fromCharCode',
-    signatures: [['...codes']]
+    name: "fromCharCode",
+    signatures: [["...codes"]]
   },
   {
-    name: 'toFixed',
-    signatures: [['?fractionDigits']]
+    name: "toFixed",
+    signatures: [["?fractionDigits"]]
   },
   {
-    name: 'toExponential',
-    signatures: [['?fractionDigits']]
+    name: "toExponential",
+    signatures: [["?fractionDigits"]]
   },
   {
-    name: 'toPrecision',
-    signatures: [['?precision']]
+    name: "toPrecision",
+    signatures: [["?precision"]]
   },
   {
-    name: 'abs',
-    signatures: [['x']]
+    name: "abs",
+    signatures: [["x"]]
   },
   {
-    name: 'acos',
-    signatures: [['x']]
+    name: "acos",
+    signatures: [["x"]]
   },
   {
-    name: 'asin',
-    signatures: [['x']]
+    name: "asin",
+    signatures: [["x"]]
   },
   {
-    name: 'atan',
-    signatures: [['x']]
+    name: "atan",
+    signatures: [["x"]]
   },
   {
-    name: 'atan2',
-    signatures: [['y','x']]
+    name: "atan2",
+    signatures: [["y","x"]]
   },
   {
-    name: 'ceil',
-    signatures: [['x']]
+    name: "ceil",
+    signatures: [["x"]]
   },
   {
-    name: 'cos',
-    signatures: [['x']]
+    name: "cos",
+    signatures: [["x"]]
   },
   {
-    name: 'exp',
-    signatures: [['x']]
+    name: "exp",
+    signatures: [["x"]]
   },
   {
-    name: 'floor',
-    signatures: [['x']]
+    name: "floor",
+    signatures: [["x"]]
   },
   {
-    name: 'log',
-    signatures: [['x']],
-    receivers: ['Math']
+    name: "log",
+    signatures: [["x"]],
+    receivers: ["Math","MLGraphBuilder"]
   },
   {
-    name: 'log',
-    signatures: [['...data']],
-    receivers: ['Console','console']
+    name: "log",
+    signatures: [["...data"]],
+    receivers: ["Console","console"]
   },
   {
-    name: 'max',
-    signatures: [['...values']],
-    receivers: ['Math','CSSNumericValue']
+    name: "max",
+    signatures: [["...values"]],
+    receivers: ["Math","CSSNumericValue"]
   },
   {
-    name: 'max',
-    signatures: [['a','b']],
-    receivers: ['MLGraphBuilder']
+    name: "max",
+    signatures: [["a","b","?options"]],
+    receivers: ["MLGraphBuilder"]
   },
   {
-    name: 'min',
-    signatures: [['...values']],
-    receivers: ['Math','CSSNumericValue']
+    name: "min",
+    signatures: [["...values"]],
+    receivers: ["Math","CSSNumericValue"]
   },
   {
-    name: 'min',
-    signatures: [['a','b']],
-    receivers: ['MLGraphBuilder']
+    name: "min",
+    signatures: [["a","b","?options"]],
+    receivers: ["MLGraphBuilder"]
   },
   {
-    name: 'pow',
-    signatures: [['x','y']]
+    name: "pow",
+    signatures: [["x","y"]],
+    receivers: ["Math"]
   },
   {
-    name: 'round',
-    signatures: [['x']]
+    name: "pow",
+    signatures: [["a","b","?options"]],
+    receivers: ["MLGraphBuilder"]
   },
   {
-    name: 'sin',
-    signatures: [['x']]
+    name: "round",
+    signatures: [["x"]]
   },
   {
-    name: 'sqrt',
-    signatures: [['x']]
+    name: "sin",
+    signatures: [["x"]]
   },
   {
-    name: 'tan',
-    signatures: [['x']]
+    name: "sqrt",
+    signatures: [["x"]]
   },
   {
-    name: 'toLocaleDateString',
-    signatures: [['?locales','?options']]
+    name: "tan",
+    signatures: [["x"]]
   },
   {
-    name: 'toLocaleTimeString',
-    signatures: [['?locales','?options']]
+    name: "toLocaleDateString",
+    signatures: [["?locales","?options"]]
   },
   {
-    name: 'setTime',
-    signatures: [['time']]
+    name: "toLocaleTimeString",
+    signatures: [["?locales","?options"]]
   },
   {
-    name: 'setMilliseconds',
-    signatures: [['ms']]
+    name: "setTime",
+    signatures: [["time"]]
   },
   {
-    name: 'setUTCMilliseconds',
-    signatures: [['ms']]
+    name: "setMilliseconds",
+    signatures: [["ms"]]
   },
   {
-    name: 'setSeconds',
-    signatures: [['sec','?ms']]
+    name: "setUTCMilliseconds",
+    signatures: [["ms"]]
   },
   {
-    name: 'setUTCSeconds',
-    signatures: [['sec','?ms']]
+    name: "setSeconds",
+    signatures: [["sec","?ms"]]
   },
   {
-    name: 'setMinutes',
-    signatures: [['min','?sec','?ms']]
+    name: "setUTCSeconds",
+    signatures: [["sec","?ms"]]
   },
   {
-    name: 'setUTCMinutes',
-    signatures: [['min','?sec','?ms']]
+    name: "setMinutes",
+    signatures: [["min","?sec","?ms"]]
   },
   {
-    name: 'setHours',
-    signatures: [['hours','?min','?sec','?ms']]
+    name: "setUTCMinutes",
+    signatures: [["min","?sec","?ms"]]
   },
   {
-    name: 'setUTCHours',
-    signatures: [['hours','?min','?sec','?ms']]
+    name: "setHours",
+    signatures: [["hours","?min","?sec","?ms"]]
   },
   {
-    name: 'setDate',
-    signatures: [['date']]
+    name: "setUTCHours",
+    signatures: [["hours","?min","?sec","?ms"]]
   },
   {
-    name: 'setUTCDate',
-    signatures: [['date']]
+    name: "setDate",
+    signatures: [["date"]]
   },
   {
-    name: 'setMonth',
-    signatures: [['month','?date']]
+    name: "setUTCDate",
+    signatures: [["date"]]
   },
   {
-    name: 'setUTCMonth',
-    signatures: [['month','?date']]
+    name: "setMonth",
+    signatures: [["month","?date"]]
   },
   {
-    name: 'setFullYear',
-    signatures: [['year','?month','?date']]
+    name: "setUTCMonth",
+    signatures: [["month","?date"]]
   },
   {
-    name: 'setUTCFullYear',
-    signatures: [['year','?month','?date']]
+    name: "setFullYear",
+    signatures: [["year","?month","?date"]]
   },
   {
-    name: 'toJSON',
-    signatures: [['?key']],
-    receivers: ['Date']
+    name: "setUTCFullYear",
+    signatures: [["year","?month","?date"]]
   },
   {
-    name: 'parse',
-    signatures: [['s']],
-    receivers: ['DateConstructor']
+    name: "toJSON",
+    signatures: [["?key"]],
+    receivers: ["Date"]
   },
   {
-    name: 'parse',
-    signatures: [['text','?reviver']],
-    receivers: ['JSON']
+    name: "parse",
+    signatures: [["s"]],
+    receivers: ["DateConstructor"]
   },
   {
-    name: 'parse',
-    signatures: [['cssText']],
-    receivers: ['CSSColorValue','CSSNumericValue']
+    name: "parse",
+    signatures: [["text","?reviver"]],
+    receivers: ["JSON"]
   },
   {
-    name: 'parse',
-    signatures: [['property','cssText']],
-    receivers: ['CSSStyleValue']
+    name: "parse",
+    signatures: [["cssText"]],
+    receivers: ["CSSColorValue","CSSNumericValue"]
   },
   {
-    name: 'UTC',
-    signatures: [['year','monthIndex','?date','?hours','?minutes','?seconds','?ms']]
+    name: "parse",
+    signatures: [["property","cssText"]],
+    receivers: ["CSSStyleValue"]
   },
   {
-    name: 'exec',
-    signatures: [['string']],
-    receivers: ['RegExp']
+    name: "parse",
+    signatures: [["url","?base"]],
+    receivers: ["URL"]
   },
   {
-    name: 'exec',
-    signatures: [['?input','?baseURL']],
-    receivers: ['URLPattern']
+    name: "UTC",
+    signatures: [["year","?monthIndex","?date","?hours","?minutes","?seconds","?ms"]]
   },
   {
-    name: 'test',
-    signatures: [['string']],
-    receivers: ['RegExp']
+    name: "exec",
+    signatures: [["string"]],
+    receivers: ["RegExp"]
   },
   {
-    name: 'test',
-    signatures: [['?input','?baseURL']],
-    receivers: ['URLPattern']
+    name: "exec",
+    signatures: [["?input","?baseURL"]],
+    receivers: ["URLPattern"]
   },
   {
-    name: 'compile',
-    signatures: [['pattern','?flags']]
+    name: "test",
+    signatures: [["string"]],
+    receivers: ["RegExp"]
   },
   {
-    name: 'stringify',
-    signatures: [['value','?replacer','?space']]
+    name: "test",
+    signatures: [["?input","?baseURL"]],
+    receivers: ["URLPattern"]
   },
   {
-    name: 'join',
-    signatures: [['?separator']]
+    name: "compile",
+    signatures: [["pattern","?flags"]]
   },
   {
-    name: 'every',
-    signatures: [['predicate','?thisArg']]
+    name: "stringify",
+    signatures: [["value","?replacer","?space"]]
   },
   {
-    name: 'some',
-    signatures: [['predicate','?thisArg']]
+    name: "join",
+    signatures: [["?separator"]]
   },
   {
-    name: 'forEach',
-    signatures: [['callbackfn','?thisArg']]
+    name: "every",
+    signatures: [["predicate","?thisArg"]],
+    receivers: ["ReadonlyArray","Array","Int8Array","Uint8Array","Uint8ClampedArray","Int16Array","Uint16Array","Int32Array","Uint32Array","Float32Array","Float64Array","BigInt64Array","BigUint64Array"]
   },
   {
-    name: 'map',
-    signatures: [['callbackfn','?thisArg']]
+    name: "every",
+    signatures: [["predicate","?options"]],
+    receivers: ["Observable"]
   },
   {
-    name: 'filter',
-    signatures: [['predicate','?thisArg']]
+    name: "some",
+    signatures: [["predicate","?thisArg"]],
+    receivers: ["ReadonlyArray","Array","Int8Array","Uint8Array","Uint8ClampedArray","Int16Array","Uint16Array","Int32Array","Uint32Array","Float32Array","Float64Array","BigInt64Array","BigUint64Array"]
   },
   {
-    name: 'reduce',
-    signatures: [['callbackfn','?initialValue']]
+    name: "some",
+    signatures: [["predicate","?options"]],
+    receivers: ["Observable"]
   },
   {
-    name: 'reduceRight',
-    signatures: [['callbackfn','?initialValue']]
+    name: "forEach",
+    signatures: [["callbackfn","?thisArg"]],
+    receivers: ["ReadonlyArray","Array","Int8Array","Uint8Array","Uint8ClampedArray","Int16Array","Uint16Array","Int32Array","Uint32Array","Float32Array","Float64Array","AudioParamMap","CSSNumericArray","CSSTransformValue","CSSUnparsedValue","CustomStateSet","DOMTokenList","EventCounts","FontFaceSet","FormData","Headers","Highlight","HighlightRegistry","MIDIInputMap","MIDIOutputMap","MediaKeyStatusMap","NodeList","NodeListOf","RTCStatsReport","StylePropertyMapReadOnly","URLSearchParams","Map","ReadonlyMap","Set","ReadonlySet","BigInt64Array","BigUint64Array"]
   },
   {
-    name: 'push',
-    signatures: [['...items']]
+    name: "forEach",
+    signatures: [["callback","?options"]],
+    receivers: ["Observable"]
   },
   {
-    name: 'sort',
-    signatures: [['?compareFn']],
-    receivers: ['Array','Int8Array','Uint8Array','Uint8ClampedArray','Int16Array','Uint16Array','Int32Array','Uint32Array','Float32Array','Float64Array','BigInt64Array','BigUint64Array']
+    name: "map",
+    signatures: [["callbackfn","?thisArg"]],
+    receivers: ["ReadonlyArray","Array","Int8Array","Uint8Array","Uint8ClampedArray","Int16Array","Uint16Array","Int32Array","Uint32Array","Float32Array","Float64Array","BigInt64Array","BigUint64Array"]
   },
   {
-    name: 'splice',
-    signatures: [['start','?deleteCount','...items']]
+    name: "map",
+    signatures: [["mapper"]],
+    receivers: ["Observable"]
   },
   {
-    name: 'unshift',
-    signatures: [['...items']]
+    name: "filter",
+    signatures: [["predicate","?thisArg"]],
+    receivers: ["ReadonlyArray","Array","Int8Array","Uint8Array","Uint8ClampedArray","Int16Array","Uint16Array","Int32Array","Uint32Array","Float32Array","Float64Array","BigInt64Array","BigUint64Array"]
   },
   {
-    name: 'isArray',
-    signatures: [['arg']]
+    name: "filter",
+    signatures: [["predicate"]],
+    receivers: ["Observable"]
   },
   {
-    name: 'then',
-    signatures: [['?onfulfilled','?onrejected']]
+    name: "reduce",
+    signatures: [["callbackfn","?initialValue"]]
   },
   {
-    name: 'catch',
-    signatures: [['?onrejected']]
+    name: "reduceRight",
+    signatures: [["callbackfn","?initialValue"]]
   },
   {
-    name: 'isView',
-    signatures: [['arg']]
+    name: "push",
+    signatures: [["...items"]]
   },
   {
-    name: 'getFloat32',
-    signatures: [['byteOffset','?littleEndian']]
+    name: "sort",
+    signatures: [["?compareFn"]],
+    receivers: ["Array","Int8Array","Uint8Array","Uint8ClampedArray","Int16Array","Uint16Array","Int32Array","Uint32Array","Float32Array","Float64Array","BigInt64Array","BigUint64Array"]
   },
   {
-    name: 'getFloat64',
-    signatures: [['byteOffset','?littleEndian']]
+    name: "splice",
+    signatures: [["start","?deleteCount","...items"]]
   },
   {
-    name: 'getInt8',
-    signatures: [['byteOffset']]
+    name: "unshift",
+    signatures: [["...items"]]
   },
   {
-    name: 'getInt16',
-    signatures: [['byteOffset','?littleEndian']]
+    name: "isArray",
+    signatures: [["arg"]]
   },
   {
-    name: 'getInt32',
-    signatures: [['byteOffset','?littleEndian']]
+    name: "then",
+    signatures: [["?onfulfilled","?onrejected"]]
   },
   {
-    name: 'getUint8',
-    signatures: [['byteOffset']]
+    name: "catch",
+    signatures: [["?onrejected"]]
   },
   {
-    name: 'getUint16',
-    signatures: [['byteOffset','?littleEndian']]
+    name: "isView",
+    signatures: [["arg"]]
   },
   {
-    name: 'getUint32',
-    signatures: [['byteOffset','?littleEndian']]
+    name: "getFloat32",
+    signatures: [["byteOffset","?littleEndian"]]
   },
   {
-    name: 'setFloat32',
-    signatures: [['byteOffset','value','?littleEndian']]
+    name: "getFloat64",
+    signatures: [["byteOffset","?littleEndian"]]
   },
   {
-    name: 'setFloat64',
-    signatures: [['byteOffset','value','?littleEndian']]
+    name: "getInt8",
+    signatures: [["byteOffset"]]
   },
   {
-    name: 'setInt8',
-    signatures: [['byteOffset','value']]
+    name: "getInt16",
+    signatures: [["byteOffset","?littleEndian"]]
   },
   {
-    name: 'setInt16',
-    signatures: [['byteOffset','value','?littleEndian']]
+    name: "getInt32",
+    signatures: [["byteOffset","?littleEndian"]]
   },
   {
-    name: 'setInt32',
-    signatures: [['byteOffset','value','?littleEndian']]
+    name: "getUint8",
+    signatures: [["byteOffset"]]
   },
   {
-    name: 'setUint8',
-    signatures: [['byteOffset','value']]
+    name: "getUint16",
+    signatures: [["byteOffset","?littleEndian"]]
   },
   {
-    name: 'setUint16',
-    signatures: [['byteOffset','value','?littleEndian']]
+    name: "getUint32",
+    signatures: [["byteOffset","?littleEndian"]]
   },
   {
-    name: 'setUint32',
-    signatures: [['byteOffset','value','?littleEndian']]
+    name: "setFloat32",
+    signatures: [["byteOffset","value","?littleEndian"]]
   },
   {
-    name: 'copyWithin',
-    signatures: [['target','?start','?end']]
+    name: "setFloat64",
+    signatures: [["byteOffset","value","?littleEndian"]]
   },
   {
-    name: 'fill',
-    signatures: [['value','?start','?end']],
-    receivers: ['Int8Array','Uint8Array','Uint8ClampedArray','Int16Array','Uint16Array','Int32Array','Uint32Array','Float32Array','Float64Array','Array','BigInt64Array','BigUint64Array']
+    name: "setInt8",
+    signatures: [["byteOffset","value"]]
   },
   {
-    name: 'fill',
-    signatures: [['?fillRule'],['path','?fillRule']],
-    receivers: ['CanvasDrawPath']
+    name: "setInt16",
+    signatures: [["byteOffset","value","?littleEndian"]]
   },
   {
-    name: 'fill',
-    signatures: [['?winding'],['path','?winding']],
-    receivers: ['CanvasRenderingContext2D','OffscreenCanvasRenderingContext2D','PaintRenderingContext2D']
+    name: "setInt32",
+    signatures: [["byteOffset","value","?littleEndian"]]
   },
   {
-    name: 'find',
-    signatures: [['predicate','?thisArg']],
-    receivers: ['Int8Array','Uint8Array','Uint8ClampedArray','Int16Array','Uint16Array','Int32Array','Uint32Array','Float32Array','Float64Array','Array','ReadonlyArray','BigInt64Array','BigUint64Array']
+    name: "setUint8",
+    signatures: [["byteOffset","value"]]
   },
   {
-    name: 'find',
-    signatures: [['?string','?caseSensitive','?backwards','?wrap','?wholeWord','?searchInFrames','?showDialog']],
-    receivers: ['Window']
+    name: "setUint16",
+    signatures: [["byteOffset","value","?littleEndian"]]
   },
   {
-    name: 'findIndex',
-    signatures: [['predicate','?thisArg']]
+    name: "setUint32",
+    signatures: [["byteOffset","value","?littleEndian"]]
   },
   {
-    name: 'subarray',
-    signatures: [['?begin','?end']]
+    name: "copyWithin",
+    signatures: [["target","start","?end"]]
   },
   {
-    name: 'of',
-    signatures: [['...items']]
+    name: "fill",
+    signatures: [["value","?start","?end"]],
+    receivers: ["Int8Array","Uint8Array","Uint8ClampedArray","Int16Array","Uint16Array","Int32Array","Uint32Array","Float32Array","Float64Array","Array","BigInt64Array","BigUint64Array"]
   },
   {
-    name: 'from',
-    signatures: [['arrayLike','?mapfn','?thisArg']],
-    receivers: ['Int8ArrayConstructor','Uint8ArrayConstructor','Uint8ClampedArrayConstructor','Int16ArrayConstructor','Uint16ArrayConstructor','Int32ArrayConstructor','Uint32ArrayConstructor','Float32ArrayConstructor','Float64ArrayConstructor','BigInt64ArrayConstructor','BigUint64ArrayConstructor']
+    name: "fill",
+    signatures: [["?fillRule"],["path","?fillRule"]],
+    receivers: ["CanvasDrawPath"]
   },
   {
-    name: 'from',
-    signatures: [['iterable','?mapfn','?thisArg'],['arrayLike','?mapfn','?thisArg']],
-    receivers: ['ArrayConstructor']
+    name: "fill",
+    signatures: [["?winding"],["path","?winding"]],
+    receivers: ["CanvasRenderingContext2D","OffscreenCanvasRenderingContext2D","PaintRenderingContext2D"]
   },
   {
-    name: 'drawArraysInstancedANGLE',
-    signatures: [['mode','first','count','primcount']]
+    name: "find",
+    signatures: [["predicate","?thisArg"]],
+    receivers: ["Int8Array","Uint8Array","Uint8ClampedArray","Int16Array","Uint16Array","Int32Array","Uint32Array","Float32Array","Float64Array","Array","ReadonlyArray","BigInt64Array","BigUint64Array"]
   },
   {
-    name: 'drawElementsInstancedANGLE',
-    signatures: [['mode','count','type','offset','primcount']]
+    name: "find",
+    signatures: [["predicate","?options"]],
+    receivers: ["Observable"]
   },
   {
-    name: 'vertexAttribDivisorANGLE',
-    signatures: [['index','divisor']]
+    name: "find",
+    signatures: [["?string","?caseSensitive","?backwards","?wrap","?wholeWord","?searchInFrames","?showDialog"]],
+    receivers: ["Window"]
   },
   {
-    name: 'abort',
-    signatures: [['?reason']],
-    receivers: ['AbortController','WritableStream','WritableStreamDefaultWriter','AbortSignal']
+    name: "findIndex",
+    signatures: [["predicate","?thisArg"]]
   },
   {
-    name: 'abort',
-    signatures: [['reason']],
-    receivers: ['UnderlyingSinkBase']
+    name: "subarray",
+    signatures: [["?begin","?end"]]
   },
   {
-    name: 'addEventListener',
-    signatures: [['type','listener','?options']],
-    receivers: ['AbortSignal','SharedWorker','Worker','ServiceWorker','Animation','AudioBufferSourceNode','AudioContext','AudioScheduledSourceNode','AudioWorkletNode','BaseAudioContext','BroadcastChannel','CSSAnimation','CSSTransition','CanvasCaptureMediaStreamTrack','ConstantSourceNode','Document','Element','EventSource','FileReader','FontFaceSet','Window','HTMLElement','MathMLElement','SVGElement','HTMLAnchorElement','HTMLAreaElement','HTMLAudioElement','HTMLBRElement','HTMLBaseElement','HTMLBodyElement','HTMLButtonElement','HTMLCanvasElement','HTMLDListElement','HTMLDataElement','HTMLDataListElement','HTMLDetailsElement','HTMLDialogElement','HTMLDirectoryElement','HTMLDivElement','HTMLDocument','HTMLEmbedElement','HTMLFieldSetElement','HTMLFontElement','HTMLFormElement','HTMLFrameElement','HTMLFrameSetElement','HTMLHRElement','HTMLHeadElement','HTMLHeadingElement','HTMLHtmlElement','HTMLIFrameElement','HTMLImageElement','HTMLInputElement','HTMLLIElement','HTMLLabelElement','HTMLLegendElement','HTMLLinkElement','HTMLMapElement','HTMLMarqueeElement','HTMLMediaElement','HTMLMenuElement','HTMLMetaElement','HTMLMeterElement','HTMLModElement','HTMLOListElement','HTMLObjectElement','HTMLOptGroupElement','HTMLOptionElement','HTMLOutputElement','HTMLParagraphElement','HTMLParamElement','HTMLPictureElement','HTMLPreElement','HTMLProgressElement','HTMLQuoteElement','HTMLScriptElement','HTMLSelectElement','HTMLSlotElement','HTMLSourceElement','HTMLSpanElement','HTMLStyleElement','HTMLTableCaptionElement','HTMLTableCellElement','HTMLTableColElement','HTMLTableDataCellElement','HTMLTableElement','HTMLTableHeaderCellElement','HTMLTableRowElement','HTMLTableSectionElement','HTMLTemplateElement','HTMLTextAreaElement','HTMLTimeElement','HTMLTitleElement','HTMLTrackElement','HTMLUListElement','HTMLUnknownElement','HTMLVideoElement','IDBDatabase','IDBOpenDBRequest','IDBRequest','IDBTransaction','MIDIAccess','MIDIInput','MIDIOutput','MIDIPort','MediaDevices','MediaKeySession','MediaQueryList','MediaRecorder','MediaSource','MediaStream','MediaStreamTrack','MessagePort','Notification','OfflineAudioContext','OffscreenCanvas','OscillatorNode','PaymentRequest','Performance','PermissionStatus','PictureInPictureWindow','RTCDTMFSender','RTCDataChannel','RTCDtlsTransport','RTCIceTransport','RTCPeerConnection','RTCSctpTransport','RemotePlayback','SVGAElement','SVGAnimateElement','SVGAnimateMotionElement','SVGAnimateTransformElement','SVGAnimationElement','SVGCircleElement','SVGClipPathElement','SVGComponentTransferFunctionElement','SVGDefsElement','SVGDescElement','SVGEllipseElement','SVGFEBlendElement','SVGFEColorMatrixElement','SVGFEComponentTransferElement','SVGFECompositeElement','SVGFEConvolveMatrixElement','SVGFEDiffuseLightingElement','SVGFEDisplacementMapElement','SVGFEDistantLightElement','SVGFEDropShadowElement','SVGFEFloodElement','SVGFEFuncAElement','SVGFEFuncBElement','SVGFEFuncGElement','SVGFEFuncRElement','SVGFEGaussianBlurElement','SVGFEImageElement','SVGFEMergeElement','SVGFEMergeNodeElement','SVGFEMorphologyElement','SVGFEOffsetElement','SVGFEPointLightElement','SVGFESpecularLightingElement','SVGFESpotLightElement','SVGFETileElement','SVGFETurbulenceElement','SVGFilterElement','SVGForeignObjectElement','SVGGElement','SVGGeometryElement','SVGGradientElement','SVGGraphicsElement','SVGImageElement','SVGLineElement','SVGLinearGradientElement','SVGMPathElement','SVGMarkerElement','SVGMaskElement','SVGMetadataElement','SVGPathElement','SVGPatternElement','SVGPolygonElement','SVGPolylineElement','SVGRadialGradientElement','SVGRectElement','SVGSVGElement','SVGScriptElement','SVGSetElement','SVGStopElement','SVGStyleElement','SVGSwitchElement','SVGSymbolElement','SVGTSpanElement','SVGTextContentElement','SVGTextElement','SVGTextPathElement','SVGTextPositioningElement','SVGTitleElement','SVGUseElement','SVGViewElement','ScreenOrientation','ScriptProcessorNode','ServiceWorkerContainer','ServiceWorkerRegistration','ShadowRoot','SourceBuffer','SourceBufferList','SpeechSynthesis','SpeechSynthesisUtterance','TextTrack','TextTrackCue','TextTrackList','VTTCue','VideoDecoder','VideoEncoder','VisualViewport','WakeLockSentinel','WebSocket','XMLDocument','XMLHttpRequest','XMLHttpRequestEventTarget','XMLHttpRequestUpload','DedicatedWorkerGlobalScope','ServiceWorkerGlobalScope','SharedWorkerGlobalScope','WorkerGlobalScope','Highlight']
+    name: "of",
+    signatures: [["...items"]]
   },
   {
-    name: 'addEventListener',
-    signatures: [['type','callback','?options'],['type','listener','?options']],
-    receivers: ['EventTarget']
+    name: "from",
+    signatures: [["arrayLike","?mapfn","?thisArg"]],
+    receivers: ["Int8ArrayConstructor","Uint8ArrayConstructor","Uint8ClampedArrayConstructor","Int16ArrayConstructor","Uint16ArrayConstructor","Int32ArrayConstructor","Uint32ArrayConstructor","Float32ArrayConstructor","Float64ArrayConstructor","BigInt64ArrayConstructor","BigUint64ArrayConstructor"]
   },
   {
-    name: 'removeEventListener',
-    signatures: [['type','listener','?options']],
-    receivers: ['AbortSignal','SharedWorker','Worker','ServiceWorker','Animation','AudioBufferSourceNode','AudioContext','AudioScheduledSourceNode','AudioWorkletNode','BaseAudioContext','BroadcastChannel','CSSAnimation','CSSTransition','CanvasCaptureMediaStreamTrack','ConstantSourceNode','Document','Element','EventSource','FileReader','FontFaceSet','Window','HTMLElement','MathMLElement','SVGElement','HTMLAnchorElement','HTMLAreaElement','HTMLAudioElement','HTMLBRElement','HTMLBaseElement','HTMLBodyElement','HTMLButtonElement','HTMLCanvasElement','HTMLDListElement','HTMLDataElement','HTMLDataListElement','HTMLDetailsElement','HTMLDialogElement','HTMLDirectoryElement','HTMLDivElement','HTMLDocument','HTMLEmbedElement','HTMLFieldSetElement','HTMLFontElement','HTMLFormElement','HTMLFrameElement','HTMLFrameSetElement','HTMLHRElement','HTMLHeadElement','HTMLHeadingElement','HTMLHtmlElement','HTMLIFrameElement','HTMLImageElement','HTMLInputElement','HTMLLIElement','HTMLLabelElement','HTMLLegendElement','HTMLLinkElement','HTMLMapElement','HTMLMarqueeElement','HTMLMediaElement','HTMLMenuElement','HTMLMetaElement','HTMLMeterElement','HTMLModElement','HTMLOListElement','HTMLObjectElement','HTMLOptGroupElement','HTMLOptionElement','HTMLOutputElement','HTMLParagraphElement','HTMLParamElement','HTMLPictureElement','HTMLPreElement','HTMLProgressElement','HTMLQuoteElement','HTMLScriptElement','HTMLSelectElement','HTMLSlotElement','HTMLSourceElement','HTMLSpanElement','HTMLStyleElement','HTMLTableCaptionElement','HTMLTableCellElement','HTMLTableColElement','HTMLTableDataCellElement','HTMLTableElement','HTMLTableHeaderCellElement','HTMLTableRowElement','HTMLTableSectionElement','HTMLTemplateElement','HTMLTextAreaElement','HTMLTimeElement','HTMLTitleElement','HTMLTrackElement','HTMLUListElement','HTMLUnknownElement','HTMLVideoElement','IDBDatabase','IDBOpenDBRequest','IDBRequest','IDBTransaction','MIDIAccess','MIDIInput','MIDIOutput','MIDIPort','MediaDevices','MediaKeySession','MediaQueryList','MediaRecorder','MediaSource','MediaStream','MediaStreamTrack','MessagePort','Notification','OfflineAudioContext','OffscreenCanvas','OscillatorNode','PaymentRequest','Performance','PermissionStatus','PictureInPictureWindow','RTCDTMFSender','RTCDataChannel','RTCDtlsTransport','RTCIceTransport','RTCPeerConnection','RTCSctpTransport','RemotePlayback','SVGAElement','SVGAnimateElement','SVGAnimateMotionElement','SVGAnimateTransformElement','SVGAnimationElement','SVGCircleElement','SVGClipPathElement','SVGComponentTransferFunctionElement','SVGDefsElement','SVGDescElement','SVGEllipseElement','SVGFEBlendElement','SVGFEColorMatrixElement','SVGFEComponentTransferElement','SVGFECompositeElement','SVGFEConvolveMatrixElement','SVGFEDiffuseLightingElement','SVGFEDisplacementMapElement','SVGFEDistantLightElement','SVGFEDropShadowElement','SVGFEFloodElement','SVGFEFuncAElement','SVGFEFuncBElement','SVGFEFuncGElement','SVGFEFuncRElement','SVGFEGaussianBlurElement','SVGFEImageElement','SVGFEMergeElement','SVGFEMergeNodeElement','SVGFEMorphologyElement','SVGFEOffsetElement','SVGFEPointLightElement','SVGFESpecularLightingElement','SVGFESpotLightElement','SVGFETileElement','SVGFETurbulenceElement','SVGFilterElement','SVGForeignObjectElement','SVGGElement','SVGGeometryElement','SVGGradientElement','SVGGraphicsElement','SVGImageElement','SVGLineElement','SVGLinearGradientElement','SVGMPathElement','SVGMarkerElement','SVGMaskElement','SVGMetadataElement','SVGPathElement','SVGPatternElement','SVGPolygonElement','SVGPolylineElement','SVGRadialGradientElement','SVGRectElement','SVGSVGElement','SVGScriptElement','SVGSetElement','SVGStopElement','SVGStyleElement','SVGSwitchElement','SVGSymbolElement','SVGTSpanElement','SVGTextContentElement','SVGTextElement','SVGTextPathElement','SVGTextPositioningElement','SVGTitleElement','SVGUseElement','SVGViewElement','ScreenOrientation','ScriptProcessorNode','ServiceWorkerContainer','ServiceWorkerRegistration','ShadowRoot','SourceBuffer','SourceBufferList','SpeechSynthesis','SpeechSynthesisUtterance','TextTrack','TextTrackCue','TextTrackList','VTTCue','VideoDecoder','VideoEncoder','VisualViewport','WakeLockSentinel','WebSocket','XMLDocument','XMLHttpRequest','XMLHttpRequestEventTarget','XMLHttpRequestUpload','DedicatedWorkerGlobalScope','ServiceWorkerGlobalScope','SharedWorkerGlobalScope','WorkerGlobalScope','Highlight']
+    name: "from",
+    signatures: [["iterable","?mapfn","?thisArg"],["arrayLike","?mapfn","?thisArg"]],
+    receivers: ["ArrayConstructor"]
   },
   {
-    name: 'removeEventListener',
-    signatures: [['type','callback','?options'],['type','listener','?options']],
-    receivers: ['EventTarget']
+    name: "from",
+    signatures: [["value"]],
+    receivers: ["Observable"]
   },
   {
-    name: 'getByteFrequencyData',
-    signatures: [['array']]
+    name: "drawArraysInstancedANGLE",
+    signatures: [["mode","first","count","primcount"]]
   },
   {
-    name: 'getByteTimeDomainData',
-    signatures: [['array']]
+    name: "drawElementsInstancedANGLE",
+    signatures: [["mode","count","type","offset","primcount"]]
   },
   {
-    name: 'getFloatFrequencyData',
-    signatures: [['array']]
+    name: "vertexAttribDivisorANGLE",
+    signatures: [["index","divisor"]]
   },
   {
-    name: 'getFloatTimeDomainData',
-    signatures: [['array']]
+    name: "abort",
+    signatures: [["?reason"]],
+    receivers: ["AbortController","WritableStream","WritableStreamDefaultWriter","AbortSignal"]
   },
   {
-    name: 'animate',
-    signatures: [['keyframes','?options']]
+    name: "abort",
+    signatures: [["reason"]],
+    receivers: ["UnderlyingSinkBase"]
   },
   {
-    name: 'getAnimations',
-    signatures: [['?options']],
-    receivers: ['Element']
+    name: "addEventListener",
+    signatures: [["type","listener","?options"]],
+    receivers: ["AbortSignal","SharedWorker","Worker","ServiceWorker","Animation","AudioBufferSourceNode","AudioContext","AudioScheduledSourceNode","AudioWorkletNode","BaseAudioContext","BroadcastChannel","CSSAnimation","CSSTransition","CanvasCaptureMediaStreamTrack","ConstantSourceNode","Document","Element","EventSource","FileReader","FontFaceSet","Window","HTMLElement","MathMLElement","SVGElement","HTMLAnchorElement","HTMLAreaElement","HTMLAudioElement","HTMLBRElement","HTMLBaseElement","HTMLBodyElement","HTMLButtonElement","HTMLCanvasElement","HTMLDListElement","HTMLDataElement","HTMLDataListElement","HTMLDetailsElement","HTMLDialogElement","HTMLDirectoryElement","HTMLDivElement","HTMLDocument","HTMLEmbedElement","HTMLFieldSetElement","HTMLFontElement","HTMLFormElement","HTMLFrameElement","HTMLFrameSetElement","HTMLHRElement","HTMLHeadElement","HTMLHeadingElement","HTMLHtmlElement","HTMLIFrameElement","HTMLImageElement","HTMLInputElement","HTMLLIElement","HTMLLabelElement","HTMLLegendElement","HTMLLinkElement","HTMLMapElement","HTMLMarqueeElement","HTMLMediaElement","HTMLMenuElement","HTMLMetaElement","HTMLMeterElement","HTMLModElement","HTMLOListElement","HTMLObjectElement","HTMLOptGroupElement","HTMLOptionElement","HTMLOutputElement","HTMLParagraphElement","HTMLParamElement","HTMLPictureElement","HTMLPreElement","HTMLProgressElement","HTMLQuoteElement","HTMLScriptElement","HTMLSelectElement","HTMLSlotElement","HTMLSourceElement","HTMLSpanElement","HTMLStyleElement","HTMLTableCaptionElement","HTMLTableCellElement","HTMLTableColElement","HTMLTableDataCellElement","HTMLTableElement","HTMLTableHeaderCellElement","HTMLTableRowElement","HTMLTableSectionElement","HTMLTemplateElement","HTMLTextAreaElement","HTMLTimeElement","HTMLTitleElement","HTMLTrackElement","HTMLUListElement","HTMLUnknownElement","HTMLVideoElement","IDBDatabase","IDBOpenDBRequest","IDBRequest","IDBTransaction","MIDIAccess","MIDIInput","MIDIOutput","MIDIPort","MediaDevices","MediaKeySession","MediaQueryList","MediaRecorder","MediaSource","MediaStream","MediaStreamTrack","MessagePort","Notification","OfflineAudioContext","OffscreenCanvas","OscillatorNode","PaymentRequest","Performance","PermissionStatus","PictureInPictureWindow","RTCDTMFSender","RTCDataChannel","RTCDtlsTransport","RTCIceTransport","RTCPeerConnection","RTCSctpTransport","RemotePlayback","SVGAElement","SVGAnimateElement","SVGAnimateMotionElement","SVGAnimateTransformElement","SVGAnimationElement","SVGCircleElement","SVGClipPathElement","SVGComponentTransferFunctionElement","SVGDefsElement","SVGDescElement","SVGEllipseElement","SVGFEBlendElement","SVGFEColorMatrixElement","SVGFEComponentTransferElement","SVGFECompositeElement","SVGFEConvolveMatrixElement","SVGFEDiffuseLightingElement","SVGFEDisplacementMapElement","SVGFEDistantLightElement","SVGFEDropShadowElement","SVGFEFloodElement","SVGFEFuncAElement","SVGFEFuncBElement","SVGFEFuncGElement","SVGFEFuncRElement","SVGFEGaussianBlurElement","SVGFEImageElement","SVGFEMergeElement","SVGFEMergeNodeElement","SVGFEMorphologyElement","SVGFEOffsetElement","SVGFEPointLightElement","SVGFESpecularLightingElement","SVGFESpotLightElement","SVGFETileElement","SVGFETurbulenceElement","SVGFilterElement","SVGForeignObjectElement","SVGGElement","SVGGeometryElement","SVGGradientElement","SVGGraphicsElement","SVGImageElement","SVGLineElement","SVGLinearGradientElement","SVGMPathElement","SVGMarkerElement","SVGMaskElement","SVGMetadataElement","SVGPathElement","SVGPatternElement","SVGPolygonElement","SVGPolylineElement","SVGRadialGradientElement","SVGRectElement","SVGSVGElement","SVGScriptElement","SVGSetElement","SVGStopElement","SVGStyleElement","SVGSwitchElement","SVGSymbolElement","SVGTSpanElement","SVGTextContentElement","SVGTextElement","SVGTextPathElement","SVGTextPositioningElement","SVGTitleElement","SVGUseElement","SVGViewElement","ScreenOrientation","ScriptProcessorNode","ServiceWorkerContainer","ServiceWorkerRegistration","ShadowRoot","SourceBuffer","SourceBufferList","SpeechSynthesis","SpeechSynthesisUtterance","TextTrack","TextTrackCue","TextTrackList","VTTCue","VideoDecoder","VideoEncoder","VisualViewport","WakeLockSentinel","WebSocket","XMLDocument","XMLHttpRequest","XMLHttpRequestEventTarget","XMLHttpRequestUpload","DedicatedWorkerGlobalScope","ServiceWorkerGlobalScope","SharedWorkerGlobalScope","WorkerGlobalScope","Highlight"]
   },
   {
-    name: 'cancel',
-    signatures: [['?reason']],
-    receivers: ['ReadableStream','ReadableStreamBYOBReader','ReadableStreamDefaultReader','UnderlyingSourceBase']
+    name: "addEventListener",
+    signatures: [["type","callback","?options"],["type","listener","?options"]],
+    receivers: ["EventTarget"]
   },
   {
-    name: 'finish',
-    signatures: [['?descriptor']],
-    receivers: ['GPUCommandEncoder','GPURenderBundleEncoder']
+    name: "removeEventListener",
+    signatures: [["type","listener","?options"]],
+    receivers: ["AbortSignal","SharedWorker","Worker","ServiceWorker","Animation","AudioBufferSourceNode","AudioContext","AudioScheduledSourceNode","AudioWorkletNode","BaseAudioContext","BroadcastChannel","CSSAnimation","CSSTransition","CanvasCaptureMediaStreamTrack","ConstantSourceNode","Document","Element","EventSource","FileReader","FontFaceSet","Window","HTMLElement","MathMLElement","SVGElement","HTMLAnchorElement","HTMLAreaElement","HTMLAudioElement","HTMLBRElement","HTMLBaseElement","HTMLBodyElement","HTMLButtonElement","HTMLCanvasElement","HTMLDListElement","HTMLDataElement","HTMLDataListElement","HTMLDetailsElement","HTMLDialogElement","HTMLDirectoryElement","HTMLDivElement","HTMLDocument","HTMLEmbedElement","HTMLFieldSetElement","HTMLFontElement","HTMLFormElement","HTMLFrameElement","HTMLFrameSetElement","HTMLHRElement","HTMLHeadElement","HTMLHeadingElement","HTMLHtmlElement","HTMLIFrameElement","HTMLImageElement","HTMLInputElement","HTMLLIElement","HTMLLabelElement","HTMLLegendElement","HTMLLinkElement","HTMLMapElement","HTMLMarqueeElement","HTMLMediaElement","HTMLMenuElement","HTMLMetaElement","HTMLMeterElement","HTMLModElement","HTMLOListElement","HTMLObjectElement","HTMLOptGroupElement","HTMLOptionElement","HTMLOutputElement","HTMLParagraphElement","HTMLParamElement","HTMLPictureElement","HTMLPreElement","HTMLProgressElement","HTMLQuoteElement","HTMLScriptElement","HTMLSelectElement","HTMLSlotElement","HTMLSourceElement","HTMLSpanElement","HTMLStyleElement","HTMLTableCaptionElement","HTMLTableCellElement","HTMLTableColElement","HTMLTableDataCellElement","HTMLTableElement","HTMLTableHeaderCellElement","HTMLTableRowElement","HTMLTableSectionElement","HTMLTemplateElement","HTMLTextAreaElement","HTMLTimeElement","HTMLTitleElement","HTMLTrackElement","HTMLUListElement","HTMLUnknownElement","HTMLVideoElement","IDBDatabase","IDBOpenDBRequest","IDBRequest","IDBTransaction","MIDIAccess","MIDIInput","MIDIOutput","MIDIPort","MediaDevices","MediaKeySession","MediaQueryList","MediaRecorder","MediaSource","MediaStream","MediaStreamTrack","MessagePort","Notification","OfflineAudioContext","OffscreenCanvas","OscillatorNode","PaymentRequest","Performance","PermissionStatus","PictureInPictureWindow","RTCDTMFSender","RTCDataChannel","RTCDtlsTransport","RTCIceTransport","RTCPeerConnection","RTCSctpTransport","RemotePlayback","SVGAElement","SVGAnimateElement","SVGAnimateMotionElement","SVGAnimateTransformElement","SVGAnimationElement","SVGCircleElement","SVGClipPathElement","SVGComponentTransferFunctionElement","SVGDefsElement","SVGDescElement","SVGEllipseElement","SVGFEBlendElement","SVGFEColorMatrixElement","SVGFEComponentTransferElement","SVGFECompositeElement","SVGFEConvolveMatrixElement","SVGFEDiffuseLightingElement","SVGFEDisplacementMapElement","SVGFEDistantLightElement","SVGFEDropShadowElement","SVGFEFloodElement","SVGFEFuncAElement","SVGFEFuncBElement","SVGFEFuncGElement","SVGFEFuncRElement","SVGFEGaussianBlurElement","SVGFEImageElement","SVGFEMergeElement","SVGFEMergeNodeElement","SVGFEMorphologyElement","SVGFEOffsetElement","SVGFEPointLightElement","SVGFESpecularLightingElement","SVGFESpotLightElement","SVGFETileElement","SVGFETurbulenceElement","SVGFilterElement","SVGForeignObjectElement","SVGGElement","SVGGeometryElement","SVGGradientElement","SVGGraphicsElement","SVGImageElement","SVGLineElement","SVGLinearGradientElement","SVGMPathElement","SVGMarkerElement","SVGMaskElement","SVGMetadataElement","SVGPathElement","SVGPatternElement","SVGPolygonElement","SVGPolylineElement","SVGRadialGradientElement","SVGRectElement","SVGSVGElement","SVGScriptElement","SVGSetElement","SVGStopElement","SVGStyleElement","SVGSwitchElement","SVGSymbolElement","SVGTSpanElement","SVGTextContentElement","SVGTextElement","SVGTextPathElement","SVGTextPositioningElement","SVGTitleElement","SVGUseElement","SVGViewElement","ScreenOrientation","ScriptProcessorNode","ServiceWorkerContainer","ServiceWorkerRegistration","ShadowRoot","SourceBuffer","SourceBufferList","SpeechSynthesis","SpeechSynthesisUtterance","TextTrack","TextTrackCue","TextTrackList","VTTCue","VideoDecoder","VideoEncoder","VisualViewport","WakeLockSentinel","WebSocket","XMLDocument","XMLHttpRequest","XMLHttpRequestEventTarget","XMLHttpRequestUpload","DedicatedWorkerGlobalScope","ServiceWorkerGlobalScope","SharedWorkerGlobalScope","WorkerGlobalScope","Highlight"]
   },
   {
-    name: 'updatePlaybackRate',
-    signatures: [['playbackRate'],['playback_rate']]
+    name: "removeEventListener",
+    signatures: [["type","callback","?options"],["type","listener","?options"]],
+    receivers: ["EventTarget"]
   },
   {
-    name: 'updateTiming',
-    signatures: [['?timing']]
+    name: "getByteFrequencyData",
+    signatures: [["array"]]
   },
   {
-    name: 'cancelAnimationFrame',
-    signatures: [['handle']]
+    name: "getByteTimeDomainData",
+    signatures: [["array"]]
   },
   {
-    name: 'requestAnimationFrame',
-    signatures: [['callback']]
+    name: "getFloatFrequencyData",
+    signatures: [["array"]]
   },
   {
-    name: 'copyFromChannel',
-    signatures: [['destination','channelNumber','?bufferOffset']]
+    name: "getFloatTimeDomainData",
+    signatures: [["array"]]
   },
   {
-    name: 'copyToChannel',
-    signatures: [['source','channelNumber','?bufferOffset']]
+    name: "animate",
+    signatures: [["keyframes","?options"]]
   },
   {
-    name: 'getChannelData',
-    signatures: [['channel'],['channelIndex']]
+    name: "getAnimations",
+    signatures: [["?options"]],
+    receivers: ["Element"]
   },
   {
-    name: 'start',
-    signatures: [['?when','?offset','?duration'],['?when','?grainOffset','?grainDuration']],
-    receivers: ['AudioBufferSourceNode']
+    name: "cancel",
+    signatures: [["?reason"]],
+    receivers: ["ReadableStream","ReadableStreamBYOBReader","ReadableStreamDefaultReader"]
   },
   {
-    name: 'start',
-    signatures: [['?when']],
-    receivers: ['AudioScheduledSourceNode']
+    name: "finish",
+    signatures: [["?descriptor"]],
+    receivers: ["GPUCommandEncoder","GPURenderBundleEncoder"]
   },
   {
-    name: 'start',
-    signatures: [['?timeslice']],
-    receivers: ['MediaRecorder']
+    name: "updatePlaybackRate",
+    signatures: [["playbackRate"],["playback_rate"]]
   },
   {
-    name: 'start',
-    signatures: [['index']],
-    receivers: ['TimeRanges']
+    name: "updateTiming",
+    signatures: [["?timing"]]
   },
   {
-    name: 'start',
-    signatures: [['controller']],
-    receivers: ['UnderlyingSinkBase']
+    name: "cancelAnimationFrame",
+    signatures: [["handle"]]
   },
   {
-    name: 'start',
-    signatures: [['stream']],
-    receivers: ['UnderlyingSourceBase']
+    name: "requestAnimationFrame",
+    signatures: [["callback"]]
   },
   {
-    name: 'start',
-    signatures: [['?options']],
-    receivers: ['IdleDetector']
+    name: "copyFromChannel",
+    signatures: [["destination","channelNumber","?bufferOffset"]]
   },
   {
-    name: 'close',
-    signatures: [['?returnValue']],
-    receivers: ['HTMLDialogElement']
+    name: "copyToChannel",
+    signatures: [["source","channelNumber","?bufferOffset"]]
   },
   {
-    name: 'close',
-    signatures: [['?code','?reason']],
-    receivers: ['WebSocket']
+    name: "getChannelData",
+    signatures: [["channel"],["channelIndex"]]
   },
   {
-    name: 'close',
-    signatures: [['?closeInfo']],
-    receivers: ['WebSocketStream','WebTransport']
+    name: "start",
+    signatures: [["?when","?offset","?duration"],["?when","?grainOffset","?grainDuration"]],
+    receivers: ["AudioBufferSourceNode"]
   },
   {
-    name: 'createMediaElementSource',
-    signatures: [['mediaElement']]
+    name: "start",
+    signatures: [["?when"]],
+    receivers: ["AudioScheduledSourceNode"]
   },
   {
-    name: 'createMediaStreamSource',
-    signatures: [['mediaStream']]
+    name: "start",
+    signatures: [["?timeslice"]],
+    receivers: ["MediaRecorder"]
   },
   {
-    name: 'suspend',
-    signatures: [['suspendTime']],
-    receivers: ['OfflineAudioContext']
+    name: "start",
+    signatures: [["index"]],
+    receivers: ["TimeRanges"]
   },
   {
-    name: 'setOrientation',
-    signatures: [['x','y','z','xUp','yUp','zUp']],
-    receivers: ['AudioListener']
+    name: "start",
+    signatures: [["controller"]],
+    receivers: ["UnderlyingSinkBase"]
   },
   {
-    name: 'setOrientation',
-    signatures: [['x','y','z']],
-    receivers: ['PannerNode']
+    name: "start",
+    signatures: [["?options"]],
+    receivers: ["IdleDetector"]
   },
   {
-    name: 'setPosition',
-    signatures: [['x','y','z']],
-    receivers: ['AudioListener','PannerNode']
+    name: "start",
+    signatures: [["?track"]],
+    receivers: ["SpeechRecognition"]
   },
   {
-    name: 'setPosition',
-    signatures: [['node','?offset']],
-    receivers: ['Selection']
+    name: "close",
+    signatures: [["?returnValue"]],
+    receivers: ["HTMLDialogElement"]
   },
   {
-    name: 'connect',
-    signatures: [['destinationParam','?output'],['destination','?output','?input'],['destinationNode','?output','?input']],
-    receivers: ['AudioNode']
+    name: "close",
+    signatures: [["?code","?reason"]],
+    receivers: ["WebSocket"]
   },
   {
-    name: 'connect',
-    signatures: [['readerName','accessMode','?preferredProtocols']],
-    receivers: ['SmartCardContext']
+    name: "close",
+    signatures: [["?closeInfo"]],
+    receivers: ["WebTransport","WebSocketStream"]
   },
   {
-    name: 'disconnect',
-    signatures: [['?output'],['destinationNode','?output','?input'],['destinationParam','?output'],['destination','?output','?input']],
-    receivers: ['AudioNode']
+    name: "createMediaElementSource",
+    signatures: [["mediaElement"]]
   },
   {
-    name: 'disconnect',
-    signatures: [['?disposition']],
-    receivers: ['SmartCardConnection']
+    name: "createMediaStreamSource",
+    signatures: [["mediaStream"]]
   },
   {
-    name: 'cancelAndHoldAtTime',
-    signatures: [['cancelTime'],['startTime']]
+    name: "suspend",
+    signatures: [["suspendTime"]],
+    receivers: ["OfflineAudioContext"]
   },
   {
-    name: 'cancelScheduledValues',
-    signatures: [['cancelTime'],['startTime']]
+    name: "setOrientation",
+    signatures: [["x","y","z","xUp","yUp","zUp"]],
+    receivers: ["AudioListener"]
   },
   {
-    name: 'exponentialRampToValueAtTime',
-    signatures: [['value','endTime'],['value','time']]
+    name: "setOrientation",
+    signatures: [["x","y","z"]],
+    receivers: ["PannerNode"]
   },
   {
-    name: 'linearRampToValueAtTime',
-    signatures: [['value','endTime'],['value','time']]
+    name: "setPosition",
+    signatures: [["x","y","z"]],
+    receivers: ["AudioListener","PannerNode"]
   },
   {
-    name: 'setTargetAtTime',
-    signatures: [['target','startTime','timeConstant'],['target','time','timeConstant']]
+    name: "setPosition",
+    signatures: [["node","?offset"]],
+    receivers: ["Selection"]
   },
   {
-    name: 'setValueAtTime',
-    signatures: [['value','startTime'],['value','time']]
+    name: "connect",
+    signatures: [["destinationParam","?output"],["destination","?output","?input"],["destinationNode","?output","?input"]],
+    receivers: ["AudioNode"]
   },
   {
-    name: 'setValueCurveAtTime',
-    signatures: [['values','startTime','duration'],['values','time','duration']]
+    name: "connect",
+    signatures: [["readerName","accessMode","?options"]],
+    receivers: ["SmartCardContext"]
   },
   {
-    name: 'stop',
-    signatures: [['?when']],
-    receivers: ['AudioScheduledSourceNode']
+    name: "disconnect",
+    signatures: [["?output"],["destinationNode","?output","?input"],["destinationParam","?output"],["destination","?output","?input"]],
+    receivers: ["AudioNode"]
   },
   {
-    name: 'createBuffer',
-    signatures: [['numberOfChannels','length','sampleRate'],['numberOfChannels','numberOfFrames','sampleRate']],
-    receivers: ['BaseAudioContext']
+    name: "disconnect",
+    signatures: [["?disposition"]],
+    receivers: ["SmartCardConnection"]
   },
   {
-    name: 'createBuffer',
-    signatures: [['descriptor']],
-    receivers: ['GPUDevice']
+    name: "cancelAndHoldAtTime",
+    signatures: [["cancelTime"],["startTime"]]
   },
   {
-    name: 'createChannelMerger',
-    signatures: [['?numberOfInputs']]
+    name: "cancelScheduledValues",
+    signatures: [["cancelTime"],["startTime"]]
   },
   {
-    name: 'createChannelSplitter',
-    signatures: [['?numberOfOutputs']]
+    name: "exponentialRampToValueAtTime",
+    signatures: [["value","endTime"],["value","time"]]
   },
   {
-    name: 'createDelay',
-    signatures: [['?maxDelayTime']]
+    name: "linearRampToValueAtTime",
+    signatures: [["value","endTime"],["value","time"]]
   },
   {
-    name: 'createIIRFilter',
-    signatures: [['feedforward','feedback'],['feedForward','feedBack']]
+    name: "setTargetAtTime",
+    signatures: [["target","startTime","timeConstant"],["target","time","timeConstant"]]
   },
   {
-    name: 'createPeriodicWave',
-    signatures: [['real','imag','?constraints']]
+    name: "setValueAtTime",
+    signatures: [["value","startTime"],["value","time"]]
   },
   {
-    name: 'createScriptProcessor',
-    signatures: [['?bufferSize','?numberOfInputChannels','?numberOfOutputChannels']]
+    name: "setValueCurveAtTime",
+    signatures: [["values","startTime","duration"],["values","time","duration"]]
   },
   {
-    name: 'decodeAudioData',
-    signatures: [['audioData','?successCallback','?errorCallback']]
+    name: "stop",
+    signatures: [["?when"]],
+    receivers: ["AudioScheduledSourceNode"]
   },
   {
-    name: 'getFrequencyResponse',
-    signatures: [['frequencyHz','magResponse','phaseResponse']]
+    name: "createBuffer",
+    signatures: [["numberOfChannels","length","sampleRate"],["numberOfChannels","numberOfFrames","sampleRate"]],
+    receivers: ["BaseAudioContext"]
   },
   {
-    name: 'json',
-    signatures: [['data','?init']],
-    receivers: ['Response']
+    name: "createBuffer",
+    signatures: [["descriptor"]],
+    receivers: ["GPUDevice"]
   },
   {
-    name: 'postMessage',
-    signatures: [['message']],
-    receivers: ['BroadcastChannel']
+    name: "createChannelMerger",
+    signatures: [["?numberOfInputs"]]
   },
   {
-    name: 'postMessage',
-    signatures: [['message','transfer'],['message','?options']],
-    receivers: ['MessagePort','ServiceWorker','Worker','Client','DedicatedWorkerGlobalScope']
+    name: "createChannelSplitter",
+    signatures: [["?numberOfOutputs"]]
   },
   {
-    name: 'postMessage',
-    signatures: [['message','?options'],['message','transfer'],['message','targetOrigin','?transfer']],
-    receivers: ['Window']
+    name: "createDelay",
+    signatures: [["?maxDelayTime"]]
   },
   {
-    name: 'postMessage',
-    signatures: [['message','?options']],
-    receivers: ['HTMLPortalElement','PortalHost']
+    name: "createIIRFilter",
+    signatures: [["feedforward","feedback"],["feedForward","feedBack"]]
   },
   {
-    name: 'deleteRule',
-    signatures: [['index']],
-    receivers: ['CSSGroupingRule','CSSStyleSheet','CSSStyleRule']
+    name: "createPeriodicWave",
+    signatures: [["real","imag","?constraints"]]
   },
   {
-    name: 'deleteRule',
-    signatures: [['select']],
-    receivers: ['CSSKeyframesRule']
+    name: "createScriptProcessor",
+    signatures: [["?bufferSize","?numberOfInputChannels","?numberOfOutputChannels"]]
   },
   {
-    name: 'insertRule',
-    signatures: [['rule','?index']]
+    name: "decodeAudioData",
+    signatures: [["audioData","?successCallback","?errorCallback"]]
   },
   {
-    name: 'appendRule',
-    signatures: [['rule']]
+    name: "getFrequencyResponse",
+    signatures: [["frequencyHz","magResponse","phaseResponse"]]
   },
   {
-    name: 'findRule',
-    signatures: [['select']]
+    name: "json",
+    signatures: [["data","?init"]],
+    receivers: ["Response"]
   },
   {
-    name: 'add',
-    signatures: [['...values']],
-    receivers: ['CSSNumericValue']
+    name: "postMessage",
+    signatures: [["message"]],
+    receivers: ["BroadcastChannel"]
   },
   {
-    name: 'add',
-    signatures: [['request']],
-    receivers: ['Cache']
+    name: "postMessage",
+    signatures: [["message","transfer"],["message","?options"]],
+    receivers: ["MessagePort","ServiceWorker","Worker","Client","DedicatedWorkerGlobalScope"]
   },
   {
-    name: 'add',
-    signatures: [['...tokens']],
-    receivers: ['DOMTokenList']
+    name: "postMessage",
+    signatures: [["message","?options"],["message","transfer"],["message","targetOrigin","?transfer"]],
+    receivers: ["Window"]
   },
   {
-    name: 'add',
-    signatures: [['data','?type'],['file']],
-    receivers: ['DataTransferItemList']
+    name: "deleteRule",
+    signatures: [["index"]],
+    receivers: ["CSSGroupingRule","CSSStyleSheet","CSSStyleRule"]
   },
   {
-    name: 'add',
-    signatures: [['element','?before']],
-    receivers: ['HTMLOptionsCollection','HTMLSelectElement']
+    name: "deleteRule",
+    signatures: [["select"]],
+    receivers: ["CSSKeyframesRule"]
   },
   {
-    name: 'add',
-    signatures: [['value','?key']],
-    receivers: ['IDBObjectStore']
+    name: "insertRule",
+    signatures: [["rule","?index"]]
   },
   {
-    name: 'add',
-    signatures: [['typedArray','index','value']],
-    receivers: ['Atomics']
+    name: "appendRule",
+    signatures: [["rule"]]
   },
   {
-    name: 'add',
-    signatures: [['value']],
-    receivers: ['Set','WeakSet']
+    name: "findRule",
+    signatures: [["select"]]
   },
   {
-    name: 'add',
-    signatures: [['node','?before']],
-    receivers: ['AccessibleNodeList']
+    name: "add",
+    signatures: [["...values"]],
+    receivers: ["CSSNumericValue"]
   },
   {
-    name: 'add',
-    signatures: [['key']],
-    receivers: ['CustomStateSet']
+    name: "add",
+    signatures: [["request"]],
+    receivers: ["Cache"]
   },
   {
-    name: 'add',
-    signatures: [['description']],
-    receivers: ['ContentIndex']
+    name: "add",
+    signatures: [["...tokens"]],
+    receivers: ["DOMTokenList"]
   },
   {
-    name: 'add',
-    signatures: [['a','b']],
-    receivers: ['MLGraphBuilder']
+    name: "add",
+    signatures: [["data","?type"],["file"]],
+    receivers: ["DataTransferItemList"]
   },
   {
-    name: 'add',
-    signatures: [['sub_apps_to_add']],
-    receivers: ['SubApps']
+    name: "add",
+    signatures: [["element","?before"]],
+    receivers: ["HTMLOptionsCollection","HTMLSelectElement"]
   },
   {
-    name: 'div',
-    signatures: [['...values']],
-    receivers: ['CSSNumericValue']
+    name: "add",
+    signatures: [["value","?key"]],
+    receivers: ["IDBObjectStore"]
   },
   {
-    name: 'div',
-    signatures: [['a','b']],
-    receivers: ['MLGraphBuilder']
+    name: "add",
+    signatures: [["typedArray","index","value"]],
+    receivers: ["Atomics"]
   },
   {
-    name: 'equals',
-    signatures: [['...value'],['...values']]
+    name: "add",
+    signatures: [["value"]],
+    receivers: ["Set","WeakSet"]
   },
   {
-    name: 'mul',
-    signatures: [['...values']],
-    receivers: ['CSSNumericValue']
+    name: "add",
+    signatures: [["node","?before"]],
+    receivers: ["AccessibleNodeList"]
   },
   {
-    name: 'mul',
-    signatures: [['a','b']],
-    receivers: ['MLGraphBuilder']
+    name: "add",
+    signatures: [["key"]],
+    receivers: ["CustomStateSet","ViewTransitionTypeSet"]
   },
   {
-    name: 'sub',
-    signatures: [['...values']],
-    receivers: ['CSSNumericValue']
+    name: "add",
+    signatures: [["description"]],
+    receivers: ["ContentIndex"]
   },
   {
-    name: 'sub',
-    signatures: [['typedArray','index','value']],
-    receivers: ['Atomics']
+    name: "add",
+    signatures: [["a","b","?options"]],
+    receivers: ["MLGraphBuilder"]
   },
   {
-    name: 'sub',
-    signatures: [['a','b']],
-    receivers: ['MLGraphBuilder']
+    name: "add",
+    signatures: [["sub_apps_to_add"]],
+    receivers: ["SubApps"]
   },
   {
-    name: 'to',
-    signatures: [['unit']]
+    name: "div",
+    signatures: [["...values"]],
+    receivers: ["CSSNumericValue"]
   },
   {
-    name: 'toSum',
-    signatures: [['...units']]
+    name: "div",
+    signatures: [["a","b","?options"]],
+    receivers: ["MLGraphBuilder"]
   },
   {
-    name: 'item',
-    signatures: [['index']],
-    receivers: ['CSSRuleList','CSSStyleDeclaration','DOMRectList','DOMStringList','DOMTokenList','FileList','HTMLCollectionBase','HTMLCollectionOf','HTMLSelectElement','MediaList','MimeTypeArray','NamedNodeMap','NodeList','NodeListOf','Plugin','PluginArray','SpeechRecognitionResult','SpeechRecognitionResultList','StyleSheetList','TouchList','AccessibleNodeList','HTMLCollection','SpeechGrammarList','SQLResultSetRowList']
+    name: "equals",
+    signatures: [["...value"],["...values"]]
   },
   {
-    name: 'item',
-    signatures: [['?nameOrIndex']],
-    receivers: ['HTMLAllCollection']
+    name: "mul",
+    signatures: [["...values"]],
+    receivers: ["CSSNumericValue"]
   },
   {
-    name: 'getPropertyPriority',
-    signatures: [['property']]
+    name: "mul",
+    signatures: [["a","b","?options"]],
+    receivers: ["MLGraphBuilder"]
   },
   {
-    name: 'getPropertyValue',
-    signatures: [['property']]
+    name: "sub",
+    signatures: [["...values"]],
+    receivers: ["CSSNumericValue"]
   },
   {
-    name: 'removeProperty',
-    signatures: [['property']]
+    name: "sub",
+    signatures: [["typedArray","index","value"]],
+    receivers: ["Atomics"]
   },
   {
-    name: 'setProperty',
-    signatures: [['property','value','?priority']]
+    name: "sub",
+    signatures: [["a","b","?options"]],
+    receivers: ["MLGraphBuilder"]
   },
   {
-    name: 'addRule',
-    signatures: [['?selector','?style','?index']]
+    name: "to",
+    signatures: [["unit"]]
   },
   {
-    name: 'removeRule',
-    signatures: [['?index']]
+    name: "toSum",
+    signatures: [["...units"]]
   },
   {
-    name: 'replaceSync',
-    signatures: [['text']]
+    name: "item",
+    signatures: [["index"]],
+    receivers: ["CSSRuleList","CSSStyleDeclaration","DOMRectList","DOMStringList","DOMTokenList","FileList","HTMLCollectionBase","HTMLCollectionOf","HTMLSelectElement","MediaList","MimeTypeArray","NamedNodeMap","NodeList","NodeListOf","Plugin","PluginArray","SpeechRecognitionResult","SpeechRecognitionResultList","StyleSheetList","TouchList","AccessibleNodeList","HTMLCollection","SpeechGrammarList","SQLResultSetRowList"]
   },
   {
-    name: 'addAll',
-    signatures: [['requests']]
+    name: "item",
+    signatures: [["?nameOrIndex"]],
+    receivers: ["HTMLAllCollection"]
   },
   {
-    name: 'delete',
-    signatures: [['request','?options']],
-    receivers: ['Cache']
+    name: "getPropertyPriority",
+    signatures: [["property"]]
   },
   {
-    name: 'delete',
-    signatures: [['cacheName']],
-    receivers: ['CacheStorage']
+    name: "getPropertyValue",
+    signatures: [["property"]]
   },
   {
-    name: 'delete',
-    signatures: [['name']],
-    receivers: ['FormData','StorageBucketManager']
+    name: "removeProperty",
+    signatures: [["property"]]
   },
   {
-    name: 'delete',
-    signatures: [['name'],['key']],
-    receivers: ['Headers']
+    name: "setProperty",
+    signatures: [["property","value","?priority"]]
   },
   {
-    name: 'delete',
-    signatures: [['query'],['key']],
-    receivers: ['IDBObjectStore']
+    name: "addRule",
+    signatures: [["?selector","?style","?index"]]
   },
   {
-    name: 'delete',
-    signatures: [['property']],
-    receivers: ['StylePropertyMap']
+    name: "removeRule",
+    signatures: [["?index"]]
   },
   {
-    name: 'delete',
-    signatures: [['name','?value']],
-    receivers: ['URLSearchParams']
+    name: "replaceSync",
+    signatures: [["text"]]
   },
   {
-    name: 'delete',
-    signatures: [['key']],
-    receivers: ['Map','WeakMap']
+    name: "addAll",
+    signatures: [["requests"]]
   },
   {
-    name: 'delete',
-    signatures: [['value']],
-    receivers: ['Set','WeakSet']
+    name: "delete",
+    signatures: [["request","?options"]],
+    receivers: ["Cache"]
   },
   {
-    name: 'delete',
-    signatures: [['id']],
-    receivers: ['ContentIndex']
+    name: "delete",
+    signatures: [["cacheName"]],
+    receivers: ["CacheStorage"]
   },
   {
-    name: 'delete',
-    signatures: [['name'],['options']],
-    receivers: ['CookieStore']
+    name: "delete",
+    signatures: [["name"]],
+    receivers: ["FormData","StorageBucketManager"]
   },
   {
-    name: 'delete',
-    signatures: [['instrumentKey']],
-    receivers: ['PaymentInstruments']
+    name: "delete",
+    signatures: [["name"],["key"]],
+    receivers: ["Headers"]
   },
   {
-    name: 'matchAll',
-    signatures: [['?request','?options']],
-    receivers: ['Cache','BackgroundFetchRegistration']
+    name: "delete",
+    signatures: [["query"],["key"]],
+    receivers: ["IDBObjectStore"]
   },
   {
-    name: 'matchAll',
-    signatures: [['regexp']],
-    receivers: ['String']
+    name: "delete",
+    signatures: [["property"]],
+    receivers: ["StylePropertyMap"]
   },
   {
-    name: 'matchAll',
-    signatures: [['?options']],
-    receivers: ['Clients']
+    name: "delete",
+    signatures: [["name","?value"]],
+    receivers: ["URLSearchParams"]
   },
   {
-    name: 'put',
-    signatures: [['request','response']],
-    receivers: ['Cache']
+    name: "delete",
+    signatures: [["key"]],
+    receivers: ["Map","WeakMap"]
   },
   {
-    name: 'put',
-    signatures: [['value','?key']],
-    receivers: ['IDBObjectStore']
+    name: "delete",
+    signatures: [["value"]],
+    receivers: ["Set","WeakSet"]
   },
   {
-    name: 'has',
-    signatures: [['cacheName']],
-    receivers: ['CacheStorage']
+    name: "delete",
+    signatures: [["id"]],
+    receivers: ["ContentIndex"]
   },
   {
-    name: 'has',
-    signatures: [['name']],
-    receivers: ['FormData']
+    name: "delete",
+    signatures: [["name"],["options"]],
+    receivers: ["CookieStore"]
   },
   {
-    name: 'has',
-    signatures: [['name'],['key']],
-    receivers: ['Headers']
+    name: "delete",
+    signatures: [["instrumentKey"]],
+    receivers: ["PaymentInstruments"]
   },
   {
-    name: 'has',
-    signatures: [['keyId']],
-    receivers: ['MediaKeyStatusMap']
+    name: "matchAll",
+    signatures: [["?request","?options"]],
+    receivers: ["Cache","BackgroundFetchRegistration"]
   },
   {
-    name: 'has',
-    signatures: [['property']],
-    receivers: ['StylePropertyMapReadOnly']
+    name: "matchAll",
+    signatures: [["regexp"]],
+    receivers: ["String"]
   },
   {
-    name: 'has',
-    signatures: [['name','?value']],
-    receivers: ['URLSearchParams']
+    name: "matchAll",
+    signatures: [["?options"]],
+    receivers: ["Clients"]
   },
   {
-    name: 'has',
-    signatures: [['target','p']],
-    receivers: ['ProxyHandler']
+    name: "put",
+    signatures: [["request","response"]],
+    receivers: ["Cache"]
   },
   {
-    name: 'has',
-    signatures: [['key']],
-    receivers: ['Map','ReadonlyMap','WeakMap']
+    name: "put",
+    signatures: [["value","?key"]],
+    receivers: ["IDBObjectStore"]
   },
   {
-    name: 'has',
-    signatures: [['value']],
-    receivers: ['Set','ReadonlySet','WeakSet']
+    name: "has",
+    signatures: [["cacheName"]],
+    receivers: ["CacheStorage"]
   },
   {
-    name: 'has',
-    signatures: [['instrumentKey']],
-    receivers: ['PaymentInstruments']
+    name: "has",
+    signatures: [["name"]],
+    receivers: ["FormData"]
   },
   {
-    name: 'open',
-    signatures: [['cacheName']],
-    receivers: ['CacheStorage']
+    name: "has",
+    signatures: [["name"],["key"]],
+    receivers: ["Headers"]
   },
   {
-    name: 'open',
-    signatures: [['?unused1','?unused2'],['?type','?replace'],['url','name','features']],
-    receivers: ['Document']
+    name: "has",
+    signatures: [["keyId"]],
+    receivers: ["MediaKeyStatusMap"]
   },
   {
-    name: 'open',
-    signatures: [['name','?version']],
-    receivers: ['IDBFactory']
+    name: "has",
+    signatures: [["property"]],
+    receivers: ["StylePropertyMapReadOnly"]
   },
   {
-    name: 'open',
-    signatures: [['?url','?target','?features']],
-    receivers: ['Window']
+    name: "has",
+    signatures: [["name","?value"]],
+    receivers: ["URLSearchParams"]
   },
   {
-    name: 'open',
-    signatures: [['method','url','?async','?username','?password']],
-    receivers: ['XMLHttpRequest']
+    name: "has",
+    signatures: [["target","p"]],
+    receivers: ["ProxyHandler"]
   },
   {
-    name: 'open',
-    signatures: [['name','?options']],
-    receivers: ['StorageBucketManager']
+    name: "has",
+    signatures: [["key"]],
+    receivers: ["Map","ReadonlyMap","WeakMap"]
   },
   {
-    name: 'open',
-    signatures: [['?options']],
-    receivers: ['EyeDropper']
+    name: "has",
+    signatures: [["value"]],
+    receivers: ["Set","ReadonlySet","WeakSet","ReadonlySetLike"]
   },
   {
-    name: 'drawImage',
-    signatures: [['image','dx','dy','?dw','?dh'],['image','sx','sy','sw','sh','dx','dy','dw','dh']],
-    receivers: ['CanvasDrawImage']
+    name: "has",
+    signatures: [["instrumentKey"]],
+    receivers: ["PaymentInstruments"]
   },
   {
-    name: 'drawImage',
-    signatures: [['image','x','y','?width','?height'],['image','sx','sy','sw','sh','dx','dy','dw','dh']],
-    receivers: ['CanvasRenderingContext2D','OffscreenCanvasRenderingContext2D','PaintRenderingContext2D']
+    name: "open",
+    signatures: [["cacheName"]],
+    receivers: ["CacheStorage"]
   },
   {
-    name: 'clip',
-    signatures: [['?fillRule'],['path','?fillRule']],
-    receivers: ['CanvasDrawPath']
+    name: "open",
+    signatures: [["?unused1","?unused2"],["?type","?replace"],["url","name","features"]],
+    receivers: ["Document"]
   },
   {
-    name: 'clip',
-    signatures: [['?winding'],['path','?winding']],
-    receivers: ['CanvasRenderingContext2D','OffscreenCanvasRenderingContext2D','PaintRenderingContext2D']
+    name: "open",
+    signatures: [["name","?version"]],
+    receivers: ["IDBFactory"]
   },
   {
-    name: 'isPointInPath',
-    signatures: [['x','y','?fillRule'],['path','x','y','?fillRule']],
-    receivers: ['CanvasDrawPath']
+    name: "open",
+    signatures: [["?url","?target","?features"]],
+    receivers: ["Window"]
   },
   {
-    name: 'isPointInPath',
-    signatures: [['x','y','?winding'],['path','x','y','?winding']],
-    receivers: ['CanvasRenderingContext2D','OffscreenCanvasRenderingContext2D','PaintRenderingContext2D']
+    name: "open",
+    signatures: [["method","url","?async","?username","?password"]],
+    receivers: ["XMLHttpRequest"]
   },
   {
-    name: 'isPointInStroke',
-    signatures: [['x','y'],['path','x','y']],
-    receivers: ['CanvasDrawPath','CanvasRenderingContext2D','OffscreenCanvasRenderingContext2D','PaintRenderingContext2D']
+    name: "open",
+    signatures: [["name","?options"]],
+    receivers: ["StorageBucketManager"]
   },
   {
-    name: 'isPointInStroke',
-    signatures: [['?point']],
-    receivers: ['SVGGeometryElement']
+    name: "open",
+    signatures: [["?options"]],
+    receivers: ["EyeDropper"]
   },
   {
-    name: 'stroke',
-    signatures: [['?path']]
+    name: "drawImage",
+    signatures: [["image","dx","dy","?dw","?dh"],["image","sx","sy","sw","sh","dx","dy","dw","dh"]],
+    receivers: ["CanvasDrawImage"]
   },
   {
-    name: 'createConicGradient',
-    signatures: [['startAngle','x','y']],
-    receivers: ['CanvasFillStrokeStyles']
+    name: "drawImage",
+    signatures: [["image","x","y","?width","?height"],["image","sx","sy","sw","sh","dx","dy","dw","dh"]],
+    receivers: ["CanvasRenderingContext2D","OffscreenCanvasRenderingContext2D","PaintRenderingContext2D"]
   },
   {
-    name: 'createConicGradient',
-    signatures: [['startAngle','cx','cy']],
-    receivers: ['CanvasRenderingContext2D','PaintRenderingContext2D']
+    name: "clip",
+    signatures: [["?fillRule"],["path","?fillRule"]],
+    receivers: ["CanvasDrawPath"]
   },
   {
-    name: 'createConicGradient',
-    signatures: [['startAngle','centerX','centerY']],
-    receivers: ['OffscreenCanvasRenderingContext2D']
+    name: "clip",
+    signatures: [["?winding"],["path","?winding"]],
+    receivers: ["CanvasRenderingContext2D","OffscreenCanvasRenderingContext2D","PaintRenderingContext2D"]
   },
   {
-    name: 'createLinearGradient',
-    signatures: [['x0','y0','x1','y1']]
+    name: "isPointInPath",
+    signatures: [["x","y","?fillRule"],["path","x","y","?fillRule"]],
+    receivers: ["CanvasDrawPath"]
   },
   {
-    name: 'createPattern',
-    signatures: [['image','repetition']],
-    receivers: ['CanvasFillStrokeStyles']
+    name: "isPointInPath",
+    signatures: [["x","y","?winding"],["path","x","y","?winding"]],
+    receivers: ["CanvasRenderingContext2D","OffscreenCanvasRenderingContext2D","PaintRenderingContext2D"]
   },
   {
-    name: 'createPattern',
-    signatures: [['image','repetitionType']],
-    receivers: ['CanvasRenderingContext2D','OffscreenCanvasRenderingContext2D','PaintRenderingContext2D']
+    name: "isPointInStroke",
+    signatures: [["x","y"],["path","x","y"]],
+    receivers: ["CanvasDrawPath","CanvasRenderingContext2D","OffscreenCanvasRenderingContext2D","PaintRenderingContext2D"]
   },
   {
-    name: 'createRadialGradient',
-    signatures: [['x0','y0','r0','x1','y1','r1']]
+    name: "isPointInStroke",
+    signatures: [["?point"]],
+    receivers: ["SVGGeometryElement"]
   },
   {
-    name: 'addColorStop',
-    signatures: [['offset','color']]
+    name: "stroke",
+    signatures: [["?path"]]
   },
   {
-    name: 'createImageData',
-    signatures: [['imagedata'],['sw','sh','?settings']],
-    receivers: ['CanvasImageData']
+    name: "createConicGradient",
+    signatures: [["startAngle","x","y"]],
+    receivers: ["CanvasFillStrokeStyles"]
   },
   {
-    name: 'createImageData',
-    signatures: [['imagedata'],['sw','sh','?imageDataSettings']],
-    receivers: ['CanvasRenderingContext2D','OffscreenCanvasRenderingContext2D']
+    name: "createConicGradient",
+    signatures: [["startAngle","cx","cy"]],
+    receivers: ["CanvasRenderingContext2D","PaintRenderingContext2D"]
   },
   {
-    name: 'getImageData',
-    signatures: [['sx','sy','sw','sh','?settings']],
-    receivers: ['CanvasImageData']
+    name: "createConicGradient",
+    signatures: [["startAngle","centerX","centerY"]],
+    receivers: ["OffscreenCanvasRenderingContext2D"]
   },
   {
-    name: 'getImageData',
-    signatures: [['sx','sy','sw','sh','?imageDataSettings']],
-    receivers: ['CanvasRenderingContext2D','OffscreenCanvasRenderingContext2D']
+    name: "createLinearGradient",
+    signatures: [["x0","y0","x1","y1"]]
   },
   {
-    name: 'putImageData',
-    signatures: [['imagedata','dx','dy','?dirtyX','?dirtyY','?dirtyWidth','?dirtyHeight']]
+    name: "createPattern",
+    signatures: [["image","repetition"]],
+    receivers: ["CanvasFillStrokeStyles"]
   },
   {
-    name: 'arc',
-    signatures: [['x','y','radius','startAngle','endAngle','?counterclockwise'],['x','y','radius','startAngle','endAngle','?anticlockwise']]
+    name: "createPattern",
+    signatures: [["image","repetitionType"]],
+    receivers: ["CanvasRenderingContext2D","OffscreenCanvasRenderingContext2D","PaintRenderingContext2D"]
   },
   {
-    name: 'arcTo',
-    signatures: [['x1','y1','x2','y2','radius']]
+    name: "createRadialGradient",
+    signatures: [["x0","y0","r0","x1","y1","r1"]]
   },
   {
-    name: 'bezierCurveTo',
-    signatures: [['cp1x','cp1y','cp2x','cp2y','x','y']]
+    name: "addColorStop",
+    signatures: [["offset","color"]]
   },
   {
-    name: 'ellipse',
-    signatures: [['x','y','radiusX','radiusY','rotation','startAngle','endAngle','?counterclockwise'],['x','y','radiusX','radiusY','rotation','startAngle','endAngle','?anticlockwise']]
+    name: "createImageData",
+    signatures: [["imagedata"],["sw","sh","?settings"]],
+    receivers: ["CanvasImageData"]
   },
   {
-    name: 'lineTo',
-    signatures: [['x','y']]
+    name: "createImageData",
+    signatures: [["imagedata"],["sw","sh","?imageDataSettings"]],
+    receivers: ["CanvasRenderingContext2D","OffscreenCanvasRenderingContext2D"]
   },
   {
-    name: 'moveTo',
-    signatures: [['x','y']],
-    receivers: ['CanvasRenderingContext2D','Path2D','OffscreenCanvasRenderingContext2D','PaintRenderingContext2D','Window']
+    name: "getImageData",
+    signatures: [["sx","sy","sw","sh","?settings"]],
+    receivers: ["CanvasImageData"]
   },
   {
-    name: 'moveTo',
-    signatures: [['parent','name']],
-    receivers: ['EntrySync']
+    name: "getImageData",
+    signatures: [["sx","sy","sw","sh","?imageDataSettings"]],
+    receivers: ["CanvasRenderingContext2D","OffscreenCanvasRenderingContext2D"]
   },
   {
-    name: 'moveTo',
-    signatures: [['parent','?name','?successCallback','?errorCallback']],
-    receivers: ['Entry']
+    name: "putImageData",
+    signatures: [["imagedata","dx","dy","?dirtyX","?dirtyY","?dirtyWidth","?dirtyHeight"]]
   },
   {
-    name: 'quadraticCurveTo',
-    signatures: [['cpx','cpy','x','y']]
+    name: "arc",
+    signatures: [["x","y","radius","startAngle","endAngle","?counterclockwise"],["x","y","radius","startAngle","endAngle","?anticlockwise"]]
   },
   {
-    name: 'rect',
-    signatures: [['x','y','w','h'],['x','y','width','height']]
+    name: "arcTo",
+    signatures: [["x1","y1","x2","y2","radius"]]
   },
   {
-    name: 'roundRect',
-    signatures: [['x','y','w','h','?radii']]
+    name: "bezierCurveTo",
+    signatures: [["cp1x","cp1y","cp2x","cp2y","x","y"]]
   },
   {
-    name: 'setLineDash',
-    signatures: [['segments']],
-    receivers: ['CanvasPathDrawingStyles']
+    name: "ellipse",
+    signatures: [["x","y","radiusX","radiusY","rotation","startAngle","endAngle","?counterclockwise"],["x","y","radiusX","radiusY","rotation","startAngle","endAngle","?anticlockwise"]]
   },
   {
-    name: 'setLineDash',
-    signatures: [['dash']],
-    receivers: ['CanvasRenderingContext2D','OffscreenCanvasRenderingContext2D','PaintRenderingContext2D']
+    name: "lineTo",
+    signatures: [["x","y"]]
   },
   {
-    name: 'setTransform',
-    signatures: [['?transform']],
-    receivers: ['CanvasPattern']
+    name: "moveTo",
+    signatures: [["x","y"]],
+    receivers: ["CanvasRenderingContext2D","Path2D","OffscreenCanvasRenderingContext2D","PaintRenderingContext2D","Window"]
   },
   {
-    name: 'setTransform',
-    signatures: [['?transform'],['a','b','c','d','e','f']],
-    receivers: ['CanvasTransform','CanvasRenderingContext2D','OffscreenCanvasRenderingContext2D','PaintRenderingContext2D']
+    name: "moveTo",
+    signatures: [["parent","name"]],
+    receivers: ["EntrySync"]
   },
   {
-    name: 'clearRect',
-    signatures: [['x','y','w','h']],
-    receivers: ['CanvasRect']
+    name: "moveTo",
+    signatures: [["parent","?name","?successCallback","?errorCallback"]],
+    receivers: ["Entry"]
   },
   {
-    name: 'clearRect',
-    signatures: [['x','y','width','height']],
-    receivers: ['CanvasRenderingContext2D','OffscreenCanvasRenderingContext2D','PaintRenderingContext2D']
+    name: "quadraticCurveTo",
+    signatures: [["cpx","cpy","x","y"]]
   },
   {
-    name: 'fillRect',
-    signatures: [['x','y','w','h']],
-    receivers: ['CanvasRect']
+    name: "rect",
+    signatures: [["x","y","w","h"],["x","y","width","height"]]
   },
   {
-    name: 'fillRect',
-    signatures: [['x','y','width','height']],
-    receivers: ['CanvasRenderingContext2D','OffscreenCanvasRenderingContext2D','PaintRenderingContext2D']
+    name: "roundRect",
+    signatures: [["x","y","w","h","?radii"]]
   },
   {
-    name: 'strokeRect',
-    signatures: [['x','y','w','h']],
-    receivers: ['CanvasRect']
+    name: "setLineDash",
+    signatures: [["segments"]],
+    receivers: ["CanvasPathDrawingStyles"]
   },
   {
-    name: 'strokeRect',
-    signatures: [['x','y','width','height']],
-    receivers: ['CanvasRenderingContext2D','OffscreenCanvasRenderingContext2D','PaintRenderingContext2D']
+    name: "setLineDash",
+    signatures: [["dash"]],
+    receivers: ["CanvasRenderingContext2D","OffscreenCanvasRenderingContext2D","PaintRenderingContext2D"]
   },
   {
-    name: 'fillText',
-    signatures: [['text','x','y','?maxWidth']]
+    name: "setTransform",
+    signatures: [["?transform"]],
+    receivers: ["CanvasPattern"]
   },
   {
-    name: 'measureText',
-    signatures: [['text']]
+    name: "setTransform",
+    signatures: [["?transform"],["a","b","c","d","e","f"]],
+    receivers: ["CanvasTransform","CanvasRenderingContext2D","OffscreenCanvasRenderingContext2D","PaintRenderingContext2D"]
   },
   {
-    name: 'strokeText',
-    signatures: [['text','x','y','?maxWidth']]
+    name: "clearRect",
+    signatures: [["x","y","w","h"]],
+    receivers: ["CanvasRect"]
   },
   {
-    name: 'rotate',
-    signatures: [['angle']],
-    receivers: ['CanvasTransform','SVGMatrix','CanvasRenderingContext2D','OffscreenCanvasRenderingContext2D','PaintRenderingContext2D']
+    name: "clearRect",
+    signatures: [["x","y","width","height"]],
+    receivers: ["CanvasRenderingContext2D","OffscreenCanvasRenderingContext2D","PaintRenderingContext2D"]
   },
   {
-    name: 'rotate',
-    signatures: [['?rotX','?rotY','?rotZ']],
-    receivers: ['DOMMatrixReadOnly']
+    name: "fillRect",
+    signatures: [["x","y","w","h"]],
+    receivers: ["CanvasRect"]
   },
   {
-    name: 'scale',
-    signatures: [['x','y']],
-    receivers: ['CanvasTransform','CanvasRenderingContext2D','OffscreenCanvasRenderingContext2D','PaintRenderingContext2D']
+    name: "fillRect",
+    signatures: [["x","y","width","height"]],
+    receivers: ["CanvasRenderingContext2D","OffscreenCanvasRenderingContext2D","PaintRenderingContext2D"]
   },
   {
-    name: 'scale',
-    signatures: [['?scaleX','?scaleY','?scaleZ','?originX','?originY','?originZ']],
-    receivers: ['DOMMatrixReadOnly']
+    name: "strokeRect",
+    signatures: [["x","y","w","h"]],
+    receivers: ["CanvasRect"]
   },
   {
-    name: 'scale',
-    signatures: [['scaleFactor']],
-    receivers: ['SVGMatrix']
+    name: "strokeRect",
+    signatures: [["x","y","width","height"]],
+    receivers: ["CanvasRenderingContext2D","OffscreenCanvasRenderingContext2D","PaintRenderingContext2D"]
   },
   {
-    name: 'transform',
-    signatures: [['a','b','c','d','e','f']]
+    name: "fillText",
+    signatures: [["text","x","y","?maxWidth"]]
   },
   {
-    name: 'translate',
-    signatures: [['x','y']],
-    receivers: ['CanvasTransform','SVGMatrix','CanvasRenderingContext2D','OffscreenCanvasRenderingContext2D','PaintRenderingContext2D']
+    name: "measureText",
+    signatures: [["text"]]
   },
   {
-    name: 'translate',
-    signatures: [['?tx','?ty','?tz']],
-    receivers: ['DOMMatrixReadOnly']
+    name: "strokeText",
+    signatures: [["text","x","y","?maxWidth"]]
   },
   {
-    name: 'drawFocusIfNeeded',
-    signatures: [['element'],['path','element']]
+    name: "rotate",
+    signatures: [["angle"]],
+    receivers: ["CanvasTransform","SVGMatrix","CanvasRenderingContext2D","OffscreenCanvasRenderingContext2D","PaintRenderingContext2D"]
   },
   {
-    name: 'appendData',
-    signatures: [['data']]
+    name: "rotate",
+    signatures: [["?rotX","?rotY","?rotZ"]],
+    receivers: ["DOMMatrixReadOnly"]
   },
   {
-    name: 'deleteData',
-    signatures: [['offset','count']],
-    receivers: ['CharacterData']
+    name: "scale",
+    signatures: [["x","y"]],
+    receivers: ["CanvasTransform","CanvasRenderingContext2D","OffscreenCanvasRenderingContext2D","PaintRenderingContext2D"]
   },
   {
-    name: 'deleteData',
-    signatures: [['key']],
-    receivers: ['LockScreenData']
+    name: "scale",
+    signatures: [["?scaleX","?scaleY","?scaleZ","?originX","?originY","?originZ"]],
+    receivers: ["DOMMatrixReadOnly"]
   },
   {
-    name: 'insertData',
-    signatures: [['offset','data']]
+    name: "scale",
+    signatures: [["scaleFactor"]],
+    receivers: ["SVGMatrix"]
   },
   {
-    name: 'replaceData',
-    signatures: [['offset','count','data']]
+    name: "transform",
+    signatures: [["a","b","c","d","e","f"]]
   },
   {
-    name: 'substringData',
-    signatures: [['offset','count']]
+    name: "translate",
+    signatures: [["x","y"]],
+    receivers: ["CanvasTransform","SVGMatrix","CanvasRenderingContext2D","OffscreenCanvasRenderingContext2D","PaintRenderingContext2D"]
   },
   {
-    name: 'after',
-    signatures: [['...nodes']]
+    name: "translate",
+    signatures: [["?tx","?ty","?tz"]],
+    receivers: ["DOMMatrixReadOnly"]
   },
   {
-    name: 'before',
-    signatures: [['...nodes']]
+    name: "translate",
+    signatures: [["input"]],
+    receivers: ["LanguageTranslator"]
   },
   {
-    name: 'remove',
-    signatures: [['...tokens']],
-    receivers: ['DOMTokenList']
+    name: "drawFocusIfNeeded",
+    signatures: [["element"],["path","element"]]
   },
   {
-    name: 'remove',
-    signatures: [['index']],
-    receivers: ['DataTransferItemList','HTMLOptionsCollection','AccessibleNodeList']
+    name: "appendData",
+    signatures: [["data"]]
   },
   {
-    name: 'remove',
-    signatures: [['?index']],
-    receivers: ['HTMLSelectElement']
+    name: "deleteData",
+    signatures: [["offset","count"]],
+    receivers: ["CharacterData"]
   },
   {
-    name: 'remove',
-    signatures: [['start','end']],
-    receivers: ['SourceBuffer']
+    name: "deleteData",
+    signatures: [["key"]],
+    receivers: ["LockScreenData"]
   },
   {
-    name: 'remove',
-    signatures: [['?options']],
-    receivers: ['FileSystemHandle']
+    name: "insertData",
+    signatures: [["offset","data"]]
   },
   {
-    name: 'remove',
-    signatures: [['successCallback','?errorCallback']],
-    receivers: ['Entry']
+    name: "replaceData",
+    signatures: [["offset","count","data"]]
   },
   {
-    name: 'remove',
-    signatures: [['app_ids']],
-    receivers: ['SubApps']
+    name: "substringData",
+    signatures: [["offset","count"]]
   },
   {
-    name: 'replaceWith',
-    signatures: [['...nodes']]
+    name: "after",
+    signatures: [["...nodes"]]
   },
   {
-    name: 'read',
-    signatures: [['?formats']],
-    receivers: ['Clipboard']
+    name: "before",
+    signatures: [["...nodes"]]
   },
   {
-    name: 'read',
-    signatures: [['view']],
-    receivers: ['ReadableStreamBYOBReader']
+    name: "remove",
+    signatures: [["...tokens"]],
+    receivers: ["DOMTokenList"]
   },
   {
-    name: 'read',
-    signatures: [['buffer','?options']],
-    receivers: ['FileSystemSyncAccessHandle']
+    name: "remove",
+    signatures: [["index"]],
+    receivers: ["DataTransferItemList","HTMLOptionsCollection","AccessibleNodeList"]
   },
   {
-    name: 'write',
-    signatures: [['data']],
-    receivers: ['Clipboard','FileSystemWritableFileStream','FileWriterSync','FileWriter']
+    name: "remove",
+    signatures: [["?index"]],
+    receivers: ["HTMLSelectElement"]
   },
   {
-    name: 'write',
-    signatures: [['...text'],['text']],
-    receivers: ['Document']
+    name: "remove",
+    signatures: [["start","end"]],
+    receivers: ["SourceBuffer"]
   },
   {
-    name: 'write',
-    signatures: [['?chunk']],
-    receivers: ['WritableStreamDefaultWriter']
+    name: "remove",
+    signatures: [["?options"]],
+    receivers: ["FileSystemHandle"]
   },
   {
-    name: 'write',
-    signatures: [['buffer','?options']],
-    receivers: ['FileSystemSyncAccessHandle']
+    name: "remove",
+    signatures: [["successCallback","?errorCallback"]],
+    receivers: ["Entry"]
   },
   {
-    name: 'write',
-    signatures: [['chunk','controller']],
-    receivers: ['UnderlyingSinkBase']
+    name: "remove",
+    signatures: [["app_ids"]],
+    receivers: ["SubApps"]
   },
   {
-    name: 'write',
-    signatures: [['message','?options']],
-    receivers: ['NDEFReader']
+    name: "replaceWith",
+    signatures: [["...nodes"]]
   },
   {
-    name: 'writeText',
-    signatures: [['data']]
+    name: "read",
+    signatures: [["?formats"]],
+    receivers: ["Clipboard"]
   },
   {
-    name: 'getType',
-    signatures: [['type']]
+    name: "read",
+    signatures: [["view"]],
+    receivers: ["ReadableStreamBYOBReader"]
   },
   {
-    name: 'initCompositionEvent',
-    signatures: [['typeArg','?bubblesArg','?cancelableArg','?viewArg','?dataArg'],['type','?bubbles','?cancelable','?view','?data']]
+    name: "read",
+    signatures: [["buffer","?options"]],
+    receivers: ["FileSystemSyncAccessHandle"]
   },
   {
-    name: 'store',
-    signatures: [['credential']],
-    receivers: ['CredentialsContainer']
+    name: "write",
+    signatures: [["data"]],
+    receivers: ["Clipboard","FileSystemWritableFileStream","FileWriterSync","FileWriter"]
   },
   {
-    name: 'store',
-    signatures: [['typedArray','index','value']],
-    receivers: ['Atomics']
+    name: "write",
+    signatures: [["...text"],["text"]],
+    receivers: ["Document"]
   },
   {
-    name: 'getRandomValues',
-    signatures: [['array']]
+    name: "write",
+    signatures: [["?chunk"]],
+    receivers: ["WritableStreamDefaultWriter"]
   },
   {
-    name: 'define',
-    signatures: [['name','constructor','?options']]
+    name: "write",
+    signatures: [["buffer","?options"]],
+    receivers: ["FileSystemSyncAccessHandle"]
   },
   {
-    name: 'upgrade',
-    signatures: [['root']]
+    name: "write",
+    signatures: [["chunk","controller"]],
+    receivers: ["UnderlyingSinkBase"]
   },
   {
-    name: 'whenDefined',
-    signatures: [['name']]
+    name: "write",
+    signatures: [["message","?options"]],
+    receivers: ["NDEFReader"]
   },
   {
-    name: 'initCustomEvent',
-    signatures: [['type','?bubbles','?cancelable','?detail']]
+    name: "writeText",
+    signatures: [["data"]]
   },
   {
-    name: 'createDocument',
-    signatures: [['namespace','qualifiedName','?doctype'],['namespaceURI','qualifiedName','?doctype']]
+    name: "getType",
+    signatures: [["type"]]
   },
   {
-    name: 'createDocumentType',
-    signatures: [['qualifiedName','publicId','systemId']]
+    name: "initCompositionEvent",
+    signatures: [["typeArg","?bubblesArg","?cancelableArg","?viewArg","?dataArg"],["type","?bubbles","?cancelable","?view","?data"]]
   },
   {
-    name: 'createHTMLDocument',
-    signatures: [['?title']]
+    name: "store",
+    signatures: [["credential"]],
+    receivers: ["CredentialsContainer"]
   },
   {
-    name: 'hasFeature',
-    signatures: [['...args']]
+    name: "store",
+    signatures: [["typedArray","index","value"]],
+    receivers: ["Atomics"]
   },
   {
-    name: 'multiplySelf',
-    signatures: [['?other']]
+    name: "getRandomValues",
+    signatures: [["array"]]
   },
   {
-    name: 'preMultiplySelf',
-    signatures: [['?other']]
+    name: "define",
+    signatures: [["name","constructor","?options"]]
   },
   {
-    name: 'rotateAxisAngleSelf',
-    signatures: [['?x','?y','?z','?angle']]
+    name: "getName",
+    signatures: [["constructor"]]
   },
   {
-    name: 'rotateFromVectorSelf',
-    signatures: [['?x','?y']]
+    name: "upgrade",
+    signatures: [["root"]]
   },
   {
-    name: 'rotateSelf',
-    signatures: [['?rotX','?rotY','?rotZ']]
+    name: "whenDefined",
+    signatures: [["name"]]
   },
   {
-    name: 'scale3dSelf',
-    signatures: [['?scale','?originX','?originY','?originZ']]
+    name: "initCustomEvent",
+    signatures: [["type","?bubbles","?cancelable","?detail"]]
   },
   {
-    name: 'scaleSelf',
-    signatures: [['?scaleX','?scaleY','?scaleZ','?originX','?originY','?originZ']]
+    name: "createDocument",
+    signatures: [["namespace","qualifiedName","?doctype"],["namespaceURI","qualifiedName","?doctype"]]
   },
   {
-    name: 'setMatrixValue',
-    signatures: [['transformList']]
+    name: "createDocumentType",
+    signatures: [["qualifiedName","publicId","systemId"]]
   },
   {
-    name: 'skewXSelf',
-    signatures: [['?sx']]
+    name: "createHTMLDocument",
+    signatures: [["?title"]]
   },
   {
-    name: 'skewYSelf',
-    signatures: [['?sy']]
+    name: "hasFeature",
+    signatures: [["...args"]]
   },
   {
-    name: 'translateSelf',
-    signatures: [['?tx','?ty','?tz']]
+    name: "multiplySelf",
+    signatures: [["?other"]]
   },
   {
-    name: 'multiply',
-    signatures: [['?other']],
-    receivers: ['DOMMatrixReadOnly']
+    name: "preMultiplySelf",
+    signatures: [["?other"]]
   },
   {
-    name: 'multiply',
-    signatures: [['secondMatrix']],
-    receivers: ['SVGMatrix']
+    name: "rotateAxisAngleSelf",
+    signatures: [["?x","?y","?z","?angle"]]
   },
   {
-    name: 'rotateAxisAngle',
-    signatures: [['?x','?y','?z','?angle']]
+    name: "rotateFromVectorSelf",
+    signatures: [["?x","?y"]]
   },
   {
-    name: 'rotateFromVector',
-    signatures: [['?x','?y']],
-    receivers: ['DOMMatrixReadOnly']
+    name: "rotateSelf",
+    signatures: [["?rotX","?rotY","?rotZ"]]
   },
   {
-    name: 'rotateFromVector',
-    signatures: [['x','y']],
-    receivers: ['SVGMatrix']
+    name: "scale3dSelf",
+    signatures: [["?scale","?originX","?originY","?originZ"]]
   },
   {
-    name: 'scale3d',
-    signatures: [['?scale','?originX','?originY','?originZ']]
+    name: "scaleSelf",
+    signatures: [["?scaleX","?scaleY","?scaleZ","?originX","?originY","?originZ"]]
   },
   {
-    name: 'scaleNonUniform',
-    signatures: [['?scaleX','?scaleY']],
-    receivers: ['DOMMatrixReadOnly']
+    name: "setMatrixValue",
+    signatures: [["transformList"]]
   },
   {
-    name: 'scaleNonUniform',
-    signatures: [['scaleFactorX','scaleFactorY']],
-    receivers: ['SVGMatrix']
+    name: "skewXSelf",
+    signatures: [["?sx"]]
   },
   {
-    name: 'skewX',
-    signatures: [['?sx']],
-    receivers: ['DOMMatrixReadOnly']
+    name: "skewYSelf",
+    signatures: [["?sy"]]
   },
   {
-    name: 'skewX',
-    signatures: [['angle']],
-    receivers: ['SVGMatrix']
+    name: "translateSelf",
+    signatures: [["?tx","?ty","?tz"]]
   },
   {
-    name: 'skewY',
-    signatures: [['?sy']],
-    receivers: ['DOMMatrixReadOnly']
+    name: "multiply",
+    signatures: [["?other"]],
+    receivers: ["DOMMatrixReadOnly"]
   },
   {
-    name: 'skewY',
-    signatures: [['angle']],
-    receivers: ['SVGMatrix']
+    name: "multiply",
+    signatures: [["secondMatrix"]],
+    receivers: ["SVGMatrix"]
   },
   {
-    name: 'transformPoint',
-    signatures: [['?point']]
+    name: "rotateAxisAngle",
+    signatures: [["?x","?y","?z","?angle"]]
   },
   {
-    name: 'parseFromString',
-    signatures: [['string','type'],['str','type','?options']]
+    name: "rotateFromVector",
+    signatures: [["?x","?y"]],
+    receivers: ["DOMMatrixReadOnly"]
   },
   {
-    name: 'matrixTransform',
-    signatures: [['?matrix']],
-    receivers: ['DOMPointReadOnly']
+    name: "rotateFromVector",
+    signatures: [["x","y"]],
+    receivers: ["SVGMatrix"]
   },
   {
-    name: 'matrixTransform',
-    signatures: [['matrix']],
-    receivers: ['SVGPoint']
+    name: "scale3d",
+    signatures: [["?scale","?originX","?originY","?originZ"]]
   },
   {
-    name: 'contains',
-    signatures: [['string']],
-    receivers: ['DOMStringList']
+    name: "scaleNonUniform",
+    signatures: [["?scaleX","?scaleY"]],
+    receivers: ["DOMMatrixReadOnly"]
   },
   {
-    name: 'contains',
-    signatures: [['token']],
-    receivers: ['DOMTokenList']
+    name: "scaleNonUniform",
+    signatures: [["scaleFactorX","scaleFactorY"]],
+    receivers: ["SVGMatrix"]
   },
   {
-    name: 'contains',
-    signatures: [['other']],
-    receivers: ['Node']
+    name: "skewX",
+    signatures: [["?sx"]],
+    receivers: ["DOMMatrixReadOnly"]
   },
   {
-    name: 'supports',
-    signatures: [['token']],
-    receivers: ['DOMTokenList']
+    name: "skewX",
+    signatures: [["angle"]],
+    receivers: ["SVGMatrix"]
   },
   {
-    name: 'supports',
-    signatures: [['conditionText'],['property','value']],
-    receivers: ['CSS']
+    name: "skewY",
+    signatures: [["?sy"]],
+    receivers: ["DOMMatrixReadOnly"]
   },
   {
-    name: 'supports',
-    signatures: [['type']],
-    receivers: ['HTMLScriptElement']
+    name: "skewY",
+    signatures: [["angle"]],
+    receivers: ["SVGMatrix"]
   },
   {
-    name: 'toggle',
-    signatures: [['token','?force']]
+    name: "transformPoint",
+    signatures: [["?point"]]
   },
   {
-    name: 'clearData',
-    signatures: [['?format']]
+    name: "parseFromString",
+    signatures: [["string","type"],["str","type","?options"]]
   },
   {
-    name: 'getData',
-    signatures: [['format']],
-    receivers: ['DataTransfer']
+    name: "matrixTransform",
+    signatures: [["?matrix"]],
+    receivers: ["DOMPointReadOnly"]
   },
   {
-    name: 'getData',
-    signatures: [['key']],
-    receivers: ['LockScreenData']
+    name: "matrixTransform",
+    signatures: [["matrix"]],
+    receivers: ["SVGPoint"]
   },
   {
-    name: 'setData',
-    signatures: [['format','data']],
-    receivers: ['DataTransfer']
+    name: "contains",
+    signatures: [["string"]],
+    receivers: ["DOMStringList"]
   },
   {
-    name: 'setData',
-    signatures: [['data']],
-    receivers: ['PendingPostBeacon']
+    name: "contains",
+    signatures: [["token"]],
+    receivers: ["DOMTokenList"]
   },
   {
-    name: 'setData',
-    signatures: [['key','data']],
-    receivers: ['LockScreenData']
+    name: "contains",
+    signatures: [["other"]],
+    receivers: ["Node"]
   },
   {
-    name: 'setDragImage',
-    signatures: [['image','x','y']]
+    name: "supports",
+    signatures: [["token"]],
+    receivers: ["DOMTokenList"]
   },
   {
-    name: 'getAsString',
-    signatures: [['callback']]
+    name: "supports",
+    signatures: [["conditionText"],["property","value"]],
+    receivers: ["CSS"]
   },
   {
-    name: 'clear',
-    signatures: [['mask']],
-    receivers: ['WebGLRenderingContext','WebGL2RenderingContextBase','WebGL2RenderingContext']
+    name: "supports",
+    signatures: [["type"]],
+    receivers: ["HTMLScriptElement","ClipboardItem"]
   },
   {
-    name: 'adoptNode',
-    signatures: [['node']]
+    name: "toggle",
+    signatures: [["token","?force"]]
   },
   {
-    name: 'caretRangeFromPoint',
-    signatures: [['?x','?y']]
+    name: "clearData",
+    signatures: [["?format"]]
   },
   {
-    name: 'createAttribute',
-    signatures: [['localName']]
+    name: "getData",
+    signatures: [["format"]],
+    receivers: ["DataTransfer"]
   },
   {
-    name: 'createAttributeNS',
-    signatures: [['namespace','qualifiedName'],['namespaceURI','qualifiedName']]
+    name: "getData",
+    signatures: [["key"]],
+    receivers: ["LockScreenData"]
   },
   {
-    name: 'createCDATASection',
-    signatures: [['data']]
+    name: "setData",
+    signatures: [["format","data"]],
+    receivers: ["DataTransfer"]
   },
   {
-    name: 'createComment',
-    signatures: [['data']]
+    name: "setData",
+    signatures: [["key","data"]],
+    receivers: ["LockScreenData"]
   },
   {
-    name: 'createElement',
-    signatures: [['localName','?options'],['tagName','?options']]
+    name: "setDragImage",
+    signatures: [["image","x","y"]]
   },
   {
-    name: 'createElementNS',
-    signatures: [['namespaceURI','qualifiedName','?options'],['namespace','qualifiedName','?options']]
+    name: "getAsString",
+    signatures: [["callback"]]
   },
   {
-    name: 'createEvent',
-    signatures: [['eventInterface'],['eventType']]
+    name: "clear",
+    signatures: [["mask"]],
+    receivers: ["WebGLRenderingContext","WebGL2RenderingContextBase","WebGL2RenderingContext"]
   },
   {
-    name: 'createNodeIterator',
-    signatures: [['root','?whatToShow','?filter']]
+    name: "adoptNode",
+    signatures: [["node"]]
   },
   {
-    name: 'createProcessingInstruction',
-    signatures: [['target','data']]
+    name: "caretRangeFromPoint",
+    signatures: [["?x","?y"]]
   },
   {
-    name: 'createTextNode',
-    signatures: [['data']]
+    name: "createAttribute",
+    signatures: [["localName"]]
   },
   {
-    name: 'createTreeWalker',
-    signatures: [['root','?whatToShow','?filter']]
+    name: "createAttributeNS",
+    signatures: [["namespace","qualifiedName"],["namespaceURI","qualifiedName"]]
   },
   {
-    name: 'execCommand',
-    signatures: [['commandId','?showUI','?value']]
+    name: "createCDATASection",
+    signatures: [["data"]]
   },
   {
-    name: 'getElementById',
-    signatures: [['elementId']]
+    name: "createComment",
+    signatures: [["data"]]
   },
   {
-    name: 'getElementsByClassName',
-    signatures: [['classNames']]
+    name: "createElement",
+    signatures: [["localName","?options"],["tagName","?options"]]
   },
   {
-    name: 'getElementsByName',
-    signatures: [['elementName']]
+    name: "createElementNS",
+    signatures: [["namespaceURI","qualifiedName","?options"],["namespace","qualifiedName","?options"]]
   },
   {
-    name: 'getElementsByTagName',
-    signatures: [['qualifiedName'],['localName']]
+    name: "createEvent",
+    signatures: [["eventInterface"],["eventType"]]
   },
   {
-    name: 'getElementsByTagNameNS',
-    signatures: [['namespaceURI','localName'],['namespace','localName']]
+    name: "createNodeIterator",
+    signatures: [["root","?whatToShow","?filter"]]
   },
   {
-    name: 'importNode',
-    signatures: [['node','?deep']]
+    name: "createProcessingInstruction",
+    signatures: [["target","data"]]
   },
   {
-    name: 'queryCommandEnabled',
-    signatures: [['commandId']]
+    name: "createTextNode",
+    signatures: [["data"]]
   },
   {
-    name: 'queryCommandIndeterm',
-    signatures: [['commandId']]
+    name: "createTreeWalker",
+    signatures: [["root","?whatToShow","?filter"]]
   },
   {
-    name: 'queryCommandState',
-    signatures: [['commandId']]
+    name: "execCommand",
+    signatures: [["commandId","?showUI","?value"]]
   },
   {
-    name: 'queryCommandSupported',
-    signatures: [['commandId']]
+    name: "getElementById",
+    signatures: [["elementId"]]
   },
   {
-    name: 'queryCommandValue',
-    signatures: [['commandId']]
+    name: "getElementsByClassName",
+    signatures: [["classNames"]]
   },
   {
-    name: 'writeln',
-    signatures: [['...text'],['text']]
+    name: "getElementsByName",
+    signatures: [["elementName"]]
   },
   {
-    name: 'elementFromPoint',
-    signatures: [['x','y']]
+    name: "getElementsByTagName",
+    signatures: [["qualifiedName"],["localName"]]
   },
   {
-    name: 'elementsFromPoint',
-    signatures: [['x','y']]
+    name: "getElementsByTagNameNS",
+    signatures: [["namespaceURI","localName"],["namespace","localName"]]
   },
   {
-    name: 'attachShadow',
-    signatures: [['init'],['shadowRootInitDict']]
+    name: "importNode",
+    signatures: [["node","?deep"]]
   },
   {
-    name: 'checkVisibility',
-    signatures: [['?options']]
+    name: "queryCommandEnabled",
+    signatures: [["commandId"]]
   },
   {
-    name: 'closest',
-    signatures: [['selector'],['selectors']]
+    name: "queryCommandIndeterm",
+    signatures: [["commandId"]]
   },
   {
-    name: 'getAttribute',
-    signatures: [['qualifiedName'],['name']],
-    receivers: ['Element']
+    name: "queryCommandState",
+    signatures: [["commandId"]]
   },
   {
-    name: 'getAttribute',
-    signatures: [['tag']],
-    receivers: ['SmartCardConnection']
+    name: "queryCommandSupported",
+    signatures: [["commandId"]]
   },
   {
-    name: 'getAttributeNS',
-    signatures: [['namespace','localName'],['namespaceURI','localName']]
+    name: "queryCommandValue",
+    signatures: [["commandId"]]
   },
   {
-    name: 'getAttributeNode',
-    signatures: [['qualifiedName'],['name']]
+    name: "requestStorageAccess",
+    signatures: [["?types"]]
   },
   {
-    name: 'getAttributeNodeNS',
-    signatures: [['namespace','localName'],['namespaceURI','localName']]
+    name: "writeln",
+    signatures: [["...text"],["text"]]
   },
   {
-    name: 'hasAttribute',
-    signatures: [['qualifiedName'],['name']]
+    name: "elementFromPoint",
+    signatures: [["x","y"]]
   },
   {
-    name: 'hasAttributeNS',
-    signatures: [['namespace','localName'],['namespaceURI','localName']]
+    name: "elementsFromPoint",
+    signatures: [["x","y"]]
   },
   {
-    name: 'hasPointerCapture',
-    signatures: [['pointerId']]
+    name: "attachShadow",
+    signatures: [["init"],["shadowRootInitDict"]]
   },
   {
-    name: 'insertAdjacentElement',
-    signatures: [['where','element']]
+    name: "checkVisibility",
+    signatures: [["?options"]]
   },
   {
-    name: 'insertAdjacentHTML',
-    signatures: [['position','text']]
+    name: "closest",
+    signatures: [["selector"],["selectors"]]
   },
   {
-    name: 'insertAdjacentText',
-    signatures: [['where','data']]
+    name: "getAttribute",
+    signatures: [["qualifiedName"],["name"]],
+    receivers: ["Element"]
   },
   {
-    name: 'matches',
-    signatures: [['selectors']]
+    name: "getAttribute",
+    signatures: [["tag"]],
+    receivers: ["SmartCardConnection"]
   },
   {
-    name: 'releasePointerCapture',
-    signatures: [['pointerId']]
+    name: "getAttributeNS",
+    signatures: [["namespace","localName"],["namespaceURI","localName"]]
   },
   {
-    name: 'removeAttribute',
-    signatures: [['qualifiedName'],['name']]
+    name: "getAttributeNode",
+    signatures: [["qualifiedName"],["name"]]
   },
   {
-    name: 'removeAttributeNS',
-    signatures: [['namespace','localName'],['namespaceURI','localName']]
+    name: "getAttributeNodeNS",
+    signatures: [["namespace","localName"],["namespaceURI","localName"]]
   },
   {
-    name: 'removeAttributeNode',
-    signatures: [['attr']]
+    name: "hasAttribute",
+    signatures: [["qualifiedName"],["name"]]
   },
   {
-    name: 'requestFullscreen',
-    signatures: [['?options']]
+    name: "hasAttributeNS",
+    signatures: [["namespace","localName"],["namespaceURI","localName"]]
   },
   {
-    name: 'requestPointerLock',
-    signatures: [['?options']]
+    name: "hasPointerCapture",
+    signatures: [["pointerId"]]
   },
   {
-    name: 'scroll',
-    signatures: [['?options'],['x','y']],
-    receivers: ['Element','Window']
+    name: "insertAdjacentElement",
+    signatures: [["where","element"]]
   },
   {
-    name: 'scrollBy',
-    signatures: [['?options'],['x','y']]
+    name: "insertAdjacentHTML",
+    signatures: [["position","text"]]
   },
   {
-    name: 'scrollIntoView',
-    signatures: [['?arg']]
+    name: "insertAdjacentText",
+    signatures: [["where","data"]]
   },
   {
-    name: 'scrollTo',
-    signatures: [['?options'],['x','y']]
+    name: "matches",
+    signatures: [["selectors"]]
   },
   {
-    name: 'setAttribute',
-    signatures: [['qualifiedName','value'],['name','value']],
-    receivers: ['Element']
+    name: "releasePointerCapture",
+    signatures: [["pointerId"]]
   },
   {
-    name: 'setAttribute',
-    signatures: [['tag','value']],
-    receivers: ['SmartCardConnection']
+    name: "removeAttribute",
+    signatures: [["qualifiedName"],["name"]]
   },
   {
-    name: 'setAttributeNS',
-    signatures: [['namespace','qualifiedName','value'],['namespaceURI','name','value']]
+    name: "removeAttributeNS",
+    signatures: [["namespace","localName"],["namespaceURI","localName"]]
   },
   {
-    name: 'setAttributeNode',
-    signatures: [['attr']]
+    name: "removeAttributeNode",
+    signatures: [["attr"]]
   },
   {
-    name: 'setAttributeNodeNS',
-    signatures: [['attr']]
+    name: "requestFullscreen",
+    signatures: [["?options"]]
   },
   {
-    name: 'setPointerCapture',
-    signatures: [['pointerId']]
+    name: "requestPointerLock",
+    signatures: [["?options"]]
   },
   {
-    name: 'toggleAttribute',
-    signatures: [['qualifiedName','?force']]
+    name: "scroll",
+    signatures: [["?options"],["x","y"]],
+    receivers: ["Element","Window"]
   },
   {
-    name: 'webkitMatchesSelector',
-    signatures: [['selectors']]
+    name: "scrollBy",
+    signatures: [["?options"],["x","y"]]
   },
   {
-    name: 'setFormValue',
-    signatures: [['value','?state']]
+    name: "scrollIntoView",
+    signatures: [["?arg"]]
   },
   {
-    name: 'setValidity',
-    signatures: [['?flags','?message','?anchor']]
+    name: "scrollTo",
+    signatures: [["?options"],["x","y"]]
   },
   {
-    name: 'copyTo',
-    signatures: [['destination']],
-    receivers: ['EncodedVideoChunk','EncodedAudioChunk']
+    name: "setAttribute",
+    signatures: [["qualifiedName","value"],["name","value"]],
+    receivers: ["Element"]
   },
   {
-    name: 'copyTo',
-    signatures: [['destination','?options']],
-    receivers: ['VideoFrame']
+    name: "setAttribute",
+    signatures: [["tag","value"]],
+    receivers: ["SmartCardConnection"]
   },
   {
-    name: 'copyTo',
-    signatures: [['parent','name']],
-    receivers: ['EntrySync']
+    name: "setAttributeNS",
+    signatures: [["namespace","qualifiedName","value"],["namespaceURI","name","value"]]
   },
   {
-    name: 'copyTo',
-    signatures: [['parent','?name','?successCallback','?errorCallback']],
-    receivers: ['Entry']
+    name: "setAttributeNode",
+    signatures: [["attr"]]
   },
   {
-    name: 'copyTo',
-    signatures: [['destination','options']],
-    receivers: ['AudioData']
+    name: "setAttributeNodeNS",
+    signatures: [["attr"]]
   },
   {
-    name: 'initEvent',
-    signatures: [['type','?bubbles','?cancelable']]
+    name: "setHTMLUnsafe",
+    signatures: [["html"]]
   },
   {
-    name: 'handleEvent',
-    signatures: [['object']]
+    name: "setPointerCapture",
+    signatures: [["pointerId"]]
   },
   {
-    name: 'dispatchEvent',
-    signatures: [['event']]
+    name: "toggleAttribute",
+    signatures: [["qualifiedName","?force"]]
   },
   {
-    name: 'readAsArrayBuffer',
-    signatures: [['blob']]
+    name: "webkitMatchesSelector",
+    signatures: [["selectors"]]
   },
   {
-    name: 'readAsBinaryString',
-    signatures: [['blob']]
+    name: "setFormValue",
+    signatures: [["value","?state"]]
   },
   {
-    name: 'readAsDataURL',
-    signatures: [['blob']]
+    name: "setValidity",
+    signatures: [["?flags","?message","?anchor"]]
   },
   {
-    name: 'readAsText',
-    signatures: [['blob','?encoding'],['blob','?label']]
+    name: "copyTo",
+    signatures: [["destination"]],
+    receivers: ["EncodedVideoChunk","EncodedAudioChunk"]
   },
   {
-    name: 'getDirectory',
-    signatures: [['?path','?options','?successCallback','?errorCallback']],
-    receivers: ['FileSystemDirectoryEntry']
+    name: "copyTo",
+    signatures: [["destination","?options"]],
+    receivers: ["VideoFrame"]
   },
   {
-    name: 'getDirectory',
-    signatures: [['path','flags']],
-    receivers: ['DirectoryEntrySync']
+    name: "copyTo",
+    signatures: [["parent","name"]],
+    receivers: ["EntrySync"]
   },
   {
-    name: 'getDirectory',
-    signatures: [['path','?options','?successCallback','?errorCallback']],
-    receivers: ['DirectoryEntry']
+    name: "copyTo",
+    signatures: [["parent","?name","?successCallback","?errorCallback"]],
+    receivers: ["Entry"]
   },
   {
-    name: 'getFile',
-    signatures: [['?path','?options','?successCallback','?errorCallback']],
-    receivers: ['FileSystemDirectoryEntry']
+    name: "copyTo",
+    signatures: [["destination","options"]],
+    receivers: ["AudioData"]
   },
   {
-    name: 'getFile',
-    signatures: [['path','flags']],
-    receivers: ['DirectoryEntrySync']
+    name: "initEvent",
+    signatures: [["type","?bubbles","?cancelable"]]
   },
   {
-    name: 'getFile',
-    signatures: [['path','?options','?successCallback','?errorCallback']],
-    receivers: ['DirectoryEntry']
+    name: "handleEvent",
+    signatures: [["object"]]
   },
   {
-    name: 'getDirectoryHandle',
-    signatures: [['name','?options']]
+    name: "dispatchEvent",
+    signatures: [["event"]]
   },
   {
-    name: 'getFileHandle',
-    signatures: [['name','?options']]
+    name: "readAsArrayBuffer",
+    signatures: [["blob"]]
   },
   {
-    name: 'removeEntry',
-    signatures: [['name','?options']]
+    name: "readAsBinaryString",
+    signatures: [["blob"]]
   },
   {
-    name: 'resolve',
-    signatures: [['possibleDescendant'],['possibleChild']],
-    receivers: ['FileSystemDirectoryHandle']
+    name: "readAsDataURL",
+    signatures: [["blob"]]
   },
   {
-    name: 'resolve',
-    signatures: [['?value']],
-    receivers: ['PromiseConstructor']
+    name: "readAsText",
+    signatures: [["blob","?encoding"],["blob","?label"]]
   },
   {
-    name: 'resolve',
-    signatures: [['token']],
-    receivers: ['IdentityProvider']
+    name: "getDirectory",
+    signatures: [["?path","?options","?successCallback","?errorCallback"]],
+    receivers: ["FileSystemDirectoryEntry"]
   },
   {
-    name: 'readEntries',
-    signatures: [['successCallback','?errorCallback']],
-    receivers: ['FileSystemDirectoryReader','DirectoryReader']
+    name: "getDirectory",
+    signatures: [["path","flags"]],
+    receivers: ["DirectoryEntrySync"]
   },
   {
-    name: 'getParent',
-    signatures: [['?successCallback','?errorCallback']],
-    receivers: ['FileSystemEntry','Entry']
+    name: "getDirectory",
+    signatures: [["path","?options","?successCallback","?errorCallback"]],
+    receivers: ["DirectoryEntry"]
   },
   {
-    name: 'file',
-    signatures: [['successCallback','?errorCallback']],
-    receivers: ['FileSystemFileEntry','FileEntry']
+    name: "getFile",
+    signatures: [["?path","?options","?successCallback","?errorCallback"]],
+    receivers: ["FileSystemDirectoryEntry"]
   },
   {
-    name: 'createWritable',
-    signatures: [['?options']]
+    name: "getFile",
+    signatures: [["path","flags"]],
+    receivers: ["DirectoryEntrySync"]
   },
   {
-    name: 'isSameEntry',
-    signatures: [['other']]
+    name: "getFile",
+    signatures: [["path","?options","?successCallback","?errorCallback"]],
+    receivers: ["DirectoryEntry"]
   },
   {
-    name: 'seek',
-    signatures: [['position'],['offset']],
-    receivers: ['FileSystemWritableFileStream']
+    name: "getDirectoryHandle",
+    signatures: [["name","?options"]]
   },
   {
-    name: 'seek',
-    signatures: [['position']],
-    receivers: ['FileWriterSync','FileWriter']
+    name: "getFileHandle",
+    signatures: [["name","?options"]]
   },
   {
-    name: 'truncate',
-    signatures: [['size']],
-    receivers: ['FileSystemWritableFileStream','FileWriterSync','FileWriter']
+    name: "removeEntry",
+    signatures: [["name","?options"]]
   },
   {
-    name: 'truncate',
-    signatures: [['newSize'],['size']],
-    receivers: ['FileSystemSyncAccessHandle']
+    name: "resolve",
+    signatures: [["possibleDescendant"],["possibleChild"]],
+    receivers: ["FileSystemDirectoryHandle"]
   },
   {
-    name: 'load',
-    signatures: [['font','?text']],
-    receivers: ['FontFaceSet']
+    name: "resolve",
+    signatures: [["?value"]],
+    receivers: ["PromiseConstructor"]
   },
   {
-    name: 'load',
-    signatures: [['sessionId']],
-    receivers: ['MediaKeySession']
+    name: "resolve",
+    signatures: [["token","?options"]],
+    receivers: ["IdentityProvider"]
   },
   {
-    name: 'load',
-    signatures: [['typedArray','index']],
-    receivers: ['Atomics']
+    name: "readEntries",
+    signatures: [["successCallback","?errorCallback"]],
+    receivers: ["FileSystemDirectoryReader","DirectoryReader"]
   },
   {
-    name: 'load',
-    signatures: [['buffer']],
-    receivers: ['MLModelLoader']
+    name: "getParent",
+    signatures: [["?successCallback","?errorCallback"]],
+    receivers: ["FileSystemEntry","Entry"]
   },
   {
-    name: 'check',
-    signatures: [['font','?text']]
+    name: "file",
+    signatures: [["successCallback","?errorCallback"]],
+    receivers: ["FileSystemFileEntry","FileEntry"]
   },
   {
-    name: 'append',
-    signatures: [['name','value','?filename'],['name','blobValue','?filename']],
-    receivers: ['FormData']
+    name: "createWritable",
+    signatures: [["?options"]]
   },
   {
-    name: 'append',
-    signatures: [['name','value']],
-    receivers: ['Headers','URLSearchParams']
+    name: "isSameEntry",
+    signatures: [["other"]]
   },
   {
-    name: 'append',
-    signatures: [['...nodes']],
-    receivers: ['DocumentFragment','Document','Element']
+    name: "seek",
+    signatures: [["position"],["offset"]],
+    receivers: ["FileSystemWritableFileStream"]
   },
   {
-    name: 'append',
-    signatures: [['property','...values']],
-    receivers: ['StylePropertyMap']
+    name: "seek",
+    signatures: [["position"]],
+    receivers: ["FileWriterSync","FileWriter"]
   },
   {
-    name: 'getAll',
-    signatures: [['name']],
-    receivers: ['FormData','URLSearchParams']
+    name: "truncate",
+    signatures: [["size"]],
+    receivers: ["FileSystemWritableFileStream","FileWriterSync","FileWriter"]
   },
   {
-    name: 'getAll',
-    signatures: [['?query','?count']],
-    receivers: ['IDBIndex','IDBObjectStore']
+    name: "truncate",
+    signatures: [["newSize"],["size"]],
+    receivers: ["FileSystemSyncAccessHandle"]
   },
   {
-    name: 'getAll',
-    signatures: [['property']],
-    receivers: ['StylePropertyMapReadOnly']
+    name: "load",
+    signatures: [["font","?text"]],
+    receivers: ["FontFaceSet"]
   },
   {
-    name: 'getAll',
-    signatures: [['name'],['?options']],
-    receivers: ['CookieStore']
+    name: "load",
+    signatures: [["sessionId"]],
+    receivers: ["MediaKeySession"]
   },
   {
-    name: 'playEffect',
-    signatures: [['type','?params']]
+    name: "load",
+    signatures: [["typedArray","index"]],
+    receivers: ["Atomics"]
   },
   {
-    name: 'clearWatch',
-    signatures: [['watchId'],['watchID']]
+    name: "check",
+    signatures: [["font","?text"]]
   },
   {
-    name: 'getCurrentPosition',
-    signatures: [['successCallback','?errorCallback','?options']]
+    name: "append",
+    signatures: [["name","value","?filename"],["name","blobValue","?filename"]],
+    receivers: ["FormData"]
   },
   {
-    name: 'watchPosition',
-    signatures: [['successCallback','?errorCallback','?options']]
+    name: "append",
+    signatures: [["name","value"]],
+    receivers: ["Headers","URLSearchParams"]
   },
   {
-    name: 'namedItem',
-    signatures: [['name']],
-    receivers: ['HTMLAllCollection','HTMLCollection','HTMLCollectionOf','HTMLFormControlsCollection','HTMLSelectElement','MimeTypeArray','Plugin','PluginArray']
+    name: "append",
+    signatures: [["...nodes"]],
+    receivers: ["DocumentFragment","Document","Element"]
   },
   {
-    name: 'namedItem',
-    signatures: [['?name']],
-    receivers: ['RTCStatsResponse']
+    name: "append",
+    signatures: [["property","...values"]],
+    receivers: ["StylePropertyMap"]
   },
   {
-    name: 'setCustomValidity',
-    signatures: [['error']]
+    name: "getAll",
+    signatures: [["name"]],
+    receivers: ["FormData","URLSearchParams"]
   },
   {
-    name: 'captureStream',
-    signatures: [['?frameRequestRate'],['?frameRate']],
-    receivers: ['HTMLCanvasElement']
+    name: "getAll",
+    signatures: [["?query","?count"]],
+    receivers: ["IDBIndex","IDBObjectStore"]
   },
   {
-    name: 'getContext',
-    signatures: [['contextId','?options'],['contextId','?attributes']],
-    receivers: ['HTMLCanvasElement']
+    name: "getAll",
+    signatures: [["property"]],
+    receivers: ["StylePropertyMapReadOnly"]
   },
   {
-    name: 'getContext',
-    signatures: [['contextId','?options'],['contextType','?attributes']],
-    receivers: ['OffscreenCanvas']
+    name: "getAll",
+    signatures: [["name"],["?options"]],
+    receivers: ["CookieStore"]
   },
   {
-    name: 'toBlob',
-    signatures: [['callback','?type','?quality']]
+    name: "playEffect",
+    signatures: [["type","?params"]]
   },
   {
-    name: 'toDataURL',
-    signatures: [['?type','?quality']]
+    name: "clearWatch",
+    signatures: [["watchId"],["watchID"]]
   },
   {
-    name: 'show',
-    signatures: [['?detailsPromise']],
-    receivers: ['PaymentRequest']
+    name: "getCurrentPosition",
+    signatures: [["successCallback","?errorCallback","?options"]]
   },
   {
-    name: 'requestSubmit',
-    signatures: [['?submitter']]
+    name: "watchPosition",
+    signatures: [["successCallback","?errorCallback","?options"]]
   },
   {
-    name: 'submit',
-    signatures: [['buffers']],
-    receivers: ['GPUQueue']
+    name: "namedItem",
+    signatures: [["name"]]
   },
   {
-    name: 'decode',
-    signatures: [['?input','?options']],
-    receivers: ['TextDecoder']
+    name: "setCustomValidity",
+    signatures: [["error"]]
   },
   {
-    name: 'decode',
-    signatures: [['chunk']],
-    receivers: ['VideoDecoder']
+    name: "captureStream",
+    signatures: [["?frameRequestRate"],["?frameRate"]],
+    receivers: ["HTMLCanvasElement"]
   },
   {
-    name: 'decode',
-    signatures: [['?options']],
-    receivers: ['ImageDecoder']
+    name: "getContext",
+    signatures: [["contextId","?options"],["contextId","?attributes"]],
+    receivers: ["HTMLCanvasElement"]
   },
   {
-    name: 'select',
-    signatures: [['properties','?options']],
-    receivers: ['ContactsManager']
+    name: "getContext",
+    signatures: [["contextId","?options"],["contextType","?attributes"]],
+    receivers: ["OffscreenCanvas"]
   },
   {
-    name: 'setRangeText',
-    signatures: [['replacement','?start','?end','?selectionMode']]
+    name: "toBlob",
+    signatures: [["callback","?type","?quality"]]
   },
   {
-    name: 'setSelectionRange',
-    signatures: [['start','end','?direction']]
+    name: "toDataURL",
+    signatures: [["?type","?quality"]]
   },
   {
-    name: 'stepDown',
-    signatures: [['?n']]
+    name: "show",
+    signatures: [["?detailsPromise"]],
+    receivers: ["PaymentRequest"]
   },
   {
-    name: 'stepUp',
-    signatures: [['?n']]
+    name: "togglePopover",
+    signatures: [["?force"]]
   },
   {
-    name: 'addTextTrack',
-    signatures: [['kind','?label','?language']]
+    name: "requestSubmit",
+    signatures: [["?submitter"]]
   },
   {
-    name: 'canPlayType',
-    signatures: [['type']]
+    name: "submit",
+    signatures: [["buffers"]],
+    receivers: ["GPUQueue"]
   },
   {
-    name: 'fastSeek',
-    signatures: [['time']]
+    name: "decode",
+    signatures: [["?input","?options"]],
+    receivers: ["TextDecoder"]
   },
   {
-    name: 'setMediaKeys',
-    signatures: [['mediaKeys']]
+    name: "decode",
+    signatures: [["chunk"]],
+    receivers: ["VideoDecoder","AudioDecoder"]
   },
   {
-    name: 'focus',
-    signatures: [['?options']],
-    receivers: ['HTMLOrSVGElement','HTMLElement','MathMLElement','SVGElement']
+    name: "decode",
+    signatures: [["?options"]],
+    receivers: ["ImageDecoder"]
   },
   {
-    name: 'assign',
-    signatures: [['...nodes']],
-    receivers: ['HTMLSlotElement']
+    name: "select",
+    signatures: [["properties","?options"]],
+    receivers: ["ContactsManager"]
   },
   {
-    name: 'assign',
-    signatures: [['url']],
-    receivers: ['Location']
+    name: "setRangeText",
+    signatures: [["replacement","?start","?end","?selectionMode"]]
   },
   {
-    name: 'assign',
-    signatures: [['target','source'],['target','...sources'],['target','source1','source2','?source3']],
-    receivers: ['ObjectConstructor']
+    name: "setSelectionRange",
+    signatures: [["start","end","?direction"]]
   },
   {
-    name: 'assignedElements',
-    signatures: [['?options']]
+    name: "stepDown",
+    signatures: [["?n"]]
   },
   {
-    name: 'assignedNodes',
-    signatures: [['?options']]
+    name: "stepUp",
+    signatures: [["?n"]]
   },
   {
-    name: 'deleteRow',
-    signatures: [['index']]
+    name: "addTextTrack",
+    signatures: [["kind","?label","?language"]]
   },
   {
-    name: 'insertRow',
-    signatures: [['?index']]
+    name: "canPlayType",
+    signatures: [["type"]]
   },
   {
-    name: 'deleteCell',
-    signatures: [['index']]
+    name: "fastSeek",
+    signatures: [["time"]]
   },
   {
-    name: 'insertCell',
-    signatures: [['?index']]
+    name: "setMediaKeys",
+    signatures: [["mediaKeys"]]
   },
   {
-    name: 'cancelVideoFrameCallback',
-    signatures: [['handle']]
+    name: "setSinkId",
+    signatures: [["sinkId"]]
   },
   {
-    name: 'requestVideoFrameCallback',
-    signatures: [['callback']]
+    name: "focus",
+    signatures: [["?options"]],
+    receivers: ["HTMLOrSVGElement","HTMLElement","MathMLElement","SVGElement"]
   },
   {
-    name: 'back',
-    signatures: [['?options']],
-    receivers: ['Navigation']
+    name: "assign",
+    signatures: [["...nodes"]],
+    receivers: ["HTMLSlotElement"]
   },
   {
-    name: 'forward',
-    signatures: [['?options']],
-    receivers: ['Navigation']
+    name: "assign",
+    signatures: [["url"]],
+    receivers: ["Location"]
   },
   {
-    name: 'go',
-    signatures: [['?delta']]
+    name: "assign",
+    signatures: [["target","source"],["target","...sources"],["target","source1","source2","?source3"]],
+    receivers: ["ObjectConstructor"]
   },
   {
-    name: 'pushState',
-    signatures: [['data','unused','?url'],['data','title','?url']]
+    name: "assignedElements",
+    signatures: [["?options"]]
   },
   {
-    name: 'replaceState',
-    signatures: [['data','unused','?url'],['data','title','?url']]
+    name: "assignedNodes",
+    signatures: [["?options"]]
   },
   {
-    name: 'advance',
-    signatures: [['count']]
+    name: "deleteRow",
+    signatures: [["index"]]
   },
   {
-    name: 'continue',
-    signatures: [['?key']]
+    name: "insertRow",
+    signatures: [["?index"]]
   },
   {
-    name: 'continuePrimaryKey',
-    signatures: [['key','primaryKey']]
+    name: "deleteCell",
+    signatures: [["index"]]
   },
   {
-    name: 'update',
-    signatures: [['value']],
-    receivers: ['IDBCursor']
+    name: "insertCell",
+    signatures: [["?index"]]
   },
   {
-    name: 'update',
-    signatures: [['response']],
-    receivers: ['MediaKeySession']
+    name: "cancelVideoFrameCallback",
+    signatures: [["handle"]]
   },
   {
-    name: 'createObjectStore',
-    signatures: [['name','?options']]
+    name: "requestVideoFrameCallback",
+    signatures: [["callback"]]
   },
   {
-    name: 'deleteObjectStore',
-    signatures: [['name']]
+    name: "back",
+    signatures: [["?options"]],
+    receivers: ["Navigation"]
   },
   {
-    name: 'transaction',
-    signatures: [['storeNames','?mode','?options']],
-    receivers: ['IDBDatabase']
+    name: "forward",
+    signatures: [["?options"]],
+    receivers: ["Navigation"]
   },
   {
-    name: 'transaction',
-    signatures: [['callback','?errorCallback','?successCallback']],
-    receivers: ['Database']
+    name: "go",
+    signatures: [["?delta"]]
   },
   {
-    name: 'cmp',
-    signatures: [['first','second']]
+    name: "pushState",
+    signatures: [["data","unused","?url"],["data","title","?url"]]
   },
   {
-    name: 'deleteDatabase',
-    signatures: [['name']]
+    name: "replaceState",
+    signatures: [["data","unused","?url"],["data","title","?url"]]
   },
   {
-    name: 'count',
-    signatures: [['?query'],['?key']],
-    receivers: ['IDBIndex','IDBObjectStore']
+    name: "advance",
+    signatures: [["count"]]
   },
   {
-    name: 'count',
-    signatures: [['?label']],
-    receivers: ['Console','console']
+    name: "continue",
+    signatures: [["?key"]]
   },
   {
-    name: 'getAllKeys',
-    signatures: [['?query','?count']]
+    name: "continuePrimaryKey",
+    signatures: [["key","primaryKey"]]
   },
   {
-    name: 'getKey',
-    signatures: [['query'],['key']],
-    receivers: ['IDBIndex','IDBObjectStore']
+    name: "update",
+    signatures: [["value"]],
+    receivers: ["IDBCursor"]
   },
   {
-    name: 'getKey',
-    signatures: [['name']],
-    receivers: ['PushSubscription']
+    name: "update",
+    signatures: [["response"]],
+    receivers: ["MediaKeySession"]
   },
   {
-    name: 'openCursor',
-    signatures: [['?query','?direction'],['?range','?direction']]
+    name: "createObjectStore",
+    signatures: [["name","?options"]]
   },
   {
-    name: 'openKeyCursor',
-    signatures: [['?query','?direction'],['?range','?direction']]
+    name: "deleteObjectStore",
+    signatures: [["name"]]
   },
   {
-    name: 'includes',
-    signatures: [['key']],
-    receivers: ['IDBKeyRange']
+    name: "transaction",
+    signatures: [["storeNames","?mode","?options"]],
+    receivers: ["IDBDatabase"]
   },
   {
-    name: 'includes',
-    signatures: [['searchString','?position']],
-    receivers: ['String']
+    name: "transaction",
+    signatures: [["callback","?errorCallback","?successCallback"]],
+    receivers: ["Database"]
   },
   {
-    name: 'includes',
-    signatures: [['searchElement','?fromIndex']],
-    receivers: ['Array','ReadonlyArray','Int8Array','Uint8Array','Uint8ClampedArray','Int16Array','Uint16Array','Int32Array','Uint32Array','Float32Array','Float64Array','BigInt64Array','BigUint64Array']
+    name: "cmp",
+    signatures: [["first","second"]]
   },
   {
-    name: 'createIndex',
-    signatures: [['name','keyPath','?options']]
+    name: "deleteDatabase",
+    signatures: [["name"]]
   },
   {
-    name: 'deleteIndex',
-    signatures: [['name']]
+    name: "count",
+    signatures: [["?query"],["?key"]],
+    receivers: ["IDBIndex","IDBObjectStore"]
   },
   {
-    name: 'index',
-    signatures: [['name']]
+    name: "count",
+    signatures: [["?label"]],
+    receivers: ["Console","console"]
   },
   {
-    name: 'objectStore',
-    signatures: [['name']]
+    name: "getAllKeys",
+    signatures: [["?query","?count"]]
   },
   {
-    name: 'transferFromImageBitmap',
-    signatures: [['bitmap']]
+    name: "getKey",
+    signatures: [["query"],["key"]],
+    receivers: ["IDBIndex","IDBObjectStore"]
   },
   {
-    name: 'observe',
-    signatures: [['target']],
-    receivers: ['IntersectionObserver']
+    name: "getKey",
+    signatures: [["name"]],
+    receivers: ["PushSubscription"]
   },
   {
-    name: 'observe',
-    signatures: [['target','?options']],
-    receivers: ['MutationObserver','ResizeObserver']
+    name: "openCursor",
+    signatures: [["?query","?direction"],["?range","?direction"]]
   },
   {
-    name: 'observe',
-    signatures: [['?options']],
-    receivers: ['PerformanceObserver']
+    name: "openKeyCursor",
+    signatures: [["?query","?direction"],["?range","?direction"]]
   },
   {
-    name: 'unobserve',
-    signatures: [['target']]
+    name: "includes",
+    signatures: [["key"]],
+    receivers: ["IDBKeyRange"]
   },
   {
-    name: 'getModifierState',
-    signatures: [['keyArg']]
+    name: "includes",
+    signatures: [["searchString","?position"]],
+    receivers: ["String"]
   },
   {
-    name: 'initKeyboardEvent',
-    signatures: [['typeArg','?bubblesArg','?cancelableArg','?viewArg','?keyArg','?locationArg','?ctrlKey','?altKey','?shiftKey','?metaKey'],['type','?bubbles','?cancelable','?view','?keyIdentifier','?location','?ctrlKey','?altKey','?shiftKey','?metaKey']]
+    name: "includes",
+    signatures: [["searchElement","?fromIndex"]],
+    receivers: ["Array","ReadonlyArray","Int8Array","Uint8Array","Uint8ClampedArray","Int16Array","Uint16Array","Int32Array","Uint32Array","Float32Array","Float64Array","BigInt64Array","BigUint64Array"]
   },
   {
-    name: 'setKeyframes',
-    signatures: [['keyframes']]
+    name: "createIndex",
+    signatures: [["name","keyPath","?options"]]
   },
   {
-    name: 'reload',
-    signatures: [['?options']],
-    receivers: ['Navigation']
+    name: "deleteIndex",
+    signatures: [["name"]]
   },
   {
-    name: 'query',
-    signatures: [['permissionDesc'],['permission']],
-    receivers: ['Permissions']
+    name: "index",
+    signatures: [["name"]]
   },
   {
-    name: 'request',
-    signatures: [['name','callback'],['name','options','callback']],
-    receivers: ['LockManager']
+    name: "objectStore",
+    signatures: [["name"]]
   },
   {
-    name: 'request',
-    signatures: [['?type']],
-    receivers: ['WakeLock']
+    name: "transferFromImageBitmap",
+    signatures: [["bitmap"]]
   },
   {
-    name: 'request',
-    signatures: [['permissions']],
-    receivers: ['Permissions']
+    name: "getCapabilities",
+    signatures: [["kind"]],
+    receivers: ["RTCRtpReceiver","RTCRtpSender"]
   },
   {
-    name: 'send',
-    signatures: [['data','?timestamp']],
-    receivers: ['MIDIOutput']
+    name: "observe",
+    signatures: [["target"]],
+    receivers: ["IntersectionObserver"]
   },
   {
-    name: 'send',
-    signatures: [['data']],
-    receivers: ['RTCDataChannel','WebSocket']
+    name: "observe",
+    signatures: [["target","?options"]],
+    receivers: ["MutationObserver","ResizeObserver"]
   },
   {
-    name: 'send',
-    signatures: [['?body']],
-    receivers: ['XMLHttpRequest']
+    name: "observe",
+    signatures: [["?options"]],
+    receivers: ["PerformanceObserver"]
   },
   {
-    name: 'send',
-    signatures: [['command']],
-    receivers: ['InspectorOverlayHost']
+    name: "observe",
+    signatures: [["handle","?options"]],
+    receivers: ["FileSystemObserver"]
   },
   {
-    name: 'send',
-    signatures: [['message'],['data']],
-    receivers: ['PresentationConnection']
+    name: "unobserve",
+    signatures: [["target"]],
+    receivers: ["IntersectionObserver","ResizeObserver"]
   },
   {
-    name: 'decodingInfo',
-    signatures: [['configuration']]
+    name: "unobserve",
+    signatures: [["handle"]],
+    receivers: ["FileSystemObserver"]
   },
   {
-    name: 'encodingInfo',
-    signatures: [['configuration']]
+    name: "getModifierState",
+    signatures: [["keyArg"]]
   },
   {
-    name: 'getDisplayMedia',
-    signatures: [['?options'],['?constraints']]
+    name: "initKeyboardEvent",
+    signatures: [["typeArg","?bubblesArg","?cancelableArg","?viewArg","?keyArg","?locationArg","?ctrlKey","?altKey","?shiftKey","?metaKey"],["type","?bubbles","?cancelable","?view","?keyIdentifier","?location","?ctrlKey","?altKey","?shiftKey","?metaKey"]]
   },
   {
-    name: 'getUserMedia',
-    signatures: [['?constraints']],
-    receivers: ['MediaDevices']
+    name: "setKeyframes",
+    signatures: [["keyframes"]]
   },
   {
-    name: 'getUserMedia',
-    signatures: [['constraints','successCallback','errorCallback']],
-    receivers: ['Navigator']
+    name: "reload",
+    signatures: [["?options"]],
+    receivers: ["Navigation"]
   },
   {
-    name: 'generateRequest',
-    signatures: [['initDataType','initData']]
+    name: "query",
+    signatures: [["permissionDesc"],["permission"]],
+    receivers: ["Permissions"]
   },
   {
-    name: 'createSession',
-    signatures: [['?sessionType']]
+    name: "request",
+    signatures: [["name","callback"],["name","options","callback"]],
+    receivers: ["LockManager"]
   },
   {
-    name: 'setServerCertificate',
-    signatures: [['serverCertificate']]
+    name: "request",
+    signatures: [["?type"]],
+    receivers: ["WakeLock"]
   },
   {
-    name: 'appendMedium',
-    signatures: [['medium']]
+    name: "request",
+    signatures: [["permissions"]],
+    receivers: ["Permissions"]
   },
   {
-    name: 'deleteMedium',
-    signatures: [['medium']]
+    name: "send",
+    signatures: [["data","?timestamp"]],
+    receivers: ["MIDIOutput"]
   },
   {
-    name: 'addListener',
-    signatures: [['callback'],['listener']]
+    name: "send",
+    signatures: [["data"]],
+    receivers: ["RTCDataChannel","WebSocket"]
   },
   {
-    name: 'removeListener',
-    signatures: [['callback'],['listener']]
+    name: "send",
+    signatures: [["?body"]],
+    receivers: ["XMLHttpRequest"]
   },
   {
-    name: 'setActionHandler',
-    signatures: [['action','handler']]
+    name: "send",
+    signatures: [["command"]],
+    receivers: ["InspectorOverlayHost"]
   },
   {
-    name: 'setPositionState',
-    signatures: [['?state']]
+    name: "send",
+    signatures: [["message"],["data"]],
+    receivers: ["PresentationConnection"]
   },
   {
-    name: 'addSourceBuffer',
-    signatures: [['type']]
+    name: "decodingInfo",
+    signatures: [["configuration"]]
   },
   {
-    name: 'endOfStream',
-    signatures: [['?error']]
+    name: "encodingInfo",
+    signatures: [["configuration"]]
   },
   {
-    name: 'removeSourceBuffer',
-    signatures: [['sourceBuffer']]
+    name: "getDisplayMedia",
+    signatures: [["?options"],["?constraints"]]
   },
   {
-    name: 'setLiveSeekableRange',
-    signatures: [['start','end']]
+    name: "getUserMedia",
+    signatures: [["?constraints"]],
+    receivers: ["MediaDevices"]
   },
   {
-    name: 'addTrack',
-    signatures: [['track']],
-    receivers: ['MediaStream']
+    name: "getUserMedia",
+    signatures: [["constraints","successCallback","errorCallback"]],
+    receivers: ["Navigator"]
   },
   {
-    name: 'addTrack',
-    signatures: [['track','...streams']],
-    receivers: ['RTCPeerConnection']
+    name: "generateRequest",
+    signatures: [["initDataType","initData"]]
   },
   {
-    name: 'getTrackById',
-    signatures: [['trackId']],
-    receivers: ['MediaStream']
+    name: "createSession",
+    signatures: [["?sessionType"]]
   },
   {
-    name: 'getTrackById',
-    signatures: [['id']],
-    receivers: ['TextTrackList','AudioTrackList','VideoTrackList']
+    name: "setServerCertificate",
+    signatures: [["serverCertificate"]]
   },
   {
-    name: 'removeTrack',
-    signatures: [['track']],
-    receivers: ['MediaStream']
+    name: "appendMedium",
+    signatures: [["medium"]]
   },
   {
-    name: 'removeTrack',
-    signatures: [['sender']],
-    receivers: ['RTCPeerConnection']
+    name: "deleteMedium",
+    signatures: [["medium"]]
   },
   {
-    name: 'applyConstraints',
-    signatures: [['?constraints']]
+    name: "addListener",
+    signatures: [["callback"],["listener"]]
   },
   {
-    name: 'getCapabilities',
-    signatures: [['kind']],
-    receivers: ['RTCRtpReceiver','RTCRtpSender']
+    name: "removeListener",
+    signatures: [["callback"],["listener"]]
   },
   {
-    name: 'initMessageEvent',
-    signatures: [['type','?bubbles','?cancelable','?data','?origin','?lastEventId','?source','?ports']]
+    name: "setActionHandler",
+    signatures: [["action","handler"]]
   },
   {
-    name: 'initMouseEvent',
-    signatures: [['typeArg','canBubbleArg','cancelableArg','viewArg','detailArg','screenXArg','screenYArg','clientXArg','clientYArg','ctrlKeyArg','altKeyArg','shiftKeyArg','metaKeyArg','buttonArg','relatedTargetArg'],['type','?bubbles','?cancelable','?view','?detail','?screenX','?screenY','?clientX','?clientY','?ctrlKey','?altKey','?shiftKey','?metaKey','?button','?relatedTarget']]
+    name: "setPositionState",
+    signatures: [["?state"]]
   },
   {
-    name: 'initMutationEvent',
-    signatures: [['typeArg','?bubblesArg','?cancelableArg','?relatedNodeArg','?prevValueArg','?newValueArg','?attrNameArg','?attrChangeArg'],['?type','?bubbles','?cancelable','?relatedNode','?prevValue','?newValue','?attrName','?attrChange']]
+    name: "addSourceBuffer",
+    signatures: [["type"]]
   },
   {
-    name: 'getNamedItem',
-    signatures: [['qualifiedName'],['name']]
+    name: "endOfStream",
+    signatures: [["?error"]]
   },
   {
-    name: 'getNamedItemNS',
-    signatures: [['namespace','localName'],['namespaceURI','localName']]
+    name: "removeSourceBuffer",
+    signatures: [["sourceBuffer"]]
   },
   {
-    name: 'removeNamedItem',
-    signatures: [['qualifiedName'],['name']]
+    name: "setLiveSeekableRange",
+    signatures: [["start","end"]]
   },
   {
-    name: 'removeNamedItemNS',
-    signatures: [['namespace','localName'],['namespaceURI','localName']]
+    name: "addTrack",
+    signatures: [["track"]],
+    receivers: ["MediaStream"]
   },
   {
-    name: 'setNamedItem',
-    signatures: [['attr']]
+    name: "addTrack",
+    signatures: [["track","...streams"]],
+    receivers: ["RTCPeerConnection"]
   },
   {
-    name: 'setNamedItemNS',
-    signatures: [['attr']]
+    name: "getTrackById",
+    signatures: [["trackId"]],
+    receivers: ["MediaStream"]
   },
   {
-    name: 'disable',
-    signatures: [['cap']],
-    receivers: ['WebGLRenderingContext','WebGL2RenderingContextBase','WebGL2RenderingContext']
+    name: "getTrackById",
+    signatures: [["id"]],
+    receivers: ["TextTrackList","AudioTrackList","VideoTrackList"]
   },
   {
-    name: 'enable',
-    signatures: [['cap']],
-    receivers: ['WebGLRenderingContext','WebGL2RenderingContextBase','WebGL2RenderingContext']
+    name: "removeTrack",
+    signatures: [["track"]],
+    receivers: ["MediaStream"]
   },
   {
-    name: 'setHeaderValue',
-    signatures: [['value']]
+    name: "removeTrack",
+    signatures: [["sender"]],
+    receivers: ["RTCPeerConnection"]
   },
   {
-    name: 'canShare',
-    signatures: [['?data']]
+    name: "applyConstraints",
+    signatures: [["?constraints"]]
   },
   {
-    name: 'requestMIDIAccess',
-    signatures: [['?options']]
+    name: "initMessageEvent",
+    signatures: [["type","?bubbles","?cancelable","?data","?origin","?lastEventId","?source","?ports"]]
   },
   {
-    name: 'requestMediaKeySystemAccess',
-    signatures: [['keySystem','supportedConfigurations']]
+    name: "initMouseEvent",
+    signatures: [["typeArg","canBubbleArg","cancelableArg","viewArg","detailArg","screenXArg","screenYArg","clientXArg","clientYArg","ctrlKeyArg","altKeyArg","shiftKeyArg","metaKeyArg","buttonArg","relatedTargetArg"],["type","?bubbles","?cancelable","?view","?detail","?screenX","?screenY","?clientX","?clientY","?ctrlKey","?altKey","?shiftKey","?metaKey","?button","?relatedTarget"]]
   },
   {
-    name: 'sendBeacon',
-    signatures: [['url','?data']]
+    name: "initMutationEvent",
+    signatures: [["typeArg","?bubblesArg","?cancelableArg","?relatedNodeArg","?prevValueArg","?newValueArg","?attrNameArg","?attrChangeArg"],["type","?bubbles","?cancelable","?relatedNode","?prevValue","?newValue","?attrName","?attrChange"]]
   },
   {
-    name: 'share',
-    signatures: [['?data']]
+    name: "getNamedItem",
+    signatures: [["qualifiedName"],["name"]]
   },
   {
-    name: 'vibrate',
-    signatures: [['pattern']]
+    name: "getNamedItemNS",
+    signatures: [["namespace","localName"],["namespaceURI","localName"]]
   },
   {
-    name: 'setAppBadge',
-    signatures: [['?contents']]
+    name: "removeNamedItem",
+    signatures: [["qualifiedName"],["name"]]
   },
   {
-    name: 'registerProtocolHandler',
-    signatures: [['scheme','url']]
+    name: "removeNamedItemNS",
+    signatures: [["namespace","localName"],["namespaceURI","localName"]]
   },
   {
-    name: 'appendChild',
-    signatures: [['node']],
-    receivers: ['Node']
+    name: "setNamedItem",
+    signatures: [["attr"]]
   },
   {
-    name: 'appendChild',
-    signatures: [['child']],
-    receivers: ['AccessibleNode']
+    name: "setNamedItemNS",
+    signatures: [["attr"]]
   },
   {
-    name: 'cloneNode',
-    signatures: [['?deep']]
+    name: "disable",
+    signatures: [["cap"]],
+    receivers: ["WebGLRenderingContext","WebGL2RenderingContextBase","WebGL2RenderingContext"]
   },
   {
-    name: 'compareDocumentPosition',
-    signatures: [['other']]
+    name: "enable",
+    signatures: [["cap"]],
+    receivers: ["WebGLRenderingContext","WebGL2RenderingContextBase","WebGL2RenderingContext"]
   },
   {
-    name: 'getRootNode',
-    signatures: [['?options']]
+    name: "setHeaderValue",
+    signatures: [["value"]]
   },
   {
-    name: 'insertBefore',
-    signatures: [['node','child']]
+    name: "canShare",
+    signatures: [["?data"]]
   },
   {
-    name: 'isDefaultNamespace',
-    signatures: [['namespace'],['namespaceURI']]
+    name: "requestMIDIAccess",
+    signatures: [["?options"]]
   },
   {
-    name: 'isEqualNode',
-    signatures: [['otherNode']]
+    name: "requestMediaKeySystemAccess",
+    signatures: [["keySystem","supportedConfigurations"]]
   },
   {
-    name: 'isSameNode',
-    signatures: [['otherNode']]
+    name: "sendBeacon",
+    signatures: [["url","?data"]]
   },
   {
-    name: 'lookupNamespaceURI',
-    signatures: [['prefix']],
-    receivers: ['Node']
+    name: "share",
+    signatures: [["?data"]]
   },
   {
-    name: 'lookupNamespaceURI',
-    signatures: [['?prefix']],
-    receivers: ['NativeXPathNSResolver']
+    name: "vibrate",
+    signatures: [["pattern"]]
   },
   {
-    name: 'lookupPrefix',
-    signatures: [['namespace'],['namespaceURI']]
+    name: "setAppBadge",
+    signatures: [["?contents"]]
   },
   {
-    name: 'normalize',
-    signatures: [['?form']],
-    receivers: ['String']
+    name: "registerProtocolHandler",
+    signatures: [["scheme","url"]]
   },
   {
-    name: 'removeChild',
-    signatures: [['child']]
+    name: "appendChild",
+    signatures: [["node"]],
+    receivers: ["Node"]
   },
   {
-    name: 'replaceChild',
-    signatures: [['node','child']]
+    name: "appendChild",
+    signatures: [["child"]],
+    receivers: ["AccessibleNode"]
   },
   {
-    name: 'blendEquationSeparateiOES',
-    signatures: [['buf','modeRGB','modeAlpha']]
+    name: "cloneNode",
+    signatures: [["?deep"]]
   },
   {
-    name: 'blendEquationiOES',
-    signatures: [['buf','mode']]
+    name: "compareDocumentPosition",
+    signatures: [["other"]]
   },
   {
-    name: 'blendFuncSeparateiOES',
-    signatures: [['buf','srcRGB','dstRGB','srcAlpha','dstAlpha']]
+    name: "getRootNode",
+    signatures: [["?options"]]
   },
   {
-    name: 'blendFunciOES',
-    signatures: [['buf','src','dst']]
+    name: "insertBefore",
+    signatures: [["node","child"]]
   },
   {
-    name: 'colorMaskiOES',
-    signatures: [['buf','r','g','b','a']]
+    name: "isDefaultNamespace",
+    signatures: [["namespace"],["namespaceURI"]]
   },
   {
-    name: 'disableiOES',
-    signatures: [['target','index']]
+    name: "isEqualNode",
+    signatures: [["otherNode"]]
   },
   {
-    name: 'enableiOES',
-    signatures: [['target','index']]
+    name: "isSameNode",
+    signatures: [["otherNode"]]
   },
   {
-    name: 'bindVertexArrayOES',
-    signatures: [['arrayObject']],
-    receivers: ['OES_vertex_array_object']
+    name: "lookupNamespaceURI",
+    signatures: [["prefix"]]
   },
   {
-    name: 'bindVertexArrayOES',
-    signatures: [['?arrayObject']],
-    receivers: ['OESVertexArrayObject']
+    name: "lookupPrefix",
+    signatures: [["namespace"],["namespaceURI"]]
   },
   {
-    name: 'deleteVertexArrayOES',
-    signatures: [['arrayObject']],
-    receivers: ['OES_vertex_array_object']
+    name: "normalize",
+    signatures: [["?form"]],
+    receivers: ["String"]
   },
   {
-    name: 'deleteVertexArrayOES',
-    signatures: [['?arrayObject']],
-    receivers: ['OESVertexArrayObject']
+    name: "removeChild",
+    signatures: [["child"]]
   },
   {
-    name: 'isVertexArrayOES',
-    signatures: [['arrayObject']],
-    receivers: ['OES_vertex_array_object']
+    name: "replaceChild",
+    signatures: [["node","child"]]
   },
   {
-    name: 'isVertexArrayOES',
-    signatures: [['?arrayObject']],
-    receivers: ['OESVertexArrayObject']
+    name: "blendEquationSeparateiOES",
+    signatures: [["buf","modeRGB","modeAlpha"]]
   },
   {
-    name: 'framebufferTextureMultiviewOVR',
-    signatures: [['target','attachment','texture','level','baseViewIndex','numViews']]
+    name: "blendEquationiOES",
+    signatures: [["buf","mode"]]
   },
   {
-    name: 'convertToBlob',
-    signatures: [['?options']]
+    name: "blendFuncSeparateiOES",
+    signatures: [["buf","srcRGB","dstRGB","srcAlpha","dstAlpha"]]
   },
   {
-    name: 'setPeriodicWave',
-    signatures: [['periodicWave']]
+    name: "blendFunciOES",
+    signatures: [["buf","src","dst"]]
   },
   {
-    name: 'prepend',
-    signatures: [['...nodes']]
+    name: "colorMaskiOES",
+    signatures: [["buf","r","g","b","a"]]
   },
   {
-    name: 'querySelector',
-    signatures: [['selectors']]
+    name: "disableiOES",
+    signatures: [["target","index"]]
   },
   {
-    name: 'querySelectorAll',
-    signatures: [['selectors']]
+    name: "enableiOES",
+    signatures: [["target","index"]]
   },
   {
-    name: 'replaceChildren',
-    signatures: [['...nodes']]
+    name: "bindVertexArrayOES",
+    signatures: [["arrayObject"]],
+    receivers: ["OES_vertex_array_object"]
   },
   {
-    name: 'addPath',
-    signatures: [['path','?transform']]
+    name: "bindVertexArrayOES",
+    signatures: [["?arrayObject"]],
+    receivers: ["OESVertexArrayObject"]
   },
   {
-    name: 'updateWith',
-    signatures: [['detailsPromise']]
+    name: "deleteVertexArrayOES",
+    signatures: [["arrayObject"]],
+    receivers: ["OES_vertex_array_object"]
   },
   {
-    name: 'complete',
-    signatures: [['?result'],['?paymentResult']],
-    receivers: ['PaymentResponse']
+    name: "deleteVertexArrayOES",
+    signatures: [["?arrayObject"]],
+    receivers: ["OESVertexArrayObject"]
   },
   {
-    name: 'complete',
-    signatures: [['merchantSessionPromise']],
-    receivers: ['MerchantValidationEvent']
+    name: "isVertexArrayOES",
+    signatures: [["arrayObject"]],
+    receivers: ["OES_vertex_array_object"]
   },
   {
-    name: 'retry',
-    signatures: [['?errorFields']]
+    name: "isVertexArrayOES",
+    signatures: [["?arrayObject"]],
+    receivers: ["OESVertexArrayObject"]
   },
   {
-    name: 'clearMarks',
-    signatures: [['?markName']]
+    name: "framebufferTextureMultiviewOVR",
+    signatures: [["target","attachment","texture","level","baseViewIndex","numViews"]]
   },
   {
-    name: 'clearMeasures',
-    signatures: [['?measureName']]
+    name: "convertToBlob",
+    signatures: [["?options"]]
   },
   {
-    name: 'getEntries',
-    signatures: [['?options']],
-    receivers: ['Performance']
+    name: "setPeriodicWave",
+    signatures: [["periodicWave"]]
   },
   {
-    name: 'getEntriesByName',
-    signatures: [['name','?type'],['name','?entryType']]
+    name: "prepend",
+    signatures: [["...nodes"]]
   },
   {
-    name: 'getEntriesByType',
-    signatures: [['type'],['entryType']]
+    name: "querySelector",
+    signatures: [["selectors"]]
   },
   {
-    name: 'mark',
-    signatures: [['markName','?markOptions']]
+    name: "querySelectorAll",
+    signatures: [["selectors"]]
   },
   {
-    name: 'measure',
-    signatures: [['measureName','?startOrMeasureOptions','?endMark']]
+    name: "replaceChildren",
+    signatures: [["...nodes"]]
   },
   {
-    name: 'setResourceTimingBufferSize',
-    signatures: [['maxSize']]
+    name: "addPath",
+    signatures: [["path","?transform"]]
   },
   {
-    name: 'refresh',
-    signatures: [['?reload']]
+    name: "updateWith",
+    signatures: [["detailsPromise"]]
   },
   {
-    name: 'permissionState',
-    signatures: [['?options']]
+    name: "complete",
+    signatures: [["?result"],["?paymentResult"]],
+    receivers: ["PaymentResponse"]
   },
   {
-    name: 'subscribe',
-    signatures: [['?options']],
-    receivers: ['PushManager']
+    name: "retry",
+    signatures: [["?errorFields"]]
   },
   {
-    name: 'subscribe',
-    signatures: [['subscriptions']],
-    receivers: ['CookieStoreManager']
+    name: "clearMarks",
+    signatures: [["?markName"]]
   },
   {
-    name: 'unsubscribe',
-    signatures: [['subscriptions']],
-    receivers: ['CookieStoreManager']
+    name: "clearMeasures",
+    signatures: [["?measureName"]]
   },
   {
-    name: 'insertDTMF',
-    signatures: [['tones','?duration','?interToneGap']]
+    name: "getEntries",
+    signatures: [["?options"]],
+    receivers: ["Performance"]
   },
   {
-    name: 'getMetadata',
-    signatures: [['successCallback','?errorCallback']],
-    receivers: ['Entry']
+    name: "getEntriesByName",
+    signatures: [["name","?type"],["name","?entryType"]]
   },
   {
-    name: 'addIceCandidate',
-    signatures: [['?candidate','?successCallback','?failureCallback']]
+    name: "getEntriesByType",
+    signatures: [["type"],["entryType"]]
   },
   {
-    name: 'addTransceiver',
-    signatures: [['trackOrKind','?init']]
+    name: "mark",
+    signatures: [["markName","?markOptions"]]
   },
   {
-    name: 'createAnswer',
-    signatures: [['?options'],['successCallback','failureCallback']]
+    name: "measure",
+    signatures: [["measureName","?startOrMeasureOptions","?endMark"]]
   },
   {
-    name: 'createDataChannel',
-    signatures: [['label','?dataChannelDict']]
+    name: "setResourceTimingBufferSize",
+    signatures: [["maxSize"]]
   },
   {
-    name: 'createOffer',
-    signatures: [['?options'],['successCallback','failureCallback','?options']]
+    name: "refresh",
+    signatures: [["?reload"]]
   },
   {
-    name: 'getStats',
-    signatures: [['?selector'],['?callbackOrSelector','?legacySelector']],
-    receivers: ['RTCPeerConnection']
+    name: "permissionState",
+    signatures: [["?options"]]
   },
   {
-    name: 'setConfiguration',
-    signatures: [['?configuration']]
+    name: "subscribe",
+    signatures: [["?options"]],
+    receivers: ["PushManager"]
   },
   {
-    name: 'setLocalDescription',
-    signatures: [['?description','?successCallback','?failureCallback']]
+    name: "subscribe",
+    signatures: [["?observer","?options"]],
+    receivers: ["Observable"]
   },
   {
-    name: 'setRemoteDescription',
-    signatures: [['description','?successCallback','?failureCallback']]
+    name: "subscribe",
+    signatures: [["subscriptions"]],
+    receivers: ["CookieStoreManager"]
   },
   {
-    name: 'replaceTrack',
-    signatures: [['withTrack']]
+    name: "unsubscribe",
+    signatures: [["subscriptions"]],
+    receivers: ["CookieStoreManager"]
   },
   {
-    name: 'setParameters',
-    signatures: [['parameters']]
+    name: "insertDTMF",
+    signatures: [["tones","?duration","?interToneGap"]]
   },
   {
-    name: 'setStreams',
-    signatures: [['...streams']]
+    name: "getMetadata",
+    signatures: [["successCallback","?errorCallback"]],
+    receivers: ["Entry"]
   },
   {
-    name: 'setCodecPreferences',
-    signatures: [['codecs']]
+    name: "addIceCandidate",
+    signatures: [["?candidate","?successCallback","?failureCallback"]]
   },
   {
-    name: 'collapse',
-    signatures: [['?toStart']],
-    receivers: ['Range']
+    name: "addTransceiver",
+    signatures: [["trackOrKind","?init"]]
   },
   {
-    name: 'collapse',
-    signatures: [['node','?offset']],
-    receivers: ['Selection']
+    name: "createAnswer",
+    signatures: [["?options"],["successCallback","failureCallback"]]
   },
   {
-    name: 'compareBoundaryPoints',
-    signatures: [['how','sourceRange']]
+    name: "createDataChannel",
+    signatures: [["label","?dataChannelDict"]]
   },
   {
-    name: 'comparePoint',
-    signatures: [['node','offset']]
+    name: "createOffer",
+    signatures: [["?options"],["successCallback","failureCallback","?options"]]
   },
   {
-    name: 'createContextualFragment',
-    signatures: [['fragment']]
+    name: "getStats",
+    signatures: [["?selector"]],
+    receivers: ["RTCPeerConnection"]
   },
   {
-    name: 'insertNode',
-    signatures: [['node']]
+    name: "setConfiguration",
+    signatures: [["?configuration"]]
   },
   {
-    name: 'intersectsNode',
-    signatures: [['node']]
+    name: "setLocalDescription",
+    signatures: [["?description","?successCallback","?failureCallback"]]
   },
   {
-    name: 'isPointInRange',
-    signatures: [['node','offset']]
+    name: "setRemoteDescription",
+    signatures: [["description","?successCallback","?failureCallback"]]
   },
   {
-    name: 'selectNode',
-    signatures: [['node']]
+    name: "replaceTrack",
+    signatures: [["withTrack"]]
   },
   {
-    name: 'selectNodeContents',
-    signatures: [['node']]
+    name: "setParameters",
+    signatures: [["parameters","?setParameterOptions"],["parameters","?options"]]
   },
   {
-    name: 'setEnd',
-    signatures: [['node','offset']]
+    name: "setStreams",
+    signatures: [["...streams"]]
   },
   {
-    name: 'setEndAfter',
-    signatures: [['node']]
+    name: "setCodecPreferences",
+    signatures: [["codecs"]]
   },
   {
-    name: 'setEndBefore',
-    signatures: [['node']]
+    name: "collapse",
+    signatures: [["?toStart"]],
+    receivers: ["Range"]
   },
   {
-    name: 'setStart',
-    signatures: [['node','offset']]
+    name: "collapse",
+    signatures: [["node","?offset"]],
+    receivers: ["Selection"]
   },
   {
-    name: 'setStartAfter',
-    signatures: [['node']]
+    name: "compareBoundaryPoints",
+    signatures: [["how","sourceRange"]]
   },
   {
-    name: 'setStartBefore',
-    signatures: [['node']]
+    name: "comparePoint",
+    signatures: [["node","offset"]]
   },
   {
-    name: 'surroundContents',
-    signatures: [['newParent']]
+    name: "createContextualFragment",
+    signatures: [["fragment"]]
   },
   {
-    name: 'enqueue',
-    signatures: [['chunk']],
-    receivers: ['ReadableByteStreamController']
+    name: "insertNode",
+    signatures: [["node"]]
   },
   {
-    name: 'enqueue',
-    signatures: [['?chunk']],
-    receivers: ['ReadableStreamDefaultController','TransformStreamDefaultController']
+    name: "intersectsNode",
+    signatures: [["node"]]
   },
   {
-    name: 'error',
-    signatures: [['?e']],
-    receivers: ['ReadableByteStreamController','ReadableStreamDefaultController','WritableStreamDefaultController']
+    name: "isPointInRange",
+    signatures: [["node","offset"]]
   },
   {
-    name: 'error',
-    signatures: [['?reason']],
-    receivers: ['TransformStreamDefaultController']
+    name: "selectNode",
+    signatures: [["node"]]
   },
   {
-    name: 'error',
-    signatures: [['...data']],
-    receivers: ['Console','console']
+    name: "selectNodeContents",
+    signatures: [["node"]]
   },
   {
-    name: 'getReader',
-    signatures: [['?options']]
+    name: "setEnd",
+    signatures: [["node","offset"]]
   },
   {
-    name: 'pipeThrough',
-    signatures: [['transform','?options']]
+    name: "setEndAfter",
+    signatures: [["node"]]
   },
   {
-    name: 'pipeTo',
-    signatures: [['destination','?options']]
+    name: "setEndBefore",
+    signatures: [["node"]]
   },
   {
-    name: 'respond',
-    signatures: [['bytesWritten']]
+    name: "setStart",
+    signatures: [["node","offset"]]
   },
   {
-    name: 'respondWithNewView',
-    signatures: [['view']]
+    name: "setStartAfter",
+    signatures: [["node"]]
   },
   {
-    name: 'cancelWatchAvailability',
-    signatures: [['?id']]
+    name: "setStartBefore",
+    signatures: [["node"]]
   },
   {
-    name: 'prompt',
-    signatures: [['?message','?_default'],['?message','?defaultValue']],
-    receivers: ['Window']
+    name: "surroundContents",
+    signatures: [["newParent"]]
   },
   {
-    name: 'watchAvailability',
-    signatures: [['callback']]
+    name: "enqueue",
+    signatures: [["chunk"]],
+    receivers: ["ReadableByteStreamController"]
   },
   {
-    name: 'convertToSpecifiedUnits',
-    signatures: [['unitType']]
+    name: "enqueue",
+    signatures: [["?chunk"]],
+    receivers: ["ReadableStreamDefaultController","TransformStreamDefaultController"]
   },
   {
-    name: 'newValueSpecifiedUnits',
-    signatures: [['unitType','valueInSpecifiedUnits']]
+    name: "error",
+    signatures: [["?e"]],
+    receivers: ["ReadableByteStreamController","ReadableStreamDefaultController","WritableStreamDefaultController"]
   },
   {
-    name: 'beginElementAt',
-    signatures: [['offset']]
+    name: "error",
+    signatures: [["?reason"]],
+    receivers: ["TransformStreamDefaultController"]
   },
   {
-    name: 'endElementAt',
-    signatures: [['offset']]
+    name: "error",
+    signatures: [["...data"]],
+    receivers: ["Console","console"]
   },
   {
-    name: 'getCurrentTime',
-    signatures: [['?rangeName']],
-    receivers: ['AnimationTimeline']
+    name: "error",
+    signatures: [["error"]],
+    receivers: ["Subscriber"]
   },
   {
-    name: 'setStdDeviation',
-    signatures: [['stdDeviationX','stdDeviationY']]
+    name: "getReader",
+    signatures: [["?options"]]
   },
   {
-    name: 'getPointAtLength',
-    signatures: [['distance']]
+    name: "pipeThrough",
+    signatures: [["transform","?options"]]
   },
   {
-    name: 'isPointInFill',
-    signatures: [['?point']]
+    name: "pipeTo",
+    signatures: [["destination","?options"]]
   },
   {
-    name: 'getBBox',
-    signatures: [['?options']]
+    name: "respond",
+    signatures: [["bytesWritten"]]
   },
   {
-    name: 'appendItem',
-    signatures: [['newItem']]
+    name: "respondWithNewView",
+    signatures: [["view"]]
   },
   {
-    name: 'getItem',
-    signatures: [['index']],
-    receivers: ['SVGLengthList','SVGNumberList','SVGPointList','SVGStringList','SVGTransformList']
+    name: "cancelWatchAvailability",
+    signatures: [["?id"]]
   },
   {
-    name: 'getItem',
-    signatures: [['key']],
-    receivers: ['Storage']
+    name: "prompt",
+    signatures: [["?message","?_default"],["?message","?defaultValue"]],
+    receivers: ["Window"]
   },
   {
-    name: 'getItem',
-    signatures: [['dimension1Index','...dimensionNIndexes']],
-    receivers: ['VBArray']
+    name: "prompt",
+    signatures: [["input"]],
+    receivers: ["AITextSession"]
   },
   {
-    name: 'initialize',
-    signatures: [['newItem']]
+    name: "watchAvailability",
+    signatures: [["callback"]]
   },
   {
-    name: 'insertItemBefore',
-    signatures: [['newItem','index']],
-    receivers: ['SVGLengthList','SVGNumberList','SVGPointList','SVGTransformList']
+    name: "convertToSpecifiedUnits",
+    signatures: [["unitType"]]
   },
   {
-    name: 'insertItemBefore',
-    signatures: [['newItem','index'],['item','index']],
-    receivers: ['SVGStringList']
+    name: "newValueSpecifiedUnits",
+    signatures: [["unitType","valueInSpecifiedUnits"]]
   },
   {
-    name: 'removeItem',
-    signatures: [['index']],
-    receivers: ['SVGLengthList','SVGNumberList','SVGPointList','SVGStringList','SVGTransformList']
+    name: "beginElementAt",
+    signatures: [["offset"]]
   },
   {
-    name: 'removeItem',
-    signatures: [['key']],
-    receivers: ['Storage']
+    name: "endElementAt",
+    signatures: [["offset"]]
   },
   {
-    name: 'replaceItem',
-    signatures: [['newItem','index']]
+    name: "getCurrentTime",
+    signatures: [["?rangeName"]],
+    receivers: ["AnimationTimeline"]
   },
   {
-    name: 'setOrientToAngle',
-    signatures: [['angle']]
+    name: "setStdDeviation",
+    signatures: [["stdDeviationX","stdDeviationY"]]
   },
   {
-    name: 'checkEnclosure',
-    signatures: [['element','rect']]
+    name: "getPointAtLength",
+    signatures: [["distance"]]
   },
   {
-    name: 'checkIntersection',
-    signatures: [['element','rect']]
+    name: "isPointInFill",
+    signatures: [["?point"]]
   },
   {
-    name: 'createSVGTransformFromMatrix',
-    signatures: [['?matrix']]
+    name: "getBBox",
+    signatures: [["?options"]]
   },
   {
-    name: 'getEnclosureList',
-    signatures: [['rect','referenceElement']]
+    name: "appendItem",
+    signatures: [["newItem"]]
   },
   {
-    name: 'getIntersectionList',
-    signatures: [['rect','referenceElement']]
+    name: "getItem",
+    signatures: [["index"]],
+    receivers: ["SVGLengthList","SVGNumberList","SVGPointList","SVGStringList","SVGTransformList"]
   },
   {
-    name: 'setCurrentTime',
-    signatures: [['seconds']]
+    name: "getItem",
+    signatures: [["key"]],
+    receivers: ["Storage"]
   },
   {
-    name: 'suspendRedraw',
-    signatures: [['maxWaitMilliseconds']]
+    name: "getItem",
+    signatures: [["dimension1Index","...dimensionNIndexes"]],
+    receivers: ["VBArray"]
   },
   {
-    name: 'unsuspendRedraw',
-    signatures: [['suspendHandleID'],['suspendHandleId']]
+    name: "initialize",
+    signatures: [["newItem"]]
   },
   {
-    name: 'getCharNumAtPosition',
-    signatures: [['?point']]
+    name: "insertItemBefore",
+    signatures: [["newItem","index"]],
+    receivers: ["SVGLengthList","SVGNumberList","SVGPointList","SVGTransformList"]
   },
   {
-    name: 'getEndPositionOfChar',
-    signatures: [['charnum']]
+    name: "insertItemBefore",
+    signatures: [["newItem","index"],["item","index"]],
+    receivers: ["SVGStringList"]
   },
   {
-    name: 'getExtentOfChar',
-    signatures: [['charnum']]
+    name: "removeItem",
+    signatures: [["index"]],
+    receivers: ["SVGLengthList","SVGNumberList","SVGPointList","SVGStringList","SVGTransformList"]
   },
   {
-    name: 'getRotationOfChar',
-    signatures: [['charnum']]
+    name: "removeItem",
+    signatures: [["key"]],
+    receivers: ["Storage"]
   },
   {
-    name: 'getStartPositionOfChar',
-    signatures: [['charnum']]
+    name: "replaceItem",
+    signatures: [["newItem","index"]]
   },
   {
-    name: 'getSubStringLength',
-    signatures: [['charnum','nchars']]
+    name: "setOrientToAngle",
+    signatures: [["angle"]]
   },
   {
-    name: 'selectSubString',
-    signatures: [['charnum','nchars']]
+    name: "checkEnclosure",
+    signatures: [["element","rect"]]
   },
   {
-    name: 'setMatrix',
-    signatures: [['?matrix']]
+    name: "checkIntersection",
+    signatures: [["element","rect"]]
   },
   {
-    name: 'setRotate',
-    signatures: [['angle','cx','cy']]
+    name: "createSVGTransformFromMatrix",
+    signatures: [["?matrix"]]
   },
   {
-    name: 'setScale',
-    signatures: [['sx','sy']]
+    name: "getEnclosureList",
+    signatures: [["rect","referenceElement"]]
   },
   {
-    name: 'setSkewX',
-    signatures: [['angle']]
+    name: "getIntersectionList",
+    signatures: [["rect","referenceElement"]]
   },
   {
-    name: 'setSkewY',
-    signatures: [['angle']]
+    name: "setCurrentTime",
+    signatures: [["seconds"]]
   },
   {
-    name: 'setTranslate',
-    signatures: [['tx','ty']]
+    name: "suspendRedraw",
+    signatures: [["maxWaitMilliseconds"]]
   },
   {
-    name: 'lock',
-    signatures: [['orientation']],
-    receivers: ['ScreenOrientation']
+    name: "unsuspendRedraw",
+    signatures: [["suspendHandleID"],["suspendHandleId"]]
   },
   {
-    name: 'lock',
-    signatures: [['?keyCodes']],
-    receivers: ['Keyboard']
+    name: "getCharNumAtPosition",
+    signatures: [["?point"]]
   },
   {
-    name: 'addRange',
-    signatures: [['range']]
+    name: "getEndPositionOfChar",
+    signatures: [["charnum"]]
   },
   {
-    name: 'containsNode',
-    signatures: [['node','?allowPartialContainment']]
+    name: "getExtentOfChar",
+    signatures: [["charnum"]]
   },
   {
-    name: 'extend',
-    signatures: [['node','?offset']]
+    name: "getRotationOfChar",
+    signatures: [["charnum"]]
   },
   {
-    name: 'getRangeAt',
-    signatures: [['index']]
+    name: "getStartPositionOfChar",
+    signatures: [["charnum"]]
   },
   {
-    name: 'modify',
-    signatures: [['?alter','?direction','?granularity']]
+    name: "getSubStringLength",
+    signatures: [["charnum","nchars"]]
   },
   {
-    name: 'removeRange',
-    signatures: [['range']]
+    name: "selectSubString",
+    signatures: [["charnum","nchars"]]
   },
   {
-    name: 'selectAllChildren',
-    signatures: [['node']]
+    name: "setMatrix",
+    signatures: [["?matrix"]]
   },
   {
-    name: 'setBaseAndExtent',
-    signatures: [['anchorNode','anchorOffset','focusNode','focusOffset'],['baseNode','baseOffset','extentNode','extentOffset']]
+    name: "setRotate",
+    signatures: [["angle","cx","cy"]]
   },
   {
-    name: 'getRegistration',
-    signatures: [['?clientURL'],['?documentURL']]
+    name: "setScale",
+    signatures: [["sx","sy"]]
   },
   {
-    name: 'register',
-    signatures: [['scriptURL','?options'],['url','?options']],
-    receivers: ['ServiceWorkerContainer']
+    name: "setSkewX",
+    signatures: [["angle"]]
   },
   {
-    name: 'register',
-    signatures: [['target','heldValue','?unregisterToken']],
-    receivers: ['FinalizationRegistry']
+    name: "setSkewY",
+    signatures: [["angle"]]
   },
   {
-    name: 'register',
-    signatures: [['tag','?options']],
-    receivers: ['PeriodicSyncManager']
+    name: "setTranslate",
+    signatures: [["tx","ty"]]
   },
   {
-    name: 'register',
-    signatures: [['tag']],
-    receivers: ['SyncManager']
+    name: "addRange",
+    signatures: [["range"]]
   },
   {
-    name: 'register',
-    signatures: [['configURL']],
-    receivers: ['IdentityProvider']
+    name: "containsNode",
+    signatures: [["node","?allowPartialContainment"]]
   },
   {
-    name: 'getNotifications',
-    signatures: [['?filter']]
+    name: "extend",
+    signatures: [["node","?offset"]]
   },
   {
-    name: 'showNotification',
-    signatures: [['title','?options']]
+    name: "getRangeAt",
+    signatures: [["index"]]
   },
   {
-    name: 'unregister',
-    signatures: [['unregisterToken']],
-    receivers: ['FinalizationRegistry']
+    name: "modify",
+    signatures: [["?alter","?direction","?granularity"]]
   },
   {
-    name: 'unregister',
-    signatures: [['tag']],
-    receivers: ['PeriodicSyncManager']
+    name: "removeRange",
+    signatures: [["range"]]
   },
   {
-    name: 'unregister',
-    signatures: [['configURL']],
-    receivers: ['IdentityProvider']
+    name: "selectAllChildren",
+    signatures: [["node"]]
   },
   {
-    name: 'appendBuffer',
-    signatures: [['data']]
+    name: "setBaseAndExtent",
+    signatures: [["anchorNode","anchorOffset","focusNode","focusOffset"],["baseNode","baseOffset","extentNode","extentOffset"]]
   },
   {
-    name: 'changeType',
-    signatures: [['type'],['config']]
+    name: "getRegistration",
+    signatures: [["?clientURL"],["?documentURL"]]
   },
   {
-    name: 'speak',
-    signatures: [['utterance']]
+    name: "register",
+    signatures: [["scriptURL","?options"],["url","?options"]],
+    receivers: ["ServiceWorkerContainer"]
   },
   {
-    name: 'key',
-    signatures: [['index']]
+    name: "register",
+    signatures: [["target","heldValue","?unregisterToken"]],
+    receivers: ["FinalizationRegistry"]
   },
   {
-    name: 'setItem',
-    signatures: [['key','value']]
+    name: "register",
+    signatures: [["tag","?options"]],
+    receivers: ["PeriodicSyncManager"]
   },
   {
-    name: 'initStorageEvent',
-    signatures: [['type','?bubbles','?cancelable','?key','?oldValue','?newValue','?url','?storageArea']]
+    name: "register",
+    signatures: [["tag"]],
+    receivers: ["SyncManager"]
   },
   {
-    name: 'matchMedium',
-    signatures: [['?mediaquery']]
+    name: "register",
+    signatures: [["configURL"]],
+    receivers: ["IdentityProvider"]
   },
   {
-    name: 'decrypt',
-    signatures: [['algorithm','key','data']]
+    name: "getNotifications",
+    signatures: [["?filter"]]
   },
   {
-    name: 'deriveBits',
-    signatures: [['algorithm','baseKey','length']]
+    name: "showNotification",
+    signatures: [["title","?options"]]
   },
   {
-    name: 'deriveKey',
-    signatures: [['algorithm','baseKey','derivedKeyType','extractable','keyUsages']]
+    name: "unregister",
+    signatures: [["unregisterToken"]],
+    receivers: ["FinalizationRegistry"]
   },
   {
-    name: 'digest',
-    signatures: [['algorithm','data']]
+    name: "unregister",
+    signatures: [["tag"]],
+    receivers: ["PeriodicSyncManager"]
   },
   {
-    name: 'encrypt',
-    signatures: [['algorithm','key','data']]
+    name: "unregister",
+    signatures: [["configURL"]],
+    receivers: ["IdentityProvider"]
   },
   {
-    name: 'exportKey',
-    signatures: [['format','key']]
+    name: "appendBuffer",
+    signatures: [["data"]]
   },
   {
-    name: 'generateKey',
-    signatures: [['algorithm','extractable','keyUsages']]
+    name: "changeType",
+    signatures: [["type"],["config"]]
   },
   {
-    name: 'importKey',
-    signatures: [['format','keyData','algorithm','extractable','keyUsages']]
+    name: "speak",
+    signatures: [["utterance"]]
   },
   {
-    name: 'sign',
-    signatures: [['algorithm','key','data']],
-    receivers: ['SubtleCrypto']
+    name: "key",
+    signatures: [["index"]]
   },
   {
-    name: 'sign',
-    signatures: [['x']],
-    receivers: ['Math']
+    name: "setItem",
+    signatures: [["key","value"]]
   },
   {
-    name: 'unwrapKey',
-    signatures: [['format','wrappedKey','unwrappingKey','unwrapAlgorithm','unwrappedKeyAlgorithm','extractable','keyUsages']]
+    name: "initStorageEvent",
+    signatures: [["type","?bubbles","?cancelable","?key","?oldValue","?newValue","?url","?storageArea"]]
   },
   {
-    name: 'verify',
-    signatures: [['algorithm','key','signature','data']]
+    name: "matchMedium",
+    signatures: [["?mediaquery"]]
   },
   {
-    name: 'wrapKey',
-    signatures: [['format','key','wrappingKey','wrapAlgorithm']]
+    name: "decrypt",
+    signatures: [["algorithm","key","data"]]
   },
   {
-    name: 'splitText',
-    signatures: [['offset']]
+    name: "deriveBits",
+    signatures: [["algorithm","baseKey","length"]]
   },
   {
-    name: 'encode',
-    signatures: [['?input']],
-    receivers: ['TextEncoder']
+    name: "deriveKey",
+    signatures: [["algorithm","baseKey","derivedKeyType","extractable","keyUsages"]]
   },
   {
-    name: 'encode',
-    signatures: [['frame','?options']],
-    receivers: ['VideoEncoder']
+    name: "digest",
+    signatures: [["algorithm","data"]]
   },
   {
-    name: 'encodeInto',
-    signatures: [['source','destination']]
+    name: "encrypt",
+    signatures: [["algorithm","key","data"]]
   },
   {
-    name: 'addCue',
-    signatures: [['cue']]
+    name: "exportKey",
+    signatures: [["format","key"]]
   },
   {
-    name: 'removeCue',
-    signatures: [['cue']]
+    name: "generateKey",
+    signatures: [["algorithm","extractable","keyUsages"]]
   },
   {
-    name: 'getCueById',
-    signatures: [['id']]
+    name: "importKey",
+    signatures: [["format","keyData","algorithm","extractable","keyUsages"]]
   },
   {
-    name: 'end',
-    signatures: [['index']],
-    receivers: ['TimeRanges']
+    name: "sign",
+    signatures: [["algorithm","key","data"]],
+    receivers: ["SubtleCrypto"]
   },
   {
-    name: 'initUIEvent',
-    signatures: [['typeArg','?bubblesArg','?cancelableArg','?viewArg','?detailArg'],['type','?bubbles','?cancelable','?view','?detail']]
+    name: "sign",
+    signatures: [["x"]],
+    receivers: ["Math"]
   },
   {
-    name: 'configure',
-    signatures: [['config']],
-    receivers: ['VideoDecoder','VideoEncoder']
+    name: "unwrapKey",
+    signatures: [["format","wrappedKey","unwrappingKey","unwrapAlgorithm","unwrappedKeyAlgorithm","extractable","keyUsages"]]
   },
   {
-    name: 'configure',
-    signatures: [['descriptor']],
-    receivers: ['GPUCanvasContext']
+    name: "verify",
+    signatures: [["algorithm","key","signature","data"]]
   },
   {
-    name: 'allocationSize',
-    signatures: [['?options']],
-    receivers: ['VideoFrame']
+    name: "wrapKey",
+    signatures: [["format","key","wrappingKey","wrapAlgorithm"]]
   },
   {
-    name: 'allocationSize',
-    signatures: [['options']],
-    receivers: ['AudioData']
+    name: "splitText",
+    signatures: [["offset"]]
   },
   {
-    name: 'getTranslatedShaderSource',
-    signatures: [['shader']]
+    name: "encode",
+    signatures: [["?input"]],
+    receivers: ["TextEncoder"]
   },
   {
-    name: 'drawBuffersWEBGL',
-    signatures: [['buffers']]
+    name: "encode",
+    signatures: [["frame","?options"]],
+    receivers: ["VideoEncoder"]
   },
   {
-    name: 'multiDrawArraysInstancedWEBGL',
-    signatures: [['mode','firstsList','firstsOffset','countsList','countsOffset','instanceCountsList','instanceCountsOffset','drawcount']]
+    name: "encode",
+    signatures: [["data"]],
+    receivers: ["AudioEncoder"]
   },
   {
-    name: 'multiDrawArraysWEBGL',
-    signatures: [['mode','firstsList','firstsOffset','countsList','countsOffset','drawcount']]
+    name: "encodeInto",
+    signatures: [["source","destination"]]
   },
   {
-    name: 'multiDrawElementsInstancedWEBGL',
-    signatures: [['mode','countsList','countsOffset','type','offsetsList','offsetsOffset','instanceCountsList','instanceCountsOffset','drawcount']]
+    name: "addCue",
+    signatures: [["cue"]]
   },
   {
-    name: 'multiDrawElementsWEBGL',
-    signatures: [['mode','countsList','countsOffset','type','offsetsList','offsetsOffset','drawcount']]
+    name: "removeCue",
+    signatures: [["cue"]]
   },
   {
-    name: 'beginQuery',
-    signatures: [['target','query']]
+    name: "getCueById",
+    signatures: [["id"]]
   },
   {
-    name: 'beginTransformFeedback',
-    signatures: [['primitiveMode']]
+    name: "end",
+    signatures: [["index"]],
+    receivers: ["TimeRanges"]
   },
   {
-    name: 'bindBufferBase',
-    signatures: [['target','index','buffer']]
+    name: "initUIEvent",
+    signatures: [["typeArg","?bubblesArg","?cancelableArg","?viewArg","?detailArg"],["type","?bubbles","?cancelable","?view","?detail"]]
   },
   {
-    name: 'bindBufferRange',
-    signatures: [['target','index','buffer','offset','size']]
+    name: "configure",
+    signatures: [["config"]],
+    receivers: ["VideoDecoder","VideoEncoder","AudioDecoder","AudioEncoder"]
   },
   {
-    name: 'bindSampler',
-    signatures: [['unit','sampler']]
+    name: "configure",
+    signatures: [["descriptor"]],
+    receivers: ["GPUCanvasContext"]
   },
   {
-    name: 'bindTransformFeedback',
-    signatures: [['target','tf'],['target','feedback']]
+    name: "allocationSize",
+    signatures: [["?options"]],
+    receivers: ["VideoFrame"]
   },
   {
-    name: 'bindVertexArray',
-    signatures: [['array'],['vertexArray']]
+    name: "allocationSize",
+    signatures: [["options"]],
+    receivers: ["AudioData"]
   },
   {
-    name: 'blitFramebuffer',
-    signatures: [['srcX0','srcY0','srcX1','srcY1','dstX0','dstY0','dstX1','dstY1','mask','filter']]
+    name: "getTranslatedShaderSource",
+    signatures: [["shader"]]
   },
   {
-    name: 'clearBufferfi',
-    signatures: [['buffer','drawbuffer','depth','stencil']]
+    name: "drawBuffersWEBGL",
+    signatures: [["buffers"]]
   },
   {
-    name: 'clearBufferfv',
-    signatures: [['buffer','drawbuffer','values','?srcOffset'],['buffer','drawbuffer','value','?srcOffset']]
+    name: "multiDrawArraysInstancedWEBGL",
+    signatures: [["mode","firstsList","firstsOffset","countsList","countsOffset","instanceCountsList","instanceCountsOffset","drawcount"]]
   },
   {
-    name: 'clearBufferiv',
-    signatures: [['buffer','drawbuffer','values','?srcOffset'],['buffer','drawbuffer','value','?srcOffset']]
+    name: "multiDrawArraysWEBGL",
+    signatures: [["mode","firstsList","firstsOffset","countsList","countsOffset","drawcount"]]
   },
   {
-    name: 'clearBufferuiv',
-    signatures: [['buffer','drawbuffer','values','?srcOffset'],['buffer','drawbuffer','value','?srcOffset']]
+    name: "multiDrawElementsInstancedWEBGL",
+    signatures: [["mode","countsList","countsOffset","type","offsetsList","offsetsOffset","instanceCountsList","instanceCountsOffset","drawcount"]]
   },
   {
-    name: 'clientWaitSync',
-    signatures: [['sync','flags','timeout']]
+    name: "multiDrawElementsWEBGL",
+    signatures: [["mode","countsList","countsOffset","type","offsetsList","offsetsOffset","drawcount"]]
   },
   {
-    name: 'compressedTexImage3D',
-    signatures: [['target','level','internalformat','width','height','depth','border','imageSize','offset'],['target','level','internalformat','width','height','depth','border','srcData','?srcOffset','?srcLengthOverride'],['target','level','internalformat','width','height','depth','border','data','?srcOffset','?srcLengthOverride']]
+    name: "beginQuery",
+    signatures: [["target","query"]]
   },
   {
-    name: 'compressedTexSubImage3D',
-    signatures: [['target','level','xoffset','yoffset','zoffset','width','height','depth','format','imageSize','offset'],['target','level','xoffset','yoffset','zoffset','width','height','depth','format','srcData','?srcOffset','?srcLengthOverride'],['target','level','xoffset','yoffset','zoffset','width','height','depth','format','data','?srcOffset','?srcLengthOverride']]
+    name: "beginTransformFeedback",
+    signatures: [["primitiveMode"]]
   },
   {
-    name: 'copyBufferSubData',
-    signatures: [['readTarget','writeTarget','readOffset','writeOffset','size']]
+    name: "bindBufferBase",
+    signatures: [["target","index","buffer"]]
   },
   {
-    name: 'copyTexSubImage3D',
-    signatures: [['target','level','xoffset','yoffset','zoffset','x','y','width','height']]
+    name: "bindBufferRange",
+    signatures: [["target","index","buffer","offset","size"]]
   },
   {
-    name: 'createSampler',
-    signatures: [['?descriptor']],
-    receivers: ['GPUDevice']
+    name: "bindSampler",
+    signatures: [["unit","sampler"]]
   },
   {
-    name: 'deleteQuery',
-    signatures: [['query']]
+    name: "bindTransformFeedback",
+    signatures: [["target","tf"],["target","feedback"]]
   },
   {
-    name: 'deleteSampler',
-    signatures: [['sampler']]
+    name: "bindVertexArray",
+    signatures: [["array"],["vertexArray"]]
   },
   {
-    name: 'deleteSync',
-    signatures: [['sync']]
+    name: "blitFramebuffer",
+    signatures: [["srcX0","srcY0","srcX1","srcY1","dstX0","dstY0","dstX1","dstY1","mask","filter"]]
   },
   {
-    name: 'deleteTransformFeedback',
-    signatures: [['tf'],['feedback']]
+    name: "clearBufferfi",
+    signatures: [["buffer","drawbuffer","depth","stencil"]]
   },
   {
-    name: 'deleteVertexArray',
-    signatures: [['vertexArray']]
+    name: "clearBufferfv",
+    signatures: [["buffer","drawbuffer","values","?srcOffset"],["buffer","drawbuffer","value","?srcOffset"]]
   },
   {
-    name: 'drawArraysInstanced',
-    signatures: [['mode','first','count','instanceCount']]
+    name: "clearBufferiv",
+    signatures: [["buffer","drawbuffer","values","?srcOffset"],["buffer","drawbuffer","value","?srcOffset"]]
   },
   {
-    name: 'drawBuffers',
-    signatures: [['buffers']]
+    name: "clearBufferuiv",
+    signatures: [["buffer","drawbuffer","values","?srcOffset"],["buffer","drawbuffer","value","?srcOffset"]]
   },
   {
-    name: 'drawElementsInstanced',
-    signatures: [['mode','count','type','offset','instanceCount']]
+    name: "clientWaitSync",
+    signatures: [["sync","flags","timeout"]]
   },
   {
-    name: 'drawRangeElements',
-    signatures: [['mode','start','end','count','type','offset']]
+    name: "compressedTexImage3D",
+    signatures: [["target","level","internalformat","width","height","depth","border","imageSize","offset"],["target","level","internalformat","width","height","depth","border","srcData","?srcOffset","?srcLengthOverride"],["target","level","internalformat","width","height","depth","border","data","?srcOffset","?srcLengthOverride"]]
   },
   {
-    name: 'endQuery',
-    signatures: [['target']]
+    name: "compressedTexSubImage3D",
+    signatures: [["target","level","xoffset","yoffset","zoffset","width","height","depth","format","imageSize","offset"],["target","level","xoffset","yoffset","zoffset","width","height","depth","format","srcData","?srcOffset","?srcLengthOverride"],["target","level","xoffset","yoffset","zoffset","width","height","depth","format","data","?srcOffset","?srcLengthOverride"]]
   },
   {
-    name: 'fenceSync',
-    signatures: [['condition','flags']]
+    name: "copyBufferSubData",
+    signatures: [["readTarget","writeTarget","readOffset","writeOffset","size"]]
   },
   {
-    name: 'framebufferTextureLayer',
-    signatures: [['target','attachment','texture','level','layer']]
+    name: "copyTexSubImage3D",
+    signatures: [["target","level","xoffset","yoffset","zoffset","x","y","width","height"]]
   },
   {
-    name: 'getActiveUniformBlockName',
-    signatures: [['program','uniformBlockIndex']]
+    name: "createSampler",
+    signatures: [["?descriptor"]],
+    receivers: ["GPUDevice"]
   },
   {
-    name: 'getActiveUniformBlockParameter',
-    signatures: [['program','uniformBlockIndex','pname']]
+    name: "deleteQuery",
+    signatures: [["query"]]
   },
   {
-    name: 'getActiveUniforms',
-    signatures: [['program','uniformIndices','pname']]
+    name: "deleteSampler",
+    signatures: [["sampler"]]
   },
   {
-    name: 'getBufferSubData',
-    signatures: [['target','srcByteOffset','dstBuffer','?dstOffset','?length'],['target','srcByteOffset','dstData','?dstOffset','?length']]
+    name: "deleteSync",
+    signatures: [["sync"]]
   },
   {
-    name: 'getFragDataLocation',
-    signatures: [['program','name']]
+    name: "deleteTransformFeedback",
+    signatures: [["tf"],["feedback"]]
   },
   {
-    name: 'getIndexedParameter',
-    signatures: [['target','index']]
+    name: "deleteVertexArray",
+    signatures: [["vertexArray"]]
   },
   {
-    name: 'getInternalformatParameter',
-    signatures: [['target','internalformat','pname']]
+    name: "drawArraysInstanced",
+    signatures: [["mode","first","count","instanceCount"]]
   },
   {
-    name: 'getQuery',
-    signatures: [['target','pname']]
+    name: "drawBuffers",
+    signatures: [["buffers"]]
   },
   {
-    name: 'getQueryParameter',
-    signatures: [['query','pname']]
+    name: "drawElementsInstanced",
+    signatures: [["mode","count","type","offset","instanceCount"]]
   },
   {
-    name: 'getSamplerParameter',
-    signatures: [['sampler','pname']]
+    name: "drawRangeElements",
+    signatures: [["mode","start","end","count","type","offset"]]
   },
   {
-    name: 'getSyncParameter',
-    signatures: [['sync','pname']]
+    name: "endQuery",
+    signatures: [["target"]]
   },
   {
-    name: 'getTransformFeedbackVarying',
-    signatures: [['program','index']]
+    name: "fenceSync",
+    signatures: [["condition","flags"]]
   },
   {
-    name: 'getUniformBlockIndex',
-    signatures: [['program','uniformBlockName']]
+    name: "framebufferTextureLayer",
+    signatures: [["target","attachment","texture","level","layer"]]
   },
   {
-    name: 'getUniformIndices',
-    signatures: [['program','uniformNames']]
+    name: "getActiveUniformBlockName",
+    signatures: [["program","uniformBlockIndex"]]
   },
   {
-    name: 'invalidateFramebuffer',
-    signatures: [['target','attachments']]
+    name: "getActiveUniformBlockParameter",
+    signatures: [["program","uniformBlockIndex","pname"]]
   },
   {
-    name: 'invalidateSubFramebuffer',
-    signatures: [['target','attachments','x','y','width','height']]
+    name: "getActiveUniforms",
+    signatures: [["program","uniformIndices","pname"]]
   },
   {
-    name: 'isQuery',
-    signatures: [['query']]
+    name: "getBufferSubData",
+    signatures: [["target","srcByteOffset","dstBuffer","?dstOffset","?length"],["target","srcByteOffset","dstData","?dstOffset","?length"]]
   },
   {
-    name: 'isSampler',
-    signatures: [['sampler']]
+    name: "getFragDataLocation",
+    signatures: [["program","name"]]
   },
   {
-    name: 'isSync',
-    signatures: [['sync']]
+    name: "getIndexedParameter",
+    signatures: [["target","index"]]
   },
   {
-    name: 'isTransformFeedback',
-    signatures: [['tf'],['feedback']]
+    name: "getInternalformatParameter",
+    signatures: [["target","internalformat","pname"]]
   },
   {
-    name: 'isVertexArray',
-    signatures: [['vertexArray']]
+    name: "getQuery",
+    signatures: [["target","pname"]]
   },
   {
-    name: 'readBuffer',
-    signatures: [['src'],['mode']]
+    name: "getQueryParameter",
+    signatures: [["query","pname"]]
   },
   {
-    name: 'renderbufferStorageMultisample',
-    signatures: [['target','samples','internalformat','width','height']]
+    name: "getSamplerParameter",
+    signatures: [["sampler","pname"]]
   },
   {
-    name: 'samplerParameterf',
-    signatures: [['sampler','pname','param']]
+    name: "getSyncParameter",
+    signatures: [["sync","pname"]]
   },
   {
-    name: 'samplerParameteri',
-    signatures: [['sampler','pname','param']]
+    name: "getTransformFeedbackVarying",
+    signatures: [["program","index"]]
   },
   {
-    name: 'texImage3D',
-    signatures: [['target','level','internalformat','width','height','depth','border','format','type','pboOffset'],['target','level','internalformat','width','height','depth','border','format','type','source'],['target','level','internalformat','width','height','depth','border','format','type','srcData','?srcOffset'],['target','level','internalformat','width','height','depth','border','format','type','offset'],['target','level','internalformat','width','height','depth','border','format','type','data'],['target','level','internalformat','width','height','depth','border','format','type','image'],['target','level','internalformat','width','height','depth','border','format','type','canvas'],['target','level','internalformat','width','height','depth','border','format','type','offscreenCanvas'],['target','level','internalformat','width','height','depth','border','format','type','video'],['target','level','internalformat','width','height','depth','border','format','type','frame'],['target','level','internalformat','width','height','depth','border','format','type','bitmap'],['target','level','internalformat','width','height','depth','border','format','type','pixels','?srcOffset']]
+    name: "getUniformBlockIndex",
+    signatures: [["program","uniformBlockName"]]
   },
   {
-    name: 'texStorage2D',
-    signatures: [['target','levels','internalformat','width','height']]
+    name: "getUniformIndices",
+    signatures: [["program","uniformNames"]]
   },
   {
-    name: 'texStorage3D',
-    signatures: [['target','levels','internalformat','width','height','depth']]
+    name: "invalidateFramebuffer",
+    signatures: [["target","attachments"]]
   },
   {
-    name: 'texSubImage3D',
-    signatures: [['target','level','xoffset','yoffset','zoffset','width','height','depth','format','type','pboOffset'],['target','level','xoffset','yoffset','zoffset','width','height','depth','format','type','source'],['target','level','xoffset','yoffset','zoffset','width','height','depth','format','type','offset'],['target','level','xoffset','yoffset','zoffset','width','height','depth','format','type','data'],['target','level','xoffset','yoffset','zoffset','width','height','depth','format','type','image'],['target','level','xoffset','yoffset','zoffset','width','height','depth','format','type','canvas'],['target','level','xoffset','yoffset','zoffset','width','height','depth','format','type','offscreenCanvas'],['target','level','xoffset','yoffset','zoffset','width','height','depth','format','type','video'],['target','level','xoffset','yoffset','zoffset','width','height','depth','format','type','frame'],['target','level','xoffset','yoffset','zoffset','width','height','depth','format','type','bitmap'],['target','level','xoffset','yoffset','zoffset','width','height','depth','format','type','srcData','?srcOffset'],['target','level','xoffset','yoffset','zoffset','width','height','depth','format','type','pixels','?srcOffset']]
+    name: "invalidateSubFramebuffer",
+    signatures: [["target","attachments","x","y","width","height"]]
   },
   {
-    name: 'transformFeedbackVaryings',
-    signatures: [['program','varyings','bufferMode']]
+    name: "isQuery",
+    signatures: [["query"]]
   },
   {
-    name: 'uniform1ui',
-    signatures: [['location','v0']]
+    name: "isSampler",
+    signatures: [["sampler"]]
   },
   {
-    name: 'uniform1uiv',
-    signatures: [['location','data','?srcOffset','?srcLength'],['location','v','?srcOffset','?srcLength']]
+    name: "isSync",
+    signatures: [["sync"]]
   },
   {
-    name: 'uniform2ui',
-    signatures: [['location','v0','v1']]
+    name: "isTransformFeedback",
+    signatures: [["tf"],["feedback"]]
   },
   {
-    name: 'uniform2uiv',
-    signatures: [['location','data','?srcOffset','?srcLength'],['location','v','?srcOffset','?srcLength']]
+    name: "isVertexArray",
+    signatures: [["vertexArray"]]
   },
   {
-    name: 'uniform3ui',
-    signatures: [['location','v0','v1','v2']]
+    name: "readBuffer",
+    signatures: [["src"],["mode"]]
   },
   {
-    name: 'uniform3uiv',
-    signatures: [['location','data','?srcOffset','?srcLength'],['location','v','?srcOffset','?srcLength']]
+    name: "renderbufferStorageMultisample",
+    signatures: [["target","samples","internalformat","width","height"]]
   },
   {
-    name: 'uniform4ui',
-    signatures: [['location','v0','v1','v2','v3']]
+    name: "samplerParameterf",
+    signatures: [["sampler","pname","param"]]
   },
   {
-    name: 'uniform4uiv',
-    signatures: [['location','data','?srcOffset','?srcLength'],['location','v','?srcOffset','?srcLength']]
+    name: "samplerParameteri",
+    signatures: [["sampler","pname","param"]]
   },
   {
-    name: 'uniformBlockBinding',
-    signatures: [['program','uniformBlockIndex','uniformBlockBinding']]
+    name: "texImage3D",
+    signatures: [["target","level","internalformat","width","height","depth","border","format","type","pboOffset"],["target","level","internalformat","width","height","depth","border","format","type","source"],["target","level","internalformat","width","height","depth","border","format","type","srcData","?srcOffset"],["target","level","internalformat","width","height","depth","border","format","type","offset"],["target","level","internalformat","width","height","depth","border","format","type","data"],["target","level","internalformat","width","height","depth","border","format","type","image"],["target","level","internalformat","width","height","depth","border","format","type","canvas"],["target","level","internalformat","width","height","depth","border","format","type","offscreenCanvas"],["target","level","internalformat","width","height","depth","border","format","type","video"],["target","level","internalformat","width","height","depth","border","format","type","frame"],["target","level","internalformat","width","height","depth","border","format","type","bitmap"],["target","level","internalformat","width","height","depth","border","format","type","pixels","?srcOffset"]]
   },
   {
-    name: 'uniformMatrix2x3fv',
-    signatures: [['location','transpose','data','?srcOffset','?srcLength'],['location','transpose','value','?srcOffset','?srcLength']]
+    name: "texStorage2D",
+    signatures: [["target","levels","internalformat","width","height"]]
   },
   {
-    name: 'uniformMatrix2x4fv',
-    signatures: [['location','transpose','data','?srcOffset','?srcLength'],['location','transpose','value','?srcOffset','?srcLength']]
+    name: "texStorage3D",
+    signatures: [["target","levels","internalformat","width","height","depth"]]
   },
   {
-    name: 'uniformMatrix3x2fv',
-    signatures: [['location','transpose','data','?srcOffset','?srcLength'],['location','transpose','value','?srcOffset','?srcLength']]
+    name: "texSubImage3D",
+    signatures: [["target","level","xoffset","yoffset","zoffset","width","height","depth","format","type","pboOffset"],["target","level","xoffset","yoffset","zoffset","width","height","depth","format","type","source"],["target","level","xoffset","yoffset","zoffset","width","height","depth","format","type","offset"],["target","level","xoffset","yoffset","zoffset","width","height","depth","format","type","data"],["target","level","xoffset","yoffset","zoffset","width","height","depth","format","type","image"],["target","level","xoffset","yoffset","zoffset","width","height","depth","format","type","canvas"],["target","level","xoffset","yoffset","zoffset","width","height","depth","format","type","offscreenCanvas"],["target","level","xoffset","yoffset","zoffset","width","height","depth","format","type","video"],["target","level","xoffset","yoffset","zoffset","width","height","depth","format","type","frame"],["target","level","xoffset","yoffset","zoffset","width","height","depth","format","type","bitmap"],["target","level","xoffset","yoffset","zoffset","width","height","depth","format","type","srcData","?srcOffset"],["target","level","xoffset","yoffset","zoffset","width","height","depth","format","type","pixels","?srcOffset"]]
   },
   {
-    name: 'uniformMatrix3x4fv',
-    signatures: [['location','transpose','data','?srcOffset','?srcLength'],['location','transpose','value','?srcOffset','?srcLength']]
+    name: "transformFeedbackVaryings",
+    signatures: [["program","varyings","bufferMode"]]
   },
   {
-    name: 'uniformMatrix4x2fv',
-    signatures: [['location','transpose','data','?srcOffset','?srcLength'],['location','transpose','value','?srcOffset','?srcLength']]
+    name: "uniform1ui",
+    signatures: [["location","v0"]]
   },
   {
-    name: 'uniformMatrix4x3fv',
-    signatures: [['location','transpose','data','?srcOffset','?srcLength'],['location','transpose','value','?srcOffset','?srcLength']]
+    name: "uniform1uiv",
+    signatures: [["location","data","?srcOffset","?srcLength"],["location","v","?srcOffset","?srcLength"]]
   },
   {
-    name: 'vertexAttribDivisor',
-    signatures: [['index','divisor']]
+    name: "uniform2ui",
+    signatures: [["location","v0","v1"]]
   },
   {
-    name: 'vertexAttribI4i',
-    signatures: [['index','x','y','z','w']]
+    name: "uniform2uiv",
+    signatures: [["location","data","?srcOffset","?srcLength"],["location","v","?srcOffset","?srcLength"]]
   },
   {
-    name: 'vertexAttribI4iv',
-    signatures: [['index','values'],['index','v']]
+    name: "uniform3ui",
+    signatures: [["location","v0","v1","v2"]]
   },
   {
-    name: 'vertexAttribI4ui',
-    signatures: [['index','x','y','z','w']]
+    name: "uniform3uiv",
+    signatures: [["location","data","?srcOffset","?srcLength"],["location","v","?srcOffset","?srcLength"]]
   },
   {
-    name: 'vertexAttribI4uiv',
-    signatures: [['index','values'],['index','v']]
+    name: "uniform4ui",
+    signatures: [["location","v0","v1","v2","v3"]]
   },
   {
-    name: 'vertexAttribIPointer',
-    signatures: [['index','size','type','stride','offset']]
+    name: "uniform4uiv",
+    signatures: [["location","data","?srcOffset","?srcLength"],["location","v","?srcOffset","?srcLength"]]
   },
   {
-    name: 'waitSync',
-    signatures: [['sync','flags','timeout']]
+    name: "uniformBlockBinding",
+    signatures: [["program","uniformBlockIndex","uniformBlockBinding"]]
   },
   {
-    name: 'bufferData',
-    signatures: [['target','size','usage'],['target','srcData','usage','?srcOffset','?length']],
-    receivers: ['WebGL2RenderingContextOverloads']
+    name: "uniformMatrix2x3fv",
+    signatures: [["location","transpose","data","?srcOffset","?srcLength"],["location","transpose","value","?srcOffset","?srcLength"]]
   },
   {
-    name: 'bufferData',
-    signatures: [['target','size','usage'],['target','data','usage']],
-    receivers: ['WebGLRenderingContextOverloads','WebGLRenderingContext','WebGL2RenderingContextBase','WebGL2RenderingContext']
+    name: "uniformMatrix2x4fv",
+    signatures: [["location","transpose","data","?srcOffset","?srcLength"],["location","transpose","value","?srcOffset","?srcLength"]]
   },
   {
-    name: 'bufferData',
-    signatures: [['target','srcData','usage','srcOffset','?length']],
-    receivers: ['WebGL2RenderingContext']
+    name: "uniformMatrix3x2fv",
+    signatures: [["location","transpose","data","?srcOffset","?srcLength"],["location","transpose","value","?srcOffset","?srcLength"]]
   },
   {
-    name: 'bufferSubData',
-    signatures: [['target','dstByteOffset','srcData','?srcOffset','?length']],
-    receivers: ['WebGL2RenderingContextOverloads']
+    name: "uniformMatrix3x4fv",
+    signatures: [["location","transpose","data","?srcOffset","?srcLength"],["location","transpose","value","?srcOffset","?srcLength"]]
   },
   {
-    name: 'bufferSubData',
-    signatures: [['target','offset','data']],
-    receivers: ['WebGLRenderingContextOverloads','WebGLRenderingContext','WebGL2RenderingContextBase','WebGL2RenderingContext']
+    name: "uniformMatrix4x2fv",
+    signatures: [["location","transpose","data","?srcOffset","?srcLength"],["location","transpose","value","?srcOffset","?srcLength"]]
   },
   {
-    name: 'bufferSubData',
-    signatures: [['target','dstByteOffset','srcData','srcOffset','?length']],
-    receivers: ['WebGL2RenderingContext']
+    name: "uniformMatrix4x3fv",
+    signatures: [["location","transpose","data","?srcOffset","?srcLength"],["location","transpose","value","?srcOffset","?srcLength"]]
   },
   {
-    name: 'compressedTexImage2D',
-    signatures: [['target','level','internalformat','width','height','border','imageSize','offset'],['target','level','internalformat','width','height','border','srcData','?srcOffset','?srcLengthOverride']],
-    receivers: ['WebGL2RenderingContextOverloads']
+    name: "vertexAttribDivisor",
+    signatures: [["index","divisor"]]
   },
   {
-    name: 'compressedTexImage2D',
-    signatures: [['target','level','internalformat','width','height','border','data']],
-    receivers: ['WebGLRenderingContextOverloads','WebGLRenderingContext','WebGL2RenderingContextBase','WebGL2RenderingContext']
+    name: "vertexAttribI4i",
+    signatures: [["index","x","y","z","w"]]
   },
   {
-    name: 'compressedTexImage2D',
-    signatures: [['target','level','internalformat','width','height','border','imageSize','offset'],['target','level','internalformat','width','height','border','data','srcOffset','?srcLengthOverride']],
-    receivers: ['WebGL2RenderingContext']
+    name: "vertexAttribI4iv",
+    signatures: [["index","values"],["index","v"]]
   },
   {
-    name: 'compressedTexSubImage2D',
-    signatures: [['target','level','xoffset','yoffset','width','height','format','imageSize','offset'],['target','level','xoffset','yoffset','width','height','format','srcData','?srcOffset','?srcLengthOverride']],
-    receivers: ['WebGL2RenderingContextOverloads']
+    name: "vertexAttribI4ui",
+    signatures: [["index","x","y","z","w"]]
   },
   {
-    name: 'compressedTexSubImage2D',
-    signatures: [['target','level','xoffset','yoffset','width','height','format','data']],
-    receivers: ['WebGLRenderingContextOverloads','WebGLRenderingContext','WebGL2RenderingContextBase','WebGL2RenderingContext']
+    name: "vertexAttribI4uiv",
+    signatures: [["index","values"],["index","v"]]
   },
   {
-    name: 'compressedTexSubImage2D',
-    signatures: [['target','level','xoffset','yoffset','width','height','format','imageSize','offset'],['target','level','xoffset','yoffset','width','height','format','data','srcOffset','?srcLengthOverride']],
-    receivers: ['WebGL2RenderingContext']
+    name: "vertexAttribIPointer",
+    signatures: [["index","size","type","stride","offset"]]
   },
   {
-    name: 'readPixels',
-    signatures: [['x','y','width','height','format','type','dstData','?dstOffset'],['x','y','width','height','format','type','offset']],
-    receivers: ['WebGL2RenderingContextOverloads']
+    name: "waitSync",
+    signatures: [["sync","flags","timeout"]]
   },
   {
-    name: 'readPixels',
-    signatures: [['x','y','width','height','format','type','pixels']],
-    receivers: ['WebGLRenderingContextOverloads','WebGLRenderingContext','WebGL2RenderingContextBase','WebGL2RenderingContext']
+    name: "bufferData",
+    signatures: [["target","size","usage"],["target","srcData","usage","?srcOffset","?length"]],
+    receivers: ["WebGL2RenderingContextOverloads"]
   },
   {
-    name: 'readPixels',
-    signatures: [['x','y','width','height','format','type','offset'],['x','y','width','height','format','type','dstData','offset']],
-    receivers: ['WebGL2RenderingContext']
+    name: "bufferData",
+    signatures: [["target","size","usage"],["target","data","usage"]],
+    receivers: ["WebGLRenderingContextOverloads","WebGLRenderingContext","WebGL2RenderingContextBase","WebGL2RenderingContext"]
   },
   {
-    name: 'texImage2D',
-    signatures: [['target','level','internalformat','format','type','source'],['target','level','internalformat','width','height','border','format','type','pixels'],['target','level','internalformat','width','height','border','format','type','pboOffset'],['target','level','internalformat','width','height','border','format','type','source'],['target','level','internalformat','width','height','border','format','type','srcData','srcOffset']],
-    receivers: ['WebGL2RenderingContextOverloads']
+    name: "bufferData",
+    signatures: [["target","srcData","usage","srcOffset","?length"]],
+    receivers: ["WebGL2RenderingContext"]
   },
   {
-    name: 'texImage2D',
-    signatures: [['target','level','internalformat','format','type','source'],['target','level','internalformat','width','height','border','format','type','pixels']],
-    receivers: ['WebGLRenderingContextOverloads']
+    name: "bufferSubData",
+    signatures: [["target","dstByteOffset","srcData","?srcOffset","?length"]],
+    receivers: ["WebGL2RenderingContextOverloads"]
   },
   {
-    name: 'texImage2D',
-    signatures: [['target','level','internalformat','format','type','pixels'],['target','level','internalformat','format','type','image'],['target','level','internalformat','format','type','canvas'],['target','level','internalformat','format','type','offscreenCanvas'],['target','level','internalformat','format','type','video'],['target','level','internalformat','format','type','bitmap'],['target','level','internalformat','format','type','frame'],['target','level','internalformat','width','height','border','format','type','pixels']],
-    receivers: ['WebGLRenderingContext','WebGL2RenderingContextBase','WebGL2RenderingContext']
+    name: "bufferSubData",
+    signatures: [["target","offset","data"]],
+    receivers: ["WebGLRenderingContextOverloads","WebGLRenderingContext","WebGL2RenderingContextBase","WebGL2RenderingContext"]
   },
   {
-    name: 'texImage2D',
-    signatures: [['target','level','internalformat','width','height','border','format','type','offset'],['target','level','internalformat','width','height','border','format','type','data'],['target','level','internalformat','width','height','border','format','type','image'],['target','level','internalformat','width','height','border','format','type','canvas'],['target','level','internalformat','width','height','border','format','type','offscreenCanvas'],['target','level','internalformat','width','height','border','format','type','video'],['target','level','internalformat','width','height','border','format','type','frame'],['target','level','internalformat','width','height','border','format','type','bitmap'],['target','level','internalformat','width','height','border','format','type','srcData','srcOffset']],
-    receivers: ['WebGL2RenderingContext']
+    name: "bufferSubData",
+    signatures: [["target","dstByteOffset","srcData","srcOffset","?length"]],
+    receivers: ["WebGL2RenderingContext"]
   },
   {
-    name: 'texSubImage2D',
-    signatures: [['target','level','xoffset','yoffset','format','type','source'],['target','level','xoffset','yoffset','width','height','format','type','pixels'],['target','level','xoffset','yoffset','width','height','format','type','pboOffset'],['target','level','xoffset','yoffset','width','height','format','type','source'],['target','level','xoffset','yoffset','width','height','format','type','srcData','srcOffset']],
-    receivers: ['WebGL2RenderingContextOverloads']
+    name: "compressedTexImage2D",
+    signatures: [["target","level","internalformat","width","height","border","imageSize","offset"],["target","level","internalformat","width","height","border","srcData","?srcOffset","?srcLengthOverride"]],
+    receivers: ["WebGL2RenderingContextOverloads"]
   },
   {
-    name: 'texSubImage2D',
-    signatures: [['target','level','xoffset','yoffset','format','type','source'],['target','level','xoffset','yoffset','width','height','format','type','pixels']],
-    receivers: ['WebGLRenderingContextOverloads']
+    name: "compressedTexImage2D",
+    signatures: [["target","level","internalformat","width","height","border","data"]],
+    receivers: ["WebGLRenderingContextOverloads","WebGLRenderingContext","WebGL2RenderingContextBase","WebGL2RenderingContext"]
   },
   {
-    name: 'texSubImage2D',
-    signatures: [['target','level','xoffset','yoffset','format','type','pixels'],['target','level','xoffset','yoffset','format','type','image'],['target','level','xoffset','yoffset','format','type','canvas'],['target','level','xoffset','yoffset','format','type','offscreenCanvas'],['target','level','xoffset','yoffset','format','type','video'],['target','level','xoffset','yoffset','format','type','bitmap'],['target','level','xoffset','yoffset','format','type','frame'],['target','level','xoffset','yoffset','width','height','format','type','pixels']],
-    receivers: ['WebGLRenderingContext','WebGL2RenderingContextBase','WebGL2RenderingContext']
+    name: "compressedTexImage2D",
+    signatures: [["target","level","internalformat","width","height","border","imageSize","offset"],["target","level","internalformat","width","height","border","data","srcOffset","?srcLengthOverride"]],
+    receivers: ["WebGL2RenderingContext"]
   },
   {
-    name: 'texSubImage2D',
-    signatures: [['target','level','xoffset','yoffset','width','height','format','type','offset'],['target','level','xoffset','yoffset','width','height','format','type','data'],['target','level','xoffset','yoffset','width','height','format','type','image'],['target','level','xoffset','yoffset','width','height','format','type','canvas'],['target','level','xoffset','yoffset','width','height','format','type','offscreenCanvas'],['target','level','xoffset','yoffset','width','height','format','type','video'],['target','level','xoffset','yoffset','width','height','format','type','frame'],['target','level','xoffset','yoffset','width','height','format','type','bitmap'],['target','level','xoffset','yoffset','width','height','format','type','srcData','srcOffset']],
-    receivers: ['WebGL2RenderingContext']
+    name: "compressedTexSubImage2D",
+    signatures: [["target","level","xoffset","yoffset","width","height","format","imageSize","offset"],["target","level","xoffset","yoffset","width","height","format","srcData","?srcOffset","?srcLengthOverride"]],
+    receivers: ["WebGL2RenderingContextOverloads"]
   },
   {
-    name: 'uniform1fv',
-    signatures: [['location','data','?srcOffset','?srcLength']],
-    receivers: ['WebGL2RenderingContextOverloads']
+    name: "compressedTexSubImage2D",
+    signatures: [["target","level","xoffset","yoffset","width","height","format","data"]],
+    receivers: ["WebGLRenderingContextOverloads","WebGLRenderingContext","WebGL2RenderingContextBase","WebGL2RenderingContext"]
   },
   {
-    name: 'uniform1fv',
-    signatures: [['location','v']],
-    receivers: ['WebGLRenderingContextOverloads','WebGLRenderingContext','WebGL2RenderingContextBase','WebGL2RenderingContext']
+    name: "compressedTexSubImage2D",
+    signatures: [["target","level","xoffset","yoffset","width","height","format","imageSize","offset"],["target","level","xoffset","yoffset","width","height","format","data","srcOffset","?srcLengthOverride"]],
+    receivers: ["WebGL2RenderingContext"]
   },
   {
-    name: 'uniform1fv',
-    signatures: [['location','v','srcOffset','?srcLength']],
-    receivers: ['WebGL2RenderingContext']
+    name: "readPixels",
+    signatures: [["x","y","width","height","format","type","dstData","?dstOffset"],["x","y","width","height","format","type","offset"]],
+    receivers: ["WebGL2RenderingContextOverloads"]
   },
   {
-    name: 'uniform1iv',
-    signatures: [['location','data','?srcOffset','?srcLength']],
-    receivers: ['WebGL2RenderingContextOverloads']
+    name: "readPixels",
+    signatures: [["x","y","width","height","format","type","pixels"]],
+    receivers: ["WebGLRenderingContextOverloads","WebGLRenderingContext","WebGL2RenderingContextBase","WebGL2RenderingContext"]
   },
   {
-    name: 'uniform1iv',
-    signatures: [['location','v']],
-    receivers: ['WebGLRenderingContextOverloads','WebGLRenderingContext','WebGL2RenderingContextBase','WebGL2RenderingContext']
+    name: "readPixels",
+    signatures: [["x","y","width","height","format","type","offset"],["x","y","width","height","format","type","dstData","offset"]],
+    receivers: ["WebGL2RenderingContext"]
   },
   {
-    name: 'uniform1iv',
-    signatures: [['location','v','srcOffset','?srcLength']],
-    receivers: ['WebGL2RenderingContext']
+    name: "texImage2D",
+    signatures: [["target","level","internalformat","format","type","source"],["target","level","internalformat","width","height","border","format","type","pixels"],["target","level","internalformat","width","height","border","format","type","pboOffset"],["target","level","internalformat","width","height","border","format","type","source"],["target","level","internalformat","width","height","border","format","type","srcData","srcOffset"]],
+    receivers: ["WebGL2RenderingContextOverloads"]
   },
   {
-    name: 'uniform2fv',
-    signatures: [['location','data','?srcOffset','?srcLength']],
-    receivers: ['WebGL2RenderingContextOverloads']
+    name: "texImage2D",
+    signatures: [["target","level","internalformat","format","type","source"],["target","level","internalformat","width","height","border","format","type","pixels"]],
+    receivers: ["WebGLRenderingContextOverloads"]
   },
   {
-    name: 'uniform2fv',
-    signatures: [['location','v']],
-    receivers: ['WebGLRenderingContextOverloads','WebGLRenderingContext','WebGL2RenderingContextBase','WebGL2RenderingContext']
+    name: "texImage2D",
+    signatures: [["target","level","internalformat","format","type","pixels"],["target","level","internalformat","format","type","image"],["target","level","internalformat","format","type","canvas"],["target","level","internalformat","format","type","offscreenCanvas"],["target","level","internalformat","format","type","video"],["target","level","internalformat","format","type","bitmap"],["target","level","internalformat","format","type","frame"],["target","level","internalformat","width","height","border","format","type","pixels"]],
+    receivers: ["WebGLRenderingContext","WebGL2RenderingContextBase","WebGL2RenderingContext"]
   },
   {
-    name: 'uniform2fv',
-    signatures: [['location','v','srcOffset','?srcLength']],
-    receivers: ['WebGL2RenderingContext']
+    name: "texImage2D",
+    signatures: [["target","level","internalformat","width","height","border","format","type","offset"],["target","level","internalformat","width","height","border","format","type","data"],["target","level","internalformat","width","height","border","format","type","image"],["target","level","internalformat","width","height","border","format","type","canvas"],["target","level","internalformat","width","height","border","format","type","offscreenCanvas"],["target","level","internalformat","width","height","border","format","type","video"],["target","level","internalformat","width","height","border","format","type","frame"],["target","level","internalformat","width","height","border","format","type","bitmap"],["target","level","internalformat","width","height","border","format","type","srcData","srcOffset"]],
+    receivers: ["WebGL2RenderingContext"]
   },
   {
-    name: 'uniform2iv',
-    signatures: [['location','data','?srcOffset','?srcLength']],
-    receivers: ['WebGL2RenderingContextOverloads']
+    name: "texSubImage2D",
+    signatures: [["target","level","xoffset","yoffset","format","type","source"],["target","level","xoffset","yoffset","width","height","format","type","pixels"],["target","level","xoffset","yoffset","width","height","format","type","pboOffset"],["target","level","xoffset","yoffset","width","height","format","type","source"],["target","level","xoffset","yoffset","width","height","format","type","srcData","srcOffset"]],
+    receivers: ["WebGL2RenderingContextOverloads"]
   },
   {
-    name: 'uniform2iv',
-    signatures: [['location','v']],
-    receivers: ['WebGLRenderingContextOverloads','WebGLRenderingContext','WebGL2RenderingContextBase','WebGL2RenderingContext']
+    name: "texSubImage2D",
+    signatures: [["target","level","xoffset","yoffset","format","type","source"],["target","level","xoffset","yoffset","width","height","format","type","pixels"]],
+    receivers: ["WebGLRenderingContextOverloads"]
   },
   {
-    name: 'uniform2iv',
-    signatures: [['location','v','srcOffset','?srcLength']],
-    receivers: ['WebGL2RenderingContext']
+    name: "texSubImage2D",
+    signatures: [["target","level","xoffset","yoffset","format","type","pixels"],["target","level","xoffset","yoffset","format","type","image"],["target","level","xoffset","yoffset","format","type","canvas"],["target","level","xoffset","yoffset","format","type","offscreenCanvas"],["target","level","xoffset","yoffset","format","type","video"],["target","level","xoffset","yoffset","format","type","bitmap"],["target","level","xoffset","yoffset","format","type","frame"],["target","level","xoffset","yoffset","width","height","format","type","pixels"]],
+    receivers: ["WebGLRenderingContext","WebGL2RenderingContextBase","WebGL2RenderingContext"]
   },
   {
-    name: 'uniform3fv',
-    signatures: [['location','data','?srcOffset','?srcLength']],
-    receivers: ['WebGL2RenderingContextOverloads']
+    name: "texSubImage2D",
+    signatures: [["target","level","xoffset","yoffset","width","height","format","type","offset"],["target","level","xoffset","yoffset","width","height","format","type","data"],["target","level","xoffset","yoffset","width","height","format","type","image"],["target","level","xoffset","yoffset","width","height","format","type","canvas"],["target","level","xoffset","yoffset","width","height","format","type","offscreenCanvas"],["target","level","xoffset","yoffset","width","height","format","type","video"],["target","level","xoffset","yoffset","width","height","format","type","frame"],["target","level","xoffset","yoffset","width","height","format","type","bitmap"],["target","level","xoffset","yoffset","width","height","format","type","srcData","srcOffset"]],
+    receivers: ["WebGL2RenderingContext"]
   },
   {
-    name: 'uniform3fv',
-    signatures: [['location','v']],
-    receivers: ['WebGLRenderingContextOverloads','WebGLRenderingContext','WebGL2RenderingContextBase','WebGL2RenderingContext']
+    name: "uniform1fv",
+    signatures: [["location","data","?srcOffset","?srcLength"]],
+    receivers: ["WebGL2RenderingContextOverloads"]
   },
   {
-    name: 'uniform3fv',
-    signatures: [['location','v','srcOffset','?srcLength']],
-    receivers: ['WebGL2RenderingContext']
+    name: "uniform1fv",
+    signatures: [["location","v"]],
+    receivers: ["WebGLRenderingContextOverloads","WebGLRenderingContext","WebGL2RenderingContextBase","WebGL2RenderingContext"]
   },
   {
-    name: 'uniform3iv',
-    signatures: [['location','data','?srcOffset','?srcLength']],
-    receivers: ['WebGL2RenderingContextOverloads']
+    name: "uniform1fv",
+    signatures: [["location","v","srcOffset","?srcLength"]],
+    receivers: ["WebGL2RenderingContext"]
   },
   {
-    name: 'uniform3iv',
-    signatures: [['location','v']],
-    receivers: ['WebGLRenderingContextOverloads','WebGLRenderingContext','WebGL2RenderingContextBase','WebGL2RenderingContext']
+    name: "uniform1iv",
+    signatures: [["location","data","?srcOffset","?srcLength"]],
+    receivers: ["WebGL2RenderingContextOverloads"]
   },
   {
-    name: 'uniform3iv',
-    signatures: [['location','v','srcOffset','?srcLength']],
-    receivers: ['WebGL2RenderingContext']
+    name: "uniform1iv",
+    signatures: [["location","v"]],
+    receivers: ["WebGLRenderingContextOverloads","WebGLRenderingContext","WebGL2RenderingContextBase","WebGL2RenderingContext"]
   },
   {
-    name: 'uniform4fv',
-    signatures: [['location','data','?srcOffset','?srcLength']],
-    receivers: ['WebGL2RenderingContextOverloads']
+    name: "uniform1iv",
+    signatures: [["location","v","srcOffset","?srcLength"]],
+    receivers: ["WebGL2RenderingContext"]
   },
   {
-    name: 'uniform4fv',
-    signatures: [['location','v']],
-    receivers: ['WebGLRenderingContextOverloads','WebGLRenderingContext','WebGL2RenderingContextBase','WebGL2RenderingContext']
+    name: "uniform2fv",
+    signatures: [["location","data","?srcOffset","?srcLength"]],
+    receivers: ["WebGL2RenderingContextOverloads"]
   },
   {
-    name: 'uniform4fv',
-    signatures: [['location','v','srcOffset','?srcLength']],
-    receivers: ['WebGL2RenderingContext']
+    name: "uniform2fv",
+    signatures: [["location","v"]],
+    receivers: ["WebGLRenderingContextOverloads","WebGLRenderingContext","WebGL2RenderingContextBase","WebGL2RenderingContext"]
   },
   {
-    name: 'uniform4iv',
-    signatures: [['location','data','?srcOffset','?srcLength']],
-    receivers: ['WebGL2RenderingContextOverloads']
+    name: "uniform2fv",
+    signatures: [["location","v","srcOffset","?srcLength"]],
+    receivers: ["WebGL2RenderingContext"]
   },
   {
-    name: 'uniform4iv',
-    signatures: [['location','v']],
-    receivers: ['WebGLRenderingContextOverloads','WebGLRenderingContext','WebGL2RenderingContextBase','WebGL2RenderingContext']
+    name: "uniform2iv",
+    signatures: [["location","data","?srcOffset","?srcLength"]],
+    receivers: ["WebGL2RenderingContextOverloads"]
   },
   {
-    name: 'uniform4iv',
-    signatures: [['location','v','srcOffset','?srcLength']],
-    receivers: ['WebGL2RenderingContext']
+    name: "uniform2iv",
+    signatures: [["location","v"]],
+    receivers: ["WebGLRenderingContextOverloads","WebGLRenderingContext","WebGL2RenderingContextBase","WebGL2RenderingContext"]
   },
   {
-    name: 'uniformMatrix2fv',
-    signatures: [['location','transpose','data','?srcOffset','?srcLength']],
-    receivers: ['WebGL2RenderingContextOverloads']
+    name: "uniform2iv",
+    signatures: [["location","v","srcOffset","?srcLength"]],
+    receivers: ["WebGL2RenderingContext"]
   },
   {
-    name: 'uniformMatrix2fv',
-    signatures: [['location','transpose','value']],
-    receivers: ['WebGLRenderingContextOverloads']
+    name: "uniform3fv",
+    signatures: [["location","data","?srcOffset","?srcLength"]],
+    receivers: ["WebGL2RenderingContextOverloads"]
   },
   {
-    name: 'uniformMatrix2fv',
-    signatures: [['location','transpose','array']],
-    receivers: ['WebGLRenderingContext','WebGL2RenderingContextBase','WebGL2RenderingContext']
+    name: "uniform3fv",
+    signatures: [["location","v"]],
+    receivers: ["WebGLRenderingContextOverloads","WebGLRenderingContext","WebGL2RenderingContextBase","WebGL2RenderingContext"]
   },
   {
-    name: 'uniformMatrix2fv',
-    signatures: [['location','transpose','array','srcOffset','?srcLength']],
-    receivers: ['WebGL2RenderingContext']
+    name: "uniform3fv",
+    signatures: [["location","v","srcOffset","?srcLength"]],
+    receivers: ["WebGL2RenderingContext"]
   },
   {
-    name: 'uniformMatrix3fv',
-    signatures: [['location','transpose','data','?srcOffset','?srcLength']],
-    receivers: ['WebGL2RenderingContextOverloads']
+    name: "uniform3iv",
+    signatures: [["location","data","?srcOffset","?srcLength"]],
+    receivers: ["WebGL2RenderingContextOverloads"]
   },
   {
-    name: 'uniformMatrix3fv',
-    signatures: [['location','transpose','value']],
-    receivers: ['WebGLRenderingContextOverloads']
+    name: "uniform3iv",
+    signatures: [["location","v"]],
+    receivers: ["WebGLRenderingContextOverloads","WebGLRenderingContext","WebGL2RenderingContextBase","WebGL2RenderingContext"]
   },
   {
-    name: 'uniformMatrix3fv',
-    signatures: [['location','transpose','array']],
-    receivers: ['WebGLRenderingContext','WebGL2RenderingContextBase','WebGL2RenderingContext']
+    name: "uniform3iv",
+    signatures: [["location","v","srcOffset","?srcLength"]],
+    receivers: ["WebGL2RenderingContext"]
   },
   {
-    name: 'uniformMatrix3fv',
-    signatures: [['location','transpose','array','srcOffset','?srcLength']],
-    receivers: ['WebGL2RenderingContext']
+    name: "uniform4fv",
+    signatures: [["location","data","?srcOffset","?srcLength"]],
+    receivers: ["WebGL2RenderingContextOverloads"]
   },
   {
-    name: 'uniformMatrix4fv',
-    signatures: [['location','transpose','data','?srcOffset','?srcLength']],
-    receivers: ['WebGL2RenderingContextOverloads']
+    name: "uniform4fv",
+    signatures: [["location","v"]],
+    receivers: ["WebGLRenderingContextOverloads","WebGLRenderingContext","WebGL2RenderingContextBase","WebGL2RenderingContext"]
   },
   {
-    name: 'uniformMatrix4fv',
-    signatures: [['location','transpose','value']],
-    receivers: ['WebGLRenderingContextOverloads']
+    name: "uniform4fv",
+    signatures: [["location","v","srcOffset","?srcLength"]],
+    receivers: ["WebGL2RenderingContext"]
   },
   {
-    name: 'uniformMatrix4fv',
-    signatures: [['location','transpose','array']],
-    receivers: ['WebGLRenderingContext','WebGL2RenderingContextBase','WebGL2RenderingContext']
+    name: "uniform4iv",
+    signatures: [["location","data","?srcOffset","?srcLength"]],
+    receivers: ["WebGL2RenderingContextOverloads"]
   },
   {
-    name: 'uniformMatrix4fv',
-    signatures: [['location','transpose','array','srcOffset','?srcLength']],
-    receivers: ['WebGL2RenderingContext']
+    name: "uniform4iv",
+    signatures: [["location","v"]],
+    receivers: ["WebGLRenderingContextOverloads","WebGLRenderingContext","WebGL2RenderingContextBase","WebGL2RenderingContext"]
   },
   {
-    name: 'activeTexture',
-    signatures: [['texture']]
+    name: "uniform4iv",
+    signatures: [["location","v","srcOffset","?srcLength"]],
+    receivers: ["WebGL2RenderingContext"]
   },
   {
-    name: 'attachShader',
-    signatures: [['program','shader']]
+    name: "uniformMatrix2fv",
+    signatures: [["location","transpose","data","?srcOffset","?srcLength"]],
+    receivers: ["WebGL2RenderingContextOverloads"]
   },
   {
-    name: 'bindAttribLocation',
-    signatures: [['program','index','name']]
+    name: "uniformMatrix2fv",
+    signatures: [["location","transpose","value"]],
+    receivers: ["WebGLRenderingContextOverloads"]
   },
   {
-    name: 'bindBuffer',
-    signatures: [['target','buffer']]
+    name: "uniformMatrix2fv",
+    signatures: [["location","transpose","array"]],
+    receivers: ["WebGLRenderingContext","WebGL2RenderingContextBase","WebGL2RenderingContext"]
   },
   {
-    name: 'bindFramebuffer',
-    signatures: [['target','framebuffer']]
+    name: "uniformMatrix2fv",
+    signatures: [["location","transpose","array","srcOffset","?srcLength"]],
+    receivers: ["WebGL2RenderingContext"]
   },
   {
-    name: 'bindRenderbuffer',
-    signatures: [['target','renderbuffer']]
+    name: "uniformMatrix3fv",
+    signatures: [["location","transpose","data","?srcOffset","?srcLength"]],
+    receivers: ["WebGL2RenderingContextOverloads"]
   },
   {
-    name: 'bindTexture',
-    signatures: [['target','texture']]
+    name: "uniformMatrix3fv",
+    signatures: [["location","transpose","value"]],
+    receivers: ["WebGLRenderingContextOverloads"]
   },
   {
-    name: 'blendColor',
-    signatures: [['red','green','blue','alpha']]
+    name: "uniformMatrix3fv",
+    signatures: [["location","transpose","array"]],
+    receivers: ["WebGLRenderingContext","WebGL2RenderingContextBase","WebGL2RenderingContext"]
   },
   {
-    name: 'blendEquation',
-    signatures: [['mode']]
+    name: "uniformMatrix3fv",
+    signatures: [["location","transpose","array","srcOffset","?srcLength"]],
+    receivers: ["WebGL2RenderingContext"]
   },
   {
-    name: 'blendEquationSeparate',
-    signatures: [['modeRGB','modeAlpha']]
+    name: "uniformMatrix4fv",
+    signatures: [["location","transpose","data","?srcOffset","?srcLength"]],
+    receivers: ["WebGL2RenderingContextOverloads"]
   },
   {
-    name: 'blendFunc',
-    signatures: [['sfactor','dfactor']]
+    name: "uniformMatrix4fv",
+    signatures: [["location","transpose","value"]],
+    receivers: ["WebGLRenderingContextOverloads"]
   },
   {
-    name: 'blendFuncSeparate',
-    signatures: [['srcRGB','dstRGB','srcAlpha','dstAlpha']]
+    name: "uniformMatrix4fv",
+    signatures: [["location","transpose","array"]],
+    receivers: ["WebGLRenderingContext","WebGL2RenderingContextBase","WebGL2RenderingContext"]
   },
   {
-    name: 'checkFramebufferStatus',
-    signatures: [['target']]
+    name: "uniformMatrix4fv",
+    signatures: [["location","transpose","array","srcOffset","?srcLength"]],
+    receivers: ["WebGL2RenderingContext"]
   },
   {
-    name: 'clearColor',
-    signatures: [['red','green','blue','alpha']]
+    name: "activeTexture",
+    signatures: [["texture"]]
   },
   {
-    name: 'clearDepth',
-    signatures: [['depth']]
+    name: "attachShader",
+    signatures: [["program","shader"]]
   },
   {
-    name: 'clearStencil',
-    signatures: [['s']]
+    name: "bindAttribLocation",
+    signatures: [["program","index","name"]]
   },
   {
-    name: 'colorMask',
-    signatures: [['red','green','blue','alpha']]
+    name: "bindBuffer",
+    signatures: [["target","buffer"]]
   },
   {
-    name: 'compileShader',
-    signatures: [['shader']]
+    name: "bindFramebuffer",
+    signatures: [["target","framebuffer"]]
   },
   {
-    name: 'copyTexImage2D',
-    signatures: [['target','level','internalformat','x','y','width','height','border']]
+    name: "bindRenderbuffer",
+    signatures: [["target","renderbuffer"]]
   },
   {
-    name: 'copyTexSubImage2D',
-    signatures: [['target','level','xoffset','yoffset','x','y','width','height']]
+    name: "bindTexture",
+    signatures: [["target","texture"]]
   },
   {
-    name: 'createShader',
-    signatures: [['type']]
+    name: "blendColor",
+    signatures: [["red","green","blue","alpha"]]
   },
   {
-    name: 'createTexture',
-    signatures: [['descriptor']],
-    receivers: ['GPUDevice']
+    name: "blendEquation",
+    signatures: [["mode"]]
   },
   {
-    name: 'cullFace',
-    signatures: [['mode']]
+    name: "blendEquationSeparate",
+    signatures: [["modeRGB","modeAlpha"]]
   },
   {
-    name: 'deleteBuffer',
-    signatures: [['buffer']]
+    name: "blendFunc",
+    signatures: [["sfactor","dfactor"]]
   },
   {
-    name: 'deleteFramebuffer',
-    signatures: [['framebuffer']]
+    name: "blendFuncSeparate",
+    signatures: [["srcRGB","dstRGB","srcAlpha","dstAlpha"]]
   },
   {
-    name: 'deleteProgram',
-    signatures: [['program']]
+    name: "checkFramebufferStatus",
+    signatures: [["target"]]
   },
   {
-    name: 'deleteRenderbuffer',
-    signatures: [['renderbuffer']]
+    name: "clearColor",
+    signatures: [["red","green","blue","alpha"]]
   },
   {
-    name: 'deleteShader',
-    signatures: [['shader']]
+    name: "clearDepth",
+    signatures: [["depth"]]
   },
   {
-    name: 'deleteTexture',
-    signatures: [['texture']]
+    name: "clearStencil",
+    signatures: [["s"]]
   },
   {
-    name: 'depthFunc',
-    signatures: [['func']]
+    name: "colorMask",
+    signatures: [["red","green","blue","alpha"]]
   },
   {
-    name: 'depthMask',
-    signatures: [['flag']]
+    name: "compileShader",
+    signatures: [["shader"]]
   },
   {
-    name: 'depthRange',
-    signatures: [['zNear','zFar']]
+    name: "copyTexImage2D",
+    signatures: [["target","level","internalformat","x","y","width","height","border"]]
   },
   {
-    name: 'detachShader',
-    signatures: [['program','shader']]
+    name: "copyTexSubImage2D",
+    signatures: [["target","level","xoffset","yoffset","x","y","width","height"]]
   },
   {
-    name: 'disableVertexAttribArray',
-    signatures: [['index']]
+    name: "createShader",
+    signatures: [["type"]]
   },
   {
-    name: 'drawArrays',
-    signatures: [['mode','first','count']]
+    name: "createTexture",
+    signatures: [["descriptor"]],
+    receivers: ["GPUDevice"]
   },
   {
-    name: 'drawElements',
-    signatures: [['mode','count','type','offset']]
+    name: "cullFace",
+    signatures: [["mode"]]
   },
   {
-    name: 'enableVertexAttribArray',
-    signatures: [['index']]
+    name: "deleteBuffer",
+    signatures: [["buffer"]]
   },
   {
-    name: 'framebufferRenderbuffer',
-    signatures: [['target','attachment','renderbuffertarget','renderbuffer']]
+    name: "deleteFramebuffer",
+    signatures: [["framebuffer"]]
   },
   {
-    name: 'framebufferTexture2D',
-    signatures: [['target','attachment','textarget','texture','level']]
+    name: "deleteProgram",
+    signatures: [["program"]]
   },
   {
-    name: 'frontFace',
-    signatures: [['mode']]
+    name: "deleteRenderbuffer",
+    signatures: [["renderbuffer"]]
   },
   {
-    name: 'generateMipmap',
-    signatures: [['target']]
+    name: "deleteShader",
+    signatures: [["shader"]]
   },
   {
-    name: 'getActiveAttrib',
-    signatures: [['program','index']]
+    name: "deleteTexture",
+    signatures: [["texture"]]
   },
   {
-    name: 'getActiveUniform',
-    signatures: [['program','index']]
+    name: "depthFunc",
+    signatures: [["func"]]
   },
   {
-    name: 'getAttachedShaders',
-    signatures: [['program']]
+    name: "depthMask",
+    signatures: [["flag"]]
   },
   {
-    name: 'getAttribLocation',
-    signatures: [['program','name']]
+    name: "depthRange",
+    signatures: [["zNear","zFar"]]
   },
   {
-    name: 'getBufferParameter',
-    signatures: [['target','pname']]
+    name: "detachShader",
+    signatures: [["program","shader"]]
   },
   {
-    name: 'getExtension',
-    signatures: [['extensionName'],['name']]
+    name: "disableVertexAttribArray",
+    signatures: [["index"]]
   },
   {
-    name: 'getFramebufferAttachmentParameter',
-    signatures: [['target','attachment','pname']]
+    name: "drawArrays",
+    signatures: [["mode","first","count"]]
   },
   {
-    name: 'getParameter',
-    signatures: [['pname']],
-    receivers: ['WebGLRenderingContext','WebGL2RenderingContextBase','WebGL2RenderingContext']
+    name: "drawElements",
+    signatures: [["mode","count","type","offset"]]
   },
   {
-    name: 'getParameter',
-    signatures: [['namespaceURI','localName']],
-    receivers: ['XSLTProcessor']
+    name: "enableVertexAttribArray",
+    signatures: [["index"]]
   },
   {
-    name: 'getProgramInfoLog',
-    signatures: [['program']]
+    name: "framebufferRenderbuffer",
+    signatures: [["target","attachment","renderbuffertarget","renderbuffer"]]
   },
   {
-    name: 'getProgramParameter',
-    signatures: [['program','pname']]
+    name: "framebufferTexture2D",
+    signatures: [["target","attachment","textarget","texture","level"]]
   },
   {
-    name: 'getRenderbufferParameter',
-    signatures: [['target','pname']]
+    name: "frontFace",
+    signatures: [["mode"]]
   },
   {
-    name: 'getShaderInfoLog',
-    signatures: [['shader']]
+    name: "generateMipmap",
+    signatures: [["target"]]
   },
   {
-    name: 'getShaderParameter',
-    signatures: [['shader','pname']]
+    name: "getActiveAttrib",
+    signatures: [["program","index"]]
   },
   {
-    name: 'getShaderPrecisionFormat',
-    signatures: [['shadertype','precisiontype']]
+    name: "getActiveUniform",
+    signatures: [["program","index"]]
   },
   {
-    name: 'getShaderSource',
-    signatures: [['shader']]
+    name: "getAttachedShaders",
+    signatures: [["program"]]
   },
   {
-    name: 'getTexParameter',
-    signatures: [['target','pname']]
+    name: "getAttribLocation",
+    signatures: [["program","name"]]
   },
   {
-    name: 'getUniform',
-    signatures: [['program','location']]
+    name: "getBufferParameter",
+    signatures: [["target","pname"]]
   },
   {
-    name: 'getUniformLocation',
-    signatures: [['program','name']]
+    name: "getExtension",
+    signatures: [["extensionName"],["name"]]
   },
   {
-    name: 'getVertexAttrib',
-    signatures: [['index','pname']]
+    name: "getFramebufferAttachmentParameter",
+    signatures: [["target","attachment","pname"]]
   },
   {
-    name: 'getVertexAttribOffset',
-    signatures: [['index','pname']]
+    name: "getParameter",
+    signatures: [["pname"]],
+    receivers: ["WebGLRenderingContext","WebGL2RenderingContextBase","WebGL2RenderingContext"]
   },
   {
-    name: 'hint',
-    signatures: [['target','mode']]
+    name: "getParameter",
+    signatures: [["namespaceURI","localName"]],
+    receivers: ["XSLTProcessor"]
   },
   {
-    name: 'isBuffer',
-    signatures: [['buffer']]
+    name: "getProgramInfoLog",
+    signatures: [["program"]]
   },
   {
-    name: 'isEnabled',
-    signatures: [['cap']]
+    name: "getProgramParameter",
+    signatures: [["program","pname"]]
   },
   {
-    name: 'isFramebuffer',
-    signatures: [['framebuffer']]
+    name: "getRenderbufferParameter",
+    signatures: [["target","pname"]]
   },
   {
-    name: 'isProgram',
-    signatures: [['program']]
+    name: "getShaderInfoLog",
+    signatures: [["shader"]]
   },
   {
-    name: 'isRenderbuffer',
-    signatures: [['renderbuffer']]
+    name: "getShaderParameter",
+    signatures: [["shader","pname"]]
   },
   {
-    name: 'isShader',
-    signatures: [['shader']]
+    name: "getShaderPrecisionFormat",
+    signatures: [["shadertype","precisiontype"]]
   },
   {
-    name: 'isTexture',
-    signatures: [['texture']]
+    name: "getShaderSource",
+    signatures: [["shader"]]
   },
   {
-    name: 'lineWidth',
-    signatures: [['width']]
+    name: "getTexParameter",
+    signatures: [["target","pname"]]
   },
   {
-    name: 'linkProgram',
-    signatures: [['program']]
+    name: "getUniform",
+    signatures: [["program","location"]]
   },
   {
-    name: 'pixelStorei',
-    signatures: [['pname','param']]
+    name: "getUniformLocation",
+    signatures: [["program","name"]]
   },
   {
-    name: 'polygonOffset',
-    signatures: [['factor','units']]
+    name: "getVertexAttrib",
+    signatures: [["index","pname"]]
   },
   {
-    name: 'renderbufferStorage',
-    signatures: [['target','internalformat','width','height']]
+    name: "getVertexAttribOffset",
+    signatures: [["index","pname"]]
   },
   {
-    name: 'sampleCoverage',
-    signatures: [['value','invert']]
+    name: "hint",
+    signatures: [["target","mode"]]
   },
   {
-    name: 'scissor',
-    signatures: [['x','y','width','height']]
+    name: "isBuffer",
+    signatures: [["buffer"]]
   },
   {
-    name: 'shaderSource',
-    signatures: [['shader','source'],['shader','string']]
+    name: "isEnabled",
+    signatures: [["cap"]]
   },
   {
-    name: 'stencilFunc',
-    signatures: [['func','ref','mask']]
+    name: "isFramebuffer",
+    signatures: [["framebuffer"]]
   },
   {
-    name: 'stencilFuncSeparate',
-    signatures: [['face','func','ref','mask']]
+    name: "isProgram",
+    signatures: [["program"]]
   },
   {
-    name: 'stencilMask',
-    signatures: [['mask']]
+    name: "isRenderbuffer",
+    signatures: [["renderbuffer"]]
   },
   {
-    name: 'stencilMaskSeparate',
-    signatures: [['face','mask']]
+    name: "isShader",
+    signatures: [["shader"]]
   },
   {
-    name: 'stencilOp',
-    signatures: [['fail','zfail','zpass']]
+    name: "isTexture",
+    signatures: [["texture"]]
   },
   {
-    name: 'stencilOpSeparate',
-    signatures: [['face','fail','zfail','zpass']]
+    name: "lineWidth",
+    signatures: [["width"]]
   },
   {
-    name: 'texParameterf',
-    signatures: [['target','pname','param']]
+    name: "linkProgram",
+    signatures: [["program"]]
   },
   {
-    name: 'texParameteri',
-    signatures: [['target','pname','param']]
+    name: "pixelStorei",
+    signatures: [["pname","param"]]
   },
   {
-    name: 'uniform1f',
-    signatures: [['location','x']]
+    name: "polygonOffset",
+    signatures: [["factor","units"]]
   },
   {
-    name: 'uniform1i',
-    signatures: [['location','x']]
+    name: "renderbufferStorage",
+    signatures: [["target","internalformat","width","height"]]
   },
   {
-    name: 'uniform2f',
-    signatures: [['location','x','y']]
+    name: "sampleCoverage",
+    signatures: [["value","invert"]]
   },
   {
-    name: 'uniform2i',
-    signatures: [['location','x','y']]
+    name: "scissor",
+    signatures: [["x","y","width","height"]]
   },
   {
-    name: 'uniform3f',
-    signatures: [['location','x','y','z']]
+    name: "shaderSource",
+    signatures: [["shader","source"],["shader","string"]]
   },
   {
-    name: 'uniform3i',
-    signatures: [['location','x','y','z']]
+    name: "stencilFunc",
+    signatures: [["func","ref","mask"]]
   },
   {
-    name: 'uniform4f',
-    signatures: [['location','x','y','z','w']]
+    name: "stencilFuncSeparate",
+    signatures: [["face","func","ref","mask"]]
   },
   {
-    name: 'uniform4i',
-    signatures: [['location','x','y','z','w']]
+    name: "stencilMask",
+    signatures: [["mask"]]
   },
   {
-    name: 'useProgram',
-    signatures: [['program']]
+    name: "stencilMaskSeparate",
+    signatures: [["face","mask"]]
   },
   {
-    name: 'validateProgram',
-    signatures: [['program']]
+    name: "stencilOp",
+    signatures: [["fail","zfail","zpass"]]
   },
   {
-    name: 'vertexAttrib1f',
-    signatures: [['index','x'],['indx','x']]
+    name: "stencilOpSeparate",
+    signatures: [["face","fail","zfail","zpass"]]
   },
   {
-    name: 'vertexAttrib1fv',
-    signatures: [['index','values'],['indx','values']]
+    name: "texParameterf",
+    signatures: [["target","pname","param"]]
   },
   {
-    name: 'vertexAttrib2f',
-    signatures: [['index','x','y'],['indx','x','y']]
+    name: "texParameteri",
+    signatures: [["target","pname","param"]]
   },
   {
-    name: 'vertexAttrib2fv',
-    signatures: [['index','values'],['indx','values']]
+    name: "uniform1f",
+    signatures: [["location","x"]]
   },
   {
-    name: 'vertexAttrib3f',
-    signatures: [['index','x','y','z'],['indx','x','y','z']]
+    name: "uniform1i",
+    signatures: [["location","x"]]
   },
   {
-    name: 'vertexAttrib3fv',
-    signatures: [['index','values'],['indx','values']]
+    name: "uniform2f",
+    signatures: [["location","x","y"]]
   },
   {
-    name: 'vertexAttrib4f',
-    signatures: [['index','x','y','z','w'],['indx','x','y','z','w']]
+    name: "uniform2i",
+    signatures: [["location","x","y"]]
   },
   {
-    name: 'vertexAttrib4fv',
-    signatures: [['index','values'],['indx','values']]
+    name: "uniform3f",
+    signatures: [["location","x","y","z"]]
   },
   {
-    name: 'vertexAttribPointer',
-    signatures: [['index','size','type','normalized','stride','offset'],['indx','size','type','normalized','stride','offset']]
+    name: "uniform3i",
+    signatures: [["location","x","y","z"]]
   },
   {
-    name: 'viewport',
-    signatures: [['x','y','width','height']]
+    name: "uniform4f",
+    signatures: [["location","x","y","z","w"]]
   },
   {
-    name: 'alert',
-    signatures: [['?message']]
+    name: "uniform4i",
+    signatures: [["location","x","y","z","w"]]
   },
   {
-    name: 'cancelIdleCallback',
-    signatures: [['handle']]
+    name: "useProgram",
+    signatures: [["program"]]
   },
   {
-    name: 'confirm',
-    signatures: [['?message']]
+    name: "validateProgram",
+    signatures: [["program"]]
   },
   {
-    name: 'getComputedStyle',
-    signatures: [['elt','?pseudoElt']]
+    name: "vertexAttrib1f",
+    signatures: [["index","x"],["indx","x"]]
   },
   {
-    name: 'matchMedia',
-    signatures: [['query']]
+    name: "vertexAttrib1fv",
+    signatures: [["index","values"],["indx","values"]]
   },
   {
-    name: 'moveBy',
-    signatures: [['x','y']]
+    name: "vertexAttrib2f",
+    signatures: [["index","x","y"],["indx","x","y"]]
   },
   {
-    name: 'requestIdleCallback',
-    signatures: [['callback','?options']]
+    name: "vertexAttrib2fv",
+    signatures: [["index","values"],["indx","values"]]
   },
   {
-    name: 'resizeBy',
-    signatures: [['x','y']]
+    name: "vertexAttrib3f",
+    signatures: [["index","x","y","z"],["indx","x","y","z"]]
   },
   {
-    name: 'resizeTo',
-    signatures: [['width','height'],['x','y']]
+    name: "vertexAttrib3fv",
+    signatures: [["index","values"],["indx","values"]]
   },
   {
-    name: 'atob',
-    signatures: [['data']]
+    name: "vertexAttrib4f",
+    signatures: [["index","x","y","z","w"],["indx","x","y","z","w"]]
   },
   {
-    name: 'btoa',
-    signatures: [['data']]
+    name: "vertexAttrib4fv",
+    signatures: [["index","values"],["indx","values"]]
   },
   {
-    name: 'clearInterval',
-    signatures: [['id'],['?handle']],
-    receivers: ['Window','WorkerGlobalScope']
+    name: "vertexAttribPointer",
+    signatures: [["index","size","type","normalized","stride","offset"],["indx","size","type","normalized","stride","offset"]]
   },
   {
-    name: 'clearInterval',
-    signatures: [['id']],
-    receivers: ['Window']
+    name: "viewport",
+    signatures: [["x","y","width","height"]]
   },
   {
-    name: 'clearTimeout',
-    signatures: [['id'],['?handle']],
-    receivers: ['Window','WorkerGlobalScope']
+    name: "createBidirectionalStream",
+    signatures: [["?options"]]
   },
   {
-    name: 'clearTimeout',
-    signatures: [['id']],
-    receivers: ['Window']
+    name: "createUnidirectionalStream",
+    signatures: [["?options"]]
   },
   {
-    name: 'createImageBitmap',
-    signatures: [['image','?options'],['image','sx','sy','sw','sh','?options']],
-    receivers: ['Window','WorkerGlobalScope']
+    name: "alert",
+    signatures: [["?message"]]
   },
   {
-    name: 'createImageBitmap',
-    signatures: [['image','?options'],['imageBitmap','?options'],['image','sx','sy','sw','sh','?options'],['imageBitmap','sx','sy','sw','sh','?options']],
-    receivers: ['Window']
+    name: "cancelIdleCallback",
+    signatures: [["handle"]]
   },
   {
-    name: 'createImageBitmap',
-    signatures: [['imageBitmap','?options'],['imageBitmap','sx','sy','sw','sh','?options']],
-    receivers: ['WorkerGlobalScope']
+    name: "confirm",
+    signatures: [["?message"]]
   },
   {
-    name: 'fetch',
-    signatures: [['input','?init']],
-    receivers: ['Window','WorkerGlobalScope']
+    name: "getComputedStyle",
+    signatures: [["elt","?pseudoElt"]]
   },
   {
-    name: 'fetch',
-    signatures: [['id','requests','?options']],
-    receivers: ['BackgroundFetchManager']
+    name: "matchMedia",
+    signatures: [["query"]]
   },
   {
-    name: 'queueMicrotask',
-    signatures: [['callback']]
+    name: "moveBy",
+    signatures: [["x","y"]]
   },
   {
-    name: 'reportError',
-    signatures: [['e']]
+    name: "requestIdleCallback",
+    signatures: [["callback","?options"]]
   },
   {
-    name: 'setInterval',
-    signatures: [['handler','?timeout','...arguments']]
+    name: "resizeBy",
+    signatures: [["x","y"]]
   },
   {
-    name: 'setTimeout',
-    signatures: [['handler','?timeout','...arguments']]
+    name: "resizeTo",
+    signatures: [["width","height"],["x","y"]]
   },
   {
-    name: 'structuredClone',
-    signatures: [['value','?options']]
+    name: "atob",
+    signatures: [["data"]]
   },
   {
-    name: 'addModule',
-    signatures: [['moduleURL','?options']],
-    receivers: ['Worklet']
+    name: "btoa",
+    signatures: [["data"]]
   },
   {
-    name: 'addModule',
-    signatures: [['moduleURL']],
-    receivers: ['SharedStorageWorklet']
+    name: "clearInterval",
+    signatures: [["id"],["?handle"]],
+    receivers: ["Window","WorkerGlobalScope"]
   },
   {
-    name: 'getResponseHeader',
-    signatures: [['name']]
+    name: "clearInterval",
+    signatures: [["id"]],
+    receivers: ["Window"]
   },
   {
-    name: 'overrideMimeType',
-    signatures: [['mime']]
+    name: "clearTimeout",
+    signatures: [["id"],["?handle"]],
+    receivers: ["Window","WorkerGlobalScope"]
   },
   {
-    name: 'setRequestHeader',
-    signatures: [['name','value']]
+    name: "clearTimeout",
+    signatures: [["id"]],
+    receivers: ["Window"]
   },
   {
-    name: 'serializeToString',
-    signatures: [['root']]
+    name: "createImageBitmap",
+    signatures: [["image","?options"],["image","sx","sy","sw","sh","?options"]],
+    receivers: ["Window","WorkerGlobalScope"]
   },
   {
-    name: 'createExpression',
-    signatures: [['expression','?resolver']]
+    name: "createImageBitmap",
+    signatures: [["image","?options"],["imageBitmap","?options"],["image","sx","sy","sw","sh","?options"],["imageBitmap","sx","sy","sw","sh","?options"]],
+    receivers: ["Window"]
   },
   {
-    name: 'createNSResolver',
-    signatures: [['nodeResolver']]
+    name: "createImageBitmap",
+    signatures: [["imageBitmap","?options"],["imageBitmap","sx","sy","sw","sh","?options"]],
+    receivers: ["WorkerGlobalScope"]
   },
   {
-    name: 'evaluate',
-    signatures: [['expression','contextNode','?resolver','?type','?result']],
-    receivers: ['XPathEvaluatorBase']
+    name: "fetch",
+    signatures: [["input","?init"]],
+    receivers: ["Window","WorkerGlobalScope"]
   },
   {
-    name: 'evaluate',
-    signatures: [['contextNode','?type','?result'],['contextNode','?type','?inResult']],
-    receivers: ['XPathExpression']
+    name: "fetch",
+    signatures: [["id","requests","?options"]],
+    receivers: ["BackgroundFetchManager"]
   },
   {
-    name: 'evaluate',
-    signatures: [['expression','contextNode','?resolver','?type','?inResult']],
-    receivers: ['Document','XPathEvaluator']
+    name: "queueMicrotask",
+    signatures: [["callback"]]
   },
   {
-    name: 'snapshotItem',
-    signatures: [['index']]
+    name: "reportError",
+    signatures: [["e"]]
   },
   {
-    name: 'importStylesheet',
-    signatures: [['style']]
+    name: "setInterval",
+    signatures: [["handler","?timeout","...arguments"]]
   },
   {
-    name: 'removeParameter',
-    signatures: [['namespaceURI','localName']]
+    name: "setTimeout",
+    signatures: [["handler","?timeout","...arguments"]]
   },
   {
-    name: 'setParameter',
-    signatures: [['namespaceURI','localName','value']]
+    name: "structuredClone",
+    signatures: [["value","?options"]]
   },
   {
-    name: 'transformToDocument',
-    signatures: [['source']]
+    name: "addModule",
+    signatures: [["moduleURL","?options"]]
   },
   {
-    name: 'transformToFragment',
-    signatures: [['source','output']]
+    name: "getResponseHeader",
+    signatures: [["name"]]
   },
   {
-    name: 'assert',
-    signatures: [['?condition','...data']]
+    name: "overrideMimeType",
+    signatures: [["mime"]]
   },
   {
-    name: 'countReset',
-    signatures: [['?label']]
+    name: "setRequestHeader",
+    signatures: [["name","value"]]
   },
   {
-    name: 'debug',
-    signatures: [['...data']]
+    name: "serializeToString",
+    signatures: [["root"]]
   },
   {
-    name: 'dir',
-    signatures: [['?item','?options']]
+    name: "createExpression",
+    signatures: [["expression","?resolver"]]
   },
   {
-    name: 'dirxml',
-    signatures: [['...data']]
+    name: "createNSResolver",
+    signatures: [["nodeResolver"]]
   },
   {
-    name: 'group',
-    signatures: [['...data']]
+    name: "evaluate",
+    signatures: [["expression","contextNode","?resolver","?type","?result"]],
+    receivers: ["XPathEvaluatorBase"]
   },
   {
-    name: 'groupCollapsed',
-    signatures: [['...data']]
+    name: "evaluate",
+    signatures: [["contextNode","?type","?result"],["contextNode","?type","?inResult"]],
+    receivers: ["XPathExpression"]
   },
   {
-    name: 'info',
-    signatures: [['...data']]
+    name: "evaluate",
+    signatures: [["expression","contextNode","?resolver","?type","?inResult"]],
+    receivers: ["Document","XPathEvaluator"]
   },
   {
-    name: 'table',
-    signatures: [['?tabularData','?properties']]
+    name: "snapshotItem",
+    signatures: [["index"]]
   },
   {
-    name: 'time',
-    signatures: [['?label']]
+    name: "importStylesheet",
+    signatures: [["style"]]
   },
   {
-    name: 'timeEnd',
-    signatures: [['?label']]
+    name: "removeParameter",
+    signatures: [["namespaceURI","localName"]]
   },
   {
-    name: 'timeLog',
-    signatures: [['?label','...data']]
+    name: "setParameter",
+    signatures: [["namespaceURI","localName","value"]]
   },
   {
-    name: 'timeStamp',
-    signatures: [['?label']]
+    name: "transformToDocument",
+    signatures: [["source"]]
   },
   {
-    name: 'trace',
-    signatures: [['...data']]
+    name: "transformToFragment",
+    signatures: [["source","output"]]
   },
   {
-    name: 'warn',
-    signatures: [['...data']]
+    name: "assert",
+    signatures: [["?condition","...data"]]
   },
   {
-    name: 'importScripts',
-    signatures: [['...urls']]
+    name: "countReset",
+    signatures: [["?label"]]
   },
   {
-    name: 'Write',
-    signatures: [['s']]
+    name: "debug",
+    signatures: [["...data"]]
   },
   {
-    name: 'WriteLine',
-    signatures: [['s']]
+    name: "dir",
+    signatures: [["?item","?options"]]
   },
   {
-    name: 'WriteBlankLines',
-    signatures: [['intLines']]
+    name: "dirxml",
+    signatures: [["...data"]]
   },
   {
-    name: 'Read',
-    signatures: [['characters']]
+    name: "group",
+    signatures: [["...data"]]
   },
   {
-    name: 'Skip',
-    signatures: [['characters']]
+    name: "groupCollapsed",
+    signatures: [["...data"]]
   },
   {
-    name: 'lbound',
-    signatures: [['?dimension']]
+    name: "info",
+    signatures: [["...data"]]
   },
   {
-    name: 'ubound',
-    signatures: [['?dimension']]
+    name: "table",
+    signatures: [["?tabularData","?properties"]]
   },
   {
-    name: 'next',
-    signatures: [['...args']],
-    receivers: ['Generator','Iterator','AsyncIterator','AsyncGenerator']
+    name: "time",
+    signatures: [["?label"]]
   },
   {
-    name: 'return',
-    signatures: [['value']],
-    receivers: ['Generator','AsyncGenerator']
+    name: "timeEnd",
+    signatures: [["?label"]]
   },
   {
-    name: 'return',
-    signatures: [['?value']],
-    receivers: ['Iterator','AsyncIterator']
+    name: "timeLog",
+    signatures: [["?label","...data"]]
   },
   {
-    name: 'throw',
-    signatures: [['e']],
-    receivers: ['Generator','AsyncGenerator']
+    name: "timeStamp",
+    signatures: [["?label"]]
   },
   {
-    name: 'throw',
-    signatures: [['?e']],
-    receivers: ['Iterator','AsyncIterator']
+    name: "trace",
+    signatures: [["...data"]]
   },
   {
-    name: 'entries',
-    signatures: [['o']],
-    receivers: ['ObjectConstructor']
+    name: "warn",
+    signatures: [["...data"]]
   },
   {
-    name: 'values',
-    signatures: [['o']],
-    receivers: ['ObjectConstructor']
+    name: "importScripts",
+    signatures: [["...urls"]]
   },
   {
-    name: 'all',
-    signatures: [['values']]
+    name: "Write",
+    signatures: [["s"]]
   },
   {
-    name: 'race',
-    signatures: [['values']]
+    name: "WriteLine",
+    signatures: [["s"]]
   },
   {
-    name: 'reject',
-    signatures: [['?reason']]
+    name: "WriteBlankLines",
+    signatures: [["intLines"]]
   },
   {
-    name: 'construct',
-    signatures: [['target','argArray','newTarget']]
+    name: "Read",
+    signatures: [["characters"]]
   },
   {
-    name: 'deleteProperty',
-    signatures: [['target','p']]
+    name: "Skip",
+    signatures: [["characters"]]
   },
   {
-    name: 'ownKeys',
-    signatures: [['target']]
+    name: "lbound",
+    signatures: [["?dimension"]]
   },
   {
-    name: 'setPrototypeOf',
-    signatures: [['target','v']],
-    receivers: ['ProxyHandler']
+    name: "ubound",
+    signatures: [["?dimension"]]
   },
   {
-    name: 'setPrototypeOf',
-    signatures: [['o','proto']],
-    receivers: ['ObjectConstructor']
+    name: "toArray",
+    signatures: [["?options"]],
+    receivers: ["Observable"]
   },
   {
-    name: 'revocable',
-    signatures: [['target','handler']]
+    name: "next",
+    signatures: [["...args"]],
+    receivers: ["Generator","Iterator","AsyncIterator","AsyncGenerator"]
   },
   {
-    name: 'for',
-    signatures: [['key']]
+    name: "next",
+    signatures: [["result"]],
+    receivers: ["Subscriber"]
   },
   {
-    name: 'keyFor',
-    signatures: [['sym']]
+    name: "return",
+    signatures: [["value"]],
+    receivers: ["Generator","AsyncGenerator"]
   },
   {
-    name: 'getOwnPropertyDescriptors',
-    signatures: [['o']]
+    name: "return",
+    signatures: [["?value"]],
+    receivers: ["Iterator","AsyncIterator"]
   },
   {
-    name: 'and',
-    signatures: [['typedArray','index','value']]
+    name: "throw",
+    signatures: [["e"]],
+    receivers: ["Generator","AsyncGenerator"]
   },
   {
-    name: 'compareExchange',
-    signatures: [['typedArray','index','expectedValue','replacementValue']]
+    name: "throw",
+    signatures: [["?e"]],
+    receivers: ["Iterator","AsyncIterator"]
   },
   {
-    name: 'exchange',
-    signatures: [['typedArray','index','value']]
+    name: "entries",
+    signatures: [["o"]],
+    receivers: ["ObjectConstructor"]
   },
   {
-    name: 'isLockFree',
-    signatures: [['size']]
+    name: "values",
+    signatures: [["o"]],
+    receivers: ["ObjectConstructor"]
   },
   {
-    name: 'or',
-    signatures: [['typedArray','index','value']]
+    name: "values",
+    signatures: [["?options"]],
+    receivers: ["ReadableStream"]
   },
   {
-    name: 'wait',
-    signatures: [['typedArray','index','value','?timeout']]
+    name: "all",
+    signatures: [["values"]]
   },
   {
-    name: 'notify',
-    signatures: [['typedArray','index','?count']]
+    name: "race",
+    signatures: [["values"]]
   },
   {
-    name: 'xor',
-    signatures: [['typedArray','index','value']]
+    name: "reject",
+    signatures: [["?reason"]]
   },
   {
-    name: 'padStart',
-    signatures: [['maxLength','?fillString']]
+    name: "construct",
+    signatures: [["target","argArray","newTarget"]]
   },
   {
-    name: 'padEnd',
-    signatures: [['maxLength','?fillString']]
+    name: "deleteProperty",
+    signatures: [["target","p"]]
   },
   {
-    name: 'finally',
-    signatures: [['?onfinally']]
+    name: "ownKeys",
+    signatures: [["target"]]
   },
   {
-    name: 'fromEntries',
-    signatures: [['entries']]
+    name: "setPrototypeOf",
+    signatures: [["target","v"]],
+    receivers: ["ProxyHandler"]
   },
   {
-    name: 'allSettled',
-    signatures: [['values']]
+    name: "setPrototypeOf",
+    signatures: [["o","proto"]],
+    receivers: ["ObjectConstructor"]
   },
   {
-    name: 'any',
-    signatures: [['values']],
-    receivers: ['PromiseConstructor']
+    name: "revocable",
+    signatures: [["target","handler"]]
   },
   {
-    name: 'any',
-    signatures: [['signals']],
-    receivers: ['AbortSignal']
+    name: "for",
+    signatures: [["key"]]
   },
   {
-    name: 'any',
-    signatures: [['signals','?init']],
-    receivers: ['TaskSignal']
+    name: "keyFor",
+    signatures: [["sym"]]
   },
   {
-    name: 'replaceAll',
-    signatures: [['searchValue','replaceValue'],['searchValue','replacer']]
+    name: "getOwnPropertyDescriptors",
+    signatures: [["o"]]
   },
   {
-    name: 'hasOwn',
-    signatures: [['o','v']]
+    name: "and",
+    signatures: [["typedArray","index","value"]]
   },
   {
-    name: 'waitAsync',
-    signatures: [['typedArray','index','value','?timeout']]
+    name: "compareExchange",
+    signatures: [["typedArray","index","expectedValue","replacementValue"]]
   },
   {
-    name: 'at',
-    signatures: [['index']]
+    name: "exchange",
+    signatures: [["typedArray","index","value"]]
   },
   {
-    name: 'addInitializer',
-    signatures: [['initializer']]
+    name: "isLockFree",
+    signatures: [["size"]]
   },
   {
-    name: 'init',
-    signatures: [['value']]
+    name: "or",
+    signatures: [["typedArray","index","value"]]
   },
   {
-    name: 'clz32',
-    signatures: [['x']]
+    name: "wait",
+    signatures: [["typedArray","index","value","?timeout"]]
   },
   {
-    name: 'imul',
-    signatures: [['x','y']]
+    name: "notify",
+    signatures: [["typedArray","index","?count"]]
   },
   {
-    name: 'log10',
-    signatures: [['x']]
+    name: "xor",
+    signatures: [["typedArray","index","value"]]
   },
   {
-    name: 'log2',
-    signatures: [['x']]
+    name: "padStart",
+    signatures: [["maxLength","?fillString"]]
   },
   {
-    name: 'log1p',
-    signatures: [['x']]
+    name: "padEnd",
+    signatures: [["maxLength","?fillString"]]
   },
   {
-    name: 'expm1',
-    signatures: [['x']]
+    name: "finally",
+    signatures: [["?onfinally"]]
   },
   {
-    name: 'cosh',
-    signatures: [['x']]
+    name: "fromEntries",
+    signatures: [["entries"]]
   },
   {
-    name: 'sinh',
-    signatures: [['x']]
+    name: "allSettled",
+    signatures: [["values"]]
   },
   {
-    name: 'tanh',
-    signatures: [['x']],
-    receivers: ['Math']
+    name: "any",
+    signatures: [["values"]],
+    receivers: ["PromiseConstructor"]
   },
   {
-    name: 'tanh',
-    signatures: [['?input']],
-    receivers: ['MLGraphBuilder']
+    name: "any",
+    signatures: [["signals"]],
+    receivers: ["AbortSignal"]
   },
   {
-    name: 'acosh',
-    signatures: [['x']]
+    name: "any",
+    signatures: [["signals","?init"]],
+    receivers: ["TaskSignal"]
   },
   {
-    name: 'asinh',
-    signatures: [['x']]
+    name: "replaceAll",
+    signatures: [["searchValue","replaceValue"],["searchValue","replacer"]]
   },
   {
-    name: 'atanh',
-    signatures: [['x']]
+    name: "hasOwn",
+    signatures: [["o","v"]]
   },
   {
-    name: 'hypot',
-    signatures: [['...values']]
+    name: "waitAsync",
+    signatures: [["typedArray","index","value","?timeout"]]
   },
   {
-    name: 'trunc',
-    signatures: [['x']]
+    name: "at",
+    signatures: [["index"]]
   },
   {
-    name: 'fround',
-    signatures: [['x']]
+    name: "use",
+    signatures: [["value"]]
   },
   {
-    name: 'cbrt',
-    signatures: [['x']]
+    name: "adopt",
+    signatures: [["value","onDispose"]],
+    receivers: ["DisposableStack"]
   },
   {
-    name: 'isInteger',
-    signatures: [['number']]
+    name: "adopt",
+    signatures: [["value","onDisposeAsync"]],
+    receivers: ["AsyncDisposableStack"]
   },
   {
-    name: 'isSafeInteger',
-    signatures: [['number']]
+    name: "defer",
+    signatures: [["onDispose"]],
+    receivers: ["DisposableStack"]
   },
   {
-    name: 'getOwnPropertySymbols',
-    signatures: [['o']]
+    name: "defer",
+    signatures: [["onDisposeAsync"]],
+    receivers: ["AsyncDisposableStack"]
   },
   {
-    name: 'is',
-    signatures: [['value1','value2']]
+    name: "move",
+    signatures: [["new_entry_name"],["destination_directory","?new_entry_name"]],
+    receivers: ["FileSystemFileHandle","FileSystemHandle"]
   },
   {
-    name: 'codePointAt',
-    signatures: [['pos']]
+    name: "groupBy",
+    signatures: [["items","keySelector"]]
   },
   {
-    name: 'endsWith',
-    signatures: [['searchString','?endPosition']]
+    name: "addInitializer",
+    signatures: [["initializer"]]
   },
   {
-    name: 'repeat',
-    signatures: [['count']]
+    name: "init",
+    signatures: [["value"]]
   },
   {
-    name: 'startsWith',
-    signatures: [['searchString','?position']]
+    name: "clz32",
+    signatures: [["x"]]
   },
   {
-    name: 'anchor',
-    signatures: [['name']]
+    name: "imul",
+    signatures: [["x","y"]]
   },
   {
-    name: 'fontcolor',
-    signatures: [['color']]
+    name: "log10",
+    signatures: [["x"]]
   },
   {
-    name: 'fontsize',
-    signatures: [['size']]
+    name: "log2",
+    signatures: [["x"]]
   },
   {
-    name: 'link',
-    signatures: [['url']]
+    name: "log1p",
+    signatures: [["x"]]
   },
   {
-    name: 'fromCodePoint',
-    signatures: [['...codePoints']]
+    name: "expm1",
+    signatures: [["x"]]
   },
   {
-    name: 'raw',
-    signatures: [['template','...substitutions']]
+    name: "cosh",
+    signatures: [["x"]]
   },
   {
-    name: 'flatMap',
-    signatures: [['callback','?thisArg']]
+    name: "sinh",
+    signatures: [["x"]]
   },
   {
-    name: 'flat',
-    signatures: [['?depth']]
+    name: "tanh",
+    signatures: [["x"]],
+    receivers: ["Math"]
   },
   {
-    name: 'asIntN',
-    signatures: [['bits','int']]
+    name: "tanh",
+    signatures: [["?input"]],
+    receivers: ["MLGraphBuilder"]
   },
   {
-    name: 'asUintN',
-    signatures: [['bits','int']]
+    name: "acosh",
+    signatures: [["x"]]
   },
   {
-    name: 'getBigInt64',
-    signatures: [['byteOffset','?littleEndian']]
+    name: "asinh",
+    signatures: [["x"]]
   },
   {
-    name: 'getBigUint64',
-    signatures: [['byteOffset','?littleEndian']]
+    name: "atanh",
+    signatures: [["x"]]
   },
   {
-    name: 'setBigInt64',
-    signatures: [['byteOffset','value','?littleEndian']]
+    name: "hypot",
+    signatures: [["...values"]]
   },
   {
-    name: 'setBigUint64',
-    signatures: [['byteOffset','value','?littleEndian']]
+    name: "trunc",
+    signatures: [["x"]]
   },
   {
-    name: 'findLast',
-    signatures: [['predicate','?thisArg']]
+    name: "fround",
+    signatures: [["x"]]
   },
   {
-    name: 'findLastIndex',
-    signatures: [['predicate','?thisArg']]
+    name: "cbrt",
+    signatures: [["x"]]
   },
   {
-    name: 'openWindow',
-    signatures: [['url']]
+    name: "isInteger",
+    signatures: [["number"]]
   },
   {
-    name: 'waitUntil',
-    signatures: [['f']]
+    name: "isSafeInteger",
+    signatures: [["number"]]
   },
   {
-    name: 'respondWith',
-    signatures: [['r']],
-    receivers: ['FetchEvent']
+    name: "getOwnPropertySymbols",
+    signatures: [["o"]]
   },
   {
-    name: 'respondWith',
-    signatures: [['paymentAbortedResponse']],
-    receivers: ['AbortPaymentEvent']
+    name: "is",
+    signatures: [["value1","value2"]]
   },
   {
-    name: 'respondWith',
-    signatures: [['canMakePaymentResponse']],
-    receivers: ['CanMakePaymentEvent']
+    name: "codePointAt",
+    signatures: [["pos"]]
   },
   {
-    name: 'respondWith',
-    signatures: [['response']],
-    receivers: ['PaymentRequestEvent']
+    name: "endsWith",
+    signatures: [["searchString","?endPosition"]]
   },
   {
-    name: 'navigate',
-    signatures: [['url']],
-    receivers: ['WindowClient']
+    name: "repeat",
+    signatures: [["count"]]
   },
   {
-    name: 'navigate',
-    signatures: [['url','?options']],
-    receivers: ['Navigation']
+    name: "startsWith",
+    signatures: [["searchString","?position"]]
   },
   {
-    name: 'Animation',
-    signatures: [['?effect','?timeline']]
+    name: "anchor",
+    signatures: [["name"]]
   },
   {
-    name: 'DocumentTimeline',
-    signatures: [['?options']]
+    name: "fontcolor",
+    signatures: [["color"]]
   },
   {
-    name: 'KeyframeEffect',
-    signatures: [['source'],['target','keyframes','?options']]
+    name: "fontsize",
+    signatures: [["size"]]
   },
   {
-    name: 'ScrollTimeline',
-    signatures: [['?options']]
+    name: "link",
+    signatures: [["url"]]
   },
   {
-    name: 'ViewTimeline',
-    signatures: [['?options']]
+    name: "fromCodePoint",
+    signatures: [["...codePoints"]]
   },
   {
-    name: 'AccessibleNodeList',
-    signatures: [['?nodes']]
+    name: "raw",
+    signatures: [["template","...substitutions"]]
   },
   {
-    name: '',
-    signatures: [['index','node']],
-    receivers: ['AccessibleNodeList']
+    name: "flatMap",
+    signatures: [["callback","?thisArg"]],
+    receivers: ["ReadonlyArray","Array"]
   },
   {
-    name: '',
-    signatures: [['index']],
-    receivers: ['DataTransferItemList','CSSKeyframesRule','CSSNumericArray','HTMLFormControlsCollection','RadioNodeList','HTMLAllCollection','AudioTrackList','TextTrackCueList','TextTrackList','VideoTrackList','SourceBufferList','TrackDefaultList','ImageTrackList','XRInputSourceArray']
+    name: "flatMap",
+    signatures: [["mapper"]],
+    receivers: ["Observable"]
   },
   {
-    name: '',
-    signatures: [['name'],['property','?propertyValue']],
-    receivers: ['CSSStyleDeclaration']
+    name: "flat",
+    signatures: [["?depth"]]
   },
   {
-    name: '',
-    signatures: [['index','?val']],
-    receivers: ['CSSTransformValue','CSSUnparsedValue']
+    name: "asIntN",
+    signatures: [["bits","int"]]
   },
   {
-    name: '',
-    signatures: [['name']],
-    receivers: ['StyleSheetList','RTCStatsResponse']
+    name: "asUintN",
+    signatures: [["bits","int"]]
   },
   {
-    name: '',
-    signatures: [['name','?value']],
-    receivers: ['DOMStringMap','HTMLEmbedElement','HTMLObjectElement']
+    name: "getBigInt64",
+    signatures: [["byteOffset","?littleEndian"]]
   },
   {
-    name: '',
-    signatures: [['index'],['name']],
-    receivers: ['Window','HTMLFormElement']
+    name: "getBigUint64",
+    signatures: [["byteOffset","?littleEndian"]]
   },
   {
-    name: '',
-    signatures: [['index','?option'],['name']],
-    receivers: ['HTMLOptionsCollection']
+    name: "setBigInt64",
+    signatures: [["byteOffset","value","?littleEndian"]]
   },
   {
-    name: '',
-    signatures: [['index','option']],
-    receivers: ['HTMLSelectElement']
+    name: "setBigUint64",
+    signatures: [["byteOffset","value","?littleEndian"]]
   },
   {
-    name: '',
-    signatures: [['index','newItem']],
-    receivers: ['SVGLengthList','SVGNumberList','SVGPointList','SVGStringList','SVGTransformList']
+    name: "findLast",
+    signatures: [["predicate","?thisArg"]]
   },
   {
-    name: 'CSSStyleSheet',
-    signatures: [['?options']]
+    name: "findLastIndex",
+    signatures: [["predicate","?thisArg"]]
   },
   {
-    name: 'CSSHSL',
-    signatures: [['h','s','l','?alpha']]
+    name: "toSorted",
+    signatures: [["?compareFn"]]
   },
   {
-    name: 'CSSHWB',
-    signatures: [['h','w','b','?alpha']]
+    name: "toSpliced",
+    signatures: [["start","?deleteCount","...items"]]
   },
   {
-    name: 'CSSKeywordValue',
-    signatures: [['keyword']]
+    name: "with",
+    signatures: [["index","value"]]
   },
   {
-    name: 'CSSMathClamp',
-    signatures: [['lower','value','upper']]
+    name: "fromAsync",
+    signatures: [["iterableOrArrayLike","?mapFn","?thisArg"]]
   },
   {
-    name: 'CSSMathInvert',
-    signatures: [['arg']]
+    name: "union",
+    signatures: [["other"]]
   },
   {
-    name: 'CSSMathMax',
-    signatures: [['...args']]
+    name: "intersection",
+    signatures: [["other"]]
   },
   {
-    name: 'CSSMathMin',
-    signatures: [['...args']]
+    name: "difference",
+    signatures: [["other"]]
   },
   {
-    name: 'CSSMathNegate',
-    signatures: [['arg']]
+    name: "symmetricDifference",
+    signatures: [["other"]]
   },
   {
-    name: 'CSSMathProduct',
-    signatures: [['...args']]
+    name: "isSubsetOf",
+    signatures: [["other"]]
   },
   {
-    name: 'CSSMathSum',
-    signatures: [['...args']]
+    name: "isSupersetOf",
+    signatures: [["other"]]
   },
   {
-    name: 'CSSMatrixComponent',
-    signatures: [['matrix','?options']]
+    name: "isDisjointFrom",
+    signatures: [["other"]]
   },
   {
-    name: 'CSSPerspective',
-    signatures: [['length']]
+    name: "openWindow",
+    signatures: [["url"]]
   },
   {
-    name: 'CSSPositionValue',
-    signatures: [['x','y']]
+    name: "waitUntil",
+    signatures: [["f"]]
   },
   {
-    name: 'CSSRGB',
-    signatures: [['r','g','b','?alpha']]
+    name: "respondWith",
+    signatures: [["r"]],
+    receivers: ["FetchEvent"]
   },
   {
-    name: 'CSSRotate',
-    signatures: [['angleValue'],['x','y','z','angle']]
+    name: "respondWith",
+    signatures: [["paymentAbortedResponse"]],
+    receivers: ["AbortPaymentEvent"]
   },
   {
-    name: 'CSSScale',
-    signatures: [['x','y','?z']]
+    name: "respondWith",
+    signatures: [["canMakePaymentResponse"]],
+    receivers: ["CanMakePaymentEvent"]
   },
   {
-    name: 'CSSSkewX',
-    signatures: [['ax']]
+    name: "respondWith",
+    signatures: [["response"]],
+    receivers: ["PaymentRequestEvent"]
   },
   {
-    name: 'CSSSkewY',
-    signatures: [['ay']]
+    name: "createSyncAccessHandle",
+    signatures: [["?options"]]
   },
   {
-    name: 'CSSSkew',
-    signatures: [['ax','ay']]
+    name: "generateKeyFrame",
+    signatures: [["?rid"]]
   },
   {
-    name: 'parseAll',
-    signatures: [['property','cssText']]
+    name: "navigate",
+    signatures: [["url"]],
+    receivers: ["WindowClient"]
   },
   {
-    name: 'CSSTransformValue',
-    signatures: [['transforms']]
+    name: "navigate",
+    signatures: [["url","?options"]],
+    receivers: ["Navigation"]
   },
   {
-    name: 'CSSTranslate',
-    signatures: [['x','y','?z']]
+    name: "Animation",
+    signatures: [["?effect","?timeline"]]
   },
   {
-    name: 'CSSUnitValue',
-    signatures: [['value','unit']]
+    name: "DocumentTimeline",
+    signatures: [["?options"]]
   },
   {
-    name: 'number',
-    signatures: [['value']]
+    name: "KeyframeEffect",
+    signatures: [["source"],["target","keyframes","?options"]]
   },
   {
-    name: 'percent',
-    signatures: [['value']]
+    name: "ScrollTimeline",
+    signatures: [["?options"]]
   },
   {
-    name: 'em',
-    signatures: [['value']]
+    name: "ViewTimeline",
+    signatures: [["?options"]]
   },
   {
-    name: 'ex',
-    signatures: [['value']]
+    name: "AccessibleNodeList",
+    signatures: [["?nodes"]]
   },
   {
-    name: 'ch',
-    signatures: [['value']]
+    name: "",
+    signatures: [["index","node"]],
+    receivers: ["AccessibleNodeList"]
   },
   {
-    name: 'rem',
-    signatures: [['value']]
+    name: "",
+    signatures: [["index"]],
+    receivers: ["DataTransferItemList","CSSKeyframesRule","CSSNumericArray","Window","HTMLFormControlsCollection","RadioNodeList","HTMLAllCollection","AudioTrackList","TextTrackCueList","TextTrackList","VideoTrackList","SourceBufferList","TrackDefaultList","ImageTrackList","XRInputSourceArray"]
   },
   {
-    name: 'vw',
-    signatures: [['value']]
+    name: "",
+    signatures: [["name"],["property","?propertyValue"]],
+    receivers: ["CSSStyleDeclaration"]
   },
   {
-    name: 'vh',
-    signatures: [['value']]
+    name: "",
+    signatures: [["index","?val"]],
+    receivers: ["CSSTransformValue","CSSUnparsedValue"]
   },
   {
-    name: 'vi',
-    signatures: [['value']]
+    name: "",
+    signatures: [["name"]],
+    receivers: ["StyleSheetList","WindowProperties"]
   },
   {
-    name: 'vb',
-    signatures: [['value']]
+    name: "",
+    signatures: [["name","?value"]],
+    receivers: ["DOMStringMap","HTMLEmbedElement","HTMLObjectElement"]
   },
   {
-    name: 'vmin',
-    signatures: [['value']]
+    name: "",
+    signatures: [["index"],["name"]],
+    receivers: ["HTMLFormElement"]
   },
   {
-    name: 'vmax',
-    signatures: [['value']]
+    name: "",
+    signatures: [["index","?option"],["name"]],
+    receivers: ["HTMLOptionsCollection"]
   },
   {
-    name: 'svw',
-    signatures: [['value']]
+    name: "",
+    signatures: [["index","option"]],
+    receivers: ["HTMLSelectElement"]
   },
   {
-    name: 'svh',
-    signatures: [['value']]
+    name: "",
+    signatures: [["index","newItem"]],
+    receivers: ["SVGLengthList","SVGNumberList","SVGPointList","SVGStringList","SVGTransformList"]
   },
   {
-    name: 'svi',
-    signatures: [['value']]
+    name: "CSSStyleSheet",
+    signatures: [["?options"]]
   },
   {
-    name: 'svb',
-    signatures: [['value']]
+    name: "CSSHSL",
+    signatures: [["h","s","l","?alpha"]]
   },
   {
-    name: 'svmin',
-    signatures: [['value']]
+    name: "CSSHWB",
+    signatures: [["h","w","b","?alpha"]]
   },
   {
-    name: 'svmax',
-    signatures: [['value']]
+    name: "CSSKeywordValue",
+    signatures: [["keyword"]]
   },
   {
-    name: 'lvw',
-    signatures: [['value']]
+    name: "CSSMathClamp",
+    signatures: [["lower","value","upper"]]
   },
   {
-    name: 'lvh',
-    signatures: [['value']]
+    name: "CSSMathInvert",
+    signatures: [["arg"]]
   },
   {
-    name: 'lvi',
-    signatures: [['value']]
+    name: "CSSMathMax",
+    signatures: [["...args"]]
   },
   {
-    name: 'lvb',
-    signatures: [['value']]
+    name: "CSSMathMin",
+    signatures: [["...args"]]
   },
   {
-    name: 'lvmin',
-    signatures: [['value']]
+    name: "CSSMathNegate",
+    signatures: [["arg"]]
   },
   {
-    name: 'lvmax',
-    signatures: [['value']]
+    name: "CSSMathProduct",
+    signatures: [["...args"]]
   },
   {
-    name: 'dvw',
-    signatures: [['value']]
+    name: "CSSMathSum",
+    signatures: [["...args"]]
   },
   {
-    name: 'dvh',
-    signatures: [['value']]
+    name: "CSSMatrixComponent",
+    signatures: [["matrix","?options"]]
   },
   {
-    name: 'dvi',
-    signatures: [['value']]
+    name: "CSSPerspective",
+    signatures: [["length"]]
   },
   {
-    name: 'dvb',
-    signatures: [['value']]
+    name: "CSSPositionValue",
+    signatures: [["x","y"]]
   },
   {
-    name: 'dvmin',
-    signatures: [['value']]
+    name: "CSSRGB",
+    signatures: [["r","g","b","?alpha"]]
   },
   {
-    name: 'dvmax',
-    signatures: [['value']]
+    name: "CSSRotate",
+    signatures: [["angleValue"],["x","y","z","angle"]]
   },
   {
-    name: 'cqw',
-    signatures: [['value']]
+    name: "CSSScale",
+    signatures: [["x","y","?z"]]
   },
   {
-    name: 'cqh',
-    signatures: [['value']]
+    name: "CSSSkewX",
+    signatures: [["ax"]]
   },
   {
-    name: 'cqi',
-    signatures: [['value']]
+    name: "CSSSkewY",
+    signatures: [["ay"]]
   },
   {
-    name: 'cqb',
-    signatures: [['value']]
+    name: "CSSSkew",
+    signatures: [["ax","ay"]]
   },
   {
-    name: 'cqmin',
-    signatures: [['value']]
+    name: "parseAll",
+    signatures: [["property","cssText"]]
   },
   {
-    name: 'cqmax',
-    signatures: [['value']]
+    name: "CSSTransformValue",
+    signatures: [["transforms"]]
   },
   {
-    name: 'cm',
-    signatures: [['value']]
+    name: "CSSTranslate",
+    signatures: [["x","y","?z"]]
   },
   {
-    name: 'mm',
-    signatures: [['value']]
+    name: "CSSUnitValue",
+    signatures: [["value","unit"]]
   },
   {
-    name: 'in',
-    signatures: [['value']]
+    name: "number",
+    signatures: [["value"]]
   },
   {
-    name: 'pt',
-    signatures: [['value']]
+    name: "percent",
+    signatures: [["value"]]
   },
   {
-    name: 'pc',
-    signatures: [['value']]
+    name: "em",
+    signatures: [["value"]]
   },
   {
-    name: 'px',
-    signatures: [['value']]
+    name: "rem",
+    signatures: [["value"]]
   },
   {
-    name: 'Q',
-    signatures: [['value']]
+    name: "ex",
+    signatures: [["value"]]
   },
   {
-    name: 'deg',
-    signatures: [['value']]
+    name: "rex",
+    signatures: [["value"]]
   },
   {
-    name: 'grad',
-    signatures: [['value']]
+    name: "ch",
+    signatures: [["value"]]
   },
   {
-    name: 'rad',
-    signatures: [['value']]
+    name: "rch",
+    signatures: [["value"]]
   },
   {
-    name: 'turn',
-    signatures: [['value']]
+    name: "ic",
+    signatures: [["value"]]
   },
   {
-    name: 's',
-    signatures: [['value']]
+    name: "ric",
+    signatures: [["value"]]
   },
   {
-    name: 'ms',
-    signatures: [['value']]
+    name: "lh",
+    signatures: [["value"]]
   },
   {
-    name: 'Hz',
-    signatures: [['value']]
+    name: "rlh",
+    signatures: [["value"]]
   },
   {
-    name: 'kHz',
-    signatures: [['value']]
+    name: "cap",
+    signatures: [["value"]]
   },
   {
-    name: 'dpi',
-    signatures: [['value']]
+    name: "rcap",
+    signatures: [["value"]]
   },
   {
-    name: 'dpcm',
-    signatures: [['value']]
+    name: "vw",
+    signatures: [["value"]]
   },
   {
-    name: 'dppx',
-    signatures: [['value']]
+    name: "vh",
+    signatures: [["value"]]
   },
   {
-    name: 'fr',
-    signatures: [['value']]
+    name: "vi",
+    signatures: [["value"]]
   },
   {
-    name: 'CSSUnparsedValue',
-    signatures: [['members']]
+    name: "vb",
+    signatures: [["value"]]
   },
   {
-    name: 'CSSVariableReferenceValue',
-    signatures: [['variable','?fallback']]
+    name: "vmin",
+    signatures: [["value"]]
   },
   {
-    name: 'FontFaceSetLoadEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "vmax",
+    signatures: [["value"]]
   },
   {
-    name: 'FontFace',
-    signatures: [['family','source','?descriptors']]
+    name: "svw",
+    signatures: [["value"]]
   },
   {
-    name: 'MediaQueryListEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "svh",
+    signatures: [["value"]]
   },
   {
-    name: 'registerProperty',
-    signatures: [['definition']]
+    name: "svi",
+    signatures: [["value"]]
   },
   {
-    name: 'ContentVisibilityAutoStateChangeEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "svb",
+    signatures: [["value"]]
   },
   {
-    name: 'timeout',
-    signatures: [['milliseconds']]
+    name: "svmin",
+    signatures: [["value"]]
   },
   {
-    name: 'ChildNodePart',
-    signatures: [['root','previousSibling','nextSibling','?init']]
+    name: "svmax",
+    signatures: [["value"]]
   },
   {
-    name: 'Comment',
-    signatures: [['?data']]
+    name: "lvw",
+    signatures: [["value"]]
   },
   {
-    name: 'CSSToggleEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "lvh",
+    signatures: [["value"]]
   },
   {
-    name: 'CSSToggle',
-    signatures: [['?options']]
+    name: "lvi",
+    signatures: [["value"]]
   },
   {
-    name: 'requestStorageAccessFor',
-    signatures: [['requestedOrigin']]
+    name: "lvb",
+    signatures: [["value"]]
   },
   {
-    name: 'hasPrivateToken',
-    signatures: [['issuer']]
+    name: "lvmin",
+    signatures: [["value"]]
   },
   {
-    name: 'hasRedemptionRecord',
-    signatures: [['issuer']]
+    name: "lvmax",
+    signatures: [["value"]]
   },
   {
-    name: 'ariaNotify',
-    signatures: [['announcement','?options']]
+    name: "dvw",
+    signatures: [["value"]]
   },
   {
-    name: 'DOMException',
-    signatures: [['?message','?name']]
+    name: "dvh",
+    signatures: [["value"]]
   },
   {
-    name: 'getInnerHTML',
-    signatures: [['?options']]
+    name: "dvi",
+    signatures: [["value"]]
   },
   {
-    name: 'scrollIntoViewIfNeeded',
-    signatures: [['?centerIfNeeded']]
+    name: "dvb",
+    signatures: [["value"]]
   },
   {
-    name: 'CustomEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "dvmin",
+    signatures: [["value"]]
   },
   {
-    name: 'Event',
-    signatures: [['type','?eventInitDict']]
+    name: "dvmax",
+    signatures: [["value"]]
   },
   {
-    name: 'MutationObserver',
-    signatures: [['callback']]
+    name: "cqw",
+    signatures: [["value"]]
   },
   {
-    name: 'NodePart',
-    signatures: [['root','node','?init']]
+    name: "cqh",
+    signatures: [["value"]]
   },
   {
-    name: 'setApplyScroll',
-    signatures: [['scrollStateCallback','nativeScrollBehavior']]
+    name: "cqi",
+    signatures: [["value"]]
   },
   {
-    name: 'setDistributeScroll',
-    signatures: [['scrollStateCallback','nativeScrollBehavior']]
+    name: "cqb",
+    signatures: [["value"]]
   },
   {
-    name: 'expand',
-    signatures: [['?unit']]
+    name: "cqmin",
+    signatures: [["value"]]
   },
   {
-    name: 'StaticRange',
-    signatures: [['init']]
+    name: "cqmax",
+    signatures: [["value"]]
   },
   {
-    name: 'Text',
-    signatures: [['?data']]
+    name: "cm",
+    signatures: [["value"]]
   },
   {
-    name: 'CharacterBoundsUpdateEvent',
-    signatures: [['type','?options']]
+    name: "mm",
+    signatures: [["value"]]
   },
   {
-    name: 'EditContext',
-    signatures: [['?options']]
+    name: "in",
+    signatures: [["value"]]
   },
   {
-    name: 'updateSelection',
-    signatures: [['start','end']]
+    name: "pt",
+    signatures: [["value"]]
   },
   {
-    name: 'updateControlBounds',
-    signatures: [['controlBounds']]
+    name: "pc",
+    signatures: [["value"]]
   },
   {
-    name: 'updateSelectionBounds',
-    signatures: [['selectionBounds']]
+    name: "px",
+    signatures: [["value"]]
   },
   {
-    name: 'updateCharacterBounds',
-    signatures: [['rangeStart','characterBounds']]
+    name: "Q",
+    signatures: [["value"]]
   },
   {
-    name: 'updateText',
-    signatures: [['start','end','newText']]
+    name: "deg",
+    signatures: [["value"]]
   },
   {
-    name: 'TextFormatUpdateEvent',
-    signatures: [['type','?options']]
+    name: "grad",
+    signatures: [["value"]]
   },
   {
-    name: 'TextFormat',
-    signatures: [['?options']]
+    name: "rad",
+    signatures: [["value"]]
   },
   {
-    name: 'TextUpdateEvent',
-    signatures: [['type','?options']]
+    name: "turn",
+    signatures: [["value"]]
   },
   {
-    name: 'AnimationEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "s",
+    signatures: [["value"]]
   },
   {
-    name: 'AnimationPlaybackEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "ms",
+    signatures: [["value"]]
   },
   {
-    name: 'ClipboardEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "Hz",
+    signatures: [["value"]]
   },
   {
-    name: 'CompositionEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "kHz",
+    signatures: [["value"]]
   },
   {
-    name: 'DragEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "dpi",
+    signatures: [["value"]]
   },
   {
-    name: 'ErrorEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "dpcm",
+    signatures: [["value"]]
   },
   {
-    name: 'FocusEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "dppx",
+    signatures: [["value"]]
   },
   {
-    name: 'HashChangeEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "x",
+    signatures: [["value"]]
   },
   {
-    name: 'InputEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "fr",
+    signatures: [["value"]]
   },
   {
-    name: 'KeyboardEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "CSSUnparsedValue",
+    signatures: [["members"]]
   },
   {
-    name: 'MessageEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "CSSVariableReferenceValue",
+    signatures: [["variable","?fallback"]]
   },
   {
-    name: 'MouseEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "FontFaceSetLoadEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'OverscrollEvent',
-    signatures: [['type','bubbles','?eventInitDict']]
+    name: "FontFace",
+    signatures: [["family","source","?descriptors"]]
   },
   {
-    name: 'PageTransitionEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "MediaQueryListEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'PointerEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "registerProperty",
+    signatures: [["definition"]]
   },
   {
-    name: 'PopStateEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "ContentVisibilityAutoStateChangeEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'ProgressEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "timeout",
+    signatures: [["milliseconds"]]
   },
   {
-    name: 'PromiseRejectionEvent',
-    signatures: [['type','eventInitDict']]
+    name: "AttributePart",
+    signatures: [["root","element","localName","?init"]]
   },
   {
-    name: 'SecurityPolicyViolationEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "ChildNodePart",
+    signatures: [["root","previousSibling","nextSibling","?init"]]
   },
   {
-    name: 'initTextEvent',
-    signatures: [['?type','?bubbles','?cancelable','?view','?data']]
+    name: "Comment",
+    signatures: [["?data"]]
   },
   {
-    name: 'ToggleEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "parseHTMLUnsafe",
+    signatures: [["html"]]
   },
   {
-    name: 'TouchEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "caretPositionFromPoint",
+    signatures: [["x","y","?options"]],
+    receivers: ["Document"]
   },
   {
-    name: 'TransitionEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "caretPositionFromPoint",
+    signatures: [["x"]],
+    receivers: ["TextMetrics"]
   },
   {
-    name: 'UIEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "hasPrivateToken",
+    signatures: [["issuer"]]
   },
   {
-    name: 'WheelEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "hasRedemptionRecord",
+    signatures: [["issuer"]]
   },
   {
-    name: 'Headers',
-    signatures: [['?init']]
+    name: "ariaNotify",
+    signatures: [["announcement","?options"]]
   },
   {
-    name: 'Request',
-    signatures: [['input','?init']]
+    name: "setSequentialFocusStartingPoint",
+    signatures: [["element"]]
   },
   {
-    name: 'Response',
-    signatures: [['?body','?init']]
+    name: "DOMException",
+    signatures: [["?message","?name"]]
   },
   {
-    name: 'redirect',
-    signatures: [['url','?status']]
+    name: "getInnerHTML",
+    signatures: [["?options"]]
   },
   {
-    name: 'Blob',
-    signatures: [['?blobParts','?options']]
+    name: "getHTML",
+    signatures: [["?options"]]
   },
   {
-    name: 'File',
-    signatures: [['fileBits','fileName','?options']]
+    name: "scrollIntoViewIfNeeded",
+    signatures: [["?centerIfNeeded"]]
   },
   {
-    name: 'createObjectURL',
-    signatures: [['blob'],['source']]
+    name: "CustomEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'revokeObjectURL',
-    signatures: [['url']]
+    name: "on",
+    signatures: [["type","?options"]]
   },
   {
-    name: 'createSelectorDirective',
-    signatures: [['arg']]
+    name: "Event",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'TextDirective',
-    signatures: [['?options']]
+    name: "MutationObserver",
+    signatures: [["callback"]]
   },
   {
-    name: 'getHighEntropyValues',
-    signatures: [['hints']]
+    name: "NodePart",
+    signatures: [["root","node","?init"]]
   },
   {
-    name: 'PendingGetBeacon',
-    signatures: [['url','?options']]
+    name: "moveBefore",
+    signatures: [["node","child"]]
   },
   {
-    name: 'setURL',
-    signatures: [['url']]
+    name: "Observable",
+    signatures: [["callback"]]
   },
   {
-    name: 'PendingPostBeacon',
-    signatures: [['url','?options']]
+    name: "takeUntil",
+    signatures: [["notifier"]]
   },
   {
-    name: 'ReportingObserver',
-    signatures: [['callback','?options']]
+    name: "take",
+    signatures: [["number_to_take"]]
   },
   {
-    name: 'isInputPending',
-    signatures: [['?options']]
+    name: "drop",
+    signatures: [["number_to_drop"]]
   },
   {
-    name: 'getComputedAccessibleNode',
-    signatures: [['element']]
+    name: "switchMap",
+    signatures: [["mapper"]]
   },
   {
-    name: 'webkitRequestAnimationFrame',
-    signatures: [['callback']]
+    name: "inspect",
+    signatures: [["?inspect_observer"]]
   },
   {
-    name: 'webkitCancelAnimationFrame',
-    signatures: [['id']]
+    name: "first",
+    signatures: [["?options"]]
   },
   {
-    name: 'webkitRequestFullScreen',
-    signatures: [['?options']]
+    name: "last",
+    signatures: [["?options"]]
   },
   {
-    name: 'webkitRequestFullscreen',
-    signatures: [['?options']]
+    name: "expand",
+    signatures: [["?unit"]],
+    receivers: ["Range"]
   },
   {
-    name: 'DOMMatrixReadOnly',
-    signatures: [['?init']]
+    name: "expand",
+    signatures: [["input","newShape"]],
+    receivers: ["MLGraphBuilder"]
   },
   {
-    name: 'fromMatrix',
-    signatures: [['?other']]
+    name: "StaticRange",
+    signatures: [["init"]]
   },
   {
-    name: 'fromFloat32Array',
-    signatures: [['array32']]
+    name: "addTeardown",
+    signatures: [["teardown"]]
   },
   {
-    name: 'fromFloat64Array',
-    signatures: [['array64']]
+    name: "Text",
+    signatures: [["?data"]]
   },
   {
-    name: 'DOMMatrix',
-    signatures: [['?init']]
+    name: "CharacterBoundsUpdateEvent",
+    signatures: [["type","?options"]]
   },
   {
-    name: 'DOMPointReadOnly',
-    signatures: [['?x','?y','?z','?w']]
+    name: "EditContext",
+    signatures: [["?options"]]
   },
   {
-    name: 'fromPoint',
-    signatures: [['?other']]
+    name: "updateSelection",
+    signatures: [["start","end"]]
   },
   {
-    name: 'DOMPoint',
-    signatures: [['?x','?y','?z','?w']]
+    name: "updateControlBounds",
+    signatures: [["controlBounds"]]
   },
   {
-    name: 'DOMQuad',
-    signatures: [['?p1','?p2','?p3','?p4']]
+    name: "updateSelectionBounds",
+    signatures: [["selectionBounds"]]
   },
   {
-    name: 'fromRect',
-    signatures: [['?other']]
+    name: "updateCharacterBounds",
+    signatures: [["rangeStart","characterBounds"]]
   },
   {
-    name: 'fromQuad',
-    signatures: [['?other']]
+    name: "updateText",
+    signatures: [["start","end","newText"]]
   },
   {
-    name: 'DOMRectReadOnly',
-    signatures: [['?x','?y','?width','?height']]
+    name: "TextFormatUpdateEvent",
+    signatures: [["type","?options"]]
   },
   {
-    name: 'DOMRect',
-    signatures: [['?x','?y','?width','?height']]
+    name: "TextFormat",
+    signatures: [["?options"]]
   },
   {
-    name: 'Highlight',
-    signatures: [['...initRanges']]
+    name: "TextUpdateEvent",
+    signatures: [["type","?options"]]
   },
   {
-    name: 'configureHighDynamicRange',
-    signatures: [['options']]
+    name: "AnimationEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'ImageData',
-    signatures: [['sw','sh','?settings'],['data','sw','?sh','?settings']]
+    name: "AnimationPlaybackEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'CloseWatcher',
-    signatures: [['?options']]
+    name: "ClipboardEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'getName',
-    signatures: [['constructor']]
+    name: "CommandEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'reportEvent',
-    signatures: [['event']]
+    name: "CompositionEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'setReportEventDataForAutomaticBeacons',
-    signatures: [['event']]
+    name: "DragEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'FencedFrameConfig',
-    signatures: [['url']]
+    name: "ErrorEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'setSharedStorageContext',
-    signatures: [['contextString']]
+    name: "FocusEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'FormDataEvent',
-    signatures: [['type','eventInitDict']]
+    name: "HashChangeEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'FormData',
-    signatures: [['?form','?submitter']]
+    name: "InputEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'SubmitEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "InterestEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'togglePopover',
-    signatures: [['?force']]
+    name: "KeyboardEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'activate',
-    signatures: [['?options']]
+    name: "MessageEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'PortalActivateEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "MouseEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'TrackEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "OverscrollEvent",
+    signatures: [["type","bubbles","?eventInitDict"]]
   },
   {
-    name: 'VTTCue',
-    signatures: [['startTime','endTime','text']]
+    name: "PageTransitionEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'InputDeviceCapabilities',
-    signatures: [['?deviceInitDict']]
+    name: "PointerEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'Touch',
-    signatures: [['initDict']]
+    name: "PopStateEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'copyText',
-    signatures: [['text']]
+    name: "ProgressEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'showContextMenuAtPoint',
-    signatures: [['x','y','items','?document']]
+    name: "PromiseRejectionEvent",
+    signatures: [["type","eventInitDict"]]
   },
   {
-    name: 'sendMessageToEmbedder',
-    signatures: [['message']]
+    name: "SecurityPolicyViolationEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'IntersectionObserver',
-    signatures: [['callback','?options']]
+    name: "initTextEvent",
+    signatures: [["type","?bubbles","?cancelable","?view","?data"]]
   },
   {
-    name: 'layoutNextFragment',
-    signatures: [['?options']]
+    name: "ToggleEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'registerLayout',
-    signatures: [['name','layoutCtor']]
+    name: "TouchEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'watch',
-    signatures: [['signals','callback']]
+    name: "TransitionEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'writeMessage',
-    signatures: [['buffer','handles']]
+    name: "UIEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'readMessage',
-    signatures: [['?flags']]
+    name: "WheelEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'writeData',
-    signatures: [['buffer','?options']]
+    name: "fetchLater",
+    signatures: [["input","?init"]]
   },
   {
-    name: 'discardData',
-    signatures: [['numBytes','?options']]
+    name: "Headers",
+    signatures: [["?init"]]
   },
   {
-    name: 'readData',
-    signatures: [['buffer','?options']]
+    name: "Request",
+    signatures: [["input","?init"]]
   },
   {
-    name: 'mapBuffer',
-    signatures: [['offset','numBytes']]
+    name: "Response",
+    signatures: [["?body","?init"]]
   },
   {
-    name: 'duplicateBufferHandle',
-    signatures: [['?options']]
+    name: "redirect",
+    signatures: [["url","?status"]]
   },
   {
-    name: 'createDataPipe',
-    signatures: [['options']]
+    name: "Blob",
+    signatures: [["?blobParts","?options"]]
   },
   {
-    name: 'createSharedBuffer',
-    signatures: [['numBytes']]
+    name: "File",
+    signatures: [["fileBits","fileName","?options"]]
   },
   {
-    name: 'bindInterface',
-    signatures: [['interfaceName','request_handle','?scope']]
+    name: "createObjectURL",
+    signatures: [["blob"],["source"]],
+    receivers: ["URL"]
   },
   {
-    name: 'MojoInterfaceInterceptor',
-    signatures: [['interfaceName','?scope']]
+    name: "createObjectURL",
+    signatures: [["blob"]],
+    receivers: ["StorageAccessHandle"]
   },
   {
-    name: 'MojoInterfaceRequestEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "revokeObjectURL",
+    signatures: [["url"]]
   },
   {
-    name: 'NavigateEvent',
-    signatures: [['type','eventInit']]
+    name: "createSelectorDirective",
+    signatures: [["arg"]]
   },
   {
-    name: 'intercept',
-    signatures: [['?options']]
+    name: "TextDirective",
+    signatures: [["?options"]]
   },
   {
-    name: 'NavigationCurrentEntryChangeEvent',
-    signatures: [['type','eventInit']]
+    name: "getHighEntropyValues",
+    signatures: [["hints"]]
   },
   {
-    name: 'updateCurrentEntry',
-    signatures: [['options']]
+    name: "ReportingObserver",
+    signatures: [["callback","?options"]]
   },
   {
-    name: 'traverseTo',
-    signatures: [['key','?options']]
+    name: "isInputPending",
+    signatures: [["?options"]]
   },
   {
-    name: 'OffscreenCanvas',
-    signatures: [['width','height']]
+    name: "getComputedAccessibleNode",
+    signatures: [["element"]]
   },
   {
-    name: 'setValueAndClosePopup',
-    signatures: [['numberValue','stringValue']]
+    name: "webkitRequestAnimationFrame",
+    signatures: [["callback"]]
   },
   {
-    name: 'setValue',
-    signatures: [['value']]
+    name: "webkitCancelAnimationFrame",
+    signatures: [["id"]]
   },
   {
-    name: 'localizeNumberString',
-    signatures: [['numberString']]
+    name: "webkitRequestFullScreen",
+    signatures: [["?options"]]
   },
   {
-    name: 'formatMonth',
-    signatures: [['year','zeroBaseMonth']]
+    name: "webkitRequestFullscreen",
+    signatures: [["?options"]]
   },
   {
-    name: 'formatShortMonth',
-    signatures: [['year','zeroBaseMonth']]
+    name: "DOMMatrixReadOnly",
+    signatures: [["?init"]]
   },
   {
-    name: 'formatWeek',
-    signatures: [['year','weekNumber','localizedStartDate']]
+    name: "fromMatrix",
+    signatures: [["?other"]]
   },
   {
-    name: 'setWindowRect',
-    signatures: [['x','y','width','height']]
+    name: "fromFloat32Array",
+    signatures: [["array32"]]
   },
   {
-    name: 'setMenuListOptionsBoundsInAXTree',
-    signatures: [['options_bounds']]
+    name: "fromFloat64Array",
+    signatures: [["array64"]]
   },
   {
-    name: 'ScrollState',
-    signatures: [['?scrollStateInit']]
+    name: "DOMMatrix",
+    signatures: [["?init"]]
   },
   {
-    name: 'consumeDelta',
-    signatures: [['x','y']]
+    name: "DOMPointReadOnly",
+    signatures: [["?x","?y","?z","?w"]]
   },
   {
-    name: 'allowsFeature',
-    signatures: [['feature','?origin']]
+    name: "fromPoint",
+    signatures: [["?other"]]
   },
   {
-    name: 'getAllowlistForFeature',
-    signatures: [['feature']]
+    name: "DOMPoint",
+    signatures: [["?x","?y","?z","?w"]]
   },
   {
-    name: 'ResizeObserver',
-    signatures: [['callback']]
+    name: "DOMQuad",
+    signatures: [["?p1","?p2","?p3","?p4"]]
   },
   {
-    name: 'ByteLengthQueuingStrategy',
-    signatures: [['init']]
+    name: "fromRect",
+    signatures: [["?other"]]
   },
   {
-    name: 'CountQueuingStrategy',
-    signatures: [['init']]
+    name: "fromQuad",
+    signatures: [["?other"]]
   },
   {
-    name: 'ReadableStreamBYOBReader',
-    signatures: [['stream']]
+    name: "DOMRectReadOnly",
+    signatures: [["?x","?y","?width","?height"]]
   },
   {
-    name: 'ReadableStreamDefaultReader',
-    signatures: [['stream']]
+    name: "DOMRect",
+    signatures: [["?x","?y","?width","?height"]]
   },
   {
-    name: 'ReadableStream',
-    signatures: [['?underlyingSource','?strategy']]
+    name: "Highlight",
+    signatures: [["...initRanges"]]
   },
   {
-    name: 'TransformStream',
-    signatures: [['?transformer','?writableStrategy','?readableStrategy']]
+    name: "configureHighDynamicRange",
+    signatures: [["options"]]
   },
   {
-    name: 'WritableStream',
-    signatures: [['?underlyingSink','?strategy']]
+    name: "ImageData",
+    signatures: [["sw","sh","?settings"],["data","sw","?sh","?settings"]]
   },
   {
-    name: 'PerformanceMark',
-    signatures: [['markName','?markOptions']]
+    name: "getSelectionRects",
+    signatures: [["start","end"]]
   },
   {
-    name: 'PerformanceObserver',
-    signatures: [['callback']]
+    name: "getActualBoundingBox",
+    signatures: [["start","end"]]
   },
   {
-    name: 'Profiler',
-    signatures: [['options']]
+    name: "CloseWatcher",
+    signatures: [["?options"]]
   },
   {
-    name: 'fromLiteral',
-    signatures: [['templateLiteral']]
+    name: "reportEvent",
+    signatures: [["event"]]
   },
   {
-    name: 'createPolicy',
-    signatures: [['policyName','?policyOptions']]
+    name: "setReportEventDataForAutomaticBeacons",
+    signatures: [["event"]]
   },
   {
-    name: 'isHTML',
-    signatures: [['checkedObject']]
+    name: "notifyEvent",
+    signatures: [["triggering_event"]]
   },
   {
-    name: 'isScript',
-    signatures: [['checkedObject']]
+    name: "FencedFrameConfig",
+    signatures: [["url"]]
   },
   {
-    name: 'isScriptURL',
-    signatures: [['checkedObject']]
+    name: "setSharedStorageContext",
+    signatures: [["contextString"]]
   },
   {
-    name: 'getAttributeType',
-    signatures: [['tagName','attribute','?elementNS','?attrNs']]
+    name: "FormDataEvent",
+    signatures: [["type","eventInitDict"]]
   },
   {
-    name: 'getPropertyType',
-    signatures: [['tagName','property','?elementNS']]
+    name: "FormData",
+    signatures: [["?form","?submitter"]]
   },
   {
-    name: 'getTypeMapping',
-    signatures: [['?ns']]
+    name: "SubmitEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'createHTML',
-    signatures: [['input','...args']]
+    name: "TrackEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'createScript',
-    signatures: [['input','...args']]
+    name: "VTTCue",
+    signatures: [["startTime","endTime","text"]]
   },
   {
-    name: 'createScriptURL',
-    signatures: [['input','...args']]
+    name: "InputDeviceCapabilities",
+    signatures: [["?deviceInitDict"]]
   },
   {
-    name: 'URLPattern',
-    signatures: [['?input','?options'],['input','baseURL','?options']]
+    name: "Touch",
+    signatures: [["initDict"]]
   },
   {
-    name: 'compareComponent',
-    signatures: [['component','left','right']]
+    name: "copyText",
+    signatures: [["text"]]
   },
   {
-    name: 'URLSearchParams',
-    signatures: [['?init']]
+    name: "showContextMenuAtPoint",
+    signatures: [["x","y","items","?document"]]
   },
   {
-    name: 'URL',
-    signatures: [['url','?base']]
+    name: "sendMessageToEmbedder",
+    signatures: [["message"]]
   },
   {
-    name: 'startViewTransition',
-    signatures: [['?callback']]
+    name: "layoutNextFragment",
+    signatures: [["?options"]]
   },
   {
-    name: 'SharedWorker',
-    signatures: [['scriptURL','?options']]
+    name: "registerLayout",
+    signatures: [["name","layoutCtor"]]
   },
   {
-    name: 'Worker',
-    signatures: [['scriptURL','?options']]
+    name: "watch",
+    signatures: [["signals","callback"]]
   },
   {
-    name: 'setPrivateToken',
-    signatures: [['privateToken']]
+    name: "writeMessage",
+    signatures: [["buffer","handles"]]
   },
   {
-    name: 'setAttributionReporting',
-    signatures: [['attributionReporting']]
+    name: "readMessage",
+    signatures: [["?flags"]]
   },
   {
-    name: 'joinAdInterestGroup',
-    signatures: [['group','?durationSeconds']]
+    name: "writeData",
+    signatures: [["buffer","?options"]]
   },
   {
-    name: 'leaveAdInterestGroup',
-    signatures: [['?group']]
+    name: "discardData",
+    signatures: [["numBytes","?options"]]
   },
   {
-    name: 'runAdAuction',
-    signatures: [['config']]
+    name: "readData",
+    signatures: [["buffer","?options"]]
   },
   {
-    name: 'adAuctionComponents',
-    signatures: [['numComponents']]
+    name: "mapBuffer",
+    signatures: [["offset","numBytes"]]
   },
   {
-    name: 'deprecatedURNToURL',
-    signatures: [['urn_or_config','?send_reports']]
+    name: "duplicateBufferHandle",
+    signatures: [["?options"]]
   },
   {
-    name: 'deprecatedReplaceInURN',
-    signatures: [['urn_or_config','replacements']]
+    name: "createDataPipe",
+    signatures: [["options"]]
   },
   {
-    name: 'getInterestGroupAdAuctionData',
-    signatures: [['config']]
+    name: "createSharedBuffer",
+    signatures: [["numBytes"]]
   },
   {
-    name: 'createAdRequest',
-    signatures: [['config']]
+    name: "bindInterface",
+    signatures: [["interfaceName","request_handle","?scope"]]
   },
   {
-    name: 'finalizeAd',
-    signatures: [['ads','config']]
+    name: "MojoInterfaceInterceptor",
+    signatures: [["interfaceName","?scope"]]
   },
   {
-    name: 'registerAnimator',
-    signatures: [['name','animatorCtor']]
+    name: "MojoInterfaceRequestEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'WorkletAnimation',
-    signatures: [['animatorName','effects','?timeline','?options']]
+    name: "NavigateEvent",
+    signatures: [["type","eventInit"]]
   },
   {
-    name: 'BeforeInstallPromptEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "intercept",
+    signatures: [["?options"]]
   },
   {
-    name: 'setSinkId',
-    signatures: [['sinkId']]
+    name: "NavigationCurrentEntryChangeEvent",
+    signatures: [["type","eventInit"]]
   },
   {
-    name: 'BackgroundFetchEvent',
-    signatures: [['type','init']]
+    name: "updateCurrentEntry",
+    signatures: [["options"]]
   },
   {
-    name: 'BackgroundFetchUpdateUIEvent',
-    signatures: [['type','init']]
+    name: "traverseTo",
+    signatures: [["key","?options"]]
   },
   {
-    name: 'updateUI',
-    signatures: [['?options']]
+    name: "OffscreenCanvas",
+    signatures: [["width","height"]]
   },
   {
-    name: 'PeriodicSyncEvent',
-    signatures: [['type','init']]
+    name: "setValueAndClosePopup",
+    signatures: [["numberValue","stringValue"]]
   },
   {
-    name: 'SyncEvent',
-    signatures: [['type','init']]
+    name: "setValue",
+    signatures: [["value"]]
   },
   {
-    name: 'watchAdvertisements',
-    signatures: [['?options']]
+    name: "localizeNumberString",
+    signatures: [["numberString"]]
   },
   {
-    name: 'getDescriptor',
-    signatures: [['descriptor']],
-    receivers: ['BluetoothRemoteGATTCharacteristic']
+    name: "formatMonth",
+    signatures: [["year","zeroBaseMonth"]]
   },
   {
-    name: 'getDescriptor',
-    signatures: [['name']],
-    receivers: ['BluetoothUUID']
+    name: "formatShortMonth",
+    signatures: [["year","zeroBaseMonth"]]
   },
   {
-    name: 'getDescriptors',
-    signatures: [['?descriptor']]
+    name: "formatWeek",
+    signatures: [["year","weekNumber","localizedStartDate"]]
   },
   {
-    name: 'writeValue',
-    signatures: [['value']]
+    name: "setWindowRect",
+    signatures: [["x","y","width","height"]]
   },
   {
-    name: 'writeValueWithResponse',
-    signatures: [['value']]
+    name: "setMenuListOptionsBoundsInAXTree",
+    signatures: [["options_bounds","children_updated"]]
   },
   {
-    name: 'writeValueWithoutResponse',
-    signatures: [['value']]
+    name: "allowsFeature",
+    signatures: [["feature","?origin"]]
   },
   {
-    name: 'getPrimaryService',
-    signatures: [['service']]
+    name: "getAllowlistForFeature",
+    signatures: [["feature"]]
   },
   {
-    name: 'getPrimaryServices',
-    signatures: [['?service']]
+    name: "requestOverride",
+    signatures: [["value"]]
   },
   {
-    name: 'getCharacteristic',
-    signatures: [['characteristic']],
-    receivers: ['BluetoothRemoteGATTService']
+    name: "ResizeObserver",
+    signatures: [["callback"]]
   },
   {
-    name: 'getCharacteristic',
-    signatures: [['name']],
-    receivers: ['BluetoothUUID']
+    name: "ByteLengthQueuingStrategy",
+    signatures: [["init"]]
   },
   {
-    name: 'getCharacteristics',
-    signatures: [['?characteristic']]
+    name: "CountQueuingStrategy",
+    signatures: [["init"]]
   },
   {
-    name: 'getService',
-    signatures: [['name']]
+    name: "ReadableStreamBYOBReader",
+    signatures: [["stream"]]
   },
   {
-    name: 'canonicalUUID',
-    signatures: [['alias']]
+    name: "ReadableStreamDefaultReader",
+    signatures: [["stream"]]
   },
   {
-    name: 'requestDevice',
-    signatures: [['?options']],
-    receivers: ['Bluetooth']
+    name: "ReadableStream",
+    signatures: [["?underlyingSource","?strategy"]]
   },
   {
-    name: 'requestDevice',
-    signatures: [['options']],
-    receivers: ['HID','USB']
+    name: "TransformStream",
+    signatures: [["?transformer","?writableStrategy","?readableStrategy"]]
   },
   {
-    name: 'requestDevice',
-    signatures: [['?descriptor']],
-    receivers: ['GPUAdapter']
+    name: "WritableStream",
+    signatures: [["?underlyingSink","?strategy"]]
   },
   {
-    name: 'requestLEScan',
-    signatures: [['?options']]
+    name: "PerformanceMark",
+    signatures: [["markName","?markOptions"]]
   },
   {
-    name: 'MediaStreamTrackGenerator',
-    signatures: [['kind'],['init']]
+    name: "PerformanceObserver",
+    signatures: [["callback"]]
   },
   {
-    name: 'MediaStreamTrackProcessor',
-    signatures: [['init'],['track','?bufferSize']]
+    name: "Profiler",
+    signatures: [["options"]]
   },
   {
-    name: 'BroadcastChannel',
-    signatures: [['name']]
+    name: "fromLiteral",
+    signatures: [["templateLiteral"]]
   },
   {
-    name: 'browsingTopics',
-    signatures: [['?options']]
+    name: "createPolicy",
+    signatures: [["policyName","?policyOptions"]]
   },
   {
-    name: 'setExpires',
-    signatures: [['expires']]
+    name: "isHTML",
+    signatures: [["checkedObject"]]
   },
   {
-    name: 'CanvasFilter',
-    signatures: [['init']]
+    name: "isScript",
+    signatures: [["checkedObject"]]
   },
   {
-    name: 'beginLayer',
-    signatures: [['?filter']]
+    name: "isScriptURL",
+    signatures: [["checkedObject"]]
   },
   {
-    name: 'scrollPathIntoView',
-    signatures: [['?path']]
+    name: "getAttributeType",
+    signatures: [["tagName","attribute","?elementNS","?attrNs"]]
   },
   {
-    name: 'drawFormattedText',
-    signatures: [['formattedText','x','y']]
+    name: "getPropertyType",
+    signatures: [["tagName","property","?elementNS"]]
   },
   {
-    name: 'Path2D',
-    signatures: [['?path']]
+    name: "getTypeMapping",
+    signatures: [["?ns"]]
   },
   {
-    name: 'ClipboardItem',
-    signatures: [['items']]
+    name: "createHTML",
+    signatures: [["input","...args"]]
   },
   {
-    name: 'CompressionStream',
-    signatures: [['format']]
+    name: "createScript",
+    signatures: [["input","...args"]]
   },
   {
-    name: 'DecompressionStream',
-    signatures: [['format']]
+    name: "createScriptURL",
+    signatures: [["input","...args"]]
   },
   {
-    name: 'ContentIndexEvent',
-    signatures: [['type','init']]
+    name: "URLPattern",
+    signatures: [["?input","?options"],["input","baseURL","?options"]]
   },
   {
-    name: 'FederatedCredential',
-    signatures: [['data']]
+    name: "compareComponent",
+    signatures: [["component","left","right"]]
   },
   {
-    name: 'logoutRPs',
-    signatures: [['?logout_requests']]
+    name: "URLSearchParams",
+    signatures: [["?init"]]
   },
   {
-    name: 'getUserInfo',
-    signatures: [['config']]
+    name: "URL",
+    signatures: [["url","?base"]]
   },
   {
-    name: 'PasswordCredential',
-    signatures: [['data'],['form']]
+    name: "canParse",
+    signatures: [["url","?base"]]
   },
   {
-    name: 'registerPaint',
-    signatures: [['name','paintCtor']]
+    name: "startViewTransition",
+    signatures: [["?update"],["opts"]]
   },
   {
-    name: 'updateInkTrailStartPoint',
-    signatures: [['evt','style']]
+    name: "SharedWorker",
+    signatures: [["scriptURL","?options"]]
   },
   {
-    name: 'requestPresenter',
-    signatures: [['?param']]
+    name: "Worker",
+    signatures: [["scriptURL","?options"]]
   },
   {
-    name: 'DeviceMotionEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "setPrivateToken",
+    signatures: [["privateToken"]]
   },
   {
-    name: 'requestPermission',
-    signatures: [['?descriptor']],
-    receivers: ['FileSystemHandle']
+    name: "setAttributionReporting",
+    signatures: [["attributionReporting"]]
   },
   {
-    name: 'requestPermission',
-    signatures: [['?deprecatedCallback']],
-    receivers: ['Notification']
+    name: "queryFeatureSupport",
+    signatures: [["feature"]]
   },
   {
-    name: 'DeviceOrientationEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "promptStreaming",
+    signatures: [["input"]]
   },
   {
-    name: 'TCPServerSocket',
-    signatures: [['localAddress','?options']]
+    name: "createTextSession",
+    signatures: [["?options"]]
   },
   {
-    name: 'TCPSocket',
-    signatures: [['remoteAddress','remotePort','?options']]
+    name: "registerAnimator",
+    signatures: [["name","animatorCtor"]]
   },
   {
-    name: 'UDPSocket',
-    signatures: [['options']]
+    name: "WorkletAnimation",
+    signatures: [["animatorName","effects","?timeline","?options"]]
   },
   {
-    name: 'DocumentPictureInPictureEvent',
-    signatures: [['type','eventInitDict']]
+    name: "BeforeInstallPromptEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'requestWindow',
-    signatures: [['?options']]
+    name: "setResizable",
+    signatures: [["resizable"]]
   },
   {
-    name: 'TextDecoderStream',
-    signatures: [['?label','?options']]
+    name: "BackgroundFetchEvent",
+    signatures: [["type","init"]]
   },
   {
-    name: 'TextDecoder',
-    signatures: [['?label','?options']]
+    name: "BackgroundFetchUpdateUIEvent",
+    signatures: [["type","init"]]
   },
   {
-    name: 'MediaEncryptedEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "updateUI",
+    signatures: [["?options"]]
   },
   {
-    name: 'MediaKeyMessageEvent',
-    signatures: [['type','eventInitDict']]
+    name: "PeriodicSyncEvent",
+    signatures: [["type","init"]]
   },
   {
-    name: 'getStatusForPolicy',
-    signatures: [['policy']]
+    name: "SyncEvent",
+    signatures: [["type","init"]]
   },
   {
-    name: 'getEnvironmentIntegrity',
-    signatures: [['contentBinding']]
+    name: "watchAdvertisements",
+    signatures: [["?options"]]
   },
   {
-    name: 'EventSource',
-    signatures: [['url','?eventSourceInitDict']]
+    name: "getDescriptor",
+    signatures: [["descriptor"]],
+    receivers: ["BluetoothRemoteGATTCharacteristic"]
   },
   {
-    name: 'move',
-    signatures: [['new_entry_name'],['destination_directory','?new_entry_name']]
+    name: "getDescriptor",
+    signatures: [["name"]],
+    receivers: ["BluetoothUUID"]
   },
   {
-    name: 'queryPermission',
-    signatures: [['?descriptor']]
+    name: "getDescriptors",
+    signatures: [["?descriptor"]]
   },
   {
-    name: 'showOpenFilePicker',
-    signatures: [['?options']]
+    name: "writeValue",
+    signatures: [["value"]]
   },
   {
-    name: 'showSaveFilePicker',
-    signatures: [['?options']]
+    name: "writeValueWithResponse",
+    signatures: [["value"]]
   },
   {
-    name: 'showDirectoryPicker',
-    signatures: [['?options']]
+    name: "writeValueWithoutResponse",
+    signatures: [["value"]]
   },
   {
-    name: 'webkitRequestFileSystem',
-    signatures: [['type','size','?successCallback','?errorCallback']],
-    receivers: ['DedicatedWorkerGlobalScope','SharedWorkerGlobalScope']
+    name: "getPrimaryService",
+    signatures: [["service"]]
   },
   {
-    name: 'webkitRequestFileSystem',
-    signatures: [['type','size','successCallback','?errorCallback']],
-    receivers: ['Window']
+    name: "getPrimaryServices",
+    signatures: [["?service"]]
   },
   {
-    name: 'webkitRequestFileSystemSync',
-    signatures: [['type','size']]
+    name: "getCharacteristic",
+    signatures: [["characteristic"]],
+    receivers: ["BluetoothRemoteGATTService"]
   },
   {
-    name: 'webkitResolveLocalFileSystemURL',
-    signatures: [['url','successCallback','?errorCallback']]
+    name: "getCharacteristic",
+    signatures: [["name"]],
+    receivers: ["BluetoothUUID"]
   },
   {
-    name: 'webkitResolveLocalFileSystemSyncURL',
-    signatures: [['url']]
+    name: "getCharacteristics",
+    signatures: [["?characteristic"]]
   },
   {
-    name: 'isolatedFileSystem',
-    signatures: [['fileSystemId','registeredName']]
+    name: "getService",
+    signatures: [["name"]]
   },
   {
-    name: 'upgradeDraggedFileSystemPermissions',
-    signatures: [['domFileSystem']]
+    name: "canonicalUUID",
+    signatures: [["alias"]]
   },
   {
-    name: 'removeRecursively',
-    signatures: [['successCallback','?errorCallback']],
-    receivers: ['DirectoryEntry']
+    name: "requestDevice",
+    signatures: [["?options"]],
+    receivers: ["Bluetooth"]
   },
   {
-    name: 'createWriter',
-    signatures: [['successCallback','?errorCallback']],
-    receivers: ['FileEntry']
+    name: "requestDevice",
+    signatures: [["options"]],
+    receivers: ["HID","USB"]
   },
   {
-    name: 'queryLocalFonts',
-    signatures: [['?options']]
+    name: "requestDevice",
+    signatures: [["?descriptor"]],
+    receivers: ["GPUAdapter"]
   },
   {
-    name: 'format',
-    signatures: [['text_runs','?style','?inline_constraint','?block_constraint']]
+    name: "requestLEScan",
+    signatures: [["?options"]]
   },
   {
-    name: 'GamepadAxisEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "MediaStreamTrackGenerator",
+    signatures: [["kind"],["init"]]
   },
   {
-    name: 'GamepadButtonEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "MediaStreamTrackProcessor",
+    signatures: [["init"],["track","?bufferSize"]]
   },
   {
-    name: 'GamepadEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "BroadcastChannel",
+    signatures: [["name"]]
   },
   {
-    name: 'canPlay',
-    signatures: [['type']]
+    name: "browsingTopics",
+    signatures: [["?options"]]
   },
   {
-    name: 'addStroke',
-    signatures: [['stroke']]
+    name: "setExpires",
+    signatures: [["expires"]]
   },
   {
-    name: 'removeStroke',
-    signatures: [['stroke']]
+    name: "transferToGPUTexture",
+    signatures: [["options"]]
   },
   {
-    name: 'startDrawing',
-    signatures: [['?hints']]
+    name: "CanvasFilter",
+    signatures: [["init"]]
   },
   {
-    name: 'addPoint',
-    signatures: [['point']]
+    name: "beginLayer",
+    signatures: [["?options"]]
   },
   {
-    name: 'createHandwritingRecognizer',
-    signatures: [['constraint']]
+    name: "scrollPathIntoView",
+    signatures: [["?path"]]
   },
   {
-    name: 'queryHandwritingRecognizer',
-    signatures: [['constraint']]
+    name: "drawFormattedText",
+    signatures: [["formattedText","x","y"]]
   },
   {
-    name: 'HIDConnectionEvent',
-    signatures: [['type','eventInitDict']]
+    name: "createMesh2DVertexBuffer",
+    signatures: [["buffer"]]
   },
   {
-    name: 'sendReport',
-    signatures: [['reportId','data']]
+    name: "createMesh2DUVBuffer",
+    signatures: [["buffer"]]
   },
   {
-    name: 'sendFeatureReport',
-    signatures: [['reportId','data']]
+    name: "createMesh2DIndexBuffer",
+    signatures: [["buffer"]]
   },
   {
-    name: 'receiveFeatureReport',
-    signatures: [['reportId']]
+    name: "drawMesh",
+    signatures: [["vertex_buffer","uv_buffer","index_buffer","image"]]
   },
   {
-    name: 'ImageCapture',
-    signatures: [['track']]
+    name: "Path2D",
+    signatures: [["?path"]]
   },
   {
-    name: 'takePhoto',
-    signatures: [['?photoSettings']]
+    name: "ClipboardItem",
+    signatures: [["items"]]
   },
   {
-    name: 'batchGetAll',
-    signatures: [['?keys','?count']]
+    name: "CompressionStream",
+    signatures: [["format"]]
   },
   {
-    name: 'only',
-    signatures: [['value']]
+    name: "DecompressionStream",
+    signatures: [["format"]]
   },
   {
-    name: 'lowerBound',
-    signatures: [['bound','?open']]
+    name: "ContentIndexEvent",
+    signatures: [["type","init"]]
   },
   {
-    name: 'upperBound',
-    signatures: [['bound','?open']]
+    name: "report",
+    signatures: [["options"]]
   },
   {
-    name: 'bound',
-    signatures: [['lower','upper','?lowerOpen','?upperOpen']]
+    name: "FederatedCredential",
+    signatures: [["data"]]
   },
   {
-    name: 'IDBVersionChangeEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "IdentityCredentialError",
+    signatures: [["?message","?options"]]
   },
   {
-    name: 'setConsumer',
-    signatures: [['consumer']]
+    name: "getUserInfo",
+    signatures: [["config"]]
   },
   {
-    name: 'BlobEvent',
-    signatures: [['type','eventInitDict']]
+    name: "setStatus",
+    signatures: [["status"]]
   },
   {
-    name: 'MediaRecorder',
-    signatures: [['stream','?options']]
+    name: "PasswordCredential",
+    signatures: [["data"],["form"]]
   },
   {
-    name: 'isTypeSupported',
-    signatures: [['type']]
+    name: "parseCreationOptionsFromJSON",
+    signatures: [["options"]]
   },
   {
-    name: 'MediaMetadata',
-    signatures: [['?init']]
+    name: "parseRequestOptionsFromJSON",
+    signatures: [["options"]]
   },
   {
-    name: 'setMicrophoneActive',
-    signatures: [['active']]
+    name: "registerPaint",
+    signatures: [["name","paintCtor"]]
   },
   {
-    name: 'setCameraActive',
-    signatures: [['active']]
+    name: "updateInkTrailStartPoint",
+    signatures: [["evt","style"]]
   },
   {
-    name: 'appendEncodedChunks',
-    signatures: [['chunks']]
+    name: "requestPresenter",
+    signatures: [["?param"]]
   },
   {
-    name: 'TrackDefaultList',
-    signatures: [['?trackDefaults']]
+    name: "DeviceMotionEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'TrackDefault',
-    signatures: [['type','language','label','kinds','?byteStreamTrackID']]
+    name: "requestPermission",
+    signatures: [["?descriptor"]],
+    receivers: ["FileSystemHandle"]
   },
   {
-    name: 'cropTo',
-    signatures: [['crop_id']]
+    name: "requestPermission",
+    signatures: [["?deprecatedCallback"]],
+    receivers: ["Notification"]
   },
   {
-    name: 'setFocusBehavior',
-    signatures: [['focusBehavior']]
+    name: "DeviceOrientationEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'CapturedMouseEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "DocumentPictureInPictureEvent",
+    signatures: [["type","eventInitDict"]]
   },
   {
-    name: 'fromElement',
-    signatures: [['element']]
+    name: "requestWindow",
+    signatures: [["?options"]]
   },
   {
-    name: 'setCaptureHandleConfig',
-    signatures: [['?config']]
+    name: "TextDecoderStream",
+    signatures: [["?label","?options"]]
   },
   {
-    name: 'MediaStreamEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "TextDecoder",
+    signatures: [["?label","?options"]]
   },
   {
-    name: 'MediaStreamTrackEvent',
-    signatures: [['type','eventInitDict']]
+    name: "MediaEncryptedEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'MediaStream',
-    signatures: [['?stream'],['tracks']]
+    name: "MediaKeyMessageEvent",
+    signatures: [["type","eventInitDict"]]
   },
   {
-    name: 'webkitGetUserMedia',
-    signatures: [['constraints','successCallback','errorCallback']]
+    name: "getStatusForPolicy",
+    signatures: [["policy"]]
   },
   {
-    name: 'OverconstrainedError',
-    signatures: [['constraint','?message']]
+    name: "EventSource",
+    signatures: [["url","?eventSourceInitDict"]]
   },
   {
-    name: 'compute',
-    signatures: [['graph','inputs','outputs']],
-    receivers: ['MLContext']
+    name: "queryPermission",
+    signatures: [["?descriptor"]]
   },
   {
-    name: 'compute',
-    signatures: [['inputs']],
-    receivers: ['MLModel']
+    name: "FileSystemObserver",
+    signatures: [["callback"]]
   },
   {
-    name: 'computeSync',
-    signatures: [['graph','inputs','outputs']]
+    name: "showOpenFilePicker",
+    signatures: [["?options"]]
   },
   {
-    name: 'MLModelLoader',
-    signatures: [['context']]
+    name: "showSaveFilePicker",
+    signatures: [["?options"]]
   },
   {
-    name: 'createContext',
-    signatures: [['?options']]
+    name: "showDirectoryPicker",
+    signatures: [["?options"]]
   },
   {
-    name: 'createContextSync',
-    signatures: [['?options']]
+    name: "webkitRequestFileSystem",
+    signatures: [["type","size","?successCallback","?errorCallback"]],
+    receivers: ["DedicatedWorkerGlobalScope","SharedWorkerGlobalScope"]
   },
   {
-    name: 'MLGraphBuilder',
-    signatures: [['context']]
+    name: "webkitRequestFileSystem",
+    signatures: [["type","size","successCallback","?errorCallback"]],
+    receivers: ["Window"]
   },
   {
-    name: 'input',
-    signatures: [['name','desc']]
+    name: "webkitRequestFileSystemSync",
+    signatures: [["type","size"]]
   },
   {
-    name: 'constant',
-    signatures: [['desc','bufferView']]
+    name: "webkitResolveLocalFileSystemURL",
+    signatures: [["url","successCallback","?errorCallback"]]
   },
   {
-    name: 'clamp',
-    signatures: [['?options'],['input','?options']]
+    name: "webkitResolveLocalFileSystemSyncURL",
+    signatures: [["url"]]
   },
   {
-    name: 'conv2d',
-    signatures: [['input','filter','?options']]
+    name: "isolatedFileSystem",
+    signatures: [["fileSystemId","registeredName"]]
   },
   {
-    name: 'convTranspose2d',
-    signatures: [['input','filter','?options']]
+    name: "upgradeDraggedFileSystemPermissions",
+    signatures: [["domFileSystem"]]
   },
   {
-    name: 'neg',
-    signatures: [['x']]
+    name: "removeRecursively",
+    signatures: [["successCallback","?errorCallback"]],
+    receivers: ["DirectoryEntry"]
   },
   {
-    name: 'elu',
-    signatures: [['?options'],['x','?options']]
+    name: "createWriter",
+    signatures: [["successCallback","?errorCallback"]],
+    receivers: ["FileEntry"]
   },
   {
-    name: 'gemm',
-    signatures: [['a','b','?options']]
+    name: "queryLocalFonts",
+    signatures: [["?options"]]
   },
   {
-    name: 'hardSwish',
-    signatures: [['?x']]
+    name: "format",
+    signatures: [["text_runs","?style","?inline_constraint","?block_constraint"]]
   },
   {
-    name: 'leakyRelu',
-    signatures: [['?options'],['x','?options']]
+    name: "runFuzzer",
+    signatures: [["fuzzer_id","fuzzer_data"]]
   },
   {
-    name: 'pad',
-    signatures: [['input','beginningPadding','endingPadding','?options']]
+    name: "GamepadAxisEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'averagePool2d',
-    signatures: [['input','?options']]
+    name: "GamepadButtonEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'maxPool2d',
-    signatures: [['input','?options']]
+    name: "GamepadEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'prelu',
-    signatures: [['x','slope']]
+    name: "addStroke",
+    signatures: [["stroke"]]
   },
   {
-    name: 'reduceSum',
-    signatures: [['input','?options']]
+    name: "removeStroke",
+    signatures: [["stroke"]]
   },
   {
-    name: 'reduceMean',
-    signatures: [['input','?options']]
+    name: "startDrawing",
+    signatures: [["?hints"]]
   },
   {
-    name: 'relu',
-    signatures: [['?input']]
+    name: "addPoint",
+    signatures: [["point"]]
   },
   {
-    name: 'reshape',
-    signatures: [['input','newShape']]
+    name: "createHandwritingRecognizer",
+    signatures: [["constraint"]]
   },
   {
-    name: 'resample2d',
-    signatures: [['input','?options']]
+    name: "queryHandwritingRecognizer",
+    signatures: [["constraint"]]
   },
   {
-    name: 'sigmoid',
-    signatures: [['?input']]
+    name: "HIDConnectionEvent",
+    signatures: [["type","eventInitDict"]]
   },
   {
-    name: 'transpose',
-    signatures: [['input','?options']]
+    name: "sendReport",
+    signatures: [["reportId","data"]]
   },
   {
-    name: 'softmax',
-    signatures: [['input']]
+    name: "sendFeatureReport",
+    signatures: [["reportId","data"]]
   },
   {
-    name: 'build',
-    signatures: [['outputs']]
+    name: "receiveFeatureReport",
+    signatures: [["reportId"]]
   },
   {
-    name: 'buildSync',
-    signatures: [['outputs']]
+    name: "ImageCapture",
+    signatures: [["track"]]
   },
   {
-    name: 'getFileSystemAccessTransferToken',
-    signatures: [['fileHandle']]
+    name: "takePhoto",
+    signatures: [["?photoSettings"]]
   },
   {
-    name: 'unregisterProtocolHandler',
-    signatures: [['scheme','url']]
+    name: "only",
+    signatures: [["value"]]
   },
   {
-    name: 'NDEFMessage',
-    signatures: [['messageInit']]
+    name: "lowerBound",
+    signatures: [["bound","?open"]]
   },
   {
-    name: 'scan',
-    signatures: [['?options']]
+    name: "upperBound",
+    signatures: [["bound","?open"]]
   },
   {
-    name: 'makeReadOnly',
-    signatures: [['?options']]
+    name: "bound",
+    signatures: [["lower","upper","?lowerOpen","?upperOpen"]]
   },
   {
-    name: 'NDEFReadingEvent',
-    signatures: [['type','eventInitDict']]
+    name: "IDBVersionChangeEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'NDEFRecord',
-    signatures: [['recordInit']]
+    name: "lock",
+    signatures: [["?keyCodes"]],
+    receivers: ["Keyboard"]
   },
   {
-    name: 'NotificationEvent',
-    signatures: [['type','eventInitDict']]
+    name: "lock",
+    signatures: [["orientation"]],
+    receivers: ["ScreenOrientation"]
   },
   {
-    name: 'Notification',
-    signatures: [['title','?options']]
+    name: "setConsumer",
+    signatures: [["consumer"]]
   },
   {
-    name: 'TimestampTrigger',
-    signatures: [['timestamp']]
+    name: "BlobEvent",
+    signatures: [["type","eventInitDict"]]
   },
   {
-    name: 'AbortPaymentEvent',
-    signatures: [['type','eventInitDict']]
+    name: "MediaRecorder",
+    signatures: [["stream","?options"]]
   },
   {
-    name: 'CanMakePaymentEvent',
-    signatures: [['type','eventInitDict']]
+    name: "isTypeSupported",
+    signatures: [["type"]]
   },
   {
-    name: 'getDetails',
-    signatures: [['itemIds']]
+    name: "MediaMetadata",
+    signatures: [["?init"]]
   },
   {
-    name: 'consume',
-    signatures: [['purchaseToken']]
+    name: "setMicrophoneActive",
+    signatures: [["active"]]
   },
   {
-    name: 'getDigitalGoodsService',
-    signatures: [['paymentMethod']]
+    name: "setCameraActive",
+    signatures: [["active"]]
   },
   {
-    name: 'MerchantValidationEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "appendEncodedChunks",
+    signatures: [["chunks"]]
   },
   {
-    name: 'enableDelegations',
-    signatures: [['delegations']]
+    name: "TrackDefaultList",
+    signatures: [["?trackDefaults"]]
   },
   {
-    name: 'PaymentMethodChangeEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "TrackDefault",
+    signatures: [["type","language","label","kinds","?byteStreamTrackID"]]
   },
   {
-    name: 'PaymentRequestEvent',
-    signatures: [['type','eventInitDict']]
+    name: "cropTo",
+    signatures: [["crop_id"]]
   },
   {
-    name: 'changePaymentMethod',
-    signatures: [['methodName','?methodDetails']]
+    name: "restrictTo",
+    signatures: [["target"]]
   },
   {
-    name: 'changeShippingAddress',
-    signatures: [['shippingAddress']]
+    name: "CapturedMouseEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'changeShippingOption',
-    signatures: [['shippingOption']]
+    name: "fromElement",
+    signatures: [["element"]]
   },
   {
-    name: 'PaymentRequestUpdateEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "setCaptureHandleConfig",
+    signatures: [["?config"]]
   },
   {
-    name: 'PaymentRequest',
-    signatures: [['methodData','?details','?options']]
+    name: "MediaStreamEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'RTCDataChannelEvent',
-    signatures: [['type','eventInitDict']]
+    name: "MediaStreamTrackEvent",
+    signatures: [["type","eventInitDict"]]
   },
   {
-    name: 'RTCDTMFToneChangeEvent',
-    signatures: [['type','eventInitDict']]
+    name: "MediaStream",
+    signatures: [["?stream"],["tracks"]]
   },
   {
-    name: 'setTimestamp',
-    signatures: [['timestamp']]
+    name: "webkitGetUserMedia",
+    signatures: [["constraints","successCallback","errorCallback"]]
   },
   {
-    name: 'setMetadata',
-    signatures: [['metadata']]
+    name: "OverconstrainedError",
+    signatures: [["constraint","?message"]]
   },
   {
-    name: 'RTCErrorEvent',
-    signatures: [['type','eventInitDict']]
+    name: "createContext",
+    signatures: [["?options"]]
   },
   {
-    name: 'RTCError',
-    signatures: [['init','?message']]
+    name: "MLGraphBuilder",
+    signatures: [["context"]]
   },
   {
-    name: 'RTCIceCandidate',
-    signatures: [['?candidateInitDict']]
+    name: "input",
+    signatures: [["name","desc"]]
   },
   {
-    name: 'stat',
-    signatures: [['name']]
+    name: "constant",
+    signatures: [["desc","bufferView"]]
   },
   {
-    name: 'RTCPeerConnectionIceErrorEvent',
-    signatures: [['type','eventInitDict']]
+    name: "argMin",
+    signatures: [["input","?options"]]
   },
   {
-    name: 'RTCPeerConnectionIceEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "argMax",
+    signatures: [["input","?options"]]
   },
   {
-    name: 'RTCPeerConnection',
-    signatures: [['?configuration','?mediaConstraints']]
+    name: "batchNormalization",
+    signatures: [["input","mean","variance","?options"]]
   },
   {
-    name: 'generateCertificate',
-    signatures: [['keygenAlgorithm']]
+    name: "clamp",
+    signatures: [["input","?options"]]
   },
   {
-    name: 'addStream',
-    signatures: [['stream']]
+    name: "conv2d",
+    signatures: [["input","filter","?options"]]
   },
   {
-    name: 'removeStream',
-    signatures: [['stream']]
+    name: "convTranspose2d",
+    signatures: [["input","filter","?options"]]
   },
   {
-    name: 'createDTMFSender',
-    signatures: [['track']]
+    name: "equal",
+    signatures: [["a","b","?options"]]
   },
   {
-    name: 'setHeaderExtensionsToNegotiate',
-    signatures: [['extensions']]
+    name: "greater",
+    signatures: [["a","b","?options"]]
   },
   {
-    name: 'RTCSessionDescription',
-    signatures: [['?descriptionInitDict']]
+    name: "greaterOrEqual",
+    signatures: [["a","b","?options"]]
   },
   {
-    name: 'revoke',
-    signatures: [['permission']]
+    name: "lesser",
+    signatures: [["a","b","?options"]]
   },
   {
-    name: 'requestAll',
-    signatures: [['permissions']]
+    name: "lesserOrEqual",
+    signatures: [["a","b","?options"]]
   },
   {
-    name: 'PictureInPictureEvent',
-    signatures: [['type','eventInitDict']]
+    name: "neg",
+    signatures: [["x"]]
   },
   {
-    name: 'PresentationConnectionAvailableEvent',
-    signatures: [['type','eventInitDict']]
+    name: "erf",
+    signatures: [["x"]]
   },
   {
-    name: 'PresentationConnectionCloseEvent',
-    signatures: [['type','eventInitDict']]
+    name: "identity",
+    signatures: [["x"]]
   },
   {
-    name: 'PresentationRequest',
-    signatures: [['url'],['urls']]
+    name: "logicalNot",
+    signatures: [["x"]]
   },
   {
-    name: 'reconnect',
-    signatures: [['id']]
+    name: "reciprocal",
+    signatures: [["x"]]
   },
   {
-    name: 'getEncryptedMatchKey',
-    signatures: [['reportCollector','options']]
+    name: "cast",
+    signatures: [["input","outputDataType"]]
   },
   {
-    name: 'PushEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "elu",
+    signatures: [["?options"],["x","?options"]]
   },
   {
-    name: 'PushSubscriptionChangeEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "gather",
+    signatures: [["input","indices","?options"]]
   },
   {
-    name: 'queryUsageAndQuota',
-    signatures: [['usageCallback','?errorCallback']]
+    name: "gelu",
+    signatures: [["?input"]]
   },
   {
-    name: 'requestQuota',
-    signatures: [['newQuotaInBytes','?quotaCallback','?errorCallback']]
+    name: "gemm",
+    signatures: [["a","b","?options"]]
   },
   {
-    name: 'DOMError',
-    signatures: [['name','?message']]
+    name: "gru",
+    signatures: [["input","weight","recurrentWeight","steps","hiddenSize","?options"]]
   },
   {
-    name: 'setHTML',
-    signatures: [['markup','?options']]
+    name: "gruCell",
+    signatures: [["input","weight","recurrentWeight","hiddenState","hiddenSize","?options"]]
   },
   {
-    name: 'Sanitizer',
-    signatures: [['?config']]
+    name: "hardSigmoid",
+    signatures: [["?options"],["x","?options"]]
   },
   {
-    name: 'sanitize',
-    signatures: [['input']]
+    name: "hardSwish",
+    signatures: [["?x"]]
   },
   {
-    name: 'sanitizeFor',
-    signatures: [['element','markup']]
+    name: "instanceNormalization",
+    signatures: [["input","?options"]]
   },
   {
-    name: 'postTask',
-    signatures: [['callback','?options']]
+    name: "matmul",
+    signatures: [["a","b"]]
   },
   {
-    name: 'yield',
-    signatures: [['?options']]
+    name: "layerNormalization",
+    signatures: [["input","?options"]]
   },
   {
-    name: 'isAncestor',
-    signatures: [['parentId']]
+    name: "leakyRelu",
+    signatures: [["?options"],["x","?options"]]
   },
   {
-    name: 'TaskController',
-    signatures: [['?init']]
+    name: "linear",
+    signatures: [["?options"],["input","?options"]]
   },
   {
-    name: 'setPriority',
-    signatures: [['priority']]
+    name: "lstm",
+    signatures: [["input","weight","recurrentWeight","steps","hiddenSize","?options"]]
   },
   {
-    name: 'TaskPriorityChangeEvent',
-    signatures: [['type','eventInitDict']]
+    name: "lstmCell",
+    signatures: [["input","weight","recurrentWeight","hiddenState","cellState","hiddenSize","?options"]]
   },
   {
-    name: 'AbsoluteOrientationSensor',
-    signatures: [['?sensorOptions']]
+    name: "pad",
+    signatures: [["input","beginningPadding","endingPadding","?options"]]
   },
   {
-    name: 'Accelerometer',
-    signatures: [['?sensorOptions']]
+    name: "averagePool2d",
+    signatures: [["input","?options"]]
   },
   {
-    name: 'AmbientLightSensor',
-    signatures: [['?sensorOptions']]
+    name: "l2Pool2d",
+    signatures: [["input","?options"]]
   },
   {
-    name: 'GravitySensor',
-    signatures: [['?sensorOptions']]
+    name: "maxPool2d",
+    signatures: [["input","?options"]]
   },
   {
-    name: 'Gyroscope',
-    signatures: [['?sensorOptions']]
+    name: "prelu",
+    signatures: [["x","slope","?options"]]
   },
   {
-    name: 'LinearAccelerationSensor',
-    signatures: [['?sensorOptions']]
+    name: "reduceL1",
+    signatures: [["input","?options"]]
   },
   {
-    name: 'Magnetometer',
-    signatures: [['?sensorOptions']]
+    name: "reduceL2",
+    signatures: [["input","?options"]]
   },
   {
-    name: 'populateMatrix',
-    signatures: [['targetBuffer']]
+    name: "reduceLogSum",
+    signatures: [["input","?options"]]
   },
   {
-    name: 'RelativeOrientationSensor',
-    signatures: [['?sensorOptions']]
+    name: "reduceLogSumExp",
+    signatures: [["input","?options"]]
   },
   {
-    name: 'SensorErrorEvent',
-    signatures: [['type','eventInitDict']]
+    name: "reduceMax",
+    signatures: [["input","?options"]]
   },
   {
-    name: 'requestPort',
-    signatures: [['?options']]
+    name: "reduceMean",
+    signatures: [["input","?options"]]
   },
   {
-    name: 'ExtendableEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "reduceMin",
+    signatures: [["input","?options"]]
   },
   {
-    name: 'ExtendableMessageEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "reduceProduct",
+    signatures: [["input","?options"]]
   },
   {
-    name: 'FetchEvent',
-    signatures: [['type','eventInitDict']]
+    name: "reduceSum",
+    signatures: [["input","?options"]]
   },
   {
-    name: 'InstallEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "reduceSumSquare",
+    signatures: [["input","?options"]]
   },
   {
-    name: 'registerRouter',
-    signatures: [['rules']]
+    name: "relu",
+    signatures: [["?input"]]
   },
   {
-    name: 'BarcodeDetector',
-    signatures: [['?barcodeDetectorOptions']]
+    name: "reshape",
+    signatures: [["input","newShape"]]
   },
   {
-    name: 'detect',
-    signatures: [['image']]
+    name: "resample2d",
+    signatures: [["input","?options"]]
   },
   {
-    name: 'FaceDetector',
-    signatures: [['?faceDetectorOptions']]
+    name: "sigmoid",
+    signatures: [["?input"]]
   },
   {
-    name: 'contributeToHistogram',
-    signatures: [['contribution']]
+    name: "softmax",
+    signatures: [["input","?axis"]]
   },
   {
-    name: 'enableDebugMode',
-    signatures: [['?options']]
+    name: "softplus",
+    signatures: [["?input"]]
   },
   {
-    name: 'transmit',
-    signatures: [['sendBuffer']]
+    name: "softsign",
+    signatures: [["?input"]]
   },
   {
-    name: 'control',
-    signatures: [['controlCode','data']]
+    name: "transpose",
+    signatures: [["input","?options"]]
   },
   {
-    name: 'startTransaction',
-    signatures: [['transaction']]
+    name: "triangular",
+    signatures: [["input","?options"]]
   },
   {
-    name: 'getStatusChange',
-    signatures: [['readerStates','signal']]
+    name: "where",
+    signatures: [["condition","trueValue","falseValue"]]
   },
   {
-    name: 'SmartCardError',
-    signatures: [['message','options']]
+    name: "build",
+    signatures: [["outputs"]]
   },
   {
-    name: 'addFromUri',
-    signatures: [['src','?weight']]
+    name: "getFileSystemAccessTransferToken",
+    signatures: [["fileHandle"]]
   },
   {
-    name: 'addFromString',
-    signatures: [['string','?weight']]
+    name: "unregisterProtocolHandler",
+    signatures: [["scheme","url"]]
   },
   {
-    name: 'SpeechRecognitionErrorEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "NDEFMessage",
+    signatures: [["messageInit"]]
   },
   {
-    name: 'SpeechRecognitionEvent',
-    signatures: [['type','?initDict']]
+    name: "scan",
+    signatures: [["?options"]]
   },
   {
-    name: 'SpeechSynthesisErrorEvent',
-    signatures: [['type','eventInitDict']]
+    name: "makeReadOnly",
+    signatures: [["?options"]]
   },
   {
-    name: 'SpeechSynthesisEvent',
-    signatures: [['type','eventInitDict']]
+    name: "NDEFReadingEvent",
+    signatures: [["type","eventInitDict"]]
   },
   {
-    name: 'SpeechSynthesisUtterance',
-    signatures: [['?text']]
+    name: "NDEFRecord",
+    signatures: [["recordInit"]]
   },
   {
-    name: 'StorageEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "NotificationEvent",
+    signatures: [["type","eventInitDict"]]
   },
   {
-    name: 'VirtualKeyboardGeometryChangeEvent',
-    signatures: [['type']]
+    name: "Notification",
+    signatures: [["title","?options"]]
   },
   {
-    name: 'AnalyserNode',
-    signatures: [['context','?options']]
+    name: "TimestampTrigger",
+    signatures: [["timestamp"]]
   },
   {
-    name: 'AudioBufferSourceNode',
-    signatures: [['context','?options']]
+    name: "canTranslate",
+    signatures: [["options"]]
   },
   {
-    name: 'AudioBuffer',
-    signatures: [['options']]
+    name: "createTranslator",
+    signatures: [["options"]]
   },
   {
-    name: 'AudioContext',
-    signatures: [['?contextOptions']]
+    name: "AbortPaymentEvent",
+    signatures: [["type","eventInitDict"]]
   },
   {
-    name: 'AudioProcessingEvent',
-    signatures: [['type','eventInitDict']]
+    name: "CanMakePaymentEvent",
+    signatures: [["type","eventInitDict"]]
   },
   {
-    name: 'registerProcessor',
-    signatures: [['name','processorCtor']]
+    name: "getDetails",
+    signatures: [["itemIds"]]
   },
   {
-    name: 'AudioWorkletNode',
-    signatures: [['context','name','?options']]
+    name: "consume",
+    signatures: [["purchaseToken"]]
   },
   {
-    name: 'BiquadFilterNode',
-    signatures: [['context','?options']]
+    name: "getDigitalGoodsService",
+    signatures: [["paymentMethod"]]
   },
   {
-    name: 'ChannelMergerNode',
-    signatures: [['context','?options']]
+    name: "enableDelegations",
+    signatures: [["delegations"]]
   },
   {
-    name: 'ChannelSplitterNode',
-    signatures: [['context','?options']]
+    name: "PaymentMethodChangeEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'ConstantSourceNode',
-    signatures: [['context','?options']]
+    name: "PaymentRequestEvent",
+    signatures: [["type","eventInitDict"]]
   },
   {
-    name: 'ConvolverNode',
-    signatures: [['context','?options']]
+    name: "changePaymentMethod",
+    signatures: [["methodName","?methodDetails"]]
   },
   {
-    name: 'DelayNode',
-    signatures: [['context','?options']]
+    name: "changeShippingAddress",
+    signatures: [["shippingAddress"]]
   },
   {
-    name: 'DynamicsCompressorNode',
-    signatures: [['context','?options']]
+    name: "changeShippingOption",
+    signatures: [["shippingOption"]]
   },
   {
-    name: 'GainNode',
-    signatures: [['context','?options']]
+    name: "PaymentRequestUpdateEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'IIRFilterNode',
-    signatures: [['context','options']]
+    name: "PaymentRequest",
+    signatures: [["methodData","?details","?options"]]
   },
   {
-    name: 'MediaElementAudioSourceNode',
-    signatures: [['context','options']]
+    name: "RTCDataChannelEvent",
+    signatures: [["type","eventInitDict"]]
   },
   {
-    name: 'MediaStreamAudioDestinationNode',
-    signatures: [['context','?options']]
+    name: "RTCDTMFToneChangeEvent",
+    signatures: [["type","eventInitDict"]]
   },
   {
-    name: 'MediaStreamAudioSourceNode',
-    signatures: [['context','options']]
+    name: "RTCEncodedAudioFrame",
+    signatures: [["originalFrame","?options"]]
   },
   {
-    name: 'OfflineAudioCompletionEvent',
-    signatures: [['type','eventInitDict']]
+    name: "setMetadata",
+    signatures: [["metadata"]]
   },
   {
-    name: 'OfflineAudioContext',
-    signatures: [['options'],['numberOfChannels','numberOfFrames','sampleRate']]
+    name: "RTCEncodedVideoFrame",
+    signatures: [["originalFrame","?options"]]
   },
   {
-    name: 'OscillatorNode',
-    signatures: [['context','?options']]
+    name: "RTCErrorEvent",
+    signatures: [["type","eventInitDict"]]
   },
   {
-    name: 'PannerNode',
-    signatures: [['context','?options']]
+    name: "RTCError",
+    signatures: [["init","?message"]]
   },
   {
-    name: 'PeriodicWave',
-    signatures: [['context','?options']]
+    name: "RTCIceCandidate",
+    signatures: [["?candidateInitDict"]]
   },
   {
-    name: 'StereoPannerNode',
-    signatures: [['context','?options']]
+    name: "RTCPeerConnectionIceErrorEvent",
+    signatures: [["type","eventInitDict"]]
   },
   {
-    name: 'WaveShaperNode',
-    signatures: [['context','?options']]
+    name: "RTCPeerConnectionIceEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'AudioData',
-    signatures: [['init']]
+    name: "RTCPeerConnection",
+    signatures: [["?configuration"]]
   },
   {
-    name: 'EncodedAudioChunk',
-    signatures: [['init']]
+    name: "generateCertificate",
+    signatures: [["keygenAlgorithm"]]
   },
   {
-    name: 'EncodedVideoChunk',
-    signatures: [['init']]
+    name: "addStream",
+    signatures: [["stream"]]
   },
   {
-    name: 'ImageDecoder',
-    signatures: [['init']]
+    name: "removeStream",
+    signatures: [["stream"]]
   },
   {
-    name: 'VideoColorSpace',
-    signatures: [['?init']]
+    name: "createDTMFSender",
+    signatures: [["track"]]
   },
   {
-    name: 'VideoFrame',
-    signatures: [['source','?init'],['data','init']]
+    name: "sendRtp",
+    signatures: [["packet","options"]]
   },
   {
-    name: 'changeVersion',
-    signatures: [['oldVersion','newVersion','?callback','?errorCallback','?successCallback']]
+    name: "setHeaderExtensionsToNegotiate",
+    signatures: [["extensions"]]
   },
   {
-    name: 'readTransaction',
-    signatures: [['callback','?errorCallback','?successCallback']]
+    name: "readReceivedAcks",
+    signatures: [["maxCount"]]
   },
   {
-    name: 'executeSql',
-    signatures: [['sqlStatement','?arguments','?callback','?errorCallback']]
+    name: "readSentRtp",
+    signatures: [["maxCount"]]
   },
   {
-    name: 'openDatabase',
-    signatures: [['name','version','displayName','estimatedSize','?creationCallback']]
+    name: "RTCSessionDescription",
+    signatures: [["?descriptionInitDict"]]
   },
   {
-    name: 'queryCounterEXT',
-    signatures: [['query','target']]
+    name: "revoke",
+    signatures: [["permission"]]
   },
   {
-    name: 'deleteQueryEXT',
-    signatures: [['query']]
+    name: "requestAll",
+    signatures: [["permissions"]]
   },
   {
-    name: 'isQueryEXT',
-    signatures: [['query']]
+    name: "PictureInPictureEvent",
+    signatures: [["type","eventInitDict"]]
   },
   {
-    name: 'beginQueryEXT',
-    signatures: [['target','query']]
+    name: "PresentationConnectionAvailableEvent",
+    signatures: [["type","eventInitDict"]]
   },
   {
-    name: 'endQueryEXT',
-    signatures: [['target']]
+    name: "PresentationConnectionCloseEvent",
+    signatures: [["type","eventInitDict"]]
   },
   {
-    name: 'getQueryEXT',
-    signatures: [['target','pname']]
+    name: "PresentationRequest",
+    signatures: [["url"],["urls"]]
   },
   {
-    name: 'getQueryObjectEXT',
-    signatures: [['query','pname']]
+    name: "reconnect",
+    signatures: [["id"]]
   },
   {
-    name: 'WebGLContextEvent',
-    signatures: [['type','?eventInit']]
+    name: "printJob",
+    signatures: [["job_name","document","attributes"]]
   },
   {
-    name: 'drawArraysInstancedBaseInstanceWEBGL',
-    signatures: [['mode','first','count','instance_count','baseinstance']]
+    name: "getEncryptedMatchKey",
+    signatures: [["reportCollector","options"]]
   },
   {
-    name: 'drawElementsInstancedBaseVertexBaseInstanceWEBGL',
-    signatures: [['mode','count','type','offset','instance_count','basevertex','baseinstance']]
+    name: "PushEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'multiDrawArraysInstancedBaseInstanceWEBGL',
-    signatures: [['mode','firstsList','firstsOffset','countsList','countsOffset','instanceCountsList','instanceCountsOffset','baseInstancesList','baseInstancesOffset','drawcount']]
+    name: "PushSubscriptionChangeEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'multiDrawElementsInstancedBaseVertexBaseInstanceWEBGL',
-    signatures: [['mode','countsList','countsOffset','type','offsetsList','offsetsOffset','instanceCountsList','instanceCountsOffset','baseVerticesList','baseVerticesOffset','baseInstancesList','baseInstancesOffset','drawcount']]
+    name: "queryUsageAndQuota",
+    signatures: [["usageCallback","?errorCallback"]]
   },
   {
-    name: 'provokingVertexWEBGL',
-    signatures: [['provokeMode']]
+    name: "requestQuota",
+    signatures: [["newQuotaInBytes","?quotaCallback","?errorCallback"]]
   },
   {
-    name: 'drawingBufferStorage',
-    signatures: [['sizedformat','width','height']]
+    name: "DOMError",
+    signatures: [["name","?message"]]
   },
   {
-    name: 'framebufferTexturePixelLocalStorageWEBGL',
-    signatures: [['plane','texture','level','layer']]
+    name: "setHTML",
+    signatures: [["markup","?options"]]
   },
   {
-    name: 'framebufferPixelLocalClearValuefvWEBGL',
-    signatures: [['plane','value','?srcOffset']]
+    name: "Sanitizer",
+    signatures: [["?config"]]
   },
   {
-    name: 'framebufferPixelLocalClearValueivWEBGL',
-    signatures: [['plane','value','?srcOffset']]
+    name: "sanitize",
+    signatures: [["input"]]
   },
   {
-    name: 'framebufferPixelLocalClearValueuivWEBGL',
-    signatures: [['plane','value','?srcOffset']]
+    name: "sanitizeFor",
+    signatures: [["element","markup"]]
   },
   {
-    name: 'beginPixelLocalStorageWEBGL',
-    signatures: [['loadops']]
+    name: "postTask",
+    signatures: [["callback","?options"]]
   },
   {
-    name: 'endPixelLocalStorageWEBGL',
-    signatures: [['storeops']]
+    name: "yield",
+    signatures: [["?options"]]
   },
   {
-    name: 'getFramebufferPixelLocalStorageParameterWEBGL',
-    signatures: [['plane','pname']]
+    name: "TaskController",
+    signatures: [["?init"]]
   },
   {
-    name: 'shareVideoImageWEBGL',
-    signatures: [['target','video']]
+    name: "setPriority",
+    signatures: [["priority"]]
   },
   {
-    name: 'releaseVideoImageWEBGL',
-    signatures: [['target']]
+    name: "TaskPriorityChangeEvent",
+    signatures: [["type","eventInitDict"]]
   },
   {
-    name: 'importVideoFrame',
-    signatures: [['videoFrame']]
+    name: "AbsoluteOrientationSensor",
+    signatures: [["?sensorOptions"]]
   },
   {
-    name: 'releaseVideoFrame',
-    signatures: [['handle']]
+    name: "Accelerometer",
+    signatures: [["?sensorOptions"]]
   },
   {
-    name: 'requestAdapterInfo',
-    signatures: [['?unmaskHints']]
+    name: "AmbientLightSensor",
+    signatures: [["?sensorOptions"]]
   },
   {
-    name: 'mapAsync',
-    signatures: [['mode','?offset','?size']]
+    name: "GravitySensor",
+    signatures: [["?sensorOptions"]]
   },
   {
-    name: 'getMappedRange',
-    signatures: [['?offset','?size']]
+    name: "Gyroscope",
+    signatures: [["?sensorOptions"]]
   },
   {
-    name: 'beginRenderPass',
-    signatures: [['descriptor']]
+    name: "LinearAccelerationSensor",
+    signatures: [["?sensorOptions"]]
   },
   {
-    name: 'beginComputePass',
-    signatures: [['?descriptor']]
+    name: "Magnetometer",
+    signatures: [["?sensorOptions"]]
   },
   {
-    name: 'copyBufferToBuffer',
-    signatures: [['src','srcOffset','dst','dstOffset','size']]
+    name: "populateMatrix",
+    signatures: [["targetBuffer"]]
   },
   {
-    name: 'copyBufferToTexture',
-    signatures: [['source','destination','copySize']]
+    name: "RelativeOrientationSensor",
+    signatures: [["?sensorOptions"]]
   },
   {
-    name: 'copyTextureToBuffer',
-    signatures: [['source','destination','copySize']]
+    name: "SensorErrorEvent",
+    signatures: [["type","eventInitDict"]]
   },
   {
-    name: 'copyTextureToTexture',
-    signatures: [['source','destination','copySize']]
+    name: "requestPort",
+    signatures: [["?options"]]
   },
   {
-    name: 'pushDebugGroup',
-    signatures: [['groupLabel']]
+    name: "ExtendableEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'insertDebugMarker',
-    signatures: [['markerLabel']]
+    name: "ExtendableMessageEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'resolveQuerySet',
-    signatures: [['querySet','firstQuery','queryCount','destination','destinationOffset']]
+    name: "FetchEvent",
+    signatures: [["type","eventInitDict"]]
   },
   {
-    name: 'writeTimestamp',
-    signatures: [['querySet','queryIndex']]
+    name: "InstallEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'clearBuffer',
-    signatures: [['buffer','?offset','?size']]
+    name: "addRoutes",
+    signatures: [["rules"]]
   },
   {
-    name: 'setPipeline',
-    signatures: [['pipeline']]
+    name: "BarcodeDetector",
+    signatures: [["?barcodeDetectorOptions"]]
   },
   {
-    name: 'dispatchWorkgroups',
-    signatures: [['workgroupCountX','?workgroupCountY','?workgroupCountZ']]
+    name: "detect",
+    signatures: [["image"]]
   },
   {
-    name: 'dispatchWorkgroupsIndirect',
-    signatures: [['indirectBuffer','indirectOffset']]
+    name: "FaceDetector",
+    signatures: [["?faceDetectorOptions"]]
   },
   {
-    name: 'importExternalTexture',
-    signatures: [['descriptor']]
+    name: "contributeToHistogram",
+    signatures: [["contribution"]]
   },
   {
-    name: 'createBindGroup',
-    signatures: [['descriptor']]
+    name: "enableDebugMode",
+    signatures: [["?options"]]
   },
   {
-    name: 'createBindGroupLayout',
-    signatures: [['descriptor']]
+    name: "selectURL",
+    signatures: [["name","urls","?options"]]
   },
   {
-    name: 'createPipelineLayout',
-    signatures: [['descriptor']]
+    name: "run",
+    signatures: [["name","?options"]]
   },
   {
-    name: 'createShaderModule',
-    signatures: [['descriptor']]
+    name: "transmit",
+    signatures: [["sendBuffer","?options"]]
   },
   {
-    name: 'createRenderPipeline',
-    signatures: [['descriptor']]
+    name: "control",
+    signatures: [["controlCode","data"]]
   },
   {
-    name: 'createComputePipeline',
-    signatures: [['descriptor']]
+    name: "startTransaction",
+    signatures: [["transaction","?options"]]
   },
   {
-    name: 'createRenderPipelineAsync',
-    signatures: [['descriptor']]
+    name: "getStatusChange",
+    signatures: [["readerStates","?options"]]
   },
   {
-    name: 'createComputePipelineAsync',
-    signatures: [['descriptor']]
+    name: "SmartCardError",
+    signatures: [["message","options"]]
   },
   {
-    name: 'createCommandEncoder',
-    signatures: [['?descriptor']]
+    name: "addFromUri",
+    signatures: [["src","?weight"]]
   },
   {
-    name: 'createRenderBundleEncoder',
-    signatures: [['descriptor']]
+    name: "addFromString",
+    signatures: [["string","?weight"]]
   },
   {
-    name: 'createQuerySet',
-    signatures: [['descriptor']]
+    name: "SpeechRecognitionErrorEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'pushErrorScope',
-    signatures: [['filter']]
+    name: "SpeechRecognitionEvent",
+    signatures: [["type","?initDict"]]
   },
   {
-    name: 'GPUInternalError',
-    signatures: [['message']]
+    name: "SpeechSynthesisErrorEvent",
+    signatures: [["type","eventInitDict"]]
   },
   {
-    name: 'GPUOutOfMemoryError',
-    signatures: [['message']]
+    name: "SpeechSynthesisEvent",
+    signatures: [["type","eventInitDict"]]
   },
   {
-    name: 'getBindGroupLayout',
-    signatures: [['index']]
+    name: "SpeechSynthesisUtterance",
+    signatures: [["?text"]]
   },
   {
-    name: 'GPUPipelineError',
-    signatures: [['?message','options']]
+    name: "requestStorageAccessFor",
+    signatures: [["requestedOrigin"]]
   },
   {
-    name: 'setBindGroup',
-    signatures: [['index','bindGroup','?dynamicOffsets'],['index','bindGroup','dynamicOffsetsData','dynamicOffsetsDataStart','dynamicOffsetsDataLength']]
+    name: "StorageEvent",
+    signatures: [["type","?eventInitDict"]]
   },
   {
-    name: 'writeBuffer',
-    signatures: [['buffer','bufferOffset','data','?dataElementOffset','?dataElementCount'],['buffer','bufferOffset','data','?dataByteOffset','?byteSize']]
+    name: "VirtualKeyboardGeometryChangeEvent",
+    signatures: [["type"]]
   },
   {
-    name: 'writeTexture',
-    signatures: [['destination','data','dataLayout','size']]
+    name: "AnalyserNode",
+    signatures: [["context","?options"]]
   },
   {
-    name: 'copyExternalImageToTexture',
-    signatures: [['source','destination','copySize']]
+    name: "AudioBufferSourceNode",
+    signatures: [["context","?options"]]
   },
   {
-    name: 'setIndexBuffer',
-    signatures: [['buffer','format','?offset','?size']]
+    name: "AudioBuffer",
+    signatures: [["options"]]
   },
   {
-    name: 'setVertexBuffer',
-    signatures: [['slot','buffer','?offset','?size']]
+    name: "AudioContext",
+    signatures: [["?contextOptions"]]
   },
   {
-    name: 'draw',
-    signatures: [['vertexCount','?instanceCount','?firstVertex','?firstInstance']]
+    name: "AudioProcessingEvent",
+    signatures: [["type","eventInitDict"]]
   },
   {
-    name: 'drawIndexed',
-    signatures: [['indexCount','?instanceCount','?firstIndex','?baseVertex','?firstInstance']]
+    name: "registerProcessor",
+    signatures: [["name","processorCtor"]]
   },
   {
-    name: 'drawIndirect',
-    signatures: [['indirectBuffer','indirectOffset']]
+    name: "AudioWorkletNode",
+    signatures: [["context","name","?options"]]
   },
   {
-    name: 'drawIndexedIndirect',
-    signatures: [['indirectBuffer','indirectOffset']]
+    name: "BiquadFilterNode",
+    signatures: [["context","?options"]]
   },
   {
-    name: 'setViewport',
-    signatures: [['x','y','width','height','minDepth','maxDepth']]
+    name: "ChannelMergerNode",
+    signatures: [["context","?options"]]
   },
   {
-    name: 'setScissorRect',
-    signatures: [['x','y','width','height']]
+    name: "ChannelSplitterNode",
+    signatures: [["context","?options"]]
   },
   {
-    name: 'setBlendConstant',
-    signatures: [['color']]
+    name: "ConstantSourceNode",
+    signatures: [["context","?options"]]
   },
   {
-    name: 'setStencilReference',
-    signatures: [['reference']]
+    name: "ConvolverNode",
+    signatures: [["context","?options"]]
   },
   {
-    name: 'executeBundles',
-    signatures: [['bundles']]
+    name: "DelayNode",
+    signatures: [["context","?options"]]
   },
   {
-    name: 'beginOcclusionQuery',
-    signatures: [['queryIndex']]
+    name: "DynamicsCompressorNode",
+    signatures: [["context","?options"]]
   },
   {
-    name: 'createView',
-    signatures: [['?descriptor']]
+    name: "GainNode",
+    signatures: [["context","?options"]]
   },
   {
-    name: 'GPUUncapturedErrorEvent',
-    signatures: [['type','gpuUncapturedErrorEventInitDict']]
+    name: "IIRFilterNode",
+    signatures: [["context","options"]]
   },
   {
-    name: 'GPUValidationError',
-    signatures: [['message']]
+    name: "MediaElementAudioSourceNode",
+    signatures: [["context","options"]]
   },
   {
-    name: 'requestAdapter',
-    signatures: [['?options']]
+    name: "MediaStreamAudioDestinationNode",
+    signatures: [["context","?options"]]
   },
   {
-    name: 'MIDIConnectionEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "MediaStreamAudioSourceNode",
+    signatures: [["context","options"]]
   },
   {
-    name: 'MIDIMessageEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "OfflineAudioCompletionEvent",
+    signatures: [["type","eventInitDict"]]
   },
   {
-    name: 'CloseEvent',
-    signatures: [['type','?eventInitDict']]
+    name: "OfflineAudioContext",
+    signatures: [["options"],["numberOfChannels","numberOfFrames","sampleRate"]]
   },
   {
-    name: 'WebSocketStream',
-    signatures: [['url','?options']]
+    name: "OscillatorNode",
+    signatures: [["context","?options"]]
   },
   {
-    name: 'WebSocket',
-    signatures: [['url','?protocols']]
+    name: "PannerNode",
+    signatures: [["context","?options"]]
   },
   {
-    name: 'WebTransportError',
-    signatures: [['?init']]
+    name: "PeriodicWave",
+    signatures: [["context","?options"]]
   },
   {
-    name: 'WebTransport',
-    signatures: [['url','?options']]
+    name: "StereoPannerNode",
+    signatures: [["context","?options"]]
   },
   {
-    name: 'USBAlternateInterface',
-    signatures: [['deviceInterface','alternateSetting']]
+    name: "WaveShaperNode",
+    signatures: [["context","?options"]]
   },
   {
-    name: 'USBConfiguration',
-    signatures: [['device','configurationValue']]
+    name: "AudioData",
+    signatures: [["init"]]
   },
   {
-    name: 'USBConnectionEvent',
-    signatures: [['type','eventInitDict']]
+    name: "AudioDecoder",
+    signatures: [["init"]]
   },
   {
-    name: 'selectConfiguration',
-    signatures: [['configurationValue']]
+    name: "isConfigSupported",
+    signatures: [["config"]]
   },
   {
-    name: 'claimInterface',
-    signatures: [['interfaceNumber']]
+    name: "AudioEncoder",
+    signatures: [["init"]]
   },
   {
-    name: 'releaseInterface',
-    signatures: [['interfaceNumber']]
+    name: "EncodedAudioChunk",
+    signatures: [["init"]]
   },
   {
-    name: 'selectAlternateInterface',
-    signatures: [['interfaceNumber','alternateSetting']]
+    name: "EncodedVideoChunk",
+    signatures: [["init"]]
   },
   {
-    name: 'controlTransferIn',
-    signatures: [['setup','length']]
+    name: "ImageDecoder",
+    signatures: [["init"]]
   },
   {
-    name: 'controlTransferOut',
-    signatures: [['setup','?data']]
+    name: "VideoColorSpace",
+    signatures: [["?init"]]
   },
   {
-    name: 'clearHalt',
-    signatures: [['direction','endpointNumber']]
+    name: "VideoDecoder",
+    signatures: [["init"]]
   },
   {
-    name: 'transferIn',
-    signatures: [['endpointNumber','length']]
+    name: "VideoEncoder",
+    signatures: [["init"]]
   },
   {
-    name: 'transferOut',
-    signatures: [['endpointNumber','data']]
+    name: "VideoFrame",
+    signatures: [["source","?init"],["data","init"]]
   },
   {
-    name: 'isochronousTransferIn',
-    signatures: [['endpointNumber','packetLengths']]
+    name: "changeVersion",
+    signatures: [["oldVersion","newVersion","?callback","?errorCallback","?successCallback"]]
   },
   {
-    name: 'isochronousTransferOut',
-    signatures: [['endpointNumber','data','packetLengths']]
+    name: "readTransaction",
+    signatures: [["callback","?errorCallback","?successCallback"]]
   },
   {
-    name: 'USBEndpoint',
-    signatures: [['alternate','endpointNumber','direction']]
+    name: "executeSql",
+    signatures: [["sqlStatement","?arguments","?callback","?errorCallback"]]
   },
   {
-    name: 'USBInTransferResult',
-    signatures: [['status','?data']]
+    name: "openDatabase",
+    signatures: [["name","version","displayName","estimatedSize","?creationCallback"]]
   },
   {
-    name: 'USBInterface',
-    signatures: [['configuration','interfaceNumber']]
+    name: "clipControlEXT",
+    signatures: [["origin","depth"]]
   },
   {
-    name: 'USBIsochronousInTransferPacket',
-    signatures: [['status','?data']]
+    name: "queryCounterEXT",
+    signatures: [["query","target"]]
   },
   {
-    name: 'USBIsochronousInTransferResult',
-    signatures: [['packets','?data']]
+    name: "deleteQueryEXT",
+    signatures: [["query"]]
   },
   {
-    name: 'USBIsochronousOutTransferPacket',
-    signatures: [['status','?bytesWritten']]
+    name: "isQueryEXT",
+    signatures: [["query"]]
   },
   {
-    name: 'USBIsochronousOutTransferResult',
-    signatures: [['packets']]
+    name: "beginQueryEXT",
+    signatures: [["target","query"]]
   },
   {
-    name: 'USBOutTransferResult',
-    signatures: [['status','?bytesWritten']]
+    name: "endQueryEXT",
+    signatures: [["target"]]
   },
   {
-    name: 'WindowControlsOverlayGeometryChangeEvent',
-    signatures: [['type','eventInitDict']]
+    name: "getQueryEXT",
+    signatures: [["target","pname"]]
   },
   {
-    name: 'getPose',
-    signatures: [['relative_to']]
+    name: "getQueryObjectEXT",
+    signatures: [["query","pname"]]
   },
   {
-    name: 'XRInputSourceEvent',
-    signatures: [['type','eventInitDict']]
+    name: "polygonOffsetClampEXT",
+    signatures: [["factor","units","clamp"]]
   },
   {
-    name: 'XRInputSourcesChangeEvent',
-    signatures: [['type','eventInitDict']]
+    name: "WebGLContextEvent",
+    signatures: [["type","?eventInit"]]
   },
   {
-    name: 'XRRay',
-    signatures: [['transform'],['?origin','?direction']]
+    name: "drawArraysInstancedBaseInstanceWEBGL",
+    signatures: [["mode","first","count","instance_count","baseinstance"]]
   },
   {
-    name: 'XRReferenceSpaceEvent',
-    signatures: [['type','eventInitDict']]
+    name: "drawElementsInstancedBaseVertexBaseInstanceWEBGL",
+    signatures: [["mode","count","type","offset","instance_count","basevertex","baseinstance"]]
   },
   {
-    name: 'getOffsetReferenceSpace',
-    signatures: [['originOffset']]
+    name: "multiDrawArraysInstancedBaseInstanceWEBGL",
+    signatures: [["mode","firstsList","firstsOffset","countsList","countsOffset","instanceCountsList","instanceCountsOffset","baseInstancesList","baseInstancesOffset","drawcount"]]
   },
   {
-    name: 'XRRigidTransform',
-    signatures: [['?position','?orientation']]
+    name: "multiDrawElementsInstancedBaseVertexBaseInstanceWEBGL",
+    signatures: [["mode","countsList","countsOffset","type","offsetsList","offsetsOffset","instanceCountsList","instanceCountsOffset","baseVerticesList","baseVerticesOffset","baseInstancesList","baseInstancesOffset","drawcount"]]
   },
   {
-    name: 'XRSessionEvent',
-    signatures: [['type','eventInitDict']]
+    name: "polygonModeWEBGL",
+    signatures: [["face","mode"]]
   },
   {
-    name: 'supportsSession',
-    signatures: [['mode']]
+    name: "provokingVertexWEBGL",
+    signatures: [["provokeMode"]]
   },
   {
-    name: 'isSessionSupported',
-    signatures: [['mode']]
+    name: "drawingBufferStorage",
+    signatures: [["sizedformat","width","height"]]
   },
   {
-    name: 'requestSession',
-    signatures: [['mode','?options']]
+    name: "framebufferTexturePixelLocalStorageWEBGL",
+    signatures: [["plane","texture","level","layer"]]
   },
   {
-    name: 'XRWebGLLayer',
-    signatures: [['session','context','?layerInit']]
+    name: "framebufferPixelLocalClearValuefvWEBGL",
+    signatures: [["plane","value","?srcOffset"]]
   },
   {
-    name: 'getViewport',
-    signatures: [['view']]
+    name: "framebufferPixelLocalClearValueivWEBGL",
+    signatures: [["plane","value","?srcOffset"]]
   },
   {
-    name: 'getNativeFramebufferScaleFactor',
-    signatures: [['session']]
+    name: "framebufferPixelLocalClearValueuivWEBGL",
+    signatures: [["plane","value","?srcOffset"]]
+  },
+  {
+    name: "beginPixelLocalStorageWEBGL",
+    signatures: [["loadops"]]
+  },
+  {
+    name: "endPixelLocalStorageWEBGL",
+    signatures: [["storeops"]]
+  },
+  {
+    name: "getFramebufferPixelLocalStorageParameterWEBGL",
+    signatures: [["plane","pname"]]
+  },
+  {
+    name: "mapAsync",
+    signatures: [["mode","?offset","?size"]]
+  },
+  {
+    name: "getMappedRange",
+    signatures: [["?offset","?size"]]
+  },
+  {
+    name: "beginRenderPass",
+    signatures: [["descriptor"]]
+  },
+  {
+    name: "beginComputePass",
+    signatures: [["?descriptor"]]
+  },
+  {
+    name: "copyBufferToBuffer",
+    signatures: [["src","srcOffset","dst","dstOffset","size"]]
+  },
+  {
+    name: "copyBufferToTexture",
+    signatures: [["source","destination","copySize"]]
+  },
+  {
+    name: "copyTextureToBuffer",
+    signatures: [["source","destination","copySize"]]
+  },
+  {
+    name: "copyTextureToTexture",
+    signatures: [["source","destination","copySize"]]
+  },
+  {
+    name: "pushDebugGroup",
+    signatures: [["groupLabel"]]
+  },
+  {
+    name: "insertDebugMarker",
+    signatures: [["markerLabel"]]
+  },
+  {
+    name: "resolveQuerySet",
+    signatures: [["querySet","firstQuery","queryCount","destination","destinationOffset"]]
+  },
+  {
+    name: "writeTimestamp",
+    signatures: [["querySet","queryIndex"]]
+  },
+  {
+    name: "clearBuffer",
+    signatures: [["buffer","?offset","?size"]]
+  },
+  {
+    name: "setPipeline",
+    signatures: [["pipeline"]]
+  },
+  {
+    name: "dispatchWorkgroups",
+    signatures: [["workgroupCountX","?workgroupCountY","?workgroupCountZ"]]
+  },
+  {
+    name: "dispatchWorkgroupsIndirect",
+    signatures: [["indirectBuffer","indirectOffset"]]
+  },
+  {
+    name: "importExternalTexture",
+    signatures: [["descriptor"]]
+  },
+  {
+    name: "createBindGroup",
+    signatures: [["descriptor"]]
+  },
+  {
+    name: "createBindGroupLayout",
+    signatures: [["descriptor"]]
+  },
+  {
+    name: "createPipelineLayout",
+    signatures: [["descriptor"]]
+  },
+  {
+    name: "createShaderModule",
+    signatures: [["descriptor"]]
+  },
+  {
+    name: "createRenderPipeline",
+    signatures: [["descriptor"]]
+  },
+  {
+    name: "createComputePipeline",
+    signatures: [["descriptor"]]
+  },
+  {
+    name: "createRenderPipelineAsync",
+    signatures: [["descriptor"]]
+  },
+  {
+    name: "createComputePipelineAsync",
+    signatures: [["descriptor"]]
+  },
+  {
+    name: "createCommandEncoder",
+    signatures: [["?descriptor"]]
+  },
+  {
+    name: "createRenderBundleEncoder",
+    signatures: [["descriptor"]]
+  },
+  {
+    name: "createQuerySet",
+    signatures: [["descriptor"]]
+  },
+  {
+    name: "pushErrorScope",
+    signatures: [["filter"]]
+  },
+  {
+    name: "GPUInternalError",
+    signatures: [["message"]]
+  },
+  {
+    name: "GPUOutOfMemoryError",
+    signatures: [["message"]]
+  },
+  {
+    name: "getBindGroupLayout",
+    signatures: [["index"]]
+  },
+  {
+    name: "GPUPipelineError",
+    signatures: [["?message","options"]]
+  },
+  {
+    name: "setBindGroup",
+    signatures: [["index","bindGroup","?dynamicOffsets"],["index","bindGroup","dynamicOffsetsData","dynamicOffsetsDataStart","dynamicOffsetsDataLength"]]
+  },
+  {
+    name: "writeBuffer",
+    signatures: [["buffer","bufferOffset","data","?dataElementOffset","?dataElementCount"],["buffer","bufferOffset","data","?dataByteOffset","?byteSize"]]
+  },
+  {
+    name: "writeTexture",
+    signatures: [["destination","data","dataLayout","size"]]
+  },
+  {
+    name: "copyExternalImageToTexture",
+    signatures: [["source","destination","copySize"]]
+  },
+  {
+    name: "setIndexBuffer",
+    signatures: [["buffer","format","?offset","?size"]]
+  },
+  {
+    name: "setVertexBuffer",
+    signatures: [["slot","buffer","?offset","?size"]]
+  },
+  {
+    name: "draw",
+    signatures: [["vertexCount","?instanceCount","?firstVertex","?firstInstance"]]
+  },
+  {
+    name: "drawIndexed",
+    signatures: [["indexCount","?instanceCount","?firstIndex","?baseVertex","?firstInstance"]]
+  },
+  {
+    name: "drawIndirect",
+    signatures: [["indirectBuffer","indirectOffset"]]
+  },
+  {
+    name: "drawIndexedIndirect",
+    signatures: [["indirectBuffer","indirectOffset"]]
+  },
+  {
+    name: "setViewport",
+    signatures: [["x","y","width","height","minDepth","maxDepth"]]
+  },
+  {
+    name: "setScissorRect",
+    signatures: [["x","y","width","height"]]
+  },
+  {
+    name: "setBlendConstant",
+    signatures: [["color"]]
+  },
+  {
+    name: "setStencilReference",
+    signatures: [["reference"]]
+  },
+  {
+    name: "executeBundles",
+    signatures: [["bundles"]]
+  },
+  {
+    name: "beginOcclusionQuery",
+    signatures: [["queryIndex"]]
+  },
+  {
+    name: "createView",
+    signatures: [["?descriptor"]]
+  },
+  {
+    name: "GPUUncapturedErrorEvent",
+    signatures: [["type","gpuUncapturedErrorEventInitDict"]]
+  },
+  {
+    name: "GPUValidationError",
+    signatures: [["message"]]
+  },
+  {
+    name: "requestAdapter",
+    signatures: [["?options"]]
+  },
+  {
+    name: "MIDIConnectionEvent",
+    signatures: [["type","?eventInitDict"]]
+  },
+  {
+    name: "MIDIMessageEvent",
+    signatures: [["type","?eventInitDict"]]
+  },
+  {
+    name: "CloseEvent",
+    signatures: [["type","?eventInitDict"]]
+  },
+  {
+    name: "WebSocketError",
+    signatures: [["?message","?init"]]
+  },
+  {
+    name: "WebSocketStream",
+    signatures: [["url","?options"]]
+  },
+  {
+    name: "WebSocket",
+    signatures: [["url","?protocols"]]
+  },
+  {
+    name: "WebTransportError",
+    signatures: [["?init"]]
+  },
+  {
+    name: "WebTransport",
+    signatures: [["url","?options"]]
+  },
+  {
+    name: "USBAlternateInterface",
+    signatures: [["deviceInterface","alternateSetting"]]
+  },
+  {
+    name: "USBConfiguration",
+    signatures: [["device","configurationValue"]]
+  },
+  {
+    name: "USBConnectionEvent",
+    signatures: [["type","eventInitDict"]]
+  },
+  {
+    name: "selectConfiguration",
+    signatures: [["configurationValue"]]
+  },
+  {
+    name: "claimInterface",
+    signatures: [["interfaceNumber"]]
+  },
+  {
+    name: "releaseInterface",
+    signatures: [["interfaceNumber"]]
+  },
+  {
+    name: "selectAlternateInterface",
+    signatures: [["interfaceNumber","alternateSetting"]]
+  },
+  {
+    name: "controlTransferIn",
+    signatures: [["setup","length"]]
+  },
+  {
+    name: "controlTransferOut",
+    signatures: [["setup","?data"]]
+  },
+  {
+    name: "clearHalt",
+    signatures: [["direction","endpointNumber"]]
+  },
+  {
+    name: "transferIn",
+    signatures: [["endpointNumber","length"]]
+  },
+  {
+    name: "transferOut",
+    signatures: [["endpointNumber","data"]]
+  },
+  {
+    name: "isochronousTransferIn",
+    signatures: [["endpointNumber","packetLengths"]]
+  },
+  {
+    name: "isochronousTransferOut",
+    signatures: [["endpointNumber","data","packetLengths"]]
+  },
+  {
+    name: "USBEndpoint",
+    signatures: [["alternate","endpointNumber","direction"]]
+  },
+  {
+    name: "USBInTransferResult",
+    signatures: [["status","?data"]]
+  },
+  {
+    name: "USBInterface",
+    signatures: [["configuration","interfaceNumber"]]
+  },
+  {
+    name: "USBIsochronousInTransferPacket",
+    signatures: [["status","?data"]]
+  },
+  {
+    name: "USBIsochronousInTransferResult",
+    signatures: [["packets","?data"]]
+  },
+  {
+    name: "USBIsochronousOutTransferPacket",
+    signatures: [["status","?bytesWritten"]]
+  },
+  {
+    name: "USBIsochronousOutTransferResult",
+    signatures: [["packets"]]
+  },
+  {
+    name: "USBOutTransferResult",
+    signatures: [["status","?bytesWritten"]]
+  },
+  {
+    name: "WindowControlsOverlayGeometryChangeEvent",
+    signatures: [["type","eventInitDict"]]
+  },
+  {
+    name: "getPose",
+    signatures: [["relative_to"]]
+  },
+  {
+    name: "XRInputSourceEvent",
+    signatures: [["type","eventInitDict"]]
+  },
+  {
+    name: "XRInputSourcesChangeEvent",
+    signatures: [["type","eventInitDict"]]
+  },
+  {
+    name: "XRRay",
+    signatures: [["transform"],["?origin","?direction"]]
+  },
+  {
+    name: "XRReferenceSpaceEvent",
+    signatures: [["type","eventInitDict"]]
+  },
+  {
+    name: "getOffsetReferenceSpace",
+    signatures: [["originOffset"]]
+  },
+  {
+    name: "XRRigidTransform",
+    signatures: [["?position","?orientation"]]
+  },
+  {
+    name: "XRSessionEvent",
+    signatures: [["type","eventInitDict"]]
+  },
+  {
+    name: "supportsSession",
+    signatures: [["mode"]]
+  },
+  {
+    name: "isSessionSupported",
+    signatures: [["mode"]]
+  },
+  {
+    name: "requestSession",
+    signatures: [["mode","?options"]]
+  },
+  {
+    name: "XRWebGLLayer",
+    signatures: [["session","context","?layerInit"]]
+  },
+  {
+    name: "getViewport",
+    signatures: [["view"]]
+  },
+  {
+    name: "getNativeFramebufferScaleFactor",
+    signatures: [["session"]]
   }
 ];
