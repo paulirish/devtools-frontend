@@ -185,7 +185,14 @@ export class EntryLabelOverlay extends HTMLElement {
     }
 
     const pastedText = clipboardData.getData('text');
+    this.pasteLabel(pastedText);
+  }
 
+
+  pasteLabel(pastedText: string): void {
+    if (!this.#inputField) {
+      return;
+    }
     const newText = this.#inputField.textContent + pastedText;
     const trimmedText = newText.slice(0, EntryLabelOverlay.MAX_LABEL_LENGTH + 1);
 

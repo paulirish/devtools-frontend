@@ -76,6 +76,24 @@ export class EntriesFilter {
     return possibleActions;
   }
 
+  getTraceEntryTreeForAI(entry: TraceEngine.Types.TraceEvents.SyntheticTraceEntry):
+      TraceEngine.Helpers.TreeHelpers.NodeForAI|null {
+    const node = this.#entryToNode.get(entry);
+    if (!node) {
+      return null;
+    }
+
+    function getRoot(node: TraceEngine.Helpers.TreeHelpers.TraceEntryNode):
+        TraceEngine.Helpers.TreeHelpers.TraceEntryNode {
+      if (node.parent) {
+        return getRoot(node.parent);
+      }
+      return node;
+    }
+
+    return TraceEngine.Helpers.TreeHelpers.NodeForAI.fromTraceEntryTree(getRoot(node));
+  }
+
   /**
    * Returns the trace entry tree for the specified event, simplified for input to AI Assistance.
    * The tree is rooted at the top-level task that contains the event, with the node for specified event marked as selected.

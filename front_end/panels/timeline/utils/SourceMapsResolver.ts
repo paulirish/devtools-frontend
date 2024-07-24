@@ -100,6 +100,14 @@ export class SourceMapsResolver extends EventTarget {
     return null;
   }
 
+  async getScriptForEntry(entry: Trace.Types.Events.SyntheticProfileCall): Promise<string> {
+    const target = this.#targetForThread(entry.tid);
+    const debuggerModel = target?.model(SDK.DebuggerModel.DebuggerModel);
+    const script = debuggerModel?.scriptForId(String(entry.callFrame.scriptId));
+    const content = await script?.requestContent();
+    return content?.content ?? '';
+  }
+
   static storeResolvedNodeDataForEntry(
       pid: Trace.Types.Events.ProcessID, tid: Trace.Types.Events.ThreadID, callFrame: Protocol.Runtime.CallFrame,
       resolvedCodeLocationData: ResolvedCodeLocationData): void {

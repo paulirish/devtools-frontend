@@ -2761,6 +2761,63 @@ export const enum Name {
   BEGIN_REMOTE_FONT_LOAD = 'BeginRemoteFontLoad',
 }
 
+export const ImportantEventName = {
+  [KnownEventName.RunTask]: 'Task',
+
+  /* Parse */
+  [KnownEventName.ParseHTML]: 'Parse HTML',
+  [KnownEventName.ParseCSS]: 'Parse CSS',
+
+  /* V8 */
+  [KnownEventName.CompileCode]: 'Compile Code',
+  [KnownEventName.CompileModule]: 'Compile Code',
+  [KnownEventName.Compile]: 'Compile Code',
+  [KnownEventName.CompileScript]: 'Compile Code',
+
+  /* Gc */
+  [KnownEventName.GC]: 'Garbage Collect',
+  [KnownEventName.DOMGC]: 'Garbage Collect',
+  [KnownEventName.MajorGC]: 'Garbage Collect',
+  [KnownEventName.MinorGC]: 'Garbage Collect',
+  [KnownEventName.CPPGCSweep]: 'Garbage Collect',
+
+  /* Layout */
+  [KnownEventName.ScheduleStyleRecalculation]: 'Layout',
+  [KnownEventName.Layout]: 'Layout',
+  [KnownEventName.UpdateLayoutTree]: 'Layout',
+  [KnownEventName.InvalidateLayout]: 'Layout',
+  [KnownEventName.LayoutInvalidationTracking]: 'Layout',
+  [KnownEventName.ComputeIntersections]: 'Layout',
+  [KnownEventName.HitTest]: 'Layout',
+  [KnownEventName.PrePaint]: 'Layout',
+  [KnownEventName.Layerize]: 'Layout',
+  [KnownEventName.LayoutShift]: 'Layout',
+  [KnownEventName.UpdateLayerTree]: 'Layout',
+  [KnownEventName.ScheduleStyleInvalidationTracking]: 'Layout',
+  [KnownEventName.StyleRecalcInvalidationTracking]: 'Layout',
+  [KnownEventName.StyleInvalidatorInvalidationTracking]: 'Layout',
+  [KnownEventName.SelectorStats]: 'Layout',
+  [KnownEventName.BeginCommitCompositorFrame]: 'Layout',
+
+  /* Paint */
+  [KnownEventName.ScrollLayer]: 'Paint',
+  [KnownEventName.UpdateLayer]: 'Paint',
+  [KnownEventName.PaintSetup]: 'Paint',
+  [KnownEventName.Paint]: 'Paint',
+  [KnownEventName.PaintImage]: 'Paint',
+  [KnownEventName.Commit]: 'Paint',
+  [KnownEventName.CompositeLayers]: 'Paint',
+  [KnownEventName.RasterTask]: 'Paint',
+  [KnownEventName.ImageDecodeTask]: 'Paint',
+  [KnownEventName.ImageUploadTask]: 'Paint',
+  [KnownEventName.DecodeImage]: 'Paint',
+  [KnownEventName.DrawLazyPixelRef]: 'Paint',
+  [KnownEventName.DecodeLazyPixelRef]: 'Paint',
+  [KnownEventName.GPUTask]: 'Paint',
+  [KnownEventName.Rasterize]: 'Paint',
+  [KnownEventName.EventTiming]: 'Paint',
+};
+
 // NOT AN EXHAUSTIVE LIST: just some categories we use and refer
 // to in multiple places.
 export const Categories = {

@@ -32,6 +32,7 @@ import * as Common from '../../../../core/common/common.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
 import * as Root from '../../../../core/root/root.js';
+import * as Bindings from '../../../../models/bindings/bindings.js';
 import type * as TimelineModel from '../../../../models/timeline_model/timeline_model.js';
 import * as Trace from '../../../../models/trace/trace.js';
 import * as VisualLogging from '../../../../ui/visual_logging/visual_logging.js';
@@ -77,6 +78,14 @@ const UIStrings = {
    *@example {Network} PH1
    */
   sCollapsed: '{PH1} collapsed',
+  /**
+   *@description Text for AI thing
+   */
+  whatsThis: 'What\s this?',
+  /**
+   *@description Text for Hiding a function from the Flame Chart
+   */
+  hideThis: 'hide this',
   /**
    *@description Text for an action that adds a label annotation to an entry in the Flame Chart
    */
@@ -1335,6 +1344,46 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
         jslogContext: 'timeline.annotations.delete-entry-annotations',
       });
     }
+
+
+    const whatsThisOption = this.contextMenu.defaultSection().appendItem(i18nString(UIStrings.whatsThis), async () => {
+      const treeForAI = this.dataProvider.getTraceEntryTreeForAIFromEntryIndex(this.selectedEntryIndex);
+      treeForAI?.sanitize({minTotal: 1, minJsTotal: 1, minJsSelf: 0.1});
+
+      const json = JSON.stringify(treeForAI);
+      // eslint-disable-next-line
+      console.log(JSON.parse(json));
+
+      const response = Trace.Helpers.TreeHelpers.NodeForAI.promptAI(
+          'A web page was profiled, and one of the tasks in the profile is described to you as a JSON object.\n' +
+          'The \'url\', \'line\' and \'column\' specify a function\'s location.\n' +
+          'The \'start\', \'totalTime\' (total duration including children) and \'selfTime\' (own duration excluding children) are in milliseconds.\n' +
+          'First, explain what the task is broadly doing.\n' +
+          'Then, focus on what is taking the most amount of time on its own.\n' +
+          'Only if \'Parse HTML\', \'Parse CSS\', \'Compile Code\', \'Garbage Collect\', \'Recalculate Style\', \'Layout\' or \'Paint\' are taking a long time, they are important in your explanation. Otherwise, don\'t say anything about them.\n' +
+          'Overall, don\'t repeat yourself, but also don\'t be too concise.\n' +
+          'The JSON object describing the task in the profile is irrelevant. Never mention anything about it.\n' +
+          json);
+
+      let explanation = '';
+      for await (const part of response) {
+        explanation = part.explanation;
+      }
+      // eslint-disable-next-line
+      console.log(explanation);
+    }, {
+      jslogContext: 'whats-this',
+    });
+    const modifier = UI.KeyboardShortcut.Modifiers.CtrlOrMeta;
+    whatsThisOption.setShortcut(UI.KeyboardShortcut.KeyboardShortcut.shortcutToString('?', modifier));
+
+    const hideEntryOption = this.contextMenu.defaultSection().appendItem(i18nString(UIStrings.hideFunction), () => {
+      this.modifyTree(FilterAction.MERGE_FUNCTION, this.selectedEntryIndex);
+    }, {
+      disabled: !possibleActions?.[FilterAction.MERGE_FUNCTION],
+      jslogContext: 'hide-function',
+    });
+    hideEntryOption.setShortcut('H');
 
     void this.contextMenu.show();
   }
@@ -4027,6 +4076,10 @@ export interface FlameChartDataProvider {
   eventByIndex?(entryIndex: number): Trace.Types.Events.Event|null;
 
   indexForEvent?(event: Trace.Types.Events.Event|Trace.Types.Events.LegacyTimelineFrame): number|null;
+
+  getTraceEntryTreeForAIFromEntryIndex(entryIndex: number): Trace.Helpers.TreeHelpers.NodeForAI|null;
+
+  getTraceEntryTreeForAIFromEntry(entry: Trace.Types.Events.Event): Trace.Helpers.TreeHelpers.NodeForAI|null;
 
   buildFlowForInitiator?(index: number): unknown;
 

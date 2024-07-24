@@ -149,7 +149,7 @@ const CODE_CHUNK_SEPARATOR = '\n`````\n';
 export class AidaAbortError extends Error {}
 
 export class AidaClient {
-  static buildConsoleInsightsRequest(input: string): AidaRequest {
+  static buildConsoleInsightsRequest(input: string, options?: {temperature?: number}): AidaRequest {
     const request: AidaRequest = {
       input,
       client: CLIENT_NAME,
@@ -157,6 +157,7 @@ export class AidaClient {
       client_feature: ClientFeature.CHROME_CONSOLE_INSIGHTS,
     };
     const config = Common.Settings.Settings.instance().getHostConfig();
+
     let temperature = -1;
     let modelId = '';
     if (config.devToolsConsoleInsights?.enabled) {
@@ -164,6 +165,11 @@ export class AidaClient {
       modelId = config.devToolsConsoleInsights.modelId || '';
     }
     const disallowLogging = config.aidaAvailability?.disallowLogging ?? true;
+
+    if (options) {
+      temperature = options?.temperature ?? temperature;
+    }
+
 
     if (temperature >= 0) {
       request.options ??= {};

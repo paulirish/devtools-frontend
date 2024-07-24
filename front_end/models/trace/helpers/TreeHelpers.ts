@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Host from '../../../core/host/host.js';
+import type * as TimelineModel from '../../../models/timeline_model/timeline_model.js';
 import * as Types from '../types/types.js';
 
 import {eventIsInBounds, microSecondsToMilliseconds} from './Timing.js';
@@ -34,6 +36,162 @@ export interface TraceEntryNode {
   id: TraceEntryNodeId;
   parent: TraceEntryNode|null;
   children: TraceEntryNode[];
+}
+
+export class NodeForAI {
+  url?: string;
+  line?: number;
+  column?: number;
+  function?: string;
+  children?: NodeForAI[];
+
+  constructor(
+      public type: string, public start: Types.Timing.MilliSeconds, public totalTime?: Types.Timing.MilliSeconds,
+      public selfTime?: Types.Timing.MilliSeconds) {
+  }
+
+  static #forEachRecursive(list: NodeForAI[], callback: (node: NodeForAI) => void): void {
+    for (const node of list) {
+      callback(node);
+      if (node.children) {
+        NodeForAI.#forEachRecursive(node.children, callback);
+      }
+    }
+  }
+
+  static #filterRecursive(list: NodeForAI[], predicate: (node: NodeForAI) => boolean): NodeForAI[] {
+    let done;
+    do {
+      done = true;
+      const filtered: NodeForAI[] = [];
+      for (const node of list) {
+        if (predicate(node)) {
+          filtered.push(node);
+        } else if (node.children) {
+          filtered.push(...node.children);
+          done = false;
+        }
+      }
+      list = filtered;
+    } while (!done);
+
+    for (const node of list) {
+      if (node.children) {
+        node.children = NodeForAI.#filterRecursive(node.children, predicate);
+      }
+    }
+    return list;
+  }
+
+  static #removeUnimportantNodesRecursively(list: NodeForAI[]): NodeForAI[] {
+    const important = new Map(Object.entries(Types.TraceEvents.ImportantEventName));
+    const isJS = (node: NodeForAI): boolean => node.function !== undefined;
+    return NodeForAI.#filterRecursive(list, node => isJS(node) || important.has(node.type));
+  }
+
+  static #removeInexpensiveNodesRecursively(
+      list: NodeForAI[],
+      options?: {minTotal?: number, minSelf?: number, minJsTotal?: number, minJsSelf?: number}): NodeForAI[] {
+    const minTotalTime = options?.minTotal ?? 0;
+    const minSelfTime = options?.minSelf ?? 0;
+    const minJsTotalTime = options?.minJsTotal ?? 0;
+    const minJsSelfTime = options?.minJsSelf ?? 0;
+    const isJS = (node: NodeForAI): boolean => node.function !== undefined;
+    const hasMinTotalTime = (node: NodeForAI): boolean =>
+        node.totalTime === undefined || node.totalTime >= (isJS(node) ? minJsTotalTime : minTotalTime);
+    const hasMinSelfTime = (node: NodeForAI): boolean =>
+        node.selfTime === undefined || node.selfTime >= (isJS(node) ? minJsSelfTime : minSelfTime);
+    return NodeForAI.#filterRecursive(list, node => hasMinTotalTime(node) && hasMinSelfTime(node));
+  }
+
+  static #deleteChildrenIfEmpty(node: NodeForAI): void {
+    if (!node.children?.length) {
+      delete node.children;
+    }
+  }
+
+  static #renameNodeType(node: NodeForAI): void {
+    const important = new Map(Object.entries(Types.TraceEvents.ImportantEventName));
+    const isJS = (node: NodeForAI): boolean => node.function !== undefined;
+    node.type = isJS(node) ? 'JS' : important.get(node.type) ?? '?';
+  }
+
+  static sanitize(
+      list: NodeForAI[],
+      options?: {minTotal?: number, minSelf?: number, minJsTotal?: number, minJsSelf?: number}): NodeForAI[] {
+    list = NodeForAI.#removeUnimportantNodesRecursively(list);
+    list = NodeForAI.#removeInexpensiveNodesRecursively(list, options);
+    NodeForAI.#forEachRecursive(list, NodeForAI.#deleteChildrenIfEmpty);
+    NodeForAI.#forEachRecursive(list, NodeForAI.#renameNodeType);
+    return list;
+  }
+
+  sanitize(options?: {minTotal?: number, minSelf?: number, minJsTotal?: number, minJsSelf?: number}): void {
+    if (this.children) {
+      this.children = NodeForAI.sanitize(this.children, options);
+    }
+    NodeForAI.#deleteChildrenIfEmpty(this);
+    NodeForAI.#renameNodeType(this);
+  }
+
+  static fromProfileTreeNode(node: TimelineModel.TimelineProfileTree.Node): NodeForAI|null {
+    if (node.event === null) {
+      return null;
+    }
+    const nodeForAI = NodeForAI.fromTraceEventData(node.event);
+    nodeForAI.totalTime = node.totalTime === undefined ? undefined : Types.Timing.MilliSeconds(node.selfTime / 1000);
+    nodeForAI.selfTime = node.selfTime === undefined ? undefined : Types.Timing.MilliSeconds(node.selfTime / 1000);
+    return nodeForAI;
+  }
+
+  static fromSyntheticTraceEntry(entry: Types.TraceEvents.SyntheticTraceEntry): NodeForAI {
+    const nodeForAI = NodeForAI.fromTraceEventData(entry);
+    nodeForAI.selfTime = entry.selfTime === undefined ? undefined : Types.Timing.MilliSeconds(entry.selfTime / 1000);
+    return nodeForAI;
+  }
+
+  static fromTraceEventData(data: Types.TraceEvents.TraceEventData): NodeForAI {
+    const start = Types.Timing.MilliSeconds(data.ts / 1000);
+    const duration = data.dur === undefined ? undefined : Types.Timing.MilliSeconds(data.dur / 1000);
+    const nodeForAI = new NodeForAI(data.name, start, duration);
+    if (Types.TraceEvents.isProfileCall(data)) {
+      nodeForAI.function = data.callFrame.functionName || '(anonymous)';
+      try {
+        const url = new URL(data.callFrame.url);
+        nodeForAI.url = url.origin;
+        nodeForAI.line = data.callFrame.lineNumber;
+        nodeForAI.column = data.callFrame.columnNumber;
+      } catch (e) {
+      }
+    }
+    return nodeForAI;
+  }
+
+  static fromProfileTreeStack(stack: TimelineModel.TimelineProfileTree.Node[]): NodeForAI[] {
+    let children = stack.map(NodeForAI.fromProfileTreeNode).filter(node => Boolean(node)) as NodeForAI[];
+    children = NodeForAI.#removeUnimportantNodesRecursively(children);
+    children = NodeForAI.#removeInexpensiveNodesRecursively(children);
+    return children;
+  }
+
+  static fromTraceEntryTree(node: TraceEntryNode): NodeForAI {
+    const nodeForAI = NodeForAI.fromSyntheticTraceEntry(node.entry);
+    for (const child of node.children) {
+      nodeForAI.children ??= [];
+      nodeForAI.children.push(NodeForAI.fromTraceEntryTree(child));
+    }
+    return nodeForAI;
+  }
+
+  static async * promptAI(text: string): AsyncGenerator<Host.AidaClient.AidaResponse, void, void> {
+    const aidaAvailability = await Host.AidaClient.AidaClient.getAidaClientAvailability();
+    if (aidaAvailability !== Host.AidaClient.AidaAvailability.AVAILABLE) {
+      throw new Error(aidaAvailability);
+    }
+    const aidaClient = new Host.AidaClient.AidaClient();
+    const aidaRequest = Host.AidaClient.AidaClient.buildConsoleInsightsRequest(text, {temperature: 0.2});
+    yield* aidaClient.fetch(aidaRequest);
+  }
 }
 
 /**
@@ -86,6 +244,7 @@ export class TraceEntryNodeForAI {
     }
     return nodeForAI;
   }
+
 
   static fromSelectedEntryNode(selectedEntryNode: TraceEntryNode): TraceEntryNodeForAI {
     function getRoot(node: TraceEntryNode): TraceEntryNode {

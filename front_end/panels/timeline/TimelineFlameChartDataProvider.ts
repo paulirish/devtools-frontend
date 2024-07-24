@@ -325,6 +325,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     return manager.getEntriesFilter().getTraceEntryTreeForAI(entry);
   }
 
+
   findPossibleContextMenuActions(entryIndex: number): PerfUI.FlameChart.PossibleFilterActions|void {
     const entry = this.entryData[entryIndex] as Trace.Types.Events.Event;
     return ModificationsManager.activeManager()?.getEntriesFilter().findPossibleActions(entry);

@@ -1366,6 +1366,34 @@ export class Overlays extends EventTarget {
       case 'ENTRY_LABEL': {
         const shouldDrawLabelBelowEntry = Trace.Types.Events.isLegacyTimelineFrame(overlay.entry);
         const component = new Components.EntryLabelOverlay.EntryLabelOverlay(overlay.label, shouldDrawLabelBelowEntry);
+        const generateLabel = async(
+            entry: Trace.Types.Events.TraceEventData,
+            component: Components.EntryLabelOverlay.EntryLabelOverlay): Promise<void> => {
+          const treeForAI = this.#charts.mainProvider.getTraceEntryTreeForAIFromEntry(entry);
+          treeForAI?.sanitize({minTotal: 1, minJsTotal: 1, minJsSelf: 0.1});
+
+          const json = JSON.stringify(treeForAI);
+          // eslint-disable-next-line
+          console.log(JSON.parse(json));
+
+          const response = Trace.Helpers.TreeHelpers.NodeForAI.promptAI(
+              'A web page was profiled, and one of the tasks in the profile is described to you as a JSON object.\n' +
+              'The \'url\', \'line\' and \'column\' specify a function\'s location.\n' +
+              'The \'start\', \'totalTime\' (total duration including children) and \'selfTime\' (own duration excluding children) are in milliseconds.\n' +
+              'Generate a very short title of only a few words describing what the task is broadly doing.\n' +
+              'In the title, focus on what is taking the most amount of time on its own.\n' +
+              'Only if \'Parse HTML\', \'Parse CSS\', \'Compile Code\', \'Garbage Collect\', \'Recalculate Style\', \'Layout\' or \'Paint\' are taking a long time, they are important in your explanation. Otherwise, don\'t say anything about them.\n' +
+              'The JSON object describing the task in the profile is irrelevant. Never mention anything about it.\n' +
+              json);
+          let explanation = '';
+          for await (const part of response) {
+            explanation = part.explanation;
+          }
+          // eslint-disable-next-line
+          console.log(explanation);
+          component.pasteLabel(explanation);
+        };
+
         component.addEventListener(Components.EntryLabelOverlay.EmptyEntryLabelRemoveEvent.eventName, () => {
           this.dispatchEvent(new AnnotationOverlayActionEvent(overlay, 'Remove'));
         });
@@ -1375,6 +1403,9 @@ export class Overlays extends EventTarget {
           this.dispatchEvent(new AnnotationOverlayActionEvent(overlay, 'Update'));
         });
         div.appendChild(component);
+        if (!(overlay.entry instanceof Trace.Handlers.ModelHandlers.Frames.TimelineFrame)) {
+          void generateLabel(overlay.entry, component);
+        }
         return div;
       }
       case 'ENTRIES_LINK': {
