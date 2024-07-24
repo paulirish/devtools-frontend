@@ -1058,9 +1058,14 @@ export class TimelineUIUtils {
     beforeImage.style.width = `${beforeImage.naturalWidth * scaleFactor}px`;
     beforeImage.style.height = `${beforeImage.naturalHeight * scaleFactor}px`;
 
-    const rectEls = affectedElementsOldRects.map(currentRect => {
+    const rectEls = affectedElementsOldRects.map((currentRect, i) => {
       const rectEl = document.createElement('div');
       rectEl.classList.add('layout-shift-screenshot-preview-rect');
+      // If it's starting from 0, animate it as a fade-in in the same location.
+      if ([currentRect.x, currentRect.y, currentRect.width, currentRect.height].every(val => val === 0)) {
+        currentRect = affectedElementsCurrentRects[i];
+        rectEl.style.opacity = '0';
+      }
       const scaledRectX = currentRect.x * beforeImage.naturalWidth / viewport.width * scaleFactor;
       const scaledRectY = currentRect.y * beforeImage.naturalHeight / viewport.height * scaleFactor;
       const scaledRectWidth = currentRect.width * beforeImage.naturalWidth / viewport.width * scaleFactor;
@@ -1086,6 +1091,9 @@ export class TimelineUIUtils {
       }
       rectEls.forEach((rectEl, i) => {
         const newRect = affectedElementsCurrentRects[i];
+        if (rectEl.hidden === true) {
+
+        }
         const scaledRectX = newRect.x * beforeImage.naturalWidth / viewport.width * scaleFactor;
         const scaledRectY = newRect.y * beforeImage.naturalHeight / viewport.height * scaleFactor;
         const scaledRectWidth = newRect.width * beforeImage.naturalWidth / viewport.width * scaleFactor;
