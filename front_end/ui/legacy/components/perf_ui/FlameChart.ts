@@ -1289,16 +1289,17 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       // eslint-disable-next-line
       console.log(JSON.parse(json));
 
-      const response = TraceHelpers.TreeHelpers.NodeForAI.promptAI(
-          'A web page was profiled, and one of the tasks in the profile is described to you as a JSON object.\n' +
-          'The \'url\', \'line\' and \'column\' specify a function\'s location.\n' +
-          'The \'start\', \'totalTime\' (total duration including children) and \'selfTime\' (own duration excluding children) are in milliseconds.\n' +
-          'First, explain what the task is broadly doing.\n' +
-          'Then, focus on what is taking the most amount of time on its own.\n' +
-          'Only if \'Parse HTML\', \'Parse CSS\', \'Compile Code\', \'Garbage Collect\', \'Recalculate Style\', \'Layout\' or \'Paint\' are taking a long time, they are important in your explanation. Otherwise, don\'t say anything about them.\n' +
-          'Overall, don\'t repeat yourself, but also don\'t be too concise.\n' +
-          'The JSON object describing the task in the profile is irrelevant. Never mention anything about it.\n' +
-          json);
+      const response = TraceHelpers.TreeHelpers.NodeForAI.promptAI(`
+      A web page was profiled, and one of the tasks in the profile is described to you as a JSON object.
+        The 'url', 'line' and 'column' specify a function's location.
+        The 'start', 'totalTime' (total duration including children) and 'selfTime' (own duration excluding children) are in milliseconds.
+      First, explain what the task is broadly doing.
+      Then, focus on what is taking the most amount of time on its own.
+        Only if 'Parse HTML', 'Parse CSS', 'Compile Code', 'Garbage Collect', 'Recalculate Style', 'Layout' or 'Paint' are taking a long time, they are important in your explanation. Otherwise, don't say anything about them.
+      Overall, don't repeat yourself, but also don't be too concise.
+      The JSON object describing the task in the profile is irrelevant. Never mention anything about it.
+      ${json}`.replaceAll('      ', ' '));
+
 
       let explanation = '';
       for await (const part of response) {

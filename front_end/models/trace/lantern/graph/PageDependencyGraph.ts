@@ -7,6 +7,7 @@ import {CPUNode} from './CPUNode.js';
 import {NetworkNode} from './NetworkNode.js';
 import * as Core from '../core/core.js';
 import type * as Lantern from '../types/types.js';
+import { I } from '../../../../third_party/codemirror.next/chunk/codemirror.js';
 
 // COMPAT: m71+ We added RunTask to `disabled-by-default-lighthouse`
 const SCHEDULABLE_TASK_TITLE_LH = 'RunTask';
@@ -580,6 +581,80 @@ class PageDependencyGraph {
       console.log(padRight(bar, widthInCharacters), `| ${displayName.slice(0, 30)}`);
     });
   }
+
+  // create a method that outputs the graph but replacing using an adjacency list to represent dependents
+  static printGraphAdjacencyList(rootNode: Node): void {
+    const nodes: Node[] = [];
+    rootNode.traverse(node => nodes.push(node));
+    nodes.sort((a, b) => a.startTime - b.startTime);
+
+    // give me a node to nodeID map that ensures nodes have a unique integer id
+    const nodeToIdMap = new Map<Node, number>();
+    nodes.forEach((node, i) => {
+      nodeToIdMap.set(node, i);
+    });
+
+    // create a map of nodeID to a list of its dependents
+    const adjacencyList = new Map<number, number[]>();
+    nodes.forEach(node => {
+      const nodeID = nodeToIdMap.get(node);
+      if (nodeID !== undefined) {
+        const dependents = node.getDependents().map(dependent => nodeToIdMap.get(dependent));
+        adjacencyList.set(nodeID, dependents.filter(id => id !== undefined) as number[]);
+      }
+    });
+
+    const displayName = node => `${nodeToIdMap.get(node)} - ${node.request ? node.request.url : node.type}`;
+
+    let str = '';
+    nodes.forEach((node) => {
+      str += `\nNode: ${displayName(node)}`;
+      str += `\nStart: ${node.startTime/1000}`;
+      str += `\nDuration: ${(node.endTime - node.startTime)/1000}`;
+      if (node.request) {
+        // str += '\n;
+      } else {
+        str += `\nType: ${node._event.name}`;
+      }
+      // str += `\n  Dependencies:`;
+      // node.getDependencies().forEach(dependency => {
+      //   str += `\n    ${displayName(dependency)}`;
+      // });
+      str += `\n  Dependents:`;
+      node.getDependents().forEach(dependent => {
+        str += `\n    ${displayName(dependent)}`;
+      });
+      str += '\n';
+    });
+    return str;
+  }
+
+  // create a method to print the graph in the graphviz DOT language
+  static getDOTstring = function(rootNode: Node): string {
+    const nodes: Node[] = [];
+    rootNode.traverse(node => nodes.push(node));
+    nodes.sort((a, b) => a.startTime - b.startTime);
+
+    let dot = 'digraph G {\n';
+    dot += '  rankdir=LR;\n';
+    dot += '  node [shape=box];\n';
+
+    nodes.forEach(node => {
+      // @ts-expect-error -- disambiguate displayName from across possible Node types.
+      const displayName = node.request ? node.request.url : node.type;
+      dot += `  "${node.id}" [label="${displayName}"];\n`;
+    });
+
+    nodes.forEach(node => {
+      node.getDependencies().forEach(dependency => {
+        dot += `  "${dependency.id}" -> "${node.id}";\n`;
+      });
+    });
+
+    dot += '}\n';
+    return dot;
+  };
 }
+
 
 export {PageDependencyGraph};

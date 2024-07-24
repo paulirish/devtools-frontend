@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 import * as Handlers from './handlers/handlers.js';
 import * as Insights from './insights/insights.js';
+import * as TraceHelpers from './helpers/helpers.js';
 import * as Lantern from './lantern/lantern.js';
 import * as LanternComputationData from './LanternComputationData.js';
 import * as Types from './types/types.js';
@@ -294,6 +295,32 @@ export class TraceProcessor extends EventTarget {
       totalBlockingTime: tbtResult,
     };
 
+    (async function(){
+
+      const str = Lantern.Graph.PageDependencyGraph.printGraphAdjacencyList(graph);
+
+      console.groupCollapsed('graph output')
+      console.log(str);
+      console.groupEnd();
+
+      console.warn('prompting about the lantern graph', graph);
+
+
+      const response = TraceHelpers.TreeHelpers.NodeForAI.promptAI(`
+      You're supplying expert analysis to a web developer.
+      Below is the graph of network and CPU activity within the web browser loading a web page. Timings are in milliseconds.
+      Find the critical path.
+
+      ${str}`);
+      let explanation = '';
+      for await (const part of response) {
+        explanation = part.explanation;
+      }
+      // eslint-disable-next-line
+      console.log(explanation);
+    })();
+
+
     return {graph, simulator, metrics};
   }
 
@@ -313,6 +340,7 @@ export class TraceProcessor extends EventTarget {
     let lantern;
     try {
       lantern = this.#createLanternContext(traceParsedData, traceEvents);
+
     } catch (e) {
       // Don't allow an error in constructing the Lantern graphs to break the rest of the trace processor.
       // Log unexpected errors, but suppress anything that occurs from a trace being too old.
