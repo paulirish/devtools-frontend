@@ -59,41 +59,6 @@ function isDir(path) {
   }
 }
 
-function copy(src, dest) {
-  try {
-    const targetFilePath = path.resolve(dest, path.basename(src));
-    fs.writeFileSync(targetFilePath, fs.readFileSync(src));
-  } catch (error) {
-    throw new Error(`Received an error: [${error}] while trying to copy: ${src} -> ${dest}`);
-  }
-}
-
-function copyRecursive(src, dest) {
-  try {
-    if (isFile(src)) {
-      copy(src, dest);
-      return;
-    }
-    const targetDirPath = path.resolve(dest, path.basename(src));
-    if (!fs.existsSync(targetDirPath)) {
-      fs.mkdirSync(targetDirPath);
-    }
-    if (isDir(src)) {
-      const files = fs.readdirSync(src);
-      for (let i = 0; i < files.length; i++) {
-        const childPath = path.resolve(src, files[i]);
-        if (isDir(childPath)) {
-          copyRecursive(childPath, targetDirPath);
-        } else {
-          const targetFilePath = path.resolve(targetDirPath, path.basename(childPath));
-          fs.writeFileSync(targetFilePath, fs.readFileSync(childPath));
-        }
-      }
-    }
-  } catch (error) {
-    throw new Error(`Received an error: [${error}] while trying to copy: ${src} -> ${dest}`);
-  }
-}
 
 function removeRecursive(filePath) {
   try {
@@ -142,8 +107,6 @@ module.exports = {
   atob,
   isFile,
   isDir,
-  copy,
-  copyRecursive,
   removeRecursive,
   includes,
   shellOutput,

@@ -8,6 +8,7 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
+import {writeIfNeeded} from '../build/ninja/write-if-changed.js';
 
 import {type Protocol} from './protocol_schema.js';
 
@@ -430,7 +431,7 @@ const emitApi = (moduleName: string, protocolModuleName: string, domains: Protoc
 
 const flushEmitToFile = (path: string) => {
   console.log(`Wrote file: ${path}`);
-  fs.writeFileSync(path, emitStr, {encoding: 'utf-8'});
+  writeIfNeeded(path, emitStr);
   numIndents = 0;
   emitStr = '';
 };

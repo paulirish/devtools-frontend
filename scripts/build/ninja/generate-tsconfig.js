@@ -3,11 +3,12 @@
 // found in the LICENSE file.
 const fs = require('fs');
 const path = require('path');
+const {writeIfChanged} = require('./write-if-changed.js');
 
 const [, , tsconfigLocation, originalFileLocation, devtools_skip_typecheck_str, ...dependencies] = process.argv;
 
 const devtools_skip_typecheck = devtools_skip_typecheck_str === 'true';
-
+console.log({devtools_skip_typecheck,devtools_skip_typecheck_str })
 const originalFrontendMappedLocation =
     path.relative(path.dirname(tsconfigLocation), path.join(process.cwd(), originalFileLocation));
 
@@ -47,6 +48,9 @@ const generatedTSConfig = {
 };
 
 // Only write to disk (invalidating much of the ninja build graph), if we're building with `tsc`
-if (!devtools_skip_typecheck) {
-  fs.writeFileSync(tsconfigLocation, JSON.stringify(generatedTSConfig));
-}
+// if (!devtools_skip_typecheck) {
+//   console.log('write')
+  writeIfChanged(tsconfigLocation, JSON.stringify(generatedTSConfig));
+// } else {
+//   console.log('dontwrite')
+// }

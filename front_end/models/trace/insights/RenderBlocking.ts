@@ -44,7 +44,7 @@ function getNodesAndTimingByRequestId(nodeTimings: Lantern.Simulation.Result['no
       continue;
     }
 
-    requestIdToNode.set(node.request.requestId, {node, nodeTiming});
+    requestIdToNode.set(node          .request.requestId, {node, nodeTiming});
   }
 
   return requestIdToNode;
