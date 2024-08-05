@@ -8,17 +8,24 @@ import("../../../../../scripts/build/ninja/generate_css.gni")
 import("../../../../../third_party/typescript/typescript.gni")
 
 generate_css("css_files") {
-  sources = [ "sidebarInsight.css" ]
+  sources = [
+    "lcpDiscovery.css",
+    "sidebarInsight.css",
+  ]
 }
 
 devtools_module("insights") {
   sources = [
+    "Helpers.ts",
+    "LCPDiscovery.ts",
     "LCPPhases.ts",
     "SidebarInsight.ts",
     "types.ts",
   ]
 
   deps = [
+    "../../../../core/common:bundle",
+    "../../../../core/platform:bundle",
     "../../../../models/trace:bundle",
     "../../../../services/trace_bounds:bundle",
     "../../../../ui/components/helpers:bundle",

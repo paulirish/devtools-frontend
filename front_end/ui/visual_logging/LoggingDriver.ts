@@ -82,7 +82,8 @@ export async function addDocument(document: Document): Promise<void> {
   observeMutations([document.body]);
 }
 
-export function stopLogging(): void {
+export async function stopLogging(): Promise<void> {
+  await keyboardLogThrottler.process?.();
   logging = false;
   unregisterAllLoggables();
   for (const document of documents) {
@@ -114,6 +115,12 @@ export function pendingWorkComplete(): Promise<void> {
         }
       }))
       .then(() => {});
+}
+
+async function yieldToResize(): Promise<void> {
+  while (resizeLogThrottler.process) {
+    await resizeLogThrottler.processCompleted;
+  }
 }
 
 async function yieldToInteractions(): Promise<void> {
@@ -163,7 +170,8 @@ async function process(): Promise<void> {
     if (!loggingState.impressionLogged) {
       const overlap = visibleOverlap(element, viewportRectFor(element));
       const visibleSelectOption = element.tagName === 'OPTION' && loggingState.parent?.selectOpen;
-      if (overlap || visibleSelectOption) {
+      const visible = overlap && (!parent || loggingState.parent?.impressionLogged);
+      if (visible || visibleSelectOption) {
         if (overlap) {
           loggingState.size = overlap;
         }
@@ -177,6 +185,7 @@ async function process(): Promise<void> {
     if (!loggingState.processed) {
       const clickLikeHandler = (doubleClick: boolean) => (e: Event) => {
         const loggable = e.currentTarget as Element;
+        maybeCancelDrag(e);
         logClick(clickLogThrottler)(loggable, e, {doubleClick});
       };
       if (loggingState.config.track?.click) {
@@ -279,6 +288,7 @@ async function process(): Promise<void> {
   }
   if (visibleLoggables.length) {
     await yieldToInteractions();
+    await yieldToResize();
     flushPendingChangeEvents();
     await logImpressions(visibleLoggables);
   }

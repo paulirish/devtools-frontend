@@ -19,6 +19,7 @@ import * as MobileThrottling from '../../mobile_throttling/mobile_throttling.js'
 import {CPUThrottlingSelector} from './CPUThrottlingSelector.js';
 import {FieldSettingsDialog} from './FieldSettingsDialog.js';
 import liveMetricsViewStyles from './liveMetricsView.css.js';
+import {renderCompareText} from './MetricCompareStrings.js';
 import {NetworkThrottlingSelector} from './NetworkThrottlingSelector.js';
 
 const {html, nothing, Directives} = LitHtml;
@@ -154,9 +155,9 @@ const UIStrings = {
    */
   tryUsingThrottling: 'Try using {PH1} network throttling to approximate the network latency measured by real users.',
   /**
-   * @description Text label for a link to a DOM node.
+   * @description Text label for a link to the Largest Contentful Paint (LCP) related DOM node.
    */
-  relatedNode: 'Related node',
+  lcpElement: 'LCP Element',
   /**
    * @description Text label for values that are classified as "good".
    */
@@ -186,14 +187,48 @@ const UIStrings = {
    */
   gtRange: '(>{PH1})',
   /**
-   * @description Text for a percentage value
+   * @description Text for a percentage value in the live metrics view.
    * @example {13} PH1
    */
   percentage: '{PH1}%',
+  /**
+   * @description Text instructing the user to interact with the page because a user interaction is required to measure Interaction to Next Paint (INP).
+   */
+  interactToMeasure: 'Interact with the page to measure INP.',
 };
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/LiveMetricsView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+
+function rateMetric(value: number, thresholds: MetricThresholds): MetricRating {
+  if (value <= thresholds[0]) {
+    return 'good';
+  }
+  if (value <= thresholds[1]) {
+    return 'needs-improvement';
+  }
+  return 'poor';
+}
+
+function renderMetricValue(
+    value: number|undefined, thresholds: MetricThresholds, format: (value: number) => string): LitHtml.LitTemplate {
+  if (value === undefined) {
+    return html`<span class="metric-value waiting">-<span>`;
+  }
+
+  const rating = rateMetric(value, thresholds);
+  const valueString = format(value);
+  return html`
+    <span class=${`metric-value ${rating}`}>${valueString}</span>
+  `;
+}
+
+export interface MetricCardData {
+  metric: 'LCP'|'CLS'|'INP';
+  localValue?: number;
+  fieldValue?: number|string;
+  histogram?: CrUXManager.MetricResponse['histogram'];
+}
 
 export class MetricCard extends HTMLElement {
   static readonly litTagName = LitHtml.literal`devtools-metric-card`;
@@ -207,6 +242,15 @@ export class MetricCard extends HTMLElement {
 
   #metricValuesEl?: Element;
   #dialog?: Dialogs.Dialog.Dialog|null;
+
+  #data: MetricCardData = {
+    metric: 'LCP',
+  };
+
+  set data(data: MetricCardData) {
+    this.#data = data;
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
+  }
 
   connectedCallback(): void {
     this.#shadow.adoptedStyleSheets = [liveMetricsViewStyles];
@@ -241,12 +285,177 @@ export class MetricCard extends HTMLElement {
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
+  #getTitle(): string {
+    switch (this.#data.metric) {
+      case 'LCP':
+        return i18nString(UIStrings.lcpTitle);
+      case 'CLS':
+        return i18nString(UIStrings.clsTitle);
+      case 'INP':
+        return i18nString(UIStrings.inpTitle);
+    }
+  }
+
+  #getThresholds(): MetricThresholds {
+    switch (this.#data.metric) {
+      case 'LCP':
+        return LCP_THRESHOLDS;
+      case 'CLS':
+        return CLS_THRESHOLDS;
+      case 'INP':
+        return INP_THRESHOLDS;
+    }
+  }
+
+  #getFormatFn(): (value: number) => string {
+    switch (this.#data.metric) {
+      case 'LCP':
+        return v => i18n.TimeUtilities.millisToString(v);
+      case 'CLS':
+        return v => v === 0 ? '0' : v.toFixed(2);
+      case 'INP':
+        return v => i18n.TimeUtilities.millisToString(v);
+    }
+  }
+
+  #getLocalValue(): number|undefined {
+    const {localValue} = this.#data;
+    if (localValue === undefined) {
+      return;
+    }
+
+    return localValue;
+  }
+
+  #getFieldValue(): number|undefined {
+    let {fieldValue} = this.#data;
+    if (fieldValue === undefined) {
+      return;
+    }
+
+    if (typeof fieldValue === 'string') {
+      fieldValue = Number(fieldValue);
+    }
+
+    if (!Number.isFinite(fieldValue)) {
+      return;
+    }
+
+    return fieldValue;
+  }
+
+  #getCompareRating(): 'better'|'worse'|'similar'|undefined {
+    const localValue = this.#getLocalValue();
+    const fieldValue = this.#getFieldValue();
+    if (localValue === undefined || fieldValue === undefined) {
+      return;
+    }
+
+    const threshold = this.#getThresholds()[0];
+    if (localValue - fieldValue > threshold) {
+      return 'worse';
+    }
+    if (fieldValue - localValue > threshold) {
+      return 'better';
+    }
+
+    return 'similar';
+  }
+
+  #renderCompareString(): LitHtml.LitTemplate {
+    const localValue = this.#getLocalValue();
+    if (localValue === undefined) {
+      if (this.#data.metric === 'INP') {
+        return html`
+          <div class="compare-text">${i18nString(UIStrings.interactToMeasure)}</div>
+        `;
+      }
+      return LitHtml.nothing;
+    }
+
+    const format = this.#getFormatFn();
+    const compare = this.#getCompareRating();
+    const rating = rateMetric(localValue, this.#getThresholds());
+
+    const valueEl = document.createElement('span');
+    valueEl.classList.add(rating);
+    valueEl.textContent = format(localValue);
+
+    // clang-format off
+    return html`
+      <div class="compare-text">
+        ${renderCompareText(rating, compare, {
+          PH1: this.#data.metric,
+          PH2: valueEl,
+        })}
+      </div>
+    `;
+    // clang-format on
+  }
+
+  #densityToCSSPercent(density?: number): string {
+    if (density === undefined) {
+      density = 0;
+    }
+    const percent = Math.round(density * 100);
+    return `${percent}%`;
+  }
+
+  #getBucketLabel(histogram: CrUXManager.MetricResponse['histogram']|undefined, bucket: number): string {
+    if (histogram === undefined) {
+      return '-';
+    }
+
+    // A missing density value should be interpreted as 0%
+    const density = histogram[bucket].density || 0;
+    const percent = Math.round(density * 100);
+    return i18nString(UIStrings.percentage, {PH1: percent});
+  }
+
+  #renderFieldHistogram(): LitHtml.LitTemplate {
+    const histogram = this.#data.histogram;
+
+    const goodPercent = this.#densityToCSSPercent(histogram?.[0].density);
+    const needsImprovementPercent = this.#densityToCSSPercent(histogram?.[1].density);
+    const poorPercent = this.#densityToCSSPercent(histogram?.[2].density);
+
+    const format = this.#getFormatFn();
+    const thresholds = this.#getThresholds();
+
+    // clang-format off
+    return html`
+      <div class="field-data-histogram">
+        <span class="histogram-label">
+          ${i18nString(UIStrings.good)}
+          <span class="histogram-range">${i18nString(UIStrings.leqRange, {PH1: format(thresholds[0])})}</span>
+        </span>
+        <span class="histogram-bar good-bg" style="width: ${goodPercent}"></span>
+        <span class="histogram-percent">${this.#getBucketLabel(histogram, 0)}</span>
+        <span class="histogram-label">
+          ${i18nString(UIStrings.needsImprovement)}
+          <span class="histogram-range">${i18nString(UIStrings.betweenRange, {PH1: format(thresholds[0]), PH2: format(thresholds[1])})}</span>
+        </span>
+        <span class="histogram-bar needs-improvement-bg" style="width: ${needsImprovementPercent}"></span>
+        <span class="histogram-percent">${this.#getBucketLabel(histogram, 1)}</span>
+        <span class="histogram-label">
+          ${i18nString(UIStrings.poor)}
+          <span class="histogram-range">${i18nString(UIStrings.gtRange, {PH1: format(thresholds[1])})}</span>
+        </span>
+        <span class="histogram-bar poor-bg" style="width: ${poorPercent}"></span>
+        <span class="histogram-percent">${this.#getBucketLabel(histogram, 2)}</span>
+      </div>
+    `;
+    // clang-format on
+  }
+
   #render = (): void => {
+    const hasFieldData = this.#getFieldValue() !== undefined;
+
     // clang-format off
     const output = html`
-      <div class="card metric-card">
+      <div class="metric-card">
         <div class="card-title">
-          <slot name="headline"></slot>
+          ${this.#getTitle()}
         </div>
         <div class="card-metric-values"
           @mouseenter=${this.#showDialog}
@@ -256,17 +465,19 @@ export class MetricCard extends HTMLElement {
           })}
         >
           <span class="local-value">
-            <slot name="local-value"></slot>
+            ${renderMetricValue(this.#getLocalValue(), this.#getThresholds(), this.#getFormatFn())}
           </span>
-          <span class="field-value">
-            <slot name="field-value"></slot>
-          </span>
-          <span class="metric-value-label">${i18nString(UIStrings.localValue)}</span>
-          <span class="metric-value-label">${i18nString(UIStrings.field75thPercentile)}</span>
+          ${hasFieldData ? html`
+            <span class="field-value">
+              ${renderMetricValue(this.#getFieldValue(), this.#getThresholds(), this.#getFormatFn())}
+            </span>
+            <span class="metric-value-label">${i18nString(UIStrings.localValue)}</span>
+            <span class="metric-value-label">${i18nString(UIStrings.field75thPercentile)}</span>
+          `: nothing}
         </div>
         <${Dialogs.Dialog.Dialog.litTagName}
           @pointerleftdialog=${() => this.#closeDialog()}
-          .showConnector=${true}
+          .showConnector=${false}
           .centered=${true}
           .closeOnScroll=${false}
           .origin=${() => {
@@ -280,13 +491,12 @@ export class MetricCard extends HTMLElement {
           })}
         >
           <div class="tooltip-content">
-            <slot name="tooltip"></slot>
+            ${this.#renderFieldHistogram()}
           </div>
         </${Dialogs.Dialog.Dialog.litTagName}>
-        <hr class="divider">
-        <div class="metric-card-element">
-          <slot name="related-element"><slot>
-        </div>
+        ${hasFieldData ? html`<hr class="divider">` : nothing}
+        ${this.#renderCompareString()}
+        <slot name="extra-info"><slot>
       </div>
     `;
     LitHtml.render(output, this.#shadow, {host: this});
@@ -380,143 +590,57 @@ export class LiveMetricsView extends HTMLElement {
     emulationModel.removeEventListener(EmulationModel.DeviceModeModel.Events.Updated, this.#onEmulationChanged, this);
   }
 
-  #renderMetricValue(value: number|string|undefined, thresholds: MetricThresholds, format: (value: number) => string):
-      LitHtml.LitTemplate {
-    if (value === undefined) {
-      return html`<span class="metric-value waiting">-<span>`;
-    }
-
-    if (typeof value === 'string') {
-      value = Number(value);
-    }
-
-    const rating = this.#rateMetric(value, thresholds);
-    const valueString = format(value);
-    return html`
-      <span class=${`metric-value ${rating}`}>${valueString}</span>
-    `;
-  }
-
   #renderLcpCard(): LitHtml.LitTemplate {
     const fieldData = this.#getFieldMetricData('largest_contentful_paint');
+    const node = this.#lcpValue?.node;
 
-    return this.#renderMetricCard(
-        i18nString(UIStrings.lcpTitle),
-        this.#lcpValue?.value,
-        fieldData?.percentiles?.p75,
-        fieldData?.histogram,
-        LCP_THRESHOLDS,
-        v => i18n.TimeUtilities.millisToString(v),
-        this.#lcpValue?.node,
-    );
+    // clang-format off
+    return html`
+      <${MetricCard.litTagName} .data=${{
+        metric: 'LCP',
+        localValue: this.#lcpValue?.value,
+        fieldValue: fieldData?.percentiles?.p75,
+        histogram: fieldData?.histogram,
+      } as MetricCardData}>
+        ${node ? html`
+            <div class="related-element-info" slot="extra-info">
+              <span class="related-element-label">${i18nString(UIStrings.lcpElement)}</span>
+              <span class="related-element-link">${until(Common.Linkifier.Linkifier.linkify(node))}</span>
+            </div>
+          `
+          : nothing}
+      </${MetricCard.litTagName}>
+    `;
+    // clang-format on
   }
 
   #renderClsCard(): LitHtml.LitTemplate {
     const fieldData = this.#getFieldMetricData('cumulative_layout_shift');
 
-    return this.#renderMetricCard(
-        i18nString(UIStrings.clsTitle),
-        this.#clsValue?.value,
-        fieldData?.percentiles?.p75,
-        fieldData?.histogram,
-        CLS_THRESHOLDS,
-        v => v === 0 ? '0' : v.toFixed(2),
-    );
+    // clang-format off
+    return html`
+      <${MetricCard.litTagName} .data=${{
+        metric: 'CLS',
+        localValue: this.#clsValue?.value,
+        fieldValue: fieldData?.percentiles?.p75,
+        histogram: fieldData?.histogram,
+      } as MetricCardData}>
+      </${MetricCard.litTagName}>
+    `;
+    // clang-format on
   }
 
   #renderInpCard(): LitHtml.LitTemplate {
     const fieldData = this.#getFieldMetricData('interaction_to_next_paint');
 
-    return this.#renderMetricCard(
-        i18nString(UIStrings.inpTitle),
-        this.#inpValue?.value,
-        fieldData?.percentiles?.p75,
-        fieldData?.histogram,
-        INP_THRESHOLDS,
-        v => i18n.TimeUtilities.millisToString(v),
-    );
-  }
-
-  #densityToCSSPercent(density?: number): string {
-    if (density === undefined) {
-      density = 0;
-    }
-    const percent = Math.round(density * 100);
-    return `${percent}%`;
-  }
-
-  #getBucketLabel(histogram: CrUXManager.MetricResponse['histogram']|undefined, bucket: number): string {
-    if (histogram === undefined) {
-      return '-';
-    }
-
-    // A missing density value should be interpreted as 0%
-    const density = histogram[bucket].density || 0;
-    const percent = Math.round(density * 100);
-    return i18nString(UIStrings.percentage, {PH1: percent});
-  }
-
-  #renderFieldHistogram(
-      histogram: CrUXManager.MetricResponse['histogram']|undefined, thresholds: MetricThresholds,
-      format: (value: number) => string): LitHtml.LitTemplate {
-    const goodPercent = this.#densityToCSSPercent(histogram?.[0].density);
-    const needsImprovementPercent = this.#densityToCSSPercent(histogram?.[1].density);
-    const poorPercent = this.#densityToCSSPercent(histogram?.[2].density);
     // clang-format off
     return html`
-      <div class="field-data-histogram">
-        <span class="histogram-label">
-          ${i18nString(UIStrings.good)}
-          <span class="histogram-range">${i18nString(UIStrings.leqRange, {PH1: format(thresholds[0])})}</span>
-        </span>
-        <span class="histogram-bar good-bg" style="width: ${goodPercent}"></span>
-        <span class="histogram-percent">${this.#getBucketLabel(histogram, 0)}</span>
-        <span class="histogram-label">
-          ${i18nString(UIStrings.needsImprovement)}
-          <span class="histogram-range">${i18nString(UIStrings.betweenRange, {PH1: format(thresholds[0]), PH2: format(thresholds[1])})}</span>
-        </span>
-        <span class="histogram-bar needs-improvement-bg" style="width: ${needsImprovementPercent}"></span>
-        <span class="histogram-percent">${this.#getBucketLabel(histogram, 1)}</span>
-        <span class="histogram-label">
-          ${i18nString(UIStrings.poor)}
-          <span class="histogram-range">${i18nString(UIStrings.gtRange, {PH1: format(thresholds[1])})}</span>
-        </span>
-        <span class="histogram-bar poor-bg" style="width: ${poorPercent}"></span>
-        <span class="histogram-percent">${this.#getBucketLabel(histogram, 2)}</span>
-      </div>
-    `;
-    // clang-format on
-  }
-
-  #rateMetric(value: number, thresholds: MetricThresholds): MetricRating {
-    if (value <= thresholds[0]) {
-      return 'good';
-    }
-    if (value <= thresholds[1]) {
-      return 'needs-improvement';
-    }
-    return 'poor';
-  }
-
-  #renderMetricCard(
-      title: string, localValue: number|undefined, fieldValue: number|string|undefined,
-      histogram: CrUXManager.MetricResponse['histogram']|undefined, thresholds: MetricThresholds,
-      format: (value: number) => string, node?: SDK.DOMModel.DOMNode): LitHtml.LitTemplate {
-    // clang-format off
-    return html`
-      <${MetricCard.litTagName}>
-        <div slot="headline">${title}</div>
-        <span slot="local-value">${this.#renderMetricValue(localValue, thresholds, format)}</span>
-        <span slot="field-value">${this.#renderMetricValue(fieldValue, thresholds, format)}</span>
-        <div slot="tooltip">
-          ${this.#renderFieldHistogram(histogram, thresholds, format)}
-        </div>
-        <div slot="related-element">
-          ${node ? html`
-              <div class="card-section-title">${i18nString(UIStrings.relatedNode)}</div>
-              <div>${until(Common.Linkifier.Linkifier.linkify(node))}</div>`
-            : nothing}
-        </div>
+      <${MetricCard.litTagName} .data=${{
+        metric: 'INP',
+        localValue: this.#inpValue?.value,
+        fieldValue: fieldData?.percentiles?.p75,
+        histogram: fieldData?.histogram,
+      } as MetricCardData}>
       </${MetricCard.litTagName}>
     `;
     // clang-format on
@@ -766,7 +890,7 @@ export class LiveMetricsView extends HTMLElement {
       <div class="container">
         <div class="live-metrics-view">
           <div class="live-metrics" slot="main">
-            <h3>${i18nString(UIStrings.localAndFieldMetrics)}</h3>
+            <div class="section-title">${i18nString(UIStrings.localAndFieldMetrics)}</div>
             <div class="metric-cards">
               <div id="lcp">
                 ${this.#renderLcpCard()}
@@ -778,37 +902,37 @@ export class LiveMetricsView extends HTMLElement {
                 ${this.#renderInpCard()}
               </div>
             </div>
-            <h3>${i18nString(UIStrings.interactions)}</h3>
-            <ol class="interactions-list">
-              ${this.#interactions.map((interaction, index) => html`
-                ${index === 0 ? html`<hr class="divider">` : nothing}
-                <li class="interaction">
-                  <span class="interaction-type">${interaction.interactionType}</span>
-                  <span class="interaction-node">${
-                    interaction.node && until(Common.Linkifier.Linkifier.linkify(interaction.node))}</span>
-                  <span class="interaction-duration">
-                    ${this.#renderMetricValue(interaction.duration, INP_THRESHOLDS, v => i18n.TimeUtilities.millisToString(v))}
-                  </span>
-                </li>
-                <hr class="divider">
-              `)}
-            </ol>
+            ${this.#interactions.length > 0 ? html`
+              <div class="section-title">${i18nString(UIStrings.interactions)}</div>
+              <ol class="interactions-list">
+                ${this.#interactions.map(interaction => html`
+                  <li class="interaction">
+                    <span class="interaction-type">${interaction.interactionType}</span>
+                    <span class="interaction-node">${
+                      interaction.node && until(Common.Linkifier.Linkifier.linkify(interaction.node))}</span>
+                    <span class="interaction-duration">
+                      ${renderMetricValue(interaction.duration, INP_THRESHOLDS, v => i18n.TimeUtilities.millisToString(v))}
+                    </span>
+                  </li>
+                `)}
+              </ol>
+            ` : nothing}
           </div>
           <div class="next-steps" slot="sidebar">
-            <h3>${i18nString(UIStrings.nextSteps)}</h3>
-            <div id="field-setup" class="card">
+            <div class="section-title">${i18nString(UIStrings.nextSteps)}</div>
+            <div id="field-setup" class="next-steps-card">
               <div class="card-title">${i18nString(UIStrings.fieldData)}</div>
               ${this.#renderPageScopeSetting()}
               ${this.#renderDeviceScopeSetting()}
               <${FieldSettingsDialog.litTagName}></${FieldSettingsDialog.litTagName}>
             </div>
-            <div id="throttling" class="card">
+            <div id="throttling" class="next-steps-card">
               ${this.#renderThrottlingSettings()}
             </div>
-            <div id="record" class="card">
+            <div id="record" class="next-steps-card">
               ${this.#renderRecordAction(this.#toggleRecordAction)}
             </div>
-            <div id="record-page-load" class="card">
+            <div id="record-page-load" class="next-steps-card">
               ${this.#renderRecordAction(this.#recordReloadAction)}
             </div>
           </div>

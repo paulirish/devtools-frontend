@@ -60,6 +60,7 @@ import {Tracker} from './FreshRecording.js';
 import historyToolbarButtonStyles from './historyToolbarButton.css.js';
 import {IsolateSelector} from './IsolateSelector.js';
 import {AnnotationModifiedEvent, ModificationsManager} from './ModificationsManager.js';
+import * as Overlays from './overlays/overlays.js';
 import {cpuprofileJsonGenerator, traceJsonGenerator} from './SaveFileFormatter.js';
 import {NodeNamesUpdated, SourceMapsResolver} from './SourceMapsResolver.js';
 import {type Client, TimelineController} from './TimelineController.js';
@@ -263,12 +264,31 @@ const UIStrings = {
    */
   performanceExtension: 'Extension data',
 
+  /**
+   * @description Tooltip for the the sidebar toggle in the Performance panel. Command to open/show the sidebar.
+   */
+  showSidebar: 'Show sidebar',
+  /**
+   * @description Tooltip for the the sole sidebar toggle in the Performance panel. Command to close the sidebar.
+   */
+  hideSidebar: 'Hide sole sidebar',
+  /**
+   * @description Screen reader announcement when the sidebar is shown in the Performance panel.
+   */
+  sidebarShown: 'Performance sidebar shown',
+  /**
+   * @description Screen reader announcement when the sidebar is hidden in the Performance panel.
+   */
+  sidebarHidden: 'Performance sidebar hidden',
+
 };
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/TimelinePanel.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 let timelinePanelInstance: TimelinePanel;
 let isNode: boolean;
+
+const DEFAULT_SIDEBAR_WIDTH_PX = 240;
 
 export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineModeViewDelegate {
   private readonly dropTarget: UI.DropTarget.DropTarget;
@@ -289,7 +309,16 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   private readonly panelRightToolbar: UI.Toolbar.Toolbar;
   private readonly timelinePane: UI.Widget.VBox;
   readonly #minimapComponent = new TimelineMiniMap();
-  readonly #sideBar = new TimelineComponents.Sidebar.SidebarWidget();
+  /**
+   * This widget holds the timeline sidebar which shows Insights & Annotations,
+   * and the main UI which shows the timeline
+   */
+  readonly #splitWidget = new UI.SplitWidget.SplitWidget(
+      true,       // isVertical
+      false,      // secondIsSidebar
+      undefined,  // settingName (we don't want to persist this state to a setting)
+      DEFAULT_SIDEBAR_WIDTH_PX,
+  );
   private readonly statusPaneContainer: HTMLElement;
   private readonly flameChart: TimelineFlameChartView;
   private readonly searchableViewInternal: UI.SearchableView.SearchableView;
@@ -325,6 +354,16 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   #sourceMapsResolver: SourceMapsResolver|null = null;
   #onSourceMapsNodeNamesResolvedBound = this.#onSourceMapsNodeNamesResolved.bind(this);
   readonly #onChartPlayableStateChangeBound: (event: Common.EventTarget.EventTargetEvent<boolean>) => void;
+  #sidebarToggleButton = this.#splitWidget.createShowHideSidebarButton(
+      i18nString(UIStrings.showSidebar),
+      i18nString(UIStrings.hideSidebar),
+      // These are used to announce to screen-readers and not shown visibly.
+      i18nString(UIStrings.sidebarShown),
+      i18nString(UIStrings.sidebarHidden),
+      'timeline.sidebar',  // jslog context
+  );
+
+  #sideBar = new TimelineComponents.Sidebar.SidebarWidget();
 
   constructor() {
     super('timeline');
@@ -404,10 +443,6 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     topPaneElement.id = 'timeline-overview-panel';
 
     this.#minimapComponent.show(topPaneElement);
-    this.#minimapComponent.addEventListener(
-        PerfUI.TimelineOverviewPane.Events.OpenSidebarButtonClicked,
-        this.#showSidebar.bind(this),
-    );
 
     this.statusPaneContainer = this.timelinePane.element.createChild('div', 'status-pane-container fill');
 
@@ -430,25 +465,20 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.flameChart.setSearchableView(this.searchableViewInternal);
     this.searchableViewInternal.hideWidget();
 
-    this.#sideBar.setMainWidget(this.timelinePane);
-    this.#sideBar.show(this.element);
-    this.#sideBar.hideSidebar();
+    this.#splitWidget.setMainWidget(this.timelinePane);
+    this.#splitWidget.show(this.element);
+    this.#splitWidget.setSidebarWidget(this.#sideBar);
 
-    this.#sideBar.addEventListener(
-        TimelineComponents.Sidebar.WidgetEvents.SidebarCollapseClick,
-        this.#hideSidebar.bind(this),
-    );
-
-    this.#sideBar.contentElement.addEventListener(TimelineInsights.SidebarInsight.InsightDeactivated.eventName, () => {
+    this.#sideBar.element.addEventListener(TimelineInsights.SidebarInsight.InsightDeactivated.eventName, () => {
       this.#setActiveInsight(null);
     });
 
-    this.#sideBar.contentElement.addEventListener(TimelineInsights.SidebarInsight.InsightActivated.eventName, event => {
+    this.#sideBar.element.addEventListener(TimelineInsights.SidebarInsight.InsightActivated.eventName, event => {
       const {name, navigationId, createOverlayFn} = event;
       this.#setActiveInsight({name, navigationId, createOverlayFn});
     });
 
-    this.#sideBar.contentElement.addEventListener(TimelineComponents.Sidebar.RemoveAnnotation.eventName, event => {
+    this.#sideBar.element.addEventListener(TimelineComponents.Sidebar.RemoveAnnotation.eventName, event => {
       const {removedAnnotation} = (event as TimelineComponents.Sidebar.RemoveAnnotation);
       ModificationsManager.activeManager()?.removeAnnotation(removedAnnotation);
     });
@@ -489,25 +519,6 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     });
   }
 
-  #showSidebar(): void {
-    if (!Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_SIDEBAR)) {
-      return;
-    }
-    this.#sideBar.showBoth();
-    this.#sideBar.updateContentsOnExpand();
-    this.#sideBar.setResizable(false);
-
-    this.#minimapComponent.hideSidebarFloatingIcon();
-  }
-
-  #hideSidebar(): void {
-    if (!Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_SIDEBAR)) {
-      return;
-    }
-    this.#minimapComponent.showSidebarFloatingIcon();
-    this.#sideBar.hideSidebar();
-  }
-
   #setActiveInsight(insight: TimelineComponents.Sidebar.ActiveInsight|null): void {
     this.#sideBar.setActiveInsight(insight);
     this.flameChart.setActiveInsight(insight);
@@ -542,6 +553,11 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.registerCSSFiles([timelinePanelStyles]);
     // Record the performance tool load time.
     Host.userMetrics.panelLoaded('timeline', 'DevTools.Launch.Timeline');
+
+    // The sidebar state is by-default persisted across reloads; we do not want
+    // that as if you come back to the panel you see the landing page, and the
+    // sidebar is empty in that state.
+    this.#splitWidget.hideSidebar();
   }
 
   override willHide(): void {
@@ -626,6 +642,26 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     const checkboxItem = new UI.Toolbar.ToolbarSettingCheckbox(setting, tooltip);
     this.recordingOptionUIControls.push(checkboxItem);
     return checkboxItem;
+  }
+
+  #addSidebarIconToToolbar(): void {
+    if (!Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_SIDEBAR)) {
+      return;
+    }
+
+    if (this.panelToolbar.hasItem(this.#sidebarToggleButton)) {
+      return;
+    }
+
+    this.panelToolbar.prependToolbarItem(this.#sidebarToggleButton);
+  }
+
+  /**
+   * Used when the user deletes their last trace and is taken back to the
+   * landing page - we don't add this icon until there is a trace loaded.
+   */
+  #removeSidebarIconFromToolbar(): void {
+    this.panelToolbar.removeToolbarItem(this.#sidebarToggleButton);
   }
 
   private populateToolbar(): void {
@@ -992,8 +1028,9 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       messages.push(i18nString(UIStrings.JavascriptSamplingIsDisabled));
     }
 
-    this.showSettingsPaneButton.setDefaultWithRedColor(messages.length > 0);
-    this.showSettingsPaneButton.setToggleWithRedColor(messages.length > 0);
+    this.showSettingsPaneButton.setChecked(messages.length > 0);
+    this.showSettingsPaneButton.element.style.setProperty('--dot-toggle-top', '16px');
+    this.showSettingsPaneButton.element.style.setProperty('--dot-toggle-left', '15px');
 
     if (messages.length) {
       const tooltipElement = document.createElement('div');
@@ -1252,6 +1289,9 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.dropTarget.setEnabled(this.state === State.Idle);
     this.loadButton.setEnabled(this.state === State.Idle);
     this.saveButton.setEnabled(this.state === State.Idle && this.#hasActiveTrace());
+    if (this.#traceEngineActiveTraceIndex > -1) {
+      this.#addSidebarIconToToolbar();
+    }
   }
 
   async toggleRecording(): Promise<void> {
@@ -1382,8 +1422,12 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
           this.flameChart.addOverlay(overlay);
         } else if (action === 'Remove') {
           this.flameChart.removeOverlay(overlay);
+        } else if (action === 'UpdateTimeRange' && Overlays.Overlays.isTimeRangeLabel(overlay)) {
+          this.flameChart.updateExistingOverlay(overlay, {
+            bounds: overlay.bounds,
+          });
         }
-        this.#sideBar.setAnnotationsTabContent(currentManager.getAnnotations());
+        this.#sideBar.setAnnotations(currentManager.getAnnotations());
       });
 
       // Create breadcrumbs.
@@ -1414,7 +1458,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       currModificationManager.getOverlays().forEach(overlay => {
         this.flameChart.addOverlay(overlay);
       });
-      this.#sideBar.setAnnotationsTabContent(currModificationManager.getAnnotations());
+      this.#sideBar.setAnnotations(currModificationManager.getAnnotations());
     }
 
     // Set up line level profiling with CPU profiles, if we found any.
@@ -1440,6 +1484,18 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       this.flameChart.setInsights(traceInsightsData);
       this.#sideBar.setInsights(traceInsightsData);
       this.#setActiveInsight(null);
+    }
+
+    // Automatically show the sidebar when a trace is loaded if we have data.
+    // Or hide it when we do not have data (which likely means we are back on the landing page)
+    const hasInsights = traceInsightsData !== null && traceInsightsData.size > 0;
+    const hasAnnotations = (currModificationManager?.getAnnotations().length ?? 0) > 0;
+    const shouldOpenSidebar = Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_SIDEBAR) &&
+        (hasInsights || hasAnnotations);
+    if (shouldOpenSidebar) {
+      this.#splitWidget.showBoth();
+    } else {
+      this.#splitWidget.hideSidebar();
     }
   }
 
@@ -1479,7 +1535,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
 
   private showLandingPage(): void {
     this.updateSettingsPaneVisibility();
-    this.#hideSidebar();
+    this.#removeSidebarIconFromToolbar();
     if (this.landingPage) {
       this.landingPage.show(this.statusPaneContainer);
       return;
@@ -1592,18 +1648,6 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         this.statusPane.remove();
       }
       this.statusPane = null;
-
-      // Show the sidebar but only if:
-      // 1. the experiment is enabled
-      // 2. the trace engine has one trace in it (the one we just loaded). This
-      //    is because we only need to show this button for the first time when we
-      //    go from landing page => trace. On subsequent trace loads, we will
-      //    maintain the sidebar state (e.g. if you have it open + record a new
-      //    trace, it will remain open).
-      if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_SIDEBAR) &&
-          this.#traceEngineModel.size() === 1) {
-        this.#minimapComponent.showSidebarFloatingIcon();
-      }
 
       const traceData = this.#traceEngineModel.traceParsedData(this.#traceEngineActiveTraceIndex);
       if (!traceData) {

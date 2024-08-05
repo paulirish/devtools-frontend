@@ -195,10 +195,9 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
     const recordButton = new UI.Toolbar.ToolbarToggle(
         i18nString(UIStrings.record), 'record-start', 'record-stop', 'protocol-monitor.toggle-recording');
     recordButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, () => {
-      recordButton.setToggled(!recordButton.toggled());
-      this.setRecording(recordButton.toggled());
+      this.setRecording(recordButton.isToggled());
     });
-    recordButton.setToggleWithRedColor(true);
+    recordButton.enableToggleWithRedColor();
     topToolbar.appendToolbarItem(recordButton);
     recordButton.setToggled(true);
 
@@ -372,7 +371,7 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
     this.suggestionBuilder = new UI.FilterSuggestionBuilder.FilterSuggestionBuilder(keys);
 
     this.textFilterUI = new UI.Toolbar.ToolbarFilter(
-        undefined, 1, .2, '', this.suggestionBuilder.completions.bind(this.suggestionBuilder), true, 'filter');
+        undefined, 1, .2, '', this.suggestionBuilder.completions.bind(this.suggestionBuilder), true);
     this.textFilterUI.addEventListener(UI.Toolbar.ToolbarInput.Event.TextChanged, event => {
       const query = event.data as string;
       const filters = this.filterParser.parse(query);

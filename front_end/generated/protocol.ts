@@ -1437,11 +1437,19 @@ export namespace Audits {
 }
 
 /**
- * Defines commands and events for browser extensions. Available if the client
- * is connected using the --remote-debugging-pipe flag and
- * the --enable-unsafe-extension-debugging flag is set.
+ * Defines commands and events for browser extensions.
  */
 export namespace Extensions {
+
+  /**
+   * Storage areas.
+   */
+  export const enum StorageArea {
+    Session = 'session',
+    Local = 'local',
+    Sync = 'sync',
+    Managed = 'managed',
+  }
 
   export interface LoadUnpackedRequest {
     /**
@@ -1455,6 +1463,25 @@ export namespace Extensions {
      * Extension id.
      */
     id: string;
+  }
+
+  export interface GetStorageItemsRequest {
+    /**
+     * ID of extension.
+     */
+    id: string;
+    /**
+     * StorageArea to retrieve data from.
+     */
+    storageArea: StorageArea;
+    /**
+     * Keys to retrieve.
+     */
+    keys?: string[];
+  }
+
+  export interface GetStorageItemsResponse extends ProtocolResponseWithError {
+    data: any;
   }
 }
 
@@ -2858,17 +2885,6 @@ export namespace CSS {
   }
 
   /**
-   * CSS position-fallback rule representation.
-   */
-  export interface CSSPositionFallbackRule {
-    name: Value;
-    /**
-     * List of keyframes.
-     */
-    tryRules: CSSTryRule[];
-  }
-
-  /**
    * CSS @position-try rule representation.
    */
   export interface CSSPositionTryRule {
@@ -3153,10 +3169,6 @@ export namespace CSS {
      * A list of CSS keyframed animations matching this node.
      */
     cssKeyframesRules?: CSSKeyframesRule[];
-    /**
-     * A list of CSS position fallbacks matching this node.
-     */
-    cssPositionFallbackRules?: CSSPositionFallbackRule[];
     /**
      * A list of CSS @position-try rules matching this node, based on the position-try-fallbacks property.
      */
@@ -11431,6 +11443,7 @@ export namespace Page {
    */
   export const enum PermissionsPolicyFeature {
     Accelerometer = 'accelerometer',
+    AllScreensCapture = 'all-screens-capture',
     AmbientLightSensor = 'ambient-light-sensor',
     AttributionReporting = 'attribution-reporting',
     Autoplay = 'autoplay',
@@ -11487,6 +11500,7 @@ export namespace Page {
     KeyboardMap = 'keyboard-map',
     LocalFonts = 'local-fonts',
     Magnetometer = 'magnetometer',
+    MediaPlaybackWhileNotVisible = 'media-playback-while-not-visible',
     Microphone = 'microphone',
     Midi = 'midi',
     OtpCredentials = 'otp-credentials',
@@ -17154,6 +17168,8 @@ export namespace Preload {
     JavaScriptInterfaceRemoved = 'JavaScriptInterfaceRemoved',
     AllPrerenderingCanceled = 'AllPrerenderingCanceled',
     WindowClosed = 'WindowClosed',
+    SlowNetwork = 'SlowNetwork',
+    OtherPrerenderedPageActivated = 'OtherPrerenderedPageActivated',
   }
 
   /**

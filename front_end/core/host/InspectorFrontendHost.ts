@@ -400,7 +400,7 @@ export class InspectorFrontendHostStub implements InspectorFrontendHostAPI {
   }
 
   getHostConfig(callback: (arg0: Root.Runtime.HostConfig) => void): void {
-    const result = {
+    const result: Root.Runtime.HostConfig = {
       devToolsConsoleInsights: {
         aidaModelId: '',
         aidaTemperature: 0,
@@ -417,18 +417,29 @@ export class InspectorFrontendHostStub implements InspectorFrontendHostAPI {
       devToolsFreestylerDogfood: {
         aidaModelId: '',
         aidaTemperature: 0,
+        blockedByAge: false,
+        blockedByEnterprisePolicy: false,
+        blockedByGeo: false,
         enabled: false,
       },
       devToolsVeLogging: {
         enabled: true,
         testing: false,
       },
+      isOffTheRecord: false,
     };
     if ('hostConfigForTesting' in globalThis) {
       const {hostConfigForTesting} = (globalThis as unknown as {hostConfigForTesting: Root.Runtime.HostConfig});
       for (const key of Object.keys(hostConfigForTesting)) {
         const mergeEntry = <K extends keyof Root.Runtime.HostConfig>(key: K): void => {
-          result[key] = {...result[key], ...hostConfigForTesting[key]};
+          if (typeof result[key] === 'object' && typeof hostConfigForTesting[key] === 'object') {
+            // If the config is an object, merge the settings, but preferring
+            // the hostConfigForTesting values over the result values.
+            result[key] = {...result[key], ...hostConfigForTesting[key]};
+          } else {
+            // Override with the testing config if the value is present + not null/undefined.
+            result[key] = hostConfigForTesting[key] ?? result[key];
+          }
         };
         mergeEntry(key as keyof Root.Runtime.HostConfig);
       }
@@ -520,6 +531,9 @@ export class InspectorFrontendHostStub implements InspectorFrontendHostAPI {
   }
 
   registerAidaClientEvent(request: string, callback: (result: AidaClientResult) => void): void {
+    callback({
+      error: 'Not implemented',
+    });
   }
 
   recordImpression(event: ImpressionEvent): void {

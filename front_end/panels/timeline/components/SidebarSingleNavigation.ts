@@ -8,7 +8,8 @@ import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 
 import * as Insights from './insights/insights.js';
-import {type ActiveInsight, InsightsCategories} from './Sidebar.js';
+import {type ActiveInsight} from './Sidebar.js';
+import {InsightsCategories} from './SidebarInsightsTab.js';
 import styles from './sidebarSingleNavigation.css.js';
 
 export interface SidebarSingleNavigationData {
@@ -140,15 +141,23 @@ export class SidebarSingleNavigation extends HTMLElement {
       navigationId: string,
       ): LitHtml.TemplateResult {
     // clang-format off
-      return LitHtml.html`
-       <div>
-          <${Insights.LCPPhases.LCPPhases.litTagName}
-            .insights=${insights}
-            .navigationId=${navigationId}
-            .activeInsight=${this.#data.activeInsight}
-            .activeCategory=${this.#data.activeCategory}
-          </${Insights.LCPPhases.LCPPhases}>
-        </div>`;
+    return LitHtml.html`
+    <div>
+      <${Insights.LCPPhases.LCPPhases.litTagName}
+        .insights=${insights}
+        .navigationId=${navigationId}
+        .activeInsight=${this.#data.activeInsight}
+        .activeCategory=${this.#data.activeCategory}
+      </${Insights.LCPPhases.LCPPhases}>
+    </div>
+    <div>
+      <${Insights.LCPDiscovery.LCPDiscovery.litTagName}
+        .insights=${insights}
+        .navigationId=${navigationId}
+        .activeInsight=${this.#data.activeInsight}
+        .activeCategory=${this.#data.activeCategory}
+      </${Insights.LCPDiscovery.LCPDiscovery}>
+    </div>`;
     // clang-format on
   }
 

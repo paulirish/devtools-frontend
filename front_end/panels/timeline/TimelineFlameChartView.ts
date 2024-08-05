@@ -90,7 +90,7 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
   #overlaysContainer: HTMLElement = document.createElement('div');
   #overlays: Overlays.Overlays.Overlays;
 
-  #timeRangeSelectionOverlay: Overlays.Overlays.TimeRangeLabel|null = null;
+  #timeRangeSelectionAnnotation: TraceEngine.Types.File.TimeRangeAnnotation|null = null;
 
   #currentInsightOverlays: Array<Overlays.Overlays.TimelineOverlay> = [];
   #activeInsight: TimelineComponents.Sidebar.ActiveInsight|null = null;
@@ -192,6 +192,13 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
     this.#overlays.addEventListener(Overlays.Overlays.AnnotationOverlayActionEvent.eventName, event => {
       const {overlay, action} = (event as Overlays.Overlays.AnnotationOverlayActionEvent);
       if (action === 'Remove') {
+        // If the overlay removed is the current time range, set it to null so that
+        // we would create a new time range overlay and annotation on the next time range selection instead
+        // of trying to update the current overlay that does not exist.
+        if (ModificationsManager.activeManager()?.getAnnotationByOverlay(overlay) ===
+            this.#timeRangeSelectionAnnotation) {
+          this.#timeRangeSelectionAnnotation = null;
+        }
         ModificationsManager.activeManager()?.removeAnnotationOverlay(overlay);
       } else if (action === 'Update') {
         ModificationsManager.activeManager()?.updateAnnotationOverlay(overlay);
@@ -382,17 +389,18 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
           TraceEngine.Types.Timing.MilliSeconds(endTime),
       );
 
-      if (this.#timeRangeSelectionOverlay) {
-        this.updateExistingOverlay(this.#timeRangeSelectionOverlay, {
-          bounds,
-        });
+      // If the current time range annotation has a label, the range selection
+      // for it is finished and we need to create a new time range annotations.
+      if (this.#timeRangeSelectionAnnotation && !this.#timeRangeSelectionAnnotation?.label) {
+        this.#timeRangeSelectionAnnotation.bounds = bounds;
+        ModificationsManager.activeManager()?.updateAnnotation(this.#timeRangeSelectionAnnotation);
       } else {
-        this.#timeRangeSelectionOverlay = this.addOverlay({
+        this.#timeRangeSelectionAnnotation = {
           type: 'TIME_RANGE',
           label: '',
-          showDuration: true,
           bounds,
-        });
+        };
+        ModificationsManager.activeManager()?.createAnnotation(this.#timeRangeSelectionAnnotation);
       }
     }
   }
@@ -566,11 +574,12 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
     // If:
     // 1. There is no selection, or the selection is not a range selection
     // AND 2. we have an active time range selection overlay
+    // AND 3. The label of the selection is not empty
     // then we need to remove it.
     if ((selection === null || !TimelineSelection.isRangeSelection(selection.object)) &&
-        this.#timeRangeSelectionOverlay) {
-      this.#overlays.remove(this.#timeRangeSelectionOverlay);
-      this.#timeRangeSelectionOverlay = null;
+        this.#timeRangeSelectionAnnotation && !this.#timeRangeSelectionAnnotation.label) {
+      ModificationsManager.activeManager()?.removeAnnotation(this.#timeRangeSelectionAnnotation);
+      this.#timeRangeSelectionAnnotation = null;
     }
 
     let index = this.mainDataProvider.entryIndexForSelection(selection);

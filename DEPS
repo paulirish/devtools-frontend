@@ -12,19 +12,19 @@ vars = {
   'build_with_chromium': False,
 
   'build_url': 'https://chromium.googlesource.com/chromium/src/build.git',
-  'build_revision': '5f1a1b3207a9c145dbf87cdc6e34427fa4791d9d',
+  'build_revision': 'b3ab9cf31ba526664c34c3452cb3a9d8d0ee7167',
 
   'buildtools_url': 'https://chromium.googlesource.com/chromium/src/buildtools.git',
-  'buildtools_revision': '3ef44a2b92d5dd1faa5189a06f3a5febe6db2d58',
+  'buildtools_revision': 'd2dedd4c7d65e203b9ba11ac82a0e79139c15be0',
 
   'depot_tools_url': 'https://chromium.googlesource.com/chromium/tools/depot_tools.git',
-  'depot_tools_revision': 'ede9a33d985cd8e134df3e32769b2c00aeac200f',
+  'depot_tools_revision': '40cece20d0eaae6fd41fcbc008480e71f2e3aed9',
 
   'inspector_protocol_url': 'https://chromium.googlesource.com/deps/inspector_protocol',
   'inspector_protocol_revision': '2915acabcf62efd7257c57bb8a443a7c389c65cb',
 
   # Keeping track of the last time we rollerd the browser protocol files.
-  'chromium_browser_protocol_revision' : 'a51d9c64b04a596df7ca3a57a88d5427746fcda2',
+  'chromium_browser_protocol_revision' : '5436357d791fbc28f1ceadaf0b6a9dbf848e33db',
 
   'clang_format_url': 'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/clang/tools/clang-format.git',
   'clang_format_revision': '3c0acd2d4e73dd911309d9e970ba09d58bf23a62',
@@ -32,7 +32,7 @@ vars = {
   'emscripten_tag': 'ade9d780ff17c88d81aa13860361743e3c1e1396',
 
   # GN CIPD package version.
-  'gn_version': 'git_revision:b2afae122eeb6ce09c52d63f67dc53fc517dbdc8',
+  'gn_version': 'git_revision:1b41f0502f87b2056cee5cc9b48f9242693d497b',
 
   'cmake_version': 'version:2@3.21.3',
 
@@ -49,7 +49,7 @@ vars = {
   # Chrome version used for tests. It should be regularly updated to
   # match the Canary version listed here:
   # https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json
-  'chrome': '128.0.6612.0',
+  'chrome': '129.0.6637.0',
 
   # 'magic' text to tell depot_tools that git submodules should be accepted but
   # but parity with DEPS file is expected.
@@ -61,7 +61,13 @@ vars = {
 
 # Only these hosts are allowed for dependencies in this DEPS file.
 # If you need to add a new host, contact chrome infrastracture team.
-allowed_hosts = [ 'chromium.googlesource.com', 'chrome-infra-packages.appspot.com' ]
+allowed_hosts = [
+  'chromium.googlesource.com',
+  'chrome-infra-packages.appspot.com',
+
+  # TODO(b/337061377): Move into a separate alllowed gcs bucket list.
+  'chromium-nodejs',
+]
 
 deps = {
   'third_party/clang-format/script': {
@@ -154,62 +160,66 @@ deps = {
     'dep_type': 'cipd',
     'condition': 'build_with_chromium == False',
   },
+  # Pull down Node binaries for WebUI toolchain.
+  'third_party/node/linux': {
+    'dep_type': 'gcs',
+    'condition': 'host_os == "linux" and build_with_chromium == False and non_git_source',
+    'bucket': 'chromium-nodejs',
+    'objects': [
+        {
+            'object_name': '20.11.0/46795170ff5df9831955f163f6966abde581c8af',
+            'sha256sum': '887504c37404898ca41b896f448ee6d7fc24179d8fb6a4b79d028ab7e1b7153d',
+            'size_bytes': 46907205,
+            'generation': 1705443744664744,
+            'output_file': 'node-linux-x64.tar.gz',
+        },
+    ],
+  },
+  'third_party/node/mac': {
+      'dep_type': 'gcs',
+      'condition': 'host_os == "mac" and build_with_chromium == False and host_cpu != "arm64" and non_git_source',
+      'bucket': 'chromium-nodejs',
+      'objects': [
+          {
+              'object_name': '20.11.0/85ccc2202fd4f1615a443248c01a866ae227ba78',
+              'sha256sum': '82db7592d4551f4c186e6a5e7916ff24a624cdd2ab0eedfc06bcb03e8c37ca77',
+              'size_bytes': 43836507,
+              'generation': 1705443728906163,
+              'output_file': 'node-darwin-x64.tar.gz',
+          },
+      ],
+  },
+  'third_party/node/mac_arm64': {
+      'dep_type': 'gcs',
+      'condition': 'host_os == "mac" and build_with_chromium == False and host_cpu == "arm64" and non_git_source',
+      'bucket': 'chromium-nodejs',
+      'objects': [
+          {
+              'object_name': '20.11.0/864780996d3be6c9aca03f371a4bd672728f0a75',
+              'sha256sum': 'cbeba59911faacd4557629952beb71f6ac619a8cb155dfe2bcdc81b02056a27b',
+              'size_bytes': 42181332,
+              'generation': 1705443735688942,
+              'output_file': 'node-darwin-arm64.tar.gz',
+          },
+      ],
+  },
+  'third_party/node/win': {
+      'dep_type': 'gcs',
+      'condition': 'host_os == "win" and build_with_chromium == False and non_git_source',
+      'bucket': 'chromium-nodejs',
+      'objects': [
+          {
+              'object_name': '20.11.0/2cb36010af52bc5e2a2d1e3675c10361c80d8f8d',
+              'sha256sum': '5da5e201155bb3ea99134b404180adebcfa696b0dbc09571d01a09ca5489f53e',
+              'size_bytes': 70017688,
+              'generation': 1705443750949255,
+              'output_file': 'node.exe',
+          },
+      ],
+  },
 }
 
 hooks = [
-  # Pull down Node binaries for WebUI toolchain.
-  {
-    'name': 'node_linux64',
-    'pattern': '.',
-    'condition': 'host_os == "linux" and build_with_chromium == False',
-    'action': [ 'python3',
-                'third_party/depot_tools/download_from_google_storage.py',
-                '--no_resume',
-                '--extract',
-                '--no_auth',
-                '--bucket', 'chromium-nodejs/20.11.0',
-                '-s', 'third_party/node/linux/node-linux-x64.tar.gz.sha1',
-    ],
-  },
-  {
-    'name': 'node_mac',
-    'pattern': '.',
-    'condition': 'host_os == "mac" and build_with_chromium == False and host_cpu != "arm64"',
-    'action': [ 'python3',
-                'third_party/depot_tools/download_from_google_storage.py',
-                '--no_resume',
-                '--extract',
-                '--no_auth',
-                '--bucket', 'chromium-nodejs/20.11.0',
-                '-s', 'third_party/node/mac/node-darwin-x64.tar.gz.sha1',
-    ],
-  },
-    {
-    'name': 'node_mac',
-    'pattern': '.',
-    'condition': 'host_os == "mac" and build_with_chromium == False and host_cpu == "arm64"',
-    'action': [ 'python3',
-                'third_party/depot_tools/download_from_google_storage.py',
-                '--no_resume',
-                '--extract',
-                '--no_auth',
-                '--bucket', 'chromium-nodejs/20.11.0',
-                '-s', 'third_party/node/mac/node-darwin-arm64.tar.gz.sha1',
-    ],
-  },
-  {
-    'name': 'node_win',
-    'pattern': '.',
-    'condition': 'host_os == "win" and build_with_chromium == False',
-    'action': [ 'python3',
-                'third_party/depot_tools/download_from_google_storage.py',
-                '--no_resume',
-                '--no_auth',
-                '--bucket', 'chromium-nodejs/20.11.0',
-                '-s', 'third_party/node/win/node.exe.sha1',
-    ],
-  },
-
   {
     # Ensure that the DEPS'd "depot_tools" has its self-update capability
     # disabled.

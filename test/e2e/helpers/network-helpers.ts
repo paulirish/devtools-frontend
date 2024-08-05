@@ -166,10 +166,10 @@ export function veImpressionForNetworkPanel(options?: {newFilterBar?: boolean}) 
         veImpression('DropDown', 'request-types'),
         veImpression('DropDown', 'more-filters'),
         veImpression('Toggle', 'invert-filter'),
-        veImpression('TextField'),
+        veImpression('TextField', 'filter'),
       ] :
       [
-        veImpression('TextField'),
+        veImpression('TextField', 'filter'),
         veImpression('Toggle', 'invert-filter'),
         veImpression('Toggle', 'hide-data-urls'),
         veImpression('Toggle', 'hide-extension-urls'),
@@ -209,7 +209,7 @@ export function veImpressionForNetworkPanel(options?: {newFilterBar?: boolean}) 
           veImpression('Toggle', 'cache-disabled'),
           veImpression('DropDown', 'preferred-network-condition'),
         ]),
-    veImpression('Pane', 'network-overview'),
+    veImpression('Timeline', 'network-overview'),
     veImpression('Toggle', 'network-settings'),
     veImpression('Link', 'learn-more'),
     veImpression('TableHeader', 'name'),

@@ -129,15 +129,15 @@ const UIStringsTemp = {
 /* eslint-disable  rulesdir/l10n_i18nString_call_only_with_uistrings */
 const i18nString = i18n.i18n.lockedString;
 
-function getInputPlaceholderString(aidaAvailability: Host.AidaClient.AidaAvailability): string {
+function getInputPlaceholderString(aidaAvailability: Host.AidaClient.AidaAccessPreconditions): string {
   switch (aidaAvailability) {
-    case Host.AidaClient.AidaAvailability.AVAILABLE:
+    case Host.AidaClient.AidaAccessPreconditions.AVAILABLE:
       return i18nString(UIStringsTemp.inputPlaceholder);
-    case Host.AidaClient.AidaAvailability.NO_ACCOUNT_EMAIL:
+    case Host.AidaClient.AidaAccessPreconditions.NO_ACCOUNT_EMAIL:
       return i18nString(UIStringsTemp.notLoggedIn);
-    case Host.AidaClient.AidaAvailability.NO_ACTIVE_SYNC:
+    case Host.AidaClient.AidaAccessPreconditions.NO_ACTIVE_SYNC:
       return i18nString(UIStringsTemp.syncIsOff);
-    case Host.AidaClient.AidaAvailability.NO_INTERNET:
+    case Host.AidaClient.AidaAccessPreconditions.NO_INTERNET:
       return i18nString(UIStringsTemp.offline);
   }
 }
@@ -179,10 +179,11 @@ export interface Props {
   onFixThisIssueClick: () => void;
   inspectElementToggled: boolean;
   state: State;
-  aidaAvailability: Host.AidaClient.AidaAvailability;
+  aidaAvailability: Host.AidaClient.AidaAccessPreconditions;
   messages: ChatMessage[];
   selectedNode: SDK.DOMModel.DOMNode|null;
   isLoading: boolean;
+  canShowFeedbackForm: boolean;
   // If there is a `confirmSideEffectDialog`, we show the
   // confirmation dialog for executing that specific code.
   confirmSideEffectDialog?: ConfirmSideEffectDialog;
@@ -277,6 +278,7 @@ export class FreestylerChatUi extends HTMLElement {
         onFeedbackSubmit: (rating, feedback) => {
           this.#props.onFeedbackSubmit(rpcId, rating, feedback);
         },
+        canShowFeedbackForm: this.#props.canShowFeedbackForm,
       } as ProvideFeedbackProps}
       ></${ProvideFeedback.litTagName}>`;
     // clang-format on
@@ -333,7 +335,10 @@ export class FreestylerChatUi extends HTMLElement {
 
   #renderSideEffectConfirmationUi(confirmSideEffectDialog: ConfirmSideEffectDialog): LitHtml.TemplateResult {
     // clang-format off
-    return LitHtml.html`<div class="side-effect-confirmation">
+    return LitHtml.html`<div
+      class="side-effect-confirmation"
+      jslog=${VisualLogging.section('side-effect-confirmation')}
+    >
       <p>${i18nString(UIStringsTemp.sideEffectConfirmationDescription)}</p>
       <${MarkdownView.CodeBlock.CodeBlock.litTagName}
         .code=${confirmSideEffectDialog.code}
@@ -370,7 +375,8 @@ export class FreestylerChatUi extends HTMLElement {
 
   #renderChatMessage = (message: ChatMessage, {isLast}: {isLast: boolean}): LitHtml.TemplateResult => {
     if (message.entity === ChatMessageEntity.USER) {
-      return LitHtml.html`<div class="chat-message query">${message.text}</div>`;
+      return LitHtml.html`<div class="chat-message query" jslog=${VisualLogging.section('question')}>${
+          message.text}</div>`;
     }
 
     const shouldShowFixThisIssueButton = !this.#props.isLoading && isLast && message.suggestingFix;
@@ -378,7 +384,7 @@ export class FreestylerChatUi extends HTMLElement {
     const shouldShowLoading = this.#props.isLoading && isLast && !this.#props.confirmSideEffectDialog;
     // clang-format off
     return LitHtml.html`
-      <div class="chat-message answer">
+      <div class="chat-message answer" jslog=${VisualLogging.section('answer')}>
         ${message.steps.map(step => this.#renderStep(step))}
         ${this.#props.confirmSideEffectDialog && isLast
             ? this.#renderSideEffectConfirmationUi(this.#props.confirmSideEffectDialog)
@@ -495,8 +501,9 @@ export class FreestylerChatUi extends HTMLElement {
 
   #renderChatUi = (): LitHtml.TemplateResult => {
     // TODO(ergunsh): Show a better UI for the states where Aida client is not available.
-    const isAidaAvailable = this.#props.aidaAvailability === Host.AidaClient.AidaAvailability.AVAILABLE;
-    const isInputDisabled = !Boolean(this.#props.selectedNode) || !isAidaAvailable;
+    const isAidaAvailable = this.#props.aidaAvailability === Host.AidaClient.AidaAccessPreconditions.AVAILABLE;
+    const isInputDisabled =
+        !Boolean(this.#props.selectedNode) || !isAidaAvailable || Boolean(this.#props.confirmSideEffectDialog);
     // clang-format off
     return LitHtml.html`
       <div class="chat-ui">
@@ -518,8 +525,9 @@ export class FreestylerChatUi extends HTMLElement {
             <input type="text" class="chat-input" .disabled=${isInputDisabled}
               placeholder=${getInputPlaceholderString(
                 this.#props.aidaAvailability,
-              )}>
-              ${
+              )}
+              jslog=${VisualLogging.textField('query').track({ change: true })}
+            >${
                 this.#props.isLoading
                   ? LitHtml.html`
                     <${Buttons.Button.Button.litTagName}
@@ -530,6 +538,7 @@ export class FreestylerChatUi extends HTMLElement {
                         {
                           variant: Buttons.Button.Variant.PRIMARY,
                           size: Buttons.Button.Size.SMALL,
+                          disabled: isInputDisabled,
                           iconName: 'stop',
                           title: i18nString(UIStringsTemp.cancelButtonTitle),
                           jslogContext: 'stop',
@@ -545,9 +554,9 @@ export class FreestylerChatUi extends HTMLElement {
                           type: 'submit',
                           variant: Buttons.Button.Variant.ICON,
                           size: Buttons.Button.Size.SMALL,
+                          disabled: isInputDisabled,
                           iconName: 'send',
                           title: i18nString(UIStringsTemp.sendButtonTitle),
-                          disabled: isInputDisabled,
                           jslogContext: 'send',
                         } as Buttons.Button.ButtonData
                       }

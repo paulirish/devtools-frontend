@@ -337,9 +337,9 @@ export class ColorRenderer implements MatchRenderer<ColorMatch> {
             return;
           }
           if (color.is(Common.Color.Format.HSL) || color.is(Common.Color.Format.HSLA)) {
-            swatch.renderColor(new Common.Color.HSL(hue, color.s, color.l, color.alpha));
+            swatch.setColor(new Common.Color.HSL(hue, color.s, color.l, color.alpha));
           } else if (color.is(Common.Color.Format.HWB) || color.is(Common.Color.Format.HWBA)) {
-            swatch.renderColor(new Common.Color.HWB(hue, color.w, color.b, color.alpha));
+            swatch.setColor(new Common.Color.HWB(hue, color.w, color.b, color.alpha));
           }
           angle.updateProperty(swatch.getColor()?.asString() ?? '');
         });
@@ -658,7 +658,7 @@ export class LinkableNameRenderer implements MatchRenderer<LinkableNameMatch> {
           isDefined: this.#treeElement.matchedStyles().fontPaletteValuesRule()?.name().text === match.text,
         };
       case LinkableNameProperties.PositionTry:
-      case LinkableNameProperties.PositionTryOptions:
+      case LinkableNameProperties.PositionTryFallbacks:
         return {
           jslogContext: 'css-position-try',
           metric: Host.UserMetrics.SwatchType.PositionTryLink,
@@ -1067,10 +1067,7 @@ export class LengthRenderer implements MatchRenderer<LengthMatch> {
     const cssLength = new InlineEditor.CSSLength.CSSLength();
     const valueElement = document.createElement('span');
     valueElement.textContent = lengthText;
-    cssLength.data = {
-      lengthText,
-      overloaded: this.#treeElement.overloaded(),
-    };
+    cssLength.data = {lengthText};
     cssLength.append(valueElement);
 
     const onValueChanged = (event: Event): void => {

@@ -34,7 +34,6 @@ import {
 } from '../../shared/helper.js';
 
 import {openSoftContextMenuAndClickOnItem} from './context-menu-helpers.js';
-import {reloadDevTools} from './cross-tool-helper.js';
 import {veImpression} from './visual-logging-helpers.js';
 
 export const ACTIVE_LINE = '.CodeMirror-activeline > pre > span';
@@ -50,7 +49,6 @@ export const SELECTED_THREAD_SELECTOR = 'div.thread-item.selected > div.thread-i
 export const STEP_INTO_BUTTON = '[aria-label="Step into next function call"]';
 export const STEP_OVER_BUTTON = '[aria-label="Step over next function call"]';
 export const STEP_OUT_BUTTON = '[aria-label="Step out of current function"]';
-export const TURNED_OFF_PAUSE_BUTTON_SELECTOR = 'button.toolbar-state-off';
 export const TURNED_ON_PAUSE_BUTTON_SELECTOR = 'button.toolbar-state-on';
 export const DEBUGGER_PAUSED_EVENT = 'DevTools.DebuggerPaused';
 const WATCH_EXPRESSION_VALUE_SELECTOR = '.watch-expression-tree-item .object-value-string.value';
@@ -95,7 +93,7 @@ export async function doubleClickSourceTreeItem(selector: string) {
 
 export async function waitForSourcesPanel(): Promise<void> {
   // Wait for the navigation panel to show up
-  await waitFor('.navigator-file-tree-item');
+  await Promise.any([waitFor('.navigator-file-tree-item'), waitFor('.empty-view')]);
 }
 
 export async function openSourcesPanel() {
@@ -159,6 +157,12 @@ export async function createNewSnippet(snippetName: string, content?: string) {
     await pasteText(content);
     await pressKey('s', {control: true});
   }
+}
+
+export async function openWorkspaceSubPane() {
+  const root = await waitFor('.navigator-tabbed-pane');
+  await click('[aria-label="Workspace"]', {root});
+  await waitFor('[aria-label="Workspace panel"]');
 }
 
 export async function openOverridesSubPane() {
@@ -729,12 +733,6 @@ export async function addSelectedTextToWatches() {
   await frontend.keyboard.up('Shift');
 }
 
-export async function refreshDevToolsAndRemoveBackendState(target: puppeteer.Page) {
-  // Navigate to a different site to make sure that back-end state will be removed.
-  await target.goto('about:blank');
-  await reloadDevTools({selectedPanel: {name: 'sources'}});
-}
-
 export async function enableLocalOverrides() {
   await clickMoreTabsButton();
   await click(OVERRIDES_TAB_SELECTOR);
@@ -865,9 +863,9 @@ export async function waitForLines(lineCount: number): Promise<void> {
 }
 
 export async function isPrettyPrinted(): Promise<boolean> {
-  const prettyButton = await waitFor('[aria-label="Pretty print"]');
-  const isPretty = await prettyButton.evaluate(e => e.ariaPressed);
-  return isPretty === 'true';
+  const prettyButton = await waitFor('[title="Pretty print"]');
+  const isPretty = await prettyButton.evaluate(e => e.classList.contains('toggled'));
+  return isPretty === true;
 }
 
 export function veImpressionForSourcesPanel() {
