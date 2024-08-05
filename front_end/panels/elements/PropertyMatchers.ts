@@ -229,7 +229,6 @@ export const enum LinkableNameProperties {
   Animation = 'animation',
   AnimationName = 'animation-name',
   FontPalette = 'font-palette',
-  PositionFallback = 'position-fallback',
   PositionTryOptions = 'position-try-options',
   PositionTry = 'position-try',
 }
@@ -256,7 +255,6 @@ export class LinkableNameMatcher extends matcherBase(LinkableNameMatch) {
       LinkableNameProperties.Animation,
       LinkableNameProperties.AnimationName,
       LinkableNameProperties.FontPalette,
-      LinkableNameProperties.PositionFallback,
       LinkableNameProperties.PositionTryOptions,
       LinkableNameProperties.PositionTry,
     ];
@@ -466,7 +464,7 @@ export class LengthMatcher extends matcherBase(LengthMatch) {
   // clang-format on
   override matches(node: CodeMirror.SyntaxNode, matching: BottomUpTreeMatching): Match|null {
     const text = matching.ast.text(node);
-    const regexp = new RegExp(`^${InlineEditor.CSSLengthUtils.CSSLengthRegex}$`);
+    const regexp = new RegExp(`^${InlineEditor.CSSLengthUtils.CSSLengthRegex.source}$`);
     const match = regexp.exec(text);
     if (!match || match.index !== 0) {
       return null;

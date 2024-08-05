@@ -12,7 +12,7 @@ import {type Loggable} from './Loggable.js';
 import {getLoggingConfig} from './LoggingConfig.js';
 import {logChange, logClick, logDrag, logHover, logImpressions, logKeyDown, logResize} from './LoggingEvents.js';
 import {getLoggingState, getOrCreateLoggingState, type LoggingState} from './LoggingState.js';
-import {getNonDomState, unregisterAllLoggables, unregisterLoggable} from './NonDomState.js';
+import {getNonDomLoggables, hasNonDomLoggables, unregisterAllLoggables, unregisterLoggables} from './NonDomState.js';
 
 const PROCESS_DOM_INTERVAL = 500;
 const KEYBOARD_LOG_INTERVAL = 3000;
@@ -109,7 +109,7 @@ export function pendingWorkComplete(): Promise<void> {
         clickLogThrottler,
         resizeLogThrottler,
       ].map(async throttler => {
-        while (throttler.process) {
+        for (let i = 0; throttler.process && i < 3; ++i) {
           await throttler.processCompleted;
         }
       }))
@@ -156,6 +156,7 @@ async function process(): Promise<void> {
   const {loggables, shadowRoots} = getDomState(documents);
   const visibleLoggables: Loggable[] = [];
   observeMutations(shadowRoots);
+  const nonDomRoots: (Loggable|undefined)[] = [undefined];
 
   for (const {element, parent} of loggables) {
     const loggingState = getOrCreateLoggingState(element, getLoggingConfig(element), parent);
@@ -169,6 +170,9 @@ async function process(): Promise<void> {
         visibleLoggables.push(element);
         loggingState.impressionLogged = true;
       }
+    }
+    if (loggingState.impressionLogged && hasNonDomLoggables(element)) {
+      nonDomRoots.push(element);
     }
     if (!loggingState.processed) {
       const clickLikeHandler = (doubleClick: boolean) => (e: Event) => {
@@ -258,18 +262,20 @@ async function process(): Promise<void> {
     }
     processForDebugging(element);
   }
-  for (const {loggable, config, parent} of getNonDomState().loggables) {
-    const loggingState = getOrCreateLoggingState(loggable, config, parent);
-    const visible = !parent || loggingState.parent?.impressionLogged;
-    if (!visible) {
-      continue;
+  for (let i = 0; i < nonDomRoots.length; ++i) {
+    const root = nonDomRoots[i];
+    for (const {loggable, config, parent} of getNonDomLoggables(root)) {
+      const loggingState = getOrCreateLoggingState(loggable, config, parent);
+      processForDebugging(loggable);
+      visibleLoggables.push(loggable);
+      loggingState.impressionLogged = true;
+      if (hasNonDomLoggables(loggable)) {
+        nonDomRoots.push(loggable);
+      }
     }
-    processForDebugging(loggable);
-    visibleLoggables.push(loggable);
-    loggingState.impressionLogged = true;
     // No need to track loggable as soon as we've logged the impression
     // We can still log interaction events with a handle to a loggable
-    unregisterLoggable(loggable);
+    unregisterLoggables(root);
   }
   if (visibleLoggables.length) {
     await yieldToInteractions();
@@ -325,51 +331,48 @@ function isAncestorOf(state1: LoggingState|null, state2: LoggingState|null): boo
 }
 
 async function onResizeOrIntersection(entries: ResizeObserverEntry[]|IntersectionObserverEntry[]): Promise<void> {
-  await Coordinator.RenderCoordinator.RenderCoordinator.instance().read('logResize', async () => {
-    for (const entry of entries) {
-      const element = entry.target;
-      const loggingState = getLoggingState(element);
-      const overlap = visibleOverlap(element, viewportRectFor(element)) || new DOMRect(0, 0, 0, 0);
-      if (!loggingState?.size) {
+  for (const entry of entries) {
+    const element = entry.target;
+    const loggingState = getLoggingState(element);
+    const overlap = visibleOverlap(element, viewportRectFor(element)) || new DOMRect(0, 0, 0, 0);
+    if (!loggingState?.size) {
+      continue;
+    }
+
+    let hasPendingParent = false;
+    for (const pendingElement of pendingResize.keys()) {
+      if (pendingElement === element) {
         continue;
       }
-
-      let hasPendingParent = false;
-      for (const pendingElement of pendingResize.keys()) {
-        if (pendingElement === element) {
+      const pendingState = getLoggingState(pendingElement);
+      if (isAncestorOf(pendingState, loggingState)) {
+        hasPendingParent = true;
+        break;
+      }
+      if (isAncestorOf(loggingState, pendingState)) {
+        pendingResize.delete(pendingElement);
+      }
+    }
+    if (hasPendingParent) {
+      continue;
+    }
+    pendingResize.set(element, overlap);
+    void resizeLogThrottler.schedule(async () => {
+      if (pendingResize.size) {
+        await yieldToInteractions();
+        flushPendingChangeEvents();
+      }
+      for (const [element, overlap] of pendingResize.entries()) {
+        const loggingState = getLoggingState(element);
+        if (!loggingState) {
           continue;
         }
-        const pendingState = getLoggingState(pendingElement);
-        if (isAncestorOf(pendingState, loggingState)) {
-          hasPendingParent = true;
-          break;
-        }
-        if (isAncestorOf(loggingState, pendingState)) {
-          pendingResize.delete(pendingElement);
+        if (Math.abs(overlap.width - loggingState.size.width) >= RESIZE_REPORT_THRESHOLD ||
+            Math.abs(overlap.height - loggingState.size.height) >= RESIZE_REPORT_THRESHOLD) {
+          logResize(element, overlap);
         }
       }
-      if (hasPendingParent) {
-        continue;
-      }
-      pendingResize.set(element, overlap);
-      await resizeLogThrottler.schedule(async () => {});
-      void resizeLogThrottler.schedule(async () => {
-        if (pendingResize.size) {
-          await yieldToInteractions();
-          flushPendingChangeEvents();
-        }
-        for (const [element, overlap] of pendingResize.entries()) {
-          const loggingState = getLoggingState(element);
-          if (!loggingState) {
-            continue;
-          }
-          if (Math.abs(overlap.width - loggingState.size.width) >= RESIZE_REPORT_THRESHOLD ||
-              Math.abs(overlap.height - loggingState.size.height) >= RESIZE_REPORT_THRESHOLD) {
-            logResize(element, overlap);
-          }
-        }
-        pendingResize.clear();
-      });
-    }
-  });
+      pendingResize.clear();
+    }, Common.Throttler.Scheduling.Delayed);
+  }
 }

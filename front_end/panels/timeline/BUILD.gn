@@ -59,7 +59,9 @@ devtools_module("timeline") {
     "CLSLinkifier.ts",
     "CompatibilityTracksAppender.ts",
     "CountersGraph.ts",
+    "EntriesFilter.ts",
     "EventUICategory.ts",
+    "EventsSerializer.ts",
     "EventsTimelineTreeView.ts",
     "ExtensionDataGatherer.ts",
     "ExtensionTrackAppender.ts",
@@ -69,8 +71,8 @@ devtools_module("timeline") {
     "InteractionsTrackAppender.ts",
     "IsolateSelector.ts",
     "LayoutShiftsTrackAppender.ts",
+    "ModificationsManager.ts",
     "NetworkTrackAppender.ts",
-    "Overlays.ts",
     "SaveFileFormatter.ts",
     "SourceMapsResolver.ts",
     "TargetForEvent.ts",
@@ -113,11 +115,11 @@ devtools_module("timeline") {
     "../../panels/layer_viewer:bundle",
     "../../panels/mobile_throttling:bundle",
     "../../panels/profiler:bundle",
-    "../../services/modifications_manager:bundle",
     "../../services/trace_bounds:bundle",
     "../../ui/components/buttons:bundle",
     "../../ui/components/code_highlighter:bundle",  # trace event highlighting
     "../../ui/components/data_grid:bundle",
+    "../../ui/components/icon_button:bundle",
     "../../ui/components/linkifier:bundle",
     "../../ui/components/menus:bundle",
     "../../ui/components/panel_feedback:bundle",
@@ -128,6 +130,8 @@ devtools_module("timeline") {
     "../../ui/lit-html:bundle",
     "./components:bundle",
     "./extensions:bundle",
+    "./overlays:bundle",
+    "./utils:bundle",
   ]
 
   visibility = [ "../../component_docs/*" ]
@@ -181,9 +185,11 @@ ts_library("unittests") {
 
   sources = [
     "Breadcrumbs.test.ts",
+    "EntriesFilter.test.ts",
+    "EventsSerializer.test.ts",
     "FreshRecording.test.ts",
     "Initiators.test.ts",
-    "Overlays.test.ts",
+    "ModificationsManager.test.ts",
     "SaveFileFormatter.test.ts",
     "SourceMapsResolver.test.ts",
     "TimelineController.test.ts",

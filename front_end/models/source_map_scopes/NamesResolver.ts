@@ -384,16 +384,18 @@ const resolveScope = async(script: SDK.Script.Script, scopeChain: Formatter.Form
     };
 
 export const resolveScopeChain =
-    async function(callFrame: SDK.DebuggerModel.CallFrame|null): Promise<SDK.DebuggerModel.ScopeChainEntry[]|null> {
-  if (!callFrame) {
-    return null;
-  }
+    async function(callFrame: SDK.DebuggerModel.CallFrame): Promise<SDK.DebuggerModel.ScopeChainEntry[]> {
   const {pluginManager} = Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance();
   const scopeChain = await pluginManager.resolveScopeChain(callFrame);
   if (scopeChain) {
     return scopeChain;
   }
-  return callFrame.scopeChain();
+
+  if (callFrame.script.isWasm()) {
+    return callFrame.scopeChain();
+  }
+  const thisObject = await resolveThisObject(callFrame);
+  return callFrame.scopeChain().map(scope => new ScopeWithSourceMappedVariables(scope, thisObject));
 };
 
 /**
@@ -551,10 +553,7 @@ export const resolveExpression = async(
 };
 
 export const resolveThisObject =
-    async(callFrame: SDK.DebuggerModel.CallFrame|null): Promise<SDK.RemoteObject.RemoteObject|null> => {
-  if (!callFrame) {
-    return null;
-  }
+    async(callFrame: SDK.DebuggerModel.CallFrame): Promise<SDK.RemoteObject.RemoteObject|null> => {
   const scopeChain = callFrame.scopeChain();
   if (scopeChain.length === 0) {
     return callFrame.thisObject();
@@ -572,7 +571,7 @@ export const resolveThisObject =
     silent: true,
     returnByValue: false,
     generatePreview: true,
-  } as SDK.RuntimeModel.EvaluationOptions));
+  }));
   if ('exceptionDetails' in result) {
     return !result.exceptionDetails && result.object ? result.object : callFrame.thisObject();
   }
@@ -590,6 +589,65 @@ export const resolveScopeInObject = function(scope: SDK.DebuggerModel.ScopeChain
 
   return new RemoteObject(scope);
 };
+
+/**
+ * Wraps a debugger `Scope` but returns a scope object where variable names are
+ * mapped to their authored name.
+ *
+ * This implementation does not utilize source map "Scopes" information but obtains
+ * original variable names via parsing + mappings + names.
+ */
+class ScopeWithSourceMappedVariables implements SDK.DebuggerModel.ScopeChainEntry {
+  readonly #debuggerScope: SDK.DebuggerModel.ScopeChainEntry;
+  /** The resolved `this` of the current call frame */
+  readonly #thisObject: SDK.RemoteObject.RemoteObject|null;
+
+  constructor(scope: SDK.DebuggerModel.ScopeChainEntry, thisObject: SDK.RemoteObject.RemoteObject|null) {
+    this.#debuggerScope = scope;
+    this.#thisObject = thisObject;
+  }
+
+  callFrame(): SDK.DebuggerModel.CallFrame {
+    return this.#debuggerScope.callFrame();
+  }
+
+  type(): string {
+    return this.#debuggerScope.type();
+  }
+
+  typeName(): string {
+    return this.#debuggerScope.typeName();
+  }
+
+  name(): string|undefined {
+    return this.#debuggerScope.name();
+  }
+
+  range(): SDK.DebuggerModel.LocationRange|null {
+    return this.#debuggerScope.range();
+  }
+
+  object(): SDK.RemoteObject.RemoteObject {
+    return resolveScopeInObject(this.#debuggerScope);
+  }
+
+  description(): string {
+    return this.#debuggerScope.description();
+  }
+
+  icon(): string|undefined {
+    return this.#debuggerScope.icon();
+  }
+
+  extraProperties(): SDK.RemoteObject.RemoteObjectProperty[] {
+    const extraProperties = this.#debuggerScope.extraProperties();
+    if (this.#thisObject && this.type() === Protocol.Debugger.ScopeType.Local) {
+      extraProperties.unshift(new SDK.RemoteObject.RemoteObjectProperty(
+          'this', this.#thisObject, undefined, undefined, undefined, undefined, undefined, /* synthetic */ true));
+    }
+    return extraProperties;
+  }
+}
 
 export class RemoteObject extends SDK.RemoteObject.RemoteObject {
   private readonly scope: SDK.DebuggerModel.ScopeChainEntry;

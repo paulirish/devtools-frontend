@@ -10,7 +10,6 @@ import {
   $$,
   assertNotNullOrUndefined,
   clickElement,
-  disableExperiment,
   enableExperiment,
   getBrowserAndPages,
   goToResource,
@@ -25,6 +24,7 @@ import {describe, it} from '../../shared/mocha-extensions.js';
 import {
   changeAllocationSampleViewViaDropdown,
   changeViewViaDropdown,
+  checkExposeInternals,
   clickOnContextMenuForRetainer,
   expandFocusedRow,
   findSearchResult,
@@ -164,8 +164,7 @@ describe('The Memory Panel', function() {
     });
   });
 
-  // TODO (343341610) Reinstate this test after change in Blink
-  it.skip('[crbug.com/343341610]: Shows the correct number of divs for a detached DOM tree correctly', async () => {
+  it('Shows the correct number of divs for a detached DOM tree correctly', async () => {
     await goToResource('memory/detached-dom-tree.html');
     await navigateToMemoryTab();
     await takeHeapSnapshot();
@@ -174,15 +173,17 @@ describe('The Memory Panel', function() {
     await waitForSearchResultNumber(3);
   });
 
-  // TODO (343341610) Reinstate this test after change in Blink
-  it.skip('[crbug.com/343341610]: Shows the correct output for an attached iframe', async () => {
+  it('Shows the correct output for an attached iframe', async () => {
     await goToResource('memory/attached-iframe.html');
     await navigateToMemoryTab();
     await takeHeapSnapshot();
     await waitForNonEmptyHeapSnapshotData();
-    await setSearchFilter('Retainer');
-    await waitForSearchResultNumber(9);
-    await findSearchResult('Retainer');
+    await setSearchFilter('searchable string');
+    await waitForSearchResultNumber(6);
+    // The string object is formatted with double quotes, and the same string
+    // within the iframe's src attribute is formatted with single quotes, so
+    // this should reliably find the string object.
+    await findSearchResult('"searchable string"');
     // The following line checks two things: That the property 'aUniqueName'
     // in the iframe is retaining the Retainer class object, and that the
     // iframe window is not detached.
@@ -271,8 +272,7 @@ describe('The Memory Panel', function() {
         retainerChain => retainerChain.some(({retainerClassName}) => retainerClassName === 'Detached Window'));
   });
 
-  // TODO (343341610) Reinstate this test after change in Blink
-  it.skip('[crbug.com/343341610]: Shows the a tooltip', async () => {
+  it('Shows the a tooltip', async () => {
     await goToResource('memory/detached-dom-tree.html');
     await navigateToMemoryTab();
     await takeHeapSnapshot();
@@ -438,7 +438,9 @@ describe('The Memory Panel', function() {
 
   it('Does not include backing store size in the shallow size of a JS Set', async () => {
     await goToResource('memory/set.html');
-    await disableExperiment('heap-snapshot-treat-backing-store-as-containing-object');
+    await enableExperiment('show-option-tp-expose-internals-in-heap-snapshot');
+    await navigateToMemoryTab();
+    await checkExposeInternals();
     const sizes = await runJSSetTest();
 
     // The Set object is small, regardless of the contained content.
@@ -454,7 +456,6 @@ describe('The Memory Panel', function() {
 
   it('Includes backing store size in the shallow size of a JS Set', async () => {
     await goToResource('memory/set.html');
-    await enableExperiment('heap-snapshot-treat-backing-store-as-containing-object');
     const sizes = await runJSSetTest();
 
     // The Set is reported as containing at least 100 pointers.
@@ -522,8 +523,7 @@ describe('The Memory Panel', function() {
     assert.isTrue(!(await getCategoryRow('ObjectRetainedByBothDetachedDomAndConsole', false)));
   });
 
-  // TODO (343341610) Enable this test after change in Blink
-  it.skip('[crbug.com/343341610]: Groups HTML elements by tag name', async () => {
+  it('Groups HTML elements by tag name', async () => {
     await goToResource('memory/dom-details.html');
     await navigateToMemoryTab();
     await takeHeapSnapshot();

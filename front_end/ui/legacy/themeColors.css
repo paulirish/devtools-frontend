@@ -301,7 +301,7 @@
 
   --sys-color-primary-bright: var(--ref-palette-primary50);
   --sys-color-blue-bright: var(--ref-palette-blue50);
-  --sys-color-green-bright: var(--ref-palette-green50);
+  --sys-color-green-bright: var(--ref-palette-green60);
   --sys-color-error-bright: var(--ref-palette-error50);
   --sys-color-orange-bright: var(--ref-palette-orange60);
   --sys-color-yellow-bright: var(--ref-palette-yellow60);
@@ -404,6 +404,12 @@
   --app-color-async: var(--ref-palette-error60);
   --app-color-async-children: var(--ref-palette-error70);
   --app-color-other: var(--ref-palette-neutral87);
+  --app-color-doc: var(--ref-palette-blue60);
+  --app-color-css: var(--ref-palette-purple60);
+  --app-color-image: var(--ref-palette-green80);
+  --app-color-media: var(--ref-palette-green60);
+  --app-color-font: var(--ref-palette-cyan60);
+  --app-color-wasm: var(--ref-palette-indigo60);
 
   /**
    * Color for the active breadcrumb in the Performance Panel timeline.
@@ -440,6 +446,11 @@
   --app-color-performance-bad: var(--color-error-bright);
   --app-color-performance-ok: var(--color-orange-bright);
   --app-color-performance-good: var(--sys-color-green-bright);
+
+  /**
+   * Colors for performance panel annotations list in sidebar.
+   */
+  --app-color-performance-sidebar-label: var(--ref-palette-purple80);
 }
 
 :root.baseline-default {
@@ -846,6 +857,12 @@
   --app-color-async: var(--ref-palette-error60);
   --app-color-async-children: var(--ref-palette-error50);
   --app-color-other: var(--ref-palette-neutral60);
+  --app-color-doc: var(--ref-palette-blue60);
+  --app-color-css: var(--ref-palette-purple60);
+  --app-color-image: var(--ref-palette-green80);
+  --app-color-media: var(--ref-palette-green60);
+  --app-color-font: var(--ref-palette-cyan60);
+  --app-color-wasm: var(--ref-palette-indigo60);
 
   /**
    * Color for the active breadcrumb in the Performance Panel timeline.

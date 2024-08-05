@@ -9,7 +9,7 @@ import * as Timeline from './timeline.js';
 
 describe('Initiators', () => {
   it('returns the initiator data', async function() {
-    const traceData = await TraceLoader.traceEngine(this, 'set-timeout-long-task.json.gz');
+    const {traceData} = await TraceLoader.traceEngine(this, 'set-timeout-long-task.json.gz');
 
     const timerFireEvent = Array.from(traceData.Initiators.eventToInitiator.keys())
                                .find(TraceEngine.Types.TraceEvents.isTraceEventTimerFire);
@@ -24,8 +24,22 @@ describe('Initiators', () => {
                      }]);
   });
 
+  it('returns the initiator data for network requests', async function() {
+    const {traceData} = await TraceLoader.traceEngine(this, 'network-requests-initiators.json.gz');
+
+    // Find the network request to test, it is initiated by `youtube.com`.
+    const event = traceData.NetworkRequests.byTime.find(event => event.ts === 1491680762420);
+    assert.exists(event);
+    // Find the `youtube.com` network request.
+    const initiator = traceData.NetworkRequests.byTime.find(event => event.ts === 1491680629144);
+    assert.exists(initiator);
+    const initiatorData = Timeline.Initiators.initiatorsDataToDrawForNetwork(traceData, event);
+
+    assert.deepEqual(initiatorData, [{event, initiator}]);
+  });
+
   it('can walk up the tree to find the first parent with an initiator', async function() {
-    const traceData = await TraceLoader.traceEngine(this, 'set-timeout-long-task.json.gz');
+    const {traceData} = await TraceLoader.traceEngine(this, 'set-timeout-long-task.json.gz');
 
     // Find any of the fibonnaci() calls; they have a parent
     // event (TimerFire) that has an initiator.
@@ -51,7 +65,7 @@ describe('Initiators', () => {
   });
 
   it('will walk back through the initiators to find the entire chain', async function() {
-    const traceData = await TraceLoader.traceEngine(this, 'nested-initiators.json.gz');
+    const {traceData} = await TraceLoader.traceEngine(this, 'nested-initiators.json.gz');
 
     // Find any of the fibonnaci() calls; they have a parent
     // event (TimerFire) that has an initiator.
@@ -75,7 +89,7 @@ describe('Initiators', () => {
   });
 
   it('will walk forward to find the events initiated by the selected entry', async function() {
-    const traceData = await TraceLoader.traceEngine(this, 'nested-initiators.json.gz');
+    const {traceData} = await TraceLoader.traceEngine(this, 'nested-initiators.json.gz');
 
     // Find any of the InstallTimer calls; they initiate other events.
     const timerInstall = traceData.Renderer.allTraceEntries.find(entry => {
@@ -99,7 +113,7 @@ describe('Initiators', () => {
 
   it('will return the closest expandable ancestor as an initiator in a pair if the initiator itself is hidden',
      async function() {
-       const traceData = await TraceLoader.traceEngine(this, 'nested-initiators.json.gz');
+       const {traceData} = await TraceLoader.traceEngine(this, 'nested-initiators.json.gz');
 
        // Find any of the InstallTimer calls; they initiate other events.
        const timerInstall = traceData.Renderer.allTraceEntries.find(entry => {
@@ -129,7 +143,7 @@ describe('Initiators', () => {
 
   it('will return the closest expandable ancestor as an initiated event in a pair if the event itself is hidden',
      async function() {
-       const traceData = await TraceLoader.traceEngine(this, 'nested-initiators.json.gz');
+       const {traceData} = await TraceLoader.traceEngine(this, 'nested-initiators.json.gz');
 
        // Find any of the fibonnaci() calls; they have a parent
        // event (TimerFire) that has an initiator.

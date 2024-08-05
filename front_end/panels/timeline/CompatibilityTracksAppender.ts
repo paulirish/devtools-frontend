@@ -9,7 +9,7 @@ import type * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
 
 import {AnimationsTrackAppender} from './AnimationsTrackAppender.js';
-import {getEventLevel} from './AppenderUtils.js';
+import {getEventLevel, type LastTimestampByLevel} from './AppenderUtils.js';
 import * as TimelineComponents from './components/components.js';
 import {getEventStyle} from './EventUICategory.js';
 import {ExtensionDataGatherer} from './ExtensionDataGatherer.js';
@@ -30,6 +30,44 @@ export type HighlightedEntryInfo = {
   formattedTime: string,
   warningElements?: HTMLSpanElement[],
 };
+
+export function entryIsVisibleInTimeline(
+    entry: TraceEngine.Types.TraceEvents.TraceEventData,
+    traceParsedData?: TraceEngine.Handlers.Types.TraceParseData): boolean {
+  if (traceParsedData && traceParsedData.Meta.traceIsGeneric) {
+    return true;
+  }
+
+  if (TraceEngine.Types.TraceEvents.isTraceEventUpdateCounters(entry)) {
+    // These events are not "visible" on the timeline because they are instant events with 0 duration.
+    // However, the Memory view (CountersGraph in the codebase) relies on
+    // finding the UpdateCounters events within the user's active trace
+    // selection in order to show the memory usage for the selected time
+    // period.
+    // Therefore we mark them as visible so they are appended onto the Thread
+    // track, and hence accessible by the CountersGraph view.
+    return true;
+  }
+
+  // Gate the visibility of post message events behind the experiement flag
+  if (TraceEngine.Types.TraceEvents.isTraceEventSchedulePostMessage(entry) ||
+      TraceEngine.Types.TraceEvents.isTraceEventHandlePostMessage(entry)) {
+    return Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_SHOW_POST_MESSAGE_EVENTS);
+  }
+
+  if (TraceEngine.Types.Extensions.isSyntheticExtensionEntry(entry)) {
+    return true;
+  }
+
+  // Default styles are globally defined for each event name. Some
+  // events are hidden by default.
+  const eventStyle = getEventStyle(entry.name as TraceEngine.Types.TraceEvents.KnownEventName);
+  const eventIsTiming = TraceEngine.Types.TraceEvents.isTraceEventConsoleTime(entry) ||
+      TraceEngine.Types.TraceEvents.isTraceEventPerformanceMeasure(entry) ||
+      TraceEngine.Types.TraceEvents.isTraceEventPerformanceMark(entry);
+
+  return (eventStyle && !eventStyle.hidden) || eventIsTiming;
+}
 
 /**
  * Track appenders add the data of each track into the timeline flame
@@ -181,9 +219,7 @@ export class CompatibilityTracksAppender {
     this.#allTrackAppenders.push(this.#layoutShiftsTrackAppender);
 
     this.#addThreadAppenders();
-    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_EXTENSIONS)) {
-      this.#addExtensionAppenders();
-    }
+    this.#addExtensionAppenders();
     ThemeSupport.ThemeSupport.instance().addEventListener(ThemeSupport.ThemeChangeEvent.eventName, () => {
       for (const group of this.#flameChartData.groups) {
         // We only need to update the color here, because FlameChart will call `scheduleUpdate()` when theme is changed.
@@ -208,7 +244,7 @@ export class CompatibilityTracksAppender {
   }
 
   #addExtensionAppenders(): void {
-    const tracks = ExtensionDataGatherer.instance().getExtensionData();
+    const tracks = ExtensionDataGatherer.instance().getExtensionData().extensionTrackData;
     for (const trackData of tracks) {
       this.#allTrackAppenders.push(new ExtensionTrackAppender(this, trackData));
     }
@@ -448,10 +484,8 @@ export class CompatibilityTracksAppender {
     this.#legacyEntryTypeByLevel[level] = EntryType.TrackAppender;
     this.#flameChartData.entryLevels[index] = level;
     this.#flameChartData.entryStartTimes[index] = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(event.ts);
-    const msDuration = event.dur ||
-        TraceEngine.Helpers.Timing.millisecondsToMicroseconds(
-            InstantEventVisibleDurationMs as TraceEngine.Types.Timing.MilliSeconds);
-    this.#flameChartData.entryTotalTimes[index] = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(msDuration);
+    const dur = event.dur || TraceEngine.Helpers.Timing.millisecondsToMicroseconds(InstantEventVisibleDurationMs);
+    this.#flameChartData.entryTotalTimes[index] = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(dur);
     return index;
   }
 
@@ -475,57 +509,21 @@ export class CompatibilityTracksAppender {
   appendEventsAtLevel<T extends TraceEngine.Types.TraceEvents.TraceEventData>(
       events: readonly T[], trackStartLevel: number, appender: TrackAppender,
       eventAppendedCallback?: (event: T, index: number) => void): number {
-    const lastUsedTimeByLevel: number[] = [];
+    const lastTimestampByLevel: LastTimestampByLevel = [];
     for (let i = 0; i < events.length; ++i) {
       const event = events[i];
-      if (!this.entryIsVisibleInTimeline(event)) {
+      if (!entryIsVisibleInTimeline(event, this.#traceParsedData)) {
         continue;
       }
 
-      const level = getEventLevel(event, lastUsedTimeByLevel);
+      const level = getEventLevel(event, lastTimestampByLevel);
       const index = this.appendEventAtLevel(event, trackStartLevel + level, appender);
       eventAppendedCallback?.(event, index);
     }
 
-    this.#legacyEntryTypeByLevel.length = trackStartLevel + lastUsedTimeByLevel.length;
+    this.#legacyEntryTypeByLevel.length = trackStartLevel + lastTimestampByLevel.length;
     this.#legacyEntryTypeByLevel.fill(EntryType.TrackAppender, trackStartLevel);
-    return trackStartLevel + lastUsedTimeByLevel.length;
-  }
-
-  entryIsVisibleInTimeline(entry: TraceEngine.Types.TraceEvents.TraceEventData): boolean {
-    if (this.#traceParsedData.Meta.traceIsGeneric) {
-      return true;
-    }
-
-    if (TraceEngine.Types.TraceEvents.isTraceEventUpdateCounters(entry)) {
-      // These events are not "visible" on the timeline because they are instant events with 0 duration.
-      // However, the Memory view (CountersGraph in the codebase) relies on
-      // finding the UpdateCounters events within the user's active trace
-      // selection in order to show the memory usage for the selected time
-      // period.
-      // Therefore we mark them as visible so they are appended onto the Thread
-      // track, and hence accessible by the CountersGraph view.
-      return true;
-    }
-
-    // Gate the visibility of post message events behind the experiement flag
-    if (TraceEngine.Types.TraceEvents.isTraceEventSchedulePostMessage(entry) ||
-        TraceEngine.Types.TraceEvents.isTraceEventHandlePostMessage(entry)) {
-      return Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_SHOW_POST_MESSAGE_EVENTS);
-    }
-
-    if (TraceEngine.Types.Extensions.isSyntheticExtensionEntry(entry)) {
-      return true;
-    }
-
-    // Default styles are globally defined for each event name. Some
-    // events are hidden by default.
-    const eventStyle = getEventStyle(entry.name as TraceEngine.Types.TraceEvents.KnownEventName);
-    const eventIsTiming = TraceEngine.Types.TraceEvents.isTraceEventConsoleTime(entry) ||
-        TraceEngine.Types.TraceEvents.isTraceEventPerformanceMeasure(entry) ||
-        TraceEngine.Types.TraceEvents.isTraceEventPerformanceMark(entry);
-
-    return (eventStyle && !eventStyle.hidden) || eventIsTiming;
+    return trackStartLevel + lastTimestampByLevel.length;
   }
 
   /**

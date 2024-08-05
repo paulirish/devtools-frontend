@@ -4,18 +4,20 @@
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
+import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as LitHtml from '../../ui/lit-html/lit-html.js';
 
 import {
-  type ChatMessage,
   ChatMessageEntity,
+  DOGFOOD_INFO,
   FreestylerChatUi,
+  type ModelChatMessage,
   type Props as FreestylerChatUiProps,
   State as FreestylerChatUiState,
 } from './components/FreestylerChatUi.js';
-import {FreestylerAgent, Step} from './FreestylerAgent.js';
+import {FIX_THIS_ISSUE_PROMPT, FreestylerAgent, Step} from './FreestylerAgent.js';
 import freestylerPanelStyles from './freestylerPanel.css.js';
 
 /*
@@ -23,7 +25,7 @@ import freestylerPanelStyles from './freestylerPanel.css.js';
   * Temporary string that should not be translated
   * as they may change often during development.
   */
-const TempUIStrings = {
+const UIStringsTemp = {
   /**
    *@description Freestyler UI text for clearing messages.
    */
@@ -32,10 +34,6 @@ const TempUIStrings = {
    *@description Freestyler UI text for sending feedback.
    */
   sendFeedback: 'Send feedback',
-  /**
-   *@description Freestyelr UI text for the help button.
-   */
-  help: 'Help',
   /**
    *@description Displayed when the user stop the response
    */
@@ -60,15 +58,16 @@ function createToolbar(target: HTMLElement, {onClearClick}: {onClearClick: () =>
   const rightToolbar = new UI.Toolbar.Toolbar('freestyler-right-toolbar', toolbarContainer);
 
   const clearButton =
-      new UI.Toolbar.ToolbarButton(i18nString(TempUIStrings.clearMessages), 'clear', undefined, 'freestyler.clear');
+      new UI.Toolbar.ToolbarButton(i18nString(UIStringsTemp.clearMessages), 'clear', undefined, 'freestyler.clear');
   clearButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, onClearClick);
   leftToolbar.appendToolbarItem(clearButton);
 
   rightToolbar.appendSeparator();
-  const feedbackButton =
-      new UI.Toolbar.ToolbarButton(i18nString(TempUIStrings.sendFeedback), 'bug', undefined, 'freestyler.feedback');
-  const helpButton = new UI.Toolbar.ToolbarButton(i18nString(TempUIStrings.help), 'help', undefined, 'freestyler.help');
-  rightToolbar.appendToolbarItem(feedbackButton);
+  const helpButton =
+      new UI.Toolbar.ToolbarButton(i18nString(UIStringsTemp.sendFeedback), 'help', undefined, 'freestyler.feedback');
+  helpButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, () => {
+    Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(DOGFOOD_INFO);
+  });
   rightToolbar.appendToolbarItem(helpButton);
 }
 
@@ -97,6 +96,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
   #agent: FreestylerAgent;
   #viewProps: FreestylerChatUiProps;
   #viewOutput: ViewOutput = {};
+  #serverSideLoggingEnabled = isFreestylerServerSideLoggingEnabled();
   #consentViewAcceptedSetting =
       Common.Settings.Settings.instance().createLocalSetting('freestyler-dogfood-consent-onboarding-finished', false);
   constructor(private view: View = defaultView, {aidaClient, aidaAvailability}: {
@@ -110,7 +110,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
         UI.ActionRegistry.ActionRegistry.instance().getAction('elements.toggle-element-search');
     this.#aidaClient = aidaClient;
     this.#contentContainer = this.contentElement.createChild('div', 'freestyler-chat-ui-container');
-    this.#agent = new FreestylerAgent({aidaClient: this.#aidaClient});
+
     this.#selectedNode = UI.Context.Context.instance().flavor(SDK.DOMModel.DOMNode);
     this.#viewProps = {
       state: this.#consentViewAcceptedSetting.get() ? FreestylerChatUiState.CHAT_VIEW :
@@ -120,26 +120,37 @@ export class FreestylerPanel extends UI.Panel.Panel {
       inspectElementToggled: this.#toggleSearchElementAction.toggled(),
       selectedNode: this.#selectedNode,
       isLoading: false,
-      onTextSubmit: this.#handleTextSubmit.bind(this),
+      onTextSubmit: this.#startConversation.bind(this),
       onInspectElementClick: this.#handleSelectElementClick.bind(this),
-      onRateClick: this.#handleRateClick.bind(this),
+      onFeedbackSubmit: this.#handleFeedbackSubmit.bind(this),
       onAcceptConsentClick: this.#handleAcceptConsentClick.bind(this),
       onCancelClick: this.#cancel.bind(this),
+      onFixThisIssueClick: () => {
+        void this.#startConversation(FIX_THIS_ISSUE_PROMPT, true);
+      },
     };
     this.#toggleSearchElementAction.addEventListener(UI.ActionRegistration.Events.Toggled, ev => {
       this.#viewProps.inspectElementToggled = ev.data;
       this.doUpdate();
     });
-
+    this.#agent = this.#createAgent();
     UI.Context.Context.instance().addFlavorChangeListener(SDK.DOMModel.DOMNode, ev => {
       if (this.#viewProps.selectedNode === ev.data) {
         return;
       }
 
       this.#viewProps.selectedNode = ev.data;
-      this.#clearMessages();
+      this.doUpdate();
     });
     this.doUpdate();
+  }
+
+  #createAgent(): FreestylerAgent {
+    return new FreestylerAgent({
+      aidaClient: this.#aidaClient,
+      serverSideLoggingEnabled: this.#serverSideLoggingEnabled,
+      confirmSideEffect: this.showConfirmSideEffectUi.bind(this),
+    });
   }
 
   static async instance(opts: {
@@ -164,12 +175,38 @@ export class FreestylerPanel extends UI.Panel.Panel {
     this.view(this.#viewProps, this.#viewOutput, this.#contentContainer);
   }
 
+  async showConfirmSideEffectUi(action: string): Promise<boolean> {
+    const sideEffectConfirmationPromiseWithResolvers = Platform.PromiseUtilities.promiseWithResolvers<boolean>();
+    this.#viewProps.confirmSideEffectDialog = {
+      code: action,
+      onAnswer: (answer: boolean) => sideEffectConfirmationPromiseWithResolvers.resolve(answer),
+    };
+    this.doUpdate();
+
+    const result = await sideEffectConfirmationPromiseWithResolvers.promise;
+    this.#viewProps.confirmSideEffectDialog = undefined;
+    this.doUpdate();
+
+    return result;
+  }
+
   #handleSelectElementClick(): void {
     void this.#toggleSearchElementAction.execute();
   }
 
-  #handleRateClick(): void {
-    // TODO(348145480): Handle this -- e.g. there be dragons.
+  #handleFeedbackSubmit(rpcId: number, rating: Host.AidaClient.Rating, feedback?: string): void {
+    void this.#aidaClient.registerClientEvent({
+      corresponding_aida_rpc_global_id: rpcId,
+      disable_user_content_logging: !this.#serverSideLoggingEnabled,
+      do_conversation_client_event: {
+        user_feedback: {
+          sentiment: rating,
+          user_input: {
+            comment: feedback,
+          },
+        },
+      },
+    });
   }
 
   #handleAcceptConsentClick(): void {
@@ -182,12 +219,12 @@ export class FreestylerPanel extends UI.Panel.Panel {
     switch (actionId) {
       case 'freestyler.element-panel-context': {
         Host.userMetrics.actionTaken(Host.UserMetrics.Action.FreestylerOpenedFromElementsPanel);
-        this.#clearMessages();
+        this.doUpdate();
         break;
       }
       case 'freestyler.style-tab-context': {
         Host.userMetrics.actionTaken(Host.UserMetrics.Action.FreestylerOpenedFromStylesTab);
-        this.#clearMessages();
+        this.doUpdate();
         break;
       }
     }
@@ -196,7 +233,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
   #clearMessages(): void {
     this.#viewProps.messages = [];
     this.#viewProps.isLoading = false;
-    this.#agent.resetHistory();
+    this.#agent = this.#createAgent();
     this.#cancel();
     this.doUpdate();
   }
@@ -209,41 +246,51 @@ export class FreestylerPanel extends UI.Panel.Panel {
     this.doUpdate();
   }
 
-  async #handleTextSubmit(text: string): Promise<void> {
+  async #startConversation(text: string, isFixQuery: boolean = false): Promise<void> {
     this.#viewProps.messages.push({
       entity: ChatMessageEntity.USER,
       text,
     });
     this.#viewProps.isLoading = true;
-    const systemMessage: ChatMessage = {
+    // TODO: We should only show "Fix this issue" button when the answer suggests fix or fixes.
+    // We shouldn't show this when the answer is complete like a confirmation without any suggestion.
+    const suggestingFix = text !== FIX_THIS_ISSUE_PROMPT;
+    let systemMessage: ModelChatMessage = {
       entity: ChatMessageEntity.MODEL,
+      suggestingFix,
       steps: [],
     };
-    this.#viewProps.messages.push(systemMessage);
     this.doUpdate();
 
     this.#runAbortController = new AbortController();
 
     const signal = this.#runAbortController.signal;
     signal.addEventListener('abort', () => {
-      systemMessage.steps.push({step: Step.ERROR, text: i18nString(TempUIStrings.stoppedResponse)});
+      systemMessage.rpcId = undefined;
+      systemMessage.suggestingFix = false;
+      systemMessage.steps.push({step: Step.ERROR, text: i18nString(UIStringsTemp.stoppedResponse)});
     });
-    for await (const data of this.#agent.run(text, {signal})) {
+    for await (const data of this.#agent.run(text, {signal, isFixQuery})) {
+      if (data.step === Step.QUERYING) {
+        systemMessage = {
+          entity: ChatMessageEntity.MODEL,
+          suggestingFix,
+          steps: [],
+        };
+        this.#viewProps.messages.push(systemMessage);
+        this.doUpdate();
+        this.#viewOutput.freestylerChatUi?.scrollToLastMessage();
+        continue;
+      }
+
       if (data.step === Step.ANSWER || data.step === Step.ERROR) {
         this.#viewProps.isLoading = false;
       }
 
-      // There can be multiple steps from the same call from the agent.
-      // We want to show `rate answer` buttons for the full response.
-      // That's why we're removing the `rpcId` from the previous step
-      // if there is a new incoming step from the call with the same rpcId.
-      const lastStep = systemMessage.steps.at(-1);
-      if (lastStep && lastStep.rpcId && lastStep.rpcId === data.rpcId) {
-        delete lastStep.rpcId;
-      }
-
+      systemMessage.rpcId = data.rpcId;
       systemMessage.steps.push(data);
       this.doUpdate();
+      this.#viewOutput.freestylerChatUi?.scrollToLastMessage();
     }
   }
 }
@@ -276,3 +323,18 @@ export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
     return false;
   }
 }
+
+function setFreestylerServerSideLoggingEnabled(enabled: boolean): void {
+  if (enabled) {
+    localStorage.setItem('freestyler_enableServerSideLogging', 'true');
+  } else {
+    localStorage.removeItem('freestyler_enableServerSideLogging');
+  }
+}
+
+function isFreestylerServerSideLoggingEnabled(): boolean {
+  return localStorage.getItem('freestyler_enableServerSideLogging') === 'true';
+}
+
+// @ts-ignore
+globalThis.setFreestylerServerSideLoggingEnabled = setFreestylerServerSideLoggingEnabled;

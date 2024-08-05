@@ -288,10 +288,6 @@ const DevToolsAPIImpl = class {
     }
   }
 
-  reattachMainTarget() {
-    this._dispatchOnInspectorFrontendAPI('reattachMainTarget', []);
-  }
-
   /**
    * @param {boolean} hard
    */
@@ -1150,10 +1146,10 @@ const InspectorFrontendHostImpl = class {
 
   /**
    * @param {string} request
-   * @param {function(!InspectorFrontendHostAPI.DoAidaConversationResult): void} cb
+   * @param {function(!InspectorFrontendHostAPI.AidaClientResult): void} cb
    */
-  registerAidaClientEvent(request) {
-    DevToolsAPI.sendMessageToEmbedder('registerAidaClientEvent', [request]);
+  registerAidaClientEvent(request, cb) {
+    DevToolsAPI.sendMessageToEmbedder('registerAidaClientEvent', [request], cb);
   }
 };
 

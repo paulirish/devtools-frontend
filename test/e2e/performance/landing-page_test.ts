@@ -16,11 +16,23 @@ import {
   waitFor,
   waitForMany,
   waitForNone,
+  waitForVisible,
 } from '../../shared/helper.js';
 import {describe, it} from '../../shared/mocha-extensions.js';
 import {
   navigateToPerformanceTab,
 } from '../helpers/performance-helpers.js';
+
+const READY_LOCAL_METRIC_SELECTOR = '[slot="local-value"] .metric-value:not(.waiting)';
+const READY_FIELD_METRIC_SELECTOR = '[slot="field-value"] .metric-value:not(.waiting)';
+const WAITING_LOCAL_METRIC_SELECTOR = '[slot="local-value"] .metric-value.waiting';
+const INTERACTION_SELECTOR = '.interaction';
+const HISTOGRAM_SELECTOR = '.field-data-histogram';
+const SETUP_FIELD_BUTTON_SELECTOR = 'devtools-button[jslogcontext="field-data-setup"]';
+const ENABLE_FIELD_BUTTON_SELECTOR = 'devtools-button[jslogcontext="field-data-enable"]';
+const ADVANCED_DETAILS_SELECTOR = '.content summary';
+const OVERRIDE_FIELD_CHECKBOX_SELECTOR = '.content input[type="checkbox"]';
+const OVERRIDE_FIELD_TEXT_SELECTOR = '.content input[type="text"]';
 
 async function installLCPListener(session: puppeteer.CDPSession): Promise<() => Promise<void>> {
   await session.send('PerformanceTimeline.enable', {eventTypes: ['largest-contentful-paint']});
@@ -70,8 +82,8 @@ describe('The Performance panel landing page', () => {
       await target.evaluate(() => new Promise(r => requestAnimationFrame(r)));
       await frontend.bringToFront();
 
-      const [lcpValueElem, clsValueElem, inpValueElem] = await waitForMany('.local-metric-value:not(.waiting)', 3);
-      const interactions = await $$<HTMLElement>('.interaction');
+      const [lcpValueElem, clsValueElem, inpValueElem] = await waitForMany(READY_LOCAL_METRIC_SELECTOR, 3);
+      const interactions = await $$<HTMLElement>(INTERACTION_SELECTOR);
       assert.lengthOf(interactions, 2);
 
       const lcpValue = await lcpValueElem.evaluate(el => el.textContent) || '';
@@ -119,8 +131,8 @@ describe('The Performance panel landing page', () => {
       await frontend.bringToFront();
       await navigateToPerformanceTab();
 
-      const [lcpValueElem, clsValueElem, inpValueElem] = await waitForMany('.local-metric-value:not(.waiting)', 3);
-      const interactions = await $$<HTMLElement>('.interaction');
+      const [lcpValueElem, clsValueElem, inpValueElem] = await waitForMany(READY_LOCAL_METRIC_SELECTOR, 3);
+      const interactions = await $$<HTMLElement>(INTERACTION_SELECTOR);
       assert.lengthOf(interactions, 2);
 
       const lcpValue = await lcpValueElem.evaluate(el => el.textContent) || '';
@@ -161,8 +173,8 @@ describe('The Performance panel landing page', () => {
 
       await frontend.bringToFront();
 
-      await waitForMany('.local-metric-value:not(.waiting)', 3);
-      const interactions1 = await $$<HTMLElement>('.interaction');
+      await waitForMany(READY_LOCAL_METRIC_SELECTOR, 3);
+      const interactions1 = await $$<HTMLElement>(INTERACTION_SELECTOR);
       assert.lengthOf(interactions1, 2);
 
       await target.bringToFront();
@@ -176,8 +188,8 @@ describe('The Performance panel landing page', () => {
 
       await frontend.bringToFront();
 
-      await waitForMany('.local-metric-value:not(.waiting)', 3);
-      const interactions2 = await $$<HTMLElement>('.interaction');
+      await waitForMany(READY_LOCAL_METRIC_SELECTOR, 3);
+      const interactions2 = await $$<HTMLElement>(INTERACTION_SELECTOR);
       assert.lengthOf(interactions2, 1);
 
       await target.bringToFront();
@@ -189,31 +201,15 @@ describe('The Performance panel landing page', () => {
       await frontend.bringToFront();
 
       // New LCP and CLS values should be emitted
-      await waitForMany('.local-metric-value:not(.waiting)', 2);
+      await waitForMany(READY_LOCAL_METRIC_SELECTOR, 2);
 
       // INP and interactions should be reset
-      const inpValueElem = await waitFor('.local-metric-value.waiting');
-      const inpCardText = await inpValueElem.evaluate(el => el.parentElement?.parentElement?.innerText) || '';
-      assert.match(inpCardText, /Interaction to Next Paint/);
-      const interactions3 = await $$<HTMLElement>('.interaction');
+      await waitFor(`#inp ${WAITING_LOCAL_METRIC_SELECTOR}`);
+      const interactions3 = await $$<HTMLElement>(INTERACTION_SELECTOR);
       assert.lengthOf(interactions3, 0);
     } finally {
       await targetSession.detach();
     }
-  });
-
-  it('gets field data manually', async () => {
-    await setCruxRawResponse('performance/crux-valid.rawresponse');
-    await navigateToPerformanceTab();
-
-    const manualFetchButton = await waitFor('#field-setup button');
-    await manualFetchButton.click();
-
-    const [lcpFieldElem, clsFieldElem, inpFieldElem] = await waitForMany('.metric-card-value .field-data', 3);
-
-    assert.strictEqual(await lcpFieldElem.evaluate(el => (el as HTMLElement).innerText), '96%\n3%\n1%');
-    assert.strictEqual(await clsFieldElem.evaluate(el => (el as HTMLElement).innerText), '100%\n0%\n0%');
-    assert.strictEqual(await inpFieldElem.evaluate(el => (el as HTMLElement).innerText), '98%\n2%\n1%');
   });
 
   it('gets field data automatically', async () => {
@@ -222,24 +218,96 @@ describe('The Performance panel landing page', () => {
     await setCruxRawResponse('performance/crux-none.rawresponse');
     await goToResource('performance/fake-website.html');
 
-    const manualFetchButton = await waitFor('#field-setup setting-checkbox');
-    await manualFetchButton.click();
+    const fieldSetupButton = await waitFor<HTMLElement>(SETUP_FIELD_BUTTON_SELECTOR);
+    await fieldSetupButton.click();
 
-    const histograms1 = await $$<HTMLElement>('.metric-card-value .field-data');
-    assert.lengthOf(histograms1, 0);
+    const fieldEnableButton = await waitForVisible<HTMLElement>(ENABLE_FIELD_BUTTON_SELECTOR);
+    await fieldEnableButton.click();
+
+    {
+      const [lcpHistogram, clsHistogram, inpHistogram] = await waitForMany(HISTOGRAM_SELECTOR, 3);
+      assert.deepStrictEqual(
+          await lcpHistogram.$$eval('.histogram-percent', els => els.map(el => el.textContent)), ['-', '-', '-']);
+      assert.deepStrictEqual(
+          await clsHistogram.$$eval('.histogram-percent', els => els.map(el => el.textContent)), ['-', '-', '-']);
+      assert.deepStrictEqual(
+          await inpHistogram.$$eval('.histogram-percent', els => els.map(el => el.textContent)), ['-', '-', '-']);
+    }
 
     // Switch the fake CrUX endpoint data to simulate new data for a new origin
     await setCruxRawResponse('performance/crux-valid.rawresponse');
     await goToResourceWithCustomHost('devtools.oopif.test', 'performance/fake-website.html');
 
-    const [lcpFieldElem, clsFieldElem, inpFieldElem] = await waitForMany('.metric-card-value .field-data', 3);
+    const [lcpFieldValue, clsFieldValue, inpFieldValue] = await waitForMany(READY_FIELD_METRIC_SELECTOR, 3);
+    assert.strictEqual(await lcpFieldValue.evaluate(el => el.textContent) || '', '1.20 s');
+    assert.strictEqual(await clsFieldValue.evaluate(el => el.textContent) || '', '0');
+    assert.strictEqual(await inpFieldValue.evaluate(el => el.textContent) || '', '49 ms');
 
-    assert.strictEqual(await lcpFieldElem.evaluate(el => (el as HTMLElement).innerText), '96%\n3%\n1%');
-    assert.strictEqual(await clsFieldElem.evaluate(el => (el as HTMLElement).innerText), '100%\n0%\n0%');
-    assert.strictEqual(await inpFieldElem.evaluate(el => (el as HTMLElement).innerText), '98%\n2%\n1%');
+    {
+      const [lcpHistogram, clsHistogram, inpHistogram] = await waitForMany(HISTOGRAM_SELECTOR, 3);
+      assert.deepStrictEqual(
+          await lcpHistogram.$$eval('.histogram-percent', els => els.map(el => el.textContent)), ['96%', '3%', '1%']);
+      assert.deepStrictEqual(
+          await clsHistogram.$$eval('.histogram-percent', els => els.map(el => el.textContent)), ['100%', '0%', '0%']);
+      assert.deepStrictEqual(
+          await inpHistogram.$$eval('.histogram-percent', els => els.map(el => el.textContent)), ['98%', '2%', '1%']);
+    }
 
     // Ensure the original CrUX data is restored when we return to the original page
     await goToResource('performance/fake-website.html');
-    await waitForNone('.metric-card-value .field-data');
+    await waitForNone(READY_FIELD_METRIC_SELECTOR);
+
+    {
+      const [lcpHistogram, clsHistogram, inpHistogram] = await waitForMany(HISTOGRAM_SELECTOR, 3);
+      assert.deepStrictEqual(
+          await lcpHistogram.$$eval('.histogram-percent', els => els.map(el => el.textContent)), ['-', '-', '-']);
+      assert.deepStrictEqual(
+          await clsHistogram.$$eval('.histogram-percent', els => els.map(el => el.textContent)), ['-', '-', '-']);
+      assert.deepStrictEqual(
+          await inpHistogram.$$eval('.histogram-percent', els => els.map(el => el.textContent)), ['-', '-', '-']);
+    }
+  });
+
+  it('uses URL override for field data', async () => {
+    await navigateToPerformanceTab();
+
+    await setCruxRawResponse('performance/crux-valid.rawresponse');
+    await goToResource('performance/fake-website.html');
+
+    const fieldSetupButton = await waitFor(SETUP_FIELD_BUTTON_SELECTOR);
+    await fieldSetupButton.click();
+
+    await (await waitFor<HTMLElement>(ADVANCED_DETAILS_SELECTOR)).evaluate(el => el.click());
+
+    const urlOverrideCheckbox = await waitForVisible<HTMLInputElement>(OVERRIDE_FIELD_CHECKBOX_SELECTOR);
+    await urlOverrideCheckbox.evaluate(el => el.click());
+
+    const urlOverrideText = await waitForVisible<HTMLInputElement>(OVERRIDE_FIELD_TEXT_SELECTOR);
+    await urlOverrideText.evaluate(el => {
+      el.value = 'https://example.com';
+      el.dispatchEvent(new Event('change'));
+    });
+
+    const fieldEnableButton = await waitForVisible(ENABLE_FIELD_BUTTON_SELECTOR);
+    await fieldEnableButton.click();
+
+    {
+      const [lcpFieldValue, clsFieldValue, inpFieldValue] = await waitForMany(READY_FIELD_METRIC_SELECTOR, 3);
+      assert.strictEqual(await lcpFieldValue.evaluate(el => el.textContent) || '', '1.20 s');
+      assert.strictEqual(await clsFieldValue.evaluate(el => el.textContent) || '', '0');
+      assert.strictEqual(await inpFieldValue.evaluate(el => el.textContent) || '', '49 ms');
+    }
+
+    // Switch the fake CrUX endpoint data to simulate new data for a new origin
+    await setCruxRawResponse('performance/crux-none.rawresponse');
+    await goToResourceWithCustomHost('devtools.oopif.test', 'performance/fake-website.html');
+
+    // Even though the URL and field data should change, the displayed data remains teh same
+    {
+      const [lcpFieldValue, clsFieldValue, inpFieldValue] = await waitForMany(READY_FIELD_METRIC_SELECTOR, 3);
+      assert.strictEqual(await lcpFieldValue.evaluate(el => el.textContent) || '', '1.20 s');
+      assert.strictEqual(await clsFieldValue.evaluate(el => el.textContent) || '', '0');
+      assert.strictEqual(await inpFieldValue.evaluate(el => el.textContent) || '', '49 ms');
+    }
   });
 });

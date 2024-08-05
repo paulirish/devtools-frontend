@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 import * as TraceEngine from '../../models/trace/trace.js';
-import * as ModificationsManager from '../../services/modifications_manager/modifications_manager.js';
 import {raf, renderElementIntoDOM} from '../../testing/DOMHelpers.js';
 import {describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
 import {TraceLoader} from '../../testing/TraceLoader.js';
@@ -13,7 +12,7 @@ import * as Timeline from './timeline.js';
 
 describeWithEnvironment('TimelineMiniMap', function() {
   it('always shows the responsiveness, CPU activity and network panel', async function() {
-    const traceParsedData = await TraceLoader.traceEngine(this, 'web-dev.json.gz');
+    const {traceData} = await TraceLoader.traceEngine(this, 'web-dev.json.gz');
 
     const container = document.createElement('div');
     renderElementIntoDOM(container);
@@ -23,7 +22,7 @@ describeWithEnvironment('TimelineMiniMap', function() {
     minimap.show(container);
 
     minimap.setData({
-      traceParsedData,
+      traceParsedData: traceData,
       settings: {
         showMemory: false,
         showScreenshots: false,
@@ -40,7 +39,7 @@ describeWithEnvironment('TimelineMiniMap', function() {
   });
 
   it('will show the other panels if they are set to visible', async function() {
-    const traceParsedData = await TraceLoader.traceEngine(this, 'web-dev.json.gz');
+    const {traceData} = await TraceLoader.traceEngine(this, 'web-dev.json.gz');
 
     const container = document.createElement('div');
     renderElementIntoDOM(container);
@@ -50,7 +49,7 @@ describeWithEnvironment('TimelineMiniMap', function() {
     minimap.show(container);
 
     minimap.setData({
-      traceParsedData,
+      traceParsedData: traceData,
       settings: {
         showMemory: true,
         showScreenshots: true,
@@ -67,7 +66,7 @@ describeWithEnvironment('TimelineMiniMap', function() {
   });
 
   it('creates the first breadcrumb', async function() {
-    const traceParsedData = await TraceLoader.traceEngine(this, 'web-dev.json.gz');
+    const {traceData} = await TraceLoader.traceEngine(this, 'web-dev.json.gz');
 
     const container = document.createElement('div');
     renderElementIntoDOM(container);
@@ -77,7 +76,7 @@ describeWithEnvironment('TimelineMiniMap', function() {
     minimap.show(container);
 
     minimap.setData({
-      traceParsedData,
+      traceParsedData: traceData,
       settings: {
         showMemory: true,
         showScreenshots: true,
@@ -93,27 +92,26 @@ describeWithEnvironment('TimelineMiniMap', function() {
 
     assert.strictEqual(
         TimelineComponents.Breadcrumbs.flattenBreadcrumbs(minimap.breadcrumbs.initialBreadcrumb).length, 1);
-    assert.deepEqual(minimap.breadcrumbs.initialBreadcrumb, {window: traceParsedData.Meta.traceBounds, child: null});
+    assert.deepEqual(minimap.breadcrumbs.initialBreadcrumb, {window: traceData.Meta.traceBounds, child: null});
   });
   it('stores breadcrumbs to be serialized', async function() {
-    const traceParsedData = await TraceLoader.traceEngine(this, 'web-dev.json.gz');
+    const {traceData} = await TraceLoader.traceEngine(this, 'web-dev.json.gz');
     const minimap = new Timeline.TimelineMiniMap.TimelineMiniMap();
     minimap.setData({
-      traceParsedData,
+      traceParsedData: traceData,
       settings: {
         showMemory: true,
         showScreenshots: true,
       },
     });
     minimap.addInitialBreadcrumb();
-    const entireTraceBounds = traceParsedData.Meta.traceBounds;
+    const entireTraceBounds = traceData.Meta.traceBounds;
     const newBounds = {
       ...entireTraceBounds,
       min: TraceEngine.Types.Timing.MicroSeconds((entireTraceBounds.max + entireTraceBounds.min) / 2),
     };
     minimap.breadcrumbs?.add(newBounds);
-    const serializableModifications =
-        ModificationsManager.ModificationsManager.ModificationsManager.activeManager()?.toJSON();
+    const serializableModifications = Timeline.ModificationsManager.ModificationsManager.activeManager()?.toJSON();
     assert.deepEqual(
         serializableModifications?.initialBreadcrumb.child,
         {window: {min: 1020035455504, max: 1020036087961, range: 1264914}, child: null} as

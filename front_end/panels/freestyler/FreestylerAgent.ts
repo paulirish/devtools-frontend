@@ -4,10 +4,11 @@
 
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
+import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
-import {ExecutionError, FreestylerEvaluateAction} from './FreestylerEvaluateAction.js';
+import {ExecutionError, FreestylerEvaluateAction, SideEffectError} from './FreestylerEvaluateAction.js';
 
 const preamble = `You are a CSS debugging assistant integrated into Chrome DevTools.
 The user selected a DOM element in the browser's DevTools and sends a CSS-related
@@ -53,25 +54,36 @@ ANSWER: The element is centered on the page because the parent is a flex contain
 
 The example session ends here.`;
 
+export const FIX_THIS_ISSUE_PROMPT = 'Fix this issue using JavaScript code execution';
+
 export enum Step {
   THOUGHT = 'thought',
   ACTION = 'action',
   ANSWER = 'answer',
   ERROR = 'error',
+  QUERYING = 'querying',
 }
 
-export type StepData = {
-  step: Step.THOUGHT|Step.ANSWER|Step.ERROR,
-  text: string,
-  rpcId?: number,
-}|{
-  step: Step.ACTION,
-  code: string,
-  output: string,
-  rpcId?: number,
-};
+export interface CommonStepData {
+  step: Step.THOUGHT|Step.ANSWER|Step.ERROR;
+  text: string;
+  rpcId?: number;
+}
 
-async function executeJsCode(code: string): Promise<string> {
+export interface ActionStepData {
+  step: Step.ACTION;
+  code: string;
+  output: string;
+  rpcId?: number;
+}
+
+export interface QueryStepData {
+  step: Step.QUERYING;
+}
+
+export type StepData = CommonStepData|ActionStepData;
+
+async function executeJsCode(code: string, {throwOnSideEffect}: {throwOnSideEffect: boolean}): Promise<string> {
   const target = UI.Context.Context.instance().flavor(SDK.Target.Target);
   if (!target) {
     throw new Error('Target is not found for executing code');
@@ -93,7 +105,7 @@ async function executeJsCode(code: string): Promise<string> {
   }
 
   try {
-    return await FreestylerEvaluateAction.execute(code, executionContext);
+    return await FreestylerEvaluateAction.execute(code, executionContext, {throwOnSideEffect});
   } catch (err) {
     if (err instanceof ExecutionError) {
       return `Error: ${err.message}`;
@@ -109,32 +121,47 @@ type HistoryChunk = {
 };
 
 const MAX_STEPS = 10;
+const MAX_OBSERVATION_BYTE_LENGTH = 25_000;
+
+interface AgentOptions {
+  aidaClient: Host.AidaClient.AidaClient;
+  serverSideLoggingEnabled?: boolean;
+  execJs?: typeof executeJsCode;
+  confirmSideEffect: (action: string) => Promise<boolean>;
+}
+
+interface AidaRequestOptions {
+  input: string;
+  preamble?: string;
+  chatHistory?: Host.AidaClient.Chunk[];
+  /**
+   * @default false
+   */
+  serverSideLoggingEnabled?: boolean;
+  sessionId?: string;
+}
+
+/**
+ * One agent instance handles one conversation. Create a new agent
+ * instance for a new conversation.
+ */
 export class FreestylerAgent {
-  #aidaClient: Host.AidaClient.AidaClient;
-  #chatHistory: Map<number, HistoryChunk[]> = new Map();
-  #execJs: typeof executeJsCode;
-
-  constructor({aidaClient, execJs}: {aidaClient: Host.AidaClient.AidaClient, execJs?: typeof executeJsCode}) {
-    this.#aidaClient = aidaClient;
-    this.#execJs = execJs ?? executeJsCode;
-  }
-
-  static buildRequest(input: string, preamble?: string, chatHistory?: Host.AidaClient.Chunk[]):
-      Host.AidaClient.AidaRequest {
+  static buildRequest(opts: AidaRequestOptions): Host.AidaClient.AidaRequest {
     const config = Common.Settings.Settings.instance().getHostConfig();
     const request: Host.AidaClient.AidaRequest = {
-      input,
-      preamble,
+      input: opts.input,
+      preamble: opts.preamble,
       // eslint-disable-next-line @typescript-eslint/naming-convention
-      chat_history: chatHistory,
-      client: 'CHROME_DEVTOOLS',
+      chat_history: opts.chatHistory,
+      client: Host.AidaClient.CLIENT_NAME,
       options: {
         temperature: config?.devToolsFreestylerDogfood.aidaTemperature ?? 0,
         model_id: config?.devToolsFreestylerDogfood.aidaModelId ?? undefined,
       },
       metadata: {
-        // TODO: enable logging later.
-        disable_user_content_logging: true,
+        // TODO: disable logging based on query params.
+        disable_user_content_logging: !(opts.serverSideLoggingEnabled ?? false),
+        string_session_id: opts.sessionId,
       },
       // eslint-disable-next-line @typescript-eslint/naming-convention
       functionality_type: Host.AidaClient.FunctionalityType.CHAT,
@@ -142,14 +169,6 @@ export class FreestylerAgent {
       client_feature: Host.AidaClient.ClientFeature.CHROME_FREESTYLER,
     };
     return request;
-  }
-
-  get #getHistoryEntry(): Array<HistoryChunk> {
-    return [...this.#chatHistory.values()].flat();
-  }
-
-  get chatHistoryForTesting(): Array<HistoryChunk> {
-    return this.#getHistoryEntry;
   }
 
   static parseResponse(response: string): {thought?: string, action?: string, answer?: string} {
@@ -197,7 +216,36 @@ export class FreestylerAgent {
         i++;
       }
     }
+    // If we could not parse the parts, consider the response to be an
+    // answer.
+    if (!answer && !thought && !action) {
+      answer = response;
+    }
     return {thought, action, answer};
+  }
+
+  #aidaClient: Host.AidaClient.AidaClient;
+  #chatHistory: Map<number, HistoryChunk[]> = new Map();
+  #serverSideLoggingEnabled: boolean;
+
+  #confirmSideEffect: (action: string) => Promise<boolean>;
+  #execJs: typeof executeJsCode;
+
+  readonly #sessionId = crypto.randomUUID();
+
+  constructor(opts: AgentOptions) {
+    this.#aidaClient = opts.aidaClient;
+    this.#execJs = opts.execJs ?? executeJsCode;
+    this.#confirmSideEffect = opts.confirmSideEffect;
+    this.#serverSideLoggingEnabled = opts.serverSideLoggingEnabled ?? false;
+  }
+
+  get #getHistoryEntry(): Array<HistoryChunk> {
+    return [...this.#chatHistory.values()].flat();
+  }
+
+  get chatHistoryForTesting(): Array<HistoryChunk> {
+    return this.#getHistoryEntry;
   }
 
   async #aidaFetch(request: Host.AidaClient.AidaRequest): Promise<{response: string, rpcId: number|undefined}> {
@@ -206,27 +254,72 @@ export class FreestylerAgent {
     for await (const lastResult of this.#aidaClient.fetch(request)) {
       response = lastResult.explanation;
       rpcId = lastResult.metadata.rpcGlobalId ?? rpcId;
+      if (lastResult.metadata.attributionMetadata?.some(
+              meta => meta.attributionAction === Host.AidaClient.RecitationAction.BLOCK)) {
+        throw new Error('Attribution action does not allow providing the response');
+      }
     }
 
     return {response, rpcId};
   }
 
-  resetHistory(): void {
-    this.#chatHistory = new Map();
+  async #generateObservation(
+      action: string, {throwOnSideEffect, confirmExecJs: confirm, execJsDeniedMesssage: denyErrorMessage}: {
+        throwOnSideEffect: boolean,
+        confirmExecJs?: (this: FreestylerAgent, action: string) => Promise<boolean>,
+        execJsDeniedMesssage?: string,
+      }): Promise<string> {
+    const actionExpression = `{${action};((typeof data !== "undefined") ? data : undefined)}`;
+
+    try {
+      const runConfirmed = await (confirm?.call(this, action) ?? Promise.resolve(true));
+      if (!runConfirmed) {
+        throw new Error(denyErrorMessage ?? 'Code execution is not allowed');
+      }
+      const result = await this.#execJs(
+          actionExpression,
+          {throwOnSideEffect},
+      );
+      const byteCount = Platform.StringUtilities.countWtf8Bytes(result);
+      if (byteCount > MAX_OBSERVATION_BYTE_LENGTH) {
+        throw new Error('Output exceeded the maximum allowed length.');
+      }
+      return result;
+    } catch (error) {
+      if (error instanceof SideEffectError) {
+        return await this.#generateObservation(action, {
+          throwOnSideEffect: false,
+          confirmExecJs: this.#confirmSideEffect,
+          execJsDeniedMesssage: error.message,
+        });
+      }
+
+      return `Error: ${error.message}`;
+    }
   }
 
   #runId = 0;
-  async * run(query: string, options?: {signal: AbortSignal}): AsyncGenerator<StepData, void, void> {
+  async *
+      run(query: string, options: {signal?: AbortSignal, isFixQuery: boolean} = {isFixQuery: false}):
+          AsyncGenerator<StepData|QueryStepData, void, void> {
+    const genericErrorMessage = 'Sorry, I could not help you with this query.';
     const structuredLog = [];
     query = `QUERY: ${query}`;
     const currentRunId = ++this.#runId;
 
-    options?.signal.addEventListener('abort', () => {
+    options.signal?.addEventListener('abort', () => {
       this.#chatHistory.delete(currentRunId);
     });
     for (let i = 0; i < MAX_STEPS; i++) {
-      const request =
-          FreestylerAgent.buildRequest(query, preamble, this.#chatHistory.size ? this.#getHistoryEntry : undefined);
+      yield {step: Step.QUERYING};
+
+      const request = FreestylerAgent.buildRequest({
+        input: query,
+        preamble,
+        chatHistory: this.#chatHistory.size ? this.#getHistoryEntry : undefined,
+        serverSideLoggingEnabled: this.#serverSideLoggingEnabled,
+        sessionId: this.#sessionId,
+      });
       let response: string;
       let rpcId: number|undefined;
       try {
@@ -234,15 +327,17 @@ export class FreestylerAgent {
         response = fetchResult.response;
         rpcId = fetchResult.rpcId;
       } catch (err) {
-        if (options?.signal.aborted) {
+        debugLog('Error calling the AIDA API', err);
+
+        if (options.signal?.aborted) {
           break;
         }
 
-        yield {step: Step.ERROR, text: err.message, rpcId};
+        yield {step: Step.ERROR, text: genericErrorMessage, rpcId};
         break;
       }
 
-      if (options?.signal.aborted) {
+      if (options.signal?.aborted) {
         break;
       }
 
@@ -265,27 +360,25 @@ export class FreestylerAgent {
       ]);
 
       const {thought, action, answer} = FreestylerAgent.parseResponse(response);
-
-      if (!thought && !action && !answer) {
-        yield {step: Step.ANSWER, text: 'Sorry, I could not help you with this query.', rpcId};
-        break;
-      }
-
-      if (answer) {
-        yield {step: Step.ANSWER, text: answer, rpcId};
-        break;
-      }
-
-      if (thought) {
-        yield {step: Step.THOUGHT, text: thought, rpcId};
-      }
-
+      // Sometimes the answer will follow an action and a thought. In
+      // that case, we only use the action and the thought (if present)
+      // since the answer is not based on the observation resulted from
+      // the action.
       if (action) {
+        if (thought) {
+          yield {step: Step.THOUGHT, text: thought, rpcId};
+        }
         debugLog(`Action to execute: ${action}`);
-        const observation = await this.#execJs(`{${action};((typeof data !== "undefined") ? data : undefined)}`);
+        const observation = await this.#generateObservation(action, {throwOnSideEffect: !options.isFixQuery});
         debugLog(`Action result: ${observation}`);
         yield {step: Step.ACTION, code: action, output: observation, rpcId};
         query = `OBSERVATION: ${observation}`;
+      } else if (answer) {
+        yield {step: Step.ANSWER, text: answer, rpcId};
+        break;
+      } else {
+        yield {step: Step.ANSWER, text: genericErrorMessage, rpcId};
+        break;
       }
 
       if (i === MAX_STEPS - 1) {

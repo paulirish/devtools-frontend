@@ -10,13 +10,14 @@ import("../../../../third_party/typescript/typescript.gni")
 generate_css("css_files") {
   sources = [
     "breadcrumbsUI.css",
-    "entryLabelOverlay.css",
+    "fieldSettingsDialog.css",
     "interactionBreakdown.css",
     "liveMetricsView.css",
+    "networkRequestDetails.css",
+    "networkRequestTooltip.css",
     "sidebar.css",
     "sidebarAnnotationsTab.css",
-    "sidebarInsight.css",
-    "timeRangeOverlay.css",
+    "sidebarSingleNavigation.css",
   ]
 }
 
@@ -24,14 +25,18 @@ devtools_module("components") {
   sources = [
     "Breadcrumbs.ts",
     "BreadcrumbsUI.ts",
+    "CPUThrottlingSelector.ts",
     "DetailsView.ts",
-    "EntryLabelOverlay.ts",
+    "FieldSettingsDialog.ts",
     "InteractionBreakdown.ts",
     "LiveMetricsView.ts",
+    "NetworkRequestDetails.ts",
+    "NetworkRequestTooltip.ts",
+    "NetworkThrottlingSelector.ts",
     "Sidebar.ts",
     "SidebarAnnotationsTab.ts",
-    "SidebarInsight.ts",
-    "TimeRangeOverlay.ts",
+    "SidebarSingleNavigation.ts",
+    "Utils.ts",
   ]
 
   deps = [
@@ -47,8 +52,14 @@ devtools_module("components") {
     "../../../ui/components/menus:bundle",
     "../../../ui/components/render_coordinator:bundle",
     "../../../ui/legacy:bundle",
+    "../../../ui/legacy/components/perf_ui:bundle",
     "../../../ui/lit-html:bundle",
     "../../../ui/visual_logging:bundle",
+    "../../emulation:bundle",
+    "../../mobile_throttling:bundle",
+    "../overlays:bundle",
+    "../utils:bundle",
+    "./insights:bundle",
   ]
 }
 
@@ -63,9 +74,7 @@ devtools_entrypoint("bundle") {
   visibility = [
     ":*",
     "..:*",
-    "../../../services/modifications_manager/*",
     "../../../ui/components/docs/*",
-    "../../application/components/*",
   ]
 }
 
@@ -74,11 +83,14 @@ ts_library("unittests") {
 
   sources = [
     "BreadcrumbsUI.test.ts",
+    "CPUThrottlingSelector.test.ts",
+    "FieldSettingsDialog.test.ts",
     "InteractionBreakdown.test.ts",
     "Invalidations.test.ts",
     "LiveMetricsView.test.ts",
+    "NetworkRequestDetails.test.ts",
+    "NetworkThrottlingSelector.test.ts",
     "SidebarAnnotationsTab.test.ts",
-    "SidebarInsight.test.ts",
   ]
 
   deps = [

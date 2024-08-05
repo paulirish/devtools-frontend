@@ -27,6 +27,7 @@ const component = new ConsoleInsight(
           fetch() {
             throw new Error('Could not connect to the server');
           },
+      registerClientEvent: () => Promise.resolve({}),
     },
     Host.AidaClient.AidaAvailability.AVAILABLE);
 document.getElementById('container')?.appendChild(component);

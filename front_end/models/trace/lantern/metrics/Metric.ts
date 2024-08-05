@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Core from '../core/core.js';
 import * as Graph from '../graph/graph.js';
 import type * as Simulation from '../simulation/simulation.js';
 import type * as Types from '../types/types.js';
@@ -56,7 +57,7 @@ class Metric {
   }
 
   static get coefficients(): MetricCoefficients {
-    throw new Error('coefficients unimplemented!');
+    throw new Core.LanternError('coefficients unimplemented!');
   }
 
   /* eslint-disable @typescript-eslint/no-unused-vars */
@@ -73,12 +74,12 @@ class Metric {
 
   static getOptimisticGraph(dependencyGraph: Graph.Node, processedNavigation: Types.Simulation.ProcessedNavigation):
       Graph.Node {
-    throw new Error('Optimistic graph unimplemented!');
+    throw new Core.LanternError('Optimistic graph unimplemented!');
   }
 
   static getPessimisticGraph(dependencyGraph: Graph.Node, processedNavigation: Types.Simulation.ProcessedNavigation):
       Graph.Node {
-    throw new Error('Pessmistic graph unimplemented!');
+    throw new Core.LanternError('Pessmistic graph unimplemented!');
   }
 
   static getEstimateFromSimulation(simulationResult: Simulation.Result, extras: Extras): Simulation.Result {
@@ -87,7 +88,7 @@ class Metric {
 
   /* eslint-enable @typescript-eslint/no-unused-vars */
 
-  static async compute(data: MetricComputationDataInput, extras?: Omit<Extras, 'optimistic'>): Promise<MetricResult> {
+  static compute(data: MetricComputationDataInput, extras?: Omit<Extras, 'optimistic'>): MetricResult {
     const {simulator, graph, processedNavigation} = data;
 
     const metricName = this.name.replace('Lantern', '');

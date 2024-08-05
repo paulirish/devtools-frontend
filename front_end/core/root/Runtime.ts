@@ -297,7 +297,6 @@ export const enum ExperimentName {
   TIMELINE_SHOW_POST_MESSAGE_EVENTS = 'timeline-show-postmessage-events',
   TIMELINE_ANNOTATIONS_OVERLAYS = 'perf-panel-annotations',
   TIMELINE_SIDEBAR = 'timeline-rpp-sidebar',
-  TIMELINE_EXTENSIONS = 'timeline-extensions',
   TIMELINE_DEBUG_MODE = 'timeline-debug-mode',
   TIMELINE_OBSERVATIONS = 'timeline-observations',
   TIMELINE_ENHANCED_TRACES = 'timeline-enhanced-traces',
@@ -323,9 +322,15 @@ export interface HostConfigFreestylerDogfood {
   enabled: boolean;
 }
 
+export interface HostConfigVeLogging {
+  enabled: boolean;
+  testing: boolean;
+}
+
 export interface HostConfig {
   devToolsConsoleInsights: HostConfigConsoleInsights;
   devToolsFreestylerDogfood: HostConfigFreestylerDogfood;
+  devToolsVeLogging: HostConfigVeLogging;
 }
 
 /**

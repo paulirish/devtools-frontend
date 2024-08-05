@@ -16,13 +16,13 @@ function createProcessedNavigation(traceEngineData: Handlers.Types.TraceParseDat
   const frameId = Meta.mainFrameId;
   const scoresByNav = traceEngineData.PageLoadMetrics.metricScoresByFrameId.get(frameId);
   if (!scoresByNav) {
-    throw new Error('missing metric scores for main frame');
+    throw new Lantern.Core.LanternError('missing metric scores for main frame');
   }
 
   const lastNavigationId = Meta.mainFrameNavigations.at(-1)?.args.data?.navigationId;
   const scores = lastNavigationId && scoresByNav.get(lastNavigationId);
   if (!scores) {
-    throw new Error('missing metric scores for specified navigation');
+    throw new Lantern.Core.LanternError('missing metric scores for specified navigation');
   }
 
   const getTimestampOrUndefined =
@@ -36,7 +36,7 @@ function createProcessedNavigation(traceEngineData: Handlers.Types.TraceParseDat
   const getTimestamp = (metric: Handlers.ModelHandlers.PageLoadMetrics.MetricName): Types.Timing.MicroSeconds => {
     const metricScore = scores.get(metric);
     if (!metricScore?.event) {
-      throw new Error(`missing metric: ${metric}`);
+      throw new Lantern.Core.LanternError(`missing metric: ${metric}`);
     }
     return metricScore.event.ts;
   };
@@ -88,10 +88,10 @@ function findWorkerThreads(trace: Lantern.Types.Trace): Map<number, number[]> {
 }
 
 function createLanternRequest(
-    traceEngineData: Handlers.Types.TraceParseData, workerThreads: Map<number, number[]>,
+    traceEngineData: Readonly<Handlers.Types.TraceParseData>, workerThreads: Map<number, number[]>,
     request: Types.TraceEvents.SyntheticNetworkRequest): NetworkRequest|undefined {
   if (request.args.data.connectionId === undefined || request.args.data.connectionReused === undefined) {
-    throw new Error('Trace is too old');
+    throw new Lantern.Core.LanternError('Trace is too old');
   }
 
   let url;

@@ -27,6 +27,38 @@ export const enum EventKeyType {
   ProfileCall = 'p',
 }
 
+/**
+ * Represents an object that is saved in the file when user created annotations in the timeline.
+ *
+ * Expected to add more annotations.
+ */
+export interface SerializedAnnotations {
+  entryLabels: EntryLabelAnnotationSerialized[];
+}
+
+/**
+ * Represents an object that is saved in the file when a user creates a label for an entry in the timeline.
+ */
+export interface EntryLabelAnnotation {
+  type: 'ENTRY_LABEL';
+  entry: TraceEventData;
+  label: string;
+}
+
+export interface EntryLabelAnnotationSerialized {
+  entry: TraceEventSerializableKey;
+  label: string;
+}
+
+/**
+ * `Annotation` are the user-created annotations that are saved into the metadata.
+ * Those annotations are rendered on the timeline by `Overlays.ts`
+ *
+ * TODO: Implement other OverlayAnnotations (annotated time ranges, links between entries).
+ * TODO: Save/load overlay annotations to/from the trace file.
+ */
+export type Annotation = EntryLabelAnnotation;
+
 // Serializable keys are created for trace events to be able to save
 // references to timeline events in a trace file. These keys enable
 // user modifications that can be saved. See go/cpq:event-data-json for
@@ -65,6 +97,7 @@ export interface Modifications {
     expandableEntries: TraceEventSerializableKey[],
   };
   initialBreadcrumb: Breadcrumb;
+  annotations: SerializedAnnotations;
 }
 
 /**
