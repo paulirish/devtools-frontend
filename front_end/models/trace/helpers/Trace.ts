@@ -208,26 +208,9 @@ export function makeProfileCall(
     tid,
     ts,
     dur: Types.Timing.MicroSeconds(0),
-    selfTime: Types.Timing.MicroSeconds(0),
     callFrame: node.callFrame,
     sampleIndex,
     profileId,
-  };
-}
-
-export function makeSyntheticTraceEntry(
-    name: string, ts: Types.Timing.MicroSeconds, pid: Types.TraceEvents.ProcessID,
-    tid: Types.TraceEvents.ThreadID): Types.TraceEvents.SyntheticTraceEntry {
-  return {
-    cat: '',
-    name,
-    args: {},
-    ph: Types.TraceEvents.Phase.COMPLETE,
-    pid,
-    tid,
-    ts,
-    dur: Types.Timing.MicroSeconds(0),
-    selfTime: Types.Timing.MicroSeconds(0),
   };
 }
 

@@ -630,7 +630,7 @@ export class ThreadAppender implements TrackAppender {
    * Returns the info shown when an event added by this appender
    * is hovered in the timeline.
    */
-  highlightedEntryInfo(event: TraceEngine.Types.TraceEvents.SyntheticTraceEntry): HighlightedEntryInfo {
+  highlightedEntryInfo(event: TraceEngine.Types.TraceEvents.TraceEventData): HighlightedEntryInfo {
     let title = this.titleForEvent(event);
     if (TraceEngine.Types.TraceEvents.isTraceEventParseHTML(event)) {
       const startLine = event.args['beginData']['startLine'];
@@ -640,6 +640,7 @@ export class ThreadAppender implements TrackAppender {
       const range = (endLine !== -1 || endLine === startLine) ? `${startLine}...${endLine}` : startLine;
       title += ` - ${url} [${range}]`;
     }
-    return {title, formattedTime: getFormattedTime(event.dur, event.selfTime)};
+    const selfTime = this.#traceParsedData.Renderer.entryToNode.get(event)?.selfTime;
+    return {title, formattedTime: getFormattedTime(event.dur, selfTime)};
   }
 }
