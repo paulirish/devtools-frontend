@@ -1026,7 +1026,7 @@ export class TimelineUIUtils {
      * physical pixels. As such the values in the impacted_nodes field need to be normalized to CSS units in order to
      * map them to the viewport dimensions, which we get in CSS pixels. We do that by dividing the values by the devicePixelRatio.
      * See https://crbug.com/1300309
-    */
+     */
     const dpr = traceParseData.Meta.devicePixelRatio;
 
     if (dpr === undefined) {
@@ -1058,13 +1058,22 @@ export class TimelineUIUtils {
     beforeImage.style.width = `${beforeImage.naturalWidth * scaleFactor}px`;
     beforeImage.style.height = `${beforeImage.naturalHeight * scaleFactor}px`;
 
-    const rectEls = affectedElementsOldRects.map(currentRect => {
+    // Setup old rects
+    const rectEls = affectedElementsOldRects.map((oldRect, i) => {
       const rectEl = document.createElement('div');
       rectEl.classList.add('layout-shift-screenshot-preview-rect');
-      const scaledRectX = currentRect.x * beforeImage.naturalWidth / viewport.width * scaleFactor;
-      const scaledRectY = currentRect.y * beforeImage.naturalHeight / viewport.height * scaleFactor;
-      const scaledRectWidth = currentRect.width * beforeImage.naturalWidth / viewport.width * scaleFactor;
-      const scaledRectHeight = currentRect.height * beforeImage.naturalHeight / viewport.height * scaleFactor;
+
+      // If it's a 0x0x0x0 rect, then set to new, so we can fade it in from the new position instead.
+      if ([oldRect.width, oldRect.height, oldRect.x, oldRect.y].every(v => v === 0)) {
+        const newRect = affectedElementsCurrentRects[i];
+        oldRect = newRect;
+        rectEl.style.opacity = '0';
+      }
+
+      const scaledRectX = oldRect.x * beforeImage.naturalWidth / viewport.width * scaleFactor;
+      const scaledRectY = oldRect.y * beforeImage.naturalHeight / viewport.height * scaleFactor;
+      const scaledRectWidth = oldRect.width * beforeImage.naturalWidth / viewport.width * scaleFactor;
+      const scaledRectHeight = oldRect.height * beforeImage.naturalHeight / viewport.height * scaleFactor;
       rectEl.style.left = `${scaledRectX}px`;
       rectEl.style.top = `${scaledRectY}px`;
       rectEl.style.width = `${scaledRectWidth}px`;
@@ -1079,11 +1088,9 @@ export class TimelineUIUtils {
       afterImage.style.height = beforeImage.style.height;
     }
 
-    // Hack to show the animation for now..
+    // Update for the new rect positions
+    // TODO: use something better than a settimeout animation hack
     setTimeout(() => {
-      if (afterImage) {
-        afterImage.style.opacity = '1';
-      }
       rectEls.forEach((rectEl, i) => {
         const newRect = affectedElementsCurrentRects[i];
         const scaledRectX = newRect.x * beforeImage.naturalWidth / viewport.width * scaleFactor;
@@ -1094,7 +1101,11 @@ export class TimelineUIUtils {
         rectEl.style.top = `${scaledRectY}px`;
         rectEl.style.width = `${scaledRectWidth}px`;
         rectEl.style.height = `${scaledRectHeight}px`;
+        rectEl.style.opacity = '1';
       });
+      if (afterImage) {
+        afterImage.style.opacity = '1';
+      }
     }, 1000);
   }
 
