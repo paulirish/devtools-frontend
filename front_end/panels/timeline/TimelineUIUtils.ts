@@ -1033,12 +1033,12 @@ export class TimelineUIUtils {
       return;
     }
 
-    const affectedElementsOldRects =
+    const beforeRects =
         event.args.data?.impacted_nodes?.map(
             node => new DOMRect(
                 node.old_rect[0] / dpr, node.old_rect[1] / dpr, node.old_rect[2] / dpr, node.old_rect[3] / dpr)) ??
         [];
-    const affectedElementsCurrentRects =
+    const afterRects =
         event.args.data?.impacted_nodes?.map(
             node => new DOMRect(
                 node.new_rect[0] / dpr, node.new_rect[1] / dpr, node.new_rect[2] / dpr, node.new_rect[3] / dpr)) ??
@@ -1059,25 +1059,28 @@ export class TimelineUIUtils {
     beforeImage.style.height = `${beforeImage.naturalHeight * scaleFactor}px`;
 
     // Setup old rects
-    const rectEls = affectedElementsOldRects.map((oldRect, i) => {
+    const rectEls = beforeRects.map((beforeRect, i) => {
       const rectEl = document.createElement('div');
       rectEl.classList.add('layout-shift-screenshot-preview-rect');
 
       // If it's a 0x0x0x0 rect, then set to new, so we can fade it in from the new position instead.
-      if ([oldRect.width, oldRect.height, oldRect.x, oldRect.y].every(v => v === 0)) {
-        const newRect = affectedElementsCurrentRects[i];
-        oldRect = newRect;
+      if ([beforeRect.width, beforeRect.height, beforeRect.x, beforeRect.y].every(v => v === 0)) {
+        beforeRect = afterRects[i];
         rectEl.style.opacity = '0';
+      } else {
+        rectEl.style.opacity = '1';
       }
 
-      const scaledRectX = oldRect.x * beforeImage.naturalWidth / viewport.width * scaleFactor;
-      const scaledRectY = oldRect.y * beforeImage.naturalHeight / viewport.height * scaleFactor;
-      const scaledRectWidth = oldRect.width * beforeImage.naturalWidth / viewport.width * scaleFactor;
-      const scaledRectHeight = oldRect.height * beforeImage.naturalHeight / viewport.height * scaleFactor;
+      const scaledRectX = beforeRect.x * beforeImage.naturalWidth / viewport.width * scaleFactor;
+      const scaledRectY = beforeRect.y * beforeImage.naturalHeight / viewport.height * scaleFactor;
+      const scaledRectWidth = beforeRect.width * beforeImage.naturalWidth / viewport.width * scaleFactor;
+      const scaledRectHeight = beforeRect.height * beforeImage.naturalHeight / viewport.height * scaleFactor;
       rectEl.style.left = `${scaledRectX}px`;
       rectEl.style.top = `${scaledRectY}px`;
       rectEl.style.width = `${scaledRectWidth}px`;
       rectEl.style.height = `${scaledRectHeight}px`;
+      rectEl.style.opacity = '0.4';
+
       screenshotContainer.appendChild(rectEl);
       return rectEl;
     });
@@ -1088,20 +1091,19 @@ export class TimelineUIUtils {
       afterImage.style.height = beforeImage.style.height;
     }
 
-    // Update for the new rect positions
-    // TODO: use something better than a settimeout animation hack
+    // Update for the after rect positions after a bit.
     setTimeout(() => {
       rectEls.forEach((rectEl, i) => {
-        const newRect = affectedElementsCurrentRects[i];
-        const scaledRectX = newRect.x * beforeImage.naturalWidth / viewport.width * scaleFactor;
-        const scaledRectY = newRect.y * beforeImage.naturalHeight / viewport.height * scaleFactor;
-        const scaledRectWidth = newRect.width * beforeImage.naturalWidth / viewport.width * scaleFactor;
-        const scaledRectHeight = newRect.height * beforeImage.naturalHeight / viewport.height * scaleFactor;
+        const afterRect = afterRects[i];
+        const scaledRectX = afterRect.x * beforeImage.naturalWidth / viewport.width * scaleFactor;
+        const scaledRectY = afterRect.y * beforeImage.naturalHeight / viewport.height * scaleFactor;
+        const scaledRectWidth = afterRect.width * beforeImage.naturalWidth / viewport.width * scaleFactor;
+        const scaledRectHeight = afterRect.height * beforeImage.naturalHeight / viewport.height * scaleFactor;
         rectEl.style.left = `${scaledRectX}px`;
         rectEl.style.top = `${scaledRectY}px`;
         rectEl.style.width = `${scaledRectWidth}px`;
         rectEl.style.height = `${scaledRectHeight}px`;
-        rectEl.style.opacity = '1';
+        rectEl.style.opacity = '0.4';
       });
       if (afterImage) {
         afterImage.style.opacity = '1';
