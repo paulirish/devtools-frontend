@@ -70,6 +70,7 @@ import {titleForInteractionEvent} from './InteractionsTrackAppender.js';
 import {ModificationsManager} from './ModificationsManager.js';
 import {SourceMapsResolver} from './SourceMapsResolver.js';
 import {targetForEvent} from './TargetForEvent.js';
+import {LayoutShiftsTrackAppender} from './timeline.js';
 import {TimelinePanel} from './TimelinePanel.js';
 import {TimelineSelection} from './TimelineSelection.js';
 
@@ -1008,110 +1009,6 @@ export class TimelineUIUtils {
     return LegacyComponents.Linkifier.Linkifier.linkifyURL(frame.url as Platform.DevToolsPath.UrlString, options);
   }
 
-  static async drawLayoutShiftScreenshotRects(
-      event: TraceEngine.Types.TraceEvents.SyntheticLayoutShift, contentHelper: TimelineDetailsContentHelper,
-      traceParseData:
-          Readonly<TraceEngine.Handlers.Types.EnabledHandlerDataWithMeta<typeof TraceEngine.Handlers.ModelHandlers>>):
-      Promise<void> {
-    const screenshots = event.parsedData.screenshots;
-    const viewport = traceParseData.Meta.viewportRect;
-    const afterImage = screenshots.after?.args.dataUri && await UI.UIUtils.loadImage(screenshots.after?.args.dataUri);
-    const beforeImage =
-        screenshots.before?.args.dataUri && await UI.UIUtils.loadImage(screenshots.before?.args.dataUri);
-    if (!beforeImage || !viewport) {
-      return;
-    }
-
-    /** The Layout Instability API in Blink, which reports the LayoutShift trace events, is not based on CSS pixels but
-     * physical pixels. As such the values in the impacted_nodes field need to be normalized to CSS units in order to
-     * map them to the viewport dimensions, which we get in CSS pixels. We do that by dividing the values by the devicePixelRatio.
-     * See https://crbug.com/1300309
-     */
-    const dpr = traceParseData.Meta.devicePixelRatio;
-
-    if (dpr === undefined) {
-      return;
-    }
-
-    const beforeRects =
-        event.args.data?.impacted_nodes?.map(
-            node => new DOMRect(
-                node.old_rect[0] / dpr, node.old_rect[1] / dpr, node.old_rect[2] / dpr, node.old_rect[3] / dpr)) ??
-        [];
-    const afterRects =
-        event.args.data?.impacted_nodes?.map(
-            node => new DOMRect(
-                node.new_rect[0] / dpr, node.new_rect[1] / dpr, node.new_rect[2] / dpr, node.new_rect[3] / dpr)) ??
-        [];
-
-    const screenshotContainer = document.createElement('div');
-    screenshotContainer.classList.add('layout-shift-screenshot-preview');
-    screenshotContainer.style.position = 'relative';
-    screenshotContainer.appendChild(beforeImage);
-    contentHelper.appendElementRow('', screenshotContainer);
-
-    // If this is being size constrained, it needs to be done in JS (rather than css max-width, etc)....
-    // That's because this function is complete before the contentHelper adds it to the DOM.. so we can't query offsetHeight for its resolved size…
-    const maxHeight = 300;
-    const maxWidth = 500;
-    const scaleFactor = Math.min(maxWidth / beforeImage.naturalWidth, maxHeight / beforeImage.naturalHeight);
-    beforeImage.style.width = `${beforeImage.naturalWidth * scaleFactor}px`;
-    beforeImage.style.height = `${beforeImage.naturalHeight * scaleFactor}px`;
-
-    // Setup old rects
-    const rectEls = beforeRects.map((beforeRect, i) => {
-      const rectEl = document.createElement('div');
-      rectEl.classList.add('layout-shift-screenshot-preview-rect');
-
-      // If it's a 0x0x0x0 rect, then set to new, so we can fade it in from the new position instead.
-      if ([beforeRect.width, beforeRect.height, beforeRect.x, beforeRect.y].every(v => v === 0)) {
-        beforeRect = afterRects[i];
-        rectEl.style.opacity = '0';
-      } else {
-        rectEl.style.opacity = '1';
-      }
-
-      const scaledRectX = beforeRect.x * beforeImage.naturalWidth / viewport.width * scaleFactor;
-      const scaledRectY = beforeRect.y * beforeImage.naturalHeight / viewport.height * scaleFactor;
-      const scaledRectWidth = beforeRect.width * beforeImage.naturalWidth / viewport.width * scaleFactor;
-      const scaledRectHeight = beforeRect.height * beforeImage.naturalHeight / viewport.height * scaleFactor;
-      rectEl.style.left = `${scaledRectX}px`;
-      rectEl.style.top = `${scaledRectY}px`;
-      rectEl.style.width = `${scaledRectWidth}px`;
-      rectEl.style.height = `${scaledRectHeight}px`;
-      rectEl.style.opacity = '0.4';
-
-      screenshotContainer.appendChild(rectEl);
-      return rectEl;
-    });
-    if (afterImage) {
-      afterImage.classList.add('layout-shift-screenshot-after');
-      screenshotContainer.appendChild(afterImage);
-      afterImage.style.width = beforeImage.style.width;
-      afterImage.style.height = beforeImage.style.height;
-    }
-
-    // Update for the after rect positions after a bit.
-    setTimeout(() => {
-      rectEls.forEach((rectEl, i) => {
-        const afterRect = afterRects[i];
-        const scaledRectX = afterRect.x * beforeImage.naturalWidth / viewport.width * scaleFactor;
-        const scaledRectY = afterRect.y * beforeImage.naturalHeight / viewport.height * scaleFactor;
-        const scaledRectWidth = afterRect.width * beforeImage.naturalWidth / viewport.width * scaleFactor;
-        const scaledRectHeight = afterRect.height * beforeImage.naturalHeight / viewport.height * scaleFactor;
-        rectEl.style.left = `${scaledRectX}px`;
-        rectEl.style.top = `${scaledRectY}px`;
-        rectEl.style.width = `${scaledRectWidth}px`;
-        rectEl.style.height = `${scaledRectHeight}px`;
-        rectEl.style.opacity = '0.4';
-      });
-      if (afterImage) {
-        afterImage.style.opacity = '1';
-      }
-    }, 1000);
-  }
-
-
 
   static buildDetailsNodeForMarkerEvents(event: TraceEngine.Types.TraceEvents.MarkerEvent): HTMLElement {
     let link = 'https://web.dev/user-centric-performance-metrics/';
@@ -1573,7 +1470,7 @@ export class TimelineUIUtils {
         const layoutShift = event as TraceEngine.Types.TraceEvents.SyntheticLayoutShift;
         const layoutShiftEventData = layoutShift.args.data;
 
-        await TimelineUIUtils.drawLayoutShiftScreenshotRects(event, contentHelper, traceParseData);
+        await LayoutShiftsTrackAppender.drawLayoutShiftScreenshotRects(event, contentHelper, traceParseData);
 
         const warning = document.createElement('span');
         const clsLink = UI.XLink.XLink.create(
