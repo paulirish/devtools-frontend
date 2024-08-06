@@ -342,7 +342,7 @@ export const NativeFunctions = [
   },
   {
     name: "concat",
-    signatures: [["inputs","axis"]],
+    signatures: [["inputs","axis","?options"]],
     receivers: ["MLGraphBuilder"]
   },
   {
@@ -420,7 +420,7 @@ export const NativeFunctions = [
   },
   {
     name: "slice",
-    signatures: [["input","starts","sizes"]],
+    signatures: [["input","starts","sizes","?options"]],
     receivers: ["MLGraphBuilder"]
   },
   {
@@ -467,7 +467,13 @@ export const NativeFunctions = [
   },
   {
     name: "abs",
-    signatures: [["x"]]
+    signatures: [["x"]],
+    receivers: ["Math"]
+  },
+  {
+    name: "abs",
+    signatures: [["x","?options"]],
+    receivers: ["MLGraphBuilder"]
   },
   {
     name: "acos",
@@ -487,29 +493,58 @@ export const NativeFunctions = [
   },
   {
     name: "ceil",
-    signatures: [["x"]]
+    signatures: [["x"]],
+    receivers: ["Math"]
+  },
+  {
+    name: "ceil",
+    signatures: [["x","?options"]],
+    receivers: ["MLGraphBuilder"]
   },
   {
     name: "cos",
-    signatures: [["x"]]
+    signatures: [["x"]],
+    receivers: ["Math"]
+  },
+  {
+    name: "cos",
+    signatures: [["x","?options"]],
+    receivers: ["MLGraphBuilder"]
   },
   {
     name: "exp",
-    signatures: [["x"]]
+    signatures: [["x"]],
+    receivers: ["Math"]
+  },
+  {
+    name: "exp",
+    signatures: [["x","?options"]],
+    receivers: ["MLGraphBuilder"]
   },
   {
     name: "floor",
-    signatures: [["x"]]
+    signatures: [["x"]],
+    receivers: ["Math"]
+  },
+  {
+    name: "floor",
+    signatures: [["x","?options"]],
+    receivers: ["MLGraphBuilder"]
   },
   {
     name: "log",
     signatures: [["x"]],
-    receivers: ["Math","MLGraphBuilder"]
+    receivers: ["Math"]
   },
   {
     name: "log",
     signatures: [["...data"]],
     receivers: ["Console","console"]
+  },
+  {
+    name: "log",
+    signatures: [["x","?options"]],
+    receivers: ["MLGraphBuilder"]
   },
   {
     name: "max",
@@ -547,15 +582,33 @@ export const NativeFunctions = [
   },
   {
     name: "sin",
-    signatures: [["x"]]
+    signatures: [["x"]],
+    receivers: ["Math"]
+  },
+  {
+    name: "sin",
+    signatures: [["x","?options"]],
+    receivers: ["MLGraphBuilder"]
   },
   {
     name: "sqrt",
-    signatures: [["x"]]
+    signatures: [["x"]],
+    receivers: ["Math"]
+  },
+  {
+    name: "sqrt",
+    signatures: [["x","?options"]],
+    receivers: ["MLGraphBuilder"]
   },
   {
     name: "tan",
-    signatures: [["x"]]
+    signatures: [["x"]],
+    receivers: ["Math"]
+  },
+  {
+    name: "tan",
+    signatures: [["x","?options"]],
+    receivers: ["MLGraphBuilder"]
   },
   {
     name: "toLocaleDateString",
@@ -5702,7 +5755,7 @@ export const NativeFunctions = [
   },
   {
     name: "tanh",
-    signatures: [["?input"]],
+    signatures: [["input","?options"]],
     receivers: ["MLGraphBuilder"]
   },
   {
@@ -6504,7 +6557,7 @@ export const NativeFunctions = [
   },
   {
     name: "expand",
-    signatures: [["input","newShape"]],
+    signatures: [["input","newShape","?options"]],
     receivers: ["MLGraphBuilder"]
   },
   {
@@ -6558,6 +6611,10 @@ export const NativeFunctions = [
   {
     name: "TextUpdateEvent",
     signatures: [["type","?options"]]
+  },
+  {
+    name: "getComposedRanges",
+    signatures: [["...shadowRoots"]]
   },
   {
     name: "AnimationEvent",
@@ -7142,6 +7199,14 @@ export const NativeFunctions = [
     signatures: [["url","?base"]]
   },
   {
+    name: "PageRevealEvent",
+    signatures: [["type","?eventInitDict"]]
+  },
+  {
+    name: "PageSwapEvent",
+    signatures: [["type","?eventInitDict"]]
+  },
+  {
     name: "startViewTransition",
     signatures: [["?update"],["opts"]]
   },
@@ -7327,6 +7392,10 @@ export const NativeFunctions = [
   {
     name: "drawFormattedText",
     signatures: [["formattedText","x","y"]]
+  },
+  {
+    name: "placeElement",
+    signatures: [["element","x","y"]]
   },
   {
     name: "createMesh2DVertexBuffer",
@@ -7718,11 +7787,11 @@ export const NativeFunctions = [
   },
   {
     name: "argMin",
-    signatures: [["input","?options"]]
+    signatures: [["input","axis","?options"]]
   },
   {
     name: "argMax",
-    signatures: [["input","?options"]]
+    signatures: [["input","axis","?options"]]
   },
   {
     name: "batchNormalization",
@@ -7762,31 +7831,31 @@ export const NativeFunctions = [
   },
   {
     name: "neg",
-    signatures: [["x"]]
+    signatures: [["x","?options"]]
   },
   {
     name: "erf",
-    signatures: [["x"]]
+    signatures: [["x","?options"]]
   },
   {
     name: "identity",
-    signatures: [["x"]]
+    signatures: [["x","?options"]]
   },
   {
     name: "logicalNot",
-    signatures: [["x"]]
+    signatures: [["x","?options"]]
   },
   {
     name: "reciprocal",
-    signatures: [["x"]]
+    signatures: [["x","?options"]]
   },
   {
     name: "cast",
-    signatures: [["input","outputDataType"]]
+    signatures: [["input","outputDataType","?options"]]
   },
   {
     name: "elu",
-    signatures: [["?options"],["x","?options"]]
+    signatures: [["x","?options"]]
   },
   {
     name: "gather",
@@ -7794,7 +7863,7 @@ export const NativeFunctions = [
   },
   {
     name: "gelu",
-    signatures: [["?input"]]
+    signatures: [["input","?options"]]
   },
   {
     name: "gemm",
@@ -7810,11 +7879,11 @@ export const NativeFunctions = [
   },
   {
     name: "hardSigmoid",
-    signatures: [["?options"],["x","?options"]]
+    signatures: [["x","?options"]]
   },
   {
     name: "hardSwish",
-    signatures: [["?x"]]
+    signatures: [["x","?options"]]
   },
   {
     name: "instanceNormalization",
@@ -7822,7 +7891,7 @@ export const NativeFunctions = [
   },
   {
     name: "matmul",
-    signatures: [["a","b"]]
+    signatures: [["a","b","?options"]]
   },
   {
     name: "layerNormalization",
@@ -7830,11 +7899,11 @@ export const NativeFunctions = [
   },
   {
     name: "leakyRelu",
-    signatures: [["?options"],["x","?options"]]
+    signatures: [["x","?options"]]
   },
   {
     name: "linear",
-    signatures: [["?options"],["input","?options"]]
+    signatures: [["input","?options"]]
   },
   {
     name: "lstm",
@@ -7906,11 +7975,11 @@ export const NativeFunctions = [
   },
   {
     name: "relu",
-    signatures: [["?input"]]
+    signatures: [["input","?options"]]
   },
   {
     name: "reshape",
-    signatures: [["input","newShape"]]
+    signatures: [["input","newShape","?options"]]
   },
   {
     name: "resample2d",
@@ -7918,19 +7987,19 @@ export const NativeFunctions = [
   },
   {
     name: "sigmoid",
-    signatures: [["?input"]]
+    signatures: [["input","?options"]]
   },
   {
     name: "softmax",
-    signatures: [["input","?axis"]]
+    signatures: [["input","?options"],["input","axis","?options"]]
   },
   {
     name: "softplus",
-    signatures: [["?input"]]
+    signatures: [["input","?options"]]
   },
   {
     name: "softsign",
-    signatures: [["?input"]]
+    signatures: [["input","?options"]]
   },
   {
     name: "transpose",
@@ -7942,7 +8011,7 @@ export const NativeFunctions = [
   },
   {
     name: "where",
-    signatures: [["condition","trueValue","falseValue"]]
+    signatures: [["condition","trueValue","falseValue","?options"]]
   },
   {
     name: "build",
@@ -7987,6 +8056,16 @@ export const NativeFunctions = [
   {
     name: "TimestampTrigger",
     signatures: [["timestamp"]]
+  },
+  {
+    name: "detect",
+    signatures: [["input"]],
+    receivers: ["LanguageDetector"]
+  },
+  {
+    name: "detect",
+    signatures: [["image"]],
+    receivers: ["BarcodeDetector","FaceDetector","TextDetector"]
   },
   {
     name: "canTranslate",
@@ -8267,10 +8346,6 @@ export const NativeFunctions = [
   {
     name: "BarcodeDetector",
     signatures: [["?barcodeDetectorOptions"]]
-  },
-  {
-    name: "detect",
-    signatures: [["image"]]
   },
   {
     name: "FaceDetector",

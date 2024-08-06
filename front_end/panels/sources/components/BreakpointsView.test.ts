@@ -8,6 +8,7 @@ import * as SDK from '../../../core/sdk/sdk.js';
 import type * as Protocol from '../../../generated/protocol.js';
 import * as Bindings from '../../../models/bindings/bindings.js';
 import * as Breakpoints from '../../../models/breakpoints/breakpoints.js';
+import * as TextUtils from '../../../models/text_utils/text_utils.js';
 import * as Workspace from '../../../models/workspace/workspace.js';
 import {
   assertElements,
@@ -20,7 +21,6 @@ import {
   describeWithEnvironment,
 } from '../../../testing/EnvironmentHelpers.js';
 import {describeWithMockConnection} from '../../../testing/MockConnection.js';
-import {describeWithRealConnection} from '../../../testing/RealConnection.js';
 import {
   createContentProviderUISourceCode,
   createFakeScriptMapping,
@@ -66,8 +66,9 @@ interface LocationTestData {
 function createBreakpointLocations(testData: LocationTestData[]): Breakpoints.BreakpointManager.BreakpointLocation[] {
   const breakpointLocations = testData.map(data => {
     const mocked = setupMockedUISourceCode(data.url);
-    const mockedContent = Promise.resolve({content: data.content, isEncoded: true});
-    sinon.stub(mocked.sut, 'requestContent').returns(mockedContent);
+    const mockedContent =
+        Promise.resolve(new TextUtils.ContentData.ContentData(data.content, /* isBase64 */ false, 'text/plain'));
+    sinon.stub(mocked.sut, 'requestContentData').returns(mockedContent);
     const uiLocation = new Workspace.UISourceCode.UILocation(mocked.sut, data.lineNumber, data.columnNumber);
     const breakpoint = sinon.createStubInstance(Breakpoints.BreakpointManager.Breakpoint);
     breakpoint.enabled.returns(data.enabled);
@@ -747,7 +748,20 @@ describeWithEnvironment('BreakpointsSidebarController', () => {
   });
 });
 
-describeWithRealConnection('BreakpointsSidebarController', () => {
+describeWithMockConnection('BreakpointsSidebarController', () => {
+  beforeEach(() => {
+    const workspace = Workspace.Workspace.WorkspaceImpl.instance();
+    const targetManager = SDK.TargetManager.TargetManager.instance();
+    const resourceMapping = new Bindings.ResourceMapping.ResourceMapping(targetManager, workspace);
+    const debuggerWorkspaceBinding = Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance({
+      forceNew: true,
+      resourceMapping,
+      targetManager,
+    });
+    Breakpoints.BreakpointManager.BreakpointManager.instance(
+        {forceNew: true, targetManager, workspace, debuggerWorkspaceBinding});
+  });
+
   const DEFAULT_BREAKPOINT:
       [Breakpoints.BreakpointManager.UserCondition, boolean, boolean, Breakpoints.BreakpointManager.BreakpointOrigin] =
           [
@@ -831,6 +845,10 @@ describeWithRealConnection('BreakpointsSidebarController', () => {
   });
 
   it('auto-expands if a breakpoint was hit', async () => {
+    sinon.stub(
+        Common.Revealer.RevealerRegistry.instance(),
+        'reveal');  // Prevent pending reveal promises after tests are done.
+
     const breakpointManager = Breakpoints.BreakpointManager.BreakpointManager.instance();
 
     // Set up sdk and ui location, and a mapping between them, such that we can identify that

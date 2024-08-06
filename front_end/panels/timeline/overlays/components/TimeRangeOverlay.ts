@@ -8,16 +8,52 @@ import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 
 import styles from './timeRangeOverlay.css.js';
 
+export class TimeRangeLabelChangeEvent extends Event {
+  static readonly eventName = 'timerangelabelchange';
+
+  constructor(public newLabel: string) {
+    super(TimeRangeLabelChangeEvent.eventName);
+  }
+}
+
+export class TimeRangeRemoveEvent extends Event {
+  static readonly eventName = 'timerangeremoveevent';
+
+  constructor() {
+    super(TimeRangeRemoveEvent.eventName);
+  }
+}
+
 export class TimeRangeOverlay extends HTMLElement {
   static readonly litTagName = LitHtml.literal`devtools-time-range-overlay`;
   readonly #shadow = this.attachShadow({mode: 'open'});
   readonly #boundRender = this.#render.bind(this);
   #duration: TraceEngine.Types.Timing.MicroSeconds|null = null;
-  #label = '';
   #canvasRect: DOMRect|null = null;
+  #label: string;
+
+  // The label is set to editable and in focus anytime the label is empty and when the label it is double clicked.
+  // If the user clicks away from the selected range element and the label is not empty, the lable is set to not editable until it is double clicked.
+  #isLabelEditable: boolean = true;
+
+  #rangeContainer: HTMLElement|null = null;
+  #labelBox: HTMLElement|null = null;
 
   connectedCallback(): void {
     this.#shadow.adoptedStyleSheets = [styles];
+  }
+
+  constructor(initialLabel: string) {
+    super();
+    this.#render();
+    this.#rangeContainer = this.#shadow.querySelector<HTMLElement>('.label');
+    this.#labelBox = this.#rangeContainer?.querySelector<HTMLElement>('.label-text') ?? null;
+    this.#label = initialLabel;
+    if (!this.#labelBox) {
+      console.error('`labelBox` element is missing.');
+      return;
+    }
+    this.#labelBox.innerText = initialLabel;
   }
 
   set canvasRect(rect: DOMRect|null) {
@@ -30,14 +66,6 @@ export class TimeRangeOverlay extends HTMLElement {
       return;
     }
     this.#duration = duration;
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
-  }
-
-  set label(label: string) {
-    if (label === this.#label) {
-      return;
-    }
-    this.#label = label;
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
   }
 
@@ -69,8 +97,7 @@ export class TimeRangeOverlay extends HTMLElement {
    * align the text so the label is visible as long as possible.
    */
   afterOverlayUpdate(): void {
-    const label = this.#shadow.querySelector<HTMLElement>('.label');
-    if (!label) {
+    if (!this.#rangeContainer) {
       return;
     }
 
@@ -85,10 +112,10 @@ export class TimeRangeOverlay extends HTMLElement {
     const paddingForScrollbar = 9;
 
     const overlayRect = this.getBoundingClientRect();
-    const labelRect = label.getBoundingClientRect();
+    const labelRect = this.#rangeContainer.getBoundingClientRect();
     const visibleOverlayWidth = this.#visibleOverlayWidth(overlayRect) - paddingForScrollbar;
     const overlayTooNarrow = visibleOverlayWidth <= labelRect.width - paddingForScrollbar;
-    label.classList.toggle('labelHidden', overlayTooNarrow);
+    this.#rangeContainer.classList.toggle('labelHidden', overlayTooNarrow);
 
     if (overlayTooNarrow) {
       // Label is invisible, no need to do all the layout.
@@ -100,7 +127,7 @@ export class TimeRangeOverlay extends HTMLElement {
     const newLabelX = overlayRect.x + labelLeftMarginToCenter;
 
     const labelOffLeftOfScreen = newLabelX < this.#canvasRect.x;
-    label.classList.toggle('offScreenLeft', labelOffLeftOfScreen);
+    this.#rangeContainer.classList.toggle('offScreenLeft', labelOffLeftOfScreen);
 
     // Check if label is off the RHS of the screen
     const rightBound = this.#canvasRect.x + this.#canvasRect.width;
@@ -108,7 +135,7 @@ export class TimeRangeOverlay extends HTMLElement {
     // label, and then the width of the label.
     const labelRightEdge = overlayRect.x + labelLeftMarginToCenter + labelRect.width;
     const labelOffRightOfScreen = labelRightEdge > rightBound;
-    label.classList.toggle('offScreenRight', labelOffRightOfScreen);
+    this.#rangeContainer.classList.toggle('offScreenRight', labelOffRightOfScreen);
 
     if (labelOffLeftOfScreen) {
       // If the label is off the left of the screen, we adjust by the
@@ -119,7 +146,7 @@ export class TimeRangeOverlay extends HTMLElement {
       // Add on 9 pixels to pad from the left; this is the width of the sidebar
       // on the RHS so we match it so the label is equally padded on either
       // side.
-      label.style.marginLeft = `${Math.abs(this.#canvasRect.x - overlayRect.x) + paddingForScrollbar}px`;
+      this.#rangeContainer.style.marginLeft = `${Math.abs(this.#canvasRect.x - overlayRect.x) + paddingForScrollbar}px`;
     } else if (labelOffRightOfScreen) {
       // To calculate how far left to push the label, we take the right hand
       // bound (the canvas width and subtract the label's width).
@@ -128,21 +155,89 @@ export class TimeRangeOverlay extends HTMLElement {
       // otherwise it will be off-screen)
       const leftMargin = rightBound - labelRect.width - overlayRect.x;
 
-      label.style.marginLeft = `${leftMargin}px`;
+      this.#rangeContainer.style.marginLeft = `${leftMargin}px`;
 
     } else {
       // Keep the label central.
-      label.style.marginLeft = `${labelLeftMarginToCenter}px`;
+      this.#rangeContainer.style.marginLeft = `${labelLeftMarginToCenter}px`;
     }
+
+    // If the text is empty, set the label editibility to true.
+    // Only allow to remove the focus and save the range as annotation if the label is not empty.
+    if (this.#labelBox?.innerText === '') {
+      this.#setLabelEditability(true);
+    }
+  }
+
+  #focusInputBox(): void {
+    if (!this.#labelBox) {
+      console.error('`labelBox` element is missing.');
+      return;
+    }
+    this.#labelBox.focus();
+  }
+
+  #setLabelEditability(editable: boolean): void {
+    // Always keep focus on the label input field if the label is empty.
+    // TODO: Do not remove a range that is being navigated away from if the label is not empty
+    if (this.#labelBox?.innerText === '') {
+      this.#focusInputBox();
+      return;
+    }
+    this.#isLabelEditable = editable;
+    this.#render();
+    // If the label is editable, focus cursor on it
+    if (editable) {
+      this.#focusInputBox();
+    }
+  }
+
+  #handleLabelInputKeyUp(): void {
+    // If the label changed on key up, dispatch label changed event
+    const labelBoxTextContent = this.#labelBox?.textContent ?? '';
+    if (labelBoxTextContent !== this.#label) {
+      this.#label = labelBoxTextContent;
+      this.dispatchEvent(new TimeRangeLabelChangeEvent(this.#label));
+    }
+  }
+
+  #handleLabelInputKeyDown(event: KeyboardEvent): boolean {
+    // If the new key is `Enter` or `Escape` key, treat it
+    // as the end of the label input and blur the input field.
+    // If the text field is empty when `Enter` or `Escape` are pressed,
+    // dispatch an event to remove the time range.
+    if (event.key === 'Enter' || event.key === 'Escape') {
+      if (this.#label === '') {
+        this.dispatchEvent(new TimeRangeRemoveEvent());
+      }
+      this.#labelBox?.blur();
+      return false;
+    }
+
+    return true;
   }
 
   #render(): void {
     const durationText = this.#duration ? i18n.TimeUtilities.formatMicroSecondsTime(this.#duration) : '';
-
+    // clang-format off
     LitHtml.render(
-        LitHtml.html`<span class="label" title=${this.#label}><span class="label-text">${this.#label}</span>${
-            durationText}</span>`,
+        LitHtml.html`
+          <span
+            class="label">
+            <span
+             class="label-text"
+             @focusout=${() => this.#setLabelEditability(false)}
+             @dblclick=${() => this.#setLabelEditability(true)}
+             @keydown=${this.#handleLabelInputKeyDown}
+             @keyup=${this.#handleLabelInputKeyUp}
+             contenteditable=${this.#isLabelEditable}>
+            </span>
+            <span
+            class="duration">${durationText}</span>
+          </span>
+          `,
         this.#shadow, {host: this});
+    // clang-format on
   }
 }
 

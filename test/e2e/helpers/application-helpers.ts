@@ -42,10 +42,6 @@ export async function navigateToServiceWorkers() {
 export async function navigateToFrame(name: string) {
   await doubleClickTreeItem(`[aria-label="${name}"]`);
   await waitFor('[title="Click to reveal in Sources panel"]');
-  await expectVeEvents([
-    veClick('Panel: resources > Pane: sidebar > Tree > TreeItem: frames > TreeItem: frame'),
-    veImpressionsUnder('Panel: resources', [veImpressionForFrameDetails()]),
-  ]);
 }
 
 export async function navigateToManifestInApplicationTab(testName: string) {
@@ -225,18 +221,19 @@ export async function getStorageItemsData(columns: string[], leastExpected: numb
 export async function filterStorageItems(filter: string) {
   const element = await $('.toolbar-input-prompt') as puppeteer.ElementHandle;
   await expectVeEvents(
-      [veImpressionsUnder('Panel: resources > Pane: cookies-data > Toolbar', [veImpression('TextField')])]);
+      [veImpressionsUnder('Panel: resources > Pane: cookies-data > Toolbar', [veImpression('TextField', 'filter')])]);
   await element.type(filter);
   await expectVeEvents([
-    veChange('Panel: resources > Pane: cookies-data > Toolbar > TextField'),
+    veChange('Panel: resources > Pane: cookies-data > Toolbar > TextField: filter'),
     veImpressionsUnder(
-        'Panel: resources > Pane: cookies-data > Toolbar > TextField', [veImpression('Action', 'clear')]),
+        'Panel: resources > Pane: cookies-data > Toolbar > TextField: filter', [veImpression('Action', 'clear')]),
   ]);
 }
 
 export async function clearStorageItemsFilter() {
   await click('.toolbar-input .toolbar-input-clear-button');
-  await expectVeEvents([veClick('Panel: resources > Pane: cookies-data > Toolbar > TextField > Action: clear')]);
+  await expectVeEvents(
+      [veClick('Panel: resources > Pane: cookies-data > Toolbar > TextField: filter > Action: clear')]);
 }
 
 export async function clearStorageItems() {
@@ -396,27 +393,16 @@ function veImpressionForCookieTable() {
           veImpression('Action', 'storage-items-view.clear-all'),
           veImpression('Action', 'storage-items-view.delete-selected'),
           veImpression('Action', 'storage-items-view.refresh'),
-          veImpression('TextField'),
+          veImpression('TextField', 'filter'),
           veImpression('Toggle', 'only-show-cookies-with-issues'),
         ]),
-  ]);
-}
-
-function veImpressionForFrameDetails() {
-  return veImpression('Pane', 'frames', [
-    veImpression('Action', 'reveal-in-elements'),
-    veImpression('Action', 'reveal-in-network'),
-    veImpression('Action', 'reveal-in-sources'),
-    veImpression('Link', 'learn-more.coop-coep'),
-    veImpression('Link', 'learn-more.monitor-memory-usage'),
-    veImpression('Link', 'learn-more.origin-trials'),
   ]);
 }
 
 function veImpressionForStorageViewToolbar() {
   return veImpression('Toolbar', undefined, [
     veImpression('Action', 'storage-items-view.refresh'),
-    veImpression('TextField'),
+    veImpression('TextField', 'filter'),
     veImpression('Action', 'storage-items-view.clear-all'),
     veImpression('Action', 'storage-items-view.delete-selected'),
   ]);

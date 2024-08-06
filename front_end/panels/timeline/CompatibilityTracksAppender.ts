@@ -31,6 +31,44 @@ export type HighlightedEntryInfo = {
   warningElements?: HTMLSpanElement[],
 };
 
+export function entryIsVisibleInTimeline(
+    entry: TraceEngine.Types.TraceEvents.TraceEventData,
+    traceParsedData?: TraceEngine.Handlers.Types.TraceParseData): boolean {
+  if (traceParsedData && traceParsedData.Meta.traceIsGeneric) {
+    return true;
+  }
+
+  if (TraceEngine.Types.TraceEvents.isTraceEventUpdateCounters(entry)) {
+    // These events are not "visible" on the timeline because they are instant events with 0 duration.
+    // However, the Memory view (CountersGraph in the codebase) relies on
+    // finding the UpdateCounters events within the user's active trace
+    // selection in order to show the memory usage for the selected time
+    // period.
+    // Therefore we mark them as visible so they are appended onto the Thread
+    // track, and hence accessible by the CountersGraph view.
+    return true;
+  }
+
+  // Gate the visibility of post message events behind the experiement flag
+  if (TraceEngine.Types.TraceEvents.isTraceEventSchedulePostMessage(entry) ||
+      TraceEngine.Types.TraceEvents.isTraceEventHandlePostMessage(entry)) {
+    return Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_SHOW_POST_MESSAGE_EVENTS);
+  }
+
+  if (TraceEngine.Types.Extensions.isSyntheticExtensionEntry(entry)) {
+    return true;
+  }
+
+  // Default styles are globally defined for each event name. Some
+  // events are hidden by default.
+  const eventStyle = getEventStyle(entry.name as TraceEngine.Types.TraceEvents.KnownEventName);
+  const eventIsTiming = TraceEngine.Types.TraceEvents.isTraceEventConsoleTime(entry) ||
+      TraceEngine.Types.TraceEvents.isTraceEventPerformanceMeasure(entry) ||
+      TraceEngine.Types.TraceEvents.isTraceEventPerformanceMark(entry);
+
+  return (eventStyle && !eventStyle.hidden) || eventIsTiming;
+}
+
 /**
  * Track appenders add the data of each track into the timeline flame
  * chart. Each track appender also implements functions tha allow the
@@ -175,8 +213,6 @@ export class CompatibilityTracksAppender {
     this.#gpuTrackAppender = new GPUTrackAppender(this, this.#traceParsedData);
     this.#allTrackAppenders.push(this.#gpuTrackAppender);
 
-    // Layout Shifts track in OPP was called the "Experience" track even though
-    // all it shows are layout shifts.
     this.#layoutShiftsTrackAppender = new LayoutShiftsTrackAppender(this, this.#traceParsedData);
     this.#allTrackAppenders.push(this.#layoutShiftsTrackAppender);
 
@@ -474,7 +510,7 @@ export class CompatibilityTracksAppender {
     const lastTimestampByLevel: LastTimestampByLevel = [];
     for (let i = 0; i < events.length; ++i) {
       const event = events[i];
-      if (!this.entryIsVisibleInTimeline(event)) {
+      if (!entryIsVisibleInTimeline(event, this.#traceParsedData)) {
         continue;
       }
 
@@ -486,42 +522,6 @@ export class CompatibilityTracksAppender {
     this.#legacyEntryTypeByLevel.length = trackStartLevel + lastTimestampByLevel.length;
     this.#legacyEntryTypeByLevel.fill(EntryType.TrackAppender, trackStartLevel);
     return trackStartLevel + lastTimestampByLevel.length;
-  }
-
-  entryIsVisibleInTimeline(entry: TraceEngine.Types.TraceEvents.TraceEventData): boolean {
-    if (this.#traceParsedData.Meta.traceIsGeneric) {
-      return true;
-    }
-
-    if (TraceEngine.Types.TraceEvents.isTraceEventUpdateCounters(entry)) {
-      // These events are not "visible" on the timeline because they are instant events with 0 duration.
-      // However, the Memory view (CountersGraph in the codebase) relies on
-      // finding the UpdateCounters events within the user's active trace
-      // selection in order to show the memory usage for the selected time
-      // period.
-      // Therefore we mark them as visible so they are appended onto the Thread
-      // track, and hence accessible by the CountersGraph view.
-      return true;
-    }
-
-    // Gate the visibility of post message events behind the experiement flag
-    if (TraceEngine.Types.TraceEvents.isTraceEventSchedulePostMessage(entry) ||
-        TraceEngine.Types.TraceEvents.isTraceEventHandlePostMessage(entry)) {
-      return Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_SHOW_POST_MESSAGE_EVENTS);
-    }
-
-    if (TraceEngine.Types.Extensions.isSyntheticExtensionEntry(entry)) {
-      return true;
-    }
-
-    // Default styles are globally defined for each event name. Some
-    // events are hidden by default.
-    const eventStyle = getEventStyle(entry.name as TraceEngine.Types.TraceEvents.KnownEventName);
-    const eventIsTiming = TraceEngine.Types.TraceEvents.isTraceEventConsoleTime(entry) ||
-        TraceEngine.Types.TraceEvents.isTraceEventPerformanceMeasure(entry) ||
-        TraceEngine.Types.TraceEvents.isTraceEventPerformanceMark(entry);
-
-    return (eventStyle && !eventStyle.hidden) || eventIsTiming;
   }
 
   /**

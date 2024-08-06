@@ -297,10 +297,10 @@ export const enum ExperimentName {
   TIMELINE_SHOW_POST_MESSAGE_EVENTS = 'timeline-show-postmessage-events',
   TIMELINE_ANNOTATIONS_OVERLAYS = 'perf-panel-annotations',
   TIMELINE_SIDEBAR = 'timeline-rpp-sidebar',
-  TIMELINE_EXTENSIONS = 'timeline-extensions',
   TIMELINE_DEBUG_MODE = 'timeline-debug-mode',
   TIMELINE_OBSERVATIONS = 'timeline-observations',
   TIMELINE_ENHANCED_TRACES = 'timeline-enhanced-traces',
+  GEN_AI_SETTINGS_PANEL = 'gen-ai-settings-panel',
 }
 
 export interface HostConfigConsoleInsights {
@@ -320,6 +320,9 @@ export interface HostConfigConsoleInsights {
 export interface HostConfigFreestylerDogfood {
   aidaModelId: string;
   aidaTemperature: number;
+  blockedByAge: boolean;
+  blockedByEnterprisePolicy: boolean;
+  blockedByGeo: boolean;
   enabled: boolean;
 }
 
@@ -332,6 +335,11 @@ export interface HostConfig {
   devToolsConsoleInsights: HostConfigConsoleInsights;
   devToolsFreestylerDogfood: HostConfigFreestylerDogfood;
   devToolsVeLogging: HostConfigVeLogging;
+  /**
+   * OffTheRecord here indicates that the user's profile is either incognito,
+   * or guest mode, rather than a "normal" profile.
+   */
+  isOffTheRecord: boolean;
 }
 
 /**

@@ -62,14 +62,6 @@ const UIStrings = {
    *@description Text that refers to closure as a programming term
    */
   closure: 'Closure',
-  /**
-   *@description Text in Scope Chain Sidebar Pane of the Sources panel
-   */
-  exception: 'Exception',
-  /**
-   *@description Text in Scope Chain Sidebar Pane of the Sources panel
-   */
-  returnValue: 'Return value',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/sources/ScopeChainSidebarPane.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -139,23 +131,19 @@ export class ScopeChainSidebarPane extends UI.Widget.VBox implements UI.ContextF
   }
 
   private buildScopeTreeOutline(eventScopeChain: SourceMapScopes.ScopeChainModel.ScopeChain): void {
-    const {callFrame, thisObject, scopeChain} = eventScopeChain;
+    const {scopeChain} = eventScopeChain;
 
-    const details = UI.Context.Context.instance().flavor(SDK.DebuggerModel.DebuggerPausedDetails);
     this.treeOutline.removeChildren();
 
     this.contentElement.removeChildren();
     this.contentElement.appendChild(this.treeOutline.element);
     let foundLocalScope = false;
-    for (let i = 0; i < scopeChain.length; ++i) {
-      const scope = scopeChain[i];
-      const extraProperties = this.extraPropertiesForScope(scope, details, callFrame, thisObject, i === 0);
-
+    for (const [i, scope] of scopeChain.entries()) {
       if (scope.type() === Protocol.Debugger.ScopeType.Local) {
         foundLocalScope = true;
       }
 
-      const section = this.createScopeSectionTreeElement(scope, extraProperties);
+      const section = this.createScopeSectionTreeElement(scope);
       if (scope.type() === Protocol.Debugger.ScopeType.Global) {
         section.collapse();
       } else if (!foundLocalScope || scope.type() === Protocol.Debugger.ScopeType.Local) {
@@ -170,9 +158,8 @@ export class ScopeChainSidebarPane extends UI.Widget.VBox implements UI.ContextF
     this.sidebarPaneUpdatedForTest();
   }
 
-  private createScopeSectionTreeElement(
-      scope: SDK.DebuggerModel.ScopeChainEntry,
-      extraProperties: SDK.RemoteObject.RemoteObjectProperty[]): ObjectUI.ObjectPropertiesSection.RootElement {
+  private createScopeSectionTreeElement(scope: SDK.DebuggerModel.ScopeChainEntry):
+      ObjectUI.ObjectPropertiesSection.RootElement {
     let emptyPlaceholder: Common.UIString.LocalizedString|null = null;
     if (scope.type() === Protocol.Debugger.ScopeType.Local || scope.type() === Protocol.Debugger.ScopeType.Closure) {
       emptyPlaceholder = i18nString(UIStrings.noVariables);
@@ -207,44 +194,13 @@ export class ScopeChainSidebarPane extends UI.Widget.VBox implements UI.ContextF
 
     const section = new ObjectUI.ObjectPropertiesSection.RootElement(
         scope.object(), this.linkifier, emptyPlaceholder, ObjectUI.ObjectPropertiesSection.ObjectPropertiesMode.All,
-        extraProperties);
+        scope.extraProperties());
     section.title = titleElement;
     section.listItemElement.classList.add('scope-chain-sidebar-pane-section');
     section.listItemElement.setAttribute('aria-label', title);
     this.expandController.watchSection(title + (subtitle ? ':' + subtitle : ''), section);
 
     return section;
-  }
-
-  private extraPropertiesForScope(
-      scope: SDK.DebuggerModel.ScopeChainEntry, details: SDK.DebuggerModel.DebuggerPausedDetails|null,
-      callFrame: SDK.DebuggerModel.CallFrame, thisObject: SDK.RemoteObject.RemoteObject|null,
-      isFirstScope: boolean): SDK.RemoteObject.RemoteObjectProperty[] {
-    if (scope.type() !== Protocol.Debugger.ScopeType.Local || callFrame.script.isWasm()) {
-      return [];
-    }
-
-    const extraProperties = [];
-    if (thisObject) {
-      extraProperties.push(new SDK.RemoteObject.RemoteObjectProperty(
-          'this', thisObject, undefined, undefined, undefined, undefined, undefined, /* synthetic */ true));
-    }
-    if (isFirstScope) {
-      const exception = details?.exception();
-      if (exception) {
-        extraProperties.push(new SDK.RemoteObject.RemoteObjectProperty(
-            i18nString(UIStrings.exception), exception, undefined, undefined, undefined, undefined, undefined,
-            /* synthetic */ true));
-      }
-      const returnValue = callFrame.returnValue();
-      if (returnValue) {
-        extraProperties.push(new SDK.RemoteObject.RemoteObjectProperty(
-            i18nString(UIStrings.returnValue), returnValue, undefined, undefined, undefined, undefined, undefined,
-            /* synthetic */ true, callFrame.setReturnValue.bind(callFrame)));
-      }
-    }
-
-    return extraProperties;
   }
 
   private sidebarPaneUpdatedForTest(): void {

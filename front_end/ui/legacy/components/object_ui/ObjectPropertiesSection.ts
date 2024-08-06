@@ -1398,7 +1398,6 @@ export class ArrayGroupingTreeElement extends UI.TreeOutline.TreeElement {
   private readonly fromIndex: number;
   private readonly toIndex: number;
   private readonly object: SDK.RemoteObject.RemoteObject;
-  private readonly readOnly: boolean;
   private readonly propertyCount: number;
   private readonly linkifier: Components.Linkifier.Linkifier|undefined;
   constructor(
@@ -1409,7 +1408,6 @@ export class ArrayGroupingTreeElement extends UI.TreeOutline.TreeElement {
     this.fromIndex = fromIndex;
     this.toIndex = toIndex;
     this.object = object;
-    this.readOnly = true;
     this.propertyCount = propertyCount;
     this.linkifier = linkifier;
   }
@@ -1423,9 +1421,6 @@ export class ArrayGroupingTreeElement extends UI.TreeOutline.TreeElement {
   private static async populateRanges(
       treeNode: UI.TreeOutline.TreeElement, object: SDK.RemoteObject.RemoteObject, fromIndex: number, toIndex: number,
       topLevel: boolean, linkifier?: Components.Linkifier.Linkifier): Promise<void> {
-    // The definition of callFunctionJSON expects an unknown, and setting to `any` causes Closure to fail.
-    // However, leaving this as unknown also causes TypeScript to fail, so for now we leave this as unchecked.
-    // @ts-ignore  TODO(crbug.com/1011811): Fix after Closure is removed.
     const jsonValue = await object.callFunctionJSON(packRanges, [
       {value: fromIndex},
       {value: toIndex},
@@ -1558,10 +1553,7 @@ export class ArrayGroupingTreeElement extends UI.TreeOutline.TreeElement {
   private static async populateAsFragment(
       this: ArrayGroupingTreeElement, treeNode: UI.TreeOutline.TreeElement, object: SDK.RemoteObject.RemoteObject,
       fromIndex: number, toIndex: number, linkifier?: Components.Linkifier.Linkifier): Promise<void> {
-    // The definition of callFunction expects an unknown, and setting to `any` causes Closure to fail.
-    // However, leaving this as unknown also causes TypeScript to fail, so for now we leave this as unchecked.
     const result = await object.callFunction(
-        // @ts-ignore  TODO(crbug.com/1011811): Fix after Closure is removed.
         buildArrayFragment,
         [{value: fromIndex}, {value: toIndex}, {value: ArrayGroupingTreeElement.sparseIterationThreshold}]);
     if (!result.object || result.wasThrown) {
@@ -1587,9 +1579,7 @@ export class ArrayGroupingTreeElement extends UI.TreeOutline.TreeElement {
         this: {
           [x: number]: Object,
         },
-        // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        fromIndex?: number, toIndex?: number, sparseIterationThreshold?: number): any {
+        fromIndex?: number, toIndex?: number, sparseIterationThreshold?: number): unknown {
       const result = Object.create(null);
 
       if (fromIndex === undefined || toIndex === undefined || sparseIterationThreshold === undefined) {
@@ -1654,54 +1644,53 @@ export class ObjectPropertyPrompt extends UI.TextPrompt.TextPrompt {
   }
 }
 
-const sectionMap = new Map<RootElement, string>();
-
-const cachedResultMap = new Map<UI.TreeOutline.TreeElement, string>();
-
 export class ObjectPropertiesSectionsTreeExpandController {
-  private readonly expandedProperties: Set<string>;
+  static readonly #propertyPathCache = new WeakMap<UI.TreeOutline.TreeElement, string>();
+  static readonly #sectionMap = new WeakMap<RootElement, string>();
+
+  readonly #expandedProperties = new Set<string>();
+
   constructor(treeOutline: UI.TreeOutline.TreeOutline) {
-    this.expandedProperties = new Set();
-    treeOutline.addEventListener(UI.TreeOutline.Events.ElementAttached, this.elementAttached, this);
-    treeOutline.addEventListener(UI.TreeOutline.Events.ElementExpanded, this.elementExpanded, this);
-    treeOutline.addEventListener(UI.TreeOutline.Events.ElementCollapsed, this.elementCollapsed, this);
+    treeOutline.addEventListener(UI.TreeOutline.Events.ElementAttached, this.#elementAttached, this);
+    treeOutline.addEventListener(UI.TreeOutline.Events.ElementExpanded, this.#elementExpanded, this);
+    treeOutline.addEventListener(UI.TreeOutline.Events.ElementCollapsed, this.#elementCollapsed, this);
   }
 
   watchSection(id: string, section: RootElement): void {
-    sectionMap.set(section, id);
+    ObjectPropertiesSectionsTreeExpandController.#sectionMap.set(section, id);
 
-    if (this.expandedProperties.has(id)) {
+    if (this.#expandedProperties.has(id)) {
       section.expand();
     }
   }
 
   stopWatchSectionsWithId(id: string): void {
-    for (const property of this.expandedProperties) {
+    for (const property of this.#expandedProperties) {
       if (property.startsWith(id + ':')) {
-        this.expandedProperties.delete(property);
+        this.#expandedProperties.delete(property);
       }
     }
   }
 
-  private elementAttached(event: Common.EventTarget.EventTargetEvent<UI.TreeOutline.TreeElement>): void {
+  #elementAttached(event: Common.EventTarget.EventTargetEvent<UI.TreeOutline.TreeElement>): void {
     const element = event.data;
-    if (element.isExpandable() && this.expandedProperties.has(this.propertyPath(element))) {
+    if (element.isExpandable() && this.#expandedProperties.has(this.#propertyPath(element))) {
       element.expand();
     }
   }
 
-  private elementExpanded(event: Common.EventTarget.EventTargetEvent<UI.TreeOutline.TreeElement>): void {
+  #elementExpanded(event: Common.EventTarget.EventTargetEvent<UI.TreeOutline.TreeElement>): void {
     const element = event.data;
-    this.expandedProperties.add(this.propertyPath(element));
+    this.#expandedProperties.add(this.#propertyPath(element));
   }
 
-  private elementCollapsed(event: Common.EventTarget.EventTargetEvent<UI.TreeOutline.TreeElement>): void {
+  #elementCollapsed(event: Common.EventTarget.EventTargetEvent<UI.TreeOutline.TreeElement>): void {
     const element = event.data;
-    this.expandedProperties.delete(this.propertyPath(element));
+    this.#expandedProperties.delete(this.#propertyPath(element));
   }
 
-  private propertyPath(treeElement: UI.TreeOutline.TreeElement): string {
-    const cachedPropertyPath = cachedResultMap.get(treeElement);
+  #propertyPath(treeElement: UI.TreeOutline.TreeElement): string {
+    const cachedPropertyPath = ObjectPropertiesSectionsTreeExpandController.#propertyPathCache.get(treeElement);
     if (cachedPropertyPath) {
       return cachedPropertyPath;
     }
@@ -1732,9 +1721,9 @@ export class ObjectPropertiesSectionsTreeExpandController {
         current = current.parent;
       }
     }
-    const treeOutlineId = sectionMap.get((sectionRoot as RootElement));
+    const treeOutlineId = ObjectPropertiesSectionsTreeExpandController.#sectionMap.get((sectionRoot as RootElement));
     result = treeOutlineId + (result ? ':' + result : '');
-    cachedResultMap.set(treeElement, result);
+    ObjectPropertiesSectionsTreeExpandController.#propertyPathCache.set(treeElement, result);
     return result;
   }
 }

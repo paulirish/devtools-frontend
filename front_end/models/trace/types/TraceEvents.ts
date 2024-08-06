@@ -1300,7 +1300,7 @@ export function isTraceEventScriptRundownSource(traceEventData: TraceEventData):
   if (!data) {
     return false;
   }
-  return 'isolate' in data && 'scriptId' in data && 'length' in data && 'sourceText' in data;
+  return 'isolate' in data && 'scriptId' in data && 'sourceText' in data;
 }
 
 /** ChromeFrameReporter args for PipelineReporter event.

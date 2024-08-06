@@ -15,8 +15,8 @@ generate_css("css_files") {
     "liveMetricsView.css",
     "networkRequestDetails.css",
     "networkRequestTooltip.css",
-    "sidebar.css",
     "sidebarAnnotationsTab.css",
+    "sidebarInsightsTab.css",
     "sidebarSingleNavigation.css",
   ]
 }
@@ -30,11 +30,13 @@ devtools_module("components") {
     "FieldSettingsDialog.ts",
     "InteractionBreakdown.ts",
     "LiveMetricsView.ts",
+    "MetricCompareStrings.ts",
     "NetworkRequestDetails.ts",
     "NetworkRequestTooltip.ts",
     "NetworkThrottlingSelector.ts",
     "Sidebar.ts",
     "SidebarAnnotationsTab.ts",
+    "SidebarInsightsTab.ts",
     "SidebarSingleNavigation.ts",
     "Utils.ts",
   ]
@@ -57,6 +59,7 @@ devtools_module("components") {
     "../../../ui/visual_logging:bundle",
     "../../emulation:bundle",
     "../../mobile_throttling:bundle",
+    "../overlays:bundle",
     "../utils:bundle",
     "./insights:bundle",
   ]

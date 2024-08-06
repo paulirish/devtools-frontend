@@ -950,11 +950,21 @@ export namespace ProtocolMapping {
     /**
      * Installs an unpacked extension from the filesystem similar to
      * --load-extension CLI flags. Returns extension ID once the extension
-     * has been installed.
+     * has been installed. Available if the client is connected using the
+     * --remote-debugging-pipe flag and the --enable-unsafe-extension-debugging
+     * flag is set.
      */
     'Extensions.loadUnpacked': {
       paramsType: [Protocol.Extensions.LoadUnpackedRequest];
       returnType: Protocol.Extensions.LoadUnpackedResponse;
+    };
+    /**
+     * Gets data from extension storage in the given `area`. If `keys` is
+     * specified, these are used to filter the result.
+     */
+    'Extensions.getStorageItems': {
+      paramsType: [Protocol.Extensions.GetStorageItemsRequest];
+      returnType: Protocol.Extensions.GetStorageItemsResponse;
     };
     /**
      * Trigger autofill on a form identified by the fieldId.
@@ -2167,6 +2177,25 @@ export namespace ProtocolMapping {
      */
     'Emulation.setSensorOverrideReadings': {
       paramsType: [Protocol.Emulation.SetSensorOverrideReadingsRequest];
+      returnType: void;
+    };
+    /**
+     * Overrides a pressure source of a given type, as used by the Compute
+     * Pressure API, so that updates to PressureObserver.observe() are provided
+     * via setPressureStateOverride instead of being retrieved from
+     * platform-provided telemetry data.
+     */
+    'Emulation.setPressureSourceOverrideEnabled': {
+      paramsType: [Protocol.Emulation.SetPressureSourceOverrideEnabledRequest];
+      returnType: void;
+    };
+    /**
+     * Provides a given pressure state that will be processed and eventually be
+     * delivered to PressureObserver users. |source| must have been previously
+     * overridden by setPressureSourceOverrideEnabled.
+     */
+    'Emulation.setPressureStateOverride': {
+      paramsType: [Protocol.Emulation.SetPressureStateOverrideRequest];
       returnType: void;
     };
     /**

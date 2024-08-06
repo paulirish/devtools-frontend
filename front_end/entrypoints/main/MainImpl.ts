@@ -168,10 +168,10 @@ export class MainImpl {
       if (veLogging?.testing) {
         VisualLogging.setVeDebugLoggingEnabled(true, VisualLogging.DebugLoggingFormat.Test);
         const options = {
-          processingThrottler: new Common.Throttler.Throttler(10),
+          processingThrottler: new Common.Throttler.Throttler(0),
           keyboardLogThrottler: new Common.Throttler.Throttler(10),
-          hoverLogThrottler: new Common.Throttler.Throttler(10),
-          dragLogThrottler: new Common.Throttler.Throttler(10),
+          hoverLogThrottler: new Common.Throttler.Throttler(50),
+          dragLogThrottler: new Common.Throttler.Throttler(50),
           clickLogThrottler: new Common.Throttler.Throttler(10),
           resizeLogThrottler: new Common.Throttler.Throttler(10),
         };
@@ -305,8 +305,6 @@ export class MainImpl {
     Root.Runtime.experiments.register(
         'timeline-v8-runtime-call-stats', 'Performance panel: V8 runtime call stats', true);
     Root.Runtime.experiments.register(
-        'timeline-extensions', 'Performance panel: enable user timings based extensions', true);
-    Root.Runtime.experiments.register(
         'timeline-enhanced-traces', 'Performance panel: Enable collecting enhanced traces', true);
     Root.Runtime.experiments.register(
         'timeline-compiled-sources', 'Performance panel: Enable collecting source text for compiled script', true);
@@ -424,6 +422,11 @@ export class MainImpl {
         'Performance panel: enable live metrics landing page',
     );
 
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.GEN_AI_SETTINGS_PANEL,
+        'Dedicated panel for generative AI settings',
+    );
+
     Root.Runtime.experiments.enableExperimentsByDefault([
       'css-type-component-length-deprecate',
       Root.Runtime.ExperimentName.OUTERMOST_TARGET_SELECTOR,
@@ -469,7 +472,8 @@ export class MainImpl {
       ThemeSupport.ThemeSupport.instance({forceNew: true, setting: themeSetting});
     }
 
-    UI.UIUtils.installComponentRootStyles((document.body as Element));
+    UI.UIUtils.addPlatformClass(document.documentElement);
+    UI.UIUtils.installComponentRootStyles(document.body);
 
     this.#addMainEventListeners(document);
 
@@ -837,7 +841,6 @@ export class MainMenuItem implements UI.Toolbar.Provider {
       const dockItemToolbar = new UI.Toolbar.Toolbar('', dockItemElement);
       dockItemElement.setAttribute(
           'jslog', `${VisualLogging.item('dock-side').track({keydown: 'ArrowDown|ArrowLeft|ArrowRight'})}`);
-      dockItemToolbar.makeBlueOnHover();
       const undock = new UI.Toolbar.ToolbarToggle(
           i18nString(UIStrings.undockIntoSeparateWindow), 'dock-window', undefined, 'current-dock-state-undock');
       const bottom = new UI.Toolbar.ToolbarToggle(

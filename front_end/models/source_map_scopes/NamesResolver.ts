@@ -20,22 +20,14 @@ interface CachedScopeMap {
 
 const scopeToCachedIdentifiersMap = new WeakMap<Formatter.FormatterWorkerPool.ScopeTreeNode, CachedScopeMap>();
 const cachedMapByCallFrame = new WeakMap<SDK.DebuggerModel.CallFrame, Map<string, string|null>>();
-const cachedTextByDeferredContent = new WeakMap<TextUtils.ContentProvider.DeferredContent, TextUtils.Text.Text|null>();
 
-async function getTextFor(contentProvider: TextUtils.ContentProvider.ContentProvider):
+export async function getTextFor(contentProvider: TextUtils.ContentProvider.ContentProvider):
     Promise<TextUtils.Text.Text|null> {
-  // We intentionally cache based on the DeferredContent object rather
-  // than the ContentProvider object, which may appear as a more sensible
-  // choice, since the content of both Script and UISourceCode objects
-  // can change over time.
-  const deferredContent = await contentProvider.requestContent();
-  let text = cachedTextByDeferredContent.get(deferredContent);
-  if (text === undefined) {
-    const {content} = deferredContent;
-    text = content ? new TextUtils.Text.Text(content) : null;
-    cachedTextByDeferredContent.set(deferredContent, text);
+  const contentData = await contentProvider.requestContentData();
+  if (TextUtils.ContentData.ContentData.isError(contentData) || !contentData.isTextContent) {
+    return null;
   }
-  return text;
+  return contentData.textObj;
 }
 
 export class IdentifierPositions {
@@ -390,7 +382,12 @@ export const resolveScopeChain =
   if (scopeChain) {
     return scopeChain;
   }
-  return callFrame.scopeChain().map(scope => new ScopeWithSourceMappedVariables(scope));
+
+  if (callFrame.script.isWasm()) {
+    return callFrame.scopeChain();
+  }
+  const thisObject = await resolveThisObject(callFrame);
+  return callFrame.scopeChain().map(scope => new ScopeWithSourceMappedVariables(scope, thisObject));
 };
 
 /**
@@ -594,9 +591,12 @@ export const resolveScopeInObject = function(scope: SDK.DebuggerModel.ScopeChain
  */
 class ScopeWithSourceMappedVariables implements SDK.DebuggerModel.ScopeChainEntry {
   readonly #debuggerScope: SDK.DebuggerModel.ScopeChainEntry;
+  /** The resolved `this` of the current call frame */
+  readonly #thisObject: SDK.RemoteObject.RemoteObject|null;
 
-  constructor(scope: SDK.DebuggerModel.ScopeChainEntry) {
+  constructor(scope: SDK.DebuggerModel.ScopeChainEntry, thisObject: SDK.RemoteObject.RemoteObject|null) {
     this.#debuggerScope = scope;
+    this.#thisObject = thisObject;
   }
 
   callFrame(): SDK.DebuggerModel.CallFrame {
@@ -629,6 +629,15 @@ class ScopeWithSourceMappedVariables implements SDK.DebuggerModel.ScopeChainEntr
 
   icon(): string|undefined {
     return this.#debuggerScope.icon();
+  }
+
+  extraProperties(): SDK.RemoteObject.RemoteObjectProperty[] {
+    const extraProperties = this.#debuggerScope.extraProperties();
+    if (this.#thisObject && this.type() === Protocol.Debugger.ScopeType.Local) {
+      extraProperties.unshift(new SDK.RemoteObject.RemoteObjectProperty(
+          'this', this.#thisObject, undefined, undefined, undefined, undefined, undefined, /* synthetic */ true));
+    }
+    return extraProperties;
   }
 }
 

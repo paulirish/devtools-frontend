@@ -101,7 +101,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
       Common.Settings.Settings.instance().createLocalSetting('freestyler-dogfood-consent-onboarding-finished', false);
   constructor(private view: View = defaultView, {aidaClient, aidaAvailability}: {
     aidaClient: Host.AidaClient.AidaClient,
-    aidaAvailability: Host.AidaClient.AidaAvailability,
+    aidaAvailability: Host.AidaClient.AidaAccessPreconditions,
   }) {
     super(FreestylerPanel.panelName);
 
@@ -128,6 +128,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
       onFixThisIssueClick: () => {
         void this.#startConversation(FIX_THIS_ISSUE_PROMPT, true);
       },
+      canShowFeedbackForm: this.#serverSideLoggingEnabled,
     };
     this.#toggleSearchElementAction.addEventListener(UI.ActionRegistration.Events.Toggled, ev => {
       this.#viewProps.inspectElementToggled = ev.data;
@@ -158,7 +159,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
   }|undefined = {forceNew: null}): Promise<FreestylerPanel> {
     const {forceNew} = opts;
     if (!freestylerPanelInstance || forceNew) {
-      const aidaAvailability = await Host.AidaClient.AidaClient.getAidaClientAvailability();
+      const aidaAvailability = await Host.AidaClient.AidaClient.checkAccessPreconditions();
       const aidaClient = new Host.AidaClient.AidaClient();
       freestylerPanelInstance = new FreestylerPanel(defaultView, {aidaClient, aidaAvailability});
     }
@@ -233,6 +234,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
   #clearMessages(): void {
     this.#viewProps.messages = [];
     this.#viewProps.isLoading = false;
+    this.#viewProps.confirmSideEffectDialog = undefined;
     this.#agent = this.#createAgent();
     this.#cancel();
     this.doUpdate();

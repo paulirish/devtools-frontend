@@ -1175,7 +1175,7 @@
       supports_incremental_style: true,
       valid_for_permission_element: true,
       valid_for_page_context: true,
-      invalidate: ["accent-color", "background-current-color", "border-visual", "color"],
+      invalidate: ["accent-color", "background-current-color", "border-visual", "color", "outline"],
     },
     {
       name: "direction",
@@ -5979,6 +5979,18 @@
       keywords: ["none"],
       typedom_types: ["Keyword"],
       runtime_flag: "CSSViewTransitionClass",
+    },
+    {
+      name: "view-transition-group",
+      field_group: "*",
+      property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal"],
+      converter: "ConvertViewTransitionGroup",
+      type_name: "AtomicString",
+      default_value: "AtomicString()",
+      field_template: "external",
+      keywords: ["normal", "contain", "nearest"],
+      typedom_types: ["Keyword"],
+      runtime_flag: "NestedViewTransition",
     },
     {
       name: "view-transition-name",

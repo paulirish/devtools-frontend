@@ -69,6 +69,7 @@ UI.ActionRegistration.registerActionExtension({
 UI.ActionRegistration.registerActionExtension({
   actionId: 'components.collect-garbage',
   category: UI.ActionRegistration.ActionCategory.PERFORMANCE,
+  iconClass: UI.ActionRegistration.IconClass.MOP,
 });
 UI.ActionRegistration.registerActionExtension({
   actionId: 'timeline.toggle-recording',
@@ -101,7 +102,6 @@ const traceUrl = params.get('loadTimelineFromURL');
 const nodeMode = params.get('isNode');
 const isNodeMode = nodeMode === 'true' ? true : false;
 Root.Runtime.experiments.setEnabled('timeline-invalidation-tracking', params.has('invalidations'));
-Root.Runtime.experiments.setEnabled('timeline-extensions', true);
 
 const timeline = Timeline.TimelinePanel.TimelinePanel.instance({forceNew: true, isNode: isNodeMode});
 const container = document.getElementById('container');

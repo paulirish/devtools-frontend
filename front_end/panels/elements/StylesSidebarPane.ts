@@ -67,7 +67,6 @@ import {
   PositionTryRuleSection,
   RegisteredPropertiesSection,
   StylePropertiesSection,
-  TryRuleSection,
 } from './StylePropertiesSection.js';
 import {StylePropertyHighlighter} from './StylePropertyHighlighter.js';
 import {activeHints, type StylePropertyTreeElement} from './StylePropertyTreeElement.js';
@@ -1182,18 +1181,6 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
       blocks.push(block);
     }
 
-    for (const positionFallbackRule of matchedStyles.positionFallbackRules()) {
-      const block = SectionBlock.createPositionFallbackBlock(positionFallbackRule.name().text);
-      for (const tryRule of positionFallbackRule.tryRules()) {
-        this.idleCallbackManager.schedule(() => {
-          block.sections.push(new TryRuleSection(
-              this, matchedStyles, tryRule.style, sectionIdx, computedStyles, parentsComputedStyles));
-          sectionIdx++;
-        });
-      }
-      blocks.push(block);
-    }
-
     for (const positionTryRule of matchedStyles.positionTryRules()) {
       const block = SectionBlock.createPositionTryBlock(positionTryRule.name().text);
       this.idleCallbackManager.schedule(() => {
@@ -1462,7 +1449,6 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
     const filterInput = new UI.Toolbar.ToolbarFilter(undefined, 1, 1, undefined, undefined, false);
     filterInput.addEventListener(UI.Toolbar.ToolbarInput.Event.TextChanged, this.onFilterChanged, this);
     toolbar.appendToolbarItem(filterInput);
-    toolbar.makeToggledGray();
     void toolbar.appendItemsAtLocation('styles-sidebarpane-toolbar');
     this.toolbar = toolbar;
 
@@ -1554,8 +1540,8 @@ export class StylesSidebarPane extends Common.ObjectWrapper.eventMixin<EventType
     const autoDarkModeSetting = Common.Settings.Settings.instance().moduleSetting('emulate-auto-dark-mode');
     const decorateStatus = (condition: boolean, title: string): string => `${condition ? '✓ ' : ''}${title}`;
 
-    const button =
-        new UI.Toolbar.ToolbarToggle(i18nString(UIStrings.toggleRenderingEmulations), 'brush', 'brush-filled');
+    const button = new UI.Toolbar.ToolbarToggle(
+        i18nString(UIStrings.toggleRenderingEmulations), 'brush', 'brush-filled', undefined, false);
     button.element.setAttribute('jslog', `${VisualLogging.dropDown('rendering-emulations').track({click: true})}`);
     button.element.addEventListener('click', event => {
       const boundingRect = button.element.getBoundingClientRect();
@@ -1723,14 +1709,6 @@ export class SectionBlock {
     const separatorElement = document.createElement('div');
     separatorElement.className = 'sidebar-separator';
     separatorElement.textContent = `@font-palette-values ${name}`;
-    return new SectionBlock(separatorElement);
-  }
-
-  static createPositionFallbackBlock(positionFallbackName: string): SectionBlock {
-    const separatorElement = document.createElement('div');
-    separatorElement.className = 'sidebar-separator';
-    separatorElement.setAttribute('jslog', `${VisualLogging.sectionHeader('position-fallback')}`);
-    separatorElement.textContent = `@position-fallback ${positionFallbackName}`;
     return new SectionBlock(separatorElement);
   }
 
@@ -2231,8 +2209,7 @@ export class ButtonProvider implements UI.Toolbar.Provider {
   private readonly button: UI.Toolbar.ToolbarButton;
   private constructor() {
     this.button = UI.Toolbar.Toolbar.createActionButtonForId('elements.new-style-rule');
-    const longclickTriangle = IconButton.Icon.create('triangle-bottom-right', 'long-click-glyph');
-    this.button.element.appendChild(longclickTriangle);
+    this.button.setLongClickable(true);
 
     new UI.UIUtils.LongClickController(this.button.element, this.longClicked.bind(this));
     UI.Context.Context.instance().addFlavorChangeListener(SDK.DOMModel.DOMNode, onNodeChanged.bind(this));
