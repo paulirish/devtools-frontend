@@ -1470,7 +1470,8 @@ export class TimelineUIUtils {
         const layoutShift = event as TraceEngine.Types.TraceEvents.SyntheticLayoutShift;
         const layoutShiftEventData = layoutShift.args.data;
 
-        const preview = await LayoutShiftsTrackAppender.drawLayoutShiftScreenshotRects(event, traceParseData);
+        const maxSize = new UI.Geometry.Size(500, 400);
+        const preview = await LayoutShiftsTrackAppender.drawLayoutShiftScreenshotRects(event, traceParseData, maxSize);
         preview && contentHelper.appendElementRow('', preview);
 
         const warning = document.createElement('span');

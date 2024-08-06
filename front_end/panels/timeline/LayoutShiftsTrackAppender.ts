@@ -136,8 +136,8 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
 export async function drawLayoutShiftScreenshotRects(
     event: TraceEngine.Types.TraceEvents.SyntheticLayoutShift,
     traceParseData:
-        Readonly<TraceEngine.Handlers.Types.EnabledHandlerDataWithMeta<typeof TraceEngine.Handlers.ModelHandlers>>):
-    Promise<Node|undefined> {
+        Readonly<TraceEngine.Handlers.Types.EnabledHandlerDataWithMeta<typeof TraceEngine.Handlers.ModelHandlers>>,
+    maxSize: UI.Geometry.Size): Promise<Node|undefined> {
   const screenshots = event.parsedData.screenshots;
   const viewport = traceParseData.Meta.viewportRect;
   // TODO paralleize
@@ -175,9 +175,9 @@ export async function drawLayoutShiftScreenshotRects(
 
   // If this is being size constrained, it needs to be done in JS (rather than css max-width, etc)....
   // That's because this function is complete before it's added to the DOM.. so we can't query offsetHeight for its resolved size…
-  const maxHeight = 300;
-  const maxWidth = 500;
-  const scaleFactor = Math.min(maxWidth / beforeImage.naturalWidth, maxHeight / beforeImage.naturalHeight);
+  const maxWidth = maxSize.width;
+  const maxHeight = maxSize.height;
+  const scaleFactor = Math.min(maxWidth / beforeImage.naturalWidth, maxHeight / beforeImage.naturalHeight, 1);
   beforeImage.style.width = `${beforeImage.naturalWidth * scaleFactor}px`;
   beforeImage.style.height = `${beforeImage.naturalHeight * scaleFactor}px`;
 
@@ -288,6 +288,7 @@ export class Dialog {
     // UI.Tooltip.Tooltip.install(prevButton, i18nString(UIStrings.previousFrame));
     // const nextButton = UI.UIUtils.createTextButton('\u25B6', this.onNextFrame.bind(this));
     // UI.Tooltip.Tooltip.install(nextButton, i18nString(UIStrings.nextFrame));
+
     this.fragment = UI.Fragment.Fragment.build`
       <x-widget flex=none margin=12px>
         <x-hbox $='container' overflow=auto border='1px solid #ddd'>
@@ -314,8 +315,8 @@ export class Dialog {
       traceParseData:
           Readonly<TraceEngine.Handlers.Types.EnabledHandlerDataWithMeta<typeof TraceEngine.Handlers.ModelHandlers>>):
       Promise<void> {
-    //  new UI.Geometry.Size(500, 400)
-    const preview = await drawLayoutShiftScreenshotRects(event, traceParseData);
+    const maxSize = new UI.Geometry.Size(800, 800);
+    const preview = await drawLayoutShiftScreenshotRects(event, traceParseData, maxSize);
     if (preview) {
       this.fragment.$('container').appendChild(preview);
     }
