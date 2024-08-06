@@ -14,7 +14,7 @@ import {
   type TrackAppenderName,
   VisualLoggingTrackName,
 } from './CompatibilityTracksAppender.js';
-import type * as Timeline from './timeline.js';
+import timelinePanelStyles from './timelinePanel.css.js';
 
 const UIStrings = {
   /**
@@ -135,12 +135,12 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
 
 export async function drawLayoutShiftScreenshotRects(
     event: TraceEngine.Types.TraceEvents.SyntheticLayoutShift,
-    contentHelper: Timeline.TimelineUIUtils.TimelineDetailsContentHelper,
     traceParseData:
         Readonly<TraceEngine.Handlers.Types.EnabledHandlerDataWithMeta<typeof TraceEngine.Handlers.ModelHandlers>>):
-    Promise<void> {
+    Promise<Node|undefined> {
   const screenshots = event.parsedData.screenshots;
   const viewport = traceParseData.Meta.viewportRect;
+  // TODO paralleize
   const afterImage = screenshots.after?.args.dataUri && await UI.UIUtils.loadImage(screenshots.after?.args.dataUri);
   const beforeImage = screenshots.before?.args.dataUri && await UI.UIUtils.loadImage(screenshots.before?.args.dataUri);
   if (!beforeImage || !viewport) {
@@ -153,7 +153,6 @@ export async function drawLayoutShiftScreenshotRects(
    * See https://crbug.com/1300309
    */
   const dpr = traceParseData.Meta.devicePixelRatio;
-
   if (dpr === undefined) {
     return;
   }
@@ -173,10 +172,9 @@ export async function drawLayoutShiftScreenshotRects(
   screenshotContainer.classList.add('layout-shift-screenshot-preview');
   screenshotContainer.style.position = 'relative';
   screenshotContainer.appendChild(beforeImage);
-  contentHelper.appendElementRow('', screenshotContainer);
 
   // If this is being size constrained, it needs to be done in JS (rather than css max-width, etc)....
-  // That's because this function is complete before the contentHelper adds it to the DOM.. so we can't query offsetHeight for its resolved size…
+  // That's because this function is complete before it's added to the DOM.. so we can't query offsetHeight for its resolved size…
   const maxHeight = 300;
   const maxWidth = 500;
   const scaleFactor = Math.min(maxWidth / beforeImage.naturalWidth, maxHeight / beforeImage.naturalHeight);
@@ -214,6 +212,9 @@ export async function drawLayoutShiftScreenshotRects(
     screenshotContainer.appendChild(afterImage);
     afterImage.style.width = beforeImage.style.width;
     afterImage.style.height = beforeImage.style.height;
+    afterImage.addEventListener('click', () => {
+      Dialog.fromFilmStrip(event, traceParseData);
+    });
   }
 
   // Update for the after rect positions after a bit.
@@ -234,59 +235,92 @@ export async function drawLayoutShiftScreenshotRects(
       afterImage.style.opacity = '1';
     }
   }, 1000);
+  return screenshotContainer;
 }
+
+const styles = `
+.layout-shift-screenshot-preview {
+  position: relative;
+}
+
+.layout-shift-screenshot-preview-rect {
+  outline: 1px solid color-mix(in srgb, black 20%, var(--app-color-rendering)); /* was rgb(132, 48, 206) */
+  background-color: color-mix(in srgb, transparent 50%, var(--app-color-rendering-children)); /* was rgba(132, 48, 206, 0.5) */
+  position: absolute;
+  transition: all 1s;
+  z-index: 200;
+}
+
+.layout-shift-screenshot-after {
+  opacity: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  transition: opacity 1s;
+}
+
+`;
 
 // TODO make the below be for layotushifts
-interface DialogTraceEngineData {
-  source: 'TraceEngine';
-  index: number;
-  zeroTime: TraceEngine.Types.Timing.MilliSeconds;
-  frames: readonly TraceEngine.Extras.FilmStrip.Frame[];
-}
-
 export class Dialog {
   private fragment: UI.Fragment.Fragment;
   private readonly widget: UI.XWidget.XWidget;
-  private index: number;
   private dialog: UI.Dialog.Dialog|null = null;
 
-  #data: DialogTraceEngineData;
 
-  static fromFilmStrip(filmStrip: TraceEngine.Extras.FilmStrip.Data, selectedFrameIndex: number): Dialog {
-    const data: DialogTraceEngineData = {
-      source: 'TraceEngine',
-      frames: filmStrip.frames,
-      index: selectedFrameIndex,
-      zeroTime: TraceEngine.Helpers.Timing.microSecondsToMilliseconds(filmStrip.zeroTime),
-    };
-    return new Dialog(data);
+  static fromFilmStrip(
+      event: TraceEngine.Types.TraceEvents.SyntheticLayoutShift,
+      traceParseData:
+          Readonly<TraceEngine.Handlers.Types.EnabledHandlerDataWithMeta<typeof TraceEngine.Handlers.ModelHandlers>>):
+      Dialog {
+    return new Dialog(
+        event,
+        traceParseData,
+    );
   }
 
-  private constructor(data: DialogTraceEngineData) {
-    this.#data = data;
-    this.index = data.index;
-    const prevButton = UI.UIUtils.createTextButton('\u25C0', this.onPrevFrame.bind(this));
-    UI.Tooltip.Tooltip.install(prevButton, i18nString(UIStrings.previousFrame));
-    const nextButton = UI.UIUtils.createTextButton('\u25B6', this.onNextFrame.bind(this));
-    UI.Tooltip.Tooltip.install(nextButton, i18nString(UIStrings.nextFrame));
+  private constructor(
+      event: TraceEngine.Types.TraceEvents.SyntheticLayoutShift,
+      traceParseData:
+          Readonly<TraceEngine.Handlers.Types.EnabledHandlerDataWithMeta<typeof TraceEngine.Handlers.ModelHandlers>>) {
+    // const prevButton = UI.UIUtils.createTextButton('\u25C0', this.onPrevFrame.bind(this));
+    // UI.Tooltip.Tooltip.install(prevButton, i18nString(UIStrings.previousFrame));
+    // const nextButton = UI.UIUtils.createTextButton('\u25B6', this.onNextFrame.bind(this));
+    // UI.Tooltip.Tooltip.install(nextButton, i18nString(UIStrings.nextFrame));
     this.fragment = UI.Fragment.Fragment.build`
       <x-widget flex=none margin=12px>
-        <x-hbox overflow=auto border='1px solid #ddd'>
-          <img $='image' data-film-strip-dialog-img style="max-height: 80vh; max-width: 80vw;"></img>
+        <x-hbox $='container' overflow=auto border='1px solid #ddd'>
         </x-hbox>
-        <x-hbox x-center justify-content=center margin-top=10px>
-          ${prevButton}
-          <x-hbox $='time' margin=8px></x-hbox>
-          ${nextButton}
-        </x-hbox>
+
       </x-widget>
     `;
+    // <x-hbox x-center justify-content=center margin-top=10px>
+    //       ${prevButton}
+    //       <x-hbox $='time' margin=8px></x-hbox>
+    //       ${nextButton}
+    //     </x-hbox>
     this.widget = (this.fragment.element() as UI.XWidget.XWidget);
     (this.widget as HTMLElement).tabIndex = 0;
-    this.widget.addEventListener('keydown', this.keyDown.bind(this), false);
+    // this.widget.addEventListener('keydown', this.keyDown.bind(this), false);
     this.dialog = null;
 
-    void this.render();
+    void this.render(event, traceParseData);
+  }
+
+
+  private async render(
+      event: TraceEngine.Types.TraceEvents.SyntheticLayoutShift,
+      traceParseData:
+          Readonly<TraceEngine.Handlers.Types.EnabledHandlerDataWithMeta<typeof TraceEngine.Handlers.ModelHandlers>>):
+      Promise<void> {
+    //  new UI.Geometry.Size(500, 400)
+    const preview = await drawLayoutShiftScreenshotRects(event, traceParseData);
+    if (preview) {
+      this.fragment.$('container').appendChild(preview);
+    }
+
+    this.resize();
   }
 
   hide(): void {
@@ -295,84 +329,68 @@ export class Dialog {
     }
   }
 
-  #framesCount(): number {
-    return this.#data.frames.length;
-  }
-
-  #zeroTime(): TraceEngine.Types.Timing.MilliSeconds {
-    return this.#data.zeroTime;
-  }
-
   private resize(): void {
     if (!this.dialog) {
       this.dialog = new UI.Dialog.Dialog();
       this.dialog.contentElement.appendChild(this.widget);
       this.dialog.setDefaultFocusedElement(this.widget);
+      this.dialog.registerRequiredCSS({cssContent: styles});
       this.dialog.show();
     }
+
     this.dialog.setSizeBehavior(UI.GlassPane.SizeBehavior.MeasureContent);
   }
 
-  private keyDown(event: Event): void {
-    const keyboardEvent = (event as KeyboardEvent);
-    switch (keyboardEvent.key) {
-      case 'ArrowLeft':
-        if (Host.Platform.isMac() && keyboardEvent.metaKey) {
-          this.onFirstFrame();
-        } else {
-          this.onPrevFrame();
-        }
-        break;
+  // private keyDown(event: Event): void {
+  //   const keyboardEvent = (event as KeyboardEvent);
+  //   switch (keyboardEvent.key) {
+  //     case 'ArrowLeft':
+  //       if (Host.Platform.isMac() && keyboardEvent.metaKey) {
+  //         this.onFirstFrame();
+  //       } else {
+  //         this.onPrevFrame();
+  //       }
+  //       break;
 
-      case 'ArrowRight':
-        if (Host.Platform.isMac() && keyboardEvent.metaKey) {
-          this.onLastFrame();
-        } else {
-          this.onNextFrame();
-        }
-        break;
+  //     case 'ArrowRight':
+  //       if (Host.Platform.isMac() && keyboardEvent.metaKey) {
+  //         this.onLastFrame();
+  //       } else {
+  //         this.onNextFrame();
+  //       }
+  //       break;
 
-      case 'Home':
-        this.onFirstFrame();
-        break;
+  //     case 'Home':
+  //       this.onFirstFrame();
+  //       break;
 
-      case 'End':
-        this.onLastFrame();
-        break;
-    }
-  }
+  //     case 'End':
+  //       this.onLastFrame();
+  //       break;
+  //   }
+  // }
 
-  private onPrevFrame(): void {
-    if (this.index > 0) {
-      --this.index;
-    }
-    void this.render();
-  }
+  // private onPrevFrame(): void {
+  //   if (this.index > 0) {
+  //     --this.index;
+  //   }
+  //   void this.render();
+  // }
 
-  private onNextFrame(): void {
-    if (this.index < this.#framesCount() - 1) {
-      ++this.index;
-    }
-    void this.render();
-  }
+  // private onNextFrame(): void {
+  //   if (this.index < this.#framesCount() - 1) {
+  //     ++this.index;
+  //   }
+  //   void this.render();
+  // }
 
-  private onFirstFrame(): void {
-    this.index = 0;
-    void this.render();
-  }
+  // private onFirstFrame(): void {
+  //   this.index = 0;
+  //   void this.render();
+  // }
 
-  private onLastFrame(): void {
-    this.index = this.#framesCount() - 1;
-    void this.render();
-  }
-
-  private render(): void {
-    const frame = this.#data.frames[this.index];
-    const timestamp = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(frame.screenshotEvent.ts);
-    this.fragment.$('time').textContent = i18n.TimeUtilities.millisToString(timestamp - this.#zeroTime());
-    const image = (this.fragment.$('image') as HTMLImageElement);
-    image.setAttribute('data-frame-index', this.index.toString());
-    FilmStripView.setImageData(image, frame.screenshotEvent.args.dataUri);
-    this.resize();
-  }
+  // private onLastFrame(): void {
+  //   this.index = this.#framesCount() - 1;
+  //   void this.render();
+  // }
 }
