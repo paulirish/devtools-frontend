@@ -1,7 +1,10 @@
 // Copyright 2023 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
+import type * as SDK from '../../core/sdk/sdk.js';
+import type * as Protocol from '../../generated/protocol.js';
 import * as TraceEngine from '../../models/trace/trace.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
@@ -14,7 +17,6 @@ import {
   type TrackAppenderName,
   VisualLoggingTrackName,
 } from './CompatibilityTracksAppender.js';
-import timelinePanelStyles from './timelinePanel.css.js';
 
 const UIStrings = {
   /**
@@ -137,7 +139,8 @@ export async function drawLayoutShiftScreenshotRects(
     event: TraceEngine.Types.TraceEvents.SyntheticLayoutShift,
     traceParseData:
         Readonly<TraceEngine.Handlers.Types.EnabledHandlerDataWithMeta<typeof TraceEngine.Handlers.ModelHandlers>>,
-    maxSize: UI.Geometry.Size): Promise<Node|undefined> {
+    maxSize: UI.Geometry.Size,
+    relatedNodesMap: Map<Protocol.DOM.BackendNodeId, SDK.DOMModel.DOMNode|null>|null): Promise<HTMLElement|undefined> {
   const screenshots = event.parsedData.screenshots;
   const viewport = traceParseData.Meta.viewportRect;
   // TODO paralleize
@@ -213,7 +216,7 @@ export async function drawLayoutShiftScreenshotRects(
     afterImage.style.width = beforeImage.style.width;
     afterImage.style.height = beforeImage.style.height;
     afterImage.addEventListener('click', () => {
-      Dialog.fromFilmStrip(event, traceParseData);
+      new Dialog(event, traceParseData, relatedNodesMap);
     });
   }
 
@@ -260,6 +263,10 @@ const styles = `
   transition: opacity 1s;
 }
 
+.highlight {
+background-color: yellow;
+}
+
 `;
 
 // TODO make the below be for layotushifts
@@ -268,22 +275,11 @@ export class Dialog {
   private readonly widget: UI.XWidget.XWidget;
   private dialog: UI.Dialog.Dialog|null = null;
 
-
-  static fromFilmStrip(
+  constructor(
       event: TraceEngine.Types.TraceEvents.SyntheticLayoutShift,
       traceParseData:
-          Readonly<TraceEngine.Handlers.Types.EnabledHandlerDataWithMeta<typeof TraceEngine.Handlers.ModelHandlers>>):
-      Dialog {
-    return new Dialog(
-        event,
-        traceParseData,
-    );
-  }
-
-  private constructor(
-      event: TraceEngine.Types.TraceEvents.SyntheticLayoutShift,
-      traceParseData:
-          Readonly<TraceEngine.Handlers.Types.EnabledHandlerDataWithMeta<typeof TraceEngine.Handlers.ModelHandlers>>) {
+          Readonly<TraceEngine.Handlers.Types.EnabledHandlerDataWithMeta<typeof TraceEngine.Handlers.ModelHandlers>>,
+      relatedNodesMap: Map<Protocol.DOM.BackendNodeId, SDK.DOMModel.DOMNode|null>|null) {
     // const prevButton = UI.UIUtils.createTextButton('\u25C0', this.onPrevFrame.bind(this));
     // UI.Tooltip.Tooltip.install(prevButton, i18nString(UIStrings.previousFrame));
     // const nextButton = UI.UIUtils.createTextButton('\u25B6', this.onNextFrame.bind(this));
@@ -291,9 +287,15 @@ export class Dialog {
 
     this.fragment = UI.Fragment.Fragment.build`
       <x-widget flex=none margin=12px>
-        <x-hbox $='container' overflow=auto border='1px solid #ddd'>
-        </x-hbox>
+        <x-hbox>
+          <x-hbox $='container' overflow=auto border='1px solid #ddd'>
+          </x-hbox>
+          <x-hbox>
+            <ul $='nodes'>
 
+            </ul>
+          </x-hbox>
+        </x-hbox>
       </x-widget>
     `;
     // <x-hbox x-center justify-content=center margin-top=10px>
@@ -306,20 +308,35 @@ export class Dialog {
     // this.widget.addEventListener('keydown', this.keyDown.bind(this), false);
     this.dialog = null;
 
-    void this.render(event, traceParseData);
+    void this.render(event, traceParseData, relatedNodesMap);
   }
-
 
   private async render(
       event: TraceEngine.Types.TraceEvents.SyntheticLayoutShift,
       traceParseData:
-          Readonly<TraceEngine.Handlers.Types.EnabledHandlerDataWithMeta<typeof TraceEngine.Handlers.ModelHandlers>>):
-      Promise<void> {
+          Readonly<TraceEngine.Handlers.Types.EnabledHandlerDataWithMeta<typeof TraceEngine.Handlers.ModelHandlers>>,
+      relatedNodesMap: Map<Protocol.DOM.BackendNodeId, SDK.DOMModel.DOMNode|null>|null): Promise<void> {
     const maxSize = new UI.Geometry.Size(800, 800);
-    const preview = await drawLayoutShiftScreenshotRects(event, traceParseData, maxSize);
-    if (preview) {
-      this.fragment.$('container').appendChild(preview);
+    const preview = await drawLayoutShiftScreenshotRects(event, traceParseData, maxSize, relatedNodesMap);
+    if (!preview) {
+      return;
     }
+    this.fragment.$('container').appendChild(preview);
+
+    const nodes = relatedNodesMap ? Array.from(relatedNodesMap.values()) : [];
+    await Promise.all(nodes.map(async (node, i) => {
+      const nodeSpan = await Common.Linkifier.Linkifier.linkify(node);
+
+      const rectEl = preview.querySelectorAll('.layout-shift-screenshot-preview-rect').item(i);
+
+      nodeSpan.addEventListener('mouseover', () => rectEl.classList.add('highlight'));
+      nodeSpan.addEventListener('mouseleave', () => rectEl.classList.remove('highlight'));
+
+      const li = document.createElement('li');
+      li.appendChild(nodeSpan);
+      this.fragment.$('nodes').appendChild(li);
+    }));
+
 
     this.resize();
   }
