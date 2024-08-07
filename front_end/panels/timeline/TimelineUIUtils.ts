@@ -1009,7 +1009,6 @@ export class TimelineUIUtils {
     return LegacyComponents.Linkifier.Linkifier.linkifyURL(frame.url as Platform.DevToolsPath.UrlString, options);
   }
 
-
   static buildDetailsNodeForMarkerEvents(event: TraceEngine.Types.TraceEvents.MarkerEvent): HTMLElement {
     let link = 'https://web.dev/user-centric-performance-metrics/';
     let name = 'page performance metrics';
