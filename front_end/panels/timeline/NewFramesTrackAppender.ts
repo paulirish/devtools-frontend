@@ -153,6 +153,7 @@ export class NewFramesTrackAppender implements TrackAppender {
       event.args.frameSeqId ??
       event.args.frame_sequence ??
       event.args.begin_frame_id ??
+      event.args.debug?.begin_frame_id ??
       event.args.args?.sequence_number ??
       event.args?.data?.beginEvent?.args?.sequence_number ??  // my additions to chrome_frame_reporter
       event.args?.data?.beginEvent?.args?.data?.sequence_number ??

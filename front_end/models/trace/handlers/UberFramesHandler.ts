@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {data as metaHandlerData} from './MetaHandler.js';
-import {type TraceEventHandlerName,HandlerState} from './types.js';
-
 import * as Platform from '../../../core/platform/platform.js';
 import * as Helpers from '../helpers/helpers.js';
 import * as Types from '../types/types.js';
+
+import {data as metaHandlerData} from './MetaHandler.js';
+import {HandlerState, type TraceEventHandlerName} from './types.js';
 
 // Each thread contains events. Events indicate the thread and process IDs, which are
 // used to store the event in the correct process thread entry below.
@@ -45,15 +45,15 @@ export function reset(): void {
 
 let handlerState = HandlerState.UNINITIALIZED;
 
-const someStuff  = {
-  CompositeLayers : 'CompositeLayers',
-  RasterTask : 'RasterTask',
-  ImageDecodeTask : 'ImageDecodeTask',
-  ImageUploadTask : 'ImageUploadTask',
-  DecodeImage : 'Decode Image',
-  ResizeImage : 'Resize Image',
-  DrawLazyPixelRef : 'Draw LazyPixelRef',
-  DecodeLazyPixelRef : 'Decode LazyPixelRef',
+const someStuff = {
+  CompositeLayers: 'CompositeLayers',
+  RasterTask: 'RasterTask',
+  ImageDecodeTask: 'ImageDecodeTask',
+  ImageUploadTask: 'ImageUploadTask',
+  DecodeImage: 'Decode Image',
+  ResizeImage: 'Resize Image',
+  DrawLazyPixelRef: 'Draw LazyPixelRef',
+  DecodeLazyPixelRef: 'Decode LazyPixelRef',
 
   BeginFrame: 'BeginFrame',
   RequestMainThreadFrame: 'RequestMainThreadFrame',
@@ -65,7 +65,7 @@ const someStuff  = {
 };
 const someRelevantTraceEventTypes = [
 
-  ... Object.values(someStuff),
+  ...Object.values(someStuff),
 
   // timeline frame model
   'ActivateLayerTree',
@@ -95,8 +95,8 @@ const someRelevantTraceEventTypes = [
   // LONG ones and ones i typically comment out
   'PipelineReporter',
   'SendBeginMainFrameToCommit',
-  'BeginImplFrameToSendBeginMainFrame', // happens too much on dropped frames
-  'SubmitCompositorFrameToPresentationCompositorFrame', // parent phase in eventlatency
+  'BeginImplFrameToSendBeginMainFrame',                  // happens too much on dropped frames
+  'SubmitCompositorFrameToPresentationCompositorFrame',  // parent phase in eventlatency
   // 'Graphics.Pipeline',
 
   'RasterDecoderImpl::DoEndRasterCHROMIUM',
@@ -126,51 +126,51 @@ const someRelevantTraceEventTypes = [
 
   'EndCommitToActivation',
   'Swap',
-  'SwapBuffers', // the gpu one
+  'SwapBuffers',  // the gpu one
   'Scheduler::BeginFrame',
   'DisplayScheduler::BeginFrame',
   'Scheduler::BeginImplFrame',
 
-  'EventLatency', // mocny said these are complicated. but.. they're also great.
+  'EventLatency',  // mocny said these are complicated. but.. they're also great.
   // https://docs.google.com/spreadsheets/d/1F6BPrtIMgDD4eKH-VxEqzZy8dOeh3U2EZaYjVlIv-Hk/edit?resourcekey=0-UtBlkaCsd0Oi1Z3bQqHqow#gid=557410449
   // TODO.. some of these are emitted separately on different trace categories.. so there's duplicates. ugh
-'GenerationToBrowserMain',
-'BrowserMainToRendererCompositor',
-'RendererCompositorQueueingDelay',
-'RendererCompositorProcessing',
-'RendererCompositorFinishedToEndActivate',
-'RendererCompositorFinishedToSendBeginMainFrame',
-'RendererCompositorFinishedToBeginImplFrame',
-'BeginImplFrameToSendBeginMainFrame',
-'RendererCompositorFinishedToCommit',
-'RendererCompositorFinishedToEndCommit',
-'RendererCompositorFinishedToActivation',
-'RendererCompositorFinishedToSubmitCompositorFrame',
-'RendererCompositorToMain',
-'RendererMainProcessing',
-'RendererMainFinishedToBeginImplFrame',
-'RendererMainFinishedToSendBeginMainFrame',
-'RendererMainFinishedToCommit',
-'RendererMainFinishedToEndCommit',
-'RendererMainFinishedToActivation',
-'RendererMainFinishedToEndActivate',
-'RendererMainFinishedToSubmitCompositorFrame',
-'SendBeginMainFrameToCommit',
-'Commit',
-'EndCommitToActivation',
-'Activation',
-'EndActivateToSubmitCompositorFrame',
-'SubmitCompositorFrameToPresentationCompositorFrame',
-'SubmitCompositorFrameToPresentationCompositorFrame sub-stages:',
-'SubmitToReceiveCompositorFrame',
-'ReceiveCompositorFrameToStartDraw',
-'StartDrawToSwapStart',
-'Swap',
-'SwapStartToBufferAvailable',
-'BufferAvailableToBufferReady',
-'BufferReadyToLatch',
-'LatchToSwapEnd',
-'SwapEndToPresentationCompositorFrame',
+  'GenerationToBrowserMain',
+  'BrowserMainToRendererCompositor',
+  'RendererCompositorQueueingDelay',
+  'RendererCompositorProcessing',
+  'RendererCompositorFinishedToEndActivate',
+  'RendererCompositorFinishedToSendBeginMainFrame',
+  'RendererCompositorFinishedToBeginImplFrame',
+  'BeginImplFrameToSendBeginMainFrame',
+  'RendererCompositorFinishedToCommit',
+  'RendererCompositorFinishedToEndCommit',
+  'RendererCompositorFinishedToActivation',
+  'RendererCompositorFinishedToSubmitCompositorFrame',
+  'RendererCompositorToMain',
+  'RendererMainProcessing',
+  'RendererMainFinishedToBeginImplFrame',
+  'RendererMainFinishedToSendBeginMainFrame',
+  'RendererMainFinishedToCommit',
+  'RendererMainFinishedToEndCommit',
+  'RendererMainFinishedToActivation',
+  'RendererMainFinishedToEndActivate',
+  'RendererMainFinishedToSubmitCompositorFrame',
+  'SendBeginMainFrameToCommit',
+  'Commit',
+  'EndCommitToActivation',
+  'Activation',
+  'EndActivateToSubmitCompositorFrame',
+  'SubmitCompositorFrameToPresentationCompositorFrame',
+  'SubmitCompositorFrameToPresentationCompositorFrame sub-stages:',
+  'SubmitToReceiveCompositorFrame',
+  'ReceiveCompositorFrameToStartDraw',
+  'StartDrawToSwapStart',
+  'Swap',
+  'SwapStartToBufferAvailable',
+  'BufferAvailableToBufferReady',
+  'BufferReadyToLatch',
+  'LatchToSwapEnd',
+  'SwapEndToPresentationCompositorFrame',
 
   //
   'EventTiming',
@@ -190,45 +190,45 @@ const someRelevantTraceEventTypes = [
 ];
 
 export const eventLatencyBreakdownTypeNames = [
-'GenerationToBrowserMain',
-'BrowserMainToRendererCompositor',
-'RendererCompositorQueueingDelay',
-'RendererCompositorProcessing',
-'RendererCompositorFinishedToEndActivate',
-'RendererCompositorFinishedToSendBeginMainFrame',
-'RendererCompositorFinishedToBeginImplFrame',
-'BeginImplFrameToSendBeginMainFrame',
-'RendererCompositorFinishedToCommit',
-'RendererCompositorFinishedToEndCommit',
-'RendererCompositorFinishedToActivation',
-'RendererCompositorFinishedToSubmitCompositorFrame',
+  'GenerationToBrowserMain',
+  'BrowserMainToRendererCompositor',
+  'RendererCompositorQueueingDelay',
+  'RendererCompositorProcessing',
+  'RendererCompositorFinishedToEndActivate',
+  'RendererCompositorFinishedToSendBeginMainFrame',
+  'RendererCompositorFinishedToBeginImplFrame',
+  'BeginImplFrameToSendBeginMainFrame',
+  'RendererCompositorFinishedToCommit',
+  'RendererCompositorFinishedToEndCommit',
+  'RendererCompositorFinishedToActivation',
+  'RendererCompositorFinishedToSubmitCompositorFrame',
 
-'RendererCompositorToMain',
-'RendererMainProcessing',
-'RendererMainFinishedToBeginImplFrame',
-'RendererMainFinishedToSendBeginMainFrame',
-'RendererMainFinishedToCommit',
-'RendererMainFinishedToEndCommit',
-'RendererMainFinishedToActivation',
-'RendererMainFinishedToEndActivate',
-'RendererMainFinishedToSubmitCompositorFrame',
+  'RendererCompositorToMain',
+  'RendererMainProcessing',
+  'RendererMainFinishedToBeginImplFrame',
+  'RendererMainFinishedToSendBeginMainFrame',
+  'RendererMainFinishedToCommit',
+  'RendererMainFinishedToEndCommit',
+  'RendererMainFinishedToActivation',
+  'RendererMainFinishedToEndActivate',
+  'RendererMainFinishedToSubmitCompositorFrame',
 
-'SendBeginMainFrameToCommit',
-'Commit',
-'EndCommitToActivation',
-'Activation',
-'EndActivateToSubmitCompositorFrame',
+  'SendBeginMainFrameToCommit',
+  'Commit',
+  'EndCommitToActivation',
+  'Activation',
+  'EndActivateToSubmitCompositorFrame',
 
-// 'SubmitCompositorFrameToPresentationCompositorFrame', // parent phase that can overlap
-'SubmitToReceiveCompositorFrame',
-'ReceiveCompositorFrameToStartDraw',
-'StartDrawToSwapStart',
-'Swap',
-'SwapStartToBufferAvailable',
-'BufferAvailableToBufferReady',
-'BufferReadyToLatch',
-'LatchToSwapEnd',
-'SwapEndToPresentationCompositorFrame',
+  // 'SubmitCompositorFrameToPresentationCompositorFrame', // parent phase that can overlap
+  'SubmitToReceiveCompositorFrame',
+  'ReceiveCompositorFrameToStartDraw',
+  'StartDrawToSwapStart',
+  'Swap',
+  'SwapStartToBufferAvailable',
+  'BufferAvailableToBufferReady',
+  'BufferReadyToLatch',
+  'LatchToSwapEnd',
+  'SwapEndToPresentationCompositorFrame',
 ];
 
 export const waterfallTypes = new Map([
@@ -241,23 +241,19 @@ export const waterfallTypes = new Map([
 ]);
 
 export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
-
   if (Types.TraceEvents.isTraceEventGPUTask(event)) {
     gpuEvents.push(event);
     Helpers.Trace.addEventToProcessThread(event, eventsInProcessThread);
   } else if (
-    event.name === 'Screenshot'
-    // || event.cat === 'blink.user_timing'
-    || someRelevantTraceEventTypes.some(type => event.name === type)
-  ) {
+      event.name === 'Screenshot'
+      // || event.cat === 'blink.user_timing'
+      || someRelevantTraceEventTypes.some(type => event.name === type)) {
     if (event.ph === 'b' || event.ph === 'e') {
       asyncEvts.push(event);
     } else {
-
       if (eventLatencyBreakdownTypeNames.includes(event.name)) {
         // we have two diff events named Commit, we'll exclude the normal mainthread one.
         if (event.name === 'Commit' && !event.cat.includes('cc')) {
-
         } else {
           waterFallEvents.push(event);
         }
@@ -266,7 +262,6 @@ export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
     }
     Helpers.Trace.addEventToProcessThread(event, eventsInProcessThread);
   }
-
 }
 
 export async function finalize(): Promise<void> {
@@ -281,7 +276,7 @@ export async function finalize(): Promise<void> {
   const {gpuProcessId, gpuThreadId, topLevelRendererIds} = metaHandlerData();
   // This cuts down GPU Task count .. 33% of what ift was.
   const ourRendererGPUTasks = gpuEvents.filter(e => topLevelRendererIds.has(e.args.data.renderer_pid));
-  relevantEvts = [... relevantEvts, ... ourRendererGPUTasks];
+  relevantEvts = [...relevantEvts, ...ourRendererGPUTasks];
 
   if (handlerState !== HandlerState.INITIALIZED) {
     throw new Error('UberFrames handler is not initialized');
@@ -346,19 +341,18 @@ export async function finalize(): Promise<void> {
       eventLatencyIdToFrameSeq[eventsPair.begin.id2.local] = eventsPair.begin.args.event_latency.frame_sequence ?? null;
     }
     if (event.name === 'PipelineReporter') {
-      eventLatencyIdToFrameSeq[eventsPair.begin.id2.local] = eventsPair.begin.args.chrome_frame_reporter.frame_sequence ?? null;
+      eventLatencyIdToFrameSeq[eventsPair.begin.id2.local] =
+          eventsPair.begin.args.chrome_frame_reporter.frame_sequence ?? null;
     }
 
     const existingDuplicate = syntheticEvents.find(e => {
-      return e.name === event.name &&
-      e.ts === event.ts &&
-      e.dur === event.dur &&
-      e.id2?.local === event.id2?.local &&
-      e.tid === event.tid &&
-      e.pid === event.pid;
+      return e.name === event.name && e.ts === event.ts && e.dur === event.dur && e.id2?.local === event.id2?.local &&
+          e.tid === event.tid && e.pid === event.pid;
     });
     // Some eventlatnecy evts are emitted on multiple categories separtely. leave them otu
-    if (existingDuplicate) {continue;}
+    if (existingDuplicate) {
+      continue;
+    }
 
     if (eventLatencyBreakdownTypeNames.includes(event.name)) {
       waterFallEvents.push(event);
@@ -370,10 +364,12 @@ export async function finalize(): Promise<void> {
   // EDIT: disabled filtering since ubeframes is a mess anyway.
   syntheticEvents = syntheticEvents.filter(e => {
     return true;
-    if (e.name !== 'PipelineReporter') {return true;}
+    if (e.name !== 'PipelineReporter') {
+      return true;
+    }
     return topLevelRendererIds.has(e.pid) &&
-      e.args.data.beginEvent.args.chrome_frame_reporter.frame_type !== 'FORKED' &&
-      e.args.data.beginEvent.args.chrome_frame_reporter.state === 'STATE_PRESENTED_ALL';
+        e.args.data.beginEvent.args.chrome_frame_reporter.frame_type !== 'FORKED' &&
+        e.args.data.beginEvent.args.chrome_frame_reporter.state === 'STATE_PRESENTED_ALL';
   });
 
   handlerState = HandlerState.FINALIZED;
