@@ -49,6 +49,7 @@ const someStuff = {
   CompositeLayers: 'CompositeLayers',
   RasterTask: 'RasterTask',
   ImageDecodeTask: 'ImageDecodeTask',
+
   ImageUploadTask: 'ImageUploadTask',
   DecodeImage: 'Decode Image',
   ResizeImage: 'Resize Image',
@@ -83,6 +84,12 @@ const someRelevantTraceEventTypes = [
   'ScheduleStyleRecalculation,',
   'ScrollLayer,',
   'SetLayerTreeId',
+
+  'AnimationFrame',
+  'AnimationFrame::FirstUIEvent',
+  'AnimationFrame::StyleAndLayout',
+  'AnimationFrame::Presentation',
+
 
 
   'MainFrame.NotifyReadyToCommitOnImpl',
@@ -219,6 +226,8 @@ export const eventLatencyBreakdownTypeNames = [
   'Activation',
   'EndActivateToSubmitCompositorFrame',
 
+
+
   // 'SubmitCompositorFrameToPresentationCompositorFrame', // parent phase that can overlap
   'SubmitToReceiveCompositorFrame',
   'ReceiveCompositorFrameToStartDraw',
@@ -287,7 +296,9 @@ export async function finalize(): Promise<void> {
     end: Types.TraceEvents.TraceEventNestableAsyncEnd | null,
   }> = new Map();
 
-  for (const event of [...asyncEvts]) {
+  for (let i = 0; i < asyncEvts.length - 1; i++) {
+    const event = asyncEvts[i];
+
     const id = Helpers.Trace.extractId(event);
     if (id === undefined) {
       continue;
@@ -304,10 +315,26 @@ export async function finalize(): Promise<void> {
 
     if (isStartEvent) {
       otherEventsWithID.begin = event;
+      const beginEvent = event;
+      // Choose next chronological end event as match.. (since we dont ahve ids to pair)
+      if (!beginEvent.name.startsWith('AnimationFrame')) {
+        continue;
+      }
+      for (let j = i + 1; j < asyncEvts.length; j++) {
+        const endEvent = asyncEvts[j];
+        if (endEvent.ph === 'e' && endEvent.name === beginEvent.name && endEvent.pid === beginEvent.pid &&
+            endEvent.tid === beginEvent.tid) {
+          matchedEvents.set(syntheticId, {begin: beginEvent, end: endEvent});
+          break;
+        }
+      }
     } else if (isEndEvent) {
       otherEventsWithID.end = event;
     }
   }
+
+  // Create synthetic events for each matched pair of begin and end events.
+
 
   for (const [id, eventsPair] of matchedEvents.entries()) {
     if (!eventsPair.begin || !eventsPair.end) {
