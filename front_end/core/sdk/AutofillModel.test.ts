@@ -2,15 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Root from '../../core/root/root.js';
 import * as Protocol from '../../generated/protocol.js';
 import {createTarget} from '../../testing/EnvironmentHelpers.js';
 import {describeWithMockConnection} from '../../testing/MockConnection.js';
+import * as Common from '../common/common.js';
 
 import * as SDK from './sdk.js';
 
-const {assert} = chai;
-
 describeWithMockConnection('AutofillModel', () => {
+  beforeEach(() => {
+    Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.AUTOFILL_VIEW);
+    Common.Settings.Settings.instance().createLocalSetting('show-test-addresses-in-autofill-menu-on-event', true);
+  });
+
   it('can enable and disable the Autofill CDP domain', () => {
     const target = createTarget();
     const autofillModel = target.model(SDK.AutofillModel.AutofillModel);
@@ -27,6 +32,19 @@ describeWithMockConnection('AutofillModel', () => {
     autofillModel!.enable();
     assert.isTrue(enableSpy.calledOnce);
     assert.isTrue(disableSpy.notCalled);
+  });
+
+  it('sets test addresses by calling the Autofill backend', () => {
+    const target = createTarget();
+    const autofillModel = target.model(SDK.AutofillModel.AutofillModel);
+    const setAddressSpy = sinon.spy(autofillModel!.agent, 'invoke_setAddresses');
+    assert.isTrue(setAddressSpy.notCalled);
+
+    autofillModel!.disable();
+    assert.isTrue(setAddressSpy.notCalled);
+
+    autofillModel!.enable();
+    assert.isTrue(setAddressSpy.calledOnce);
   });
 
   it('dispatches addressFormFilledEvent on autofill event', () => {

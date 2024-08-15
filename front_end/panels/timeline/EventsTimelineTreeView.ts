@@ -8,6 +8,7 @@ import type * as TimelineModel from '../../models/timeline_model/timeline_model.
 import * as TraceEngine from '../../models/trace/trace.js';
 import * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {type EventCategory, getCategoryStyles} from './EventUICategory.js';
 import {Category, IsLong} from './TimelineFilters.js';
@@ -17,10 +18,6 @@ import {TimelineTreeView} from './TimelineTreeView.js';
 import {TimelineUIUtils} from './TimelineUIUtils.js';
 
 const UIStrings = {
-  /**
-   *@description Aria-label for filter bar in Event Log view
-   */
-  filterEventLog: 'Filter event log',
   /**
    *@description Text for the start time of an activity
    */
@@ -47,6 +44,7 @@ export class EventsTimelineTreeView extends TimelineTreeView {
   private currentTree!: TimelineModel.TimelineProfileTree.Node;
   constructor(delegate: TimelineModeViewDelegate) {
     super();
+    this.element.setAttribute('jslog', `${VisualLogging.pane('event-log').track({resize: true})}`);
     this.filtersControl = new Filters();
     this.filtersControl.addEventListener(Events.FilterChanged, this.onFilterChanged, this);
     this.init();
@@ -66,10 +64,6 @@ export class EventsTimelineTreeView extends TimelineTreeView {
     }
   }
 
-  override getToolbarInputAccessiblePlaceHolder(): string {
-    return i18nString(UIStrings.filterEventLog);
-  }
-
   override buildTree(): TimelineModel.TimelineProfileTree.Node {
     this.currentTree = this.buildTopDownTree(true, null);
     return this.currentTree;
@@ -84,7 +78,7 @@ export class EventsTimelineTreeView extends TimelineTreeView {
     }
   }
 
-  private findNodeWithEvent(event: TraceEngine.Legacy.CompatibleTraceEvent): TimelineModel.TimelineProfileTree.Node
+  private findNodeWithEvent(event: TraceEngine.Types.TraceEvents.TraceEventData): TimelineModel.TimelineProfileTree.Node
       |null {
     if (event.name === TraceEngine.Types.TraceEvents.KnownEventName.RunTask) {
       // No node is ever created for the top level RunTask event, so
@@ -106,7 +100,7 @@ export class EventsTimelineTreeView extends TimelineTreeView {
     return null;
   }
 
-  private selectEvent(event: TraceEngine.Legacy.CompatibleTraceEvent, expand?: boolean): void {
+  private selectEvent(event: TraceEngine.Types.TraceEvents.TraceEventData, expand?: boolean): void {
     const node = this.findNodeWithEvent(event);
     if (!node) {
       return;
@@ -140,16 +134,15 @@ export class EventsTimelineTreeView extends TimelineTreeView {
   }
 
   override showDetailsForNode(node: TimelineModel.TimelineProfileTree.Node): boolean {
+    const traceParseData = this.traceParseData();
+    if (!traceParseData) {
+      return false;
+    }
     const traceEvent = node.event;
     if (!traceEvent) {
       return false;
     }
-    const model = this.model();
-    if (!model) {
-      return false;
-    }
-    void TimelineUIUtils
-        .buildTraceEventDetails(traceEvent, model.timelineModel(), this.linkifier, false, this.traceParseData())
+    void TimelineUIUtils.buildTraceEventDetails(traceParseData, traceEvent, this.linkifier, false)
         .then(fragment => this.detailsView.element.appendChild(fragment));
     return true;
   }
@@ -175,8 +168,8 @@ export class Filters extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
   }
 
   populateToolbar(toolbar: UI.Toolbar.Toolbar): void {
-    const durationFilterUI =
-        new UI.Toolbar.ToolbarComboBox(durationFilterChanged.bind(this), i18nString(UIStrings.durationFilter));
+    const durationFilterUI = new UI.Toolbar.ToolbarComboBox(
+        durationFilterChanged.bind(this), i18nString(UIStrings.durationFilter), undefined, 'duration');
     for (const durationMs of Filters.durationFilterPresetsMs) {
       durationFilterUI.addOption(durationFilterUI.createOption(
           durationMs ? `≥ ${i18nString(UIStrings.Dms, {PH1: durationMs})}` : i18nString(UIStrings.all),
@@ -192,7 +185,7 @@ export class Filters extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
         continue;
       }
       const checkbox = new UI.Toolbar.ToolbarCheckbox(
-          category.title, undefined, categoriesFilterChanged.bind(this, categoryName as EventCategory));
+          category.title, undefined, categoriesFilterChanged.bind(this, categoryName as EventCategory), categoryName);
       checkbox.setChecked(true);
       checkbox.inputElement.style.backgroundColor = category.color;
       categoryFiltersUI.set(category.name, checkbox);
@@ -202,7 +195,7 @@ export class Filters extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
     function durationFilterChanged(this: Filters): void {
       const duration = (durationFilterUI.selectedOption() as HTMLOptionElement).value;
       const minimumRecordDuration = parseInt(duration, 10);
-      this.durationFilter.setMinimumRecordDuration(minimumRecordDuration);
+      this.durationFilter.setMinimumRecordDuration(TraceEngine.Types.Timing.MilliSeconds(minimumRecordDuration));
       this.notifyFiltersChanged();
     }
 

@@ -28,6 +28,10 @@ export function getRemoteBase(location: string = self.location.toString()): {
   return {base: `devtools://devtools/remote/serve_file/${version[1]}/`, version: version[1]};
 }
 
+export function getPathName(): string {
+  return window.location.pathname;
+}
+
 export class Runtime {
   private constructor() {
   }
@@ -78,10 +82,12 @@ export class Runtime {
     return runtimePlatform;
   }
 
-  static isDescriptorEnabled(descriptor: {
-    experiment: ((string | undefined)|null),
-    condition?: Condition,
-  }): boolean {
+  static isDescriptorEnabled(
+      descriptor: {
+        experiment: ((string | undefined)|null),
+        condition?: Condition,
+      },
+      config?: HostConfig): boolean {
     const {experiment} = descriptor;
     if (experiment === '*') {
       return true;
@@ -93,7 +99,7 @@ export class Runtime {
       return false;
     }
     const {condition} = descriptor;
-    return condition ? condition() : true;
+    return condition ? condition(config) : true;
   }
 
   loadLegacyModule(modulePath: string): Promise<void> {
@@ -282,26 +288,71 @@ export const enum ExperimentName {
   IMPORTANT_DOM_PROPERTIES = 'important-dom-properties',
   JUST_MY_CODE = 'just-my-code',
   PRELOADING_STATUS_PANEL = 'preloading-status-panel',
-  TIMELINE_AS_CONSOLE_PROFILE_RESULT_PANEL = 'timeline-as-console-profile-result-panel',
   OUTERMOST_TARGET_SELECTOR = 'outermost-target-selector',
   HIGHLIGHT_ERRORS_ELEMENTS_PANEL = 'highlight-errors-elements-panel',
-  SET_ALL_BREAKPOINTS_EAGERLY = 'set-all-breakpoints-eagerly',
   USE_SOURCE_MAP_SCOPES = 'use-source-map-scopes',
-  STORAGE_BUCKETS_TREE = 'storage-buckets-tree',
   NETWORK_PANEL_FILTER_BAR_REDESIGN = 'network-panel-filter-bar-redesign',
   AUTOFILL_VIEW = 'autofill-view',
   INDENTATION_MARKERS_TEMP_DISABLE = 'sources-frame-indentation-markers-temporarily-disable',
   TIMELINE_SHOW_POST_MESSAGE_EVENTS = 'timeline-show-postmessage-events',
-  SAVE_AND_LOAD_TRACE_WITH_ANNOTATIONS = 'save-and-load-trace-with-annotations',
-  TIMELINE_TRACK_CONFIGURATION = 'timeline-track-configuration',
-  TIMELINE_EXTENSIONS = 'timeline-extensions',
+  TIMELINE_ANNOTATIONS = 'perf-panel-annotations',
+  TIMELINE_INSIGHTS = 'timeline-rpp-sidebar',
+  TIMELINE_DEBUG_MODE = 'timeline-debug-mode',
+  TIMELINE_OBSERVATIONS = 'timeline-observations',
+  TIMELINE_ENHANCED_TRACES = 'timeline-enhanced-traces',
+  GEN_AI_SETTINGS_PANEL = 'gen-ai-settings-panel',
+  TIMELINE_SERVER_TIMINGS = 'timeline-server-timings',
 }
+
+export interface HostConfigConsoleInsights {
+  aidaModelId: string;
+  aidaTemperature: number;
+  blockedByAge: boolean;
+  blockedByEnterprisePolicy: boolean;
+  blockedByGeo: boolean;
+  blockedByRollout: boolean;
+  disallowLogging: boolean;
+  enabled: boolean;
+  optIn: boolean;
+}
+
+export interface HostConfigFreestylerDogfood {
+  aidaModelId: string;
+  aidaTemperature: number;
+  blockedByAge: boolean;
+  blockedByEnterprisePolicy: boolean;
+  blockedByGeo: boolean;
+  enabled: boolean;
+}
+
+export interface HostConfigVeLogging {
+  enabled: boolean;
+  testing: boolean;
+}
+
+// We use `RecursivePartial` here to enforce that DevTools code is able to
+// handle `HostConfig` objects of an unexpected shape. This can happen if
+// the implementation in the Chromium backend is changed without correctly
+// updating the DevTools frontend. Or if remote debugging a different version
+// of Chrome, resulting in the local browser window and the local DevTools
+// window being of different versions, and consequently potentially having
+// differently shaped `HostConfig`s.
+export type HostConfig = Platform.TypeScriptUtilities.RecursivePartial<{
+  devToolsConsoleInsights: HostConfigConsoleInsights,
+  devToolsFreestylerDogfood: HostConfigFreestylerDogfood,
+  devToolsVeLogging: HostConfigVeLogging,
+  /**
+   * OffTheRecord here indicates that the user's profile is either incognito,
+   * or guest mode, rather than a "normal" profile.
+   */
+  isOffTheRecord: boolean,
+}>;
 
 /**
  * When defining conditions make sure that objects used by the function have
  * been instantiated.
  */
-export type Condition = () => boolean;
+export type Condition = (config?: HostConfig) => boolean;
 
 export const conditions = {
   canDock: () => Boolean(Runtime.queryParam('can_dock')),

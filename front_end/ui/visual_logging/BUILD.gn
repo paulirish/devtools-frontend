@@ -10,6 +10,7 @@ devtools_module("visual_logging") {
   sources = [
     "Debugging.ts",
     "DomState.ts",
+    "KnownContextValues.ts",
     "Loggable.ts",
     "LoggingConfig.ts",
     "LoggingDriver.ts",
@@ -44,7 +45,10 @@ devtools_entrypoint("testing") {
 
   deps = [ ":visual_logging" ]
 
-  visibility = [ ":unittests" ]
+  visibility = [
+    ":unittests",
+    "../../testing/*",
+  ]
 }
 
 ts_library("unittests") {

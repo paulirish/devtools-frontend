@@ -11,6 +11,7 @@ import {
   type HighlightedEntryInfo,
   type TrackAppender,
   type TrackAppenderName,
+  VisualLoggingTrackName,
 } from './CompatibilityTracksAppender.js';
 
 const UIStrings = {
@@ -65,7 +66,8 @@ export class GPUTrackAppender implements TrackAppender {
    */
   #appendTrackHeaderAtLevel(currentLevel: number, expanded?: boolean): void {
     const style = buildGroupStyle({useFirstLineForOverview: false});
-    const group = buildTrackHeader(currentLevel, i18nString(UIStrings.gpu), style, /* selectable= */ true, expanded);
+    const group = buildTrackHeader(
+        VisualLoggingTrackName.GPU, currentLevel, i18nString(UIStrings.gpu), style, /* selectable= */ true, expanded);
     this.#compatibilityBuilder.registerTrackForGroup(group, this);
   }
 
@@ -80,10 +82,10 @@ export class GPUTrackAppender implements TrackAppender {
    * Gets the color an event added by this appender should be rendered with.
    */
   colorForEvent(event: TraceEngine.Types.TraceEvents.TraceEventData): string {
-     if (TraceEngine.Types.TraceEvents.isTraceEventGPUTask(event)) {
+    if (TraceEngine.Types.TraceEvents.isTraceEventGPUTask(event)) {
       return ThemeSupport.ThemeSupport.instance().getComputedValue('--app-color-painting');
-     }
-     return 'hsl(109, 0%, 75%)';
+    }
+    return 'hsl(109, 0%, 75%)';
   }
 
   /**

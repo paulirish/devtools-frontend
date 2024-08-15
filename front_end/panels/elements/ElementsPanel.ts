@@ -168,6 +168,7 @@ const createAccessibilityTreeToggleButton = (isActive: boolean): HTMLElement => 
     variant: Buttons.Button.Variant.TOOLBAR,
     iconUrl: new URL('../../Images/person.svg', import.meta.url).toString(),
     title,
+    jslogContext: 'toggle-accessibility-tree',
   };
   button.tabIndex = 0;
   button.classList.add('axtree-button');
@@ -1047,8 +1048,6 @@ export class ElementsPanel extends UI.Panel.Panel implements UI.SearchableView.S
       }
     };
 
-    let skippedInitialTabSelectedEvent = false;
-
     const toggleMetricsWidget = (event: Common.EventTarget.EventTargetEvent<StylesUpdateCompletedEvent>): void => {
       this.metricsWidget.toggleVisibility(event.data.hasMatchedStyles);
     };
@@ -1061,14 +1060,6 @@ export class ElementsPanel extends UI.Panel.Panel implements UI.SearchableView.S
       } else if (tabId === SidebarPaneTabId.Styles) {
         stylesSplitWidget.setSidebarWidget(computedStylePanesWrapper);
         showMetricsWidgetInStylesPane();
-      }
-
-      if (skippedInitialTabSelectedEvent) {
-        // We don't log the initially selected sidebar pane to UMA because
-        // it will skew the histogram heavily toward the Styles pane
-        Host.userMetrics.elementsSidebarTabShown(tabId);
-      } else {
-        skippedInitialTabSelectedEvent = true;
       }
     };
 

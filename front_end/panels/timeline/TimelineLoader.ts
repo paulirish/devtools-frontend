@@ -32,7 +32,6 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
  */
 export class TimelineLoader implements Common.StringOutputStream.OutputStream {
   private client: Client|null;
-  private tracingModel: TraceEngine.Legacy.TracingModel|null;
   private canceledCallback: (() => void)|null;
   private buffer: string;
   private firstRawChunk: boolean;
@@ -45,9 +44,8 @@ export class TimelineLoader implements Common.StringOutputStream.OutputStream {
   #traceFinalizedCallbackForTest?: () => void;
   #traceFinalizedPromiseForTest: Promise<void>;
 
-  constructor(client: Client, title?: string) {
+  constructor(client: Client) {
     this.client = client;
-    this.tracingModel = new TraceEngine.Legacy.TracingModel(title);
     this.canceledCallback = null;
     this.buffer = '';
     this.firstRawChunk = true;
@@ -77,7 +75,7 @@ export class TimelineLoader implements Common.StringOutputStream.OutputStream {
     return loader;
   }
 
-  static loadFromEvents(events: TraceEngine.TracingManager.EventPayload[], client: Client): TimelineLoader {
+  static loadFromEvents(events: TraceEngine.Types.TraceEvents.TraceEventData[], client: Client): TimelineLoader {
     const loader = new TimelineLoader(client);
     window.setTimeout(async () => {
       void loader.addEvents(events);
@@ -85,23 +83,13 @@ export class TimelineLoader implements Common.StringOutputStream.OutputStream {
     return loader;
   }
 
-  static getCpuProfileFilter(): TimelineModel.TimelineModelFilter.TimelineVisibleEventsFilter {
-    const visibleTypes = [];
-    visibleTypes.push(TimelineModel.TimelineModel.RecordType.JSFrame);
-    visibleTypes.push(TimelineModel.TimelineModel.RecordType.JSIdleFrame);
-    visibleTypes.push(TimelineModel.TimelineModel.RecordType.JSSystemFrame);
-    return new TimelineModel.TimelineModelFilter.TimelineVisibleEventsFilter(visibleTypes);
-  }
-
-  static loadFromCpuProfile(profile: Protocol.Profiler.Profile|null, client: Client, title?: string): TimelineLoader {
-    const loader = new TimelineLoader(client, title);
+  static loadFromCpuProfile(profile: Protocol.Profiler.Profile, client: Client): TimelineLoader {
+    const loader = new TimelineLoader(client);
     loader.#traceIsCPUProfile = true;
 
     try {
       const events = TimelineModel.TimelineJSProfile.TimelineJSProfileProcessor.createFakeTraceFromCpuProfile(
-          profile, /* tid */ 1, /* injectPageEvent */ true);
-
-      loader.filter = TimelineLoader.getCpuProfileFilter();
+          profile, TraceEngine.Types.TraceEvents.ThreadID(1));
 
       window.setTimeout(async () => {
         void loader.addEvents(events);
@@ -127,22 +115,43 @@ export class TimelineLoader implements Common.StringOutputStream.OutputStream {
       if (!success) {
         return loader.reportErrorAndCancelLoading(errorDescription.message);
       }
-      const txt = stream.data();
-      const trace = JSON.parse(txt);
-      if (Array.isArray(trace.nodes)) {
-        loader.#traceIsCPUProfile = true;
-        loader.buffer = txt;
+      try {
+        const txt = stream.data();
+        const trace = JSON.parse(txt);
+        loader.#processParsedFile(trace);
         await loader.close();
-        return;
+      } catch (e: unknown) {
+        await loader.close();
+        const message = e instanceof Error ? e.message : '';
+        return loader.reportErrorAndCancelLoading(i18nString(UIStrings.malformedTimelineDataS, {PH1: message}));
       }
-      const events = Array.isArray(trace.traceEvents) ? trace.traceEvents : trace;
-      void loader.addEvents(events);
     }
 
     return loader;
   }
 
-  async addEvents(events: TraceEngine.TracingManager.EventPayload[]): Promise<void> {
+  #processParsedFile(trace: ParsedJSONFile): void {
+    if ('traceEvents' in trace || Array.isArray(trace)) {
+      // We know that this is NOT a raw CPU Profile because it has traceEvents
+      // (either at the top level, or nested under the traceEvents key)
+      const items = Array.isArray(trace) ? trace : trace.traceEvents;
+
+      this.#collectEvents(items);
+    } else if (trace.nodes) {
+      // We know it's a raw Protocol CPU Profile.
+      this.#parseCPUProfileFormatFromFile(trace);
+      this.#traceIsCPUProfile = true;
+    } else {
+      this.reportErrorAndCancelLoading(i18nString(UIStrings.malformedTimelineDataS));
+      return;
+    }
+
+    if ('metadata' in trace) {
+      this.#metadata = trace.metadata;
+    }
+  }
+
+  async addEvents(events: TraceEngine.Types.TraceEvents.TraceEventData[]): Promise<void> {
     await this.client?.loadingStarted();
     /**
      * See the `eventsPerChunk` comment in `models/trace/types/Configuration.ts`.
@@ -153,8 +162,7 @@ export class TimelineLoader implements Common.StringOutputStream.OutputStream {
     const eventsPerChunk = 150_000;
     for (let i = 0; i < events.length; i += eventsPerChunk) {
       const chunk = events.slice(i, i + eventsPerChunk);
-      this.#collectEvents(chunk);
-      (this.tracingModel as TraceEngine.Legacy.TracingModel).addEvents(chunk);
+      this.#collectEvents(chunk as unknown as TraceEngine.Types.TraceEvents.TraceEventData[]);
       await this.client?.loadingProgress((i + chunk.length) / events.length);
       await new Promise(r => window.setTimeout(r, 0));  // Yield event loop to paint.
     }
@@ -162,10 +170,9 @@ export class TimelineLoader implements Common.StringOutputStream.OutputStream {
   }
 
   async cancel(): Promise<void> {
-    this.tracingModel = null;
     if (this.client) {
       await this.client.loadingComplete(
-          /* collectedEvents */[], /* tracingModel= */ null, /* exclusiveFilter= */ null, /* isCpuProfile= */ false,
+          /* collectedEvents */[], /* exclusiveFilter= */ null, /* isCpuProfile= */ false,
           /* recordingStartTime= */ null, /* metadata= */ null);
       this.client = null;
     }
@@ -177,7 +184,7 @@ export class TimelineLoader implements Common.StringOutputStream.OutputStream {
   /**
    * As TimelineLoader implements `Common.StringOutputStream.OutputStream`, `write()` is called when a
    * Common.StringOutputStream.StringOutputStream instance has decoded a chunk. This path is only used
-   * by `loadFromURL()`; it's NOT used by `loadFromEvents` or `loadFromFile`.
+   * by `loadFromFile()`; it's NOT used by `loadFromEvents` or `loadFromURL`.
    */
   async write(chunk: string, endOfFile: boolean): Promise<void> {
     if (!this.client) {
@@ -193,7 +200,7 @@ export class TimelineLoader implements Common.StringOutputStream.OutputStream {
       let progress = undefined;
       progress = this.buffer.length / this.totalSize;
       // For compressed traces, we can't provide a definite progress percentage. So, just keep it moving.
-      // For other traces, calculate a laoded part.
+      // For other traces, calculate a loaded part.
       progress = progress > 1 ? progress - Math.floor(progress) : progress;
       await this.client.loadingProgress(progress);
     }
@@ -201,27 +208,13 @@ export class TimelineLoader implements Common.StringOutputStream.OutputStream {
     if (endOfFile) {
       let trace;
       try {
-        trace = JSON.parse(this.buffer);
+        trace = JSON.parse(this.buffer) as ParsedJSONFile;
+        this.#processParsedFile(trace);
+        return Promise.resolve();
       } catch (e) {
         this.reportErrorAndCancelLoading(i18nString(UIStrings.malformedTimelineDataS, {PH1: e.toString()}));
         return;
       }
-      if (trace.traceEvents || Array.isArray(trace)) {
-        const items = Array.isArray(trace) ? trace : (trace.traceEvents as TraceEngine.TracingManager.EventPayload[]);
-        (this.tracingModel as TraceEngine.Legacy.TracingModel).addEvents(items);
-        this.#collectEvents(items);
-      } else if (trace.nodes) {
-        this.parseCPUProfileFormat(trace);
-        this.#traceIsCPUProfile = true;
-      } else {
-        this.reportErrorAndCancelLoading(i18nString(UIStrings.malformedTimelineDataS));
-        return;
-      }
-
-      if (trace.metadata) {
-        this.#metadata = trace.metadata as TraceEngine.Types.File.MetaData;
-      }
-      return Promise.resolve();
     }
   }
 
@@ -245,11 +238,9 @@ export class TimelineLoader implements Common.StringOutputStream.OutputStream {
   }
 
   private async finalizeTrace(): Promise<void> {
-    (this.tracingModel as TraceEngine.Legacy.TracingModel).tracingComplete();
     await (this.client as Client)
         .loadingComplete(
-            this.#collectedEvents, this.tracingModel, this.filter, this.isCpuProfile(), /* recordingStartTime=*/ null,
-            this.#metadata);
+            this.#collectedEvents, this.filter, this.isCpuProfile(), /* recordingStartTime=*/ null, this.#metadata);
     this.#traceFinalizedCallbackForTest?.();
   }
 
@@ -257,17 +248,19 @@ export class TimelineLoader implements Common.StringOutputStream.OutputStream {
     return this.#traceFinalizedPromiseForTest;
   }
 
-  private parseCPUProfileFormat(parsedTrace: string): void {
+  #parseCPUProfileFormatFromFile(parsedTrace: Protocol.Profiler.Profile): void {
     const traceEvents = TimelineModel.TimelineJSProfile.TimelineJSProfileProcessor.createFakeTraceFromCpuProfile(
-        parsedTrace, /* tid */ 1, /* injectPageEvent */ true);
-    this.filter = TimelineLoader.getCpuProfileFilter();
-    (this.tracingModel as TraceEngine.Legacy.TracingModel).addEvents(traceEvents);
+        parsedTrace, TraceEngine.Types.TraceEvents.ThreadID(1));
+
     this.#collectEvents(traceEvents);
   }
 
-  #collectEvents(events: TraceEngine.TracingManager.EventPayload[]): void {
-    // Once the old engine is removed, this can be updated to use the types from the new engine and avoid the `as unknown`.
-    this.#collectedEvents =
-        this.#collectedEvents.concat(events as unknown as TraceEngine.Types.TraceEvents.TraceEventData);
+  #collectEvents(events: readonly TraceEngine.Types.TraceEvents.TraceEventData[]): void {
+    this.#collectedEvents = this.#collectedEvents.concat(events);
   }
 }
+
+/**
+ * Used when we parse the input, but do not yet know if it is a raw CPU Profile or a Trace
+ **/
+type ParsedJSONFile = TraceEngine.Types.File.Contents|Protocol.Profiler.Profile;

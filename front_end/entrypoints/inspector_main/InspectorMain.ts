@@ -27,6 +27,7 @@ const UIStrings = {
    * DevTools is connected to. This text is used in various places in the UI as a label/name to inform
    * the user which target they are currently connected to, as DevTools may connect to multiple
    * targets at the same time in some scenarios.
+   * @meaning Tab target that's different than the "Tab" of Chrome. (See b/343009012)
    */
   tab: 'Tab',
   /**
@@ -153,7 +154,7 @@ export class NodeIndicator implements UI.Toolbar.Provider {
   private constructor() {
     const element = document.createElement('div');
     const shadowRoot =
-        UI.Utils.createShadowRootWithCoreStyles(element, {cssFile: [nodeIconStyles], delegatesFocus: undefined});
+        UI.UIUtils.createShadowRootWithCoreStyles(element, {cssFile: [nodeIconStyles], delegatesFocus: undefined});
     this.#element = shadowRoot.createChild('div', 'node-icon');
     element.addEventListener(
         'click', () => Host.InspectorFrontendHost.InspectorFrontendHostInstance.openNodeFrontend(), false);

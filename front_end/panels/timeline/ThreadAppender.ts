@@ -8,7 +8,6 @@ import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as TraceEngine from '../../models/trace/trace.js';
-import * as AnnotationsManager from '../../services/annotations_manager/annotations_manager.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 
 import {
@@ -19,11 +18,14 @@ import {
 } from './AppenderUtils.js';
 import {
   type CompatibilityTracksAppender,
+  entryIsVisibleInTimeline,
   type HighlightedEntryInfo,
   type TrackAppender,
   type TrackAppenderName,
+  VisualLoggingTrackName,
 } from './CompatibilityTracksAppender.js';
 import {getCategoryStyles, getEventStyle} from './EventUICategory.js';
+import * as ModificationsManager from './ModificationsManager.js';
 
 const UIStrings = {
   /**
@@ -161,7 +163,6 @@ export class ThreadAppender implements TrackAppender {
   #headerAppended: boolean = false;
   readonly threadType: TraceEngine.Handlers.Threads.ThreadType = TraceEngine.Handlers.Threads.ThreadType.MAIN_THREAD;
   readonly isOnMainFrame: boolean;
-  #ignoreListingEnabled = Root.Runtime.experiments.isEnabled('ignore-list-js-frames-on-timeline');
   #showAllEventsEnabled = Root.Runtime.experiments.isEnabled('timeline-show-all-events');
   #url: string = '';
   #headerNestingLevel: number|null = null;
@@ -278,10 +279,32 @@ export class ThreadAppender implements TrackAppender {
     if (this.#headerNestingLevel !== null) {
       style.nestingLevel = this.#headerNestingLevel;
     }
+    const visualLoggingName = this.#visualLoggingNameForThread();
     const group = buildTrackHeader(
-        currentLevel, this.trackName(), style, /* selectable= */ true, this.#expanded, /* track= */ null,
+        visualLoggingName, currentLevel, this.trackName(), style, /* selectable= */ true, this.#expanded,
         /* showStackContextMenu= */ true);
     this.#compatibilityBuilder.registerTrackForGroup(group, this);
+  }
+
+  #visualLoggingNameForThread(): VisualLoggingTrackName|null {
+    switch (this.threadType) {
+      case TraceEngine.Handlers.Threads.ThreadType.MAIN_THREAD:
+        return this.isOnMainFrame ? VisualLoggingTrackName.THREAD_MAIN : VisualLoggingTrackName.THREAD_FRAME;
+      case TraceEngine.Handlers.Threads.ThreadType.WORKER:
+        return VisualLoggingTrackName.THREAD_WORKER;
+      case TraceEngine.Handlers.Threads.ThreadType.RASTERIZER:
+        return VisualLoggingTrackName.THREAD_RASTERIZER;
+      case TraceEngine.Handlers.Threads.ThreadType.AUCTION_WORKLET:
+        return VisualLoggingTrackName.THREAD_AUCTION_WORKLET;
+      case TraceEngine.Handlers.Threads.ThreadType.OTHER:
+        return VisualLoggingTrackName.THREAD_OTHER;
+      case TraceEngine.Handlers.Threads.ThreadType.CPU_PROFILE:
+        return VisualLoggingTrackName.THREAD_CPU_PROFILE;
+      case TraceEngine.Handlers.Threads.ThreadType.THREAD_POOL:
+        return VisualLoggingTrackName.THREAD_POOL;
+      default:
+        return null;
+    }
   }
   /**
    * Raster threads are rendered under a single header in the
@@ -296,8 +319,11 @@ export class ThreadAppender implements TrackAppender {
     if (currentTrackCount === 0) {
       const trackIsCollapsible = this.#entries.length > 0;
       const headerStyle = buildGroupStyle({shareHeaderLine: false, collapsible: trackIsCollapsible});
-      const headerGroup =
-          buildTrackHeader(trackStartLevel, this.trackName(), headerStyle, /* selectable= */ false, this.#expanded);
+
+      // Don't set any jslogcontext (first argument) because this is a shared
+      // header group. Each child will have its context set.
+      const headerGroup = buildTrackHeader(
+          null, trackStartLevel, this.trackName(), headerStyle, /* selectable= */ false, this.#expanded);
       this.#compatibilityBuilder.getFlameChartTimelineData().groups.push(headerGroup);
     }
 
@@ -307,8 +333,10 @@ export class ThreadAppender implements TrackAppender {
     const rasterizerTitle = this.threadType === TraceEngine.Handlers.Threads.ThreadType.RASTERIZER ?
         i18nString(UIStrings.rasterizerThreadS, {PH1: currentTrackCount + 1}) :
         i18nString(UIStrings.threadPoolThreadS, {PH1: currentTrackCount + 1});
-    const titleGroup =
-        buildTrackHeader(trackStartLevel, rasterizerTitle, titleStyle, /* selectable= */ true, this.#expanded);
+
+    const visualLoggingName = this.#visualLoggingNameForThread();
+    const titleGroup = buildTrackHeader(
+        visualLoggingName, trackStartLevel, rasterizerTitle, titleStyle, /* selectable= */ true, this.#expanded);
     this.#compatibilityBuilder.registerTrackForGroup(titleGroup, this);
   }
 
@@ -348,6 +376,10 @@ export class ThreadAppender implements TrackAppender {
 
   getUrl(): string {
     return this.#url;
+  }
+
+  getEntries(): TraceEngine.Types.TraceEvents.TraceEventData[] {
+    return this.#entries;
   }
 
   #buildNameForAuctionWorklet(): string {
@@ -444,10 +476,8 @@ export class ThreadAppender implements TrackAppender {
   #appendNodesAtLevel(
       nodes: Iterable<TraceEngine.Helpers.TreeHelpers.TraceEntryNode>, startingLevel: number,
       parentIsIgnoredListed: boolean = false): number {
-    const invisibleEntries = AnnotationsManager.AnnotationsManager.AnnotationsManager.maybeInstance()
-                                 ?.getEntriesFilter()
-                                 .invisibleEntries() ??
-        [];
+    const invisibleEntries =
+        ModificationsManager.ModificationsManager.activeManager()?.getEntriesFilter().invisibleEntries() ?? [];
     let maxDepthInTree = startingLevel;
     for (const node of nodes) {
       let nextLevel = startingLevel;
@@ -462,7 +492,7 @@ export class ThreadAppender implements TrackAppender {
       // large). To avoid the extra cost we  add the check in the
       // traversal we already need to append events.
       const entryIsVisible = !invisibleEntries.includes(entry) &&
-          (this.#compatibilityBuilder.entryIsVisibleInTimeline(entry) || this.#showAllEventsEnabled);
+          (entryIsVisibleInTimeline(entry, this.#traceParsedData) || this.#showAllEventsEnabled);
       // For ignore listing support, these two conditions need to be met
       // to not append a profile call to the flame chart:
       // 1. It is ignore listed
@@ -495,8 +525,7 @@ export class ThreadAppender implements TrackAppender {
 
   #addDecorationsToEntry(entry: TraceEngine.Types.TraceEvents.TraceEventData, index: number): void {
     const flameChartData = this.#compatibilityBuilder.getFlameChartTimelineData();
-    if (AnnotationsManager.AnnotationsManager.AnnotationsManager.maybeInstance()?.getEntriesFilter().isEntryModified(
-            entry)) {
+    if (ModificationsManager.ModificationsManager.activeManager()?.getEntriesFilter().isEntryExpandable(entry)) {
       addDecorationToEvent(
           flameChartData, index, {type: PerfUI.FlameChart.FlameChartDecorationType.HIDDEN_DESCENDANTS_ARROW});
     }
@@ -515,10 +544,6 @@ export class ThreadAppender implements TrackAppender {
   }
 
   isIgnoreListedEntry(entry: TraceEngine.Types.TraceEvents.TraceEventData): boolean {
-    if (!this.#ignoreListingEnabled) {
-      return false;
-    }
-
     if (!TraceEngine.Types.TraceEvents.isProfileCall(entry)) {
       return false;
     }
@@ -604,7 +629,7 @@ export class ThreadAppender implements TrackAppender {
    * Returns the info shown when an event added by this appender
    * is hovered in the timeline.
    */
-  highlightedEntryInfo(event: TraceEngine.Types.TraceEvents.SyntheticTraceEntry): HighlightedEntryInfo {
+  highlightedEntryInfo(event: TraceEngine.Types.TraceEvents.TraceEventData): HighlightedEntryInfo {
     let title = this.titleForEvent(event);
     if (TraceEngine.Types.TraceEvents.isTraceEventParseHTML(event)) {
       const startLine = event.args['beginData']['startLine'];
@@ -614,6 +639,7 @@ export class ThreadAppender implements TrackAppender {
       const range = (endLine !== -1 || endLine === startLine) ? `${startLine}...${endLine}` : startLine;
       title += ` - ${url} [${range}]`;
     }
-    return {title, formattedTime: getFormattedTime(event.dur, event.selfTime)};
+    const selfTime = this.#traceParsedData.Renderer.entryToNode.get(event)?.selfTime;
+    return {title, formattedTime: getFormattedTime(event.dur, selfTime)};
   }
 }

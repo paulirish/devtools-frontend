@@ -38,9 +38,10 @@ import * as MapUtilities from './MapUtilities.js';
 import * as MimeType from './MimeType.js';
 import * as NumberUtilities from './NumberUtilities.js';
 import * as PromiseUtilities from './PromiseUtilities.js';
-import * as SetUtilities from './SetUtilities.js';
+import * as ServerTiming from './ServerTiming.js';
 import * as StringUtilities from './StringUtilities.js';
 import * as Timing from './Timing.js';
+import * as TypedArrayUtilities from './TypedArrayUtilities.js';
 import * as TypeScriptUtilities from './TypescriptUtilities.js';
 import * as UIString from './UIString.js';
 import * as UserVisibleError from './UserVisibleError.js';
@@ -62,9 +63,10 @@ export {
   MimeType,
   NumberUtilities,
   PromiseUtilities,
-  SetUtilities,
+  ServerTiming,
   StringUtilities,
   Timing,
+  TypedArrayUtilities,
   TypeScriptUtilities,
   UIString,
   UserVisibleError,

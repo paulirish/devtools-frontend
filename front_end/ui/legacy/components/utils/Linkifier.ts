@@ -37,6 +37,7 @@ import type * as Protocol from '../../../../generated/protocol.js';
 import * as Bindings from '../../../../models/bindings/bindings.js';
 import * as Breakpoints from '../../../../models/breakpoints/breakpoints.js';
 import * as TextUtils from '../../../../models/text_utils/text_utils.js';
+import type * as TraceEngine from '../../../../models/trace/trace.js';
 import * as Workspace from '../../../../models/workspace/workspace.js';
 import type * as IconButton from '../../../components/icon_button/icon_button.js';
 import * as VisualLogging from '../../../visual_logging/visual_logging.js';
@@ -233,7 +234,7 @@ export class Linkifier extends Common.ObjectWrapper.ObjectWrapper<EventTypes> im
       tabStop: options?.tabStop,
       inlineFrameIndex: options?.inlineFrameIndex ?? 0,
       userMetric: options?.userMetric,
-      jslogContext: options?.jslogContext || 'script-source-url',
+      jslogContext: options?.jslogContext || 'script-location',
     };
     const {columnNumber, className = ''} = linkifyURLOptions;
     if (sourceURL) {
@@ -326,16 +327,17 @@ export class Linkifier extends Common.ObjectWrapper.ObjectWrapper<EventTypes> im
   }
 
   maybeLinkifyConsoleCallFrame(
-      target: SDK.Target.Target|null, callFrame: Protocol.Runtime.CallFrame, options?: LinkifyOptions): HTMLElement
-      |null {
+      target: SDK.Target.Target|null,
+      callFrame: Protocol.Runtime.CallFrame|TraceEngine.Types.TraceEvents.TraceEventCallFrame,
+      options?: LinkifyOptions): HTMLElement|null {
     const linkifyOptions: LinkifyOptions = {
       ...options,
       columnNumber: callFrame.columnNumber,
       inlineFrameIndex: options?.inlineFrameIndex ?? 0,
     };
     return this.maybeLinkifyScriptLocation(
-        target, callFrame.scriptId, callFrame.url as Platform.DevToolsPath.UrlString, callFrame.lineNumber,
-        linkifyOptions);
+        target, String(callFrame.scriptId) as Protocol.Runtime.ScriptId,
+        callFrame.url as Platform.DevToolsPath.UrlString, callFrame.lineNumber, linkifyOptions);
   }
 
   linkifyStackTraceTopFrame(target: SDK.Target.Target|null, stackTrace: Protocol.Runtime.StackTrace): HTMLElement {
@@ -370,7 +372,7 @@ export class Linkifier extends Common.ObjectWrapper.ObjectWrapper<EventTypes> im
     // All targets that can report stack traces also have a debugger model.
     const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel) as SDK.DebuggerModel.DebuggerModel;
 
-    const {link, linkInfo} = Linkifier.createLink('', '');
+    const {link, linkInfo} = Linkifier.createLink('', '', {jslogContext: 'script-location'});
     linkInfo.enableDecorator = this.useLinkDecorator;
     linkInfo.fallback = fallbackAnchor;
 
@@ -428,6 +430,7 @@ export class Linkifier extends Common.ObjectWrapper.ObjectWrapper<EventTypes> im
       this.targetRemoved(target);
       this.targetAdded(target);
     }
+    this.listeners?.clear();
   }
 
   dispose(): void {
@@ -455,12 +458,7 @@ export class Linkifier extends Common.ObjectWrapper.ObjectWrapper<EventTypes> im
             event.consume(true);
             void Common.Revealer.reveal(header.ownerNode || null);
           }, false);
-          // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-          // This workaround is needed to make stylelint happy
-          Linkifier.setTrimmedText(
-              anchor,
-              '<' +
-                  'style>');
+          Linkifier.setTrimmedText(anchor, '<style>');
         }
       }
 
@@ -582,11 +580,14 @@ export class Linkifier extends Common.ObjectWrapper.ObjectWrapper<EventTypes> im
   private static createLink(text: string|HTMLElement, className: string, options: CreateLinkOptions = {}):
       {link: HTMLElement, linkInfo: LinkInfo} {
     const {maxLength, title, href, preventClick, tabStop, bypassURLTrimming, jslogContext} = options;
-    const link = document.createElement('button');
+    const link = document.createElement(options.preventClick ? 'span' : 'button');
     if (className) {
       link.className = className;
     }
-    link.classList.add('devtools-link', 'text-button', 'link-style');
+    link.classList.add('devtools-link');
+    if (!options.preventClick) {
+      link.classList.add('text-button', 'link-style');
+    }
     if (title) {
       UI.Tooltip.Tooltip.install(link, title);
     }
@@ -778,13 +779,7 @@ export class Linkifier extends Common.ObjectWrapper.ObjectWrapper<EventTypes> im
         section: 'reveal',
         title: destination ? i18nString(UIStrings.revealInS, {PH1: destination}) : i18nString(UIStrings.reveal),
         jslogContext: 'reveal',
-        handler: () => {
-          if (revealable instanceof Breakpoints.BreakpointManager.BreakpointLocation) {
-            Host.userMetrics.breakpointEditDialogRevealedFrom(
-                Host.UserMetrics.BreakpointEditDialogRevealedFrom.Linkifier);
-          }
-          return Common.Revealer.reveal(revealable);
-        },
+        handler: () => Common.Revealer.reveal(revealable),
       });
     }
     if (contentProvider) {

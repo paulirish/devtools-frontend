@@ -4,20 +4,22 @@
 
 import * as Common from '../../core/common/common.js';
 import * as Root from '../../core/root/root.js';
-import type * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 import * as TraceEngine from '../../models/trace/trace.js';
 import type * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
 
 import {AnimationsTrackAppender} from './AnimationsTrackAppender.js';
-import {getEventLevel} from './AppenderUtils.js';
+import {getEventLevel, type LastTimestampByLevel} from './AppenderUtils.js';
 import * as TimelineComponents from './components/components.js';
 import {getEventStyle} from './EventUICategory.js';
+import {ExtensionDataGatherer} from './ExtensionDataGatherer.js';
+import {ExtensionTrackAppender} from './ExtensionTrackAppender.js';
 import {FramesWaterfallTrackAppender} from './FramesWaterfallTrackAppender.js';
 import {GPUTrackAppender} from './GPUTrackAppender.js';
 import {InteractionsTrackAppender} from './InteractionsTrackAppender.js';
 import {LayoutShiftsTrackAppender} from './LayoutShiftsTrackAppender.js';
 import {NewFramesTrackAppender} from './NewFramesTrackAppender.js';
+import {ServerTimingsTrackAppender} from './ServerTimingsTrackAppender.js';
 import {ThreadAppender} from './ThreadAppender.js';
 import {
   EntryType,
@@ -32,6 +34,45 @@ export type HighlightedEntryInfo = {
   formattedTime: string,
   warningElements?: HTMLSpanElement[],
 };
+
+export function entryIsVisibleInTimeline(
+    entry: TraceEngine.Types.TraceEvents.TraceEventData,
+    traceParsedData?: TraceEngine.Handlers.Types.TraceParseData): boolean {
+  if (traceParsedData && traceParsedData.Meta.traceIsGeneric) {
+    return true;
+  }
+
+  if (TraceEngine.Types.TraceEvents.isTraceEventUpdateCounters(entry)) {
+    // These events are not "visible" on the timeline because they are instant events with 0 duration.
+    // However, the Memory view (CountersGraph in the codebase) relies on
+    // finding the UpdateCounters events within the user's active trace
+    // selection in order to show the memory usage for the selected time
+    // period.
+    // Therefore we mark them as visible so they are appended onto the Thread
+    // track, and hence accessible by the CountersGraph view.
+    return true;
+  }
+
+  // Gate the visibility of post message events behind the experiement flag
+  if (TraceEngine.Types.TraceEvents.isTraceEventSchedulePostMessage(entry) ||
+      TraceEngine.Types.TraceEvents.isTraceEventHandlePostMessage(entry)) {
+    return Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_SHOW_POST_MESSAGE_EVENTS);
+  }
+
+  if (TraceEngine.Types.Extensions.isSyntheticExtensionEntry(entry) ||
+      TraceEngine.Types.TraceEvents.isSyntheticServerTiming(entry)) {
+    return true;
+  }
+
+  // Default styles are globally defined for each event name. Some
+  // events are hidden by default.
+  const eventStyle = getEventStyle(entry.name as TraceEngine.Types.TraceEvents.KnownEventName);
+  const eventIsTiming = TraceEngine.Types.TraceEvents.isTraceEventConsoleTime(entry) ||
+      TraceEngine.Types.TraceEvents.isTraceEventPerformanceMeasure(entry) ||
+      TraceEngine.Types.TraceEvents.isTraceEventPerformanceMark(entry);
+
+  return (eventStyle && !eventStyle.hidden) || eventIsTiming;
+}
 
 /**
  * Track appenders add the data of each track into the timeline flame
@@ -95,10 +136,41 @@ export const TrackNames = [
   'UberFrames',
   'FramesWaterfall',
   'NewFrames',
+  'ServerTimings',
 ] as const;
 // Network track will use TrackAppender interface, but it won't be shown in Main flamechart.
 // So manually add it to TrackAppenderName.
 export type TrackAppenderName = typeof TrackNames[number]|'Network';
+
+/**
+ * Used as the context when a track (aka group) is selected and we log
+ * something to the VE Logging framework.
+ * This enum broadly corresponds with the list of TrackNames, but can be more
+ * specific in some situations such as when we want to identify the thread type
+ * rather than log "thread" - it is useful to know if the thread is the main
+ * thread or not.
+ * VE context needs to be kebab-case, and not contain any PII, which is why we
+ * log this set list rather than full track names, which in the case of threads
+ * can contain URLswhich we do not want to log.
+ */
+export const enum VisualLoggingTrackName {
+  ANIMATIONS = 'animations',
+  TIMINGS = 'timings',
+  INTERACTIONS = 'interactions',
+  GPU = 'gpu',
+  LAYOUT_SHIFTS = 'layout-shifts',
+  SERVER_TIMINGS = 'server.timings',
+  THREAD_CPU_PROFILE = 'thread.cpu-profile',
+  THREAD_MAIN = 'thread.main',
+  THREAD_FRAME = 'thread.frame',
+  THREAD_WORKER = 'thread.worker',
+  THREAD_AUCTION_WORKLET = 'thread.auction-worklet',
+  THREAD_RASTERIZER = 'thread.rasterizer',
+  THREAD_POOL = 'thread.pool',
+  THREAD_OTHER = 'thread.other',
+  EXTENSION = 'extension',
+  NETWORK = 'network',
+}
 
 export class CompatibilityTracksAppender {
   #trackForLevel = new Map<number, TrackAppender>();
@@ -112,12 +184,6 @@ export class CompatibilityTracksAppender {
   #allTrackAppenders: TrackAppender[] = [];
   #visibleTrackNames: Set<TrackAppenderName> = new Set([...TrackNames]);
 
-  // TODO(crbug.com/1416533)
-  // These are used only for compatibility with the legacy flame chart
-  // architecture of the panel. Once all tracks have been migrated to
-  // use the new engine and flame chart architecture, the reference can
-  // be removed.
-  #legacyTimelineModel: TimelineModel.TimelineModel.TimelineModelImpl;
   #legacyEntryTypeByLevel: EntryType[];
   #timingsTrackAppender: TimingsTrackAppender;
   #uberFramesTrackAppender: UberFramesTrackAppender;
@@ -128,6 +194,7 @@ export class CompatibilityTracksAppender {
   #gpuTrackAppender: GPUTrackAppender;
   #layoutShiftsTrackAppender: LayoutShiftsTrackAppender;
   #threadAppenders: ThreadAppender[] = [];
+  #serverTimingsTrackAppender: ServerTimingsTrackAppender;
 
   /**
    * @param flameChartData the data used by the flame chart renderer on
@@ -145,7 +212,7 @@ export class CompatibilityTracksAppender {
   constructor(
       flameChartData: PerfUI.FlameChart.FlameChartTimelineData,
       traceParsedData: TraceEngine.Handlers.Types.TraceParseData, entryData: TimelineFlameChartEntry[],
-      legacyEntryTypeByLevel: EntryType[], legacyTimelineModel: TimelineModel.TimelineModel.TimelineModelImpl) {
+      legacyEntryTypeByLevel: EntryType[]) {
     this.#flameChartData = flameChartData;
     this.#traceParsedData = traceParsedData;
     this.#entryData = entryData;
@@ -155,7 +222,6 @@ export class CompatibilityTracksAppender {
         /* lightnessSpace= */ 50,
         /* alphaSpace= */ 0.7);
     this.#legacyEntryTypeByLevel = legacyEntryTypeByLevel;
-    this.#legacyTimelineModel = legacyTimelineModel;
     this.#timingsTrackAppender = new TimingsTrackAppender(this, this.#traceParsedData, this.#colorGenerator);
     this.#allTrackAppenders.push(this.#timingsTrackAppender);
 
@@ -185,12 +251,13 @@ export class CompatibilityTracksAppender {
     this.#gpuTrackAppender = new GPUTrackAppender(this, this.#traceParsedData);
     this.#allTrackAppenders.push(this.#gpuTrackAppender);
 
-    // Layout Shifts track in OPP was called the "Experience" track even though
-    // all it shows are layout shifts.
     this.#layoutShiftsTrackAppender = new LayoutShiftsTrackAppender(this, this.#traceParsedData);
     this.#allTrackAppenders.push(this.#layoutShiftsTrackAppender);
 
+    this.#serverTimingsTrackAppender = new ServerTimingsTrackAppender(this, this.#traceParsedData);
+    this.#allTrackAppenders.push(this.#serverTimingsTrackAppender);
     this.#addThreadAppenders();
+    this.#addExtensionAppenders();
     ThemeSupport.ThemeSupport.instance().addEventListener(ThemeSupport.ThemeChangeEvent.eventName, () => {
       for (const group of this.#flameChartData.groups) {
         // We only need to update the color here, because FlameChart will call `scheduleUpdate()` when theme is changed.
@@ -214,26 +281,26 @@ export class CompatibilityTracksAppender {
     return this.#flameChartData;
   }
 
+  #addExtensionAppenders(): void {
+    const tracks = ExtensionDataGatherer.instance().getExtensionData().extensionTrackData;
+    for (const trackData of tracks) {
+      this.#allTrackAppenders.push(new ExtensionTrackAppender(this, trackData));
+    }
+  }
+
   #addThreadAppenders(): void {
-    const weight = (appender: ThreadAppender): number => {
+    const threadTrackOrder = (appender: ThreadAppender): number => {
       switch (appender.threadType) {
         case TraceEngine.Handlers.Threads.ThreadType.MAIN_THREAD: {
-          // Within tracks of the main thread, those with data
-          // from about:blank are treated with the lowest priority,
-          // since there's a chance they have only noise from the
-          // navigation to about:blank done on record and reload.
-          if (!appender.getUrl()) {
-            // We expect each appender to have a URL as we filter out empty URL
-            // processes, but in the event that we do not have a URL (can
-            // happen for a generic trace), return 2, to ensure these are put
-            // below any that do have value URLs.
-            return 2;
+          if (appender.isOnMainFrame) {
+            // Ensure `about:blank` or `chrome://new-tab-page` are deprioritized, as they're likely not the profiling targets
+            const url = appender.getUrl();
+            if (url.startsWith('about:') || url.startsWith('chrome:')) {
+              return 2;
+            }
+            return 0;
           }
-          const asUrl = new URL(appender.getUrl());
-          if (asUrl.protocol === 'about:') {
-            return 2;
-          }
-          return (appender.isOnMainFrame && appender.getUrl() !== '') ? 0 : 1;
+          return 1;
         }
         case TraceEngine.Handlers.Threads.ThreadType.WORKER:
           return 3;
@@ -251,6 +318,7 @@ export class CompatibilityTracksAppender {
     };
     const threads = TraceEngine.Handlers.Threads.threadsInTrace(this.#traceParsedData);
     const processedAuctionWorkletsIds = new Set<TraceEngine.Types.TraceEvents.ProcessID>();
+    const showAllEvents = Root.Runtime.experiments.isEnabled('timeline-show-all-events');
 
     for (const {pid, tid, name, type} of threads) {
       if (this.#traceParsedData.Meta.traceIsGeneric) {
@@ -259,6 +327,10 @@ export class CompatibilityTracksAppender {
         // OTHER for all threads.
         this.#threadAppenders.push(new ThreadAppender(
             this, this.#traceParsedData, pid, tid, name, TraceEngine.Handlers.Threads.ThreadType.OTHER));
+        continue;
+      }
+      // These threads have no useful information. Omit them
+      if ((name === 'Chrome_ChildIOThread' || name === 'Compositor' || name === 'GpuMemoryThread') && !showAllEvents) {
         continue;
       }
 
@@ -285,22 +357,10 @@ export class CompatibilityTracksAppender {
 
       this.#threadAppenders.push(new ThreadAppender(this, this.#traceParsedData, pid, tid, name, type));
     }
-
-    this.#threadAppenders.sort((a, b) => weight(a) - weight(b));
+    // Sort first by track order, then break ties by placing busier tracks first.
+    this.#threadAppenders.sort(
+        (a, b) => (threadTrackOrder(a) - threadTrackOrder(b)) || (b.getEntries().length - a.getEntries().length));
     this.#allTrackAppenders.push(...this.#threadAppenders);
-  }
-  /**
-   * Given a trace event returns instantiates a legacy SDK.Event. This should
-   * be used for compatibility purposes only.
-   */
-  getLegacyEvent(event: TraceEngine.Types.TraceEvents.TraceEventData): TraceEngine.Legacy.Event|null {
-    const process = this.#legacyTimelineModel.tracingModel()?.getProcessById(event.pid);
-    const thread = process?.threadById(event.tid);
-    if (!thread) {
-      return null;
-    }
-    return TraceEngine.Legacy.PayloadEvent.fromPayload(
-        event as unknown as TraceEngine.TracingManager.EventPayload, thread);
   }
 
   timingsTrackAppender(): TimingsTrackAppender {
@@ -339,6 +399,10 @@ export class CompatibilityTracksAppender {
     return this.#threadAppenders;
   }
 
+  serverTimingsTrackAppender(): ServerTimingsTrackAppender {
+    return this.#serverTimingsTrackAppender;
+  }
+
   eventsInTrack(trackAppender: TrackAppender): TraceEngine.Types.TraceEvents.TraceEventData[] {
     const cachedData = this.#eventsForTrack.get(trackAppender);
     if (cachedData) {
@@ -368,59 +432,10 @@ export class CompatibilityTracksAppender {
         events.push(this.#entryData[i] as TraceEngine.Types.TraceEvents.TraceEventData);
       }
     }
-    events.sort((a, b) => a.ts - b.ts);
+    events.sort((a, b) => a.ts - b.ts);  // TODO(paulirish): Remove as I'm 90% it's already sorted.
+
     this.#eventsForTrack.set(trackAppender, events);
     return events;
-  }
-
-  /**
-   * Determines if the given events, which are assumed to be ordered can
-   * be organized into tree structures.
-   * This condition is met if there is *not* a pair of async events
-   * e1 and e2 where:
-   *
-   * e1.startTime <= e2.startTime && e1.endTime > e2.startTime && e1.endTime > e2.endTime.
-   * or, graphically:
-   * |------- e1 ------|
-   *   |------- e2 --------|
-   *
-   * Because a parent-child relationship cannot be made from the example
-   * above, a tree cannot be made from the set of events.
-   *
-   * Note that this will also return true if multiple trees can be
-   * built, for example if none of the events overlap with each other.
-   */
-  canBuildTreesFromEvents(events: readonly TraceEngine.Types.TraceEvents.TraceEventData[]): boolean {
-    const stack: TraceEngine.Types.TraceEvents.TraceEventData[] = [];
-    for (const event of events) {
-      const startTime = event.ts;
-      const endTime = event.ts + (event.dur || 0);
-      let parent = stack.at(-1);
-      if (parent === undefined) {
-        stack.push(event);
-        continue;
-      }
-      let parentEndTime = parent.ts + (parent.dur || 0);
-      // Discard events that are not parents for this event. The parent
-      // is one whose end time is after this event start time.
-      while (stack.length && startTime >= parentEndTime) {
-        stack.pop();
-        parent = stack.at(-1);
-
-        if (parent === undefined) {
-          break;
-        }
-        parentEndTime = parent.ts + (parent.dur || 0);
-      }
-      if (stack.length && endTime > parentEndTime) {
-        // If such an event exists but its end time is before this
-        // event's end time, then a tree cannot be made using this
-        // events.
-        return false;
-      }
-      stack.push(event);
-    }
-    return true;
   }
 
   /**
@@ -435,7 +450,7 @@ export class CompatibilityTracksAppender {
     }
 
     let trackEvents = this.eventsInTrack(trackAppender);
-    if (!this.canBuildTreesFromEvents(trackEvents)) {
+    if (!TraceEngine.Helpers.TreeHelpers.canBuildTreesFromEvents(trackEvents)) {
       // Some tracks can include both async and sync events. When this
       // happens, we use all events for the tree views if a trees can be
       // built from both sync and async events. If this is not possible,
@@ -523,10 +538,8 @@ export class CompatibilityTracksAppender {
     this.#legacyEntryTypeByLevel[level] = EntryType.TrackAppender;
     this.#flameChartData.entryLevels[index] = level;
     this.#flameChartData.entryStartTimes[index] = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(event.ts);
-    const msDuration = event.dur ||
-        TraceEngine.Helpers.Timing.millisecondsToMicroseconds(
-            InstantEventVisibleDurationMs as TraceEngine.Types.Timing.MilliSeconds);
-    this.#flameChartData.entryTotalTimes[index] = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(msDuration);
+    const dur = event.dur || TraceEngine.Helpers.Timing.millisecondsToMicroseconds(InstantEventVisibleDurationMs);
+    this.#flameChartData.entryTotalTimes[index] = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(dur);
     return index;
   }
 
@@ -550,54 +563,21 @@ export class CompatibilityTracksAppender {
   appendEventsAtLevel<T extends TraceEngine.Types.TraceEvents.TraceEventData>(
       events: readonly T[], trackStartLevel: number, appender: TrackAppender,
       eventAppendedCallback?: (event: T, index: number) => void): number {
-    const lastUsedTimeByLevel: number[] = [];
+    const lastTimestampByLevel: LastTimestampByLevel = [];
     for (let i = 0; i < events.length; ++i) {
       const event = events[i];
-      // SHOW ALL FFOR THE WIN.
-      // if (!this.entryIsVisibleInTimeline(event)) {
-      //   continue;
-      // }
+      if (!entryIsVisibleInTimeline(event, this.#traceParsedData)) {
+        continue;
+      }
 
-      const level = getEventLevel(event, lastUsedTimeByLevel);
+      const level = getEventLevel(event, lastTimestampByLevel);
       const index = this.appendEventAtLevel(event, trackStartLevel + level, appender);
       eventAppendedCallback?.(event, index);
     }
 
-    this.#legacyEntryTypeByLevel.length = trackStartLevel + lastUsedTimeByLevel.length;
+    this.#legacyEntryTypeByLevel.length = trackStartLevel + lastTimestampByLevel.length;
     this.#legacyEntryTypeByLevel.fill(EntryType.TrackAppender, trackStartLevel);
-    return trackStartLevel + lastUsedTimeByLevel.length;
-  }
-
-  entryIsVisibleInTimeline(entry: TraceEngine.Types.TraceEvents.TraceEventData): boolean {
-    if (this.#traceParsedData.Meta.traceIsGeneric) {
-      return true;
-    }
-
-    if (TraceEngine.Types.TraceEvents.isTraceEventUpdateCounters(entry)) {
-      // These events are not "visible" on the timeline because they are instant events with 0 duration.
-      // However, the Memory view (CountersGraph in the codebase) relies on
-      // finding the UpdateCounters events within the user's active trace
-      // selection in order to show the memory usage for the selected time
-      // period.
-      // Therefore we mark them as visible so they are appended onto the Thread
-      // track, and hence accessible by the CountersGraph view.
-      return true;
-    }
-
-    // Gate the visibility of post message events behind the experiement flag
-    if (TraceEngine.Types.TraceEvents.isTraceEventSchedulePostMessage(entry) ||
-        TraceEngine.Types.TraceEvents.isTraceEventHandlePostMessage(entry)) {
-      return Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_SHOW_POST_MESSAGE_EVENTS);
-    }
-
-    // Default styles are globally defined for each event name. Some
-    // events are hidden by default.
-    const eventStyle = getEventStyle(entry.name as TraceEngine.Types.TraceEvents.KnownEventName);
-    const eventIsTiming = TraceEngine.Types.TraceEvents.isTraceEventConsoleTime(entry) ||
-        TraceEngine.Types.TraceEvents.isTraceEventPerformanceMeasure(entry) ||
-        TraceEngine.Types.TraceEvents.isTraceEventPerformanceMark(entry);
-
-    return (eventStyle && !eventStyle.hidden) || eventIsTiming;
+    return trackStartLevel + lastTimestampByLevel.length;
   }
 
   /**

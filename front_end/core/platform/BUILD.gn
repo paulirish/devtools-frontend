@@ -20,9 +20,10 @@ devtools_module("platform") {
     "MimeType.ts",
     "NumberUtilities.ts",
     "PromiseUtilities.ts",
-    "SetUtilities.ts",
+    "ServerTiming.ts",
     "StringUtilities.ts",
     "Timing.ts",
+    "TypedArrayUtilities.ts",
     "TypescriptUtilities.ts",
     "UIString.ts",
     "UserVisibleError.ts",
@@ -49,8 +50,8 @@ ts_library("unittests") {
     "MapUtilities.test.ts",
     "MimeType.test.ts",
     "NumberUtilities.test.ts",
-    "SetUtilities.test.ts",
     "StringUtilities.test.ts",
+    "TypedArrayUtilities.test.ts",
   ]
 
   deps = [

@@ -8,8 +8,6 @@ import {getAllNodes, getMainThread} from '../../../testing/TraceHelpers.js';
 import {TraceLoader} from '../../../testing/TraceLoader.js';
 import * as TraceModel from '../trace.js';
 
-const {assert} = chai;
-
 async function handleEventsFromTraceFile(context: Mocha.Context|Mocha.Suite|null, name: string):
     Promise<TraceModel.Handlers.ModelHandlers.Samples.SamplesHandlerData> {
   const traceEvents = await TraceLoader.rawEvents(context, name);
@@ -44,15 +42,15 @@ describeWithEnvironment('SamplesHandler', function() {
 
     const profilesFirstProcess = data.profilesInProcess.get(firstProcessId);
     assert.strictEqual(profilesFirstProcess?.size, 1);
-    assert.isDefined(profilesFirstProcess?.get(threadId));
+    assert.exists(profilesFirstProcess?.get(threadId));
 
     const profilesSecondProcess = data.profilesInProcess.get(secondProcessId);
     assert.strictEqual(profilesSecondProcess?.size, 1);
-    assert.isDefined(profilesSecondProcess?.get(threadId));
+    assert.exists(profilesSecondProcess?.get(threadId));
 
     const profilesThirdProcess = data.profilesInProcess.get(thirdProcessId);
     assert.strictEqual(profilesThirdProcess?.size, 1);
-    assert.isDefined(profilesThirdProcess?.get(threadId));
+    assert.exists(profilesThirdProcess?.get(threadId));
   });
   describe('profile calls building', () => {
     const pid = TraceModel.Types.TraceEvents.ProcessID(0);
@@ -150,7 +148,10 @@ describeWithEnvironment('SamplesHandler', function() {
       }
       await TraceModel.Handlers.ModelHandlers.Samples.finalize();
       const data = TraceModel.Handlers.ModelHandlers.Samples.data();
-      const calls = data.profilesInProcess.get(pid)?.get(tid)?.profileCalls;
+      const calls = data.profilesInProcess.get(pid)?.get(tid)?.profileCalls.map(call => {
+        const selfTime = data.entryToNode.get(call)?.selfTime;
+        return {...call, selfTime};
+      });
       const tree = data.profilesInProcess.get(pid)?.get(tid)?.profileTree;
       const expectedResult = [
         {id: A, ts: 0, dur: 154, selfTime: 58, children: [B, D]},
@@ -187,7 +188,10 @@ describeWithEnvironment('SamplesHandler', function() {
       const threadId = TraceModel.Types.TraceEvents.ThreadID(1);
       const firstProcessId = TraceModel.Types.TraceEvents.ProcessID(2236123);
       const profilesFirstProcess = data.profilesInProcess.get(firstProcessId);
-      const calls = profilesFirstProcess?.get(threadId)?.profileCalls.slice(0, 5);
+      const calls = profilesFirstProcess?.get(threadId)?.profileCalls.slice(0, 5).map(call => {
+        const selfTime = data.entryToNode.get(call)?.selfTime;
+        return {...call, selfTime};
+      });
       const tree = profilesFirstProcess?.get(threadId)?.profileTree;
       const expectedResult = [
         {'id': 2, 'dur': 392, 'ts': 643496962681, 'selfTime': 392, 'children': []},
@@ -294,30 +298,30 @@ describeWithEnvironment('SamplesHandler', function() {
     }
 
     it('falls back to the call frame name if the ProfileNode name is empty', async function() {
-      const traceParsedData = await TraceLoader.traceEngine(this, 'react-hello-world.json.gz');
-      const {entry, profileNode} = getProfileEventAndNode(traceParsedData);
+      const {traceData} = await TraceLoader.traceEngine(this, 'react-hello-world.json.gz');
+      const {entry, profileNode} = getProfileEventAndNode(traceData);
       // Store and then reset this: we are doing this to test the fallback to
       // the entry callFrame.functionName property. After the assertion we
       // reset this to avoid impacting other tests.
       const originalProfileNodeName = profileNode.functionName;
       profileNode.setFunctionName('');
       assert.strictEqual(
-          TraceModel.Handlers.ModelHandlers.Samples.getProfileCallFunctionName(traceParsedData.Samples, entry),
+          TraceModel.Handlers.ModelHandlers.Samples.getProfileCallFunctionName(traceData.Samples, entry),
           'performConcurrentWorkOnRoot');
       // St
       profileNode.setFunctionName(originalProfileNodeName);
     });
 
     it('uses the profile name if it has been set', async function() {
-      const traceParsedData = await TraceLoader.traceEngine(this, 'react-hello-world.json.gz');
-      const {entry, profileNode} = getProfileEventAndNode(traceParsedData);
+      const {traceData} = await TraceLoader.traceEngine(this, 'react-hello-world.json.gz');
+      const {entry, profileNode} = getProfileEventAndNode(traceData);
       // Store and then reset this: we are doing this to test the fallback to
       // the entry callFrame.functionName property. After the assertion we
       // reset this to avoid impacting other tests.
       const originalProfileNodeName = profileNode.functionName;
       profileNode.setFunctionName('testing-profile-name');
       assert.strictEqual(
-          TraceModel.Handlers.ModelHandlers.Samples.getProfileCallFunctionName(traceParsedData.Samples, entry),
+          TraceModel.Handlers.ModelHandlers.Samples.getProfileCallFunctionName(traceData.Samples, entry),
           'testing-profile-name');
       profileNode.setFunctionName(originalProfileNodeName);
     });

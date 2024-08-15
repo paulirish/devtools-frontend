@@ -6,6 +6,7 @@ import * as Helpers from '../helpers/helpers.js';
 import * as Types from '../types/types.js';
 
 import {data as metaHandlerData} from './MetaHandler.js';
+import {ScoreClassification} from './PageLoadMetricsHandler.js';
 import {HandlerState, type TraceEventHandlerName} from './types.js';
 
 // This handler serves two purposes. It generates a list of events that are
@@ -17,11 +18,18 @@ import {HandlerState, type TraceEventHandlerName} from './types.js';
 // because they are effectively global, so we just track all that we find.
 const allEvents: Types.TraceEvents.TraceEventEventTiming[] = [];
 
+const beginCommitCompositorFrameEvents: Types.TraceEvents.TraceEventBeginCommitCompositorFrame[] = [];
+
 export const LONG_INTERACTION_THRESHOLD = Helpers.Timing.millisecondsToMicroseconds(Types.Timing.MilliSeconds(200));
+
+const INP_GOOD_TIMING = LONG_INTERACTION_THRESHOLD;
+const INP_MEDIUM_TIMING = Helpers.Timing.millisecondsToMicroseconds(Types.Timing.MilliSeconds(500));
 
 export interface UserInteractionsData {
   /** All the user events we found in the trace */
   allEvents: readonly Types.TraceEvents.TraceEventEventTiming[];
+  /** All the BeginCommitCompositorFrame events we found in the trace */
+  beginCommitCompositorFrameEvents: readonly Types.TraceEvents.TraceEventBeginCommitCompositorFrame[];
   /** All the interaction events we found in the trace that had an
    * interactionId and a duration > 0
    **/
@@ -57,6 +65,7 @@ let handlerState = HandlerState.UNINITIALIZED;
 
 export function reset(): void {
   allEvents.length = 0;
+  beginCommitCompositorFrameEvents.length = 0;
   interactionEvents.length = 0;
   eventTimingStartEventsForInteractions.length = 0;
   eventTimingEndEventsById.clear();
@@ -68,6 +77,11 @@ export function reset(): void {
 export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
   if (handlerState !== HandlerState.INITIALIZED) {
     throw new Error('Handler is not initialized');
+  }
+
+  if (Types.TraceEvents.isTraceEventBeginCommitCompositorFrame(event)) {
+    beginCommitCompositorFrameEvents.push(event);
+    return;
   }
 
   if (!Types.TraceEvents.isTraceEventEventTiming(event)) {
@@ -289,33 +303,34 @@ export async function finalize(): Promise<void> {
     const frameId = interactionStartEvent.args.frame ?? interactionStartEvent.args.data.frame;
     const navigation = Helpers.Trace.getNavigationForTraceEvent(interactionStartEvent, frameId, navigationsByFrameId);
     const navigationId = navigation?.args.data?.navigationId;
-
-    const interactionEvent: Types.TraceEvents.SyntheticInteractionPair = {
-      // Use the start event to define the common fields.
-      cat: interactionStartEvent.cat,
-      name: interactionStartEvent.name,
-      pid: interactionStartEvent.pid,
-      tid: interactionStartEvent.tid,
-      ph: interactionStartEvent.ph,
-      processingStart: processingStartRelativeToTraceTime,
-      processingEnd: processingEndRelativeToTraceTime,
-      // These will be set in writeSyntheticTimespans()
-      inputDelay: Types.Timing.MicroSeconds(-1),
-      mainThreadHandling: Types.Timing.MicroSeconds(-1),
-      presentationDelay: Types.Timing.MicroSeconds(-1),
-      args: {
-        data: {
-          beginEvent: interactionStartEvent,
-          endEvent: endEvent,
-          frame: frameId,
-          navigationId,
-        },
-      },
-      ts: interactionStartEvent.ts,
-      dur: Types.Timing.MicroSeconds(endEvent.ts - interactionStartEvent.ts),
-      type: interactionStartEvent.args.data.type,
-      interactionId: interactionStartEvent.args.data.interactionId,
-    };
+    const interactionEvent = Helpers.SyntheticEvents.SyntheticEventsManager
+                                 .registerSyntheticBasedEvent<Types.TraceEvents.SyntheticInteractionPair>({
+                                   // Use the start event to define the common fields.
+                                   rawSourceEvent: interactionStartEvent,
+                                   cat: interactionStartEvent.cat,
+                                   name: interactionStartEvent.name,
+                                   pid: interactionStartEvent.pid,
+                                   tid: interactionStartEvent.tid,
+                                   ph: interactionStartEvent.ph,
+                                   processingStart: processingStartRelativeToTraceTime,
+                                   processingEnd: processingEndRelativeToTraceTime,
+                                   // These will be set in writeSyntheticTimespans()
+                                   inputDelay: Types.Timing.MicroSeconds(-1),
+                                   mainThreadHandling: Types.Timing.MicroSeconds(-1),
+                                   presentationDelay: Types.Timing.MicroSeconds(-1),
+                                   args: {
+                                     data: {
+                                       beginEvent: interactionStartEvent,
+                                       endEvent: endEvent,
+                                       frame: frameId,
+                                       navigationId,
+                                     },
+                                   },
+                                   ts: interactionStartEvent.ts,
+                                   dur: Types.Timing.MicroSeconds(endEvent.ts - interactionStartEvent.ts),
+                                   type: interactionStartEvent.args.data.type,
+                                   interactionId: interactionStartEvent.args.data.interactionId,
+                                 });
     writeSyntheticTimespans(interactionEvent);
 
     interactionEvents.push(interactionEvent);
@@ -336,6 +351,7 @@ export async function finalize(): Promise<void> {
 export function data(): UserInteractionsData {
   return {
     allEvents,
+    beginCommitCompositorFrameEvents,
     interactionEvents,
     interactionEventsWithNoNesting,
     longestInteractionEvent,
@@ -347,4 +363,20 @@ export function data(): UserInteractionsData {
 
 export function deps(): TraceEventHandlerName[] {
   return ['Meta'];
+}
+
+/**
+ * Classifications sourced from
+ * https://web.dev/articles/inp#good-score
+ */
+export function scoreClassificationForInteractionToNextPaint(timing: Types.Timing.MicroSeconds): ScoreClassification {
+  if (timing <= INP_GOOD_TIMING) {
+    return ScoreClassification.GOOD;
+  }
+
+  if (timing <= INP_MEDIUM_TIMING) {
+    return ScoreClassification.OK;
+  }
+
+  return ScoreClassification.BAD;
 }

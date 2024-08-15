@@ -30,10 +30,12 @@
 
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
+import * as Protocol from '../../generated/protocol.js';
 import * as TraceEngine from '../../models/trace/trace.js';
 import * as TraceBounds from '../../services/trace_bounds/trace_bounds.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {
   EventCategory,
@@ -84,10 +86,10 @@ export abstract class TimelineEventOverview extends PerfUI.TimelineOverviewPane.
   }
 }
 
-const HIGH_NETWORK_PRIORITIES = new Set<TraceEngine.Types.TraceEvents.Priority>([
-  'VeryHigh',
-  'High',
-  'Medium',
+const HIGH_NETWORK_PRIORITIES = new Set<Protocol.Network.ResourcePriority>([
+  Protocol.Network.ResourcePriority.VeryHigh,
+  Protocol.Network.ResourcePriority.High,
+  Protocol.Network.ResourcePriority.Medium,
 ]);
 
 export class TimelineEventOverviewNetwork extends TimelineEventOverview {
@@ -235,7 +237,7 @@ export class TimelineEventOverviewCPUActivity extends TimelineEventOverview {
             x += quantSizePx;
           }
 
-          const onEntryStart = (entry: TraceEngine.Types.TraceEvents.SyntheticTraceEntry): void => {
+          const onEntryStart = (entry: TraceEngine.Types.TraceEvents.TraceEventData): void => {
             const category = this.#entryCategory(entry);
             if (!category || category === 'idle') {
               // Idle event won't show in CPU activity, so just skip them.
@@ -248,7 +250,7 @@ export class TimelineEventOverviewCPUActivity extends TimelineEventOverview {
             categoryIndexStack.push(categoryIndex || otherIndex);
           };
 
-          function onEntryEnd(entry: TraceEngine.Types.TraceEvents.SyntheticTraceEntry): void {
+          function onEntryEnd(entry: TraceEngine.Types.TraceEvents.TraceEventData): void {
             const endTimeMilli = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(entry.ts) +
                 TraceEngine.Helpers.Timing.microSecondsToMilliseconds(
                     TraceEngine.Types.Timing.MicroSeconds(entry.dur || 0));
@@ -420,6 +422,7 @@ export class TimelineFilmStripOverview extends TimelineEventOverview {
 
   constructor(filmStrip: TraceEngine.Extras.FilmStrip.Data) {
     super('filmstrip', null);
+    this.element.setAttribute('jslog', `${VisualLogging.section('film-strip')}`);
     this.frameToImagePromise = new Map();
     this.#filmStrip = filmStrip;
     this.lastFrame = null;

@@ -87,10 +87,12 @@ export interface TraceEventData {
 
 export interface TraceEventArgs {
   data?: TraceEventArgsData;
+  stackTrace?: TraceEventCallFrame[];
 }
 
 export interface TraceEventArgsData {
   stackTrace?: TraceEventCallFrame[];
+  url?: string;
   navigationId?: string;
   frame?: string;
 }
@@ -105,12 +107,26 @@ export interface TraceEventCallFrame {
   url: string;
 }
 
+export function objectIsTraceEventCallFrame(object: {}): object is TraceEventCallFrame {
+  return ('functionName' in object && typeof object.functionName === 'string') &&
+      ('scriptId' in object && (typeof object.scriptId === 'string' || typeof object.scriptId === 'number')) &&
+      ('columnNumber' in object && typeof object.columnNumber === 'number') &&
+      ('lineNumber' in object && typeof object.lineNumber === 'number') &&
+      ('url' in object && typeof object.url === 'string');
+}
+
 export interface TraceFrame {
   frame: string;
   name: string;
   processId: ProcessID;
   url: string;
   parent?: string;
+  // Added to Chromium in April 2024:
+  // crrev.com/c/5424783
+  isOutermostMainFrame?: boolean;
+  // Added to Chromium in June 2024:
+  // crrev.com/c/5595033
+  isInPrimaryMainFrame?: boolean;
 }
 
 // Sample events.
@@ -123,7 +139,7 @@ export interface TraceEventSample extends TraceEventData {
  * A fake trace event created to support CDP.Profiler.Profiles in the
  * trace engine.
  */
-export interface SyntheticCpuProfile extends TraceEventInstant {
+export interface SyntheticCpuProfile extends TraceEventInstant, SyntheticBasedEvent<Phase.INSTANT> {
   name: 'CpuProfile';
   args: TraceEventArgs&{
     data: TraceEventArgsData & {
@@ -171,6 +187,13 @@ export interface TraceEventPartialNode {
 export interface TraceEventComplete extends TraceEventData {
   ph: Phase.COMPLETE;
   dur: MicroSeconds;
+}
+
+export interface TraceEventRunTask extends TraceEventComplete {
+  name: KnownEventName.RunTask;
+}
+export function isTraceEventRunTask(event: TraceEventData): event is TraceEventRunTask {
+  return event.name === KnownEventName.RunTask;
 }
 
 export interface TraceEventFireIdleCallback extends TraceEventComplete {
@@ -313,7 +336,8 @@ interface SyntheticArgsData {
   waiting: MicroSeconds;
 }
 
-export interface SyntheticNetworkRequest extends TraceEventComplete {
+export interface SyntheticNetworkRequest extends TraceEventComplete, SyntheticBasedEvent<Phase.COMPLETE> {
+  rawSourceEvent: TraceEventResourceSendRequest;
   args: TraceEventArgs&{
     data: TraceEventArgsData & {
       syntheticData: SyntheticArgsData,
@@ -324,12 +348,16 @@ export interface SyntheticNetworkRequest extends TraceEventComplete {
       frame: string,
       fromServiceWorker: boolean,
       isLinkPreload: boolean,
-      host: string,
       mimeType: string,
-      pathname: string,
-      search: string,
-      priority: Priority,
-      initialPriority: Priority,
+      priority: Protocol.Network.ResourcePriority,
+      initialPriority: Protocol.Network.ResourcePriority,
+      /**
+       * This is the protocol used to resolve the request.
+       *
+       * Note, this is not the same as URL.protocol.
+       *
+       * Example values (not exhaustive): http/0.9, http/1.0, http/1.1, http, h2, h3-Q050, data, blob
+       */
       protocol: string,
       redirects: SyntheticNetworkRedirect[],
       renderBlocking: RenderBlocking,
@@ -340,10 +368,17 @@ export interface SyntheticNetworkRequest extends TraceEventComplete {
       responseHeaders: Array<{name: string, value: string}>,
       fetchPriorityHint: FetchPriorityHint,
       url: string,
+      /** True only if got a 'resourceFinish' event indicating a failure. */
+      failed: boolean,
+      /** True only if got a 'resourceFinish' event. */
+      finished: boolean,
+      connectionId: number,
+      connectionReused: boolean,
       // Optional fields
       initiator?: Initiator,
       requestMethod?: string,
       timing?: TraceEventResourceReceiveResponseTimingData,
+      syntheticServerTimings?: SyntheticServerTiming[],
     },
   };
   cat: 'loading';
@@ -357,6 +392,25 @@ export interface SyntheticNetworkRequest extends TraceEventComplete {
   tid: ThreadID;
 }
 
+export interface SyntheticWebSocketConnectionEvent extends TraceEventComplete, SyntheticBasedEvent<Phase.COMPLETE> {
+  rawSourceEvent: TraceEventData;
+  args: TraceEventArgs&{
+    data: TraceEventArgsData & {
+      identifier: number,
+      priority: Protocol.Network.ResourcePriority,
+      url: string,
+    },
+  };
+  cat: string;
+  name: 'SyntheticWebSocketConnectionEvent';
+  ph: Phase.COMPLETE;
+  dur: MicroSeconds;
+  ts: MicroSeconds;
+  pid: ProcessID;
+  tid: ThreadID;
+  s: TraceEventScope;
+}
+
 export const enum AuctionWorkletType {
   BIDDER = 'bidder',
   SELLER = 'seller',
@@ -365,7 +419,8 @@ export const enum AuctionWorkletType {
   UNKNOWN = 'unknown',
 }
 
-export interface SyntheticAuctionWorkletEvent extends TraceEventInstant {
+export interface SyntheticAuctionWorkletEvent extends TraceEventInstant, SyntheticBasedEvent<Phase.INSTANT> {
+  rawSourceEvent: TraceEventData;
   name: 'SyntheticAuctionWorkletEvent';
   // The PID that the AuctionWorklet is running in.
   pid: ProcessID;
@@ -463,7 +518,8 @@ export function isTraceEventScreenshot(event: TraceEventData): event is TraceEve
   return event.name === KnownEventName.Screenshot;
 }
 
-export interface SyntheticScreenshot extends TraceEventData {
+export interface SyntheticScreenshot extends TraceEventData, SyntheticBasedEvent {
+  rawSourceEvent: TraceEventScreenshot;
   /** This is the correct presentation timestamp. */
   ts: MicroSeconds;
   args: TraceEventArgs&{
@@ -478,19 +534,22 @@ export interface SyntheticScreenshot extends TraceEventData {
 
 export interface TraceEventAnimation extends TraceEventData {
   args: TraceEventArgs&{
-    id?: string,
-    name?: string,
-    nodeId?: number,
-    nodeName?: string,
-    state?: string,
-    compositeFailed?: number,
-    unsupportedProperties?: string[],
+    data: TraceEventArgsData & {
+      nodeName?: string,
+      nodeId?: number,
+      displayName?: string,
+      id?: string,
+      name?: string,
+      state?: string,
+      compositeFailed?: number,
+      unsupportedProperties?: string[],
+    },
   };
   name: 'Animation';
   id2?: {
     local?: string,
   };
-  ph: Phase.ASYNC_NESTABLE_START|Phase.ASYNC_NESTABLE_END;
+  ph: Phase.ASYNC_NESTABLE_START|Phase.ASYNC_NESTABLE_END|Phase.ASYNC_NESTABLE_INSTANT;
 }
 
 // Metadata events.
@@ -540,13 +599,17 @@ export interface TraceEventNavigationStart extends TraceEventMark {
       // reasonably may import traces from before that date that do not have
       // this field present.
       isOutermostMainFrame?: boolean, navigationId: string,
+      /**
+       * @deprecated use documentLoaderURL for navigation events URLs
+       */
+      url?: string,
     },
         frame: string,
   };
 }
 
 export interface TraceEventFirstContentfulPaint extends TraceEventMark {
-  name: 'firstContentfulPaint';
+  name: KnownEventName.MarkFCP;
   args: TraceEventArgs&{
     frame: string,
     data?: TraceEventArgsData&{
@@ -569,8 +632,37 @@ export type PageLoadEvent = TraceEventFirstContentfulPaint|TraceEventMarkDOMCont
     TraceEventLargestContentfulPaintCandidate|TraceEventLayoutShift|TraceEventFirstPaint|TraceEventMarkLoad|
     TraceEventNavigationStart;
 
+const markerTypeGuards = [
+  isTraceEventMarkDOMContent,
+  isTraceEventMarkLoad,
+  isTraceEventFirstPaint,
+  isTraceEventFirstContentfulPaint,
+  isTraceEventLargestContentfulPaintCandidate,
+  isTraceEventNavigationStart,
+];
+
+export const MarkerName =
+    ['MarkDOMContent', 'MarkLoad', 'firstPaint', 'firstContentfulPaint', 'largestContentfulPaint::Candidate'] as const;
+
+export interface MarkerEvent extends TraceEventData {
+  name: typeof MarkerName[number];
+}
+
+export function isTraceEventMarkerEvent(event: TraceEventData): event is MarkerEvent {
+  return markerTypeGuards.some(fn => fn(event));
+}
+
+const pageLoadEventTypeGuards = [
+  ...markerTypeGuards,
+  isTraceEventInteractiveTime,
+];
+
+export function eventIsPageLoadEvent(event: TraceEventData): event is PageLoadEvent {
+  return pageLoadEventTypeGuards.some(fn => fn(event));
+}
+
 export interface TraceEventLargestContentfulPaintCandidate extends TraceEventMark {
-  name: 'largestContentfulPaint::Candidate';
+  name: KnownEventName.MarkLCPCandidate;
   args: TraceEventArgs&{
     frame: string,
     data?: TraceEventArgsData&{
@@ -706,7 +798,7 @@ export interface TraceEventMarkDOMContent extends TraceEventInstant {
     data?: TraceEventArgsData & {
       frame: string,
       isMainFrame: boolean,
-      page: string,
+      isOutermostMainFrame?: boolean, page: string,
     },
   };
 }
@@ -718,6 +810,7 @@ export interface TraceEventMarkLoad extends TraceEventInstant {
       frame: string,
       isMainFrame: boolean,
       page: string,
+      isOutermostMainFrame?: boolean,
     },
   };
 }
@@ -778,7 +871,9 @@ export interface LayoutShiftParsedData {
   cumulativeWeightedScoreInWindow: number;
   sessionWindowData: LayoutShiftSessionWindowData;
 }
-export interface SyntheticLayoutShift extends TraceEventLayoutShift {
+export interface SyntheticLayoutShift extends TraceEventLayoutShift, SyntheticBasedEvent<Phase.INSTANT> {
+  name: 'LayoutShift';
+  rawSourceEvent: TraceEventLayoutShift;
   args: TraceEventArgs&{
     frame: string,
     data?: LayoutShiftData&{
@@ -788,7 +883,6 @@ export interface SyntheticLayoutShift extends TraceEventLayoutShift {
   parsedData: LayoutShiftParsedData;
 }
 
-export type Priority = 'Low'|'High'|'Medium'|'VeryHigh'|'Highest';
 export type FetchPriorityHint = 'low'|'high'|'auto';
 export type RenderBlocking = 'blocking'|'non_blocking'|'in_body_parser_blocking'|'potentially_blocking';
 
@@ -807,13 +901,14 @@ export interface TraceEventResourceSendRequest extends TraceEventInstant {
       frame: string,
       requestId: string,
       url: string,
-      priority: Priority,
+      priority: Protocol.Network.ResourcePriority,
       resourceType: Protocol.Network.ResourceType,
       fetchPriorityHint: FetchPriorityHint,
       // TODO(crbug.com/1457985): change requestMethod to enum when confirm in the backend code.
       requestMethod?: string,
       renderBlocking?: RenderBlocking,
       initiator?: Initiator,
+      isLinkPreload?: boolean,
     },
   };
 }
@@ -823,7 +918,7 @@ export interface TraceEventResourceChangePriority extends TraceEventInstant {
   args: TraceEventArgs&{
     data: TraceEventArgsData & {
       requestId: string,
-      priority: Priority,
+      priority: Protocol.Network.ResourcePriority,
     },
   };
 }
@@ -885,6 +980,14 @@ export interface TraceEventResourceReceiveResponse extends TraceEventInstant {
   name: 'ResourceReceiveResponse';
   args: TraceEventArgs&{
     data: TraceEventArgsData & {
+      /**
+       * This is the protocol used to resolve the request.
+       *
+       * Note, this is not the same as URL.protocol.
+       *
+       * Example values (not exhaustive): http/0.9, http/1.0, http/1.1, http, h2, h3-Q050, data, blob
+       */
+      protocol: string,
       encodedDataLength: number,
       frame: string,
       fromCache: boolean,
@@ -894,7 +997,8 @@ export interface TraceEventResourceReceiveResponse extends TraceEventInstant {
       responseTime: MilliSeconds,
       statusCode: number,
       timing: TraceEventResourceReceiveResponseTimingData,
-      isLinkPreload?: boolean,
+      connectionId: number,
+      connectionReused: boolean,
       headers?: Array<{name: string, value: string}>,
     },
   };
@@ -971,6 +1075,7 @@ export interface TraceEventStyleRecalcInvalidationTracking extends TraceEventIns
     },
   };
 }
+
 export function isTraceEventStyleRecalcInvalidationTracking(event: TraceEventData):
     event is TraceEventStyleRecalcInvalidationTracking {
   return event.name === KnownEventName.StyleRecalcInvalidationTracking;
@@ -994,6 +1099,19 @@ export function isTraceEventStyleInvalidatorInvalidationTracking(event: TraceEve
   return event.name === KnownEventName.StyleInvalidatorInvalidationTracking;
 }
 
+export interface TraceEventBeginCommitCompositorFrame extends TraceEventInstant {
+  name: KnownEventName.BeginCommitCompositorFrame;
+  args: TraceEventArgs&{
+    frame: string,
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    is_mobile_optimized: boolean,
+  };
+}
+export function isTraceEventBeginCommitCompositorFrame(event: TraceEventData):
+    event is TraceEventBeginCommitCompositorFrame {
+  return event.name === KnownEventName.BeginCommitCompositorFrame;
+}
+
 export interface TraceEventScheduleStyleRecalculation extends TraceEventInstant {
   name: KnownEventName.ScheduleStyleRecalculation;
   args: TraceEventArgs&{
@@ -1007,12 +1125,25 @@ export function isTraceEventScheduleStyleRecalculation(event: TraceEventData):
   return event.name === KnownEventName.ScheduleStyleRecalculation;
 }
 
+export interface TraceEventRenderFrameImplCreateChildFrame extends TraceEventData {
+  name: KnownEventName.RenderFrameImplCreateChildFrame;
+  /* eslint-disable @typescript-eslint/naming-convention */
+  args: TraceEventArgs&{
+    child_frame_token: string,
+    frame_token: string,
+  };
+}
+export function isTraceEventRenderFrameImplCreateChildFrame(event: TraceEventData):
+    event is TraceEventRenderFrameImplCreateChildFrame {
+  return event.name === KnownEventName.RenderFrameImplCreateChildFrame;
+}
+
 export interface TraceEventPrePaint extends TraceEventComplete {
   name: 'PrePaint';
 }
 
 export interface TraceEventPairableAsync extends TraceEventData {
-  ph: Phase.ASYNC_NESTABLE_START|Phase.ASYNC_NESTABLE_END;
+  ph: Phase.ASYNC_NESTABLE_START|Phase.ASYNC_NESTABLE_END|Phase.ASYNC_NESTABLE_INSTANT;
   // The id2 field gives flexibility to explicitly specify if an event
   // id is global among processes or process local. However not all
   // events use it, so both kind of ids need to be marked as optional.
@@ -1023,6 +1154,10 @@ export interface TraceEventPairableAsyncBegin extends TraceEventPairableAsync {
   ph: Phase.ASYNC_NESTABLE_START;
 }
 
+export interface TraceEventPairableAsyncInstant extends TraceEventPairableAsync {
+  ph: Phase.ASYNC_NESTABLE_INSTANT;
+}
+
 export interface TraceEventPairableAsyncEnd extends TraceEventPairableAsync {
   ph: Phase.ASYNC_NESTABLE_END;
 }
@@ -1031,6 +1166,10 @@ export interface TraceEventUserTiming extends TraceEventData {
   id2?: {local?: string, global?: string};
   id?: string;
   cat: 'blink.user_timing';
+  // Note that the timestamp for user timing trace events is set to the
+  // start time passed by the user at the call site of the timing (based
+  // on the UserTiming spec).
+  // https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/renderer/core/timing/performance_user_timing.cc;l=236;drc=494419358caf690316f160a1f27d9e771a14c033
 }
 
 export type TraceEventPairableUserTiming = TraceEventUserTiming&TraceEventPairableAsync;
@@ -1038,6 +1177,7 @@ export type TraceEventPairableUserTiming = TraceEventUserTiming&TraceEventPairab
 export interface TraceEventPerformanceMeasureBegin extends TraceEventPairableUserTiming {
   args: TraceEventArgs&{
     detail?: string,
+    stackTrace?: TraceEventCallFrame[],
   };
   ph: Phase.ASYNC_NESTABLE_START;
 }
@@ -1049,6 +1189,7 @@ export interface TraceEventPerformanceMark extends TraceEventUserTiming {
   args: TraceEventArgs&{
     data?: TraceEventArgsData & {
       detail?: string,
+      stackTrace?: TraceEventCallFrame[],
     },
   };
   ph: Phase.INSTANT|Phase.MARK|Phase.ASYNC_NESTABLE_INSTANT;
@@ -1075,6 +1216,92 @@ export interface TraceEventTimeStamp extends TraceEventData {
       message: string,
     },
   };
+}
+
+export interface TraceEventTargetRundown extends TraceEventData {
+  cat: 'disabled-by-default-devtools.target-rundown';
+  args: TraceEventArgs&{
+    data: TraceEventArgsData & {
+      frame: string,
+      frameType: string,
+      url: string,
+      isolate: string,
+      v8context: string,
+      origin: string,
+      scriptId: number,
+      isDefault?: boolean,
+      contextType?: string,
+    },
+  };
+}
+
+export function isTraceEventTargetRundown(traceEventData: TraceEventData): traceEventData is TraceEventTargetRundown {
+  if (traceEventData.cat !== 'disabled-by-default-devtools.target-rundown') {
+    return false;
+  }
+  const data = traceEventData.args?.data;
+  if (!data) {
+    return false;
+  }
+  return 'frame' in data && 'frameType' in data && 'url' in data && 'isolate' in data && 'v8context' in data &&
+      'scriptId' in data;
+}
+
+export interface TraceEventScriptRundown extends TraceEventData {
+  cat: 'disabled-by-default-devtools.v8-source-rundown';
+  args: TraceEventArgs&{
+    data: TraceEventArgsData & {
+      isolate: string,
+      executionContextId: number,
+      scriptId: number,
+      startLine: number,
+      startColumn: number,
+      endLine: number,
+      endColumn: number,
+      url: string,
+      hash: string,
+      isModule: boolean,
+      hasSourceUrl: boolean,
+      sourceMapUrl?: string,
+    },
+  };
+}
+
+export function isTraceEventScriptRundown(traceEventData: TraceEventData): traceEventData is TraceEventScriptRundown {
+  if (traceEventData.cat !== 'disabled-by-default-devtools.v8-source-rundown') {
+    return false;
+  }
+  const data = traceEventData.args?.data;
+  if (!data) {
+    return false;
+  }
+  return 'isolate' in data && 'executionContextId' in data && 'scriptId' in data && 'startLine' in data &&
+      'startColumn' in data && 'endLine' in data && 'endColumn' in data && 'hash' in data && 'isModule' in data &&
+      'hasSourceUrl' in data;
+}
+
+export interface TraceEventScriptRundownSource extends TraceEventData {
+  cat: 'disabled-by-default-devtools.v8-source-rundown-sources';
+  args: TraceEventArgs&{
+    data: TraceEventArgsData & {
+      isolate: string,
+      scriptId: number,
+      length?: number,
+      sourceText?: string,
+    },
+  };
+}
+
+export function isTraceEventScriptRundownSource(traceEventData: TraceEventData):
+    traceEventData is TraceEventScriptRundownSource {
+  if (traceEventData.cat !== 'disabled-by-default-devtools.v8-source-rundown-sources') {
+    return false;
+  }
+  const data = traceEventData.args?.data;
+  if (!data) {
+    return false;
+  }
+  return 'isolate' in data && 'scriptId' in data && 'sourceText' in data;
 }
 
 /** ChromeFrameReporter args for PipelineReporter event.
@@ -1173,22 +1400,41 @@ export interface TraceEventPipelineReporter extends TraceEventData {
 export function isTraceEventPipelineReporter(event: TraceEventData): event is TraceEventPipelineReporter {
   return event.name === KnownEventName.PipelineReporter;
 }
-/* eslint-enable @typescript-eslint/naming-convention */
+
+// A type used for synthetic events created based on a raw trace event.
+// A branded type is used to ensure not all events can be typed as
+// SyntheticBasedEvent and prevent places different to the
+// SyntheticEventsManager from creating synthetic events. This is
+// because synthetic events need to be registered in order to resolve
+// serialized event keys into event objects, so we ensure events are
+// registered at the time they are created by the SyntheticEventsManager.
+export interface SyntheticBasedEvent<Ph extends Phase = Phase> extends TraceEventData {
+  ph: Ph;
+  rawSourceEvent: TraceEventData;
+  _tag: 'SyntheticEntryTag';
+}
+
+export function isSyntheticBasedEvent(event: TraceEventData): event is SyntheticBasedEvent {
+  return 'rawSourceEvent' in event;
+}
 
 // Nestable async events with a duration are made up of two distinct
 // events: the begin, and the end. We need both of them to be able to
 // display the right information, so we create these synthetic events.
 export interface SyntheticEventPair<T extends TraceEventPairableAsync = TraceEventPairableAsync> extends
-    TraceEventData {
+    SyntheticBasedEvent {
+  rawSourceEvent: TraceEventData;
   name: T['name'];
   cat: T['cat'];
   id?: string;
   id2?: {local?: string, global?: string};
+
   dur: MicroSeconds;
   args: TraceEventArgs&{
     data: {
       beginEvent: T & TraceEventPairableAsyncBegin,
       endEvent: T&TraceEventPairableAsyncEnd,
+      instantEvents?: Array<T&TraceEventPairableAsyncInstant>,
     },
   };
 }
@@ -1227,35 +1473,59 @@ export interface SyntheticInteractionPair extends SyntheticEventPair<TraceEventE
 }
 
 /**
- * An event created synthetically in the frontend that has a self time
- * (the time spent running the task itself).
- */
-export interface SyntheticTraceEntry extends TraceEventData {
-  selfTime?: MicroSeconds;
-}
-
-/**
  * A profile call created in the frontend from samples disguised as a
  * trace event.
+ *
+ * We store the sampleIndex, profileId and nodeId so that we can easily link
+ * back a Synthetic Trace Entry to an indivdual Sample trace event within a
+ * Profile.
+ *
+ * Because a sample contains a set of call frames representing the stack at the
+ * point in time that the sample was created, we also have to store the ID of
+ * the Node that points to the function call that this profile call represents.
  */
-export interface SyntheticProfileCall extends SyntheticTraceEntry {
+export interface SyntheticProfileCall extends TraceEventData {
   callFrame: Protocol.Runtime.CallFrame;
   nodeId: Protocol.integer;
+  sampleIndex: number;
+  profileId: ProfileID;
 }
 
 /**
- * A trace event augmented synthetically in the frontend to contain
- * its self time.
+ * A synthetic event created from the Server-Timing header of network
+ * request. In order to create these synthetic events, the corresponding
+ * metric (timing) in the header must contain a "start" param, which
+ * corresponds to the timestamp of the metric in the server. The
+ * ServerTimingsHandler implements a heuristic to estimate the offset
+ * between the client clock and the server clock so that the server
+ * timestamp can be translated to the tracing clock.
  */
-export type SyntheticRendererEvent = TraceEventRendererEvent&SyntheticTraceEntry;
+export interface SyntheticServerTiming<T extends Phase = Phase.COMPLETE> extends SyntheticBasedEvent<T> {
+  rawSourceEvent: TraceEventResourceSendRequest;
+  cat: 'devtools.server-timing';
+  args: TraceEventArgs&{
+    data: TraceEventArgsData & {
+      desc?: string, origin: string,
+    },
+  };
+}
+
+/**
+ * A JS Sample reflects a single sample from the V8 CPU Profile
+ */
+export interface SyntheticJSSample extends TraceEventData {
+  name: KnownEventName.JSSample;
+  args: TraceEventArgs&{
+    data: TraceEventArgsData & {
+      stackTrace: Protocol.Runtime.CallFrame[],
+    },
+  };
+  ph: Phase.INSTANT;
+}
 
 export function isSyntheticInteractionEvent(event: TraceEventData): event is SyntheticInteractionPair {
   return Boolean(
       'interactionId' in event && event.args?.data && 'beginEvent' in event.args.data && 'endEvent' in event.args.data);
-}
-
-export function isSyntheticTraceEntry(event: TraceEventData): event is SyntheticTraceEntry {
-  return isTraceEventRendererEvent(event) || isProfileCall(event);
 }
 
 // Events relating to frames.
@@ -1397,19 +1667,75 @@ export function isTraceEventActivateLayerTree(event: TraceEventData): event is T
   return event.name === KnownEventName.ActivateLayerTree;
 }
 
-export interface SyntheticInvalidation extends TraceEventInstant {
-  name: 'SyntheticInvalidation';
-  nodeName?: string;
-  rawEvent: TraceEventScheduleStyleInvalidationTracking|TraceEventStyleRecalcInvalidationTracking|
-      TraceEventStyleInvalidatorInvalidationTracking|TraceEventLayoutInvalidationTracking;
-  nodeId: Protocol.DOM.BackendNodeId;
-  frame: string;
-  reason?: string;
-  stackTrace?: TraceEventCallFrame[];
+export type InvalidationTrackingEvent =
+    TraceEventScheduleStyleInvalidationTracking|TraceEventStyleRecalcInvalidationTracking|
+    TraceEventStyleInvalidatorInvalidationTracking|TraceEventLayoutInvalidationTracking;
+
+export function isTraceEventInvalidationTracking(event: TraceEventData): event is InvalidationTrackingEvent {
+  return isTraceEventScheduleStyleInvalidationTracking(event) || isTraceEventStyleRecalcInvalidationTracking(event) ||
+      isTraceEventStyleInvalidatorInvalidationTracking(event) || isTraceEventLayoutInvalidationTracking(event);
 }
 
-export function isSyntheticInvalidation(event: TraceEventData): event is SyntheticInvalidation {
-  return event.name === 'SyntheticInvalidation';
+export interface TraceEventDrawLazyPixelRef extends TraceEventInstant {
+  name: KnownEventName.DrawLazyPixelRef;
+  args?: TraceEventArgs&{
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    LazyPixelRef: number,
+  };
+}
+export function isTraceEventDrawLazyPixelRef(event: TraceEventData): event is TraceEventDrawLazyPixelRef {
+  return event.name === KnownEventName.DrawLazyPixelRef;
+}
+
+export interface TraceEventDecodeLazyPixelRef extends TraceEventInstant {
+  name: KnownEventName.DecodeLazyPixelRef;
+  args?: TraceEventArgs&{
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    LazyPixelRef: number,
+  };
+}
+export function isTraceEventDecodeLazyPixelRef(event: TraceEventData): event is TraceEventDecodeLazyPixelRef {
+  return event.name === KnownEventName.DecodeLazyPixelRef;
+}
+
+export interface TraceEventDecodeImage extends TraceEventComplete {
+  name: KnownEventName.DecodeImage;
+  args: TraceEventArgs&{
+    imageType: string,
+  };
+}
+export function isTraceEventDecodeImage(event: TraceEventData): event is TraceEventDecodeImage {
+  return event.name === KnownEventName.DecodeImage;
+}
+
+export interface SelectorTiming {
+  'elapsed (us)': number;
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  'fast_reject_count': number;
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  'match_attempts': number;
+  'selector': string;
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  'style_sheet_id': string;
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  'match_count': number;
+}
+
+export interface SelectorStats {
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  selector_timings: SelectorTiming[];
+}
+
+export interface TraceEventSelectorStats extends TraceEventComplete {
+  name: KnownEventName.SelectorStats;
+  args: TraceEventArgs&{
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    selector_stats?: SelectorStats,
+  };
+}
+
+export function isTraceEventSelectorStats(event: TraceEventData): event is TraceEventSelectorStats {
+  return event.name === KnownEventName.SelectorStats;
 }
 
 export interface TraceEventUpdateLayoutTree extends TraceEventComplete {
@@ -1435,7 +1761,9 @@ export interface TraceEventLayout extends TraceEventComplete {
       partialLayout: boolean,
       totalObjects: number,
     },
-    endData: {
+    // endData is not reliably populated.
+    // Why? TBD. https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/renderer/core/frame/local_frame_view.cc;l=847-851;drc=8b6aaad8027390ce6b32d82d57328e93f34bb8e5
+    endData?: {
       layoutRoots: Array<{
         depth: number,
         nodeId: Protocol.DOM.BackendNodeId,
@@ -1476,6 +1804,15 @@ export type CallFrameID = number&CallFrameIdTag;
 // eslint-disable-next-line @typescript-eslint/naming-convention
 export function CallFrameID(value: number): CallFrameID {
   return value as CallFrameID;
+}
+
+class SampleIndexTag {
+  readonly #sampleIndexTag: (symbol|undefined);
+}
+export type SampleIndex = number&SampleIndexTag;
+// eslint-disable-next-line @typescript-eslint/naming-convention
+export function SampleIndex(value: number): SampleIndex {
+  return value as SampleIndex;
 }
 
 class ProcessIdTag {
@@ -1584,7 +1921,8 @@ export function isTraceEventNavigationStart(
 export function isTraceEventAnimation(
     traceEventData: TraceEventData,
     ): traceEventData is TraceEventAnimation {
-  return traceEventData.name === 'Animation';
+  // We've found some rare traces with an Animtation trace event from a different category: https://crbug.com/1472375#comment7
+  return traceEventData.name === 'Animation' && traceEventData.cat.includes('devtools.timeline');
 }
 
 export function isTraceEventLayoutShift(
@@ -1606,7 +1944,7 @@ export function isTraceEventFirstContentfulPaint(traceEventData: TraceEventData)
 
 export function isTraceEventLargestContentfulPaintCandidate(traceEventData: TraceEventData):
     traceEventData is TraceEventLargestContentfulPaintCandidate {
-  return traceEventData.name === 'largestContentfulPaint::Candidate';
+  return traceEventData.name === KnownEventName.MarkLCPCandidate;
 }
 export function isTraceEventLargestImagePaintCandidate(traceEventData: TraceEventData):
     traceEventData is TraceEventLargestImagePaintCandidate {
@@ -1704,10 +2042,22 @@ export function isTraceEventResourceReceivedData(
   return traceEventData.name === 'ResourceReceivedData';
 }
 
-export function isSyntheticNetworkRequestDetailsEvent(
+export function isSyntheticNetworkRequestEvent(
     traceEventData: TraceEventData,
     ): traceEventData is SyntheticNetworkRequest {
   return traceEventData.name === 'SyntheticNetworkRequest';
+}
+
+export function isSyntheticWebSocketConnectionEvent(
+    traceEventData: TraceEventData,
+    ): traceEventData is SyntheticWebSocketConnectionEvent {
+  return traceEventData.name === 'SyntheticWebSocketConnectionEvent';
+}
+
+export function isNetworkTrackEntry(traceEventData: TraceEventData):
+    traceEventData is SyntheticWebSocketConnectionEvent|SyntheticNetworkRequest {
+  return isSyntheticNetworkRequestEvent(traceEventData) || isSyntheticWebSocketConnectionEvent(traceEventData) ||
+      isWebSocketTraceEvent(traceEventData);
 }
 
 export function isTraceEventPrePaint(
@@ -1748,16 +2098,19 @@ export function isSyntheticConsoleTiming(traceEventData: TraceEventData): traceE
   return 'beginEvent' in data && 'endEvent' in data;
 }
 
+export function isTraceEventUserTiming(traceEventData: TraceEventData): traceEventData is TraceEventUserTiming {
+  return traceEventData.cat === 'blink.user_timing';
+}
+
 export function isTraceEventPerformanceMeasure(traceEventData: TraceEventData):
     traceEventData is TraceEventPerformanceMeasure {
-  return traceEventData.cat === 'blink.user_timing' && isTraceEventAsyncPhase(traceEventData);
+  return isTraceEventUserTiming(traceEventData) && isTraceEventAsyncPhase(traceEventData);
 }
 
 export function isTraceEventPerformanceMark(traceEventData: TraceEventData):
     traceEventData is TraceEventPerformanceMark {
-  return traceEventData.cat === 'blink.user_timing' &&
-      (traceEventData.ph === Phase.MARK || traceEventData.ph === Phase.INSTANT ||
-       traceEventData.ph === Phase.ASYNC_NESTABLE_INSTANT);
+  return isTraceEventUserTiming(traceEventData) &&
+      (traceEventData.ph === Phase.MARK || traceEventData.ph === Phase.INSTANT);
 }
 
 export function isTraceEventConsoleTime(traceEventData: TraceEventData): traceEventData is TraceEventConsoleTime {
@@ -1809,13 +2162,45 @@ export interface TraceEventPaint extends TraceEventComplete {
       clip: number[],
       frame: string,
       layerId: number,
-      nodeId: number,
+      // With CompositeAfterPaint enabled, paint events are no longer
+      // associated with a Node, and nodeId will not be present.
+      nodeId?: Protocol.DOM.BackendNodeId,
     },
   };
 }
 
 export function isTraceEventPaint(event: TraceEventData): event is TraceEventPaint {
   return event.name === KnownEventName.Paint;
+}
+
+export interface TraceEventPaintImage extends TraceEventComplete {
+  name: KnownEventName.PaintImage;
+  args: TraceEventArgs&{
+    data: TraceEventData & {
+      height: number,
+      width: number,
+      x: number,
+      y: number,
+      url?: string, srcHeight: number, srcWidth: number,
+      nodeId?: Protocol.DOM.BackendNodeId,
+    },
+  };
+}
+export function isTraceEventPaintImage(event: TraceEventData): event is TraceEventPaintImage {
+  return event.name === KnownEventName.PaintImage;
+}
+
+export interface TraceEventScrollLayer extends TraceEventComplete {
+  name: KnownEventName.ScrollLayer;
+  args: TraceEventArgs&{
+    data: TraceEventData & {
+      frame: string,
+      nodeId?: Protocol.DOM.BackendNodeId,
+    },
+  };
+}
+export function isTraceEventScrollLayer(event: TraceEventData): event is TraceEventScrollLayer {
+  return event.name === KnownEventName.ScrollLayer;
 }
 
 export interface TraceEventSetLayerTreeId extends TraceEventInstant {
@@ -1997,6 +2382,7 @@ export interface TraceEventWebSocketCreate extends TraceEventInstant {
       identifier: number,
       url: string,
       frame?: string,
+      workerId?: string,
       websocketProtocol?: string,
       stackTrace?: TraceEventCallFrame,
     },
@@ -2004,6 +2390,72 @@ export interface TraceEventWebSocketCreate extends TraceEventInstant {
 }
 export function isTraceEventWebSocketCreate(event: TraceEventData): event is TraceEventWebSocketCreate {
   return event.name === KnownEventName.WebSocketCreate;
+}
+
+export interface TraceEventWebSocketInfo extends TraceEventInstant {
+  name: KnownEventName.WebSocketDestroy|KnownEventName.WebSocketReceiveHandshake|
+      KnownEventName.WebSocketReceiveHandshakeResponse;
+  args: TraceEventArgs&{
+    data: TraceEventArgsData & {
+      identifier: number,
+      url: string,
+      frame?: string,
+      workerId?: string,
+    },
+  };
+}
+export interface TraceEventWebSocketTransfer extends TraceEventInstant {
+  name: KnownEventName.WebSocketSend|KnownEventName.WebSocketReceive;
+  args: TraceEventArgs&{
+    data: TraceEventArgsData & {
+      identifier: number,
+      url: string,
+      frame?: string,
+      workerId?: string, dataLength: number,
+    },
+  };
+}
+export function isTraceEventWebSocketInfo(traceEventData: TraceEventData): traceEventData is TraceEventWebSocketInfo {
+  return traceEventData.name === KnownEventName.WebSocketSendHandshakeRequest ||
+      traceEventData.name === KnownEventName.WebSocketReceiveHandshakeResponse ||
+      traceEventData.name === KnownEventName.WebSocketDestroy;
+}
+
+export function isTraceEventWebSocketTransfer(traceEventData: TraceEventData):
+    traceEventData is TraceEventWebSocketTransfer {
+  return traceEventData.name === KnownEventName.WebSocketSend ||
+      traceEventData.name === KnownEventName.WebSocketReceive;
+}
+
+export interface TraceEventWebSocketSend extends TraceEventInstant {
+  name: KnownEventName.WebSocketSend;
+  args: TraceEventArgs&{
+    data: TraceEventArgsData & {
+      identifier: number,
+      url: string,
+      frame?: string,
+      workerId?: string, dataLength: number,
+    },
+  };
+}
+
+export function isTraceEventWebSocketSend(event: TraceEventData): event is TraceEventWebSocketSend {
+  return event.name === KnownEventName.WebSocketSend;
+}
+
+export interface TraceEventWebSocketReceive extends TraceEventInstant {
+  name: KnownEventName.WebSocketReceive;
+  args: TraceEventArgs&{
+    data: TraceEventArgsData & {
+      identifier: number,
+      url: string,
+      frame?: string,
+      workerId?: string, dataLength: number,
+    },
+  };
+}
+export function isTraceEventWebSocketReceive(event: TraceEventData): event is TraceEventWebSocketReceive {
+  return event.name === KnownEventName.WebSocketReceive;
 }
 
 export interface TraceEventWebSocketSendHandshakeRequest extends TraceEventInstant {
@@ -2047,10 +2499,15 @@ export function isTraceEventWebSocketDestroy(event: TraceEventData): event is Tr
   return event.name === KnownEventName.WebSocketDestroy;
 }
 
-export function isWebSocketTraceEvent(event: TraceEventData): event is TraceEventWebSocketCreate|
-    TraceEventWebSocketDestroy|TraceEventWebSocketReceiveHandshakeResponse|TraceEventWebSocketSendHandshakeRequest {
-  return isTraceEventWebSocketCreate(event) || isTraceEventWebSocketDestroy(event) ||
-      isTraceEventWebSocketReceiveHandshakeResponse(event) || isTraceEventWebSocketSendHandshakeRequest(event);
+export type WebSocketTraceEvent = TraceEventWebSocketCreate|TraceEventWebSocketInfo|TraceEventWebSocketTransfer;
+export function isWebSocketTraceEvent(event: TraceEventData): event is WebSocketTraceEvent {
+  return isTraceEventWebSocketCreate(event) || isTraceEventWebSocketInfo(event) || isTraceEventWebSocketTransfer(event);
+}
+
+export type WebSocketEvent = WebSocketTraceEvent|SyntheticWebSocketConnectionEvent;
+export function isWebSocketEvent(event: TraceEventData): event is WebSocketTraceEvent|
+    SyntheticWebSocketConnectionEvent {
+  return isWebSocketTraceEvent(event) || isSyntheticWebSocketConnectionEvent(event);
 }
 
 export interface TraceEventV8Compile extends TraceEventComplete {
@@ -2059,6 +2516,9 @@ export interface TraceEventV8Compile extends TraceEventComplete {
     data?: {
       url?: string,
       columnNumber?: number,
+      consumedCacheSize?: number,
+      cacheRejected?: boolean,
+      cacheKind?: 'full'|'normal',
       lineNumber?: number,
       notStreamedReason?: string,
       streamed?: boolean,
@@ -2069,6 +2529,27 @@ export interface TraceEventV8Compile extends TraceEventComplete {
 }
 export function isTraceEventV8Compile(event: TraceEventData): event is TraceEventV8Compile {
   return event.name === KnownEventName.Compile;
+}
+
+export interface TraceEventFunctionCall extends TraceEventComplete {
+  name: KnownEventName.FunctionCall;
+  args: TraceEventArgs&{
+    data?: {
+      frame?: string,
+      columnNumber?: number,
+      lineNumber?: number,
+      functionName?: string,
+      scriptId?: number,
+      url?: string,
+    },
+  };
+}
+export function isTraceEventFunctionCall(event: TraceEventData): event is TraceEventFunctionCall {
+  return event.name === KnownEventName.FunctionCall;
+}
+
+export function isSyntheticServerTiming(event: TraceEventData): event is SyntheticServerTiming {
+  return event.cat === 'devtools.server-timing';
 }
 
 /**
@@ -2151,6 +2632,8 @@ export const enum KnownEventName {
   WebSocketSendHandshake = 'WebSocketSendHandshakeRequest',
   WebSocketReceiveHandshake = 'WebSocketReceiveHandshakeResponse',
   WebSocketDestroy = 'WebSocketDestroy',
+  WebSocketSend = 'WebSocketSend',
+  WebSocketReceive = 'WebSocketReceive',
   CryptoDoEncrypt = 'DoEncrypt',
   CryptoDoEncryptReply = 'DoEncryptReply',
   CryptoDoDecrypt = 'DoDecrypt',
@@ -2166,7 +2649,6 @@ export const enum KnownEventName {
   /* Gc */
   GC = 'GCEvent',
   DOMGC = 'BlinkGC.AtomicPhase',
-  IncrementalGCMarking = 'V8.GCIncrementalMarking',
   MajorGC = 'MajorGC',
   MinorGC = 'MinorGC',
   GCCollectGarbage = 'BlinkGC.AtomicPhase',
@@ -2174,7 +2656,6 @@ export const enum KnownEventName {
 
   /* Layout */
   ScheduleStyleRecalculation = 'ScheduleStyleRecalculation',
-  RecalculateStyles = 'RecalculateStyles',
   Layout = 'Layout',
   UpdateLayoutTree = 'UpdateLayoutTree',
   InvalidateLayout = 'InvalidateLayout',
@@ -2188,6 +2669,8 @@ export const enum KnownEventName {
   ScheduleStyleInvalidationTracking = 'ScheduleStyleInvalidationTracking',
   StyleRecalcInvalidationTracking = 'StyleRecalcInvalidationTracking',
   StyleInvalidatorInvalidationTracking = 'StyleInvalidatorInvalidationTracking',
+  SelectorStats = 'SelectorStats',
+  BeginCommitCompositorFrame = 'BeginCommitCompositorFrame',
 
   /* Paint */
   ScrollLayer = 'ScrollLayer',
@@ -2201,7 +2684,6 @@ export const enum KnownEventName {
   ImageDecodeTask = 'ImageDecodeTask',
   ImageUploadTask = 'ImageUploadTask',
   DecodeImage = 'Decode Image',
-  ResizeImage = 'Resize Image',
   DrawLazyPixelRef = 'Draw LazyPixelRef',
   DecodeLazyPixelRef = 'Decode LazyPixelRef',
   GPUTask = 'GPUTask',
@@ -2267,6 +2749,8 @@ export const enum KnownEventName {
   ProfileChunk = 'ProfileChunk',
   UpdateCounters = 'UpdateCounters',
 
+  JSSample = 'JSSample',
+
   /* Other */
   Animation = 'Animation',
   ParseAuthorStyleSheet = 'ParseAuthorStyleSheet',
@@ -2285,4 +2769,14 @@ export const enum KnownEventName {
 
   SchedulePostMessage = 'SchedulePostMessage',
   HandlePostMessage = 'HandlePostMessage',
+
+  RenderFrameImplCreateChildFrame = 'RenderFrameImpl::createChildFrame',
 }
+
+// NOT AN EXHAUSTIVE LIST: just some categories we use and refer
+// to in multiple places.
+export const Categories = {
+  Console: 'blink.console',
+  UserTiming: 'blink.user_timing',
+  Loading: 'loading',
+} as const;

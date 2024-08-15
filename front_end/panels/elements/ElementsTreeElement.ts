@@ -37,6 +37,7 @@ import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import * as Protocol from '../../generated/protocol.js';
 import type * as IssuesManager from '../../models/issues_manager/issues_manager.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as CodeMirror from '../../third_party/codemirror.next/codemirror.next.js';
@@ -202,6 +203,10 @@ const UIStrings = {
    * to the Media Panel.
    */
   openMediaPanel: 'Jump to Media panel',
+  /**
+   *@description Text of a tooltip to redirect to another element in the Elements panel
+   */
+  showPopoverTarget: 'Show popover target',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/elements/ElementsTreeElement.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -217,8 +222,8 @@ type OpeningTagContext = {
     adorners: Adorners.Adorner.Adorner[],
     styleAdorners: Adorners.Adorner.Adorner[],
     readonly adornersThrottler: Common.Throttler.Throttler,
-    slot?: Adorners.Adorner.Adorner,
     canAddAttributes: boolean,
+    slot?: Adorners.Adorner.Adorner,
 };
 
 type ClosingTagContext = {
@@ -262,6 +267,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
         'jslog', `${VisualLogging.treeItem().parent('elementsTreeOutline').track({
           keydown: 'ArrowUp|ArrowDown|ArrowLeft|ArrowRight|Backspace|Delete|Enter|Space|Home|End',
           drag: true,
+          click: true,
         })}`);
     this.contentElement = this.listItemElement.createChild('div');
     this.gutterContainer = this.contentElement.createChild('div', 'gutter-container');
@@ -473,7 +479,6 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
       this.tagTypeContext.slot = this.adornSlot(config, this.tagTypeContext);
       const deferredNode = nodeShortcut.deferredNode;
       this.tagTypeContext.slot.addEventListener('click', () => {
-        Host.userMetrics.badgeActivated(Host.UserMetrics.BadgeType.SLOT);
         deferredNode.resolve(node => {
           void Common.Revealer.reveal(node);
         });
@@ -759,6 +764,12 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     }
     let menuItem;
 
+    if (UI.ActionRegistry.ActionRegistry.instance().hasAction('freestyler.element-panel-context')) {
+      contextMenu.headerSection().appendAction(
+          'freestyler.element-panel-context',
+      );
+    }
+
     menuItem = contextMenu.clipboardSection().appendItem(
         i18nString(UIStrings.cut), treeOutline.performCopyOrCut.bind(treeOutline, true, this.nodeInternal),
         {disabled: !this.hasEditableNode(), jslogContext: 'cut'});
@@ -1033,15 +1044,13 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
       this.tagNameEditingCommitted(element, newTagName, oldText, tagName, moveDirection);
     }
 
-    // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    function editingCancelled(this: ElementsTreeElement, element: Element, context: any): void {
+    function editingCancelled(this: ElementsTreeElement, element: Element, tagName: string|null): void {
       if (!tagNameElement) {
         return;
       }
       tagNameElement.removeEventListener('keyup', keyupListener, false);
       tagNameElement.removeEventListener('keydown', keydownListener, false);
-      this.editingCancelled(element, context);
+      this.editingCancelled(element, tagName);
     }
 
     tagNameElement.addEventListener('keyup', keyupListener, false);
@@ -1055,9 +1064,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     return true;
   }
 
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private updateEditorHandles(element: Element, config?: UI.InplaceEditor.Config<any>): void {
+  private updateEditorHandles<T>(element: Element, config?: UI.InplaceEditor.Config<T>): void {
     const editorHandles = UI.InplaceEditor.InplaceEditor.startEditing(element, config);
     if (!editorHandles) {
       this.editing = null;
@@ -1123,9 +1130,9 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
           },
         ]),
         TextEditor.Config.baseConfiguration(initialValue),
-        TextEditor.Config.closeBrackets,
+        TextEditor.Config.closeBrackets.instance(),
         TextEditor.Config.autocompletion.instance(),
-        CodeMirror.html.html(),
+        CodeMirror.html.html({autoCloseTags: false, selfClosingTags: true}),
         TextEditor.Config.domWordWrap.instance(),
         CodeMirror.EditorView.theme({
           '&.cm-editor': {maxHeight: '300px'},
@@ -1329,9 +1336,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     textNode.setNodeValue(newText, callback.bind(this));
   }
 
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private editingCancelled(_element: Element, _context: any): void {
+  private editingCancelled(_element: Element, _tagName: string|null): void {
     this.editing = null;
 
     // Need to restore attributes structure.
@@ -1622,6 +1627,13 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
       setValueWithEntities.call(this, attrValueElement, value);
     }
 
+    if (name === 'popovertarget') {
+      const linkedPart = value ? attrValueElement : attrNameElement;
+      void this.linkifyElementByRelation(
+          linkedPart, Protocol.DOM.GetElementByRelationRequestRelation.PopoverTarget,
+          i18nString(UIStrings.showPopoverTarget));
+    }
+
     if (hasText) {
       UI.UIUtils.createTextChild(attrSpanElement, '"');
     }
@@ -1677,6 +1689,24 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     }
 
     return attrSpanElement;
+  }
+
+  private async linkifyElementByRelation(
+      linkContainer: Element, relation: Protocol.DOM.GetElementByRelationRequestRelation,
+      tooltip: string): Promise<void> {
+    const relatedElementId = await this.nodeInternal.domModel().getElementByRelation(this.nodeInternal.id, relation);
+    const relatedElement = this.nodeInternal.domModel().nodeForId(relatedElementId);
+    if (!relatedElement) {
+      return;
+    }
+    const link = await Common.Linkifier.Linkifier.linkify(relatedElement, {
+      preventKeyboardFocus: true,
+      tooltip,
+      textContent: linkContainer.textContent || undefined,
+      isDynamicLink: true,
+    });
+    linkContainer.removeChildren();
+    linkContainer.append(link);
   }
 
   private buildPseudoElementDOM(parentElement: DocumentFragment, pseudoElementName: string): void {
@@ -2238,8 +2268,6 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     const onClick = ((() => {
                        if (adorner.isActive()) {
                          node.domModel().overlayModel().highlightGridInPersistentOverlay(nodeId);
-                         Host.userMetrics.badgeActivated(
-                             isSubgrid ? Host.UserMetrics.BadgeType.SUBGRID : Host.UserMetrics.BadgeType.GRID);
                        } else {
                          node.domModel().overlayModel().hideGridInPersistentOverlay(nodeId);
                        }
@@ -2281,7 +2309,6 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
                        const model = node.domModel().overlayModel();
                        if (adorner.isActive()) {
                          model.highlightScrollSnapInPersistentOverlay(nodeId);
-                         Host.userMetrics.badgeActivated(Host.UserMetrics.BadgeType.SCROLL_SNAP);
                        } else {
                          model.hideScrollSnapInPersistentOverlay(nodeId);
                        }
@@ -2325,7 +2352,6 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
                        const model = node.domModel().overlayModel();
                        if (adorner.isActive()) {
                          model.highlightFlexContainerInPersistentOverlay(nodeId);
-                         Host.userMetrics.badgeActivated(Host.UserMetrics.BadgeType.FLEX);
                        } else {
                          model.hideFlexContainerInPersistentOverlay(nodeId);
                        }
@@ -2370,7 +2396,6 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
                        const model = node.domModel().overlayModel();
                        if (adorner.isActive()) {
                          model.highlightContainerQueryInPersistentOverlay(nodeId);
-                         Host.userMetrics.badgeActivated(Host.UserMetrics.BadgeType.CONTAINER);
                        } else {
                          model.hideContainerQueryInPersistentOverlay(nodeId);
                        }

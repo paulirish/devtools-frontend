@@ -13,9 +13,9 @@ import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
-import {ProfileFlameChartDataProvider} from './CPUProfileFlameChart.js';
 import {Events, HeapTimelineOverview, type IdsRangeChangedEvent, type Samples} from './HeapTimelineOverview.js';
 import {type Formatter, type ProfileDataGridNode} from './ProfileDataGrid.js';
+import {ProfileFlameChartDataProvider} from './ProfileFlameChartDataProvider.js';
 import {ProfileEvents, type ProfileHeader, ProfileType} from './ProfileHeader.js';
 import {ProfileView, WritableProfileHeader} from './ProfileView.js';
 
@@ -60,7 +60,7 @@ const UIStrings = {
   /**
    *@description The title for the collection of profiles that are gathered from various snapshots of the heap, using a sampling (e.g. every 1/100) technique.
    */
-  samplingProfiles: 'SAMPLING PROFILES',
+  samplingProfiles: 'Sampling profiles',
   /**
    *@description Description (part 1) in Heap Profile View of a profiler tool
    */

@@ -48,6 +48,7 @@ module.exports = {
         'rulesdir/ban_a_tags_in_lit_html': 'error',
         'rulesdir/check_component_naming': 'error',
         'rulesdir/check_css_import': 'error',
+        'rulesdir/enforce-optional-properties-last': 'error',
         'rulesdir/check_enumerated_histograms': 'error',
         'rulesdir/check_was_shown_methods': 'error',
         'rulesdir/static_custom_event_names': 'error',
@@ -55,6 +56,7 @@ module.exports = {
         'rulesdir/lit_html_no_attribute_quotes': 'error',
         'rulesdir/lit_template_result_or_nothing': 'error',
         'rulesdir/inject_checkbox_styles': 'error',
+        'rulesdir/jslog_context_list': 'error',
         '@typescript-eslint/naming-convention': [
           'error', {
             'selector': ['property', 'parameterProperty'],
@@ -162,6 +164,12 @@ module.exports = {
       'files': ['panels/**/components/*.ts', 'ui/components/**/*.ts', 'entrypoints/**/*.ts'],
       'rules': {
         'rulesdir/use_private_class_members': 'error',
+      }
+    },
+    {
+      'files': ['ui/visual_logging/KnownContextValues.ts'],
+      'rules': {
+        'rulesdir/jslog_context_list': 'off',
       }
     },
     // TODO(crbug/1402569): Remove once LitElement is fully adopted.

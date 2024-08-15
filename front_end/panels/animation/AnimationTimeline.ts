@@ -135,6 +135,7 @@ export class AnimationTimeline extends UI.Widget.VBox implements SDK.TargetManag
   #scrollListenerId?: number|null;
   #collectedGroups: AnimationGroup[];
   #createPreviewForCollectedGroupsThrottler: Common.Throttler.Throttler = new Common.Throttler.Throttler(10);
+  #animationGroupUpdatedThrottler: Common.Throttler.Throttler = new Common.Throttler.Throttler(10);
 
   // We're only adding event listeners to the animation model when the panel is first shown.
   #initialized: boolean = false;
@@ -155,6 +156,7 @@ export class AnimationTimeline extends UI.Widget.VBox implements SDK.TargetManag
     this.#animationGroupPausedBeforeScrub = false;
     this.createHeader();
     this.#animationsContainer = this.contentElement.createChild('div', 'animation-timeline-rows');
+    this.#animationsContainer.setAttribute('jslog', `${VisualLogging.section('animations')}`);
     const timelineHint = this.contentElement.createChild('div', 'animation-timeline-rows-hint');
     timelineHint.textContent = i18nString(UIStrings.selectAnEffectAboveToInspectAnd);
 
@@ -249,11 +251,13 @@ export class AnimationTimeline extends UI.Widget.VBox implements SDK.TargetManag
   private addEventListeners(animationModel: AnimationModel): void {
     void animationModel.ensureEnabled();
     animationModel.addEventListener(Events.AnimationGroupStarted, this.animationGroupStarted, this);
+    animationModel.addEventListener(Events.AnimationGroupUpdated, this.animationGroupUpdated, this);
     animationModel.addEventListener(Events.ModelReset, this.reset, this);
   }
 
   private removeEventListeners(animationModel: AnimationModel): void {
     animationModel.removeEventListener(Events.AnimationGroupStarted, this.animationGroupStarted, this);
+    animationModel.removeEventListener(Events.AnimationGroupUpdated, this.animationGroupUpdated, this);
     animationModel.removeEventListener(Events.ModelReset, this.reset, this);
   }
 
@@ -317,6 +321,7 @@ export class AnimationTimeline extends UI.Widget.VBox implements SDK.TargetManag
     }
     this.updatePlaybackControls();
     this.#previewContainer = (this.contentElement.createChild('div', 'animation-timeline-buffer') as HTMLElement);
+    this.#previewContainer.setAttribute('jslog', `${VisualLogging.section('film-strip')}`);
     UI.ARIAUtils.markAsListBox(this.#previewContainer);
     UI.ARIAUtils.setLabel(this.#previewContainer, i18nString(UIStrings.animationPreviews));
     const emptyBufferHint = this.contentElement.createChild('div', 'animation-timeline-buffer-hint');
@@ -380,9 +385,6 @@ export class AnimationTimeline extends UI.Widget.VBox implements SDK.TargetManag
     Host.userMetrics.actionTaken(
         this.#allPaused ? Host.UserMetrics.Action.AnimationsPaused : Host.UserMetrics.Action.AnimationsResumed,
     );
-    if (this.#pauseButton) {
-      this.#pauseButton.setToggled(this.#allPaused);
-    }
     this.setPlaybackRate(this.#playbackRate);
     if (this.#pauseButton) {
       this.#pauseButton.setTitle(this.#allPaused ? i18nString(UIStrings.resumeAll) : i18nString(UIStrings.pauseAll));
@@ -530,6 +532,49 @@ export class AnimationTimeline extends UI.Widget.VBox implements SDK.TargetManag
 
   private animationGroupStarted({data}: Common.EventTarget.EventTargetEvent<AnimationGroup>): void {
     this.addAnimationGroup(data);
+  }
+
+  scheduledRedrawAfterAnimationGroupUpdatedForTest(): void {
+  }
+
+  private animationGroupUpdated({data: group}: Common.EventTarget.EventTargetEvent<AnimationGroup>): void {
+    void this.#animationGroupUpdatedThrottler.schedule(async () => {
+      const preview = this.#previewMap.get(group);
+      if (preview) {
+        preview.replay();
+      }
+
+      if (this.#selectedGroup !== group) {
+        return;
+      }
+
+      if (group.isScrollDriven()) {
+        const animationNode = await group.scrollNode();
+        if (animationNode) {
+          const scrollRange = group.scrollOrientation() === Protocol.DOM.ScrollOrientation.Vertical ?
+              await animationNode.verticalScrollRange() :
+              await animationNode.horizontalScrollRange();
+          const scrollOffset = group.scrollOrientation() === Protocol.DOM.ScrollOrientation.Vertical ?
+              await animationNode.scrollTop() :
+              await animationNode.scrollLeft();
+          if (scrollRange !== null) {
+            this.setDuration(scrollRange);
+          }
+
+          if (scrollOffset !== null) {
+            this.setCurrentTimeText(scrollOffset);
+            this.setTimelineScrubberPosition(scrollOffset);
+          }
+        }
+      } else {
+        this.setDuration(group.finiteDuration());
+      }
+
+      this.updateControlButton();
+      this.scheduleRedraw();
+
+      this.scheduledRedrawAfterAnimationGroupUpdatedForTest();
+    });
   }
 
   private clearPreviews(): void {

@@ -122,14 +122,20 @@ export class BrowsingContext extends EventEmitter<{
     userContext: UserContext,
     parent: BrowsingContext | undefined,
     id: string,
-    url: string
+    url: string,
+    originalOpener: string | null
   ): BrowsingContext {
-    const browsingContext = new BrowsingContext(userContext, parent, id, url);
+    const browsingContext = new BrowsingContext(
+      userContext,
+      parent,
+      id,
+      url,
+      originalOpener
+    );
     browsingContext.#initialize();
     return browsingContext;
   }
 
-  // keep-sorted start
   #navigation: Navigation | undefined;
   #reason?: string;
   #url: string;
@@ -141,21 +147,22 @@ export class BrowsingContext extends EventEmitter<{
   readonly id: string;
   readonly parent: BrowsingContext | undefined;
   readonly userContext: UserContext;
-  // keep-sorted end
+  readonly originalOpener: string | null;
 
   private constructor(
     context: UserContext,
     parent: BrowsingContext | undefined,
     id: string,
-    url: string
+    url: string,
+    originalOpener: string | null
   ) {
     super();
-    // keep-sorted start
+
     this.#url = url;
     this.id = id;
     this.parent = parent;
     this.userContext = context;
-    // keep-sorted end
+    this.originalOpener = originalOpener;
 
     this.defaultRealm = this.#createWindowRealm();
   }
@@ -180,7 +187,8 @@ export class BrowsingContext extends EventEmitter<{
         this.userContext,
         this,
         info.context,
-        info.url
+        info.url,
+        info.originalOpener
       );
       this.#children.set(info.context, browsingContext);
 
@@ -222,7 +230,8 @@ export class BrowsingContext extends EventEmitter<{
       if (info.context !== this.id) {
         return;
       }
-      this.#url = info.url;
+      // Note: we should not update this.#url at this point since the context
+      // has not finished navigating to the info.url yet.
 
       for (const [id, request] of this.#requests) {
         if (request.disposed) {
@@ -255,8 +264,9 @@ export class BrowsingContext extends EventEmitter<{
       if (event.context !== this.id) {
         return;
       }
-      if (event.redirectCount !== 0) {
+      if (this.#requests.has(event.request.request)) {
         // Means the request is a redirect. This is handled in Request.
+        // Or an Auth event was issued
         return;
       }
 
@@ -283,7 +293,6 @@ export class BrowsingContext extends EventEmitter<{
     });
   }
 
-  // keep-sorted start block=yes
   get #session() {
     return this.userContext.browser.session;
   }
@@ -314,7 +323,6 @@ export class BrowsingContext extends EventEmitter<{
   get url(): string {
     return this.#url;
   }
-  // keep-sorted end
 
   #createWindowRealm(sandbox?: string) {
     const realm = WindowRealm.from(this, sandbox);
@@ -406,6 +414,18 @@ export class BrowsingContext extends EventEmitter<{
     await this.#session.send('browsingContext.reload', {
       context: this.id,
       ...options,
+    });
+  }
+
+  @throwIfDisposed<BrowsingContext>(context => {
+    // SAFETY: Disposal implies this exists.
+    return context.#reason!;
+  })
+  async setCacheBehavior(cacheBehavior: 'default' | 'bypass'): Promise<void> {
+    // @ts-expect-error not in BiDi types yet.
+    await this.#session.send('network.setCacheBehavior', {
+      contexts: [this.id],
+      cacheBehavior,
     });
   }
 
@@ -605,5 +625,22 @@ export class BrowsingContext extends EventEmitter<{
         });
       })
     );
+  }
+
+  @throwIfDisposed<BrowsingContext>(context => {
+    // SAFETY: Disposal implies this exists.
+    return context.#reason!;
+  })
+  async locateNodes(
+    locator: Bidi.BrowsingContext.Locator,
+    startNodes: [Bidi.Script.SharedReference, ...Bidi.Script.SharedReference[]]
+  ): Promise<Bidi.Script.NodeRemoteValue[]> {
+    // TODO: add other locateNodes options if needed.
+    const result = await this.#session.send('browsingContext.locateNodes', {
+      context: this.id,
+      locator,
+      startNodes: startNodes.length ? startNodes : undefined,
+    });
+    return result.result.nodes;
   }
 }

@@ -5,6 +5,7 @@
 import * as Platform from '../../core/platform/platform.js';
 
 import { contentAsDataURL, type DeferredContent } from './ContentProvider.js';
+import {Text} from './Text.js';
 
 /**
  * This class is a small wrapper around either raw binary or text data.
@@ -28,6 +29,8 @@ export class ContentData {
 
   #contentAsBase64?: string;
   #contentAsText?: string;
+
+  #contentAsTextObj?: Text;
 
   constructor(data: string, isBase64: boolean, mimeType: string, charset?: string) {
     this.charset = charset || 'utf-8';
@@ -61,7 +64,7 @@ export class ContentData {
    * Returns the content as text. If this `ContentData` was constructed with base64
    * encoded bytes, it will use the provided charset to attempt to decode the bytes.
    *
-   * @throws if `resourceType` is not a text type.
+   * @throws if `mimeType` is not a text type.
    */
   get text(): string {
     if (this.#contentAsText !== undefined) {
@@ -91,6 +94,37 @@ export class ContentData {
     return this.#contentAsBase64 !== undefined;
   }
 
+  /**
+   * Returns the text content as a `Text` object. The returned object is always the same to
+   * minimize the number of times we have to calculate the line endings array.
+   *
+   * @throws if `mimeType` is not a text type.
+   */
+  get textObj(): Text {
+    if (this.#contentAsTextObj === undefined) {
+      this.#contentAsTextObj = new Text(this.text);
+    }
+    return this.#contentAsTextObj;
+  }
+
+  /**
+   * @returns True, iff the contents (base64 or text) are equal.
+   * Does not compare mime type and charset, but will decode base64 data if both
+   * mime types indicate that it's text content.
+   */
+  contentEqualTo(other: ContentData): boolean {
+    if (this.#contentAsBase64 !== undefined && other.#contentAsBase64 !== undefined) {
+      return this.#contentAsBase64 === other.#contentAsBase64;
+    }
+    if (this.#contentAsText !== undefined && other.#contentAsText !== undefined) {
+      return this.#contentAsText === other.#contentAsText;
+    }
+    if (this.isTextContent && other.isTextContent) {
+      return this.text === other.text;
+    }
+    return false;
+  }
+
   asDataUrl(): string|null {
     // To keep with existing behavior we prefer to return the content
     // encoded if that is how this ContentData was constructed with.
@@ -98,7 +132,7 @@ export class ContentData {
       const charset = this.isTextContent ? this.charset : null;
       return contentAsDataURL(this.#contentAsBase64, this.mimeType ?? '', true, charset);
     }
-    return contentAsDataURL(this.text, this.mimeType ?? '', false);
+    return contentAsDataURL(this.text, this.mimeType ?? '', false, 'utf-8');
   }
 
   /**
@@ -123,6 +157,22 @@ export class ContentData {
     return 'error' in contentDataOrError;
   }
 
+  /** @returns `value` if the passed `ContentDataOrError` is an error, or the text content otherwise */
+  static textOr<T>(contentDataOrError: ContentDataOrError, value: T): string|T {
+    if (ContentData.isError(contentDataOrError)) {
+      return value;
+    }
+    return contentDataOrError.text;
+  }
+
+  /** @returns an empty 'text/plain' content data if the passed `ContentDataOrError` is an error, or the content data itself otherwise */
+  static contentDataOrEmpty(contentDataOrError: ContentDataOrError): ContentData {
+    if (ContentData.isError(contentDataOrError)) {
+      return EMPTY_TEXT_CONTENT_DATA;
+    }
+    return contentDataOrError;
+  }
+
   /**
    * @deprecated Used during migration from `DeferredContent` to `ContentData`.
    */
@@ -133,5 +183,7 @@ export class ContentData {
     return contentDataOrError.asDeferedContent();
   }
 }
+
+export const EMPTY_TEXT_CONTENT_DATA = new ContentData('', /* isBase64 */ false, 'text/plain');
 
 export type ContentDataOrError = ContentData|{error: string};

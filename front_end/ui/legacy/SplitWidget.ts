@@ -409,6 +409,12 @@ export class SplitWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typ
     this.resizerWidget.setEnabled(resizable);
   }
 
+  forceSetSidebarWidth(width: number): void {
+    this.defaultSidebarWidth = width;
+    this.savedSidebarSizeDIP = width;
+    this.updateLayout();
+  }
+
   isResizable(): boolean {
     return this.resizerWidget.isEnabled();
   }
@@ -831,7 +837,7 @@ export class SplitWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typ
     this.hideSidebarButtonTitle = hideTitle;
     this.shownSidebarString = shownString;
     this.hiddenSidebarString = hiddenString;
-    this.showHideSidebarButton = new ToolbarButton('', '');
+    this.showHideSidebarButton = new ToolbarButton('', 'right-panel-open');
     this.showHideSidebarButton.addEventListener(ToolbarButton.Events.Click, buttonClicked, this);
     if (jslogContext) {
       this.showHideSidebarButton.element.setAttribute(
@@ -846,14 +852,18 @@ export class SplitWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typ
     return this.showHideSidebarButton;
   }
 
-  toggleSidebar(): void {
+  /**
+   * @returns true if this call makes the sidebar visible, and false otherwise.
+   */
+  toggleSidebar(): boolean {
     if (this.showModeInternal !== ShowMode.Both) {
       this.showBoth(true);
       ARIAUtils.alert(this.shownSidebarString);
-    } else {
-      this.hideSidebar(true);
-      ARIAUtils.alert(this.hiddenSidebarString);
+      return true;
     }
+    this.hideSidebar(true);
+    ARIAUtils.alert(this.hiddenSidebarString);
+    return false;
   }
 
   private updateShowHideSidebarButton(): void {

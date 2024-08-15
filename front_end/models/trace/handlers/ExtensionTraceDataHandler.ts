@@ -8,13 +8,15 @@ import * as Types from '../types/types.js';
 import {HandlerState, type TraceEventHandlerName} from './types.js';
 import {data as userTimingsData} from './UserTimingsHandler.js';
 
-const extensionFlameChartEntries: Types.Extensions.SyntheticExtensionFlameChartEntry[] = [];
+const extensionFlameChartEntries: Types.Extensions.SyntheticExtensionTrackEntry[] = [];
 const extensionTrackData: Types.Extensions.ExtensionTrackData[] = [];
 const extensionMarkers: Types.Extensions.SyntheticExtensionMarker[] = [];
+const entryToNode: Map<Types.TraceEvents.TraceEventData, Helpers.TreeHelpers.TraceEntryNode> = new Map();
 
 export interface ExtensionTraceData {
   extensionTrackData: readonly Types.Extensions.ExtensionTrackData[];
   extensionMarkers: readonly Types.Extensions.SyntheticExtensionMarker[];
+  entryToNode: Map<Types.TraceEvents.TraceEventData, Helpers.TreeHelpers.TraceEntryNode>;
 }
 let handlerState = HandlerState.UNINITIALIZED;
 
@@ -27,6 +29,7 @@ export function reset(): void {
   extensionFlameChartEntries.length = 0;
   extensionTrackData.length = 0;
   extensionMarkers.length = 0;
+  entryToNode.clear();
 }
 
 export async function finalize(): Promise<void> {
@@ -43,7 +46,7 @@ function createExtensionFlameChartEntries(): void {
   const mergedRawExtensionEvents = Helpers.Trace.mergeEventsInOrder(pairedMeasures, marks);
 
   extractExtensionEntries(mergedRawExtensionEvents);
-  Helpers.Extensions.buildTrackDataFromExtensionEntries(extensionFlameChartEntries, extensionTrackData);
+  Helpers.Extensions.buildTrackDataFromExtensionEntries(extensionFlameChartEntries, extensionTrackData, entryToNode);
 }
 
 export function extractExtensionEntries(
@@ -54,23 +57,34 @@ export function extractExtensionEntries(
       // Not an extension user timing.
       continue;
     }
-    const extensionName = extensionPayload.metadata.extensionName;
-    if (!extensionName) {
-      continue;
-    }
+
     const extensionSyntheticEntry = {
-      ...Helpers.Trace.makeSyntheticTraceEntry(
-          timing.name, timing.ts, Types.TraceEvents.ProcessID(0), Types.TraceEvents.ThreadID(0)),
+      name: timing.name,
+      ph: Types.TraceEvents.Phase.COMPLETE,
+      pid: Types.TraceEvents.ProcessID(0),
+      tid: Types.TraceEvents.ThreadID(0),
+      ts: timing.ts,
       dur: timing.dur as Types.Timing.MicroSeconds,
-      cat: 'timeline-extension',
+      cat: 'devtools.extension',
       args: extensionPayload,
+      rawSourceEvent: Types.TraceEvents.isSyntheticUserTiming(timing) ? timing.rawSourceEvent : timing,
     };
+
     if (Types.Extensions.isExtensionPayloadMarker(extensionPayload)) {
-      extensionMarkers.push(extensionSyntheticEntry as Types.Extensions.SyntheticExtensionMarker);
+      const extensionMarker =
+          Helpers.SyntheticEvents.SyntheticEventsManager.getActiveManager()
+              .registerSyntheticBasedEvent<Types.Extensions.SyntheticExtensionMarker>(
+                  extensionSyntheticEntry as Omit<Types.Extensions.SyntheticExtensionMarker, '_tag'>);
+      extensionMarkers.push(extensionMarker);
       continue;
     }
-    if (Types.Extensions.isExtensionPayloadFlameChartEntry(extensionPayload)) {
-      extensionFlameChartEntries.push(extensionSyntheticEntry as Types.Extensions.SyntheticExtensionFlameChartEntry);
+
+    if (Types.Extensions.isExtensionPayloadTrackEntry(extensionSyntheticEntry.args)) {
+      const extensionTrackEntry =
+          Helpers.SyntheticEvents.SyntheticEventsManager.getActiveManager()
+              .registerSyntheticBasedEvent<Types.Extensions.SyntheticExtensionTrackEntry>(
+                  extensionSyntheticEntry as Omit<Types.Extensions.SyntheticExtensionTrackEntry, '_tag'>);
+      extensionFlameChartEntries.push(extensionTrackEntry);
       continue;
     }
   }
@@ -84,14 +98,26 @@ export function extensionDataInTiming(timing: Types.TraceEvents.SyntheticUserTim
   if (!timingDetail) {
     return null;
   }
-  const detailObj = JSON.parse(timingDetail);
-  if (!('devtools' in detailObj)) {
+  try {
+    // Attempt to parse the detail as an object that might be coming from a
+    // DevTools Perf extension.
+    // Wrapped in a try-catch because timingDetail might either:
+    // 1. Not be `json.parse`-able (it should, but just in case...)
+    // 2.Not be an object - in which case the `in` check will error.
+    // If we hit either of these cases, we just ignore this mark and move on.
+    const detailObj = JSON.parse(timingDetail);
+    if (!('devtools' in detailObj)) {
+      return null;
+    }
+    if (!Types.Extensions.isValidExtensionPayload(detailObj.devtools)) {
+      return null;
+    }
+    return detailObj.devtools;
+  } catch (e) {
+    // No need to worry about this error, just discard this event and don't
+    // treat it as having any useful information for the purposes of extensions
     return null;
   }
-  if (!('metadata' in detailObj['devtools'])) {
-    return null;
-  }
-  return detailObj.devtools;
 }
 
 export function data(): ExtensionTraceData {
@@ -100,6 +126,7 @@ export function data(): ExtensionTraceData {
   }
 
   return {
+    entryToNode,
     extensionTrackData: [...extensionTrackData],
     extensionMarkers: [...extensionMarkers],
   };

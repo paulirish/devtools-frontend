@@ -1,0 +1,61 @@
+/*
+ * Copyright 2024 The Chromium Authors. All rights reserved.
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+:host {
+  display: block;
+}
+
+.annotations {
+  display: block;
+  padding: 0;
+}
+
+.bin-icon {
+  visibility: hidden;
+}
+
+.annotation-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 10px;
+
+  &:hover {
+    background-color: var(--sys-color-neutral-container);
+
+    .bin-icon {
+      visibility: visible;
+    }
+  }
+}
+
+.annotation {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  word-break: break-all;
+  padding-top: 15px;
+  gap: 6px;
+}
+
+.entry-name {
+  padding: 4px 8px;
+  border-radius: 10px;
+  font-weight: bold;
+
+  &.entry-label {
+    background-color: var(--app-color-performance-sidebar-entry-label);
+  }
+
+  &.time-range {
+    background-color: var(--app-color-performance-sidebar-time-range);
+    color: var(--app-color-performance-sidebar-time-range-text);
+  }
+}
+
+.label {
+  font-size: larger;
+}

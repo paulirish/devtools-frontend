@@ -3,10 +3,9 @@
 // found in the LICENSE file.
 import type * as TraceEngine from '../../models/trace/trace.js';
 
-type TrackData = TraceEngine.Types.Extensions.ExtensionTrackData;
-export {TrackData};
+import {TimelinePanel} from './TimelinePanel.js';
 
-type ExtensionData = readonly TrackData[];
+type ExtensionData = TraceEngine.Handlers.ModelHandlers.ExtensionTraceData.ExtensionTraceData;
 
 let extensionDataGathererInstance: ExtensionDataGatherer|undefined;
 
@@ -17,7 +16,7 @@ let extensionDataGathererInstance: ExtensionDataGatherer|undefined;
 export class ExtensionDataGatherer {
   #traceParsedData: TraceEngine.Handlers.Types.TraceParseData|null = null;
   #extensionDataByModel: Map<TraceEngine.Handlers.Types.TraceParseData, ExtensionData> = new Map();
-  static instace(): ExtensionDataGatherer {
+  static instance(): ExtensionDataGatherer {
     if (extensionDataGathererInstance) {
       return extensionDataGathererInstance;
     }
@@ -33,14 +32,15 @@ export class ExtensionDataGatherer {
    * Gets the data provided by extensions.
    */
   getExtensionData(): ExtensionData {
-    if (!this.#traceParsedData || !this.#traceParsedData.ExtensionTraceData) {
-      return [];
+    const extensionDataEnabled = TimelinePanel.extensionDataVisibilitySetting().get();
+    if (!extensionDataEnabled || !this.#traceParsedData || !this.#traceParsedData.ExtensionTraceData) {
+      return {extensionMarkers: [], extensionTrackData: [], entryToNode: new Map()};
     }
     const maybeCachedData = this.#extensionDataByModel.get(this.#traceParsedData);
     if (maybeCachedData) {
       return maybeCachedData;
     }
-    return this.#traceParsedData.ExtensionTraceData.extensionTrackData;
+    return this.#traceParsedData.ExtensionTraceData;
   }
 
   saveCurrentModelData(): void {

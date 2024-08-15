@@ -4,6 +4,7 @@
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
+import * as SDK from '../../core/sdk/sdk.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
 import type * as Timeline from './timeline.js';
@@ -28,7 +29,7 @@ const UIStrings = {
   /**
    *@description Title of an action in the timeline tool to record reload
    */
-  startProfilingAndReloadPage: 'Start profiling and reload page',
+  recordAndReload: 'Record and reload',
   /**
    *@description Tooltip text that appears when hovering over the largeicon download button
    */
@@ -72,14 +73,6 @@ async function loadTimelineModule(): Promise<typeof Timeline> {
   }
   return loadedTimelineModule;
 }
-
-// The profiler module is imported here because the js profiler tab is implemented
-// in the profiler module. Since the tab doesn't belong to all apps that extend
-// the shell app, it cannot be registered in profiler's meta file, as profiler is
-// part of the shell app, and thus all of the extensions registered in profiler
-// belong to all apps that extend from shell.
-// Instead, we register the extensions for the js profiler tab in panels/timeline/ and
-// js_profiler/ so that the tab is available only in the apps it belongs to.
 
 function maybeRetrieveContextTypes<T = unknown>(getClassCallBack: (timelineModule: typeof Timeline) => T[]): T[] {
   if (loadedTimelineModule === undefined) {
@@ -143,7 +136,7 @@ UI.ActionRegistration.registerActionExtension({
     return maybeRetrieveContextTypes(Timeline => [Timeline.TimelinePanel.TimelinePanel]);
   },
   category: UI.ActionRegistration.ActionCategory.PERFORMANCE,
-  title: i18nLazyString(UIStrings.startProfilingAndReloadPage),
+  title: i18nLazyString(UIStrings.recordAndReload),
   async loadActionDelegate() {
     const Timeline = await loadTimelineModule();
     return new Timeline.TimelinePanel.ActionDelegate();
@@ -340,4 +333,15 @@ UI.ContextMenu.registerItem({
   location: UI.ContextMenu.ItemLocation.TIMELINE_MENU_OPEN,
   actionId: 'timeline.save-to-file',
   order: 15,
+});
+
+Common.Revealer.registerRevealer({
+  contextTypes() {
+    return [SDK.TraceObject.TraceObject];
+  },
+  destination: Common.Revealer.RevealerDestination.TIMELINE_PANEL,
+  async loadRevealer() {
+    const Timeline = await loadTimelineModule();
+    return new Timeline.TimelinePanel.TraceRevealer();
+  },
 });

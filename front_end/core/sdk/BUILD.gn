@@ -78,10 +78,12 @@ devtools_module("sdk") {
     "SourceMap.ts",
     "SourceMapManager.ts",
     "SourceMapScopes.ts",
+    "SourceMapScopesInfo.ts",
     "StorageBucketsModel.ts",
     "StorageKeyManager.ts",
     "Target.ts",
     "TargetManager.ts",
+    "TraceObject.ts",
     "WebAuthnModel.ts",
   ]
 
@@ -163,10 +165,12 @@ ts_library("unittests") {
     "SourceMap.test.ts",
     "SourceMapManager.test.ts",
     "SourceMapScopes.test.ts",
+    "SourceMapScopesInfo.test.ts",
     "StorageBucketsModel.test.ts",
     "StorageKeyManager.test.ts",
     "Target.test.ts",
     "TargetManager.test.ts",
+    "TraceObject.test.ts",
   ]
 
   deps = [
@@ -180,5 +184,6 @@ ts_library("unittests") {
     "../../testing",
     "../common:bundle",
     "../protocol_client:bundle",
+    "../root:bundle",
   ]
 }

@@ -133,4 +133,5 @@ export enum CPUThrottlingRates {
   NoThrottling = 1,
   MidTierMobile = 4,
   LowEndMobile = 6,
+  ExtraSlow = 20,
 }

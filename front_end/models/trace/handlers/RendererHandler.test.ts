@@ -17,8 +17,6 @@ import {
 import {TraceLoader} from '../../../testing/TraceLoader.js';
 import * as TraceModel from '../trace.js';
 
-const {assert} = chai;
-
 const MAIN_FRAME_PID = 2154214;
 const SUB_FRAME_PID = 2236065;
 const SUB_FRAME_PID_2 = 2236084;
@@ -26,7 +24,7 @@ const SUB_FRAME_PID_3 = 2236123;
 
 async function handleEventsFromTraceFile(
     context: Mocha.Suite|Mocha.Context|null, file: string): Promise<TraceModel.Handlers.Types.TraceParseData> {
-  const traceData = await TraceLoader.traceEngine(context, file);
+  const {traceData} = await TraceLoader.traceEngine(context, file);
   return traceData;
 }
 
@@ -196,13 +194,12 @@ describeWithEnvironment('RendererHandler', function() {
     }
 
     const isRoot = (node: TraceModel.Helpers.TreeHelpers.TraceEntryNode) => node.depth === 0;
-    const isInstant = (event: TraceModel.Types.TraceEvents.SyntheticTraceEntry) =>
+    const isInstant = (event: TraceModel.Types.TraceEvents.TraceEventData) =>
         TraceModel.Types.TraceEvents.isTraceEventInstant(event);
-    const isLong = (event: TraceModel.Types.TraceEvents.SyntheticTraceEntry) =>
+    const isLong = (event: TraceModel.Types.TraceEvents.TraceEventData) =>
         TraceModel.Types.TraceEvents.isTraceEventComplete(event) && event.dur > 1000;
     const isIncluded =
-        (node: TraceModel.Helpers.TreeHelpers.TraceEntryNode,
-         event: TraceModel.Types.TraceEvents.SyntheticTraceEntry) =>
+        (node: TraceModel.Helpers.TreeHelpers.TraceEntryNode, event: TraceModel.Types.TraceEvents.TraceEventData) =>
             (!isRoot(node) || isInstant(event) || isLong(event)) &&
         Boolean(Timeline.EventUICategory.getEventStyle(event.name as TraceModel.Types.TraceEvents.KnownEventName));
     assert.strictEqual(prettyPrint(tree, isIncluded), `
@@ -405,8 +402,7 @@ describeWithEnvironment('RendererHandler', function() {
       return;
     }
     const isIncluded =
-        (_node: TraceModel.Helpers.TreeHelpers.TraceEntryNode,
-         event: TraceModel.Types.TraceEvents.SyntheticTraceEntry) =>
+        (_node: TraceModel.Helpers.TreeHelpers.TraceEntryNode, event: TraceModel.Types.TraceEvents.TraceEventData) =>
             Boolean(Timeline.EventUICategory.getEventStyle(event.name as TraceModel.Types.TraceEvents.KnownEventName));
     assert.strictEqual(prettyPrint(tree, isIncluded), `
 -RunTask [0.13ms]
@@ -460,8 +456,8 @@ describeWithEnvironment('RendererHandler', function() {
       'tid': 1,
       'ts': 643492822363,
       'tts': 291450,
-      'selfTime': 132,
     });
+    assert.strictEqual(renderers.entryToNode.get(event0)?.selfTime, 132);
 
     const event1 = getRootAt(thread, 2).entry;
     assert.deepEqual(event1 as unknown, {
@@ -475,8 +471,8 @@ describeWithEnvironment('RendererHandler', function() {
       'tid': 1,
       'ts': 643492822500,
       'tts': 291586,
-      'selfTime': 4,
     });
+    assert.strictEqual(renderers.entryToNode.get(event1)?.selfTime, 4);
 
     const eventLast = getRootAt(thread, tree.roots.size - 1).entry;
     assert.deepEqual(eventLast as unknown, {
@@ -490,8 +486,9 @@ describeWithEnvironment('RendererHandler', function() {
       'tid': 1,
       'ts': 643499551460,
       'tts': 949032,
-      'selfTime': 35,
     });
+    assert.strictEqual(renderers.entryToNode.get(eventLast)?.selfTime, 35);
+
   });
 
   it('has some correct known roots for the sub frame\'s main thread in a real world profile', async () => {
@@ -522,8 +519,8 @@ describeWithEnvironment('RendererHandler', function() {
       'tid': 1,
       'ts': 643492822099,
       'tts': 62157,
-      'selfTime': 130,
     });
+    assert.strictEqual(renderers.entryToNode.get(event0)?.selfTime, 130);
 
     const event1 = getRootAt(thread, 1).entry;
     assert.deepEqual(event1 as unknown, {
@@ -537,8 +534,8 @@ describeWithEnvironment('RendererHandler', function() {
       'tid': 1,
       'ts': 643492822234,
       'tts': 62291,
-      'selfTime': 5,
     });
+    assert.strictEqual(renderers.entryToNode.get(event1)?.selfTime, 5);
 
     const event2 = getRootAt(thread, 2).entry;
 
@@ -553,8 +550,8 @@ describeWithEnvironment('RendererHandler', function() {
       'tid': 1,
       'ts': 643492822242,
       'tts': 62299,
-      'selfTime': 9,
     });
+    assert.strictEqual(renderers.entryToNode.get(event2)?.selfTime, 9);
   });
 
   it('can correctly sort a simple list of complete events', async () => {
@@ -813,6 +810,7 @@ describeWithEnvironment('RendererHandler', function() {
     const {Renderer: renderers} = await handleEventsFromTraceFile(this, 'multiple-navigations-with-iframes.json.gz');
     assert.strictEqual(renderers.entryToNode.size, 3591);
   });
+
   describe('Synthetic complete events', () => {
     async function handleEvents(traceEvents: TraceModel.Types.TraceEvents.TraceEventData[]):
         Promise<TraceModel.Handlers.ModelHandlers.Renderer.RendererHandlerData> {
@@ -925,7 +923,26 @@ describeWithEnvironment('RendererHandler', function() {
     -FunctionCall [0.001ms]
   -Layout [0.003ms]`);
     });
+
+    it('keeps a FunctionCall that has the end event missing', async () => {
+      const traceEvents = [
+        ...defaultTraceEvents, makeBeginEvent('RunMicrotasks', 1, '*', pid, tid),  // 1..4
+        makeBeginEvent('FunctionCall', 2, '*', pid, tid),                          // 2..3
+      ];
+
+      const data = await handleEvents(traceEvents);
+      assert.strictEqual(data.processes.size, 1);
+      const [process] = data.processes.values();
+      assert.strictEqual(process.threads.size, 1);
+      const [thread] = process.threads.values();
+      if (!thread.tree) {
+        throw new Error('thread should have a tree');
+      }
+      // Ensure that the FunctionCall event has been kept despite not having an END event.
+      assert.deepEqual(thread.entries.map(e => e.name), ['RunMicrotasks', 'FunctionCall']);
+    });
   });
+
   describe('building hierarchies trace events and profile calls', () => {
     it('build a hierarchy using data from real world trace file', async () => {
       const {Renderer} = await handleEventsFromTraceFile(this, 'recursive-counting-js.json.gz');
@@ -936,8 +953,8 @@ describeWithEnvironment('RendererHandler', function() {
         throw new Error('Tree not found');
       }
       const onlyLongTasksPredicate =
-          (_node: TraceModel.Helpers.TreeHelpers.TraceEntryNode,
-           event: TraceModel.Types.TraceEvents.SyntheticTraceEntry) => Boolean(event.dur && event.dur > 1000) &&
+          (_node: TraceModel.Helpers.TreeHelpers.TraceEntryNode, event: TraceModel.Types.TraceEvents.TraceEventData) =>
+              Boolean(event.dur && event.dur > 1000) &&
           Boolean(Timeline.EventUICategory.getEventStyle(event.name as TraceModel.Types.TraceEvents.KnownEventName));
       assert.strictEqual(prettyPrint(thread.tree, onlyLongTasksPredicate), `
 .............
@@ -1002,7 +1019,7 @@ describeWithEnvironment('RendererHandler', function() {
     assert.strictEqual(AuctionWorklets.worklets.size, 3);
     for (const [pid] of AuctionWorklets.worklets) {
       const process = Renderer.processes.get(pid);
-      assert.isDefined(process);
+      assert.exists(process);
       // Ensure that the URL was set properly based on the AuctionWorklets metadata event.
       assert.isTrue(process?.url?.includes('fledge-demo.glitch.me'));
     }

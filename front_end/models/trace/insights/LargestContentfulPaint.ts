@@ -6,7 +6,8 @@ import * as Handlers from '../handlers/handlers.js';
 import * as Helpers from '../helpers/helpers.js';
 import * as Types from '../types/types.js';
 
-import {type InsightResult, InsightWarning, type NavigationInsightContext, type RequiredData} from './types.js';
+import {findLCPRequest} from './Common.js';
+import {InsightWarning, type LCPInsightResult, type NavigationInsightContext, type RequiredData} from './types.js';
 
 export function deps(): ['NetworkRequests', 'PageLoadMetrics', 'LargestImagePaint', 'Meta'] {
   return ['NetworkRequests', 'PageLoadMetrics', 'LargestImagePaint', 'Meta'];
@@ -70,46 +71,8 @@ function breakdownPhases(
   };
 }
 
-function findLCPRequest(
-    traceParsedData: RequiredData<typeof deps>, context: NavigationInsightContext,
-    lcpEvent: Types.TraceEvents.TraceEventLargestContentfulPaintCandidate): Types.TraceEvents.SyntheticNetworkRequest|
-    null {
-  const lcpNodeId = lcpEvent.args.data?.nodeId;
-  if (!lcpNodeId) {
-    throw new Error('no lcp node id');
-  }
-
-  const imagePaint = traceParsedData.LargestImagePaint.get(lcpNodeId);
-  if (!imagePaint) {
-    return null;
-  }
-
-  const lcpUrl = imagePaint.args.data?.imageUrl;
-  if (!lcpUrl) {
-    throw new Error('no lcp url');
-  }
-  // Look for the LCP resource.
-  const lcpResource = traceParsedData.NetworkRequests.byTime.find(req => {
-    const nav =
-        Helpers.Trace.getNavigationForTraceEvent(req, context.frameId, traceParsedData.Meta.navigationsByFrameId);
-    return (nav?.args.data?.navigationId === context.navigationId) && (req.args.data.url === lcpUrl);
-  });
-
-  if (!lcpResource) {
-    throw new Error('no lcp resource found');
-  }
-
-  return lcpResource;
-}
-
 export function generateInsight(
-    traceParsedData: RequiredData<typeof deps>, context: NavigationInsightContext): InsightResult<{
-  lcpMs?: Types.Timing.MilliSeconds,
-  phases?: LCPPhases,
-  shouldRemoveLazyLoading?: boolean,
-  shouldIncreasePriorityHint?: boolean,
-  shouldPreloadImage?: boolean,
-}> {
+    traceParsedData: RequiredData<typeof deps>, context: NavigationInsightContext): LCPInsightResult {
   const networkRequests = traceParsedData.NetworkRequests;
 
   const nav = traceParsedData.Meta.navigationsByNavigationId.get(context.navigationId);
@@ -132,17 +95,20 @@ export function generateInsight(
     return {warnings: [InsightWarning.NO_LCP]};
   }
 
-  const lcpTiming = metricScore.timing;
-  const lcpMs = Helpers.Timing.microSecondsToMilliseconds(lcpTiming);
+  // This helps calculate the phases.
+  const lcpMs = Helpers.Timing.microSecondsToMilliseconds(metricScore.timing);
+  // This helps position things on the timeline's UI accurately for a trace.
+  const lcpTs = metricScore.event?.ts ? Helpers.Timing.microSecondsToMilliseconds(metricScore.event?.ts) : undefined;
   const lcpResource = findLCPRequest(traceParsedData, context, lcpEvent);
   const mainReq = networkRequests.byTime.find(req => req.args.data.requestId === context.navigationId);
   if (!mainReq) {
-    return {lcpMs, warnings: [InsightWarning.NO_DOCUMENT_REQUEST]};
+    return {lcpMs, lcpTs, warnings: [InsightWarning.NO_DOCUMENT_REQUEST]};
   }
 
   if (!lcpResource) {
     return {
-      lcpMs,
+      lcpMs: lcpMs,
+      lcpTs: lcpTs,
       phases: breakdownPhases(nav, mainReq, lcpMs, lcpResource),
     };
   }
@@ -151,11 +117,20 @@ export function generateInsight(
   const imagePreloaded = lcpResource?.args.data.isLinkPreload || lcpResource?.args.data.initiator?.type === 'preload';
   const imageFetchPriorityHint = lcpResource?.args.data.fetchPriorityHint;
 
+  // This is the earliest discovery time an LCP resource could have - it's TTFB.
+  const earliestDiscoveryTime = mainReq && mainReq.args.data.timing ?
+      Helpers.Timing.secondsToMicroseconds(mainReq.args.data.timing.requestTime) +
+          Helpers.Timing.millisecondsToMicroseconds(mainReq.args.data.timing.receiveHeadersStart) :
+      undefined;
+
   return {
-    lcpMs,
+    lcpMs: lcpMs,
+    lcpTs: lcpTs,
     phases: breakdownPhases(nav, mainReq, lcpMs, lcpResource),
     shouldRemoveLazyLoading: imageLoadingAttr === 'lazy',
     shouldIncreasePriorityHint: imageFetchPriorityHint !== 'high',
     shouldPreloadImage: !imagePreloaded,
+    lcpResource,
+    earliestDiscoveryTimeTs: earliestDiscoveryTime ? Types.Timing.MicroSeconds(earliestDiscoveryTime) : undefined,
   };
 }

@@ -160,7 +160,7 @@ export class DOMNode {
       this.childrenInternal = [];
     }
 
-    const frameOwnerTags = new Set(['EMBED', 'IFRAME', 'OBJECT', 'PORTAL', 'FENCEDFRAME']);
+    const frameOwnerTags = new Set(['EMBED', 'IFRAME', 'OBJECT', 'FENCEDFRAME']);
     if (payload.contentDocument) {
       this.contentDocumentInternal = new DOMDocument(this.#domModelInternal, payload.contentDocument);
       this.contentDocumentInternal.parentNode = this;
@@ -313,10 +313,6 @@ export class DOMNode {
 
   isIframe(): boolean {
     return this.#nodeNameInternal === 'IFRAME';
-  }
-
-  isPortal(): boolean {
-    return this.#nodeNameInternal === 'PORTAL';
   }
 
   importedDocument(): DOMNode|null {
@@ -573,17 +569,34 @@ export class DOMNode {
   }
 
   path(): string {
-    function canPush(node: DOMNode): number|false|null {
-      return (node.index !== undefined || (node.isShadowRoot() && node.parentNode)) && node.#nodeNameInternal.length;
+    function getNodeKey(node: DOMNode): number|'u'|'a'|'d'|null {
+      if (!node.#nodeNameInternal.length) {
+        return null;
+      }
+      if (node.index !== undefined) {
+        return node.index;
+      }
+      if (!node.parentNode) {
+        return null;
+      }
+      if (node.isShadowRoot()) {
+        return node.shadowRootType() === DOMNode.ShadowRootTypes.UserAgent ? 'u' : 'a';
+      }
+      if (node.nodeType() === Node.DOCUMENT_NODE) {
+        return 'd';
+      }
+      return null;
     }
 
     const path = [];
     let node: (DOMNode|null) = (this as DOMNode | null);
-    while (node && canPush(node)) {
-      const index = typeof node.index === 'number' ?
-          node.index :
-          (node.shadowRootType() === DOMNode.ShadowRootTypes.UserAgent ? 'u' : 'a');
-      path.push([index, node.#nodeNameInternal]);
+    while (node) {
+      const key = getNodeKey(node);
+      if (key === null) {
+        break;
+      }
+
+      path.push([key, node.#nodeNameInternal]);
       node = node.parentNode;
     }
     path.reverse();
@@ -1002,6 +1015,19 @@ export class DOMNode {
     }
     return lowerCaseName;
   }
+
+  async getAnchorBySpecifier(specifier?: string): Promise<DOMNode|null> {
+    const response = await this.#agent.invoke_getAnchorElement({
+      nodeId: this.id,
+      anchorSpecifier: specifier,
+    });
+
+    if (response.getError()) {
+      return null;
+    }
+
+    return this.domModel().nodeForId(response.nodeId);
+  }
 }
 
 export namespace DOMNode {
@@ -1253,8 +1279,8 @@ export class DOMModel extends SDKModel<EventTypes> {
     this.scheduleMutationEvent(node);
   }
 
-  inlineStyleInvalidated(nodeIds: number[]): void {
-    Platform.SetUtilities.addAll(this.#attributeLoadNodeIds, nodeIds);
+  inlineStyleInvalidated(nodeIds: Protocol.DOM.NodeId[]): void {
+    nodeIds.forEach(nodeId => this.#attributeLoadNodeIds.add(nodeId));
     if (!this.#loadNodeAttributesTimeout) {
       this.#loadNodeAttributesTimeout = window.setTimeout(this.loadNodeAttributes.bind(this), 20);
     }
@@ -1545,6 +1571,11 @@ export class DOMModel extends SDKModel<EventTypes> {
 
   getTopLayerElements(): Promise<Protocol.DOM.NodeId[]|null> {
     return this.agent.invoke_getTopLayerElements().then(({nodeIds}) => nodeIds);
+  }
+
+  getElementByRelation(nodeId: Protocol.DOM.NodeId, relation: Protocol.DOM.GetElementByRelationRequestRelation):
+      Promise<Protocol.DOM.NodeId|null> {
+    return this.agent.invoke_getElementByRelation({nodeId, relation}).then(({nodeId}) => nodeId);
   }
 
   markUndoableState(minorChange?: boolean): void {

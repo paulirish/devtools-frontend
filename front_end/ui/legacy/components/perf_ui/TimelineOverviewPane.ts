@@ -30,6 +30,7 @@
 
 import * as Common from '../../../../core/common/common.js';
 import * as TraceEngine from '../../../../models/trace/trace.js';
+import * as VisualLoggging from '../../../visual_logging/visual_logging.js';
 import * as UI from '../../legacy.js';
 
 import {Events as OverviewGridEvents, OverviewGrid, type WindowChangedWithPositionEvent} from './OverviewGrid.js';
@@ -59,6 +60,8 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
 
     this.overviewCalculator = new TimelineOverviewCalculator();
     this.overviewGrid = new OverviewGrid(prefix, this.overviewCalculator);
+    this.overviewGrid.element.setAttribute(
+        'jslog', `${VisualLoggging.timeline(`${prefix}-overview`).track({click: true, drag: true, hover: true})}`);
     this.element.appendChild(this.overviewGrid.element);
     this.cursorArea = this.overviewGrid.element.createChild('div', 'overview-grid-cursor-area');
     this.cursorElement = this.overviewGrid.element.createChild('div', 'overview-grid-cursor-position');
@@ -293,6 +296,7 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
 export const enum Events {
   OverviewPaneWindowChanged = 'OverviewPaneWindowChanged',
   OverviewPaneBreadcrumbAdded = 'OverviewPaneBreadcrumbAdded',
+  OpenSidebarButtonClicked = 'OpenSidebarButtonClicked',
 }
 
 export interface OverviewPaneWindowChangedEvent {
@@ -305,9 +309,12 @@ export interface OverviewPaneBreadcrumbAddedEvent {
   endTime: TraceEngine.Types.Timing.MilliSeconds;
 }
 
+export interface OpenSidebarButtonClicked {}
+
 export type EventTypes = {
   [Events.OverviewPaneWindowChanged]: OverviewPaneWindowChangedEvent,
   [Events.OverviewPaneBreadcrumbAdded]: OverviewPaneBreadcrumbAddedEvent,
+  [Events.OpenSidebarButtonClicked]: OpenSidebarButtonClicked,
 };
 
 export interface TimelineOverview {
@@ -400,7 +407,7 @@ export class OverviewInfo {
     this.glassPane.setMarginBehavior(UI.GlassPane.MarginBehavior.Arrow);
     this.glassPane.setSizeBehavior(UI.GlassPane.SizeBehavior.MeasureContent);
     this.visible = false;
-    this.element = UI.Utils
+    this.element = UI.UIUtils
                        .createShadowRootWithCoreStyles(this.glassPane.contentElement, {
                          cssFile: [timelineOverviewInfoStyles],
                          delegatesFocus: undefined,

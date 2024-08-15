@@ -28,7 +28,8 @@ export declare abstract class BidiRealm extends Realm {
     evaluateHandle<Params extends unknown[], Func extends EvaluateFunc<Params> = EvaluateFunc<Params>>(pageFunction: Func | string, ...args: Params): Promise<HandleFor<Awaited<ReturnType<Func>>>>;
     evaluate<Params extends unknown[], Func extends EvaluateFunc<Params> = EvaluateFunc<Params>>(pageFunction: Func | string, ...args: Params): Promise<Awaited<ReturnType<Func>>>;
     createHandle(result: Bidi.Script.RemoteValue): BidiJSHandle<unknown> | BidiElementHandle<Node>;
-    serialize(arg: unknown): Promise<Bidi.Script.LocalValue>;
+    serializeAsync(arg: unknown): Promise<Bidi.Script.LocalValue>;
+    serialize(arg: unknown): Bidi.Script.LocalValue;
     destroyHandles(handles: Array<BidiJSHandle<unknown>>): Promise<void>;
     adoptHandle<T extends JSHandle<Node>>(handle: T): Promise<T>;
     transferHandle<T extends JSHandle<Node>>(handle: T): Promise<T>;
@@ -41,6 +42,7 @@ export declare class BidiFrameRealm extends BidiRealm {
     static from(realm: WindowRealm, frame: BidiFrame): BidiFrameRealm;
     readonly realm: WindowRealm;
     private constructor();
+    get puppeteerUtil(): Promise<BidiJSHandle<PuppeteerUtil>>;
     get sandbox(): string | undefined;
     get environment(): BidiFrame;
     adoptBackendNode(backendNodeId?: number | undefined): Promise<JSHandle<Node>>;
