@@ -105,7 +105,7 @@ export class TimingsTrackAppender implements TrackAppender {
       consoleTimings,
     ].flat().sort((a, b) => a.ts - b.ts);
     this.#appendTrackHeaderAtLevel(trackStartLevel, expanded);
-    const newLevel = pageLoadMarkers.length ? this.#appendMarkersAtLevel(trackStartLevel) : trackStartLevel;
+    const newLevel = pageloadMarkers.length ? this.#appendMarkersAtLevel(trackStartLevel) : trackStartLevel;
     return this.#compatibilityBuilder.appendEventsAtLevel(userTimingEvents, newLevel, this);
   }
 

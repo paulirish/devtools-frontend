@@ -248,7 +248,7 @@ export function assignThreadName(
  */
 export function sanitizeProcesses(processes: Map<Types.TraceEvents.ProcessID, RendererProcess>): void {
   // Don't delete anything if we want to show it all.
-  if (config.experiments.timelineShowAllEvents) {
+  if (config.timelineShowAllEvents) {
     return;
   }
 
@@ -287,7 +287,7 @@ export function sanitizeProcesses(processes: Map<Types.TraceEvents.ProcessID, Re
  */
 export function sanitizeThreads(processes: Map<Types.TraceEvents.ProcessID, RendererProcess>): void {
   // Don't delete anything if we want to show it all. (Not sure about this one)
-  if (config.experiments.timelineShowAllEvents) {
+  if (config.timelineShowAllEvents) {
     return;
   }
   for (const [, process] of processes) {

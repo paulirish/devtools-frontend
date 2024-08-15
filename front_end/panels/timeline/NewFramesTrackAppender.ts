@@ -1,20 +1,19 @@
 // Copyright 2023 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+import type * as Common from '../../core/common/common.js';
+import * as i18n from '../../core/i18n/i18n.js';
 import * as TraceEngine from '../../models/trace/trace.js';
 import type * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 
+import {buildGroupStyle, buildTrackHeader, getFormattedTime} from './AppenderUtils.js';
 import {
   type CompatibilityTracksAppender,
-  type TrackAppender,
   type HighlightedEntryInfo,
+  type TrackAppender,
   type TrackAppenderName,
 } from './CompatibilityTracksAppender.js';
-import * as i18n from '../../core/i18n/i18n.js';
-
 import {type TimelineMarkerStyle} from './TimelineUIUtils.js';
-import type * as Common from '../../core/common/common.js';
-import {buildGroupStyle, buildTrackHeader, getFormattedTime} from './AppenderUtils.js';
 
 const UIStrings = {
   /**
@@ -26,7 +25,8 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/NewFramesTrackAppender.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-const eventLatencyBreakdownTypeNames = TraceEngine.Handlers.ModelHandlers.UberFramesHandler.eventLatencyBreakdownTypeNames;
+const eventLatencyBreakdownTypeNames =
+    TraceEngine.Handlers.ModelHandlers.UberFramesHandler.eventLatencyBreakdownTypeNames;
 
 /**
  * Show the frame timeline in an easy to understand manner.
@@ -79,7 +79,7 @@ export class NewFramesTrackAppender implements TrackAppender {
     const updatedTypeNames = eventLatencyBreakdownTypeNames.filter(name => actualNames.has(name));
     const reversed = updatedTypeNames.reverse();
     const typeNamesToLevel = Object.fromEntries(
-      updatedTypeNames.map(name => [name, reversed.indexOf(name)]),
+        updatedTypeNames.map(name => [name, reversed.indexOf(name)]),
     );
 
     for (const event of waterFallEvts) {
@@ -102,11 +102,9 @@ export class NewFramesTrackAppender implements TrackAppender {
    * appended.
    */
   #appendTrackHeaderAtLevel(currentLevel: number, expanded?: boolean): void {
-
-    const style =
-        buildGroupStyle({shareHeaderLine: true, useFirstLineForOverview: true, collapsible: true});
-    const group =
-        buildTrackHeader(currentLevel, i18nString(UIStrings.trackTitle), style, /* selectable= */ true, expanded);
+    const style = buildGroupStyle({shareHeaderLine: true, useFirstLineForOverview: true, collapsible: true});
+    const group = buildTrackHeader(
+        'NewFrames', currentLevel, i18nString(UIStrings.trackTitle), style, /* selectable= */ true, expanded);
     this.#compatibilityBuilder.registerTrackForGroup(group, this);
   }
 
@@ -138,9 +136,6 @@ export class NewFramesTrackAppender implements TrackAppender {
    * Gets the color an event added by this appender should be rendered with.
    */
   colorForEvent(event: TraceEngine.Types.TraceEvents.TraceEventData): string {
-    if (TraceEngine.Handlers.ModelHandlers.PageLoadMetrics.eventIsPageLoadEvent(event)) {
-      return this.markerStyleForEvent(event).color;
-    }
     // Performance and console timings.
     return this.#colorGenerator.colorForID(event.name);
   }
@@ -149,23 +144,22 @@ export class NewFramesTrackAppender implements TrackAppender {
    * Gets the title an event added by this appender should be rendered with.
    */
   titleForEvent(event: TraceEngine.Types.TraceEvents.TraceEventData): string {
-    const frameSeqId =
-      event.args.frameSeqId ??
-      event.args.frame_sequence ??
-      event.args.begin_frame_id ??
-      event.args.debug?.begin_frame_id ??
-      event.args.args?.sequence_number ??
-      event.args?.data?.beginEvent?.args?.sequence_number ??  // my additions to chrome_frame_reporter
-      event.args?.data?.beginEvent?.args?.data?.sequence_number ??
-      event.args?.data?.beginEvent?.args?.event_latency?.frame_sequence ??
-      event.args?.data?.beginEvent?.args?.chrome_frame_reporter?.frame_sequence ??
-      event.args?.data?.beginEvent?.args?.send_begin_mainframe_to_commit_breakdown?.frame_sequence ??
-      '';
+    const frameSeqId = event.args.frameSeqId ?? event.args.frame_sequence ?? event.args.begin_frame_id ??
+        event.args.debug?.begin_frame_id ?? event.args.args?.sequence_number ??
+        event.args?.data?.beginEvent?.args?.sequence_number ??  // my additions to chrome_frame_reporter
+        event.args?.data?.beginEvent?.args?.data?.sequence_number ??
+        event.args?.data?.beginEvent?.args?.event_latency?.frame_sequence ??
+        event.args?.data?.beginEvent?.args?.chrome_frame_reporter?.frame_sequence ??
+        event.args?.data?.beginEvent?.args?.send_begin_mainframe_to_commit_breakdown?.frame_sequence ?? '';
 
-    if (frameSeqId) {return `${event.name} sq${frameSeqId % 1000}`;}
+    if (frameSeqId) {
+      return `${event.name} sq${frameSeqId % 1000}`;
+    }
 
     const localID = event.args?.data?.beginEvent?.id2?.local;
-    if (localID) {return `${event.name} c${localID}`;}
+    if (localID) {
+      return `${event.name} c${localID}`;
+    }
 
     return event.name;
   }
