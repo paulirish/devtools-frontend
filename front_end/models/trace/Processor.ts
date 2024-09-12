@@ -21,6 +21,7 @@ export class TraceParseProgressEvent extends Event {
     super(TraceParseProgressEvent.eventName, init);
   }
 }
+
 /**
  * Parsing a trace can take time. On large traces we see a breakdown of time like so:
  *   - handleEvent() loop:  ~20%
@@ -32,6 +33,13 @@ const enum ProgressPhase {
   HANDLE_EVENT = 0.2,
   FINALIZE = 0.8,
   CLONE = 1.0,
+}
+function calculateProgress(value: number, phase: ProgressPhase): number {
+  // Finalize values should be [0.2...0.8]
+  if (phase === ProgressPhase.FINALIZE) {
+    return (value * (ProgressPhase.FINALIZE - ProgressPhase.HANDLE_EVENT)) + ProgressPhase.HANDLE_EVENT;
+  }
+  return value * phase;
 }
 
 declare global {
@@ -192,7 +200,8 @@ export class TraceProcessor extends EventTarget {
       // Every so often we take a break just to render.
       if (i % eventsPerChunk === 0 && i) {
         // Take the opportunity to provide status update events.
-        this.dispatchEvent(new TraceParseProgressEvent({percent: i / traceEvents.length * ProgressPhase.HANDLE_EVENT}));
+        const percent = calculateProgress(i / traceEvents.length, ProgressPhase.HANDLE_EVENT);
+        this.dispatchEvent(new TraceParseProgressEvent({percent}));
         // TODO(paulirish): consider using `scheduler.yield()` or `scheduler.postTask(() => {}, {priority: 'user-blocking'})`
         await new Promise(resolve => setTimeout(resolve, 0));
       }
@@ -203,16 +212,15 @@ export class TraceProcessor extends EventTarget {
     }
 
     // Finalize.
-    for (let i = 0; i < sortedHandlers.length; ++i) {
-      const handler = sortedHandlers[i];
+    for (const [i, handler] of sortedHandlers.entries()) {
       if (handler.finalize) {
         // Yield to the UI because finalize() calls can be expensive
-        this.dispatchEvent(new TraceParseProgressEvent(
-            {percent: (i / sortedHandlers.length * ProgressPhase.FINALIZE) + ProgressPhase.HANDLE_EVENT}));
         // TODO(jacktfranklin): consider using `scheduler.yield()` or `scheduler.postTask(() => {}, {priority: 'user-blocking'})`
         await new Promise(resolve => setTimeout(resolve, 0));
         await handler.finalize();
       }
+      const percent = calculateProgress(i / sortedHandlers.length, ProgressPhase.FINALIZE);
+      this.dispatchEvent(new TraceParseProgressEvent({percent}));
     }
 
     // Handlers that depend on other handlers do so via .data(), which used to always

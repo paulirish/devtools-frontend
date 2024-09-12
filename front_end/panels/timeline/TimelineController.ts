@@ -202,7 +202,7 @@ export class TimelineController implements TraceEngine.TracingManager.TracingMan
   }
 
   private async allSourcesFinished(): Promise<void> {
-    // TODO(paulirish): Report the progress of this resumption, as it can be lengthy on heavy pages.
+    // TODO(crbug.com/366072294): Report the progress of this resumption, as it can be lengthy on heavy pages.
     await SDK.TargetManager.TargetManager.instance().resumeAllTargets();
     Extensions.ExtensionServer.ExtensionServer.instance().profilingStopped();
 
