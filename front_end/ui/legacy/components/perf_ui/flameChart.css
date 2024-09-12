@@ -53,8 +53,7 @@
 .flame-chart-search-element {
   position: absolute;
   pointer-events: none;
-  /* outline: 1px solid var(--sys-color-on-surface-subtle); */
-  /* background-color: var(--sys-color-state-ripple-neutral-on-subtle); */
+  outline: 0.5px solid var(--sys-color-outline);
 }
 
 .chart-cursor-element {

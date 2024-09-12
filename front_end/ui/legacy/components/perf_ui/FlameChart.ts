@@ -358,26 +358,22 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     // Obviously quite hacky. Comments left within the SVG for explanation.
     this.dimSvgDiv = this.viewportElement.createChild('div', 'dim-svg-mask fill hidden');
     this.dimSvgDiv.innerHTML = `
-<svg viewBox="0 0 756.3  756.3">
-
-  <mask id="myMask">
-    <!--within the mask... -->
-    <!--  grayish pixels => show the the outer rect at % opacity -->
-    <rect x="0" y="0" width="100%" height="100%" fill="hsl(0deg 0% 82.36%)"></rect>
-
-    <!--  black pixels =>   punch, fully transparently, through to the next thing. these are the cutouts -->
-    <!-- <rect x="37" y="78" width="103.02" height="16" fill="black"></rect> -->
-
-    <!--  white pixels =>   show the outer rect. (probably dont need. just for debugging.) -->
-    <!-- <rect x="37" y="78" width="103.02" height="16" fill="white"></rect> -->
-  </mask>
-
-  <!-- the fill is what i want to be user visible (grey = some desaturation).
-       the mask punches through it-->
-  <rect x="0" y="0" width="100%" height="100%" id="screenrect" fill="#ebebeb" mask="url(#myMask)"></rect>
+<svg class="fill" style="width: 100%; height: 100%;">
+  <defs>
+    <mask id="cutouts">
+      <!-- within the mask...
+              black fill = punch, fully transparently, through to the next thing. these are the cutouts to the color.
+              white fill = be 100% desaturated
+              grey fill  = show at the Lightness level of grayscale/desaturation
+      -->
+      <rect x="0" y="0" width="100%" height="100%" fill="hsl(0deg 0% 95%)"></rect>
+      <!-- other rect.punch will be added here -->
+    </mask>
+  </defs>
+  <rect width="100%" height="100%" id="screenrect" fill="#ffffff" mask="url(#cutouts)" style="mix-blend-mode: saturation;"></rect>
 </svg>
 `;
-    this.dimSvgDiv.style.cssText = 'mix-blend-mode: screen; pointer-events: none;';
+    this.dimSvgDiv.style.cssText = 'pointer-events: none;';
 
     this.selectedElement = this.viewportElement.createChild('div', 'flame-chart-selected-element');
     if (this.#selectedElementOutlineEnabled) {
@@ -511,15 +507,11 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       throw new Error('nosvg');
     }
 
-    // TODO: tweak if i drop the surrounding div
-    const elRect = svg?.parentElement?.parentElement?.getBoundingClientRect();
-    svg.viewBox.baseVal.width = elRect.width;
-    svg.viewBox.baseVal.height = elRect.height;
-
     mask.querySelectorAll('rect.punch').forEach(el => el.remove());
     for (const elPosition of elPositions) {
-      if (!elPosition)
+      if (!elPosition) {
         continue;
+      }
       const punchRect = UI.UIUtils.createSVGChild(mask, 'rect', 'punch');
       punchRect.setAttribute('x', elPosition.position.left.toString());
       punchRect.setAttribute('y', elPosition.position.top.toString());
