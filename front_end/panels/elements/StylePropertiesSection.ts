@@ -40,6 +40,7 @@ import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
+import * as Buttons from '../../ui/components/buttons/buttons.js';
 import type * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
@@ -56,7 +57,7 @@ const UIStrings = {
   /**
    *@description Tooltip text that appears when hovering over the largeicon add button in the Styles Sidebar Pane of the Elements panel
    */
-  insertStyleRuleBelow: 'Insert Style Rule Below',
+  insertStyleRuleBelow: 'Insert style rule below',
   /**
    *@description Text in Styles Sidebar Pane of the Elements panel
    */
@@ -86,7 +87,7 @@ const UIStrings = {
    *@description Show all button text content in Styles Sidebar Pane of the Elements panel
    *@example {3} PH1
    */
-  showAllPropertiesSMore: 'Show All Properties ({PH1} more)',
+  showAllPropertiesSMore: 'Show all properties ({PH1} more)',
   /**
    *@description Text in Elements Tree Element of the Elements panel, copy should be used as a verb
    */
@@ -130,7 +131,7 @@ export class StylePropertiesSection {
   readonly #styleRuleElement: HTMLElement;
   private readonly titleElement: HTMLElement;
   propertiesTreeOutline: UI.TreeOutline.TreeOutlineInShadow;
-  private showAllButton: HTMLButtonElement;
+  private showAllButton: Buttons.Button.Button;
   protected selectorElement: HTMLSpanElement;
   private readonly newStyleRuleToolbar: UI.Toolbar.Toolbar|undefined;
   private readonly fontEditorToolbar: UI.Toolbar.Toolbar|undefined;
@@ -158,8 +159,8 @@ export class StylePropertiesSection {
   constructor(
       parentPane: StylesSidebarPane, matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles,
       style: SDK.CSSStyleDeclaration.CSSStyleDeclaration, sectionIdx: number, computedStyles: Map<string, string>|null,
-      parentsComputedStyles: Map<string, string>|null, headerText?: string) {
-    this.#customHeaderText = headerText;
+      parentsComputedStyles: Map<string, string>|null, customHeaderText?: string) {
+    this.#customHeaderText = customHeaderText;
     this.parentPane = parentPane;
     this.sectionIdx = sectionIdx;
     this.styleInternal = style;
@@ -173,6 +174,7 @@ export class StylePropertiesSection {
     this.originalPropertiesCount = style.leadingProperties().length;
 
     const rule = style.parentRule;
+    const headerText = this.headerText();
     this.element = document.createElement('div');
     this.element.classList.add('styles-section');
     this.element.classList.add('matched-styles');
@@ -180,7 +182,7 @@ export class StylePropertiesSection {
     this.element.setAttribute('jslog', `${VisualLogging.section('style-properties').track({
                                 keydown: 'ArrowUp|ArrowDown|ArrowLeft|ArrowRight|Enter|Space',
                               })}`);
-    UI.ARIAUtils.setLabel(this.element, `${this.headerText()}, css selector`);
+    UI.ARIAUtils.setLabel(this.element, `${headerText}, css selector`);
     this.element.tabIndex = -1;
     UI.ARIAUtils.markAsListitem(this.element);
     this.element.addEventListener('keydown', this.onKeyDown.bind(this), false);
@@ -217,22 +219,28 @@ export class StylePropertiesSection {
     this.selectorElement = document.createElement('span');
     UI.ARIAUtils.setLabel(this.selectorElement, i18nString(UIStrings.cssSelector));
     this.selectorElement.classList.add('selector');
-    this.selectorElement.textContent = this.headerText();
+    this.selectorElement.textContent = headerText;
     selectorContainer.appendChild(this.selectorElement);
     this.selectorElement.addEventListener('mouseenter', this.onMouseEnterSelector.bind(this), false);
     this.selectorElement.addEventListener('mouseleave', this.onMouseOutSelector.bind(this), false);
 
-    const openBrace = selectorContainer.createChild('span', 'sidebar-pane-open-brace');
-    openBrace.textContent = ' {';
+    // We only add braces for style rules with selectors and non-style rules, which create their own sections.
+    if (headerText.length > 0 || !(rule instanceof SDK.CSSRule.CSSStyleRule)) {
+      const openBrace = selectorContainer.createChild('span', 'sidebar-pane-open-brace');
+      openBrace.textContent = headerText.length > 0 ? ' {' : '{';  // We don't add spacing when there is no selector.
 
-    const closeBrace = this.#styleRuleElement.createChild('div', 'sidebar-pane-closing-brace');
-    closeBrace.createChild('span', 'styles-clipboard-only').textContent = indent.repeat(this.nestingLevel);
-    closeBrace.createChild('span').textContent = '}';
+      const closeBrace = this.#styleRuleElement.createChild('div', 'sidebar-pane-closing-brace');
+      closeBrace.createChild('span', 'styles-clipboard-only').textContent = indent.repeat(this.nestingLevel);
+      closeBrace.createChild('span').textContent = '}';
+    } else {
+      this.titleElement.classList.add('hidden');
+    }
 
-    if (this.styleInternal.parentRule) {
+    if (rule) {
       const newRuleButton = new UI.Toolbar.ToolbarButton(
           i18nString(UIStrings.insertStyleRuleBelow), 'plus', undefined, 'elements.new-style-rule');
-      newRuleButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.onNewRuleClick, this);
+      newRuleButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, this.onNewRuleClick, this);
+      newRuleButton.setSize(Buttons.Button.Size.SMALL);
       newRuleButton.element.tabIndex = -1;
       if (!this.newStyleRuleToolbar) {
         this.newStyleRuleToolbar =
@@ -245,8 +253,9 @@ export class StylePropertiesSection {
     if (Root.Runtime.experiments.isEnabled('font-editor') && this.editable) {
       this.fontEditorToolbar = new UI.Toolbar.Toolbar('sidebar-pane-section-toolbar', this.#styleRuleElement);
       this.fontEditorSectionManager = new FontEditorSectionManager(this.parentPane.swatchPopoverHelper(), this);
-      this.fontEditorButton = new UI.Toolbar.ToolbarButton('Font Editor', 'custom-typography');
-      this.fontEditorButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, () => {
+      this.fontEditorButton =
+          new UI.Toolbar.ToolbarButton('Font Editor', 'custom-typography', undefined, 'font-editor');
+      this.fontEditorButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, () => {
         this.onFontEditorButtonClicked();
       }, this);
       this.fontEditorButton.element.addEventListener('keydown', event => {
@@ -267,7 +276,8 @@ export class StylePropertiesSection {
     }
 
     this.selectorElement.addEventListener('click', this.handleSelectorClick.bind(this), false);
-    this.selectorElement.setAttribute('jslog', `${VisualLogging.stylesSelector().track({click: true})}`);
+    this.selectorElement.setAttribute(
+        'jslog', `${VisualLogging.cssRuleHeader('selector').track({click: true, change: true})}`);
     this.element.addEventListener('contextmenu', this.handleContextMenuEvent.bind(this), false);
     this.element.addEventListener('mousedown', this.handleEmptySpaceMouseDown.bind(this), false);
     this.element.addEventListener('click', this.handleEmptySpaceClick.bind(this), false);
@@ -290,7 +300,9 @@ export class StylePropertiesSection {
       }
     }
 
-    this.selectorRefElement = this.titleElement.createChild('div', 'styles-section-subtitle');
+    this.selectorRefElement = document.createElement('div');
+    this.selectorRefElement.classList.add('styles-section-subtitle');
+    this.element.prepend(this.selectorRefElement);
     this.updateRuleOrigin();
     this.titleElement.appendChild(selectorContainer);
 
@@ -791,6 +803,11 @@ export class StylePropertiesSection {
       }
     }
 
+    if (this.headerText().length === 0) {
+      // We reduce one level since no selector means one less pair of braces are added for declarations.
+      this.nestingLevel--;
+    }
+
     let curNestingLevel = 0;
     for (const element of this.#ancestorRuleListElement.children) {
       const indentElement = document.createElement('span');
@@ -838,6 +855,7 @@ export class StylePropertiesSection {
       queryPrefix,
       queryText,
       onQueryTextClick,
+      jslogContext: 'media-query',
     };
     return mediaQueryElement;
   }
@@ -859,6 +877,7 @@ export class StylePropertiesSection {
       queryName: containerQuery.name,
       queryText: containerQuery.text,
       onQueryTextClick,
+      jslogContext: 'container-query',
     };
     if (!/^style\(.*\)/.test(containerQuery.text)) {
       // We only add container element for non-style queries.
@@ -878,6 +897,7 @@ export class StylePropertiesSection {
       queryPrefix: '@scope',
       queryText: scope.text,
       onQueryTextClick,
+      jslogContext: 'scope',
     };
     return scopeElement;
   }
@@ -898,6 +918,7 @@ export class StylePropertiesSection {
       queryPrefix: '@supports',
       queryText: supports.text,
       onQueryTextClick,
+      jslogContext: 'supports',
     };
     return supportsElement;
   }
@@ -993,17 +1014,22 @@ export class StylePropertiesSection {
   }
 
   updateVarFunctions(editedTreeElement: StylePropertyTreeElement): void {
+    if (!editedTreeElement.property.name.startsWith('--')) {
+      return;
+    }
     let child = this.propertiesTreeOutline.firstChild();
     while (child) {
       if (child !== editedTreeElement && child instanceof StylePropertyTreeElement) {
-        child.updateTitleIfComputedValueChanged();
+        child.refreshIfComputedValueChanged();
       }
       child = child.traverseNextTreeElement(false /* skipUnrevealed */, null /* stayWithin */, true /* dontPopulate */);
     }
   }
 
   update(full: boolean): void {
-    this.selectorElement.textContent = this.headerText();
+    const headerText = this.headerText();
+    this.selectorElement.textContent = headerText;
+    this.titleElement.classList.toggle('hidden', headerText.length === 0);
     this.markSelectorMatches();
     if (full) {
       this.onpopulate();
@@ -1072,7 +1098,7 @@ export class StylePropertiesSection {
   }
 
   isPropertyOverloaded(property: SDK.CSSProperty.CSSProperty): boolean {
-    return this.matchedStyles.propertyState(property) === SDK.CSSMatchedStyles.PropertyState.Overloaded;
+    return this.matchedStyles.propertyState(property) === SDK.CSSMatchedStyles.PropertyState.OVERLOADED;
   }
 
   updateFilter(): boolean {
@@ -1345,26 +1371,26 @@ export class StylePropertiesSection {
     contextMenu.clipboardSection().appendItem(i18nString(UIStrings.copySelector), () => {
       const selectorText = this.headerText();
       Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(selectorText);
-      Host.userMetrics.styleTextCopied(Host.UserMetrics.StyleTextCopied.SelectorViaContextMenu);
+      Host.userMetrics.styleTextCopied(Host.UserMetrics.StyleTextCopied.SELECTOR_VIA_CONTEXT_MENU);
     }, {jslogContext: 'copy-selector'});
 
     contextMenu.clipboardSection().appendItem(i18nString(UIStrings.copyRule), () => {
       const ruleText = StylesSidebarPane.formatLeadingProperties(this).ruleText;
       Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(ruleText);
-      Host.userMetrics.styleTextCopied(Host.UserMetrics.StyleTextCopied.RuleViaContextMenu);
+      Host.userMetrics.styleTextCopied(Host.UserMetrics.StyleTextCopied.RULE_VIA_CONTEXT_MENU);
     }, {jslogContext: 'copy-rule'});
 
     contextMenu.clipboardSection().appendItem(i18nString(UIStrings.copyAllDeclarations), () => {
       const allDeclarationText = StylesSidebarPane.formatLeadingProperties(this).allDeclarationText;
       Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(allDeclarationText);
-      Host.userMetrics.styleTextCopied(Host.UserMetrics.StyleTextCopied.AllDeclarationsViaContextMenu);
+      Host.userMetrics.styleTextCopied(Host.UserMetrics.StyleTextCopied.ALL_DECLARATIONS_VIA_CONTEXT_MENU);
     }, {jslogContext: 'copy-all-declarations'});
 
     // TODO(changhaohan): conditionally add this item only when there are changes to copy
     contextMenu.clipboardSection().appendItem(i18nString(UIStrings.copyAllCSSChanges), async () => {
       const allChanges = await this.parentPane.getFormattedChanges();
       Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(allChanges);
-      Host.userMetrics.styleTextCopied(Host.UserMetrics.StyleTextCopied.AllChangesViaStylesPane);
+      Host.userMetrics.styleTextCopied(Host.UserMetrics.StyleTextCopied.ALL_CHANGES_VIA_STYLES_TAB);
     }, {jslogContext: 'copy-all-css-changes'});
     void contextMenu.show();
   }
@@ -1710,6 +1736,16 @@ export class FontPaletteValuesRuleSection extends StylePropertiesSection {
   }
 }
 
+export class PositionTryRuleSection extends StylePropertiesSection {
+  constructor(
+      stylesPane: StylesSidebarPane, matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles,
+      style: SDK.CSSStyleDeclaration.CSSStyleDeclaration, sectionIdx: number, active: boolean) {
+    super(stylesPane, matchedStyles, style, sectionIdx, null, null);
+    this.selectorElement.className = 'position-try-values-key';
+    this.propertiesTreeOutline.element.classList.toggle('no-affect', !active);
+  }
+}
+
 export class KeyframePropertiesSection extends StylePropertiesSection {
   constructor(
       stylesPane: StylesSidebarPane, matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles,
@@ -1761,22 +1797,6 @@ export class KeyframePropertiesSection extends StylePropertiesSection {
   }
 
   override highlight(): void {
-  }
-}
-
-export class TryRuleSection extends StylePropertiesSection {
-  constructor(
-      stylesPane: StylesSidebarPane, matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles,
-      style: SDK.CSSStyleDeclaration.CSSStyleDeclaration, sectionIdx: number, computedStyles: Map<string, string>|null,
-      parentsComputedStyles: Map<string, string>|null) {
-    super(stylesPane, matchedStyles, style, sectionIdx, computedStyles, parentsComputedStyles);
-    this.selectorElement.className = 'try-rule-selector-element';
-    // Disables clicking on the selector element for `@try` rules.
-    this.selectorElement.addEventListener('click', ev => ev.stopPropagation(), true);
-  }
-
-  override headerText(): string {
-    return '@try';
   }
 }
 

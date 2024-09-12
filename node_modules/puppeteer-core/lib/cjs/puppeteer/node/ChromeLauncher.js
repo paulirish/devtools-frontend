@@ -15,12 +15,12 @@ const path_1 = __importDefault(require("path"));
 const browsers_1 = require("@puppeteer/browsers");
 const util_js_1 = require("../common/util.js");
 const assert_js_1 = require("../util/assert.js");
-const ProductLauncher_js_1 = require("./ProductLauncher.js");
+const BrowserLauncher_js_1 = require("./BrowserLauncher.js");
 const fs_js_1 = require("./util/fs.js");
 /**
  * @internal
  */
-class ChromeLauncher extends ProductLauncher_js_1.ProductLauncher {
+class ChromeLauncher extends BrowserLauncher_js_1.BrowserLauncher {
     constructor(puppeteer) {
         super(puppeteer, 'chrome');
     }
@@ -115,6 +115,7 @@ class ChromeLauncher extends ProductLauncher_js_1.ProductLauncher {
         if (options.args && userDisabledFeatures.length > 0) {
             removeMatchingFlags(options.args, '--disable-features');
         }
+        const turnOnExperimentalFeaturesForTesting = process.env['PUPPETEER_TEST_EXPERIMENTAL_CHROME_FEATURES'] === 'true';
         // Merge default disabled features with user-provided ones, if any.
         const disabledFeatures = [
             'Translate',
@@ -122,19 +123,30 @@ class ChromeLauncher extends ProductLauncher_js_1.ProductLauncher {
             'AcceptCHFrame',
             'MediaRouter',
             'OptimizationHints',
-            // https://crbug.com/1492053
-            'ProcessPerSiteUpToMainFrameThreshold',
+            ...(turnOnExperimentalFeaturesForTesting
+                ? []
+                : [
+                    // https://crbug.com/1492053
+                    'ProcessPerSiteUpToMainFrameThreshold',
+                    // https://github.com/puppeteer/puppeteer/issues/10715
+                    'IsolateSandboxedIframes',
+                ]),
             ...userDisabledFeatures,
-        ];
+        ].filter(feature => {
+            return feature !== '';
+        });
         const userEnabledFeatures = getFeatures('--enable-features', options.args);
         if (options.args && userEnabledFeatures.length > 0) {
             removeMatchingFlags(options.args, '--enable-features');
         }
         // Merge default enabled features with user-provided ones, if any.
         const enabledFeatures = [
-            'NetworkServiceInProcess2',
+            'PdfOopif',
+            // Add features to enable by default here.
             ...userEnabledFeatures,
-        ];
+        ].filter(feature => {
+            return feature !== '';
+        });
         const chromeArguments = [
             '--allow-pre-commit-input',
             '--disable-background-networking',
@@ -147,7 +159,6 @@ class ChromeLauncher extends ProductLauncher_js_1.ProductLauncher {
             '--disable-default-apps',
             '--disable-dev-shm-usage',
             '--disable-extensions',
-            '--disable-field-trial-config', // https://source.chromium.org/chromium/chromium/src/+/main:testing/variations/README.md
             '--disable-hang-monitor',
             '--disable-infobars',
             '--disable-ipc-flooding-protection',
@@ -166,7 +177,9 @@ class ChromeLauncher extends ProductLauncher_js_1.ProductLauncher {
             '--use-mock-keychain',
             `--disable-features=${disabledFeatures.join(',')}`,
             `--enable-features=${enabledFeatures.join(',')}`,
-        ];
+        ].filter(arg => {
+            return arg !== '';
+        });
         const { devtools = false, headless = !devtools, args = [], userDataDir, } = options;
         if (userDataDir) {
             chromeArguments.push(`--user-data-dir=${path_1.default.resolve(userDataDir)}`);

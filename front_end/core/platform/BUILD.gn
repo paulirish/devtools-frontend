@@ -6,7 +6,7 @@ import("../../../scripts/build/ninja/devtools_entrypoint.gni")
 import("../../../scripts/build/ninja/devtools_module.gni")
 import("../../../scripts/build/ninja/devtools_pre_built.gni")
 import("../../../scripts/build/ninja/vars.gni")
-import("../../../third_party/typescript/typescript.gni")
+import("../../../scripts/build/typescript/typescript.gni")
 
 devtools_module("platform") {
   sources = [
@@ -19,10 +19,10 @@ devtools_module("platform") {
     "MapUtilities.ts",
     "MimeType.ts",
     "NumberUtilities.ts",
-    "PromiseUtilities.ts",
-    "SetUtilities.ts",
+    "ServerTiming.ts",
     "StringUtilities.ts",
     "Timing.ts",
+    "TypedArrayUtilities.ts",
     "TypescriptUtilities.ts",
     "UIString.ts",
     "UserVisibleError.ts",
@@ -49,8 +49,8 @@ ts_library("unittests") {
     "MapUtilities.test.ts",
     "MimeType.test.ts",
     "NumberUtilities.test.ts",
-    "SetUtilities.test.ts",
     "StringUtilities.test.ts",
+    "TypedArrayUtilities.test.ts",
   ]
 
   deps = [

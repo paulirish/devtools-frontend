@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
 import {TraceLoader} from '../../../testing/TraceLoader.js';
 import * as TraceEngine from '../trace.js';
 
-const {assert} = chai;
-
-describe('WarningsHandler', function() {
+describeWithEnvironment('WarningsHandler', function() {
   beforeEach(() => {
     TraceEngine.Handlers.ModelHandlers.Warnings.reset();
   });
@@ -21,7 +20,7 @@ describe('WarningsHandler', function() {
     // We expect one long task.
     assert.strictEqual(data.perEvent.size, 1);
     const event = Array.from(data.perEvent.keys()).at(0);
-    assert.strictEqual(event?.name, TraceEngine.Types.TraceEvents.KnownEventName.RunTask);
+    assert.strictEqual(event?.name, TraceEngine.Types.TraceEvents.KnownEventName.RUN_TASK);
   });
 
   it('identifies idle callbacks that ran over the allotted time', async function() {
@@ -48,8 +47,8 @@ describe('WarningsHandler', function() {
     const layout = forcedReflow[1];
     assert.deepEqual(data.perEvent.get(stylesRecalc), ['FORCED_REFLOW']);
     assert.deepEqual(data.perEvent.get(layout), ['FORCED_REFLOW']);
-    assert.strictEqual(stylesRecalc.name, TraceEngine.Types.TraceEvents.KnownEventName.UpdateLayoutTree);
-    assert.strictEqual(layout.name, TraceEngine.Types.TraceEvents.KnownEventName.Layout);
+    assert.strictEqual(stylesRecalc.name, TraceEngine.Types.TraceEvents.KnownEventName.UPDATE_LAYOUT_TREE);
+    assert.strictEqual(layout.name, TraceEngine.Types.TraceEvents.KnownEventName.LAYOUT);
   });
 
   it('ignores reflows that are not forced by JS', async function() {
@@ -64,15 +63,15 @@ describe('WarningsHandler', function() {
 
   it('identifies long interactions', async function() {
     // We run the entire model here as the WarningsHandler actually depends on the UserInteractionsHandler to fetch this data
-    const traceParsedData = await TraceLoader.traceEngine(this, 'one-second-interaction.json.gz');
+    const {traceData} = await TraceLoader.traceEngine(this, 'one-second-interaction.json.gz');
 
     // These events do exist on the UserInteractionsHandler, but we also put
     // them into the WarningsHandler so that the warnings handler can be the
     // source of truth and the way to look up all warnings for a given event.
-    const {interactionsOverThreshold} = traceParsedData.UserInteractions;
+    const {interactionsOverThreshold} = traceData.UserInteractions;
 
     for (const interaction of interactionsOverThreshold) {
-      const warnings = traceParsedData.Warnings.perEvent.get(interaction);
+      const warnings = traceData.Warnings.perEvent.get(interaction);
       assert.deepEqual(warnings, ['LONG_INTERACTION']);
     }
   });

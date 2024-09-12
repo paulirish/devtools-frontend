@@ -2,12 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as TraceModel from '../trace.js';
-
-const {assert} = chai;
-
 import {defaultTraceEvent} from '../../../testing/TraceHelpers.js';
 import {TraceLoader} from '../../../testing/TraceLoader.js';
+import * as TraceModel from '../trace.js';
 
 describe('MetaHandler', function() {
   let baseEvents: TraceModel.Types.TraceEvents.TraceEventData[];
@@ -271,13 +268,13 @@ describe('MetaHandler', function() {
     const windowMinTime = 1143381875846;
     assert.deepStrictEqual(
         [...rendererProcesses?.values()], [[{
-          'frame': {
-            'frame': '1D148CB660D1F96ED70D78DC6A53267B',
-            'name': '',
-            'processId': 3601132,
-            'url': 'https://threejs.org/examples/',
+          frame: {
+            frame: '1D148CB660D1F96ED70D78DC6A53267B',
+            name: '',
+            processId: 3601132,
+            url: 'https://threejs.org/examples/',
           },
-          'window': {'min': windowMinTime, 'max': data.traceBounds.max, 'range': data.traceBounds.max - windowMinTime},
+          window: {min: windowMinTime, max: data.traceBounds.max, range: data.traceBounds.max - windowMinTime},
         }]]);
   });
 
@@ -310,31 +307,31 @@ describe('MetaHandler', function() {
     assert.deepStrictEqual([...rendererProcesses?.keys()], [78450, 78473, 79194]);
     assert.deepStrictEqual([...rendererProcesses?.values()], [
       [{
-        'frame': {
-          'frame': 'E70A9327100EBD78F1C03582BBBE8E5F',
-          'name': '',
-          'processId': 78450,
-          'url': 'http://127.0.0.1:8081/',
+        frame: {
+          frame: 'E70A9327100EBD78F1C03582BBBE8E5F',
+          name: '',
+          processId: 78450,
+          url: 'http://127.0.0.1:8081/',
         },
-        'window': {'min': 3550803491779, 'max': 3550805534872, 'range': 2043093},
+        window: {min: 3550803491779, max: 3550805534872, range: 2043093},
       }],
       [{
-        'frame': {
-          'frame': 'E70A9327100EBD78F1C03582BBBE8E5F',
-          'name': '',
-          'processId': 78473,
-          'url': 'http://localhost:8080/',
+        frame: {
+          frame: 'E70A9327100EBD78F1C03582BBBE8E5F',
+          name: '',
+          processId: 78473,
+          url: 'http://localhost:8080/',
         },
-        'window': {'min': 3550805534873, 'max': 3550807444740, 'range': 1909867},
+        window: {min: 3550805534873, max: 3550807444740, range: 1909867},
       }],
       [{
-        'frame': {
-          'frame': 'E70A9327100EBD78F1C03582BBBE8E5F',
-          'name': '',
-          'processId': 79194,
-          'url': 'https://www.google.com/',
+        frame: {
+          frame: 'E70A9327100EBD78F1C03582BBBE8E5F',
+          name: '',
+          processId: 79194,
+          url: 'https://www.google.com/',
         },
-        'window': {'min': windowMinTime, 'max': data.traceBounds.max, 'range': data.traceBounds.max - windowMinTime},
+        window: {min: windowMinTime, max: data.traceBounds.max, range: data.traceBounds.max - windowMinTime},
       }],
     ]);
   });
@@ -367,29 +364,29 @@ describe('MetaHandler', function() {
     assert.deepStrictEqual([...rendererProcesses?.values()], [
       [
         {
-          'frame': {
-            'frame': '1F729458403A23CF1D8D246095129AC4',
-            'name': '',
-            'processId': 2080,
-            'url': 'about:blank',
+          frame: {
+            frame: '1F729458403A23CF1D8D246095129AC4',
+            name: '',
+            processId: 2080,
+            url: 'about:blank',
           },
-          'window': {
-            'min': 251126654355,
-            'max': 251126663397,
-            'range': 9042,
+          window: {
+            min: 251126654355,
+            max: 251126663397,
+            range: 9042,
           },
         },
         {
-          'frame': {
-            'frame': '1F729458403A23CF1D8D246095129AC4',
-            'name': '',
-            'processId': 2080,
-            'url': 'https://www.google.com',
+          frame: {
+            frame: '1F729458403A23CF1D8D246095129AC4',
+            name: '',
+            processId: 2080,
+            url: 'https://www.google.com',
           },
-          'window': {
-            'min': 251126663398,
-            'max': 251128073034,
-            'range': 1409636,
+          window: {
+            min: 251126663398,
+            max: 251128073034,
+            range: 1409636,
           },
         },
       ],
@@ -594,4 +591,47 @@ describe('MetaHandler', function() {
       [TraceModel.Types.TraceEvents.ProcessID(48531), 'Renderer'],
     ]);
   });
+
+  it('does not set a frame as a main frame if it has no URL.', async function() {
+    // This test exists because of a bug report from this trace where we
+    // incorrectly set the main frame ID, causing DevTools to pick an advert in
+    // an iframe as the main thread. This happened because we happily set
+    // mainFrameID to a frame that had no URL, which doesn't make sense.
+    const events = await TraceLoader.rawEvents(this, 'wrong-main-frame-bug.json.gz');
+    for (const event of events) {
+      TraceModel.Handlers.ModelHandlers.Meta.handleEvent(event);
+    }
+    await TraceModel.Handlers.ModelHandlers.Meta.finalize();
+    const data = TraceModel.Handlers.ModelHandlers.Meta.data();
+    assert.strictEqual(data.mainFrameId, 'D1731088F5DE299149240DF9E6025291');
+  });
+
+  it('will use isOutermostMainFrame to determine the main frame from the TracingStartedInBrowser event if it is present',
+     async function() {
+       const events = await TraceLoader.rawEvents(this, 'web-dev-outermost-frames.json.gz');
+       for (const event of events) {
+         TraceModel.Handlers.ModelHandlers.Meta.handleEvent(event);
+       }
+       await TraceModel.Handlers.ModelHandlers.Meta.finalize();
+       const data = TraceModel.Handlers.ModelHandlers.Meta.data();
+       assert.strictEqual(data.mainFrameId, '881522AC20B813B0C0E99E27CEBAB951');
+     });
+
+  it('will use isInPrimaryPage along with isOutermostMainFrame to identify the main frame from TracingStartedInBrowser',
+     async function() {
+       // See crbug.com/343873756 for context on this bug report and fix.
+       const events = await TraceLoader.rawEvents(this, 'primary-page-frame.json.gz');
+       for (const event of events) {
+         TraceModel.Handlers.ModelHandlers.Meta.handleEvent(event);
+       }
+       await TraceModel.Handlers.ModelHandlers.Meta.finalize();
+       const data = TraceModel.Handlers.ModelHandlers.Meta.data();
+       // If you look at the trace, this is the frame that is both:
+       // isInPrimaryPage === true
+       // isOutermostMainFrame == true
+       //
+       // The other frames have isOutermostMainFrame == true (as they are pre-rendered pages)
+       // But they are not in the primary page.
+       assert.strictEqual(data.mainFrameId, '07B7D55F5BE0ADB8AAD6502F2D3859FF');
+     });
 });

@@ -272,7 +272,7 @@ export class CreateRecordingView extends HTMLElement {
               jslog=${VisualLogging.close().track({click: true})}
               .data=${
                 {
-                  variant: Buttons.Button.Variant.ROUND,
+                  variant: Buttons.Button.Variant.ICON,
                   size: Buttons.Button.Size.SMALL,
                   iconName: 'cross',
                 } as Buttons.Button.ButtonData
@@ -287,7 +287,7 @@ export class CreateRecordingView extends HTMLElement {
             value=${this.#defaultRecordingName}
             @focus=${this.#onInputFocus}
             @keydown=${this.#onKeyDown}
-            jslog=${VisualLogging.textField('user-flow-name').track({keydown: true})}
+            jslog=${VisualLogging.textField('user-flow-name').track({change: true})}
             class="devtools-text-input"
             id="user-flow-name"
           />
@@ -305,7 +305,7 @@ export class CreateRecordingView extends HTMLElement {
             value=${this.#recorderSettings?.selectorAttribute}
             placeholder="data-testid"
             @keydown=${this.#onKeyDown}
-            jslog=${VisualLogging.textField('selector-attribute').track({keydown: true})}
+            jslog=${VisualLogging.textField('selector-attribute').track({change: true})}
             class="devtools-text-input"
             id="selector-attribute"
           />
@@ -355,10 +355,10 @@ export class CreateRecordingView extends HTMLElement {
               @click=${this.startRecording}
               .label=${i18nString(UIStrings.startRecording)}
               .shape=${'circle'}
-              jslog=${VisualLogging.action(Actions.RecorderActions.StartRecording).track({click: true})}
+              jslog=${VisualLogging.action(Actions.RecorderActions.START_RECORDING).track({click: true})}
               title=${Models.Tooltip.getTooltipForActions(
                 i18nString(UIStrings.startRecording),
-                Actions.RecorderActions.StartRecording,
+                Actions.RecorderActions.START_RECORDING,
               )}
             ></devtools-control-button>
           </div>

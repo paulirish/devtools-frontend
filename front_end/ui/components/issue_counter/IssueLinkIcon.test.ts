@@ -6,8 +6,6 @@ import * as Common from '../../../core/common/common.js';
 import type * as Protocol from '../../../generated/protocol.js';
 import * as IssuesManager from '../../../models/issues_manager/issues_manager.js';
 import {
-  assertElement,
-  assertShadowRoot,
   renderElementIntoDOM,
 } from '../../../testing/DOMHelpers.js';
 import {describeWithLocale} from '../../../testing/EnvironmentHelpers.js';
@@ -15,8 +13,6 @@ import * as IconButton from '../icon_button/icon_button.js';
 import * as Coordinator from '../render_coordinator/render_coordinator.js';
 
 import * as IssueCounter from './issue_counter.js';
-
-const {assert} = chai;
 
 const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
 
@@ -27,7 +23,7 @@ const renderIssueLinkIcon = async(data: IssueCounter.IssueLinkIcon.IssueLinkIcon
   const component = new IssueCounter.IssueLinkIcon.IssueLinkIcon();
   component.data = data;
   renderElementIntoDOM(component);
-  assertShadowRoot(component.shadowRoot);
+  assert.isNotNull(component.shadowRoot);
   await coordinator.done();
   return {component, shadowRoot: component.shadowRoot};
 };
@@ -37,9 +33,9 @@ export const extractElements = (shadowRoot: ShadowRoot): {
   button: HTMLButtonElement,
 } => {
   const icon = shadowRoot.querySelector('devtools-icon');
-  assertElement(icon, IconButton.Icon.Icon);
+  assert.instanceOf(icon, IconButton.Icon.Icon);
   const button = shadowRoot.querySelector('button');
-  assertElement(button, HTMLButtonElement);
+  assert.instanceOf(button, HTMLButtonElement);
   return {icon, button};
 };
 
@@ -89,7 +85,7 @@ describeWithLocale('IssueLinkIcon', () => {
   const issueId = 'issue1' as Protocol.Audits.IssueId;
   const mockIssue = {
     getKind() {
-      return IssuesManager.Issue.IssueKind.PageError;
+      return IssuesManager.Issue.IssueKind.PAGE_ERROR;
     },
     getIssueId() {
       return issueId;
@@ -166,7 +162,7 @@ describeWithLocale('IssueLinkIcon', () => {
 
       const mockIssue2 = {
         getKind() {
-          return IssuesManager.Issue.IssueKind.BreakingChange;
+          return IssuesManager.Issue.IssueKind.BREAKING_CHANGE;
         },
       };
 

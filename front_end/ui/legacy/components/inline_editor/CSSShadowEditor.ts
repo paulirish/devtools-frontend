@@ -55,6 +55,13 @@ export interface CSSShadowModel {
   spreadRadius(): CSSLength;
 }
 
+const CSS_LENGTH_REGEX = (function(): string {
+  const number = '([+-]?(?:[0-9]*[.])?[0-9]+(?:[eE][+-]?[0-9]+)?)';
+  const unit = '(ch|cm|em|ex|in|mm|pc|pt|px|rem|vh|vmax|vmin|vw)';
+  const zero = '[+-]?(?:0*[.])?0+(?:[eE][+-]?[0-9]+)?';
+  return new RegExp(number + unit + '|' + zero, 'gi').source;
+})();
+
 export class CSSLength {
   amount: number;
   unit: string;
@@ -64,7 +71,7 @@ export class CSSLength {
   }
 
   static parse(text: string): CSSLength|null {
-    const lengthRegex = new RegExp('^(?:' + CSSLength.Regex.source + ')$', 'i');
+    const lengthRegex = new RegExp('^(?:' + CSS_LENGTH_REGEX + ')$', 'i');
     const match = text.match(lengthRegex);
     if (!match) {
       return null;
@@ -82,14 +89,6 @@ export class CSSLength {
   asCSSText(): string {
     return this.amount + this.unit;
   }
-
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  static Regex = (function(): RegExp {
-    const number = '([+-]?(?:[0-9]*[.])?[0-9]+(?:[eE][+-]?[0-9]+)?)';
-    const unit = '(ch|cm|em|ex|in|mm|pc|pt|px|rem|vh|vmax|vmin|vw)';
-    const zero = '[+-]?(?:0*[.])?0+(?:[eE][+-]?[0-9]+)?';
-    return new RegExp(number + unit + '|' + zero, 'gi');
-  })();
 }
 
 export class CSSShadowEditor extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.VBox>(
@@ -257,7 +256,7 @@ export class CSSShadowEditor extends Common.ObjectWrapper.eventMixin<EventTypes,
     }
     this.model.setInset(insetClicked);
     this.updateButtons();
-    this.dispatchEventToListeners(Events.ShadowChanged, this.model);
+    this.dispatchEventToListeners(Events.SHADOW_CHANGED, this.model);
   }
 
   private handleValueModification(event: Event): void {
@@ -308,7 +307,7 @@ export class CSSShadowEditor extends Common.ObjectWrapper.eventMixin<EventTypes,
       this.model.setSpreadRadius(length);
       this.spreadSlider.value = length.amount.toString();
     }
-    this.dispatchEventToListeners(Events.ShadowChanged, this.model);
+    this.dispatchEventToListeners(Events.SHADOW_CHANGED, this.model);
   }
 
   private onTextBlur(): void {
@@ -346,7 +345,7 @@ export class CSSShadowEditor extends Common.ObjectWrapper.eventMixin<EventTypes,
       this.spreadSlider.value = length.amount.toString();
     }
     this.changedElement = null;
-    this.dispatchEventToListeners(Events.ShadowChanged, this.model);
+    this.dispatchEventToListeners(Events.SHADOW_CHANGED, this.model);
   }
 
   private onSliderInput(event: Event): void {
@@ -361,7 +360,7 @@ export class CSSShadowEditor extends Common.ObjectWrapper.eventMixin<EventTypes,
       this.spreadInput.value = this.model.spreadRadius().asCSSText();
       this.spreadInput.classList.remove('invalid');
     }
-    this.dispatchEventToListeners(Events.ShadowChanged, this.model);
+    this.dispatchEventToListeners(Events.SHADOW_CHANGED, this.model);
   }
 
   private dragStart(event: MouseEvent): boolean {
@@ -403,7 +402,7 @@ export class CSSShadowEditor extends Common.ObjectWrapper.eventMixin<EventTypes,
     this.xInput.classList.remove('invalid');
     this.yInput.classList.remove('invalid');
     this.updateCanvas(true);
-    this.dispatchEventToListeners(Events.ShadowChanged, this.model);
+    this.dispatchEventToListeners(Events.SHADOW_CHANGED, this.model);
   }
 
   private onCanvasBlur(): void {
@@ -450,7 +449,7 @@ export class CSSShadowEditor extends Common.ObjectWrapper.eventMixin<EventTypes,
       this.yInput.classList.remove('invalid');
     }
     this.updateCanvas(true);
-    this.dispatchEventToListeners(Events.ShadowChanged, this.model);
+    this.dispatchEventToListeners(Events.SHADOW_CHANGED, this.model);
   }
 
   private constrainPoint(point: UI.Geometry.Point, max: number): UI.Geometry.Point {
@@ -489,9 +488,9 @@ export class CSSShadowEditor extends Common.ObjectWrapper.eventMixin<EventTypes,
 }
 
 export const enum Events {
-  ShadowChanged = 'ShadowChanged',
+  SHADOW_CHANGED = 'ShadowChanged',
 }
 
 export type EventTypes = {
-  [Events.ShadowChanged]: CSSShadowModel,
+  [Events.SHADOW_CHANGED]: CSSShadowModel,
 };

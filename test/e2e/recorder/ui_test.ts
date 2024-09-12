@@ -18,10 +18,6 @@ import {
   waitForFunction,
   waitForNone,
 } from '../../../test/shared/helper.js';
-import {
-  describe,
-  it,
-} from '../../../test/shared/mocha-extensions.js';
 
 import {
   assertRecordingMatchesSnapshot,
@@ -118,7 +114,7 @@ describe('Recorder', function() {
         });
         await clickSelectButtonItem(
             'Normal (Default)',
-            'devtools-replay-button',
+            'devtools-replay-section',
         );
         await target.bringToFront();
         await promise;

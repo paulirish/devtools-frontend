@@ -40,7 +40,8 @@ import * as i18n from '../i18n/i18n.js';
 import * as Platform from '../platform/platform.js';
 import * as Root from '../root/root.js';
 
-import {type GetPropertiesResult, type RemoteObject, ScopeRef} from './RemoteObject.js';
+import {type PageResourceLoadInitiator} from './PageResourceLoader.js';
+import {type GetPropertiesResult, type RemoteObject, RemoteObjectProperty, ScopeRef} from './RemoteObject.js';
 import {Events as ResourceTreeModelEvents, ResourceTreeModel} from './ResourceTreeModel.js';
 import {type EvaluationOptions, type EvaluationResult, type ExecutionContext, RuntimeModel} from './RuntimeModel.js';
 import {Script} from './Script.js';
@@ -89,6 +90,14 @@ const UIStrings = {
    *@description Text describing the expression scope in WebAssembly
    */
   expression: 'Expression',
+  /**
+   *@description Text in Scope Chain Sidebar Pane of the Sources panel
+   */
+  exception: 'Exception',
+  /**
+   *@description Text in Scope Chain Sidebar Pane of the Sources panel
+   */
+  returnValue: 'Return value',
 };
 const str_ = i18n.i18n.registerUIStrings('core/sdk/DebuggerModel.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -142,9 +151,9 @@ export function sortAndMergeRanges(locationRanges: Protocol.Debugger.LocationRan
 }
 
 export const enum StepMode {
-  StepInto = 'StepInto',
-  StepOut = 'StepOut',
-  StepOver = 'StepOver',
+  STEP_INTO = 'StepInto',
+  STEP_OUT = 'StepOut',
+  STEP_OVER = 'StepOver',
 }
 
 export class DebuggerModel extends SDKModel<EventTypes> {
@@ -297,6 +306,7 @@ export class DebuggerModel extends SDKModel<EventTypes> {
 
   private registerDebugger(response: Protocol.Debugger.EnableResponse): void {
     if (response.getError()) {
+      this.#debuggerEnabledInternal = false;
       return;
     }
     const {debuggerId} = response;
@@ -412,18 +422,18 @@ export class DebuggerModel extends SDKModel<EventTypes> {
   }
 
   async stepInto(): Promise<void> {
-    const skipList = await this.computeAutoStepSkipList(StepMode.StepInto);
+    const skipList = await this.computeAutoStepSkipList(StepMode.STEP_INTO);
     void this.agent.invoke_stepInto({breakOnAsyncCall: false, skipList});
   }
 
   async stepOver(): Promise<void> {
     this.#autoSteppingContext = this.#debuggerPausedDetailsInternal?.callFrames[0]?.functionLocation() ?? null;
-    const skipList = await this.computeAutoStepSkipList(StepMode.StepOver);
+    const skipList = await this.computeAutoStepSkipList(StepMode.STEP_OVER);
     void this.agent.invoke_stepOver({skipList});
   }
 
   async stepOut(): Promise<void> {
-    const skipList = await this.computeAutoStepSkipList(StepMode.StepOut);
+    const skipList = await this.computeAutoStepSkipList(StepMode.STEP_OUT);
     if (skipList.length !== 0) {
       void this.agent.invoke_stepOver({skipList});
     } else {
@@ -432,7 +442,7 @@ export class DebuggerModel extends SDKModel<EventTypes> {
   }
 
   scheduleStepIntoAsync(): void {
-    void this.computeAutoStepSkipList(StepMode.StepInto).then(skipList => {
+    void this.computeAutoStepSkipList(StepMode.STEP_INTO).then(skipList => {
       void this.agent.invoke_stepInto({breakOnAsyncCall: true, skipList});
     });
   }
@@ -453,7 +463,7 @@ export class DebuggerModel extends SDKModel<EventTypes> {
       condition?: BackendCondition): Promise<SetBreakpointResult> {
     // Convert file url to node-js path.
     let urlRegex;
-    if (this.target().type() === Type.Node && Common.ParsedURL.schemeIs(url, 'file:')) {
+    if (this.target().type() === Type.NODE && Common.ParsedURL.schemeIs(url, 'file:')) {
       const platformPath = Common.ParsedURL.ParsedURL.urlToRawPathString(url, Host.Platform.isWin());
       urlRegex =
           `${Platform.StringUtilities.escapeForRegExp(platformPath)}|${Platform.StringUtilities.escapeForRegExp(url)}`;
@@ -473,11 +483,11 @@ export class DebuggerModel extends SDKModel<EventTypes> {
     }
     columnNumber = Math.max(columnNumber || 0, minColumnNumber);
     const response = await this.agent.invoke_setBreakpointByUrl({
-      lineNumber: lineNumber,
+      lineNumber,
       url: urlRegex ? undefined : url,
-      urlRegex: urlRegex,
-      columnNumber: columnNumber,
-      condition: condition,
+      urlRegex,
+      columnNumber,
+      condition,
     });
     if (response.getError()) {
       return {locations: [], breakpointId: null};
@@ -492,8 +502,7 @@ export class DebuggerModel extends SDKModel<EventTypes> {
   async setBreakpointInAnonymousScript(
       scriptHash: string, lineNumber: number, columnNumber?: number,
       condition?: BackendCondition): Promise<SetBreakpointResult> {
-    const response = await this.agent.invoke_setBreakpointByUrl(
-        {lineNumber: lineNumber, scriptHash: scriptHash, columnNumber: columnNumber, condition: condition});
+    const response = await this.agent.invoke_setBreakpointByUrl({lineNumber, scriptHash, columnNumber, condition});
     if (response.getError()) {
       return {locations: [], breakpointId: null};
     }
@@ -513,7 +522,7 @@ export class DebuggerModel extends SDKModel<EventTypes> {
     const response = await this.agent.invoke_getPossibleBreakpoints({
       start: startLocation.payload(),
       end: endLocation ? endLocation.payload() : undefined,
-      restrictToFunction: restrictToFunction,
+      restrictToFunction,
     });
     if (response.getError() || !response.locations) {
       return [];
@@ -638,10 +647,7 @@ export class DebuggerModel extends SDKModel<EventTypes> {
 
     const pausedDetails =
         new DebuggerPausedDetails(this, callFrames, reason, auxData, breakpointIds, asyncStackTrace, asyncStackTraceId);
-
-    if (this.#expandCallFramesCallback) {
-      pausedDetails.callFrames = await this.#expandCallFramesCallback.call(null, pausedDetails.callFrames);
-    }
+    await this.#expandCallFrames(pausedDetails);
 
     if (this.continueToLocationCallback) {
       const callback = this.continueToLocationCallback;
@@ -660,6 +666,33 @@ export class DebuggerModel extends SDKModel<EventTypes> {
     } else {
       Common.EventTarget.fireEvent('DevTools.DebuggerPaused');
     }
+  }
+
+  /** Delegates to the DebuggerLanguagePlugin and potential attached source maps to expand inlined call frames */
+  async #expandCallFrames(pausedDetails: DebuggerPausedDetails): Promise<void> {
+    if (this.#expandCallFramesCallback) {
+      pausedDetails.callFrames = await this.#expandCallFramesCallback.call(null, pausedDetails.callFrames);
+    }
+
+    if (!Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.USE_SOURCE_MAP_SCOPES)) {
+      return;
+    }
+
+    // TODO(crbug.com/40277685): Support attaching/detaching source maps after pausing.
+    // Expanding call frames via source maps here is only suitable for the experiment prototype because
+    // we block until all relevant source maps are loaded.
+    // We should change this so the "Debugger Plugin" and "Source Map" have a bottle neck where they expand
+    // call frames and that bottleneck should support attaching/detaching source maps while paused.
+    const finalFrames: CallFrame[] = [];
+    for (const frame of pausedDetails.callFrames) {
+      const sourceMap = await this.sourceMapManager().sourceMapForClientPromise(frame.script);
+      if (sourceMap?.hasScopeInfo()) {
+        finalFrames.push(...sourceMap.expandCallFrame(frame));
+      } else {
+        finalFrames.push(frame);
+      }
+    }
+    pausedDetails.callFrames = finalFrames;
   }
 
   resumedScript(): void {
@@ -691,14 +724,6 @@ export class DebuggerModel extends SDKModel<EventTypes> {
         scriptLanguage, debugSymbols, embedderName);
     this.registerScript(script);
     this.dispatchEventToListeners(Events.ParsedScriptSource, script);
-
-    if (script.isInlineScript() && !script.hasSourceURL) {
-      if (script.isModule) {
-        Host.userMetrics.inlineScriptParsed(Host.UserMetrics.VMInlineScriptType.MODULE_SCRIPT);
-      } else {
-        Host.userMetrics.inlineScriptParsed(Host.UserMetrics.VMInlineScriptType.CLASSIC_SCRIPT);
-      }
-    }
 
     if (script.sourceMapURL && !hasSyntaxError) {
       this.#sourceMapManagerInternal.attachSourceMap(script, script.sourceURL, script.sourceMapURL);
@@ -892,7 +917,6 @@ export class DebuggerModel extends SDKModel<EventTypes> {
   }
 
   override dispose(): void {
-    this.#sourceMapManagerInternal.dispose();
     if (this.#debuggerId) {
       debuggerIdToModel.delete(this.#debuggerId);
     }
@@ -933,13 +957,16 @@ const debuggerIdToModel = new Map<string, DebuggerModel>();
  * Keep these in sync with WebCore::V8Debugger
  */
 export enum PauseOnExceptionsState {
+  /* eslint-disable @typescript-eslint/naming-convention -- Used by web_tests. */
   DontPauseOnExceptions = 'none',
   PauseOnAllExceptions = 'all',
   PauseOnCaughtExceptions = 'caught',
   PauseOnUncaughtExceptions = 'uncaught',
+  /* eslint-enable @typescript-eslint/naming-convention */
 }
 
 export enum Events {
+  /* eslint-disable @typescript-eslint/naming-convention -- Used by web_tests. */
   DebuggerWasEnabled = 'DebuggerWasEnabled',
   DebuggerWasDisabled = 'DebuggerWasDisabled',
   DebuggerPaused = 'DebuggerPaused',
@@ -951,6 +978,7 @@ export enum Events {
   CallFrameSelected = 'CallFrameSelected',
   DebuggerIsReadyToPause = 'DebuggerIsReadyToPause',
   ScriptSourceWasEdited = 'ScriptSourceWasEdited',
+  /* eslint-enable @typescript-eslint/naming-convention */
 }
 
 export type EventTypes = {
@@ -1137,9 +1165,14 @@ export class BreakLocation extends Location {
   }
 }
 
+export interface MissingDebugFiles {
+  resourceUrl: Platform.DevToolsPath.UrlString;
+  initiator: PageResourceLoadInitiator;
+}
+
 export interface MissingDebugInfoDetails {
   details: string;
-  resources: string[];
+  resources: MissingDebugFiles[];
 }
 
 export class CallFrame {
@@ -1154,12 +1187,13 @@ export class CallFrame {
   readonly #functionLocationInternal: Location|undefined;
   #returnValueInternal: RemoteObject|null;
   missingDebugInfoDetails: MissingDebugInfoDetails|null;
+  readonly exception: RemoteObject|null;
 
   readonly canBeRestarted: boolean;
 
   constructor(
       debuggerModel: DebuggerModel, script: Script, payload: Protocol.Debugger.CallFrame, inlineFrameIndex?: number,
-      functionName?: string) {
+      functionName?: string, exception: RemoteObject|null = null) {
     this.debuggerModel = debuggerModel;
     this.script = script;
     this.payload = payload;
@@ -1170,6 +1204,7 @@ export class CallFrame {
     this.functionName = functionName || payload.functionName;
     this.missingDebugInfoDetails = null;
     this.canBeRestarted = Boolean(payload.canBeRestarted);
+    this.exception = exception;
     for (let i = 0; i < payload.scopeChain.length; ++i) {
       const scope = new Scope(this, i);
       this.#scopeChainInternal.push(scope);
@@ -1184,13 +1219,16 @@ export class CallFrame {
         payload.returnValue ? this.debuggerModel.runtimeModel().createRemoteObject(payload.returnValue) : null;
   }
 
-  static fromPayloadArray(debuggerModel: DebuggerModel, callFrames: Protocol.Debugger.CallFrame[]): CallFrame[] {
+  static fromPayloadArray(
+      debuggerModel: DebuggerModel, callFrames: Protocol.Debugger.CallFrame[],
+      exception: RemoteObject|null): CallFrame[] {
     const result = [];
     for (let i = 0; i < callFrames.length; ++i) {
       const callFrame = callFrames[i];
       const script = debuggerModel.scriptForId(callFrame.location.scriptId);
       if (script) {
-        result.push(new CallFrame(debuggerModel, script, callFrame));
+        const ex = i === 0 ? exception : null;
+        result.push(new CallFrame(debuggerModel, script, callFrame, undefined, undefined, ex));
       }
     }
     return result;
@@ -1226,7 +1264,7 @@ export class CallFrame {
     }
 
     const evaluateResponse = await this.debuggerModel.agent.invoke_evaluateOnCallFrame(
-        {callFrameId: this.id, expression: expression, silent: true, objectGroup: 'backtrace'});
+        {callFrameId: this.id, expression, silent: true, objectGroup: 'backtrace'});
     if (evaluateResponse.getError() || evaluateResponse.exceptionDetails) {
       return null;
     }
@@ -1250,14 +1288,6 @@ export class CallFrame {
     const debuggerModel = this.debuggerModel;
     const runtimeModel = debuggerModel.runtimeModel();
 
-    // Assume backends either support both throwOnSideEffect and timeout options or neither.
-    const needsTerminationOptions = Boolean(options.throwOnSideEffect) || options.timeout !== undefined;
-    if (needsTerminationOptions &&
-        (runtimeModel.hasSideEffectSupport() === false ||
-         (runtimeModel.hasSideEffectSupport() === null && !await runtimeModel.checkSideEffectSupport()))) {
-      return {error: 'Side-effect checks not supported by backend.'};
-    }
-
     const evaluateOnCallFrameCallback = debuggerModel.getEvaluateOnCallFrameCallback();
     if (evaluateOnCallFrameCallback) {
       const result = await evaluateOnCallFrameCallback(this, options);
@@ -1279,7 +1309,7 @@ export class CallFrame {
     });
     const error = response.getError();
     if (error) {
-      return {error: error};
+      return {error};
     }
     return {object: runtimeModel.createRemoteObject(response.result), exceptionDetails: response.exceptionDetails};
   }
@@ -1314,6 +1344,12 @@ export interface ScopeChainEntry {
   description(): string;
 
   icon(): string|undefined;
+
+  /**
+   * Extra and/or synthetic properties that should be added to the `RemoteObject`
+   * returned by {@link ScopeChainEntry.object}.
+   */
+  extraProperties(): RemoteObjectProperty[];
 }
 
 export class Scope implements ScopeChainEntry {
@@ -1412,6 +1448,28 @@ export class Scope implements ScopeChainEntry {
   icon(): undefined {
     return undefined;
   }
+
+  extraProperties(): RemoteObjectProperty[] {
+    if (this.#ordinal !== 0 || this.#typeInternal !== Protocol.Debugger.ScopeType.Local ||
+        this.#callFrameInternal.script.isWasm()) {
+      return [];
+    }
+
+    const extraProperties = [];
+    const exception = this.#callFrameInternal.exception;
+    if (exception) {
+      extraProperties.push(new RemoteObjectProperty(
+          i18nString(UIStrings.exception), exception, undefined, undefined, undefined, undefined, undefined,
+          /* synthetic */ true));
+    }
+    const returnValue = this.#callFrameInternal.returnValue();
+    if (returnValue) {
+      extraProperties.push(new RemoteObjectProperty(
+          i18nString(UIStrings.returnValue), returnValue, undefined, undefined, undefined, undefined, undefined,
+          /* synthetic */ true, this.#callFrameInternal.setReturnValue.bind(this.#callFrameInternal)));
+    }
+    return extraProperties;
+  }
 }
 
 export class DebuggerPausedDetails {
@@ -1436,7 +1494,6 @@ export class DebuggerPausedDetails {
       breakpointIds: string[], asyncStackTrace?: Protocol.Runtime.StackTrace,
       asyncStackTraceId?: Protocol.Runtime.StackTraceId) {
     this.debuggerModel = debuggerModel;
-    this.callFrames = CallFrame.fromPayloadArray(debuggerModel, callFrames);
     this.reason = reason;
     this.auxData = auxData;
     this.breakpointIds = breakpointIds;
@@ -1444,9 +1501,10 @@ export class DebuggerPausedDetails {
       this.asyncStackTrace = this.cleanRedundantFrames(asyncStackTrace);
     }
     this.asyncStackTraceId = asyncStackTraceId;
+    this.callFrames = CallFrame.fromPayloadArray(debuggerModel, callFrames, this.exception());
   }
 
-  exception(): RemoteObject|null {
+  private exception(): RemoteObject|null {
     if (this.reason !== Protocol.Debugger.PausedEventReason.Exception &&
         this.reason !== Protocol.Debugger.PausedEventReason.PromiseRejection) {
       return null;
@@ -1458,11 +1516,6 @@ export class DebuggerPausedDetails {
     let stack: (Protocol.Runtime.StackTrace|undefined)|Protocol.Runtime.StackTrace = asyncStackTrace;
     let previous: Protocol.Runtime.StackTrace|null = null;
     while (stack) {
-      // TODO(crbug.com/1254259): Remove this post-processing step once the V8
-      // inspector back-end change propagated to Node LTS.
-      if (stack.description === 'async function' && stack.callFrames.length) {
-        stack.callFrames.shift();
-      }
       if (previous && !stack.callFrames.length) {
         previous.parent = stack.parent;
       } else {

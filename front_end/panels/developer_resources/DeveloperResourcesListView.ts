@@ -87,7 +87,7 @@ export class DeveloperResourcesListView extends UI.Widget.VBox {
         width: '80px',
         fixedWidth: true,
         sortable: true,
-        align: DataGrid.DataGrid.Align.Right,
+        align: DataGrid.DataGrid.Align.RIGHT,
       },
       {
         id: 'error-message',
@@ -104,15 +104,29 @@ export class DeveloperResourcesListView extends UI.Widget.VBox {
       refreshCallback: undefined,
       deleteCallback: undefined,
     });
-    this.dataGrid.setResizeMethod(DataGrid.DataGrid.ResizeMethod.Last);
+    this.dataGrid.setResizeMethod(DataGrid.DataGrid.ResizeMethod.LAST);
     this.dataGrid.setStriped(true);
     this.dataGrid.element.classList.add('flex-auto');
-    this.dataGrid.addEventListener(DataGrid.DataGrid.Events.SortingChanged, this.sortingChanged, this);
+    this.dataGrid.addEventListener(DataGrid.DataGrid.Events.SORTING_CHANGED, this.sortingChanged, this);
     this.dataGrid.setRowContextMenuCallback(this.populateContextMenu.bind(this));
 
     const dataGridWidget = this.dataGrid.asWidget();
     dataGridWidget.show(this.contentElement);
     this.setDefaultFocusedChild(dataGridWidget);
+  }
+
+  select(item: SDK.PageResourceLoader.PageResource): void {
+    const node = this.nodeForItem.get(item);
+    if (node) {
+      node.select();
+    }
+  }
+
+  selectedItem(): SDK.PageResourceLoader.PageResource|null {
+    if (!this.dataGrid.selectedNode) {
+      return null;
+    }
+    return (this.dataGrid.selectedNode as GridNode).item;
   }
 
   private populateContextMenu(

@@ -286,7 +286,7 @@
   visibility: hidden;
 }
 
-#network-container:not(.brief-mode) .data-container {
+#network-container.has-waterfall .data-container {
   overflow: hidden;
 }
 
@@ -376,6 +376,7 @@
 .network-frame-group-icon {
   display: inline-block;
   margin: -7px 1px;
+  vertical-align: baseline;
 }
 
 .network-frame-group-badge {

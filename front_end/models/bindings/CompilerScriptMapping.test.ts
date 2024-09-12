@@ -9,6 +9,7 @@ import {createTarget} from '../../testing/EnvironmentHelpers.js';
 import {describeWithMockConnection} from '../../testing/MockConnection.js';
 import {MockProtocolBackend} from '../../testing/MockScopeChain.js';
 import {encodeSourceMap} from '../../testing/SourceMapEncoder.js';
+import * as TextUtils from '../text_utils/text_utils.js';
 import * as Workspace from '../workspace/workspace.js';
 
 import * as Bindings from './bindings.js';
@@ -123,15 +124,16 @@ describeWithMockConnection('CompilerScriptMapping', () => {
     const metadata = await uiSourceCode.requestMetadata();
     assert.strictEqual(metadata?.contentSize, sourceContent.length);
 
-    const {content} = await uiSourceCode.requestContent();
-    assert.strictEqual(content, sourceContent);
+    const content = await uiSourceCode.requestContentData();
+    assert.instanceOf(content, TextUtils.ContentData.ContentData);
+    assert.strictEqual(content.text, sourceContent);
   });
 
   it('creates separate UISourceCodes for separate targets', async () => {
     // Create a main target and a worker child target.
     const mainTarget = createTarget({
       id: 'main' as Protocol.Target.TargetID,
-      type: SDK.Target.Type.Frame,
+      type: SDK.Target.Type.FRAME,
     });
     const workerTarget = createTarget({
       id: 'worker' as Protocol.Target.TargetID,

@@ -2,61 +2,79 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {assertNotNullOrUndefined} from '../../core/platform/platform.js';
+import type * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
-import {assertElement} from '../../testing/DOMHelpers.js';
-import {createTarget} from '../../testing/EnvironmentHelpers.js';
+import {createTarget, describeWithLocale} from '../../testing/EnvironmentHelpers.js';
 import {describeWithMockConnection} from '../../testing/MockConnection.js';
+import {getMainFrame, navigate} from '../../testing/ResourceTreeHelpers.js';
+import * as IconButton from '../../ui/components/icon_button/icon_button.js';
 
 import * as Security from './security.js';
 
+describeWithLocale('SecurityPanelSidebarTree', () => {
+  const {SecurityPanelSidebarTree, SecurityPanelSidebarTreeElement} = Security.SecurityPanel;
+
+  describe('updateOrigin', () => {
+    it('correctly updates the URL scheme highlighting', () => {
+      const origin = 'https://foo.bar' as Platform.DevToolsPath.UrlString;
+      const mainViewElement = new SecurityPanelSidebarTreeElement({
+        onSelect: () => undefined,
+        getIconForSecurityState: () => new IconButton.Icon.Icon(),
+        getTitleForSecurityState: () => document.createElement('span'),
+        className: 'main-view-element',
+      });
+      const tree = new SecurityPanelSidebarTree(mainViewElement, () => {});
+      tree.addOrigin(origin, Protocol.Security.SecurityState.Unknown);
+      assert.notExists(tree.contentElement.querySelector('.highlighted-url > .url-scheme-secure'));
+      assert.exists(tree.contentElement.querySelector('.highlighted-url > .url-scheme-unknown'));
+
+      tree.updateOrigin(origin, Protocol.Security.SecurityState.Secure);
+
+      assert.exists(tree.contentElement.querySelector('.highlighted-url > .url-scheme-secure'));
+      assert.notExists(tree.contentElement.querySelector('.highlighted-url > .url-scheme-unknown'));
+    });
+  });
+});
+
 describeWithMockConnection('SecurityPanel', () => {
-  const tests = (targetFactory: () => SDK.Target.Target) => {
-    let target: SDK.Target.Target;
+  let target: SDK.Target.Target;
+  let prerenderTarget: SDK.Target.Target;
 
-    beforeEach(() => {
-      target = targetFactory();
-    });
+  beforeEach(() => {
+    const tabTarget = createTarget({type: SDK.Target.Type.TAB});
+    prerenderTarget = createTarget({parentTarget: tabTarget, subtype: 'prerender'});
+    target = createTarget({parentTarget: tabTarget});
+  });
 
-    it('updates when security state changes', async () => {
-      const securityPanel = Security.SecurityPanel.SecurityPanel.instance({forceNew: true});
-      const securityModel = target.model(Security.SecurityModel.SecurityModel);
-      assertNotNullOrUndefined(securityModel);
-      const visibleSecurityState = {
-        securityState: Protocol.Security.SecurityState.Insecure,
-        securityStateIssueIds: [],
-        certificateSecurityState: null,
-      } as unknown as Security.SecurityModel.PageVisibleSecurityState;
-      securityModel.dispatchEventToListeners(
-          Security.SecurityModel.Events.VisibleSecurityStateChanged, visibleSecurityState);
+  it('updates when security state changes', async () => {
+    const securityPanel = Security.SecurityPanel.SecurityPanel.instance({forceNew: true});
+    const securityModel = target.model(Security.SecurityModel.SecurityModel);
+    assert.exists(securityModel);
+    const visibleSecurityState = {
+      securityState: Protocol.Security.SecurityState.Insecure,
+      securityStateIssueIds: [],
+      certificateSecurityState: null,
+    } as unknown as Security.SecurityModel.PageVisibleSecurityState;
+    securityModel.dispatchEventToListeners(
+        Security.SecurityModel.Events.VisibleSecurityStateChanged, visibleSecurityState);
 
-      assert.isTrue(securityPanel.mainView.contentElement.querySelector('.security-summary')
-                        ?.classList.contains('security-summary-insecure'));
+    assert.isTrue(securityPanel.mainView.contentElement.querySelector('.security-summary')
+                      ?.classList.contains('security-summary-insecure'));
 
-      visibleSecurityState.securityState = Protocol.Security.SecurityState.Secure;
-      securityModel.dispatchEventToListeners(
-          Security.SecurityModel.Events.VisibleSecurityStateChanged, visibleSecurityState);
+    visibleSecurityState.securityState = Protocol.Security.SecurityState.Secure;
+    securityModel.dispatchEventToListeners(
+        Security.SecurityModel.Events.VisibleSecurityStateChanged, visibleSecurityState);
 
-      assert.isFalse(securityPanel.mainView.contentElement.querySelector('.security-summary')
-                         ?.classList.contains('security-summary-insecure'));
-      assert.isTrue(securityPanel.mainView.contentElement.querySelector('.security-summary')
-                        ?.classList.contains('security-summary-secure'));
-    });
-  };
-
-  describe('without tab target', () => tests(createTarget));
-  describe('with tab target', () => tests(() => {
-                                const tabTarget = createTarget({type: SDK.Target.Type.Tab});
-                                createTarget({parentTarget: tabTarget, subtype: 'prerender'});
-                                return createTarget({parentTarget: tabTarget});
-                              }));
+    assert.isFalse(securityPanel.mainView.contentElement.querySelector('.security-summary')
+                       ?.classList.contains('security-summary-insecure'));
+    assert.isTrue(securityPanel.mainView.contentElement.querySelector('.security-summary')
+                      ?.classList.contains('security-summary-secure'));
+  });
 
   it('can switch to a different SecurityModel', async () => {
-    const tabTarget = createTarget({type: SDK.Target.Type.Tab});
-    const mainTarget = createTarget({parentTarget: tabTarget});
-    const mainSecurityModel = mainTarget.model(Security.SecurityModel.SecurityModel);
-    assertNotNullOrUndefined(mainSecurityModel);
+    const mainSecurityModel = target.model(Security.SecurityModel.SecurityModel);
+    assert.exists(mainSecurityModel);
     const securityPanel = Security.SecurityPanel.SecurityPanel.instance({forceNew: true});
 
     // Add the main target to the security panel.
@@ -72,9 +90,8 @@ describeWithMockConnection('SecurityPanel', () => {
                       ?.classList.contains('security-summary-insecure'));
 
     // Switch to the prerender target.
-    const prerenderTarget = createTarget({parentTarget: tabTarget, subtype: 'prerender'});
     const prerenderSecurityModel = prerenderTarget.model(Security.SecurityModel.SecurityModel);
-    assertNotNullOrUndefined(prerenderSecurityModel);
+    assert.exists(prerenderSecurityModel);
     securityPanel.modelAdded(prerenderSecurityModel);
     securityPanel.modelRemoved(mainSecurityModel);
 
@@ -92,25 +109,19 @@ describeWithMockConnection('SecurityPanel', () => {
                       ?.classList.contains('security-summary-secure'));
 
     // Check that the SecurityPanel listens to any PrimaryPageChanged event
-    const resourceTreeModel = mainTarget.model(SDK.ResourceTreeModel.ResourceTreeModel);
-    assertNotNullOrUndefined(resourceTreeModel);
     const sidebarTreeClearSpy = sinon.spy(securityPanel.sidebarTree, 'clearOrigins');
-    resourceTreeModel.dispatchEventToListeners(SDK.ResourceTreeModel.Events.PrimaryPageChanged, {
-      frame: {url: 'https://www.example.com'} as SDK.ResourceTreeModel.ResourceTreeFrame,
-      type: SDK.ResourceTreeModel.PrimaryPageChangeType.Navigation,
-    });
+    navigate(getMainFrame(target));
     assert.isTrue(sidebarTreeClearSpy.calledOnce);
   });
 
   it('shows \'reload page\' message when no data is available', async () => {
-    const target = createTarget();
     const securityModel = target.model(Security.SecurityModel.SecurityModel);
-    assertNotNullOrUndefined(securityModel);
+    assert.exists(securityModel);
     const securityPanel = Security.SecurityPanel.SecurityPanel.instance({forceNew: true});
 
     // Check that reload message is visible initially.
     const reloadMessage = securityPanel.sidebarTree.shadowRoot.querySelector('.security-main-view-reload-message');
-    assertElement(reloadMessage, HTMLLIElement);
+    assert.instanceOf(reloadMessage, HTMLLIElement);
     assert.isFalse(reloadMessage.classList.contains('hidden'));
 
     // Check that reload message is hidden when there is data to display.
@@ -126,12 +137,7 @@ describeWithMockConnection('SecurityPanel', () => {
     assert.isTrue(reloadMessage.classList.contains('hidden'));
 
     // Check that reload message is hidden after clearing data.
-    const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
-    assertNotNullOrUndefined(resourceTreeModel);
-    resourceTreeModel.dispatchEventToListeners(SDK.ResourceTreeModel.Events.PrimaryPageChanged, {
-      frame: {url: 'https://www.example.com'} as SDK.ResourceTreeModel.ResourceTreeFrame,
-      type: SDK.ResourceTreeModel.PrimaryPageChangeType.Navigation,
-    });
+    navigate(getMainFrame(target));
     assert.isFalse(reloadMessage.classList.contains('hidden'));
   });
 });

@@ -4,8 +4,8 @@
 
 import {assert} from 'chai';
 
-import {click, enableExperiment, getBrowserAndPages, step, typeText, waitFor} from '../../shared/helper.js';
-import {describe, it} from '../../shared/mocha-extensions.js';
+import {click, getBrowserAndPages, step, typeText, waitFor} from '../../shared/helper.js';
+
 import {
   addBreakpointForLine,
   openSourceCodeEditorForFile,
@@ -44,7 +44,6 @@ describe('Watch Expression Pane', () => {
 
   it('deobfuscates variable names', async () => {
     const {target, frontend} = getBrowserAndPages();
-    await enableExperiment('evaluate-expressions-with-source-maps');
 
     await openSourceCodeEditorForFile('sourcemap-scopes-minified.js', 'sourcemap-scopes-minified.html');
 

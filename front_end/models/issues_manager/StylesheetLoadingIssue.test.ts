@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as Platform from '../../core/platform/platform.js';
 import type * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 import * as Issues from '../../panels/issues/issues.js';
@@ -40,11 +39,11 @@ describeWithLocale('StylesheetLoadingIssue', () => {
     assert.lengthOf(stylesheetIssues, 1);
     const stylesheetIssue = stylesheetIssues[0];
 
-    assert.strictEqual(stylesheetIssue.getCategory(), IssuesManager.Issue.IssueCategory.Other);
+    assert.strictEqual(stylesheetIssue.getCategory(), IssuesManager.Issue.IssueCategory.OTHER);
     assert.deepStrictEqual(stylesheetIssue.sources(), [issueDetails.sourceCodeLocation]);
     const {url, requestId} = issueDetails.failedRequestInfo;
     assert.deepStrictEqual(stylesheetIssue.requests(), [{url, requestId}]);
-    assert.strictEqual(stylesheetIssue.getKind(), IssuesManager.Issue.IssueKind.PageError);
+    assert.strictEqual(stylesheetIssue.getKind(), IssuesManager.Issue.IssueKind.PAGE_ERROR);
     assert.isNotNull(stylesheetIssue.getDescription());
   });
 
@@ -63,9 +62,9 @@ describeWithLocale('StylesheetLoadingIssue', () => {
     assert.lengthOf(stylesheetIssues, 1);
     const stylesheetIssue = stylesheetIssues[0];
 
-    assert.strictEqual(stylesheetIssue.getCategory(), IssuesManager.Issue.IssueCategory.Other);
+    assert.strictEqual(stylesheetIssue.getCategory(), IssuesManager.Issue.IssueCategory.OTHER);
     assert.deepStrictEqual(stylesheetIssue.sources(), [issueDetails.sourceCodeLocation]);
-    assert.strictEqual(stylesheetIssue.getKind(), IssuesManager.Issue.IssueKind.PageError);
+    assert.strictEqual(stylesheetIssue.getKind(), IssuesManager.Issue.IssueKind.PAGE_ERROR);
     assert.isNotNull(stylesheetIssue.getDescription());
   });
 
@@ -119,7 +118,7 @@ describeWithLocale('StylesheetLoadingIssue', () => {
     const aggregator = new Issues.IssueAggregator.IssueAggregator(mockManager);
     for (const issue of issues) {
       mockManager.dispatchEventToListeners(
-          IssuesManager.IssuesManager.Events.IssueAdded, {issuesModel: mockModel, issue});
+          IssuesManager.IssuesManager.Events.ISSUE_ADDED, {issuesModel: mockModel, issue});
     }
 
     const aggregatedIssues = Array.from(aggregator.aggregatedIssues());
@@ -133,7 +132,7 @@ describeWithLocale('StylesheetLoadingIssue', () => {
         [issueDetails[2].sourceCodeLocation, issueDetails[3].sourceCodeLocation]);
     assert.deepStrictEqual(Array.from(aggregatedIssues[0].requests()), []);
     const {url, requestId} = issueDetails[3].failedRequestInfo as Protocol.Audits.FailedRequestInfo;
-    Platform.assertNotNullOrUndefined(requestId);
+    assert.exists(requestId);
     assert.deepStrictEqual(Array.from(aggregatedIssues[1].requests()), [{url, requestId}]);
   });
 });

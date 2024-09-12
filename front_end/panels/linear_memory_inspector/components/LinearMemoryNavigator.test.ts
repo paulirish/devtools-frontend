@@ -3,9 +3,7 @@
 // found in the LICENSE file.
 
 import {
-  assertElement,
   assertElements,
-  assertShadowRoot,
   getElementsWithinComponent,
   getElementWithinComponent,
   getEventPromise,
@@ -14,8 +12,6 @@ import {
 import {describeWithLocale} from '../../../testing/EnvironmentHelpers.js';
 
 import * as LinearMemoryInspectorComponents from './components.js';
-
-const {assert} = chai;
 
 export const NAVIGATOR_ADDRESS_SELECTOR = '[data-input]';
 export const NAVIGATOR_PAGE_BUTTON_SELECTOR = '[data-button=pagenavigation]';
@@ -34,7 +30,7 @@ describeWithLocale('LinearMemoryNavigator', () => {
     component.data = {
       address: '20',
       valid: true,
-      mode: LinearMemoryInspectorComponents.LinearMemoryNavigator.Mode.Submitted,
+      mode: LinearMemoryInspectorComponents.LinearMemoryNavigator.Mode.SUBMITTED,
       error: undefined,
       canGoBackInHistory: true,
       canGoForwardInHistory: true,
@@ -43,7 +39,7 @@ describeWithLocale('LinearMemoryNavigator', () => {
 
   async function assertNavigationEvents(eventType: string) {
     const shadowRoot = component.shadowRoot;
-    assertShadowRoot(shadowRoot);
+    assert.isNotNull(shadowRoot);
     const pageNavigationButtons = shadowRoot.querySelectorAll(`[data-button=${eventType}]`);
     assertElements(pageNavigationButtons, HTMLButtonElement);
     assert.lengthOf(pageNavigationButtons, 2);
@@ -58,16 +54,16 @@ describeWithLocale('LinearMemoryNavigator', () => {
     }
 
     assert.deepEqual(navigation, [
-      LinearMemoryInspectorComponents.LinearMemoryNavigator.Navigation.Backward,
-      LinearMemoryInspectorComponents.LinearMemoryNavigator.Navigation.Forward,
+      LinearMemoryInspectorComponents.LinearMemoryNavigator.Navigation.BACKWARD,
+      LinearMemoryInspectorComponents.LinearMemoryNavigator.Navigation.FORWARD,
     ]);
   }
 
   it('renders navigator address', () => {
     const shadowRoot = component.shadowRoot;
-    assertShadowRoot(shadowRoot);
+    assert.isNotNull(shadowRoot);
     const input = shadowRoot.querySelector(NAVIGATOR_ADDRESS_SELECTOR);
-    assertElement(input, HTMLInputElement);
+    assert.instanceOf(input, HTMLInputElement);
     assert.strictEqual(input.value, '20');
   });
 
@@ -75,16 +71,16 @@ describeWithLocale('LinearMemoryNavigator', () => {
     component.data = {
       address: '16',
       valid: true,
-      mode: LinearMemoryInspectorComponents.LinearMemoryNavigator.Mode.Submitted,
+      mode: LinearMemoryInspectorComponents.LinearMemoryNavigator.Mode.SUBMITTED,
       error: undefined,
       canGoBackInHistory: false,
       canGoForwardInHistory: false,
     };
 
     const shadowRoot = component.shadowRoot;
-    assertShadowRoot(shadowRoot);
+    assert.isNotNull(shadowRoot);
     const input = shadowRoot.querySelector(NAVIGATOR_ADDRESS_SELECTOR);
-    assertElement(input, HTMLInputElement);
+    assert.instanceOf(input, HTMLInputElement);
     assert.strictEqual(input.value, '16');
   });
 
@@ -93,9 +89,9 @@ describeWithLocale('LinearMemoryNavigator', () => {
         component, 'refreshrequested');
 
     const shadowRoot = component.shadowRoot;
-    assertShadowRoot(shadowRoot);
+    assert.isNotNull(shadowRoot);
     const refreshButton = shadowRoot.querySelector(NAVIGATOR_REFRESH_BUTTON_SELECTOR);
-    assertElement(refreshButton, HTMLButtonElement);
+    assert.instanceOf(refreshButton, HTMLButtonElement);
     refreshButton.click();
 
     assert.isNotNull(await eventPromise);
@@ -113,7 +109,7 @@ describeWithLocale('LinearMemoryNavigator', () => {
     component.data = {
       address: '0',
       valid: true,
-      mode: LinearMemoryInspectorComponents.LinearMemoryNavigator.Mode.Submitted,
+      mode: LinearMemoryInspectorComponents.LinearMemoryNavigator.Mode.SUBMITTED,
       error: undefined,
       canGoBackInHistory: false,
       canGoForwardInHistory: false,
@@ -139,7 +135,7 @@ describeWithLocale('LinearMemoryNavigator', () => {
     component.data = {
       address: invalidAddress,
       valid: false,
-      mode: LinearMemoryInspectorComponents.LinearMemoryNavigator.Mode.InvalidSubmit,
+      mode: LinearMemoryInspectorComponents.LinearMemoryNavigator.Mode.INVALID_SUBMIT,
       error,
       canGoBackInHistory: false,
       canGoForwardInHistory: false,
@@ -159,7 +155,7 @@ describeWithLocale('LinearMemoryNavigator', () => {
     component.data = {
       address: '60',
       valid: false,
-      mode: LinearMemoryInspectorComponents.LinearMemoryNavigator.Mode.Edit,
+      mode: LinearMemoryInspectorComponents.LinearMemoryNavigator.Mode.EDIT,
       error,
       canGoBackInHistory: false,
       canGoForwardInHistory: false,

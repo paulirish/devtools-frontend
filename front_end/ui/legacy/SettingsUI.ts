@@ -97,7 +97,7 @@ const createSettingSelect = function(
 
   let reloadWarning: HTMLElement|(Element | null) = (null as Element | null);
   if (requiresReload) {
-    reloadWarning = container.createChild('span', 'reload-warning hidden');
+    reloadWarning = container.createChild('p', 'reload-warning hidden');
     reloadWarning.textContent = i18nString(UIStrings.srequiresReload);
     ARIAUtils.markAsAlert(reloadWarning);
   }
@@ -186,7 +186,9 @@ export const createControlForSetting = function(
         setting: setting as Common.Settings.Setting<boolean>,
       };
       component.onchange = () => {
-        InspectorView.instance().displayReloadRequiredWarning(i18nString(UIStrings.oneOrMoreSettingsHaveChanged));
+        if (setting.reloadRequired()) {
+          InspectorView.instance().displayReloadRequiredWarning(i18nString(UIStrings.oneOrMoreSettingsHaveChanged));
+        }
       };
       return component;
     }

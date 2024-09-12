@@ -34,7 +34,7 @@ const UIStrings = {
   /**
    *@description Text in Service Worker Cache Views of the Application panel
    */
-  filterByPath: 'Filter by Path',
+  filterByPath: 'Filter by path',
   /**
    *@description Text in Service Worker Cache Views of the Application panel
    */
@@ -132,21 +132,21 @@ export class ServiceWorkerCacheView extends UI.View.SimpleView {
     this.refreshThrottler = new Common.Throttler.Throttler(300);
     this.refreshButton =
         new UI.Toolbar.ToolbarButton(i18nString(UIStrings.refresh), 'refresh', undefined, 'cache-storage.refresh');
-    this.refreshButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.refreshButtonClicked, this);
+    this.refreshButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, this.refreshButtonClicked, this);
     editorToolbar.appendToolbarItem(this.refreshButton);
 
     this.deleteSelectedButton = new UI.Toolbar.ToolbarButton(
         i18nString(UIStrings.deleteSelected), 'cross', undefined, 'cache-storage.delete-selected');
-    this.deleteSelectedButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, _event => {
+    this.deleteSelectedButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, _event => {
       void this.deleteButtonClicked(null);
     });
     editorToolbar.appendToolbarItem(this.deleteSelectedButton);
 
-    const entryPathFilterBox = new UI.Toolbar.ToolbarInput(i18nString(UIStrings.filterByPath), '', 1);
+    const entryPathFilterBox = new UI.Toolbar.ToolbarFilter(i18nString(UIStrings.filterByPath), 1);
     editorToolbar.appendToolbarItem(entryPathFilterBox);
     const entryPathFilterThrottler = new Common.Throttler.Throttler(300);
     this.entryPathFilter = '';
-    entryPathFilterBox.addEventListener(UI.Toolbar.ToolbarInput.Event.TextChanged, () => {
+    entryPathFilterBox.addEventListener(UI.Toolbar.ToolbarInput.Event.TEXT_CHANGED, () => {
       void entryPathFilterThrottler.schedule(() => {
         this.entryPathFilter = entryPathFilterBox.value();
         return this.updateData(true);
@@ -171,14 +171,14 @@ export class ServiceWorkerCacheView extends UI.View.SimpleView {
 
   override wasShown(): void {
     this.model.addEventListener(
-        SDK.ServiceWorkerCacheModel.Events.CacheStorageContentUpdated, this.cacheContentUpdated, this);
+        SDK.ServiceWorkerCacheModel.Events.CACHE_STORAGE_CONTENT_UPDATED, this.cacheContentUpdated, this);
     this.registerCSSFiles([serviceWorkerCacheViewsStyles]);
     void this.updateData(true);
   }
 
   override willHide(): void {
     this.model.removeEventListener(
-        SDK.ServiceWorkerCacheModel.Events.CacheStorageContentUpdated, this.cacheContentUpdated, this);
+        SDK.ServiceWorkerCacheModel.Events.CACHE_STORAGE_CONTENT_UPDATED, this.cacheContentUpdated, this);
   }
 
   private showPreview(preview: UI.Widget.Widget|null): void {
@@ -203,7 +203,7 @@ export class ServiceWorkerCacheView extends UI.View.SimpleView {
         id: 'response-type',
         title: i18n.i18n.lockedString('Response-Type'),
         weight: 1,
-        align: DataGrid.DataGrid.Align.Right,
+        align: DataGrid.DataGrid.Align.RIGHT,
         sortable: true,
       },
       {id: 'content-type', title: i18n.i18n.lockedString('Content-Type'), weight: 1, sortable: true},
@@ -211,7 +211,7 @@ export class ServiceWorkerCacheView extends UI.View.SimpleView {
         id: 'content-length',
         title: i18n.i18n.lockedString('Content-Length'),
         weight: 1,
-        align: DataGrid.DataGrid.Align.Right,
+        align: DataGrid.DataGrid.Align.RIGHT,
         sortable: true,
       },
       {
@@ -219,7 +219,7 @@ export class ServiceWorkerCacheView extends UI.View.SimpleView {
         title: i18nString(UIStrings.timeCached),
         width: '12em',
         weight: 1,
-        align: DataGrid.DataGrid.Align.Right,
+        align: DataGrid.DataGrid.Align.RIGHT,
         sortable: true,
       },
       {id: 'vary-header', title: i18n.i18n.lockedString('Vary Header'), weight: 1, sortable: true},
@@ -232,9 +232,9 @@ export class ServiceWorkerCacheView extends UI.View.SimpleView {
       editCallback: undefined,
     });
 
-    dataGrid.addEventListener(DataGrid.DataGrid.Events.SortingChanged, this.sortingChanged, this);
+    dataGrid.addEventListener(DataGrid.DataGrid.Events.SORTING_CHANGED, this.sortingChanged, this);
 
-    dataGrid.addEventListener(DataGrid.DataGrid.Events.SelectedNode, event => {
+    dataGrid.addEventListener(DataGrid.DataGrid.Events.SELECTED_NODE, event => {
       void this.previewCachedResponse(event.data.data as SDK.NetworkRequest.NetworkRequest);
     }, this);
     dataGrid.setStriped(true);
@@ -382,7 +382,8 @@ export class ServiceWorkerCacheView extends UI.View.SimpleView {
     if ((!this.cache.inBucket(storageBucket) || this.cache.cacheName !== cacheName)) {
       return;
     }
-    void this.refreshThrottler.schedule(() => Promise.resolve(this.updateData(true)), true);
+    void this.refreshThrottler.schedule(
+        () => Promise.resolve(this.updateData(true)), Common.Throttler.Scheduling.AS_SOON_AS_POSSIBLE);
   }
 
   private async previewCachedResponse(request: SDK.NetworkRequest.NetworkRequest): Promise<void> {

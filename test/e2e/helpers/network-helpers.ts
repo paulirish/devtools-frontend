@@ -11,9 +11,13 @@ import {
   getBrowserAndPages,
   goToResource,
   setCheckBox,
+  typeText,
   waitFor,
+  waitForAria,
   waitForFunction,
 } from '../../shared/helper.js';
+
+import {veImpression} from './visual-logging-helpers.js';
 
 const REQUEST_LIST_SELECTOR = '.network-log-grid tbody';
 
@@ -108,6 +112,10 @@ export async function setCacheDisabled(disabled: boolean): Promise<void> {
   await setCheckBox('[title^="Disable cache"]', disabled);
 }
 
+export async function setInvert(invert: boolean) {
+  await setCheckBox('[title="Invert"]', invert);
+}
+
 export async function setTimeWindow(): Promise<void> {
   const overviewGridCursorArea = await waitFor('.overview-grid-cursor-area');
   await overviewGridCursorArea.click({offset: {x: 0, y: 10}});
@@ -116,6 +124,30 @@ export async function setTimeWindow(): Promise<void> {
 export async function clearTimeWindow(): Promise<void> {
   const overviewGridCursorArea = await waitFor('.overview-grid-cursor-area');
   await overviewGridCursorArea.click({count: 2});
+}
+
+export async function setTextFilter(text: string): Promise<void> {
+  const toolbarHandle = await waitFor('.text-filter');
+  const input = await waitForAria('Filter', toolbarHandle);
+  await input.focus();
+  await typeText(text);
+}
+
+export async function getTextFilterContent(): Promise<string> {
+  const toolbarHandle = await waitFor('.text-filter');
+  const textFilterContent = toolbarHandle.evaluate(toolbar => {
+    const input = toolbar.shadowRoot?.querySelector('[aria-label="Filter"]');
+    return input?.textContent ?? '';
+  });
+  return textFilterContent;
+}
+
+export async function clearTextFilter(): Promise<void> {
+  const textFilterContent = await getTextFilterContent();
+  if (textFilterContent) {
+    const toolbarHandle = await waitFor('.text-filter');
+    await click('devtools-button', {root: toolbarHandle});
+  }
 }
 
 export async function getTextFromHeadersRow(row: puppeteer.ElementHandle<Element>) {
@@ -139,4 +171,61 @@ export async function elementContainsTextWithSelector(
     return [...node.querySelectorAll(selector)].map(node => node.textContent || '') || [];
   }, selector);
   return selectedElements.includes(textContent);
+}
+
+export function veImpressionForNetworkPanel(options?: {newFilterBar?: boolean}) {
+  const filterBar = options?.newFilterBar ?
+      [
+        veImpression('DropDown', 'request-types'),
+        veImpression('DropDown', 'more-filters'),
+        veImpression('Toggle', 'invert-filter'),
+        veImpression('TextField', 'filter'),
+      ] :
+      [
+        veImpression('DropDown', 'more-filters'),
+        veImpression(
+            'Section', 'filter-bitset',
+            [
+              veImpression('Item', 'all'),
+              veImpression('Item', 'FetchandXHR'),
+              veImpression('Item', 'Document'),
+              veImpression('Item', 'CSS'),
+              veImpression('Item', 'JavaScript'),
+              veImpression('Item', 'Font'),
+              veImpression('Item', 'Image'),
+              veImpression('Item', 'Media'),
+              veImpression('Item', 'Manifest'),
+              veImpression('Item', 'WebSocket'),
+              veImpression('Item', 'WebAssembly'),
+              veImpression('Item', 'Other'),
+            ]),
+        veImpression('TextField', 'filter'),
+        veImpression('Toggle', 'invert-filter'),
+      ];
+  return veImpression('Panel', 'network', [
+    veImpression('Toolbar', 'filter-bar', filterBar),
+    veImpression(
+        'Toolbar', 'network-main',
+        [
+          veImpression('Toggle', 'network.toggle-recording'),
+          veImpression('Action', 'network.clear'),
+          veImpression('Toggle', 'filter'),
+          veImpression('Toggle', 'search'),
+          veImpression('Action', 'network-conditions'),
+          veImpression('Action', 'import-har'),
+          veImpression('Action', 'export-har'),
+          veImpression('Toggle', 'network-log.preserve-log'),
+          veImpression('Toggle', 'cache-disabled'),
+          veImpression('DropDown', 'preferred-network-condition'),
+        ]),
+    veImpression('Timeline', 'network-overview'),
+    veImpression('Toggle', 'network-settings'),
+    veImpression('Link', 'learn-more'),
+    veImpression('TableHeader', 'name'),
+    veImpression('TableHeader', 'status'),
+    veImpression('TableHeader', 'type'),
+    veImpression('TableHeader', 'initiator'),
+    veImpression('TableHeader', 'size'),
+    veImpression('TableHeader', 'time'),
+  ]);
 }

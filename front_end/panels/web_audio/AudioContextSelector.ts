@@ -44,7 +44,7 @@ export class AudioContextSelector extends Common.ObjectWrapper.ObjectWrapper<Eve
     this.toolbarItemInternal = new UI.Toolbar.ToolbarItem(this.dropDown.element);
     this.toolbarItemInternal.setEnabled(false);
     this.toolbarItemInternal.setTitle(i18nString(UIStrings.audioContextS, {PH1: this.placeholderText}));
-    this.items.addEventListener(UI.ListModel.Events.ItemsReplaced, this.onListItemReplaced, this);
+    this.items.addEventListener(UI.ListModel.Events.ITEMS_REPLACED, this.onListItemReplaced, this);
     this.toolbarItemInternal.element.classList.add('toolbar-has-dropdown');
 
     this.selectedContextInternal = null;
@@ -92,7 +92,7 @@ export class AudioContextSelector extends Common.ObjectWrapper.ObjectWrapper<Eve
 
   createElementForItem(item: Protocol.WebAudio.BaseAudioContext): Element {
     const element = document.createElement('div');
-    const shadowRoot = UI.Utils.createShadowRootWithCoreStyles(
+    const shadowRoot = UI.UIUtils.createShadowRootWithCoreStyles(
         element, {cssFile: [audioContextSelectorStyles], delegatesFocus: undefined});
     const title = shadowRoot.createChild('div', 'title');
     UI.UIUtils.createTextChild(title, Platform.StringUtilities.trimEndWithMaxLength(this.titleFor(item), 100));
@@ -133,7 +133,7 @@ export class AudioContextSelector extends Common.ObjectWrapper.ObjectWrapper<Eve
       this.toolbarItemInternal.setTitle(i18nString(UIStrings.audioContextS, {PH1: this.titleFor(item)}));
     }
 
-    this.dispatchEventToListeners(Events.ContextSelected, item);
+    this.dispatchEventToListeners(Events.CONTEXT_SELECTED, item);
   }
 
   reset(): void {
@@ -150,9 +150,9 @@ export class AudioContextSelector extends Common.ObjectWrapper.ObjectWrapper<Eve
 }
 
 export const enum Events {
-  ContextSelected = 'ContextSelected',
+  CONTEXT_SELECTED = 'ContextSelected',
 }
 
 export type EventTypes = {
-  [Events.ContextSelected]: Protocol.WebAudio.BaseAudioContext|null,
+  [Events.CONTEXT_SELECTED]: Protocol.WebAudio.BaseAudioContext|null,
 };

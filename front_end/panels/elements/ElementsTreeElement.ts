@@ -37,6 +37,7 @@ import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import * as Protocol from '../../generated/protocol.js';
 import type * as IssuesManager from '../../models/issues_manager/issues_manager.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as CodeMirror from '../../third_party/codemirror.next/codemirror.next.js';
@@ -202,6 +203,14 @@ const UIStrings = {
    * to the Media Panel.
    */
   openMediaPanel: 'Jump to Media panel',
+  /**
+   *@description Text of a tooltip to redirect to another element in the Elements panel
+   */
+  showPopoverTarget: 'Show popover target',
+  /**
+   *@description Text of the tooltip for scroll adorner.
+   */
+  elementHasScrollableOverflow: 'This element has a scrollable overflow',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/elements/ElementsTreeElement.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -217,8 +226,8 @@ type OpeningTagContext = {
     adorners: Adorners.Adorner.Adorner[],
     styleAdorners: Adorners.Adorner.Adorner[],
     readonly adornersThrottler: Common.Throttler.Throttler,
-    slot?: Adorners.Adorner.Adorner,
     canAddAttributes: boolean,
+    slot?: Adorners.Adorner.Adorner,
 };
 
 type ClosingTagContext = {
@@ -261,6 +270,8 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     this.listItemElement.setAttribute(
         'jslog', `${VisualLogging.treeItem().parent('elementsTreeOutline').track({
           keydown: 'ArrowUp|ArrowDown|ArrowLeft|ArrowRight|Backspace|Delete|Enter|Space|Home|End',
+          drag: true,
+          click: true,
         })}`);
     this.contentElement = this.listItemElement.createChild('div');
     this.gutterContainer = this.contentElement.createChild('div', 'gutter-container');
@@ -303,6 +314,8 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
         const adorner = this.adorn(config);
         UI.Tooltip.Tooltip.install(adorner, i18nString(UIStrings.thisFrameWasIdentifiedAsAnAd));
       }
+
+      this.updateScrollAdorner();
     }
     this.expandAllButtonElement = null;
   }
@@ -472,7 +485,6 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
       this.tagTypeContext.slot = this.adornSlot(config, this.tagTypeContext);
       const deferredNode = nodeShortcut.deferredNode;
       this.tagTypeContext.slot.addEventListener('click', () => {
-        Host.userMetrics.badgeActivated(Host.UserMetrics.BadgeType.SLOT);
         deferredNode.resolve(node => {
           void Common.Revealer.reveal(node);
         });
@@ -758,6 +770,12 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     }
     let menuItem;
 
+    if (UI.ActionRegistry.ActionRegistry.instance().hasAction('freestyler.element-panel-context')) {
+      contextMenu.headerSection().appendAction(
+          'freestyler.element-panel-context',
+      );
+    }
+
     menuItem = contextMenu.clipboardSection().appendItem(
         i18nString(UIStrings.cut), treeOutline.performCopyOrCut.bind(treeOutline, true, this.nodeInternal),
         {disabled: !this.hasEditableNode(), jslogContext: 'cut'});
@@ -872,6 +890,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     const attr = this.buildAttributeDOM(container, ' ', '', null);
     attr.style.marginLeft = '2px';   // overrides the .editing margin rule
     attr.style.marginRight = '2px';  // overrides the .editing margin rule
+    attr.setAttribute('jslog', `${VisualLogging.value('new-attribute').track({change: true, resize: true})}`);
 
     const tag = this.listItemElement.getElementsByClassName('webkit-html-tag')[0];
     this.insertInLastAttributePosition(tag, attr);
@@ -1031,15 +1050,13 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
       this.tagNameEditingCommitted(element, newTagName, oldText, tagName, moveDirection);
     }
 
-    // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    function editingCancelled(this: ElementsTreeElement, element: Element, context: any): void {
+    function editingCancelled(this: ElementsTreeElement, element: Element, tagName: string|null): void {
       if (!tagNameElement) {
         return;
       }
       tagNameElement.removeEventListener('keyup', keyupListener, false);
       tagNameElement.removeEventListener('keydown', keydownListener, false);
-      this.editingCancelled(element, context);
+      this.editingCancelled(element, tagName);
     }
 
     tagNameElement.addEventListener('keyup', keyupListener, false);
@@ -1053,9 +1070,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     return true;
   }
 
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private updateEditorHandles(element: Element, config?: UI.InplaceEditor.Config<any>): void {
+  private updateEditorHandles<T>(element: Element, config?: UI.InplaceEditor.Config<T>): void {
     const editorHandles = UI.InplaceEditor.InplaceEditor.startEditing(element, config);
     if (!editorHandles) {
       this.editing = null;
@@ -1121,9 +1136,9 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
           },
         ]),
         TextEditor.Config.baseConfiguration(initialValue),
-        TextEditor.Config.closeBrackets,
+        TextEditor.Config.closeBrackets.instance(),
         TextEditor.Config.autocompletion.instance(),
-        CodeMirror.html.html(),
+        CodeMirror.html.html({autoCloseTags: false, selfClosingTags: true}),
         TextEditor.Config.domWordWrap.instance(),
         CodeMirror.EditorView.theme({
           '&.cm-editor': {maxHeight: '300px'},
@@ -1327,9 +1342,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     textNode.setNodeValue(newText, callback.bind(this));
   }
 
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private editingCancelled(_element: Element, _context: any): void {
+  private editingCancelled(_element: Element, _tagName: string|null): void {
     this.editing = null;
 
     // Need to restore attributes structure.
@@ -1566,6 +1579,12 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
 
     const hasText = (forceValue || value.length > 0);
     const attrSpanElement = (parentElement.createChild('span', 'webkit-html-attribute') as HTMLElement);
+    attrSpanElement.setAttribute(
+        'jslog', `${VisualLogging.value(name === 'style' ? 'style-attribute' : 'attribute').track({
+          change: true,
+          dblclick: true,
+        })}`);
+
     const attrNameElement = attrSpanElement.createChild('span', 'webkit-html-attribute-name');
     attrNameElement.textContent = name;
 
@@ -1612,6 +1631,13 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
       attrValueElement.appendChild(linkifySrcset.call(this, value));
     } else {
       setValueWithEntities.call(this, attrValueElement, value);
+    }
+
+    if (name === 'popovertarget') {
+      const linkedPart = value ? attrValueElement : attrNameElement;
+      void this.linkifyElementByRelation(
+          linkedPart, Protocol.DOM.GetElementByRelationRequestRelation.PopoverTarget,
+          i18nString(UIStrings.showPopoverTarget));
     }
 
     if (hasText) {
@@ -1671,6 +1697,24 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     return attrSpanElement;
   }
 
+  private async linkifyElementByRelation(
+      linkContainer: Element, relation: Protocol.DOM.GetElementByRelationRequestRelation,
+      tooltip: string): Promise<void> {
+    const relatedElementId = await this.nodeInternal.domModel().getElementByRelation(this.nodeInternal.id, relation);
+    const relatedElement = this.nodeInternal.domModel().nodeForId(relatedElementId);
+    if (!relatedElement) {
+      return;
+    }
+    const link = await Common.Linkifier.Linkifier.linkify(relatedElement, {
+      preventKeyboardFocus: true,
+      tooltip,
+      textContent: linkContainer.textContent || undefined,
+      isDynamicLink: true,
+    });
+    linkContainer.removeChildren();
+    linkContainer.append(link);
+  }
+
   private buildPseudoElementDOM(parentElement: DocumentFragment, pseudoElementName: string): void {
     const pseudoElement = parentElement.createChild('span', 'webkit-html-pseudo-element');
     pseudoElement.textContent = '::' + pseudoElementName;
@@ -1689,6 +1733,9 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     UI.UIUtils.createTextChild(tagElement, '<');
     const tagNameElement =
         tagElement.createChild('span', isClosingTag ? 'webkit-html-close-tag-name' : 'webkit-html-tag-name');
+    if (!isClosingTag) {
+      tagNameElement.setAttribute('jslog', `${VisualLogging.value('tag-name').track({change: true, dblclick: true})}`);
+    }
     tagNameElement.textContent = (isClosingTag ? '/' : '') + tagName;
     if (!isClosingTag) {
       if (node.hasAttributes()) {
@@ -1736,7 +1783,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     if (result) {
       result += text.substring(lastIndexAfterEntity);
     }
-    return {text: result || text, entityRanges: entityRanges};
+    return {text: result || text, entityRanges};
   }
 
   private nodeTitleInfo(updateRecord: UpdateRecord|null): DocumentFragment {
@@ -1794,6 +1841,8 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
 
         if (ElementsTreeElement.canShowInlineText(node)) {
           const textNodeElement = titleDOM.createChild('span', 'webkit-html-text-node');
+          textNodeElement.setAttribute(
+              'jslog', `${VisualLogging.value('text-node').track({change: true, dblclick: true})}`);
           const firstChild = node.firstChild;
           if (!firstChild) {
             throw new Error('ElementsTreeElement._nodeTitleInfo expects node.firstChild to be defined.');
@@ -1821,17 +1870,23 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
       case Node.TEXT_NODE:
         if (node.parentNode && node.parentNode.nodeName().toLowerCase() === 'script') {
           const newNode = titleDOM.createChild('span', 'webkit-html-text-node webkit-html-js-node');
+          newNode.setAttribute(
+              'jslog', `${VisualLogging.value('script-text-node').track({change: true, dblclick: true})}`);
           const text = node.nodeValue();
           newNode.textContent = text.replace(/^[\n\r]+|\s+$/g, '');
           void CodeHighlighter.CodeHighlighter.highlightNode(newNode, 'text/javascript').then(updateSearchHighlight);
         } else if (node.parentNode && node.parentNode.nodeName().toLowerCase() === 'style') {
           const newNode = titleDOM.createChild('span', 'webkit-html-text-node webkit-html-css-node');
+          newNode.setAttribute(
+              'jslog', `${VisualLogging.value('css-text-node').track({change: true, dblclick: true})}`);
           const text = node.nodeValue();
           newNode.textContent = text.replace(/^[\n\r]+|\s+$/g, '');
           void CodeHighlighter.CodeHighlighter.highlightNode(newNode, 'text/css').then(updateSearchHighlight);
         } else {
           UI.UIUtils.createTextChild(titleDOM, '"');
           const textNodeElement = titleDOM.createChild('span', 'webkit-html-text-node');
+          textNodeElement.setAttribute(
+              'jslog', `${VisualLogging.value('text-node').track({change: true, dblclick: true})}`);
           const result = this.convertWhitespaceToEntities(node.nodeValue());
           textNodeElement.textContent = Platform.StringUtilities.collapseWhitespace(result.text);
           UI.UIUtils.highlightRangesWithStyleClass(textNodeElement, result.entityRanges, 'webkit-html-entity-value');
@@ -1987,7 +2042,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
         if (style.parentRule && style.parentRule.isUserAgent()) {
           continue;
         }
-        if (cascade.propertyState(property) !== SDK.CSSMatchedStyles.PropertyState.Active) {
+        if (cascade.propertyState(property) !== SDK.CSSMatchedStyles.PropertyState.ACTIVE) {
           continue;
         }
         lines.push(`${indent}${property.name}: ${property.value};`);
@@ -2179,7 +2234,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     const containerType = styles.get('container-type');
     const contain = styles.get('contain');
     const isContainer =
-        SDK.CSSContainerQuery.getQueryAxis(`${containerType} ${contain}`) !== SDK.CSSContainerQuery.QueryAxis.None;
+        SDK.CSSContainerQuery.getQueryAxis(`${containerType} ${contain}`) !== SDK.CSSContainerQuery.QueryAxis.NONE;
 
     if (isGrid) {
       this.pushGridAdorner(this.tagTypeContext, isSubgrid);
@@ -2215,8 +2270,6 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     const onClick = ((() => {
                        if (adorner.isActive()) {
                          node.domModel().overlayModel().highlightGridInPersistentOverlay(nodeId);
-                         Host.userMetrics.badgeActivated(
-                             isSubgrid ? Host.UserMetrics.BadgeType.SUBGRID : Host.UserMetrics.BadgeType.GRID);
                        } else {
                          node.domModel().overlayModel().hideGridInPersistentOverlay(nodeId);
                        }
@@ -2229,7 +2282,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     });
 
     node.domModel().overlayModel().addEventListener(
-        SDK.OverlayModel.Events.PersistentGridOverlayStateChanged, event => {
+        SDK.OverlayModel.Events.PERSISTENT_GRID_OVERLAY_STATE_CHANGED, event => {
           const {nodeId: eventNodeId, enabled} = event.data;
           if (eventNodeId !== nodeId) {
             return;
@@ -2258,7 +2311,6 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
                        const model = node.domModel().overlayModel();
                        if (adorner.isActive()) {
                          model.highlightScrollSnapInPersistentOverlay(nodeId);
-                         Host.userMetrics.badgeActivated(Host.UserMetrics.BadgeType.SCROLL_SNAP);
                        } else {
                          model.hideScrollSnapInPersistentOverlay(nodeId);
                        }
@@ -2272,7 +2324,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     });
 
     node.domModel().overlayModel().addEventListener(
-        SDK.OverlayModel.Events.PersistentScrollSnapOverlayStateChanged, event => {
+        SDK.OverlayModel.Events.PERSISTENT_SCROLL_SNAP_OVERLAY_STATE_CHANGED, event => {
           const {nodeId: eventNodeId, enabled} = event.data;
           if (eventNodeId !== nodeId) {
             return;
@@ -2302,7 +2354,6 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
                        const model = node.domModel().overlayModel();
                        if (adorner.isActive()) {
                          model.highlightFlexContainerInPersistentOverlay(nodeId);
-                         Host.userMetrics.badgeActivated(Host.UserMetrics.BadgeType.FLEX);
                        } else {
                          model.hideFlexContainerInPersistentOverlay(nodeId);
                        }
@@ -2316,7 +2367,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     });
 
     node.domModel().overlayModel().addEventListener(
-        SDK.OverlayModel.Events.PersistentFlexContainerOverlayStateChanged, event => {
+        SDK.OverlayModel.Events.PERSISTENT_FLEX_CONTAINER_OVERLAY_STATE_CHANGED, event => {
           const {nodeId: eventNodeId, enabled} = event.data;
           if (eventNodeId !== nodeId) {
             return;
@@ -2347,7 +2398,6 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
                        const model = node.domModel().overlayModel();
                        if (adorner.isActive()) {
                          model.highlightContainerQueryInPersistentOverlay(nodeId);
-                         Host.userMetrics.badgeActivated(Host.UserMetrics.BadgeType.CONTAINER);
                        } else {
                          model.hideContainerQueryInPersistentOverlay(nodeId);
                        }
@@ -2361,7 +2411,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     });
 
     node.domModel().overlayModel().addEventListener(
-        SDK.OverlayModel.Events.PersistentContainerQueryOverlayStateChanged, event => {
+        SDK.OverlayModel.Events.PERSISTENT_CONTAINER_QUERY_OVERLAY_STATE_CHANGED, event => {
           const {nodeId: eventNodeId, enabled} = event.data;
           if (eventNodeId !== nodeId) {
             return;
@@ -2399,6 +2449,30 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
 
     context.styleAdorners.push(adorner);
   }
+
+  updateScrollAdorner(): void {
+    if (!isOpeningTag(this.tagTypeContext)) {
+      return;
+    }
+    // Check if the node is scrollable, or if it's the <html> element and the document is scrollable because the top-level document (#document) doesn't have a corresponding tree element.
+    if ((this.node().nodeName() === 'HTML' && this.node().ownerDocument?.isScrollable()) ||
+        (this.node().nodeName() !== '#document' && this.node().isScrollable())) {
+      this.pushScrollAdorner();
+    } else {
+      const scrollAdorner = this.tagTypeContext.adorners.find(x => x.name === 'scroll');
+      if (scrollAdorner) {
+        this.removeAdorner(scrollAdorner, this.tagTypeContext);
+      }
+    }
+  }
+
+  pushScrollAdorner(): void {
+    const config = ElementsComponents.AdornerManager.getRegisteredAdorner(
+        ElementsComponents.AdornerManager.RegisteredAdorners.SCROLL);
+    const adorner = this.adorn(config);
+    UI.Tooltip.Tooltip.install(adorner, i18nString(UIStrings.elementHasScrollableOverflow));
+    adorner.classList.add('scroll');
+  }
 }
 
 export const InitialChildrenLimit = 500;
@@ -2432,7 +2506,7 @@ export interface EditorHandles {
 // child of a tree outline.
 function loggingParentProvider(e: Element): Element|undefined {
   const treeElement = UI.TreeOutline.TreeElement.getTreeElementBylistItemNode(e);
-  return treeElement?.treeOutline?.element;
+  return treeElement?.treeOutline?.contentElement;
 }
 
 VisualLogging.registerParentProvider('elementsTreeOutline', loggingParentProvider);

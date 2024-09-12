@@ -64,7 +64,7 @@ export class RPCInterface implements WorkerInterface, HostInterface {
   }
 
   evaluate(expression: string, context: Chrome.DevTools.RawLocation, stopId: unknown):
-      Promise<Chrome.DevTools.RemoteObject|null> {
+      Promise<Chrome.DevTools.RemoteObject|Chrome.DevTools.ForeignObject|null> {
     if (this.plugin.evaluate) {
       return this.plugin.evaluate(expression, context, stopId);
     }
@@ -104,7 +104,8 @@ export class RPCInterface implements WorkerInterface, HostInterface {
     return this.plugin.removeRawModule(rawModuleId);
   }
   getFunctionInfo(rawLocation: Chrome.DevTools.RawLocation):
-      Promise<{frames: Chrome.DevTools.FunctionInfo[]}|{missingSymbolFiles: string[]}> {
+      Promise<{frames: Chrome.DevTools.FunctionInfo[], missingSymbolFiles: string[]}|
+              {frames: Chrome.DevTools.FunctionInfo[]}|{missingSymbolFiles: string[]}> {
     return this.plugin.getFunctionInfo(rawLocation);
   }
   getInlinedFunctionRanges(rawLocation: Chrome.DevTools.RawLocation): Promise<Chrome.DevTools.RawLocationRange[]> {

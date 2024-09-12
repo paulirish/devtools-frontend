@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Host from '../../../../core/host/host.js';
 import * as Explain from '../../../../panels/explain/explain.js';
 import * as FrontendHelpers from '../../../../testing/EnvironmentHelpers.js';
 import * as ComponentHelpers from '../../helpers/helpers.js';
@@ -19,6 +20,7 @@ const component = new ConsoleInsight(
       async buildPrompt() {
         return {
           prompt: '',
+          isPageReloadRecommended: false,
           sources: [
             {
               type: Explain.SourceType.MESSAGE,
@@ -71,11 +73,11 @@ Links: [https://example.com](https://example.com)
 Images: ![https://example.com](https://example.com)
 `,
               metadata: {},
+              completed: true,
             };
           },
+      registerClientEvent: () => Promise.resolve({}),
     },
-    {
-      isSyncActive: true,
-      accountEmail: 'some-email',
-    });
+
+    Host.AidaClient.AidaAccessPreconditions.AVAILABLE);
 document.getElementById('container')?.appendChild(component);

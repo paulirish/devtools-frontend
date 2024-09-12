@@ -7,23 +7,24 @@ import type * as puppeteer from 'puppeteer-core';
 
 import {
   $,
-  platform,
-  waitForElementWithTextContent,
   $$,
   click,
   clickElement,
   getBrowserAndPages,
   pasteText,
+  platform,
   waitFor,
+  waitForAria,
+  waitForElementWithTextContent,
   waitForFunction,
   waitForNone,
 } from '../../shared/helper.js';
 
-const NEW_HEAP_SNAPSHOT_BUTTON = 'button[aria-label="Take heap snapshot"]';
+const NEW_HEAP_SNAPSHOT_BUTTON = 'devtools-button[aria-label="Take heap snapshot"]';
 const MEMORY_PANEL_CONTENT = 'div[aria-label="Memory panel"]';
 const PROFILE_TREE_SIDEBAR = 'div.profiles-tree-sidebar';
 export const MEMORY_TAB_ID = '#tab-heap-profiler';
-const CLASS_FILTER_INPUT = 'div[aria-placeholder="Class filter"]';
+const CLASS_FILTER_INPUT = 'div[aria-placeholder="Filter by class"]';
 const SELECTED_RESULT = '#profile-views table.data tr.data-grid-data-grid-node.revealed.parent.selected';
 
 export async function navigateToMemoryTab() {
@@ -32,12 +33,20 @@ export async function navigateToMemoryTab() {
   await waitFor(PROFILE_TREE_SIDEBAR);
 }
 
+export async function takeDetachedElementsProfile() {
+  const radioButton = await $('//label[text()="Detached elements"]', undefined, 'xpath');
+  await clickElement(radioButton);
+  await click('devtools-button[aria-label="Obtain detached elements"]');
+  await waitForNone('.heap-snapshot-sidebar-tree-item.wait');
+  await waitFor('.heap-snapshot-sidebar-tree-item.selected');
+}
+
 export async function takeAllocationProfile() {
   const radioButton = await $('//label[text()="Allocation sampling"]', undefined, 'xpath');
   await clickElement(radioButton);
-  await click('button[aria-label="Start heap profiling"]');
+  await click('devtools-button[aria-label="Start heap profiling"]');
   await new Promise(r => setTimeout(r, 200));
-  await click('button[aria-label="Stop heap profiling"]');
+  await click('devtools-button[aria-label="Stop heap profiling"]');
   await waitForNone('.heap-snapshot-sidebar-tree-item.wait');
   await waitFor('.heap-snapshot-sidebar-tree-item.selected');
 }
@@ -45,22 +54,26 @@ export async function takeAllocationProfile() {
 export async function takeAllocationTimelineProfile({recordStacks}: {recordStacks: boolean} = {
   recordStacks: false,
 }) {
-  const radioButton = await $('//label[text()="Allocation instrumentation on timeline"]', undefined, 'xpath');
+  const radioButton = await $('//label[text()="Allocations on timeline"]', undefined, 'xpath');
   await clickElement(radioButton);
   if (recordStacks) {
-    await click('[title="Record stack traces of allocations (extra performance overhead)"]');
+    await click('[title="Allocation stack traces (more overhead)"]');
   }
-  await click('button[aria-label="Start recording heap profile"]');
+  await click('devtools-button[aria-label="Start recording heap profile"]');
   await new Promise(r => setTimeout(r, 200));
-  await click('button[aria-label="Stop recording heap profile"]');
+  await click('devtools-button[aria-label="Stop recording heap profile"]');
   await waitForNone('.heap-snapshot-sidebar-tree-item.wait');
   await waitFor('.heap-snapshot-sidebar-tree-item.selected');
 }
 
-export async function takeHeapSnapshot() {
+export async function takeHeapSnapshot(name: string = 'Snapshot 1') {
   await click(NEW_HEAP_SNAPSHOT_BUTTON);
   await waitForNone('.heap-snapshot-sidebar-tree-item.wait');
-  await waitFor('.heap-snapshot-sidebar-tree-item.selected');
+  await waitForFunction(async () => {
+    const selected = await waitFor('.heap-snapshot-sidebar-tree-item.selected');
+    const title = await waitFor('span.title', selected);
+    return (await title.evaluate(e => e.textContent)) === name ? title : undefined;
+  });
 }
 
 export async function waitForHeapSnapshotData() {
@@ -131,7 +144,7 @@ export async function setSearchFilter(text: string) {
 
 export async function waitForSearchResultNumber(results: number) {
   const findMatch = async () => {
-    const currentMatch = await waitFor('label[for=\'search-input-field\']');
+    const currentMatch = await waitFor('.search-results-matches');
     const currentTextContent = currentMatch && await currentMatch.evaluate(el => el.textContent);
     if (currentTextContent && currentTextContent.endsWith(` ${results}`)) {
       return currentMatch;
@@ -144,7 +157,7 @@ export async function waitForSearchResultNumber(results: number) {
 export async function findSearchResult(searchResult: string, pollIntrerval: number = 500) {
   const {frontend} = getBrowserAndPages();
   const match = await waitFor('#profile-views table.data');
-  const matches = await waitFor('label.search-results-matches');
+  const matches = await waitFor(' .search-results-matches');
   const matchesText = await matches.evaluate(async element => {
     return element.textContent;
   });
@@ -153,7 +166,7 @@ export async function findSearchResult(searchResult: string, pollIntrerval: numb
   } else {
     await waitForFunction(async () => {
       const selectedBefore = await waitFor(SELECTED_RESULT);
-      await click('[aria-label="Search next"]');
+      await click('[aria-label="Show next result"]');
       // Wait until the click has taken effect by checking that the selected
       // result has changed. This is done to prevent the assertion afterwards
       // from happening before the next result is fully loaded.
@@ -296,14 +309,18 @@ export async function expandFocusedRow() {
   await waitFor('.selected.data-grid-data-grid-node.expanded');
 }
 
+function parseNumberWithSpaces(number: string): number {
+  return parseInt(number.replaceAll('\xa0', ''), 10);
+}
+
 async function getSizesFromRow(row: puppeteer.ElementHandle<Element>) {
   const numericData = await $$('.numeric-column>.profile-multiple-values>span', row);
   assert.strictEqual(numericData.length, 4);
-  function readNumber(e: Element) {
-    return parseInt((e.textContent as string).replaceAll('\xa0', ''), 10);
+  function readNumber(e: Element): string {
+    return e.textContent as string;
   }
-  const shallowSize = await numericData[0].evaluate(readNumber);
-  const retainedSize = await numericData[2].evaluate(readNumber);
+  const shallowSize = parseNumberWithSpaces(await numericData[0].evaluate(readNumber));
+  const retainedSize = parseNumberWithSpaces(await numericData[2].evaluate(readNumber));
   assert.isTrue(retainedSize >= shallowSize);
   return {shallowSize, retainedSize};
 }
@@ -313,8 +330,9 @@ export async function getSizesFromSelectedRow() {
   return await getSizesFromRow(row);
 }
 
-async function getCategoryRow(text: string) {
-  return await waitFor(`//td[text()="${text}"]/ancestor::tr`, undefined, undefined, 'xpath');
+export async function getCategoryRow(text: string, wait: boolean = true) {
+  const selector = `//td[text()="${text}"]/ancestor::tr`;
+  return await (wait ? waitFor(selector, undefined, undefined, 'xpath') : $(selector, undefined, 'xpath'));
 }
 
 export async function getSizesFromCategoryRow(text: string) {
@@ -326,4 +344,40 @@ export async function getDistanceFromCategoryRow(text: string) {
   const row = await getCategoryRow(text);
   const numericColumns = await $$('.numeric-column', row);
   return await numericColumns[0].evaluate(e => parseInt(e.textContent as string, 10));
+}
+
+export async function getCountFromCategoryRow(text: string) {
+  const row = await getCategoryRow(text);
+  const countSpan = await waitFor('.objects-count', row);
+  return await countSpan.evaluate(e => parseInt((e.textContent ?? '').substring(1), 10));
+}
+
+export async function getAddedCountFromComparisonRow(text: string) {
+  const row = await getCategoryRow(text);
+  const addedCountCell = await waitFor('.addedCount-column', row);
+  const countText = await addedCountCell.evaluate(e => e.textContent ?? '');
+  return parseNumberWithSpaces(countText);
+}
+
+export async function clickOnContextMenuForRetainer(retainerName: string, menuItem: string) {
+  const retainersPane = await waitFor('.retaining-paths-view');
+  const element = await waitFor(`//span[text()="${retainerName}"]`, retainersPane, undefined, 'xpath');
+  await clickElement(element, {clickOptions: {button: 'right'}});
+  const button = await waitForAria(menuItem);
+  await clickElement(button);
+}
+
+export async function restoreIgnoredRetainers() {
+  const element = await waitFor('devtools-button[aria-label="Restore ignored retainers"]');
+  await clickElement(element);
+}
+
+export async function setFilterDropdown(filter: string) {
+  const select = await waitFor('select.toolbar-item[aria-label="Filter"]');
+  await select.select(filter);
+}
+
+export async function checkExposeInternals() {
+  const element = await waitForElementWithTextContent('Internals with implementation details');
+  await clickElement(element);
 }

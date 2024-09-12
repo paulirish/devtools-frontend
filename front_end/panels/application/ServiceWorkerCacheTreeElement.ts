@@ -83,16 +83,16 @@ export class ServiceWorkerCacheTreeElement extends ExpandableApplicationPanelTre
     for (const cache of model.caches()) {
       this.addCache(model, cache);
     }
-    model.addEventListener(SDK.ServiceWorkerCacheModel.Events.CacheAdded, this.cacheAdded, this);
-    model.addEventListener(SDK.ServiceWorkerCacheModel.Events.CacheRemoved, this.cacheRemoved, this);
+    model.addEventListener(SDK.ServiceWorkerCacheModel.Events.CACHE_ADDED, this.cacheAdded, this);
+    model.addEventListener(SDK.ServiceWorkerCacheModel.Events.CACHE_REMOVED, this.cacheRemoved, this);
   }
 
   private serviceWorkerCacheModelRemoved(model: SDK.ServiceWorkerCacheModel.ServiceWorkerCacheModel): void {
     for (const cache of model.caches()) {
       this.removeCache(model, cache);
     }
-    model.removeEventListener(SDK.ServiceWorkerCacheModel.Events.CacheAdded, this.cacheAdded, this);
-    model.removeEventListener(SDK.ServiceWorkerCacheModel.Events.CacheRemoved, this.cacheRemoved, this);
+    model.removeEventListener(SDK.ServiceWorkerCacheModel.Events.CACHE_ADDED, this.cacheAdded, this);
+    model.removeEventListener(SDK.ServiceWorkerCacheModel.Events.CACHE_REMOVED, this.cacheRemoved, this);
     this.swCacheModels.delete(model);
   }
 
@@ -163,7 +163,7 @@ export class SWCacheTreeElement extends ApplicationPanelTreeElement {
     } else {
       cacheName = cache.cacheName;
     }
-    super(resourcesPanel, cacheName, false);
+    super(resourcesPanel, cacheName, false, 'cache-storage-instance');
     this.model = model;
     this.cache = cache;
     this.view = null;

@@ -6,14 +6,12 @@ import type * as Platform from '../../../../core/platform/platform.js';
 import * as SDK from '../../../../core/sdk/sdk.js';
 import * as Protocol from '../../../../generated/protocol.js';
 import {assertGridContents, getCellByIndexes} from '../../../../testing/DataGridHelpers.js';
-import {assertShadowRoot, renderElementIntoDOM} from '../../../../testing/DOMHelpers.js';
+import {renderElementIntoDOM} from '../../../../testing/DOMHelpers.js';
 import {describeWithEnvironment} from '../../../../testing/EnvironmentHelpers.js';
 import type * as DataGrid from '../../../../ui/components/data_grid/data_grid.js';
 import * as Coordinator from '../../../../ui/components/render_coordinator/render_coordinator.js';
 
 import * as PreloadingComponents from './components.js';
-
-const {assert} = chai;
 
 const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
 
@@ -45,7 +43,7 @@ describeWithEnvironment('PreloadingGrid', () => {
                 action: Protocol.Preload.SpeculationAction.Prefetch,
                 url: 'https://example.com/prefetched.html' as Platform.DevToolsPath.UrlString,
               },
-              status: SDK.PreloadingModel.PreloadingStatus.Running,
+              status: SDK.PreloadingModel.PreloadingStatus.RUNNING,
               prefetchStatus: null,
               requestId: 'requestId:1' as Protocol.Network.RequestId,
               ruleSetIds: ['ruleSetId:0.1'] as Protocol.Preload.RuleSetId[],
@@ -89,7 +87,7 @@ describeWithEnvironment('PreloadingGrid', () => {
                 action: Protocol.Preload.SpeculationAction.Prefetch,
                 url: 'https://cross-origin.example.com/prefetched.html' as Platform.DevToolsPath.UrlString,
               },
-              status: SDK.PreloadingModel.PreloadingStatus.Running,
+              status: SDK.PreloadingModel.PreloadingStatus.RUNNING,
               prefetchStatus: null,
               requestId: 'requestId:1' as Protocol.Network.RequestId,
               ruleSetIds: ['ruleSetId:0.1'] as Protocol.Preload.RuleSetId[],
@@ -133,7 +131,7 @@ describeWithEnvironment('PreloadingGrid', () => {
                 action: Protocol.Preload.SpeculationAction.Prefetch,
                 url: 'https://example.com/prefetched.html' as Platform.DevToolsPath.UrlString,
               },
-              status: SDK.PreloadingModel.PreloadingStatus.Running,
+              status: SDK.PreloadingModel.PreloadingStatus.RUNNING,
               prefetchStatus: null,
               requestId: 'requestId:1' as Protocol.Network.RequestId,
               ruleSetIds: ['ruleSetId:0.1'] as Protocol.Preload.RuleSetId[],
@@ -179,7 +177,7 @@ describeWithEnvironment('PreloadingGrid', () => {
                   action: Protocol.Preload.SpeculationAction.Prefetch,
                   url: 'https://example.com/rule-set-missing.html' as Platform.DevToolsPath.UrlString,
                 },
-                status: SDK.PreloadingModel.PreloadingStatus.Running,
+                status: SDK.PreloadingModel.PreloadingStatus.RUNNING,
                 prefetchStatus: null,
                 requestId: 'requestId:1' as Protocol.Network.RequestId,
                 ruleSetIds: ['ruleSetId:0.1'] as Protocol.Preload.RuleSetId[],
@@ -196,7 +194,7 @@ describeWithEnvironment('PreloadingGrid', () => {
                   action: Protocol.Preload.SpeculationAction.Prefetch,
                   url: 'https://example.com/multiple-rule-sets.html' as Platform.DevToolsPath.UrlString,
                 },
-                status: SDK.PreloadingModel.PreloadingStatus.Running,
+                status: SDK.PreloadingModel.PreloadingStatus.RUNNING,
                 prefetchStatus: null,
                 requestId: 'requestId:2' as Protocol.Network.RequestId,
                 ruleSetIds: ['ruleSetId:0.2', 'ruleSetId:0.3'] as Protocol.Preload.RuleSetId[],
@@ -257,7 +255,7 @@ describeWithEnvironment('PreloadingGrid', () => {
                 action: Protocol.Preload.SpeculationAction.Prerender,
                 url: 'https://example.com/prerendered.html' as Platform.DevToolsPath.UrlString,
               },
-              status: SDK.PreloadingModel.PreloadingStatus.Failure,
+              status: SDK.PreloadingModel.PreloadingStatus.FAILURE,
               prerenderStatus: Protocol.Preload.PrerenderFinalStatus.MojoBinderPolicy,
               disallowedMojoInterface: 'device.mojom.GamepadMonitor',
               mismatchedHeaders: null,
@@ -295,7 +293,7 @@ describeWithEnvironment('PreloadingGrid', () => {
         ],
     );
 
-    assertShadowRoot(grid.shadowRoot);
+    assert.isNotNull(grid.shadowRoot);
     const cell = getCellByIndexes(grid.shadowRoot, {row: 1, column: 3});
     const div = cell.querySelector('div');
     assert.strictEqual(div!.getAttribute('style'), 'color: var(--sys-color-error);');

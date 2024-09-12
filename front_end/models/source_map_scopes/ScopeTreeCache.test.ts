@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-const {assert} = chai;
-
-import * as SourceMapScopes from '../source_map_scopes/source_map_scopes.js';
-import * as Formatter from '../formatter/formatter.js';
 import * as SDK from '../../core/sdk/sdk.js';
-import * as Platform from '../../core/platform/platform.js';
+import * as Formatter from '../formatter/formatter.js';
+import * as SourceMapScopes from '../source_map_scopes/source_map_scopes.js';
+import * as TextUtils from '../text_utils/text_utils.js';
 
 describe('ScopeTreeCache', () => {
   describe('scopeTreeForScript', () => {
@@ -18,7 +16,8 @@ describe('ScopeTreeCache', () => {
     beforeEach(() => {
       javaScriptScopeTreeStub = sinon.stub(Formatter.FormatterWorkerPool.formatterWorkerPool(), 'javaScriptScopeTree');
       script = sinon.createStubInstance(
-          SDK.Script.Script, {requestContent: Promise.resolve({content: '', isEncoded: false})});
+          SDK.Script.Script,
+          {requestContentData: Promise.resolve(new TextUtils.ContentData.ContentData('', false, 'text/javascript'))});
     });
 
     it('requests the scope tree once for a script', async () => {
@@ -47,7 +46,7 @@ describe('ScopeTreeCache', () => {
     it('requests the scope tree once for a script, even if the first request is not done yet', async () => {
       const scopeTree = {start: 0, end: 20, variables: [], children: []};
       const {promise: scopeTreePromise, resolve: scopeTreeResolve} =
-          Platform.PromiseUtilities.promiseWithResolvers<Formatter.FormatterWorkerPool.ScopeTreeNode|null>();
+          Promise.withResolvers<Formatter.FormatterWorkerPool.ScopeTreeNode|null>();
       javaScriptScopeTreeStub.returns(scopeTreePromise);
 
       const scopeTreePromise1 = scopeTreeForScript(script);

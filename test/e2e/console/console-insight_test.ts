@@ -5,53 +5,50 @@
 import {assert} from 'chai';
 import type * as puppeteer from 'puppeteer-core';
 
+import type * as Root from '../../../front_end/core/root/root.js';
 import type * as Console from '../../../front_end/panels/console/console.js';
 import {click, getBrowserAndPages, hover, setDevToolsSettings, waitFor, waitForNone} from '../../shared/helper.js';
-import {describe, it} from '../../shared/mocha-extensions.js';
+
 import {clickOnContextMenu, CONSOLE_TAB_SELECTOR} from '../helpers/console-helpers.js';
 
 describe('ConsoleInsight', function() {
   const CLICK_TARGET_SELECTOR = '.console-message-text';
   const EXPLAIN_LABEL = 'Understand this error';
+  const EXPLAIN_ACTION_ID = 'explain.console-message.context.error';
 
-  async function setupMocks(aidaResponse: unknown) {
+  async function setupMocks(
+      aidaAvailability: Partial<Root.Runtime.AidaAvailability>,
+      devToolsConsoleInsights: Partial<Root.Runtime.HostConfigConsoleInsights>) {
     const {frontend} = getBrowserAndPages();
     await frontend.bringToFront();
-    await frontend.evaluateOnNewDocument(`
-      globalThis.doAidaConversationForTesting = (data, cb) => {
-        cb({"response": JSON.stringify(${JSON.stringify(aidaResponse)})});
-      }
-      globalThis.getSyncInformation = (cb) => {
-        cb({"isSyncActive": true, "accountEmail": "some-email"});
-      }
-    `);
-    await frontend.goto(frontend.url() + '&enableAida=true', {
+    await frontend.evaluateOnNewDocument(
+        `globalThis.hostConfigForTesting = {...globalThis.hostConfigForTesting, devToolsConsoleInsights: ${
+            JSON.stringify(devToolsConsoleInsights)}, aidaAvailability: ${JSON.stringify(aidaAvailability)}
+  };`);
+    await frontend.reload({
       waitUntil: 'networkidle0',
     });
   }
 
   it('shows an insight for a console message via the context menu', async () => {
     const {target} = getBrowserAndPages();
-    await setupMocks([
-      {'textChunk': {'text': 'test'}},
-    ]);
+    await setupMocks({}, {enabled: true});
     await click(CONSOLE_TAB_SELECTOR);
     await target.evaluate(() => {
       console.error(new Error('Unexpected error'));
     });
-    await clickOnContextMenu(CLICK_TARGET_SELECTOR, EXPLAIN_LABEL);
+    await clickOnContextMenu(CLICK_TARGET_SELECTOR, EXPLAIN_ACTION_ID);
     await waitFor('devtools-console-insight', undefined, undefined, 'pierce');
   });
 
   it('shows an insight for a console message via the hover button', async () => {
     const {target} = getBrowserAndPages();
-    await setupMocks([
-      {'textChunk': {'text': 'test'}},
-    ]);
+    await setupMocks({}, {enabled: true});
     await click(CONSOLE_TAB_SELECTOR);
     await target.evaluate(() => {
       console.error(new Error('Unexpected error'));
     });
+    await waitFor('.console-message', undefined, undefined, 'pierce');
     await waitFor('.hover-button', undefined, undefined, 'pierce');
     await hover('.console-message');
     await click('.hover-button');
@@ -60,6 +57,7 @@ describe('ConsoleInsight', function() {
 
   it('does not show context menu if AIDA is not available', async () => {
     const {target} = getBrowserAndPages();
+    await setupMocks({enabled: false}, {enabled: true});
     await click(CONSOLE_TAB_SELECTOR);
     await target.evaluate(() => {
       console.error(new Error('Unexpected error'));
@@ -71,19 +69,52 @@ describe('ConsoleInsight', function() {
     assert(
         !texts.some(item => item.toLowerCase().startsWith(EXPLAIN_LABEL.toLowerCase())),
         'Context menu shows the explain option');
+    await waitFor('.console-message', undefined, undefined, 'pierce');
     await waitForNone('.hover-button');
   });
 
   it('does not show the hover button if locale is not supported', async () => {
     const {target} = getBrowserAndPages();
     await setDevToolsSettings({language: 'zh'});
-    await setupMocks([
-      {'textChunk': {'text': 'test'}},
-    ]);
+    await setupMocks({}, {enabled: true});
     await click(CONSOLE_TAB_SELECTOR);
     await target.evaluate(() => {
       console.error(new Error('Unexpected error'));
     });
+    await waitFor('.console-message', undefined, undefined, 'pierce');
+    await waitForNone('.hover-button', undefined, undefined, 'pierce');
+  });
+
+  it('does not show the hover button if age check is not passing', async () => {
+    const {target} = getBrowserAndPages();
+    await setupMocks({blockedByAge: true}, {enabled: true});
+    await click(CONSOLE_TAB_SELECTOR);
+    await target.evaluate(() => {
+      console.error(new Error('Unexpected error'));
+    });
+    await waitFor('.console-message', undefined, undefined, 'pierce');
+    await waitForNone('.hover-button', undefined, undefined, 'pierce');
+  });
+
+  it('does not show the hover button if policy does not allow it', async () => {
+    const {target} = getBrowserAndPages();
+    await setupMocks({blockedByEnterprisePolicy: true}, {enabled: true});
+    await click(CONSOLE_TAB_SELECTOR);
+    await target.evaluate(() => {
+      console.error(new Error('Unexpected error'));
+    });
+    await waitFor('.console-message', undefined, undefined, 'pierce');
+    await waitForNone('.hover-button', undefined, undefined, 'pierce');
+  });
+
+  it('does not show the hover button if it is restriced by geography', async () => {
+    const {target} = getBrowserAndPages();
+    await setupMocks({blockedByGeo: true}, {enabled: true});
+    await click(CONSOLE_TAB_SELECTOR);
+    await target.evaluate(() => {
+      console.error(new Error('Unexpected error'));
+    });
+    await waitFor('.console-message', undefined, undefined, 'pierce');
     await waitForNone('.hover-button', undefined, undefined, 'pierce');
   });
 
@@ -188,7 +219,8 @@ describe('ConsoleInsight', function() {
       const message = consoleViewMessage?.toMessageTextString() || '';
       // Replace dynamic line and column numbers in stacktraces with ':1:1'.
       // Ignore stacktrace added by Puppeteer.
-      return message.replace(/:\d+:\d+/gi, ':1:1').replaceAll(/\n    at pptr:;CdpFrame\.%3Can….js%3A\d+%3A\d+\):1:1/gi, '');
+      return message.replace(/:\d+:\d+/gi, ':1:1')
+          .replaceAll(/\n    at pptr:;CdpFrame\.%3Can….js%3A\d+%3A\d+\):1:1/gi, '');
     };
     const consoleModule = (await frontend.evaluateHandle('import(\'./panels/console/console.js\')')) as
         puppeteer.JSHandle<typeof Console>;

@@ -8,12 +8,10 @@ import {
   assertSubMenuItemsText,
   assertTopLevelContextMenuItemsText,
   findSubMenuEntryItem,
-  platformSpecificTextForSubMenuEntryItem,
 } from '../../e2e/helpers/context-menu-helpers.js';
 import {getDataGrid, getDataGridController, getInnerTextOfDataGridCells} from '../../e2e/helpers/datagrid-helpers.js';
 import {$, $$, click, waitFor, waitForFunction} from '../../shared/helper.js';
-import {describe, it} from '../../shared/mocha-extensions.js';
-import {loadComponentDocExample, preloadForCodeCoverage} from '../helpers/shared.js';
+import {loadComponentDocExample} from '../helpers/shared.js';
 
 async function activateContextMenuOnColumnHeader(headerText: string) {
   const dataGridController = await getDataGridController();
@@ -38,8 +36,6 @@ async function activateContextMenuOnBodyCell(cellText: string) {
 }
 
 describe('data grid controller', () => {
-  preloadForCodeCoverage('data_grid_controller/basic.html');
-
   // Flaky
   it.skip('[crbug.com/1502498] lets the user right click on a header to show the context menu', async () => {
     await loadComponentDocExample('data_grid_controller/basic.html');
@@ -47,8 +43,7 @@ describe('data grid controller', () => {
 
     const contextMenu = await $('.soft-context-menu');
     assert.isNotNull(contextMenu);
-    await assertTopLevelContextMenuItemsText(
-        ['Value', platformSpecificTextForSubMenuEntryItem('Sort By'), 'Reset Columns']);
+    await assertTopLevelContextMenuItemsText(['Value', 'Sort By', 'Reset Columns']);
   });
 
   it('lists the hideable columns in the context menu and lets the user click to toggle the visibility', async () => {
@@ -81,7 +76,7 @@ describe('data grid controller', () => {
     if (!contextMenu) {
       assert.fail('Could not find context menu.');
     }
-    const sortBy = await findSubMenuEntryItem('Sort By', true);
+    const sortBy = await findSubMenuEntryItem('Sort By');
     await sortBy.hover();
 
     const keyColumnSort = await waitFor('[aria-label="Key"]');
@@ -123,10 +118,7 @@ describe('data grid controller', () => {
     await loadComponentDocExample('data_grid_controller/basic.html');
     await activateContextMenuOnBodyCell('Bravo');
 
-    await assertTopLevelContextMenuItemsText([
-      platformSpecificTextForSubMenuEntryItem('Sort By'),
-      platformSpecificTextForSubMenuEntryItem('Header Options'),
-    ]);
+    await assertTopLevelContextMenuItemsText(['Sort By', 'Header Options']);
     await assertSubMenuItemsText('Header Options', ['Value', 'Reset Columns']);
     await assertSubMenuItemsText('Sort By', ['Key', 'Value']);
   });
@@ -134,10 +126,6 @@ describe('data grid controller', () => {
   it('allows the parent to add custom context menu items', async () => {
     await loadComponentDocExample('data_grid_controller/custom-context-menu-items.html');
     await activateContextMenuOnBodyCell('Bravo');
-    await assertTopLevelContextMenuItemsText([
-      platformSpecificTextForSubMenuEntryItem('Sort By'),
-      platformSpecificTextForSubMenuEntryItem('Header Options'),
-      'Hello World',
-    ]);
+    await assertTopLevelContextMenuItemsText(['Sort By', 'Header Options', 'Hello World']);
   });
 });

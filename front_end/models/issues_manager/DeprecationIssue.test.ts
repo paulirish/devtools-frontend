@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-const {assert} = chai;
-
-import * as Issues from '../../panels/issues/issues.js';
-import * as IssuesManager from '../issues_manager/issues_manager.js';
 import type * as SDK from '../../core/sdk/sdk.js';
-import {MockIssuesModel} from '../../testing/MockIssuesModel.js';
 import * as Protocol from '../../generated/protocol.js';
+import * as Issues from '../../panels/issues/issues.js';
 import {describeWithLocale} from '../../testing/EnvironmentHelpers.js';
 import {MockIssuesManager} from '../../testing/MockIssuesManager.js';
+import {MockIssuesModel} from '../../testing/MockIssuesModel.js';
+import * as IssuesManager from '../issues_manager/issues_manager.js';
 
 describeWithLocale('DeprecationIssue', () => {
   const mockModel = new MockIssuesModel([]) as unknown as SDK.IssuesModel.IssuesModel;
@@ -59,7 +57,7 @@ describeWithLocale('DeprecationIssue', () => {
     const aggregator = new Issues.IssueAggregator.IssueAggregator(mockManager);
     for (const issue of issues) {
       mockManager.dispatchEventToListeners(
-          IssuesManager.IssuesManager.Events.IssueAdded, {issuesModel: mockModel, issue});
+          IssuesManager.IssuesManager.Events.ISSUE_ADDED, {issuesModel: mockModel, issue});
     }
     const aggregatedIssues = Array.from(aggregator.aggregatedIssues());
     assert.strictEqual(aggregatedIssues.length, 1);
@@ -75,7 +73,7 @@ describeWithLocale('DeprecationIssue', () => {
     const aggregator = new Issues.IssueAggregator.IssueAggregator(mockManager);
     for (const issue of issues) {
       mockManager.dispatchEventToListeners(
-          IssuesManager.IssuesManager.Events.IssueAdded, {issuesModel: mockModel, issue});
+          IssuesManager.IssuesManager.Events.ISSUE_ADDED, {issuesModel: mockModel, issue});
     }
     const aggregatedIssues = Array.from(aggregator.aggregatedIssues());
     assert.strictEqual(aggregatedIssues.length, 2);

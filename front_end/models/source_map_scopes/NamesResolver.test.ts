@@ -2,18 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-const {assert} = chai;
-
-import * as SourceMapScopes from '../source_map_scopes/source_map_scopes.js';
-import * as SDK from '../../core/sdk/sdk.js';
-import * as Workspace from '../workspace/workspace.js';
-import * as Bindings from '../bindings/bindings.js';
 import type * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
+import * as SDK from '../../core/sdk/sdk.js';
 import {createTarget} from '../../testing/EnvironmentHelpers.js';
-import {MockProtocolBackend} from '../../testing/MockScopeChain.js';
 import {describeWithMockConnection} from '../../testing/MockConnection.js';
-import {assertNotNullOrUndefined} from '../../core/platform/platform.js';
+import {MockProtocolBackend} from '../../testing/MockScopeChain.js';
+import {createContentProviderUISourceCode} from '../../testing/UISourceCodeHelpers.js';
+import * as Bindings from '../bindings/bindings.js';
+import * as SourceMapScopes from '../source_map_scopes/source_map_scopes.js';
+import * as Workspace from '../workspace/workspace.js';
 
 describeWithMockConnection('NameResolver', () => {
   const URL = 'file:///tmp/example.js' as Platform.DevToolsPath.UrlString;
@@ -175,8 +173,8 @@ describeWithMockConnection('NameResolver', () => {
   ];
 
   const dummyMapContent = JSON.stringify({
-    'version': 3,
-    'sources': [],
+    version: 3,
+    sources: [],
   });
 
   for (const test of tests) {
@@ -186,7 +184,7 @@ describeWithMockConnection('NameResolver', () => {
       const parsedScopeChain =
           await SourceMapScopes.NamesResolver.findScopeChainForDebuggerScope(callFrame.scopeChain()[0]);
       const scope = parsedScopeChain.pop();
-      assertNotNullOrUndefined(scope);
+      assert.exists(scope);
       const identifiers =
           await SourceMapScopes.NamesResolver.scopeIdentifiers(callFrame.script, scope, parsedScopeChain);
       const boundIdentifiers = identifiers?.boundVariables ?? [];
@@ -206,11 +204,11 @@ describeWithMockConnection('NameResolver', () => {
     const sourceMapUrl = 'file:///tmp/example.js.min.map';
     // This was minified with 'esbuild --sourcemap=linked --minify' v0.14.31.
     const sourceMapContent = JSON.stringify({
-      'version': 3,
-      'sources': ['index.js'],
-      'sourcesContent': ['function f(par1, par2) {\n  console.log(par1, par2);\n}\nf(1, 2);\n'],
-      'mappings': 'AAAA,WAAW,EAAM,EAAM,CACrB,QAAQ,IAAI,EAAM,CAAI,CACxB,CACA,EAAE,EAAG,CAAC',
-      'names': [],
+      version: 3,
+      sources: ['index.js'],
+      sourcesContent: ['function f(par1, par2) {\n  console.log(par1, par2);\n}\nf(1, 2);\n'],
+      mappings: 'AAAA,WAAW,EAAM,EAAM,CACrB,QAAQ,IAAI,EAAM,CAAI,CACxB,CACA,EAAE,EAAG,CAAC',
+      names: [],
     });
 
     const source = `function f(o,n){console.log(o,n)}f(1,2);\n//# sourceMappingURL=${sourceMapUrl}`;
@@ -231,11 +229,11 @@ describeWithMockConnection('NameResolver', () => {
     const sourceMapUrl = 'file:///tmp/example.js.min.map';
     // This was minified with 'esbuild --sourcemap=linked --minify' v0.14.31.
     const sourceMapContent = JSON.stringify({
-      'version': 3,
-      'sources': ['index.js'],
-      'sourcesContent': ['function f(n) {\n  for (let i = 0; i < n; i++) {\n    console.log("hi");\n  }\n}\nf(10);\n'],
-      'mappings': 'AAAA,WAAW,EAAG,CACZ,OAAS,GAAI,EAAG,EAAI,EAAG,IACrB,QAAQ,IAAI,IAAI,CAEpB,CACA,EAAE,EAAE',
-      'names': [],
+      version: 3,
+      sources: ['index.js'],
+      sourcesContent: ['function f(n) {\n  for (let i = 0; i < n; i++) {\n    console.log("hi");\n  }\n}\nf(10);\n'],
+      mappings: 'AAAA,WAAW,EAAG,CACZ,OAAS,GAAI,EAAG,EAAI,EAAG,IACrB,QAAQ,IAAI,IAAI,CAEpB,CACA,EAAE,EAAE',
+      names: [],
     });
 
     const source = `function f(i){for(let o=0;o<i;o++)console.log("hi")}f(10);\n//# sourceMappingURL=${sourceMapUrl}`;
@@ -256,11 +254,11 @@ describeWithMockConnection('NameResolver', () => {
     const sourceMapUrl = 'file:///tmp/example.js.min.map';
     // This was minified with 'terser -m -o example.min.js --source-map "includeSources;url=example.min.js.map" --toplevel' v5.7.0.
     const sourceMapContent = JSON.stringify({
-      'version': 3,
-      'names': ['f', 'par1', 'par2', 'console', 'log'],
-      'sources': ['index.js'],
-      'sourcesContent': ['function f(par1, par2) {\n  console.log(par1, par2);\n}\nf(1, 2);\n'],
-      'mappings': 'AAAA,SAASA,EAAEC,EAAMC,GACfC,QAAQC,IAAIH,EAAMC,GAEpBF,EAAE,EAAG',
+      version: 3,
+      names: ['f', 'par1', 'par2', 'console', 'log'],
+      sources: ['index.js'],
+      sourcesContent: ['function f(par1, par2) {\n  console.log(par1, par2);\n}\nf(1, 2);\n'],
+      mappings: 'AAAA,SAASA,EAAEC,EAAMC,GACfC,QAAQC,IAAIH,EAAMC,GAEpBF,EAAE,EAAG',
     });
 
     const source = `function o(o,n){console.log(o,n)}o(1,2);\n//# sourceMappingURL=${sourceMapUrl}`;
@@ -281,10 +279,10 @@ describeWithMockConnection('NameResolver', () => {
     const sourceMapUrl = 'file:///tmp/example.js.min.map';
     // This was minified with 'terser -m -o example.min.js --source-map "includeSources;url=example.min.js.map"' v5.7.0.
     const sourceMapContent = JSON.stringify({
-      'version': 3,
-      'names': ['C', 'B', 'constructor', 'par1', 'super', 'console', 'log'],
-      'sources': ['index.js'],
-      'mappings': 'AAAA,MAAMA,UAAUC,EACdC,YAAYC,GACVC,MAAMD,GACNE,QAAQC,IAAIH',
+      version: 3,
+      names: ['C', 'B', 'constructor', 'par1', 'super', 'console', 'log'],
+      sources: ['index.js'],
+      mappings: 'AAAA,MAAMA,UAAUC,EACdC,YAAYC,GACVC,MAAMD,GACNE,QAAQC,IAAIH',
     });
 
     const source = `class C extends B{constructor(s){super(s),console.log(s)}}\n//# sourceMappingURL=${sourceMapUrl}`;
@@ -305,13 +303,13 @@ describeWithMockConnection('NameResolver', () => {
     const sourceMapUrl = 'file:///tmp/example.js.min.map';
     // This was minified with 'terser -m -o example.min.js --source-map "includeSources;url=example.min.js.map" v5.7.0.
     const sourceMapContent = JSON.stringify({
-      'version': 3,
-      'names': ['adder', 'arg1', 'arg2', 'console', 'log', 'result'],
-      'sources': ['index.js'],
-      'sourcesContent': [
+      version: 3,
+      names: ['adder', 'arg1', 'arg2', 'console', 'log', 'result'],
+      sources: ['index.js'],
+      sourcesContent: [
         'function adder(arg1, arg2) {\n  console.log(arg1, arg2);\n  const result = arg1 + arg2;\n  return result;\n}\n',
       ],
-      'mappings': 'AAAA,SAASA,MAAMC,EAAMC,GACnBC,QAAQC,IAAIH,EAAMC,GAClB,MAAMG,EAASJ,EAAOC,EACtB,OAAOG,CACT',
+      mappings: 'AAAA,SAASA,MAAMC,EAAMC,GACnBC,QAAQC,IAAIH,EAAMC,GAClB,MAAMG,EAASJ,EAAOC,EACtB,OAAOG,CACT',
     });
 
     const source = `function adder(n,o){console.log(n,o);const c=n+o;return c}\n//# sourceMappingURL=${sourceMapUrl}`;
@@ -337,17 +335,17 @@ describeWithMockConnection('NameResolver', () => {
     const sourceMapUrl = 'file:///tmp/index.js.map';
     // The source map was obtained with 'tsc --target es5 --sourceMap --inlineSources index.ts'.
     const sourceMapContent = JSON.stringify({
-      'version': 3,
-      'file': 'index.js',
-      'sourceRoot': '',
-      'sources': ['index.ts'],
-      'names': [],
-      'mappings': 'AAAA,SAAS,CAAC;IACR,IAAI,GAAG,GAAG,EAAE,CAAC;' +
+      version: 3,
+      file: 'index.js',
+      sourceRoot: '',
+      sources: ['index.ts'],
+      names: [],
+      mappings: 'AAAA,SAAS,CAAC;IACR,IAAI,GAAG,GAAG,EAAE,CAAC;' +
           'IACb,KAAK,IAAI,KAAG,GAAG,CAAC,EAAE,KAAG,GAAG,CAAC,EAAE,KAAG,EAAE,EAAE;' +
           'QAChC,OAAO,CAAC,GAAG,CAAC,KAAG,CAAC,CAAC;KAClB;' +
           'AACH,CAAC;' +
           'AACD,CAAC,EAAE,CAAC',
-      'sourcesContent': [
+      sourcesContent: [
         'function f() {\n  let pos = 10;\n  for (let pos = 0; pos < 5; pos++) {\n    console.log(pos);\n  }\n}\nf();\n',
       ],
     });
@@ -388,11 +386,11 @@ describeWithMockConnection('NameResolver', () => {
       const sourceMapUrl = 'file:///tmp/example.js.min.map';
       // This was minified with 'terser -m -o example.min.js --source-map "includeSources;url=example.min.js.map"' v5.7.0.
       const sourceMapContent = JSON.stringify({
-        'version': 3,
-        'names': ['unminified', 'par1', 'par2', 'console', 'log'],
-        'sources': ['index.js'],
-        'sourcesContent': ['function unminified(par1, par2) {\n  console.log(par1, par2);\n}\n'],
-        'mappings': 'AAAA,SAASA,EAAWC,EAAMC,GACxBC,QAAQC,IAAIH,EAAMC',
+        version: 3,
+        names: ['unminified', 'par1', 'par2', 'console', 'log'],
+        sources: ['index.js'],
+        sourcesContent: ['function unminified(par1, par2) {\n  console.log(par1, par2);\n}\n'],
+        mappings: 'AAAA,SAASA,EAAWC,EAAMC,GACxBC,QAAQC,IAAIH,EAAMC',
       });
 
       const source = `function o(o,n){console.log(o,n)}o(1,2);\n//# sourceMappingURL=${sourceMapUrl}`;
@@ -418,7 +416,7 @@ describeWithMockConnection('NameResolver', () => {
         return;
       }
       const {lineNumber, columnNumber} = scopeLocation;
-      await script?.requestContent();
+      await script?.requestContentData();
       const functionName = await SourceMapScopes.NamesResolver.resolveProfileFrameFunctionName(
           {scriptId, columnNumber, lineNumber}, target);
       assert.strictEqual(functionName, 'unminified');
@@ -431,19 +429,19 @@ describeWithMockConnection('NameResolver', () => {
 
       const sourceMapUrl = 'file:///tmp/example.js.min.map';
       const sourceMapContent = JSON.stringify({
-        'version': 3,
-        'names': [
+        version: 3,
+        names: [
           '<toplevel>',
           '<anonymous>',
           'log',
           'main',
         ],
-        'sources': ['main.js'],
-        'sourcesContent': [
+        sources: ['main.js'],
+        sourcesContent: [
           '(function () {\n  function log(m) {\n    console.log(m);\n  }\n\n  function main() {\n\t  log("hello");\n\t  log("world");\n  }\n  \n  main();\n})();',
         ],
-        'mappings': 'CAAA,WACE,SAAS,EAAI,GACX,QAAQ,IAAI,EACd,CAEA,SAAS,IACR,EAAI,SACJ,EAAI,QACL,CAEA,GACD,EAXD',
-        'x_com_bloomberg_sourcesFunctionMappings': ['AAAWK,CACAJ,CCCRE,CIAKA'],
+        mappings: 'CAAA,WACE,SAAS,EAAI,GACX,QAAQ,IAAI,EACd,CAEA,SAAS,IACR,EAAI,SACJ,EAAI,QACL,CAEA,GACD,EAXD',
+        x_com_bloomberg_sourcesFunctionMappings: ['AAAWK,CACAJ,CCCRE,CIAKA'],
       });
 
       const source = '(function(){function o(o){console.log(o)}function n(){o("hello");o("world")}n()})();\n';
@@ -463,11 +461,11 @@ describeWithMockConnection('NameResolver', () => {
     const sourceMapUrl = 'file:///tmp/example.js.min.map';
     // This was minified with 'terser -m -o example.min.js --source-map "includeSources;url=example.min.js.map"' v5.7.0.
     const sourceMapContent = JSON.stringify({
-      'version': 3,
-      'names': ['unminified', 'par1', 'console', 'log'],
-      'sources': ['index.js'],
-      'sourcesContent': ['const unminified = par1 => {\n  console.log(par1);\n}\n'],
-      'mappings': 'AAAA,MAAMA,EAAaC,IACjBC,QAAQC,IAAIF',
+      version: 3,
+      names: ['unminified', 'par1', 'console', 'log'],
+      sources: ['index.js'],
+      sourcesContent: ['const unminified = par1 => {\n  console.log(par1);\n}\n'],
+      mappings: 'AAAA,MAAMA,EAAaC,IACjBC,QAAQC,IAAIF',
     });
 
     const source = `const o=o=>{console.log(o)};\n//# sourceMappingURL=${sourceMapUrl}`;
@@ -515,7 +513,7 @@ function mulWithOffset(param1, param2, offset) {
 
     it('has the right mapping on a function scope without shadowing', async () => {
       const location = script.rawLocation(0, 30);  // Beginning of function scope.
-      assertNotNullOrUndefined(location);
+      assert.exists(location);
 
       const mapping = await SourceMapScopes.NamesResolver.allVariablesAtPosition(location);
 
@@ -528,7 +526,7 @@ function mulWithOffset(param1, param2, offset) {
 
     it('has the right mapping in a block scope with shadowing in the authored code', async () => {
       const location = script.rawLocation(0, 70);  // Beginning of block scope.
-      assertNotNullOrUndefined(location);
+      assert.exists(location);
 
       const mapping = await SourceMapScopes.NamesResolver.allVariablesAtPosition(location);
 
@@ -538,11 +536,32 @@ function mulWithOffset(param1, param2, offset) {
 
     it('has the right mapping in a block scope with shadowing in the compiled code', async () => {
       const location = script.rawLocation(0, 70);  // Beginning of block scope.
-      assertNotNullOrUndefined(location);
+      assert.exists(location);
 
       const mapping = await SourceMapScopes.NamesResolver.allVariablesAtPosition(location);
 
       assert.isNull(mapping.get('param1'));
+    });
+  });
+
+  describe('getTextFor', () => {
+    it('caches Text instances for scripts', async () => {
+      const script = await backend.addScript(target, {url: URL, content: 'console.log(42)'}, null);
+
+      const text1 = await SourceMapScopes.NamesResolver.getTextFor(script);
+      const text2 = await SourceMapScopes.NamesResolver.getTextFor(script);
+
+      assert.strictEqual(text1, text2);
+    });
+
+    it('caches Text instances for UISourceCodes', async () => {
+      const {uiSourceCode} = createContentProviderUISourceCode(
+          {target, url: URL, mimeType: 'text/typescript', content: 'console.log(42)'});
+
+      const text1 = await SourceMapScopes.NamesResolver.getTextFor(uiSourceCode);
+      const text2 = await SourceMapScopes.NamesResolver.getTextFor(uiSourceCode);
+
+      assert.strictEqual(text1, text2);
     });
   });
 });

@@ -18,7 +18,7 @@ describeWithMockConnection('DebuggerWorkspaceBinding', () => {
   let debuggerWorkspaceBinding: Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding;
 
   beforeEach(() => {
-    target = createTarget({id: 'main' as Protocol.Target.TargetID, name: 'main', type: SDK.Target.Type.Frame});
+    target = createTarget({id: 'main' as Protocol.Target.TargetID, name: 'main', type: SDK.Target.Type.FRAME});
     const targetManager = target.targetManager();
     const workspace = Workspace.Workspace.WorkspaceImpl.instance();
     const resourceMapping = new Bindings.ResourceMapping.ResourceMapping(targetManager, workspace);
@@ -55,7 +55,6 @@ describeWithMockConnection('DebuggerWorkspaceBinding', () => {
     const uiSourceCode = await uiSourceCodePromise;
 
     // Check if the uiSourceCode is the expected one (from the main target, and having the correct sourceURL).
-    assert.isNotNull(uiSourceCode);
     assert.strictEqual(uiSourceCode.url(), scriptUrl);
     assert.deepEqual(Bindings.NetworkProject.NetworkProject.targetForUISourceCode(uiSourceCode), target);
   });

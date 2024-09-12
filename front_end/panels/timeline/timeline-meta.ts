@@ -4,6 +4,7 @@
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
+import * as SDK from '../../core/sdk/sdk.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
 import type * as Timeline from './timeline.js';
@@ -28,7 +29,7 @@ const UIStrings = {
   /**
    *@description Title of an action in the timeline tool to record reload
    */
-  startProfilingAndReloadPage: 'Start profiling and reload page',
+  recordAndReload: 'Record and reload',
   /**
    *@description Tooltip text that appears when hovering over the largeicon download button
    */
@@ -72,14 +73,6 @@ async function loadTimelineModule(): Promise<typeof Timeline> {
   }
   return loadedTimelineModule;
 }
-
-// The profiler module is imported here because the js profiler tab is implemented
-// in the profiler module. Since the tab doesn't belong to all apps that extend
-// the shell app, it cannot be registered in profiler's meta file, as profiler is
-// part of the shell app, and thus all of the extensions registered in profiler
-// belong to all apps that extend from shell.
-// Instead, we register the extensions for the js profiler tab in panels/timeline/ and
-// js_profiler/ so that the tab is available only in the apps it belongs to.
 
 function maybeRetrieveContextTypes<T = unknown>(getClassCallBack: (timelineModule: typeof Timeline) => T[]): T[] {
   if (loadedTimelineModule === undefined) {
@@ -126,11 +119,11 @@ UI.ActionRegistration.registerActionExtension({
   ],
   bindings: [
     {
-      platform: UI.ActionRegistration.Platforms.WindowsLinux,
+      platform: UI.ActionRegistration.Platforms.WINDOWS_LINUX,
       shortcut: 'Ctrl+E',
     },
     {
-      platform: UI.ActionRegistration.Platforms.Mac,
+      platform: UI.ActionRegistration.Platforms.MAC,
       shortcut: 'Meta+E',
     },
   ],
@@ -143,18 +136,18 @@ UI.ActionRegistration.registerActionExtension({
     return maybeRetrieveContextTypes(Timeline => [Timeline.TimelinePanel.TimelinePanel]);
   },
   category: UI.ActionRegistration.ActionCategory.PERFORMANCE,
-  title: i18nLazyString(UIStrings.startProfilingAndReloadPage),
+  title: i18nLazyString(UIStrings.recordAndReload),
   async loadActionDelegate() {
     const Timeline = await loadTimelineModule();
     return new Timeline.TimelinePanel.ActionDelegate();
   },
   bindings: [
     {
-      platform: UI.ActionRegistration.Platforms.WindowsLinux,
+      platform: UI.ActionRegistration.Platforms.WINDOWS_LINUX,
       shortcut: 'Ctrl+Shift+E',
     },
     {
-      platform: UI.ActionRegistration.Platforms.Mac,
+      platform: UI.ActionRegistration.Platforms.MAC,
       shortcut: 'Meta+Shift+E',
     },
   ],
@@ -173,11 +166,11 @@ UI.ActionRegistration.registerActionExtension({
   title: i18nLazyString(UIStrings.saveProfile),
   bindings: [
     {
-      platform: UI.ActionRegistration.Platforms.WindowsLinux,
+      platform: UI.ActionRegistration.Platforms.WINDOWS_LINUX,
       shortcut: 'Ctrl+S',
     },
     {
-      platform: UI.ActionRegistration.Platforms.Mac,
+      platform: UI.ActionRegistration.Platforms.MAC,
       shortcut: 'Meta+S',
     },
   ],
@@ -196,11 +189,11 @@ UI.ActionRegistration.registerActionExtension({
   title: i18nLazyString(UIStrings.loadProfile),
   bindings: [
     {
-      platform: UI.ActionRegistration.Platforms.WindowsLinux,
+      platform: UI.ActionRegistration.Platforms.WINDOWS_LINUX,
       shortcut: 'Ctrl+O',
     },
     {
-      platform: UI.ActionRegistration.Platforms.Mac,
+      platform: UI.ActionRegistration.Platforms.MAC,
       shortcut: 'Meta+O',
     },
   ],
@@ -255,11 +248,11 @@ UI.ActionRegistration.registerActionExtension({
   },
   bindings: [
     {
-      platform: UI.ActionRegistration.Platforms.WindowsLinux,
+      platform: UI.ActionRegistration.Platforms.WINDOWS_LINUX,
       shortcut: 'Ctrl+H',
     },
     {
-      platform: UI.ActionRegistration.Platforms.Mac,
+      platform: UI.ActionRegistration.Platforms.MAC,
       shortcut: 'Meta+Y',
     },
   ],
@@ -278,11 +271,11 @@ UI.ActionRegistration.registerActionExtension({
   },
   bindings: [
     {
-      platform: UI.ActionRegistration.Platforms.WindowsLinux,
+      platform: UI.ActionRegistration.Platforms.WINDOWS_LINUX,
       shortcut: 'Alt+Left',
     },
     {
-      platform: UI.ActionRegistration.Platforms.Mac,
+      platform: UI.ActionRegistration.Platforms.MAC,
       shortcut: 'Meta+Left',
     },
   ],
@@ -301,11 +294,11 @@ UI.ActionRegistration.registerActionExtension({
   },
   bindings: [
     {
-      platform: UI.ActionRegistration.Platforms.WindowsLinux,
+      platform: UI.ActionRegistration.Platforms.WINDOWS_LINUX,
       shortcut: 'Alt+Right',
     },
     {
-      platform: UI.ActionRegistration.Platforms.Mac,
+      platform: UI.ActionRegistration.Platforms.MAC,
       shortcut: 'Meta+Right',
     },
   ],
@@ -313,11 +306,21 @@ UI.ActionRegistration.registerActionExtension({
 
 Common.Settings.registerSettingExtension({
   category: Common.Settings.SettingCategory.PERFORMANCE,
-  storageType: Common.Settings.SettingStorageType.Synced,
+  storageType: Common.Settings.SettingStorageType.SYNCED,
   title: i18nLazyString(UIStrings.hideChromeFrameInLayersView),
   settingName: 'frame-viewer-hide-chrome-window',
   settingType: Common.Settings.SettingType.BOOLEAN,
   defaultValue: false,
+});
+
+// IMPORTANT: if you are updating this, you should also update the setting in
+// js_timeline-meta.
+Common.Settings.registerSettingExtension({
+  category: Common.Settings.SettingCategory.PERFORMANCE,
+  storageType: Common.Settings.SettingStorageType.SYNCED,
+  settingName: 'annotations-hidden',
+  settingType: Common.Settings.SettingType.BOOLEAN,
+  defaultValue: true,
 });
 
 Common.Linkifier.registerLinkifier({
@@ -340,4 +343,15 @@ UI.ContextMenu.registerItem({
   location: UI.ContextMenu.ItemLocation.TIMELINE_MENU_OPEN,
   actionId: 'timeline.save-to-file',
   order: 15,
+});
+
+Common.Revealer.registerRevealer({
+  contextTypes() {
+    return [SDK.TraceObject.TraceObject];
+  },
+  destination: Common.Revealer.RevealerDestination.TIMELINE_PANEL,
+  async loadRevealer() {
+    const Timeline = await loadTimelineModule();
+    return new Timeline.TimelinePanel.TraceRevealer();
+  },
 });

@@ -13,6 +13,7 @@ import {
   createTarget,
   describeWithEnvironment,
 } from '../../../testing/EnvironmentHelpers.js';
+import {expectCall} from '../../../testing/ExpectStubCall.js';
 import {TestPlugin} from '../../../testing/LanguagePluginHelpers.js';
 import {describeWithMockConnection} from '../../../testing/MockConnection.js';
 import {MockExecutionContext} from '../../../testing/MockExecutionContext.js';
@@ -20,8 +21,6 @@ import * as CodeMirror from '../../../third_party/codemirror.next/codemirror.nex
 import * as UI from '../../legacy/legacy.js';
 
 import * as TextEditor from './text_editor.js';
-
-const {assert} = chai;
 
 function makeState(doc: string, extensions: CodeMirror.Extension = []) {
   return CodeMirror.EditorState.create({
@@ -70,18 +69,13 @@ describeWithEnvironment('TextEditor', () => {
     });
 
     it('should restore scroll to the same position after reconnecting to DOM when it is scrollable', async () => {
-      let resolveEventPromise: Function;
       const editor = new TextEditor.TextEditor.TextEditor(makeState(
           'line1\nline2\nline3\nline4\nline5\nline6andthisisalonglinesothatwehaveenoughspacetoscrollhorizontally',
           [CodeMirror.EditorView.theme(
               {'&.cm-editor': {height: '50px', width: '50px'}, '.cm-scroller': {overflow: 'auto'}})]));
-      const waitForFirstScrollPromise = new Promise(r => {
-        resolveEventPromise = r;
-      });
-      sinon.stub(editor, 'scrollEventHandledToSaveScrollPositionForTest').callsFake(() => {
-        // Resolves the waitForScrollPromise(s) after 'scrollEventHandledToSaveScrollPositionForTest' is called
-        resolveEventPromise();
-      });
+      const scrollEventHandledToSaveScrollPositionForTest =
+          sinon.stub(editor, 'scrollEventHandledToSaveScrollPositionForTest');
+      const waitForFirstScrollPromise = expectCall(scrollEventHandledToSaveScrollPositionForTest);
       renderElementIntoDOM(editor);
       editor.editor.dispatch({
         effects: CodeMirror.EditorView.scrollIntoView(0, {
@@ -95,9 +89,7 @@ describeWithEnvironment('TextEditor', () => {
       const scrollTopBeforeRemove = editor.editor.scrollDOM.scrollTop;
       const scrollLeftBeforeRemove = editor.editor.scrollDOM.scrollLeft;
 
-      const waitForSecondScrollPromise = new Promise(r => {
-        resolveEventPromise = r;
-      });
+      const waitForSecondScrollPromise = expectCall(scrollEventHandledToSaveScrollPositionForTest);
       editor.remove();
       renderElementIntoDOM(editor);
       await waitForSecondScrollPromise;
@@ -166,35 +158,36 @@ describeWithEnvironment('TextEditor', () => {
     }
 
     it('recognizes expression queries', async () => {
-      await testQueryType('foo', 3, TextEditor.JavaScript.QueryType.Expression, 'foo');
-      await testQueryType('foo ', 4, TextEditor.JavaScript.QueryType.Expression, '');
-      await testQueryType('let', 3, TextEditor.JavaScript.QueryType.Expression, 'let');
+      await testQueryType('foo', 3, TextEditor.JavaScript.QueryType.EXPRESSION, 'foo');
+      await testQueryType('foo ', 4, TextEditor.JavaScript.QueryType.EXPRESSION, '');
+      await testQueryType('let', 3, TextEditor.JavaScript.QueryType.EXPRESSION, 'let');
     });
 
     it('recognizes propery name queries', async () => {
-      await testQueryType('foo.bar', 7, TextEditor.JavaScript.QueryType.PropertyName, 'bar', 'foo.bar');
-      await testQueryType('foo.', 4, TextEditor.JavaScript.QueryType.PropertyName, '', 'foo.');
-      await testQueryType('if (foo.', 8, TextEditor.JavaScript.QueryType.PropertyName, '', 'foo.');
-      await testQueryType('new foo.bar().', 14, TextEditor.JavaScript.QueryType.PropertyName, '', 'new foo.bar().');
-      await testQueryType('foo?.', 5, TextEditor.JavaScript.QueryType.PropertyName, '', 'foo?.');
-      await testQueryType('foo?.b', 6, TextEditor.JavaScript.QueryType.PropertyName, 'b', 'foo?.b');
+      await testQueryType('foo.bar', 7, TextEditor.JavaScript.QueryType.PROPERTY_NAME, 'bar', 'foo.bar');
+      await testQueryType('foo.', 4, TextEditor.JavaScript.QueryType.PROPERTY_NAME, '', 'foo.');
+      await testQueryType('if (foo.', 8, TextEditor.JavaScript.QueryType.PROPERTY_NAME, '', 'foo.');
+      await testQueryType('new foo.bar().', 14, TextEditor.JavaScript.QueryType.PROPERTY_NAME, '', 'new foo.bar().');
+      await testQueryType('foo?.', 5, TextEditor.JavaScript.QueryType.PROPERTY_NAME, '', 'foo?.');
+      await testQueryType('foo?.b', 6, TextEditor.JavaScript.QueryType.PROPERTY_NAME, 'b', 'foo?.b');
     });
 
     it('recognizes property expression queries', async () => {
-      await testQueryType('foo[', 4, TextEditor.JavaScript.QueryType.PropertyExpression, '', 'foo[');
-      await testQueryType('foo["ba', 7, TextEditor.JavaScript.QueryType.PropertyExpression, '"ba', 'foo["ba');
+      await testQueryType('foo[', 4, TextEditor.JavaScript.QueryType.PROPERTY_EXPRESSION, '', 'foo[');
+      await testQueryType('foo["ba', 7, TextEditor.JavaScript.QueryType.PROPERTY_EXPRESSION, '"ba', 'foo["ba');
     });
 
     describe('potential map key retrievals', () => {
       it('recognizes potential maps', async () => {
-        await testQueryType('foo.get(', 8, TextEditor.JavaScript.QueryType.PotentiallyRetrievingFromMap, '', 'foo');
-        await testQueryType('foo\n.get(', 9, TextEditor.JavaScript.QueryType.PotentiallyRetrievingFromMap, '', 'foo');
+        await testQueryType('foo.get(', 8, TextEditor.JavaScript.QueryType.POTENTIALLY_RETRIEVING_FROM_MAP, '', 'foo');
+        await testQueryType(
+            'foo\n.get(', 9, TextEditor.JavaScript.QueryType.POTENTIALLY_RETRIEVING_FROM_MAP, '', 'foo');
       });
 
       it('leaves other expressions as-is', async () => {
-        await testQueryType('foo.method(', 11, TextEditor.JavaScript.QueryType.Expression);
-        await testQueryType('5 + (', 5, TextEditor.JavaScript.QueryType.Expression);
-        await testQueryType('functionCall(', 13, TextEditor.JavaScript.QueryType.Expression);
+        await testQueryType('foo.method(', 11, TextEditor.JavaScript.QueryType.EXPRESSION);
+        await testQueryType('5 + (', 5, TextEditor.JavaScript.QueryType.EXPRESSION);
+        await testQueryType('functionCall(', 13, TextEditor.JavaScript.QueryType.EXPRESSION);
       });
     });
 

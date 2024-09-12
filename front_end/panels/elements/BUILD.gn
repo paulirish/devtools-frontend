@@ -5,7 +5,7 @@
 import("../../../scripts/build/ninja/devtools_entrypoint.gni")
 import("../../../scripts/build/ninja/devtools_module.gni")
 import("../../../scripts/build/ninja/generate_css.gni")
-import("../../../third_party/typescript/typescript.gni")
+import("../../../scripts/build/typescript/typescript.gni")
 import("../visibility.gni")
 
 generate_css("css_files") {
@@ -54,8 +54,9 @@ devtools_module("elements") {
     "NodeStackTraceWidget.ts",
     "PlatformFontsWidget.ts",
     "PropertiesWidget.ts",
+    "PropertyMatchers.ts",
     "PropertyNameCategories.ts",
-    "PropertyParser.ts",
+    "PropertyRenderer.ts",
     "StyleEditorWidget.ts",
     "StylePropertiesSection.ts",
     "StylePropertyHighlighter.ts",
@@ -113,6 +114,7 @@ devtools_entrypoint("bundle") {
   visibility = [
     ":*",
     "../../entrypoints/*",
+    "../../panels/profiler/*",
     "../../panels/recorder/*",
     "../../ui/components/docs/computed_style_property/*",
     "../../ui/components/docs/computed_style_trace/*",
@@ -152,12 +154,14 @@ ts_library("unittests") {
     "CSSRuleValidator.test.ts",
     "ClassesPaneWidget.test.ts",
     "DOMLinkifier.test.ts",
+    "ElementStatePaneWidget.test.ts",
     "ElementsPanel.test.ts",
     "ElementsTreeElementHighlighter.test.ts",
     "InspectElementModeController.test.ts",
     "PlatformFontsWidget.test.ts",
     "PropertiesWidget.test.ts",
-    "PropertyParser.test.ts",
+    "PropertyMatchers.test.ts",
+    "PropertyRenderer.test.ts",
     "StylePropertiesSection.test.ts",
     "StylePropertyHighlighter.test.ts",
     "StylePropertyTreeElement.test.ts",

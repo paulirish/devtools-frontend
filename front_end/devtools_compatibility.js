@@ -69,7 +69,7 @@ const DevToolsAPIImpl = class {
     if (callback) {
       this._callbacks[callId] = callback;
     }
-    const message = {'id': callId, 'method': method};
+    const message = {id: callId, method};
     if (args.length) {
       message.params = args;
     }
@@ -82,6 +82,12 @@ const DevToolsAPIImpl = class {
    */
   _dispatchOnInspectorFrontendAPI(method, args) {
     const inspectorFrontendAPI = /** @type {!Object<string, function()>} */ (window['InspectorFrontendAPI']);
+    if (!inspectorFrontendAPI) {
+      // This is the case for device_mode_emulation_frame entrypoint. It's created via `window.open` from
+      // the DevTools window, so it shares a context with DevTools but has a separate DevToolsUIBinding and `window` object.
+      // We can safely ignore the events since they also arrive on the DevTools `window` object.
+      return;
+    }
     inspectorFrontendAPI[method].apply(inspectorFrontendAPI, args);
   }
 
@@ -282,10 +288,6 @@ const DevToolsAPIImpl = class {
     }
   }
 
-  reattachMainTarget() {
-    this._dispatchOnInspectorFrontendAPI('reattachMainTarget', []);
-  }
-
   /**
    * @param {boolean} hard
    */
@@ -405,12 +407,9 @@ window.DevToolsAPI = DevToolsAPI;
  */
 const EnumeratedHistogram = {
   ActionTaken: 'DevTools.ActionTaken',
-  BreakpointWithConditionAdded: 'DevTools.BreakpointWithConditionAdded',
-  BreakpointEditDialogRevealedFrom: 'DevTools.BreakpointEditDialogRevealedFrom',
   CSSHintShown: 'DevTools.CSSHintShown',
   DeveloperResourceLoaded: 'DevTools.DeveloperResourceLoaded',
   DeveloperResourceScheme: 'DevTools.DeveloperResourceScheme',
-  ElementsSidebarTabShown: 'DevTools.Elements.SidebarTabShown',
   ExperimentDisabled: 'DevTools.ExperimentDisabled',
   ExperimentDisabledAtLaunch: 'DevTools.ExperimentDisabledAtLaunch',
   ExperimentEnabled: 'DevTools.ExperimentEnabled',
@@ -425,7 +424,6 @@ const EnumeratedHistogram = {
   LighthouseModeRun: 'DevTools.LighthouseModeRun',
   LighthouseCategoryUsed: 'DevTools.LighthouseCategoryUsed',
   ManifestSectionSelected: 'DevTools.ManifestSectionSelected',
-  PanelClosed: 'DevTools.PanelClosed',
   PanelShown: 'DevTools.PanelShown',
   PanelShownInLocation: 'DevTools.PanelShownInLocation',
   RecordingAssertion: 'DevTools.RecordingAssertion',
@@ -438,20 +436,14 @@ const EnumeratedHistogram = {
   RecordingReplayStarted: 'DevTools.RecordingReplayStarted',
   RecordingToggled: 'DevTools.RecordingToggled',
   SidebarPaneShown: 'DevTools.SidebarPaneShown',
-  SourcesSidebarTabShown: 'DevTools.Sources.SidebarTabShown',
   SourcesPanelFileDebugged: 'DevTools.SourcesPanelFileDebugged',
   SourcesPanelFileOpened: 'DevTools.SourcesPanelFileOpened',
   NetworkPanelResponsePreviewOpened: 'DevTools.NetworkPanelResponsePreviewOpened',
   StyleTextCopied: 'DevTools.StyleTextCopied',
   SyncSetting: 'DevTools.SyncSetting',
-  ColorConvertedFrom: 'DevTools.ColorConvertedFrom',
   ColorPickerOpenedFrom: 'DevTools.ColorPickerOpenedFrom',
   CSSPropertyDocumentation: 'DevTools.CSSPropertyDocumentation',
-  InlineScriptParsed: 'DevTools.InlineScriptParsed',
-  VMInlineScriptTypeShown: 'DevTools.VMInlineScriptShown',
-  BreakpointsRestoredFromStorageCount: 'DevTools.BreakpointsRestoredFromStorageCount',
   SwatchActivated: 'DevTools.SwatchActivated',
-  BadgeActivated: 'DevTools.BadgeActivated',
   AnimationPlaybackRateChanged: 'DevTools.AnimationPlaybackRateChanged',
   AnimationPointDragged: 'DevTools.AnimationPointDragged',
   LegacyResourceTypeFilterNumberOfSelectedChanged: 'DevTools.LegacyResourceTypeFilterNumberOfSelectedChanged',
@@ -645,6 +637,53 @@ const InspectorFrontendHostImpl = class {
 
   /**
    * @override
+   * @param {function(Object<string, Object<string, string|boolean>>):void} callback
+   */
+  getHostConfig(callback) {
+    DevToolsAPI.sendMessageToEmbedder('getHostConfig', [], hostConfig => {
+      const majorVersion = getRemoteMajorVersion();
+      if (majorVersion && majorVersion < 129 && hostConfig?.aidaAvailability) {
+        return callback(this.hostConfigNewToOld(hostConfig));
+      }
+      return callback(hostConfig);
+    });
+  }
+
+  /**
+   * @param {Object<string, Object<string, string|boolean>>} newConfig
+   */
+  hostConfigNewToOld(newConfig) {
+    const devToolsConsoleInsights = {
+      enabled: (newConfig.devToolsConsoleInsights?.enabled && newConfig.aidaAvailability?.enabled) ?? false,
+      aidaModelId: newConfig.devToolsConsoleInsights?.modelId ?? '',
+      aidaTemperature: newConfig.devToolsConsoleInsights?.temperature ?? 0,
+      blockedByAge: newConfig.aidaAvailability?.blockedByAge ?? true,
+      blockedByEnterprisePolicy: newConfig.aidaAvailability?.blockedByEnterprisePolicy ?? true,
+      blockedByFeatureFlag:
+          (newConfig.devToolsConsoleInsights?.enabled && newConfig.aidaAvailability?.enabled) ?? false,
+      blockedByGeo: newConfig.aidaAvailability?.blockedByGeo ?? true,
+      blockedByRollout: false,
+      disallowLogging: newConfig.aidaAvailability?.disallowLogging ?? true,
+      optIn: false,
+    };
+    const devToolsFreestylerDogfood = {
+      enabled: (newConfig.devToolsFreestylerDogfood?.enabled && newConfig.aidaAvailability?.enabled) ?? false,
+      aidaModelId: newConfig.devToolsFreestylerDogfood?.modelId ?? '',
+      aidaTemperature: newConfig.devToolsFreestylerDogfood?.temperature ?? 0,
+      blockedByAge: newConfig.aidaAvailability?.blockedByAge ?? true,
+      blockedByEnterprisePolicy: newConfig.aidaAvailability?.blockedByEnterprisePolicy ?? true,
+      blockedByGeo: newConfig.aidaAvailability?.blockedByGeo ?? true,
+    };
+    return {
+      devToolsConsoleInsights,
+      devToolsFreestylerDogfood,
+      devToolsVeLogging: newConfig.devToolsVeLogging,
+      isOffTheRecord: newConfig.isOffTheRecord,
+    };
+  }
+
+  /**
+   * @override
    * @param {string} origin
    * @param {string} script
    */
@@ -697,9 +736,10 @@ const InspectorFrontendHostImpl = class {
    * @param {string} url
    * @param {string} content
    * @param {boolean} forceSaveAs
+   * @param {boolean} isBase64
    */
-  save(url, content, forceSaveAs) {
-    DevToolsAPI.sendMessageToEmbedder('save', [url, content, forceSaveAs], null);
+  save(url, content, forceSaveAs, isBase64) {
+    DevToolsAPI.sendMessageToEmbedder('save', [url, content, forceSaveAs, isBase64], null);
   }
 
   /**
@@ -1143,10 +1183,10 @@ const InspectorFrontendHostImpl = class {
 
   /**
    * @param {string} request
-   * @param {function(!InspectorFrontendHostAPI.DoAidaConversationResult): void} cb
+   * @param {function(!InspectorFrontendHostAPI.AidaClientResult): void} cb
    */
-  registerAidaClientEvent(request) {
-    DevToolsAPI.sendMessageToEmbedder('registerAidaClientEvent', [request]);
+  registerAidaClientEvent(request, cb) {
+    DevToolsAPI.sendMessageToEmbedder('registerAidaClientEvent', [request], cb);
   }
 };
 
@@ -1365,7 +1405,7 @@ function installObjectObserve() {
       scheduled = false;
       const changes = /** @type {!Array<!{name: string}>} */ ([]);
       changedProperties.forEach(function(name) {
-        changes.push({name: name});
+        changes.push({name});
       });
       changedProperties.clear();
       observer.call(null, changes);

@@ -42,6 +42,7 @@ import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 import * as Bindings from '../../models/bindings/bindings.js';
+import type * as HAR from '../../models/har/har.js';
 import * as Logs from '../../models/logs/logs.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as NetworkForward from '../../panels/network/forward/forward.js';
@@ -155,6 +156,10 @@ const UIStrings = {
    */
   preload: 'Preload',
   /**
+   *@description Cell title in Network Data Grid Node of the Network panel
+   */
+  earlyHints: 'early-hints',
+  /**
    *@description Text in Network Data Grid Node of the Network panel
    */
   signedexchange: 'signed-exchange',
@@ -212,10 +217,6 @@ const UIStrings = {
    *@example {10 B} PH1
    */
   servedFromDiskCacheResourceSizeS: 'Served from disk cache, resource size: {PH1}',
-  /**
-   *@description Text of a DOM element in Network Data Grid Node of the Network panel
-   */
-  serviceWorkerRouter: '(`ServiceWorker router`)',
   /**
    *@description Cell title in Network Data Grid Node of the Network panel
    *@example {1} PH1
@@ -312,7 +313,7 @@ const UIStrings = {
    *@description Tooltip to explain why the request has warning icon
    */
   thirdPartyPhaseout:
-      'Cookies for this request are blocked due to third-party cookie phaseout. Learn more in the Issues tab.',
+      'Cookies for this request are blocked either because of Chrome flags or browser configuration. Learn more in the Issues panel.',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/network/NetworkDataGridNode.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -359,7 +360,7 @@ export interface NetworkLogViewInterface extends Common.EventTarget.EventTarget<
   switchViewMode(gridMode: boolean): void;
   handleContextMenuForRequest(contextMenu: UI.ContextMenu.ContextMenu, request: SDK.NetworkRequest.NetworkRequest):
       void;
-  exportAll(): Promise<void>;
+  exportAll(options: HAR.Log.BuildOptions): Promise<void>;
   revealAndHighlightRequest(request: SDK.NetworkRequest.NetworkRequest): void;
   selectRequest(request: SDK.NetworkRequest.NetworkRequest): void;
   removeAllNodeHighlights(): void;
@@ -866,6 +867,10 @@ export class NetworkRequestNode extends NetworkNode {
     const resourceType = this.requestInternal.resourceType();
     let simpleType = resourceType.name();
 
+    if (this.requestInternal.fromEarlyHints()) {
+      return i18nString(UIStrings.earlyHints);
+    }
+
     if (resourceType === Common.ResourceType.resourceTypes.Other ||
         resourceType === Common.ResourceType.resourceTypes.Image) {
       simpleType = mimeType.replace(/^(application|image)\//, '');
@@ -942,7 +947,7 @@ export class NetworkRequestNode extends NetworkNode {
               i18nString(UIStrings.sPreflight, {PH1: this.requestInternal.requestMethod}));
           cell.appendChild(Components.Linkifier.Linkifier.linkifyRevealable(
               preflightRequest, i18nString(UIStrings.preflight), undefined,
-              i18nString(UIStrings.selectPreflightRequest)));
+              i18nString(UIStrings.selectPreflightRequest), undefined, 'preflight-request'));
         } else {
           this.setTextAndTitle(cell, this.requestInternal.requestMethod);
         }
@@ -1130,7 +1135,7 @@ export class NetworkRequestNode extends NetworkNode {
           cell.appendChild(Components.Linkifier.Linkifier.linkifyRevealable(
               new NetworkForward.NetworkRequestId.NetworkRequestId(
                   webBundleInnerRequestInfo.bundleRequestId, networkManager),
-              secondIconElement));
+              secondIconElement, undefined, undefined, undefined, 'webbundle-request'));
         } else {
           cell.appendChild(secondIconElement);
         }
@@ -1343,7 +1348,7 @@ export class NetworkRequestNode extends NetworkNode {
             cell, i18nString(UIStrings.blockeds, {PH1: reason}), i18nString(UIStrings.blockedTooltip), () => {
               this.parentView().dispatchEventToListeners(Events.RequestActivated, {
                 showPanel: true,
-                tab: NetworkForward.UIRequestLocation.UIRequestTabs.HeadersComponent,
+                tab: NetworkForward.UIRequestLocation.UIRequestTabs.HEADERS_COMPONENT,
               });
             });
       } else {
@@ -1430,7 +1435,7 @@ export class NetworkRequestNode extends NetworkNode {
       cell.appendChild(document.createTextNode(i18nString(UIStrings.push)));
     }
     switch (initiator.type) {
-      case SDK.NetworkRequest.InitiatorType.Parser: {
+      case SDK.NetworkRequest.InitiatorType.PARSER: {
         const uiSourceCode = Workspace.Workspace.WorkspaceImpl.instance().uiSourceCodeForURL(initiator.url);
         const displayName = uiSourceCode?.displayName();
         const text = displayName !== undefined && initiator.lineNumber !== undefined ?
@@ -1446,21 +1451,23 @@ export class NetworkRequestNode extends NetworkNode {
         break;
       }
 
-      case SDK.NetworkRequest.InitiatorType.Redirect: {
+      case SDK.NetworkRequest.InitiatorType.REDIRECT: {
         UI.Tooltip.Tooltip.install(cell, initiator.url);
         const redirectSource = (request.redirectSource() as SDK.NetworkRequest.NetworkRequest);
         console.assert(redirectSource !== null);
         if (this.parentView().nodeForRequest(redirectSource)) {
           cell.appendChild(Components.Linkifier.Linkifier.linkifyRevealable(
-              redirectSource, Bindings.ResourceUtils.displayNameForURL(redirectSource.url())));
+              redirectSource, Bindings.ResourceUtils.displayNameForURL(redirectSource.url()), undefined, undefined,
+              undefined, 'redirect-source-request'));
         } else {
-          cell.appendChild(Components.Linkifier.Linkifier.linkifyURL(redirectSource.url()));
+          cell.appendChild(Components.Linkifier.Linkifier.linkifyURL(
+              redirectSource.url(), {jslogContext: 'redirect-source-request-url'}));
         }
         this.appendSubtitle(cell, i18nString(UIStrings.redirect));
         break;
       }
 
-      case SDK.NetworkRequest.InitiatorType.Script: {
+      case SDK.NetworkRequest.InitiatorType.SCRIPT: {
         const target = SDK.NetworkManager.NetworkManager.forRequest(request)?.target() || null;
         const linkifier = this.parentView().linkifier();
         if (initiator.stack) {
@@ -1477,26 +1484,26 @@ export class NetworkRequestNode extends NetworkNode {
         break;
       }
 
-      case SDK.NetworkRequest.InitiatorType.Preload: {
+      case SDK.NetworkRequest.InitiatorType.PRELOAD: {
         UI.Tooltip.Tooltip.install(cell, i18nString(UIStrings.preload));
         cell.classList.add('network-dim-cell');
         cell.appendChild(document.createTextNode(i18nString(UIStrings.preload)));
         break;
       }
 
-      case SDK.NetworkRequest.InitiatorType.SignedExchange: {
+      case SDK.NetworkRequest.InitiatorType.SIGNED_EXCHANGE: {
         cell.appendChild(Components.Linkifier.Linkifier.linkifyURL(initiator.url));
         this.appendSubtitle(cell, i18nString(UIStrings.signedexchange));
         break;
       }
 
-      case SDK.NetworkRequest.InitiatorType.Preflight: {
+      case SDK.NetworkRequest.InitiatorType.PREFLIGHT: {
         cell.appendChild(document.createTextNode(i18nString(UIStrings.preflight)));
         if (initiator.initiatorRequest) {
           const icon = IconButton.Icon.create('arrow-up-down-circle');
           const link = Components.Linkifier.Linkifier.linkifyRevealable(
               initiator.initiatorRequest, icon, undefined, i18nString(UIStrings.selectTheRequestThatTriggered),
-              'trailing-link-icon');
+              'trailing-link-icon', 'initator-request');
           UI.ARIAUtils.setLabel(link, i18nString(UIStrings.selectTheRequestThatTriggered));
           cell.appendChild(link);
         }
@@ -1526,8 +1533,9 @@ export class NetworkRequestNode extends NetworkNode {
       cell.classList.add('network-dim-cell');
     } else if (this.requestInternal.serviceWorkerRouterInfo) {
       const {serviceWorkerRouterInfo} = this.requestInternal;
-      const ruleIdMatched = serviceWorkerRouterInfo.ruleIdMatched;
-      UI.UIUtils.createTextChild(cell, i18nString(UIStrings.serviceWorkerRouter));
+      // If `serviceWorkerRouterInfo.ruleIdMatched` is undefined,store 0 to indicate invalid ID.
+      const ruleIdMatched = serviceWorkerRouterInfo.ruleIdMatched ?? 0;
+      UI.UIUtils.createTextChild(cell, i18n.i18n.lockedString('(ServiceWorker router)'));
       let tooltipText;
       if (serviceWorkerRouterInfo.matchedSourceType === Protocol.Network.ServiceWorkerRouterSource.Network) {
         const transferSize = Platform.NumberUtilities.bytesToString(this.requestInternal.transferSize);

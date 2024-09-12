@@ -22,7 +22,7 @@ import {
   waitForElementWithTextContent,
   waitForFunction,
 } from '../../shared/helper.js';
-import {describe, it} from '../../shared/mocha-extensions.js';
+
 import {CONSOLE_TAB_SELECTOR, focusConsolePrompt} from '../helpers/console-helpers.js';
 import {triggerLocalFindDialog} from '../helpers/memory-helpers.js';
 import {
@@ -135,8 +135,7 @@ describe('The Network Request view', () => {
     await waitForElementWithTextContent('uuid-in-package:020111b3-437a-4c5c-ae07-adb6bbffb720', networkView);
   });
 
-  // failing test blocking the roll
-  it.skip('[crbug.com/1518454]: prevents requests on the preview tab.', async () => {
+  it('prevents requests on the preview tab.', async () => {
     await navigateToNetworkTab('embedded_requests.html');
 
     // For the issue to manifest it's mandatory to load the stylesheet by absolute URL. A relative URL would be treated
@@ -176,8 +175,7 @@ describe('The Network Request view', () => {
     await waitForFunction(async () => await styleSrcError.caught);
   });
 
-  // failing test blocking the roll
-  it.skip('[crbug.com/1518454]: permits inline styles on the preview tab.', async () => {
+  it('permits inline styles on the preview tab.', async () => {
     await navigateToNetworkTab('embedded_requests.html');
     const contents = '<head><style>p { color: red; }</style></head><body><p>Content</p></body>';
     const {target} = getBrowserAndPages();
@@ -279,7 +277,7 @@ describe('The Network Request view', () => {
     let messages = await waitForMessages(messagesView, 3);
     await assertBaseState(messagesView);
 
-    const inputSelector = '[aria-placeholder="Enter regex, for example: https?';
+    const inputSelector = '[aria-placeholder="Filter using regex (example: https?)';
 
     const filterInput = await waitFor(inputSelector, messagesView);
 
@@ -290,7 +288,7 @@ describe('The Network Request view', () => {
     assertMessage(messages[0], knownMessages[0]);
 
     // clear
-    await click('[title="Clear input"]', {
+    await click('[title="Clear"]', {
       root: messagesView,
     });
     await assertBaseState(messagesView);
@@ -348,9 +346,9 @@ describe('The Network Request view', () => {
     let messages = await waitForMessages(4);
 
     const filterInput =
-        await waitFor('[aria-label="Enter regex, for example: (web)?socket"][role=textbox]', messagesView);
+        await waitFor('[aria-label="Filter using regex (example: (web)?socket)"][role=textbox]', messagesView);
     await filterInput.focus();
-    await typeText('ping');
+    await typeText('p[ai]ng');
 
     messages = await waitForMessages(2);
     assert.deepEqual(messages, ['ping', 'ping']);
@@ -642,7 +640,7 @@ describe('The Network Request view', () => {
     await waitForSomeRequestsToAppear(2);
 
     await selectRequestByName('image.svg?id=42&param=a%20b');
-    const SEARCH_QUERY = '[aria-label="Search Query"]';
+    const SEARCH_QUERY = '[aria-label="Find"]';
     const SEARCH_RESULT = '.search-result';
     const {frontend} = getBrowserAndPages();
 

@@ -2,22 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-const {assert} = chai;
-import * as TraceEngine from '../trace.js';
 import type * as Protocol from '../../../generated/protocol.js';
 import {TraceLoader} from '../../../testing/TraceLoader.js';
+import * as TraceEngine from '../trace.js';
 
-function invalidationDataForTestAssertion(invalidation: TraceEngine.Types.TraceEvents.SyntheticInvalidation): {
+function invalidationDataForTestAssertion(invalidation: TraceEngine.Types.TraceEvents.InvalidationTrackingEvent): {
   nodeId: Protocol.DOM.BackendNodeId,
   nodeName?: string,
   reason?: string,
   stackTrace?: TraceEngine.Types.TraceEvents.TraceEventCallFrame[],
 } {
   return {
-    nodeId: invalidation.nodeId,
-    nodeName: invalidation.nodeName,
-    reason: invalidation.reason,
-    stackTrace: invalidation.stackTrace,
+    nodeId: invalidation.args.data.nodeId,
+    nodeName: invalidation.args.data.nodeName,
+    reason: invalidation.args.data.reason,
+    stackTrace: invalidation.args.data.stackTrace,
   };
 }
 
@@ -153,5 +152,35 @@ describe('InvalidationsHandler', () => {
         stackTrace: undefined,
       },
     ]);
+  });
+
+  it('limits the number of kept invalidations per event', async function() {
+    const events = await TraceLoader.rawEvents(this, 'over-20-invalidations-per-event.json.gz');
+
+    TraceEngine.Handlers.ModelHandlers.Invalidations.handleUserConfig(
+        {
+          ...TraceEngine.Types.Configuration.defaults(),
+          maxInvalidationEventsPerEvent: 5,
+        },
+    );
+    for (const event of events) {
+      TraceEngine.Handlers.ModelHandlers.Invalidations.handleEvent(event);
+    }
+    await TraceEngine.Handlers.ModelHandlers.Invalidations.finalize();
+    const data = TraceEngine.Handlers.ModelHandlers.Invalidations.data();
+
+    // Find the UpdateLayoutEvent that had 26 invalidations
+    const layoutEvent = Array.from(data.invalidationCountForEvent.entries())
+                            .filter(entry => {
+                              const [, count] = entry;
+                              return count === 26;
+                            })
+                            .map(entry => entry[0])
+                            .at(0);
+    assert.isOk(layoutEvent);
+    const invalidations = data.invalidationsForEvent.get(layoutEvent);
+    assert.isOk(invalidations);
+    // We know there are 26 invalidation events, but the handler only kept the last 5 as per the config we passed in.
+    assert.lengthOf(invalidations, 5);
   });
 });

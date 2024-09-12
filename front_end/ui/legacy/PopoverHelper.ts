@@ -37,8 +37,8 @@ export class PopoverHelper {
   static createPopover = (jslogContext?: string): GlassPane => {
     const popover = new GlassPane(`${VisualLogging.popover(jslogContext).parent('mapped')}`);
     popover.registerRequiredCSS(popoverStyles);
-    popover.setSizeBehavior(SizeBehavior.MeasureContent);
-    popover.setMarginBehavior(MarginBehavior.Arrow);
+    popover.setSizeBehavior(SizeBehavior.MEASURE_CONTENT);
+    popover.setMarginBehavior(MarginBehavior.ARROW);
     return popover;
   };
   private disableOnClick: boolean;
@@ -54,12 +54,12 @@ export class PopoverHelper {
   private readonly boundMouseDown: (event: Event) => void;
   private readonly boundMouseMove: (ev: Event) => void;
   private readonly boundMouseOut: (event: Event) => void;
-  readonly #jslogContext: string;
-  constructor(container: Element, getRequest: (arg0: MouseEvent) => PopoverRequest | null, jslogContext: string) {
+  jslogContext?: string;
+  constructor(container: Element, getRequest: (arg0: MouseEvent) => PopoverRequest | null, jslogContext?: string) {
     this.disableOnClick = false;
     this.hasPadding = false;
     this.getRequest = getRequest;
-    this.#jslogContext = jslogContext;
+    this.jslogContext = jslogContext;
     this.scheduledRequest = null;
     this.hidePopoverCallback = null;
     this.container = container;
@@ -204,7 +204,7 @@ export class PopoverHelper {
   }
 
   private showPopover(document: Document): void {
-    const popover = PopoverHelper.createPopover(this.#jslogContext);
+    const popover = PopoverHelper.createPopover(this.jslogContext);
     const request = this.scheduledRequest;
     if (!request) {
       return;

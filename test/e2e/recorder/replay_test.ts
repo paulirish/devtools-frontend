@@ -16,10 +16,6 @@ import {
   getTestServerPort,
   waitFor,
 } from '../../../test/shared/helper.js';
-import {
-  describe,
-  it,
-} from '../../../test/shared/mocha-extensions.js';
 
 import {
   clickSelectButtonItem,
@@ -627,7 +623,7 @@ describe('Recorder', function() {
       });
 
       const onceFinished = onReplayFinished();
-      await clickSelectButtonItem('Slow', 'devtools-replay-button');
+      await clickSelectButtonItem('Slow', 'devtools-replay-section');
       await onceFinished;
 
       assert.strictEqual(

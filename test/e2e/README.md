@@ -1,4 +1,4 @@
-# Guide on end-to-end testing
+# E2E Testing
 
 This directory hosts the end-to-end tests we run on DevTools. These tests open a target page and a DevTools frontend page, for which the DevTools frontend connects to the target page over CDP. We use [Puppeteer] to talk over CDP and all functionality of Puppeteer is available to you as well when writing end-to-end tests. We use [Mocha] as testing framework.
 
@@ -9,56 +9,129 @@ The tests therefore have a dual purpose:
 1. Verify that core user stories are working as intended and are not broken by a particular DevTools frontend change.
 1. Serve as documentation and reference point for how DevTools is intended to be used.
 
-## Running tests
+[TOC]
 
-The following command (builds and) runs all tests:
+## Running E2E tests
 
-```sh
-npm run auto-e2etest
+The end-to-end tests are implicitly run as part of `npm run test`,
+but that also runs all the other test suites. To run only
+**all end-to-end tests**, use:
+
+```
+npm run test test/e2e
 ```
 
-> Note, you can use `it.only` to run a single test!
+To use `out/Debug` instead of the default `out/Default` target
+directory, use:
 
-### Flags
-
-The following list of flags are commonly used:
-
-- `--jobs=N` — use N parallel runners to speed things up
-  - The number to chose depends on several factors, not just the number of cores. A good way to determine the number is to bisect the number of cores until the tests pass.
-- `--chrome-binary-path=LOCATION` — set a path to the chrome executable
-- `--chrome-features=FEATURES` — set a comma separated list of chrome features passed as `--enable-features=[FEATURES]` to the chrome binary.
-- `--test-file-pattern=FILE_PATTERN` — run tests in selected test files only. The extglob pattern matches paths relative to the test/e2e/ directory. To run all sources panel tests, for example, use `--test-file-pattern=sources/*`.
-
-To use the flags, first append `--` to the `npm` command. For example,
-
-```sh
-npm run auto-e2etest -- --jobs=4
+```
+npm run test -- -t Debug test/e2e
 ```
 
-See scripts/test/run_test_suite.py for more flags.
+To run the end-to-end tests in **debug mode**, use:
 
-### Environment variables
+```
+npm run test -- --debug test/e2e
+```
 
-The following environmental variable are commonly used:
+To run only **specific end-to-end tests** from a single `_test.ts`
+file, say `console-log_test.ts` for example, use:
 
-- `ITERATIONS=N` - Runs every test `N` number of times.
-- `LATE_PROMISES=true|N` - Delays all promises in the frontend by `N` number of milliseconds. Defaults to 10ms if set to `true`.
-- `STRESS=true` - Emulates CPU slow-down.
+```
+npm run test test/e2e/console/console-log_test.ts
+```
 
-## Skipping tests
+Check the output of `npm run test -- --help` for an overview of
+all options.
 
-You can disable a test for all platforms using `it.skip`. If you are disabling a flaky test, consider disabling it only on the affected platforms. For example,
+## Debugging E2E tests
+
+You can debug the "DevTools under test" with DevTools-on-DevTools. Use the
+standard DevTools key combination to open another DevTools instance while
+you look at the "DevTools under test". You can set breakpoints and inspect
+the status of the "DevTools under test" this way. You can debug the puppeteer
+side by inspecting the Node.js process that runs the e2e suite. Either open
+`chrome://inspect` or click the Node.js icon in any open DevTools window to
+connect to the puppeteer process. You can step through the puppeteer test
+code this way.
+
+To listen to the frontend's console:
 
 ```js
-it.skipOnPlatforms(['mac', 'win32'], '[crbug.com/xxx] ...', () => {...});
-it.skipOnPlatforms(['linux'], '[crbug.com/xxx] ...', () => {...});
+getBrowserAndPages().frontend.on('console', msg => console.log(msg.text()));
 ```
 
-To use `skipOnPlatforms`, you need to import `it` from `test/shared/mocha-extensions.ts`.
+### Debugging E2E tests with VSCode
 
-## Debugging tests
+There's experimental support for running unit tests directly from
+within VSCode. Open the "Run and Debug" sidebar, select "Run end-to-end tests
+in VS Code debugger" from the dropdown, and click the start button or
+press F5.
 
-To see what the test script does, run `npm run debug-e2etest`. This will bring up the chrome window and stop just before your test script is about to execute. The test will then run to completion and exit. You can add an infinite await `await new Promise(() => {});` at the end of your test to give you some time to examine the result of your test script.
+![Debugging E2E tests with VSCode](../../docs/images/debugging-e2e-tests-with-vscode.png "Debugging E2E tests with VSCode")
+
+Current limitations when using VSCode for e2e and interactions tests:
+
+- VSCode only attaches to the node portion of the code (mostly the test files
+  and the test helpers), not to Chrome.
+- VSCode debugging only works with headless mode.
+
+## Dealing with flaky E2E tests
+
+To skip a flaky E2E test, create a new bug on [crbug.com](https://crbug.com) in the
+`Chromium > Platform > DevTools` component, and modify the `it` or `describe`
+block accordingly by adding `.skip` to it, adding a preceeding comment
+why the test is skipp and adding the `crbug.com` reference to the test
+block string. For example
+
+```js
+describe('Foo', () => {
+  it('can return bar', () => {
+    assert.strictEqual((new Foo()).bar(), 'bar');
+  });
+
+  ...
+});
+```
+
+would be changed to look like this
+
+```js
+describe('Foo', () => {
+  // Flaking on multiple bots on CQ after recent CL xyz.
+  it.skip('[crbug.com/12345678] can return bar', () => {
+    assert.strictEqual((new Foo()).bar(), 'bar');
+  });
+
+  ...
+});
+```
+
+if only the one test case should be skipped, or like this
+
+```js
+// Flaking on multiple bots on CQ after recent CL xyz.
+describe.skip('[crbug.com/12345678] Foo', () => {
+  it('can return bar', () => {
+    assert.strictEqual((new Foo()).bar(), 'bar');
+  });
+
+  ...
+});
+```
+
+if all the tests for `Foo` should be skipped. If you are disabling a flaky test,
+consider disabling it only on the affected platforms. For example:
+
+```js
+// Consistently flakes on Mac and Windows bots.
+it.skipOnPlatforms(['mac', 'win32'], '[crbug.com/xxx] ...', () => {...});
+
+// Skipped on Linux because the world isn't round.
+describe.skipOnPlatforms(['linux'], '[crbug.com/xxx] ...', () => {...});
+```
+
+### De-flaking E2E tests
 
 The `it.repeat` helper is useful for reproducing a flaky test failure. e.g.
 
@@ -67,22 +140,6 @@ it.repeat(20, 'find element', async () => {...});
 ```
 
 `it.repeat` behaves like `it.only` in that it will cause just that single test to be run.
-
-### Debug tests with DevTools
-
-Running `npm run debug-e2etest` also allows debugging a test with DevTools. Please note that there are two different targets that can be inspected, and the way they are inspected differs slightly:
-
-- You can debug the "DevTools under test" with DevTools-on-DevTools. Use the standard DevTools key combination to open another DevTools instance while you look at the "DevTools under test". You can set breakpoints and inspect the status of the "DevTools under test" this way.
-- You can debug the puppeteer side by inspecting the Node.js process that runs the e2e suite. Either open `chrome://inspect` or click the Node.js icon in any open DevTools window to connect to the puppeteer process. You can step through the puppeteer test code this way.
-
-### Debug tests with VSCode
-
-To debug in VSCode, open the "Run and Debug" sidebar, select "Run end-to-end tests in VS Code debugger" from the dropdown, and click the start button or press F5. Current limitations when using VSCode:
-
-- VSCode only attaches to the node portion of the code (mostly the test files and the test helpers), not to Chrome.
-- VSCode debugging only works with headless mode.
-
-## Debugging flaky tests
 
 To see if certain tests are flaky you can use the E2E stressor bots. Open a CL with your test changes and run the following command specifying your test file:
 

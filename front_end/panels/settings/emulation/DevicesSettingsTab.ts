@@ -4,6 +4,7 @@
 
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as EmulationModel from '../../../models/emulation/emulation.js';
+import type * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as UI from '../../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
@@ -69,7 +70,7 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export class DevicesSettingsTab extends UI.Widget.VBox implements
     UI.ListWidget.Delegate<EmulationModel.EmulatedDevices.EmulatedDevice> {
   containerElement: HTMLElement;
-  private readonly addCustomButton: HTMLButtonElement;
+  private readonly addCustomButton: Buttons.Button.Button;
   private readonly ariaSuccessMessageElement: HTMLElement;
   private readonly list: UI.ListWidget.ListWidget<EmulationModel.EmulatedDevices.EmulatedDevice>;
   private muteUpdate: boolean;
@@ -104,9 +105,9 @@ export class DevicesSettingsTab extends UI.Widget.VBox implements
     this.muteUpdate = false;
     this.emulatedDevicesList = EmulationModel.EmulatedDevices.EmulatedDevicesList.instance();
     this.emulatedDevicesList.addEventListener(
-        EmulationModel.EmulatedDevices.Events.CustomDevicesUpdated, this.devicesUpdated, this);
+        EmulationModel.EmulatedDevices.Events.CUSTOM_DEVICES_UPDATED, this.devicesUpdated, this);
     this.emulatedDevicesList.addEventListener(
-        EmulationModel.EmulatedDevices.Events.StandardDevicesUpdated, this.devicesUpdated, this);
+        EmulationModel.EmulatedDevices.Events.STANDARD_DEVICES_UPDATED, this.devicesUpdated, this);
 
     this.setDefaultFocusedElement(this.addCustomButton);
   }
@@ -214,13 +215,13 @@ export class DevicesSettingsTab extends UI.Widget.VBox implements
     });
     device.capabilities = [];
     const uaType = editor.control('ua-type').value;
-    if (uaType === EmulationModel.DeviceModeModel.UA.Mobile ||
-        uaType === EmulationModel.DeviceModeModel.UA.MobileNoTouch) {
-      device.capabilities.push(EmulationModel.EmulatedDevices.Capability.Mobile);
+    if (uaType === EmulationModel.DeviceModeModel.UA.MOBILE ||
+        uaType === EmulationModel.DeviceModeModel.UA.MOBILE_NO_TOUCH) {
+      device.capabilities.push(EmulationModel.EmulatedDevices.Capability.MOBILE);
     }
-    if (uaType === EmulationModel.DeviceModeModel.UA.Mobile ||
-        uaType === EmulationModel.DeviceModeModel.UA.DesktopTouch) {
-      device.capabilities.push(EmulationModel.EmulatedDevices.Capability.Touch);
+    if (uaType === EmulationModel.DeviceModeModel.UA.MOBILE ||
+        uaType === EmulationModel.DeviceModeModel.UA.DESKTOP_TOUCH) {
+      device.capabilities.push(EmulationModel.EmulatedDevices.Capability.TOUCH);
     }
     const userAgentControlValue =
         (editor.control('ua-metadata') as
@@ -230,8 +231,8 @@ export class DevicesSettingsTab extends UI.Widget.VBox implements
       device.userAgentMetadata = {
         ...userAgentControlValue,
         mobile:
-            (uaType === EmulationModel.DeviceModeModel.UA.Mobile ||
-             uaType === EmulationModel.DeviceModeModel.UA.MobileNoTouch),
+            (uaType === EmulationModel.DeviceModeModel.UA.MOBILE ||
+             uaType === EmulationModel.DeviceModeModel.UA.MOBILE_NO_TOUCH),
       };
     }
     if (isNew) {
@@ -256,10 +257,10 @@ export class DevicesSettingsTab extends UI.Widget.VBox implements
     let uaType;
     if (device.mobile()) {
       uaType =
-          device.touch() ? EmulationModel.DeviceModeModel.UA.Mobile : EmulationModel.DeviceModeModel.UA.MobileNoTouch;
+          device.touch() ? EmulationModel.DeviceModeModel.UA.MOBILE : EmulationModel.DeviceModeModel.UA.MOBILE_NO_TOUCH;
     } else {
       uaType =
-          device.touch() ? EmulationModel.DeviceModeModel.UA.DesktopTouch : EmulationModel.DeviceModeModel.UA.Desktop;
+          device.touch() ? EmulationModel.DeviceModeModel.UA.DESKTOP_TOUCH : EmulationModel.DeviceModeModel.UA.DESKTOP;
     }
     editor.control('ua-type').value = uaType;
     (editor.control('ua-metadata') as
@@ -297,10 +298,10 @@ export class DevicesSettingsTab extends UI.Widget.VBox implements
       return {valid: true, errorMessage: undefined};
     }));
     const uaTypeOptions = [
-      EmulationModel.DeviceModeModel.UA.Mobile,
-      EmulationModel.DeviceModeModel.UA.MobileNoTouch,
-      EmulationModel.DeviceModeModel.UA.Desktop,
-      EmulationModel.DeviceModeModel.UA.DesktopTouch,
+      EmulationModel.DeviceModeModel.UA.MOBILE,
+      EmulationModel.DeviceModeModel.UA.MOBILE_NO_TOUCH,
+      EmulationModel.DeviceModeModel.UA.DESKTOP,
+      EmulationModel.DeviceModeModel.UA.DESKTOP_TOUCH,
     ];
     const uaType = editor.createSelect('ua-type', uaTypeOptions, () => {
       return {valid: true, errorMessage: undefined};

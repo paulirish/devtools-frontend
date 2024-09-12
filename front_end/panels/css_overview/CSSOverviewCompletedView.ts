@@ -253,7 +253,7 @@ export class CSSOverviewCompletedView extends UI.Widget.VBox {
     this.#elementContainer = new DetailsView();
 
     // If closing the last tab, collapse the sidebar.
-    this.#elementContainer.addEventListener(Events.TabClosed, evt => {
+    this.#elementContainer.addEventListener(Events.TAB_CLOSED, evt => {
       if (evt.data === 0) {
         this.#mainContainer.setSidebarMinimized(true);
       }
@@ -283,10 +283,10 @@ export class CSSOverviewCompletedView extends UI.Widget.VBox {
     this.#sideBar.addItem(i18nString(UIStrings.mediaQueries), 'media-queries');
     this.#sideBar.select('summary', false);
 
-    this.#sideBar.addEventListener(SidebarEvents.ItemSelected, this.#sideBarItemSelected, this);
-    this.#sideBar.addEventListener(SidebarEvents.Reset, this.#sideBarReset, this);
-    this.#controller.addEventListener(CSSOverViewControllerEvents.Reset, this.#reset, this);
-    this.#controller.addEventListener(CSSOverViewControllerEvents.PopulateNodes, this.#createElementsView, this);
+    this.#sideBar.addEventListener(SidebarEvents.ITEM_SELECTED, this.#sideBarItemSelected, this);
+    this.#sideBar.addEventListener(SidebarEvents.RESET, this.#sideBarReset, this);
+    this.#controller.addEventListener(CSSOverViewControllerEvents.RESET, this.#reset, this);
+    this.#controller.addEventListener(CSSOverViewControllerEvents.POPULATE_NODES, this.#createElementsView, this);
     this.#resultsContainer.element.addEventListener('click', this.#onClick.bind(this));
 
     this.#data = null;
@@ -326,7 +326,7 @@ export class CSSOverviewCompletedView extends UI.Widget.VBox {
   }
 
   #sideBarReset(): void {
-    this.#controller.dispatchEventToListeners(CSSOverViewControllerEvents.Reset);
+    this.#controller.dispatchEventToListeners(CSSOverViewControllerEvents.RESET);
   }
 
   #reset(): void {
@@ -466,7 +466,7 @@ export class CSSOverviewCompletedView extends UI.Widget.VBox {
     }
 
     evt.consume();
-    this.#controller.dispatchEventToListeners(CSSOverViewControllerEvents.PopulateNodes, {payload});
+    this.#controller.dispatchEventToListeners(CSSOverViewControllerEvents.POPULATE_NODES, {payload});
     this.#mainContainer.setSidebarMinimized(false);
   }
 
@@ -661,7 +661,7 @@ export class CSSOverviewCompletedView extends UI.Widget.VBox {
       this.#viewMap.set(id, view);
     }
 
-    this.#elementContainer.appendTab(id, tabTitle, view, true);
+    this.#elementContainer.appendTab(id, tabTitle, view, payload.type);
   }
 
   #fontInfoToFragment(fontInfo: Map<string, Map<string, Map<string, number[]>>>): UI.Fragment.Fragment {
@@ -855,13 +855,14 @@ export class DetailsView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
     this.#tabbedPane = new UI.TabbedPane.TabbedPane();
     this.#tabbedPane.show(this.element);
     this.#tabbedPane.addEventListener(UI.TabbedPane.Events.TabClosed, () => {
-      this.dispatchEventToListeners(Events.TabClosed, this.#tabbedPane.tabIds().length);
+      this.dispatchEventToListeners(Events.TAB_CLOSED, this.#tabbedPane.tabIds().length);
     });
   }
 
-  appendTab(id: string, tabTitle: string, view: UI.Widget.Widget, isCloseable?: boolean): void {
+  appendTab(id: string, tabTitle: string, view: UI.Widget.Widget, jslogContext?: string): void {
     if (!this.#tabbedPane.hasTab(id)) {
-      this.#tabbedPane.appendTab(id, tabTitle, view, undefined, undefined, isCloseable);
+      this.#tabbedPane.appendTab(
+          id, tabTitle, view, undefined, undefined, /* isCloseable */ true, undefined, undefined, jslogContext);
     }
 
     this.#tabbedPane.selectTab(id);
@@ -873,11 +874,11 @@ export class DetailsView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
 }
 
 export const enum Events {
-  TabClosed = 'TabClosed',
+  TAB_CLOSED = 'TabClosed',
 }
 
 export type EventTypes = {
-  [Events.TabClosed]: number,
+  [Events.TAB_CLOSED]: number,
 };
 
 export class ElementDetailsView extends UI.Widget.Widget {
@@ -984,7 +985,7 @@ export class ElementDetailsView extends UI.Widget.Widget {
     this.#elementGrid.element.addEventListener('mouseover', this.#onMouseOver.bind(this));
     this.#elementGrid.setStriped(true);
     this.#elementGrid.addEventListener(
-        DataGrid.DataGrid.Events.SortingChanged, this.#sortMediaQueryDataGrid.bind(this));
+        DataGrid.DataGrid.Events.SORTING_CHANGED, this.#sortMediaQueryDataGrid.bind(this));
 
     this.#elementGrid.asWidget().show(this.element);
   }
@@ -1008,7 +1009,7 @@ export class ElementDetailsView extends UI.Widget.Widget {
     }
 
     const backendNodeId = Number(node.dataset.backendNodeId);
-    this.#controller.dispatchEventToListeners(CSSOverViewControllerEvents.RequestNodeHighlight, backendNodeId);
+    this.#controller.dispatchEventToListeners(CSSOverViewControllerEvents.REQUEST_NODE_HIGHLIGHT, backendNodeId);
   }
 
   async populateNodes(data: PopulateNodesEventNodes): Promise<void> {
@@ -1057,7 +1058,7 @@ export class ElementDetailsView extends UI.Widget.Widget {
       this.#elementGrid.insertChild(node);
     }
 
-    this.#elementGrid.setColumnsVisiblity(visibility);
+    this.#elementGrid.setColumnsVisibility(visibility);
     this.#elementGrid.renderInline();
     this.#elementGrid.wasShown();
   }

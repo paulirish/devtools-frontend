@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 
 import type * as Platform from '../../core/platform/platform.js';
+import type * as Root from '../root/root.js';
 
 export enum Events {
+  /* eslint-disable @typescript-eslint/naming-convention -- Accessed from web_tests */
   AppendedToURL = 'appendedToURL',
   CanceledSaveURL = 'canceledSaveURL',
   ColorThemeChanged = 'colorThemeChanged',
@@ -26,7 +28,6 @@ export enum Events {
   IndexingWorked = 'indexingWorked',
   IndexingDone = 'indexingDone',
   KeyEventUnhandled = 'keyEventUnhandled',
-  ReattachRootTarget = 'reattachMainTarget',
   ReloadInspectedPage = 'reloadInspectedPage',
   RevealSourceLine = 'revealSourceLine',
   SavedURL = 'savedURL',
@@ -34,6 +35,7 @@ export enum Events {
   SetInspectedTabId = 'setInspectedTabId',
   SetUseSoftMenu = 'setUseSoftMenu',
   ShowPanel = 'showPanel',
+  /* eslint-enable @typescript-eslint/naming-convention */
 }
 
 export const EventDescriptors = [
@@ -58,7 +60,6 @@ export const EventDescriptors = [
   [Events.IndexingWorked, 'indexingWorked', ['requestId', 'fileSystemPath', 'worked']],
   [Events.IndexingDone, 'indexingDone', ['requestId', 'fileSystemPath']],
   [Events.KeyEventUnhandled, 'keyEventUnhandled', ['event']],
-  [Events.ReattachRootTarget, 'reattachMainTarget', []],
   [Events.ReloadInspectedPage, 'reloadInspectedPage', ['hard']],
   [Events.RevealSourceLine, 'revealSourceLine', ['url', 'lineNumber', 'columnNumber']],
   [Events.SavedURL, 'savedURL', ['url', 'fileSystemPath']],
@@ -145,6 +146,12 @@ export interface DoAidaConversationResult {
   detail?: string;
 }
 
+export interface AidaClientResult {
+  response?: string;
+  error?: string;
+  detail?: string;
+}
+
 export interface VisualElementImpression {
   id: number;
   type: number;
@@ -166,7 +173,7 @@ export interface ResizeEvent {
 
 export interface ClickEvent {
   veid: number;
-  mouseButton: number;
+  mouseButton?: number;
   context?: number;
   doubleClick: boolean;
 }
@@ -219,7 +226,6 @@ export type EventTypes = {
   [Events.IndexingWorked]: IndexingWorkedEvent,
   [Events.IndexingDone]: IndexingEvent,
   [Events.KeyEventUnhandled]: KeyEventUnhandledEvent,
-  [Events.ReattachRootTarget]: void,
   [Events.ReloadInspectedPage]: boolean,
   [Events.RevealSourceLine]: RevealSourceLineEvent,
   [Events.SavedURL]: SavedURLEvent,
@@ -264,7 +270,7 @@ export interface InspectorFrontendHostAPI {
 
   requestFileSystems(): void;
 
-  save(url: Platform.DevToolsPath.UrlString, content: string, forceSaveAs: boolean): void;
+  save(url: Platform.DevToolsPath.UrlString, content: string, forceSaveAs: boolean, isBase64: boolean): void;
 
   append(url: Platform.DevToolsPath.UrlString, content: string): void;
 
@@ -302,6 +308,8 @@ export interface InspectorFrontendHostAPI {
   clearPreferences(): void;
 
   getSyncInformation(callback: (arg0: SyncInformation) => void): void;
+
+  getHostConfig(callback: (arg0: Root.Runtime.HostConfig) => void): void;
 
   upgradeDraggedFileSystemPermissions(fileSystem: FileSystem): void;
 
@@ -361,7 +369,7 @@ export interface InspectorFrontendHostAPI {
   initialTargetId(): Promise<string|null>;
 
   doAidaConversation: (request: string, streamId: number, cb: (result: DoAidaConversationResult) => void) => void;
-  registerAidaClientEvent: (request: string) => void;
+  registerAidaClientEvent: (request: string, cb: (result: AidaClientResult) => void) => void;
 
   recordImpression(event: ImpressionEvent): void;
   recordClick(event: ClickEvent): void;
@@ -378,6 +386,7 @@ export interface ContextMenuDescriptor {
   enabled?: boolean;
   checked?: boolean;
   subItems?: ContextMenuDescriptor[];
+  shortcut?: string;
   jslogContext?: string;
 }
 export interface LoadNetworkResourceResult {
@@ -416,6 +425,8 @@ export interface SyncInformation {
   accountEmail?: string;
   /** The image of the account used for syncing. Its a base64 encoded PNG */
   accountImage?: string;
+  /** The full name of the account used for syncing */
+  accountFullName?: string;
 }
 
 /**
@@ -426,10 +437,8 @@ export interface SyncInformation {
  * @readonly
  */
 export const enum EnumeratedHistogram {
+  /* eslint-disable @typescript-eslint/naming-convention -- Shadows a legacy enum */
   ActionTaken = 'DevTools.ActionTaken',
-  BreakpointWithConditionAdded = 'DevTools.BreakpointWithConditionAdded',
-  BreakpointEditDialogRevealedFrom = 'DevTools.BreakpointEditDialogRevealedFrom',
-  PanelClosed = 'DevTools.PanelClosed',
   PanelShown = 'DevTools.PanelShown',
   PanelShownInLocation = 'DevTools.PanelShownInLocation',
   SidebarPaneShown = 'DevTools.SidebarPaneShown',
@@ -439,7 +448,6 @@ export const enum EnumeratedHistogram {
   IssuesPanelOpenedFrom = 'DevTools.IssuesPanelOpenedFrom',
   IssuesPanelResourceOpened = 'DevTools.IssuesPanelResourceOpened',
   KeybindSetSettingChanged = 'DevTools.KeybindSetSettingChanged',
-  ElementsSidebarTabShown = 'DevTools.Elements.SidebarTabShown',
   ExperimentEnabledAtLaunch = 'DevTools.ExperimentEnabledAtLaunch',
   ExperimentDisabledAtLaunch = 'DevTools.ExperimentDisabledAtLaunch',
   ExperimentEnabled = 'DevTools.ExperimentEnabled',
@@ -457,7 +465,6 @@ export const enum EnumeratedHistogram {
   RecordingReplaySpeed = 'DevTools.RecordingReplaySpeed',
   RecordingReplayStarted = 'DevTools.RecordingReplayStarted',
   RecordingToggled = 'DevTools.RecordingToggled',
-  SourcesSidebarTabShown = 'DevTools.Sources.SidebarTabShown',
   SourcesPanelFileDebugged = 'DevTools.SourcesPanelFileDebugged',
   SourcesPanelFileOpened = 'DevTools.SourcesPanelFileOpened',
   NetworkPanelResponsePreviewOpened = 'DevTools.NetworkPanelResponsePreviewOpened',
@@ -466,14 +473,9 @@ export const enum EnumeratedHistogram {
   CSSHintShown = 'DevTools.CSSHintShown',
   LighthouseModeRun = 'DevTools.LighthouseModeRun',
   LighthouseCategoryUsed = 'DevTools.LighthouseCategoryUsed',
-  ColorConvertedFrom = 'DevTools.ColorConvertedFrom',
   ColorPickerOpenedFrom = 'DevTools.ColorPickerOpenedFrom',
   CSSPropertyDocumentation = 'DevTools.CSSPropertyDocumentation',
-  InlineScriptParsed = 'DevTools.InlineScriptParsed',
-  VMInlineScriptTypeShown = 'DevTools.VMInlineScriptShown',
-  BreakpointsRestoredFromStorageCount = 'DevTools.BreakpointsRestoredFromStorageCount',
   SwatchActivated = 'DevTools.SwatchActivated',
-  BadgeActivated = 'DevTools.BadgeActivated',
   AnimationPlaybackRateChanged = 'DevTools.AnimationPlaybackRateChanged',
   AnimationPointDragged = 'DevTools.AnimationPointDragged',
   LegacyResourceTypeFilterNumberOfSelectedChanged = 'DevTools.LegacyResourceTypeFilterNumberOfSelectedChanged',
@@ -482,4 +484,5 @@ export const enum EnumeratedHistogram {
   ResourceTypeFilterItemSelected = 'DevTools.ResourceTypeFilterItemSelected',
   NetworkPanelMoreFiltersNumberOfSelectedChanged = 'DevTools.NetworkPanelMoreFiltersNumberOfSelectedChanged',
   NetworkPanelMoreFiltersItemSelected = 'DevTools.NetworkPanelMoreFiltersItemSelected',
+  /* eslint-disable @typescript-eslint/naming-convention -- Shadows a legacy enum */
 }

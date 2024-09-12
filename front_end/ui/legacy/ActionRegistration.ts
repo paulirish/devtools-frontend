@@ -99,7 +99,7 @@ const str_ = i18n.i18n.registerUIStrings('ui/legacy/ActionRegistration.ts', UISt
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export interface ActionDelegate {
-  handleAction(_context: Context, _actionId: string): boolean;
+  handleAction(context: Context, actionId: string): boolean;
 }
 
 export class Action extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
@@ -142,7 +142,7 @@ export class Action extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
     }
 
     this.enabledInternal = enabled;
-    this.dispatchEventToListeners(Events.Enabled, enabled);
+    this.dispatchEventToListeners(Events.ENABLED, enabled);
   }
 
   enabled(): boolean {
@@ -193,7 +193,7 @@ export class Action extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
     }
 
     this.toggledInternal = toggled;
-    this.dispatchEventToListeners(Events.Toggled, toggled);
+    this.dispatchEventToListeners(Events.TOGGLED, toggled);
   }
 
   options(): undefined|Array<ExtensionOption> {
@@ -264,7 +264,12 @@ export function getRegisteredActionExtensions(): Array<Action> {
         }
 
         return Root.Runtime.Runtime.isDescriptorEnabled(
-            {experiment: action.experiment(), condition: action.condition()});
+            {
+              experiment: action.experiment(),
+              condition: action.condition(),
+            },
+            Common.Settings.Settings.instance().getHostConfig(),
+        );
       })
       .sort((firstAction, secondAction) => {
         const order1 = firstAction.order() || 0;
@@ -278,21 +283,21 @@ export function maybeRemoveActionExtension(actionId: string): boolean {
 }
 
 export const enum Platforms {
-  All = 'All platforms',
-  Mac = 'mac',
-  WindowsLinux = 'windows,linux',
-  Android = 'Android',
-  Windows = 'windows',
+  ALL = 'All platforms',
+  MAC = 'mac',
+  WINDOWS_LINUX = 'windows,linux',
+  ANDROID = 'Android',
+  WINDOWS = 'windows',
 }
 
 export const enum Events {
-  Enabled = 'Enabled',
-  Toggled = 'Toggled',
+  ENABLED = 'Enabled',
+  TOGGLED = 'Toggled',
 }
 
 export type EventTypes = {
-  [Events.Enabled]: boolean,
-  [Events.Toggled]: boolean,
+  [Events.ENABLED]: boolean,
+  [Events.TOGGLED]: boolean,
 };
 
 export const enum ActionCategory {

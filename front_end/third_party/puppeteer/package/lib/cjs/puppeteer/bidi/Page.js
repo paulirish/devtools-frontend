@@ -87,7 +87,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.BidiPage = void 0;
 const rxjs_js_1 = require("../../third_party/rxjs/rxjs.js");
 const Page_js_1 = require("../api/Page.js");
-const Accessibility_js_1 = require("../cdp/Accessibility.js");
 const Coverage_js_1 = require("../cdp/Coverage.js");
 const EmulationManager_js_1 = require("../cdp/EmulationManager.js");
 const Tracing_js_1 = require("../cdp/Tracing.js");
@@ -96,24 +95,26 @@ const EventEmitter_js_1 = require("../common/EventEmitter.js");
 const util_js_1 = require("../common/util.js");
 const assert_js_1 = require("../util/assert.js");
 const decorators_js_1 = require("../util/decorators.js");
+const encoding_js_1 = require("../util/encoding.js");
 const ErrorLike_js_1 = require("../util/ErrorLike.js");
-const ElementHandle_js_1 = require("./ElementHandle.js");
 const Frame_js_1 = require("./Frame.js");
 const Input_js_1 = require("./Input.js");
 const util_js_2 = require("./util.js");
 /**
+ * Implements Page using WebDriver BiDi.
+ *
  * @internal
  */
 let BidiPage = (() => {
     let _classSuper = Page_js_1.Page;
-    let _instanceExtraInitializers = [];
     let _trustedEmitter_decorators;
     let _trustedEmitter_initializers = [];
+    let _trustedEmitter_extraInitializers = [];
     return class BidiPage extends _classSuper {
         static {
             const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
             _trustedEmitter_decorators = [(0, decorators_js_1.bubble)()];
-            __esDecorate(this, null, _trustedEmitter_decorators, { kind: "accessor", name: "trustedEmitter", static: false, private: false, access: { has: obj => "trustedEmitter" in obj, get: obj => obj.trustedEmitter, set: (obj, value) => { obj.trustedEmitter = value; } }, metadata: _metadata }, _trustedEmitter_initializers, _instanceExtraInitializers);
+            __esDecorate(this, null, _trustedEmitter_decorators, { kind: "accessor", name: "trustedEmitter", static: false, private: false, access: { has: obj => "trustedEmitter" in obj, get: obj => obj.trustedEmitter, set: (obj, value) => { obj.trustedEmitter = value; } }, metadata: _metadata }, _trustedEmitter_initializers, _trustedEmitter_extraInitializers);
             if (_metadata) Object.defineProperty(this, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
         }
         static from(browserContext, browsingContext) {
@@ -121,20 +122,20 @@ let BidiPage = (() => {
             page.#initialize();
             return page;
         }
-        #trustedEmitter_accessor_storage = (__runInitializers(this, _instanceExtraInitializers), __runInitializers(this, _trustedEmitter_initializers, new EventEmitter_js_1.EventEmitter()));
+        #trustedEmitter_accessor_storage = __runInitializers(this, _trustedEmitter_initializers, new EventEmitter_js_1.EventEmitter());
         get trustedEmitter() { return this.#trustedEmitter_accessor_storage; }
         set trustedEmitter(value) { this.#trustedEmitter_accessor_storage = value; }
-        #browserContext;
+        #browserContext = __runInitializers(this, _trustedEmitter_extraInitializers);
         #frame;
         #viewport = null;
         #workers = new Set();
         keyboard;
         mouse;
         touchscreen;
-        accessibility;
         tracing;
         coverage;
         #cdpEmulationManager;
+        #emulatedNetworkConditions;
         _client() {
             return this.#frame.client;
         }
@@ -143,7 +144,6 @@ let BidiPage = (() => {
             this.#browserContext = browserContext;
             this.#frame = Frame_js_1.BidiFrame.from(this, browsingContext);
             this.#cdpEmulationManager = new EmulationManager_js_1.EmulationManager(this.#frame.client);
-            this.accessibility = new Accessibility_js_1.Accessibility(this.#frame.client);
             this.tracing = new Tracing_js_1.Tracing(this.#frame.client);
             this.coverage = new Coverage_js_1.Coverage(this.#frame.client);
             this.keyboard = new Input_js_1.BidiKeyboard(this);
@@ -162,12 +162,54 @@ let BidiPage = (() => {
                 this.#workers.delete(worker);
             });
         }
+        /**
+         * @internal
+         */
+        _userAgentHeaders = {};
+        #userAgentInterception;
+        #userAgentPreloadScript;
         async setUserAgent(userAgent, userAgentMetadata) {
-            // TODO: handle CDP-specific cases such as mprach.
-            await this._client().send('Network.setUserAgentOverride', {
-                userAgent: userAgent,
-                userAgentMetadata: userAgentMetadata,
-            });
+            if (!this.#browserContext.browser().cdpSupported && userAgentMetadata) {
+                throw new Errors_js_1.UnsupportedOperation('Current Browser does not support `userAgentMetadata`');
+            }
+            else if (this.#browserContext.browser().cdpSupported &&
+                userAgentMetadata) {
+                return await this._client().send('Network.setUserAgentOverride', {
+                    userAgent: userAgent,
+                    userAgentMetadata: userAgentMetadata,
+                });
+            }
+            const enable = userAgent !== '';
+            userAgent = userAgent ?? (await this.#browserContext.browser().userAgent());
+            this._userAgentHeaders = enable
+                ? {
+                    'User-Agent': userAgent,
+                }
+                : {};
+            this.#userAgentInterception = await this.#toggleInterception(["beforeRequestSent" /* Bidi.Network.InterceptPhase.BeforeRequestSent */], this.#userAgentInterception, enable);
+            const changeUserAgent = (userAgent) => {
+                Object.defineProperty(navigator, 'userAgent', {
+                    value: userAgent,
+                });
+            };
+            const frames = [this.#frame];
+            for (const frame of frames) {
+                frames.push(...frame.childFrames());
+            }
+            if (this.#userAgentPreloadScript) {
+                await this.removeScriptToEvaluateOnNewDocument(this.#userAgentPreloadScript);
+            }
+            const [evaluateToken] = await Promise.all([
+                enable
+                    ? this.evaluateOnNewDocument(changeUserAgent, userAgent)
+                    : undefined,
+                // When we disable the UserAgent we want to
+                // evaluate the original value in all Browsing Contexts
+                frames.map(frame => {
+                    return frame.evaluate(changeUserAgent, userAgent);
+                }),
+            ]);
+            this.#userAgentPreloadScript = evaluateToken?.identifier;
         }
         async setBypassCSP(enabled) {
             // TODO: handle CDP-specific cases such as mprach.
@@ -196,21 +238,26 @@ let BidiPage = (() => {
         async focusedFrame() {
             const env_1 = { stack: [], error: void 0, hasError: false };
             try {
-                const frame = __addDisposableResource(env_1, await this.mainFrame()
+                const handle = __addDisposableResource(env_1, (await this.mainFrame()
                     .isolatedRealm()
                     .evaluateHandle(() => {
-                    let frame;
                     let win = window;
-                    while (win?.document.activeElement instanceof HTMLIFrameElement) {
-                        frame = win.document.activeElement;
-                        win = frame.contentWindow;
+                    while (win.document.activeElement instanceof win.HTMLIFrameElement ||
+                        win.document.activeElement instanceof win.HTMLFrameElement) {
+                        if (win.document.activeElement.contentWindow === null) {
+                            break;
+                        }
+                        win = win.document.activeElement.contentWindow;
                     }
-                    return frame;
-                }), false);
-                if (!(frame instanceof ElementHandle_js_1.BidiElementHandle)) {
-                    return this.mainFrame();
-                }
-                return await frame.contentFrame();
+                    return win;
+                })), false);
+                const value = handle.remoteValue();
+                (0, assert_js_1.assert)(value.type === 'window');
+                const frame = this.frames().find(frame => {
+                    return frame._id === value.value.context;
+                });
+                (0, assert_js_1.assert)(frame);
+                return frame;
             }
             catch (e_1) {
                 env_1.error = e_1;
@@ -231,11 +278,22 @@ let BidiPage = (() => {
             return this.#frame.detached;
         }
         async close(options) {
+            const env_2 = { stack: [], error: void 0, hasError: false };
             try {
-                await this.#frame.browsingContext.close(options?.runBeforeUnload);
+                const _guard = __addDisposableResource(env_2, await this.#browserContext.waitForScreenshotOperations(), false);
+                try {
+                    await this.#frame.browsingContext.close(options?.runBeforeUnload);
+                }
+                catch {
+                    return;
+                }
             }
-            catch {
-                return;
+            catch (e_2) {
+                env_2.error = e_2;
+                env_2.hasError = true;
+            }
+            finally {
+                __disposeResources(env_2);
             }
         }
         async reload(options = {}) {
@@ -284,13 +342,13 @@ let BidiPage = (() => {
         async setViewport(viewport) {
             if (!this.browser().cdpSupported) {
                 await this.#frame.browsingContext.setViewport({
-                    viewport: viewport.width && viewport.height
+                    viewport: viewport?.width && viewport?.height
                         ? {
                             width: viewport.width,
                             height: viewport.height,
                         }
                         : null,
-                    devicePixelRatio: viewport.deviceScaleFactor
+                    devicePixelRatio: viewport?.deviceScaleFactor
                         ? viewport.deviceScaleFactor
                         : null,
                 });
@@ -310,6 +368,11 @@ let BidiPage = (() => {
             const { timeout: ms = this._timeoutSettings.timeout(), path = undefined } = options;
             const { printBackground: background, margin, landscape, width, height, pageRanges: ranges, scale, preferCSSPageSize, } = (0, util_js_1.parsePDFOptions)(options, 'cm');
             const pageRanges = ranges ? ranges.split(', ') : [];
+            await (0, rxjs_js_1.firstValueFrom)((0, rxjs_js_1.from)(this.mainFrame()
+                .isolatedRealm()
+                .evaluate(() => {
+                return document.fonts.ready;
+            })).pipe((0, rxjs_js_1.raceWith)((0, util_js_1.timeout)(ms))));
             const data = await (0, rxjs_js_1.firstValueFrom)((0, rxjs_js_1.from)(this.#frame.browsingContext.print({
                 background,
                 margin,
@@ -322,15 +385,15 @@ let BidiPage = (() => {
                 scale,
                 shrinkToFit: !preferCSSPageSize,
             })).pipe((0, rxjs_js_1.raceWith)((0, util_js_1.timeout)(ms))));
-            const buffer = Buffer.from(data, 'base64');
-            await this._maybeWriteBufferToFile(path, buffer);
-            return buffer;
+            const typedArray = (0, encoding_js_1.stringToTypedArray)(data, true);
+            await this._maybeWriteTypedArrayToFile(path, typedArray);
+            return typedArray;
         }
         async createPDFStream(options) {
-            const buffer = await this.pdf(options);
+            const typedArray = await this.pdf(options);
             return new ReadableStream({
                 start(controller) {
-                    controller.enqueue(buffer);
+                    controller.enqueue(typedArray);
                     controller.close();
                 },
             });
@@ -405,6 +468,10 @@ let BidiPage = (() => {
             return false;
         }
         async setCacheEnabled(enabled) {
+            if (!this.#browserContext.browser().cdpSupported) {
+                await this.#frame.browsingContext.setCacheBehavior(enabled ? 'default' : 'bypass');
+                return;
+            }
             // TODO: handle CDP-specific cases such as mprach.
             await this._client().send('Network.setCacheDisabled', {
                 cacheDisabled: !enabled,
@@ -437,8 +504,44 @@ let BidiPage = (() => {
         workers() {
             return [...this.#workers];
         }
-        setRequestInterception() {
-            throw new Errors_js_1.UnsupportedOperation();
+        #userInterception;
+        async setRequestInterception(enable) {
+            this.#userInterception = await this.#toggleInterception(["beforeRequestSent" /* Bidi.Network.InterceptPhase.BeforeRequestSent */], this.#userInterception, enable);
+        }
+        /**
+         * @internal
+         */
+        _extraHTTPHeaders = {};
+        #extraHeadersInterception;
+        async setExtraHTTPHeaders(headers) {
+            const extraHTTPHeaders = {};
+            for (const [key, value] of Object.entries(headers)) {
+                (0, assert_js_1.assert)((0, util_js_1.isString)(value), `Expected value of header "${key}" to be String, but "${typeof value}" is found.`);
+                extraHTTPHeaders[key.toLowerCase()] = value;
+            }
+            this._extraHTTPHeaders = extraHTTPHeaders;
+            this.#extraHeadersInterception = await this.#toggleInterception(["beforeRequestSent" /* Bidi.Network.InterceptPhase.BeforeRequestSent */], this.#extraHeadersInterception, Boolean(Object.keys(this._extraHTTPHeaders).length));
+        }
+        /**
+         * @internal
+         */
+        _credentials = null;
+        #authInterception;
+        async authenticate(credentials) {
+            this.#authInterception = await this.#toggleInterception(["authRequired" /* Bidi.Network.InterceptPhase.AuthRequired */], this.#authInterception, Boolean(credentials));
+            this._credentials = credentials;
+        }
+        async #toggleInterception(phases, interception, expected) {
+            if (expected && !interception) {
+                return await this.#frame.browsingContext.addIntercept({
+                    phases,
+                });
+            }
+            else if (!expected && interception) {
+                await this.#frame.browsingContext.userContext.browser.removeIntercept(interception);
+                return;
+            }
+            return interception;
         }
         setDragInterception() {
             throw new Errors_js_1.UnsupportedOperation();
@@ -446,11 +549,54 @@ let BidiPage = (() => {
         setBypassServiceWorker() {
             throw new Errors_js_1.UnsupportedOperation();
         }
-        setOfflineMode() {
-            throw new Errors_js_1.UnsupportedOperation();
+        async setOfflineMode(enabled) {
+            if (!this.#browserContext.browser().cdpSupported) {
+                throw new Errors_js_1.UnsupportedOperation();
+            }
+            if (!this.#emulatedNetworkConditions) {
+                this.#emulatedNetworkConditions = {
+                    offline: false,
+                    upload: -1,
+                    download: -1,
+                    latency: 0,
+                };
+            }
+            this.#emulatedNetworkConditions.offline = enabled;
+            return await this.#applyNetworkConditions();
         }
-        emulateNetworkConditions() {
-            throw new Errors_js_1.UnsupportedOperation();
+        async emulateNetworkConditions(networkConditions) {
+            if (!this.#browserContext.browser().cdpSupported) {
+                throw new Errors_js_1.UnsupportedOperation();
+            }
+            if (!this.#emulatedNetworkConditions) {
+                this.#emulatedNetworkConditions = {
+                    offline: false,
+                    upload: -1,
+                    download: -1,
+                    latency: 0,
+                };
+            }
+            this.#emulatedNetworkConditions.upload = networkConditions
+                ? networkConditions.upload
+                : -1;
+            this.#emulatedNetworkConditions.download = networkConditions
+                ? networkConditions.download
+                : -1;
+            this.#emulatedNetworkConditions.latency = networkConditions
+                ? networkConditions.latency
+                : 0;
+            return await this.#applyNetworkConditions();
+        }
+        async #applyNetworkConditions() {
+            if (!this.#emulatedNetworkConditions) {
+                return;
+            }
+            await this._client().send('Network.emulateNetworkConditions', {
+                offline: this.#emulatedNetworkConditions.offline,
+                latency: this.#emulatedNetworkConditions.latency,
+                uploadThroughput: this.#emulatedNetworkConditions.upload,
+                downloadThroughput: this.#emulatedNetworkConditions.download,
+            });
         }
         async setCookie(...cookies) {
             const pageURL = this.url();
@@ -513,12 +659,6 @@ let BidiPage = (() => {
         async removeExposedFunction(name) {
             await this.#frame.removeExposedFunction(name);
         }
-        authenticate() {
-            throw new Errors_js_1.UnsupportedOperation();
-        }
-        setExtraHTTPHeaders() {
-            throw new Errors_js_1.UnsupportedOperation();
-        }
         metrics() {
             throw new Errors_js_1.UnsupportedOperation();
         }
@@ -529,15 +669,19 @@ let BidiPage = (() => {
             return await this.#go(1, options);
         }
         async #go(delta, options) {
+            const controller = new AbortController();
             try {
                 const [response] = await Promise.all([
-                    this.waitForNavigation(options),
+                    this.waitForNavigation({
+                        ...options,
+                        signal: controller.signal,
+                    }),
                     this.#frame.browsingContext.traverseHistory(delta),
                 ]);
                 return response;
             }
             catch (error) {
-                // TODO: waitForNavigation should be cancelled if an error happens.
+                controller.abort();
                 if ((0, ErrorLike_js_1.isErrorLike)(error)) {
                     if (error.message.includes('no such history entry')) {
                         return null;
@@ -604,6 +748,20 @@ function testUrlMatchCookie(cookie, url) {
     return testUrlMatchCookiePath(cookie, normalizedUrl);
 }
 function bidiToPuppeteerCookie(bidiCookie) {
+    const partitionKey = bidiCookie[CDP_SPECIFIC_PREFIX + 'partitionKey'];
+    function getParitionKey() {
+        if (typeof partitionKey === 'string') {
+            return { partitionKey };
+        }
+        if (typeof partitionKey === 'object' && partitionKey !== null) {
+            return {
+                // TODO: a breaking change in Puppeteer is required to change
+                // partitionKey type and report the composite partition key.
+                partitionKey: partitionKey.topLevelSite,
+            };
+        }
+        return {};
+    }
     return {
         name: bidiCookie.name,
         // Presents binary value as base64 string.
@@ -617,7 +775,8 @@ function bidiToPuppeteerCookie(bidiCookie) {
         expires: bidiCookie.expiry ?? -1,
         session: bidiCookie.expiry === undefined || bidiCookie.expiry <= 0,
         // Extending with CDP-specific properties with `goog:` prefix.
-        ...cdpSpecificCookiePropertiesFromBidiToPuppeteer(bidiCookie, 'sameParty', 'sourceScheme', 'partitionKey', 'partitionKeyOpaque', 'priority'),
+        ...cdpSpecificCookiePropertiesFromBidiToPuppeteer(bidiCookie, 'sameParty', 'sourceScheme', 'partitionKeyOpaque', 'priority'),
+        ...getParitionKey(),
     };
 }
 const CDP_SPECIFIC_PREFIX = 'goog:';

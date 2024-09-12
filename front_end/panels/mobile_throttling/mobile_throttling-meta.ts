@@ -69,6 +69,7 @@ UI.ViewManager.registerViewExtension({
   settings: [
     'custom-network-conditions',
   ],
+  iconName: 'performance',
 });
 
 UI.ActionRegistration.registerActionExtension({
@@ -128,7 +129,7 @@ UI.ActionRegistration.registerActionExtension({
 });
 
 Common.Settings.registerSettingExtension({
-  storageType: Common.Settings.SettingStorageType.Synced,
+  storageType: Common.Settings.SettingStorageType.SYNCED,
   settingName: 'custom-network-conditions',
   settingType: Common.Settings.SettingType.ARRAY,
   defaultValue: [],

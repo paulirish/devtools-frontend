@@ -397,6 +397,7 @@ export class EditorState {
     const state = structuredClone(step) as EditorState;
     for (const key of ['parameters', 'properties'] as Array<'properties'>) {
       if (key in step && step[key] !== undefined) {
+        // @ts-ignore Potential infinite type instantiation.
         state[key] = JSON.stringify(step[key]);
       }
     }
@@ -496,7 +497,7 @@ class RecorderSelectorPickerButton extends LitElement {
       .size=${Buttons.Button.Size.SMALL}
       .iconName=${'select-element'}
       .active=${this.#picker.active}
-      .variant=${Buttons.Button.Variant.SECONDARY}
+      .variant=${Buttons.Button.Variant.ICON}
       jslog=${VisualLogging.toggle('selector-picker').track({
       click: true,
     })}
@@ -636,7 +637,7 @@ export class StepEditor extends LitElement {
       return;
     }
     this.#commit(await EditorState.default(value));
-    Host.userMetrics.recordingEdited(Host.UserMetrics.RecordingEdited.TypeChanged);
+    Host.userMetrics.recordingEdited(Host.UserMetrics.RecordingEdited.TYPE_CHANGED);
   };
 
   #handleAddRowClickEvent = async(event: MouseEvent): Promise<void> => {
@@ -662,7 +663,7 @@ export class StepEditor extends LitElement {
         title=${opts.title}
         .size=${Buttons.Button.Size.SMALL}
         .iconName=${opts.iconName}
-        .variant=${Buttons.Button.Variant.SECONDARY}
+        .variant=${Buttons.Button.Variant.ICON}
         jslog=${VisualLogging.action(opts.class).track({
       click: true,
     })}
@@ -687,7 +688,7 @@ export class StepEditor extends LitElement {
     return html`<devtools-button
       .size=${Buttons.Button.Size.SMALL}
       .iconName=${'bin'}
-      .variant=${Buttons.Button.Variant.SECONDARY}
+      .variant=${Buttons.Button.Variant.ICON}
       .title=${i18nString(UIStrings.deleteRow)}
       class="inline-button delete-row"
       data-attribute=${attribute}
@@ -751,12 +752,12 @@ export class StepEditor extends LitElement {
         }
         switch (attribute) {
           case 'properties':
-            Host.userMetrics.recordingAssertion(Host.UserMetrics.RecordingAssertion.PropertyAssertionEdited);
+            Host.userMetrics.recordingAssertion(Host.UserMetrics.RecordingAssertion.PROPERTY_ASSERTION_EDITED);
             break;
         }
         return {[attribute]: value};
       },
-      metric: Host.UserMetrics.RecordingEdited.OtherEditing,
+      metric: Host.UserMetrics.RecordingEdited.OTHER_EDITING,
     })}
       ></devtools-suggestion-input>
       ${this.#renderDeleteButton(attribute)}
@@ -794,7 +795,7 @@ export class StepEditor extends LitElement {
                       frame: new ArrayAssignments({ [index]: value }),
                     };
                   },
-                  metric: Host.UserMetrics.RecordingEdited.OtherEditing,
+                  metric: Host.UserMetrics.RecordingEdited.OTHER_EDITING,
                 })}
               ></devtools-suggestion-input>
               ${this.#renderInlineButton({
@@ -810,7 +811,7 @@ export class StepEditor extends LitElement {
                     }),
                   },
                   `devtools-suggestion-input[data-path="frame.${index + 1}"]`,
-                  Host.UserMetrics.RecordingEdited.OtherEditing,
+                  Host.UserMetrics.RecordingEdited.OTHER_EDITING,
                 ),
               })}
               ${this.#renderInlineButton({
@@ -825,7 +826,7 @@ export class StepEditor extends LitElement {
                     index,
                     frames.length - 2,
                   )}"]`,
-                  Host.UserMetrics.RecordingEdited.OtherEditing,
+                  Host.UserMetrics.RecordingEdited.OTHER_EDITING,
                 ),
               })}
             </div>
@@ -867,7 +868,7 @@ export class StepEditor extends LitElement {
                   }),
                 },
                 `devtools-suggestion-input[data-path="selectors.${index + 1}.0"]`,
-                Host.UserMetrics.RecordingEdited.SelectorAdded,
+                Host.UserMetrics.RecordingEdited.SELECTOR_ADDED,
               ),
             })}
             ${this.#renderInlineButton({
@@ -880,7 +881,7 @@ export class StepEditor extends LitElement {
                   index,
                   selectors.length - 2,
                 )}.0"]`,
-                Host.UserMetrics.RecordingEdited.SelectorRemoved,
+                Host.UserMetrics.RecordingEdited.SELECTOR_REMOVED,
               ),
             })}
           </div>
@@ -910,7 +911,7 @@ export class StepEditor extends LitElement {
                       }),
                     };
                   },
-                  metric: Host.UserMetrics.RecordingEdited.SelectorPartEdited,
+                  metric: Host.UserMetrics.RecordingEdited.SELECTOR_PART_EDITED,
                 })}
               ></devtools-suggestion-input>
               ${this.#renderInlineButton({
@@ -930,7 +931,7 @@ export class StepEditor extends LitElement {
                   `devtools-suggestion-input[data-path="selectors.${index}.${
                     partIndex + 1
                   }"]`,
-                  Host.UserMetrics.RecordingEdited.SelectorPartAdded,
+                  Host.UserMetrics.RecordingEdited.SELECTOR_PART_ADDED,
                 ),
               })}
               ${this.#renderInlineButton({
@@ -949,7 +950,7 @@ export class StepEditor extends LitElement {
                     partIndex,
                     parts.length - 2,
                   )}"]`,
-                  Host.UserMetrics.RecordingEdited.SelectorPartRemoved,
+                  Host.UserMetrics.RecordingEdited.SELECTOR_PART_REMOVED,
                 ),
               })}
             </div>`;
@@ -993,7 +994,7 @@ export class StepEditor extends LitElement {
                     }),
                   };
                 },
-                metric: Host.UserMetrics.RecordingEdited.OtherEditing,
+                metric: Host.UserMetrics.RecordingEdited.OTHER_EDITING,
               })}
             ></devtools-suggestion-input>
           </div>
@@ -1015,7 +1016,7 @@ export class StepEditor extends LitElement {
                     }),
                   };
                 },
-                metric: Host.UserMetrics.RecordingEdited.OtherEditing,
+                metric: Host.UserMetrics.RecordingEdited.OTHER_EDITING,
               })}
             ></devtools-suggestion-input>
           </div>`;
@@ -1050,13 +1051,13 @@ export class StepEditor extends LitElement {
                   return;
                 }
                 Host.userMetrics.recordingAssertion(
-                  Host.UserMetrics.RecordingAssertion.AttributeAssertionEdited,
+                  Host.UserMetrics.RecordingAssertion.ATTRIBUTE_ASSERTION_EDITED,
                 );
                 return {
                   attributes: new ArrayAssignments({ [index]: { name } }),
                 };
               },
-              metric: Host.UserMetrics.RecordingEdited.OtherEditing,
+              metric: Host.UserMetrics.RecordingEdited.OTHER_EDITING,
             })}
           ></devtools-suggestion-input>
           <span class="separator">:</span>
@@ -1072,13 +1073,13 @@ export class StepEditor extends LitElement {
                   return;
                 }
                 Host.userMetrics.recordingAssertion(
-                  Host.UserMetrics.RecordingAssertion.AttributeAssertionEdited,
+                  Host.UserMetrics.RecordingAssertion.ATTRIBUTE_ASSERTION_EDITED,
                 );
                 return {
                   attributes: new ArrayAssignments({ [index]: { value } }),
                 };
               },
-              metric: Host.UserMetrics.RecordingEdited.OtherEditing,
+              metric: Host.UserMetrics.RecordingEdited.OTHER_EDITING,
             })}
           ></devtools-suggestion-input>
           ${this.#renderInlineButton({
@@ -1111,7 +1112,7 @@ export class StepEditor extends LitElement {
               `devtools-suggestion-input[data-path="attributes.${
                 index + 1
               }.name"]`,
-              Host.UserMetrics.RecordingEdited.OtherEditing,
+              Host.UserMetrics.RecordingEdited.OTHER_EDITING,
             ),
           })}
           ${this.#renderInlineButton({
@@ -1124,7 +1125,7 @@ export class StepEditor extends LitElement {
                 index,
                 attributes.length - 2,
               )}.value"]`,
-              Host.UserMetrics.RecordingEdited.OtherEditing,
+              Host.UserMetrics.RecordingEdited.OTHER_EDITING,
             ),
           })}
         </div>`;
@@ -1138,7 +1139,7 @@ export class StepEditor extends LitElement {
     return [...attributes.optional].filter(attr => this.state[attr] === undefined).map(attr => {
       // clang-format off
         return html`<devtools-button
-          .variant=${Buttons.Button.Variant.SECONDARY}
+          .variant=${Buttons.Button.Variant.OUTLINED}
           class="add-row"
           data-attribute=${attr}
           jslog=${VisualLogging.action(`add-${Platform.StringUtilities.toKebabCase(attr)}`)}

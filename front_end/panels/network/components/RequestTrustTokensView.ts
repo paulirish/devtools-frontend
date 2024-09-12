@@ -104,12 +104,12 @@ export class RequestTrustTokensView extends LegacyWrapper.LegacyWrapper.Wrappabl
   }
 
   override wasShown(): void {
-    this.#request.addEventListener(SDK.NetworkRequest.Events.TrustTokenResultAdded, this.render, this);
+    this.#request.addEventListener(SDK.NetworkRequest.Events.TRUST_TOKEN_RESULT_ADDED, this.render, this);
     void this.render();
   }
 
   override willHide(): void {
-    this.#request.removeEventListener(SDK.NetworkRequest.Events.TrustTokenResultAdded, this.render, this);
+    this.#request.removeEventListener(SDK.NetworkRequest.Events.TRUST_TOKEN_RESULT_ADDED, this.render, this);
   }
 
   connectedCallback(): void {
@@ -266,7 +266,7 @@ function getDetailedTextForStatusCode(status: Protocol.Network.TrustTokenOperati
     case Protocol.Network.TrustTokenOperationDoneEventStatus.MissingIssuerKeys:
       return i18nString(UIStrings.theKeysForThisPSTIssuerAreUnavailable);
     case Protocol.Network.TrustTokenOperationDoneEventStatus.FailedPrecondition:
-    case Protocol.Network.TrustTokenOperationDoneEventStatus.Unavailable:
+    case Protocol.Network.TrustTokenOperationDoneEventStatus.ResourceLimited:
     case Protocol.Network.TrustTokenOperationDoneEventStatus.InternalError:
     case Protocol.Network.TrustTokenOperationDoneEventStatus.Unauthorized:
     case Protocol.Network.TrustTokenOperationDoneEventStatus.UnknownError:

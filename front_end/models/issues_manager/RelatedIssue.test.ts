@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-const {assert} = chai;
-
-import * as SDK from '../../core/sdk/sdk.js';
 import * as Platform from '../../core/platform/platform.js';
+import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
-import * as IssuesManager from '../issues_manager/issues_manager.js';
 import {StubIssue} from '../../testing/StubIssue.js';
+import * as IssuesManager from '../issues_manager/issues_manager.js';
 
 describe('issuesAssociatedWith', () => {
   const requestId1 = 'r0' as Protocol.Network.RequestId;
@@ -44,8 +42,8 @@ describe('issuesAssociatedWith', () => {
 
   function createTestCookie(name: string): SDK.Cookie.Cookie {
     const cookie = new SDK.Cookie.Cookie(name, '');
-    cookie.addAttribute(SDK.Cookie.Attribute.Domain, '');
-    cookie.addAttribute(SDK.Cookie.Attribute.Path, '');
+    cookie.addAttribute(SDK.Cookie.Attribute.DOMAIN, '');
+    cookie.addAttribute(SDK.Cookie.Attribute.PATH, '');
     return cookie;
   }
 

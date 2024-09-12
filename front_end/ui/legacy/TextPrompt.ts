@@ -146,15 +146,21 @@ export class TextPrompt extends Common.ObjectWrapper.ObjectWrapper<EventTypes> i
       element.parentElement.insertBefore(this.proxyElement, element);
     }
     this.contentElement.appendChild(element);
-    let jslog = VisualLogging.textField().track({keydown: 'Enter|Escape', change: true});
+    let jslog = VisualLogging.textField().track({
+      keydown: 'ArrowLeft|ArrowUp|PageUp|Home|PageDown|ArrowRight|ArrowDown|End|Space|Tab|Enter|Escape',
+      change: true,
+    });
+
     if (this.jslogContext) {
       jslog = jslog.context(this.jslogContext);
     }
-    this.elementInternal.setAttribute('jslog', `${jslog}`);
+    if (!this.elementInternal.hasAttribute('jslog')) {
+      this.elementInternal.setAttribute('jslog', `${jslog}`);
+    }
     this.elementInternal.classList.add('text-prompt');
     ARIAUtils.markAsTextBox(this.elementInternal);
-    ARIAUtils.setAutocomplete(this.elementInternal, ARIAUtils.AutocompleteInteractionModel.Both);
-    ARIAUtils.setHasPopup(this.elementInternal, ARIAUtils.PopupRole.ListBox);
+    ARIAUtils.setAutocomplete(this.elementInternal, ARIAUtils.AutocompleteInteractionModel.BOTH);
+    ARIAUtils.setHasPopup(this.elementInternal, ARIAUtils.PopupRole.LIST_BOX);
     this.elementInternal.setAttribute('contenteditable', 'plaintext-only');
     this.element().addEventListener('keydown', this.boundOnKeyDown, false);
     this.elementInternal.addEventListener('input', this.boundOnInput, false);
@@ -192,7 +198,7 @@ export class TextPrompt extends Common.ObjectWrapper.ObjectWrapper<EventTypes> i
     this.element().removeAttribute('contenteditable');
     this.element().removeAttribute('role');
     ARIAUtils.clearAutocomplete(this.element());
-    ARIAUtils.setHasPopup(this.element(), ARIAUtils.PopupRole.False);
+    ARIAUtils.setHasPopup(this.element(), ARIAUtils.PopupRole.FALSE);
   }
 
   textWithCurrentSuggestion(): string {
@@ -337,6 +343,7 @@ export class TextPrompt extends Common.ObjectWrapper.ObjectWrapper<EventTypes> i
     let handled = false;
     const event = (ev as KeyboardEvent);
     if (this.isSuggestBoxVisible() && this.suggestBox && this.suggestBox.keyPressed(event)) {
+      void VisualLogging.logKeyDown(this.suggestBox.element, event);
       event.consume(true);
       return;
     }
@@ -433,7 +440,7 @@ export class TextPrompt extends Common.ObjectWrapper.ObjectWrapper<EventTypes> i
     }
     this.refreshGhostText();
     this.previousText = text;
-    this.dispatchEventToListeners(Events.TextChanged);
+    this.dispatchEventToListeners(Events.TEXT_CHANGED);
     this.changed = true;
 
     this.autoCompleteSoon();
@@ -465,17 +472,13 @@ export class TextPrompt extends Common.ObjectWrapper.ObjectWrapper<EventTypes> i
     this.refreshGhostText();
 
     if (beforeText !== this.textWithCurrentSuggestion()) {
-      this.dispatchEventToListeners(Events.TextChanged);
+      this.dispatchEventToListeners(Events.TEXT_CHANGED);
       this.changed = true;
     }
   }
 
   private onBlur(): void {
     this.clearAutocomplete();
-    if (this.changed && this.elementInternal) {
-      this.elementInternal.dispatchEvent(new Event('change'));
-      this.changed = false;
-    }
   }
 
   private refreshGhostText(): void {
@@ -617,7 +620,7 @@ export class TextPrompt extends Common.ObjectWrapper.ObjectWrapper<EventTypes> i
     this.currentSuggestion = suggestion;
     this.refreshGhostText();
     if (isIntermediateSuggestion) {
-      this.dispatchEventToListeners(Events.TextChanged);
+      this.dispatchEventToListeners(Events.TEXT_CHANGED);
       this.changed = true;
     }
   }
@@ -640,7 +643,7 @@ export class TextPrompt extends Common.ObjectWrapper.ObjectWrapper<EventTypes> i
     this.updateLeftParenthesesIndices();
 
     this.clearAutocomplete();
-    this.dispatchEventToListeners(Events.TextChanged);
+    this.dispatchEventToListeners(Events.TEXT_CHANGED);
     this.changed = true;
 
     return true;
@@ -802,9 +805,9 @@ export class TextPrompt extends Common.ObjectWrapper.ObjectWrapper<EventTypes> i
 const DefaultAutocompletionTimeout = 250;
 
 export const enum Events {
-  TextChanged = 'TextChanged',
+  TEXT_CHANGED = 'TextChanged',
 }
 
 export type EventTypes = {
-  [Events.TextChanged]: void,
+  [Events.TEXT_CHANGED]: void,
 };

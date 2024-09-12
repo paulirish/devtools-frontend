@@ -28,10 +28,10 @@
  */
 
 import * as Common from '../../core/common/common.js';
-import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import * as IconButton from '../../ui/components/icon_button/icon_button.js';
 // eslint-disable-next-line rulesdir/es_modules_import
 import objectValueStyles from '../../ui/legacy/components/object_ui/objectValue.css.js';
 import * as UI from '../../ui/legacy/legacy.js';
@@ -48,7 +48,6 @@ import {Events as ProfileLauncherEvents, ProfileLauncherView} from './ProfileLau
 import {ProfileSidebarTreeElement} from './ProfileSidebarTreeElement.js';
 import profilesPanelStyles from './profilesPanel.css.js';
 import profilesSidebarTreeStyles from './profilesSidebarTree.css.js';
-import {instance} from './ProfileTypeRegistry.js';
 
 const UIStrings = {
   /**
@@ -74,19 +73,6 @@ const UIStrings = {
    *@description Text in Profiles Panel of a profiler tool
    */
   profiles: 'Profiles',
-  /**
-   *@description Text in the JS Profiler panel to show warning to user that JS profiler will be deprecated.
-   */
-  deprecationWarnMsg:
-      'This panel will be deprecated in the upcoming version. Use the Performance panel to record JavaScript CPU profiles.',
-  /**
-   *@description Text of a button in the JS Profiler panel to let user give feedback.
-   */
-  feedback: 'Feedback',
-  /**
-   *@description Text of a button in the JS Profiler panel to let user go to Performance panel.
-   */
-  goToPerformancePanel: 'Go to Performance Panel',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/profiler/ProfilesPanel.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -165,7 +151,7 @@ export class ProfilesPanel extends UI.Panel.PanelWithSidebar implements DataDisp
 
     this.profileGroups = {};
     this.launcherView = new ProfileLauncherView(this);
-    this.launcherView.addEventListener(ProfileLauncherEvents.ProfileTypeSelected, this.onProfileTypeSelected, this);
+    this.launcherView.addEventListener(ProfileLauncherEvents.PROFILE_TYPE_SELECTED, this.onProfileTypeSelected, this);
 
     this.profileToView = [];
 
@@ -181,7 +167,7 @@ export class ProfilesPanel extends UI.Panel.PanelWithSidebar implements DataDisp
     this.createFileSelectorElement();
 
     SDK.TargetManager.TargetManager.instance().addEventListener(
-        SDK.TargetManager.Events.SuspendStateChanged, this.onSuspendStateChanged, this);
+        SDK.TargetManager.Events.SUSPEND_STATE_CHANGED, this.onSuspendStateChanged, this);
     UI.Context.Context.instance().addFlavorChangeListener(
         SDK.CPUProfilerModel.CPUProfilerModel, this.updateProfileTypeSpecificUI, this);
     UI.Context.Context.instance().addFlavorChangeListener(
@@ -352,10 +338,10 @@ export class ProfilesPanel extends UI.Panel.PanelWithSidebar implements DataDisp
       this.showProfile(event.data);
     }
 
-    profileType.addEventListener(ProfileTypeEvents.ViewUpdated, this.updateProfileTypeSpecificUI, this);
-    profileType.addEventListener(ProfileTypeEvents.AddProfileHeader, onAddProfileHeader, this);
-    profileType.addEventListener(ProfileTypeEvents.RemoveProfileHeader, onRemoveProfileHeader, this);
-    profileType.addEventListener(ProfileTypeEvents.ProfileComplete, profileComplete, this);
+    profileType.addEventListener(ProfileTypeEvents.VIEW_UPDATED, this.updateProfileTypeSpecificUI, this);
+    profileType.addEventListener(ProfileTypeEvents.ADD_PROFILE_HEADER, onAddProfileHeader, this);
+    profileType.addEventListener(ProfileTypeEvents.REMOVE_PROFILE_HEADER, onRemoveProfileHeader, this);
+    profileType.addEventListener(ProfileTypeEvents.PROFILE_COMPLETE, profileComplete, this);
 
     const profiles = profileType.getProfiles();
     for (let i = 0; i < profiles.length; i++) {
@@ -445,7 +431,7 @@ export class ProfilesPanel extends UI.Panel.PanelWithSidebar implements DataDisp
     }
     const view = profile.createView(this);
     view.element.classList.add('profile-view');
-    this.profileToView.push({profile: profile, view: view});
+    this.profileToView.push({profile, view});
     return view;
   }
 
@@ -674,89 +660,11 @@ export class ProfilesSidebarTreeElement extends UI.TreeOutline.TreeElement {
 
   override onattach(): void {
     this.listItemElement.classList.add('profile-launcher-view-tree-item');
-    this.listItemElement.createChild('div', 'icon');
     this.listItemElement.createChild('div', 'titles no-subtitle')
         .createChild('span', 'title-container')
         .createChild('span', 'title')
         .textContent = i18nString(UIStrings.profiles);
-  }
-}
-
-let jsProfilerPanelInstance: JSProfilerPanel;
-
-export class JSProfilerPanel extends ProfilesPanel implements UI.ActionRegistration.ActionDelegate {
-  constructor() {
-    const registry = instance;
-    super('js-profiler', [registry.cpuProfileType], 'profiler.js-toggle-recording');
-    this.splitWidget().mainWidget()?.setMinimumSize(350, 0);
-    this.#showDeprecationInfobar();
-  }
-
-  static instance(opts: {
-    forceNew: boolean|null,
-  } = {forceNew: null}): JSProfilerPanel {
-    const {forceNew} = opts;
-    if (!jsProfilerPanelInstance || forceNew) {
-      jsProfilerPanelInstance = new JSProfilerPanel();
-    }
-    return jsProfilerPanelInstance;
-  }
-
-  #showDeprecationInfobar(): void {
-    function openFeedbackLink(): void {
-      Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(
-          'https://crbug.com/1354548' as Platform.DevToolsPath.UrlString);
-    }
-
-    async function openPerformancePanel(): Promise<void> {
-      await UI.InspectorView.InspectorView.instance().showPanel('timeline');
-    }
-
-    const infobar = new UI.Infobar.Infobar(
-        UI.Infobar.Type.Warning,
-        /* text */ i18nString(UIStrings.deprecationWarnMsg), /* actions? */
-        [
-          {
-            text: i18nString(UIStrings.feedback),
-            highlight: false,
-            delegate: openFeedbackLink,
-            dismiss: false,
-            jslogContext: 'feedback',
-          },
-          {
-            text: i18nString(UIStrings.goToPerformancePanel),
-            highlight: true,
-            delegate: openPerformancePanel,
-            dismiss: false,
-            jslogContext: 'go-to-performance-panel',
-          },
-        ],
-        /* disableSetting? */ undefined,
-        /* isCloseable TODO(crbug.com/1354548) Remove the prop from infobar with JS Profiler deprecation */ false,
-        'panel-deprecated',
-    );
-    infobar.setParentView(this);
-    this.splitWidget().mainWidget()?.element.prepend(infobar.element);
-  }
-
-  override wasShown(): void {
-    super.wasShown();
-    UI.Context.Context.instance().setFlavor(JSProfilerPanel, this);
-  }
-
-  override willHide(): void {
-    UI.Context.Context.instance().setFlavor(JSProfilerPanel, null);
-    super.willHide();
-  }
-
-  handleAction(_context: UI.Context.Context, _actionId: string): boolean {
-    const panel = UI.Context.Context.instance().flavor(JSProfilerPanel);
-    if (panel instanceof JSProfilerPanel) {
-      panel.toggleRecord();
-    } else {
-      throw new Error('non-null JSProfilerPanel expected!');
-    }
-    return true;
+    this.setLeadingIcons([IconButton.Icon.create('tune')]);
   }
 }
 

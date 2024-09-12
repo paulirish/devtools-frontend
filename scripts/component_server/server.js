@@ -8,17 +8,25 @@ const path = require('path');
 const parseURL = require('url').parse;
 const {argv} = require('yargs');
 
-const {createInstrumenter} = require('istanbul-lib-instrument');
-const convertSourceMap = require('convert-source-map');
-const defaultIstanbulSchema = require('@istanbuljs/schema');
-
 const {getTestRunnerConfigSetting} = require('../test/test_config_helpers.js');
-
-const match = require('minimatch');
 
 const tracesMode = argv.traces || false;
 const serverPort = parseInt(process.env.PORT, 10) || (tracesMode ? 11010 : 8090);
-const target = argv.target || process.env.TARGET || 'Default';
+
+/**
+ * When you run npm run components-server we run the script as is from scripts/,
+ * but when this server is run as part of a test suite it's run from
+ * out/Default/gen/scripts, so we have to do a bit of path mangling to figure
+ * out where we are.
+ */
+const [target, isRunningInGen] = (() => {
+  const regex = new RegExp(`out\\${path.sep}(.*)\\${path.sep}gen`);
+  const match = regex.exec(__dirname);
+  if (match) {
+    return [match[1], true];
+  }
+  return [argv.target || process.env.TARGET || 'Default', false];
+})();
 
 /**
  * This configures the base of the URLs that are injected into each component
@@ -37,14 +45,6 @@ const sharedResourcesBase =
 const componentDocsBaseArg = argv.componentDocsBase || process.env.COMPONENT_DOCS_BASE ||
     getTestRunnerConfigSetting('component-server-base-path', '');
 
-/**
- * When you run npm run components-server we run the script as is from scripts/,
- * but when this server is run as part of a test suite it's run from
- * out/Default/gen/scripts, so we have to do a bit of path mangling to figure
- * out where we are.
- */
-const isRunningInGen = __dirname.includes(path.join('out', path.sep, target));
-
 let pathToOutTargetDir = __dirname;
 /**
  * If we are in the gen directory, we need to find the out/Default folder to use
@@ -60,7 +60,12 @@ while (isRunningInGen && !pathToOutTargetDir.endsWith(`out${path.sep}${target}`)
 const pathToBuiltOutTargetDirectory =
     isRunningInGen ? pathToOutTargetDir : path.resolve(path.join(process.cwd(), 'out', target));
 
-const devtoolsRootFolder = path.resolve(path.join(pathToBuiltOutTargetDirectory, 'gen'));
+let devtoolsRootFolder = path.resolve(path.join(pathToBuiltOutTargetDirectory, 'gen'));
+const fullCheckoutDevtoolsRootFolder = path.join(devtoolsRootFolder, 'third_party', 'devtools-frontend', 'src');
+if (__dirname.startsWith(fullCheckoutDevtoolsRootFolder)) {
+  devtoolsRootFolder = fullCheckoutDevtoolsRootFolder;
+}
+
 const componentDocsBaseFolder = path.join(devtoolsRootFolder, componentDocsBaseArg);
 
 if (!fs.existsSync(devtoolsRootFolder)) {
@@ -102,6 +107,7 @@ const styleSheetPaths = [
   'front_end/ui/legacy/themeColors.css',
   'front_end/ui/legacy/tokens.css',
   'front_end/ui/legacy/applicationColorTokens.css',
+  'front_end/ui/legacy/designTokens.css',
   'front_end/ui/legacy/inspectorCommon.css',
   'front_end/ui/legacy/inspectorSyntaxHighlight.css',
   'front_end/ui/legacy/textButton.css',
@@ -233,40 +239,6 @@ async function checkFileExists(filePath) {
   }
 }
 
-const EXCLUDED_COVERAGE_FOLDERS = new Set(['third_party', 'ui/components/docs', 'Images']);
-
-const USER_DEFINED_COVERAGE_FOLDERS = process.env['COVERAGE_FOLDERS'];
-
-/**
- * @param {string} filePath
- * @returns {boolean}
- */
-function isIncludedForCoverageComputation(filePath) {
-  for (const excludedFolder of EXCLUDED_COVERAGE_FOLDERS) {
-    if (filePath.startsWith(`/front_end/${excludedFolder}/`)) {
-      return false;
-    }
-  }
-  if (USER_DEFINED_COVERAGE_FOLDERS) {
-    const matchPattern = `/${USER_DEFINED_COVERAGE_FOLDERS}/**/*.{js,mjs}`;
-    return match(filePath, matchPattern);
-  }
-
-  return true;
-}
-
-const COVERAGE_INSTRUMENTER = createInstrumenter({
-  esModules: true,
-  parserPlugins: [
-    ...defaultIstanbulSchema.instrumenter.properties.parserPlugins.default,
-    'topLevelAwait',
-  ],
-});
-
-const instrumentedSourceCacheForFilePaths = new Map();
-
-const SHOULD_GATHER_COVERAGE_INFORMATION = process.env.COVERAGE === '1';
-
 /**
  * @param {http.IncomingMessage} request
  * @param {http.ServerResponse} response
@@ -368,7 +340,7 @@ async function requestHandler(request, response) {
     }
 
     let encoding = 'utf8';
-    if (fullPath.endsWith('.js')) {
+    if (fullPath.endsWith('.js') || fullPath.endsWith('.mjs')) {
       response.setHeader('Content-Type', 'text/javascript; charset=utf-8');
     } else if (fullPath.endsWith('.css')) {
       response.setHeader('Content-Type', 'text/css; charset=utf-8');
@@ -391,46 +363,7 @@ async function requestHandler(request, response) {
       encoding = 'binary';
     }
 
-    let fileContents = await fs.promises.readFile(fullPath, encoding);
-    const isComputingCoverageRequest = request.headers['devtools-compute-coverage'] === '1';
-
-    if (SHOULD_GATHER_COVERAGE_INFORMATION && fullPath.endsWith('.js') && filePath.startsWith('/front_end/') &&
-        isIncludedForCoverageComputation(filePath)) {
-      const previouslyGeneratedInstrumentedSource = instrumentedSourceCacheForFilePaths.get(fullPath);
-
-      if (previouslyGeneratedInstrumentedSource) {
-        fileContents = previouslyGeneratedInstrumentedSource;
-      } else {
-        if (!isComputingCoverageRequest) {
-          response.writeHead(400);
-          response.write(`Invalid coverage request. Attempted to load ${request.url}.`, 'utf8');
-          response.end();
-
-          console.error(
-              `Invalid coverage request. Attempted to load ${request.url} which was not available in the ` +
-              'code coverage instrumentation cache. Make sure that you call `preloadForCodeCoverage` in the describe block ' +
-              'of your interactions test, before declaring any tests.\n');
-          return;
-        }
-
-        fileContents = await new Promise(async (resolve, reject) => {
-          let sourceMap = convertSourceMap.fromSource(fileContents);
-          if (!sourceMap) {
-            sourceMap = convertSourceMap.fromMapFileSource(fileContents, path.dirname(fullPath));
-          }
-
-          COVERAGE_INSTRUMENTER.instrument(fileContents, fullPath, (error, instrumentedSource) => {
-            if (error) {
-              reject(error);
-            } else {
-              resolve(instrumentedSource);
-            }
-          }, sourceMap ? sourceMap.sourcemap : undefined);
-        });
-
-        instrumentedSourceCacheForFilePaths.set(fullPath, fileContents);
-      }
-    }
+    const fileContents = await fs.promises.readFile(fullPath, encoding);
 
     response.writeHead(200);
     response.write(fileContents, encoding);

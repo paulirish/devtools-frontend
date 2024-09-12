@@ -6,7 +6,7 @@ import {assert} from 'chai';
 
 import {expectError} from '../../conductor/events.js';
 import {$textContent, getBrowserAndPages} from '../../shared/helper.js';
-import {describe} from '../../shared/mocha-extensions.js';
+
 import {
   clickStartButton,
   getAuditsBreakdown,
@@ -80,8 +80,8 @@ describe('Snapshot', function() {
       'document-title',
       'html-has-lang',
       'label',
+      'target-size',
       'meta-description',
-      'tap-targets',
     ]);
 
     // These a11y violations are not present on initial page load.

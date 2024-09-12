@@ -21,9 +21,10 @@ import {
   waitForFunction,
   withControlOrMetaKey,
 } from '../../shared/helper.js';
-import {describe, it} from '../../shared/mocha-extensions.js';
+
 import {CONSOLE_TAB_SELECTOR, focusConsolePrompt, getCurrentConsoleMessages} from '../helpers/console-helpers.js';
 import {openSoftContextMenuAndClickOnItem} from '../helpers/context-menu-helpers.js';
+import {reloadDevTools} from '../helpers/cross-tool-helper.js';
 import {
   clickNthChildOfSelectedElementNode,
   focusElementsTree,
@@ -42,7 +43,6 @@ import {
   openSourceCodeEditorForFile,
   openSourcesPanel,
   PAUSE_INDICATOR_SELECTOR,
-  refreshDevToolsAndRemoveBackendState,
   reloadPageAndWaitForSourceFile,
   removeBreakpointForLine,
   RESUME_BUTTON,
@@ -236,11 +236,6 @@ describe('The Sources Tab', function() {
     });
 
     await step('Check that expression evaluation understands unminified name', async () => {
-      await frontend.evaluate(`(async () => {
-        const Root = await import('./core/root/root.js');
-        Root.Runtime.experiments.setEnabled('evaluate-expressions-with-source-maps', true);
-      })()`);
-
       await click(CONSOLE_TAB_SELECTOR);
       await focusConsolePrompt();
       await pasteText('`Hello${text}!`');
@@ -405,7 +400,7 @@ describe('The Sources Tab', function() {
 
   it('reliably hits breakpoints on worker with source map', async () => {
     await enableExperiment('instrumentation-breakpoints');
-    const {target, frontend} = getBrowserAndPages();
+    const {frontend} = getBrowserAndPages();
     await openSourceCodeEditorForFile('sourcemap-stepping-source.js', 'sourcemap-breakpoint.html');
 
     await step('Add a breakpoint at first line of function multiline', async () => {
@@ -413,7 +408,7 @@ describe('The Sources Tab', function() {
     });
 
     await step('Navigate to a different site to refresh devtools and remove back-end state', async () => {
-      await refreshDevToolsAndRemoveBackendState(target);
+      await reloadDevTools({removeBackendState: true, selectedPanel: {name: 'sources'}});
     });
 
     await step('Navigate back to test page', () => {

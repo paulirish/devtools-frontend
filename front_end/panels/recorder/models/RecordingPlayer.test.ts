@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-const {assert} = chai;
-
-import * as Models from './models.js';
-
 import {
   createCustomStep,
   installMocksForRecordingPlayer,
   installMocksForTargetManager,
 } from '../testing/RecorderHelpers.js';
+
+import * as Models from './models.js';
 
 describe('RecordingPlayer', () => {
   let recordingPlayer: Models.RecordingPlayer.RecordingPlayer;
@@ -35,7 +33,7 @@ describe('RecordingPlayer', () => {
           ],
         },
         {
-          speed: Models.RecordingPlayer.PlayRecordingSpeed.Normal,
+          speed: Models.RecordingPlayer.PlayRecordingSpeed.NORMAL,
           breakpointIndexes: new Set(),
         },
     );
@@ -43,7 +41,7 @@ describe('RecordingPlayer', () => {
       resolve();
     });
     recordingPlayer.addEventListener(
-        Models.RecordingPlayer.Events.Step,
+        Models.RecordingPlayer.Events.STEP,
         stepEventHandlerStub,
     );
 
@@ -64,7 +62,7 @@ describe('RecordingPlayer', () => {
             ],
           },
           {
-            speed: Models.RecordingPlayer.PlayRecordingSpeed.Normal,
+            speed: Models.RecordingPlayer.PlayRecordingSpeed.NORMAL,
             breakpointIndexes: new Set([1]),
           },
       );
@@ -73,14 +71,14 @@ describe('RecordingPlayer', () => {
       });
       const stopEventPromise = new Promise<void>(resolve => {
         recordingPlayer.addEventListener(
-            Models.RecordingPlayer.Events.Stop,
+            Models.RecordingPlayer.Events.STOP,
             () => {
               resolve();
             },
         );
       });
       recordingPlayer.addEventListener(
-          Models.RecordingPlayer.Events.Step,
+          Models.RecordingPlayer.Events.STEP,
           stepEventHandlerStub,
       );
 
@@ -102,7 +100,7 @@ describe('RecordingPlayer', () => {
             ],
           },
           {
-            speed: Models.RecordingPlayer.PlayRecordingSpeed.Normal,
+            speed: Models.RecordingPlayer.PlayRecordingSpeed.NORMAL,
             breakpointIndexes: new Set([1]),
           },
       );
@@ -111,12 +109,12 @@ describe('RecordingPlayer', () => {
       });
       let stopEventPromise = new Promise<void>(resolve => {
         recordingPlayer.addEventListener(
-            Models.RecordingPlayer.Events.Stop,
+            Models.RecordingPlayer.Events.STOP,
             () => {
               resolve();
               stopEventPromise = new Promise<void>(nextResolve => {
                 recordingPlayer.addEventListener(
-                    Models.RecordingPlayer.Events.Stop,
+                    Models.RecordingPlayer.Events.STOP,
                     () => {
                       nextResolve();
                     },
@@ -128,7 +126,7 @@ describe('RecordingPlayer', () => {
         );
       });
       recordingPlayer.addEventListener(
-          Models.RecordingPlayer.Events.Step,
+          Models.RecordingPlayer.Events.STEP,
           stepEventHandlerStub,
       );
 
@@ -154,7 +152,7 @@ describe('RecordingPlayer', () => {
             ],
           },
           {
-            speed: Models.RecordingPlayer.PlayRecordingSpeed.Normal,
+            speed: Models.RecordingPlayer.PlayRecordingSpeed.NORMAL,
             breakpointIndexes: new Set([1, 3]),
           },
       );
@@ -163,12 +161,12 @@ describe('RecordingPlayer', () => {
       });
       let stopEventPromise = new Promise<void>(resolve => {
         recordingPlayer.addEventListener(
-            Models.RecordingPlayer.Events.Stop,
+            Models.RecordingPlayer.Events.STOP,
             () => {
               resolve();
               stopEventPromise = new Promise<void>(nextResolve => {
                 recordingPlayer.addEventListener(
-                    Models.RecordingPlayer.Events.Stop,
+                    Models.RecordingPlayer.Events.STOP,
                     () => {
                       nextResolve();
                     },
@@ -180,7 +178,7 @@ describe('RecordingPlayer', () => {
         );
       });
       recordingPlayer.addEventListener(
-          Models.RecordingPlayer.Events.Step,
+          Models.RecordingPlayer.Events.STEP,
           stepEventHandlerStub,
       );
 
@@ -206,7 +204,7 @@ describe('RecordingPlayer', () => {
             ],
           },
           {
-            speed: Models.RecordingPlayer.PlayRecordingSpeed.Normal,
+            speed: Models.RecordingPlayer.PlayRecordingSpeed.NORMAL,
             breakpointIndexes: new Set([1]),
           },
       );
@@ -215,12 +213,12 @@ describe('RecordingPlayer', () => {
       });
       let stopEventPromise = new Promise<void>(resolve => {
         recordingPlayer.addEventListener(
-            Models.RecordingPlayer.Events.Stop,
+            Models.RecordingPlayer.Events.STOP,
             () => {
               resolve();
               stopEventPromise = new Promise<void>(nextResolve => {
                 recordingPlayer.addEventListener(
-                    Models.RecordingPlayer.Events.Stop,
+                    Models.RecordingPlayer.Events.STOP,
                     () => {
                       nextResolve();
                     },
@@ -233,7 +231,7 @@ describe('RecordingPlayer', () => {
       });
       const doneEventPromise = new Promise<void>(resolve => {
         recordingPlayer.addEventListener(
-            Models.RecordingPlayer.Events.Done,
+            Models.RecordingPlayer.Events.DONE,
             () => {
               resolve();
             },
@@ -241,7 +239,7 @@ describe('RecordingPlayer', () => {
         );
       });
       recordingPlayer.addEventListener(
-          Models.RecordingPlayer.Events.Step,
+          Models.RecordingPlayer.Events.STEP,
           stepEventHandlerStub,
       );
 

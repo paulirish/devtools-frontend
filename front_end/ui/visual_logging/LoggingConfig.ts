@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {knownContextValues} from './KnownContextValues.js';
+
 const LOGGING_ATTRIBUTE = 'jslog';
 
 interface TrackConfig {
@@ -30,6 +32,7 @@ export function getLoggingConfig(element: Element): LoggingConfig {
 }
 
 export enum VisualElements {
+  /* eslint-disable @typescript-eslint/naming-convention -- Indexed access. */
   TreeItem = 1,
   Close = 2,
   Counter = 3,
@@ -42,7 +45,7 @@ export enum VisualElements {
   Section = 10,
   SectionHeader = 11,
   Timeline = 12,
-  StylesSelector = 13,
+  CSSRuleHeader = 13,
   Expand = 14,
   ToggleSubpane = 15,
   ControlPoint = 16,
@@ -51,7 +54,7 @@ export enum VisualElements {
   BreakpointMarker = 19,
   DropDown = 20,
   Adorner = 21,
-  /* 22 used to be JumpToSource, but free to grab now */
+  Gutter = 22,
   MetricsBox = 23,
   MetricsBoxPart = 24,
   /* 25 used to be DOMBreakpointsPane, but free to grab now */
@@ -105,12 +108,25 @@ export enum VisualElements {
   ResponsivePresets = 73,
   DeviceModeRuler = 74,
   MediaInspectorView = 75,
+  /* eslint-enable @typescript-eslint/naming-convention */
 }
 
 export type VisualElementName = keyof typeof VisualElements;
 
 function resolveVe(ve: string): number {
   return VisualElements[ve as VisualElementName] ?? 0;
+}
+
+const reportedUnknownVeContext: Set<string> = new Set();
+
+function checkContextValue(context: string|number|undefined): void {
+  if (typeof context !== 'string' || !context.length || knownContextValues.has(context) ||
+      reportedUnknownVeContext.has(context)) {
+    return;
+  }
+  const stack = (new Error().stack || '').split('\n').slice(3).join('\n');
+  console.error(`Unknown VE context: ${context}${stack}`);
+  reportedUnknownVeContext.add(context);
 }
 
 export function parseJsLog(jslog: string): LoggingConfig {
@@ -123,7 +139,8 @@ export function parseJsLog(jslog: string): LoggingConfig {
   }
   const config: LoggingConfig = {ve};
   const context = getComponent('context:');
-  if (context) {
+  if (context && context.trim().length) {
+    checkContextValue(context);
     config.context = context;
   }
 
@@ -135,11 +152,11 @@ export function parseJsLog(jslog: string): LoggingConfig {
   const trackString = getComponent('track:');
   if (trackString) {
     config.track = {};
-    for (const [key, value] of trackString.split(',').map(t => t.split(':') as [string, string])) {
-      if (key === 'keydown' && value?.length) {
-        config.track.keydown = value;
+    for (const track of trackString.split(',')) {
+      if (track.startsWith('keydown:')) {
+        config.track.keydown = track.substr('keydown:'.length);
       } else {
-        config.track[key as keyof TrackConfig] = true;
+        config.track[track as keyof TrackConfig] = true;
       }
     }
   }
@@ -183,14 +200,16 @@ export interface ConfigStringBuilder {
 
 export function makeConfigStringBuilder(veName: VisualElementName, context?: string): ConfigStringBuilder {
   const components: string[] = [veName];
-  if (typeof context !== 'undefined') {
+  if (typeof context === 'string' && context.trim().length) {
     components.push(`context: ${context}`);
+    checkContextValue(context);
   }
   return {
     context: function(value: string|number|undefined): ConfigStringBuilder {
-      if (typeof value !== 'undefined') {
+      if (typeof value === 'number' || typeof value === 'string' && value.length) {
         components.push(`context: ${value}`);
       }
+      checkContextValue(context);
       return this;
     },
     parent: function(value: string): ConfigStringBuilder {

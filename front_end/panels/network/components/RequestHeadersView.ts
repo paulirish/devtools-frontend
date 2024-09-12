@@ -24,6 +24,7 @@ import * as Sources from '../../sources/sources.js';
 import {RequestHeaderSection, type RequestHeaderSectionData} from './RequestHeaderSection.js';
 import requestHeadersViewStyles from './RequestHeadersView.css.js';
 import {
+  EarlyHintsHeaderSection,
   RESPONSE_HEADER_SECTION_DATA_KEY,
   ResponseHeaderSection,
   type ResponseHeaderSectionData,
@@ -41,6 +42,10 @@ const UIStrings = {
    *@description Text in Request Headers View of the Network panel
    */
   fromMemoryCache: '(from memory cache)',
+  /**
+   *@description Text in Request Headers View of the Network panel
+   */
+  fromEarlyHints: '(from early hints)',
   /**
    *@description Text in Request Headers View of the Network panel
    */
@@ -90,6 +95,10 @@ const UIStrings = {
    */
   responseHeaders: 'Response Headers',
   /**
+   *@description A context menu item in the Network Log View Columns of the Network panel
+   */
+  earlyHintsHeaders: 'Early Hints Headers',
+  /**
    *@description Title text for a link to the Sources panel to the file containing the header override definitions
    */
   revealHeaderOverrides: 'Reveal header override definitions',
@@ -125,21 +134,22 @@ export class RequestHeadersView extends LegacyWrapper.LegacyWrapper.WrappableCom
   }
 
   override wasShown(): void {
-    this.#request.addEventListener(SDK.NetworkRequest.Events.RemoteAddressChanged, this.#refreshHeadersView, this);
-    this.#request.addEventListener(SDK.NetworkRequest.Events.FinishedLoading, this.#refreshHeadersView, this);
-    this.#request.addEventListener(SDK.NetworkRequest.Events.RequestHeadersChanged, this.#refreshHeadersView, this);
+    this.#request.addEventListener(SDK.NetworkRequest.Events.REMOTE_ADDRESS_CHANGED, this.#refreshHeadersView, this);
+    this.#request.addEventListener(SDK.NetworkRequest.Events.FINISHED_LOADING, this.#refreshHeadersView, this);
+    this.#request.addEventListener(SDK.NetworkRequest.Events.REQUEST_HEADERS_CHANGED, this.#refreshHeadersView, this);
     this.#request.addEventListener(
-        SDK.NetworkRequest.Events.ResponseHeadersChanged, this.#resetAndRefreshHeadersView, this);
+        SDK.NetworkRequest.Events.RESPONSE_HEADERS_CHANGED, this.#resetAndRefreshHeadersView, this);
     this.#toReveal = undefined;
     this.#refreshHeadersView();
   }
 
   override willHide(): void {
-    this.#request.removeEventListener(SDK.NetworkRequest.Events.RemoteAddressChanged, this.#refreshHeadersView, this);
-    this.#request.removeEventListener(SDK.NetworkRequest.Events.FinishedLoading, this.#refreshHeadersView, this);
-    this.#request.removeEventListener(SDK.NetworkRequest.Events.RequestHeadersChanged, this.#refreshHeadersView, this);
+    this.#request.removeEventListener(SDK.NetworkRequest.Events.REMOTE_ADDRESS_CHANGED, this.#refreshHeadersView, this);
+    this.#request.removeEventListener(SDK.NetworkRequest.Events.FINISHED_LOADING, this.#refreshHeadersView, this);
     this.#request.removeEventListener(
-        SDK.NetworkRequest.Events.ResponseHeadersChanged, this.#resetAndRefreshHeadersView, this);
+        SDK.NetworkRequest.Events.REQUEST_HEADERS_CHANGED, this.#refreshHeadersView, this);
+    this.#request.removeEventListener(
+        SDK.NetworkRequest.Events.RESPONSE_HEADERS_CHANGED, this.#resetAndRefreshHeadersView, this);
   }
 
   #resetAndRefreshHeadersView(): void {
@@ -193,11 +203,51 @@ export class RequestHeadersView extends LegacyWrapper.LegacyWrapper.WrappableCom
       // clang-format off
       render(html`
         ${this.#renderGeneralSection()}
+        ${this.#renderEarlyHintsHeaders()}
         ${this.#renderResponseHeaders()}
         ${this.#renderRequestHeaders()}
       `, this.#shadow, {host: this});
+
       // clang-format on
     });
+  }
+
+  #renderEarlyHintsHeaders(): LitHtml.LitTemplate {
+    if (!this.#request || !this.#request.earlyHintsHeaders || this.#request.earlyHintsHeaders.length === 0) {
+      return LitHtml.nothing;
+    }
+
+    const toggleShowRaw = (): void => {
+      this.#showResponseHeadersText = !this.#showResponseHeadersText;
+      void this.render();
+    };
+
+    // Disabled until https://crbug.com/1079231 is fixed.
+    // clang-format off
+    return html`
+      <${Category.litTagName}
+        @togglerawevent=${toggleShowRaw}
+        .data=${{
+        name: 'early-hints-headers',
+        title: i18nString(UIStrings.earlyHintsHeaders),
+        headerCount: this.#request.earlyHintsHeaders.length,
+        checked: undefined,
+        additionalContent: undefined,
+        forceOpen: this.#toReveal?.section === NetworkForward.UIRequestLocation.UIHeaderSection.EARLY_HINTS,
+        loggingContext: 'early-hints-headers',
+      } as CategoryData}
+        aria-label=${i18nString(UIStrings.earlyHintsHeaders)}
+      >
+        ${this.#showResponseHeadersText ?
+        this.#renderRawHeaders(this.#request.responseHeadersText, true) : html`
+          <${EarlyHintsHeaderSection.litTagName} .data=${{
+            request: this.#request,
+            toReveal: this.#toReveal,
+          } as ResponseHeaderSectionData}></${EarlyHintsHeaderSection.litTagName}>
+        `}
+      </${Category.litTagName}>
+    `;
+    // clang-format on
   }
 
   #renderResponseHeaders(): LitHtml.LitTemplate {
@@ -221,7 +271,7 @@ export class RequestHeadersView extends LegacyWrapper.LegacyWrapper.WrappableCom
           headerCount: this.#request.sortedResponseHeaders.length,
           checked: this.#request.responseHeadersText ? this.#showResponseHeadersText : undefined,
           additionalContent: this.#renderHeaderOverridesLink(),
-          forceOpen: this.#toReveal?.section === NetworkForward.UIRequestLocation.UIHeaderSection.Response,
+          forceOpen: this.#toReveal?.section === NetworkForward.UIRequestLocation.UIHeaderSection.RESPONSE,
           loggingContext: 'response-headers',
         } as CategoryData}
         aria-label=${i18nString(UIStrings.responseHeaders)}
@@ -250,7 +300,6 @@ export class RequestHeadersView extends LegacyWrapper.LegacyWrapper.WrappableCom
     const fileIcon = html`
       <${IconButton.Icon.Icon.litTagName} class=${overridesSetting.get() ? 'inline-icon dot purple': 'inline-icon'} .data=${{
           iconName: 'document',
-          color: 'var(--icon-default)',
           width: '16px',
           height: '16px',
         } as IconButton.Icon.IconData}>
@@ -276,7 +325,6 @@ export class RequestHeadersView extends LegacyWrapper.LegacyWrapper.WrappableCom
       >
         <${IconButton.Icon.Icon.litTagName} class="inline-icon" .data=${{
             iconName: 'help',
-            color: 'var(--icon-link)',
             width: '16px',
             height: '16px',
           } as IconButton.Icon.IconData}>
@@ -325,7 +373,7 @@ export class RequestHeadersView extends LegacyWrapper.LegacyWrapper.WrappableCom
           title: i18nString(UIStrings.requestHeaders),
           headerCount: this.#request.requestHeaders().length,
           checked: requestHeadersText? this.#showRequestHeadersText : undefined,
-          forceOpen: this.#toReveal?.section === NetworkForward.UIRequestLocation.UIHeaderSection.Request,
+          forceOpen: this.#toReveal?.section === NetworkForward.UIRequestLocation.UIHeaderSection.REQUEST,
           loggingContext: 'request-headers',
         } as CategoryData}
         aria-label=${i18nString(UIStrings.requestHeaders)}
@@ -347,7 +395,7 @@ export class RequestHeadersView extends LegacyWrapper.LegacyWrapper.WrappableCom
     const showFull = forResponseHeaders ? this.#showResponseHeadersTextFull : this.#showRequestHeadersTextFull;
     const isShortened = !showFull && trimmed.length > RAW_HEADER_CUTOFF;
 
-    const showMore = ():void => {
+    const showMore = (): void => {
       if (forResponseHeaders) {
         this.#showResponseHeadersTextFull = true;
       } else {
@@ -366,7 +414,7 @@ export class RequestHeadersView extends LegacyWrapper.LegacyWrapper.WrappableCom
       }
     };
 
-    const addContextMenuListener = (el: Element):void => {
+    const addContextMenuListener = (el: Element): void => {
       if (isShortened) {
         el.addEventListener('contextmenu', onContextMenuOpen);
       }
@@ -380,7 +428,7 @@ export class RequestHeadersView extends LegacyWrapper.LegacyWrapper.WrappableCom
         ${isShortened ? html`
           <${Buttons.Button.Button.litTagName}
             .size=${Buttons.Button.Size.SMALL}
-            .variant=${Buttons.Button.Variant.SECONDARY}
+            .variant=${Buttons.Button.Variant.OUTLINED}
             @click=${showMore}
             jslog=${VisualLogging.action('raw-headers-show-more').track({click: true})}
           >${i18nString(UIStrings.showMore)}</${Buttons.Button.Button.litTagName}>
@@ -407,6 +455,8 @@ export class RequestHeadersView extends LegacyWrapper.LegacyWrapper.WrappableCom
     let comment = '';
     if (this.#request.cachedInMemory()) {
       comment = i18nString(UIStrings.fromMemoryCache);
+    } else if (this.#request.fromEarlyHints()) {
+      comment = i18nString(UIStrings.fromEarlyHints);
     } else if (this.#request.fetchedViaServiceWorker) {
       comment = i18nString(UIStrings.fromServiceWorker);
     } else if (this.#request.redirectSourceSignedExchangeInfoHasNoErrors()) {
@@ -432,7 +482,7 @@ export class RequestHeadersView extends LegacyWrapper.LegacyWrapper.WrappableCom
         .data=${{
           name: 'general',
           title: i18nString(UIStrings.general),
-          forceOpen: this.#toReveal?.section === NetworkForward.UIRequestLocation.UIHeaderSection.General,
+          forceOpen: this.#toReveal?.section === NetworkForward.UIRequestLocation.UIHeaderSection.GENERAL,
           loggingContext: 'general',
         } as CategoryData}
         aria-label=${i18nString(UIStrings.general)}
@@ -450,7 +500,7 @@ export class RequestHeadersView extends LegacyWrapper.LegacyWrapper.WrappableCom
   }
 
   #renderGeneralRow(name: Common.UIString.LocalizedString, value: string, classNames?: string[]): LitHtml.LitTemplate {
-    const isHighlighted = this.#toReveal?.section === NetworkForward.UIRequestLocation.UIHeaderSection.General &&
+    const isHighlighted = this.#toReveal?.section === NetworkForward.UIRequestLocation.UIHeaderSection.GENERAL &&
         name.toLowerCase() === this.#toReveal?.header?.toLowerCase();
     return html`
       <div class="row ${isHighlighted ? 'header-highlight' : ''}">

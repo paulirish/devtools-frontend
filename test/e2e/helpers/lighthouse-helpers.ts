@@ -79,7 +79,7 @@ type CheckboxLabel = Element&{checkboxElement: HTMLInputElement};
 
 /**
  * Set the category checkboxes
- * @param selectedCategoryIds One of 'performance'|'accessibility'|'best-practices'|'seo'|'pwa'|'lighthouse-plugin-publisher-ads'
+ * @param selectedCategoryIds One of 'performance'|'accessibility'|'best-practices'|'seo'|'pwa'
  */
 export async function selectCategories(selectedCategoryIds: string[]) {
   const startViewHandle = await waitFor('.lighthouse-start-view');
@@ -134,12 +134,13 @@ export async function setThrottlingMethod(throttlingMethod: 'simulate'|'devtools
 }
 
 export async function clickStartButton() {
-  await click('.lighthouse-start-view button');
+  await click('.lighthouse-start-view devtools-button');
 }
 
 export async function isGenerateReportButtonDisabled() {
-  const button = await waitFor('.lighthouse-start-view .primary-button');
-  return button.evaluate(element => (element as HTMLButtonElement).disabled);
+  const buttonContainer = await waitFor<HTMLElement>('.lighthouse-start-button-container');
+  const button = await waitFor('button', buttonContainer);
+  return button.evaluate(element => element.hasAttribute('disabled'));
 }
 
 export async function getHelpText() {

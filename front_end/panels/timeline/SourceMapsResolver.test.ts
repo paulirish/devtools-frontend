@@ -19,8 +19,6 @@ import {
 
 import * as Timeline from './timeline.js';
 
-const {assert} = chai;
-
 const MINIFIED_FUNCTION_NAME = 'minified';
 const AUTHORED_FUNCTION_NAME = 'someFunction';
 
@@ -40,11 +38,11 @@ describeWithMockConnection('SourceMapsResolver', () => {
         'function', 10, 100, TraceEngine.Types.TraceEvents.ProcessID(1), TraceEngine.Types.TraceEvents.ThreadID(1));
 
     profileCall.callFrame = {
-      'columnNumber': columnNumber,
-      'functionName': 'minified',
-      'lineNumber': 0,
-      'scriptId': script.scriptId,
-      'url': 'file://gen.js',
+      columnNumber,
+      functionName: 'minified',
+      lineNumber: 0,
+      scriptId: script.scriptId,
+      url: 'file://gen.js',
     };
 
     const workersData: TraceEngine.Handlers.ModelHandlers.Workers.WorkersData = {

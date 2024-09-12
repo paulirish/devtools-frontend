@@ -7,8 +7,8 @@
  * @internal
  */
 export const PUPPETEER_REVISIONS = Object.freeze({
-    chrome: '122.0.6261.111',
-    'chrome-headless-shell': '122.0.6261.111',
-    firefox: 'latest',
+    chrome: '128.0.6613.119',
+    'chrome-headless-shell': '128.0.6613.119',
+    firefox: 'stable_130.0',
 });
 //# sourceMappingURL=revisions.js.map

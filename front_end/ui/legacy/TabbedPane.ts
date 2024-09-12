@@ -31,6 +31,7 @@
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
+import * as Buttons from '../../ui/components/buttons/buttons.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 import * as IconButton from '../components/icon_button/icon_button.js';
 
@@ -133,7 +134,7 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.triggerDropDownTimeout = null;
     this.dropDownButton = this.createDropDownButton();
     this.currentDevicePixelRatio = window.devicePixelRatio;
-    ZoomManager.instance().addEventListener(ZoomManagerEvents.ZoomChanged, this.zoomChanged, this);
+    ZoomManager.instance().addEventListener(ZoomManagerEvents.ZOOM_CHANGED, this.zoomChanged, this);
     this.makeTabSlider();
   }
 
@@ -228,16 +229,16 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
 
   appendTab(
       id: string, tabTitle: string, view: Widget, tabTooltip?: string, userGesture?: boolean, isCloseable?: boolean,
-      isPreviewFeature?: boolean, index?: number): void {
+      isPreviewFeature?: boolean, index?: number, jslogContext?: string): void {
     const closeable = typeof isCloseable === 'boolean' ? isCloseable : Boolean(this.closeableTabs);
-    const tab = new TabbedPaneTab(this, id, tabTitle, closeable, Boolean(isPreviewFeature), view, tabTooltip);
+    const tab =
+        new TabbedPaneTab(this, id, tabTitle, closeable, Boolean(isPreviewFeature), view, tabTooltip, jslogContext);
     tab.setDelegate((this.delegate as TabbedPaneTabDelegate));
     console.assert(!this.tabsById.has(id), `Tabbed pane already contains a tab with id '${id}'`);
     this.tabsById.set(id, tab);
     tab.tabElement.tabIndex = -1;
-    const context = id === 'console-view' ? 'console' : id;
     tab.tabElement.setAttribute(
-        'jslog', `${VisualLogging.panelTabHeader().track({click: true, drag: true}).context(context)}`);
+        'jslog', `${VisualLogging.panelTabHeader().track({click: true, drag: true}).context(tab.jslogContext)}`);
     if (index !== undefined) {
       this.tabs.splice(index, 0, tab);
     } else {
@@ -482,6 +483,7 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
     if (effectiveTab && this.autoSelectFirstItemOnShow) {
       this.selectTab(effectiveTab.id);
     }
+    this.updateTabElements();
   }
 
   makeTabSlider(): void {
@@ -637,10 +639,10 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
       }
       if (this.numberOfTabsShown() === 0 && this.tabsHistory[0] === tab) {
         menu.defaultSection().appendCheckboxItem(
-            tab.title, this.dropDownMenuItemSelected.bind(this, tab), {checked: true, jslogContext: tab.id});
+            tab.title, this.dropDownMenuItemSelected.bind(this, tab), {checked: true, jslogContext: tab.jslogContext});
       } else {
         menu.defaultSection().appendItem(
-            tab.title, this.dropDownMenuItemSelected.bind(this, tab), {jslogContext: tab.id});
+            tab.title, this.dropDownMenuItemSelected.bind(this, tab), {jslogContext: tab.jslogContext});
       }
     }
     void menu.show().then(() => ARIAUtils.setExpanded(this.dropDownButton, menu.isHostedMenuOpen()));
@@ -970,10 +972,12 @@ export interface EventData {
 }
 
 export enum Events {
+  /* eslint-disable @typescript-eslint/naming-convention -- Used by web_tests. */
   TabInvoked = 'TabInvoked',
   TabSelected = 'TabSelected',
   TabClosed = 'TabClosed',
   TabOrderChanged = 'TabOrderChanged',
+  /* eslint-enable @typescript-eslint/naming-convention */
 }
 
 export type EventTypes = {
@@ -999,9 +1003,10 @@ export class TabbedPaneTab {
   private delegate?: TabbedPaneTabDelegate;
   private titleElement?: HTMLElement;
   private dragStartX?: number;
+  private jslogContextInternal?: string;
   constructor(
       tabbedPane: TabbedPane, id: string, title: string, closeable: boolean, previewFeature: boolean, view: Widget,
-      tooltip?: string) {
+      tooltip?: string, jslogContext?: string) {
     this.closeable = closeable;
     this.previewFeature = previewFeature;
     this.tabbedPane = tabbedPane;
@@ -1010,6 +1015,7 @@ export class TabbedPaneTab {
     this.tooltipInternal = tooltip;
     this.viewInternal = view;
     this.shown = false;
+    this.jslogContextInternal = jslogContext;
   }
 
   get id(): string {
@@ -1032,6 +1038,10 @@ export class TabbedPaneTab {
       closeIconContainer?.setAttribute('aria-label', i18nString(UIStrings.closeS, {PH1: title}));
     }
     delete this.measuredWidth;
+  }
+
+  get jslogContext(): string {
+    return this.jslogContextInternal ?? (this.idInternal === 'console-view' ? 'console' : this.idInternal);
   }
 
   isCloseable(): boolean {
@@ -1172,21 +1182,19 @@ export class TabbedPaneTab {
     return tabElement as HTMLElement;
   }
 
-  private createCloseIconButton(): HTMLButtonElement {
-    const closeIconContainer = document.createElement('button');
-    closeIconContainer.classList.add('close-button', 'tabbed-pane-close-button');
-    closeIconContainer.setAttribute('jslog', `${VisualLogging.close().track({click: true})}`);
-    const closeIcon = new IconButton.Icon.Icon();
-    closeIcon.data = {
+  private createCloseIconButton(): Buttons.Button.Button {
+    const closeButton = new Buttons.Button.Button();
+    closeButton.data = {
+      variant: Buttons.Button.Variant.ICON,
+      size: Buttons.Button.Size.SMALL,
       iconName: 'cross',
-      color: 'var(--tabbed-pane-close-icon-color)',
-      width: '16px',
+      title: i18nString(UIStrings.closeS, {PH1: this.title}),
     };
-    closeIconContainer.appendChild(closeIcon);
-    closeIconContainer.setAttribute('role', 'button');
-    closeIconContainer.setAttribute('title', i18nString(UIStrings.closeS, {PH1: this.title}));
-    closeIconContainer.setAttribute('aria-label', i18nString(UIStrings.closeS, {PH1: this.title}));
-    return closeIconContainer;
+    closeButton.classList.add('close-button', 'tabbed-pane-close-button');
+    closeButton.setAttribute('jslog', `${VisualLogging.close().track({click: true})}`);
+
+    closeButton.setAttribute('aria-label', i18nString(UIStrings.closeS, {PH1: this.title}));
+    return closeButton;
   }
 
   private createPreviewIcon(): HTMLDivElement {

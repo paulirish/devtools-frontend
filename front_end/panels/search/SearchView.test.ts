@@ -2,16 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-const {assert} = chai;
-
 import * as Common from '../../core/common/common.js';
-import * as Platform from '../../core/platform/platform.js';
 import type * as Workspace from '../../models/workspace/workspace.js';
-import * as Search from './search.js';
-import * as UI from '../../ui/legacy/legacy.js';
-
 import {dispatchKeyDownEvent} from '../../testing/DOMHelpers.js';
 import {describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
+import * as UI from '../../ui/legacy/legacy.js';
+
+import * as Search from './search.js';
 
 interface PerformSearchArgs {
   searchConfig: Workspace.SearchConfig.SearchConfig;
@@ -25,7 +22,7 @@ class FakeSearchScope implements Search.SearchScope.SearchScope {
   readonly #resolvePerformSearchCalledPromise: (args: PerformSearchArgs) => void;
 
   constructor() {
-    const {promise, resolve} = Platform.PromiseUtilities.promiseWithResolvers<PerformSearchArgs>();
+    const {promise, resolve} = Promise.withResolvers<PerformSearchArgs>();
     this.performSearchCalledPromise = promise;
     this.#resolvePerformSearchCalledPromise = resolve;
   }
@@ -89,8 +86,8 @@ class TestSearchView extends Search.SearchView.SearchView {
   /** Fills in the UI elements of the SearchView and hits 'Enter'. */
   triggerSearch(query: string, matchCase: boolean, isRegex: boolean): void {
     this.search.value = query;
-    this.matchCaseButton.setToggled(matchCase);
-    this.regexButton.setToggled(isRegex);
+    this.matchCaseButton.toggled = matchCase;
+    this.regexButton.toggled = isRegex;
 
     dispatchKeyDownEvent(this.search, {keyCode: UI.KeyboardShortcut.Keys.Enter.code});
   }

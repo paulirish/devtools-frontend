@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-const {assert} = chai;
 import * as EmulationUtils from './utils.js';
+
 import StructuredHeaders = EmulationUtils.StructuredHeaders;
 
 function assertItemError(result: StructuredHeaders.Item|StructuredHeaders.Error): void {
@@ -144,12 +144,12 @@ function makeItemWithParams(
 }
 
 function makeList(items: StructuredHeaders.ListMember[]): StructuredHeaders.List {
-  return {kind: StructuredHeaders.ResultKind.LIST, items: items};
+  return {kind: StructuredHeaders.ResultKind.LIST, items};
 }
 
 function makeInnerList(
     items: StructuredHeaders.Item[], params: [string, StructuredHeaders.BareItem][]): StructuredHeaders.InnerList {
-  return {kind: StructuredHeaders.ResultKind.INNER_LIST, items: items, parameters: makeParams(params)};
+  return {kind: StructuredHeaders.ResultKind.INNER_LIST, items, parameters: makeParams(params)};
 }
 
 describe('StructuredHeaders', () => {

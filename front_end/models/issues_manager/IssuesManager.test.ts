@@ -2,20 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-const {assert} = chai;
-
 import * as SDK from '../../core/sdk/sdk.js';
-import * as IssuesManager from '../issues_manager/issues_manager.js';
-
+import * as Protocol from '../../generated/protocol.js';
 import {createFakeSetting, createTarget} from '../../testing/EnvironmentHelpers.js';
 import {describeWithMockConnection, dispatchEvent} from '../../testing/MockConnection.js';
+import {activate, getMainFrame, navigate} from '../../testing/ResourceTreeHelpers.js';
 import {
   mkInspectorCspIssue,
   StubIssue,
   ThirdPartyStubIssue,
 } from '../../testing/StubIssue.js';
-import {assertNotNullOrUndefined} from '../../core/platform/platform.js';
-import * as Protocol from '../../generated/protocol.js';
+import * as IssuesManager from '../issues_manager/issues_manager.js';
 
 describeWithMockConnection('IssuesManager', () => {
   let target: SDK.Target.Target;
@@ -24,7 +21,7 @@ describeWithMockConnection('IssuesManager', () => {
   beforeEach(() => {
     target = createTarget();
     const maybeModel = target.model(SDK.IssuesModel.IssuesModel);
-    assertNotNullOrUndefined(maybeModel);
+    assert.exists(maybeModel);
     model = maybeModel;
   });
 
@@ -33,12 +30,12 @@ describeWithMockConnection('IssuesManager', () => {
 
     const dispatchedIssues: IssuesManager.Issue.Issue[] = [];
     issuesManager.addEventListener(
-        IssuesManager.IssuesManager.Events.IssueAdded, event => dispatchedIssues.push(event.data.issue));
+        IssuesManager.IssuesManager.Events.ISSUE_ADDED, event => dispatchedIssues.push(event.data.issue));
 
     model.dispatchEventToListeners(
-        SDK.IssuesModel.Events.IssueAdded, {issuesModel: model, inspectorIssue: mkInspectorCspIssue('url1')});
+        SDK.IssuesModel.Events.ISSUE_ADDED, {issuesModel: model, inspectorIssue: mkInspectorCspIssue('url1')});
     model.dispatchEventToListeners(
-        SDK.IssuesModel.Events.IssueAdded, {issuesModel: model, inspectorIssue: mkInspectorCspIssue('url2')});
+        SDK.IssuesModel.Events.ISSUE_ADDED, {issuesModel: model, inspectorIssue: mkInspectorCspIssue('url2')});
 
     const expected = ['ContentSecurityPolicyIssue::kURLViolation', 'ContentSecurityPolicyIssue::kURLViolation'];
     assert.deepStrictEqual(dispatchedIssues.map(i => i.code()), expected);
@@ -58,15 +55,15 @@ describeWithMockConnection('IssuesManager', () => {
 
     const dispatchedIssues: IssuesManager.Issue.Issue[] = [];
     issuesManager.addEventListener(
-        IssuesManager.IssuesManager.Events.IssueAdded, event => dispatchedIssues.push(event.data.issue));
+        IssuesManager.IssuesManager.Events.ISSUE_ADDED, event => dispatchedIssues.push(event.data.issue));
 
     model.dispatchEventToListeners(
-        SDK.IssuesModel.Events.IssueAdded, {issuesModel: model, inspectorIssue: mkInspectorCspIssue('url1')});
+        SDK.IssuesModel.Events.ISSUE_ADDED, {issuesModel: model, inspectorIssue: mkInspectorCspIssue('url1')});
     const prerenderTarget = createTarget({subtype: 'prerender'});
     const prerenderModel = prerenderTarget.model(SDK.IssuesModel.IssuesModel);
-    assertNotNullOrUndefined(prerenderModel);
+    assert.exists(prerenderModel);
     prerenderModel.dispatchEventToListeners(
-        SDK.IssuesModel.Events.IssueAdded, {issuesModel: prerenderModel, inspectorIssue: mkInspectorCspIssue('url2')});
+        SDK.IssuesModel.Events.ISSUE_ADDED, {issuesModel: prerenderModel, inspectorIssue: mkInspectorCspIssue('url2')});
 
     const expected = ['url1'];
     assert.deepStrictEqual(dispatchedIssues.map(getBlockedUrl), expected);
@@ -85,15 +82,8 @@ describeWithMockConnection('IssuesManager', () => {
   it('keeps issues of prerendered page upon activation', () => {
     const {issuesManager, prerenderTarget} = assertOutOfScopeIssuesAreFiltered();
 
-    const resourceTreeModel = prerenderTarget.model(SDK.ResourceTreeModel.ResourceTreeModel);
-    assertNotNullOrUndefined(resourceTreeModel);
-    const frame = {url: 'http://example.com/', resourceTreeModel: () => resourceTreeModel} as
-        SDK.ResourceTreeModel.ResourceTreeFrame;
-
     SDK.TargetManager.TargetManager.instance().setScopeTarget(prerenderTarget);
-    resourceTreeModel.dispatchEventToListeners(
-        SDK.ResourceTreeModel.Events.PrimaryPageChanged,
-        {frame, type: SDK.ResourceTreeModel.PrimaryPageChangeType.Activation});
+    activate(prerenderTarget);
     assert.deepStrictEqual(Array.from(issuesManager.issues()).map(getBlockedUrl), ['url2']);
   });
 
@@ -101,22 +91,10 @@ describeWithMockConnection('IssuesManager', () => {
     const issuesManager = new IssuesManager.IssuesManager.IssuesManager();
 
     model.dispatchEventToListeners(
-        SDK.IssuesModel.Events.IssueAdded, {issuesModel: model, inspectorIssue: mkInspectorCspIssue('url1')});
+        SDK.IssuesModel.Events.ISSUE_ADDED, {issuesModel: model, inspectorIssue: mkInspectorCspIssue('url1')});
     assert.strictEqual(issuesManager.numberOfIssues(), 1);
 
-    const FRAME = {
-      id: 'main',
-      loaderId: 'test',
-      url: 'http://example.com',
-      securityOrigin: 'http://example.com',
-      mimeType: 'text/html',
-    };
-    if (primary) {
-      dispatchEvent(target, 'Page.frameNavigated', {frame: FRAME});
-    } else {
-      const prerenderTarget = createTarget({subtype: 'prerender'});
-      dispatchEvent(prerenderTarget, 'Page.frameNavigated', {frame: FRAME});
-    }
+    navigate(getMainFrame(primary ? target : createTarget({subtype: 'prerender'})));
     assert.strictEqual(issuesManager.numberOfIssues(), primary ? 0 : 1);
   };
 
@@ -136,7 +114,7 @@ describeWithMockConnection('IssuesManager', () => {
 
     const firedIssueAddedEventCodes: string[] = [];
     issuesManager.addEventListener(
-        IssuesManager.IssuesManager.Events.IssueAdded,
+        IssuesManager.IssuesManager.Events.ISSUE_ADDED,
         event => firedIssueAddedEventCodes.push(event.data.issue.code()));
 
     for (const issue of issues) {
@@ -154,9 +132,9 @@ describeWithMockConnection('IssuesManager', () => {
   });
 
   it('reports issue counts by kind', () => {
-    const issue1 = new StubIssue('StubIssue1', ['id1'], [], IssuesManager.Issue.IssueKind.Improvement);
-    const issue2 = new StubIssue('StubIssue1', ['id2'], [], IssuesManager.Issue.IssueKind.Improvement);
-    const issue3 = new StubIssue('StubIssue1', ['id3'], [], IssuesManager.Issue.IssueKind.BreakingChange);
+    const issue1 = new StubIssue('StubIssue1', ['id1'], [], IssuesManager.Issue.IssueKind.IMPROVEMENT);
+    const issue2 = new StubIssue('StubIssue1', ['id2'], [], IssuesManager.Issue.IssueKind.IMPROVEMENT);
+    const issue3 = new StubIssue('StubIssue1', ['id3'], [], IssuesManager.Issue.IssueKind.BREAKING_CHANGE);
 
     const issuesManager = new IssuesManager.IssuesManager.IssuesManager();
 
@@ -165,9 +143,9 @@ describeWithMockConnection('IssuesManager', () => {
     issuesManager.addIssue(model, issue3);
 
     assert.deepStrictEqual(issuesManager.numberOfIssues(), 3);
-    assert.deepStrictEqual(issuesManager.numberOfIssues(IssuesManager.Issue.IssueKind.Improvement), 2);
-    assert.deepStrictEqual(issuesManager.numberOfIssues(IssuesManager.Issue.IssueKind.BreakingChange), 1);
-    assert.deepStrictEqual(issuesManager.numberOfIssues(IssuesManager.Issue.IssueKind.PageError), 0);
+    assert.deepStrictEqual(issuesManager.numberOfIssues(IssuesManager.Issue.IssueKind.IMPROVEMENT), 2);
+    assert.deepStrictEqual(issuesManager.numberOfIssues(IssuesManager.Issue.IssueKind.BREAKING_CHANGE), 1);
+    assert.deepStrictEqual(issuesManager.numberOfIssues(IssuesManager.Issue.IssueKind.PAGE_ERROR), 0);
   });
 
   describe('instance', () => {
@@ -193,7 +171,7 @@ describeWithMockConnection('IssuesManager', () => {
         new IssuesManager.IssuesManager.IssuesManager(showThirdPartyIssuesSetting, hideIssueByCodeSetting);
 
     const hiddenIssues: string[] = [];
-    issuesManager.addEventListener(IssuesManager.IssuesManager.Events.IssueAdded, event => {
+    issuesManager.addEventListener(IssuesManager.IssuesManager.Events.ISSUE_ADDED, event => {
       if (event.data.issue.isHidden()) {
         hiddenIssues.push(event.data.issue.code());
       }
@@ -204,8 +182,8 @@ describeWithMockConnection('IssuesManager', () => {
     // These settings have been updated by clicking on "hide issue" and cause the updateHiddenIssues
     // method to be called. These issues are being added to the IssuesManager after this has happened.
     hideIssueByCodeSetting.set({
-      'HiddenStubIssue1': IssuesManager.IssuesManager.IssueStatus.Hidden,
-      'HiddenStubIssue2': IssuesManager.IssuesManager.IssueStatus.Hidden,
+      HiddenStubIssue1: IssuesManager.IssuesManager.IssueStatus.HIDDEN,
+      HiddenStubIssue2: IssuesManager.IssuesManager.IssueStatus.HIDDEN,
     });
 
     for (const issue of issues) {
@@ -229,7 +207,7 @@ describeWithMockConnection('IssuesManager', () => {
         new IssuesManager.IssuesManager.IssuesManager(showThirdPartyIssuesSetting, hideIssueByCodeSetting);
 
     let hiddenIssues: string[] = [];
-    issuesManager.addEventListener(IssuesManager.IssuesManager.Events.FullUpdateRequired, () => {
+    issuesManager.addEventListener(IssuesManager.IssuesManager.Events.FULL_UPDATE_REQUIRED, () => {
       hiddenIssues = [];
       for (const issue of issuesManager.issues()) {
         if (issue.isHidden()) {
@@ -242,13 +220,13 @@ describeWithMockConnection('IssuesManager', () => {
     }
     // Setting is updated by clicking on "hide issue".
     hideIssueByCodeSetting.set({
-      'HiddenStubIssue1': IssuesManager.IssuesManager.IssueStatus.Hidden,
+      HiddenStubIssue1: IssuesManager.IssuesManager.IssueStatus.HIDDEN,
     });
     assert.deepStrictEqual(hiddenIssues, ['HiddenStubIssue1']);
 
     hideIssueByCodeSetting.set({
-      'HiddenStubIssue1': IssuesManager.IssuesManager.IssueStatus.Hidden,
-      'HiddenStubIssue2': IssuesManager.IssuesManager.IssueStatus.Hidden,
+      HiddenStubIssue1: IssuesManager.IssuesManager.IssueStatus.HIDDEN,
+      HiddenStubIssue2: IssuesManager.IssuesManager.IssueStatus.HIDDEN,
     });
     assert.deepStrictEqual(hiddenIssues, ['HiddenStubIssue1', 'HiddenStubIssue2']);
   });
@@ -269,13 +247,13 @@ describeWithMockConnection('IssuesManager', () => {
       issuesManager.addIssue(model, issue);
     }
     hideIssueByCodeSetting.set({
-      'HiddenStubIssue1': IssuesManager.IssuesManager.IssueStatus.Hidden,
-      'HiddenStubIssue2': IssuesManager.IssuesManager.IssueStatus.Hidden,
-      'UnhiddenStubIssue1': IssuesManager.IssuesManager.IssueStatus.Hidden,
-      'UnhiddenStubIssue2': IssuesManager.IssuesManager.IssueStatus.Hidden,
+      HiddenStubIssue1: IssuesManager.IssuesManager.IssueStatus.HIDDEN,
+      HiddenStubIssue2: IssuesManager.IssuesManager.IssueStatus.HIDDEN,
+      UnhiddenStubIssue1: IssuesManager.IssuesManager.IssueStatus.HIDDEN,
+      UnhiddenStubIssue2: IssuesManager.IssuesManager.IssueStatus.HIDDEN,
     });
     let unhiddenIssues: string[] = [];
-    issuesManager.addEventListener(IssuesManager.IssuesManager.Events.FullUpdateRequired, () => {
+    issuesManager.addEventListener(IssuesManager.IssuesManager.Events.FULL_UPDATE_REQUIRED, () => {
       unhiddenIssues = [];
       for (const issue of issuesManager.issues()) {
         if (!issue.isHidden()) {
@@ -286,18 +264,18 @@ describeWithMockConnection('IssuesManager', () => {
 
     // Setting updated by clicking on "unhide issue"
     hideIssueByCodeSetting.set({
-      'HiddenStubIssue1': IssuesManager.IssuesManager.IssueStatus.Hidden,
-      'HiddenStubIssue2': IssuesManager.IssuesManager.IssueStatus.Hidden,
-      'UnhiddenStubIssue1': IssuesManager.IssuesManager.IssueStatus.Unhidden,
-      'UnhiddenStubIssue2': IssuesManager.IssuesManager.IssueStatus.Hidden,
+      HiddenStubIssue1: IssuesManager.IssuesManager.IssueStatus.HIDDEN,
+      HiddenStubIssue2: IssuesManager.IssuesManager.IssueStatus.HIDDEN,
+      UnhiddenStubIssue1: IssuesManager.IssuesManager.IssueStatus.UNHIDDEN,
+      UnhiddenStubIssue2: IssuesManager.IssuesManager.IssueStatus.HIDDEN,
     });
     assert.deepStrictEqual(unhiddenIssues, ['UnhiddenStubIssue1']);
 
     hideIssueByCodeSetting.set({
-      'HiddenStubIssue1': IssuesManager.IssuesManager.IssueStatus.Hidden,
-      'HiddenStubIssue2': IssuesManager.IssuesManager.IssueStatus.Hidden,
-      'UnhiddenStubIssue1': IssuesManager.IssuesManager.IssueStatus.Unhidden,
-      'UnhiddenStubIssue2': IssuesManager.IssuesManager.IssueStatus.Unhidden,
+      HiddenStubIssue1: IssuesManager.IssuesManager.IssueStatus.HIDDEN,
+      HiddenStubIssue2: IssuesManager.IssuesManager.IssueStatus.HIDDEN,
+      UnhiddenStubIssue1: IssuesManager.IssuesManager.IssueStatus.UNHIDDEN,
+      UnhiddenStubIssue2: IssuesManager.IssuesManager.IssueStatus.UNHIDDEN,
     });
     assert.deepStrictEqual(unhiddenIssues, ['UnhiddenStubIssue1', 'UnhiddenStubIssue2']);
   });
@@ -318,13 +296,13 @@ describeWithMockConnection('IssuesManager', () => {
       issuesManager.addIssue(model, issue);
     }
     hideIssueByCodeSetting.set({
-      'HiddenStubIssue1': IssuesManager.IssuesManager.IssueStatus.Hidden,
-      'HiddenStubIssue2': IssuesManager.IssuesManager.IssueStatus.Hidden,
-      'UnhiddenStubIssue1': IssuesManager.IssuesManager.IssueStatus.Hidden,
-      'UnhiddenStubIssue2': IssuesManager.IssuesManager.IssueStatus.Hidden,
+      HiddenStubIssue1: IssuesManager.IssuesManager.IssueStatus.HIDDEN,
+      HiddenStubIssue2: IssuesManager.IssuesManager.IssueStatus.HIDDEN,
+      UnhiddenStubIssue1: IssuesManager.IssuesManager.IssueStatus.HIDDEN,
+      UnhiddenStubIssue2: IssuesManager.IssuesManager.IssueStatus.HIDDEN,
     });
     let unhiddenIssues: string[] = [];
-    issuesManager.addEventListener(IssuesManager.IssuesManager.Events.FullUpdateRequired, () => {
+    issuesManager.addEventListener(IssuesManager.IssuesManager.Events.FULL_UPDATE_REQUIRED, () => {
       unhiddenIssues = [];
       for (const issue of issuesManager.issues()) {
         if (!issue.isHidden()) {
@@ -340,7 +318,7 @@ describeWithMockConnection('IssuesManager', () => {
   it('send update event on scope change', async () => {
     const issuesManager = new IssuesManager.IssuesManager.IssuesManager();
 
-    const updateRequired = issuesManager.once(IssuesManager.IssuesManager.Events.FullUpdateRequired);
+    const updateRequired = issuesManager.once(IssuesManager.IssuesManager.Events.FULL_UPDATE_REQUIRED);
     const anotherTarget = createTarget();
     SDK.TargetManager.TargetManager.instance().setScopeTarget(anotherTarget);
     await updateRequired;
@@ -357,7 +335,7 @@ describeWithMockConnection('IssuesManager', () => {
       },
     };
 
-    model.dispatchEventToListeners(SDK.IssuesModel.Events.IssueAdded, {issuesModel: model, inspectorIssue: issue});
+    model.dispatchEventToListeners(SDK.IssuesModel.Events.ISSUE_ADDED, {issuesModel: model, inspectorIssue: issue});
     assert.strictEqual(issuesManager.numberOfIssues(), 1);
 
     dispatchEvent(target, 'Network.requestWillBeSent', {
@@ -366,14 +344,8 @@ describeWithMockConnection('IssuesManager', () => {
       request: {url: 'http://example.com'},
       hasUserGesture: false,
     } as unknown as Protocol.Network.RequestWillBeSentEvent);
-    const frame1 = {
-      id: 'main',
-      loaderId: 'loaderId1',
-      url: 'http://example.com',
-      securityOrigin: 'http://example.com',
-      mimeType: 'text/html',
-    };
-    dispatchEvent(target, 'Page.frameNavigated', {frame: frame1});
+    const frame = getMainFrame(target);
+    navigate(frame, {loaderId: 'loaderId1' as Protocol.Network.LoaderId});
     assert.strictEqual(issuesManager.numberOfIssues(), 1);
 
     dispatchEvent(target, 'Network.requestWillBeSent', {
@@ -382,14 +354,7 @@ describeWithMockConnection('IssuesManager', () => {
       request: {url: 'http://example.com/page'},
       hasUserGesture: true,
     } as unknown as Protocol.Network.RequestWillBeSentEvent);
-    const frame2 = {
-      id: 'main',
-      loaderId: 'loaderId2',
-      url: 'http://example.com/page',
-      securityOrigin: 'http://example.com',
-      mimeType: 'text/html',
-    };
-    dispatchEvent(target, 'Page.frameNavigated', {frame: frame2});
+    navigate(frame, {loaderId: 'loaderId2' as Protocol.Network.LoaderId});
     assert.strictEqual(issuesManager.numberOfIssues(), 0);
   });
 });

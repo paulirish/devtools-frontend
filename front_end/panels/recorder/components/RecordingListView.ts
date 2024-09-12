@@ -154,7 +154,7 @@ export class RecordingListView extends HTMLElement {
               @click=${this.#onCreateClick}
               title=${Models.Tooltip.getTooltipForActions(
                 i18nString(UIStrings.createRecording),
-                Actions.RecorderActions.CreateRecording,
+                Actions.RecorderActions.CREATE_RECORDING,
               )}
               .jslogContext=${'create-recording'}
             >
@@ -193,7 +193,7 @@ export class RecordingListView extends HTMLElement {
                                 title=${i18nString(UIStrings.playRecording)}
                                 .data=${
                                   {
-                                    variant: Buttons.Button.Variant.ROUND,
+                                    variant: Buttons.Button.Variant.ICON,
                                     iconName: 'play',
                                      jslogContext: 'play-recording',
                                   } as Buttons.Button.ButtonData
@@ -212,7 +212,7 @@ export class RecordingListView extends HTMLElement {
                         title=${i18nString(UIStrings.deleteRecording)}
                         .data=${
                           {
-                            variant: Buttons.Button.Variant.ROUND,
+                            variant: Buttons.Button.Variant.ICON,
                             iconName: 'bin',
                             jslogContext: 'delete-recording',
                           } as Buttons.Button.ButtonData

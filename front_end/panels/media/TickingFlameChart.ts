@@ -386,13 +386,17 @@ class TickingFlameChartDataProvider implements PerfUI.FlameChart.FlameChartDataP
     this.maxLevel = 0;
   }
 
+  hasTrackConfigurationMode(): boolean {
+    return false;
+  }
+
   /**
    * Add a group with |name| that can contain |depth| different tracks.
    */
   addGroup(name: Common.UIString.LocalizedString, depth: number): void {
     if (this.timelineDataInternal.groups) {
       const newGroup = {
-        name: name,
+        name,
         startLevel: this.maxLevel,
         expanded: true,
         selectable: false,

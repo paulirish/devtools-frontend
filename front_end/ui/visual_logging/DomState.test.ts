@@ -2,12 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {assertNotNullOrUndefined} from '../../core/platform/platform.js';
 import {renderElementIntoDOM} from '../../testing/DOMHelpers.js';
 
 import * as VisualLogging from './visual_logging-testing.js';
-
-const {assert} = chai;
 
 describe('DomState', () => {
   let container: HTMLElement;
@@ -87,7 +84,7 @@ describe('DomState', () => {
       <iframe id="iframe"></iframe>`;
     const iframe = el('iframe') as HTMLIFrameElement;
     const iframeDocument = iframe.contentDocument;
-    assertNotNullOrUndefined(iframeDocument);
+    assert.exists(iframeDocument);
     iframeDocument.body.innerHTML = `
       <div jslog="TreeItem" id="2"></div>`;
     const {loggables} = VisualLogging.DomState.getDomState([document, iframeDocument]);
@@ -217,5 +214,14 @@ describe('DomState', () => {
 
     assert.isNull(VisualLogging.DomState.visibleOverlap(el('1'), new DOMRect(25, 25, 30, 30)));
     assert.isNull(VisualLogging.DomState.visibleOverlap(el('2'), new DOMRect(25, 25, 30, 30)));
+  });
+
+  it('identifies small visible elements', () => {
+    container.innerHTML = `
+      <div id="1" class="box" style="width: 100px; height: 5px;"></div>
+      <div id="2" class="box" style="width: 0; height: 5px;"></div>`;
+
+    assert.isNotNull(VisualLogging.DomState.visibleOverlap(el('1'), new DOMRect(0, 0, 200, 200)));
+    assert.isNull(VisualLogging.DomState.visibleOverlap(el('2'), new DOMRect(0, 0, 200, 200)));
   });
 });

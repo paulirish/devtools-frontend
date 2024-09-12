@@ -6,11 +6,9 @@ import * as Common from '../../../core/common/common.js';
 import type * as Platform from '../../../core/platform/platform.js';
 import * as Root from '../../../core/root/root.js';
 import {
-  assertElement,
-  assertShadowRoot,
   renderElementIntoDOM,
 } from '../../../testing/DOMHelpers.js';
-import {createFakeSetting} from '../../../testing/EnvironmentHelpers.js';
+import {createFakeSetting, stubNoopSettings} from '../../../testing/EnvironmentHelpers.js';
 
 import * as Settings from './settings.js';
 
@@ -19,10 +17,10 @@ function renderSettingCheckbox(data: Settings.SettingCheckbox.SettingCheckboxDat
   const component = new Settings.SettingCheckbox.SettingCheckbox();
   component.data = data;
   renderElementIntoDOM(component);
-  assertShadowRoot(component.shadowRoot);
+  assert.isNotNull(component.shadowRoot);
 
   const checkbox = component.shadowRoot.querySelector('input');
-  assertElement(checkbox, HTMLInputElement);
+  assert.instanceOf(checkbox, HTMLInputElement);
 
   return {component, checkbox};
 }
@@ -78,6 +76,13 @@ describe('SettingCheckbox', () => {
     assert.isTrue(setting.get());
   });
 
+  it('renders override text if provided', () => {
+    const setting = createFakeSetting<boolean>('setting', false);
+    const {component} = renderSettingCheckbox({setting, textOverride: 'Text override'});
+
+    assert.strictEqual(component.shadowRoot!.querySelector('label')!.innerText, 'Text override');
+  });
+
   it('ignores clicks when disabled', () => {
     const setting = createFakeSetting<boolean>('setting', false);
     setting.setDisabled(true);
@@ -89,6 +94,7 @@ describe('SettingCheckbox', () => {
   });
 
   it('can be disabled via registration', () => {
+    stubNoopSettings();
     const setting = createFakeSetting<boolean>('setting', false);
     setting.setRegistration({
       settingName: 'setting',
@@ -108,6 +114,7 @@ describe('SettingCheckbox', () => {
   });
 
   it('shows disabled reason', () => {
+    stubNoopSettings();
     const setting = createFakeSetting<boolean>('setting', false);
     setting.setRegistration({
       settingName: 'setting',

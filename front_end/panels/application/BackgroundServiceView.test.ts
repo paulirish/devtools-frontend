@@ -2,17 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-const {assert} = chai;
-
+import type * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
-import * as UI from '../../ui/legacy/legacy.js';
-import {assertNotNullOrUndefined} from '../../core/platform/platform.js';
 import * as Protocol from '../../generated/protocol.js';
-import * as Resources from './application.js';
 import {createTarget} from '../../testing/EnvironmentHelpers.js';
 import {describeWithMockConnection} from '../../testing/MockConnection.js';
+import * as UI from '../../ui/legacy/legacy.js';
 
-import type * as Platform from '../../core/platform/platform.js';
+import * as Resources from './application.js';
 
 describeWithMockConnection('BackgroundServiceView', () => {
   const testKey = 'test-storage-key';
@@ -36,9 +33,9 @@ describeWithMockConnection('BackgroundServiceView', () => {
     sinon.stub(UI.ShortcutRegistry.ShortcutRegistry, 'instance').returns({
       shortcutTitleForAction: () => {},
       shortcutsForAction: () => [new UI.KeyboardShortcut.KeyboardShortcut(
-          [{key: 0, name: ''}], '', UI.KeyboardShortcut.Type.DefaultShortcut)],
+          [{key: 0, name: ''}], '', UI.KeyboardShortcut.Type.DEFAULT_SHORTCUT)],
     } as unknown as UI.ShortcutRegistry.ShortcutRegistry);
-    assertNotNullOrUndefined(backgroundServiceModel);
+    assert.exists(backgroundServiceModel);
     view = new Resources.BackgroundServiceView.BackgroundServiceView(serviceName, backgroundServiceModel);
   });
 
@@ -47,8 +44,8 @@ describeWithMockConnection('BackgroundServiceView', () => {
   });
 
   it('updates event list when main storage key changes', () => {
-    assertNotNullOrUndefined(backgroundServiceModel);
-    assertNotNullOrUndefined(manager);
+    assert.exists(backgroundServiceModel);
+    assert.exists(manager);
     backgroundServiceModel.backgroundServiceEventReceived({
       backgroundServiceEvent: {
         timestamp: 1556889085,  // 2019-05-03 14:11:25.000.

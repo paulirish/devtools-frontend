@@ -71,25 +71,24 @@ let UserContext = (() => {
             context.#initialize();
             return context;
         }
-        // keep-sorted start
-        #reason = (__runInitializers(this, _instanceExtraInitializers), void 0);
+        #reason = __runInitializers(this, _instanceExtraInitializers);
         // Note these are only top-level contexts.
         #browsingContexts = new Map();
         #disposables = new DisposableStack();
         #id;
         browser;
-        // keep-sorted end
         constructor(browser, id) {
             super();
-            // keep-sorted start
             this.#id = id;
             this.browser = browser;
-            // keep-sorted end
         }
         #initialize() {
             const browserEmitter = this.#disposables.use(new EventEmitter(this.browser));
             browserEmitter.once('closed', ({ reason }) => {
-                this.dispose(`User context already closed: ${reason}`);
+                this.dispose(`User context was closed: ${reason}`);
+            });
+            browserEmitter.once('disconnected', ({ reason }) => {
+                this.dispose(`User context was closed: ${reason}`);
             });
             const sessionEmitter = this.#disposables.use(new EventEmitter(this.#session));
             sessionEmitter.on('browsingContext.contextCreated', info => {
@@ -99,7 +98,7 @@ let UserContext = (() => {
                 if (info.userContext !== this.#id) {
                     return;
                 }
-                const browsingContext = BrowsingContext.from(this, undefined, info.context, info.url);
+                const browsingContext = BrowsingContext.from(this, undefined, info.context, info.url, info.originalOpener);
                 this.#browsingContexts.set(browsingContext.id, browsingContext);
                 const browsingContextEmitter = this.#disposables.use(new EventEmitter(browsingContext));
                 browsingContextEmitter.on('closed', () => {
@@ -109,7 +108,6 @@ let UserContext = (() => {
                 this.emit('browsingcontext', { browsingContext });
             });
         }
-        // keep-sorted start block=yes
         get #session() {
             return this.browser.session;
         }
@@ -125,7 +123,6 @@ let UserContext = (() => {
         get id() {
             return this.#id;
         }
-        // keep-sorted end
         dispose(reason) {
             this.#reason = reason;
             this[disposeSymbol]();
@@ -178,8 +175,7 @@ let UserContext = (() => {
                 origin,
                 descriptor,
                 state,
-                // @ts-expect-error not standard implementation.
-                'goog:userContext': this.#id,
+                userContext: this.#id,
             });
         }
         [(_dispose_decorators = [inertIfDisposed], _createBrowsingContext_decorators = [throwIfDisposed(context => {

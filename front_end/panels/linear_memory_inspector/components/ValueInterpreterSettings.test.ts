@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 import {
-  assertElement,
   getElementsWithinComponent,
   getEventPromise,
   renderElementIntoDOM,
@@ -11,8 +10,6 @@ import {
 import {describeWithLocale} from '../../../testing/EnvironmentHelpers.js';
 
 import * as LinearMemoryInspectorComponents from './components.js';
-
-const {assert} = chai;
 
 const SETTINGS_INPUT_SELECTOR = '[data-input]';
 const SETTINGS_TITLE_SELECTOR = '[data-title]';
@@ -23,9 +20,9 @@ describeWithLocale('ValueInterpreterSettings', () => {
     const component = new LinearMemoryInspectorComponents.ValueInterpreterSettings.ValueInterpreterSettings();
     const data = {
       valueTypes: new Set([
-        LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.Int8,
-        LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.Float64,
-        LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.Pointer32,
+        LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.INT8,
+        LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.FLOAT64,
+        LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.POINTER32,
       ]),
     };
     component.data = data;
@@ -38,14 +35,14 @@ describeWithLocale('ValueInterpreterSettings', () => {
     const checkboxes = getElementsWithinComponent(component, SETTINGS_LABEL_SELECTOR, HTMLLabelElement);
     const checkboxLabels = Array.from(checkboxes, checkbox => checkbox.getAttribute('title'));
     assert.deepEqual(checkboxLabels, [
-      LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.Int8,
-      LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.Int16,
-      LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.Int32,
-      LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.Int64,
-      LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.Float32,
-      LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.Float64,
-      LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.Pointer32,
-      LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.Pointer64,
+      LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.INT8,
+      LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.INT16,
+      LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.INT32,
+      LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.INT64,
+      LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.FLOAT32,
+      LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.FLOAT64,
+      LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.POINTER32,
+      LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.POINTER64,
     ]);
   });
 
@@ -55,9 +52,9 @@ describeWithLocale('ValueInterpreterSettings', () => {
 
     for (const label of labels) {
       const checkbox = label.querySelector(SETTINGS_INPUT_SELECTOR);
-      assertElement(checkbox, HTMLInputElement);
+      assert.instanceOf(checkbox, HTMLInputElement);
       const title = label.querySelector(SETTINGS_TITLE_SELECTOR);
-      assertElement(title, HTMLSpanElement);
+      assert.instanceOf(title, HTMLSpanElement);
 
       const checked = checkbox.checked;
 
@@ -77,8 +74,8 @@ describeWithLocale('ValueInterpreterSettings', () => {
     const elements = Array.from(labels).map(label => {
       const checkbox = label.querySelector<HTMLInputElement>(SETTINGS_INPUT_SELECTOR);
       const title = label.querySelector<HTMLSpanElement>(SETTINGS_TITLE_SELECTOR);
-      assertElement(checkbox, HTMLInputElement);
-      assertElement(title, HTMLSpanElement);
+      assert.instanceOf(checkbox, HTMLInputElement);
+      assert.instanceOf(title, HTMLSpanElement);
       return {title, checked: checkbox.checked};
     });
     assert.isAtLeast(data.valueTypes.size, 1);
@@ -88,14 +85,14 @@ describeWithLocale('ValueInterpreterSettings', () => {
 
     const uncheckedTitles = new Set(elements.filter(n => !n.checked).map(n => n.title.innerText));
     const allTypesTitle = [
-      LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.Int8,
-      LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.Int16,
-      LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.Int32,
-      LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.Int64,
-      LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.Float32,
-      LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.Float64,
-      LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.Pointer32,
-      LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.Pointer64,
+      LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.INT8,
+      LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.INT16,
+      LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.INT32,
+      LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.INT64,
+      LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.FLOAT32,
+      LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.FLOAT64,
+      LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.POINTER32,
+      LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType.POINTER64,
     ];
     const expectedUncheckedTitles = new Set(allTypesTitle.filter(title => !expectedTitles.has(title)));
     assert.deepEqual(uncheckedTitles, expectedUncheckedTitles);

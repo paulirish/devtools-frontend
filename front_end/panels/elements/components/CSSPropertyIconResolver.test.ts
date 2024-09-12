@@ -4,8 +4,6 @@
 
 import * as ElementsComponents from './components.js';
 
-const {assert} = chai;
-
 describe('CSSPropertyIconResolver', () => {
   function mapFromStyle(style: {[key: string]: string|undefined}) {
     const result = new Map();
@@ -19,7 +17,7 @@ describe('CSSPropertyIconResolver', () => {
     const tests = [
       {
         style: {
-          'direction': 'ltr',
+          direction: 'ltr',
           display: 'flex',
         },
         expected: {
@@ -31,7 +29,7 @@ describe('CSSPropertyIconResolver', () => {
       },
       {
         style: {
-          'direction': 'ltr',
+          direction: 'ltr',
           'writing-mode': 'vertical-rl',
           display: 'flex',
         },
@@ -44,7 +42,7 @@ describe('CSSPropertyIconResolver', () => {
       },
       {
         style: {
-          'direction': 'ltr',
+          direction: 'ltr',
           'writing-mode': 'vertical-lr',
           display: 'flex',
         },
@@ -57,7 +55,7 @@ describe('CSSPropertyIconResolver', () => {
       },
       {
         style: {
-          'direction': 'ltr',
+          direction: 'ltr',
           'writing-mode': 'tb',
           display: 'flex',
         },
@@ -70,7 +68,7 @@ describe('CSSPropertyIconResolver', () => {
       },
       {
         style: {
-          'direction': 'ltr',
+          direction: 'ltr',
           'writing-mode': 'tb-rl',
           display: 'flex',
         },
@@ -83,7 +81,7 @@ describe('CSSPropertyIconResolver', () => {
       },
       {
         style: {
-          'direction': 'rtl',
+          direction: 'rtl',
           display: 'flex',
         },
         expected: {
@@ -95,7 +93,7 @@ describe('CSSPropertyIconResolver', () => {
       },
       {
         style: {
-          'direction': 'rtl',
+          direction: 'rtl',
           'writing-mode': 'vertical-rl',
           display: 'flex',
         },
@@ -108,7 +106,7 @@ describe('CSSPropertyIconResolver', () => {
       },
       {
         style: {
-          'direction': 'rtl',
+          direction: 'rtl',
           'writing-mode': 'vertical-lr',
           display: 'flex',
         },
@@ -121,7 +119,7 @@ describe('CSSPropertyIconResolver', () => {
       },
       {
         style: {
-          'direction': 'rtl',
+          direction: 'rtl',
           'writing-mode': 'tb',
           display: 'flex',
         },
@@ -134,7 +132,7 @@ describe('CSSPropertyIconResolver', () => {
       },
       {
         style: {
-          'direction': 'rtl',
+          direction: 'rtl',
           'writing-mode': 'tb-rl',
           display: 'flex',
         },
@@ -197,14 +195,14 @@ describe('CSSPropertyIconResolver', () => {
     const tests = [
       {
         style: {
-          'direction': 'ltr',
+          direction: 'ltr',
           display: 'flex',
         },
         expected: ElementsComponents.CSSPropertyIconResolver.PhysicalDirection.LEFT_TO_RIGHT,
       },
       {
         style: {
-          'direction': 'ltr',
+          direction: 'ltr',
           'writing-mode': 'tb',
           display: 'flex',
         },
@@ -212,7 +210,7 @@ describe('CSSPropertyIconResolver', () => {
       },
       {
         style: {
-          'direction': 'ltr',
+          direction: 'ltr',
           'writing-mode': 'vertical-lr',
           display: 'flex',
         },
@@ -220,7 +218,7 @@ describe('CSSPropertyIconResolver', () => {
       },
       {
         style: {
-          'direction': 'ltr',
+          direction: 'ltr',
           'writing-mode': 'vertical-rl',
           display: 'flex',
         },
@@ -228,7 +226,7 @@ describe('CSSPropertyIconResolver', () => {
       },
       {
         style: {
-          'direction': 'ltr',
+          direction: 'ltr',
           'writing-mode': 'tb-rl',
           display: 'flex',
         },
@@ -236,14 +234,14 @@ describe('CSSPropertyIconResolver', () => {
       },
       {
         style: {
-          'direction': 'rtl',
+          direction: 'rtl',
           display: 'flex',
         },
         expected: ElementsComponents.CSSPropertyIconResolver.PhysicalDirection.RIGHT_TO_LEFT,
       },
       {
         style: {
-          'direction': 'rtl',
+          direction: 'rtl',
           'writing-mode': 'tb',
           display: 'flex',
         },
@@ -251,7 +249,7 @@ describe('CSSPropertyIconResolver', () => {
       },
       {
         style: {
-          'direction': 'rtl',
+          direction: 'rtl',
           'writing-mode': 'vertical-lr',
           display: 'flex',
         },
@@ -259,7 +257,7 @@ describe('CSSPropertyIconResolver', () => {
       },
       {
         style: {
-          'direction': 'rtl',
+          direction: 'rtl',
           'writing-mode': 'vertical-rl',
           display: 'flex',
         },
@@ -267,7 +265,7 @@ describe('CSSPropertyIconResolver', () => {
       },
       {
         style: {
-          'direction': 'rtl',
+          direction: 'rtl',
           'writing-mode': 'tb-rl',
           display: 'flex',
         },
@@ -292,7 +290,7 @@ describe('CSSPropertyIconResolver', () => {
     const tests = [
       {
         style: {
-          'direction': 'ltr',
+          direction: 'ltr',
           display: 'flex',
         },
         expected: ElementsComponents.CSSPropertyIconResolver.PhysicalDirection.TOP_TO_BOTTOM,

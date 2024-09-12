@@ -2,12 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {assertNotNullOrUndefined} from '../../../core/platform/platform.js';
 import * as IssuesManager from '../../../models/issues_manager/issues_manager.js';
 import {
-  assertElement,
   assertElements,
-  assertShadowRoot,
   renderElementIntoDOM,
 } from '../../../testing/DOMHelpers.js';
 import {describeWithLocale} from '../../../testing/EnvironmentHelpers.js';
@@ -16,22 +13,20 @@ import * as IconButton from '../icon_button/icon_button.js';
 
 import * as IssueCounter from './issue_counter.js';
 
-const {assert} = chai;
-
 const renderIssueCounter = (data: IssueCounter.IssueCounter.IssueCounterData):
     {component: IssueCounter.IssueCounter.IssueCounter, shadowRoot: ShadowRoot} => {
       const component = new IssueCounter.IssueCounter.IssueCounter();
       component.data = data;
       renderElementIntoDOM(component);
-      assertShadowRoot(component.shadowRoot);
+      assert.isNotNull(component.shadowRoot);
       return {component, shadowRoot: component.shadowRoot};
     };
 
 export const extractIconGroups = (shadowRoot: ShadowRoot) => {
   const iconButton = shadowRoot.querySelector('icon-button');
-  assertElement(iconButton, IconButton.IconButton.IconButton);
+  assert.instanceOf(iconButton, IconButton.IconButton.IconButton);
   const iconButtonShadowRoot = iconButton.shadowRoot;
-  assertNotNullOrUndefined(iconButtonShadowRoot);
+  assert.exists(iconButtonShadowRoot);
   const icons = iconButtonShadowRoot.querySelectorAll('.status-icon');
   assertElements(icons, IconButton.Icon.Icon);
   const labels = iconButtonShadowRoot.querySelectorAll('.icon-button-title');
@@ -49,11 +44,11 @@ export const extractIconGroups = (shadowRoot: ShadowRoot) => {
 
 export const extractButton = (shadowRoot: ShadowRoot) => {
   const iconButton = shadowRoot.querySelector('icon-button');
-  assertElement(iconButton, IconButton.IconButton.IconButton);
+  assert.instanceOf(iconButton, IconButton.IconButton.IconButton);
   const iconButtonShadowRoot = iconButton.shadowRoot;
-  assertNotNullOrUndefined(iconButtonShadowRoot);
+  assert.exists(iconButtonShadowRoot);
   const button = iconButtonShadowRoot.querySelector('button');
-  assertElement(button, HTMLButtonElement);
+  assert.instanceOf(button, HTMLButtonElement);
   return button;
 };
 
@@ -114,7 +109,7 @@ describeWithLocale('IssueCounter', () => {
         assert.deepEqual(iconNames, ['issue-cross-filled', 'issue-exclamation-filled']);
       }
 
-      component.data = {...component.data, displayMode: IssueCounter.IssueCounter.DisplayMode.OnlyMostImportant};
+      component.data = {...component.data, displayMode: IssueCounter.IssueCounter.DisplayMode.ONLY_MOST_IMPORTANT};
 
       {
         const icons = extractIconGroups(shadowRoot);
@@ -146,7 +141,7 @@ describeWithLocale('IssueCounter', () => {
       const issuesManager = new MockIssuesManager([]);
       const {shadowRoot} = renderIssueCounter({
         issuesManager: issuesManager as unknown as IssuesManager.IssuesManager.IssuesManager,
-        displayMode: IssueCounter.IssueCounter.DisplayMode.ShowAlways,
+        displayMode: IssueCounter.IssueCounter.DisplayMode.SHOW_ALWAYS,
         throttlerTimeout: 0,
       });
 
@@ -161,7 +156,7 @@ describeWithLocale('IssueCounter', () => {
       const issuesManager = new MockIssuesManager([]);
       const {shadowRoot} = renderIssueCounter({
         issuesManager: issuesManager as unknown as IssuesManager.IssuesManager.IssuesManager,
-        displayMode: IssueCounter.IssueCounter.DisplayMode.ShowAlways,
+        displayMode: IssueCounter.IssueCounter.DisplayMode.SHOW_ALWAYS,
         throttlerTimeout: 0,
       });
 
@@ -204,9 +199,9 @@ describeWithLocale('IssueCounter', () => {
     it('renders correctly with only improvement issues', () => {
       const issuesManager = new MockIssuesManager([]);
       issuesManager.setNumberOfIssues(new Map([
-        [IssuesManager.Issue.IssueKind.Improvement, 3],
-        [IssuesManager.Issue.IssueKind.BreakingChange, 0],
-        [IssuesManager.Issue.IssueKind.PageError, 0],
+        [IssuesManager.Issue.IssueKind.IMPROVEMENT, 3],
+        [IssuesManager.Issue.IssueKind.BREAKING_CHANGE, 0],
+        [IssuesManager.Issue.IssueKind.PAGE_ERROR, 0],
       ]));
       const {shadowRoot} = renderIssueCounter({
         issuesManager: issuesManager as unknown as IssuesManager.IssuesManager.IssuesManager,

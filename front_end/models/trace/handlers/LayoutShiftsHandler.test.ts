@@ -81,6 +81,8 @@ describe('LayoutShiftsHandler', function() {
     }
 
     assert.strictEqual(layoutShifts.clusters[0].clusterWindow.max, navigations[0].ts);
+    // The first cluster happens before any navigation
+    assert.isUndefined(layoutShifts.clusters[0].navigationId);
 
     // We should see an initial cluster here from the first layout shifts,
     // followed by 1 for each of the navigations themselves.
@@ -89,6 +91,11 @@ describe('LayoutShiftsHandler', function() {
     const secondCluster = layoutShifts.clusters[1];
     // The second cluster should be marked to start at the first shift timestamp.
     assert.strictEqual(secondCluster.clusterWindow.min, secondCluster.events[0].ts);
+
+    // The second cluster happened after the first navigation, so it should
+    // have navigationId set to the ID of the first navigation
+    assert.isDefined(secondCluster.navigationId);
+    assert.strictEqual(secondCluster.navigationId, navigations[0].args.data?.navigationId);
   });
 
   it('creates a cluster after exceeding the continuous shift limit', async function() {
@@ -218,5 +225,43 @@ describe('LayoutShiftsHandler', function() {
     // Test the calculated CLS.
     assert.strictEqual(layoutShifts.sessionMaxScore, globalCLS);
     assert.strictEqual(layoutShifts.clsWindowID, clusterWithCLS);
+  });
+
+  it('calculates worst shift correctly for clusters', async function() {
+    await processTrace(this, 'cls-cluster-max-timeout.json.gz');
+
+    const clusters = TraceModel.Handlers.ModelHandlers.LayoutShifts.data().clusters;
+    assert.isNotEmpty(clusters);
+
+    for (const cluster of clusters) {
+      // Get the max shift score from the list of layout shifts.
+      const maxShiftScore = Math.max(...cluster.events.map(s => s.args.data?.score ?? 0));
+      const gotShift = cluster.worstShiftEvent as TraceModel.Types.TraceEvents.SyntheticLayoutShift;
+      assert.isNotNull(gotShift);
+      // Make sure the worstShiftEvent's data matches the maxShiftScore.
+      assert.strictEqual(gotShift.args.data?.score ?? 0, maxShiftScore);
+    }
+  });
+
+  it('correctly calculates the duration and start time of the clusters', async function() {
+    await processTrace(this, 'cls-cluster-max-timeout.json.gz');
+
+    const clusters = TraceModel.Handlers.ModelHandlers.LayoutShifts.data().clusters;
+    assert.isNotEmpty(clusters);
+
+    for (const cluster of clusters) {
+      // Earliest and latest layout shifts should match.
+      const earliestLayoutShiftTs = Math.min(...cluster.events.map(s => s.ts));
+      assert.strictEqual(cluster.events[0].ts, earliestLayoutShiftTs);
+      const latestLayoutShiftTs = Math.max(...cluster.events.map(s => s.ts));
+      assert.strictEqual(cluster.events[cluster.events.length - 1].ts, latestLayoutShiftTs);
+      // earliest layout shift ts should be the cluster's ts.
+      assert.strictEqual(cluster.ts, earliestLayoutShiftTs);
+
+      const lastShiftTimings =
+          TraceModel.Helpers.Timing.eventTimingsMicroSeconds(cluster.events[cluster.events.length - 1]);
+      const dur = TraceModel.Types.Timing.MicroSeconds(lastShiftTimings.endTime - earliestLayoutShiftTs);
+      assert.strictEqual(cluster.dur || 0, dur);
+    }
   });
 });

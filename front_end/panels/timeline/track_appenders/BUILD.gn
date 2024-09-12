@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("../../../../third_party/typescript/typescript.gni")
+import("../../../../scripts/build/typescript/typescript.gni")
 
 ts_library("unittests") {
   testonly = true
@@ -11,10 +11,12 @@ ts_library("unittests") {
     "AnimationsTrackAppender.test.ts",
     "AppenderUtils.test.ts",
     "CompatibilityTracksAppender.test.ts",
+    "ExtensionTrackAppender.test.ts",
     "GPUTrackAppender.test.ts",
     "InteractionsTrackAppender.test.ts",
     "LayoutShiftsTrackAppender.test.ts",
     "NetworkTrackAppender.test.ts",
+    "ServerTimingsTrackAppender.test.ts",
     "ThreadAppender.test.ts",
     "TimingsTrackAppender.test.ts",
   ]

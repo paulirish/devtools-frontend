@@ -201,7 +201,7 @@ export class BreakpointsSidebarController implements UI.ContextFlavorListener.Co
 
   static targetSupportsIndependentPauseOnExceptionToggles(): boolean {
     const hasNodeTargets =
-        SDK.TargetManager.TargetManager.instance().targets().some(target => target.type() === SDK.Target.Type.Node);
+        SDK.TargetManager.TargetManager.instance().targets().some(target => target.type() === SDK.Target.Type.NODE);
     return !hasNodeTargets;
   }
 
@@ -333,10 +333,10 @@ export class BreakpointsSidebarController implements UI.ContextFlavorListener.Co
       const showColumn = numBreakpointsOnLine > 1;
       const locationText = uiLocation.lineAndColumnText(showColumn) as string;
 
-      const text = content[idx];
-      const codeSnippet = text instanceof TextUtils.Text.Text ?
-          text.lineAt(uiLocation.lineNumber) :
-          text.lines[text.bytecodeOffsetToLineNumber(uiLocation.columnNumber ?? 0)] ?? '';
+      const contentData = content[idx];
+      const codeSnippet = contentData instanceof TextUtils.WasmDisassembly.WasmDisassembly ?
+          contentData.lines[contentData.bytecodeOffsetToLineNumber(uiLocation.columnNumber ?? 0)] ?? '' :
+          contentData.textObj.lineAt(uiLocation.lineNumber);
 
       if (isHit && this.#collapsedFiles.has(sourceURL)) {
         this.#collapsedFiles.delete(sourceURL);
@@ -507,25 +507,10 @@ export class BreakpointsSidebarController implements UI.ContextFlavorListener.Co
   }
 
   #getContent(locations: Breakpoints.BreakpointManager.BreakpointLocation[][]):
-      Promise<Array<TextUtils.Text.Text|Common.WasmDisassembly.WasmDisassembly>> {
-    // Use a cache to share the Text objects between all breakpoints. This way
-    // we share the cached line ending information that Text calculates. This
-    // was very slow to calculate with a lot of breakpoints in the same very
-    // large source file.
-    const contentToTextMap = new Map<string, TextUtils.Text.Text>();
-
+      Promise<TextUtils.ContentData.ContentData[]> {
     return Promise.all(locations.map(async ([{uiLocation: {uiSourceCode}}]) => {
-      const deferredContent = await uiSourceCode.requestContent({cachedWasmOnly: true});
-      if ('wasmDisassemblyInfo' in deferredContent && deferredContent.wasmDisassemblyInfo) {
-        return deferredContent.wasmDisassemblyInfo;
-      }
-      const contentText = deferredContent.content || '';
-      if (contentToTextMap.has(contentText)) {
-        return contentToTextMap.get(contentText) as TextUtils.Text.Text;
-      }
-      const text = new TextUtils.Text.Text(contentText);
-      contentToTextMap.set(contentText, text);
-      return text;
+      const contentData = await uiSourceCode.requestContentData({cachedWasmOnly: true});
+      return TextUtils.ContentData.ContentData.contentDataOrEmpty(contentData);
     }));
   }
 }
@@ -601,7 +586,7 @@ export class BreakpointsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
             aria-checked=${this.#pauseOnUncaughtExceptions}
             data-first-pause>
           <label class='checkbox-label'>
-            <input type='checkbox' tabindex=-1 ?checked=${this.#pauseOnUncaughtExceptions} @change=${this.#onPauseOnUncaughtExceptionsStateChanged.bind(this)} jslog=${VisualLogging.toggle('pause-uncaught').track({ change: true })}>
+            <input type='checkbox' tabindex=-1 class="small" ?checked=${this.#pauseOnUncaughtExceptions} @change=${this.#onPauseOnUncaughtExceptionsStateChanged.bind(this)} jslog=${VisualLogging.toggle('pause-uncaught').track({ change: true })}>
             <span>${i18nString(UIStrings.pauseOnUncaughtExceptions)}</span>
           </label>
         </div>
@@ -613,7 +598,7 @@ export class BreakpointsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
               aria-checked=${pauseOnCaughtIsChecked}
               data-last-pause>
             <label class='checkbox-label'>
-              <input data-pause-on-caught-checkbox type='checkbox' tabindex=-1 ?checked=${pauseOnCaughtIsChecked} ?disabled=${pauseOnCaughtExceptionIsDisabled} @change=${this.#onPauseOnCaughtExceptionsStateChanged.bind(this)} jslog=${VisualLogging.toggle('pause-on-caught-exception').track({ change: true })}>
+              <input data-pause-on-caught-checkbox type='checkbox' class="small" tabindex=-1 ?checked=${pauseOnCaughtIsChecked} ?disabled=${pauseOnCaughtExceptionIsDisabled} @change=${this.#onPauseOnCaughtExceptionsStateChanged.bind(this)} jslog=${VisualLogging.toggle('pause-on-caught-exception').track({ change: true })}>
               <span>${i18nString(UIStrings.pauseOnCaughtExceptions)}</span>
             </label>
         </div>
@@ -716,8 +701,6 @@ export class BreakpointsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
 
   #renderEditBreakpointButton(breakpointItem: BreakpointItem): LitHtml.TemplateResult {
     const clickHandler = (event: Event): void => {
-      Host.userMetrics.breakpointEditDialogRevealedFrom(
-          Host.UserMetrics.BreakpointEditDialogRevealedFrom.BreakpointSidebarEditButton);
       void this.#controller.breakpointEdited(breakpointItem, true /* editButtonClicked */);
       event.consume();
     };
@@ -851,7 +834,7 @@ export class BreakpointsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
 
     const checked = group.breakpointItems.some(item => item.status === BreakpointStatus.ENABLED);
     return LitHtml.html`
-      <input class='group-checkbox' type='checkbox'
+      <input class='group-checkbox small' type='checkbox'
             aria-label=''
             .checked=${checked}
             @change=${groupCheckboxToggled}
@@ -879,8 +862,6 @@ export class BreakpointsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
     }, {jslogContext: 'jump-to-breakpoint'});
 
     menu.editSection().appendItem(editBreakpointText, () => {
-      Host.userMetrics.breakpointEditDialogRevealedFrom(
-          Host.UserMetrics.BreakpointEditDialogRevealedFrom.BreakpointSidebarContextMenu);
       void this.#controller.breakpointEdited(breakpointItem, false /* editButtonClicked */);
     }, {disabled: !editable, jslogContext: 'edit-breakpoint'});
 
@@ -930,9 +911,9 @@ export class BreakpointsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
     };
     const classMap = {
       'breakpoint-item': true,
-      'hit': breakpointItem.isHit,
+      hit: breakpointItem.isHit,
       'conditional-breakpoint': breakpointItem.type === SDK.DebuggerModel.BreakpointType.CONDITIONAL_BREAKPOINT,
-      'logpoint': breakpointItem.type === SDK.DebuggerModel.BreakpointType.LOGPOINT,
+      logpoint: breakpointItem.type === SDK.DebuggerModel.BreakpointType.LOGPOINT,
     };
     const breakpointItemDescription = this.#getBreakpointItemDescription(breakpointItem);
     const codeSnippet = Platform.StringUtilities.trimEndWithMaxLength(breakpointItem.codeSnippet, MAX_SNIPPET_LENGTH);
@@ -954,6 +935,7 @@ export class BreakpointsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
         <span class='type-indicator'></span>
         <input type='checkbox'
               aria-label=${breakpointItem.location}
+              class='small'
               ?indeterminate=${breakpointItem.status === BreakpointStatus.INDETERMINATE}
               .checked=${breakpointItem.status === BreakpointStatus.ENABLED}
               @change=${(e: Event) => this.#onCheckboxToggled(e, breakpointItem)}

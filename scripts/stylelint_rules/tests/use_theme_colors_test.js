@@ -164,7 +164,7 @@ describe('use_theme_colors', () => {
   });
 
   it('allows any color to be used when in a :host-context dark theme block', async () => {
-    const code = `:host-context(.-theme-with-dark-background) p {
+    const code = `:host-context(.theme-with-dark-background) p {
       color: #fff;
     }`;
     const warnings = await lint(code);
@@ -203,8 +203,8 @@ describe('use_theme_colors', () => {
     ]);
   });
 
-  it('allows any color to be used when in a .-theme-with-dark-background block', async () => {
-    const code = `.-theme-with-dark-background p {
+  it('allows any color to be used when in a .theme-with-dark-background block', async () => {
+    const code = `.theme-with-dark-background p {
       color: #fff;
     }`;
     const warnings = await lint(code);
@@ -243,6 +243,18 @@ describe('use_theme_colors', () => {
     const warnings = await lint('p { border: var(--button-border-size) solid var(--color-primary); }');
 
     assert.lengthOf(warnings, 0);
+  });
+
+  it('does not error when using --sys-elevation for box-shadow', async () => {
+    const warnings = await lint('p { box-shadow: var(--sys-elevation-level1); }');
+
+    assert.lengthOf(warnings, 0);
+  });
+
+  it('does error when using a random color for box shadow', async () => {
+    const warnings = await lint('p { box-shadow: 0 1px 2px 0 #ff0000; }');
+
+    assert.lengthOf(warnings, 1);
   });
 
   it('is silent when linting code that has an empty var()', async () => {

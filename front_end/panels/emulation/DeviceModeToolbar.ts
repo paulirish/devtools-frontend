@@ -8,6 +8,7 @@ import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as EmulationModel from '../../models/emulation/emulation.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 import * as MobileThrottling from '../mobile_throttling/mobile_throttling.js';
 
 import * as EmulationComponents from './components/components.js';
@@ -189,7 +190,7 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
  * than in the DevTools panel itself. Therefore, we need to fall back to using the
  * built-in tooltip by setting the title attribute on the button's element.
  */
-function setTitleForButton(button: UI.Toolbar.ToolbarButton, title: string): void {
+function setTitleForButton(button: UI.Toolbar.ToolbarButton|UI.Toolbar.ToolbarMenuButton, title: string): void {
   button.setTitle(title);
   button.element.title = title;
 }
@@ -249,6 +250,7 @@ export class DeviceModeToolbar {
 
     this.elementInternal = document.createElement('div');
     this.elementInternal.classList.add('device-mode-toolbar');
+    this.elementInternal.setAttribute('jslog', `${VisualLogging.toolbar('device-mode').track({resize: true})}`);
 
     const leftContainer = this.elementInternal.createChild('div', 'device-mode-toolbar-spacer');
     leftContainer.createChild('div', 'device-mode-toolbar-spacer');
@@ -260,12 +262,20 @@ export class DeviceModeToolbar {
     this.widthInput = new EmulationComponents.DeviceSizeInputElement.SizeInputElement(
         i18nString(UIStrings.width), {jslogContext: 'width'});
     this.widthInput.addEventListener('sizechanged', ({size: width}) => {
-      this.model.setWidthAndScaleToFit(width);
+      if (this.autoAdjustScaleSetting.get()) {
+        this.model.setWidthAndScaleToFit(width);
+      } else {
+        this.model.setWidth(width);
+      }
     });
     this.heightInput = new EmulationComponents.DeviceSizeInputElement.SizeInputElement(
         i18nString(UIStrings.heightLeaveEmptyForFull), {jslogContext: 'height'});
     this.heightInput.addEventListener('sizechanged', ({size: height}) => {
-      this.model.setHeightAndScaleToFit(height);
+      if (this.autoAdjustScaleSetting.get()) {
+        this.model.setHeightAndScaleToFit(height);
+      } else {
+        this.model.setHeight(height);
+      }
     });
     this.fillMainToolbar(mainToolbar);
 
@@ -283,9 +293,9 @@ export class DeviceModeToolbar {
 
     this.emulatedDevicesList = EmulationModel.EmulatedDevices.EmulatedDevicesList.instance();
     this.emulatedDevicesList.addEventListener(
-        EmulationModel.EmulatedDevices.Events.CustomDevicesUpdated, this.deviceListChanged, this);
+        EmulationModel.EmulatedDevices.Events.CUSTOM_DEVICES_UPDATED, this.deviceListChanged, this);
     this.emulatedDevicesList.addEventListener(
-        EmulationModel.EmulatedDevices.Events.StandardDevicesUpdated, this.deviceListChanged, this);
+        EmulationModel.EmulatedDevices.Events.STANDARD_DEVICES_UPDATED, this.deviceListChanged, this);
 
     this.persistenceSetting = Common.Settings.Settings.instance().createSetting(
         'emulation.device-mode-value', {device: '', orientation: '', mode: ''});
@@ -312,9 +322,8 @@ export class DeviceModeToolbar {
   private fillLeftToolbar(toolbar: UI.Toolbar.Toolbar): void {
     toolbar.appendToolbarItem(this.wrapToolbarItem(this.createEmptyToolbarElement()));
     this.deviceSelectItem =
-        new UI.Toolbar.ToolbarMenuButton(this.appendDeviceMenuItems.bind(this), undefined, 'device');
-    this.deviceSelectItem.setGlyph('');
-    this.deviceSelectItem.turnIntoSelect(true);
+        new UI.Toolbar.ToolbarMenuButton(this.appendDeviceMenuItems.bind(this), undefined, undefined, 'device');
+    this.deviceSelectItem.turnShrinkable();
     this.deviceSelectItem.setDarkText();
     toolbar.appendToolbarItem(this.deviceSelectItem);
   }
@@ -333,30 +342,26 @@ export class DeviceModeToolbar {
 
   private fillRightToolbar(toolbar: UI.Toolbar.Toolbar): void {
     toolbar.appendToolbarItem(this.wrapToolbarItem(this.createEmptyToolbarElement()));
-    this.scaleItem = new UI.Toolbar.ToolbarMenuButton(this.appendScaleMenuItems.bind(this), undefined, 'scale');
+    this.scaleItem =
+        new UI.Toolbar.ToolbarMenuButton(this.appendScaleMenuItems.bind(this), undefined, undefined, 'scale');
     setTitleForButton(this.scaleItem, i18nString(UIStrings.zoom));
-    this.scaleItem.setGlyph('');
-    this.scaleItem.turnIntoSelect();
     this.scaleItem.setDarkText();
     toolbar.appendToolbarItem(this.scaleItem);
 
     toolbar.appendToolbarItem(this.wrapToolbarItem(this.createEmptyToolbarElement()));
 
-    this.deviceScaleItem =
-        new UI.Toolbar.ToolbarMenuButton(this.appendDeviceScaleMenuItems.bind(this), undefined, 'device-pixel-ratio');
+    this.deviceScaleItem = new UI.Toolbar.ToolbarMenuButton(
+        this.appendDeviceScaleMenuItems.bind(this), undefined, undefined, 'device-pixel-ratio');
     this.deviceScaleItem.setVisible(this.showDeviceScaleFactorSetting.get());
     setTitleForButton(this.deviceScaleItem, i18nString(UIStrings.devicePixelRatio));
-    this.deviceScaleItem.setGlyph('');
-    this.deviceScaleItem.turnIntoSelect();
     this.deviceScaleItem.setDarkText();
     toolbar.appendToolbarItem(this.deviceScaleItem);
 
     toolbar.appendToolbarItem(this.wrapToolbarItem(this.createEmptyToolbarElement()));
-    this.uaItem = new UI.Toolbar.ToolbarMenuButton(this.appendUserAgentMenuItems.bind(this), undefined, 'device-type');
+    this.uaItem =
+        new UI.Toolbar.ToolbarMenuButton(this.appendUserAgentMenuItems.bind(this), undefined, undefined, 'device-type');
     this.uaItem.setVisible(this.showUserAgentTypeSetting.get());
     setTitleForButton(this.uaItem, i18nString(UIStrings.deviceType));
-    this.uaItem.setGlyph('');
-    this.uaItem.turnIntoSelect();
     this.uaItem.setDarkText();
     toolbar.appendToolbarItem(this.uaItem);
 
@@ -368,20 +373,18 @@ export class DeviceModeToolbar {
   private fillModeToolbar(toolbar: UI.Toolbar.Toolbar): void {
     toolbar.appendToolbarItem(this.wrapToolbarItem(this.createEmptyToolbarElement()));
     this.modeButton = new UI.Toolbar.ToolbarButton('', 'screen-rotation', undefined, 'screen-rotation');
-    this.modeButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.modeMenuClicked, this);
+    this.modeButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, this.modeMenuClicked, this);
     toolbar.appendToolbarItem(this.modeButton);
 
     // Show dual screen toolbar.
     this.spanButton = new UI.Toolbar.ToolbarButton('', 'device-fold', undefined, 'device-fold');
-    this.spanButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.spanClicked, this);
+    this.spanButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, this.spanClicked, this);
     toolbar.appendToolbarItem(this.spanButton);
 
     // Show posture toolbar menu for foldable devices.
     toolbar.appendToolbarItem(this.wrapToolbarItem(this.createEmptyToolbarElement()));
-    this.postureItem =
-        new UI.Toolbar.ToolbarMenuButton(this.appendDevicePostureItems.bind(this), undefined, 'device-posture');
-    this.postureItem.setGlyph('');
-    this.postureItem.turnIntoSelect();
+    this.postureItem = new UI.Toolbar.ToolbarMenuButton(
+        this.appendDevicePostureItems.bind(this), undefined, undefined, 'device-posture');
     this.postureItem.setDarkText();
     setTitleForButton(this.postureItem, i18nString(UIStrings.devicePosture));
     toolbar.appendToolbarItem(this.postureItem);
@@ -398,7 +401,7 @@ export class DeviceModeToolbar {
     this.experimentalButton = new UI.Toolbar.ToolbarToggle(title, 'experiment-check');
     this.experimentalButton.setToggled(this.model.webPlatformExperimentalFeaturesEnabled());
     this.experimentalButton.setEnabled(true);
-    this.experimentalButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.experimentalClicked, this);
+    this.experimentalButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, this.experimentalClicked, this);
 
     toolbar.appendToolbarItem(this.experimentalButton);
   }
@@ -410,9 +413,9 @@ export class DeviceModeToolbar {
 
   private fillOptionsToolbar(toolbar: UI.Toolbar.Toolbar): void {
     toolbar.appendToolbarItem(this.wrapToolbarItem(this.createEmptyToolbarElement()));
-    const moreOptionsButton =
-        new UI.Toolbar.ToolbarMenuButton(this.appendOptionsMenuItems.bind(this), undefined, 'more-options');
-    setTitleForButton(moreOptionsButton, i18nString(UIStrings.moreOptions));
+    const moreOptionsButton = new UI.Toolbar.ToolbarMenuButton(
+        this.appendOptionsMenuItems.bind(this), true, undefined, 'more-options', 'dots-vertical');
+    moreOptionsButton.setTitle(i18nString(UIStrings.moreOptions));
     toolbar.appendToolbarItem(moreOptionsButton);
   }
 
@@ -468,8 +471,8 @@ export class DeviceModeToolbar {
 
   private appendDeviceScaleMenuItems(contextMenu: UI.ContextMenu.ContextMenu): void {
     const deviceScaleFactorSetting = this.model.deviceScaleFactorSetting();
-    const defaultValue = this.model.uaSetting().get() === EmulationModel.DeviceModeModel.UA.Mobile ||
-            this.model.uaSetting().get() === EmulationModel.DeviceModeModel.UA.MobileNoTouch ?
+    const defaultValue = this.model.uaSetting().get() === EmulationModel.DeviceModeModel.UA.MOBILE ||
+            this.model.uaSetting().get() === EmulationModel.DeviceModeModel.UA.MOBILE_NO_TOUCH ?
         EmulationModel.DeviceModeModel.defaultMobileScaleFactor :
         window.devicePixelRatio;
     appendDeviceScaleFactorItem(
@@ -488,10 +491,10 @@ export class DeviceModeToolbar {
 
   private appendUserAgentMenuItems(contextMenu: UI.ContextMenu.ContextMenu): void {
     const uaSetting = this.model.uaSetting();
-    appendUAItem(EmulationModel.DeviceModeModel.UA.Mobile, EmulationModel.DeviceModeModel.UA.Mobile);
-    appendUAItem(EmulationModel.DeviceModeModel.UA.MobileNoTouch, EmulationModel.DeviceModeModel.UA.MobileNoTouch);
-    appendUAItem(EmulationModel.DeviceModeModel.UA.Desktop, EmulationModel.DeviceModeModel.UA.Desktop);
-    appendUAItem(EmulationModel.DeviceModeModel.UA.DesktopTouch, EmulationModel.DeviceModeModel.UA.DesktopTouch);
+    appendUAItem(EmulationModel.DeviceModeModel.UA.MOBILE, EmulationModel.DeviceModeModel.UA.MOBILE);
+    appendUAItem(EmulationModel.DeviceModeModel.UA.MOBILE_NO_TOUCH, EmulationModel.DeviceModeModel.UA.MOBILE_NO_TOUCH);
+    appendUAItem(EmulationModel.DeviceModeModel.UA.DESKTOP, EmulationModel.DeviceModeModel.UA.DESKTOP);
+    appendUAItem(EmulationModel.DeviceModeModel.UA.DESKTOP_TOUCH, EmulationModel.DeviceModeModel.UA.DESKTOP_TOUCH);
 
     function appendUAItem(title: string, value: EmulationModel.DeviceModeModel.UA): void {
       contextMenu.defaultSection().appendCheckboxItem(
@@ -552,7 +555,7 @@ export class DeviceModeToolbar {
 
   private wrapToolbarItem(element: Element): UI.Toolbar.ToolbarItem {
     const container = document.createElement('div');
-    const shadowRoot = UI.Utils.createShadowRootWithCoreStyles(
+    const shadowRoot = UI.UIUtils.createShadowRootWithCoreStyles(
         container, {cssFile: deviceModeToolbarStyles, delegatesFocus: undefined});
     shadowRoot.appendChild(element);
     return new UI.Toolbar.ToolbarItem(container);

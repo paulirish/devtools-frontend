@@ -5,12 +5,13 @@ import { disposeSymbol } from './disposable.js';
 export declare class Mutex {
     #private;
     static Guard: {
-        new (mutex: Mutex): {
-            "__#51263@#mutex": Mutex;
+        new (mutex: Mutex, onRelease?: () => void): {
+            "__#55466@#mutex": Mutex;
+            "__#55466@#onRelease"?: (() => void) | undefined;
             [Symbol.dispose](): void;
         };
     };
-    acquire(): Promise<InstanceType<typeof Mutex.Guard>>;
+    acquire(onRelease?: () => void): Promise<InstanceType<typeof Mutex.Guard>>;
     release(): void;
 }
 //# sourceMappingURL=Mutex.d.ts.map

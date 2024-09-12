@@ -5,13 +5,13 @@
 import {assert} from 'chai';
 
 import {$, $$, getBrowserAndPages, goToResource, timeout, waitFor, waitForFunction} from '../../shared/helper.js';
-import {describe, it} from '../../shared/mocha-extensions.js';
+
 import {triggerFindDialog} from '../helpers/search-helpers.js';
 
 describe('The Search Panel', () => {
   it('provides results across scopes', async () => {
     const {frontend} = getBrowserAndPages();
-    const SEARCH_QUERY = '[aria-label="Search Query"]';
+    const SEARCH_QUERY = '[aria-label="Find"]';
     const SEARCH_RESULTS = '.search-results';
     const SEARCH_FILE_RESULT = '.search-result';
     const SEARCH_CHILDREN_RESULT = '.search-match-link';

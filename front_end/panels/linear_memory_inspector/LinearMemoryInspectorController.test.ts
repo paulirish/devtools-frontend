@@ -8,7 +8,6 @@ import {describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
 import * as LinearMemoryInspectorComponents from './components/components.js';
 import * as LinearMemoryInspector from './linear_memory_inspector.js';
 
-const {assert} = chai;
 const {LinearMemoryInspectorController} = LinearMemoryInspector;
 const {ValueInterpreterDisplayUtils} = LinearMemoryInspectorComponents;
 
@@ -90,13 +89,13 @@ describeWithEnvironment('LinearMemoryInspectorController', () => {
     const instance = LinearMemoryInspectorController.LinearMemoryInspectorController.instance();
 
     const valueTypes =
-        new Set([ValueInterpreterDisplayUtils.ValueType.Int16, ValueInterpreterDisplayUtils.ValueType.Float32]);
+        new Set([ValueInterpreterDisplayUtils.ValueType.INT16, ValueInterpreterDisplayUtils.ValueType.FLOAT32]);
     const valueTypeModes = new Map(
-        [[ValueInterpreterDisplayUtils.ValueType.Int16, ValueInterpreterDisplayUtils.ValueTypeMode.Hexadecimal]]);
+        [[ValueInterpreterDisplayUtils.ValueType.INT16, ValueInterpreterDisplayUtils.ValueTypeMode.HEXADECIMAL]]);
     const settings = {
       valueTypes,
       modes: valueTypeModes,
-      endianness: ValueInterpreterDisplayUtils.Endianness.Little,
+      endianness: ValueInterpreterDisplayUtils.Endianness.LITTLE,
     };
     const defaultSettings = instance.loadSettings();
     instance.saveSettings(settings);

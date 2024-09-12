@@ -2,17 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-const {assert} = chai;
-
-import * as SDK from './sdk.js';
+import type * as ProtocolProxyApi from '../../generated/protocol-proxy-api.js';
 import * as Protocol from '../../generated/protocol.js';
 import {createTarget} from '../../testing/EnvironmentHelpers.js';
 import {
+  clearMockConnectionResponseHandler,
   describeWithMockConnection,
   setMockConnectionResponseHandler,
-  clearMockConnectionResponseHandler,
 } from '../../testing/MockConnection.js';
-import type * as ProtocolProxyApi from '../../generated/protocol-proxy-api.js';
+
+import * as SDK from './sdk.js';
 
 describeWithMockConnection('ServiceWorkerCacheModel', () => {
   let cacheStorageModel: SDK.ServiceWorkerCacheModel.ServiceWorkerCacheModel;
@@ -49,7 +48,7 @@ describeWithMockConnection('ServiceWorkerCacheModel', () => {
     it('registers cache only when the model is enabled', async () => {
       const cacheAdeddSpy = sinon.spy(cacheStorageModel, 'dispatchEventToListeners');
       const cacheNamePromise = new Promise<string>(resolve => {
-        cacheStorageModel.addEventListener(SDK.ServiceWorkerCacheModel.Events.CacheAdded, event => {
+        cacheStorageModel.addEventListener(SDK.ServiceWorkerCacheModel.Events.CACHE_ADDED, event => {
           resolve(event.data.cache.cacheName);
         });
       });
@@ -61,7 +60,7 @@ describeWithMockConnection('ServiceWorkerCacheModel', () => {
 
       manager?.storageBucketCreatedOrUpdated({bucketInfo: testStorageBucketInfo});
       assert.isFalse(cacheAdeddSpy.calledWithExactly(
-          SDK.ServiceWorkerCacheModel.Events.CacheAdded as unknown as sinon.SinonMatcher,
+          SDK.ServiceWorkerCacheModel.Events.CACHE_ADDED as unknown as sinon.SinonMatcher,
           {model: cacheStorageModel, cache}));
 
       cacheStorageModel.enable();
@@ -105,7 +104,7 @@ describeWithMockConnection('ServiceWorkerCacheModel', () => {
   it('calls protocol method and dispatches event on refreshCacheNames', async () => {
     const requestCacheNamesSpy = sinon.spy(cacheAgent, 'invoke_requestCacheNames');
     const cacheAddedPromise = new Promise<void>(resolve => {
-      cacheStorageModel.addEventListener(SDK.ServiceWorkerCacheModel.Events.CacheAdded, () => {
+      cacheStorageModel.addEventListener(SDK.ServiceWorkerCacheModel.Events.CACHE_ADDED, () => {
         resolve();
       });
     });
@@ -131,7 +130,7 @@ describeWithMockConnection('ServiceWorkerCacheModel', () => {
         {origin: '', storageKey: testKey, bucketId: testStorageBucketInfo.id, cacheName: 'test-cache'});
 
     assert.isTrue(dispatcherSpy.calledOnceWithExactly(
-        SDK.ServiceWorkerCacheModel.Events.CacheStorageContentUpdated as unknown as sinon.SinonMatcher,
+        SDK.ServiceWorkerCacheModel.Events.CACHE_STORAGE_CONTENT_UPDATED as unknown as sinon.SinonMatcher,
         {storageBucket: testStorageBucket, cacheName: 'test-cache'}));
   });
 
@@ -148,7 +147,7 @@ describeWithMockConnection('ServiceWorkerCacheModel', () => {
   it('gets caches added for storage key', async () => {
     const cacheNames = ['test-cache-1', 'test-cache-2'];
     const cachesAddedPromise = new Promise<void>(resolve => {
-      cacheStorageModel.addEventListener(SDK.ServiceWorkerCacheModel.Events.CacheAdded, () => {
+      cacheStorageModel.addEventListener(SDK.ServiceWorkerCacheModel.Events.CACHE_ADDED, () => {
         resolve();
       });
     });

@@ -10,13 +10,11 @@ import type * as Platform from '../platform/platform.js';
 
 import * as SDK from './sdk.js';
 
-const {assert} = chai;
-
 const content = JSON.stringify({
-  'version': 3,
-  'file': '/script.js',
-  'mappings': '',
-  'sources': [
+  version: 3,
+  file: '/script.js',
+  mappings: '',
+  sources: [
     '/original-script.js',
   ],
 });
@@ -30,7 +28,7 @@ describeWithMockConnection('SourceMapManager', () => {
     const sourceMapUrl = 'script.js.map' as Platform.DevToolsPath.UrlString;
 
     const mainTarget =
-        createTarget({id: 'main' as Protocol.Target.TargetID, name: 'main', type: SDK.Target.Type.Frame});
+        createTarget({id: 'main' as Protocol.Target.TargetID, name: 'main', type: SDK.Target.Type.FRAME});
     mainTarget.setInspectedURL(frameUrl);
 
     const workerTarget = createTarget({
@@ -42,10 +40,6 @@ describeWithMockConnection('SourceMapManager', () => {
 
     const debuggerModel = workerTarget.model(SDK.DebuggerModel.DebuggerModel);
     assert.isNotNull(debuggerModel);
-    if (debuggerModel === null) {
-      return;
-    }
-
     const sourceMapManager = debuggerModel.sourceMapManager();
 
     const script = new SDK.Script.Script(
@@ -71,15 +65,11 @@ describeWithMockConnection('SourceMapManager', () => {
     const scriptUrl = 'https://script-host/script.js' as Platform.DevToolsPath.UrlString;
 
     const mainTarget =
-        createTarget({id: 'main' as Protocol.Target.TargetID, name: 'main', type: SDK.Target.Type.Frame});
+        createTarget({id: 'main' as Protocol.Target.TargetID, name: 'main', type: SDK.Target.Type.FRAME});
     mainTarget.setInspectedURL(frameUrl);
 
     const debuggerModel = mainTarget.model(SDK.DebuggerModel.DebuggerModel);
     assert.isNotNull(debuggerModel);
-    if (debuggerModel === null) {
-      return;
-    }
-
     const sourceMapManager = debuggerModel.sourceMapManager();
 
     const script = new SDK.Script.Script(
@@ -109,7 +99,7 @@ describe('SourceMapManager', () => {
 
   const createTarget = () => {
     const target = sinon.createStubInstance(SDK.Target.Target);
-    target.type.returns(SDK.Target.Type.Frame);
+    target.type.returns(SDK.Target.Type.FRAME);
     return target;
   };
 

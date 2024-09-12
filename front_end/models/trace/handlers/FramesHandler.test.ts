@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-const {assert} = chai;
-import * as TraceEngine from '../trace.js';
-import {TraceLoader} from '../../../testing/TraceLoader.js';
 import {describeWithMockConnection} from '../../../testing/MockConnection.js';
+import {TraceLoader} from '../../../testing/TraceLoader.js';
+import * as TraceEngine from '../trace.js';
 
 async function processTrace(events: readonly TraceEngine.Types.TraceEvents.TraceEventData[]): Promise<void> {
   // The FramesHandler depends on a few other handlers, so we run all of them as part of these tests.
@@ -55,6 +54,20 @@ describeWithMockConnection('FramesHandler', () => {
     assert.strictEqual(parsedFrames[2].duration, 16683);
     assert.isTrue(parsedFrames[2].isPartial);
     assert.isTrue(parsedFrames[2].dropped);
+  });
+
+  it('assigns each frame an index', async function() {
+    const rawEvents = await TraceLoader.rawEvents(this, 'web-dev-with-commit.json.gz');
+    await processTrace(rawEvents);
+
+    const parsedFrames = TraceEngine.Handlers.ModelHandlers.Frames.data().frames;
+    assert.lengthOf(parsedFrames, 18);
+
+    parsedFrames.forEach((frame, arrayIndex) => {
+      // Seems silly, but this means we know the frame's index without having
+      // to look it up in the trace data.
+      assert.strictEqual(frame.index, arrayIndex);
+    });
   });
 
   it('can create LayerPaintEvents from Paint and snapshot events', async function() {

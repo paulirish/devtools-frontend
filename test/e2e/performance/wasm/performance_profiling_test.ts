@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
+import * as path from 'path';
 import type * as puppeteer from 'puppeteer-core';
 
+import {GEN_DIR} from '../../../conductor/paths.js';
 import {
   $,
   getBrowserAndPages,
@@ -13,7 +15,7 @@ import {
   waitForElementWithTextContent,
   waitForFunction,
 } from '../../../shared/helper.js';
-import {describe, it} from '../../../shared/mocha-extensions.js';
+
 import {
   BOTTOM_UP_SELECTOR,
   CALL_TREE_SELECTOR,
@@ -114,7 +116,8 @@ describe('The Performance panel', function() {
 
       const uploadProfileHandle = await waitFor<HTMLInputElement>('input[type=file]');
       assert.isNotNull(uploadProfileHandle, 'unable to upload the performance profile');
-      await uploadProfileHandle.uploadFile('test/e2e/resources/performance/wasm/mainWasm_profile.json');
+      await uploadProfileHandle.uploadFile(
+          path.join(GEN_DIR, 'test/e2e/resources/performance/wasm/mainWasm_profile.json'));
     });
 
     await step('search for "mainWasm"', async () => {
@@ -134,9 +137,9 @@ describe('The Performance panel', function() {
       ['mac'], '[crbug.com/1510890]: is able to inspect the call stack for a wasm function from the bottom up',
       async () => {
         const {frontend} = getBrowserAndPages();
-        const expectedActivities = ['mainWasm', 'js-to-wasm::i', '(anonymous)', 'Run Microtasks'];
+        const expectedActivities = ['mainWasm', 'js-to-wasm::i', '(anonymous)', 'Run microtasks'];
 
-        await step('navigate to the Bottom Up tab', async () => {
+        await step('navigate to the Bottom-up tab', async () => {
           await navigateToBottomUpTab();
         });
 
@@ -158,7 +161,7 @@ describe('The Performance panel', function() {
       async () => {
         const {frontend} = getBrowserAndPages();
         const expectedActivities = [
-          'Run Microtasks',
+          'Run microtasks',
           '(anonymous)',
           'js-to-wasm::i',
           'mainWasm',
@@ -171,7 +174,7 @@ describe('The Performance panel', function() {
         });
 
         await step(
-            'expand the tree for the "Run Microtasks" activity and check that it displays the correct values',
+            'expand the tree for the "Run microtasks" activity and check that it displays the correct values',
             async () => {
               const timelineTree = await $('.timeline-tree-view') as puppeteer.ElementHandle<HTMLSelectElement>;
               const rootActivity = await waitForElementWithTextContent(expectedActivities[0], timelineTree);

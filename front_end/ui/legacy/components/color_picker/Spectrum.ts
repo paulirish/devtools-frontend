@@ -130,12 +130,10 @@ const colorElementToMutable = new WeakMap<HTMLElement, boolean>();
 const colorElementToColor = new WeakMap<HTMLElement, string>();
 const srgbGamutFormats = [
   Common.Color.Format.SRGB,
-  Common.Color.Format.Nickname,
   Common.Color.Format.RGB,
   Common.Color.Format.HEX,
   Common.Color.Format.HSL,
   Common.Color.Format.HWB,
-  Common.Color.Format.ShortHEX,
 ];
 
 const enum SpectrumGamut {
@@ -161,9 +159,6 @@ function convertColorFormat(colorFormat: Common.Color.Format): SpectrumColorForm
   }
   if (colorFormat === Common.Color.Format.HEXA) {
     return Common.Color.Format.HEX;
-  }
-  if (colorFormat === Common.Color.Format.ShortHEXA) {
-    return Common.Color.Format.ShortHEX;
   }
 
   return colorFormat;
@@ -307,7 +302,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
         'color-eye-dropper');
     this.colorPickerButton.setToggled(true);
     this.colorPickerButton.addEventListener(
-        UI.Toolbar.ToolbarButton.Events.Click, this.toggleColorPicker.bind(this, undefined));
+        UI.Toolbar.ToolbarButton.Events.CLICK, this.toggleColorPicker.bind(this, undefined));
     toolbar.appendToolbarItem(this.colorPickerButton);
     this.colorPickerButton.element.setAttribute('jslog', `${VisualLogging.colorEyeDropper().track({click: true})}`);
 
@@ -439,7 +434,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
     this.addColorToolbar = new UI.Toolbar.Toolbar('add-color-toolbar');
     const addColorButton =
         new UI.Toolbar.ToolbarButton(i18nString(UIStrings.addToPalette), 'plus', undefined, 'add-color');
-    addColorButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.onAddColorMousedown.bind(this));
+    addColorButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, this.onAddColorMousedown.bind(this));
     addColorButton.element.addEventListener('keydown', this.onAddColorKeydown.bind(this));
     this.addColorToolbar.appendToolbarItem(addColorButton);
 
@@ -599,7 +594,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
     title.textContent = i18nString(UIStrings.colorPalettes);
     const toolbar = new UI.Toolbar.Toolbar('', this.palettePanel);
     this.closeButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.returnToColorPicker), 'cross');
-    this.closeButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.togglePalettePanel.bind(this, false));
+    this.closeButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, this.togglePalettePanel.bind(this, false));
     this.closeButton.element.addEventListener('keydown', this.onCloseBtnKeydown.bind(this));
     this.closeButton.element.setAttribute('jslog', `${VisualLogging.close().track({click: true})}`);
     toolbar.appendToolbarItem(this.closeButton);
@@ -955,7 +950,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
       }
     }
     this.element.style.height = (paletteTop + paletteMargin + (paletteColorHeight + paletteMargin) * rowsNeeded) + 'px';
-    this.dispatchEventToListeners(Events.SizeChanged);
+    this.dispatchEventToListeners(Events.SIZE_CHANGED);
   }
 
   private paletteColorSelected(colorText: string, colorName: string|undefined, matchUserFormat: boolean): void {
@@ -1057,8 +1052,8 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
     this.showPalette(palette, false);
   }
 
-  setColor(color: Common.Color.Color, colorFormat: Common.Color.Format): void {
-    this.innerSetColor(color, '', undefined /* colorName */, colorFormat, ChangeSource.Model);
+  setColor(color: Common.Color.Color): void {
+    this.innerSetColor(color, '', undefined /* colorName */, color.format(), ChangeSource.Model);
     const colorValues = color.as(Common.Color.Format.HSL).canonicalHSLA();
     UI.ARIAUtils.setValueNow(this.hueElement, colorValues[0]);
     UI.ARIAUtils.setValueText(this.alphaElement, colorValues[3]);
@@ -1142,7 +1137,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
       this.updateInput();
     }
     if (changeSource !== ChangeSource.Model) {
-      this.dispatchEventToListeners(Events.ColorChanged, this.colorString());
+      this.dispatchEventToListeners(Events.COLOR_CHANGED, this.colorString());
     }
   }
 
@@ -1168,12 +1163,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
       return colorString;
     }
 
-    if (this.colorFormat === Common.Color.Format.Nickname) {
-      colorString =
-          color.asString(color.asLegacyColor().hasAlpha() ? Common.Color.Format.HEXA : Common.Color.Format.HEX);
-    } else if (this.colorFormat === Common.Color.Format.ShortHEX) {
-      colorString = color.asString(color.asLegacyColor().detectHEXFormat());
-    } else if (this.colorFormat === Common.Color.Format.HEX) {
+    if (this.colorFormat === Common.Color.Format.HEX) {
       colorString = color.asString(Common.Color.Format.HEXA);
     } else if (this.colorFormat === Common.Color.Format.HSL) {
       colorString = color.asString(Common.Color.Format.HSLA);
@@ -1214,16 +1204,11 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
   }
 
   private updateInput(): void {
-    if (this.colorFormat === Common.Color.Format.HEX || this.colorFormat === Common.Color.Format.ShortHEX ||
-        this.colorFormat === Common.Color.Format.Nickname) {
+    if (this.colorFormat === Common.Color.Format.HEX) {
       this.hexContainer.hidden = false;
       this.displayContainer.hidden = true;
-      if (this.colorFormat === Common.Color.Format.ShortHEX) {
-        this.hexValue.value = String(this.color.asString(this.color.asLegacyColor().detectHEXFormat()));
-      } else {  // Don't use ShortHEX if original was not in that format.
-        this.hexValue.value = String(this.color.asString(
-            this.color.asLegacyColor().hasAlpha() ? Common.Color.Format.HEXA : Common.Color.Format.HEX));
-      }
+      this.hexValue.value =
+          this.color.asString((this.color.alpha ?? 1) !== 1 ? Common.Color.Format.HEXA : Common.Color.Format.HEX);
     } else {
       // RGBA, HSLA, HWBA, color() display.
       this.hexContainer.hidden = true;
@@ -1291,12 +1276,10 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
   }
 
   private async showFormatPicker(event: MouseEvent): Promise<void> {
-    const contextMenu = new FormatPickerContextMenu(this.color, this.colorFormat);
+    const contextMenu = new FormatPickerContextMenu(this.color);
     this.isFormatPickerShown = true;
-    await contextMenu.show(event, (format: Common.Color.Format) => {
-      const newColor = this.color.as(format);
-      this.innerSetColor(newColor, undefined, undefined, format, ChangeSource.Other);
-      Host.userMetrics.colorConvertedFrom(Host.UserMetrics.ColorConvertedFrom.ColorPicker);
+    await contextMenu.show(event, newColor => {
+      this.innerSetColor(newColor, undefined, undefined, newColor.format(), ChangeSource.Other);
     });
     this.isFormatPickerShown = false;
   }
@@ -1329,8 +1312,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
 
     let color: Common.Color.Color|null = null;
     let colorFormat: Common.Color.Format|undefined;
-    if (this.colorFormat === Common.Color.Format.HEX || this.colorFormat === Common.Color.Format.ShortHEX ||
-        this.colorFormat === Common.Color.Format.Nickname) {
+    if (this.colorFormat === Common.Color.Format.HEX) {
       color = Common.Color.parse(this.hexValue.value);
     } else {
       const spec = colorFormatSpec[this.colorFormat];
@@ -1370,7 +1352,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
 
     if (this.contrastDetails && this.contrastDetailsBackgroundColorPickedToggledBound) {
       this.contrastDetails.addEventListener(
-          ContrastDetailsEvents.BackgroundColorPickerWillBeToggled,
+          ContrastDetailsEvents.BACKGROUND_COLOR_PICKER_WILL_BE_TOGGLED,
           this.contrastDetailsBackgroundColorPickedToggledBound);
     }
   }
@@ -1379,16 +1361,15 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
     void this.toggleColorPicker(false);
     if (this.contrastDetails && this.contrastDetailsBackgroundColorPickedToggledBound) {
       this.contrastDetails.removeEventListener(
-          ContrastDetailsEvents.BackgroundColorPickerWillBeToggled,
+          ContrastDetailsEvents.BACKGROUND_COLOR_PICKER_WILL_BE_TOGGLED,
           this.contrastDetailsBackgroundColorPickedToggledBound);
     }
   }
 
   async toggleColorPicker(enabled?: boolean): Promise<void> {
     if (enabled === undefined) {
-      enabled = !this.colorPickerButton.toggled();
+      enabled = this.colorPickerButton.isToggled();
     }
-    this.colorPickerButton.setToggled(enabled);
 
     // This is to make sure that only one picker is open at a time
     // Also have a look at this.contrastDetailsBackgroundColorPickedToggled
@@ -1450,13 +1431,13 @@ export const ChangeSource = {
 };
 
 export const enum Events {
-  ColorChanged = 'ColorChanged',
-  SizeChanged = 'SizeChanged',
+  COLOR_CHANGED = 'ColorChanged',
+  SIZE_CHANGED = 'SizeChanged',
 }
 
 export type EventTypes = {
-  [Events.ColorChanged]: string,
-  [Events.SizeChanged]: void,
+  [Events.COLOR_CHANGED]: string,
+  [Events.SIZE_CHANGED]: void,
 };
 
 const COLOR_CHIP_SIZE = 24;
@@ -1535,10 +1516,16 @@ export class PaletteGenerator {
   private async processStylesheet(stylesheet: SDK.CSSStyleSheetHeader.CSSStyleSheetHeader): Promise<void> {
     let text: string = (await stylesheet.requestContent()).content || '';
     text = text.toLowerCase();
-    const regexResult = text.match(/((?:rgb|hsl|hwb)a?\([^)]+\)|#[0-9a-f]{6}|#[0-9a-f]{3})/g) || [];
-    for (const c of regexResult) {
-      let frequency = this.frequencyMap.get(c) || 0;
-      this.frequencyMap.set(c, ++frequency);
+    const regexResult = text.matchAll(/((?:rgb|hsl|hwb)a?\([^)]+\)|#[0-9a-f]{6}|#[0-9a-f]{3})/g);
+    for (const {0: c, index} of regexResult) {
+      // Check whether the match occured in a property value and not in a property name or a selector by verifying
+      // that there's no colon after the match and before the next semicolon.
+      if (text.indexOf(';', index) < 0 ||
+          text.indexOf(':', index) > -1 && text.indexOf(':', index) < text.indexOf(';', index)) {
+        continue;
+      }
+      const frequency = 1 + (this.frequencyMap.get(c) ?? 0);
+      this.frequencyMap.set(c, frequency);
     }
   }
 }

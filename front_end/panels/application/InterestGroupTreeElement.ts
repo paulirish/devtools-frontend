@@ -29,7 +29,7 @@ export class InterestGroupTreeElement extends ApplicationPanelTreeElement {
   private view: InterestGroupStorageView;
 
   constructor(storagePanel: ResourcesPanel) {
-    super(storagePanel, i18nString(UIStrings.interestGroups), false);
+    super(storagePanel, i18nString(UIStrings.interestGroups), false, 'interest-groups');
     const interestGroupIcon = IconButton.Icon.create('database');
     this.setLeadingIcons([interestGroupIcon]);
     this.view = new InterestGroupStorageView(this);
@@ -44,8 +44,7 @@ export class InterestGroupTreeElement extends ApplicationPanelTreeElement {
     if (!mainTarget) {
       return null;
     }
-    const response =
-        await mainTarget.storageAgent().invoke_getInterestGroupDetails({'ownerOrigin': owner, 'name': name});
+    const response = await mainTarget.storageAgent().invoke_getInterestGroupDetails({ownerOrigin: owner, name});
     return response.details;
   }
 

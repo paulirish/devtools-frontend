@@ -2,18 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-const {assert} = chai;
-
 import * as SDK from '../../core/sdk/sdk.js';
-import * as UI from '../../ui/legacy/legacy.js';
-import * as InspectorMain from './inspector_main.js';
 import {
   createTarget,
 } from '../../testing/EnvironmentHelpers.js';
-
 import {
   describeWithMockConnection,
 } from '../../testing/MockConnection.js';
+import * as UI from '../../ui/legacy/legacy.js';
+
+import * as InspectorMain from './inspector_main.js';
 
 describeWithMockConnection('OutermostTargetSelector', () => {
   let tabTarget: SDK.Target.Target;
@@ -22,7 +20,7 @@ describeWithMockConnection('OutermostTargetSelector', () => {
   let selector: InspectorMain.OutermostTargetSelector.OutermostTargetSelector;
 
   beforeEach(() => {
-    tabTarget = createTarget({type: SDK.Target.Type.Tab, url: 'http://example.com/', name: 'tab'});
+    tabTarget = createTarget({type: SDK.Target.Type.TAB, url: 'http://example.com/', name: 'tab'});
     primaryTarget = createTarget({parentTarget: tabTarget, url: 'http://example.com/', name: 'primary'});
     prerenderTarget = createTarget(
         {parentTarget: tabTarget, subtype: 'prerender', url: 'http://example.com/prerender1', name: 'prerender1'});

@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-const {assert} = chai;
-
 import * as FormatterWorker from './formatter_worker.js';
 
 const mapping = new Map<string, string|null>([
@@ -23,6 +21,10 @@ function substitute(expression: string): string {
 describe('Substitute', () => {
   it('Preserves unrelated variable', () => {
     assert.strictEqual(substitute('x'), 'x');
+  });
+
+  it('Preserves `import.meta`', () => {
+    assert.strictEqual(substitute('import.meta'), 'import.meta');
   });
 
   it('Substitutes single variable', () => {

@@ -7,6 +7,7 @@ import {assert} from 'chai';
 import {
   $$,
   click,
+  goTo,
   goToResource,
   hasClass,
   pressKey,
@@ -17,7 +18,7 @@ import {
   waitForFunction,
   waitForNone,
 } from '../../shared/helper.js';
-import {describe, it} from '../../shared/mocha-extensions.js';
+
 import {openSoftContextMenuAndClickOnItem} from '../helpers/context-menu-helpers.js';
 import {
   openNetworkTab,
@@ -53,8 +54,14 @@ async function waitForOverrideContentMenuItemIsEnabled(requestName: string) {
 describe('Overrides panel', function() {
   afterEach(async () => {
     await openSourcesPanel();
-    await click('[aria-label="Overrides"]');
-    await click('[aria-label="Clear configuration"]');
+    await Promise.any([
+      waitFor(ENABLE_OVERRIDES_SELECTOR),
+      new Promise<void>(async resolve => {
+        await click('[aria-label="Overrides"]');
+        await click('[aria-label="Clear configuration"]');
+        resolve();
+      }),
+    ]);
     await waitFor(ENABLE_OVERRIDES_SELECTOR);
   });
 
@@ -216,7 +223,7 @@ describe('Overrides panel', function() {
       await setCacheDisabled(false);
       const networkPanel = await waitFor('.tabbed-pane-header-tab.selected');
       const icons = await networkPanel.$$('.tabbed-pane-header-tab-icon');
-      const iconTitleElement = await icons[0].$('aria/Requests may be overridden locally, see the Sources panel');
+      const iconTitleElement = await icons[0].$('[title="Requests may be overridden locally, see the Sources panel"]');
 
       assert.strictEqual(icons.length, 1);
       assert.isNotNull(iconTitleElement);
@@ -245,7 +252,7 @@ describe('Overrides panel', function() {
       await setCacheDisabled(false);
       const networkPanel = await waitFor('.tabbed-pane-header-tab.selected');
       const icons = await networkPanel.$$('.tabbed-pane-header-tab-icon');
-      const iconTitleElement = await icons[0].$('aria/Requests may be overridden locally, see the Sources panel');
+      const iconTitleElement = await icons[0].$('[title="Requests may be overridden locally, see the Sources panel"]');
 
       assert.strictEqual(icons.length, 1);
       assert.isNotNull(iconTitleElement);
@@ -264,7 +271,7 @@ describe('Overrides panel', function() {
       await waitForAria('Select folder for overrides');
 
       const assertElements = await $$('Select folder for overrides', undefined, 'aria');
-      assert.strictEqual(assertElements.length, 1);
+      assert.strictEqual(assertElements.length, 2);
     });
 
     await step('when overrides setting is enabled', async () => {
@@ -378,36 +385,43 @@ describe('Overrides panel', function() {
     await click('aria/Override content');
     const p = await waitFor('.dimmed-pane');
     const dialog = await p.waitForSelector('>>>> [role="dialog"]');
-    const okButton = await dialog?.waitForSelector('>>> .primary-button');
+    const okButton = await dialog?.waitForSelector('>>> devtools-button');
+    const okButtonTextContent = await okButton?.evaluate(e => e.textContent);
+    assert.deepEqual(okButtonTextContent, 'OK');
     await okButton?.click();
     await waitFor('[aria-label="Close sourcemap-origin.min.js"]');
   });
 
-  it('show redirect dialog when override content of source mapped css file', async () => {
-    await goToResource('sources/sourcemap-origin.html');
-    await openSourcesPanel();
-    await enableLocalOverrides();
+  // crbug.com/350617272
+  it.skipOnPlatforms(
+      ['mac'], '[crbug.com/350617272]: show redirect dialog when override content of source mapped css file',
+      async () => {
+        await goToResource('sources/sourcemap-origin.html');
+        await openSourcesPanel();
+        await enableLocalOverrides();
 
-    await openNetworkTab();
-    await waitForSomeRequestsToAppear(4);
-    await waitForOverrideContentMenuItemIsEnabled('sourcemap-origin.css');
-    await click('aria/Open in Sources panel');
+        await openNetworkTab();
+        await waitForSomeRequestsToAppear(4);
+        await waitForOverrideContentMenuItemIsEnabled('sourcemap-origin.css');
+        await click('aria/Open in Sources panel');
 
-    // Actual file > Has override content
-    const file = await waitFor('[aria-label="sourcemap-origin.css"]');
-    await file.click({button: 'right'});
-    await click('aria/Close');
+        // Actual file > Has override content
+        const file = await waitFor('[aria-label="sourcemap-origin.css"]');
+        await file.click({button: 'right'});
+        await click('aria/Close');
 
-    // Source mapped file > Show redirect confirmation dialog
-    const mappedfile = await waitFor('[aria-label="sourcemap-origin.scss, file"]');
-    await mappedfile.click({button: 'right'});
-    await click('aria/Override content');
-    const p = await waitFor('.dimmed-pane');
-    const dialog = await p.waitForSelector('>>>> [role="dialog"]');
-    const okButton = await dialog?.waitForSelector('>>> .primary-button');
-    await okButton?.click();
-    await waitFor('[aria-label="Close sourcemap-origin.css"]');
-  });
+        // Source mapped file > Show redirect confirmation dialog
+        const mappedfile = await waitFor('[aria-label="sourcemap-origin.scss, file"]');
+        await mappedfile.click({button: 'right'});
+        await click('aria/Override content');
+        const p = await waitFor('.dimmed-pane');
+        const dialog = await p.waitForSelector('>>>> [role="dialog"]');
+        const okButton = await dialog?.waitForSelector('>>> devtools-button');
+        const okButtonTextContent = await okButton?.evaluate(e => e.textContent);
+        assert.deepEqual(okButtonTextContent, 'OK');
+        await okButton?.click();
+        await waitFor('[aria-label="Close sourcemap-origin.css"]');
+      });
 });
 
 describe('Overrides panel', () => {
@@ -427,6 +441,22 @@ describe('Overrides panel', () => {
 
     assert.strictEqual(assertShowAllElements.length, 0);
     assert.strictEqual(assertOverridesContentElements.length, 1);
+  });
+});
+
+describe('Network panel', () => {
+  it('context menu "override" items are disabled for forbidden URLs', async () => {
+    await goTo('chrome://terms');
+    await openNetworkTab();
+    await selectRequestByName('terms', {button: 'right'});
+
+    const menuItem1 = await waitForAria('Override content');
+    const isDisabled1 = await menuItem1.evaluate(el => el.classList.contains('soft-context-menu-disabled'));
+    assert.isTrue(isDisabled1, '"Override content" menu item is enabled');
+
+    const menuItem2 = await waitForAria('Override headers');
+    const isDisabled2 = await menuItem2.evaluate(el => el.classList.contains('soft-context-menu-disabled'));
+    assert.isTrue(isDisabled2, '"Override headers" menu item is enabled');
   });
 });
 

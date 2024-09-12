@@ -3,13 +3,10 @@
 // found in the LICENSE file.
 
 import type * as Platform from '../../../../core/platform/platform.js';
-import {assertNotNullOrUndefined} from '../../../../core/platform/platform.js';
 import * as SDK from '../../../../core/sdk/sdk.js';
 import * as Protocol from '../../../../generated/protocol.js';
 import {assertGridContents} from '../../../../testing/DataGridHelpers.js';
 import {
-  assertElement,
-  assertShadowRoot,
   getElementsWithinComponent,
   getElementWithinComponent,
   renderElementIntoDOM,
@@ -20,8 +17,6 @@ import * as ReportView from '../../../../ui/components/report_view/report_view.j
 
 import * as PreloadingComponents from './components.js';
 
-const {assert} = chai;
-
 const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
 
 async function renderUsedPreloadingView(data: PreloadingComponents.UsedPreloadingView.UsedPreloadingViewData):
@@ -29,7 +24,7 @@ async function renderUsedPreloadingView(data: PreloadingComponents.UsedPreloadin
   const component = new PreloadingComponents.UsedPreloadingView.UsedPreloadingView();
   component.data = data;
   renderElementIntoDOM(component);
-  assertShadowRoot(component.shadowRoot);
+  assert.isNotNull(component.shadowRoot);
   await coordinator.done();
 
   return component;
@@ -47,7 +42,7 @@ describeWithEnvironment('UsedPreloadingView', () => {
             action: Protocol.Preload.SpeculationAction.Prefetch,
             url: 'https://example.com/prefetched.html' as Platform.DevToolsPath.UrlString,
           },
-          status: SDK.PreloadingModel.PreloadingStatus.Success,
+          status: SDK.PreloadingModel.PreloadingStatus.SUCCESS,
           prefetchStatus: null,
           requestId: 'requestId:1' as Protocol.Network.RequestId,
           ruleSetIds: ['ruleSetId:1'] as Protocol.Preload.RuleSetId[],
@@ -60,7 +55,7 @@ describeWithEnvironment('UsedPreloadingView', () => {
             action: Protocol.Preload.SpeculationAction.Prerender,
             url: 'https://example.com/prerendered.html' as Platform.DevToolsPath.UrlString,
           },
-          status: SDK.PreloadingModel.PreloadingStatus.Failure,
+          status: SDK.PreloadingModel.PreloadingStatus.FAILURE,
           prerenderStatus: Protocol.Preload.PrerenderFinalStatus.TriggerDestroyed,
           disallowedMojoInterface: null,
           mismatchedHeaders: null,
@@ -72,7 +67,7 @@ describeWithEnvironment('UsedPreloadingView', () => {
     };
 
     const component = await renderUsedPreloadingView(data);
-    assertShadowRoot(component.shadowRoot);
+    assert.isNotNull(component.shadowRoot);
     const headers = getElementsWithinComponent(
         component, 'devtools-report devtools-report-section-header', ReportView.ReportView.ReportSectionHeader);
     const sections = getElementsWithinComponent(
@@ -104,7 +99,7 @@ describeWithEnvironment('UsedPreloadingView', () => {
             action: Protocol.Preload.SpeculationAction.Prefetch,
             url: 'https://example.com/prefetched.html' as Platform.DevToolsPath.UrlString,
           },
-          status: SDK.PreloadingModel.PreloadingStatus.Ready,
+          status: SDK.PreloadingModel.PreloadingStatus.READY,
           prefetchStatus: null,
           requestId: 'requestId:1' as Protocol.Network.RequestId,
           ruleSetIds: ['ruleSetId:1'] as Protocol.Preload.RuleSetId[],
@@ -117,7 +112,7 @@ describeWithEnvironment('UsedPreloadingView', () => {
             action: Protocol.Preload.SpeculationAction.Prerender,
             url: 'https://example.com/prerendered.html' as Platform.DevToolsPath.UrlString,
           },
-          status: SDK.PreloadingModel.PreloadingStatus.Success,
+          status: SDK.PreloadingModel.PreloadingStatus.SUCCESS,
           prerenderStatus: null,
           disallowedMojoInterface: null,
           mismatchedHeaders: null,
@@ -129,7 +124,7 @@ describeWithEnvironment('UsedPreloadingView', () => {
     };
 
     const component = await renderUsedPreloadingView(data);
-    assertShadowRoot(component.shadowRoot);
+    assert.isNotNull(component.shadowRoot);
     const headers = getElementsWithinComponent(
         component, 'devtools-report devtools-report-section-header', ReportView.ReportView.ReportSectionHeader);
     const sections = getElementsWithinComponent(
@@ -161,8 +156,8 @@ describeWithEnvironment('UsedPreloadingView', () => {
             action: Protocol.Preload.SpeculationAction.Prefetch,
             url: 'https://example.com/prefetched.html' as Platform.DevToolsPath.UrlString,
           },
-          status: SDK.PreloadingModel.PreloadingStatus.Failure,
-          prefetchStatus: Protocol.Preload.PrefetchStatus.PrefetchFailedPerPageLimitExceeded,
+          status: SDK.PreloadingModel.PreloadingStatus.FAILURE,
+          prefetchStatus: Protocol.Preload.PrefetchStatus.PrefetchFailedIneligibleRedirect,
           requestId: 'requestId:1' as Protocol.Network.RequestId,
           ruleSetIds: ['ruleSetId:1'] as Protocol.Preload.RuleSetId[],
           nodeIds: [1] as Protocol.DOM.BackendNodeId[],
@@ -174,7 +169,7 @@ describeWithEnvironment('UsedPreloadingView', () => {
             action: Protocol.Preload.SpeculationAction.Prerender,
             url: 'https://example.com/prerendered.html' as Platform.DevToolsPath.UrlString,
           },
-          status: SDK.PreloadingModel.PreloadingStatus.Failure,
+          status: SDK.PreloadingModel.PreloadingStatus.FAILURE,
           prerenderStatus: Protocol.Preload.PrerenderFinalStatus.TriggerDestroyed,
           disallowedMojoInterface: null,
           mismatchedHeaders: null,
@@ -186,7 +181,7 @@ describeWithEnvironment('UsedPreloadingView', () => {
     };
 
     const component = await renderUsedPreloadingView(data);
-    assertShadowRoot(component.shadowRoot);
+    assert.isNotNull(component.shadowRoot);
     const headers = getElementsWithinComponent(
         component, 'devtools-report devtools-report-section-header', ReportView.ReportView.ReportSectionHeader);
     const sections = getElementsWithinComponent(
@@ -202,8 +197,7 @@ describeWithEnvironment('UsedPreloadingView', () => {
         'The initiating page attempted to prefetch this page\'s URL, but the prefetch failed, so a full navigation was performed instead.');
     assert.include(headers[1]?.textContent, 'Failure reason');
     assert.include(
-        sections[1]?.textContent,
-        'The prefetch was not performed because the initiating page already has too many prefetches ongoing.');
+        sections[1]?.textContent, 'The prefetch was redirected, but the redirect URL is not eligible for prefetch.');
 
     assert.include(headers[2]?.textContent, 'Speculations initiated by this page');
     const badges = sections[2]?.querySelectorAll('.status-badge span') || [];
@@ -224,7 +218,7 @@ describeWithEnvironment('UsedPreloadingView', () => {
             action: Protocol.Preload.SpeculationAction.Prefetch,
             url: 'https://example.com/prefetched.html' as Platform.DevToolsPath.UrlString,
           },
-          status: SDK.PreloadingModel.PreloadingStatus.Ready,
+          status: SDK.PreloadingModel.PreloadingStatus.READY,
           prefetchStatus: null,
           requestId: 'requestId:1' as Protocol.Network.RequestId,
           ruleSetIds: ['ruleSetId:1'] as Protocol.Preload.RuleSetId[],
@@ -237,7 +231,7 @@ describeWithEnvironment('UsedPreloadingView', () => {
             action: Protocol.Preload.SpeculationAction.Prerender,
             url: 'https://example.com/prerendered.html' as Platform.DevToolsPath.UrlString,
           },
-          status: SDK.PreloadingModel.PreloadingStatus.Failure,
+          status: SDK.PreloadingModel.PreloadingStatus.FAILURE,
           prerenderStatus: Protocol.Preload.PrerenderFinalStatus.MojoBinderPolicy,
           disallowedMojoInterface: 'device.mojom.GamepadMonitor',
           mismatchedHeaders: null,
@@ -249,7 +243,7 @@ describeWithEnvironment('UsedPreloadingView', () => {
     };
 
     const component = await renderUsedPreloadingView(data);
-    assertShadowRoot(component.shadowRoot);
+    assert.isNotNull(component.shadowRoot);
     const headers = getElementsWithinComponent(
         component, 'devtools-report devtools-report-section-header', ReportView.ReportView.ReportSectionHeader);
     const sections = getElementsWithinComponent(
@@ -287,7 +281,7 @@ describeWithEnvironment('UsedPreloadingView', () => {
             action: Protocol.Preload.SpeculationAction.Prefetch,
             url: 'https://example.com/prefetched.html' as Platform.DevToolsPath.UrlString,
           },
-          status: SDK.PreloadingModel.PreloadingStatus.Ready,
+          status: SDK.PreloadingModel.PreloadingStatus.READY,
           prefetchStatus: null,
           requestId: 'requestId:1' as Protocol.Network.RequestId,
           ruleSetIds: ['ruleSetId:1'] as Protocol.Preload.RuleSetId[],
@@ -300,7 +294,7 @@ describeWithEnvironment('UsedPreloadingView', () => {
             action: Protocol.Preload.SpeculationAction.Prerender,
             url: 'https://example.com/prerendered.html' as Platform.DevToolsPath.UrlString,
           },
-          status: SDK.PreloadingModel.PreloadingStatus.Failure,
+          status: SDK.PreloadingModel.PreloadingStatus.FAILURE,
           prerenderStatus: Protocol.Preload.PrerenderFinalStatus.ActivationNavigationParameterMismatch,
           disallowedMojoInterface: null,
           mismatchedHeaders: [
@@ -323,7 +317,7 @@ describeWithEnvironment('UsedPreloadingView', () => {
     };
 
     const component = await renderUsedPreloadingView(data);
-    assertShadowRoot(component.shadowRoot);
+    assert.isNotNull(component.shadowRoot);
     const headers = getElementsWithinComponent(
         component, 'devtools-report devtools-report-section-header', ReportView.ReportView.ReportSectionHeader);
     const sections = getElementsWithinComponent(
@@ -374,7 +368,7 @@ describeWithEnvironment('UsedPreloadingView', () => {
             action: Protocol.Preload.SpeculationAction.Prefetch,
             url: 'https://example.com/downgraded.html' as Platform.DevToolsPath.UrlString,
           },
-          status: SDK.PreloadingModel.PreloadingStatus.Success,
+          status: SDK.PreloadingModel.PreloadingStatus.SUCCESS,
           prefetchStatus: null,
           requestId: 'requestId:1' as Protocol.Network.RequestId,
           ruleSetIds: ['ruleSetId:1'] as Protocol.Preload.RuleSetId[],
@@ -387,7 +381,7 @@ describeWithEnvironment('UsedPreloadingView', () => {
             action: Protocol.Preload.SpeculationAction.Prerender,
             url: 'https://example.com/downgraded.html' as Platform.DevToolsPath.UrlString,
           },
-          status: SDK.PreloadingModel.PreloadingStatus.Failure,
+          status: SDK.PreloadingModel.PreloadingStatus.FAILURE,
           prerenderStatus: Protocol.Preload.PrerenderFinalStatus.MojoBinderPolicy,
           disallowedMojoInterface: 'device.mojom.GamepadMonitor',
           mismatchedHeaders: null,
@@ -399,7 +393,7 @@ describeWithEnvironment('UsedPreloadingView', () => {
     };
 
     const component = await renderUsedPreloadingView(data);
-    assertShadowRoot(component.shadowRoot);
+    assert.isNotNull(component.shadowRoot);
     const headers = getElementsWithinComponent(
         component, 'devtools-report devtools-report-section-header', ReportView.ReportView.ReportSectionHeader);
     const sections = getElementsWithinComponent(
@@ -434,7 +428,7 @@ describeWithEnvironment('UsedPreloadingView', () => {
     };
 
     const component = await renderUsedPreloadingView(data);
-    assertShadowRoot(component.shadowRoot);
+    assert.isNotNull(component.shadowRoot);
     const headers = getElementsWithinComponent(
         component, 'devtools-report devtools-report-section-header', ReportView.ReportView.ReportSectionHeader);
     const sections = getElementsWithinComponent(
@@ -467,7 +461,7 @@ describeWithEnvironment('UsedPreloadingView', () => {
             action: Protocol.Preload.SpeculationAction.Prefetch,
             url: 'https://example.com/prefetched.html#beta' as Platform.DevToolsPath.UrlString,
           },
-          status: SDK.PreloadingModel.PreloadingStatus.Success,
+          status: SDK.PreloadingModel.PreloadingStatus.SUCCESS,
           prefetchStatus: null,
           requestId: 'requestId:1' as Protocol.Network.RequestId,
           ruleSetIds: ['ruleSetId:1'] as Protocol.Preload.RuleSetId[],
@@ -478,7 +472,7 @@ describeWithEnvironment('UsedPreloadingView', () => {
     };
 
     const component = await renderUsedPreloadingView(data);
-    assertShadowRoot(component.shadowRoot);
+    assert.isNotNull(component.shadowRoot);
     const headers = getElementsWithinComponent(
         component, 'devtools-report devtools-report-section-header', ReportView.ReportView.ReportSectionHeader);
     const sections = getElementsWithinComponent(
@@ -511,7 +505,7 @@ describeWithEnvironment('UsedPreloadingView', () => {
             action: Protocol.Preload.SpeculationAction.Prerender,
             url: 'https://example.com/prerendered.html#beta' as Platform.DevToolsPath.UrlString,
           },
-          status: SDK.PreloadingModel.PreloadingStatus.Ready,
+          status: SDK.PreloadingModel.PreloadingStatus.READY,
           prerenderStatus: null,
           disallowedMojoInterface: null,
           mismatchedHeaders: null,
@@ -523,7 +517,7 @@ describeWithEnvironment('UsedPreloadingView', () => {
     };
 
     const component = await renderUsedPreloadingView(data);
-    assertShadowRoot(component.shadowRoot);
+    assert.isNotNull(component.shadowRoot);
     const headers = getElementsWithinComponent(
         component, 'devtools-report devtools-report-section-header', ReportView.ReportView.ReportSectionHeader);
     const sections = getElementsWithinComponent(
@@ -540,7 +534,7 @@ describeWithEnvironment('UsedPreloadingView', () => {
     assert.include(sections[1]?.textContent, 'https://example.com/prerendered.html#alpha');
     assert.include(headers[2]?.textContent, 'URLs being speculatively loaded by the initiating page');
     const grid = sections[2].querySelector('devtools-resources-mismatched-preloading-grid');
-    assertElement(grid, PreloadingComponents.MismatchedPreloadingGrid.MismatchedPreloadingGrid);
+    assert.instanceOf(grid, PreloadingComponents.MismatchedPreloadingGrid.MismatchedPreloadingGrid);
     assertGridContents(
         grid,
         ['URL', 'Action', 'Status'],
@@ -568,7 +562,7 @@ describeWithEnvironment('UsedPreloadingView', () => {
             action: Protocol.Preload.SpeculationAction.Prefetch,
             url: 'https://example.com/prefetched.html' as Platform.DevToolsPath.UrlString,
           },
-          status: SDK.PreloadingModel.PreloadingStatus.Ready,
+          status: SDK.PreloadingModel.PreloadingStatus.READY,
           prefetchStatus: null,
           requestId: 'requestId:1' as Protocol.Network.RequestId,
           ruleSetIds: ['ruleSetId:1'] as Protocol.Preload.RuleSetId[],
@@ -581,7 +575,7 @@ describeWithEnvironment('UsedPreloadingView', () => {
             action: Protocol.Preload.SpeculationAction.Prerender,
             url: 'https://example.com/prerendered.html' as Platform.DevToolsPath.UrlString,
           },
-          status: SDK.PreloadingModel.PreloadingStatus.Failure,
+          status: SDK.PreloadingModel.PreloadingStatus.FAILURE,
           prerenderStatus: Protocol.Preload.PrerenderFinalStatus.TriggerDestroyed,
           disallowedMojoInterface: null,
           mismatchedHeaders: null,
@@ -593,7 +587,7 @@ describeWithEnvironment('UsedPreloadingView', () => {
     };
 
     const component = await renderUsedPreloadingView(data);
-    assertShadowRoot(component.shadowRoot);
+    assert.isNotNull(component.shadowRoot);
     const headers = getElementsWithinComponent(
         component, 'devtools-report devtools-report-section-header', ReportView.ReportView.ReportSectionHeader);
     const sections = getElementsWithinComponent(
@@ -609,7 +603,7 @@ describeWithEnvironment('UsedPreloadingView', () => {
     assert.include(headers[1]?.textContent, 'Current URL');
     assert.include(sections[1]?.textContent, 'https://example.com/no-preloads.html');
     assert.include(headers[2]?.textContent, 'URLs being speculatively loaded by the initiating page');
-    assertNotNullOrUndefined(sections[2].querySelector('devtools-resources-mismatched-preloading-grid'));
+    assert.exists(sections[2].querySelector('devtools-resources-mismatched-preloading-grid'));
 
     assert.include(headers[3]?.textContent, 'Speculations initiated by this page');
     const badges = sections[3]?.querySelectorAll('.status-badge span') || [];
@@ -631,7 +625,7 @@ describeWithEnvironment('UsedPreloadingView', () => {
             action: Protocol.Preload.SpeculationAction.Prefetch,
             url: 'https://example.com/prefetch-not-triggered.html' as Platform.DevToolsPath.UrlString,
           },
-          status: SDK.PreloadingModel.PreloadingStatus.NotTriggered,
+          status: SDK.PreloadingModel.PreloadingStatus.NOT_TRIGGERED,
           prefetchStatus: null,
           requestId: 'requestId:1' as Protocol.Network.RequestId,
           ruleSetIds: ['ruleSetId:1'] as Protocol.Preload.RuleSetId[],
@@ -644,7 +638,7 @@ describeWithEnvironment('UsedPreloadingView', () => {
             action: Protocol.Preload.SpeculationAction.Prefetch,
             url: 'https://example.com/prefetch-running.html' as Platform.DevToolsPath.UrlString,
           },
-          status: SDK.PreloadingModel.PreloadingStatus.Running,
+          status: SDK.PreloadingModel.PreloadingStatus.RUNNING,
           prefetchStatus: null,
           requestId: 'requestId:2' as Protocol.Network.RequestId,
           ruleSetIds: ['ruleSetId:1'] as Protocol.Preload.RuleSetId[],
@@ -657,7 +651,7 @@ describeWithEnvironment('UsedPreloadingView', () => {
             action: Protocol.Preload.SpeculationAction.Prefetch,
             url: 'https://example.com/prefetch-ready.html' as Platform.DevToolsPath.UrlString,
           },
-          status: SDK.PreloadingModel.PreloadingStatus.Ready,
+          status: SDK.PreloadingModel.PreloadingStatus.READY,
           prefetchStatus: null,
           requestId: 'requestId:3' as Protocol.Network.RequestId,
           ruleSetIds: ['ruleSetId:1'] as Protocol.Preload.RuleSetId[],
@@ -670,7 +664,7 @@ describeWithEnvironment('UsedPreloadingView', () => {
             action: Protocol.Preload.SpeculationAction.Prefetch,
             url: 'https://example.com/prefetch-failure.html' as Platform.DevToolsPath.UrlString,
           },
-          status: SDK.PreloadingModel.PreloadingStatus.Failure,
+          status: SDK.PreloadingModel.PreloadingStatus.FAILURE,
           prefetchStatus: null,
           requestId: 'requestId:4' as Protocol.Network.RequestId,
           ruleSetIds: ['ruleSetId:1'] as Protocol.Preload.RuleSetId[],
@@ -683,7 +677,7 @@ describeWithEnvironment('UsedPreloadingView', () => {
             action: Protocol.Preload.SpeculationAction.Prerender,
             url: 'https://example.com/prerender-pending.html' as Platform.DevToolsPath.UrlString,
           },
-          status: SDK.PreloadingModel.PreloadingStatus.Pending,
+          status: SDK.PreloadingModel.PreloadingStatus.PENDING,
           prerenderStatus: null,
           disallowedMojoInterface: null,
           mismatchedHeaders: null,
@@ -697,7 +691,7 @@ describeWithEnvironment('UsedPreloadingView', () => {
             action: Protocol.Preload.SpeculationAction.Prerender,
             url: 'https://example.com/prerender-ready.html' as Platform.DevToolsPath.UrlString,
           },
-          status: SDK.PreloadingModel.PreloadingStatus.Ready,
+          status: SDK.PreloadingModel.PreloadingStatus.READY,
           prerenderStatus: null,
           mismatchedHeaders: null,
           disallowedMojoInterface: null,
@@ -708,7 +702,7 @@ describeWithEnvironment('UsedPreloadingView', () => {
     };
 
     const component = await renderUsedPreloadingView(data);
-    assertShadowRoot(component.shadowRoot);
+    assert.isNotNull(component.shadowRoot);
     const headers = getElementsWithinComponent(
         component, 'devtools-report devtools-report-section-header', ReportView.ReportView.ReportSectionHeader);
     const sections = getElementsWithinComponent(

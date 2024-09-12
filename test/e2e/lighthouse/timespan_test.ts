@@ -6,7 +6,7 @@ import {assert} from 'chai';
 
 import {expectError} from '../../conductor/events.js';
 import {$textContent, getBrowserAndPages} from '../../shared/helper.js';
-import {describe, it} from '../../shared/mocha-extensions.js';
+
 import {
   clickStartButton,
   endTimespan,
@@ -91,7 +91,7 @@ describe('Timespan', function() {
     assert.strictEqual(devicePixelRatio, 1);
 
     const {auditResults, erroredAudits, failedAudits} = getAuditsBreakdown(lhr);
-    assert.strictEqual(auditResults.length, 48);
+    assert.strictEqual(auditResults.length, 44);
     assert.deepStrictEqual(erroredAudits, []);
     assert.deepStrictEqual(failedAudits.map(audit => audit.id), []);
 

@@ -2,22 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-const {assert} = chai;
-
-import type * as Platform from '../platform/platform.js';
-import {assertNotNullOrUndefined} from '../platform/platform.js';
-import * as SDK from './sdk.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
-
-import {encodeSourceMap} from '../../testing/SourceMapEncoder.js';
 import {describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
+import {encodeSourceMap, GeneratedRangeBuilder, OriginalScopeBuilder} from '../../testing/SourceMapEncoder.js';
+import type * as Platform from '../platform/platform.js';
+import * as Root from '../root/root.js';
+
+import * as SDK from './sdk.js';
 
 const sourceUrlFoo = '<foo>' as Platform.DevToolsPath.UrlString;
 
 describe('SourceMapEntry', () => {
   it('can be instantiated correctly', () => {
     const sourceMapEntry = new SDK.SourceMap.SourceMapEntry(
-        1, 1, 'http://www.example.com/' as Platform.DevToolsPath.UrlString, 1, 1, 'example');
+        1, 1, 0, 'http://www.example.com/' as Platform.DevToolsPath.UrlString, 1, 1, 'example');
     assert.strictEqual(sourceMapEntry.lineNumber, 1, 'line number was not set correctly');
     assert.strictEqual(sourceMapEntry.columnNumber, 1, 'column number was not set correctly');
     assert.strictEqual(
@@ -30,22 +28,22 @@ describe('SourceMapEntry', () => {
 
   describe('comparison', () => {
     it('checks line numbers first', () => {
-      const sourceMapEntry1 = new SDK.SourceMap.SourceMapEntry(1, 5, sourceUrlFoo, 1, 5, 'foo');
-      const sourceMapEntry2 = new SDK.SourceMap.SourceMapEntry(2, 5, sourceUrlFoo, 2, 5, 'foo');
+      const sourceMapEntry1 = new SDK.SourceMap.SourceMapEntry(1, 5, 0, sourceUrlFoo, 1, 5, 'foo');
+      const sourceMapEntry2 = new SDK.SourceMap.SourceMapEntry(2, 5, 0, sourceUrlFoo, 2, 5, 'foo');
       assert.isBelow(
           SDK.SourceMap.SourceMapEntry.compare(sourceMapEntry1, sourceMapEntry2), 0, 'first entry is not smaller');
     });
 
     it('checks column numbers second when line numbers are equal', () => {
-      const sourceMapEntry1 = new SDK.SourceMap.SourceMapEntry(2, 5, sourceUrlFoo, 1, 5, 'foo');
-      const sourceMapEntry2 = new SDK.SourceMap.SourceMapEntry(2, 25, sourceUrlFoo, 2, 5, 'foo');
+      const sourceMapEntry1 = new SDK.SourceMap.SourceMapEntry(2, 5, 0, sourceUrlFoo, 1, 5, 'foo');
+      const sourceMapEntry2 = new SDK.SourceMap.SourceMapEntry(2, 25, 0, sourceUrlFoo, 2, 5, 'foo');
       assert.isBelow(
           SDK.SourceMap.SourceMapEntry.compare(sourceMapEntry1, sourceMapEntry2), 0, 'first entry is not smaller');
     });
 
     it('works for equal SourceMapEntries', () => {
-      const sourceMapEntry1 = new SDK.SourceMap.SourceMapEntry(2, 5, sourceUrlFoo, 1, 5, 'foo');
-      const sourceMapEntry2 = new SDK.SourceMap.SourceMapEntry(2, 5, sourceUrlFoo, 1, 5, 'foo');
+      const sourceMapEntry1 = new SDK.SourceMap.SourceMapEntry(2, 5, 0, sourceUrlFoo, 1, 5, 'foo');
+      const sourceMapEntry2 = new SDK.SourceMap.SourceMapEntry(2, 5, 0, sourceUrlFoo, 1, 5, 'foo');
       assert.strictEqual(SDK.SourceMap.SourceMapEntry.compare(sourceMapEntry1, sourceMapEntry2), 0);
     });
   });
@@ -104,7 +102,7 @@ describeWithEnvironment('SourceMap', () => {
   function assertMapping(
       actual: SDK.SourceMap.SourceMapEntry|null, expectedSourceURL: string|undefined,
       expectedSourceLineNumber: number|undefined, expectedSourceColumnNumber: number|undefined) {
-    assertNotNullOrUndefined(actual);
+    assert.exists(actual);
     assert.strictEqual(actual.sourceURL, expectedSourceURL, 'unexpected source URL');
     assert.strictEqual(actual.sourceLineNumber, expectedSourceLineNumber, 'unexpected source line number');
     assert.strictEqual(actual.sourceColumnNumber, expectedSourceColumnNumber, 'unexpected source column number');
@@ -113,7 +111,7 @@ describeWithEnvironment('SourceMap', () => {
   function assertReverseMapping(
       actual: SDK.SourceMap.SourceMapEntry|null, expectedCompiledLineNumber: number,
       expectedCompiledColumnNumber: number) {
-    assertNotNullOrUndefined(actual);
+    assert.exists(actual);
     assert.strictEqual(actual.lineNumber, expectedCompiledLineNumber, 'unexpected compiled line number');
     assert.strictEqual(actual.columnNumber, expectedCompiledColumnNumber, 'unexpected compiled column number');
   }
@@ -275,7 +273,7 @@ describeWithEnvironment('SourceMap', () => {
     assertMapping(sourceMap.findEntry(0, 2), 'example.js', 0, 2);
 
     const emptyEntry = sourceMap.findEntry(0, 1);
-    assertNotNullOrUndefined(emptyEntry);
+    assert.exists(emptyEntry);
     assert.isUndefined(emptyEntry.sourceURL, 'unexpected url present for empty segment');
     assert.isUndefined(emptyEntry.sourceLineNumber, 'unexpected source line number for empty segment');
     assert.isUndefined(emptyEntry.sourceColumnNumber, 'unexpected source line number for empty segment');
@@ -475,7 +473,7 @@ describeWithEnvironment('SourceMap', () => {
       };
       const payload2 = {
         ...payload1,
-        'ignoreList': [0],
+        ignoreList: [0],
       };
       const sourceMap1 = new SDK.SourceMap.SourceMap(compiledURL, sourceMappingURL, payload1);
       const sourceMap2 = new SDK.SourceMap.SourceMap(compiledURL, sourceMappingURL, payload2);
@@ -906,10 +904,10 @@ describeWithEnvironment('SourceMap', () => {
 
       assert.deepEqual(sourceMap.findRanges(url => sourceMap.hasIgnoreListHint(url)) as [], [
         {
-          'startLine': 0,
-          'startColumn': 0,
-          'endLine': 3,
-          'endColumn': 0,
+          startLine: 0,
+          startColumn: 0,
+          endLine: 3,
+          endColumn: 0,
         },
       ]);
     });
@@ -946,22 +944,22 @@ describeWithEnvironment('SourceMap', () => {
 
       assert.deepEqual(sourceMap.findRanges(url => sourceMap.hasIgnoreListHint(url)) as [], [
         {
-          'startLine': 11,
-          'startColumn': 8,
-          'endLine': 13,
-          'endColumn': 6,
+          startLine: 11,
+          startColumn: 8,
+          endLine: 13,
+          endColumn: 6,
         },
         {
-          'startLine': 14,
-          'startColumn': 5,
-          'endLine': 17,
-          'endColumn': 2,
+          startLine: 14,
+          startColumn: 5,
+          endLine: 17,
+          endColumn: 2,
         },
         {
-          'startLine': 19,
-          'startColumn': 0,
-          'endLine': 2147483647,
-          'endColumn': 2147483647,
+          startLine: 19,
+          startColumn: 0,
+          endLine: 2147483647,
+          endColumn: 2147483647,
         },
       ]);
     });
@@ -990,19 +988,19 @@ describeWithEnvironment('SourceMap', () => {
 
       assert.deepEqual(sourceMap.findRanges(url => sourceMap.hasIgnoreListHint(url)) as [], [
         {
-          'startLine': 10,   // By default, unmapped code (before 10:9) is not considered
-          'startColumn': 9,  // special, and will therefore not be included in the range.
-          'endLine': 13,
-          'endColumn': 6,
+          startLine: 10,   // By default, unmapped code (before 10:9) is not considered
+          startColumn: 9,  // special, and will therefore not be included in the range.
+          endLine: 13,
+          endColumn: 6,
         },
       ]);
 
       assert.deepEqual(sourceMap.findRanges(url => sourceMap.hasIgnoreListHint(url), {isStartMatching: true}) as [], [
         {
-          'startLine': 0,    // Starting at 0:0 instead of 10:9 because all the code until
-          'startColumn': 0,  // the initial mapping is now assumed to match the predicate.
-          'endLine': 13,
-          'endColumn': 6,
+          startLine: 0,    // Starting at 0:0 instead of 10:9 because all the code until
+          startColumn: 0,  // the initial mapping is now assumed to match the predicate.
+          endLine: 13,
+          endColumn: 6,
         },
       ]);
     });
@@ -1032,25 +1030,25 @@ describeWithEnvironment('SourceMap', () => {
 
       assert.deepEqual(sourceMap.findRanges(url => sourceMap.hasIgnoreListHint(url)) as [], [
         {
-          'startLine': 10,   // By default, unmapped code (before 5:5) is not considered
-          'startColumn': 9,  // special, and will therefore not be included in the range.
-          'endLine': 13,
-          'endColumn': 6,
+          startLine: 10,   // By default, unmapped code (before 5:5) is not considered
+          startColumn: 9,  // special, and will therefore not be included in the range.
+          endLine: 13,
+          endColumn: 6,
         },
       ]);
 
       assert.deepEqual(sourceMap.findRanges(url => sourceMap.hasIgnoreListHint(url), {isStartMatching: true}) as [], [
         {
-          'startLine': 0,    // Starting at 0:0 instead of 10:9 because all the code until
-          'startColumn': 0,  // the initial mapping is now assumed to match the predicate.
-          'endLine': 5,      // And because the first source url is not hinted as being on
-          'endColumn': 5,    // the ignore-list, there's now an extra initial range.
+          startLine: 0,    // Starting at 0:0 instead of 10:9 because all the code until
+          startColumn: 0,  // the initial mapping is now assumed to match the predicate.
+          endLine: 5,      // And because the first source url is not hinted as being on
+          endColumn: 5,    // the ignore-list, there's now an extra initial range.
         },
         {
-          'startLine': 10,
-          'startColumn': 9,
-          'endLine': 13,
-          'endColumn': 6,
+          startLine: 10,
+          startColumn: 9,
+          endLine: 13,
+          endColumn: 6,
         },
       ]);
     });
@@ -1232,6 +1230,53 @@ describeWithEnvironment('SourceMap', () => {
       const exampleRanges = sourceMap.reverseMapTextRanges(sourceUrlExample, new TextRange(1, 0, 1, 9));
       assert.lengthOf(exampleRanges, 1, 'expected a single maximally merged range');
       assert.deepEqual(exampleRanges[0], new TextRange(1, 0, 2, 7));
+    });
+  });
+
+  describe('findEntry', () => {
+    it('can resolve generated positions with inlineFrameIndex', () => {
+      Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.USE_SOURCE_MAP_SCOPES);
+      // 'foo' calls 'bar', 'bar' calls 'baz'. 'bar' and 'baz' are inlined into 'foo'.
+      const names: string[] = [];
+      const originalScopes = [new OriginalScopeBuilder(names)
+                                  .start(0, 0, 'global')
+                                  .start(10, 0, 'function', 'foo')
+                                  .end(20, 0)
+                                  .start(30, 0, 'function', 'bar')
+                                  .end(40, 0)
+                                  .start(50, 0, 'function', 'baz')
+                                  .end(60, 0)
+                                  .end(70, 0)
+                                  .build()];
+
+      const generatedRanges =
+          new GeneratedRangeBuilder(names)
+              .start(0, 0, {definition: {sourceIdx: 0, scopeIdx: 0}})
+              .start(0, 0, {definition: {sourceIdx: 0, scopeIdx: 1}, isFunctionScope: true})
+              .start(0, 5, {definition: {sourceIdx: 0, scopeIdx: 3}, callsite: {sourceIdx: 0, line: 15, column: 0}})
+              .start(0, 5, {definition: {sourceIdx: 0, scopeIdx: 5}, callsite: {sourceIdx: 0, line: 35, column: 0}})
+              .end(0, 10)
+              .end(0, 10)
+              .end(0, 10)
+              .end(0, 10)
+              .build();
+
+      const sourceMap = new SDK.SourceMap.SourceMap(
+          compiledUrl, sourceMapJsonUrl,
+          {version: 3, sources: ['foo.ts'], mappings: '', names, originalScopes, generatedRanges});
+
+      assert.isNull(
+          sourceMap.findEntry(0, 7, 0));  // We don't have mappings, so inlineFrameIndex = 0 ('baz') has no entry.
+
+      const barEntry = sourceMap.findEntry(0, 7, 1);
+      assert.isNotNull(barEntry);
+      assert.strictEqual(barEntry.sourceLineNumber, 35);
+      assert.strictEqual(barEntry.sourceColumnNumber, 0);
+
+      const fooEntry = sourceMap.findEntry(0, 7, 2);
+      assert.isNotNull(fooEntry);
+      assert.strictEqual(fooEntry.sourceLineNumber, 15);
+      assert.strictEqual(fooEntry.sourceColumnNumber, 0);
     });
   });
 });

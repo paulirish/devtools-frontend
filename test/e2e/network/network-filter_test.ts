@@ -7,12 +7,10 @@ import {type ElementHandle} from 'puppeteer-core';
 
 import {
   $textContent,
-  click,
   clickElement,
   disableExperiment,
-  enableExperiment,
   getTestServerPort,
-  reloadDevTools,
+  setCheckBox,
   step,
   typeText,
   waitFor,
@@ -20,8 +18,12 @@ import {
   waitForMany,
   waitForNone,
 } from '../../shared/helper.js';
-import {describe, it} from '../../shared/mocha-extensions.js';
+
 import {
+  reloadDevTools,
+} from '../helpers/cross-tool-helper.js';
+import {
+  clearTextFilter,
   getAllRequestNames,
   navigateToNetworkTab,
   setCacheDisabled,
@@ -45,35 +47,11 @@ async function checkboxIsChecked(element: ElementHandle<HTMLInputElement>): Prom
   return await element.evaluate(node => node.checked);
 }
 
-async function clearFilter() {
-  await click('.filter-input-container');
-  const clearFilter = await waitFor('.filter-input-clear-button');
-  if (await clearFilter.isIntersectingViewport()) {
-    await clickElement(clearFilter);
-  }
-}
-
-async function openRequestTypeDropdown() {
-  const filterDropdown = await waitFor('[aria-label="Request types to include"]');
-  const filterButton = await waitFor('.toolbar-button', filterDropdown);
-  await filterButton.click();
-  return filterButton;
-}
-
 async function openMoreFiltersDropdown() {
   const filterDropdown = await waitFor('[aria-label="Show only/hide requests dropdown"]');
   const filterButton = await waitFor('.toolbar-button', filterDropdown);
   await filterButton.click();
   return filterButton;
-}
-
-async function getCategoryTypeFilter(label: string) {
-  const categoryTypeFilter = await $textContent(label);
-
-  if (!categoryTypeFilter) {
-    assert.fail(`Could not find the ${label} category filter. Make sure the "Request types" dropdown is open.`);
-  }
-  return categoryTypeFilter;
 }
 
 async function getFilter(label: string, root?: ElementHandle) {
@@ -126,12 +104,12 @@ describe('The Network Tab', function() {
     let nodes = await waitForMany('.data-grid-data-grid-node > .name-column', 1);
     expect(nodes.length).to.equal(11);
 
-    await clearFilter();
+    await clearTextFilter();
     await typeText('/.*\\..*/');
     nodes = await waitForMany('.data-grid-data-grid-node > .name-column', 1);
     expect(nodes.length).to.equal(11);
 
-    await clearFilter();
+    await clearTextFilter();
     await typeText('/.*\\.svg/');
     nodes = await waitForMany('.data-grid-data-grid-node > .name-column', 1);
     expect(nodes.length).to.equal(10);
@@ -141,7 +119,7 @@ describe('The Network Tab', function() {
     await typeText('/NOTHINGTOMATCH/');
     await waitForNone('.data-grid-data-grid-node > .name-column');
 
-    await clearFilter();
+    await clearTextFilter();
     await typeText('//');
     await waitForNone('.data-grid-data-grid-node > .name-column');
   });
@@ -155,7 +133,7 @@ describe('The Network Tab', function() {
     let nodes = await waitForMany('.data-grid-data-grid-node > .name-column', 1);
     expect(nodes.length).to.equal(7);
 
-    await clearFilter();
+    await clearTextFilter();
     await typeText('is:from-cache');
     nodes = await waitForMany('.data-grid-data-grid-node > .name-column', 1);
     expect(nodes.length).to.equal(3);
@@ -172,7 +150,7 @@ describe('The Network Tab', function() {
     await typeText('://');
     await waitForNone('.data-grid-data-grid-node > .name-column');
 
-    await clearFilter();
+    await clearTextFilter();
     await typeText('scheme:https');
     const nodes = await waitForMany('.data-grid-data-grid-node > .name-column', 1);
     expect(nodes.length).to.equal(11);
@@ -182,14 +160,14 @@ describe('The Network Tab', function() {
     await typeText('localhost');
     await waitForNone('.data-grid-data-grid-node > .name-column');
 
-    await clearFilter();
+    await clearTextFilter();
     await typeText('domain:localhost');
     const nodes = await waitForMany('.data-grid-data-grid-node > .name-column', 1);
     expect(nodes.length).to.equal(11);
   });
 
   it('can filter by partial URL in the log view', async () => {
-    await clearFilter();
+    await clearTextFilter();
     await typeText(`https://localhost:${getTestServerPort()}`);
     const nodes = await waitForMany('.data-grid-data-grid-node > .name-column', 1);
     expect(nodes.length).to.equal(11);
@@ -318,16 +296,11 @@ describe('The Network Tab', function() {
   });
 
   it('can show only third-party requests from checkbox', async () => {
+    await setCheckBox('[title="3rd-party requests"]', true);
     await navigateToNetworkTab('third-party-resources.html');
-    await waitForSomeRequestsToAppear(3);
-    let names = await getAllRequestNames();
-    const filters = await waitFor('.filter-bar');
+    await waitForSomeRequestsToAppear(1);
 
-    const thirdPartyFilter = await getFilter('3rd-party requests', filters);
-    await thirdPartyFilter.click();
-
-    names = await getAllRequestNames();
-    assert.deepStrictEqual(names, ['external_image.svg'], 'The right request names should appear in the list');
+    assert.deepStrictEqual(await getAllRequestNames(), ['external_image.svg']);
   });
 });
 
@@ -335,7 +308,7 @@ describe('The Network Tab', function() {
   this.timeout(5000);
 
   beforeEach(async () => {
-    await enableExperiment('network-panel-filter-bar-redesign');
+    await reloadDevTools({enableExperiments: ['network-panel-filter-bar-redesign']});
 
     await navigateToNetworkTab('empty.html');
     await setCacheDisabled(true);
@@ -370,72 +343,6 @@ describe('The Network Tab', function() {
       assert.deepStrictEqual(
           names, ['third-party-resources.html', 'image.svg', 'external_image.svg'],
           'The right request names should appear in the list');
-    });
-  });
-
-  it('persists filters across a reload', async () => {
-    await navigateToNetworkTab(SIMPLE_PAGE_URL);
-    let filterInput = await waitFor('.filter-input-field.text-prompt');
-    filterInput.focus();
-    await typeText('foo');
-
-    await openRequestTypeDropdown();
-
-    let categoryXHRFilter = await getCategoryTypeFilter('Fetch and XHR');
-    assert.isTrue(await checkOpacityCheckmark(categoryXHRFilter, '0'));
-
-    await categoryXHRFilter.click();
-
-    await reloadDevTools({selectedPanel: {name: 'network'}});
-    filterInput = await waitFor('.filter-input-field.text-prompt');
-    const filterText = await filterInput.evaluate(x => (x as HTMLElement).innerText);
-    assert.strictEqual(filterText, 'foo');
-
-    await openRequestTypeDropdown();
-
-    categoryXHRFilter = await getCategoryTypeFilter('Fetch and XHR');
-
-    assert.isTrue(await checkOpacityCheckmark(categoryXHRFilter, '1'));
-  });
-
-  it('unchecks all filters and the all option is checked automatically - by checkmark opacity', async () => {
-    await navigateToNetworkTab(SIMPLE_PAGE_URL);
-    await waitForSomeRequestsToAppear(SIMPLE_PAGE_REQUEST_NUMBER);
-
-    await openRequestTypeDropdown();
-
-    const categoryXHRFilter = await getCategoryTypeFilter('Fetch and XHR');
-    const categoryAllFilter = await getCategoryTypeFilter('All');
-
-    let names = await getAllRequestNames();
-
-    await step('verify the initial state when the "All" filter is selected', async () => {
-      assert.isTrue(await checkOpacityCheckmark(categoryXHRFilter, '0'));
-
-      assert.deepEqual(11, names.length);
-      assert.isTrue(names.includes('requests.html?num=10'));
-    });
-
-    await step('verify the dropdown state and the requests when XHR filter is selected', async () => {
-      await categoryXHRFilter.click();
-
-      assert.isTrue(await checkOpacityCheckmark(categoryXHRFilter, '1'));
-      assert.isTrue(await checkOpacityCheckmark(categoryAllFilter, '0'));
-
-      names = await getAllRequestNames();
-      assert.deepEqual(10, names.length);
-      assert.isFalse(names.includes('requests.html?num=10'));
-    });
-
-    await step('verify the dropdown state and the requests when XHR filter is deselected', async () => {
-      await categoryXHRFilter.click();
-
-      assert.isTrue(await checkOpacityCheckmark(categoryXHRFilter, '0'));
-      assert.isTrue(await checkOpacityCheckmark(categoryAllFilter, '1'));
-
-      names = await getAllRequestNames();
-      assert.deepEqual(11, names.length);
-      assert.isTrue(names.includes('requests.html?num=10'));
     });
   });
 });

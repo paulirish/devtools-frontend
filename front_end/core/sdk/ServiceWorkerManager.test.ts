@@ -6,8 +6,6 @@ import type * as Protocol from '../../generated/protocol.js';
 
 import * as SDK from './sdk.js';
 
-const {assert} = chai;
-
 describe('ServiceWorkerVersion', () => {
   const REGISTRATION_PAYLOAD = {registrationId: 'foo', scopeURL: 'https://example.com', isDeleted: false} as
       Protocol.ServiceWorker.ServiceWorkerRegistration;
@@ -239,35 +237,35 @@ describe('ServiceWorkerVersion', () => {
   it('identifies when the worker is in installing mode', () => {
     let version = makeVersion(
         REGISTRATION_PAYLOAD, {...VERSION_PAYLOAD, status: 'new'} as Protocol.ServiceWorker.ServiceWorkerVersion);
-    assert.strictEqual(version.mode(), SDK.ServiceWorkerManager.ServiceWorkerVersion.Modes.Installing);
+    assert.strictEqual(version.mode(), SDK.ServiceWorkerManager.ServiceWorkerVersion.Modes.INSTALLING);
 
     version = makeVersion(
         REGISTRATION_PAYLOAD,
         {...VERSION_PAYLOAD, status: 'installing'} as Protocol.ServiceWorker.ServiceWorkerVersion);
-    assert.strictEqual(version.mode(), SDK.ServiceWorkerManager.ServiceWorkerVersion.Modes.Installing);
+    assert.strictEqual(version.mode(), SDK.ServiceWorkerManager.ServiceWorkerVersion.Modes.INSTALLING);
   });
 
   it('identifies when the worker is in waiting mode', () => {
     const version = makeVersion(
         REGISTRATION_PAYLOAD, {...VERSION_PAYLOAD, status: 'installed'} as Protocol.ServiceWorker.ServiceWorkerVersion);
-    assert.strictEqual(version.mode(), SDK.ServiceWorkerManager.ServiceWorkerVersion.Modes.Waiting);
+    assert.strictEqual(version.mode(), SDK.ServiceWorkerManager.ServiceWorkerVersion.Modes.WAITING);
   });
 
   it('identifies when the worker is in active mode', () => {
     let version = makeVersion(
         REGISTRATION_PAYLOAD,
         {...VERSION_PAYLOAD, status: 'activating'} as Protocol.ServiceWorker.ServiceWorkerVersion);
-    assert.strictEqual(version.mode(), SDK.ServiceWorkerManager.ServiceWorkerVersion.Modes.Active);
+    assert.strictEqual(version.mode(), SDK.ServiceWorkerManager.ServiceWorkerVersion.Modes.ACTIVE);
 
     version = makeVersion(
         REGISTRATION_PAYLOAD, {...VERSION_PAYLOAD, status: 'activated'} as Protocol.ServiceWorker.ServiceWorkerVersion);
-    assert.strictEqual(version.mode(), SDK.ServiceWorkerManager.ServiceWorkerVersion.Modes.Active);
+    assert.strictEqual(version.mode(), SDK.ServiceWorkerManager.ServiceWorkerVersion.Modes.ACTIVE);
   });
 
   it('identifies when the worker is in redundant mode', () => {
     const version = makeVersion(
         REGISTRATION_PAYLOAD, {...VERSION_PAYLOAD, status: 'redundant'} as Protocol.ServiceWorker.ServiceWorkerVersion);
-    assert.strictEqual(version.mode(), SDK.ServiceWorkerManager.ServiceWorkerVersion.Modes.Redundant);
+    assert.strictEqual(version.mode(), SDK.ServiceWorkerManager.ServiceWorkerVersion.Modes.REDUNDANT);
   });
 
   it('routerRules should be null if not provided', () => {

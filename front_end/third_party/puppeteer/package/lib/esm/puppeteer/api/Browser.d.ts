@@ -56,6 +56,10 @@ export interface WaitForTargetOptions {
      * @defaultValue `30_000`
      */
     timeout?: number;
+    /**
+     * A signal object that allows you to cancel a waitFor call.
+     */
+    signal?: AbortSignal;
 }
 /**
  * All the events a {@link Browser | browser instance} may emit.
@@ -129,7 +133,7 @@ export interface DebugInfo {
  * - connected to via {@link Puppeteer.connect} or
  * - launched by {@link PuppeteerNode.launch}.
  *
- * {@link Browser} {@link EventEmitter | emits} various events which are
+ * {@link Browser} {@link EventEmitter.emit | emits} various events which are
  * documented in the {@link BrowserEvent} enum.
  *
  * @example Using a {@link Browser} to create a {@link Page}:

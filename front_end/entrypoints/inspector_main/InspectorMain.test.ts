@@ -2,35 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-const {assert} = chai;
-
-import type * as Protocol from '../../generated/protocol.js';
-import * as SDK from '../../core/sdk/sdk.js';
 import * as ProtocolClient from '../../core/protocol_client/protocol_client.js';
 import * as Root from '../../core/root/root.js';
-import type * as UI from '../../ui/legacy/legacy.js';
-import * as InspectorMain from './inspector_main.js';
+import * as SDK from '../../core/sdk/sdk.js';
+import type * as Protocol from '../../generated/protocol.js';
 import {
   createTarget,
   stubNoopSettings,
 } from '../../testing/EnvironmentHelpers.js';
-
+import {expectCall} from '../../testing/ExpectStubCall.js';
 import {
   describeWithMockConnection,
   setMockConnectionResponseHandler,
 } from '../../testing/MockConnection.js';
+import type * as UI from '../../ui/legacy/legacy.js';
+
+import * as InspectorMain from './inspector_main.js';
 
 describeWithMockConnection('FocusDebuggeeActionDelegate', () => {
-  it('uses main frame without tab tatget', async () => {
-    const target = createTarget();
-    const delegate = new InspectorMain.InspectorMain.FocusDebuggeeActionDelegate();
-    const bringToFront = sinon.spy(target.pageAgent(), 'invoke_bringToFront');
-    delegate.handleAction({} as UI.Context.Context, 'foo');
-    assert.isTrue(bringToFront.calledOnce);
-  });
-
-  it('uses main frame with tab tatget', async () => {
-    const tabTarget = createTarget({type: SDK.Target.Type.Tab});
+  it('uses main frame', async () => {
+    const tabTarget = createTarget({type: SDK.Target.Type.TAB});
     createTarget({parentTarget: tabTarget, subtype: 'prerender'});
     const frameTarget = createTarget({parentTarget: tabTarget});
     const delegate = new InspectorMain.InspectorMain.FocusDebuggeeActionDelegate();
@@ -48,7 +39,7 @@ describeWithMockConnection('InspectorMainImpl', () => {
     const runPromise = inspectorMain.run();
     const rootTarget = SDK.TargetManager.TargetManager.instance().rootTarget();
     SDK.TargetManager.TargetManager.instance().createTarget(
-        'someTargetID' as Protocol.Target.TargetID, 'someName', SDK.Target.Type.Frame, rootTarget, undefined);
+        'someTargetID' as Protocol.Target.TargetID, 'someName', SDK.Target.Type.FRAME, rootTarget, undefined);
     await runPromise;
   };
 
@@ -72,7 +63,7 @@ describeWithMockConnection('InspectorMainImpl', () => {
     assert.isFalse(finished);
     const rootTarget = SDK.TargetManager.TargetManager.instance().rootTarget();
     SDK.TargetManager.TargetManager.instance().createTarget(
-        'someTargetID' as Protocol.Target.TargetID, 'someName', SDK.Target.Type.Frame, rootTarget, undefined);
+        'someTargetID' as Protocol.Target.TargetID, 'someName', SDK.Target.Type.FRAME, rootTarget, undefined);
     await new Promise(resolve => setTimeout(resolve, 0));
     assert.isTrue(finished);
   });
@@ -83,7 +74,7 @@ describeWithMockConnection('InspectorMainImpl', () => {
     assert.notExists(SDK.TargetManager.TargetManager.instance().rootTarget());
     await inspectorMain.run();
 
-    assert.strictEqual(SDK.TargetManager.TargetManager.instance().rootTarget()?.type(), SDK.Target.Type.Node);
+    assert.strictEqual(SDK.TargetManager.TargetManager.instance().rootTarget()?.type(), SDK.Target.Type.NODE);
     Root.Runtime.Runtime.setQueryParamForTesting('v8only', '');
   });
 
@@ -92,7 +83,7 @@ describeWithMockConnection('InspectorMainImpl', () => {
     assert.notExists(SDK.TargetManager.TargetManager.instance().rootTarget());
     await runForTabTarget();
 
-    assert.strictEqual(SDK.TargetManager.TargetManager.instance().rootTarget()?.type(), SDK.Target.Type.Tab);
+    assert.strictEqual(SDK.TargetManager.TargetManager.instance().rootTarget()?.type(), SDK.Target.Type.TAB);
     Root.Runtime.Runtime.setQueryParamForTesting('targetType', '');
   });
 
@@ -101,7 +92,7 @@ describeWithMockConnection('InspectorMainImpl', () => {
     assert.notExists(SDK.TargetManager.TargetManager.instance().rootTarget());
     await inspectorMain.run();
 
-    assert.strictEqual(SDK.TargetManager.TargetManager.instance().rootTarget()?.type(), SDK.Target.Type.Frame);
+    assert.strictEqual(SDK.TargetManager.TargetManager.instance().rootTarget()?.type(), SDK.Target.Type.FRAME);
   });
 
   it('creates main target waiting for debugger if the main target is frame and panel is sources', async () => {
@@ -128,7 +119,7 @@ describeWithMockConnection('InspectorMainImpl', () => {
 
     const debuggerPause = sinon.stub();
     setMockConnectionResponseHandler('Debugger.pause', debuggerPause);
-    const debuggerPauseCalled = new Promise<void>(resolve => debuggerPause.callsFake(resolve));
+    const debuggerPauseCalled = expectCall(debuggerPause);
 
     let debuggerEnable = (_: Protocol.Debugger.EnableResponse) => {};
     setMockConnectionResponseHandler('Debugger.enable', () => new Promise<Protocol.Debugger.EnableResponse>(resolve => {
@@ -142,6 +133,19 @@ describeWithMockConnection('InspectorMainImpl', () => {
     await Promise.all([debuggerPauseCalled, result]);
     assert.isTrue(debuggerPause.calledOnce);
     Root.Runtime.Runtime.setQueryParamForTesting('panel', '');
+  });
+
+  it('frontend correctly registers if Debugger.enable fails', async () => {
+    const inspectorMain = InspectorMain.InspectorMain.InspectorMainImpl.instance({forceNew: true});
+    assert.notExists(SDK.TargetManager.TargetManager.instance().rootTarget());
+
+    setMockConnectionResponseHandler('Debugger.enable', () => ({getError: () => 'Debugger.enable failed'}));
+    await inspectorMain.run();
+
+    const target = SDK.TargetManager.TargetManager.instance().rootTarget();
+    assert.isNotNull(target);
+    const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel) as SDK.DebuggerModel.DebuggerModel;
+    assert.isFalse(debuggerModel.debuggerEnabled());
   });
 
   it('calls Runtime.runIfWaitingForDebugger for Node target', async () => {
