@@ -22,7 +22,7 @@
   height: 18px;
   width: 6px;
   margin: 0 -3px;
-  content: "";
+  content: '';
   display: block;
 }
 
@@ -53,8 +53,8 @@
 .flame-chart-search-element {
   position: absolute;
   pointer-events: none;
-  outline: 1px solid var(--sys-color-on-surface-subtle);
-  background-color: var(--sys-color-state-ripple-neutral-on-subtle);
+  /* outline: 1px solid var(--sys-color-on-surface-subtle); */
+  /* background-color: var(--sys-color-state-ripple-neutral-on-subtle); */
 }
 
 .chart-cursor-element {

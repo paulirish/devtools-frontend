@@ -288,6 +288,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   private entryColorsCache?: string[]|null;
   private totalTime?: number;
   private lastPopoverState: PopoverState;
+  private dimSvgDiv: HTMLElement;
 
   #tooltipPopoverYAdjustment: number = 0;
 
@@ -354,39 +355,29 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.revealDescendantsArrowHighlightElement =
         this.viewportElement.createChild('div', 'reveal-descendants-arrow-highlight-element');
 
-    // this.dimDiv =
-    //     this.viewportElement.createChild('div', 'dimming-mask fill');
-    // this.dimDiv.style.cssText = `
-    // background: #ffffffb3;
-    // mix-blend-mode: color;`;
-
-    this.dimSvgDiv =
-        this.viewportElement.createChild('div', 'dim-svg-mask fill hidden');
+    // Obviously quite hacky. Comments left within the SVG for explanation.
+    this.dimSvgDiv = this.viewportElement.createChild('div', 'dim-svg-mask fill hidden');
     this.dimSvgDiv.innerHTML = `
-
-
-    <svg viewBox="0 0 756.3  756.3">
+<svg viewBox="0 0 756.3  756.3">
 
   <mask id="myMask">
-  <!--within the mask... -->
-  <!--  grayish pixels => show the the outer rect at % opacity -->
+    <!--within the mask... -->
+    <!--  grayish pixels => show the the outer rect at % opacity -->
     <rect x="0" y="0" width="100%" height="100%" fill="hsl(0deg 0% 82.36%)"></rect>
 
-  <!--  black pixels =>   punch, fully transparently, through to the next thing. these are the cutouts -->
+    <!--  black pixels =>   punch, fully transparently, through to the next thing. these are the cutouts -->
     <!-- <rect x="37" y="78" width="103.02" height="16" fill="black"></rect> -->
 
-  <!--  white pixels =>   show the outer rect. (probably dont need. just for debugging.) -->
-    <path d="M10,35 A20,20,0,0,1,50,35 A20,20,0,0,1,90,35 Q90,65,50,95 Q10,65,10,35 Z"
-     style="fill: white;"></path>
+    <!--  white pixels =>   show the outer rect. (probably dont need. just for debugging.) -->
+    <!-- <rect x="37" y="78" width="103.02" height="16" fill="white"></rect> -->
   </mask>
-
 
   <!-- the fill is what i want to be user visible (grey = some desaturation).
        the mask punches through it-->
-<rect x="0" y="0" width="100%" height="100%" id="screenrect" fill="#ebebeb" mask="url(#myMask)"></rect></svg>
-
+  <rect x="0" y="0" width="100%" height="100%" id="screenrect" fill="#ebebeb" mask="url(#myMask)"></rect>
+</svg>
 `;
-    this.dimSvgDiv.style.cssText = `    mix-blend-mode: screen; pointer-events: none;`;
+    this.dimSvgDiv.style.cssText = 'mix-blend-mode: screen; pointer-events: none;';
 
     this.selectedElement = this.viewportElement.createChild('div', 'flame-chart-selected-element');
     if (this.#selectedElementOutlineEnabled) {
@@ -505,7 +496,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   }
 
   highlightAllEntries(entries: number[]): void {
-    const elPositions:Array<ReturnType<FlameChart["updateElementPosition"]>> = [];
+    const elPositions: Array<ReturnType<FlameChart['updateElementPosition']>> = [];
     for (const entry of entries) {
       const searchElement = this.viewportElement.createChild('div', 'flame-chart-search-element');
       this.#searchResultHighlightElements.push(searchElement);
@@ -515,16 +506,20 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     }
 
     const svg = this.dimSvgDiv.querySelector('svg');
-    const mask = svg.querySelector('mask');
+    const mask = svg?.querySelector('mask');
+    if (!svg || !mask) {
+      throw new Error('nosvg');
+    }
 
     // TODO: tweak if i drop the surrounding div
-    const elRect = svg.parentNode.parentNode.getBoundingClientRect();
+    const elRect = svg?.parentElement?.parentElement?.getBoundingClientRect();
     svg.viewBox.baseVal.width = elRect.width;
     svg.viewBox.baseVal.height = elRect.height;
 
     mask.querySelectorAll('rect.punch').forEach(el => el.remove());
     for (const elPosition of elPositions) {
-      if (!elPosition) continue;
+      if (!elPosition)
+        continue;
       const punchRect = UI.UIUtils.createSVGChild(mask, 'rect', 'punch');
       punchRect.setAttribute('x', elPosition.position.left.toString());
       punchRect.setAttribute('y', elPosition.position.top.toString());
@@ -534,11 +529,6 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     }
 
     this.dimSvgDiv.classList.remove('hidden');
-
-
-
-
-
   }
 
   removeSearchResultHighlights(): void {
@@ -3499,7 +3489,14 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
    * Update position of an Element. By default, the element is treated as a full entry and it's dimentions are set to the full entry width/length/height.
    * If isDecoration parameter is set to true, the element will be positioned on the right side of the entry and have a square shape where width == height of the entry.
    */
-  private updateElementPosition(element: Element|null, entryIndex: number, isDecoration?: boolean): void {
+  private updateElementPosition(element: Element|null, entryIndex: number, isDecoration?: boolean): void|{
+  position: {
+  top:
+    number, width: number, height: number, left: number,
+  }
+    , visible: boolean,
+  }
+  {
     if (!element) {
       return;
     }
@@ -3545,12 +3542,13 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       width: barHeight,
       height: barHeight,
       left: barX + barWidth - barHeight,
-    } : {
-      top: barY,
-      width: barWidth,
-      height: barHeight - 1,
-      left: barX,
-    };
+    } :
+                                    {
+                                      top: barY,
+                                      width: barWidth,
+                                      height: barHeight - 1,
+                                      left: barX,
+                                    };
 
     const elStyle = (element as HTMLElement).style;
     for (const prop of Object.keys(position)) {
