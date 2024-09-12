@@ -288,7 +288,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   private entryColorsCache?: string[]|null;
   private totalTime?: number;
   private lastPopoverState: PopoverState;
-  private dimSvgDiv: HTMLElement;
+  private dimHighlightSVG: Element;
 
   #tooltipPopoverYAdjustment: number = 0;
 
@@ -348,32 +348,15 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.canvas.addEventListener('keydown', this.onKeyDown.bind(this), false);
     this.canvas.addEventListener('contextmenu', this.onContextMenu.bind(this), false);
 
+    this.dimHighlightSVG =
+        UI.UIUtils.createSVGChild(this.viewportElement, 'svg', 'flame-chart-dim-highlight-svg fill hidden');
+
     this.popoverElement =
         optionalConfig.tooltipElement || this.viewportElement.createChild('div', 'flame-chart-entry-info');
     this.markerHighlighElement = this.viewportElement.createChild('div', 'flame-chart-marker-highlight-element');
     this.highlightElement = this.viewportElement.createChild('div', 'flame-chart-highlight-element');
     this.revealDescendantsArrowHighlightElement =
         this.viewportElement.createChild('div', 'reveal-descendants-arrow-highlight-element');
-
-    // Obviously quite hacky. Comments left within the SVG for explanation.
-    this.dimSvgDiv = this.viewportElement.createChild('div', 'dim-svg-mask fill hidden');
-    this.dimSvgDiv.innerHTML = `
-<svg class="fill" style="width: 100%; height: 100%;">
-  <defs>
-    <mask id="cutouts">
-      <!-- within the mask...
-              black fill = punch, fully transparently, through to the next thing. these are the cutouts to the color.
-              white fill = be 100% desaturated
-              grey fill  = show at the Lightness level of grayscale/desaturation
-      -->
-      <rect x="0" y="0" width="100%" height="100%" fill="hsl(0deg 0% 95%)"></rect>
-      <!-- other rect.punch will be added here -->
-    </mask>
-  </defs>
-  <rect width="100%" height="100%" id="screenrect" fill="#ffffff" mask="url(#cutouts)" style="mix-blend-mode: saturation;"></rect>
-</svg>
-`;
-    this.dimSvgDiv.style.cssText = 'pointer-events: none;';
 
     this.selectedElement = this.viewportElement.createChild('div', 'flame-chart-selected-element');
     if (this.#selectedElementOutlineEnabled) {
@@ -501,10 +484,27 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       elPositions.push(newPosition);
     }
 
-    const svg = this.dimSvgDiv.querySelector('svg');
-    const mask = svg?.querySelector('mask');
-    if (!svg || !mask) {
-      throw new Error('nosvg');
+    let mask = this.dimHighlightSVG?.querySelector('mask');
+    if (!mask) {
+      const defs = UI.UIUtils.createSVGChild(this.dimHighlightSVG, 'defs');
+      mask = UI.UIUtils.createSVGChild(defs, 'mask') as SVGMaskElement;
+      mask.id = 'dim-highlight-cutouts';
+      /* Within the mask...
+          - black fill = punch, fully transparently, through to the next thing. these are the cutouts to the color.
+          - white fill = be 100% desaturated
+          - grey fill  = show at the Lightness level of grayscale/desaturation
+      */
+      const showAllRect = UI.UIUtils.createSVGChild(mask, 'rect');
+      showAllRect.setAttribute('width', '100%');
+      showAllRect.setAttribute('height', '100%');
+      showAllRect.setAttribute('fill', 'hsl(0deg 0% 95%)');
+
+      const desaturateRect = UI.UIUtils.createSVGChild(this.dimHighlightSVG, 'rect') as SVGRectElement;
+      desaturateRect.setAttribute('width', '100%');
+      desaturateRect.setAttribute('height', '100%');
+      desaturateRect.setAttribute('fill', '#ffffff');
+      desaturateRect.setAttribute('mask', `url(#${mask.id})`);
+      desaturateRect.style.mixBlendMode = 'saturation';
     }
 
     mask.querySelectorAll('rect.punch').forEach(el => el.remove());
@@ -520,11 +520,11 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       punchRect.setAttribute('fill', 'black');
     }
 
-    this.dimSvgDiv.classList.remove('hidden');
+    this.dimHighlightSVG.classList.remove('hidden');
   }
 
   removeSearchResultHighlights(): void {
-    this.dimSvgDiv.classList.add('hidden');
+    this.dimHighlightSVG.classList.add('hidden');
     for (const element of this.#searchResultHighlightElements) {
       element.remove();
     }
