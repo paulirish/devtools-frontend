@@ -61,12 +61,12 @@ const UIStrings = {
    * @description The title of the button that allows submitting positive
    * feedback about the console insight.
    */
-  thumbsUp: 'Thumbs up',
+  goodResponse: 'Good response',
   /**
    * @description The title of the button that allows submitting negative
    * feedback about the console insight.
    */
-  thumbsDown: 'Thumbs down',
+  badResponse: 'Bad response',
   /**
    * @description The title of the button that opens a page to report a legal
    * issue with the console insight.
@@ -291,7 +291,7 @@ export class ConsoleInsight extends HTMLElement {
           this.#state = {
             type: State.LOADING,
             consentReminderConfirmed: this.#getOnboardingCompletedSetting().get() || skipReminder,
-            consentOnboardingFinished: this.#consoleInsightsEnabledSetting?.get() === true,
+            consentOnboardingFinished: this.#consoleInsightsEnabledSetting?.getIfNotDisabled() === true,
           };
         } else {
           this.#state = {
@@ -379,10 +379,11 @@ export class ConsoleInsight extends HTMLElement {
 
   #onConsoleInsightsSettingChanged(): void {
     if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.GEN_AI_SETTINGS_PANEL)) {
-      if (this.#consoleInsightsEnabledSetting?.get() === true) {
+      if (this.#consoleInsightsEnabledSetting?.getIfNotDisabled() === true) {
         this.#getOnboardingCompletedSetting().set(true);
       }
-      if (this.#state.type === State.CONSENT_ONBOARDING && this.#consoleInsightsEnabledSetting?.get() === true) {
+      if (this.#state.type === State.CONSENT_ONBOARDING &&
+          this.#consoleInsightsEnabledSetting?.getIfNotDisabled() === true) {
         this.#transitionTo({
           type: State.LOADING,
           consentReminderConfirmed: true,
@@ -391,7 +392,8 @@ export class ConsoleInsight extends HTMLElement {
         Host.userMetrics.actionTaken(Host.UserMetrics.Action.InsightsOptInTeaserConfirmedInSettings);
         void this.#generateInsightIfNeeded();
       }
-      if (this.#state.type === State.CONSENT_REMINDER && this.#consoleInsightsEnabledSetting?.get() === false) {
+      if (this.#state.type === State.CONSENT_REMINDER &&
+          this.#consoleInsightsEnabledSetting?.getIfNotDisabled() === false) {
         this.#transitionTo({
           type: State.LOADING,
           consentReminderConfirmed: false,
@@ -778,7 +780,7 @@ export class ConsoleInsight extends HTMLElement {
     switch (this.#state.type) {
       case State.LOADING:
         return html`<main jslog=${jslog}>
-            <div role="presentation" class="loader" style="clip-path: url('#clipPath');">
+            <div role="presentation" aria-label="Loading" class="loader" style="clip-path: url('#clipPath');">
               <svg width="100%" height="64">
                 <clipPath id="clipPath">
                   <rect x="0" y="0" width="100%" height="16" rx="8"></rect>
@@ -814,7 +816,7 @@ export class ConsoleInsight extends HTMLElement {
         if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.GEN_AI_SETTINGS_PANEL)) {
           return html`
           <main class="reminder-container" jslog=${jslog}>
-            <div>Things to consider</div>
+            <h3>Things to consider</h3>
             <div class="reminder-items">
               <div>
                 <${IconButton.Icon.Icon.litTagName} .data=${{
@@ -1017,6 +1019,7 @@ export class ConsoleInsight extends HTMLElement {
                   {
                     variant: Buttons.Button.Variant.TONAL,
                     jslogContext: 'settings',
+                    title: 'Settings',
                   } as Buttons.Button.ButtonData
                 }
               >
@@ -1029,6 +1032,7 @@ export class ConsoleInsight extends HTMLElement {
                   {
                     variant: Buttons.Button.Variant.PRIMARY,
                     jslogContext: 'lets-go',
+                    title: 'Let\'s go',
                   } as Buttons.Button.ButtonData
                 }
                >
@@ -1093,7 +1097,7 @@ export class ConsoleInsight extends HTMLElement {
                   size: Buttons.Button.Size.SMALL,
                   iconName: 'thumb-up',
                   active: this.#selectedRating !== undefined && this.#selectedRating,
-                  title: i18nString(UIStrings.thumbsUp),
+                  title: i18nString(UIStrings.goodResponse),
                   jslogContext: 'thumbs-up',
                 } as Buttons.Button.ButtonData
               }
@@ -1107,7 +1111,7 @@ export class ConsoleInsight extends HTMLElement {
                   size: Buttons.Button.Size.SMALL,
                   iconName: 'thumb-down',
                   active: this.#selectedRating !== undefined && !this.#selectedRating,
-                  title: i18nString(UIStrings.thumbsDown),
+                  title: i18nString(UIStrings.badResponse),
                   jslogContext: 'thumbs-down',
                 } as Buttons.Button.ButtonData
               }

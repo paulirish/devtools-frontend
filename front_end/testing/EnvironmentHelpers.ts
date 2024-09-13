@@ -298,8 +298,7 @@ export async function initializeGlobalVars({reset = true} = {}) {
         Common.Settings.SettingCategory.MOBILE, 'emulation.show-device-outline', false,
         Common.Settings.SettingType.BOOLEAN),
     createSettingValue(
-        Common.Settings.SettingCategory.APPEARANCE, 'use-browser-theme-colors', true,
-        Common.Settings.SettingType.BOOLEAN),
+        Common.Settings.SettingCategory.APPEARANCE, 'chrome-theme-colors', true, Common.Settings.SettingType.BOOLEAN),
   ];
 
   Common.Settings.registerSettingsForTest(settings, reset);
@@ -524,6 +523,10 @@ export function getGetHostConfigStub(config: Root.Runtime.HostConfig): sinon.Sin
       enabled: true,
       testing: false,
     },
+    devToolsPrivacyUI: {
+      enabled: false,
+      ...config.devToolsPrivacyUI,
+    } as Root.Runtime.HostConfigPrivacyUI,
     isOffTheRecord: false,
   });
 }

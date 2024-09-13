@@ -14,6 +14,7 @@ import * as MarkdownView from '../../../ui/components/markdown_view/markdown_vie
 import * as Spinners from '../../../ui/components/spinners/spinners.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
+import {ErrorType} from '../FreestylerAgent.js';
 
 import freestylerChatUiStyles from './freestylerChatUi.css.js';
 import {ProvideFeedback, type ProvideFeedbackProps} from './ProvideFeedback.js';
@@ -30,12 +31,21 @@ const UIStringsTemp = {
   /**
    *@description Placeholder text for the chat UI input.
    */
-  inputPlaceholder: 'Ask a question about the selected element',
+  inputPlaceholderForFreestylerAgent: 'Ask a question about the selected element',
+  /**
+   *@description Placeholder text for the chat UI input.
+   */
+  inputPlaceholderForDrJonesNetworkAgent: 'Ask a question about the selected network request',
   /**
    *@description Disclaimer text right after the chat input.
    */
-  inputDisclaimer:
+  inputDisclaimerForFreestylerAgent:
       'Chat messages and any data the inspected page can access via Web APIs are sent to Google and may be seen by human reviewers to improve this feature. This is an experimental AI feature and won\'t always get it right.',
+  /**
+   *@description Disclaimer text right after the chat input.
+   */
+  inputDisclaimerForDrJonesNetworkAgent:
+      'Chat messages and the selected network request are sent to Google and may be seen by human reviewers to improve this feature. This is an experimental AI feature and won\'t always get it right.',
   /**
    *@description Title for the send icon button.
    */
@@ -78,7 +88,15 @@ const UIStringsTemp = {
    * @description The error message when the LLM loop is stopped for some reason (Max steps reached or request to LLM failed)
    */
   systemError:
-      'I apologize, but it seems that an unexpected error has occurred. Please try asking a different question or rephrasing your previous one',
+      'Something unforeseen happened and I can no longer continue. Try your request again and see if that resolves the issue.',
+  /**
+   * @description The error message when the LLM loop is stopped for some reason (Max steps reached or request to LLM failed)
+   */
+  maxStepsError: 'Seems like I am stuck with the investigation. It would be better if you start over.',
+  /**
+   *@description Displayed when the user stop the response
+   */
+  stoppedResponse: 'You stopped this response',
   /**
    * @description Message shown when the user is offline.
    */
@@ -153,6 +171,10 @@ const UIStringsTemp = {
    */
   codeExecuted: 'Code executed',
   /**
+   *@description Heading text for the code block that shows the code to be executed after side effect confirmation.
+   */
+  codeToExecute: 'Code to execute',
+  /**
    *@description Heading text for the code block that shows the returned data.
    */
   dataReturned: 'Data returned',
@@ -162,10 +184,16 @@ const UIStringsTemp = {
 /* eslint-disable  rulesdir/l10n_i18nString_call_only_with_uistrings */
 const i18nString = i18n.i18n.lockedString;
 
-function getInputPlaceholderString(aidaAvailability: Host.AidaClient.AidaAccessPreconditions): string {
+function getInputPlaceholderString(
+    aidaAvailability: Host.AidaClient.AidaAccessPreconditions, agentType: AgentType): string {
   switch (aidaAvailability) {
     case Host.AidaClient.AidaAccessPreconditions.AVAILABLE:
-      return i18nString(UIStringsTemp.inputPlaceholder);
+      switch (agentType) {
+        case AgentType.FREESTYLER:
+          return i18nString(UIStringsTemp.inputPlaceholderForFreestylerAgent);
+        case AgentType.DRJONES_NETWORK_REQUEST:
+          return i18nString(UIStringsTemp.inputPlaceholderForDrJonesNetworkAgent);
+      }
     case Host.AidaClient.AidaAccessPreconditions.NO_ACCOUNT_EMAIL:
       return i18nString(UIStringsTemp.notLoggedIn);
     case Host.AidaClient.AidaAccessPreconditions.NO_ACTIVE_SYNC:
@@ -203,7 +231,8 @@ export interface ModelChatMessage {
   suggestingFix: boolean;
   steps: Step[];
   answer?: string;
-  error?: string;
+  error?: ErrorType;
+  aborted: boolean;
   rpcId?: number;
 }
 
@@ -212,6 +241,11 @@ export type ChatMessage = UserChatMessage|ModelChatMessage;
 export const enum State {
   CONSENT_VIEW = 'consent-view',
   CHAT_VIEW = 'chat-view',
+}
+
+export const enum AgentType {
+  FREESTYLER = 'freestyler',
+  DRJONES_NETWORK_REQUEST = 'drjones-network-request',
 }
 
 export interface Props {
@@ -226,9 +260,11 @@ export interface Props {
   aidaAvailability: Host.AidaClient.AidaAccessPreconditions;
   messages: ChatMessage[];
   selectedElement: SDK.DOMModel.DOMNode|null;
+  selectedNetworkRequest: SDK.NetworkRequest.NetworkRequest|null;
   isLoading: boolean;
   canShowFeedbackForm: boolean;
-  userInfo: Pick<Host.InspectorFrontendHostAPI.SyncInformation, 'accountImage'>;
+  userInfo: Pick<Host.InspectorFrontendHostAPI.SyncInformation, 'accountImage'|'accountFullName'>;
+  agentType: AgentType;
 }
 
 // The model returns multiline code blocks in an erroneous way with the language being in new line.
@@ -401,30 +437,38 @@ export class FreestylerChatUi extends HTMLElement {
     const sideEffects =
         options.isLast && step.sideEffect ? this.#renderSideEffectConfirmationUi(step) : LitHtml.nothing;
     const thought = step.thought ? LitHtml.html`<p>${this.#renderTextAsMarkdown(step.thought)}</p>` : LitHtml.nothing;
+    // If there is no "output" yet, it means we didn't execute the code yet (e.g. maybe it is still waiting for confirmation from the user)
+    // thus we show "Code to execute" text rather than "Code executed" text on the heading of the code block.
+    const codeHeadingText = (step.output && !step.canceled) ? i18nString(UIStringsTemp.codeExecuted) :
+                                                              i18nString(UIStringsTemp.codeToExecute);
     // If there is output, we don't show notice on this code block and instead show
     // it in the data returned code block.
+    // clang-format off
     const code = step.code ? LitHtml.html`<div class="action-result">
         <${MarkdownView.CodeBlock.CodeBlock.litTagName}
           .code=${step.code.trim()}
           .codeLang=${'js'}
           .displayToolbar=${false}
           .displayNotice=${!Boolean(step.output)}
-          .headingText=${i18nString(UIStringsTemp.codeExecuted)}
+          .heading=${{
+            text: codeHeadingText,
+            showCopyButton: true,
+          }}
         ></${MarkdownView.CodeBlock.CodeBlock.litTagName}>
-    </div>` :
-                             LitHtml.nothing;
+    </div>` : LitHtml.nothing;
     const output = step.output ? LitHtml.html`<div class="js-code-output">
       <${MarkdownView.CodeBlock.CodeBlock.litTagName}
         .code=${step.output}
         .codeLang=${'js'}
         .displayToolbar=${false}
         .displayNotice=${true}
-        .headingText=${i18nString(UIStringsTemp.dataReturned)}
+        .heading=${{
+          text: i18nString(UIStringsTemp.dataReturned),
+          showCopyButton: false,
+        }}
       ></${MarkdownView.CodeBlock.CodeBlock.litTagName}>
-    </div>` :
-                                 LitHtml.nothing;
+    </div>` : LitHtml.nothing;
 
-    // clang-format off
     return LitHtml.html`<div class="step-details">
       ${thought}
       ${code}
@@ -435,33 +479,33 @@ export class FreestylerChatUi extends HTMLElement {
   }
 
   #renderStepBadge(step: Step, options: {isLast: boolean}): LitHtml.LitTemplate {
-    const isLoading = this.#props.isLoading && options.isLast && !step.sideEffect;
+    if (this.#props.isLoading && options.isLast && !step.sideEffect) {
+      return LitHtml.html`<${Spinners.Spinner.Spinner.litTagName}></${Spinners.Spinner.Spinner.litTagName}>`;
+    }
+
     let iconName: string = 'checkmark';
     if (options.isLast && step.sideEffect) {
       iconName = 'pause-circle';
     } else if (step.canceled) {
-      iconName = 'cross-circle';
-    } else if (isLoading) {
-      return LitHtml.html`<${Spinners.Spinner.Spinner.litTagName}></${Spinners.Spinner.Spinner.litTagName}>`;
+      iconName = 'cross';
     }
 
-    const iconClasses = LitHtml.Directives.classMap({
-      indicator: true,
-      loading: isLoading,
-      paused: Boolean(step.sideEffect),
-      canceled: Boolean(step.canceled),
-    });
-
     return LitHtml.html`<${IconButton.Icon.Icon.litTagName}
-        class=${iconClasses}
+        class="indicator"
         .name=${iconName}
       ></${IconButton.Icon.Icon.litTagName}>`;
   }
 
   #renderStep(step: Step, options: {isLast: boolean}): LitHtml.LitTemplate {
+    const stepClasses = LitHtml.Directives.classMap({
+      step: true,
+      empty: !step.thought && !step.code,
+      paused: Boolean(step.sideEffect),
+      canceled: Boolean(step.canceled),
+    });
     // clang-format off
     return LitHtml.html`
-      <details class="step" .open=${Boolean(step.sideEffect)}>
+      <details class=${stepClasses} .open=${Boolean(step.sideEffect)}>
         <summary>
           <div class="summary">
             ${this.#renderStepBadge(step, options)}
@@ -520,11 +564,32 @@ export class FreestylerChatUi extends HTMLElement {
     // clang-format on
   }
 
+  #renderError(message: ModelChatMessage): LitHtml.LitTemplate {
+    if (message.aborted) {
+      return LitHtml.html`<p class="aborted">${i18nString(UIStringsTemp.stoppedResponse)}</p>`;
+    }
+
+    if (message.error) {
+      let errorMessage;
+      switch (message.error) {
+        case ErrorType.UNKNOWN:
+          errorMessage = UIStringsTemp.systemError;
+          break;
+        case ErrorType.MAX_STEPS:
+          errorMessage = UIStringsTemp.maxStepsError;
+          break;
+      }
+
+      return LitHtml.html`<p class="error">${i18nString(errorMessage)}</p>`;
+    }
+
+    return LitHtml.nothing;
+  }
+
   #renderChatMessage = (message: ChatMessage, {isLast}: {isLast: boolean}): LitHtml.TemplateResult => {
     // TODO(b/365068104): Render user's message as markdown too.
     if (message.entity === ChatMessageEntity.USER) {
-      // TODO(b/359768313): Surface user's name in DevTools
-      const name = i18nString(UIStringsTemp.you);
+      const name = this.#props.userInfo.accountFullName || i18nString(UIStringsTemp.you);
       const image = this.#props.userInfo.accountImage ?
           LitHtml.html`<img src="data:image/png;base64, ${this.#props.userInfo.accountImage}" alt="Account avatar" />` :
           LitHtml.html`<${IconButton.Icon.Icon.litTagName}
@@ -567,13 +632,11 @@ export class FreestylerChatUi extends HTMLElement {
           },
         )}
         ${
-          message.answer !== undefined
-            ? LitHtml.html`<p class="answer-step">${this.#renderTextAsMarkdown(message.answer)}</p>`
+          message.answer
+            ? LitHtml.html`<p>${this.#renderTextAsMarkdown(message.answer)}</p>`
             : LitHtml.nothing
         }
-        ${
-          (!message.answer && message.error) ? this.#renderTextAsMarkdown(i18nString(UIStringsTemp.systemError)) : LitHtml.nothing
-        }
+        ${this.#renderError(message)}
         <div class="actions">
           ${
             message.rpcId !== undefined
@@ -596,6 +659,29 @@ export class FreestylerChatUi extends HTMLElement {
         </div>
       </div>
     `;
+    // clang-format on
+  };
+
+  #renderSelection(): LitHtml.TemplateResult {
+    switch (this.#props.agentType) {
+      case AgentType.FREESTYLER:
+        return this.#renderSelectAnElement();
+      case AgentType.DRJONES_NETWORK_REQUEST:
+        return this.#renderSelectedNetworkRequest();
+    }
+  }
+
+  #renderSelectedNetworkRequest = (): LitHtml.TemplateResult => {
+    const resourceClass = LitHtml.Directives.classMap({
+      'not-selected': !this.#props.selectedNetworkRequest,
+      'resource-link': true,
+    });
+    // clang-format off
+    return LitHtml.html`<div class="select-element">
+      <div class=${resourceClass}>
+        <${IconButton.Icon.Icon.litTagName} name="file-script"></${IconButton.Icon.Icon.litTagName}>
+        ${this.#props.selectedNetworkRequest?.name()}
+      </div></div>`;
     // clang-format on
   };
 
@@ -697,6 +783,7 @@ export class FreestylerChatUi extends HTMLElement {
                 size: Buttons.Button.Size.REGULAR,
                 title: suggestion,
                 jslogContext: 'suggestion',
+                disabled: this.#props.aidaAvailability !== Host.AidaClient.AidaAccessPreconditions.AVAILABLE,
               } as Buttons.Button.ButtonData
             }
           >${suggestion}</${Buttons.Button.Button.litTagName}>`;
@@ -714,7 +801,12 @@ export class FreestylerChatUi extends HTMLElement {
         return Boolean(step.sideEffect);
       });
     });
-    const isInputDisabled = !Boolean(this.#props.selectedElement) || !isAidaAvailable || showsSideEffects;
+    const isInputDisabledCheckForFreestylerAgent = !Boolean(this.#props.selectedElement) || showsSideEffects;
+    const isInputDisabledCheckForDrJonesNetworkAgent = !Boolean(this.#props.selectedNetworkRequest);
+    const isInputDisabled =
+        (this.#props.agentType === AgentType.FREESTYLER && isInputDisabledCheckForFreestylerAgent) ||
+        (this.#props.agentType === AgentType.DRJONES_NETWORK_REQUEST && isInputDisabledCheckForDrJonesNetworkAgent) ||
+        !isAidaAvailable;
 
     // clang-format off
     return LitHtml.html`
@@ -723,7 +815,7 @@ export class FreestylerChatUi extends HTMLElement {
           .disabled=${isInputDisabled}
           wrap="hard"
           @keydown=${this.#handleTextAreaKeyDown}
-          placeholder=${getInputPlaceholderString(this.#props.aidaAvailability)}
+          placeholder=${getInputPlaceholderString(this.#props.aidaAvailability, this.#props.agentType)}
           jslog=${VisualLogging.textField('query').track({ keydown: 'Enter' })}></textarea>
           ${this.#props.isLoading
             ? LitHtml.html`<${Buttons.Button.Button.litTagName}
@@ -760,6 +852,15 @@ export class FreestylerChatUi extends HTMLElement {
     // clang-format on
   };
 
+  #getDisclaimerText = (): string => {
+    switch (this.#props.agentType) {
+      case AgentType.FREESTYLER:
+        return UIStringsTemp.inputDisclaimerForFreestylerAgent;
+      case AgentType.DRJONES_NETWORK_REQUEST:
+        return UIStringsTemp.inputDisclaimerForDrJonesNetworkAgent;
+    }
+  };
+
   #renderChatUi = (): LitHtml.TemplateResult => {
     // clang-format off
     return LitHtml.html`
@@ -772,7 +873,7 @@ export class FreestylerChatUi extends HTMLElement {
         <form class="input-form" @submit=${this.#handleSubmit}>
           <div class="input-header">
             <div class="header-link-container">
-              ${this.#renderSelectAnElement()}
+              ${this.#renderSelection()}
             </div>
             <div class="header-link-container">
               ${this.#renderFeedbackLink()}
@@ -782,7 +883,7 @@ export class FreestylerChatUi extends HTMLElement {
         </form>
         <div class="disclaimer">
           <div class="disclaimer-text">${i18nString(
-            UIStringsTemp.inputDisclaimer,
+            this.#getDisclaimerText(),
           )} See <x-link
               class="link"
               href=${DOGFOOD_INFO}

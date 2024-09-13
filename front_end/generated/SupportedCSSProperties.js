@@ -559,6 +559,7 @@ export const generatedProperties = [
    "mask-repeat",
    "mask-size",
    "mask-type",
+   "masonry-slack",
    "masonry-template-tracks",
    "masonry-track-end",
    "masonry-track-start",
@@ -2787,6 +2788,12 @@ export const generatedProperties = [
   "name": "mask-type"
  },
  {
+  "keywords": [
+   "normal"
+  ],
+  "name": "masonry-slack"
+ },
+ {
   "name": "masonry-template-tracks"
  },
  {
@@ -4232,7 +4239,8 @@ export const generatedProperties = [
   "keywords": [
    "visible",
    "hidden",
-   "collapse"
+   "collapse",
+   "inert"
   ],
   "name": "visibility"
  },
@@ -5572,6 +5580,11 @@ export const generatedPropertyValues = {
    "alpha"
   ]
  },
+ "masonry-slack": {
+  "values": [
+   "normal"
+  ]
+ },
  "masonry-track-end": {
   "values": [
    "auto"
@@ -6373,7 +6386,8 @@ export const generatedPropertyValues = {
   "values": [
    "visible",
    "hidden",
-   "collapse"
+   "collapse",
+   "inert"
   ]
  },
  "white-space-collapse": {
