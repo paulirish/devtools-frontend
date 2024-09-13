@@ -358,7 +358,6 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.revealDescendantsArrowHighlightElement =
         this.viewportElement.createChild('div', 'reveal-descendants-arrow-highlight-element');
 
-    this.selectedElement = this.viewportElement.createChild('div', 'flame-chart-selected-element');
     if (this.#selectedElementOutlineEnabled) {
       this.selectedElement = this.viewportElement.createChild('div', 'flame-chart-selected-element');
     }
