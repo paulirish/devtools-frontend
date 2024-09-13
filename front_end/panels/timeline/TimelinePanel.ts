@@ -1844,6 +1844,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   }
 
   async loadingStarted(): Promise<void> {
+    this.#traceEngineModel.resetProcessor();
     this.#changeView({mode: 'STATUS_PANE_OVERLAY'});
 
     if (this.statusPane) {
@@ -1866,6 +1867,10 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     }
     this.traceLoadStart = TraceEngine.Types.Timing.MilliSeconds(performance.now());
     await this.loadingProgress(0);
+  }
+
+  eventsCollected(events: TraceEngine.Types.TraceEvents.TraceEventData[]): void {
+    this.#parseCollectedEventsChunk(events);
   }
 
   async loadingProgress(progress?: number): Promise<void> {
@@ -1912,8 +1917,6 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       collectedEvents: TraceEngine.Types.TraceEvents.TraceEventData[],
       exclusiveFilter: TimelineModel.TimelineModelFilter.TimelineModelFilter|null = null, isCpuProfile: boolean,
       recordingStartTime: number|null, metadata: TraceEngine.Types.File.MetaData|null): Promise<void> {
-    this.#traceEngineModel.resetProcessor();
-
     delete this.loader;
 
     // If the user just recorded this trace via the record UI, the state will
@@ -2005,6 +2008,10 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         Host.userMetrics.performanceTraceLoad(measure);
       }, 0);
     });
+  }
+
+  #parseCollectedEventsChunk(collectedEvents: TraceEngine.Types.TraceEvents.TraceEventData[]): void {
+    this.#traceEngineModel.parseChunk(collectedEvents);
   }
 
   async #executeNewTraceEngine(

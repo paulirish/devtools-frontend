@@ -18,10 +18,6 @@ const workerIdByThread: Map<Types.TraceEvents.ThreadID, Types.TraceEvents.Worker
 const workerURLById: Map<Types.TraceEvents.WorkerId, string> = new Map();
 
 export function initialize(): void {
-  if (handlerState !== HandlerState.UNINITIALIZED) {
-    throw new Error('Workers Handler was not reset');
-  }
-
   handlerState = HandlerState.INITIALIZED;
 }
 

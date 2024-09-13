@@ -151,13 +151,28 @@ export class TraceProcessor extends EventTarget {
     this.#status = Status.IDLE;
   }
 
-  async parse(traceEvents: readonly Types.TraceEvents.TraceEventData[], freshRecording = false): Promise<void> {
+  parseChunk(traceEvents: readonly Types.TraceEvents.TraceEventData[]): void {
+    console.log('chunk', traceEvents.length);
+    const sortedHandlers = [...sortHandlers(this.#traceHandlers).values()];
+    // Initialize.
+    for (const handler of sortedHandlers)
+      handler.initialize?.();
+
+    for (let i = 0; i < traceEvents.length; ++i) {
+      const event = traceEvents[i];
+      for (let j = 0; j < sortedHandlers.length; ++j) {
+        sortedHandlers[j].handleEvent(event);
+      }
+    }
+  }
+
+  async parse(traceEvents: readonly Types.TraceEvents.TraceEventData[]): Promise<void> {
     if (this.#status !== Status.IDLE) {
       throw new Error(`Trace processor can't start parsing when not idle. Current state: ${this.#status}`);
     }
     try {
       this.#status = Status.PARSING;
-      await this.#computeTraceParsedData(traceEvents, freshRecording);
+      await this.#computeTraceParsedData(traceEvents);
       if (this.#data) {
         this.#computeInsights(this.#data, traceEvents);
       }
@@ -171,8 +186,7 @@ export class TraceProcessor extends EventTarget {
   /**
    * Run all the handlers and set the result to `#data`.
    */
-  async #computeTraceParsedData(traceEvents: readonly Types.TraceEvents.TraceEventData[], freshRecording: boolean):
-      Promise<void> {
+  async #computeTraceParsedData(traceEvents: readonly Types.TraceEvents.TraceEventData[]): Promise<void> {
     /**
      * We want to yield regularly to maintain responsiveness. If we yield too often, we're wasting idle time.
      * We could do this by checking `performance.now()` regularly, but it's an expensive call in such a hot loop.
@@ -185,14 +199,16 @@ export class TraceProcessor extends EventTarget {
     // Convert to array so that we are able to iterate all handlers multiple times.
     const sortedHandlers = [...sortHandlers(this.#traceHandlers).values()];
 
-    // Reset.
-    for (const handler of sortedHandlers) {
-      handler.reset();
-    }
+    // // Reset.
+    // i bet this is currently redundant with the larger reset method
+    // for (const handler of sortedHandlers) {
+    //   handler.reset();
+    // }
 
+    // TODO: remove initialization cuz it does nothing.
     // Initialize.
     for (const handler of sortedHandlers) {
-      handler.initialize?.(freshRecording);
+      handler.initialize?.();
     }
 
     // Handle each event.

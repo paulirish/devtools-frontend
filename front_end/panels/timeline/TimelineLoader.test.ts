@@ -34,6 +34,7 @@ describeWithEnvironment('TimelineLoader', () => {
   const loadingStartedSpy = sinon.spy();
   const loadingProgressSpy = sinon.spy();
   const processingStartedSpy = sinon.spy();
+  const eventsCollectedSpy = sinon.spy();
   const loadingCompleteSpy = sinon.spy();
   const recordingProgressSpy = sinon.spy();
   const loadingCompleteForTestSpy = sinon.spy();
@@ -47,6 +48,9 @@ describeWithEnvironment('TimelineLoader', () => {
     },
     async processingStarted() {
       processingStartedSpy();
+    },
+    async eventsCollected() {
+      eventsCollectedSpy();
     },
     async loadingComplete(
         collectedEvents: TraceEngine.Types.TraceEvents.TraceEventData[],

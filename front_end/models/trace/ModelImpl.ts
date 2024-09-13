@@ -91,7 +91,6 @@ export class Model extends EventTarget {
    **/
   async parse(traceEvents: readonly Types.TraceEvents.TraceEventData[], config?: ParseConfig): Promise<void> {
     const metadata = config?.metadata || {};
-    const isFreshRecording = config?.isFreshRecording || false;
     // During parsing, periodically update any listeners on each processors'
     // progress (if they have any updates).
     const onTraceUpdate = (event: Event): void => {
@@ -113,7 +112,7 @@ export class Model extends EventTarget {
       // Wait for all outstanding promises before finishing the async execution,
       // but perform all tasks in parallel.
       const syntheticEventsManager = Helpers.SyntheticEvents.SyntheticEventsManager.createAndActivate(traceEvents);
-      await this.#processor.parse(traceEvents, isFreshRecording);
+      await this.#processor.parse(traceEvents);
       this.#storeParsedFileData(file, this.#processor.traceParsedData, this.#processor.insights);
       // We only push the file onto this.#traces here once we know it's valid
       // and there's been no errors in the parsing.
@@ -127,6 +126,10 @@ export class Model extends EventTarget {
       // Finally, update any listeners that all processors are 'done'.
       this.dispatchEvent(new ModelUpdateEvent({type: ModelUpdateType.COMPLETE, data: 'done'}));
     }
+  }
+
+  parseChunk(traceEvents: readonly Types.TraceEvents.TraceEventData[]): void {
+    void this.#processor.parseChunk(traceEvents);
   }
 
   #storeParsedFileData(

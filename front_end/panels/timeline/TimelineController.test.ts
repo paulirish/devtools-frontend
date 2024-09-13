@@ -19,6 +19,7 @@ describeWithRealConnection('TimelineController', () => {
       recordingProgress: sinon.stub(),
       loadingStarted: sinon.stub(),
       processingStarted: sinon.stub(),
+      eventsCollected: sinon.stub(),
       loadingProgress: sinon.stub(),
       loadingComplete: sinon.stub().callsFake(function(
           _collectedEvents: TraceEngine.Types.TraceEvents.TraceEventData[],
@@ -33,6 +34,9 @@ describeWithRealConnection('TimelineController', () => {
       },
       processingStarted() {
         stubs.processingStarted();
+      },
+      eventsCollected() {
+        stubs.eventsCollected();
       },
       loadingProgress() {
         stubs.loadingProgress();

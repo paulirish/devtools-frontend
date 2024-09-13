@@ -70,10 +70,6 @@ function getScriptIsolateId(isolate: string, scriptId: number): string {
 }
 
 export function initialize(): void {
-  if (handlerState !== HandlerState.UNINITIALIZED) {
-    throw new Error('Enhanced Traces Handler was not reset');
-  }
-
   handlerState = HandlerState.INITIALIZED;
 }
 

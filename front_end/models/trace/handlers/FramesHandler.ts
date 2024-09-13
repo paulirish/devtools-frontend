@@ -33,10 +33,6 @@ export function reset(): void {
   allEvents.length = 0;
 }
 export function initialize(): void {
-  if (handlerState !== HandlerState.UNINITIALIZED) {
-    throw new Error('FramesHandler was not reset before being initialized');
-  }
-
   handlerState = HandlerState.INITIALIZED;
 }
 

@@ -109,9 +109,6 @@ const scoreRecords: ScoreRecord[] = [];
 let handlerState = HandlerState.UNINITIALIZED;
 
 export function initialize(): void {
-  if (handlerState !== HandlerState.UNINITIALIZED) {
-    throw new Error('LayoutShifts Handler was not reset');
-  }
   handlerState = HandlerState.INITIALIZED;
 }
 
