@@ -33,10 +33,6 @@ export function handleUserConfig(userConfig: Types.Configuration.Configuration):
 }
 
 export function initialize(): void {
-  if (handlerState !== HandlerState.UNINITIALIZED) {
-    throw new Error('InvalidationsHandler was not reset before being initialized');
-  }
-
   handlerState = HandlerState.INITIALIZED;
 }
 

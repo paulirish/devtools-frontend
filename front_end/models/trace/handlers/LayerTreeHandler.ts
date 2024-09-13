@@ -36,10 +36,6 @@ export function reset(): void {
 }
 
 export function initialize(): void {
-  if (handlerState !== HandlerState.UNINITIALIZED) {
-    throw new Error('LayerTree Handler was not reset before being initialized');
-  }
-
   handlerState = HandlerState.INITIALIZED;
 }
 

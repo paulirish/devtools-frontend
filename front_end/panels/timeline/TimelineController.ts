@@ -191,6 +191,8 @@ export class TimelineController implements Trace.TracingManager.TracingManagerCl
 
   traceEventsCollected(events: Trace.Types.Events.Event[]): void {
     this.#collectedEvents.push(...events);
+    // Stream these to the client for realtime processing
+    this.client.eventsCollected(events);
   }
 
   tracingComplete(): void {
@@ -208,7 +210,7 @@ export class TimelineController implements Trace.TracingManager.TracingManagerCl
 
     this.client.processingStarted();
     await this.client.loadingComplete(
-        this.#collectedEvents, /* exclusiveFilter= */ null, /* isCpuProfile= */ false, this.#recordingStartTime,
+        [this.#collectedEvents.at(0)], /* exclusiveFilter= */ null, /* isCpuProfile= */ false, this.#recordingStartTime,
         /* metadata= */ null);
     this.client.loadingCompleteForTest();
   }
@@ -225,6 +227,7 @@ export class TimelineController implements Trace.TracingManager.TracingManagerCl
 export interface Client {
   recordingProgress(usage: number): void;
   loadingStarted(): void;
+  eventsCollected(events: TraceEngine.Types.TraceEvents.TraceEventData[]): void;
   processingStarted(): void;
   loadingProgress(progress?: number): void;
   loadingComplete(

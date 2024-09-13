@@ -114,10 +114,6 @@ export function reset(): void {
 }
 
 export function initialize(): void {
-  if (handlerState !== HandlerState.UNINITIALIZED) {
-    throw new Error('Samples Handler was not reset');
-  }
-
   handlerState = HandlerState.INITIALIZED;
 }
 

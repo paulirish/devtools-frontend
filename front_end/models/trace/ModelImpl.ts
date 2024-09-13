@@ -132,6 +132,10 @@ export class Model extends EventTarget {
     }
   }
 
+  parseChunk(traceEvents: readonly Types.TraceEvents.TraceEventData[]): void {
+    void this.#processor.parseChunk(traceEvents);
+  }
+
   #storeParsedFileData(
       file: ParsedTraceFile, data: Handlers.Types.ParsedTrace|null,
       insights: Insights.Types.TraceInsightSets|null): void {
