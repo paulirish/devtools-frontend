@@ -12,6 +12,7 @@ import * as Types from './types/types.js';
 const enum Status {
   IDLE = 'IDLE',
   PARSING = 'PARSING',
+  PARSING_CHUNKS = 'PARSING_CHUNKS',
   FINISHED_PARSING = 'FINISHED_PARSING',
   ERRORED_WHILE_PARSING = 'ERRORED_WHILE_PARSING',
 }
@@ -66,6 +67,7 @@ export class TraceProcessor extends EventTarget {
   // We force the Meta handler to be enabled, so the TraceHandlers type here is
   // the model handlers the user passes in and the Meta handler.
   readonly #traceHandlers: Partial<Handlers.Types.Handlers>;
+  readonly #sortedHandlers: Handlers.Types.Handler[];
   #status = Status.IDLE;
   #modelConfiguration = Types.Configuration.defaults();
   #data: Handlers.Types.ParsedTrace|null = null;
@@ -99,6 +101,7 @@ export class TraceProcessor extends EventTarget {
       this.#modelConfiguration = modelConfiguration;
     }
     this.#passConfigToHandlers();
+    this.#sortedHandlers = [...sortHandlers(this.#traceHandlers).values()];
   }
 
   #passConfigToHandlers(): void {
@@ -164,8 +167,41 @@ export class TraceProcessor extends EventTarget {
     this.#status = Status.IDLE;
   }
 
+  parseChunk(traceEvents: readonly Types.Events.Event[]): void {
+    if (this.#status !== Status.IDLE && this.#status !== Status.PARSING_CHUNKS) {
+      throw new Error(`Trace processor can't parse chunks. Current state: ${this.#status}`);
+    }
+    if (this.#status === Status.IDLE) {
+      // This is the first chunk. Reset + Initialize.
+      for (const handler of this.#sortedHandlers) {
+        handler.reset();
+      }
+      for (const handler of this.#sortedHandlers) {
+        handler.initialize?.();
+      }
+      this.#status = Status.PARSING_CHUNKS;
+    }
+    // console.log('chunk', traceEvents.length)
+    try {
+      for (let i = 0; i < traceEvents.length; ++i) {
+        const event = traceEvents[i];
+        for (let j = 0; j < this.#sortedHandlers.length; ++j) {
+          this.#sortedHandlers[j].handleEvent(event);
+        }
+      }
+    } catch (e) {
+      this.#status = Status.ERRORED_WHILE_PARSING;
+      throw e;
+    }
+  }
+
+  async finishParsingChunks(): Promise<void> {
+    await this.#finalizeParse();
+  }
+
   async parse(traceEvents: readonly Types.Events.Event[], options: ParseOptions): Promise<void> {
-    if (this.#status !== Status.IDLE) {
+    // TODO: use finalize instead of this second check
+    if (this.#status !== Status.IDLE && this.#status !== Status.PARSING_CHUNKS) {
       throw new Error(`Trace processor can't start parsing when not idle. Current state: ${this.#status}`);
     }
     try {
@@ -195,17 +231,17 @@ export class TraceProcessor extends EventTarget {
      */
     const eventsPerChunk = 50_000;
     // Convert to array so that we are able to iterate all handlers multiple times.
-    const sortedHandlers = [...sortHandlers(this.#traceHandlers).values()];
 
-    // Reset.
-    for (const handler of sortedHandlers) {
-      handler.reset();
-    }
+    // // Reset. -- i bet this is currently redundant with the larger reset method
+    // for (const handler of this.#sortedHandlers) {
+    //   handler.reset();
+    // }
 
-    // Initialize.
-    for (const handler of sortedHandlers) {
-      handler.initialize?.(freshRecording);
-    }
+    // // TODO: remove initialization cuz it does nothing.
+    // // Initialize.
+    // for (const handler of this.#sortedHandlers) {
+    //   handler.initialize?.();
+    // }
 
     // Handle each event.
     for (let i = 0; i < traceEvents.length; ++i) {
@@ -218,23 +254,25 @@ export class TraceProcessor extends EventTarget {
         await new Promise(resolve => setTimeout(resolve, 0));
       }
       const event = traceEvents[i];
-      for (let j = 0; j < sortedHandlers.length; ++j) {
-        sortedHandlers[j].handleEvent(event);
+      for (let j = 0; j < this.#sortedHandlers.length; ++j) {
+        this.#sortedHandlers[j].handleEvent(event);
       }
     }
 
-    // Finalize.
-    for (const [i, handler] of sortedHandlers.entries()) {
+    await this.#finalizeParse();
+  }
+
+  async #finalizeParse(): Promise<void> {
+    for (const [i, handler] of this.#sortedHandlers.entries()) {
       if (handler.finalize) {
         // Yield to the UI because finalize() calls can be expensive
         // TODO(jacktfranklin): consider using `scheduler.yield()` or `scheduler.postTask(() => {}, {priority: 'user-blocking'})`
         await new Promise(resolve => setTimeout(resolve, 0));
         await handler.finalize();
       }
-      const percent = calculateProgress(i / sortedHandlers.length, ProgressPhase.FINALIZE);
+      const percent = calculateProgress(i / this.#sortedHandlers.length, ProgressPhase.FINALIZE);
       this.dispatchEvent(new TraceParseProgressEvent({percent}));
     }
-
     // Handlers that depend on other handlers do so via .data(), which used to always
     // return a shallow clone of its internal data structures. However, that pattern
     // easily results in egregious amounts of allocation. Now .data() does not do any
