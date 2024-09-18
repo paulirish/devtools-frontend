@@ -129,7 +129,7 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
       return 'Layout shift';
     }
     if (TraceEngine.Types.TraceEvents.isSyntheticLayoutShiftCluster(event)) {
-      return 'Layout shift cluster';
+      return '';
     }
     return event.name;
   }
@@ -168,17 +168,11 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
     }
     if (TraceEngine.Types.TraceEvents.isSyntheticLayoutShiftCluster(event)) {
       return (context, x, y, width, height) => {
-        context.strokeStyle = ThemeSupport.ThemeSupport.instance().getComputedValue('--app-color-rendering');
-
-        const lineY = Math.floor(y + height / 2) + 0.5;
-        context.setLineDash([3, 2]);
-        context.moveTo(x, lineY - 1);
-        context.lineTo(x + width, lineY - 1);
-        context.moveTo(x, lineY + 1);
-        context.lineTo(x + width, lineY + 1);
-        context.stroke();
-        context.restore();
-
+        const barHeight = height * 0.5;
+        const barY = y + (height - barHeight) / 2 + 0.5;
+        context.fillStyle = this.colorForEvent(event).replace('100%)', '66%)');  // hack to add opacity
+        context.rect(x, barY, width - 0.5, barHeight - 1);
+        context.fill();
         return {x, width, z: -1};
       };
     }
