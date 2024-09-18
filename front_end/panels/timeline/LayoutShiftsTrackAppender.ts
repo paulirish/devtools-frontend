@@ -9,6 +9,7 @@ import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
 import {buildGroupStyle, buildTrackHeader, getFormattedTime} from './AppenderUtils.js';
 import {
   type CompatibilityTracksAppender,
+  type DrawOverride,
   type HighlightedEntryInfo,
   type TrackAppender,
   type TrackAppenderName,
@@ -105,14 +106,13 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
     let shiftLevel = currentLevel;
     if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_LAYOUT_SHIFT_DETAILS)) {
       const allClusters = this.#traceParsedData.LayoutShifts.clusters;
-      this.#compatibilityBuilder.appendEventsAtLevel(allClusters, currentLevel, this, setFlameChartEntryTotalTime);
+      this.#compatibilityBuilder.appendEventsAtLevel(allClusters, currentLevel + 1, this, setFlameChartEntryTotalTime);
 
       // layout shifts should be below clusters.
-      shiftLevel = currentLevel + 1;
+      shiftLevel = currentLevel + 2;
     }
 
-    return this.#compatibilityBuilder.appendEventsAtLevel(
-        allLayoutShifts, shiftLevel, this, setFlameChartEntryTotalTime);
+    return this.#compatibilityBuilder.appendEventsAtLevel(allLayoutShifts, shiftLevel, this);
   }
 
   /*
@@ -149,5 +149,32 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
   highlightedEntryInfo(event: TraceEngine.Types.TraceEvents.TraceEventLayoutShift): HighlightedEntryInfo {
     const title = this.titleForEvent(event);
     return {title, formattedTime: getFormattedTime(event.dur)};
+  }
+
+  getDrawOverride(event: TraceEngine.Types.TraceEvents.TraceEventData): DrawOverride|undefined {
+    if (!TraceEngine.Types.TraceEvents.isTraceEventLayoutShift(event)) {
+      return;
+    }
+
+    const score = event.args.data?.weighted_score_delta || 0;
+    const bufferScale = 1 - Math.min(score / 0.1, 1);
+    const buffer = Math.round(bufferScale * 3);
+
+    return (context, x, y, _width, height) => {
+      const boxSize = height;
+      const halfSize = boxSize / 2;
+      context.beginPath();
+      context.moveTo(x, y + buffer);
+      context.lineTo(x + halfSize - buffer, y + halfSize);
+      context.lineTo(x, y + height - buffer);
+      context.lineTo(x - halfSize + buffer, y + halfSize);
+      context.closePath();
+      context.fillStyle = this.colorForEvent(event);
+      context.fill();
+      return {
+        x: x - halfSize,
+        width: boxSize,
+      };
+    };
   }
 }

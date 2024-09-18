@@ -8,13 +8,6 @@ import type * as PerfUI from '../../../ui/legacy/components/perf_ui/perf_ui.js';
 
 import * as Components from './components/components.js';
 
-// Bit of a hack: LayoutShifts are instant events, so have no duration. But
-// OPP doesn't do well at making tiny events easy to spot and click. So we
-// set it to a small duration so that the user is able to see and click
-// them more easily. Long term we will explore a better UI solution to
-// allow us to do this properly and not hack around it.
-export const LAYOUT_SHIFT_SYNTHETIC_DURATION = TraceEngine.Types.Timing.MicroSeconds(5_000);
-
 /**
  * Below the network track there is a resize bar the user can click and drag.
  */
@@ -1248,7 +1241,7 @@ export class Overlays extends EventTarget {
       return;
     }
 
-    const {endTime, duration} = timingsForOverlayEntry(overlay.entry);
+    const {endTime} = timingsForOverlayEntry(overlay.entry);
     const endX = this.#xPixelForMicroSeconds(chartName, endTime);
     if (endX === null) {
       return;
@@ -1267,21 +1260,15 @@ export class Overlays extends EventTarget {
     // minimum width.
     let widthPixels = endX - x;
 
-    if (!duration) {
-      // No duration = instant event, so we check in case it's a marker.
-      const provider = chartName === 'main' ? this.#charts.mainProvider : this.#charts.networkProvider;
-      const chart = chartName === 'main' ? this.#charts.mainChart : this.#charts.networkChart;
-      // It could be a marker event, in which case we need to know the
-      // exact position the marker was rendered. This is because markers
-      // which have the same timestamp are rendered next to each other, so
-      // the timestamp is not necessarily exactly where the marker was
-      // rendered.
-      const index = provider.indexForEvent?.(overlay.entry);
-      const markerPixels = chart.getMarkerPixelsForEntryIndex(index ?? -1);
-      if (markerPixels) {
-        x = markerPixels.x;
-        widthPixels = markerPixels.width;
-      }
+    const provider = chartName === 'main' ? this.#charts.mainProvider : this.#charts.networkProvider;
+    const chart = chartName === 'main' ? this.#charts.mainChart : this.#charts.networkChart;
+    const index = provider.indexForEvent?.(overlay.entry);
+    const customPos = chart.getCustomDrawnPositionForEntryIndex(index ?? -1);
+    if (customPos) {
+      // Some events like markers and layout shifts define their exact coordinates explicitly.
+      // If this is one of those events we should change the overlay coordinates to match.
+      x = customPos.x;
+      widthPixels = customPos.width;
     }
 
     // The entry selected overlay is always at least 2px wide.
@@ -1794,14 +1781,6 @@ export function timingsForOverlayEntry(entry: OverlayEntry):
       startTime: entry.startTime,
       endTime: entry.endTime,
       duration: entry.duration,
-    };
-  }
-  if (TraceEngine.Types.TraceEvents.isSyntheticLayoutShift(entry)) {
-    const endTime = TraceEngine.Types.Timing.MicroSeconds(entry.ts + LAYOUT_SHIFT_SYNTHETIC_DURATION);
-    return {
-      endTime,
-      duration: LAYOUT_SHIFT_SYNTHETIC_DURATION,
-      startTime: entry.ts,
     };
   }
   return TraceEngine.Helpers.Timing.eventTimingsMicroSeconds(entry);
