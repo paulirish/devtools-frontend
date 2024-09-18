@@ -167,23 +167,21 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
       };
     }
     if (TraceEngine.Types.TraceEvents.isSyntheticLayoutShiftCluster(event)) {
-      return (context, x, y, _width, height) => {
+      return (context, x, y, width, height) => {
         context.strokeStyle = ThemeSupport.ThemeSupport.instance().getComputedValue('--app-color-rendering');
 
         const lineY = Math.floor(y + height / 2) + 0.5;
         context.setLineDash([3, 2]);
         context.moveTo(x, lineY - 1);
-        context.lineTo(x + _width, lineY - 1);
+        context.lineTo(x + width, lineY - 1);
         context.moveTo(x, lineY + 1);
-        context.lineTo(x + _width, lineY + 1);
+        context.lineTo(x + width, lineY + 1);
         context.stroke();
         context.restore();
 
-        return {
-          x,
-          width: _width,
-        };
+        return {x, width, z: -1};
       };
     }
+    return;
   }
 }
