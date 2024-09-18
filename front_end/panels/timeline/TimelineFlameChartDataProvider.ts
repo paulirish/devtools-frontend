@@ -953,6 +953,10 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
             context, entryIndex, text, entry, barX, barY, unclippedBarX, barWidth, barHeight, timeToPixelRatio);
         return true;
       }
+      if (TraceEngine.Types.TraceEvents.isSyntheticLayoutShiftCluster(entry)) {
+        return this.#decorateLayoutShiftCluster(
+            context, entryIndex, text, entry, barX, barY, unclippedBarX, barWidth, barHeight, timeToPixelRatio);
+      }
     }
 
     return false;
@@ -1057,6 +1061,37 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       }
     }
     context.restore();
+  }
+
+  /**
+   * Decorates the synthetic websocket event entry with a whisk from the start to the end.
+   *   ------------------------
+   *   ^start                 ^end
+   * */
+  #decorateLayoutShiftCluster(
+      context: CanvasRenderingContext2D, entryIndex: number, entryTitle: string|null,
+      entry: TraceEngine.Types.TraceEvents.SyntheticLayoutShiftCluster, barX: number, barY: number,
+      unclippedBarXStartPixel: number, barWidth: number, barHeight: number, timeToPixelRatio: number): void {
+    context.save();
+    const event = entry;
+    const beginTime = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(event.ts);
+    const timeToPixel = (time: number): number =>
+        Math.floor(unclippedBarXStartPixel + (time - beginTime) * timeToPixelRatio);
+    const endTime = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(
+        (event.ts + event.dur) as TraceEngine.Types.Timing.MicroSeconds);
+    const start = timeToPixel(beginTime) + 0.5;
+    const end = timeToPixel(endTime) - 0.5;
+    context.strokeStyle = ThemeSupport.ThemeSupport.instance().getComputedValue('--app-color-rendering');
+
+    const lineY = Math.floor(barY + barHeight / 2) + 0.5;
+    context.setLineDash([3, 2]);
+    context.moveTo(start, lineY - 1);
+    context.lineTo(end, lineY - 1);
+    context.moveTo(start, lineY + 1);
+    context.lineTo(end, lineY + 1);
+    context.stroke();
+    context.restore();
+    return;
   }
 
   forceDecoration(entryIndex: number): boolean {

@@ -90,8 +90,6 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
   #appendLayoutShiftsAtLevel(currentLevel: number): number {
     const allLayoutShifts = this.#traceParsedData.LayoutShifts.clusters.flatMap(cluster => cluster.events);
 
-    let shiftLevel = currentLevel;
-
     if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_LAYOUT_SHIFT_DETAILS)) {
       const allClusters = this.#traceParsedData.LayoutShifts.clusters;
       for (const event of allClusters) {
@@ -103,10 +101,10 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
           cluster.dur = LAYOUT_SHIFT_SYNTHETIC_DURATION;
         }
       }
-      shiftLevel = this.#compatibilityBuilder.appendEventsAtLevel(allClusters, shiftLevel, this);
+      this.#compatibilityBuilder.appendEventsAtLevel(allClusters, currentLevel, this);
     }
 
-    return this.#compatibilityBuilder.appendEventsAtLevel(allLayoutShifts, shiftLevel, this);
+    return this.#compatibilityBuilder.appendEventsAtLevel(allLayoutShifts, currentLevel, this);
   }
 
   /*

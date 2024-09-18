@@ -321,6 +321,7 @@ async function buildLayoutShiftsClusters(): Promise<void> {
         tid: event.tid,
         ph: Types.TraceEvents.Phase.COMPLETE,
         cat: '',
+        dur: Types.Timing.MicroSeconds(-1),  // Will be updated below.
       });
 
       firstShiftTime = clusterStartTime;
