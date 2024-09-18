@@ -953,10 +953,10 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
             context, entryIndex, text, entry, barX, barY, unclippedBarX, barWidth, barHeight, timeToPixelRatio);
         return true;
       }
-      if (TraceEngine.Types.TraceEvents.isSyntheticLayoutShiftCluster(entry)) {
-        return this.#decorateLayoutShiftCluster(
-            context, entryIndex, text, entry, barX, barY, unclippedBarX, barWidth, barHeight, timeToPixelRatio);
-      }
+      // if (TraceEngine.Types.TraceEvents.isSyntheticLayoutShiftCluster(entry)) {
+      //   return this.#decorateLayoutShiftCluster(
+      //       context, entryIndex, text, entry, barX, barY, unclippedBarX, barWidth, barHeight, timeToPixelRatio);
+      // }
     }
 
     return false;
@@ -1072,6 +1072,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       context: CanvasRenderingContext2D, entryIndex: number, entryTitle: string|null,
       entry: TraceEngine.Types.TraceEvents.SyntheticLayoutShiftCluster, barX: number, barY: number,
       unclippedBarXStartPixel: number, barWidth: number, barHeight: number, timeToPixelRatio: number): void {
+    return;
     context.save();
     const event = entry;
     const beginTime = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(event.ts);

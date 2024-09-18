@@ -144,29 +144,46 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
   }
 
   getDrawOverride(event: TraceEngine.Types.TraceEvents.TraceEventData): DrawOverride|undefined {
-    if (!TraceEngine.Types.TraceEvents.isTraceEventLayoutShift(event)) {
-      return;
-    }
+    if (TraceEngine.Types.TraceEvents.isTraceEventLayoutShift(event)) {
+      const score = event.args.data?.weighted_score_delta || 0;
+      const bufferScale = 1 - Math.min(score / 0.1, 1);
+      const buffer = Math.round(bufferScale * 3);
 
-    const score = event.args.data?.weighted_score_delta || 0;
-    const bufferScale = 1 - Math.min(score / 0.1, 1);
-    const buffer = Math.round(bufferScale * 3);
-
-    return (context, x, y, _width, height) => {
-      const boxSize = height;
-      const halfSize = boxSize / 2;
-      context.beginPath();
-      context.moveTo(x, y + buffer);
-      context.lineTo(x + halfSize - buffer, y + halfSize);
-      context.lineTo(x, y + height - buffer);
-      context.lineTo(x - halfSize + buffer, y + halfSize);
-      context.closePath();
-      context.fillStyle = this.colorForEvent(event);
-      context.fill();
-      return {
-        x: x - halfSize,
-        width: boxSize,
+      return (context, x, y, _width, height) => {
+        const boxSize = height;
+        const halfSize = boxSize / 2;
+        context.beginPath();
+        context.moveTo(x, y + buffer);
+        context.lineTo(x + halfSize - buffer, y + halfSize);
+        context.lineTo(x, y + height - buffer);
+        context.lineTo(x - halfSize + buffer, y + halfSize);
+        context.closePath();
+        context.fillStyle = this.colorForEvent(event);
+        context.fill();
+        return {
+          x: x - halfSize,
+          width: boxSize,
+        };
       };
-    };
+    }
+    if (TraceEngine.Types.TraceEvents.isSyntheticLayoutShiftCluster(event)) {
+      return (context, x, y, _width, height) => {
+        context.strokeStyle = ThemeSupport.ThemeSupport.instance().getComputedValue('--app-color-rendering');
+
+        const lineY = Math.floor(y + height / 2) + 0.5;
+        context.setLineDash([3, 2]);
+        context.moveTo(x, lineY - 1);
+        context.lineTo(x + _width, lineY - 1);
+        context.moveTo(x, lineY + 1);
+        context.lineTo(x + _width, lineY + 1);
+        context.stroke();
+        context.restore();
+
+        return {
+          x,
+          width: _width,
+        };
+      };
+    }
   }
 }
