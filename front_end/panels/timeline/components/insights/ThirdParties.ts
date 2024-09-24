@@ -75,6 +75,13 @@ export class ThirdParties extends BaseInsight {
         overlays.push(overlay);
       }
 
+      const desatOverlay: Overlays.Overlays.TimelineOverlay = {
+        type: 'DESATURATION',
+        entries: requests,
+      };
+      overlaysForThisEntity.push(desatOverlay);
+
+
       this.#overlaysForEntity.set(entity, overlaysForThisEntity);
     }
 

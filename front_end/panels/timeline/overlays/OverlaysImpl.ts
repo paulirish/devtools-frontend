@@ -5,6 +5,7 @@ import * as Common from '../../../core/common/common.js';
 import * as Platform from '../../../core/platform/platform.js';
 import * as Trace from '../../../models/trace/trace.js';
 import type * as PerfUI from '../../../ui/legacy/components/perf_ui/perf_ui.js';
+import * as UI from '../../legacy.js';
 
 import * as Components from './components/components.js';
 
@@ -71,6 +72,11 @@ export interface EntriesLink {
   type: 'ENTRIES_LINK';
   entryFrom: OverlayEntry;
   entryTo?: OverlayEntry;
+}
+
+export interface Desaturation {
+  type: 'DESATURATION';
+  entries: OverlayEntry[];
 }
 
 /**
@@ -165,6 +171,11 @@ function traceWindowForOverlay(overlay: TimelineOverlay): Trace.Types.Timing.Tra
       overlayMaxBounds.push(timings.endTime);
       break;
     }
+    case 'DESATURATION': {
+      overlayMinBounds.push(overlay.entries.at(0).startTime);
+      overlayMaxBounds.push(overlay.entries.at(-1).endTime);
+      break;
+    }
     case 'TIMESPAN_BREAKDOWN': {
       if (overlay.entry) {
         const timings = timingsForOverlayEntry(overlay.entry);
@@ -232,6 +243,10 @@ export function entriesForOverlay(overlay: TimelineOverlay): readonly OverlayEnt
       entries.push(overlay.entry);
       break;
     }
+    case 'DESATURATION': {
+      entries.push(...overlay.entries);
+      break;
+    }
     case 'TIMESPAN_BREAKDOWN': {
       if (overlay.entry) {
         entries.push(overlay.entry);
@@ -289,7 +304,7 @@ export interface CursorTimestampMarker {
  * All supported overlay types. Expected to grow in time!
  */
 export type TimelineOverlay = EntrySelected|EntryOutline|TimeRangeLabel|EntryLabel|EntriesLink|CreateEntriesLink|
-    TimespanBreakdown|CursorTimestampMarker|CandyStripedTimeRange;
+    TimespanBreakdown|CursorTimestampMarker|CandyStripedTimeRange|Desaturation;
 
 /**
  * Denotes overlays that are singletons; only one of these will be allowed to
@@ -820,6 +835,15 @@ export class Overlays extends EventTarget {
         if (isVisible) {
           this.#positionCreateEntriesLinkOverlay(overlay, element);
         }
+        break;
+      }
+      case 'DESATURATION': {
+        // const isVisible = this.entryIsVisibleOnChart(overlay.entry);
+        // this.#setOverlayElementVisibility(element, isVisible);
+        // if (isVisible) {
+        //   this.#positionCreateEntriesLinkOverlay(overlay, element);
+        // }
+        console.log('desat, position');
         break;
       }
       case 'TIMESPAN_BREAKDOWN': {
@@ -1397,6 +1421,30 @@ export class Overlays extends EventTarget {
         div.appendChild(component);
         return div;
       }
+      case 'DESATURATION': {
+        const dimHighlightSVG = UI.UIUtils.createSVGChild(div, 'svg', 'overlay-dim-highlight-svg');
+        // Set up the desaturation mask
+        const defs = UI.UIUtils.createSVGChild(dimHighlightSVG, 'defs');
+        const mask = UI.UIUtils.createSVGChild(defs, 'mask') as SVGMaskElement;
+        mask.id = 'dim-highlight-cutouts';
+        /* Within the mask...
+            - black fill = punch, fully transparently, through to the next thing. these are the cutouts to the color.
+            - white fill = be 100% DESATURATIONd
+            - grey fill  = show at the Lightness level of grayscale/desaturation
+        */
+        const showAllRect = UI.UIUtils.createSVGChild(mask, 'rect');
+        showAllRect.setAttribute('width', '100%');
+        showAllRect.setAttribute('height', '100%');
+        showAllRect.setAttribute('fill', 'hsl(0deg 0% 95%)');
+
+        const DESATURATIONRect = UI.UIUtils.createSVGChild(dimHighlightSVG, 'rect') as SVGRectElement;
+        DESATURATIONRect.setAttribute('width', '100%');
+        DESATURATIONRect.setAttribute('height', '100%');
+        DESATURATIONRect.setAttribute('fill', '#ffffff');
+        DESATURATIONRect.setAttribute('mask', `url(#${mask.id})`);
+        DESATURATIONRect.style.mixBlendMode = 'saturation';
+        return div;
+      }
       case 'ENTRY_OUTLINE': {
         div.classList.add(`outline-reason-${overlay.outlineReason}`);
         return div;
@@ -1457,6 +1505,10 @@ export class Overlays extends EventTarget {
         if (component) {
           component.canvasRect = this.#charts.mainChart.canvasBoundingClientRect();
         }
+        break;
+      }
+      case 'DESATURATION': {
+        console.log('desat update after positioning');
         break;
       }
       case 'TIMESPAN_BREAKDOWN': {
