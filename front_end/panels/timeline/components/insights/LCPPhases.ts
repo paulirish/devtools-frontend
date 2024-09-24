@@ -3,16 +3,26 @@
 // found in the LICENSE file.
 
 import * as i18n from '../../../../core/i18n/i18n.js';
-import * as TraceEngine from '../../../../models/trace/trace.js';
+import * as Trace from '../../../../models/trace/trace.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 import type * as Overlays from '../../overlays/overlays.js';
 
-import {BaseInsight, shouldRenderForCategory} from './Helpers.js';
+import {BaseInsight, md, shouldRenderForCategory} from './Helpers.js';
 import * as SidebarInsight from './SidebarInsight.js';
 import {Table, type TableData} from './Table.js';
 import {InsightsCategories} from './types.js';
 
 const UIStrings = {
+  /**
+   *@description Title of an insight that provides details about the LCP metric, broken down by phases / parts.
+   */
+  title: 'LCP by phase',
+  /**
+   * @description Description of a DevTools insight that presents a breakdown for the LCP metric by phases.
+   * This is displayed after a user expands the section to see more. No character length limits.
+   */
+  description:
+      'Learn about the [strategies for improving each phase of LCP](https://web.dev/articles/optimize-lcp#lcp-breakdown). Pages with great LCP have minimal durations for "Resource load delay" and "Element render delay".',
   /**
    *@description Time to first byte title for the Largest Contentful Paint's phases timespan breakdown.
    */
@@ -29,13 +39,21 @@ const UIStrings = {
    *@description Element render delay title for the Largest Contentful Paint phases timespan breakdown.
    */
   elementRenderDelay: 'Element render delay',
+  /**
+   *@description Label used for the phase/component/stage/section of a larger duration.
+   */
+  phase: 'Phase',
+  /**
+   *@description Label used for the percentage a single phase/component/stage/section takes up of a larger duration.
+   */
+  percentLCP: '% of LCP',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/insights/LCPPhases.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 interface PhaseData {
   phase: string;
-  timing: number|TraceEngine.Types.Timing.MilliSeconds;
+  timing: number|Trace.Types.Timing.MilliSeconds;
   percent: string;
 }
 
@@ -43,9 +61,9 @@ export class LCPPhases extends BaseInsight {
   static readonly litTagName = LitHtml.literal`devtools-performance-lcp-by-phases`;
   override insightCategory: InsightsCategories = InsightsCategories.LCP;
   override internalName: string = 'lcp-by-phase';
-  override userVisibleTitle: string = 'LCP by phase';
+  override userVisibleTitle: string = i18nString(UIStrings.title);
 
-  #getPhaseData(insights: TraceEngine.Insights.Types.TraceInsightData|null, navigationId: string|null): PhaseData[] {
+  #getPhaseData(insights: Trace.Insights.Types.TraceInsightSets|null, navigationId: string|null): PhaseData[] {
     if (!insights || !navigationId) {
       return [];
     }
@@ -53,7 +71,7 @@ export class LCPPhases extends BaseInsight {
     if (!insightsByNavigation) {
       return [];
     }
-    const lcpInsight = insightsByNavigation.LargestContentfulPaint;
+    const lcpInsight = insightsByNavigation.data.LargestContentfulPaint;
     if (lcpInsight instanceof Error) {
       return [];
     }
@@ -102,17 +120,17 @@ export class LCPPhases extends BaseInsight {
   }
 
   override createOverlays(): Overlays.Overlays.TimelineOverlay[] {
-    if (!this.data.insights || !this.data.navigationId) {
+    if (!this.data.insights || !this.data.insightSetKey) {
       return [];
     }
-    const {navigationId, insights} = this.data;
+    const {insightSetKey: navigationId, insights} = this.data;
 
     const insightsByNavigation = insights.get(navigationId);
     if (!insightsByNavigation) {
       return [];
     }
 
-    const lcpInsight = insightsByNavigation.LargestContentfulPaint;
+    const lcpInsight = insightsByNavigation.data.LargestContentfulPaint;
     if (lcpInsight instanceof Error) {
       return [];
     }
@@ -122,22 +140,21 @@ export class LCPPhases extends BaseInsight {
     if (!phases || !lcpTs) {
       return [];
     }
-    const lcpMicroseconds =
-        TraceEngine.Types.Timing.MicroSeconds(TraceEngine.Helpers.Timing.millisecondsToMicroseconds(lcpTs));
+    const lcpMicroseconds = Trace.Types.Timing.MicroSeconds(Trace.Helpers.Timing.millisecondsToMicroseconds(lcpTs));
 
     const sections = [];
     // For text LCP, we should only have ttfb and renderDelay sections.
     if (!phases?.loadDelay && !phases?.loadTime) {
-      const renderBegin: TraceEngine.Types.Timing.MicroSeconds = TraceEngine.Types.Timing.MicroSeconds(
-          lcpMicroseconds - TraceEngine.Helpers.Timing.millisecondsToMicroseconds(phases.renderDelay));
-      const renderDelay = TraceEngine.Helpers.Timing.traceWindowFromMicroSeconds(
+      const renderBegin: Trace.Types.Timing.MicroSeconds = Trace.Types.Timing.MicroSeconds(
+          lcpMicroseconds - Trace.Helpers.Timing.millisecondsToMicroseconds(phases.renderDelay));
+      const renderDelay = Trace.Helpers.Timing.traceWindowFromMicroSeconds(
           renderBegin,
           lcpMicroseconds,
       );
 
-      const mainReqStart = TraceEngine.Types.Timing.MicroSeconds(
-          renderBegin - TraceEngine.Helpers.Timing.millisecondsToMicroseconds(phases.ttfb));
-      const ttfb = TraceEngine.Helpers.Timing.traceWindowFromMicroSeconds(
+      const mainReqStart =
+          Trace.Types.Timing.MicroSeconds(renderBegin - Trace.Helpers.Timing.millisecondsToMicroseconds(phases.ttfb));
+      const ttfb = Trace.Helpers.Timing.traceWindowFromMicroSeconds(
           mainReqStart,
           renderBegin,
       );
@@ -145,30 +162,30 @@ export class LCPPhases extends BaseInsight {
           {bounds: ttfb, label: i18nString(UIStrings.timeToFirstByte), showDuration: true},
           {bounds: renderDelay, label: i18nString(UIStrings.elementRenderDelay), showDuration: true});
     } else if (phases?.loadDelay && phases?.loadTime) {
-      const renderBegin: TraceEngine.Types.Timing.MicroSeconds = TraceEngine.Types.Timing.MicroSeconds(
-          lcpMicroseconds - TraceEngine.Helpers.Timing.millisecondsToMicroseconds(phases.renderDelay));
-      const renderDelay = TraceEngine.Helpers.Timing.traceWindowFromMicroSeconds(
+      const renderBegin: Trace.Types.Timing.MicroSeconds = Trace.Types.Timing.MicroSeconds(
+          lcpMicroseconds - Trace.Helpers.Timing.millisecondsToMicroseconds(phases.renderDelay));
+      const renderDelay = Trace.Helpers.Timing.traceWindowFromMicroSeconds(
           renderBegin,
           lcpMicroseconds,
       );
 
-      const loadBegin = TraceEngine.Types.Timing.MicroSeconds(
-          renderBegin - TraceEngine.Helpers.Timing.millisecondsToMicroseconds(phases.loadTime));
-      const loadTime = TraceEngine.Helpers.Timing.traceWindowFromMicroSeconds(
+      const loadBegin = Trace.Types.Timing.MicroSeconds(
+          renderBegin - Trace.Helpers.Timing.millisecondsToMicroseconds(phases.loadTime));
+      const loadTime = Trace.Helpers.Timing.traceWindowFromMicroSeconds(
           loadBegin,
           renderBegin,
       );
 
-      const loadDelayStart = TraceEngine.Types.Timing.MicroSeconds(
-          loadBegin - TraceEngine.Helpers.Timing.millisecondsToMicroseconds(phases.loadDelay));
-      const loadDelay = TraceEngine.Helpers.Timing.traceWindowFromMicroSeconds(
+      const loadDelayStart = Trace.Types.Timing.MicroSeconds(
+          loadBegin - Trace.Helpers.Timing.millisecondsToMicroseconds(phases.loadDelay));
+      const loadDelay = Trace.Helpers.Timing.traceWindowFromMicroSeconds(
           loadDelayStart,
           loadBegin,
       );
 
-      const mainReqStart = TraceEngine.Types.Timing.MicroSeconds(
-          loadDelayStart - TraceEngine.Helpers.Timing.millisecondsToMicroseconds(phases.ttfb));
-      const ttfb = TraceEngine.Helpers.Timing.traceWindowFromMicroSeconds(
+      const mainReqStart = Trace.Types.Timing.MicroSeconds(
+          loadDelayStart - Trace.Helpers.Timing.millisecondsToMicroseconds(phases.ttfb));
+      const ttfb = Trace.Helpers.Timing.traceWindowFromMicroSeconds(
           mainReqStart,
           loadDelayStart,
       );
@@ -194,19 +211,18 @@ export class LCPPhases extends BaseInsight {
     <div class="insights">
       <${SidebarInsight.SidebarInsight.litTagName} .data=${{
             title: this.userVisibleTitle,
+            internalName: this.internalName,
             expanded: this.isActive(),
         } as SidebarInsight.InsightDetails}
         @insighttoggleclick=${this.onSidebarClick}
       >
         <div slot="insight-description" class="insight-description">
-          Each
-          <x-link class="link" href="https://web.dev/articles/optimize-lcp#lcp-breakdown">phase has specific recommendations to improve.</x-link>
-          In an ideal load, the two delay phases should be quite short.
+          ${md(i18nString(UIStrings.description))}
         </div>
         <div slot="insight-content">
           ${LitHtml.html`<${Table.litTagName}
             .data=${{
-              headers: ['Phase', '% of LCP'],
+              headers: [i18nString(UIStrings.phase), i18nString(UIStrings.percentLCP)],
               rows,
             } as TableData}>
           </${Table.litTagName}>`}
@@ -221,7 +237,7 @@ export class LCPPhases extends BaseInsight {
   }
 
   override render(): void {
-    const phaseData = this.#getPhaseData(this.data.insights, this.data.navigationId);
+    const phaseData = this.#getPhaseData(this.data.insights, this.data.insightSetKey);
     const matchesCategory = shouldRenderForCategory({
       activeCategory: this.data.activeCategory,
       insightCategory: this.insightCategory,

@@ -91,17 +91,9 @@ const UIStrings = {
    */
   learnMore: 'Learn more',
   /**
-   * @description The title of the message when the console insight is not available for some reason.
-   */
-  notAvailable: 'This feature is not available',
-  /**
    * @description The error message when the user is not logged in into Chrome.
    */
   notLoggedIn: 'This feature is only available when you sign into Chrome with your Google account.',
-  /**
-   * @description The error message when the user is not logged in into Chrome.
-   */
-  syncIsOff: 'This feature requires you to turn on Chrome sync.',
   /**
    * @description The title of the button that opens Chrome settings.
    */
@@ -206,7 +198,7 @@ const enum State {
   CONSENT_ONBOARDING = 'consent-onboarding',
   CONSENT_REMINDER = 'consent-reminder',
   NOT_LOGGED_IN = 'not-logged-in',
-  SYNC_IS_OFF = 'sync-is-off',
+  SYNC_IS_PAUSED = 'sync-is-paused',
   OFFLINE = 'offline',
 }
 
@@ -239,7 +231,7 @@ type StateData = {
 }|{
   type: State.NOT_LOGGED_IN,
 }|{
-  type: State.SYNC_IS_OFF,
+  type: State.SYNC_IS_PAUSED,
 }|{
   type: State.OFFLINE,
 };
@@ -306,9 +298,9 @@ export class ConsoleInsight extends HTMLElement {
           type: State.NOT_LOGGED_IN,
         };
         break;
-      case Host.AidaClient.AidaAccessPreconditions.NO_ACTIVE_SYNC:
+      case Host.AidaClient.AidaAccessPreconditions.SYNC_IS_PAUSED:
         this.#state = {
-          type: State.SYNC_IS_OFF,
+          type: State.SYNC_IS_PAUSED,
         };
         break;
       case Host.AidaClient.AidaAccessPreconditions.NO_INTERNET:
@@ -934,14 +926,10 @@ export class ConsoleInsight extends HTMLElement {
         }
       }
       case State.NOT_LOGGED_IN:
+      case State.SYNC_IS_PAUSED:
         return html`
           <main jslog=${jslog}>
             <div class="error">${i18nString(UIStrings.notLoggedIn)}</div>
-          </main>`;
-      case State.SYNC_IS_OFF:
-        return html`
-          <main jslog=${jslog}>
-            <div class="error">${i18nString(UIStrings.syncIsOff)}</div>
           </main>`;
       case State.OFFLINE:
         return html`
@@ -988,7 +976,7 @@ export class ConsoleInsight extends HTMLElement {
           </div>
         </footer>`;
       case State.NOT_LOGGED_IN:
-      case State.SYNC_IS_OFF:
+      case State.SYNC_IS_PAUSED:
         return html`<footer jslog=${VisualLogging.section('footer')}>
         <div class="filler"></div>
         <div>
@@ -1026,17 +1014,17 @@ export class ConsoleInsight extends HTMLElement {
                 Settings
               </${Buttons.Button.Button.litTagName}>
               <${Buttons.Button.Button.litTagName}
-                class='lets-go-button'
+                class='continue-button'
                 @click=${this.#onConsentReminderConfirmed}
                 .data=${
                   {
                     variant: Buttons.Button.Variant.PRIMARY,
-                    jslogContext: 'lets-go',
-                    title: 'Let\'s go',
+                    jslogContext: 'continue',
+                    title: 'continue',
                   } as Buttons.Button.ButtonData
                 }
                >
-                Let's go
+                Continue
               </${Buttons.Button.Button.litTagName}>
             </div>
           </footer>`;
@@ -1140,9 +1128,8 @@ export class ConsoleInsight extends HTMLElement {
   #getHeader(): string {
     switch (this.#state.type) {
       case State.NOT_LOGGED_IN:
+      case State.SYNC_IS_PAUSED:
         return i18nString(UIStrings.signInToUse);
-      case State.SYNC_IS_OFF:
-        return i18nString(UIStrings.notAvailable);
       case State.OFFLINE:
         return i18nString(UIStrings.offlineHeader);
       case State.LOADING:

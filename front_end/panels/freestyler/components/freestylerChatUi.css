@@ -32,12 +32,24 @@
   display: flex;
   gap: var(--sys-size-3);
   align-items: center;
+  width: 100%;
 
   .resource-link {
     padding: var(--sys-size-2) var(--sys-size-4);
     font: var(--sys-typescale-body4-size);
     border: var(--sys-size-1) solid var(--sys-color-divider);
     border-radius: var(--sys-shape-corner-extra-small);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: var(--sys-size-32);
+    cursor: pointer;
+
+    devtools-icon[name="file-script"] {
+      color: var(--icon-file-script);
+      vertical-align: top;
+      margin-right: var(--sys-size-1);
+    }
   }
 
   .resource-link.not-selected {
@@ -56,7 +68,7 @@
 }
 
 .chat-input-container {
-  margin: var(--sys-size-3) 0;
+  margin: var(--sys-size-4) 0;
   width: 100%;
   display: flex;
   position: relative;
@@ -65,9 +77,10 @@
 .chat-input {
   --right-padding:
     calc(
-      var(--sys-size-5) + 26px + var(--sys-size-4)
-    ); /* Gap between the button and the edge + icon's width + gap between icon and the textarea */
+      var(--sys-size-4) + 26px
+    ); /* Gap between the button and the edge + icon's width */
 
+  scrollbar-width: none;
   field-sizing: content; /* stylelint-disable-line property-no-unknown */
   resize: none;
   width: 100%;
@@ -78,8 +91,8 @@
   line-height: 18px;
   min-height: var(--sys-size-11);
   padding:
-    var(--sys-size-3) var(--right-padding) var(--sys-size-3)
-    var(--sys-size-5);
+    var(--sys-size-4) var(--right-padding) var(--sys-size-4)
+    var(--sys-size-4);
   color: var(--sys-color-on-surface);
   background-color: var(--sys-color-cdt-base-container);
 
@@ -102,7 +115,7 @@
   position: absolute;
   right: 0;
   bottom: 0;
-  padding: var(--sys-size-3) var(--sys-size-5);
+  padding: var(--sys-size-4) var(--sys-size-4);
 }
 
 .disclaimer {
@@ -115,7 +128,7 @@
     color: var(--sys-color-on-surface-subtle);
     font: var(--sys-typescale-body5-regular);
     text-wrap: pretty;
-    padding: var(--sys-size-5);
+    padding: var(--sys-size-2) var(--sys-size-5);
   }
 }
 
@@ -149,9 +162,8 @@
 
   &.query {
     .message-content {
-      line-height: 18px;
-      white-space: pre;
-      text-wrap: wrap;
+      /* devtools-markdown-view's paragraphs add 10px bottom margin. This negative margin is here to offset that. */
+      margin-bottom: -10px;
     }
   }
 
@@ -179,7 +191,7 @@
   }
 
   .aborted {
-    color: var(--sys-color-state-disabled);
+    color: var(--sys-color-on-surface-subtle);
   }
 }
 
@@ -188,6 +200,14 @@
   background-color: var(--sys-color-surface3);
   border-radius: var(--sys-size-6);
   position: relative;
+
+  &.empty {
+    pointer-events: none;
+
+    .arrow {
+      display: none;
+    }
+  }
 
   &:not(&[open]):hover::after {
     content: "";
@@ -286,16 +306,23 @@
   justify-content: space-between;
   margin-bottom: 2px;
   line-height: 20px;
+  gap: var(--sys-size-8);
 
   & .feedback-icon {
     width: var(--sys-size-8);
     height: var(--sys-size-8);
   }
 
+  & .header-link-container:first-of-type {
+    flex-shrink: 1;
+    min-width: 0;
+  }
+
   & .header-link-container {
     display: inline-flex;
     align-items: center;
     gap: var(--sys-size-2);
+    flex-shrink: 0;
   }
 }
 
@@ -309,13 +336,13 @@
 }
 
 .empty-state-container {
-  display: flex;
-  flex-direction: column;
+  display: grid;
   align-items: center;
   justify-content: center;
   font: var(--sys-typescale-headline4);
   gap: var(--sys-size-11);
   height: 100%;
+  padding: var(--sys-size-3);
 
   .header {
     display: flex;
@@ -323,6 +350,7 @@
     width: 100%;
     align-items: center;
     justify-content: center;
+    align-self: end;
     gap: var(--sys-size-5);
 
     .icon {
@@ -347,6 +375,7 @@
     gap: var(--sys-size-5);
     align-items: center;
     justify-content: center;
+    align-self: start;
   }
 }
 
@@ -359,6 +388,12 @@
 .js-code-output {
   devtools-code-block {
     --max-code-height: 50px;
+  }
+}
+
+.context-details {
+  devtools-code-block {
+    --max-code-height: 80px;
   }
 }
 

@@ -46,12 +46,14 @@ css
       onFeedbackSubmit: noop,
       onAcceptConsentClick: noop,
       onCancelClick: noop,
-      onFixThisIssueClick: noop,
+      onSelectedNetworkRequestClick: noop,
       inspectElementToggled: false,
       state: Freestyler.State.CHAT_VIEW,
+      agentType: Freestyler.AgentType.FREESTYLER,
       aidaAvailability: Host.AidaClient.AidaAccessPreconditions.AVAILABLE,
       messages,
       selectedElement: {} as unknown as SDK.DOMModel.DOMNode,
+      selectedNetworkRequest: {} as unknown as SDK.NetworkRequest.NetworkRequest,
       isLoading: false,
       canShowFeedbackForm: false,
       userInfo: {},
@@ -66,7 +68,6 @@ css
           {
             entity: Freestyler.ChatMessageEntity.MODEL,
             suggestingFix: false,
-            aborted: false,
             steps: [
               {
                 isLoading: false,

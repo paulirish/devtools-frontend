@@ -4,7 +4,7 @@
 
 import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
-import * as TraceEngine from '../../../../models/trace/trace.js';
+import * as Trace from '../../../../models/trace/trace.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 import type * as Overlays from '../../overlays/overlays.js';
 
@@ -18,7 +18,7 @@ const UIStrings = {
    * @description Text to tell the user about the longest user interaction.
    */
   description:
-      'Improve user responsiveness by improving the Interaction to Next Paint metric. Learn how to [Optimize INP](https://web.dev/articles/optimize-inp).',
+      'Optimize user responsiveness by [improving the Interaction to Next Paint metric](https://web.dev/articles/optimize-inp).',
   /**
    * @description Title for the performance insight "INP by phase", which shows a breakdown of INP by phases / sections.
    */
@@ -54,24 +54,6 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/insights/InteractionToNextPaint.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-export function getINPInsight(insights: TraceEngine.Insights.Types.TraceInsightData|null, navigationId: string|null):
-    TraceEngine.Insights.Types.InsightResults['InteractionToNextPaint']|null {
-  if (!insights || !navigationId) {
-    return null;
-  }
-
-  const insightsByNavigation = insights.get(navigationId);
-  if (!insightsByNavigation) {
-    return null;
-  }
-
-  const insight = insightsByNavigation.InteractionToNextPaint;
-  if (insight instanceof Error) {
-    return null;
-  }
-  return insight;
-}
-
 export class InteractionToNextPaint extends BaseInsight {
   static readonly litTagName = LitHtml.literal`devtools-performance-inp`;
   override insightCategory: InsightsCategories = InsightsCategories.INP;
@@ -79,17 +61,8 @@ export class InteractionToNextPaint extends BaseInsight {
   override userVisibleTitle: string = i18nString(UIStrings.title);
 
   override createOverlays(): Overlays.Overlays.TimelineOverlay[] {
-    if (!this.data.insights || !this.data.navigationId) {
-      return [];
-    }
-    const {navigationId, insights} = this.data;
-
-    const insightsByNavigation = insights.get(navigationId);
-    if (!insightsByNavigation) {
-      return [];
-    }
-
-    const insight = getINPInsight(insights, this.data.navigationId);
+    const insight =
+        Trace.Insights.Common.getInsight('InteractionToNextPaint', this.data.insights, this.data.insightSetKey);
     if (!insight) {
       return [];
     }
@@ -99,17 +72,17 @@ export class InteractionToNextPaint extends BaseInsight {
       return [];
     }
 
-    const p1 = TraceEngine.Helpers.Timing.traceWindowFromMicroSeconds(
+    const p1 = Trace.Helpers.Timing.traceWindowFromMicroSeconds(
         event.ts,
-        (event.ts + event.inputDelay) as TraceEngine.Types.Timing.MicroSeconds,
+        (event.ts + event.inputDelay) as Trace.Types.Timing.MicroSeconds,
     );
-    const p2 = TraceEngine.Helpers.Timing.traceWindowFromMicroSeconds(
+    const p2 = Trace.Helpers.Timing.traceWindowFromMicroSeconds(
         p1.max,
-        (p1.max + event.mainThreadHandling) as TraceEngine.Types.Timing.MicroSeconds,
+        (p1.max + event.mainThreadHandling) as Trace.Types.Timing.MicroSeconds,
     );
-    const p3 = TraceEngine.Helpers.Timing.traceWindowFromMicroSeconds(
+    const p3 = Trace.Helpers.Timing.traceWindowFromMicroSeconds(
         p2.max,
-        (p2.max + event.presentationDelay) as TraceEngine.Types.Timing.MicroSeconds,
+        (p2.max + event.presentationDelay) as Trace.Types.Timing.MicroSeconds,
     );
     const sections = [
       {bounds: p1, label: i18nString(UIStrings.inputDelay), showDuration: true},
@@ -131,8 +104,8 @@ export class InteractionToNextPaint extends BaseInsight {
     ];
   }
 
-  #render(event: TraceEngine.Types.TraceEvents.SyntheticInteractionPair): LitHtml.TemplateResult {
-    const time = (us: TraceEngine.Types.Timing.MicroSeconds): string =>
+  #render(event: Trace.Types.Events.SyntheticInteractionPair): LitHtml.TemplateResult {
+    const time = (us: Trace.Types.Timing.MicroSeconds): string =>
         i18n.TimeUtilities.millisToString(Platform.Timing.microSecondsToMilliSeconds(us));
 
     // clang-format off
@@ -140,6 +113,7 @@ export class InteractionToNextPaint extends BaseInsight {
         <div class="insights">
             <${SidebarInsight.SidebarInsight.litTagName} .data=${{
             title: this.userVisibleTitle,
+            internalName: this.internalName,
             expanded: this.isActive(),
             } as SidebarInsight.InsightDetails}
             @insighttoggleclick=${this.onSidebarClick}>
@@ -164,7 +138,8 @@ export class InteractionToNextPaint extends BaseInsight {
   }
 
   override render(): void {
-    const insight = getINPInsight(this.data.insights, this.data.navigationId);
+    const insight =
+        Trace.Insights.Common.getInsight('InteractionToNextPaint', this.data.insights, this.data.insightSetKey);
     const event = insight?.longestInteractionEvent;
 
     const matchesCategory = shouldRenderForCategory({

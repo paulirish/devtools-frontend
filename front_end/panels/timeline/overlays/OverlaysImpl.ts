@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 import * as Common from '../../../core/common/common.js';
 import * as Platform from '../../../core/platform/platform.js';
-import * as TraceEngine from '../../../models/trace/trace.js';
+import * as Trace from '../../../models/trace/trace.js';
 import type * as PerfUI from '../../../ui/legacy/components/perf_ui/perf_ui.js';
 
 import * as Components from './components/components.js';
@@ -13,7 +13,7 @@ import * as Components from './components/components.js';
 // set it to a small duration so that the user is able to see and click
 // them more easily. Long term we will explore a better UI solution to
 // allow us to do this properly and not hack around it.
-export const LAYOUT_SHIFT_SYNTHETIC_DURATION = TraceEngine.Types.Timing.MicroSeconds(5_000);
+export const LAYOUT_SHIFT_SYNTHETIC_DURATION = Trace.Types.Timing.MicroSeconds(5_000);
 
 /**
  * Below the network track there is a resize bar the user can click and drag.
@@ -36,8 +36,7 @@ export type EntryChartLocation = 'main'|'network';
  * support TimelineFrame instances (which themselves will be removed from the
  * codebase.)
  */
-export type OverlayEntry =
-    TraceEngine.Types.TraceEvents.TraceEventData|TraceEngine.Types.TraceEvents.LegacyTimelineFrame;
+export type OverlayEntry = Trace.Types.Events.Event|Trace.Types.Events.LegacyTimelineFrame;
 
 /**
  * Represents when a user has selected an entry in the timeline
@@ -75,22 +74,189 @@ export interface EntriesLink {
 }
 
 /**
+ * Represents an object created when a user double click an entry and before
+ * creating a link between two entries.
+ */
+export interface CreateEntriesLink {
+  type: 'ENTRIES_LINK_CREATE_BUTTON';
+  entry: OverlayEntry;
+}
+
+/**
  * Represents a time range on the trace. Also used when the user shift+clicks
  * and drags to create a time range.
  */
 export interface TimeRangeLabel {
   type: 'TIME_RANGE';
-  bounds: TraceEngine.Types.Timing.TraceWindowMicroSeconds;
+  bounds: Trace.Types.Timing.TraceWindowMicroSeconds;
   label: string;
   showDuration: boolean;
 }
 
-export function isTimeRangeLabel(annotation: TimelineOverlay): annotation is TimeRangeLabel {
-  return annotation.type === 'TIME_RANGE';
+/**
+ * Given a list of overlays, this method will calculate the smallest possible
+ * trace window that will contain all of the overlays.
+ */
+export function traceWindowContainingOverlays(overlays: TimelineOverlay[]): Trace.Types.Timing.TraceWindowMicroSeconds {
+  let minTime = Trace.Types.Timing.MicroSeconds(Number.POSITIVE_INFINITY);
+  let maxTime = Trace.Types.Timing.MicroSeconds(Number.NEGATIVE_INFINITY);
+
+  for (const overlay of overlays) {
+    const windowForOverlay = traceWindowForOverlay(overlay);
+    if (windowForOverlay.min < minTime) {
+      minTime = windowForOverlay.min;
+    }
+    if (windowForOverlay.max > maxTime) {
+      maxTime = windowForOverlay.max;
+    }
+  }
+
+  return Trace.Helpers.Timing.traceWindowFromMicroSeconds(minTime, maxTime);
 }
 
-export function isEntriesLink(annotation: TimelineOverlay): annotation is EntriesLink {
-  return annotation.type === 'ENTRIES_LINK';
+function traceWindowForOverlay(overlay: TimelineOverlay): Trace.Types.Timing.TraceWindowMicroSeconds {
+  const overlayMinBounds: Trace.Types.Timing.MicroSeconds[] = [];
+  const overlayMaxBounds: Trace.Types.Timing.MicroSeconds[] = [];
+
+  switch (overlay.type) {
+    case 'ENTRY_SELECTED': {
+      const timings = timingsForOverlayEntry(overlay.entry);
+      overlayMinBounds.push(timings.startTime);
+      overlayMaxBounds.push(timings.endTime);
+      break;
+    }
+    case 'ENTRY_OUTLINE': {
+      const timings = timingsForOverlayEntry(overlay.entry);
+      overlayMinBounds.push(timings.startTime);
+      overlayMaxBounds.push(timings.endTime);
+      break;
+    }
+
+    case 'TIME_RANGE': {
+      overlayMinBounds.push(overlay.bounds.min);
+      overlayMaxBounds.push(overlay.bounds.max);
+      break;
+    }
+    case 'ENTRY_LABEL': {
+      const timings = timingsForOverlayEntry(overlay.entry);
+      overlayMinBounds.push(timings.startTime);
+      overlayMaxBounds.push(timings.endTime);
+      break;
+    }
+
+    case 'ENTRIES_LINK': {
+      const timingsFrom = timingsForOverlayEntry(overlay.entryFrom);
+      overlayMinBounds.push(timingsFrom.startTime);
+      if (overlay.entryTo) {
+        const timingsTo = timingsForOverlayEntry(overlay.entryTo);
+        // No need to push the startTime; it must be larger than the entryFrom start time.
+        overlayMaxBounds.push(timingsTo.endTime);
+      } else {
+        // Only use the end time if we have no entryTo; otherwise the entryTo
+        // endTime is guaranteed to be larger than the entryFrom endTime.
+        overlayMaxBounds.push(timingsFrom.endTime);
+      }
+
+      break;
+    }
+    case 'ENTRIES_LINK_CREATE_BUTTON': {
+      const timings = timingsForOverlayEntry(overlay.entry);
+      overlayMinBounds.push(timings.startTime);
+      overlayMaxBounds.push(timings.endTime);
+      break;
+    }
+    case 'TIMESPAN_BREAKDOWN': {
+      if (overlay.entry) {
+        const timings = timingsForOverlayEntry(overlay.entry);
+        overlayMinBounds.push(timings.startTime);
+        overlayMaxBounds.push(timings.endTime);
+      }
+      for (const section of overlay.sections) {
+        overlayMinBounds.push(section.bounds.min);
+        overlayMaxBounds.push(section.bounds.max);
+      }
+      break;
+    }
+    case 'CURSOR_TIMESTAMP_MARKER': {
+      overlayMinBounds.push(overlay.timestamp);
+      break;
+    }
+    case 'CANDY_STRIPED_TIME_RANGE': {
+      const timings = timingsForOverlayEntry(overlay.entry);
+      overlayMinBounds.push(timings.startTime);
+      overlayMaxBounds.push(timings.endTime);
+      overlayMinBounds.push(overlay.bounds.min);
+      overlayMaxBounds.push(overlay.bounds.max);
+      break;
+    }
+    default:
+      Platform.TypeScriptUtilities.assertNever(overlay, `Unexpected overlay ${overlay}`);
+  }
+
+  const min = Trace.Types.Timing.MicroSeconds(Math.min(...overlayMinBounds));
+  const max = Trace.Types.Timing.MicroSeconds(Math.max(...overlayMaxBounds));
+  return Trace.Helpers.Timing.traceWindowFromMicroSeconds(min, max);
+}
+
+/**
+ * Get a list of entries for a given overlay.
+ */
+export function entriesForOverlay(overlay: TimelineOverlay): readonly OverlayEntry[] {
+  const entries: OverlayEntry[] = [];
+
+  switch (overlay.type) {
+    case 'ENTRY_SELECTED': {
+      entries.push(overlay.entry);
+      break;
+    }
+    case 'ENTRY_OUTLINE': {
+      entries.push(overlay.entry);
+      break;
+    }
+    case 'TIME_RANGE': {
+      // Time ranges are not associated with entries.
+      break;
+    }
+    case 'ENTRY_LABEL': {
+      entries.push(overlay.entry);
+      break;
+    }
+    case 'ENTRIES_LINK': {
+      entries.push(overlay.entryFrom);
+      if (overlay.entryTo) {
+        entries.push(overlay.entryTo);
+      }
+      break;
+    }
+    case 'ENTRIES_LINK_CREATE_BUTTON': {
+      entries.push(overlay.entry);
+      break;
+    }
+    case 'TIMESPAN_BREAKDOWN': {
+      if (overlay.entry) {
+        entries.push(overlay.entry);
+      }
+      break;
+    }
+    case 'CURSOR_TIMESTAMP_MARKER': {
+      break;
+    }
+    case 'CANDY_STRIPED_TIME_RANGE': {
+      entries.push(overlay.entry);
+      break;
+    }
+    default:
+      Platform.assertNever(overlay, `Unknown overlay type ${JSON.stringify(overlay)}`);
+  }
+
+  return entries;
+}
+export function chartForEntry(entry: OverlayEntry): EntryChartLocation {
+  if (Trace.Types.Events.isNetworkTrackEntry(entry)) {
+    return 'network';
+  }
+
+  return 'main';
 }
 
 /**
@@ -100,8 +266,8 @@ export function isEntriesLink(annotation: TimelineOverlay): annotation is Entrie
  */
 export interface CandyStripedTimeRange {
   type: 'CANDY_STRIPED_TIME_RANGE';
-  bounds: TraceEngine.Types.Timing.TraceWindowMicroSeconds;
-  entry: TraceEngine.Types.TraceEvents.TraceEventData;
+  bounds: Trace.Types.Timing.TraceWindowMicroSeconds;
+  entry: Trace.Types.Events.Event;
 }
 
 /**
@@ -111,28 +277,29 @@ export interface CandyStripedTimeRange {
 export interface TimespanBreakdown {
   type: 'TIMESPAN_BREAKDOWN';
   sections: Array<Components.TimespanBreakdownOverlay.EntryBreakdown>;
-  entry?: TraceEngine.Types.TraceEvents.TraceEventData;
+  entry?: Trace.Types.Events.Event;
 }
 
 export interface CursorTimestampMarker {
   type: 'CURSOR_TIMESTAMP_MARKER';
-  timestamp: TraceEngine.Types.Timing.MicroSeconds;
+  timestamp: Trace.Types.Timing.MicroSeconds;
 }
 
 /**
  * All supported overlay types. Expected to grow in time!
  */
-export type TimelineOverlay = EntrySelected|EntryOutline|TimeRangeLabel|EntryLabel|EntriesLink|TimespanBreakdown|
-    CursorTimestampMarker|CandyStripedTimeRange;
+export type TimelineOverlay = EntrySelected|EntryOutline|TimeRangeLabel|EntryLabel|EntriesLink|CreateEntriesLink|
+    TimespanBreakdown|CursorTimestampMarker|CandyStripedTimeRange;
 
 /**
  * Denotes overlays that are singletons; only one of these will be allowed to
  * exist at any given time. If one exists and the add() method is called, the
  * new overlay will replace the existing one.
  */
-type SingletonOverlay = EntrySelected|CursorTimestampMarker;
+type SingletonOverlay = EntrySelected|CursorTimestampMarker|CreateEntriesLink;
 export function overlayIsSingleton(overlay: TimelineOverlay): overlay is SingletonOverlay {
-  return overlay.type === 'CURSOR_TIMESTAMP_MARKER' || overlay.type === 'ENTRY_SELECTED';
+  return overlay.type === 'CURSOR_TIMESTAMP_MARKER' || overlay.type === 'ENTRY_SELECTED' ||
+      overlay.type === 'ENTRIES_LINK_CREATE_BUTTON';
 }
 
 /**
@@ -149,7 +316,7 @@ export function overlayIsSingleton(overlay: TimelineOverlay): overlay is Singlet
  */
 interface ActiveDimensions {
   trace: {
-    visibleWindow: TraceEngine.Types.Timing.TraceWindowMicroSeconds|null,
+    visibleWindow: Trace.Types.Timing.TraceWindowMicroSeconds|null,
   };
   charts: {
     main: FlameChartDimensions|null,
@@ -182,15 +349,14 @@ export interface TimelineCharts {
 }
 
 export interface OverlayEntryQueries {
-  isEntryCollapsedByUser: (entry: TraceEngine.Types.TraceEvents.TraceEventData) => boolean;
-  firstVisibleParentForEntry:
-      (entry: TraceEngine.Types.TraceEvents.TraceEventData) => TraceEngine.Types.TraceEvents.TraceEventData | null;
+  isEntryCollapsedByUser: (entry: Trace.Types.Events.Event) => boolean;
+  firstVisibleParentForEntry: (entry: Trace.Types.Events.Event) => Trace.Types.Events.Event | null;
 }
 
 // An event dispatched when one of the Annotation Overlays (overlay created by the user,
 // ex. EntryLabel) is removed or updated. When one of the Annotation Overlays is removed or updated,
 // ModificationsManager listens to this event and updates the current annotations.
-export type UpdateAction = 'Remove'|'Update';
+export type UpdateAction = 'Remove'|'Update'|'CreateLink';
 export class AnnotationOverlayActionEvent extends Event {
   static readonly eventName = 'annotationoverlayactionsevent';
 
@@ -200,8 +366,8 @@ export class AnnotationOverlayActionEvent extends Event {
 }
 
 interface EntriesLinkVisibleEntries {
-  entryFrom: TraceEngine.Types.TraceEvents.TraceEventData;
-  entryTo: TraceEngine.Types.TraceEvents.TraceEventData|undefined;
+  entryFrom: Trace.Types.Events.Event;
+  entryTo: Trace.Types.Events.Event|undefined;
   entryFromIsSource: boolean;
   entryToIsSource: boolean;
 }
@@ -328,42 +494,6 @@ export class Overlays extends EventTarget {
   }
 
   /**
-   * Because entries can be a TimelineFrame, which is not a trace event, this
-   * helper exists to return a consistent set of timings regardless of the type
-   * of entry.
-   */
-  timingsForOverlayEntry(entry: OverlayEntry):
-      TraceEngine.Helpers.Timing.EventTimingsData<TraceEngine.Types.Timing.MicroSeconds> {
-    if (TraceEngine.Types.TraceEvents.isLegacyTimelineFrame(entry)) {
-      return {
-        startTime: entry.startTime,
-        endTime: entry.endTime,
-        duration: entry.duration,
-      };
-    }
-    if (TraceEngine.Types.TraceEvents.isSyntheticLayoutShift(entry)) {
-      const endTime = TraceEngine.Types.Timing.MicroSeconds(entry.ts + LAYOUT_SHIFT_SYNTHETIC_DURATION);
-      return {
-        endTime,
-        duration: LAYOUT_SHIFT_SYNTHETIC_DURATION,
-        startTime: entry.ts,
-      };
-    }
-    return TraceEngine.Helpers.Timing.eventTimingsMicroSeconds(entry);
-  }
-
-  #chartForOverlayEntry(entry: OverlayEntry): EntryChartLocation {
-    if (TraceEngine.Types.TraceEvents.isLegacyTimelineFrame(entry)) {
-      return 'main';
-    }
-    if (TraceEngine.Types.TraceEvents.isNetworkTrackEntry(entry)) {
-      return 'network';
-    }
-
-    return 'main';
-  }
-
-  /**
    * Add a new overlay to the view.
    */
   add<T extends TimelineOverlay>(newOverlay: T): T {
@@ -407,6 +537,17 @@ export class Overlays extends EventTarget {
       // Object.entries doesn't carry that information.
       const k = key as keyof T;
       existingOverlay[k] = value;
+    }
+  }
+
+  enterLabelEditMode(overlay: EntryLabel): void {
+    // Entry edit state can be triggered from outside the label component by clicking on the
+    // Entry that already has a label. Instead of creating a new label, set the existing entry
+    // label into an editable state.
+    const element = this.#overlaysToElements.get(overlay);
+    const component = element?.querySelector('devtools-entry-label-overlay');
+    if (component) {
+      component.setLabelEditabilityAndRemoveEmptyLabel(true);
     }
   }
 
@@ -479,7 +620,7 @@ export class Overlays extends EventTarget {
    * Update the visible window of the UI.
    * IMPORTANT: this does not trigger a re-draw. You must call the render() method manually.
    */
-  updateVisibleWindow(visibleWindow: TraceEngine.Types.Timing.TraceWindowMicroSeconds): void {
+  updateVisibleWindow(visibleWindow: Trace.Types.Timing.TraceWindowMicroSeconds): void {
     this.#dimensions.trace.visibleWindow = visibleWindow;
   }
 
@@ -509,14 +650,18 @@ export class Overlays extends EventTarget {
     const timeRangeOverlays: TimeRangeLabel[] = [];
     for (const [overlay, existingElement] of this.#overlaysToElements) {
       const element = existingElement || this.#createElementForNewOverlay(overlay);
-      if (existingElement) {
-        this.#updateOverlayElementIfRequired(overlay, element);
-      } else {
+      if (!existingElement) {
         // This is a new overlay, so we have to store the element and add it to the DOM.
         this.#overlaysToElements.set(overlay, element);
         this.#overlaysContainer.appendChild(element);
       }
+
+      // Now we position the overlay on the timeline.
       this.#positionOverlay(overlay, element);
+
+      // And now we give every overlay a chance to react to its new position, if it needs to
+      this.#updateOverlayElementAfterPositioning(overlay, element);
+
       if (overlay.type === 'TIME_RANGE') {
         timeRangeOverlays.push(overlay);
       }
@@ -552,7 +697,7 @@ export class Overlays extends EventTarget {
       // Walk through subsequent overlays and find stop when you find the next one that does not overlap.
       for (let j = i + 1; j < overlaysSorted.length; j++) {
         const next = overlaysSorted[j];
-        const currentAndNextOverlap = TraceEngine.Helpers.Timing.boundsIncludeTimeRange({
+        const currentAndNextOverlap = Trace.Helpers.Timing.boundsIncludeTimeRange({
           bounds: current.bounds,
           timeRange: next.bounds,
         });
@@ -617,20 +762,16 @@ export class Overlays extends EventTarget {
           this.#setOverlayElementVisibility(element, !annotationsAreHidden);
         }
         this.#positionTimeRangeOverlay(overlay, element);
-        const component = element.querySelector('devtools-time-range-overlay');
-        if (component) {
-          component.afterOverlayUpdate();
-        }
         break;
       }
       case 'ENTRY_LABEL': {
         const entryVisible = this.entryIsVisibleOnChart(overlay.entry);
         this.#setOverlayElementVisibility(element, entryVisible && !annotationsAreHidden);
         if (entryVisible) {
-          const entryLabelParams = this.#positionEntryLabelOverlay(overlay, element);
+          const entryLabelVisibleHeight = this.#positionEntryLabelOverlay(overlay, element);
           const component = element.querySelector('devtools-entry-label-overlay');
-          if (component && entryLabelParams) {
-            component.entryLabelParams = entryLabelParams;
+          if (component && entryLabelVisibleHeight) {
+            component.entryLabelVisibleHeight = entryLabelVisibleHeight;
           }
         }
         break;
@@ -646,34 +787,49 @@ export class Overlays extends EventTarget {
           break;
         }
 
-        // If either entry is in a track that the user has collapsed, we do not show the connection at all.
+        // If both entries are in collapsed tracks, we hide the overlay completely.
         const fromEntryInCollapsedTrack = this.#entryIsInCollapsedTrack(entriesToConnect.entryFrom);
         const toEntryInCollapsedTrack =
             entriesToConnect.entryTo && this.#entryIsInCollapsedTrack(entriesToConnect.entryTo);
-        if (fromEntryInCollapsedTrack || toEntryInCollapsedTrack) {
+        const bothEntriesInCollapsedTrack = Boolean(fromEntryInCollapsedTrack && toEntryInCollapsedTrack);
+        if (bothEntriesInCollapsedTrack) {
           this.#setOverlayElementVisibility(element, false);
-          break;
+          return;
         }
 
         const isVisible = !annotationsAreHidden;
         this.#setOverlayElementVisibility(element, isVisible);
         if (isVisible) {
           this.#positionEntriesLinkOverlay(overlay, element, entriesToConnect);
+
+          // If either entry (but not both) is in a track that the user has collapsed, we do not
+          // show the connection at all, but we still show the borders around
+          // the entry. So in this case we mark the overlay as visible, but
+          // tell it to not draw the arrow.
+          const hideArrow = Boolean(fromEntryInCollapsedTrack || toEntryInCollapsedTrack);
+          const component = element.querySelector('devtools-entries-link-overlay');
+          if (component) {
+            component.hideArrow = hideArrow;
+          }
+        }
+        break;
+      }
+      case 'ENTRIES_LINK_CREATE_BUTTON': {
+        const isVisible = this.entryIsVisibleOnChart(overlay.entry);
+        this.#setOverlayElementVisibility(element, isVisible);
+        if (isVisible) {
+          this.#positionCreateEntriesLinkOverlay(overlay, element);
         }
         break;
       }
       case 'TIMESPAN_BREAKDOWN': {
         this.#positionTimespanBreakdownOverlay(overlay, element);
-        const component = element.querySelector('devtools-timespan-breakdown-overlay');
-        if (component) {
-          component.afterOverlayUpdate();
-        }
         // TODO: Have the timespan squeeze instead.
         if (overlay.entry) {
           const {visibleWindow} = this.#dimensions.trace;
           const isVisible = Boolean(
               visibleWindow && this.#entryIsVerticallyVisibleOnChart(overlay.entry) &&
-                  TraceEngine.Helpers.Timing.boundsIncludeTimeRange({
+                  Trace.Helpers.Timing.boundsIncludeTimeRange({
                     bounds: visibleWindow,
                     timeRange: overlay.sections[0].bounds,
                   }),
@@ -688,7 +844,7 @@ export class Overlays extends EventTarget {
         // Only update the position if the timestamp of this marker is within
         // the visible bounds.
         const isVisible =
-            Boolean(visibleWindow && TraceEngine.Helpers.Timing.timestampIsInBounds(visibleWindow, overlay.timestamp));
+            Boolean(visibleWindow && Trace.Helpers.Timing.timestampIsInBounds(visibleWindow, overlay.timestamp));
         this.#setOverlayElementVisibility(element, isVisible);
         if (isVisible) {
           this.#positionTimestampMarker(overlay, element);
@@ -703,7 +859,7 @@ export class Overlays extends EventTarget {
 
         const isVisible = Boolean(
             visibleWindow && this.#entryIsVerticallyVisibleOnChart(overlay.entry) &&
-            TraceEngine.Helpers.Timing.boundsIncludeTimeRange({
+            Trace.Helpers.Timing.boundsIncludeTimeRange({
               bounds: visibleWindow,
               timeRange: overlay.bounds,
             }));
@@ -767,36 +923,48 @@ export class Overlays extends EventTarget {
 
     // Handle vertical positioning based on the entry's vertical position.
     if (overlay.entry) {
-      const chartName = this.#chartForOverlayEntry(overlay.entry);
-      if (chartName === 'network') {
-        const y = this.yPixelForEventOnChart(overlay.entry);
-        if (y === null) {
-          return;
-        }
-
-        // Max height for the overlay box.
-        const MAX_BOX_HEIGHT = 50;
-        // Some padding so the box hovers just on top.
-        const PADDING = 7;
-
-        // Where the timespan breakdown should sit. Slightly on top of the entry.
-        const bottom = y - PADDING;
-
-        // Available space between the bottom of the overlay and top of the chart.
-        const minSpace = Math.max(bottom, 0);
-        // Contrain height to available space.
-        const height = Math.min(MAX_BOX_HEIGHT, minSpace);
-
-        elementSections[0].style.maxHeight = `${MAX_BOX_HEIGHT}px`;
-        elementSections[0].style.height = `${height}px`;
-
-        const top = bottom - height;
-        element.style.top = `${top}px`;
-        element.style.fontStyle = 'italic';
+      const y = this.yPixelForEventOnChart(overlay.entry);
+      if (y === null) {
+        return;
       }
+
+      // Max height for the overlay box.
+      const MAX_BOX_HEIGHT = 50;
+      // Some padding so the box hovers just on top.
+      const PADDING = 7;
+
+      // Where the timespan breakdown should sit. Slightly on top of the entry.
+      const bottom = y - PADDING;
+
+      // Available space between the bottom of the overlay and top of the chart.
+      const minSpace = Math.max(bottom, 0);
+      // Contrain height to available space.
+      const height = Math.min(MAX_BOX_HEIGHT, minSpace);
+
+      elementSections[0].style.maxHeight = `${MAX_BOX_HEIGHT}px`;
+      elementSections[0].style.height = `${height}px`;
+
+      const top = bottom - height;
+      element.style.top = `${top}px`;
     }
   }
 
+  #positionCreateEntriesLinkOverlay(overlay: CreateEntriesLink, element: HTMLElement): void {
+    const componentDefault = element.querySelector('devtools-create-entries-link-overlay');
+
+    if (componentDefault) {
+      const component = componentDefault.querySelector('devtools-entries-link-overlay');
+      if (!component) {
+        const entryStartX = this.xPixelForEventStartOnChart(overlay.entry) ?? 0;
+        const entryEndX = this.xPixelForEventEndOnChart(overlay.entry) ?? 0;
+        const entryWidth = entryEndX - entryStartX;
+        const entryStartY = (this.yPixelForEventOnChart(overlay.entry) ?? 0);
+        const entryHeight = this.pixelHeightForEventOnChart(overlay.entry) ?? 0;
+
+        componentDefault.fromEntryData = {entryStartX, entryStartY, entryWidth, entryHeight};
+      }
+    }
+  }
   /**
    * Positions the arrow between two entries. Takes in the entriesToConnect
    * because if one of the original entries is hidden in a collapsed main thread
@@ -873,7 +1041,7 @@ export class Overlays extends EventTarget {
    * On the contrary, if the entry is scrolled off the bottom, get the coordinate of the top of the visible canvas.
    */
   #yCoordinateForNotVisibleEntry(entry: OverlayEntry): number {
-    const chartName = this.#chartForOverlayEntry(entry);
+    const chartName = chartForEntry(entry);
 
     const y = this.yPixelForEventOnChart(entry);
     if (y === null) {
@@ -930,51 +1098,37 @@ export class Overlays extends EventTarget {
    * @param overlay - the EntrySelected overlay that we need to position.
    * @param element - the DOM element representing the overlay
    */
-  #positionEntryLabelOverlay(overlay: EntryLabel, element: HTMLElement):
-      {height: number, width: number, cutOffEntryHeight: number, chart: string}|null {
-    const chartName = this.#chartForOverlayEntry(overlay.entry);
-    const x = this.xPixelForEventStartOnChart(overlay.entry);
-    const y = this.yPixelForEventOnChart(overlay.entry);
-    const {endTime} = this.timingsForOverlayEntry(overlay.entry);
-    const endX = this.#xPixelForMicroSeconds(chartName, endTime);
-    const entryHeight = this.pixelHeightForEventOnChart(overlay.entry) ?? 0;
+  #positionEntryLabelOverlay(overlay: EntryLabel, element: HTMLElement): number|null {
+    // Because the entry outline is a common Overlay pattern, get the wrapper of the entry
+    // that comes with the EntryLabel Overlay and pass it into the `positionEntryBorderOutlineType`
+    // to draw and position it. The other parts of EntryLabel are drawn by the `EntryLabelOverlay` class.
+    const component = element.querySelector('devtools-entry-label-overlay');
+    if (!component) {
+      return null;
+    }
+    const entryWrapper = component.entryHighlightWrapper();
 
-    if (x === null || y === null || endX === null) {
+    if (!entryWrapper) {
       return null;
     }
 
-    // The width of the overlay is by default the width of the entry. However
-    // we modify that for instant events like LCP markers, and also ensure a
-    // minimum width.
-    const widthPixels = endX - x;
-    // The part of the overlay that draws a box around an entry is always at least 2px wide.
-    const entryWidth = Math.max(2, widthPixels);
-    const networkHeight = this.#dimensions.charts.network?.heightPixels ?? 0;
+    const {entryHeight, entryWidth, cutOffHeight = 0, x, y} =
+        this.#positionEntryBorderOutlineType(overlay, entryWrapper) || {};
 
-    // Find the part of the entry that is covered by resizer to not draw it over the resizer.
-    // If the entry is in the main flamechart, find the part of the entry that is covered from the top.
-    // If it is in the network track, find the part covered by the resizer from the bottom.
-    const entryHiddenTop = this.networkChartOffsetHeight() - y;
-    const entryHiddenBottom = entryHeight + y - networkHeight;
-    // If the covered part is negative, the entry is fully visible and the cut off part is 0.
-    const cutOffEntryHeight = Math.max((chartName === 'main') ? entryHiddenTop : entryHiddenBottom, 0);
-
-    let topOffset = y - Components.EntryLabelOverlay.EntryLabelOverlay.LABEL_AND_CONNECTOR_HEIGHT;
-    // If part of the entry height is not visible in the main flamechart, take that into the account in the top offset.
-    if (chartName === 'main') {
-      topOffset += cutOffEntryHeight;
+    if (!entryHeight || !entryWidth || !x || !y) {
+      return null;
     }
 
     // Position the start of label overlay at the start of the entry + length of connector + legth of the label element
-    element.style.top = `${topOffset}px`;
-    // Position the start of the entry label overlay in the the middle of the entry.
-    element.style.left = `${x + entryWidth / 2}px`;
+    element.style.top = `${y - Components.EntryLabelOverlay.EntryLabelOverlay.LABEL_AND_CONNECTOR_HEIGHT}px`;
+    element.style.left = `${x}px`;
+    element.style.width = `${entryWidth}px`;
 
-    return {height: entryHeight, width: entryWidth, cutOffEntryHeight, chart: chartName};
+    return entryHeight - cutOffHeight;
   }
 
   #positionCandyStripedTimeRange(overlay: CandyStripedTimeRange, element: HTMLElement): void {
-    const chartName = this.#chartForOverlayEntry(overlay.entry);
+    const chartName = chartForEntry(overlay.entry);
 
     const startX = this.#xPixelForMicroSeconds(chartName, overlay.bounds.min);
     const endX = this.#xPixelForMicroSeconds(chartName, overlay.bounds.max);
@@ -1048,24 +1202,26 @@ export class Overlays extends EventTarget {
   }
 
   /**
-   * Positions an EntrySelected or EntryOutline overlay. These share the same
-   * method as they are both borders around an entry.
-   * @param overlay - the EntrySelected/EntryOutline overlay that we need to position.
+   * Draw and position borders around an entry. Multiple overlays either fully consist
+   * of a border around an entry of have an entry border as a part of the overlay.
+   * Positions an EntrySelected or EntryOutline overlay and a part of the EntryLabel.
+   * @param overlay - the EntrySelected/EntryOutline/EntryLabel overlay that we need to position.
    * @param element - the DOM element representing the overlay
    */
-  #positionEntryBorderOutlineType(overlay: EntrySelected|EntryOutline, element: HTMLElement): void {
-    const chartName = this.#chartForOverlayEntry(overlay.entry);
+  #positionEntryBorderOutlineType(overlay: EntrySelected|EntryOutline|EntryLabel, element: HTMLElement):
+      {entryHeight: number, entryWidth: number, cutOffHeight: number, x: number, y: number}|null {
+    const chartName = chartForEntry(overlay.entry);
     let x = this.xPixelForEventStartOnChart(overlay.entry);
     let y = this.yPixelForEventOnChart(overlay.entry);
 
     if (x === null || y === null) {
-      return;
+      return null;
     }
 
-    const {endTime, duration} = this.timingsForOverlayEntry(overlay.entry);
+    const {endTime} = timingsForOverlayEntry(overlay.entry);
     const endX = this.#xPixelForMicroSeconds(chartName, endTime);
     if (endX === null) {
-      return;
+      return null;
     }
 
     const totalHeight = this.pixelHeightForEventOnChart(overlay.entry) ?? 0;
@@ -1073,7 +1229,7 @@ export class Overlays extends EventTarget {
     // We might modify the height we use when drawing the overlay, hence copying the totalHeight.
     let height = totalHeight;
     if (height === null) {
-      return;
+      return null;
     }
 
     // The width of the overlay is by default the width of the entry. However
@@ -1081,21 +1237,15 @@ export class Overlays extends EventTarget {
     // minimum width.
     let widthPixels = endX - x;
 
-    if (!duration) {
-      // No duration = instant event, so we check in case it's a marker.
-      const provider = chartName === 'main' ? this.#charts.mainProvider : this.#charts.networkProvider;
-      const chart = chartName === 'main' ? this.#charts.mainChart : this.#charts.networkChart;
-      // It could be a marker event, in which case we need to know the
-      // exact position the marker was rendered. This is because markers
-      // which have the same timestamp are rendered next to each other, so
-      // the timestamp is not necessarily exactly where the marker was
-      // rendered.
-      const index = provider.indexForEvent?.(overlay.entry);
-      const markerPixels = chart.getMarkerPixelsForEntryIndex(index ?? -1);
-      if (markerPixels) {
-        x = markerPixels.x;
-        widthPixels = markerPixels.width;
-      }
+    const provider = chartName === 'main' ? this.#charts.mainProvider : this.#charts.networkProvider;
+    const chart = chartName === 'main' ? this.#charts.mainChart : this.#charts.networkChart;
+    const index = provider.indexForEvent?.(overlay.entry);
+    const customPos = chart.getCustomDrawnPositionForEntryIndex(index ?? -1);
+    if (customPos) {
+      // Some events like markers and layout shifts define their exact coordinates explicitly.
+      // If this is one of those events we should change the overlay coordinates to match.
+      x = customPos.x;
+      widthPixels = customPos.width;
     }
 
     // The entry selected overlay is always at least 2px wide.
@@ -1145,6 +1295,8 @@ export class Overlays extends EventTarget {
     element.style.height = `${height}px`;
     element.style.top = `${y}px`;
     element.style.left = `${x}px`;
+
+    return {entryHeight: totalHeight, entryWidth: finalWidth, cutOffHeight: totalHeight - height, x, y};
   }
 
   /**
@@ -1197,9 +1349,8 @@ export class Overlays extends EventTarget {
     div.classList.add('overlay-item', `overlay-type-${overlay.type}`);
     switch (overlay.type) {
       case 'ENTRY_LABEL': {
-        const shouldDrawLabelBelowEntry = TraceEngine.Types.TraceEvents.isLegacyTimelineFrame(overlay.entry);
-        const component = new Components.EntryLabelOverlay.EntryLabelOverlay(
-            overlay.label, this.#chartForOverlayEntry(overlay.entry) === 'main', shouldDrawLabelBelowEntry);
+        const shouldDrawLabelBelowEntry = Trace.Types.Events.isLegacyTimelineFrame(overlay.entry);
+        const component = new Components.EntryLabelOverlay.EntryLabelOverlay(overlay.label, shouldDrawLabelBelowEntry);
         component.addEventListener(Components.EntryLabelOverlay.EmptyEntryLabelRemoveEvent.eventName, () => {
           this.dispatchEvent(new AnnotationOverlayActionEvent(overlay, 'Remove'));
         });
@@ -1227,6 +1378,22 @@ export class Overlays extends EventTarget {
 
         const component = new Components.EntriesLinkOverlay.EntriesLinkOverlay(
             {x: entryEndX, y: entryStartY, width: entryWidth, height: entryHeight});
+        div.appendChild(component);
+        return div;
+      }
+      case 'ENTRIES_LINK_CREATE_BUTTON': {
+        const entryStartX = this.xPixelForEventStartOnChart(overlay.entry) ?? 0;
+        const entryEndX = this.xPixelForEventEndOnChart(overlay.entry) ?? 0;
+        const entryWidth = entryEndX - entryStartX;
+        const entryStartY = (this.yPixelForEventOnChart(overlay.entry) ?? 0);
+        const entryHeight = this.pixelHeightForEventOnChart(overlay.entry) ?? 0;
+
+        const component = new Components.EntriesLinkOverlay.CreateEntriesLinkOverlay(
+            {entryStartX, entryStartY, entryWidth, entryHeight});
+
+        component.addEventListener(Components.EntriesLinkOverlay.CreateEntriesLinkRemoveEvent.eventName, () => {
+          this.dispatchEvent(new AnnotationOverlayActionEvent(overlay, 'CreateLink'));
+        });
         div.appendChild(component);
         return div;
       }
@@ -1266,7 +1433,7 @@ export class Overlays extends EventTarget {
    * Some of the HTML elements for overlays might need updating between each render
    * (for example, if a time range has changed, we update its duration text)
    */
-  #updateOverlayElementIfRequired(overlay: TimelineOverlay, element: HTMLElement): void {
+  #updateOverlayElementAfterPositioning(overlay: TimelineOverlay, element: HTMLElement): void {
     switch (overlay.type) {
       case 'ENTRY_SELECTED':
         // Nothing to do here.
@@ -1276,15 +1443,20 @@ export class Overlays extends EventTarget {
         if (component) {
           component.duration = overlay.showDuration ? overlay.bounds.range : null;
           component.canvasRect = this.#charts.mainChart.canvasBoundingClientRect();
+          component.updateLabelPositioning();
         }
         break;
       }
+      case 'ENTRY_LABEL':
       case 'ENTRY_OUTLINE':
+      case 'ENTRIES_LINK_CREATE_BUTTON':
+        // Nothing to do here.
         break;
       case 'ENTRIES_LINK': {
-        break;
-      }
-      case 'ENTRY_LABEL': {
+        const component = element.querySelector('devtools-entries-link-overlay');
+        if (component) {
+          component.canvasRect = this.#charts.mainChart.canvasBoundingClientRect();
+        }
         break;
       }
       case 'TIMESPAN_BREAKDOWN': {
@@ -1292,6 +1464,7 @@ export class Overlays extends EventTarget {
         if (component) {
           component.sections = overlay.sections;
           component.canvasRect = this.#charts.mainChart.canvasBoundingClientRect();
+          component.checkSectionLabelPositioning();
         }
         break;
       }
@@ -1324,18 +1497,18 @@ export class Overlays extends EventTarget {
     if (this.#dimensions.trace.visibleWindow === null) {
       return false;
     }
-    const {startTime, endTime} = this.timingsForOverlayEntry(entry);
+    const {startTime, endTime} = timingsForOverlayEntry(entry);
 
-    const entryTimeRange = TraceEngine.Helpers.Timing.traceWindowFromMicroSeconds(startTime, endTime);
+    const entryTimeRange = Trace.Helpers.Timing.traceWindowFromMicroSeconds(startTime, endTime);
 
-    return TraceEngine.Helpers.Timing.boundsIncludeTimeRange({
+    return Trace.Helpers.Timing.boundsIncludeTimeRange({
       bounds: this.#dimensions.trace.visibleWindow,
       timeRange: entryTimeRange,
     });
   }
 
   #entryIsInCollapsedTrack(entry: OverlayEntry): boolean {
-    const chartName = this.#chartForOverlayEntry(entry);
+    const chartName = chartForEntry(entry);
     const provider = chartName === 'main' ? this.#charts.mainProvider : this.#charts.networkProvider;
 
     const entryIndex = provider.indexForEvent?.(entry) ?? null;
@@ -1357,7 +1530,7 @@ export class Overlays extends EventTarget {
    * visibility, we can't work soley from its microsecond values.
    */
   #entryIsVerticallyVisibleOnChart(entry: OverlayEntry): boolean {
-    const chartName = this.#chartForOverlayEntry(entry);
+    const chartName = chartForEntry(entry);
 
     const y = this.yPixelForEventOnChart(entry);
     if (y === null) {
@@ -1425,8 +1598,8 @@ export class Overlays extends EventTarget {
    * @param event - the trace event you want to get the pixel position of
    */
   xPixelForEventStartOnChart(event: OverlayEntry): number|null {
-    const chartName = this.#chartForOverlayEntry(event);
-    const {startTime} = this.timingsForOverlayEntry(event);
+    const chartName = chartForEntry(event);
+    const {startTime} = timingsForOverlayEntry(event);
     return this.#xPixelForMicroSeconds(chartName, startTime);
   }
 
@@ -1439,8 +1612,8 @@ export class Overlays extends EventTarget {
    * @param event - the trace event you want to get the pixel position of
    */
   xPixelForEventEndOnChart(event: OverlayEntry): number|null {
-    const chartName = this.#chartForOverlayEntry(event);
-    const {endTime} = this.timingsForOverlayEntry(event);
+    const chartName = chartForEntry(event);
+    const {endTime} = timingsForOverlayEntry(event);
     return this.#xPixelForMicroSeconds(chartName, endTime);
   }
 
@@ -1451,7 +1624,7 @@ export class Overlays extends EventTarget {
    * how far along the timeline the event is. We can then multiply that by the
    * width of the canvas to get its pixel position.
    */
-  #xPixelForMicroSeconds(chart: EntryChartLocation, timestamp: TraceEngine.Types.Timing.MicroSeconds): number|null {
+  #xPixelForMicroSeconds(chart: EntryChartLocation, timestamp: Trace.Types.Timing.MicroSeconds): number|null {
     if (this.#dimensions.trace.visibleWindow === null) {
       console.error('Cannot calculate xPixel without visible trace window.');
       return null;
@@ -1480,7 +1653,7 @@ export class Overlays extends EventTarget {
    * for example)
    */
   yPixelForEventOnChart(event: OverlayEntry): number|null {
-    const chartName = this.#chartForOverlayEntry(event);
+    const chartName = chartForEntry(event);
     const chart = chartName === 'main' ? this.#charts.mainChart : this.#charts.networkChart;
     const provider = chartName === 'main' ? this.#charts.mainProvider : this.#charts.networkProvider;
 
@@ -1518,7 +1691,7 @@ export class Overlays extends EventTarget {
    * Calculate the height of the event on the timeline.
    */
   pixelHeightForEventOnChart(event: OverlayEntry): number|null {
-    const chartName = this.#chartForOverlayEntry(event);
+    const chartName = chartForEntry(event);
     const chart = chartName === 'main' ? this.#charts.mainChart : this.#charts.networkChart;
     const provider = chartName === 'main' ? this.#charts.mainProvider : this.#charts.networkProvider;
 
@@ -1572,4 +1745,29 @@ export class Overlays extends EventTarget {
   #setOverlayElementVisibility(element: HTMLElement, isVisible: boolean): void {
     element.style.display = isVisible ? 'block' : 'none';
   }
+}
+
+/**
+ * Because entries can be a TimelineFrame, which is not a trace event, this
+ * helper exists to return a consistent set of timings regardless of the type
+ * of entry.
+ */
+export function timingsForOverlayEntry(entry: OverlayEntry):
+    Trace.Helpers.Timing.EventTimingsData<Trace.Types.Timing.MicroSeconds> {
+  if (Trace.Types.Events.isLegacyTimelineFrame(entry)) {
+    return {
+      startTime: entry.startTime,
+      endTime: entry.endTime,
+      duration: entry.duration,
+    };
+  }
+  if (Trace.Types.Events.isSyntheticLayoutShift(entry)) {
+    const endTime = Trace.Types.Timing.MicroSeconds(entry.ts + LAYOUT_SHIFT_SYNTHETIC_DURATION);
+    return {
+      endTime,
+      duration: LAYOUT_SHIFT_SYNTHETIC_DURATION,
+      startTime: entry.ts,
+    };
+  }
+  return Trace.Helpers.Timing.eventTimingsMicroSeconds(entry);
 }

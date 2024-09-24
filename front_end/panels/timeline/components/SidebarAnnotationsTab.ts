@@ -5,7 +5,8 @@
 import * as Common from '../../../core/common/common.js';
 import * as Host from '../../../core/host/host.js';
 import * as i18n from '../../../core/i18n/i18n.js';
-import * as TraceEngine from '../../../models/trace/trace.js';
+import * as Platform from '../../../core/platform/platform.js';
+import * as Trace from '../../../models/trace/trace.js';
 import * as TraceBounds from '../../../services/trace_bounds/trace_bounds.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as IconButton from '../../../ui/components/icon_button/icon_button.js';
@@ -13,7 +14,7 @@ import * as Settings from '../../../ui/components/settings/settings.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 
 import {nameForEntry} from './EntryName.js';
-import {RemoveAnnotation} from './Sidebar.js';
+import {RemoveAnnotation, RevealAnnotation} from './Sidebar.js';
 import sidebarAnnotationsTabStyles from './sidebarAnnotationsTab.css.js';
 
 const diagramImageUrl = new URL('../../../Images/performance-panel-diagram.svg', import.meta.url).toString();
@@ -46,6 +47,10 @@ const UIStrings = {
    */
   timeRangeDescription:
       'Shift and drag on the canvas to create a time range and add a label. Press Esc or Enter to complete.',
+  /**
+   * @description Text used to describe the delete button to screen readers
+   **/
+  deleteButton: 'Delete this annotation',
 };
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/SidebarAnnotationsTab.ts', UIStrings);
@@ -55,12 +60,10 @@ export class SidebarAnnotationsTab extends HTMLElement {
   static readonly litTagName = LitHtml.literal`devtools-performance-sidebar-annotations`;
   readonly #shadow = this.attachShadow({mode: 'open'});
   readonly #boundRender = this.#render.bind(this);
-  #annotations: TraceEngine.Types.File.Annotation[] = [];
+  #annotations: Trace.Types.File.Annotation[] = [];
   // A map with annotated entries and the colours that are used to display them in the FlameChart.
   // We need this map to display the entries in the sidebar with the same colours.
-  #annotationEntryToColorMap:
-      Map<TraceEngine.Types.TraceEvents.TraceEventData|TraceEngine.Types.TraceEvents.LegacyTimelineFrame, string> =
-          new Map();
+  #annotationEntryToColorMap: Map<Trace.Types.Events.Event|Trace.Types.Events.LegacyTimelineFrame, string> = new Map();
 
   readonly #annotationsHiddenSetting: Common.Settings.Setting<boolean>;
 
@@ -69,12 +72,12 @@ export class SidebarAnnotationsTab extends HTMLElement {
     this.#annotationsHiddenSetting = Common.Settings.Settings.instance().moduleSetting('annotations-hidden');
   }
 
-  set annotations(annotations: TraceEngine.Types.File.Annotation[]) {
+  set annotations(annotations: Trace.Types.File.Annotation[]) {
     this.#annotations = annotations;
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
   }
 
-  set annotationEntryToColorMap(annotationEntryToColorMap: Map<TraceEngine.Types.TraceEvents.TraceEventData, string>) {
+  set annotationEntryToColorMap(annotationEntryToColorMap: Map<Trace.Types.Events.Event, string>) {
     this.#annotationEntryToColorMap = annotationEntryToColorMap;
   }
 
@@ -94,7 +97,7 @@ export class SidebarAnnotationsTab extends HTMLElement {
    *
    * All identifiers have a different colour background.
    */
-  #renderAnnotationIdentifier(annotation: TraceEngine.Types.File.Annotation): LitHtml.LitTemplate {
+  #renderAnnotationIdentifier(annotation: Trace.Types.File.Annotation): LitHtml.LitTemplate {
     switch (annotation.type) {
       case 'ENTRY_LABEL': {
         const entryName = nameForEntry(annotation.entry);
@@ -110,10 +113,10 @@ export class SidebarAnnotationsTab extends HTMLElement {
         const minTraceBoundsMilli =
             TraceBounds.TraceBounds.BoundsManager.instance().state()?.milli.entireTraceBounds.min ?? 0;
 
-        const timeRangeStartInMs = Math.round(
-            TraceEngine.Helpers.Timing.microSecondsToMilliseconds(annotation.bounds.min) - minTraceBoundsMilli);
-        const timeRangeEndInMs = Math.round(
-            TraceEngine.Helpers.Timing.microSecondsToMilliseconds(annotation.bounds.max) - minTraceBoundsMilli);
+        const timeRangeStartInMs =
+            Math.round(Trace.Helpers.Timing.microSecondsToMilliseconds(annotation.bounds.min) - minTraceBoundsMilli);
+        const timeRangeEndInMs =
+            Math.round(Trace.Helpers.Timing.microSecondsToMilliseconds(annotation.bounds.max) - minTraceBoundsMilli);
 
         return LitHtml.html`
               <span class="annotation-identifier time-range">
@@ -122,17 +125,11 @@ export class SidebarAnnotationsTab extends HTMLElement {
         `;
       }
       case 'ENTRIES_LINK': {
-        const entryFromName = TraceEngine.Types.TraceEvents.isProfileCall(annotation.entryFrom) ?
-            annotation.entryFrom.callFrame.functionName :
-            annotation.entryFrom.name;
-
-        const entryToName = (!annotation.entryTo) ? '' :
-            TraceEngine.Types.TraceEvents.isProfileCall(annotation.entryTo) ?
-                                                    annotation.entryTo.callFrame.functionName :
-                                                    annotation.entryTo.name;
-
+        const entryFromName = nameForEntry(annotation.entryFrom);
         const fromColor = this.#annotationEntryToColorMap.get(annotation.entryFrom);
-        const toColor = (annotation.entryTo) ? this.#annotationEntryToColorMap.get(annotation.entryTo) : '';
+
+        const entryToName = annotation.entryTo ? nameForEntry(annotation.entryTo) : '';
+        const toColor = annotation.entryTo ? this.#annotationEntryToColorMap.get(annotation.entryTo) : '';
 
         // clang-format off
         return LitHtml.html`
@@ -154,63 +151,13 @@ export class SidebarAnnotationsTab extends HTMLElement {
       `;
         // clang-format on
       }
+      default:
+        Platform.assertNever(annotation, 'Unsupported annotation type');
     }
   }
 
-  // When an annotations are clicked in the sidebar, zoom into it.
-  #zoomIntoAnnotation(annotation: TraceEngine.Types.File.Annotation): void {
-    let annotationWindow: TraceEngine.Types.Timing.TraceWindowMicroSeconds|null = null;
-    const minVisibleEntryDuration = TraceEngine.Types.Timing.MilliSeconds(1);
-
-    switch (annotation.type) {
-      case 'ENTRY_LABEL': {
-        const eventDuration = annotation.entry.dur ?? minVisibleEntryDuration;
-
-        annotationWindow = {
-          min: annotation.entry.ts,
-          max: TraceEngine.Types.Timing.MicroSeconds(annotation.entry.ts + eventDuration),
-          range: TraceEngine.Types.Timing.MicroSeconds(eventDuration),
-        };
-        break;
-      }
-      case 'TIME_RANGE': {
-        annotationWindow = annotation.bounds;
-        break;
-      }
-      case 'ENTRIES_LINK': {
-        // If entryTo does not exist, the annotation is in the process of being created.
-        // Do not allow to zoom into it in this case.
-        if (!annotation.entryTo) {
-          break;
-        }
-
-        const fromEventDuration = (annotation.entryFrom.dur) ?? minVisibleEntryDuration;
-        const toEventDuration = annotation.entryTo.dur ?? minVisibleEntryDuration;
-
-        // To choose window max, check which entry ends later
-        const fromEntryEndTS = (annotation.entryFrom.ts + fromEventDuration);
-        const toEntryEndTS = (annotation.entryTo.ts + toEventDuration);
-        const maxTimestamp = Math.max(fromEntryEndTS, toEntryEndTS);
-
-        annotationWindow = {
-          min: annotation.entryFrom.ts,
-          max: TraceEngine.Types.Timing.MicroSeconds(maxTimestamp),
-          range: TraceEngine.Types.Timing.MicroSeconds(maxTimestamp - annotation.entryFrom.ts),
-        };
-      }
-    }
-
-    const currentMinimapWindow = TraceBounds.TraceBounds.BoundsManager.instance().state()?.micro.minimapTraceBounds;
-    if (annotationWindow && currentMinimapWindow) {
-      // Expand the bounds by 20% to make the new window 40% bigger than the annotation so it is not taking the whole visible window. Pass the minimap window to make
-      // sure we do not set a window outside of the current bounds.
-      const newVisibleWindow = TraceEngine.Helpers.Timing.expandWindowByPercentOrToOneMillisecond(
-          annotationWindow, currentMinimapWindow, 40);
-      TraceBounds.TraceBounds.BoundsManager.instance().setTimelineVisibleWindow(
-          newVisibleWindow, {shouldAnimate: true});
-    } else {
-      console.error('Could not calculate zoom in window for ', annotation);
-    }
+  #revealAnnotation(annotation: Trace.Types.File.Annotation): void {
+    this.dispatchEvent(new RevealAnnotation(annotation));
   }
 
   #renderTutorialCard(): LitHtml.TemplateResult {
@@ -252,30 +199,35 @@ export class SidebarAnnotationsTab extends HTMLElement {
             LitHtml.html`
               ${this.#annotations.map(annotation =>
                 LitHtml.html`
-                  <div class="annotation-container" @click=${() => this.#zoomIntoAnnotation(annotation)}>
+                  <div class="annotation-container" @click=${() => this.#revealAnnotation(annotation)}>
                     <div class="annotation">
                       ${this.#renderAnnotationIdentifier(annotation)}
                       <span class="label">
                         ${(annotation.type === 'ENTRY_LABEL' || annotation.type === 'TIME_RANGE') ? annotation.label : ''}
                       </span>
                     </div>
-                    <${IconButton.Icon.Icon.litTagName} class="bin-icon" .data=${{
-                            iconName: 'bin',
-                            color: 'var(--icon-default)',
-                            width: '20px',
-                            height: '20px',
-                          } as IconButton.Icon.IconData} @click=${(event: Event) => {
-                            // Stop propagation to not zoom into the annotation when the delete button is clicked
-                            event.stopPropagation();
-                            this.dispatchEvent(new RemoveAnnotation(annotation));
-                    }}>
+                    <span class="delete-button" role="button" aria-label=${i18nString(UIStrings.deleteButton)}>
+                      <${IconButton.Icon.Icon.litTagName}
+                        class="bin-icon"
+                        .data=${{
+                          iconName: 'bin',
+                          color: 'var(--icon-default)',
+                          width: '20px',
+                          height: '20px',
+                        } as IconButton.Icon.IconData}
+                        @click=${(event: Event) => {
+                          // Stop propagation to not zoom into the annotation when the delete button is clicked
+                          event.stopPropagation();
+                          this.dispatchEvent(new RemoveAnnotation(annotation));
+                      }}>
+                    </span>
                   </div>`,
               )}
               <${Settings.SettingCheckbox.SettingCheckbox.litTagName} class="visibility-setting" .data=${{
-              setting: this.#annotationsHiddenSetting,
-              textOverride: 'Hide annotations',
-            } as Settings.SettingCheckbox.SettingCheckboxData}>
-            </${Settings.SettingCheckbox.SettingCheckbox.litTagName}>
+                setting: this.#annotationsHiddenSetting,
+                textOverride: 'Hide annotations',
+              } as Settings.SettingCheckbox.SettingCheckboxData}>
+              </${Settings.SettingCheckbox.SettingCheckbox.litTagName}>
         </span>`
       }`,
     this.#shadow, {host: this});

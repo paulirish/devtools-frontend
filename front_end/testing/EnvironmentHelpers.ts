@@ -133,6 +133,7 @@ const REGISTERED_EXPERIMENTS = [
   Root.Runtime.ExperimentName.TIMELINE_ENHANCED_TRACES,
   Root.Runtime.ExperimentName.GEN_AI_SETTINGS_PANEL,
   Root.Runtime.ExperimentName.TIMELINE_LAYOUT_SHIFT_DETAILS,
+  Root.Runtime.ExperimentName.EXTENSION_STORAGE_VIEWER,
 ];
 
 export async function initializeGlobalVars({reset = true} = {}) {
@@ -200,7 +201,6 @@ export async function initializeGlobalVars({reset = true} = {}) {
     createSettingValue(Common.Settings.SettingCategory.RENDERING, 'show-debug-borders', false),
     createSettingValue(Common.Settings.SettingCategory.RENDERING, 'show-fps-counter', false),
     createSettingValue(Common.Settings.SettingCategory.RENDERING, 'show-scroll-bottleneck-rects', false),
-    createSettingValue(Common.Settings.SettingCategory.RENDERING, 'show-web-vitals', false),
     createSettingValue(Common.Settings.SettingCategory.RENDERING, 'webp-format-disabled', false),
     createSettingValue(Common.Settings.SettingCategory.SOURCES, 'allow-scroll-past-eof', true),
     createSettingValue(Common.Settings.SettingCategory.SOURCES, 'css-source-maps-enabled', true),
@@ -510,12 +510,12 @@ export function getGetHostConfigStub(config: Root.Runtime.HostConfig): sinon.Sin
     devToolsConsoleInsights: {
       enabled: false,
       modelId: '',
-      temperature: 0.2,
+      temperature: -1,
       ...config.devToolsConsoleInsights,
     } as Root.Runtime.HostConfigConsoleInsights,
     devToolsFreestylerDogfood: {
       modelId: '',
-      temperature: 0,
+      temperature: -1,
       enabled: false,
       ...config.devToolsFreestylerDogfood,
     } as Root.Runtime.HostConfigFreestylerDogfood,
@@ -523,6 +523,10 @@ export function getGetHostConfigStub(config: Root.Runtime.HostConfig): sinon.Sin
       enabled: true,
       testing: false,
     },
+    devToolsPrivacyUI: {
+      enabled: false,
+      ...config.devToolsPrivacyUI,
+    } as Root.Runtime.HostConfigPrivacyUI,
     isOffTheRecord: false,
   });
 }

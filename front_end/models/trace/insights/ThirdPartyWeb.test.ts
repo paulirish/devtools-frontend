@@ -3,35 +3,24 @@
 // found in the LICENSE file.
 
 import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
+import {getFirstOrError, getInsightOrError} from '../../../testing/InsightHelpers.js';
 import {TraceLoader} from '../../../testing/TraceLoader.js';
-import type * as TraceModel from '../trace.js';
 
 export async function processTrace(testContext: Mocha.Suite|Mocha.Context|null, traceFile: string) {
-  const {traceData, insights} = await TraceLoader.traceEngine(testContext, traceFile);
+  const {parsedTrace, insights} = await TraceLoader.traceEngine(testContext, traceFile);
   if (!insights) {
     throw new Error('No insights');
   }
 
-  return {data: traceData, insights};
-}
-
-function getInsight(insights: TraceModel.Insights.Types.TraceInsightData, navigationId: string) {
-  const navInsights = insights.get(navigationId);
-  if (!navInsights) {
-    throw new Error('missing navInsights');
-  }
-  const insight = navInsights.ThirdPartyWeb;
-  if (insight instanceof Error) {
-    throw insight;
-  }
-  return insight;
+  return {data: parsedTrace, insights};
 }
 
 describeWithEnvironment('ThirdPartyWeb', function() {
   it('categorizes third party web requests (simple)', async () => {
     const {data, insights} = await processTrace(this, 'load-simple.json.gz');
-    assert.strictEqual(insights.size, 1);
-    const insight = getInsight(insights, data.Meta.navigationsByNavigationId.keys().next().value);
+    assert.strictEqual(insights.size, 2);
+    const insight =
+        getInsightOrError('ThirdPartyWeb', insights, getFirstOrError(data.Meta.navigationsByNavigationId.values()));
 
     const entityByRequestResult = [...insight.entityByRequest.entries()].map(([request, entity]) => {
       return [request.args.data.url, entity.name];
@@ -82,7 +71,8 @@ describeWithEnvironment('ThirdPartyWeb', function() {
   it('categorizes third party web requests (complex)', async () => {
     const {data, insights} = await processTrace(this, 'lantern/paul/trace.json.gz');
     assert.strictEqual(insights.size, 1);
-    const insight = getInsight(insights, data.Meta.navigationsByNavigationId.keys().next().value);
+    const insight =
+        getInsightOrError('ThirdPartyWeb', insights, getFirstOrError(data.Meta.navigationsByNavigationId.values()));
 
     const entityNames = [...insight.entityByRequest.values()].map(entity => entity.name);
     assert.deepEqual([...new Set(entityNames)], [

@@ -5,12 +5,14 @@
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import type * as SDK from '../../core/sdk/sdk.js';
+import * as Logs from '../../models/logs/logs.js';
 
 /* clang-format off */
 const preamble = `You are the most advanced network request debugging assistant integrated into Chrome DevTools.
 The user selected a network request in the browser's DevTools Network Panel and sends a query to understand the request.
 Provide a comprehensive analysis of the network request, focusing on areas crucial for a software engineer. Your analysis should include:
 * Briefly explain the purpose of the request based on the URL, method, and any relevant headers or payload.
+* Analyze timing information to identify potential bottlenecks or areas for optimization.
 * Highlight potential issues indicated by the status code.
 
 # Considerations
@@ -38,11 +40,57 @@ This request aims to retrieve a list of products matching the search query "lapt
 
 const MAX_HEADERS_SIZE = 1000;
 
-export const EXPLAIN_THIS_NETWORK_REQUEST = 'Explain this network request';
+const UIStringsTemp = {
+  inspectingNetworkData: 'Inspecting network data',
+  /**
+   *@description Thought text for thinking step of DrJones Network agent.
+   */
+  dataUsedToGenerateThisResponse: 'Data used to generate this response',
+  /**
+   *@description Heading text for the block that shows the network request details.
+   */
+  request: 'Request',
+  /**
+   *@description Heading text for the block that shows the network response details.
+   */
+  response: 'Response',
+  /**
+   *@description Prefix text for request URL.
+   */
+  requestUrl: 'Request URL',
+  /**
+   *@description Title text for request headers.
+   */
+  requestHeaders: 'Request Headers',
+  /**
+   *@description Title text for request timing details.
+   */
+  timing: 'Timing',
+  /**
+   *@description Title text for response headers.
+   */
+  responseHeaders: 'Response Headers',
+  /**
+   *@description Prefix text for response status.
+   */
+  responseStatus: 'Response Status',
+  /**
+   *@description Title text for request initiator chain.
+   */
+  requestInitiatorChain: 'Request Initiator Chain',
+
+};
 
 export enum DrJonesNetworkAgentResponseType {
   ANSWER = 'answer',
+  TITLE = 'title',
+  THOUGHT = 'thought',
   ERROR = 'error',
+}
+
+export interface ContextDetail {
+  title: string;
+  text: string;
 }
 
 export interface AnswerResponse {
@@ -53,11 +101,23 @@ export interface AnswerResponse {
 
 export interface ErrorResponse {
   type: DrJonesNetworkAgentResponseType.ERROR;
-  error: string;
   rpcId?: number;
 }
 
-export type ResponseData = AnswerResponse|ErrorResponse;
+export interface TitleResponse {
+  type: DrJonesNetworkAgentResponseType.TITLE;
+  title: string;
+  rpcId?: number;
+}
+
+export interface ThoughtResponse {
+  type: DrJonesNetworkAgentResponseType.THOUGHT;
+  thought: string;
+  contextDetails: ContextDetail[];
+  rpcId?: number;
+}
+
+export type ResponseData = AnswerResponse|ErrorResponse|ThoughtResponse|TitleResponse;
 
 type HistoryChunk = {
   text: string,
@@ -87,6 +147,7 @@ interface AidaRequestOptions {
 export class DrJonesNetworkAgent {
   static buildRequest(opts: AidaRequestOptions): Host.AidaClient.AidaRequest {
     const config = Common.Settings.Settings.instance().getHostConfig();
+    const temperature = config.devToolsExplainThisResourceDogfood?.temperature;
     const request: Host.AidaClient.AidaRequest = {
       input: opts.input,
       preamble: opts.preamble,
@@ -94,14 +155,13 @@ export class DrJonesNetworkAgent {
       chat_history: opts.chatHistory,
       client: Host.AidaClient.CLIENT_NAME,
       options: {
-        temperature: config.devToolsFreestylerDogfood?.temperature ?? 0,
-        model_id: config.devToolsFreestylerDogfood?.modelId ?? undefined,
+        ...(temperature !== undefined && temperature >= 0) && {temperature},
+        model_id: config.devToolsExplainThisResourceDogfood?.modelId ?? undefined,
       },
       metadata: {
         // TODO: disable logging based on query params.
         disable_user_content_logging: !(opts.serverSideLoggingEnabled ?? false),
         string_session_id: opts.sessionId,
-        user_tier: Host.AidaClient.convertToUserTierEnum(config.devToolsFreestylerDogfood?.userTier),
       },
       // eslint-disable-next-line @typescript-eslint/naming-convention
       functionality_type: Host.AidaClient.FunctionalityType.CHAT,
@@ -145,16 +205,15 @@ export class DrJonesNetworkAgent {
   }
 
   #runId = 0;
-  async * run(options: {
+  async * run(query: string, options: {
     signal?: AbortSignal, selectedNetworkRequest: SDK.NetworkRequest.NetworkRequest|null,
   }): AsyncGenerator<ResponseData, void, void> {
-    const genericErrorMessage = 'Sorry, I could not help you with this query.';
     const structuredLog = [];
-    const query = `${
+    query = `${
         options.selectedNetworkRequest ?
             `# Selected network request \n${
                 formatNetworkRequest(options.selectedNetworkRequest)}\n\n# User request\n\n` :
-            ''}${EXPLAIN_THIS_NETWORK_REQUEST}`;
+            ''}${query}`;
     const currentRunId = ++this.#runId;
 
     options.signal?.addEventListener('abort', () => {
@@ -171,6 +230,17 @@ export class DrJonesNetworkAgent {
     let response: string;
     let rpcId: number|undefined;
     try {
+      yield {
+        type: DrJonesNetworkAgentResponseType.TITLE,
+        title: UIStringsTemp.inspectingNetworkData,
+        rpcId,
+      };
+      yield {
+        type: DrJonesNetworkAgentResponseType.THOUGHT,
+        thought: UIStringsTemp.dataUsedToGenerateThisResponse,
+        contextDetails: createContextDetailsForDrJonesNetworkAgent(options.selectedNetworkRequest),
+        rpcId,
+      };
       const fetchResult = await this.#aidaFetch(request);
       response = fetchResult.response;
       rpcId = fetchResult.rpcId;
@@ -183,7 +253,6 @@ export class DrJonesNetworkAgent {
 
       yield {
         type: DrJonesNetworkAgentResponseType.ERROR,
-        error: genericErrorMessage,
         rpcId,
       };
       return;
@@ -214,7 +283,7 @@ export class DrJonesNetworkAgent {
       ]);
     };
     const currentRunEntries = this.#chatHistory.get(currentRunId) ?? [];
-    addToHistory(`ANSWER: ${response}`);
+    addToHistory(response);
     yield {
       type: DrJonesNetworkAgentResponseType.ANSWER,
       text: response,
@@ -276,10 +345,62 @@ export function allowHeader(header: SDK.NetworkRequest.NameValue): boolean {
   return true;
 }
 
-export function formatNetworkRequest(
-    request:
-        Pick<SDK.NetworkRequest.NetworkRequest, 'url'|'requestHeaders'|'responseHeaders'|'statusCode'|'statusText'>):
-    string {
+export function formatHeaders(title: string, headers: SDK.NetworkRequest.NameValue[]): string {
+  return formatLines(
+      title, headers.filter(allowHeader).map(header => header.name + ': ' + header.value + '\n'), MAX_HEADERS_SIZE);
+}
+
+export function formatNetworkRequestTiming(request: SDK.NetworkRequest.NetworkRequest): string {
+  const timing = request.timing;
+
+  return `
+Request start time: ${request.startTime}
+Request end time: ${request.endTime}
+Receiving response headers start time: ${timing?.receiveHeadersStart}
+Receiving response headers end time: ${timing?.receiveHeadersEnd}
+Proxy negotiation start time: ${timing?.proxyStart}
+Proxy negotiation end time: ${timing?.proxyEnd}
+DNS lookup start time: ${timing?.dnsStart}
+DNS lookup end time: ${timing?.dnsEnd}
+TCP start time: ${timing?.connectStart}
+TCP end time: ${timing?.connectEnd}
+SSL start time: ${timing?.sslStart}
+SSL end time: ${timing?.sslEnd}
+Sending start: ${timing?.sendStart}
+Sending end: ${timing?.sendEnd}
+  `;
+}
+
+function formatRequestInitiated(
+    request: SDK.NetworkRequest.NetworkRequest, initiatorChain: string, lineStart: string): string {
+  const initiated = Logs.NetworkLog.NetworkLog.instance().initiatorGraphForRequest(request).initiated;
+  initiated.forEach((k, initiatedRequest) => {
+    if (request === k) {
+      initiatorChain = initiatorChain + lineStart + initiatedRequest.url() + '\n';
+      initiatorChain = formatRequestInitiated(initiatedRequest, initiatorChain, '\t' + lineStart);
+    }
+  });
+  return initiatorChain;
+}
+
+function formatRequestInitiatorChain(request: SDK.NetworkRequest.NetworkRequest): string {
+  let initiatorChain = '';
+  let lineStart = '- URL: ';
+  const initiators = Logs.NetworkLog.NetworkLog.instance().initiatorGraphForRequest(request).initiators;
+
+  for (const initator of Array.from(initiators).reverse()) {
+    initiatorChain = initiatorChain + lineStart + initator.url() + '\n';
+    lineStart = '\t' + lineStart;
+    if (initator === request) {
+      initiatorChain = formatRequestInitiated(initator, initiatorChain, lineStart);
+      break;
+    }
+  }
+
+  return initiatorChain;
+}
+
+export function formatNetworkRequest(request: SDK.NetworkRequest.NetworkRequest): string {
   const formatHeaders = (title: string, headers: SDK.NetworkRequest.NameValue[]): string => formatLines(
       title, headers.filter(allowHeader).map(header => header.name + ': ' + header.value + '\n'), MAX_HEADERS_SIZE);
   // TODO: anything else that might be relavant?
@@ -290,7 +411,41 @@ ${formatHeaders('Request headers:', request.requestHeaders())}
 
 ${formatHeaders('Response headers:', request.responseHeaders)}
 
-Response status: ${request.statusCode} ${request.statusText}`;
+Response status: ${request.statusCode} ${request.statusText}
+
+Request Timing:\n ${formatNetworkRequestTiming(request)}
+
+Request Initiator Chain:\n ${formatRequestInitiatorChain(request)}`;
+}
+
+function createContextDetailsForDrJonesNetworkAgent(request: SDK.NetworkRequest.NetworkRequest|null): ContextDetail[] {
+  if (request) {
+    const requestContextDetail: ContextDetail = {
+      title: UIStringsTemp.request,
+      text: UIStringsTemp.requestUrl + ': ' + request.url() + '\n\n' +
+          formatHeaders(UIStringsTemp.requestHeaders, request.requestHeaders()),
+    };
+    const responseContextDetail: ContextDetail = {
+      title: UIStringsTemp.response,
+      text: UIStringsTemp.responseStatus + ': ' + request.statusCode + ' ' + request.statusText + '\n\n' +
+          formatHeaders(UIStringsTemp.responseHeaders, request.responseHeaders),
+    };
+    const timingContextDetail: ContextDetail = {
+      title: UIStringsTemp.timing,
+      text: formatNetworkRequestTiming(request),
+    };
+    const initiatorChainContextDetail: ContextDetail = {
+      title: UIStringsTemp.requestInitiatorChain,
+      text: formatRequestInitiatorChain(request),
+    };
+    return [
+      requestContextDetail,
+      responseContextDetail,
+      timingContextDetail,
+      initiatorChainContextDetail,
+    ];
+  }
+  return [];
 }
 
 // @ts-ignore

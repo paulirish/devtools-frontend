@@ -12,19 +12,19 @@ vars = {
   'build_with_chromium': False,
 
   'build_url': 'https://chromium.googlesource.com/chromium/src/build.git',
-  'build_revision': '6ad2a109821c5a126abedcbf0b10449f1b737970',
+  'build_revision': '4fcf81fd5cf614a80ccb9d4ee6cc86867a3cee69',
 
   'buildtools_url': 'https://chromium.googlesource.com/chromium/src/buildtools.git',
-  'buildtools_revision': '34a8595e7595985d1b5ca6b6fb14a4a0ddd3b952',
+  'buildtools_revision': 'f47eda3946cd680b22ad0a0749148ead072ac178',
 
   'depot_tools_url': 'https://chromium.googlesource.com/chromium/tools/depot_tools.git',
-  'depot_tools_revision': '20a0cda9e99abf86d37cb42cd98b1be9b727fdf8',
+  'depot_tools_revision': 'ec715a4dacaaeb2e95946cfbbc9d1eddb0307108',
 
   'inspector_protocol_url': 'https://chromium.googlesource.com/deps/inspector_protocol',
   'inspector_protocol_revision': 'ccf6613682a24413db28656da6f9c52948331bad',
 
   # Keeping track of the last time we rollerd the browser protocol files.
-  'chromium_browser_protocol_revision' : 'c591a29c8d429b6b5899bf4364c80fd8df7ccdb5',
+  'chromium_browser_protocol_revision' : '3585abaa071f83fdcbf097abe7833d42d3744963',
 
   'clang_format_url': 'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/clang/tools/clang-format.git',
   'clang_format_revision': '3c0acd2d4e73dd911309d9e970ba09d58bf23a62',
@@ -44,12 +44,12 @@ vars = {
 
   # ninja CIPD package version.
   # https://chrome-infra-packages.appspot.com/p/infra/3pp/tools/ninja
-  'ninja_version': 'version:2@1.12.1.chromium.4',
+  'ninja_version': 'version:3@1.12.1.chromium.4',
 
   # Chrome version used for tests. It should be regularly updated to
   # match the Canary version listed here:
   # https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json
-  'chrome': '130.0.6713.0',
+  'chrome': '131.0.6736.0',
 
   # 'magic' text to tell depot_tools that git submodules should be accepted but
   # but parity with DEPS file is expected.

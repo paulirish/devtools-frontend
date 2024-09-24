@@ -21,14 +21,14 @@ const UIStringsTemp = {
 
   /**
    * @description The title of the button that allows submitting positive
-   * feedback about the response for freestyler.
+   * feedback about the response for AI assistant.
    */
-  thumbsUp: 'Thumbs up',
+  thumbsUp: 'Good response',
   /**
    * @description The title of the button that allows submitting negative
-   * feedback about the response for freestyler.
+   * feedback about the response for AI assistant.
    */
-  thumbsDown: 'Thumbs down',
+  thumbsDown: 'Bad response',
   /**
    * @description The placeholder text for the feedback input.
    */
@@ -52,7 +52,7 @@ const UIStringsTemp = {
   close: 'Close',
   /**
    * @description The title of the button that opens a page to report a legal
-   * issue with the Freestyler message.
+   * issue with the AI assistant message.
    */
   report: 'Report legal issue',
 };
@@ -129,7 +129,7 @@ export class ProvideFeedback extends HTMLElement {
           variant: Buttons.Button.Variant.ICON,
           size: Buttons.Button.Size.SMALL,
           iconName: 'thumb-up',
-          toggledIconName: 'thumb-up',
+          toggledIconName: 'thumb-up-filled',
           toggled: this.#currentRating === Host.AidaClient.Rating.POSITIVE,
           toggleType: Buttons.Button.ToggleType.PRIMARY,
           title: i18nString(UIStringsTemp.thumbsUp),
@@ -142,7 +142,7 @@ export class ProvideFeedback extends HTMLElement {
           variant: Buttons.Button.Variant.ICON,
           size: Buttons.Button.Size.SMALL,
           iconName: 'thumb-down',
-          toggledIconName: 'thumb-down',
+          toggledIconName: 'thumb-down-filled',
           toggled: this.#currentRating === Host.AidaClient.Rating.NEGATIVE,
           toggleType: Buttons.Button.ToggleType.PRIMARY,
           title: i18nString(UIStringsTemp.thumbsDown),

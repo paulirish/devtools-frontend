@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 import * as i18n from '../../../../core/i18n/i18n.js';
-import type * as TraceEngine from '../../../../models/trace/trace.js';
+import type * as Trace from '../../../../models/trace/trace.js';
 import * as Buttons from '../../../../ui/components/buttons/buttons.js';
 import * as ComponentHelpers from '../../../../ui/components/helpers/helpers.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
@@ -25,6 +25,7 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export interface InsightDetails {
   title: string;
+  internalName: string;
   expanded: boolean;
   estimatedSavings?: number|undefined;
 }
@@ -33,7 +34,7 @@ export class InsightActivated extends Event {
   static readonly eventName = 'insightactivated';
 
   constructor(
-      public name: string, public navigationId: string,
+      public name: string, public insightSetKey: string,
       public createOverlayFn: () => Array<Overlays.Overlays.TimelineOverlay>) {
     super(InsightActivated.eventName, {bubbles: true, composed: true});
   }
@@ -46,10 +47,27 @@ export class InsightDeactivated extends Event {
   }
 }
 
+export class InsightSetHovered extends Event {
+  static readonly eventName = 'navigationhovered';
+  constructor(public bounds?: Trace.Types.Timing.TraceWindowMicroSeconds) {
+    super(InsightSetHovered.eventName, {bubbles: true, composed: true});
+  }
+}
+
+export class InsightOverlayOverride extends Event {
+  static readonly eventName = 'insightoverlayoverride';
+
+  constructor(public overlays: Array<Overlays.Overlays.TimelineOverlay>|null) {
+    super(InsightOverlayOverride.eventName, {bubbles: true, composed: true});
+  }
+}
+
 declare global {
   interface GlobalEventHandlersEventMap {
     [InsightActivated.eventName]: InsightActivated;
     [InsightDeactivated.eventName]: InsightDeactivated;
+    [InsightSetHovered.eventName]: InsightSetHovered;
+    [InsightOverlayOverride.eventName]: InsightOverlayOverride;
   }
 }
 
@@ -57,12 +75,15 @@ export class SidebarInsight extends HTMLElement {
   static readonly litTagName = LitHtml.literal`devtools-performance-sidebar-insight`;
   readonly #shadow = this.attachShadow({mode: 'open'});
   readonly #boundRender = this.#render.bind(this);
+
   #insightTitle: string = '';
+  #insightInternalName: string = '';
   #expanded: boolean = false;
   #estimatedSavings: number|undefined = undefined;
 
   set data(data: InsightDetails) {
     this.#insightTitle = data.title;
+    this.#insightInternalName = data.internalName;
     this.#expanded = data.expanded;
     this.#estimatedSavings = data.estimatedSavings;
 
@@ -107,13 +128,13 @@ export class SidebarInsight extends HTMLElement {
     // clang-format off
     const output = LitHtml.html`
       <div class=${containerClasses}>
-        <header @click=${this.#dispatchInsightToggle} jslog=${VisualLogging.action('timeline.toggle-insight').track({click: true})}>
+        <header @click=${this.#dispatchInsightToggle} jslog=${VisualLogging.action(`timeline.toggle-insight.${this.#insightInternalName}`).track({click: true})}>
           ${this.#renderHoverIcon(this.#expanded)}
           <h3 class="insight-title">${this.#insightTitle}</h3>
           ${this.#estimatedSavings && this.#estimatedSavings > 0 ?
             LitHtml.html`
             <slot name="insight-savings" class="insight-savings">
-              ${i18nString(UIStrings.estimatedSavings, {PH1: i18n.TimeUtilities.millisToString(this.#estimatedSavings as TraceEngine.Types.Timing.MilliSeconds)})}
+              ${i18nString(UIStrings.estimatedSavings, {PH1: i18n.TimeUtilities.millisToString(this.#estimatedSavings as Trace.Types.Timing.MilliSeconds)})}
             </slot>
           </div>`
           : LitHtml.nothing}

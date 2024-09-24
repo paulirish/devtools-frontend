@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import type * as TraceEngine from '../../../models/trace/trace.js';
+import type * as Trace from '../../../models/trace/trace.js';
 import {describeWithMockConnection} from '../../../testing/MockConnection.js';
 import {TraceLoader} from '../../../testing/TraceLoader.js';
 
@@ -10,21 +10,20 @@ import * as TimelineComponents from './components.js';
 
 describeWithMockConnection('LayoutShiftDetails', () => {
   it('correctly renders main details', async function() {
-    const {traceData, insights} = await TraceLoader.traceEngine(this, 'shift-attribution.json.gz');
-    const shiftEvent =
-        traceData.LayoutShifts.clusters[0].worstShiftEvent as TraceEngine.Types.TraceEvents.SyntheticLayoutShift;
+    const {parsedTrace, insights} = await TraceLoader.traceEngine(this, 'shift-attribution.json.gz');
+    const shiftEvent = parsedTrace.LayoutShifts.clusters[0].worstShiftEvent as Trace.Types.Events.SyntheticLayoutShift;
     assert.isNotNull(shiftEvent);
 
     const details = new TimelineComponents.LayoutShiftDetails.LayoutShiftDetails();
-    await details.setData(shiftEvent, insights, traceData, false);
+    details.setData(shiftEvent, insights, parsedTrace, false);
 
     assert.isNotNull(details.shadowRoot);
     const decorativeChip = details.shadowRoot.querySelector('.timeline-details-chip-decorative-title');
     assert.isNotNull(decorativeChip);
 
-    assert.include(decorativeChip?.textContent, 'Layout Shift culprits');
+    assert.include(decorativeChip?.textContent, 'Layout shift culprits');
     const eventTitle = details.shadowRoot.querySelector('.layout-shift-details-title');
-    assert.include(eventTitle?.textContent, 'Layout Shift');
+    assert.include(eventTitle?.textContent, 'Layout shift');
 
     const table = details.shadowRoot.querySelector('.layout-shift-details-table');
 

@@ -25,17 +25,10 @@ The user selected a DOM element in the browser's DevTools and sends a query abou
 * When presenting solutions, clearly distinguish between the primary cause and contributing factors.
 * Please answer only if you are sure about the answer. Otherwise, explain why you're not able to answer.
 * When answering, always consider MULTIPLE possible solutions.
+* Use \`window.getComputedStyle\` to gather **rendered** styles and make sure that you take the distinction between authored styles and computed styles into account.
+* **CRITICAL** Use \`window.getComputedStyle\` ALWAYS with property access, like \`window.getComputedStyle($0.parentElement)['color']\`.
 * **CRITICAL** Never assume a selector for the elements unless you verified your knowledge.
-* **Prioritize Modern Layout Techniques:** Whenever possible, favor CSS Grid and Flexbox for layout solutions. Avoid using \`position: absolute\` unless it's absolutely necessary or specifically requested by the user.
-* Utilize \`window.getComputedStyle\` to gather **rendered** styles and make sure that you take the distinction between authored styles and computed styles into account.
-* While giving suggestions, consider that \`setElementStyles\` function is not available in user's environment.
-* **CRITICAL** Use \`window.getComputedStyle\` ALWAYS with property access, like \`window.getComputedStyle($0.parentElement)['color']\`
 * **CRITICAL** Consider that \`data\` variable from the previous ACTION blocks are not available in a different ACTION block.
-
-# Abstract rules
-P = "problem"
-multilevel(P) = p₁ v p₂ v p₃ ... pₙ
-P ∈ multilevel(P) → collect_data_for(p₁, p₂, p₃, ... pₙ)
 
 # Instructions
 You are going to answer to the query in these steps:
@@ -113,9 +106,8 @@ FIXABLE: true
 `;
 /* clang-format on */
 
-export const FIX_THIS_ISSUE_PROMPT = 'Fix this issue using JavaScript code execution';
-
 export enum ResponseType {
+  TITLE = 'title',
   THOUGHT = 'thought',
   ACTION = 'action',
   SIDE_EFFECT = 'side-effect',
@@ -131,16 +123,27 @@ export interface AnswerResponse {
   fixable: boolean;
 }
 
+export const enum ErrorType {
+  UNKNOWN = 'unknown',
+  ABORT = 'abort',
+  MAX_STEPS = 'max-steps',
+}
+
 export interface ErrorResponse {
   type: ResponseType.ERROR;
-  error: string;
+  error: ErrorType;
+  rpcId?: number;
+}
+
+export interface TitleResponse {
+  type: ResponseType.TITLE;
+  title: string;
   rpcId?: number;
 }
 
 export interface ThoughtResponse {
   type: ResponseType.THOUGHT;
   thought: string;
-  title?: string;
   rpcId?: number;
 }
 
@@ -163,26 +166,29 @@ export interface QueryResponse {
   type: ResponseType.QUERYING;
 }
 
-export type ResponseData = AnswerResponse|ErrorResponse|ActionResponse|SideEffectResponse|ThoughtResponse|QueryResponse;
+export type ResponseData =
+    AnswerResponse|ErrorResponse|ActionResponse|SideEffectResponse|ThoughtResponse|TitleResponse|QueryResponse;
 
-// TODO: this should use the current execution context pased on the
-// node.
 async function executeJsCode(code: string, {throwOnSideEffect}: {throwOnSideEffect: boolean}): Promise<string> {
-  const target = UI.Context.Context.instance().flavor(SDK.Target.Target);
+  const selectedNode = UI.Context.Context.instance().flavor(SDK.DOMModel.DOMNode);
+  const target = selectedNode?.domModel().target() ?? UI.Context.Context.instance().flavor(SDK.Target.Target);
+
   if (!target) {
     throw new Error('Target is not found for executing code');
   }
 
   const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
-  const runtimeModel = target.model(SDK.RuntimeModel.RuntimeModel);
-  const pageAgent = target.pageAgent();
-  if (!resourceTreeModel?.mainFrame) {
+  const frameId = selectedNode?.frameId() ?? resourceTreeModel?.mainFrame?.id;
+
+  if (!frameId) {
     throw new Error('Main frame is not found for executing code');
   }
 
+  const runtimeModel = target.model(SDK.RuntimeModel.RuntimeModel);
+  const pageAgent = target.pageAgent();
+
   // This returns previously created world if it exists for the frame.
-  const {executionContextId} = await pageAgent.invoke_createIsolatedWorld(
-      {frameId: resourceTreeModel.mainFrame.id, worldName: FREESTYLER_WORLD_NAME});
+  const {executionContextId} = await pageAgent.invoke_createIsolatedWorld({frameId, worldName: FREESTYLER_WORLD_NAME});
   const executionContext = runtimeModel?.executionContext(executionContextId);
   if (!executionContext) {
     throw new Error('Execution context is not found for executing code');
@@ -238,6 +244,7 @@ interface AidaRequestOptions {
 export class FreestylerAgent {
   static buildRequest(opts: AidaRequestOptions): Host.AidaClient.AidaRequest {
     const config = Common.Settings.Settings.instance().getHostConfig();
+    const temperature = config.devToolsFreestylerDogfood?.temperature;
     const request: Host.AidaClient.AidaRequest = {
       input: opts.input,
       preamble: opts.preamble,
@@ -245,7 +252,7 @@ export class FreestylerAgent {
       chat_history: opts.chatHistory,
       client: Host.AidaClient.CLIENT_NAME,
       options: {
-        temperature: config.devToolsFreestylerDogfood?.temperature ?? 0,
+        ...(temperature !== undefined && temperature >= 0) && {temperature},
         model_id: config.devToolsFreestylerDogfood?.modelId ?? undefined,
       },
       metadata: {
@@ -372,19 +379,27 @@ export class FreestylerAgent {
     return this.#getHistoryEntry;
   }
 
-  async #aidaFetch(request: Host.AidaClient.AidaRequest): Promise<{response: string, rpcId: number|undefined}> {
+  async #aidaFetch(
+      request: Host.AidaClient.AidaRequest,
+      options?: {signal?: AbortSignal},
+      ): Promise<{
+    response: string,
+    rpcId: number|undefined,
+    rawResponse: Host.AidaClient.AidaResponse|undefined,
+  }> {
+    let rawResponse: Host.AidaClient.AidaResponse|undefined = undefined;
     let response = '';
     let rpcId;
-    for await (const lastResult of this.#aidaClient.fetch(request)) {
-      response = lastResult.explanation;
-      rpcId = lastResult.metadata.rpcGlobalId ?? rpcId;
-      if (lastResult.metadata.attributionMetadata?.some(
+    for await (rawResponse of this.#aidaClient.fetch(request, options)) {
+      response = rawResponse.explanation;
+      rpcId = rawResponse.metadata.rpcGlobalId ?? rpcId;
+      if (rawResponse.metadata.attributionMetadata?.some(
               meta => meta.attributionAction === Host.AidaClient.RecitationAction.BLOCK)) {
         throw new Error('Attribution action does not allow providing the response');
       }
     }
 
-    return {response, rpcId};
+    return {response, rpcId, rawResponse};
   }
 
   async #generateObservation(
@@ -448,7 +463,7 @@ export class FreestylerAgent {
   }
 
   static async describeElement(element: SDK.DOMModel.DOMNode): Promise<string> {
-    let output = `\n* Its selector is \`${element.simpleSelector()}\``;
+    let output = `* Its selector is \`${element.simpleSelector()}\``;
     const childNodes = await element.getChildNodesPromise();
     if (childNodes) {
       const textChildNodes = childNodes.filter(childNode => childNode.nodeType() === Node.TEXT_NODE);
@@ -528,20 +543,15 @@ export class FreestylerAgent {
 
   #runId = 0;
   async * run(query: string, options: {
-    signal?: AbortSignal, selectedElement: SDK.DOMModel.DOMNode|null, isFixQuery: boolean,
+    signal?: AbortSignal, selectedElement: SDK.DOMModel.DOMNode|null,
   }): AsyncGenerator<ResponseData, void, void> {
-    const genericErrorMessage = 'Sorry, I could not help you with this query.';
     const structuredLog = [];
-    query = `${
-        options.selectedElement ?
-            `# Inspected element\n${
-                await FreestylerAgent.describeElement(options.selectedElement)}\n\n# User request\n\n` :
-            ''}QUERY: ${query}`;
+    const elementEnchantmentQuery = options.selectedElement ?
+        `# Inspected element\n\n${
+            await FreestylerAgent.describeElement(options.selectedElement)}\n\n# User request\n\n` :
+        '';
+    query = `${elementEnchantmentQuery}QUERY: ${query}`;
     const currentRunId = ++this.#runId;
-
-    options.signal?.addEventListener('abort', () => {
-      this.#chatHistory.delete(currentRunId);
-    });
 
     for (let i = 0; i < MAX_STEPS; i++) {
       yield {
@@ -557,30 +567,42 @@ export class FreestylerAgent {
       });
       let response: string;
       let rpcId: number|undefined;
+      let rawResponse: Host.AidaClient.AidaResponse|undefined;
       try {
-        const fetchResult = await this.#aidaFetch(request);
+        const fetchResult = await this.#aidaFetch(
+            request,
+            {signal: options.signal},
+        );
         response = fetchResult.response;
         rpcId = fetchResult.rpcId;
+        rawResponse = fetchResult.rawResponse;
       } catch (err) {
         debugLog('Error calling the AIDA API', err);
 
-        if (options.signal?.aborted) {
+        if (err instanceof Host.AidaClient.AidaAbortError) {
+          this.#chatHistory.delete(currentRunId);
+          yield {
+            type: ResponseType.ERROR,
+            error: ErrorType.ABORT,
+            rpcId,
+          };
           break;
         }
 
         yield {
           type: ResponseType.ERROR,
-          error: genericErrorMessage,
+          error: ErrorType.UNKNOWN,
           rpcId,
         };
         break;
       }
 
-      if (options.signal?.aborted) {
-        break;
-      }
+      debugLog({
+        iteration: i,
+        request,
+        response: rawResponse,
+      });
 
-      debugLog(`Iteration: ${i}`, 'Request', request, 'Response', response);
       structuredLog.push({
         request: structuredClone(request),
         response,
@@ -606,6 +628,14 @@ export class FreestylerAgent {
       // since the answer is not based on the observation resulted from
       // the action.
       if (action) {
+        if (title) {
+          yield {
+            type: ResponseType.TITLE,
+            title,
+            rpcId,
+          };
+        }
+
         if (thought) {
           addToHistory(`THOUGHT: ${thought}
 TITLE: ${title}
@@ -615,7 +645,6 @@ STOP`);
           yield {
             type: ResponseType.THOUGHT,
             thought,
-            title,
             rpcId,
           };
         } else {
@@ -627,7 +656,7 @@ STOP`);
         const scope = this.#createExtensionScope(this.#changes);
         await scope.install();
         try {
-          let result = await this.#generateObservation(action, {throwOnSideEffect: !options.isFixQuery});
+          let result = await this.#generateObservation(action, {throwOnSideEffect: true});
           debugLog(`Action result: ${JSON.stringify(result)}`);
           if (result.sideEffect) {
             const sideEffectConfirmationPromiseWithResolvers = this.#confirmSideEffect<boolean>();
@@ -673,7 +702,7 @@ STOP`);
         addToHistory(response);
         yield {
           type: ResponseType.ERROR,
-          error: genericErrorMessage,
+          error: ErrorType.UNKNOWN,
           rpcId,
         };
         break;
@@ -682,7 +711,7 @@ STOP`);
       if (i === MAX_STEPS - 1) {
         yield {
           type: ResponseType.ERROR,
-          error: 'Max steps reached, please try again.',
+          error: ErrorType.MAX_STEPS,
         };
         break;
       }

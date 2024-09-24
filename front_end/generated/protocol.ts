@@ -772,6 +772,8 @@ export namespace Audits {
     WarnDomainNonASCII = 'WarnDomainNonASCII',
     WarnThirdPartyPhaseout = 'WarnThirdPartyPhaseout',
     WarnCrossSiteRedirectDowngradeChangesInclusion = 'WarnCrossSiteRedirectDowngradeChangesInclusion',
+    WarnDeprecationTrialMetadata = 'WarnDeprecationTrialMetadata',
+    WarnThirdPartyCookieHeuristic = 'WarnThirdPartyCookieHeuristic',
   }
 
   export const enum CookieOperation {
@@ -6060,7 +6062,6 @@ export namespace Emulation {
     Gyroscope = 'gyroscope',
     LinearAcceleration = 'linear-acceleration',
     Magnetometer = 'magnetometer',
-    Proximity = 'proximity',
     RelativeOrientation = 'relative-orientation',
   }
 
@@ -11586,6 +11587,7 @@ export namespace Page {
     DeferredFetch = 'deferred-fetch',
     DigitalCredentialsGet = 'digital-credentials-get',
     DirectSockets = 'direct-sockets',
+    DirectSocketsPrivate = 'direct-sockets-private',
     DisplayCapture = 'display-capture',
     DocumentDomain = 'document-domain',
     EncryptedMedia = 'encrypted-media',
@@ -17927,7 +17929,6 @@ export namespace Debugger {
   }
 
   export const enum DebugSymbolsType {
-    None = 'None',
     SourceMap = 'SourceMap',
     EmbeddedDWARF = 'EmbeddedDWARF',
     ExternalDWARF = 'ExternalDWARF',
@@ -18677,9 +18678,9 @@ export namespace Debugger {
      */
     scriptLanguage?: Debugger.ScriptLanguage;
     /**
-     * If the scriptLanguage is WebASsembly, the source of debug symbols for the module.
+     * If the scriptLanguage is WebAssembly, the source of debug symbols for the module.
      */
-    debugSymbols?: Debugger.DebugSymbols;
+    debugSymbols?: Debugger.DebugSymbols[];
     /**
      * The name the embedder supplied for this script.
      */

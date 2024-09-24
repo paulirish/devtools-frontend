@@ -76,7 +76,8 @@ export interface OriginMapping {
 
 export interface ConfigSetting {
   enabled: boolean;
-  override: string;
+  override?: string;
+  overrideEnabled?: boolean;
   originMappings?: OriginMapping[];
 }
 
@@ -121,7 +122,8 @@ export class CrUXManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
         useSessionStorage ? Common.Settings.SettingStorageType.SESSION : Common.Settings.SettingStorageType.GLOBAL;
 
     this.#configSetting = Common.Settings.Settings.instance().createSetting<ConfigSetting>(
-        'field-data', {enabled: false, override: '', originMappings: []}, storageTypeForConsent);
+        'field-data', {enabled: false, override: '', originMappings: [], overrideEnabled: false},
+        storageTypeForConsent);
 
     this.#configSetting.addChangeListener(() => {
       void this.#automaticRefresh();
@@ -210,7 +212,8 @@ export class CrUXManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
    * the main document URL cannot be found.
    */
   async getFieldDataForCurrentPage(): Promise<PageResult> {
-    const pageUrl = this.#configSetting.get().override ||
+    const pageUrl = this.#configSetting.get().overrideEnabled ?
+        this.#configSetting.get().override || '' :
         this.#getMappedUrl(this.#mainDocumentUrl || await this.#getInspectedURL());
     return this.getFieldDataForPage(pageUrl);
   }
@@ -268,7 +271,7 @@ export class CrUXManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
   async #getScopedData(normalizedUrl: URL, pageScope: PageScope, deviceScope: DeviceScope): Promise<CrUXResponse|null> {
     const {origin, href: url, hostname} = normalizedUrl;
 
-    if (hostname === 'localhost') {
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || !origin.startsWith('http')) {
       return null;
     }
 

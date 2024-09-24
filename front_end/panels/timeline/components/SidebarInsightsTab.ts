@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import type * as TraceEngine from '../../../models/trace/trace.js';
+import * as Trace from '../../../models/trace/trace.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
@@ -10,7 +10,7 @@ import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 import * as Insights from './insights/insights.js';
 import {type ActiveInsight} from './Sidebar.js';
 import styles from './sidebarInsightsTab.css.js';
-import {SidebarSingleNavigation, type SidebarSingleNavigationData} from './SidebarSingleNavigation.js';
+import {SidebarSingleInsightSet, type SidebarSingleInsightSetData} from './SidebarSingleInsightSet.js';
 
 export enum InsightsCategories {
   ALL = 'All',
@@ -25,40 +25,56 @@ export class SidebarInsightsTab extends HTMLElement {
   readonly #boundRender = this.#render.bind(this);
   readonly #shadow = this.attachShadow({mode: 'open'});
 
-  #traceParsedData: TraceEngine.Handlers.Types.TraceParseData|null = null;
-  #insights: TraceEngine.Insights.Types.TraceInsightData|null = null;
+  #parsedTrace: Trace.Handlers.Types.ParsedTrace|null = null;
+  #insights: Trace.Insights.Types.TraceInsightSets|null = null;
   #activeInsight: ActiveInsight|null = null;
   #selectedCategory: InsightsCategories = InsightsCategories.ALL;
   /**
-   * When a trace has multiple navigations, we show an accordion with each
-   * navigation in. You can only have one of these open at any time, and we
-   * track it via this ID.
+   * When a trace has sets of insights, we show an accordion with each
+   * set within. A set can be specific to a single navigation, or include the
+   * beginning of the trace up to the first navigation.
+   * You can only have one of these open at any time, and we track it via this ID.
    */
-  #activeNavigationId: string|null = null;
+  #insightSetKey: string|null = null;
 
   connectedCallback(): void {
     this.#shadow.adoptedStyleSheets = [styles];
   }
 
-  set traceParsedData(data: TraceEngine.Handlers.Types.TraceParseData|null) {
-    if (data === this.#traceParsedData) {
+  set parsedTrace(data: Trace.Handlers.Types.ParsedTrace|null) {
+    if (data === this.#parsedTrace) {
       return;
     }
-    this.#traceParsedData = data;
-    // When the trace data gets set, we clear the active navigation ID (as any old
-    // navigation ID is now outdated) and we auto-set the first ID to be
-    // active.
-    if (data) {
-      this.#activeNavigationId = data.Meta.mainFrameNavigations.at(0)?.args.data?.navigationId ?? null;
-    }
+    this.#parsedTrace = data;
+    this.#insightSetKey = null;
+
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
   }
 
-  set insights(data: TraceEngine.Insights.Types.TraceInsightData|null) {
+  set insights(data: Trace.Insights.Types.TraceInsightSets|null) {
     if (data === this.#insights) {
       return;
     }
+
+    // TODO(crbug.com/366049346): move "shouldShow" logic to insight result (rather than the component),
+    // and if none are visible, exclude it here.
     this.#insights = data;
+    this.#insightSetKey = null;
+    if (!this.#insights || !this.#parsedTrace) {
+      return;
+    }
+
+    // Select by default the first non-trivial insight set:
+    // - greater than 5s in duration
+    // - or, has a navigation
+    // In practice this means selecting either the first or the second insight set.
+    const trivialThreshold = Trace.Helpers.Timing.millisecondsToMicroseconds(Trace.Types.Timing.MilliSeconds(5000));
+    const insightSets = [...this.#insights.values()];
+    this.#insightSetKey =
+        insightSets.find(insightSet => insightSet.navigation || insightSet.bounds.range > trivialThreshold)?.id
+        // If everything is "trivial", just select the first one.
+        ?? insightSets[0]?.id ?? null;
+
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
   }
 
@@ -77,24 +93,31 @@ export class SidebarInsightsTab extends HTMLElement {
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
   }
 
-  #navigationClicked(id: string): void {
-    // New navigation clicked. Update the active insight.
-    if (id !== this.#activeInsight?.navigationId) {
+  #insightSetClicked(id: string): void {
+    // Update the active insight set.
+    if (id !== this.#activeInsight?.insightSetKey) {
       this.dispatchEvent(new Insights.SidebarInsight.InsightDeactivated());
     }
-    this.#activeNavigationId = id;
+    this.#insightSetKey = id;
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
   }
 
+  #insightSetHovered(id: string): void {
+    const data = this.#insights?.get(id);
+    data && this.dispatchEvent(new Insights.SidebarInsight.InsightSetHovered(data.bounds));
+  }
+
+  #insightSetUnhovered(): void {
+    this.dispatchEvent(new Insights.SidebarInsight.InsightSetHovered());
+  }
+
   #render(): void {
-    if (!this.#traceParsedData || !this.#insights) {
+    if (!this.#parsedTrace || !this.#insights) {
       LitHtml.render(LitHtml.nothing, this.#shadow, {host: this});
       return;
     }
 
-    const navigations = this.#traceParsedData.Meta.mainFrameNavigations ?? [];
-
-    const hasMultipleNavigations = navigations.length > 1;
+    const hasMultipleInsightSets = this.#insights.size > 1;
 
     // clang-format off
     const html = LitHtml.html`
@@ -111,33 +134,31 @@ export class SidebarInsightsTab extends HTMLElement {
         })}
       </select>
 
-      <div class="navigations-wrapper">
-        ${navigations.map(navigation => {
-          const id = navigation.args.data?.navigationId;
-          const url = navigation.args.data?.documentLoaderURL;
-          if(!id || !url) {
-            return LitHtml.nothing;
-          }
+      <div class="insight-sets-wrapper">
+        ${[...this.#insights.values()].map(({id, label}) => {
           const data = {
-            traceParsedData: this.#traceParsedData ?? null,
+            parsedTrace: this.#parsedTrace,
             insights: this.#insights,
-            navigationId: id,
+            insightSetKey: id,
             activeCategory: this.#selectedCategory,
             activeInsight: this.#activeInsight,
           };
 
           const contents = LitHtml.html`
-            <${SidebarSingleNavigation.litTagName}
-              .data=${data as SidebarSingleNavigationData}>
-            </${SidebarSingleNavigation.litTagName}>
+            <${SidebarSingleInsightSet.litTagName}
+              .data=${data as SidebarSingleInsightSetData}>
+            </${SidebarSingleInsightSet.litTagName}>
           `;
 
-          if(hasMultipleNavigations) {
+          if (hasMultipleInsightSets) {
             return LitHtml.html`<details
-              ?open=${id === this.#activeNavigationId}
-              class="navigation-wrapper"
+              ?open=${id === this.#insightSetKey}
             >
-              <summary @click=${() => this.#navigationClicked(id)}>${url}</summary>
+              <summary
+                @click=${() => this.#insightSetClicked(id)}
+                @mouseenter=${() => this.#insightSetHovered(id)}
+                @mouseleave=${() => this.#insightSetUnhovered()}
+                >${label}</summary>
               ${contents}
             </details>`;
           }

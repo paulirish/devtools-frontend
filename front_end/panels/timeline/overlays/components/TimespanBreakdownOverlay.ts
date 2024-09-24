@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 import * as i18n from '../../../../core/i18n/i18n.js';
-import * as TraceEngine from '../../../../models/trace/trace.js';
+import * as Trace from '../../../../models/trace/trace.js';
 import * as ComponentHelpers from '../../../../ui/components/helpers/helpers.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 
@@ -12,7 +12,7 @@ import styles from './timespanBreakdownOverlay.css.js';
  * An EntryBreakdown, or section, that makes up a TimespanBreakdown.
  */
 export type EntryBreakdown = {
-  bounds: TraceEngine.Types.Timing.TraceWindowMicroSeconds,
+  bounds: Trace.Types.Timing.TraceWindowMicroSeconds,
   label: string|LitHtml.LitTemplate,
   showDuration: boolean,
 };
@@ -35,6 +35,9 @@ export class TimespanBreakdownOverlay extends HTMLElement {
   }
 
   set canvasRect(rect: DOMRect|null) {
+    if (this.#canvasRect && rect && this.#canvasRect.width === rect.width && this.#canvasRect.height === rect.height) {
+      return;
+    }
     this.#canvasRect = rect;
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
   }
@@ -53,7 +56,7 @@ export class TimespanBreakdownOverlay extends HTMLElement {
    * If the label is off to the left or right, we fix it to that corner and
    * align the text so the label is visible as long as possible.
    */
-  afterOverlayUpdate(): void {
+  checkSectionLabelPositioning(): void {
     const sections = this.#shadow.querySelectorAll<HTMLElement>('.timespan-breakdown-overlay-section');
     if (!sections) {
       return;
@@ -151,7 +154,7 @@ export class TimespanBreakdownOverlay extends HTMLElement {
   }
 
   renderSection(section: EntryBreakdown): LitHtml.TemplateResult {
-    const sectionRange = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(section.bounds.range);
+    const sectionRange = Trace.Helpers.Timing.microSecondsToMilliseconds(section.bounds.range);
     // clang-format off
     return LitHtml.html`
       <div class="timespan-breakdown-overlay-section">
@@ -168,6 +171,7 @@ export class TimespanBreakdownOverlay extends HTMLElement {
 
   #render(): void {
     LitHtml.render(LitHtml.html`${this.#sections?.map(this.renderSection)}`, this.#shadow, {host: this});
+    this.checkSectionLabelPositioning();
   }
 }
 

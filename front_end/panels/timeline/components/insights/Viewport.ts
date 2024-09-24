@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 import * as i18n from '../../../../core/i18n/i18n.js';
-import type * as TraceEngine from '../../../../models/trace/trace.js';
+import * as Trace from '../../../../models/trace/trace.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 import type * as Overlays from '../../overlays/overlays.js';
 
@@ -13,6 +13,8 @@ import * as SidebarInsight from './SidebarInsight.js';
 import {InsightsCategories} from './types.js';
 
 const UIStrings = {
+  /** Title of an insight that provides details about if the page's viewport is optimized for mobile viewing. */
+  title: 'Mobile-optimized viewport',
   /**
    * @description Text to tell the user how a viewport meta element can improve performance.
    */
@@ -23,45 +25,27 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/insights/Viewport.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-export function getViewportInsight(
-    insights: TraceEngine.Insights.Types.TraceInsightData|null,
-    navigationId: string|null): TraceEngine.Insights.Types.InsightResults['Viewport']|null {
-  if (!insights || !navigationId) {
-    return null;
-  }
-
-  const insightsByNavigation = insights.get(navigationId);
-  if (!insightsByNavigation) {
-    return null;
-  }
-
-  const viewportInsight = insightsByNavigation.Viewport;
-  if (viewportInsight instanceof Error) {
-    return null;
-  }
-  return viewportInsight;
-}
-
 export class Viewport extends BaseInsight {
   static readonly litTagName = LitHtml.literal`devtools-performance-viewport`;
   override insightCategory: InsightsCategories = InsightsCategories.INP;
   override internalName: string = 'viewport';
-  override userVisibleTitle: string = 'Mobile-optimized viewport';
+  override userVisibleTitle: string = i18nString(UIStrings.title);
 
   override createOverlays(): Overlays.Overlays.TimelineOverlay[] {
     // TODO(b/351757418): create overlay for synthetic input delay events
     return [];
   }
 
-  #render(data: TraceEngine.Insights.Types.InsightResults['Viewport']): LitHtml.TemplateResult {
+  #render(data: Trace.Insights.Types.InsightResults['Viewport']): LitHtml.TemplateResult {
     const backendNodeId = data.viewportEvent?.args.data.node_id;
 
     // clang-format off
     return LitHtml.html`
         <div class="insights">
             <${SidebarInsight.SidebarInsight.litTagName} .data=${{
-            title: this.userVisibleTitle,
-            expanded: this.isActive(),
+              title: this.userVisibleTitle,
+              expanded: this.isActive(),
+              internalName: this.internalName,
             } as SidebarInsight.InsightDetails}
             @insighttoggleclick=${this.onSidebarClick}>
                 <div slot="insight-description" class="insight-description">
@@ -81,8 +65,8 @@ export class Viewport extends BaseInsight {
   }
 
   override render(): void {
-    const viewportInsight = getViewportInsight(this.data.insights, this.data.navigationId);
-    const shouldShow = viewportInsight && !viewportInsight.mobileOptimized;
+    const viewportInsight = Trace.Insights.Common.getInsight('Viewport', this.data.insights, this.data.insightSetKey);
+    const shouldShow = viewportInsight && viewportInsight.mobileOptimized === false;
 
     const matchesCategory = shouldRenderForCategory({
       activeCategory: this.data.activeCategory,

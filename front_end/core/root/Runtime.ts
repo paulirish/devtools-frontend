@@ -299,6 +299,7 @@ export const enum ExperimentName {
   GEN_AI_SETTINGS_PANEL = 'gen-ai-settings-panel',
   TIMELINE_SERVER_TIMINGS = 'timeline-server-timings',
   TIMELINE_LAYOUT_SHIFT_DETAILS = 'timeline-layout-shift-details',
+  EXTENSION_STORAGE_VIEWER = 'extension-storage-viewer',
 }
 
 export interface AidaAvailability {
@@ -333,6 +334,10 @@ export interface HostConfigVeLogging {
   testing: boolean;
 }
 
+export interface HostConfigPrivacyUI {
+  enabled: boolean;
+}
+
 // We use `RecursivePartial` here to enforce that DevTools code is able to
 // handle `HostConfig` objects of an unexpected shape. This can happen if
 // the implementation in the Chromium backend is changed without correctly
@@ -346,6 +351,7 @@ export type HostConfig = Platform.TypeScriptUtilities.RecursivePartial<{
   devToolsFreestylerDogfood: HostConfigFreestylerDogfood,
   devToolsExplainThisResourceDogfood: HostConfigExplainThisResourceDogfood,
   devToolsVeLogging: HostConfigVeLogging,
+  devToolsPrivacyUI: HostConfigPrivacyUI,
   /**
    * OffTheRecord here indicates that the user's profile is either incognito,
    * or guest mode, rather than a "normal" profile.

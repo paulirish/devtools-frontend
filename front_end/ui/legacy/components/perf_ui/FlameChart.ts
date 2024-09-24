@@ -33,7 +33,7 @@ import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
 import * as Root from '../../../../core/root/root.js';
 import type * as TimelineModel from '../../../../models/timeline_model/timeline_model.js';
-import * as TraceEngine from '../../../../models/trace/trace.js';
+import * as Trace from '../../../../models/trace/trace.js';
 import * as Buttons from '../../../components/buttons/buttons.js';
 import * as UI from '../../legacy.js';
 import * as ThemeSupport from '../../theme_support/theme_support.js';
@@ -215,7 +215,7 @@ export const enum FilterAction {
 
 export interface UserFilterAction {
   type: FilterAction;
-  entry: TraceEngine.Types.TraceEvents.TraceEventData;
+  entry: Trace.Types.Events.Event;
 }
 
 // Object used to indicate to the Context Menu if an action is possible on the selected entry.
@@ -226,6 +226,14 @@ export interface PossibleFilterActions {
   [FilterAction.RESET_CHILDREN]: boolean;
   [FilterAction.UNDO_ALL_ACTIONS]: boolean;
 }
+
+export interface PositionOverride {
+  x: number;
+  width: number;
+}
+
+export type DrawOverride = (context: CanvasRenderingContext2D, x: number, y: number, width: number, height: number) =>
+    PositionOverride;
 
 export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.VBox>(UI.Widget.VBox)
     implements Calculator, ChartViewportDelegate {
@@ -264,10 +272,8 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
    **/
   private selectedEntryIndex: number;
   private rawTimelineDataLength: number;
-  private readonly markerPositions: Map<number, {
-    x: number,
-    width: number,
-  }>;
+  private readonly markerPositions: Map<number, PositionOverride>;
+  private readonly customDrawnPositions: Map<number, PositionOverride>;
   private lastMouseOffsetX: number;
   private selectedGroupIndex: number;
   private keyboardFocusedGroup: number;
@@ -301,6 +307,8 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   // Stored because we cache this value to save extra lookups and layoffs.
   #canvasBoundingClientRect: DOMRect|null = null;
   #selectedElementOutlineEnabled = true;
+
+  #indexToDrawOverride = new Map<number, DrawOverride>();
 
   constructor(
       dataProvider: FlameChartDataProvider, flameChartDelegate: FlameChartDelegate,
@@ -384,6 +392,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.#searchResultEntryIndex = -1;
     this.rawTimelineDataLength = 0;
     this.markerPositions = new Map();
+    this.customDrawnPositions = new Map();
 
     this.lastMouseOffsetX = 0;
     this.selectedGroupIndex = -1;
@@ -406,7 +415,12 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   }
 
   canvasBoundingClientRect(): DOMRect|null {
-    if (this.#canvasBoundingClientRect) {
+    // If we have a rect already, and it has width & height, use it by default.
+    // The reason we check the dimensions is because otherwise if this method was
+    // called before the FlameChart was fully rendered it might have been
+    // calculated with a width or height of 0, and that is clearly incorrect.
+    if (this.#canvasBoundingClientRect && this.#canvasBoundingClientRect.width > 0 &&
+        this.#canvasBoundingClientRect.height > 0) {
       return this.#canvasBoundingClientRect;
     }
     this.#canvasBoundingClientRect = this.canvas.getBoundingClientRect();
@@ -622,6 +636,15 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     return this.rawTimelineData || null;
   }
 
+  revealEntryVertically(entryIndex: number): void {
+    const timelineData = this.timelineData();
+    if (!timelineData) {
+      return;
+    }
+    const level = timelineData.entryLevels[entryIndex];
+    this.chartViewport.setScrollOffset(this.levelToOffset(level), this.levelHeight(level), true);
+  }
+
   revealEntry(entryIndex: number): void {
     const timelineData = this.timelineData();
     if (!timelineData) {
@@ -671,11 +694,11 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       return;
     }
 
-    const timeMilliSeconds = TraceEngine.Types.Timing.MilliSeconds(this.chartViewport.pixelToTime(mouseEvent.offsetX));
+    const timeMilliSeconds = Trace.Types.Timing.MilliSeconds(this.chartViewport.pixelToTime(mouseEvent.offsetX));
 
     this.dispatchEventToListeners(Events.MOUSE_MOVE, {
       mouseEvent,
-      timeInMicroSeconds: TraceEngine.Helpers.Timing.millisecondsToMicroseconds(timeMilliSeconds),
+      timeInMicroSeconds: Trace.Helpers.Timing.millisecondsToMicroseconds(timeMilliSeconds),
     });
 
     // Check if the mouse is hovering any group's header area
@@ -886,7 +909,8 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
      */
     if (this.highlightedEntryIndex !== -1) {
       this.#selectGroup(groupIndex);
-      this.dispatchEventToListeners(Events.ENTRY_LABEL_ANNOTATION_ADDED, this.highlightedEntryIndex);
+      this.dispatchEventToListeners(
+          Events.ENTRY_LABEL_ANNOTATION_ADDED, {entryIndex: this.highlightedEntryIndex, withLinkCreationButton: true});
     }
   }
 
@@ -1025,7 +1049,13 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.chartViewport.setScrollOffset(scrollTop, scrollHeight);
   }
 
-  private toggleGroupExpand(groupIndex: number): void {
+  /**
+   * Toggle a group's expanded state.
+   * @param groupIndex - the index of this group in the timelineData.groups
+   * array. Note that this is the array index, and not the startLevel of the
+   * group.
+   */
+  toggleGroupExpand(groupIndex: number): void {
     if (groupIndex < 0 || !this.isGroupCollapsible(groupIndex)) {
       return;
     }
@@ -1287,7 +1317,8 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       const annotationSection = this.contextMenu.section('annotations');
 
       const labelEntryAnnotationOption = annotationSection.appendItem(i18nString(UIStrings.labelEntry), () => {
-        this.dispatchEventToListeners(Events.ENTRY_LABEL_ANNOTATION_ADDED, this.selectedEntryIndex);
+        this.dispatchEventToListeners(
+            Events.ENTRY_LABEL_ANNOTATION_ADDED, {entryIndex: this.selectedEntryIndex, withLinkCreationButton: false});
       });
 
       labelEntryAnnotationOption.setShortcut('Double Click');
@@ -1636,7 +1667,17 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       return -1;
     }
 
-    // Check markers first.
+    // Check custom drawn entries first.
+    for (const [index, pos] of this.customDrawnPositions) {
+      if (timelineData.entryLevels[index] !== cursorLevel) {
+        continue;
+      }
+      if (pos.x <= x && x < pos.x + pos.width) {
+        return index as number;
+      }
+    }
+
+    // Check markers.
     for (const [index, pos] of this.markerPositions) {
       if (timelineData.entryLevels[index] !== cursorLevel) {
         continue;
@@ -1937,8 +1978,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
         // that as all being collapsed.
         allGroupsCollapsed: this.rawTimelineData?.groups.every(g => !g.expanded) ?? true,
       },
-      traceWindow:
-          TraceEngine.Helpers.Timing.traceWindowFromMilliSeconds(this.minimumBoundary(), this.maximumBoundary()),
+      traceWindow: Trace.Helpers.Timing.traceWindowFromMilliSeconds(this.minimumBoundary(), this.maximumBoundary()),
     });
     const canvasWidth = this.offsetWidth;
     const canvasHeight = this.offsetHeight;
@@ -1988,6 +2028,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     }
     this.dispatchEventToListeners(Events.CHART_PLAYABLE_STATE_CHANGED, wideEntryExists);
 
+    this.#drawCustomSymbols(context, timelineData);
     this.drawMarkers(context, timelineData, markerIndices);
 
     this.drawEventTitles(context, timelineData, titleIndices, canvasWidth);
@@ -2015,8 +2056,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       const hasNextNavStartTime = navStartTimes.length > navStartTimeIndex + 1;
       if (hasNextNavStartTime) {
         const nextNavStartTime = navStartTimes[navStartTimeIndex + 1];
-        const nextNavStartTimeStartTimestamp =
-            TraceEngine.Helpers.Timing.microSecondsToMilliseconds(nextNavStartTime.ts);
+        const nextNavStartTimeStartTimestamp = Trace.Helpers.Timing.microSecondsToMilliseconds(nextNavStartTime.ts);
         if (time > nextNavStartTimeStartTimestamp) {
           navStartTimeIndex++;
         }
@@ -2025,7 +2065,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       // Adjust the time by the nearest nav start marker's value.
       const nearestMarker = navStartTimes[navStartTimeIndex];
       if (nearestMarker) {
-        const nearestMarkerStartTime = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(nearestMarker.ts);
+        const nearestMarkerStartTime = Trace.Helpers.Timing.microSecondsToMilliseconds(nearestMarker.ts);
         time -= nearestMarkerStartTime - this.zeroTime();
       }
 
@@ -2060,6 +2100,12 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     context.beginPath();
     for (let i = 0; i < indexes.length; ++i) {
       const entryIndex = indexes[i];
+
+      // If there is a draw override, then this is not a generic event.
+      if (this.#indexToDrawOverride.has(entryIndex)) {
+        continue;
+      }
+
       this.#drawEventRect(context, timelineData, entryIndex);
     }
     context.fillStyle = color;
@@ -2093,7 +2139,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       for (const decoration of decorationsForEvent) {
         switch (decoration.type) {
           case FlameChartDecorationType.CANDY: {
-            const candyStripeStartTime = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(decoration.startAtTime);
+            const candyStripeStartTime = Trace.Helpers.Timing.microSecondsToMilliseconds(decoration.startAtTime);
             if (duration < candyStripeStartTime) {
               // If the duration of the event is less than the start time to draw the candy stripes, then we have no stripes to draw.
               continue;
@@ -2110,7 +2156,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
 
             // If a custom end time was passed in, that is when we stop striping, else we stripe until the very end of the entry.
             const stripingEndTime = decoration.endAtTime ?
-                TraceEngine.Helpers.Timing.microSecondsToMilliseconds(decoration.endAtTime) :
+                Trace.Helpers.Timing.microSecondsToMilliseconds(decoration.endAtTime) :
                 entryStartTime + duration;
             const barXEnd = this.timeToPositionClipped(stripingEndTime);
             this.#drawEventRect(context, timelineData, entryIndex, {
@@ -2127,7 +2173,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
             if (typeof decoration.customEndTime !== 'undefined') {
               // The user can pass a customEndTime to tell us where the event's box ends and therefore where we should
               // draw the triangle. So therefore we calculate the width by taking the end time off the start time.
-              const endTimeMilli = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(decoration.customEndTime);
+              const endTimeMilli = Trace.Helpers.Timing.microSecondsToMilliseconds(decoration.customEndTime);
               endTimePixels = this.timeToPositionClipped(endTimeMilli);
               barWidth = endTimePixels - barX;
             }
@@ -2137,7 +2183,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
               // The user can pass a customStartTime to tell us where the event's box start and therefore where we
               // should draw the triangle. So therefore we calculate the width by taking the end time off the start
               // time.
-              const startTimeMilli = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(decoration.customStartTime);
+              const startTimeMilli = Trace.Helpers.Timing.microSecondsToMilliseconds(decoration.customStartTime);
               const startTimePixels = this.timeToPositionClipped(startTimeMilli);
               triangleWidth = Math.min(endTimePixels - startTimePixels, 8);
             }
@@ -2569,7 +2615,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     // Markers are sorted top to bottom, right to left.
     for (let m = markerIndices.length - 1; m >= 0; --m) {
       const entryIndex = markerIndices[m];
-      const title = this.dataProvider.entryTitle(entryIndex);
+      const title = this.entryTitle(entryIndex);
       if (!title) {
         continue;
       }
@@ -2593,6 +2639,23 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     }
     context.strokeStyle = 'rgba(0, 0, 0, 0.2)';
     context.stroke();
+    context.restore();
+  }
+
+  #drawCustomSymbols(context: CanvasRenderingContext2D, timelineData: FlameChartTimelineData): void {
+    const {entryStartTimes, entryLevels} = timelineData;
+    this.customDrawnPositions.clear();
+    context.save();
+    for (const [entryIndex, drawOverride] of this.#indexToDrawOverride.entries()) {
+      const entryStartTime = entryStartTimes[entryIndex];
+      const level = entryLevels[entryIndex];
+      const x = this.chartViewport.timeToPosition(entryStartTime);
+      const y = this.levelToOffset(level);
+      const height = this.levelHeight(level);
+      const width = this.#eventBarWidth(timelineData, entryIndex);
+      const pos = drawOverride(context, x, y, width, height);
+      this.customDrawnPositions.set(entryIndex, pos);
+    }
     context.restore();
   }
 
@@ -3069,9 +3132,14 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.rawTimelineDataLength = timelineData.entryStartTimes.length;
     this.forceDecorationCache = new Array(this.rawTimelineDataLength);
     this.entryColorsCache = new Array(this.rawTimelineDataLength);
+    this.#indexToDrawOverride.clear();
     for (let i = 0; i < this.rawTimelineDataLength; ++i) {
       this.forceDecorationCache[i] = this.dataProvider.forceDecoration(i) ?? false;
       this.entryColorsCache[i] = this.dataProvider.entryColor(i);
+      const drawOverride = this.dataProvider.getDrawOverride?.(i);
+      if (drawOverride) {
+        this.#indexToDrawOverride.set(i, drawOverride);
+      }
     }
 
     const entryCounters = new Uint32Array(this.dataProvider.maxStackDepth() + 1);
@@ -3472,7 +3540,12 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     return false;
   }
 
-  getMarkerPixelsForEntryIndex(entryIndex: number): {x: number, width: number}|null {
+  getCustomDrawnPositionForEntryIndex(entryIndex: number): PositionOverride|null {
+    const customPos = this.customDrawnPositions.get(entryIndex);
+    if (customPos) {
+      return customPos;
+    }
+
     return this.markerPositions.get(entryIndex) ?? null;
   }
 
@@ -3506,7 +3579,13 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     let barX = 0;
     let barWidth = 0;
     let visible = true;
-    if (Number.isNaN(duration)) {
+
+    const customPos = this.customDrawnPositions.get(entryIndex);
+
+    if (customPos) {
+      barX = customPos.x;
+      barWidth = customPos.width;
+    } else if (Number.isNaN(duration)) {
       const position = this.markerPositions.get(entryIndex);
       if (position) {
         barX = position.x;
@@ -3684,20 +3763,20 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     return this.dataProvider.formatValue(value - this.zeroTime(), precision);
   }
 
-  maximumBoundary(): TraceEngine.Types.Timing.MilliSeconds {
-    return TraceEngine.Types.Timing.MilliSeconds(this.chartViewport.windowRightTime());
+  maximumBoundary(): Trace.Types.Timing.MilliSeconds {
+    return Trace.Types.Timing.MilliSeconds(this.chartViewport.windowRightTime());
   }
 
-  minimumBoundary(): TraceEngine.Types.Timing.MilliSeconds {
-    return TraceEngine.Types.Timing.MilliSeconds(this.chartViewport.windowLeftTime());
+  minimumBoundary(): Trace.Types.Timing.MilliSeconds {
+    return Trace.Types.Timing.MilliSeconds(this.chartViewport.windowLeftTime());
   }
 
-  zeroTime(): TraceEngine.Types.Timing.MilliSeconds {
-    return TraceEngine.Types.Timing.MilliSeconds(this.dataProvider.minimumBoundary());
+  zeroTime(): Trace.Types.Timing.MilliSeconds {
+    return Trace.Types.Timing.MilliSeconds(this.dataProvider.minimumBoundary());
   }
 
-  boundarySpan(): TraceEngine.Types.Timing.MilliSeconds {
-    return TraceEngine.Types.Timing.MilliSeconds(this.maximumBoundary() - this.minimumBoundary());
+  boundarySpan(): Trace.Types.Timing.MilliSeconds {
+    return Trace.Types.Timing.MilliSeconds(this.maximumBoundary() - this.minimumBoundary());
   }
 }
 
@@ -3740,13 +3819,13 @@ export type FlameChartDecoration = {
   // We often only want to highlight problem parts of events, so this time sets
   // the minimum time at which the candystriping will start. If you want to
   // candystripe the entire event, set this to 0.
-  startAtTime: TraceEngine.Types.Timing.MicroSeconds,
+  startAtTime: Trace.Types.Timing.MicroSeconds,
   // Optionally set the end time for the striping. If this is not provided, the entire entry will be striped.
-  endAtTime?: TraceEngine.Types.Timing.MicroSeconds,
+  endAtTime?: Trace.Types.Timing.MicroSeconds,
 }|{
   type: FlameChartDecorationType.WARNING_TRIANGLE,
-  customStartTime?: TraceEngine.Types.Timing.MicroSeconds,
-  customEndTime?: TraceEngine.Types.Timing.MicroSeconds,
+  customStartTime?: Trace.Types.Timing.MicroSeconds,
+  customEndTime?: Trace.Types.Timing.MicroSeconds,
 }|{
   type: FlameChartDecorationType.HIDDEN_DESCENDANTS_ARROW,
 };
@@ -3829,13 +3908,13 @@ export class FlameChartTimelineData {
 
 export interface DataProviderSearchResult {
   index: number;
-  startTimeMilli: TraceEngine.Types.Timing.MilliSeconds;
+  startTimeMilli: Trace.Types.Timing.MilliSeconds;
   provider: 'main'|'network'|'other';
 }
 
 export interface DataProviderSearchResult {
   index: number;
-  startTimeMilli: TraceEngine.Types.Timing.MilliSeconds;
+  startTimeMilli: Trace.Types.Timing.MilliSeconds;
   provider: 'main'|'network'|'other';
 }
 
@@ -3872,16 +3951,14 @@ export interface FlameChartDataProvider {
 
   textColor(entryIndex: number): string;
 
-  mainFrameNavigationStartEvents?(): readonly TraceEngine.Types.TraceEvents.TraceEventNavigationStart[];
+  mainFrameNavigationStartEvents?(): readonly Trace.Types.Events.NavigationStart[];
 
   hasTrackConfigurationMode(): boolean;
 
   // The following functions are optional and are used in Performance panel.
-  eventByIndex?(entryIndex: number): TraceEngine.Types.TraceEvents.TraceEventData
-      |TraceEngine.Handlers.ModelHandlers.Frames.TimelineFrame|null;
+  eventByIndex?(entryIndex: number): Trace.Types.Events.Event|Trace.Handlers.ModelHandlers.Frames.TimelineFrame|null;
 
-  indexForEvent?(event: TraceEngine.Types.TraceEvents.TraceEventData|
-                 TraceEngine.Types.TraceEvents.LegacyTimelineFrame): number|null;
+  indexForEvent?(event: Trace.Types.Events.Event|Trace.Types.Events.LegacyTimelineFrame): number|null;
 
   buildFlowForInitiator?(index: number): unknown;
 
@@ -3889,7 +3966,7 @@ export interface FlameChartDataProvider {
       (event: MouseEvent, eventIndex: number, groupIndex: number): UI.ContextMenu.ContextMenu|undefined;
 
   search?
-      (visibleWindow: TraceEngine.Types.Timing.TraceWindowMicroSeconds,
+      (visibleWindow: Trace.Types.Timing.TraceWindowMicroSeconds,
        filter: TimelineModel.TimelineModelFilter.TimelineModelFilter): DataProviderSearchResult[];
 
   // The following three functions are used for the flame chart entry customization.
@@ -3900,6 +3977,8 @@ export interface FlameChartDataProvider {
   handleFlameChartTransformKeyboardEvent?(event: KeyboardEvent, entryIndex: number, groupIndex: number): void;
 
   groupForEvent?(entryIndex: number): Group|null;
+
+  getDrawOverride?(entryIndex: number): DrawOverride|undefined;
 }
 
 export interface FlameChartMarker {
@@ -3952,7 +4031,10 @@ export const enum Events {
 }
 
 export type EventTypes = {
-  [Events.ENTRY_LABEL_ANNOTATION_ADDED]: number,
+  [Events.ENTRY_LABEL_ANNOTATION_ADDED]: {
+    entryIndex: number,
+    withLinkCreationButton: boolean,
+  },
   [Events.ENTRIES_LINK_ANNOTATION_CREATED]: {
     entryFromIndex: number,
   },
@@ -3968,11 +4050,11 @@ export type EventTypes = {
       scrollOffsetPixels: number,
       allGroupsCollapsed: boolean,
     },
-    traceWindow: TraceEngine.Types.Timing.TraceWindowMicroSeconds,
+    traceWindow: Trace.Types.Timing.TraceWindowMicroSeconds,
   },
   [Events.MOUSE_MOVE]: {
     mouseEvent: MouseEvent,
-    timeInMicroSeconds: TraceEngine.Types.Timing.MicroSeconds,
+    timeInMicroSeconds: Trace.Types.Timing.MicroSeconds,
   },
 };
 

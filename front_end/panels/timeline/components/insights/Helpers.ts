@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import type * as TraceEngine from '../../../../models/trace/trace.js';
+import type * as Trace from '../../../../models/trace/trace.js';
 import * as Marked from '../../../../third_party/marked/marked.js';
 import * as ComponentHelpers from '../../../../ui/components/helpers/helpers.js';
 import * as MarkdownView from '../../../../ui/components/markdown_view/markdown_view.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
+import * as VisualLogging from '../../../../ui/visual_logging/visual_logging.js';
 import type * as Overlays from '../../overlays/overlays.js';
 
 import sidebarInsightStyles from './sidebarInsight.css.js';
@@ -23,16 +24,17 @@ export function shouldRenderForCategory(options: {
 export function insightIsActive(options: {
   activeInsight: ActiveInsight|null,
   insightName: string,
-  insightNavigationId: string|null,
+  insightSetKey: string|null,
 }): boolean {
   const active = options.activeInsight && options.activeInsight.name === options.insightName &&
-      options.activeInsight.navigationId === options.insightNavigationId;
+      options.activeInsight.insightSetKey === options.insightSetKey;
   return Boolean(active);
 }
 
 export interface BaseInsightData {
-  insights: TraceEngine.Insights.Types.TraceInsightData|null;
-  navigationId: string|null;
+  insights: Trace.Insights.Types.TraceInsightSets|null;
+  /** The key into `insights` that contains this particular insight. */
+  insightSetKey: string|null;
   activeInsight: ActiveInsight|null;
   activeCategory: InsightsCategories;
 }
@@ -48,7 +50,7 @@ export abstract class BaseInsight extends HTMLElement {
 
   protected data: BaseInsightData = {
     insights: null,
-    navigationId: null,
+    insightSetKey: null,
     activeInsight: null,
     activeCategory: InsightsCategories.ALL,
   };
@@ -61,19 +63,20 @@ export abstract class BaseInsight extends HTMLElement {
 
   connectedCallback(): void {
     this.shadow.adoptedStyleSheets.push(sidebarInsightStyles);
+    this.setAttribute('jslog', `${VisualLogging.section(`timeline.insights.${this.internalName}`)}`);
   }
 
-  set insights(insights: TraceEngine.Insights.Types.TraceInsightData|null) {
+  set insights(insights: Trace.Insights.Types.TraceInsightSets|null) {
     this.data.insights = insights;
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
   }
 
-  set navigationId(navigationId: string|null) {
-    this.data.navigationId = navigationId;
+  set insightSetKey(insightSetKey: string|null) {
+    this.data.insightSetKey = insightSetKey;
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
   }
 
-  set activeInsight(activeInsight: ActiveInsight) {
+  set activeInsight(activeInsight: ActiveInsight|null) {
     this.data.activeInsight = activeInsight;
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
   }
@@ -88,16 +91,24 @@ export abstract class BaseInsight extends HTMLElement {
       this.dispatchEvent(new SidebarInsight.InsightDeactivated());
       return;
     }
-    if (!this.data.navigationId) {
+    if (!this.data.insightSetKey) {
       // Shouldn't happen, but needed to satisfy TS.
       return;
     }
 
     this.dispatchEvent(new SidebarInsight.InsightActivated(
         this.internalName,
-        this.data.navigationId,
+        this.data.insightSetKey,
         this.createOverlays.bind(this),
         ));
+  }
+
+  protected onOverlayOverride(overlays: Overlays.Overlays.TimelineOverlay[]|null): void {
+    if (!this.isActive()) {
+      return;
+    }
+
+    this.dispatchEvent(new SidebarInsight.InsightOverlayOverride(overlays));
   }
 
   abstract createOverlays(): Overlays.Overlays.TimelineOverlay[];
@@ -108,7 +119,7 @@ export abstract class BaseInsight extends HTMLElement {
     return insightIsActive({
       activeInsight: this.data.activeInsight,
       insightName: this.internalName,
-      insightNavigationId: this.data.navigationId,
+      insightSetKey: this.data.insightSetKey,
     });
   }
 }

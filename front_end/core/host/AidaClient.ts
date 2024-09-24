@@ -47,6 +47,8 @@ export enum UserTier {
   USER_TIER_UNSPECIFIED = 0,
   // Users who are internal testers.
   TESTERS = 1,
+  // Users who are early adopters.
+  BETA = 2,
   // Users in the general public.
   PUBLIC = 3,
 }
@@ -127,13 +129,17 @@ export interface AidaResponse {
 export const enum AidaAccessPreconditions {
   AVAILABLE = 'available',
   NO_ACCOUNT_EMAIL = 'no-account-email',
-  NO_ACTIVE_SYNC = 'no-active-sync',
   NO_INTERNET = 'no-internet',
+  // This is the state (mostly enterprise) users are in, when they are automatically logged out from
+  // Chrome after a certain time period. For making AIDA requests, they need to log in again.
+  SYNC_IS_PAUSED = 'sync-is-paused',
 }
 
 export const CLIENT_NAME = 'CHROME_DEVTOOLS';
 
 const CODE_CHUNK_SEPARATOR = '\n`````\n';
+
+export class AidaAbortError extends Error {}
 
 export class AidaClient {
   static buildConsoleInsightsRequest(input: string): AidaRequest {
@@ -144,15 +150,15 @@ export class AidaClient {
       client_feature: ClientFeature.CHROME_CONSOLE_INSIGHTS,
     };
     const config = Common.Settings.Settings.instance().getHostConfig();
-    let temperature = NaN;
+    let temperature = -1;
     let modelId = '';
     if (config.devToolsConsoleInsights?.enabled) {
-      temperature = config.devToolsConsoleInsights.temperature || 0;
+      temperature = config.devToolsConsoleInsights.temperature ?? -1;
       modelId = config.devToolsConsoleInsights.modelId || '';
     }
     const disallowLogging = config.aidaAvailability?.disallowLogging ?? true;
 
-    if (!isNaN(temperature)) {
+    if (temperature >= 0) {
       request.options ??= {};
       request.options.temperature = temperature;
     }
@@ -179,19 +185,22 @@ export class AidaClient {
       return AidaAccessPreconditions.NO_ACCOUNT_EMAIL;
     }
 
-    if (!syncInfo.isSyncActive) {
-      return AidaAccessPreconditions.NO_ACTIVE_SYNC;
+    if (syncInfo.isSyncPaused) {
+      return AidaAccessPreconditions.SYNC_IS_PAUSED;
     }
 
     return AidaAccessPreconditions.AVAILABLE;
   }
 
-  async * fetch(request: AidaRequest): AsyncGenerator<AidaResponse, void, void> {
+  async * fetch(request: AidaRequest, options?: {signal?: AbortSignal}): AsyncGenerator<AidaResponse, void, void> {
     if (!InspectorFrontendHostInstance.doAidaConversation) {
       throw new Error('doAidaConversation is not available');
     }
     const stream = (() => {
       let {promise, resolve, reject} = Promise.withResolvers<string|null>();
+      options?.signal?.addEventListener('abort', () => {
+        reject(new AidaAbortError());
+      });
       return {
         write: async(data: string): Promise<void> => {
           resolve(data);
@@ -313,9 +322,11 @@ export function convertToUserTierEnum(userTier: string|undefined): UserTier {
     switch (userTier) {
       case 'TESTERS':
         return UserTier.TESTERS;
+      case 'BETA':
+        return UserTier.BETA;
       case 'PUBLIC':
         return UserTier.PUBLIC;
     }
   }
-  return UserTier.TESTERS;
+  return UserTier.BETA;
 }

@@ -317,7 +317,7 @@ c`;
 
       const result = await FreestylerAgent.describeElement(element);
 
-      assert.strictEqual(result, '\n* Its selector is `div#myElement`');
+      assert.strictEqual(result, '* Its selector is `div#myElement`');
     });
 
     it('should describe an element with child element and text nodes', async () => {
@@ -339,8 +339,7 @@ c`;
       element.parentNode = null;
 
       const result = await FreestylerAgent.describeElement(element);
-      const expectedOutput = `
-* Its selector is \`div#parentElement\`
+      const expectedOutput = `* Its selector is \`div#parentElement\`
 * It has 2 child element nodes: \`span.child1\`, \`span.child2\`
 * It only has 1 child text node`;
 
@@ -371,8 +370,7 @@ c`;
       element.parentNode = parentNode;
 
       const result = await FreestylerAgent.describeElement(element);
-      const expectedOutput = `
-* Its selector is \`div#parentElement\`
+      const expectedOutput = `* Its selector is \`div#parentElement\`
 * It has a next sibling and it is an element node
 * It has a previous sibling and it is a non element node
 * Its parent's selector is \`div#grandparentElement\`
@@ -501,11 +499,10 @@ c`;
             metadata: {
               disable_user_content_logging: false,
               string_session_id: 'sessionId',
-              user_tier: 1,
+              user_tier: 2,
             },
             options: {
               model_id: 'test model',
-              temperature: 0,
             },
             client_feature: 2,
             functionality_type: 1,
@@ -522,7 +519,8 @@ c`;
     });
 
     function mockAidaClient(
-        fetch: () => AsyncGenerator<Host.AidaClient.AidaResponse, void, void>,
+        fetch: (_: unknown, options?: {signal: AbortSignal}) =>
+            AsyncGenerator<Host.AidaClient.AidaResponse, void, void>,
         ): Host.AidaClient.AidaClient {
       return {
         fetch,
@@ -566,7 +564,7 @@ c`;
         });
 
         promise.resolve(true);
-        await Array.fromAsync(agent.run('test', {selectedElement: element, isFixQuery: false}));
+        await Array.fromAsync(agent.run('test', {selectedElement: element}));
 
         sinon.assert.match(execJs.getCall(0).args[1], sinon.match({throwOnSideEffect: true}));
       });
@@ -605,7 +603,7 @@ c`;
 
         });
         promise.resolve(true);
-        await Array.fromAsync(agent.run('test', {selectedElement: element, isFixQuery: false}));
+        await Array.fromAsync(agent.run('test', {selectedElement: element}));
 
         assert.strictEqual(execJs.getCalls().length, 2);
         sinon.assert.match(execJs.getCall(1).args[1], sinon.match({throwOnSideEffect: false}));
@@ -644,48 +642,12 @@ c`;
 
         });
         promise.resolve(false);
-        const responses = await Array.fromAsync(agent.run('test', {selectedElement: element, isFixQuery: false}));
+        const responses = await Array.fromAsync(agent.run('test', {selectedElement: element}));
 
         const actionStep = responses.find(response => response.type === Freestyler.ResponseType.ACTION)!;
 
         assert.strictEqual(actionStep.output, 'Error: User denied code execution with side effects.');
         assert.strictEqual(execJs.getCalls().length, 1);
-      });
-
-      it('calls execJs with allowing side effects when the query includes "Fix this issue" prompt', async () => {
-        let count = 0;
-        async function* generateActionAndAnswer() {
-          if (count === 0) {
-            yield {
-              explanation: `ACTION
-              $0.style.backgroundColor = 'red'
-              STOP`,
-              metadata: {},
-              completed: true,
-            };
-          } else {
-            yield {
-              explanation: 'ANSWER: This is the answer',
-              metadata: {},
-              completed: true,
-            };
-          }
-
-          count++;
-        }
-        const execJs = sinon.mock().once();
-        const agent = new FreestylerAgent({
-          aidaClient: mockAidaClient(generateActionAndAnswer),
-          createExtensionScope,
-          execJs,
-
-        });
-
-        await Array.fromAsync(
-            agent.run(Freestyler.FIX_THIS_ISSUE_PROMPT, {selectedElement: element, isFixQuery: true}));
-
-        const optionsArg = execJs.lastCall.args[1];
-        sinon.assert.match(optionsArg, sinon.match({throwOnSideEffect: false}));
       });
     });
 
@@ -718,7 +680,7 @@ c`;
 
         });
 
-        const result = await Array.fromAsync(agent.run('test', {selectedElement: element, isFixQuery: false}));
+        const result = await Array.fromAsync(agent.run('test', {selectedElement: element}));
         const actionSteps = result.filter(step => {
           return step.type === Freestyler.ResponseType.ACTION;
         });
@@ -744,7 +706,7 @@ c`;
 
       });
 
-      const responses = await Array.fromAsync(agent.run('test', {selectedElement: element, isFixQuery: false}));
+      const responses = await Array.fromAsync(agent.run('test', {selectedElement: element}));
       assert.deepStrictEqual(responses, [
         {
           type: Freestyler.ResponseType.QUERYING,
@@ -786,7 +748,7 @@ c`;
 
       });
 
-      const responses = await Array.fromAsync(agent.run('test', {selectedElement: element, isFixQuery: false}));
+      const responses = await Array.fromAsync(agent.run('test', {selectedElement: element}));
       assert.deepStrictEqual(responses, [
         {
           type: Freestyler.ResponseType.QUERYING,
@@ -821,7 +783,7 @@ c`;
 
       });
 
-      const responses = await Array.fromAsync(agent.run('test', {selectedElement: element, isFixQuery: false}));
+      const responses = await Array.fromAsync(agent.run('test', {selectedElement: element}));
       assert.deepStrictEqual(responses, [
         {
           type: Freestyler.ResponseType.QUERYING,
@@ -829,7 +791,7 @@ c`;
         {
           rpcId: undefined,
           type: Freestyler.ResponseType.ERROR,
-          error: 'Sorry, I could not help you with this query.',
+          error: Freestyler.ErrorType.UNKNOWN,
         },
       ]);
     });
@@ -855,7 +817,7 @@ c`;
 
       });
 
-      const responses = await Array.fromAsync(agent.run('test', {selectedElement: element, isFixQuery: false}));
+      const responses = await Array.fromAsync(agent.run('test', {selectedElement: element}));
       assert.deepStrictEqual(responses, [
         {
           type: Freestyler.ResponseType.QUERYING,
@@ -884,14 +846,14 @@ c`;
         execJs,
 
       });
-      const responses = await Array.fromAsync(agent.run('test', {selectedElement: element, isFixQuery: false}));
+      const responses = await Array.fromAsync(agent.run('test', {selectedElement: element}));
       assert.deepStrictEqual(responses, [
         {
           type: Freestyler.ResponseType.QUERYING,
         },
         {
           type: Freestyler.ResponseType.ERROR,
-          error: 'Sorry, I could not help you with this query.',
+          error: Freestyler.ErrorType.UNKNOWN,
           rpcId: undefined,
         },
       ]);
@@ -941,7 +903,7 @@ ANSWER: this is the answer`,
         execJs,
 
       });
-      const responses = await Array.fromAsync(agent.run('test', {selectedElement: element, isFixQuery: false}));
+      const responses = await Array.fromAsync(agent.run('test', {selectedElement: element}));
       assert.deepStrictEqual(responses, [
         {
           type: Freestyler.ResponseType.QUERYING,
@@ -949,7 +911,6 @@ ANSWER: this is the answer`,
         {
           type: Freestyler.ResponseType.THOUGHT,
           thought: 'I am thinking.',
-          title: undefined,
           rpcId: undefined,
         },
         {
@@ -999,7 +960,7 @@ ANSWER: this is the answer`,
 
       });
 
-      await Array.fromAsync(agent.run('test', {selectedElement: element, isFixQuery: false}));
+      await Array.fromAsync(agent.run('test', {selectedElement: element}));
 
       assert.deepStrictEqual(agent.chatHistoryForTesting, [
         {
@@ -1039,7 +1000,10 @@ ANSWER: this is the answer`,
 
     it('stops when aborted', async () => {
       let count = 0;
-      async function* generateMultipleTimes() {
+      async function* generateAndAbort(_: unknown, options?: {signal: AbortSignal}) {
+        if (options?.signal.aborted) {
+          throw new Host.AidaClient.AidaAbortError();
+        }
         if (count === 3) {
           yield {
             explanation: 'ANSWER: this is the answer',
@@ -1058,16 +1022,14 @@ ANSWER: this is the answer`,
 
       const execJs = sinon.spy();
       const agent = new FreestylerAgent({
-        aidaClient: mockAidaClient(generateMultipleTimes),
+        aidaClient: mockAidaClient(generateAndAbort),
         createExtensionScope,
         execJs,
-
       });
 
       const controller = new AbortController();
       controller.abort();
-      await Array.fromAsync(
-          agent.run('test', {selectedElement: element, signal: controller.signal, isFixQuery: false}));
+      await Array.fromAsync(agent.run('test', {selectedElement: element, signal: controller.signal}));
 
       assert.deepStrictEqual(agent.chatHistoryForTesting, []);
     });

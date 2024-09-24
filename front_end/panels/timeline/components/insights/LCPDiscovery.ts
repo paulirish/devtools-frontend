@@ -5,7 +5,7 @@
 import * as Common from '../../../../core/common/common.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
-import * as TraceEngine from '../../../../models/trace/trace.js';
+import * as Trace from '../../../../models/trace/trace.js';
 import * as IconButton from '../../../../ui/components/icon_button/icon_button.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 import type * as Overlays from '../../overlays/overlays.js';
@@ -16,6 +16,10 @@ import * as SidebarInsight from './SidebarInsight.js';
 import {InsightsCategories} from './types.js';
 
 const UIStrings = {
+  /**
+   *@description Title of an insight that provides details about the LCP metric, and the network requests necessary to load it.
+   */
+  title: 'LCP request discovery',
   /**
    * @description Text to tell the user how long after the earliest discovery time their LCP element loaded.
    * @example {401ms} PH1
@@ -43,43 +47,24 @@ interface LCPImageDiscoveryData {
   shouldIncreasePriorityHint: boolean;
   shouldPreloadImage: boolean;
   shouldRemoveLazyLoading: boolean;
-  request: TraceEngine.Types.TraceEvents.SyntheticNetworkRequest;
-  discoveryDelay: TraceEngine.Types.Timing.MicroSeconds|null;
-}
-
-export function getLCPInsightData(
-    insights: TraceEngine.Insights.Types.TraceInsightData|null,
-    navigationId: string|null): TraceEngine.Insights.Types.InsightResults['LargestContentfulPaint']|null {
-  if (!insights || !navigationId) {
-    return null;
-  }
-
-  const insightsByNavigation = insights.get(navigationId);
-  if (!insightsByNavigation) {
-    return null;
-  }
-
-  const lcpInsight = insightsByNavigation.LargestContentfulPaint;
-  if (lcpInsight instanceof Error) {
-    return null;
-  }
-  return lcpInsight;
+  request: Trace.Types.Events.SyntheticNetworkRequest;
+  discoveryDelay: Trace.Types.Timing.MicroSeconds|null;
 }
 
 function getImageData(
-    insights: TraceEngine.Insights.Types.TraceInsightData|null, navigationId: string|null): LCPImageDiscoveryData|null {
-  const lcpInsight = getLCPInsightData(insights, navigationId);
-  if (!lcpInsight) {
+    insights: Trace.Insights.Types.TraceInsightSets|null, insightSetKey: string|null): LCPImageDiscoveryData|null {
+  const insight = Trace.Insights.Common.getInsight('LargestContentfulPaint', insights, insightSetKey);
+  if (!insight) {
     return null;
   }
 
-  if (lcpInsight.lcpRequest === undefined) {
+  if (insight.lcpRequest === undefined) {
     return null;
   }
 
-  const shouldIncreasePriorityHint = lcpInsight.shouldIncreasePriorityHint;
-  const shouldPreloadImage = lcpInsight.shouldPreloadImage;
-  const shouldRemoveLazyLoading = lcpInsight.shouldRemoveLazyLoading;
+  const shouldIncreasePriorityHint = insight.shouldIncreasePriorityHint;
+  const shouldPreloadImage = insight.shouldPreloadImage;
+  const shouldRemoveLazyLoading = insight.shouldRemoveLazyLoading;
 
   const imageLCP = shouldIncreasePriorityHint !== undefined && shouldPreloadImage !== undefined &&
       shouldRemoveLazyLoading !== undefined;
@@ -93,13 +78,13 @@ function getImageData(
     shouldIncreasePriorityHint,
     shouldPreloadImage,
     shouldRemoveLazyLoading,
-    request: lcpInsight.lcpRequest,
+    request: insight.lcpRequest,
     discoveryDelay: null,
   };
 
-  if (lcpInsight.earliestDiscoveryTimeTs && lcpInsight.lcpRequest) {
-    const discoveryDelay = lcpInsight.lcpRequest.ts - lcpInsight.earliestDiscoveryTimeTs;
-    data.discoveryDelay = TraceEngine.Types.Timing.MicroSeconds(discoveryDelay);
+  if (insight.earliestDiscoveryTimeTs && insight.lcpRequest) {
+    const discoveryDelay = insight.lcpRequest.ts - insight.earliestDiscoveryTimeTs;
+    data.discoveryDelay = Trace.Types.Timing.MicroSeconds(discoveryDelay);
   }
 
   return data;
@@ -109,7 +94,7 @@ export class LCPDiscovery extends BaseInsight {
   static readonly litTagName = LitHtml.literal`devtools-performance-lcp-discovery`;
   override insightCategory: InsightsCategories = InsightsCategories.LCP;
   override internalName: string = 'lcp-discovery';
-  override userVisibleTitle: string = 'LCP request discovery';
+  override userVisibleTitle: string = i18nString(UIStrings.title);
 
   override connectedCallback(): void {
     super.connectedCallback();
@@ -127,7 +112,7 @@ export class LCPDiscovery extends BaseInsight {
     `;
   }
 
-  #renderDiscoveryDelay(delay: TraceEngine.Types.Timing.MicroSeconds): Element {
+  #renderDiscoveryDelay(delay: Trace.Types.Timing.MicroSeconds): Element {
     const timeWrapper = document.createElement('span');
     timeWrapper.classList.add('discovery-time-ms');
     timeWrapper.innerText = i18n.TimeUtilities.formatMicroSecondsTime(delay);
@@ -135,13 +120,13 @@ export class LCPDiscovery extends BaseInsight {
   }
 
   override createOverlays(): Overlays.Overlays.TimelineOverlay[] {
-    const imageResults = getImageData(this.data.insights, this.data.navigationId);
+    const imageResults = getImageData(this.data.insights, this.data.insightSetKey);
     if (!imageResults || !imageResults.discoveryDelay) {
       return [];
     }
 
-    const delay = TraceEngine.Helpers.Timing.traceWindowFromMicroSeconds(
-        TraceEngine.Types.Timing.MicroSeconds(imageResults.request.ts - imageResults.discoveryDelay),
+    const delay = Trace.Helpers.Timing.traceWindowFromMicroSeconds(
+        Trace.Types.Timing.MicroSeconds(imageResults.request.ts - imageResults.discoveryDelay),
         imageResults.request.ts,
     );
 
@@ -176,6 +161,7 @@ export class LCPDiscovery extends BaseInsight {
         <div class="insights">
           <${SidebarInsight.SidebarInsight.litTagName} .data=${{
             title: this.userVisibleTitle,
+            internalName: this.internalName,
             expanded: this.isActive(),
           } as SidebarInsight.InsightDetails}
           @insighttoggleclick=${this.onSidebarClick}
@@ -210,7 +196,7 @@ export class LCPDiscovery extends BaseInsight {
   }
 
   override render(): void {
-    const imageResults = getImageData(this.data.insights, this.data.navigationId);
+    const imageResults = getImageData(this.data.insights, this.data.insightSetKey);
     const matchesCategory = shouldRenderForCategory({
       activeCategory: this.data.activeCategory,
       insightCategory: this.insightCategory,

@@ -708,7 +708,7 @@ export class DebuggerModel extends SDKModel<EventTypes> {
       executionContextId: number, hash: string, executionContextAuxData: any, isLiveEdit: boolean,
       sourceMapURL: string|undefined, hasSourceURLComment: boolean, hasSyntaxError: boolean, length: number,
       isModule: boolean|null, originStackTrace: Protocol.Runtime.StackTrace|null, codeOffset: number|null,
-      scriptLanguage: string|null, debugSymbols: Protocol.Debugger.DebugSymbols|null,
+      scriptLanguage: string|null, debugSymbols: Protocol.Debugger.DebugSymbols[]|null,
       embedderName: Platform.DevToolsPath.UrlString|null): Script {
     const knownScript = this.#scriptsInternal.get(scriptId);
     if (knownScript) {
@@ -718,10 +718,16 @@ export class DebuggerModel extends SDKModel<EventTypes> {
     if (executionContextAuxData && ('isDefault' in executionContextAuxData)) {
       isContentScript = !executionContextAuxData['isDefault'];
     }
+
+    let selectedDebugSymbol = null;
+    if (debugSymbols && debugSymbols.length > 0) {
+      // TODO(crbug.com/40879198): Adapt to prioritize DWARF information.
+      selectedDebugSymbol = debugSymbols[0];
+    }
     const script = new Script(
         this, scriptId, sourceURL, startLine, startColumn, endLine, endColumn, executionContextId, hash,
         isContentScript, isLiveEdit, sourceMapURL, hasSourceURLComment, length, isModule, originStackTrace, codeOffset,
-        scriptLanguage, debugSymbols, embedderName);
+        scriptLanguage, selectedDebugSymbol, embedderName);
     this.registerScript(script);
     this.dispatchEventToListeners(Events.ParsedScriptSource, script);
 
@@ -1201,7 +1207,7 @@ export class CallFrame {
     this.#scopeChainInternal = [];
     this.#localScopeInternal = null;
     this.inlineFrameIndex = inlineFrameIndex || 0;
-    this.functionName = functionName || payload.functionName;
+    this.functionName = functionName ?? payload.functionName;
     this.missingDebugInfoDetails = null;
     this.canBeRestarted = Boolean(payload.canBeRestarted);
     this.exception = exception;
@@ -1235,7 +1241,7 @@ export class CallFrame {
   }
 
   createVirtualCallFrame(inlineFrameIndex: number, name: string): CallFrame {
-    return new CallFrame(this.debuggerModel, this.script, this.payload, inlineFrameIndex, name);
+    return new CallFrame(this.debuggerModel, this.script, this.payload, inlineFrameIndex, name, this.exception);
   }
 
   get id(): Protocol.Debugger.CallFrameId {

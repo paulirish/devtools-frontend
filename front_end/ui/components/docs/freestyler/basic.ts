@@ -21,7 +21,6 @@ const messages: Freestyler.ChatMessage[] = [
   {
     entity: Freestyler.ChatMessageEntity.MODEL,
     suggestingFix: true,
-    aborted: false,
     steps: [
       {
         isLoading: false,
@@ -46,12 +45,14 @@ const component = new Freestyler.FreestylerChatUi({
   onFeedbackSubmit: noop,
   onAcceptConsentClick: noop,
   onCancelClick: noop,
-  onFixThisIssueClick: noop,
+  onSelectedNetworkRequestClick: noop,
   inspectElementToggled: false,
   state: Freestyler.State.CHAT_VIEW,
   aidaAvailability: Host.AidaClient.AidaAccessPreconditions.AVAILABLE,
   messages,
   selectedElement: {} as unknown as SDK.DOMModel.DOMNode,
+  selectedNetworkRequest: {} as unknown as SDK.NetworkRequest.NetworkRequest,
+  agentType: Freestyler.AgentType.FREESTYLER,
   isLoading: false,
   canShowFeedbackForm: false,
   userInfo: {},
