@@ -5,7 +5,7 @@ import * as Common from '../../../core/common/common.js';
 import * as Platform from '../../../core/platform/platform.js';
 import * as Trace from '../../../models/trace/trace.js';
 import type * as PerfUI from '../../../ui/legacy/components/perf_ui/perf_ui.js';
-import * as UI from '../../legacy.js';
+import * as UI from '../../../ui/legacy/legacy.js';
 
 import * as Components from './components/components.js';
 
@@ -838,12 +838,23 @@ export class Overlays extends EventTarget {
         break;
       }
       case 'DESATURATION': {
-        // const isVisible = this.entryIsVisibleOnChart(overlay.entry);
-        // this.#setOverlayElementVisibility(element, isVisible);
-        // if (isVisible) {
-        //   this.#positionCreateEntriesLinkOverlay(overlay, element);
-        // }
-        console.log('desat, position');
+        const mask = element.querySelector('mask') as SVGMaskElement;
+        mask.querySelectorAll('rect.punch').forEach(el => el.remove());
+
+        overlay.entries.filter(entry => this.#entryIsVerticallyVisibleOnChart(entry)).forEach(entry => {
+          const entryStartX = this.xPixelForEventStartOnChart(entry) ?? 0;
+          const entryEndX = this.xPixelForEventEndOnChart(entry) ?? 0;
+          const entryWidth = entryEndX - entryStartX;
+          const entryStartY = (this.yPixelForEventOnChart(entry) ?? 0);
+          const entryHeight = this.pixelHeightForEventOnChart(entry) ?? 0;
+
+          const punchRect = UI.UIUtils.createSVGChild(mask, 'rect', 'punch');
+          punchRect.setAttribute('x', entryStartX.toString());
+          punchRect.setAttribute('y', entryStartY.toString());
+          punchRect.setAttribute('width', entryWidth.toString());
+          punchRect.setAttribute('height', entryHeight.toString());
+          punchRect.setAttribute('fill', 'black');
+        });
         break;
       }
       case 'TIMESPAN_BREAKDOWN': {
@@ -1422,11 +1433,14 @@ export class Overlays extends EventTarget {
         return div;
       }
       case 'DESATURATION': {
+        // This almost works but.. I think doesnt because its DOM location isn't on top of the flamecharts.
+        // If i put the div as the preceding sibling of timeline-overlays-container.. it kinda works but still not wonderfully.
+        div.classList.add('fill');
         const dimHighlightSVG = UI.UIUtils.createSVGChild(div, 'svg', 'overlay-dim-highlight-svg');
         // Set up the desaturation mask
         const defs = UI.UIUtils.createSVGChild(dimHighlightSVG, 'defs');
         const mask = UI.UIUtils.createSVGChild(defs, 'mask') as SVGMaskElement;
-        mask.id = 'dim-highlight-cutouts';
+        mask.id = 'desat-overlay-cutouts';
         /* Within the mask...
             - black fill = punch, fully transparently, through to the next thing. these are the cutouts to the color.
             - white fill = be 100% DESATURATIONd
@@ -1508,7 +1522,7 @@ export class Overlays extends EventTarget {
         break;
       }
       case 'DESATURATION': {
-        console.log('desat update after positioning');
+        console.log('desat, update after positioning');
         break;
       }
       case 'TIMESPAN_BREAKDOWN': {
