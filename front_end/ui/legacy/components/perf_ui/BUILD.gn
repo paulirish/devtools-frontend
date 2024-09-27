@@ -15,7 +15,7 @@ copy_to_gen("css_files") {
   ]
 }
 
-copy_to_gen("legacy_css_files") {
+generate_css("legacy_css_files") {
   sources = [
     "chartViewport.css",
     "filmStripView.css",
@@ -23,7 +23,7 @@ copy_to_gen("legacy_css_files") {
     "overviewGrid.css",
     "timelineGrid.css",
   ]
-  # legacy = true
+  legacy = true
 }
 
 devtools_module("perf_ui") {

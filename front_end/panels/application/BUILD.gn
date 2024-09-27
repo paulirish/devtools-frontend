@@ -110,8 +110,7 @@ devtools_entrypoint("bundle") {
   deps = [
     ":application",
     ":css_files",
-
-    # "../../ui/legacy:css_files",
+    "../../ui/legacy:css_files",
   ]
 
   visibility = [

@@ -41,7 +41,7 @@ template("generate_css") {
         _file_name = "$_file_name.legacy"
       }
 
-      # outputs += [ "$target_gen_dir/$_file_name.js" ]
+      outputs += [ "$target_gen_dir/$_file_name.js" ]
     }
 
     data = outputs
