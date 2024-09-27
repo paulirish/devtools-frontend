@@ -15,7 +15,7 @@ import * as TextEditor from '../../../../ui/components/text_editor/text_editor.j
 import type * as UI from '../../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 
-import ruleSetDetailsViewStyles from './RuleSetDetailsView.css.js';
+import ruleSetDetailsViewStyles from './RuleSetDetailsView.css' assert { type: 'css' };
 
 type RuleSet = Protocol.Preload.RuleSet;
 

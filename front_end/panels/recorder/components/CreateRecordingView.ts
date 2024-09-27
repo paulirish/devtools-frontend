@@ -15,7 +15,7 @@ import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 import * as Models from '../models/models.js';
 import * as Actions from '../recorder-actions/recorder-actions.js';
 
-import createRecordingViewStyles from './createRecordingView.css.js';
+import createRecordingViewStyles from './createRecordingView.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

@@ -15,7 +15,7 @@ import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import {EditableSpan, type EditableSpanData} from './EditableSpan.js';
-import headerSectionRowStyles from './HeaderSectionRow.css.js';
+import headerSectionRowStyles from './HeaderSectionRow.css' assert { type: 'css' };
 
 const {render, html} = LitHtml;
 

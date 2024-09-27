@@ -9,9 +9,9 @@ import * as IconButton from '../../../ui/components/icon_button/icon_button.js';
 import * as TreeOutline from '../../../ui/components/tree_outline/tree_outline.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 
-import badgeStyles from './badge.css.js';
-import originTrialTokenRowsStyles from './originTrialTokenRows.css.js';
-import originTrialTreeViewStyles from './originTrialTreeView.css.js';
+import badgeStyles from './badge.css' assert { type: 'css' };
+import originTrialTokenRowsStyles from './originTrialTokenRows.css' assert { type: 'css' };
+import originTrialTreeViewStyles from './originTrialTreeView.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

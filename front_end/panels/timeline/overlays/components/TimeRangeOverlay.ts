@@ -7,7 +7,7 @@ import * as ComponentHelpers from '../../../../ui/components/helpers/helpers.js'
 import * as IconButton from '../../../../ui/components/icon_button/icon_button.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 
-import styles from './timeRangeOverlay.css.js';
+import styles from './timeRangeOverlay.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

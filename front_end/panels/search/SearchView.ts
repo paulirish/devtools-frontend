@@ -13,7 +13,7 @@ import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {SearchResultsPane} from './SearchResultsPane.js';
 import {type SearchResult, type SearchScope} from './SearchScope.js';
-import searchViewStyles from './searchView.css.js';
+import searchViewStyles from './searchView.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

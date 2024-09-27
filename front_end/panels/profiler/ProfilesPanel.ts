@@ -33,11 +33,11 @@ import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as IconButton from '../../ui/components/icon_button/icon_button.js';
 // eslint-disable-next-line rulesdir/es_modules_import
-import objectValueStyles from '../../ui/legacy/components/object_ui/objectValue.css.js';
+import objectValueStyles from '../../ui/legacy/components/object_ui/objectValue.css' assert { type: 'css' };
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
-import heapProfilerStyles from './heapProfiler.css.js';
+import heapProfilerStyles from './heapProfiler.css' assert { type: 'css' };
 import {
   type DataDisplayDelegate,
   ProfileEvents as ProfileTypeEvents,
@@ -46,8 +46,8 @@ import {
 } from './ProfileHeader.js';
 import {Events as ProfileLauncherEvents, ProfileLauncherView} from './ProfileLauncherView.js';
 import {ProfileSidebarTreeElement} from './ProfileSidebarTreeElement.js';
-import profilesPanelStyles from './profilesPanel.css.js';
-import profilesSidebarTreeStyles from './profilesSidebarTree.css.js';
+import profilesPanelStyles from './profilesPanel.css' assert { type: 'css' };
+import profilesSidebarTreeStyles from './profilesSidebarTree.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

@@ -7,7 +7,7 @@ import * as Helpers from '../../../models/trace/helpers/helpers.js';
 import * as Trace from '../../../models/trace/trace.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 
-import layoutShiftDetailsStyles from './layoutShiftDetails.css.js';
+import layoutShiftDetailsStyles from './layoutShiftDetails.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

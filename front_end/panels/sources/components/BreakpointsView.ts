@@ -20,7 +20,7 @@ import * as UI from '../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
-import breakpointsViewStyles from './breakpointsView.css.js';
+import breakpointsViewStyles from './breakpointsView.css' assert { type: 'css' };
 import {findNextNodeForKeyboardNavigation, getDifferentiatingPathMap, type TitleInfo} from './BreakpointsViewUtils.js';
 
 const UIStrings = {

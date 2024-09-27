@@ -12,12 +12,12 @@ import * as LegacyWrapper from '../../../ui/components/legacy_wrapper/legacy_wra
 import * as NodeText from '../../../ui/components/node_text/node_text.js';
 import * as Coordinator from '../../../ui/components/render_coordinator/render_coordinator.js';
 // eslint-disable-next-line rulesdir/es_modules_import
-import inspectorCommonStyles from '../../../ui/legacy/inspectorCommon.css.js';
+import inspectorCommonStyles from '../../../ui/legacy/inspectorCommon.css' assert { type: 'css' };
 import * as UI from '../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
-import layoutPaneStyles from './layoutPane.css.js';
+import layoutPaneStyles from './layoutPane.css' assert { type: 'css' };
 import {type BooleanSetting, type EnumSetting, type LayoutElement, type Setting} from './LayoutPaneUtils.js';
 
 const UIStrings = {

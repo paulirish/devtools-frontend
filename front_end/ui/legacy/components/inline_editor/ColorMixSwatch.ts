@@ -7,7 +7,7 @@ import * as Platform from '../../../../core/platform/platform.js';
 import * as LitHtml from '../../../lit-html/lit-html.js';
 import * as VisualLogging from '../../../visual_logging/visual_logging.js';
 
-import colorMixSwatchStyles from './colorMixSwatch.css.js';
+import colorMixSwatchStyles from './colorMixSwatch.css' assert { type: 'css' };
 
 export const enum Events {
   COLOR_CHANGED = 'colorChanged',

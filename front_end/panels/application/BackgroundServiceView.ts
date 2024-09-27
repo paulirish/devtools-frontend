@@ -10,12 +10,12 @@ import * as Protocol from '../../generated/protocol.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
 // eslint-disable-next-line rulesdir/es_modules_import
-import emptyWidgetStyles from '../../ui/legacy/emptyWidget.css.js';
+import emptyWidgetStyles from '../../ui/legacy/emptyWidget.css' assert { type: 'css' };
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {type BackgroundServiceModel, Events} from './BackgroundServiceModel.js';
-import backgroundServiceViewStyles from './backgroundServiceView.css.js';
+import backgroundServiceViewStyles from './backgroundServiceView.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

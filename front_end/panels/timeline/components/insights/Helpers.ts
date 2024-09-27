@@ -10,7 +10,7 @@ import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../../ui/visual_logging/visual_logging.js';
 import type * as Overlays from '../../overlays/overlays.js';
 
-import sidebarInsightStyles from './sidebarInsight.css.js';
+import sidebarInsightStyles from './sidebarInsight.css' assert { type: 'css' };
 import * as SidebarInsight from './SidebarInsight.js';
 import {type TableState} from './Table.js';
 import {type ActiveInsight, Category} from './types.js';

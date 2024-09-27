@@ -5,7 +5,7 @@
 import * as LitHtml from '../../lit-html/lit-html.js';
 import * as ComponentHelpers from '../helpers/helpers.js';
 
-import twoStatesCounterStyles from './twoStatesCounter.css.js';
+import twoStatesCounterStyles from './twoStatesCounter.css' assert { type: 'css' };
 const isString = (value: string|undefined): value is string => value !== undefined;
 
 export interface TwoStatesCounterData {

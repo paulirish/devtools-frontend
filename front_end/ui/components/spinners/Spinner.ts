@@ -4,7 +4,7 @@
 
 import * as LitHtml from '../../lit-html/lit-html.js';
 
-import spinnerStyles from './spinner.css.js';
+import spinnerStyles from './spinner.css' assert { type: 'css' };
 
 export class Spinner extends HTMLElement {
   static readonly litTagName = LitHtml.literal`devtools-spinner`;

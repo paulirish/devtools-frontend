@@ -5,7 +5,7 @@
 import * as LitHtml from '../../lit-html/lit-html.js';
 import * as VisualLogging from '../../visual_logging/visual_logging.js';
 
-import switchStyles from './switch.css.js';
+import switchStyles from './switch.css' assert { type: 'css' };
 
 export class SwitchChangeEvent extends Event {
   static readonly eventName = 'switchchange';

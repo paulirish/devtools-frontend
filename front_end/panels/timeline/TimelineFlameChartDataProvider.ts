@@ -44,7 +44,7 @@ import {ExtensionDataGatherer} from './ExtensionDataGatherer.js';
 import {initiatorsDataToDraw} from './Initiators.js';
 import {ModificationsManager} from './ModificationsManager.js';
 import {ThreadAppender} from './ThreadAppender.js';
-import timelineFlamechartPopoverStyles from './timelineFlamechartPopover.css.js';
+import timelineFlamechartPopoverStyles from './timelineFlamechartPopover.css' assert { type: 'css' };
 import {FlameChartStyle, Selection} from './TimelineFlameChartView.js';
 import {TimelineSelection} from './TimelineSelection.js';
 import * as Utils from './utils/utils.js';

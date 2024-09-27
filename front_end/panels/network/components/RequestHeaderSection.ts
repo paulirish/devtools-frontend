@@ -16,7 +16,7 @@ import {
   HeaderSectionRow,
   type HeaderSectionRowData,
 } from './HeaderSectionRow.js';
-import requestHeaderSectionStyles from './RequestHeaderSection.css.js';
+import requestHeaderSectionStyles from './RequestHeaderSection.css' assert { type: 'css' };
 
 const {render, html} = LitHtml;
 

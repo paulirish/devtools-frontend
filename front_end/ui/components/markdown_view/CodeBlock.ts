@@ -12,7 +12,7 @@ import * as IconButton from '../../components/icon_button/icon_button.js';
 import * as LitHtml from '../../lit-html/lit-html.js';
 import * as VisualLogging from '../../visual_logging/visual_logging.js';
 
-import styles from './codeBlock.css.js';
+import styles from './codeBlock.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

@@ -8,8 +8,8 @@ import type * as SDK from '../../../../core/sdk/sdk.js';
 import type * as Protocol from '../../../../generated/protocol.js';
 import * as IconButton from '../../../components/icon_button/icon_button.js';
 import * as UI from '../../legacy.js';
-
-import customPreviewComponentStyles from './customPreviewComponent.css.js';
+ 
+import customPreviewComponentStyles from './customPreviewComponent.css' with { type: 'css' };
 import {
   ObjectPropertiesSection,
   ObjectPropertiesSectionsTreeOutline,

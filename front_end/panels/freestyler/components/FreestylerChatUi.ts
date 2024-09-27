@@ -17,7 +17,7 @@ import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 import {type ContextDetail, ErrorType} from '../AiAgent.js';
 
-import freestylerChatUiStyles from './freestylerChatUi.css.js';
+import freestylerChatUiStyles from './freestylerChatUi.css' assert { type: 'css' };
 import {ProvideFeedback, type ProvideFeedbackProps} from './ProvideFeedback.js';
 
 const UIStrings = {

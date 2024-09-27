@@ -44,7 +44,7 @@ import * as IconButton from '../../../components/icon_button/icon_button.js';
 import * as UI from '../../legacy.js';
 import * as DataGrid from '../data_grid/data_grid.js';
 
-import cookiesTableStyles from './cookiesTable.css.js';
+import cookiesTableStyles from './cookiesTable.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

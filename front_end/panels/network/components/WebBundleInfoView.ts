@@ -12,7 +12,7 @@ import * as LegacyWrapper from '../../../ui/components/legacy_wrapper/legacy_wra
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
-import webBundleInfoViewStyles from './WebBundleInfoView.css.js';
+import webBundleInfoViewStyles from './WebBundleInfoView.css' assert { type: 'css' };
 
 const {render, html} = LitHtml;
 

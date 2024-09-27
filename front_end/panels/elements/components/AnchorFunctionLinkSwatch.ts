@@ -8,7 +8,7 @@ import * as InlineEditor from '../../../ui/legacy/components/inline_editor/inlin
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
-import anchorFunctionLinkSwatchStyles from './anchorFunctionLinkSwatch.css.js';
+import anchorFunctionLinkSwatchStyles from './anchorFunctionLinkSwatch.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

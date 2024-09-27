@@ -11,7 +11,7 @@ import * as VisualLogging from '../../../../ui/visual_logging/visual_logging.js'
 import type * as Overlays from '../../overlays/overlays.js';
 
 import {md} from './Helpers.js';
-import sidebarInsightStyles from './sidebarInsight.css.js';
+import sidebarInsightStyles from './sidebarInsight.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

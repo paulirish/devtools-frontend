@@ -37,7 +37,7 @@ import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {ElementsSidebarPane} from './ElementsSidebarPane.js';
-import metricsSidebarPaneStyles from './metricsSidebarPane.css.js';
+import metricsSidebarPaneStyles from './metricsSidebarPane.css' assert { type: 'css' };
 
 export class MetricsSidebarPane extends ElementsSidebarPane {
   originalPropertyData: SDK.CSSProperty.CSSProperty|null;

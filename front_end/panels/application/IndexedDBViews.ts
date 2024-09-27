@@ -48,7 +48,7 @@ import {
   type ObjectStore,
   type ObjectStoreMetadata,
 } from './IndexedDBModel.js';
-import indexedDBViewsStyles from './indexedDBViews.css.js';
+import indexedDBViewsStyles from './indexedDBViews.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

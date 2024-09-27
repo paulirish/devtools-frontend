@@ -10,7 +10,7 @@ import * as Input from '../../../ui/components/input/input.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
-import provideFeedbackStyles from './provideFeedback.css.js';
+import provideFeedbackStyles from './provideFeedback.css' assert { type: 'css' };
 
 /*
 * Strings that don't need to be translated at this time.

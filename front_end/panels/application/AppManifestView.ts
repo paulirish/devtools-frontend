@@ -15,7 +15,7 @@ import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
-import appManifestViewStyles from './appManifestView.css.js';
+import appManifestViewStyles from './appManifestView.css' assert { type: 'css' };
 import * as ApplicationComponents from './components/components.js';
 
 const UIStrings = {

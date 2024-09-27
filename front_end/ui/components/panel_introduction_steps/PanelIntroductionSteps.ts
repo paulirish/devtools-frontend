@@ -4,7 +4,7 @@
 
 import * as ComponentHelpers from '../../components/helpers/helpers.js';
 import * as LitHtml from '../../lit-html/lit-html.js';
-import panelIntroductionStepsStyles from './panelIntroductionSteps.css.js';
+import panelIntroductionStepsStyles from './panelIntroductionSteps.css' assert { type: 'css' };
 
 export class PanelIntroductionSteps extends HTMLElement {
   static readonly litTagName = LitHtml.literal`devtools-panel-introduction-steps`;

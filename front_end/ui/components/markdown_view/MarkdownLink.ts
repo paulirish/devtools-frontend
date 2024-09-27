@@ -7,7 +7,7 @@ import '../../legacy/legacy.js'; // Required for <x-link>.
 import * as LitHtml from '../../lit-html/lit-html.js';
 import * as VisualLogging from '../../visual_logging/visual_logging.js';
 
-import markdownLinkStyles from './markdownLink.css.js';
+import markdownLinkStyles from './markdownLink.css' assert { type: 'css' };
 import {getMarkdownLink} from './MarkdownLinksMap.js';
 
 export interface MarkdownLinkData {

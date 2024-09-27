@@ -15,7 +15,7 @@ import * as UI from '../../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../../ui/visual_logging/visual_logging.js';
 
-import preloadingDisabledInfobarStyles from './preloadingDisabledInfobar.css.js';
+import preloadingDisabledInfobarStyles from './preloadingDisabledInfobar.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

@@ -14,7 +14,7 @@ import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 import * as Actions from '../recorder-actions/recorder-actions.js';
 
-import startViewStyles from './startView.css.js';
+import startViewStyles from './startView.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

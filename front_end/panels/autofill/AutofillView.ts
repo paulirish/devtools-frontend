@@ -16,7 +16,7 @@ import * as LegacyWrapper from '../../ui/components/legacy_wrapper/legacy_wrappe
 import * as LitHtml from '../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
-import autofillViewStyles from './autofillView.css.js';
+import autofillViewStyles from './autofillView.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

@@ -8,7 +8,7 @@ import * as IssuesManager from '../../../models/issues_manager/issues_manager.js
 import * as LitHtml from '../../lit-html/lit-html.js';
 import type * as IconButton from '../icon_button/icon_button.js';
 
-import issueCounterStyles from './issueCounter.css.js';
+import issueCounterStyles from './issueCounter.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

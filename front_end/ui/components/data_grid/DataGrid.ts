@@ -9,7 +9,7 @@ import * as LitHtml from '../../lit-html/lit-html.js';
 import * as VisualLogging from '../../visual_logging/visual_logging.js';
 import * as Coordinator from '../render_coordinator/render_coordinator.js';
 
-import dataGridStyles from './dataGrid.css.js';
+import dataGridStyles from './dataGrid.css' assert { type: 'css' };
 import {
   BodyCellFocusedEvent,
   ColumnHeaderClickEvent,

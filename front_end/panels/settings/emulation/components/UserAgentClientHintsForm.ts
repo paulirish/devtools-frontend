@@ -13,7 +13,7 @@ import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../../ui/visual_logging/visual_logging.js';
 import * as EmulationUtils from '../utils/utils.js';
 
-import userAgentClientHintsFormStyles from './userAgentClientHintsForm.css.js';
+import userAgentClientHintsFormStyles from './userAgentClientHintsForm.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

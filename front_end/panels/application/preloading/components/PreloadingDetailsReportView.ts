@@ -19,7 +19,7 @@ import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../../ui/visual_logging/visual_logging.js';
 import * as PreloadingHelper from '../helper/helper.js';
 
-import preloadingDetailsReportViewStyles from './preloadingDetailsReportView.css.js';
+import preloadingDetailsReportViewStyles from './preloadingDetailsReportView.css' assert { type: 'css' };
 import * as PreloadingString from './PreloadingString.js';
 import {prefetchFailureReason, prerenderFailureReason, ruleSetLocationShort} from './PreloadingString.js';
 

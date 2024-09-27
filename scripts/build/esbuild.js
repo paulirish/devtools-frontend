@@ -26,17 +26,29 @@ const plugin = {
   },
 };
 
-require('esbuild')
-    .build({
-      entryPoints,
-      outfile,
-      bundle: true,
-      format: 'esm',
-      platform: 'browser',
-      plugins: [plugin],
-      sourcemap: useSourceMaps,
-    })
-    .catch(err => {
-      console.error('failed to run esbuild:', err);
-      process.exit(1);
+const cheesePlugin = {
+  name: 'cheese',
+  setup(build) {
+    build.onLoad({filter: /.*/}, args => {
+      if (args.with.type === 'css')
+        return {
+          contents: `export default "🧀"`,
+        };
     });
+  },
+};
+
+require('esbuild')
+  .build({
+    entryPoints,
+    outfile,
+    bundle: true,
+    format: 'esm',
+    platform: 'browser',
+    plugins: [plugin],
+    sourcemap: useSourceMaps,
+  })
+  .catch(err => {
+    console.error('failed to run esbuild:', err);
+    process.exit(1);
+  });

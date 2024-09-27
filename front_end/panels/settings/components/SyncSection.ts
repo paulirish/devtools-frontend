@@ -10,7 +10,7 @@ import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as Settings from '../../../ui/components/settings/settings.js';
 import * as ChromeLink from '../../../ui/components/chrome_link/chrome_link.js';
 
-import syncSectionStyles from './syncSection.css.js';
+import syncSectionStyles from './syncSection.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

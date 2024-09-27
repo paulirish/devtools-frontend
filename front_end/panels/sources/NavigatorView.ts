@@ -42,8 +42,8 @@ import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 import * as Snippets from '../snippets/snippets.js';
 
-import navigatorTreeStyles from './navigatorTree.css.js';
-import navigatorViewStyles from './navigatorView.css.js';
+import navigatorTreeStyles from './navigatorTree.css' assert { type: 'css' };
+import navigatorViewStyles from './navigatorView.css' assert { type: 'css' };
 import {SearchSources} from './SearchSourcesView.js';
 
 const UIStrings = {

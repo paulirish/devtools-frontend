@@ -7,7 +7,7 @@ import * as IconButton from '../../../ui/components/icon_button/icon_button.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
-import elementsTreeExpandButtonStyles from './elementsTreeExpandButton.css.js';
+import elementsTreeExpandButtonStyles from './elementsTreeExpandButton.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

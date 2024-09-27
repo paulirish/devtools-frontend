@@ -20,7 +20,7 @@ import {
   TimelineEventOverviewResponsiveness,
   TimelineFilmStripOverview,
 } from './TimelineEventOverview.js';
-import miniMapStyles from './timelineMiniMap.css.js';
+import miniMapStyles from './timelineMiniMap.css' assert { type: 'css' };
 import {TimelineUIUtils} from './TimelineUIUtils.js';
 
 export interface OverviewData {

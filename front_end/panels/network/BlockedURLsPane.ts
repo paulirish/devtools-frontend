@@ -11,7 +11,7 @@ import * as Buttons from '../../ui/components/buttons/buttons.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
-import blockedURLsPaneStyles from './blockedURLsPane.css.js';
+import blockedURLsPaneStyles from './blockedURLsPane.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

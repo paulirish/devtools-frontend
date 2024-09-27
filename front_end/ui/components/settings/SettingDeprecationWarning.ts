@@ -6,7 +6,7 @@ import * as Common from '../../../core/common/common.js';
 import * as LitHtml from '../../lit-html/lit-html.js';
 import * as IconButton from '../icon_button/icon_button.js';
 
-import settingDeprecationWarning from './settingDeprecationWarning.css.js';
+import settingDeprecationWarning from './settingDeprecationWarning.css' assert { type: 'css' };
 
 export class SettingDeprecationWarning extends HTMLElement {
   static readonly litTagName = LitHtml.literal`devtools-setting-deprecation-warning`;

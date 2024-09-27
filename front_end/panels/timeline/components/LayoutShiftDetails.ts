@@ -13,7 +13,7 @@ import * as UI from '../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 
 import {NodeLink} from './insights/insights.js';
-import layoutShiftDetailsStyles from './layoutShiftDetails.css.js';
+import layoutShiftDetailsStyles from './layoutShiftDetails.css' assert { type: 'css' };
 
 const MAX_URL_LENGTH = 20;
 

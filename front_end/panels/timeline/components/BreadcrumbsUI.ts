@@ -11,7 +11,7 @@ import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import {flattenBreadcrumbs} from './Breadcrumbs.js';
-import breadcrumbsUIStyles from './breadcrumbsUI.css.js';
+import breadcrumbsUIStyles from './breadcrumbsUI.css' assert { type: 'css' };
 
 const {render, html} = LitHtml;
 

@@ -8,9 +8,9 @@ import * as CrUXManager from '../../../models/crux-manager/crux-manager.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 
-import metricCardStyles from './metricCard.css.js';
+import metricCardStyles from './metricCard.css' assert { type: 'css' };
 import {type CompareRating, renderCompareText, renderDetailedCompareText} from './MetricCompareStrings.js';
-import metricValueStyles from './metricValueStyles.css.js';
+import metricValueStyles from './metricValueStyles.css' assert { type: 'css' };
 import {
   CLS_THRESHOLDS,
   INP_THRESHOLDS,

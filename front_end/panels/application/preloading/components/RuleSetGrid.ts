@@ -18,7 +18,7 @@ import * as NetworkForward from '../../../network/forward/forward.js';
 import * as PreloadingHelper from '../helper/helper.js';
 
 import * as PreloadingString from './PreloadingString.js';
-import ruleSetGridStyles from './ruleSetGrid.css.js';
+import ruleSetGridStyles from './ruleSetGrid.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

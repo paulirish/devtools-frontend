@@ -28,7 +28,7 @@ import {
   TimelineFlameChartDataProvider,
 } from './TimelineFlameChartDataProvider.js';
 import {TimelineFlameChartNetworkDataProvider} from './TimelineFlameChartNetworkDataProvider.js';
-import timelineFlameChartViewStyles from './timelineFlameChartView.css.js';
+import timelineFlameChartViewStyles from './timelineFlameChartView.css' assert { type: 'css' };
 import {type TimelineModeViewDelegate} from './TimelinePanel.js';
 import {TimelineSelection} from './TimelineSelection.js';
 import {AggregatedTimelineTreeView} from './TimelineTreeView.js';

@@ -12,7 +12,7 @@ import * as TextEditor from '../../ui/components/text_editor/text_editor.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
-import breakpointEditDialogStyles from './breakpointEditDialog.css.js';
+import breakpointEditDialogStyles from './breakpointEditDialog.css' assert { type: 'css' };
 
 const {Direction} = TextEditor.TextEditorHistory;
 

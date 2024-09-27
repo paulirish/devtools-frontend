@@ -6,7 +6,7 @@ import type * as SDK from '../../../core/sdk/sdk.js';
 import * as LegacyWrapper from '../../../ui/components/legacy_wrapper/legacy_wrapper.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 
-import styles from './serviceWorkerRouterView.css.js';
+import styles from './serviceWorkerRouterView.css' assert { type: 'css' };
 
 const {html, render} = LitHtml;
 

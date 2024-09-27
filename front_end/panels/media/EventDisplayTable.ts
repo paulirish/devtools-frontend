@@ -8,7 +8,7 @@ import * as SourceFrame from '../../ui/legacy/components/source_frame/source_fra
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
-import eventDisplayTableStyles from './eventDisplayTable.css.js';
+import eventDisplayTableStyles from './eventDisplayTable.css' assert { type: 'css' };
 import {type PlayerEvent} from './MediaModel.js';
 
 const UIStrings = {

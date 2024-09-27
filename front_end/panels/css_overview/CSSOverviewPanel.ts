@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 import * as CSSOverviewComponents from './components/components.js';
-import cssOverviewStyles from './cssOverview.css.js';
+import cssOverviewStyles from './cssOverview.css' assert { type: 'css' };
 import type * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as SDK from '../../core/sdk/sdk.js';

@@ -36,7 +36,7 @@ import type * as Protocol from '../../generated/protocol.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
-import layers3DViewStyles from './layers3DView.css.js';
+import layers3DViewStyles from './layers3DView.css' assert { type: 'css' };
 import {
   LayerSelection,
   type LayerView,

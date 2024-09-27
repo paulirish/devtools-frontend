@@ -13,7 +13,7 @@ import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
 import * as TimelineComponents from './components/components.js';
 import {initiatorsDataToDrawForNetwork} from './Initiators.js';
 import {NetworkTrackAppender, type NetworkTrackEvent} from './NetworkTrackAppender.js';
-import timelineFlamechartPopoverStyles from './timelineFlamechartPopover.css.js';
+import timelineFlamechartPopoverStyles from './timelineFlamechartPopover.css' assert { type: 'css' };
 import {FlameChartStyle, Selection} from './TimelineFlameChartView.js';
 import {TimelineSelection} from './TimelineSelection.js';
 import * as TimelineUtils from './utils/utils.js';

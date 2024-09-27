@@ -45,10 +45,10 @@ import * as Trace from '../../models/trace/trace.js';
 import * as TraceBounds from '../../services/trace_bounds/trace_bounds.js';
 import * as CodeHighlighter from '../../ui/components/code_highlighter/code_highlighter.js';
 // eslint-disable-next-line rulesdir/es_modules_import
-import codeHighlighterStyles from '../../ui/components/code_highlighter/codeHighlighter.css.js';
+import codeHighlighterStyles from '../../ui/components/code_highlighter/codeHighlighter.css' assert { type: 'css' };
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 // eslint-disable-next-line rulesdir/es_modules_import
-import imagePreviewStyles from '../../ui/legacy/components/utils/imagePreview.css.js';
+import imagePreviewStyles from '../../ui/legacy/components/utils/imagePreview.css' assert { type: 'css' };
 import * as LegacyComponents from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 

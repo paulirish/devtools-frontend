@@ -11,7 +11,7 @@ import * as Coordinator from '../../../ui/components/render_coordinator/render_c
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
-import elementsBreadcrumbsStyles from './elementsBreadcrumbs.css.js';
+import elementsBreadcrumbsStyles from './elementsBreadcrumbs.css' assert { type: 'css' };
 import {crumbsToRender, type UserScrollPosition} from './ElementsBreadcrumbsUtils.js';
 import {type DOMNode} from './Helper.js';
 

@@ -10,7 +10,7 @@ import * as UI from '../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
-import hideIssuesMenuStyles from './hideIssuesMenu.css.js';
+import hideIssuesMenuStyles from './hideIssuesMenu.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

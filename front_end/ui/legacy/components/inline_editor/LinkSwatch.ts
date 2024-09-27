@@ -8,7 +8,7 @@ import * as VisualLogging from '../../../visual_logging/visual_logging.js';
 import textButtonStyles from '../../textButton.css.legacy.js';
 import * as ThemeSupport from '../../theme_support/theme_support.js';
 
-import linkSwatchStyles from './linkSwatch.css.js';
+import linkSwatchStyles from './linkSwatch.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

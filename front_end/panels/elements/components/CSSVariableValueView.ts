@@ -6,7 +6,7 @@ import * as i18n from '../../../core/i18n/i18n.js';
 import type * as SDK from '../../../core/sdk/sdk.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 
-import cssVariableValueViewStyles from './cssVariableValueView.css.js';
+import cssVariableValueViewStyles from './cssVariableValueView.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

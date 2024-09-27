@@ -14,7 +14,7 @@ import * as Controllers from '../controllers/controllers.js';
 import * as Models from '../models/models.js';
 import * as Util from '../util/util.js';
 
-import stepEditorStyles from './stepEditor.css.js';
+import stepEditorStyles from './stepEditor.css' assert { type: 'css' };
 import {
   ArrayAssignments,
   assert,

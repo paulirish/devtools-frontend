@@ -4,7 +4,7 @@
 
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 
-import controlButtonStyles from './controlButton.css.js';
+import controlButtonStyles from './controlButton.css' assert { type: 'css' };
 
 const {html, Decorators, LitElement} = LitHtml;
 const {customElement, property} = Decorators;

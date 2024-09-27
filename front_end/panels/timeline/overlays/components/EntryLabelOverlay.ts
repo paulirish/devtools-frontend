@@ -7,7 +7,7 @@ import * as IconButton from '../../../../ui/components/icon_button/icon_button.j
 import * as ThemeSupport from '../../../../ui/legacy/theme_support/theme_support.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 
-import styles from './entryLabelOverlay.css.js';
+import styles from './entryLabelOverlay.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

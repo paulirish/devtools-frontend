@@ -13,7 +13,7 @@ import {IsolatedFileSystem} from './IsolatedFileSystem.js';
 import {Events, IsolatedFileSystemManager} from './IsolatedFileSystemManager.js';
 import {NetworkPersistenceManager} from './NetworkPersistenceManager.js';
 import {type PlatformFileSystem} from './PlatformFileSystem.js';
-import workspaceSettingsTabStyles from './workspaceSettingsTab.css.js';
+import workspaceSettingsTabStyles from './workspaceSettingsTab.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

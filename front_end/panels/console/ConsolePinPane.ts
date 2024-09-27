@@ -10,11 +10,11 @@ import * as CodeMirror from '../../third_party/codemirror.next/codemirror.next.j
 import * as TextEditor from '../../ui/components/text_editor/text_editor.js';
 import * as ObjectUI from '../../ui/legacy/components/object_ui/object_ui.js';
 // eslint-disable-next-line rulesdir/es_modules_import
-import objectValueStyles from '../../ui/legacy/components/object_ui/objectValue.css.js';
+import objectValueStyles from '../../ui/legacy/components/object_ui/objectValue.css' assert { type: 'css' };
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
-import consolePinPaneStyles from './consolePinPane.css.js';
+import consolePinPaneStyles from './consolePinPane.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

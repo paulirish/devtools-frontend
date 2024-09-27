@@ -6,7 +6,7 @@ import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import {toHexString} from './LinearMemoryInspectorUtils.js';
-import linearMemoryViewerStyles from './linearMemoryViewer.css.js';
+import linearMemoryViewerStyles from './linearMemoryViewer.css' assert { type: 'css' };
 import {type HighlightInfo} from './LinearMemoryViewerUtils.js';
 
 const {render, html} = LitHtml;

@@ -14,7 +14,7 @@ import * as LegacyWrapper from '../../../../ui/components/legacy_wrapper/legacy_
 import type * as UI from '../../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 
-import preloadingGridStyles from './preloadingGrid.css.js';
+import preloadingGridStyles from './preloadingGrid.css' assert { type: 'css' };
 import * as PreloadingString from './PreloadingString.js';
 
 const UIStrings = {

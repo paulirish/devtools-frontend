@@ -26,7 +26,7 @@ import {PlayRecordingSpeed} from '../models/RecordingPlayer.js';
 import * as Actions from '../recorder-actions/recorder-actions.js';
 
 import {ExtensionView} from './ExtensionView.js';
-import recordingViewStyles from './recordingView.css.js';
+import recordingViewStyles from './recordingView.css' assert { type: 'css' };
 import {
   ReplaySection,
   type ReplaySectionData,

@@ -9,7 +9,7 @@ import * as SDK from '../../core/sdk/sdk.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
-import sensorsStyles from './sensors.css.js';
+import sensorsStyles from './sensors.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

@@ -9,7 +9,7 @@ import * as LitHtml from '../../lit-html/lit-html.js';
 import * as VisualLogging from '../../visual_logging/visual_logging.js';
 import * as IconButton from '../icon_button/icon_button.js';
 
-import panelFeedbackStyles from './panelFeedback.css.js';
+import panelFeedbackStyles from './panelFeedback.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

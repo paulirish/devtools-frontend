@@ -10,7 +10,7 @@ import * as Workspace from '../../models/workspace/workspace.js';
 import * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
-import coverageListViewStyles from './coverageListView.css.js';
+import coverageListViewStyles from './coverageListView.css' assert { type: 'css' };
 import {
   CoverageType,
   SourceURLCoverageInfo,

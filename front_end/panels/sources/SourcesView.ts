@@ -17,7 +17,7 @@ import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import * as Components from './components/components.js';
 import {EditingLocationHistoryManager} from './EditingLocationHistoryManager.js';
-import sourcesViewStyles from './sourcesView.css.js';
+import sourcesViewStyles from './sourcesView.css' assert { type: 'css' };
 import {
   type EditorSelectedEvent,
   Events as TabbedEditorContainerEvents,

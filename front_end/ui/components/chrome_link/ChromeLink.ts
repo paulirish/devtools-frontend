@@ -10,7 +10,7 @@ import * as LitHtml from '../../lit-html/lit-html.js';
 import * as VisualLogging from '../../visual_logging/visual_logging.js';
 import * as ComponentHelpers from '../helpers/helpers.js';
 
-import chromeLinkStyles from './chromeLink.css.js';
+import chromeLinkStyles from './chromeLink.css' assert { type: 'css' };
 
 declare global {
   interface HTMLElementTagNameMap {

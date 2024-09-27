@@ -15,8 +15,8 @@ import {
   type MenuItemSelectedEvent,
   type MenuItemValue,
 } from './Menu.js';
-import selectMenuStyles from './selectMenu.css.js';
-import selectMenuButtonStyles from './selectMenuButton.css.js';
+import selectMenuStyles from './selectMenu.css' assert { type: 'css' };
+import selectMenuButtonStyles from './selectMenuButton.css' assert { type: 'css' };
 
 const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
 

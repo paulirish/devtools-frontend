@@ -11,7 +11,7 @@ import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 import type * as Overlays from '../../overlays/overlays.js';
 
 import {BaseInsight, shouldRenderForCategory} from './Helpers.js';
-import discoveryStyles from './lcpDiscovery.css.js';
+import discoveryStyles from './lcpDiscovery.css' assert { type: 'css' };
 import * as SidebarInsight from './SidebarInsight.js';
 import {Category} from './types.js';
 

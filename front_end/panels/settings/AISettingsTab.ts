@@ -13,7 +13,7 @@ import * as UI from '../../ui/legacy/legacy.js';
 import * as LitHtml from '../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
-import aiSettingsTabStyles from './aiSettingsTab.css.js';
+import aiSettingsTabStyles from './aiSettingsTab.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

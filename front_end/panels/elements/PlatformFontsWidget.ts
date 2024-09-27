@@ -30,7 +30,7 @@
 
 import * as i18n from '../../core/i18n/i18n.js';
 
-import platformFontsWidgetStyles from './platformFontsWidget.css.js';
+import platformFontsWidgetStyles from './platformFontsWidget.css' assert { type: 'css' };
 
 import type * as SDK from '../../core/sdk/sdk.js';
 import * as UI from '../../ui/legacy/legacy.js';

@@ -45,7 +45,7 @@ import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as CodeHighlighter from '../../ui/components/code_highlighter/code_highlighter.js';
 import * as IssueCounter from '../../ui/components/issue_counter/issue_counter.js';
 // eslint-disable-next-line rulesdir/es_modules_import
-import objectValueStyles from '../../ui/legacy/components/object_ui/objectValue.css.js';
+import objectValueStyles from '../../ui/legacy/components/object_ui/objectValue.css' assert { type: 'css' };
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
@@ -55,7 +55,7 @@ import {ConsoleFilter, FilterType, type LevelsMask} from './ConsoleFilter.js';
 import {ConsolePinPane} from './ConsolePinPane.js';
 import {ConsolePrompt, Events as ConsolePromptEvents} from './ConsolePrompt.js';
 import {ConsoleSidebar, Events} from './ConsoleSidebar.js';
-import consoleViewStyles from './consoleView.css.js';
+import consoleViewStyles from './consoleView.css' assert { type: 'css' };
 import {
   ConsoleCommand,
   ConsoleCommandResult,

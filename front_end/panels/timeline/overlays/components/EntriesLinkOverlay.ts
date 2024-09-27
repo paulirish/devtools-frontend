@@ -21,7 +21,7 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 // In other overlays, the border line width is set to 2px.
 const BORDER_LINE_WIDTH = 2;
 
-import styles from './entriesLinkOverlay.css.js';
+import styles from './entriesLinkOverlay.css' assert { type: 'css' };
 
 export class EntryLinkStartCreating extends Event {
   static readonly eventName = 'entrylinkstartcreating';

@@ -5,7 +5,7 @@
 import * as LitHtml from '../../lit-html/lit-html.js';
 import * as VisualLogging from '../../visual_logging/visual_logging.js';
 
-import expandableListStyles from './expandableList.css.js';
+import expandableListStyles from './expandableList.css' assert { type: 'css' };
 
 export interface ExpandableListData {
   rows: LitHtml.TemplateResult[];

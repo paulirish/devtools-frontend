@@ -18,7 +18,7 @@ import * as UI from '../../ui/legacy/legacy.js';
 
 // The css files aren't exported by the bundle, so we need to import it directly.
 // eslint-disable-next-line rulesdir/es_modules_import
-import consoleViewStyles from './consoleView.css.js';
+import consoleViewStyles from './consoleView.css' assert { type: 'css' };
 
 describeWithMockConnection('ConsoleViewMessage', () => {
   describe('anchor rendering', () => {

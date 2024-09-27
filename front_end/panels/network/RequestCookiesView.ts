@@ -37,7 +37,7 @@ import * as CookieTable from '../../ui/legacy/components/cookie_table/cookie_tab
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
-import requestCookiesViewStyles from './requestCookiesView.css.js';
+import requestCookiesViewStyles from './requestCookiesView.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

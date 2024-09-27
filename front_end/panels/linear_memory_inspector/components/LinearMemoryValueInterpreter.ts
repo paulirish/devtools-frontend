@@ -8,7 +8,7 @@ import * as IconButton from '../../../ui/components/icon_button/icon_button.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
-import linearMemoryValueInterpreterStyles from './linearMemoryValueInterpreter.css.js';
+import linearMemoryValueInterpreterStyles from './linearMemoryValueInterpreter.css' assert { type: 'css' };
 import {type ValueDisplayData, ValueInterpreterDisplay} from './ValueInterpreterDisplay.js';
 import {Endianness, type ValueType, type ValueTypeMode} from './ValueInterpreterDisplayUtils.js';
 import {

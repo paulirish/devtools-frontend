@@ -10,7 +10,7 @@ import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {type MainView, type TriggerDispatcher} from './MainView.js';
 import {type PlayerEvent} from './MediaModel.js';
-import playerListViewStyles from './playerListView.css.js';
+import playerListViewStyles from './playerListView.css' assert { type: 'css' };
 import {PlayerPropertyKeys} from './PlayerPropertiesView.js';
 
 const UIStrings = {

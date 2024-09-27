@@ -9,13 +9,13 @@ import type * as Protocol from '../../generated/protocol.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
 import * as ObjectUI from '../../ui/legacy/components/object_ui/object_ui.js';
 /* eslint-disable rulesdir/es_modules_import */
-import objectValueStyles from '../../ui/legacy/components/object_ui/objectValue.css.js';
+import objectValueStyles from '../../ui/legacy/components/object_ui/objectValue.css' assert { type: 'css' };
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {frameworkEventListeners, type FrameworkEventListenersObject} from './EventListenersUtils.js';
-import eventListenersViewStyles from './eventListenersView.css.js';
+import eventListenersViewStyles from './eventListenersView.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

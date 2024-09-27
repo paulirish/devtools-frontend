@@ -10,7 +10,7 @@ import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
-import developerResourcesListViewStyles from './developerResourcesListView.css.js';
+import developerResourcesListViewStyles from './developerResourcesListView.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

@@ -14,7 +14,7 @@ import * as Coordinator from '../../../ui/components/render_coordinator/render_c
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
-import requestLinkIconStyles from './requestLinkIcon.css.js';
+import requestLinkIconStyles from './requestLinkIcon.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

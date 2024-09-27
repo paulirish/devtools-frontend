@@ -9,7 +9,7 @@ import * as Coordinator from '../../../ui/components/render_coordinator/render_c
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
-import dialogStyles from './dialog.css.js';
+import dialogStyles from './dialog.css' assert { type: 'css' };
 
 const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
 

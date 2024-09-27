@@ -8,7 +8,7 @@ import * as ColorPicker from '../../../legacy/components/color_picker/color_pick
 import * as LitHtml from '../../../lit-html/lit-html.js';
 import * as VisualLogging from '../../../visual_logging/visual_logging.js';
 
-import colorSwatchStyles from './colorSwatch.css.js';
+import colorSwatchStyles from './colorSwatch.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

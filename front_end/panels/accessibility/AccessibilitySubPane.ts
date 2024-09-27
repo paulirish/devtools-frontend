@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import accessibilityPropertiesStyles from './accessibilityProperties.css.js';
+import accessibilityPropertiesStyles from './accessibilityProperties.css' assert { type: 'css' };
 import type * as Platform from '../../core/platform/platform.js';
 import type * as SDK from '../../core/sdk/sdk.js';
 import * as UI from '../../ui/legacy/legacy.js';
-import accessibilityNodeStyles from './accessibilityNode.css.js';
+import accessibilityNodeStyles from './accessibilityNode.css' assert { type: 'css' };
 // eslint-disable-next-line rulesdir/es_modules_import
-import objectValueStyles from '../../ui/legacy/components/object_ui/objectValue.css.js';
+import objectValueStyles from '../../ui/legacy/components/object_ui/objectValue.css' assert { type: 'css' };
 
 export class AccessibilitySubPane extends UI.View.SimpleView {
   axNode: SDK.AccessibilityModel.AccessibilityNode|null;

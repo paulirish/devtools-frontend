@@ -12,7 +12,7 @@ import * as MobileThrottling from '../../panels/mobile_throttling/mobile_throttl
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
-import nodeIconStyles from './nodeIcon.css.js';
+import nodeIconStyles from './nodeIcon.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

@@ -13,9 +13,9 @@ import * as IconButton from '../../ui/components/icon_button/icon_button.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
-import lockIconStyles from './lockIcon.css.js';
-import mainViewStyles from './mainView.css.js';
-import originViewStyles from './originView.css.js';
+import lockIconStyles from './lockIcon.css' assert { type: 'css' };
+import mainViewStyles from './mainView.css' assert { type: 'css' };
+import originViewStyles from './originView.css' assert { type: 'css' };
 import {
   Events,
   type PageVisibleSecurityState,
@@ -24,7 +24,7 @@ import {
   SecurityStyleExplanation,
   SummaryMessages,
 } from './SecurityModel.js';
-import sidebarStyles from './sidebar.css.js';
+import sidebarStyles from './sidebar.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

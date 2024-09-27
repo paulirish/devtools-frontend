@@ -9,7 +9,7 @@ import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import {ValueType, valueTypeToLocalizedString} from './ValueInterpreterDisplayUtils.js';
-import valueInterpreterSettingsStyles from './valueInterpreterSettings.css.js';
+import valueInterpreterSettingsStyles from './valueInterpreterSettings.css' assert { type: 'css' };
 
 const {render, html} = LitHtml;
 

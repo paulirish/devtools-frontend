@@ -21,9 +21,9 @@ import * as MobileThrottling from '../../mobile_throttling/mobile_throttling.js'
 
 import {CPUThrottlingSelector} from './CPUThrottlingSelector.js';
 import {FieldSettingsDialog} from './FieldSettingsDialog.js';
-import liveMetricsViewStyles from './liveMetricsView.css.js';
+import liveMetricsViewStyles from './liveMetricsView.css' assert { type: 'css' };
 import {MetricCard, type MetricCardData} from './MetricCard.js';
-import metricValueStyles from './metricValueStyles.css.js';
+import metricValueStyles from './metricValueStyles.css' assert { type: 'css' };
 import {NetworkThrottlingSelector} from './NetworkThrottlingSelector.js';
 import {INP_THRESHOLDS, renderMetricValue} from './Utils.js';
 

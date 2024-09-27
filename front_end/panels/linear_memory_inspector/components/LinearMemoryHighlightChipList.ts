@@ -7,7 +7,7 @@ import * as IconButton from '../../../ui/components/icon_button/icon_button.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
-import linearMemoryHighlightChipListStyles from './linearMemoryHighlightChipList.css.js';
+import linearMemoryHighlightChipListStyles from './linearMemoryHighlightChipList.css' assert { type: 'css' };
 import {type HighlightInfo} from './LinearMemoryViewerUtils.js';
 
 const UIStrings = {

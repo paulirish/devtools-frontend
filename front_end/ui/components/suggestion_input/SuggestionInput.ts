@@ -4,11 +4,11 @@
 
 import * as CodeHighlighter from '../../../ui/components/code_highlighter/code_highlighter.js';
 // eslint-disable-next-line rulesdir/es_modules_import
-import codeHighlighterStyles from '../../../ui/components/code_highlighter/codeHighlighter.css.js';
+import codeHighlighterStyles from '../../../ui/components/code_highlighter/codeHighlighter.css' assert { type: 'css' };
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
-import contentEditableStyles from './suggestionInput.css.js';
+import contentEditableStyles from './suggestionInput.css' assert { type: 'css' };
 
 const mod = (a: number, n: number): number => {
   return ((a % n) + n) % n;

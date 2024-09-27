@@ -5,7 +5,7 @@
 import * as Platform from '../../../core/platform/platform.js';
 import * as LitHtml from '../../lit-html/lit-html.js';
 
-import textPromptStyles from './textPrompt.css.js';
+import textPromptStyles from './textPrompt.css' assert { type: 'css' };
 
 export interface TextPromptData {
   ariaLabel: string;

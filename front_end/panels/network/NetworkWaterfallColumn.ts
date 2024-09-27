@@ -4,7 +4,7 @@
 
 import * as Common from '../../core/common/common.js';
 
-import networkWaterfallColumnStyles from './networkWaterfallColumn.css.js';
+import networkWaterfallColumnStyles from './networkWaterfallColumn.css' assert { type: 'css' };
 
 import type * as SDK from '../../core/sdk/sdk.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
@@ -17,7 +17,7 @@ import {RequestTimeRangeNameToColor} from './NetworkOverview.js';
 import {type Label, type NetworkTimeCalculator} from './NetworkTimeCalculator.js';
 
 import {RequestTimeRangeNames, RequestTimingView, type RequestTimeRange} from './RequestTimingView.js';
-import networkingTimingTableStyles from './networkTimingTable.css.js';
+import networkingTimingTableStyles from './networkTimingTable.css' assert { type: 'css' };
 
 const BAR_SPACING = 1;
 

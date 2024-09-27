@@ -9,7 +9,7 @@ import * as LitHtml from '../../lit-html/lit-html.js';
 import {CodeBlock} from './CodeBlock.js';
 import {MarkdownImage, type MarkdownImageData} from './MarkdownImage.js';
 import {MarkdownLink, type MarkdownLinkData} from './MarkdownLink.js';
-import markdownViewStyles from './markdownView.css.js';
+import markdownViewStyles from './markdownView.css' assert { type: 'css' };
 
 const html = LitHtml.html;
 const render = LitHtml.render;

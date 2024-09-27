@@ -8,7 +8,7 @@ import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as IconButton from '../icon_button/icon_button.js';
 import * as Input from '../input/input.js';
 
-import previewToggleStyles from './previewToggle.css.js';
+import previewToggleStyles from './previewToggle.css' assert { type: 'css' };
 
 const {render, html, nothing} = LitHtml;
 

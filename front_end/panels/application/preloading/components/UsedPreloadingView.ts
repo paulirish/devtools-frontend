@@ -20,7 +20,7 @@ import * as PreloadingHelper from '../helper/helper.js';
 import * as MismatchedPreloadingGrid from './MismatchedPreloadingGrid.js';
 import * as PreloadingMismatchedHeadersGrid from './PreloadingMismatchedHeadersGrid.js';
 import {prefetchFailureReason, prerenderFailureReason} from './PreloadingString.js';
-import usedPreloadingStyles from './usedPreloadingView.css.js';
+import usedPreloadingStyles from './usedPreloadingView.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

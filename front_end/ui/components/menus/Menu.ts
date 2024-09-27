@@ -9,9 +9,9 @@ import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 import * as Dialogs from '../dialogs/dialogs.js';
 
-import menuStyles from './menu.css.js';
-import menuGroupStyles from './menuGroup.css.js';
-import menuItemStyles from './menuItem.css.js';
+import menuStyles from './menu.css' assert { type: 'css' };
+import menuGroupStyles from './menuGroup.css' assert { type: 'css' };
+import menuItemStyles from './menuItem.css' assert { type: 'css' };
 
 const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
 

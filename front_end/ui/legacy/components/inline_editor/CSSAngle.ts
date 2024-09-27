@@ -4,7 +4,7 @@
 
 import * as LitHtml from '../../../lit-html/lit-html.js';
 
-import cssAngleStyles from './cssAngle.css.js';
+import cssAngleStyles from './cssAngle.css' assert { type: 'css' };
 import {CSSAngleEditor, type CSSAngleEditorData} from './CSSAngleEditor.js';
 import {CSSAngleSwatch, type CSSAngleSwatchData} from './CSSAngleSwatch.js';
 import {

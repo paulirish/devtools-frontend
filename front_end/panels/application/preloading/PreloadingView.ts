@@ -13,15 +13,15 @@ import * as Buttons from '../../../ui/components/buttons/buttons.js';
 import type * as DataGrid from '../../../ui/components/data_grid/data_grid.js';
 import * as SplitView from '../../../ui/components/split_view/split_view.js';
 // eslint-disable-next-line rulesdir/es_modules_import
-import emptyWidgetStyles from '../../../ui/legacy/emptyWidget.css.js';
+import emptyWidgetStyles from '../../../ui/legacy/emptyWidget.css' assert { type: 'css' };
 import * as UI from '../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import * as PreloadingComponents from './components/components.js';
 import type * as PreloadingHelper from './helper/helper.js';
-import preloadingViewStyles from './preloadingView.css.js';
-import preloadingViewDropDownStyles from './preloadingViewDropDown.css.js';
+import preloadingViewStyles from './preloadingView.css' assert { type: 'css' };
+import preloadingViewDropDownStyles from './preloadingViewDropDown.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

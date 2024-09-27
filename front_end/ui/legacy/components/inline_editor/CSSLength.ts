@@ -6,7 +6,7 @@ import * as Host from '../../../../core/host/host.js';
 import * as UI from '../../../legacy/legacy.js';
 import * as LitHtml from '../../../lit-html/lit-html.js';
 
-import cssLengthStyles from './cssLength.css.js';
+import cssLengthStyles from './cssLength.css' assert { type: 'css' };
 import {ValueChangedEvent} from './InlineEditorUtils.js';
 
 const {render, html} = LitHtml;

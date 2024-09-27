@@ -42,8 +42,8 @@ import type * as Components from '../utils/utils.js';
 
 import {CustomPreviewComponent} from './CustomPreviewComponent.js';
 import {JavaScriptREPL} from './JavaScriptREPL.js';
-import objectPropertiesSectionStyles from './objectPropertiesSection.css.js';
-import objectValueStyles from './objectValue.css.js';
+import objectPropertiesSectionStyles from './objectPropertiesSection.css' assert { type: 'css' };
+import objectValueStyles from './objectValue.css' assert { type: 'css' };
 import {createSpansForNodeTitle, RemoteObjectPreviewFormatter} from './RemoteObjectPreviewFormatter.js';
 
 const UIStrings = {

@@ -9,7 +9,7 @@ import * as SDK from '../../core/sdk/sdk.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
-import classesPaneWidgetStyles from './classesPaneWidget.css.js';
+import classesPaneWidgetStyles from './classesPaneWidget.css' assert { type: 'css' };
 import {ElementsPanel} from './ElementsPanel.js';
 
 const UIStrings = {

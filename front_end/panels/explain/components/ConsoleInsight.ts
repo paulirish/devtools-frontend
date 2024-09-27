@@ -18,8 +18,8 @@ import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 import {type PromptBuilder, type Source, SourceType} from '../PromptBuilder.js';
 
-import styles from './consoleInsight.css.js';
-import listStyles from './consoleInsightSourcesList.css.js';
+import styles from './consoleInsight.css' assert { type: 'css' };
+import listStyles from './consoleInsightSourcesList.css' assert { type: 'css' };
 
 // Note: privacy and legal notices are not localized so far.
 const UIStrings = {

@@ -7,7 +7,7 @@ import * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
-import toolbarStyles from './toolbar.css.js';
+import toolbarStyles from './toolbar.css' assert { type: 'css' };
 
 const {html, Decorators, LitElement} = LitHtml;
 const {customElement} = Decorators;

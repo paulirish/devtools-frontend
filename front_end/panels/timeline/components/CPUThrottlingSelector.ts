@@ -10,7 +10,7 @@ import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 import * as MobileThrottling from '../../mobile_throttling/mobile_throttling.js';
 
-import cpuThrottlingSelectorStyles from './cpuThrottlingSelector.css.js';
+import cpuThrottlingSelectorStyles from './cpuThrottlingSelector.css' assert { type: 'css' };
 
 const {html} = LitHtml;
 

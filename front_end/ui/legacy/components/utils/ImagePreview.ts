@@ -8,7 +8,7 @@ import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
 import * as SDK from '../../../../core/sdk/sdk.js';
 
-import imagePreviewStyles from './imagePreview.css.js';
+import imagePreviewStyles from './imagePreview.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

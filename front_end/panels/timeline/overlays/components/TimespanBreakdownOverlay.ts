@@ -6,7 +6,7 @@ import * as Trace from '../../../../models/trace/trace.js';
 import * as ComponentHelpers from '../../../../ui/components/helpers/helpers.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 
-import styles from './timespanBreakdownOverlay.css.js';
+import styles from './timespanBreakdownOverlay.css' assert { type: 'css' };
 
 /**
  * An EntryBreakdown, or section, that makes up a TimespanBreakdown.

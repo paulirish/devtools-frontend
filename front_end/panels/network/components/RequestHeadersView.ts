@@ -22,7 +22,7 @@ import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 import * as Sources from '../../sources/sources.js';
 
 import {RequestHeaderSection, type RequestHeaderSectionData} from './RequestHeaderSection.js';
-import requestHeadersViewStyles from './RequestHeadersView.css.js';
+import requestHeadersViewStyles from './RequestHeadersView.css' assert { type: 'css' };
 import {
   EarlyHintsHeaderSection,
   RESPONSE_HEADER_SECTION_DATA_KEY,

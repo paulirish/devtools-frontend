@@ -12,7 +12,7 @@ import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 import * as Extensions from '../extensions/extensions.js';
 
-import extensionViewStyles from './extensionView.css.js';
+import extensionViewStyles from './extensionView.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

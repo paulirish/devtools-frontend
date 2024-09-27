@@ -32,7 +32,7 @@ import * as Platform from '../../../../core/platform/platform.js';
 import * as VisualLogging from '../../../visual_logging/visual_logging.js';
 import * as UI from '../../legacy.js';
 
-import dataGridStyles from './dataGrid.css.js';
+import dataGridStyles from './dataGrid.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

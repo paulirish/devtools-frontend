@@ -21,7 +21,7 @@ import * as Components from '../../../ui/legacy/components/utils/utils.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
-import frameDetailsReportViewStyles from './frameDetailsReportView.css.js';
+import frameDetailsReportViewStyles from './frameDetailsReportView.css' assert { type: 'css' };
 import {OriginTrialTreeView} from './OriginTrialTreeView.js';
 import {
   PermissionsPolicySection,

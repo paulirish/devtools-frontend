@@ -6,7 +6,7 @@ import type * as Trace from '../../../models/trace/trace.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 
-import styles from './interactionBreakdown.css.js';
+import styles from './interactionBreakdown.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

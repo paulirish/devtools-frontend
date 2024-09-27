@@ -28,7 +28,7 @@ import * as Converters from './converters/converters.js';
 import * as Extensions from './extensions/extensions.js';
 import * as Models from './models/models.js';
 import * as Actions from './recorder-actions/recorder-actions.js';
-import recorderControllerStyles from './recorderController.css.js';
+import recorderControllerStyles from './recorderController.css' assert { type: 'css' };
 import * as Events from './RecorderEvents.js';
 
 const {html, Decorators, LitElement} = LitHtml;

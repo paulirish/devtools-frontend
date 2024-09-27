@@ -5,7 +5,7 @@
 import * as LitHtml from '../../lit-html/lit-html.js';
 
 import {Icon, type IconData} from './Icon.js';
-import iconButtonStyles from './iconButton.css.js';
+import iconButtonStyles from './iconButton.css' assert { type: 'css' };
 
 export interface IconWithTextData {
   iconName: string;

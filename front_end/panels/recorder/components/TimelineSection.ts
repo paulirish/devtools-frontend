@@ -4,7 +4,7 @@
 
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 
-import timelineSectionStyles from './timelineSection.css.js';
+import timelineSectionStyles from './timelineSection.css' assert { type: 'css' };
 
 declare global {
   interface HTMLElementTagNameMap {

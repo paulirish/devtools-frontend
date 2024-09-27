@@ -9,7 +9,7 @@ import type * as Platform from '../../core/platform/platform.js';
 import * as SourceFrame from '../../ui/legacy/components/source_frame/source_frame.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
-import binaryResourceViewStyles from './binaryResourceView.css.js';
+import binaryResourceViewStyles from './binaryResourceView.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

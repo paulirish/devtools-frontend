@@ -14,7 +14,7 @@ import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 import * as ElementsComponents from '../../elements/components/components.js';
 
-import editorWidgetStyles from './JSONEditor.css.js';
+import editorWidgetStyles from './JSONEditor.css' assert { type: 'css' };
 
 const {html, Decorators, LitElement, Directives, nothing} = LitHtml;
 const {customElement, property, state} = Decorators;

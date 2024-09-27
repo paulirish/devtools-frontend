@@ -41,7 +41,7 @@ import * as Bindings from '../../../../models/bindings/bindings.js';
 import * as VisualLogging from '../../../visual_logging/visual_logging.js';
 import * as UI from '../../legacy.js';
 
-import jsUtilsStyles from './jsUtils.css.js';
+import jsUtilsStyles from './jsUtils.css' assert { type: 'css' };
 import {Events as LinkifierEvents, Linkifier} from './Linkifier.js';
 
 const UIStrings = {

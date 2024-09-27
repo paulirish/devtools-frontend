@@ -10,12 +10,12 @@ import * as IconButton from '../../../ui/components/icon_button/icon_button.js';
 import * as Input from '../../../ui/components/input/input.js';
 // inspectorCommonStyles is imported for the chrome-select class that is used for the dropdown
 // eslint-disable-next-line rulesdir/es_modules_import
-import inspectorCommonStyles from '../../../ui/legacy/inspectorCommon.css.js';
+import inspectorCommonStyles from '../../../ui/legacy/inspectorCommon.css' assert { type: 'css' };
 import * as UI from '../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
-import protocolHandlersViewStyles from './protocolHandlersView.css.js';
+import protocolHandlersViewStyles from './protocolHandlersView.css' assert { type: 'css' };
 
 const PROTOCOL_DOCUMENT_URL = 'https://web.dev/url-protocol-handler/';
 const UIStrings = {

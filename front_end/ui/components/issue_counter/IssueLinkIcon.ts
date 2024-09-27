@@ -13,7 +13,7 @@ import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import {getIssueKindIconData} from './IssueCounter.js';
-import IssueLinkIconStyles from './issueLinkIcon.css.js';
+import IssueLinkIconStyles from './issueLinkIcon.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

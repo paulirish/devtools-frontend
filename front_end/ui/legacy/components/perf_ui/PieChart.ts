@@ -5,7 +5,7 @@
 import * as LitHtml from '../../../lit-html/lit-html.js';
 import * as VisualLogging from '../../../visual_logging/visual_logging.js';
 
-import pieChartStyles from './pieChart.css.js';
+import pieChartStyles from './pieChart.css' assert { type: 'css' };
 
 const {render, html, svg} = LitHtml;
 

@@ -5,11 +5,11 @@
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as IconButton from '../../../ui/components/icon_button/icon_button.js';
 // eslint-disable-next-line rulesdir/es_modules_import
-import inspectorCommonStyles from '../../../ui/legacy/inspectorCommon.css.js';
+import inspectorCommonStyles from '../../../ui/legacy/inspectorCommon.css' assert { type: 'css' };
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
-import valueInterpreterDisplayStyles from './valueInterpreterDisplay.css.js';
+import valueInterpreterDisplayStyles from './valueInterpreterDisplay.css' assert { type: 'css' };
 import {
   Endianness,
   format,

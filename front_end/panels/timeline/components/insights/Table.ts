@@ -7,7 +7,7 @@ import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 import type * as Overlays from '../../overlays/overlays.js';
 
 import {type BaseInsight} from './Helpers.js';
-import tableStyles from './table.css.js';
+import tableStyles from './table.css' assert { type: 'css' };
 
 /**
  * @fileoverview An interactive table component.

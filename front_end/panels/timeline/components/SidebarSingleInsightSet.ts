@@ -10,7 +10,7 @@ import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import {type BaseInsight} from './insights/Helpers.js';
 import * as Insights from './insights/insights.js';
 import {type ActiveInsight, EventReferenceClick} from './Sidebar.js';
-import styles from './sidebarSingleInsightSet.css.js';
+import styles from './sidebarSingleInsightSet.css' assert { type: 'css' };
 
 export interface SidebarSingleInsightSetData {
   parsedTrace: Trace.Handlers.Types.ParsedTrace|null;

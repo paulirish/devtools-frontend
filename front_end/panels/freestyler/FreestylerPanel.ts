@@ -25,7 +25,7 @@ import {
   DrJonesNetworkAgent,
 } from './DrJonesNetworkAgent.js';
 import {FreestylerAgent} from './FreestylerAgent.js';
-import freestylerPanelStyles from './freestylerPanel.css.js';
+import freestylerPanelStyles from './freestylerPanel.css' assert { type: 'css' };
 
 // Bug for the send feed back link
 // const AI_ASSISTANCE_SEND_FEEDBACK = 'https://crbug.com/364805393' as Platform.DevToolsPath.UrlString;

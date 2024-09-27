@@ -5,8 +5,8 @@
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 
-import signedExchangeInfoTreeStyles from './signedExchangeInfoTree.css.js';
-import signedExchangeInfoViewStyles from './signedExchangeInfoView.css.js';
+import signedExchangeInfoTreeStyles from './signedExchangeInfoTree.css' assert { type: 'css' };
+import signedExchangeInfoViewStyles from './signedExchangeInfoView.css' assert { type: 'css' };
 
 import type * as SDK from '../../core/sdk/sdk.js';
 import * as IconButton from '../../ui/components/icon_button/icon_button.js';

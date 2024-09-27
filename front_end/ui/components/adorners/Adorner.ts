@@ -6,7 +6,7 @@ import type * as Platform from '../../../core/platform/platform.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualElements from '../../visual_logging/visual_logging.js';
 
-import adornerStyles from './adorner.css.js';
+import adornerStyles from './adorner.css' assert { type: 'css' };
 
 const {render, html} = LitHtml;
 

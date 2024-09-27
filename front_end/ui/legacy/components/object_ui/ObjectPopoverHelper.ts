@@ -35,9 +35,9 @@ import * as UI from '../../legacy.js';
 import * as Components from '../utils/utils.js';
 
 import {CustomPreviewComponent} from './CustomPreviewComponent.js';
-import objectPopoverStyles from './objectPopover.css.js';
+import objectPopoverStyles from './objectPopover.css' assert { type: 'css' };
 import {ObjectPropertiesSection} from './ObjectPropertiesSection.js';
-import objectValueStyles from './objectValue.css.js';
+import objectValueStyles from './objectValue.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

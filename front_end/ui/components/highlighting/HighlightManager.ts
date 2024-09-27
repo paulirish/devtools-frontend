@@ -4,7 +4,7 @@
 
 import type * as TextUtils from '../../../models/text_utils/text_utils.js';
 
-import highlightingStyles from './highlighting.css.js';
+import highlightingStyles from './highlighting.css' assert { type: 'css' };
 
 export class RangeWalker {
   #offset = 0;

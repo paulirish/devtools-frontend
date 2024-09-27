@@ -40,7 +40,7 @@ import * as UI from '../../ui/legacy/legacy.js';
 import * as Snippets from '../snippets/snippets.js';
 
 import {type NavigatorUISourceCodeTreeNode, NavigatorView} from './NavigatorView.js';
-import sourcesNavigatorStyles from './sourcesNavigator.css.js';
+import sourcesNavigatorStyles from './sourcesNavigator.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

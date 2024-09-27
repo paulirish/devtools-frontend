@@ -20,7 +20,7 @@ import type * as Converters from '../converters/converters.js';
 import * as Models from '../models/models.js';
 
 import {type StepEditedEvent} from './StepEditor.js';
-import stepViewStyles from './stepView.css.js';
+import stepViewStyles from './stepView.css' assert { type: 'css' };
 import {
   TimelineSection,
   type TimelineSectionData,

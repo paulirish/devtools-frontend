@@ -7,7 +7,7 @@ import * as i18n from '../../core/i18n/i18n.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
-import locationsSettingsTabStyles from './locationsSettingsTab.css.js';
+import locationsSettingsTabStyles from './locationsSettingsTab.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

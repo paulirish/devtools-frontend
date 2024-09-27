@@ -8,7 +8,7 @@ import type * as Protocol from '../../generated/protocol.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
-import playerMessagesViewStyles from './playerMessagesView.css.js';
+import playerMessagesViewStyles from './playerMessagesView.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

@@ -15,7 +15,7 @@ import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 import {CoverageDecorationManager} from './CoverageDecorationManager.js';
 import {CoverageListView} from './CoverageListView.js';
 import {type CoverageInfo, CoverageModel, CoverageType, Events, type URLCoverageInfo} from './CoverageModel.js';
-import coverageViewStyles from './coverageView.css.js';
+import coverageViewStyles from './coverageView.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

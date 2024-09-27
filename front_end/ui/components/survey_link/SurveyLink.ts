@@ -8,7 +8,7 @@ import * as i18n from '../../../core/i18n/i18n.js';
 import * as LitHtml from '../../lit-html/lit-html.js';
 import * as IconButton from '../icon_button/icon_button.js';
 
-import surveyLinkStyles from './surveyLink.css.js';
+import surveyLinkStyles from './surveyLink.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

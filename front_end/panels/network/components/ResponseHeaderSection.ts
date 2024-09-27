@@ -31,7 +31,7 @@ import {
   type HeaderSectionRowData,
   isValidHeaderName,
 } from './HeaderSectionRow.js';
-import responseHeaderSectionStyles from './ResponseHeaderSection.css.js';
+import responseHeaderSectionStyles from './ResponseHeaderSection.css' assert { type: 'css' };
 
 const {render, html} = LitHtml;
 

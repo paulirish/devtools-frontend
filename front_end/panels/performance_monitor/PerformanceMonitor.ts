@@ -11,7 +11,7 @@ import * as UI from '../../ui/legacy/legacy.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
-import performanceMonitorStyles from './performanceMonitor.css.js';
+import performanceMonitorStyles from './performanceMonitor.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

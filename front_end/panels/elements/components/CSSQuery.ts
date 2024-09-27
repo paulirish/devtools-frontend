@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 // eslint-disable-next-line rulesdir/es_modules_import
-import inspectorCommonStyles from '../../../ui/legacy/inspectorCommon.css.js';
+import inspectorCommonStyles from '../../../ui/legacy/inspectorCommon.css' assert { type: 'css' };
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
-import cssQueryStyles from './cssQuery.css.js';
+import cssQueryStyles from './cssQuery.css' assert { type: 'css' };
 
 const {render, html} = LitHtml;
 

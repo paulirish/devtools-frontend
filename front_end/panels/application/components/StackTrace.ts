@@ -11,8 +11,8 @@ import * as Components from '../../../ui/legacy/components/utils/utils.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
-import stackTraceLinkButtonStyles from './stackTraceLinkButton.css.js';
-import stackTraceRowStyles from './stackTraceRow.css.js';
+import stackTraceLinkButtonStyles from './stackTraceLinkButton.css' assert { type: 'css' };
+import stackTraceRowStyles from './stackTraceRow.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

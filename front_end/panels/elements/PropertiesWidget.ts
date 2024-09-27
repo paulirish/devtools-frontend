@@ -40,7 +40,7 @@ import * as ObjectUI from '../../ui/legacy/components/object_ui/object_ui.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
-import propertiesWidgetStyles from './propertiesWidget.css.js';
+import propertiesWidgetStyles from './propertiesWidget.css' assert { type: 'css' };
 
 const OBJECT_GROUP_NAME = 'properties-sidebar-pane';
 

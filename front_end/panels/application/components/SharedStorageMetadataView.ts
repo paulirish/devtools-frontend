@@ -8,7 +8,7 @@ import * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as IconButton from '../../../ui/components/icon_button/icon_button.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 
-import sharedStorageMetadataViewStyles from './sharedStorageMetadataView.css.js';
+import sharedStorageMetadataViewStyles from './sharedStorageMetadataView.css' assert { type: 'css' };
 import {StorageMetadataView} from './StorageMetadataView.js';
 
 const UIStrings = {

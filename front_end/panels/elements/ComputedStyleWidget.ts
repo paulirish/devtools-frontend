@@ -43,7 +43,7 @@ import * as LitHtml from '../../ui/lit-html/lit-html.js';
 
 import * as ElementsComponents from './components/components.js';
 import {type ComputedStyle, ComputedStyleModel, Events} from './ComputedStyleModel.js';
-import computedStyleSidebarPaneStyles from './computedStyleSidebarPane.css.js';
+import computedStyleSidebarPaneStyles from './computedStyleSidebarPane.css' assert { type: 'css' };
 import {ImagePreviewPopover} from './ImagePreviewPopover.js';
 import {PlatformFontsWidget} from './PlatformFontsWidget.js';
 import {type ColorMatch, ColorMatcher} from './PropertyMatchers.js';

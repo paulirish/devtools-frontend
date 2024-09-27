@@ -21,7 +21,7 @@ import {
   Events,
 } from './AnimationModel.js';
 import {AnimationScreenshotPopover} from './AnimationScreenshotPopover.js';
-import animationTimelineStyles from './animationTimeline.css.js';
+import animationTimelineStyles from './animationTimeline.css' assert { type: 'css' };
 import {AnimationUI} from './AnimationUI.js';
 
 const UIStrings = {

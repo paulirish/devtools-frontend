@@ -4,12 +4,12 @@
 
 import * as LitHtml from '../../lit-html/lit-html.js';
 
-import reportStyles from './report.css.js';
-import reportKeyStyles from './reportKey.css.js';
-import reportSectionStyles from './reportSection.css.js';
-import reportSectionDividerStyles from './reportSectionDivider.css.js';
-import reportSectionHeaderStyles from './reportSectionHeader.css.js';
-import reportValueStyles from './reportValue.css.js';
+import reportStyles from './report.css' assert { type: 'css' };
+import reportKeyStyles from './reportKey.css' assert { type: 'css' };
+import reportSectionStyles from './reportSection.css' assert { type: 'css' };
+import reportSectionDividerStyles from './reportSectionDivider.css' assert { type: 'css' };
+import reportSectionHeaderStyles from './reportSectionHeader.css' assert { type: 'css' };
+import reportValueStyles from './reportValue.css' assert { type: 'css' };
 
 /**
  * The `Report` component can be used to display static information. A report

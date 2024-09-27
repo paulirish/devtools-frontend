@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as Style from './codeHighlighter.css.js';
+import * as Style from './codeHighlighter.css' assert { type: 'css' };
 import * as CodeHighlighter from './CodeHighlighter.js';
 
 export {

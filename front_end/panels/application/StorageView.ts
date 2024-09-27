@@ -15,7 +15,7 @@ import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {DOMStorageModel} from './DOMStorageModel.js';
 import {IndexedDBModel} from './IndexedDBModel.js';
-import storageViewStyles from './storageView.css.js';
+import storageViewStyles from './storageView.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

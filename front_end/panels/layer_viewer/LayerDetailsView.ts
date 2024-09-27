@@ -36,7 +36,7 @@ import type * as Protocol from '../../generated/protocol.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
-import layerDetailsViewStyles from './layerDetailsView.css.js';
+import layerDetailsViewStyles from './layerDetailsView.css' assert { type: 'css' };
 import {
   type LayerView,
   type LayerViewHost,

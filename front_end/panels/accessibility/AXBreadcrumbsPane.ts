@@ -14,7 +14,7 @@ import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {type AccessibilitySidebarView} from './AccessibilitySidebarView.js';
 import {AccessibilitySubPane} from './AccessibilitySubPane.js';
-import axBreadcrumbsStyles from './axBreadcrumbs.css.js';
+import axBreadcrumbsStyles from './axBreadcrumbs.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

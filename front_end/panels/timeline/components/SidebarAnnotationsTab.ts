@@ -15,7 +15,7 @@ import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 
 import {nameForEntry} from './EntryName.js';
 import {RemoveAnnotation, RevealAnnotation} from './Sidebar.js';
-import sidebarAnnotationsTabStyles from './sidebarAnnotationsTab.css.js';
+import sidebarAnnotationsTabStyles from './sidebarAnnotationsTab.css' assert { type: 'css' };
 
 const diagramImageUrl = new URL('../../../Images/performance-panel-diagram.svg', import.meta.url).toString();
 const entryLabelImageUrl = new URL('../../../Images/performance-panel-entry-label.svg', import.meta.url).toString();

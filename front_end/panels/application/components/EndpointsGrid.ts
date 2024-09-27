@@ -8,7 +8,7 @@ import * as DataGrid from '../../../ui/components/data_grid/data_grid.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
-import reportingApiGridStyles from './reportingApiGrid.css.js';
+import reportingApiGridStyles from './reportingApiGrid.css' assert { type: 'css' };
 
 const UIStrings = {
   /**

@@ -13,7 +13,7 @@ import * as UI from '../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as TimelineUtils from '../utils/utils.js';
 
-import NetworkRequestDetailsStyles from './networkRequestDetails.css.js';
+import NetworkRequestDetailsStyles from './networkRequestDetails.css' assert { type: 'css' };
 import {colorForNetworkRequest} from './Utils.js';
 
 const MAX_URL_LENGTH = 80;

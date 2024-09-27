@@ -9,7 +9,7 @@ import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import * as Insights from './insights/insights.js';
 import {type ActiveInsight} from './Sidebar.js';
-import styles from './sidebarInsightsTab.css.js';
+import styles from './sidebarInsightsTab.css' assert { type: 'css' };
 import {SidebarSingleInsightSet, type SidebarSingleInsightSetData} from './SidebarSingleInsightSet.js';
 
 export class SidebarInsightsTab extends HTMLElement {

@@ -29,5 +29,6 @@ template("copy_to_gen") {
     foreach(_input, sources) {
       outputs += [ "$target_gen_dir/$_input" ]
     }
+    data = outputs
   }
 }

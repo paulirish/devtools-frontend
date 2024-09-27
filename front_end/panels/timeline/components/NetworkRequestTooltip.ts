@@ -9,7 +9,7 @@ import * as IconButton from '../../../ui/components/icon_button/icon_button.js';
 import * as PerfUI from '../../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 
-import networkRequestTooltipStyles from './networkRequestTooltip.css.js';
+import networkRequestTooltipStyles from './networkRequestTooltip.css' assert { type: 'css' };
 import {colorForNetworkRequest} from './Utils.js';
 
 const MAX_URL_LENGTH = 30;

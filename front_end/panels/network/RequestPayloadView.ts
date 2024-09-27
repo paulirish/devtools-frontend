@@ -39,14 +39,14 @@ import * as SDK from '../../core/sdk/sdk.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
 import * as ObjectUI from '../../ui/legacy/components/object_ui/object_ui.js';
 // eslint-disable-next-line rulesdir/es_modules_import
-import objectPropertiesSectionStyles from '../../ui/legacy/components/object_ui/objectPropertiesSection.css.js';
+import objectPropertiesSectionStyles from '../../ui/legacy/components/object_ui/objectPropertiesSection.css' assert { type: 'css' };
 // eslint-disable-next-line rulesdir/es_modules_import
-import objectValueStyles from '../../ui/legacy/components/object_ui/objectValue.css.js';
+import objectValueStyles from '../../ui/legacy/components/object_ui/objectValue.css' assert { type: 'css' };
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
-import requestPayloadTreeStyles from './requestPayloadTree.css.js';
-import requestPayloadViewStyles from './requestPayloadView.css.js';
+import requestPayloadTreeStyles from './requestPayloadTree.css' assert { type: 'css' };
+import requestPayloadViewStyles from './requestPayloadView.css' assert { type: 'css' };
 const UIStrings = {
   /**
    *@description A context menu item in the Watch Expressions Sidebar Pane of the Sources panel and Network pane request.
