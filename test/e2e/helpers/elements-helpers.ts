@@ -4,7 +4,7 @@
 import {assert} from 'chai';
 import type * as puppeteer from 'puppeteer-core';
 
-import {AsyncScope} from '../../shared/async-scope.js';
+import {AsyncScope} from '../../conductor/async-scope.js';
 import {
   $,
   $$,
@@ -429,7 +429,7 @@ export const forcePseudoState = async (pseudoState: string) => {
     veImpressionsUnder('Panel: elements > Pane: styles', [veImpression(
                                                              'Pane', 'element-states',
                                                              [
-                                                               veImpression('Link: learn-more'),
+                                                               veImpression('Action: learn-more'),
                                                                veImpression('Toggle: active'),
                                                                veImpression('Toggle: focus'),
                                                                veImpression('Toggle: focus-visible'),

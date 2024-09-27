@@ -7,9 +7,9 @@ import * as Trace from '../../../../models/trace/trace.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 import type * as Overlays from '../../overlays/overlays.js';
 
-import {BaseInsight, md, shouldRenderForCategory} from './Helpers.js';
+import {BaseInsight, shouldRenderForCategory} from './Helpers.js';
 import * as SidebarInsight from './SidebarInsight.js';
-import {InsightsCategories} from './types.js';
+import {Category} from './types.js';
 
 const UIStrings = {
   /** Title of an insight that provides details about why elements shift/move on the page. The causes for these shifts are referred to as culprits ("reasons"). */
@@ -36,22 +36,28 @@ const UIStrings = {
    * @description Text for a culprit type of Font request.
    */
   fontRequest: 'Font request',
+  /**
+   * @description Text for a culprit type of Animation.
+   */
+  animation: 'Animation',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/insights/CLSCulprits.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class CLSCulprits extends BaseInsight {
   static readonly litTagName = LitHtml.literal`devtools-performance-cls-culprits`;
-  override insightCategory: InsightsCategories = InsightsCategories.CLS;
+  override insightCategory: Category = Category.CLS;
   override internalName: string = 'cls-culprits';
   override userVisibleTitle: string = i18nString(UIStrings.title);
+  override description: string = i18nString(UIStrings.description);
 
   override createOverlays(): Overlays.Overlays.TimelineOverlay[] {
     const insight =
         Trace.Insights.Common.getInsight('CumulativeLayoutShift', this.data.insights, this.data.insightSetKey);
 
-    // Clusters are sorted by bad scores, so we can grab the first.
-    const worstCluster = insight?.clusters[0];
+    const clustersByScore =
+        insight?.clusters.toSorted((a, b) => b.clusterCumulativeScore - a.clusterCumulativeScore) ?? [];
+    const worstCluster = clustersByScore[0];
     if (!worstCluster) {
       return [];
     }
@@ -83,7 +89,8 @@ export class CLSCulprits extends BaseInsight {
     }
     const MAX_TOP_CULPRITS = 3;
     const causes: Array<string> = [];
-    for (const cluster of clusters) {
+    const clustersByScore = clusters.toSorted((a, b) => b.clusterCumulativeScore - a.clusterCumulativeScore);
+    for (const cluster of clustersByScore) {
       if (causes.length === MAX_TOP_CULPRITS) {
         break;
       }
@@ -99,12 +106,16 @@ export class CLSCulprits extends BaseInsight {
         }
         const fontReq = culprits.fontRequests;
         const iframes = culprits.iframeIds;
+        const animations = culprits.nonCompositedAnimations;
 
         for (let i = 0; i < fontReq.length && causes.length < MAX_TOP_CULPRITS; i++) {
           causes.push(i18nString(UIStrings.fontRequest));
         }
         for (let i = 0; i < iframes.length && causes.length < MAX_TOP_CULPRITS; i++) {
           causes.push(i18nString(UIStrings.injectedIframe));
+        }
+        for (let i = 0; i < animations.length && causes.length < MAX_TOP_CULPRITS; i++) {
+          causes.push(i18nString(UIStrings.animation));
         }
       }
     }
@@ -117,14 +128,12 @@ export class CLSCulprits extends BaseInsight {
         <div class="insights">
             <${SidebarInsight.SidebarInsight.litTagName} .data=${{
               title: this.userVisibleTitle,
+              description: this.description,
               internalName: this.internalName,
               expanded: this.isActive(),
             } as SidebarInsight.InsightDetails}
             @insighttoggleclick=${this.onSidebarClick}>
-                <div slot="insight-description" class="insight-description">
-                  ${md(i18nString(UIStrings.description))}
-                </div>
-                <div slot="insight-content" style="insight-content">
+                <div slot="insight-content" class="insight-section">
                   <p>
                     <h3>${i18nString(UIStrings.topCulprits)}</h3>
                     ${culprits.map(culprit => {

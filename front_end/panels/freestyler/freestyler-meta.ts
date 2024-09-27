@@ -14,25 +14,25 @@ import type * as Freestyler from './freestyler.js';
   * Temporary string that should not be translated
   * as they may change often during development.
   */
-const UIStringsTemp = {
+const UIStrings = {
   /**
-   * @description The title of the command menu action for showing the AI assistant panel.
+   * @description The title of the AI assistance panel.
    */
-  showAiAssistant: 'Show  AI assistant',
+  aiAssistance: 'AI assistance',
   /**
-   * @description The title of the AI assistant panel.
+   * @description The title of the command menu action for showing the AI assistance panel.
    */
-  aiAssistant: 'AI assistant',
+  showAiAssistance: 'Show AI assistance',
   /**
-   * @description The setting title to enable the AI assistant via
+   * @description The setting title to enable the AI assistance via
    * the settings tab.
    */
-  enableAiAssistant: 'Enable AI assistant',
+  enableAiAssistance: 'Enable AI assistance',
   /**
-   *@description Text of a tooltip to redirect to the AI assistant panel with
-   *the current element as context
+   *@description Text of a tooltip to redirect to the AI assistance panel with
+   * the current element as context
    */
-  askAiAssistant: 'Ask AI assistant',
+  askAiAssistance: 'Ask AI assistance',
   /**
    * @description Message shown to the user if the DevTools locale is not
    * supported.
@@ -54,12 +54,9 @@ const UIStringsTemp = {
   policyRestricted: 'Your organization turned off this feature. Contact your administrators for more information',
 };
 
-// TODO(nvitkov): b/346933425
-// const str_ = i18n.i18n.registerUIStrings('panels/freestyler/freestyler-meta.ts', UIStrings);
-// const i18nLazyString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined, str_);
-/* eslint-disable  rulesdir/l10n_i18nString_call_only_with_uistrings */
-const i18nLazyString = i18n.i18n.lockedLazyString;
-const i18nString = i18n.i18n.lockedString;
+const str_ = i18n.i18n.registerUIStrings('panels/freestyler/freestyler-meta.ts', UIStrings);
+const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+const i18nLazyString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined, str_);
 
 const setting = 'freestyler-enabled';
 
@@ -100,14 +97,13 @@ function isDrJonesFeatureAvailable(config?: Root.Runtime.HostConfig): boolean {
 UI.ViewManager.registerViewExtension({
   location: UI.ViewManager.ViewLocationValues.DRAWER_VIEW,
   id: 'freestyler',
-  commandPrompt: i18nLazyString(UIStringsTemp.showAiAssistant),
-  title: i18nLazyString(UIStringsTemp.aiAssistant),
+  commandPrompt: i18nLazyString(UIStrings.showAiAssistance),
+  title: i18nLazyString(UIStrings.aiAssistance),
   order: 10,
   isPreviewFeature: true,
   persistence: UI.ViewManager.ViewPersistence.CLOSEABLE,
   hasToolbar: false,
-  condition: config => isFeatureAvailable(config) && !isPolicyRestricted(config) &&
-      Common.Settings.Settings.instance().moduleSetting(setting).get(),
+  condition: config => isFeatureAvailable(config) && !isPolicyRestricted(config),
   async loadView() {
     const Freestyler = await loadFreestylerModule();
     return Freestyler.FreestylerPanel.instance();
@@ -115,25 +111,25 @@ UI.ViewManager.registerViewExtension({
 });
 
 Common.Settings.registerSettingExtension({
-  category: Common.Settings.SettingCategory.GLOBAL,
+  category: Common.Settings.SettingCategory.NONE,
   settingName: setting,
   settingType: Common.Settings.SettingType.BOOLEAN,
-  title: i18nLazyString(UIStringsTemp.enableAiAssistant),
-  defaultValue: isFeatureAvailable,
-  reloadRequired: true,
+  title: i18nLazyString(UIStrings.enableAiAssistance),
+  defaultValue: false,
+  reloadRequired: false,
   condition: isFeatureAvailable,
   disabledCondition: config => {
     if (isLocaleRestricted()) {
-      return {disabled: true, reason: i18nString(UIStringsTemp.wrongLocale)};
+      return {disabled: true, reason: i18nString(UIStrings.wrongLocale)};
     }
     if (isAgeRestricted(config)) {
-      return {disabled: true, reason: i18nString(UIStringsTemp.ageRestricted)};
+      return {disabled: true, reason: i18nString(UIStrings.ageRestricted)};
     }
     if (isGeoRestricted(config)) {
-      return {disabled: true, reason: i18nString(UIStringsTemp.geoRestricted)};
+      return {disabled: true, reason: i18nString(UIStrings.geoRestricted)};
     }
     if (isPolicyRestricted(config)) {
-      return {disabled: true, reason: i18nString(UIStringsTemp.policyRestricted)};
+      return {disabled: true, reason: i18nString(UIStrings.policyRestricted)};
     }
 
     return {disabled: false};
@@ -145,9 +141,8 @@ UI.ActionRegistration.registerActionExtension({
   contextTypes(): [] {
     return [];
   },
-  setting,
   category: UI.ActionRegistration.ActionCategory.GLOBAL,
-  title: i18nLazyString(UIStringsTemp.askAiAssistant),
+  title: i18nLazyString(UIStrings.askAiAssistance),
   async loadActionDelegate() {
     const Freestyler = await loadFreestylerModule();
     return new Freestyler.ActionDelegate();
@@ -160,9 +155,8 @@ UI.ActionRegistration.registerActionExtension({
   contextTypes(): [] {
     return [];
   },
-  setting,
   category: UI.ActionRegistration.ActionCategory.GLOBAL,
-  title: i18nLazyString(UIStringsTemp.askAiAssistant),
+  title: i18nLazyString(UIStrings.askAiAssistance),
   async loadActionDelegate() {
     const Freestyler = await loadFreestylerModule();
     return new Freestyler.ActionDelegate();

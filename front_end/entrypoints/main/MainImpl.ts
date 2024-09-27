@@ -282,7 +282,6 @@ export class MainImpl {
   }
 
   #initializeExperiments(): void {
-    Root.Runtime.experiments.register('apply-custom-stylesheet', 'Allow extensions to load custom stylesheets');
     Root.Runtime.experiments.register('capture-node-creation-stacks', 'Capture node creation stacks');
     Root.Runtime.experiments.register('live-heap-profile', 'Live heap profile', true);
     Root.Runtime.experiments.register(
@@ -383,7 +382,6 @@ export class MainImpl {
     Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.TIMELINE_ANNOTATIONS,
         'Performance panel: enable annotations',
-        true,
     );
 
     Root.Runtime.experiments.register(
@@ -397,10 +395,6 @@ export class MainImpl {
         'Performance panel: enable live metrics landing page',
     );
 
-    Root.Runtime.experiments.register(
-        Root.Runtime.ExperimentName.GEN_AI_SETTINGS_PANEL,
-        'Dedicated panel for generative AI settings',
-    );
     Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.TIMELINE_SERVER_TIMINGS,
         'Performance panel: enable server timings in the timeline',
@@ -421,8 +415,8 @@ export class MainImpl {
       'css-type-component-length-deprecate',
       Root.Runtime.ExperimentName.AUTOFILL_VIEW,
       Root.Runtime.ExperimentName.TIMELINE_OBSERVATIONS,
+      Root.Runtime.ExperimentName.TIMELINE_ANNOTATIONS,
       Root.Runtime.ExperimentName.NETWORK_PANEL_FILTER_BAR_REDESIGN,
-      Root.Runtime.ExperimentName.GEN_AI_SETTINGS_PANEL,
       ...(Root.Runtime.Runtime.queryParam('isChromeForTesting') ? ['protocol-monitor'] : []),
     ]);
 

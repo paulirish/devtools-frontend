@@ -8,12 +8,12 @@ import * as Trace from '../../../../models/trace/trace.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 import type * as Overlays from '../../overlays/overlays.js';
 
-import {BaseInsight, md, shouldRenderForCategory} from './Helpers.js';
+import {BaseInsight, shouldRenderForCategory} from './Helpers.js';
 import * as SidebarInsight from './SidebarInsight.js';
 import {Table, type TableData} from './Table.js';
-import {InsightsCategories} from './types.js';
+import {Category} from './types.js';
 
-type ThirdPartiesEntires = Array<[
+type ThirdPartiesEntries = Array<[
   Trace.Insights.InsightRunners.ThirdPartyWeb.Entity,
   Trace.Insights.InsightRunners.ThirdPartyWeb.Summary,
 ]>;
@@ -41,14 +41,13 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class ThirdParties extends BaseInsight {
   static readonly litTagName = LitHtml.literal`devtools-performance-third-parties`;
-  override insightCategory: InsightsCategories = InsightsCategories.OTHER;
+  override insightCategory: Category = Category.ALL;
   override internalName: string = 'third-parties';
   override userVisibleTitle: string = i18nString(UIStrings.title);
+  override description: string = i18nString(UIStrings.description);
 
   #overlaysForEntity =
       new Map<Trace.Insights.InsightRunners.ThirdPartyWeb.Entity, Overlays.Overlays.TimelineOverlay[]>();
-  #currentSelectedRowEl: HTMLElement|null = null;
-  #currentSelectionIsSticky = false;
 
   override createOverlays(): Overlays.Overlays.TimelineOverlay[] {
     this.#overlaysForEntity.clear();
@@ -81,35 +80,7 @@ export class ThirdParties extends BaseInsight {
     return overlays;
   }
 
-  #onSelectedRowChanged(
-      entity: Trace.Insights.InsightRunners.ThirdPartyWeb.Entity|null, rowEl: HTMLElement|null, sticky: boolean): void {
-    if (this.#currentSelectionIsSticky && !sticky) {
-      return;
-    }
-
-    // Unselect a sticky-selection when clicking it for a second time.
-    if (this.#currentSelectionIsSticky && rowEl === this.#currentSelectedRowEl) {
-      entity = null;
-      rowEl = null;
-      sticky = false;
-    }
-
-    if (entity) {
-      const overlays = this.#overlaysForEntity.get(entity);
-      if (overlays) {
-        this.onOverlayOverride(overlays);
-      }
-    } else {
-      this.onOverlayOverride(null);
-    }
-
-    this.#currentSelectedRowEl?.classList.remove('selected');
-    rowEl?.classList.add('selected');
-    this.#currentSelectedRowEl = rowEl;
-    this.#currentSelectionIsSticky = sticky;
-  }
-
-  #render(entries: ThirdPartiesEntires): LitHtml.TemplateResult {
+  #render(entries: ThirdPartiesEntries): LitHtml.TemplateResult {
     const topTransferSizeEntries = entries.sort((a, b) => b[1].transferSize - a[1].transferSize).slice(0, 6);
     const topMainThreadTimeEntries = entries.sort((a, b) => b[1].mainThreadTime - a[1].mainThreadTime).slice(0, 6);
 
@@ -118,38 +89,43 @@ export class ThirdParties extends BaseInsight {
         <div class="insights">
             <${SidebarInsight.SidebarInsight.litTagName} .data=${{
               title: this.userVisibleTitle,
+              description: this.description,
               internalName: this.internalName,
               expanded: this.isActive(),
             } as SidebarInsight.InsightDetails}
             @insighttoggleclick=${this.onSidebarClick}>
-                <div slot="insight-description" class="insight-description">
-                  ${md(i18nString(UIStrings.description))}
-                </div>
                 <div slot="insight-content">
-                  ${LitHtml.html`<${Table.litTagName}
-                    .data=${{
-                      headers: [i18nString(UIStrings.columnThirdParty), i18nString(UIStrings.columnTransferSize)],
-                      rows: topTransferSizeEntries.map(([entity, summary]) => [
-                        entity.name,
-                        Platform.NumberUtilities.bytesToString(summary.transferSize),
-                      ]),
-                      onHoverRow: (index: number, rowEl: HTMLElement) => this.#onSelectedRowChanged(topTransferSizeEntries[index][0], rowEl, false),
-                      onClickRow: (index: number, rowEl: HTMLElement) => this.#onSelectedRowChanged(topTransferSizeEntries[index][0], rowEl, true),
-                      onMouseLeave: () => this.#onSelectedRowChanged(null, null, false),
-                    } as TableData}>
-                  </${Table.litTagName}>`}
-                  ${LitHtml.html`<${Table.litTagName}
-                    .data=${{
-                      headers: [i18nString(UIStrings.columnThirdParty), i18nString(UIStrings.columnBlockingTime)],
-                      rows: topMainThreadTimeEntries.map(([entity, summary]) => [
-                        entity.name,
-                        i18n.TimeUtilities.millisToString(Platform.Timing.microSecondsToMilliSeconds(summary.mainThreadTime)),
-                      ]),
-                      onHoverRow: (index: number, rowEl: HTMLElement) => this.#onSelectedRowChanged(topMainThreadTimeEntries[index][0], rowEl, false),
-                      onClickRow: (index: number, rowEl: HTMLElement) => this.#onSelectedRowChanged(topMainThreadTimeEntries[index][0], rowEl, true),
-                      onMouseLeave: () => this.#onSelectedRowChanged(null, null, false),
-                    } as TableData}>
-                  </${Table.litTagName}>`}
+                  <div class="insight-section">
+                    ${LitHtml.html`<${Table.litTagName}
+                      .data=${{
+                        insight: this,
+                        headers: [i18nString(UIStrings.columnThirdParty), i18nString(UIStrings.columnTransferSize)],
+                        rows: topTransferSizeEntries.map(([entity, summary]) => ({
+                          values: [
+                            entity.name,
+                            Platform.NumberUtilities.bytesToString(summary.transferSize),
+                          ],
+                          overlays: this.#overlaysForEntity.get(entity),
+                        })),
+                      } as TableData}>
+                    </${Table.litTagName}>`}
+                  </div>
+
+                  <div class="insight-section">
+                    ${LitHtml.html`<${Table.litTagName}
+                      .data=${{
+                        insight: this,
+                        headers: [i18nString(UIStrings.columnThirdParty), i18nString(UIStrings.columnBlockingTime)],
+                        rows: topMainThreadTimeEntries.map(([entity, summary]) => ({
+                          values: [
+                            entity.name,
+                            i18n.TimeUtilities.millisToString(Platform.Timing.microSecondsToMilliSeconds(summary.mainThreadTime)),
+                          ],
+                          overlays: this.#overlaysForEntity.get(entity),
+                        })),
+                      } as TableData}>
+                    </${Table.litTagName}>`}
+                  </div>
                 </div>
             </${SidebarInsight.SidebarInsight}>
         </div>`;

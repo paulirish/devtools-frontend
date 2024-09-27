@@ -38,31 +38,22 @@ describeWithEnvironment('FreestylerAgent', () => {
       assert.deepStrictEqual(
           FreestylerAgent.parseResponse(`THOUGHT: ${payload}`),
           {
-            action: undefined,
             title: undefined,
             thought: payload,
-            answer: undefined,
-            fixable: false,
           },
       );
       assert.deepStrictEqual(
           FreestylerAgent.parseResponse(`   THOUGHT: ${payload}`),
           {
-            action: undefined,
             title: undefined,
             thought: payload,
-            answer: undefined,
-            fixable: false,
           },
       );
       assert.deepStrictEqual(
           FreestylerAgent.parseResponse(`Something\n   THOUGHT: ${payload}`),
           {
-            action: undefined,
             title: undefined,
             thought: payload,
-            answer: undefined,
-            fixable: false,
           },
       );
     });
@@ -71,31 +62,22 @@ describeWithEnvironment('FreestylerAgent', () => {
       assert.deepStrictEqual(
           FreestylerAgent.parseResponse(`ANSWER: ${payload}`),
           {
-            action: undefined,
-            title: undefined,
-            thought: undefined,
             answer: payload,
-            fixable: false,
+            suggestions: [],
           },
       );
       assert.deepStrictEqual(
           FreestylerAgent.parseResponse(`   ANSWER: ${payload}`),
           {
-            action: undefined,
-            title: undefined,
-            thought: undefined,
             answer: payload,
-            fixable: false,
+            suggestions: [],
           },
       );
       assert.deepStrictEqual(
           FreestylerAgent.parseResponse(`Something\n   ANSWER: ${payload}`),
           {
-            action: undefined,
-            title: undefined,
-            thought: undefined,
             answer: payload,
-            fixable: false,
+            suggestions: [],
           },
       );
     });
@@ -106,41 +88,29 @@ c`;
       assert.deepStrictEqual(
           FreestylerAgent.parseResponse(`ANSWER: ${payload}`),
           {
-            action: undefined,
-            title: undefined,
-            thought: undefined,
             answer: payload,
-            fixable: false,
+            suggestions: [],
           },
       );
       assert.deepStrictEqual(
           FreestylerAgent.parseResponse(`   ANSWER: ${payload}`),
           {
-            action: undefined,
-            title: undefined,
-            thought: undefined,
             answer: payload,
-            fixable: false,
+            suggestions: [],
           },
       );
       assert.deepStrictEqual(
           FreestylerAgent.parseResponse(`Something\n   ANSWER: ${payload}`),
           {
-            action: undefined,
-            title: undefined,
-            thought: undefined,
             answer: payload,
-            fixable: false,
+            suggestions: [],
           },
       );
       assert.deepStrictEqual(
           FreestylerAgent.parseResponse(`ANSWER: ${payload}\nTHOUGHT: thought`),
           {
-            action: undefined,
-            title: undefined,
-            thought: 'thought',
             answer: payload,
-            fixable: false,
+            suggestions: [],
           },
       );
       assert.deepStrictEqual(
@@ -148,11 +118,8 @@ c`;
               `ANSWER: ${payload}\nOBSERVATION: observation`,
               ),
           {
-            action: undefined,
-            title: undefined,
-            thought: undefined,
             answer: payload,
-            fixable: false,
+            suggestions: [],
           },
       );
       assert.deepStrictEqual(
@@ -163,8 +130,6 @@ c`;
             action: 'action',
             title: undefined,
             thought: undefined,
-            answer: payload,
-            fixable: false,
           },
       );
     });
@@ -178,8 +143,6 @@ c`;
             action: payload,
             title: undefined,
             thought: undefined,
-            answer: undefined,
-            fixable: false,
           },
       );
       assert.deepStrictEqual(
@@ -188,8 +151,6 @@ c`;
             action: payload,
             title: undefined,
             thought: undefined,
-            answer: undefined,
-            fixable: false,
           },
       );
       assert.deepStrictEqual(
@@ -198,8 +159,6 @@ c`;
             action: payload,
             title: undefined,
             thought: undefined,
-            answer: undefined,
-            fixable: false,
           },
       );
 
@@ -209,8 +168,6 @@ c`;
             action: payload,
             title: undefined,
             thought: undefined,
-            answer: 'answer',
-            fixable: false,
           },
       );
     });
@@ -220,11 +177,8 @@ c`;
       assert.deepStrictEqual(
           FreestylerAgent.parseResponse(`THOUGHT: ${payload}\nTITLE: ${title}`),
           {
-            action: undefined,
             thought: payload,
             title,
-            answer: undefined,
-            fixable: false,
           },
       );
     });
@@ -241,8 +195,6 @@ c`;
             action: payload,
             title: undefined,
             thought: undefined,
-            answer: undefined,
-            fixable: false,
           },
       );
     });
@@ -259,8 +211,6 @@ c`;
             action: payload,
             title: undefined,
             thought: undefined,
-            answer: undefined,
-            fixable: false,
           },
       );
     });
@@ -278,8 +228,54 @@ c`;
             action: actionPayload,
             title: undefined,
             thought: thoughtPayload,
-            answer: undefined,
-            fixable: false,
+          },
+      );
+    });
+
+    it('parses a thought and an answer', async () => {
+      const answerPayload = 'answer';
+      const thoughtPayload = 'thought';
+      assert.deepStrictEqual(
+          FreestylerAgent.parseResponse(
+              `THOUGHT:${thoughtPayload}\nANSWER:${answerPayload}`,
+              ),
+          {
+            answer: answerPayload,
+            suggestions: [],
+          },
+      );
+    });
+
+    it('parses an answer and suggestions', async () => {
+      const answerPayload = 'answer';
+      const suggestions = ['suggestion'];
+      const suggestionsText = JSON.stringify(suggestions);
+      assert.deepStrictEqual(
+          FreestylerAgent.parseResponse(
+              `ANSWER:${answerPayload}\nSUGGESTIONS: ${suggestionsText}`,
+              ),
+          {
+            answer: answerPayload,
+            suggestions,
+          },
+      );
+    });
+
+    it('parses a thought, title, action and answer from same response', async () => {
+      const answerPayload = 'answer';
+      const thoughtPayload = 'thought';
+      const actionPayload = `const data = {
+  someKey: "value",
+}`;
+      const title = 'title';
+      assert.deepStrictEqual(
+          FreestylerAgent.parseResponse(
+              `THOUGHT: ${thoughtPayload}\nTITLE: ${title}\nACTION\n${actionPayload}\nSTOP\nANSWER:${answerPayload}`,
+              ),
+          {
+            thought: thoughtPayload,
+            action: actionPayload,
+            title,
           },
       );
     });
@@ -290,11 +286,20 @@ c`;
               'This is also an answer',
               ),
           {
-            action: undefined,
-            title: undefined,
-            thought: undefined,
             answer: 'This is also an answer',
-            fixable: false,
+            suggestions: [],
+          },
+      );
+    });
+
+    it('parses a response with no instruction tags as an answer and correctly parses suggestions', async () => {
+      assert.deepStrictEqual(
+          FreestylerAgent.parseResponse(
+              'This is also an answer\nSUGGESTIONS: [\"suggestion\"]',
+              ),
+          {
+            answer: 'This is also an answer',
+            suggestions: ['suggestion'],
           },
       );
     });
@@ -715,7 +720,7 @@ c`;
           type: Freestyler.ResponseType.ANSWER,
           text: 'this is the answer',
           rpcId: undefined,
-          fixable: false,
+          suggestions: [],
         },
       ]);
       sinon.assert.notCalled(execJs);
@@ -757,7 +762,7 @@ c`;
           type: Freestyler.ResponseType.ANSWER,
           text: 'this is the answer',
           rpcId: 123,
-          fixable: false,
+          suggestions: [],
         },
       ]);
     });
@@ -826,7 +831,7 @@ c`;
           type: Freestyler.ResponseType.ANSWER,
           text: 'this is the answer',
           rpcId: 123,
-          fixable: false,
+          suggestions: [],
         },
       ]);
     });
@@ -844,7 +849,6 @@ c`;
       const agent = new FreestylerAgent({
         aidaClient: mockAidaClient(generateNothing),
         execJs,
-
       });
       const responses = await Array.fromAsync(agent.run('test', {selectedElement: element}));
       assert.deepStrictEqual(responses, [
@@ -858,16 +862,7 @@ c`;
         },
       ]);
       sinon.assert.notCalled(execJs);
-      assert.deepStrictEqual(agent.chatHistoryForTesting, [
-        {
-          entity: 1,
-          text: '# Inspected element\n\n* Its selector is `undefined`\n\n# User request\n\nQUERY: test',
-        },
-        {
-          entity: 2,
-          text: '',
-        },
-      ]);
+      assert.deepStrictEqual(agent.chatHistoryForTesting, []);
     });
 
     it('generates an action response if action and answer both present', async () => {
@@ -927,7 +922,7 @@ ANSWER: this is the answer`,
           type: Freestyler.ResponseType.ANSWER,
           text: 'this is the actual answer',
           rpcId: undefined,
-          fixable: false,
+          suggestions: [],
         },
       ]);
       sinon.assert.calledOnce(execJs);

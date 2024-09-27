@@ -10,13 +10,17 @@ import * as UI from '../../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 import type * as Overlays from '../../overlays/overlays.js';
 
-import {BaseInsight, md, shouldRenderForCategory} from './Helpers.js';
+import {BaseInsight, shouldRenderForCategory} from './Helpers.js';
 import * as SidebarInsight from './SidebarInsight.js';
-import {InsightsCategories} from './types.js';
+import {Category} from './types.js';
 
 const MAX_URL_LENGTH = 80;
 
 const UIStrings = {
+  /**
+   * @description Title of an insight that provides the user with the list of network requests that blocked and therefore slowed down the page rendering and becoming visible to the user.
+   */
+  title: 'Render blocking requests',
   /**
    * @description Text to describe that there are requests blocking rendering, which may affect LCP.
    */
@@ -34,9 +38,10 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class RenderBlockingRequests extends BaseInsight {
   static readonly litTagName = LitHtml.literal`devtools-performance-render-blocking-requests`;
-  override insightCategory: InsightsCategories = InsightsCategories.LCP;
+  override insightCategory: Category = Category.LCP;
   override internalName: string = 'render-blocking-requests';
-  override userVisibleTitle: string = i18nString(UIStrings.description);
+  override userVisibleTitle: string = i18nString(UIStrings.title);
+  override description: string = i18nString(UIStrings.description);
 
   override connectedCallback(): void {
     super.connectedCallback();
@@ -50,17 +55,17 @@ export class RenderBlockingRequests extends BaseInsight {
       return [];
     }
 
-    const entryOutlineOverlays: Array<Overlays.Overlays.EntryOutline> =
-        insight.renderBlockingRequests.map(req => {
-          return {
-            type: 'ENTRY_OUTLINE',
-            entry: req,
-            outlineReason: 'ERROR',
-          };
-        });
+    const entryOutlineOverlays: Array<Overlays.Overlays.EntryOutline> = insight.renderBlockingRequests.map(req => {
+      return {
+        type: 'ENTRY_OUTLINE',
+        entry: req,
+        outlineReason: 'ERROR',
+      };
+    });
     return entryOutlineOverlays;
   }
 
+  // TODO(crbug.com/368170718): handle long urls better than this.
   #linkifyUrl(url: string): HTMLElement {
     const options = {
       tabStop: true,
@@ -83,16 +88,14 @@ export class RenderBlockingRequests extends BaseInsight {
         <div class="insights">
           <${SidebarInsight.SidebarInsight.litTagName} .data=${{
             title: this.userVisibleTitle,
+            description: this.description,
             internalName: this.internalName,
             expanded: this.isActive(),
             estimatedSavings,
           } as SidebarInsight.InsightDetails}
           @insighttoggleclick=${this.onSidebarClick}
         >
-          <div slot="insight-description" class="insight-description">
-            ${md(i18nString(UIStrings.description))}
-          </div>
-          <div slot="insight-content" style="insight-content">
+          <div slot="insight-content" class="insight-section">
             <p>
               <h3>${i18nString(UIStrings.longestBlockingRequests)}</h3>
               <ul class="url-list">

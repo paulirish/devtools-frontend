@@ -12,19 +12,19 @@ vars = {
   'build_with_chromium': False,
 
   'build_url': 'https://chromium.googlesource.com/chromium/src/build.git',
-  'build_revision': '4fcf81fd5cf614a80ccb9d4ee6cc86867a3cee69',
+  'build_revision': '525c52ee513a1d08ebd433376d94cae2a5fb7007',
 
   'buildtools_url': 'https://chromium.googlesource.com/chromium/src/buildtools.git',
-  'buildtools_revision': 'f47eda3946cd680b22ad0a0749148ead072ac178',
+  'buildtools_revision': '50c43ab677d22d82d7bb12b88e07a419dc00a438',
 
   'depot_tools_url': 'https://chromium.googlesource.com/chromium/tools/depot_tools.git',
-  'depot_tools_revision': 'ec715a4dacaaeb2e95946cfbbc9d1eddb0307108',
+  'depot_tools_revision': 'ac3b7937a3dd650f6c6e7f8acadd2d9a29933ee6',
 
   'inspector_protocol_url': 'https://chromium.googlesource.com/deps/inspector_protocol',
   'inspector_protocol_revision': 'ccf6613682a24413db28656da6f9c52948331bad',
 
   # Keeping track of the last time we rollerd the browser protocol files.
-  'chromium_browser_protocol_revision' : '3585abaa071f83fdcbf097abe7833d42d3744963',
+  'chromium_browser_protocol_revision' : '32b32b77184fab8bb76a1f9f3be12ba17a28d4d3',
 
   'clang_format_url': 'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/clang/tools/clang-format.git',
   'clang_format_revision': '3c0acd2d4e73dd911309d9e970ba09d58bf23a62',
@@ -32,7 +32,7 @@ vars = {
   'emscripten_tag': 'ade9d780ff17c88d81aa13860361743e3c1e1396',
 
   # GN CIPD package version.
-  'gn_version': 'git_revision:20806f79c6b4ba295274e3a589d85db41a02fdaa',
+  'gn_version': 'git_revision:95b0f8fe31a992a33c040bbe3867901335c12762',
 
   'cmake_version': 'version:2@3.21.3',
 

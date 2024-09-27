@@ -12,13 +12,14 @@ import type * as Overlays from '../../overlays/overlays.js';
 
 import sidebarInsightStyles from './sidebarInsight.css.js';
 import * as SidebarInsight from './SidebarInsight.js';
-import {type ActiveInsight, InsightsCategories} from './types.js';
+import {type TableState} from './Table.js';
+import {type ActiveInsight, Category} from './types.js';
 
 export function shouldRenderForCategory(options: {
-  activeCategory: InsightsCategories,
-  insightCategory: InsightsCategories,
+  activeCategory: Category,
+  insightCategory: Category,
 }): boolean {
-  return options.activeCategory === InsightsCategories.ALL || options.activeCategory === options.insightCategory;
+  return options.activeCategory === Category.ALL || options.activeCategory === options.insightCategory;
 }
 
 export function insightIsActive(options: {
@@ -36,15 +37,16 @@ export interface BaseInsightData {
   /** The key into `insights` that contains this particular insight. */
   insightSetKey: string|null;
   activeInsight: ActiveInsight|null;
-  activeCategory: InsightsCategories;
+  activeCategory: Category;
 }
 
 // This is an abstract base class so the component naming rules do not apply.
 // eslint-disable-next-line rulesdir/check_component_naming
 export abstract class BaseInsight extends HTMLElement {
   abstract internalName: string;
-  abstract insightCategory: InsightsCategories;
+  abstract insightCategory: Category;
   abstract userVisibleTitle: string;
+  abstract description: string;
 
   protected readonly shadow = this.attachShadow({mode: 'open'});
 
@@ -52,10 +54,15 @@ export abstract class BaseInsight extends HTMLElement {
     insights: null,
     insightSetKey: null,
     activeInsight: null,
-    activeCategory: InsightsCategories.ALL,
+    activeCategory: Category.ALL,
   };
 
   readonly #boundRender = this.render.bind(this);
+  readonly sharedTableState: TableState = {
+    selectedRowEl: null,
+    selectionIsSticky: false,
+  };
+  #initialOverlays: Overlays.Overlays.TimelineOverlay[]|null = null;
 
   protected scheduleRender(): void {
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
@@ -64,6 +71,8 @@ export abstract class BaseInsight extends HTMLElement {
   connectedCallback(): void {
     this.shadow.adoptedStyleSheets.push(sidebarInsightStyles);
     this.setAttribute('jslog', `${VisualLogging.section(`timeline.insights.${this.internalName}`)}`);
+    // Used for unit test purposes when querying the DOM.
+    this.dataset.insightName = this.internalName;
   }
 
   set insights(insights: Trace.Insights.Types.TraceInsightSets|null) {
@@ -81,7 +90,7 @@ export abstract class BaseInsight extends HTMLElement {
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
   }
 
-  set activeCategory(activeCategory: InsightsCategories) {
+  set activeCategory(activeCategory: Category) {
     this.data.activeCategory = activeCategory;
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
   }
@@ -96,22 +105,48 @@ export abstract class BaseInsight extends HTMLElement {
       return;
     }
 
+    this.sharedTableState.selectedRowEl?.classList.remove('selected');
+    this.sharedTableState.selectedRowEl = null;
+    this.sharedTableState.selectionIsSticky = false;
+
     this.dispatchEvent(new SidebarInsight.InsightActivated(
         this.internalName,
         this.data.insightSetKey,
-        this.createOverlays.bind(this),
+        this.getInitialOverlays(),
         ));
   }
 
-  protected onOverlayOverride(overlays: Overlays.Overlays.TimelineOverlay[]|null): void {
+  /**
+   * Replaces the initial insight overlays with the ones provided.
+   *
+   * If `overlays` is null, reverts back to the initial overlays.
+   *
+   * This allows insights to provide an initial set of overlays,
+   * and later temporarily replace all of those insights with a different set.
+   * This enables the hover/click table interactions.
+   */
+  toggleTemporaryOverlays(
+      overlays: Overlays.Overlays.TimelineOverlay[]|null, options?: Overlays.Overlays.TimelineOverlaySetOptions): void {
     if (!this.isActive()) {
       return;
     }
 
-    this.dispatchEvent(new SidebarInsight.InsightOverlayOverride(overlays));
+    if (!options) {
+      options = {updateTraceWindow: true};
+    }
+    this.dispatchEvent(new SidebarInsight.InsightProvideOverlays(overlays ?? this.getInitialOverlays(), options));
   }
 
-  abstract createOverlays(): Overlays.Overlays.TimelineOverlay[];
+  getInitialOverlays(): Overlays.Overlays.TimelineOverlay[] {
+    if (this.#initialOverlays) {
+      return this.#initialOverlays;
+    }
+
+    this.#initialOverlays = this.createOverlays();
+    return this.#initialOverlays;
+  }
+
+  protected abstract createOverlays(): Overlays.Overlays.TimelineOverlay[];
 
   abstract render(): void;
 

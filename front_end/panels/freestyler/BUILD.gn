@@ -18,6 +18,7 @@ copy_to_gen("css_files") {
 
 devtools_module("freestyler") {
   sources = [
+    "AiAgent.ts",
     "ChangeManager.ts",
     "DrJonesNetworkAgent.ts",
     "ExtensionScope.ts",
@@ -71,6 +72,7 @@ ts_library("unittests") {
 
   sources = [
     "ChangeManager.test.ts",
+    "DrJonesNetworkAgent.test.ts",
     "FreestylerAgent.test.ts",
     "FreestylerEvaluateAction.test.ts",
     "FreestylerPanel.test.ts",

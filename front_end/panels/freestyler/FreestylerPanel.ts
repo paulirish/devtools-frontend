@@ -4,16 +4,17 @@
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
+import type * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as NetworkForward from '../../panels/network/forward/forward.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as LitHtml from '../../ui/lit-html/lit-html.js';
 
+import {ErrorType, ResponseType} from './AiAgent.js';
 import {ChangeManager} from './ChangeManager.js';
 import {
   AgentType,
   ChatMessageEntity,
-  DOGFOOD_INFO,
   FreestylerChatUi,
   type ModelChatMessage,
   type Props as FreestylerChatUiProps,
@@ -22,73 +23,33 @@ import {
 } from './components/FreestylerChatUi.js';
 import {
   DrJonesNetworkAgent,
-  DrJonesNetworkAgentResponseType,
 } from './DrJonesNetworkAgent.js';
-import {ErrorType, FreestylerAgent, ResponseType} from './FreestylerAgent.js';
+import {FreestylerAgent} from './FreestylerAgent.js';
 import freestylerPanelStyles from './freestylerPanel.css.js';
 
+// Bug for the send feed back link
+// const AI_ASSISTANCE_SEND_FEEDBACK = 'https://crbug.com/364805393' as Platform.DevToolsPath.UrlString;
+const AI_ASSISTANCE_HELP = 'https://goo.gle/devtools-ai-assistance' as Platform.DevToolsPath.UrlString;
+
 /*
-  * TODO(nvitkov): b/346933425
-  * Temporary string that should not be translated
-  * as they may change often during development.
-  */
-const UIStringsTemp = {
+* Strings that don't need to be translated at this time.
+*/
+const UIStringsNotTranslate = {
   /**
-   *@description AI assistant UI text for clearing messages.
+   *@description AI assistance UI text for clearing messages.
    */
   clearMessages: 'Clear messages',
   /**
-   *@description AI assistant UI tooltip text for the help button.
+   *@description AI assistance UI tooltip text for the help button.
    */
   help: 'Help',
   /**
-   *@description Title text for thinking step of DrJones Network agent.
+   *@description AI assistant UI tooltip text for the settings button (gear icon).
    */
-  inspectingNetworkData: 'Inspecting network data',
-  /**
-   *@description Thought text for thinking step of DrJones Network agent.
-   */
-  dataUsedToGenerateThisResponse: 'Data used to generate this response',
-  /**
-   *@description Heading text for the block that shows the network request details.
-   */
-  request: 'Request',
-  /**
-   *@description Heading text for the block that shows the network response details.
-   */
-  response: 'Response',
-  /**
-   *@description Prefix text for request URL.
-   */
-  requestUrl: 'Request URL',
-  /**
-   *@description Title text for request headers.
-   */
-  requestHeaders: 'Request Headers',
-  /**
-   *@description Title text for request timing details.
-   */
-  timing: 'Timing',
-  /**
-   *@description Title text for response headers.
-   */
-  responseHeaders: 'Response Headers',
-  /**
-   *@description Prefix text for response status.
-   */
-  responseStatus: 'Response Status',
-  /**
-   *@description Title text for request initiator chain.
-   */
-  requestInitiatorChain: 'Request Initiator Chain',
-
+  settings: 'Settings',
 };
 
-// TODO(nvitkov): b/346933425
-// const str_ = i18n.i18n.registerUIStrings('panels/freestyler/FreestylerPanel.ts', UIStrings);
-// const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
-/* eslint-disable  rulesdir/l10n_i18nString_call_only_with_uistrings */
-const i18nString = i18n.i18n.lockedString;
+const lockedString = i18n.i18n.lockedString;
 
 type ViewOutput = {
   freestylerChatUi?: FreestylerChatUi,
@@ -101,17 +62,25 @@ function createToolbar(target: HTMLElement, {onClearClick}: {onClearClick: () =>
   const leftToolbar = new UI.Toolbar.Toolbar('', toolbarContainer);
   const rightToolbar = new UI.Toolbar.Toolbar('freestyler-right-toolbar', toolbarContainer);
 
-  const clearButton =
-      new UI.Toolbar.ToolbarButton(i18nString(UIStringsTemp.clearMessages), 'clear', undefined, 'freestyler.clear');
+  const clearButton = new UI.Toolbar.ToolbarButton(
+      lockedString(UIStringsNotTranslate.clearMessages), 'clear', undefined, 'freestyler.clear');
   clearButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, onClearClick);
   leftToolbar.appendToolbarItem(clearButton);
 
   rightToolbar.appendSeparator();
-  const helpButton = new UI.Toolbar.ToolbarButton(i18nString(UIStringsTemp.help), 'help', undefined, 'freestyler.help');
+  const helpButton =
+      new UI.Toolbar.ToolbarButton(lockedString(UIStringsNotTranslate.help), 'help', undefined, 'freestyler.help');
   helpButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, () => {
-    Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(DOGFOOD_INFO);
+    Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(AI_ASSISTANCE_HELP);
   });
   rightToolbar.appendToolbarItem(helpButton);
+
+  const settingsButton = new UI.Toolbar.ToolbarButton(
+      lockedString(UIStringsNotTranslate.settings), 'gear', undefined, 'freestyler.settings');
+  settingsButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, () => {
+    void UI.ViewManager.ViewManager.instance().showView('chrome-ai');
+  });
+  rightToolbar.appendToolbarItem(settingsButton);
 }
 
 function defaultView(input: FreestylerChatUiProps, output: ViewOutput, target: HTMLElement): void {
@@ -142,8 +111,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
   #viewProps: FreestylerChatUiProps;
   #viewOutput: ViewOutput = {};
   #serverSideLoggingEnabled = isFreestylerServerSideLoggingEnabled();
-  #consentViewAcceptedSetting =
-      Common.Settings.Settings.instance().createLocalSetting('freestyler-dogfood-consent-onboarding-finished', false);
+  #freestylerEnabledSetting: Common.Settings.Setting<boolean>|undefined;
   #changeManager = new ChangeManager();
 
   constructor(private view: View = defaultView, {aidaClient, aidaAvailability, syncInfo}: {
@@ -152,6 +120,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
     syncInfo: Host.InspectorFrontendHostAPI.SyncInformation,
   }) {
     super(FreestylerPanel.panelName);
+    this.#freestylerEnabledSetting = this.#getFreestylerEnabledSetting();
 
     createToolbar(this.contentElement, {onClearClick: this.#clearMessages.bind(this)});
     this.#toggleSearchElementAction =
@@ -162,8 +131,8 @@ export class FreestylerPanel extends UI.Panel.Panel {
     this.#selectedElement = UI.Context.Context.instance().flavor(SDK.DOMModel.DOMNode);
     this.#selectedNetworkRequest = UI.Context.Context.instance().flavor(SDK.NetworkRequest.NetworkRequest);
     this.#viewProps = {
-      state: this.#consentViewAcceptedSetting.get() ? FreestylerChatUiState.CHAT_VIEW :
-                                                      FreestylerChatUiState.CONSENT_VIEW,
+      state: this.#freestylerEnabledSetting?.get() ? FreestylerChatUiState.CHAT_VIEW :
+                                                     FreestylerChatUiState.CONSENT_VIEW,
       aidaAvailability,
       messages: [],
       inspectElementToggled: this.#toggleSearchElementAction.toggled(),
@@ -173,7 +142,6 @@ export class FreestylerPanel extends UI.Panel.Panel {
       onTextSubmit: this.#startConversation.bind(this),
       onInspectElementClick: this.#handleSelectElementClick.bind(this),
       onFeedbackSubmit: this.#handleFeedbackSubmit.bind(this),
-      onAcceptConsentClick: this.#handleAcceptConsentClick.bind(this),
       onCancelClick: this.#cancel.bind(this),
       onSelectedNetworkRequestClick: this.#handleSelectedNetworkRequestClick.bind(this),
       canShowFeedbackForm: this.#serverSideLoggingEnabled,
@@ -208,6 +176,14 @@ export class FreestylerPanel extends UI.Panel.Panel {
       this.doUpdate();
     });
     this.doUpdate();
+  }
+
+  #getFreestylerEnabledSetting(): Common.Settings.Setting<boolean>|undefined {
+    try {
+      return Common.Settings.moduleSetting('freestyler-enabled') as Common.Settings.Setting<boolean>;
+    } catch {
+      return;
+    }
   }
 
   #createFreestylerAgent(): FreestylerAgent {
@@ -245,6 +221,17 @@ export class FreestylerPanel extends UI.Panel.Panel {
     this.registerCSSFiles([freestylerPanelStyles]);
     this.#viewOutput.freestylerChatUi?.restoreScrollPosition();
     this.#viewOutput.freestylerChatUi?.focusTextInput();
+    this.#freestylerEnabledSetting?.addChangeListener(this.#handleFreestylerEnabledSettingChanged, this);
+  }
+
+  override willHide(): void {
+    this.#freestylerEnabledSetting?.removeChangeListener(this.#handleFreestylerEnabledSettingChanged, this);
+  }
+
+  #handleFreestylerEnabledSettingChanged(): void {
+    this.#viewProps.state =
+        this.#freestylerEnabledSetting?.get() ? FreestylerChatUiState.CHAT_VIEW : FreestylerChatUiState.CONSENT_VIEW;
+    this.doUpdate();
   }
 
   doUpdate(): void {
@@ -268,12 +255,6 @@ export class FreestylerPanel extends UI.Panel.Panel {
         },
       },
     });
-  }
-
-  #handleAcceptConsentClick(): void {
-    this.#consentViewAcceptedSetting.set(true);
-    this.#viewProps.state = FreestylerChatUiState.CHAT_VIEW;
-    this.doUpdate();
   }
 
   #handleSelectedNetworkRequestClick(): void|Promise<void> {
@@ -327,7 +308,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
     this.#viewProps.isLoading = true;
     const systemMessage: ModelChatMessage = {
       entity: ChatMessageEntity.MODEL,
-      suggestingFix: false,
+      suggestions: [],
       steps: [],
     };
     this.#viewProps.messages.push(systemMessage);
@@ -336,7 +317,6 @@ export class FreestylerPanel extends UI.Panel.Panel {
     this.#runAbortController = new AbortController();
 
     const signal = this.#runAbortController.signal;
-
     if (this.#viewProps.agentType === AgentType.FREESTYLER) {
       await this.#conversationStepsForFreestylerAgent(text, signal, systemMessage);
     } else if (this.#viewProps.agentType === AgentType.DRJONES_NETWORK_REQUEST) {
@@ -397,7 +377,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
           break;
         }
         case ResponseType.ANSWER: {
-          systemMessage.suggestingFix = data.fixable;
+          systemMessage.suggestions = data.suggestions || [];
           systemMessage.answer = data.text;
           systemMessage.rpcId = data.rpcId;
           // When there is an answer without any thinking steps, we don't want to show the thinking step.
@@ -412,7 +392,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
         case ResponseType.ERROR: {
           step.isLoading = false;
           systemMessage.error = data.error;
-          systemMessage.suggestingFix = false;
+          systemMessage.suggestions = [];
           systemMessage.rpcId = undefined;
           this.#viewProps.isLoading = false;
           if (data.error === ErrorType.ABORT) {
@@ -438,14 +418,14 @@ export class FreestylerPanel extends UI.Panel.Panel {
     for await (const data of this.#drJonesNetworkAgent.run(
         text, {signal, selectedNetworkRequest: this.#viewProps.selectedNetworkRequest})) {
       switch (data.type) {
-        case DrJonesNetworkAgentResponseType.TITLE: {
+        case ResponseType.TITLE: {
           step.title = data.title;
           if (systemMessage.steps.at(-1) !== step) {
             systemMessage.steps.push(step);
           }
           break;
         }
-        case DrJonesNetworkAgentResponseType.THOUGHT: {
+        case ResponseType.THOUGHT: {
           step.isLoading = false;
           step.thought = data.thought;
           step.contextDetails = data.contextDetails;
@@ -455,7 +435,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
           break;
         }
 
-        case DrJonesNetworkAgentResponseType.ANSWER: {
+        case ResponseType.ANSWER: {
           systemMessage.answer = data.text;
           systemMessage.rpcId = data.rpcId;
           step.isLoading = false;
@@ -463,7 +443,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
           break;
         }
 
-        case DrJonesNetworkAgentResponseType.ERROR: {
+        case ResponseType.ERROR: {
           step.isLoading = false;
           systemMessage.error = ErrorType.UNKNOWN;
           this.#viewProps.isLoading = false;

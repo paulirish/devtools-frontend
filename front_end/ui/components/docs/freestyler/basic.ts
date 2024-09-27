@@ -20,7 +20,7 @@ const messages: Freestyler.ChatMessage[] = [
   },
   {
     entity: Freestyler.ChatMessageEntity.MODEL,
-    suggestingFix: true,
+    suggestions: [],
     steps: [
       {
         isLoading: false,
@@ -43,7 +43,6 @@ const component = new Freestyler.FreestylerChatUi({
   onTextSubmit: noop,
   onInspectElementClick: noop,
   onFeedbackSubmit: noop,
-  onAcceptConsentClick: noop,
   onCancelClick: noop,
   onSelectedNetworkRequestClick: noop,
   inspectElementToggled: false,
