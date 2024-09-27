@@ -37,7 +37,7 @@ devtools_pre_built("easter-egg") {
   deps = [ ":generate_easter_egg_file" ]
 }
 
-generate_css("css_files") {
+copy_to_gen("css_files") {
   sources = [
     "historyToolbarButton.css",
     "timelineFlameChartView.css",

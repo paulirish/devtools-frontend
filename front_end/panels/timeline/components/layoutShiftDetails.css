@@ -47,6 +47,9 @@
   tr {
     width: 100%;
   }
+  th,td {
+     padding: 10px;
+    }
 }
 
 .table-title {
@@ -115,4 +118,8 @@
     display: flex;
     justify-content: flex-start;
   }
+
+
 }
+
+.culprit > div { display: inline-block;}

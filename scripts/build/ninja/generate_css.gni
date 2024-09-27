@@ -40,7 +40,8 @@ template("generate_css") {
       if (invoker.legacy) {
         _file_name = "$_file_name.legacy"
       }
-      outputs += [ "$target_gen_dir/$_file_name.js" ]
+
+      # outputs += [ "$target_gen_dir/$_file_name.js" ]
     }
 
     data = outputs
@@ -56,3 +57,97 @@ template("generate_css") {
 set_defaults("generate_css") {
   legacy = false
 }
+
+# # Copyright 2021 The Chromium Authors. All rights reserved.
+# # Use of this source code is governed by a BSD-style license that can be
+# # found in the LICENSE file.
+
+# import("//build/timestamp.gni")
+# import("./copy.gni")
+# import("./node.gni")
+# import("./vars.gni")
+
+# declare_args() {
+#   # Whether to enable CSS hot reloading with `watch` script or not.
+#   devtools_css_hot_reload_enabled = false
+# }
+
+# copy_to_gen("generate_css") {
+#   sources = devtools_emulated_devices_images
+# }
+
+# template("generate_css") {
+#   copy_to_gen("generate_css") {
+#     sources = devtools_emulated_devices_images
+#   }
+# }
+
+#   action(target_name) {
+#     forward_variables_from(invoker,
+#                            [
+#                              "sources",
+#                              "deps",
+#                            ])
+
+#     script = "scripts/build/ninja/copy-files.js"
+
+#     _copy_src = rebase_path(get_path_info(target_name, "dir"), root_build_dir)
+#     _copy_dest = rebase_path(target_gen_dir, root_build_dir)
+
+#     args = [
+#       _copy_src,
+#       _copy_dest,
+#       string_join(",", sources),
+#     ]
+
+#     outputs = []
+#     foreach(_source, sources) {
+#       outputs += [ "$target_gen_dir/$_source" ]
+#     }
+#   }
+
+# # node_action(target_name) {
+# #   forward_variables_from(invoker, [ "sources" ])
+
+# #   script = "scripts/build/generate_css_js_files.js"
+
+# #   _src = rebase_path(".", root_build_dir)
+# #   _dest = rebase_path(target_gen_dir, root_build_dir)
+
+# #   inputs +=
+# #       [ devtools_location_prepend + "node_modules/cssnano/package.json" ]
+
+# #   args = [
+# #     build_timestamp,
+# #     "$is_debug",
+# #     "${invoker.legacy}",
+# #     target_name,
+# #     _src,
+# #     _dest,
+# #     string_join(",", sources),
+# #     "$devtools_css_hot_reload_enabled",
+# #   ]
+
+# #   outputs = []
+# #   foreach(_input, sources) {
+# #     _file_name = _input
+# #     if (invoker.legacy) {
+# #       _file_name = "$_file_name.legacy"
+# #     }
+# #     outputs += [ "$target_gen_dir/$_file_name.js" ]
+# #   }
+
+# #   data = outputs
+
+# #   if (is_debug) {
+# #     metadata = {
+# #       grd_files = outputs
+# #     }
+# #   }
+# # }
+
+# # }
+
+# set_defaults("generate_css") {
+#   legacy = false
+# }
