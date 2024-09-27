@@ -236,7 +236,7 @@ export interface PositionOverride {
 
 export type DrawOverride =
     (context: CanvasRenderingContext2D, x: number, y: number, width: number, height: number,
-     timeToPosition: (time: number) => number) => PositionOverride;
+     isVisible: (widthToDraw: number) => boolean,  timeToPosition: (time: number) => number) => PositionOverride|null;
 
 export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.VBox>(UI.Widget.VBox)
     implements Calculator, ChartViewportDelegate {
@@ -2633,21 +2633,49 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   }
 
   #drawCustomSymbols(context: CanvasRenderingContext2D, timelineData: FlameChartTimelineData): void {
-    const {entryStartTimes, entryLevels} = timelineData;
+    const {entryStartTimes, entryLevels, entryTotalTimes} = timelineData;
     this.customDrawnPositions.clear();
     context.save();
 
     // TODO: Don't draw if it's not in the viewport.
+          const firstVisibleIndex = Platform.ArrayUtilities.lowerBound(
+                                    Array.from(this.#indexToDrawOverride.keys()), this.chartViewport.windowRightTime(),
+                                    (time, entryIndex) => time - entryStartTimes[entryIndex]) -
+          1;
+
+
+             const otherIndexOnLevel = Platform.ArrayUtilities.upperBound(
+                                    Array.from(this.#indexToDrawOverride.keys()), this.chartViewport.windowLeftTime(),
+                                    (time, entryIndex) => entryTotalTimes[entryIndex] + entryStartTimes[entryIndex] - time ) -
+          1;
+
+          console.log({firstVisibleIndex, otherIndexOnLevel});
+
+
     const posArray = [];
     for (const [entryIndex, drawOverride] of this.#indexToDrawOverride.entries()) {
       const entryStartTime = entryStartTimes[entryIndex];
       const level = entryLevels[entryIndex];
-      const x = this.chartViewport.timeToPosition(entryStartTime);
+      const x = this.timeToPositionClipped(entryStartTime);
       const y = this.levelToOffset(level);
       const height = this.levelHeight(level);
       const width = this.#eventBarWidth(timelineData, entryIndex);
-      const pos = drawOverride(context, x, y, width, height, time => this.timeToPositionClipped(time));
-      posArray.push({entryIndex, pos});
+      const isVisible = (widthToDraw: number) => {
+        const startX = this.chartViewport.timeToPosition(entryStartTime);
+        // This still doesnt work because we need the unclipped barWidth number. (at least for cluster rects)
+        // like it ends up being doable but i don't love the idea of passing x, xUnclipped, width, widthUnclipped to the override
+
+        // Is its end after the left canvas edge, and is its start before the right canvas edge?
+        return  (startX + widthToDraw) > 0 && startX < this.offsetWidth;
+      };
+
+        //       const entryStartTime = entryStartTimes[entryIndex];
+        // const entryOffsetRight = entryStartTime + duration;
+        // const levelForcedDrawable = Boolean(this.dataProvider.forceDrawableLevel?.(level));
+        // if (entryOffsetRight <= this.chartViewport.windowLeftTime()
+
+      const pos = drawOverride(context, x, y, width, height, isVisible, time => this.timeToPositionClipped(time));
+      pos && posArray.push({entryIndex, pos});
     }
     // Place in z order so coordinatesToEntryIndex finds the highest z-index match first.
     posArray.sort((a, b) => (b.pos.z ?? 0) - (a.pos.z ?? 0));

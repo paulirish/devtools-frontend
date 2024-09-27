@@ -463,7 +463,7 @@ async function buildLayoutShiftsClusters(): Promise<void> {
     cluster.ts = cluster.events[0].ts;
     const lastShiftTimings = Helpers.Timing.eventTimingsMicroSeconds(cluster.events[cluster.events.length - 1]);
     // Add MAX_SHIFT_TIME_DELTA, the section gap after the last layout shift. This marks the end of the cluster.
-    cluster.dur = Types.Timing.MicroSeconds((lastShiftTimings.endTime - cluster.events[0].ts) + MAX_SHIFT_TIME_DELTA);
+    cluster.dur = Types.Timing.MicroSeconds((lastShiftTimings.endTime - cluster.ts) + MAX_SHIFT_TIME_DELTA);
 
     if (weightedScore > sessionMaxScore) {
       clsWindowID = windowID;
