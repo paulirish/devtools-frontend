@@ -18,15 +18,15 @@
 import type * as Protocol from '../../generated/protocol.js';
 import type * as ProtocolClient from '../protocol_client/protocol_client.js';
 
-import * as EnhancedTraces from './EnhancedTracesParser.js';
+import {EnhancedTracesParser} from './EnhancedTracesParser.js';
 import {
-  HydratingDataPerTarget,
   type ProtocolMessage,
   type RehydratingExecutionContext,
   type RehydratingScript,
   type RehydratingTarget,
   type ServerMessage,
 } from './RehydratingObject.js';
+import {TraceObject} from './TraceObject.js';
 
 export interface RehydratingConnectionInterface {
   postToFrontend: (arg: ServerMessage) => void;
@@ -37,7 +37,7 @@ export class RehydratingConnection implements ProtocolClient.InspectorBackend.Co
   onMessage!: ((arg0: Object) => void)|null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   traceEvents: any;
-  sessionMapping: Map<number, RehydratingSessionBase> = new Map();
+  sessions: Map<number, RehydratingSessionBase> = new Map();
   private static instance: RehydratingConnection|null = null;
 
   private constructor() {
@@ -50,7 +50,7 @@ export class RehydratingConnection implements ProtocolClient.InspectorBackend.Co
     return this.instance;
   }
 
-  async initialize(logPayload: string): Promise<void> {
+  async startHydration(logPayload: string): Promise<void> {
     // OnMessage should've been set before initialization
     if (!this.onMessage) {
       return;
@@ -62,14 +62,15 @@ export class RehydratingConnection implements ProtocolClient.InspectorBackend.Co
       return;
     }
 
-    this.traceEvents = payload.traceEvents;
-    const enhancedTracesParser = new EnhancedTraces.EnhancedTracesParser(this.traceEvents);
+    const x = new TraceObject(payload.traceEvents, payload.metadata);
+    this.traceEvents = x.traceEvents;
+    const enhancedTracesParser = new EnhancedTracesParser(this.traceEvents);
     const hydratingDataPerTarget = enhancedTracesParser.data();
 
     let sessionId = 0;
 
     // Set up default rehydrating session.
-    this.sessionMapping.set(sessionId, new RehydratingSessionBase(this));
+    this.sessions.set(sessionId, new RehydratingSessionBase(this));
 
     for (const [target, [executionContexts, scripts]] of hydratingDataPerTarget.data.entries()) {
       // Send Target.targetCreated after identifying targets from the enhanced traces.
@@ -90,8 +91,8 @@ export class RehydratingConnection implements ProtocolClient.InspectorBackend.Co
 
       // Create new session associated to the target created and send
       // Target.attachedToTarget to frontend.
-      sessionId += 1;
-      this.sessionMapping.set(sessionId, new RehydratingSession(sessionId, target, executionContexts, scripts, this));
+      sessionId++;
+      this.sessions.set(sessionId, new RehydratingSession(sessionId, target, executionContexts, scripts, this));
     }
   }
 
@@ -108,16 +109,16 @@ export class RehydratingConnection implements ProtocolClient.InspectorBackend.Co
       message = JSON.parse(message);
     }
     const data = message as ProtocolMessage;
-    if (this.sessionMapping) {
+    if (this.sessions) {
       if (data.sessionId) {
-        const session = this.sessionMapping.get(data.sessionId);
+        const session = this.sessions.get(data.sessionId);
         if (session) {
           session.handleMessage(data);
         } else {
           console.error('Invalid SessionId: ' + data.sessionId);
         }
       } else {
-        this.sessionMapping.get(0)?.handleMessage(data);
+        this.sessions.get(0)?.handleMessage(data);
       }
     }
   }
