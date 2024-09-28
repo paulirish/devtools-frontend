@@ -20,7 +20,7 @@ import type * as ProtocolClient from '../protocol_client/protocol_client.js';
 
 import * as EnhancedTraces from './EnhancedTracesParser.js';
 import {
-  EnhancedTracesData,
+  HydratingDataPerTarget,
   type ProtocolMessage,
   type RehydratingExecutionContext,
   type RehydratingScript,
@@ -64,12 +64,14 @@ export class RehydratingConnection implements ProtocolClient.InspectorBackend.Co
 
     this.traceEvents = payload.traceEvents;
     const enhancedTracesParser = new EnhancedTraces.EnhancedTracesParser(this.traceEvents);
-    const enhancedTracesData: EnhancedTracesData = enhancedTracesParser.data();
+    const hydratingDataPerTarget = enhancedTracesParser.data();
 
+    let sessionId = 0;
 
-    // for (let i = 0; i < enhancedTracesData.targets.length; i++) {
-    let sessionIdTracker = 0;
-    for (const target of enhancedTracesData.data.keys()) {
+    // Set up default rehydrating session.
+    this.sessionMapping.set(sessionId, new RehydratingSessionBase(this));
+
+    for (const [target, [executionContexts, scripts]] of hydratingDataPerTarget.data.entries()) {
       // Send Target.targetCreated after identifying targets from the enhanced traces.
       // const target = enhancedTracesData.targets[i];
       this.postToFrontend({
@@ -86,24 +88,11 @@ export class RehydratingConnection implements ProtocolClient.InspectorBackend.Co
         },
       });
 
-      let executionContexts: RehydratingExecutionContext[] = [];
-      let scripts: RehydratingScript[] = [];
-      let dataAssociatedToTarget = enhancedTracesData.data.get(target);
-
-      if (dataAssociatedToTarget) {
-        executionContexts = dataAssociatedToTarget[0];
-        scripts = dataAssociatedToTarget[1];
-      }
-
       // Create new session associated to the target created and send
       // Target.attachedToTarget to frontend.
-      sessionIdTracker += 1;
-      this.sessionMapping.set(
-          sessionIdTracker, new RehydratingSession(sessionIdTracker, target, executionContexts, scripts, this));
+      sessionId += 1;
+      this.sessionMapping.set(sessionId, new RehydratingSession(sessionId, target, executionContexts, scripts, this));
     }
-
-    // Set up default rehydrating session.
-    this.sessionMapping.set(0, new RehydratingSessionBase(this));
   }
 
   setOnMessage(onMessage: (arg0: (Object|string)) => void): void {

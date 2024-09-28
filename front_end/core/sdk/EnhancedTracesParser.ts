@@ -6,7 +6,7 @@ import type * as Protocol from '../../generated/protocol.js';
 import {UserVisibleError} from '../platform/platform.js';
 
 import {
-  type EnhancedTracesData,
+  type HydratingDataPerTarget,
   type RehydratingExecutionContext,
   type RehydratingScript,
   type RehydratingTarget,
@@ -160,7 +160,7 @@ export class EnhancedTracesParser {
     }
   }
 
-  data(): EnhancedTracesData {
+  data(): HydratingDataPerTarget {
     // Put back execution context id
     const v8ContextToExecutionContextId: Map<string, Protocol.Runtime.ExecutionContextId> =
         new Map<string, Protocol.Runtime.ExecutionContextId>();

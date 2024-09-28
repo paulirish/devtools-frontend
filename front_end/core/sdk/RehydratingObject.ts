@@ -45,7 +45,7 @@ export interface RehydratingTarget {
   isolate?: string;
 }
 
-export interface EnhancedTracesData {
+export interface HydratingDataPerTarget {
   data: Map<RehydratingTarget, [RehydratingExecutionContext[], RehydratingScript[]]>;
 }
 
@@ -65,9 +65,9 @@ export interface ProtocolResponse {
   id: number;
 }
 
-export type ServerMessage = (ProtocolEvent|ProtocolMessage|ProtocolResponse)&{
+export type ServerMessage = (ProtocolEvent | ProtocolMessage | ProtocolResponse) & {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [others: string]: any,
+  [others: string]: any;
 };
 
 export interface Session {
