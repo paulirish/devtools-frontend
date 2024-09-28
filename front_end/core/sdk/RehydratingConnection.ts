@@ -194,8 +194,8 @@ export class RehydratingSession extends RehydratingSessionBase {
         break;
       case 'Debugger.getScriptSource':
         if (data.params) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          this.handleDebuggerGetScriptSource(data.id, (data.params as any).scriptId);
+          const params = data.params as Protocol.Debugger.GetScriptSourceRequest;
+          this.handleDebuggerGetScriptSource(data.id, params.scriptId);
         }
         break;
       default:
