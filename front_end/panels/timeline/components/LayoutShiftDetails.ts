@@ -230,13 +230,14 @@ export class LayoutShiftDetails extends HTMLElement {
     // clang-format on
   }
 
-  #render(): void {
+  async #render(): Promise<void> {
     if (!this.#layoutShift || !this.#traceInsightsSets || !this.#parsedTrace) {
       return;
     }
     // todo: move into table
-    const previewEl = this.#renderScreenshotThumbnail(this.#layoutShift);
-    previewEl && this.#shadow.append(previewEl);
+    const gif = await this.#renderScreenshotThumbnail(this.#layoutShift);
+    gif && this.#shadow.append(gif.elem);
+
     // clang-format off
     const output = LitHtml.html`
       <div class="layout-shift-summary-details">
@@ -253,7 +254,7 @@ export class LayoutShiftDetails extends HTMLElement {
     LitHtml.render(output, this.#shadow, {host: this});
   }
 
-  #renderScreenshotThumbnail(event: Trace.Types.Events.SyntheticLayoutShift): HTMLElement|undefined {
+  async #renderScreenshotThumbnail(event: Trace.Types.Events.SyntheticLayoutShift): Promise<ScreenshotGif|undefined> {
     if (!this.#parsedTrace) {
       return;
     }
@@ -271,115 +272,122 @@ declare global {
 customElements.define('devtools-performance-layout-shift-details', LayoutShiftDetails);
 
 
+type ScreenshotGif = {
+  elem: HTMLElement,
+  width: number,
+  height: number
+};
+
 /** This is called twice. Once with a small maxSize for the thumbnail, and again to create the large version in the dialog. */
-export function createScreenshotGif(
+export async function createScreenshotGif(
     event: Trace.Types.Events.SyntheticLayoutShift, parsedTrace: Trace.Handlers.Types.ParsedTrace,
-    maxSize: UI.Geometry.Size): HTMLElement|undefined {
+    maxSize: UI.Geometry.Size): Promise<ScreenshotGif|undefined> {
   const screenshots = event.parsedData.screenshots;
   const viewport = parsedTrace.Meta.viewportRect;
-  if (!screenshots.before?.args.dataUri || !screenshots.after?.args.dataUri || !viewport) {
+
+  const beforeUri = screenshots.before?.args.dataUri;
+  const afterUri = screenshots.after?.args.dataUri;
+  if (!beforeUri || !afterUri || !viewport) {
     return;
   }
-  const screenshotContainer = document.createElement('div');
-  screenshotContainer.classList.add('layout-shift-screenshot-preview');
-  screenshotContainer.style.position = 'relative';
 
-  Promise
-      .all([
-        UI.UIUtils.loadImage(screenshots.after?.args.dataUri), UI.UIUtils.loadImage(screenshots.before?.args.dataUri)
-      ])
-      .then(([afterImage, beforeImage]) => {
-        if (!beforeImage) {
-          return;
-        }
+  const [afterImage, beforeImage] =
+      await Promise.all([UI.UIUtils.loadImage(afterUri), UI.UIUtils.loadImage(beforeUri)]);
+  if (!beforeImage) {
+    return;
+  }
 
-        /** The Layout Instability API in Blink, which reports the LayoutShift trace events, is not based on CSS pixels but
+  /** The Layout Instability API in Blink, which reports the LayoutShift trace events, is not based on CSS pixels but
          * physical pixels. As such the values in the impacted_nodes field need to be normalized to CSS units in order to
          * map them to the viewport dimensions, which we get in CSS pixels. We do that by dividing the values by the devicePixelRatio.
          * See https://crbug.com/1300309
          */
-        const dpr = parsedTrace.Meta.devicePixelRatio;
-        if (dpr === undefined) {
-          return;
-        }
+  const dpr = parsedTrace.Meta.devicePixelRatio;
+  if (dpr === undefined) {
+    return;
+  }
 
-        const beforeRects =
-            event.args.data?.impacted_nodes?.map(
-                node => new DOMRect(
-                    node.old_rect[0] / dpr, node.old_rect[1] / dpr, node.old_rect[2] / dpr, node.old_rect[3] / dpr)) ??
-            [];
-        const afterRects =
-            event.args.data?.impacted_nodes?.map(
-                node => new DOMRect(
-                    node.new_rect[0] / dpr, node.new_rect[1] / dpr, node.new_rect[2] / dpr, node.new_rect[3] / dpr)) ??
-            [];
-        screenshotContainer.appendChild(beforeImage);
+  const beforeRects =
+      event.args.data?.impacted_nodes?.map(
+          node => new DOMRect(
+              node.old_rect[0] / dpr, node.old_rect[1] / dpr, node.old_rect[2] / dpr, node.old_rect[3] / dpr)) ??
+      [];
+  const afterRects =
+      event.args.data?.impacted_nodes?.map(
+          node => new DOMRect(
+              node.new_rect[0] / dpr, node.new_rect[1] / dpr, node.new_rect[2] / dpr, node.new_rect[3] / dpr)) ??
+      [];
 
-        // If this is being size constrained, it needs to be done in JS (rather than css max-width, etc)....
-        // That's because this function is complete before it's added to the DOM.. so we can't query offsetHeight for its resolved size…
-        const maxWidth = maxSize.width;
-        const maxHeight = maxSize.height;
-        const scaleFactor = Math.min(maxWidth / beforeImage.naturalWidth, maxHeight / beforeImage.naturalHeight, 1);
-        beforeImage.style.width = `${beforeImage.naturalWidth * scaleFactor}px`;
-        beforeImage.style.height = `${beforeImage.naturalHeight * scaleFactor}px`;
+  const screenshotContainer = document.createElement('div');
+  screenshotContainer.classList.add('layout-shift-screenshot-preview');
+  screenshotContainer.style.position = 'relative';
+  screenshotContainer.appendChild(beforeImage);
 
-        // Setup old rects
-        const rectEls = beforeRects.map((beforeRect, i) => {
-          const rectEl = document.createElement('div');
-          rectEl.classList.add('layout-shift-screenshot-preview-rect');
+  // If this is being size constrained, it needs to be done in JS (rather than css max-width, etc)....
+  // That's because this function is complete before it's added to the DOM.. so we can't query offsetHeight for its resolved size…
+  const scaleFactor = Math.min(maxSize.width / beforeImage.naturalWidth, maxSize.height / beforeImage.naturalHeight, 1);
+  const width = beforeImage.naturalWidth * scaleFactor;
+  const height = beforeImage.naturalHeight * scaleFactor;
+  beforeImage.style.width = `${width}px`;
+  beforeImage.style.height = `${height}px`;
 
-          // If it's a 0x0x0x0 rect, then set to new, so we can fade it in from the new position instead.
-          if ([beforeRect.width, beforeRect.height, beforeRect.x, beforeRect.y].every(v => v === 0)) {
-            beforeRect = afterRects[i];
-            rectEl.style.opacity = '0';
-          } else {
-            rectEl.style.opacity = '1';
-          }
+  // Set up before rects
+  const rectEls = beforeRects.map((beforeRect, i) => {
+    const rectEl = document.createElement('div');
+    rectEl.classList.add('layout-shift-screenshot-preview-rect');
 
-          const scaledRectX = beforeRect.x * beforeImage.naturalWidth / viewport.width * scaleFactor;
-          const scaledRectY = beforeRect.y * beforeImage.naturalHeight / viewport.height * scaleFactor;
-          const scaledRectWidth = beforeRect.width * beforeImage.naturalWidth / viewport.width * scaleFactor;
-          const scaledRectHeight = beforeRect.height * beforeImage.naturalHeight / viewport.height * scaleFactor;
-          rectEl.style.left = `${scaledRectX}px`;
-          rectEl.style.top = `${scaledRectY}px`;
-          rectEl.style.width = `${scaledRectWidth}px`;
-          rectEl.style.height = `${scaledRectHeight}px`;
-          rectEl.style.opacity = '0.4';
+    // If it's a 0x0x0x0 rect, then set to new, so we can fade it in from the new position instead.
+    if ([beforeRect.width, beforeRect.height, beforeRect.x, beforeRect.y].every(v => v === 0)) {
+      beforeRect = afterRects[i];
+      rectEl.style.opacity = '0';
+    } else {
+      rectEl.style.opacity = '1';
+    }
 
-          screenshotContainer.appendChild(rectEl);
-          return rectEl;
-        });
-        if (afterImage) {
-          afterImage.classList.add('layout-shift-screenshot-after');
-          screenshotContainer.appendChild(afterImage);
-          afterImage.style.width = beforeImage.style.width;
-          afterImage.style.height = beforeImage.style.height;
-          afterImage.addEventListener('click', () => {
-            new ScreenshotGifDialog(event, parsedTrace);
-          });
-        }
+    const scaledRectX = beforeRect.x * beforeImage.naturalWidth / viewport.width * scaleFactor;
+    const scaledRectY = beforeRect.y * beforeImage.naturalHeight / viewport.height * scaleFactor;
+    const scaledRectWidth = beforeRect.width * beforeImage.naturalWidth / viewport.width * scaleFactor;
+    const scaledRectHeight = beforeRect.height * beforeImage.naturalHeight / viewport.height * scaleFactor;
+    rectEl.style.left = `${scaledRectX}px`;
+    rectEl.style.top = `${scaledRectY}px`;
+    rectEl.style.width = `${scaledRectWidth}px`;
+    rectEl.style.height = `${scaledRectHeight}px`;
+    rectEl.style.opacity = '0.4';
 
-        // Update for the after rect positions after a bit.
-        setTimeout(() => {
-          rectEls.forEach((rectEl, i) => {
-            const afterRect = afterRects[i];
-            const scaledRectX = afterRect.x * beforeImage.naturalWidth / viewport.width * scaleFactor;
-            const scaledRectY = afterRect.y * beforeImage.naturalHeight / viewport.height * scaleFactor;
-            const scaledRectWidth = afterRect.width * beforeImage.naturalWidth / viewport.width * scaleFactor;
-            const scaledRectHeight = afterRect.height * beforeImage.naturalHeight / viewport.height * scaleFactor;
-            rectEl.style.left = `${scaledRectX}px`;
-            rectEl.style.top = `${scaledRectY}px`;
-            rectEl.style.width = `${scaledRectWidth}px`;
-            rectEl.style.height = `${scaledRectHeight}px`;
-            rectEl.style.opacity = '0.4';
-          });
-          if (afterImage) {
-            afterImage.style.opacity = '1';
-          }
-        }, 1000);
-      });
+    screenshotContainer.appendChild(rectEl);
+    return rectEl;
+  });
+  if (afterImage) {
+    afterImage.classList.add('layout-shift-screenshot-after');
+    screenshotContainer.appendChild(afterImage);
+    afterImage.style.width = beforeImage.style.width;
+    afterImage.style.height = beforeImage.style.height;
+    afterImage.addEventListener('click', () => {
+      new ScreenshotGifDialog(event, parsedTrace);
+    });
+  }
 
-  return screenshotContainer;
+  // Update for the after rect positions after a bit.
+  setTimeout(() => {
+    rectEls.forEach((rectEl, i) => {
+      const afterRect = afterRects[i];
+      const scaledRectX = afterRect.x * beforeImage.naturalWidth / viewport.width * scaleFactor;
+      const scaledRectY = afterRect.y * beforeImage.naturalHeight / viewport.height * scaleFactor;
+      const scaledRectWidth = afterRect.width * beforeImage.naturalWidth / viewport.width * scaleFactor;
+      const scaledRectHeight = afterRect.height * beforeImage.naturalHeight / viewport.height * scaleFactor;
+      rectEl.style.left = `${scaledRectX}px`;
+      rectEl.style.top = `${scaledRectY}px`;
+      rectEl.style.width = `${scaledRectWidth}px`;
+      rectEl.style.height = `${scaledRectHeight}px`;
+      rectEl.style.opacity = '0.4';
+    });
+    if (afterImage) {
+      afterImage.style.opacity = '1';
+    }
+  }, 1000);
+
+
+  return {elem: screenshotContainer, width, height};
 }
 
 const styles = `
@@ -448,15 +456,16 @@ export class ScreenshotGifDialog {
     void this.renderDialog(event, parsedTrace);
   }
 
-  private async renderDialog(event: Trace.Types.Events.SyntheticLayoutShift, parsedTrace: Trace.Handlers.Types.ParsedTrace):
-      Promise<void> {
+  private async renderDialog(
+      event: Trace.Types.Events.SyntheticLayoutShift, parsedTrace: Trace.Handlers.Types.ParsedTrace): Promise<void> {
     const maxSize = new UI.Geometry.Size(800, 800);
-    const preview = await createScreenshotGif(event, parsedTrace, maxSize);
-    if (!preview) {
+    const gif = await createScreenshotGif(event, parsedTrace, maxSize);
+    if (!gif) {
       return;
     }
+    const dialogSize = new UI.Geometry.Size(gif.width + 300, gif.height);
 
-    LitHtml.render(preview, this.fragment.$('container'));
+    this.fragment.$('container').append(gif.elem);
 
     const lis = event.args.data?.impacted_nodes?.map((node, i) => {
       const rectEl = this.fragment.$('container').querySelectorAll('.layout-shift-screenshot-preview-rect').item(i);
@@ -477,7 +486,7 @@ export class ScreenshotGifDialog {
     `,
         this.fragment.$('nodes'));
 
-    this.resize();
+    this.resize(dialogSize);
   }
 
   hide(): void {
@@ -486,7 +495,7 @@ export class ScreenshotGifDialog {
     }
   }
 
-  private resize(): void {
+  private resize(dialogSize: UI.Geometry.Size): void {
     if (!this.dialog) {
       this.dialog = new UI.Dialog.Dialog();
       this.dialog.contentElement.appendChild(this.widget);
@@ -494,7 +503,7 @@ export class ScreenshotGifDialog {
       this.dialog.registerRequiredCSS({cssContent: styles});
       this.dialog.show();
     }
-    this.dialog.setMaxContentSize(new UI.Geometry.Size(300, 250));
+    this.dialog.setMaxContentSize(dialogSize);
     this.dialog.setSizeBehavior(UI.GlassPane.SizeBehavior.SET_EXACT_SIZE);
   }
 
