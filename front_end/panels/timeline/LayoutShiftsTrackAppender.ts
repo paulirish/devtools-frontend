@@ -93,18 +93,18 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
   #appendLayoutShiftsAtLevel(currentLevel: number): number {
     const allLayoutShifts = this.#parsedTrace.LayoutShifts.clusters.flatMap(cluster => cluster.events);
     const setFlameChartEntryTotalTime =
-        (_event: Trace.Types.Events.SyntheticLayoutShift|Trace.Types.Events.SyntheticLayoutShiftCluster, index: number):
-            void => {
-              let totalTime = LAYOUT_SHIFT_SYNTHETIC_DURATION;
-              if (Trace.Types.Events.isSyntheticLayoutShiftCluster(_event)) {
-                // This is to handle the cases where there is a singular shift for a cluster.
-                // A single shift would make the cluster duration 0 and hard to read.
-                // So in this case, give it the LAYOUT_SHIFT_SYNTHETIC_DURATION duration.
-                totalTime = _event.dur || LAYOUT_SHIFT_SYNTHETIC_DURATION;
-              }
-              this.#compatibilityBuilder.getFlameChartTimelineData().entryTotalTimes[index] =
-                  Trace.Helpers.Timing.microSecondsToMilliseconds(totalTime);
-            };
+        (_event: Trace.Types.Events.SyntheticLayoutShift|Trace.Types.Events.SyntheticLayoutShiftCluster,
+         index: number): void => {
+          let totalTime = LAYOUT_SHIFT_SYNTHETIC_DURATION;
+          if (Trace.Types.Events.isSyntheticLayoutShiftCluster(_event)) {
+            // This is to handle the cases where there is a singular shift for a cluster.
+            // A single shift would make the cluster duration 0 and hard to read.
+            // So in this case, give it the LAYOUT_SHIFT_SYNTHETIC_DURATION duration.
+            totalTime = _event.dur || LAYOUT_SHIFT_SYNTHETIC_DURATION;
+          }
+          this.#compatibilityBuilder.getFlameChartTimelineData().entryTotalTimes[index] =
+              Trace.Helpers.Timing.microSecondsToMilliseconds(totalTime);
+        };
     let shiftLevel = currentLevel;
     if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_LAYOUT_SHIFT_DETAILS)) {
       const allClusters = this.#parsedTrace.LayoutShifts.clusters;
