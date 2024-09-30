@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Common from '../../../core/common/common.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import type * as Platform from '../../../core/platform/platform.js';
 import * as SDK from '../../../core/sdk/sdk.js';
@@ -11,6 +12,7 @@ import * as Trace from '../../../models/trace/trace.js';
 import * as LegacyComponents from '../../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import {CLSRect} from '../CLSLinkifier.js';
 
 import {NodeLink} from './insights/insights.js';
 import layoutShiftDetailsStyles from './layoutShiftDetails.css.js';
@@ -232,6 +234,9 @@ export class LayoutShiftDetails extends HTMLElement {
     if (!this.#layoutShift || !this.#traceInsightsSets || !this.#parsedTrace) {
       return;
     }
+    // todo: move into table
+    const previewEl = await this.#renderPreview(this.#layoutShift);
+
     // clang-format off
     const output = LitHtml.html`
       <div class="layout-shift-summary-details">
@@ -247,6 +252,15 @@ export class LayoutShiftDetails extends HTMLElement {
     // clang-format on
     LitHtml.render(output, this.#shadow, {host: this});
   }
+
+  async #renderPreview(event: Trace.Types.Events.SyntheticLayoutShift): Promise<LitHtml.TemplateResult|null> {
+    if (!this.#parsedTrace) {
+      return null;
+    }
+    const maxSize = new UI.Geometry.Size(500, 400);
+
+    return drawLayoutShiftScreenshotRects(event, this.#parsedTrace, maxSize);
+  }
 }
 
 declare global {
@@ -256,3 +270,278 @@ declare global {
 }
 
 customElements.define('devtools-performance-layout-shift-details', LayoutShiftDetails);
+
+
+
+export async function drawLayoutShiftScreenshotRects(
+    event: Trace.Types.Events.SyntheticLayoutShift, parsedTrace: Trace.Handlers.Types.ParsedTrace,
+    maxSize: UI.Geometry.Size): Promise<LitHtml.TemplateResult|undefined> {
+  const screenshots = event.parsedData.screenshots;
+  const viewport = parsedTrace.Meta.viewportRect;
+  // TODO paralleize
+  const afterImage = screenshots.after?.args.dataUri && await UI.UIUtils.loadImage(screenshots.after?.args.dataUri);
+  const beforeImage = screenshots.before?.args.dataUri && await UI.UIUtils.loadImage(screenshots.before?.args.dataUri);
+  if (!beforeImage || !viewport) {
+    return;
+  }
+
+  /** The Layout Instability API in Blink, which reports the LayoutShift trace events, is not based on CSS pixels but
+   * physical pixels. As such the values in the impacted_nodes field need to be normalized to CSS units in order to
+   * map them to the viewport dimensions, which we get in CSS pixels. We do that by dividing the values by the devicePixelRatio.
+   * See https://crbug.com/1300309
+   */
+  const dpr = parsedTrace.Meta.devicePixelRatio;
+  if (dpr === undefined) {
+    return;
+  }
+
+  const beforeRects =
+      event.args.data?.impacted_nodes?.map(
+          node => new DOMRect(
+              node.old_rect[0] / dpr, node.old_rect[1] / dpr, node.old_rect[2] / dpr, node.old_rect[3] / dpr)) ??
+      [];
+  const afterRects =
+      event.args.data?.impacted_nodes?.map(
+          node => new DOMRect(
+              node.new_rect[0] / dpr, node.new_rect[1] / dpr, node.new_rect[2] / dpr, node.new_rect[3] / dpr)) ??
+      [];
+
+  const screenshotContainer = document.createElement('div');
+  screenshotContainer.classList.add('layout-shift-screenshot-preview');
+  screenshotContainer.style.position = 'relative';
+  screenshotContainer.appendChild(beforeImage);
+
+  // If this is being size constrained, it needs to be done in JS (rather than css max-width, etc)....
+  // That's because this function is complete before it's added to the DOM.. so we can't query offsetHeight for its resolved size…
+  const maxWidth = maxSize.width;
+  const maxHeight = maxSize.height;
+  const scaleFactor = Math.min(maxWidth / beforeImage.naturalWidth, maxHeight / beforeImage.naturalHeight, 1);
+  beforeImage.style.width = `${beforeImage.naturalWidth * scaleFactor}px`;
+  beforeImage.style.height = `${beforeImage.naturalHeight * scaleFactor}px`;
+
+  // Setup old rects
+  const rectEls = beforeRects.map((beforeRect, i) => {
+    const rectEl = document.createElement('div');
+    rectEl.classList.add('layout-shift-screenshot-preview-rect');
+
+    // If it's a 0x0x0x0 rect, then set to new, so we can fade it in from the new position instead.
+    if ([beforeRect.width, beforeRect.height, beforeRect.x, beforeRect.y].every(v => v === 0)) {
+      beforeRect = afterRects[i];
+      rectEl.style.opacity = '0';
+    } else {
+      rectEl.style.opacity = '1';
+    }
+
+    const scaledRectX = beforeRect.x * beforeImage.naturalWidth / viewport.width * scaleFactor;
+    const scaledRectY = beforeRect.y * beforeImage.naturalHeight / viewport.height * scaleFactor;
+    const scaledRectWidth = beforeRect.width * beforeImage.naturalWidth / viewport.width * scaleFactor;
+    const scaledRectHeight = beforeRect.height * beforeImage.naturalHeight / viewport.height * scaleFactor;
+    rectEl.style.left = `${scaledRectX}px`;
+    rectEl.style.top = `${scaledRectY}px`;
+    rectEl.style.width = `${scaledRectWidth}px`;
+    rectEl.style.height = `${scaledRectHeight}px`;
+    rectEl.style.opacity = '0.4';
+
+    screenshotContainer.appendChild(rectEl);
+    return rectEl;
+  });
+  if (afterImage) {
+    afterImage.classList.add('layout-shift-screenshot-after');
+    screenshotContainer.appendChild(afterImage);
+    afterImage.style.width = beforeImage.style.width;
+    afterImage.style.height = beforeImage.style.height;
+    afterImage.addEventListener('click', () => {
+      new Dialog(event, parsedTrace);
+    });
+  }
+
+  // Update for the after rect positions after a bit.
+  setTimeout(() => {
+    rectEls.forEach((rectEl, i) => {
+      const afterRect = afterRects[i];
+      const scaledRectX = afterRect.x * beforeImage.naturalWidth / viewport.width * scaleFactor;
+      const scaledRectY = afterRect.y * beforeImage.naturalHeight / viewport.height * scaleFactor;
+      const scaledRectWidth = afterRect.width * beforeImage.naturalWidth / viewport.width * scaleFactor;
+      const scaledRectHeight = afterRect.height * beforeImage.naturalHeight / viewport.height * scaleFactor;
+      rectEl.style.left = `${scaledRectX}px`;
+      rectEl.style.top = `${scaledRectY}px`;
+      rectEl.style.width = `${scaledRectWidth}px`;
+      rectEl.style.height = `${scaledRectHeight}px`;
+      rectEl.style.opacity = '0.4';
+    });
+    if (afterImage) {
+      afterImage.style.opacity = '1';
+    }
+  }, 1000);
+  return LitHtml.html`${screenshotContainer}`;
+}
+
+const styles = `
+.layout-shift-screenshot-preview {
+  position: relative;
+}
+
+.layout-shift-screenshot-preview-rect {
+  outline: 1px solid color-mix(in srgb, black 20%, var(--app-color-rendering)); /* was rgb(132, 48, 206) */
+  background-color: color-mix(in srgb, transparent 50%, var(--app-color-rendering-children)); /* was rgba(132, 48, 206, 0.5) */
+  position: absolute;
+  transition: all 1s;
+  z-index: 200;
+}
+
+.layout-shift-screenshot-after {
+  opacity: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  transition: opacity 1s;
+}
+
+.highlight {
+background-color: yellow;
+}
+
+`;
+
+
+export class Dialog {
+  private fragment: UI.Fragment.Fragment;
+  private readonly widget: UI.XWidget.XWidget;
+  private dialog: UI.Dialog.Dialog|null = null;
+
+  constructor(event: Trace.Types.Events.SyntheticLayoutShift, parsedTrace: Trace.Handlers.Types.ParsedTrace) {
+    // const prevButton = UI.UIUtils.createTextButton('\u25C0', this.onPrevFrame.bind(this));
+    // UI.Tooltip.Tooltip.install(prevButton, i18nString(UIStrings.previousFrame));
+    // const nextButton = UI.UIUtils.createTextButton('\u25B6', this.onNextFrame.bind(this));
+    // UI.Tooltip.Tooltip.install(nextButton, i18nString(UIStrings.nextFrame));
+
+    this.fragment = UI.Fragment.Fragment.build`
+      <x-widget flex=none margin=12px>
+        <x-hbox>
+          <x-hbox $='container' overflow=auto border='1px solid #ddd'>
+          </x-hbox>
+          <x-hbox>
+            <ul $='nodes'>
+
+            </ul>
+          </x-hbox>
+        </x-hbox>
+      </x-widget>
+    `;
+    // <x-hbox x-center justify-content=center margin-top=10px>
+    //       ${prevButton}
+    //       <x-hbox $='time' margin=8px></x-hbox>
+    //       ${nextButton}
+    //     </x-hbox>
+    this.widget = (this.fragment.element() as UI.XWidget.XWidget);
+    (this.widget as HTMLElement).tabIndex = 0;
+    // this.widget.addEventListener('keydown', this.keyDown.bind(this), false);
+    this.dialog = null;
+
+    void this.render(event, parsedTrace);
+  }
+
+  private async render(event: Trace.Types.Events.SyntheticLayoutShift, parsedTrace: Trace.Handlers.Types.ParsedTrace):
+      Promise<void> {
+    const maxSize = new UI.Geometry.Size(800, 800);
+    const preview = await drawLayoutShiftScreenshotRects(event, parsedTrace, maxSize);
+    if (!preview) {
+      return;
+    }
+
+    const previewEl = LitHtml.render(preview, this.fragment.$('container'));
+
+    const lis = event.args.data?.impacted_nodes?.map((node, i) => {
+      const rectEl = previewEl.querySelectorAll('.layout-shift-screenshot-preview-rect').item(i);
+      return LitHtml.html`
+            <li><${NodeLink.NodeLink.litTagName}
+              @mouseover=${() => () => rectEl.classList.add('highlight')}
+              @mouseleave=${() => () => rectEl.classList.remove('highlight')}
+              .data=${{
+        backendNodeId: node.node_id,
+      } as NodeLink.NodeLinkData}>
+            </${NodeLink.NodeLink.litTagName}></li>`;
+    });
+    LitHtml.render(
+        LitHtml.html`
+      <ul>
+        ${lis}
+      </ul>
+    `,
+        this.fragment.$('nodes'));
+
+    this.resize();
+  }
+
+  hide(): void {
+    if (this.dialog) {
+      this.dialog.hide();
+    }
+  }
+
+  private resize(): void {
+    if (!this.dialog) {
+      this.dialog = new UI.Dialog.Dialog();
+      this.dialog.contentElement.appendChild(this.widget);
+      this.dialog.setDefaultFocusedElement(this.widget);
+      this.dialog.registerRequiredCSS({cssContent: styles});
+      this.dialog.show();
+    }
+
+    this.dialog.setSizeBehavior(UI.GlassPane.SizeBehavior.MEASURE_CONTENT);
+  }
+
+  // private keyDown(event: Event): void {
+  //   const keyboardEvent = (event as KeyboardEvent);
+  //   switch (keyboardEvent.key) {
+  //     case 'ArrowLeft':
+  //       if (Host.Platform.isMac() && keyboardEvent.metaKey) {
+  //         this.onFirstFrame();
+  //       } else {
+  //         this.onPrevFrame();
+  //       }
+  //       break;
+
+  //     case 'ArrowRight':
+  //       if (Host.Platform.isMac() && keyboardEvent.metaKey) {
+  //         this.onLastFrame();
+  //       } else {
+  //         this.onNextFrame();
+  //       }
+  //       break;
+
+  //     case 'Home':
+  //       this.onFirstFrame();
+  //       break;
+
+  //     case 'End':
+  //       this.onLastFrame();
+  //       break;
+  //   }
+  // }
+
+  // private onPrevFrame(): void {
+  //   if (this.index > 0) {
+  //     --this.index;
+  //   }
+  //   void this.render();
+  // }
+
+  // private onNextFrame(): void {
+  //   if (this.index < this.#framesCount() - 1) {
+  //     ++this.index;
+  //   }
+  //   void this.render();
+  // }
+
+  // private onFirstFrame(): void {
+  //   this.index = 0;
+  //   void this.render();
+  // }
+
+  // private onLastFrame(): void {
+  //   this.index = this.#framesCount() - 1;
+  //   void this.render();
+  // }
+}
