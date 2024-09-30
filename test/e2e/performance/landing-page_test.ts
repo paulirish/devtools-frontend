@@ -17,6 +17,7 @@ import {
   waitForNone,
   waitForVisible,
 } from '../../shared/helper.js';
+
 import {reloadDevTools} from '../helpers/cross-tool-helper.js';
 
 const READY_LOCAL_METRIC_SELECTOR = '#local-value .metric-value:not(.waiting)';

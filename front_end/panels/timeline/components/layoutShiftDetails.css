@@ -119,3 +119,25 @@
     justify-content: flex-start;
   }
 }
+
+
+.layout-shift-screenshot-preview {
+  position: relative;
+}
+
+.layout-shift-screenshot-preview-rect {
+  outline: 1px solid color-mix(in srgb, black 20%, var(--app-color-rendering)); /* was rgb(132, 48, 206) */
+  background-color: color-mix(in srgb, transparent 50%, var(--app-color-rendering-children)); /* was rgba(132, 48, 206, 0.5) */
+  position: absolute;
+  transition: all 1s;
+  z-index: 200;
+}
+
+.layout-shift-screenshot-after {
+  opacity: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  transition: opacity 1s;
+}

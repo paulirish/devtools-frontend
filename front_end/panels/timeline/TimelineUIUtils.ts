@@ -52,7 +52,6 @@ import imagePreviewStyles from '../../ui/legacy/components/utils/imagePreview.cs
 import * as LegacyComponents from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
-import {CLSRect} from './CLSLinkifier.js';
 import * as TimelineComponents from './components/components.js';
 import * as Extensions from './extensions/extensions.js';
 import {Tracker} from './FreshRecording.js';

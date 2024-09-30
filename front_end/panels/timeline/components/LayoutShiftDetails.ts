@@ -235,8 +235,8 @@ export class LayoutShiftDetails extends HTMLElement {
       return;
     }
     // todo: move into table
-    const previewEl = this.#renderPreview(this.#layoutShift);
-    this.#shadow.append(previewEl);
+    const previewEl = this.#renderScreenshotThumbnail(this.#layoutShift);
+    previewEl && this.#shadow.append(previewEl);
     // clang-format off
     const output = LitHtml.html`
       <div class="layout-shift-summary-details">
@@ -253,13 +253,12 @@ export class LayoutShiftDetails extends HTMLElement {
     LitHtml.render(output, this.#shadow, {host: this});
   }
 
-  #renderPreview(event: Trace.Types.Events.SyntheticLayoutShift): HTMLElement|undefined {
+  #renderScreenshotThumbnail(event: Trace.Types.Events.SyntheticLayoutShift): HTMLElement|undefined {
     if (!this.#parsedTrace) {
       return;
     }
-    const maxSize = new UI.Geometry.Size(500, 400);
-
-    return drawLayoutShiftScreenshotRects(event, this.#parsedTrace, maxSize);
+    const maxSize = new UI.Geometry.Size(100, 100);
+    return createScreenshotGif(event, this.#parsedTrace, maxSize);
   }
 }
 
@@ -272,8 +271,8 @@ declare global {
 customElements.define('devtools-performance-layout-shift-details', LayoutShiftDetails);
 
 
-
-export function drawLayoutShiftScreenshotRects(
+/** This is called twice. Once with a small maxSize for the thumbnail, and again to create the large version in the dialog. */
+export function createScreenshotGif(
     event: Trace.Types.Events.SyntheticLayoutShift, parsedTrace: Trace.Handlers.Types.ParsedTrace,
     maxSize: UI.Geometry.Size): HTMLElement|undefined {
   const screenshots = event.parsedData.screenshots;
@@ -314,7 +313,6 @@ export function drawLayoutShiftScreenshotRects(
                 node => new DOMRect(
                     node.new_rect[0] / dpr, node.new_rect[1] / dpr, node.new_rect[2] / dpr, node.new_rect[3] / dpr)) ??
             [];
-
         screenshotContainer.appendChild(beforeImage);
 
         // If this is being size constrained, it needs to be done in JS (rather than css max-width, etc)....
@@ -357,7 +355,7 @@ export function drawLayoutShiftScreenshotRects(
           afterImage.style.width = beforeImage.style.width;
           afterImage.style.height = beforeImage.style.height;
           afterImage.addEventListener('click', () => {
-            new Dialog(event, parsedTrace);
+            new ScreenshotGifDialog(event, parsedTrace);
           });
         }
 
@@ -413,7 +411,7 @@ background-color: yellow;
 `;
 
 
-export class Dialog {
+export class ScreenshotGifDialog {
   private fragment: UI.Fragment.Fragment;
   private readonly widget: UI.XWidget.XWidget;
   private dialog: UI.Dialog.Dialog|null = null;
@@ -447,21 +445,21 @@ export class Dialog {
     // this.widget.addEventListener('keydown', this.keyDown.bind(this), false);
     this.dialog = null;
 
-    void this.render(event, parsedTrace);
+    void this.renderDialog(event, parsedTrace);
   }
 
-  private async render(event: Trace.Types.Events.SyntheticLayoutShift, parsedTrace: Trace.Handlers.Types.ParsedTrace):
+  private async renderDialog(event: Trace.Types.Events.SyntheticLayoutShift, parsedTrace: Trace.Handlers.Types.ParsedTrace):
       Promise<void> {
     const maxSize = new UI.Geometry.Size(800, 800);
-    const preview = await drawLayoutShiftScreenshotRects(event, parsedTrace, maxSize);
+    const preview = await createScreenshotGif(event, parsedTrace, maxSize);
     if (!preview) {
       return;
     }
 
-    const previewEl = LitHtml.render(preview, this.fragment.$('container'));
+    LitHtml.render(preview, this.fragment.$('container'));
 
     const lis = event.args.data?.impacted_nodes?.map((node, i) => {
-      const rectEl = previewEl.querySelectorAll('.layout-shift-screenshot-preview-rect').item(i);
+      const rectEl = this.fragment.$('container').querySelectorAll('.layout-shift-screenshot-preview-rect').item(i);
       return LitHtml.html`
             <li><${NodeLink.NodeLink.litTagName}
               @mouseover=${() => () => rectEl.classList.add('highlight')}
@@ -496,8 +494,8 @@ export class Dialog {
       this.dialog.registerRequiredCSS({cssContent: styles});
       this.dialog.show();
     }
-
-    this.dialog.setSizeBehavior(UI.GlassPane.SizeBehavior.MEASURE_CONTENT);
+    this.dialog.setMaxContentSize(new UI.Geometry.Size(300, 250));
+    this.dialog.setSizeBehavior(UI.GlassPane.SizeBehavior.SET_EXACT_SIZE);
   }
 
   // private keyDown(event: Event): void {

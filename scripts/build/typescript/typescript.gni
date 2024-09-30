@@ -50,8 +50,7 @@ assert(!devtools_skip_typecheck || !is_official_build,
 #
 template("ts_library") {
   action(target_name) {
-    script =
-        devtools_location_prepend + "scripts/build/typescript/ts_library.py"
+    script = devtools_location_prepend + "scripts/build/typescript/ts_library.py"
 
     forward_variables_from(invoker,
                            [
