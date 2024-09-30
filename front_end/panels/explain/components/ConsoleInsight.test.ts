@@ -4,7 +4,12 @@
 
 import * as Common from '../../../core/common/common.js';
 import * as Host from '../../../core/host/host.js';
-import {dispatchClickEvent, renderElementIntoDOM} from '../../../testing/DOMHelpers.js';
+import * as Root from '../../../core/root/root.js';
+import {
+  dispatchClickEvent,
+  getCleanTextContentFromElements,
+  renderElementIntoDOM,
+} from '../../../testing/DOMHelpers.js';
 import {describeWithEnvironment, getGetHostConfigStub} from '../../../testing/EnvironmentHelpers.js';
 import * as Explain from '../explain.js';
 
@@ -13,7 +18,7 @@ describeWithEnvironment('ConsoleInsight', () => {
     return {
       async *
           fetch() {
-            yield {explanation: 'test', metadata: {rpcGlobalId: 0}};
+            yield {explanation: 'test', metadata: {rpcGlobalId: 0}, completed: true};
           },
       registerClientEvent: sinon.spy(),
     };
@@ -52,6 +57,96 @@ describeWithEnvironment('ConsoleInsight', () => {
       Common.Settings.settingForTest('console-insights-onboarding-finished').set(false);
     });
   }
+
+  describe('new consent onboarding', () => {
+    before(() => {
+      Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.GEN_AI_SETTINGS_PANEL);
+    });
+
+    after(() => {
+      Root.Runtime.experiments.disableForTest(Root.Runtime.ExperimentName.GEN_AI_SETTINGS_PANEL);
+      Common.Settings.settingForTest('console-insights-enabled').set(false);
+      Common.Settings.settingForTest('console-insights-onboarding-finished').set(false);
+    });
+
+    it('shows opt-in teaser when setting is disabled', async () => {
+      Common.Settings.settingForTest('console-insights-enabled').set(false);
+      const component = new Explain.ConsoleInsight(
+          getTestPromptBuilder(), getTestAidaClient(), Host.AidaClient.AidaAccessPreconditions.AVAILABLE);
+      renderElementIntoDOM(component);
+      await drainMicroTasks();
+      assert.isNotNull(component.shadowRoot);
+      assert.deepEqual(
+          getCleanTextContentFromElements(component.shadowRoot, 'main'),
+          [
+            'Turn on Console insights in Settings to receive AI assistance for understanding and addressing console warnings and errors. Learn more',
+          ],
+      );
+    });
+
+    it('shows opt-in teaser when setting is disabled via disabledCondition', async () => {
+      Common.Settings.settingForTest('console-insights-onboarding-finished').set(true);
+      const setting = Common.Settings.settingForTest('console-insights-enabled');
+      setting.set(true);
+      setting.setRegistration({
+        settingName: 'console-insights-enabled',
+        settingType: Common.Settings.SettingType.BOOLEAN,
+        defaultValue: true,
+        disabledCondition: () => {
+          return {disabled: true, reason: 'disabled for test'};
+        },
+      });
+      const component = new Explain.ConsoleInsight(
+          getTestPromptBuilder(), getTestAidaClient(), Host.AidaClient.AidaAccessPreconditions.AVAILABLE);
+      renderElementIntoDOM(component);
+      await drainMicroTasks();
+      assert.isNotNull(component.shadowRoot);
+      assert.deepEqual(
+          getCleanTextContentFromElements(component.shadowRoot, 'main'),
+          [
+            'Turn on Console insights in Settings to receive AI assistance for understanding and addressing console warnings and errors. Learn more',
+          ],
+      );
+
+      setting.setRegistration({
+        settingName: 'console-insights-enabled',
+        settingType: Common.Settings.SettingType.BOOLEAN,
+        defaultValue: false,
+      });
+    });
+
+    it('shows reminder on first run of console insights', async () => {
+      Common.Settings.settingForTest('console-insights-enabled').set(true);
+      Common.Settings.settingForTest('console-insights-onboarding-finished').set(false);
+      const component = new Explain.ConsoleInsight(
+          getTestPromptBuilder(), getTestAidaClient(), Host.AidaClient.AidaAccessPreconditions.AVAILABLE);
+      renderElementIntoDOM(component);
+      await drainMicroTasks();
+      assert.isNotNull(component.shadowRoot);
+      assert.strictEqual(
+          component.shadowRoot!.querySelector('h2')?.innerText, 'Understand console messages with Chrome AI');
+
+      dispatchClickEvent(component.shadowRoot!.querySelector('.continue-button')!, {
+        bubbles: true,
+        composed: true,
+      });
+      await drainMicroTasks();
+      // Rating buttons are shown.
+      assert(component.shadowRoot!.querySelector('.rating'));
+    });
+
+    it('immediately renders insight on subsequent runs', async () => {
+      Common.Settings.settingForTest('console-insights-enabled').set(true);
+      Common.Settings.settingForTest('console-insights-onboarding-finished').set(true);
+      const component = new Explain.ConsoleInsight(
+          getTestPromptBuilder(), getTestAidaClient(), Host.AidaClient.AidaAccessPreconditions.AVAILABLE);
+      renderElementIntoDOM(component);
+      await drainMicroTasks();
+      assert.isNotNull(component.shadowRoot);
+      // Rating buttons are shown.
+      assert(component.shadowRoot!.querySelector('.rating'));
+    });
+  });
 
   describe('consent onboarding', () => {
     afterEach(() => {
@@ -169,6 +264,7 @@ describeWithEnvironment('ConsoleInsight', () => {
     };
 
     const reportsRating = (positive: boolean) => async () => {
+      const stub = getGetHostConfigStub({});
       const actionTaken = sinon.stub(Host.userMetrics, 'actionTaken');
       const aidaClient = getTestAidaClient();
       const component = await renderInsight(aidaClient);
@@ -193,6 +289,7 @@ describeWithEnvironment('ConsoleInsight', () => {
       });
       // Can only rate once.
       assert(aidaClient.registerClientEvent.calledOnce);
+      stub.restore();
     };
 
     it('reports positive rating', reportsRating(true));
@@ -200,9 +297,11 @@ describeWithEnvironment('ConsoleInsight', () => {
 
     it('has no thumbs up/down buttons if logging is disabled', async () => {
       const stub = getGetHostConfigStub({
+        aidaAvailability: {
+          disallowLogging: true,
+        },
         devToolsConsoleInsights: {
           enabled: true,
-          disallowLogging: true,
         },
       });
       const component = await renderInsight();

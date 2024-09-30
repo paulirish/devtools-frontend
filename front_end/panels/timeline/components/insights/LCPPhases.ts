@@ -9,6 +9,7 @@ import type * as Overlays from '../../overlays/overlays.js';
 
 import {BaseInsight, shouldRenderForCategory} from './Helpers.js';
 import * as SidebarInsight from './SidebarInsight.js';
+import {Table, type TableData} from './Table.js';
 import {InsightsCategories} from './types.js';
 
 const UIStrings = {
@@ -21,9 +22,9 @@ const UIStrings = {
    */
   resourceLoadDelay: 'Resource load delay',
   /**
-   *@description Resource load time title for the Largest Contentful Paint phases timespan breakdown.
+   *@description Resource load duration title for the Largest Contentful Paint phases timespan breakdown.
    */
-  resourceLoadTime: 'Resource load time',
+  resourceLoadDuration: 'Resource load duration',
   /**
    *@description Element render delay title for the Largest Contentful Paint phases timespan breakdown.
    */
@@ -52,7 +53,7 @@ export class LCPPhases extends BaseInsight {
     if (!insightsByNavigation) {
       return [];
     }
-    const lcpInsight = insightsByNavigation.LargestContentfulPaint;
+    const lcpInsight = insightsByNavigation.data.LargestContentfulPaint;
     if (lcpInsight instanceof Error) {
       return [];
     }
@@ -68,18 +69,34 @@ export class LCPPhases extends BaseInsight {
 
     if (loadDelay && loadTime) {
       const phaseData = [
-        {phase: 'Time to first byte', timing: ttfb, percent: `${(100 * ttfb / timing).toFixed(0)}%`},
-        {phase: 'Resource load delay', timing: loadDelay, percent: `${(100 * loadDelay / timing).toFixed(0)}%`},
-        {phase: 'Resource load duration', timing: loadTime, percent: `${(100 * loadTime / timing).toFixed(0)}%`},
-        {phase: 'Resource render delay', timing: renderDelay, percent: `${(100 * renderDelay / timing).toFixed(0)}%`},
+        {phase: i18nString(UIStrings.timeToFirstByte), timing: ttfb, percent: `${(100 * ttfb / timing).toFixed(0)}%`},
+        {
+          phase: i18nString(UIStrings.resourceLoadDelay),
+          timing: loadDelay,
+          percent: `${(100 * loadDelay / timing).toFixed(0)}%`,
+        },
+        {
+          phase: i18nString(UIStrings.resourceLoadDuration),
+          timing: loadTime,
+          percent: `${(100 * loadTime / timing).toFixed(0)}%`,
+        },
+        {
+          phase: i18nString(UIStrings.elementRenderDelay),
+          timing: renderDelay,
+          percent: `${(100 * renderDelay / timing).toFixed(0)}%`,
+        },
       ];
       return phaseData;
     }
 
     // If the lcp is text, we only have ttfb and render delay.
     const phaseData = [
-      {phase: 'Time to first byte', timing: ttfb, percent: `${(100 * ttfb / timing).toFixed(0)}%`},
-      {phase: 'Resource render delay', timing: renderDelay, percent: `${(100 * renderDelay / timing).toFixed(0)}%`},
+      {phase: i18nString(UIStrings.timeToFirstByte), timing: ttfb, percent: `${(100 * ttfb / timing).toFixed(0)}%`},
+      {
+        phase: i18nString(UIStrings.elementRenderDelay),
+        timing: renderDelay,
+        percent: `${(100 * renderDelay / timing).toFixed(0)}%`,
+      },
     ];
     return phaseData;
   }
@@ -95,7 +112,7 @@ export class LCPPhases extends BaseInsight {
       return [];
     }
 
-    const lcpInsight: TraceEngine.Insights.Types.LCPInsightResult|Error = insightsByNavigation.LargestContentfulPaint;
+    const lcpInsight = insightsByNavigation.data.LargestContentfulPaint;
     if (lcpInsight instanceof Error) {
       return [];
     }
@@ -125,8 +142,8 @@ export class LCPPhases extends BaseInsight {
           renderBegin,
       );
       sections.push(
-          {bounds: ttfb, label: i18nString(UIStrings.timeToFirstByte)},
-          {bounds: renderDelay, label: i18nString(UIStrings.elementRenderDelay)});
+          {bounds: ttfb, label: i18nString(UIStrings.timeToFirstByte), showDuration: true},
+          {bounds: renderDelay, label: i18nString(UIStrings.elementRenderDelay), showDuration: true});
     } else if (phases?.loadDelay && phases?.loadTime) {
       const renderBegin: TraceEngine.Types.Timing.MicroSeconds = TraceEngine.Types.Timing.MicroSeconds(
           lcpMicroseconds - TraceEngine.Helpers.Timing.millisecondsToMicroseconds(phases.renderDelay));
@@ -157,10 +174,10 @@ export class LCPPhases extends BaseInsight {
       );
 
       sections.push(
-          {bounds: ttfb, label: i18nString(UIStrings.timeToFirstByte)},
-          {bounds: loadDelay, label: i18nString(UIStrings.resourceLoadDelay)},
-          {bounds: loadTime, label: i18nString(UIStrings.resourceLoadTime)},
-          {bounds: renderDelay, label: i18nString(UIStrings.elementRenderDelay)},
+          {bounds: ttfb, label: i18nString(UIStrings.timeToFirstByte), showDuration: true},
+          {bounds: loadDelay, label: i18nString(UIStrings.resourceLoadDelay), showDuration: true},
+          {bounds: loadTime, label: i18nString(UIStrings.resourceLoadDuration), showDuration: true},
+          {bounds: renderDelay, label: i18nString(UIStrings.elementRenderDelay), showDuration: true},
       );
     }
     return [{
@@ -170,6 +187,8 @@ export class LCPPhases extends BaseInsight {
   }
 
   #renderLCPPhases(phaseData: PhaseData[]): LitHtml.LitTemplate {
+    const rows = phaseData.map(({phase, percent}) => [phase, percent]);
+
     // clang-format off
     return LitHtml.html`
     <div class="insights">
@@ -180,19 +199,19 @@ export class LCPPhases extends BaseInsight {
         @insighttoggleclick=${this.onSidebarClick}
       >
         <div slot="insight-description" class="insight-description">
-          Each
-          <x-link class="link" href="https://web.dev/articles/optimize-lcp#lcp-breakdown">phase has specific recommendations to improve.</x-link>
-          In an ideal load, the two delay phases should be quite short.
+          <p>
+            Each
+            <x-link class="link" href="https://web.dev/articles/optimize-lcp#lcp-breakdown">phase has specific recommendations to improve.</x-link>
+            In an ideal load, the two delay phases should be quite short.
+          </p>
         </div>
-        <div slot="insight-content" class="table-container">
-          <dl>
-            <dt class="dl-title">Phase</dt>
-            <dd class="dl-title">% of LCP</dd>
-            ${phaseData?.map(phase => LitHtml.html`
-              <dt>${phase.phase}</dt>
-              <dd class="dl-value">${phase.percent}</dd>
-            `)}
-          </dl>
+        <div slot="insight-content">
+          ${LitHtml.html`<${Table.litTagName}
+            .data=${{
+              headers: ['Phase', '% of LCP'],
+              rows,
+            } as TableData}>
+          </${Table.litTagName}>`}
         </div>
       </${SidebarInsight}>
     </div>`;

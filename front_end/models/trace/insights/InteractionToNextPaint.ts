@@ -2,22 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Helpers from '../helpers/helpers.js';
 import {type SyntheticInteractionPair} from '../types/TraceEvents.js';
 
-import {type InsightResult, type NavigationInsightContext, type RequiredData} from './types.js';
+import {type BoundedInsightContext, type InsightResult, type RequiredData} from './types.js';
 
 export function deps(): ['UserInteractions'] {
   return ['UserInteractions'];
 }
 
-type Result = InsightResult<{
+export type INPInsightResult = InsightResult<{
   longestInteractionEvent?: SyntheticInteractionPair,
   highPercentileInteractionEvent?: SyntheticInteractionPair,
 }>;
 
-export function generateInsight(traceParsedData: RequiredData<typeof deps>, context: NavigationInsightContext): Result {
+export function generateInsight(
+    traceParsedData: RequiredData<typeof deps>, context: BoundedInsightContext): INPInsightResult {
   const interactionEvents = traceParsedData.UserInteractions.interactionEvents.filter(event => {
-    return event.args.data.navigationId === context.navigationId;
+    return Helpers.Timing.eventIsInBounds(event, context.bounds);
   });
 
   if (!interactionEvents.length) {

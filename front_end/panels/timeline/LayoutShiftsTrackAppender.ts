@@ -5,6 +5,7 @@ import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import type * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
+import * as Root from '../../core/root/root.js';
 import * as TraceEngine from '../../models/trace/trace.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
@@ -12,6 +13,7 @@ import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
 import {buildGroupStyle, buildTrackHeader, getFormattedTime} from './AppenderUtils.js';
 import {
   type CompatibilityTracksAppender,
+  type DrawOverride,
   type HighlightedEntryInfo,
   type TrackAppender,
   type TrackAppenderName,
@@ -92,13 +94,32 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
   #appendLayoutShiftsAtLevel(currentLevel: number): number {
     const allLayoutShifts = this.#traceParsedData.LayoutShifts.clusters.flatMap(cluster => cluster.events);
     const setFlameChartEntryTotalTime =
-        (_event: TraceEngine.Types.TraceEvents.SyntheticLayoutShift, index: number): void => {
+        (_event: TraceEngine.Types.TraceEvents.SyntheticLayoutShift|
+         TraceEngine.Types.TraceEvents.SyntheticLayoutShiftCluster,
+         index: number): void => {
+          let totalTime = LAYOUT_SHIFT_SYNTHETIC_DURATION;
+          if (TraceEngine.Types.TraceEvents.isSyntheticLayoutShiftCluster(_event)) {
+            // This is to handle the cases where there is a singular shift for a cluster.
+            // A single shift would make the cluster duration 0 and hard to read.
+            // So in this case, give it the LAYOUT_SHIFT_SYNTHETIC_DURATION duration.
+            totalTime = _event.dur || LAYOUT_SHIFT_SYNTHETIC_DURATION;
+          }
           this.#compatibilityBuilder.getFlameChartTimelineData().entryTotalTimes[index] =
-              TraceEngine.Helpers.Timing.microSecondsToMilliseconds(LAYOUT_SHIFT_SYNTHETIC_DURATION);
+              TraceEngine.Helpers.Timing.microSecondsToMilliseconds(totalTime);
         };
+    let shiftLevel = currentLevel;
+    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_LAYOUT_SHIFT_DETAILS)) {
+      const allClusters = this.#traceParsedData.LayoutShifts.clusters;
+      this.#compatibilityBuilder.appendEventsAtLevel(allClusters, currentLevel + 1, this, setFlameChartEntryTotalTime);
+
+      // layout shifts should be below clusters.
+      shiftLevel = currentLevel + 2;
+
+      return this.#compatibilityBuilder.appendEventsAtLevel(allLayoutShifts, shiftLevel, this);
+    }
 
     return this.#compatibilityBuilder.appendEventsAtLevel(
-        allLayoutShifts, currentLevel, this, setFlameChartEntryTotalTime);
+        allLayoutShifts, shiftLevel, this, setFlameChartEntryTotalTime);
   }
 
   /*
@@ -122,6 +143,9 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
     if (TraceEngine.Types.TraceEvents.isTraceEventLayoutShift(event)) {
       return 'Layout shift';
     }
+    if (TraceEngine.Types.TraceEvents.isSyntheticLayoutShiftCluster(event)) {
+      return 'Layout shift cluster';
+    }
     return event.name;
   }
 
@@ -132,6 +156,45 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
   highlightedEntryInfo(event: TraceEngine.Types.TraceEvents.TraceEventLayoutShift): HighlightedEntryInfo {
     const title = this.titleForEvent(event);
     return {title, formattedTime: getFormattedTime(event.dur)};
+  }
+
+  getDrawOverride(event: TraceEngine.Types.TraceEvents.TraceEventData): DrawOverride|undefined {
+    if (!Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_LAYOUT_SHIFT_DETAILS)) {
+      return;
+    }
+
+    if (!TraceEngine.Types.TraceEvents.isTraceEventLayoutShift(event)) {
+      return;
+    }
+
+    const score = event.args.data?.weighted_score_delta || 0;
+
+    // `buffer` is how much space is between the actual diamond shape and the
+    // edge of its select box. The select box will have a constant size
+    // so a larger `buffer` will create a smaller diamond.
+    //
+    // This logic will scale the size of the diamond based on the layout shift score.
+    // A LS score of >=0.1 will create a diamond of maximum size
+    // A LS score of ~0 will create a diamond of minimum size (exactly 0 should not happen in practice)
+    const bufferScale = 1 - Math.min(score / 0.1, 1);
+    const buffer = Math.round(bufferScale * 3);
+
+    return (context, x, y, _width, height) => {
+      const boxSize = height;
+      const halfSize = boxSize / 2;
+      context.beginPath();
+      context.moveTo(x, y + buffer);
+      context.lineTo(x + halfSize - buffer, y + halfSize);
+      context.lineTo(x, y + height - buffer);
+      context.lineTo(x - halfSize + buffer, y + halfSize);
+      context.closePath();
+      context.fillStyle = this.colorForEvent(event);
+      context.fill();
+      return {
+        x: x - halfSize,
+        width: boxSize,
+      };
+    };
   }
 }
 

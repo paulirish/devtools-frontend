@@ -112,12 +112,12 @@ export class WatchExpressionsSidebarPane extends UI.ThrottledWidget.ThrottledWid
 
     this.addButton = new UI.Toolbar.ToolbarButton(
         i18nString(UIStrings.addWatchExpression), 'plus', undefined, 'add-watch-expression');
-    this.addButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, _event => {
+    this.addButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, _event => {
       void this.addButtonClicked();
     });
     this.refreshButton = new UI.Toolbar.ToolbarButton(
         i18nString(UIStrings.refreshWatchExpressions), 'refresh', undefined, 'refresh-watch-expressions');
-    this.refreshButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.update, this);
+    this.refreshButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, this.update, this);
 
     this.contentElement.classList.add('watch-expressions');
     this.contentElement.setAttribute('jslog', `${VisualLogging.section('sources.watch')}`);
@@ -203,7 +203,7 @@ export class WatchExpressionsSidebarPane extends UI.ThrottledWidget.ThrottledWid
     this.contentElement.appendChild(this.treeOutline.element);
     const watchExpression = new WatchExpression(expression, this.expandController, this.linkifier);
     UI.ARIAUtils.setLabel(this.contentElement, i18nString(UIStrings.addWatchExpression));
-    watchExpression.addEventListener(Events.ExpressionUpdated, this.watchExpressionUpdated, this);
+    watchExpression.addEventListener(Events.EXPRESSION_UPDATED, this.watchExpressionUpdated, this);
     this.treeOutline.appendChild(watchExpression.treeElement());
     this.watchExpressions.push(watchExpression);
     return watchExpression;
@@ -438,7 +438,7 @@ export class WatchExpression extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     }
     this.expressionInternal = newExpression;
     this.update();
-    this.dispatchEventToListeners(Events.ExpressionUpdated, this);
+    this.dispatchEventToListeners(Events.EXPRESSION_UPDATED, this);
   }
 
   private deleteWatchExpression(event: Event): void {
@@ -596,9 +596,9 @@ export class WatchExpression extends Common.ObjectWrapper.ObjectWrapper<EventTyp
 }
 
 const enum Events {
-  ExpressionUpdated = 'ExpressionUpdated',
+  EXPRESSION_UPDATED = 'ExpressionUpdated',
 }
 
 type EventTypes = {
-  [Events.ExpressionUpdated]: WatchExpression,
+  [Events.EXPRESSION_UPDATED]: WatchExpression,
 };

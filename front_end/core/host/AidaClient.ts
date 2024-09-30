@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 import * as Common from '../common/common.js';
-import * as Platform from '../platform/platform.js';
 
 import {InspectorFrontendHostInstance} from './InspectorFrontendHost.js';
 import {type AidaClientResult, type SyncInformation} from './InspectorFrontendHostAPI.js';
@@ -43,6 +42,17 @@ export enum ClientFeature {
   CHROME_FREESTYLER = 2,
 }
 
+export enum UserTier {
+  // Unspecified user tier.
+  USER_TIER_UNSPECIFIED = 0,
+  // Users who are internal testers.
+  TESTERS = 1,
+  // Users who are early adopters.
+  BETA = 2,
+  // Users in the general public.
+  PUBLIC = 3,
+}
+
 export interface AidaRequest {
   input: string;
   preamble?: string;
@@ -59,6 +69,8 @@ export interface AidaRequest {
     disable_user_content_logging: boolean,
     // eslint-disable-next-line @typescript-eslint/naming-convention
     string_session_id?: string,
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    user_tier?: UserTier,
   };
   // eslint-disable-next-line @typescript-eslint/naming-convention
   functionality_type?: FunctionalityType;
@@ -111,6 +123,7 @@ export interface AidaResponseMetadata {
 export interface AidaResponse {
   explanation: string;
   metadata: AidaResponseMetadata;
+  completed: boolean;
 }
 
 export const enum AidaAccessPreconditions {
@@ -122,6 +135,10 @@ export const enum AidaAccessPreconditions {
 
 export const CLIENT_NAME = 'CHROME_DEVTOOLS';
 
+const CODE_CHUNK_SEPARATOR = '\n`````\n';
+
+export class AidaAbortError extends Error {}
+
 export class AidaClient {
   static buildConsoleInsightsRequest(input: string): AidaRequest {
     const request: AidaRequest = {
@@ -132,13 +149,12 @@ export class AidaClient {
     };
     const config = Common.Settings.Settings.instance().getHostConfig();
     let temperature = NaN;
-    let modelId = null;
-    let disallowLogging = false;
-    if (config?.devToolsConsoleInsights.enabled) {
-      temperature = config.devToolsConsoleInsights.aidaTemperature;
-      modelId = config.devToolsConsoleInsights.aidaModelId;
-      disallowLogging = config.devToolsConsoleInsights.disallowLogging;
+    let modelId = '';
+    if (config.devToolsConsoleInsights?.enabled) {
+      temperature = config.devToolsConsoleInsights.temperature || 0;
+      modelId = config.devToolsConsoleInsights.modelId || '';
     }
+    const disallowLogging = config.aidaAvailability?.disallowLogging ?? true;
 
     if (!isNaN(temperature)) {
       request.options ??= {};
@@ -174,16 +190,19 @@ export class AidaClient {
     return AidaAccessPreconditions.AVAILABLE;
   }
 
-  async * fetch(request: AidaRequest): AsyncGenerator<AidaResponse, void, void> {
+  async * fetch(request: AidaRequest, options?: {signal?: AbortSignal}): AsyncGenerator<AidaResponse, void, void> {
     if (!InspectorFrontendHostInstance.doAidaConversation) {
       throw new Error('doAidaConversation is not available');
     }
     const stream = (() => {
-      let {promise, resolve, reject} = Platform.PromiseUtilities.promiseWithResolvers<string|null>();
+      let {promise, resolve, reject} = Promise.withResolvers<string|null>();
+      options?.signal?.addEventListener('abort', () => {
+        reject(new AidaAbortError());
+      });
       return {
         write: async(data: string): Promise<void> => {
           resolve(data);
-          ({promise, resolve, reject} = Platform.PromiseUtilities.promiseWithResolvers<string|null>());
+          ({promise, resolve, reject} = Promise.withResolvers<string|null>());
         },
         close: async(): Promise<void> => {
           resolve(null);
@@ -235,7 +254,7 @@ export class AidaClient {
       } catch (error) {
         throw new Error('Cannot parse chunk: ' + chunk, {cause: error});
       }
-      const CODE_CHUNK_SEPARATOR = '\n`````\n';
+
       for (const result of results) {
         if ('metadata' in result) {
           metadata.rpcGlobalId = result.metadata.rpcGlobalId;
@@ -270,13 +289,19 @@ export class AidaClient {
         yield {
           explanation: text.join('') + (inCodeChunk ? CODE_CHUNK_SEPARATOR : ''),
           metadata,
+          completed: false,
         };
       }
     }
+    yield {
+      explanation: text.join('') + (inCodeChunk ? CODE_CHUNK_SEPARATOR : ''),
+      metadata,
+      completed: true,
+    };
   }
 
   registerClientEvent(clientEvent: AidaDoConversationClientEvent): Promise<AidaClientResult> {
-    const {promise, resolve} = Platform.PromiseUtilities.promiseWithResolvers<AidaClientResult>();
+    const {promise, resolve} = Promise.withResolvers<AidaClientResult>();
     InspectorFrontendHostInstance.registerAidaClientEvent(
         JSON.stringify({
           client: CLIENT_NAME,
@@ -288,4 +313,18 @@ export class AidaClient {
 
     return promise;
   }
+}
+
+export function convertToUserTierEnum(userTier: string|undefined): UserTier {
+  if (userTier) {
+    switch (userTier) {
+      case 'TESTERS':
+        return UserTier.TESTERS;
+      case 'BETA':
+        return UserTier.BETA;
+      case 'PUBLIC':
+        return UserTier.PUBLIC;
+    }
+  }
+  return UserTier.BETA;
 }

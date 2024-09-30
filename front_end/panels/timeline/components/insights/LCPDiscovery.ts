@@ -5,7 +5,6 @@
 import * as Common from '../../../../core/common/common.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
-import {type LCPInsightResult} from '../../../../models/trace/insights/types.js';
 import * as TraceEngine from '../../../../models/trace/trace.js';
 import * as IconButton from '../../../../ui/components/icon_button/icon_button.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
@@ -22,20 +21,35 @@ const UIStrings = {
    * @example {401ms} PH1
    */
   lcpLoadDelay: 'LCP image loaded {PH1} after earliest start point.',
+  /**
+   * @description Text to tell the user that a fetchpriority property value of "high" is applied to the LCP request.
+   */
+  fetchPriorityApplied: 'fetchpriority=high applied',
+  /**
+   * @description Text to tell the user that the LCP request is discoverable in the initial document.
+   */
+  requestDiscoverable: 'Request is discoverable in initial document',
+  /**
+   * @description Text to tell the user that the LCP request does not have the lazy load property applied.
+   */
+  lazyLoadNotApplied: 'lazy load not applied',
+
 };
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/insights/LCPDiscovery.ts', UIStrings);
+const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 interface LCPImageDiscoveryData {
   shouldIncreasePriorityHint: boolean;
   shouldPreloadImage: boolean;
   shouldRemoveLazyLoading: boolean;
-  resource: TraceEngine.Types.TraceEvents.SyntheticNetworkRequest;
+  request: TraceEngine.Types.TraceEvents.SyntheticNetworkRequest;
   discoveryDelay: TraceEngine.Types.Timing.MicroSeconds|null;
 }
 
 export function getLCPInsightData(
-    insights: TraceEngine.Insights.Types.TraceInsightData|null, navigationId: string|null): LCPInsightResult|null {
+    insights: TraceEngine.Insights.Types.TraceInsightData|null,
+    navigationId: string|null): TraceEngine.Insights.Types.InsightResults['LargestContentfulPaint']|null {
   if (!insights || !navigationId) {
     return null;
   }
@@ -45,7 +59,7 @@ export function getLCPInsightData(
     return null;
   }
 
-  const lcpInsight: TraceEngine.Insights.Types.LCPInsightResult|Error = insightsByNavigation.LargestContentfulPaint;
+  const lcpInsight = insightsByNavigation.data.LargestContentfulPaint;
   if (lcpInsight instanceof Error) {
     return null;
   }
@@ -59,7 +73,7 @@ function getImageData(
     return null;
   }
 
-  if (lcpInsight.lcpResource === undefined) {
+  if (lcpInsight.lcpRequest === undefined) {
     return null;
   }
 
@@ -79,12 +93,12 @@ function getImageData(
     shouldIncreasePriorityHint,
     shouldPreloadImage,
     shouldRemoveLazyLoading,
-    resource: lcpInsight.lcpResource,
+    request: lcpInsight.lcpRequest,
     discoveryDelay: null,
   };
 
-  if (lcpInsight.earliestDiscoveryTimeTs && lcpInsight.lcpResource) {
-    const discoveryDelay = lcpInsight.lcpResource.ts - lcpInsight.earliestDiscoveryTimeTs;
+  if (lcpInsight.earliestDiscoveryTimeTs && lcpInsight.lcpRequest) {
+    const discoveryDelay = lcpInsight.lcpRequest.ts - lcpInsight.earliestDiscoveryTimeTs;
     data.discoveryDelay = TraceEngine.Types.Timing.MicroSeconds(discoveryDelay);
   }
 
@@ -121,8 +135,39 @@ export class LCPDiscovery extends BaseInsight {
   }
 
   override createOverlays(): Overlays.Overlays.TimelineOverlay[] {
-    // TODO: create overlays
-    return [];
+    const imageResults = getImageData(this.data.insights, this.data.navigationId);
+    if (!imageResults || !imageResults.discoveryDelay) {
+      return [];
+    }
+
+    const delay = TraceEngine.Helpers.Timing.traceWindowFromMicroSeconds(
+        TraceEngine.Types.Timing.MicroSeconds(imageResults.request.ts - imageResults.discoveryDelay),
+        imageResults.request.ts,
+    );
+
+    const label = LitHtml.html`<div class="discovery-delay"> ${this.#renderDiscoveryDelay(delay.range)}</div>`;
+
+    return [
+      {
+        type: 'ENTRY_OUTLINE',
+        entry: imageResults.request,
+        outlineReason: 'ERROR',
+      },
+      {
+        type: 'CANDY_STRIPED_TIME_RANGE',
+        bounds: delay,
+        entry: imageResults.request,
+      },
+      {
+        type: 'TIMESPAN_BREAKDOWN',
+        sections: [{
+          bounds: delay,
+          label,
+          showDuration: false,
+        }],
+        entry: imageResults.request,
+      },
+    ];
   }
 
   #renderDiscovery(imageData: LCPImageDiscoveryData): LitHtml.TemplateResult {
@@ -136,27 +181,27 @@ export class LCPDiscovery extends BaseInsight {
           @insighttoggleclick=${this.onSidebarClick}
         >
           <div slot="insight-description" class="insight-description">
-          ${imageData.discoveryDelay ? LitHtml.html`<p class="discovery-delay">${this.#renderDiscoveryDelay(imageData.discoveryDelay)}</p>` : LitHtml.nothing}
-            <ul class="insight-results discovery-icon-results">
+          ${imageData.discoveryDelay ? LitHtml.html`<div class="discovery-delay">${this.#renderDiscoveryDelay(imageData.discoveryDelay)}</div>` : LitHtml.nothing}
+            <ul class="insight-results insight-icon-results">
               <li class="insight-entry">
                 ${this.#adviceIcon(imageData.shouldIncreasePriorityHint)}
-                <span>fetchpriority=high applied</span>
+                <span>${i18nString(UIStrings.fetchPriorityApplied)}</span>
               </li>
               <li class="insight-entry">
                 ${this.#adviceIcon(imageData.shouldPreloadImage)}
-                <span>Request is discoverable in initial document</span>
+                <span>${i18nString(UIStrings.requestDiscoverable)}</span>
               </li>
               <li class="insight-entry">
                 ${this.#adviceIcon(imageData.shouldRemoveLazyLoading)}
-                <span>lazyload not applied</span>
+                <span>${i18nString(UIStrings.lazyLoadNotApplied)}</span>
               </li>
             </ul>
           </div>
           <div slot="insight-content" class="insight-content">
-            <img class="element-img" data-src=${imageData.resource.args.data.url} src=${imageData.resource.args.data.url}>
+            <img class="element-img" data-src=${imageData.request.args.data.url} src=${imageData.request.args.data.url}>
             <div class="element-img-details">
-              ${Common.ParsedURL.ParsedURL.extractName(imageData.resource.args.data.url ?? '')}
-              <div class="element-img-details-size">${Platform.NumberUtilities.bytesToString(imageData.resource.args.data.decodedBodyLength ?? 0)}</div>
+              ${Common.ParsedURL.ParsedURL.extractName(imageData.request.args.data.url ?? '')}
+              <div class="element-img-details-size">${Platform.NumberUtilities.bytesToString(imageData.request.args.data.decodedBodyLength ?? 0)}</div>
             </div>
           </div>
         </${SidebarInsight.SidebarInsight}>

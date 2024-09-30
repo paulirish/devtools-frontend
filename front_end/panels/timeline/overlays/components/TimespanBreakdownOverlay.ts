@@ -13,7 +13,8 @@ import styles from './timespanBreakdownOverlay.css.js';
  */
 export type EntryBreakdown = {
   bounds: TraceEngine.Types.Timing.TraceWindowMicroSeconds,
-  label: string,
+  label: string|LitHtml.LitTemplate,
+  showDuration: boolean,
 };
 
 export class TimespanBreakdownOverlay extends HTMLElement {
@@ -34,6 +35,9 @@ export class TimespanBreakdownOverlay extends HTMLElement {
   }
 
   set canvasRect(rect: DOMRect|null) {
+    if (this.#canvasRect && rect && this.#canvasRect.width === rect.width && this.#canvasRect.height === rect.height) {
+      return;
+    }
     this.#canvasRect = rect;
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
   }
@@ -52,7 +56,7 @@ export class TimespanBreakdownOverlay extends HTMLElement {
    * If the label is off to the left or right, we fix it to that corner and
    * align the text so the label is visible as long as possible.
    */
-  afterOverlayUpdate(): void {
+  checkSectionLabelPositioning(): void {
     const sections = this.#shadow.querySelectorAll<HTMLElement>('.timespan-breakdown-overlay-section');
     if (!sections) {
       return;
@@ -148,19 +152,26 @@ export class TimespanBreakdownOverlay extends HTMLElement {
       }
     }
   }
+
   renderSection(section: EntryBreakdown): LitHtml.TemplateResult {
     const sectionRange = TraceEngine.Helpers.Timing.microSecondsToMilliseconds(section.bounds.range);
+    // clang-format off
     return LitHtml.html`
       <div class="timespan-breakdown-overlay-section">
         <div class="timespan-breakdown-overlay-label">
-          <span class="duration-text">${i18n.TimeUtilities.preciseMillisToString(sectionRange, 2)}</span>
+        ${section.showDuration ?
+          LitHtml.html`
+            <span class="duration-text">${i18n.TimeUtilities.preciseMillisToString(sectionRange, 2)}</span>
+          ` : LitHtml.nothing}
           ${section.label}
         </div>
       </div>`;
+    // clang-format on
   }
 
   #render(): void {
     LitHtml.render(LitHtml.html`${this.#sections?.map(this.renderSection)}`, this.#shadow, {host: this});
+    this.checkSectionLabelPositioning();
   }
 }
 

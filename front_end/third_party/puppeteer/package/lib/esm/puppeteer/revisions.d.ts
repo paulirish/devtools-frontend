@@ -7,8 +7,8 @@
  * @internal
  */
 export declare const PUPPETEER_REVISIONS: Readonly<{
-    chrome: "127.0.6533.88";
-    'chrome-headless-shell': "127.0.6533.88";
-    firefox: "latest";
+    chrome: "129.0.6668.58";
+    'chrome-headless-shell': "129.0.6668.58";
+    firefox: "stable_130.0.1";
 }>;
 //# sourceMappingURL=revisions.d.ts.map

@@ -170,12 +170,19 @@ export class LinearGradientMatcher extends matcherBase(LinearGradientMatch) {
 }
 
 export class ColorMatch implements Match {
-  constructor(readonly text: string, readonly node: CodeMirror.SyntaxNode) {
+  computedText: (() => string | null)|undefined;
+  constructor(
+      readonly text: string, readonly node: CodeMirror.SyntaxNode,
+      private readonly currentColorCallback?: () => string | null) {
+    this.computedText = currentColorCallback;
   }
 }
 
 // clang-format off
 export class ColorMatcher extends matcherBase(ColorMatch) {
+  constructor(private readonly currentColorCallback?: () => string|null) {
+      super();
+  }
   // clang-format on
   override accepts(propertyName: string): boolean {
     return SDK.CSSMetadata.cssMetadata().isColorAwareProperty(propertyName);
@@ -186,8 +193,14 @@ export class ColorMatcher extends matcherBase(ColorMatch) {
     if (node.name === 'ColorLiteral') {
       return new ColorMatch(text, node);
     }
-    if (node.name === 'ValueName' && Common.Color.Nicknames.has(text)) {
-      return new ColorMatch(text, node);
+    if (node.name === 'ValueName') {
+      if (Common.Color.Nicknames.has(text)) {
+        return new ColorMatch(text, node);
+      }
+      if (text.toLowerCase() === 'currentcolor' && this.currentColorCallback) {
+        const callback = this.currentColorCallback;
+        return new ColorMatch(text, node, () => callback() ?? text);
+      }
     }
     if (node.name === 'CallExpression') {
       const callee = node.getChild('Callee');
@@ -226,19 +239,19 @@ export class LightDarkColorMatcher extends matcherBase(LightDarkColorMatch) {
 }
 
 export const enum LinkableNameProperties {
-  Animation = 'animation',
-  AnimationName = 'animation-name',
-  FontPalette = 'font-palette',
-  PositionTryFallbacks = 'position-try-fallbacks',
-  PositionTry = 'position-try',
+  ANIMATION = 'animation',
+  ANIMATION_NAME = 'animation-name',
+  FONT_PALETTE = 'font-palette',
+  POSITION_TRY_FALLBACKS = 'position-try-fallbacks',
+  POSITION_TRY = 'position-try',
 }
 
 const enum AnimationLonghandPart {
-  Direction = 'direction',
-  FillMode = 'fill-mode',
-  PlayState = 'play-state',
-  IterationCount = 'iteration-count',
-  EasingFunction = 'easing-function',
+  DIRECTION = 'direction',
+  FILL_MODE = 'fill-mode',
+  PLAY_STATE = 'play-state',
+  ITERATION_COUNT = 'iteration-count',
+  EASING_FUNCTION = 'easing-function',
 }
 
 export class LinkableNameMatch implements Match {
@@ -252,33 +265,33 @@ export class LinkableNameMatcher extends matcherBase(LinkableNameMatch) {
   // clang-format on
   private static isLinkableNameProperty(propertyName: string): propertyName is LinkableNameProperties {
     const names: string[] = [
-      LinkableNameProperties.Animation,
-      LinkableNameProperties.AnimationName,
-      LinkableNameProperties.FontPalette,
-      LinkableNameProperties.PositionTryFallbacks,
-      LinkableNameProperties.PositionTry,
+      LinkableNameProperties.ANIMATION,
+      LinkableNameProperties.ANIMATION_NAME,
+      LinkableNameProperties.FONT_PALETTE,
+      LinkableNameProperties.POSITION_TRY_FALLBACKS,
+      LinkableNameProperties.POSITION_TRY,
     ];
     return names.includes(propertyName);
   }
 
   static readonly identifierAnimationLonghandMap: Map<string, AnimationLonghandPart> = new Map(
       Object.entries({
-        'normal': AnimationLonghandPart.Direction,
-        'alternate': AnimationLonghandPart.Direction,
-        'reverse': AnimationLonghandPart.Direction,
-        'alternate-reverse': AnimationLonghandPart.Direction,
-        'none': AnimationLonghandPart.FillMode,
-        'forwards': AnimationLonghandPart.FillMode,
-        'backwards': AnimationLonghandPart.FillMode,
-        'both': AnimationLonghandPart.FillMode,
-        'running': AnimationLonghandPart.PlayState,
-        'paused': AnimationLonghandPart.PlayState,
-        'infinite': AnimationLonghandPart.IterationCount,
-        'linear': AnimationLonghandPart.EasingFunction,
-        'ease': AnimationLonghandPart.EasingFunction,
-        'ease-in': AnimationLonghandPart.EasingFunction,
-        'ease-out': AnimationLonghandPart.EasingFunction,
-        'ease-in-out': AnimationLonghandPart.EasingFunction,
+        normal: AnimationLonghandPart.DIRECTION,
+        alternate: AnimationLonghandPart.DIRECTION,
+        reverse: AnimationLonghandPart.DIRECTION,
+        'alternate-reverse': AnimationLonghandPart.DIRECTION,
+        none: AnimationLonghandPart.FILL_MODE,
+        forwards: AnimationLonghandPart.FILL_MODE,
+        backwards: AnimationLonghandPart.FILL_MODE,
+        both: AnimationLonghandPart.FILL_MODE,
+        running: AnimationLonghandPart.PLAY_STATE,
+        paused: AnimationLonghandPart.PLAY_STATE,
+        infinite: AnimationLonghandPart.ITERATION_COUNT,
+        linear: AnimationLonghandPart.EASING_FUNCTION,
+        ease: AnimationLonghandPart.EASING_FUNCTION,
+        'ease-in': AnimationLonghandPart.EASING_FUNCTION,
+        'ease-out': AnimationLonghandPart.EASING_FUNCTION,
+        'ease-in-out': AnimationLonghandPart.EASING_FUNCTION,
       }),
   );
 
@@ -290,7 +303,7 @@ export class LinkableNameMatcher extends matcherBase(LinkableNameMatch) {
     const text = matching.ast.text(node);
     // This is not a known identifier, so return it as `animation-name`.
     if (!LinkableNameMatcher.identifierAnimationLonghandMap.has(text)) {
-      return new LinkableNameMatch(text, node, LinkableNameProperties.Animation);
+      return new LinkableNameMatch(text, node, LinkableNameProperties.ANIMATION);
     }
     // There can be multiple `animation` declarations splitted by a comma.
     // So, we find the declaration nodes that are related to the node argument.
@@ -320,7 +333,7 @@ export class LinkableNameMatcher extends matcherBase(LinkableNameMatch) {
       if (itNode.name === 'ValueName') {
         const categoryValue = LinkableNameMatcher.identifierAnimationLonghandMap.get(tokenized.text(itNode));
         if (categoryValue && categoryValue === identifierCategory) {
-          return new LinkableNameMatch(text, node, LinkableNameProperties.Animation);
+          return new LinkableNameMatch(text, node, LinkableNameProperties.ANIMATION);
         }
       }
     }
@@ -345,8 +358,8 @@ export class LinkableNameMatcher extends matcherBase(LinkableNameMatch) {
         matching.ast.text(parentNode.prevSibling) === 'var';
     const isAParentDeclarationOrVarCall = isParentADeclaration || isInsideVarCall;
     // `position-try-fallbacks` and `position-try` only accept names with dashed ident.
-    const shouldMatchOnlyVariableName = propertyName === LinkableNameProperties.PositionTry ||
-        propertyName === LinkableNameProperties.PositionTryFallbacks;
+    const shouldMatchOnlyVariableName = propertyName === LinkableNameProperties.POSITION_TRY ||
+        propertyName === LinkableNameProperties.POSITION_TRY_FALLBACKS;
     // We only mark top level nodes or nodes that are inside `var()` expressions as linkable names.
     if (!propertyName || (node.name !== 'ValueName' && node.name !== 'VariableName') ||
         !isAParentDeclarationOrVarCall || (node.name === 'ValueName' && shouldMatchOnlyVariableName)) {
@@ -407,8 +420,8 @@ export class StringMatcher extends matcherBase(StringMatch) {
 }
 
 export const enum ShadowType {
-  BoxShadow = 'boxShadow',
-  TextShadow = 'textShadow',
+  BOX_SHADOW = 'boxShadow',
+  TEXT_SHADOW = 'textShadow',
 }
 export class ShadowMatch implements Match {
   constructor(readonly text: string, readonly node: CodeMirror.SyntaxNode, readonly shadowType: ShadowType) {
@@ -428,7 +441,7 @@ export class ShadowMatcher extends matcherBase(ShadowMatch) {
     const valueNodes = ASTUtils.siblings(ASTUtils.declValue(node));
     const valueText = matching.ast.textRange(valueNodes[0], valueNodes[valueNodes.length - 1]);
     return new ShadowMatch(
-        valueText, node, matching.ast.propertyName === 'text-shadow' ? ShadowType.TextShadow : ShadowType.BoxShadow);
+        valueText, node, matching.ast.propertyName === 'text-shadow' ? ShadowType.TEXT_SHADOW : ShadowType.BOX_SHADOW);
   }
 }
 
@@ -565,30 +578,50 @@ export class GridTemplateMatcher extends matcherBase(GridTemplateMatch) {
   }
 }
 export class AnchorFunctionMatch implements Match {
-  constructor(
-      readonly text: string, readonly matching: BottomUpTreeMatching, readonly node: CodeMirror.SyntaxNode,
-      readonly functionName: string, readonly args: CodeMirror.SyntaxNode[]) {
+  constructor(readonly text: string, readonly node: CodeMirror.SyntaxNode, readonly functionName: string|null) {
   }
 }
 
 // clang-format off
 export class AnchorFunctionMatcher extends matcherBase(AnchorFunctionMatch) {
-  override matches(node: CodeMirror.SyntaxNode, matching: BottomUpTreeMatching): Match|null {
+  anchorFunction(node: CodeMirror.SyntaxNode, matching: BottomUpTreeMatching): string|null {
     if (node.name !== 'CallExpression') {
       return null;
     }
-
     const calleeText = matching.ast.text(node.getChild('Callee'));
-    if (calleeText !== 'anchor' && calleeText !== 'anchor-size') {
+    if (calleeText === 'anchor' || calleeText === 'anchor-size') {
+      return calleeText;
+    }
+    return null;
+  }
+
+  override matches(node: CodeMirror.SyntaxNode, matching: BottomUpTreeMatching): Match|null {
+    if (node.name === 'VariableName') {
+      // Double-dashed anchor reference to be rendered with a link to its matching anchor.
+      let parent = node.parent;
+      if (!parent || parent.name !== 'ArgList') {
+        return null;
+      }
+      parent = parent.parent;
+      if (!parent || !this.anchorFunction(parent, matching)) {
+        return null;
+      }
+      return new AnchorFunctionMatch(matching.ast.text(node), node, null);
+    }
+    const calleeText = this.anchorFunction(node, matching);
+    if (!calleeText) {
       return null;
     }
-
-    const [firstArg] = ASTUtils.callArgs(node);
-    if (!firstArg || firstArg.length === 0) {
+    // Match if the anchor/anchor-size function implicitly references an anchor.
+    const args = ASTUtils.children(node.getChild('ArgList'));
+    if (calleeText === 'anchor' && args.length <= 2) {
       return null;
     }
-
-    return new AnchorFunctionMatch(matching.ast.text(node), matching, node, calleeText, firstArg);
+    if (args.find(arg => arg.name === 'VariableName')) {
+      // We have an explicit anchor reference, no need to render swatch.
+      return null;
+    }
+    return new AnchorFunctionMatch(matching.ast.text(node), node, calleeText);
   }
 }
 // clang-format on

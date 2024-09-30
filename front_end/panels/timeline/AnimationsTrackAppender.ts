@@ -58,11 +58,12 @@ export class AnimationsTrackAppender implements TrackAppender {
     return ThemeSupport.ThemeSupport.instance().getComputedValue('--app-color-rendering');
   }
 
-  titleForEvent(event: TraceEngine.Types.TraceEvents.TraceEventData): string {
-    return event.name;
+  titleForEvent(event: TraceEngine.Types.TraceEvents.SyntheticAnimationPair): string {
+    const {displayName} = event.args.data.beginEvent.args.data;
+    return displayName || event.name;
   }
 
-  highlightedEntryInfo(event: TraceEngine.Types.TraceEvents.TraceEventData): HighlightedEntryInfo {
+  highlightedEntryInfo(event: TraceEngine.Types.TraceEvents.SyntheticAnimationPair): HighlightedEntryInfo {
     const title = this.titleForEvent(event);
     return {title, formattedTime: getFormattedTime(event.dur)};
   }

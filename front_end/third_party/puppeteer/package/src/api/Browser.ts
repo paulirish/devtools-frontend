@@ -21,6 +21,7 @@ import {
   fromEmitterEvent,
   filterAsync,
   timeout,
+  fromAbortSignal,
 } from '../common/util.js';
 import {asyncDisposeSymbol, disposeSymbol} from '../util/disposable.js';
 
@@ -120,6 +121,11 @@ export interface WaitForTargetOptions {
    * @defaultValue `30_000`
    */
   timeout?: number;
+
+  /**
+   * A signal object that allows you to cancel a waitFor call.
+   */
+  signal?: AbortSignal;
 }
 
 /**
@@ -342,20 +348,23 @@ export abstract class Browser extends EventEmitter<BrowserEvents> {
     predicate: (x: Target) => boolean | Promise<boolean>,
     options: WaitForTargetOptions = {}
   ): Promise<Target> {
-    const {timeout: ms = 30000} = options;
+    const {timeout: ms = 30000, signal} = options;
     return await firstValueFrom(
       merge(
         fromEmitterEvent(this, BrowserEvent.TargetCreated),
         fromEmitterEvent(this, BrowserEvent.TargetChanged),
         from(this.targets())
-      ).pipe(filterAsync(predicate), raceWith(timeout(ms)))
+      ).pipe(
+        filterAsync(predicate),
+        raceWith(fromAbortSignal(signal), timeout(ms))
+      )
     );
   }
 
   /**
    * Gets a list of all open {@link Page | pages} inside this {@link Browser}.
    *
-   * If there ar multiple {@link BrowserContext | browser contexts}, this
+   * If there are multiple {@link BrowserContext | browser contexts}, this
    * returns all {@link Page | pages} in all
    * {@link BrowserContext | browser contexts}.
    *

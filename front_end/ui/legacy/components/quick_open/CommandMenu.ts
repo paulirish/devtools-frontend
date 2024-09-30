@@ -108,9 +108,6 @@ export class CommandMenu {
         if (setting.name === 'emulate-page-focus') {
           Host.userMetrics.actionTaken(Host.UserMetrics.Action.ToggleEmulateFocusedPageFromCommandMenu);
         }
-        if (setting.name === 'show-web-vitals') {
-          Host.userMetrics.actionTaken(Host.UserMetrics.Action.ToggleShowWebVitals);
-        }
 
         if (reloadRequired) {
           UI.InspectorView.InspectorView.instance().displayReloadRequiredWarning(
@@ -168,7 +165,7 @@ export class CommandMenu {
 
     const executeHandler = (): Promise<void> => {
       if (id === 'issues-pane') {
-        Host.userMetrics.issuesPanelOpenedFrom(Host.UserMetrics.IssueOpener.CommandMenu);
+        Host.userMetrics.issuesPanelOpenedFrom(Host.UserMetrics.IssueOpener.COMMAND_MENU);
       }
       return UI.ViewManager.ViewManager.instance().showView(id, /* userGesture */ true);
     };
