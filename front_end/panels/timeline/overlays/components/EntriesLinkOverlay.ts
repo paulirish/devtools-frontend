@@ -3,6 +3,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 import * as i18n from '../../../../core/i18n/i18n.js';
+import * as Trace from '../../../../models/trace/trace.js';
 import * as ComponentHelpers from '../../../../ui/components/helpers/helpers.js';
 import * as IconButton from '../../../../ui/components/icon_button/icon_button.js';
 import * as ThemeSupport from '../../../../ui/legacy/theme_support/theme_support.js';
@@ -17,10 +18,15 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/overlays/components/EntriesLinkOverlay.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-// In other overlays, the border line width is set to 2px.
-const BORDER_LINE_WIDTH = 2;
-
 import styles from './entriesLinkOverlay.css.js';
+
+export class EntryLinkStartCreating extends Event {
+  static readonly eventName = 'entrylinkstartcreating';
+
+  constructor() {
+    super(EntryLinkStartCreating.eventName);
+  }
+}
 
 export class EntriesLinkOverlay extends HTMLElement {
   static readonly litTagName = LitHtml.literal`devtools-entries-link-overlay`;
@@ -32,8 +38,8 @@ export class EntriesLinkOverlay extends HTMLElement {
   #toEntryDimentions: {width: number, height: number}|null = null;
   #connectorLineContainer: SVGAElement|null = null;
   #connector: SVGLineElement|null = null;
-  #entryFromWrapper: SVGLineElement|null = null;
-  #entryToWrapper: SVGLineElement|null = null;
+  #entryFromWrapper: HTMLElement|null = null;
+  #entryToWrapper: HTMLElement|null = null;
   #entryFromConnector: SVGCircleElement|null = null;
   #entryToConnector: SVGCircleElement|null = null;
   #entryFromVisible: boolean = true;
@@ -47,8 +53,11 @@ export class EntriesLinkOverlay extends HTMLElement {
   #fromEntryIsSource: boolean = true;
   #toEntryIsSource: boolean = true;
   #arrowHidden: boolean = false;
+  #linkState: Trace.Types.File.EntriesLinkState;
 
-  constructor(initialFromEntryCoordinateAndDimentions: {x: number, y: number, width: number, height: number}) {
+  constructor(
+      initialFromEntryCoordinateAndDimentions: {x: number, y: number, width: number, height: number},
+      linkCreationNotStartedState: Trace.Types.File.EntriesLinkState) {
     super();
     this.#render();
     this.#coordinateFrom = {x: initialFromEntryCoordinateAndDimentions.x, y: initialFromEntryCoordinateAndDimentions.y};
@@ -59,10 +68,12 @@ export class EntriesLinkOverlay extends HTMLElement {
     this.#coordinateTo = {x: initialFromEntryCoordinateAndDimentions.x, y: initialFromEntryCoordinateAndDimentions.y};
     this.#connectorLineContainer = this.#shadow.querySelector<SVGAElement>('.connectorContainer') ?? null;
     this.#connector = this.#connectorLineContainer?.querySelector('line') ?? null;
-    this.#entryFromWrapper = this.#connectorLineContainer?.querySelector('.entryFromWrapper') ?? null;
-    this.#entryToWrapper = this.#connectorLineContainer?.querySelector('.entryToWrapper') ?? null;
+    this.#entryFromWrapper = this.#shadow.querySelector('.from-highlight-wrapper') ?? null;
+    this.#entryToWrapper = this.#shadow.querySelector('.to-highlight-wrapper') ?? null;
     this.#entryFromConnector = this.#connectorLineContainer?.querySelector('.entryFromConnector') ?? null;
     this.#entryToConnector = this.#connectorLineContainer?.querySelector('.entryToConnector') ?? null;
+    this.#linkState = linkCreationNotStartedState;
+    this.#render();
   }
 
   set canvasRect(rect: DOMRect|null) {
@@ -74,6 +85,14 @@ export class EntriesLinkOverlay extends HTMLElement {
     }
     this.#canvasRect = rect;
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
+  }
+
+  entryFromWrapper(): HTMLElement|null {
+    return this.#entryFromWrapper;
+  }
+
+  entryToWrapper(): HTMLElement|null {
+    return this.#entryToWrapper;
   }
 
   connectedCallback(): void {
@@ -94,6 +113,7 @@ export class EntriesLinkOverlay extends HTMLElement {
   set fromEntryCoordinateAndDimentions(fromEntryParams: {x: number, y: number, length: number, height: number}) {
     this.#coordinateFrom = {x: fromEntryParams.x, y: fromEntryParams.y};
     this.#fromEntryDimentions = {width: fromEntryParams.length, height: fromEntryParams.height};
+    this.#updateCreateLinkBox();
     this.#redrawConnectionArrow();
   }
 
@@ -112,6 +132,7 @@ export class EntriesLinkOverlay extends HTMLElement {
       this.#toEntryDimentions = null;
     }
 
+    this.#updateCreateLinkBox();
     this.#redrawConnectionArrow();
   }
 
@@ -135,6 +156,10 @@ export class EntriesLinkOverlay extends HTMLElement {
     if (!this.#connector || !this.#entryFromWrapper || !this.#entryToWrapper || !this.#entryFromConnector ||
         !this.#entryToConnector) {
       console.error('`connector` element is missing.');
+      return;
+    }
+
+    if (this.#linkState === Trace.Types.File.EntriesLinkState.CREATION_NOT_STARTED) {
       return;
     }
 
@@ -171,55 +196,28 @@ export class EntriesLinkOverlay extends HTMLElement {
 
       this.#entryFromConnector.setAttribute('cx', endConnectionPointX);
       this.#entryFromConnector.setAttribute('cy', endConnectionPointY);
-
-      const adjustedEntryFromWrapperX = String(this.#coordinateFrom.x + BORDER_LINE_WIDTH / 2);
-      const adjustedEntryFromWrapperY = String(this.#coordinateFrom.y + BORDER_LINE_WIDTH / 2);
-      const adjustedWidth = String(this.#fromEntryDimentions.width - BORDER_LINE_WIDTH);
-      const adjustedHeight = String(this.#fromEntryDimentions.height - BORDER_LINE_WIDTH);
-      this.#entryFromWrapper.setAttribute('visibility', 'visible');
-      this.#entryFromWrapper.setAttribute('x', adjustedEntryFromWrapperX);
-      this.#entryFromWrapper.setAttribute('y', adjustedEntryFromWrapperY);
-      this.#entryFromWrapper.setAttribute('width', adjustedWidth);
-      this.#entryFromWrapper.setAttribute('height', adjustedHeight);
+      this.#entryFromWrapper.style.visibility = 'visible';
     } else {
       this.#connector.setAttribute('x1', (this.#coordinateFrom.x + this.#fromEntryDimentions.width).toString());
       this.#connector.setAttribute('y1', this.#coordinateFrom.y.toString());
-      this.#entryFromWrapper.setAttribute('visibility', 'hidden');
+      this.#entryFromWrapper.style.visibility = 'hidden';
     }
 
-    // If the arrow is pointing to the entry, point it to the middle of the entry and draw a box around the entry.
-    // If the arrow is pointing to an entry, but it is not visible, the coordinates are for the edge of the track
-    // and we don't need the half entry height offset.
+    // If the arrow is pointing to the entry, point it to the middle of the entry.
     // Otherwise, the arrow is following the mouse so we assign it to the provided coordinates.
-    if (this.#toEntryDimentions) {
-      if (this.#entryToVisible) {
-        const adjustedEntryToWrapperX = String(this.#coordinateTo.x + BORDER_LINE_WIDTH / 2);
-        const adjustedEntryToWrapperY = String(this.#coordinateTo.y + BORDER_LINE_WIDTH / 2);
-        const adjustedWidth = String(this.#toEntryDimentions.width - BORDER_LINE_WIDTH);
-        const adjustedHeight = String(this.#toEntryDimentions.height - BORDER_LINE_WIDTH);
-        this.#entryToWrapper.setAttribute('visibility', 'visible');
-        this.#entryToWrapper.setAttribute('x', adjustedEntryToWrapperX);
-        this.#entryToWrapper.setAttribute('y', adjustedEntryToWrapperY);
-        this.#entryToWrapper.setAttribute('width', adjustedWidth);
-        this.#entryToWrapper.setAttribute('height', adjustedHeight);
+    if (this.#toEntryDimentions && this.#entryToVisible) {
+      const connectionPointX = String(this.#coordinateTo.x);
+      const connectionPointY = String(this.#coordinateTo.y + this.#toEntryDimentions.height / 2);
 
-        const connectionPointX = String(this.#coordinateTo.x);
-        const connectionPointY = String(this.#coordinateTo.y + this.#toEntryDimentions.height / 2);
+      this.#connector.setAttribute('x2', connectionPointX);
+      this.#connector.setAttribute('y2', connectionPointY);
 
-        this.#connector.setAttribute('x2', connectionPointX);
-        this.#connector.setAttribute('y2', connectionPointY);
+      this.#entryToConnector.setAttribute('cx', connectionPointX);
+      this.#entryToConnector.setAttribute('cy', connectionPointY);
 
-        this.#entryToConnector.setAttribute('cx', connectionPointX);
-        this.#entryToConnector.setAttribute('cy', connectionPointY);
-
-      } else {
-        this.#entryToWrapper.setAttribute('visibility', 'hidden');
-        this.#connector.setAttribute('x2', this.#coordinateTo.x.toString());
-        this.#connector.setAttribute('y2', (this.#coordinateTo.y).toString());
-      }
-
+      this.#entryToWrapper.style.visibility = 'visible';
     } else {
-      this.#entryToWrapper.setAttribute('visibility', 'hidden');
+      this.#entryToWrapper.style.visibility = 'hidden';
       this.#connector.setAttribute('x2', this.#coordinateTo.x.toString());
       this.#connector.setAttribute('y2', this.#coordinateTo.y.toString());
     }
@@ -235,6 +233,7 @@ export class EntriesLinkOverlay extends HTMLElement {
       this.#connector.setAttribute('stroke', arrowColor);
     }
 
+    this.#render();
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
   }
 
@@ -268,6 +267,29 @@ export class EntriesLinkOverlay extends HTMLElement {
     const visibleLineFromTotalPercentage = (visibleLineLength * 100) / lineLength;
 
     return (visibleLineFromTotalPercentage < 100) ? visibleLineFromTotalPercentage : 100;
+  }
+
+  #updateCreateLinkBox(): void {
+    const createLinkBox = this.#shadow.querySelector<HTMLElement>('.create-link-box');
+    const createLinkIcon = createLinkBox?.querySelector<HTMLElement>('.create-link-icon') ?? null;
+
+    if (!createLinkBox || !createLinkIcon) {
+      console.error('creating element is missing.');
+      return;
+    }
+
+    if (this.#linkState !== Trace.Types.File.EntriesLinkState.CREATION_NOT_STARTED) {
+      createLinkIcon.style.display = 'none';
+      return;
+    }
+
+    createLinkIcon.style.left = `${this.#coordinateFrom.x + this.#fromEntryDimentions.width}px`;
+    createLinkIcon.style.top = `${this.#coordinateFrom.y}px`;
+  }
+
+  #startCreatingConnection(): void {
+    this.#linkState = Trace.Types.File.EntriesLinkState.PENDING_TO_EVENT;
+    this.dispatchEvent(new EntryLinkStartCreating());
   }
 
   /*
@@ -319,24 +341,28 @@ export class EntriesLinkOverlay extends HTMLElement {
                 markerHeight="4"
                 fill-opacity="1"
                 refX="4"
-                refY="2">
+                refY="2"
+                visibility=${this.#entryToVisible || !this.#toEntryDimentions ? 'visible' : 'hidden'}>
                 <path d="M0,0 V4 L4,2 Z" fill=${arrowColor} />
               </marker>
             </defs>
             <line
               marker-end="url(#arrow)"
               stroke-dasharray=${!this.#fromEntryIsSource || !this.#toEntryIsSource ? DASHED_STROKE_AMOUNT : 'none'}
-              stroke-opacity=${!this.#entryFromVisible && !this.#entryToVisible ? OUT_OF_VIEW_STROKE_OPACITY : 1}
+              visibility=${!this.#entryFromVisible && !this.#entryToVisible ? 'hidden' : 'visible'}
               />
-
-            <rect
-              class="entryFromWrapper" fill="none" stroke=${arrowColor} stroke-width=${BORDER_LINE_WIDTH} stroke-dasharray=${this.#fromEntryIsSource ? 'none' : DASHED_STROKE_AMOUNT} />
-            <rect
-              class="entryToWrapper" fill="none" stroke=${arrowColor} stroke-width=${BORDER_LINE_WIDTH} stroke-dasharray=${this.#toEntryIsSource ? 'none' : DASHED_STROKE_AMOUNT} />
-
             <circle class="entryFromConnector" fill="none" stroke=${arrowColor} stroke-width=${CONNECTOR_CIRCLE_STROKE_WIDTH} r=${CONNECTOR_CIRCLE_RADIUS} />
             <circle class="entryToConnector" fill="none" stroke=${arrowColor} stroke-width=${CONNECTOR_CIRCLE_STROKE_WIDTH} r=${CONNECTOR_CIRCLE_RADIUS} />
           </svg>
+          <div class="entry-wrapper from-highlight-wrapper ${this.#fromEntryIsSource ? '' : 'entry-is-not-source'}"></div>
+          <div class="entry-wrapper to-highlight-wrapper ${this.#toEntryIsSource ? '' : 'entry-is-not-source'}"></div>
+          <div class="create-link-box ${this.#linkState ? 'visible' : 'hidden'}">
+            <${IconButton.Icon.Icon.litTagName}
+              class='create-link-icon'
+              @click=${this.#startCreatingConnection}
+              name='arrow-right-circle'>
+            </${IconButton.Icon.Icon.litTagName}>
+          </div>
         `,
         this.#shadow, {host: this});
     // clang-format on
@@ -346,92 +372,14 @@ export class EntriesLinkOverlay extends HTMLElement {
 const CONNECTOR_CIRCLE_RADIUS = 2;
 const CONNECTOR_CIRCLE_STROKE_WIDTH = 1;
 
-export class CreateEntriesLinkRemoveEvent extends Event {
-  static readonly eventName = 'createentrieslinkremoveevent';
-
-  constructor() {
-    super(CreateEntriesLinkRemoveEvent.eventName);
-  }
-}
-
-export class CreateEntriesLinkOverlay extends HTMLElement {
-  static readonly litTagName = LitHtml.literal`devtools-create-entries-link-overlay`;
-  readonly #shadow = this.attachShadow({mode: 'open'});
-  #fromEntryData: {entryStartX: number, entryStartY: number, entryWidth: number, entryHeight: number};
-
-  constructor(initialFromEntryParams:
-                  {entryStartX: number, entryStartY: number, entryWidth: number, entryHeight: number}) {
-    super();
-    this.#render();
-    this.#fromEntryData = initialFromEntryParams;
-    this.#updateCreateLinkBox();
-    const createLinkBox = this.#shadow.querySelector<HTMLElement>('.create-link-box');
-    const createLinkIcon = createLinkBox?.querySelector<HTMLElement>('.create-link-icon') ?? null;
-    createLinkIcon?.addEventListener('click', this.#onClick.bind(this));
-  }
-
-  connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [styles];
-  }
-
-  set fromEntryData(fromEntryParams:
-                        {entryStartX: number, entryStartY: number, entryWidth: number, entryHeight: number}) {
-    this.#fromEntryData = fromEntryParams;
-    this.#updateCreateLinkBox();
-  }
-
-  #updateCreateLinkBox(): void {
-    const createLinkBox = this.#shadow.querySelector<HTMLElement>('.create-link-box');
-    const createLinkIcon = createLinkBox?.querySelector<HTMLElement>('.create-link-icon') ?? null;
-    const entryHighlightWrapper = createLinkBox?.querySelector<HTMLElement>('.entry-highlight-wrapper') ?? null;
-
-    if (!createLinkBox || !createLinkIcon || !entryHighlightWrapper) {
-      console.error('creating element is missing.');
-      return;
-    }
-
-    const {entryStartX, entryStartY, entryWidth, entryHeight} = this.#fromEntryData;
-
-    createLinkIcon.style.left = `${entryStartX + entryWidth}px`;
-    createLinkIcon.style.top = `${entryStartY}px`;
-    entryHighlightWrapper.style.left = `${entryStartX}px`;
-    entryHighlightWrapper.style.top = `${entryStartY}px`;
-    entryHighlightWrapper.style.width = `${entryWidth}px`;
-    entryHighlightWrapper.style.height = `${entryHeight}px`;
-  }
-
-  #onClick(): void {
-    this.dispatchEvent(new CreateEntriesLinkRemoveEvent());
-  }
-
-  #render(): void {
-    // clang-format off
-    LitHtml.render(
-      LitHtml.html`
-        <div class='create-link-box'>
-          <div class="entry-highlight-wrapper"></div>
-          <${IconButton.Icon.Icon.litTagName}
-            class='create-link-icon'
-            name='arrow-right-circle'>
-          </${IconButton.Icon.Icon.litTagName}>
-        </div>
-      `,
-      this.#shadow, {host: this});
-    // clang-format on
-  }
-}
-
 // Defines the gap in the border when we are drawing a dashed outline.
 // https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/stroke-dasharray
 const DASHED_STROKE_AMOUNT = 4;
-const OUT_OF_VIEW_STROKE_OPACITY = 0.2;
 
 customElements.define('devtools-entries-link-overlay', EntriesLinkOverlay);
-customElements.define('devtools-create-entries-link-overlay', CreateEntriesLinkOverlay);
 
 declare global {
   interface HTMLElementTagNameMap {
     'devtools-entries-link-overlay': EntriesLinkOverlay;
-    'devtools-create-entries-link-overlay': CreateEntriesLinkOverlay;
   }
 }

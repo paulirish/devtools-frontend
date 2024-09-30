@@ -4,16 +4,16 @@
 
 import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
-import type * as Trace from '../../../../models/trace/trace.js';
+import * as Trace from '../../../../models/trace/trace.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 import type * as Overlays from '../../overlays/overlays.js';
 
-import {BaseInsight, md, shouldRenderForCategory} from './Helpers.js';
+import {BaseInsight, shouldRenderForCategory} from './Helpers.js';
 import * as SidebarInsight from './SidebarInsight.js';
 import {Table, type TableData} from './Table.js';
-import {InsightsCategories} from './types.js';
+import {Category} from './types.js';
 
-type ThirdPartiesEntires = Array<[
+type ThirdPartiesEntries = Array<[
   Trace.Insights.InsightRunners.ThirdPartyWeb.Entity,
   Trace.Insights.InsightRunners.ThirdPartyWeb.Summary,
 ]>;
@@ -24,7 +24,6 @@ const UIStrings = {
   /**
    * @description Description of a DevTools insight that identifies the code on the page that the user doesn't control.
    * This is displayed after a user expands the section to see more. No character length limits.
-   * The last sentence starting with 'Learn' becomes link text to additional documentation.
    */
   description: 'Third party code can significantly impact load performance. ' +
       'Assess and reduce the ' +
@@ -40,39 +39,20 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/insights/ThirdParties.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-export function getThirdPartiesInsight(insights: Trace.Insights.Types.TraceInsightSets|null, navigationId: string|null):
-    Trace.Insights.Types.InsightResults['ThirdPartyWeb']|null {
-  if (!insights || !navigationId) {
-    return null;
-  }
-
-  const insightsByNavigation = insights.get(navigationId);
-  if (!insightsByNavigation) {
-    return null;
-  }
-
-  const thirdPartiesInsight = insightsByNavigation.data.ThirdPartyWeb;
-  if (thirdPartiesInsight instanceof Error) {
-    return null;
-  }
-  return thirdPartiesInsight;
-}
-
 export class ThirdParties extends BaseInsight {
   static readonly litTagName = LitHtml.literal`devtools-performance-third-parties`;
-  override insightCategory: InsightsCategories = InsightsCategories.OTHER;
+  override insightCategory: Category = Category.ALL;
   override internalName: string = 'third-parties';
   override userVisibleTitle: string = i18nString(UIStrings.title);
+  override description: string = i18nString(UIStrings.description);
 
   #overlaysForEntity =
       new Map<Trace.Insights.InsightRunners.ThirdPartyWeb.Entity, Overlays.Overlays.TimelineOverlay[]>();
-  #currentSelectedRowEl: HTMLElement|null = null;
-  #currentSelectionIsSticky = false;
 
   override createOverlays(): Overlays.Overlays.TimelineOverlay[] {
     this.#overlaysForEntity.clear();
 
-    const insight = getThirdPartiesInsight(this.data.insights, this.data.navigationId);
+    const insight = Trace.Insights.Common.getInsight('ThirdPartyWeb', this.data.insights, this.data.insightSetKey);
     if (!insight) {
       return [];
     }
@@ -100,35 +80,7 @@ export class ThirdParties extends BaseInsight {
     return overlays;
   }
 
-  #onSelectedRowChanged(
-      entity: Trace.Insights.InsightRunners.ThirdPartyWeb.Entity|null, rowEl: HTMLElement|null, sticky: boolean): void {
-    if (this.#currentSelectionIsSticky && !sticky) {
-      return;
-    }
-
-    // Unselect a sticky-selection when clicking it for a second time.
-    if (this.#currentSelectionIsSticky && rowEl === this.#currentSelectedRowEl) {
-      entity = null;
-      rowEl = null;
-      sticky = false;
-    }
-
-    if (entity) {
-      const overlays = this.#overlaysForEntity.get(entity);
-      if (overlays) {
-        this.onOverlayOverride(overlays);
-      }
-    } else {
-      this.onOverlayOverride(null);
-    }
-
-    this.#currentSelectedRowEl?.classList.remove('selected');
-    rowEl?.classList.add('selected');
-    this.#currentSelectedRowEl = rowEl;
-    this.#currentSelectionIsSticky = sticky;
-  }
-
-  #render(entries: ThirdPartiesEntires): LitHtml.TemplateResult {
+  #render(entries: ThirdPartiesEntries): LitHtml.TemplateResult {
     const topTransferSizeEntries = entries.sort((a, b) => b[1].transferSize - a[1].transferSize).slice(0, 6);
     const topMainThreadTimeEntries = entries.sort((a, b) => b[1].mainThreadTime - a[1].mainThreadTime).slice(0, 6);
 
@@ -136,38 +88,44 @@ export class ThirdParties extends BaseInsight {
     return LitHtml.html`
         <div class="insights">
             <${SidebarInsight.SidebarInsight.litTagName} .data=${{
-            title: this.userVisibleTitle,
-            expanded: this.isActive(),
+              title: this.userVisibleTitle,
+              description: this.description,
+              internalName: this.internalName,
+              expanded: this.isActive(),
             } as SidebarInsight.InsightDetails}
             @insighttoggleclick=${this.onSidebarClick}>
-                <div slot="insight-description" class="insight-description">
-                  ${md(i18nString(UIStrings.description))}
-                </div>
                 <div slot="insight-content">
-                  ${LitHtml.html`<${Table.litTagName}
-                    .data=${{
-                      headers: [i18nString(UIStrings.columnThirdParty), i18nString(UIStrings.columnTransferSize)],
-                      rows: topTransferSizeEntries.map(([entity, summary]) => [
-                        entity.name,
-                        Platform.NumberUtilities.bytesToString(summary.transferSize),
-                      ]),
-                      onHoverRow: (index: number, rowEl: HTMLElement) => this.#onSelectedRowChanged(topTransferSizeEntries[index][0], rowEl, false),
-                      onClickRow: (index: number, rowEl: HTMLElement) => this.#onSelectedRowChanged(topTransferSizeEntries[index][0], rowEl, true),
-                      onMouseLeave: () => this.#onSelectedRowChanged(null, null, false),
-                    } as TableData}>
-                  </${Table.litTagName}>`}
-                  ${LitHtml.html`<${Table.litTagName}
-                    .data=${{
-                      headers: [i18nString(UIStrings.columnThirdParty), i18nString(UIStrings.columnBlockingTime)],
-                      rows: topMainThreadTimeEntries.map(([entity, summary]) => [
-                        entity.name,
-                        i18n.TimeUtilities.millisToString(Platform.Timing.microSecondsToMilliSeconds(summary.mainThreadTime)),
-                      ]),
-                      onHoverRow: (index: number, rowEl: HTMLElement) => this.#onSelectedRowChanged(topMainThreadTimeEntries[index][0], rowEl, false),
-                      onClickRow: (index: number, rowEl: HTMLElement) => this.#onSelectedRowChanged(topMainThreadTimeEntries[index][0], rowEl, true),
-                      onMouseLeave: () => this.#onSelectedRowChanged(null, null, false),
-                    } as TableData}>
-                  </${Table.litTagName}>`}
+                  <div class="insight-section">
+                    ${LitHtml.html`<${Table.litTagName}
+                      .data=${{
+                        insight: this,
+                        headers: [i18nString(UIStrings.columnThirdParty), i18nString(UIStrings.columnTransferSize)],
+                        rows: topTransferSizeEntries.map(([entity, summary]) => ({
+                          values: [
+                            entity.name,
+                            Platform.NumberUtilities.bytesToString(summary.transferSize),
+                          ],
+                          overlays: this.#overlaysForEntity.get(entity),
+                        })),
+                      } as TableData}>
+                    </${Table.litTagName}>`}
+                  </div>
+
+                  <div class="insight-section">
+                    ${LitHtml.html`<${Table.litTagName}
+                      .data=${{
+                        insight: this,
+                        headers: [i18nString(UIStrings.columnThirdParty), i18nString(UIStrings.columnBlockingTime)],
+                        rows: topMainThreadTimeEntries.map(([entity, summary]) => ({
+                          values: [
+                            entity.name,
+                            i18n.TimeUtilities.millisToString(Platform.Timing.microSecondsToMilliSeconds(summary.mainThreadTime)),
+                          ],
+                          overlays: this.#overlaysForEntity.get(entity),
+                        })),
+                      } as TableData}>
+                    </${Table.litTagName}>`}
+                  </div>
                 </div>
             </${SidebarInsight.SidebarInsight}>
         </div>`;
@@ -175,7 +133,7 @@ export class ThirdParties extends BaseInsight {
   }
 
   override render(): void {
-    const insight = getThirdPartiesInsight(this.data.insights, this.data.navigationId);
+    const insight = Trace.Insights.Common.getInsight('ThirdPartyWeb', this.data.insights, this.data.insightSetKey);
     const entries = insight && [...insight.summaryByEntity.entries()].filter(kv => kv[0] !== insight.firstPartyEntity);
     const shouldShow = entries?.length;
 

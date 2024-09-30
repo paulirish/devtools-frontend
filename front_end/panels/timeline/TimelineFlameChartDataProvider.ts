@@ -30,7 +30,6 @@
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
-import type * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import type * as TimelineModel from '../../models/timeline_model/timeline_model.js';
@@ -48,6 +47,7 @@ import {ThreadAppender} from './ThreadAppender.js';
 import timelineFlamechartPopoverStyles from './timelineFlamechartPopover.css.js';
 import {FlameChartStyle, Selection} from './TimelineFlameChartView.js';
 import {TimelineSelection} from './TimelineSelection.js';
+import * as Utils from './utils/utils.js';
 
 const UIStrings = {
   /**
@@ -256,26 +256,27 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     });
 
     const entry = this.eventByIndex(entryIndex);
-    if (entry && entry instanceof Trace.Handlers.ModelHandlers.Frames.TimelineFrame === false) {
-      const url = (Trace.Types.Events.isProfileCall(entry)) ? entry.callFrame.url as Platform.DevToolsPath.UrlString :
-                                                              undefined;
-      if (url) {
-        if (Bindings.IgnoreListManager.IgnoreListManager.instance().isUserIgnoreListedURL(url)) {
-          contextMenu.defaultSection().appendItem(i18nString(UIStrings.removeScriptFromIgnoreList), () => {
-            Bindings.IgnoreListManager.IgnoreListManager.instance().unIgnoreListURL(url);
-            this.dispatchEventToListeners(Events.DATA_CHANGED);
-          }, {
-            jslogContext: 'remove-from-ignore-list',
-          });
-        } else {
-          contextMenu.defaultSection().appendItem(i18nString(UIStrings.addScriptToIgnoreList), () => {
-            Bindings.IgnoreListManager.IgnoreListManager.instance().ignoreListURL(url);
-            this.dispatchEventToListeners(Events.DATA_CHANGED);
-          }, {
-            jslogContext: 'add-to-ignore-list',
-          });
-        }
-      }
+    if (!entry || entry instanceof Trace.Handlers.ModelHandlers.Frames.TimelineFrame || !this.parsedTrace) {
+      return contextMenu;
+    }
+    const url = Utils.SourceMapsResolver.SourceMapsResolver.resolvedURLForEntry(this.parsedTrace, entry);
+    if (!url) {
+      return contextMenu;
+    }
+    if (Utils.IgnoreList.isIgnoreListedEntry(entry)) {
+      contextMenu.defaultSection().appendItem(i18nString(UIStrings.removeScriptFromIgnoreList), () => {
+        Bindings.IgnoreListManager.IgnoreListManager.instance().unIgnoreListURL(url);
+        this.dispatchEventToListeners(Events.DATA_CHANGED);
+      }, {
+        jslogContext: 'remove-from-ignore-list',
+      });
+    } else {
+      contextMenu.defaultSection().appendItem(i18nString(UIStrings.addScriptToIgnoreList), () => {
+        Bindings.IgnoreListManager.IgnoreListManager.instance().ignoreListURL(url);
+        this.dispatchEventToListeners(Events.DATA_CHANGED);
+      }, {
+        jslogContext: 'add-to-ignore-list',
+      });
     }
 
     return contextMenu;
@@ -437,7 +438,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     if (!TimelineFlameChartDataProvider.timelineEntryIsTraceEvent(event)) {
       return FlameChartStyle.textColor;
     }
-    return this.isIgnoreListedEvent(event) ? '#888' : FlameChartStyle.textColor;
+    return Utils.IgnoreList.isIgnoreListedEntry(event) ? '#888' : FlameChartStyle.textColor;
   }
 
   entryFont(_index: number): string|null {
@@ -626,17 +627,6 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     return results;
   }
 
-  isIgnoreListedEvent(event: Trace.Types.Events.Event): boolean {
-    if (Trace.Types.Events.isProfileCall(event)) {
-      return this.isIgnoreListedURL(event.callFrame.url as Platform.DevToolsPath.UrlString);
-    }
-    return false;
-  }
-
-  private isIgnoreListedURL(url: Platform.DevToolsPath.UrlString): boolean {
-    return Bindings.IgnoreListManager.IgnoreListManager.instance().isUserIgnoreListedURL(url);
-  }
-
   getEntryTypeForLevel(level: number): EntryType {
     return this.entryTypeByLevel[level];
   }
@@ -803,10 +793,28 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     return this.compatibilityTracksAppender?.getDrawOverride(event, eventLevel);
   }
 
+  #entryColorForFrame(entryIndex: number): string {
+    const frame = (this.entryData[entryIndex] as Trace.Handlers.ModelHandlers.Frames.TimelineFrame);
+    if (frame.idle) {
+      return 'white';
+    }
+    if (frame.dropped) {
+      if (frame.isPartial) {
+        // For partially presented frame boxes, paint a yellow background with
+        // a sparse white dashed-line pattern overlay.
+        return '#f0e442';
+      }
+      // For dropped frame boxes, paint a red background with a dense white
+      // solid-line pattern overlay.
+      return '#f08080';
+    }
+    return '#d7f0d1';
+  }
+
   entryColor(entryIndex: number): string {
     const entryType = this.#entryTypeForIndex(entryIndex);
     if (entryType === EntryType.FRAME) {
-      return 'white';
+      return this.#entryColorForFrame(entryIndex);
     }
     if (entryType === EntryType.TRACK_APPENDER) {
       const timelineData = (this.timelineDataInternal as PerfUI.FlameChart.FlameChartTimelineData);
@@ -860,13 +868,12 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     const frame = (this.entryData[entryIndex] as Trace.Handlers.ModelHandlers.Frames.TimelineFrame);
     barX += hPadding;
     barWidth -= 2 * hPadding;
-    if (frame.idle) {
-      context.fillStyle = 'white';
-    } else if (frame.dropped) {
+    context.fillStyle = this.entryColor(entryIndex);
+
+    if (frame.dropped) {
       if (frame.isPartial) {
         // For partially presented frame boxes, paint a yellow background with
         // a sparse white dashed-line pattern overlay.
-        context.fillStyle = '#f0e442';
         context.fillRect(barX, barY, barWidth, barHeight);
 
         const overlay = context.createPattern(this.partialFramePatternCanvas, 'repeat');
@@ -874,14 +881,11 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       } else {
         // For dropped frame boxes, paint a red background with a dense white
         // solid-line pattern overlay.
-        context.fillStyle = '#f08080';
         context.fillRect(barX, barY, barWidth, barHeight);
 
         const overlay = context.createPattern(this.droppedFramePatternCanvas, 'repeat');
         context.fillStyle = overlay || context.fillStyle;
       }
-    } else {
-      context.fillStyle = '#d7f0d1';
     }
     context.fillRect(barX, barY, barWidth, barHeight);
 
@@ -1146,7 +1150,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     // If the index is -1 and the selection is a TraceEvent, it might be
     // the case that this Entry is hidden by the Context Menu action.
     // Try revealing the entry and getting the index again.
-    if (this.entryData.indexOf(selection.object) === -1 && TimelineSelection.isSelection(selection.object)) {
+    if (this.entryData.indexOf(selection.object) === -1 && TimelineSelection.isTraceEventSelection(selection.object)) {
       if (this.timelineDataInternal?.selectedGroup) {
         ModificationsManager.activeManager()?.getEntriesFilter().revealEntry(
             selection.object as Trace.Types.Events.Event);

@@ -12,19 +12,19 @@ vars = {
   'build_with_chromium': False,
 
   'build_url': 'https://chromium.googlesource.com/chromium/src/build.git',
-  'build_revision': '3180ed0a6041d3855f6cc2cb8d31f66935389922',
+  'build_revision': '9b11bd3a6a523134ac35bcc9d1f59d04cc6f5821',
 
   'buildtools_url': 'https://chromium.googlesource.com/chromium/src/buildtools.git',
-  'buildtools_revision': '72eb13ed7e8598677161e9532fcf00c8bb4da4d8',
+  'buildtools_revision': '7f979120bfa80658a4e48c596e9de989477b3311',
 
   'depot_tools_url': 'https://chromium.googlesource.com/chromium/tools/depot_tools.git',
-  'depot_tools_revision': '795b5b6a20d330a293d236bccd2fb605b63957a9',
+  'depot_tools_revision': '2c16d7f80b2316f7294114e1d774245b79f1f2d4',
 
   'inspector_protocol_url': 'https://chromium.googlesource.com/deps/inspector_protocol',
   'inspector_protocol_revision': 'ccf6613682a24413db28656da6f9c52948331bad',
 
   # Keeping track of the last time we rollerd the browser protocol files.
-  'chromium_browser_protocol_revision' : '612b00ee0c0227f60d96c1702685b52186d92120',
+  'chromium_browser_protocol_revision' : '32b32b77184fab8bb76a1f9f3be12ba17a28d4d3',
 
   'clang_format_url': 'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/clang/tools/clang-format.git',
   'clang_format_revision': '3c0acd2d4e73dd911309d9e970ba09d58bf23a62',
@@ -32,7 +32,7 @@ vars = {
   'emscripten_tag': 'ade9d780ff17c88d81aa13860361743e3c1e1396',
 
   # GN CIPD package version.
-  'gn_version': 'git_revision:20806f79c6b4ba295274e3a589d85db41a02fdaa',
+  'gn_version': 'git_revision:95b0f8fe31a992a33c040bbe3867901335c12762',
 
   'cmake_version': 'version:2@3.21.3',
 
@@ -49,7 +49,7 @@ vars = {
   # Chrome version used for tests. It should be regularly updated to
   # match the Canary version listed here:
   # https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json
-  'chrome': '131.0.6728.0',
+  'chrome': '131.0.6748.0',
 
   # 'magic' text to tell depot_tools that git submodules should be accepted but
   # but parity with DEPS file is expected.

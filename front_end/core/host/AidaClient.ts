@@ -129,8 +129,10 @@ export interface AidaResponse {
 export const enum AidaAccessPreconditions {
   AVAILABLE = 'available',
   NO_ACCOUNT_EMAIL = 'no-account-email',
-  NO_ACTIVE_SYNC = 'no-active-sync',
   NO_INTERNET = 'no-internet',
+  // This is the state (mostly enterprise) users are in, when they are automatically logged out from
+  // Chrome after a certain time period. For making AIDA requests, they need to log in again.
+  SYNC_IS_PAUSED = 'sync-is-paused',
 }
 
 export const CLIENT_NAME = 'CHROME_DEVTOOLS';
@@ -148,15 +150,15 @@ export class AidaClient {
       client_feature: ClientFeature.CHROME_CONSOLE_INSIGHTS,
     };
     const config = Common.Settings.Settings.instance().getHostConfig();
-    let temperature = NaN;
+    let temperature = -1;
     let modelId = '';
     if (config.devToolsConsoleInsights?.enabled) {
-      temperature = config.devToolsConsoleInsights.temperature || 0;
+      temperature = config.devToolsConsoleInsights.temperature ?? -1;
       modelId = config.devToolsConsoleInsights.modelId || '';
     }
     const disallowLogging = config.aidaAvailability?.disallowLogging ?? true;
 
-    if (!isNaN(temperature)) {
+    if (temperature >= 0) {
       request.options ??= {};
       request.options.temperature = temperature;
     }
@@ -183,8 +185,8 @@ export class AidaClient {
       return AidaAccessPreconditions.NO_ACCOUNT_EMAIL;
     }
 
-    if (!syncInfo.isSyncActive) {
-      return AidaAccessPreconditions.NO_ACTIVE_SYNC;
+    if (syncInfo.isSyncPaused) {
+      return AidaAccessPreconditions.SYNC_IS_PAUSED;
     }
 
     return AidaAccessPreconditions.AVAILABLE;

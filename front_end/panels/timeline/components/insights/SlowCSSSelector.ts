@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as Common from '../../../../core/common/common.js';
-import type * as Trace from '../../../../models/trace/trace.js';
+import * as i18n from '../../../../core/i18n/i18n.js';
+import * as Platform from '../../../../core/platform/platform.js';
+import * as Trace from '../../../../models/trace/trace.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 import type * as Components from '../../overlays/components/components.js';
 import type * as Overlays from '../../overlays/overlays.js';
@@ -11,39 +12,57 @@ import type * as Overlays from '../../overlays/overlays.js';
 import {BaseInsight, shouldRenderForCategory} from './Helpers.js';
 import * as SidebarInsight from './SidebarInsight.js';
 import {Table, type TableData} from './Table.js';
-import {InsightsCategories} from './types.js';
+import {Category} from './types.js';
+
+const UIStrings = {
+  /**
+   *@description Title of an insight that provides details about slow CSS selectors.
+   */
+  title: 'Slow CSS selectors',
+  /**
+   * @description Text to describe how to improve the performance of CSS selectors.
+   */
+  description:
+      'Learn how to [assess the performance of CSS selectors](https://developer.chrome.com/docs/devtools/performance/selector-stats).',
+
+  /**
+   *@description Column name for count of elements that the engine attempted to match against a style rule
+   */
+  matchAttempts: 'Match attempts',
+  /**
+   *@description Column name for count of elements that matched a style rule
+   */
+  matchCount: 'Match count',
+  /**
+   *@description Column name for elapsed time spent computing a style rule
+   */
+  elapsed: 'Elapsed time',
+  /**
+   *@description Column name for the selectors that took the longest amount of time/effort.
+   */
+  topSelectors: 'Top selectors',
+  /**
+   *@description Column name for a total sum.
+   */
+  total: 'Total',
+};
+
+const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/insights/SlowCSSSelector.ts', UIStrings);
+const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class SlowCSSSelector extends BaseInsight {
   static readonly litTagName = LitHtml.literal`devtools-performance-slow-css-selector`;
-  override insightCategory: InsightsCategories = InsightsCategories.OTHER;
+  override insightCategory: Category = Category.ALL;
   override internalName: string = 'slow-css-selector';
-  override userVisibleTitle: string = 'Slow CSS Selectors';
+  override userVisibleTitle: string = i18nString(UIStrings.title);
+  override description: string = i18nString(UIStrings.description);
   #slowCSSSelector: Trace.Insights.InsightRunners.SlowCSSSelector.SlowCSSSelectorInsightResult|null = null;
 
-  getSlowCSSSelectorData(insights: Trace.Insights.Types.TraceInsightSets|null, navigationId: string|null):
-      Trace.Insights.InsightRunners.SlowCSSSelector.SlowCSSSelectorInsightResult|null {
-    if (!insights || !navigationId) {
-      return null;
-    }
-
-    const insightsByNavigation = insights.get(navigationId);
-    if (!insightsByNavigation) {
-      return null;
-    }
-
-    const slowCSSSelector = insightsByNavigation.data.SlowCSSSelector;
-    if (slowCSSSelector instanceof Error) {
-      return null;
-    }
-
-    return slowCSSSelector;
-  }
-
   override createOverlays(): Overlays.Overlays.TimelineOverlay[] {
-    if (!this.data.insights || !this.data.navigationId) {
+    if (!this.data.insights || !this.data.insightSetKey) {
       return [];
     }
-    const {navigationId, insights} = this.data;
+    const {insightSetKey: navigationId, insights} = this.data;
 
     const insightsByNavigation = insights.get(navigationId);
     if (!insightsByNavigation) {
@@ -65,39 +84,51 @@ export class SlowCSSSelector extends BaseInsight {
   }
 
   renderSlowCSSSelector(): LitHtml.LitTemplate {
+    const time = (us: Trace.Types.Timing.MicroSeconds): string =>
+        i18n.TimeUtilities.millisToString(Platform.Timing.microSecondsToMilliSeconds(us));
+
     // clang-format off
     return this.#slowCSSSelector ? LitHtml.html`
       <div class="insights">
         <${SidebarInsight.SidebarInsight.litTagName} .data=${{
               title: this.userVisibleTitle,
+              description: this.description,
+              internalName: this.internalName,
               expanded: this.isActive(),
           } as SidebarInsight.InsightDetails}
           @insighttoggleclick=${this.onSidebarClick}
         >
-          <div slot="insight-content">
+          <div slot="insight-content" class="insight-section">
             ${LitHtml.html`<${Table.litTagName}
               .data=${{
-                headers: ['Total', 'Stats'],
+                insight: this,
+                headers: [i18nString(UIStrings.total), ''],
                 rows: [
-                  ['Elapsed in ms', this.#slowCSSSelector.totalElapsedMs],
-                  ['Match Attempts', this.#slowCSSSelector.totalMatchAttempts],
-                  ['Match Count', this.#slowCSSSelector.totalMatchCount],
+                  {values: [i18nString(UIStrings.elapsed), i18n.TimeUtilities.millisToString(this.#slowCSSSelector.totalElapsedMs)]},
+                  {values: [i18nString(UIStrings.matchAttempts), this.#slowCSSSelector.totalMatchAttempts]},
+                  {values: [i18nString(UIStrings.matchCount), this.#slowCSSSelector.totalMatchCount]},
                 ],
               } as TableData}>
             </${Table.litTagName}>`}
             ${LitHtml.html`<${Table.litTagName}
               .data=${{
-                headers: ['Top Selectors', 'Elapsed Time (ms)'],
+                insight: this,
+                headers: [i18nString(UIStrings.topSelectors), i18nString(UIStrings.elapsed)],
                 rows: this.#slowCSSSelector.topElapsedMs.map(selector => {
-                  return [selector.selector, selector['elapsed (us)'] / 1000.0];
+                  return {
+                    values: [selector.selector, time(Trace.Types.Timing.MicroSeconds(selector['elapsed (us)']))],
+                  };
                 }),
               } as TableData}>
             </${Table.litTagName}>`}
             ${LitHtml.html`<${Table.litTagName}
               .data=${{
-                headers: ['Top Selectors', 'Match Attempts'],
+                insight: this,
+                headers: [i18nString(UIStrings.topSelectors), i18nString(UIStrings.matchAttempts)],
                 rows: this.#slowCSSSelector.topMatchAttempts.map(selector => {
-                  return [selector.selector, selector['match_attempts']];
+                  return {
+                    values: [selector.selector, selector['match_attempts']],
+                  };
                 }),
               } as TableData}>
             </${Table.litTagName}>`}
@@ -108,12 +139,10 @@ export class SlowCSSSelector extends BaseInsight {
   }
 
   #hasDataToRender(): boolean {
-    const selectorStatsFeatureEnabled =
-        Common.Settings.Settings.instance().createSetting('timeline-capture-selector-stats', false);
-    this.#slowCSSSelector = selectorStatsFeatureEnabled.get() ?
-        this.getSlowCSSSelectorData(this.data.insights, this.data.navigationId) :
-        null;
-    return this.#slowCSSSelector !== null;
+    this.#slowCSSSelector =
+        Trace.Insights.Common.getInsight('SlowCSSSelector', this.data.insights, this.data.insightSetKey);
+    return this.#slowCSSSelector !== null && this.#slowCSSSelector.topElapsedMs.length !== 0 &&
+        this.#slowCSSSelector.topMatchAttempts.length !== 0;
   }
 
   override render(): void {

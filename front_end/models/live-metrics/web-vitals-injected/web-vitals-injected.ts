@@ -5,10 +5,12 @@
 import * as WebVitals from '../../../third_party/web-vitals/web-vitals.js';
 
 import * as OnEachInteraction from './OnEachInteraction.js';
+import * as OnEachLayoutShift from './OnEachLayoutShift.js';
 import * as Spec from './spec/spec.js';
 
 const {onLCP, onCLS, onINP} = WebVitals.Attribution;
 const {onEachInteraction} = OnEachInteraction;
+const {onEachLayoutShift} = OnEachLayoutShift;
 
 declare const window: Window&{
   getNodeForIndex: (index: number) => Node | undefined,
@@ -113,6 +115,12 @@ function initialize(): void {
     const event: Spec.LCPChangeEvent = {
       name: 'LCP',
       value: metric.value,
+      phases: {
+        timeToFirstByte: metric.attribution.timeToFirstByte,
+        resourceLoadDelay: metric.attribution.resourceLoadDelay,
+        resourceLoadTime: metric.attribution.resourceLoadDuration,
+        elementRenderDelay: metric.attribution.elementRenderDelay,
+      },
     };
 
     const element = metric.attribution.lcpEntry?.element;
@@ -126,6 +134,7 @@ function initialize(): void {
     const event: Spec.CLSChangeEvent = {
       name: 'CLS',
       value: metric.value,
+      clusterShiftIds: metric.entries.map(Spec.getUniqueLayoutShiftId),
     };
     sendEventToDevTools(event);
   }, {reportAllChanges: true});
@@ -134,12 +143,14 @@ function initialize(): void {
     const event: Spec.INPChangeEvent = {
       name: 'INP',
       value: metric.value,
+      phases: {
+        inputDelay: metric.attribution.inputDelay,
+        processingDuration: metric.attribution.processingDuration,
+        presentationDelay: metric.attribution.presentationDelay,
+      },
+      uniqueInteractionId: Spec.getUniqueInteractionId(metric.entries),
       interactionType: metric.attribution.interactionType,
     };
-    const element = metric.attribution.interactionTargetElement;
-    if (element) {
-      event.nodeIndex = establishNodeIndex(element);
-    }
     sendEventToDevTools(event);
   }, {reportAllChanges: true});
 
@@ -147,13 +158,24 @@ function initialize(): void {
     const event: Spec.InteractionEvent = {
       name: 'Interaction',
       duration: interaction.value,
-      interactionId: interaction.attribution.interactionId,
+      uniqueInteractionId: Spec.getUniqueInteractionId(interaction.entries),
       interactionType: interaction.attribution.interactionType,
     };
     const node = interaction.attribution.interactionTargetElement;
     if (node) {
       event.nodeIndex = establishNodeIndex(node);
     }
+    sendEventToDevTools(event);
+  });
+
+  onEachLayoutShift(layoutShift => {
+    const event: Spec.LayoutShiftEvent = {
+      name: 'LayoutShift',
+      score: layoutShift.value,
+      uniqueLayoutShiftId: Spec.getUniqueLayoutShiftId(layoutShift.entry),
+      affectedNodeIndices: layoutShift.attribution.affectedNodes.map(establishNodeIndex),
+    };
+
     sendEventToDevTools(event);
   });
 }

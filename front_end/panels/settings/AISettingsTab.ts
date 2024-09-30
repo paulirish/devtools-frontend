@@ -19,7 +19,7 @@ const UIStrings = {
   /**
    *@description Header text for for a list of things to consider in the context of generative AI features
    */
-  boostYourProductivity: 'Boost your productivity with Chrome AI',
+  boostYourProductivity: 'Boost your productivity with AI',
   /**
    *@description Text announcing a list of facts to consider (when using a GenAI feature)
    */
@@ -28,22 +28,22 @@ const UIStrings = {
    *@description Text describing a fact to consider when using AI features
    */
   experimentalFeatures:
-      'These features are experimental. They use generative AI and may provide inaccurate or offensive information that does not represent Google’s views.',
+      'These features are experimental. They use generative AI and may provide inaccurate or offensive information that doesn’t represent Google’s views.',
   /**
    *@description Text describing a fact to consider when using AI features
    */
   sendsDataToGoogle:
-      'Using these features sends data relevant for the feature to Google. Google collects this data and feedback to improve its products and services with the help of human reviewers. Avoid sharing sensitive or personal information.',
+      'These features send relevant data to Google. Google collects this data and feedback to improve its products and services with the help of human reviewers. Avoid sharing sensitive or personal information.',
   /**
    *@description Text describing a fact to consider when using AI features
    */
   retainData:
-      'Usage data will be retained for up to 18 months and stored in a way where Google cannot tell who provided it.',
+      'Usage data will be retained for up to 18 months and stored in such a way that Google can’t tell who provided it.',
   /**
    *@description Text describing a fact to consider when using AI features
    */
   adminSettings:
-      'Depending on your Google account management and/or region, Google may refrain from data collection. Depending on their organization’s settings, features available to managed users may vary.',
+      'Depending on your Google account management and/or region, Google may refrain from data collection. Depending on your organization’s settings, features available to managed users may vary.',
   /**
    *@description Text describing the 'Console Insights' feature
    */
@@ -78,32 +78,28 @@ const UIStrings = {
    *@example {Google Terms of Service} PH1
    *@example {Privacy Notice} PH2
    */
-  termsOfServicePrivacyNotice: 'Use of this feature is subject to the {PH1} and {PH2}',
+  termsOfServicePrivacyNotice: 'Use of these features is subject to the {PH1} and {PH2}',
   /**
-   *@description Label for a link to a URL, which asks to use generated code responsibly
+   *@description Text describing the 'AI assistance' feature
    */
-  generatedSnippets: 'Use generated code snippets with caution',
-  /**
-   *@description Text describing the 'AI assistant' feature
-   */
-  helpUnderstandStyling: 'Helps you understand and fix styling issues',
+  helpUnderstandStyling: 'Get help with understanding CSS styles',
   /**
    *@description Text which is a hyperlink to more documentation
    */
   learnMore: 'Learn more',
   /**
-   *@description Description of the AI assistant feature
+   *@description Description of the AI assistance feature
    */
-  explainStyling: 'Get explanations and additional context for styling behaviors',
+  explainStyling: 'Understand CSS styles with AI-powered insights',
   /**
-   *@description Description of the AI assistant feature
+   *@description Description of the AI assistance feature
    */
-  receiveStylingSuggestions: 'Receive suggestions and code samples for fixing styling issues',
+  receiveStylingSuggestions: 'Improve your development workflow with contextual explanations and suggestions',
   /**
-   *@description Explainer for which data is being sent by the AI assistant feature
+   *@description Explainer for which data is being sent by the AI assistance feature
    */
   freestylerSendsData:
-      'Any data the inspected page can access via Web APIs may be sent to Google to generate explanations. This data may be seen by human reviewers to improve this feature.',
+      'Any data the inspected page can access via Web APIs are sent to Google to generate explanations. This data may be seen by human reviewers to improve this feature. Don’t use on pages with personal or sensitive information',
   /**
    *@description Label for a link to the terms of service
    */
@@ -113,21 +109,17 @@ const UIStrings = {
    */
   privacyNotice: 'Google Privacy Policy',
   /**
-   *@description Message to display if a setting change requires a reload of DevTools
+   *@description Header for the AI innovations settings page
    */
-  oneOrMoreSettingsHaveChanged: 'One or more settings have changed which requires a reload to take effect.',
-  /**
-   *@description Header for the Chrome AI settings page
-   */
-  chromeAi: 'Chrome AI',
+  aiInnovations: 'AI innovations',
   /**
    *@description Label for a toggle to enable the Console Insights feature
    */
   enableConsoleInsights: 'Enable Console Insights',
   /**
-   *@description Label for a toggle to enable the AI assistant feature
+   *@description Label for a toggle to enable the AI assistance feature
    */
-  enableAiAssistant: 'Enable AI assistant',
+  enableAiAssistance: 'Enable AI assistance',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/settings/AISettingsTab.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -208,12 +200,11 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
     if (!oldSettingValue && !this.#isFreestylerSettingExpanded) {
       this.#isFreestylerSettingExpanded = true;
     }
-    UI.InspectorView.InspectorView.instance().displayReloadRequiredWarning(
-        i18nString(UIStrings.oneOrMoreSettingsHaveChanged));
     void this.render();
   }
 
-  #renderSharedDisclaimerItem(icon: string, text: Common.UIString.LocalizedString): LitHtml.TemplateResult {
+  #renderSharedDisclaimerItem(icon: string, text: Common.UIString.LocalizedString|LitHtml.TemplateResult):
+      LitHtml.TemplateResult {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     return LitHtml.html`
@@ -232,11 +223,25 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
   }
 
   #renderSharedDisclaimer(): LitHtml.TemplateResult {
+    const tosLink = UI.XLink.XLink.create(
+        'https://policies.google.com/terms', i18nString(UIStrings.termsOfService), undefined, undefined,
+        'terms-of-service');
+    const privacyNoticeLink = UI.XLink.XLink.create(
+        'https://policies.google.com/privacy', i18nString(UIStrings.privacyNotice), undefined, undefined,
+        'privacy-notice');
+
     const bulletPoints = [
       {icon: 'psychiatry', text: i18nString(UIStrings.experimentalFeatures)},
       {icon: 'google', text: i18nString(UIStrings.sendsDataToGoogle)},
       {icon: 'calendar-today', text: i18nString(UIStrings.retainData)},
       {icon: 'corporate-fare', text: i18nString(UIStrings.adminSettings)},
+      {
+        icon: 'policy',
+        text: LitHtml.html`${i18n.i18n.getFormatLocalizedString(str_, UIStrings.termsOfServicePrivacyNotice, {
+          PH1: tosLink,
+          PH2: privacyNoticeLink,
+        })}`,
+      },
     ];
     return LitHtml.html`
       <div class="shared-disclaimer">
@@ -249,8 +254,7 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
     `;
   }
 
-  #renderSettingItem(icon: string, text: Common.UIString.LocalizedString|LitHtml.TemplateResult):
-      LitHtml.TemplateResult {
+  #renderSettingItem(icon: string, text: Common.UIString.LocalizedString): LitHtml.TemplateResult {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     return LitHtml.html`
@@ -273,12 +277,6 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
       open: this.#isConsoleInsightsSettingExpanded,
     };
     const tabindex = this.#isConsoleInsightsSettingExpanded ? '0' : '-1';
-    const tosLink = UI.XLink.XLink.create(
-        'https://policies.google.com/terms', i18nString(UIStrings.termsOfService), undefined, undefined,
-        'terms-of-service', tabindex);
-    const privacyNoticeLink = UI.XLink.XLink.create(
-        'https://policies.google.com/privacy', i18nString(UIStrings.privacyNotice), undefined, undefined,
-        'privacy-notice', tabindex);
 
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
@@ -322,22 +320,6 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
             ${this.#renderSettingItem('code', i18nString(UIStrings.receiveSuggestions))}
             <h3 class="expansion-grid-whole-row">${i18nString(UIStrings.thingsToConsider)}</h3>
             ${this.#renderSettingItem('google', i18nString(UIStrings.consoleInsightsSendsData))}
-            ${this.#renderSettingItem('policy', LitHtml.html`
-              ${i18n.i18n.getFormatLocalizedString(str_, UIStrings.termsOfServicePrivacyNotice, {
-                PH1: tosLink,
-                PH2: privacyNoticeLink,
-              })}
-            `)}
-            ${this.#renderSettingItem('warning', LitHtml.html`
-              <x-link
-                href="https://support.google.com/legal/answer/13505487"
-                class="link"
-                tabindex=${tabindex}
-                jslog=${VisualLogging.link('code-snippets-explainer.console-insights').track({
-                  click: true,
-                })}
-              >${i18nString(UIStrings.generatedSnippets)}</x-link>
-            `)}
             <div class="expansion-grid-whole-row">
               <x-link
                 href="https://goo.gle/devtools-console-messages-ai"
@@ -362,22 +344,15 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
     };
     const tabindex = this.#isFreestylerSettingExpanded ? '0' : '-1';
 
-    const tosLink = UI.XLink.XLink.create(
-        'https://policies.google.com/terms', i18nString(UIStrings.termsOfService), undefined, undefined,
-        'terms-of-service', tabindex);
-    const privacyNoticeLink = UI.XLink.XLink.create(
-        'https://policies.google.com/privacy', i18nString(UIStrings.privacyNotice), undefined, undefined,
-        'privacy-notice', tabindex);
-
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     return LitHtml.html`
       <div class="accordion-header" @click=${this.#expandFreestylerSetting}>
         <div class="icon-container centered">
-          <${IconButton.Icon.Icon.litTagName} name="pen-spark"></${IconButton.Icon.Icon.litTagName}>
+          <${IconButton.Icon.Icon.litTagName} name="smart-assistant"></${IconButton.Icon.Icon.litTagName}>
         </div>
         <div class="setting-card">
-          <h2>${i18n.i18n.lockedString('AI assistant')}</h2>
+          <h2>${i18n.i18n.lockedString('AI assistance')}</h2>
           <div class="setting-description">${i18nString(UIStrings.helpUnderstandStyling)}</div>
         </div>
         <div class="dropdown centered">
@@ -400,33 +375,27 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
           .disabled=${this.#freestylerSetting?.disabled()}
           title=${this.#freestylerSetting?.disabledReason()}
           @switchchange=${this.#toggleFreestylerSetting.bind(this)}
-          aria-label=${this.#freestylerSetting?.disabledReason() || i18nString(UIStrings.enableAiAssistant)}
+          aria-label=${this.#freestylerSetting?.disabledReason() || i18nString(UIStrings.enableAiAssistance)}
         ></${Switch.Switch.Switch.litTagName}>
       </div>
       <div class=${LitHtml.Directives.classMap(detailsClasses)}>
         <div class="overflow-hidden">
           <div class="expansion-grid">
             <h3 class="expansion-grid-whole-row">${i18nString(UIStrings.whenOn)}</h3>
-            ${this.#renderSettingItem('lightbulb', i18nString(UIStrings.explainStyling))}
-            ${this.#renderSettingItem('code', i18nString(UIStrings.receiveStylingSuggestions))}
+            ${this.#renderSettingItem('info', i18nString(UIStrings.explainStyling))}
+            ${this.#renderSettingItem('pen-spark', i18nString(UIStrings.receiveStylingSuggestions))}
             <h3 class="expansion-grid-whole-row">${i18nString(UIStrings.thingsToConsider)}</h3>
             ${this.#renderSettingItem('google', i18nString(UIStrings.freestylerSendsData))}
-            ${this.#renderSettingItem('policy', LitHtml.html`
-              ${i18n.i18n.getFormatLocalizedString(str_, UIStrings.termsOfServicePrivacyNotice, {
-                PH1: tosLink,
-                PH2: privacyNoticeLink,
-              })}
-            `)}
-            ${this.#renderSettingItem('warning', LitHtml.html`
+            <div class="expansion-grid-whole-row">
               <x-link
-                href="https://support.google.com/legal/answer/13505487"
+                href="https://goo.gle/devtools-ai-assistance"
                 class="link"
                 tabindex=${tabindex}
-                jslog=${VisualLogging.link('code-snippets-explainer.freestyler').track({
+                jslog=${VisualLogging.link('learn-more.ai-assistance').track({
                   click: true,
                 })}
-              >${i18nString(UIStrings.generatedSnippets)}</x-link>
-            `)}
+              >${i18nString(UIStrings.learnMore)}</x-link>
+            </div>
           </div>
         </div>
       </div>
@@ -439,7 +408,7 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
     // clang-format off
     LitHtml.render(LitHtml.html`
       <header>
-        <h1>${i18nString(UIStrings.chromeAi)}</h1>
+        <h1>${i18nString(UIStrings.aiInnovations)}</h1>
       </header>
       <div class="settings-container-wrapper" jslog=${VisualLogging.pane('chrome-ai')}>
         ${this.#renderSharedDisclaimer()}

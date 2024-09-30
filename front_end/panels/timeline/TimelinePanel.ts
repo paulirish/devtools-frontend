@@ -53,6 +53,7 @@ import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 import * as MobileThrottling from '../mobile_throttling/mobile_throttling.js';
 
 import {ActiveFilters} from './ActiveFilters.js';
+import * as AnnotationHelpers from './AnnotationHelpers.js';
 import {TraceLoadEvent} from './BenchmarkEvents.js';
 import * as TimelineComponents from './components/components.js';
 import * as TimelineInsights from './components/insights/insights.js';
@@ -63,7 +64,6 @@ import {IsolateSelector} from './IsolateSelector.js';
 import {AnnotationModifiedEvent, ModificationsManager} from './ModificationsManager.js';
 import * as Overlays from './overlays/overlays.js';
 import {cpuprofileJsonGenerator, traceJsonGenerator} from './SaveFileFormatter.js';
-import {NodeNamesUpdated, SourceMapsResolver} from './SourceMapsResolver.js';
 import {type Client, TimelineController} from './TimelineController.js';
 import {TimelineFlameChartView} from './TimelineFlameChartView.js';
 import {TimelineHistoryManager} from './TimelineHistoryManager.js';
@@ -76,6 +76,7 @@ import timelineStatusDialogStyles from './timelineStatusDialog.css.js';
 import {TimelineUIUtils} from './TimelineUIUtils.js';
 import {UIDevtoolsController} from './UIDevtoolsController.js';
 import {UIDevtoolsUtils} from './UIDevtoolsUtils.js';
+import * as Utils from './utils/utils.js';
 
 const UIStrings = {
   /**
@@ -293,7 +294,19 @@ const UIStrings = {
    * @description Screen reader announcement when the sidebar is hidden in the Performance panel.
    */
   sidebarHidden: 'Performance sidebar hidden',
-
+  /**
+   * @description Screen reader announcement when the user clears their selection
+   */
+  selectionCleared: 'Selection cleared',
+  /**
+   * @description Screen reader announcement when the user selects a frame.
+   */
+  frameSelected: 'Frame selected',
+  /**
+   * @description Screen reader announcement when the user selects a trace event.
+   * @example {Paint} PH1
+   */
+  eventSelected: 'Event {PH1} selected',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/TimelinePanel.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -378,7 +391,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   private networkThrottlingSelect?: UI.Toolbar.ToolbarComboBox;
   private cpuThrottlingSelect?: UI.Toolbar.ToolbarComboBox;
   private fileSelectorElement?: HTMLInputElement;
-  private selection?: TimelineSelection|null;
+  private selection: TimelineSelection|null = null;
   private traceLoadStart!: Trace.Types.Timing.MilliSeconds|null;
   private primaryPageTargetPromiseCallback = (_target: SDK.Target.Target): void => {};
   // Note: this is technically unused, but we need it to define the promiseCallback function above.
@@ -387,7 +400,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   });
 
   #traceEngineModel: Trace.TraceModel.Model;
-  #sourceMapsResolver: SourceMapsResolver|null = null;
+  #sourceMapsResolver: Utils.SourceMapsResolver.SourceMapsResolver|null = null;
   #onSourceMapsNodeNamesResolvedBound = this.#onSourceMapsNodeNamesResolved.bind(this);
   readonly #onChartPlayableStateChangeBound: (event: Common.EventTarget.EventTargetEvent<boolean>) => void;
   #sidebarToggleButton = this.#splitWidget.createShowHideSidebarButton(
@@ -413,6 +426,13 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
    * widgets, to avoid this complexity.
    */
   #restoreSidebarVisibilityOnTraceLoad: boolean = false;
+
+  /**
+   * Used to track an aria announcement that we need to alert for
+   * screen-readers. We track these because we debounce announcements to not
+   * overwhelm.
+   */
+  #pendingAriaMessage: string|null = null;
 
   constructor() {
     super('timeline');
@@ -526,18 +546,26 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     });
 
     this.#sideBar.element.addEventListener(TimelineInsights.SidebarInsight.InsightActivated.eventName, event => {
-      const {name, navigationId, createOverlayFn} = event;
-      this.#setActiveInsight({name, navigationId, createOverlayFn});
+      const {name, insightSetKey, overlays} = event;
+      this.#setActiveInsight({name, insightSetKey, overlays});
     });
 
-    this.#sideBar.element.addEventListener(TimelineInsights.SidebarInsight.InsightOverlayOverride.eventName, event => {
-      const {overlays} = event;
-      this.flameChart.setOverlaysOverride(overlays);
+    this.#sideBar.element.addEventListener(TimelineInsights.SidebarInsight.InsightProvideOverlays.eventName, event => {
+      const {overlays, options} = event;
+
+      this.flameChart.setOverlays(overlays, options);
+
+      const overlaysBounds = overlays && Overlays.Overlays.traceWindowContainingOverlays(overlays);
+      if (overlaysBounds) {
+        this.#minimapComponent.highlightBounds(overlaysBounds);
+      } else {
+        this.#minimapComponent.clearBoundsHighlight();
+      }
     });
 
     this.#sideBar.contentElement.addEventListener(TimelineComponents.Sidebar.EventReferenceClick.eventName, event => {
       const {metricEvent} = event;
-      this.flameChart.setSelectionAndReveal(TimelineSelection.fromTraceEvent(metricEvent));
+      this.select(TimelineSelection.fromTraceEvent(metricEvent));
     });
 
     this.#sideBar.element.addEventListener(TimelineComponents.Sidebar.RemoveAnnotation.eventName, event => {
@@ -549,7 +577,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       this.flameChart.revealAnnotation(event.annotation);
     });
 
-    this.#sideBar.element.addEventListener(TimelineInsights.SidebarInsight.NavigationBoundsHovered.eventName, event => {
+    this.#sideBar.element.addEventListener(TimelineInsights.SidebarInsight.InsightSetHovered.eventName, event => {
       if (event.bounds) {
         this.#minimapComponent.highlightBounds(event.bounds);
       } else {
@@ -678,10 +706,10 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       // this set of NodeNames is cached by PIDs, so we clear it so we don't
       // use incorrect names from another trace that might happen to share
       // PID/TIDs.
-      SourceMapsResolver.clearResolvedNodeNames();
+      Utils.SourceMapsResolver.SourceMapsResolver.clearResolvedNodeNames();
 
       this.#sourceMapsResolver.removeEventListener(
-          NodeNamesUpdated.eventName, this.#onSourceMapsNodeNamesResolvedBound);
+          Utils.SourceMapsResolver.SourceMappingsUpdated.eventName, this.#onSourceMapsNodeNamesResolvedBound);
       this.#sourceMapsResolver.uninstall();
       this.#sourceMapsResolver = null;
     }
@@ -711,6 +739,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     }
 
     this.#viewMode = newMode;
+    this.updateTimelineControls();
 
     /**
      * Note that the TimelinePanel UI is really rendered in two distinct layers.
@@ -908,7 +937,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
 
     if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_ANNOTATIONS)) {
       this.saveButton = new UI.Toolbar.ToolbarMenuButton(
-          this.populateDownloadMenu.bind(this), true, true, 'more-options', 'download');
+          this.populateDownloadMenu.bind(this), true, true, 'timeline.save-to-file-more-options', 'download');
       this.saveButton.setTitle(i18nString(UIStrings.saveProfile));
     } else {
       this.saveButton = new UI.Toolbar.ToolbarButton(
@@ -1598,6 +1627,31 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   }
 
   /**
+   * If we generate a lot of the same aria announcements very quickly, we don't
+   * want to send them all to the user.
+   */
+  #ariaDebouncer = Common.Debouncer.debounce(() => {
+    if (this.#pendingAriaMessage) {
+      UI.ARIAUtils.alert(this.#pendingAriaMessage);
+    }
+  }, 1_000);
+
+  #makeAriaAnnouncement(message: string): void {
+    // If we already have one pending, don't queue this one.
+    if (message === this.#pendingAriaMessage) {
+      return;
+    }
+
+    // If the pending message is different, immediately announce the pending
+    // message + then update the pending message to the new one.
+    if (this.#pendingAriaMessage) {
+      UI.ARIAUtils.alert(this.#pendingAriaMessage);
+    }
+    this.#pendingAriaMessage = message;
+    this.#ariaDebouncer();
+  }
+
+  /**
    * Called when we update the active trace that is being shown to the user.
    * This is called from {@see changeView} when we change the UI to show a
    * trace - either one the user has just recorded/imported, or one they have
@@ -1662,20 +1716,26 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
 
     // Add ModificationsManager listeners for annotations change to update the Annotation Overlays.
     currentManager?.addEventListener(AnnotationModifiedEvent.eventName, event => {
+      // Update screen readers.
+      const announcementText = AnnotationHelpers.ariaAnnouncementForModifiedEvent(event as AnnotationModifiedEvent);
+      if (announcementText) {
+        this.#makeAriaAnnouncement(announcementText);
+      }
+
       const {overlay, action} = (event as AnnotationModifiedEvent);
       if (action === 'Add') {
         this.flameChart.addOverlay(overlay);
       } else if (action === 'Remove') {
         this.flameChart.removeOverlay(overlay);
-      } else if (action === 'UpdateTimeRange' && Overlays.Overlays.isTimeRangeLabel(overlay)) {
+      } else if (action === 'UpdateTimeRange' && AnnotationHelpers.isTimeRangeLabel(overlay)) {
         this.flameChart.updateExistingOverlay(overlay, {
           bounds: overlay.bounds,
         });
-      } else if (action === 'UpdateLinkToEntry' && Overlays.Overlays.isEntriesLink(overlay)) {
+      } else if (action === 'UpdateLinkToEntry' && AnnotationHelpers.isEntriesLink(overlay)) {
         this.flameChart.updateExistingOverlay(overlay, {
           entryTo: overlay.entryTo,
         });
-      } else if (action === 'EnterLabelEditState' && Overlays.Overlays.isEntryLabel(overlay)) {
+      } else if (action === 'EnterLabelEditState' && AnnotationHelpers.isEntryLabel(overlay)) {
         this.flameChart.enterLabelEditMode(overlay);
       }
 
@@ -1720,8 +1780,9 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
 
     // Set up SourceMapsResolver to ensure we resolve any function names in
     // profile calls.
-    this.#sourceMapsResolver = new SourceMapsResolver(parsedTrace);
-    this.#sourceMapsResolver.addEventListener(NodeNamesUpdated.eventName, this.#onSourceMapsNodeNamesResolvedBound);
+    this.#sourceMapsResolver = new Utils.SourceMapsResolver.SourceMapsResolver(parsedTrace);
+    this.#sourceMapsResolver.addEventListener(
+        Utils.SourceMapsResolver.SourceMappingsUpdated.eventName, this.#onSourceMapsNodeNamesResolvedBound);
     void this.#sourceMapsResolver.install();
 
     this.statusPane?.updateProgressBar(i18nString(UIStrings.processed), 80);
@@ -1779,11 +1840,17 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   private getEntryColorByEntry(entry: Trace.Types.Events.Event): string {
     const mainIndex = this.flameChart.getMainDataProvider().indexForEvent(entry);
     const networkIndex = this.flameChart.getNetworkDataProvider().indexForEvent(entry);
-    if (mainIndex) {
+    if (mainIndex !== null) {
       const color = this.flameChart.getMainDataProvider().entryColor(mainIndex);
+
+      // The color for idle frames will be white in flame chart, which will display weird in the sidebar, so just use a
+      // light gray color instead.
+      if (color === 'white') {
+        return ThemeSupport.ThemeSupport.instance().getComputedValue('--app-color-system');
+      }
       return color;
     }
-    if (networkIndex) {
+    if (networkIndex !== null) {
       const color = this.flameChart.getNetworkDataProvider().entryColor(networkIndex);
       return color;
     }
@@ -1911,7 +1978,12 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   }
 
   #onSourceMapsNodeNamesResolved(): void {
-    this.flameChart.refreshMainFlameChart();
+    // Source maps can change the way calls hierarchies should look in
+    // the flame chart (f.e. if some calls are ignore listed after
+    // resolving source maps). Thus, we must reappend the flamechart
+    // entries.
+    this.flameChart.getMainDataProvider().timelineData(true);
+    this.flameChart.getMainFlameChart().update();
   }
 
   /**
@@ -2092,7 +2164,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         TimelineSelection.isSyntheticNetworkRequestDetailsEventSelection(selection.object)) {
       return null;
     }
-    if (TimelineSelection.isSelection(selection.object)) {
+    if (TimelineSelection.isTraceEventSelection(selection.object)) {
       const parsedTrace = this.#traceEngineModel.parsedTrace(this.#viewMode.traceIndex);
       if (!parsedTrace) {
         return null;
@@ -2137,7 +2209,31 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     return true;
   }
 
+  #announceSelectionToAria(oldSelection: TimelineSelection|null, newSelection: TimelineSelection|null): void {
+    if (oldSelection !== null && newSelection === null) {
+      UI.ARIAUtils.alert(i18nString(UIStrings.selectionCleared));
+    }
+    if (newSelection === null) {
+      return;
+    }
+
+    if (TimelineSelection.isRangeSelection(newSelection.object)) {
+      // We don't announce here; within the annotations code we announce when
+      // the user creates a new time range selection. So if we also announce
+      // here we will duplicate and overwhelm rather than be useful.
+      return;
+    }
+    if (TimelineSelection.isLegacyTimelineFrame(newSelection.object)) {
+      UI.ARIAUtils.alert(i18nString(UIStrings.frameSelected));
+      return;
+    }
+    // At this point we know the object is a trace event
+    const name = TimelineComponents.EntryName.nameForEntry(newSelection.object);
+    UI.ARIAUtils.alert(i18nString(UIStrings.eventSelected, {PH1: name}));
+  }
+
   select(selection: TimelineSelection|null): void {
+    this.#announceSelectionToAria(this.selection, selection);
     this.selection = selection;
     this.flameChart.setSelectionAndReveal(selection);
   }

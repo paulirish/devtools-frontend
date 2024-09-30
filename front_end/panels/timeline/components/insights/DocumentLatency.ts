@@ -3,16 +3,20 @@
 // found in the LICENSE file.
 
 import * as i18n from '../../../../core/i18n/i18n.js';
-import type * as Trace from '../../../../models/trace/trace.js';
+import * as Trace from '../../../../models/trace/trace.js';
 import * as IconButton from '../../../../ui/components/icon_button/icon_button.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 import type * as Overlays from '../../overlays/overlays.js';
 
 import {BaseInsight, shouldRenderForCategory} from './Helpers.js';
 import * as SidebarInsight from './SidebarInsight.js';
-import {InsightsCategories} from './types.js';
+import {Category} from './types.js';
 
 const UIStrings = {
+  /**
+   *@description Title of an insight that provides a breakdown for how long it took to download the main document.
+   */
+  title: 'Document request latency',
   /**
    * @description Text to tell the user that the document request does not have redirects.
    */
@@ -42,30 +46,12 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/insights/DocumentLatency.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-export function getDocumentLatencyInsight(
-    insights: Trace.Insights.Types.TraceInsightSets|null,
-    navigationId: string|null): Trace.Insights.Types.InsightResults['DocumentLatency']|null {
-  if (!insights || !navigationId) {
-    return null;
-  }
-
-  const insightsByNavigation = insights.get(navigationId);
-  if (!insightsByNavigation) {
-    return null;
-  }
-
-  const insight = insightsByNavigation.data.DocumentLatency;
-  if (insight instanceof Error) {
-    return null;
-  }
-  return insight;
-}
-
 export class DocumentLatency extends BaseInsight {
   static readonly litTagName = LitHtml.literal`devtools-performance-document-latency`;
-  override insightCategory: InsightsCategories = InsightsCategories.OTHER;
+  override insightCategory: Category = Category.ALL;
   override internalName: string = 'document-latency';
-  override userVisibleTitle: string = 'Document request latency';
+  override userVisibleTitle: string = i18nString(UIStrings.title);
+  override description: string = '';
 
   #check(didPass: boolean, good: string, bad: string): LitHtml.TemplateResult {
     const icon = didPass ? 'check-circle' : 'clear';
@@ -80,7 +66,7 @@ export class DocumentLatency extends BaseInsight {
   }
 
   override createOverlays(): Overlays.Overlays.TimelineOverlay[] {
-    const insight = getDocumentLatencyInsight(this.data.insights, this.data.navigationId);
+    const insight = Trace.Insights.Common.getInsight('DocumentLatency', this.data.insights, this.data.insightSetKey);
     if (!insight?.data?.documentRequest) {
       return [];
     }
@@ -102,26 +88,28 @@ export class DocumentLatency extends BaseInsight {
     <div class="insights">
       <${SidebarInsight.SidebarInsight.litTagName} .data=${{
             title: this.userVisibleTitle,
+            description: this.description,
             expanded: this.isActive(),
+            internalName: this.internalName,
             estimatedSavings: insight.metricSavings?.FCP,
         } as SidebarInsight.InsightDetails}
         @insighttoggleclick=${this.onSidebarClick}
       >
-        <div slot="insight-description" class="insight-description">
+        <div slot="insight-content" class="insight-section">
           <ul class="insight-results insight-icon-results">
-              <li class="insight-entry">
-                ${this.#check(insight.data.redirectDuration === 0,
-                  i18nString(UIStrings.passingRedirects), i18nString(UIStrings.failedRedirects))}
-              </li>
-              <li class="insight-entry">
-                ${this.#check(!insight.data.serverResponseTooSlow,
-                  i18nString(UIStrings.passingServerResponseTime), i18nString(UIStrings.failedServerResponseTime))}
-              </li>
-              <li class="insight-entry">
-                ${this.#check(insight.data.uncompressedResponseBytes === 0,
-                  i18nString(UIStrings.passingTextCompression), i18nString(UIStrings.failedTextCompression))}
-              </li>
-            </ul>
+            <li class="insight-entry">
+              ${this.#check(insight.data.redirectDuration === 0,
+                i18nString(UIStrings.passingRedirects), i18nString(UIStrings.failedRedirects))}
+            </li>
+            <li class="insight-entry">
+              ${this.#check(!insight.data.serverResponseTooSlow,
+                i18nString(UIStrings.passingServerResponseTime), i18nString(UIStrings.failedServerResponseTime))}
+            </li>
+            <li class="insight-entry">
+              ${this.#check(insight.data.uncompressedResponseBytes === 0,
+                i18nString(UIStrings.passingTextCompression), i18nString(UIStrings.failedTextCompression))}
+            </li>
+          </ul>
         </div>
       </${SidebarInsight.SidebarInsight}>
     </div>`;
@@ -129,7 +117,7 @@ export class DocumentLatency extends BaseInsight {
   }
 
   override render(): void {
-    const insight = getDocumentLatencyInsight(this.data.insights, this.data.navigationId);
+    const insight = Trace.Insights.Common.getInsight('DocumentLatency', this.data.insights, this.data.insightSetKey);
     const matchesCategory = shouldRenderForCategory({
       activeCategory: this.data.activeCategory,
       insightCategory: this.insightCategory,

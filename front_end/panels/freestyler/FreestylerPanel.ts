@@ -4,17 +4,17 @@
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
+import type * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as NetworkForward from '../../panels/network/forward/forward.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as LitHtml from '../../ui/lit-html/lit-html.js';
 
+import {ErrorType, type ResponseData, ResponseType} from './AiAgent.js';
 import {ChangeManager} from './ChangeManager.js';
 import {
   AgentType,
   ChatMessageEntity,
-  type ContextDetail,
-  DOGFOOD_INFO,
   FreestylerChatUi,
   type ModelChatMessage,
   type Props as FreestylerChatUiProps,
@@ -23,71 +23,33 @@ import {
 } from './components/FreestylerChatUi.js';
 import {
   DrJonesNetworkAgent,
-  DrJonesNetworkAgentResponseType,
-  formatHeaders,
-  formatNetworkRequestTiming,
 } from './DrJonesNetworkAgent.js';
-import {ErrorType, FIX_THIS_ISSUE_PROMPT, FreestylerAgent, ResponseType} from './FreestylerAgent.js';
+import {FreestylerAgent} from './FreestylerAgent.js';
 import freestylerPanelStyles from './freestylerPanel.css.js';
 
+// Bug for the send feed back link
+// const AI_ASSISTANCE_SEND_FEEDBACK = 'https://crbug.com/364805393' as Platform.DevToolsPath.UrlString;
+const AI_ASSISTANCE_HELP = 'https://goo.gle/devtools-ai-assistance' as Platform.DevToolsPath.UrlString;
+
 /*
-  * TODO(nvitkov): b/346933425
-  * Temporary string that should not be translated
-  * as they may change often during development.
-  */
-const UIStringsTemp = {
+* Strings that don't need to be translated at this time.
+*/
+const UIStringsNotTranslate = {
   /**
-   *@description AI assistant UI text for clearing messages.
+   *@description AI assistance UI text for clearing messages.
    */
   clearMessages: 'Clear messages',
   /**
-   *@description AI assistant UI tooltip text for the help button.
+   *@description AI assistance UI tooltip text for the help button.
    */
   help: 'Help',
   /**
-   *@description Title text for thinking step of DrJones Network agent.
+   *@description AI assistant UI tooltip text for the settings button (gear icon).
    */
-  inspectingNetworkData: 'Inspecting network data',
-  /**
-   *@description Thought text for thinking step of DrJones Network agent.
-   */
-  dataUsedToGenerateThisResponse: 'Data used to generate this response',
-  /**
-   *@description Heading text for the block that shows the network request details.
-   */
-  request: 'Request',
-  /**
-   *@description Heading text for the block that shows the network response details.
-   */
-  response: 'Response',
-  /**
-   *@description Prefix text for request URL.
-   */
-  requestUrl: 'Request URL',
-  /**
-   *@description Title text for request headers.
-   */
-  requestHeaders: 'Request Headers',
-  /**
-   *@description Title text for request timing details.
-   */
-  timing: 'Timing',
-  /**
-   *@description Title text for response headers.
-   */
-  responseHeaders: 'Response Headers',
-  /**
-   *@description Prefix text for response status.
-   */
-  responseStatus: 'Response Status',
-
+  settings: 'Settings',
 };
 
-// TODO(nvitkov): b/346933425
-// const str_ = i18n.i18n.registerUIStrings('panels/freestyler/FreestylerPanel.ts', UIStrings);
-// const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
-/* eslint-disable  rulesdir/l10n_i18nString_call_only_with_uistrings */
-const i18nString = i18n.i18n.lockedString;
+const lockedString = i18n.i18n.lockedString;
 
 type ViewOutput = {
   freestylerChatUi?: FreestylerChatUi,
@@ -100,17 +62,25 @@ function createToolbar(target: HTMLElement, {onClearClick}: {onClearClick: () =>
   const leftToolbar = new UI.Toolbar.Toolbar('', toolbarContainer);
   const rightToolbar = new UI.Toolbar.Toolbar('freestyler-right-toolbar', toolbarContainer);
 
-  const clearButton =
-      new UI.Toolbar.ToolbarButton(i18nString(UIStringsTemp.clearMessages), 'clear', undefined, 'freestyler.clear');
+  const clearButton = new UI.Toolbar.ToolbarButton(
+      lockedString(UIStringsNotTranslate.clearMessages), 'clear', undefined, 'freestyler.clear');
   clearButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, onClearClick);
   leftToolbar.appendToolbarItem(clearButton);
 
   rightToolbar.appendSeparator();
-  const helpButton = new UI.Toolbar.ToolbarButton(i18nString(UIStringsTemp.help), 'help', undefined, 'freestyler.help');
+  const helpButton =
+      new UI.Toolbar.ToolbarButton(lockedString(UIStringsNotTranslate.help), 'help', undefined, 'freestyler.help');
   helpButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, () => {
-    Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(DOGFOOD_INFO);
+    Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(AI_ASSISTANCE_HELP);
   });
   rightToolbar.appendToolbarItem(helpButton);
+
+  const settingsButton = new UI.Toolbar.ToolbarButton(
+      lockedString(UIStringsNotTranslate.settings), 'gear', undefined, 'freestyler.settings');
+  settingsButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, () => {
+    void UI.ViewManager.ViewManager.instance().showView('chrome-ai');
+  });
+  rightToolbar.appendToolbarItem(settingsButton);
 }
 
 function defaultView(input: FreestylerChatUiProps, output: ViewOutput, target: HTMLElement): void {
@@ -141,8 +111,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
   #viewProps: FreestylerChatUiProps;
   #viewOutput: ViewOutput = {};
   #serverSideLoggingEnabled = isFreestylerServerSideLoggingEnabled();
-  #consentViewAcceptedSetting =
-      Common.Settings.Settings.instance().createLocalSetting('freestyler-dogfood-consent-onboarding-finished', false);
+  #freestylerEnabledSetting: Common.Settings.Setting<boolean>|undefined;
   #changeManager = new ChangeManager();
 
   constructor(private view: View = defaultView, {aidaClient, aidaAvailability, syncInfo}: {
@@ -151,6 +120,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
     syncInfo: Host.InspectorFrontendHostAPI.SyncInformation,
   }) {
     super(FreestylerPanel.panelName);
+    this.#freestylerEnabledSetting = this.#getFreestylerEnabledSetting();
 
     createToolbar(this.contentElement, {onClearClick: this.#clearMessages.bind(this)});
     this.#toggleSearchElementAction =
@@ -158,11 +128,19 @@ export class FreestylerPanel extends UI.Panel.Panel {
     this.#aidaClient = aidaClient;
     this.#contentContainer = this.contentElement.createChild('div', 'freestyler-chat-ui-container');
 
-    this.#selectedElement = UI.Context.Context.instance().flavor(SDK.DOMModel.DOMNode);
+    const selectedElementFilter = (maybeNode: SDK.DOMModel.DOMNode|null): SDK.DOMModel.DOMNode|null => {
+      if (maybeNode) {
+        return maybeNode.nodeType() === Node.ELEMENT_NODE ? maybeNode : null;
+      }
+
+      return null;
+    };
+
+    this.#selectedElement = selectedElementFilter(UI.Context.Context.instance().flavor(SDK.DOMModel.DOMNode));
     this.#selectedNetworkRequest = UI.Context.Context.instance().flavor(SDK.NetworkRequest.NetworkRequest);
     this.#viewProps = {
-      state: this.#consentViewAcceptedSetting.get() ? FreestylerChatUiState.CHAT_VIEW :
-                                                      FreestylerChatUiState.CONSENT_VIEW,
+      state: this.#freestylerEnabledSetting?.get() ? FreestylerChatUiState.CHAT_VIEW :
+                                                     FreestylerChatUiState.CONSENT_VIEW,
       aidaAvailability,
       messages: [],
       inspectElementToggled: this.#toggleSearchElementAction.toggled(),
@@ -172,11 +150,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
       onTextSubmit: this.#startConversation.bind(this),
       onInspectElementClick: this.#handleSelectElementClick.bind(this),
       onFeedbackSubmit: this.#handleFeedbackSubmit.bind(this),
-      onAcceptConsentClick: this.#handleAcceptConsentClick.bind(this),
       onCancelClick: this.#cancel.bind(this),
-      onFixThisIssueClick: () => {
-        void this.#startConversation(FIX_THIS_ISSUE_PROMPT, true);
-      },
       onSelectedNetworkRequestClick: this.#handleSelectedNetworkRequestClick.bind(this),
       canShowFeedbackForm: this.#serverSideLoggingEnabled,
       userInfo: {
@@ -198,7 +172,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
         return;
       }
 
-      this.#viewProps.selectedElement = Boolean(ev.data) && ev.data.nodeType() === Node.ELEMENT_NODE ? ev.data : null;
+      this.#viewProps.selectedElement = selectedElementFilter(ev.data);
       this.doUpdate();
     });
     UI.Context.Context.instance().addFlavorChangeListener(SDK.NetworkRequest.NetworkRequest, ev => {
@@ -210,6 +184,14 @@ export class FreestylerPanel extends UI.Panel.Panel {
       this.doUpdate();
     });
     this.doUpdate();
+  }
+
+  #getFreestylerEnabledSetting(): Common.Settings.Setting<boolean>|undefined {
+    try {
+      return Common.Settings.moduleSetting('freestyler-enabled') as Common.Settings.Setting<boolean>;
+    } catch {
+      return;
+    }
   }
 
   #createFreestylerAgent(): FreestylerAgent {
@@ -247,6 +229,17 @@ export class FreestylerPanel extends UI.Panel.Panel {
     this.registerCSSFiles([freestylerPanelStyles]);
     this.#viewOutput.freestylerChatUi?.restoreScrollPosition();
     this.#viewOutput.freestylerChatUi?.focusTextInput();
+    this.#freestylerEnabledSetting?.addChangeListener(this.#handleFreestylerEnabledSettingChanged, this);
+  }
+
+  override willHide(): void {
+    this.#freestylerEnabledSetting?.removeChangeListener(this.#handleFreestylerEnabledSettingChanged, this);
+  }
+
+  #handleFreestylerEnabledSettingChanged(): void {
+    this.#viewProps.state =
+        this.#freestylerEnabledSetting?.get() ? FreestylerChatUiState.CHAT_VIEW : FreestylerChatUiState.CONSENT_VIEW;
+    this.doUpdate();
   }
 
   doUpdate(): void {
@@ -270,12 +263,6 @@ export class FreestylerPanel extends UI.Panel.Panel {
         },
       },
     });
-  }
-
-  #handleAcceptConsentClick(): void {
-    this.#consentViewAcceptedSetting.set(true);
-    this.#viewProps.state = FreestylerChatUiState.CHAT_VIEW;
-    this.doUpdate();
   }
 
   #handleSelectedNetworkRequestClick(): void|Promise<void> {
@@ -308,6 +295,8 @@ export class FreestylerPanel extends UI.Panel.Panel {
   #clearMessages(): void {
     this.#viewProps.messages = [];
     this.#viewProps.isLoading = false;
+    this.#freestylerAgent = this.#createFreestylerAgent();
+    this.#drJonesNetworkAgent = this.#createDrJonesNetworkAgent();
     this.#cancel();
     this.doUpdate();
   }
@@ -320,8 +309,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
     this.doUpdate();
   }
 
-  async #startConversation(text: string, isFixQuery: boolean = false): Promise<void> {
-    // TODO(samiyac): Refactor startConversation
+  async #startConversation(text: string): Promise<void> {
     this.#viewProps.messages.push({
       entity: ChatMessageEntity.USER,
       text,
@@ -329,29 +317,30 @@ export class FreestylerPanel extends UI.Panel.Panel {
     this.#viewProps.isLoading = true;
     const systemMessage: ModelChatMessage = {
       entity: ChatMessageEntity.MODEL,
-      suggestingFix: false,
+      suggestions: [],
       steps: [],
     };
     this.#viewProps.messages.push(systemMessage);
     this.doUpdate();
 
     this.#runAbortController = new AbortController();
-
     const signal = this.#runAbortController.signal;
 
+    let runner: AsyncGenerator<ResponseData, void, void>|undefined;
     if (this.#viewProps.agentType === AgentType.FREESTYLER) {
-      await this.#conversationStepsForFreestylerAgent(text, isFixQuery, signal, systemMessage);
+      runner = this.#freestylerAgent.run(text, {signal, selectedElement: this.#viewProps.selectedElement});
     } else if (this.#viewProps.agentType === AgentType.DRJONES_NETWORK_REQUEST) {
-      await this.#conversationStepsForDrJonesNetworkAgent(text, signal, systemMessage);
+      runner =
+          this.#drJonesNetworkAgent.run(text, {signal, selectedNetworkRequest: this.#viewProps.selectedNetworkRequest});
     }
-  }
 
-  async #conversationStepsForFreestylerAgent(
-      text: string, isFixQuery: boolean = false, signal: AbortSignal, systemMessage: ModelChatMessage): Promise<void> {
+    if (!runner) {
+      return;
+    }
+
     let step: Step = {isLoading: true};
 
-    for await (const data of this.#freestylerAgent.run(
-        text, {signal, selectedElement: this.#viewProps.selectedElement, isFixQuery})) {
+    for await (const data of runner) {
       step.sideEffect = undefined;
       switch (data.type) {
         case ResponseType.QUERYING: {
@@ -372,6 +361,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
         case ResponseType.THOUGHT: {
           step.isLoading = false;
           step.thought = data.thought;
+          step.contextDetails = data.contextDetails;
           if (systemMessage.steps.at(-1) !== step) {
             systemMessage.steps.push(step);
           }
@@ -399,7 +389,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
           break;
         }
         case ResponseType.ANSWER: {
-          systemMessage.suggestingFix = data.fixable;
+          systemMessage.suggestions = data.suggestions || [];
           systemMessage.answer = data.text;
           systemMessage.rpcId = data.rpcId;
           // When there is an answer without any thinking steps, we don't want to show the thinking step.
@@ -414,7 +404,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
         case ResponseType.ERROR: {
           step.isLoading = false;
           systemMessage.error = data.error;
-          systemMessage.suggestingFix = false;
+          systemMessage.suggestions = [];
           systemMessage.rpcId = undefined;
           this.#viewProps.isLoading = false;
           if (data.error === ErrorType.ABORT) {
@@ -430,71 +420,6 @@ export class FreestylerPanel extends UI.Panel.Panel {
       this.doUpdate();
       this.#viewOutput.freestylerChatUi?.scrollToLastMessage();
     }
-  }
-
-  async #conversationStepsForDrJonesNetworkAgent(text: string, signal: AbortSignal, systemMessage: ModelChatMessage):
-      Promise<void> {
-    // TODO(samiyac): Only display the thinking step with context details when it is the first message
-    const step: Step = {
-      isLoading: true,
-      title: UIStringsTemp.inspectingNetworkData,
-      thought: UIStringsTemp.dataUsedToGenerateThisResponse,
-      contextDetails: this.#createContextDetailsForDrJonesNetworkAgent(),
-    };
-
-    if (!systemMessage.steps.length) {
-      systemMessage.steps.push(step);
-    }
-    this.doUpdate();
-    this.#viewOutput.freestylerChatUi?.scrollToLastMessage();
-
-    for await (const data of this.#drJonesNetworkAgent.run(
-        text, {signal, selectedNetworkRequest: this.#viewProps.selectedNetworkRequest})) {
-      switch (data.type) {
-        case DrJonesNetworkAgentResponseType.ANSWER: {
-          systemMessage.answer = data.text;
-          systemMessage.rpcId = data.rpcId;
-          step.isLoading = false;
-          this.#viewProps.isLoading = false;
-          break;
-        }
-
-        case DrJonesNetworkAgentResponseType.ERROR: {
-          step.isLoading = false;
-          systemMessage.error = ErrorType.UNKNOWN;
-          this.#viewProps.isLoading = false;
-        }
-      }
-
-      this.doUpdate();
-      this.#viewOutput.freestylerChatUi?.scrollToLastMessage();
-    }
-  }
-
-  #createContextDetailsForDrJonesNetworkAgent(): ContextDetail[] {
-    if (this.#viewProps.selectedNetworkRequest) {
-      const requestContextDetail: ContextDetail = {
-        title: UIStringsTemp.request,
-        text: UIStringsTemp.requestUrl + ': ' + this.#viewProps.selectedNetworkRequest.url() + '\n\n' +
-            formatHeaders(UIStringsTemp.requestHeaders, this.#viewProps.selectedNetworkRequest.requestHeaders()),
-      };
-      const responseContextDetail: ContextDetail = {
-        title: UIStringsTemp.response,
-        text: UIStringsTemp.responseStatus + ': ' + this.#viewProps.selectedNetworkRequest.statusCode + ' ' +
-            this.#viewProps.selectedNetworkRequest.statusText + '\n\n' +
-            formatHeaders(UIStringsTemp.responseHeaders, this.#viewProps.selectedNetworkRequest.responseHeaders),
-      };
-      const timingContextDetail: ContextDetail = {
-        title: UIStringsTemp.timing,
-        text: formatNetworkRequestTiming(this.#viewProps.selectedNetworkRequest),
-      };
-      return [
-        requestContextDetail,
-        responseContextDetail,
-        timingContextDetail,
-      ];
-    }
-    return [];
   }
 }
 

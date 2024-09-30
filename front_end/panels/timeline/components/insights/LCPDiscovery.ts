@@ -13,9 +13,13 @@ import type * as Overlays from '../../overlays/overlays.js';
 import {BaseInsight, shouldRenderForCategory} from './Helpers.js';
 import discoveryStyles from './lcpDiscovery.css.js';
 import * as SidebarInsight from './SidebarInsight.js';
-import {InsightsCategories} from './types.js';
+import {Category} from './types.js';
 
 const UIStrings = {
+  /**
+   *@description Title of an insight that provides details about the LCP metric, and the network requests necessary to load it.
+   */
+  title: 'LCP request discovery',
   /**
    * @description Text to tell the user how long after the earliest discovery time their LCP element loaded.
    * @example {401ms} PH1
@@ -47,38 +51,20 @@ interface LCPImageDiscoveryData {
   discoveryDelay: Trace.Types.Timing.MicroSeconds|null;
 }
 
-export function getLCPInsightData(insights: Trace.Insights.Types.TraceInsightSets|null, navigationId: string|null):
-    Trace.Insights.Types.InsightResults['LargestContentfulPaint']|null {
-  if (!insights || !navigationId) {
-    return null;
-  }
-
-  const insightsByNavigation = insights.get(navigationId);
-  if (!insightsByNavigation) {
-    return null;
-  }
-
-  const lcpInsight = insightsByNavigation.data.LargestContentfulPaint;
-  if (lcpInsight instanceof Error) {
-    return null;
-  }
-  return lcpInsight;
-}
-
 function getImageData(
-    insights: Trace.Insights.Types.TraceInsightSets|null, navigationId: string|null): LCPImageDiscoveryData|null {
-  const lcpInsight = getLCPInsightData(insights, navigationId);
-  if (!lcpInsight) {
+    insights: Trace.Insights.Types.TraceInsightSets|null, insightSetKey: string|null): LCPImageDiscoveryData|null {
+  const insight = Trace.Insights.Common.getInsight('LargestContentfulPaint', insights, insightSetKey);
+  if (!insight) {
     return null;
   }
 
-  if (lcpInsight.lcpRequest === undefined) {
+  if (insight.lcpRequest === undefined) {
     return null;
   }
 
-  const shouldIncreasePriorityHint = lcpInsight.shouldIncreasePriorityHint;
-  const shouldPreloadImage = lcpInsight.shouldPreloadImage;
-  const shouldRemoveLazyLoading = lcpInsight.shouldRemoveLazyLoading;
+  const shouldIncreasePriorityHint = insight.shouldIncreasePriorityHint;
+  const shouldPreloadImage = insight.shouldPreloadImage;
+  const shouldRemoveLazyLoading = insight.shouldRemoveLazyLoading;
 
   const imageLCP = shouldIncreasePriorityHint !== undefined && shouldPreloadImage !== undefined &&
       shouldRemoveLazyLoading !== undefined;
@@ -92,12 +78,12 @@ function getImageData(
     shouldIncreasePriorityHint,
     shouldPreloadImage,
     shouldRemoveLazyLoading,
-    request: lcpInsight.lcpRequest,
+    request: insight.lcpRequest,
     discoveryDelay: null,
   };
 
-  if (lcpInsight.earliestDiscoveryTimeTs && lcpInsight.lcpRequest) {
-    const discoveryDelay = lcpInsight.lcpRequest.ts - lcpInsight.earliestDiscoveryTimeTs;
+  if (insight.earliestDiscoveryTimeTs && insight.lcpRequest) {
+    const discoveryDelay = insight.lcpRequest.ts - insight.earliestDiscoveryTimeTs;
     data.discoveryDelay = Trace.Types.Timing.MicroSeconds(discoveryDelay);
   }
 
@@ -106,9 +92,10 @@ function getImageData(
 
 export class LCPDiscovery extends BaseInsight {
   static readonly litTagName = LitHtml.literal`devtools-performance-lcp-discovery`;
-  override insightCategory: InsightsCategories = InsightsCategories.LCP;
+  override insightCategory: Category = Category.LCP;
   override internalName: string = 'lcp-discovery';
-  override userVisibleTitle: string = 'LCP request discovery';
+  override userVisibleTitle: string = i18nString(UIStrings.title);
+  override description: string = '';
 
   override connectedCallback(): void {
     super.connectedCallback();
@@ -134,7 +121,7 @@ export class LCPDiscovery extends BaseInsight {
   }
 
   override createOverlays(): Overlays.Overlays.TimelineOverlay[] {
-    const imageResults = getImageData(this.data.insights, this.data.navigationId);
+    const imageResults = getImageData(this.data.insights, this.data.insightSetKey);
     if (!imageResults || !imageResults.discoveryDelay) {
       return [];
     }
@@ -175,32 +162,37 @@ export class LCPDiscovery extends BaseInsight {
         <div class="insights">
           <${SidebarInsight.SidebarInsight.litTagName} .data=${{
             title: this.userVisibleTitle,
+            description: this.description,
+            internalName: this.internalName,
             expanded: this.isActive(),
           } as SidebarInsight.InsightDetails}
           @insighttoggleclick=${this.onSidebarClick}
         >
-          <div slot="insight-description" class="insight-description">
-          ${imageData.discoveryDelay ? LitHtml.html`<div class="discovery-delay">${this.#renderDiscoveryDelay(imageData.discoveryDelay)}</div>` : LitHtml.nothing}
-            <ul class="insight-results insight-icon-results">
-              <li class="insight-entry">
-                ${this.#adviceIcon(imageData.shouldIncreasePriorityHint)}
-                <span>${i18nString(UIStrings.fetchPriorityApplied)}</span>
-              </li>
-              <li class="insight-entry">
-                ${this.#adviceIcon(imageData.shouldPreloadImage)}
-                <span>${i18nString(UIStrings.requestDiscoverable)}</span>
-              </li>
-              <li class="insight-entry">
-                ${this.#adviceIcon(imageData.shouldRemoveLazyLoading)}
-                <span>${i18nString(UIStrings.lazyLoadNotApplied)}</span>
-              </li>
-            </ul>
-          </div>
-          <div slot="insight-content" class="insight-content">
-            <img class="element-img" data-src=${imageData.request.args.data.url} src=${imageData.request.args.data.url}>
-            <div class="element-img-details">
-              ${Common.ParsedURL.ParsedURL.extractName(imageData.request.args.data.url ?? '')}
-              <div class="element-img-details-size">${Platform.NumberUtilities.bytesToString(imageData.request.args.data.decodedBodyLength ?? 0)}</div>
+          <div slot="insight-content" class="insight-section">
+            <div>
+              ${imageData.discoveryDelay ? LitHtml.html`<div class="discovery-delay">${this.#renderDiscoveryDelay(imageData.discoveryDelay)}</div>` : LitHtml.nothing}
+              <ul class="insight-results insight-icon-results">
+                <li class="insight-entry">
+                  ${this.#adviceIcon(imageData.shouldIncreasePriorityHint)}
+                  <span>${i18nString(UIStrings.fetchPriorityApplied)}</span>
+                </li>
+                <li class="insight-entry">
+                  ${this.#adviceIcon(imageData.shouldPreloadImage)}
+                  <span>${i18nString(UIStrings.requestDiscoverable)}</span>
+                </li>
+                <li class="insight-entry">
+                  ${this.#adviceIcon(imageData.shouldRemoveLazyLoading)}
+                  <span>${i18nString(UIStrings.lazyLoadNotApplied)}</span>
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <img class="element-img" data-src=${imageData.request.args.data.url} src=${imageData.request.args.data.url}>
+              <div class="element-img-details">
+                ${Common.ParsedURL.ParsedURL.extractName(imageData.request.args.data.url ?? '')}
+                <div class="element-img-details-size">${Platform.NumberUtilities.bytesToString(imageData.request.args.data.decodedBodyLength ?? 0)}</div>
+              </div>
             </div>
           </div>
         </${SidebarInsight.SidebarInsight}>
@@ -209,7 +201,7 @@ export class LCPDiscovery extends BaseInsight {
   }
 
   override render(): void {
-    const imageResults = getImageData(this.data.insights, this.data.navigationId);
+    const imageResults = getImageData(this.data.insights, this.data.insightSetKey);
     const matchesCategory = shouldRenderForCategory({
       activeCategory: this.data.activeCategory,
       insightCategory: this.insightCategory,

@@ -10,6 +10,7 @@ import * as EntryName from './EntryName.js';
 import * as EntryStyles from './EntryStyles.js';
 import * as FieldSettingsDialog from './FieldSettingsDialog.js';
 import * as InteractionBreakdown from './InteractionBreakdown.js';
+import * as LayoutShiftClusterDetails from './LayoutShiftClusterDetails.js';
 import * as LayoutShiftDetails from './LayoutShiftDetails.js';
 import * as LiveMetricsView from './LiveMetricsView.js';
 import * as MetricCard from './MetricCard.js';
@@ -18,6 +19,8 @@ import * as NetworkRequestTooltip from './NetworkRequestTooltip.js';
 import * as NetworkThrottlingSelector from './NetworkThrottlingSelector.js';
 import * as Sidebar from './Sidebar.js';
 import * as SidebarAnnotationsTab from './SidebarAnnotationsTab.js';
+import * as SidebarInsightsTab from './SidebarInsightsTab.js';
+import * as SidebarSingleInsightSet from './SidebarSingleInsightSet.js';
 import * as Utils from './Utils.js';
 
 export {
@@ -29,6 +32,7 @@ export {
   EntryStyles,
   FieldSettingsDialog,
   InteractionBreakdown,
+  LayoutShiftClusterDetails,
   LayoutShiftDetails,
   LiveMetricsView,
   MetricCard,
@@ -37,5 +41,7 @@ export {
   NetworkThrottlingSelector,
   Sidebar,
   SidebarAnnotationsTab,
+  SidebarInsightsTab,
+  SidebarSingleInsightSet,
   Utils,
 };

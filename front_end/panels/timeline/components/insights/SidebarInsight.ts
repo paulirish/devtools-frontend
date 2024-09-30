@@ -10,6 +10,7 @@ import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../../ui/visual_logging/visual_logging.js';
 import type * as Overlays from '../../overlays/overlays.js';
 
+import {md} from './Helpers.js';
 import sidebarInsightStyles from './sidebarInsight.css.js';
 
 const UIStrings = {
@@ -25,6 +26,8 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export interface InsightDetails {
   title: string;
+  description: string;
+  internalName: string;
   expanded: boolean;
   estimatedSavings?: number|undefined;
 }
@@ -32,9 +35,7 @@ export interface InsightDetails {
 export class InsightActivated extends Event {
   static readonly eventName = 'insightactivated';
 
-  constructor(
-      public name: string, public navigationId: string,
-      public createOverlayFn: () => Array<Overlays.Overlays.TimelineOverlay>) {
+  constructor(public name: string, public insightSetKey: string, public overlays: Overlays.Overlays.TimelineOverlay[]) {
     super(InsightActivated.eventName, {bubbles: true, composed: true});
   }
 }
@@ -46,18 +47,20 @@ export class InsightDeactivated extends Event {
   }
 }
 
-export class NavigationBoundsHovered extends Event {
-  static readonly eventName = 'navigationhovered';
+export class InsightSetHovered extends Event {
+  static readonly eventName = 'insightsethovered';
   constructor(public bounds?: Trace.Types.Timing.TraceWindowMicroSeconds) {
-    super(NavigationBoundsHovered.eventName, {bubbles: true, composed: true});
+    super(InsightSetHovered.eventName, {bubbles: true, composed: true});
   }
 }
 
-export class InsightOverlayOverride extends Event {
-  static readonly eventName = 'insightoverlayoverride';
+export class InsightProvideOverlays extends Event {
+  static readonly eventName = 'insightprovideoverlays';
 
-  constructor(public overlays: Array<Overlays.Overlays.TimelineOverlay>|null) {
-    super(InsightOverlayOverride.eventName, {bubbles: true, composed: true});
+  constructor(
+      public overlays: Array<Overlays.Overlays.TimelineOverlay>,
+      public options: Overlays.Overlays.TimelineOverlaySetOptions) {
+    super(InsightProvideOverlays.eventName, {bubbles: true, composed: true});
   }
 }
 
@@ -65,8 +68,8 @@ declare global {
   interface GlobalEventHandlersEventMap {
     [InsightActivated.eventName]: InsightActivated;
     [InsightDeactivated.eventName]: InsightDeactivated;
-    [NavigationBoundsHovered.eventName]: NavigationBoundsHovered;
-    [InsightOverlayOverride.eventName]: InsightOverlayOverride;
+    [InsightSetHovered.eventName]: InsightSetHovered;
+    [InsightProvideOverlays.eventName]: InsightProvideOverlays;
   }
 }
 
@@ -74,14 +77,27 @@ export class SidebarInsight extends HTMLElement {
   static readonly litTagName = LitHtml.literal`devtools-performance-sidebar-insight`;
   readonly #shadow = this.attachShadow({mode: 'open'});
   readonly #boundRender = this.#render.bind(this);
+
   #insightTitle: string = '';
+  #insightDescription: string = '';
+  #insightInternalName: string = '';
   #expanded: boolean = false;
   #estimatedSavings: number|undefined = undefined;
 
   set data(data: InsightDetails) {
     this.#insightTitle = data.title;
+    this.#insightDescription = data.description;
+    this.#insightInternalName = data.internalName;
     this.#expanded = data.expanded;
     this.#estimatedSavings = data.estimatedSavings;
+
+    // Used for testing.
+    this.dataset.insightTitle = data.title;
+    if (data.expanded) {
+      this.dataset.insightExpanded = '';
+    } else {
+      delete this.dataset.insightExpanded;
+    }
 
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
   }
@@ -124,7 +140,7 @@ export class SidebarInsight extends HTMLElement {
     // clang-format off
     const output = LitHtml.html`
       <div class=${containerClasses}>
-        <header @click=${this.#dispatchInsightToggle} jslog=${VisualLogging.action('timeline.toggle-insight').track({click: true})}>
+        <header @click=${this.#dispatchInsightToggle} jslog=${VisualLogging.action(`timeline.toggle-insight.${this.#insightInternalName}`).track({click: true})}>
           ${this.#renderHoverIcon(this.#expanded)}
           <h3 class="insight-title">${this.#insightTitle}</h3>
           ${this.#estimatedSavings && this.#estimatedSavings > 0 ?
@@ -137,8 +153,10 @@ export class SidebarInsight extends HTMLElement {
         </header>
         ${this.#expanded ? LitHtml.html`
           <div class="insight-body">
-            <slot name="insight-description"></slot>
-            <slot name="insight-content"></slot>
+            <div class="insight-description">${this.#insightDescription ? md(this.#insightDescription) : LitHtml.nothing}</div>
+            <div class="insight-content">
+              <slot name="insight-content"></slot>
+            </div>
           </div>`
           : LitHtml.nothing
         }

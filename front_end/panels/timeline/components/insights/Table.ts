@@ -4,36 +4,63 @@
 
 import * as ComponentHelpers from '../../../../ui/components/helpers/helpers.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
+import type * as Overlays from '../../overlays/overlays.js';
 
+import {type BaseInsight} from './Helpers.js';
 import tableStyles from './table.css.js';
 
+/**
+ * @fileoverview An interactive table component.
+ *
+ * On hover:
+ *           desaturates the relevant time range (in both the minimap and the flamegraph), and
+ *           replaces the current insight's overlays with the overlays attached to that row.
+ *           The currently selected trace bounds does not change.
+ *           TODO(crbug.com/369102516): make the "desaturates the flamegraph" part true
+ *
+ *           Removing the mouse from the table without clicking on any row restores the original
+ *           overlays.
+ *
+ * On click:
+ *           "sticks" the selection, replaces overlays like hover does, and additionally updates
+ *           the current trace bounds to fit the bounds of the row's overlays.
+ */
+
+export type TableState = {
+  selectedRowEl: HTMLElement|null,
+  selectionIsSticky: boolean,
+};
+
 export interface TableData {
+  insight: BaseInsight;
   headers: string[];
-  /** Each row is a tuple of values. */
-  rows: Array<Array<string|number>>;
-  onHoverRow?: (index: number, rowEl: HTMLElement) => void;
-  onClickRow?: (index: number, rowEl: HTMLElement) => void;
-  onMouseLeave?: () => void;
+  rows: TableDataRow[];
 }
+
+export type TableDataRow = {
+  values: string[],
+  overlays?: Overlays.Overlays.TimelineOverlay[],
+};
 
 export class Table extends HTMLElement {
   static readonly litTagName = LitHtml.literal`devtools-performance-table`;
 
   readonly #shadow = this.attachShadow({mode: 'open'});
   readonly #boundRender = this.#render.bind(this);
+  #insight?: BaseInsight;
+  #state?: TableState;
   #headers?: string[];
-  #rows?: Array<Array<string|number>>;
-  #onHoverRowCallback?: (index: number, rowEl: HTMLElement) => void;
-  #onClickRowCallback?: (index: number, rowEl: HTMLElement) => void;
-  #onMouseLeaveCallback?: () => void;
+  #rows?: TableDataRow[];
+  #interactive: boolean = false;
   #currentHoverIndex: number|null = null;
 
   set data(data: TableData) {
+    this.#insight = data.insight;
+    this.#state = data.insight.sharedTableState;
     this.#headers = data.headers;
     this.#rows = data.rows;
-    this.#onHoverRowCallback = data.onHoverRow;
-    this.#onClickRowCallback = data.onClickRow;
-    this.#onMouseLeaveCallback = data.onMouseLeave;
+    // If this table isn't interactive, don't attach mouse listeners or use CSS :hover.
+    this.#interactive = this.#rows.some(row => row.overlays);
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
   }
 
@@ -42,7 +69,7 @@ export class Table extends HTMLElement {
   }
 
   #onHoverRow(e: MouseEvent): void {
-    if (!this.#onHoverRowCallback || !(e.target instanceof HTMLElement)) {
+    if (!(e.target instanceof HTMLElement)) {
       return;
     }
 
@@ -57,11 +84,12 @@ export class Table extends HTMLElement {
     }
 
     this.#currentHoverIndex = index;
-    this.#onHoverRowCallback(index, rowEl);
+    // Temporarily selects the row, but only if there is not already a sticky selection.
+    this.#onSelectedRowChanged(rowEl, index, {isHover: true});
   }
 
   #onClickRow(e: MouseEvent): void {
-    if (!this.#onClickRowCallback || !(e.target instanceof HTMLElement)) {
+    if (!(e.target instanceof HTMLElement)) {
       return;
     }
 
@@ -75,16 +103,47 @@ export class Table extends HTMLElement {
       return;
     }
 
-    this.#onClickRowCallback(index, rowEl);
+    // Select the row and make it sticky.
+    this.#onSelectedRowChanged(rowEl, index, {sticky: true});
   }
 
   #onMouseLeave(): void {
-    if (!this.#onMouseLeaveCallback) {
+    this.#currentHoverIndex = null;
+    // Unselect the row, unless it's sticky.
+    this.#onSelectedRowChanged(null, null);
+  }
+
+  #onSelectedRowChanged(rowEl: HTMLElement|null, rowIndex: number|null, opts: {
+    sticky?: boolean,
+    isHover?: boolean,
+  } = {}): void {
+    if (!this.#rows || !this.#state || !this.#insight) {
       return;
     }
 
-    this.#currentHoverIndex = null;
-    this.#onMouseLeaveCallback();
+    if (this.#state.selectionIsSticky && !opts.sticky) {
+      return;
+    }
+
+    // Unselect a sticky-selection when clicking it for a second time.
+    if (this.#state.selectionIsSticky && rowEl === this.#state.selectedRowEl) {
+      rowEl = null;
+      opts.sticky = false;
+    }
+
+    if (rowEl && rowIndex !== null) {
+      const overlays = this.#rows[rowIndex].overlays;
+      if (overlays) {
+        this.#insight.toggleTemporaryOverlays(overlays, {updateTraceWindow: !opts.isHover});
+      }
+    } else {
+      this.#insight.toggleTemporaryOverlays(null);
+    }
+
+    this.#state.selectedRowEl?.classList.remove('selected');
+    rowEl?.classList.add('selected');
+    this.#state.selectedRowEl = rowEl;
+    this.#state.selectionIsSticky = opts.sticky ?? false;
   }
 
   async #render(): Promise<void> {
@@ -95,20 +154,20 @@ export class Table extends HTMLElement {
     LitHtml.render(
         LitHtml.html`<table
           class=${LitHtml.Directives.classMap({
-          hoverable: Boolean(this.#onHoverRowCallback),
+          interactive: this.#interactive,
         })}
-          @mouseleave=${this.#onMouseLeaveCallback ? this.#onMouseLeave : null}>
+          @mouseleave=${this.#interactive ? this.#onMouseLeave : null}>
         <thead>
           <tr>
           ${this.#headers.map(h => LitHtml.html`<th scope="col">${h}</th>`)}
           </tr>
         </thead>
         <tbody
-          @mouseover=${this.#onHoverRowCallback ? this.#onHoverRow : null}
-          @click=${this.#onClickRowCallback ? this.#onClickRow : null}
+          @mouseover=${this.#interactive ? this.#onHoverRow : null}
+          @click=${this.#interactive ? this.#onClickRow : null}
         >
           ${this.#rows.map(row => {
-          const rowsEls = row.map(
+          const rowsEls = row.values.map(
               (value, i) => i === 0 ? LitHtml.html`<th scope="row">${value}</th>` : LitHtml.html`<td>${value}</td>`);
           return LitHtml.html`<tr>${rowsEls}</tr>`;
         })}
