@@ -235,8 +235,8 @@ export class LayoutShiftDetails extends HTMLElement {
       return;
     }
     // todo: move into table
-    const previewEl = await this.#renderPreview(this.#layoutShift);
-
+    const previewEl = this.#renderPreview(this.#layoutShift);
+    this.#shadow.append(previewEl);
     // clang-format off
     const output = LitHtml.html`
       <div class="layout-shift-summary-details">
@@ -253,9 +253,9 @@ export class LayoutShiftDetails extends HTMLElement {
     LitHtml.render(output, this.#shadow, {host: this});
   }
 
-  async #renderPreview(event: Trace.Types.Events.SyntheticLayoutShift): Promise<LitHtml.TemplateResult|null> {
+  #renderPreview(event: Trace.Types.Events.SyntheticLayoutShift): HTMLElement|undefined {
     if (!this.#parsedTrace) {
-      return null;
+      return;
     }
     const maxSize = new UI.Geometry.Size(500, 400);
 
@@ -273,107 +273,115 @@ customElements.define('devtools-performance-layout-shift-details', LayoutShiftDe
 
 
 
-export async function drawLayoutShiftScreenshotRects(
+export function drawLayoutShiftScreenshotRects(
     event: Trace.Types.Events.SyntheticLayoutShift, parsedTrace: Trace.Handlers.Types.ParsedTrace,
-    maxSize: UI.Geometry.Size): Promise<LitHtml.TemplateResult|undefined> {
+    maxSize: UI.Geometry.Size): HTMLElement|undefined {
   const screenshots = event.parsedData.screenshots;
   const viewport = parsedTrace.Meta.viewportRect;
-  // TODO paralleize
-  const afterImage = screenshots.after?.args.dataUri && await UI.UIUtils.loadImage(screenshots.after?.args.dataUri);
-  const beforeImage = screenshots.before?.args.dataUri && await UI.UIUtils.loadImage(screenshots.before?.args.dataUri);
-  if (!beforeImage || !viewport) {
+  if (!screenshots.before?.args.dataUri || !screenshots.after?.args.dataUri || !viewport) {
     return;
   }
-
-  /** The Layout Instability API in Blink, which reports the LayoutShift trace events, is not based on CSS pixels but
-   * physical pixels. As such the values in the impacted_nodes field need to be normalized to CSS units in order to
-   * map them to the viewport dimensions, which we get in CSS pixels. We do that by dividing the values by the devicePixelRatio.
-   * See https://crbug.com/1300309
-   */
-  const dpr = parsedTrace.Meta.devicePixelRatio;
-  if (dpr === undefined) {
-    return;
-  }
-
-  const beforeRects =
-      event.args.data?.impacted_nodes?.map(
-          node => new DOMRect(
-              node.old_rect[0] / dpr, node.old_rect[1] / dpr, node.old_rect[2] / dpr, node.old_rect[3] / dpr)) ??
-      [];
-  const afterRects =
-      event.args.data?.impacted_nodes?.map(
-          node => new DOMRect(
-              node.new_rect[0] / dpr, node.new_rect[1] / dpr, node.new_rect[2] / dpr, node.new_rect[3] / dpr)) ??
-      [];
-
   const screenshotContainer = document.createElement('div');
   screenshotContainer.classList.add('layout-shift-screenshot-preview');
   screenshotContainer.style.position = 'relative';
-  screenshotContainer.appendChild(beforeImage);
 
-  // If this is being size constrained, it needs to be done in JS (rather than css max-width, etc)....
-  // That's because this function is complete before it's added to the DOM.. so we can't query offsetHeight for its resolved size…
-  const maxWidth = maxSize.width;
-  const maxHeight = maxSize.height;
-  const scaleFactor = Math.min(maxWidth / beforeImage.naturalWidth, maxHeight / beforeImage.naturalHeight, 1);
-  beforeImage.style.width = `${beforeImage.naturalWidth * scaleFactor}px`;
-  beforeImage.style.height = `${beforeImage.naturalHeight * scaleFactor}px`;
+  Promise
+      .all([
+        UI.UIUtils.loadImage(screenshots.after?.args.dataUri), UI.UIUtils.loadImage(screenshots.before?.args.dataUri)
+      ])
+      .then(([afterImage, beforeImage]) => {
+        if (!beforeImage) {
+          return;
+        }
 
-  // Setup old rects
-  const rectEls = beforeRects.map((beforeRect, i) => {
-    const rectEl = document.createElement('div');
-    rectEl.classList.add('layout-shift-screenshot-preview-rect');
+        /** The Layout Instability API in Blink, which reports the LayoutShift trace events, is not based on CSS pixels but
+         * physical pixels. As such the values in the impacted_nodes field need to be normalized to CSS units in order to
+         * map them to the viewport dimensions, which we get in CSS pixels. We do that by dividing the values by the devicePixelRatio.
+         * See https://crbug.com/1300309
+         */
+        const dpr = parsedTrace.Meta.devicePixelRatio;
+        if (dpr === undefined) {
+          return;
+        }
 
-    // If it's a 0x0x0x0 rect, then set to new, so we can fade it in from the new position instead.
-    if ([beforeRect.width, beforeRect.height, beforeRect.x, beforeRect.y].every(v => v === 0)) {
-      beforeRect = afterRects[i];
-      rectEl.style.opacity = '0';
-    } else {
-      rectEl.style.opacity = '1';
-    }
+        const beforeRects =
+            event.args.data?.impacted_nodes?.map(
+                node => new DOMRect(
+                    node.old_rect[0] / dpr, node.old_rect[1] / dpr, node.old_rect[2] / dpr, node.old_rect[3] / dpr)) ??
+            [];
+        const afterRects =
+            event.args.data?.impacted_nodes?.map(
+                node => new DOMRect(
+                    node.new_rect[0] / dpr, node.new_rect[1] / dpr, node.new_rect[2] / dpr, node.new_rect[3] / dpr)) ??
+            [];
 
-    const scaledRectX = beforeRect.x * beforeImage.naturalWidth / viewport.width * scaleFactor;
-    const scaledRectY = beforeRect.y * beforeImage.naturalHeight / viewport.height * scaleFactor;
-    const scaledRectWidth = beforeRect.width * beforeImage.naturalWidth / viewport.width * scaleFactor;
-    const scaledRectHeight = beforeRect.height * beforeImage.naturalHeight / viewport.height * scaleFactor;
-    rectEl.style.left = `${scaledRectX}px`;
-    rectEl.style.top = `${scaledRectY}px`;
-    rectEl.style.width = `${scaledRectWidth}px`;
-    rectEl.style.height = `${scaledRectHeight}px`;
-    rectEl.style.opacity = '0.4';
+        screenshotContainer.appendChild(beforeImage);
 
-    screenshotContainer.appendChild(rectEl);
-    return rectEl;
-  });
-  if (afterImage) {
-    afterImage.classList.add('layout-shift-screenshot-after');
-    screenshotContainer.appendChild(afterImage);
-    afterImage.style.width = beforeImage.style.width;
-    afterImage.style.height = beforeImage.style.height;
-    afterImage.addEventListener('click', () => {
-      new Dialog(event, parsedTrace);
-    });
-  }
+        // If this is being size constrained, it needs to be done in JS (rather than css max-width, etc)....
+        // That's because this function is complete before it's added to the DOM.. so we can't query offsetHeight for its resolved size…
+        const maxWidth = maxSize.width;
+        const maxHeight = maxSize.height;
+        const scaleFactor = Math.min(maxWidth / beforeImage.naturalWidth, maxHeight / beforeImage.naturalHeight, 1);
+        beforeImage.style.width = `${beforeImage.naturalWidth * scaleFactor}px`;
+        beforeImage.style.height = `${beforeImage.naturalHeight * scaleFactor}px`;
 
-  // Update for the after rect positions after a bit.
-  setTimeout(() => {
-    rectEls.forEach((rectEl, i) => {
-      const afterRect = afterRects[i];
-      const scaledRectX = afterRect.x * beforeImage.naturalWidth / viewport.width * scaleFactor;
-      const scaledRectY = afterRect.y * beforeImage.naturalHeight / viewport.height * scaleFactor;
-      const scaledRectWidth = afterRect.width * beforeImage.naturalWidth / viewport.width * scaleFactor;
-      const scaledRectHeight = afterRect.height * beforeImage.naturalHeight / viewport.height * scaleFactor;
-      rectEl.style.left = `${scaledRectX}px`;
-      rectEl.style.top = `${scaledRectY}px`;
-      rectEl.style.width = `${scaledRectWidth}px`;
-      rectEl.style.height = `${scaledRectHeight}px`;
-      rectEl.style.opacity = '0.4';
-    });
-    if (afterImage) {
-      afterImage.style.opacity = '1';
-    }
-  }, 1000);
-  return LitHtml.html`${screenshotContainer}`;
+        // Setup old rects
+        const rectEls = beforeRects.map((beforeRect, i) => {
+          const rectEl = document.createElement('div');
+          rectEl.classList.add('layout-shift-screenshot-preview-rect');
+
+          // If it's a 0x0x0x0 rect, then set to new, so we can fade it in from the new position instead.
+          if ([beforeRect.width, beforeRect.height, beforeRect.x, beforeRect.y].every(v => v === 0)) {
+            beforeRect = afterRects[i];
+            rectEl.style.opacity = '0';
+          } else {
+            rectEl.style.opacity = '1';
+          }
+
+          const scaledRectX = beforeRect.x * beforeImage.naturalWidth / viewport.width * scaleFactor;
+          const scaledRectY = beforeRect.y * beforeImage.naturalHeight / viewport.height * scaleFactor;
+          const scaledRectWidth = beforeRect.width * beforeImage.naturalWidth / viewport.width * scaleFactor;
+          const scaledRectHeight = beforeRect.height * beforeImage.naturalHeight / viewport.height * scaleFactor;
+          rectEl.style.left = `${scaledRectX}px`;
+          rectEl.style.top = `${scaledRectY}px`;
+          rectEl.style.width = `${scaledRectWidth}px`;
+          rectEl.style.height = `${scaledRectHeight}px`;
+          rectEl.style.opacity = '0.4';
+
+          screenshotContainer.appendChild(rectEl);
+          return rectEl;
+        });
+        if (afterImage) {
+          afterImage.classList.add('layout-shift-screenshot-after');
+          screenshotContainer.appendChild(afterImage);
+          afterImage.style.width = beforeImage.style.width;
+          afterImage.style.height = beforeImage.style.height;
+          afterImage.addEventListener('click', () => {
+            new Dialog(event, parsedTrace);
+          });
+        }
+
+        // Update for the after rect positions after a bit.
+        setTimeout(() => {
+          rectEls.forEach((rectEl, i) => {
+            const afterRect = afterRects[i];
+            const scaledRectX = afterRect.x * beforeImage.naturalWidth / viewport.width * scaleFactor;
+            const scaledRectY = afterRect.y * beforeImage.naturalHeight / viewport.height * scaleFactor;
+            const scaledRectWidth = afterRect.width * beforeImage.naturalWidth / viewport.width * scaleFactor;
+            const scaledRectHeight = afterRect.height * beforeImage.naturalHeight / viewport.height * scaleFactor;
+            rectEl.style.left = `${scaledRectX}px`;
+            rectEl.style.top = `${scaledRectY}px`;
+            rectEl.style.width = `${scaledRectWidth}px`;
+            rectEl.style.height = `${scaledRectHeight}px`;
+            rectEl.style.opacity = '0.4';
+          });
+          if (afterImage) {
+            afterImage.style.opacity = '1';
+          }
+        }, 1000);
+      });
+
+  return screenshotContainer;
 }
 
 const styles = `
