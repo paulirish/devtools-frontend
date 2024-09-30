@@ -18,7 +18,6 @@ import {
   waitForMany,
   waitForNone,
 } from '../../shared/helper.js';
-
 import {
   reloadDevTools,
 } from '../helpers/cross-tool-helper.js';

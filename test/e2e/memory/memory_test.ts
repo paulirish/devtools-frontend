@@ -20,7 +20,6 @@ import {
   waitForFunction,
   waitForNoElementsWithTextContent,
 } from '../../shared/helper.js';
-
 import {
   changeAllocationSampleViewViaDropdown,
   changeViewViaDropdown,

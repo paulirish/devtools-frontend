@@ -16,7 +16,6 @@ import {
   waitForElementWithTextContent,
   waitForFunction,
 } from '../../shared/helper.js';
-
 import {
   clearTextFilter,
   getAllRequestNames,
