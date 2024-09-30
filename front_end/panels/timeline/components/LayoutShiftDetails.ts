@@ -425,10 +425,10 @@ export class ScreenshotGifDialog {
   private dialog: UI.Dialog.Dialog|null = null;
 
   constructor(event: Trace.Types.Events.SyntheticLayoutShift, parsedTrace: Trace.Handlers.Types.ParsedTrace) {
-    // const prevButton = UI.UIUtils.createTextButton('\u25C0', this.onPrevFrame.bind(this));
-    // UI.Tooltip.Tooltip.install(prevButton, i18nString(UIStrings.previousFrame));
-    // const nextButton = UI.UIUtils.createTextButton('\u25B6', this.onNextFrame.bind(this));
-    // UI.Tooltip.Tooltip.install(nextButton, i18nString(UIStrings.nextFrame));
+    const prevButton = UI.UIUtils.createTextButton('\u25C0', () => console.log('prev gif'));
+    UI.Tooltip.Tooltip.install(prevButton, i18nString('prev gif'));
+    const nextButton = UI.UIUtils.createTextButton('\u25B6', () => console.log('next gif'));
+    UI.Tooltip.Tooltip.install(nextButton, i18nString('next gif'));
 
     this.fragment = UI.Fragment.Fragment.build`
       <x-widget flex=none margin=12px>
@@ -441,13 +441,14 @@ export class ScreenshotGifDialog {
             </ul>
           </x-hbox>
         </x-hbox>
+          <x-hbox x-center justify-content=center margin-top=10px>
+          ${prevButton}
+          <x-hbox $='time' margin=8px></x-hbox>
+          ${nextButton}
+        </x-hbox>
       </x-widget>
     `;
-    // <x-hbox x-center justify-content=center margin-top=10px>
-    //       ${prevButton}
-    //       <x-hbox $='time' margin=8px></x-hbox>
-    //       ${nextButton}
-    //     </x-hbox>
+
     this.widget = (this.fragment.element() as UI.XWidget.XWidget);
     (this.widget as HTMLElement).tabIndex = 0;
     // this.widget.addEventListener('keydown', this.keyDown.bind(this), false);
@@ -484,7 +485,7 @@ export class ScreenshotGifDialog {
         ${lis}
       </ul>
     `,
-        this.fragment.$('nodes'));
+        this.fragment.$('nodes') as HTMLElement);
 
     this.resize(dialogSize);
   }
@@ -506,57 +507,4 @@ export class ScreenshotGifDialog {
     this.dialog.setMaxContentSize(dialogSize);
     this.dialog.setSizeBehavior(UI.GlassPane.SizeBehavior.SET_EXACT_SIZE);
   }
-
-  // private keyDown(event: Event): void {
-  //   const keyboardEvent = (event as KeyboardEvent);
-  //   switch (keyboardEvent.key) {
-  //     case 'ArrowLeft':
-  //       if (Host.Platform.isMac() && keyboardEvent.metaKey) {
-  //         this.onFirstFrame();
-  //       } else {
-  //         this.onPrevFrame();
-  //       }
-  //       break;
-
-  //     case 'ArrowRight':
-  //       if (Host.Platform.isMac() && keyboardEvent.metaKey) {
-  //         this.onLastFrame();
-  //       } else {
-  //         this.onNextFrame();
-  //       }
-  //       break;
-
-  //     case 'Home':
-  //       this.onFirstFrame();
-  //       break;
-
-  //     case 'End':
-  //       this.onLastFrame();
-  //       break;
-  //   }
-  // }
-
-  // private onPrevFrame(): void {
-  //   if (this.index > 0) {
-  //     --this.index;
-  //   }
-  //   void this.render();
-  // }
-
-  // private onNextFrame(): void {
-  //   if (this.index < this.#framesCount() - 1) {
-  //     ++this.index;
-  //   }
-  //   void this.render();
-  // }
-
-  // private onFirstFrame(): void {
-  //   this.index = 0;
-  //   void this.render();
-  // }
-
-  // private onLastFrame(): void {
-  //   this.index = this.#framesCount() - 1;
-  //   void this.render();
-  // }
 }
