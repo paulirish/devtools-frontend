@@ -270,7 +270,7 @@ export class LayoutShiftDetails extends HTMLElement {
         <div class="event-details">
           ${this.#renderTitle(this.#event)}
           ${this.#renderDetails(this.#event, this.#traceInsightsSets, this.#parsedTrace)}
-          ${(await this.#renderScreenshotThumbnail(this.#event))?.elem ?? ''}
+          ${await this.#renderScreenshotThumbnail(this.#event)}
         </div>
         <div class="insight-categories">
           ${this.#renderInsightChip()}
@@ -282,16 +282,15 @@ export class LayoutShiftDetails extends HTMLElement {
   }
 
   async #renderScreenshotThumbnail(event: Trace.Types.Events.SyntheticLayoutShift|
-                                   Trace.Types.Events.SyntheticLayoutShiftCluster): Promise<ScreenshotGif|undefined> {
-    if (!this.#parsedTrace) {
+                                   Trace.Types.Events.SyntheticLayoutShiftCluster):
+      Promise<LitHtml.TemplateResult|undefined> {
+    if (!this.#parsedTrace || Trace.Types.Events.isSyntheticLayoutShiftCluster(event)) {
       return;
     }
 
-    if (Trace.Types.Events.isSyntheticLayoutShiftCluster(event)) {
-      return;
-    }
-    const maxSize = new UI.Geometry.Size(400, 400);
-    return createScreenshotGif(event, this.#parsedTrace, maxSize);
+    const maxSize = new UI.Geometry.Size(300, 300);
+    const gif = await createScreenshotGif(event, this.#parsedTrace, maxSize);
+    return LitHtml.html`${gif?.elem ?? ''}`;
   }
 }
 
@@ -330,10 +329,10 @@ export async function createScreenshotGif(
   }
 
   /** The Layout Instability API in Blink, which reports the LayoutShift trace events, is not based on CSS pixels but
-         * physical pixels. As such the values in the impacted_nodes field need to be normalized to CSS units in order to
-         * map them to the viewport dimensions, which we get in CSS pixels. We do that by dividing the values by the devicePixelRatio.
-         * See https://crbug.com/1300309
-         */
+   * physical pixels. As such the values in the impacted_nodes field need to be normalized to CSS units in order to
+   * map them to the viewport dimensions, which we get in CSS pixels. We do that by dividing the values by the devicePixelRatio.
+   * See https://crbug.com/1300309
+   */
   const dpr = parsedTrace.Meta.devicePixelRatio;
   if (dpr === undefined) {
     return;
@@ -351,8 +350,7 @@ export async function createScreenshotGif(
       [];
 
   const screenshotContainer = document.createElement('div');
-  screenshotContainer.classList.add('layout-shift-screenshot-preview');
-  screenshotContainer.style.position = 'relative';
+  screenshotContainer.classList.add('layout-shift-screenshot-gif');
   screenshotContainer.appendChild(beforeImage);
 
   // If this is being size constrained, it needs to be done in JS (rather than css max-width, etc)....
@@ -366,7 +364,7 @@ export async function createScreenshotGif(
   // Set up before rects
   const rectEls = beforeRects.map((beforeRect, i) => {
     const rectEl = document.createElement('div');
-    rectEl.classList.add('layout-shift-screenshot-preview-rect');
+    rectEl.classList.add('layout-shift-screenshot-gif-rect');
 
     // If it's a 0x0x0x0 rect, then set to new, so we can fade it in from the new position instead.
     if ([beforeRect.width, beforeRect.height, beforeRect.x, beforeRect.y].every(v => v === 0)) {
