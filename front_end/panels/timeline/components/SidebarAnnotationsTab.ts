@@ -12,6 +12,7 @@ import * as IconButton from '../../../ui/components/icon_button/icon_button.js';
 import * as Settings from '../../../ui/components/settings/settings.js';
 import * as ThemeSupport from '../../../ui/legacy/theme_support/theme_support.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import {nameForEntry} from './EntryName.js';
 import {RemoveAnnotation, RevealAnnotation} from './Sidebar.js';
@@ -25,34 +26,37 @@ const UIStrings = {
   /**
    * @description Title for entry label.
    */
-  entryLabel: 'Entry label',
+  annotationGetStarted: 'Annotate a trace for yourself and others',
+  /**
+   * @description Title for entry label.
+   */
+  entryLabelTutorialTitle: 'Label an item',
   /**
    * @description Text for how to create an entry label.
    */
-  entryLabelDescription:
-      'Double click on an entry to create an entry label or select "Label Entry" from the entry context menu. Press "Esc" or "Enter" to complete.',
+  entryLabelTutorialDescription: 'Double-click on an item and type to create an item label.',
   /**
    * @description  Title for diagram.
    */
-  diagram: 'Diagram',
+  entryLinkTutorialTitle: 'Connect two items',
   /**
    * @description Text for how to create a diagram between entries.
    */
-  diagramDescription:
-      'Double click on an entry to create a diagram or select `Link Entries` from the entry context menu. Click empty space to delete the current connection.',
+  entryLinkTutorialDescription:
+      'Double-click on an item, click on the adjacent rightward arrow, then select the destination item.',
   /**
    * @description  Title for time range.
    */
-  timeRange: 'Time range',
+  timeRangeTutorialTitle: 'Define a time range',
   /**
    * @description Text for how to create a time range selection and add note.
    */
-  timeRangeDescription:
-      'Shift and drag on the canvas to create a time range and add a label. Press Esc or Enter to complete.',
+  timeRangeTutorialDescription: 'Shift-drag in the flamechart then type to create a time range annotation.',
   /**
-   * @description Text used to describe the delete button to screen readers
+   * @description Text used to describe the delete button to screen readers.
+   * @example {"A paint event annotated with the text hello world"} PH1
    **/
-  deleteButton: 'Delete this annotation',
+  deleteButton: 'Delete annotation: {PH1}',
   /**
    * @description label used to describe an annotation on an entry
    *@example {Paint} PH1
@@ -224,32 +228,43 @@ export class SidebarAnnotationsTab extends HTMLElement {
   #renderTutorialCard(): LitHtml.TemplateResult {
     return LitHtml.html`
       <div class="annotation-tutorial-container">
-        Try the new annotation feature:
+      ${i18nString(UIStrings.annotationGetStarted)}
         <div class="tutorial-card">
           <div class="tutorial-image"> <img src=${entryLabelImageUrl}></img></div>
-          <div class="tutorial-title">${i18nString(UIStrings.entryLabel)}</div>
-          <div class="tutorial-description">${i18nString(UIStrings.entryLabelDescription)}</div>
-          <div class="tutorial-shortcut">Double Click</div>
+          <div class="tutorial-title">${i18nString(UIStrings.entryLabelTutorialTitle)}</div>
+          <div class="tutorial-description">${i18nString(UIStrings.entryLabelTutorialDescription)}</div>
         </div>
         <div class="tutorial-card">
           <div class="tutorial-image"> <img src=${diagramImageUrl}></img></div>
-          <div class="tutorial-title">${i18nString(UIStrings.diagram)}</div>
-          <div class="tutorial-description">${i18nString(UIStrings.diagramDescription)}</div>
-          <div class="tutorial-shortcut">
-            <div class="keybinds-shortcut">
-              <span class="keybinds-key">Double Click</span>
-            </div>
-          </div>
+          <div class="tutorial-title">${i18nString(UIStrings.entryLabelTutorialTitle)}</div>
+          <div class="tutorial-description">${i18nString(UIStrings.entryLabelTutorialDescription)}</div>
+        </div>
+        <div class="tutorial-card">
+          <div class="tutorial-image"> <img src=${diagramImageUrl}></img></div>
+          <div class="tutorial-title">${i18nString(UIStrings.entryLinkTutorialTitle)}</div>
+          <div class="tutorial-description">${i18nString(UIStrings.entryLinkTutorialDescription)}</div>
         </div>
         <div class="tutorial-card">
           <div class="tutorial-image"> <img src=${timeRangeImageUrl}></img></div>
-          <div class="tutorial-title">${i18nString(UIStrings.timeRange)}</div>
-          <div class="tutorial-description">${i18nString(UIStrings.timeRangeDescription)}</div>
+          <div class="tutorial-title">${i18nString(UIStrings.timeRangeTutorialTitle)}</div>
+          <div class="tutorial-description">${i18nString(UIStrings.timeRangeTutorialDescription)}</div>
         </div>
       </div>
     `;
   }
 
+  #jslogForAnnotation(annotation: Trace.Types.File.Annotation): string {
+    switch (annotation.type) {
+      case 'ENTRY_LABEL':
+        return 'entry-label';
+      case 'TIME_RANGE':
+        return 'time-range';
+      case 'ENTRIES_LINK':
+        return 'entries-link';
+      default:
+        Platform.assertNever(annotation, 'unknown annotation type');
+    }
+  }
   #render(): void {
     // clang-format off
     LitHtml.render(
@@ -261,19 +276,24 @@ export class SidebarAnnotationsTab extends HTMLElement {
               ${this.#annotations.map(annotation => {
                 const label = detailedAriaDescriptionForAnnotation(annotation);
                 return LitHtml.html`
-                  <div class="annotation-container" @click=${() => this.#revealAnnotation(annotation)} aria-label=${label} tabindex="0">
+                  <div class="annotation-container"
+                    @click=${() => this.#revealAnnotation(annotation)}
+                    aria-label=${label}
+                    tabindex="0"
+                    jslog=${VisualLogging.item(`timeline.annotation-sidebar.annotation-${this.#jslogForAnnotation(annotation)}`).track({click: true})}
+                  >
                     <div class="annotation">
                       ${this.#renderAnnotationIdentifier(annotation)}
                       <span class="label">
                         ${(annotation.type === 'ENTRY_LABEL' || annotation.type === 'TIME_RANGE') ? annotation.label : ''}
                       </span>
                     </div>
-                    <button class="delete-button" aria-label=${i18nString(UIStrings.deleteButton)} @click=${(event: Event) => {
+                    <button class="delete-button" aria-label=${i18nString(UIStrings.deleteButton, {PH1: label})} @click=${(event: Event) => {
                       // Stop propagation to not zoom into the annotation when
                       // the delete button is clicked
                       event.stopPropagation();
                       this.dispatchEvent(new RemoveAnnotation(annotation));
-                    }}>
+                    }} jslog=${VisualLogging.action('timeline.annotation-sidebar.delete').track({click: true})}>
                       <${IconButton.Icon.Icon.litTagName}
                         class="bin-icon"
                         .data=${{

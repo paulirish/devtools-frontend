@@ -47,6 +47,11 @@ const UIStrings = {
    *@example {AI assistance in Settings} PH1
    */
   turnOnForStyles: 'Turn on {PH1} to get help with understanding CSS styles',
+  /**
+   *@description Text for asking the user to turn the AI assistance feature in settings first before they are able to use it.
+   *@example {AI assistance in Settings} PH1
+   */
+  turnOnForStylesAndRequests: 'Turn on {PH1} to get help with styles and network requests',
 };
 
 /*
@@ -125,9 +130,9 @@ const UIStringsNotTranslate = {
    */
   fixThisIssue: 'Fix this issue',
   /**
-   *@description The generic name of the AI assistance (do not translate)
+   *@description The generic name of the AI agent (do not translate)
    */
-  aiAssistance: 'AI assistance',
+  ai: 'AI',
   /**
    *@description The fallback text when we can't find the user full name
    */
@@ -218,8 +223,8 @@ export interface UserChatMessage {
 }
 export interface ModelChatMessage {
   entity: ChatMessageEntity.MODEL;
-  suggestions: string[];
   steps: Step[];
+  suggestions?: string[];
   answer?: string;
   error?: ErrorType;
   rpcId?: number;
@@ -639,7 +644,8 @@ export class FreestylerChatUi extends HTMLElement {
       // clang-format on
     }
 
-    const shouldShowSuggestions = (isLast && !this.#props.isLoading && message.suggestions?.length > 0);
+    const shouldShowSuggestions =
+        (isLast && !this.#props.isLoading && message.suggestions && message.suggestions?.length > 0);
     // clang-format off
     return LitHtml.html`
       <section class="chat-message answer" jslog=${VisualLogging.section('answer')}>
@@ -648,7 +654,7 @@ export class FreestylerChatUi extends HTMLElement {
             name="smart-assistant"
           ></${IconButton.Icon.Icon.litTagName}>
           <div class="message-name">
-            <h2>${lockedString(UIStringsNotTranslate.aiAssistance)}</h2>
+            <h2>${lockedString(UIStringsNotTranslate.ai)}</h2>
           </div>
         </div>
         ${LitHtml.Directives.repeat(
@@ -674,7 +680,7 @@ export class FreestylerChatUi extends HTMLElement {
           }
           ${shouldShowSuggestions ?
             LitHtml.html`<div class="suggestions">
-              ${message.suggestions.map(suggestion => LitHtml.html`<${Buttons.Button.Button.litTagName}
+              ${message.suggestions?.map(suggestion => LitHtml.html`<${Buttons.Button.Button.litTagName}
                   .data=${{
                       variant: Buttons.Button.Variant.OUTLINED,
                       jslogContext: 'fix-this-issue',
@@ -883,6 +889,7 @@ export class FreestylerChatUi extends HTMLElement {
       void UI.ViewManager.ViewManager.instance().showView('chrome-ai');
     });
     settingsLink.setAttribute('jslog', `${VisualLogging.action('open-ai-settings').track({click: true})}`);
+    const config = Common.Settings.Settings.instance().getHostConfig();
 
     // clang-format off
     return LitHtml.html`
@@ -896,7 +903,10 @@ export class FreestylerChatUi extends HTMLElement {
             } as IconButton.Icon.IconData}>
           </div>
           <div>
-            ${i18n.i18n.getFormatLocalizedString(str_, UIStrings.turnOnForStyles, {PH1: settingsLink})}
+            ${config.devToolsExplainThisResourceDogfood?.enabled ?
+              i18n.i18n.getFormatLocalizedString(str_, UIStrings.turnOnForStylesAndRequests, {PH1: settingsLink}) :
+              i18n.i18n.getFormatLocalizedString(str_, UIStrings.turnOnForStyles, {PH1: settingsLink})
+            }
           </div>
         </div>
       </div>

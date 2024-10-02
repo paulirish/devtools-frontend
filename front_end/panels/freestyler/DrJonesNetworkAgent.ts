@@ -9,12 +9,16 @@ import type * as SDK from '../../core/sdk/sdk.js';
 import * as Logs from '../../models/logs/logs.js';
 
 import {
+  AiAgent,
   type AidaRequestOptions,
   type ContextDetail,
+  debugLog,
   ErrorType,
-  type HistoryChunk,
+  isDebugMode,
   type ResponseData,
   ResponseType,
+  type ThoughtResponse,
+  type TitleResponse,
 } from './AiAgent.js';
 
 /* clang-format off */
@@ -96,117 +100,66 @@ const UIStringsNotTranslate = {
 
 const lockedString = i18n.i18n.lockedString;
 
-type AgentOptions = {
-  aidaClient: Host.AidaClient.AidaClient,
-  serverSideLoggingEnabled?: boolean,
-};
-
 /**
  * One agent instance handles one conversation. Create a new agent
  * instance for a new conversation.
  */
-export class DrJonesNetworkAgent {
-  static buildRequest(opts: AidaRequestOptions): Host.AidaClient.AidaRequest {
+export class DrJonesNetworkAgent extends AiAgent {
+  readonly preamble = preamble;
+  readonly clientFeature = Host.AidaClient.ClientFeature.CHROME_FREESTYLER;
+  // TODO(b/369822364): use a feature param instead.
+  readonly userTier = 'BETA';
+  get options(): AidaRequestOptions {
     const config = Common.Settings.Settings.instance().getHostConfig();
-    const temperature = config.devToolsExplainThisResourceDogfood?.temperature;
-    const request: Host.AidaClient.AidaRequest = {
-      input: opts.input,
-      preamble: opts.preamble,
-      // eslint-disable-next-line @typescript-eslint/naming-convention
-      chat_history: opts.chatHistory,
-      client: Host.AidaClient.CLIENT_NAME,
-      options: {
-        ...(temperature !== undefined && temperature >= 0) && {temperature},
-        model_id: config.devToolsExplainThisResourceDogfood?.modelId ?? undefined,
-      },
-      metadata: {
-        disable_user_content_logging: !(opts.serverSideLoggingEnabled ?? false),
-        string_session_id: opts.sessionId,
-        // TODO(b/369822364): use a feature param instead.
-        user_tier: Host.AidaClient.convertToUserTierEnum('BETA'),
-      },
-      // eslint-disable-next-line @typescript-eslint/naming-convention
-      functionality_type: Host.AidaClient.FunctionalityType.CHAT,
-      // eslint-disable-next-line @typescript-eslint/naming-convention
-      client_feature: Host.AidaClient.ClientFeature.CHROME_FREESTYLER,
+    const temperature = AiAgent.validTemperature(config.devToolsExplainThisResourceDogfood?.temperature);
+    const modelId = config.devToolsExplainThisResourceDogfood?.modelId;
+
+    return {
+      temperature,
+      model_id: modelId,
     };
-    return request;
   }
 
-  #aidaClient: Host.AidaClient.AidaClient;
-  #chatHistory: Map<number, HistoryChunk[]> = new Map();
-  #serverSideLoggingEnabled: boolean;
-
-  readonly #sessionId = crypto.randomUUID();
-
-  constructor(opts: AgentOptions) {
-    this.#aidaClient = opts.aidaClient;
-    this.#serverSideLoggingEnabled = opts.serverSideLoggingEnabled ?? false;
+  *
+      handleContextDetails(selectedNetworkRequest: SDK.NetworkRequest.NetworkRequest|null):
+          Generator<ThoughtResponse|TitleResponse, void, void> {
+    yield {
+      type: ResponseType.TITLE,
+      title: lockedString(UIStringsNotTranslate.inspectingNetworkData),
+    };
+    yield {
+      type: ResponseType.THOUGHT,
+      thought: lockedString(UIStringsNotTranslate.dataUsedToGenerateThisResponse),
+      contextDetails: createContextDetailsForDrJonesNetworkAgent(selectedNetworkRequest),
+    };
   }
 
-  get #getHistoryEntry(): Array<HistoryChunk> {
-    return [...this.#chatHistory.values()].flat();
-  }
-
-  get chatHistoryForTesting(): Array<HistoryChunk> {
-    return this.#getHistoryEntry;
-  }
-
-  async #aidaFetch(request: Host.AidaClient.AidaRequest, options: {signal?: AbortSignal}):
-      Promise<{response: string, rpcId: number|undefined}> {
-    let response = '';
-    let rpcId;
-    for await (const lastResult of this.#aidaClient.fetch(request, options)) {
-      response = lastResult.explanation;
-      rpcId = lastResult.metadata.rpcGlobalId ?? rpcId;
-      if (lastResult.metadata.attributionMetadata?.some(
-              meta => meta.attributionAction === Host.AidaClient.RecitationAction.BLOCK)) {
-        throw new Error('Attribution action does not allow providing the response');
-      }
-    }
-    return {response, rpcId};
+  async enhanceQuery(query: string, selectedNetworkRequest: SDK.NetworkRequest.NetworkRequest|null): Promise<string> {
+    const networkEnchantmentQuery = selectedNetworkRequest ?
+        `# Selected network request \n${formatNetworkRequest(selectedNetworkRequest)}\n\n# User request\n\n` :
+        '';
+    return `${networkEnchantmentQuery}${query}`;
   }
 
   #runId = 0;
   async * run(query: string, options: {
     signal?: AbortSignal, selectedNetworkRequest: SDK.NetworkRequest.NetworkRequest|null,
   }): AsyncGenerator<ResponseData, void, void> {
-    const structuredLog = [];
-    query = `${
-        options.selectedNetworkRequest ?
-            `# Selected network request \n${
-                formatNetworkRequest(options.selectedNetworkRequest)}\n\n# User request\n\n` :
-            ''}${query}`;
+    yield* this.handleContextDetails(options.selectedNetworkRequest);
+
+    query = await this.enhanceQuery(query, options.selectedNetworkRequest);
     const currentRunId = ++this.#runId;
 
-    const request = DrJonesNetworkAgent.buildRequest({
-      input: query,
-      preamble,
-      chatHistory: this.#chatHistory.size ? this.#getHistoryEntry : undefined,
-      serverSideLoggingEnabled: this.#serverSideLoggingEnabled,
-      sessionId: this.#sessionId,
-    });
     let response: string;
     let rpcId: number|undefined;
     try {
-      yield {
-        type: ResponseType.TITLE,
-        title: lockedString(UIStringsNotTranslate.inspectingNetworkData),
-        rpcId,
-      };
-      yield {
-        type: ResponseType.THOUGHT,
-        thought: lockedString(UIStringsNotTranslate.dataUsedToGenerateThisResponse),
-        contextDetails: createContextDetailsForDrJonesNetworkAgent(options.selectedNetworkRequest),
-        rpcId,
-      };
-      const fetchResult = await this.#aidaFetch(request, {signal: options.signal});
+      const fetchResult = await this.aidaFetch(query, {signal: options.signal});
       response = fetchResult.response;
       rpcId = fetchResult.rpcId;
     } catch (err) {
       debugLog('Error calling the AIDA API', err);
       if (err instanceof Host.AidaClient.AidaAbortError) {
-        this.#chatHistory.delete(currentRunId);
+        this.removeHistoryRun(currentRunId);
         yield {
           type: ResponseType.ERROR,
           error: ErrorType.ABORT,
@@ -223,64 +176,20 @@ export class DrJonesNetworkAgent {
       return;
     }
 
-    if (options.signal?.aborted) {
-      return;
-    }
-
-    debugLog('Request', request, 'Response', response);
-
-    structuredLog.push({
-      request: structuredClone(request),
-      response,
+    this.addToHistory({
+      id: currentRunId,
+      query,
+      output: response,
     });
 
-    const addToHistory = (text: string): void => {
-      this.#chatHistory.set(currentRunId, [
-        ...currentRunEntries,
-        {
-          text: query,
-          entity: Host.AidaClient.Entity.USER,
-        },
-        {
-          text,
-          entity: Host.AidaClient.Entity.SYSTEM,
-        },
-      ]);
-    };
-    const currentRunEntries = this.#chatHistory.get(currentRunId) ?? [];
-    addToHistory(response);
     yield {
       type: ResponseType.ANSWER,
       text: response,
-      // TODO: Remove this need.
-      suggestions: [],
       rpcId,
     };
     if (isDebugMode()) {
-      localStorage.setItem('freestylerStructuredLog', JSON.stringify(structuredLog));
       window.dispatchEvent(new CustomEvent('freestylerdone'));
     }
-  }
-}
-
-function isDebugMode(): boolean {
-  return Boolean(localStorage.getItem('debugFreestylerEnabled'));
-}
-
-function debugLog(...log: unknown[]): void {
-  if (!isDebugMode()) {
-    return;
-  }
-
-  // eslint-disable-next-line no-console
-  console.log(...log);
-}
-
-function setDebugFreestylerEnabled(enabled: boolean): void {
-  if (enabled) {
-    localStorage.setItem('debugFreestylerEnabled', 'true');
-  } else {
-    localStorage.removeItem('debugFreestylerEnabled');
   }
 }
 
@@ -413,6 +322,3 @@ function createContextDetailsForDrJonesNetworkAgent(request: SDK.NetworkRequest.
   }
   return [];
 }
-
-// @ts-ignore
-globalThis.setDebugFreestylerEnabled = setDebugFreestylerEnabled;

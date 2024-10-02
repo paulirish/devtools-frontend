@@ -5,6 +5,7 @@ import * as Common from '../../../core/common/common.js';
 import * as Platform from '../../../core/platform/platform.js';
 import * as Trace from '../../../models/trace/trace.js';
 import type * as PerfUI from '../../../ui/legacy/components/perf_ui/perf_ui.js';
+import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import * as Components from './components/components.js';
 
@@ -762,32 +763,8 @@ export class Overlays extends EventTarget {
           this.#setOverlayElementVisibility(element, false);
           break;
         }
+        this.#positionEntriesLinkOverlay(overlay, element, entriesToConnect);
 
-        // If both entries are in collapsed tracks, we hide the overlay completely.
-        const fromEntryInCollapsedTrack = this.#entryIsInCollapsedTrack(entriesToConnect.entryFrom);
-        const toEntryInCollapsedTrack =
-            entriesToConnect.entryTo && this.#entryIsInCollapsedTrack(entriesToConnect.entryTo);
-        const bothEntriesInCollapsedTrack = Boolean(fromEntryInCollapsedTrack && toEntryInCollapsedTrack);
-        if (bothEntriesInCollapsedTrack) {
-          this.#setOverlayElementVisibility(element, false);
-          return;
-        }
-
-        const isVisible = !annotationsAreHidden;
-        this.#setOverlayElementVisibility(element, isVisible);
-        if (isVisible) {
-          this.#positionEntriesLinkOverlay(overlay, element, entriesToConnect);
-
-          // If either entry (but not both) is in a track that the user has collapsed, we do not
-          // show the connection at all, but we still show the borders around
-          // the entry. So in this case we mark the overlay as visible, but
-          // tell it to not draw the arrow.
-          const hideArrow = Boolean(fromEntryInCollapsedTrack || toEntryInCollapsedTrack);
-          const component = element.querySelector('devtools-entries-link-overlay');
-          if (component) {
-            component.hideArrow = hideArrow;
-          }
-        }
         break;
       }
       case 'TIMESPAN_BREAKDOWN': {
@@ -927,6 +904,24 @@ export class Overlays extends EventTarget {
     const component = element.querySelector('devtools-entries-link-overlay');
 
     if (component) {
+      const fromEntryInCollapsedTrack = this.#entryIsInCollapsedTrack(entriesToConnect.entryFrom);
+      const toEntryInCollapsedTrack =
+          entriesToConnect.entryTo && this.#entryIsInCollapsedTrack(entriesToConnect.entryTo);
+
+      const bothEntriesInCollapsedTrack = Boolean(fromEntryInCollapsedTrack && toEntryInCollapsedTrack);
+      // If both entries are in collapsed tracks, we hide the overlay completely.
+      if (bothEntriesInCollapsedTrack) {
+        this.#setOverlayElementVisibility(element, false);
+        return;
+      }
+
+      // If either entry (but not both) is in a track that the user has collapsed, we do not
+      // show the connection at all, but we still show the borders around
+      // the entry. So in this case we mark the overlay as visible, but
+      // tell it to not draw the arrow.
+      const hideArrow = Boolean(fromEntryInCollapsedTrack || toEntryInCollapsedTrack);
+      component.hideArrow = hideArrow;
+
       const {entryFrom, entryTo, entryFromIsSource, entryToIsSource} = entriesToConnect;
       const entryFromWrapper = component.entryFromWrapper();
 
@@ -943,12 +938,8 @@ export class Overlays extends EventTarget {
         y: fromEntryY,
       } = this.#positionEntryBorderOutlineType(entriesToConnect.entryFrom, entryFromWrapper) || {};
 
-      if (!fromEntryHeight || !fromEntryWidth || !fromEntryX || !fromEntryY) {
-        return;
-      }
-
-      const entryFromVisibility = this.entryIsVisibleOnChart(entryFrom);
-      const entryToVisibility = entryTo ? this.entryIsVisibleOnChart(entryTo) : false;
+      const entryFromVisibility = this.entryIsVisibleOnChart(entryFrom) && !fromEntryInCollapsedTrack;
+      const entryToVisibility = entryTo ? this.entryIsVisibleOnChart(entryTo) && !toEntryInCollapsedTrack : false;
 
       // If `fromEntry` is not visible and the link creation is not started yet, meaning that
       // only the button to create the link is displayed, delete the whole overlay.
@@ -967,8 +958,10 @@ export class Overlays extends EventTarget {
         toEntryVisibility: entryToVisibility,
       };
 
-      component.fromEntryCoordinateAndDimentions =
-          {x: fromEntryX, y: yPixelForFromArrow, length: fromEntryWidth, height: fromEntryHeight - fromCutOffHeight};
+      if (fromEntryHeight && fromEntryWidth && fromEntryX && fromEntryY) {
+        component.fromEntryCoordinateAndDimentions =
+            {x: fromEntryX, y: yPixelForFromArrow, length: fromEntryWidth, height: fromEntryHeight - fromCutOffHeight};
+      }
 
       const entryToWrapper = component.entryToWrapper();
       // If entryTo exists, pass the coordinates and dimentions of the entry that the arrow snaps to.
@@ -982,20 +975,18 @@ export class Overlays extends EventTarget {
           y: toEntryY,
         } = this.#positionEntryBorderOutlineType(entryTo, entryToWrapper) || {};
 
-        if (!toEntryHeight || !toEntryX) {
-          return;
+        if (toEntryHeight && toEntryX) {
+          // If the 'to' entry is visible, set the entry Y as an arrow coordinate to point ot. If not, get the canvas edge coordate to point the arrow to.
+          const yPixelForToArrow =
+              ((this.entryIsVisibleOnChart(entryTo)) ? toEntryY : this.#yCoordinateForNotVisibleEntry(entryTo)) ?? 0;
+
+          component.toEntryCoordinateAndDimentions = {
+            x: toEntryX,
+            y: yPixelForToArrow,
+            length: toEntryWidth,
+            height: toEntryHeight - toCutOffHeight,
+          };
         }
-
-        // If the 'to' entry is visible, set the entry Y as an arrow coordinate to point ot. If not, get the canvas edge coordate to point the arrow to.
-        const yPixelForToArrow =
-            ((this.entryIsVisibleOnChart(entryTo)) ? toEntryY : this.#yCoordinateForNotVisibleEntry(entryTo)) ?? 0;
-
-        component.toEntryCoordinateAndDimentions = {
-          x: toEntryX,
-          y: yPixelForToArrow,
-          length: toEntryWidth,
-          height: toEntryHeight - toCutOffHeight,
-        };
 
       } else if (this.#lastMouseOffsetX && this.#lastMouseOffsetY) {
         // The second coordinate for in progress link gets updated on mousemove
@@ -1325,6 +1316,12 @@ export class Overlays extends EventTarget {
   #createElementForNewOverlay(overlay: TimelineOverlay): HTMLElement {
     const div = document.createElement('div');
     div.classList.add('overlay-item', `overlay-type-${overlay.type}`);
+
+    const jslogContext = jsLogContext(overlay);
+    if (jslogContext) {
+      div.setAttribute('jslog', `${VisualLogging.item(jslogContext)}`);
+    }
+
     switch (overlay.type) {
       case 'ENTRY_LABEL': {
         const shouldDrawLabelBelowEntry = Trace.Types.Events.isLegacyTimelineFrame(overlay.entry);
@@ -1726,4 +1723,46 @@ export function timingsForOverlayEntry(entry: OverlayEntry):
     };
   }
   return Trace.Helpers.Timing.eventTimingsMicroSeconds(entry);
+}
+
+/**
+ * Defines if the overlay container `div` should have a jslog context attached.
+ * Note that despite some of the overlays being used currently exclusively
+ * for annotations, we log here with `overlays` to be generic as overlays can
+ * be used for insights, annotations or in the future, who knows...
+ */
+export function jsLogContext(overlay: TimelineOverlay): string|null {
+  switch (overlay.type) {
+    case 'ENTRY_SELECTED': {
+      // No jslog for this; it would be very noisy and not very useful.
+      return null;
+    }
+    case 'ENTRY_OUTLINE': {
+      return `timeline.overlays.entry-outline-${Platform.StringUtilities.toKebabCase(overlay.outlineReason)}`;
+    }
+    case 'ENTRY_LABEL': {
+      return 'timeline.overlays.entry-label';
+    }
+    case 'ENTRIES_LINK': {
+      // do not log impressions for incomplete entry links
+      if (overlay.state !== Trace.Types.File.EntriesLinkState.CONNECTED) {
+        return null;
+      }
+      return 'timeline.overlays.entries-link';
+    }
+    case 'TIME_RANGE': {
+      return 'timeline.overlays.time-range';
+    }
+    case 'TIMESPAN_BREAKDOWN': {
+      return 'timeline.overlays.timespan-breakdown';
+    }
+    case 'CURSOR_TIMESTAMP_MARKER': {
+      return 'timeline.overlays.cursor-timestamp-marker';
+    }
+    case 'CANDY_STRIPED_TIME_RANGE': {
+      return 'timeline.overlays.candy-striped-time-range';
+    }
+    default:
+      Platform.assertNever(overlay, 'Unknown overlay type');
+  }
 }

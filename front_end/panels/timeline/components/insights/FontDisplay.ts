@@ -3,12 +3,11 @@
 // found in the LICENSE file.
 
 import * as i18n from '../../../../core/i18n/i18n.js';
-import * as Platform from '../../../../core/platform/platform.js';
 import * as Trace from '../../../../models/trace/trace.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 import type * as Overlays from '../../overlays/overlays.js';
 
-import {BaseInsight, shouldRenderForCategory} from './Helpers.js';
+import {BaseInsight, shortenUrl, shouldRenderForCategory} from './Helpers.js';
 import * as SidebarInsight from './SidebarInsight.js';
 import {Table, type TableData} from './Table.js';
 import {Category} from './types.js';
@@ -37,19 +36,25 @@ export class FontDisplay extends BaseInsight {
   override userVisibleTitle: string = i18nString(UIStrings.title);
   override description: string = i18nString(UIStrings.description);
 
+  #overlayForRequest = new Map<Trace.Types.Events.SyntheticNetworkRequest, Overlays.Overlays.TimelineOverlay>();
+
   override createOverlays(): Overlays.Overlays.TimelineOverlay[] {
+    this.#overlayForRequest.clear();
+
     const insight = Trace.Insights.Common.getInsight('FontDisplay', this.data.insights, this.data.insightSetKey);
     if (!insight) {
       return [];
     }
 
-    return insight.fonts.map(font => {
-      return {
+    for (const font of insight.fonts) {
+      this.#overlayForRequest.set(font.request, {
         type: 'ENTRY_OUTLINE',
         entry: font.request,
         outlineReason: font.wastedTime ? 'ERROR' : 'INFO',
-      };
-    });
+      });
+    }
+
+    return [...this.#overlayForRequest.values()];
   }
 
   #render(data: Trace.Insights.Types.InsightResults['FontDisplay']): LitHtml.TemplateResult {
@@ -71,11 +76,11 @@ export class FontDisplay extends BaseInsight {
                       rows: data.fonts.map(font => ({
                         values: [
                           // TODO(crbug.com/369422196): the font name would be nicer here.
-                          Platform.StringUtilities.trimMiddle(font.request.args.data.url.split('/').at(-1) ?? '', 20),
+                          shortenUrl(font.request.args.data.url),
                           font.display,
                           i18n.TimeUtilities.millisToString(font.wastedTime),
-                          // TODO(crbug.com/369102516): hover?
                         ],
+                        overlays: [this.#overlayForRequest.get(font.request)],
                       })),
                     } as TableData}>
                   </${Table.litTagName}>`}

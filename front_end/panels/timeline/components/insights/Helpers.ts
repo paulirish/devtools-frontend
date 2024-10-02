@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Platform from '../../../../core/platform/platform.js';
 import type * as Trace from '../../../../models/trace/trace.js';
 import * as Marked from '../../../../third_party/marked/marked.js';
 import * as ComponentHelpers from '../../../../ui/components/helpers/helpers.js';
@@ -34,6 +35,7 @@ export function insightIsActive(options: {
 
 export interface BaseInsightData {
   insights: Trace.Insights.Types.TraceInsightSets|null;
+  parsedTrace: Trace.Handlers.Types.ParsedTrace|null;
   /** The key into `insights` that contains this particular insight. */
   insightSetKey: string|null;
   activeInsight: ActiveInsight|null;
@@ -52,6 +54,7 @@ export abstract class BaseInsight extends HTMLElement {
 
   protected data: BaseInsightData = {
     insights: null,
+    parsedTrace: null,
     insightSetKey: null,
     activeInsight: null,
     activeCategory: Category.ALL,
@@ -77,6 +80,11 @@ export abstract class BaseInsight extends HTMLElement {
 
   set insights(insights: Trace.Insights.Types.TraceInsightSets|null) {
     this.data.insights = insights;
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
+  }
+
+  set parsedTrace(parsedTrace: Trace.Handlers.Types.ParsedTrace|null) {
+    this.data.parsedTrace = parsedTrace;
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
   }
 
@@ -159,6 +167,27 @@ export abstract class BaseInsight extends HTMLElement {
   }
 }
 
+// TODO(crbug.com/368170718): consider better treatments for shortening URLs.
+export function shortenUrl(url: string): string {
+  const maxLength = 20;
+
+  // TODO(crbug.com/368170718): This is something that should only be done if the origin is the same
+  // as the insight set's origin.
+  const elideOrigin = false;
+  if (elideOrigin) {
+    try {
+      url = new URL(url).pathname;
+    } catch {
+    }
+  }
+
+  if (url.length <= maxLength) {
+    return url;
+  }
+
+  return Platform.StringUtilities.trimMiddle(url.split('/').at(-1) ?? '', maxLength);
+}
+
 /**
  * Returns a rendered MarkdownView component.
  *
@@ -169,4 +198,18 @@ export function md(markdown: string): LitHtml.TemplateResult {
   return LitHtml.html`<${MarkdownView.MarkdownView.MarkdownView.litTagName}
     .data=${{tokens} as MarkdownView.MarkdownView.MarkdownViewData}>
   </${MarkdownView.MarkdownView.MarkdownView.litTagName}>`;
+}
+
+export class EventReferenceClick extends Event {
+  static readonly eventName = 'eventreferenceclick';
+
+  constructor(public metricEvent: Trace.Types.Events.Event) {
+    super(EventReferenceClick.eventName, {bubbles: true, composed: true});
+  }
+}
+
+declare global {
+  interface GlobalEventHandlersEventMap {
+    [EventReferenceClick.eventName]: EventReferenceClick;
+  }
 }
