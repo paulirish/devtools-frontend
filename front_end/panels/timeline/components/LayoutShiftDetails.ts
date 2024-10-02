@@ -234,16 +234,13 @@ export class LayoutShiftDetails extends HTMLElement {
     if (!this.#layoutShift || !this.#traceInsightsSets || !this.#parsedTrace) {
       return;
     }
-    // todo: move into table
-    const gif = await this.#renderScreenshotThumbnail(this.#layoutShift);
-    gif && this.#shadow.append(gif.elem);
-
     // clang-format off
     const output = LitHtml.html`
       <div class="layout-shift-summary-details">
         <div class="event-details">
           ${this.#renderTitle()}
           ${this.#renderDetailsTable(this.#layoutShift, this.#traceInsightsSets, this.#parsedTrace)}
+          ${(await this.#renderScreenshotThumbnail(this.#layoutShift))?.elem ?? ''}
         </div>
         <div class="insight-categories">
           ${this.#renderInsightChip()}
@@ -258,7 +255,7 @@ export class LayoutShiftDetails extends HTMLElement {
     if (!this.#parsedTrace) {
       return;
     }
-    const maxSize = new UI.Geometry.Size(100, 100);
+    const maxSize = new UI.Geometry.Size(400, 400);
     return createScreenshotGif(event, this.#parsedTrace, maxSize);
   }
 }
@@ -362,9 +359,8 @@ export async function createScreenshotGif(
     screenshotContainer.appendChild(afterImage);
     afterImage.style.width = beforeImage.style.width;
     afterImage.style.height = beforeImage.style.height;
-    afterImage.addEventListener('click', () => {
-      new ScreenshotGifDialog(event, parsedTrace);
-    });
+    // TODO(paulirish): hook up dialog
+    // afterImage.addEventListener('click', () => { new ScreenshotGifDialog(event, parsedTrace); });
   }
 
   // Update for the after rect positions after a bit.
@@ -390,169 +386,3 @@ export async function createScreenshotGif(
   return {elem: screenshotContainer, width, height};
 }
 
-
-export class ScreenshotGifDialog {
-  private fragment: UI.Fragment.Fragment;
-  private readonly widget: UI.XWidget.XWidget;
-  private dialog: UI.Dialog.Dialog|null = null;
-
-  constructor(event: Trace.Types.Events.SyntheticLayoutShift, parsedTrace: Trace.Handlers.Types.ParsedTrace) {
-    const prevButton = UI.UIUtils.createTextButton('\u25C0', () => console.log('prev gif'));
-    UI.Tooltip.Tooltip.install(prevButton, i18nString('prev gif'));
-    const nextButton = UI.UIUtils.createTextButton('\u25B6', () => console.log('next gif'));
-    UI.Tooltip.Tooltip.install(nextButton, i18nString('next gif'));
-
-    this.fragment = UI.Fragment.Fragment.build`
-      <x-widget flex=none margin=12px>
-        <x-hbox>
-          <x-hbox $='container' overflow=auto border='1px solid #ddd'>
-          </x-hbox>
-          <x-hbox>
-            <ul $='nodes'>
-
-            </ul>
-          </x-hbox>
-        </x-hbox>
-          <x-hbox x-center justify-content=center margin-top=10px>
-          ${prevButton}
-          <x-hbox $='time' margin=8px></x-hbox>
-          ${nextButton}
-        </x-hbox>
-      </x-widget>
-    `;
-
-    this.widget = (this.fragment.element() as UI.XWidget.XWidget);
-    (this.widget as HTMLElement).tabIndex = 0;
-    // this.widget.addEventListener('keydown', this.keyDown.bind(this), false);
-    this.dialog = null;
-
-    void this.renderDialog(event, parsedTrace);
-  }
-
-  private async renderDialog(
-      event: Trace.Types.Events.SyntheticLayoutShift, parsedTrace: Trace.Handlers.Types.ParsedTrace): Promise<void> {
-    const maxSize = new UI.Geometry.Size(800, 800);
-    const gif = await createScreenshotGif(event, parsedTrace, maxSize);
-    if (!gif) {
-      return;
-    }
-    const dialogSize = new UI.Geometry.Size(gif.width + 300, gif.height);
-
-    this.fragment.$('container').append(gif.elem);
-
-    const lis = event.args.data?.impacted_nodes?.map((node, i) => {
-      const rectEl = this.fragment.$('container').querySelectorAll('.layout-shift-screenshot-preview-rect').item(i);
-      return LitHtml.html`
-            <li><${NodeLink.NodeLink.litTagName}
-              @mouseover=${() => () => rectEl.classList.add('highlight')}
-              @mouseleave=${() => () => rectEl.classList.remove('highlight')}
-              .data=${{
-        backendNodeId: node.node_id,
-      } as NodeLink.NodeLinkData}>
-            </${NodeLink.NodeLink.litTagName}></li>`;
-    });
-    LitHtml.render(
-        LitHtml.html`
-      <ul>
-        ${lis}
-      </ul>
-    `,
-        this.fragment.$('nodes') as HTMLElement);
-
-    this.resize(dialogSize);
-  }
-
-  hide(): void {
-    if (this.dialog) {
-      this.dialog.hide();
-    }
-  }
-
-  private resize(dialogSize: UI.Geometry.Size): void {
-    if (!this.dialog) {
-      this.dialog = new UI.Dialog.Dialog();
-      this.dialog.contentElement.appendChild(this.widget);
-      this.dialog.setDefaultFocusedElement(this.widget);
-      // this.dialog.registerRequiredCSS({cssContent: styles});
-      this.dialog.show();
-    }
-    this.dialog.setMaxContentSize(dialogSize);
-    this.dialog.setSizeBehavior(UI.GlassPane.SizeBehavior.SET_EXACT_SIZE);
-  }
-}
-
-
-// write a new version of the ScreenshotGifDialog, but as a custom element using LitHtml where appropriate. and the NodeLink component to link nodes.  Finally, add a "time" element that shows the time of the current layout shift.
-// okay go
-export class LayoutShiftGifDialog extends HTMLElement {
-  static readonly litTagName = LitHtml.literal`devtools-performance-layout-shift-gif-dialog`;
-  readonly #shadow = this.attachShadow({mode: 'open'});
-  #layoutShift?: Trace.Types.Events.SyntheticLayoutShift|null;
-  #parsedTrace: Trace.Handlers.Types.ParsedTrace|null = null;
-  #gif: ScreenshotGif|undefined;
-  #currentShiftIndex = 0;
-  #rectEls: HTMLElement[] = [];
-  #nodeLinks: NodeLink.NodeLink[] = [];
-
-
-  connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [layoutShiftDetailsStyles];
-    // Styles for linkifier button.
-    UI.UIUtils.injectTextButtonStyles(this.#shadow);
-    this.#render();
-  }
-
-  setData(layoutShift: Trace.Types.Events.SyntheticLayoutShift, parsedTrace: Trace.Handlers.Types.ParsedTrace): void {
-    if (this.#layoutShift === layoutShift) {
-      return;
-    }
-    this.#layoutShift = layoutShift;
-    this.#parsedTrace = parsedTrace;
-    this.#render();
-  }
-
-  #render(): void {
-    if (!this.#layoutShift || !this.#parsedTrace) {
-      return;
-    }
-
-    const maxSize = new UI.Geometry.Size(800, 800);
-    const gif = createScreenshotGif(this.#layoutShift, this.#parsedTrace, maxSize);
-    if (!gif) {
-      return;
-    }
-
-
-    this.#layoutShift.args.data?.impacted_nodes?.forEach((node, i) => {
-      const rectEl = gif.elem.querySelectorAll('.layout-shift-screenshot-preview-rect').item(i);
-      LitHtml.html`
-            ${NodeLink.NodeLink.litTagName}
-              @mouseover=${() => () => rectEl.classList.add('highlight')}
-              @mouseleave=${() => () => rectEl.classList.remove('highlight')}
-              .data=${{
-        backendNodeId: node.node_id,
-      } as NodeLink.NodeLinkData}>
-            </${NodeLink.NodeLink.litTagName}>`;
-    });
-    this.#nodeLinks.push(nodeLink);
-  });
-
-
-  // clang-format off
-    const output = LitHtml.html`
-      <div class="layout-shift-gif-dialog">
-        <div class="layout-shift-gif-dialog-container">
-          ${this.#gif ? LitHtml.html`
-            <div class="layout-shift-gif-dialog-gif">
-              ${this.#gif.elem}
-            </div>` : LitHtml.nothing}
-        </div>
-        <div class="layout-shift-gif-dialog-controls">
-          <div class="layout-shift-gif-dialog-nodes">
-            <ul>
-              ${this.#lis}
-            </ul>
-          </div>
-          <div class="layout-shift-gif-dialog-time">
-            ${this.#layoutShift ? LitHtml.html`
-              <span class="time">${i18n.TimeUtilities.preciseMillisToString(Helpers.Timing.microSecondsToMilliseconds(this

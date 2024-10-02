@@ -41,6 +41,7 @@ export async function finalize(): Promise<void> {
 
   for (const snapshotEvent of snapshotEvents) {
     const {cat, name, ph, pid, tid} = snapshotEvent;
+    console.log(`correcting ${(getPresentationTimestamp(snapshotEvent) - snapshotEvent.ts) / 1000} to the right`);
     const syntheticEvent = Helpers.SyntheticEvents.SyntheticEventsManager.registerSyntheticEvent<
         Types.Events.SyntheticScreenshot>({
       rawSourceEvent: snapshotEvent,
@@ -50,7 +51,7 @@ export async function finalize(): Promise<void> {
       pid,
       tid,
       // `getPresentationTimestamp(snapshotEvent) - snapshotEvent.ts` is how many microsec the screenshot was adjusted to the right/later
-      ts: snapshotEvent.ts,  // getPresentationTimestamp(snapshotEvent),
+      ts: getPresentationTimestamp(snapshotEvent),
       args: {
         dataUri: `data:image/jpg;base64,${snapshotEvent.args.snapshot}`,
       },
