@@ -390,34 +390,6 @@ export async function createScreenshotGif(
   return {elem: screenshotContainer, width, height};
 }
 
-const styles = `
-.layout-shift-screenshot-preview {
-  position: relative;
-}
-
-.layout-shift-screenshot-preview-rect {
-  outline: 1px solid color-mix(in srgb, black 20%, var(--app-color-rendering)); /* was rgb(132, 48, 206) */
-  background-color: color-mix(in srgb, transparent 50%, var(--app-color-rendering-children)); /* was rgba(132, 48, 206, 0.5) */
-  position: absolute;
-  transition: all 1s;
-  z-index: 200;
-}
-
-.layout-shift-screenshot-after {
-  opacity: 0;
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 100;
-  transition: opacity 1s;
-}
-
-.highlight {
-background-color: yellow;
-}
-
-`;
-
 
 export class ScreenshotGifDialog {
   private fragment: UI.Fragment.Fragment;
@@ -501,10 +473,86 @@ export class ScreenshotGifDialog {
       this.dialog = new UI.Dialog.Dialog();
       this.dialog.contentElement.appendChild(this.widget);
       this.dialog.setDefaultFocusedElement(this.widget);
-      this.dialog.registerRequiredCSS({cssContent: styles});
+      // this.dialog.registerRequiredCSS({cssContent: styles});
       this.dialog.show();
     }
     this.dialog.setMaxContentSize(dialogSize);
     this.dialog.setSizeBehavior(UI.GlassPane.SizeBehavior.SET_EXACT_SIZE);
   }
 }
+
+
+// write a new version of the ScreenshotGifDialog, but as a custom element using LitHtml where appropriate. and the NodeLink component to link nodes.  Finally, add a "time" element that shows the time of the current layout shift.
+// okay go
+export class LayoutShiftGifDialog extends HTMLElement {
+  static readonly litTagName = LitHtml.literal`devtools-performance-layout-shift-gif-dialog`;
+  readonly #shadow = this.attachShadow({mode: 'open'});
+  #layoutShift?: Trace.Types.Events.SyntheticLayoutShift|null;
+  #parsedTrace: Trace.Handlers.Types.ParsedTrace|null = null;
+  #gif: ScreenshotGif|undefined;
+  #currentShiftIndex = 0;
+  #rectEls: HTMLElement[] = [];
+  #nodeLinks: NodeLink.NodeLink[] = [];
+
+
+  connectedCallback(): void {
+    this.#shadow.adoptedStyleSheets = [layoutShiftDetailsStyles];
+    // Styles for linkifier button.
+    UI.UIUtils.injectTextButtonStyles(this.#shadow);
+    this.#render();
+  }
+
+  setData(layoutShift: Trace.Types.Events.SyntheticLayoutShift, parsedTrace: Trace.Handlers.Types.ParsedTrace): void {
+    if (this.#layoutShift === layoutShift) {
+      return;
+    }
+    this.#layoutShift = layoutShift;
+    this.#parsedTrace = parsedTrace;
+    this.#render();
+  }
+
+  #render(): void {
+    if (!this.#layoutShift || !this.#parsedTrace) {
+      return;
+    }
+
+    const maxSize = new UI.Geometry.Size(800, 800);
+    const gif = createScreenshotGif(this.#layoutShift, this.#parsedTrace, maxSize);
+    if (!gif) {
+      return;
+    }
+
+
+    this.#layoutShift.args.data?.impacted_nodes?.forEach((node, i) => {
+      const rectEl = gif.elem.querySelectorAll('.layout-shift-screenshot-preview-rect').item(i);
+      LitHtml.html`
+            ${NodeLink.NodeLink.litTagName}
+              @mouseover=${() => () => rectEl.classList.add('highlight')}
+              @mouseleave=${() => () => rectEl.classList.remove('highlight')}
+              .data=${{
+        backendNodeId: node.node_id,
+      } as NodeLink.NodeLinkData}>
+            </${NodeLink.NodeLink.litTagName}>`;
+    });
+    this.#nodeLinks.push(nodeLink);
+  });
+
+
+  // clang-format off
+    const output = LitHtml.html`
+      <div class="layout-shift-gif-dialog">
+        <div class="layout-shift-gif-dialog-container">
+          ${this.#gif ? LitHtml.html`
+            <div class="layout-shift-gif-dialog-gif">
+              ${this.#gif.elem}
+            </div>` : LitHtml.nothing}
+        </div>
+        <div class="layout-shift-gif-dialog-controls">
+          <div class="layout-shift-gif-dialog-nodes">
+            <ul>
+              ${this.#lis}
+            </ul>
+          </div>
+          <div class="layout-shift-gif-dialog-time">
+            ${this.#layoutShift ? LitHtml.html`
+              <span class="time">${i18n.TimeUtilities.preciseMillisToString(Helpers.Timing.microSecondsToMilliseconds(this
