@@ -353,11 +353,15 @@ export async function createScreenshotGif(
   screenshotContainer.classList.add('layout-shift-screenshot-gif');
   screenshotContainer.appendChild(beforeImage);
 
-  // If this is being size constrained, it needs to be done in JS (rather than css max-width, etc)....
-  // That's because this function is complete before it's added to the DOM.. so we can't query offsetHeight for its resolved size…
-  const scaleFactor = Math.min(maxSize.width / beforeImage.naturalWidth, maxSize.height / beforeImage.naturalHeight, 1);
-  const width = beforeImage.naturalWidth * scaleFactor;
-  const height = beforeImage.naturalHeight * scaleFactor;
+  /**
+   * If this is being size constrained, it needs to be done in JS (rather than css max-width, etc)....
+   * That's because this function is complete before it's added to the DOM.. so we can't query offsetHeight for its resolved size…
+   * This number represents how much the screenshot image (generally fits in a 500x500 box) is scaled down for display in the UI
+   */
+  const displayScaleFactor =
+      Math.min(maxSize.width / beforeImage.naturalWidth, maxSize.height / beforeImage.naturalHeight, 1);
+  const width = beforeImage.naturalWidth * displayScaleFactor;
+  const height = beforeImage.naturalHeight * displayScaleFactor;
   beforeImage.style.width = `${width}px`;
   beforeImage.style.height = `${height}px`;
 
@@ -366,7 +370,7 @@ export async function createScreenshotGif(
     const rectEl = document.createElement('div');
     rectEl.classList.add('layout-shift-screenshot-gif-rect');
 
-    // If it's a 0x0x0x0 rect, then set to new, so we can fade it in from the new position instead.
+    // If it's a 0x0x0x0 rect, then set to the _after_ position, so we can fade it in from there instead.
     if ([beforeRect.width, beforeRect.height, beforeRect.x, beforeRect.y].every(v => v === 0)) {
       beforeRect = afterRects[i];
       rectEl.style.opacity = '0';
@@ -374,10 +378,12 @@ export async function createScreenshotGif(
       rectEl.style.opacity = '1';
     }
 
-    const scaledRectX = beforeRect.x * beforeImage.naturalWidth / viewport.width * scaleFactor;
-    const scaledRectY = beforeRect.y * beforeImage.naturalHeight / viewport.height * scaleFactor;
-    const scaledRectWidth = beforeRect.width * beforeImage.naturalWidth / viewport.width * scaleFactor;
-    const scaledRectHeight = beforeRect.height * beforeImage.naturalHeight / viewport.height * scaleFactor;
+    // These two values will be extremely close: (beforeImage.naturalHeight / viewport.height) and (beforeImage.naturalHeight / viewport.height)
+    // They represent the scaling factor from original page viewport CSS pixels to screenshot pixels.
+    const scaledRectX = beforeRect.x * beforeImage.naturalWidth / viewport.width * displayScaleFactor;
+    const scaledRectY = beforeRect.y * beforeImage.naturalHeight / viewport.height * displayScaleFactor;
+    const scaledRectWidth = beforeRect.width * beforeImage.naturalWidth / viewport.width * displayScaleFactor;
+    const scaledRectHeight = beforeRect.height * beforeImage.naturalHeight / viewport.height * displayScaleFactor;
     rectEl.style.left = `${scaledRectX}px`;
     rectEl.style.top = `${scaledRectY}px`;
     rectEl.style.width = `${scaledRectWidth}px`;
@@ -387,6 +393,7 @@ export async function createScreenshotGif(
     screenshotContainer.appendChild(rectEl);
     return rectEl;
   });
+
   if (afterImage) {
     afterImage.classList.add('layout-shift-screenshot-after');
     screenshotContainer.appendChild(afterImage);
@@ -396,25 +403,65 @@ export async function createScreenshotGif(
     // afterImage.addEventListener('click', () => { new ScreenshotGifDialog(event, parsedTrace); });
   }
 
-  // Update for the after rect positions after a bit.
-  setTimeout(() => {
-    rectEls.forEach((rectEl, i) => {
-      const afterRect = afterRects[i];
-      const scaledRectX = afterRect.x * beforeImage.naturalWidth / viewport.width * scaleFactor;
-      const scaledRectY = afterRect.y * beforeImage.naturalHeight / viewport.height * scaleFactor;
-      const scaledRectWidth = afterRect.width * beforeImage.naturalWidth / viewport.width * scaleFactor;
-      const scaledRectHeight = afterRect.height * beforeImage.naturalHeight / viewport.height * scaleFactor;
-      rectEl.style.left = `${scaledRectX}px`;
-      rectEl.style.top = `${scaledRectY}px`;
-      rectEl.style.width = `${scaledRectWidth}px`;
-      rectEl.style.height = `${scaledRectHeight}px`;
-      rectEl.style.opacity = '0.4';
-    });
-    if (afterImage) {
-      afterImage.style.opacity = '1';
-    }
-  }, 1000);
+  // // Update for the after rect positions after a bit.
+  // setTimeout(() => {
+  //   rectEls.forEach((rectEl, i) => {
+  //     const afterRect = afterRects[i];
+  //     const scaledRectX = afterRect.x * beforeImage.naturalWidth / viewport.width * displayScaleFactor;
+  //     const scaledRectY = afterRect.y * beforeImage.naturalHeight / viewport.height * displayScaleFactor;
+  //     const scaledRectWidth = afterRect.width * beforeImage.naturalWidth / viewport.width * displayScaleFactor;
+  //     const scaledRectHeight = afterRect.height * beforeImage.naturalHeight / viewport.height * displayScaleFactor;
+  //     rectEl.style.left = `${scaledRectX}px`;
+  //     rectEl.style.top = `${scaledRectY}px`;
+  //     rectEl.style.width = `${scaledRectWidth}px`;
+  //     rectEl.style.height = `${scaledRectHeight}px`;
+  //     rectEl.style.opacity = '0.4';
+  //   });
+  //   if (afterImage) {
+  //     afterImage.style.opacity = '1';
+  //   }
+  // }, 1000);
 
+  // instead of the settimeout above i want to use the web animations API with the animate() method invoked on each of these rects. we'll define a animationTimeline that will orchestrate all of them. it will repeat indefinitely with a 1s delay between each iteration.
+  rectEls.forEach((rectEl, i) => {
+    const afterRect = afterRects[i];
+    const scaledRectX = afterRect.x * beforeImage.naturalWidth / viewport.width * displayScaleFactor;
+    const scaledRectY = afterRect.y * beforeImage.naturalHeight / viewport.height * displayScaleFactor;
+    const scaledRectWidth = afterRect.width * beforeImage.naturalWidth / viewport.width * displayScaleFactor;
+    const scaledRectHeight = afterRect.height * beforeImage.naturalHeight / viewport.height * displayScaleFactor;
+    rectEl.animate(
+        [
+          {
+            left: `${scaledRectX}px`,
+            top: `${scaledRectY}px`,
+            width: `${scaledRectWidth}px`,
+            height: `${scaledRectHeight}px`,
+            opacity: '0.4'
+          },
+        ],
+        {
+          duration: 1000,
+          iterations: Infinity,
+          easing: 'ease-in-out',
+          delay: 1000,
+          fill: 'both',
+        });
+  });
+
+  if (afterImage) {
+    afterImage.animate(
+        [
+          {opacity: '0'},
+          {opacity: '1'},
+        ],
+        {
+          duration: 1000,
+          iterations: Infinity,
+          easing: 'ease-in-out',
+          delay: 1000,
+          fill: 'both',
+        });
+  }
 
   return {elem: screenshotContainer, width, height};
 }
