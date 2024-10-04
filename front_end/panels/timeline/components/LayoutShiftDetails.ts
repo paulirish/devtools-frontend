@@ -366,15 +366,10 @@ declare global {
 customElements.define('devtools-performance-layout-shift-details', LayoutShiftDetails);
 
 
-type ShiftViz = {
-  elem: HTMLElement,
-  width: number,
-  height: number
-};
-
 export async function createShiftViz(
     event: Trace.Types.Events.SyntheticLayoutShift, parsedTrace: Trace.Handlers.Types.ParsedTrace,
-    maxSize: UI.Geometry.Size): Promise<ShiftViz|undefined> {
+    maxSize: UI.Geometry.Size): Promise<HTMLElement|undefined> {
+  //TODO: maybe remove maxSize
   const screenshots = event.parsedData.screenshots;
   const viewport = parsedTrace.Meta.viewportRect;
 
@@ -448,16 +443,16 @@ export async function createShiftViz(
       rectEl.style.height = `${rect.height * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`;
     };
 
-     setRectPosition(currentRect);
-     vizContainer.appendChild(rectEl);
+    setRectPosition(currentRect);
+    vizContainer.appendChild(rectEl);
 
-     // Animate to the after rectangle position.
-     setTimeout(() => {
-       setRectPosition(afterRects[i]);
-       rectEl.style.opacity = '0.4';
-     }, 1000);
+    // Animate to the after rectangle position.
+    setTimeout(() => {
+      setRectPosition(afterRects[i]);
+      rectEl.style.opacity = '0.4';
+    }, 1000);
 
-     return rectEl;
+    return rectEl;
   });
 
   // Fade in the 'after' screenshot
@@ -472,5 +467,5 @@ export async function createShiftViz(
     }, 1000);
   }
 
-  return {elem: vizContainer};
+  return vizContainer;
 }

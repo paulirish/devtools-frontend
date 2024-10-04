@@ -29,6 +29,7 @@ export type HighlightedEntryInfo = {
   title: string,
   formattedTime: string,
   warningElements?: HTMLSpanElement[],
+  additionalElement?: HTMLElement;
 };
 
 export function entryIsVisibleInTimeline(

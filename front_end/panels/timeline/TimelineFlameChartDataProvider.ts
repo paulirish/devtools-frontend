@@ -721,11 +721,10 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       title = highlightedEntryInfo.title;
       time = highlightedEntryInfo.formattedTime;
       warningElements = highlightedEntryInfo.warningElements || warningElements;
-      if (Trace.Types.Events.isSyntheticInteraction(event)) {
-        const breakdown = new Components.InteractionBreakdown.InteractionBreakdown();
-        breakdown.entry = event;
-        additionalContent.push(breakdown);
+      if (highlightedEntryInfo.additionalElement) {
+        additionalContent.push(highlightedEntryInfo.additionalElement);
       }
+
     } else if (entryType === EntryType.FRAME) {
       const frame = (this.entryData[entryIndex] as Trace.Handlers.ModelHandlers.Frames.TimelineFrame);
       time =

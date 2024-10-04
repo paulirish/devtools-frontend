@@ -19,6 +19,7 @@ import {
   type TrackAppenderName,
   VisualLoggingTrackName,
 } from './CompatibilityTracksAppender.js';
+import * as Components from './components/components.js';
 
 const UIStrings = {
   /**
@@ -153,8 +154,15 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
     const title = Trace.Types.Events.isLayoutShift(event)       ? i18nString(UIStrings.layoutShift) :
         Trace.Types.Events.isSyntheticLayoutShiftCluster(event) ? i18nString(UIStrings.layoutShiftCluster) :
                                                                   event.name;
+
+    let additionalElement;
+    if (Trace.Types.Events.isSyntheticLayoutShift(event)) {
+      const maxSize = new UI.Geometry.Size(600, 600);
+      additionalElement = Components.LayoutShiftDetails.createShiftViz(event, this.#parsedTrace, maxSize);
+    }
+
     // Score isn't a duration, but the UI works anyhow.
-    return {title, formattedTime: score.toFixed(4)};
+    return {title, formattedTime: score.toFixed(4), additionalElement};
   }
 
   getDrawOverride(event: Trace.Types.Events.Event): DrawOverride|undefined {
