@@ -384,8 +384,7 @@ export async function createShiftViz(
     return;
   }
 
-  const [afterImage, beforeImage] =
-      await Promise.all([UI.UIUtils.loadImage(afterUri), UI.UIUtils.loadImage(beforeUri)]);
+  const [afterImage, beforeImage] = await Promise.all([afterUri, beforeUri].map(UI.UIUtils.loadImage));
   if (!beforeImage) {
     return;
   }
@@ -400,82 +399,78 @@ export async function createShiftViz(
     return;
   }
 
-  const beforeRects =
-      event.args.data?.impacted_nodes?.map(
-          node => new DOMRect(
-              node.old_rect[0] / dpr, node.old_rect[1] / dpr, node.old_rect[2] / dpr, node.old_rect[3] / dpr)) ??
-      [];
-  const afterRects =
-      event.args.data?.impacted_nodes?.map(
-          node => new DOMRect(
-              node.new_rect[0] / dpr, node.new_rect[1] / dpr, node.new_rect[2] / dpr, node.new_rect[3] / dpr)) ??
-      [];
+  // Helper to re-scale rectangles, removing DPR effect
+  const scaleRect = (rect: Trace.Types.Events.TraceRect): DOMRect => {
+    const {width: vw, height: vh} = viewport;
+    return new DOMRect(
+        rect[0] / dpr,
+        rect[1] / dpr,
+        rect[2] / dpr,
+        rect[3] / dpr,
+    );
+  };
+  const beforeRects = (event.args.data?.impacted_nodes?.map(node => scaleRect(node.old_rect)) ?? []);
+  const afterRects = (event.args.data?.impacted_nodes?.map(node => scaleRect(node.new_rect)) ?? []);
+
 
   const vizContainer = document.createElement('div');
   vizContainer.classList.add('layout-shift-viz');
-  vizContainer.appendChild(beforeImage);
 
+  // Calculate scaling factor based on maxSize.
   // If this is being size constrained, it needs to be done in JS (rather than css max-width, etc)....
   // That's because this function is complete before it's added to the DOM.. so we can't query offsetHeight for its resolved size…
-  const scaleFactor = Math.min(maxSize.width / beforeImage.naturalWidth, maxSize.height / beforeImage.naturalHeight, 1);
-  const width = beforeImage.naturalWidth * scaleFactor;
-  const height = beforeImage.naturalHeight * scaleFactor;
-  beforeImage.style.width = `${width}px`;
-  beforeImage.style.height = `${height}px`;
+  const maxSizeScaleFactor =
+      Math.min(maxSize.width / beforeImage.naturalWidth, maxSize.height / beforeImage.naturalHeight, 1);
+  beforeImage.style.width = `${beforeImage.naturalWidth * maxSizeScaleFactor}px`;
+  beforeImage.style.height = `${beforeImage.naturalHeight * maxSizeScaleFactor}px`;
+  vizContainer.appendChild(beforeImage);
 
-  // Set up before rects
-  const rectEls = beforeRects.map((beforeRect, i) => {
+  // Create and position individual rects representing each impacted_node within a shift
+  beforeRects.forEach((beforeRect, i) => {
     const rectEl = document.createElement('div');
     rectEl.classList.add('layout-shift-viz-rect');
 
+    let currentRect = beforeRect;
     // If it's a 0x0x0x0 rect, then set to new, so we can fade it in from the new position instead.
     if ([beforeRect.width, beforeRect.height, beforeRect.x, beforeRect.y].every(v => v === 0)) {
-      beforeRect = afterRects[i];
+      currentRect = afterRects[i];
       rectEl.style.opacity = '0';
     } else {
-      rectEl.style.opacity = '1';
+      rectEl.style.opacity = '0.4';
     }
 
-    const scaledRectX = beforeRect.x * beforeImage.naturalWidth / viewport.width * scaleFactor;
-    const scaledRectY = beforeRect.y * beforeImage.naturalHeight / viewport.height * scaleFactor;
-    const scaledRectWidth = beforeRect.width * beforeImage.naturalWidth / viewport.width * scaleFactor;
-    const scaledRectHeight = beforeRect.height * beforeImage.naturalHeight / viewport.height * scaleFactor;
-    rectEl.style.left = `${scaledRectX}px`;
-    rectEl.style.top = `${scaledRectY}px`;
-    rectEl.style.width = `${scaledRectWidth}px`;
-    rectEl.style.height = `${scaledRectHeight}px`;
-    rectEl.style.opacity = '0.4';
+    const cssPixelToScreenshotScaleFactor =
+        Math.min(beforeImage.naturalWidth / viewport.width, beforeImage.naturalHeight / viewport.height, 1)
+    const setRectPosition = (rect: DOMRect) => {
+      rectEl.style.left = `${rect.x * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`;
+      rectEl.style.top = `${rect.y * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`;
+      rectEl.style.width = `${rect.width * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`;
+      rectEl.style.height = `${rect.height * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`;
+    };
 
-    vizContainer.appendChild(rectEl);
-    return rectEl;
+     setRectPosition(currentRect);
+     vizContainer.appendChild(rectEl);
+
+     // Animate to the after rectangle position.
+     setTimeout(() => {
+       setRectPosition(afterRects[i]);
+       rectEl.style.opacity = '0.4';
+     }, 1000);
+
+     return rectEl;
   });
 
+  // Fade in the 'after' screenshot
   if (afterImage) {
     afterImage.classList.add('layout-shift-viz-screenshot--after');
-    vizContainer.appendChild(afterImage);
     afterImage.style.width = beforeImage.style.width;
     afterImage.style.height = beforeImage.style.height;
+    vizContainer.appendChild(afterImage);
+
+    setTimeout(() => {
+      afterImage.style.opacity = '1';
+    }, 1000);
   }
 
-  // Update for the after rect positions after a bit.
-  setTimeout(() => {
-    rectEls.forEach((rectEl, i) => {
-      const afterRect = afterRects[i];
-      const scaledRectX = afterRect.x * beforeImage.naturalWidth / viewport.width * scaleFactor;
-      const scaledRectY = afterRect.y * beforeImage.naturalHeight / viewport.height * scaleFactor;
-      const scaledRectWidth = afterRect.width * beforeImage.naturalWidth / viewport.width * scaleFactor;
-      const scaledRectHeight = afterRect.height * beforeImage.naturalHeight / viewport.height * scaleFactor;
-      rectEl.style.left = `${scaledRectX}px`;
-      rectEl.style.top = `${scaledRectY}px`;
-      rectEl.style.width = `${scaledRectWidth}px`;
-      rectEl.style.height = `${scaledRectHeight}px`;
-      rectEl.style.opacity = '0.4';
-    });
-    if (afterImage) {
-      afterImage.style.opacity = '1';
-    }
-  }, 1000);
-
-
-  return {elem: vizContainer, width, height};
+  return {elem: vizContainer};
 }
