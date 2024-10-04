@@ -352,7 +352,7 @@ export class LayoutShiftDetails extends HTMLElement {
     }
 
     const maxSize = new UI.Geometry.Size(300, 300);
-    const gif = await createScreenshotGif(event, this.#parsedTrace, maxSize);
+    const gif = await createShiftViz(event, this.#parsedTrace, maxSize);
     return LitHtml.html`${gif?.elem ?? ''}`;
   }
 }
@@ -366,16 +366,15 @@ declare global {
 customElements.define('devtools-performance-layout-shift-details', LayoutShiftDetails);
 
 
-type ScreenshotGif = {
+type ShiftViz = {
   elem: HTMLElement,
   width: number,
   height: number
 };
 
-/** This is called twice. Once with a small maxSize for the thumbnail, and again to create the large version in the dialog. */
-export async function createScreenshotGif(
+export async function createShiftViz(
     event: Trace.Types.Events.SyntheticLayoutShift, parsedTrace: Trace.Handlers.Types.ParsedTrace,
-    maxSize: UI.Geometry.Size): Promise<ScreenshotGif|undefined> {
+    maxSize: UI.Geometry.Size): Promise<ShiftViz|undefined> {
   const screenshots = event.parsedData.screenshots;
   const viewport = parsedTrace.Meta.viewportRect;
 
@@ -413,7 +412,7 @@ export async function createScreenshotGif(
       [];
 
   const screenshotContainer = document.createElement('div');
-  screenshotContainer.classList.add('layout-shift-screenshot-gif');
+  screenshotContainer.classList.add('layout-shift-viz');
   screenshotContainer.appendChild(beforeImage);
 
   /**
@@ -431,7 +430,7 @@ export async function createScreenshotGif(
   // Set up before rects
   const rectEls = beforeRects.map((beforeRect, i) => {
     const rectEl = document.createElement('div');
-    rectEl.classList.add('layout-shift-screenshot-gif-rect');
+    rectEl.classList.add('layout-shift-viz-rect');
 
     // If it's a 0x0x0x0 rect, then set to the _after_ position, so we can fade it in from there instead.
     if ([beforeRect.width, beforeRect.height, beforeRect.x, beforeRect.y].every(v => v === 0)) {

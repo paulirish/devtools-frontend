@@ -106,14 +106,14 @@
 }
 
 
-.layout-shift-screenshot-gif {
+.layout-shift-viz {
   position: relative;
   margin: var(--sys-size-8) var(--sys-size-5);
   outline: 1px solid var(--sys-color-divider);
   width: fit-content;
 }
 
-.layout-shift-screenshot-gif-rect {
+.layout-shift-viz-rect {
   outline: 1px solid color-mix(in srgb, black 20%, var(--app-color-rendering));
   background-color: color-mix(in srgb, transparent 50%, var(--app-color-rendering-children));
   position: absolute;
