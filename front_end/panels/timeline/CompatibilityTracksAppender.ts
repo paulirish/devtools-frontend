@@ -639,11 +639,16 @@ export class CompatibilityTracksAppender {
 
     let title = this.titleForEvent(event, level);
     let formattedTime = getFormattedTime(event.dur);
+    let additionalElement;
 
     // If the track defines a custom highlight, call it and use its values.
     if (track.highlightedEntryInfo) {
-      const {title: customTitle, formattedTime: customFormattedTime, warningElements: extraWarningElements} =
-          track.highlightedEntryInfo(event);
+      const {
+        title: customTitle,
+        formattedTime: customFormattedTime,
+        warningElements: extraWarningElements,
+        additionalElement: element
+      } = track.highlightedEntryInfo(event);
       if (customTitle) {
         title = customTitle;
       }
@@ -653,11 +658,13 @@ export class CompatibilityTracksAppender {
       if (extraWarningElements) {
         warningElements.push(...extraWarningElements);
       }
+      additionalElement = element;
     }
     return {
       title,
       formattedTime,
       warningElements,
+      additionalElement,
     };
   }
 }

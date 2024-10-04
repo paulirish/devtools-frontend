@@ -31,3 +31,31 @@
 .timeline-flamechart-popover span.timeline-info-warning * {
   color: inherit;
 }
+
+
+.layout-shift-viz {
+  position: relative;
+  margin: var(--sys-size-8) var(--sys-size-5);
+  outline: 1px solid var(--sys-color-divider);
+}
+
+.layout-shift-viz-rect {
+  outline: 1px solid color-mix(in srgb, black 20%, var(--app-color-rendering));
+  background-color: color-mix(in srgb, transparent 50%, var(--app-color-rendering-children));
+  position: absolute;
+  transition: all 1s;
+  z-index: 200;
+}
+
+.layout-shift-viz-screenshot--after {
+  opacity: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  transition: opacity 1s;
+}
+
+.highlight {
+  background-color: yellow;
+}

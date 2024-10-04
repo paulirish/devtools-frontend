@@ -366,9 +366,9 @@ declare global {
 customElements.define('devtools-performance-layout-shift-details', LayoutShiftDetails);
 
 
-export async function createShiftViz(
+export function createShiftViz(
     event: Trace.Types.Events.SyntheticLayoutShift, parsedTrace: Trace.Handlers.Types.ParsedTrace,
-    maxSize: UI.Geometry.Size): Promise<HTMLElement|undefined> {
+    maxSize: UI.Geometry.Size): HTMLElement|undefined {
   //TODO: maybe remove maxSize
   const screenshots = event.parsedData.screenshots;
   const viewport = parsedTrace.Meta.viewportRect;
@@ -379,93 +379,90 @@ export async function createShiftViz(
     return;
   }
 
-  const [afterImage, beforeImage] = await Promise.all([afterUri, beforeUri].map(UI.UIUtils.loadImage));
-  if (!beforeImage) {
-    return;
-  }
+  const vizContainer = document.createElement('div');
+  vizContainer.classList.add('layout-shift-viz');
 
-  /** The Layout Instability API in Blink, which reports the LayoutShift trace events, is not based on CSS pixels but
+
+  Promise.all([afterUri, beforeUri].map(UI.UIUtils.loadImage)).then(([afterImage, beforeImage]) => {
+    if (!beforeImage) {
+      return;
+    }
+
+
+    /** The Layout Instability API in Blink, which reports the LayoutShift trace events, is not based on CSS pixels but
    * physical pixels. As such the values in the impacted_nodes field need to be normalized to CSS units in order to
    * map them to the viewport dimensions, which we get in CSS pixels. We do that by dividing the values by the devicePixelRatio.
    * See https://crbug.com/1300309
    */
-  const dpr = parsedTrace.Meta.devicePixelRatio;
-  if (dpr === undefined) {
-    return;
-  }
-
-  // Helper to re-scale rectangles, removing DPR effect
-  const scaleRect = (rect: Trace.Types.Events.TraceRect): DOMRect => {
-    const {width: vw, height: vh} = viewport;
-    return new DOMRect(
-        rect[0] / dpr,
-        rect[1] / dpr,
-        rect[2] / dpr,
-        rect[3] / dpr,
-    );
-  };
-  const beforeRects = (event.args.data?.impacted_nodes?.map(node => scaleRect(node.old_rect)) ?? []);
-  const afterRects = (event.args.data?.impacted_nodes?.map(node => scaleRect(node.new_rect)) ?? []);
-
-
-  const vizContainer = document.createElement('div');
-  vizContainer.classList.add('layout-shift-viz');
-
-  // Calculate scaling factor based on maxSize.
-  // If this is being size constrained, it needs to be done in JS (rather than css max-width, etc)....
-  // That's because this function is complete before it's added to the DOM.. so we can't query offsetHeight for its resolved size…
-  const maxSizeScaleFactor =
-      Math.min(maxSize.width / beforeImage.naturalWidth, maxSize.height / beforeImage.naturalHeight, 1);
-  beforeImage.style.width = `${beforeImage.naturalWidth * maxSizeScaleFactor}px`;
-  beforeImage.style.height = `${beforeImage.naturalHeight * maxSizeScaleFactor}px`;
-  vizContainer.appendChild(beforeImage);
-
-  // Create and position individual rects representing each impacted_node within a shift
-  beforeRects.forEach((beforeRect, i) => {
-    const rectEl = document.createElement('div');
-    rectEl.classList.add('layout-shift-viz-rect');
-
-    let currentRect = beforeRect;
-    // If it's a 0x0x0x0 rect, then set to new, so we can fade it in from the new position instead.
-    if ([beforeRect.width, beforeRect.height, beforeRect.x, beforeRect.y].every(v => v === 0)) {
-      currentRect = afterRects[i];
-      rectEl.style.opacity = '0';
-    } else {
-      rectEl.style.opacity = '0.4';
+    const dpr = parsedTrace.Meta.devicePixelRatio;
+    if (dpr === undefined) {
+      return;
     }
 
-    const cssPixelToScreenshotScaleFactor =
-        Math.min(beforeImage.naturalWidth / viewport.width, beforeImage.naturalHeight / viewport.height, 1)
-    const setRectPosition = (rect: DOMRect) => {
-      rectEl.style.left = `${rect.x * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`;
-      rectEl.style.top = `${rect.y * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`;
-      rectEl.style.width = `${rect.width * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`;
-      rectEl.style.height = `${rect.height * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`;
+    // Helper to re-scale rectangles, removing DPR effect
+    const scaleRect = (rect: Trace.Types.Events.TraceRect): DOMRect => {
+      const {width: vw, height: vh} = viewport;
+      return new DOMRect(
+          rect[0] / dpr,
+          rect[1] / dpr,
+          rect[2] / dpr,
+          rect[3] / dpr,
+      );
     };
+    const beforeRects = (event.args.data?.impacted_nodes?.map(node => scaleRect(node.old_rect)) ?? []);
+    const afterRects = (event.args.data?.impacted_nodes?.map(node => scaleRect(node.new_rect)) ?? []);
 
-    setRectPosition(currentRect);
-    vizContainer.appendChild(rectEl);
 
-    // Animate to the after rectangle position.
-    setTimeout(() => {
-      setRectPosition(afterRects[i]);
-      rectEl.style.opacity = '0.4';
-    }, 1000);
-
-    return rectEl;
-  });
-
-  // Fade in the 'after' screenshot
-  if (afterImage) {
+    // Calculate scaling factor based on maxSize.
+    // If this is being size constrained, it needs to be done in JS (rather than css max-width, etc)....
+    // That's because this function is complete before it's added to the DOM.. so we can't query offsetHeight for its resolved size…
+    const maxSizeScaleFactor =
+        Math.min(maxSize.width / beforeImage.naturalWidth, maxSize.height / beforeImage.naturalHeight, 1);
+    afterImage = afterImage || beforeImage;
+    afterImage.style.width = beforeImage.style.width = `${beforeImage.naturalWidth * maxSizeScaleFactor}px`;
+    afterImage.style.height = beforeImage.style.height = `${beforeImage.naturalHeight * maxSizeScaleFactor}px`;
     afterImage.classList.add('layout-shift-viz-screenshot--after');
-    afterImage.style.width = beforeImage.style.width;
-    afterImage.style.height = beforeImage.style.height;
-    vizContainer.appendChild(afterImage);
+    vizContainer.append(beforeImage, afterImage);
 
+    // Fade in the 'after' screenshot
     setTimeout(() => {
       afterImage.style.opacity = '1';
     }, 1000);
-  }
 
+    // Create and position individual rects representing each impacted_node within a shift
+    beforeRects.forEach((beforeRect, i) => {
+      const rectEl = document.createElement('div');
+      rectEl.classList.add('layout-shift-viz-rect');
+
+      let currentRect = beforeRect;
+      // If it's a 0x0x0x0 rect, then set to new, so we can fade it in from the new position instead.
+      if ([beforeRect.width, beforeRect.height, beforeRect.x, beforeRect.y].every(v => v === 0)) {
+        currentRect = afterRects[i];
+        rectEl.style.opacity = '0';
+      } else {
+        rectEl.style.opacity = '0.4';
+      }
+
+      const cssPixelToScreenshotScaleFactor =
+          Math.min(beforeImage.naturalWidth / viewport.width, beforeImage.naturalHeight / viewport.height, 1)
+      const setRectPosition = (rect: DOMRect) => {
+        rectEl.style.left = `${rect.x * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`;
+        rectEl.style.top = `${rect.y * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`;
+        rectEl.style.width = `${rect.width * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`;
+        rectEl.style.height = `${rect.height * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`;
+      };
+
+      setRectPosition(currentRect);
+      vizContainer.appendChild(rectEl);
+
+      // Animate to the after rectangle position.
+      setTimeout(() => {
+        setRectPosition(afterRects[i]);
+        rectEl.style.opacity = '0.4';
+      }, 1000);
+    }); // end of handling rects
+
+    return vizContainer;
+  });
   return vizContainer;
 }
