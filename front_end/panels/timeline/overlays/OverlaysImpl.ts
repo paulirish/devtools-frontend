@@ -252,6 +252,7 @@ export interface TimespanBreakdown {
   type: 'TIMESPAN_BREAKDOWN';
   sections: Array<Components.TimespanBreakdownOverlay.EntryBreakdown>;
   entry?: Trace.Types.Events.Event;
+  renderLocation?: 'BOTTOM_OF_TIMELINE'|'BELOW_EVENT'|'ABOVE_EVENT';
 }
 
 export interface CursorTimestampMarker {
@@ -623,7 +624,7 @@ export class Overlays extends EventTarget {
    * existing overlays will have their positions changed to ensure they are
    * rendered in the right place.
    */
-  update(): void {
+  async update(): Promise<void> {
     const timeRangeOverlays: TimeRangeLabel[] = [];
     for (const [overlay, existingElement] of this.#overlaysToElements) {
       const element = existingElement || this.#createElementForNewOverlay(overlay);
@@ -633,11 +634,17 @@ export class Overlays extends EventTarget {
         this.#overlaysContainer.appendChild(element);
       }
 
+      // A chance to update the overlay before we re-position it. If an
+      // overlay's data changed, this is where we can pass that data into the
+      // overlay's component so it has the latest data.
+      this.#updateOverlayBeforePositioning(overlay, element);
+
       // Now we position the overlay on the timeline.
       this.#positionOverlay(overlay, element);
 
-      // And now we give every overlay a chance to react to its new position, if it needs to
-      this.#updateOverlayElementAfterPositioning(overlay, element);
+      // And now we give every overlay a chance to react to its new position,
+      // if it needs to
+      this.#updateOverlayAfterPositioning(overlay, element);
 
       if (overlay.type === 'TIME_RANGE') {
         timeRangeOverlays.push(overlay);
@@ -828,13 +835,13 @@ export class Overlays extends EventTarget {
   }
 
   #positionTimespanBreakdownOverlay(overlay: TimespanBreakdown, element: HTMLElement): void {
-    const component = element.querySelector<HTMLElement>('devtools-timespan-breakdown-overlay');
-    const shadow = component?.shadowRoot;
-    const elementSections = shadow?.querySelectorAll<HTMLElement>('.timespan-breakdown-overlay-section');
-
     if (overlay.sections.length === 0) {
       return;
     }
+
+    const component = element.querySelector('devtools-timespan-breakdown-overlay');
+    const elementSections = component?.renderedSections() ?? [];
+
     // Handle horizontal positioning.
     const leftEdgePixel = this.#xPixelForMicroSeconds('main', overlay.sections[0].bounds.min);
     const rightEdgePixel =
@@ -847,7 +854,7 @@ export class Overlays extends EventTarget {
     element.style.left = `${leftEdgePixel}px`;
     element.style.width = `${rangeWidth}px`;
 
-    if (!(elementSections?.length)) {
+    if (elementSections.length === 0) {
       return;
     }
 
@@ -867,30 +874,38 @@ export class Overlays extends EventTarget {
     }
 
     // Handle vertical positioning based on the entry's vertical position.
-    if (overlay.entry) {
+    if (overlay.entry && (overlay.renderLocation === 'BELOW_EVENT' || overlay.renderLocation === 'ABOVE_EVENT')) {
+      // Max height for the overlay box when attached to an entry.
+      const MAX_BOX_HEIGHT = 50;
+      element.style.maxHeight = `${MAX_BOX_HEIGHT}px`;
+
       const y = this.yPixelForEventOnChart(overlay.entry);
       if (y === null) {
         return;
       }
+      const eventHeight = this.pixelHeightForEventOnChart(overlay.entry);
+      if (eventHeight === null) {
+        return;
+      }
 
-      // Max height for the overlay box.
-      const MAX_BOX_HEIGHT = 50;
-      // Some padding so the box hovers just on top.
-      const PADDING = 7;
+      if (overlay.renderLocation === 'BELOW_EVENT') {
+        const top = y + eventHeight;
+        element.style.top = `${top}px`;
+      } else {
+        // Some padding so the box hovers just on top.
+        const PADDING = 7;
 
-      // Where the timespan breakdown should sit. Slightly on top of the entry.
-      const bottom = y - PADDING;
+        // Where the timespan breakdown should sit. Slightly on top of the entry.
+        const bottom = y - PADDING;
 
-      // Available space between the bottom of the overlay and top of the chart.
-      const minSpace = Math.max(bottom, 0);
-      // Contrain height to available space.
-      const height = Math.min(MAX_BOX_HEIGHT, minSpace);
+        // Available space between the bottom of the overlay and top of the chart.
+        const minSpace = Math.max(bottom, 0);
+        // Contrain height to available space.
+        const height = Math.min(MAX_BOX_HEIGHT, minSpace);
 
-      elementSections[0].style.maxHeight = `${MAX_BOX_HEIGHT}px`;
-      elementSections[0].style.height = `${height}px`;
-
-      const top = bottom - height;
-      element.style.top = `${top}px`;
+        const top = bottom - height;
+        element.style.top = `${top}px`;
+      }
     }
   }
 
@@ -1384,6 +1399,7 @@ export class Overlays extends EventTarget {
         const component = new Components.TimespanBreakdownOverlay.TimespanBreakdownOverlay();
         component.sections = overlay.sections;
         component.canvasRect = this.#charts.mainChart.canvasBoundingClientRect();
+        component.isBelowEntry = overlay.renderLocation === 'BELOW_EVENT';
         div.appendChild(component);
         return div;
       }
@@ -1394,20 +1410,21 @@ export class Overlays extends EventTarget {
   }
 
   /**
-   * Some of the HTML elements for overlays might need updating between each render
-   * (for example, if a time range has changed, we update its duration text)
+   * Some overlays store data in their components that needs to be updated
+   * before we position an overlay. Else, we might position an overlay based on
+   * stale data. This method is used to update an overlay BEFORE it is then
+   * positioned onto the canvas. It is the right place to ensure an overlay has
+   * the latest data it needs.
    */
-  #updateOverlayElementAfterPositioning(overlay: TimelineOverlay, element: HTMLElement): void {
+  #updateOverlayBeforePositioning(overlay: TimelineOverlay, element: HTMLElement): void {
     switch (overlay.type) {
       case 'ENTRY_SELECTED':
-        // Nothing to do here.
         break;
       case 'TIME_RANGE': {
         const component = element.querySelector('devtools-time-range-overlay');
         if (component) {
           component.duration = overlay.showDuration ? overlay.bounds.range : null;
           component.canvasRect = this.#charts.mainChart.canvasBoundingClientRect();
-          component.updateLabelPositioning();
         }
         break;
       }
@@ -1425,12 +1442,44 @@ export class Overlays extends EventTarget {
         if (component) {
           component.sections = overlay.sections;
           component.canvasRect = this.#charts.mainChart.canvasBoundingClientRect();
-          component.checkSectionLabelPositioning();
         }
         break;
       }
       case 'CURSOR_TIMESTAMP_MARKER':
-        // No contents within this that need updating.
+        break;
+      case 'CANDY_STRIPED_TIME_RANGE':
+        break;
+      default:
+        Platform.TypeScriptUtilities.assertNever(overlay, `Unexpected overlay ${overlay}`);
+    }
+  }
+  /**
+   * Some overlays have custom logic within them to manage visibility of
+   * labels/etc that can be impacted if the positioning or size of the overlay
+   * has changed. This method can be used to run code after an overlay has
+   * been updated + repositioned on the timeline.
+   */
+  #updateOverlayAfterPositioning(overlay: TimelineOverlay, element: HTMLElement): void {
+    switch (overlay.type) {
+      case 'ENTRY_SELECTED':
+        break;
+      case 'TIME_RANGE': {
+        const component = element.querySelector('devtools-time-range-overlay');
+        component?.updateLabelPositioning();
+        break;
+      }
+      case 'ENTRY_LABEL':
+        break;
+      case 'ENTRY_OUTLINE':
+        break;
+      case 'ENTRIES_LINK':
+        break;
+      case 'TIMESPAN_BREAKDOWN': {
+        const component = element.querySelector('devtools-timespan-breakdown-overlay');
+        component?.checkSectionLabelPositioning();
+        break;
+      }
+      case 'CURSOR_TIMESTAMP_MARKER':
         break;
       case 'CANDY_STRIPED_TIME_RANGE':
         break;

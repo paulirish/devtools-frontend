@@ -2,7 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Host from '../../../core/host/host.js';
+import * as i18n from '../../../core/i18n/i18n.js';
+import type * as Platform from '../../../core/platform/platform.js';
 import * as Trace from '../../../models/trace/trace.js';
+import * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
@@ -11,6 +15,23 @@ import * as Insights from './insights/insights.js';
 import {type ActiveInsight} from './Sidebar.js';
 import styles from './sidebarInsightsTab.css.js';
 import {SidebarSingleInsightSet, type SidebarSingleInsightSetData} from './SidebarSingleInsightSet.js';
+import {createUrlLabels} from './Utils.js';
+
+const FEEDBACK_URL = 'https://crbug.com/371170842' as Platform.DevToolsPath.UrlString;
+
+const UIStrings = {
+  /**
+   *@description text show in feedback button
+   */
+  feedbackButton: 'Feedback',
+  /**
+   *@description text show in feedback tooltip
+   */
+  feedbackTooltip: 'Insights is an experimental feature. Your feedback will help us improve it.',
+};
+
+const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/SidebarInsightsTab.ts', UIStrings);
+const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class SidebarInsightsTab extends HTMLElement {
   static readonly litTagName = LitHtml.literal`devtools-performance-sidebar-insights`;
@@ -101,6 +122,10 @@ export class SidebarInsightsTab extends HTMLElement {
     this.dispatchEvent(new Insights.SidebarInsight.InsightSetHovered());
   }
 
+  #onFeedbackClick(): void {
+    Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(FEEDBACK_URL);
+  }
+
   // TODO(crbug.com/368170718): use a shorter label for each insight set/url when possible.
   #render(): void {
     if (!this.#parsedTrace || !this.#insights) {
@@ -109,6 +134,7 @@ export class SidebarInsightsTab extends HTMLElement {
     }
 
     const hasMultipleInsightSets = this.#insights.size > 1;
+    const labels = createUrlLabels([...this.#insights.values()].map(({url}) => url));
 
     // clang-format off
     const html = LitHtml.html`
@@ -126,7 +152,7 @@ export class SidebarInsightsTab extends HTMLElement {
       </select>
 
       <div class="insight-sets-wrapper">
-        ${[...this.#insights.values()].map(({id, label}) => {
+        ${[...this.#insights.values()].map(({id, url}, index) => {
           const data = {
             parsedTrace: this.#parsedTrace,
             insights: this.#insights,
@@ -149,13 +175,22 @@ export class SidebarInsightsTab extends HTMLElement {
                 @click=${() => this.#insightSetClicked(id)}
                 @mouseenter=${() => this.#insightSetHovered(id)}
                 @mouseleave=${() => this.#insightSetUnhovered()}
-                >${label}</summary>
+                title=${url.href}
+                >${labels[index]}</summary>
               ${contents}
             </details>`;
           }
 
           return contents;
         })}
+      </div>
+
+      <div class="feedback-wrapper">
+        <${Buttons.Button.Button.litTagName} .variant=${Buttons.Button.Variant.OUTLINED} .iconName=${'experiment'} @click=${this.#onFeedbackClick}>
+          ${i18nString(UIStrings.feedbackButton)}
+        </${Buttons.Button.Button.litTagName}>
+
+        <p class="tooltip">${i18nString(UIStrings.feedbackTooltip)}</p>
       </div>
     `;
     // clang-format on

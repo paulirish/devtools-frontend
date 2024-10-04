@@ -49,6 +49,7 @@ interface LCPImageDiscoveryData {
   shouldRemoveLazyLoading: boolean;
   request: Trace.Types.Events.SyntheticNetworkRequest;
   discoveryDelay: Trace.Types.Timing.MicroSeconds|null;
+  estimatedSavings: Trace.Types.Timing.MilliSeconds|null;
 }
 
 function getImageData(
@@ -80,6 +81,7 @@ function getImageData(
     shouldRemoveLazyLoading,
     request: insight.lcpRequest,
     discoveryDelay: null,
+    estimatedSavings: insight.metricSavings?.LCP ?? null,
   };
 
   if (insight.earliestDiscoveryTimeTs && insight.lcpRequest) {
@@ -152,6 +154,7 @@ export class LCPDiscovery extends BaseInsight {
           showDuration: false,
         }],
         entry: imageResults.request,
+        renderLocation: 'ABOVE_EVENT',
       },
     ];
   }
@@ -165,6 +168,7 @@ export class LCPDiscovery extends BaseInsight {
             description: this.description,
             internalName: this.internalName,
             expanded: this.isActive(),
+            estimatedSavingsTime: imageData.estimatedSavings,
           } as SidebarInsight.InsightDetails}
           @insighttoggleclick=${this.onSidebarClick}
         >

@@ -563,9 +563,13 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       }
     });
 
+    this.flameChart.element.addEventListener(TimelineInsights.Helpers.EventReferenceClick.eventName, event => {
+      const fromTraceEvent = TimelineSelection.fromTraceEvent(event.event);
+      this.flameChart.setSelectionAndReveal(fromTraceEvent);
+    });
+
     this.#sideBar.contentElement.addEventListener(TimelineInsights.Helpers.EventReferenceClick.eventName, event => {
-      const {metricEvent} = event;
-      this.select(TimelineSelection.fromTraceEvent(metricEvent));
+      this.select(TimelineSelection.fromTraceEvent(event.event));
     });
 
     this.#sideBar.element.addEventListener(TimelineComponents.Sidebar.RemoveAnnotation.eventName, event => {
@@ -1794,10 +1798,8 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.#setActiveInsight(null);
 
     const traceInsightsSets = this.#traceEngineModel.traceInsights(traceIndex);
-    if (traceInsightsSets) {
-      this.flameChart.setInsights(traceInsightsSets);
-      this.#sideBar.setInsights(traceInsightsSets);
-    }
+    this.#sideBar.setInsights(traceInsightsSets);
+    this.flameChart.setInsights(traceInsightsSets);
 
     this.#showSidebarIfRequired();
   }

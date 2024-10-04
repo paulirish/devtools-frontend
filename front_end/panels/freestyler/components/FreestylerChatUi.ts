@@ -52,6 +52,10 @@ const UIStrings = {
    *@example {AI assistance in Settings} PH1
    */
   turnOnForStylesAndRequests: 'Turn on {PH1} to get help with styles and network requests',
+  /**
+   *@description The footer disclaimer that links to more information about the AI feature.
+   */
+  learnAbout: 'Learn about AI in DevTools',
 };
 
 /*
@@ -122,14 +126,6 @@ const UIStringsNotTranslate = {
    */
   negativeSideEffectConfirmation: 'Cancel',
   /**
-   *@description Link text for redirecting to feedback form
-   */
-  feedbackLink: 'Send feedback',
-  /**
-   *@description Button text for "Fix this issue" button
-   */
-  fixThisIssue: 'Fix this issue',
-  /**
    *@description The generic name of the AI agent (do not translate)
    */
   ai: 'AI',
@@ -157,18 +153,6 @@ const UIStringsNotTranslate = {
    *@description Heading text for the code block that shows the returned data.
    */
   dataReturned: 'Data returned',
-  /**
-   *@description The footer disclaimer that links to more information about the AI feature.
-   */
-  learnAbout: 'Learn about AI in DevTools',
-  /**
-   * @description Text for a link to Chrome DevTools Settings.
-   */
-  settingsLink: 'AI assistance in Settings',
-  /**
-   * @description Placeholder text for an inactive text field. When active, it's used for the user's input to the GenAI assistance.
-   */
-  followTheSteps: 'Follow the steps above to ask a question',
 };
 
 const str_ = i18n.i18n.registerUIStrings('panels/freestyler/components/FreestylerChatUi.ts', UIStrings);
@@ -456,14 +440,16 @@ export class FreestylerChatUi extends HTMLElement {
     return LitHtml.html`<span class="title">${paused}${actionTitle}</span>`;
   }
 
-  #renderStepDetails(step: Step, options: {isLast: boolean}): LitHtml.LitTemplate {
-    const sideEffects =
-        options.isLast && step.sideEffect ? this.#renderSideEffectConfirmationUi(step) : LitHtml.nothing;
-    const thought = step.thought ? LitHtml.html`<p>${this.#renderTextAsMarkdown(step.thought)}</p>` : LitHtml.nothing;
+  #renderStepCode(step: Step): LitHtml.LitTemplate {
+    if (!step.code && !step.output) {
+      return LitHtml.nothing;
+    }
+
     // If there is no "output" yet, it means we didn't execute the code yet (e.g. maybe it is still waiting for confirmation from the user)
     // thus we show "Code to execute" text rather than "Code executed" text on the heading of the code block.
     const codeHeadingText = (step.output && !step.canceled) ? lockedString(UIStringsNotTranslate.codeExecuted) :
                                                               lockedString(UIStringsNotTranslate.codeToExecute);
+
     // If there is output, we don't show notice on this code block and instead show
     // it in the data returned code block.
     // clang-format off
@@ -475,7 +461,8 @@ export class FreestylerChatUi extends HTMLElement {
           .header=${codeHeadingText}
           .showCopyButton=${true}
         ></${MarkdownView.CodeBlock.CodeBlock.litTagName}>
-    </div>` : LitHtml.nothing;
+    </div>` :
+                             LitHtml.nothing;
     const output = step.output ? LitHtml.html`<div class="js-code-output">
       <${MarkdownView.CodeBlock.CodeBlock.litTagName}
         .code=${step.output}
@@ -484,7 +471,19 @@ export class FreestylerChatUi extends HTMLElement {
         .header=${lockedString(UIStringsNotTranslate.dataReturned)}
         .showCopyButton=${false}
       ></${MarkdownView.CodeBlock.CodeBlock.litTagName}>
-    </div>` : LitHtml.nothing;
+    </div>` :
+                                 LitHtml.nothing;
+
+    return LitHtml.html`<div class="step-code">${code}${output}</div>`;
+    // clang-format on
+  }
+
+  #renderStepDetails(step: Step, options: {isLast: boolean}): LitHtml.LitTemplate {
+    const sideEffects =
+        options.isLast && step.sideEffect ? this.#renderSideEffectConfirmationUi(step) : LitHtml.nothing;
+    const thought = step.thought ? LitHtml.html`<p>${this.#renderTextAsMarkdown(step.thought)}</p>` : LitHtml.nothing;
+
+    // clang-format off
     const contextDetails = step.contextDetails && step.contextDetails?.length > 0 ?
     LitHtml.html`${LitHtml.Directives.repeat(
       step.contextDetails,
@@ -503,9 +502,8 @@ export class FreestylerChatUi extends HTMLElement {
 
     return LitHtml.html`<div class="step-details">
       ${thought}
-      ${code}
+      ${this.#renderStepCode(step)}
       ${sideEffects}
-      ${output}
       ${contextDetails}
     </div>`;
     // clang-format on
@@ -936,10 +934,9 @@ export class FreestylerChatUi extends HTMLElement {
           ${this.#renderChatInput()}
         </form>
         <footer class="disclaimer">
-          <p class="disclaimer-text">${lockedString(
-            this.#getDisclaimerText(),
-          )} <x-link
-              href="#"
+          <p class="disclaimer-text">
+            ${this.#getDisclaimerText()}
+            <x-link
               class="link"
               jslog=${VisualLogging.link('open-ai-settings').track({
                 click: true,
@@ -950,7 +947,7 @@ export class FreestylerChatUi extends HTMLElement {
                   'chrome-ai',
                 );
               }}
-            >${lockedString(UIStringsNotTranslate.learnAbout)}</x-link>
+            >${i18nString(UIStrings.learnAbout)}</x-link>
           </p>
         </footer>
       </div>

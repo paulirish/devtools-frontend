@@ -38,7 +38,7 @@ export interface TableData {
 }
 
 export type TableDataRow = {
-  values: string[],
+  values: Array<string|LitHtml.LitTemplate>,
   overlays?: Overlays.Overlays.TimelineOverlay[],
 };
 
@@ -137,7 +137,7 @@ export class Table extends HTMLElement {
         this.#insight.toggleTemporaryOverlays(overlays, {updateTraceWindow: !opts.isHover});
       }
     } else {
-      this.#insight.toggleTemporaryOverlays(null);
+      this.#insight.toggleTemporaryOverlays(null, {updateTraceWindow: false});
     }
 
     this.#state.selectedRowEl?.classList.remove('selected');

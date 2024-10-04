@@ -139,8 +139,8 @@ export class FreestylerPanel extends UI.Panel.Panel {
     this.#selectedElement = selectedElementFilter(UI.Context.Context.instance().flavor(SDK.DOMModel.DOMNode));
     this.#selectedNetworkRequest = UI.Context.Context.instance().flavor(SDK.NetworkRequest.NetworkRequest);
     this.#viewProps = {
-      state: this.#freestylerEnabledSetting?.get() ? FreestylerChatUiState.CHAT_VIEW :
-                                                     FreestylerChatUiState.CONSENT_VIEW,
+      state: this.#freestylerEnabledSetting?.getIfNotDisabled() ? FreestylerChatUiState.CHAT_VIEW :
+                                                                  FreestylerChatUiState.CONSENT_VIEW,
       aidaAvailability,
       messages: [],
       inspectElementToggled: this.#toggleSearchElementAction.toggled(),
@@ -275,6 +275,13 @@ export class FreestylerPanel extends UI.Panel.Panel {
 
   handleAction(actionId: string): void {
     switch (actionId) {
+      case 'freestyler.elements-floating-button': {
+        this.#viewOutput.freestylerChatUi?.focusTextInput();
+        Host.userMetrics.actionTaken(Host.UserMetrics.Action.FreestylerOpenedFromElementsPanelFloatingButton);
+        this.#viewProps.agentType = AgentType.FREESTYLER;
+        this.doUpdate();
+        break;
+      }
       case 'freestyler.element-panel-context': {
         this.#viewOutput.freestylerChatUi?.focusTextInput();
         Host.userMetrics.actionTaken(Host.UserMetrics.Action.FreestylerOpenedFromElementsPanel);
@@ -287,6 +294,14 @@ export class FreestylerPanel extends UI.Panel.Panel {
         this.#viewOutput.freestylerChatUi?.focusTextInput();
         this.#viewProps.agentType = AgentType.DRJONES_NETWORK_REQUEST;
         this.doUpdate();
+        break;
+      }
+      case 'drjones.performance-panel-context': {
+        // TODO(samiyac): Add actions and UMA
+        break;
+      }
+      case 'drjones.sources-panel-context': {
+        // TODO(samiyac): Add actions and UMA
         break;
       }
     }
@@ -430,8 +445,11 @@ export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
       actionId: string,
       ): boolean {
     switch (actionId) {
+      case 'freestyler.elements-floating-button':
       case 'freestyler.element-panel-context':
-      case 'drjones.network-panel-context': {
+      case 'drjones.network-panel-context':
+      case 'drjones.performance-panel-context':
+      case 'drjones.sources-panel-context': {
         void (async () => {
           const view = UI.ViewManager.ViewManager.instance().view(
               FreestylerPanel.panelName,

@@ -30,16 +30,28 @@ describeWithEnvironment('CumulativeLayoutShift', function() {
       const insight = getInsightOrError('CumulativeLayoutShift', insights, firstNav);
       const {animationFailures} = insight;
 
+      const simpleAnimation = data.Animations.animations.find(animation => {
+        return animation.args.data.beginEvent.args.data.displayName === 'simple-animation';
+      });
+      const top = data.Animations.animations.find(animation => {
+        return animation.args.data.beginEvent.args.data.displayName === 'top';
+      });
+
       const expected: InsightRunners.CumulativeLayoutShift.NoncompositedAnimationFailure[] = [
         {
           name: 'simple-animation',
           failureReasons: [InsightRunners.CumulativeLayoutShift.AnimationFailureReasons.UNSUPPORTED_CSS_PROPERTY],
           unsupportedProperties: ['color'],
+          animation: simpleAnimation,
         },
         {
           name: 'top',
-          failureReasons: [InsightRunners.CumulativeLayoutShift.AnimationFailureReasons.UNSUPPORTED_CSS_PROPERTY],
+          failureReasons: [
+            InsightRunners.CumulativeLayoutShift.AnimationFailureReasons.TARGET_HAS_INVALID_COMPOSITING_STATE,
+            InsightRunners.CumulativeLayoutShift.AnimationFailureReasons.UNSUPPORTED_CSS_PROPERTY,
+          ],
           unsupportedProperties: ['top'],
+          animation: top,
         },
       ];
       assert.deepStrictEqual(animationFailures, expected);
@@ -51,6 +63,13 @@ describeWithEnvironment('CumulativeLayoutShift', function() {
       const insight = getInsightOrError('CumulativeLayoutShift', insights, firstNav);
       const {shifts, animationFailures} = insight;
 
+      const simpleAnimation = data.Animations.animations.find(animation => {
+        return animation.args.data.beginEvent.args.data.displayName === 'simple-animation';
+      });
+      const top = data.Animations.animations.find(animation => {
+        return animation.args.data.beginEvent.args.data.displayName === 'top';
+      });
+
       const shiftAnimations: InsightRunners.CumulativeLayoutShift.NoncompositedAnimationFailure[] = [];
       shifts?.forEach(entry => {
         shiftAnimations.push(...entry.nonCompositedAnimations);
@@ -60,6 +79,7 @@ describeWithEnvironment('CumulativeLayoutShift', function() {
           name: 'simple-animation',
           failureReasons: [InsightRunners.CumulativeLayoutShift.AnimationFailureReasons.UNSUPPORTED_CSS_PROPERTY],
           unsupportedProperties: ['height', 'color', 'top'],
+          animation: simpleAnimation,
         },
       ];
       assert.deepStrictEqual(shiftAnimations, expectedWithShift);
@@ -69,11 +89,13 @@ describeWithEnvironment('CumulativeLayoutShift', function() {
           name: 'simple-animation',
           failureReasons: [InsightRunners.CumulativeLayoutShift.AnimationFailureReasons.UNSUPPORTED_CSS_PROPERTY],
           unsupportedProperties: ['height', 'color', 'top'],
+          animation: simpleAnimation,
         },
         {
           name: 'top',
           failureReasons: [InsightRunners.CumulativeLayoutShift.AnimationFailureReasons.UNSUPPORTED_CSS_PROPERTY],
           unsupportedProperties: ['top'],
+          animation: top,
         },
       ];
       // animationFailures should include both root causes failures, and failures without associated shifts.

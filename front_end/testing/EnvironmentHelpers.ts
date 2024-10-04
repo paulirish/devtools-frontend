@@ -332,6 +332,7 @@ export async function deinitializeGlobalVars() {
   await deinitializeGlobalLocaleVars();
   Logs.NetworkLog.NetworkLog.removeInstance();
   SDK.TargetManager.TargetManager.removeInstance();
+  SDK.FrameManager.FrameManager.removeInstance();
   Root.Runtime.Runtime.removeInstance();
   Common.Settings.Settings.removeInstance();
   Common.Revealer.RevealerRegistry.removeInstance();
@@ -507,12 +508,12 @@ export function getGetHostConfigStub(config: Root.Runtime.HostConfig): sinon.Sin
       temperature: -1,
       ...config.devToolsConsoleInsights,
     } as Root.Runtime.HostConfigConsoleInsights,
-    devToolsFreestylerDogfood: {
+    devToolsFreestyler: {
       modelId: '',
       temperature: -1,
       enabled: false,
-      ...config.devToolsFreestylerDogfood,
-    } as Root.Runtime.HostConfigFreestylerDogfood,
+      ...config.devToolsFreestyler,
+    } as Root.Runtime.HostConfigFreestyler,
     devToolsExplainThisResourceDogfood: {
       modelId: '',
       temperature: -1,

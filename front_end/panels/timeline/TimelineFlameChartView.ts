@@ -19,6 +19,7 @@ import type * as TimelineComponents from './components/components.js';
 import {CountersGraph} from './CountersGraph.js';
 import {SHOULD_SHOW_EASTER_EGG} from './EasterEgg.js';
 import {ModificationsManager} from './ModificationsManager.js';
+import * as OverlayComponents from './overlays/components/components.js';
 import * as Overlays from './overlays/overlays.js';
 import {targetForEvent} from './TargetForEvent.js';
 import {TimelineDetailsView} from './TimelineDetailsView.js';
@@ -171,7 +172,7 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
     this.mainFlameChart.addEventListener(PerfUI.FlameChart.Events.LATEST_DRAW_DIMENSIONS, dimensions => {
       this.#overlays.updateChartDimensions('main', dimensions.data.chart);
       this.#overlays.updateVisibleWindow(dimensions.data.traceWindow);
-      this.#overlays.update();
+      void this.#overlays.update();
     });
 
     this.networkFlameChartGroupExpansionSetting =
@@ -188,7 +189,7 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
     this.networkFlameChart.addEventListener(PerfUI.FlameChart.Events.LATEST_DRAW_DIMENSIONS, dimensions => {
       this.#overlays.updateChartDimensions('network', dimensions.data.chart);
       this.#overlays.updateVisibleWindow(dimensions.data.traceWindow);
-      this.#overlays.update();
+      void this.#overlays.update();
 
       // If the height of the network chart has changed, we need to tell the
       // main flame chart because its tooltips are positioned based in part on
@@ -197,11 +198,11 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
     });
 
     this.mainFlameChart.addEventListener(PerfUI.FlameChart.Events.MOUSE_MOVE, event => {
-      this.#processFlameChartMouseMoveEvent(event.data);
+      void this.#processFlameChartMouseMoveEvent(event.data);
     });
 
     this.networkFlameChart.addEventListener(PerfUI.FlameChart.Events.MOUSE_MOVE, event => {
-      this.#processFlameChartMouseMoveEvent(event.data);
+      void this.#processFlameChartMouseMoveEvent(event.data);
     });
 
     this.#overlays = new Overlays.Overlays.Overlays({
@@ -241,6 +242,22 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
       } else if (action === 'Update') {
         ModificationsManager.activeManager()?.updateAnnotationOverlay(overlay);
       }
+    });
+
+    this.element.addEventListener(OverlayComponents.EntriesLinkOverlay.EntryLinkStartCreating.eventName, () => {
+      /**
+       * When the user creates an entries link, they click on the arrow icon to
+       * begin creating it. At this point the arrow icon gets deleted. This
+       * causes the focus of the page by default to jump to the entire Timeline
+       * Panel. This is a bit aggressive; and problematic as it means we cannot
+       * use <ESC> to cancel the creation of the entry. So instead we focus the
+       * TimelineFlameChartView instead. This means that the user's <ESC> gets
+       * dealt with in its keydown.
+       * If the user goes ahead and creates the entry, they will end up
+       * focused on whichever target entry they pick, so this only matters for
+       * the case where the user hits <ESC> to cancel.
+       */
+      this.focus();
     });
 
     this.networkPane = new UI.Widget.VBox();
@@ -436,7 +453,7 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
     }
   }
 
-  #processFlameChartMouseMoveEvent(data: PerfUI.FlameChart.EventTypes['MouseMove']): void {
+  async #processFlameChartMouseMoveEvent(data: PerfUI.FlameChart.EventTypes['MouseMove']): Promise<void> {
     const {mouseEvent, timeInMicroSeconds} = data;
     // If the user is no longer holding shift, remove any existing marker.
     if (!mouseEvent.shiftKey) {
@@ -444,7 +461,7 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
       if (removedCount > 0) {
         // Don't trigger lots of updates on a mouse move if we didn't actually
         // remove any overlays.
-        this.#overlays.update();
+        await this.#overlays.update();
       }
     }
 
@@ -607,10 +624,14 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
 
     // `CREATION_NOT_STARTED` is only true in the state when both empty label and button to create connection are
     // created at the same time. If any key is typed in that state, it means that the label is in focus and the key
-    // is typed into the label. In that case, delete the connection.
+    // is typed into the label. This tells us that the user chose to create the
+    // label, not the connection. In that case, delete the connection.
     if (this.#linkSelectionAnnotation &&
         this.#linkSelectionAnnotation.state === Trace.Types.File.EntriesLinkState.CREATION_NOT_STARTED) {
       this.#clearLinkSelectionAnnotation(true);
+      // We have dealt with the keypress as the user is typing into the label, so do not let it propogate up.
+      // This also ensures that if the user uses "Escape" they don't toggle the DevTools drawer.
+      event.stopPropagation();
     }
 
     /**
@@ -779,9 +800,12 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
   }
 
   setInsights(insights: Trace.Insights.Types.TraceInsightSets|null): void {
-    if (this.#traceInsightsSets !== insights) {
-      this.#traceInsightsSets = insights;
+    if (this.#traceInsightsSets === insights) {
+      return;
     }
+    this.#traceInsightsSets = insights;
+    // The DetailsView is provided with the InsightSets, so make sure we update it.
+    this.#updateDetailViews();
   }
 
   #reset(): void {
@@ -935,9 +959,9 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
   revealEvent(event: Trace.Types.Events.Event): void {
     const mainIndex = this.mainDataProvider.indexForEvent(event);
     const networkIndex = this.networkDataProvider.indexForEvent(event);
-    if (mainIndex) {
+    if (mainIndex !== null) {
       this.mainFlameChart.revealEntry(mainIndex);
-    } else if (networkIndex) {
+    } else if (networkIndex !== null) {
       this.networkFlameChart.revealEntry(networkIndex);
     }
   }
@@ -946,9 +970,9 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
   revealEventVertically(event: Trace.Types.Events.Event): void {
     const mainIndex = this.mainDataProvider.indexForEvent(event);
     const networkIndex = this.networkDataProvider.indexForEvent(event);
-    if (mainIndex) {
+    if (mainIndex !== null) {
       this.mainFlameChart.revealEntryVertically(mainIndex);
-    } else if (networkIndex) {
+    } else if (networkIndex !== null) {
       this.networkFlameChart.revealEntryVertically(networkIndex);
     }
   }
@@ -1006,12 +1030,12 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
     for (const overlay of overlays) {
       this.#overlays.add(overlay);
     }
-    this.#overlays.update();
+    void this.#overlays.update();
   }
 
   addOverlay<T extends Overlays.Overlays.TimelineOverlay>(newOverlay: T): T {
     const overlay = this.#overlays.add(newOverlay);
-    this.#overlays.update();
+    void this.#overlays.update();
     return overlay;
   }
 
@@ -1023,16 +1047,16 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
     for (const overlay of overlays) {
       this.#overlays.remove(overlay);
     }
-    this.#overlays.update();
+    void this.#overlays.update();
   }
   removeOverlay(removedOverlay: Overlays.Overlays.TimelineOverlay): void {
     this.#overlays.remove(removedOverlay);
-    this.#overlays.update();
+    void this.#overlays.update();
   }
 
   updateExistingOverlay<T extends Overlays.Overlays.TimelineOverlay>(existingOverlay: T, newData: Partial<T>): void {
     this.#overlays.updateExisting(existingOverlay, newData);
-    this.#overlays.update();
+    void this.#overlays.update();
   }
 
   enterLabelEditMode(overlay: Overlays.Overlays.EntryLabel): void {

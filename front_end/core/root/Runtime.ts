@@ -298,6 +298,7 @@ export const enum ExperimentName {
   TIMELINE_ENHANCED_TRACES = 'timeline-enhanced-traces',
   TIMELINE_SERVER_TIMINGS = 'timeline-server-timings',
   EXTENSION_STORAGE_VIEWER = 'extension-storage-viewer',
+  FLOATING_ENTRY_POINTS_FOR_AI_ASSISTANCE = 'floating-entry-points-for-ai-assistance',
 }
 
 export interface AidaAvailability {
@@ -314,7 +315,7 @@ export interface HostConfigConsoleInsights {
   enabled: boolean;
 }
 
-export interface HostConfigFreestylerDogfood {
+export interface HostConfigFreestyler {
   modelId: string;
   temperature: number;
   enabled: boolean;
@@ -361,7 +362,7 @@ export interface HostConfigPrivacyUI {
 export type HostConfig = Platform.TypeScriptUtilities.RecursivePartial<{
   aidaAvailability: AidaAvailability,
   devToolsConsoleInsights: HostConfigConsoleInsights,
-  devToolsFreestylerDogfood: HostConfigFreestylerDogfood,
+  devToolsFreestyler: HostConfigFreestyler,
   devToolsExplainThisResourceDogfood: HostConfigExplainThisResourceDogfood,
   devToolsAiAssistancePerformanceAgentDogfood: HostConfigAiAssistancePerformanceAgentDogfood,
   devToolsAiAssistanceFileAgentDogfood: HostConfigAiAssistanceFileAgentDogfood,

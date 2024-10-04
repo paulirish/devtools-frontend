@@ -49,6 +49,19 @@ declare global {
   }
 }
 
+export interface ParseOptions {
+  /**
+   * If the trace was just recorded on the current page, rather than an imported file.
+   * @default false
+   */
+  isFreshRecording?: boolean;
+  /**
+   * If the trace is a CPU Profile rather than a Chrome tracing trace.
+   * @default false
+   */
+  isCPUProfile?: boolean;
+}
+
 export class TraceProcessor extends EventTarget {
   // We force the Meta handler to be enabled, so the TraceHandlers type here is
   // the model handlers the user passes in and the Meta handler.
@@ -151,14 +164,14 @@ export class TraceProcessor extends EventTarget {
     this.#status = Status.IDLE;
   }
 
-  async parse(traceEvents: readonly Types.Events.Event[], freshRecording = false): Promise<void> {
+  async parse(traceEvents: readonly Types.Events.Event[], options: ParseOptions): Promise<void> {
     if (this.#status !== Status.IDLE) {
       throw new Error(`Trace processor can't start parsing when not idle. Current state: ${this.#status}`);
     }
     try {
       this.#status = Status.PARSING;
-      await this.#computeParsedTrace(traceEvents, freshRecording);
-      if (this.#data) {
+      await this.#computeParsedTrace(traceEvents, Boolean(options.isFreshRecording));
+      if (this.#data && !options.isCPUProfile) {  // We do not calculate insights for CPU Profiles.
         this.#computeInsights(this.#data, traceEvents);
       }
       this.#status = Status.FINISHED_PARSING;
@@ -342,19 +355,28 @@ export class TraceProcessor extends EventTarget {
       Object.assign(data, {[name]: insightResult});
     }
 
-    let id, label, navigation;
+    let id, urlString, navigation;
     if (context.navigation) {
       id = context.navigationId;
-      label = context.navigation.args.data?.documentLoaderURL ?? parsedTrace.Meta.mainFrameURL;
+      urlString = context.navigation.args.data?.documentLoaderURL ?? parsedTrace.Meta.mainFrameURL;
       navigation = context.navigation;
     } else {
       id = Types.Events.NO_NAVIGATION;
-      label = parsedTrace.Meta.mainFrameURL;
+      urlString = parsedTrace.Meta.mainFrameURL;
+    }
+
+    let url;
+    try {
+      url = new URL(urlString);
+    } catch {
+      // We're pretty sure this only happens for our test fixture: missing-url.json.gz. Shouldn't
+      // happen for real traces.
+      return;
     }
 
     const insightSets = {
       id,
-      label,
+      url,
       navigation,
       frameId: context.frameId,
       bounds: context.bounds,
@@ -403,7 +425,7 @@ export class TraceProcessor extends EventTarget {
       const frameId = navigation.args.frame;
       const navigationId = navigation.args.data?.navigationId as string;
 
-      // The lantern sub-context is optional on NavigationInsightContext, so not setting it is OK.
+      // The lantern sub-context is optional on InsightSetContext, so not setting it is OK.
       // This is also a hedge against an error inside Lantern resulting in breaking the entire performance panel.
       // Additionally, many trace fixtures are too old to be processed by Lantern.
       let lantern;

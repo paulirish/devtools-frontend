@@ -4,7 +4,7 @@
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
-import type * as Root from '../../core/root/root.js';
+import * as Root from '../../core/root/root.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
 import type * as Freestyler from './freestyler.js';
@@ -86,12 +86,22 @@ async function loadFreestylerModule(): Promise<typeof Freestyler> {
 }
 
 function isFeatureAvailable(config?: Root.Runtime.HostConfig): boolean {
-  return (config?.aidaAvailability?.enabled && config?.devToolsFreestylerDogfood?.enabled) === true;
+  return (config?.aidaAvailability?.enabled && config?.devToolsFreestyler?.enabled) === true;
 }
 
-function isDrJonesFeatureAvailable(config?: Root.Runtime.HostConfig): boolean {
-  return (config?.aidaAvailability?.enabled && config?.devToolsFreestylerDogfood?.enabled &&
+function isDrJonesNetworkFeatureAvailable(config?: Root.Runtime.HostConfig): boolean {
+  return (config?.aidaAvailability?.enabled && config?.devToolsFreestyler?.enabled &&
           config?.devToolsExplainThisResourceDogfood?.enabled) === true;
+}
+
+function isDrJonesPerformanceFeatureAvailable(config?: Root.Runtime.HostConfig): boolean {
+  return (config?.aidaAvailability?.enabled && config?.devToolsFreestyler?.enabled &&
+          config?.devToolsAiAssistancePerformanceAgentDogfood?.enabled) === true;
+}
+
+function isDrJonesFileFeatureAvailable(config?: Root.Runtime.HostConfig): boolean {
+  return (config?.aidaAvailability?.enabled && config?.devToolsFreestyler?.enabled &&
+          config?.devToolsAiAssistanceFileAgentDogfood?.enabled) === true;
 }
 
 UI.ViewManager.registerViewExtension({
@@ -137,6 +147,21 @@ Common.Settings.registerSettingExtension({
 });
 
 UI.ActionRegistration.registerActionExtension({
+  actionId: 'freestyler.elements-floating-button',
+  contextTypes(): [] {
+    return [];
+  },
+  experiment: Root.Runtime.ExperimentName.FLOATING_ENTRY_POINTS_FOR_AI_ASSISTANCE,
+  category: UI.ActionRegistration.ActionCategory.GLOBAL,
+  title: i18nLazyString(UIStrings.askAiAssistance),
+  async loadActionDelegate() {
+    const Freestyler = await loadFreestylerModule();
+    return new Freestyler.ActionDelegate();
+  },
+  condition: config => isFeatureAvailable(config) && !isPolicyRestricted(config),
+});
+
+UI.ActionRegistration.registerActionExtension({
   actionId: 'freestyler.element-panel-context',
   contextTypes(): [] {
     return [];
@@ -161,5 +186,35 @@ UI.ActionRegistration.registerActionExtension({
     const Freestyler = await loadFreestylerModule();
     return new Freestyler.ActionDelegate();
   },
-  condition: config => isDrJonesFeatureAvailable(config) && !isPolicyRestricted(config),
+  condition: config => isDrJonesNetworkFeatureAvailable(config) && !isPolicyRestricted(config),
+});
+
+UI.ActionRegistration.registerActionExtension({
+  actionId: 'drjones.performance-panel-context',
+  contextTypes(): [] {
+    return [];
+  },
+  setting,
+  category: UI.ActionRegistration.ActionCategory.GLOBAL,
+  title: i18nLazyString(UIStrings.askAiAssistance),
+  async loadActionDelegate() {
+    const Freestyler = await loadFreestylerModule();
+    return new Freestyler.ActionDelegate();
+  },
+  condition: config => isDrJonesPerformanceFeatureAvailable(config) && !isPolicyRestricted(config),
+});
+
+UI.ActionRegistration.registerActionExtension({
+  actionId: 'drjones.sources-panel-context',
+  contextTypes(): [] {
+    return [];
+  },
+  setting,
+  category: UI.ActionRegistration.ActionCategory.GLOBAL,
+  title: i18nLazyString(UIStrings.askAiAssistance),
+  async loadActionDelegate() {
+    const Freestyler = await loadFreestylerModule();
+    return new Freestyler.ActionDelegate();
+  },
+  condition: config => isDrJonesFileFeatureAvailable(config) && !isPolicyRestricted(config),
 });

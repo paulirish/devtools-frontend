@@ -134,14 +134,11 @@ export abstract class BaseInsight extends HTMLElement {
    * This enables the hover/click table interactions.
    */
   toggleTemporaryOverlays(
-      overlays: Overlays.Overlays.TimelineOverlay[]|null, options?: Overlays.Overlays.TimelineOverlaySetOptions): void {
+      overlays: Overlays.Overlays.TimelineOverlay[]|null, options: Overlays.Overlays.TimelineOverlaySetOptions): void {
     if (!this.isActive()) {
       return;
     }
 
-    if (!options) {
-      options = {updateTraceWindow: true};
-    }
     this.dispatchEvent(new SidebarInsight.InsightProvideOverlays(overlays ?? this.getInitialOverlays(), options));
   }
 
@@ -203,13 +200,74 @@ export function md(markdown: string): LitHtml.TemplateResult {
 export class EventReferenceClick extends Event {
   static readonly eventName = 'eventreferenceclick';
 
-  constructor(public metricEvent: Trace.Types.Events.Event) {
+  constructor(public event: Trace.Types.Events.Event) {
     super(EventReferenceClick.eventName, {bubbles: true, composed: true});
   }
+}
+
+class EventRef extends HTMLElement {
+  static readonly litTagName = LitHtml.literal`devtools-performance-event-ref`;
+  readonly #shadow = this.attachShadow({mode: 'open'});
+  readonly #boundRender = this.#render.bind(this);
+
+  #baseInsight: BaseInsight|null = null;
+  #text: string|null = null;
+  #event: Trace.Types.Events.Event|null = null;
+
+  connectedCallback(): void {
+    this.#shadow.adoptedStyleSheets = [sidebarInsightStyles];
+  }
+
+  set text(text: string) {
+    this.#text = text;
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
+  }
+
+  set baseInsight(baseInsight: BaseInsight) {
+    this.#baseInsight = baseInsight;
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
+  }
+
+  set event(event: Trace.Types.Events.Event) {
+    this.#event = event;
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
+  }
+
+  #render(): void {
+    if (!this.#baseInsight || !this.#text || !this.#event) {
+      return;
+    }
+
+    // clang-format off
+    LitHtml.render(LitHtml.html`
+      <span class=devtools-link @click=${(e: Event) => {
+        e.stopPropagation();
+        if (this.#baseInsight && this.#event) {
+          this.#baseInsight.dispatchEvent(new EventReferenceClick(this.#event));
+        }
+      }}>${this.#text}</span>
+    `, this.#shadow, {host: this});
+    // clang-format on
+  }
+}
+
+export function eventRef(
+    baseInsight: BaseInsight, event: Trace.Types.Events.Event, text: string): LitHtml.TemplateResult {
+  return LitHtml.html`<${EventRef.litTagName}
+    .baseInsight=${baseInsight}
+    .event=${event}
+    .text=${text}
+  ></${EventRef.litTagName}>`;
 }
 
 declare global {
   interface GlobalEventHandlersEventMap {
     [EventReferenceClick.eventName]: EventReferenceClick;
   }
+
+  interface HTMLElementTagNameMap {
+    'devtools-performance-event-ref': EventRef;
+  }
 }
+
+customElements.define('devtools-performance-event-ref', EventRef);
