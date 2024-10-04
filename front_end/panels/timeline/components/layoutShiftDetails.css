@@ -120,7 +120,7 @@
   z-index: 200;
 }
 
-.layout-shift-screenshot-after {
+.layout-shift-viz-screenshot--after {
   opacity: 0;
   position: absolute;
   top: 0;

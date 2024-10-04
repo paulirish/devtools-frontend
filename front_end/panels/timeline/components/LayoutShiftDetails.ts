@@ -411,9 +411,9 @@ export async function createShiftViz(
               node.new_rect[0] / dpr, node.new_rect[1] / dpr, node.new_rect[2] / dpr, node.new_rect[3] / dpr)) ??
       [];
 
-  const screenshotContainer = document.createElement('div');
-  screenshotContainer.classList.add('layout-shift-viz');
-  screenshotContainer.appendChild(beforeImage);
+  const vizContainer = document.createElement('div');
+  vizContainer.classList.add('layout-shift-viz');
+  vizContainer.appendChild(beforeImage);
 
   // If this is being size constrained, it needs to be done in JS (rather than css max-width, etc)....
   // That's because this function is complete before it's added to the DOM.. so we can't query offsetHeight for its resolved size…
@@ -446,16 +446,15 @@ export async function createShiftViz(
     rectEl.style.height = `${scaledRectHeight}px`;
     rectEl.style.opacity = '0.4';
 
-    screenshotContainer.appendChild(rectEl);
+    vizContainer.appendChild(rectEl);
     return rectEl;
   });
+
   if (afterImage) {
-    afterImage.classList.add('layout-shift-screenshot-after');
-    screenshotContainer.appendChild(afterImage);
+    afterImage.classList.add('layout-shift-viz-screenshot--after');
+    vizContainer.appendChild(afterImage);
     afterImage.style.width = beforeImage.style.width;
     afterImage.style.height = beforeImage.style.height;
-    // TODO(paulirish): hook up dialog
-    // afterImage.addEventListener('click', () => { new ScreenshotGifDialog(event, parsedTrace); });
   }
 
   // Update for the after rect positions after a bit.
@@ -478,5 +477,5 @@ export async function createShiftViz(
   }, 1000);
 
 
-  return {elem: screenshotContainer, width, height};
+  return {elem: vizContainer, width, height};
 }
