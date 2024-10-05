@@ -278,8 +278,6 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
     const toCssPixelRect = (rect: Trace.Types.Events.TraceRect): DOMRect => {
       return new DOMRect(rect[0] / dpr, rect[1] / dpr, rect[2] / dpr, rect[3] / dpr);
     };
-    const beforeRects = event.args.data?.impacted_nodes?.map(node => toCssPixelRect(node.old_rect)) ?? [];
-    const afterRects = event.args.data?.impacted_nodes?.map(node => toCssPixelRect(node.new_rect)) ?? [];
 
     // 2 of 3 scaling factors. Turns CSS pixels into pixels relative to the size of the screenshot image's natural size.
     const screenshotImageScaleFactor =
@@ -295,6 +293,9 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
       elem.style.height = `${beforeImg.naturalHeight * maxSizeScaleFactor}px`;
     }
 
+    const beforeRects = event.args.data?.impacted_nodes?.map(node => toCssPixelRect(node.old_rect)) ?? [];
+    const afterRects = event.args.data?.impacted_nodes?.map(node => toCssPixelRect(node.new_rect)) ?? [];
+
     function startVizAnimation() {
       if (!beforeImg || !afterImg) {
         return;
@@ -303,24 +304,25 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
       // If image is reused, drop existing anims
       [beforeImg, afterImg].flatMap(img => img.getAnimations()).forEach(a => a.cancel());
 
+      const easing = 'ease-out';
       const vizAnimOpts: KeyframeAnimationOptions = {
-        duration: 2500,
+        duration: 3000,
         iterations: Infinity,
-        easing: 'ease-out',
         fill: 'forwards',
+        easing,
       };
       // Using keyframe offsets to add "delay" to both the start and the end.
       // https://drafts.csswg.org/web-animations-1/#:~:text=Keyframe%20offsets%20can%20be%20specified%20using%20either%20form%20as%20illustrated%20below%3A
-      // Animate the screenshot in
-      afterImg.animate({opacity: [0, 0, 1, 1, 1], easing: 'ease-out'}, {...vizAnimOpts, easing: 'ease-out'});
+      // Animate the "after" screenshot's opacity in.
+      afterImg.animate({opacity: [0, 0, 1, 1, 1], easing}, vizAnimOpts);
 
       const getRectPosition = (rect: DOMRect): Keyframe => ({
         left: `${rect.x * maxSizeScaleFactor * screenshotImageScaleFactor}px`,
         top: `${rect.y * maxSizeScaleFactor * screenshotImageScaleFactor}px`,
         width: `${rect.width * maxSizeScaleFactor * screenshotImageScaleFactor}px`,
         height: `${rect.height * maxSizeScaleFactor * screenshotImageScaleFactor}px`,
-        opacity: 0.4,
-        easing: 'ease-out',
+        opacity: 0.7,
+        easing,
       });
 
       // Create and position individual rects representing each impacted_node within a shift
@@ -332,14 +334,14 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
 
         let beforePos = getRectPosition(beforeRect);
         const afterPos = getRectPosition(afterRect);
-        afterPos.opacity = 0.7;
+        afterPos.opacity = 0.4;
 
         // If it's a 0x0x0x0 rect, then set to after, so we can fade it in from the after position instead.
         if ([beforeRect.width, beforeRect.height, beforeRect.x, beforeRect.y].every(v => v === 0)) {
           beforePos = {...afterPos};
           beforePos.opacity = '0';
         }
-
+        // Keep these keyframe offsets sync'd with the opacity ones above.
         rectEl.animate([beforePos, beforePos, afterPos, afterPos, afterPos], vizAnimOpts);
       });
     }
