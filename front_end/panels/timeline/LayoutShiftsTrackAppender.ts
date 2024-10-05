@@ -314,7 +314,7 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
       // Using keyframe offsets to add "delay" to both the start and the end.
       // https://drafts.csswg.org/web-animations-1/#:~:text=Keyframe%20offsets%20can%20be%20specified%20using%20either%20form%20as%20illustrated%20below%3A
       // Animate the "after" screenshot's opacity in.
-      afterImg.animate({opacity: [0, 0, 1, 1, 1], easing}, vizAnimOpts);
+      afterImg.animate({opacity: [0, 0, 0.8, 0.8, 0.8], easing}, vizAnimOpts);
 
       const getRectPosition = (rect: DOMRect): Keyframe => ({
         left: `${rect.x * maxSizeScaleFactor * screenshotImageScaleFactor}px`,
@@ -333,14 +333,19 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
         vizContainer.appendChild(rectEl);
 
         let beforePos = getRectPosition(beforeRect);
-        const afterPos = getRectPosition(afterRect);
+        let afterPos = getRectPosition(afterRect);
         afterPos.opacity = 0.4;
 
-        // If it's a 0x0x0x0 rect, then set to after, so we can fade it in from the after position instead.
+        // Edge case: if either before or after is 0x0x0x0, then we'll fade it in/out in the same location.
         if ([beforeRect.width, beforeRect.height, beforeRect.x, beforeRect.y].every(v => v === 0)) {
           beforePos = {...afterPos};
           beforePos.opacity = '0';
         }
+        if ([afterRect.width, afterRect.height, afterRect.x, afterRect.y].every(v => v === 0)) {
+          afterPos = {...beforePos};
+          afterPos.opacity = '0';
+        }
+
         // Keep these keyframe offsets sync'd with the opacity ones above.
         rectEl.animate([beforePos, beforePos, afterPos, afterPos, afterPos], vizAnimOpts);
       });

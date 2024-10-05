@@ -13,6 +13,7 @@ import * as LegacyComponents from '../../../ui/legacy/components/utils/utils.js'
 import * as UI from '../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import {CLSRect} from '../CLSLinkifier.js';
+import {TimelineUIUtils} from '../TimelineUIUtils.js';
 
 import * as EntryName from './EntryName.js';
 import * as Insights from './insights/insights.js';
@@ -404,12 +405,18 @@ export class LayoutShiftDetails extends HTMLElement {
           ${this.#renderInsightChip()}
         </div>
       </div>
+      ${TimelineUIUtils.renderObjectJson(this.#event)}
     `;
     // clang-format on
     LitHtml.render(output, this.#shadow, {host: this});
   }
 
   #togglePopover(e: MouseEvent): void {
+    const show = e.type === 'mouseover';
+    if (e.type === 'mouseleave') {
+      this.dispatchEvent(new CustomEvent('toggle-popover', {detail: {show}, bubbles: true, composed: true}));
+    }
+
     if (!(e.target instanceof HTMLElement)) {
       return;
     }
@@ -422,9 +429,8 @@ export class LayoutShiftDetails extends HTMLElement {
       return;
     }
 
-    const shiftEvent = this.#rowEvents[index];
-    const payload = {event: shiftEvent, show: e.type === 'mouseover'};
-    this.dispatchEvent(new CustomEvent('toggle-popover', {detail: payload, bubbles: true, composed: true}));
+    const event = this.#rowEvents[index];
+    this.dispatchEvent(new CustomEvent('toggle-popover', {detail: {event, show}, bubbles: true, composed: true}));
   }
 }
 
