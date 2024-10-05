@@ -259,19 +259,15 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
     //TODO: maybe remove maxSize
     const screenshots = event.parsedData.screenshots;
     const viewport = parsedTrace.Meta.viewportRect;
-
-    const beforeUri = screenshots.before?.args.dataUri;
-    const afterUri = screenshots.after?.args.dataUri;
-    if (!beforeUri || !afterUri || !viewport) {
-      return;
-    }
-
     const vizContainer = document.createElement('div');
     vizContainer.classList.add('layout-shift-viz');
 
-
     const beforeImage = screenshots.before && parsedTrace.Screenshots.screenshotImageCache.get(screenshots.before);
     let afterImage = screenshots.after && parsedTrace.Screenshots.screenshotImageCache.get(screenshots.after);
+
+    if (!beforeImage || !afterImage || !viewport) {
+      return;
+    }
 
     /** The Layout Instability API in Blink, which reports the LayoutShift trace events, is not based on CSS pixels but
      * physical pixels. As such the values in the impacted_nodes field need to be normalized to CSS units in order to
@@ -296,25 +292,29 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
     const beforeRects = (event.args.data?.impacted_nodes?.map(node => scaleRect(node.old_rect)) ?? []);
     const afterRects = (event.args.data?.impacted_nodes?.map(node => scaleRect(node.new_rect)) ?? []);
 
-
     // Calculate scaling factor based on maxSize.
     // If this is being size constrained, it needs to be done in JS (rather than css max-width, etc)....
     // That's because this function is complete before it's added to the DOM.. so we can't query offsetHeight for its resolved size…
     const maxSizeScaleFactor =
         Math.min(maxSize.width / beforeImage.naturalWidth, maxSize.height / beforeImage.naturalHeight, 1);
-    afterImage = afterImage || beforeImage;
     afterImage.style.width = beforeImage.style.width = `${beforeImage.naturalWidth * maxSizeScaleFactor}px`;
     afterImage.style.height = beforeImage.style.height = `${beforeImage.naturalHeight * maxSizeScaleFactor}px`;
     afterImage.classList.add('layout-shift-viz-screenshot--after');
     vizContainer.append(beforeImage, afterImage);
 
-    // Fade in the 'after' screenshot
-    setTimeout(() => {
-      afterImage.style.opacity = '1';
-    }, 1000);
+    // Need to onvert css pixel coordinate spaces into the size of the 500px screenshot image
+    const cssPixelToScreenshotScaleFactor =
+        Math.min(beforeImage.naturalWidth / viewport.width, beforeImage.naturalHeight / viewport.height, 1)
+
+    const setRectPosition = (rectEl: HTMLDivElement, rect: DOMRect) => {
+      rectEl.style.left = `${rect.x * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`;
+      rectEl.style.top = `${rect.y * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`;
+      rectEl.style.width = `${rect.width * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`;
+      rectEl.style.height = `${rect.height * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`;
+    };
 
     // Create and position individual rects representing each impacted_node within a shift
-    beforeRects.forEach((beforeRect, i) => {
+    const rectEls = beforeRects.map((beforeRect, i) => {
       const rectEl = document.createElement('div');
       rectEl.classList.add('layout-shift-viz-rect');
 
@@ -327,24 +327,22 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
         rectEl.style.opacity = '0.4';
       }
 
-      const cssPixelToScreenshotScaleFactor =
-          Math.min(beforeImage.naturalWidth / viewport.width, beforeImage.naturalHeight / viewport.height, 1)
-      const setRectPosition = (rect: DOMRect) => {
-        rectEl.style.left = `${rect.x * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`;
-        rectEl.style.top = `${rect.y * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`;
-        rectEl.style.width = `${rect.width * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`;
-        rectEl.style.height = `${rect.height * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`;
-      };
-
-      setRectPosition(currentRect);
+      setRectPosition(rectEl, currentRect);
       vizContainer.appendChild(rectEl);
+      return rectEl;
+    });
+
+    setTimeout(() => {
+      // Fade in the 'after' screenshot
+      afterImage.style.opacity = '1';
 
       // Animate to the after rectangle position.
-      setTimeout(() => {
-        setRectPosition(afterRects[i]);
-        rectEl.style.opacity = '0.4';
-      }, 1000);
-    });  // end of handling rects
+      rectEls.forEach((rectEl, i) => {
+        setRectPosition(rectEl, afterRects[i]);
+        rectEl.style.opacity = '0.7';
+      });
+    }, 1000);
+
 
     return vizContainer;
   }
