@@ -7,6 +7,7 @@ import * as Root from '../../core/root/root.js';
 import type * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
 import * as Trace from '../../models/trace/trace.js';
+import * as ComponentHelpers from '../../ui/components/helpers/helpers.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
 
@@ -256,52 +257,50 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
   static createShiftViz(
       event: Trace.Types.Events.SyntheticLayoutShift, parsedTrace: Trace.Handlers.Types.ParsedTrace,
       maxSize: UI.Geometry.Size): HTMLElement|undefined {
-    //TODO: maybe remove maxSize
     const screenshots = event.parsedData.screenshots;
-    const viewport = parsedTrace.Meta.viewportRect;
+    const {viewportRect, devicePixelRatio: dpr} = parsedTrace.Meta;
     const vizContainer = document.createElement('div');
     vizContainer.classList.add('layout-shift-viz');
 
-    const beforeImage = screenshots.before && parsedTrace.Screenshots.screenshotImageCache.get(screenshots.before);
-    let afterImage = screenshots.after && parsedTrace.Screenshots.screenshotImageCache.get(screenshots.after);
+    const beforeImg = screenshots.before && parsedTrace.Screenshots.screenshotImageCache.get(screenshots.before);
+    let afterImg = screenshots.after && parsedTrace.Screenshots.screenshotImageCache.get(screenshots.after);
 
-    if (!beforeImage || !afterImage || !viewport) {
+
+    if (!beforeImg || !afterImg || !viewportRect || dpr === undefined) {
       return;
     }
 
     // Clear classList in case a two shifts share the same screenshot.
-    beforeImage.className = afterImage.className = '';
+    beforeImg.className = afterImg.className = '';
+    afterImg.classList.add('layout-shift-viz-screenshot--after');
+    vizContainer.append(beforeImg, afterImg);
 
-    /** The Layout Instability API in Blink, which reports the LayoutShift trace events, is not based on CSS pixels but
+    /** 1 of 3 scaling factors.
+     * The Layout Instability API in Blink, which reports the LayoutShift trace events, is not based on CSS pixels but
      * physical pixels. As such the values in the impacted_nodes field need to be normalized to CSS units in order to
      * map them to the viewport dimensions, which we get in CSS pixels. We do that by dividing the values by the devicePixelRatio.
      * See https://crbug.com/1300309
      */
-    const dpr = parsedTrace.Meta.devicePixelRatio;
-    if (dpr === undefined || !beforeImage) {
-      return;
-    }
-
-    // Helper to re-scale rectangles, removing DPR effect
-    const scaleRect = (rect: Trace.Types.Events.TraceRect): DOMRect => {
+    const toCssPixelRect = (rect: Trace.Types.Events.TraceRect): DOMRect => {
       return new DOMRect(rect[0] / dpr, rect[1] / dpr, rect[2] / dpr, rect[3] / dpr);
     };
-    const beforeRects = event.args.data?.impacted_nodes?.map(node => scaleRect(node.old_rect)) ?? [];
-    const afterRects = event.args.data?.impacted_nodes?.map(node => scaleRect(node.new_rect)) ?? [];
+    const beforeRects = event.args.data?.impacted_nodes?.map(node => toCssPixelRect(node.old_rect)) ?? [];
+    const afterRects = event.args.data?.impacted_nodes?.map(node => toCssPixelRect(node.new_rect)) ?? [];
 
-    // Calculate scaling factor based on maxSize.
+    // 2 of 3 scaling factors. Turns CSS pixels into pixels relative to the size of the screenshot image's natural size.
+    const screenshotImageScaleFactor =
+        Math.min(beforeImg.naturalWidth / viewportRect.width, beforeImg.naturalHeight / viewportRect.height, 1);
+
+    // 3 of 3 scaling factors. We can constrain this UI by a maxSize in case we want it smaller.
     // If this is being size constrained, it needs to be done in JS (rather than css max-width, etc)....
     // That's because this function is complete before it's added to the DOM.. so we can't query offsetHeight for its resolved size…
     const maxSizeScaleFactor =
-        Math.min(maxSize.width / beforeImage.naturalWidth, maxSize.height / beforeImage.naturalHeight, 1);
-    afterImage.style.width = beforeImage.style.width = `${beforeImage.naturalWidth * maxSizeScaleFactor}px`;
-    afterImage.style.height = beforeImage.style.height = `${beforeImage.naturalHeight * maxSizeScaleFactor}px`;
-    afterImage.classList.add('layout-shift-viz-screenshot--after');
-    vizContainer.append(beforeImage, afterImage);
+        Math.min(maxSize.width / beforeImg.naturalWidth, maxSize.height / beforeImg.naturalHeight, 1);
+    vizContainer.style.width = afterImg.style.width = beforeImg.style.width =
+        `${beforeImg.naturalWidth * maxSizeScaleFactor}px`;
+    vizContainer.style.height = afterImg.style.height = beforeImg.style.height =
+        `${beforeImg.naturalHeight * maxSizeScaleFactor}px`;
 
-    // Need to onvert css pixel coordinate spaces into the size of the 500px screenshot image
-    const cssPixelToScreenshotScaleFactor =
-        Math.min(beforeImage.naturalWidth / viewport.width, beforeImage.naturalHeight / viewport.height, 1);
 
     const vizAnimOpts: KeyframeAnimationOptions = {
       duration: 2500,
@@ -310,37 +309,51 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
       fill: 'forwards',
     };
 
-    // Using keyframe offsets to add "delay" to both the start and the end.
-    // https://drafts.csswg.org/web-animations-1/#:~:text=Keyframe%20offsets%20can%20be%20specified%20using%20either%20form%20as%20illustrated%20below%3A
-    afterImage.animate({opacity: [0, 0, 1, 1]}, vizAnimOpts);
 
-    const getRectPosition = (rect: DOMRect): Keyframe => ({
-      left: `${rect.x * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`,
-      top: `${rect.y * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`,
-      width: `${rect.width * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`,
-      height: `${rect.height * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`,
-      opacity: 0.4,
-    });
-
-    // Create and position individual rects representing each impacted_node within a shift
-    beforeRects.forEach((beforeRect, i) => {
-      const afterRect = afterRects[i];
-      const rectEl = document.createElement('div');
-      rectEl.classList.add('layout-shift-viz-rect');
-      vizContainer.appendChild(rectEl);
-
-      let beforePos = getRectPosition(beforeRect);
-      const afterPos = getRectPosition(afterRect);
-      afterPos.opacity = 0.7;
-
-      // If it's a 0x0x0x0 rect, then set to after, so we can fade it in from the after position instead.
-      if ([beforeRect.width, beforeRect.height, beforeRect.x, beforeRect.y].every(v => v === 0)) {
-        beforePos = {...afterPos};
-        beforePos.opacity = '0';
+    function startViz() {
+      if (!beforeImg || !afterImg) {
+        return;
       }
 
-      rectEl.animate([beforePos, beforePos, afterPos, afterPos], vizAnimOpts);
-    });
+      // If image is reused, drop existing anims
+      [beforeImg, afterImg].flatMap(img => img.getAnimations()).forEach(a => a.cancel());
+
+      // Using keyframe offsets to add "delay" to both the start and the end.
+      // https://drafts.csswg.org/web-animations-1/#:~:text=Keyframe%20offsets%20can%20be%20specified%20using%20either%20form%20as%20illustrated%20below%3A
+      // Animate the screenshot in
+      afterImg.animate({opacity: [0, 0, 1, 1, 1]}, vizAnimOpts);
+
+      const getRectPosition = (rect: DOMRect): Keyframe => ({
+        left: `${rect.x * maxSizeScaleFactor * screenshotImageScaleFactor}px`,
+        top: `${rect.y * maxSizeScaleFactor * screenshotImageScaleFactor}px`,
+        width: `${rect.width * maxSizeScaleFactor * screenshotImageScaleFactor}px`,
+        height: `${rect.height * maxSizeScaleFactor * screenshotImageScaleFactor}px`,
+        opacity: 0.4,
+      });
+
+      // Create and position individual rects representing each impacted_node within a shift
+      beforeRects.forEach((beforeRect, i) => {
+        const afterRect = afterRects[i];
+        const rectEl = document.createElement('div');
+        rectEl.classList.add('layout-shift-viz-rect');
+        vizContainer.appendChild(rectEl);
+
+        let beforePos = getRectPosition(beforeRect);
+        const afterPos = getRectPosition(afterRect);
+        afterPos.opacity = 0.7;
+
+        // If it's a 0x0x0x0 rect, then set to after, so we can fade it in from the after position instead.
+        if ([beforeRect.width, beforeRect.height, beforeRect.x, beforeRect.y].every(v => v === 0)) {
+          beforePos = {...afterPos};
+          beforePos.opacity = '0';
+        }
+
+        rectEl.animate([beforePos, beforePos, afterPos, afterPos, afterPos], vizAnimOpts);
+      });
+    }
+
+    // If not done within the render lifecycle, getAnimations() falsely returns [] which allows animations to pile up on the same screenshot
+    void ComponentHelpers.ScheduledRender.scheduleRender(vizContainer, () => startViz());
 
     return vizContainer;
   }

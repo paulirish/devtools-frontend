@@ -186,17 +186,16 @@ function updateTraceWindowMax(
 
 function findScreenshots(timestamp: Types.Timing.MicroSeconds): Types.Events.LayoutShiftParsedData['screenshots'] {
   const screenshots = screenshotsHandlerData().syntheticScreenshots;
-  const screenshotIndex = findNextScreenshotEventIndex(screenshots, timestamp);
-  if (!screenshotIndex) {
-    return {
-      after: undefined,
-      before: undefined,
-    };
-  }
-  return {
-  after:
-    screenshots[screenshotIndex], before: screenshots[screenshotIndex - 1] ?? undefined,
-  }
+  const index = findNextScreenshotEventIndex(screenshots, timestamp);
+
+  const after = index === null ? undefined : screenshots[index];
+  const before = index === null ? undefined : screenshots[index - 1];
+  const deltaBefore = (before.ts - timestamp) / 1000;
+  const deltaAfter = (after.ts - timestamp) / 1000;
+  console.log(
+      'at', (timestamp / 1000).toLocaleString(), 'screenshots on either side of shift', deltaBefore.toLocaleString(), 0,
+      deltaAfter.toLocaleString());
+  return {after, before};
 }
 
 export function findNextScreenshotEventIndex(
