@@ -196,7 +196,7 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
       // This logic will scale the size of the diamond based on the layout shift score.
       // A LS score of >=0.1 will create a diamond of maximum size
       // A LS score of ~0 will create a diamond of minimum size (exactly 0 should not happen in practice)
-      const bufferScale = 1 - Math.min(score / 0.10, 1);
+      const bufferScale = 1 - Math.min(score / 0.1, 1);
 
       return (context, x, y, _width, levelHeight) => {
         // levelHeight is 17px, so this math translates to a minimum diamond size of 5.6px tall.
@@ -284,16 +284,10 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
 
     // Helper to re-scale rectangles, removing DPR effect
     const scaleRect = (rect: Trace.Types.Events.TraceRect): DOMRect => {
-      const {width: vw, height: vh} = viewport;
-      return new DOMRect(
-          rect[0] / dpr,
-          rect[1] / dpr,
-          rect[2] / dpr,
-          rect[3] / dpr,
-      );
+      return new DOMRect(rect[0] / dpr, rect[1] / dpr, rect[2] / dpr, rect[3] / dpr);
     };
-    const beforeRects = (event.args.data?.impacted_nodes?.map(node => scaleRect(node.old_rect)) ?? []);
-    const afterRects = (event.args.data?.impacted_nodes?.map(node => scaleRect(node.new_rect)) ?? []);
+    const beforeRects = event.args.data?.impacted_nodes?.map(node => scaleRect(node.old_rect)) ?? [];
+    const afterRects = event.args.data?.impacted_nodes?.map(node => scaleRect(node.new_rect)) ?? [];
 
     // Calculate scaling factor based on maxSize.
     // If this is being size constrained, it needs to be done in JS (rather than css max-width, etc)....
@@ -307,84 +301,46 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
 
     // Need to onvert css pixel coordinate spaces into the size of the 500px screenshot image
     const cssPixelToScreenshotScaleFactor =
-        Math.min(beforeImage.naturalWidth / viewport.width, beforeImage.naturalHeight / viewport.height, 1)
+        Math.min(beforeImage.naturalWidth / viewport.width, beforeImage.naturalHeight / viewport.height, 1);
 
-    const setRectPosition = (rectEl: HTMLDivElement, rect: DOMRect): Keyframe => ({
+    const vizAnimOpts: KeyframeAnimationOptions = {
+      duration: 2500,
+      iterations: Infinity,
+      easing: 'ease-in',
+      fill: 'forwards',
+    };
+
+    // Using keyframe offsets to add "delay" to both the start and the end.
+    // https://drafts.csswg.org/web-animations-1/#:~:text=Keyframe%20offsets%20can%20be%20specified%20using%20either%20form%20as%20illustrated%20below%3A
+    afterImage.animate({opacity: [0, 0, 1, 1]}, vizAnimOpts);
+
+    const getRectPosition = (rect: DOMRect): Keyframe => ({
       left: `${rect.x * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`,
       top: `${rect.y * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`,
       width: `${rect.width * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`,
       height: `${rect.height * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`,
+      opacity: 0.4,
     });
 
-    const rectEls = beforeRects.map(() => {
+    // Create and position individual rects representing each impacted_node within a shift
+    beforeRects.forEach((beforeRect, i) => {
+      const afterRect = afterRects[i];
       const rectEl = document.createElement('div');
       rectEl.classList.add('layout-shift-viz-rect');
       vizContainer.appendChild(rectEl);
-      return rectEl;
-    });
 
-    const delay = 2000;
-    // const tId = setInterval(animateRects, 2000);
-    // animateRects();
+      let beforePos = getRectPosition(beforeRect);
+      const afterPos = getRectPosition(afterRect);
+      afterPos.opacity = 0.7;
 
-
-    // https://drafts.csswg.org/web-animations-1/#:~:text=Keyframe%20offsets%20can%20be%20specified%20using%20either%20form%20as%20illustrated%20below%3A
-    /**
-     * elem.animate([ { color: 'blue' },
-               { color: 'green', offset: 0.5 },
-               { color: 'red' },
-               { color: 'yellow', offset: 0.8 },
-               { color: 'pink' } ], 2000);
-      elem.animate({ color: [ 'blue', 'green', 'red', 'yellow', 'pink' ],
-                    offset: [ null, 0.5, null, 0.8 ] }, 2000);
-     */
-
-    afterImage.animate(
-        {
-          opacity: [0, 0, 1, 1],
-        },
-        {
-          duration: 4000,
-          iterations: Infinity,
-          easing: 'ease-in-out',
-          fill: 'forwards',
-        });
-
-
-    // Create and position individual rects representing each impacted_node within a shift
-    rectEls.forEach((rectEl, i) => {
-      let beforeRect = beforeRects[i];
-      // If it's a 0x0x0x0 rect, then set to new, so we can fade it in from the new position instead.
+      // If it's a 0x0x0x0 rect, then set to after, so we can fade it in from the after position instead.
       if ([beforeRect.width, beforeRect.height, beforeRect.x, beforeRect.y].every(v => v === 0)) {
-        beforeRect = afterRects[i];
-        rectEl.style.opacity = '0';
-      } else {
-        rectEl.style.opacity = '0.4';
+        beforePos = {...afterPos};
+        beforePos.opacity = '0';
       }
 
-
-
-      const pos = setRectPosition(rectEl, beforeRect);
-      const afterpos = setRectPosition(rectEl, afterRects[i]);
-      rectEl.animate([pos, pos, afterpos, afterpos], {
-        duration: 4000,
-        iterations: Infinity,
-        easing: 'ease-in-out',
-        fill: 'forwards',
-      });
+      rectEl.animate([beforePos, beforePos, afterPos, afterPos], vizAnimOpts);
     });
-
-    // setTimeout(() => {
-    //   // Animate to the after rectangle position.
-    //   // FYI: css transition takes 1s
-    //   rectEls.forEach((rectEl, i) => {
-
-    //     setRectPosition(rectEl, afterRects[i]);
-    //     rectEl.style.opacity = '0.7';
-    //   });
-    // }, delay);
-
-
 
     return vizContainer;
   }
