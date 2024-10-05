@@ -45,7 +45,7 @@ describe('SyntheticEvents', function() {
          const allSyntheticEvents = [
            ...parsedTrace.Animations.animations,
            ...parsedTrace.NetworkRequests.byTime,
-           ...parsedTrace.Screenshots,
+           ...parsedTrace.Screenshots.syntheticScreenshots,
          ];
          const syntheticEventsManager = Trace.Helpers.SyntheticEvents.SyntheticEventsManager.getActiveManager();
          for (const syntheticEvent of allSyntheticEvents) {

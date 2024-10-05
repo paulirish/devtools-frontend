@@ -43,7 +43,7 @@ export function fromParsedTrace(
     return fromCache;
   }
 
-  for (const screenshotEvent of parsedTrace.Screenshots) {
+  for (const screenshotEvent of parsedTrace.Screenshots.syntheticScreenshots) {
     if (screenshotEvent.ts < zeroTime) {
       continue;
     }

@@ -14,12 +14,14 @@ const unpairedAsyncEvents: Types.Events.PipelineReporter[] = [];
 const snapshotEvents: Types.Events.Screenshot[] = [];
 const syntheticScreenshots: Types.Events.SyntheticScreenshot[] = [];
 let frameSequenceToTs: Record<string, Types.Timing.MicroSeconds> = {};
+const screenshotImageCache: Map<Types.Events.SyntheticScreenshot, HTMLImageElement> = new Map();
 
 export function reset(): void {
   unpairedAsyncEvents.length = 0;
   snapshotEvents.length = 0;
   syntheticScreenshots.length = 0;
   frameSequenceToTs = {};
+  screenshotImageCache.clear();
 }
 
 export function handleEvent(event: Types.Events.Event): void {
@@ -85,8 +87,9 @@ function getPresentationTimestamp(screenshotEvent: Types.Events.Screenshot): Typ
 }
 
 // TODO(crbug/41484172): should be readonly
-export function data(): Types.Events.SyntheticScreenshot[] {
-  return syntheticScreenshots;
+export function data():
+    ({syntheticScreenshots: Types.Events.SyntheticScreenshot[], screenshotImageCache: typeof screenshotImageCache}) {
+  return {syntheticScreenshots, screenshotImageCache};
 }
 
 export function deps(): HandlerName[] {

@@ -185,7 +185,7 @@ function updateTraceWindowMax(
 }
 
 function findScreenshots(timestamp: Types.Timing.MicroSeconds): Types.Events.LayoutShiftParsedData['screenshots'] {
-  const screenshots = screenshotsHandlerData();
+  const screenshots = screenshotsHandlerData().syntheticScreenshots;
   const screenshotIndex = findNextScreenshotEventIndex(screenshots, timestamp);
   if (!screenshotIndex) {
     return {

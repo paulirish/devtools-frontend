@@ -1379,6 +1379,7 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
     const entryIndex = this.mainDataProvider.indexForEvent(event);
     if (show && entryIndex) {
       this.mainFlameChart.setSelectedEntry(entryIndex);
+      // Y position isn't ideal. and its because updatePopoverOffset underestimates the  Y height of the popover (because image async loading)
       this.mainFlameChart.showPopoverForSearchResult(entryIndex);
     } else {
       this.mainFlameChart.hideHighlight();
