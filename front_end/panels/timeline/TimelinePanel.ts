@@ -524,6 +524,9 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
 
     this.flameChart = new TimelineFlameChartView(this);
     this.#onChartPlayableStateChangeBound = this.#onChartPlayableStateChange.bind(this);
+    this.element.addEventListener(
+        'toggle-popover', event => this.flameChart.togglePopover(event.detail.event, event.detail.show));
+
 
     this.flameChart.getMainFlameChart().addEventListener(
         PerfUI.FlameChart.Events.CHART_PLAYABLE_STATE_CHANGED, this.#onChartPlayableStateChangeBound, this);

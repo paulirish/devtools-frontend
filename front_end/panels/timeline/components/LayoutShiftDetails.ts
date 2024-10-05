@@ -89,6 +89,7 @@ export class LayoutShiftDetails extends HTMLElement {
   readonly #shadow = this.attachShadow({mode: 'open'});
 
   #event: Trace.Types.Events.SyntheticLayoutShift|Trace.Types.Events.SyntheticLayoutShiftCluster|null = null;
+  #rowEvents: Trace.Types.Events.SyntheticLayoutShift[] = [];
   #traceInsightsSets: Trace.Insights.Types.TraceInsightSets|null = null;
   #parsedTrace: Trace.Handlers.Types.ParsedTrace|null = null;
   #isFreshRecording: Boolean = false;
@@ -249,7 +250,7 @@ export class LayoutShiftDetails extends HTMLElement {
       output: LitHtml.html`
       <tr class="shift-row">
         <td>${this.#renderStartTime(shift, parsedTrace, useShiftReference)}</td>
-        <td>${(score.toPrecision(4))}</td>
+        <td>${(score.toFixed(4))}</td>
         ${this.#isFreshRecording ? LitHtml.html`
           <td>
             <div class="elements-shifted">
@@ -302,6 +303,7 @@ export class LayoutShiftDetails extends HTMLElement {
         (rootCauses.fontRequests.length || rootCauses.iframeIds.length || rootCauses.nonCompositedAnimations.length);
     const hasShiftedElements = elementsShifted?.length;
 
+    this.#rowEvents = [layoutShift];
     const parentCluster = clsInsight?.clusters.find(cluster => {
       return cluster.events.find(event => event === layoutShift);
     });
@@ -341,6 +343,7 @@ export class LayoutShiftDetails extends HTMLElement {
       return null;
     }
 
+    this.#rowEvents = cluster.events;
     let hasCulprits = false;
     // clang-format off
     const shiftRows = LitHtml.html`
@@ -379,17 +382,6 @@ export class LayoutShiftDetails extends HTMLElement {
     // clang-format on
   }
 
-  #renderDetails(
-      event: Trace.Types.Events.SyntheticLayoutShift|Trace.Types.Events.SyntheticLayoutShiftCluster,
-      traceInsightsSets: Trace.Insights.Types.TraceInsightSets|null,
-      parsedTrace: Trace.Handlers.Types.ParsedTrace,
-      ): LitHtml.TemplateResult|null {
-    if (Trace.Types.Events.isSyntheticLayoutShift(event)) {
-      return this.#renderShiftDetails(event, traceInsightsSets, parsedTrace);
-    }
-    return this.#renderClusterDetails(event, traceInsightsSets, parsedTrace);
-  }
-
   async #render(): Promise<void> {
     if (!this.#event || !this.#parsedTrace) {
       return;
@@ -397,10 +389,16 @@ export class LayoutShiftDetails extends HTMLElement {
     // clang-format off
     const output = LitHtml.html`
       <div class="layout-shift-summary-details">
-        <div class="event-details">
+        <div
+          class="event-details"
+          @mouseover=${this.#togglePopover}
+          @mouseleave=${this.#togglePopover}
+        >
           ${this.#renderTitle(this.#event)}
-          ${this.#renderDetails(this.#event, this.#traceInsightsSets, this.#parsedTrace)}
-          ${await this.#renderScreenshotThumbnail(this.#event)}
+          ${Trace.Types.Events.isSyntheticLayoutShift(this.#event)
+            ? this.#renderShiftDetails(this.#event, this.#traceInsightsSets, this.#parsedTrace)
+            : this.#renderClusterDetails(this.#event, this.#traceInsightsSets, this.#parsedTrace)
+          }
         </div>
         <div class="insight-categories">
           ${this.#renderInsightChip()}
@@ -411,16 +409,27 @@ export class LayoutShiftDetails extends HTMLElement {
     LitHtml.render(output, this.#shadow, {host: this});
   }
 
-  async #renderScreenshotThumbnail(event: Trace.Types.Events.SyntheticLayoutShift|
-                                   Trace.Types.Events.SyntheticLayoutShiftCluster):
-      Promise<LitHtml.TemplateResult|undefined> {
-    if (!this.#parsedTrace || Trace.Types.Events.isSyntheticLayoutShiftCluster(event)) {
+  #togglePopover(e: MouseEvent): void {
+    if (!(e.target instanceof HTMLElement)) {
       return;
     }
 
-    const maxSize = new UI.Geometry.Size(300, 300);
-    const gif = await createShiftViz(event, this.#parsedTrace, maxSize);
-    return LitHtml.html`${gif?.elem ?? ''}`;
+    const rowEl = e.target.closest('tr');
+    if (!rowEl || !rowEl.parentElement) {
+      return;
+    }
+    const index = [...rowEl.parentElement.children].indexOf(rowEl);
+    if (index === -1) {
+      return;
+    }
+
+    const event = this.#rowEvents[index];
+    const payload = {event, show: e.type === 'mouseover'};
+    // gotta call showPopoverForSearchResult somehow
+    // o rmaybe its just updatePopoverForEntry(entryIndex) directly.
+
+    // TLFlameView calls this.mainFlameChart.showPopoverForSearchResult(
+    this.dispatchEvent(new CustomEvent('toggle-popover', {detail: payload, bubbles: true, composed: true}));
   }
 }
 
@@ -527,7 +536,7 @@ export function createShiftViz(
         setRectPosition(afterRects[i]);
         rectEl.style.opacity = '0.4';
       }, 1000);
-    }); // end of handling rects
+    });  // end of handling rects
 
     return vizContainer;
   });
