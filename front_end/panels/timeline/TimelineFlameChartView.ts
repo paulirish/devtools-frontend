@@ -1376,9 +1376,10 @@ export class TimelineFlameChartView extends UI.Widget.VBox implements PerfUI.Fla
   }
 
   togglePopover(event: Trace.Types.Events.Event, show: boolean) {
-    if (show) {
-      const entryIndex = this.mainDataProvider.indexForEvent(event);
-      entryIndex && this.mainFlameChart.showPopoverForSearchResult(entryIndex);
+    const entryIndex = this.mainDataProvider.indexForEvent(event);
+    if (show && entryIndex) {
+      this.mainFlameChart.setSelectedEntry(entryIndex);
+      this.mainFlameChart.showPopoverForSearchResult(entryIndex);
     } else {
       this.mainFlameChart.hideHighlight();
     }
