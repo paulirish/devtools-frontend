@@ -265,15 +265,9 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
     const beforeImg = screenshots.before && parsedTrace.Screenshots.screenshotImageCache.get(screenshots.before);
     let afterImg = screenshots.after && parsedTrace.Screenshots.screenshotImageCache.get(screenshots.after);
 
-
     if (!beforeImg || !afterImg || !viewportRect || dpr === undefined) {
       return;
     }
-
-    // Clear classList in case a two shifts share the same screenshot.
-    beforeImg.className = afterImg.className = '';
-    afterImg.classList.add('layout-shift-viz-screenshot--after');
-    vizContainer.append(beforeImg, afterImg);
 
     /** 1 of 3 scaling factors.
      * The Layout Instability API in Blink, which reports the LayoutShift trace events, is not based on CSS pixels but
@@ -296,21 +290,12 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
     // That's because this function is complete before it's added to the DOM.. so we can't query offsetHeight for its resolved size…
     const maxSizeScaleFactor =
         Math.min(maxSize.width / beforeImg.naturalWidth, maxSize.height / beforeImg.naturalHeight, 1);
-    vizContainer.style.width = afterImg.style.width = beforeImg.style.width =
-        `${beforeImg.naturalWidth * maxSizeScaleFactor}px`;
-    vizContainer.style.height = afterImg.style.height = beforeImg.style.height =
-        `${beforeImg.naturalHeight * maxSizeScaleFactor}px`;
+    for (const elem of [vizContainer, afterImg, beforeImg]) {
+      elem.style.width = `${beforeImg.naturalWidth * maxSizeScaleFactor}px`;
+      elem.style.height = `${beforeImg.naturalHeight * maxSizeScaleFactor}px`;
+    }
 
-
-    const vizAnimOpts: KeyframeAnimationOptions = {
-      duration: 2500,
-      iterations: Infinity,
-      easing: 'ease-in',
-      fill: 'forwards',
-    };
-
-
-    function startViz() {
+    function startVizAnimation() {
       if (!beforeImg || !afterImg) {
         return;
       }
@@ -318,10 +303,16 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
       // If image is reused, drop existing anims
       [beforeImg, afterImg].flatMap(img => img.getAnimations()).forEach(a => a.cancel());
 
+      const vizAnimOpts: KeyframeAnimationOptions = {
+        duration: 2500,
+        iterations: Infinity,
+        easing: 'ease-out',
+        fill: 'forwards',
+      };
       // Using keyframe offsets to add "delay" to both the start and the end.
       // https://drafts.csswg.org/web-animations-1/#:~:text=Keyframe%20offsets%20can%20be%20specified%20using%20either%20form%20as%20illustrated%20below%3A
       // Animate the screenshot in
-      afterImg.animate({opacity: [0, 0, 1, 1, 1]}, vizAnimOpts);
+      afterImg.animate({opacity: [0, 0, 1, 1, 1], easing: 'ease-out'}, {...vizAnimOpts, easing: 'ease-out'});
 
       const getRectPosition = (rect: DOMRect): Keyframe => ({
         left: `${rect.x * maxSizeScaleFactor * screenshotImageScaleFactor}px`,
@@ -329,6 +320,7 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
         width: `${rect.width * maxSizeScaleFactor * screenshotImageScaleFactor}px`,
         height: `${rect.height * maxSizeScaleFactor * screenshotImageScaleFactor}px`,
         opacity: 0.4,
+        easing: 'ease-out',
       });
 
       // Create and position individual rects representing each impacted_node within a shift
@@ -353,8 +345,9 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
     }
 
     // If not done within the render lifecycle, getAnimations() falsely returns [] which allows animations to pile up on the same screenshot
-    void ComponentHelpers.ScheduledRender.scheduleRender(vizContainer, () => startViz());
+    void ComponentHelpers.ScheduledRender.scheduleRender(vizContainer, () => startVizAnimation());
 
+    vizContainer.append(beforeImg, afterImg);
     return vizContainer;
   }
 }

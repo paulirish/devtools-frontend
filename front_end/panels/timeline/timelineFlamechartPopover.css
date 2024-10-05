@@ -43,14 +43,13 @@
   outline: 1px solid color-mix(in srgb, black 20%, var(--app-color-rendering));
   background-color: color-mix(in srgb, transparent 50%, var(--app-color-rendering-children));
   position: absolute;
-  z-index: 200;
+  z-index: 100;
 }
 
-.layout-shift-viz-screenshot--after {
+.layout-shift-viz > img {
   position: absolute;
   top: 0;
   left: 0;
-  z-index: 100;
 }
 
 .highlight {
