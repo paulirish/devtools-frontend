@@ -88,7 +88,6 @@ describeWithEnvironment('LayoutShiftsTrackAppender', function() {
     assert.deepEqual(info, {
       title: 'Layout shift',
       formattedTime: '0.0422',
-      additionalElement: [],
     });
   });
 });

@@ -239,7 +239,7 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
   }
 
   preloadScreenshots(events: Trace.Types.Events.SyntheticLayoutShift[]) {
-    const screenshotsToLoad: Set<Trace.Types.Events.SyntheticScreenshot|undefined> = new Set();
+    const screenshotsToLoad: Set<Trace.Types.Events.SyntheticScreenshot|null> = new Set();
     for (const event of events) {
       screenshotsToLoad.add(event.parsedData.screenshots.before);
       screenshotsToLoad.add(event.parsedData.screenshots.after);
@@ -317,7 +317,7 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
       // Using keyframe offsets to add "delay" to both the start and the end.
       // https://drafts.csswg.org/web-animations-1/#:~:text=Keyframe%20offsets%20can%20be%20specified%20using%20either%20form%20as%20illustrated%20below%3A
       // Animate the "after" screenshot's opacity in.
-      afterImg.animate({opacity: [0, 0, 0.8, 0.8, 0.8], easing}, vizAnimOpts);
+      afterImg.animate({opacity: [0, 0, 1, 1, 1], easing}, vizAnimOpts);
 
       const getRectPosition = (rect: DOMRect): Keyframe => ({
         left: `${rect.x * maxSizeScaleFactor * screenshotImageScaleFactor}px`,

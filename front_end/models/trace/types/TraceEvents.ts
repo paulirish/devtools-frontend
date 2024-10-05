@@ -869,8 +869,8 @@ interface LayoutShiftSessionWindowData {
   id: number;
 }
 export interface LayoutShiftParsedData {
-  /** screenshot taken before and after this shift. */
-  screenshots: {before?: SyntheticScreenshot, after?: SyntheticScreenshot};
+  /** screenshot taken before and after this shift. Before *should* always exist, but after might not at the end of a trace. */
+  screenshots: {before: SyntheticScreenshot|null, after: SyntheticScreenshot|null};
   timeFromNavigation?: MicroSeconds;
   // The sum of the weighted scores of the shifts that
   // belong to a session window up until this shift

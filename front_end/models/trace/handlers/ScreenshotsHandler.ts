@@ -43,7 +43,7 @@ export async function finalize(): Promise<void> {
 
   for (const snapshotEvent of snapshotEvents) {
     const {cat, name, ph, pid, tid} = snapshotEvent;
-    console.log(`correcting ${(getPresentationTimestamp(snapshotEvent) - snapshotEvent.ts) / 1000} to the right`);
+    // console.log(`correcting ${(getPresentationTimestamp(snapshotEvent) - snapshotEvent.ts) / 1000} to the right`);
     const syntheticEvent = Helpers.SyntheticEvents.SyntheticEventsManager.registerSyntheticEvent<
         Types.Events.SyntheticScreenshot>({
       rawSourceEvent: snapshotEvent,
