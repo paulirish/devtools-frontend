@@ -43,7 +43,7 @@
   outline: 1px solid color-mix(in srgb, black 20%, var(--app-color-rendering));
   background-color: color-mix(in srgb, transparent 50%, var(--app-color-rendering-children));
   position: absolute;
-  transition: all 1s;
+  /* transition: all 1s; */
   z-index: 200;
 }
 
@@ -53,7 +53,7 @@
   top: 0;
   left: 0;
   z-index: 100;
-  transition: opacity 1s;
+  /* transition: opacity 1s; */
 }
 
 .highlight {

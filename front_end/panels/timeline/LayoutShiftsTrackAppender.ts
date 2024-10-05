@@ -269,6 +269,9 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
       return;
     }
 
+    // Clear classList in case a two shifts share the same screenshot.
+    beforeImage.className = afterImage.className = '';
+
     /** The Layout Instability API in Blink, which reports the LayoutShift trace events, is not based on CSS pixels but
      * physical pixels. As such the values in the impacted_nodes field need to be normalized to CSS units in order to
      * map them to the viewport dimensions, which we get in CSS pixels. We do that by dividing the values by the devicePixelRatio.
@@ -306,42 +309,81 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
     const cssPixelToScreenshotScaleFactor =
         Math.min(beforeImage.naturalWidth / viewport.width, beforeImage.naturalHeight / viewport.height, 1)
 
-    const setRectPosition = (rectEl: HTMLDivElement, rect: DOMRect) => {
-      rectEl.style.left = `${rect.x * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`;
-      rectEl.style.top = `${rect.y * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`;
-      rectEl.style.width = `${rect.width * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`;
-      rectEl.style.height = `${rect.height * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`;
-    };
+    const setRectPosition = (rectEl: HTMLDivElement, rect: DOMRect): Keyframe => ({
+      left: `${rect.x * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`,
+      top: `${rect.y * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`,
+      width: `${rect.width * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`,
+      height: `${rect.height * maxSizeScaleFactor * cssPixelToScreenshotScaleFactor}px`,
+    });
 
-    // Create and position individual rects representing each impacted_node within a shift
-    const rectEls = beforeRects.map((beforeRect, i) => {
+    const rectEls = beforeRects.map(() => {
       const rectEl = document.createElement('div');
       rectEl.classList.add('layout-shift-viz-rect');
+      vizContainer.appendChild(rectEl);
+      return rectEl;
+    });
 
-      let currentRect = beforeRect;
+    const delay = 2000;
+    // const tId = setInterval(animateRects, 2000);
+    // animateRects();
+
+
+    // https://drafts.csswg.org/web-animations-1/#:~:text=Keyframe%20offsets%20can%20be%20specified%20using%20either%20form%20as%20illustrated%20below%3A
+    /**
+     * elem.animate([ { color: 'blue' },
+               { color: 'green', offset: 0.5 },
+               { color: 'red' },
+               { color: 'yellow', offset: 0.8 },
+               { color: 'pink' } ], 2000);
+      elem.animate({ color: [ 'blue', 'green', 'red', 'yellow', 'pink' ],
+                    offset: [ null, 0.5, null, 0.8 ] }, 2000);
+     */
+
+    afterImage.animate(
+        {
+          opacity: [0, 0, 1, 1],
+        },
+        {
+          duration: 4000,
+          iterations: Infinity,
+          easing: 'ease-in-out',
+          fill: 'forwards',
+        });
+
+
+    // Create and position individual rects representing each impacted_node within a shift
+    rectEls.forEach((rectEl, i) => {
+      let beforeRect = beforeRects[i];
       // If it's a 0x0x0x0 rect, then set to new, so we can fade it in from the new position instead.
       if ([beforeRect.width, beforeRect.height, beforeRect.x, beforeRect.y].every(v => v === 0)) {
-        currentRect = afterRects[i];
+        beforeRect = afterRects[i];
         rectEl.style.opacity = '0';
       } else {
         rectEl.style.opacity = '0.4';
       }
 
-      setRectPosition(rectEl, currentRect);
-      vizContainer.appendChild(rectEl);
-      return rectEl;
+
+
+      const pos = setRectPosition(rectEl, beforeRect);
+      const afterpos = setRectPosition(rectEl, afterRects[i]);
+      rectEl.animate([pos, pos, afterpos, afterpos], {
+        duration: 4000,
+        iterations: Infinity,
+        easing: 'ease-in-out',
+        fill: 'forwards',
+      });
     });
 
-    setTimeout(() => {
-      // Fade in the 'after' screenshot
-      afterImage.style.opacity = '1';
+    // setTimeout(() => {
+    //   // Animate to the after rectangle position.
+    //   // FYI: css transition takes 1s
+    //   rectEls.forEach((rectEl, i) => {
 
-      // Animate to the after rectangle position.
-      rectEls.forEach((rectEl, i) => {
-        setRectPosition(rectEl, afterRects[i]);
-        rectEl.style.opacity = '0.7';
-      });
-    }, 1000);
+    //     setRectPosition(rectEl, afterRects[i]);
+    //     rectEl.style.opacity = '0.7';
+    //   });
+    // }, delay);
+
 
 
     return vizContainer;
