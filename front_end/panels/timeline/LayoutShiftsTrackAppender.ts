@@ -160,7 +160,10 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
     let additionalElement;
     if (Trace.Types.Events.isSyntheticLayoutShift(event)) {
       const maxSize = new UI.Geometry.Size(600, 600);
-      additionalElement = LayoutShiftsTrackAppender.createShiftViz(event, this.#parsedTrace, maxSize);
+      const vizElem = LayoutShiftsTrackAppender.createShiftViz(event, this.#parsedTrace, maxSize);
+      if (vizElem) {
+        additionalElement = vizElem;
+      }
     }
 
     // Score isn't a duration, but the UI works anyhow.
@@ -346,7 +349,7 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
           afterPos.opacity = '0';
         }
 
-        // Keep these keyframe offsets sync'd with the opacity ones above.
+        // Keep these keyframe offsets sync'd with other animate() ones above.
         rectEl.animate([beforePos, beforePos, afterPos, afterPos, afterPos], vizAnimOpts);
       });
     }

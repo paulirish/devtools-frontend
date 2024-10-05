@@ -269,7 +269,7 @@ describe('LayoutShiftsHandler', function() {
   describe('findNextScreenshotEvent', () => {
     it('gets the first screenshot after a trace', async function() {
       await processTrace(this, 'cls-cluster-navigation.json.gz');
-      const screenshots = Trace.Handlers.ModelHandlers.Screenshots.data();
+      const screenshots = Trace.Handlers.ModelHandlers.Screenshots.data().syntheticScreenshots;
       const {clusters} = Trace.Handlers.ModelHandlers.LayoutShifts.data();
       const shifts = clusters.flatMap(cluster => cluster.events);
       for (const shift of shifts) {
