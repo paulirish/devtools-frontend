@@ -159,7 +159,9 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
 
     let additionalElement;
     if (Trace.Types.Events.isSyntheticLayoutShift(event)) {
-      const maxSize = new UI.Geometry.Size(600, 600);
+      // Screenshots are max 500x500 naturally, but on a laptop in dock-to-right, 500px tall usually doesn't fit.
+      // In the future, we may investigate a way to dynamically scale this tooltip content per available space.
+      const maxSize = new UI.Geometry.Size(510, 400);
       const vizElem = LayoutShiftsTrackAppender.createShiftViz(event, this.#parsedTrace, maxSize);
       if (vizElem) {
         additionalElement = vizElem;
@@ -325,6 +327,7 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
         width: `${rect.width * maxSizeScaleFactor * screenshotImageScaleFactor}px`,
         height: `${rect.height * maxSizeScaleFactor * screenshotImageScaleFactor}px`,
         opacity: 0.7,
+        outlineWidth: '1px',
         easing,
       });
 
@@ -350,7 +353,8 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
         }
 
         // Keep these keyframe offsets sync'd with other animate() ones above.
-        rectEl.animate([beforePos, beforePos, afterPos, afterPos, afterPos], vizAnimOpts);
+        // The 4px outline slightly pulses the rect so it's easier to distinguish.
+        rectEl.animate([beforePos, beforePos, {...afterPos, outlineWidth: '4px'}, afterPos, afterPos], vizAnimOpts);
       });
     }
 

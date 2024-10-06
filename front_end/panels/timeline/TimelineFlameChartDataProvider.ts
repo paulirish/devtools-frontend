@@ -706,7 +706,6 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     let title;
     let warningElements: Element[] = [];
     let nameSpanTimelineInfoTime = 'timeline-info-time';
-
     const additionalContent: HTMLElement[] = [];
 
     const entryType = this.#entryTypeForIndex(entryIndex);
