@@ -52,3 +52,8 @@
   left: 0;
 }
 
+/* If we show any images, like screenshots, they shouldn't be inline */
+.timeline-flamechart-popover img {
+  display: block;
+}
+

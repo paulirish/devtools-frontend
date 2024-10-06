@@ -136,7 +136,6 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
   private entryData: TimelineFlameChartEntry[] = [];
 
   private entryTypeByLevel!: EntryType[];
-  private screenshotImageCache!: Map<Trace.Types.Events.SyntheticScreenshot, HTMLImageElement|null>;
   private entryIndexToTitle!: string[];
   private lastInitiatorEntry!: number;
   private lastInitiatorsData: PerfUI.FlameChart.FlameChartInitiatorData[] = [];
@@ -457,7 +456,6 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     this.entryData = [];
     this.entryTypeByLevel = [];
     this.entryIndexToTitle = [];
-    this.screenshotImageCache = new Map();
     this.#eventIndexByEvent = new Map();
     if (resetCompatibilityTracksAppender) {
       this.compatibilityTracksAppender = null;
@@ -741,6 +739,23 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       } else {
         title = i18nString(UIStrings.frame);
       }
+    } else if (entryType === EntryType.SCREENSHOT) {
+      // Add Fullsize screenshot in popover
+
+      const screenshot = (this.entryData[entryIndex] as Trace.Types.Events.SyntheticScreenshot);
+      const image = this.getScreenshotImageFromCache(screenshot);
+      image && additionalContent.push(image);
+      // Get navigation-relative timestamp
+      const timeSinceNav = this.parsedTrace ? Trace.Helpers.Timing.timeStampForEventAdjustedByClosestNavigation(
+                                                  screenshot,
+                                                  this.parsedTrace.Meta.traceBounds,
+                                                  this.parsedTrace.Meta.navigationsByNavigationId,
+                                                  this.parsedTrace.Meta.navigationsByFrameId,
+                                                  ) :
+                                              screenshot.ts;
+      time = i18n.TimeUtilities.formatMicroSecondsAsMillisFixed(timeSinceNav, 1);
+      title = '';
+
     } else {
       return null;
     }
@@ -902,20 +917,30 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     }
   }
 
+  private getScreenshotImageFromCache(screenshot: Trace.Types.Events.SyntheticScreenshot): HTMLImageElement|null {
+    const screenshotImageCache = this.parsedTrace?.Screenshots.screenshotImageCache;
+    if (!screenshotImageCache) {
+      return null;
+    }
+    if (!screenshotImageCache.has(screenshot)) {
+      // If it's not already in the cache, the async loadImage is started, null is returned, and DATA_CHANGED fired when loaded.
+      screenshotImageCache.set(screenshot, null);
+      const data = screenshot.args.dataUri;
+      UI.UIUtils.loadImage(data).then(image => {
+        screenshotImageCache.set(screenshot, image);
+        this.dispatchEventToListeners(Events.DATA_CHANGED);
+      });
+      return null;
+    }
+    const image = screenshotImageCache.get(screenshot);
+    return image ?? null;
+  }
+
   private async drawScreenshot(
       entryIndex: number, context: CanvasRenderingContext2D, barX: number, barY: number, barWidth: number,
       barHeight: number): Promise<void> {
     const screenshot = (this.entryData[entryIndex] as Trace.Types.Events.SyntheticScreenshot);
-    if (!this.screenshotImageCache.has(screenshot)) {
-      this.screenshotImageCache.set(screenshot, null);
-      const data = screenshot.args.dataUri;
-      const image = await UI.UIUtils.loadImage(data);
-      this.screenshotImageCache.set(screenshot, image);
-      this.dispatchEventToListeners(Events.DATA_CHANGED);
-      return;
-    }
-
-    const image = this.screenshotImageCache.get(screenshot);
+    const image = this.getScreenshotImageFromCache(screenshot);
     if (!image) {
       return;
     }

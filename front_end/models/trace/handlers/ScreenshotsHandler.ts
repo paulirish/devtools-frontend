@@ -14,7 +14,7 @@ const unpairedAsyncEvents: Types.Events.PipelineReporter[] = [];
 const snapshotEvents: Types.Events.Screenshot[] = [];
 const syntheticScreenshots: Types.Events.SyntheticScreenshot[] = [];
 let frameSequenceToTs: Record<string, Types.Timing.MicroSeconds> = {};
-const screenshotImageCache: Map<Types.Events.SyntheticScreenshot, HTMLImageElement> = new Map();
+const screenshotImageCache: Map<Types.Events.SyntheticScreenshot, HTMLImageElement|null> = new Map();
 
 export function reset(): void {
   unpairedAsyncEvents.length = 0;
