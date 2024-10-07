@@ -53,7 +53,8 @@ export async function finalize(): Promise<void> {
       pid,
       tid,
       // `getPresentationTimestamp(snapshotEvent) - snapshotEvent.ts` is how many microsec the screenshot was adjusted to the right/later
-      ts: getPresentationTimestamp(snapshotEvent),
+      // TODO(paulirish): investigate why getPresentationTimestamp(snapshotEvent) seems less accurate. Resolve screenshot timing innaccuracy.
+      ts: snapshotEvent.ts,
       args: {
         dataUri: `data:image/jpg;base64,${snapshotEvent.args.snapshot}`,
       },
