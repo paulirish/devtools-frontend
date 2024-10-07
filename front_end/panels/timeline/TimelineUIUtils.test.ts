@@ -691,6 +691,73 @@ describeWithMockConnection('TimelineUIUtils', function() {
       ]);
     });
 
+    it('renders the details for a layout shift properly', async function() {
+      // Set related CDP methods responses to return our mock document and node.
+      const domModel = target.model(SDK.DOMModel.DOMModel);
+      assert.exists(domModel);
+      const documentNode = {nodeId: 1 as Protocol.DOM.NodeId};
+      const docc = new SDK.DOMModel.DOMNode(domModel) as SDK.DOMModel.DOMDocument;
+      const domNode2 = new SDK.DOMModel.DOMNode(domModel);
+      const domID = 58 as Protocol.DOM.NodeId;
+      domNode2.id = domID;
+
+      setMockConnectionResponseHandler('DOM.pushNodesByBackendIdsToFrontend', () => ({nodeIds: [domID]}));
+
+      setMockConnectionResponseHandler('DOM.getDocument', () => ({root: documentNode}));
+      await domModel.requestDocument();
+      domModel.registerNode(domNode2);
+      domNode2.init(docc, false, {nodeName: 'A test node name', nodeId: domID} as Protocol.DOM.Node);
+      const {parsedTrace} = await TraceLoader.traceEngine(this, 'cls-single-frame.json.gz');
+      const layoutShift = parsedTrace.LayoutShifts.clusters[0].events[0];
+      Common.Linkifier.registerLinkifier({
+        contextTypes() {
+          return [Timeline.CLSLinkifier.CLSRect];
+        },
+        async loadLinkifier() {
+          return Timeline.CLSLinkifier.Linkifier.instance();
+        },
+      });
+      Common.Linkifier.registerLinkifier({
+        contextTypes() {
+          return [
+            SDK.DOMModel.DOMNode,
+          ];
+        },
+        async loadLinkifier() {
+          return Elements.DOMLinkifier.Linkifier.instance();
+        },
+      });
+
+      if (!layoutShift) {
+        throw new Error('Could not find LayoutShift event.');
+      }
+
+      const details = await Timeline.TimelineUIUtils.TimelineUIUtils.buildTraceEventDetails(
+          parsedTrace,
+          layoutShift,
+          new Components.Linkifier.Linkifier(),
+          false,
+      );
+      const rowData = getRowDataForDetailsElement(details);
+      assert.deepEqual(
+          rowData,
+          [
+            {
+              title: 'Warning',
+              value: 'Cumulative Layout Shifts can result in poor user experiences. It has recently evolved.',
+            },
+            {title: 'Score', value: '0.04218'},
+            {title: 'Cumulative score', value: '0.04218'},
+            {title: 'Current cluster ID', value: '1'},
+            {title: 'Current cluster score', value: '0.2952'},
+            {title: 'Had recent input', value: 'No'},
+            {title: 'Moved from', value: 'Location: [120,670], Size: [900x900]'},
+            {title: 'Moved to', value: 'Location: [120,1270], Size: [900x478]'},
+            {title: 'Related node', value: 'A test node name'},
+          ],
+      );
+    });
+
     it('renders the details for an extension entry properly', async function() {
       const {parsedTrace} = await TraceLoader.traceEngine(this, 'extension-tracks-and-marks.json.gz');
       const extensionEntry =
@@ -748,6 +815,15 @@ describeWithMockConnection('TimelineUIUtils', function() {
     });
 
     it('renders the details for a profile call properly', async function() {
+      Common.Linkifier.registerLinkifier({
+        contextTypes() {
+          return [Timeline.CLSLinkifier.CLSRect];
+        },
+        async loadLinkifier() {
+          return Timeline.CLSLinkifier.Linkifier.instance();
+        },
+      });
+
       const {parsedTrace} = await TraceLoader.traceEngine(this, 'simple-js-program.json.gz');
       const [process] = parsedTrace.Renderer.processes.values();
       const [thread] = process.threads.values();
@@ -775,6 +851,15 @@ describeWithMockConnection('TimelineUIUtils', function() {
       );
     });
     it('renders the stack trace of a ScheduleStyleRecalculation properly', async function() {
+      Common.Linkifier.registerLinkifier({
+        contextTypes() {
+          return [Timeline.CLSLinkifier.CLSRect];
+        },
+        async loadLinkifier() {
+          return Timeline.CLSLinkifier.Linkifier.instance();
+        },
+      });
+
       const {parsedTrace} = await TraceLoader.traceEngine(this, 'web-dev.json.gz');
       TraceLoader.initTraceBoundsManager(parsedTrace);
       const [process] = parsedTrace.Renderer.processes.values();
@@ -804,6 +889,15 @@ describeWithMockConnection('TimelineUIUtils', function() {
     });
 
     it('renders the stack trace of a RecalculateStyles properly', async function() {
+      Common.Linkifier.registerLinkifier({
+        contextTypes() {
+          return [Timeline.CLSLinkifier.CLSRect];
+        },
+        async loadLinkifier() {
+          return Timeline.CLSLinkifier.Linkifier.instance();
+        },
+      });
+
       const {parsedTrace} = await TraceLoader.traceEngine(this, 'web-dev.json.gz');
       TraceLoader.initTraceBoundsManager(parsedTrace);
       const [process] = parsedTrace.Renderer.processes.values();
@@ -823,6 +917,15 @@ describeWithMockConnection('TimelineUIUtils', function() {
       );
     });
     it('renders the stack trace of extension entries properly', async function() {
+      Common.Linkifier.registerLinkifier({
+        contextTypes() {
+          return [Timeline.CLSLinkifier.CLSRect];
+        },
+        async loadLinkifier() {
+          return Timeline.CLSLinkifier.Linkifier.instance();
+        },
+      });
+
       const {parsedTrace} = await TraceLoader.traceEngine(this, 'extension-tracks-and-marks.json.gz');
       TraceLoader.initTraceBoundsManager(parsedTrace);
       const [extensionMarker] = parsedTrace.ExtensionTraceData.extensionMarkers.values();
@@ -854,6 +957,15 @@ describeWithMockConnection('TimelineUIUtils', function() {
       );
     });
     it('renders the stack trace of user timings properly', async function() {
+      Common.Linkifier.registerLinkifier({
+        contextTypes() {
+          return [Timeline.CLSLinkifier.CLSRect];
+        },
+        async loadLinkifier() {
+          return Timeline.CLSLinkifier.Linkifier.instance();
+        },
+      });
+
       const {parsedTrace} = await TraceLoader.traceEngine(this, 'user-timings.json.gz');
       TraceLoader.initTraceBoundsManager(parsedTrace);
       const [performanceMark] = parsedTrace.UserTimings.performanceMarks.values();

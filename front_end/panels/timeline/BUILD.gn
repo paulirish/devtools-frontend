@@ -57,6 +57,7 @@ devtools_module("timeline") {
     "AnnotationHelpers.ts",
     "AppenderUtils.ts",
     "BenchmarkEvents.ts",
+    "CLSLinkifier.ts",
     "CompatibilityTracksAppender.ts",
     "CountersGraph.ts",
     "EntriesFilter.ts",
