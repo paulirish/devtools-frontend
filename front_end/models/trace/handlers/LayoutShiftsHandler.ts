@@ -185,14 +185,9 @@ function updateTraceWindowMax(
 }
 
 function findScreenshots(timestamp: Types.Timing.MicroSeconds): Types.Events.LayoutShiftParsedData['screenshots'] {
-  const screenshots = screenshotsHandlerData().syntheticScreenshots;
+  const screenshots = screenshotsHandlerData().all;
   const before = Helpers.Trace.findPreviousEventBeforeTimestamp(screenshots, timestamp);
   const after = before ? screenshots[screenshots.indexOf(before) + 1] : null;
-  // const deltaBefore = (before.ts - timestamp) / 1000;
-  // const deltaAfter = (after.ts - timestamp) / 1000;
-  // console.log(
-  //     'at', (timestamp / 1000).toLocaleString(), 'screenshots on either side of shift', deltaBefore.toLocaleString(), 0,
-  //     deltaAfter.toLocaleString());
   return {before, after};
 }
 

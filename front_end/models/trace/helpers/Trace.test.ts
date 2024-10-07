@@ -732,7 +732,7 @@ describeWithEnvironment('Trace helpers', function() {
   describe('findNextEventAfterTimestamp', () => {
     it('gets the first screenshot after a trace', async function() {
       const {parsedTrace} = await TraceLoader.traceEngine(this, 'cls-multiple-frames.json.gz');
-      const screenshots = parsedTrace.Screenshots.syntheticScreenshots;
+      const screenshots = parsedTrace.Screenshots.all;
       const {clusters} = parsedTrace.LayoutShifts;
       const shifts = clusters.flatMap(cluster => cluster.events);
       assert.isAtLeast(shifts.length, 10);

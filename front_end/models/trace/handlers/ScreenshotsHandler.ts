@@ -14,14 +14,14 @@ const unpairedAsyncEvents: Types.Events.PipelineReporter[] = [];
 const snapshotEvents: Types.Events.Screenshot[] = [];
 const syntheticScreenshots: Types.Events.SyntheticScreenshot[] = [];
 let frameSequenceToTs: Record<string, Types.Timing.MicroSeconds> = {};
-const screenshotImageCache: Map<Types.Events.SyntheticScreenshot, HTMLImageElement> = new Map();
+const imageCache: Map<Types.Events.SyntheticScreenshot, HTMLImageElement> = new Map();
 
 export function reset(): void {
   unpairedAsyncEvents.length = 0;
   snapshotEvents.length = 0;
   syntheticScreenshots.length = 0;
   frameSequenceToTs = {};
-  screenshotImageCache.clear();
+  imageCache.clear();
 }
 
 export function handleEvent(event: Types.Events.Event): void {
@@ -43,7 +43,6 @@ export async function finalize(): Promise<void> {
 
   for (const snapshotEvent of snapshotEvents) {
     const {cat, name, ph, pid, tid} = snapshotEvent;
-    // console.log(`correcting ${(getPresentationTimestamp(snapshotEvent) - snapshotEvent.ts) / 1000} to the right`);
     const syntheticEvent = Helpers.SyntheticEvents.SyntheticEventsManager.registerSyntheticEvent<
         Types.Events.SyntheticScreenshot>({
       rawSourceEvent: snapshotEvent,
@@ -52,8 +51,8 @@ export async function finalize(): Promise<void> {
       ph,
       pid,
       tid,
-      // `getPresentationTimestamp(snapshotEvent) - snapshotEvent.ts` is how many microsec the screenshot was adjusted to the right/later
       // TODO(paulirish): investigate why getPresentationTimestamp(snapshotEvent) seems less accurate. Resolve screenshot timing innaccuracy.
+      // `getPresentationTimestamp(snapshotEvent) - snapshotEvent.ts` is how many microsec the screenshot USED TO BE adjusted to the right/later
       ts: snapshotEvent.ts,
       args: {
         dataUri: `data:image/jpg;base64,${snapshotEvent.args.snapshot}`,
@@ -88,9 +87,8 @@ function getPresentationTimestamp(screenshotEvent: Types.Events.Screenshot): Typ
 }
 
 // TODO(crbug/41484172): should be readonly
-export function data():
-    ({syntheticScreenshots: Types.Events.SyntheticScreenshot[], screenshotImageCache: typeof screenshotImageCache}) {
-  return {syntheticScreenshots, screenshotImageCache};
+export function data(): ({all: Types.Events.SyntheticScreenshot[], imageCache: typeof imageCache}) {
+  return {all: syntheticScreenshots, imageCache};
 }
 
 export function deps(): HandlerName[] {

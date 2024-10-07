@@ -253,7 +253,7 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
       // TODO: handle this promise
       UI.UIUtils.loadImage(screenshot.args.dataUri)
           .then(image => {
-            image && this.#parsedTrace.Screenshots.screenshotImageCache.set(screenshot, image);
+            image && this.#parsedTrace.Screenshots.imageCache.set(screenshot, image);
           })
           .catch(console.warn);
     });
@@ -267,8 +267,8 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
     const vizContainer = document.createElement('div');
     vizContainer.classList.add('layout-shift-viz');
 
-    const beforeImg = screenshots.before && parsedTrace.Screenshots.screenshotImageCache.get(screenshots.before);
-    let afterImg = screenshots.after && parsedTrace.Screenshots.screenshotImageCache.get(screenshots.after);
+    const beforeImg = screenshots.before && parsedTrace.Screenshots.imageCache.get(screenshots.before);
+    let afterImg = screenshots.after && parsedTrace.Screenshots.imageCache.get(screenshots.after);
 
     if (!beforeImg || !afterImg || !viewportRect || dpr === undefined) {
       return;
@@ -353,7 +353,7 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
         }
 
         // Keep these keyframe offsets sync'd with other animate() ones above.
-        // The 4px outline slightly pulses the rect so it's easier to distinguish.
+        // The 4px outline slightly pulses the rect so it's easier to distin
         rectEl.animate([beforePos, beforePos, {...afterPos, outlineWidth: '4px'}, afterPos, afterPos], vizAnimOpts);
       });
     }
