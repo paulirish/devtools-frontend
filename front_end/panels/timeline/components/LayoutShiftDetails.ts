@@ -87,7 +87,6 @@ export class LayoutShiftDetails extends HTMLElement {
   readonly #shadow = this.attachShadow({mode: 'open'});
 
   #event: Trace.Types.Events.SyntheticLayoutShift|Trace.Types.Events.SyntheticLayoutShiftCluster|null = null;
-  #rowEvents: Trace.Types.Events.SyntheticLayoutShift[] = [];
   #traceInsightsSets: Trace.Insights.Types.TraceInsightSets|null = null;
   #parsedTrace: Trace.Handlers.Types.ParsedTrace|null = null;
   #isFreshRecording: Boolean = false;
@@ -301,7 +300,6 @@ export class LayoutShiftDetails extends HTMLElement {
         (rootCauses.fontRequests.length || rootCauses.iframeIds.length || rootCauses.nonCompositedAnimations.length);
     const hasShiftedElements = elementsShifted?.length;
 
-    this.#rowEvents = [layoutShift];
     const parentCluster = clsInsight?.clusters.find(cluster => {
       return cluster.events.find(event => event === layoutShift);
     });
@@ -341,7 +339,6 @@ export class LayoutShiftDetails extends HTMLElement {
       return null;
     }
 
-    this.#rowEvents = cluster.events;
     let hasCulprits = false;
     // clang-format off
     const shiftRows = LitHtml.html`
@@ -413,7 +410,7 @@ export class LayoutShiftDetails extends HTMLElement {
       this.dispatchEvent(new CustomEvent('toggle-popover', {detail: {show}, bubbles: true, composed: true}));
     }
 
-    if (!(e.target instanceof HTMLElement)) {
+    if (!(e.target instanceof HTMLElement) || !this.#event) {
       return;
     }
     const rowEl = e.target.closest('tbody tr');
@@ -425,7 +422,8 @@ export class LayoutShiftDetails extends HTMLElement {
       return;
     }
 
-    const event = this.#rowEvents[index];
+    // Grab the associated trace event of this row.
+    const event = Trace.Types.Events.isSyntheticLayoutShift(this.#event) ? this.#event : this.#event.events[index];
     this.dispatchEvent(new CustomEvent('toggle-popover', {detail: {event, show}, bubbles: true, composed: true}));
   }
 }
