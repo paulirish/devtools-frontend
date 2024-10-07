@@ -202,7 +202,7 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
       // This logic will scale the size of the diamond based on the layout shift score.
       // A LS score of >=0.1 will create a diamond of maximum size
       // A LS score of ~0 will create a diamond of minimum size (exactly 0 should not happen in practice)
-      const bufferScale = 1 - Math.min(score / 0.1, 1);
+      const bufferScale = 1 - Math.min(score / 0.10, 1);
 
       return (context, x, y, _width, levelHeight) => {
         // levelHeight is 17px, so this math translates to a minimum diamond size of 5.6px tall.
@@ -246,17 +246,15 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
       screenshotsToLoad.add(event.parsedData.screenshots.before);
       screenshotsToLoad.add(event.parsedData.screenshots.after);
     }
-    screenshotsToLoad.forEach(screenshot => {
-      if (!screenshot) {
+    const promises = Array.from(screenshotsToLoad).filter(s => s).map(screenshot => {
+      if (!screenshot || this.#parsedTrace.Screenshots.imageCache.has(screenshot)) {
         return;
       }
-      // TODO: handle this promise
-      UI.UIUtils.loadImage(screenshot.args.dataUri)
-          .then(image => {
-            image && this.#parsedTrace.Screenshots.imageCache.set(screenshot, image);
-          })
-          .catch(console.warn);
+      return UI.UIUtils.loadImage(screenshot.args.dataUri).then(image => {
+        image && this.#parsedTrace.Screenshots.imageCache.set(screenshot, image);
+      });
     });
+    return Promise.all(promises);
   }
 
   static createShiftViz(
@@ -353,7 +351,7 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
         }
 
         // Keep these keyframe offsets sync'd with other animate() ones above.
-        // The 4px outline slightly pulses the rect so it's easier to distin
+        // The 4px outline slightly pulses the rect so it's easier to distinguish
         rectEl.animate([beforePos, beforePos, {...afterPos, outlineWidth: '4px'}, afterPos, afterPos], vizAnimOpts);
       });
     }

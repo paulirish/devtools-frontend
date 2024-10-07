@@ -52,12 +52,12 @@ import imagePreviewStyles from '../../ui/legacy/components/utils/imagePreview.cs
 import * as LegacyComponents from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
+import {CLSRect} from './CLSLinkifier.js';
 import * as TimelineComponents from './components/components.js';
 import * as Extensions from './extensions/extensions.js';
 import {Tracker} from './FreshRecording.js';
 import {ModificationsManager} from './ModificationsManager.js';
 import {targetForEvent} from './TargetForEvent.js';
-import {LayoutShiftsTrackAppender} from './timeline.js';
 import {TimelinePanel} from './TimelinePanel.js';
 import {TimelineSelection} from './TimelineSelection.js';
 import * as Utils from './utils/utils.js';
@@ -1600,6 +1600,52 @@ export class TimelineUIUtils {
         break;
       }
 
+      case Trace.Types.Events.Name.LAYOUT_SHIFT: {
+        if (!Trace.Types.Events.isSyntheticLayoutShift(event)) {
+          console.error('Unexpected type for LayoutShift event');
+          break;
+        }
+        const layoutShift = event as Trace.Types.Events.SyntheticLayoutShift;
+        const layoutShiftEventData = layoutShift.args.data;
+        const warning = document.createElement('span');
+        const clsLink = UI.XLink.XLink.create(
+            'https://web.dev/cls/', i18nString(UIStrings.cumulativeLayoutShifts), undefined, undefined,
+            'cumulative-layout-shifts');
+        const evolvedClsLink = UI.XLink.XLink.create(
+            'https://web.dev/evolving-cls/', i18nString(UIStrings.evolvedClsLink), undefined, undefined, 'evolved-cls');
+
+        warning.appendChild(
+            i18n.i18n.getFormatLocalizedString(str_, UIStrings.sCLSInformation, {PH1: clsLink, PH2: evolvedClsLink}));
+        contentHelper.appendElementRow(i18nString(UIStrings.warning), warning, true);
+        if (!layoutShiftEventData) {
+          break;
+        }
+        contentHelper.appendTextRow(i18nString(UIStrings.score), layoutShiftEventData['score'].toPrecision(4));
+        contentHelper.appendTextRow(
+            i18nString(UIStrings.cumulativeScore), layoutShiftEventData['cumulative_score'].toPrecision(4));
+        contentHelper.appendTextRow(
+            i18nString(UIStrings.currentClusterId), layoutShift.parsedData.sessionWindowData.id);
+        contentHelper.appendTextRow(
+            i18nString(UIStrings.currentClusterScore),
+            layoutShift.parsedData.sessionWindowData.cumulativeWindowScore.toPrecision(4));
+        contentHelper.appendTextRow(
+            i18nString(UIStrings.hadRecentInput),
+            unsafeEventData['had_recent_input'] ? i18nString(UIStrings.yes) : i18nString(UIStrings.no));
+
+        for (const impactedNode of unsafeEventData['impacted_nodes']) {
+          const oldRect = new CLSRect(impactedNode['old_rect']);
+          const newRect = new CLSRect(impactedNode['new_rect']);
+
+          const linkedOldRect = await Common.Linkifier.Linkifier.linkify(oldRect);
+          const linkedNewRect = await Common.Linkifier.Linkifier.linkify(newRect);
+
+          contentHelper.appendElementRow(i18nString(UIStrings.movedFrom), linkedOldRect);
+          contentHelper.appendElementRow(i18nString(UIStrings.movedTo), linkedNewRect);
+        }
+
+        break;
+      }
+
       default: {
         const detailsNode = await TimelineUIUtils.buildDetailsNodeForTraceEvent(
             event, targetForEvent(parsedTrace, event), linkifier, isFreshRecording, parsedTrace);
@@ -1793,7 +1839,7 @@ export class TimelineUIUtils {
     contentHelper.appendElementRow('', highlightContainer);
   }
 
-  static renderObjectJson(obj: Object): HTMLDivElement {
+  private static renderObjectJson(obj: Object): HTMLDivElement {
     const indentLength = Common.Settings.Settings.instance().moduleSetting('text-editor-indent').get().length;
     // Elide if the data is huge. Then remove the initial new-line for a denser UI
     const eventStr = JSON.stringify(obj, null, indentLength).slice(0, 10_000).replace(/{\n  /, '{ ');
