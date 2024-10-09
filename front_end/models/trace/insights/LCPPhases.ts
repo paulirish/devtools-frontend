@@ -191,9 +191,9 @@ export function generateInsight(
     return finalize({warnings: [InsightWarning.NO_LCP]});
   }
 
-  // This helps calculate the phases.
+  // This helps calculate the phases. Relative to navigation.
   const lcpMs = Helpers.Timing.microToMilli(metricScore.timing);
-  // This helps position things on the timeline's UI accurately for a trace.
+  // This helps position things on the timeline's UI accurately for a trace.  Monotonic clock.
   const lcpTs = metricScore.event?.ts ? Helpers.Timing.microToMilli(metricScore.event?.ts) : undefined;
   const lcpRequest = parsedTrace.LargestImagePaint.lcpRequestByNavigationId.get(context.navigationId);
 
