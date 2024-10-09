@@ -178,7 +178,7 @@ export class TimingsTrackAppender implements TrackAppender {
       color = '#1A3422';
       title = Trace.Handlers.ModelHandlers.PageLoadMetrics.MetricName.LCP;
     }
-    if (Trace.Types.Events.isNavigationStart(markerEvent)) {
+    if (Trace.Types.Events.isNavigationStartWithURL(markerEvent)) {
       color = '#FF9800';
       title = '';
     }

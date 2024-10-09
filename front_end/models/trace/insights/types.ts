@@ -22,7 +22,7 @@ export interface InsightSetContextWithoutNavigation {
 export interface InsightSetContextWithNavigation {
   bounds: Types.Timing.TraceWindowMicro;
   frameId: string;
-  navigation: Types.Events.NavigationStart;
+  navigation: Types.Events.NavigationStartWithUrl;
   navigationId: string;
   lantern?: LanternContext;
 }

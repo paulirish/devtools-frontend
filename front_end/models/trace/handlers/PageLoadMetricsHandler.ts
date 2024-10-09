@@ -64,7 +64,7 @@ export function handleEvent(event: Types.Events.Event): void {
 }
 
 function storePageLoadMetricAgainstNavigationId(
-    navigation: Types.Events.NavigationStart, event: Types.Events.PageLoadEvent): void {
+    navigation: Types.Events.NavigationStartWithUrl, event: Types.Events.PageLoadEvent): void {
   const navigationId = navigation.args.data?.navigationId;
   if (!navigationId) {
     throw new Error('Navigation event unexpectedly had no navigation ID.');
@@ -87,7 +87,7 @@ function storePageLoadMetricAgainstNavigationId(
     return;
   }
 
-  if (Types.Events.isNavigationStart(event)) {
+  if (Types.Events.isNavigationStartWithURL(event)) {
     return;
   }
 
@@ -214,7 +214,7 @@ function storeMetricScore(frameId: string, navigationId: string, metricScore: Me
 
 export function getFrameIdForPageLoadEvent(event: Types.Events.PageLoadEvent): string {
   if (Types.Events.isFirstContentfulPaint(event) || Types.Events.isInteractiveTime(event) ||
-      Types.Events.isLargestContentfulPaintCandidate(event) || Types.Events.isNavigationStart(event) ||
+      Types.Events.isLargestContentfulPaintCandidate(event) || Types.Events.isNavigationStartWithURL(event) ||
       Types.Events.isLayoutShift(event) || Types.Events.isFirstPaint(event)) {
     return event.args.frame;
   }
@@ -228,7 +228,7 @@ export function getFrameIdForPageLoadEvent(event: Types.Events.PageLoadEvent): s
   Platform.assertNever(event, `Unexpected event type: ${event}`);
 }
 
-function getNavigationForPageLoadEvent(event: Types.Events.PageLoadEvent): Types.Events.NavigationStart|null {
+function getNavigationForPageLoadEvent(event: Types.Events.PageLoadEvent): Types.Events.NavigationStartWithUrl|null {
   if (Types.Events.isFirstContentfulPaint(event) || Types.Events.isLargestContentfulPaintCandidate(event) ||
       Types.Events.isFirstPaint(event)) {
     const navigationId = event.args.data?.navigationId;
@@ -252,7 +252,7 @@ function getNavigationForPageLoadEvent(event: Types.Events.PageLoadEvent): Types
     return Helpers.Trace.getNavigationForTraceEvent(event, frameId, navigationsByFrameId);
   }
 
-  if (Types.Events.isNavigationStart(event)) {
+  if (Types.Events.isNavigationStartWithURL(event)) {
     // We don't want to compute metrics of the navigation relative to itself, so we'll avoid avoid all that.
     return null;
   }

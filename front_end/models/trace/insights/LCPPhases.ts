@@ -116,8 +116,8 @@ function breakdownPhases(
   const firstDocByteTs = Helpers.Timing.secondsToMicro(docReqTiming.requestTime) +
       Helpers.Timing.milliToMicro(docReqTiming.receiveHeadersStart);
 
-  const firstDocByteTiming = Types.Timing.Micro(firstDocByteTs - nav.ts);
-  const ttfb = Helpers.Timing.microToMilli(firstDocByteTiming);
+  // the doc rquest is 5.3ms after navstart.
+  const ttfb = Helpers.Timing.microToMilli(Types.Timing.Micro(firstDocByteTs - nav.ts));
   let renderDelay = Types.Timing.Milli(lcpMs - ttfb);
 
   // Text LCP, we only report two phases. See also http://go/kfpez

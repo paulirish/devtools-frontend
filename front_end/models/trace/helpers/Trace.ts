@@ -183,8 +183,8 @@ export function mergeEventsInOrder<T1 extends Types.Events.Event, T2 extends Typ
 export function getNavigationForTraceEvent(
     event: Types.Events.Event,
     eventFrameId: string,
-    navigationsByFrameId: Map<string, Types.Events.NavigationStart[]>,
-    ): Types.Events.NavigationStart|null {
+    navigationsByFrameId: Map<string, Types.Events.NavigationStartWithUrl[]>,
+    ): Types.Events.NavigationStartWithUrl|null {
   const navigations = navigationsByFrameId.get(eventFrameId);
   if (!navigations || eventFrameId === '') {
     // This event's navigation has been filtered out by the meta handler as a noise event

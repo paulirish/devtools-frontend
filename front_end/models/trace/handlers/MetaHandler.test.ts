@@ -34,7 +34,7 @@ describe('MetaHandler', function() {
         tid: Trace.Types.Events.ThreadID(775),
         ts: Trace.Types.Timing.Micro(100),
         name: 'navigationStart',
-      } as Trace.Types.Events.NavigationStart,
+      } as Trace.Types.Events.NavigationStartWithUrl,
       {
         ...defaultTraceEvent,
         // Should be ignored based on empty documentLoaderURL
@@ -66,7 +66,7 @@ describe('MetaHandler', function() {
         tid: Trace.Types.Events.ThreadID(775),
         ts: Trace.Types.Timing.Micro(1000),
         name: 'navigationStart',
-      } as Trace.Types.Events.NavigationStart,
+      } as Trace.Types.Events.NavigationStartWithUrl,
     ];
 
     Trace.Handlers.ModelHandlers.Meta.reset();

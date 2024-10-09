@@ -186,7 +186,7 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
     this.scheduleUpdate(minimumBoundary, maximumBoundary);
   }
 
-  setNavStartTimes(navStartTimes: readonly Trace.Types.Events.NavigationStart[]): void {
+  setNavStartTimes(navStartTimes: readonly Trace.Types.Events.NavigationStartWithUrl[]): void {
     this.overviewCalculator.setNavStartTimes(navStartTimes);
   }
 
