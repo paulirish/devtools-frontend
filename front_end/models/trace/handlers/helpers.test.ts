@@ -37,7 +37,7 @@ describeWithEnvironment('getNonResolvedURL', () => {
   it('for a generic event with a stackTrace property, it uses the URL of the top frame', async function() {
     const {parsedTrace} = await TraceLoader.traceEngine(this, 'web-dev-with-commit.json.gz');
     const eventDispatch = parsedTrace.Renderer.allTraceEntries.find(entry => {
-      return Trace.Types.Events.isDispatch(entry) && entry.args.data.stackTrace;
+      return Trace.Types.Events.isEventDispatch(entry) && entry.args.data.stackTrace;
     });
     assert.isOk(eventDispatch);
     const url = Trace.Handlers.Helpers.getNonResolvedURL(eventDispatch, parsedTrace);

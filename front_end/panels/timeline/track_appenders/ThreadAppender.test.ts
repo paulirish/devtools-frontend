@@ -207,7 +207,7 @@ describeWithEnvironment('ThreadAppender', function() {
       throw new Error('Could not find renderer events');
     }
     const clickEvent = events.find(event => {
-      return Trace.Types.Events.isDispatch(event) && event.args.data.type === 'click';
+      return Trace.Types.Events.isEventDispatch(event) && event.args.data.type === 'click';
     });
     if (!clickEvent) {
       throw new Error('Could not find expected click event');

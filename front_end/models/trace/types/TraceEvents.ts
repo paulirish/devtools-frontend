@@ -236,11 +236,21 @@ export interface HandlePostMessage extends Complete {
   };
 }
 
-export interface Dispatch extends Complete {
-  name: 'EventDispatch';
+export interface EventDispatch extends Complete {
+  name: Name.EVENT_DISPATCH;
   args: Args&{
     data: ArgsData & {
       type: string,
+      stackTrace?: CallFrame[],
+      // if disabled-by-default.devtools.timeline.inputs is on then there are many more properties set
+      // https://source.chromium.org/search?q=%22void%20inspector_event_dispatch_event::Data%22%20f:cc&ss=chromium%2Fchromium%2Fsrc
+      // The event.target node
+      nodeId?: Protocol.DOM.BackendNodeId,
+      nodeName?: string,
+      // The event.currentTarget node
+      nodeIdCurrent?: Protocol.DOM.BackendNodeId,
+      nodeNameCurrent?: string,
+
     },
   };
 }
@@ -1993,7 +2003,7 @@ export function isEnd(event: Event): event is End {
   return event.ph === Phase.END;
 }
 
-export function isDispatch(event: Event): event is Dispatch {
+export function isEventDispatch(event: Event): event is EventDispatch {
   return event.name === 'EventDispatch';
 }
 

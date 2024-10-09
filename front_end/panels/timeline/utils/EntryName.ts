@@ -74,7 +74,7 @@ export function nameForEntry(
     return i18n.i18n.lockedString(UIStrings.frame);
   }
 
-  if (Trace.Types.Events.isDispatch(entry)) {
+  if (Trace.Types.Events.isEventDispatch(entry)) {
     // EventDispatch represent user actions such as clicks, so in this case
     // rather than show the event title (which is always just "Event"), we
     // add the type ("click") to help the user understand the event.

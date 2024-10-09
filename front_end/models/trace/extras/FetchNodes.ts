@@ -97,6 +97,8 @@ export function nodeIdsForEvent(
     }
   } else if (Types.Events.isParseMetaViewport(event) && typeof event.args?.data.node_id !== 'undefined') {
     foundIds.add(event.args.data.node_id);
+  } else if (Types.Events.isEventDispatch(event) && typeof event.args?.data.nodeId !== 'undefined') {
+    foundIds.add(event.args.data.nodeId);
   }
   nodeIdsForEventCache.set(event, foundIds);
   return foundIds;

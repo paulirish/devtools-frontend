@@ -30,7 +30,7 @@ describeWithEnvironment('EntryName', () => {
   it('adds the event type for EventDispatch events', async function() {
     const {parsedTrace} = await TraceLoader.traceEngine(this, 'one-second-interaction.json.gz');
     const clickEvent = parsedTrace.Renderer.allTraceEntries.find(event => {
-      return Trace.Types.Events.isDispatch(event) && event.args.data.type === 'click';
+      return Trace.Types.Events.isEventDispatch(event) && event.args.data.type === 'click';
     });
     assert.isOk(clickEvent);
     const name = Utils.EntryName.nameForEntry(clickEvent);

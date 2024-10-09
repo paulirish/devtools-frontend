@@ -214,7 +214,7 @@ export function prettyPrint(
       }
       skipped = false;
       const spacing = new Array(node.depth * indentation).fill(delimiter).join('');
-      const eventType = Trace.Types.Events.isDispatch(event) ? `(${event.args.data?.type})` : false;
+      const eventType = Trace.Types.Events.isEventDispatch(event) ? `(${event.args.data?.type})` : false;
       const jsFunctionName =
           Trace.Types.Events.isProfileCall(event) ? `(${event.callFrame.functionName || 'anonymous'})` : false;
       const duration = `[${(event.dur || 0) / 1000}ms]`;

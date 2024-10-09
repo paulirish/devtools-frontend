@@ -512,8 +512,6 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/TimelineUIUtils.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-let eventDispatchDesciptors: EventDispatchTypeDescriptor[];
-
 let colorGenerator: Common.Color.Generator;
 
 interface LinkifyLocationOptions {
@@ -675,7 +673,7 @@ export class TimelineUIUtils {
     if (Trace.Types.Events.isAnimation(event) && event.args.data.name) {
       return i18nString(UIStrings.sS, {PH1: title, PH2: event.args.data.name});
     }
-    if (Trace.Types.Events.isDispatch(event)) {
+    if (Trace.Types.Events.isEventDispatch(event)) {
       return i18nString(UIStrings.sS, {PH1: title, PH2: event.args.data.type});
     }
     return title;
@@ -1424,6 +1422,17 @@ export class TimelineUIUtils {
           const rows = TimelineComponents.DetailsView.buildRowsForWebSocketEvent(event, parsedTrace);
           for (const {key, value} of rows) {
             contentHelper.appendTextRow(key, value);
+          }
+        }
+        break;
+      }
+
+      case Trace.Types.Events.Name.EVENT_DISPATCH: {
+        if (Trace.Types.Events.isEventDispatch(event)) {
+          const {nodeName} = event.args.data;
+          // If relatedNodes is empty (maybe saved trace), then print the text description of the DOM node.
+          if (!relatedNodesMap?.size && nodeName) {
+            contentHelper.appendTextRow(i18nString(UIStrings.relatedNode), nodeName);
           }
         }
         break;
@@ -2329,29 +2338,6 @@ export class TimelineUIUtils {
     return Math.round(Math.sqrt(Math.pow(quad[0] - quad[6], 2) + Math.pow(quad[1] - quad[7], 2)));
   }
 
-  static eventDispatchDesciptors(): EventDispatchTypeDescriptor[] {
-    if (eventDispatchDesciptors) {
-      return eventDispatchDesciptors;
-    }
-    const lightOrange = 'hsl(40,100%,80%)';
-    const orange = 'hsl(40,100%,50%)';
-    const green = 'hsl(90,100%,40%)';
-    const purple = 'hsl(256,100%,75%)';
-    eventDispatchDesciptors = [
-      new EventDispatchTypeDescriptor(
-          1, lightOrange, ['mousemove', 'mouseenter', 'mouseleave', 'mouseout', 'mouseover']),
-      new EventDispatchTypeDescriptor(
-          1, lightOrange, ['pointerover', 'pointerout', 'pointerenter', 'pointerleave', 'pointermove']),
-      new EventDispatchTypeDescriptor(2, green, ['wheel']),
-      new EventDispatchTypeDescriptor(3, orange, ['click', 'mousedown', 'mouseup']),
-      new EventDispatchTypeDescriptor(3, orange, ['touchstart', 'touchend', 'touchmove', 'touchcancel']),
-      new EventDispatchTypeDescriptor(
-          3, orange, ['pointerdown', 'pointerup', 'pointercancel', 'gotpointercapture', 'lostpointercapture']),
-      new EventDispatchTypeDescriptor(3, purple, ['keydown', 'keyup', 'keypress']),
-    ];
-    return eventDispatchDesciptors;
-  }
-
   static markerStyleForEvent(event: Trace.Types.Events.Event): TimelineMarkerStyle {
     // Note: keep the colors matching that of `markerDetailsForEvent`.
 
@@ -2455,18 +2441,6 @@ export class TimelineUIUtils {
 export const aggregatedStatsKey = Symbol('aggregatedStats');
 
 export const previewElementSymbol = Symbol('previewElement');
-
-export class EventDispatchTypeDescriptor {
-  priority: number;
-  color: string;
-  eventTypes: string[];
-
-  constructor(priority: number, color: string, eventTypes: string[]) {
-    this.priority = priority;
-    this.color = color;
-    this.eventTypes = eventTypes;
-  }
-}
 
 export class TimelineDetailsContentHelper {
   fragment: DocumentFragment;
