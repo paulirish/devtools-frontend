@@ -518,7 +518,7 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
    * that happened in other frames.
    * The map's key is the frame ID.
    **/
-  mainFrameNavigationStartEvents(): readonly Trace.Types.Events.NavigationStartWithUrl[] {
+  mainFrameNavigationStartEvents(): readonly Trace.Types.Events.NavigationStart[] {
     if (!this.#parsedTrace) {
       return [];
     }

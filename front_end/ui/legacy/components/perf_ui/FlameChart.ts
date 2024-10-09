@@ -4190,7 +4190,7 @@ export interface FlameChartDataProvider {
 
   textColor(entryIndex: number): string;
 
-  mainFrameNavigationStartEvents?(): readonly Trace.Types.Events.NavigationStartWithUrl[];
+  mainFrameNavigationStartEvents?(): readonly Trace.Types.Events.NavigationStart[];
 
   hasTrackConfigurationMode(): boolean;
 

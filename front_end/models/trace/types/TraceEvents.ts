@@ -685,7 +685,7 @@ export interface FirstPaint extends Mark {
 }
 
 export type PageLoadEvent = FirstContentfulPaint|MarkDOMContent|InteractiveTime|LargestContentfulPaintCandidate|
-    LayoutShift|FirstPaint|MarkLoad|NavigationStartWithUrl;
+    LayoutShift|FirstPaint|MarkLoad|NavigationStart;
 
 const markerTypeGuards = [
   isMarkDOMContent,

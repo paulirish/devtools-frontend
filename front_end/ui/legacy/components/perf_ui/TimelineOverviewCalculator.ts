@@ -36,7 +36,7 @@ export class TimelineOverviewCalculator implements Calculator {
     this.#maximumBoundary = maximumBoundary;
   }
 
-  setNavStartTimes(navStartTimes: readonly Trace.Types.Events.NavigationStartWithUrl[]): void {
+  setNavStartTimes(navStartTimes: readonly Trace.Types.Events.NavigationStart[]): void {
     this.navStartTimes = navStartTimes;
   }
 

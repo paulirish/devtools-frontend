@@ -467,7 +467,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     return this.compatibilityTracksAppender?.groupEventsForTreeView(group) ?? null;
   }
 
-  mainFrameNavigationStartEvents(): readonly Trace.Types.Events.NavigationStartWithUrl[] {
+  mainFrameNavigationStartEvents(): readonly Trace.Types.Events.NavigationStart[] {
     if (!this.parsedTrace) {
       return [];
     }

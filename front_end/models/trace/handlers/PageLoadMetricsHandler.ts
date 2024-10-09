@@ -64,7 +64,7 @@ export function handleEvent(event: Types.Events.Event): void {
 }
 
 function storePageLoadMetricAgainstNavigationId(
-    navigation: Types.Events.NavigationStartWithUrl, event: Types.Events.PageLoadEvent): void {
+    navigation: Types.Events.NavigationStart, event: Types.Events.PageLoadEvent): void {
   const navigationId = navigation.args.data?.navigationId;
   if (!navigationId) {
     throw new Error('Navigation event unexpectedly had no navigation ID.');
@@ -228,7 +228,7 @@ export function getFrameIdForPageLoadEvent(event: Types.Events.PageLoadEvent): s
   Platform.assertNever(event, `Unexpected event type: ${event}`);
 }
 
-function getNavigationForPageLoadEvent(event: Types.Events.PageLoadEvent): Types.Events.NavigationStartWithUrl|null {
+function getNavigationForPageLoadEvent(event: Types.Events.PageLoadEvent): Types.Events.NavigationStart|null {
   if (Types.Events.isFirstContentfulPaint(event) || Types.Events.isLargestContentfulPaintCandidate(event) ||
       Types.Events.isFirstPaint(event)) {
     const navigationId = event.args.data?.navigationId;

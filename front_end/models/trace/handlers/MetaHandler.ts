@@ -49,9 +49,9 @@ const traceBounds: Types.Timing.TraceWindowMicro = {
  * main frame navigations, so calculating this list here is better than
  * filtering either of the below maps over and over again at the UI layer.
  */
-const navigationsByFrameId = new Map<string, Types.Events.NavigationStartWithUrl[]>();
-const navigationsByNavigationId = new Map<string, Types.Events.NavigationStartWithUrl>();
-const mainFrameNavigations: Types.Events.NavigationStartWithUrl[] = [];
+const navigationsByFrameId = new Map<string, Types.Events.NavigationStart[]>();
+const navigationsByNavigationId = new Map<string, Types.Events.NavigationStart>();
+const mainFrameNavigations: Types.Events.NavigationStart[] = [];
 
 // Represents all the threads in the trace, organized by process. This is mostly for internal
 // bookkeeping so that during the finalize pass we can obtain the main and browser thread IDs.
@@ -403,8 +403,8 @@ export interface MetaHandlerData {
   processNames: Map<Types.Events.ProcessID, Types.Events.ProcessName>;
   browserThreadId: Types.Events.ThreadID;
   gpuProcessId: Types.Events.ProcessID;
-  navigationsByFrameId: Map<string, Types.Events.NavigationStartWithUrl[]>;
-  navigationsByNavigationId: Map<string, Types.Events.NavigationStartWithUrl>;
+  navigationsByFrameId: Map<string, Types.Events.NavigationStart[]>;
+  navigationsByNavigationId: Map<string, Types.Events.NavigationStart>;
   threadsInProcess: Map<Types.Events.ProcessID, Map<Types.Events.ThreadID, Types.Events.ThreadName>>;
   mainFrameId: string;
   mainFrameURL: string;
@@ -419,7 +419,7 @@ export interface MetaHandlerData {
   rendererProcessesByFrame: FrameProcessData;
   topLevelRendererIds: Set<Types.Events.ProcessID>;
   frameByProcessId: Map<Types.Events.ProcessID, Map<string, Types.Events.TraceFrame>>;
-  mainFrameNavigations: Types.Events.NavigationStartWithUrl[];
+  mainFrameNavigations: Types.Events.NavigationStart[];
   gpuThreadId?: Types.Events.ThreadID;
   viewportRect?: DOMRect;
   devicePixelRatio?: number;
