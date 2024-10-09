@@ -87,7 +87,7 @@ function storePageLoadMetricAgainstNavigationId(
     return;
   }
 
-  if (Types.Events.isNavigationStartWithURL(event)) {
+  if (Types.Events.isNavigationStart(event)) {
     return;
   }
 
@@ -214,7 +214,7 @@ function storeMetricScore(frameId: string, navigationId: string, metricScore: Me
 
 export function getFrameIdForPageLoadEvent(event: Types.Events.PageLoadEvent): string {
   if (Types.Events.isFirstContentfulPaint(event) || Types.Events.isInteractiveTime(event) ||
-      Types.Events.isLargestContentfulPaintCandidate(event) || Types.Events.isNavigationStartWithURL(event) ||
+      Types.Events.isLargestContentfulPaintCandidate(event) || Types.Events.isNavigationStart(event) ||
       Types.Events.isLayoutShift(event) || Types.Events.isFirstPaint(event)) {
     return event.args.frame;
   }
@@ -252,7 +252,7 @@ function getNavigationForPageLoadEvent(event: Types.Events.PageLoadEvent): Types
     return Helpers.Trace.getNavigationForTraceEvent(event, frameId, navigationsByFrameId);
   }
 
-  if (Types.Events.isNavigationStartWithURL(event)) {
+  if (Types.Events.isNavigationStart(event)) {
     // We don't want to compute metrics of the navigation relative to itself, so we'll avoid avoid all that.
     return null;
   }

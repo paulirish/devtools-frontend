@@ -693,7 +693,7 @@ const markerTypeGuards = [
   isFirstPaint,
   isFirstContentfulPaint,
   isLargestContentfulPaintCandidate,
-  isNavigationStartWithURL,
+  isNavigationStart,
 ];
 
 export const MarkerName =
