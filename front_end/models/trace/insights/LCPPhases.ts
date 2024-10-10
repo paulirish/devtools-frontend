@@ -116,6 +116,7 @@ function breakdownPhases(
   const firstDocByteTs = Helpers.Timing.secondsToMicro(docReqTiming.requestTime) +
       Helpers.Timing.milliToMicro(docReqTiming.receiveHeadersStart);
 
+  // The TTFB includes the small gap of time between navStart and when the docRequest starts.
   // the doc rquest is 5.3ms after navstart.
   const ttfb = Helpers.Timing.microToMilli(Types.Timing.Micro(firstDocByteTs - nav.ts));
   let renderDelay = Types.Timing.Milli(lcpMs - ttfb);

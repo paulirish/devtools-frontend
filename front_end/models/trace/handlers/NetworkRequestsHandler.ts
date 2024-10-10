@@ -276,10 +276,12 @@ export async function finalize(): Promise<void> {
 
     // Start time
     // =======================
-    // The time where the request started, which is either the first willSendRequest
-    // event if there is one, or, if there is not, the sendRequest.
-    const startTime = (request.willSendRequests?.length) ? Types.Timing.Micro(request.willSendRequests[0].ts) :
-                                                           Types.Timing.Micro(firstSendRequest.ts);
+    // The time where the request started, which is either the first willSendRequest event (only present for navigations),
+    // or the sendRequest. However in some navigation edge cases the requestTime will be earlier; if so, use that.
+    const firstWillSendRequest = request.willSendRequests?.at(0);
+    const startTime = Types.Timing.Micro(Math.min(
+        firstWillSendRequest ? firstWillSendRequest.ts : firstSendRequest.ts,
+        timing?.requestTime ? Helpers.Timing.secondsToMicro(timing?.requestTime) : Infinity));
 
     // End redirect time
     // =======================
