@@ -82,68 +82,65 @@ export class LCPPhases extends BaseInsightComponent<LCPPhasesInsightModel> {
       return [];
     }
 
-    const phases = this.model.phases;
-    const lcpTs = this.model.lcpTs;
+    const {phases, lcpTs} = this.model;
     if (!phases || !lcpTs) {
       return [];
     }
-    const lcpMicroseconds = Trace.Types.Timing.Micro(Trace.Helpers.Timing.milliToMicro(lcpTs));
+    const sections: Overlays.Overlays.TimespanBreakdown['sections'] = [];
 
     const overlays: Overlays.Overlays.TimelineOverlay[] = [];
     if (this.model.lcpRequest) {
       overlays.push({type: 'ENTRY_OUTLINE', entry: this.model.lcpRequest, outlineReason: 'INFO'});
     }
 
-    const sections = [];
-    // For text LCP, we should only have ttfb and renderDelay sections.
-    if (!phases?.loadDelay && !phases?.loadTime) {
-      const renderBegin: Trace.Types.Timing.Micro =
-          Trace.Types.Timing.Micro(lcpMicroseconds - Trace.Helpers.Timing.milliToMicro(phases.renderDelay));
-      const renderDelay = Trace.Helpers.Timing.traceWindowFromMicroSeconds(
-          renderBegin,
-          lcpMicroseconds,
-      );
+    // smal possibility i messed up a merge conflict here.
 
-      const mainReqStart = Trace.Types.Timing.Micro(renderBegin - Trace.Helpers.Timing.milliToMicro(phases.ttfb));
-      const ttfb = Trace.Helpers.Timing.traceWindowFromMicroSeconds(
-          mainReqStart,
-          renderBegin,
-      );
-      sections.push(
-          {bounds: ttfb, label: i18nString(UIStrings.timeToFirstByte), showDuration: true},
-          {bounds: renderDelay, label: i18nString(UIStrings.elementRenderDelay), showDuration: true});
-    } else if (phases?.loadDelay && phases?.loadTime) {
-      const renderBegin: Trace.Types.Timing.Micro =
-          Trace.Types.Timing.Micro(lcpMicroseconds - Trace.Helpers.Timing.milliToMicro(phases.renderDelay));
-      const renderDelay = Trace.Helpers.Timing.traceWindowFromMicroSeconds(
-          renderBegin,
-          lcpMicroseconds,
-      );
+    /** Image LCP. 4 phases means 5 timestamps
+     *
+     *       |  ttfb   |    loadDelay     |     loadTime    |    renderDelay    |
+     *                                                                          ^ lcpTs
+     *                                                      ^ loadedTs
+     *                                    ^ loadStartTs
+     *                 ^ ttfbTs
+     *       ^ navStartTs
+     */
 
-      const loadBegin = Trace.Types.Timing.Micro(renderBegin - Trace.Helpers.Timing.milliToMicro(phases.loadTime));
-      const loadTime = Trace.Helpers.Timing.traceWindowFromMicroSeconds(
-          loadBegin,
-          renderBegin,
-      );
+    if (phases.loadDelay && phases.loadTime) {
+      // Microsecond timestamps
+      const loadedTs = lcpTs - Trace.Helpers.Timing.milliToMicro(phases.renderDelay);
+      const loadStartTs = loadedTs - Trace.Helpers.Timing.milliToMicro(phases.loadTime);
+      const ttfbTs = loadStartTs - Trace.Helpers.Timing.milliToMicro(phases.loadDelay);
+      const navStartTs = loadStartTs - Trace.Helpers.Timing.milliToMicro(phases.ttfb);
+      const timestamps = [navStartTs, ttfbTs, loadStartTs, loadedTs, lcpTs] as Trace.Types.Timing.Micro[];
 
-      const loadDelayStart = Trace.Types.Timing.Micro(loadBegin - Trace.Helpers.Timing.milliToMicro(phases.loadDelay));
-      const loadDelay = Trace.Helpers.Timing.traceWindowFromMicroSeconds(
-          loadDelayStart,
-          loadBegin,
-      );
+      const lcpImagePhases = [
+        UIStrings.timeToFirstByte, UIStrings.resourceLoadDelay, UIStrings.resourceLoadDuration,
+        UIStrings.elementRenderDelay
+      ];
 
-      const mainReqStart = Trace.Types.Timing.Micro(loadDelayStart - Trace.Helpers.Timing.milliToMicro(phases.ttfb));
-      const ttfb = Trace.Helpers.Timing.traceWindowFromMicroSeconds(
-          mainReqStart,
-          loadDelayStart,
-      );
+      lcpImagePhases.forEach((phaseLabel, i) => {
+        const bounds = Trace.Helpers.Timing.traceWindowFromMicroSeconds(timestamps[i], timestamps[i + 1]);
+        sections.push({bounds, label: phaseLabel, showDuration: true});
+      });
 
-      sections.push(
-          {bounds: ttfb, label: i18nString(UIStrings.timeToFirstByte), showDuration: true},
-          {bounds: loadDelay, label: i18nString(UIStrings.resourceLoadDelay), showDuration: true},
-          {bounds: loadTime, label: i18nString(UIStrings.resourceLoadDuration), showDuration: true},
-          {bounds: renderDelay, label: i18nString(UIStrings.elementRenderDelay), showDuration: true},
-      );
+    } else {
+      /** Text LCP. 2 phases, thus 3 timestamps
+       *
+       *       |          ttfb           |             renderDelay              |
+       *                                                                        ^ lcpTs
+       *                                 ^ ttfbTs
+       *       ^ navStartTs
+       */
+      const ttfbTs = lcpTs - Trace.Helpers.Timing.milliToMicro(phases.renderDelay);
+      const navStartTs = ttfbTs - Trace.Helpers.Timing.milliToMicro(phases.ttfb);
+      const timestamps = [navStartTs, ttfbTs, lcpTs] as Trace.Types.Timing.Micro[];
+
+      const lcpTextPhases = [UIStrings.timeToFirstByte, UIStrings.elementRenderDelay];
+
+      lcpTextPhases.forEach((phaseLabel, i) => {
+        const bounds = Trace.Helpers.Timing.traceWindowFromMicroSeconds(timestamps[i], timestamps[i + 1]);
+        sections.push({bounds, label: phaseLabel, showDuration: true});
+      });
     }
 
     this.#overlay = {

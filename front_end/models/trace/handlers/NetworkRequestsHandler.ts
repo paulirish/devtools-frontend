@@ -290,10 +290,22 @@ export async function finalize(): Promise<void> {
 
     // Start time
     // =======================
-    // The time where the request started, which is either the first willSendRequest
-    // event if there is one, or, if there is not, the sendRequest.
-    const startTime = (request.willSendRequests?.length) ? Types.Timing.Micro(request.willSendRequests[0].ts) :
-                                                           Types.Timing.Micro(firstSendRequest.ts);
+    // The time where the request started, which is either the first willSendRequest event (only present for navigations),
+    // or the sendRequest.
+    const firstWillSendRequestTime = request.willSendRequests?.at(0)?.ts ?? Infinity;
+    const firstSendRequestTime = firstSendRequest.ts;
+    const requestTime = timing?.requestTime ? Helpers.Timing.secondsToMicro(timing.requestTime) : Infinity;
+
+    const startTime = Types.Timing.MicroSeconds(Math.min(firstWillSendRequestTime, firstSendRequestTime));
+
+    // In some rare navigation edge cases, the requestTime is before a willSendRequest.
+    // How exactly would the network-side of a navigation happen before the renderer notes that we need to navigate? Good question!
+    // We think this is an error in instrumentation and may be due to Overrides or other unexpected case where net's `request_start_time` is overridden.
+    // https://source.chromium.org/chromium/chromium/src/+/main:net/base/load_timing_info.h;l=139;drc=0afdaad03fc3fc271a751cb77dea8c8efb84b49f
+    // To re-align the data, we'll make sure requestTime is no earlier than the above startTime calculation.
+    if (timing && Helpers.Timing.secondsToMicroseconds(timing.requestTime) < startTime) {
+      timing.requestTime = Helpers.Timing.microSecondsToSeconds(startTime);
+    }
 
     // End redirect time
     // =======================

@@ -13,7 +13,9 @@ import * as Trace from '../../../models/trace/trace.js';
 import * as LegacyComponents from '../../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../../ui/legacy/legacy.js';
 import * as Lit from '../../../ui/lit/lit.js';
+import * as TimelineUIUItils from '../TimelineUIUtils.js';
 import type * as TimelineUtils from '../utils/utils.js';
+import * as TimelineUtils from '../utils/utils.js';
 
 import networkRequestDetailsStyles from './networkRequestDetails.css.js';
 import networkRequestTooltipStyles from './networkRequestTooltip.css.js';

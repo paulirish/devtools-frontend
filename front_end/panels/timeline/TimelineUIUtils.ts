@@ -1789,7 +1789,7 @@ export class TimelineUIUtils {
     contentHelper.appendElementRow('', highlightContainer);
   }
 
-  private static renderObjectJson(obj: Object): HTMLDivElement {
+  static renderObjectJson(obj: Object): HTMLDivElement {
     const indentLength = Common.Settings.Settings.instance().moduleSetting('text-editor-indent').get().length;
     // Elide if the data is huge. Then remove the initial new-line for a denser UI
     const eventStr = JSON.stringify(obj, null, indentLength).slice(0, 10_000).replace(/{\n  /, '{ ');

@@ -11,6 +11,7 @@ export class TimelineOverviewCalculator implements Calculator {
   #maximumBoundary: Trace.Types.Timing.Milli = Trace.Types.Timing.Milli(100);
 
   #displayWidth = 0;
+  private workingArea!: number;
   private navStartTimes?: readonly Trace.Types.Events.NavigationStart[];
 
   /**
@@ -20,14 +21,14 @@ export class TimelineOverviewCalculator implements Calculator {
    * @returns position in pixel
    */
   computePosition(time: Trace.Types.Timing.Milli): number {
-    return (time - this.#minimumBoundary) / this.boundarySpan() * this.#displayWidth;
+    return (time - this.#minimumBoundary) / this.boundarySpan() * this.workingArea;
   }
 
   positionToTime(position: number): Trace.Types.Timing.Milli {
-    if (this.#displayWidth === 0) {
+    if (this.workingArea === 0) {
       return Trace.Types.Timing.Milli(0);
     }
-    return Trace.Types.Timing.Milli(position / this.#displayWidth * this.boundarySpan() + this.#minimumBoundary);
+    return Trace.Types.Timing.Milli(position / this.workingArea * this.boundarySpan() + this.#minimumBoundary);
   }
 
   setBounds(minimumBoundary: Trace.Types.Timing.Milli, maximumBoundary: Trace.Types.Timing.Milli): void {
@@ -40,7 +41,7 @@ export class TimelineOverviewCalculator implements Calculator {
   }
 
   setDisplayWidth(clientWidth: number): void {
-    this.#displayWidth = clientWidth;
+    this.workingArea = clientWidth;
   }
 
   reset(): void {

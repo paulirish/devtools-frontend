@@ -90,7 +90,7 @@ export function isLCPPhases(model: InsightModel): model is LCPPhasesInsightModel
 }
 export type LCPPhasesInsightModel = InsightModel<typeof UIStrings, {
   lcpMs?: Types.Timing.Milli,
-  lcpTs?: Types.Timing.Milli,
+  lcpTs?: Types.Timing.Micro,
   lcpEvent?: Types.Events.LargestContentfulPaintCandidate,
   /** The network request for the LCP image, if there was one. */
   lcpRequest?: Types.Events.SyntheticNetworkRequest,
@@ -116,10 +116,13 @@ function breakdownPhases(
   const firstDocByteTs = Helpers.Timing.secondsToMicro(docReqTiming.requestTime) +
       Helpers.Timing.milliToMicro(docReqTiming.receiveHeadersStart);
 
-  const firstDocByteTiming = Types.Timing.Micro(firstDocByteTs - nav.ts);
-  const ttfb = Helpers.Timing.microToMilli(firstDocByteTiming);
+
+  // The TTFB includes the small gap of time between navStart and when the docRequest starts.
+  // the doc rquest is 5.3ms after navstart.
+  const ttfb = Helpers.Timing.microToMilli(Types.Timing.Micro(firstDocByteTs - nav.ts));
   let renderDelay = Types.Timing.Milli(lcpMs - ttfb);
 
+  // Text LCP, we only report two phases. See also http://go/kfpez
   if (!lcpRequest) {
     if (anyValuesNaN(ttfb, renderDelay)) {
       return null;
@@ -191,12 +194,17 @@ export function generateInsight(
     return finalize({warnings: [InsightWarning.NO_LCP]});
   }
 
-  // This helps calculate the phases.
+  // This helps calculate the phases. Relative to navigation.
   const lcpMs = Helpers.Timing.microToMilli(metricScore.timing);
-  // This helps position things on the timeline's UI accurately for a trace.
+  // This helps position things on the timeline's UI accurately for a trace.  Monotonic clock.
   const lcpTs = metricScore.event?.ts ? Helpers.Timing.microToMilli(metricScore.event?.ts) : undefined;
   const lcpRequest = parsedTrace.LargestImagePaint.lcpRequestByNavigationId.get(context.navigationId);
 
+  // i have no idea what the conflict diff state of this is.....
+
+  // This helps position things on the timeline's UI accurately for a trace. Monotonic clock.
+  const lcpTs = lcpEvent.ts;
+  const lcpRequest = parsedTrace.LargestImagePaint.lcpRequestByNavigation.get(context.navigation);
   const docRequest = networkRequests.byTime.find(req => req.args.data.requestId === context.navigationId);
   if (!docRequest) {
     return finalize({lcpMs, lcpTs, lcpEvent, lcpRequest, warnings: [InsightWarning.NO_DOCUMENT_REQUEST]});

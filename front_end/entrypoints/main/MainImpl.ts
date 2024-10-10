@@ -133,14 +133,14 @@ export class MainImpl {
     if (Host.InspectorFrontendHost.isUnderTest()) {
       return;
     }
-    console.time(label);
+    // console.time(label);
   }
 
   static timeEnd(label: string): void {
     if (Host.InspectorFrontendHost.isUnderTest()) {
       return;
     }
-    console.timeEnd(label);
+    // console.timeEnd(label);
   }
 
   async #loaded(): Promise<void> {
