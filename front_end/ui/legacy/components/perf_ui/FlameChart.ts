@@ -980,6 +980,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
         x = Platform.NumberUtilities.clamp(mouseX + dx, 0, parentWidth - infoWidth);
         y = Platform.NumberUtilities.clamp(mouseY + dy, 0, parentHeight - infoHeight);
 
+
         const popoverFits = pass === 0 ?
             // Will the whole popover be visible?
             (x >= mouseX || mouseX >= x + infoWidth) && (y >= mouseY || mouseY >= y + infoHeight) :
