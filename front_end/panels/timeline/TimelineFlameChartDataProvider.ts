@@ -139,6 +139,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
   readonly #font = `${PerfUI.Font.DEFAULT_FONT_SIZE} ${PerfUI.Font.getFontFamilyForCanvas()}`;
   #eventIndexByEvent = new WeakMap<Trace.Types.Events.Event, number|null>();
   #entityMapper: Utils.EntityMapper.EntityMapper|null = null;
+  entryInfoElement: HTMLDivElement;
 
   /**
    * When we create initiator chains for a selected event, we store those
@@ -156,6 +157,14 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     this.framesGroupStyle = this.buildGroupStyle({useFirstLineForOverview: true});
     this.screenshotsGroupStyle =
         this.buildGroupStyle({useFirstLineForOverview: true, nestingLevel: 1, collapsible: false, itemsHeight: 150});
+
+    this.entryInfoElement = document.createElement('div');
+    const entryInfoRoot = UI.UIUtils.createShadowRootWithCoreStyles(this.entryInfoElement, {
+      cssFile: [timelineFlamechartPopoverStyles],
+      delegatesFocus: undefined,
+    });
+    entryInfoRoot.createChild('div', 'timeline-flamechart-popover');
+
 
     ThemeSupport.ThemeSupport.instance().addEventListener(ThemeSupport.ThemeChangeEvent.eventName, () => {
       const headers = [
@@ -823,19 +832,20 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       return null;
     }
 
-    const popoverElement = document.createElement('div');
-    const root = UI.UIUtils.createShadowRootWithCoreStyles(popoverElement, {cssFile: timelineFlamechartPopoverStyles});
-    const popoverContents = root.createChild('div', 'timeline-flamechart-popover');
+    const popoverContents = this.entryInfoElement.shadowRoot?.lastElementChild as HTMLDivElement;
+    popoverContents.removeChildren();
     popoverContents.createChild('span', timeElementClassName).textContent = time;
-    popoverContents.createChild('span', 'popoverinfo-title').textContent = title;
-    for (const warningElement of warningElements) {
-      warningElement.classList.add('popoverinfo-warning');
-      popoverContents.appendChild(warningElement);
+    popoverContents.createChild('span', 'popover-title').textContent = title;
+    if (warningElements) {
+      for (const warningElement of warningElements) {
+        warningElement.classList.add('popover-warning');
+        popoverContents.appendChild(warningElement);
+      }
     }
     for (const elem of additionalContent) {
       popoverContents.appendChild(elem);
     }
-    return popoverElement;
+    return this.entryInfoElement;
   }
 
   preparePopoverForCollapsedArrow(entryIndex: number): Element|null {

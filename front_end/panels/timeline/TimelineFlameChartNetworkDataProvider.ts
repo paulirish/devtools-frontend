@@ -39,9 +39,15 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
   #lastInitiatorEntry = -1;
   #lastInitiatorsData: PerfUI.FlameChart.FlameChartInitiatorData[] = [];
   #entityMapper: TimelineUtils.EntityMapper.EntityMapper|null = null;
+  entryInfoRoot: ShadowRoot;
 
   constructor() {
     this.reset();
+
+    const entryInfoElement = document.createElement('div');
+    this.entryInfoRoot =
+        UI.UIUtils.createShadowRootWithCoreStyles(entryInfoElement, {cssFile: [timelineFlamechartPopoverStyles]});
+    this.entryInfoRoot.createChild('div', 'timeline-flamechart-popover');
   }
 
   // Reset all data other than the UI elements.
@@ -415,11 +421,12 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
       const element = document.createElement('div');
       const root = UI.UIUtils.createShadowRootWithCoreStyles(element, {cssFile: timelineFlamechartPopoverStyles});
 
-      const contents = root.createChild('div', 'timeline-flamechart-popover');
+      this.entryInfoRoot.textContent = '';
+      const contents = this.entryInfoRoot.createChild('div', 'timeline-flamechart-popover');
       const infoElement = new TimelineComponents.NetworkRequestTooltip.NetworkRequestTooltip();
       infoElement.data = {networkRequest: event, entityMapper: this.#entityMapper};
       contents.appendChild(infoElement);
-      return element;
+      return this.entryInfoRoot.host;
     }
     return null;
   }
