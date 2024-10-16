@@ -70,6 +70,12 @@ export class TraceEntryNodeForAI {
     return nodeForAI;
   }
 
+  toJSON(): TraceEntryNodeForAI {
+    // Only need this during debugging. At serialization we can drop it.
+    delete this.id;
+    return this;
+  }
+
   /**
    * Builds a TraceEntryNodeForAI tree from a TraceEntryNode tree and marks the selected node.
    */

@@ -240,6 +240,7 @@ STOP`,
     let rawResponse: Host.AidaClient.AidaResponse|undefined = undefined;
     let response = '';
     let rpcId: number|undefined;
+    console.log(request);
     for await (rawResponse of this.#aidaClient.fetch(request, options)) {
       response = rawResponse.explanation;
       rpcId = rawResponse.metadata.rpcGlobalId ?? rpcId;
