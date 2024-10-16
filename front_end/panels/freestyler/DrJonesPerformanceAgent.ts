@@ -95,21 +95,36 @@ export class DrJonesPerformanceAgent extends AiAgent<Trace.Helpers.TreeHelpers.T
     };
   }
 
+  getContextDetails(selectedStackTrace: Trace.Helpers.TreeHelpers.TraceEntryNodeForAI|
+                    null): [ContextDetail, ...ContextDetail[]] {
+    if (JSON.stringify(selectedStackTrace).trim().length > 50_000) {
+      console.error('serialized data is TOO BIG');
+      debugger;
+    }
+
+    return [
+      {
+        title: 'Selected stack trace',
+        text: JSON.stringify(selectedStackTrace).trim(),
+      },
+    ];
+  }
+
   async *
       handleContextDetails(selectedStackTrace: Trace.Helpers.TreeHelpers.TraceEntryNodeForAI|null):
           AsyncGenerator<ContextResponse, void, void> {
     yield {
       type: ResponseType.CONTEXT,
       title: lockedString(UIStringsNotTranslate.analyzingStackTrace),
-      details: createContextDetailsForDrJonesPerformanceAgent(selectedStackTrace),
+      details: this.getContextDetails(selectedStackTrace),
     };
   }
 
   override async enhanceQuery(query: string, selectedStackTrace: Trace.Helpers.TreeHelpers.TraceEntryNodeForAI|null):
       Promise<string> {
-    const networkEnchantmentQuery =
-        selectedStackTrace ? `# Selected stack trace\n${JSON.stringify(selectedStackTrace)}\n\n# User request\n\n` : '';
-    return `${networkEnchantmentQuery}${query}`;
+    const stackStr = this.getContextDetails(selectedStackTrace)[0]!.text;
+    const perfEnhancementQuery = selectedStackTrace ? `# Selected stack trace\n${stackStr}\n\n# User request\n\n` : '';
+    return `${perfEnhancementQuery}${query}`;
   }
 
   override parseResponse(response: string): ParsedResponse {
@@ -119,15 +134,6 @@ export class DrJonesPerformanceAgent extends AiAgent<Trace.Helpers.TreeHelpers.T
   }
 }
 
-function createContextDetailsForDrJonesPerformanceAgent(
-    selectedStackTrace: Trace.Helpers.TreeHelpers.TraceEntryNodeForAI|null): [ContextDetail, ...ContextDetail[]] {
-  return [
-    {
-      title: 'Selected stack trace',
-      text: JSON.stringify(selectedStackTrace).trim(),
-    },
-  ];
-}
 
 function setDebugFreestylerEnabled(enabled: boolean): void {
   if (enabled) {
