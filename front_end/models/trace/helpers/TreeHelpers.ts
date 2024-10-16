@@ -119,6 +119,93 @@ export class TraceEntryNodeForAI {
     }
     return null;
   }
+
+
+  static #forEachRecursive(list: TraceEntryNodeForAI[], callback: (node: TraceEntryNodeForAI) => void): void {
+    for (const node of list) {
+      callback(node);
+      if (node.children) {
+        TraceEntryNodeForAI.#forEachRecursive(node.children, callback);
+      }
+    }
+  }
+
+  static #filterRecursive(list: TraceEntryNodeForAI[], predicate: (node: TraceEntryNodeForAI) => boolean):
+      TraceEntryNodeForAI[] {
+    let done;
+    do {
+      done = true;
+      const filtered: TraceEntryNodeForAI[] = [];
+      for (const node of list) {
+        if (predicate(node)) {
+          filtered.push(node);
+        } else if (node.children) {
+          filtered.push(...node.children);
+          done = false;
+        }
+      }
+      list = filtered;
+    } while (!done);
+
+    for (const node of list) {
+      if (node.children) {
+        node.children = TraceEntryNodeForAI.#filterRecursive(node.children, predicate);
+      }
+    }
+    return list;
+  }
+
+  static #removeUnimportantNodesRecursively(list: TraceEntryNodeForAI[]): TraceEntryNodeForAI[] {
+    // const important = new Map(Object.entries(Types.Events.ImportantEventName));
+    const isJS = (node: TraceEntryNodeForAI): boolean => node.function !== undefined;
+    return TraceEntryNodeForAI.#filterRecursive(list, node => true);  // isJS(node) || important.has(node.type));
+  }
+
+  static #removeInexpensiveNodesRecursively(
+      list: TraceEntryNodeForAI[],
+      options?: {minTotal?: number, minSelf?: number, minJsTotal?: number, minJsSelf?: number}): TraceEntryNodeForAI[] {
+    const minTotalTime = options?.minTotal ?? 0;
+    const minSelfTime = options?.minSelf ?? 0;
+    const minJsTotalTime = options?.minJsTotal ?? 0;
+    const minJsSelfTime = options?.minJsSelf ?? 0;
+    const isJS = (node: TraceEntryNodeForAI): boolean => node.function !== undefined;
+    const hasMinTotalTime = (node: TraceEntryNodeForAI): boolean =>
+        node.totalTime === undefined || node.totalTime >= (isJS(node) ? minJsTotalTime : minTotalTime);
+    const hasMinSelfTime = (node: TraceEntryNodeForAI): boolean =>
+        node.selfTime === undefined || node.selfTime >= (isJS(node) ? minJsSelfTime : minSelfTime);
+    return TraceEntryNodeForAI.#filterRecursive(list, node => hasMinTotalTime(node) && hasMinSelfTime(node));
+  }
+
+  static #deleteChildrenIfEmpty(node: TraceEntryNodeForAI): void {
+    if (!node.children?.length) {
+      delete node.children;
+    }
+  }
+
+  static #renameNodeType(node: TraceEntryNodeForAI): void {
+    // const important = new Map(Object.entries(Types.Events.ImportantEventName));
+    const isJS = (node: TraceEntryNodeForAI): boolean => node.function !== undefined;
+    // important.get(node.type)
+    node.type = isJS(node) ? 'JS' : 'notjs';
+  }
+
+  static sanitize(
+      list: TraceEntryNodeForAI[],
+      options?: {minTotal?: number, minSelf?: number, minJsTotal?: number, minJsSelf?: number}): TraceEntryNodeForAI[] {
+    list = TraceEntryNodeForAI.#removeUnimportantNodesRecursively(list);
+    list = TraceEntryNodeForAI.#removeInexpensiveNodesRecursively(list, options);
+    TraceEntryNodeForAI.#forEachRecursive(list, TraceEntryNodeForAI.#deleteChildrenIfEmpty);
+    TraceEntryNodeForAI.#forEachRecursive(list, TraceEntryNodeForAI.#renameNodeType);
+    return list;
+  }
+
+  sanitize(options?: {minTotal?: number, minSelf?: number, minJsTotal?: number, minJsSelf?: number}): void {
+    if (this.children) {
+      this.children = TraceEntryNodeForAI.sanitize(this.children, options);
+    }
+    TraceEntryNodeForAI.#deleteChildrenIfEmpty(this);
+    TraceEntryNodeForAI.#renameNodeType(this);
+  }
 }
 
 class TraceEntryNodeIdTag {
