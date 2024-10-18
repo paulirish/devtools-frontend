@@ -898,10 +898,13 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
     }
     const editor = this.textEditor;
     const range = this.searchResults[this.currentSearchResultIndex];
+    const xMargin = Math.min(100, this.textEditor.offsetWidth);
     editor.dispatch({
-      effects: setActiveSearch.of(new ActiveSearch(this.searchRegex, range)),
+      effects: [
+        setActiveSearch.of(new ActiveSearch(this.searchRegex, range)),
+        CodeMirror.EditorView.scrollIntoView(range.from, {y: 'center', x: 'start', xMargin}),
+      ],
       selection: {anchor: range.from, head: range.to},
-      scrollIntoView: true,
       userEvent: 'select.search',
     });
   }
