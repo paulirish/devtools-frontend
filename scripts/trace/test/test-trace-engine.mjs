@@ -8,11 +8,11 @@ import test from 'node:test';
 import {analyzeTrace} from '../analyze-trace.mjs';
 
 const filename = './front_end/panels/timeline/fixtures/traces/invalid-animation-events.json.gz';
-const data = await analyzeTrace(filename);
+const {parsedTrace: data, insights} = await analyzeTrace(filename);
 
 test('key values are populated', t => {
   assert.equal(data.Renderer.allTraceEntries.length > 90_000, true);
-  assert.equal(data.Screenshots.length > 2, true);
+  assert.equal(data.Screenshots.all.length > 2, true);
   assert.equal(data.Meta.threadsInProcess.size > 2, true);
   assert.equal(data.Meta.mainFrameNavigations.length > 0, true);
 });
@@ -49,4 +49,11 @@ test('string values are set and look legit', t => {
     assert.equal(typeof datum, 'string');
     assert.equal(datum.length > 10, true);
   }
+});
+
+test('insights look ok', t => {
+  if (insights === null) {
+    throw new Error('insights null');
+  }
+  console.log(insights);
 });
