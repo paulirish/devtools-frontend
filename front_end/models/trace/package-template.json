@@ -12,6 +12,7 @@
   "author": "",
   "license": "BSD-3-Clause",
   "dependencies": {
+    "third-party-web": "latest"
   },
   "devDependencies": {
 

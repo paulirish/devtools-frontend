@@ -26,7 +26,9 @@ cp "$out_dir/gen/front_end/generated/protocol.js" "$dist/generated/protocol.js"
 cp "$out_dir/gen/front_end/generated/protocol.d.ts" "$dist/generated/protocol.d.ts"
 cp ./front_end/models/trace/package-template.json "$dist/package.json"
 
-echo 'export {};' > $dist/models/trace/extras/extras.js
+
+# TODO: maybe something more legit than this hack
+echo 'const URLForEntry = { getNonResolved: (_, entry) => entry.callFrame?.url ?? entry.args?.data?.stackTrace ?? entry.args?.data?.url ?? null};export {URLForEntry};' > $dist/models/trace/extras/extras.js
 echo 'export {};' > $dist/models/trace/extras/extras.d.ts
 echo 'export {};' > $dist/models/trace/TracingManager.js
 echo 'export {};' > $dist/models/trace/TracingManager.d.ts
@@ -34,7 +36,7 @@ echo 'export {};' > $dist/models/trace/LegacyTracingModel.js
 echo 'export {};' > $dist/models/trace/LegacyTracingModel.d.ts
 
 mkdir -p $dist/third_party/third-party-web/
-echo 'export {};' > $dist/third_party/third-party-web/third-party-web.js
+echo "import ThirdPartyWeb from 'third-party-web'; export {ThirdPartyWeb};" > $dist/third_party/third-party-web/third-party-web.js
 
 
 $DIRNAME/copy-build-trace-engine-for-publish.sh

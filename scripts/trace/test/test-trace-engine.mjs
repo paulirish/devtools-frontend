@@ -7,7 +7,7 @@ import test from 'node:test';
 
 import {analyzeTrace} from '../analyze-trace.mjs';
 
-const filename = './front_end/panels/timeline/fixtures/traces/invalid-animation-events.json.gz';
+const filename = './test/invalid-animation-events.json.gz';
 const {parsedTrace: data, insights} = await analyzeTrace(filename);
 
 test('key values are populated', t => {
@@ -55,5 +55,43 @@ test('insights look ok', t => {
   if (insights === null) {
     throw new Error('insights null');
   }
-  console.log(insights);
+  // First insightset with a navigation on it, to skip over the NO_NAV one.
+  const insightSet = Array.from(insights.values()).find(is => is.navigation);
+
+  const keys = Object.keys(insightSet.data);
+  assert.deepStrictEqual(keys, [
+    'CumulativeLayoutShift',
+    'DocumentLatency',
+    'FontDisplay',
+    'InteractionToNextPaint',
+    'LargestContentfulPaint',
+    'RenderBlocking',
+    'SlowCSSSelector',
+    'ThirdPartyWeb',
+    'Viewport',
+  ]);
+  for (const key of keys) {
+    assert.ok(insightSet.data[key] instanceof Error === false, `key ${key} is an error`);
+    assert.ok(typeof insightSet.data[key] === 'object', `key ${key} is not an object`);
+  }
+
+  const entityNames = Array.from(insightSet.data.ThirdPartyWeb.summaryByEntity.keys()).map(e => e.name);
+  const values = Array.from(insightSet.data.ThirdPartyWeb.summaryByEntity.values());
+  const simplified = Object.fromEntries(values.map((v, i) => [entityNames[i], v]));
+
+  const expected = {
+    'Google Fonts': {
+      mainThreadTime: 0,
+      transferSize: 74145,
+    },
+    'paulirish.com': {
+      mainThreadTime: 5545,
+      transferSize: 142142,
+    },
+    Disqus: {
+      mainThreadTime: 413,
+      transferSize: 1550,
+    },
+  };
+  assert.deepStrictEqual(simplified, expected);
 });
