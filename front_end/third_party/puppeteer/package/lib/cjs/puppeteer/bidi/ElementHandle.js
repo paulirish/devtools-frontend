@@ -4,22 +4,6 @@
  * Copyright 2023 Google Inc.
  * SPDX-License-Identifier: Apache-2.0
  */
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
 var __runInitializers = (this && this.__runInitializers) || function (thisArg, initializers, value) {
     var useValue = arguments.length > 2;
     for (var i = 0; i < initializers.length; i++) {
@@ -54,17 +38,10 @@ var __esDecorate = (this && this.__esDecorate) || function (ctor, descriptorIn, 
     if (target) Object.defineProperty(target, contextIn.name, descriptor);
     done = true;
 };
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
 var __addDisposableResource = (this && this.__addDisposableResource) || function (env, value, async) {
     if (value !== null && value !== void 0) {
         if (typeof value !== "object" && typeof value !== "function") throw new TypeError("Object expected.");
-        var dispose;
+        var dispose, inner;
         if (async) {
             if (!Symbol.asyncDispose) throw new TypeError("Symbol.asyncDispose is not defined.");
             dispose = value[Symbol.asyncDispose];
@@ -72,8 +49,10 @@ var __addDisposableResource = (this && this.__addDisposableResource) || function
         if (dispose === void 0) {
             if (!Symbol.dispose) throw new TypeError("Symbol.dispose is not defined.");
             dispose = value[Symbol.dispose];
+            if (async) inner = dispose;
         }
         if (typeof dispose !== "function") throw new TypeError("Object not disposable.");
+        if (inner) dispose = function() { try { inner.call(this); } catch (e) { return Promise.reject(e); } };
         env.stack.push({ value: value, dispose: dispose, async: async });
     }
     else if (async) {
@@ -109,6 +88,7 @@ var __disposeResources = (this && this.__disposeResources) || (function (Suppres
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BidiElementHandle = void 0;
 const ElementHandle_js_1 = require("../api/ElementHandle.js");
+const environment_js_1 = require("../environment.js");
 const AsyncIterableUtil_js_1 = require("../util/AsyncIterableUtil.js");
 const decorators_js_1 = require("../util/decorators.js");
 const JSHandle_js_1 = require("./JSHandle.js");
@@ -116,7 +96,6 @@ const JSHandle_js_1 = require("./JSHandle.js");
  * @internal
  */
 let BidiElementHandle = (() => {
-    var _a;
     let _classSuper = ElementHandle_js_1.ElementHandle;
     let _instanceExtraInitializers = [];
     let _autofill_decorators;
@@ -125,7 +104,7 @@ let BidiElementHandle = (() => {
         static {
             const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
             _autofill_decorators = [(0, decorators_js_1.throwIfDisposed)()];
-            _contentFrame_decorators = [(0, decorators_js_1.throwIfDisposed)(), (_a = ElementHandle_js_1.ElementHandle).bindIsolatedHandle.bind(_a)];
+            _contentFrame_decorators = [(0, decorators_js_1.throwIfDisposed)(), ElementHandle_js_1.bindIsolatedHandle];
             __esDecorate(this, null, _autofill_decorators, { kind: "method", name: "autofill", static: false, private: false, access: { has: obj => "autofill" in obj, get: obj => obj.autofill }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _contentFrame_decorators, { kind: "method", name: "contentFrame", static: false, private: false, access: { has: obj => "contentFrame" in obj, get: obj => obj.contentFrame }, metadata: _metadata }, null, _instanceExtraInitializers);
             if (_metadata) Object.defineProperty(this, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
@@ -191,17 +170,7 @@ let BidiElementHandle = (() => {
         }
         async uploadFile(...files) {
             // Locate all files and confirm that they exist.
-            // eslint-disable-next-line @typescript-eslint/consistent-type-imports
-            let path;
-            try {
-                path = await Promise.resolve().then(() => __importStar(require('path')));
-            }
-            catch (error) {
-                if (error instanceof TypeError) {
-                    throw new Error(`JSHandle#uploadFile can only be used in Node-like environments.`);
-                }
-                throw error;
-            }
+            const path = environment_js_1.environment.value.path;
             files = files.map(file => {
                 if (path.win32.isAbsolute(file) || path.posix.isAbsolute(file)) {
                     return file;

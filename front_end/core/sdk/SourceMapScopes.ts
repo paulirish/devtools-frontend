@@ -20,10 +20,17 @@ import {TokenIterator} from './SourceMap.js';
 export interface OriginalScope {
   start: Position;
   end: Position;
-  kind: ScopeKind;
+
+  /**
+   * JavaScript-like languages are encouraged to use 'global', 'class', 'function' and 'block'.
+   * Other languages might require language-specific scope kinds, in which case we'll print the
+   * kind as-is.
+   */
+  kind: string;
   name?: string;
   variables: string[];
   children: OriginalScope[];
+  parent?: OriginalScope;
 }
 
 /**
@@ -35,9 +42,9 @@ export interface GeneratedRange {
   originalScope?: OriginalScope;
 
   /**
-   * Whether this generated range is an actual JavaScript scope in the generated code.
+   * Whether this generated range is an actual JavaScript function in the generated code.
    */
-  isScope: boolean;
+  isFunctionScope: boolean;
 
   /**
    * If this `GeneratedRange` is the result of inlining `originalScope`, then `callsite`
@@ -59,8 +66,6 @@ export interface GeneratedRange {
   values: (string|undefined|BindingRange[])[];
   children: GeneratedRange[];
 }
-
-export type ScopeKind = 'global'|'class'|'function'|'block';
 
 export interface BindingRange {
   value?: string;
@@ -90,12 +95,17 @@ function decodeOriginalScope(encodedOriginalScope: string, names: string[]): Ori
   const scopeForItemIndex = new Map<number, OriginalScope>();
   const scopeStack: OriginalScope[] = [];
   let line = 0;
+  let kindIdx = 0;
 
   for (const [index, item] of decodeOriginalScopeItems(encodedOriginalScope)) {
     line += item.line;
     const {column} = item;
     if (isStart(item)) {
-      const kind = decodeKind(item.kind);
+      kindIdx += item.kind;
+      const kind = resolveName(kindIdx, names);
+      if (kind === undefined) {
+        throw new Error(`Scope does not have a valid kind '${kind}'`);
+      }
       const name = resolveName(item.name, names);
       const variables = item.variables.map(idx => names[idx]);
       const scope: OriginalScope = {start: {line, column}, end: {line, column}, kind, name, variables, children: []};
@@ -112,6 +122,7 @@ function decodeOriginalScope(encodedOriginalScope: string, names: string[]): Ori
         // We are done. There might be more top-level scopes but we only allow one.
         return {root: scope, scopeForItemIndex};
       }
+      scope.parent = scopeStack[scopeStack.length - 1];
       scopeStack[scopeStack.length - 1].children.push(scope);
     }
   }
@@ -180,18 +191,23 @@ function*
 }
 
 export function decodeGeneratedRanges(
-    encodedGeneratedRange: string, originalScopeTrees: OriginalScopeTree[], names: string[]): GeneratedRange {
-  const rangeStack: GeneratedRange[] = [];
+    encodedGeneratedRange: string, originalScopeTrees: OriginalScopeTree[], names: string[]): GeneratedRange[] {
+  // We insert a pseudo range as there could be multiple top-level ranges and we need a root range those can be attached to.
+  const rangeStack: GeneratedRange[] = [{
+    start: {line: 0, column: 0},
+    end: {line: 0, column: 0},
+    isFunctionScope: false,
+    children: [],
+    values: [],
+  }];
   const rangeToStartItem = new Map<GeneratedRange, EncodedGeneratedRangeStart>();
 
   for (const item of decodeGeneratedRangeItems(encodedGeneratedRange)) {
     if (isRangeStart(item)) {
-      // TODO(crbug.com/40277685): Decode callsite and bindings.
-
       const range: GeneratedRange = {
         start: {line: item.line, column: item.column},
         end: {line: item.line, column: item.column},
-        isScope: Boolean(item.flags & EncodedGeneratedRangeFlag.IsScope),
+        isFunctionScope: Boolean(item.flags & EncodedGeneratedRangeFlag.IS_FUNCTION_SCOPE),
         values: [],
         children: [],
       };
@@ -229,15 +245,14 @@ export function decodeGeneratedRanges(
       }
       range.end = {line: item.line, column: item.column};
       resolveBindings(range, names, rangeToStartItem.get(range)?.bindings);
-
-      if (rangeStack.length === 0) {
-        // We are done. There might be more top-level scopes but we only allow one.
-        return range;
-      }
       rangeStack[rangeStack.length - 1].children.push(range);
     }
   }
-  throw new Error('Malformed generated range encoding');
+
+  if (rangeStack.length !== 1) {
+    throw new Error('Malformed generated range encoding');
+  }
+  return rangeStack[0].children;
 }
 
 function resolveBindings(
@@ -291,9 +306,9 @@ interface EncodedGeneratedRangeEnd {
 }
 
 export const enum EncodedGeneratedRangeFlag {
-  HasDefinition = 0x1,
-  HasCallsite = 0x2,
-  IsScope = 0x4,
+  HAS_DEFINITION = 0x1,
+  HAS_CALLSITE = 0x2,
+  IS_FUNCTION_SCOPE = 0x4,
 }
 
 function isRangeStart(item: EncodedGeneratedRangeStart|EncodedGeneratedRangeEnd): item is EncodedGeneratedRangeStart {
@@ -342,7 +357,7 @@ function*
       bindings: [],
     };
 
-    if (startItem.flags & EncodedGeneratedRangeFlag.HasDefinition) {
+    if (startItem.flags & EncodedGeneratedRangeFlag.HAS_DEFINITION) {
       const sourceIdx = iter.nextVLQ();
       const scopeIdx = iter.nextVLQ();
       state.defScopeIdx = scopeIdx + (sourceIdx === 0 ? state.defScopeIdx : 0);
@@ -353,7 +368,7 @@ function*
       };
     }
 
-    if (startItem.flags & EncodedGeneratedRangeFlag.HasCallsite) {
+    if (startItem.flags & EncodedGeneratedRangeFlag.HAS_CALLSITE) {
       const sourceIdx = iter.nextVLQ();
       const line = iter.nextVLQ();
       const column = iter.nextVLQ();
@@ -407,19 +422,4 @@ function resolveName(idx: number|undefined, names: string[]): string|undefined {
     return undefined;
   }
   return names[idx];
-}
-
-function decodeKind(kind: number): ScopeKind {
-  switch (kind) {
-    case 0x1:
-      return 'global';
-    case 0x2:
-      return 'function';
-    case 0x3:
-      return 'class';
-    case 0x4:
-      return 'block';
-    default:
-      throw new Error(`Unknown scope kind ${kind}`);
-  }
 }

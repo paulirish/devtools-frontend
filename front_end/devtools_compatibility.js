@@ -69,7 +69,7 @@ const DevToolsAPIImpl = class {
     if (callback) {
       this._callbacks[callId] = callback;
     }
-    const message = {'id': callId, 'method': method};
+    const message = {id: callId, method};
     if (args.length) {
       message.params = args;
     }
@@ -436,13 +436,11 @@ const EnumeratedHistogram = {
   RecordingReplayStarted: 'DevTools.RecordingReplayStarted',
   RecordingToggled: 'DevTools.RecordingToggled',
   SidebarPaneShown: 'DevTools.SidebarPaneShown',
-  SourcesSidebarTabShown: 'DevTools.Sources.SidebarTabShown',
   SourcesPanelFileDebugged: 'DevTools.SourcesPanelFileDebugged',
   SourcesPanelFileOpened: 'DevTools.SourcesPanelFileOpened',
   NetworkPanelResponsePreviewOpened: 'DevTools.NetworkPanelResponsePreviewOpened',
   StyleTextCopied: 'DevTools.StyleTextCopied',
   SyncSetting: 'DevTools.SyncSetting',
-  ColorConvertedFrom: 'DevTools.ColorConvertedFrom',
   ColorPickerOpenedFrom: 'DevTools.ColorPickerOpenedFrom',
   CSSPropertyDocumentation: 'DevTools.CSSPropertyDocumentation',
   SwatchActivated: 'DevTools.SwatchActivated',
@@ -452,8 +450,6 @@ const EnumeratedHistogram = {
   LegacyResourceTypeFilterItemSelected: 'DevTools.LegacyResourceTypeFilterItemSelected',
   ResourceTypeFilterNumberOfSelectedChanged: 'DevTools.ResourceTypeFilterNumberOfSelectedChanged',
   ResourceTypeFilterItemSelected: 'DevTools.ResourceTypeFilterItemSelected',
-  NetworkPanelMoreFiltersNumberOfSelectedChanged: 'DevTools.NetworkPanelMoreFiltersNumberOfSelectedChanged',
-  NetworkPanelMoreFiltersItemSelected: 'DevTools.NetworkPanelMoreFiltersItemSelected',
 };
 
 /**
@@ -642,7 +638,46 @@ const InspectorFrontendHostImpl = class {
    * @param {function(Object<string, Object<string, string|boolean>>):void} callback
    */
   getHostConfig(callback) {
-    DevToolsAPI.sendMessageToEmbedder('getHostConfig', [], /** @type {function(?Object)} */ (callback));
+    DevToolsAPI.sendMessageToEmbedder('getHostConfig', [], hostConfig => {
+      const majorVersion = getRemoteMajorVersion();
+      if (majorVersion && majorVersion < 129 && hostConfig?.aidaAvailability) {
+        return callback(this.hostConfigNewToOld(hostConfig));
+      }
+      return callback(hostConfig);
+    });
+  }
+
+  /**
+   * @param {Object<string, Object<string, string|boolean>>} newConfig
+   */
+  hostConfigNewToOld(newConfig) {
+    const devToolsConsoleInsights = {
+      enabled: (newConfig.devToolsConsoleInsights?.enabled && newConfig.aidaAvailability?.enabled) ?? false,
+      aidaModelId: newConfig.devToolsConsoleInsights?.modelId ?? '',
+      aidaTemperature: newConfig.devToolsConsoleInsights?.temperature ?? 0,
+      blockedByAge: newConfig.aidaAvailability?.blockedByAge ?? true,
+      blockedByEnterprisePolicy: newConfig.aidaAvailability?.blockedByEnterprisePolicy ?? true,
+      blockedByFeatureFlag:
+          (newConfig.devToolsConsoleInsights?.enabled && newConfig.aidaAvailability?.enabled) ?? false,
+      blockedByGeo: newConfig.aidaAvailability?.blockedByGeo ?? true,
+      blockedByRollout: false,
+      disallowLogging: newConfig.aidaAvailability?.disallowLogging ?? true,
+      optIn: false,
+    };
+    const devToolsFreestylerDogfood = {
+      enabled: (newConfig.devToolsFreestyler?.enabled && newConfig.aidaAvailability?.enabled) ?? false,
+      aidaModelId: newConfig.devToolsFreestyler?.modelId ?? '',
+      aidaTemperature: newConfig.devToolsFreestyler?.temperature ?? 0,
+      blockedByAge: newConfig.aidaAvailability?.blockedByAge ?? true,
+      blockedByEnterprisePolicy: newConfig.aidaAvailability?.blockedByEnterprisePolicy ?? true,
+      blockedByGeo: newConfig.aidaAvailability?.blockedByGeo ?? true,
+    };
+    return {
+      devToolsConsoleInsights,
+      devToolsFreestylerDogfood,
+      devToolsVeLogging: newConfig.devToolsVeLogging,
+      isOffTheRecord: newConfig.isOffTheRecord,
+    };
   }
 
   /**
@@ -1146,10 +1181,10 @@ const InspectorFrontendHostImpl = class {
 
   /**
    * @param {string} request
-   * @param {function(!InspectorFrontendHostAPI.DoAidaConversationResult): void} cb
+   * @param {function(!InspectorFrontendHostAPI.AidaClientResult): void} cb
    */
-  registerAidaClientEvent(request) {
-    DevToolsAPI.sendMessageToEmbedder('registerAidaClientEvent', [request]);
+  registerAidaClientEvent(request, cb) {
+    DevToolsAPI.sendMessageToEmbedder('registerAidaClientEvent', [request], cb);
   }
 };
 
@@ -1368,7 +1403,7 @@ function installObjectObserve() {
       scheduled = false;
       const changes = /** @type {!Array<!{name: string}>} */ ([]);
       changedProperties.forEach(function(name) {
-        changes.push({name: name});
+        changes.push({name});
       });
       changedProperties.clear();
       observer.call(null, changes);

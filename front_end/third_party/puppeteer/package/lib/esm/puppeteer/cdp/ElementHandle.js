@@ -37,8 +37,9 @@ var __esDecorate = (this && this.__esDecorate) || function (ctor, descriptorIn, 
     if (target) Object.defineProperty(target, contextIn.name, descriptor);
     done = true;
 };
-import { ElementHandle } from '../api/ElementHandle.js';
+import { bindIsolatedHandle, ElementHandle, } from '../api/ElementHandle.js';
 import { debugError } from '../common/util.js';
+import { environment } from '../environment.js';
 import { assert } from '../util/assert.js';
 import { AsyncIterableUtil } from '../util/AsyncIterableUtil.js';
 import { throwIfDisposed } from '../util/decorators.js';
@@ -52,7 +53,6 @@ const NON_ELEMENT_NODE_ROLES = new Set(['StaticText', 'InlineTextBox']);
  * @internal
  */
 let CdpElementHandle = (() => {
-    var _a, _b;
     let _classSuper = ElementHandle;
     let _instanceExtraInitializers = [];
     let _contentFrame_decorators;
@@ -63,8 +63,8 @@ let CdpElementHandle = (() => {
         static {
             const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
             _contentFrame_decorators = [throwIfDisposed()];
-            _scrollIntoView_decorators = [throwIfDisposed(), (_a = ElementHandle).bindIsolatedHandle.bind(_a)];
-            _uploadFile_decorators = [throwIfDisposed(), (_b = ElementHandle).bindIsolatedHandle.bind(_b)];
+            _scrollIntoView_decorators = [throwIfDisposed(), bindIsolatedHandle];
+            _uploadFile_decorators = [throwIfDisposed(), bindIsolatedHandle];
             _autofill_decorators = [throwIfDisposed()];
             __esDecorate(this, null, _contentFrame_decorators, { kind: "method", name: "contentFrame", static: false, private: false, access: { has: obj => "contentFrame" in obj, get: obj => obj.contentFrame }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _scrollIntoView_decorators, { kind: "method", name: "scrollIntoView", static: false, private: false, access: { has: obj => "scrollIntoView" in obj, get: obj => obj.scrollIntoView }, metadata: _metadata }, null, _instanceExtraInitializers);
@@ -119,16 +119,7 @@ let CdpElementHandle = (() => {
             });
             assert(filePaths.length <= 1 || isMultiple, 'Multiple file uploads only work with <input type=file multiple>');
             // Locate all files and confirm that they exist.
-            let path;
-            try {
-                path = await import('path');
-            }
-            catch (error) {
-                if (error instanceof TypeError) {
-                    throw new Error(`JSHandle#uploadFile can only be used in Node-like environments.`);
-                }
-                throw error;
-            }
+            const path = environment.value.path;
             const files = filePaths.map(filePath => {
                 if (path.win32.isAbsolute(filePath) || path.posix.isAbsolute(filePath)) {
                     return filePath;

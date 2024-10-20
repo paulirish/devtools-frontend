@@ -2,20 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import '../../../ui/components/icon_button/icon_button.js';
+import './ValueInterpreterDisplay.js';
+import './ValueInterpreterSettings.js';
+
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Platform from '../../../core/platform/platform.js';
-import * as IconButton from '../../../ui/components/icon_button/icon_button.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import linearMemoryValueInterpreterStyles from './linearMemoryValueInterpreter.css.js';
-import {type ValueDisplayData, ValueInterpreterDisplay} from './ValueInterpreterDisplay.js';
+import type {ValueDisplayData} from './ValueInterpreterDisplay.js';
 import {Endianness, type ValueType, type ValueTypeMode} from './ValueInterpreterDisplayUtils.js';
-import {
-  type TypeToggleEvent,
-  ValueInterpreterSettings,
-  type ValueInterpreterSettingsData,
-} from './ValueInterpreterSettings.js';
+import type {TypeToggleEvent, ValueInterpreterSettingsData} from './ValueInterpreterSettings.js';
 
 const UIStrings = {
   /**
@@ -63,10 +62,8 @@ export interface LinearMemoryValueInterpreterData {
 }
 
 export class LinearMemoryValueInterpreter extends HTMLElement {
-  static readonly litTagName = LitHtml.literal`devtools-linear-memory-inspector-interpreter`;
-
   readonly #shadow = this.attachShadow({mode: 'open'});
-  #endianness = Endianness.Little;
+  #endianness = Endianness.LITTLE;
   #buffer = new ArrayBuffer(0);
   #valueTypes: Set<ValueType> = new Set();
   #valueTypeModeConfig: Map<ValueType, ValueTypeMode> = new Map();
@@ -96,19 +93,19 @@ export class LinearMemoryValueInterpreter extends HTMLElement {
           <button data-settings="true" class="settings-toolbar-button ${this.#showSettings ? 'active' : ''}"
               title=${i18nString(UIStrings.toggleValueTypeSettings)} @click=${this.#onSettingsToggle}
               jslog=${VisualLogging.toggleSubpane('linear-memory-inspector.toggle-value-settings').track({click: true})}>
-            <${IconButton.Icon.Icon.litTagName} name=${this.#showSettings ? 'gear-filled' : 'gear'}></${IconButton.Icon.Icon.litTagName}>
+            <devtools-icon name=${this.#showSettings ? 'gear-filled' : 'gear'}></devtools-icon>
           </button>
         </div>
         <span class="divider"></span>
         <div>
           ${this.#showSettings ?
             html`
-              <${ValueInterpreterSettings.litTagName}
+              <devtools-linear-memory-inspector-interpreter-settings
                 .data=${{ valueTypes: this.#valueTypes } as ValueInterpreterSettingsData}
                 @typetoggle=${this.#onTypeToggle}>
-              </${ValueInterpreterSettings.litTagName}>` :
+              </devtools-linear-memory-inspector-interpreter-settings>` :
             html`
-              <${ValueInterpreterDisplay.litTagName}
+              <devtools-linear-memory-inspector-interpreter-display
                 .data=${{
                   buffer: this.#buffer,
                   valueTypes: this.#valueTypes,
@@ -116,7 +113,7 @@ export class LinearMemoryValueInterpreter extends HTMLElement {
                   valueTypeModes: this.#valueTypeModeConfig,
                   memoryLength: this.#memoryLength,
                 } as ValueDisplayData}>
-              </${ValueInterpreterDisplay.litTagName}>`}
+              </devtools-linear-memory-inspector-interpreter-display>`}
         </div>
       </div>
     `,
@@ -142,7 +139,7 @@ export class LinearMemoryValueInterpreter extends HTMLElement {
         jslog=${VisualLogging.dropDown('linear-memory-inspector.endianess').track({change: true})}
         style="border: none; background-color: transparent; cursor: pointer;"
         data-endianness="true" @change=${onEnumSettingChange}>
-        ${[Endianness.Little, Endianness.Big].map(endianness => {
+        ${[Endianness.LITTLE, Endianness.BIG].map(endianness => {
             return html`<option value=${endianness} .selected=${this.#endianness === endianness}
             jslog=${VisualLogging.item(Platform.StringUtilities.toKebabCase(endianness)).track({click: true})}>${
                 i18n.i18n.lockedString(endianness)}</option>`;

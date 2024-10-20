@@ -96,7 +96,7 @@ export class CommandMenu {
       keys: tags,
       title,
       shortcut: '',
-      jslogContext: setting.name,
+      jslogContext: Platform.StringUtilities.toKebabCase(`${setting.name}-${value}`),
       executeHandler: () => {
         if (setting.deprecation?.disabled &&
             (!setting.deprecation?.experiment || setting.deprecation.experiment.isEnabled())) {
@@ -107,9 +107,6 @@ export class CommandMenu {
 
         if (setting.name === 'emulate-page-focus') {
           Host.userMetrics.actionTaken(Host.UserMetrics.Action.ToggleEmulateFocusedPageFromCommandMenu);
-        }
-        if (setting.name === 'show-web-vitals') {
-          Host.userMetrics.actionTaken(Host.UserMetrics.Action.ToggleShowWebVitals);
         }
 
         if (reloadRequired) {
@@ -168,7 +165,7 @@ export class CommandMenu {
 
     const executeHandler = (): Promise<void> => {
       if (id === 'issues-pane') {
-        Host.userMetrics.issuesPanelOpenedFrom(Host.UserMetrics.IssueOpener.CommandMenu);
+        Host.userMetrics.issuesPanelOpenedFrom(Host.UserMetrics.IssueOpener.COMMAND_MENU);
       }
       return UI.ViewManager.ViewManager.instance().showView(id, /* userGesture */ true);
     };

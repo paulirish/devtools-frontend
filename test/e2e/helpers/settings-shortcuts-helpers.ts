@@ -2,15 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 import {assert} from 'chai';
-import {type ElementHandle} from 'puppeteer-core';
+import type {ElementHandle} from 'puppeteer-core';
+
 import {
   $$,
   $$textContent,
   click,
+  clickElement,
   platform,
   selectOption,
   waitFor,
-  clickElement,
   waitForElementsWithTextContent,
   waitForElementWithTextContent,
   waitForFunction,
@@ -27,6 +28,7 @@ const SHORTCUT_SELECT_TEXT = 'DevTools (Default)Visual Studio Code';
 export const ADD_SHORTCUT_LINK_TEXT = 'Add a shortcut';
 export const SHORTCUT_CHORD_TIMEOUT = 1000;
 
+/* eslint-disable @typescript-eslint/naming-convention */
 export let VS_CODE_SHORTCUTS_SHORTCUTS = ['CtrlKCtrlS'];
 export let VS_CODE_SETTINGS_SHORTCUTS = ['Shift?', 'Ctrl,'];
 export let VS_CODE_SHORTCUTS_QUICK_OPEN_TEXT = 'Show ShortcutsCtrl + K Ctrl + SSettings';
@@ -40,6 +42,7 @@ export let CONTROL_2_SHORTCUT_DISPLAY_TEXT = ['Ctrl2'];
 export let CONSOLE_SHORTCUT_INPUT_TEXT = ['Ctrl + `'];
 export let CONSOLE_SHORTCUT_DISPLAY_TEXT = ['Ctrl`'];
 export let CONTROL_ALT_C_SHORTCUT_INPUT_TEXT = ['Ctrl + Alt + C'];
+/* eslint-enable @typescript-eslint/naming-convention */
 if (platform === 'mac') {
   VS_CODE_SHORTCUTS_SHORTCUTS = ['⌘ K⌘ S'];
   VS_CODE_SETTINGS_SHORTCUTS = ['⇧ ?', '⌘ ,'];
@@ -113,7 +116,7 @@ export const clickAddShortcutLink = async () => {
   let addShortcutLinkElement;
   // the link container and the link have the same textContent, but only the latter has a click handler
   for (const matchingElement of addShortcutLinkTextMatches) {
-    if (await matchingElement.evaluate(element => element.matches('[role="link"]'))) {
+    if (await matchingElement.evaluate(element => element.matches('devtools-button'))) {
       addShortcutLinkElement = matchingElement;
       break;
     }

@@ -10,7 +10,7 @@ import * as EmulationModel from '../../models/emulation/emulation.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
 import {DeviceModeView} from './DeviceModeView.js';
-import {type InspectedPagePlaceholder} from './InspectedPagePlaceholder.js';
+import type {InspectedPagePlaceholder} from './InspectedPagePlaceholder.js';
 
 let deviceModeWrapperInstance: DeviceModeWrapper;
 
@@ -30,8 +30,8 @@ export class DeviceModeWrapper extends UI.Widget.VBox {
     this.showDeviceModeSetting.setRequiresUserAction(Boolean(Root.Runtime.Runtime.queryParam('hasOtherClients')));
     this.showDeviceModeSetting.addChangeListener(this.update.bind(this, false));
     SDK.TargetManager.TargetManager.instance().addModelListener(
-        SDK.OverlayModel.OverlayModel, SDK.OverlayModel.Events.ScreenshotRequested, this.screenshotRequestedFromOverlay,
-        this);
+        SDK.OverlayModel.OverlayModel, SDK.OverlayModel.Events.SCREENSHOT_REQUESTED,
+        this.screenshotRequestedFromOverlay, this);
     this.update(true);
   }
 

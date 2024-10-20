@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import type { BrowserConnectOptions } from '../common/ConnectOptions.js';
-import type { Product } from '../common/Product.js';
+import type { SupportedBrowser } from '../common/SupportedBrowser.js';
 /**
  * Launcher options that only apply to Chrome.
  *
@@ -62,9 +62,13 @@ export interface LaunchOptions {
      */
     channel?: ChromeReleaseChannel;
     /**
-     * Path to a browser executable to use instead of the bundled Chromium. Note
-     * that Puppeteer is only guaranteed to work with the bundled Chromium, so use
+     * Path to a browser executable to use instead of the bundled browser. Note
+     * that Puppeteer is only guaranteed to work with the bundled browser, so use
      * this setting at your own risk.
+     *
+     * @remarks
+     * When using this is recommended to set the `browser` property as well
+     * as Puppeteer will default to `chrome` by default.
      */
     executablePath?: string;
     /**
@@ -107,7 +111,9 @@ export interface LaunchOptions {
      */
     env?: Record<string, string | undefined>;
     /**
-     * Connect to a browser over a pipe instead of a WebSocket.
+     * Connect to a browser over a pipe instead of a WebSocket. Only supported
+     * with Chrome.
+     *
      * @defaultValue `false`
      */
     pipe?: boolean;
@@ -115,7 +121,7 @@ export interface LaunchOptions {
      * Which browser to launch.
      * @defaultValue `chrome`
      */
-    product?: Product;
+    browser?: SupportedBrowser;
     /**
      * {@link https://searchfox.org/mozilla-release/source/modules/libpref/init/all.js | Additional preferences } that can be passed when launching with Firefox.
      */

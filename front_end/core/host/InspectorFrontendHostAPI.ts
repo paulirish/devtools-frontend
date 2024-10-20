@@ -6,6 +6,7 @@ import type * as Platform from '../../core/platform/platform.js';
 import type * as Root from '../root/root.js';
 
 export enum Events {
+  /* eslint-disable @typescript-eslint/naming-convention -- Accessed from web_tests */
   AppendedToURL = 'appendedToURL',
   CanceledSaveURL = 'canceledSaveURL',
   ColorThemeChanged = 'colorThemeChanged',
@@ -34,6 +35,7 @@ export enum Events {
   SetInspectedTabId = 'setInspectedTabId',
   SetUseSoftMenu = 'setUseSoftMenu',
   ShowPanel = 'showPanel',
+  /* eslint-enable @typescript-eslint/naming-convention */
 }
 
 export const EventDescriptors = [
@@ -140,6 +142,12 @@ export interface DoAidaConversationResult {
   };
   netError?: number;
   netErrorName?: string;
+  error?: string;
+  detail?: string;
+}
+
+export interface AidaClientResult {
+  response?: string;
   error?: string;
   detail?: string;
 }
@@ -361,7 +369,7 @@ export interface InspectorFrontendHostAPI {
   initialTargetId(): Promise<string|null>;
 
   doAidaConversation: (request: string, streamId: number, cb: (result: DoAidaConversationResult) => void) => void;
-  registerAidaClientEvent: (request: string) => void;
+  registerAidaClientEvent: (request: string, cb: (result: AidaClientResult) => void) => void;
 
   recordImpression(event: ImpressionEvent): void;
   recordClick(event: ClickEvent): void;
@@ -375,6 +383,7 @@ export interface ContextMenuDescriptor {
   type: 'checkbox'|'item'|'separator'|'subMenu';
   id?: number;
   label?: string;
+  isExperimentalFeature?: boolean;
   enabled?: boolean;
   checked?: boolean;
   subItems?: ContextMenuDescriptor[];
@@ -417,6 +426,10 @@ export interface SyncInformation {
   accountEmail?: string;
   /** The image of the account used for syncing. Its a base64 encoded PNG */
   accountImage?: string;
+  /** The full name of the account used for syncing */
+  accountFullName?: string;
+  /** Whether Chrome Sync is paused, equivalent to the user being logged out automatically */
+  isSyncPaused?: boolean;
 }
 
 /**
@@ -427,6 +440,7 @@ export interface SyncInformation {
  * @readonly
  */
 export const enum EnumeratedHistogram {
+  /* eslint-disable @typescript-eslint/naming-convention -- Shadows a legacy enum */
   ActionTaken = 'DevTools.ActionTaken',
   PanelShown = 'DevTools.PanelShown',
   PanelShownInLocation = 'DevTools.PanelShownInLocation',
@@ -454,7 +468,6 @@ export const enum EnumeratedHistogram {
   RecordingReplaySpeed = 'DevTools.RecordingReplaySpeed',
   RecordingReplayStarted = 'DevTools.RecordingReplayStarted',
   RecordingToggled = 'DevTools.RecordingToggled',
-  SourcesSidebarTabShown = 'DevTools.Sources.SidebarTabShown',
   SourcesPanelFileDebugged = 'DevTools.SourcesPanelFileDebugged',
   SourcesPanelFileOpened = 'DevTools.SourcesPanelFileOpened',
   NetworkPanelResponsePreviewOpened = 'DevTools.NetworkPanelResponsePreviewOpened',
@@ -463,7 +476,6 @@ export const enum EnumeratedHistogram {
   CSSHintShown = 'DevTools.CSSHintShown',
   LighthouseModeRun = 'DevTools.LighthouseModeRun',
   LighthouseCategoryUsed = 'DevTools.LighthouseCategoryUsed',
-  ColorConvertedFrom = 'DevTools.ColorConvertedFrom',
   ColorPickerOpenedFrom = 'DevTools.ColorPickerOpenedFrom',
   CSSPropertyDocumentation = 'DevTools.CSSPropertyDocumentation',
   SwatchActivated = 'DevTools.SwatchActivated',
@@ -473,6 +485,5 @@ export const enum EnumeratedHistogram {
   LegacyResourceTypeFilterItemSelected = 'DevTools.LegacyResourceTypeFilterItemSelected',
   ResourceTypeFilterNumberOfSelectedChanged = 'DevTools.ResourceTypeFilterNumberOfSelectedChanged',
   ResourceTypeFilterItemSelected = 'DevTools.ResourceTypeFilterItemSelected',
-  NetworkPanelMoreFiltersNumberOfSelectedChanged = 'DevTools.NetworkPanelMoreFiltersNumberOfSelectedChanged',
-  NetworkPanelMoreFiltersItemSelected = 'DevTools.NetworkPanelMoreFiltersItemSelected',
+  /* eslint-disable @typescript-eslint/naming-convention -- Shadows a legacy enum */
 }

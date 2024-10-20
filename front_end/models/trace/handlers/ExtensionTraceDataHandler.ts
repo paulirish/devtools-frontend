@@ -5,20 +5,22 @@
 import * as Helpers from '../helpers/helpers.js';
 import * as Types from '../types/types.js';
 
-import {HandlerState, type TraceEventHandlerName} from './types.js';
+import {type HandlerName, HandlerState} from './types.js';
 import {data as userTimingsData} from './UserTimingsHandler.js';
 
-const extensionFlameChartEntries: Types.Extensions.SyntheticExtensionTrackChartEntry[] = [];
+const extensionFlameChartEntries: Types.Extensions.SyntheticExtensionTrackEntry[] = [];
 const extensionTrackData: Types.Extensions.ExtensionTrackData[] = [];
 const extensionMarkers: Types.Extensions.SyntheticExtensionMarker[] = [];
+const entryToNode: Map<Types.Events.Event, Helpers.TreeHelpers.TraceEntryNode> = new Map();
 
 export interface ExtensionTraceData {
   extensionTrackData: readonly Types.Extensions.ExtensionTrackData[];
   extensionMarkers: readonly Types.Extensions.SyntheticExtensionMarker[];
+  entryToNode: Map<Types.Events.Event, Helpers.TreeHelpers.TraceEntryNode>;
 }
 let handlerState = HandlerState.UNINITIALIZED;
 
-export function handleEvent(_event: Types.TraceEvents.TraceEventData): void {
+export function handleEvent(_event: Types.Events.Event): void {
   // Implementation not needed because data is sourced from UserTimingsHandler
 }
 
@@ -27,6 +29,7 @@ export function reset(): void {
   extensionFlameChartEntries.length = 0;
   extensionTrackData.length = 0;
   extensionMarkers.length = 0;
+  entryToNode.clear();
 }
 
 export async function finalize(): Promise<void> {
@@ -38,16 +41,16 @@ export async function finalize(): Promise<void> {
 }
 
 function createExtensionFlameChartEntries(): void {
-  const pairedMeasures: readonly Types.TraceEvents.SyntheticUserTimingPair[] = userTimingsData().performanceMeasures;
-  const marks: readonly Types.TraceEvents.TraceEventPerformanceMark[] = userTimingsData().performanceMarks;
+  const pairedMeasures: readonly Types.Events.SyntheticUserTimingPair[] = userTimingsData().performanceMeasures;
+  const marks: readonly Types.Events.PerformanceMark[] = userTimingsData().performanceMarks;
   const mergedRawExtensionEvents = Helpers.Trace.mergeEventsInOrder(pairedMeasures, marks);
 
   extractExtensionEntries(mergedRawExtensionEvents);
-  Helpers.Extensions.buildTrackDataFromExtensionEntries(extensionFlameChartEntries, extensionTrackData);
+  Helpers.Extensions.buildTrackDataFromExtensionEntries(extensionFlameChartEntries, extensionTrackData, entryToNode);
 }
 
-export function extractExtensionEntries(
-    timings: (Types.TraceEvents.SyntheticUserTimingPair|Types.TraceEvents.TraceEventPerformanceMark)[]): void {
+export function extractExtensionEntries(timings: (Types.Events.SyntheticUserTimingPair|Types.Events.PerformanceMark)[]):
+    void {
   for (const timing of timings) {
     const extensionPayload = extensionDataInTiming(timing);
     if (!extensionPayload) {
@@ -57,31 +60,40 @@ export function extractExtensionEntries(
 
     const extensionSyntheticEntry = {
       name: timing.name,
-      ph: Types.TraceEvents.Phase.COMPLETE,
-      pid: Types.TraceEvents.ProcessID(0),
-      tid: Types.TraceEvents.ThreadID(0),
+      ph: Types.Events.Phase.COMPLETE,
+      pid: Types.Events.ProcessID(0),
+      tid: Types.Events.ThreadID(0),
       ts: timing.ts,
-      selfTime: Types.Timing.MicroSeconds(0),
       dur: timing.dur as Types.Timing.MicroSeconds,
       cat: 'devtools.extension',
       args: extensionPayload,
+      rawSourceEvent: Types.Events.isSyntheticUserTiming(timing) ? timing.rawSourceEvent : timing,
     };
+
     if (Types.Extensions.isExtensionPayloadMarker(extensionPayload)) {
-      extensionMarkers.push(extensionSyntheticEntry as Types.Extensions.SyntheticExtensionMarker);
+      const extensionMarker =
+          Helpers.SyntheticEvents.SyntheticEventsManager.getActiveManager()
+              .registerSyntheticEvent<Types.Extensions.SyntheticExtensionMarker>(
+                  extensionSyntheticEntry as Omit<Types.Extensions.SyntheticExtensionMarker, '_tag'>);
+      extensionMarkers.push(extensionMarker);
       continue;
     }
-    if (Types.Extensions.isExtensionPayloadTrackEntry(extensionPayload)) {
-      extensionFlameChartEntries.push(extensionSyntheticEntry as Types.Extensions.SyntheticExtensionTrackChartEntry);
+
+    if (Types.Extensions.isExtensionPayloadTrackEntry(extensionSyntheticEntry.args)) {
+      const extensionTrackEntry =
+          Helpers.SyntheticEvents.SyntheticEventsManager.getActiveManager()
+              .registerSyntheticEvent<Types.Extensions.SyntheticExtensionTrackEntry>(
+                  extensionSyntheticEntry as Omit<Types.Extensions.SyntheticExtensionTrackEntry, '_tag'>);
+      extensionFlameChartEntries.push(extensionTrackEntry);
       continue;
     }
   }
 }
 
-export function extensionDataInTiming(timing: Types.TraceEvents.SyntheticUserTimingPair|
-                                      Types.TraceEvents.TraceEventPerformanceMark):
-    Types.Extensions.ExtensionDataPayload|null {
-  const timingDetail = Types.TraceEvents.isTraceEventPerformanceMark(timing) ? timing.args.data?.detail :
-                                                                               timing.args.data.beginEvent.args.detail;
+export function extensionDataInTiming(timing: Types.Events.SyntheticUserTimingPair|
+                                      Types.Events.PerformanceMark): Types.Extensions.ExtensionDataPayload|null {
+  const timingDetail =
+      Types.Events.isPerformanceMark(timing) ? timing.args.data?.detail : timing.args.data.beginEvent.args.detail;
   if (!timingDetail) {
     return null;
   }
@@ -113,11 +125,12 @@ export function data(): ExtensionTraceData {
   }
 
   return {
+    entryToNode,
     extensionTrackData: [...extensionTrackData],
     extensionMarkers: [...extensionMarkers],
   };
 }
 
-export function deps(): TraceEventHandlerName[] {
+export function deps(): HandlerName[] {
   return ['UserTimings'];
 }

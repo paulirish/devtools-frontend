@@ -1,6 +1,6 @@
 {
   "name": "puppeteer-core",
-  "version": "22.12.1",
+  "version": "23.6.0",
   "description": "A high-level API to control headless Chrome over the DevTools Protocol",
   "keywords": [
     "puppeteer",
@@ -11,6 +11,7 @@
   "type": "commonjs",
   "main": "./lib/cjs/puppeteer/puppeteer-core.js",
   "types": "./lib/types.d.ts",
+  "browser": "./lib/esm/puppeteer/puppeteer-core-browser.js",
   "exports": {
     ".": {
       "types": "./lib/types.d.ts",
@@ -54,7 +55,8 @@
     "build": {
       "dependencies": [
         "build:tsc",
-        "build:types"
+        "build:types",
+        "build:es5"
       ]
     },
     "build:docs": {
@@ -82,6 +84,19 @@
       ],
       "output": [
         "lib/{cjs,esm}/**"
+      ]
+    },
+    "build:es5": {
+      "command": "rollup -c rollup.config.mjs && node ../../tools/patch.mjs lib/es5-iife/puppeteer-core-browser.js lib/es5-iife/puppeteer-core-browser.d.ts lib/types.d.ts",
+      "files": [
+        "rollup.config.mjs"
+      ],
+      "output": [
+        "lib/es5-iife/puppeteer-core-browser.js"
+      ],
+      "dependencies": [
+        "build:tsc",
+        "build:types"
       ]
     },
     "build:types": {
@@ -119,17 +134,18 @@
   "author": "The Chromium Authors",
   "license": "Apache-2.0",
   "dependencies": {
-    "@puppeteer/browsers": "2.2.3",
-    "chromium-bidi": "0.5.24",
-    "debug": "^4.3.5",
-    "devtools-protocol": "0.0.1299070",
-    "ws": "^8.17.1"
+    "@puppeteer/browsers": "2.4.0",
+    "chromium-bidi": "0.8.0",
+    "debug": "^4.3.7",
+    "devtools-protocol": "0.0.1354347",
+    "typed-query-selector": "^2.12.0",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@types/chrome": "0.0.277",
     "@types/debug": "4.1.12",
     "@types/node": "18.17.15",
-    "@types/chrome": "0.0.268",
-    "@types/ws": "8.5.10",
+    "@types/ws": "8.5.12",
     "mitt": "3.0.1",
     "parsel-js": "1.1.2",
     "rxjs": "7.8.1"

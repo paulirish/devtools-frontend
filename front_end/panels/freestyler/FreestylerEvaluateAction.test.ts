@@ -10,9 +10,17 @@ import * as Freestyler from './FreestylerEvaluateAction.js';
 
 describe('FreestylerEvaluateAction', () => {
   describe('error handling', () => {
-    function executeWithResult(mockResult: SDK.RuntimeModel.EvaluationResult): Promise<string> {
+    function executeWithResult(
+        mockResult: SDK.RuntimeModel.EvaluationResult, pausedOnBreakpoint = false): Promise<string> {
       const executionContextStub = sinon.createStubInstance(SDK.RuntimeModel.ExecutionContext);
+      executionContextStub.debuggerModel = sinon.createStubInstance(SDK.DebuggerModel.DebuggerModel);
+      if (pausedOnBreakpoint) {
+        executionContextStub.debuggerModel.selectedCallFrame = () => {
+          return sinon.createStubInstance(SDK.DebuggerModel.CallFrame);
+        };
+      }
       executionContextStub.evaluate.resolves(mockResult);
+      executionContextStub.runtimeModel = sinon.createStubInstance(SDK.RuntimeModel.RuntimeModel);
       return Freestyler.FreestylerEvaluateAction.execute('', executionContextStub, {throwOnSideEffect: false});
     }
 
@@ -43,9 +51,20 @@ describe('FreestylerEvaluateAction', () => {
     it('should throw an ExecutionError when the page returned with an error message', async () => {
       try {
         await executeWithResult({error: 'errorMessage'});
+        assert.fail('not reachable');
       } catch (err) {
         assert.instanceOf(err, Freestyler.ExecutionError);
         assert.strictEqual(err.message, 'errorMessage');
+      }
+    });
+
+    it('should throw an ExecutionError when the debugger is paused', async () => {
+      try {
+        await executeWithResult({error: 'errorMessage'}, true);
+        assert.fail('not reachable');
+      } catch (err) {
+        assert.instanceOf(err, Freestyler.ExecutionError);
+        assert.strictEqual(err.message, 'Cannot evaluate JavaScript because the execution is paused on a breakpoint.');
       }
     });
 
@@ -56,6 +75,7 @@ describe('FreestylerEvaluateAction', () => {
              object: mockRemoteObject(),
              exceptionDetails: mockExceptionDetails({description: 'Error description'}),
            });
+           assert.fail('not reachable');
          } catch (err) {
            assert.instanceOf(err, Freestyler.ExecutionError);
            assert.strictEqual(err.message, 'Error description');
@@ -69,6 +89,7 @@ describe('FreestylerEvaluateAction', () => {
              object: mockRemoteObject(),
              exceptionDetails: mockExceptionDetails({description: 'EvalError: Possible side-effect in debug-evaluate'}),
            });
+           assert.fail('not reachable');
          } catch (err) {
            assert.instanceOf(err, Freestyler.SideEffectError);
            assert.strictEqual(err.message, 'EvalError: Possible side-effect in debug-evaluate');
@@ -85,8 +106,9 @@ describe('FreestylerEvaluateAction', () => {
     }
 
     async function executeForTest(code: string) {
+      const actionExpression = `const scope = {$0, $1, getEventListeners}; with (scope) {${code}}`;
       return Freestyler.FreestylerEvaluateAction.execute(
-          code, await executionContextForTest(), {throwOnSideEffect: false});
+          actionExpression, await executionContextForTest(), {throwOnSideEffect: false});
     }
 
     it('should serialize primitive values correctly', async () => {
@@ -158,11 +180,11 @@ describe('FreestylerEvaluateAction', () => {
     });
 
     it('should serialize objects correctly', async () => {
-      assert.strictEqual(await executeForTest('{const object = {key: "str"}; object}'), '{"key":"str"}');
+      assert.strictEqual(await executeForTest('const object = {key: "str"}; object;'), '{"key":"str"}');
       assert.strictEqual(
-          await executeForTest('{const object = {key: "str", secondKey: "str2"}; object}'),
+          await executeForTest('const object = {key: "str", secondKey: "str2"}; object;'),
           '{"key":"str","secondKey":"str2"}');
-      assert.strictEqual(await executeForTest('{const object = {key: 1}; object}'), '{"key":1}');
+      assert.strictEqual(await executeForTest('const object = {key: 1}; object;'), '{"key":1}');
     });
 
     it('should not continue serializing cycles', async () => {
@@ -170,7 +192,7 @@ describe('FreestylerEvaluateAction', () => {
           await executeForTest(`{
         const obj = { a: 1 };
         obj.itself = obj;
-        obj
+        obj;
       }`),
           '{"a":1,"itself":"(cycle)"}');
     });

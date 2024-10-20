@@ -53,8 +53,8 @@ export class KeyboardShortcut {
   }
 
   isDefault(): boolean {
-    return this.type === Type.DefaultShortcut || this.type === Type.DisabledDefault ||
-        (this.type === Type.KeybindSetShortcut && this.keybindSets.has(DefaultShortcutSetting));
+    return this.type === Type.DEFAULT_SHORTCUT || this.type === Type.DISABLED_DEFAULT ||
+        (this.type === Type.KEYBIND_SET_SHORTCUT && this.keybindSets.has(DefaultShortcutSetting));
   }
 
   changeType(type: Type): KeyboardShortcut {
@@ -142,6 +142,10 @@ export class KeyboardShortcut {
   static hasNoModifiers(event: Event): boolean {
     const keyboardEvent = (event as KeyboardEvent);
     return !keyboardEvent.ctrlKey && !keyboardEvent.shiftKey && !keyboardEvent.altKey && !keyboardEvent.metaKey;
+  }
+
+  static hasAtLeastOneModifier(event: Event): boolean {
+    return KeyboardShortcut.hasNoModifiers(event) === false;
   }
 
   static makeDescriptor(key: string|Key, modifiers?: number): Descriptor {
@@ -352,11 +356,11 @@ export const Keys: {
 };
 
 export const enum Type {
-  UserShortcut = 'UserShortcut',
-  DefaultShortcut = 'DefaultShortcut',
-  DisabledDefault = 'DisabledDefault',
-  UnsetShortcut = 'UnsetShortcut',
-  KeybindSetShortcut = 'KeybindSetShortcut',
+  USER_SHORTCUT = 'UserShortcut',
+  DEFAULT_SHORTCUT = 'DefaultShortcut',
+  DISABLED_DEFAULT = 'DisabledDefault',
+  UNSET_SHORTCUT = 'UnsetShortcut',
+  KEYBIND_SET_SHORTCUT = 'KeybindSetShortcut',
 }
 
 export const KeyBindings: {

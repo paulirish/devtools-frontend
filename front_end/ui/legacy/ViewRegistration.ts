@@ -6,9 +6,9 @@ import * as i18n from '../../core/i18n/i18n.js';
 import type * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 
-import {type ViewLocationResolver} from './View.js';
+import type {ViewLocationResolver} from './View.js';
 import {PreRegisteredView} from './ViewManager.js';
-import {type Widget} from './Widget.js';
+import type {Widget} from './Widget.js';
 
 const UIStrings = {
   /**
@@ -166,7 +166,7 @@ export function registerViewExtension(registration: ViewRegistration): void {
   registeredViewExtensions.push(new PreRegisteredView(registration));
 }
 
-export function getRegisteredViewExtensions(config?: Root.Runtime.HostConfig): Array<PreRegisteredView> {
+export function getRegisteredViewExtensions(config: Root.Runtime.HostConfig): Array<PreRegisteredView> {
   return registeredViewExtensions.filter(
       view => Root.Runtime.Runtime.isDescriptorEnabled(
           {experiment: view.experiment(), condition: view.condition()}, config));

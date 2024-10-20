@@ -14,7 +14,7 @@ import * as UI from '../../ui/legacy/legacy.js';
 import {IndexedDBTreeElement} from './ApplicationPanelSidebar.js';
 import {ExpandableApplicationPanelTreeElement} from './ApplicationPanelTreeElement.js';
 import {StorageMetadataView} from './components/components.js';
-import {type ResourcesPanel} from './ResourcesPanel.js';
+import type {ResourcesPanel} from './ResourcesPanel.js';
 import {ServiceWorkerCacheTreeElement} from './ServiceWorkerCacheTreeElement.js';
 
 const UIStrings = {
@@ -41,13 +41,13 @@ export class StorageBucketsTreeParentElement extends ExpandableApplicationPanelT
 
   initialize(): void {
     SDK.TargetManager.TargetManager.instance().addModelListener(
-        SDK.StorageBucketsModel.StorageBucketsModel, SDK.StorageBucketsModel.Events.BucketAdded, this.bucketAdded,
+        SDK.StorageBucketsModel.StorageBucketsModel, SDK.StorageBucketsModel.Events.BUCKET_ADDED, this.bucketAdded,
         this);
     SDK.TargetManager.TargetManager.instance().addModelListener(
-        SDK.StorageBucketsModel.StorageBucketsModel, SDK.StorageBucketsModel.Events.BucketRemoved, this.bucketRemoved,
+        SDK.StorageBucketsModel.StorageBucketsModel, SDK.StorageBucketsModel.Events.BUCKET_REMOVED, this.bucketRemoved,
         this);
     SDK.TargetManager.TargetManager.instance().addModelListener(
-        SDK.StorageBucketsModel.StorageBucketsModel, SDK.StorageBucketsModel.Events.BucketChanged, this.bucketChanged,
+        SDK.StorageBucketsModel.StorageBucketsModel, SDK.StorageBucketsModel.Events.BUCKET_CHANGED, this.bucketChanged,
         this);
 
     for (const bucketsModel of SDK.TargetManager.TargetManager.instance().models(

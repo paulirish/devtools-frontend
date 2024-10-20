@@ -36,7 +36,7 @@ import type * as ProtocolProxyApi from '../../generated/protocol-proxy-api.js';
 import * as Protocol from '../../generated/protocol.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as Common from '../common/common.js';
-import {type Serializer} from '../common/Settings.js';
+import type {Serializer} from '../common/Settings.js';
 import * as Host from '../host/host.js';
 import * as i18n from '../i18n/i18n.js';
 import * as Platform from '../platform/platform.js';
@@ -188,8 +188,8 @@ export class NetworkManager extends SDKModel<EventTypes> {
     if (!manager || !requestId || request.isRedirect()) {
       return [];
     }
-    const response = await manager.#networkAgent.invoke_searchInResponseBody(
-        {requestId, query: query, caseSensitive: caseSensitive, isRegex: isRegex});
+    const response =
+        await manager.#networkAgent.invoke_searchInResponseBody({requestId, query, caseSensitive, isRegex});
     return TextUtils.TextUtils.performSearchInSearchMatches(response.result || [], query, caseSensitive, isRegex);
   }
 
@@ -198,7 +198,7 @@ export class NetworkManager extends SDKModel<EventTypes> {
       return {error: i18nString(UIStrings.noContentForWebSocket)};
     }
     if (!request.finished) {
-      await request.once(NetworkRequestEvents.FinishedLoading);
+      await request.once(NetworkRequestEvents.FINISHED_LOADING);
     }
     if (request.isRedirect()) {
       return {error: i18nString(UIStrings.noContentForRedirect)};
@@ -352,6 +352,7 @@ export class NetworkManager extends SDKModel<EventTypes> {
 }
 
 export enum Events {
+  /* eslint-disable @typescript-eslint/naming-convention -- Used by web_tests. */
   RequestStarted = 'RequestStarted',
   RequestUpdated = 'RequestUpdated',
   RequestFinished = 'RequestFinished',
@@ -363,6 +364,7 @@ export enum Events {
   ReportingApiReportAdded = 'ReportingApiReportAdded',
   ReportingApiReportUpdated = 'ReportingApiReportUpdated',
   ReportingApiEndpointsChangedForOrigin = 'ReportingApiEndpointsChangedForOrigin',
+  /* eslint-enable @typescript-eslint/naming-convention */
 }
 
 export interface RequestStartedEvent {
@@ -418,6 +420,7 @@ export const OfflineConditions: Conditions = {
   latency: 0,
 };
 
+const slow3GTargetLatency = 400;
 export const Slow3GConditions: Conditions = {
   title: i18nLazyString(UIStrings.slowG),
   i18nTitleKey: UIStrings.slowG,
@@ -426,11 +429,13 @@ export const Slow3GConditions: Conditions = {
   // ~500Kbps up
   upload: 500 * 1000 / 8 * .8,
   // 400ms RTT
-  latency: 400 * 5,
+  latency: slow3GTargetLatency * 5,
+  targetLatency: slow3GTargetLatency,
 };
 
 // Note for readers: this used to be called "Fast 3G" but it was renamed in May
 // 2024 to align with LH (crbug.com/342406608).
+const slow4GTargetLatency = 150;
 export const Slow4GConditions: Conditions = {
   title: i18nLazyString(UIStrings.fastG),
   i18nTitleKey: UIStrings.fastG,
@@ -439,9 +444,11 @@ export const Slow4GConditions: Conditions = {
   // ~0.75 Mbps up
   upload: 750 * 1000 / 8 * .9,
   // 150ms RTT
-  latency: 150 * 3.75,
+  latency: slow4GTargetLatency * 3.75,
+  targetLatency: slow4GTargetLatency,
 };
 
+const fast4GTargetLatency = 60;
 export const Fast4GConditions: Conditions = {
   title: i18nLazyString(UIStrings.fast4G),
   i18nTitleKey: UIStrings.fast4G,
@@ -450,7 +457,8 @@ export const Fast4GConditions: Conditions = {
   // 1.5 Mbps up
   upload: 1.5 * 1000 * 1000 / 8 * .9,
   // 60ms RTT
-  latency: 60 * 2.75,
+  latency: fast4GTargetLatency * 2.75,
+  targetLatency: fast4GTargetLatency,
 };
 
 const MAX_EAGER_POST_REQUEST_BODY_LENGTH = 64 * 1024;  // bytes
@@ -504,7 +512,7 @@ export class NetworkDispatcher implements ProtocolProxyApi.NetworkDispatcher {
     this.#requestIdToTrustTokenEvent = new Map();
 
     MultitargetNetworkManager.instance().addEventListener(
-        MultitargetNetworkManager.Events.RequestIntercepted, this.#markAsIntercepted.bind(this));
+        MultitargetNetworkManager.Events.REQUEST_INTERCEPTED, this.#markAsIntercepted.bind(this));
   }
 
   #markAsIntercepted(event: Common.EventTarget.EventTargetEvent<string>): void {
@@ -519,7 +527,7 @@ export class NetworkDispatcher implements ProtocolProxyApi.NetworkDispatcher {
     for (const name in headersMap) {
       const values = headersMap[name].split('\n');
       for (let i = 0; i < values.length; ++i) {
-        result.push({name: name, value: values[i]});
+        result.push({name, value: values[i]});
       }
     }
     return result;
@@ -756,7 +764,7 @@ export class NetworkDispatcher implements ProtocolProxyApi.NetworkDispatcher {
       const eventData: RequestUpdateDroppedEventData = {
         url: response.url as Platform.DevToolsPath.UrlString,
         frameId: frameId ?? null,
-        loaderId: loaderId,
+        loaderId,
         resourceType: type,
         mimeType: response.mimeType,
         lastModified: lastModifiedHeader ? new Date(lastModifiedHeader) : null,
@@ -820,8 +828,7 @@ export class NetworkDispatcher implements ProtocolProxyApi.NetworkDispatcher {
       networkRequest.setBlockedReason(blockedReason);
       if (blockedReason === Protocol.Network.BlockedReason.Inspector) {
         const message = i18nString(UIStrings.requestWasBlockedByDevtoolsS, {PH1: networkRequest.url()});
-        this.#manager.dispatchEventToListeners(
-            Events.MessageGenerated, {message: message, requestId: requestId, warning: true});
+        this.#manager.dispatchEventToListeners(Events.MessageGenerated, {message, requestId, warning: true});
       }
     }
     if (corsErrorStatus) {
@@ -1112,7 +1119,7 @@ export class NetworkDispatcher implements ProtocolProxyApi.NetworkDispatcher {
       }
 
       this.#manager.dispatchEventToListeners(
-          Events.MessageGenerated, {message: message, requestId: networkRequest.requestId(), warning: false});
+          Events.MessageGenerated, {message, requestId: networkRequest.requestId(), warning: false});
     }
   }
 
@@ -1413,7 +1420,7 @@ export class MultitargetNetworkManager extends Common.ObjectWrapper.ObjectWrappe
     for (const agent of this.#networkAgents) {
       this.updateNetworkConditions(agent);
     }
-    this.dispatchEventToListeners(MultitargetNetworkManager.Events.ConditionsChanged);
+    this.dispatchEventToListeners(MultitargetNetworkManager.Events.CONDITIONS_CHANGED);
   }
 
   networkConditions(): Conditions {
@@ -1458,7 +1465,7 @@ export class MultitargetNetworkManager extends Common.ObjectWrapper.ObjectWrappe
     const userAgent = this.currentUserAgent();
     for (const agent of this.#networkAgents) {
       void agent.invoke_setUserAgentOverride(
-          {userAgent: userAgent, userAgentMetadata: this.#userAgentMetadataOverride || undefined});
+          {userAgent, userAgentMetadata: this.#userAgentMetadataOverride || undefined});
     }
   }
 
@@ -1473,7 +1480,7 @@ export class MultitargetNetworkManager extends Common.ObjectWrapper.ObjectWrappe
     }
 
     if (uaChanged) {
-      this.dispatchEventToListeners(MultitargetNetworkManager.Events.UserAgentChanged);
+      this.dispatchEventToListeners(MultitargetNetworkManager.Events.USER_AGENT_CHANGED);
     }
   }
 
@@ -1491,13 +1498,13 @@ export class MultitargetNetworkManager extends Common.ObjectWrapper.ObjectWrappe
   setCustomAcceptedEncodingsOverride(acceptedEncodings: Protocol.Network.ContentEncoding[]): void {
     this.#customAcceptedEncodings = acceptedEncodings;
     this.updateAcceptedEncodingsOverride();
-    this.dispatchEventToListeners(MultitargetNetworkManager.Events.AcceptedEncodingsChanged);
+    this.dispatchEventToListeners(MultitargetNetworkManager.Events.ACCEPTED_ENCODINGS_CHANGED);
   }
 
   clearCustomAcceptedEncodingsOverride(): void {
     this.#customAcceptedEncodings = null;
     this.updateAcceptedEncodingsOverride();
-    this.dispatchEventToListeners(MultitargetNetworkManager.Events.AcceptedEncodingsChanged);
+    this.dispatchEventToListeners(MultitargetNetworkManager.Events.ACCEPTED_ENCODINGS_CHANGED);
   }
 
   isAcceptedEncodingOverrideSet(): boolean {
@@ -1531,7 +1538,7 @@ export class MultitargetNetworkManager extends Common.ObjectWrapper.ObjectWrappe
   setBlockedPatterns(patterns: BlockedPattern[]): void {
     this.#blockedPatternsSetting.set(patterns);
     this.updateBlockedPatterns();
-    this.dispatchEventToListeners(MultitargetNetworkManager.Events.BlockedPatternsChanged);
+    this.dispatchEventToListeners(MultitargetNetworkManager.Events.BLOCKED_PATTERNS_CHANGED);
   }
 
   setBlockingEnabled(enabled: boolean): void {
@@ -1540,7 +1547,7 @@ export class MultitargetNetworkManager extends Common.ObjectWrapper.ObjectWrappe
     }
     this.#blockingEnabledSetting.set(enabled);
     this.updateBlockedPatterns();
-    this.dispatchEventToListeners(MultitargetNetworkManager.Events.BlockedPatternsChanged);
+    this.dispatchEventToListeners(MultitargetNetworkManager.Events.BLOCKED_PATTERNS_CHANGED);
   }
 
   private updateBlockedPatterns(): void {
@@ -1593,7 +1600,7 @@ export class MultitargetNetworkManager extends Common.ObjectWrapper.ObjectWrappe
     for (const agent of this.#fetchAgents) {
       promises.push(agent.invoke_enable({patterns: this.#urlsForRequestInterceptor.valuesArray()}));
     }
-    this.dispatchEventToListeners(MultitargetNetworkManager.Events.InterceptorsChanged);
+    this.dispatchEventToListeners(MultitargetNetworkManager.Events.INTERCEPTORS_CHANGED);
     await Promise.all(promises);
   }
 
@@ -1602,7 +1609,7 @@ export class MultitargetNetworkManager extends Common.ObjectWrapper.ObjectWrappe
       await requestInterceptor(interceptedRequest);
       if (interceptedRequest.hasResponded() && interceptedRequest.networkRequest) {
         this.dispatchEventToListeners(
-            MultitargetNetworkManager.Events.RequestIntercepted, interceptedRequest.networkRequest.requestId());
+            MultitargetNetworkManager.Events.REQUEST_INTERCEPTED, interceptedRequest.networkRequest.requestId());
         return;
       }
     }
@@ -1665,23 +1672,23 @@ export class MultitargetNetworkManager extends Common.ObjectWrapper.ObjectWrappe
 
 export namespace MultitargetNetworkManager {
   export const enum Events {
-    BlockedPatternsChanged = 'BlockedPatternsChanged',
-    ConditionsChanged = 'ConditionsChanged',
-    UserAgentChanged = 'UserAgentChanged',
-    InterceptorsChanged = 'InterceptorsChanged',
-    AcceptedEncodingsChanged = 'AcceptedEncodingsChanged',
-    RequestIntercepted = 'RequestIntercepted',
-    RequestFulfilled = 'RequestFulfilled',
+    BLOCKED_PATTERNS_CHANGED = 'BlockedPatternsChanged',
+    CONDITIONS_CHANGED = 'ConditionsChanged',
+    USER_AGENT_CHANGED = 'UserAgentChanged',
+    INTERCEPTORS_CHANGED = 'InterceptorsChanged',
+    ACCEPTED_ENCODINGS_CHANGED = 'AcceptedEncodingsChanged',
+    REQUEST_INTERCEPTED = 'RequestIntercepted',
+    REQUEST_FULFILLED = 'RequestFulfilled',
   }
 
   export type EventTypes = {
-    [Events.BlockedPatternsChanged]: void,
-    [Events.ConditionsChanged]: void,
-    [Events.UserAgentChanged]: void,
-    [Events.InterceptorsChanged]: void,
-    [Events.AcceptedEncodingsChanged]: void,
-    [Events.RequestIntercepted]: string,
-    [Events.RequestFulfilled]: Platform.DevToolsPath.UrlString,
+    [Events.BLOCKED_PATTERNS_CHANGED]: void,
+    [Events.CONDITIONS_CHANGED]: void,
+    [Events.USER_AGENT_CHANGED]: void,
+    [Events.INTERCEPTORS_CHANGED]: void,
+    [Events.ACCEPTED_ENCODINGS_CHANGED]: void,
+    [Events.REQUEST_INTERCEPTED]: string,
+    [Events.REQUEST_FULFILLED]: Platform.DevToolsPath.UrlString,
   };
 }
 
@@ -1799,7 +1806,7 @@ export class InterceptedRequest {
 
     void this.#fetchAgent.invoke_fulfillRequest({requestId: this.requestId, responseCode, body, responseHeaders});
     MultitargetNetworkManager.instance().dispatchEventToListeners(
-        MultitargetNetworkManager.Events.RequestFulfilled, this.request.url as Platform.DevToolsPath.UrlString);
+        MultitargetNetworkManager.Events.REQUEST_FULFILLED, this.request.url as Platform.DevToolsPath.UrlString);
   }
 
   continueRequestWithoutChange(): void {
@@ -1948,7 +1955,7 @@ class ExtraInfoBuilder {
   }
 }
 
-SDKModel.register(NetworkManager, {capabilities: Capability.Network, autostart: true});
+SDKModel.register(NetworkManager, {capabilities: Capability.NETWORK, autostart: true});
 
 export class ConditionsSerializer implements Serializer<Conditions, Conditions> {
   stringify(value: unknown): string {
@@ -2001,6 +2008,12 @@ export interface Conditions {
   // should not be irrecoverably baked, just in case the string changes
   // (or the user switches locales).
   i18nTitleKey?: string;
+  /**
+   * RTT values are multiplied by adjustment factors to make DevTools' emulation more accurate.
+   * This value represents the RTT value *before* the adjustment factor is applied.
+   * @see https://docs.google.com/document/d/10lfVdS1iDWCRKQXPfbxEn4Or99D64mvNlugP1AQuFlE/edit for historical context.
+   */
+  targetLatency?: number;
 }
 
 export interface BlockedPattern {

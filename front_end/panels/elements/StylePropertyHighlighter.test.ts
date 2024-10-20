@@ -29,11 +29,11 @@ describeWithMockConnection('StylePropertyHighlighter', () => {
       inheritedPseudoPayload: [],
       animationsPayload: [],
       parentLayoutNodeId: undefined,
-      positionFallbackRules: [],
       positionTryRules: [],
       propertyRules: [],
       cssPropertyRegistrations: [],
       fontPaletteValuesRule: undefined,
+      activePositionFallbackIndex: -1,
     });
     return {
       stylesSidebarPane,

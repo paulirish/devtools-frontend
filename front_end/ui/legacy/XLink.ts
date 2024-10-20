@@ -8,8 +8,8 @@ import * as LitHtml from '../lit-html/lit-html.js';
 import * as VisualLogging from '../visual_logging/visual_logging.js';
 
 import * as ARIAUtils from './ARIAUtils.js';
-import {type ContextMenu, type Provider} from './ContextMenu.js';
-import {html} from './Fragment.js';
+import type {ContextMenu, Provider} from './ContextMenu.js';
+import {html as xhtml} from './Fragment.js';
 import {Tooltip} from './Tooltip.js';
 import {
   addReferrerToURLIfNecessary,
@@ -19,21 +19,24 @@ import {
 } from './UIUtils.js';
 import {XElement} from './XElement.js';
 
+const {html} = LitHtml;
+
 export class XLink extends XElement {
   hrefInternal: Platform.DevToolsPath.UrlString|null;
   private clickable: boolean;
   private readonly onClick: (arg0: Event) => void;
   private readonly onKeyDown: (arg0: KeyboardEvent) => void;
-  static create(url: string, linkText?: string, className?: string, preventClick?: boolean, jsLogContext?: string):
-      HTMLElement {
+  static create(
+      url: string, linkText?: string, className?: string, preventClick?: boolean, jsLogContext?: string,
+      tabindex = '0'): HTMLElement {
     if (!linkText) {
       linkText = url;
     }
     className = className || '';
     // clang-format off
     // TODO(dgozman): migrate css from 'devtools-link' to 'x-link'.
-    const element = html `
-  <x-link href='${url}' tabindex="0" class='${className} devtools-link' ${preventClick ? 'no-click' : ''}
+    const element = xhtml `
+  <x-link href='${url}' tabindex='${tabindex}' class='${className} devtools-link' ${preventClick ? 'no-click' : ''}
   jslog=${VisualLogging.link().track({click: true, keydown:'Enter|Space'}).context(jsLogContext)}>${Platform.StringUtilities.trimMiddle(linkText, MaxLengthForDisplayedURLs)}</x-link>`;
     // clang-format on
     return element as HTMLElement;
@@ -71,7 +74,7 @@ export class XLink extends XElement {
 
   static override get observedAttributes(): string[] {
     // TODO(dgozman): should be super.observedAttributes, but it does not compile.
-    return XElement.observedAttributes.concat(['href', 'no-click', 'title']);
+    return XElement.observedAttributes.concat(['href', 'no-click', 'title', 'tabindex']);
   }
 
   get href(): Platform.DevToolsPath.UrlString|null {
@@ -106,6 +109,13 @@ export class XLink extends XElement {
         Tooltip.install(this, newValue);
       }
       this.updateClick();
+      return;
+    }
+
+    if (attr === 'tabindex') {
+      if (oldValue !== newValue) {
+        this.setAttribute('tabindex', newValue || '0');
+      }
       return;
     }
 
@@ -150,4 +160,4 @@ export class ContextMenuProvider implements Provider<Node> {
 
 customElements.define('x-link', XLink);
 
-export const sample = LitHtml.html`<p>Hello, <x-link>world!</x-link></p>`;
+export const sample = html`<p>Hello, <x-link>world!</x-link></p>`;

@@ -9,10 +9,10 @@ import * as Platform from '../platform/platform.js';
 import {CSSContainerQuery} from './CSSContainerQuery.js';
 import {CSSLayer} from './CSSLayer.js';
 import {CSSMedia} from './CSSMedia.js';
-import {type CSSModel, type Edit} from './CSSModel.js';
+import type {CSSModel, Edit} from './CSSModel.js';
 import {CSSScope} from './CSSScope.js';
 import {CSSStyleDeclaration, Type} from './CSSStyleDeclaration.js';
-import {type CSSStyleSheetHeader} from './CSSStyleSheetHeader.js';
+import type {CSSStyleSheetHeader} from './CSSStyleSheetHeader.js';
 import {CSSSupports} from './CSSSupports.js';
 
 export class CSSRule {
@@ -334,33 +334,20 @@ export class CSSKeyframeRule extends CSSRule {
   }
 }
 
-export class CSSPositionFallbackRule {
-  readonly #name: CSSValue;
-  readonly #tryRules: CSSRule[];
-  constructor(cssModel: CSSModel, payload: Protocol.CSS.CSSPositionFallbackRule) {
-    this.#name = new CSSValue(payload.name);
-    this.#tryRules = payload.tryRules.map(
-        tryRule =>
-            new CSSRule(cssModel, {origin: tryRule.origin, style: tryRule.style, styleSheetId: tryRule.styleSheetId}));
-  }
-
-  name(): CSSValue {
-    return this.#name;
-  }
-
-  tryRules(): CSSRule[] {
-    return this.#tryRules;
-  }
-}
-
 export class CSSPositionTryRule extends CSSRule {
   readonly #name: CSSValue;
+  readonly #active: boolean;
   constructor(cssModel: CSSModel, payload: Protocol.CSS.CSSPositionTryRule) {
     super(cssModel, {origin: payload.origin, style: payload.style, styleSheetId: payload.styleSheetId});
     this.#name = new CSSValue(payload.name);
+    this.#active = payload.active;
   }
 
   name(): CSSValue {
     return this.#name;
+  }
+
+  active(): boolean {
+    return this.#active;
   }
 }

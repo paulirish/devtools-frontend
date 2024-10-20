@@ -1,10 +1,12 @@
 // Copyright (c) 2024 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+import '../../../ui/components/icon_button/icon_button.js';
+import '../../../ui/legacy/components/inline_editor/inline_editor.js';
+
 import * as i18n from '../../../core/i18n/i18n.js';
 import type * as SDK from '../../../core/sdk/sdk.js';
-import * as IconButton from '../../../ui/components/icon_button/icon_button.js';
-import * as InlineEditor from '../../../ui/legacy/components/inline_editor/inline_editor.js';
+import type * as InlineEditor from '../../../ui/legacy/components/inline_editor/inline_editor.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
@@ -24,6 +26,9 @@ const {render, html} = LitHtml;
 // to leave formatting off for this type declaration.
 // clang-format off
 export type AnchorFunctionLinkSwatchData = {
+  onLinkActivate: () => void,
+  onMouseEnter: () => void,
+  onMouseLeave: () => void,
   // The dashed identifier for the anchor function.
   // It is undefined when we're rendering for implicit or default anchor cases.
   identifier?: string,
@@ -36,14 +41,10 @@ export type AnchorFunctionLinkSwatchData = {
   // However for `position-anchor: --dashed-ident` case, there is no space needed at all.
   // That's why we need the parameter so that we don't render a space for that case.
   needsSpace?: boolean,
-  onLinkActivate: () => void,
-  onMouseEnter: () => void,
-  onMouseLeave: () => void,
 };
 // clang-format on
 
 export class AnchorFunctionLinkSwatch extends HTMLElement {
-  static readonly litTagName = LitHtml.literal`devtools-anchor-function-link-swatch`;
   readonly #shadow = this.attachShadow({mode: 'open'});
   #data: AnchorFunctionLinkSwatchData;
 
@@ -73,7 +74,7 @@ export class AnchorFunctionLinkSwatch extends HTMLElement {
 
   #renderIdentifierLink(): LitHtml.LitTemplate {
     // clang-format off
-    return html`<${InlineEditor.LinkSwatch.LinkSwatch.litTagName}
+    return html`<devtools-link-swatch
       @mouseenter=${this.#data.onMouseEnter}
       @mouseleave=${this.#data.onMouseLeave}
       .data=${{
@@ -81,13 +82,13 @@ export class AnchorFunctionLinkSwatch extends HTMLElement {
         isDefined: Boolean(this.#data.anchorNode),
         jslogContext: 'anchor-link',
         onLinkActivate: this.#data.onLinkActivate,
-      } as InlineEditor.LinkSwatch.LinkSwatchRenderData}></${InlineEditor.LinkSwatch.LinkSwatch.litTagName}>`;
+      } as InlineEditor.LinkSwatch.LinkSwatchRenderData}></devtools-link-swatch>`;
     // clang-format on
   }
 
   #renderIconLink(): LitHtml.LitTemplate {
     // clang-format off
-    return html`<${IconButton.Icon.Icon.litTagName}
+    return html`<devtools-icon
       role='button'
       title=${i18nString(UIStrings.jumpToAnchorNode)}
       class='icon-link'
@@ -97,7 +98,7 @@ export class AnchorFunctionLinkSwatch extends HTMLElement {
       @mouseleave=${this.#data.onMouseLeave}
       @mousedown=${(ev: MouseEvent) => ev.stopPropagation()}
       @click=${this.#handleIconClick}
-    ></${IconButton.Icon.Icon.litTagName}>`;
+    ></devtools-icon>`;
     // clang-format on
   }
 

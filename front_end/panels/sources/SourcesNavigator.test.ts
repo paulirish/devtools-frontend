@@ -54,7 +54,7 @@ describeWithMockConnection('NetworkNavigatorView', () => {
     let project: Bindings.ContentProviderBasedProject.ContentProviderBasedProject;
 
     beforeEach(async () => {
-      const tabTarget = createTarget({type: SDK.Target.Type.Tab});
+      const tabTarget = createTarget({type: SDK.Target.Type.TAB});
       createTarget({parentTarget: tabTarget, subtype: 'prerender'});
       target = createTarget({parentTarget: tabTarget});
       ({project} = createContentProviderUISourceCodes({
@@ -459,6 +459,7 @@ describeWithMockConnection('NetworkNavigatorView', () => {
         }
       });
       setMockConnectionResponseHandler('Debugger.setBlackboxPatterns', () => ({}));
+      setMockConnectionResponseHandler('Debugger.setBlackboxExecutionContexts', () => ({}));
     });
 
     const updatePatternSetting = async (settingValue: Common.Settings.RegExpSettingItem[]) => {

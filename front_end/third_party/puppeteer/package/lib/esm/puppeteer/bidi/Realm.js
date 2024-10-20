@@ -1,7 +1,7 @@
 var __addDisposableResource = (this && this.__addDisposableResource) || function (env, value, async) {
     if (value !== null && value !== void 0) {
         if (typeof value !== "object" && typeof value !== "function") throw new TypeError("Object expected.");
-        var dispose;
+        var dispose, inner;
         if (async) {
             if (!Symbol.asyncDispose) throw new TypeError("Symbol.asyncDispose is not defined.");
             dispose = value[Symbol.asyncDispose];
@@ -9,8 +9,10 @@ var __addDisposableResource = (this && this.__addDisposableResource) || function
         if (dispose === void 0) {
             if (!Symbol.dispose) throw new TypeError("Symbol.dispose is not defined.");
             dispose = value[Symbol.dispose];
+            if (async) inner = dispose;
         }
         if (typeof dispose !== "function") throw new TypeError("Object not disposable.");
+        if (inner) dispose = function() { try { inner.call(this); } catch (e) { return Promise.reject(e); } };
         env.stack.push({ value: value, dispose: dispose, async: async });
     }
     else if (async) {
@@ -126,11 +128,17 @@ export class BidiRealm extends Realm {
                 : `${functionDeclaration}\n${sourceUrlComment}\n`;
             responsePromise = this.realm.callFunction(functionDeclaration, 
             /* awaitPromise= */ true, {
-                arguments: args.length
+                // LazyArgs are used only internally and should not affect the order
+                // evaluate calls for the public APIs.
+                arguments: args.some(arg => {
+                    return arg instanceof LazyArg;
+                })
                     ? await Promise.all(args.map(arg => {
-                        return this.serialize(arg);
+                        return this.serializeAsync(arg);
                     }))
-                    : [],
+                    : args.map(arg => {
+                        return this.serialize(arg);
+                    }),
                 resultOwnership,
                 userActivation: true,
                 serializationOptions,
@@ -151,10 +159,13 @@ export class BidiRealm extends Realm {
         }
         return BidiJSHandle.from(result, this);
     }
-    async serialize(arg) {
+    async serializeAsync(arg) {
         if (arg instanceof LazyArg) {
             arg = await arg.get(this);
         }
+        return this.serialize(arg);
+    }
+    serialize(arg) {
         if (arg instanceof BidiJSHandle || arg instanceof BidiElementHandle) {
             if (arg.realm !== this) {
                 if (!(arg.realm instanceof BidiFrameRealm) ||

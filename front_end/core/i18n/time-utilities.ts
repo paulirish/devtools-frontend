@@ -9,16 +9,22 @@ import {getLocalizedString, registerUIStrings} from './i18nImpl.js';
 const UIStrings = {
   /**
    *@description μs is the short form of micro-seconds and the placeholder is a number
+   * The shortest form or abbreviation of micro-seconds should be used, as there is
+   * limited room in this UI.
    *@example {2} PH1
    */
   fmms: '{PH1} μs',
   /**
    *@description ms is the short form of milli-seconds and the placeholder is a decimal number
+   * The shortest form or abbreviation of milli-seconds should be used, as there is
+   * limited room in this UI.
    *@example {2.14} PH1
    */
   fms: '{PH1} ms',
   /**
    *@description s is short for seconds and the placeholder is a decimal number
+   * The shortest form or abbreviation of seconds should be used, as there is
+   * limited room in this UI.
    *@example {2.14} PH1
    */
   fs: '{PH1} s',
@@ -37,6 +43,12 @@ const UIStrings = {
    *@example {2.2} PH1
    */
   fdays: '{PH1} days',
+
+  /**
+   *@description describes a number of milliseconds (the unit should not abbreviated)
+   *@example {2.14} PH1
+   */
+  fmsExpanded: '{PH1} milliseconds',
 };
 
 const str_ = registerUIStrings('core/i18n/time-utilities.ts', UIStrings);
@@ -53,6 +65,20 @@ export function formatMicroSecondsTime(
   return millisToString(Platform.Timing.microSecondsToMilliSeconds(time), true);
 }
 
+export function formatMicroSecondsAsMillisFixed(time: Platform.Timing.MicroSeconds, fractionDigits = 0): string {
+  const milliseconds = Platform.Timing.microSecondsToMilliSeconds(
+      time,
+  );
+  return i18nString(UIStrings.fms, {PH1: milliseconds.toFixed(fractionDigits)});
+}
+export function formatMicroSecondsAsMillisFixedExpanded(
+    time: Platform.Timing.MicroSeconds, fractionDigits = 0): string {
+  const milliseconds = Platform.Timing.microSecondsToMilliSeconds(
+      time,
+  );
+  return i18nString(UIStrings.fmsExpanded, {PH1: milliseconds.toFixed(fractionDigits)});
+}
+
 export function formatMicroSecondsAsSeconds(time: Platform.Timing.MicroSeconds): string {
   const milliseconds = Platform.Timing.microSecondsToMilliSeconds(
       time,
@@ -64,10 +90,6 @@ export function formatMicroSecondsAsSeconds(time: Platform.Timing.MicroSeconds):
 export const millisToString = function(ms: number, higherResolution?: boolean): string {
   if (!isFinite(ms)) {
     return '-';
-  }
-
-  if (ms === 0) {
-    return '0';
   }
 
   if (higherResolution && ms < 0.1) {

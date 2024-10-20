@@ -7,7 +7,7 @@ import * as Buttons from '../../ui/components/buttons/buttons.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
 import lighthouseDialogStyles from './lighthouseDialog.css.js';
-import {type LighthousePanel} from './LighthousePanel.js';
+import type {LighthousePanel} from './LighthousePanel.js';
 
 const UIStrings = {
   /**
@@ -92,7 +92,7 @@ export class TimespanView extends UI.Dialog.Dialog {
     this.statusHeader = fragment.$('status-header');
     dialogRoot.appendChild(fragment.element());
 
-    this.setSizeBehavior(UI.GlassPane.SizeBehavior.SetExactWidthMaxHeight);
+    this.setSizeBehavior(UI.GlassPane.SizeBehavior.SET_EXACT_WIDTH_MAX_HEIGHT);
     this.setMaxContentSize(new UI.Geometry.Size(500, 400));
     this.reset();
   }

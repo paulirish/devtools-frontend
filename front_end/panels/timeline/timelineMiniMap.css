@@ -17,6 +17,7 @@
   width: 36px;
   height: 36px;
   border-radius: 50%;
+  box-shadow: var(--drop-shadow-depth-1);
   background: var(--sys-color-cdt-base-container);
 
   &:hover {
@@ -97,6 +98,12 @@
 
 .timeline-minimap #timeline-overview-container canvas {
   width: 100%;
+  height: 100%;
+}
+
+.timeline-minimap-dim-highlight-svg {
+  width: 100%;
+  position: absolute;
   height: 100%;
 }
 

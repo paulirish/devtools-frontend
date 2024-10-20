@@ -112,6 +112,8 @@ declare namespace ProtocolProxyApi {
 
     PWA: PWAApi;
 
+    BluetoothEmulation: BluetoothEmulationApi;
+
     Debugger: DebuggerApi;
 
     HeapProfiler: HeapProfilerApi;
@@ -218,6 +220,8 @@ declare namespace ProtocolProxyApi {
     FedCm: FedCmDispatcher;
 
     PWA: PWADispatcher;
+
+    BluetoothEmulation: BluetoothEmulationDispatcher;
 
     Debugger: DebuggerDispatcher;
 
@@ -411,9 +415,33 @@ declare namespace ProtocolProxyApi {
     /**
      * Installs an unpacked extension from the filesystem similar to
      * --load-extension CLI flags. Returns extension ID once the extension
-     * has been installed.
+     * has been installed. Available if the client is connected using the
+     * --remote-debugging-pipe flag and the --enable-unsafe-extension-debugging
+     * flag is set.
      */
     invoke_loadUnpacked(params: Protocol.Extensions.LoadUnpackedRequest): Promise<Protocol.Extensions.LoadUnpackedResponse>;
+
+    /**
+     * Gets data from extension storage in the given `storageArea`. If `keys` is
+     * specified, these are used to filter the result.
+     */
+    invoke_getStorageItems(params: Protocol.Extensions.GetStorageItemsRequest): Promise<Protocol.Extensions.GetStorageItemsResponse>;
+
+    /**
+     * Removes `keys` from extension storage in the given `storageArea`.
+     */
+    invoke_removeStorageItems(params: Protocol.Extensions.RemoveStorageItemsRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Clears extension storage in the given `storageArea`.
+     */
+    invoke_clearStorageItems(params: Protocol.Extensions.ClearStorageItemsRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Sets `values` in extension storage in the given `storageArea`. The provided `values`
+     * will be merged with existing values in the storage area.
+     */
+    invoke_setStorageItems(params: Protocol.Extensions.SetStorageItemsRequest): Promise<Protocol.ProtocolResponseWithError>;
 
   }
   export interface ExtensionsDispatcher {
@@ -1108,6 +1136,11 @@ declare namespace ProtocolProxyApi {
     invoke_getFileInfo(params: Protocol.DOM.GetFileInfoRequest): Promise<Protocol.DOM.GetFileInfoResponse>;
 
     /**
+     * Returns list of detached nodes
+     */
+    invoke_getDetachedDomNodes(): Promise<Protocol.DOM.GetDetachedDomNodesResponse>;
+
+    /**
      * Enables console to refer to the node with given id via $x (see Command Line API for more details
      * $x functions).
      */
@@ -1214,6 +1247,11 @@ declare namespace ProtocolProxyApi {
      * Called when top layer elements are changed.
      */
     topLayerElementsUpdated(): void;
+
+    /**
+     * Fired when a node's scrollability state changes.
+     */
+    scrollableFlagUpdated(params: Protocol.DOM.ScrollableFlagUpdatedEvent): void;
 
     /**
      * Called when a pseudo element is removed from an element.
@@ -1512,6 +1550,21 @@ declare namespace ProtocolProxyApi {
      * by setSensorOverrideEnabled.
      */
     invoke_setSensorOverrideReadings(params: Protocol.Emulation.SetSensorOverrideReadingsRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Overrides a pressure source of a given type, as used by the Compute
+     * Pressure API, so that updates to PressureObserver.observe() are provided
+     * via setPressureStateOverride instead of being retrieved from
+     * platform-provided telemetry data.
+     */
+    invoke_setPressureSourceOverrideEnabled(params: Protocol.Emulation.SetPressureSourceOverrideEnabledRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Provides a given pressure state that will be processed and eventually be
+     * delivered to PressureObserver users. |source| must have been previously
+     * overridden by setPressureSourceOverrideEnabled.
+     */
+    invoke_setPressureStateOverride(params: Protocol.Emulation.SetPressureStateOverrideRequest): Promise<Protocol.ProtocolResponseWithError>;
 
     /**
      * Overrides the Idle state.
@@ -1896,8 +1949,20 @@ declare namespace ProtocolProxyApi {
   }
 
   export interface MemoryApi {
+    /**
+     * Retruns current DOM object counters.
+     */
     invoke_getDOMCounters(): Promise<Protocol.Memory.GetDOMCountersResponse>;
 
+    /**
+     * Retruns DOM object counters after preparing renderer for leak detection.
+     */
+    invoke_getDOMCountersForLeakDetection(): Promise<Protocol.Memory.GetDOMCountersForLeakDetectionResponse>;
+
+    /**
+     * Prepares for leak detection by terminating workers, stopping spellcheckers,
+     * dropping non-essential internal caches, running garbage collections, etc.
+     */
     invoke_prepareForLeakDetection(): Promise<Protocol.ProtocolResponseWithError>;
 
     /**
@@ -2422,7 +2487,7 @@ declare namespace ProtocolProxyApi {
     invoke_setShowHitTestBorders(params: Protocol.Overlay.SetShowHitTestBordersRequest): Promise<Protocol.ProtocolResponseWithError>;
 
     /**
-     * Request that backend shows an overlay with web vital metrics.
+     * Deprecated, no longer has any effect.
      */
     invoke_setShowWebVitals(params: Protocol.Overlay.SetShowWebVitalsRequest): Promise<Protocol.ProtocolResponseWithError>;
 
@@ -2816,6 +2881,12 @@ declare namespace ProtocolProxyApi {
      * Fired when frame has been detached from its parent.
      */
     frameDetached(params: Protocol.Page.FrameDetachedEvent): void;
+
+    /**
+     * Fired before frame subtree is detached. Emitted before any frame of the
+     * subtree is actually detached.
+     */
+    frameSubtreeWillBeDetached(params: Protocol.Page.FrameSubtreeWillBeDetachedEvent): void;
 
     /**
      * Fired once navigation of the frame has completed. Frame is now associated with the new loader.
@@ -3790,6 +3861,18 @@ declare namespace ProtocolProxyApi {
     credentialAdded(params: Protocol.WebAuthn.CredentialAddedEvent): void;
 
     /**
+     * Triggered when a credential is deleted, e.g. through
+     * PublicKeyCredential.signalUnknownCredential().
+     */
+    credentialDeleted(params: Protocol.WebAuthn.CredentialDeletedEvent): void;
+
+    /**
+     * Triggered when a credential is updated, e.g. through
+     * PublicKeyCredential.signalCurrentUserDetails().
+     */
+    credentialUpdated(params: Protocol.WebAuthn.CredentialUpdatedEvent): void;
+
+    /**
      * Triggered when a credential is used in a webauthn assertion.
      */
     credentialAsserted(params: Protocol.WebAuthn.CredentialAssertedEvent): void;
@@ -4011,6 +4094,33 @@ declare namespace ProtocolProxyApi {
   export interface PWADispatcher {
   }
 
+  export interface BluetoothEmulationApi {
+    /**
+     * Enable the BluetoothEmulation domain.
+     */
+    invoke_enable(params: Protocol.BluetoothEmulation.EnableRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Disable the BluetoothEmulation domain.
+     */
+    invoke_disable(): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Simulates a peripheral with |address|, |name| and |knownServiceUuids|
+     * that has already been connected to the system.
+     */
+    invoke_simulatePreconnectedPeripheral(params: Protocol.BluetoothEmulation.SimulatePreconnectedPeripheralRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Simulates an advertisement packet described in |entry| being received by
+     * the central.
+     */
+    invoke_simulateAdvertisement(params: Protocol.BluetoothEmulation.SimulateAdvertisementRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+  }
+  export interface BluetoothEmulationDispatcher {
+  }
+
   export interface DebuggerApi {
     /**
      * Continues execution until specific location is reached.
@@ -4107,6 +4217,13 @@ declare namespace ProtocolProxyApi {
      * Enables or disables async call stacks tracking.
      */
     invoke_setAsyncCallStackDepth(params: Protocol.Debugger.SetAsyncCallStackDepthRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Replace previous blackbox execution contexts with passed ones. Forces backend to skip
+     * stepping/pausing in scripts in these execution contexts. VM will try to leave blackboxed script by
+     * performing 'step in' several times, finally resorting to 'step out' if unsuccessful.
+     */
+    invoke_setBlackboxExecutionContexts(params: Protocol.Debugger.SetBlackboxExecutionContextsRequest): Promise<Protocol.ProtocolResponseWithError>;
 
     /**
      * Replace previous blackbox patterns with passed ones. Forces backend to skip stepping/pausing in

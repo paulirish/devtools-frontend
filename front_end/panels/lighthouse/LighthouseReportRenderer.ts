@@ -11,14 +11,9 @@ import * as LighthouseReport from '../../third_party/lighthouse/report/report.js
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
-import * as Timeline from '../timeline/timeline.js';
 
-import {
-  type NodeDetailsJSON,
-  type ReportJSON,
-  type RunnerResultArtifacts,
-  type SourceLocationDetailsJSON,
-} from './LighthouseReporterTypes.js';
+import type {
+  NodeDetailsJSON, ReportJSON, RunnerResultArtifacts, SourceLocationDetailsJSON} from './LighthouseReporterTypes.js';
 
 const MaxLengthForLinks = 40;
 
@@ -35,8 +30,8 @@ export class LighthouseReportRenderer {
       onViewTrace = async () => {
         const defaultPassTrace = artifacts.traces.defaultPass;
         Host.userMetrics.actionTaken(Host.UserMetrics.Action.LighthouseViewTrace);
-        await UI.InspectorView.InspectorView.instance().showPanel('timeline');
-        Timeline.TimelinePanel.TimelinePanel.instance().loadFromEvents(defaultPassTrace.traceEvents);
+        const trace = new SDK.TraceObject.TraceObject(defaultPassTrace.traceEvents);
+        void Common.Revealer.reveal(trace);
       };
     }
 

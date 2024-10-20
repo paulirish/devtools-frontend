@@ -1,9 +1,9 @@
+/// <reference types="node" preserve="true" />
 /**
  * @license
  * Copyright 2017 Google Inc.
  * SPDX-License-Identifier: Apache-2.0
  */
-/// <reference types="node" />
 import type { ChildProcess } from 'child_process';
 import type { Protocol } from 'devtools-protocol';
 import type { ProtocolType } from '../common/ConnectOptions.js';
@@ -56,6 +56,10 @@ export interface WaitForTargetOptions {
      * @defaultValue `30_000`
      */
     timeout?: number;
+    /**
+     * A signal object that allows you to cancel a waitFor call.
+     */
+    signal?: AbortSignal;
 }
 /**
  * All the events a {@link Browser | browser instance} may emit.
@@ -261,7 +265,7 @@ export declare abstract class Browser extends EventEmitter<BrowserEvents> {
     /**
      * Gets a list of all open {@link Page | pages} inside this {@link Browser}.
      *
-     * If there ar multiple {@link BrowserContext | browser contexts}, this
+     * If there are multiple {@link BrowserContext | browser contexts}, this
      * returns all {@link Page | pages} in all
      * {@link BrowserContext | browser contexts}.
      *

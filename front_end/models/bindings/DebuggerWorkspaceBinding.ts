@@ -15,7 +15,7 @@ import {DefaultScriptMapping} from './DefaultScriptMapping.js';
 import {IgnoreListManager} from './IgnoreListManager.js';
 import {type LiveLocation, type LiveLocationPool, LiveLocationWithPool} from './LiveLocation.js';
 import {NetworkProject} from './NetworkProject.js';
-import {type ResourceMapping} from './ResourceMapping.js';
+import type {ResourceMapping} from './ResourceMapping.js';
 import {type ResourceScriptFile, ResourceScriptMapping} from './ResourceScriptMapping.js';
 
 let debuggerWorkspaceBindingInstance: DebuggerWorkspaceBinding|undefined;
@@ -103,7 +103,7 @@ export class DebuggerWorkspaceBinding implements SDK.TargetManager.SDKModelObser
     }
     const pluginManager = this.pluginManager;
     let ranges: SDK.DebuggerModel.LocationRange[] = [];
-    if (mode === SDK.DebuggerModel.StepMode.StepOut) {
+    if (mode === SDK.DebuggerModel.StepMode.STEP_OUT) {
       // Step out of inline function.
       return await pluginManager.getInlinedFunctionRanges(rawLocation);
     }
@@ -114,7 +114,7 @@ export class DebuggerWorkspaceBinding implements SDK.TargetManager.SDKModelObser
           [];
       // TODO(bmeurer): Remove the {rawLocation} from the {ranges}?
       ranges = ranges.filter(range => contained(rawLocation, range));
-      if (mode === SDK.DebuggerModel.StepMode.StepOver) {
+      if (mode === SDK.DebuggerModel.StepMode.STEP_OVER) {
         // Step over an inlined function.
         ranges = ranges.concat(await pluginManager.getInlinedCalleesRanges(rawLocation));
       }

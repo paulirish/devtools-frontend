@@ -29,7 +29,6 @@
  */
 
 import * as Common from '../../core/common/common.js';
-import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import type * as SDK from '../../core/sdk/sdk.js';
@@ -89,14 +88,6 @@ const UIStrings = {
    *@description A context menu item in the DView of the Layers panel
    */
   showPaintProfiler: 'Show Paint Profiler',
-  /**
-   *@description Text for a button in the DView of the Layers panel
-   */
-  sendFeedback: 'Send feedback',
-  /**
-   *@description Text for a warning message in the DView of the Layers panel
-   */
-  deprecationWarning: 'Layers panel might be deprecated soon. Share your thoughts and concerns before we decide.',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/layer_viewer/Layers3DView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -116,7 +107,6 @@ const imageForTexture = new Map<WebGLTexture, HTMLImageElement>();
 export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.VBox>(UI.Widget.VBox)
     implements LayerView {
   private readonly failBanner: UI.Widget.VBox;
-  private readonly deprecationBanner: UI.Infobar.Infobar;
   private readonly layerViewHost: LayerViewHost;
   private transformController: TransformController;
   private canvasElement: HTMLCanvasElement;
@@ -157,11 +147,7 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
     this.layerViewHost = layerViewHost;
     this.layerViewHost.registerView(this);
     this.transformController = new TransformController(this.contentElement as HTMLElement);
-    this.transformController.addEventListener(TransformControllerEvents.TransformChanged, this.update, this);
-
-    this.deprecationBanner = this.#createDeprecationBanner();
-    this.deprecationBanner.setParentView(this);
-    this.contentElement.appendChild(this.deprecationBanner.element);
+    this.transformController.addEventListener(TransformControllerEvents.TRANSFORM_CHANGED, this.update, this);
 
     this.initToolbar();
     this.canvasElement = this.contentElement.createChild('canvas') as HTMLCanvasElement;
@@ -191,30 +177,6 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
     this.layerViewHost.showInternalLayersSetting().addChangeListener(this.update, this);
   }
 
-  #createDeprecationBanner(): UI.Infobar.Infobar {
-    function openLink(): void {
-      Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(
-          'https://crbug.com/328948996' as Platform.DevToolsPath.UrlString);
-    }
-
-    return new UI.Infobar.Infobar(
-        UI.Infobar.Type.Warning,
-        i18nString(UIStrings.deprecationWarning),
-        [
-          {
-            text: i18nString(UIStrings.sendFeedback),
-            highlight: false,
-            delegate: openLink,
-            dismiss: false,
-            jslogContext: 'Send feedback',
-          },
-        ],
-        /* disableSetting? */ undefined,
-        /* isCloseable */ true,
-        'panel-deprecated',
-    );
-  }
-
   setLayerTree(layerTree: SDK.LayerTreeBase.LayerTreeBase|null): void {
     this.layerTree = layerTree;
     this.layerTexture = null;
@@ -233,7 +195,7 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
     }
     void UI.UIUtils.loadImage(imageURL).then(image => {
       const texture = image && LayerTextureManager.createTextureForImage(this.gl || null, image);
-      this.layerTexture = texture ? {layer: layer, texture: texture} : null;
+      this.layerTexture = texture ? {layer, texture} : null;
       this.update();
     });
   }
@@ -276,7 +238,7 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
   }
 
   snapshotForSelection(selection: Selection): Promise<SDK.PaintProfiler.SnapshotWithRect|null> {
-    if (selection.type() === Type.Snapshot) {
+    if (selection.type() === Type.SNAPSHOT) {
       const snapshotWithRect = (selection as SnapshotSelection).snapshot();
       snapshotWithRect.snapshot.addReference();
       return Promise.resolve(snapshotWithRect);
@@ -380,7 +342,7 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
     if (textureScale !== this.oldTextureScale) {
       this.oldTextureScale = textureScale;
       this.textureManager.setScale(textureScale);
-      this.dispatchEventToListeners(Events.ScaleChanged, textureScale);
+      this.dispatchEventToListeners(Events.SCALE_CHANGED, textureScale);
     }
     const scaleAndRotationMatrix = new WebKitCSSMatrix()
                                        .scale(scale, scale, scale)
@@ -459,9 +421,9 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
             image && LayerTextureManager.createTextureForImage(this.gl || null, image) || undefined;
       });
     }
-    loadChromeTexture.call(this, ChromeTexture.Left, 'Images/chromeLeft.avif');
-    loadChromeTexture.call(this, ChromeTexture.Middle, 'Images/chromeMiddle.avif');
-    loadChromeTexture.call(this, ChromeTexture.Right, 'Images/chromeRight.avif');
+    loadChromeTexture.call(this, ChromeTexture.LEFT, 'Images/chromeLeft.avif');
+    loadChromeTexture.call(this, ChromeTexture.MIDDLE, 'Images/chromeMiddle.avif');
+    loadChromeTexture.call(this, ChromeTexture.RIGHT, 'Images/chromeRight.avif');
   }
 
   private initGLIfNecessary(): WebGLRenderingContext|null {
@@ -748,7 +710,7 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
         if (!image) {
           continue;
         }
-        const width = i === ChromeTexture.Middle ? middleFragmentWidth : image.naturalWidth;
+        const width = i === ChromeTexture.MIDDLE ? middleFragmentWidth : image.naturalWidth;
         if (width < 0 || x + width > viewportWidth) {
           break;
         }
@@ -887,10 +849,10 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
           jslogContext: 'layers.3d-center',
         });
     const selection = this.selectionFromEventPoint(event);
-    if (selection && selection.type() === Type.Snapshot) {
+    if (selection && selection.type() === Type.SNAPSHOT) {
       contextMenu.defaultSection().appendItem(
           i18nString(UIStrings.showPaintProfiler),
-          () => this.dispatchEventToListeners(Events.PaintProfilerRequested, selection), {
+          () => this.dispatchEventToListeners(Events.PAINT_PROFILER_REQUESTED, selection), {
             jslogContext: 'layers.paint-profiler',
           });
     }
@@ -925,8 +887,8 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
 
   private onDoubleClick(event: Event): void {
     const selection = this.selectionFromEventPoint(event);
-    if (selection && (selection.type() === Type.Snapshot || selection.layer())) {
-      this.dispatchEventToListeners(Events.PaintProfilerRequested, selection);
+    if (selection && (selection.type() === Type.SNAPSHOT || selection.layer())) {
+      this.dispatchEventToListeners(Events.PAINT_PROFILER_REQUESTED, selection);
     }
     event.stopPropagation();
   }
@@ -947,24 +909,26 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
 }
 
 export enum OutlineType {
+  /* eslint-disable @typescript-eslint/naming-convention -- Used by web_tests. */
   Hovered = 'hovered',
   Selected = 'selected',
+  /* eslint-enable @typescript-eslint/naming-convention */
 }
 
 export const enum Events {
-  PaintProfilerRequested = 'PaintProfilerRequested',
-  ScaleChanged = 'ScaleChanged',
+  PAINT_PROFILER_REQUESTED = 'PaintProfilerRequested',
+  SCALE_CHANGED = 'ScaleChanged',
 }
 
 export type EventTypes = {
-  [Events.PaintProfilerRequested]: Selection,
-  [Events.ScaleChanged]: number,
+  [Events.PAINT_PROFILER_REQUESTED]: Selection,
+  [Events.SCALE_CHANGED]: number,
 };
 
 export const enum ChromeTexture {
-  Left = 0,
-  Middle = 1,
-  Right = 2,
+  LEFT = 0,
+  MIDDLE = 1,
+  RIGHT = 2,
 }
 
 export const FragmentShader = '' +

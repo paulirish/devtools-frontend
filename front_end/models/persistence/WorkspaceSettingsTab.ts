@@ -8,11 +8,11 @@ import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {EditFileSystemView} from './EditFileSystemView.js';
-import {type FileSystem} from './FileSystemWorkspaceBinding.js';
+import type {FileSystem} from './FileSystemWorkspaceBinding.js';
 import {IsolatedFileSystem} from './IsolatedFileSystem.js';
 import {Events, IsolatedFileSystemManager} from './IsolatedFileSystemManager.js';
 import {NetworkPersistenceManager} from './NetworkPersistenceManager.js';
-import {type PlatformFileSystem} from './PlatformFileSystem.js';
+import type {PlatformFileSystem} from './PlatformFileSystem.js';
 import workspaceSettingsTabStyles from './workspaceSettingsTab.css.js';
 
 const UIStrings = {
@@ -159,7 +159,7 @@ export class WorkspaceSettingsTab extends UI.Widget.VBox {
     const toolbar = new UI.Toolbar.Toolbar('');
     const button =
         new UI.Toolbar.ToolbarButton(i18nString(UIStrings.remove), 'cross', undefined, 'settings.remove-file-system');
-    button.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.removeFileSystemClicked.bind(this, fileSystem));
+    button.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, this.removeFileSystemClicked.bind(this, fileSystem));
     toolbar.appendToolbarItem(button);
     header.appendChild(toolbar.element);
 

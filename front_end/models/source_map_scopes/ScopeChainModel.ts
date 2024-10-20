@@ -5,6 +5,8 @@
 import * as Common from '../../core/common/common.js';
 import * as SDK from '../../core/sdk/sdk.js';
 
+import {resolveScopeChain} from './NamesResolver.js';
+
 /**
  * This class is responsible for resolving / updating the scope chain for a specific {@link SDK.DebuggerModel.CallFrame}
  * instance.
@@ -40,11 +42,12 @@ export class ScopeChainModel extends Common.ObjectWrapper.ObjectWrapper<EventTyp
         SDK.DebuggerModel.Events.DebugInfoAttached, this.#debugInfoAttached, this);
     this.#callFrame.debuggerModel.sourceMapManager().removeEventListener(
         SDK.SourceMapManager.Events.SourceMapAttached, this.#sourceMapAttached, this);
+    this.listeners?.clear();
   }
 
   async #update(): Promise<void> {
-    // TODO(crbug.com/40277685): Actually resolve the scope info and send it along with the event.
-    this.dispatchEventToListeners(Events.ScopeChainUpdated, new ScopeChain(this.#callFrame));
+    const scopeChain = await resolveScopeChain(this.#callFrame);
+    this.dispatchEventToListeners(Events.SCOPE_CHAIN_UPDATED, new ScopeChain(scopeChain));
   }
 
   #debugInfoAttached(event: Common.EventTarget.EventTargetEvent<SDK.Script.Script>): void {
@@ -62,22 +65,20 @@ export class ScopeChainModel extends Common.ObjectWrapper.ObjectWrapper<EventTyp
 }
 
 export const enum Events {
-  ScopeChainUpdated = 'ScopeChainUpdated',
+  SCOPE_CHAIN_UPDATED = 'ScopeChainUpdated',
 }
 
 export type EventTypes = {
-  [Events.ScopeChainUpdated]: ScopeChain,
+  [Events.SCOPE_CHAIN_UPDATED]: ScopeChain,
 };
 
 /**
- * Placeholder event payload.
- *
- * TODO(crbug.com/40277685): Send an actual scope chain.
+ * A scope chain ready to be shown in the UI with debugging info applied.
  */
 export class ScopeChain {
-  readonly callFrame: SDK.DebuggerModel.CallFrame;
+  readonly scopeChain: SDK.DebuggerModel.ScopeChainEntry[];
 
-  constructor(callFrame: SDK.DebuggerModel.CallFrame) {
-    this.callFrame = callFrame;
+  constructor(scopeChain: SDK.DebuggerModel.ScopeChainEntry[]) {
+    this.scopeChain = scopeChain;
   }
 }

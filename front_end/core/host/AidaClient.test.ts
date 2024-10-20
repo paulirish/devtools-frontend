@@ -25,7 +25,7 @@ describeWithEnvironment('AidaClient', () => {
     const stub = getGetHostConfigStub({
       devToolsConsoleInsights: {
         enabled: true,
-        aidaTemperature: 0.5,
+        temperature: 0.5,
       },
     });
     const request = Host.AidaClient.AidaClient.buildConsoleInsightsRequest('foo');
@@ -45,7 +45,7 @@ describeWithEnvironment('AidaClient', () => {
     const stub = getGetHostConfigStub({
       devToolsConsoleInsights: {
         enabled: true,
-        aidaTemperature: 0,
+        temperature: 0,
       },
     });
     const request = Host.AidaClient.AidaClient.buildConsoleInsightsRequest('foo');
@@ -61,12 +61,29 @@ describeWithEnvironment('AidaClient', () => {
     stub.restore();
   });
 
+  it('ignores a negative model temperature', () => {
+    const stub = getGetHostConfigStub({
+      devToolsConsoleInsights: {
+        enabled: true,
+        temperature: -1,
+      },
+    });
+    const request = Host.AidaClient.AidaClient.buildConsoleInsightsRequest('foo');
+    assert.deepStrictEqual(request, {
+      input: 'foo',
+      client: 'CHROME_DEVTOOLS',
+      client_feature: 1,
+      functionality_type: 2,
+    });
+    stub.restore();
+  });
+
   it('adds a model id and temperature', () => {
     const stub = getGetHostConfigStub({
       devToolsConsoleInsights: {
         enabled: true,
-        aidaModelId: TEST_MODEL_ID,
-        aidaTemperature: 0.5,
+        modelId: TEST_MODEL_ID,
+        temperature: 0.5,
       },
     });
     const request = Host.AidaClient.AidaClient.buildConsoleInsightsRequest('foo');
@@ -85,10 +102,12 @@ describeWithEnvironment('AidaClient', () => {
 
   it('adds metadata to disallow logging', () => {
     const stub = getGetHostConfigStub({
+      aidaAvailability: {
+        disallowLogging: true,
+      },
       devToolsConsoleInsights: {
         enabled: true,
-        aidaTemperature: 0.5,
-        disallowLogging: true,
+        temperature: 0.5,
       },
     });
     const request = Host.AidaClient.AidaClient.buildConsoleInsightsRequest('foo');
@@ -135,9 +154,10 @@ describeWithEnvironment('AidaClient', () => {
     const provider = new Host.AidaClient.AidaClient();
     const results = await getAllResults(provider);
     assert.deepStrictEqual(results, [
-      {explanation: 'hello ', metadata: {rpcGlobalId: 123}},
-      {explanation: 'hello brave ', metadata: {rpcGlobalId: 123}},
-      {explanation: 'hello brave new world!', metadata: {rpcGlobalId: 123}},
+      {explanation: 'hello ', metadata: {rpcGlobalId: 123}, completed: false},
+      {explanation: 'hello brave ', metadata: {rpcGlobalId: 123}, completed: false},
+      {explanation: 'hello brave new world!', metadata: {rpcGlobalId: 123}, completed: false},
+      {explanation: 'hello brave new world!', metadata: {rpcGlobalId: 123}, completed: true},
     ]);
   });
 
@@ -155,7 +175,8 @@ describeWithEnvironment('AidaClient', () => {
     const provider = new Host.AidaClient.AidaClient();
     const results = await getAllResults(provider);
     assert.deepStrictEqual(results, [
-      {explanation: 'hello world', metadata: {rpcGlobalId: 123}},
+      {explanation: 'hello world', metadata: {rpcGlobalId: 123}, completed: false},
+      {explanation: 'hello world', metadata: {rpcGlobalId: 123}, completed: true},
     ]);
   });
 
@@ -191,6 +212,7 @@ describeWithEnvironment('AidaClient', () => {
         explanation: 'Friends, Romans, countrymen, lend me your ears;\n' +
             'I come to bury Caesar, not to praise him.\n',
         metadata: {rpcGlobalId: 123},
+        completed: false,
       },
       {
         explanation: 'Friends, Romans, countrymen, lend me your ears;\n' +
@@ -199,6 +221,7 @@ describeWithEnvironment('AidaClient', () => {
             'The good is oft interred with their bones;\n' +
             'So let it be with Caesar. The noble Brutus\n',
         metadata: {rpcGlobalId: 123},
+        completed: false,
       },
       {
         explanation: 'Friends, Romans, countrymen, lend me your ears;\n' +
@@ -208,6 +231,7 @@ describeWithEnvironment('AidaClient', () => {
             'So let it be with Caesar. The noble Brutus\n' +
             'Hath told you Caesar was ambitious:\n',
         metadata: {rpcGlobalId: 123},
+        completed: false,
       },
       {
         explanation: 'Friends, Romans, countrymen, lend me your ears;\n' +
@@ -219,6 +243,19 @@ describeWithEnvironment('AidaClient', () => {
             'If it were so, it was a grievous fault,\n' +
             'And grievously hath Caesar answer’d it.\n',
         metadata: {rpcGlobalId: 123},
+        completed: false,
+      },
+      {
+        explanation: 'Friends, Romans, countrymen, lend me your ears;\n' +
+            'I come to bury Caesar, not to praise him.\n' +
+            'The evil that men do lives after them;\n' +
+            'The good is oft interred with their bones;\n' +
+            'So let it be with Caesar. The noble Brutus\n' +
+            'Hath told you Caesar was ambitious:\n' +
+            'If it were so, it was a grievous fault,\n' +
+            'And grievously hath Caesar answer’d it.\n',
+        metadata: {rpcGlobalId: 123},
+        completed: true,
       },
     ]);
   });
@@ -263,6 +300,22 @@ describeWithEnvironment('AidaClient', () => {
             },
           ],
         },
+        completed: false,
+      },
+      {
+        explanation: 'Chunk1\n' +
+            'Chunk2\n',
+        metadata: {
+          rpcGlobalId: 123,
+          attributionMetadata: [
+            {attributionAction: Host.AidaClient.RecitationAction.BLOCK, citations: []},
+            {
+              attributionAction: Host.AidaClient.RecitationAction.CITE,
+              citations: [{startIndex: 0, endIndex: 1, url: 'https://example.com'}],
+            },
+          ],
+        },
+        completed: true,
       },
     ]);
   });
@@ -284,13 +337,17 @@ describeWithEnvironment('AidaClient', () => {
 
     const provider = new Host.AidaClient.AidaClient();
     const results = (await getAllResults(provider)).map(r => r.explanation);
-    assert.deepStrictEqual(
-        results, ['hello ', 'hello \n`````\nbrave \n`````\n', 'hello \n`````\nbrave new World()\n`````\n']);
+    assert.deepStrictEqual(results, [
+      'hello ',
+      'hello \n`````\nbrave \n`````\n',
+      'hello \n`````\nbrave new World()\n`````\n',
+      'hello \n`````\nbrave new World()\n`````\n',
+    ]);
   });
 
   it('throws a readable error on 403', async () => {
     sinon.stub(Host.InspectorFrontendHost.InspectorFrontendHostInstance, 'doAidaConversation').callsArgWith(2, {
-      'statusCode': 403,
+      statusCode: 403,
     });
     const provider = new Host.AidaClient.AidaClient();
     try {
@@ -303,7 +360,7 @@ describeWithEnvironment('AidaClient', () => {
 
   it('throws an error for other codes', async () => {
     sinon.stub(Host.InspectorFrontendHost.InspectorFrontendHostInstance, 'doAidaConversation').callsArgWith(2, {
-      'statusCode': 418,
+      statusCode: 418,
     });
     const provider = new Host.AidaClient.AidaClient();
     try {
@@ -316,8 +373,8 @@ describeWithEnvironment('AidaClient', () => {
 
   it('throws an error with all details for other failures', async () => {
     sinon.stub(Host.InspectorFrontendHost.InspectorFrontendHostInstance, 'doAidaConversation').callsArgWith(2, {
-      'error': 'Cannot get OAuth credentials',
-      'detail': '{\'@type\': \'type.googleapis.com/google.rpc.DebugInfo\', \'detail\': \'DETAILS\'}',
+      error: 'Cannot get OAuth credentials',
+      detail: '{\'@type\': \'type.googleapis.com/google.rpc.DebugInfo\', \'detail\': \'DETAILS\'}',
     });
     const provider = new Host.AidaClient.AidaClient();
     try {
@@ -350,8 +407,8 @@ describeWithEnvironment('AidaClient', () => {
       });
 
       try {
-        const result = await Host.AidaClient.AidaClient.getAidaClientAvailability();
-        assert.strictEqual(result, Host.AidaClient.AidaAvailability.NO_INTERNET);
+        const result = await Host.AidaClient.AidaClient.checkAccessPreconditions();
+        assert.strictEqual(result, Host.AidaClient.AidaAccessPreconditions.NO_INTERNET);
       } finally {
         Object.defineProperty(globalThis, 'navigator', navigatorDescriptor);
       }
@@ -360,25 +417,25 @@ describeWithEnvironment('AidaClient', () => {
     it('should return NO_ACCOUNT_EMAIL when the syncInfo doesn\'t contain accountEmail', async () => {
       mockGetSyncInformation({accountEmail: undefined, isSyncActive: true});
 
-      const result = await Host.AidaClient.AidaClient.getAidaClientAvailability();
+      const result = await Host.AidaClient.AidaClient.checkAccessPreconditions();
 
-      assert.strictEqual(result, Host.AidaClient.AidaAvailability.NO_ACCOUNT_EMAIL);
-    });
-
-    it('should return NO_ACTIVE_SYNC when the syncInfo.isSyncActive is not true', async () => {
-      mockGetSyncInformation({accountEmail: 'some-email', isSyncActive: false});
-
-      const result = await Host.AidaClient.AidaClient.getAidaClientAvailability();
-
-      assert.strictEqual(result, Host.AidaClient.AidaAvailability.NO_ACTIVE_SYNC);
+      assert.strictEqual(result, Host.AidaClient.AidaAccessPreconditions.NO_ACCOUNT_EMAIL);
     });
 
     it('should return AVAILABLE when navigator is online, accountEmail exists and isSyncActive is true', async () => {
       mockGetSyncInformation({accountEmail: 'some-email', isSyncActive: true});
 
-      const result = await Host.AidaClient.AidaClient.getAidaClientAvailability();
+      const result = await Host.AidaClient.AidaClient.checkAccessPreconditions();
 
-      assert.strictEqual(result, Host.AidaClient.AidaAvailability.AVAILABLE);
+      assert.strictEqual(result, Host.AidaClient.AidaAccessPreconditions.AVAILABLE);
+    });
+
+    it('should return AVAILABLE when navigator is online, accountEmail exists and isSyncActive is false', async () => {
+      mockGetSyncInformation({accountEmail: 'some-email', isSyncActive: false});
+
+      const result = await Host.AidaClient.AidaClient.checkAccessPreconditions();
+
+      assert.strictEqual(result, Host.AidaClient.AidaAccessPreconditions.AVAILABLE);
     });
   });
 
@@ -388,8 +445,9 @@ describeWithEnvironment('AidaClient', () => {
       const RPC_ID = 0;
 
       const provider = new Host.AidaClient.AidaClient();
-      provider.registerClientEvent({
+      void provider.registerClientEvent({
         corresponding_aida_rpc_global_id: RPC_ID,
+        disable_user_content_logging: false,
         do_conversation_client_event: {user_feedback: {sentiment: Host.AidaClient.Rating.POSITIVE}},
       });
       const arg = JSON.parse(stub.getCalls()[0].args[0]);

@@ -136,6 +136,10 @@ export namespace ProtocolMapping {
      */
     'DOM.topLayerElementsUpdated': [];
     /**
+     * Fired when a node's scrollability state changes.
+     */
+    'DOM.scrollableFlagUpdated': [Protocol.DOM.ScrollableFlagUpdatedEvent];
+    /**
      * Called when a pseudo element is removed from an element.
      */
     'DOM.pseudoElementRemoved': [Protocol.DOM.PseudoElementRemovedEvent];
@@ -355,6 +359,11 @@ export namespace ProtocolMapping {
      * Fired when frame has been detached from its parent.
      */
     'Page.frameDetached': [Protocol.Page.FrameDetachedEvent];
+    /**
+     * Fired before frame subtree is detached. Emitted before any frame of the
+     * subtree is actually detached.
+     */
+    'Page.frameSubtreeWillBeDetached': [Protocol.Page.FrameSubtreeWillBeDetachedEvent];
     /**
      * Fired once navigation of the frame has completed. Frame is now associated with the new loader.
      */
@@ -632,6 +641,16 @@ export namespace ProtocolMapping {
      * Triggered when a credential is added to an authenticator.
      */
     'WebAuthn.credentialAdded': [Protocol.WebAuthn.CredentialAddedEvent];
+    /**
+     * Triggered when a credential is deleted, e.g. through
+     * PublicKeyCredential.signalUnknownCredential().
+     */
+    'WebAuthn.credentialDeleted': [Protocol.WebAuthn.CredentialDeletedEvent];
+    /**
+     * Triggered when a credential is updated, e.g. through
+     * PublicKeyCredential.signalCurrentUserDetails().
+     */
+    'WebAuthn.credentialUpdated': [Protocol.WebAuthn.CredentialUpdatedEvent];
     /**
      * Triggered when a credential is used in a webauthn assertion.
      */
@@ -950,11 +969,43 @@ export namespace ProtocolMapping {
     /**
      * Installs an unpacked extension from the filesystem similar to
      * --load-extension CLI flags. Returns extension ID once the extension
-     * has been installed.
+     * has been installed. Available if the client is connected using the
+     * --remote-debugging-pipe flag and the --enable-unsafe-extension-debugging
+     * flag is set.
      */
     'Extensions.loadUnpacked': {
       paramsType: [Protocol.Extensions.LoadUnpackedRequest];
       returnType: Protocol.Extensions.LoadUnpackedResponse;
+    };
+    /**
+     * Gets data from extension storage in the given `storageArea`. If `keys` is
+     * specified, these are used to filter the result.
+     */
+    'Extensions.getStorageItems': {
+      paramsType: [Protocol.Extensions.GetStorageItemsRequest];
+      returnType: Protocol.Extensions.GetStorageItemsResponse;
+    };
+    /**
+     * Removes `keys` from extension storage in the given `storageArea`.
+     */
+    'Extensions.removeStorageItems': {
+      paramsType: [Protocol.Extensions.RemoveStorageItemsRequest];
+      returnType: void;
+    };
+    /**
+     * Clears extension storage in the given `storageArea`.
+     */
+    'Extensions.clearStorageItems': {
+      paramsType: [Protocol.Extensions.ClearStorageItemsRequest];
+      returnType: void;
+    };
+    /**
+     * Sets `values` in extension storage in the given `storageArea`. The provided `values`
+     * will be merged with existing values in the storage area.
+     */
+    'Extensions.setStorageItems': {
+      paramsType: [Protocol.Extensions.SetStorageItemsRequest];
+      returnType: void;
     };
     /**
      * Trigger autofill on a form identified by the fieldId.
@@ -1769,6 +1820,13 @@ export namespace ProtocolMapping {
       returnType: Protocol.DOM.GetFileInfoResponse;
     };
     /**
+     * Returns list of detached nodes
+     */
+    'DOM.getDetachedDomNodes': {
+      paramsType: [];
+      returnType: Protocol.DOM.GetDetachedDomNodesResponse;
+    };
+    /**
      * Enables console to refer to the node with given id via $x (see Command Line API for more details
      * $x functions).
      */
@@ -2167,6 +2225,25 @@ export namespace ProtocolMapping {
      */
     'Emulation.setSensorOverrideReadings': {
       paramsType: [Protocol.Emulation.SetSensorOverrideReadingsRequest];
+      returnType: void;
+    };
+    /**
+     * Overrides a pressure source of a given type, as used by the Compute
+     * Pressure API, so that updates to PressureObserver.observe() are provided
+     * via setPressureStateOverride instead of being retrieved from
+     * platform-provided telemetry data.
+     */
+    'Emulation.setPressureSourceOverrideEnabled': {
+      paramsType: [Protocol.Emulation.SetPressureSourceOverrideEnabledRequest];
+      returnType: void;
+    };
+    /**
+     * Provides a given pressure state that will be processed and eventually be
+     * delivered to PressureObserver users. |source| must have been previously
+     * overridden by setPressureSourceOverrideEnabled.
+     */
+    'Emulation.setPressureStateOverride': {
+      paramsType: [Protocol.Emulation.SetPressureStateOverrideRequest];
       returnType: void;
     };
     /**
@@ -2582,10 +2659,24 @@ export namespace ProtocolMapping {
       paramsType: [];
       returnType: void;
     };
+    /**
+     * Retruns current DOM object counters.
+     */
     'Memory.getDOMCounters': {
       paramsType: [];
       returnType: Protocol.Memory.GetDOMCountersResponse;
     };
+    /**
+     * Retruns DOM object counters after preparing renderer for leak detection.
+     */
+    'Memory.getDOMCountersForLeakDetection': {
+      paramsType: [];
+      returnType: Protocol.Memory.GetDOMCountersForLeakDetectionResponse;
+    };
+    /**
+     * Prepares for leak detection by terminating workers, stopping spellcheckers,
+     * dropping non-essential internal caches, running garbage collections, etc.
+     */
     'Memory.prepareForLeakDetection': {
       paramsType: [];
       returnType: void;
@@ -3065,7 +3156,7 @@ export namespace ProtocolMapping {
       returnType: void;
     };
     /**
-     * Request that backend shows an overlay with web vital metrics.
+     * Deprecated, no longer has any effect.
      */
     'Overlay.setShowWebVitals': {
       paramsType: [Protocol.Overlay.SetShowWebVitalsRequest];
@@ -4492,6 +4583,36 @@ export namespace ProtocolMapping {
       returnType: void;
     };
     /**
+     * Enable the BluetoothEmulation domain.
+     */
+    'BluetoothEmulation.enable': {
+      paramsType: [Protocol.BluetoothEmulation.EnableRequest];
+      returnType: void;
+    };
+    /**
+     * Disable the BluetoothEmulation domain.
+     */
+    'BluetoothEmulation.disable': {
+      paramsType: [];
+      returnType: void;
+    };
+    /**
+     * Simulates a peripheral with |address|, |name| and |knownServiceUuids|
+     * that has already been connected to the system.
+     */
+    'BluetoothEmulation.simulatePreconnectedPeripheral': {
+      paramsType: [Protocol.BluetoothEmulation.SimulatePreconnectedPeripheralRequest];
+      returnType: void;
+    };
+    /**
+     * Simulates an advertisement packet described in |entry| being received by
+     * the central.
+     */
+    'BluetoothEmulation.simulateAdvertisement': {
+      paramsType: [Protocol.BluetoothEmulation.SimulateAdvertisementRequest];
+      returnType: void;
+    };
+    /**
      * Continues execution until specific location is reached.
      */
     'Debugger.continueToLocation': {
@@ -4619,6 +4740,15 @@ export namespace ProtocolMapping {
      */
     'Debugger.setAsyncCallStackDepth': {
       paramsType: [Protocol.Debugger.SetAsyncCallStackDepthRequest];
+      returnType: void;
+    };
+    /**
+     * Replace previous blackbox execution contexts with passed ones. Forces backend to skip
+     * stepping/pausing in scripts in these execution contexts. VM will try to leave blackboxed script by
+     * performing 'step in' several times, finally resorting to 'step out' if unsuccessful.
+     */
+    'Debugger.setBlackboxExecutionContexts': {
+      paramsType: [Protocol.Debugger.SetBlackboxExecutionContextsRequest];
       returnType: void;
     };
     /**

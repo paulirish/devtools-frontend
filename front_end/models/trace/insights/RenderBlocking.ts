@@ -6,18 +6,20 @@ import * as Protocol from '../../../generated/protocol.js';
 import * as Handlers from '../handlers/handlers.js';
 import * as Helpers from '../helpers/helpers.js';
 import type * as Lantern from '../lantern/lantern.js';
-import type * as Types from '../types/types.js';
+import * as Types from '../types/types.js';
 
+import {findLCPRequest} from './Common.js';
 import {
   type InsightResult,
+  type InsightSetContext,
+  type InsightSetContextWithNavigation,
   InsightWarning,
   type LanternContext,
-  type NavigationInsightContext,
   type RequiredData,
 } from './types.js';
 
 export type RenderBlockingInsightResult = InsightResult<{
-  renderBlockingRequests: Types.TraceEvents.SyntheticNetworkRequest[],
+  renderBlockingRequests: Types.Events.SyntheticNetworkRequest[],
   requestIdToWastedMs?: Map<string, number>,
 }>;
 
@@ -27,8 +29,8 @@ export type RenderBlockingInsightResult = InsightResult<{
 // to possibly be non-blocking (and they have minimal impact anyway).
 const MINIMUM_WASTED_MS = 50;
 
-export function deps(): ['NetworkRequests', 'PageLoadMetrics'] {
-  return ['NetworkRequests', 'PageLoadMetrics'];
+export function deps(): ['NetworkRequests', 'PageLoadMetrics', 'LargestImagePaint'] {
+  return ['NetworkRequests', 'PageLoadMetrics', 'LargestImagePaint'];
 }
 
 /**
@@ -50,7 +52,8 @@ function getNodesAndTimingByRequestId(nodeTimings: Lantern.Simulation.Result['no
   return requestIdToNode;
 }
 
-function estimateSavingsWithGraphs(deferredIds: Set<string>, lanternContext: LanternContext): number {
+function estimateSavingsWithGraphs(
+    deferredIds: Set<string>, lanternContext: LanternContext): Types.Timing.MilliSeconds {
   const simulator = lanternContext.simulator;
   const fcpGraph = lanternContext.metrics.firstContentfulPaint.optimisticGraph;
   const {nodeTimings} = lanternContext.simulator.simulate(fcpGraph);
@@ -78,20 +81,44 @@ function estimateSavingsWithGraphs(deferredIds: Set<string>, lanternContext: Lan
   minimalFCPGraph.request.transferSize = safeTransferSize + totalChildNetworkBytes;
   const estimateAfterInline = simulator.simulate(minimalFCPGraph).timeInMs;
   minimalFCPGraph.request.transferSize = originalTransferSize;
-  return Math.round(Math.max(estimateBeforeInline - estimateAfterInline, 0));
+  return Math.round(Math.max(estimateBeforeInline - estimateAfterInline, 0)) as Types.Timing.MilliSeconds;
+}
+
+function hasImageLCP(parsedTrace: RequiredData<typeof deps>, context: InsightSetContextWithNavigation): boolean {
+  const frameMetrics = parsedTrace.PageLoadMetrics.metricScoresByFrameId.get(context.frameId);
+  if (!frameMetrics) {
+    throw new Error('no frame metrics');
+  }
+
+  const navMetrics = frameMetrics.get(context.navigationId);
+  if (!navMetrics) {
+    throw new Error('no navigation metrics');
+  }
+  const metricScore = navMetrics.get(Handlers.ModelHandlers.PageLoadMetrics.MetricName.LCP);
+  const lcpEvent = metricScore?.event;
+  if (!lcpEvent || !Types.Events.isLargestContentfulPaintCandidate(lcpEvent)) {
+    return false;
+  }
+
+  return findLCPRequest(parsedTrace, context, lcpEvent) !== null;
 }
 
 function computeSavings(
-    renderBlockingRequests: Types.TraceEvents.SyntheticNetworkRequest[],
-    lanternContext: LanternContext): Pick<RenderBlockingInsightResult, 'metricSavings'|'requestIdToWastedMs'> {
-  const nodesAndTimingsByRequestId =
-      getNodesAndTimingByRequestId(lanternContext.metrics.firstContentfulPaint.optimisticEstimate.nodeTimings);
+    parsedTrace: RequiredData<typeof deps>, context: InsightSetContextWithNavigation,
+    renderBlockingRequests: Types.Events.SyntheticNetworkRequest[]):
+    Pick<RenderBlockingInsightResult, 'metricSavings'|'requestIdToWastedMs'>|undefined {
+  if (!context.lantern) {
+    return;
+  }
 
-  const metricSavings = {FCP: 0, LCP: 0};
+  const nodesAndTimingsByRequestId =
+      getNodesAndTimingByRequestId(context.lantern.metrics.firstContentfulPaint.optimisticEstimate.nodeTimings);
+
+  const metricSavings = {FCP: 0 as Types.Timing.MilliSeconds, LCP: 0 as Types.Timing.MilliSeconds};
   const requestIdToWastedMs = new Map<string, number>();
   const deferredNodeIds = new Set<string>();
-  for (const resource of renderBlockingRequests) {
-    const nodeAndTiming = nodesAndTimingsByRequestId.get(resource.args.data.requestId);
+  for (const request of renderBlockingRequests) {
+    const nodeAndTiming = nodesAndTimingsByRequestId.get(request.args.data.requestId);
     if (!nodeAndTiming) {
       continue;
     }
@@ -111,22 +138,26 @@ function computeSavings(
   }
 
   if (requestIdToWastedMs.size) {
-    metricSavings.FCP = estimateSavingsWithGraphs(deferredNodeIds, lanternContext);
+    metricSavings.FCP = estimateSavingsWithGraphs(deferredNodeIds, context.lantern);
 
     // In most cases, render blocking resources only affect LCP if LCP isn't an image.
-    // TODO(crbug.com/313905799): https://chromium-review.googlesource.com/c/devtools/devtools-frontend/+/5684935/comment/c85b06da_90b0c274/
-    // const lcpIsImage = ???
-    // if (!lcpIsImage) {
-    //   metricSavings.LCP = metricSavings.FCP;
-    // }
+    if (!hasImageLCP(parsedTrace, context)) {
+      metricSavings.LCP = metricSavings.FCP;
+    }
   }
 
   return {metricSavings, requestIdToWastedMs};
 }
 
 export function generateInsight(
-    traceParsedData: RequiredData<typeof deps>, context: NavigationInsightContext): RenderBlockingInsightResult {
-  const firstPaintTs = traceParsedData.PageLoadMetrics.metricScoresByFrameId.get(context.frameId)
+    parsedTrace: RequiredData<typeof deps>, context: InsightSetContext): RenderBlockingInsightResult {
+  if (!context.navigation) {
+    return {
+      renderBlockingRequests: [],
+    };
+  }
+
+  const firstPaintTs = parsedTrace.PageLoadMetrics.metricScoresByFrameId.get(context.frameId)
                            ?.get(context.navigationId)
                            ?.get(Handlers.ModelHandlers.PageLoadMetrics.MetricName.FP)
                            ?.event?.ts;
@@ -137,13 +168,13 @@ export function generateInsight(
     };
   }
 
-  const renderBlockingRequests = [];
-  for (const req of traceParsedData.NetworkRequests.byTime) {
+  let renderBlockingRequests: Types.Events.SyntheticNetworkRequest[] = [];
+  for (const req of parsedTrace.NetworkRequests.byTime) {
     if (req.args.data.frame !== context.frameId) {
       continue;
     }
 
-    if (req.args.data.renderBlocking !== 'blocking' && req.args.data.renderBlocking !== 'in_body_parser_blocking') {
+    if (!Helpers.Network.isSyntheticNetworkRequestEventRenderBlocking(req)) {
       continue;
     }
 
@@ -151,8 +182,8 @@ export function generateInsight(
       continue;
     }
 
-    // If a resource is marked `in_body_parser_blocking` it should only be considered render blocking if it is a
-    // high enough priority. Some resources (e.g. scripts) are not marked as high priority if they are fetched
+    // If a request is marked `in_body_parser_blocking` it should only be considered render blocking if it is a
+    // high enough priority. Some requests (e.g. scripts) are not marked as high priority if they are fetched
     // after a non-preloaded image. (See "early" definition in https://web.dev/articles/fetch-priority)
     //
     // There are edge cases and exceptions (e.g. priority hints) but this gives us the best approximation
@@ -167,17 +198,21 @@ export function generateInsight(
     }
 
     const navigation =
-        Helpers.Trace.getNavigationForTraceEvent(req, context.frameId, traceParsedData.Meta.navigationsByFrameId);
-    if (navigation?.args.data?.navigationId !== context.navigationId) {
-      continue;
+        Helpers.Trace.getNavigationForTraceEvent(req, context.frameId, parsedTrace.Meta.navigationsByFrameId);
+    if (navigation === context.navigation) {
+      renderBlockingRequests.push(req);
     }
-
-    renderBlockingRequests.push(req);
   }
 
-  const savings = context.lantern && computeSavings(renderBlockingRequests, context.lantern);
+  const savings = computeSavings(parsedTrace, context, renderBlockingRequests);
+
+  // Sort by request duration for insights.
+  renderBlockingRequests = renderBlockingRequests.sort((a, b) => {
+    return b.dur - a.dur;
+  });
 
   return {
+    relatedEvents: renderBlockingRequests,
     renderBlockingRequests,
     ...savings,
   };

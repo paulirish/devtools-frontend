@@ -249,14 +249,10 @@ export class SourcesPanel extends UI.Panel.Panel implements
         'jslog',
         `${VisualLogging.toolbar('navigator').track({keydown: 'ArrowUp|ArrowLeft|ArrowDown|ArrowRight|Enter|Space'})}`);
     const navigatorMenuButton = new UI.Toolbar.ToolbarMenuButton(
-        this.populateNavigatorMenu.bind(this), /* isIconDropdown */ true, /* useSoftMenu */ true, 'more-options');
-    navigatorMenuButton.setGlyph('dots-vertical');
+        this.populateNavigatorMenu.bind(this), /* isIconDropdown */ true, /* useSoftMenu */ true, 'more-options',
+        'dots-vertical');
     navigatorMenuButton.setTitle(i18nString(UIStrings.moreOptions));
     tabbedPane.rightToolbar().appendToolbarItem(navigatorMenuButton);
-    tabbedPane.addEventListener(
-        UI.TabbedPane.Events.TabSelected,
-        ({data: {tabId}}: Common.EventTarget.EventTargetEvent<UI.TabbedPane.EventData>) =>
-            Host.userMetrics.sourcesSidebarTabShown(tabId));
 
     if (UI.ViewManager.ViewManager.instance().hasViewsForLocation('run-view-sidebar')) {
       const navigatorSplitWidget =
@@ -273,7 +269,7 @@ export class SourcesPanel extends UI.Panel.Panel implements
     }
 
     this.sourcesViewInternal = new SourcesView();
-    this.sourcesViewInternal.addEventListener(Events.EditorSelected, this.editorSelected.bind(this));
+    this.sourcesViewInternal.addEventListener(Events.EDITOR_SELECTED, this.editorSelected.bind(this));
 
     this.toggleNavigatorSidebarButton = this.editorView.createShowHideSidebarButton(
         i18nString(UIStrings.showNavigator), i18nString(UIStrings.hideNavigator), i18nString(UIStrings.navigatorShown),
@@ -748,6 +744,7 @@ export class SourcesPanel extends UI.Panel.Panel implements
 
   private editorSelected(event: Common.EventTarget.EventTargetEvent<Workspace.UISourceCode.UISourceCode>): void {
     const uiSourceCode = event.data;
+    UI.Context.Context.instance().setFlavor(Workspace.UISourceCode.UISourceCode, uiSourceCode);
     if (this.editorView.mainWidget() &&
         Common.Settings.Settings.instance().moduleSetting('auto-reveal-in-navigator').get()) {
       void this.revealInNavigator(uiSourceCode, true);
@@ -871,12 +868,14 @@ export class SourcesPanel extends UI.Panel.Panel implements
 
     const longResumeButton =
         new UI.Toolbar.ToolbarButton(i18nString(UIStrings.resumeWithAllPausesBlockedForMs), 'play');
-    longResumeButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.longResume, this);
+    longResumeButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, this.longResume, this);
     const terminateExecutionButton =
         new UI.Toolbar.ToolbarButton(i18nString(UIStrings.terminateCurrentJavascriptCall), 'stop');
-    terminateExecutionButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.terminateExecution, this);
-    debugToolbar.appendToolbarItem(UI.Toolbar.Toolbar.createLongPressActionButton(
-        this.togglePauseAction, [terminateExecutionButton, longResumeButton], []));
+    terminateExecutionButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, this.terminateExecution, this);
+    const pauseActionButton = UI.Toolbar.Toolbar.createLongPressActionButton(
+        this.togglePauseAction, [terminateExecutionButton, longResumeButton], []);
+    pauseActionButton.toggleOnClick(false);
+    debugToolbar.appendToolbarItem(pauseActionButton);
 
     debugToolbar.appendToolbarItem(UI.Toolbar.Toolbar.createActionButton(this.stepOverAction));
     debugToolbar.appendToolbarItem(UI.Toolbar.Toolbar.createActionButton(this.stepIntoAction));
@@ -940,6 +939,17 @@ export class SourcesPanel extends UI.Panel.Panel implements
             jslogContext: 'sources.reveal-in-navigator-sidebar',
           });
     }
+
+    if (UI.ActionRegistry.ActionRegistry.instance().hasAction('drjones.sources-panel-context')) {
+      const editorElement = this.element.querySelector('devtools-text-editor');
+      if (!eventTarget.isSelfOrDescendant(editorElement)) {
+        UI.Context.Context.instance().setFlavor(Workspace.UISourceCode.UISourceCode, uiSourceCode);
+        contextMenu.headerSection().appendAction(
+            'drjones.sources-panel-context',
+        );
+      }
+    }
+
     // Ignore list only works for JavaScript debugging.
     if (uiSourceCode.contentType().hasScripts() &&
         Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance()
@@ -1028,7 +1038,7 @@ export class SourcesPanel extends UI.Panel.Panel implements
         const result = await remoteObject.callFunctionJSON(toStringForClipboard, [{
                                                              value: {
                                                                subtype: remoteObject.subtype,
-                                                               indent: indent,
+                                                               indent,
                                                              },
                                                            }]);
         inspectorFrontendHost.copyText(result);

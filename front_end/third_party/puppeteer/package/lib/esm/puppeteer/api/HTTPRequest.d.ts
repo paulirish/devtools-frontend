@@ -1,4 +1,3 @@
-/// <reference types="node" />
 /**
  * @license
  * Copyright 2020 Google Inc.
@@ -36,11 +35,16 @@ export interface InterceptResolutionState {
 export interface ResponseForRequest {
     status: number;
     /**
-     * Optional response headers. All values are converted to strings.
+     * Optional response headers.
+     *
+     * The record values will be converted to string following:
+     * Arrays' values will be mapped to String
+     * (Used when you need multiple headers with the same name).
+     * Non-arrays will be converted to String.
      */
-    headers: Record<string, unknown>;
+    headers: Record<string, string | string[] | unknown>;
     contentType: string;
-    body: string | Buffer;
+    body: string | Uint8Array;
 }
 /**
  * Resource types for HTTPRequests as perceived by the rendering engine.
@@ -86,6 +90,7 @@ export declare const DEFAULT_INTERCEPT_RESOLUTION_PRIORITY = 0;
  * @public
  */
 export declare abstract class HTTPRequest {
+    #private;
     /**
      * @internal
      */
@@ -367,6 +372,13 @@ export declare abstract class HTTPRequest {
      * throw an exception immediately.
      */
     abort(errorCode?: ErrorCode, priority?: number): Promise<void>;
+    /**
+     * @internal
+     */
+    static getResponse(body: string | Uint8Array): {
+        contentLength: number;
+        base64: string;
+    };
 }
 /**
  * @public

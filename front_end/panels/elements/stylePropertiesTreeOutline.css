@@ -88,8 +88,6 @@
   }
 
   &.child-editing {
-    padding-left: 8px;
-
     .text-prompt {
       white-space: pre-wrap;
     }
@@ -128,7 +126,7 @@ ol.expanded {
 input.enabled-button.small {
   &:hover::after,
   &:active::before {
-    left: 0;
+    left: 3px;
   }
 }
 
@@ -230,23 +228,13 @@ input.enabled-button.small {
 }
 
 .styles-pane-button {
-  width: 15px;
   height: 15px;
-  padding: 0;
-  border: 0;
   margin: 0 0 0 6px;
   position: absolute;
   top: -1px;
-  background-color: var(--sys-color-cdt-base-container);
-  border-radius: 3px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-
-  &:hover devtools-icon {
-    color: var(--icon-default-hover);
-  }
 }
 /* Matched styles */
 

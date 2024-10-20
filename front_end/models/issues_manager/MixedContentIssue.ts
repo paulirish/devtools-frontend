@@ -7,7 +7,7 @@ import type * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 
 import {Issue, IssueCategory, IssueKind} from './Issue.js';
-import {type MarkdownIssueDescription} from './MarkdownIssueDescription.js';
+import type {MarkdownIssueDescription} from './MarkdownIssueDescription.js';
 
 const UIStrings = {
   /**
@@ -38,7 +38,7 @@ export class MixedContentIssue extends Issue {
   }
 
   getCategory(): IssueCategory {
-    return IssueCategory.MixedContent;
+    return IssueCategory.MIXED_CONTENT;
   }
 
   getDescription(): MarkdownIssueDescription {
@@ -56,11 +56,11 @@ export class MixedContentIssue extends Issue {
   getKind(): IssueKind {
     switch (this.#issueDetails.resolutionStatus) {
       case Protocol.Audits.MixedContentResolutionStatus.MixedContentAutomaticallyUpgraded:
-        return IssueKind.Improvement;
+        return IssueKind.IMPROVEMENT;
       case Protocol.Audits.MixedContentResolutionStatus.MixedContentBlocked:
-        return IssueKind.PageError;
+        return IssueKind.PAGE_ERROR;
       case Protocol.Audits.MixedContentResolutionStatus.MixedContentWarning:
-        return IssueKind.Improvement;
+        return IssueKind.IMPROVEMENT;
     }
   }
 

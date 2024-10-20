@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as LitHtml from '../../../ui/lit-html/lit-html.js';
-
 import iconStyles from './icon.css.legacy.js';
 
 /**
@@ -44,8 +42,8 @@ export type IconData = IconWithName|{
  *
  * // Use within a template:
  * LitHtml.html`
- *   <${IconButton.Icon.Icon.litTagName} name="bin">
- *   </${IconButton.Icon.Icon.litTagName}>
+ *   <devtools-icon name="bin">
+ *   </devtools-icon>
  * `;
  * ```
  *
@@ -71,7 +69,6 @@ export type IconData = IconWithName|{
  * @prop {IconData} data - Deprecated way to set dimensions, color and name at once.
  */
 export class Icon extends HTMLElement {
-  static readonly litTagName = LitHtml.literal`devtools-icon`;
   static readonly observedAttributes = ['name'];
 
   readonly #shadowRoot;
@@ -84,7 +81,7 @@ export class Icon extends HTMLElement {
     this.#shadowRoot = this.attachShadow({mode: 'open'});
     this.#shadowRoot.appendChild(this.#icon);
 
-    // TODO(bmeurer): Ideally we'd have a `connectedCallback()` that would just
+    // TODO(crbug.com/359141904): Ideally we'd have a `connectedCallback()` that would just
     // install the CSS via `adoptedStyleSheets`, but that throws when using the
     // same `CSSStyleSheet` across two different documents (which happens in the
     // case of undocked DevTools windows and using the DeviceMode). So the work-

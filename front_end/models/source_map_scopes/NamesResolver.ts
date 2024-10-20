@@ -20,22 +20,14 @@ interface CachedScopeMap {
 
 const scopeToCachedIdentifiersMap = new WeakMap<Formatter.FormatterWorkerPool.ScopeTreeNode, CachedScopeMap>();
 const cachedMapByCallFrame = new WeakMap<SDK.DebuggerModel.CallFrame, Map<string, string|null>>();
-const cachedTextByDeferredContent = new WeakMap<TextUtils.ContentProvider.DeferredContent, TextUtils.Text.Text|null>();
 
-async function getTextFor(contentProvider: TextUtils.ContentProvider.ContentProvider):
+export async function getTextFor(contentProvider: TextUtils.ContentProvider.ContentProvider):
     Promise<TextUtils.Text.Text|null> {
-  // We intentionally cache based on the DeferredContent object rather
-  // than the ContentProvider object, which may appear as a more sensible
-  // choice, since the content of both Script and UISourceCode objects
-  // can change over time.
-  const deferredContent = await contentProvider.requestContent();
-  let text = cachedTextByDeferredContent.get(deferredContent);
-  if (text === undefined) {
-    const {content} = deferredContent;
-    text = content ? new TextUtils.Text.Text(content) : null;
-    cachedTextByDeferredContent.set(deferredContent, text);
+  const contentData = await contentProvider.requestContentData();
+  if (TextUtils.ContentData.ContentData.isError(contentData) || !contentData.isTextContent) {
+    return null;
   }
-  return text;
+  return contentData.textObj;
 }
 
 export class IdentifierPositions {
@@ -165,7 +157,7 @@ freeVariables:
   for (const variable of scope.variables) {
     // Skip the fixed-kind variable (i.e., 'this' or 'arguments') if we only found their "definition"
     // without any uses.
-    if (variable.kind === Formatter.FormatterWorkerPool.DefinitionKind.Fixed && variable.offsets.length <= 1) {
+    if (variable.kind === Formatter.FormatterWorkerPool.DefinitionKind.FIXED && variable.offsets.length <= 1) {
       continue;
     }
 
@@ -202,11 +194,11 @@ freeVariables:
 const identifierAndPunctuationRegExp = /^\s*([A-Za-z_$][A-Za-z_$0-9]*)\s*([.;,=]?)\s*$/;
 
 const enum Punctuation {
-  None = 'none',
-  Comma = 'comma',
-  Dot = 'dot',
-  Semicolon = 'semicolon',
-  Equals = 'equals',
+  NONE = 'none',
+  COMMA = 'comma',
+  DOT = 'dot',
+  SEMICOLON = 'semicolon',
+  EQUALS = 'equals',
 }
 
 const resolveDebuggerScope = async(scope: SDK.DebuggerModel.ScopeChainEntry):
@@ -343,7 +335,7 @@ const resolveScope = async(script: SDK.Script.Script, scopeChain: Formatter.Form
           return sourceName;
         }
         // Let us also allow semicolons into commas since that it is a common transformation.
-        if (compiledPunctuation === Punctuation.Comma && sourcePunctuation === Punctuation.Semicolon) {
+        if (compiledPunctuation === Punctuation.COMMA && sourcePunctuation === Punctuation.SEMICOLON) {
           return sourceName;
         }
 
@@ -359,19 +351,19 @@ const resolveScope = async(script: SDK.Script.Script, scopeChain: Formatter.Form
           let punctuation: Punctuation|null = null;
           switch (match[2]) {
             case '.':
-              punctuation = Punctuation.Dot;
+              punctuation = Punctuation.DOT;
               break;
             case ',':
-              punctuation = Punctuation.Comma;
+              punctuation = Punctuation.COMMA;
               break;
             case ';':
-              punctuation = Punctuation.Semicolon;
+              punctuation = Punctuation.SEMICOLON;
               break;
             case '=':
-              punctuation = Punctuation.Equals;
+              punctuation = Punctuation.EQUALS;
               break;
             case '':
-              punctuation = Punctuation.None;
+              punctuation = Punctuation.NONE;
               break;
             default:
               console.error(`Name token parsing error: unexpected token "${match[2]}"`);
@@ -384,16 +376,23 @@ const resolveScope = async(script: SDK.Script.Script, scopeChain: Formatter.Form
     };
 
 export const resolveScopeChain =
-    async function(callFrame: SDK.DebuggerModel.CallFrame|null): Promise<SDK.DebuggerModel.ScopeChainEntry[]|null> {
-  if (!callFrame) {
-    return null;
-  }
+    async function(callFrame: SDK.DebuggerModel.CallFrame): Promise<SDK.DebuggerModel.ScopeChainEntry[]> {
   const {pluginManager} = Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance();
-  const scopeChain = await pluginManager.resolveScopeChain(callFrame);
+  let scopeChain: SDK.DebuggerModel.ScopeChainEntry[]|null|undefined = await pluginManager.resolveScopeChain(callFrame);
   if (scopeChain) {
     return scopeChain;
   }
-  return callFrame.scopeChain();
+
+  scopeChain = callFrame.script.sourceMap()?.resolveScopeChain(callFrame);
+  if (scopeChain) {
+    return scopeChain;
+  }
+
+  if (callFrame.script.isWasm()) {
+    return callFrame.scopeChain();
+  }
+  const thisObject = await resolveThisObject(callFrame);
+  return callFrame.scopeChain().map(scope => new ScopeWithSourceMappedVariables(scope, thisObject));
 };
 
 /**
@@ -551,10 +550,7 @@ export const resolveExpression = async(
 };
 
 export const resolveThisObject =
-    async(callFrame: SDK.DebuggerModel.CallFrame|null): Promise<SDK.RemoteObject.RemoteObject|null> => {
-  if (!callFrame) {
-    return null;
-  }
+    async(callFrame: SDK.DebuggerModel.CallFrame): Promise<SDK.RemoteObject.RemoteObject|null> => {
   const scopeChain = callFrame.scopeChain();
   if (scopeChain.length === 0) {
     return callFrame.thisObject();
@@ -572,7 +568,7 @@ export const resolveThisObject =
     silent: true,
     returnByValue: false,
     generatePreview: true,
-  } as SDK.RuntimeModel.EvaluationOptions));
+  }));
   if ('exceptionDetails' in result) {
     return !result.exceptionDetails && result.object ? result.object : callFrame.thisObject();
   }
@@ -590,6 +586,65 @@ export const resolveScopeInObject = function(scope: SDK.DebuggerModel.ScopeChain
 
   return new RemoteObject(scope);
 };
+
+/**
+ * Wraps a debugger `Scope` but returns a scope object where variable names are
+ * mapped to their authored name.
+ *
+ * This implementation does not utilize source map "Scopes" information but obtains
+ * original variable names via parsing + mappings + names.
+ */
+class ScopeWithSourceMappedVariables implements SDK.DebuggerModel.ScopeChainEntry {
+  readonly #debuggerScope: SDK.DebuggerModel.ScopeChainEntry;
+  /** The resolved `this` of the current call frame */
+  readonly #thisObject: SDK.RemoteObject.RemoteObject|null;
+
+  constructor(scope: SDK.DebuggerModel.ScopeChainEntry, thisObject: SDK.RemoteObject.RemoteObject|null) {
+    this.#debuggerScope = scope;
+    this.#thisObject = thisObject;
+  }
+
+  callFrame(): SDK.DebuggerModel.CallFrame {
+    return this.#debuggerScope.callFrame();
+  }
+
+  type(): string {
+    return this.#debuggerScope.type();
+  }
+
+  typeName(): string {
+    return this.#debuggerScope.typeName();
+  }
+
+  name(): string|undefined {
+    return this.#debuggerScope.name();
+  }
+
+  range(): SDK.DebuggerModel.LocationRange|null {
+    return this.#debuggerScope.range();
+  }
+
+  object(): SDK.RemoteObject.RemoteObject {
+    return resolveScopeInObject(this.#debuggerScope);
+  }
+
+  description(): string {
+    return this.#debuggerScope.description();
+  }
+
+  icon(): string|undefined {
+    return this.#debuggerScope.icon();
+  }
+
+  extraProperties(): SDK.RemoteObject.RemoteObjectProperty[] {
+    const extraProperties = this.#debuggerScope.extraProperties();
+    if (this.#thisObject && this.type() === Protocol.Debugger.ScopeType.Local) {
+      extraProperties.unshift(new SDK.RemoteObject.RemoteObjectProperty(
+          'this', this.#thisObject, undefined, undefined, undefined, undefined, undefined, /* synthetic */ true));
+    }
+    return extraProperties;
+  }
+}
 
 export class RemoteObject extends SDK.RemoteObject.RemoteObject {
   private readonly scope: SDK.DebuggerModel.ScopeChainEntry;

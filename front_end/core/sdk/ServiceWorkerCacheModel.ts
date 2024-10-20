@@ -2,18 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import type * as ProtocolProxyApi from '../../generated/protocol-proxy-api.js';
+import type * as Protocol from '../../generated/protocol.js';
 import * as Common from '../common/common.js';
 import * as i18n from '../i18n/i18n.js';
 import type * as Platform from '../platform/platform.js';
-import type * as ProtocolProxyApi from '../../generated/protocol-proxy-api.js';
-import type * as Protocol from '../../generated/protocol.js';
 
-import {type NameValue} from './NetworkRequest.js';
-
-import {Capability, type Target} from './Target.js';
+import type {NameValue} from './NetworkRequest.js';
 import {SDKModel} from './SDKModel.js';
-
-import {Events as StorageBucketsModelEvents, StorageBucketsModel, type BucketEvent} from './StorageBucketsModel.js';
+import {type BucketEvent, Events as StorageBucketsModelEvents, StorageBucketsModel} from './StorageBucketsModel.js';
+import {Capability, type Target} from './Target.js';
 
 const UIStrings = {
   /**
@@ -57,8 +55,9 @@ export class ServiceWorkerCacheModel extends SDKModel<EventTypes> implements Pro
       return;
     }
 
-    this.#storageBucketModel.addEventListener(StorageBucketsModelEvents.BucketAdded, this.storageBucketAdded, this);
-    this.#storageBucketModel.addEventListener(StorageBucketsModelEvents.BucketRemoved, this.storageBucketRemoved, this);
+    this.#storageBucketModel.addEventListener(StorageBucketsModelEvents.BUCKET_ADDED, this.storageBucketAdded, this);
+    this.#storageBucketModel.addEventListener(
+        StorageBucketsModelEvents.BUCKET_REMOVED, this.storageBucketRemoved, this);
 
     for (const storageBucket of this.#storageBucketModel.getBuckets()) {
       this.addStorageBucket(storageBucket.bucket);
@@ -135,9 +134,9 @@ export class ServiceWorkerCacheModel extends SDKModel<EventTypes> implements Pro
     this.#cachesInternal.clear();
     if (this.#enabled) {
       this.#storageBucketModel.removeEventListener(
-          StorageBucketsModelEvents.BucketAdded, this.storageBucketAdded, this);
+          StorageBucketsModelEvents.BUCKET_ADDED, this.storageBucketAdded, this);
       this.#storageBucketModel.removeEventListener(
-          StorageBucketsModelEvents.BucketRemoved, this.storageBucketRemoved, this);
+          StorageBucketsModelEvents.BUCKET_REMOVED, this.storageBucketRemoved, this);
     }
   }
 
@@ -216,11 +215,11 @@ export class ServiceWorkerCacheModel extends SDKModel<EventTypes> implements Pro
   }
 
   private cacheAdded(cache: Cache): void {
-    this.dispatchEventToListeners(Events.CacheAdded, {model: this, cache: cache});
+    this.dispatchEventToListeners(Events.CACHE_ADDED, {model: this, cache});
   }
 
   private cacheRemoved(cache: Cache): void {
-    this.dispatchEventToListeners(Events.CacheRemoved, {model: this, cache: cache});
+    this.dispatchEventToListeners(Events.CACHE_REMOVED, {model: this, cache});
   }
 
   private async requestEntries(
@@ -258,15 +257,15 @@ export class ServiceWorkerCacheModel extends SDKModel<EventTypes> implements Pro
             this.#storageBucketsUpdated.clear();
             return Promise.all(promises);
           },
-          this.#scheduleAsSoonAsPossible ? Common.Throttler.Scheduling.AsSoonAsPossible :
-                                           Common.Throttler.Scheduling.Default);
+          this.#scheduleAsSoonAsPossible ? Common.Throttler.Scheduling.AS_SOON_AS_POSSIBLE :
+                                           Common.Throttler.Scheduling.DEFAULT);
     }
   }
 
   cacheStorageContentUpdated({bucketId, cacheName}: Protocol.Storage.CacheStorageContentUpdatedEvent): void {
     const storageBucket = this.#storageBucketModel.getBucketById(bucketId)?.bucket;
     if (storageBucket) {
-      this.dispatchEventToListeners(Events.CacheStorageContentUpdated, {storageBucket, cacheName});
+      this.dispatchEventToListeners(Events.CACHE_STORAGE_CONTENT_UPDATED, {storageBucket, cacheName});
     }
   }
 
@@ -307,9 +306,9 @@ export class ServiceWorkerCacheModel extends SDKModel<EventTypes> implements Pro
 }
 
 export const enum Events {
-  CacheAdded = 'CacheAdded',
-  CacheRemoved = 'CacheRemoved',
-  CacheStorageContentUpdated = 'CacheStorageContentUpdated',
+  CACHE_ADDED = 'CacheAdded',
+  CACHE_REMOVED = 'CacheRemoved',
+  CACHE_STORAGE_CONTENT_UPDATED = 'CacheStorageContentUpdated',
 }
 
 export interface CacheEvent {
@@ -323,9 +322,9 @@ export interface CacheStorageContentUpdatedEvent {
 }
 
 export type EventTypes = {
-  [Events.CacheAdded]: CacheEvent,
-  [Events.CacheRemoved]: CacheEvent,
-  [Events.CacheStorageContentUpdated]: CacheStorageContentUpdatedEvent,
+  [Events.CACHE_ADDED]: CacheEvent,
+  [Events.CACHE_REMOVED]: CacheEvent,
+  [Events.CACHE_STORAGE_CONTENT_UPDATED]: CacheStorageContentUpdatedEvent,
 };
 
 export class Cache {
@@ -368,4 +367,4 @@ export class Cache {
   }
 }
 
-SDKModel.register(ServiceWorkerCacheModel, {capabilities: Capability.Storage, autostart: false});
+SDKModel.register(ServiceWorkerCacheModel, {capabilities: Capability.STORAGE, autostart: false});

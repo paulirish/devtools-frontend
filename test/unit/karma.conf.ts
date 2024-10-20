@@ -7,7 +7,7 @@
 import * as path from 'path';
 
 import {formatAsPatch, resultAssertionsDiff, ResultsDBReporter} from '../../test/conductor/karma-resultsdb-reporter.js';
-import {GEN_DIR, SOURCE_ROOT} from '../../test/conductor/paths.js';
+import {CHECKOUT_ROOT, GEN_DIR, SOURCE_ROOT} from '../../test/conductor/paths.js';
 // eslint-disable-next-line  rulesdir/es_modules_import
 import * as ResultsDb from '../../test/conductor/resultsdb.js';
 import {loadTests, TestConfig} from '../../test/conductor/test_config.js';
@@ -32,14 +32,19 @@ const CustomChrome = function(this: unknown, _baseBrowserDecorator: unknown, _ar
   require('karma-chrome-launcher')['launcher:Chrome'][1].apply(this, arguments);
 };
 
+const executablePath = TestConfig.chromeBinary;
+
 CustomChrome.prototype = {
   name: 'ChromeLauncher',
 
   DEFAULT_CMD: {
-    [process.platform]: TestConfig.chromeBinary,
+    [process.platform]: executablePath,
   },
   ENV_CMD: 'CHROME_BIN',
 };
+
+TestConfig.configureChrome(executablePath);
+
 CustomChrome.$inject = ['baseBrowserDecorator', 'args', 'config'];
 
 const BaseProgressReporter =
@@ -69,7 +74,7 @@ const coveragePreprocessors = TestConfig.coverage ? {
 module.exports = function(config: any) {
   const targetDir = path.relative(SOURCE_ROOT, GEN_DIR);
   const options = {
-    basePath: SOURCE_ROOT,
+    basePath: CHECKOUT_ROOT,
     autoWatchBatchDelay: 3000,
 
     files: [
@@ -98,7 +103,7 @@ module.exports = function(config: any) {
 
     browsers: ['BrowserWithArgs'],
     customLaunchers: {
-      'BrowserWithArgs': {
+      BrowserWithArgs: {
         base: CustomChrome.prototype.name,
         flags: [
           '--remote-allow-origins=*',

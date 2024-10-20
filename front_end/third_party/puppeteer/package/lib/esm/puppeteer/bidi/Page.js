@@ -40,7 +40,7 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
 var __addDisposableResource = (this && this.__addDisposableResource) || function (env, value, async) {
     if (value !== null && value !== void 0) {
         if (typeof value !== "object" && typeof value !== "function") throw new TypeError("Object expected.");
-        var dispose;
+        var dispose, inner;
         if (async) {
             if (!Symbol.asyncDispose) throw new TypeError("Symbol.asyncDispose is not defined.");
             dispose = value[Symbol.asyncDispose];
@@ -48,8 +48,10 @@ var __addDisposableResource = (this && this.__addDisposableResource) || function
         if (dispose === void 0) {
             if (!Symbol.dispose) throw new TypeError("Symbol.dispose is not defined.");
             dispose = value[Symbol.dispose];
+            if (async) inner = dispose;
         }
         if (typeof dispose !== "function") throw new TypeError("Object not disposable.");
+        if (inner) dispose = function() { try { inner.call(this); } catch (e) { return Promise.reject(e); } };
         env.stack.push({ value: value, dispose: dispose, async: async });
     }
     else if (async) {
@@ -92,6 +94,7 @@ import { EventEmitter } from '../common/EventEmitter.js';
 import { evaluationString, isString, parsePDFOptions, timeout, } from '../common/util.js';
 import { assert } from '../util/assert.js';
 import { bubble } from '../util/decorators.js';
+import { stringToTypedArray } from '../util/encoding.js';
 import { isErrorLike } from '../util/ErrorLike.js';
 import { BidiFrame } from './Frame.js';
 import { BidiKeyboard, BidiMouse, BidiTouchscreen } from './Input.js';
@@ -274,11 +277,22 @@ let BidiPage = (() => {
             return this.#frame.detached;
         }
         async close(options) {
+            const env_2 = { stack: [], error: void 0, hasError: false };
             try {
-                await this.#frame.browsingContext.close(options?.runBeforeUnload);
+                const _guard = __addDisposableResource(env_2, await this.#browserContext.waitForScreenshotOperations(), false);
+                try {
+                    await this.#frame.browsingContext.close(options?.runBeforeUnload);
+                }
+                catch {
+                    return;
+                }
             }
-            catch {
-                return;
+            catch (e_2) {
+                env_2.error = e_2;
+                env_2.hasError = true;
+            }
+            finally {
+                __disposeResources(env_2);
             }
         }
         async reload(options = {}) {
@@ -370,15 +384,15 @@ let BidiPage = (() => {
                 scale,
                 shrinkToFit: !preferCSSPageSize,
             })).pipe(raceWith(timeout(ms))));
-            const buffer = Buffer.from(data, 'base64');
-            await this._maybeWriteBufferToFile(path, buffer);
-            return buffer;
+            const typedArray = stringToTypedArray(data, true);
+            await this._maybeWriteTypedArrayToFile(path, typedArray);
+            return typedArray;
         }
         async createPDFStream(options) {
-            const buffer = await this.pdf(options);
+            const typedArray = await this.pdf(options);
             return new ReadableStream({
                 start(controller) {
-                    controller.enqueue(buffer);
+                    controller.enqueue(typedArray);
                     controller.close();
                 },
             });
@@ -453,6 +467,10 @@ let BidiPage = (() => {
             return false;
         }
         async setCacheEnabled(enabled) {
+            if (!this.#browserContext.browser().cdpSupported) {
+                await this.#frame.browsingContext.setCacheBehavior(enabled ? 'default' : 'bypass');
+                return;
+            }
             // TODO: handle CDP-specific cases such as mprach.
             await this._client().send('Network.setCacheDisabled', {
                 cacheDisabled: !enabled,
@@ -650,15 +668,19 @@ let BidiPage = (() => {
             return await this.#go(1, options);
         }
         async #go(delta, options) {
+            const controller = new AbortController();
             try {
                 const [response] = await Promise.all([
-                    this.waitForNavigation(options),
+                    this.waitForNavigation({
+                        ...options,
+                        signal: controller.signal,
+                    }),
                     this.#frame.browsingContext.traverseHistory(delta),
                 ]);
                 return response;
             }
             catch (error) {
-                // TODO: waitForNavigation should be cancelled if an error happens.
+                controller.abort();
                 if (isErrorLike(error)) {
                     if (error.message.includes('no such history entry')) {
                         return null;
@@ -725,6 +747,20 @@ function testUrlMatchCookie(cookie, url) {
     return testUrlMatchCookiePath(cookie, normalizedUrl);
 }
 function bidiToPuppeteerCookie(bidiCookie) {
+    const partitionKey = bidiCookie[CDP_SPECIFIC_PREFIX + 'partitionKey'];
+    function getParitionKey() {
+        if (typeof partitionKey === 'string') {
+            return { partitionKey };
+        }
+        if (typeof partitionKey === 'object' && partitionKey !== null) {
+            return {
+                // TODO: a breaking change in Puppeteer is required to change
+                // partitionKey type and report the composite partition key.
+                partitionKey: partitionKey.topLevelSite,
+            };
+        }
+        return {};
+    }
     return {
         name: bidiCookie.name,
         // Presents binary value as base64 string.
@@ -738,7 +774,8 @@ function bidiToPuppeteerCookie(bidiCookie) {
         expires: bidiCookie.expiry ?? -1,
         session: bidiCookie.expiry === undefined || bidiCookie.expiry <= 0,
         // Extending with CDP-specific properties with `goog:` prefix.
-        ...cdpSpecificCookiePropertiesFromBidiToPuppeteer(bidiCookie, 'sameParty', 'sourceScheme', 'partitionKey', 'partitionKeyOpaque', 'priority'),
+        ...cdpSpecificCookiePropertiesFromBidiToPuppeteer(bidiCookie, 'sameParty', 'sourceScheme', 'partitionKeyOpaque', 'priority'),
+        ...getParitionKey(),
     };
 }
 const CDP_SPECIFIC_PREFIX = 'goog:';

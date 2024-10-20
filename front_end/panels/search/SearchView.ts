@@ -12,7 +12,7 @@ import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {SearchResultsPane} from './SearchResultsPane.js';
-import {type SearchResult, type SearchScope} from './SearchScope.js';
+import type {SearchResult, SearchScope} from './SearchScope.js';
 import searchViewStyles from './searchView.css.js';
 
 const UIStrings = {
@@ -222,8 +222,8 @@ export class SearchView extends UI.Widget.VBox {
     const clearButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.clear), 'clear', undefined, 'search.clear');
     toolbar.appendToolbarItem(refreshButton);
     toolbar.appendToolbarItem(clearButton);
-    refreshButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, () => this.onAction());
-    clearButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, () => {
+    refreshButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, () => this.onAction());
+    clearButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, () => {
       this.resetSearch();
       this.onSearchInputClear();
     });

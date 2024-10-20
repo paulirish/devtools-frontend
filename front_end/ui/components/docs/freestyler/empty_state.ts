@@ -4,6 +4,8 @@
 
 import * as Host from '../../../../core/host/host.js';
 import type * as SDK from '../../../../core/sdk/sdk.js';
+import type * as Trace from '../../../../models/trace/trace.js';
+import type * as Workspace from '../../../../models/workspace/workspace.js';
 import * as Freestyler from '../../../../panels/freestyler/freestyler.js';
 import * as FrontendHelpers from '../../../../testing/EnvironmentHelpers.js';
 import * as ComponentHelpers from '../../helpers/helpers.js';
@@ -16,17 +18,22 @@ const noop = () => {};
 const component = new Freestyler.FreestylerChatUi({
   onTextSubmit: noop,
   onInspectElementClick: noop,
-  onRateClick: noop,
   onFeedbackSubmit: noop,
-  onAcceptConsentClick: noop,
   onCancelClick: noop,
-  onFixThisIssueClick: noop,
+  onSelectedNetworkRequestClick: noop,
+  onSelectedFileRequestClick: noop,
   inspectElementToggled: false,
   state: Freestyler.State.CHAT_VIEW,
-  aidaAvailability: Host.AidaClient.AidaAvailability.AVAILABLE,
+  aidaAvailability: Host.AidaClient.AidaAccessPreconditions.AVAILABLE,
   messages: [],
-  selectedNode: {} as unknown as SDK.DOMModel.DOMNode,
+  selectedElement: {} as unknown as SDK.DOMModel.DOMNode,
+  selectedFile: {} as unknown as Workspace.UISourceCode.UISourceCode,
+  selectedNetworkRequest: {} as unknown as SDK.NetworkRequest.NetworkRequest,
+  selectedStackTrace: {} as unknown as Trace.Helpers.TreeHelpers.TraceEntryNodeForAI,
+  agentType: Freestyler.AgentType.FREESTYLER,
   isLoading: false,
+  canShowFeedbackForm: false,
+  userInfo: {},
 });
 
 document.getElementById('container')?.appendChild(component);

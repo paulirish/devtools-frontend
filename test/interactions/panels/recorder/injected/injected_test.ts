@@ -4,22 +4,15 @@
 
 import {assert} from 'chai';
 
-import {type DevToolsRecorder} from '../../../../../front_end/panels/recorder/injected/injected.js';
-import {type Schema} from '../../../../../front_end/panels/recorder/models/models.js';
+import type {DevToolsRecorder} from '../../../../../front_end/panels/recorder/injected/injected.js';
+import type {Schema} from '../../../../../front_end/panels/recorder/models/models.js';
 import {
   loadComponentDocExample,
-  preloadForCodeCoverage,
 } from '../../../../../test/interactions/helpers/shared.js';
 import {getBrowserAndPages} from '../../../../../test/shared/helper.js';
-import {
-  describe,
-  it,
-} from '../../../../../test/shared/mocha-extensions.js';
 import {assertMatchesJSONSnapshot} from '../../../../../test/shared/snapshots.js';
 
 describe('Injected', () => {
-  preloadForCodeCoverage('recorder_injected/basic.html');
-
   beforeEach(async () => {
     await loadComponentDocExample('recorder_injected/basic.html');
 

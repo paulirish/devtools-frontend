@@ -5,10 +5,12 @@
 import * as i18n from '../../../core/i18n/i18n.js';
 import type * as Protocol from '../../../generated/protocol.js';
 import * as DataGrid from '../../../ui/components/data_grid/data_grid.js';
-import * as IconButton from '../../../ui/components/icon_button/icon_button.js';
+import type * as IconButton from '../../../ui/components/icon_button/icon_button.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 
 import interestGroupAccessGridStyles from './interestGroupAccessGrid.css.js';
+
+const {html} = LitHtml;
 
 const UIStrings = {
   /**
@@ -51,7 +53,6 @@ const str_ = i18n.i18n.registerUIStrings('panels/application/components/Interest
 export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class InterestGroupAccessGrid extends HTMLElement {
-  static readonly litTagName = LitHtml.literal`devtools-interest-group-access-grid`;
   readonly #shadow = this.attachShadow({mode: 'open'});
   #datastores: Array<Protocol.Storage.InterestGroupAccessedEvent> = [];
 
@@ -67,15 +68,15 @@ export class InterestGroupAccessGrid extends HTMLElement {
 
   #render(): void {
     // clang-format off
-    LitHtml.render(LitHtml.html`
+    LitHtml.render(html`
       <div>
         <span class="heading">Interest Groups</span>
-        <${IconButton.Icon.Icon.litTagName} class="info-icon" title=${
+        <devtools-icon class="info-icon" title=${
             i18nString(UIStrings.allInterestGroupStorageEvents)}
           .data=${
             {iconName: 'info', color: 'var(--icon-default)', width: '16px'} as
             IconButton.Icon.IconWithName}>
-        </${IconButton.Icon.Icon.litTagName}>
+        </devtools-icon>
         ${this.#renderGridOrNoDataMessage()}
       </div>
     `, this.#shadow, {host: this});
@@ -84,7 +85,7 @@ export class InterestGroupAccessGrid extends HTMLElement {
 
   #renderGridOrNoDataMessage(): LitHtml.TemplateResult {
     if (this.#datastores.length === 0) {
-      return LitHtml.html`<div class="no-events-message">${i18nString(UIStrings.noEvents)}</div>`;
+      return html`<div class="no-events-message">${i18nString(UIStrings.noEvents)}</div>`;
     }
 
     const gridData: DataGrid.DataGridController.DataGridControllerData = {
@@ -129,10 +130,9 @@ export class InterestGroupAccessGrid extends HTMLElement {
       },
     };
 
-    return LitHtml.html`
-      <${DataGrid.DataGridController.DataGridController.litTagName} .data=${
-        gridData as DataGrid.DataGridController.DataGridControllerData}></${
-        DataGrid.DataGridController.DataGridController.litTagName}>
+    return html`
+      <devtools-data-grid-controller .data=${
+        gridData as DataGrid.DataGridController.DataGridControllerData}></devtools-data-grid-controller>
     `;
   }
 
@@ -153,7 +153,7 @@ export class InterestGroupAccessGrid extends HTMLElement {
 
   #renderDateForDataGridCell(value: DataGrid.DataGridUtils.CellValue): LitHtml.TemplateResult {
     const date = new Date(1e3 * (value as number));
-    return LitHtml.html`${date.toLocaleString()}`;
+    return html`${date.toLocaleString()}`;
   }
 }
 

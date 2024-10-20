@@ -37,8 +37,7 @@ import * as KeyboardUtilities from './KeyboardUtilities.js';
 import * as MapUtilities from './MapUtilities.js';
 import * as MimeType from './MimeType.js';
 import * as NumberUtilities from './NumberUtilities.js';
-import * as PromiseUtilities from './PromiseUtilities.js';
-import * as SetUtilities from './SetUtilities.js';
+import * as ServerTiming from './ServerTiming.js';
 import * as StringUtilities from './StringUtilities.js';
 import * as Timing from './Timing.js';
 import * as TypedArrayUtilities from './TypedArrayUtilities.js';
@@ -62,8 +61,7 @@ export {
   MapUtilities,
   MimeType,
   NumberUtilities,
-  PromiseUtilities,
-  SetUtilities,
+  ServerTiming,
   StringUtilities,
   Timing,
   TypedArrayUtilities,

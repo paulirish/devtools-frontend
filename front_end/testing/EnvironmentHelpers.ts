@@ -25,7 +25,7 @@ let UI: typeof UIModule;
 let uniqueTargetId = 0;
 
 export function createTarget(
-    {id, name, type = SDK.Target.Type.Frame, parentTarget, subtype, url = 'http://example.com'}: {
+    {id, name, type = SDK.Target.Type.FRAME, parentTarget, subtype, url = 'http://example.com'}: {
       id?: Protocol.Target.TargetID,
       name?: string,
       type?: SDK.Target.Type,
@@ -122,16 +122,17 @@ const REGISTERED_EXPERIMENTS = [
   Root.Runtime.ExperimentName.USE_SOURCE_MAP_SCOPES,
   'font-editor',
   Root.Runtime.ExperimentName.NETWORK_PANEL_FILTER_BAR_REDESIGN,
-  Root.Runtime.ExperimentName.INDENTATION_MARKERS_TEMP_DISABLE,
   Root.Runtime.ExperimentName.AUTOFILL_VIEW,
-  Root.Runtime.ExperimentName.TIMELINE_ANNOTATIONS_OVERLAYS,
-  Root.Runtime.ExperimentName.TIMELINE_SIDEBAR,
-  Root.Runtime.ExperimentName.TIMELINE_EXTENSIONS,
+  Root.Runtime.ExperimentName.TIMELINE_ANNOTATIONS,
+  Root.Runtime.ExperimentName.TIMELINE_INSIGHTS,
   Root.Runtime.ExperimentName.TIMELINE_DEBUG_MODE,
   Root.Runtime.ExperimentName.TIMELINE_OBSERVATIONS,
+  Root.Runtime.ExperimentName.TIMELINE_SERVER_TIMINGS,
   Root.Runtime.ExperimentName.FULL_ACCESSIBILITY_TREE,
   Root.Runtime.ExperimentName.TIMELINE_SHOW_POST_MESSAGE_EVENTS,
   Root.Runtime.ExperimentName.TIMELINE_ENHANCED_TRACES,
+  Root.Runtime.ExperimentName.EXTENSION_STORAGE_VIEWER,
+  Root.Runtime.ExperimentName.TIMELINE_EXPERIMENTAL_INSIGHTS,
 ];
 
 export async function initializeGlobalVars({reset = true} = {}) {
@@ -154,6 +155,7 @@ export async function initializeGlobalVars({reset = true} = {}) {
     createSettingValue(Common.Settings.SettingCategory.DEBUGGER, 'skip-content-scripts', true),
     createSettingValue(
         Common.Settings.SettingCategory.DEBUGGER, 'automatically-ignore-list-known-third-party-scripts', true),
+    createSettingValue(Common.Settings.SettingCategory.DEBUGGER, 'skip-anonymous-scripts', false),
     createSettingValue(Common.Settings.SettingCategory.DEBUGGER, 'enable-ignore-listing', true),
     createSettingValue(
         Common.Settings.SettingCategory.DEBUGGER, 'skip-stack-frames-pattern', '/node_modules/|/bower_components/',
@@ -162,6 +164,7 @@ export async function initializeGlobalVars({reset = true} = {}) {
     createSettingValue(Common.Settings.SettingCategory.ELEMENTS, 'show-detailed-inspect-tooltip', true),
     createSettingValue(Common.Settings.SettingCategory.ELEMENTS, 'show-html-comments', true),
     createSettingValue(Common.Settings.SettingCategory.ELEMENTS, 'show-ua-shadow-dom', false),
+    createSettingValue(Common.Settings.SettingCategory.PERFORMANCE, 'annotations-hidden', false),
     createSettingValue(Common.Settings.SettingCategory.NETWORK, 'cache-disabled', false),
     createSettingValue(Common.Settings.SettingCategory.RENDERING, 'avif-format-disabled', false),
     createSettingValue(
@@ -198,7 +201,6 @@ export async function initializeGlobalVars({reset = true} = {}) {
     createSettingValue(Common.Settings.SettingCategory.RENDERING, 'show-debug-borders', false),
     createSettingValue(Common.Settings.SettingCategory.RENDERING, 'show-fps-counter', false),
     createSettingValue(Common.Settings.SettingCategory.RENDERING, 'show-scroll-bottleneck-rects', false),
-    createSettingValue(Common.Settings.SettingCategory.RENDERING, 'show-web-vitals', false),
     createSettingValue(Common.Settings.SettingCategory.RENDERING, 'webp-format-disabled', false),
     createSettingValue(Common.Settings.SettingCategory.SOURCES, 'allow-scroll-past-eof', true),
     createSettingValue(Common.Settings.SettingCategory.SOURCES, 'css-source-maps-enabled', true),
@@ -218,6 +220,8 @@ export async function initializeGlobalVars({reset = true} = {}) {
         Common.Settings.SettingCategory.EMULATION, 'emulation.touch', '', Common.Settings.SettingType.ENUM),
     createSettingValue(
         Common.Settings.SettingCategory.EMULATION, 'emulation.idle-detection', '', Common.Settings.SettingType.ENUM),
+    createSettingValue(
+        Common.Settings.SettingCategory.EMULATION, 'emulation.cpu-pressure', '', Common.Settings.SettingType.ENUM),
     createSettingValue(
         Common.Settings.SettingCategory.GRID, 'show-grid-line-labels', 'none', Common.Settings.SettingType.ENUM),
     createSettingValue(Common.Settings.SettingCategory.GRID, 'extend-grid-lines', true),
@@ -261,10 +265,9 @@ export async function initializeGlobalVars({reset = true} = {}) {
         Common.Settings.SettingCategory.CONSOLE, 'console-timestamps-enabled', false,
         Common.Settings.SettingType.BOOLEAN),
     createSettingValue(
-        Common.Settings.SettingCategory.CONSOLE, 'console-insights-enabled', false,
-        Common.Settings.SettingType.BOOLEAN),
+        Common.Settings.SettingCategory.CONSOLE, 'console-insights-enabled', true, Common.Settings.SettingType.BOOLEAN),
     createSettingValue(
-        Common.Settings.SettingCategory.CONSOLE, 'console-insights-onboarding-finished', false,
+        Common.Settings.SettingCategory.CONSOLE, 'console-insights-onboarding-finished', true,
         Common.Settings.SettingType.BOOLEAN),
     createSettingValue(
         Common.Settings.SettingCategory.CONSOLE, 'console-history-autocomplete', false,
@@ -288,8 +291,12 @@ export async function initializeGlobalVars({reset = true} = {}) {
         Common.Settings.SettingCategory.ELEMENTS, 'show-css-property-documentation-on-hover', false,
         Common.Settings.SettingType.BOOLEAN),
     createSettingValue(
-        Common.Settings.SettingCategory.NONE, 'freestyler-dogfood-consent-onboarding-finished', false,
+        Common.Settings.SettingCategory.CONSOLE, 'ai-assistance-enabled', false, Common.Settings.SettingType.BOOLEAN),
+    createSettingValue(
+        Common.Settings.SettingCategory.MOBILE, 'emulation.show-device-outline', false,
         Common.Settings.SettingType.BOOLEAN),
+    createSettingValue(
+        Common.Settings.SettingCategory.APPEARANCE, 'chrome-theme-colors', true, Common.Settings.SettingType.BOOLEAN),
   ];
 
   Common.Settings.registerSettingsForTest(settings, reset);
@@ -329,6 +336,7 @@ export async function deinitializeGlobalVars() {
   await deinitializeGlobalLocaleVars();
   Logs.NetworkLog.NetworkLog.removeInstance();
   SDK.TargetManager.TargetManager.removeInstance();
+  SDK.FrameManager.FrameManager.removeInstance();
   Root.Runtime.Runtime.removeInstance();
   Common.Settings.Settings.removeInstance();
   Common.Revealer.RevealerRegistry.removeInstance();
@@ -491,28 +499,51 @@ export function expectConsoleLogs(expectedLogs: {warn?: string[], log?: string[]
   });
 }
 
-export function getGetHostConfigStub(config: RecursivePartial<Root.Runtime.HostConfig>): sinon.SinonStub {
+export function getGetHostConfigStub(config: Root.Runtime.HostConfig): sinon.SinonStub {
   const settings = Common.Settings.Settings.instance();
   return sinon.stub(settings, 'getHostConfig').returns({
-    devToolsAida: {
-      enabled: false,
-      ...config.devToolsAida,
-    } as Root.Runtime.HostConfigAida,
+    aidaAvailability: {
+      disallowLogging: false,
+      ...config.aidaAvailability,
+    },
     devToolsConsoleInsights: {
       enabled: false,
-      aidaModelId: '',
-      aidaTemperature: 0.2,
+      modelId: '',
+      temperature: -1,
       ...config.devToolsConsoleInsights,
     } as Root.Runtime.HostConfigConsoleInsights,
-    devToolsFreestylerDogfood: {
-      aidaModelId: '',
-      aidaTemperature: 0,
+    devToolsFreestyler: {
+      modelId: '',
+      temperature: -1,
       enabled: false,
-      ...config.devToolsFreestylerDogfood,
+      ...config.devToolsFreestyler,
+    } as Root.Runtime.HostConfigFreestyler,
+    devToolsExplainThisResourceDogfood: {
+      modelId: '',
+      temperature: -1,
+      enabled: false,
+      ...config.devToolsExplainThisResourceDogfood,
+    } as Root.Runtime.HostConfigExplainThisResourceDogfood,
+    devToolsAiAssistanceFileAgentDogfood: {
+      modelId: '',
+      temperature: -1,
+      enabled: false,
+      ...config.devToolsAiAssistanceFileAgentDogfood,
+    } as Root.Runtime.HostConfigAiAssistanceFileAgentDogfood,
+    devToolsAiAssistancePerformanceAgentDogfood: {
+      modelId: '',
+      temperature: -1,
+      enabled: false,
+      ...config.devToolsAiAssistancePerformanceAgentDogfood,
+    } as Root.Runtime.HostConfigAiAssistancePerformanceAgentDogfood,
+    devToolsVeLogging: {
+      enabled: true,
+      testing: false,
     },
+    devToolsPrivacyUI: {
+      enabled: false,
+      ...config.devToolsPrivacyUI,
+    } as Root.Runtime.HostConfigPrivacyUI,
+    isOffTheRecord: false,
   });
 }
-
-type RecursivePartial<T> = {
-  [P in keyof T]?: RecursivePartial<T[P]>;
-};

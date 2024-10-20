@@ -31,13 +31,12 @@
 // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
 /* eslint-disable @typescript-eslint/naming-convention */
 
-import {type Chrome} from '../../../extension-api/ExtensionAPI.js';
+import type {Chrome} from '../../../extension-api/ExtensionAPI.js';
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as _ProtocolClient from '../../core/protocol_client/protocol_client.js';  // eslint-disable-line @typescript-eslint/no-unused-vars
-import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
 import * as Logs from '../../models/logs/logs.js';
@@ -46,7 +45,7 @@ import * as UI from '../../ui/legacy/legacy.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
 import * as Bindings from '../bindings/bindings.js';
 import * as HAR from '../har/har.js';
-import type * as TextUtils from '../text_utils/text_utils.js';
+import * as TextUtils from '../text_utils/text_utils.js';
 import * as Workspace from '../workspace/workspace.js';
 
 import {PrivateAPI} from './ExtensionAPI.js';
@@ -184,7 +183,6 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     this.extensionsEnabled = true;
 
     this.registerHandler(PrivateAPI.Commands.AddRequestHeaders, this.onAddRequestHeaders.bind(this));
-    this.registerHandler(PrivateAPI.Commands.ApplyStyleSheet, this.onApplyStyleSheet.bind(this));
     this.registerHandler(PrivateAPI.Commands.CreatePanel, this.onCreatePanel.bind(this));
     this.registerHandler(PrivateAPI.Commands.CreateSidebarPane, this.onCreateSidebarPane.bind(this));
     this.registerHandler(PrivateAPI.Commands.CreateToolbarButton, this.onCreateToolbarButton.bind(this));
@@ -244,7 +242,7 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
 
     // Set up by this.initExtensions in the constructor.
     SDK.TargetManager.TargetManager.instance().removeEventListener(
-        SDK.TargetManager.Events.InspectedURLChanged, this.inspectedURLChanged, this);
+        SDK.TargetManager.Events.INSPECTED_URL_CHANGED, this.inspectedURLChanged, this);
 
     Host.InspectorFrontendHost.InspectorFrontendHostInstance.events.removeEventListener(
         Host.InspectorFrontendHostAPI.Events.SetInspectedTabId, this.setInspectedTabId, this);
@@ -603,28 +601,6 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     return undefined;
   }
 
-  private onApplyStyleSheet(message: PrivateAPI.ExtensionServerRequestMessage): Record|undefined {
-    if (message.command !== PrivateAPI.Commands.ApplyStyleSheet) {
-      return this.status.E_BADARG('command', `expected ${PrivateAPI.Commands.ApplyStyleSheet}`);
-    }
-    if (!Root.Runtime.experiments.isEnabled('apply-custom-stylesheet')) {
-      return;
-    }
-
-    const styleSheet = document.createElement('style');
-    styleSheet.textContent = message.styleSheet;
-    document.head.appendChild(styleSheet);
-
-    ThemeSupport.ThemeSupport.instance().addCustomStylesheet(message.styleSheet);
-    // Add to all the shadow roots that have already been created
-    for (let node: (Node|null)|HTMLElement = document.body; node; node = node.traverseNextNode(document.body)) {
-      if (node instanceof ShadowRoot) {
-        ThemeSupport.ThemeSupport.instance().injectCustomStyleSheets(node);
-      }
-    }
-    return undefined;
-  }
-
   private getExtensionOrigin(port: MessagePort): Platform.DevToolsPath.UrlString {
     const origin = extensionOrigins.get(port);
     if (!origin) {
@@ -649,7 +625,7 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
       return this.status.E_BADARG('page', 'Resources paths cannot point to non-extension resources');
     }
     let persistentId = this.getExtensionOrigin(port) + message.title;
-    persistentId = persistentId.replace(/\s/g, '');
+    persistentId = persistentId.replace(/\s|:\d+/g, '');
     const panelView = new ExtensionServerPanelView(
         persistentId, i18n.i18n.lockedString(message.title), new ExtensionPanel(this, persistentId, id, page));
     this.clientObjects.set(id, panelView);
@@ -912,7 +888,7 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     }
     const requests =
         Logs.NetworkLog.NetworkLog.instance().requests().filter(r => this.extensionAllowedOnURL(r.url(), port));
-    const harLog = await HAR.Log.Log.build(requests);
+    const harLog = await HAR.Log.Log.build(requests, {sanitize: false});
     for (let i = 0; i < harLog.entries.length; ++i) {
       // @ts-ignore
       harLog.entries[i]._requestId = this.requestId(requests[i]);
@@ -958,8 +934,14 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
       this.dispatchCallback(message.requestId, port, this.status.E_FAILED('Permission denied'));
       return undefined;
     }
-    const {content, isEncoded} = await contentProvider.requestContent();
-    this.dispatchCallback(message.requestId, port, {encoding: isEncoded ? 'base64' : '', content: content});
+    const contentData = await contentProvider.requestContentData();
+    if (TextUtils.ContentData.ContentData.isError(contentData)) {
+      this.dispatchCallback(message.requestId, port, {encoding: '', content: null});
+      return;
+    }
+    const encoding = !contentData.isTextContent ? 'base64' : '';
+    const content = contentData.isTextContent ? contentData.text : contentData.base64;
+    this.dispatchCallback(message.requestId, port, {encoding, content});
   }
 
   private onGetRequestContent(message: PrivateAPI.ExtensionServerRequestMessage, port: MessagePort): Record|undefined {
@@ -1074,7 +1056,7 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
 
   private dispatchCallback(requestId: unknown, port: MessagePort, result: unknown): void {
     if (requestId) {
-      port.postMessage({command: 'callback', requestId: requestId, result: result});
+      port.postMessage({command: 'callback', requestId, result});
     }
   }
 
@@ -1102,7 +1084,7 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     this.registerResourceContentCommittedHandler(this.notifyUISourceCodeContentCommitted);
 
     SDK.TargetManager.TargetManager.instance().addEventListener(
-        SDK.TargetManager.Events.InspectedURLChanged, this.inspectedURLChanged, this);
+        SDK.TargetManager.Events.INSPECTED_URL_CHANGED, this.inspectedURLChanged, this);
   }
 
   private notifyResourceAdded(event: Common.EventTarget.EventTargetEvent<Workspace.UISourceCode.UISourceCode>): void {
@@ -1119,7 +1101,7 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
   private async notifyRequestFinished(event: Common.EventTarget.EventTargetEvent<SDK.NetworkRequest.NetworkRequest>):
       Promise<void> {
     const request = event.data;
-    const entry = await HAR.Log.Entry.build(request);
+    const entry = await HAR.Log.Entry.build(request, {sanitize: false});
     this.postNotification(PrivateAPI.Events.NetworkRequestFinished, this.requestId(request), entry);
   }
 
@@ -1133,7 +1115,7 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
       startColumn: range.startColumn,
       endLine: range.endLine,
       endColumn: range.endColumn,
-      url: url,
+      url,
     });
   }
 
@@ -1395,11 +1377,11 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     void context
         .evaluate(
             {
-              expression: expression,
+              expression,
               objectGroup: 'extension',
               includeCommandLineAPI: exposeCommandLineAPI,
               silent: true,
-              returnByValue: returnByValue,
+              returnByValue,
               generatePreview: false,
             },
             /* userGesture */ false, /* awaitPromise */ false)

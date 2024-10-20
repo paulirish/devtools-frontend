@@ -6,8 +6,9 @@
 import type {Protocol} from 'devtools-protocol';
 
 import type {ProtocolError} from '../common/Errors.js';
-import {debugError} from '../common/util.js';
+import {debugError, isString} from '../common/util.js';
 import {assert} from '../util/assert.js';
+import {typedArrayToBase64} from '../util/encoding.js';
 
 import type {CDPSession} from './CDPSession.js';
 import type {Frame} from './Frame.js';
@@ -42,11 +43,16 @@ export interface InterceptResolutionState {
 export interface ResponseForRequest {
   status: number;
   /**
-   * Optional response headers. All values are converted to strings.
+   * Optional response headers.
+   *
+   * The record values will be converted to string following:
+   * Arrays' values will be mapped to String
+   * (Used when you need multiple headers with the same name).
+   * Non-arrays will be converted to String.
    */
-  headers: Record<string, unknown>;
+  headers: Record<string, string | string[] | unknown>;
   contentType: string;
-  body: string | Buffer;
+  body: string | Uint8Array;
 }
 
 /**
@@ -254,7 +260,7 @@ export abstract class HTTPRequest {
     await this.interception.handlers.reduce((promiseChain, interceptAction) => {
       return promiseChain.then(interceptAction);
     }, Promise.resolve());
-    this.interception.handlers = []; // TODO: verify this is correct top let gc run
+    this.interception.handlers = [];
     const {action} = this.interceptResolutionState();
     switch (action) {
       case 'abort':
@@ -377,6 +383,10 @@ export abstract class HTTPRequest {
    */
   abstract failure(): {errorText: string} | null;
 
+  #canBeIntercepted(): boolean {
+    return !this.url().startsWith('data:') && !this._fromMemoryCache;
+  }
+
   /**
    * Continues request with optional request overrides.
    *
@@ -409,8 +419,7 @@ export abstract class HTTPRequest {
     overrides: ContinueRequestOverrides = {},
     priority?: number
   ): Promise<void> {
-    // Request interception is not supported for data: urls.
-    if (this.url().startsWith('data:')) {
+    if (!this.#canBeIntercepted()) {
       return;
     }
     assert(this.interception.enabled, 'Request Interception is not enabled!');
@@ -478,8 +487,7 @@ export abstract class HTTPRequest {
     response: Partial<ResponseForRequest>,
     priority?: number
   ): Promise<void> {
-    // Mocking responses for dataURL requests is not currently supported.
-    if (this.url().startsWith('data:')) {
+    if (!this.#canBeIntercepted()) {
       return;
     }
     assert(this.interception.enabled, 'Request Interception is not enabled!');
@@ -525,8 +533,7 @@ export abstract class HTTPRequest {
     errorCode: ErrorCode = 'failed',
     priority?: number
   ): Promise<void> {
-    // Request interception is not supported for data: urls.
-    if (this.url().startsWith('data:')) {
+    if (!this.#canBeIntercepted()) {
       return;
     }
     const errorReason = errorReasons[errorCode];
@@ -547,6 +554,24 @@ export abstract class HTTPRequest {
       };
       return;
     }
+  }
+
+  /**
+   * @internal
+   */
+  static getResponse(body: string | Uint8Array): {
+    contentLength: number;
+    base64: string;
+  } {
+    // Needed to get the correct byteLength
+    const byteBody: Uint8Array = isString(body)
+      ? new TextEncoder().encode(body)
+      : body;
+
+    return {
+      contentLength: byteBody.byteLength,
+      base64: typedArrayToBase64(byteBody),
+    };
   }
 }
 

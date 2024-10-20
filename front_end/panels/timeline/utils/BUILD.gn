@@ -1,0 +1,66 @@
+# Copyright 2024 The Chromium Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("../../../../scripts/build/ninja/devtools_entrypoint.gni")
+import("../../../../scripts/build/ninja/devtools_module.gni")
+
+devtools_module("utils") {
+  sources = [
+    "Helpers.ts",
+    "IgnoreList.ts",
+    "ImageCache.ts",
+    "NetworkRequest.ts",
+    "SourceMapsResolver.ts",
+  ]
+
+  deps = [
+    "../../../core/common:bundle",
+    "../../../core/platform:bundle",
+    "../../../core/sdk:bundle",
+    "../../../generated",
+    "../../../models/bindings:bundle",
+    "../../../models/source_map_scopes:bundle",
+    "../../../models/trace:bundle",
+    "../../../models/workspace:bundle",
+  ]
+}
+
+devtools_entrypoint("bundle") {
+  entrypoint = "utils.ts"
+
+  deps = [ ":utils" ]
+
+  visibility = [
+    ":*",
+    "..:*",
+    "../../network/*",
+    "../components:*",
+    "../components/insights:*",
+  ]
+}
+
+ts_library("unittests") {
+  testonly = true
+
+  sources = [
+    "Helpers.test.ts",
+    "IgnoreList.test.ts",
+    "ImageCache.test.ts",
+    "SourceMapsResolver.test.ts",
+  ]
+
+  deps = [
+    ":bundle",
+    "../../../core/platform:bundle",
+    "../../../core/root:bundle",
+    "../../../core/sdk:bundle",
+    "../../../core/sdk:bundle",
+    "../../../models/bindings:bundle",
+    "../../../models/timeline_model:bundle",
+    "../../../models/trace:bundle",
+    "../../../models/trace:bundle",
+    "../../../models/workspace:bundle",
+    "../../../testing",
+  ]
+}

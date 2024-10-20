@@ -6,7 +6,7 @@
 var __addDisposableResource = (this && this.__addDisposableResource) || function (env, value, async) {
     if (value !== null && value !== void 0) {
         if (typeof value !== "object" && typeof value !== "function") throw new TypeError("Object expected.");
-        var dispose;
+        var dispose, inner;
         if (async) {
             if (!Symbol.asyncDispose) throw new TypeError("Symbol.asyncDispose is not defined.");
             dispose = value[Symbol.asyncDispose];
@@ -14,8 +14,10 @@ var __addDisposableResource = (this && this.__addDisposableResource) || function
         if (dispose === void 0) {
             if (!Symbol.dispose) throw new TypeError("Symbol.dispose is not defined.");
             dispose = value[Symbol.dispose];
+            if (async) inner = dispose;
         }
         if (typeof dispose !== "function") throw new TypeError("Object not disposable.");
+        if (inner) dispose = function() { try { inner.call(this); } catch (e) { return Promise.reject(e); } };
         env.stack.push({ value: value, dispose: dispose, async: async });
     }
     else if (async) {
@@ -160,8 +162,7 @@ export class QueryHandler {
                 return await frame.isolatedRealm().adoptHandle(elementOrFrame);
             })(), false);
             const { visible = false, hidden = false, timeout, signal } = options;
-            const polling = options.polling ??
-                (visible || hidden ? "raf" /* PollingOptions.RAF */ : "mutation" /* PollingOptions.MUTATION */);
+            const polling = visible || hidden ? "raf" /* PollingOptions.RAF */ : options.polling;
             try {
                 const env_4 = { stack: [], error: void 0, hasError: false };
                 try {

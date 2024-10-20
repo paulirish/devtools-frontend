@@ -50,16 +50,13 @@ import * as Logs from '../../models/logs/logs.js';
 import * as Persistence from '../../models/persistence/persistence.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as Snippets from '../../panels/snippets/snippets.js';
-import * as Timeline from '../../panels/timeline/timeline.js';
 import * as IconButton from '../../ui/components/icon_button/icon_button.js';
-import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {ExecutionContextSelector} from './ExecutionContextSelector.js';
-import {SettingTracker} from './SettingTracker.js';
 
 const UIStrings = {
   /**
@@ -163,8 +160,22 @@ export class MainImpl {
     await this.requestAndRegisterLocaleData();
 
     Host.userMetrics.syncSetting(Common.Settings.Settings.instance().moduleSetting<boolean>('sync-preferences').get());
-    if (Root.Runtime.Runtime.queryParam('veLogging')) {
-      void VisualLogging.startLogging();
+    const veLogging = Common.Settings.Settings.instance().getHostConfig()?.devToolsVeLogging;
+    if (veLogging?.enabled) {
+      if (veLogging?.testing) {
+        VisualLogging.setVeDebugLoggingEnabled(true, VisualLogging.DebugLoggingFormat.TEST);
+        const options = {
+          processingThrottler: new Common.Throttler.Throttler(0),
+          keyboardLogThrottler: new Common.Throttler.Throttler(10),
+          hoverLogThrottler: new Common.Throttler.Throttler(50),
+          dragLogThrottler: new Common.Throttler.Throttler(50),
+          clickLogThrottler: new Common.Throttler.Throttler(10),
+          resizeLogThrottler: new Common.Throttler.Throttler(10),
+        };
+        void VisualLogging.startLogging(options);
+      } else {
+        void VisualLogging.startLogging();
+      }
     }
     void this.#createAppUI();
   }
@@ -265,16 +276,12 @@ export class MainImpl {
     const globalStorage = new Common.Settings.SettingsStorage(prefs, hostUnsyncedStorage, storagePrefix);
     Common.Settings.Settings.instance({forceNew: true, syncedStorage, globalStorage, localStorage, config});
 
-    // Needs to be created after Settings are available.
-    new SettingTracker();
-
     if (!Host.InspectorFrontendHost.isUnderTest()) {
       new Common.Settings.VersionController().updateVersion();
     }
   }
 
   #initializeExperiments(): void {
-    Root.Runtime.experiments.register('apply-custom-stylesheet', 'Allow extensions to load custom stylesheets');
     Root.Runtime.experiments.register('capture-node-creation-stacks', 'Capture node creation stacks');
     Root.Runtime.experiments.register('live-heap-profile', 'Live heap profile', true);
     Root.Runtime.experiments.register(
@@ -291,20 +298,12 @@ export class MainImpl {
     Root.Runtime.experiments.register(
         'timeline-v8-runtime-call-stats', 'Performance panel: V8 runtime call stats', true);
     Root.Runtime.experiments.register(
-        'timeline-extensions', 'Performance panel: enable user timings based extensions', true);
-    Root.Runtime.experiments.register(
         'timeline-enhanced-traces', 'Performance panel: Enable collecting enhanced traces', true);
     Root.Runtime.experiments.register(
         'timeline-compiled-sources', 'Performance panel: Enable collecting source text for compiled script', true);
     Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.TIMELINE_DEBUG_MODE,
         'Performance panel: Enable debug mode (trace event details, etc)', true);
-
-    // Sources
-    Root.Runtime.experiments.register(
-        Root.Runtime.ExperimentName.INDENTATION_MARKERS_TEMP_DISABLE, 'Disable indentation markers temporarily',
-        /* unstable= */ false, 'https://developer.chrome.com/blog/new-in-devtools-121/#indentation',
-        'https://crbug.com/1479986');
 
     // Debugging
     Root.Runtime.experiments.register('instrumentation-breakpoints', 'Enable instrumentation breakpoints', true);
@@ -359,19 +358,6 @@ export class MainImpl {
     Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.JUST_MY_CODE, 'Hide ignore-listed code in Sources tree view');
 
-    // Highlight important DOM properties in the Object Properties viewer.
-    Root.Runtime.experiments.register(
-        Root.Runtime.ExperimentName.IMPORTANT_DOM_PROPERTIES,
-        'Highlight important DOM properties in the Properties tab');
-
-    Root.Runtime.experiments.register(
-        Root.Runtime.ExperimentName.PRELOADING_STATUS_PANEL, 'Enable speculative loads panel in Application panel',
-        true);
-
-    Root.Runtime.experiments.register(
-        Root.Runtime.ExperimentName.OUTERMOST_TARGET_SELECTOR, 'Enable background page selector (for prerendering)',
-        false);
-
     Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.NETWORK_PANEL_FILTER_BAR_REDESIGN,
         'Redesign of the filter bar in the Network panel',
@@ -394,15 +380,13 @@ export class MainImpl {
     );
 
     Root.Runtime.experiments.register(
-        Root.Runtime.ExperimentName.TIMELINE_ANNOTATIONS_OVERLAYS,
+        Root.Runtime.ExperimentName.TIMELINE_ANNOTATIONS,
         'Performance panel: enable annotations',
-        true,
     );
 
     Root.Runtime.experiments.register(
-        Root.Runtime.ExperimentName.TIMELINE_SIDEBAR,
-        'Performance panel: enable sidebar',
-        true,
+        Root.Runtime.ExperimentName.TIMELINE_INSIGHTS,
+        'Performance panel: enable performance insights',
     );
 
     Root.Runtime.experiments.register(
@@ -410,11 +394,33 @@ export class MainImpl {
         'Performance panel: enable live metrics landing page',
     );
 
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.TIMELINE_SERVER_TIMINGS,
+        'Performance panel: enable server timings in the timeline',
+    );
+
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.EXTENSION_STORAGE_VIEWER,
+        'Extension storage in Application panel',
+    );
+
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.FLOATING_ENTRY_POINTS_FOR_AI_ASSISTANCE,
+        'Floating entry points for the AI assistance panel');
+
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.TIMELINE_EXPERIMENTAL_INSIGHTS,
+        'Performance panel: enable experimental performance insights',
+    );
+
     Root.Runtime.experiments.enableExperimentsByDefault([
       'css-type-component-length-deprecate',
-      Root.Runtime.ExperimentName.OUTERMOST_TARGET_SELECTOR,
-      Root.Runtime.ExperimentName.PRELOADING_STATUS_PANEL,
       Root.Runtime.ExperimentName.AUTOFILL_VIEW,
+      Root.Runtime.ExperimentName.TIMELINE_INSIGHTS,
+      Root.Runtime.ExperimentName.TIMELINE_OBSERVATIONS,
+      Root.Runtime.ExperimentName.TIMELINE_ANNOTATIONS,
+      Root.Runtime.ExperimentName.NETWORK_PANEL_FILTER_BAR_REDESIGN,
+      Root.Runtime.ExperimentName.FLOATING_ENTRY_POINTS_FOR_AI_ASSISTANCE,
       ...(Root.Runtime.Runtime.queryParam('isChromeForTesting') ? ['protocol-monitor'] : []),
     ]);
 
@@ -455,7 +461,8 @@ export class MainImpl {
       ThemeSupport.ThemeSupport.instance({forceNew: true, setting: themeSetting});
     }
 
-    UI.UIUtils.installComponentRootStyles((document.body as Element));
+    UI.UIUtils.addPlatformClass(document.documentElement);
+    UI.UIUtils.installComponentRootStyles(document.body);
 
     this.#addMainEventListeners(document);
 
@@ -481,7 +488,7 @@ export class MainImpl {
     SDK.NetworkManager.MultitargetNetworkManager.instance({forceNew: true});
     SDK.DOMDebuggerModel.DOMDebuggerManager.instance({forceNew: true});
     SDK.TargetManager.TargetManager.instance().addEventListener(
-        SDK.TargetManager.Events.SuspendStateChanged, this.#onSuspendStateChanged.bind(this));
+        SDK.TargetManager.Events.SUSPEND_STATE_CHANGED, this.#onSuspendStateChanged.bind(this));
 
     Workspace.FileManager.FileManager.instance({forceNew: true});
     Workspace.Workspace.WorkspaceImpl.instance();
@@ -585,6 +592,9 @@ export class MainImpl {
 
     const value = Root.Runtime.Runtime.queryParam('loadTimelineFromURL');
     if (value !== null) {
+      // Only import Timeline if neeeded. If this was a static import, every load of devtools
+      // would request and evaluate the Timeline panel dep tree, slowing down the UI's load.
+      const Timeline = await import('../../panels/timeline/timeline.js');
       Timeline.TimelinePanel.LoadTimelineHandler.instance().handleQueryParam(value);
     }
 
@@ -614,7 +624,27 @@ export class MainImpl {
     MainImpl.timeEnd('Main._initializeTarget');
   }
 
-  #lateInitialization(): void {
+  // TODO(crbug.com/350668580) Move this to AISettingsTab once the setting is only available
+  // there and not in the general settings screen anymore.
+  // The ConsoleInsightsEnabledSetting represents the toggle/checkbox allowing the user to turn the feature on/off.
+  // If the user turns the feature off, we want them to go through the full onboarding flow should they later turn
+  // the feature on again. We achieve this by resetting the onboardig setting.
+  #onConsoleInsightsEnabledSettingChanged(): void {
+    const settingValue = this.#getConsoleInsightsEnabledSetting()?.get();
+    if (settingValue === false) {
+      Common.Settings.Settings.instance().createLocalSetting('console-insights-onboarding-finished', false).set(false);
+    }
+  }
+
+  #getConsoleInsightsEnabledSetting(): Common.Settings.Setting<boolean>|undefined {
+    try {
+      return Common.Settings.moduleSetting('console-insights-enabled') as Common.Settings.Setting<boolean>;
+    } catch {
+      return;
+    }
+  }
+
+  async #lateInitialization(): Promise<void> {
     MainImpl.time('Main._lateInitialization');
     Extensions.ExtensionServer.ExtensionServer.instance().initializeExtensions();
     const promises: Promise<void>[] =
@@ -623,6 +653,7 @@ export class MainImpl {
           return runnable.run();
         });
     if (Root.Runtime.experiments.isEnabled('live-heap-profile')) {
+      const PerfUI = await import('../../ui/legacy/components/perf_ui/perf_ui.js');
       const setting = 'memory-live-heap-profile';
       if (Common.Settings.Settings.instance().moduleSetting(setting).get()) {
         promises.push(PerfUI.LiveHeapProfile.LiveHeapProfile.instance().run());
@@ -637,6 +668,14 @@ export class MainImpl {
         Common.Settings.Settings.instance().moduleSetting(setting).addChangeListener(changeListener);
       }
     }
+
+    // TODO(crbug.com/350668580) Move this to AISettingsTab once the setting is only available
+    // there and not in the general settings screen anymore.
+    const consoleInsightsSetting = this.#getConsoleInsightsEnabledSetting();
+    if (consoleInsightsSetting) {
+      consoleInsightsSetting.addChangeListener(this.#onConsoleInsightsEnabledSettingChanged, this);
+    }
+
     this.#lateInitDonePromise = Promise.all(promises).then(() => undefined);
     MainImpl.timeEnd('Main._lateInitialization');
   }
@@ -650,7 +689,7 @@ export class MainImpl {
   }
 
   #registerMessageSinkListener(): void {
-    Common.Console.Console.instance().addEventListener(Common.Console.Events.MessageAdded, messageAdded);
+    Common.Console.Console.instance().addEventListener(Common.Console.Events.MESSAGE_ADDED, messageAdded);
 
     function messageAdded({data: message}: Common.EventTarget.EventTargetEvent<Common.Console.Message>): void {
       if (message.show) {
@@ -783,8 +822,8 @@ export class MainMenuItem implements UI.Toolbar.Provider {
   readonly #itemInternal: UI.Toolbar.ToolbarMenuButton;
   constructor() {
     this.#itemInternal = new UI.Toolbar.ToolbarMenuButton(
-        this.#handleContextMenu.bind(this), /* isIconDropdown */ true, /* useSoftMenu */ true, 'main-menu');
-    this.#itemInternal.setGlyph('dots-vertical');
+        this.#handleContextMenu.bind(this), /* isIconDropdown */ true, /* useSoftMenu */ true, 'main-menu',
+        'dots-vertical');
     this.#itemInternal.element.classList.add('main-menu');
     this.#itemInternal.setTitle(i18nString(UIStrings.customizeAndControlDevtools));
   }
@@ -823,26 +862,26 @@ export class MainMenuItem implements UI.Toolbar.Provider {
       const dockItemToolbar = new UI.Toolbar.Toolbar('', dockItemElement);
       dockItemElement.setAttribute(
           'jslog', `${VisualLogging.item('dock-side').track({keydown: 'ArrowDown|ArrowLeft|ArrowRight'})}`);
-      dockItemToolbar.makeBlueOnHover();
       const undock = new UI.Toolbar.ToolbarToggle(
-          i18nString(UIStrings.undockIntoSeparateWindow), 'dock-window', undefined, 'undock');
-      const bottom =
-          new UI.Toolbar.ToolbarToggle(i18nString(UIStrings.dockToBottom), 'dock-bottom', undefined, 'dock-bottom');
-      const right =
-          new UI.Toolbar.ToolbarToggle(i18nString(UIStrings.dockToRight), 'dock-right', undefined, 'dock-right');
-      const left = new UI.Toolbar.ToolbarToggle(i18nString(UIStrings.dockToLeft), 'dock-left', undefined, 'dock-left');
-      undock.addEventListener(UI.Toolbar.ToolbarButton.Events.MouseDown, event => event.data.consume());
-      bottom.addEventListener(UI.Toolbar.ToolbarButton.Events.MouseDown, event => event.data.consume());
-      right.addEventListener(UI.Toolbar.ToolbarButton.Events.MouseDown, event => event.data.consume());
-      left.addEventListener(UI.Toolbar.ToolbarButton.Events.MouseDown, event => event.data.consume());
+          i18nString(UIStrings.undockIntoSeparateWindow), 'dock-window', undefined, 'current-dock-state-undock');
+      const bottom = new UI.Toolbar.ToolbarToggle(
+          i18nString(UIStrings.dockToBottom), 'dock-bottom', undefined, 'current-dock-state-bottom');
+      const right = new UI.Toolbar.ToolbarToggle(
+          i18nString(UIStrings.dockToRight), 'dock-right', undefined, 'current-dock-state-right');
+      const left = new UI.Toolbar.ToolbarToggle(
+          i18nString(UIStrings.dockToLeft), 'dock-left', undefined, 'current-dock-state-left');
+      undock.addEventListener(UI.Toolbar.ToolbarButton.Events.MOUSE_DOWN, event => event.data.consume());
+      bottom.addEventListener(UI.Toolbar.ToolbarButton.Events.MOUSE_DOWN, event => event.data.consume());
+      right.addEventListener(UI.Toolbar.ToolbarButton.Events.MOUSE_DOWN, event => event.data.consume());
+      left.addEventListener(UI.Toolbar.ToolbarButton.Events.MOUSE_DOWN, event => event.data.consume());
       undock.addEventListener(
-          UI.Toolbar.ToolbarButton.Events.Click, setDockSide.bind(null, UI.DockController.DockState.UNDOCKED));
+          UI.Toolbar.ToolbarButton.Events.CLICK, setDockSide.bind(null, UI.DockController.DockState.UNDOCKED));
       bottom.addEventListener(
-          UI.Toolbar.ToolbarButton.Events.Click, setDockSide.bind(null, UI.DockController.DockState.BOTTOM));
+          UI.Toolbar.ToolbarButton.Events.CLICK, setDockSide.bind(null, UI.DockController.DockState.BOTTOM));
       right.addEventListener(
-          UI.Toolbar.ToolbarButton.Events.Click, setDockSide.bind(null, UI.DockController.DockState.RIGHT));
+          UI.Toolbar.ToolbarButton.Events.CLICK, setDockSide.bind(null, UI.DockController.DockState.RIGHT));
       left.addEventListener(
-          UI.Toolbar.ToolbarButton.Events.Click, setDockSide.bind(null, UI.DockController.DockState.LEFT));
+          UI.Toolbar.ToolbarButton.Events.CLICK, setDockSide.bind(null, UI.DockController.DockState.LEFT));
       undock.setToggled(
           UI.DockController.DockController.instance().dockSide() === UI.DockController.DockState.UNDOCKED);
       bottom.setToggled(UI.DockController.DockController.instance().dockSide() === UI.DockController.DockState.BOTTOM);
@@ -879,16 +918,18 @@ export class MainMenuItem implements UI.Toolbar.Provider {
     const button = (this.#itemInternal.element as HTMLButtonElement);
 
     function setDockSide(side: UI.DockController.DockState): void {
-      void UI.DockController.DockController.instance().once(UI.DockController.Events.AfterDockSideChanged).then(() => {
-        button.focus();
-      });
+      void UI.DockController.DockController.instance()
+          .once(UI.DockController.Events.AFTER_DOCK_SIDE_CHANGED)
+          .then(() => {
+            button.focus();
+          });
       UI.DockController.DockController.instance().setDockSide(side);
       contextMenu.discard();
     }
 
     if (UI.DockController.DockController.instance().dockSide() === UI.DockController.DockState.UNDOCKED) {
       const mainTarget = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
-      if (mainTarget && mainTarget.type() === SDK.Target.Type.Frame) {
+      if (mainTarget && mainTarget.type() === SDK.Target.Type.FRAME) {
         contextMenu.defaultSection().appendAction('inspector-main.focus-debuggee', i18nString(UIStrings.focusDebuggee));
       }
     }
@@ -916,7 +957,7 @@ export class MainMenuItem implements UI.Toolbar.Provider {
 
       if (id === 'issues-pane') {
         moreTools.defaultSection().appendItem(title, () => {
-          Host.userMetrics.issuesPanelOpenedFrom(Host.UserMetrics.IssueOpener.HamburgerMenu);
+          Host.userMetrics.issuesPanelOpenedFrom(Host.UserMetrics.IssueOpener.HAMBURGER_MENU);
           void UI.ViewManager.ViewManager.instance().showView('issues-pane', /* userGesture */ true);
         }, {jslogContext: id});
         continue;

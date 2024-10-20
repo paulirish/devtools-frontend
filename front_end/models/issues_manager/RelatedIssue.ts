@@ -6,7 +6,7 @@ import * as Common from '../../core/common/common.js';
 import * as SDK from '../../core/sdk/sdk.js';
 
 import {CookieIssue, CookieIssueSubCategory} from './CookieIssue.js';
-import {type Issue, type IssueCategory} from './Issue.js';
+import type {Issue, IssueCategory} from './Issue.js';
 import {IssuesManager} from './IssuesManager.js';
 
 export type IssuesAssociatable = Readonly<SDK.NetworkRequest.NetworkRequest>|SDK.Cookie.Cookie|string;
@@ -59,14 +59,14 @@ export function hasIssueOfCategory(obj: IssuesAssociatable, category: IssueCateg
 export function hasThirdPartyPhaseoutCookieIssue(obj: IssuesAssociatable): boolean {
   const issues = Array.from(IssuesManager.instance().issues());
   return issuesAssociatedWith(issues, obj)
-      .some(issue => CookieIssue.getSubCategory(issue.code()) === CookieIssueSubCategory.ThirdPartyPhaseoutCookie);
+      .some(issue => CookieIssue.getSubCategory(issue.code()) === CookieIssueSubCategory.THIRD_PARTY_PHASEOUT_COOKIE);
 }
 
 export function hasThirdPartyPhaseoutCookieIssueForDomain(domain: string): boolean {
   const issues = Array.from(IssuesManager.instance().issues());
   const issuesForDomain = issues.filter(issue => Array.from(issue.cookies()).some(cookie => cookie.domain === domain));
   return issuesForDomain.some(
-      issue => CookieIssue.getSubCategory(issue.code()) === CookieIssueSubCategory.ThirdPartyPhaseoutCookie);
+      issue => CookieIssue.getSubCategory(issue.code()) === CookieIssueSubCategory.THIRD_PARTY_PHASEOUT_COOKIE);
 }
 
 export async function reveal(obj: IssuesAssociatable, category?: IssueCategory): Promise<void|undefined> {

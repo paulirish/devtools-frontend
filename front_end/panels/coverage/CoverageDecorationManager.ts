@@ -8,7 +8,7 @@ import type * as Bindings from '../../models/bindings/bindings.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 
-import {type CoverageInfo, type CoverageModel} from './CoverageModel.js';
+import type {CoverageInfo, CoverageModel} from './CoverageModel.js';
 
 export const decoratorType = 'coverage';
 
@@ -130,8 +130,9 @@ export class CoverageDecorationManager {
   }
 
   private async updateTextForProvider(contentProvider: TextUtils.ContentProvider.ContentProvider): Promise<void> {
-    const content = TextUtils.ContentData.ContentData.textOr(await contentProvider.requestContentData(), '');
-    this.textByProvider.set(contentProvider, new TextUtils.Text.Text(content));
+    const contentData =
+        TextUtils.ContentData.ContentData.contentDataOrEmpty(await contentProvider.requestContentData());
+    this.textByProvider.set(contentProvider, contentData.textObj);
   }
 
   private async rawLocationsForSourceLocation(

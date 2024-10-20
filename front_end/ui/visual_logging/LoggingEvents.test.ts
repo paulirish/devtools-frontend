@@ -93,7 +93,7 @@ describe('LoggingEvents', () => {
         Host.InspectorFrontendHost.InspectorFrontendHostInstance,
         'recordChange',
     );
-    VisualLogging.LoggingState.getLoggingState(element)!.lastInputEventType = 'instertText';
+    VisualLogging.LoggingState.getLoggingState(element)!.pendingChangeContext = 'instertText';
     await VisualLogging.LoggingEvents.logChange(element);
     assert.isTrue(recordChange.calledOnce);
     assert.deepStrictEqual(recordChange.firstCall.firstArg, {veid, context: 296063892});
@@ -217,7 +217,6 @@ describe('LoggingEvents', () => {
     const event = new MouseEvent('click', {button: 1});
     sinon.stub(event, 'currentTarget').value(element);
     void VisualLogging.LoggingEvents.logDrag(throttler)(event);
-    await throttler.schedule(async () => {}, Common.Throttler.Scheduling.AsSoonAsPossible);
     await assertThrottled(recordDrag);
     assert.deepStrictEqual(recordDrag.firstCall.firstArg, {veid});
   });

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
-import {type ElementHandle} from 'puppeteer-core';
+import type {ElementHandle} from 'puppeteer-core';
 
 import {
   $,
@@ -138,10 +138,9 @@ export async function clickStartButton() {
 }
 
 export async function isGenerateReportButtonDisabled() {
-  const button = await waitFor<HTMLElement>('.lighthouse-start-view devtools-button');
-  return button.evaluate(element => {
-    return element.hasAttribute('disabled');
-  });
+  const buttonContainer = await waitFor<HTMLElement>('.lighthouse-start-button-container');
+  const button = await waitFor('button', buttonContainer);
+  return button.evaluate(element => element.hasAttribute('disabled'));
 }
 
 export async function getHelpText() {

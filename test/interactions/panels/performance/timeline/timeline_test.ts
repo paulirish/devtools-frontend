@@ -5,12 +5,14 @@
 import {assert} from 'chai';
 
 import {click, getBrowserAndPages, timeout, waitFor, waitForFunction} from '../../../../shared/helper.js';
-import {describe, itScreenshot} from '../../../../shared/mocha-extensions.js';
 import {assertElementScreenshotUnchanged} from '../../../../shared/screenshots.js';
-import {loadComponentDocExample, preloadForCodeCoverage} from '../../../helpers/shared.js';
+import {loadComponentDocExample} from '../../../helpers/shared.js';
 
 describe('Performance panel', function() {
-  preloadForCodeCoverage('performance_panel/basic.html');
+  if (this.timeout() !== 0) {
+    // The Perf Panel is quite heavy to render, especially on CQ bots, so give it a bit more time per test.
+    this.timeout(20_000);
+  }
 
   itScreenshot('loads a trace file and renders it in the timeline', async () => {
     await loadComponentDocExample('performance_panel/basic.html?trace=basic');
@@ -49,7 +51,7 @@ describe('Performance panel', function() {
 
   // Flaky on linux
   itScreenshot.skipOnPlatforms(
-      ['linux'], '[crbug.com/327586819 renders the timeline correctly when scrolling', async () => {
+      ['linux'], '[crbug.com/327586819]: renders the timeline correctly when scrolling', async () => {
         await loadComponentDocExample('performance_panel/basic.html?trace=one-second-interaction');
         await waitFor('.timeline-flamechart');
         const panel = await waitFor('body');
@@ -92,10 +94,7 @@ describe('Performance panel', function() {
     await assertElementScreenshotUnchanged(panel, 'performance/timeline-long-task-candystripe.png', 2);
   });
 
-  itScreenshot.skip('renders screenshots in the frames track', async () => {
-    if (this.timeout() !== 0) {
-      this.timeout(20_000);
-    }
+  itScreenshot('renders screenshots in the frames track', async () => {
     await loadComponentDocExample(
         'performance_panel/basic.html?trace=web-dev-with-commit&flamechart-force-expand=frames');
     const panel = await waitFor('body');
@@ -108,37 +107,41 @@ describe('Performance panel', function() {
     await assertElementScreenshotUnchanged(panel, 'performance/timeline-web-dev-screenshot-frames.png', 1);
   });
 
-  itScreenshot.skip('supports the network track being expanded and then clicked', async function() {
-    await loadComponentDocExample('performance_panel/basic.html?trace=web-dev');
-    await waitFor('.timeline-flamechart');
-    const panel = await waitFor('body');
+  // Flaking.
+  itScreenshot.skip(
+      '[crbug.com/373792008]: supports the network track being expanded and then clicked', async function() {
+        await loadComponentDocExample('performance_panel/basic.html?trace=web-dev');
+        await waitFor('.timeline-flamechart');
+        const panel = await waitFor('body');
 
-    const {frontend} = getBrowserAndPages();
-    // Click to expand the network track.
-    await frontend.mouse.click(27, 131);
-    await timeout(100);  // cannot await for DOM as this is a purely canvas change.
-    await assertElementScreenshotUnchanged(panel, 'performance/timeline-expand-network-panel.png', 1);
-    // Click to select a network event.
-    await frontend.mouse.click(104, 144);
-    await timeout(100);  // cannot await for DOM as this is a purely canvas change.
-    await assertElementScreenshotUnchanged(panel, 'performance/timeline-expand-network-panel-and-select-event.png', 1);
-  });
+        const {frontend} = getBrowserAndPages();
+        // Click to expand the network track.
+        await frontend.mouse.click(27, 131);
+        await timeout(100);  // cannot await for DOM as this is a purely canvas change.
+        await assertElementScreenshotUnchanged(panel, 'performance/timeline-expand-network-panel.png', 1);
+        // Click to select a network event.
+        await frontend.mouse.click(104, 144);
+        await timeout(100);  // cannot await for DOM as this is a purely canvas change.
+        await assertElementScreenshotUnchanged(
+            panel, 'performance/timeline-expand-network-panel-and-select-event.png', 1);
+      });
 
   it('renders the window range bounds correctly when loading multiple profiles', async () => {
     await loadComponentDocExample('performance_panel/basic.html?cpuprofile=basic');
     let timingTitleHandle = await waitFor('.timeline-details-chip-title');
     let timingTitle = await timingTitleHandle.evaluate(element => element.innerHTML);
-    assert.isTrue(timingTitle.includes('0 – 2.38'));
+    assert.isTrue(timingTitle.includes('0&nbsp;ms – 2.38&nbsp;s'), `got: ${timingTitle}`);
     const {frontend} = getBrowserAndPages();
 
     // load another profile and ensure the time range is updated correctly.
     await frontend.evaluate(`(async () => {
       await loadFromFile('node-fibonacci-website.cpuprofile.gz');
     })()`);
-    await waitForFunction(async () => {
+    const didUpdate = await waitForFunction(async () => {
       timingTitleHandle = await waitFor('.timeline-details-chip-title');
       timingTitle = await timingTitleHandle.evaluate(element => element.innerHTML);
-      return timingTitle.includes('0 – 2.66');
+      return timingTitle.includes('0&nbsp;ms – 2.66&nbsp;s');
     });
+    assert(didUpdate);
   });
 });

@@ -74,6 +74,8 @@ const ALL_DEFINED_VARIABLES = new Set([
   ...DEFINED_INSPECTOR_STYLE_VARIABLES
 ]);
 
+const BOX_SHADOW_VARIABLES = new Set([1, 2, 3, 4, 5].map(x => `var(--sys-elevation-level${x})`));
+
 module.exports = stylelint.createPlugin(RULE_NAME, function(primary, secondary, context) {
   return function(postcssRoot, postcssResult) {
     function reportError(declaration, shouldFix) {
@@ -144,9 +146,17 @@ module.exports = stylelint.createPlugin(RULE_NAME, function(primary, secondary, 
       }
 
       if (cssValueToCheck.includes('var(')) {
-        const [match, variableName] = /var\((--[\w-]+)/.exec(cssValueToCheck);
+        const execArray = /var\(\s*(--[\w-]+)\s*/.exec(cssValueToCheck);
+        if (!execArray) {
+          throw new Error(
+              `Could not parse CSS variable usage: ${cssValueToCheck}`,
+          );
+        }
+        const [match, variableName] = execArray;
         if (!match) {
-          throw new Error(`Could not parse CSS variable usage: ${cssValueToCheck}`);
+          throw new Error(
+              `Could not parse CSS variable usage: ${cssValueToCheck}`,
+          );
         }
 
         /**
@@ -186,6 +196,13 @@ module.exports = stylelint.createPlugin(RULE_NAME, function(primary, secondary, 
           return;
         }
 
+        if (declaration.prop === 'box-shadow') {
+          // Along with the colour values, we also have predefined elevation values for box-shadow which are allowed.
+          if (BOX_SHADOW_VARIABLES.has(declaration.value)) {
+            return;
+          }
+        }
+
         /**
          * Fix the index of the declaration in its parent and then see if its
          * immediate sibling node is a comment with the disable-line text in. If
@@ -204,8 +221,9 @@ module.exports = stylelint.createPlugin(RULE_NAME, function(primary, secondary, 
         /**
          * If we're checking a border-{top/bottom/left/right}, we need to regex
          * out just the color part of the declaration to check.
+         * We also apply the same check for outline.
          */
-        if (borderCombinedDeclarations.has(declaration.prop)) {
+        if (borderCombinedDeclarations.has(declaration.prop) || declaration.prop === 'outline') {
           // This is a pretty basic regex but it should split border-bottom:
           // var(--foo) solid var(--bar) into the three parts we need.
           // If this rule picks up false positives, we can improve this regex.

@@ -335,6 +335,9 @@ export class BrowsingContext extends EventEmitter<{
   @inertIfDisposed
   private dispose(reason?: string): void {
     this.#reason = reason;
+    for (const context of this.#children.values()) {
+      context.dispose('Parent browsing context was disposed');
+    }
     this[disposeSymbol]();
   }
 
@@ -414,6 +417,18 @@ export class BrowsingContext extends EventEmitter<{
     await this.#session.send('browsingContext.reload', {
       context: this.id,
       ...options,
+    });
+  }
+
+  @throwIfDisposed<BrowsingContext>(context => {
+    // SAFETY: Disposal implies this exists.
+    return context.#reason!;
+  })
+  async setCacheBehavior(cacheBehavior: 'default' | 'bypass'): Promise<void> {
+    // @ts-expect-error not in BiDi types yet.
+    await this.#session.send('network.setCacheBehavior', {
+      contexts: [this.id],
+      cacheBehavior,
     });
   }
 
@@ -586,7 +601,7 @@ export class BrowsingContext extends EventEmitter<{
     await this.#session.subscribe(events, [this.id]);
   }
 
-  [disposeSymbol](): void {
+  override [disposeSymbol](): void {
     this.#reason ??=
       'Browsing context already closed, probably because the user context closed.';
     this.emit('closed', {reason: this.#reason});

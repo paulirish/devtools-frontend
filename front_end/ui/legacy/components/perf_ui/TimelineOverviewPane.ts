@@ -29,8 +29,10 @@
  */
 
 import * as Common from '../../../../core/common/common.js';
-import * as TraceEngine from '../../../../models/trace/trace.js';
+import * as Trace from '../../../../models/trace/trace.js';
+import * as VisualLoggging from '../../../visual_logging/visual_logging.js';
 import * as UI from '../../legacy.js';
+import * as ThemeSupport from '../../theme_support/theme_support.js';
 
 import {Events as OverviewGridEvents, OverviewGrid, type WindowChangedWithPositionEvent} from './OverviewGrid.js';
 import {TimelineOverviewCalculator} from './TimelineOverviewCalculator.js';
@@ -52,6 +54,7 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
   private windowStartTime: number;
   private windowEndTime: number;
   private muteOnWindowChanged: boolean;
+  #dimHighlightSVG: Element;
 
   constructor(prefix: string) {
     super();
@@ -59,6 +62,8 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
 
     this.overviewCalculator = new TimelineOverviewCalculator();
     this.overviewGrid = new OverviewGrid(prefix, this.overviewCalculator);
+    this.overviewGrid.element.setAttribute(
+        'jslog', `${VisualLoggging.timeline(`${prefix}-overview`).track({click: true, drag: true, hover: true})}`);
     this.element.appendChild(this.overviewGrid.element);
     this.cursorArea = this.overviewGrid.element.createChild('div', 'overview-grid-cursor-area');
     this.cursorElement = this.overviewGrid.element.createChild('div', 'overview-grid-cursor-position');
@@ -66,8 +71,8 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
     this.cursorArea.addEventListener('mouseleave', this.hideCursor.bind(this), true);
 
     this.overviewGrid.setResizeEnabled(false);
-    this.overviewGrid.addEventListener(OverviewGridEvents.WindowChangedWithPosition, this.onWindowChanged, this);
-    this.overviewGrid.addEventListener(OverviewGridEvents.BreadcrumbAdded, this.onBreadcrumbAdded, this);
+    this.overviewGrid.addEventListener(OverviewGridEvents.WINDOW_CHANGED_WITH_POSITION, this.onWindowChanged, this);
+    this.overviewGrid.addEventListener(OverviewGridEvents.BREADCRUMB_ADDED, this.onBreadcrumbAdded, this);
     this.overviewGrid.setClickHandler(this.onClick.bind(this));
     this.overviewControls = [];
     this.markers = new Map();
@@ -82,6 +87,8 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
     this.windowStartTime = 0;
     this.windowEndTime = Infinity;
     this.muteOnWindowChanged = false;
+
+    this.#dimHighlightSVG = UI.UIUtils.createSVGChild(this.element, 'svg', 'timeline-minimap-dim-highlight-svg hidden');
   }
 
   enableCreateBreadcrumbsButton(): void {
@@ -153,9 +160,7 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
     this.overviewGrid.showingScreenshots = isShowing;
   }
 
-  setBounds(
-      minimumBoundary: TraceEngine.Types.Timing.MilliSeconds,
-      maximumBoundary: TraceEngine.Types.Timing.MilliSeconds): void {
+  setBounds(minimumBoundary: Trace.Types.Timing.MilliSeconds, maximumBoundary: Trace.Types.Timing.MilliSeconds): void {
     if (minimumBoundary === this.overviewCalculator.minimumBoundary() &&
         maximumBoundary === this.overviewCalculator.maximumBoundary()) {
       return;
@@ -166,17 +171,17 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
     this.scheduleUpdate(minimumBoundary, maximumBoundary);
   }
 
-  setNavStartTimes(navStartTimes: readonly TraceEngine.Types.TraceEvents.TraceEventNavigationStart[]): void {
+  setNavStartTimes(navStartTimes: readonly Trace.Types.Events.NavigationStart[]): void {
     this.overviewCalculator.setNavStartTimes(navStartTimes);
   }
 
-  scheduleUpdate(start?: TraceEngine.Types.Timing.MilliSeconds, end?: TraceEngine.Types.Timing.MilliSeconds): void {
+  scheduleUpdate(start?: Trace.Types.Timing.MilliSeconds, end?: Trace.Types.Timing.MilliSeconds): void {
     void this.updateThrottler.schedule(async () => {
       this.update(start, end);
     });
   }
 
-  private update(start?: TraceEngine.Types.Timing.MilliSeconds, end?: TraceEngine.Types.Timing.MilliSeconds): void {
+  private update(start?: Trace.Types.Timing.MilliSeconds, end?: Trace.Types.Timing.MilliSeconds): void {
     if (!this.isShowing()) {
       return;
     }
@@ -201,7 +206,7 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
     const filteredMarkers = new Map<number, Element>();
     for (const time of this.markers.keys()) {
       const marker = this.markers.get(time) as HTMLElement;
-      const position = Math.round(this.overviewCalculator.computePosition(TraceEngine.Types.Timing.MilliSeconds(time)));
+      const position = Math.round(this.overviewCalculator.computePosition(Trace.Types.Timing.MilliSeconds(time)));
       // Limit the number of markers to one per pixel.
       if (filteredMarkers.has(position)) {
         continue;
@@ -234,9 +239,9 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
   }
 
   private onBreadcrumbAdded(): void {
-    this.dispatchEventToListeners(Events.OverviewPaneBreadcrumbAdded, {
-      startTime: TraceEngine.Types.Timing.MilliSeconds(this.windowStartTime),
-      endTime: TraceEngine.Types.Timing.MilliSeconds(this.windowEndTime),
+    this.dispatchEventToListeners(Events.OVERVIEW_PANE_BREADCRUMB_ADDED, {
+      startTime: Trace.Types.Timing.MilliSeconds(this.windowStartTime),
+      endTime: Trace.Types.Timing.MilliSeconds(this.windowEndTime),
     });
   }
 
@@ -255,11 +260,11 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
         event.data.rawEndValue === this.overviewCalculator.maximumBoundary() ? Infinity : event.data.rawEndValue;
 
     const windowTimes = {
-      startTime: TraceEngine.Types.Timing.MilliSeconds(this.windowStartTime),
-      endTime: TraceEngine.Types.Timing.MilliSeconds(this.windowEndTime),
+      startTime: Trace.Types.Timing.MilliSeconds(this.windowStartTime),
+      endTime: Trace.Types.Timing.MilliSeconds(this.windowEndTime),
     };
 
-    this.dispatchEventToListeners(Events.OverviewPaneWindowChanged, windowTimes);
+    this.dispatchEventToListeners(Events.OVERVIEW_PANE_WINDOW_CHANGED, windowTimes);
   }
 
   setWindowTimes(startTime: number, endTime: number): void {
@@ -269,9 +274,9 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
     this.windowStartTime = startTime;
     this.windowEndTime = endTime;
     this.updateWindow();
-    this.dispatchEventToListeners(Events.OverviewPaneWindowChanged, {
-      startTime: TraceEngine.Types.Timing.MilliSeconds(startTime),
-      endTime: TraceEngine.Types.Timing.MilliSeconds(endTime),
+    this.dispatchEventToListeners(Events.OVERVIEW_PANE_WINDOW_CHANGED, {
+      startTime: Trace.Types.Timing.MilliSeconds(startTime),
+      endTime: Trace.Types.Timing.MilliSeconds(endTime),
     });
   }
 
@@ -288,36 +293,89 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
     this.overviewGrid.setWindow(left, right);
     this.muteOnWindowChanged = false;
   }
+
+  highlightBounds(bounds: Trace.Types.Timing.TraceWindowMicroSeconds): void {
+    let mask = this.#dimHighlightSVG?.querySelector('mask');
+    if (!mask) {
+      // Set up the desaturation mask
+      const defs = UI.UIUtils.createSVGChild(this.#dimHighlightSVG, 'defs');
+      mask = UI.UIUtils.createSVGChild(defs, 'mask') as SVGMaskElement;
+      mask.id = 'dim-highlight-cutouts';
+      /* Within the mask...
+          - black fill = punch, fully transparently, through to the next thing. these are the cutouts to the color.
+          - white fill = be 100% desaturated
+          - grey fill  = show at the Lightness level of grayscale/desaturation
+      */
+      const showAllRect = UI.UIUtils.createSVGChild(mask, 'rect');
+      showAllRect.setAttribute('width', '100%');
+      showAllRect.setAttribute('height', '100%');
+      showAllRect.setAttribute('fill', 'hsl(0deg 0% 95%)');
+
+      const desaturateRect = UI.UIUtils.createSVGChild(this.#dimHighlightSVG, 'rect') as SVGRectElement;
+      desaturateRect.setAttribute('width', '100%');
+      desaturateRect.setAttribute('height', '100%');
+      desaturateRect.setAttribute('fill', '#ffffff');
+      desaturateRect.setAttribute('mask', `url(#${mask.id})`);
+      desaturateRect.style.mixBlendMode = 'saturation';
+
+      const punchRect = UI.UIUtils.createSVGChild(mask, 'rect', 'punch');
+      punchRect.setAttribute('y', '0');
+      punchRect.setAttribute('height', '100%');
+      punchRect.setAttribute('fill', 'black');
+
+      const bracketColor = ThemeSupport.ThemeSupport.instance().getComputedValue('--sys-color-state-on-header-hover');
+      const bracket = UI.UIUtils.createSVGChild(this.#dimHighlightSVG, 'polygon') as SVGRectElement;
+      bracket.setAttribute('fill', bracketColor);
+    }
+
+    const left = this.overviewCalculator.computePosition(Trace.Helpers.Timing.microSecondsToMilliseconds(bounds.min));
+    const right = this.overviewCalculator.computePosition(Trace.Helpers.Timing.microSecondsToMilliseconds(bounds.max));
+
+    const punchRect = this.#dimHighlightSVG.querySelector('rect.punch');
+    punchRect?.setAttribute('x', left.toString());
+    punchRect?.setAttribute('width', (right - left).toString());
+
+    const size = 5;  // px size of triangles
+    const bracket = this.#dimHighlightSVG.querySelector('polygon');
+    bracket?.setAttribute(
+        'points', `${left},0 ${left},${size} ${left + size - 1},1 ${right - size - 1},1 ${right},${size} ${right},0`);
+
+    this.#dimHighlightSVG.classList.remove('hidden');
+  }
+
+  clearBoundsHighlight(): void {
+    this.#dimHighlightSVG.classList.add('hidden');
+  }
 }
 
 export const enum Events {
-  OverviewPaneWindowChanged = 'OverviewPaneWindowChanged',
-  OverviewPaneBreadcrumbAdded = 'OverviewPaneBreadcrumbAdded',
-  OpenSidebarButtonClicked = 'OpenSidebarButtonClicked',
+  OVERVIEW_PANE_WINDOW_CHANGED = 'OverviewPaneWindowChanged',
+  OVERVIEW_PANE_BREADCRUMB_ADDED = 'OverviewPaneBreadcrumbAdded',
+  OPEN_SIDEBAR_BUTTON_CLICKED = 'OpenSidebarButtonClicked',
 }
 
 export interface OverviewPaneWindowChangedEvent {
-  startTime: TraceEngine.Types.Timing.MilliSeconds;
-  endTime: TraceEngine.Types.Timing.MilliSeconds;
+  startTime: Trace.Types.Timing.MilliSeconds;
+  endTime: Trace.Types.Timing.MilliSeconds;
 }
 
 export interface OverviewPaneBreadcrumbAddedEvent {
-  startTime: TraceEngine.Types.Timing.MilliSeconds;
-  endTime: TraceEngine.Types.Timing.MilliSeconds;
+  startTime: Trace.Types.Timing.MilliSeconds;
+  endTime: Trace.Types.Timing.MilliSeconds;
 }
 
 export interface OpenSidebarButtonClicked {}
 
 export type EventTypes = {
-  [Events.OverviewPaneWindowChanged]: OverviewPaneWindowChangedEvent,
-  [Events.OverviewPaneBreadcrumbAdded]: OverviewPaneBreadcrumbAddedEvent,
-  [Events.OpenSidebarButtonClicked]: OpenSidebarButtonClicked,
+  [Events.OVERVIEW_PANE_WINDOW_CHANGED]: OverviewPaneWindowChangedEvent,
+  [Events.OVERVIEW_PANE_BREADCRUMB_ADDED]: OverviewPaneBreadcrumbAddedEvent,
+  [Events.OPEN_SIDEBAR_BUTTON_CLICKED]: OpenSidebarButtonClicked,
 };
 
 export interface TimelineOverview {
   show(parentElement: Element, insertBefore?: Element|null): void;
   // if start and end are specified, data will be filtered and only data within those bound will be displayed
-  update(start?: TraceEngine.Types.Timing.MilliSeconds, end?: TraceEngine.Types.Timing.MilliSeconds): void;
+  update(start?: Trace.Types.Timing.MilliSeconds, end?: Trace.Types.Timing.MilliSeconds): void;
   dispose(): void;
   reset(): void;
   overviewInfoPromise(x: number): Promise<Element|null>;
@@ -400,9 +458,9 @@ export class OverviewInfo {
   constructor(anchor: Element) {
     this.anchorElement = anchor;
     this.glassPane = new UI.GlassPane.GlassPane();
-    this.glassPane.setPointerEventsBehavior(UI.GlassPane.PointerEventsBehavior.PierceContents);
-    this.glassPane.setMarginBehavior(UI.GlassPane.MarginBehavior.Arrow);
-    this.glassPane.setSizeBehavior(UI.GlassPane.SizeBehavior.MeasureContent);
+    this.glassPane.setPointerEventsBehavior(UI.GlassPane.PointerEventsBehavior.PIERCE_CONTENTS);
+    this.glassPane.setMarginBehavior(UI.GlassPane.MarginBehavior.ARROW);
+    this.glassPane.setSizeBehavior(UI.GlassPane.SizeBehavior.MEASURE_CONTENT);
     this.visible = false;
     this.element = UI.UIUtils
                        .createShadowRootWithCoreStyles(this.glassPane.contentElement, {

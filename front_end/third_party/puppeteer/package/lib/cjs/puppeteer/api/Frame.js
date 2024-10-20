@@ -41,7 +41,7 @@ var __esDecorate = (this && this.__esDecorate) || function (ctor, descriptorIn, 
 var __addDisposableResource = (this && this.__addDisposableResource) || function (env, value, async) {
     if (value !== null && value !== void 0) {
         if (typeof value !== "object" && typeof value !== "function") throw new TypeError("Object expected.");
-        var dispose;
+        var dispose, inner;
         if (async) {
             if (!Symbol.asyncDispose) throw new TypeError("Symbol.asyncDispose is not defined.");
             dispose = value[Symbol.asyncDispose];
@@ -49,8 +49,10 @@ var __addDisposableResource = (this && this.__addDisposableResource) || function
         if (dispose === void 0) {
             if (!Symbol.dispose) throw new TypeError("Symbol.dispose is not defined.");
             dispose = value[Symbol.dispose];
+            if (async) inner = dispose;
         }
         if (typeof dispose !== "function") throw new TypeError("Object not disposable.");
+        if (inner) dispose = function() { try { inner.call(this); } catch (e) { return Promise.reject(e); } };
         env.stack.push({ value: value, dispose: dispose, async: async });
     }
     else if (async) {
@@ -89,6 +91,7 @@ const EventEmitter_js_1 = require("../common/EventEmitter.js");
 const GetQueryHandler_js_1 = require("../common/GetQueryHandler.js");
 const HandleIterator_js_1 = require("../common/HandleIterator.js");
 const util_js_1 = require("../common/util.js");
+const environment_js_1 = require("../environment.js");
 const assert_js_1 = require("../util/assert.js");
 const decorators_js_1 = require("../util/decorators.js");
 const locators_js_1 = require("./locators/locators.js");
@@ -353,7 +356,7 @@ let Frame = (() => {
          *
          * @param selector -
          * {@link https://pptr.dev/guides/page-interactions#selectors | selector}
-         * to query page for.
+         * to query the page for.
          * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
          * can be passed as-is and a
          * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
@@ -380,7 +383,7 @@ let Frame = (() => {
          *
          * @param selector -
          * {@link https://pptr.dev/guides/page-interactions#selectors | selector}
-         * to query page for.
+         * to query the page for.
          * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
          * can be passed as-is and a
          * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
@@ -417,7 +420,7 @@ let Frame = (() => {
          *
          * @param selector -
          * {@link https://pptr.dev/guides/page-interactions#selectors | selector}
-         * to query page for.
+         * to query the page for.
          * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
          * can be passed as-is and a
          * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
@@ -457,7 +460,7 @@ let Frame = (() => {
          *
          * @param selector -
          * {@link https://pptr.dev/guides/page-interactions#selectors | selector}
-         * to query page for.
+         * to query the page for.
          * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
          * can be passed as-is and a
          * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
@@ -637,8 +640,7 @@ let Frame = (() => {
                 throw new Error('Exactly one of `url`, `path`, or `content` must be specified.');
             }
             if (path) {
-                const fs = await (0, util_js_1.importFSPromises)();
-                content = await fs.readFile(path, 'utf8');
+                content = await environment_js_1.environment.value.fs.promises.readFile(path, 'utf8');
                 content += `//# sourceURL=${path.replace(/\n/g, '')}`;
             }
             type = type ?? 'text/javascript';
@@ -677,8 +679,7 @@ let Frame = (() => {
                 throw new Error('Exactly one of `url`, `path`, or `content` must be specified.');
             }
             if (path) {
-                const fs = await (0, util_js_1.importFSPromises)();
-                content = await fs.readFile(path, 'utf8');
+                content = await environment_js_1.environment.value.fs.promises.readFile(path, 'utf8');
                 content += '/*# sourceURL=' + path.replace(/\n/g, '') + '*/';
                 options.content = content;
             }

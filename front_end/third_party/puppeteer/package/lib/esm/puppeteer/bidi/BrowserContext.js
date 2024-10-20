@@ -37,10 +37,58 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
     }
     return useValue ? value : void 0;
 };
+var __addDisposableResource = (this && this.__addDisposableResource) || function (env, value, async) {
+    if (value !== null && value !== void 0) {
+        if (typeof value !== "object" && typeof value !== "function") throw new TypeError("Object expected.");
+        var dispose, inner;
+        if (async) {
+            if (!Symbol.asyncDispose) throw new TypeError("Symbol.asyncDispose is not defined.");
+            dispose = value[Symbol.asyncDispose];
+        }
+        if (dispose === void 0) {
+            if (!Symbol.dispose) throw new TypeError("Symbol.dispose is not defined.");
+            dispose = value[Symbol.dispose];
+            if (async) inner = dispose;
+        }
+        if (typeof dispose !== "function") throw new TypeError("Object not disposable.");
+        if (inner) dispose = function() { try { inner.call(this); } catch (e) { return Promise.reject(e); } };
+        env.stack.push({ value: value, dispose: dispose, async: async });
+    }
+    else if (async) {
+        env.stack.push({ async: true });
+    }
+    return value;
+};
+var __disposeResources = (this && this.__disposeResources) || (function (SuppressedError) {
+    return function (env) {
+        function fail(e) {
+            env.error = env.hasError ? new SuppressedError(e, env.error, "An error was suppressed during disposal.") : e;
+            env.hasError = true;
+        }
+        function next() {
+            while (env.stack.length) {
+                var rec = env.stack.pop();
+                try {
+                    var result = rec.dispose && rec.dispose.call(rec.value);
+                    if (rec.async) return Promise.resolve(result).then(next, function(e) { fail(e); return next(); });
+                }
+                catch (e) {
+                    fail(e);
+                }
+            }
+            if (env.hasError) throw env.error;
+        }
+        return next();
+    };
+})(typeof SuppressedError === "function" ? SuppressedError : function (error, suppressed, message) {
+    var e = new Error(message);
+    return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
+});
 import { WEB_PERMISSION_TO_PROTOCOL_PERMISSION } from '../api/Browser.js';
 import { BrowserContext } from '../api/BrowserContext.js';
 import { EventEmitter } from '../common/EventEmitter.js';
 import { debugError } from '../common/util.js';
+import { assert } from '../util/assert.js';
 import { bubble } from '../util/decorators.js';
 import { UserContext } from './core/UserContext.js';
 import { BidiPage } from './Page.js';
@@ -172,25 +220,34 @@ let BidiBrowserContext = (() => {
             });
         }
         async newPage() {
-            const context = await this.userContext.createBrowsingContext("tab" /* Bidi.BrowsingContext.CreateType.Tab */);
-            const page = this.#pages.get(context);
-            if (!page) {
-                throw new Error('Page is not found');
-            }
-            if (this.#defaultViewport) {
-                try {
-                    await page.setViewport(this.#defaultViewport);
+            const env_1 = { stack: [], error: void 0, hasError: false };
+            try {
+                const _guard = __addDisposableResource(env_1, await this.waitForScreenshotOperations(), false);
+                const context = await this.userContext.createBrowsingContext("tab" /* Bidi.BrowsingContext.CreateType.Tab */);
+                const page = this.#pages.get(context);
+                if (!page) {
+                    throw new Error('Page is not found');
                 }
-                catch {
-                    // No support for setViewport in Firefox.
+                if (this.#defaultViewport) {
+                    try {
+                        await page.setViewport(this.#defaultViewport);
+                    }
+                    catch {
+                        // No support for setViewport in Firefox.
+                    }
                 }
+                return page;
             }
-            return page;
+            catch (e_1) {
+                env_1.error = e_1;
+                env_1.hasError = true;
+            }
+            finally {
+                __disposeResources(env_1);
+            }
         }
         async close() {
-            if (!this.isIncognito()) {
-                throw new Error('Default context cannot be closed!');
-            }
+            assert(this.userContext.id !== UserContext.DEFAULT, 'Default BrowserContext cannot be closed!');
             try {
                 await this.userContext.remove();
             }
@@ -206,9 +263,6 @@ let BidiBrowserContext = (() => {
             return [...this.userContext.browsingContexts].map(context => {
                 return this.#pages.get(context);
             });
-        }
-        isIncognito() {
-            return this.userContext.id !== UserContext.DEFAULT;
         }
         async overridePermissions(origin, permissions) {
             const permissionsSet = new Set(permissions.map(permission => {
