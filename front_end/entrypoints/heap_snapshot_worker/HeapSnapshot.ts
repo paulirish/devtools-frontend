@@ -358,11 +358,21 @@ export class HeapSnapshotNode implements HeapSnapshotItem {
   }
 
   className(): string {
-    throw new Error('Not implemented');
+    return this.snapshot.strings[this.classIndex()];
   }
 
   classIndex(): number {
-    throw new Error('Not implemented');
+    return this.#detachednessAndClassIndex() >>> SHIFT_FOR_CLASS_INDEX;
+  }
+
+  setClassIndex(index: number): void {
+    let value = this.#detachednessAndClassIndex();
+    value &= BITMASK_FOR_DOM_LINK_STATE;        // Clear previous class index.
+    value |= (index << SHIFT_FOR_CLASS_INDEX);  // Set new class index.
+    this.#setDetachednessAndClassIndex(value);
+    if (this.classIndex() !== index) {
+      throw new Error('String index overflow');
+    }
   }
 
   dominatorIndex(): number {
@@ -383,7 +393,7 @@ export class HeapSnapshotNode implements HeapSnapshotItem {
   }
 
   rawName(): string {
-    throw new Error('Not implemented');
+    return this.snapshot.strings[this.rawNameIndex()];
   }
 
   isRoot(): boolean {
@@ -411,7 +421,7 @@ export class HeapSnapshotNode implements HeapSnapshotItem {
   }
 
   name(): string {
-    return this.snapshot.strings[this.nameInternal()];
+    return this.rawName();
   }
 
   retainedSize(): number {
@@ -451,7 +461,7 @@ export class HeapSnapshotNode implements HeapSnapshotItem {
         this.id(), this.name(), this.distance(), this.nodeIndex, this.retainedSize(), this.selfSize(), this.type());
   }
 
-  private nameInternal(): number {
+  rawNameIndex(): number {
     const snapshot = this.snapshot;
     return snapshot.nodes.getValue(this.nodeIndex + snapshot.nodeNameOffset);
   }
@@ -492,6 +502,35 @@ export class HeapSnapshotNode implements HeapSnapshotItem {
       }
     }
     return false;
+  }
+
+  #detachednessAndClassIndex(): number {
+    const {snapshot, nodeIndex} = this;
+    const nodeDetachednessAndClassIndexOffset = snapshot.nodeDetachednessAndClassIndexOffset;
+    return nodeDetachednessAndClassIndexOffset !== -1 ?
+        snapshot.nodes.getValue(nodeIndex + nodeDetachednessAndClassIndexOffset) :
+        (snapshot.detachednessAndClassIndexArray as Uint32Array)[nodeIndex / snapshot.nodeFieldCount];
+  }
+
+  #setDetachednessAndClassIndex(value: number): void {
+    const {snapshot, nodeIndex} = this;
+    const nodeDetachednessAndClassIndexOffset = snapshot.nodeDetachednessAndClassIndexOffset;
+    if (nodeDetachednessAndClassIndexOffset !== -1) {
+      snapshot.nodes.setValue(nodeIndex + nodeDetachednessAndClassIndexOffset, value);
+    } else {
+      (snapshot.detachednessAndClassIndexArray as Uint32Array)[nodeIndex / snapshot.nodeFieldCount] = value;
+    }
+  }
+
+  detachedness(): DOMLinkState {
+    return this.#detachednessAndClassIndex() & BITMASK_FOR_DOM_LINK_STATE;
+  }
+
+  setDetachedness(detachedness: DOMLinkState): void {
+    let value = this.#detachednessAndClassIndex();
+    value &= ~BITMASK_FOR_DOM_LINK_STATE;  // Clear the old bits.
+    value |= detachedness;                 // Set the new bits.
+    this.#setDetachednessAndClassIndex(value);
   }
 }
 
@@ -599,6 +638,14 @@ export class HeapSnapshotProgress {
   }
 }
 
+// An "interface" to be used when classifying plain JS objects in the snapshot.
+// An object matches the interface if it contains every listed property (even
+// if it also contains extra properties).
+interface InterfaceDefinition {
+  name: string;
+  properties: string[];
+}
+
 export class HeapSnapshotProblemReport {
   readonly #errors: string[];
   constructor(title: string) {
@@ -638,10 +685,31 @@ export interface LiveObjects {
  * DOM node link state.
  */
 const enum DOMLinkState {
-  Unknown = 0,
-  Attached = 1,
-  Detached = 2,
+  UNKNOWN = 0,
+  ATTACHED = 1,
+  DETACHED = 2,
 }
+const BITMASK_FOR_DOM_LINK_STATE = 3;
+
+// The class index is stored in the upper 30 bits of the detachedness field.
+const SHIFT_FOR_CLASS_INDEX = 2;
+
+// The maximum number of results produced by inferInterfaceDefinitions.
+const MAX_INTERFACE_COUNT = 1000;
+
+// After this many properties, inferInterfaceDefinitions can stop adding more
+// properties to an interface definition if the name is getting too long.
+const MIN_INTERFACE_PROPERTY_COUNT = 1;
+
+// The maximum length of an interface name produced by inferInterfaceDefinitions.
+// This limit can be exceeded if the first MIN_INTERFACE_PROPERTY_COUNT property
+// names are long.
+const MAX_INTERFACE_NAME_LENGTH = 120;
+
+// Each interface definition produced by inferInterfaceDefinitions will match at
+// least this many objects. There's no point in defining interfaces which match
+// only a single object.
+const MIN_OBJECT_COUNT_PER_INTERFACE = 2;
 
 export abstract class HeapSnapshot {
   nodes: Platform.TypedArrayUtilities.BigUint32Array;
@@ -659,8 +727,11 @@ export abstract class HeapSnapshot {
       [x: string]: HeapSnapshotModel.HeapSnapshotModel.Diff,
     },
   };
-  #aggregatesForDiffInternal!: {
-    [x: string]: HeapSnapshotModel.HeapSnapshotModel.AggregateForDiff,
+  #aggregatesForDiffInternal?: {
+    interfaceDefinitions: string,
+    aggregates: {
+      [x: string]: HeapSnapshotModel.HeapSnapshotModel.AggregateForDiff,
+    },
   };
   #aggregates: {
     [x: string]: {
@@ -688,6 +759,8 @@ export abstract class HeapSnapshot {
   nodeSlicedStringType!: number;
   nodeCodeType!: number;
   nodeSyntheticType!: number;
+  nodeClosureType!: number;
+  nodeRegExpType!: number;
   edgeFieldsCount!: number;
   edgeTypeOffset!: number;
   edgeNameOffset!: number;
@@ -699,6 +772,7 @@ export abstract class HeapSnapshot {
   edgeShortcutType!: number;
   edgeWeakType!: number;
   edgeInvisibleType!: number;
+  edgePropertyType!: number;
   #locationIndexOffset!: number;
   #locationScriptIdOffset!: number;
   #locationLineOffset!: number;
@@ -716,16 +790,16 @@ export abstract class HeapSnapshot {
   dominatedNodes!: Uint32Array;
   dominatorsTree!: Uint32Array;
   #allocationProfile!: AllocationProfile;
-  #nodeDetachednessOffset!: number;
+  nodeDetachednessAndClassIndexOffset!: number;
   #locationMap!: Map<number, HeapSnapshotModel.HeapSnapshotModel.Location>;
-  lazyStringCache!: {
-    [x: string]: string,
-  };
   #ignoredNodesInRetainersView: Set<number>;
   #ignoredEdgesInRetainersView: Set<number>;
   #nodeDistancesForRetainersView: Int32Array|undefined;
   #edgeNamesThatAreNotWeakMaps: Platform.TypedArrayUtilities.BitVector;
-  #syntheticClassNames: Map<string, number>;
+  detachednessAndClassIndexArray?: Uint32Array;
+  #essentialEdges?: Platform.TypedArrayUtilities.BitVector;
+  #interfaceNames: Map<string, number>;
+  #interfaceDefinitions?: InterfaceDefinition[];
 
   constructor(profile: Profile, progress: HeapSnapshotProgress) {
     this.nodes = profile.nodes;
@@ -752,7 +826,7 @@ export abstract class HeapSnapshot {
     this.#ignoredNodesInRetainersView = new Set();
     this.#ignoredEdgesInRetainersView = new Set();
     this.#edgeNamesThatAreNotWeakMaps = Platform.TypedArrayUtilities.createBitVector(this.strings.length);
-    this.#syntheticClassNames = new Map();
+    this.#interfaceNames = new Map();
   }
 
   initialize(): void {
@@ -764,7 +838,7 @@ export abstract class HeapSnapshot {
     this.nodeSelfSizeOffset = meta.node_fields.indexOf('self_size');
     this.#nodeEdgeCountOffset = meta.node_fields.indexOf('edge_count');
     this.nodeTraceNodeIdOffset = meta.node_fields.indexOf('trace_node_id');
-    this.#nodeDetachednessOffset = meta.node_fields.indexOf('detachedness');
+    this.nodeDetachednessAndClassIndexOffset = meta.node_fields.indexOf('detachedness');
     this.nodeFieldCount = meta.node_fields.length;
 
     this.nodeTypes = meta.node_types[this.nodeTypeOffset];
@@ -777,6 +851,8 @@ export abstract class HeapSnapshot {
     this.nodeSlicedStringType = this.nodeTypes.indexOf('sliced string');
     this.nodeCodeType = this.nodeTypes.indexOf('code');
     this.nodeSyntheticType = this.nodeTypes.indexOf('synthetic');
+    this.nodeClosureType = this.nodeTypes.indexOf('closure');
+    this.nodeRegExpType = this.nodeTypes.indexOf('regexp');
 
     this.edgeFieldsCount = meta.edge_fields.length;
     this.edgeTypeOffset = meta.edge_fields.indexOf('type');
@@ -791,6 +867,7 @@ export abstract class HeapSnapshot {
     this.edgeShortcutType = this.edgeTypes.indexOf('shortcut');
     this.edgeWeakType = this.edgeTypes.indexOf('weak');
     this.edgeInvisibleType = this.edgeTypes.indexOf('invisible');
+    this.edgePropertyType = this.edgeTypes.indexOf('property');
 
     const locationFields = meta.location_fields || [];
 
@@ -809,8 +886,6 @@ export abstract class HeapSnapshot {
     this.retainingEdges = new Uint32Array(this.#edgeCount);
     this.firstRetainerIndex = new Uint32Array(this.nodeCount + 1);
     this.nodeDistances = new Int32Array(this.nodeCount);
-    this.firstDominatedNodeIndex = new Uint32Array(this.nodeCount + 1);
-    this.dominatedNodes = new Uint32Array(this.nodeCount - 1);
 
     this.#progress.updateStatus('Building edge indexes…');
     this.buildEdgeIndexes();
@@ -822,17 +897,17 @@ export abstract class HeapSnapshot {
     this.calculateFlags();
     this.#progress.updateStatus('Calculating distances…');
     this.calculateDistances(/* isForRetainersView=*/ false);
-    this.#progress.updateStatus('Building postorder index…');
-    const result = this.buildPostOrderIndex();
-    // Actually it is array that maps node ordinal number to dominator node ordinal number.
-    this.#progress.updateStatus('Building dominator tree…');
-    this.dominatorsTree = this.buildDominatorTree(result.postOrderIndex2NodeOrdinal, result.nodeOrdinal2PostOrderIndex);
     this.#progress.updateStatus('Calculating shallow sizes…');
     this.calculateShallowSizes();
     this.#progress.updateStatus('Calculating retained sizes…');
-    this.calculateRetainedSizes(result.postOrderIndex2NodeOrdinal);
+    this.buildDominatorTreeAndCalculateRetainedSizes();
     this.#progress.updateStatus('Building dominated nodes…');
+    this.firstDominatedNodeIndex = new Uint32Array(this.nodeCount + 1);
+    this.dominatedNodes = new Uint32Array(this.nodeCount - 1);
     this.buildDominatedNodes();
+    this.#progress.updateStatus('Calculating object names…');
+    this.calculateObjectNames();
+    this.applyInterfaceDefinitions(this.inferInterfaceDefinitions());
     this.#progress.updateStatus('Calculating statistics…');
     this.calculateStatistics();
     this.#progress.updateStatus('Calculating samples…');
@@ -1002,12 +1077,9 @@ export abstract class HeapSnapshot {
       return matchedStringIndexes;
     }
 
-    const stringFilter = (searchConfig.isRegex || !searchConfig.caseSensitive) ? filterRegexp : filterString;
+    const useRegExp = searchConfig.isRegex || !searchConfig.caseSensitive;
+    const stringFilter = useRegExp ? filterRegexp : filterString;
     const stringIndexes = this.strings.reduce(stringFilter, new Set());
-
-    if (!stringIndexes.size) {
-      return [];
-    }
 
     const filter = this.createFilter(nodeFilter);
     const nodeIds = [];
@@ -1023,8 +1095,20 @@ export abstract class HeapSnapshot {
       if (filter && !filter(node)) {
         continue;
       }
-      if (stringIndexes.has(nodes.getValue(nodeIndex + nodeNameOffset))) {
-        nodeIds.push(nodes.getValue(nodeIndex + nodeIdOffset));
+      const name = node.name();
+      if (name === node.rawName()) {
+        // If the string displayed to the user matches the raw name from the
+        // snapshot, then we can use the Set computed above. This avoids
+        // repeated work when multiple nodes have the same name.
+        if (stringIndexes.has(nodes.getValue(nodeIndex + nodeNameOffset))) {
+          nodeIds.push(nodes.getValue(nodeIndex + nodeIdOffset));
+        }
+      } else {
+        // If the node is displaying a customized name, then we must perform the
+        // full string search within that name here.
+        if (useRegExp ? regexp.test(name) : (name.indexOf(query) !== -1)) {
+          nodeIds.push(nodes.getValue(nodeIndex + nodeIdOffset));
+        }
       }
     }
     return nodeIds;
@@ -1107,7 +1191,7 @@ export abstract class HeapSnapshot {
       case 'objectsRetainedByDetachedDomNodes':
         // Traverse the graph, avoiding detached nodes.
         traverse((node: HeapSnapshotNode, edge: HeapSnapshotEdge) => {
-          return this.nodes.getValue(edge.nodeIndex() + this.#nodeDetachednessOffset) !== DOMLinkState.Detached;
+          return edge.node().detachedness() !== DOMLinkState.DETACHED;
         });
         markUnreachableNodes();
         return (node: HeapSnapshotNode) => !getBit(node);
@@ -1194,13 +1278,17 @@ export abstract class HeapSnapshot {
     return this.#allocationProfile.serializeAllocationStack(allocationNodeId);
   }
 
-  aggregatesForDiff(): {[x: string]: HeapSnapshotModel.HeapSnapshotModel.AggregateForDiff} {
-    if (this.#aggregatesForDiffInternal) {
-      return this.#aggregatesForDiffInternal;
+  aggregatesForDiff(interfaceDefinitions: string): {[x: string]: HeapSnapshotModel.HeapSnapshotModel.AggregateForDiff} {
+    if (this.#aggregatesForDiffInternal?.interfaceDefinitions === interfaceDefinitions) {
+      return this.#aggregatesForDiffInternal.aggregates;
     }
 
+    // Temporarily apply the interface definitions from the other snapshot.
+    const originalInterfaceDefinitions = this.#interfaceDefinitions;
+    this.applyInterfaceDefinitions(JSON.parse(interfaceDefinitions) as InterfaceDefinition[]);
     const aggregatesByClassName = this.getAggregatesByClassName(true, 'allObjects');
-    this.#aggregatesForDiffInternal = {};
+    this.applyInterfaceDefinitions(originalInterfaceDefinitions ?? []);
+    const result: {[x: string]: HeapSnapshotModel.HeapSnapshotModel.AggregateForDiff} = {};
 
     const node = this.createNode();
     for (const className in aggregatesByClassName) {
@@ -1214,9 +1302,11 @@ export abstract class HeapSnapshot {
         selfSizes[i] = node.selfSize();
       }
 
-      this.#aggregatesForDiffInternal[className] = {indexes: indexes, ids: ids, selfSizes: selfSizes};
+      result[className] = {indexes, ids, selfSizes};
     }
-    return this.#aggregatesForDiffInternal;
+
+    this.#aggregatesForDiffInternal = {interfaceDefinitions, aggregates: result};
+    return result;
   }
 
   isUserRoot(_node: HeapSnapshotNode): boolean {
@@ -1347,7 +1437,7 @@ export abstract class HeapSnapshot {
         const nameMatters = nodeType === 'object' || nodeType === 'native';
         const value = {
           count: 1,
-          distance: distance,
+          distance,
           self: selfSize,
           maxRet: 0,
           type: nodeType,
@@ -1379,7 +1469,7 @@ export abstract class HeapSnapshot {
       classIndexValues.idxs = classIndexValues.idxs.slice();
     }
 
-    return {aggregatesByClassName: aggregatesByClassName, aggregatesByClassIndex: aggregates};
+    return {aggregatesByClassName, aggregatesByClassIndex: aggregates};
   }
 
   private calculateClassesRetainedSize(
@@ -1454,11 +1544,8 @@ export abstract class HeapSnapshot {
     return match.groups as {duplicatedPart: string, tableId: string};
   }
 
-  /**
-   * The function checks is the edge should be considered during building
-   * postorder iterator and dominator tree.
-   */
-  private isEssentialEdge(nodeIndex: number, edgeIndex: number): boolean {
+  private computeIsEssentialEdge(
+      nodeIndex: number, edgeIndex: number, userObjectsMapAndFlag: {map: Uint8Array, flag: number}|null): boolean {
     const edgeType = this.containmentEdges.getValue(edgeIndex + this.edgeTypeOffset);
 
     // Values in WeakMaps are retained by the key and table together. Removing
@@ -1471,296 +1558,293 @@ export abstract class HeapSnapshot {
       const match = this.tryParseWeakMapEdgeName(edgeNameIndex);
       if (match) {
         const nodeId = this.nodes.getValue(nodeIndex + this.nodeIdOffset);
-        return nodeId !== parseInt(match.tableId, 10);
+        if (nodeId === parseInt(match.tableId, 10)) {
+          return false;
+        }
       }
     }
 
-    // Shortcuts at the root node have special meaning of marking user global objects.
-    return edgeType !== this.edgeWeakType &&
-        (edgeType !== this.edgeShortcutType || nodeIndex === this.rootNodeIndexInternal);
+    // Weak edges never retain anything.
+    if (edgeType === this.edgeWeakType) {
+      return false;
+    }
+
+    const childNodeIndex = this.containmentEdges.getValue(edgeIndex + this.edgeToNodeOffset);
+    // Ignore self edges.
+    if (nodeIndex === childNodeIndex) {
+      return false;
+    }
+
+    if (nodeIndex !== this.rootNodeIndex) {
+      // Shortcuts at the root node have special meaning of marking user global objects.
+      if (edgeType === this.edgeShortcutType) {
+        return false;
+      }
+
+      const flags = userObjectsMapAndFlag ? userObjectsMapAndFlag.map : null;
+      const userObjectFlag = userObjectsMapAndFlag ? userObjectsMapAndFlag.flag : 0;
+      const nodeOrdinal = nodeIndex / this.nodeFieldCount;
+      const childNodeOrdinal = childNodeIndex / this.nodeFieldCount;
+      const nodeFlag = !flags || (flags[nodeOrdinal] & userObjectFlag);
+      const childNodeFlag = !flags || (flags[childNodeOrdinal] & userObjectFlag);
+      // We are skipping the edges from non-page-owned nodes to page-owned nodes.
+      // Otherwise the dominators for the objects that also were retained by debugger would be affected.
+      if (childNodeFlag && !nodeFlag) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
-  private buildPostOrderIndex(): {postOrderIndex2NodeOrdinal: Uint32Array, nodeOrdinal2PostOrderIndex: Uint32Array} {
-    const nodeFieldCount = this.nodeFieldCount;
-    const nodeCount = this.nodeCount;
-    const rootNodeOrdinal = this.rootNodeIndexInternal / nodeFieldCount;
+  // Returns whether the edge should be considered when building the dominator tree.
+  // The first call to this function computes essential edges and caches them.
+  // Subsequent calls just lookup from the cache and are much faster.
+  private isEssentialEdge(edgeIndex: number): boolean {
+    let essentialEdges = this.#essentialEdges;
 
-    const edgeFieldsCount = this.edgeFieldsCount;
-    const edgeToNodeOffset = this.edgeToNodeOffset;
-    const firstEdgeIndexes = this.firstEdgeIndexes;
-    const containmentEdges = this.containmentEdges;
-
-    const mapAndFlag = this.userObjectsMapAndFlag();
-    const flags = mapAndFlag ? mapAndFlag.map : null;
-    const flag = mapAndFlag ? mapAndFlag.flag : 0;
-
-    const stackNodes = new Uint32Array(nodeCount);
-    const stackCurrentEdge = new Uint32Array(nodeCount);
-    const postOrderIndex2NodeOrdinal = new Uint32Array(nodeCount);
-    const nodeOrdinal2PostOrderIndex = new Uint32Array(nodeCount);
-    const visited = new Uint8Array(nodeCount);
-    let postOrderIndex = 0;
-
-    let stackTop = 0;
-    stackNodes[0] = rootNodeOrdinal;
-    stackCurrentEdge[0] = firstEdgeIndexes[rootNodeOrdinal];
-    visited[rootNodeOrdinal] = 1;
-
-    let iteration = 0;
-    while (true) {
-      ++iteration;
-      while (stackTop >= 0) {
-        const nodeOrdinal = stackNodes[stackTop];
-        const edgeIndex = stackCurrentEdge[stackTop];
-        const edgesEnd = firstEdgeIndexes[nodeOrdinal + 1];
-
-        if (edgeIndex < edgesEnd) {
-          stackCurrentEdge[stackTop] += edgeFieldsCount;
-          if (!this.isEssentialEdge(nodeOrdinal * nodeFieldCount, edgeIndex)) {
-            continue;
+    if (!essentialEdges) {
+      essentialEdges = this.#essentialEdges = Platform.TypedArrayUtilities.createBitVector(this.#edgeCount);
+      const {nodes, nodeFieldCount, edgeFieldsCount} = this;
+      const userObjectsMapAndFlag = this.userObjectsMapAndFlag();
+      const endNodeIndex = nodes.length;
+      const node = this.createNode(0);
+      for (let nodeIndex = 0; nodeIndex < endNodeIndex; nodeIndex += nodeFieldCount) {
+        node.nodeIndex = nodeIndex;
+        const edgeIndexesEnd = node.edgeIndexesEnd();
+        for (let edgeIndex = node.edgeIndexesStart(); edgeIndex < edgeIndexesEnd; edgeIndex += edgeFieldsCount) {
+          if (this.computeIsEssentialEdge(nodeIndex, edgeIndex, userObjectsMapAndFlag)) {
+            essentialEdges.setBit(edgeIndex / edgeFieldsCount);
           }
-          const childNodeIndex = containmentEdges.getValue(edgeIndex + edgeToNodeOffset);
-          const childNodeOrdinal = childNodeIndex / nodeFieldCount;
-          if (visited[childNodeOrdinal]) {
-            continue;
-          }
-          const nodeFlag = !flags || (flags[nodeOrdinal] & flag);
-          const childNodeFlag = !flags || (flags[childNodeOrdinal] & flag);
-          // We are skipping the edges from non-page-owned nodes to page-owned nodes.
-          // Otherwise the dominators for the objects that also were retained by debugger would be affected.
-          if (nodeOrdinal !== rootNodeOrdinal && childNodeFlag && !nodeFlag) {
-            continue;
-          }
-          ++stackTop;
-          stackNodes[stackTop] = childNodeOrdinal;
-          stackCurrentEdge[stackTop] = firstEdgeIndexes[childNodeOrdinal];
-          visited[childNodeOrdinal] = 1;
-        } else {
-          // Done with all the node children
-          nodeOrdinal2PostOrderIndex[nodeOrdinal] = postOrderIndex;
-          postOrderIndex2NodeOrdinal[postOrderIndex++] = nodeOrdinal;
-          --stackTop;
         }
       }
-
-      if (postOrderIndex === nodeCount || iteration > 1) {
-        break;
-      }
-      const errors = new HeapSnapshotProblemReport(`Heap snapshot: ${
-          nodeCount - postOrderIndex} nodes are unreachable from the root. Following nodes have only weak retainers:`);
-      const dumpNode = this.rootNode();
-      // Remove root from the result (last node in the array) and put it at the bottom of the stack so that it is
-      // visited after all orphan nodes and their subgraphs.
-      --postOrderIndex;
-      stackTop = 0;
-      stackNodes[0] = rootNodeOrdinal;
-      stackCurrentEdge[0] = firstEdgeIndexes[rootNodeOrdinal + 1];  // no need to reiterate its edges
-      for (let i = 0; i < nodeCount; ++i) {
-        if (visited[i] || !this.hasOnlyWeakRetainers(i)) {
-          continue;
-        }
-
-        // Add all nodes that have only weak retainers to traverse their subgraphs.
-        stackNodes[++stackTop] = i;
-        stackCurrentEdge[stackTop] = firstEdgeIndexes[i];
-        visited[i] = 1;
-
-        dumpNode.nodeIndex = i * nodeFieldCount;
-        const retainers = [];
-        for (let it = dumpNode.retainers(); it.hasNext(); it.next()) {
-          retainers.push(`${it.item().node().name()}@${it.item().node().id()}.${it.item().name()}`);
-        }
-        errors.addError(`${dumpNode.name()} @${dumpNode.id()}  weak retainers: ${retainers.join(', ')}`);
-      }
-      console.warn(errors.toString());
     }
 
-    // If we already processed all orphan nodes that have only weak retainers and still have some orphans...
-    if (postOrderIndex !== nodeCount) {
-      const errors = new HeapSnapshotProblemReport(
-          'Still found ' + (nodeCount - postOrderIndex) + ' unreachable nodes in heap snapshot:');
-      const dumpNode = this.rootNode();
-      // Remove root from the result (last node in the array) and put it at the bottom of the stack so that it is
-      // visited after all orphan nodes and their subgraphs.
-      --postOrderIndex;
-      for (let i = 0; i < nodeCount; ++i) {
-        if (visited[i]) {
-          continue;
-        }
-        dumpNode.nodeIndex = i * nodeFieldCount;
-        errors.addError(dumpNode.name() + ' @' + dumpNode.id());
-        // Fix it by giving the node a postorder index anyway.
-        nodeOrdinal2PostOrderIndex[i] = postOrderIndex;
-        postOrderIndex2NodeOrdinal[postOrderIndex++] = i;
-      }
-      nodeOrdinal2PostOrderIndex[rootNodeOrdinal] = postOrderIndex;
-      postOrderIndex2NodeOrdinal[postOrderIndex++] = rootNodeOrdinal;
-      console.warn(errors.toString());
-    }
-
-    return {
-      postOrderIndex2NodeOrdinal: postOrderIndex2NodeOrdinal,
-      nodeOrdinal2PostOrderIndex: nodeOrdinal2PostOrderIndex,
-    };
+    return essentialEdges.getBit(edgeIndex / this.edgeFieldsCount);
   }
 
   private hasOnlyWeakRetainers(nodeOrdinal: number): boolean {
-    const edgeTypeOffset = this.edgeTypeOffset;
-    const edgeWeakType = this.edgeWeakType;
-    const edgeShortcutType = this.edgeShortcutType;
-    const containmentEdges = this.containmentEdges;
     const retainingEdges = this.retainingEdges;
     const beginRetainerIndex = this.firstRetainerIndex[nodeOrdinal];
     const endRetainerIndex = this.firstRetainerIndex[nodeOrdinal + 1];
     for (let retainerIndex = beginRetainerIndex; retainerIndex < endRetainerIndex; ++retainerIndex) {
       const retainerEdgeIndex = retainingEdges[retainerIndex];
-      const retainerEdgeType = containmentEdges.getValue(retainerEdgeIndex + edgeTypeOffset);
-      if (retainerEdgeType !== edgeWeakType && retainerEdgeType !== edgeShortcutType) {
+      if (this.isEssentialEdge(retainerEdgeIndex)) {
         return false;
       }
     }
     return true;
   }
 
-  // The algorithm is based on the article:
-  // K. Cooper, T. Harvey and K. Kennedy "A Simple, Fast Dominance Algorithm"
-  // Softw. Pract. Exper. 4 (2001), pp. 1-10.
-  private buildDominatorTree(postOrderIndex2NodeOrdinal: Uint32Array, nodeOrdinal2PostOrderIndex: Uint32Array):
-      Uint32Array {
+  // The algorithm for building the dominator tree is from the paper:
+  // Thomas Lengauer and Robert Endre Tarjan. 1979. A fast algorithm for finding dominators in a flowgraph.
+  // ACM Trans. Program. Lang. Syst. 1, 1 (July 1979), 121–141. https://doi.org/10.1145/357062.357071
+  private buildDominatorTreeAndCalculateRetainedSizes(): void {
+    // Preload fields into local variables for better performance.
+    const nodeCount = this.nodeCount;
+    const firstEdgeIndexes = this.firstEdgeIndexes;
+    const edgeFieldsCount = this.edgeFieldsCount;
+    const containmentEdges = this.containmentEdges;
+    const edgeToNodeOffset = this.edgeToNodeOffset;
     const nodeFieldCount = this.nodeFieldCount;
     const firstRetainerIndex = this.firstRetainerIndex;
-    const retainingNodes = this.retainingNodes;
     const retainingEdges = this.retainingEdges;
-    const edgeFieldsCount = this.edgeFieldsCount;
-    const edgeToNodeOffset = this.edgeToNodeOffset;
-    const firstEdgeIndexes = this.firstEdgeIndexes;
-    const containmentEdges = this.containmentEdges;
-    const rootNodeIndex = this.rootNodeIndexInternal;
+    const retainingNodes = this.retainingNodes;
+    const rootNodeOrdinal = this.rootNodeIndexInternal / nodeFieldCount;
+    const isEssentialEdge = this.isEssentialEdge.bind(this);
+    const hasOnlyWeakRetainers = this.hasOnlyWeakRetainers.bind(this);
 
-    const mapAndFlag = this.userObjectsMapAndFlag();
-    const flags = mapAndFlag ? mapAndFlag.map : null;
-    const flag = mapAndFlag ? mapAndFlag.flag : 0;
+    // The Lengauer-Tarjan algorithm expects vectors to be numbered from 1 to n
+    // and uses 0 as an invalid value, so use 1-indexing for all the arrays.
+    // Convert between ordinals and vertex numbers by adding/subtracting 1.
+    const arrayLength = nodeCount + 1;
+    const parent = new Uint32Array(arrayLength);
+    const ancestor = new Uint32Array(arrayLength);
+    const vertex = new Uint32Array(arrayLength);
+    const label = new Uint32Array(arrayLength);
+    const semi = new Uint32Array(arrayLength);
+    const bucket = new Array<Set<number>>(arrayLength);
+    let n = 0;
 
-    const nodesCount = postOrderIndex2NodeOrdinal.length;
-    const rootPostOrderedIndex = nodesCount - 1;
-    const noEntry = nodesCount;
-    const dominators = new Uint32Array(nodesCount);
-    for (let i = 0; i < rootPostOrderedIndex; ++i) {
-      dominators[i] = noEntry;
+    // Iterative DFS since the recursive version can cause stack overflows.
+    // Use an array to keep track of the next edge index to be examined for each node.
+    const nextEdgeIndex = new Uint32Array(arrayLength);
+    const dfs = (root: number): void => {
+      const rootOrdinal = root - 1;
+      nextEdgeIndex[rootOrdinal] = firstEdgeIndexes[rootOrdinal];
+      let v = root;
+      while (v !== 0) {
+        // First process v if not done already.
+        if (semi[v] === 0) {
+          semi[v] = ++n;
+          vertex[n] = label[v] = v;
+        }
+
+        // The next node to process is the first unprocessed successor w of v,
+        // or parent[v] if all of v's successors have already been processed.
+        let vNext = parent[v];
+        const vOrdinal = v - 1;
+        for (; nextEdgeIndex[vOrdinal] < firstEdgeIndexes[vOrdinal + 1]; nextEdgeIndex[vOrdinal] += edgeFieldsCount) {
+          const edgeIndex = nextEdgeIndex[vOrdinal];
+          if (!isEssentialEdge(edgeIndex)) {
+            continue;
+          }
+          const wOrdinal = containmentEdges.getValue(edgeIndex + edgeToNodeOffset) / nodeFieldCount;
+          const w = wOrdinal + 1;
+          if (semi[w] === 0) {
+            parent[w] = v;
+            nextEdgeIndex[wOrdinal] = firstEdgeIndexes[wOrdinal];
+            vNext = w;
+            break;
+          }
+        }
+        v = vNext;
+      }
+    };
+
+    // Iterative version since the recursive version can cause stack overflows.
+    // Preallocate a stack since compress() is called several times.
+    // The stack cannot grow larger than the number of nodes since we walk up
+    // the tree represented by the ancestor array.
+    const compressionStack = new Uint32Array(arrayLength);
+    const compress = (v: number): void => {
+      let stackPointer = 0;
+      while (ancestor[ancestor[v]] !== 0) {
+        compressionStack[++stackPointer] = v;
+        v = ancestor[v];
+      }
+      while (stackPointer > 0) {
+        const w = compressionStack[stackPointer--] as number;
+        if (semi[label[ancestor[w]]] < semi[label[w]]) {
+          label[w] = label[ancestor[w]];
+        }
+        ancestor[w] = ancestor[ancestor[w]];
+      }
+    };
+
+    // Simple versions of eval and link from the paper.
+    const evaluate = (v: number): number => {
+      if (ancestor[v] === 0) {
+        return v;
+      }
+      compress(v);
+      return label[v];
+    };
+
+    const link = (v: number, w: number): void => {
+      ancestor[w] = v;
+    };
+
+    // Algorithm begins here. The variable names are as per the paper.
+    const r = rootNodeOrdinal + 1;
+    n = 0;
+    const dom = new Uint32Array(arrayLength);
+
+    // First perform DFS from the root.
+    dfs(r);
+
+    // Then perform DFS from orphan nodes (ones with only weak retainers) if any.
+    if (n < nodeCount) {
+      const errors =
+          new HeapSnapshotProblemReport(`Heap snapshot: ${nodeCount - n} nodes are unreachable from the root.`);
+      errors.addError('The following nodes have only weak retainers:');
+      const dumpNode = this.rootNode();
+      for (let v = 1; v <= nodeCount; v++) {
+        const vOrdinal = v - 1;
+        if (semi[v] === 0 && hasOnlyWeakRetainers(vOrdinal)) {
+          dumpNode.nodeIndex = vOrdinal * nodeFieldCount;
+          errors.addError(`${dumpNode.name()} @${dumpNode.id()}`);
+          parent[v] = r;
+          dfs(v);
+        }
+      }
+      console.warn(errors.toString());
     }
-    dominators[rootPostOrderedIndex] = rootPostOrderedIndex;
 
-    // The affected array is used to mark entries which dominators
-    // have to be recalculated because of changes in their retainers.
-    const affected = Platform.TypedArrayUtilities.createBitVector(nodesCount);
-    let nodeOrdinal;
+    // If there are unreachable nodes still, visit them individually from the root.
+    // This can happen when there is a clique of nodes retained by one another.
+    if (n < nodeCount) {
+      const errors = new HeapSnapshotProblemReport(`Heap snapshot: Still found ${nodeCount - n} unreachable nodes:`);
+      const dumpNode = this.rootNode();
+      for (let v = 1; v <= nodeCount; v++) {
+        if (semi[v] === 0) {
+          const vOrdinal = v - 1;
+          dumpNode.nodeIndex = vOrdinal * nodeFieldCount;
+          errors.addError(`${dumpNode.name()} @${dumpNode.id()}`);
+          parent[v] = r;
+          semi[v] = ++n;
+          vertex[n] = label[v] = v;
+        }
+      }
+      console.warn(errors.toString());
+    }
 
-    {  // Mark the root direct children as affected.
-      nodeOrdinal = this.rootNodeIndexInternal / nodeFieldCount;
-      const endEdgeIndex = firstEdgeIndexes[nodeOrdinal + 1];
-      for (let edgeIndex = firstEdgeIndexes[nodeOrdinal]; edgeIndex < endEdgeIndex; edgeIndex += edgeFieldsCount) {
-        if (!this.isEssentialEdge(this.rootNodeIndexInternal, edgeIndex)) {
+    // Main loop. Process the vertices in decreasing order by DFS number.
+    for (let i = n; i >= 2; --i) {
+      const w = vertex[i];
+      // Iterate over all predecessors v of w.
+      const wOrdinal = w - 1;
+      let isOrphanNode = true;
+      for (let retainerIndex = firstRetainerIndex[wOrdinal]; retainerIndex < firstRetainerIndex[wOrdinal + 1];
+           retainerIndex++) {
+        if (!isEssentialEdge(retainingEdges[retainerIndex])) {
           continue;
         }
-        const childNodeOrdinal = containmentEdges.getValue(edgeIndex + edgeToNodeOffset) / nodeFieldCount;
-        affected.setBit(nodeOrdinal2PostOrderIndex[childNodeOrdinal]);
+        isOrphanNode = false;
+        const vOrdinal = retainingNodes[retainerIndex] / nodeFieldCount;
+        const v = vOrdinal + 1;
+        const u = evaluate(v);
+        if (semi[u] < semi[w]) {
+          semi[w] = semi[u];
+        }
+      }
+      if (isOrphanNode) {
+        // We treat orphan nodes as having a single predecessor - the root.
+        // semi[r] is always less than any semi[w] so set it unconditionally.
+        semi[w] = semi[r];
+      }
+
+      if (bucket[vertex[semi[w]]] === undefined) {
+        bucket[vertex[semi[w]]] = new Set<number>();
+      }
+      bucket[vertex[semi[w]]].add(w);
+      link(parent[w], w);
+
+      // Process all vertices v in bucket(parent(w)).
+      if (bucket[parent[w]] !== undefined) {
+        for (const v of bucket[parent[w]]) {
+          const u = evaluate(v);
+          dom[v] = semi[u] < semi[v] ? u : parent[w];
+        }
+        bucket[parent[w]].clear();
       }
     }
 
-    let changed = true;
-    while (changed) {
-      changed = false;
-      for (let postOrderIndex = affected.previous(rootPostOrderedIndex); postOrderIndex >= 0;
-           postOrderIndex = affected.previous(postOrderIndex)) {
-        affected.clearBit(postOrderIndex);
-        // If dominator of the entry has already been set to root,
-        // then it can't propagate any further.
-        if (dominators[postOrderIndex] === rootPostOrderedIndex) {
-          continue;
-        }
-        nodeOrdinal = postOrderIndex2NodeOrdinal[postOrderIndex];
-        const nodeFlag = !flags || (flags[nodeOrdinal] & flag);
-        let newDominatorIndex: number = noEntry;
-        const beginRetainerIndex = firstRetainerIndex[nodeOrdinal];
-        const endRetainerIndex = firstRetainerIndex[nodeOrdinal + 1];
-        let orphanNode = true;
-        for (let retainerIndex = beginRetainerIndex; retainerIndex < endRetainerIndex; ++retainerIndex) {
-          const retainerEdgeIndex = retainingEdges[retainerIndex];
-          const retainerNodeIndex = retainingNodes[retainerIndex];
-          if (!this.isEssentialEdge(retainerNodeIndex, retainerEdgeIndex)) {
-            continue;
-          }
-          orphanNode = false;
-          const retainerNodeOrdinal = retainerNodeIndex / nodeFieldCount;
-          const retainerNodeFlag = !flags || (flags[retainerNodeOrdinal] & flag);
-          // We are skipping the edges from non-page-owned nodes to page-owned nodes.
-          // Otherwise the dominators for the objects that also were retained by debugger would be affected.
-          if (retainerNodeIndex !== rootNodeIndex && nodeFlag && !retainerNodeFlag) {
-            continue;
-          }
-          let retainerPostOrderIndex: number = nodeOrdinal2PostOrderIndex[retainerNodeOrdinal];
-          if (dominators[retainerPostOrderIndex] !== noEntry) {
-            if (newDominatorIndex === noEntry) {
-              newDominatorIndex = retainerPostOrderIndex;
-            } else {
-              while (retainerPostOrderIndex !== newDominatorIndex) {
-                while (retainerPostOrderIndex < newDominatorIndex) {
-                  retainerPostOrderIndex = dominators[retainerPostOrderIndex];
-                }
-                while (newDominatorIndex < retainerPostOrderIndex) {
-                  newDominatorIndex = dominators[newDominatorIndex];
-                }
-              }
-            }
-            // If item has already reached the root, it doesn't make sense
-            // to check other retainers.
-            if (newDominatorIndex === rootPostOrderedIndex) {
-              break;
-            }
-          }
-        }
-        // Make root dominator of orphans.
-        if (orphanNode) {
-          newDominatorIndex = rootPostOrderedIndex;
-        }
-        if (newDominatorIndex !== noEntry && dominators[postOrderIndex] !== newDominatorIndex) {
-          dominators[postOrderIndex] = newDominatorIndex;
-          changed = true;
-          nodeOrdinal = postOrderIndex2NodeOrdinal[postOrderIndex];
-          const beginEdgeToNodeFieldIndex = firstEdgeIndexes[nodeOrdinal] + edgeToNodeOffset;
-          const endEdgeToNodeFieldIndex = firstEdgeIndexes[nodeOrdinal + 1];
-          for (let toNodeFieldIndex = beginEdgeToNodeFieldIndex; toNodeFieldIndex < endEdgeToNodeFieldIndex;
-               toNodeFieldIndex += edgeFieldsCount) {
-            const childNodeOrdinal = containmentEdges.getValue(toNodeFieldIndex) / nodeFieldCount;
-            affected.setBit(nodeOrdinal2PostOrderIndex[childNodeOrdinal]);
-          }
-        }
+    // Final step. Fill in the immediate dominators not explicitly computed above.
+    // Unlike the paper, we consider the root to be its own dominator and
+    // set dom[0] to r to propagate the root as the dominator of unreachable nodes.
+    dom[0] = dom[r] = r;
+    for (let i = 2; i <= n; i++) {
+      const w = vertex[i];
+      if (dom[w] !== vertex[semi[w]]) {
+        dom[w] = dom[dom[w]];
       }
     }
+    // Algorithm ends here.
 
-    const dominatorsTree = new Uint32Array(nodesCount);
-    for (let postOrderIndex = 0, l = dominators.length; postOrderIndex < l; ++postOrderIndex) {
-      nodeOrdinal = postOrderIndex2NodeOrdinal[postOrderIndex];
-      dominatorsTree[nodeOrdinal] = postOrderIndex2NodeOrdinal[dominators[postOrderIndex]];
-    }
-    return dominatorsTree;
-  }
-
-  private calculateRetainedSizes(postOrderIndex2NodeOrdinal: Uint32Array): void {
-    const nodeCount = this.nodeCount;
+    // Transform the dominators into an ordinal-indexed array and populate the self sizes.
     const nodes = this.nodes;
     const nodeSelfSizeOffset = this.nodeSelfSizeOffset;
-    const nodeFieldCount = this.nodeFieldCount;
-    const dominatorsTree = this.dominatorsTree;
+    const dominatorsTree = this.dominatorsTree = new Uint32Array(nodeCount);
     const retainedSizes = this.retainedSizes;
-
-    for (let nodeOrdinal = 0; nodeOrdinal < nodeCount; ++nodeOrdinal) {
+    for (let nodeOrdinal = 0; nodeOrdinal < nodeCount; nodeOrdinal++) {
+      dominatorsTree[nodeOrdinal] = dom[nodeOrdinal + 1] - 1;
       retainedSizes[nodeOrdinal] = nodes.getValue(nodeOrdinal * nodeFieldCount + nodeSelfSizeOffset);
     }
 
-    // Propagate retained sizes for each node excluding root.
-    for (let postOrderIndex = 0; postOrderIndex < nodeCount - 1; ++postOrderIndex) {
-      const nodeOrdinal = postOrderIndex2NodeOrdinal[postOrderIndex];
+    // Then propagate up the retained sizes for each traversed node excluding the root.
+    for (let i = n; i > 1; i--) {
+      const nodeOrdinal = vertex[i] - 1;
       const dominatorOrdinal = dominatorsTree[nodeOrdinal];
       retainedSizes[dominatorOrdinal] += retainedSizes[nodeOrdinal];
     }
@@ -1813,6 +1897,309 @@ export abstract class HeapSnapshot {
     }
   }
 
+  private calculateObjectNames(): void {
+    const {
+      nodes,
+      nodeCount,
+      nodeNameOffset,
+      nodeNativeType,
+      nodeHiddenType,
+      nodeObjectType,
+      nodeCodeType,
+      nodeClosureType,
+      nodeRegExpType,
+    } = this;
+
+    // If the snapshot doesn't contain a detachedness field in each node, then
+    // allocate a separate array so there is somewhere to store the class index.
+    if (this.nodeDetachednessAndClassIndexOffset === -1) {
+      this.detachednessAndClassIndexArray = new Uint32Array(nodeCount);
+    }
+
+    // We'll add some new values to the `strings` array during the processing below.
+    // This map lets us easily find the index for each added string.
+    const stringTable = new Map<string, number>();
+    const getIndexForString = (s: string): number => {
+      let index = stringTable.get(s);
+      if (index === undefined) {
+        index = this.addString(s);
+        stringTable.set(s, index);
+      }
+      return index;
+    };
+
+    const hiddenClassIndex = getIndexForString('(system)');
+    const codeClassIndex = getIndexForString('(compiled code)');
+    const functionClassIndex = getIndexForString('Function');
+    const regExpClassIndex = getIndexForString('RegExp');
+
+    function getNodeClassIndex(node: HeapSnapshotNode): number {
+      switch (node.rawType()) {
+        case nodeHiddenType:
+          return hiddenClassIndex;
+        case nodeObjectType:
+        case nodeNativeType: {
+          let name = node.rawName();
+
+          // If the node name is (for example) '<div id="a">', then the class
+          // name should be just '<div>'. If the node name is already short
+          // enough, like '<div>', we must still call getIndexForString on that
+          // name, because the names added by getIndexForString are not
+          // deduplicated with preexisting strings, and we want all objects with
+          // class name '<div>' to refer to that class name via the same index.
+          // Otherwise, object categorization doesn't work.
+          if (name.startsWith('<')) {
+            const firstSpace = name.indexOf(' ');
+            if (firstSpace !== -1) {
+              name = name.substring(0, firstSpace) + '>';
+            }
+            return getIndexForString(name);
+          }
+          if (name.startsWith('Detached <')) {
+            const firstSpace = name.indexOf(' ', 10);
+            if (firstSpace !== -1) {
+              name = name.substring(0, firstSpace) + '>';
+            }
+            return getIndexForString(name);
+          }
+
+          // Avoid getIndexForString here; the class name index should match the name index.
+          return nodes.getValue(node.nodeIndex + nodeNameOffset);
+        }
+        case nodeCodeType:
+          return codeClassIndex;
+        case nodeClosureType:
+          return functionClassIndex;
+        case nodeRegExpType:
+          return regExpClassIndex;
+        default:
+          return getIndexForString('(' + node.type() + ')');
+      }
+    }
+
+    const node = this.createNode(0);
+    for (let i = 0; i < nodeCount; ++i) {
+      node.setClassIndex(getNodeClassIndex(node));
+      node.nodeIndex = node.nextNodeIndex();
+    }
+  }
+
+  interfaceDefinitions(): string {
+    return JSON.stringify(this.#interfaceDefinitions ?? []);
+  }
+
+  private isPlainJSObject(node: HeapSnapshotNode): boolean {
+    return node.rawType() === this.nodeObjectType && node.rawName() === 'Object';
+  }
+
+  private inferInterfaceDefinitions(): InterfaceDefinition[] {
+    const {edgePropertyType} = this;
+
+    // First, produce a set of candidate definitions by iterating the properties
+    // on every plain JS Object in the snapshot.
+    interface InterfaceDefinitionCandidate extends InterfaceDefinition {
+      // How many objects start with these properties in this order.
+      count: number;
+    }
+    // A map from interface names to their definitions.
+    const candidates = new Map<string, InterfaceDefinitionCandidate>();
+    for (let it = this.allNodes(); it.hasNext(); it.next()) {
+      const node = it.item();
+      if (!this.isPlainJSObject(node)) {
+        continue;
+      }
+      let interfaceName = '{';
+      const properties: string[] = [];
+      for (let edgeIt = node.edges(); edgeIt.hasNext(); edgeIt.next()) {
+        const edge = edgeIt.item();
+        const edgeName = edge.name();
+        if (edge.rawType() !== edgePropertyType || edgeName === '__proto__') {
+          continue;
+        }
+        const formattedEdgeName = JSHeapSnapshotNode.formatPropertyName(edgeName);
+        if (interfaceName.length > MIN_INTERFACE_PROPERTY_COUNT &&
+            interfaceName.length + formattedEdgeName.length > MAX_INTERFACE_NAME_LENGTH) {
+          break;  // The interface name is getting too long.
+        }
+        if (interfaceName.length !== 1) {
+          interfaceName += ', ';
+        }
+        interfaceName += formattedEdgeName;
+        properties.push(edgeName);
+      }
+      // The empty interface is not a very meaningful, and can be sort of misleading
+      // since someone might incorrectly interpret it as objects with no properties.
+      if (properties.length === 0) {
+        continue;
+      }
+      interfaceName += '}';
+      const candidate = candidates.get(interfaceName);
+      if (candidate) {
+        ++candidate.count;
+      } else {
+        candidates.set(interfaceName, {name: interfaceName, properties, count: 1});
+      }
+    }
+
+    // Next, sort the candidates and select the most popular ones. It's possible that
+    // some candidates represent the same properties in different orders, but that's
+    // okay: by sorting here, we ensure that the most popular ordering appears first
+    // in the result list, and the rules for applying interface definitions will prefer
+    // the first matching definition if multiple matches contain the same properties.
+    const sortedCandidates = Array.from(candidates.values());
+    sortedCandidates.sort((a, b) => b.count - a.count);
+    const result: InterfaceDefinition[] = [];
+    const maxResultSize = Math.min(sortedCandidates.length, MAX_INTERFACE_COUNT);
+    for (let i = 0; i < maxResultSize; ++i) {
+      const candidate = sortedCandidates[i];
+      if (candidate.count < MIN_OBJECT_COUNT_PER_INTERFACE) {
+        break;
+      }
+      result.push(candidate);
+    }
+
+    return result;
+  }
+
+  private applyInterfaceDefinitions(definitions: InterfaceDefinition[]): void {
+    const {edgePropertyType} = this;
+    this.#interfaceDefinitions = definitions;
+
+    // Any computed aggregate data will be wrong after recategorization, so clear it.
+    this.#aggregates = {};
+    this.#aggregatesSortedFlags = {};
+
+    // Information about a named interface.
+    interface MatchInfo {
+      name: string;
+      // The number of properties listed in the interface definition.
+      propertyCount: number;
+      // The position of the interface definition in the list of definitions.
+      index: number;
+    }
+
+    function selectBetterMatch(a: MatchInfo, b: MatchInfo|null): MatchInfo {
+      if (!b || a.propertyCount > b.propertyCount) {
+        return a;
+      }
+      if (b.propertyCount > a.propertyCount) {
+        return b;
+      }
+      return a.index <= b.index ? a : b;
+    }
+
+    // A node in the tree which allows us to search for interfaces matching an object.
+    // Each edge in this tree represents adding a property, starting from an empty
+    // object. Properties must be iterated in sorted order.
+    interface PropertyTreeNode {
+      // All possible successors from this node. Keys are property names.
+      next: Map<string, PropertyTreeNode>;
+      // If this node corresponds to a named interface, then matchInfo contains that name.
+      matchInfo: MatchInfo|null;
+      // The maximum of all keys in `next`. This helps determine when no further transitions
+      // are possible from this node.
+      greatestNext: string|null;
+    }
+
+    // The root node of the tree.
+    const propertyTree: PropertyTreeNode = {
+      next: new Map(),
+      matchInfo: null,
+      greatestNext: null,
+    };
+
+    // Build up the property tree.
+    for (let interfaceIndex = 0; interfaceIndex < definitions.length; ++interfaceIndex) {
+      const definition = definitions[interfaceIndex];
+      const properties = definition.properties.toSorted();
+      let currentNode = propertyTree;
+      for (const property of properties) {
+        const nextMap = currentNode.next;
+        let nextNode = nextMap.get(property);
+        if (!nextNode) {
+          nextNode = {
+            next: new Map(),
+            matchInfo: null,
+            greatestNext: null,
+          };
+          nextMap.set(property, nextNode);
+          if (currentNode.greatestNext === null || currentNode.greatestNext < property) {
+            currentNode.greatestNext = property;
+          }
+        }
+        currentNode = nextNode;
+      }
+      // Only set matchInfo on this node if it wasn't already set, to ensure that
+      // interfaces defined earlier in the list have priority.
+      if (!currentNode.matchInfo) {
+        currentNode.matchInfo = {
+          name: definition.name,
+          propertyCount: properties.length,
+          index: interfaceIndex,
+        };
+      }
+    }
+
+    // The fallback match for objects which don't match any defined interface.
+    const initialMatch: MatchInfo = {
+      name: 'Object',
+      propertyCount: 0,
+      index: Infinity,
+    };
+
+    // Iterate all nodes and check whether they match a named interface, using
+    // the tree constructed above. Then update the class name for each node.
+    for (let it = this.allNodes(); it.hasNext(); it.next()) {
+      const node = it.item();
+      if (!this.isPlainJSObject(node)) {
+        continue;
+      }
+
+      // Collect and sort the properties of this object.
+      const properties: string[] = [];
+      for (let edgeIt = node.edges(); edgeIt.hasNext(); edgeIt.next()) {
+        const edge = edgeIt.item();
+        if (edge.rawType() === edgePropertyType) {
+          properties.push(edge.name());
+        }
+      }
+      properties.sort();
+
+      // We may explore multiple possible paths through the tree, so this set tracks
+      // all states that match with the properties iterated thus far.
+      const states = new Set<PropertyTreeNode>();
+      states.add(propertyTree);
+
+      // This variable represents the best match found thus far. We start by checking
+      // whether there is an interface definition for the empty object.
+      let match = selectBetterMatch(initialMatch, propertyTree.matchInfo);
+
+      // Traverse the tree to find any matches.
+      for (const property of properties) {
+        // Iterate only the states that already exist, not the ones added during the loop below.
+        for (const currentState of Array.from(states.keys())) {
+          if (currentState.greatestNext === null || property >= currentState.greatestNext) {
+            // No further transitions are possible from this state.
+            states.delete(currentState);
+          }
+          const nextState = currentState.next.get(property);
+          if (nextState) {
+            states.add(nextState);
+            match = selectBetterMatch(match, nextState.matchInfo);
+          }
+        }
+      }
+
+      // Update the node's class name accordingly.
+      let classIndex = match === initialMatch ? node.rawNameIndex() : this.#interfaceNames.get(match.name);
+      if (classIndex === undefined) {
+        classIndex = this.addString(match.name);
+        this.#interfaceNames.set(match.name, classIndex);
+      }
+      node.setClassIndex(classIndex);
+    }
+  }
+
   /**
    * Iterates children of a node.
    */
@@ -1853,7 +2240,7 @@ export abstract class HeapSnapshot {
    *   "Detached <Name>".
    */
   private propagateDOMState(): void {
-    if (this.#nodeDetachednessOffset === -1) {
+    if (this.nodeDetachednessAndClassIndexOffset === -1) {
       return;
     }
 
@@ -1864,6 +2251,7 @@ export abstract class HeapSnapshot {
     const detached: number[] = [];
 
     const stringIndexCache = new Map<number, number>();
+    const node = this.createNode(0);
 
     /**
      * Adds a 'Detached ' prefix to the name of a node.
@@ -1898,11 +2286,12 @@ export abstract class HeapSnapshot {
         return;
       }
 
-      snapshot.nodes.setValue(nodeIndex + snapshot.#nodeDetachednessOffset, newState);
+      node.nodeIndex = nodeIndex;
+      node.setDetachedness(newState);
 
-      if (newState === DOMLinkState.Attached) {
+      if (newState === DOMLinkState.ATTACHED) {
         attached.push(nodeOrdinal);
-      } else if (newState === DOMLinkState.Detached) {
+      } else if (newState === DOMLinkState.DETACHED) {
         // Detached state: Rewire node name.
         addDetachedPrefixToNodeName(snapshot, nodeIndex);
         detached.push(nodeOrdinal);
@@ -1923,9 +2312,10 @@ export abstract class HeapSnapshot {
     //    through processing to have their name adjusted and them enqueued in
     //    the respective queues.
     for (let nodeOrdinal = 0; nodeOrdinal < this.nodeCount; ++nodeOrdinal) {
-      const state = this.nodes.getValue(nodeOrdinal * this.nodeFieldCount + this.#nodeDetachednessOffset);
+      node.nodeIndex = nodeOrdinal * this.nodeFieldCount;
+      const state = node.detachedness();
       // Bail out for objects that have no known state. For all other objects set that state.
-      if (state === DOMLinkState.Unknown) {
+      if (state === DOMLinkState.UNKNOWN) {
         continue;
       }
       processNode(this, nodeOrdinal, state);
@@ -1933,17 +2323,18 @@ export abstract class HeapSnapshot {
     // 2. If the parent is attached, then the child is also attached.
     while (attached.length !== 0) {
       const nodeOrdinal = (attached.pop() as number);
-      propagateState(this, nodeOrdinal, DOMLinkState.Attached);
+      propagateState(this, nodeOrdinal, DOMLinkState.ATTACHED);
     }
     // 3. If the parent is not attached, then the child inherits the parent's state.
     while (detached.length !== 0) {
       const nodeOrdinal = (detached.pop() as number);
-      const nodeState = this.nodes.getValue(nodeOrdinal * this.nodeFieldCount + this.#nodeDetachednessOffset);
+      node.nodeIndex = nodeOrdinal * this.nodeFieldCount;
+      const nodeState = node.detachedness();
       // Ignore if the node has been found through propagating forward attached state.
-      if (nodeState === DOMLinkState.Attached) {
+      if (nodeState === DOMLinkState.ATTACHED) {
         continue;
       }
-      propagateState(this, nodeOrdinal, DOMLinkState.Detached);
+      propagateState(this, nodeOrdinal, DOMLinkState.DETACHED);
     }
 
     console.timeEnd('propagateDOMState');
@@ -2021,7 +2412,7 @@ export abstract class HeapSnapshot {
     throw new Error('Not implemented');
   }
 
-  userObjectsMapAndFlag(): {map: Uint32Array, flag: number}|null {
+  userObjectsMapAndFlag(): {map: Uint8Array, flag: number}|null {
     throw new Error('Not implemented');
   }
 
@@ -2309,15 +2700,6 @@ export abstract class HeapSnapshot {
 
   isEdgeIgnoredInRetainersView(edgeIndex: number): boolean {
     return this.#ignoredEdgesInRetainersView.has(edgeIndex);
-  }
-
-  getIndexForSyntheticClassName(className: string): number {
-    let index = this.#syntheticClassNames.get(className);
-    if (index === undefined) {
-      index = this.addString(className);
-      this.#syntheticClassNames.set(className, index);
-    }
-    return index;
   }
 }
 
@@ -2648,25 +3030,23 @@ export class HeapSnapshotNodesProvider extends HeapSnapshotItemProvider {
 
 export class JSHeapSnapshot extends HeapSnapshot {
   readonly nodeFlags: {
-    // bit flags
+    // bit flags in 8-bit value
     canBeQueried: number,
     detachedDOMTreeNode: number,
     pageObject:
         number,  // The idea is to track separately the objects owned by the page and the objects owned by debugger.
   };
-  override lazyStringCache: {};
-  private flags!: Uint32Array;
+  private flags!: Uint8Array;
   #statistics?: HeapSnapshotModel.HeapSnapshotModel.Statistics;
   constructor(profile: Profile, progress: HeapSnapshotProgress) {
     super(profile, progress);
     this.nodeFlags = {
-      // bit flags
+      // bit flags in 8-bit value
       canBeQueried: 1,
       detachedDOMTreeNode: 2,
       pageObject:
           4,  // The idea is to track separately the objects owned by the page and the objects owned by debugger.
     };
-    this.lazyStringCache = {};
     this.initialize();
   }
 
@@ -2695,7 +3075,7 @@ export class JSHeapSnapshot extends HeapSnapshot {
   }
 
   override calculateFlags(): void {
-    this.flags = new Uint32Array(this.nodeCount);
+    this.flags = new Uint8Array(this.nodeCount);
     this.markDetachedDOMTreeNodes();
     this.markQueriableHeapObjects();
     this.markPageOwnedNodes();
@@ -2861,7 +3241,7 @@ export class JSHeapSnapshot extends HeapSnapshot {
     return node.isUserRoot() || node.isDocumentDOMTreesRoot();
   }
 
-  override userObjectsMapAndFlag(): {map: Uint32Array, flag: number}|null {
+  override userObjectsMapAndFlag(): {map: Uint8Array, flag: number}|null {
     return {map: this.flags, flag: this.nodeFlags.pageObject};
   }
 
@@ -2905,7 +3285,7 @@ export class JSHeapSnapshot extends HeapSnapshot {
     const nodeFieldCount = this.nodeFieldCount;
     const firstEdgeIndexes = this.firstEdgeIndexes;
 
-    const flags = (this.flags as Uint32Array);
+    const flags = this.flags;
     const list: number[] = [];
 
     for (let iter = this.rootNode().edges(); iter.hasNext(); iter.next()) {
@@ -2950,7 +3330,7 @@ export class JSHeapSnapshot extends HeapSnapshot {
     const nodeFieldCount = this.nodeFieldCount;
     const nodesCount = this.nodeCount;
 
-    const flags = (this.flags as Uint32Array);
+    const flags = this.flags;
     const pageObjectFlag = this.nodeFlags.pageObject;
 
     const nodesToVisit = new Uint32Array(nodesCount);
@@ -3030,7 +3410,7 @@ export class JSHeapSnapshot extends HeapSnapshot {
         sizeCode += nodeSize;
       } else if (nodeType === nodeConsStringType || nodeType === nodeSlicedStringType || node.type() === 'string') {
         sizeStrings += nodeSize;
-      } else if (node.name() === 'Array') {
+      } else if (node.rawName() === 'Array') {
         sizeJSArrays += this.calculateArraySize(node);
       }
     }
@@ -3090,19 +3470,13 @@ export class JSHeapSnapshotNode extends HeapSnapshotNode {
     return Boolean(flags & snapshot.nodeFlags.canBeQueried);
   }
 
-  override rawName(): string {
-    return super.name();
-  }
-
   override name(): string {
     const snapshot = this.snapshot;
     if (this.rawType() === snapshot.nodeConsStringType) {
-      let string: string = snapshot.lazyStringCache[this.nodeIndex];
-      if (typeof string === 'undefined') {
-        string = this.consStringName();
-        snapshot.lazyStringCache[this.nodeIndex] = string;
-      }
-      return string;
+      return this.consStringName();
+    }
+    if (this.rawType() === snapshot.nodeObjectType && this.rawName() === 'Object') {
+      return this.#plainObjectName();
     }
     return this.rawName();
   }
@@ -3155,49 +3529,74 @@ export class JSHeapSnapshotNode extends HeapSnapshotNode {
     return name;
   }
 
-  override className(): string {
-    const type = this.type();
-    switch (type) {
-      case 'hidden':
-        return '(system)';
-      case 'object':
-      case 'native': {
-        let name = this.name();
-        if (name.startsWith('<')) {
-          const firstSpace = name.indexOf(' ');
-          if (firstSpace !== -1) {
-            name = name.substring(0, firstSpace) + '>';
-          }
-        } else if (name.startsWith('Detached <')) {
-          const firstSpace = name.indexOf(' ', 10);
-          if (firstSpace !== -1) {
-            name = name.substring(0, firstSpace) + '>';
-          }
+  // Creates a name for plain JS objects, which looks something like
+  // '{propName, otherProp, thirdProp, ..., secondToLastProp, lastProp}'.
+  // A variable number of property names is included, depending on the length
+  // of the property names, so that the result fits nicely in a reasonably
+  // sized DevTools window.
+  #plainObjectName(): string {
+    const snapshot = this.snapshot;
+    const {edgeFieldsCount, edgePropertyType} = snapshot;
+    const edge = snapshot.createEdge(0);
+    let categoryNameStart = '{';
+    let categoryNameEnd = '}';
+    let edgeIndexFromStart = this.edgeIndexesStart();
+    let edgeIndexFromEnd = this.edgeIndexesEnd() - edgeFieldsCount;
+    let nextFromEnd = false;
+    while (edgeIndexFromStart <= edgeIndexFromEnd) {
+      edge.edgeIndex = nextFromEnd ? edgeIndexFromEnd : edgeIndexFromStart;
+
+      // Skip non-property edges and the special __proto__ property.
+      if (edge.rawType() !== edgePropertyType || edge.name() === '__proto__') {
+        if (nextFromEnd) {
+          edgeIndexFromEnd -= edgeFieldsCount;
+        } else {
+          edgeIndexFromStart += edgeFieldsCount;
         }
-        return name;
+        continue;
       }
-      case 'code':
-        return '(compiled code)';
-      case 'closure':
-        return 'Function';
-      case 'regexp':
-        return 'RegExp';
-      default:
-        return '(' + type + ')';
+
+      const formatted = JSHeapSnapshotNode.formatPropertyName(edge.name());
+
+      // Always include at least one property, regardless of its length. Beyond that point,
+      // only include more properties if the name isn't too long.
+      if (categoryNameStart.length > 1 && categoryNameStart.length + categoryNameEnd.length + formatted.length > 100) {
+        break;
+      }
+
+      if (nextFromEnd) {
+        edgeIndexFromEnd -= edgeFieldsCount;
+        if (categoryNameEnd.length > 1) {
+          categoryNameEnd = ', ' + categoryNameEnd;
+        }
+        categoryNameEnd = formatted + categoryNameEnd;
+      } else {
+        edgeIndexFromStart += edgeFieldsCount;
+        if (categoryNameStart.length > 1) {
+          categoryNameStart += ', ';
+        }
+        categoryNameStart += formatted;
+      }
+      nextFromEnd = !nextFromEnd;
     }
+    if (edgeIndexFromStart <= edgeIndexFromEnd) {
+      categoryNameStart += ', ...';
+    }
+    if (categoryNameEnd.length > 1) {
+      categoryNameStart += ', ';
+    }
+    return categoryNameStart + categoryNameEnd;
   }
 
-  override classIndex(): number {
-    const snapshot = this.snapshot;
-    const nodes = snapshot.nodes;
-    const type = nodes.getValue(this.nodeIndex + snapshot.nodeTypeOffset);
-    if (type === snapshot.nodeObjectType || type === snapshot.nodeNativeType) {
-      const name = this.name();
-      const useSyntheticClassName = name.startsWith('<') || name.startsWith('Detached <');
-      return useSyntheticClassName ? snapshot.getIndexForSyntheticClassName(this.className()) :
-                                     nodes.getValue(this.nodeIndex + snapshot.nodeNameOffset);
+  static formatPropertyName(name: string): string {
+    // We don't need a strict test for whether a property name follows the
+    // rules for being a JS identifier, but property names containing commas,
+    // quotation marks, or braces could cause confusion, so we'll escape those.
+    if (/[,'"{}]/.test(name)) {
+      name = JSON.stringify({[name]: 0});
+      name = name.substring(1, name.length - 3);
     }
-    return -1 - type;
+    return name;
   }
 
   override id(): number {
@@ -3222,7 +3621,7 @@ export class JSHeapSnapshotNode extends HeapSnapshotNode {
   }
 
   override isDocumentDOMTreesRoot(): boolean {
-    return this.isSynthetic() && this.name() === '(Document DOM trees)';
+    return this.isSynthetic() && this.rawName() === '(Document DOM trees)';
   }
 
   override serialize(): HeapSnapshotModel.HeapSnapshotModel.Node {

@@ -28,13 +28,13 @@ class SharedStorageTreeElementListener {
     this.#sidebar = sidebar;
 
     this.#sidebar.sharedStorageTreeElementDispatcher.addEventListener(
-        Application.ApplicationPanelSidebar.SharedStorageTreeElementDispatcher.Events.SharedStorageTreeElementAdded,
+        Application.ApplicationPanelSidebar.SharedStorageTreeElementDispatcher.Events.SHARED_STORAGE_TREE_ELEMENT_ADDED,
         this.#treeElementAdded, this);
   }
 
   dispose(): void {
     this.#sidebar.sharedStorageTreeElementDispatcher.removeEventListener(
-        Application.ApplicationPanelSidebar.SharedStorageTreeElementDispatcher.Events.SharedStorageTreeElementAdded,
+        Application.ApplicationPanelSidebar.SharedStorageTreeElementDispatcher.Events.SHARED_STORAGE_TREE_ELEMENT_ADDED,
         this.#treeElementAdded, this);
   }
 
@@ -47,7 +47,8 @@ class SharedStorageTreeElementListener {
   async waitForElementsAdded(expectedCount: number): Promise<void> {
     while (this.#originsAdded.length < expectedCount) {
       await this.#sidebar.sharedStorageTreeElementDispatcher.once(
-          Application.ApplicationPanelSidebar.SharedStorageTreeElementDispatcher.Events.SharedStorageTreeElementAdded);
+          Application.ApplicationPanelSidebar.SharedStorageTreeElementDispatcher.Events
+              .SHARED_STORAGE_TREE_ELEMENT_ADDED);
     }
   }
 }
@@ -58,6 +59,8 @@ describeWithMockConnection('ApplicationPanelSidebar', () => {
   const TEST_ORIGIN_A = 'http://www.example.com/';
   const TEST_ORIGIN_B = 'http://www.example.org/';
   const TEST_ORIGIN_C = 'http://www.example.net/';
+
+  const TEST_EXTENSION_NAME = 'Test Extension';
 
   const ID = 'AA' as Protocol.Page.FrameId;
 
@@ -109,10 +112,9 @@ describeWithMockConnection('ApplicationPanelSidebar', () => {
   beforeEach(() => {
     stubNoopSettings();
     SDK.ChildTargetManager.ChildTargetManager.install();
-    const tabTarget = createTarget({type: SDK.Target.Type.Tab});
+    const tabTarget = createTarget({type: SDK.Target.Type.TAB});
     createTarget({parentTarget: tabTarget, subtype: 'prerender'});
     target = createTarget({parentTarget: tabTarget});
-    Root.Runtime.experiments.register(Root.Runtime.ExperimentName.PRELOADING_STATUS_PANEL, '', false);
     sinon.stub(UI.ViewManager.ViewManager.instance(), 'showView').resolves();  // Silence console error
     setMockConnectionResponseHandler('Storage.getSharedStorageEntries', () => ({}));
     setMockConnectionResponseHandler('Storage.setSharedStorageTracking', () => ({}));
@@ -187,10 +189,55 @@ describeWithMockConnection('ApplicationPanelSidebar', () => {
 
     sidebar.sharedStorageListTreeElement.view.setDefaultIdForTesting(ID);
     for (const event of EVENTS) {
-      sharedStorageModel.dispatchEventToListeners(Application.SharedStorageModel.Events.SharedStorageAccess, event);
+      sharedStorageModel.dispatchEventToListeners(Application.SharedStorageModel.Events.SHARED_STORAGE_ACCESS, event);
     }
 
     assert.deepEqual(sidebar.sharedStorageListTreeElement.view.getEventsForTesting(), EVENTS);
+  });
+
+  it('shows extension storage based on added models', async () => {
+    Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.EXTENSION_STORAGE_VIEWER);
+
+    for (const useTreeView of [false, true]) {
+      Application.ResourcesPanel.ResourcesPanel.instance({forceNew: true});
+      const sidebar = await Application.ResourcesPanel.ResourcesPanel.showAndGetSidebar();
+
+      // Cast to any allows overriding private method.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      sinon.stub(sidebar, 'useTreeViewForExtensionStorage' as any).returns(useTreeView);
+
+      const extensionStorageModel = target.model(Application.ExtensionStorageModel.ExtensionStorageModel);
+      assert.exists(extensionStorageModel);
+
+      const makeFakeExtensionStorage = (storageArea: Protocol.Extensions.StorageArea) =>
+          new Application.ExtensionStorageModel.ExtensionStorage(
+              extensionStorageModel, '', TEST_EXTENSION_NAME, storageArea);
+
+      const fakeModelLocal = makeFakeExtensionStorage(Protocol.Extensions.StorageArea.Local);
+      const fakeModelSession = makeFakeExtensionStorage(Protocol.Extensions.StorageArea.Session);
+
+      extensionStorageModel.dispatchEventToListeners(
+          Application.ExtensionStorageModel.Events.EXTENSION_STORAGE_ADDED, fakeModelLocal);
+      extensionStorageModel.dispatchEventToListeners(
+          Application.ExtensionStorageModel.Events.EXTENSION_STORAGE_ADDED, fakeModelSession);
+
+      if (useTreeView) {
+        assert.strictEqual(sidebar.extensionStorageListTreeElement!.childCount(), 1);
+        assert.strictEqual(sidebar.extensionStorageListTreeElement!.children()[0].title, TEST_EXTENSION_NAME);
+        assert.deepStrictEqual(
+            sidebar.extensionStorageListTreeElement!.children()[0].children().map(e => e.title), ['Session', 'Local']);
+      } else {
+        assert.strictEqual(sidebar.extensionStorageListTreeElement!.childCount(), 2);
+        assert.deepStrictEqual(
+            sidebar.extensionStorageListTreeElement!.children().map(e => e.title), ['Session', 'Local']);
+      }
+
+      extensionStorageModel.dispatchEventToListeners(
+          Application.ExtensionStorageModel.Events.EXTENSION_STORAGE_REMOVED, fakeModelLocal);
+      extensionStorageModel.dispatchEventToListeners(
+          Application.ExtensionStorageModel.Events.EXTENSION_STORAGE_REMOVED, fakeModelSession);
+      assert.strictEqual(sidebar.extensionStorageListTreeElement!.childCount(), 0);
+    }
   });
 
   async function getExpectedCall(expectedCall: string): Promise<sinon.SinonSpy> {
@@ -226,23 +273,23 @@ describeWithMockConnection('ApplicationPanelSidebar', () => {
 
   it('adds interest group event on in scope event',
      testUiUpdate(
-         Application.InterestGroupStorageModel.Events.InterestGroupAccess,
+         Application.InterestGroupStorageModel.Events.INTEREST_GROUP_ACCESS,
          Application.InterestGroupStorageModel.InterestGroupStorageModel, 'interestGroupTreeElement.addEvent', true));
   // Failing on the toolbar button CL together with some AnimationTimeline tests
   it.skip(
       '[crbug.com/354673294] does not add interest group event on out of scope event',
       testUiUpdate(
-          Application.InterestGroupStorageModel.Events.InterestGroupAccess,
+          Application.InterestGroupStorageModel.Events.INTEREST_GROUP_ACCESS,
           Application.InterestGroupStorageModel.InterestGroupStorageModel, 'interestGroupTreeElement.addEvent', false));
   it('adds DOM storage on in scope event',
      testUiUpdate(
-         Application.DOMStorageModel.Events.DOMStorageAdded, Application.DOMStorageModel.DOMStorageModel,
+         Application.DOMStorageModel.Events.DOM_STORAGE_ADDED, Application.DOMStorageModel.DOMStorageModel,
          'sessionStorageListTreeElement.appendChild', true));
   // Failing on the toolbar button CL together with some AnimationTimeline tests
   it.skip(
       '[crbug.com/354673294] does not add DOM storage on out of scope event',
       testUiUpdate(
-          Application.DOMStorageModel.Events.DOMStorageAdded, Application.DOMStorageModel.DOMStorageModel,
+          Application.DOMStorageModel.Events.DOM_STORAGE_ADDED, Application.DOMStorageModel.DOMStorageModel,
           'sessionStorageListTreeElement.appendChild', false));
 
   it('adds indexed DB on in scope event',
@@ -258,13 +305,13 @@ describeWithMockConnection('ApplicationPanelSidebar', () => {
 
   it('adds shared storage on in scope event',
      testUiUpdate(
-         Application.SharedStorageModel.Events.SharedStorageAdded, Application.SharedStorageModel.SharedStorageModel,
+         Application.SharedStorageModel.Events.SHARED_STORAGE_ADDED, Application.SharedStorageModel.SharedStorageModel,
          'sharedStorageListTreeElement.appendChild', true));
   // Failing on the toolbar button CL together with some AnimationTimeline tests
   it.skip(
       '[crbug.com/354673294] does not add shared storage on out of scope event',
       testUiUpdate(
-          Application.SharedStorageModel.Events.SharedStorageAdded, Application.SharedStorageModel.SharedStorageModel,
+          Application.SharedStorageModel.Events.SHARED_STORAGE_ADDED, Application.SharedStorageModel.SharedStorageModel,
           'sharedStorageListTreeElement.appendChild', false));
 
   const MOCK_GETTER_ITEM = {
@@ -300,7 +347,6 @@ describeWithMockConnection('ApplicationPanelSidebar', () => {
 describeWithMockConnection('IDBDatabaseTreeElement', () => {
   beforeEach(() => {
     stubNoopSettings();
-    Root.Runtime.experiments.register(Root.Runtime.ExperimentName.PRELOADING_STATUS_PANEL, '', false);
   });
 
   it('only becomes selectable after database is updated', () => {
@@ -322,7 +368,6 @@ describeWithMockConnection('ResourcesSection', () => {
     let target: SDK.Target.Target;
     beforeEach(() => {
       stubNoopSettings();
-      Root.Runtime.experiments.register(Root.Runtime.ExperimentName.PRELOADING_STATUS_PANEL, '', false);
       SDK.FrameManager.FrameManager.instance({forceNew: true});
       target = createTarget();
     });

@@ -4,23 +4,24 @@
 
 // @ts-nocheck TODO(crbug.com/348449529)
 
-import * as TraceModel from '../../trace.js';
+import {TraceLoader} from '../../../../testing/TraceLoader.js';
+import * as Trace from '../../trace.js';
 import * as Lantern from '../lantern.js';
-import {loadTrace, runTraceEngine} from '../testing/testing.js';
+import {runTrace, toLanternTrace} from '../testing/testing.js';
 
 const {NetworkAnalyzer} = Lantern.Core;
 
 async function createRequests(trace: Lantern.Types.Trace) {
-  const traceEngineData = await runTraceEngine(trace);
-  return TraceModel.LanternComputationData.createNetworkRequests(trace, traceEngineData);
+  const parsedTrace = await runTrace(trace);
+  return Trace.LanternComputationData.createNetworkRequests(trace, parsedTrace);
 }
 
 describe('NetworkAnalyzer', () => {
   let trace: Lantern.Types.Trace;
   let traceWithRedirect: Lantern.Types.Trace;
   before(async function() {
-    trace = await loadTrace(this, 'lantern/paul/trace.json.gz');
-    traceWithRedirect = await loadTrace(this, 'lantern/redirect/trace.json.gz');
+    trace = toLanternTrace(await TraceLoader.rawEvents(this, 'lantern/paul/trace.json.gz'));
+    traceWithRedirect = toLanternTrace(await TraceLoader.rawEvents(this, 'lantern/redirect/trace.json.gz'));
   });
 
   let recordId;

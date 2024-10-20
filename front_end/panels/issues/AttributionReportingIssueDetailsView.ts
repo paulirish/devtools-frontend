@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import type * as Protocol from '../../generated/protocol.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
+import type * as Protocol from '../../generated/protocol.js';
 import * as IssuesManager from '../../models/issues_manager/issues_manager.js';
 
 import {AffectedItem, AffectedResourcesView} from './AffectedResourcesView.js';
@@ -43,10 +43,11 @@ export class AttributionReportingIssueDetailsView extends AffectedResourcesView 
   override update(): void {
     this.clear();
     const issues = this.issue.getAttributionReportingIssues();
-    if (issues.size > 0) {
-      this.#appendDetails(issues.values().next().value.code(), issues);
-    } else {
+    const issue = issues.values().next();
+    if (issue.done) {
       this.updateAffectedResourceCount(0);
+    } else {
+      this.#appendDetails(issue.value.code(), issues);
     }
   }
 
@@ -55,32 +56,32 @@ export class AttributionReportingIssueDetailsView extends AffectedResourcesView 
       issues: Iterable<IssuesManager.AttributionReportingIssue.AttributionReportingIssue>): void {
     const header = document.createElement('tr');
     switch (issueCode) {
-      case IssuesManager.AttributionReportingIssue.IssueCode.InvalidRegisterSourceHeader:
-      case IssuesManager.AttributionReportingIssue.IssueCode.InvalidRegisterTriggerHeader:
-      case IssuesManager.AttributionReportingIssue.IssueCode.InvalidRegisterOsSourceHeader:
-      case IssuesManager.AttributionReportingIssue.IssueCode.InvalidRegisterOsTriggerHeader:
-      case IssuesManager.AttributionReportingIssue.IssueCode.OsSourceIgnored:
-      case IssuesManager.AttributionReportingIssue.IssueCode.OsTriggerIgnored:
-      case IssuesManager.AttributionReportingIssue.IssueCode.SourceIgnored:
-      case IssuesManager.AttributionReportingIssue.IssueCode.TriggerIgnored:
+      case IssuesManager.AttributionReportingIssue.IssueCode.INVALID_REGISTER_SOURCE_HEADER:
+      case IssuesManager.AttributionReportingIssue.IssueCode.INVALID_REGISTER_TRIGGER_HEADER:
+      case IssuesManager.AttributionReportingIssue.IssueCode.INVALID_REGISTER_OS_SOURCE_HEADER:
+      case IssuesManager.AttributionReportingIssue.IssueCode.INVALID_REGISTER_OS_TRIGGER_HEADER:
+      case IssuesManager.AttributionReportingIssue.IssueCode.OS_SOURCE_IGNORED:
+      case IssuesManager.AttributionReportingIssue.IssueCode.OS_TRIGGER_IGNORED:
+      case IssuesManager.AttributionReportingIssue.IssueCode.SOURCE_IGNORED:
+      case IssuesManager.AttributionReportingIssue.IssueCode.TRIGGER_IGNORED:
         this.appendColumnTitle(header, i18nString(UIStrings.request));
         this.appendColumnTitle(header, i18nString(UIStrings.invalidHeaderValue));
         break;
-      case IssuesManager.AttributionReportingIssue.IssueCode.InsecureContext:
-      case IssuesManager.AttributionReportingIssue.IssueCode.UntrustworthyReportingOrigin:
+      case IssuesManager.AttributionReportingIssue.IssueCode.INSECURE_CONTEXT:
+      case IssuesManager.AttributionReportingIssue.IssueCode.UNTRUSTWORTHY_REPORTING_ORIGIN:
         this.appendColumnTitle(header, i18nString(UIStrings.element));
         this.appendColumnTitle(header, i18nString(UIStrings.request));
         this.appendColumnTitle(header, i18nString(UIStrings.untrustworthyOrigin));
         break;
-      case IssuesManager.AttributionReportingIssue.IssueCode.PermissionPolicyDisabled:
+      case IssuesManager.AttributionReportingIssue.IssueCode.PERMISSION_POLICY_DISABLED:
         this.appendColumnTitle(header, i18nString(UIStrings.element));
         this.appendColumnTitle(header, i18nString(UIStrings.request));
         break;
-      case IssuesManager.AttributionReportingIssue.IssueCode.SourceAndTriggerHeaders:
-      case IssuesManager.AttributionReportingIssue.IssueCode.WebAndOsHeaders:
+      case IssuesManager.AttributionReportingIssue.IssueCode.SOURCE_AND_TRIGGER_HEADERS:
+      case IssuesManager.AttributionReportingIssue.IssueCode.WEB_AND_OS_HEADERS:
         this.appendColumnTitle(header, i18nString(UIStrings.request));
         break;
-      case IssuesManager.AttributionReportingIssue.IssueCode.NavigationRegistrationWithoutTransientUserActivation:
+      case IssuesManager.AttributionReportingIssue.IssueCode.NAVIGATION_REGISTRATION_WITHOUT_TRANSIENT_USER_ACTIVATION:
         this.appendColumnTitle(header, i18nString(UIStrings.element));
         break;
     }
@@ -103,32 +104,32 @@ export class AttributionReportingIssueDetailsView extends AffectedResourcesView 
     const details = issue.issueDetails;
 
     switch (issueCode) {
-      case IssuesManager.AttributionReportingIssue.IssueCode.InvalidRegisterSourceHeader:
-      case IssuesManager.AttributionReportingIssue.IssueCode.InvalidRegisterTriggerHeader:
-      case IssuesManager.AttributionReportingIssue.IssueCode.InvalidRegisterOsSourceHeader:
-      case IssuesManager.AttributionReportingIssue.IssueCode.InvalidRegisterOsTriggerHeader:
-      case IssuesManager.AttributionReportingIssue.IssueCode.OsSourceIgnored:
-      case IssuesManager.AttributionReportingIssue.IssueCode.OsTriggerIgnored:
-      case IssuesManager.AttributionReportingIssue.IssueCode.SourceIgnored:
-      case IssuesManager.AttributionReportingIssue.IssueCode.TriggerIgnored:
+      case IssuesManager.AttributionReportingIssue.IssueCode.INVALID_REGISTER_SOURCE_HEADER:
+      case IssuesManager.AttributionReportingIssue.IssueCode.INVALID_REGISTER_TRIGGER_HEADER:
+      case IssuesManager.AttributionReportingIssue.IssueCode.INVALID_REGISTER_OS_SOURCE_HEADER:
+      case IssuesManager.AttributionReportingIssue.IssueCode.INVALID_REGISTER_OS_TRIGGER_HEADER:
+      case IssuesManager.AttributionReportingIssue.IssueCode.OS_SOURCE_IGNORED:
+      case IssuesManager.AttributionReportingIssue.IssueCode.OS_TRIGGER_IGNORED:
+      case IssuesManager.AttributionReportingIssue.IssueCode.SOURCE_IGNORED:
+      case IssuesManager.AttributionReportingIssue.IssueCode.TRIGGER_IGNORED:
         this.#appendRequestOrEmptyCell(element, details.request);
         this.appendIssueDetailCell(element, details.invalidParameter || '');
         break;
-      case IssuesManager.AttributionReportingIssue.IssueCode.InsecureContext:
-      case IssuesManager.AttributionReportingIssue.IssueCode.UntrustworthyReportingOrigin:
+      case IssuesManager.AttributionReportingIssue.IssueCode.INSECURE_CONTEXT:
+      case IssuesManager.AttributionReportingIssue.IssueCode.UNTRUSTWORTHY_REPORTING_ORIGIN:
         await this.#appendElementOrEmptyCell(element, issue);
         this.#appendRequestOrEmptyCell(element, details.request);
         this.appendIssueDetailCell(element, details.invalidParameter || '');
         break;
-      case IssuesManager.AttributionReportingIssue.IssueCode.PermissionPolicyDisabled:
+      case IssuesManager.AttributionReportingIssue.IssueCode.PERMISSION_POLICY_DISABLED:
         await this.#appendElementOrEmptyCell(element, issue);
         this.#appendRequestOrEmptyCell(element, details.request);
         break;
-      case IssuesManager.AttributionReportingIssue.IssueCode.SourceAndTriggerHeaders:
-      case IssuesManager.AttributionReportingIssue.IssueCode.WebAndOsHeaders:
+      case IssuesManager.AttributionReportingIssue.IssueCode.SOURCE_AND_TRIGGER_HEADERS:
+      case IssuesManager.AttributionReportingIssue.IssueCode.WEB_AND_OS_HEADERS:
         this.#appendRequestOrEmptyCell(element, details.request);
         break;
-      case IssuesManager.AttributionReportingIssue.IssueCode.NavigationRegistrationWithoutTransientUserActivation:
+      case IssuesManager.AttributionReportingIssue.IssueCode.NAVIGATION_REGISTRATION_WITHOUT_TRANSIENT_USER_ACTIVATION:
         await this.#appendElementOrEmptyCell(element, issue);
         break;
     }
@@ -158,7 +159,7 @@ export class AttributionReportingIssueDetailsView extends AffectedResourcesView 
     const opts = {
       additionalOnClickAction(): void {
         Host.userMetrics.issuesPanelResourceOpened(
-            IssuesManager.Issue.IssueCategory.AttributionReporting, AffectedItem.Request);
+            IssuesManager.Issue.IssueCategory.ATTRIBUTION_REPORTING, AffectedItem.REQUEST);
       },
     };
     parent.appendChild(this.createRequestCell(request, opts));

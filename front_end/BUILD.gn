@@ -6,7 +6,7 @@ import("../scripts/build/ninja/copy.gni")
 import("../scripts/build/ninja/devtools_entrypoint.gni")
 import("../scripts/build/ninja/node.gni")
 import("../scripts/build/ninja/vars.gni")
-import("../third_party/typescript/typescript.gni")
+import("../scripts/build/typescript/typescript.gni")
 
 group("front_end") {
   public_deps = [
@@ -137,6 +137,7 @@ group("unittests") {
     "models/trace/insights:unittests",
     "models/trace/lantern/core:unittests",
     "models/trace/lantern/graph:unittests",
+    "models/trace/lantern/metrics:unittests",
     "models/trace/lantern/simulation:unittests",
     "models/trace/root-causes:unittests",
     "models/trace/types:unittests",
@@ -183,6 +184,7 @@ group("unittests") {
     "panels/screencast:unittests",
     "panels/search:unittests",
     "panels/security:unittests",
+    "panels/settings:unittests",
     "panels/settings/components:unittests",
     "panels/settings/emulation/components:unittests",
     "panels/settings/emulation/utils:unittests",
@@ -194,7 +196,9 @@ group("unittests") {
     "panels/timeline/components/insights:unittests",
     "panels/timeline/fixtures/traces",
     "panels/timeline/overlays:unittests",
+    "panels/timeline/overlays/components:unittests",
     "panels/timeline/track_appenders:unittests",
+    "panels/timeline/utils:unittests",
     "panels/utils:unittests",
     "panels/web_audio:unittests",
     "panels/webauthn:unittests",
@@ -204,6 +208,7 @@ group("unittests") {
     "third_party/i18n:unittests",
     "ui/components/adorners:unittests",
     "ui/components/buttons:unittests",
+    "ui/components/cards:unittests",
     "ui/components/chrome_link:unittests",
     "ui/components/code_highlighter:unittests",
     "ui/components/data_grid:unittests",

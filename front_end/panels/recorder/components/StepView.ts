@@ -8,10 +8,11 @@
    about it. */
 /* eslint-disable rulesdir/lit_html_host_this */
 
+import '../../../ui/components/icon_button/icon_button.js';
+
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Platform from '../../../core/platform/platform.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
-import * as IconButton from '../../../ui/components/icon_button/icon_button.js';
 import * as Menus from '../../../ui/components/menus/menus.js';
 import * as UI from '../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
@@ -22,9 +23,10 @@ import * as Models from '../models/models.js';
 import {type StepEditedEvent} from './StepEditor.js';
 import stepViewStyles from './stepView.css.js';
 import {
-  TimelineSection,
   type TimelineSectionData,
 } from './TimelineSection.js';
+
+const {html} = LitHtml;
 
 const UIStrings = {
   /**
@@ -146,12 +148,12 @@ declare global {
 }
 
 export const enum State {
-  Default = 'default',
-  Success = 'success',
-  Current = 'current',
-  Outstanding = 'outstanding',
-  Error = 'error',
-  Stopped = 'stopped',
+  DEFAULT = 'default',
+  SUCCESS = 'success',
+  CURRENT = 'current',
+  OUTSTANDING = 'outstanding',
+  ERROR = 'error',
+  STOPPED = 'stopped',
 }
 
 export interface StepViewData {
@@ -316,7 +318,7 @@ function getStepTypeTitle(input: {
   section?: Models.Section.Section,
 }): string|LitHtml.TemplateResult {
   if (input.section) {
-    return input.section.title ? input.section.title : LitHtml.html`<span class="fallback">(No Title)</span>`;
+    return input.section.title ? input.section.title : html`<span class="fallback">(No Title)</span>`;
   }
   if (!input.step) {
     throw new Error('Missing both step and section');
@@ -392,8 +394,8 @@ function getSectionPreview(section?: Models.Section.Section): string {
 
 function renderStepActions(input: ViewInput): LitHtml.TemplateResult|null {
   // clang-format off
-  return LitHtml.html`
-    <${Buttons.Button.Button.litTagName}
+  return html`
+    <devtools-button
       class="step-actions"
       title=${i18nString(UIStrings.openStepActions)}
       aria-label=${i18nString(UIStrings.openStepActions)}
@@ -409,7 +411,7 @@ function renderStepActions(input: ViewInput): LitHtml.TemplateResult|null {
           title: i18nString(UIStrings.openStepActions),
         } as Buttons.Button.ButtonData
       }
-    ></${Buttons.Button.Button.litTagName}>
+    ></devtools-button>
   `;
   // clang-format on
 }
@@ -422,11 +424,11 @@ function viewFunction(input: ViewInput, _output: ViewOutput, target: HTMLElement
   const stepClasses = {
     step: true,
     expanded: input.showDetails,
-    'is-success': input.state === State.Success,
-    'is-current': input.state === State.Current,
-    'is-outstanding': input.state === State.Outstanding,
-    'is-error': input.state === State.Error,
-    'is-stopped': input.state === State.Stopped,
+    'is-success': input.state === State.SUCCESS,
+    'is-current': input.state === State.CURRENT,
+    'is-outstanding': input.state === State.OUTSTANDING,
+    'is-error': input.state === State.ERROR,
+    'is-stopped': input.state === State.STOPPED,
     'is-start-of-group': input.isStartOfGroup,
     'is-first-section': input.isFirstSection,
     'has-breakpoint': input.hasBreakpoint,
@@ -440,8 +442,8 @@ function viewFunction(input: ViewInput, _output: ViewOutput, target: HTMLElement
 
   // clang-format off
   LitHtml.render(
-    LitHtml.html`
-    <${TimelineSection.litTagName} .data=${
+    html`
+    <devtools-timeline-section .data=${
       {
         isFirstSection: input.isFirstSection,
         isLastSection: input.isLastSection,
@@ -475,11 +477,11 @@ function viewFunction(input: ViewInput, _output: ViewOutput, target: HTMLElement
         >
           ${
             isExpandable
-              ? LitHtml.html`<${IconButton.Icon.Icon.litTagName}
+              ? html`<devtools-icon
                   class="chevron"
                   jslog=${VisualLogging.expand().track({click: true})}
                   name="triangle-down">
-                </${IconButton.Icon.Icon.litTagName}>`
+                </devtools-icon>`
               : ''
           }
           <div class="title">
@@ -493,7 +495,7 @@ function viewFunction(input: ViewInput, _output: ViewOutput, target: HTMLElement
       <div class="details">
         ${
           input.step &&
-          LitHtml.html`<devtools-recorder-step-editor
+          html`<devtools-recorder-step-editor
           class=${input.isSelected ? 'is-selected' : ''}
           .step=${input.step}
           .disabled=${input.isPlaying}
@@ -502,7 +504,7 @@ function viewFunction(input: ViewInput, _output: ViewOutput, target: HTMLElement
         }
         ${
           input.section?.causingStep &&
-          LitHtml.html`<devtools-recorder-step-editor
+          html`<devtools-recorder-step-editor
           .step=${input.section.causingStep}
           .isTypeEditable=${false}
           .disabled=${input.isPlaying}
@@ -512,13 +514,13 @@ function viewFunction(input: ViewInput, _output: ViewOutput, target: HTMLElement
       </div>
       ${
         input.error &&
-        LitHtml.html`
+        html`
         <div class="error" role="alert">
           ${input.error.message}
         </div>
       `
       }
-    </${TimelineSection.litTagName}>
+    </devtools-timeline-section>
   `,
     target,
   );
@@ -526,7 +528,6 @@ function viewFunction(input: ViewInput, _output: ViewOutput, target: HTMLElement
 }
 
 export class StepView extends HTMLElement {
-  static readonly litTagName = LitHtml.literal`devtools-step-view`;
 
   readonly #shadow = this.attachShadow({mode: 'open'});
 
@@ -534,7 +535,7 @@ export class StepView extends HTMLElement {
     this.#viewInput.isVisible = result[0].isIntersecting;
   });
   #viewInput: ViewInput = {
-    state: State.Default,
+    state: State.DEFAULT,
     showDetails: false,
     isEndOfGroup: false,
     isStartOfGroup: false,

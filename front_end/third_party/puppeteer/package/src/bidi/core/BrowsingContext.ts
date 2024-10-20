@@ -335,6 +335,9 @@ export class BrowsingContext extends EventEmitter<{
   @inertIfDisposed
   private dispose(reason?: string): void {
     this.#reason = reason;
+    for (const context of this.#children.values()) {
+      context.dispose('Parent browsing context was disposed');
+    }
     this[disposeSymbol]();
   }
 
@@ -598,7 +601,7 @@ export class BrowsingContext extends EventEmitter<{
     await this.#session.subscribe(events, [this.id]);
   }
 
-  [disposeSymbol](): void {
+  override [disposeSymbol](): void {
     this.#reason ??=
       'Browsing context already closed, probably because the user context closed.';
     this.emit('closed', {reason: this.#reason});

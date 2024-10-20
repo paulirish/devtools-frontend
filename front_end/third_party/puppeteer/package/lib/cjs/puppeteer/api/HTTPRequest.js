@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.handleError = exports.STATUS_TEXTS = exports.headersArray = exports.InterceptResolutionAction = exports.HTTPRequest = exports.DEFAULT_INTERCEPT_RESOLUTION_PRIORITY = void 0;
 const util_js_1 = require("../common/util.js");
 const assert_js_1 = require("../util/assert.js");
+const encoding_js_1 = require("../util/encoding.js");
 /**
  * The default cooperative request interception resolution priority
  *
@@ -161,6 +162,9 @@ class HTTPRequest {
                 return await this._continue(this.interception.requestOverrides);
         }
     }
+    #canBeIntercepted() {
+        return !this.url().startsWith('data:') && !this._fromMemoryCache;
+    }
     /**
      * Continues request with optional request overrides.
      *
@@ -190,8 +194,7 @@ class HTTPRequest {
      * Exception is immediately thrown if the request interception is not enabled.
      */
     async continue(overrides = {}, priority) {
-        // Request interception is not supported for data: urls.
-        if (this.url().startsWith('data:')) {
+        if (!this.#canBeIntercepted()) {
             return;
         }
         (0, assert_js_1.assert)(this.interception.enabled, 'Request Interception is not enabled!');
@@ -251,8 +254,7 @@ class HTTPRequest {
      * Exception is immediately thrown if the request interception is not enabled.
      */
     async respond(response, priority) {
-        // Mocking responses for dataURL requests is not currently supported.
-        if (this.url().startsWith('data:')) {
+        if (!this.#canBeIntercepted()) {
             return;
         }
         (0, assert_js_1.assert)(this.interception.enabled, 'Request Interception is not enabled!');
@@ -292,8 +294,7 @@ class HTTPRequest {
      * throw an exception immediately.
      */
     async abort(errorCode = 'failed', priority) {
-        // Request interception is not supported for data: urls.
-        if (this.url().startsWith('data:')) {
+        if (!this.#canBeIntercepted()) {
             return;
         }
         const errorReason = errorReasons[errorCode];
@@ -321,13 +322,9 @@ class HTTPRequest {
         const byteBody = (0, util_js_1.isString)(body)
             ? new TextEncoder().encode(body)
             : body;
-        const bytes = [];
-        for (const byte of byteBody) {
-            bytes.push(String.fromCharCode(byte));
-        }
         return {
             contentLength: byteBody.byteLength,
-            base64: btoa(bytes.join('')),
+            base64: (0, encoding_js_1.typedArrayToBase64)(byteBody),
         };
     }
 }

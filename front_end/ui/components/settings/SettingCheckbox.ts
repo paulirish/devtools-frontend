@@ -3,16 +3,20 @@
 // found in the LICENSE file.
 
 import type * as Common from '../../../core/common/common.js';
+import * as Host from '../../../core/host/host.js';
 import * as LitHtml from '../../lit-html/lit-html.js';
 import * as VisualLogging from '../../visual_logging/visual_logging.js';
-import * as IconButton from '../icon_button/icon_button.js';
+import * as Buttons from '../buttons/buttons.js';
 import * as Input from '../input/input.js';
 
 import settingCheckboxStyles from './settingCheckbox.css.js';
 import {SettingDeprecationWarning} from './SettingDeprecationWarning.js';
 
+const {html, Directives: {ifDefined}} = LitHtml;
+
 export interface SettingCheckboxData {
   setting: Common.Settings.Setting<boolean>;
+  textOverride?: string;
 }
 
 /**
@@ -24,6 +28,7 @@ export class SettingCheckbox extends HTMLElement {
 
   #setting?: Common.Settings.Setting<boolean>;
   #changeListenerDescriptor?: Common.EventTarget.EventDescriptor;
+  #textOverride?: string;
 
   connectedCallback(): void {
     this.#shadow.adoptedStyleSheets = [Input.checkboxStyles, settingCheckboxStyles];
@@ -35,6 +40,7 @@ export class SettingCheckbox extends HTMLElement {
     }
 
     this.#setting = data.setting;
+    this.#textOverride = data.textOverride;
 
     this.#changeListenerDescriptor = this.#setting.addChangeListener(() => {
       this.#render();
@@ -42,13 +48,29 @@ export class SettingCheckbox extends HTMLElement {
     this.#render();
   }
 
-  #deprecationIcon(): LitHtml.TemplateResult|undefined {
-    if (!this.#setting?.deprecation) {
+  icon(): LitHtml.TemplateResult|undefined {
+    if (!this.#setting) {
       return undefined;
     }
 
-    return LitHtml.html`<${SettingDeprecationWarning.litTagName} .data=${
-        this.#setting.deprecation as Common.Settings.Deprecation}></${SettingDeprecationWarning.litTagName}>`;
+    if (this.#setting.deprecation) {
+      return html`<${SettingDeprecationWarning.litTagName} .data=${
+          this.#setting.deprecation as Common.Settings.Deprecation}></${SettingDeprecationWarning.litTagName}>`;
+    }
+
+    const learnMore = this.#setting.learnMore();
+    if (learnMore) {
+      const jslog = VisualLogging.link()
+                        .track({click: true, keydown: 'Enter|Space'})
+                        .context(this.#setting.name + '-documentation');
+      return html`<${Buttons.Button.Button.litTagName} .iconName=${'help'} .size=${
+          Buttons.Button.Size.SMALL} .variant=${Buttons.Button.Variant.ICON} .title=${learnMore.tooltip()} jslog=${
+          jslog} @click=${
+          () => Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(
+              learnMore.url)} class="learn-more"></${Buttons.Button.Button.litTagName}>`;
+    }
+
+    return undefined;
   }
 
   #render(): void {
@@ -56,15 +78,16 @@ export class SettingCheckbox extends HTMLElement {
       throw new Error('No "Setting" object provided for rendering');
     }
 
-    const icon = this.#deprecationIcon();
+    const icon = this.icon();
     const reason = this.#setting.disabledReason() ?
-        LitHtml.html`
-      <${IconButton.Icon.Icon.litTagName} class="disabled-reason" name="info" title=${
-            this.#setting.disabledReason()} @click=${onclick}></${IconButton.Icon.Icon.litTagName}>
+        html`
+      <${Buttons.Button.Button.litTagName} class="disabled-reason" .iconName=${'info'} .variant=${
+            Buttons.Button.Variant.ICON} .size=${Buttons.Button.Size.SMALL} title=${
+            ifDefined(this.#setting.disabledReason())} @click=${onclick}></${Buttons.Button.Button.litTagName}>
     ` :
         LitHtml.nothing;
     LitHtml.render(
-        LitHtml.html`
+        html`
       <p>
         <label>
           <input
@@ -75,8 +98,9 @@ export class SettingCheckbox extends HTMLElement {
             jslog=${VisualLogging.toggle().track({click: true}).context(this.#setting.name)}
             aria-label=${this.#setting.title()}
           />
-          ${this.#setting.title()}${reason}${icon}
+          ${this.#textOverride || this.#setting.title()}${reason}
         </label>
+        ${icon}
       </p>`,
         this.#shadow, {host: this});
   }

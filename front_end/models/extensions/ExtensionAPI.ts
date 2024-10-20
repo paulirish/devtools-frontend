@@ -61,7 +61,6 @@ export namespace PrivateAPI {
 
   export const enum Commands {
     AddRequestHeaders = 'addRequestHeaders',
-    ApplyStyleSheet = 'applyStyleSheet',
     CreatePanel = 'createPanel',
     CreateSidebarPane = 'createSidebarPane',
     CreateToolbarButton = 'createToolbarButton',
@@ -165,7 +164,6 @@ export namespace PrivateAPI {
     extensionId: string,
     headers: {[key: string]: string},
   };
-  type ApplyStyleSheetRequest = {command: Commands.ApplyStyleSheet, styleSheet: string};
   type CreatePanelRequest = {command: Commands.CreatePanel, id: string, title: string, page: string};
   type ShowPanelRequest = {command: Commands.ShowPanel, id: string};
   type CreateToolbarButtonRequest = {
@@ -243,12 +241,12 @@ export namespace PrivateAPI {
 
   export type ServerRequests = ShowRecorderViewRequest|CreateRecorderViewRequest|RegisterRecorderExtensionPluginRequest|
       RegisterLanguageExtensionPluginRequest|SubscribeRequest|UnsubscribeRequest|AddRequestHeadersRequest|
-      ApplyStyleSheetRequest|CreatePanelRequest|ShowPanelRequest|CreateToolbarButtonRequest|UpdateButtonRequest|
-      CreateSidebarPaneRequest|SetSidebarHeightRequest|SetSidebarContentRequest|SetSidebarPageRequest|
-      OpenResourceRequest|SetOpenResourceHandlerRequest|SetThemeChangeHandlerRequest|ReloadRequest|
-      EvaluateOnInspectedPageRequest|GetRequestContentRequest|GetResourceContentRequest|SetResourceContentRequest|
-      ForwardKeyboardEventRequest|GetHARRequest|GetPageResourcesRequest|GetWasmLinearMemoryRequest|GetWasmLocalRequest|
-      GetWasmGlobalRequest|GetWasmOpRequest|ShowNetworkPanelRequest|ReportResourceLoadRequest;
+      CreatePanelRequest|ShowPanelRequest|CreateToolbarButtonRequest|UpdateButtonRequest|CreateSidebarPaneRequest|
+      SetSidebarHeightRequest|SetSidebarContentRequest|SetSidebarPageRequest|OpenResourceRequest|
+      SetOpenResourceHandlerRequest|SetThemeChangeHandlerRequest|ReloadRequest|EvaluateOnInspectedPageRequest|
+      GetRequestContentRequest|GetResourceContentRequest|SetResourceContentRequest|ForwardKeyboardEventRequest|
+      GetHARRequest|GetPageResourcesRequest|GetWasmLinearMemoryRequest|GetWasmLocalRequest|GetWasmGlobalRequest|
+      GetWasmOpRequest|ShowNetworkPanelRequest|ReportResourceLoadRequest;
   export type ExtensionServerRequestMessage = PrivateAPI.ServerRequests&{requestId?: number};
 
   type AddRawModuleRequest = {
@@ -396,7 +394,6 @@ namespace APIImpl {
 
   export interface Panels extends PublicAPI.Chrome.DevTools.Panels {
     get SearchAction(): {[key: string]: string};
-    applyStyleSheet(styleSheet: string): void;
     setOpenResourceHandler(callback?: (resource: PublicAPI.Chrome.DevTools.Resource, lineNumber: number) => unknown):
         void;
     setThemeChangeHandler(callback?: (themeName: string) => unknown): void;
@@ -566,7 +563,7 @@ self.injectedExtensionAPI = function(
 
     addRequestHeaders: function(headers: {[key: string]: string}): void {
       extensionServer.sendRequest(
-          {command: PrivateAPI.Commands.AddRequestHeaders, headers: headers, extensionId: window.location.hostname});
+          {command: PrivateAPI.Commands.AddRequestHeaders, headers, extensionId: window.location.hostname});
     },
   };
 
@@ -598,9 +595,6 @@ self.injectedExtensionAPI = function(
     for (const panel in panels) {
       Object.defineProperty(this, panel, {get: panelGetter.bind(null, panel), enumerable: true});
     }
-    this.applyStyleSheet = function(styleSheet: string): void {
-      extensionServer.sendRequest({command: PrivateAPI.Commands.ApplyStyleSheet, styleSheet: styleSheet});
-    };
   }
 
   (Panels.prototype as
@@ -640,7 +634,7 @@ self.injectedExtensionAPI = function(
       // Only send command if we either removed an existing handler or added handler and had none before.
       if (hadHandler === !callback) {
         extensionServer.sendRequest(
-            {command: PrivateAPI.Commands.SetOpenResourceHandler, 'handlerPresent': Boolean(callback)});
+            {command: PrivateAPI.Commands.SetOpenResourceHandler, handlerPresent: Boolean(callback)});
       }
     },
 
@@ -662,7 +656,7 @@ self.injectedExtensionAPI = function(
       // Only send command if we either removed an existing handler or added handler and had none before.
       if (hadHandler === !callback) {
         extensionServer.sendRequest(
-            {command: PrivateAPI.Commands.SetThemeChangeHandler, 'handlerPresent': Boolean(callback)});
+            {command: PrivateAPI.Commands.SetThemeChangeHandler, handlerPresent: Boolean(callback)});
       }
     },
 
@@ -1053,7 +1047,7 @@ self.injectedExtensionAPI = function(
                                  extensionServer.sendRequest({
                                    command: PrivateAPI.Commands.CreateToolbarButton,
                                    panel: this._id as string,
-                                   id: id,
+                                   id,
                                    icon: iconPath,
                                    tooltip: tooltipText,
                                    disabled: Boolean(disabled),
@@ -1097,8 +1091,7 @@ self.injectedExtensionAPI = function(
        Pick<APIImpl.ExtensionSidebarPane, 'setHeight'|'setExpression'|'setObject'|'setPage'>&
    {__proto__: APIImpl.ExtensionView}) = {
     setHeight: function(this: APIImpl.ExtensionSidebarPane, height: string): void {
-      extensionServer.sendRequest(
-          {command: PrivateAPI.Commands.SetSidebarHeight, id: this._id as string, height: height});
+      extensionServer.sendRequest({command: PrivateAPI.Commands.SetSidebarHeight, id: this._id as string, height});
     },
 
     setExpression: function(
@@ -1108,8 +1101,8 @@ self.injectedExtensionAPI = function(
           {
             command: PrivateAPI.Commands.SetSidebarContent,
             id: this._id as string,
-            expression: expression,
-            rootTitle: rootTitle,
+            expression,
+            rootTitle,
             evaluateOnPage: true,
             evaluateOptions: (typeof evaluateOptions === 'object' ? evaluateOptions : {}),
           },
@@ -1123,13 +1116,13 @@ self.injectedExtensionAPI = function(
             command: PrivateAPI.Commands.SetSidebarContent,
             id: this._id as string,
             expression: jsonObject,
-            rootTitle: rootTitle,
+            rootTitle,
           },
           callback);
     },
 
     setPage: function(this: APIImpl.ExtensionSidebarPane, page: string): void {
-      extensionServer.sendRequest({command: PrivateAPI.Commands.SetSidebarPage, id: this._id as string, page: page});
+      extensionServer.sendRequest({command: PrivateAPI.Commands.SetSidebarPage, id: this._id as string, page});
     },
 
     __proto__: ExtensionViewImpl.prototype,
@@ -1205,7 +1198,7 @@ self.injectedExtensionAPI = function(
             'Passing userAgent as string parameter to inspectedWindow.reload() is deprecated. ' +
             'Use inspectedWindow.reload({ userAgent: value}) instead.');
       }
-      extensionServer.sendRequest({command: PrivateAPI.Commands.Reload, options: options});
+      extensionServer.sendRequest({command: PrivateAPI.Commands.Reload, options});
     },
 
     eval: function(
@@ -1228,7 +1221,7 @@ self.injectedExtensionAPI = function(
           extensionServer.sendRequest(
               {
                 command: PrivateAPI.Commands.EvaluateOnInspectedPage,
-                expression: expression,
+                expression,
                 evaluateOptions: (typeof evaluateOptions === 'object' ? evaluateOptions : undefined),
               },
               callback && callbackWrapper);
@@ -1276,7 +1269,7 @@ self.injectedExtensionAPI = function(
     setContent: function(
         this: APIImpl.Resource, content: string, commit: boolean, callback: (error?: Object) => unknown): void {
       extensionServer.sendRequest(
-          {command: PrivateAPI.Commands.SetResourceContent, url: this._url, content: content, commit: commit},
+          {command: PrivateAPI.Commands.SetResourceContent, url: this._url, content, commit},
           callback as (response: unknown) => unknown);
     },
   };

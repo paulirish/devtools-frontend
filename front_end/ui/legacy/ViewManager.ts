@@ -44,6 +44,7 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export const defaultOptionsForTabs = {
   security: true,
+  freestyler: true,
 };
 
 export class PreRegisteredView implements View {
@@ -642,9 +643,8 @@ class TabbedLocation extends Location implements TabbedViewLocation {
   }
 
   enableMoreTabsButton(): ToolbarMenuButton {
-    const moreTabsButton =
-        new ToolbarMenuButton(this.appendTabsToMenu.bind(this), /* isIconDropdown */ true, undefined, 'more-tabs');
-    moreTabsButton.setGlyph('dots-vertical');
+    const moreTabsButton = new ToolbarMenuButton(
+        this.appendTabsToMenu.bind(this), /* isIconDropdown */ true, undefined, 'more-tabs', 'dots-vertical');
     this.tabbedPaneInternal.leftToolbar().appendToolbarItem(moreTabsButton);
     this.tabbedPaneInternal.disableOverflowMenu();
     return moreTabsButton;
@@ -704,7 +704,7 @@ class TabbedLocation extends Location implements TabbedViewLocation {
 
       if (view.viewId() === 'issues-pane') {
         contextMenu.defaultSection().appendItem(title, () => {
-          Host.userMetrics.issuesPanelOpenedFrom(Host.UserMetrics.IssueOpener.HamburgerMenu);
+          Host.userMetrics.issuesPanelOpenedFrom(Host.UserMetrics.IssueOpener.HAMBURGER_MENU);
           void this.showView(view, undefined, true);
         }, {jslogContext: 'issues-pane'});
         continue;

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 import type * as Platform from '../../core/platform/platform.js';
-import * as TraceEngine from '../../models/trace/trace.js';
+import * as Trace from '../../models/trace/trace.js';
 import {describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
 import {setupIgnoreListManagerEnvironment} from '../../testing/TraceHelpers.js';
 import {TraceLoader} from '../../testing/TraceLoader.js';
@@ -15,34 +15,39 @@ describeWithEnvironment('TimelineFlameChartDataProvider', function() {
   describe('groupTreeEvents', function() {
     it('returns the correct events for tree views given a flame chart group', async function() {
       const dataProvider = new Timeline.TimelineFlameChartDataProvider.TimelineFlameChartDataProvider();
-      const {traceData} = await TraceLoader.traceEngine(this, 'sync-like-timings.json.gz');
-      dataProvider.setModel(traceData);
+      const {parsedTrace} = await TraceLoader.traceEngine(this, 'sync-like-timings.json.gz');
+      dataProvider.setModel(parsedTrace);
       const timingsTrackGroup = dataProvider.timelineData().groups.find(g => g.name === 'Timings');
       if (!timingsTrackGroup) {
         assert.fail('Could not find Timings track flame chart group');
       }
       const groupTreeEvents = dataProvider.groupTreeEvents(timingsTrackGroup);
       const allTimingEvents = [
-        ...traceData.UserTimings.consoleTimings,
-        ...traceData.UserTimings.timestampEvents,
-        ...traceData.UserTimings.performanceMarks,
-        ...traceData.UserTimings.performanceMeasures,
-        ...traceData.PageLoadMetrics.allMarkerEvents,
+        ...parsedTrace.UserTimings.consoleTimings,
+        ...parsedTrace.UserTimings.timestampEvents,
+        ...parsedTrace.UserTimings.performanceMarks,
+        ...parsedTrace.UserTimings.performanceMeasures,
+        ...parsedTrace.PageLoadMetrics.allMarkerEvents.toSorted((m1, m2) => {
+          // These get sorted based on the metric so we have to replicate
+          // that for this assertion.
+          return Timeline.TimingsTrackAppender.SORT_ORDER_PAGE_LOAD_MARKERS[m1.name] -
+              Timeline.TimingsTrackAppender.SORT_ORDER_PAGE_LOAD_MARKERS[m2.name];
+        }),
       ].sort((a, b) => a.ts - b.ts);
       assert.deepEqual(groupTreeEvents, allTimingEvents);
     });
 
     it('filters out async events if they cannot be added to the tree', async function() {
       const dataProvider = new Timeline.TimelineFlameChartDataProvider.TimelineFlameChartDataProvider();
-      const {traceData} = await TraceLoader.traceEngine(this, 'timings-track.json.gz');
-      dataProvider.setModel(traceData);
+      const {parsedTrace} = await TraceLoader.traceEngine(this, 'timings-track.json.gz');
+      dataProvider.setModel(parsedTrace);
       const timingsTrackGroup = dataProvider.timelineData().groups.find(g => g.name === 'Timings');
       if (!timingsTrackGroup) {
         assert.fail('Could not find Timings track flame chart group');
       }
       const groupTreeEvents = dataProvider.groupTreeEvents(timingsTrackGroup);
       assert.strictEqual(groupTreeEvents?.length, 12);
-      const allEventsAreSync = groupTreeEvents?.every(event => !TraceEngine.Types.TraceEvents.isAsyncPhase(event.ph));
+      const allEventsAreSync = groupTreeEvents?.every(event => !Trace.Types.Events.isPhaseAsync(event.ph));
       assert.isTrue(allEventsAreSync);
     });
   });
@@ -50,8 +55,8 @@ describeWithEnvironment('TimelineFlameChartDataProvider', function() {
   it('can provide the index for an event and the event for a given index', async function() {
     setupIgnoreListManagerEnvironment();
     const dataProvider = new Timeline.TimelineFlameChartDataProvider.TimelineFlameChartDataProvider();
-    const {traceData} = await TraceLoader.traceEngine(this, 'one-second-interaction.json.gz');
-    dataProvider.setModel(traceData);
+    const {parsedTrace} = await TraceLoader.traceEngine(this, 'one-second-interaction.json.gz');
+    dataProvider.setModel(parsedTrace);
 
     // Need to use an index that is not a frame, so jump past the frames.
     const event = dataProvider.eventByIndex(100);
@@ -61,8 +66,8 @@ describeWithEnvironment('TimelineFlameChartDataProvider', function() {
   it('renders track in the correct order by default', async function() {
     setupIgnoreListManagerEnvironment();
     const dataProvider = new Timeline.TimelineFlameChartDataProvider.TimelineFlameChartDataProvider();
-    const {traceData} = await TraceLoader.traceEngine(this, 'extension-tracks-and-marks.json.gz');
-    dataProvider.setModel(traceData);
+    const {parsedTrace} = await TraceLoader.traceEngine(this, 'extension-tracks-and-marks.json.gz');
+    dataProvider.setModel(parsedTrace);
     const groupNames = dataProvider.timelineData().groups.map(g => g.name);
     assert.deepEqual(
         groupNames,
@@ -70,24 +75,42 @@ describeWithEnvironment('TimelineFlameChartDataProvider', function() {
           'Frames',
           'Timings',
           'Interactions',
-          'A track group — Custom Track',
+          'A track group — Custom track',
           'Another Extension Track',
-          'An Extension Track — Custom Track',
+          'An Extension Track — Custom track',
           'Main — http://localhost:3000/',
-          'Thread Pool',
-          'Thread Pool Worker 1',
-          'Thread Pool Worker 2',
-          'Thread Pool Worker 3',
+          'Thread pool',
+          'Thread pool worker 1',
+          'Thread pool worker 2',
+          'Thread pool worker 3',
           'StackSamplingProfiler',
           'GPU',
         ],
     );
   });
+
+  it('can return the FlameChart group for a given event', async function() {
+    setupIgnoreListManagerEnvironment();
+    const dataProvider = new Timeline.TimelineFlameChartDataProvider.TimelineFlameChartDataProvider();
+    const {parsedTrace} = await TraceLoader.traceEngine(this, 'one-second-interaction.json.gz');
+    dataProvider.setModel(parsedTrace);
+    // Force the track appenders to run and populate the chart data.
+    dataProvider.timelineData();
+
+    const longest = parsedTrace.UserInteractions.longestInteractionEvent;
+    assert.isOk(longest);
+    const index = dataProvider.indexForEvent(longest);
+    assert.isNotNull(index);
+    const group = dataProvider.groupForEvent(index);
+    assert.strictEqual(group?.name, 'Interactions');
+  });
+
   it('adds candy stripe and triangle decorations to long tasks in the main thread', async function() {
     setupIgnoreListManagerEnvironment();
     const dataProvider = new Timeline.TimelineFlameChartDataProvider.TimelineFlameChartDataProvider();
-    const {traceData} = await TraceLoader.traceEngine(this, 'one-second-interaction.json.gz');
-    dataProvider.setModel(traceData);
+    const {parsedTrace} = await TraceLoader.traceEngine(this, 'one-second-interaction.json.gz');
+    dataProvider.setModel(parsedTrace);
+    dataProvider.timelineData();
 
     const {entryDecorations} = dataProvider.timelineData();
     const stripingTitles: string[] = [];
@@ -117,8 +140,8 @@ describeWithEnvironment('TimelineFlameChartDataProvider', function() {
 
   it('populates the frames track with frames and screenshots', async function() {
     const dataProvider = new Timeline.TimelineFlameChartDataProvider.TimelineFlameChartDataProvider();
-    const {traceData} = await TraceLoader.traceEngine(this, 'web-dev.json.gz');
-    dataProvider.setModel(traceData);
+    const {parsedTrace} = await TraceLoader.traceEngine(this, 'web-dev.json.gz');
+    dataProvider.setModel(parsedTrace);
     const framesTrack = dataProvider.timelineData().groups.find(g => {
       return g.name.includes('Frames');
     });
@@ -129,10 +152,10 @@ describeWithEnvironment('TimelineFlameChartDataProvider', function() {
     const screenshotsLevel = framesLevel + 1;
     // The frames track first shows the frames, and then shows screenhots just below it.
     assert.strictEqual(
-        dataProvider.getEntryTypeForLevel(framesLevel), Timeline.TimelineFlameChartDataProvider.EntryType.Frame);
+        dataProvider.getEntryTypeForLevel(framesLevel), Timeline.TimelineFlameChartDataProvider.EntryType.FRAME);
     assert.strictEqual(
         dataProvider.getEntryTypeForLevel(screenshotsLevel),
-        Timeline.TimelineFlameChartDataProvider.EntryType.Screenshot);
+        Timeline.TimelineFlameChartDataProvider.EntryType.SCREENSHOT);
 
     // There are 5 screenshots in this trace, so we expect there to be 5 events on the screenshots track level.
     const eventsOnScreenshotsLevel = dataProvider.timelineData().entryLevels.filter(e => e === screenshotsLevel);
@@ -144,8 +167,8 @@ describeWithEnvironment('TimelineFlameChartDataProvider', function() {
       const {ignoreListManager} = setupIgnoreListManagerEnvironment();
 
       const dataProvider = new Timeline.TimelineFlameChartDataProvider.TimelineFlameChartDataProvider();
-      const {traceData} = await TraceLoader.traceEngine(this, 'react-hello-world.json.gz');
-      dataProvider.setModel(traceData);
+      const {parsedTrace} = await TraceLoader.traceEngine(this, 'react-hello-world.json.gz');
+      dataProvider.setModel(parsedTrace);
 
       const eventCountBeforeIgnoreList = dataProvider.timelineData().entryStartTimes.length;
 
@@ -170,15 +193,27 @@ describeWithEnvironment('TimelineFlameChartDataProvider', function() {
 
   it('filters navigations to only return those that happen on the main frame', async function() {
     const dataProvider = new Timeline.TimelineFlameChartDataProvider.TimelineFlameChartDataProvider();
-    const {traceData} = await TraceLoader.traceEngine(this, 'multiple-navigations-with-iframes.json.gz');
+    const {parsedTrace} = await TraceLoader.traceEngine(this, 'multiple-navigations-with-iframes.json.gz');
 
-    dataProvider.setModel(traceData);
+    dataProvider.setModel(parsedTrace);
 
-    const mainFrameID = traceData.Meta.mainFrameId;
+    const mainFrameID = parsedTrace.Meta.mainFrameId;
     const navigationEvents = dataProvider.mainFrameNavigationStartEvents();
     // Ensure that every navigation event that we return is for the main frame.
     assert.isTrue(navigationEvents.every(navEvent => {
       return navEvent.args.frame === mainFrameID;
     }));
+  });
+
+  it('can search for entries within a given time-range', async function() {
+    const dataProvider = new Timeline.TimelineFlameChartDataProvider.TimelineFlameChartDataProvider();
+    const {parsedTrace} = await TraceLoader.traceEngine(this, 'web-dev-with-commit.json.gz');
+    dataProvider.setModel(parsedTrace);
+
+    const bounds = parsedTrace.Meta.traceBounds;
+    const filter = new Timeline.TimelineFilters.TimelineRegExp(/Evaluate script/);
+    const results = dataProvider.search(bounds, filter);
+    assert.lengthOf(results, 12);
+    assert.deepEqual(results[0], {index: 154, startTimeMilli: 122411041.395, provider: 'main'});
   });
 });

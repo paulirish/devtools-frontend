@@ -24,6 +24,7 @@ const component = new ConsoleInsight(
     {
       async *
           fetch() {
+            await new Promise(_resolve => {});
             yield {
               explanation: `## Result
 
@@ -37,6 +38,7 @@ Links: [https://example.com](https://example.com)
 Images: ![https://example.com](https://example.com)
 `,
               metadata: {},
+              completed: true,
             };
           },
       registerClientEvent: () => Promise.resolve({}),

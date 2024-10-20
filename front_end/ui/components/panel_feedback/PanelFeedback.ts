@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import '../../legacy/legacy.js';
+
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Platform from '../../../core/platform/platform.js';
 import * as ComponentHelpers from '../../components/helpers/helpers.js';
@@ -10,6 +12,8 @@ import * as VisualLogging from '../../visual_logging/visual_logging.js';
 import * as IconButton from '../icon_button/icon_button.js';
 
 import panelFeedbackStyles from './panelFeedback.css.js';
+
+const {html} = LitHtml;
 
 const UIStrings = {
   /**
@@ -67,7 +71,7 @@ export class PanelFeedback extends HTMLElement {
     }
 
     // clang-format off
-    LitHtml.render(LitHtml.html`
+    LitHtml.render(html`
       <div class="preview">
         <h2 class="flex">
           <${IconButton.Icon.Icon.litTagName} .data=${{

@@ -4,47 +4,75 @@
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
-import * as Platform from '../../core/platform/platform.js';
+import type * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import * as Trace from '../../models/trace/trace.js';
+import * as Workspace from '../../models/workspace/workspace.js';
+import * as NetworkForward from '../../panels/network/forward/forward.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as LitHtml from '../../ui/lit-html/lit-html.js';
 
+import {ErrorType, type ResponseData, ResponseType} from './AiAgent.js';
+import {ChangeManager} from './ChangeManager.js';
 import {
+  AgentType,
   ChatMessageEntity,
-  DOGFOOD_INFO,
   FreestylerChatUi,
   type ModelChatMessage,
   type Props as FreestylerChatUiProps,
   State as FreestylerChatUiState,
+  type Step,
 } from './components/FreestylerChatUi.js';
-import {FIX_THIS_ISSUE_PROMPT, FreestylerAgent, Step} from './FreestylerAgent.js';
+import {
+  DrJonesFileAgent,
+} from './DrJonesFileAgent.js';
+import {
+  DrJonesNetworkAgent,
+} from './DrJonesNetworkAgent.js';
+import {DrJonesPerformanceAgent} from './DrJonesPerformanceAgent.js';
+import {FreestylerAgent} from './FreestylerAgent.js';
 import freestylerPanelStyles from './freestylerPanel.css.js';
 
+const {html} = LitHtml;
+
+const AI_ASSISTANCE_SEND_FEEDBACK = 'https://crbug.com/364805393' as Platform.DevToolsPath.UrlString;
+const AI_ASSISTANCE_HELP = 'https://goo.gle/devtools-ai-assistance' as Platform.DevToolsPath.UrlString;
+
 /*
-  * TODO(nvitkov): b/346933425
-  * Temporary string that should not be translated
-  * as they may change often during development.
-  */
-const UIStringsTemp = {
+* Strings that don't need to be translated at this time.
+*/
+const UIStringsNotTranslate = {
   /**
-   *@description Freestyler UI text for clearing messages.
+   *@description AI assistance UI text for clearing messages.
    */
-  clearMessages: 'Clear messages',
+  clearChat: 'Clear chat',
   /**
-   *@description Freestyler UI text for sending feedback.
+   *@description AI assistance UI tooltip text for the help button.
+   */
+  help: 'Help',
+  /**
+   *@description AI assistant UI tooltip text for the settings button (gear icon).
+   */
+  settings: 'Settings',
+  /**
+   *@description AI assistant UI tooltip sending feedback.
    */
   sendFeedback: 'Send feedback',
   /**
-   *@description Displayed when the user stop the response
+   *@description Announcement text for screen readers when the messages are cleared.
    */
-  stoppedResponse: 'You stopped this response',
+  messagesCleared: 'Messages cleared',
+  /**
+   *@description Announcement text for screen readers when the conversation starts.
+   */
+  answerLoading: 'Answer loading',
+  /**
+   *@description Announcement text for screen readers when the answer comes.
+   */
+  answerReady: 'Answer ready',
 };
 
-// TODO(nvitkov): b/346933425
-// const str_ = i18n.i18n.registerUIStrings('panels/freestyler/FreestylerPanel.ts', UIStrings);
-// const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
-/* eslint-disable  rulesdir/l10n_i18nString_call_only_with_uistrings */
-const i18nString = i18n.i18n.lockedString;
+const lockedString = i18n.i18n.lockedString;
 
 type ViewOutput = {
   freestylerChatUi?: FreestylerChatUi,
@@ -57,23 +85,39 @@ function createToolbar(target: HTMLElement, {onClearClick}: {onClearClick: () =>
   const leftToolbar = new UI.Toolbar.Toolbar('', toolbarContainer);
   const rightToolbar = new UI.Toolbar.Toolbar('freestyler-right-toolbar', toolbarContainer);
 
-  const clearButton =
-      new UI.Toolbar.ToolbarButton(i18nString(UIStringsTemp.clearMessages), 'clear', undefined, 'freestyler.clear');
-  clearButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, onClearClick);
+  const clearButton = new UI.Toolbar.ToolbarButton(
+      lockedString(UIStringsNotTranslate.clearChat), 'clear', undefined, 'freestyler.clear');
+  clearButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, onClearClick);
   leftToolbar.appendToolbarItem(clearButton);
+
+  const link = UI.XLink.XLink.create(
+      AI_ASSISTANCE_SEND_FEEDBACK, lockedString(UIStringsNotTranslate.sendFeedback), undefined, undefined,
+      'freestyler.send-feedback');
+  link.style.setProperty('display', null);
+  link.style.setProperty('text-decoration', 'none');
+  link.style.setProperty('padding', '0 var(--sys-size-3)');
+  const linkItem = new UI.Toolbar.ToolbarItem(link);
+  rightToolbar.appendToolbarItem(linkItem);
 
   rightToolbar.appendSeparator();
   const helpButton =
-      new UI.Toolbar.ToolbarButton(i18nString(UIStringsTemp.sendFeedback), 'help', undefined, 'freestyler.feedback');
-  helpButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, () => {
-    Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(DOGFOOD_INFO);
+      new UI.Toolbar.ToolbarButton(lockedString(UIStringsNotTranslate.help), 'help', undefined, 'freestyler.help');
+  helpButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, () => {
+    Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(AI_ASSISTANCE_HELP);
   });
   rightToolbar.appendToolbarItem(helpButton);
+
+  const settingsButton = new UI.Toolbar.ToolbarButton(
+      lockedString(UIStringsNotTranslate.settings), 'gear', undefined, 'freestyler.settings');
+  settingsButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, () => {
+    void UI.ViewManager.ViewManager.instance().showView('chrome-ai');
+  });
+  rightToolbar.appendToolbarItem(settingsButton);
 }
 
 function defaultView(input: FreestylerChatUiProps, output: ViewOutput, target: HTMLElement): void {
   // clang-format off
-  LitHtml.render(LitHtml.html`
+  LitHtml.render(html`
     <${FreestylerChatUi.litTagName} .props=${input} ${LitHtml.Directives.ref((el: Element|undefined) => {
       if (!el || !(el instanceof FreestylerChatUi)) {
         return;
@@ -90,20 +134,29 @@ export class FreestylerPanel extends UI.Panel.Panel {
   static panelName = 'freestyler';
 
   #toggleSearchElementAction: UI.ActionRegistration.Action;
-  #selectedNode: SDK.DOMModel.DOMNode|null;
+  #selectedElement: SDK.DOMModel.DOMNode|null;
+  #selectedFile: Workspace.UISourceCode.UISourceCode|null;
+  #selectedNetworkRequest: SDK.NetworkRequest.NetworkRequest|null;
+  #selectedStackTrace: Trace.Helpers.TreeHelpers.TraceEntryNodeForAI|null;
   #contentContainer: HTMLElement;
   #aidaClient: Host.AidaClient.AidaClient;
-  #agent: FreestylerAgent;
+  #freestylerAgent: FreestylerAgent;
+  #drJonesFileAgent: DrJonesFileAgent;
+  #drJonesNetworkAgent: DrJonesNetworkAgent;
+  #drJonesPerformanceAgent: DrJonesPerformanceAgent;
   #viewProps: FreestylerChatUiProps;
   #viewOutput: ViewOutput = {};
   #serverSideLoggingEnabled = isFreestylerServerSideLoggingEnabled();
-  #consentViewAcceptedSetting =
-      Common.Settings.Settings.instance().createLocalSetting('freestyler-dogfood-consent-onboarding-finished', false);
-  constructor(private view: View = defaultView, {aidaClient, aidaAvailability}: {
+  #freestylerEnabledSetting: Common.Settings.Setting<boolean>|undefined;
+  #changeManager = new ChangeManager();
+
+  constructor(private view: View = defaultView, {aidaClient, aidaAvailability, syncInfo}: {
     aidaClient: Host.AidaClient.AidaClient,
     aidaAvailability: Host.AidaClient.AidaAccessPreconditions,
+    syncInfo: Host.InspectorFrontendHostAPI.SyncInformation,
   }) {
     super(FreestylerPanel.panelName);
+    this.#freestylerEnabledSetting = this.#getAiAssistanceEnabledSetting();
 
     createToolbar(this.contentElement, {onClearClick: this.#clearMessages.bind(this)});
     this.#toggleSearchElementAction =
@@ -111,46 +164,120 @@ export class FreestylerPanel extends UI.Panel.Panel {
     this.#aidaClient = aidaClient;
     this.#contentContainer = this.contentElement.createChild('div', 'freestyler-chat-ui-container');
 
-    this.#selectedNode = UI.Context.Context.instance().flavor(SDK.DOMModel.DOMNode);
+    const selectedElementFilter = (maybeNode: SDK.DOMModel.DOMNode|null): SDK.DOMModel.DOMNode|null => {
+      if (maybeNode) {
+        return maybeNode.nodeType() === Node.ELEMENT_NODE ? maybeNode : null;
+      }
+
+      return null;
+    };
+
+    this.#selectedElement = selectedElementFilter(UI.Context.Context.instance().flavor(SDK.DOMModel.DOMNode));
+    this.#selectedNetworkRequest = UI.Context.Context.instance().flavor(SDK.NetworkRequest.NetworkRequest);
+    this.#selectedStackTrace = UI.Context.Context.instance().flavor(Trace.Helpers.TreeHelpers.TraceEntryNodeForAI);
+    this.#selectedFile = UI.Context.Context.instance().flavor(Workspace.UISourceCode.UISourceCode);
     this.#viewProps = {
-      state: this.#consentViewAcceptedSetting.get() ? FreestylerChatUiState.CHAT_VIEW :
-                                                      FreestylerChatUiState.CONSENT_VIEW,
+      state: this.#freestylerEnabledSetting?.getIfNotDisabled() ? FreestylerChatUiState.CHAT_VIEW :
+                                                                  FreestylerChatUiState.CONSENT_VIEW,
       aidaAvailability,
       messages: [],
       inspectElementToggled: this.#toggleSearchElementAction.toggled(),
-      selectedNode: this.#selectedNode,
+      selectedElement: this.#selectedElement,
+      selectedNetworkRequest: this.#selectedNetworkRequest,
+      selectedStackTrace: this.#selectedStackTrace,
+      selectedFile: this.#selectedFile,
       isLoading: false,
       onTextSubmit: this.#startConversation.bind(this),
       onInspectElementClick: this.#handleSelectElementClick.bind(this),
       onFeedbackSubmit: this.#handleFeedbackSubmit.bind(this),
-      onAcceptConsentClick: this.#handleAcceptConsentClick.bind(this),
       onCancelClick: this.#cancel.bind(this),
-      onFixThisIssueClick: () => {
-        void this.#startConversation(FIX_THIS_ISSUE_PROMPT, true);
-      },
+      onSelectedNetworkRequestClick: this.#handleSelectedNetworkRequestClick.bind(this),
       canShowFeedbackForm: this.#serverSideLoggingEnabled,
+      userInfo: {
+        accountImage: syncInfo.accountImage,
+        accountFullName: syncInfo.accountFullName,
+      },
+      agentType: AgentType.FREESTYLER,
     };
-    this.#toggleSearchElementAction.addEventListener(UI.ActionRegistration.Events.Toggled, ev => {
+    this.#toggleSearchElementAction.addEventListener(UI.ActionRegistration.Events.TOGGLED, ev => {
       this.#viewProps.inspectElementToggled = ev.data;
       this.doUpdate();
     });
-    this.#agent = this.#createAgent();
+
+    this.#freestylerAgent = this.#createFreestylerAgent();
+    this.#drJonesFileAgent = this.#createDrJonesFileAgent();
+    this.#drJonesNetworkAgent = this.#createDrJonesNetworkAgent();
+    this.#drJonesPerformanceAgent = this.#createDrJonesPerformanceAgent();
+
     UI.Context.Context.instance().addFlavorChangeListener(SDK.DOMModel.DOMNode, ev => {
-      if (this.#viewProps.selectedNode === ev.data) {
+      if (this.#viewProps.selectedElement === ev.data) {
         return;
       }
 
-      this.#viewProps.selectedNode = ev.data;
+      this.#viewProps.selectedElement = selectedElementFilter(ev.data);
+      this.doUpdate();
+    });
+    UI.Context.Context.instance().addFlavorChangeListener(SDK.NetworkRequest.NetworkRequest, ev => {
+      if (this.#viewProps.selectedNetworkRequest === ev.data) {
+        return;
+      }
+
+      this.#viewProps.selectedNetworkRequest = Boolean(ev.data) ? ev.data : null;
+      this.doUpdate();
+    });
+    UI.Context.Context.instance().addFlavorChangeListener(Trace.Helpers.TreeHelpers.TraceEntryNodeForAI, ev => {
+      if (this.#viewProps.selectedStackTrace === ev.data) {
+        return;
+      }
+
+      this.#viewProps.selectedStackTrace = Boolean(ev.data) ? ev.data : null;
+      this.doUpdate();
+    });
+    UI.Context.Context.instance().addFlavorChangeListener(Workspace.UISourceCode.UISourceCode, ev => {
+      if (this.#viewProps.selectedFile === ev.data) {
+        return;
+      }
+
+      this.#viewProps.selectedFile = Boolean(ev.data) ? ev.data : null;
       this.doUpdate();
     });
     this.doUpdate();
   }
 
-  #createAgent(): FreestylerAgent {
+  #getAiAssistanceEnabledSetting(): Common.Settings.Setting<boolean>|undefined {
+    try {
+      return Common.Settings.moduleSetting('ai-assistance-enabled') as Common.Settings.Setting<boolean>;
+    } catch {
+      return;
+    }
+  }
+
+  #createFreestylerAgent(): FreestylerAgent {
     return new FreestylerAgent({
       aidaClient: this.#aidaClient,
+      changeManager: this.#changeManager,
       serverSideLoggingEnabled: this.#serverSideLoggingEnabled,
-      confirmSideEffect: this.showConfirmSideEffectUi.bind(this),
+    });
+  }
+
+  #createDrJonesFileAgent(): DrJonesFileAgent {
+    return new DrJonesFileAgent({
+      aidaClient: this.#aidaClient,
+      serverSideLoggingEnabled: this.#serverSideLoggingEnabled,
+    });
+  }
+
+  #createDrJonesNetworkAgent(): DrJonesNetworkAgent {
+    return new DrJonesNetworkAgent({
+      aidaClient: this.#aidaClient,
+      serverSideLoggingEnabled: this.#serverSideLoggingEnabled,
+    });
+  }
+
+  #createDrJonesPerformanceAgent(): DrJonesPerformanceAgent {
+    return new DrJonesPerformanceAgent({
+      aidaClient: this.#aidaClient,
+      serverSideLoggingEnabled: this.#serverSideLoggingEnabled,
     });
   }
 
@@ -161,7 +288,10 @@ export class FreestylerPanel extends UI.Panel.Panel {
     if (!freestylerPanelInstance || forceNew) {
       const aidaAvailability = await Host.AidaClient.AidaClient.checkAccessPreconditions();
       const aidaClient = new Host.AidaClient.AidaClient();
-      freestylerPanelInstance = new FreestylerPanel(defaultView, {aidaClient, aidaAvailability});
+      const syncInfo = await new Promise<Host.InspectorFrontendHostAPI.SyncInformation>(
+          resolve => Host.InspectorFrontendHost.InspectorFrontendHostInstance.getSyncInformation(
+              syncInfo => resolve(syncInfo)));
+      freestylerPanelInstance = new FreestylerPanel(defaultView, {aidaClient, aidaAvailability, syncInfo});
     }
 
     return freestylerPanelInstance;
@@ -169,26 +299,23 @@ export class FreestylerPanel extends UI.Panel.Panel {
 
   override wasShown(): void {
     this.registerCSSFiles([freestylerPanelStyles]);
+    this.#viewOutput.freestylerChatUi?.restoreScrollPosition();
     this.#viewOutput.freestylerChatUi?.focusTextInput();
+    this.#freestylerEnabledSetting?.addChangeListener(this.#handleFreestylerEnabledSettingChanged, this);
+  }
+
+  override willHide(): void {
+    this.#freestylerEnabledSetting?.removeChangeListener(this.#handleFreestylerEnabledSettingChanged, this);
+  }
+
+  #handleFreestylerEnabledSettingChanged(): void {
+    this.#viewProps.state =
+        this.#freestylerEnabledSetting?.get() ? FreestylerChatUiState.CHAT_VIEW : FreestylerChatUiState.CONSENT_VIEW;
+    this.doUpdate();
   }
 
   doUpdate(): void {
     this.view(this.#viewProps, this.#viewOutput, this.#contentContainer);
-  }
-
-  async showConfirmSideEffectUi(action: string): Promise<boolean> {
-    const sideEffectConfirmationPromiseWithResolvers = Platform.PromiseUtilities.promiseWithResolvers<boolean>();
-    this.#viewProps.confirmSideEffectDialog = {
-      code: action,
-      onAnswer: (answer: boolean) => sideEffectConfirmationPromiseWithResolvers.resolve(answer),
-    };
-    this.doUpdate();
-
-    const result = await sideEffectConfirmationPromiseWithResolvers.promise;
-    this.#viewProps.confirmSideEffectDialog = undefined;
-    this.doUpdate();
-
-    return result;
   }
 
   #handleSelectElementClick(): void {
@@ -210,21 +337,48 @@ export class FreestylerPanel extends UI.Panel.Panel {
     });
   }
 
-  #handleAcceptConsentClick(): void {
-    this.#consentViewAcceptedSetting.set(true);
-    this.#viewProps.state = FreestylerChatUiState.CHAT_VIEW;
-    this.doUpdate();
+  #handleSelectedNetworkRequestClick(): void|Promise<void> {
+    if (this.#viewProps.selectedNetworkRequest) {
+      const requestLocation = NetworkForward.UIRequestLocation.UIRequestLocation.tab(
+          this.#viewProps.selectedNetworkRequest, NetworkForward.UIRequestLocation.UIRequestTabs.HEADERS_COMPONENT);
+      return Common.Revealer.reveal(requestLocation);
+    }
   }
 
   handleAction(actionId: string): void {
     switch (actionId) {
-      case 'freestyler.element-panel-context': {
-        Host.userMetrics.actionTaken(Host.UserMetrics.Action.FreestylerOpenedFromElementsPanel);
+      case 'freestyler.elements-floating-button': {
+        this.#viewOutput.freestylerChatUi?.focusTextInput();
+        Host.userMetrics.actionTaken(Host.UserMetrics.Action.FreestylerOpenedFromElementsPanelFloatingButton);
+        this.#viewProps.agentType = AgentType.FREESTYLER;
         this.doUpdate();
         break;
       }
-      case 'freestyler.style-tab-context': {
-        Host.userMetrics.actionTaken(Host.UserMetrics.Action.FreestylerOpenedFromStylesTab);
+      case 'freestyler.element-panel-context': {
+        this.#viewOutput.freestylerChatUi?.focusTextInput();
+        Host.userMetrics.actionTaken(Host.UserMetrics.Action.FreestylerOpenedFromElementsPanel);
+        this.#viewProps.agentType = AgentType.FREESTYLER;
+        this.doUpdate();
+        break;
+      }
+      case 'drjones.network-panel-context': {
+        // TODO(samiyac): Add UMA
+        this.#viewOutput.freestylerChatUi?.focusTextInput();
+        this.#viewProps.agentType = AgentType.DRJONES_NETWORK_REQUEST;
+        this.doUpdate();
+        break;
+      }
+      case 'drjones.performance-panel-context': {
+        // TODO(samiyac): Add UMA
+        this.#viewOutput.freestylerChatUi?.focusTextInput();
+        this.#viewProps.agentType = AgentType.DRJONES_PERFORMANCE;
+        this.doUpdate();
+        break;
+      }
+      case 'drjones.sources-panel-context': {
+        // TODO(samiyac): Add UMA
+        this.#viewOutput.freestylerChatUi?.focusTextInput();
+        this.#viewProps.agentType = AgentType.DRJONES_FILE;
         this.doUpdate();
         break;
       }
@@ -234,10 +388,12 @@ export class FreestylerPanel extends UI.Panel.Panel {
   #clearMessages(): void {
     this.#viewProps.messages = [];
     this.#viewProps.isLoading = false;
-    this.#viewProps.confirmSideEffectDialog = undefined;
-    this.#agent = this.#createAgent();
+    this.#freestylerAgent = this.#createFreestylerAgent();
+    this.#drJonesFileAgent = this.#createDrJonesFileAgent();
+    this.#drJonesNetworkAgent = this.#createDrJonesNetworkAgent();
     this.#cancel();
     this.doUpdate();
+    UI.ARIAUtils.alert(lockedString(UIStringsNotTranslate.messagesCleared));
   }
 
   #runAbortController = new AbortController();
@@ -248,55 +404,124 @@ export class FreestylerPanel extends UI.Panel.Panel {
     this.doUpdate();
   }
 
-  async #startConversation(text: string, isFixQuery: boolean = false): Promise<void> {
+  async #startConversation(text: string): Promise<void> {
     this.#viewProps.messages.push({
       entity: ChatMessageEntity.USER,
       text,
     });
     this.#viewProps.isLoading = true;
-    // TODO: We should only show "Fix this issue" button when the answer suggests fix or fixes.
-    // We shouldn't show this when the answer is complete like a confirmation without any suggestion.
-    const suggestingFix = !isFixQuery;
-    let systemMessage: ModelChatMessage = {
+    const systemMessage: ModelChatMessage = {
       entity: ChatMessageEntity.MODEL,
-      suggestingFix,
       steps: [],
     };
+    this.#viewProps.messages.push(systemMessage);
     this.doUpdate();
 
     this.#runAbortController = new AbortController();
-
     const signal = this.#runAbortController.signal;
-    signal.addEventListener('abort', () => {
-      systemMessage.rpcId = undefined;
-      systemMessage.suggestingFix = false;
-      systemMessage.steps.push({step: Step.ERROR, text: i18nString(UIStringsTemp.stoppedResponse)});
-    });
-    for await (const data of this.#agent.run(text, {signal, isFixQuery})) {
-      if (data.step === Step.QUERYING) {
-        systemMessage = {
-          entity: ChatMessageEntity.MODEL,
-          suggestingFix,
-          steps: [],
-        };
-        this.#viewProps.messages.push(systemMessage);
-        this.doUpdate();
-        this.#viewOutput.freestylerChatUi?.scrollToLastMessage();
-        continue;
+
+    let runner: AsyncGenerator<ResponseData, void, void>|undefined;
+    if (this.#viewProps.agentType === AgentType.FREESTYLER) {
+      runner = this.#freestylerAgent.run(text, {signal, selectedElement: this.#viewProps.selectedElement});
+    } else if (this.#viewProps.agentType === AgentType.DRJONES_FILE) {
+      runner = this.#drJonesFileAgent.run(text, {signal, selectedFile: this.#viewProps.selectedFile});
+    } else if (this.#viewProps.agentType === AgentType.DRJONES_NETWORK_REQUEST) {
+      runner =
+          this.#drJonesNetworkAgent.run(text, {signal, selectedNetworkRequest: this.#viewProps.selectedNetworkRequest});
+    } else if (this.#viewProps.agentType === AgentType.DRJONES_PERFORMANCE) {
+      runner =
+          this.#drJonesPerformanceAgent.run(text, {signal, selectedStackTrace: this.#viewProps.selectedStackTrace});
+    }
+
+    if (!runner) {
+      return;
+    }
+
+    let step: Step = {isLoading: true};
+    UI.ARIAUtils.alert(lockedString(UIStringsNotTranslate.answerLoading));
+    for await (const data of runner) {
+      step.sideEffect = undefined;
+      switch (data.type) {
+        case ResponseType.QUERYING: {
+          step = {isLoading: true};
+          if (!systemMessage.steps.length) {
+            systemMessage.steps.push(step);
+          }
+
+          break;
+        }
+        case ResponseType.TITLE: {
+          step.title = data.title;
+          if (systemMessage.steps.at(-1) !== step) {
+            systemMessage.steps.push(step);
+          }
+          break;
+        }
+        case ResponseType.THOUGHT: {
+          step.isLoading = false;
+          step.thought = data.thought;
+          step.contextDetails = data.contextDetails;
+          if (systemMessage.steps.at(-1) !== step) {
+            systemMessage.steps.push(step);
+          }
+          break;
+        }
+        case ResponseType.SIDE_EFFECT: {
+          step.isLoading = false;
+          step.code = data.code;
+          step.sideEffect = {
+            onAnswer: data.confirm,
+          };
+          if (systemMessage.steps.at(-1) !== step) {
+            systemMessage.steps.push(step);
+          }
+          break;
+        }
+        case ResponseType.ACTION: {
+          step.isLoading = false;
+          step.code = data.code;
+          step.output = data.output;
+          step.canceled = data.canceled;
+          if (systemMessage.steps.at(-1) !== step) {
+            systemMessage.steps.push(step);
+          }
+          break;
+        }
+        case ResponseType.ANSWER: {
+          systemMessage.suggestions = data.suggestions;
+          systemMessage.answer = data.text;
+          systemMessage.rpcId = data.rpcId;
+          // When there is an answer without any thinking steps, we don't want to show the thinking step.
+          if (systemMessage.steps.length === 1 && systemMessage.steps[0].isLoading) {
+            systemMessage.steps.pop();
+          }
+          step.isLoading = false;
+          this.#viewProps.isLoading = false;
+          break;
+        }
+
+        case ResponseType.ERROR: {
+          systemMessage.error = data.error;
+          systemMessage.suggestions = [];
+          systemMessage.rpcId = undefined;
+          this.#viewProps.isLoading = false;
+          const lastStep = systemMessage.steps.at(-1);
+          if (lastStep) {
+            // Mark the last step as cancelled to make the UI feel better.
+            if (data.error === ErrorType.ABORT) {
+              lastStep.canceled = true;
+              // If error happens while the step is still loading remove it.
+            } else if (lastStep.isLoading) {
+              systemMessage.steps.pop();
+            }
+          }
+        }
       }
 
-      if (data.step === Step.ANSWER || data.step === Step.ERROR) {
-        this.#viewProps.isLoading = false;
-      }
-      if (data.step === Step.ERROR) {
-        systemMessage.suggestingFix = false;
-      }
-
-      systemMessage.rpcId = data.rpcId;
-      systemMessage.steps.push(data);
       this.doUpdate();
       this.#viewOutput.freestylerChatUi?.scrollToLastMessage();
     }
+    UI.ARIAUtils.alert(lockedString(UIStringsNotTranslate.answerReady));
   }
 }
 
@@ -306,8 +531,11 @@ export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
       actionId: string,
       ): boolean {
     switch (actionId) {
+      case 'freestyler.elements-floating-button':
       case 'freestyler.element-panel-context':
-      case 'freestyler.style-tab-context': {
+      case 'drjones.network-panel-context':
+      case 'drjones.performance-panel-context':
+      case 'drjones.sources-panel-context': {
         void (async () => {
           const view = UI.ViewManager.ViewManager.instance().view(
               FreestylerPanel.panelName,
@@ -333,12 +561,16 @@ function setFreestylerServerSideLoggingEnabled(enabled: boolean): void {
   if (enabled) {
     localStorage.setItem('freestyler_enableServerSideLogging', 'true');
   } else {
-    localStorage.removeItem('freestyler_enableServerSideLogging');
+    localStorage.setItem('freestyler_enableServerSideLogging', 'false');
   }
 }
 
 function isFreestylerServerSideLoggingEnabled(): boolean {
-  return localStorage.getItem('freestyler_enableServerSideLogging') === 'true';
+  const config = Common.Settings.Settings.instance().getHostConfig();
+  if (config.aidaAvailability?.disallowLogging) {
+    return false;
+  }
+  return localStorage.getItem('freestyler_enableServerSideLogging') !== 'false';
 }
 
 // @ts-ignore

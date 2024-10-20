@@ -2,11 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 import * as i18n from '../../../../core/i18n/i18n.js';
-import type * as TraceEngine from '../../../../models/trace/trace.js';
-import * as ComponentHelpers from '../../../../ui/components/helpers/helpers.js';
+import type * as Trace from '../../../../models/trace/trace.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 
 import styles from './timeRangeOverlay.css.js';
+
+const {html} = LitHtml;
+
+const UIStrings = {
+  /**
+   *@description Accessible label used to explain to a user that they are viewing an entry label.
+   */
+  timeRange: 'Time range',
+};
+const str_ = i18n.i18n.registerUIStrings('panels/timeline/overlays/components/TimeRangeOverlay.ts', UIStrings);
+const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class TimeRangeLabelChangeEvent extends Event {
   static readonly eventName = 'timerangelabelchange';
@@ -25,10 +35,8 @@ export class TimeRangeRemoveEvent extends Event {
 }
 
 export class TimeRangeOverlay extends HTMLElement {
-  static readonly litTagName = LitHtml.literal`devtools-time-range-overlay`;
   readonly #shadow = this.attachShadow({mode: 'open'});
-  readonly #boundRender = this.#render.bind(this);
-  #duration: TraceEngine.Types.Timing.MicroSeconds|null = null;
+  #duration: Trace.Types.Timing.MicroSeconds|null = null;
   #canvasRect: DOMRect|null = null;
   #label: string;
 
@@ -46,7 +54,7 @@ export class TimeRangeOverlay extends HTMLElement {
   constructor(initialLabel: string) {
     super();
     this.#render();
-    this.#rangeContainer = this.#shadow.querySelector<HTMLElement>('.label');
+    this.#rangeContainer = this.#shadow.querySelector<HTMLElement>('.range-container');
     this.#labelBox = this.#rangeContainer?.querySelector<HTMLElement>('.label-text') ?? null;
     this.#label = initialLabel;
     if (!this.#labelBox) {
@@ -54,19 +62,32 @@ export class TimeRangeOverlay extends HTMLElement {
       return;
     }
     this.#labelBox.innerText = initialLabel;
+    if (initialLabel) {
+      this.#labelBox?.setAttribute('aria-label', initialLabel);
+      // To construct a time range with a predefined label, it must have been
+      // loaded from the trace file. In this case we do not want it to default
+      // to editable.
+      this.#setLabelEditability(false);
+    }
   }
 
   set canvasRect(rect: DOMRect|null) {
+    if (rect === null) {
+      return;
+    }
+    if (this.#canvasRect && this.#canvasRect.width === rect.width && this.#canvasRect.height === rect.height) {
+      return;
+    }
     this.#canvasRect = rect;
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
+    this.#render();
   }
 
-  set duration(duration: TraceEngine.Types.Timing.MicroSeconds|null) {
+  set duration(duration: Trace.Types.Timing.MicroSeconds|null) {
     if (duration === this.#duration) {
       return;
     }
     this.#duration = duration;
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
+    this.#render();
   }
 
   /**
@@ -96,12 +117,12 @@ export class TimeRangeOverlay extends HTMLElement {
    * If the label is off to the left or right, we fix it to that corner and
    * align the text so the label is visible as long as possible.
    */
-  afterOverlayUpdate(): void {
+  updateLabelPositioning(): void {
     if (!this.#rangeContainer) {
       return;
     }
 
-    if (!this.#canvasRect) {
+    if (!this.#canvasRect || !this.#labelBox) {
       return;
     }
 
@@ -110,14 +131,26 @@ export class TimeRangeOverlay extends HTMLElement {
     // values and label positioning from the left hand side in order to be
     // consistent on both edges of the UI.
     const paddingForScrollbar = 9;
-
     const overlayRect = this.getBoundingClientRect();
+    const labelFocused = this.#shadow.activeElement === this.#labelBox;
+
     const labelRect = this.#rangeContainer.getBoundingClientRect();
     const visibleOverlayWidth = this.#visibleOverlayWidth(overlayRect) - paddingForScrollbar;
-    const overlayTooNarrow = visibleOverlayWidth <= labelRect.width - paddingForScrollbar;
-    this.#rangeContainer.classList.toggle('labelHidden', overlayTooNarrow);
 
-    if (overlayTooNarrow) {
+    const durationBox = this.#rangeContainer.querySelector<HTMLElement>('.duration') ?? null;
+    const durationBoxLength = durationBox?.getBoundingClientRect().width;
+    if (!durationBoxLength) {
+      return;
+    }
+    const overlayTooNarrow = visibleOverlayWidth <= durationBoxLength;
+    // We do not hide the label if:
+    // 1. it is focused (user is typing into it)
+    // 2. it is empty - this means it's a new label and we need to let the user type into it!
+    // 3. it is too narrow - narrower than the duration length
+    const hideLabel = overlayTooNarrow && !labelFocused && this.#label.length > 0;
+    this.#rangeContainer.classList.toggle('labelHidden', hideLabel);
+
+    if (hideLabel) {
       // Label is invisible, no need to do all the layout.
       return;
     }
@@ -148,18 +181,13 @@ export class TimeRangeOverlay extends HTMLElement {
       // side.
       this.#rangeContainer.style.marginLeft = `${Math.abs(this.#canvasRect.x - overlayRect.x) + paddingForScrollbar}px`;
     } else if (labelOffRightOfScreen) {
-      // To calculate how far left to push the label, we take the right hand
-      // bound (the canvas width and subtract the label's width).
-      // Finally, we subtract the X position of the overlay (if the overlay is
-      // 200px within the view, we don't need to push the label that 200px too
-      // otherwise it will be off-screen)
-      const leftMargin = rightBound - labelRect.width - overlayRect.x;
-
-      this.#rangeContainer.style.marginLeft = `${leftMargin}px`;
-
+      // If the label is off the right of the screen, we adjust by adding the
+      // right margin equal to the difference between the right edge of the
+      // overlay and the right edge of the canvas.
+      this.#rangeContainer.style.marginRight = `${overlayRect.right - this.#canvasRect.right + paddingForScrollbar}px`;
     } else {
       // Keep the label central.
-      this.#rangeContainer.style.marginLeft = `${labelLeftMarginToCenter}px`;
+      this.#rangeContainer.style.margin = '0px';
     }
 
     // If the text is empty, set the label editibility to true.
@@ -198,6 +226,7 @@ export class TimeRangeOverlay extends HTMLElement {
     if (labelBoxTextContent !== this.#label) {
       this.#label = labelBoxTextContent;
       this.dispatchEvent(new TimeRangeLabelChangeEvent(this.#label));
+      this.#labelBox?.setAttribute('aria-label', labelBoxTextContent);
     }
   }
 
@@ -207,6 +236,10 @@ export class TimeRangeOverlay extends HTMLElement {
     // If the text field is empty when `Enter` or `Escape` are pressed,
     // dispatch an event to remove the time range.
     if (event.key === 'Enter' || event.key === 'Escape') {
+      // In DevTools, the `Escape` button will by default toggle the console
+      // drawer, which we don't want here, so we need to call
+      // `stopPropagation()`.
+      event.stopPropagation();
       if (this.#label === '') {
         this.dispatchEvent(new TimeRangeRemoveEvent());
       }
@@ -221,23 +254,26 @@ export class TimeRangeOverlay extends HTMLElement {
     const durationText = this.#duration ? i18n.TimeUtilities.formatMicroSecondsTime(this.#duration) : '';
     // clang-format off
     LitHtml.render(
-        LitHtml.html`
-          <span
-            class="label">
+        html`
+          <span class="range-container" role="region" aria-label=${i18nString(UIStrings.timeRange)}>
             <span
              class="label-text"
+             role="textbox"
              @focusout=${() => this.#setLabelEditability(false)}
              @dblclick=${() => this.#setLabelEditability(true)}
              @keydown=${this.#handleLabelInputKeyDown}
              @keyup=${this.#handleLabelInputKeyUp}
-             contenteditable=${this.#isLabelEditable}>
+             contenteditable=${this.#isLabelEditable ? 'plaintext-only' : false}>
             </span>
-            <span
-            class="duration">${durationText}</span>
+            <span class="duration">${durationText}</span>
           </span>
           `,
         this.#shadow, {host: this});
     // clang-format on
+
+    // Now we have rendered, we need to re-run the code to tweak the margin &
+    // positioning of the label.
+    this.updateLabelPositioning();
   }
 }
 

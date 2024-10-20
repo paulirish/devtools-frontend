@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 
 import {
-  type TraceEventArgs,
-  type TraceEventData,
+  type Args,
+  type Event,
+  type Phase,
+  type SyntheticBased,
 } from './TraceEvents.js';
 
 export type ExtensionEntryType = 'track-entry'|'marker';
@@ -59,20 +61,18 @@ export interface ExtensionMarkerPayload extends ExtensionDataPayloadBase {
 /**
  * Synthetic events created for extension tracks.
  */
-export interface SyntheticExtensionTrackChartEntry extends TraceEventData {
-  args: TraceEventArgs&ExtensionTrackEntryPayload;
-  cat: 'devtools.extension';
+export interface SyntheticExtensionTrackEntry extends SyntheticBased<Phase.COMPLETE> {
+  args: Args&ExtensionTrackEntryPayload;
 }
 
 /**
  * Synthetic events created for extension marks.
  */
-export interface SyntheticExtensionMarker extends TraceEventData {
-  args: TraceEventArgs&ExtensionMarkerPayload;
-  cat: 'devtools.extension';
+export interface SyntheticExtensionMarker extends SyntheticBased<Phase.COMPLETE> {
+  args: Args&ExtensionMarkerPayload;
 }
 
-export type SyntheticExtensionEntry = SyntheticExtensionTrackChartEntry|SyntheticExtensionMarker;
+export type SyntheticExtensionEntry = SyntheticExtensionTrackEntry|SyntheticExtensionMarker;
 
 export function isExtensionPayloadMarker(payload: {dataType?: string}): payload is ExtensionMarkerPayload {
   return payload.dataType === 'marker';
@@ -89,7 +89,7 @@ export function isValidExtensionPayload(payload: {track?: string, dataType?: str
   return isExtensionPayloadMarker(payload) || isExtensionPayloadTrackEntry(payload);
 }
 
-export function isSyntheticExtensionEntry(entry: TraceEventData): entry is SyntheticExtensionEntry {
+export function isSyntheticExtensionEntry(entry: Event): entry is SyntheticExtensionEntry {
   return entry.cat === 'devtools.extension';
 }
 
@@ -102,6 +102,6 @@ export interface ExtensionTrackData {
   // the entries of each of the tracks in the the group. If this is a
   // standalone track, then this contains that track's entries only.
   entriesByTrack: {
-    [x: string]: SyntheticExtensionTrackChartEntry[],
+    [x: string]: SyntheticExtensionTrackEntry[],
   };
 }

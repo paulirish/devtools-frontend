@@ -393,6 +393,10 @@ export class InspectorFrontendHostStub implements InspectorFrontendHostAPI {
   }
 
   getSyncInformation(callback: (arg0: SyncInformation) => void): void {
+    if ('getSyncInformationForTesting' in globalThis) {
+      // @ts-ignore for testing
+      return callback(globalThis.getSyncInformationForTesting());
+    }
     callback({
       isSyncActive: false,
       arePreferencesSynced: false,
@@ -401,30 +405,29 @@ export class InspectorFrontendHostStub implements InspectorFrontendHostAPI {
 
   getHostConfig(callback: (arg0: Root.Runtime.HostConfig) => void): void {
     const result: Root.Runtime.HostConfig = {
-      devToolsConsoleInsights: {
-        aidaModelId: '',
-        aidaTemperature: 0,
-        blocked: true,
+      aidaAvailability: {
+        enabled: true,
         blockedByAge: false,
         blockedByEnterprisePolicy: false,
-        blockedByFeatureFlag: true,
         blockedByGeo: false,
-        blockedByRollout: false,
         disallowLogging: false,
-        enabled: false,
-        optIn: false,
       },
-      devToolsFreestylerDogfood: {
-        aidaModelId: '',
-        aidaTemperature: 0,
-        blockedByAge: false,
-        blockedByEnterprisePolicy: false,
-        blockedByGeo: false,
+      devToolsConsoleInsights: {
+        modelId: '',
+        temperature: -1,
+        enabled: false,
+      },
+      devToolsFreestyler: {
+        modelId: '',
+        temperature: -1,
         enabled: false,
       },
       devToolsVeLogging: {
         enabled: true,
         testing: false,
+      },
+      devToolsPrivacyUI: {
+        enabled: false,
       },
       isOffTheRecord: false,
     };

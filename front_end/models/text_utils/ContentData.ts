@@ -81,8 +81,9 @@ export class ContentData {
     return this.#contentAsText;
   }
 
+  /** @returns true, if this `ContentData` was constructed from text content or the mime type indicates text that can be decoded */
   get isTextContent(): boolean {
-    return Platform.MimeType.isTextType(this.mimeType);
+    return this.#createdFromText || Platform.MimeType.isTextType(this.mimeType);
   }
 
   get isEmpty(): boolean {
@@ -92,6 +93,10 @@ export class ContentData {
 
   get createdFromBase64(): boolean {
     return this.#contentAsBase64 !== undefined;
+  }
+
+  get #createdFromText(): boolean {
+    return this.#contentAsBase64 === undefined;
   }
 
   /**
@@ -184,6 +189,6 @@ export class ContentData {
   }
 }
 
-export const EMPTY_TEXT_CONTENT_DATA = new ContentData('', /* isBase64 */ false, 'text/palin');
+export const EMPTY_TEXT_CONTENT_DATA = new ContentData('', /* isBase64 */ false, 'text/plain');
 
 export type ContentDataOrError = ContentData|{error: string};

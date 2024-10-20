@@ -8,6 +8,7 @@ import("../../../../scripts/build/ninja/node.gni")
 devtools_module("web-vitals-injected") {
   sources = [
     "OnEachInteraction.ts",
+    "OnEachLayoutShift.ts",
     "web-vitals-injected.ts",
   ]
 
@@ -53,6 +54,7 @@ node_action("bundled_library") {
   }
 
   outputs = [ _output_file_location ]
+  data = outputs
   metadata = {
     grd_files = [ _output_file_location ]
   }

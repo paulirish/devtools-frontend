@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import * as AnimationsTrackAppender from './AnimationsTrackAppender.js';
+import * as AnnotationHelpers from './AnnotationHelpers.js';
 import * as AppenderUtils from './AppenderUtils.js';
 import * as BenchmarkEvents from './BenchmarkEvents.js';
 import * as CLSLinkifier from './CLSLinkifier.js';
@@ -11,7 +12,6 @@ import * as CountersGraph from './CountersGraph.js';
 import * as EntriesFilter from './EntriesFilter.js';
 import * as EventsSerializer from './EventsSerializer.js';
 import * as EventsTimelineTreeView from './EventsTimelineTreeView.js';
-import * as EventUICategory from './EventUICategory.js';
 import * as ExtensionDataGatherer from './ExtensionDataGatherer.js';
 import * as ExtensionTrackAppender from './ExtensionTrackAppender.js';
 import * as FreshRecording from './FreshRecording.js';
@@ -22,7 +22,7 @@ import * as LayoutShiftsTrackAppender from './LayoutShiftsTrackAppender.js';
 import * as ModificationsManager from './ModificationsManager.js';
 import * as NetworkTrackAppender from './NetworkTrackAppender.js';
 import * as SaveFileFormatter from './SaveFileFormatter.js';
-import * as SourceMapsResolver from './SourceMapsResolver.js';
+import * as ServerTimingsTrackAppender from './ServerTimingsTrackAppender.js';
 import * as TargetForEvent from './TargetForEvent.js';
 import * as ThreadAppender from './ThreadAppender.js';
 import * as TimelineController from './TimelineController.js';
@@ -44,9 +44,11 @@ import * as TimelineUIUtils from './TimelineUIUtils.js';
 import * as TimingsTrackAppender from './TimingsTrackAppender.js';
 import * as UIDevtoolsController from './UIDevtoolsController.js';
 import * as UIDevtoolsUtils from './UIDevtoolsUtils.js';
+import * as Utils from './utils/utils.js';
 
 export {
   AnimationsTrackAppender,
+  AnnotationHelpers,
   AppenderUtils,
   BenchmarkEvents,
   CLSLinkifier,
@@ -55,7 +57,6 @@ export {
   EntriesFilter,
   EventsSerializer,
   EventsTimelineTreeView,
-  EventUICategory,
   ExtensionDataGatherer,
   ExtensionTrackAppender,
   FreshRecording,
@@ -66,7 +67,7 @@ export {
   ModificationsManager,
   NetworkTrackAppender,
   SaveFileFormatter,
-  SourceMapsResolver,
+  ServerTimingsTrackAppender,
   TargetForEvent,
   ThreadAppender,
   TimelineController,
@@ -88,4 +89,5 @@ export {
   TimingsTrackAppender,
   UIDevtoolsController,
   UIDevtoolsUtils,
+  Utils,
 };

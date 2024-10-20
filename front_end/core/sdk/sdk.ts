@@ -42,6 +42,7 @@ import * as DebuggerModel from './DebuggerModel.js';
 import * as DOMDebuggerModel from './DOMDebuggerModel.js';
 import * as DOMModel from './DOMModel.js';
 import * as EmulationModel from './EmulationModel.js';
+import * as EnhancedTracesParser from './EnhancedTracesParser.js';
 import * as EventBreakpointsModel from './EventBreakpointsModel.js';
 import * as FrameAssociated from './FrameAssociated.js';
 import * as FrameManager from './FrameManager.js';
@@ -76,6 +77,7 @@ import * as ServiceWorkerCacheModel from './ServiceWorkerCacheModel.js';
 import * as ServiceWorkerManager from './ServiceWorkerManager.js';
 import * as SourceMap from './SourceMap.js';
 import * as SourceMapManager from './SourceMapManager.js';
+import * as SourceMapScopeChainEntry from './SourceMapScopeChainEntry.js';
 import * as SourceMapScopes from './SourceMapScopes.js';
 import * as SourceMapScopesInfo from './SourceMapScopesInfo.js';
 import * as StorageBucketsModel from './StorageBucketsModel.js';
@@ -118,6 +120,7 @@ export {
   DOMDebuggerModel,
   DOMModel,
   EmulationModel,
+  EnhancedTracesParser,
   EventBreakpointsModel,
   FrameAssociated,
   FrameManager,
@@ -152,6 +155,7 @@ export {
   ServiceWorkerManager,
   SourceMap,
   SourceMapManager,
+  SourceMapScopeChainEntry,
   SourceMapScopes,
   SourceMapScopesInfo,
   StorageBucketsModel,

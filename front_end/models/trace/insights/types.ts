@@ -9,17 +9,27 @@ import type * as Types from '../types/types.js';
 import type * as InsightsRunners from './InsightRunners.js';
 
 /**
- * Context for which navigation an insight should look at.
+ * Context for the portion of the trace an insight should look at.
  */
-export interface NavigationInsightContext {
+export type InsightSetContext = InsightSetContextWithoutNavigation|InsightSetContextWithNavigation;
+
+export interface InsightSetContextWithoutNavigation {
+  bounds: Types.Timing.TraceWindowMicroSeconds;
   frameId: string;
+  navigation?: never;
+}
+
+export interface InsightSetContextWithNavigation {
+  bounds: Types.Timing.TraceWindowMicroSeconds;
+  frameId: string;
+  navigation: Types.Events.NavigationStart;
   navigationId: string;
   lantern?: LanternContext;
 }
 
 export interface LanternContext {
-  graph: Lantern.Graph.Node<Types.TraceEvents.SyntheticNetworkRequest>;
-  simulator: Lantern.Simulation.Simulator<Types.TraceEvents.SyntheticNetworkRequest>;
+  graph: Lantern.Graph.Node<Types.Events.SyntheticNetworkRequest>;
+  simulator: Lantern.Simulation.Simulator<Types.Events.SyntheticNetworkRequest>;
   metrics: Record<string, Lantern.Metrics.MetricResult>;
 }
 
@@ -33,41 +43,52 @@ export enum InsightWarning {
   NO_LAYOUT = 'NO_LAYOUT',
 }
 
+export interface MetricSavings {
+  /* eslint-disable @typescript-eslint/naming-convention */
+  FCP?: Types.Timing.MilliSeconds;
+  LCP?: Types.Timing.MilliSeconds;
+  TBT?: Types.Timing.MilliSeconds;
+  CLS?: number;
+  INP?: Types.Timing.MilliSeconds;
+  /* eslint-enable @typescript-eslint/naming-convention */
+}
+
 export type InsightResult<R extends Record<string, unknown>> = R&{
+  relatedEvents?: Types.Events.Event[],
   warnings?: InsightWarning[],
-  metricSavings?: {
-    /* eslint-disable @typescript-eslint/naming-convention */
-    FCP?: number,
-    LCP?: number,
-    TBT?: number,
-    CLS?: number,
-    INP?: number,
-    /* eslint-enable @typescript-eslint/naming-convention */
-  },
+  metricSavings?: MetricSavings,
 };
 
-export type LCPInsightResult = InsightResult<{
-  lcpMs?: Types.Timing.MilliSeconds,
-  lcpTs?: Types.Timing.MilliSeconds,
-  phases?: InsightsRunners.LargestContentfulPaint.LCPPhases,
-  shouldRemoveLazyLoading?: boolean,
-  shouldIncreasePriorityHint?: boolean,
-  shouldPreloadImage?: boolean,
-  lcpResource?: Types.TraceEvents.SyntheticNetworkRequest,
-  earliestDiscoveryTimeTs?: Types.Timing.MicroSeconds,
-}>;
+/**
+ * Contains insights for a specific navigation. If a trace began after a navigation already started,
+ * this could instead represent the duration from the beginning of the trace up to the first recorded
+ * navigation (or the end of the trace).
+ */
+export type InsightSets = {
+  /** If for a navigation, this is the navigationId. Else it is Trace.Types.Events.NO_NAVIGATION. */
+  id: Types.Events.NavigationId,
+  /** The URL to show in the accordion list. */
+  url: URL,
+  frameId: string,
+  bounds: Types.Timing.TraceWindowMicroSeconds,
+  data: InsightResults,
+  navigation?: Types.Events.NavigationStart,
+};
 
 /**
  * Contains insights for a specific navigation.
  */
-export type NavigationInsightData = {
-  [I in keyof InsightRunnersType]: ReturnType<InsightRunnersType[I]['generateInsight']>|Error;
+export type InsightResults = {
+  [I in keyof InsightRunnersType]: ReturnType<InsightRunnersType[I]['generateInsight']>;
 };
 
 /**
- * Contains insights for the entire trace. Insights are grouped by `navigationId`.
+ * Contains insights for the entire trace. Insights are mostly grouped by `navigationId`, with one exception:
+ *
+ * If the analyzed trace started after the navigation, and has meaningful work with that span, there is no
+ * navigation to map it to. In this case `Types.Events.NO_NAVIGATION` is used for the key.
  */
-export type TraceInsightData = Map<string, NavigationInsightData>;
+export type TraceInsightSets = Map<Types.Events.NavigationId, InsightSets>;
 
 /**
  * Represents the narrow set of dependencies defined by an insight's `deps()` function. `Meta` is always included regardless of `deps()`.

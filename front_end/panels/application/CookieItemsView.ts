@@ -101,6 +101,7 @@ class CookiePreviewWidget extends UI.Widget.VBox {
 
     const toggle = UI.UIUtils.CheckboxLabel.create(
         i18nString(UIStrings.showUrlDecoded), this.showDecodedSetting.get(), undefined, 'show-url-decoded');
+    toggle.title = i18nString(UIStrings.showUrlDecoded);
     toggle.classList.add('cookie-preview-widget-toggle');
     toggle.checkboxElement.addEventListener('click', () => this.showDecoded(!this.showDecodedSetting.get()));
     header.appendChild(toggle);
@@ -215,11 +216,11 @@ export class CookieItemsView extends StorageItemsView {
   }
 
   setCookiesDomain(model: SDK.CookieModel.CookieModel, domain: string): void {
-    this.model.removeEventListener(SDK.CookieModel.Events.CookieListUpdated, this.onCookieListUpdate, this);
+    this.model.removeEventListener(SDK.CookieModel.Events.COOKIE_LIST_UPDATED, this.onCookieListUpdate, this);
     this.model = model;
     this.cookieDomain = domain;
     this.refreshItems();
-    this.model.addEventListener(SDK.CookieModel.Events.CookieListUpdated, this.onCookieListUpdate, this);
+    this.model.addEventListener(SDK.CookieModel.Events.COOKIE_LIST_UPDATED, this.onCookieListUpdate, this);
   }
 
   private showPreview(cookie: SDK.Cookie.Cookie|null): void {

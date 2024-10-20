@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 import * as Common from '../common/common.js';
-import * as Platform from '../platform/platform.js';
 
 import {InspectorFrontendHostInstance} from './InspectorFrontendHost.js';
 import {type AidaClientResult, type SyncInformation} from './InspectorFrontendHostAPI.js';
@@ -41,6 +40,23 @@ export enum ClientFeature {
   CHROME_CONSOLE_INSIGHTS = 1,
   // Chrome freestyler.
   CHROME_FREESTYLER = 2,
+  // Chrome DrJones Network Agent.
+  CHROME_DRJONES_NETWORK_AGENT = 7,
+  // Chrome DrJones Performance Agent.
+  CHROME_DRJONES_PERFORMANCE_AGENT = 8,
+  // Chrome DrJones File Agent.
+  CHROME_DRJONES_FILE_AGENT = 9,
+}
+
+export enum UserTier {
+  // Unspecified user tier.
+  USER_TIER_UNSPECIFIED = 0,
+  // Users who are internal testers.
+  TESTERS = 1,
+  // Users who are early adopters.
+  BETA = 2,
+  // Users in the general public.
+  PUBLIC = 3,
 }
 
 export interface AidaRequest {
@@ -59,6 +75,8 @@ export interface AidaRequest {
     disable_user_content_logging: boolean,
     // eslint-disable-next-line @typescript-eslint/naming-convention
     string_session_id?: string,
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    user_tier?: UserTier,
   };
   // eslint-disable-next-line @typescript-eslint/naming-convention
   functionality_type?: FunctionalityType;
@@ -111,16 +129,23 @@ export interface AidaResponseMetadata {
 export interface AidaResponse {
   explanation: string;
   metadata: AidaResponseMetadata;
+  completed: boolean;
 }
 
 export const enum AidaAccessPreconditions {
   AVAILABLE = 'available',
   NO_ACCOUNT_EMAIL = 'no-account-email',
-  NO_ACTIVE_SYNC = 'no-active-sync',
   NO_INTERNET = 'no-internet',
+  // This is the state (mostly enterprise) users are in, when they are automatically logged out from
+  // Chrome after a certain time period. For making AIDA requests, they need to log in again.
+  SYNC_IS_PAUSED = 'sync-is-paused',
 }
 
 export const CLIENT_NAME = 'CHROME_DEVTOOLS';
+
+const CODE_CHUNK_SEPARATOR = '\n`````\n';
+
+export class AidaAbortError extends Error {}
 
 export class AidaClient {
   static buildConsoleInsightsRequest(input: string): AidaRequest {
@@ -131,16 +156,15 @@ export class AidaClient {
       client_feature: ClientFeature.CHROME_CONSOLE_INSIGHTS,
     };
     const config = Common.Settings.Settings.instance().getHostConfig();
-    let temperature = NaN;
-    let modelId = null;
-    let disallowLogging = false;
-    if (config?.devToolsConsoleInsights.enabled) {
-      temperature = config.devToolsConsoleInsights.aidaTemperature;
-      modelId = config.devToolsConsoleInsights.aidaModelId;
-      disallowLogging = config.devToolsConsoleInsights.disallowLogging;
+    let temperature = -1;
+    let modelId = '';
+    if (config.devToolsConsoleInsights?.enabled) {
+      temperature = config.devToolsConsoleInsights.temperature ?? -1;
+      modelId = config.devToolsConsoleInsights.modelId || '';
     }
+    const disallowLogging = config.aidaAvailability?.disallowLogging ?? true;
 
-    if (!isNaN(temperature)) {
+    if (temperature >= 0) {
       request.options ??= {};
       request.options.temperature = temperature;
     }
@@ -167,23 +191,26 @@ export class AidaClient {
       return AidaAccessPreconditions.NO_ACCOUNT_EMAIL;
     }
 
-    if (!syncInfo.isSyncActive) {
-      return AidaAccessPreconditions.NO_ACTIVE_SYNC;
+    if (syncInfo.isSyncPaused) {
+      return AidaAccessPreconditions.SYNC_IS_PAUSED;
     }
 
     return AidaAccessPreconditions.AVAILABLE;
   }
 
-  async * fetch(request: AidaRequest): AsyncGenerator<AidaResponse, void, void> {
+  async * fetch(request: AidaRequest, options?: {signal?: AbortSignal}): AsyncGenerator<AidaResponse, void, void> {
     if (!InspectorFrontendHostInstance.doAidaConversation) {
       throw new Error('doAidaConversation is not available');
     }
     const stream = (() => {
-      let {promise, resolve, reject} = Platform.PromiseUtilities.promiseWithResolvers<string|null>();
+      let {promise, resolve, reject} = Promise.withResolvers<string|null>();
+      options?.signal?.addEventListener('abort', () => {
+        reject(new AidaAbortError());
+      });
       return {
         write: async(data: string): Promise<void> => {
           resolve(data);
-          ({promise, resolve, reject} = Platform.PromiseUtilities.promiseWithResolvers<string|null>());
+          ({promise, resolve, reject} = Promise.withResolvers<string|null>());
         },
         close: async(): Promise<void> => {
           resolve(null);
@@ -235,7 +262,7 @@ export class AidaClient {
       } catch (error) {
         throw new Error('Cannot parse chunk: ' + chunk, {cause: error});
       }
-      const CODE_CHUNK_SEPARATOR = '\n`````\n';
+
       for (const result of results) {
         if ('metadata' in result) {
           metadata.rpcGlobalId = result.metadata.rpcGlobalId;
@@ -270,13 +297,19 @@ export class AidaClient {
         yield {
           explanation: text.join('') + (inCodeChunk ? CODE_CHUNK_SEPARATOR : ''),
           metadata,
+          completed: false,
         };
       }
     }
+    yield {
+      explanation: text.join('') + (inCodeChunk ? CODE_CHUNK_SEPARATOR : ''),
+      metadata,
+      completed: true,
+    };
   }
 
   registerClientEvent(clientEvent: AidaDoConversationClientEvent): Promise<AidaClientResult> {
-    const {promise, resolve} = Platform.PromiseUtilities.promiseWithResolvers<AidaClientResult>();
+    const {promise, resolve} = Promise.withResolvers<AidaClientResult>();
     InspectorFrontendHostInstance.registerAidaClientEvent(
         JSON.stringify({
           client: CLIENT_NAME,
@@ -288,4 +321,18 @@ export class AidaClient {
 
     return promise;
   }
+}
+
+export function convertToUserTierEnum(userTier: string|undefined): UserTier {
+  if (userTier) {
+    switch (userTier) {
+      case 'TESTERS':
+        return UserTier.TESTERS;
+      case 'BETA':
+        return UserTier.BETA;
+      case 'PUBLIC':
+        return UserTier.PUBLIC;
+    }
+  }
+  return UserTier.BETA;
 }

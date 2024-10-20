@@ -8,6 +8,7 @@ import * as i18n from '../../core/i18n/i18n.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
+import * as MobileThrottling from '../mobile_throttling/mobile_throttling.js';
 
 import sensorsStyles from './sensors.css.js';
 
@@ -225,6 +226,10 @@ export class SensorsView extends UI.Widget.VBox {
     this.createPanelSeparator();
 
     this.appendIdleEmulator();
+
+    this.createPanelSeparator();
+
+    this.createHardwareConcurrencySection();
 
     this.createPanelSeparator();
   }
@@ -532,7 +537,7 @@ export class SensorsView extends UI.Widget.VBox {
       const parsedValue = JSON.parse(value);
       this.deviceOrientationOverrideEnabled = true;
       this.deviceOrientation = new SDK.EmulationModel.DeviceOrientation(parsedValue[0], parsedValue[1], parsedValue[2]);
-      this.setDeviceOrientation(this.deviceOrientation, DeviceOrientationModificationSource.SelectPreset);
+      this.setDeviceOrientation(this.deviceOrientation, DeviceOrientationModificationSource.SELECT_PRESET);
     }
   }
 
@@ -555,13 +560,13 @@ export class SensorsView extends UI.Widget.VBox {
     this.setDeviceOrientation(
         SDK.EmulationModel.DeviceOrientation.parseUserInput(
             this.alphaElement.value.trim(), this.betaElement.value.trim(), this.gammaElement.value.trim()),
-        DeviceOrientationModificationSource.UserInput);
+        DeviceOrientationModificationSource.USER_INPUT);
     this.setSelectElementLabel(this.orientationSelectElement, NonPresetOptions.Custom);
   }
 
   private resetDeviceOrientation(): void {
     this.setDeviceOrientation(
-        new SDK.EmulationModel.DeviceOrientation(0, 90, 0), DeviceOrientationModificationSource.ResetButton);
+        new SDK.EmulationModel.DeviceOrientation(0, 90, 0), DeviceOrientationModificationSource.RESET_BUTTON);
     this.setSelectElementLabel(this.orientationSelectElement, '[0, 90, 0]');
   }
 
@@ -576,7 +581,7 @@ export class SensorsView extends UI.Widget.VBox {
       return Math.round(angle * 10000) / 10000;
     }
 
-    if (modificationSource !== DeviceOrientationModificationSource.UserInput) {
+    if (modificationSource !== DeviceOrientationModificationSource.USER_INPUT) {
       // Even though the angles in |deviceOrientation| will not be rounded
       // here, their precision will be rounded by CSS when we change
       // |this.orientationLayer.style| in setBoxOrientation().
@@ -585,7 +590,7 @@ export class SensorsView extends UI.Widget.VBox {
       this.gammaSetter(String(roundAngle(deviceOrientation.gamma)));
     }
 
-    const animate = modificationSource !== DeviceOrientationModificationSource.UserDrag;
+    const animate = modificationSource !== DeviceOrientationModificationSource.USER_DRAG;
     this.setBoxOrientation(deviceOrientation, animate);
 
     this.deviceOrientation = deviceOrientation;
@@ -709,7 +714,7 @@ export class SensorsView extends UI.Widget.VBox {
     const eulerAngles = UI.Geometry.EulerAngles.fromDeviceOrientationRotationMatrix(currentMatrix);
     const newOrientation =
         new SDK.EmulationModel.DeviceOrientation(eulerAngles.alpha, eulerAngles.beta, eulerAngles.gamma);
-    this.setDeviceOrientation(newOrientation, DeviceOrientationModificationSource.UserDrag);
+    this.setDeviceOrientation(newOrientation, DeviceOrientationModificationSource.USER_DRAG);
     this.setSelectElementLabel(this.orientationSelectElement, NonPresetOptions.Custom);
     return false;
   }
@@ -764,16 +769,26 @@ export class SensorsView extends UI.Widget.VBox {
       container.appendChild(control);
     }
   }
+
+  private createHardwareConcurrencySection(): void {
+    const container = this.contentElement.createChild('div', 'concurrency-section');
+
+    const {checkbox, numericInput, reset, warning} =
+        MobileThrottling.ThrottlingManager.throttlingManager().createHardwareConcurrencySelector();
+    const div = document.createElement('div');
+    div.classList.add('concurrency-details');
+    div.append(numericInput.element, reset.element, warning.element);
+    container.append(checkbox, div);
+  }
 }
 
 export const enum DeviceOrientationModificationSource {
-  UserInput = 'userInput',
-  UserDrag = 'userDrag',
-  ResetButton = 'resetButton',
-  SelectPreset = 'selectPreset',
+  USER_INPUT = 'userInput',
+  USER_DRAG = 'userDrag',
+  RESET_BUTTON = 'resetButton',
+  SELECT_PRESET = 'selectPreset',
 }
 
-/** {string} */
 export const NonPresetOptions = {
   NoOverride: 'noOverride',
   Custom: 'custom',

@@ -2,10 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import '../../../ui/components/request_link_icon/request_link_icon.js';
+
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Platform from '../../../core/platform/platform.js';
 import type * as SDK from '../../../core/sdk/sdk.js';
-import * as TraceEngine from '../../../models/trace/trace.js';
+import * as Trace from '../../../models/trace/trace.js';
+import type * as RequestLinkIcon from '../../../ui/components/request_link_icon/request_link_icon.js';
 import * as PerfUI from '../../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as LegacyComponents from '../../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../../ui/legacy/legacy.js';
@@ -15,17 +18,19 @@ import * as TimelineUtils from '../utils/utils.js';
 import NetworkRequestDetailsStyles from './networkRequestDetails.css.js';
 import {colorForNetworkRequest} from './Utils.js';
 
+const {html} = LitHtml;
+
 const MAX_URL_LENGTH = 80;
 
 const UIStrings = {
   /**
    *@description Text that refers to updated priority of network request
    */
-  initialPriority: 'Initial Priority',
+  initialPriority: 'Initial priority',
   /**
    *@description Text that refers to the network request method
    */
-  requestMethod: 'Request Method',
+  requestMethod: 'Request method',
   /**
    *@description Text to show the priority of an item
    */
@@ -33,11 +38,11 @@ const UIStrings = {
   /**
    *@description Text used when referring to the data sent in a network request that is encoded as a particular file format.
    */
-  encodedData: 'Encoded Data',
+  encodedData: 'Encoded data',
   /**
    *@description Text used to refer to the data sent in a network request that has been decoded.
    */
-  decodedBody: 'Decoded Body',
+  decodedBody: 'Decoded body',
   /**
    *@description Text in Timeline indicating that input has happened recently
    */
@@ -65,7 +70,7 @@ const UIStrings = {
   /**
    *@description Text used to show the mime-type of the data transferred with a network request (e.g. "application/json").
    */
-  mimeType: 'Mime Type',
+  mimeType: 'MIME type',
   /**
    *@description Text used to show the user that a request was served from the browser's in-memory cache.
    */
@@ -107,13 +112,13 @@ const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/NetworkRequ
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class NetworkRequestDetails extends HTMLElement {
-  static readonly litTagName = LitHtml.literal`devtools-performance-network-request-details`;
   readonly #shadow = this.attachShadow({mode: 'open'});
 
-  #networkRequest: TraceEngine.Types.TraceEvents.SyntheticNetworkRequest|null = null;
+  #networkRequest: Trace.Types.Events.SyntheticNetworkRequest|null = null;
   #maybeTarget: SDK.Target.Target|null = null;
-  #requestPreviewElements = new WeakMap<TraceEngine.Types.TraceEvents.SyntheticNetworkRequest, HTMLImageElement>();
+  #requestPreviewElements = new WeakMap<Trace.Types.Events.SyntheticNetworkRequest, HTMLImageElement>();
   #linkifier: LegacyComponents.Linkifier.Linkifier;
+  #parsedTrace: Trace.Handlers.Types.ParsedTrace|null = null;
   constructor(linkifier: LegacyComponents.Linkifier.Linkifier) {
     super();
     this.#linkifier = linkifier;
@@ -124,11 +129,12 @@ export class NetworkRequestDetails extends HTMLElement {
   }
 
   async setData(
-      networkRequest: TraceEngine.Types.TraceEvents.SyntheticNetworkRequest,
+      parsedTrace: Trace.Handlers.Types.ParsedTrace, networkRequest: Trace.Types.Events.SyntheticNetworkRequest,
       maybeTarget: SDK.Target.Target|null): Promise<void> {
-    if (this.#networkRequest === networkRequest) {
+    if (this.#networkRequest === networkRequest && parsedTrace === this.#parsedTrace) {
       return;
     }
+    this.#parsedTrace = parsedTrace;
     this.#networkRequest = networkRequest;
     this.#maybeTarget = maybeTarget;
     await this.#render();
@@ -141,9 +147,9 @@ export class NetworkRequestDetails extends HTMLElement {
     const style = {
       backgroundColor: `${colorForNetworkRequest(this.#networkRequest)}`,
     };
-    return LitHtml.html`
+    return html`
       <div class="network-request-details-title">
-        <div style=${LitHtml.Directives.styleMap(style)}"></div>
+        <div style=${LitHtml.Directives.styleMap(style)}></div>
         ${i18nString(UIStrings.networkRequest)}
       </div>
     `;
@@ -153,7 +159,7 @@ export class NetworkRequestDetails extends HTMLElement {
     if (!value) {
       return null;
     }
-    return LitHtml.html`
+    return html`
       <div class="network-request-details-row"><div class="title">${title}</div><div class="value">${value}</div></div>
     `;
   }
@@ -170,23 +176,36 @@ export class NetworkRequestDetails extends HTMLElement {
     };
     const linkifiedURL = LegacyComponents.Linkifier.Linkifier.linkifyURL(
         this.#networkRequest.args.data.url as Platform.DevToolsPath.UrlString, options);
-    linkifiedURL.addEventListener('contextmenu', (event: MouseEvent) => {
-      if (!this.#networkRequest) {
-        return;
-      }
-      // Add a wrapper class here.
-      // The main reason is the `Reveal in Network panel` option is handled by the context
-      // menu provider, which will add this option for all supporting types. And there are a lot of context menu
-      // providers that support `SDK.NetworkRequest.NetworkRequest`, for example `Override content` by
-      // PersistenceActions, but we so far just want the one to reveal in network panel, so add a new class which will
-      // only be supported by Network panel.
-      // Also we want to have a different behavior(select the network request) from the
-      // `SDK.NetworkRequest.NetworkRequest` (highlight the network request once).
-      const timelineNetworkRequest = TimelineUtils.NetworkRequest.createTimelineNetworkRequest(this.#networkRequest);
-      const contextMenu = new UI.ContextMenu.ContextMenu(event, {useSoftMenu: true});
-      contextMenu.appendApplicableItems(timelineNetworkRequest);
-      void contextMenu.show();
-    });
+
+    const networkRequest = TimelineUtils.NetworkRequest.getNetworkRequest(this.#networkRequest);
+    if (networkRequest) {
+      linkifiedURL.addEventListener('contextmenu', (event: MouseEvent) => {
+        if (!this.#networkRequest) {
+          return;
+        }
+        // Add a wrapper class here.
+        // The main reason is the `Reveal in Network panel` option is handled by the context menu provider, which will
+        // add this option for all supporting types. And there are a lot of context menu providers that support
+        // `SDK.NetworkRequest.NetworkRequest`, for example `Override content` by PersistenceActions, but we so far just
+        // want the one to reveal in network panel, so add a new class which will only be supported by Network panel.
+        // Also we want to have a different behavior(select the network request) from the
+        // `SDK.NetworkRequest.NetworkRequest` (highlight the network request once).
+        const contextMenu = new UI.ContextMenu.ContextMenu(event, {useSoftMenu: true});
+        contextMenu.appendApplicableItems(new TimelineUtils.NetworkRequest.TimelineNetworkRequest(networkRequest));
+        void contextMenu.show();
+      });
+
+      // clang-format off
+      const urlElement = html`
+        ${linkifiedURL}
+        <devtools-request-link-icon
+          .data=${{request: networkRequest} as RequestLinkIcon.RequestLinkIcon.RequestLinkIconData} >
+        </devtools-request-link-icon>
+      `;
+      // clang-format on
+      return this.#renderRow(i18n.i18n.lockedString('URL'), urlElement);
+    }
+
     return this.#renderRow(i18n.i18n.lockedString('URL'), linkifiedURL);
   }
 
@@ -209,7 +228,7 @@ export class NetworkRequestDetails extends HTMLElement {
       return null;
     }
     const durationValue = i18n.TimeUtilities.formatMicroSecondsTime(fullDuration);
-    const durationElement = LitHtml.html`
+    const durationElement = html`
       <div>
         ${durationValue}
         ${this.#renderTimings()}
@@ -246,14 +265,33 @@ export class NetworkRequestDetails extends HTMLElement {
       return null;
     }
 
-    const topFrame = TraceEngine.Helpers.Trace.getZeroIndexedStackTraceForEvent(this.#networkRequest)?.at(0) ?? null;
-    if (topFrame) {
-      const link = this.#linkifier.maybeLinkifyConsoleCallFrame(
-          this.#maybeTarget, topFrame, {tabStop: true, inlineFrameIndex: 0, showColumnNumber: true});
+    const hasStackTrace = Trace.Helpers.Trace.stackTraceForEvent(this.#networkRequest) !== null;
+
+    // If we have a stack trace, that is the most reliable way to get the initiator data and display a link to the source.
+    if (hasStackTrace) {
+      const topFrame = Trace.Helpers.Trace.getZeroIndexedStackTraceForEvent(this.#networkRequest)?.at(0) ?? null;
+      if (topFrame) {
+        const link = this.#linkifier.maybeLinkifyConsoleCallFrame(
+            this.#maybeTarget, topFrame, {tabStop: true, inlineFrameIndex: 0, showColumnNumber: true});
+        if (link) {
+          return this.#renderRow(i18nString(UIStrings.initiatedBy), link);
+        }
+      }
+    }
+    // If we do not, we can see if the network handler found an initiator and try to link by URL
+    const initiator = this.#parsedTrace?.NetworkRequests.eventToInitiator.get(this.#networkRequest);
+    if (initiator) {
+      const link = this.#linkifier.maybeLinkifyScriptLocation(
+          this.#maybeTarget,
+          null,  // this would be the scriptId, but we don't have one. The linkifier will fallback to using the URL.
+          initiator.args.data.url as Platform.DevToolsPath.UrlString,
+          undefined,  // line number
+      );
       if (link) {
         return this.#renderRow(i18nString(UIStrings.initiatedBy), link);
       }
     }
+
     return null;
   }
 
@@ -288,7 +326,7 @@ export class NetworkRequestDetails extends HTMLElement {
     // |
     // |----
     // |
-    return LitHtml.html`<span class="whisker-left"> <span class="horizontal"></span> </span>`;
+    return html`<span class="whisker-left"> <span class="horizontal"></span> </span>`;
   }
 
   #renderRightWhisker(): LitHtml.TemplateResult {
@@ -297,7 +335,7 @@ export class NetworkRequestDetails extends HTMLElement {
     //      |
     //  ----|
     //      |
-    return LitHtml.html`<span class="whisker-right"> <span class="horizontal"></span> </span>`;
+    return html`<span class="whisker-right"> <span class="horizontal"></span> </span>`;
   }
 
   #renderTimings(): LitHtml.TemplateResult|null {
@@ -305,12 +343,12 @@ export class NetworkRequestDetails extends HTMLElement {
       return null;
     }
     const syntheticData = this.#networkRequest.args.data.syntheticData;
-    const queueing = (syntheticData.sendStartTime - this.#networkRequest.ts) as TraceEngine.Types.Timing.MicroSeconds;
+    const queueing = (syntheticData.sendStartTime - this.#networkRequest.ts) as Trace.Types.Timing.MicroSeconds;
     const requestPlusWaiting =
-        (syntheticData.downloadStart - syntheticData.sendStartTime) as TraceEngine.Types.Timing.MicroSeconds;
-    const download = (syntheticData.finishTime - syntheticData.downloadStart) as TraceEngine.Types.Timing.MicroSeconds;
+        (syntheticData.downloadStart - syntheticData.sendStartTime) as Trace.Types.Timing.MicroSeconds;
+    const download = (syntheticData.finishTime - syntheticData.downloadStart) as Trace.Types.Timing.MicroSeconds;
     const waitingOnMainThread = (this.#networkRequest.ts + this.#networkRequest.dur - syntheticData.finishTime) as
-        TraceEngine.Types.Timing.MicroSeconds;
+        Trace.Types.Timing.MicroSeconds;
 
     const color = colorForNetworkRequest(this.#networkRequest);
     const styleForWaiting = {
@@ -320,7 +358,7 @@ export class NetworkRequestDetails extends HTMLElement {
       backgroundColor: color,
     };
 
-    return LitHtml.html`
+    return html`
       <div class="timings-row">
         ${this.#renderLeftWhisker()}
         ${i18nString(UIStrings.queuingAndConnecting)}
@@ -350,7 +388,7 @@ export class NetworkRequestDetails extends HTMLElement {
     }
     const networkData = this.#networkRequest.args.data;
     // clang-format off
-    const output = LitHtml.html`
+    const output = html`
       ${this.#renderTitle()}
       <div class="network-request-details-body">
         <div class="network-request-details-col">

@@ -55,6 +55,7 @@ export class BidiHTTPResponse extends HTTPResponse {
 
   #initialize() {
     if (this.#data.fromCache) {
+      this.#request._fromMemoryCache = true;
       this.#request
         .frame()
         ?.page()
@@ -145,7 +146,7 @@ export class BidiHTTPResponse extends HTTPResponse {
     return this.#securityDetails ?? null;
   }
 
-  override buffer(): never {
+  override content(): never {
     throw new UnsupportedOperation();
   }
 }

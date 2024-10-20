@@ -95,7 +95,7 @@ export const Utils = {
         matches.push({
           value: match,
           position: startIndex + result.index,
-          regexIndex: regexIndex,
+          regexIndex,
           captureGroups: result.slice(1),
         });
         currentIndex = result.index + match.length;
@@ -151,7 +151,7 @@ export class FilterParser {
         try {
           parsedFilters.push({
             key: undefined,
-            regex: new RegExp((parsedRegex as string), 'i'),
+            regex: new RegExp((parsedRegex as string), 'im'),
             text: undefined,
             negative: Boolean(startsWithMinus),
           });

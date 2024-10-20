@@ -2,22 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Helpers from '../helpers/helpers.js';
 import {type SyntheticInteractionPair} from '../types/TraceEvents.js';
 
-import {type InsightResult, type NavigationInsightContext, type RequiredData} from './types.js';
+import {type InsightResult, type InsightSetContext, type RequiredData} from './types.js';
 
 export function deps(): ['UserInteractions'] {
   return ['UserInteractions'];
 }
 
-type Result = InsightResult<{
+export type INPInsightResult = InsightResult<{
   longestInteractionEvent?: SyntheticInteractionPair,
   highPercentileInteractionEvent?: SyntheticInteractionPair,
 }>;
 
-export function generateInsight(traceParsedData: RequiredData<typeof deps>, context: NavigationInsightContext): Result {
-  const interactionEvents = traceParsedData.UserInteractions.interactionEvents.filter(event => {
-    return event.args.data.navigationId === context.navigationId;
+export function generateInsight(parsedTrace: RequiredData<typeof deps>, context: InsightSetContext): INPInsightResult {
+  const interactionEvents = parsedTrace.UserInteractions.interactionEventsWithNoNesting.filter(event => {
+    return Helpers.Timing.eventIsInBounds(event, context.bounds);
   });
 
   if (!interactionEvents.length) {
@@ -43,6 +44,7 @@ export function generateInsight(traceParsedData: RequiredData<typeof deps>, cont
   const highPercentileIndex = Math.min(9, Math.floor(normalizedInteractionEvents.length / 50));
 
   return {
+    relatedEvents: [normalizedInteractionEvents[0]],
     longestInteractionEvent: normalizedInteractionEvents[0],
     highPercentileInteractionEvent: normalizedInteractionEvents[highPercentileIndex],
   };

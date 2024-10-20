@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import type * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 import {createTarget} from '../../testing/EnvironmentHelpers.js';
@@ -10,12 +11,34 @@ import {getMainFrame, navigate} from '../../testing/ResourceTreeHelpers.js';
 
 import * as Security from './security.js';
 
+describeWithMockConnection('SecurityAndPrivacyPanel', () => {
+  describe('updateOrigin', () => {
+    it('correctly updates the URL scheme highlighting', () => {
+      const origin = 'https://foo.bar' as Platform.DevToolsPath.UrlString;
+      const securityPanel = Security.SecurityPanel.SecurityPanel.instance({forceNew: true});
+
+      securityPanel.sidebar.addOrigin(origin, Protocol.Security.SecurityState.Unknown);
+      assert.notExists(
+          securityPanel.sidebar.sidebarTree.contentElement.querySelector('.highlighted-url > .url-scheme-secure'));
+      assert.exists(
+          securityPanel.sidebar.sidebarTree.contentElement.querySelector('.highlighted-url > .url-scheme-unknown'));
+
+      securityPanel.sidebar.updateOrigin(origin, Protocol.Security.SecurityState.Secure);
+
+      assert.exists(
+          securityPanel.sidebar.sidebarTree.contentElement.querySelector('.highlighted-url > .url-scheme-secure'));
+      assert.notExists(
+          securityPanel.sidebar.sidebarTree.contentElement.querySelector('.highlighted-url > .url-scheme-unknown'));
+    });
+  });
+});
+
 describeWithMockConnection('SecurityPanel', () => {
   let target: SDK.Target.Target;
   let prerenderTarget: SDK.Target.Target;
 
   beforeEach(() => {
-    const tabTarget = createTarget({type: SDK.Target.Type.Tab});
+    const tabTarget = createTarget({type: SDK.Target.Type.TAB});
     prerenderTarget = createTarget({parentTarget: tabTarget, subtype: 'prerender'});
     target = createTarget({parentTarget: tabTarget});
   });
@@ -82,7 +105,7 @@ describeWithMockConnection('SecurityPanel', () => {
                       ?.classList.contains('security-summary-secure'));
 
     // Check that the SecurityPanel listens to any PrimaryPageChanged event
-    const sidebarTreeClearSpy = sinon.spy(securityPanel.sidebarTree, 'clearOrigins');
+    const sidebarTreeClearSpy = sinon.spy(securityPanel.sidebar, 'clearOrigins');
     navigate(getMainFrame(target));
     assert.isTrue(sidebarTreeClearSpy.calledOnce);
   });
@@ -93,7 +116,8 @@ describeWithMockConnection('SecurityPanel', () => {
     const securityPanel = Security.SecurityPanel.SecurityPanel.instance({forceNew: true});
 
     // Check that reload message is visible initially.
-    const reloadMessage = securityPanel.sidebarTree.shadowRoot.querySelector('.security-main-view-reload-message');
+    const reloadMessage =
+        securityPanel.sidebar.sidebarTree.shadowRoot.querySelector('.security-main-view-reload-message');
     assert.instanceOf(reloadMessage, HTMLLIElement);
     assert.isFalse(reloadMessage.classList.contains('hidden'));
 

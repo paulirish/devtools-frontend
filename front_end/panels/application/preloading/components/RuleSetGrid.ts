@@ -2,14 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import '../../../../ui/components/data_grid/data_grid.js';
+import '../../../../ui/components/icon_button/icon_button.js';
+
 import * as Common from '../../../../core/common/common.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
 import type * as Platform from '../../../../core/platform/platform.js';
 import {assertNotNullOrUndefined} from '../../../../core/platform/platform.js';
 import * as SDK from '../../../../core/sdk/sdk.js';
 import * as Protocol from '../../../../generated/protocol.js';
-import * as DataGrid from '../../../../ui/components/data_grid/data_grid.js';
-import * as IconButton from '../../../../ui/components/icon_button/icon_button.js';
+import type * as DataGrid from '../../../../ui/components/data_grid/data_grid.js';
+import type * as IconButton from '../../../../ui/components/icon_button/icon_button.js';
 import * as LegacyWrapper from '../../../../ui/components/legacy_wrapper/legacy_wrapper.js';
 import type * as UI from '../../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
@@ -19,6 +22,8 @@ import * as PreloadingHelper from '../helper/helper.js';
 
 import * as PreloadingString from './PreloadingString.js';
 import ruleSetGridStyles from './ruleSetGrid.css.js';
+
+const {html} = LitHtml;
 
 const UIStrings = {
   /**
@@ -61,7 +66,6 @@ export interface RuleSetGridRow {
 
 // Grid component to show SpeculationRules rule sets.
 export class RuleSetGrid extends LegacyWrapper.LegacyWrapper.WrappableComponent<UI.Widget.VBox> {
-  static readonly litTagName = LitHtml.literal`devtools-resources-ruleset-grid`;
 
   readonly #shadow = this.attachShadow({mode: 'open'});
   #data: RuleSetGridData|null = null;
@@ -106,12 +110,12 @@ export class RuleSetGrid extends LegacyWrapper.LegacyWrapper.WrappableComponent<
 
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
-    LitHtml.render(LitHtml.html`
+    LitHtml.render(html`
       <div class="ruleset-container"
       jslog=${VisualLogging.pane('preloading-rules')}>
-        <${DataGrid.DataGridController.DataGridController.litTagName} .data=${
+        <devtools-data-grid-controller .data=${
             reportsGridData as DataGrid.DataGridController.DataGridControllerData}>
-        </${DataGrid.DataGridController.DataGridController.litTagName}>
+        </devtools-data-grid-controller>
       </div>
     `, this.#shadow, {host: this});
     // clang-format on
@@ -166,7 +170,7 @@ function ruleSetRenderer(
 
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
-    return LitHtml.html`
+    return html`
       <button class="link" role="link"
         @click=${revealSpeculationRulesInElements}
         title=${i18nString(UIStrings.buttonClickToRevealInElementsPanel)}
@@ -181,7 +185,7 @@ function ruleSetRenderer(
         })}
         jslog=${VisualLogging.action('reveal-in-elements').track({click: true})}
       >
-        <${IconButton.Icon.Icon.litTagName}
+        <devtools-icon
           .data=${{
             iconName: 'code-circle',
             color: 'var(--icon-link)',
@@ -192,7 +196,7 @@ function ruleSetRenderer(
             'vertical-align': 'sub',
           })}
         >
-        </${IconButton.Icon.Icon.litTagName}>
+        </devtools-icon>
         ${location}
       </button>
     `;
@@ -215,13 +219,13 @@ function ruleSetRenderer(
       }
 
       const requestLocation = NetworkForward.UIRequestLocation.UIRequestLocation.tab(
-          request, NetworkForward.UIRequestLocation.UIRequestTabs.Preview, {clearFilter: false});
+          request, NetworkForward.UIRequestLocation.UIRequestTabs.PREVIEW, {clearFilter: false});
       await Common.Revealer.reveal(requestLocation);
     };
 
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
-    return LitHtml.html`
+    return html`
       <button class="link" role="link"
         @click=${revealSpeculationRulesInNetwork}
         title=${i18nString(UIStrings.buttonClickToRevealInNetworkPanel)}
@@ -235,7 +239,7 @@ function ruleSetRenderer(
           'padding-inline-end': '0',
         })}
       >
-        <${IconButton.Icon.Icon.litTagName}
+        <devtools-icon
          .data=${{
             iconName: 'arrow-up-down-circle',
             color: 'var(--icon-link)',
@@ -246,7 +250,7 @@ function ruleSetRenderer(
             'vertical-align': 'sub',
           })}
         >
-        </${IconButton.Icon.Icon.litTagName}>
+        </devtools-icon>
         ${location}
       </button>
     `;
@@ -263,7 +267,7 @@ function ruleSetRenderer(
     return ruleSetRendererOutOfDocument(ruleSet, location);
   }
 
-  return LitHtml.html`${location}`;
+  return html`${location}`;
 }
 
 function statusRenderer(preloadsStatusSummary: string, ruleSet: Protocol.Preload.RuleSet): LitHtml.TemplateResult {
@@ -274,7 +278,7 @@ function statusRenderer(preloadsStatusSummary: string, ruleSet: Protocol.Preload
 
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
-    return LitHtml.html`
+    return html`
       <button class="link" role="link"
         @click=${revealAttemptViewWithFilter}
         title=${i18nString(UIStrings.buttonRevealPreloadsAssociatedWithRuleSet)}
@@ -296,7 +300,7 @@ function statusRenderer(preloadsStatusSummary: string, ruleSet: Protocol.Preload
 
   function errors(): LitHtml.TemplateResult {
     const nErrors = i18nString(UIStrings.errors, {errorCount: 1});
-    return LitHtml.html`
+    return html`
       <span
         style=${LitHtml.Directives.styleMap({
       color: 'var(--sys-color-error)',
@@ -313,6 +317,6 @@ function statusRenderer(preloadsStatusSummary: string, ruleSet: Protocol.Preload
     case Protocol.Preload.RuleSetErrorType.SourceIsNotJsonObject:
       return errors();
     case Protocol.Preload.RuleSetErrorType.InvalidRulesSkipped:
-      return LitHtml.html`${errors()} ${counts(preloadsStatusSummary, ruleSet)}`;
+      return html`${errors()} ${counts(preloadsStatusSummary, ruleSet)}`;
   }
 }

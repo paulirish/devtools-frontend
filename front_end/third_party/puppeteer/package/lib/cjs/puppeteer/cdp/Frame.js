@@ -47,6 +47,7 @@ const Deferred_js_1 = require("../util/Deferred.js");
 const disposable_js_1 = require("../util/disposable.js");
 const ErrorLike_js_1 = require("../util/ErrorLike.js");
 const Accessibility_js_1 = require("./Accessibility.js");
+const FirefoxTargetManager_js_1 = require("./FirefoxTargetManager.js");
 const FrameManagerEvents_js_1 = require("./FrameManagerEvents.js");
 const IsolatedWorld_js_1 = require("./IsolatedWorld.js");
 const IsolatedWorlds_js_1 = require("./IsolatedWorlds.js");
@@ -141,9 +142,6 @@ let CdpFrame = (() => {
         }
         page() {
             return this._frameManager.page();
-        }
-        isOOPFrame() {
-            return this.#client !== this._frameManager.client;
         }
         async goto(url, options = {}) {
             const { referer = this._frameManager.networkManager.extraHTTPHeaders()['referer'], referrerPolicy = this._frameManager.networkManager.extraHTTPHeaders()['referer-policy'], waitUntil = ['load'], timeout = this._frameManager.timeoutSettings.navigationTimeout(), } = options;
@@ -252,16 +250,11 @@ let CdpFrame = (() => {
             return this._frameManager._frameTree.childFrames(this._id);
         }
         #deviceRequestPromptManager() {
-            const rootFrame = this.page().mainFrame();
-            if (this.isOOPFrame() || rootFrame === null) {
-                return this._frameManager._deviceRequestPromptManager(this.#client);
-            }
-            else {
-                return rootFrame._frameManager._deviceRequestPromptManager(this.#client);
-            }
+            return this._frameManager._deviceRequestPromptManager(this.#client);
         }
         async addPreloadScript(preloadScript) {
-            if (!this.isOOPFrame() && this !== this._frameManager.mainFrame()) {
+            const parentFrame = this.parentFrame();
+            if (parentFrame && this.#client === parentFrame.client) {
                 return;
             }
             if (preloadScript.getIdForFrame(this)) {
@@ -339,6 +332,22 @@ let CdpFrame = (() => {
         }
         exposeFunction() {
             throw new Errors_js_1.UnsupportedOperation();
+        }
+        async frameElement() {
+            const isFirefox = this.page().target()._targetManager() instanceof FirefoxTargetManager_js_1.FirefoxTargetManager;
+            if (isFirefox) {
+                return await super.frameElement();
+            }
+            const parent = this.parentFrame();
+            if (!parent) {
+                return null;
+            }
+            const { backendNodeId } = await parent.client.send('DOM.getFrameOwner', {
+                frameId: this._id,
+            });
+            return (await parent
+                .mainRealm()
+                .adoptBackendNode(backendNodeId));
         }
     };
 })();

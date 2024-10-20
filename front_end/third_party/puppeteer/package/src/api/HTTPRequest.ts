@@ -8,6 +8,7 @@ import type {Protocol} from 'devtools-protocol';
 import type {ProtocolError} from '../common/Errors.js';
 import {debugError, isString} from '../common/util.js';
 import {assert} from '../util/assert.js';
+import {typedArrayToBase64} from '../util/encoding.js';
 
 import type {CDPSession} from './CDPSession.js';
 import type {Frame} from './Frame.js';
@@ -377,6 +378,10 @@ export abstract class HTTPRequest {
    */
   abstract failure(): {errorText: string} | null;
 
+  #canBeIntercepted(): boolean {
+    return !this.url().startsWith('data:') && !this._fromMemoryCache;
+  }
+
   /**
    * Continues request with optional request overrides.
    *
@@ -409,8 +414,7 @@ export abstract class HTTPRequest {
     overrides: ContinueRequestOverrides = {},
     priority?: number
   ): Promise<void> {
-    // Request interception is not supported for data: urls.
-    if (this.url().startsWith('data:')) {
+    if (!this.#canBeIntercepted()) {
       return;
     }
     assert(this.interception.enabled, 'Request Interception is not enabled!');
@@ -478,8 +482,7 @@ export abstract class HTTPRequest {
     response: Partial<ResponseForRequest>,
     priority?: number
   ): Promise<void> {
-    // Mocking responses for dataURL requests is not currently supported.
-    if (this.url().startsWith('data:')) {
+    if (!this.#canBeIntercepted()) {
       return;
     }
     assert(this.interception.enabled, 'Request Interception is not enabled!');
@@ -525,8 +528,7 @@ export abstract class HTTPRequest {
     errorCode: ErrorCode = 'failed',
     priority?: number
   ): Promise<void> {
-    // Request interception is not supported for data: urls.
-    if (this.url().startsWith('data:')) {
+    if (!this.#canBeIntercepted()) {
       return;
     }
     const errorReason = errorReasons[errorCode];
@@ -561,14 +563,9 @@ export abstract class HTTPRequest {
       ? new TextEncoder().encode(body)
       : body;
 
-    const bytes = [];
-    for (const byte of byteBody) {
-      bytes.push(String.fromCharCode(byte));
-    }
-
     return {
       contentLength: byteBody.byteLength,
-      base64: btoa(bytes.join('')),
+      base64: typedArrayToBase64(byteBody),
     };
   }
 }

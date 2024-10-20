@@ -3,30 +3,30 @@
 // found in the LICENSE file.
 
 import * as Helpers from '../helpers/helpers.js';
+import type * as Types from '../types/types.js';
 
-import {type InsightResult, InsightWarning, type NavigationInsightContext, type RequiredData} from './types.js';
+import {type InsightResult, type InsightSetContext, InsightWarning, type RequiredData} from './types.js';
 
 export function deps(): ['Meta', 'UserInteractions'] {
   return ['Meta', 'UserInteractions'];
 }
 
-export function generateInsight(traceParsedData: RequiredData<typeof deps>, context: NavigationInsightContext):
-    InsightResult<{mobileOptimized: boolean | null}> {
-  const events = traceParsedData.UserInteractions.beginCommitCompositorFrameEvents.filter(event => {
+export type ViewportInsightResult = InsightResult<{
+  mobileOptimized: boolean | null,
+  viewportEvent?: Types.Events.ParseMetaViewport,
+}>;
+
+export function generateInsight(
+    parsedTrace: RequiredData<typeof deps>, context: InsightSetContext): ViewportInsightResult {
+  const compositorEvents = parsedTrace.UserInteractions.beginCommitCompositorFrameEvents.filter(event => {
     if (event.args.frame !== context.frameId) {
       return false;
     }
 
-    const navigation =
-        Helpers.Trace.getNavigationForTraceEvent(event, context.frameId, traceParsedData.Meta.navigationsByFrameId);
-    if (navigation?.args.data?.navigationId !== context.navigationId) {
-      return false;
-    }
-
-    return true;
+    return Helpers.Timing.eventIsInBounds(event, context.bounds);
   });
 
-  if (!events.length) {
+  if (!compositorEvents.length) {
     // Trace doesn't have the data we need.
     return {
       mobileOptimized: null,
@@ -34,16 +34,27 @@ export function generateInsight(traceParsedData: RequiredData<typeof deps>, cont
     };
   }
 
+  const viewportEvent = parsedTrace.UserInteractions.parseMetaViewportEvents.find(event => {
+    if (event.args.data.frame !== context.frameId) {
+      return false;
+    }
+
+    return Helpers.Timing.eventIsInBounds(event, context.bounds);
+  });
+
   // Returns true only if all events are mobile optimized.
-  for (const event of events) {
+  for (const event of compositorEvents) {
     if (!event.args.is_mobile_optimized) {
       return {
         mobileOptimized: false,
+        viewportEvent,
+        metricSavings: {INP: 300 as Types.Timing.MilliSeconds},
       };
     }
   }
 
   return {
     mobileOptimized: true,
+    viewportEvent,
   };
 }

@@ -7,8 +7,9 @@ import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
 import * as Extensions from '../../models/extensions/extensions.js';
+import * as LiveMetrics from '../../models/live-metrics/live-metrics.js';
 import type * as TimelineModel from '../../models/timeline_model/timeline_model.js';
-import * as TraceEngine from '../../models/trace/trace.js';
+import * as Trace from '../../models/trace/trace.js';
 
 const UIStrings = {
   /**
@@ -20,16 +21,14 @@ const UIStrings = {
 };
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/TimelineController.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
-export class TimelineController implements TraceEngine.TracingManager.TracingManagerClient {
+export class TimelineController implements Trace.TracingManager.TracingManagerClient {
   readonly primaryPageTarget: SDK.Target.Target;
   readonly rootTarget: SDK.Target.Target;
-  private tracingManager: TraceEngine.TracingManager.TracingManager|null;
-  #collectedEvents: TraceEngine.Types.TraceEvents.TraceEventData[] = [];
+  private tracingManager: Trace.TracingManager.TracingManager|null;
+  #collectedEvents: Trace.Types.Events.Event[] = [];
   #recordingStartTime: number|null = null;
   private readonly client: Client;
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private tracingCompleteCallback?: ((value: any) => void)|null;
+  private tracingCompletePromise: PromiseWithResolvers<void>|null = null;
 
   /**
    * We always need to profile against the DevTools root target, which is
@@ -62,7 +61,7 @@ export class TimelineController implements TraceEngine.TracingManager.TracingMan
     this.rootTarget = rootTarget;
     // Ensure the tracing manager is the one for the Root Target, NOT the
     // primaryPageTarget, as that is the one we have to invoke tracing against.
-    this.tracingManager = rootTarget.model(TraceEngine.TracingManager.TracingManager);
+    this.tracingManager = rootTarget.model(Trace.TracingManager.TracingManager);
     this.client = client;
   }
 
@@ -87,9 +86,9 @@ export class TimelineController implements TraceEngine.TracingManager.TracingMan
     //   └ default: on, option: enableJSSampling
     const categoriesArray = [
       Root.Runtime.experiments.isEnabled('timeline-show-all-events') ? '*' : '-*',
-      TraceEngine.Types.TraceEvents.Categories.Console,
-      TraceEngine.Types.TraceEvents.Categories.Loading,
-      TraceEngine.Types.TraceEvents.Categories.UserTiming,
+      Trace.Types.Events.Categories.Console,
+      Trace.Types.Events.Categories.Loading,
+      Trace.Types.Events.Categories.UserTiming,
       'devtools.timeline',
       disabledByDefault('devtools.timeline'),
       disabledByDefault('devtools.timeline.frame'),
@@ -131,10 +130,11 @@ export class TimelineController implements TraceEngine.TracingManager.TracingMan
       categoriesArray.push(disabledByDefault('devtools.v8-source-rundown-sources'));
     }
 
+    await LiveMetrics.LiveMetrics.instance().disable();
+
     this.#recordingStartTime = Date.now();
     const response = await this.startRecordingWithCategories(categoriesArray.join(','));
     if (response.getError()) {
-      await this.waitForTracingToStop(false);
       await SDK.TargetManager.TargetManager.instance().resumeAllTargets();
     }
     return response;
@@ -146,19 +146,16 @@ export class TimelineController implements TraceEngine.TracingManager.TracingMan
     }
 
     this.client.loadingStarted();
-    await this.waitForTracingToStop(true);
+    await this.waitForTracingToStop();
     await this.allSourcesFinished();
+
+    await LiveMetrics.LiveMetrics.instance().enable();
   }
 
-  private async waitForTracingToStop(awaitTracingCompleteCallback: boolean): Promise<void> {
-    const tracingStoppedPromises = [];
-    if (this.tracingManager && awaitTracingCompleteCallback) {
-      tracingStoppedPromises.push(new Promise(resolve => {
-        this.tracingCompleteCallback = resolve;
-      }));
+  private async waitForTracingToStop(): Promise<void> {
+    if (this.tracingManager) {
+      await this.tracingCompletePromise?.promise;
     }
-
-    await Promise.all(tracingStoppedPromises);
   }
 
   private async startRecordingWithCategories(categories: string): Promise<Protocol.ProtocolResponseWithError> {
@@ -169,6 +166,7 @@ export class TimelineController implements TraceEngine.TracingManager.TracingMan
     // caused by starting CPU profiler, that needs to traverse JS heap to collect
     // all the functions data.
     await SDK.TargetManager.TargetManager.instance().suspendAllTargets('performance-timeline');
+    this.tracingCompletePromise = Promise.withResolvers();
     const response = await this.tracingManager.start(this, categories, '');
     await this.warmupJsProfiler();
     Extensions.ExtensionServer.ExtensionServer.instance().profilingStarted();
@@ -191,26 +189,24 @@ export class TimelineController implements TraceEngine.TracingManager.TracingMan
     });
   }
 
-  traceEventsCollected(events: TraceEngine.Types.TraceEvents.TraceEventData[]): void {
+  traceEventsCollected(events: Trace.Types.Events.Event[]): void {
     this.#collectedEvents.push(...events);
   }
 
   tracingComplete(): void {
-    if (!this.tracingCompleteCallback) {
+    if (!this.tracingCompletePromise) {
       return;
     }
-    this.tracingCompleteCallback(undefined);
-    this.tracingCompleteCallback = null;
+    this.tracingCompletePromise.resolve(undefined);
+    this.tracingCompletePromise = null;
   }
 
   private async allSourcesFinished(): Promise<void> {
-    this.client.processingStarted();
-    await this.finalizeTrace();
-  }
-
-  private async finalizeTrace(): Promise<void> {
+    // TODO(crbug.com/366072294): Report the progress of this resumption, as it can be lengthy on heavy pages.
     await SDK.TargetManager.TargetManager.instance().resumeAllTargets();
     Extensions.ExtensionServer.ExtensionServer.instance().profilingStopped();
+
+    this.client.processingStarted();
     await this.client.loadingComplete(
         this.#collectedEvents, /* exclusiveFilter= */ null, /* isCpuProfile= */ false, this.#recordingStartTime,
         /* metadata= */ null);
@@ -232,9 +228,9 @@ export interface Client {
   processingStarted(): void;
   loadingProgress(progress?: number): void;
   loadingComplete(
-      collectedEvents: TraceEngine.Types.TraceEvents.TraceEventData[],
+      collectedEvents: Trace.Types.Events.Event[],
       exclusiveFilter: TimelineModel.TimelineModelFilter.TimelineModelFilter|null, isCpuProfile: boolean,
-      recordingStartTime: number|null, metadata: TraceEngine.Types.File.MetaData|null): Promise<void>;
+      recordingStartTime: number|null, metadata: Trace.Types.File.MetaData|null): Promise<void>;
   loadingCompleteForTest(): void;
 }
 export interface RecordingOptions {

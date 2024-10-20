@@ -3,7 +3,6 @@
  * Copyright 2023 Google Inc.
  * SPDX-License-Identifier: Apache-2.0
  */
-/// <reference types="node" />
 import type { Protocol } from 'devtools-protocol';
 import type { Frame } from '../api/Frame.js';
 import type { AwaitableIterable, ElementFor, EvaluateFuncWith, HandleFor, HandleOr, NodeFor } from '../common/types.js';
@@ -79,6 +78,15 @@ export interface ElementScreenshotOptions extends ScreenshotOptions {
     scrollIntoView?: boolean;
 }
 /**
+ * A given method will have it's `this` replaced with an isolated version of
+ * `this` when decorated with this decorator.
+ *
+ * All changes of isolated `this` are reflected on the actual `this`.
+ *
+ * @internal
+ */
+export declare function bindIsolatedHandle<This extends ElementHandle<Node>>(target: (this: This, ...args: any[]) => Promise<any>, _: unknown): typeof target;
+/**
  * ElementHandle represents an in-page DOM element.
  *
  * @remarks
@@ -123,15 +131,6 @@ export declare abstract class ElementHandle<ElementType extends Node = Element> 
      * trying to adopt it multiple times
      */
     isolatedHandle?: typeof this;
-    /**
-     * A given method will have it's `this` replaced with an isolated version of
-     * `this` when decorated with this decorator.
-     *
-     * All changes of isolated `this` are reflected on the actual `this`.
-     *
-     * @internal
-     */
-    static bindIsolatedHandle<This extends ElementHandle<Node>>(target: (this: This, ...args: any[]) => Promise<any>, _: unknown): typeof target;
     /**
      * @internal
      */
@@ -193,7 +192,7 @@ export declare abstract class ElementHandle<ElementType extends Node = Element> 
      *
      * @param selector -
      * {@link https://pptr.dev/guides/page-interactions#selectors | selector}
-     * to query page for.
+     * to query the page for.
      * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
      * can be passed as-is and a
      * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
@@ -215,7 +214,7 @@ export declare abstract class ElementHandle<ElementType extends Node = Element> 
      *
      * @param selector -
      * {@link https://pptr.dev/guides/page-interactions#selectors | selector}
-     * to query page for.
+     * to query the page for.
      * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
      * can be passed as-is and a
      * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
@@ -253,7 +252,7 @@ export declare abstract class ElementHandle<ElementType extends Node = Element> 
      *
      * @param selector -
      * {@link https://pptr.dev/guides/page-interactions#selectors | selector}
-     * to query page for.
+     * to query the page for.
      * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
      * can be passed as-is and a
      * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
@@ -301,7 +300,7 @@ export declare abstract class ElementHandle<ElementType extends Node = Element> 
      *
      * @param selector -
      * {@link https://pptr.dev/guides/page-interactions#selectors | selector}
-     * to query page for.
+     * to query the page for.
      * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
      * can be passed as-is and a
      * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
@@ -568,7 +567,7 @@ export declare abstract class ElementHandle<ElementType extends Node = Element> 
     screenshot(options: Readonly<ScreenshotOptions> & {
         encoding: 'base64';
     }): Promise<string>;
-    screenshot(options?: Readonly<ScreenshotOptions>): Promise<Buffer>;
+    screenshot(options?: Readonly<ScreenshotOptions>): Promise<Uint8Array>;
     /**
      * @internal
      */

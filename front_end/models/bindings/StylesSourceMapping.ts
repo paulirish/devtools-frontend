@@ -231,7 +231,7 @@ export class StyleFile implements TextUtils.ContentProvider.ContentProvider {
       return;
     }
     const mirrorContentBound = this.mirrorContent.bind(this, header, true /* majorChange */);
-    void this.#throttler.schedule(mirrorContentBound, Common.Throttler.Scheduling.Default);
+    void this.#throttler.schedule(mirrorContentBound, Common.Throttler.Scheduling.DEFAULT);
   }
 
   private workingCopyCommitted(): void {
@@ -239,7 +239,7 @@ export class StyleFile implements TextUtils.ContentProvider.ContentProvider {
       return;
     }
     const mirrorContentBound = this.mirrorContent.bind(this, this.uiSourceCode, true /* majorChange */);
-    void this.#throttler.schedule(mirrorContentBound, Common.Throttler.Scheduling.AsSoonAsPossible);
+    void this.#throttler.schedule(mirrorContentBound, Common.Throttler.Scheduling.AS_SOON_AS_POSSIBLE);
   }
 
   private workingCopyChanged(): void {
@@ -247,7 +247,7 @@ export class StyleFile implements TextUtils.ContentProvider.ContentProvider {
       return;
     }
     const mirrorContentBound = this.mirrorContent.bind(this, this.uiSourceCode, false /* majorChange */);
-    void this.#throttler.schedule(mirrorContentBound, Common.Throttler.Scheduling.Default);
+    void this.#throttler.schedule(mirrorContentBound, Common.Throttler.Scheduling.DEFAULT);
   }
 
   private async mirrorContent(fromProvider: TextUtils.ContentProvider.ContentProvider, majorChange: boolean):
@@ -303,28 +303,33 @@ export class StyleFile implements TextUtils.ContentProvider.ContentProvider {
 
   contentURL(): Platform.DevToolsPath.UrlString {
     console.assert(this.headers.size > 0);
-    return this.headers.values().next().value.originalContentProvider().contentURL();
+    return this.#firstHeader().originalContentProvider().contentURL();
   }
 
   contentType(): Common.ResourceType.ResourceType {
     console.assert(this.headers.size > 0);
-    return this.headers.values().next().value.originalContentProvider().contentType();
+    return this.#firstHeader().originalContentProvider().contentType();
   }
 
   requestContent(): Promise<TextUtils.ContentProvider.DeferredContent> {
     console.assert(this.headers.size > 0);
-    return this.headers.values().next().value.originalContentProvider().requestContent();
+    return this.#firstHeader().originalContentProvider().requestContent();
   }
 
   requestContentData(): Promise<TextUtils.ContentData.ContentDataOrError> {
     console.assert(this.headers.size > 0);
-    return this.headers.values().next().value.originalContentProvider().requestContentData();
+    return this.#firstHeader().originalContentProvider().requestContentData();
   }
 
   searchInContent(query: string, caseSensitive: boolean, isRegex: boolean):
       Promise<TextUtils.ContentProvider.SearchMatch[]> {
     console.assert(this.headers.size > 0);
-    return this.headers.values().next().value.originalContentProvider().searchInContent(query, caseSensitive, isRegex);
+    return this.#firstHeader().originalContentProvider().searchInContent(query, caseSensitive, isRegex);
+  }
+
+  #firstHeader(): SDK.CSSStyleSheetHeader.CSSStyleSheetHeader {
+    console.assert(this.headers.size > 0);
+    return this.headers.values().next().value as SDK.CSSStyleSheetHeader.CSSStyleSheetHeader;
   }
 
   static readonly updateTimeout = 200;

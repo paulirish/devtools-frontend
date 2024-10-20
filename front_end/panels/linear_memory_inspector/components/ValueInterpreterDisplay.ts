@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import '../../../ui/components/icon_button/icon_button.js';
+
 import * as i18n from '../../../core/i18n/i18n.js';
-import * as IconButton from '../../../ui/components/icon_button/icon_button.js';
+import type * as IconButton from '../../../ui/components/icon_button/icon_button.js';
 // eslint-disable-next-line rulesdir/es_modules_import
 import inspectorCommonStyles from '../../../ui/legacy/inspectorCommon.css.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
@@ -87,10 +89,9 @@ export class JumpToPointerAddressEvent extends Event {
 }
 
 export class ValueInterpreterDisplay extends HTMLElement {
-  static readonly litTagName = LitHtml.literal`devtools-linear-memory-inspector-interpreter-display`;
 
   readonly #shadow = this.attachShadow({mode: 'open'});
-  #endianness = Endianness.Little;
+  #endianness = Endianness.LITTLE;
   #buffer = new ArrayBuffer(0);
   #valueTypes: Set<ValueType> = new Set();
   #valueTypeModeConfig: Map<ValueType, ValueTypeMode> = getDefaultValueTypeMapping();
@@ -164,9 +165,9 @@ export class ValueInterpreterDisplay extends HTMLElement {
               <button class="jump-to-button" data-jump="true" title=${buttonTitle} ?disabled=${jumpDisabled}
                 jslog=${VisualLogging.action('linear-memory-inspector.jump-to-address').track({click: true})}
                 @click=${this.#onJumpToAddressClicked.bind(this, Number(address))}>
-                <${IconButton.Icon.Icon.litTagName} .data=${
+                <devtools-icon .data=${
                   {iconName: 'open-externally', color: iconColor, width: '16px'} as IconButton.Icon.IconWithName}>
-                </${IconButton.Icon.Icon.litTagName}>
+                </devtools-icon>
               </button>`}
         </div>
       </div>
@@ -209,7 +210,7 @@ export class ValueInterpreterDisplay extends HTMLElement {
     const signedValue = this.#parse({type, signed: true});
     const mode = this.#valueTypeModeConfig.get(type);
     const showSignedAndUnsigned =
-        signedValue !== unsignedValue && mode !== ValueTypeMode.Hexadecimal && mode !== ValueTypeMode.Octal;
+        signedValue !== unsignedValue && mode !== ValueTypeMode.HEXADECIMAL && mode !== ValueTypeMode.OCTAL;
 
     const unsignedRendered = html`<span class="value-type-cell selectable-text"  title=${
         i18nString(UIStrings.unsignedValue)} data-value="true">${unsignedValue}</span>`;
@@ -218,7 +219,7 @@ export class ValueInterpreterDisplay extends HTMLElement {
     }
 
     // Some values are too long to show in one line, we're putting them into the next line.
-    const showInMultipleLines = type === ValueType.Int32 || type === ValueType.Int64;
+    const showInMultipleLines = type === ValueType.INT32 || type === ValueType.INT64;
     const signedRendered = html`<span class="selectable-text" data-value="true" title=${
         i18nString(UIStrings.signedValue)}>${signedValue}</span>`;
 

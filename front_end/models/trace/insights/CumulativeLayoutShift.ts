@@ -8,21 +8,41 @@ import * as Types from '../types/types.js';
 
 import {
   type InsightResult,
-  type NavigationInsightContext,
+  type InsightSetContext,
   type RequiredData,
 } from './types.js';
+
+export type CLSInsightResult = InsightResult<{
+  animationFailures: readonly NoncompositedAnimationFailure[],
+  shifts: Map<Types.Events.SyntheticLayoutShift, LayoutShiftRootCausesData>,
+  clusters: Types.Events.SyntheticLayoutShiftCluster[],
+  worstCluster: Types.Events.SyntheticLayoutShiftCluster | undefined,
+}>;
 
 export function deps(): ['Meta', 'Animations', 'LayoutShifts', 'NetworkRequests'] {
   return ['Meta', 'Animations', 'LayoutShifts', 'NetworkRequests'];
 }
 
 export const enum AnimationFailureReasons {
-  UNSUPPORTED_CSS_PROPERTY = 'UNSUPPORTED_CSS_PROPERTY',
+  ACCELERATED_ANIMATIONS_DISABLED = 'ACCELERATED_ANIMATIONS_DISABLED',
+  EFFECT_SUPPRESSED_BY_DEVTOOLS = 'EFFECT_SUPPRESSED_BY_DEVTOOLS',
+  INVALID_ANIMATION_OR_EFFECT = 'INVALID_ANIMATION_OR_EFFECT',
+  EFFECT_HAS_UNSUPPORTED_TIMING_PARAMS = 'EFFECT_HAS_UNSUPPORTED_TIMING_PARAMS',
+  EFFECT_HAS_NON_REPLACE_COMPOSITE_MODE = 'EFFECT_HAS_NON_REPLACE_COMPOSITE_MODE',
+  TARGET_HAS_INVALID_COMPOSITING_STATE = 'TARGET_HAS_INVALID_COMPOSITING_STATE',
+  TARGET_HAS_INCOMPATIBLE_ANIMATIONS = 'TARGET_HAS_INCOMPATIBLE_ANIMATIONS',
+  TARGET_HAS_CSS_OFFSET = 'TARGET_HAS_CSS_OFFSET',
+  ANIMATION_AFFECTS_NON_CSS_PROPERTIES = 'ANIMATION_AFFECTS_NON_CSS_PROPERTIES',
+  TRANSFORM_RELATED_PROPERTY_CANNOT_BE_ACCELERATED_ON_TARGET =
+      'TRANSFORM_RELATED_PROPERTY_CANNOT_BE_ACCELERATED_ON_TARGET',
   TRANSFROM_BOX_SIZE_DEPENDENT = 'TRANSFROM_BOX_SIZE_DEPENDENT',
-  FILTER_MAY_MOVE_PIXELS = 'FILTER_MAY_MOVE_PIXELS',
-  NON_REPLACE_COMPOSITE_MODE = 'NON_REPLACE_COMPOSITE_MODE',
-  INCOMPATIBLE_ANIMATIONS = 'INCOMPATIBLE_ANIMATIONS',
-  UNSUPPORTED_TIMING_PARAMS = 'UNSUPPORTED_TIMING_PARAMS',
+  FILTER_RELATED_PROPERTY_MAY_MOVE_PIXELS = 'FILTER_RELATED_PROPERTY_MAY_MOVE_PIXELS',
+  UNSUPPORTED_CSS_PROPERTY = 'UNSUPPORTED_CSS_PROPERTY',
+  MIXED_KEYFRAME_VALUE_TYPES = 'MIXED_KEYFRAME_VALUE_TYPES',
+  TIMELINE_SOURCE_HAS_INVALID_COMPOSITING_STATE = 'TIMELINE_SOURCE_HAS_INVALID_COMPOSITING_STATE',
+  ANIMATION_HAS_NO_VISIBLE_CHANGE = 'ANIMATION_HAS_NO_VISIBLE_CHANGE',
+  AFFECTS_IMPORTANT_PROPERTY = 'AFFECTS_IMPORTANT_PROPERTY',
+  SVG_TARGET_HAS_INDEPENDENT_TRANSFORM_PROPERTY = 'SVG_TARGET_HAS_INDEPENDENT_TRANSFORM_PROPERTY',
 }
 
 export interface NoncompositedAnimationFailure {
@@ -38,7 +58,11 @@ export interface NoncompositedAnimationFailure {
   /**
    * Unsupported properties.
    */
-  unsupportedProperties?: Types.TraceEvents.TraceEventAnimation['args']['data']['unsupportedProperties'];
+  unsupportedProperties?: Types.Events.Animation['args']['data']['unsupportedProperties'];
+  /**
+   * Animation event.
+   */
+  animation?: Types.Events.SyntheticAnimationPair;
 }
 
 /**
@@ -49,8 +73,45 @@ export interface NoncompositedAnimationFailure {
  */
 const ACTIONABLE_FAILURE_REASONS = [
   {
-    flag: 1 << 13,
-    failure: AnimationFailureReasons.UNSUPPORTED_CSS_PROPERTY,
+    flag: 1 << 0,
+    failure: AnimationFailureReasons.ACCELERATED_ANIMATIONS_DISABLED,
+  },
+  {
+    flag: 1 << 1,
+    failure: AnimationFailureReasons.EFFECT_SUPPRESSED_BY_DEVTOOLS,
+  },
+  {
+    flag: 1 << 2,
+    failure: AnimationFailureReasons.INVALID_ANIMATION_OR_EFFECT,
+  },
+  {
+    flag: 1 << 3,
+    failure: AnimationFailureReasons.EFFECT_HAS_UNSUPPORTED_TIMING_PARAMS,
+  },
+  {
+    flag: 1 << 4,
+    failure: AnimationFailureReasons.EFFECT_HAS_NON_REPLACE_COMPOSITE_MODE,
+  },
+  {
+    flag: 1 << 5,
+    failure: AnimationFailureReasons.TARGET_HAS_INVALID_COMPOSITING_STATE,
+  },
+  {
+    flag: 1 << 6,
+    failure: AnimationFailureReasons.TARGET_HAS_INCOMPATIBLE_ANIMATIONS,
+  },
+  {
+    flag: 1 << 7,
+    failure: AnimationFailureReasons.TARGET_HAS_CSS_OFFSET,
+  },
+  // The failure 1 << 8 is marked as obsolete in Blink
+  {
+    flag: 1 << 9,
+    failure: AnimationFailureReasons.ANIMATION_AFFECTS_NON_CSS_PROPERTIES,
+  },
+  {
+    flag: 1 << 10,
+    failure: AnimationFailureReasons.TRANSFORM_RELATED_PROPERTY_CANNOT_BE_ACCELERATED_ON_TARGET,
   },
   {
     flag: 1 << 11,
@@ -58,19 +119,32 @@ const ACTIONABLE_FAILURE_REASONS = [
   },
   {
     flag: 1 << 12,
-    failure: AnimationFailureReasons.FILTER_MAY_MOVE_PIXELS,
+    failure: AnimationFailureReasons.FILTER_RELATED_PROPERTY_MAY_MOVE_PIXELS,
   },
   {
-    flag: 1 << 4,
-    failure: AnimationFailureReasons.NON_REPLACE_COMPOSITE_MODE,
+    flag: 1 << 13,
+    failure: AnimationFailureReasons.UNSUPPORTED_CSS_PROPERTY,
+  },
+  // The failure 1 << 14 is marked as obsolete in Blink
+  {
+    flag: 1 << 15,
+    failure: AnimationFailureReasons.MIXED_KEYFRAME_VALUE_TYPES,
   },
   {
-    flag: 1 << 6,
-    failure: AnimationFailureReasons.INCOMPATIBLE_ANIMATIONS,
+    flag: 1 << 16,
+    failure: AnimationFailureReasons.TIMELINE_SOURCE_HAS_INVALID_COMPOSITING_STATE,
   },
   {
-    flag: 1 << 3,
-    failure: AnimationFailureReasons.UNSUPPORTED_TIMING_PARAMS,
+    flag: 1 << 17,
+    failure: AnimationFailureReasons.ANIMATION_HAS_NO_VISIBLE_CHANGE,
+  },
+  {
+    flag: 1 << 18,
+    failure: AnimationFailureReasons.AFFECTS_IMPORTANT_PROPERTY,
+  },
+  {
+    flag: 1 << 19,
+    failure: AnimationFailureReasons.SVG_TARGET_HAS_INDEPENDENT_TRANSFORM_PROPERTY,
   },
 ];
 
@@ -79,47 +153,89 @@ const ACTIONABLE_FAILURE_REASONS = [
 const INVALIDATION_WINDOW = Helpers.Timing.secondsToMicroseconds(Types.Timing.Seconds(0.5));
 
 export interface LayoutShiftRootCausesData {
-  iframes: Types.TraceEvents.TraceEventRenderFrameImplCreateChildFrame[];
-  fontRequests: Types.TraceEvents.SyntheticNetworkRequest[];
+  iframeIds: string[];
+  fontRequests: Types.Events.SyntheticNetworkRequest[];
+  nonCompositedAnimations: NoncompositedAnimationFailure[];
 }
 
-function isInInvalidationWindow(
-    event: Types.TraceEvents.TraceEventData, targetEvent: Types.TraceEvents.TraceEventData): boolean {
+function isInInvalidationWindow(event: Types.Events.Event, targetEvent: Types.Events.Event): boolean {
   const eventEnd = event.dur ? event.ts + event.dur : event.ts;
   return eventEnd < targetEvent.ts && eventEnd >= targetEvent.ts - INVALIDATION_WINDOW;
 }
 
-/**
- * Returns a list of NoncompositedAnimationFailures.
- */
-function getNonCompositedAnimations(animations: readonly Types.TraceEvents.SyntheticAnimationPair[]):
+export function getNonCompositedFailure(animationEvent: Types.Events.SyntheticAnimationPair):
     NoncompositedAnimationFailure[] {
   const failures: NoncompositedAnimationFailure[] = [];
-  for (const event of animations) {
-    const beginEvent = event.args.data.beginEvent;
-    const instantEvents = event.args.data.instantEvents || [];
+  const beginEvent = animationEvent.args.data.beginEvent;
+  const instantEvents = animationEvent.args.data.instantEvents || [];
+  /**
+   * Animation events containing composite information are ASYNC_NESTABLE_INSTANT ('n').
+   * An animation may also contain multiple 'n' events, so we look through those with useful non-composited data.
+   */
+  for (const event of instantEvents) {
+    const failureMask = event.args.data.compositeFailed;
+    const unsupportedProperties = event.args.data.unsupportedProperties;
+    if (!failureMask) {
+      continue;
+    }
+    const failureReasons =
+        ACTIONABLE_FAILURE_REASONS.filter(reason => failureMask & reason.flag).map(reason => reason.failure);
+    const failure: NoncompositedAnimationFailure = {
+      name: beginEvent.args.data.displayName,
+      failureReasons,
+      unsupportedProperties,
+      animation: animationEvent,
+    };
+    failures.push(failure);
+  }
+  return failures;
+}
+
+function getNonCompositedFailureRootCauses(
+    animationEvents: Types.Events.SyntheticAnimationPair[],
+    prePaintEvents: Types.Events.PrePaint[],
+    shiftsByPrePaint: Map<Types.Events.PrePaint, Types.Events.LayoutShift[]>,
+    rootCausesByShift: Map<Types.Events.LayoutShift, LayoutShiftRootCausesData>,
+    ): NoncompositedAnimationFailure[] {
+  const allAnimationFailures: NoncompositedAnimationFailure[] = [];
+  for (const animation of animationEvents) {
     /**
      * Animation events containing composite information are ASYNC_NESTABLE_INSTANT ('n').
      * An animation may also contain multiple 'n' events, so we look through those with useful non-composited data.
      */
-    for (const event of instantEvents) {
-      const failureMask = event.args.data.compositeFailed;
-      const unsupportedProperties = event.args.data.unsupportedProperties;
-      if (!failureMask || !unsupportedProperties) {
-        continue;
+    const failures = getNonCompositedFailure(animation);
+    if (!failures) {
+      continue;
+    }
+    allAnimationFailures.push(...failures);
+
+    const nextPrePaint = getNextPrePaintEvent(prePaintEvents, animation);
+    // If no following prePaint, this is not a root cause.
+    if (!nextPrePaint) {
+      continue;
+    }
+
+    // If the animation event is outside the INVALIDATION_WINDOW, it could not be a root cause.
+    if (!isInInvalidationWindow(animation, nextPrePaint)) {
+      continue;
+    }
+
+    const shifts = shiftsByPrePaint.get(nextPrePaint);
+    // if no layout shift(s), this is not a root cause.
+    if (!shifts) {
+      continue;
+    }
+
+    for (const shift of shifts) {
+      const rootCausesForShift = rootCausesByShift.get(shift);
+      if (!rootCausesForShift) {
+        throw new Error('Unaccounted shift');
       }
-      const failureReasons = ACTIONABLE_FAILURE_REASONS.filter(reason => failureMask & reason.flag).map(reason => {
-        return reason.failure;
-      });
-      const failure: NoncompositedAnimationFailure = {
-        name: beginEvent.args.data.displayName,
-        failureReasons,
-        unsupportedProperties,
-      };
-      failures.push(failure);
+      rootCausesForShift.nonCompositedAnimations.push(...failures);
     }
   }
-  return failures;
+
+  return allAnimationFailures;
 }
 
 /**
@@ -127,11 +243,11 @@ function getNonCompositedAnimations(animations: readonly Types.TraceEvents.Synth
  * PrePaint events to layout shifts dispatched within it.
  */
 function getShiftsByPrePaintEvents(
-    layoutShifts: Types.TraceEvents.TraceEventLayoutShift[],
-    prePaintEvents: Types.TraceEvents.TraceEventPrePaint[],
-    ): Map<Types.TraceEvents.TraceEventPrePaint, Types.TraceEvents.TraceEventLayoutShift[]> {
+    layoutShifts: Types.Events.LayoutShift[],
+    prePaintEvents: Types.Events.PrePaint[],
+    ): Map<Types.Events.PrePaint, Types.Events.LayoutShift[]> {
   // Maps from PrePaint events to LayoutShifts that occured in each one.
-  const shiftsByPrePaint = new Map<Types.TraceEvents.TraceEventPrePaint, Types.TraceEvents.TraceEventLayoutShift[]>();
+  const shiftsByPrePaint = new Map<Types.Events.PrePaint, Types.Events.LayoutShift[]>();
 
   // Associate all shifts to their corresponding PrePaint.
   for (const prePaintEvent of prePaintEvents) {
@@ -160,8 +276,7 @@ function getShiftsByPrePaintEvents(
  * This gets the first prePaint event that follows the provided event and returns it.
  */
 function getNextPrePaintEvent(
-    prePaintEvents: Types.TraceEvents.TraceEventPrePaint[],
-    targetEvent: Types.TraceEvents.TraceEventData): Types.TraceEvents.TraceEventPrePaint|undefined {
+    prePaintEvents: Types.Events.PrePaint[], targetEvent: Types.Events.Event): Types.Events.PrePaint|undefined {
   // Get the first PrePaint event that happened after the targetEvent.
   const nextPrePaintIndex = Platform.ArrayUtilities.nearestIndexFromBeginning(
       prePaintEvents, prePaint => prePaint.ts > targetEvent.ts + (targetEvent.dur || 0));
@@ -178,11 +293,10 @@ function getNextPrePaintEvent(
  * and within this prePaint event a layout shift(s) occurs.
  */
 function getIframeRootCauses(
-    iframeCreatedEvents: readonly Types.TraceEvents.TraceEventRenderFrameImplCreateChildFrame[],
-    prePaintEvents: Types.TraceEvents.TraceEventPrePaint[],
-    shiftsByPrePaint: Map<Types.TraceEvents.TraceEventPrePaint, Types.TraceEvents.TraceEventLayoutShift[]>,
-    rootCausesByShift: Map<Types.TraceEvents.TraceEventLayoutShift, LayoutShiftRootCausesData>):
-    Map<Types.TraceEvents.TraceEventLayoutShift, LayoutShiftRootCausesData> {
+    iframeCreatedEvents: readonly Types.Events.RenderFrameImplCreateChildFrame[],
+    prePaintEvents: Types.Events.PrePaint[], shiftsByPrePaint: Map<Types.Events.PrePaint, Types.Events.LayoutShift[]>,
+    rootCausesByShift: Map<Types.Events.LayoutShift, LayoutShiftRootCausesData>,
+    domLoadingEvents: readonly Types.Events.DomLoading[]): Map<Types.Events.LayoutShift, LayoutShiftRootCausesData> {
   for (const iframeEvent of iframeCreatedEvents) {
     const nextPrePaint = getNextPrePaintEvent(prePaintEvents, iframeEvent);
     // If no following prePaint, this is not a root cause.
@@ -195,13 +309,20 @@ function getIframeRootCauses(
       continue;
     }
     for (const shift of shifts) {
-      const rootCausesForShift = Platform.MapUtilities.getWithDefault(rootCausesByShift, shift, () => {
-        return {
-          iframes: [],
-          fontRequests: [],
-        };
+      const rootCausesForShift = rootCausesByShift.get(shift);
+      if (!rootCausesForShift) {
+        throw new Error('Unaccounted shift');
+      }
+
+      // Look for the first dom event that occurs within the bounds of the iframe event.
+      // This contains the frame id.
+      const domEvent = domLoadingEvents.find(e => {
+        const maxIframe = Types.Timing.MicroSeconds(iframeEvent.ts + (iframeEvent.dur ?? 0));
+        return e.ts >= iframeEvent.ts && e.ts <= maxIframe;
       });
-      rootCausesForShift.iframes.push(iframeEvent);
+      if (domEvent && domEvent.args.frame) {
+        rootCausesForShift.iframeIds.push(domEvent.args.frame);
+      }
     }
   }
   return rootCausesByShift;
@@ -213,11 +334,10 @@ function getIframeRootCauses(
  * happen within the INVALIDATION_WINDOW of the prePaint event.
  */
 function getFontRootCauses(
-    networkRequests: Types.TraceEvents.SyntheticNetworkRequest[],
-    prePaintEvents: Types.TraceEvents.TraceEventPrePaint[],
-    shiftsByPrePaint: Map<Types.TraceEvents.TraceEventPrePaint, Types.TraceEvents.TraceEventLayoutShift[]>,
-    rootCausesByShift: Map<Types.TraceEvents.TraceEventLayoutShift, LayoutShiftRootCausesData>):
-    Map<Types.TraceEvents.TraceEventLayoutShift, LayoutShiftRootCausesData> {
+    networkRequests: Types.Events.SyntheticNetworkRequest[], prePaintEvents: Types.Events.PrePaint[],
+    shiftsByPrePaint: Map<Types.Events.PrePaint, Types.Events.LayoutShift[]>,
+    rootCausesByShift: Map<Types.Events.LayoutShift, LayoutShiftRootCausesData>):
+    Map<Types.Events.LayoutShift, LayoutShiftRootCausesData> {
   const fontRequests =
       networkRequests.filter(req => req.args.data.resourceType === 'Font' && req.args.data.mimeType.startsWith('font'));
 
@@ -241,56 +361,55 @@ function getFontRootCauses(
     }
     // Include the root cause to the shifts in this prePaint.
     for (const shift of shifts) {
-      const rootCausesForShift = Platform.MapUtilities.getWithDefault(rootCausesByShift, shift, () => {
-        return {
-          iframes: [],
-          fontRequests: [],
-        };
-      });
+      const rootCausesForShift = rootCausesByShift.get(shift);
+      if (!rootCausesForShift) {
+        throw new Error('Unaccounted shift');
+      }
       rootCausesForShift.fontRequests.push(req);
     }
   }
   return rootCausesByShift;
 }
 
-export function generateInsight(
-    traceParsedData: RequiredData<typeof deps>, context: NavigationInsightContext): InsightResult<{
-  animationFailures?: readonly NoncompositedAnimationFailure[],
-  shifts?: Map<Types.TraceEvents.TraceEventLayoutShift, LayoutShiftRootCausesData>,
-}> {
-  const isWithinSameNavigation = ((event: Types.TraceEvents.TraceEventData): boolean => {
-    const nav =
-        Helpers.Trace.getNavigationForTraceEvent(event, context.frameId, traceParsedData.Meta.navigationsByFrameId);
-    return nav?.args.data?.navigationId === context.navigationId;
-  });
+export function generateInsight(parsedTrace: RequiredData<typeof deps>, context: InsightSetContext): CLSInsightResult {
+  const isWithinContext = (event: Types.Events.Event): boolean => Helpers.Timing.eventIsInBounds(event, context.bounds);
 
-  const compositeAnimationEvents = traceParsedData.Animations.animations.filter(isWithinSameNavigation);
-  const animationFailures = getNonCompositedAnimations(compositeAnimationEvents);
+  const compositeAnimationEvents = parsedTrace.Animations.animations.filter(isWithinContext);
+  const iframeEvents = parsedTrace.LayoutShifts.renderFrameImplCreateChildFrameEvents.filter(isWithinContext);
+  const networkRequests = parsedTrace.NetworkRequests.byTime.filter(isWithinContext);
+  const domLoadingEvents = parsedTrace.LayoutShifts.domLoadingEvents.filter(isWithinContext);
 
-  const iframeEvents =
-      traceParsedData.LayoutShifts.renderFrameImplCreateChildFrameEvents.filter(isWithinSameNavigation);
-  const networkRequests = traceParsedData.NetworkRequests.byTime.filter(isWithinSameNavigation);
-
-  const layoutShifts = traceParsedData.LayoutShifts.clusters.flatMap(
-      cluster =>
-          // Use one of the events in the cluster to determine if within the same navigation.
-      isWithinSameNavigation(cluster.events[0]) ? cluster.events : [],
-  );
-  const prePaintEvents = traceParsedData.LayoutShifts.prePaintEvents.filter(isWithinSameNavigation);
+  const clusterKey = context.navigation ? context.navigationId : Types.Events.NO_NAVIGATION;
+  const clusters = parsedTrace.LayoutShifts.clustersByNavigationId.get(clusterKey) ?? [];
+  const clustersByScore = clusters.toSorted((a, b) => b.clusterCumulativeScore - a.clusterCumulativeScore);
+  const worstCluster = clustersByScore.at(0);
+  const layoutShifts = clusters.flatMap(cluster => cluster.events);
+  const prePaintEvents = parsedTrace.LayoutShifts.prePaintEvents.filter(isWithinContext);
 
   // Get root causes.
-  const rootCausesByShift = new Map<Types.TraceEvents.TraceEventLayoutShift, LayoutShiftRootCausesData>();
+  const rootCausesByShift = new Map<Types.Events.SyntheticLayoutShift, LayoutShiftRootCausesData>();
   const shiftsByPrePaint = getShiftsByPrePaintEvents(layoutShifts, prePaintEvents);
 
   for (const shift of layoutShifts) {
-    rootCausesByShift.set(shift, {iframes: [], fontRequests: []});
+    rootCausesByShift.set(shift, {iframeIds: [], fontRequests: [], nonCompositedAnimations: []});
   }
 
-  getIframeRootCauses(iframeEvents, prePaintEvents, shiftsByPrePaint, rootCausesByShift);
+  // Populate root causes for rootCausesByShift.
+  getIframeRootCauses(iframeEvents, prePaintEvents, shiftsByPrePaint, rootCausesByShift, domLoadingEvents);
   getFontRootCauses(networkRequests, prePaintEvents, shiftsByPrePaint, rootCausesByShift);
+  const animationFailures =
+      getNonCompositedFailureRootCauses(compositeAnimationEvents, prePaintEvents, shiftsByPrePaint, rootCausesByShift);
+
+  const relatedEvents: Types.Events.Event[] = [...layoutShifts];
+  if (worstCluster) {
+    relatedEvents.push(worstCluster);
+  }
 
   return {
+    relatedEvents,
     animationFailures,
     shifts: rootCausesByShift,
+    clusters,
+    worstCluster,
   };
 }

@@ -17,35 +17,22 @@ import * as Components from './components.js';
 
 const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
 
-function getLocalMetricValue(view: Element, metric: string): HTMLElement {
-  const card = view.shadowRoot!.querySelector(`#${metric} devtools-metric-card`);
-  return card!.shadowRoot!.querySelector('.local-value .metric-value') as HTMLElement;
-}
-
 function getFieldMetricValue(view: Element, metric: string): HTMLElement|null {
   const card = view.shadowRoot!.querySelector(`#${metric} devtools-metric-card`);
-  return card!.shadowRoot!.querySelector('.field-value .metric-value');
+  return card!.shadowRoot!.querySelector('#field-value .metric-value');
 }
 
-function getFieldHistogramPercents(view: Element, metric: string): string[] {
-  const card = view.shadowRoot!.querySelector(`#${metric} devtools-metric-card`);
-  const histogram = card!.shadowRoot!.querySelector('.field-data-histogram') as HTMLElement;
-  const percents = Array.from(histogram.querySelectorAll('.histogram-percent')) as HTMLElement[];
-  return percents.map(p => p.textContent || '');
-}
-
-function getCompareText(view: Element, metric: string): HTMLElement|null {
-  const card = view.shadowRoot!.querySelector(`#${metric} devtools-metric-card`);
-  return card!.shadowRoot!.querySelector('.compare-text');
-}
-
-function getThrottlingRecommendation(view: Element): HTMLElement|null {
-  return view.shadowRoot!.querySelector('.throttling-recommendation');
+function getEnvironmentRecs(view: Element): HTMLElement[] {
+  return Array.from(view.shadowRoot!.querySelectorAll<HTMLElement>('.environment-recs li'));
 }
 
 function getInteractions(view: Element): HTMLElement[] {
-  const interactionsListEl = view.shadowRoot?.querySelector('.interactions-list') as HTMLElement;
-  return Array.from(interactionsListEl.querySelectorAll('.interaction')) as HTMLElement[];
+  const interactionsListEl = view.shadowRoot!.querySelector('.interactions-list');
+  return Array.from(interactionsListEl?.querySelectorAll('.interaction') || []) as HTMLElement[];
+}
+
+function getClearInteractionsButton(view: Element): HTMLElementTagNameMap['devtools-button']|null {
+  return view.shadowRoot!.querySelector('.interactions-clear') as HTMLElementTagNameMap['devtools-button'] | null;
 }
 
 function selectDeviceOption(view: Element, deviceOption: string): void {
@@ -67,6 +54,23 @@ function selectPageScope(view: Element, pageScope: string): void {
   originOption!.click();
 }
 
+function getFieldMessage(view: Element): HTMLElement|null {
+  return view.shadowRoot!.querySelector('#field-setup .field-data-message');
+}
+
+function getDataDescriptions(view: Element): HTMLElement {
+  return view.shadowRoot!.querySelector('.data-descriptions') as HTMLElement;
+}
+
+function getLiveMetricsTitle(view: Element): HTMLElement {
+  // There may be multiple, but this should always be the first one.
+  return view.shadowRoot!.querySelector('.live-metrics > .section-title') as HTMLElement;
+}
+
+function getInpInteractionLink(view: Element): HTMLElement|null {
+  return view.shadowRoot!.querySelector<HTMLElement>('#inp .related-info button');
+}
+
 function createMockFieldData() {
   return {
     record: {
@@ -77,7 +81,7 @@ function createMockFieldData() {
         origin: 'https://example.com',
       },
       metrics: {
-        'largest_contentful_paint': {
+        largest_contentful_paint: {
           histogram: [
             {start: 0, end: 2500, density: 0.5},
             {start: 2500, end: 4000, density: 0.3},
@@ -85,7 +89,7 @@ function createMockFieldData() {
           ],
           percentiles: {p75: 1000},
         },
-        'cumulative_layout_shift': {
+        cumulative_layout_shift: {
           histogram: [
             {start: 0, end: 0.1},
             {start: 0.1, end: 0.25, density: 0.2},
@@ -93,8 +97,15 @@ function createMockFieldData() {
           ],
           percentiles: {p75: 0.25},
         },
-        'round_trip_time': {
+        round_trip_time: {
           percentiles: {p75: 150},
+        },
+        form_factors: {
+          fractions: {
+            desktop: 0.6,
+            phone: 0.3,
+            tablet: 0.1,
+          },
         },
       },
       collectionPeriod: {
@@ -107,9 +118,12 @@ function createMockFieldData() {
 
 describeWithMockConnection('LiveMetricsView', () => {
   const mockHandleAction = sinon.stub();
+  let mockReveal = sinon.stub();
 
   beforeEach(async () => {
     mockHandleAction.reset();
+
+    mockReveal = sinon.stub(Common.Revealer.RevealerRegistry.instance(), 'reveal');
 
     UI.ActionRegistration.registerActionExtension({
       actionId: 'timeline.toggle-recording',
@@ -123,12 +137,6 @@ describeWithMockConnection('LiveMetricsView', () => {
     });
 
     const dummyStorage = new Common.Settings.SettingsStorage({});
-    Common.Settings.registerSettingExtension({
-      category: Common.Settings.SettingCategory.MOBILE,
-      settingName: 'emulation.show-device-outline',
-      settingType: Common.Settings.SettingType.BOOLEAN,
-      defaultValue: false,
-    });
     Common.Settings.Settings.instance({
       forceNew: true,
       syncedStorage: dummyStorage,
@@ -151,60 +159,24 @@ describeWithMockConnection('LiveMetricsView', () => {
     UI.ActionRegistration.maybeRemoveActionExtension('timeline.record-reload');
   });
 
-  it('should show LCP value', async () => {
-    const view = new Components.LiveMetricsView.LiveMetricsView();
-    renderElementIntoDOM(view);
-    LiveMetrics.LiveMetrics.instance().dispatchEventToListeners(LiveMetrics.Events.Status, {
-      lcp: {value: 100},
-      interactions: [],
-    });
-    await coordinator.done();
-    const metricValueEl = getLocalMetricValue(view, 'lcp');
-    assert.strictEqual(metricValueEl.className, 'metric-value good');
-    assert.strictEqual(metricValueEl.innerText, '100 ms');
-  });
-
-  it('should show CLS value', async () => {
-    const view = new Components.LiveMetricsView.LiveMetricsView();
-    renderElementIntoDOM(view);
-    LiveMetrics.LiveMetrics.instance().dispatchEventToListeners(LiveMetrics.Events.Status, {
-      cls: {value: 0.14294789234},
-      interactions: [],
-    });
-    await coordinator.done();
-    const metricValueEl = getLocalMetricValue(view, 'cls');
-    assert.strictEqual(metricValueEl.className, 'metric-value needs-improvement');
-    assert.strictEqual(metricValueEl.innerText, '0.14');
-  });
-
-  it('should show INP value', async () => {
-    const view = new Components.LiveMetricsView.LiveMetricsView();
-    renderElementIntoDOM(view);
-    LiveMetrics.LiveMetrics.instance().dispatchEventToListeners(
-        LiveMetrics.Events.Status, {inp: {value: 2000}, interactions: []});
-    await coordinator.done();
-    const metricValueEl = getLocalMetricValue(view, 'inp');
-    assert.strictEqual(metricValueEl.className, 'metric-value poor');
-    assert.strictEqual(metricValueEl.innerText, '2.00 s');
-  });
-
-  it('should show empty metric', async () => {
-    const view = new Components.LiveMetricsView.LiveMetricsView();
-    renderElementIntoDOM(view);
-    await coordinator.done();
-    const metricValueEl = getLocalMetricValue(view, 'inp');
-    assert.strictEqual(metricValueEl.className.trim(), 'metric-value waiting');
-    assert.strictEqual(metricValueEl.innerText, '-');
-  });
-
   it('should show interactions', async () => {
     const view = new Components.LiveMetricsView.LiveMetricsView();
     renderElementIntoDOM(view);
-    LiveMetrics.LiveMetrics.instance().dispatchEventToListeners(LiveMetrics.Events.Status, {
+    LiveMetrics.LiveMetrics.instance().dispatchEventToListeners(LiveMetrics.Events.STATUS, {
+      inp: {
+        value: 500,
+        phases: {
+          inputDelay: 100,
+          processingDuration: 300,
+          presentationDelay: 100,
+        },
+        uniqueInteractionId: 'interaction-1-1',
+      },
       interactions: [
-        {duration: 500, interactionType: 'pointer'},
-        {duration: 30, interactionType: 'keyboard'},
+        {duration: 500, interactionType: 'pointer', uniqueInteractionId: 'interaction-1-1'},
+        {duration: 30, interactionType: 'keyboard', uniqueInteractionId: 'interaction-1-2'},
       ],
+      layoutShifts: [],
     });
     await coordinator.done();
 
@@ -212,18 +184,165 @@ describeWithMockConnection('LiveMetricsView', () => {
     assert.lengthOf(interactionsEls, 2);
 
     const typeEl1 = interactionsEls[0].querySelector('.interaction-type') as HTMLDivElement;
-    assert.strictEqual(typeEl1.textContent, 'pointer');
+    assert.match(typeEl1.textContent!, /pointer/);
+
+    const inpChip1 = typeEl1.querySelector('.interaction-inp-chip');
+    assert.isNotNull(inpChip1);
 
     const durationEl1 = interactionsEls[0].querySelector('.interaction-duration .metric-value') as HTMLDivElement;
     assert.strictEqual(durationEl1.textContent, '500 ms');
     assert.strictEqual(durationEl1.className, 'metric-value needs-improvement dim');
 
     const typeEl2 = interactionsEls[1].querySelector('.interaction-type') as HTMLDivElement;
-    assert.strictEqual(typeEl2.textContent, 'keyboard');
+    assert.match(typeEl2.textContent!, /keyboard/);
+
+    const inpChip2 = typeEl2.querySelector('.interaction-inp-chip');
+    assert.isNull(inpChip2);
 
     const durationEl2 = interactionsEls[1].querySelector('.interaction-duration .metric-value') as HTMLDivElement;
     assert.strictEqual(durationEl2.textContent, '30 ms');
     assert.strictEqual(durationEl2.className, 'metric-value good dim');
+  });
+
+  it('should show help icon for interaction that is longer than INP', async () => {
+    const view = new Components.LiveMetricsView.LiveMetricsView();
+    renderElementIntoDOM(view);
+    LiveMetrics.LiveMetrics.instance().dispatchEventToListeners(LiveMetrics.Events.STATUS, {
+      inp: {
+        value: 50,
+        phases: {
+          inputDelay: 10,
+          processingDuration: 30,
+          presentationDelay: 10,
+        },
+        uniqueInteractionId: 'interaction-1-2',
+      },
+      interactions: [
+        {duration: 50, interactionType: 'keyboard', uniqueInteractionId: 'interaction-1-1'},
+        {duration: 500, interactionType: 'pointer', uniqueInteractionId: 'interaction-1-2'},
+      ],
+      layoutShifts: [],
+    });
+    await coordinator.done();
+
+    const interactionsEls = getInteractions(view);
+    assert.lengthOf(interactionsEls, 2);
+
+    const typeEl1 = interactionsEls[0].querySelector<HTMLElement>('.interaction-type');
+    assert.match(typeEl1!.textContent!, /keyboard/);
+
+    const durationEl1 = interactionsEls[0].querySelector<HTMLElement>('.interaction-duration .metric-value');
+    assert.strictEqual(durationEl1!.textContent, '50 ms');
+    assert.strictEqual(durationEl1!.className, 'metric-value good dim');
+
+    const helpEl1 = interactionsEls[0].querySelector('.interaction-info');
+    assert.isNull(helpEl1);
+
+    const typeEl2 = interactionsEls[1].querySelector<HTMLElement>('.interaction-type');
+    assert.match(typeEl2!.textContent!, /pointer/);
+
+    const helpEl2 = interactionsEls[1].querySelector<HTMLElement>('.interaction-info');
+    assert.match(helpEl2!.title, /98th percentile/);
+
+    const durationEl2 = interactionsEls[1].querySelector<HTMLElement>('.interaction-duration .metric-value');
+    assert.strictEqual(durationEl2!.textContent, '500 ms');
+    assert.strictEqual(durationEl2!.className, 'metric-value needs-improvement dim');
+  });
+
+  it('should reveal INP interaction when link clicked', async () => {
+    const view = new Components.LiveMetricsView.LiveMetricsView();
+    renderElementIntoDOM(view);
+    LiveMetrics.LiveMetrics.instance().dispatchEventToListeners(LiveMetrics.Events.STATUS, {
+      inp: {
+        value: 500,
+        phases: {
+          inputDelay: 100,
+          processingDuration: 300,
+          presentationDelay: 100,
+        },
+        uniqueInteractionId: 'interaction-1-1',
+      },
+      interactions: [
+        {duration: 500, interactionType: 'pointer', uniqueInteractionId: 'interaction-1-1'},
+        {duration: 30, interactionType: 'keyboard', uniqueInteractionId: 'interaction-1-2'},
+      ],
+      layoutShifts: [],
+    });
+    await coordinator.done();
+
+    const inpInteractionLink = getInpInteractionLink(view);
+    inpInteractionLink!.click();
+
+    await coordinator.done();
+
+    assert(mockReveal.calledWithExactly(
+        {
+          duration: 500,
+          interactionType: 'pointer',
+          uniqueInteractionId: 'interaction-1-1',
+        },
+        false));
+  });
+
+  it('should hide INP link if no matching interaction', async () => {
+    const view = new Components.LiveMetricsView.LiveMetricsView();
+    renderElementIntoDOM(view);
+    LiveMetrics.LiveMetrics.instance().dispatchEventToListeners(LiveMetrics.Events.STATUS, {
+      inp: {
+        value: 500,
+        phases: {
+          inputDelay: 100,
+          processingDuration: 300,
+          presentationDelay: 100,
+        },
+        uniqueInteractionId: 'interaction-1-1',
+      },
+      interactions: [
+        {duration: 30, interactionType: 'keyboard', uniqueInteractionId: 'interaction-1-2'},
+      ],
+      layoutShifts: [],
+    });
+    await coordinator.done();
+
+    const inpInteractionLink = getInpInteractionLink(view);
+    assert.isNull(inpInteractionLink);
+  });
+
+  it('clear interactions log button should work', async () => {
+    const view = new Components.LiveMetricsView.LiveMetricsView();
+    renderElementIntoDOM(view);
+    await coordinator.done();
+
+    assert.isNull(getClearInteractionsButton(view));
+    assert.lengthOf(getInteractions(view), 0);
+
+    LiveMetrics.LiveMetrics.instance().dispatchEventToListeners(LiveMetrics.Events.STATUS, {
+      inp: {
+        value: 50,
+        phases: {
+          inputDelay: 10,
+          processingDuration: 30,
+          presentationDelay: 10,
+        },
+        uniqueInteractionId: 'interaction-1-2',
+      },
+      interactions: [
+        {duration: 50, interactionType: 'keyboard', uniqueInteractionId: 'interaction-1-1'},
+        {duration: 500, interactionType: 'pointer', uniqueInteractionId: 'interaction-1-2'},
+      ],
+      layoutShifts: [],
+    });
+    await coordinator.done();
+
+    assert.lengthOf(getInteractions(view), 2);
+
+    const interactionsButton = getClearInteractionsButton(view);
+    interactionsButton!.click();
+
+    await coordinator.done();
+
+    assert.isNull(getClearInteractionsButton(view));
+    assert.lengthOf(getInteractions(view), 0);
   });
 
   it('record action button should work', async () => {
@@ -259,7 +378,7 @@ describeWithMockConnection('LiveMetricsView', () => {
     let mockFieldData: CrUXManager.PageResult;
 
     beforeEach(async () => {
-      const tabTarget = createTarget({type: SDK.Target.Type.Tab});
+      const tabTarget = createTarget({type: SDK.Target.Type.TAB});
       target = createTarget({parentTarget: tabTarget});
 
       mockFieldData = {
@@ -287,26 +406,18 @@ describeWithMockConnection('LiveMetricsView', () => {
 
       await coordinator.done();
 
-      const lcpPercents = getFieldHistogramPercents(view, 'lcp');
-      assert.deepStrictEqual(lcpPercents, ['-', '-', '-']);
+      const envRecs = getEnvironmentRecs(view);
+      assert.lengthOf(envRecs, 0);
 
-      const clsPercents = getFieldHistogramPercents(view, 'cls');
-      assert.deepStrictEqual(clsPercents, ['-', '-', '-']);
+      const fieldMessage = getFieldMessage(view);
+      assert.match(fieldMessage!.innerText, /See how your local metrics compare/);
 
-      const inpPercents = getFieldHistogramPercents(view, 'inp');
-      assert.deepStrictEqual(inpPercents, ['-', '-', '-']);
+      const dataDescriptions = getDataDescriptions(view);
+      assert.match(dataDescriptions.innerText, /local metrics/);
+      assert.notMatch(dataDescriptions.innerText, /field data/);
 
-      const lcpFieldEl = getFieldMetricValue(view, 'lcp');
-      assert.isNull(lcpFieldEl);
-
-      const clsFieldEl = getFieldMetricValue(view, 'cls');
-      assert.isNull(clsFieldEl);
-
-      const inpFieldEl = getFieldMetricValue(view, 'inp');
-      assert.isNull(inpFieldEl);
-
-      const throttlingRec = getThrottlingRecommendation(view);
-      assert.isNull(throttlingRec);
+      const title = getLiveMetricsTitle(view);
+      assert.strictEqual(title.innerText, 'Local metrics');
     });
 
     it('should show when crux is enabled', async () => {
@@ -325,26 +436,52 @@ describeWithMockConnection('LiveMetricsView', () => {
 
       await coordinator.done();
 
-      const lcpPercents = getFieldHistogramPercents(view, 'lcp');
-      assert.deepStrictEqual(lcpPercents, ['50%', '30%', '20%']);
+      const envRecs = getEnvironmentRecs(view);
+      assert.lengthOf(envRecs, 2);
+      assert.match(envRecs[0].textContent!, /60%.*desktop/);
+      assert.match(envRecs[1].textContent!, /Slow 4G/);
 
-      const clsPercents = getFieldHistogramPercents(view, 'cls');
-      assert.deepStrictEqual(clsPercents, ['0%', '20%', '80%']);
+      const fieldMessage = getFieldMessage(view);
+      // We can't match the exact string because we format the dates based on
+      // locale, so the exact format depends based on where the SWE or bots who
+      // run these tests are!
+      // We expect it to say something like Jan 1 - Jan 29 2024.
+      assert.match(fieldMessage!.innerText, /Jan.+2024/);
 
-      const inpPercents = getFieldHistogramPercents(view, 'inp');
-      assert.deepStrictEqual(inpPercents, ['-', '-', '-']);
+      const dataDescriptions = getDataDescriptions(view);
+      assert.match(dataDescriptions.innerText, /local metrics/);
+      assert.match(dataDescriptions.innerText, /field data/);
 
-      const lcpFieldEl = getFieldMetricValue(view, 'lcp');
-      assert.strictEqual(lcpFieldEl!.textContent, '1.00 s');
+      const title = getLiveMetricsTitle(view);
+      assert.strictEqual(title.innerText, 'Local and field metrics');
+    });
 
-      const clsFieldEl = getFieldMetricValue(view, 'cls');
-      assert.strictEqual(clsFieldEl!.textContent, '0.25');
+    it('should show empty values when crux is enabled but there is no field data', async () => {
+      const view = new Components.LiveMetricsView.LiveMetricsView();
+      renderElementIntoDOM(view);
 
-      const inpFieldEl = getFieldMetricValue(view, 'inp');
-      assert.isNull(inpFieldEl);
+      await coordinator.done();
 
-      const throttlingRec = getThrottlingRecommendation(view);
-      assert.match(throttlingRec!.innerText, /Slow 4G/);
+      target.model(SDK.ResourceTreeModel.ResourceTreeModel)
+          ?.dispatchEventToListeners(SDK.ResourceTreeModel.Events.FrameNavigated, {
+            url: 'https://example.com',
+            isPrimaryFrame: () => true,
+          } as SDK.ResourceTreeModel.ResourceTreeFrame);
+
+      await coordinator.done();
+
+      const envRecs = getEnvironmentRecs(view);
+      assert.lengthOf(envRecs, 0);
+
+      const fieldMessage = getFieldMessage(view);
+      assert.isNull(fieldMessage);
+
+      const dataDescriptions = getDataDescriptions(view);
+      assert.match(dataDescriptions.innerText, /local metrics/);
+      assert.match(dataDescriptions.innerText, /field data/);
+
+      const title = getLiveMetricsTitle(view);
+      assert.strictEqual(title.innerText, 'Local and field metrics');
     });
 
     it('should make initial request on render when crux is enabled', async () => {
@@ -482,93 +619,7 @@ describeWithMockConnection('LiveMetricsView', () => {
       assert.strictEqual(lcpFieldEl2!.textContent, '2.00 s');
     });
 
-    describe('local/field comparison', () => {
-      it('should show message when values are similar', async () => {
-        mockFieldData['url-ALL'] = createMockFieldData();
-
-        const view = new Components.LiveMetricsView.LiveMetricsView();
-        renderElementIntoDOM(view);
-
-        LiveMetrics.LiveMetrics.instance().dispatchEventToListeners(LiveMetrics.Events.Status, {
-          lcp: {value: 100},
-          interactions: [],
-        });
-
-        await coordinator.done();
-
-        const compareText = getCompareText(view, 'lcp');
-        assert.strictEqual(
-            compareText!.innerText, 'Your local LCP 100 ms is good, and is similar to your users’ experience.');
-      });
-
-      it('should show message when local is better', async () => {
-        mockFieldData['url-ALL'] = createMockFieldData();
-        mockFieldData['url-ALL'].record.metrics.largest_contentful_paint!.percentiles!.p75 = 5000;
-
-        const view = new Components.LiveMetricsView.LiveMetricsView();
-        renderElementIntoDOM(view);
-
-        LiveMetrics.LiveMetrics.instance().dispatchEventToListeners(LiveMetrics.Events.Status, {
-          lcp: {value: 100},
-          interactions: [],
-        });
-
-        await coordinator.done();
-
-        const compareText = getCompareText(view, 'lcp');
-        assert.strictEqual(
-            compareText!.innerText,
-            'Your local LCP 100 ms is good, and is significantly better than your users’ experience.');
-      });
-
-      it('should show message when local is worse', async () => {
-        mockFieldData['url-ALL'] = createMockFieldData();
-
-        const view = new Components.LiveMetricsView.LiveMetricsView();
-        renderElementIntoDOM(view);
-
-        LiveMetrics.LiveMetrics.instance().dispatchEventToListeners(LiveMetrics.Events.Status, {
-          lcp: {value: 5000},
-          interactions: [],
-        });
-
-        await coordinator.done();
-
-        const compareText = getCompareText(view, 'lcp');
-        assert.strictEqual(
-            compareText!.innerText,
-            'Your local LCP 5.00 s is poor, and is significantly worse than your users’ experience.');
-      });
-
-      it('should show generic summary if field is missing', async () => {
-        const view = new Components.LiveMetricsView.LiveMetricsView();
-        renderElementIntoDOM(view);
-
-        LiveMetrics.LiveMetrics.instance().dispatchEventToListeners(LiveMetrics.Events.Status, {
-          lcp: {value: 3000},
-          interactions: [],
-        });
-
-        await coordinator.done();
-
-        const compareText = getCompareText(view, 'lcp');
-        assert.strictEqual(compareText!.innerText, 'Your local LCP 3.00 s needs improvement.');
-      });
-
-      it('should suggest interaction if local INP is missing', async () => {
-        mockFieldData['url-ALL'] = createMockFieldData();
-
-        const view = new Components.LiveMetricsView.LiveMetricsView();
-        renderElementIntoDOM(view);
-
-        await coordinator.done();
-
-        const compareText = getCompareText(view, 'inp');
-        assert.strictEqual(compareText!.innerText, 'Interact with the page to measure INP.');
-      });
-    });
-
-    describe('throttling recommendation', () => {
+    describe('network throttling recommendation', () => {
       it('should show for closest target RTT', async () => {
         mockFieldData['url-ALL'] = createMockFieldData();
 
@@ -582,8 +633,10 @@ describeWithMockConnection('LiveMetricsView', () => {
 
         await coordinator.done();
 
-        const throttlingRec = getThrottlingRecommendation(view);
-        assert.match(throttlingRec!.innerText, /Slow 4G/);
+        const envRecs = getEnvironmentRecs(view);
+        assert.lengthOf(envRecs, 2);
+        assert.match(envRecs[0].textContent!, /60%.*desktop/);
+        assert.match(envRecs[1].textContent!, /Slow 4G/);
       });
 
       it('should hide if no RTT data', async () => {
@@ -595,8 +648,9 @@ describeWithMockConnection('LiveMetricsView', () => {
 
         await coordinator.done();
 
-        const throttlingRec = getThrottlingRecommendation(view);
-        assert.isNull(throttlingRec);
+        const envRecs = getEnvironmentRecs(view);
+        assert.lengthOf(envRecs, 1);
+        assert.match(envRecs[0].textContent!, /60%.*desktop/);
       });
 
       it('should suggest no throttling for very low latency', async () => {
@@ -611,8 +665,10 @@ describeWithMockConnection('LiveMetricsView', () => {
 
         await coordinator.done();
 
-        const throttlingRec = getThrottlingRecommendation(view);
-        assert.match(throttlingRec!.innerText, /Try disabling/);
+        const envRecs = getEnvironmentRecs(view);
+        assert.lengthOf(envRecs, 2);
+        assert.match(envRecs[0].textContent!, /60%.*desktop/);
+        assert.match(envRecs[1].textContent!, /no throttling/);
       });
 
       it('should ignore presets that are generally too far off', async () => {
@@ -627,8 +683,64 @@ describeWithMockConnection('LiveMetricsView', () => {
 
         await coordinator.done();
 
-        const throttlingRec = getThrottlingRecommendation(view);
-        assert.isNull(throttlingRec);
+        const envRecs = getEnvironmentRecs(view);
+        assert.lengthOf(envRecs, 1);
+        assert.match(envRecs[0].textContent!, /60%.*desktop/);
+      });
+    });
+
+    describe('form factor recommendation', () => {
+      it('should recommend desktop if it is the majority', async () => {
+        mockFieldData['url-ALL'] = createMockFieldData();
+
+        const view = new Components.LiveMetricsView.LiveMetricsView();
+        renderElementIntoDOM(view);
+
+        await coordinator.done();
+
+        const envRecs = getEnvironmentRecs(view);
+        assert.lengthOf(envRecs, 2);
+        assert.match(envRecs[0].textContent!, /60%.*desktop/);
+        assert.match(envRecs[1].textContent!, /Slow 4G/);
+      });
+
+      it('should recommend mobile if it is the majority', async () => {
+        mockFieldData['url-ALL'] = createMockFieldData();
+
+        mockFieldData['url-ALL'].record.metrics.form_factors!.fractions = {
+          desktop: 0.1,
+          phone: 0.8,
+          tablet: 0.1,
+        };
+
+        const view = new Components.LiveMetricsView.LiveMetricsView();
+        renderElementIntoDOM(view);
+
+        await coordinator.done();
+
+        const envRecs = getEnvironmentRecs(view);
+        assert.lengthOf(envRecs, 2);
+        assert.match(envRecs[0].textContent!, /80%.*mobile/);
+        assert.match(envRecs[1].textContent!, /Slow 4G/);
+      });
+
+      it('should recommend nothing if there is no majority', async () => {
+        mockFieldData['url-ALL'] = createMockFieldData();
+
+        mockFieldData['url-ALL'].record.metrics.form_factors!.fractions = {
+          desktop: 0.49,
+          phone: 0.49,
+          tablet: 0.02,
+        };
+
+        const view = new Components.LiveMetricsView.LiveMetricsView();
+        renderElementIntoDOM(view);
+
+        await coordinator.done();
+
+        const envRecs = getEnvironmentRecs(view);
+        assert.lengthOf(envRecs, 1);
+        assert.match(envRecs[0].textContent!, /Slow 4G/);
       });
     });
   });

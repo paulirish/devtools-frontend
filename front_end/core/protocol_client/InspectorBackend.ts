@@ -329,7 +329,7 @@ export class SessionRouter {
     const messageId = this.nextMessageId();
     const messageObject: Message = {
       id: messageId,
-      method: method,
+      method,
     };
 
     if (params) {
@@ -666,6 +666,10 @@ export class TargetBase {
 
   eventBreakpointsAgent(): ProtocolProxyApi.EventBreakpointsApi {
     return this.getAgent('EventBreakpoints');
+  }
+
+  extensionsAgent(): ProtocolProxyApi.ExtensionsApi {
+    return this.getAgent('Extensions');
   }
 
   fetchAgent(): ProtocolProxyApi.FetchApi {

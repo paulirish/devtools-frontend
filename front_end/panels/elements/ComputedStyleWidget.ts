@@ -51,6 +51,8 @@ import {categorizePropertyName, type Category, DefaultCategoryOrder} from './Pro
 import {type MatchRenderer, Renderer, type RenderingContext, StringRenderer, URLRenderer} from './PropertyRenderer.js';
 import {StylePropertiesSection} from './StylePropertiesSection.js';
 
+const {html} = LitHtml;
+
 const UIStrings = {
   /**
    * @description Text for a checkbox setting that controls whether the user-supplied filter text
@@ -123,7 +125,7 @@ const createPropertyElement =
      onContextMenu: ((event: Event) => void)): LitHtml.TemplateResult => {
       const {name, value} = renderPropertyContents(node, propertyName, propertyValue);
       // clang-format off
-      return LitHtml.html`<${ElementsComponents.ComputedStyleProperty.ComputedStyleProperty.litTagName}
+      return html`<devtools-computed-style-property
         .traceable=${traceable}
         .inherited=${inherited}
         @oncontextmenu=${onContextMenu}
@@ -134,7 +136,7 @@ const createPropertyElement =
         }}>
           ${name}
           ${value}
-      </${ElementsComponents.ComputedStyleProperty.ComputedStyleProperty.litTagName}>`;
+      </devtools-computed-style-property>`;
       // clang-format on
     };
 
@@ -246,7 +248,7 @@ export class ComputedStyleWidget extends UI.ThrottledWidget.ThrottledWidget {
     this.contentElement.classList.add('styles-sidebar-computed-style-widget');
 
     this.computedStyleModel = new ComputedStyleModel();
-    this.computedStyleModel.addEventListener(Events.ComputedStyleChanged, this.update, this);
+    this.computedStyleModel.addEventListener(Events.COMPUTED_STYLE_CHANGED, this.update, this);
 
     this.showInheritedComputedStylePropertiesSetting =
         Common.Settings.Settings.instance().createSetting('show-inherited-computed-style-properties', false);
@@ -260,7 +262,7 @@ export class ComputedStyleWidget extends UI.ThrottledWidget.ThrottledWidget {
     const hbox = this.contentElement.createChild('div', 'hbox styles-sidebar-pane-toolbar');
     const toolbar = new UI.Toolbar.Toolbar('styles-pane-toolbar', hbox);
     const filterInput = new UI.Toolbar.ToolbarFilter(undefined, 1, 1, undefined, undefined, false);
-    filterInput.addEventListener(UI.Toolbar.ToolbarInput.Event.TextChanged, this.onFilterChanged, this);
+    filterInput.addEventListener(UI.Toolbar.ToolbarInput.Event.TEXT_CHANGED, this.onFilterChanged, this);
     toolbar.appendToolbarItem(filterInput);
     this.input = filterInput;
     this.filterRegex = null;
@@ -463,7 +465,7 @@ export class ComputedStyleWidget extends UI.ThrottledWidget.ThrottledWidget {
       if (data.tag === 'property') {
         const trace = propertyTraces.get(data.propertyName);
         const activeProperty = trace?.find(
-            property => matchedStyles.propertyState(property) === SDK.CSSMatchedStyles.PropertyState.Active);
+            property => matchedStyles.propertyState(property) === SDK.CSSMatchedStyles.PropertyState.ACTIVE);
         const propertyElement = createPropertyElement(
             domNode, data.propertyName, data.propertyValue, propertyTraces.has(data.propertyName), data.inherited,
             activeProperty, event => {
@@ -475,14 +477,14 @@ export class ComputedStyleWidget extends UI.ThrottledWidget.ThrottledWidget {
       }
       if (data.tag === 'traceElement') {
         const isPropertyOverloaded =
-            matchedStyles.propertyState(data.property) === SDK.CSSMatchedStyles.PropertyState.Overloaded;
+            matchedStyles.propertyState(data.property) === SDK.CSSMatchedStyles.PropertyState.OVERLOADED;
         const traceElement =
             createTraceElement(domNode, data.property, isPropertyOverloaded, matchedStyles, this.linkifier);
         traceElement.addEventListener(
             'contextmenu', this.handleContextMenuEvent.bind(this, matchedStyles, data.property));
-        return LitHtml.html`${traceElement}`;
+        return html`${traceElement}`;
       }
-      return LitHtml.html`<span style="cursor: text; color: var(--sys-color-token-subtle);">${data.name}</span>`;
+      return html`<span style="cursor: text; color: var(--sys-color-token-subtle);">${data.name}</span>`;
     };
   }
 

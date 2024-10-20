@@ -2,37 +2,37 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import '../../../ui/components/icon_button/icon_button.js';
+import './CPUThrottlingSelector.js';
+import './FieldSettingsDialog.js';
+import './NetworkThrottlingSelector.js';
+import '../../../ui/components/menus/menus.js';
+
 import * as Common from '../../../core/common/common.js';
 import * as i18n from '../../../core/i18n/i18n.js';
-import * as SDK from '../../../core/sdk/sdk.js';
+import type * as SDK from '../../../core/sdk/sdk.js';
 import * as CrUXManager from '../../../models/crux-manager/crux-manager.js';
 import * as EmulationModel from '../../../models/emulation/emulation.js';
 import * as LiveMetrics from '../../../models/live-metrics/live-metrics.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
-import * as Dialogs from '../../../ui/components/dialogs/dialogs.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
-import * as Menus from '../../../ui/components/menus/menus.js';
+import * as LegacyWrapper from '../../../ui/components/legacy_wrapper/legacy_wrapper.js';
+import type * as Menus from '../../../ui/components/menus/menus.js';
+import type * as Settings from '../../../ui/components/settings/settings.js';
+import * as Components from '../../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as MobileThrottling from '../../mobile_throttling/mobile_throttling.js';
 
-import {CPUThrottlingSelector} from './CPUThrottlingSelector.js';
-import {FieldSettingsDialog} from './FieldSettingsDialog.js';
 import liveMetricsViewStyles from './liveMetricsView.css.js';
-import {renderCompareText} from './MetricCompareStrings.js';
-import {NetworkThrottlingSelector} from './NetworkThrottlingSelector.js';
+import {type MetricCardData} from './MetricCard.js';
+import metricValueStyles from './metricValueStyles.css.js';
+import {INP_THRESHOLDS, renderMetricValue} from './Utils.js';
 
 const {html, nothing, Directives} = LitHtml;
 const {until} = Directives;
 
-type MetricRating = 'good'|'needs-improvement'|'poor';
-type MetricThresholds = [number, number];
 type DeviceOption = CrUXManager.DeviceScope|'AUTO';
-
-// TODO: Consolidate our metric rating logic with the trace engine.
-const LCP_THRESHOLDS = [2500, 4000] as MetricThresholds;
-const CLS_THRESHOLDS = [0.1, 0.25] as MetricThresholds;
-const INP_THRESHOLDS = [200, 500] as MetricThresholds;
 
 const DEVICE_OPTION_LIST: DeviceOption[] = ['AUTO', ...CrUXManager.DEVICE_SCOPE_LIST];
 
@@ -41,9 +41,13 @@ const RTT_MINIMUM = 60;
 
 const UIStrings = {
   /**
-   * @description Title of a view that shows metrics from the local environment and field metrics collected from real users in the field.
+   * @description Title of a view that shows performance metrics from the local environment and field metrics collected from real users in the field.
    */
-  localAndFieldMetrics: 'Local and Field Metrics',
+  localAndFieldMetrics: 'Local and field metrics',
+  /**
+   * @description Title of a view that shows performance metrics from the local environment.
+   */
+  localMetrics: 'Local metrics',
   /**
    * @description Title of a section that lists user interactions.
    */
@@ -57,29 +61,9 @@ const UIStrings = {
    */
   fieldData: 'Field data',
   /**
-   * @description Title of a section that shows throttling settings.
+   * @description Title of a section that shows settings to control the developers local testing environment.
    */
-  throttling: 'Throttling',
-  /**
-   * @description Title of a report section for the largest contentful paint metric.
-   */
-  lcpTitle: 'Largest Contentful Paint (LCP)',
-  /**
-   * @description Title of a report section for the cumulative layout shift metric.
-   */
-  clsTitle: 'Cumulative Layout Shift (CLS)',
-  /**
-   * @description Title of a report section for the interaction to next paint metric.
-   */
-  inpTitle: 'Interaction to Next Paint (INP)',
-  /**
-   * @description Label for a metric value that was measured in the local environment.
-   */
-  localValue: 'Local',
-  /**
-   * @description Label for the 75th percentile of a metric according to data collected from real users in the field.
-   */
-  field75thPercentile: 'Field 75th Percentile',
+  environmentSettings: 'Environment settings',
   /**
    * @description Label for an select box that selects which device type field data be shown for (e.g. desktop/mobile/all devices/etc).
    * @example {Mobile} PH1
@@ -145,383 +129,146 @@ const UIStrings = {
    */
   showFieldDataForPage: 'Show field data for {PH1}',
   /**
-   * @description Text block recommendation instructing the user to disable network throttling to best match real user network data.
+   * @description Tooltip text explaining that real user connections are similar to a test environment with no throttling. "latencies" refers to the time it takes for a website server to respond. "throttling" is when the network is intentionally slowed down to simulate a slower connection.
    */
-  tryDisablingThrottling: 'Try disabling network throttling to approximate the network latency measured by real users.',
+  tryDisablingThrottling:
+      'The 75th percentile of real users experienced network latencies similar to a connection with no throttling.',
   /**
-   * @description Text block recommendation instructing the user to enable a throttling preset to best match real user network data.
+   * @description Tooltip text explaining that real user connections are similar to a specif network throttling setup. "latencies" refers to the time it takes for a website server to respond. "throttling" is when the network is intentionally slowed down to simulate a slower connection.
    * @example {Slow 4G} PH1
    */
-  tryUsingThrottling: 'Try using {PH1} network throttling to approximate the network latency measured by real users.',
+  tryUsingThrottling: 'The 75th percentile of real users experienced network latencies similar to {PH1} throttling.',
   /**
-   * @description Text label for a link to the Largest Contentful Paint (LCP) related DOM node.
+   * @description Tooltip text explaining that a majority of users are using a mobile form factor with the specific percentage.
+   * @example {60%} PH1
    */
-  lcpElement: 'LCP Element',
+  mostUsersMobile: '{PH1} of users are on mobile.',
   /**
-   * @description Text label for values that are classified as "good".
+   * @description Tooltip text explaining that a majority of users are using a desktop form factor with the specific percentage.
+   * @example {60%} PH1
    */
-  good: 'Good',
+  mostUsersDesktop: '{PH1} of users are on desktop.',
   /**
-   * @description Text label for values that are classified as "needs improvement".
-   */
-  needsImprovement: 'Needs improvement',
-  /**
-   * @description Text label for values that are classified as "poor".
-   */
-  poor: 'Poor',
-  /**
-   * @description Text label for a range of values that are less than or equal to a certain value.
-   * @example {500 ms} PH1
-   */
-  leqRange: '(≤{PH1})',
-  /**
-   * @description Text label for a range of values that are between two values.
-   * @example {500 ms} PH1
-   * @example {800 ms} PH2
-   */
-  betweenRange: '({PH1}-{PH2})',
-  /**
-   * @description Text label for a range of values that are greater than a certain value.
-   * @example {500 ms} PH1
-   */
-  gtRange: '(>{PH1})',
-  /**
-   * @description Text for a percentage value in the live metrics view.
-   * @example {13} PH1
+   * @description Text for a percentage value.
+   * @example {60} PH1
    */
   percentage: '{PH1}%',
   /**
-   * @description Text instructing the user to interact with the page because a user interaction is required to measure Interaction to Next Paint (INP).
+   * @description Text block explaining how to simulate different mobile and desktop devices. The placeholder at the end will be a link with the text "simulate different devices" translated separately.
+   * @example {simulate different devices} PH1
    */
-  interactToMeasure: 'Interact with the page to measure INP.',
+  useDeviceToolbar: 'Use the device toolbar to {PH1}.',
   /**
-   * @description Label for a tooltip that provides more details.
+   * @description Text for a link that is inserted inside a larger text block that explains how to simulate different mobile and desktop devices.
    */
-  viewCardDetails: 'View card details',
+  simulateDifferentDevices: 'simulate different devices',
+  /**
+   * @description Tooltip text that explains how disabling the network cache can simulate the network connections of users that are visiting a page for the first time.
+   */
+  networkCacheExplanation:
+      'Disabling the network cache will simulate a network experience similar to a first time visitor.',
+  /**
+   * @description Text label for a checkbox that controls if the network cache is disabled.
+   */
+  disableNetworkCache: 'Disable network cache',
+  /**
+   * @description Text label for a link to the Largest Contentful Paint (LCP) related page element. This element represents the largest content on the page. "LCP" should not be translated.
+   */
+  lcpElement: 'LCP Element',
+  /**
+   * @description Label for a a range of dates that represents the period of time a set of field data is collected from.
+   */
+  collectionPeriod: 'Collection period:',
+  /**
+   * @description Text showing a range of dates meant to represent a period of time.
+   * @example {Oct 1, 2024} PH1
+   * @example {Nov 1, 2024} PH2
+   */
+  dateRange: '{PH1} - {PH2}',
+  /**
+   * @description Text block telling the user to see how performance metrics measured on their local computer compare to data collected from real users. PH1 will be a link to more information about the Chrome UX Report and the link text will be untranslated because it is a product name.
+   * @example {Chrome UX Report} PH1
+   */
+  seeHowYourLocalMetricsCompare: 'See how your local metrics compare to real user data in the {PH1}.',
+  /**
+   * @description Text block explaining that local metrics are collected from the local environment used to load the page being tested. PH1 will be a link with text that will be translated separately.
+   * @example {local metrics} PH1
+   */
+  theLocalMetricsAre: 'The {PH1} are captured from the current page using your network connection and device.',
+  /**
+   * @description Link text that is inserted in another translated text block that describes performance metrics measured in the developers local environment.
+   */
+  localMetricsLink: 'local metrics',
+  /**
+   * @description Text block explaining that field metrics are measured by real users using many different connections and hardware over a 28 period. PH1 will be a link with text that will be translated separately.
+   * @example {field data} PH1
+   */
+  theFieldMetricsAre: 'The {PH1} is measured by real users using many different network connections and devices.',
+  /**
+   * @description Link text that is inserted in another translated text block that describes performance data measured by real users in the field.
+   */
+  fieldDataLink: 'field data',
+  /**
+   * @description Tooltip text explaining that this user interaction was ignored when calculating the Interaction to Next Paint (INP) metric because the interaction delay fell beyond the 98th percentile of interaction delays on this page. "INP" is an acronym and should not be translated.
+   */
+  interactionExcluded:
+      'INP is calculated using the 98th percentile of interaction delays, so some interaction delays may be larger than the INP value.',
+  /**
+   * @description Tooltip for a button that will remove everything from a log that lists user interactions that happened on the page.
+   */
+  clearInteractionsLog: 'Clear interactions log',
+  /**
+   * @description Title for an expandable section that contains more information about real user environments. This message is meant to prompt the user to understand the conditions experienced by real users.
+   */
+  considerRealUser: 'Consider real user environments',
+  /**
+   * @description Title for a page load phase that measures the time between when the page load starts and the time when the first byte of the initial document is downloaded.
+   */
+  timeToFirstByte: 'Time to first byte',
+  /**
+   * @description Title for a page load phase that measures the time between when the first byte of the initial document is downloaded and when the request for the largest image content starts.
+   */
+  resourceLoadDelay: 'Resource load delay',
+  /**
+   * @description Title for a page load phase that measures the time between when the request for the largest image content starts and when it finishes.
+   */
+  resourceLoadDuration: 'Resource load duration',
+  /**
+   * @description Title for a page load phase that measures the time between when the request for the largest image content finishes and when the largest image element is rendered on the page.
+   */
+  elementRenderDelay: 'Element render delay',
+  /**
+   * @description Title for a phase during a user interaction that measures the time between when the interaction starts and when the browser starts running interaction handlers.
+   */
+  inputDelay: 'Input delay',
+  /**
+   * @description Title for a phase during a user interaction that measures the time between when the browser starts running interaction handlers and when the browser finishes running interaction handlers.
+   */
+  processingDuration: 'Processing duration',
+  /**
+   * @description Title for a phase during a user interaction that measures the time between when the browser finishes running interaction handlers and when the browser renders the next visual frame that shows the result of the interaction.
+   */
+  presentationDelay: 'Presentation delay',
+  /**
+   * @description Tooltip text for a status chip in a list of user interactions that indicates if the associated interaction is the interaction used in the Interaction to Next Paint (INP) performance metric because it's interaction delay is at the 98th percentile.
+   */
+  inpInteraction: 'The INP interaction is at the 98th percentile of interaction delays.',
+  /**
+   * @description Tooltip text for a button that reveals the user interaction associated with the Interaction to Next Paint (INP) performance metric.
+   */
+  showInpInteraction: 'Go to the INP interaction.',
 };
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/LiveMetricsView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-function rateMetric(value: number, thresholds: MetricThresholds): MetricRating {
-  if (value <= thresholds[0]) {
-    return 'good';
-  }
-  if (value <= thresholds[1]) {
-    return 'needs-improvement';
-  }
-  return 'poor';
-}
-
-function renderMetricValue(
-    value: number|undefined, thresholds: MetricThresholds, format: (value: number) => string,
-    options?: {dim?: boolean}): HTMLElement {
-  const metricValueEl = document.createElement('span');
-  metricValueEl.classList.add('metric-value');
-  if (value === undefined) {
-    metricValueEl.classList.add('waiting');
-    metricValueEl.textContent = '-';
-    return metricValueEl;
-  }
-
-  metricValueEl.textContent = format(value);
-  const rating = rateMetric(value, thresholds);
-  metricValueEl.classList.add(rating);
-  if (options?.dim) {
-    metricValueEl.classList.add('dim');
-  }
-
-  return metricValueEl;
-}
-
-export interface MetricCardData {
-  metric: 'LCP'|'CLS'|'INP';
-  localValue?: number;
-  fieldValue?: number|string;
-  histogram?: CrUXManager.MetricResponse['histogram'];
-}
-
-export class MetricCard extends HTMLElement {
-  static readonly litTagName = LitHtml.literal`devtools-metric-card`;
-  readonly #shadow = this.attachShadow({mode: 'open'});
-
-  constructor() {
-    super();
-
-    this.#render();
-  }
-
-  #metricValuesEl?: Element;
-  #dialog?: Dialogs.Dialog.Dialog|null;
-
-  #data: MetricCardData = {
-    metric: 'LCP',
-  };
-
-  set data(data: MetricCardData) {
-    this.#data = data;
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
-  }
-
-  connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [liveMetricsViewStyles];
-
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
-  }
-
-  #showDialog(): void {
-    if (!this.#dialog) {
-      return;
-    }
-    void this.#dialog.setDialogVisible(true);
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
-  }
-
-  #closeDialog(event?: Event): void {
-    if (!this.#dialog || !this.#metricValuesEl) {
-      return;
-    }
-
-    if (event) {
-      const path = event.composedPath();
-      if (path.includes(this.#metricValuesEl)) {
-        return;
-      }
-      if (path.includes(this.#dialog)) {
-        return;
-      }
-    }
-
-    void this.#dialog.setDialogVisible(false);
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
-  }
-
-  #getTitle(): string {
-    switch (this.#data.metric) {
-      case 'LCP':
-        return i18nString(UIStrings.lcpTitle);
-      case 'CLS':
-        return i18nString(UIStrings.clsTitle);
-      case 'INP':
-        return i18nString(UIStrings.inpTitle);
-    }
-  }
-
-  #getThresholds(): MetricThresholds {
-    switch (this.#data.metric) {
-      case 'LCP':
-        return LCP_THRESHOLDS;
-      case 'CLS':
-        return CLS_THRESHOLDS;
-      case 'INP':
-        return INP_THRESHOLDS;
-    }
-  }
-
-  #getFormatFn(): (value: number) => string {
-    switch (this.#data.metric) {
-      case 'LCP':
-        return v => i18n.TimeUtilities.millisToString(v);
-      case 'CLS':
-        return v => v === 0 ? '0' : v.toFixed(2);
-      case 'INP':
-        return v => i18n.TimeUtilities.millisToString(v);
-    }
-  }
-
-  #getLocalValue(): number|undefined {
-    const {localValue} = this.#data;
-    if (localValue === undefined) {
-      return;
-    }
-
-    return localValue;
-  }
-
-  #getFieldValue(): number|undefined {
-    let {fieldValue} = this.#data;
-    if (fieldValue === undefined) {
-      return;
-    }
-
-    if (typeof fieldValue === 'string') {
-      fieldValue = Number(fieldValue);
-    }
-
-    if (!Number.isFinite(fieldValue)) {
-      return;
-    }
-
-    return fieldValue;
-  }
-
-  #getCompareRating(): 'better'|'worse'|'similar'|undefined {
-    const localValue = this.#getLocalValue();
-    const fieldValue = this.#getFieldValue();
-    if (localValue === undefined || fieldValue === undefined) {
-      return;
-    }
-
-    const threshold = this.#getThresholds()[0];
-    if (localValue - fieldValue > threshold) {
-      return 'worse';
-    }
-    if (fieldValue - localValue > threshold) {
-      return 'better';
-    }
-
-    return 'similar';
-  }
-
-  #renderCompareString(): LitHtml.LitTemplate {
-    const localValue = this.#getLocalValue();
-    if (localValue === undefined) {
-      if (this.#data.metric === 'INP') {
-        return html`
-          <div class="compare-text">${i18nString(UIStrings.interactToMeasure)}</div>
-        `;
-      }
-      return LitHtml.nothing;
-    }
-
-    const compare = this.#getCompareRating();
-    const rating = rateMetric(localValue, this.#getThresholds());
-
-    const valueEl = renderMetricValue(localValue, this.#getThresholds(), this.#getFormatFn(), {dim: true});
-    valueEl.classList.add('metric-value-label');
-
-    // clang-format off
-    return html`
-      <div class="compare-text">
-        ${renderCompareText(rating, compare, {
-          PH1: this.#data.metric,
-          PH2: valueEl,
-        })}
-      </div>
-    `;
-    // clang-format on
-  }
-
-  #densityToCSSPercent(density?: number): string {
-    if (density === undefined) {
-      density = 0;
-    }
-    const percent = Math.round(density * 100);
-    return `${percent}%`;
-  }
-
-  #getBucketLabel(histogram: CrUXManager.MetricResponse['histogram']|undefined, bucket: number): string {
-    if (histogram === undefined) {
-      return '-';
-    }
-
-    // A missing density value should be interpreted as 0%
-    const density = histogram[bucket].density || 0;
-    const percent = Math.round(density * 100);
-    return i18nString(UIStrings.percentage, {PH1: percent});
-  }
-
-  #renderFieldHistogram(): LitHtml.LitTemplate {
-    const histogram = this.#data.histogram;
-
-    const goodPercent = this.#densityToCSSPercent(histogram?.[0].density);
-    const needsImprovementPercent = this.#densityToCSSPercent(histogram?.[1].density);
-    const poorPercent = this.#densityToCSSPercent(histogram?.[2].density);
-
-    const format = this.#getFormatFn();
-    const thresholds = this.#getThresholds();
-
-    // clang-format off
-    return html`
-      <div class="field-data-histogram">
-        <span class="histogram-label">
-          ${i18nString(UIStrings.good)}
-          <span class="histogram-range">${i18nString(UIStrings.leqRange, {PH1: format(thresholds[0])})}</span>
-        </span>
-        <span class="histogram-bar good-bg" style="width: ${goodPercent}"></span>
-        <span class="histogram-percent">${this.#getBucketLabel(histogram, 0)}</span>
-        <span class="histogram-label">
-          ${i18nString(UIStrings.needsImprovement)}
-          <span class="histogram-range">${i18nString(UIStrings.betweenRange, {PH1: format(thresholds[0]), PH2: format(thresholds[1])})}</span>
-        </span>
-        <span class="histogram-bar needs-improvement-bg" style="width: ${needsImprovementPercent}"></span>
-        <span class="histogram-percent">${this.#getBucketLabel(histogram, 1)}</span>
-        <span class="histogram-label">
-          ${i18nString(UIStrings.poor)}
-          <span class="histogram-range">${i18nString(UIStrings.gtRange, {PH1: format(thresholds[1])})}</span>
-        </span>
-        <span class="histogram-bar poor-bg" style="width: ${poorPercent}"></span>
-        <span class="histogram-percent">${this.#getBucketLabel(histogram, 2)}</span>
-      </div>
-    `;
-    // clang-format on
-  }
-
-  #render = (): void => {
-    const hasFieldData = this.#getFieldValue() !== undefined;
-
-    // clang-format off
-    const output = html`
-      <div class="metric-card">
-        <h3 class="card-title">
-          ${this.#getTitle()}
-        </h3>
-        <div class="card-metric-values"
-          @mouseenter=${this.#showDialog}
-          @mouseleave=${this.#closeDialog}
-          on-render=${ComponentHelpers.Directives.nodeRenderedCallback(node => {
-            this.#metricValuesEl = node;
-          })}
-          aria-describedby="tooltip-content"
-        >
-          <span class="local-value">
-            ${renderMetricValue(this.#getLocalValue(), this.#getThresholds(), this.#getFormatFn())}
-          </span>
-          ${hasFieldData ? html`
-            <span class="field-value">
-              ${renderMetricValue(this.#getFieldValue(), this.#getThresholds(), this.#getFormatFn())}
-            </span>
-            <span class="metric-value-label">${i18nString(UIStrings.localValue)}</span>
-            <span class="metric-value-label">${i18nString(UIStrings.field75thPercentile)}</span>
-          `: nothing}
-        </div>
-        <${Dialogs.Dialog.Dialog.litTagName}
-          @pointerleftdialog=${() => this.#closeDialog()}
-          .showConnector=${false}
-          .centered=${true}
-          .closeOnScroll=${false}
-          .origin=${() => {
-            if (!this.#metricValuesEl) {
-              throw new Error('No metric values element');
-            }
-            return this.#metricValuesEl;
-          }}
-          on-render=${ComponentHelpers.Directives.nodeRenderedCallback(node => {
-            this.#dialog = node as Dialogs.Dialog.Dialog;
-          })}
-        >
-          <div id="tooltip-content" class="tooltip-content" role="tooltip" aria-label=${i18nString(UIStrings.viewCardDetails)}>
-            ${this.#renderFieldHistogram()}
-          </div>
-        </${Dialogs.Dialog.Dialog.litTagName}>
-        ${hasFieldData ? html`<hr class="divider">` : nothing}
-        ${this.#renderCompareString()}
-        <slot name="extra-info"><slot>
-      </div>
-    `;
-    LitHtml.render(output, this.#shadow, {host: this});
-  };
-  // clang-format on
-}
-
-export class LiveMetricsView extends HTMLElement {
-  static readonly litTagName = LitHtml.literal`devtools-live-metrics-view`;
+export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableComponent {
   readonly #shadow = this.attachShadow({mode: 'open'});
 
   #lcpValue?: LiveMetrics.LCPValue;
   #clsValue?: LiveMetrics.CLSValue;
   #inpValue?: LiveMetrics.INPValue;
-  #interactions: LiveMetrics.InteractionValue[] = [];
+  #interactions: LiveMetrics.Interaction[] = [];
 
   #cruxPageResult?: CrUXManager.PageResult;
 
@@ -531,11 +278,27 @@ export class LiveMetricsView extends HTMLElement {
   #toggleRecordAction: UI.ActionRegistration.Action;
   #recordReloadAction: UI.ActionRegistration.Action;
 
+  #tooltipContainerEl?: Element;
+  #interactionsListEl?: HTMLElement;
+  #interactionsListScrolling = false;
+
   constructor() {
     super();
 
     this.#toggleRecordAction = UI.ActionRegistry.ActionRegistry.instance().getAction('timeline.toggle-recording');
     this.#recordReloadAction = UI.ActionRegistry.ActionRegistry.instance().getAction('timeline.record-reload');
+
+    const interactionRevealer = new InteractionRevealer(this);
+
+    Common.Revealer.registerRevealer({
+      contextTypes() {
+        return [LiveMetrics.Interaction];
+      },
+      destination: Common.Revealer.RevealerDestination.TIMELINE_PANEL,
+      async loadRevealer() {
+        return interactionRevealer;
+      },
+    });
 
     this.#render();
   }
@@ -544,8 +307,36 @@ export class LiveMetricsView extends HTMLElement {
     this.#lcpValue = event.data.lcp;
     this.#clsValue = event.data.cls;
     this.#inpValue = event.data.inp;
-    this.#interactions = event.data.interactions;
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
+
+    const hasNewInteraction = this.#interactions.length < event.data.interactions.length;
+    this.#interactions = [...event.data.interactions];
+
+    const renderPromise = ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
+
+    const listEl = this.#interactionsListEl;
+    if (!hasNewInteraction || !listEl) {
+      return;
+    }
+
+    const isAtBottom = Math.abs(listEl.scrollHeight - listEl.clientHeight - listEl.scrollTop) <= 1;
+
+    // We shouldn't scroll to the bottom if the list wasn't already at the bottom.
+    // However, if a new item appears while the animation for a previous item is still going,
+    // then we should "finish" the scroll by sending another scroll command even if the scroll position
+    // the element hasn't scrolled all the way to the bottom yet.
+    if (!isAtBottom && !this.#interactionsListScrolling) {
+      return;
+    }
+
+    void renderPromise.then(() => {
+      requestAnimationFrame(() => {
+        this.#interactionsListScrolling = true;
+        listEl.addEventListener('scrollend', () => {
+          this.#interactionsListScrolling = false;
+        }, {once: true});
+        listEl.scrollTo({top: listEl.scrollHeight, behavior: 'smooth'});
+      });
+    });
   }
 
   #onFieldDataChanged(event: {data: CrUXManager.PageResult|undefined}): void {
@@ -562,22 +353,26 @@ export class LiveMetricsView extends HTMLElement {
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
-  #getFieldMetricData(fieldMetric: CrUXManager.MetricNames): CrUXManager.MetricResponse|undefined {
+  #getSelectedFieldResponse(): CrUXManager.CrUXResponse|null|undefined {
     const deviceScope = this.#fieldDeviceOption === 'AUTO' ? this.#getAutoDeviceScope() : this.#fieldDeviceOption;
-    return this.#cruxPageResult?.[`${this.#fieldPageScope}-${deviceScope}`]?.record.metrics[fieldMetric];
+    return this.#cruxPageResult?.[`${this.#fieldPageScope}-${deviceScope}`];
+  }
+
+  #getFieldMetricData(fieldMetric: CrUXManager.StandardMetricNames): CrUXManager.MetricResponse|undefined {
+    return this.#getSelectedFieldResponse()?.record.metrics[fieldMetric];
   }
 
   connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [liveMetricsViewStyles];
+    this.#shadow.adoptedStyleSheets = [liveMetricsViewStyles, metricValueStyles];
 
     const liveMetrics = LiveMetrics.LiveMetrics.instance();
-    liveMetrics.addEventListener(LiveMetrics.Events.Status, this.#onMetricStatus, this);
+    liveMetrics.addEventListener(LiveMetrics.Events.STATUS, this.#onMetricStatus, this);
 
     const cruxManager = CrUXManager.CrUXManager.instance();
-    cruxManager.addEventListener(CrUXManager.Events.FieldDataChanged, this.#onFieldDataChanged, this);
+    cruxManager.addEventListener(CrUXManager.Events.FIELD_DATA_CHANGED, this.#onFieldDataChanged, this);
 
-    const emulationModel = EmulationModel.DeviceModeModel.DeviceModeModel.instance();
-    emulationModel.addEventListener(EmulationModel.DeviceModeModel.Events.Updated, this.#onEmulationChanged, this);
+    const emulationModel = this.#deviceModeModel();
+    emulationModel?.addEventListener(EmulationModel.DeviceModeModel.Events.UPDATED, this.#onEmulationChanged, this);
 
     if (cruxManager.getConfigSetting().get().enabled) {
       void this.#refreshFieldDataForCurrentPage();
@@ -590,36 +385,58 @@ export class LiveMetricsView extends HTMLElement {
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
+  #deviceModeModel(): EmulationModel.DeviceModeModel.DeviceModeModel|null {
+    // This is wrapped in a try/catch because in some DevTools entry points
+    // (such as worker_app.ts) the Emulation panel is not included and as such
+    // the below code fails; it tries to instantiate the model which requires
+    // reading the value of a setting which has not been registered.
+    // In this case, we fallback to 'ALL'. See crbug.com/361515458 for an
+    // example bug that this resolves.
+    try {
+      return EmulationModel.DeviceModeModel.DeviceModeModel.instance();
+    } catch {
+      return null;
+    }
+  }
+
   disconnectedCallback(): void {
-    LiveMetrics.LiveMetrics.instance().removeEventListener(LiveMetrics.Events.Status, this.#onMetricStatus, this);
+    LiveMetrics.LiveMetrics.instance().removeEventListener(LiveMetrics.Events.STATUS, this.#onMetricStatus, this);
 
     const cruxManager = CrUXManager.CrUXManager.instance();
-    cruxManager.removeEventListener(CrUXManager.Events.FieldDataChanged, this.#onFieldDataChanged, this);
+    cruxManager.removeEventListener(CrUXManager.Events.FIELD_DATA_CHANGED, this.#onFieldDataChanged, this);
 
-    const emulationModel = EmulationModel.DeviceModeModel.DeviceModeModel.instance();
-    emulationModel.removeEventListener(EmulationModel.DeviceModeModel.Events.Updated, this.#onEmulationChanged, this);
+    this.#deviceModeModel()?.removeEventListener(
+        EmulationModel.DeviceModeModel.Events.UPDATED, this.#onEmulationChanged, this);
   }
 
   #renderLcpCard(): LitHtml.LitTemplate {
     const fieldData = this.#getFieldMetricData('largest_contentful_paint');
     const node = this.#lcpValue?.node;
+    const phases = this.#lcpValue?.phases;
 
     // clang-format off
     return html`
-      <${MetricCard.litTagName} .data=${{
+      <devtools-metric-card .data=${{
         metric: 'LCP',
         localValue: this.#lcpValue?.value,
         fieldValue: fieldData?.percentiles?.p75,
         histogram: fieldData?.histogram,
+        tooltipContainer: this.#tooltipContainerEl,
+        phases: phases && [
+          [i18nString(UIStrings.timeToFirstByte), phases.timeToFirstByte],
+          [i18nString(UIStrings.resourceLoadDelay), phases.resourceLoadDelay],
+          [i18nString(UIStrings.resourceLoadDuration), phases.resourceLoadTime],
+          [i18nString(UIStrings.elementRenderDelay), phases.elementRenderDelay],
+        ],
       } as MetricCardData}>
         ${node ? html`
-            <div class="related-element-info" slot="extra-info">
-              <span class="related-element-label">${i18nString(UIStrings.lcpElement)}</span>
-              <span class="related-element-link">${until(Common.Linkifier.Linkifier.linkify(node))}</span>
+            <div class="related-info" slot="extra-info">
+              <span class="related-info-label">${i18nString(UIStrings.lcpElement)}</span>
+              <span class="related-info-link">${until(Common.Linkifier.Linkifier.linkify(node))}</span>
             </div>
           `
           : nothing}
-      </${MetricCard.litTagName}>
+      </devtools-metric-card>
     `;
     // clang-format on
   }
@@ -629,29 +446,57 @@ export class LiveMetricsView extends HTMLElement {
 
     // clang-format off
     return html`
-      <${MetricCard.litTagName} .data=${{
+      <devtools-metric-card .data=${{
         metric: 'CLS',
         localValue: this.#clsValue?.value,
         fieldValue: fieldData?.percentiles?.p75,
         histogram: fieldData?.histogram,
+        tooltipContainer: this.#tooltipContainerEl,
       } as MetricCardData}>
-      </${MetricCard.litTagName}>
+      </devtools-metric-card>
     `;
     // clang-format on
   }
 
   #renderInpCard(): LitHtml.LitTemplate {
     const fieldData = this.#getFieldMetricData('interaction_to_next_paint');
+    const phases = this.#inpValue?.phases;
+    const interaction =
+        this.#interactions.find(interaction => interaction.uniqueInteractionId === this.#inpValue?.uniqueInteractionId);
+
+    let interactionLink;
+    if (interaction) {
+      interactionLink = Components.Linkifier.Linkifier.linkifyRevealable(
+          interaction,
+          interaction.interactionType,
+          undefined,
+          i18nString(UIStrings.showInpInteraction),
+          'link-to-interaction',
+      );
+      interactionLink.tabIndex = 0;
+    }
 
     // clang-format off
     return html`
-      <${MetricCard.litTagName} .data=${{
+      <devtools-metric-card .data=${{
         metric: 'INP',
         localValue: this.#inpValue?.value,
         fieldValue: fieldData?.percentiles?.p75,
         histogram: fieldData?.histogram,
+        tooltipContainer: this.#tooltipContainerEl,
+        phases: phases && [
+          [i18nString(UIStrings.inputDelay), phases.inputDelay],
+          [i18nString(UIStrings.processingDuration), phases.processingDuration],
+          [i18nString(UIStrings.presentationDelay), phases.presentationDelay],
+        ],
       } as MetricCardData}>
-      </${MetricCard.litTagName}>
+        ${interactionLink ? html`
+          <div class="related-info" slot="extra-info">
+            <span class="related-info-label">INP interaction</span>
+            ${interactionLink}
+          </div>
+        ` : nothing}
+      </devtools-metric-card>
     `;
     // clang-format on
   }
@@ -664,7 +509,7 @@ export class LiveMetricsView extends HTMLElement {
     // clang-format off
     return html`
       <div class="record-action">
-        <${Buttons.Button.Button.litTagName} @click=${onClick} .data=${{
+        <devtools-button @click=${onClick} .data=${{
             variant: Buttons.Button.Variant.TEXT,
             size: Buttons.Button.Size.REGULAR,
             iconName: action.icon(),
@@ -672,14 +517,14 @@ export class LiveMetricsView extends HTMLElement {
             jslogContext: action.id(),
         } as Buttons.Button.ButtonData}>
           ${action.title()}
-        </${Buttons.Button.Button.litTagName}>
+        </devtools-button>
         <span class="shortcut-label">${UI.ShortcutRegistry.ShortcutRegistry.instance().shortcutTitleForAction(action.id())}</span>
       </div>
     `;
     // clang-format on
   }
 
-  #getClosestNetworkPreset(): SDK.NetworkManager.Conditions|null {
+  #getNetworkRec(): string|null {
     const response = this.#getFieldMetricData('round_trip_time');
     if (!response?.percentiles) {
       return null;
@@ -691,7 +536,7 @@ export class LiveMetricsView extends HTMLElement {
     }
 
     if (rtt < RTT_MINIMUM) {
-      return SDK.NetworkManager.NoThrottlingConditions;
+      return i18nString(UIStrings.tryDisablingThrottling);
     }
 
     let closestPreset: SDK.NetworkManager.Conditions|null = null;
@@ -715,33 +560,77 @@ export class LiveMetricsView extends HTMLElement {
       smallestDiff = diff;
     }
 
-    return closestPreset;
+    if (!closestPreset) {
+      return null;
+    }
+
+    const title = typeof closestPreset.title === 'function' ? closestPreset.title() : closestPreset.title;
+
+    return i18nString(UIStrings.tryUsingThrottling, {PH1: title});
   }
 
-  #renderThrottlingSettings(): LitHtml.LitTemplate {
-    const throttlingRec = this.#getClosestNetworkPreset();
-
-    let recEl;
-    if (throttlingRec) {
-      if (throttlingRec === SDK.NetworkManager.NoThrottlingConditions) {
-        recEl = i18nString(UIStrings.tryDisablingThrottling);
-      } else {
-        const title = typeof throttlingRec.title === 'function' ? throttlingRec.title() : throttlingRec.title;
-
-        const recValueEl = document.createElement('span');
-        recValueEl.classList.add('throttling-recommendation-value');
-        recValueEl.textContent = title;
-
-        recEl = i18n.i18n.getFormatLocalizedString(str_, UIStrings.tryUsingThrottling, {PH1: recValueEl});
-      }
+  #getDeviceRec(): Common.UIString.LocalizedString|null {
+    // `form_factors` metric is only populated if CrUX data is fetched for all devices.
+    const fractions = this.#cruxPageResult?.[`${this.#fieldPageScope}-ALL`]?.record.metrics.form_factors?.fractions;
+    if (!fractions) {
+      return null;
     }
+
+    if (fractions.desktop > 0.5) {
+      const percentage = i18nString(UIStrings.percentage, {PH1: Math.round(fractions.desktop * 100)});
+      return i18nString(UIStrings.mostUsersDesktop, {PH1: percentage});
+    }
+
+    if (fractions.phone > 0.5) {
+      const percentage = i18nString(UIStrings.percentage, {PH1: Math.round(fractions.phone * 100)});
+      return i18nString(UIStrings.mostUsersMobile, {PH1: percentage});
+    }
+
+    return null;
+  }
+
+  #renderRecordingSettings(): LitHtml.LitTemplate {
+    const envRecs = [
+      this.#getDeviceRec(),
+      this.#getNetworkRec(),
+    ].filter(rec => rec !== null);
+
+    const deviceLinkEl = UI.XLink.XLink.create(
+        'https://developer.chrome.com/docs/devtools/device-mode', i18nString(UIStrings.simulateDifferentDevices));
+    const deviceMessage = i18n.i18n.getFormatLocalizedString(str_, UIStrings.useDeviceToolbar, {PH1: deviceLinkEl});
 
     // clang-format off
     return html`
-      <h3 class="card-title">${i18nString(UIStrings.throttling)}</h3>
-      ${recEl ? html`<div class="throttling-recommendation">${recEl}</div>` : nothing}
-      <${CPUThrottlingSelector.litTagName} class="live-metrics-option"></${CPUThrottlingSelector.litTagName}>
-      <${NetworkThrottlingSelector.litTagName} class="live-metrics-option"></${NetworkThrottlingSelector.litTagName}>
+      <h3 class="card-title">${i18nString(UIStrings.environmentSettings)}</h3>
+      <div class="device-toolbar-description">${deviceMessage}</div>
+      ${envRecs.length > 0 ? html`
+        <details class="environment-recs">
+          <summary>${i18nString(UIStrings.considerRealUser)}</summary>
+          <ul class="environment-recs-list">
+            ${envRecs.map(rec => html`<li>${rec}</li>`)}
+          </ul>
+        </details>
+      ` : nothing}
+      <div class="environment-option">
+        <devtools-cpu-throttling-selector></devtools-cpu-throttling-selector>
+      </div>
+      <div class="environment-option">
+        <devtools-network-throttling-selector></devtools-network-throttling-selector>
+      </div>
+      <div class="environment-option">
+        <setting-checkbox
+          class="network-cache-setting"
+          .data=${{
+            setting: Common.Settings.Settings.instance().moduleSetting('cache-disabled'),
+            textOverride: i18nString(UIStrings.disableNetworkCache),
+          } as Settings.SettingCheckbox.SettingCheckboxData}
+        ></setting-checkbox>
+        <devtools-icon
+          class="setting-hint"
+          name="help"
+          title=${i18nString(UIStrings.networkCacheExplanation)}
+        ></devtools-icon>
+        </div>
     `;
     // clang-format on
   }
@@ -777,10 +666,13 @@ export class LiveMetricsView extends HTMLElement {
     const buttonTitle = this.#fieldPageScope === 'url' ? urlLabel : originLabel;
     const accessibleTitle = i18nString(UIStrings.showFieldDataForPage, {PH1: buttonTitle});
 
+    // If there is no data at all we should force users to switch pages or reconfigure CrUX.
+    const shouldDisable = !this.#cruxPageResult?.['url-ALL'] && !this.#cruxPageResult?.['origin-ALL'];
+
     return html`
-      <${Menus.SelectMenu.SelectMenu.litTagName}
+      <devtools-select-menu
         id="page-scope-select"
-        class="live-metrics-option"
+        class="field-data-option"
         @selectmenuselected=${this.#onPageScopeMenuItemSelected}
         .showDivider=${true}
         .showArrow=${true}
@@ -788,21 +680,22 @@ export class LiveMetricsView extends HTMLElement {
         .showSelectedItem=${true}
         .showConnector=${false}
         .buttonTitle=${buttonTitle}
+        .disabled=${shouldDisable}
         title=${accessibleTitle}
       >
-        <${Menus.Menu.MenuItem.litTagName}
+        <devtools-menu-item
           .value=${'url'}
           .selected=${this.#fieldPageScope === 'url'}
         >
           ${urlLabel}
-        </${Menus.Menu.MenuItem.litTagName}>
-        <${Menus.Menu.MenuItem.litTagName}
+        </devtools-menu-item>
+        <devtools-menu-item
           .value=${'origin'}
           .selected=${this.#fieldPageScope === 'origin'}
         >
           ${originLabel}
-        </${Menus.Menu.MenuItem.litTagName}>
-      </${Menus.SelectMenu.SelectMenu.litTagName}>
+        </devtools-menu-item>
+      </devtools-select-menu>
     `;
   }
 
@@ -820,8 +713,13 @@ export class LiveMetricsView extends HTMLElement {
   }
 
   #getAutoDeviceScope(): CrUXManager.DeviceScope {
-    const emulationModel = EmulationModel.DeviceModeModel.DeviceModeModel.instance();
-    if (emulationModel.device()?.mobile()) {
+    const emulationModel = this.#deviceModeModel();
+
+    if (emulationModel === null) {
+      return 'ALL';
+    }
+
+    if (emulationModel.isMobile()) {
       if (this.#cruxPageResult?.[`${this.#fieldPageScope}-PHONE`]) {
         return 'PHONE';
       }
@@ -870,9 +768,9 @@ export class LiveMetricsView extends HTMLElement {
 
     // clang-format off
     return html`
-      <${Menus.SelectMenu.SelectMenu.litTagName}
+      <devtools-select-menu
         id="device-scope-select"
-        class="live-metrics-option"
+        class="field-data-option"
         @selectmenuselected=${this.#onDeviceOptionMenuItemSelected}
         .showDivider=${true}
         .showArrow=${true}
@@ -885,27 +783,176 @@ export class LiveMetricsView extends HTMLElement {
       >
         ${DEVICE_OPTION_LIST.map(deviceOption => {
           return html`
-            <${Menus.Menu.MenuItem.litTagName}
+            <devtools-menu-item
               .value=${deviceOption}
               .selected=${this.#fieldDeviceOption === deviceOption}
             >
               ${this.#getLabelForDeviceOption(deviceOption)}
-            </${Menus.Menu.MenuItem.litTagName}>
+            </devtools-menu-item>
           `;
         })}
-      </${Menus.SelectMenu.SelectMenu.litTagName}>
+      </devtools-select-menu>
+    `;
+    // clang-format on
+  }
+
+  #renderCollectionPeriod(): LitHtml.LitTemplate {
+    const selectedResponse = this.#getSelectedFieldResponse();
+    if (!selectedResponse) {
+      return LitHtml.nothing;
+    }
+
+    const {firstDate, lastDate} = selectedResponse.record.collectionPeriod;
+
+    const formattedFirstDate = new Date(
+        firstDate.year,
+        // CrUX month is 1-indexed but `Date` month is 0-indexed
+        firstDate.month - 1,
+        firstDate.day,
+    );
+    const formattedLastDate = new Date(
+        lastDate.year,
+        // CrUX month is 1-indexed but `Date` month is 0-indexed
+        lastDate.month - 1,
+        lastDate.day,
+    );
+
+    const options: Intl.DateTimeFormatOptions = {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    };
+
+    const dateEl = document.createElement('span');
+    dateEl.classList.add('collection-period-range');
+    dateEl.textContent = i18nString(UIStrings.dateRange, {
+      PH1: formattedFirstDate.toLocaleDateString(undefined, options),
+      PH2: formattedLastDate.toLocaleDateString(undefined, options),
+    });
+
+    return html`
+      <div class="field-data-message">
+        ${i18nString(UIStrings.collectionPeriod)}
+        ${dateEl}
+      </div>
+    `;
+  }
+
+  #renderFieldDataMessage(): LitHtml.LitTemplate {
+    if (CrUXManager.CrUXManager.instance().getConfigSetting().get().enabled) {
+      return this.#renderCollectionPeriod();
+    }
+
+    const linkEl =
+        UI.XLink.XLink.create('https://developer.chrome.com/docs/crux', i18n.i18n.lockedString('Chrome UX Report'));
+    const messageEl = i18n.i18n.getFormatLocalizedString(str_, UIStrings.seeHowYourLocalMetricsCompare, {PH1: linkEl});
+
+    return html`
+      <div class="field-data-message">${messageEl}</div>
+    `;
+  }
+
+  #renderDataDescriptions(): LitHtml.LitTemplate {
+    const fieldEnabled = CrUXManager.CrUXManager.instance().getConfigSetting().get().enabled;
+
+    const localLink =
+        UI.XLink.XLink.create('https://goo.gle/perf-local-metrics', i18nString(UIStrings.localMetricsLink));
+    const localEl = i18n.i18n.getFormatLocalizedString(str_, UIStrings.theLocalMetricsAre, {PH1: localLink});
+
+    const fieldLink = UI.XLink.XLink.create('https://goo.gle/perf-field-data', i18nString(UIStrings.fieldDataLink));
+    const fieldEl = i18n.i18n.getFormatLocalizedString(str_, UIStrings.theFieldMetricsAre, {PH1: fieldLink});
+
+    return html`
+      <div class="data-descriptions">
+        <div>${localEl}</div>
+        ${fieldEnabled ? html`<div>${fieldEl}</div>` : nothing}
+      </div>
+    `;
+  }
+
+  #clearInteractionsLog(): void {
+    LiveMetrics.LiveMetrics.instance().clearInteractions();
+  }
+
+  #renderInteractionsSection(): LitHtml.LitTemplate {
+    if (!this.#interactions.length) {
+      return LitHtml.nothing;
+    }
+
+    // clang-format off
+    return html`
+      <section class="interactions-section" aria-labelledby="interactions-section-title">
+        <h2 id="interactions-section-title" class="section-title">
+          ${i18nString(UIStrings.interactions)}
+          <devtools-button
+            class="interactions-clear"
+            title=${i18nString(UIStrings.clearInteractionsLog)}
+            @click=${this.#clearInteractionsLog}
+            .data=${{
+              variant: Buttons.Button.Variant.ICON,
+              size: Buttons.Button.Size.REGULAR,
+              iconName: 'clear',
+            } as Buttons.Button.ButtonData}></devtools-button>
+        </h2>
+        <ol class="interactions-list"
+          on-render=${ComponentHelpers.Directives.nodeRenderedCallback(node => {
+            this.#interactionsListEl = node as HTMLElement;
+          })}
+        >
+          ${this.#interactions.map(interaction => {
+            const metricValue = renderMetricValue(
+              'timeline.landing.interaction-event-timing',
+              interaction.duration,
+              INP_THRESHOLDS,
+              v => i18n.TimeUtilities.millisToString(v),
+              {dim: true},
+            );
+
+            const isP98Excluded = this.#inpValue && this.#inpValue.value < interaction.duration;
+            const isInp = this.#inpValue?.uniqueInteractionId === interaction.uniqueInteractionId;
+
+            return html`
+              <li id=${interaction.uniqueInteractionId} class="interaction" tabindex="-1">
+                <span class="interaction-type">
+                  ${interaction.interactionType}
+                  ${isInp ?
+                    html`<span class="interaction-inp-chip" title=${i18nString(UIStrings.inpInteraction)}>INP</span>`
+                  : nothing}
+                </span>
+                <span class="interaction-node">${
+                  interaction.node && until(Common.Linkifier.Linkifier.linkify(interaction.node))}</span>
+                ${isP98Excluded ? html`<devtools-icon
+                  class="interaction-info"
+                  name="info"
+                  title=${i18nString(UIStrings.interactionExcluded)}
+                ></devtools-icon>` : nothing}
+                <span class="interaction-duration">${metricValue}</span>
+              </li>
+            `;
+          })}
+        </ol>
+      </section>
     `;
     // clang-format on
   }
 
   #render = (): void => {
+    const fieldEnabled = CrUXManager.CrUXManager.instance().getConfigSetting().get().enabled;
+    const liveMetricsTitle =
+        fieldEnabled ? i18nString(UIStrings.localAndFieldMetrics) : i18nString(UIStrings.localMetrics);
+
     // clang-format off
     const output = html`
       <div class="container">
         <div class="live-metrics-view">
-          <main class="live-metrics">
-            <h2 class="section-title">${i18nString(UIStrings.localAndFieldMetrics)}</h2>
-            <div class="metric-cards">
+          <main class="live-metrics"
+          >
+            <h2 class="section-title">${liveMetricsTitle}</h2>
+            <div class="metric-cards"
+              on-render=${ComponentHelpers.Directives.nodeRenderedCallback(node => {
+                this.#tooltipContainerEl = node;
+              })}
+            >
               <div id="lcp">
                 ${this.#renderLcpCard()}
               </div>
@@ -916,36 +963,22 @@ export class LiveMetricsView extends HTMLElement {
                 ${this.#renderInpCard()}
               </div>
             </div>
-            ${this.#interactions.length > 0 ? html`
-              <section class="interactions-section" aria-labelledby="interactions-section-title">
-                <h2 id="interactions-section-title" class="section-title">${i18nString(UIStrings.interactions)}</h2>
-                <ol class="interactions-list">
-                  ${this.#interactions.map(interaction => html`
-                    <li class="interaction">
-                      <span class="interaction-type">${interaction.interactionType}</span>
-                      <span class="interaction-node">${
-                        interaction.node && until(Common.Linkifier.Linkifier.linkify(interaction.node))}</span>
-                      <span class="interaction-duration">
-                        ${renderMetricValue(interaction.duration, INP_THRESHOLDS, v => i18n.TimeUtilities.millisToString(v), {dim: true})}
-                      </span>
-                    </li>
-                  `)}
-                </ol>
-              </section>
-            ` : nothing}
+            ${this.#renderDataDescriptions()}
+            ${this.#renderInteractionsSection()}
           </main>
           <aside class="next-steps" aria-labelledby="next-steps-section-title">
             <h2 id="next-steps-section-title" class="section-title">${i18nString(UIStrings.nextSteps)}</h2>
             <div id="field-setup" class="settings-card">
               <h3 class="card-title">${i18nString(UIStrings.fieldData)}</h3>
+              ${this.#renderFieldDataMessage()}
               ${this.#renderPageScopeSetting()}
               ${this.#renderDeviceScopeSetting()}
               <div class="field-setup-buttons">
-                <${FieldSettingsDialog.litTagName}></${FieldSettingsDialog.litTagName}>
+                <devtools-field-settings-dialog></devtools-field-settings-dialog>
               </div>
             </div>
-            <div id="throttling" class="settings-card">
-              ${this.#renderThrottlingSettings()}
+            <div id="recording-settings" class="settings-card">
+              ${this.#renderRecordingSettings()}
             </div>
             <div id="record" class="record-action-card">
               ${this.#renderRecordAction(this.#toggleRecordAction)}
@@ -962,12 +995,31 @@ export class LiveMetricsView extends HTMLElement {
   // clang-format on
 }
 
-customElements.define('devtools-metric-card', MetricCard);
+export class InteractionRevealer implements Common.Revealer.Revealer<LiveMetrics.Interaction> {
+  #view: LiveMetricsView;
+
+  constructor(view: LiveMetricsView) {
+    this.#view = view;
+  }
+
+  async reveal(interaction: LiveMetrics.Interaction): Promise<void> {
+    const interactionEl = this.#view.shadowRoot?.getElementById(interaction.uniqueInteractionId);
+    if (!interactionEl) {
+      return;
+    }
+
+    interactionEl.scrollIntoView({
+      block: 'center',
+    });
+    interactionEl.focus();
+    UI.UIUtils.runCSSAnimationOnce(interactionEl, 'highlight');
+  }
+}
+
 customElements.define('devtools-live-metrics-view', LiveMetricsView);
 
 declare global {
   interface HTMLElementTagNameMap {
-    'devtools-metric-card': MetricCard;
     'devtools-live-metrics-view': LiveMetricsView;
   }
 }

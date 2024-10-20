@@ -147,7 +147,7 @@ export class AnimationModel extends SDK.SDKModel.SDKModel<EventTypes> {
 
   private createGroupFromPendingAnimations(): AnimationGroup {
     console.assert(this.#pendingAnimations.size > 0);
-    const firstAnimationId = this.#pendingAnimations.values().next().value;
+    const firstAnimationId = this.#pendingAnimations.values().next().value as string;
     this.#pendingAnimations.delete(firstAnimationId);
 
     const firstAnimation = this.#animationsById.get(firstAnimationId);
@@ -204,9 +204,11 @@ export class AnimationModel extends SDK.SDKModel.SDKModel<EventTypes> {
 }
 
 export enum Events {
+  /* eslint-disable @typescript-eslint/naming-convention -- Used by web_tests. */
   AnimationGroupStarted = 'AnimationGroupStarted',
   AnimationGroupUpdated = 'AnimationGroupUpdated',
   ModelReset = 'ModelReset',
+  /* eslint-enable @typescript-eslint/naming-convention */
 }
 
 export type EventTypes = {
@@ -812,7 +814,7 @@ export class ScreenshotCapture {
   captureScreenshots(duration: number, screenshots: string[]): void {
     const screencastDuration = Math.min(duration / this.#animationModel.playbackRate, 3000);
     const endTime = screencastDuration + window.performance.now();
-    this.#requests.push({endTime: endTime, screenshots: screenshots});
+    this.#requests.push({endTime, screenshots});
 
     if (!this.#endTime || endTime > this.#endTime) {
       clearTimeout(this.#stopTimer);

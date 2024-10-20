@@ -7,7 +7,7 @@
 import * as Common from '../../core/common/common.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
-import type * as TraceEngine from '../trace/trace.js';
+import type * as Trace from '../trace/trace.js';
 
 export class TracingLayerTree extends SDK.LayerTreeBase.LayerTreeBase {
   private tileById: Map<string, TracingLayerTile>;
@@ -21,7 +21,7 @@ export class TracingLayerTree extends SDK.LayerTreeBase.LayerTreeBase {
 
   async setLayers(
       root: TracingLayerPayload|null, layers: TracingLayerPayload[]|null,
-      paints: TraceEngine.Handlers.ModelHandlers.Frames.LayerPaintEvent[]): Promise<void> {
+      paints: Trace.Types.Events.LegacyLayerPaintEvent[]): Promise<void> {
     const idsToResolve = new Set<Protocol.DOM.BackendNodeId>();
     if (root) {
       // This is a legacy code path for compatibility, as cc is removing
@@ -78,7 +78,7 @@ export class TracingLayerTree extends SDK.LayerTreeBase.LayerTreeBase {
     return layer.pictureForRect(tile.content_rect);
   }
 
-  private setPaints(paints: TraceEngine.Handlers.ModelHandlers.Frames.LayerPaintEvent[]): void {
+  private setPaints(paints: Trace.Types.Events.LegacyLayerPaintEvent[]): void {
     for (let i = 0; i < paints.length; ++i) {
       const layer = (this.layersById.get(paints[i].layerId()) as TracingLayer | null);
       if (layer) {
@@ -121,10 +121,10 @@ export class TracingLayerTree extends SDK.LayerTreeBase.LayerTreeBase {
 }
 export class TracingFrameLayerTree {
   readonly #target: SDK.Target.Target|null;
-  readonly #snapshot: TraceEngine.Types.TraceEvents.TraceEventLayerTreeHostImplSnapshot;
-  readonly #paints: TraceEngine.Handlers.ModelHandlers.Frames.LayerPaintEvent[] = [];
+  readonly #snapshot: Trace.Types.Events.LayerTreeHostImplSnapshot;
+  readonly #paints: Trace.Types.Events.LegacyLayerPaintEvent[] = [];
 
-  constructor(target: SDK.Target.Target|null, data: TraceEngine.Handlers.ModelHandlers.Frames.FrameLayerTreeData) {
+  constructor(target: SDK.Target.Target|null, data: Trace.Types.Events.LegacyFrameLayerTreeData) {
     this.#target = target;
     this.#snapshot = data.entry;
     this.#paints = data.paints;
@@ -143,7 +143,7 @@ export class TracingFrameLayerTree {
     return layerTree;
   }
 
-  paints(): TraceEngine.Handlers.ModelHandlers.Frames.LayerPaintEvent[] {
+  paints(): Trace.Types.Events.LegacyLayerPaintEvent[] {
     return this.#paints;
   }
 }
@@ -161,7 +161,7 @@ export class TracingLayer implements SDK.LayerTreeBase.Layer {
   private quadInternal: number[];
   private scrollRectsInternal: Protocol.LayerTree.ScrollRect[];
   private gpuMemoryUsageInternal: number;
-  private paints: TraceEngine.Handlers.ModelHandlers.Frames.LayerPaintEvent[];
+  private paints: Trace.Types.Events.LegacyLayerPaintEvent[];
   private compositingReasons: string[];
   private compositingReasonIds: string[];
   private drawsContentInternal: boolean;
@@ -323,7 +323,7 @@ export class TracingLayer implements SDK.LayerTreeBase.Layer {
         return null;
       }
       const rect = {x: snapshot.rect[0], y: snapshot.rect[1], width: snapshot.rect[2], height: snapshot.rect[3]};
-      return {rect: rect, snapshot: snapshot.snapshot};
+      return {rect, snapshot: snapshot.snapshot};
     });
   }
 
@@ -345,7 +345,7 @@ export class TracingLayer implements SDK.LayerTreeBase.Layer {
       // Rect is in layer content coordinates, make it relative to picture by offsetting to the top left corner.
       const rect = {x: targetRect[0] - x0, y: targetRect[1] - y0, width: targetRect[2], height: targetRect[3]};
       return this.paintProfilerModel.loadSnapshotFromFragments(fragments).then(
-          snapshot => snapshot ? {rect: rect, snapshot: snapshot} : null);
+          snapshot => snapshot ? {rect, snapshot} : null);
     });
 
     function segmentsOverlap(a1: number, a2: number, b1: number, b2: number): boolean {
@@ -361,7 +361,7 @@ export class TracingLayer implements SDK.LayerTreeBase.Layer {
 
   private scrollRectsFromParams(params: number[], type: Protocol.LayerTree.ScrollRectType):
       Protocol.LayerTree.ScrollRect {
-    return {rect: {x: params[0], y: params[1], width: params[2], height: params[3]}, type: type};
+    return {rect: {x: params[0], y: params[1], width: params[2], height: params[3]}, type};
   }
 
   private createScrollRects(payload: TracingLayerPayload): void {
@@ -389,7 +389,7 @@ export class TracingLayer implements SDK.LayerTreeBase.Layer {
     this.scrollRectsInternal = nonPayloadScrollRects;
   }
 
-  addPaintEvent(paint: TraceEngine.Handlers.ModelHandlers.Frames.LayerPaintEvent): void {
+  addPaintEvent(paint: Trace.Types.Events.LegacyLayerPaintEvent): void {
     this.paints.push(paint);
   }
 
@@ -434,7 +434,7 @@ export interface TracingLayerTile {
 
 async function getPaintProfilerSnapshot(
     paintProfilerModel: SDK.PaintProfiler.PaintProfilerModel,
-    paint: TraceEngine.Handlers.ModelHandlers.Frames.LayerPaintEvent): Promise<{
+    paint: Trace.Types.Events.LegacyLayerPaintEvent): Promise<{
   rect: number[],
   snapshot: SDK.PaintProfiler.PaintProfilerSnapshot,
 }|null> {
@@ -443,5 +443,5 @@ async function getPaintProfilerSnapshot(
     return null;
   }
   const snapshot = await paintProfilerModel.loadSnapshot(picture.serializedPicture);
-  return snapshot ? {rect: picture.rect, snapshot: snapshot} : null;
+  return snapshot ? {rect: picture.rect, snapshot} : null;
 }

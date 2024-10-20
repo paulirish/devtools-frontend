@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 
 import * as Common from '../../core/common/common.js';
+import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
-import * as IconButton from '../../ui/components/icon_button/icon_button.js';
+import type * as Platform from '../../core/platform/platform.js';
+import * as Buttons from '../../ui/components/buttons/buttons.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
@@ -14,11 +16,12 @@ const UIStrings = {
   /**
    *@description Header text content in Framework Ignore List Settings Tab of the Settings
    */
-  frameworkIgnoreList: 'Framework Ignore List',
+  frameworkIgnoreList: 'Framework ignore list',
   /**
    *@description Text in Framework Ignore List Settings Tab of the Settings
    */
-  debuggerWillSkipThroughThe: 'Debugger will skip through the scripts and will not stop on exceptions thrown by them.',
+  debuggerWillSkipThroughThe:
+      'Debugger won\'t step through these scripts or break on exceptions that only affect them and Performance panel will collapse flamechart items that match.',
   /**
    *@description Text in Framework Ignore List Settings Tab of the Settings
    */
@@ -30,7 +33,7 @@ const UIStrings = {
   /**
    *@description Text in Framework Ignore List Settings Tab of the Settings
    */
-  enableIgnoreListing: 'Enable Ignore Listing',
+  enableIgnoreListing: 'Enable ignore listing',
   /**
    *@description Text in Framework Ignore List Settings Tab of the Settings
    */
@@ -46,11 +49,11 @@ const UIStrings = {
   /**
    *@description Text of the add pattern button in Framework Ignore List Settings Tab of the Settings
    */
-  addPattern: 'Add pattern...',
+  addPattern: 'Add regex rule...',
   /**
    *@description Aria accessible name in Framework Ignore List Settings Tab of the Settings
    */
-  addFilenamePattern: 'Add filename pattern',
+  addFilenamePattern: 'Add a regular expression rule for the script\'s URL',
   /**
    *@description Pattern title in Framework Ignore List Settings Tab of the Settings
    *@example {ad.*?} PH1
@@ -60,19 +63,19 @@ const UIStrings = {
    *@description Aria accessible name in Framework Ignore List Settings Tab of the Settings. It labels the input
    * field used to add new or edit existing regular expressions that match file names to ignore in the debugger.
    */
-  pattern: 'Add Pattern',
+  pattern: 'Add a regular expression rule for the script\'s URL',
   /**
    *@description Error message in Framework Ignore List settings pane that declares pattern must not be empty
    */
-  patternCannotBeEmpty: 'Pattern cannot be empty',
+  patternCannotBeEmpty: 'Rule can\'t be empty',
   /**
    *@description Error message in Framework Ignore List settings pane that declares pattern already exits
    */
-  patternAlreadyExists: 'Pattern already exists',
+  patternAlreadyExists: 'Rule already exists',
   /**
    *@description Error message in Framework Ignore List settings pane that declares pattern must be a valid regular expression
    */
-  patternMustBeAValidRegular: 'Pattern must be a valid regular expression',
+  patternMustBeAValidRegular: 'Rule must be a valid regular expression',
   /**
    *@description Text that is usually a hyperlink to more documentation
    */
@@ -121,15 +124,19 @@ export class FrameworkIgnoreListSettingsTab extends UI.Widget.VBox implements
         Common.Settings.Settings.instance().moduleSetting('automatically-ignore-list-known-third-party-scripts'),
         true));
 
-    const automaticallyIgnoreLink =
-        UI.XLink.XLink.create('http://goo.gle/skip-third-party', undefined, undefined, undefined, 'learn-more');
-    automaticallyIgnoreLink.textContent = '';
-    automaticallyIgnoreLink.setAttribute('aria-label', i18nString(UIStrings.learnMore));
-
-    const automaticallyIgnoreLinkIcon = new IconButton.Icon.Icon();
-    automaticallyIgnoreLinkIcon.data = {iconName: 'help', color: 'var(--icon-default)', width: '16px', height: '16px'};
-    automaticallyIgnoreLink.prepend(automaticallyIgnoreLinkIcon);
-    automaticallyIgnoreList.appendChild(automaticallyIgnoreLink);
+    const automaticallyIgnoreLinkButton = new Buttons.Button.Button();
+    automaticallyIgnoreLinkButton.data = {
+      iconName: 'help',
+      variant: Buttons.Button.Variant.ICON,
+      size: Buttons.Button.Size.SMALL,
+      jslogContext: 'learn-more',
+      title: i18nString(UIStrings.learnMore),
+    };
+    automaticallyIgnoreLinkButton.addEventListener(
+        'click',
+        () => Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(
+            'http://goo.gle/skip-third-party' as Platform.DevToolsPath.UrlString));
+    automaticallyIgnoreList.appendChild(automaticallyIgnoreLinkButton);
 
     const customExclusionGroup = this.createSettingGroup(i18nString(UIStrings.customExclusionRules));
     ignoreListOptions.appendChild(customExclusionGroup);

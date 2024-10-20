@@ -2,15 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import '../../../ui/components/icon_button/icon_button.js';
+
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Platform from '../../../core/platform/platform.js';
-import * as TraceEngine from '../../../models/trace/trace.js';
-import * as IconButton from '../../../ui/components/icon_button/icon_button.js';
+import * as Trace from '../../../models/trace/trace.js';
 import * as PerfUI from '../../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 
 import networkRequestTooltipStyles from './networkRequestTooltip.css.js';
 import {colorForNetworkRequest} from './Utils.js';
+
+const {html} = LitHtml;
 
 const MAX_URL_LENGTH = 30;
 
@@ -42,17 +45,16 @@ const UIStrings = {
 };
 
 export class NetworkRequestTooltip extends HTMLElement {
-  static readonly litTagName = LitHtml.literal`devtools-performance-network-request-tooltip`;
   readonly #shadow = this.attachShadow({mode: 'open'});
 
-  #networkRequest?: TraceEngine.Types.TraceEvents.SyntheticNetworkRequest|null;
+  #networkRequest?: Trace.Types.Events.SyntheticNetworkRequest|null;
 
   connectedCallback(): void {
     this.#shadow.adoptedStyleSheets = [networkRequestTooltipStyles];
     this.#render();
   }
 
-  set networkRequest(networkRequest: TraceEngine.Types.TraceEvents.SyntheticNetworkRequest) {
+  set networkRequest(networkRequest: Trace.Types.Events.SyntheticNetworkRequest) {
     if (this.#networkRequest === networkRequest) {
       return;
     }
@@ -65,16 +67,16 @@ export class NetworkRequestTooltip extends HTMLElement {
       return null;
     }
     if (this.#networkRequest.args.data.priority === this.#networkRequest.args.data.initialPriority) {
-      return LitHtml.html`
+      return html`
         <div class="priority">${UIStrings.priority}: ${
           PerfUI.NetworkPriorities.uiLabelForNetworkPriority(this.#networkRequest.args.data.priority)}</div>
       `;
     }
-    return LitHtml.html`
+    return html`
       <div class="priority">
         ${UIStrings.priority}:
         ${PerfUI.NetworkPriorities.uiLabelForNetworkPriority(this.#networkRequest.args.data.initialPriority)}
-        <${IconButton.Icon.Icon.litTagName} name=${'arrow-forward'}></${IconButton.Icon.Icon.litTagName}>
+        <devtools-icon name=${'arrow-forward'}></devtools-icon>
         ${PerfUI.NetworkPriorities.uiLabelForNetworkPriority(this.#networkRequest.args.data.priority)}
       </div>
     `;
@@ -86,7 +88,7 @@ export class NetworkRequestTooltip extends HTMLElement {
     // |
     // |----
     // |
-    return LitHtml.html`<span class="whisker-left"> <span class="horizontal"></span> </span>`;
+    return html`<span class="whisker-left"> <span class="horizontal"></span> </span>`;
   }
 
   #renderRightWhisker(): LitHtml.TemplateResult {
@@ -95,7 +97,7 @@ export class NetworkRequestTooltip extends HTMLElement {
     //      |
     //  ----|
     //      |
-    return LitHtml.html`<span class="whisker-right"> <span class="horizontal"></span> </span>`;
+    return html`<span class="whisker-right"> <span class="horizontal"></span> </span>`;
   }
 
   #renderTimings(): LitHtml.TemplateResult|null {
@@ -103,12 +105,12 @@ export class NetworkRequestTooltip extends HTMLElement {
       return null;
     }
     const syntheticData = this.#networkRequest.args.data.syntheticData;
-    const queueing = (syntheticData.sendStartTime - this.#networkRequest.ts) as TraceEngine.Types.Timing.MicroSeconds;
+    const queueing = (syntheticData.sendStartTime - this.#networkRequest.ts) as Trace.Types.Timing.MicroSeconds;
     const requestPlusWaiting =
-        (syntheticData.downloadStart - syntheticData.sendStartTime) as TraceEngine.Types.Timing.MicroSeconds;
-    const download = (syntheticData.finishTime - syntheticData.downloadStart) as TraceEngine.Types.Timing.MicroSeconds;
+        (syntheticData.downloadStart - syntheticData.sendStartTime) as Trace.Types.Timing.MicroSeconds;
+    const download = (syntheticData.finishTime - syntheticData.downloadStart) as Trace.Types.Timing.MicroSeconds;
     const waitingOnMainThread = (this.#networkRequest.ts + this.#networkRequest.dur - syntheticData.finishTime) as
-        TraceEngine.Types.Timing.MicroSeconds;
+        Trace.Types.Timing.MicroSeconds;
 
     const color = colorForNetworkRequest(this.#networkRequest);
     const styleForWaiting = {
@@ -118,7 +120,7 @@ export class NetworkRequestTooltip extends HTMLElement {
       backgroundColor: color,
     };
 
-    return LitHtml.html`
+    return html`
       <ul>
         <li>
           ${this.#renderLeftWhisker()}
@@ -150,15 +152,15 @@ export class NetworkRequestTooltip extends HTMLElement {
     }
     const networkData = this.#networkRequest.args.data;
     // clang-format off
-    const output = LitHtml.html`
+    const output = html`
       <div class="performance-card">
         <span class="url">${Platform.StringUtilities.trimMiddle(networkData.url, MAX_URL_LENGTH)}</span>
         <span class="time bold">${i18n.TimeUtilities.formatMicroSecondsTime(this.#networkRequest.dur)}</span>
 
         <div class="divider"></div>
         ${this.#renderPriority()}
-        ${TraceEngine.Helpers.Network.isSyntheticNetworkRequestEventRenderBlocking(this.#networkRequest) ?
-          LitHtml.html`<div class="render-blocking"> ${UIStrings.renderBlocking} </div>` :  LitHtml.nothing
+        ${Trace.Helpers.Network.isSyntheticNetworkRequestEventRenderBlocking(this.#networkRequest) ?
+          html`<div class="render-blocking"> ${UIStrings.renderBlocking} </div>` :  LitHtml.nothing
         }
         <div class="divider"></div>
 

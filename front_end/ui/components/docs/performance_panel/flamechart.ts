@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 import type * as Platform from '../../../../core/platform/platform.js';
-import * as TraceEngine from '../../../../models/trace/trace.js';
+import * as Trace from '../../../../models/trace/trace.js';
 import * as EnvironmentHelpers from '../../../../testing/EnvironmentHelpers.js';
 import * as TraceHelpers from '../../../../testing/TraceHelpers.js';
 import * as PerfUI from '../../../legacy/components/perf_ui/perf_ui.js';
@@ -68,20 +68,20 @@ function renderBasicExample() {
 }
 
 /**
- * Render a flame chart with main thread long events to stripe and a warning triangle.
+ * Render a flame chart with events with decorations.
  **/
-function renderLongTaskExample() {
-  class FakeProviderWithLongTasksForStriping extends TraceHelpers.FakeFlameChartProvider {
+function renderDecorationExample() {
+  class FakeProviderWithDecorations extends TraceHelpers.FakeFlameChartProvider {
     override timelineData(): PerfUI.FlameChart.FlameChartTimelineData|null {
       return PerfUI.FlameChart.FlameChartTimelineData.create({
-        entryLevels: [0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2],
-        entryStartTimes: [5, 55, 70, 5, 30, 55, 75, 5, 10, 15, 20],
-        entryTotalTimes: [45, 10, 20, 20, 20, 5, 15, 4, 4, 4, 4],
+        entryLevels: [0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 2],
+        entryStartTimes: [5, 55, 70, 5, 30, 55, 75, 5, 10, 15, 20, 25],
+        entryTotalTimes: [45, 10, 20, 20, 20, 5, 15, 4, 4, 4, 4, 1],
         entryDecorations: [
           [
             {
               type: PerfUI.FlameChart.FlameChartDecorationType.CANDY,
-              startAtTime: TraceEngine.Types.Timing.MicroSeconds(25_000),
+              startAtTime: Trace.Types.Timing.MicroSeconds(25_000),
             },
             {type: PerfUI.FlameChart.FlameChartDecorationType.WARNING_TRIANGLE},
           ],
@@ -93,13 +93,13 @@ function renderLongTaskExample() {
           [
             {
               type: PerfUI.FlameChart.FlameChartDecorationType.CANDY,
-              startAtTime: TraceEngine.Types.Timing.MicroSeconds(15_000),
+              startAtTime: Trace.Types.Timing.MicroSeconds(15_000),
             },
           ],
           [
             {
               type: PerfUI.FlameChart.FlameChartDecorationType.CANDY,
-              startAtTime: TraceEngine.Types.Timing.MicroSeconds(10_000),
+              startAtTime: Trace.Types.Timing.MicroSeconds(10_000),
             },
             {type: PerfUI.FlameChart.FlameChartDecorationType.HIDDEN_DESCENDANTS_ARROW},
           ],
@@ -109,7 +109,7 @@ function renderLongTaskExample() {
           [
             {
               type: PerfUI.FlameChart.FlameChartDecorationType.CANDY,
-              startAtTime: TraceEngine.Types.Timing.MicroSeconds(10_000),
+              startAtTime: Trace.Types.Timing.MicroSeconds(10_000),
             },
             {type: PerfUI.FlameChart.FlameChartDecorationType.HIDDEN_DESCENDANTS_ARROW},
             {type: PerfUI.FlameChart.FlameChartDecorationType.WARNING_TRIANGLE},
@@ -124,17 +124,25 @@ function renderLongTaskExample() {
           [
             {
               type: PerfUI.FlameChart.FlameChartDecorationType.CANDY,
-              startAtTime: TraceEngine.Types.Timing.MicroSeconds(1_000),
+              startAtTime: Trace.Types.Timing.MicroSeconds(1_000),
             },
             {type: PerfUI.FlameChart.FlameChartDecorationType.HIDDEN_DESCENDANTS_ARROW},
           ],
           [
             {
               type: PerfUI.FlameChart.FlameChartDecorationType.CANDY,
-              startAtTime: TraceEngine.Types.Timing.MicroSeconds(1_000),
+              startAtTime: Trace.Types.Timing.MicroSeconds(1_000),
             },
             {type: PerfUI.FlameChart.FlameChartDecorationType.HIDDEN_DESCENDANTS_ARROW},
             {type: PerfUI.FlameChart.FlameChartDecorationType.WARNING_TRIANGLE},
+          ],
+          [
+            {
+              type: PerfUI.FlameChart.FlameChartDecorationType.WARNING_TRIANGLE,
+              // This triangle should start 1/4 of hte event, and end at 3/4 of the event.
+              customStartTime: Trace.Types.Timing.MicroSeconds(25_250),
+              customEndTime: Trace.Types.Timing.MicroSeconds(25_750),
+            },
           ],
         ],
         groups: [{
@@ -147,12 +155,12 @@ function renderLongTaskExample() {
     }
   }
 
-  const container = document.querySelector('div#long-task');
+  const container = document.querySelector('div#decorations');
   if (!container) {
     throw new Error('No container');
   }
   const delegate = new TraceHelpers.MockFlameChartDelegate();
-  const dataProvider = new FakeProviderWithLongTasksForStriping();
+  const dataProvider = new FakeProviderWithDecorations();
   const flameChart = new PerfUI.FlameChart.FlameChart(dataProvider, delegate);
 
   flameChart.markAsRoot();
@@ -356,7 +364,7 @@ function renderInitiatorsExample() {
 }
 
 renderBasicExample();
-renderLongTaskExample();
+renderDecorationExample();
 renderNestedExample();
 renderTrackCustomizationExample();
 renderInitiatorsExample();

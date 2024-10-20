@@ -9,6 +9,8 @@ import * as LitHtml from '../../lit-html/lit-html.js';
 
 import * as MarkdownView from './markdown_view.js';
 
+const {html} = LitHtml;
+
 type TestToken = {
   type: string,
   tokens?: Marked.Marked.Token[],
@@ -27,34 +29,34 @@ describeWithEnvironment('MarkdownView', () => {
     it('tokenizers links in single quotes', () => {
       assert.deepStrictEqual(Marked.Marked.lexer('\'https://example.com\''), [
         {
-          'raw': '\'https://example.com\'',
-          'text': '\'https://example.com\'',
-          'tokens': [
+          raw: '\'https://example.com\'',
+          text: '\'https://example.com\'',
+          tokens: [
             {
-              'raw': '\'',
-              'text': '&#39;',
-              'type': 'text',
+              raw: '\'',
+              text: '&#39;',
+              type: 'text',
             },
             {
-              'href': 'https://example.com',
-              'raw': 'https://example.com',
-              'text': 'https://example.com',
-              'tokens': [
+              href: 'https://example.com',
+              raw: 'https://example.com',
+              text: 'https://example.com',
+              tokens: [
                 {
-                  'raw': 'https://example.com',
-                  'text': 'https://example.com',
-                  'type': 'text',
+                  raw: 'https://example.com',
+                  text: 'https://example.com',
+                  type: 'text',
                 },
               ],
-              'type': 'link',
+              type: 'link',
             },
             {
-              'raw': '\'',
-              'text': '&#39;',
-              'type': 'text',
+              raw: '\'',
+              text: '&#39;',
+              type: 'text',
             },
           ],
-          'type': 'paragraph',
+          type: 'paragraph',
         },
       ] as unknown as Marked.Marked.TokensList);
     });
@@ -64,7 +66,7 @@ describeWithEnvironment('MarkdownView', () => {
 
     it('wraps paragraph tokens in <p> tags', () => {
       const renderResult = renderer.renderToken(getFakeToken({type: 'paragraph', tokens: []}));
-      assert.deepStrictEqual(renderResult.strings.raw, ['<p>', '']);
+      assert.deepStrictEqual(renderResult.strings.raw, ['<p>', '</p>']);
     });
 
     it('wraps an unordered list token in <ul> tags', () => {
@@ -74,7 +76,7 @@ describeWithEnvironment('MarkdownView', () => {
 
     it('wraps list items in <li> tags', () => {
       const renderResult = renderer.renderToken(getFakeToken({type: 'list_item', tokens: []}));
-      assert.deepStrictEqual(renderResult.strings.raw, ['<li>', '']);
+      assert.deepStrictEqual(renderResult.strings.raw, ['<li>', '</li>']);
     });
 
     it('wraps a codespan token in <code> tags', () => {
@@ -165,12 +167,26 @@ describeWithEnvironment('MarkdownView', () => {
     const renderer = new MarkdownView.MarkdownView.MarkdownInsightRenderer();
     it('renders link as an x-link', () => {
       const result =
-          renderer.renderToken({type: 'link', text: 'learn more', href: 'exampleLink'} as Marked.Marked.Token);
+          renderer.renderToken({type: 'link', text: 'learn more', href: 'https://example.com'} as Marked.Marked.Token);
       assert((result.values[0] as HTMLElement).tagName === 'X-LINK');
+    });
+    it('does not render URLs with "javascript:"', () => {
+      const result = renderer.renderToken(
+          {type: 'link', text: 'learn more', href: 'javascript:alert("test")'} as Marked.Marked.Token);
+      assert(result.values[0] === undefined);
+    });
+    it('does not render chrome:// URLs', () => {
+      const result =
+          renderer.renderToken({type: 'link', text: 'learn more', href: 'chrome://settings'} as Marked.Marked.Token);
+      assert(result.values[0] === undefined);
+    });
+    it('does not render invalid URLs', () => {
+      const result = renderer.renderToken({type: 'link', text: 'learn more', href: '123'} as Marked.Marked.Token);
+      assert(result.values[0] === undefined);
     });
     it('renders images as an x-link', () => {
       const result =
-          renderer.renderToken({type: 'image', text: 'learn more', href: 'exampleLink'} as Marked.Marked.Token);
+          renderer.renderToken({type: 'image', text: 'learn more', href: 'https://example.com'} as Marked.Marked.Token);
       assert((result.values[0] as HTMLElement).tagName === 'X-LINK');
     });
     it('renders headers as a strong element', () => {
@@ -180,6 +196,52 @@ describeWithEnvironment('MarkdownView', () => {
     it('renders unsupported tokens', () => {
       const result = renderer.renderToken({type: 'html', raw: '<!DOCTYPE html>'} as Marked.Marked.Token);
       assert(result.values.join('').includes('<!DOCTYPE html>'));
+    });
+    it('detects language but default to provided', () => {
+      let result =
+          renderer.detectCodeLanguage({text: 'const int foo = "bar"', lang: 'cpp'} as Marked.Marked.Tokens.Code);
+      assert.strictEqual(result, 'cpp');
+      result = renderer.detectCodeLanguage({text: '', lang: 'cpp'} as Marked.Marked.Tokens.Code);
+      assert.strictEqual(result, 'cpp');
+    });
+    it('detects JavaScript language', () => {
+      let result = renderer.detectCodeLanguage({text: 'const t = 2', lang: ''} as Marked.Marked.Tokens.Code);
+      assert.strictEqual(result, 'js');
+      result = renderer.detectCodeLanguage({text: 'let t = 2', lang: ''} as Marked.Marked.Tokens.Code);
+      assert.strictEqual(result, 'js');
+      result = renderer.detectCodeLanguage({text: 'var t = 2', lang: ''} as Marked.Marked.Tokens.Code);
+      assert.strictEqual(result, 'js');
+      result = renderer.detectCodeLanguage({text: 'function t(){}', lang: ''} as Marked.Marked.Tokens.Code);
+      assert.strictEqual(result, 'js');
+      result = renderer.detectCodeLanguage({text: 'async function t(){}', lang: ''} as Marked.Marked.Tokens.Code);
+      assert.strictEqual(result, 'js');
+      result = renderer.detectCodeLanguage(
+          {text: 'import puppeteer from "puppeteer-core"', lang: ''} as Marked.Marked.Tokens.Code);
+      assert.strictEqual(result, 'js');
+    });
+    it('doesn`t detect JavaScript language', () => {
+      let result = renderer.detectCodeLanguage({text: 'constant F', lang: ''} as Marked.Marked.Tokens.Code);
+      assert.strictEqual(result, '');
+      result = renderer.detectCodeLanguage({text: 'variable', lang: ''} as Marked.Marked.Tokens.Code);
+      assert.strictEqual(result, '');
+      result = renderer.detectCodeLanguage(
+          {text: 'functions are better then classes', lang: ''} as Marked.Marked.Tokens.Code);
+      assert.strictEqual(result, '');
+      result = renderer.detectCodeLanguage(
+          {text: 'asynchronous code it hard to understand', lang: ''} as Marked.Marked.Tokens.Code);
+      assert.strictEqual(result, '');
+    });
+    it('detects CSS language', () => {
+      let result = renderer.detectCodeLanguage({text: '.myClass {}', lang: ''} as Marked.Marked.Tokens.Code);
+      assert.strictEqual(result, 'css');
+      result = renderer.detectCodeLanguage({text: '.myClass{}', lang: ''} as Marked.Marked.Tokens.Code);
+      assert.strictEqual(result, 'css');
+      result = renderer.detectCodeLanguage({text: 'my-component {}', lang: ''} as Marked.Marked.Tokens.Code);
+      assert.strictEqual(result, 'css');
+      result = renderer.detectCodeLanguage({text: 'my-component::after {}', lang: ''} as Marked.Marked.Tokens.Code);
+      assert.strictEqual(result, 'css');
+      result = renderer.detectCodeLanguage({text: '.foo::[name="bar"] {}', lang: ''} as Marked.Marked.Tokens.Code);
+      assert.strictEqual(result, 'css');
     });
   });
 
@@ -236,7 +298,7 @@ console.log('test')
           renderString('`console.log()`', 'code', new class extends MarkdownView.MarkdownView.MarkdownLitRenderer {
             override templateForToken(token: Marked.Marked.Token): LitHtml.TemplateResult|null {
               if (token.type === 'codespan') {
-                return LitHtml.html`<code>overriden</code>`;
+                return html`<code>overriden</code>`;
               }
               return super.templateForToken(token as Marked.Marked.MarkedToken);
             }

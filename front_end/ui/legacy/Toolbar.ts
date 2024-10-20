@@ -115,7 +115,7 @@ export class Toolbar {
     let longClickController: LongClickController|null = null;
     let longClickButtons: ToolbarButton[]|null = null;
 
-    action.addEventListener(ActionEvents.Toggled, updateOptions);
+    action.addEventListener(ActionEvents.TOGGLED, updateOptions);
     updateOptions();
     return button;
 
@@ -146,7 +146,7 @@ export class Toolbar {
       document.documentElement.addEventListener('mouseup', mouseUp, false);
 
       const optionsGlassPane = new GlassPane();
-      optionsGlassPane.setPointerEventsBehavior(PointerEventsBehavior.BlockedByGlassPane);
+      optionsGlassPane.setPointerEventsBehavior(PointerEventsBehavior.BLOCKED_BY_GLASS_PANE);
       optionsGlassPane.show(document);
       const optionsBar = new Toolbar('fill', optionsGlassPane.contentElement);
       optionsBar.contentElement.classList.add('floating');
@@ -216,7 +216,7 @@ export class Toolbar {
 
   static createActionButton(action: Action, options: ToolbarButtonOptions|undefined = TOOLBAR_BUTTON_DEFAULT_OPTIONS):
       ToolbarButton {
-    const button = action.toggleable() ? makeToggle() : makeButton();
+    const button = (action.toggleable() && !options?.ignoreToggleable) ? makeToggle() : makeButton();
 
     if (options.showLabel) {
       button.setText(options.label?.() || action.title());
@@ -232,8 +232,8 @@ export class Toolbar {
         void action.execute();
       };
     }
-    button.addEventListener(ToolbarButton.Events.Click, handler, action);
-    action.addEventListener(ActionEvents.Enabled, enabledChanged);
+    button.addEventListener(ToolbarButton.Events.CLICK, handler, action);
+    action.addEventListener(ActionEvents.ENABLED, enabledChanged);
     button.setEnabled(action.enabled());
     return button;
 
@@ -250,7 +250,7 @@ export class Toolbar {
       if (action.toggleWithRedColor()) {
         toggleButton.enableToggleWithRedColor();
       }
-      action.addEventListener(ActionEvents.Toggled, toggled);
+      action.addEventListener(ActionEvents.TOGGLED, toggled);
       toggled();
       return toggleButton;
 
@@ -441,6 +441,7 @@ export interface ToolbarButtonOptions {
   label?: () => Platform.UIString.LocalizedString;
   showLabel: boolean;
   userActionCode?: Host.UserMetrics.Action;
+  ignoreToggleable?: boolean;
 }
 
 const TOOLBAR_BUTTON_DEFAULT_OPTIONS: ToolbarButtonOptions = {
@@ -521,11 +522,11 @@ export class ToolbarItem<T = any> extends Common.ObjectWrapper.ObjectWrapper<T> 
 }
 
 export const enum ToolbarItemWithCompactLayoutEvents {
-  CompactLayoutUpdated = 'CompactLayoutUpdated',
+  COMPACT_LAYOUT_UPDATED = 'CompactLayoutUpdated',
 }
 
 type ToolbarItemWithCompactLayoutEventTypes = {
-  [ToolbarItemWithCompactLayoutEvents.CompactLayoutUpdated]: boolean,
+  [ToolbarItemWithCompactLayoutEvents.COMPACT_LAYOUT_UPDATED]: boolean,
 };
 
 export class ToolbarItemWithCompactLayout extends ToolbarItem<ToolbarItemWithCompactLayoutEventTypes> {
@@ -534,7 +535,7 @@ export class ToolbarItemWithCompactLayout extends ToolbarItem<ToolbarItemWithCom
   }
 
   override setCompactLayout(enable: boolean): void {
-    this.dispatchEventToListeners(ToolbarItemWithCompactLayoutEvents.CompactLayoutUpdated, enable);
+    this.dispatchEventToListeners(ToolbarItemWithCompactLayoutEvents.COMPACT_LAYOUT_UPDATED, enable);
   }
 }
 
@@ -573,6 +574,7 @@ export class ToolbarButton extends ToolbarItem<ToolbarButton.EventTypes> {
       this.button.data = {variant: Buttons.Button.Variant.ICON, iconName: glyphOrAdorner};
     } else {
       this.button.variant = Buttons.Button.Variant.TEXT;
+      this.button.reducedFocusRing = true;
       if (glyphOrAdorner) {
         this.button.iconName = glyphOrAdorner;
       }
@@ -589,10 +591,6 @@ export class ToolbarButton extends ToolbarItem<ToolbarButton.EventTypes> {
 
   focus(): void {
     this.element.focus();
-  }
-
-  pressed(pressed: boolean): void {
-    this.button.pressed = pressed;
   }
 
   checked(checked: boolean): void {
@@ -623,12 +621,17 @@ export class ToolbarButton extends ToolbarItem<ToolbarButton.EventTypes> {
     this.button.size = size;
   }
 
+  setReducedFocusRing(): void {
+    this.button.reducedFocusRing = true;
+  }
+
   setText(text: string): void {
     if (this.text === text) {
       return;
     }
     this.button.textContent = text;
     this.button.variant = Buttons.Button.Variant.TEXT;
+    this.button.reducedFocusRing = true;
     this.text = text;
   }
 
@@ -675,7 +678,7 @@ export class ToolbarButton extends ToolbarItem<ToolbarButton.EventTypes> {
     if (!this.enabled) {
       return;
     }
-    this.dispatchEventToListeners(ToolbarButton.Events.Click, event);
+    this.dispatchEventToListeners(ToolbarButton.Events.CLICK, event);
     event.consume();
   }
 
@@ -683,28 +686,30 @@ export class ToolbarButton extends ToolbarItem<ToolbarButton.EventTypes> {
     if (!this.enabled) {
       return;
     }
-    this.dispatchEventToListeners(ToolbarButton.Events.MouseDown, event);
+    this.dispatchEventToListeners(ToolbarButton.Events.MOUSE_DOWN, event);
   }
 }
 
 export class ToolbarCombobox extends ToolbarItem<ToolbarButton.EventTypes> {
-  private readonly glyphElement: IconButton.Icon.Icon;
-  private textElement: HTMLElement;
+  private textElement?: HTMLElement;
   private text?: string;
-  private glyph?: string;
+  private iconName?: string;
   private adorner?: Adorners.Adorner.Adorner;
 
-  constructor(title: string, isIconDropdown?: boolean, jslogContext?: string) {
-    const element = document.createElement('button');
+  constructor(title: string, isIconDropdown?: boolean, jslogContext?: string, iconName?: string) {
+    let element;
+    if (iconName) {
+      element = new Buttons.Button.Button();
+      element.data = {variant: Buttons.Button.Variant.ICON, iconName};
+    } else {
+      element = document.createElement('button');
+    }
     element.classList.add('toolbar-button');
     super(element);
     this.element.addEventListener('click', this.clicked.bind(this), false);
     this.element.addEventListener('mousedown', this.mouseDown.bind(this), false);
 
-    this.glyphElement = new IconButton.Icon.Icon();
-    this.glyphElement.className = 'toolbar-glyph hidden';
-    this.element.appendChild(this.glyphElement);
-    this.textElement = this.element.createChild('div', 'toolbar-text hidden');
+    this.iconName = iconName;
 
     this.setTitle(title);
     if (jslogContext) {
@@ -719,25 +724,24 @@ export class ToolbarCombobox extends ToolbarItem<ToolbarButton.EventTypes> {
   }
 
   setText(text: string): void {
-    if (this.text === text) {
+    if (this.text === text || this.iconName) {
       return;
+    }
+    if (!this.textElement) {
+      this.textElement = document.createElement('div');
+      this.textElement.classList.add('toolbar-text', 'hidden');
+      const dropDownArrow = this.element.querySelector('.toolbar-dropdown-arrow');
+      this.element.insertBefore(this.textElement, dropDownArrow);
     }
     this.textElement.textContent = text;
     this.textElement.classList.toggle('hidden', !text);
     this.text = text;
   }
 
-  setGlyph(glyph: string): void {
-    if (this.glyph === glyph) {
+  setAdorner(adorner: Adorners.Adorner.Adorner): void {
+    if (this.iconName) {
       return;
     }
-    this.glyphElement.name = !glyph ? null : glyph;
-    this.glyphElement.classList.toggle('hidden', !glyph);
-    this.element.classList.toggle('toolbar-has-glyph', Boolean(glyph));
-    this.glyph = glyph;
-  }
-
-  setAdorner(adorner: Adorners.Adorner.Adorner): void {
     if (!this.adorner) {
       this.adorner = adorner;
     } else {
@@ -761,7 +765,7 @@ export class ToolbarCombobox extends ToolbarItem<ToolbarButton.EventTypes> {
     if (!this.enabled) {
       return;
     }
-    this.dispatchEventToListeners(ToolbarButton.Events.Click, event);
+    this.dispatchEventToListeners(ToolbarButton.Events.CLICK, event);
     event.consume();
   }
 
@@ -769,19 +773,19 @@ export class ToolbarCombobox extends ToolbarItem<ToolbarButton.EventTypes> {
     if (!this.enabled) {
       return;
     }
-    this.dispatchEventToListeners(ToolbarButton.Events.MouseDown, event);
+    this.dispatchEventToListeners(ToolbarButton.Events.MOUSE_DOWN, event);
   }
 }
 
 export namespace ToolbarButton {
   export const enum Events {
-    Click = 'Click',
-    MouseDown = 'MouseDown',
+    CLICK = 'Click',
+    MOUSE_DOWN = 'MouseDown',
   }
 
   export type EventTypes = {
-    [Events.Click]: Event,
-    [Events.MouseDown]: MouseEvent,
+    [Events.CLICK]: Event,
+    [Events.MOUSE_DOWN]: MouseEvent,
   };
 }
 
@@ -816,7 +820,7 @@ export class ToolbarInput extends ToolbarItem<ToolbarInput.EventTypes> {
       this.prompt.setTitle(tooltip);
     }
     this.prompt.setPlaceholder(placeholder, accessiblePlaceholder);
-    this.prompt.addEventListener(TextPromptEvents.TextChanged, this.onChangeCallback.bind(this));
+    this.prompt.addEventListener(TextPromptEvents.TEXT_CHANGED, this.onChangeCallback.bind(this));
 
     if (growFactor) {
       this.element.style.flexGrow = String(growFactor);
@@ -888,7 +892,7 @@ export class ToolbarInput extends ToolbarItem<ToolbarInput.EventTypes> {
 
   private onKeydownCallback(event: KeyboardEvent): void {
     if (event.key === 'Enter' && this.prompt.text()) {
-      this.dispatchEventToListeners(ToolbarInput.Event.EnterPressed, this.prompt.text());
+      this.dispatchEventToListeners(ToolbarInput.Event.ENTER_PRESSED, this.prompt.text());
     }
     if (!Platform.KeyboardUtilities.isEscKey(event) || !this.prompt.text()) {
       return;
@@ -899,7 +903,7 @@ export class ToolbarInput extends ToolbarItem<ToolbarInput.EventTypes> {
 
   private onChangeCallback(): void {
     this.updateEmptyStyles();
-    this.dispatchEventToListeners(ToolbarInput.Event.TextChanged, this.prompt.text());
+    this.dispatchEventToListeners(ToolbarInput.Event.TEXT_CHANGED, this.prompt.text());
   }
 
   private updateEmptyStyles(): void {
@@ -924,13 +928,13 @@ export class ToolbarFilter extends ToolbarInput {
 
 export namespace ToolbarInput {
   export const enum Event {
-    TextChanged = 'TextChanged',
-    EnterPressed = 'EnterPressed',
+    TEXT_CHANGED = 'TextChanged',
+    ENTER_PRESSED = 'EnterPressed',
   }
 
   export interface EventTypes {
-    [Event.TextChanged]: string;
-    [Event.EnterPressed]: string;
+    [Event.TEXT_CHANGED]: string;
+    [Event.ENTER_PRESSED]: string;
   }
 }
 
@@ -946,7 +950,6 @@ export class ToolbarToggle extends ToolbarButton {
     this.setToggleType(Buttons.Button.ToggleType.PRIMARY);
     this.toggled(false);
 
-    this.setPressed(false);
     if (jslogContext) {
       this.element.setAttribute('jslog', `${VisualLogging.toggle().track({click: true}).context(jslogContext)}`);
     }
@@ -955,17 +958,12 @@ export class ToolbarToggle extends ToolbarButton {
     }
   }
 
-  setPressed(pressed: boolean): void {
-    this.pressed(pressed);
-  }
-
   setToggleOnClick(toggleOnClick: boolean): void {
     this.toggleOnClick(toggleOnClick);
   }
 
   setToggled(toggled: boolean): void {
     this.toggled(toggled);
-    this.setPressed(toggled);
   }
 
   setChecked(checked: boolean): void {
@@ -989,11 +987,13 @@ export class ToolbarToggle extends ToolbarButton {
 export class ToolbarMenuButton extends ToolbarCombobox {
   private readonly contextMenuHandler: (arg0: ContextMenu) => void;
   private readonly useSoftMenu: boolean;
-  private triggerTimeout?: number;
+  private triggerTimeoutId?: number;
+  #triggerDelay: number = 200;
+
   constructor(
       contextMenuHandler: (arg0: ContextMenu) => void, isIconDropdown?: boolean, useSoftMenu?: boolean,
-      jslogContext?: string) {
-    super('', isIconDropdown, jslogContext);
+      jslogContext?: string, iconName?: string) {
+    super('', isIconDropdown, jslogContext, iconName);
     if (jslogContext) {
       this.element.setAttribute('jslog', `${VisualLogging.dropDown().track({click: true}).context(jslogContext)}`);
     }
@@ -1002,19 +1002,26 @@ export class ToolbarMenuButton extends ToolbarCombobox {
     ARIAUtils.markAsMenuButton(this.element);
   }
 
+  setTriggerDelay(x: number): void {
+    this.#triggerDelay = x;
+  }
+
   override mouseDown(event: MouseEvent): void {
+    if (!this.enabled) {
+      return;
+    }
     if (event.buttons !== 1) {
       super.mouseDown(event);
       return;
     }
 
-    if (!this.triggerTimeout) {
-      this.triggerTimeout = window.setTimeout(this.trigger.bind(this, event), 200);
+    if (!this.triggerTimeoutId) {
+      this.triggerTimeoutId = window.setTimeout(this.trigger.bind(this, event), this.#triggerDelay);
     }
   }
 
   private trigger(event: Event): void {
-    delete this.triggerTimeout;
+    delete this.triggerTimeoutId;
 
     const contextMenu = new ContextMenu(event, {
       useSoftMenu: this.useSoftMenu,
@@ -1030,8 +1037,8 @@ export class ToolbarMenuButton extends ToolbarCombobox {
   }
 
   override clicked(event: Event): void {
-    if (this.triggerTimeout) {
-      clearTimeout(this.triggerTimeout);
+    if (this.triggerTimeoutId) {
+      clearTimeout(this.triggerTimeoutId);
     }
     this.trigger(event);
   }
@@ -1191,7 +1198,7 @@ export class ToolbarSettingComboBox extends ToolbarComboBox {
   private readonly setting: Common.Settings.Setting<string>;
   private muteSettingListener?: boolean;
   constructor(options: Option[], setting: Common.Settings.Setting<string>, accessibleName: string) {
-    super(null, accessibleName);
+    super(null, accessibleName, undefined, setting.name);
     this.optionsInternal = options;
     this.setting = setting;
     this.selectElementInternal.addEventListener('change', this.valueChanged.bind(this), false);

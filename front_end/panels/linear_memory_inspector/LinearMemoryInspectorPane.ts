@@ -83,25 +83,28 @@ export class LinearMemoryInspectorPane extends Common.ObjectWrapper.eventMixin<E
 
   #tabClosed(event: Common.EventTarget.EventTargetEvent<UI.TabbedPane.EventData>): void {
     const {tabId} = event.data;
-    this.dispatchEventToListeners(Events.ViewClosed, tabId);
+    this.dispatchEventToListeners(Events.VIEW_CLOSED, tabId);
   }
 }
 
 export const enum Events {
-  ViewClosed = 'ViewClosed',
+  VIEW_CLOSED = 'ViewClosed',
 }
 
 export type EventTypes = {
-  [Events.ViewClosed]: string,
+  [Events.VIEW_CLOSED]: string,
 };
 
-class LinearMemoryInspectorView extends UI.Widget.VBox {
+export class LinearMemoryInspectorView extends UI.Widget.VBox {
   #memoryWrapper: LazyUint8Array;
   #address: number;
   #tabId: string;
   #inspector: LinearMemoryInspectorComponents.LinearMemoryInspector.LinearMemoryInspector;
   firstTimeOpen: boolean;
-  constructor(memoryWrapper: LazyUint8Array, address: number|undefined = 0, tabId: string) {
+  readonly #hideValueInspector: boolean;
+
+  constructor(
+      memoryWrapper: LazyUint8Array, address: number|undefined = 0, tabId: string, hideValueInspector?: boolean) {
     super(false);
 
     if (address < 0 || address >= memoryWrapper.length()) {
@@ -111,6 +114,7 @@ class LinearMemoryInspectorView extends UI.Widget.VBox {
     this.#memoryWrapper = memoryWrapper;
     this.#address = address;
     this.#tabId = tabId;
+    this.#hideValueInspector = Boolean(hideValueInspector);
     this.#inspector = new LinearMemoryInspectorComponents.LinearMemoryInspector.LinearMemoryInspector();
     this.#inspector.addEventListener(
         LinearMemoryInspectorComponents.LinearMemoryInspector.MemoryRequestEvent.eventName,
@@ -178,6 +182,7 @@ class LinearMemoryInspectorView extends UI.Widget.VBox {
         valueTypeModes,
         endianness,
         highlightInfo: this.#getHighlightInfo(),
+        hideValueInspector: this.#hideValueInspector,
       };
     });
   }
@@ -190,11 +195,12 @@ class LinearMemoryInspectorView extends UI.Widget.VBox {
 
     void LinearMemoryInspectorController.getMemoryRange(this.#memoryWrapper, start, end).then(memory => {
       this.#inspector.data = {
-        memory: memory,
-        address: address,
+        memory,
+        address,
         memoryOffset: start,
         outerMemoryLength: this.#memoryWrapper.length(),
         highlightInfo: this.#getHighlightInfo(),
+        hideValueInspector: this.#hideValueInspector,
       };
     });
   }

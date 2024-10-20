@@ -7,6 +7,7 @@
 import type {Protocol} from 'devtools-protocol';
 
 import type {CDPSession} from '../api/CDPSession.js';
+import type {ElementHandle} from '../api/ElementHandle.js';
 import type {WaitForOptions} from '../api/Frame.js';
 import {Frame, FrameEvent, throwIfDetached} from '../api/Frame.js';
 import type {HTTPResponse} from '../api/HTTPResponse.js';
@@ -24,6 +25,7 @@ import type {
   DeviceRequestPrompt,
   DeviceRequestPromptManager,
 } from './DeviceRequestPrompt.js';
+import {FirefoxTargetManager} from './FirefoxTargetManager.js';
 import type {FrameManager} from './FrameManager.js';
 import {FrameManagerEvent} from './FrameManagerEvents.js';
 import type {IsolatedWorldChart} from './IsolatedWorld.js';
@@ -134,10 +136,6 @@ export class CdpFrame extends Frame {
 
   override page(): CdpPage {
     return this._frameManager.page();
-  }
-
-  override isOOPFrame(): boolean {
-    return this.#client !== this._frameManager.client;
   }
 
   @throwIfDetached
@@ -321,17 +319,13 @@ export class CdpFrame extends Frame {
   }
 
   #deviceRequestPromptManager(): DeviceRequestPromptManager {
-    const rootFrame = this.page().mainFrame();
-    if (this.isOOPFrame() || rootFrame === null) {
-      return this._frameManager._deviceRequestPromptManager(this.#client);
-    } else {
-      return rootFrame._frameManager._deviceRequestPromptManager(this.#client);
-    }
+    return this._frameManager._deviceRequestPromptManager(this.#client);
   }
 
   @throwIfDetached
   async addPreloadScript(preloadScript: CdpPreloadScript): Promise<void> {
-    if (!this.isOOPFrame() && this !== this._frameManager.mainFrame()) {
+    const parentFrame = this.parentFrame();
+    if (parentFrame && this.#client === parentFrame.client) {
       return;
     }
     if (preloadScript.getIdForFrame(this)) {
@@ -419,7 +413,7 @@ export class CdpFrame extends Frame {
     return this.#detached;
   }
 
-  [disposeSymbol](): void {
+  override [disposeSymbol](): void {
     if (this.#detached) {
       return;
     }
@@ -430,5 +424,24 @@ export class CdpFrame extends Frame {
 
   exposeFunction(): never {
     throw new UnsupportedOperation();
+  }
+
+  override async frameElement(): Promise<ElementHandle<HTMLIFrameElement> | null> {
+    const isFirefox =
+      this.page().target()._targetManager() instanceof FirefoxTargetManager;
+
+    if (isFirefox) {
+      return await super.frameElement();
+    }
+    const parent = this.parentFrame();
+    if (!parent) {
+      return null;
+    }
+    const {backendNodeId} = await parent.client.send('DOM.getFrameOwner', {
+      frameId: this._id,
+    });
+    return (await parent
+      .mainRealm()
+      .adoptBackendNode(backendNodeId)) as ElementHandle<HTMLIFrameElement>;
   }
 }

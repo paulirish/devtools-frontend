@@ -772,6 +772,8 @@ export namespace Audits {
     WarnDomainNonASCII = 'WarnDomainNonASCII',
     WarnThirdPartyPhaseout = 'WarnThirdPartyPhaseout',
     WarnCrossSiteRedirectDowngradeChangesInclusion = 'WarnCrossSiteRedirectDowngradeChangesInclusion',
+    WarnDeprecationTrialMetadata = 'WarnDeprecationTrialMetadata',
+    WarnThirdPartyCookieHeuristic = 'WarnThirdPartyCookieHeuristic',
   }
 
   export const enum CookieOperation {
@@ -1018,6 +1020,7 @@ export namespace Audits {
     NoRegisterTriggerHeader = 'NoRegisterTriggerHeader',
     NoRegisterOsSourceHeader = 'NoRegisterOsSourceHeader',
     NoRegisterOsTriggerHeader = 'NoRegisterOsTriggerHeader',
+    NavigationRegistrationUniqueScopeAlreadySet = 'NavigationRegistrationUniqueScopeAlreadySet',
   }
 
   export const enum SharedDictionaryError {
@@ -1206,7 +1209,7 @@ export namespace Audits {
     ThirdPartyCookiesBlocked = 'ThirdPartyCookiesBlocked',
     NotSignedInWithIdp = 'NotSignedInWithIdp',
     MissingTransientUserActivation = 'MissingTransientUserActivation',
-    ReplacedByButtonMode = 'ReplacedByButtonMode',
+    ReplacedByActiveMode = 'ReplacedByActiveMode',
     InvalidFieldsSpecified = 'InvalidFieldsSpecified',
     RelyingPartyOriginIsOpaque = 'RelyingPartyOriginIsOpaque',
     TypeNotMatching = 'TypeNotMatching',
@@ -1482,6 +1485,47 @@ export namespace Extensions {
 
   export interface GetStorageItemsResponse extends ProtocolResponseWithError {
     data: any;
+  }
+
+  export interface RemoveStorageItemsRequest {
+    /**
+     * ID of extension.
+     */
+    id: string;
+    /**
+     * StorageArea to remove data from.
+     */
+    storageArea: StorageArea;
+    /**
+     * Keys to remove.
+     */
+    keys: string[];
+  }
+
+  export interface ClearStorageItemsRequest {
+    /**
+     * ID of extension.
+     */
+    id: string;
+    /**
+     * StorageArea to remove data from.
+     */
+    storageArea: StorageArea;
+  }
+
+  export interface SetStorageItemsRequest {
+    /**
+     * ID of extension.
+     */
+    id: string;
+    /**
+     * StorageArea to set data in.
+     */
+    storageArea: StorageArea;
+    /**
+     * Values to set.
+     */
+    values: any;
   }
 }
 
@@ -1802,6 +1846,7 @@ export namespace Browser {
     VideoCapturePanTiltZoom = 'videoCapturePanTiltZoom',
     WakeLockScreen = 'wakeLockScreen',
     WakeLockSystem = 'wakeLockSystem',
+    WebAppInstallation = 'webAppInstallation',
     WindowManagement = 'windowManagement',
   }
 
@@ -3730,6 +3775,7 @@ export namespace DOM {
     After = 'after',
     Marker = 'marker',
     Backdrop = 'backdrop',
+    Column = 'column',
     Selection = 'selection',
     SearchText = 'search-text',
     TargetText = 'target-text',
@@ -3739,6 +3785,8 @@ export namespace DOM {
     FirstLineInherited = 'first-line-inherited',
     ScrollMarker = 'scroll-marker',
     ScrollMarkerGroup = 'scroll-marker-group',
+    ScrollNextButton = 'scroll-next-button',
+    ScrollPrevButton = 'scroll-prev-button',
     Scrollbar = 'scrollbar',
     ScrollbarThumb = 'scrollbar-thumb',
     ScrollbarButton = 'scrollbar-button',
@@ -3752,6 +3800,12 @@ export namespace DOM {
     ViewTransitionImagePair = 'view-transition-image-pair',
     ViewTransitionOld = 'view-transition-old',
     ViewTransitionNew = 'view-transition-new',
+    Placeholder = 'placeholder',
+    FileSelectorButton = 'file-selector-button',
+    DetailsContent = 'details-content',
+    SelectFallbackButton = 'select-fallback-button',
+    SelectFallbackButtonText = 'select-fallback-button-text',
+    Picker = 'picker',
   }
 
   /**
@@ -3926,6 +3980,15 @@ export namespace DOM {
     isSVG?: boolean;
     compatibilityMode?: CompatibilityMode;
     assignedSlot?: BackendNode;
+    isScrollable?: boolean;
+  }
+
+  /**
+   * A structure to hold the top-level node of a detached tree and an array of its retained descendants.
+   */
+  export interface DetachedElementInfo {
+    treeNode: Node;
+    retainedNodeIds: NodeId[];
   }
 
   /**
@@ -4672,6 +4735,13 @@ export namespace DOM {
     path: string;
   }
 
+  export interface GetDetachedDomNodesResponse extends ProtocolResponseWithError {
+    /**
+     * The list of detached nodes
+     */
+    detachedNodes: DetachedElementInfo[];
+  }
+
   export interface SetInspectedNodeRequest {
     /**
      * DOM node id to be accessible by means of $x command line API.
@@ -4911,6 +4981,20 @@ export namespace DOM {
      * The added pseudo element.
      */
     pseudoElement: Node;
+  }
+
+  /**
+   * Fired when a node's scrollability state changes.
+   */
+  export interface ScrollableFlagUpdatedEvent {
+    /**
+     * The id of the node.
+     */
+    nodeId: DOM.NodeId;
+    /**
+     * If the node is scrollable.
+     */
+    isScrollable: boolean;
   }
 
   /**
@@ -5978,7 +6062,6 @@ export namespace Emulation {
     Gyroscope = 'gyroscope',
     LinearAcceleration = 'linear-acceleration',
     Magnetometer = 'magnetometer',
-    Proximity = 'proximity',
     RelativeOrientation = 'relative-orientation',
   }
 
@@ -7928,10 +8011,32 @@ export namespace Memory {
     size: number;
   }
 
+  /**
+   * DOM object counter data.
+   */
+  export interface DOMCounter {
+    /**
+     * Object name. Note: object names should be presumed volatile and clients should not expect
+     * the returned names to be consistent across runs.
+     */
+    name: string;
+    /**
+     * Object count.
+     */
+    count: integer;
+  }
+
   export interface GetDOMCountersResponse extends ProtocolResponseWithError {
     documents: integer;
     nodes: integer;
     jsEventListeners: integer;
+  }
+
+  export interface GetDOMCountersForLeakDetectionResponse extends ProtocolResponseWithError {
+    /**
+     * DOM object counters.
+     */
+    counters: DOMCounter[];
   }
 
   export interface SetPressureNotificationsSuppressedRequest {
@@ -8929,11 +9034,11 @@ export namespace Network {
     UserSetting = 'UserSetting',
     TPCDMetadata = 'TPCDMetadata',
     TPCDDeprecationTrial = 'TPCDDeprecationTrial',
+    TopLevelTPCDDeprecationTrial = 'TopLevelTPCDDeprecationTrial',
     TPCDHeuristics = 'TPCDHeuristics',
     EnterprisePolicy = 'EnterprisePolicy',
     StorageAccess = 'StorageAccess',
     TopLevelStorageAccess = 'TopLevelStorageAccess',
-    CorsOptIn = 'CorsOptIn',
     Scheme = 'Scheme',
   }
 
@@ -11477,10 +11582,12 @@ export namespace Page {
     ClipboardRead = 'clipboard-read',
     ClipboardWrite = 'clipboard-write',
     ComputePressure = 'compute-pressure',
+    ControlledFrame = 'controlled-frame',
     CrossOriginIsolated = 'cross-origin-isolated',
     DeferredFetch = 'deferred-fetch',
     DigitalCredentialsGet = 'digital-credentials-get',
     DirectSockets = 'direct-sockets',
+    DirectSocketsPrivate = 'direct-sockets-private',
     DisplayCapture = 'display-capture',
     DocumentDomain = 'document-domain',
     EncryptedMedia = 'encrypted-media',
@@ -11506,6 +11613,7 @@ export namespace Page {
     OtpCredentials = 'otp-credentials',
     Payment = 'payment',
     PictureInPicture = 'picture-in-picture',
+    Popins = 'popins',
     PrivateAggregation = 'private-aggregation',
     PrivateStateTokenIssuance = 'private-state-token-issuance',
     PrivateStateTokenRedemption = 'private-state-token-redemption',
@@ -11526,6 +11634,7 @@ export namespace Page {
     Usb = 'usb',
     UsbUnrestricted = 'usb-unrestricted',
     VerticalScroll = 'vertical-scroll',
+    WebAppInstallation = 'web-app-installation',
     WebPrinting = 'web-printing',
     WebShare = 'web-share',
     WindowManagement = 'window-management',
@@ -12018,14 +12127,16 @@ export namespace Page {
   }
 
   export const enum ClientNavigationReason {
+    AnchorClick = 'anchorClick',
     FormSubmissionGet = 'formSubmissionGet',
     FormSubmissionPost = 'formSubmissionPost',
     HttpHeaderRefresh = 'httpHeaderRefresh',
-    ScriptInitiated = 'scriptInitiated',
+    InitialFrameNavigation = 'initialFrameNavigation',
     MetaTagRefresh = 'metaTagRefresh',
+    Other = 'other',
     PageBlockInterstitial = 'pageBlockInterstitial',
     Reload = 'reload',
-    AnchorClick = 'anchorClick',
+    ScriptInitiated = 'scriptInitiated',
   }
 
   export const enum ClientNavigationDisposition {
@@ -12362,6 +12473,7 @@ export namespace Page {
     ContentWebUSB = 'ContentWebUSB',
     ContentMediaSessionService = 'ContentMediaSessionService',
     ContentScreenReader = 'ContentScreenReader',
+    ContentDiscarded = 'ContentDiscarded',
     EmbedderPopupBlockerTabHelper = 'EmbedderPopupBlockerTabHelper',
     EmbedderSafeBrowsingTriggeredPopupBlocker = 'EmbedderSafeBrowsingTriggeredPopupBlocker',
     EmbedderSafeBrowsingThreatDetails = 'EmbedderSafeBrowsingThreatDetails',
@@ -13254,6 +13366,17 @@ export namespace Page {
   }
 
   /**
+   * Fired before frame subtree is detached. Emitted before any frame of the
+   * subtree is actually detached.
+   */
+  export interface FrameSubtreeWillBeDetachedEvent {
+    /**
+     * Id of the frame that is the root of the subtree that will be detached.
+     */
+    frameId: FrameId;
+  }
+
+  /**
    * Fired once navigation of the frame has completed. Frame is now associated with the new loader.
    */
   export interface FrameNavigatedEvent {
@@ -13481,6 +13604,12 @@ export namespace Page {
     timestamp: Network.MonotonicTime;
   }
 
+  export const enum NavigatedWithinDocumentEventNavigationType {
+    Fragment = 'fragment',
+    HistoryAPI = 'historyApi',
+    Other = 'other',
+  }
+
   /**
    * Fired when same-document navigation happens, e.g. due to history API usage or anchor navigation.
    */
@@ -13493,6 +13622,10 @@ export namespace Page {
      * Frame's new url.
      */
     url: string;
+    /**
+     * Navigation type
+     */
+    navigationType: NavigatedWithinDocumentEventNavigationType;
   }
 
   /**
@@ -14478,6 +14611,16 @@ export namespace Storage {
     aggregationCoordinatorOrigin?: string;
   }
 
+  export interface AttributionScopesData {
+    values: string[];
+    /**
+     * number instead of integer because not all uint32 can be represented by
+     * int
+     */
+    limit: number;
+    maxEventStates: number;
+  }
+
   export interface AttributionReportingSourceRegistration {
     time: Network.TimeSinceEpoch;
     /**
@@ -14501,6 +14644,7 @@ export namespace Storage {
     triggerDataMatching: AttributionReportingTriggerDataMatching;
     destinationLimitPriority: SignedInt64AsBase10;
     aggregatableDebugReportingConfig: AttributionReportingAggregatableDebugReportingConfig;
+    scopesData?: AttributionScopesData;
   }
 
   export const enum AttributionReportingSourceRegistrationResult {
@@ -14516,7 +14660,9 @@ export namespace Storage {
     DestinationBothLimitsReached = 'destinationBothLimitsReached',
     ReportingOriginsPerSiteLimitReached = 'reportingOriginsPerSiteLimitReached',
     ExceedsMaxChannelCapacity = 'exceedsMaxChannelCapacity',
+    ExceedsMaxScopesChannelCapacity = 'exceedsMaxScopesChannelCapacity',
     ExceedsMaxTriggerStateCardinality = 'exceedsMaxTriggerStateCardinality',
+    ExceedsMaxEventStatesLimit = 'exceedsMaxEventStatesLimit',
     DestinationPerDayReportingLimitReached = 'destinationPerDayReportingLimitReached',
   }
 
@@ -14571,6 +14717,7 @@ export namespace Storage {
     sourceRegistrationTimeConfig: AttributionReportingSourceRegistrationTimeConfig;
     triggerContextId?: string;
     aggregatableDebugReportingConfig: AttributionReportingAggregatableDebugReportingConfig;
+    scopes: string[];
   }
 
   export const enum AttributionReportingEventLevelResult {
@@ -16707,6 +16854,17 @@ export namespace WebAuthn {
      * defaultBackupState value.
      */
     backupState?: boolean;
+    /**
+     * The credential's user.name property. Equivalent to empty if not set.
+     * https://w3c.github.io/webauthn/#dom-publickeycredentialentity-name
+     */
+    userName?: string;
+    /**
+     * The credential's user.displayName property. Equivalent to empty if
+     * not set.
+     * https://w3c.github.io/webauthn/#dom-publickeycredentialuserentity-displayname
+     */
+    userDisplayName?: string;
   }
 
   export interface EnableRequest {
@@ -16803,6 +16961,24 @@ export namespace WebAuthn {
    * Triggered when a credential is added to an authenticator.
    */
   export interface CredentialAddedEvent {
+    authenticatorId: AuthenticatorId;
+    credential: Credential;
+  }
+
+  /**
+   * Triggered when a credential is deleted, e.g. through
+   * PublicKeyCredential.signalUnknownCredential().
+   */
+  export interface CredentialDeletedEvent {
+    authenticatorId: AuthenticatorId;
+    credentialId: binary;
+  }
+
+  /**
+   * Triggered when a credential is updated, e.g. through
+   * PublicKeyCredential.signalCurrentUserDetails().
+   */
+  export interface CredentialUpdatedEvent {
     authenticatorId: AuthenticatorId;
     credential: Credential;
   }
@@ -17170,6 +17346,7 @@ export namespace Preload {
     WindowClosed = 'WindowClosed',
     SlowNetwork = 'SlowNetwork',
     OtherPrerenderedPageActivated = 'OtherPrerenderedPageActivated',
+    V8OptimizerDisabled = 'V8OptimizerDisabled',
   }
 
   /**
@@ -17196,7 +17373,6 @@ export namespace Preload {
     PrefetchFailedMIMENotSupported = 'PrefetchFailedMIMENotSupported',
     PrefetchFailedNetError = 'PrefetchFailedNetError',
     PrefetchFailedNon2XX = 'PrefetchFailedNon2XX',
-    PrefetchFailedPerPageLimitExceeded = 'PrefetchFailedPerPageLimitExceeded',
     PrefetchEvictedAfterCandidateRemoved = 'PrefetchEvictedAfterCandidateRemoved',
     PrefetchEvictedForNewerPrefetch = 'PrefetchEvictedForNewerPrefetch',
     PrefetchHeldback = 'PrefetchHeldback',
@@ -17512,6 +17688,86 @@ export namespace PWA {
 }
 
 /**
+ * This domain allows configuring virtual Bluetooth devices to test
+ * the web-bluetooth API.
+ */
+export namespace BluetoothEmulation {
+
+  /**
+   * Indicates the various states of Central.
+   */
+  export const enum CentralState {
+    Absent = 'absent',
+    PoweredOff = 'powered-off',
+    PoweredOn = 'powered-on',
+  }
+
+  /**
+   * Stores the manufacturer data
+   */
+  export interface ManufacturerData {
+    /**
+     * Company identifier
+     * https://bitbucket.org/bluetooth-SIG/public/src/main/assigned_numbers/company_identifiers/company_identifiers.yaml
+     * https://usb.org/developers
+     */
+    key: integer;
+    /**
+     * Manufacturer-specific data
+     */
+    data: binary;
+  }
+
+  /**
+   * Stores the byte data of the advertisement packet sent by a Bluetooth device.
+   */
+  export interface ScanRecord {
+    name?: string;
+    uuids?: string[];
+    /**
+     * Stores the external appearance description of the device.
+     */
+    appearance?: integer;
+    /**
+     * Stores the transmission power of a broadcasting device.
+     */
+    txPower?: integer;
+    /**
+     * Key is the company identifier and the value is an array of bytes of
+     * manufacturer specific data.
+     */
+    manufacturerData?: ManufacturerData[];
+  }
+
+  /**
+   * Stores the advertisement packet information that is sent by a Bluetooth device.
+   */
+  export interface ScanEntry {
+    deviceAddress: string;
+    rssi: integer;
+    scanRecord: ScanRecord;
+  }
+
+  export interface EnableRequest {
+    /**
+     * State of the simulated central.
+     */
+    state: CentralState;
+  }
+
+  export interface SimulatePreconnectedPeripheralRequest {
+    address: string;
+    name: string;
+    manufacturerData: ManufacturerData[];
+    knownServiceUuids: string[];
+  }
+
+  export interface SimulateAdvertisementRequest {
+    entry: ScanEntry;
+  }
+}
+
+/**
  * Debugger domain exposes JavaScript debugging capabilities. It allows setting and removing
  * breakpoints, stepping through execution, exploring stack traces, etc.
  */
@@ -17703,7 +17959,6 @@ export namespace Debugger {
   }
 
   export const enum DebugSymbolsType {
-    None = 'None',
     SourceMap = 'SourceMap',
     EmbeddedDWARF = 'EmbeddedDWARF',
     ExternalDWARF = 'ExternalDWARF',
@@ -17993,11 +18248,22 @@ export namespace Debugger {
     maxDepth: integer;
   }
 
+  export interface SetBlackboxExecutionContextsRequest {
+    /**
+     * Array of execution context unique ids for the debugger to ignore.
+     */
+    uniqueIds: string[];
+  }
+
   export interface SetBlackboxPatternsRequest {
     /**
      * Array of regexps that will be used to check script url for blackbox state.
      */
     patterns: string[];
+    /**
+     * If true, also ignore scripts with no source url.
+     */
+    skipAnonymous?: boolean;
   }
 
   export interface SetBlackboxedRangesRequest {
@@ -18453,9 +18719,9 @@ export namespace Debugger {
      */
     scriptLanguage?: Debugger.ScriptLanguage;
     /**
-     * If the scriptLanguage is WebASsembly, the source of debug symbols for the module.
+     * If the scriptLanguage is WebAssembly, the source of debug symbols for the module.
      */
-    debugSymbols?: Debugger.DebugSymbols;
+    debugSymbols?: Debugger.DebugSymbols[];
     /**
      * The name the embedder supplied for this script.
      */

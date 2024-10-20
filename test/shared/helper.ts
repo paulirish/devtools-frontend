@@ -3,14 +3,15 @@
 // found in the LICENSE file.
 
 import {assert, AssertionError} from 'chai';
-import * as os from 'os';
 import type * as puppeteer from 'puppeteer-core';
 
+import {AsyncScope} from '../conductor/async-scope.js';
 import {type DevToolsFrontendReloadOptions} from '../conductor/frontend_tab.js';
 import {getDevToolsFrontendHostname, reloadDevTools} from '../conductor/hooks.js';
+import {platform} from '../conductor/mocha-interface-helpers.js';
 import {getBrowserAndPages, getTestServerPort} from '../conductor/puppeteer-state.js';
 
-import {AsyncScope} from './async-scope.js';
+export {platform} from '../conductor/mocha-interface-helpers.js';
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -24,22 +25,6 @@ declare global {
     // eslint-disable-next-line @typescript-eslint/naming-convention
     __getRenderCoordinatorPendingFrames(): number;
   }
-}
-
-export type Platform = 'mac'|'win32'|'linux';
-export let platform: Platform;
-switch (os.platform()) {
-  case 'darwin':
-    platform = 'mac';
-    break;
-
-  case 'win32':
-    platform = 'win32';
-    break;
-
-  default:
-    platform = 'linux';
-    break;
 }
 
 // TODO: Remove once Chromium updates its version of Node.js to 12+.
@@ -339,16 +324,13 @@ export const waitForNoElementsWithTextContent =
                              }, asyncScope), `Waiting for no elements with textContent '${textContent}'`);
     };
 
-export const TIMEOUT_ERROR_MESSAGE = 'Test timed out';
-
 export const waitForFunction =
     async<T>(fn: () => Promise<T|undefined>, asyncScope = new AsyncScope(), description?: string) => {
   const innerFunction = async () => {
     while (true) {
-      if (asyncScope.isCanceled()) {
-        throw new Error(TIMEOUT_ERROR_MESSAGE);
-      }
+      AsyncScope.abortSignal?.throwIfAborted();
       const result = await fn();
+      AsyncScope.abortSignal?.throwIfAborted();
       if (result) {
         return result;
       }
