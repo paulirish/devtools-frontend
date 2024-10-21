@@ -217,7 +217,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
 
     if (UI.ActionRegistry.ActionRegistry.instance().hasAction('drjones.performance-panel-context')) {
       const traceEntryNodeForAI = this.getTraceEntryTreeForAIFromEntryIndex(entryIndex);
-      UI.Context.Context.instance().setFlavor(Trace.Helpers.TreeHelpers.TraceEntryNodeForAI, traceEntryNodeForAI);
+      UI.Context.Context.instance().setFlavor(Trace.Helpers.TreeHelpers.EventNodeForAI, traceEntryNodeForAI);
       contextMenu.headerSection().appendAction(
           'drjones.performance-panel-context',
       );
@@ -316,7 +316,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     this.dispatchEventToListeners(Events.DATA_CHANGED);
   }
 
-  getTraceEntryTreeForAIFromEntryIndex(entryIndex: number): Trace.Helpers.TreeHelpers.TraceEntryNodeForAI|null {
+  getTraceEntryTreeForAIFromEntryIndex(entryIndex: number): Trace.Helpers.TreeHelpers.EventNodeForAI|null {
     const entry = this.entryData[entryIndex] as Trace.Types.Events.Event;
     const manager = ModificationsManager.activeManager();
     if (!manager) {
@@ -1139,7 +1139,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     }
     if (UI.ActionRegistry.ActionRegistry.instance().hasAction('drjones.performance-panel-context')) {
       const traceEntryNodeForAI = this.getTraceEntryTreeForAIFromEntryIndex(entryIndex);
-      UI.Context.Context.instance().setFlavor(Trace.Helpers.TreeHelpers.TraceEntryNodeForAI, traceEntryNodeForAI);
+      UI.Context.Context.instance().setFlavor(Trace.Helpers.TreeHelpers.EventNodeForAI, traceEntryNodeForAI);
     }
     return timelineSelection;
   }

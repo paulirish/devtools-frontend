@@ -27,6 +27,7 @@ export interface TraceEntryTree {
   maxDepth: number;
 }
 
+/** Node in the graph that defines all parent/child relationships. */
 export interface TraceEntryNode {
   entry: Types.Events.Event;
   depth: number;
@@ -36,16 +37,14 @@ export interface TraceEntryNode {
   children: TraceEntryNode[];
 }
 
-/**
- * Represents a node in a trace entry tree, simplified for AI Assistance processing.
- */
-export class TraceEntryNodeForAI {
+/** Node in a graph simplified for AI Assistance processing. The graph mirrors the TraceEntryNode one. */
+export class EventNodeForAI {
   id?: TraceEntryNodeId;
   domain?: string;
   line?: number;
   column?: number;
   function?: string;
-  children?: TraceEntryNodeForAI[];
+  children?: EventNodeForAI[];
   selected?: boolean;
 
   constructor(
@@ -53,10 +52,10 @@ export class TraceEntryNodeForAI {
       public totalTime?: Types.Timing.MilliSeconds, public selfTime?: Types.Timing.MilliSeconds) {
   }
 
-  static #fromTraceEvent(event: Types.Events.Event): TraceEntryNodeForAI {
+  static #fromTraceEvent(event: Types.Events.Event): EventNodeForAI {
     const start = microSecondsToMilliseconds(event.ts);
     const duration = event.dur === undefined ? undefined : microSecondsToMilliseconds(event.dur);
-    const nodeForAI = new TraceEntryNodeForAI(event.name, start, duration);
+    const nodeForAI = new EventNodeForAI(event.name, start, duration);
     if (Types.Events.isProfileCall(event)) {
       nodeForAI.function = event.callFrame.functionName || '(anonymous)';
       try {
@@ -73,21 +72,21 @@ export class TraceEntryNodeForAI {
   /**
    * Builds a TraceEntryNodeForAI tree from a TraceEntryNode tree and marks the selected node.
    */
-  static #fromTraceEntryTree(node: TraceEntryNode, selectedEntryNode: TraceEntryNode): TraceEntryNodeForAI {
-    const nodeForAI = TraceEntryNodeForAI.#fromTraceEvent(node.entry);
+  static #fromNodeAndTree(node: TraceEntryNode, selectedNode: TraceEntryNode): EventNodeForAI {
+    const nodeForAI = EventNodeForAI.#fromTraceEvent(node.entry);
     nodeForAI.id = node.id;
-    if (node === selectedEntryNode) {
+    if (node === selectedNode) {
       nodeForAI.selected = true;
     }
     nodeForAI.selfTime = node.selfTime === undefined ? undefined : microSecondsToMilliseconds(node.selfTime);
     for (const child of node.children) {
       nodeForAI.children ??= [];
-      nodeForAI.children.push(TraceEntryNodeForAI.#fromTraceEntryTree(child, selectedEntryNode));
+      nodeForAI.children.push(EventNodeForAI.#fromNodeAndTree(child, selectedNode));
     }
     return nodeForAI;
   }
 
-  static fromSelectedEntryNode(selectedEntryNode: TraceEntryNode): TraceEntryNodeForAI {
+  static fromNode(selectedNode: TraceEntryNode): EventNodeForAI {
     function getRoot(node: TraceEntryNode): TraceEntryNode {
       if (node.parent) {
         return getRoot(node.parent);
@@ -95,10 +94,10 @@ export class TraceEntryNodeForAI {
       return node;
     }
 
-    return TraceEntryNodeForAI.#fromTraceEntryTree(getRoot(selectedEntryNode), selectedEntryNode);
+    return EventNodeForAI.#fromNodeAndTree(getRoot(selectedNode), selectedNode);
   }
 
-  static getSelectedNodeForTraceEntryTreeForAI(node: TraceEntryNodeForAI): TraceEntryNodeForAI|null {
+  static getSelectedNodeWithinTree(node: EventNodeForAI): EventNodeForAI|null {
     if (node.selected) {
       return node;
     }
@@ -106,7 +105,7 @@ export class TraceEntryNodeForAI {
       return null;
     }
     for (const child of node.children) {
-      const returnedNode = TraceEntryNodeForAI.getSelectedNodeForTraceEntryTreeForAI(child);
+      const returnedNode = EventNodeForAI.getSelectedNodeWithinTree(child);
       if (returnedNode) {
         return returnedNode;
       }

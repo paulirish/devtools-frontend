@@ -80,13 +80,13 @@ export class EntriesFilter {
    * Returns the trace entry tree for the specified event, simplified for input to AI Assistance.
    * The tree is rooted at the top-level task that contains the event, with the node for specified event marked as selected.
    */
-  getTraceEntryTreeForAI(entry: Trace.Types.Events.Event): Trace.Helpers.TreeHelpers.TraceEntryNodeForAI|null {
+  getTraceEntryTreeForAI(entry: Trace.Types.Events.Event): Trace.Helpers.TreeHelpers.EventNodeForAI|null {
     const entryNode = this.#entryToNode.get(entry);
     if (!entryNode) {
       return null;
     }
 
-    return Trace.Helpers.TreeHelpers.TraceEntryNodeForAI.fromSelectedEntryNode(entryNode);
+    return Trace.Helpers.TreeHelpers.EventNodeForAI.fromNode(entryNode);
   }
 
   /**
