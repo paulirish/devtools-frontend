@@ -86,7 +86,7 @@ export class EntriesFilter {
       return null;
     }
 
-    return Trace.Helpers.TreeHelpers.AINode.fromEntryNode(node);
+    return Trace.Helpers.TreeHelpers.AINode.fromEntryNode(node, entryIsVisibleInTimeline);
   }
 
   /**

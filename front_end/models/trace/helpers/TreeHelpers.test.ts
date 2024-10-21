@@ -473,33 +473,21 @@ describe('TreeHelpers', () => {
       assert.exists(rootNode);
       assert.exists(selectedNode);
 
-      const traceEntryTreeForAI = Trace.Helpers.TreeHelpers.AINode.fromEntryNode(selectedNode);
-      const actualSelectedNode = Trace.Helpers.TreeHelpers.AINode.getSelectedNodeWithinTree(traceEntryTreeForAI);
+      const aiNode = Trace.Helpers.TreeHelpers.AINode.fromEntryNode(selectedNode, () => true);
+      const actualSelectedNode = Trace.Helpers.TreeHelpers.AINode.getSelectedNodeWithinTree(aiNode);
 
-      assert.exists(traceEntryTreeForAI);
+      assert.exists(aiNode);
       assert.exists(actualSelectedNode);
 
       // delete for smaller deepStrictEqual comparison
-      actualSelectedNode.children = traceEntryTreeForAI.children = [];
+      actualSelectedNode.children = aiNode.children = [];
 
-      const expectedTraceEntryTree = new Trace.Helpers.TreeHelpers.AINode(
-          'EvaluateScript',
-          Trace.Types.Timing.MilliSeconds(0),
-          Trace.Types.Timing.MilliSeconds(0.5),
-          undefined,
-          Trace.Types.Timing.MilliSeconds(0.01),
-      );
+      const expectedTraceEntryTree = new Trace.Helpers.TreeHelpers.AINode(evaluateScript);
       expectedTraceEntryTree.id = 0 as Trace.Helpers.TreeHelpers.TraceEntryNodeId;
       expectedTraceEntryTree.children = [];
-      assert.deepStrictEqual(traceEntryTreeForAI, expectedTraceEntryTree);
+      assert.deepStrictEqual(aiNode, expectedTraceEntryTree);
 
-      const expectedselectedNodeForAI = new Trace.Helpers.TreeHelpers.AINode(
-          'V8.ParseFunction',
-          Trace.Types.Timing.MilliSeconds(0.012),
-          Trace.Types.Timing.MilliSeconds(0.001),
-          undefined,
-          Trace.Types.Timing.MilliSeconds(0.001),
-      );
+      const expectedselectedNodeForAI = new Trace.Helpers.TreeHelpers.AINode(parseFunction);
       expectedselectedNodeForAI.id = 2 as Trace.Helpers.TreeHelpers.TraceEntryNodeId;
       expectedselectedNodeForAI.children = [];
       expectedselectedNodeForAI.selected = true;

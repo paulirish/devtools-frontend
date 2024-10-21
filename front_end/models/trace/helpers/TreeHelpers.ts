@@ -44,7 +44,7 @@ export class AINode {
   // event: Types.Events.Event; // Set in the constructor.
   name: string;
   start: Types.Timing.MilliSeconds;
-  duration?: Types.Timing.MilliSeconds;  // TODO: doublecheck no "end" numbers are being passed in.
+  duration?: Types.Timing.MilliSeconds;
   totalTime?: Types.Timing.MilliSeconds;
   selfTime?: Types.Timing.MilliSeconds;
   id?: TraceEntryNodeId;
@@ -54,7 +54,6 @@ export class AINode {
   function?: string;
   children?: AINode[];
   selected?: boolean;
-  inclusionPredicate?: InclusionPredicate;
 
   constructor(public event: Types.Events.Event) {
     this.name = event.name;
@@ -80,7 +79,7 @@ export class AINode {
   /**
    * Builds a TraceEntryNodeForAI tree from a node and marks the selected node. Primary entrypoint from EntriesFilter
    */
-  static fromEntryNode(selectedNode: TraceEntryNode, inclusionPredicate?: InclusionPredicate): AINode {
+  static fromEntryNode(selectedNode: TraceEntryNode, inclusionPredicate: InclusionPredicate): AINode {
     function getRoot(node: TraceEntryNode): TraceEntryNode {
       if (node.parent) {
         return getRoot(node.parent);
