@@ -890,8 +890,8 @@ export class FreestylerChatUi extends HTMLElement {
       return html`${LitHtml.nothing}`;
     }
 
-    let displayName = selectedNode.type;
-    if (selectedNode.type === 'ProfileCall' && selectedNode.function) {
+    let displayName = selectedNode.name;
+    if (selectedNode.name === 'ProfileCall' && selectedNode.function) {
       displayName = selectedNode.function;
     }
 

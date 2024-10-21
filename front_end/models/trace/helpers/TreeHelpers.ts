@@ -37,8 +37,16 @@ export interface TraceEntryNode {
   children: TraceEntryNode[];
 }
 
+type InclusionPredicate = (entry: Types.Events.Event) => boolean;
+
 /** Node in a graph simplified for AI Assistance processing. The graph mirrors the TraceEntryNode one. */
 export class AINode {
+  // event: Types.Events.Event; // Set in the constructor.
+  name: string;
+  start: Types.Timing.MilliSeconds;
+  duration?: Types.Timing.MilliSeconds;  // TODO: doublecheck no "end" numbers are being passed in.
+  totalTime?: Types.Timing.MilliSeconds;
+  selfTime?: Types.Timing.MilliSeconds;
   id?: TraceEntryNodeId;
   domain?: string;
   line?: number;
@@ -46,47 +54,33 @@ export class AINode {
   function?: string;
   children?: AINode[];
   selected?: boolean;
+  inclusionPredicate?: InclusionPredicate;
 
-  constructor(
-      public type: string, public start: Types.Timing.MilliSeconds, public end?: Types.Timing.MilliSeconds,
-      public totalTime?: Types.Timing.MilliSeconds, public selfTime?: Types.Timing.MilliSeconds) {
-  }
+  constructor(public event: Types.Events.Event) {
+    this.name = event.name;
+    this.start = microSecondsToMilliseconds(event.ts);
+    this.duration = event.dur === undefined ? undefined : microSecondsToMilliseconds(event.dur);
 
-  static #fromTraceEvent(event: Types.Events.Event): AINode {
-    const start = microSecondsToMilliseconds(event.ts);
-    const duration = event.dur === undefined ? undefined : microSecondsToMilliseconds(event.dur);
-    const aiNode = new AINode(event.name, start, duration);
     if (Types.Events.isProfileCall(event)) {
-      aiNode.function = event.callFrame.functionName || '(anonymous)';
+      this.function = event.callFrame.functionName || '(anonymous)';
       try {
         const url = new URL(event.callFrame.url);
-        aiNode.domain = url.origin;
-        aiNode.line = event.callFrame.lineNumber;
-        aiNode.column = event.callFrame.columnNumber;
+        this.domain = url.origin;
+        this.line = event.callFrame.lineNumber;
+        this.column = event.callFrame.columnNumber;
       } catch (e) {
       }
     }
-    return aiNode;
+  }
+
+  static #fromTraceEvent(event: Types.Events.Event): AINode {
+    return new AINode(event);
   }
 
   /**
-   * Builds a AINode tree from a TraceEntryNode tree and marks the selected node.
+   * Builds a TraceEntryNodeForAI tree from a node and marks the selected node. Primary entrypoint from EntriesFilter
    */
-  static #fromEntryNodeAndTree(node: TraceEntryNode, selectedNode: TraceEntryNode): AINode {
-    const aiNode = AINode.#fromTraceEvent(node.entry);
-    aiNode.id = node.id;
-    if (node === selectedNode) {
-      aiNode.selected = true;
-    }
-    aiNode.selfTime = node.selfTime === undefined ? undefined : microSecondsToMilliseconds(node.selfTime);
-    for (const child of node.children) {
-      aiNode.children ??= [];
-      aiNode.children.push(AINode.#fromEntryNodeAndTree(child, selectedNode));
-    }
-    return aiNode;
-  }
-
-  static fromEntryNode(selectedNode: TraceEntryNode): AINode {
+  static fromEntryNode(selectedNode: TraceEntryNode, inclusionPredicate?: InclusionPredicate): AINode {
     function getRoot(node: TraceEntryNode): TraceEntryNode {
       if (node.parent) {
         return getRoot(node.parent);
@@ -94,7 +88,29 @@ export class AINode {
       return node;
     }
 
-    return AINode.#fromEntryNodeAndTree(getRoot(selectedNode), selectedNode);
+    /**
+     * Builds a AINode tree from a TraceEntryNode tree and marks the selected node.
+     */
+    function fromEntryNodeAndTree(node: TraceEntryNode, selectedNode: TraceEntryNode): AINode {
+      const aiNode = AINode.#fromTraceEvent(node.entry);
+      aiNode.id = node.id;
+      if (node === selectedNode) {
+        aiNode.selected = true;
+      }
+      aiNode.selfTime = node.selfTime === undefined ? undefined : microSecondsToMilliseconds(node.selfTime);
+      for (const child of node.children) {
+        aiNode.children ??= [];
+        aiNode.children.push(fromEntryNodeAndTree(child, selectedNode));
+      }
+      return aiNode;
+    }
+
+    const rootNode = getRoot(selectedNode);
+    const aiNode = fromEntryNodeAndTree(rootNode, selectedNode);
+    const filteredNodeForAi = AINode.#filterRecursive([aiNode], node => {
+      return inclusionPredicate?.(node.event) ?? true;
+    });
+    return filteredNodeForAi[0];
   }
 
   static getSelectedNodeWithinTree(node: AINode): AINode|null {
@@ -111,6 +127,92 @@ export class AINode {
       }
     }
     return null;
+  }
+
+  static #forEachRecursive(list: AINode[], callback: (node: AINode) => void): void {
+    for (const node of list) {
+      callback(node);
+      if (node.children) {
+        AINode.#forEachRecursive(node.children, callback);
+      }
+    }
+  }
+
+  static #filterRecursive(list: AINode[], predicate: (node: AINode) => boolean): AINode[] {
+    let done;
+    do {
+      done = true;
+      const filtered: AINode[] = [];
+      for (const node of list) {
+        if (predicate(node)) {
+          filtered.push(node);
+        } else if (node.children) {
+          filtered.push(...node.children);
+          done = false;
+        }
+      }
+      list = filtered;
+    } while (!done);
+
+    for (const node of list) {
+      if (node.children) {
+        node.children = AINode.#filterRecursive(node.children, predicate);
+      }
+    }
+    return list;
+  }
+
+  static #removeUnimportantNodesRecursively(list: AINode[]): AINode[] {
+    // const important = new Map(Object.entries(Types.Events.ImportantEventName));
+    const isJS = (node: AINode): boolean => node.function !== undefined;
+    return AINode.#filterRecursive(list, node => true);  // isJS(node) || important.has(node.type));
+  }
+
+  static #removeInexpensiveNodesRecursively(
+      list: AINode[],
+      options?: {minTotal?: number, minSelf?: number, minJsTotal?: number, minJsSelf?: number}): AINode[] {
+    const minTotalTime = options?.minTotal ?? 0;
+    const minSelfTime = options?.minSelf ?? 0;
+    const minJsTotalTime = options?.minJsTotal ?? 0;
+    const minJsSelfTime = options?.minJsSelf ?? 0;
+    const isJS = (node: AINode): boolean => node.function !== undefined;
+    const hasMinTotalTime = (node: AINode): boolean =>
+        node.totalTime === undefined || node.totalTime >= (isJS(node) ? minJsTotalTime : minTotalTime);
+    const hasMinSelfTime = (node: AINode): boolean =>
+        node.selfTime === undefined || node.selfTime >= (isJS(node) ? minJsSelfTime : minSelfTime);
+    return AINode.#filterRecursive(list, node => hasMinTotalTime(node) && hasMinSelfTime(node));
+  }
+
+  static #deleteChildrenIfEmpty(node: AINode): void {
+    if (!node.children?.length) {
+      delete node.children;
+    }
+  }
+
+  static #renameNodeType(node: AINode): void {
+    // const important = new Map(Object.entries(Types.Events.ImportantEventName));
+    const isJS = (node: AINode): boolean => node.function !== undefined;
+    // important.get(node.type)
+    node.name = isJS(node) ? 'JS' : 'notjs';
+  }
+
+  static sanitize(
+      list: AINode[],
+      options?: {minTotal?: number, minSelf?: number, minJsTotal?: number, minJsSelf?: number}): AINode[] {
+    list = AINode.#removeUnimportantNodesRecursively(list);
+    list = AINode.#removeInexpensiveNodesRecursively(list, options);
+    AINode.#forEachRecursive(list, AINode.#deleteChildrenIfEmpty);
+    AINode.#forEachRecursive(list, AINode.#renameNodeType);
+    return list;
+  }
+
+  // Invoked from Performance Agent
+  sanitize(options?: {minTotal?: number, minSelf?: number, minJsTotal?: number, minJsSelf?: number}): void {
+    if (this.children) {
+      this.children = AINode.sanitize(this.children, options);
+    }
+    AINode.#deleteChildrenIfEmpty(this);
+    AINode.#renameNodeType(this);
   }
 }
 
