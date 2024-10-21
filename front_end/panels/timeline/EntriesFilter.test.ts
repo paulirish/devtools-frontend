@@ -741,7 +741,6 @@ describeWithEnvironment('EntriesFilter', function() {
     const runTaskRoot = entriesFilter.firstVisibleParentEntryForEntry(firstFooCallEntry) as Trace.Types.Events.Event;
     const expectedTraceEntryTree = new Trace.Helpers.TreeHelpers.AINode(runTaskRoot);
 
-
     //     'RunTask',
     //     Trace.Types.Timing.MilliSeconds(336772948.813),
     //     Trace.Types.Timing.MilliSeconds(4.614),
@@ -753,7 +752,7 @@ describeWithEnvironment('EntriesFilter', function() {
     assert.deepStrictEqual(aiNode, expectedTraceEntryTree);
     assert.deepStrictEqual(expectedTraceEntryTree.start, Trace.Types.Timing.MilliSeconds(336772948.813));
 
-    const expectedselectedNode = new Trace.Helpers.TreeHelpers.AINode(firstFooCallEntry)
+    const expectedselectedNode = new Trace.Helpers.TreeHelpers.AINode(firstFooCallEntry);
     // expectedselectedNode.id = 408 as Trace.Helpers.TreeHelpers.TraceEntryNodeId;
     // expectedselectedNode.column = 12;
     // expectedselectedNode.function = 'foo';

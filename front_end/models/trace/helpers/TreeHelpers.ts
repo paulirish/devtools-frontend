@@ -37,8 +37,6 @@ export interface TraceEntryNode {
   children: TraceEntryNode[];
 }
 
-type InclusionPredicate = (entry: Types.Events.Event) => boolean;
-
 /** Node in a graph simplified for AI Assistance processing. The graph mirrors the TraceEntryNode one. */
 export class AINode {
   // event: Types.Events.Event; // Set in the constructor.
@@ -49,27 +47,33 @@ export class AINode {
   selfTime?: Types.Timing.MilliSeconds;
   id?: TraceEntryNodeId;
   domain?: string;
-  line?: number;
-  column?: number;
+  // line?: number;
+  // column?: number;
   function?: string;
   children?: AINode[];
   selected?: boolean;
 
   constructor(public event: Types.Events.Event) {
     this.name = event.name;
-    this.start = microSecondsToMilliseconds(event.ts);
+    this.start = microSecondsToMilliseconds(event.ts);  // Can we baseline this against traceBounds.min?
     this.duration = event.dur === undefined ? undefined : microSecondsToMilliseconds(event.dur);
 
     if (Types.Events.isProfileCall(event)) {
       this.function = event.callFrame.functionName || '(anonymous)';
-      try {
-        const url = new URL(event.callFrame.url);
+      const url = URL.parse(event.callFrame.url);
+      if (url) {
         this.domain = url.origin;
-        this.line = event.callFrame.lineNumber;
-        this.column = event.callFrame.columnNumber;
-      } catch (e) {
+        // this.line = event.callFrame.lineNumber;
+        // this.column = event.callFrame.columnNumber;
       }
     }
+  }
+
+  toJSON(key: string): void {
+    console.log(key);
+    debugger;
+    // @ts-expect-error Deleting required property
+    delete this.event;
   }
 
   static #fromTraceEvent(event: Types.Events.Event): AINode {
@@ -79,7 +83,8 @@ export class AINode {
   /**
    * Builds a TraceEntryNodeForAI tree from a node and marks the selected node. Primary entrypoint from EntriesFilter
    */
-  static fromEntryNode(selectedNode: TraceEntryNode, inclusionPredicate: InclusionPredicate): AINode {
+  static fromEntryNode(selectedNode: TraceEntryNode, entryIsVisibleInTimeline: (event: Types.Events.Event) => boolean):
+      AINode {
     function getRoot(node: TraceEntryNode): TraceEntryNode {
       if (node.parent) {
         return getRoot(node.parent);
@@ -106,10 +111,12 @@ export class AINode {
 
     const rootNode = getRoot(selectedNode);
     const aiNode = fromEntryNodeAndTree(rootNode, selectedNode);
-    const filteredNodeForAi = AINode.#filterRecursive([aiNode], node => {
-      return inclusionPredicate?.(node.event) ?? true;
+
+    // Filter immediately
+    const filteredAiNode = AINode.#filterRecursive([aiNode], node => {
+      return entryIsVisibleInTimeline(node.event);
     });
-    return filteredNodeForAi[0];
+    return filteredAiNode[0];
   }
 
   static getSelectedNodeWithinTree(node: AINode): AINode|null {
@@ -188,20 +195,12 @@ export class AINode {
     }
   }
 
-  static #renameNodeType(node: AINode): void {
-    // const important = new Map(Object.entries(Types.Events.ImportantEventName));
-    const isJS = (node: AINode): boolean => node.function !== undefined;
-    // important.get(node.type)
-    node.name = isJS(node) ? 'JS' : 'notjs';
-  }
-
   static sanitize(
       list: AINode[],
       options?: {minTotal?: number, minSelf?: number, minJsTotal?: number, minJsSelf?: number}): AINode[] {
     list = AINode.#removeUnimportantNodesRecursively(list);
     list = AINode.#removeInexpensiveNodesRecursively(list, options);
     AINode.#forEachRecursive(list, AINode.#deleteChildrenIfEmpty);
-    AINode.#forEachRecursive(list, AINode.#renameNodeType);
     return list;
   }
 
@@ -211,7 +210,6 @@ export class AINode {
       this.children = AINode.sanitize(this.children, options);
     }
     AINode.#deleteChildrenIfEmpty(this);
-    AINode.#renameNodeType(this);
   }
 }
 
