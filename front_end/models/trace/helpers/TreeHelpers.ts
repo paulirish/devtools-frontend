@@ -38,13 +38,13 @@ export interface TraceEntryNode {
 }
 
 /** Node in a graph simplified for AI Assistance processing. The graph mirrors the TraceEntryNode one. */
-export class EventNodeForAI {
+export class AINode {
   id?: TraceEntryNodeId;
   domain?: string;
   line?: number;
   column?: number;
   function?: string;
-  children?: EventNodeForAI[];
+  children?: AINode[];
   selected?: boolean;
 
   constructor(
@@ -52,41 +52,41 @@ export class EventNodeForAI {
       public totalTime?: Types.Timing.MilliSeconds, public selfTime?: Types.Timing.MilliSeconds) {
   }
 
-  static #fromTraceEvent(event: Types.Events.Event): EventNodeForAI {
+  static #fromTraceEvent(event: Types.Events.Event): AINode {
     const start = microSecondsToMilliseconds(event.ts);
     const duration = event.dur === undefined ? undefined : microSecondsToMilliseconds(event.dur);
-    const nodeForAI = new EventNodeForAI(event.name, start, duration);
+    const aiNode = new AINode(event.name, start, duration);
     if (Types.Events.isProfileCall(event)) {
-      nodeForAI.function = event.callFrame.functionName || '(anonymous)';
+      aiNode.function = event.callFrame.functionName || '(anonymous)';
       try {
         const url = new URL(event.callFrame.url);
-        nodeForAI.domain = url.origin;
-        nodeForAI.line = event.callFrame.lineNumber;
-        nodeForAI.column = event.callFrame.columnNumber;
+        aiNode.domain = url.origin;
+        aiNode.line = event.callFrame.lineNumber;
+        aiNode.column = event.callFrame.columnNumber;
       } catch (e) {
       }
     }
-    return nodeForAI;
+    return aiNode;
   }
 
   /**
-   * Builds a TraceEntryNodeForAI tree from a TraceEntryNode tree and marks the selected node.
+   * Builds a AINode tree from a TraceEntryNode tree and marks the selected node.
    */
-  static #fromNodeAndTree(node: TraceEntryNode, selectedNode: TraceEntryNode): EventNodeForAI {
-    const nodeForAI = EventNodeForAI.#fromTraceEvent(node.entry);
-    nodeForAI.id = node.id;
+  static #fromEntryNodeAndTree(node: TraceEntryNode, selectedNode: TraceEntryNode): AINode {
+    const aiNode = AINode.#fromTraceEvent(node.entry);
+    aiNode.id = node.id;
     if (node === selectedNode) {
-      nodeForAI.selected = true;
+      aiNode.selected = true;
     }
-    nodeForAI.selfTime = node.selfTime === undefined ? undefined : microSecondsToMilliseconds(node.selfTime);
+    aiNode.selfTime = node.selfTime === undefined ? undefined : microSecondsToMilliseconds(node.selfTime);
     for (const child of node.children) {
-      nodeForAI.children ??= [];
-      nodeForAI.children.push(EventNodeForAI.#fromNodeAndTree(child, selectedNode));
+      aiNode.children ??= [];
+      aiNode.children.push(AINode.#fromEntryNodeAndTree(child, selectedNode));
     }
-    return nodeForAI;
+    return aiNode;
   }
 
-  static fromNode(selectedNode: TraceEntryNode): EventNodeForAI {
+  static fromEntryNode(selectedNode: TraceEntryNode): AINode {
     function getRoot(node: TraceEntryNode): TraceEntryNode {
       if (node.parent) {
         return getRoot(node.parent);
@@ -94,10 +94,10 @@ export class EventNodeForAI {
       return node;
     }
 
-    return EventNodeForAI.#fromNodeAndTree(getRoot(selectedNode), selectedNode);
+    return AINode.#fromEntryNodeAndTree(getRoot(selectedNode), selectedNode);
   }
 
-  static getSelectedNodeWithinTree(node: EventNodeForAI): EventNodeForAI|null {
+  static getSelectedNodeWithinTree(node: AINode): AINode|null {
     if (node.selected) {
       return node;
     }
@@ -105,7 +105,7 @@ export class EventNodeForAI {
       return null;
     }
     for (const child of node.children) {
-      const returnedNode = EventNodeForAI.getSelectedNodeWithinTree(child);
+      const returnedNode = AINode.getSelectedNodeWithinTree(child);
       if (returnedNode) {
         return returnedNode;
       }

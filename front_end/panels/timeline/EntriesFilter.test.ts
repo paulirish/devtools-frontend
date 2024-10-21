@@ -730,17 +730,17 @@ describeWithEnvironment('EntriesFilter', function() {
       throw new Error('EntriesFilter does not exist');
     }
 
-    const traceEntryTree = stack.getTraceEntryTreeForAI(firstFooCallEntry);
+    const traceEntryTree = stack.getAIEventNodeTree(firstFooCallEntry);
 
     assert.exists(traceEntryTree);
 
-    const selectedNode = Trace.Helpers.TreeHelpers.EventNodeForAI.getSelectedNodeWithinTree(traceEntryTree);
+    const selectedNode = Trace.Helpers.TreeHelpers.AINode.getSelectedNodeWithinTree(traceEntryTree);
     assert.exists(selectedNode);
 
     // delete for smaller deepStrictEqual comparison
     selectedNode.children = traceEntryTree.children = [];
 
-    const expectedTraceEntryTree = new Trace.Helpers.TreeHelpers.EventNodeForAI(
+    const expectedTraceEntryTree = new Trace.Helpers.TreeHelpers.AINode(
         'RunTask',
         Trace.Types.Timing.MilliSeconds(336772948.813),
         Trace.Types.Timing.MilliSeconds(4.614),
@@ -751,7 +751,7 @@ describeWithEnvironment('EntriesFilter', function() {
     expectedTraceEntryTree.children = [];
     assert.deepStrictEqual(traceEntryTree, expectedTraceEntryTree);
 
-    const expectedselectedNode = new Trace.Helpers.TreeHelpers.EventNodeForAI(
+    const expectedselectedNode = new Trace.Helpers.TreeHelpers.AINode(
         'ProfileCall',
         Trace.Types.Timing.MilliSeconds(336772953.044),
         Trace.Types.Timing.MilliSeconds(0.233),
