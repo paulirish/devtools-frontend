@@ -96,18 +96,32 @@ export class DrJonesPerformanceAgent extends AiAgent<Trace.Helpers.TreeHelpers.A
   async *
       handleContextDetails(selectedStackTrace: Trace.Helpers.TreeHelpers.AINode|null):
           AsyncGenerator<ContextResponse, void, void> {
+    const details = [
+      {
+        title: 'Selected stack trace',
+        text: '…',
+      },
+    ] as [ContextDetail, ...ContextDetail[]];
+
     yield {
       type: ResponseType.CONTEXT,
       title: lockedString(UIStringsNotTranslate.analyzingStackTrace),
-      details: createContextDetailsForDrJonesPerformanceAgent(selectedStackTrace),
+      details,
     };
   }
 
   override async enhanceQuery(query: string, selectedStackTrace: Trace.Helpers.TreeHelpers.AINode|null):
       Promise<string> {
-    const networkEnchantmentQuery =
-        selectedStackTrace ? `# Selected stack trace\n${JSON.stringify(selectedStackTrace)}\n\n# User request\n\n` : '';
-    return `${networkEnchantmentQuery}${query}`;
+    selectedStackTrace?.sanitize();
+    const stackStr = JSON.stringify(selectedStackTrace).trim();
+    if (stackStr.length > 40_000) {
+      console.error('serialized data is TOO BIG', stackStr.length.toLocaleString());
+      console.log('             copy(selectedStackTrace)       ')
+      debugger;
+    }
+
+    const perfEnhancementQuery = selectedStackTrace ? `# Selected stack trace\n${stackStr}\n\n# User request\n\n` : '';
+    return `${perfEnhancementQuery}${query}`;
   }
 
   override parseResponse(response: string): ParsedResponse {
@@ -117,15 +131,7 @@ export class DrJonesPerformanceAgent extends AiAgent<Trace.Helpers.TreeHelpers.A
   }
 }
 
-function createContextDetailsForDrJonesPerformanceAgent(selectedStackTrace: Trace.Helpers.TreeHelpers.AINode|
-                                                        null): [ContextDetail, ...ContextDetail[]] {
-  return [
-    {
-      title: 'Selected stack trace',
-      text: JSON.stringify(selectedStackTrace).trim(),
-    },
-  ];
-}
+
 
 function setDebugFreestylerEnabled(enabled: boolean): void {
   if (enabled) {

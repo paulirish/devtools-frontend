@@ -41,25 +41,25 @@ export interface TraceEntryNode {
 export class AINode {
   // event: Types.Events.Event; // Set in the constructor.
   name: string;
-  start: Types.Timing.MilliSeconds;
+  // start: Types.Timing.MilliSeconds;
   duration?: Types.Timing.MilliSeconds;
   totalTime?: Types.Timing.MilliSeconds;
   selfTime?: Types.Timing.MilliSeconds;
   id?: TraceEntryNodeId;
+  children?: AINode[];
   domain?: string;
+  function?: string;
   // line?: number;
   // column?: number;
-  function?: string;
-  children?: AINode[];
   selected?: boolean;
 
   constructor(public event: Types.Events.Event) {
     this.name = event.name;
-    this.start = microSecondsToMilliseconds(event.ts);  // Can we baseline this against traceBounds.min?
+    // this.start = microSecondsToMilliseconds(event.ts);  // Can we baseline this against traceBounds.min?
     this.duration = event.dur === undefined ? undefined : microSecondsToMilliseconds(event.dur);
 
     if (Types.Events.isProfileCall(event)) {
-      this.function = event.callFrame.functionName || '(anonymous)';
+      this.name = `JS: ${event.callFrame.functionName || '(anonymous)'}`;
       const url = URL.parse(event.callFrame.url);
       if (url) {
         this.domain = url.origin;
@@ -69,11 +69,12 @@ export class AINode {
     }
   }
 
-  toJSON(key: string): void {
-    console.log(key);
-    debugger;
+  toJSON(): AINode {
     // @ts-expect-error Deleting required property
     delete this.event;
+    // Only need this during debugging. At serialization we can drop it.
+    delete this.id;
+    return this;
   }
 
   static #fromTraceEvent(event: Types.Events.Event): AINode {
@@ -102,6 +103,7 @@ export class AINode {
         aiNode.selected = true;
       }
       aiNode.selfTime = node.selfTime === undefined ? undefined : microSecondsToMilliseconds(node.selfTime);
+      aiNode.totalTime = node.totalTime === undefined ? undefined : microSecondsToMilliseconds(node.totalTime);
       for (const child of node.children) {
         aiNode.children ??= [];
         aiNode.children.push(fromEntryNodeAndTree(child, selectedNode));
@@ -114,6 +116,9 @@ export class AINode {
 
     // Filter immediately
     const filteredAiNode = AINode.#filterRecursive([aiNode], node => {
+      if (node.event.name === 'V8.CompileCode') {
+        return false;
+      }
       return entryIsVisibleInTimeline(node.event);
     });
     return filteredAiNode[0];
@@ -168,12 +173,6 @@ export class AINode {
     return list;
   }
 
-  static #removeUnimportantNodesRecursively(list: AINode[]): AINode[] {
-    // const important = new Map(Object.entries(Types.Events.ImportantEventName));
-    const isJS = (node: AINode): boolean => node.function !== undefined;
-    return AINode.#filterRecursive(list, node => true);  // isJS(node) || important.has(node.type));
-  }
-
   static #removeInexpensiveNodesRecursively(
       list: AINode[],
       options?: {minTotal?: number, minSelf?: number, minJsTotal?: number, minJsSelf?: number}): AINode[] {
@@ -198,7 +197,6 @@ export class AINode {
   static sanitize(
       list: AINode[],
       options?: {minTotal?: number, minSelf?: number, minJsTotal?: number, minJsSelf?: number}): AINode[] {
-    list = AINode.#removeUnimportantNodesRecursively(list);
     list = AINode.#removeInexpensiveNodesRecursively(list, options);
     AINode.#forEachRecursive(list, AINode.#deleteChildrenIfEmpty);
     return list;
