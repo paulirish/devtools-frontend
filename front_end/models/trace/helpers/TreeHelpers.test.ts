@@ -485,6 +485,7 @@ describe('TreeHelpers', () => {
       const expectedTraceEntryTree = new Trace.Helpers.TreeHelpers.AINode(evaluateScript);
       expectedTraceEntryTree.id = 0 as Trace.Helpers.TreeHelpers.TraceEntryNodeId;
       expectedTraceEntryTree.children = [];
+      expectedTraceEntryTree.selfTime = 0.1;
       assert.deepStrictEqual(aiNode, expectedTraceEntryTree);
 
       const expectedselectedNodeForAI = new Trace.Helpers.TreeHelpers.AINode(parseFunction);
