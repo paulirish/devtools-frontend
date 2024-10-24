@@ -40,11 +40,28 @@ export enum NetworkCategory {
   IMG = 'Img',
   MEDIA = 'Media',
   WASM = 'Wasm',
+  FETCH = 'Fetch',
   OTHER = 'Other',
 }
 
 export function networkResourceCategory(request: Trace.Types.Events.SyntheticNetworkRequest): NetworkCategory {
   const {mimeType} = request.args.data;
+
+  // Resource types can be less accurate, so we defer to mimetype
+  const category = mimeType.startsWith('text/')                      ? NetworkCategory.DOC :
+      mimeType.endsWith('/css')                                      ? NetworkCategory.CSS :
+      mimeType.endsWith('javascript')                                ? NetworkCategory.JS :
+      mimeType.startsWith('image/')                                  ? NetworkCategory.IMG :
+      mimeType.startsWith('audio/') || mimeType.startsWith('video/') ? NetworkCategory.MEDIA :
+      mimeType.startsWith('font/') || mimeType.includes('font-')     ? NetworkCategory.FONT :
+      mimeType === 'application/wasm'                                ? NetworkCategory.WASM :
+                                                                       // Ultimate fallback:
+                                                                       NetworkCategory.OTHER;
+
+  if (category !== NetworkCategory.OTHER) {
+    return category;
+  }
+
   switch (request.args.data.resourceType) {
     case Protocol.Network.ResourceType.Document:
       return NetworkCategory.DOC;
@@ -59,6 +76,9 @@ export function networkResourceCategory(request: Trace.Types.Events.SyntheticNet
     case Protocol.Network.ResourceType.Script:
     case Protocol.Network.ResourceType.WebSocket:
       return NetworkCategory.JS;
+    case Protocol.Network.ResourceType.XHR:
+    case Protocol.Network.ResourceType.Fetch:
+      return NetworkCategory.FETCH;
     default:
       // FWIW, all the other (current) resourceTypes are:
       //     TextTrack, XHR, Fetch, Prefetch, EventSource, Manifest, SignedExchange, Ping, CSPViolationReport, Preflight, Other
@@ -102,6 +122,9 @@ export function colorForNetworkCategory(category: NetworkCategory): string {
       break;
     case NetworkCategory.WASM:
       cssVarName = '--app-color-wasm';
+      break;
+    case NetworkCategory.FETCH:
+      cssVarName = '--app-color-fetch';
       break;
     case NetworkCategory.OTHER:
     default:

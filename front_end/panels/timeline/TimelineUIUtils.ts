@@ -1159,7 +1159,8 @@ export class TimelineUIUtils {
     }
 
     if (parsedTrace.Meta.traceIsGeneric) {
-      TimelineUIUtils.renderEventJson(event, contentHelper);
+      contentHelper.addSection(i18nString(UIStrings.traceEvent));
+      contentHelper.appendElementRow('', TimelineUIUtils.renderEventJson(event));
       return contentHelper.fragment;
     }
 
@@ -1648,7 +1649,8 @@ export class TimelineUIUtils {
     }
 
     if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_DEBUG_MODE)) {
-      TimelineUIUtils.renderEventJson(event, contentHelper);
+      contentHelper.addSection(i18nString(UIStrings.traceEvent));
+      contentHelper.appendElementRow('', TimelineUIUtils.renderEventJson(event));
     }
 
     const stats: TimeRangeCategoryStats = {};
@@ -1783,15 +1785,12 @@ export class TimelineUIUtils {
     }
   }
 
-  private static renderEventJson(event: Trace.Types.Events.Event, contentHelper: TimelineDetailsContentHelper): void {
-    contentHelper.addSection(i18nString(UIStrings.traceEvent));
-
+  static renderEventJson(event: Trace.Types.Events.Event): HTMLDivElement {
     const eventWithArgsFirst = {
       ...{args: event.args},
       ...event,
     };
-    const highlightContainer = TimelineUIUtils.renderObjectJson(eventWithArgsFirst);
-    contentHelper.appendElementRow('', highlightContainer);
+    return TimelineUIUtils.renderObjectJson(eventWithArgsFirst);
   }
 
   private static renderObjectJson(obj: Object): HTMLDivElement {

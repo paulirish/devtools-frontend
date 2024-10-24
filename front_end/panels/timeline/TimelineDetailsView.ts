@@ -445,6 +445,10 @@ export class TimelineDetailsPane extends
     }
 
     this.setSummaryContent(this.#networkRequestDetails);
+
+    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_DEBUG_MODE)) {
+      this.#networkRequestDetails.append(TimelineUIUtils.renderEventJson(networkRequest));
+    }
   }
 
   async #setSelectionForTraceEvent(event: Trace.Types.Events.Event): Promise<void> {
@@ -463,6 +467,10 @@ export class TimelineDetailsPane extends
       const isFreshRecording = Boolean(this.#parsedTrace && Tracker.instance().recordingIsFresh(this.#parsedTrace));
       this.#layoutShiftDetails.setData(event, this.#traceInsightsSets, this.#parsedTrace, isFreshRecording);
       this.setSummaryContent(this.#layoutShiftDetails);
+      if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_DEBUG_MODE)) {
+        this.#layoutShiftDetails.append(TimelineUIUtils.renderEventJson(event));
+      }
+
       return;
     }
 
