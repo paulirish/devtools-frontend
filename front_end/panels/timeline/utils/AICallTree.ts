@@ -8,6 +8,37 @@ import {nameForEntry} from './EntryName.js';
 import {visibleTypes} from './EntryStyles.js';
 import {SourceMapsResolver} from './SourceMapsResolver.js';
 
+/*
+const METADATA_VALUES = {
+  Node: 900,
+  selected: 1000,
+  dur: 200,
+  self: 500,
+  snippet: 700,  // Potentially useful, but can be very long
+  'URL#': 300,
+  children: 400,
+};
+*/
+
+/**
+ * Approximate token counts guidance for weight calculation
+ *
+ * numbers equivalent to num.toString().length (count of digits incl decimal)
+ */
+
+/*
+
+Node: 7+, plus extra for words or higher nodeid digit counts.
+Selected: 4
+dur: 5+
+self: 5+
+URL#: 5
+snippet: minimum 25, up to 200
+Having children: 3
+  Each child 7+, plus extra for words
+
+ */
+
 /** Iterates from a node down through its descendents. If the callback returns true, the loop stops. */
 function depthFirstWalk(
     nodes: MapIterator<Trace.Extras.TraceTree.Node>, callback: (arg0: Trace.Extras.TraceTree.Node) => void|true): void {
@@ -20,13 +51,14 @@ function depthFirstWalk(
 }
 
 export class AICallTree {
+  rootNode: TimelineModel.TimelineProfileTree.TopDownRootNode|null = null;
+  selectedNode: TimelineModel.TimelineProfileTree.TopDownRootNode|null = null;
   constructor(
-      public selectedNode: Trace.Extras.TraceTree.Node,
-      public rootNode: Trace.Extras.TraceTree.TopDownRootNode,
-      // TODO: see if we can avoid passing around this entire thing.
+      public selectedEvent: Trace.Types.Events.Event,
       public parsedTrace: Trace.Handlers.Types.ParsedTrace,
   ) {
   }
+
 
   /**
    * Attempts to build an AICallTree from a given selected event. It also
@@ -65,6 +97,14 @@ export class AICallTree {
       return null;
     }
 
+    const instance = new AICallTree(selectedEvent, parsedTrace);
+    instance.optimize();
+    instance.logDebug();
+    return instance;
+  }
+
+  optimize() {
+    const selectedEvent = this.selectedEvent;
     const {startTime, endTime} = Trace.Helpers.Timing.eventTimingsMilliSeconds(selectedEvent);
 
     const selectedEventBounds = Trace.Helpers.Timing.traceWindowFromMicroSeconds(
@@ -72,7 +112,8 @@ export class AICallTree {
     let threadEvents = parsedTrace.Renderer.processes.get(selectedEvent.pid)?.threads.get(selectedEvent.tid)?.entries;
     if (!threadEvents) {
       // None from the renderer: try the samples handler, this might be a CPU trace.
-      threadEvents = parsedTrace.Samples.profilesInProcess.get(selectedEvent.pid)?.get(selectedEvent.tid)?.profileCalls;
+      threadEvents =
+          this.parsedTrace.Samples.profilesInProcess.get(selectedEvent.pid)?.get(selectedEvent.tid)?.profileCalls;
     }
 
     if (!threadEvents) {
@@ -106,20 +147,149 @@ export class AICallTree {
       console.warn(`Selected event ${selectedEvent} not found within its own tree.`);
       return null;
     }
-    const instance = new AICallTree(selectedNode, rootNode, parsedTrace);
-    // instance.logDebug();
-    return instance;
+
+    this.rootNode = rootNode;
+    this.selectedNode = selectedNode;
+    // this.annotateNode(this.rootNode);
+    // this.calculateMetrics(this.rootNode);
   }
+
+
+  // annotateNode(
+  //     node: TimelineModel.TimelineProfileTree.Node, currentDepth = 0,
+  //     pathToSelected: TimelineModel.TimelineProfileTree.Node[] = []) {
+  //   if (!this.rootNode || !this.selectedNode) {
+  //     throw new Error('Not set');
+  //   }
+
+  //   node.depth = currentDepth;
+
+  //   if (node.event === this.selectedNode.event) {
+  //     node.onSelectedPath = true;
+  //     pathToSelected = [...pathToSelected, node];
+  //   }
+
+  //   node.distanceToSelected = pathToSelected.length;
+
+  //   for (const child of node.children().values()) {
+  //     this.annotateNode(child, currentDepth + 1, node.onSelectedPath ? [...pathToSelected, node] : pathToSelected);
+  //   }
+  // }
+
+  // calculateMetrics(node: TimelineModel.TimelineProfileTree.Node) {
+  //   // todo remove hacks
+  //   node.dur = node.totalTime;
+  //   node.self = node.selfTime;
+  //   node.snippet = '';
+
+  //   // Base values (adjust as needed)
+  //   let value = 900 + 200 * node.dur + 500 * node.self + (node.url ? 300 : 0) + (node.snippet ? 700 : 0) +
+  //       400 * node.children.length;
+  //   let weight = 7 + (node.url ? 5 : 0) + (node.snippet ? Math.min(200, Math.max(25, node.snippet.length / 10)) : 0) +
+  //       3 * node.children.length;
+
+  //   // Boosts
+  //   if (node.depth === 0) {
+  //     value *= 5;  // Root boost
+  //   } else if (node.depth === 1) {
+  //     value *= 3;  // Second level boost
+  //   }
+  //   if (node.onSelectedPath) {
+  //     value *= 10;  // Selected path boost
+  //   }
+  //   if (node.self > 0) {
+  //     value *= 1.25;  // Self duration boost
+  //   }
+
+  //   // Distance-based boost (exponential decay)
+  //   if (node.distanceToSelected !== undefined) {
+  //     const distanceFactor = Math.pow(0.8, node.distanceToSelected);  // Adjust decay factor as needed
+  //     value *= distanceFactor;
+  //   }
+
+  //   // Child weight calculation
+  //   weight += node.children().values().reduce((acc, child) => acc + this.calculateMetrics(child), 0);
+
+  //   node.value = value;
+  //   node.weight = weight;
+
+  //   return weight;  // Return weight for parent's calculation
+  // }
+
+  // buildOptimizedTree(node: TimelineModel.TimelineProfileTree.Node, remainingTokens: number):
+  //     TimelineModel.TimelineProfileTree.Node|null {
+  //   if (remainingTokens <= 0) {
+  //     return null;  // Token limit reached
+  //   }
+
+  //   const newNode: TimelineModel.TimelineProfileTree.Node = {
+  //     id: node.id,
+  //     event: node.event,
+  //     value: node.value,
+  //     weight: node.weight,
+  //     dur: node.dur,
+  //     self: node.self,
+  //     children: [],
+  //   };
+
+  //   let tokensUsed = 7 + (node.dur ? 5 : 0) + (node.self ? 5 : 0);  // Base node weight
+
+  //   // Always include selected path nodes
+  //     newNode.url = node.url;
+  //     newNode.snippet = node.snippet;
+  //     tokensUsed += (node.url ? 5 : 0) + (node.snippet ? Math.min(200, Math.max(25, node.snippet.length / 10)) : 0);
+  //   if (node.onSelectedPath) {
+
+  //   } else {
+  //     // Include optional fields based on value/weight ratio
+  //     const valueWeightRatioThreshold = 10;  // Adjust as needed
+
+  //     if (node.url && (node.value || 0) / (node.weight || 1) > valueWeightRatioThreshold) {
+  //       newNode.url = node.url;
+  //       tokensUsed += 5;
+  //     }
+
+  //     if (node.snippet &&
+  //         (node.value || 0) / (node.weight || 1) > valueWeightRatioThreshold * 2) {  // Higher threshold for snippet
+  //       newNode.snippet = node.snippet;
+  //       tokensUsed += Math.min(200, Math.max(25, node.snippet.length / 10));
+  //     }
+  //   }
+
+  //   remainingTokens -= tokensUsed;
+
+  //   // Process children
+  //   if (remainingTokens > 3 && node.children.length > 0) {  // 3 tokens for "children" field
+  //     remainingTokens -= 3;
+  //     newNode.children = Array.from(node.children().values())
+  //                            .sort(
+  //                                (a, b) => (b.value || 0) / (b.weight || 1) -
+  //                                    (a.value || 0) / (a.weight || 1))  // Sort by value/weight ratio
+  //                            .map(child => this.buildOptimizedTree(child, remainingTokens))
+  //                            .filter((child): child is TimelineModel.TimelineProfileTree.Node => child !== null);
+  //   }
+
+  //   return newNode;
+  // }
+
 
   /** Define precisely how the call tree is serialized. Typically called from within `PerformanceAgent` */
   serialize(): string {
+    if (!this.rootNode || !this.selectedNode) {
+      throw new Error('Not set');
+    }
+    const {selectedNode} = this;
+
+    // const optimizedRoot = this.buildOptimizedTree(this.rootNode, 30_000);
+    // debugger;
+
     const nodeToIdMap = new Map<Trace.Extras.TraceTree.Node, number>();
     // Keep a map of URLs. We'll output a LUT to keep size down.
     const allUrls: string[] = [];
 
     let nodesStr = '';
     depthFirstWalk(this.rootNode.children().values(), node => {
-      nodesStr += AICallTree.stringifyNode(node, this.parsedTrace, this.selectedNode, nodeToIdMap, allUrls);
+      nodesStr += AICallTree.stringifyNode(node, this.parsedTrace, selectedNode, nodeToIdMap, allUrls);
     });
 
     let output = '';
@@ -207,5 +377,184 @@ export class AITreeFilter extends Trace.Extras.TraceFilter.TraceFilter {
       return false;
     }
     return event.dur ? event.dur >= this.#minDuration : false;
+  }
+}
+
+
+
+interface CallTreeNode {
+  id: string;
+  selected: boolean;
+  dur: number;
+  self: number;
+  url?: string;
+  snippet?: string;
+  children: CallTreeNode[];
+
+  // Optimization metadata
+  depth?: number;
+  distanceToSelected?: number;
+  pathToSelected?: boolean;
+  calculatedValue?: number;
+  calculatedWeight?: number;
+}
+
+class TreeOptimizer {
+  private readonly TARGET_TOKENS = 32000;
+  private readonly MIN_DURATION_MS = 0.2;
+
+  // Base values for metadata fields
+  private readonly BASE_VALUES =
+      {identifier: 900, selected: 1000, dur: 200, self: 500, snippet: 700, url: 300, children: 400};
+
+  // Approximate token weights
+  private readonly WEIGHTS = {
+    identifier: 7,
+    selected: 4,
+    dur: 5,
+    self: 5,
+    url: 5,
+    snippet: 25,  // Minimum
+    childrenPresent: 3,
+    perChild: 7
+  };
+
+  constructor(private root: CallTreeNode) {
+  }
+
+  public optimize(): CallTreeNode {
+    // First pass: Annotate tree with depth and distance info
+    this.annotateTree(this.root);
+
+    // Second pass: Calculate values and weights
+    this.calculateNodeMetrics(this.root);
+
+    // Third pass: Select nodes and fields to include
+    return this.buildOptimizedTree(this.root);
+  }
+
+  private annotateTree(node: CallTreeNode, depth: number = 0): void {
+    node.depth = depth;
+
+    // Find and mark path to selected node
+    if (node.selected) {
+      node.distanceToSelected = 0;
+      node.pathToSelected = true;
+      return true;
+    }
+
+    // Process children
+    for (const child of node.children) {
+      if (this.annotateTree(child, depth + 1)) {
+        node.pathToSelected = true;
+        node.distanceToSelected = child.distanceToSelected! + 1;
+        return true;
+      }
+    }
+
+    // Not on path to selected
+    node.pathToSelected = false;
+    node.distanceToSelected = Infinity;
+    return false;
+  }
+
+  private calculateNodeMetrics(node: CallTreeNode): void {
+    let value = 0;
+    let weight = 0;
+
+    // Calculate boost factor based on position
+    let boost = this.calculateBoost(node);
+
+    // Calculate base value and weight for each field
+    if (node.id) {
+      value += this.BASE_VALUES.identifier * boost;
+      weight += this.WEIGHTS.identifier;
+    }
+
+    if (node.selected) {
+      value += this.BASE_VALUES.selected * boost;
+      weight += this.WEIGHTS.selected;
+    }
+
+    if (node.dur) {
+      value += this.BASE_VALUES.dur * boost;
+      weight += this.WEIGHTS.dur;
+    }
+
+    if (node.self) {
+      value += this.BASE_VALUES.self * boost;
+      weight += this.WEIGHTS.self;
+    }
+
+    // Add children metrics
+    if (node.children.length > 0) {
+      weight += this.WEIGHTS.childrenPresent;
+      node.children.forEach(child => {
+        this.calculateNodeMetrics(child);
+        weight += this.WEIGHTS.perChild;
+      });
+    }
+
+    node.calculatedValue = value;
+    node.calculatedWeight = weight;
+  }
+
+  private calculateBoost(node: CallTreeNode): number {
+    let boost = 1;
+
+    // Base boosts
+    if (node.selected)
+      boost *= 10;  // 1000% boost
+    if (node.depth === 0)
+      boost *= 5;  // 500% boost for root
+    if (node.depth === 1)
+      boost *= 3;  // 300% boost for second level
+    if (node.self > 0)
+      boost *= 1.25;  // 125% boost for non-zero self time
+
+    // Distance-based boost for nodes on path to selected
+    if (node.pathToSelected) {
+      // Exponential decay based on distance to selected
+      const distanceBoost = Math.max(1, 2 ** (-node.distanceToSelected! / 3));
+      boost *= distanceBoost;
+    }
+
+    return boost;
+  }
+
+  private buildOptimizedTree(node: CallTreeNode, tokenCount: number = 0): CallTreeNode|null {
+    if (tokenCount >= this.TARGET_TOKENS)
+      return null;
+
+    // Always include nodes on path to selected
+    if (node.pathToSelected || node.calculatedValue! / node.calculatedWeight! > 50) {
+      const optimizedNode:
+          CallTreeNode = {id: node.id, selected: node.selected, dur: node.dur, self: node.self, children: []};
+
+      // Add optional fields based on value/weight ratio
+      if (node.url && node.calculatedValue! / node.calculatedWeight! > 100) {
+        optimizedNode.url = node.url;
+      }
+
+      if (node.snippet && node.calculatedValue! / node.calculatedWeight! > 150) {
+        optimizedNode.snippet = node.snippet;
+      }
+
+      // Recursively process children
+      let remainingTokens = this.TARGET_TOKENS - tokenCount - node.calculatedWeight!;
+      for (const child of node.children) {
+        const optimizedChild = this.buildOptimizedTree(child, this.TARGET_TOKENS - remainingTokens);
+        if (optimizedChild) {
+          optimizedNode.children.push(optimizedChild);
+          remainingTokens -= optimizedChild.calculatedWeight!;
+        }
+        if (remainingTokens <= 0)
+          break;
+      }
+
+      return optimizedNode;
+    }
+
+    return null;
   }
 }
