@@ -431,6 +431,7 @@ class TreeOptimizer {
   };
   root: CallTreeNode;
   selectedNodeId: string|symbol;
+  totalTreeWeight: number;
 
   constructor(rootNode: TimelineModel.TimelineProfileTree.Node, selectedNode: TimelineModel.TimelineProfileTree.Node) {
     this.root = new CallTreeNode(rootNode);
@@ -538,42 +539,74 @@ class TreeOptimizer {
     return boost;
   }
 
-  private buildOptimizedTree(node: CallTreeNode, tokenCount: number = 0): CallTreeNode|null {
-    if (tokenCount >= this.TARGET_TOKENS)
-      return null;
+
+  private calculateTreeStats(node: CallTreeNode): void {
+    this.totalTreeWeight += node.calculatedWeight!;
+    node.children.forEach(child => this.calculateTreeStats(child));
+  }
+
+
+
+  private buildOptimizedTree(node: CallTreeNode, tokenCount: number = 0): CallTreeNode {
+    const compressionNeeded = this.totalTreeWeight > this.TARGET_TOKENS;
+    const valueWeightThreshold = compressionNeeded ? this.calculateAdaptiveThreshold() : 0;
 
     console.log(
         node.node.event ? nameForEntry(node.node.event) : '??', node, 'worth', node.calculatedValue, 'weighs',
         node.calculatedWeight, 'sack', tokenCount);
-    // Always include nodes on path to selected
-    if (node.pathToSelected || node.calculatedValue! / node.calculatedWeight! > 50) {
-      const optimizedNode:
-          CallTreeNode = {id: node.id, selected: node.selected, dur: node.dur, self: node.self, children: []};
 
-      // Add optional fields based on value/weight ratio
-      if (node.url && node.calculatedValue! / node.calculatedWeight! > 100) {
-        optimizedNode.url = node.url;
-      }
+    // Create base node - always include core fields
+    const optimizedNode:
+        CallTreeNode = {id: node.id, selected: node.selected, dur: node.dur, self: node.self, children: []};
 
-      if (node.snippet && node.calculatedValue! / node.calculatedWeight! > 150) {
-        optimizedNode.snippet = node.snippet;
-      }
+    let currentTokens =
+        tokenCount + this.WEIGHTS.identifier + this.WEIGHTS.selected + this.WEIGHTS.dur + this.WEIGHTS.self;
 
-      // Recursively process children
-      let remainingTokens = this.TARGET_TOKENS - tokenCount - node.calculatedWeight!;
-      for (const child of node.children) {
-        const optimizedChild = this.buildOptimizedTree(child, this.TARGET_TOKENS - remainingTokens);
-        if (optimizedChild) {
-          optimizedNode.children.push(optimizedChild);
-          remainingTokens -= optimizedChild.calculatedWeight!;
-        }
-        if (remainingTokens <= 0)
-          break;
-      }
-
-      return optimizedNode;
+    // Add optional fields based on space availability and value
+    if (!compressionNeeded || (node.url && node.calculatedValue! / node.calculatedWeight! > valueWeightThreshold)) {
+      optimizedNode.url = node.url;
+      currentTokens += this.WEIGHTS.url;
     }
 
-    return null;
+    if (!compressionNeeded ||
+        (node.snippet && node.calculatedValue! / node.calculatedWeight! > valueWeightThreshold * 1.5)) {
+      optimizedNode.snippet = node.snippet;
+      currentTokens += Math.max(this.WEIGHTS.snippet, node.snippet!.length / 4);
+    }
+
+    // Process children if we have space
+    if (currentTokens < this.TARGET_TOKENS) {
+      let remainingTokens = this.TARGET_TOKENS - currentTokens;
+
+      // Sort children by value/weight ratio if we need to compress
+      const children = [...node.children];
+      if (compressionNeeded) {
+        children.sort(
+            (a, b) => (b.calculatedValue! / b.calculatedWeight!) - (a.calculatedValue! / a.calculatedWeight!));
+      }
+
+      // Process children
+      for (const child of children) {
+        if (remainingTokens <= 0)
+          break;
+
+        // Always include children on path to selected or if we have space
+        if (!compressionNeeded || child.pathToSelected ||
+            child.calculatedValue! / child.calculatedWeight! > valueWeightThreshold) {
+          const optimizedChild = this.buildOptimizedTree(child, this.TARGET_TOKENS - remainingTokens);
+          optimizedNode.children.push(optimizedChild);
+          remainingTokens -= child.calculatedWeight!;
+        }
+      }
+    }
+
+    return optimizedNode;
+  }
+
+  private calculateAdaptiveThreshold(): number {
+    // Calculate threshold based on total tree size and target tokens
+    const compressionRatio = this.totalTreeWeight / this.TARGET_TOKENS;
+    // Start with low threshold for small trees, increase for larger ones
+    return Math.max(0, (compressionRatio - 1) * 50);
   }
 }
