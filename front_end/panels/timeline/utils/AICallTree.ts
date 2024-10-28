@@ -411,7 +411,7 @@ class CallTreeNode {
 }
 
 class TreeOptimizer {
-  private readonly TARGET_TOKENS = 32000;
+  private readonly TARGET_TOKENS = 1500;
   private readonly MIN_DURATION_MS = 0.2;
 
   // Base values for metadata fields
@@ -431,7 +431,7 @@ class TreeOptimizer {
   };
   root: CallTreeNode;
   selectedNodeId: string|symbol;
-  totalTreeWeight: number;
+  totalTreeWeight: number = 0;
 
   constructor(rootNode: TimelineModel.TimelineProfileTree.Node, selectedNode: TimelineModel.TimelineProfileTree.Node) {
     this.root = new CallTreeNode(rootNode);
@@ -445,6 +445,9 @@ class TreeOptimizer {
 
     // Second pass: Calculate values and weights
     this.calculateNodeMetrics(this.root);
+
+    // Calculate tree statistics
+    this.calculateTreeStats(this.root);
 
     // Third pass: Select nodes and fields to include
     return this.buildOptimizedTree(this.root);
