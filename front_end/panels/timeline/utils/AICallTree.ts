@@ -279,7 +279,9 @@ export class AICallTree {
       throw new Error('Not set');
     }
     const {selectedNode} = this;
-
+    const ok = new TreeOptimizer(this.rootNode, this.selectedNode);
+    const yeah = ok.optimize();
+    debugger;
     // const optimizedRoot = this.buildOptimizedTree(this.rootNode, 30_000);
     // debugger;
 
@@ -382,21 +384,30 @@ export class AITreeFilter extends Trace.Extras.TraceFilter.TraceFilter {
 
 
 
-interface CallTreeNode {
+class CallTreeNode {
   id: string;
   selected: boolean;
   dur: number;
   self: number;
   url?: string;
+  children: CallTreeNode[] = [];
   snippet?: string;
-  children: CallTreeNode[];
-
   // Optimization metadata
   depth?: number;
   distanceToSelected?: number;
   pathToSelected?: boolean;
   calculatedValue?: number;
-  calculatedWeight?: number;
+  calculatedWeight?: number
+
+  constructor(public node: TimelineModel.TimelineProfileTree.Node) {
+    this.id = node.id;
+    this.selected = false;  // umm
+    this.dur = node.totalTime;
+    this.self = node.selfTime;
+    this.url = node.event?.args?.data?.url;
+    this.snippet = node.snippet ?? 'x';
+    this.children = Array.from(node.children().values()).map(child => new CallTreeNode(child));
+  }
 }
 
 class TreeOptimizer {
@@ -418,11 +429,16 @@ class TreeOptimizer {
     childrenPresent: 3,
     perChild: 7
   };
+  root: CallTreeNode;
+  selectedNodeId: string|symbol;
 
-  constructor(private root: CallTreeNode) {
+  constructor(rootNode: TimelineModel.TimelineProfileTree.Node, selectedNode: TimelineModel.TimelineProfileTree.Node) {
+    this.root = new CallTreeNode(rootNode);
+    this.selectedNodeId = selectedNode.id
+    return this;
   }
 
-  public optimize(): CallTreeNode {
+  public optimize(): CallTreeNode|null {
     // First pass: Annotate tree with depth and distance info
     this.annotateTree(this.root);
 
@@ -433,7 +449,7 @@ class TreeOptimizer {
     return this.buildOptimizedTree(this.root);
   }
 
-  private annotateTree(node: CallTreeNode, depth: number = 0): void {
+  private annotateTree(node: CallTreeNode, depth: number = 0): boolean {
     node.depth = depth;
 
     // Find and mark path to selected node
@@ -526,6 +542,9 @@ class TreeOptimizer {
     if (tokenCount >= this.TARGET_TOKENS)
       return null;
 
+    console.log(
+        node.node.event ? nameForEntry(node.node.event) : '??', node, 'worth', node.calculatedValue, 'weighs',
+        node.calculatedWeight, 'sack', tokenCount);
     // Always include nodes on path to selected
     if (node.pathToSelected || node.calculatedValue! / node.calculatedWeight! > 50) {
       const optimizedNode:
