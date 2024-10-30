@@ -8,36 +8,6 @@ import {nameForEntry} from './EntryName.js';
 import {visibleTypes} from './EntryStyles.js';
 import {SourceMapsResolver} from './SourceMapsResolver.js';
 
-/*
-const METADATA_VALUES = {
-  Node: 900,
-  selected: 1000,
-  dur: 200,
-  self: 500,
-  snippet: 700,  // Potentially useful, but can be very long
-  'URL#': 300,
-  children: 400,
-};
-*/
-
-/**
- * Approximate token counts guidance for weight calculation
- *
- * numbers equivalent to num.toString().length (count of digits incl decimal)
- */
-
-/*
-
-Node: 7+, plus extra for words or higher nodeid digit counts.
-Selected: 4
-dur: 5+
-self: 5+
-URL#: 5
-snippet: minimum 25, up to 200
-Having children: 3
-  Each child 7+, plus extra for words
-
- */
 
 /** Iterates from a node down through its descendents. If the callback returns true, the loop stops. */
 function depthFirstWalk(
@@ -98,12 +68,12 @@ export class AICallTree {
     }
 
     const instance = new AICallTree(selectedEvent, parsedTrace);
-    instance.optimize();
+    instance.initializeTree();
     instance.logDebug();
     return instance;
   }
 
-  optimize() {
+  initializeTree() {
     const selectedEvent = this.selectedEvent;
     const {startTime, endTime} = Trace.Helpers.Timing.eventTimingsMilliSeconds(selectedEvent);
 
@@ -150,8 +120,6 @@ export class AICallTree {
 
     this.rootNode = rootNode;
     this.selectedNode = selectedNode;
-    // this.annotateNode(this.rootNode);
-    // this.calculateMetrics(this.rootNode);
   }
 
 
@@ -279,11 +247,17 @@ export class AICallTree {
       throw new Error('Not set');
     }
     const {selectedNode} = this;
-    const ok = new TreeOptimizer(this.rootNode, this.selectedNode);
-    const yeah = ok.optimize();
+
+
+
+    // BUT CAN WE OPTIMIZE?!
+    const treeOpt = new TreeOptimizer(this.rootNode, this.selectedNode);
+    const yeah = treeOpt.optimize();
+    // Obviously i'm not serializing this the same way, but.. even as JSON you can see it's not working right
+    console.log(JSON.stringify(yeah), 'is this long:', JSON.stringify(yeah).length.toLocaleString());
     debugger;
-    // const optimizedRoot = this.buildOptimizedTree(this.rootNode, 30_000);
-    // debugger;
+    // If you look, this tree probably doesn't make much sense.
+
 
     const nodeToIdMap = new Map<Trace.Extras.TraceTree.Node, number>();
     // Keep a map of URLs. We'll output a LUT to keep size down.
@@ -383,52 +357,40 @@ export class AITreeFilter extends Trace.Extras.TraceFilter.TraceFilter {
 }
 
 
+// How valuable is the data in each node?  The number scale here is arbitrary, but figured 0-1000 was nice.
+const DATA_VALUE = {
+  selected: 1000,
+  identifier: 900,
+  snippet: 700,  // Potentially useful, but can be very long
+  self: 500,
+  children: 400,
+  url: 300,
+  dur: 200,
+};
 
-class CallTreeNode {
-  id: string;
-  selected: boolean;
-  dur: number;
-  self: number;
-  url?: string;
-  children: CallTreeNode[] = [];
-  snippet?: string;
-  // Optimization metadata
-  depth?: number;
-  distanceToSelected?: number;
-  pathToSelected?: boolean;
-  calculatedValue?: number;
-  calculatedWeight?: number
+/**
+ * Approximate token weights. Found with ai studio.
+ * numbers equivalent to num.toString().length (count of digits incl decimal)
+ * TODO: consider even more precise per-datum token estimate. (split word in identifier/snippet, count digits, etc)
+ */
+const TOKEN_WEIGHT = {
+  identifier: 9,  //  plus extra for words or higher nodeid digit counts.
+  selected: 4,
+  dur: 7,
+  self: 6,
+  url: 6,
+  snippet: 50,  // Minimum. Up to 200.
+  childrenPresent: 3,
+  perChild: 7,
+};
 
-  constructor(public node: TimelineModel.TimelineProfileTree.Node) {
-    this.id = node.id;
-    this.selected = false;  // umm
-    this.dur = node.totalTime;
-    this.self = node.selfTime;
-    this.url = node.event?.args?.data?.url;
-    this.snippet = node.snippet ?? 'x';
-    this.children = Array.from(node.children().values()).map(child => new CallTreeNode(child));
-  }
-}
+
 
 class TreeOptimizer {
-  private readonly TARGET_TOKENS = 1500;
+  private readonly TARGET_TOKENS = 5_000;  // reduced for testing. TODO: restore to 30k
   private readonly MIN_DURATION_MS = 0.2;
 
-  // Base values for metadata fields
-  private readonly BASE_VALUES =
-      {identifier: 900, selected: 1000, dur: 200, self: 500, snippet: 700, url: 300, children: 400};
 
-  // Approximate token weights
-  private readonly WEIGHTS = {
-    identifier: 7,
-    selected: 4,
-    dur: 5,
-    self: 5,
-    url: 5,
-    snippet: 25,  // Minimum
-    childrenPresent: 3,
-    perChild: 7
-  };
   root: CallTreeNode;
   selectedNodeId: string|symbol;
   totalTreeWeight: number = 0;
@@ -458,23 +420,23 @@ class TreeOptimizer {
 
     // Find and mark path to selected node
     if (node.selected) {
-      node.distanceToSelected = 0;
-      node.pathToSelected = true;
+      node.descendentDepth = 0;
+      node.betweenRootAndSelected = true;
       return true;
     }
 
     // Process children
     for (const child of node.children) {
       if (this.annotateTree(child, depth + 1)) {
-        node.pathToSelected = true;
-        node.distanceToSelected = child.distanceToSelected! + 1;
+        node.betweenRootAndSelected = true;
+        node.descendentDepth = child.descendentDepth! + 1;
         return true;
       }
     }
 
     // Not on path to selected
-    node.pathToSelected = false;
-    node.distanceToSelected = Infinity;
+    node.betweenRootAndSelected = false;
+    node.descendentDepth = Infinity;
     return false;
   }
 
@@ -483,35 +445,35 @@ class TreeOptimizer {
     let weight = 0;
 
     // Calculate boost factor based on position
-    let boost = this.calculateBoost(node);
+    let boost = this.calculateTreePositionBoost(node);
 
     // Calculate base value and weight for each field
     if (node.id) {
-      value += this.BASE_VALUES.identifier * boost;
-      weight += this.WEIGHTS.identifier;
+      value += DATA_VALUE.identifier * boost;
+      weight += TOKEN_WEIGHT.identifier;
     }
 
     if (node.selected) {
-      value += this.BASE_VALUES.selected * boost;
-      weight += this.WEIGHTS.selected;
+      value += DATA_VALUE.selected * boost;
+      weight += TOKEN_WEIGHT.selected;
     }
 
     if (node.dur) {
-      value += this.BASE_VALUES.dur * boost;
-      weight += this.WEIGHTS.dur;
+      value += DATA_VALUE.dur * boost;
+      weight += TOKEN_WEIGHT.dur;
     }
 
     if (node.self) {
-      value += this.BASE_VALUES.self * boost;
-      weight += this.WEIGHTS.self;
+      value += DATA_VALUE.self * boost;
+      weight += TOKEN_WEIGHT.self;
     }
 
     // Add children metrics
     if (node.children.length > 0) {
-      weight += this.WEIGHTS.childrenPresent;
+      weight += TOKEN_WEIGHT.childrenPresent;
       node.children.forEach(child => {
         this.calculateNodeMetrics(child);
-        weight += this.WEIGHTS.perChild;
+        weight += TOKEN_WEIGHT.perChild;
       });
     }
 
@@ -519,7 +481,7 @@ class TreeOptimizer {
     node.calculatedWeight = weight;
   }
 
-  private calculateBoost(node: CallTreeNode): number {
+  private calculateTreePositionBoost(node: CallTreeNode): number {
     let boost = 1;
 
     // Base boosts
@@ -533,9 +495,9 @@ class TreeOptimizer {
       boost *= 1.25;  // 125% boost for non-zero self time
 
     // Distance-based boost for nodes on path to selected
-    if (node.pathToSelected) {
+    if (node.betweenRootAndSelected) {
       // Exponential decay based on distance to selected
-      const distanceBoost = Math.max(1, 2 ** (-node.distanceToSelected! / 3));
+      const distanceBoost = Math.max(1, 2 ** (-node.descendentDepth! / 3));
       boost *= distanceBoost;
     }
 
@@ -549,7 +511,7 @@ class TreeOptimizer {
   }
 
 
-
+  // This method, I do not like it. Thanks for nothing, Gemini.
   private buildOptimizedTree(node: CallTreeNode, tokenCount: number = 0): CallTreeNode {
     const compressionNeeded = this.totalTreeWeight > this.TARGET_TOKENS;
     const valueWeightThreshold = compressionNeeded ? this.calculateAdaptiveThreshold() : 0;
@@ -563,18 +525,18 @@ class TreeOptimizer {
         CallTreeNode = {id: node.id, selected: node.selected, dur: node.dur, self: node.self, children: []};
 
     let currentTokens =
-        tokenCount + this.WEIGHTS.identifier + this.WEIGHTS.selected + this.WEIGHTS.dur + this.WEIGHTS.self;
+        tokenCount + TOKEN_WEIGHT.identifier + TOKEN_WEIGHT.selected + TOKEN_WEIGHT.dur + TOKEN_WEIGHT.self;
 
     // Add optional fields based on space availability and value
     if (!compressionNeeded || (node.url && node.calculatedValue! / node.calculatedWeight! > valueWeightThreshold)) {
       optimizedNode.url = node.url;
-      currentTokens += this.WEIGHTS.url;
+      currentTokens += TOKEN_WEIGHT.url;
     }
 
     if (!compressionNeeded ||
         (node.snippet && node.calculatedValue! / node.calculatedWeight! > valueWeightThreshold * 1.5)) {
       optimizedNode.snippet = node.snippet;
-      currentTokens += Math.max(this.WEIGHTS.snippet, node.snippet!.length / 4);
+      currentTokens += Math.max(TOKEN_WEIGHT.snippet, node.snippet!.length / 4);
     }
 
     // Process children if we have space
@@ -594,7 +556,7 @@ class TreeOptimizer {
           break;
 
         // Always include children on path to selected or if we have space
-        if (!compressionNeeded || child.pathToSelected ||
+        if (!compressionNeeded || child.betweenRootAndSelected ||
             child.calculatedValue! / child.calculatedWeight! > valueWeightThreshold) {
           const optimizedChild = this.buildOptimizedTree(child, this.TARGET_TOKENS - remainingTokens);
           optimizedNode.children.push(optimizedChild);
@@ -611,5 +573,34 @@ class TreeOptimizer {
     const compressionRatio = this.totalTreeWeight / this.TARGET_TOKENS;
     // Start with low threshold for small trees, increase for larger ones
     return Math.max(0, (compressionRatio - 1) * 50);
+  }
+}
+
+
+
+// Dumb wrapper class to avoid adding optimization metadata to our TimelineProfileTree nodes
+class CallTreeNode {
+  id: string;
+  selected: boolean;
+  dur: number;
+  self: number;
+  url?: string;
+  children: CallTreeNode[] = [];
+  snippet?: string;
+  // Optimization metadata
+  depth?: number;
+  descendentDepth?: number;
+  betweenRootAndSelected?: boolean;
+  calculatedValue?: number;
+  calculatedWeight?: number
+
+  constructor(public node: TimelineModel.TimelineProfileTree.Node) {
+    this.id = node.id;
+    this.selected = false;  // umm
+    this.dur = node.totalTime;
+    this.self = node.selfTime;
+    this.url = node.event?.args?.data?.url;
+    this.snippet = node.snippet ?? 'x';
+    this.children = Array.from(node.children().values()).map(child => new CallTreeNode(child));
   }
 }
