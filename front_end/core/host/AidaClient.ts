@@ -363,7 +363,9 @@ export class AidaClient {
       };
     })();
     const streamId = bindOutputStream(stream);
+    console.log({request});
     InspectorFrontendHostInstance.doAidaConversation(JSON.stringify(request), streamId, result => {
+      console.log(result.statusCode, {converationresult: result});
       if (result.statusCode === 403) {
         stream.fail(new Error('Server responded: permission denied'));
       } else if (result.error) {
@@ -406,7 +408,7 @@ export class AidaClient {
       } catch (error) {
         throw new Error('Cannot parse chunk: ' + chunk, {cause: error});
       }
-
+      console.log({results});
       for (const result of results) {
         if ('metadata' in result) {
           metadata = result.metadata;

@@ -159,7 +159,7 @@ export class AICallTree {
       return null;
     }
     const instance = new AICallTree(selectedNode, rootNode, parsedTrace);
-    // instance.logDebug();
+    instance.logDebug();
     return instance;
   }
 
@@ -230,7 +230,7 @@ export class AICallTree {
   logDebug(): void {
     const str = this.serialize();
     // eslint-disable-next-line no-console
-    console.log('🎆', str);
+    console.log('🎆', str, '\n\n', str.length.toLocaleString());
     if (str.length > 45_000) {
       // Manual testing shows 45k fits. 50k doesn't.
       // Max is 32k _tokens_, but tokens to bytes is wishywashy, so... hard to know for sure.
