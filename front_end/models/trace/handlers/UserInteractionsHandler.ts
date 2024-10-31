@@ -64,7 +64,7 @@ const interactionEvents: Types.Events.SyntheticInteractionPair[] = [];
 const interactionEventsWithNoNesting: Types.Events.SyntheticInteractionPair[] = [];
 const eventTimingEndEventsById = new Map<string, Types.Events.EventTimingEnd>();
 const eventTimingStartEventsForInteractions: Types.Events.EventTimingBegin[] = [];
-let handlerState = HandlerState.UNINITIALIZED;
+let handlerState = HandlerState.NOT_READY;
 
 export function reset(): void {
   allEvents.length = 0;
@@ -75,12 +75,12 @@ export function reset(): void {
   eventTimingEndEventsById.clear();
   interactionEventsWithNoNesting.length = 0;
   longestInteractionEvent = null;
-  handlerState = HandlerState.INITIALIZED;
+  handlerState = HandlerState.READY_TO_HANDLE;
 }
 
 export function handleEvent(event: Types.Events.Event): void {
-  if (handlerState !== HandlerState.INITIALIZED) {
-    throw new Error('Handler is not initialized');
+  if (handlerState !== HandlerState.READY_TO_HANDLE) {
+    throw new Error('Handler was not reset');
   }
 
   if (Types.Events.isBeginCommitCompositorFrame(event)) {

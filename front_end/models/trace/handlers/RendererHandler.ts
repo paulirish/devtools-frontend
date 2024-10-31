@@ -37,7 +37,7 @@ let allTraceEntries: Types.Events.Event[] = [];
 
 const completeEventStack: (Types.Events.SyntheticComplete)[] = [];
 
-let handlerState = HandlerState.UNINITIALIZED;
+let handlerState = HandlerState.NOT_READY;
 let config: Types.Configuration.Configuration = Types.Configuration.defaults();
 
 const makeRendererProcess = (): RendererProcess => ({
@@ -71,20 +71,13 @@ export function reset(): void {
   allTraceEntries.length = 0;
   completeEventStack.length = 0;
   compositorTileWorkers.length = 0;
-  handlerState = HandlerState.UNINITIALIZED;
+  handlerState = HandlerState.READY_TO_HANDLE;
 }
 
-export function initialize(): void {
-  if (handlerState !== HandlerState.UNINITIALIZED) {
-    throw new Error('Renderer Handler was not reset');
-  }
-
-  handlerState = HandlerState.INITIALIZED;
-}
 
 export function handleEvent(event: Types.Events.Event): void {
-  if (handlerState !== HandlerState.INITIALIZED) {
-    throw new Error('Renderer Handler is not initialized');
+  if (handlerState !== HandlerState.READY_TO_HANDLE) {
+    throw new Error('Renderer Handler was not reset');
   }
 
   if (Types.Events.isThreadName(event) && event.args.name?.startsWith('CompositorTileWorker')) {
@@ -115,8 +108,8 @@ export function handleEvent(event: Types.Events.Event): void {
 }
 
 export async function finalize(): Promise<void> {
-  if (handlerState !== HandlerState.INITIALIZED) {
-    throw new Error('Renderer Handler is not initialized');
+  if (handlerState !== HandlerState.READY_TO_HANDLE) {
+    throw new Error('Renderer Handler was not reset');
   }
 
   const {mainFrameId, rendererProcessesByFrame, threadsInProcess} = metaHandlerData();

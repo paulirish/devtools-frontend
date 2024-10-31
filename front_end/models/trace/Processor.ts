@@ -202,11 +202,6 @@ export class TraceProcessor extends EventTarget {
       handler.reset();
     }
 
-    // Initialize.
-    for (const handler of sortedHandlers) {
-      handler.initialize?.(freshRecording);
-    }
-
     // Handle each event.
     for (let i = 0; i < traceEvents.length; ++i) {
       // Every so often we take a break just to render.
@@ -472,6 +467,10 @@ export class TraceProcessor extends EventTarget {
 
       this.#computeInsightSets(this.#insights, parsedTrace, enabledInsightRunners, context);
     }
+  }
+
+  handlersForTest(): Partial<Handlers.Types.Handlers> {
+    return this.#traceHandlers;
   }
 }
 

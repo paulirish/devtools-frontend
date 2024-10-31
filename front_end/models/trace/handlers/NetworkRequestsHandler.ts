@@ -103,7 +103,7 @@ function firstPositiveValueInList(entries: number[]): number {
   return 0;
 }
 
-let handlerState = HandlerState.UNINITIALIZED;
+let handlerState = HandlerState.NOT_READY;
 
 export function reset(): void {
   requestsById.clear();
@@ -113,17 +113,13 @@ export function reset(): void {
   networkRequestEventByInitiatorUrl.clear();
   eventToInitiatorMap.clear();
   webSocketData.clear();
-
-  handlerState = HandlerState.UNINITIALIZED;
-}
-
-export function initialize(): void {
-  handlerState = HandlerState.INITIALIZED;
+  handlerState = HandlerState.READY_TO_HANDLE;
 }
 
 export function handleEvent(event: Types.Events.Event): void {
-  if (handlerState !== HandlerState.INITIALIZED) {
-    throw new Error('Network Request handler is not initialized');
+  console.log('handleEvent', handlerState);
+  if (handlerState !== HandlerState.READY_TO_HANDLE) {
+    throw new Error('Network Request handler was not reset');
   }
 
   if (Types.Events.isResourceChangePriority(event)) {
@@ -187,10 +183,9 @@ export function handleEvent(event: Types.Events.Event): void {
 }
 
 export async function finalize(): Promise<void> {
-  if (handlerState !== HandlerState.INITIALIZED) {
-    throw new Error('Network Request handler is not initialized');
+  if (handlerState !== HandlerState.READY_TO_HANDLE) {
+    throw new Error('Network Request handler was not reset');
   }
-
   const {rendererProcessesByFrame} = metaHandlerData();
   for (const [requestId, request] of requestMap.entries()) {
     // If we have an incomplete set of events here, we choose to drop the network
@@ -509,6 +504,7 @@ export async function finalize(): Promise<void> {
 }
 
 export function data(): NetworkRequestData {
+  console.log('data', handlerState);
   if (handlerState !== HandlerState.FINALIZED) {
     throw new Error('Network Request handler is not finalized');
   }

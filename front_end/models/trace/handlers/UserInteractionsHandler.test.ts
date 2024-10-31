@@ -8,7 +8,6 @@ import * as Trace from '../trace.js';
 async function processTrace(context: Mocha.Suite|Mocha.Context|null, path: string): Promise<void> {
   const traceEvents = await TraceLoader.rawEvents(context, path);
   Trace.Handlers.ModelHandlers.Meta.reset();
-  Trace.Handlers.ModelHandlers.Meta.initialize();
   for (const event of traceEvents) {
     Trace.Handlers.ModelHandlers.Meta.handleEvent(event);
     Trace.Handlers.ModelHandlers.UserInteractions.handleEvent(event);
@@ -19,7 +18,6 @@ async function processTrace(context: Mocha.Suite|Mocha.Context|null, path: strin
 
 beforeEach(() => {
   Trace.Handlers.ModelHandlers.Meta.reset();
-  Trace.Handlers.ModelHandlers.Meta.initialize();
 });
 
 describe('UserInteractionsHandler', function() {
@@ -46,7 +44,6 @@ describe('UserInteractionsHandler', function() {
   describe('error handling', () => {
     it('throws if not initialized', async () => {
       Trace.Handlers.ModelHandlers.Meta.reset();
-      Trace.Handlers.ModelHandlers.Meta.initialize();
 
       // Finalize the handler by calling data and then finalize on it.
       Trace.Handlers.ModelHandlers.UserInteractions.data();
@@ -56,7 +53,7 @@ describe('UserInteractionsHandler', function() {
       assert.throws(() => {
         const fakeEvent = {} as Trace.Types.Events.Event;
         Trace.Handlers.ModelHandlers.UserInteractions.handleEvent(fakeEvent);
-      }, 'Handler is not initialized');
+      }, 'Handler was not reset');
     });
   });
 

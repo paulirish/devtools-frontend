@@ -43,7 +43,7 @@ export interface UserTimingsData {
    */
   timestampEvents: readonly Types.Events.TimeStamp[];
 }
-let handlerState = HandlerState.UNINITIALIZED;
+let handlerState = HandlerState.NOT_READY;
 
 export function reset(): void {
   syntheticEvents.length = 0;
@@ -51,7 +51,7 @@ export function reset(): void {
   performanceMarkEvents.length = 0;
   consoleTimings.length = 0;
   timestampEvents.length = 0;
-  handlerState = HandlerState.INITIALIZED;
+  handlerState = HandlerState.READY_TO_HANDLE;
 }
 
 const resourceTimingNames = [
@@ -143,8 +143,8 @@ function userTimingComparator(
 }
 
 export function handleEvent(event: Types.Events.Event): void {
-  if (handlerState !== HandlerState.INITIALIZED) {
-    throw new Error('UserTimings handler is not initialized');
+  if (handlerState !== HandlerState.READY_TO_HANDLE) {
+    throw new Error('UserTimings handler was not reset');
   }
 
   if (ignoredNames.includes(event.name)) {
@@ -167,8 +167,8 @@ export function handleEvent(event: Types.Events.Event): void {
 }
 
 export async function finalize(): Promise<void> {
-  if (handlerState !== HandlerState.INITIALIZED) {
-    throw new Error('UserTimings handler is not initialized');
+  if (handlerState !== HandlerState.READY_TO_HANDLE) {
+    throw new Error('UserTimings handler was not reset');
   }
 
   const asyncEvents = [...performanceMeasureEvents, ...consoleTimings];

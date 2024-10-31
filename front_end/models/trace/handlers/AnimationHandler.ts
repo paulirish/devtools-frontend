@@ -13,7 +13,7 @@ const animationsSyntheticEvents: Types.Events.SyntheticAnimationPair[] = [];
 export interface AnimationData {
   animations: readonly Types.Events.SyntheticAnimationPair[];
 }
-let handlerState = HandlerState.UNINITIALIZED;
+let handlerState = HandlerState.NOT_READY;
 
 export function reset(): void {
   animations.length = 0;

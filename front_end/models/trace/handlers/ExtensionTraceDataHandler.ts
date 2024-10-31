@@ -18,14 +18,14 @@ export interface ExtensionTraceData {
   extensionMarkers: readonly Types.Extensions.SyntheticExtensionMarker[];
   entryToNode: Map<Types.Events.Event, Helpers.TreeHelpers.TraceEntryNode>;
 }
-let handlerState = HandlerState.UNINITIALIZED;
+let handlerState = HandlerState.NOT_READY;
 
 export function handleEvent(_event: Types.Events.Event): void {
   // Implementation not needed because data is sourced from UserTimingsHandler
 }
 
 export function reset(): void {
-  handlerState = HandlerState.INITIALIZED;
+  handlerState = HandlerState.READY_TO_HANDLE;
   extensionFlameChartEntries.length = 0;
   extensionTrackData.length = 0;
   extensionMarkers.length = 0;
@@ -33,8 +33,8 @@ export function reset(): void {
 }
 
 export async function finalize(): Promise<void> {
-  if (handlerState !== HandlerState.INITIALIZED) {
-    throw new Error('ExtensionTraceData handler is not initialized');
+  if (handlerState !== HandlerState.READY_TO_HANDLE) {
+    throw new Error('ExtensionTraceData handler was not reset');
   }
   createExtensionFlameChartEntries();
   handlerState = HandlerState.FINALIZED;

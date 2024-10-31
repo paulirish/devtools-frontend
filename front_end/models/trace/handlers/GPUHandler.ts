@@ -8,7 +8,7 @@ import * as Types from '../types/types.js';
 import {data as metaHandlerData} from './MetaHandler.js';
 import {type HandlerName, HandlerState} from './types.js';
 
-let handlerState = HandlerState.UNINITIALIZED;
+let handlerState = HandlerState.NOT_READY;
 
 // Each thread contains events. Events indicate the thread and process IDs, which are
 // used to store the event in the correct process thread entry below.
@@ -20,20 +20,12 @@ export function reset(): void {
   eventsInProcessThread.clear();
   mainGPUThreadTasks = [];
 
-  handlerState = HandlerState.UNINITIALIZED;
-}
-
-export function initialize(): void {
-  if (handlerState !== HandlerState.UNINITIALIZED) {
-    throw new Error('GPU Handler was not reset before being initialized');
-  }
-
-  handlerState = HandlerState.INITIALIZED;
+  handlerState = HandlerState.READY_TO_HANDLE;
 }
 
 export function handleEvent(event: Types.Events.Event): void {
-  if (handlerState !== HandlerState.INITIALIZED) {
-    throw new Error('GPU Handler is not initialized');
+  if (handlerState !== HandlerState.READY_TO_HANDLE) {
+    throw new Error('GPU Handler was not reset');
   }
 
   if (!Types.Events.isGPUTask(event)) {
@@ -44,8 +36,8 @@ export function handleEvent(event: Types.Events.Event): void {
 }
 
 export async function finalize(): Promise<void> {
-  if (handlerState !== HandlerState.INITIALIZED) {
-    throw new Error('GPU Handler is not initialized');
+  if (handlerState !== HandlerState.READY_TO_HANDLE) {
+    throw new Error('GPU Handler was not reset');
   }
 
   const {gpuProcessId, gpuThreadId} = metaHandlerData();

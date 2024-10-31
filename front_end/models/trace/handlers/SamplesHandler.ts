@@ -26,7 +26,7 @@ const entryToNode = new Map<Types.Events.Event, Helpers.TreeHelpers.TraceEntryNo
 // events matched by thread id.
 const preprocessedData = new Map<Types.Events.ProcessID, Map<Types.Events.ProfileID, PreprocessedData>>();
 
-let handlerState = HandlerState.UNINITIALIZED;
+let handlerState = HandlerState.NOT_READY;
 
 function buildProfileCalls(): void {
   for (const [processId, profiles] of preprocessedData) {
@@ -110,20 +110,14 @@ export function reset(): void {
   preprocessedData.clear();
   profilesInProcess.clear();
   entryToNode.clear();
-  handlerState = HandlerState.UNINITIALIZED;
+  handlerState = HandlerState.READY_TO_HANDLE;
 }
 
-export function initialize(): void {
-  if (handlerState !== HandlerState.UNINITIALIZED) {
-    throw new Error('Samples Handler was not reset');
-  }
 
-  handlerState = HandlerState.INITIALIZED;
-}
 
 export function handleEvent(event: Types.Events.Event): void {
-  if (handlerState !== HandlerState.INITIALIZED) {
-    throw new Error('Samples Handler is not initialized');
+  if (handlerState !== HandlerState.READY_TO_HANDLE) {
+    throw new Error('Samples Handler was not reset');
   }
 
   /**
@@ -201,8 +195,8 @@ export function handleEvent(event: Types.Events.Event): void {
 }
 
 export async function finalize(): Promise<void> {
-  if (handlerState !== HandlerState.INITIALIZED) {
-    throw new Error('Samples Handler is not initialized');
+  if (handlerState !== HandlerState.READY_TO_HANDLE) {
+    throw new Error('Samples Handler was not reset');
   }
   buildProfileCalls();
 

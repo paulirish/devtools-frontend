@@ -19,9 +19,6 @@ async function processTrace(events: readonly Trace.Types.Events.Event[]): Promis
   for (const handlerName of handlersInOrder) {
     const handler = Trace.Handlers.ModelHandlers[handlerName];
     handler.reset();
-    if ('initialize' in handler) {
-      handler.initialize();
-    }
   }
   for (const event of events) {
     for (const handlerName of handlersInOrder) {

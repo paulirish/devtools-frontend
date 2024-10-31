@@ -239,6 +239,19 @@ describeWithEnvironment('TraceProcessor', function() {
       assert.throws(
           () => Trace.Processor.sortHandlers(handlers), `Found dependency cycle in trace event handlers: ${cyclePath}`);
     });
+
+    it('has consistent handler state management', function() {
+      const processor = Trace.Processor.TraceProcessor.createWithAllHandlers();
+      const handlers = processor.handlersForTest();
+
+      for (const handler of Object.values(handlers)) {
+        // test_setup.js forces a call to reset() on all handlers, so we can't write a test to assert that reset wasn't called.
+        // handler.reset();
+        assert.strictEqual(handler)
+      }
+
+      Trace.Handlers.ModelHandlers.NetworkRequests.reset();
+    });
   });
 
   describe('insights', () => {

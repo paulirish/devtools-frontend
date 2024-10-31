@@ -7,7 +7,7 @@ import * as Types from '../types/types.js';
 
 import {HandlerState} from './types.js';
 
-let handlerState = HandlerState.UNINITIALIZED;
+let handlerState = HandlerState.NOT_READY;
 
 const lastScheduleStyleRecalcByFrame = new Map<string, Types.Events.ScheduleStyleRecalculation>();
 
@@ -55,15 +55,7 @@ export function reset(): void {
   schedulePostMessageEventByTraceId.clear();
   postMessageHandlerEvents.length = 0;
 
-  handlerState = HandlerState.UNINITIALIZED;
-}
-
-export function initialize(): void {
-  if (handlerState !== HandlerState.UNINITIALIZED) {
-    throw new Error('InitiatorsHandler was not reset before being initialized');
-  }
-
-  handlerState = HandlerState.INITIALIZED;
+  handlerState = HandlerState.READY_TO_HANDLE;
 }
 
 function storeInitiator(data: {initiator: Types.Events.Event, event: Types.Events.Event}): void {
@@ -202,8 +194,8 @@ function finalizeInitiatorRelationship(): void {
 }
 
 export async function finalize(): Promise<void> {
-  if (handlerState !== HandlerState.INITIALIZED) {
-    throw new Error('InitiatorsHandler is not initialized');
+  if (handlerState !== HandlerState.READY_TO_HANDLE) {
+    throw new Error('InitiatorsHandler was not reset');
   }
 
   // During event processing, we may encounter initiators before the handler events themselves

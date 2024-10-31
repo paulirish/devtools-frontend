@@ -11,24 +11,21 @@ import {type HandlerName, HandlerState} from './types.js';
 
 const serverTimings: Types.Events.SyntheticServerTiming[] = [];
 
-let handlerState = HandlerState.UNINITIALIZED;
+let handlerState = HandlerState.NOT_READY;
 
 export function reset(): void {
   serverTimings.length = 0;
-  handlerState = HandlerState.UNINITIALIZED;
+  handlerState = HandlerState.READY_TO_HANDLE;
 }
 
-export function initialize(): void {
-  handlerState = HandlerState.INITIALIZED;
-}
 
 export function handleEvent(_event: Types.Events.Event): void {
   // Implementation not needed because data is sourced from NetworkRequestsHandler
 }
 
 export async function finalize(): Promise<void> {
-  if (handlerState !== HandlerState.INITIALIZED) {
-    throw new Error('Server Timings handler is not initialized');
+  if (handlerState !== HandlerState.READY_TO_HANDLE) {
+    throw new Error('Server Timings handler was not reset');
   }
   extractServerTimings();
   Helpers.Trace.sortTraceEventsInPlace(serverTimings);

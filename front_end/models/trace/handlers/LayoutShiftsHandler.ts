@@ -114,17 +114,11 @@ type ScoreRecord = {
 // Includes drops to 0 when session windows end.
 const scoreRecords: ScoreRecord[] = [];
 
-let handlerState = HandlerState.UNINITIALIZED;
+let handlerState = HandlerState.NOT_READY;
 
-export function initialize(): void {
-  if (handlerState !== HandlerState.UNINITIALIZED) {
-    throw new Error('LayoutShifts Handler was not reset');
-  }
-  handlerState = HandlerState.INITIALIZED;
-}
 
 export function reset(): void {
-  handlerState = HandlerState.UNINITIALIZED;
+  handlerState = HandlerState.READY_TO_HANDLE;
   layoutShiftEvents.length = 0;
   layoutInvalidationEvents.length = 0;
   scheduleStyleInvalidationEvents.length = 0;
@@ -144,8 +138,8 @@ export function reset(): void {
 }
 
 export function handleEvent(event: Types.Events.Event): void {
-  if (handlerState !== HandlerState.INITIALIZED) {
-    throw new Error('Handler is not initialized');
+  if (handlerState !== HandlerState.READY_TO_HANDLE) {
+    throw new Error('Handler was not reset');
   }
 
   if (Types.Events.isLayoutShift(event) && !event.args.data?.had_recent_input) {

@@ -23,21 +23,14 @@ import {type HandlerName, HandlerState} from './types.js';
  *
  * In time we expect to migrate this code to a more "typical" handler.
  */
-let handlerState = HandlerState.UNINITIALIZED;
+let handlerState = HandlerState.NOT_READY;
 
 const allEvents: Types.Events.Event[] = [];
 let model: TimelineFrameModel|null = null;
 
 export function reset(): void {
-  handlerState = HandlerState.UNINITIALIZED;
+  handlerState = HandlerState.READY_TO_HANDLE;
   allEvents.length = 0;
-}
-export function initialize(): void {
-  if (handlerState !== HandlerState.UNINITIALIZED) {
-    throw new Error('FramesHandler was not reset before being initialized');
-  }
-
-  handlerState = HandlerState.INITIALIZED;
 }
 
 export function handleEvent(event: Types.Events.Event): void {
@@ -45,8 +38,8 @@ export function handleEvent(event: Types.Events.Event): void {
 }
 
 export async function finalize(): Promise<void> {
-  if (handlerState !== HandlerState.INITIALIZED) {
-    throw new Error('FramesHandler is not initialized');
+  if (handlerState !== HandlerState.READY_TO_HANDLE) {
+    throw new Error('FramesHandler was not reset');
   }
 
   // Snapshot events can be emitted out of order, so we need to sort before

@@ -67,7 +67,7 @@ const eventPhasesOfInterestForTraceBounds = new Set([
   Types.Events.Phase.INSTANT,
 ]);
 
-let handlerState = HandlerState.UNINITIALIZED;
+let handlerState = HandlerState.NOT_READY;
 // Tracks if the trace is a generic trace, which here means that it did not come from athe DevTools Performance Panel recording.
 // We assume a trace is generic, and mark it as not generic if we see any of:
 // - TracingStartedInPage
@@ -105,16 +105,9 @@ export function reset(): void {
 
   traceIsGeneric = true;
 
-  handlerState = HandlerState.UNINITIALIZED;
+  handlerState = HandlerState.READY_TO_HANDLE;
 }
 
-export function initialize(): void {
-  if (handlerState !== HandlerState.UNINITIALIZED) {
-    throw new Error('Meta Handler was not reset');
-  }
-
-  handlerState = HandlerState.INITIALIZED;
-}
 
 function updateRendererProcessByFrame(event: Types.Events.Event, frame: Types.Events.TraceFrame): void {
   const framesInProcessById = Platform.MapUtilities.getWithDefault(framesByProcessId, frame.processId, () => new Map());
@@ -147,8 +140,8 @@ function updateRendererProcessByFrame(event: Types.Events.Event, frame: Types.Ev
 }
 
 export function handleEvent(event: Types.Events.Event): void {
-  if (handlerState !== HandlerState.INITIALIZED) {
-    throw new Error('Meta Handler is not initialized');
+  if (handlerState !== HandlerState.READY_TO_HANDLE) {
+    throw new Error('Meta Handler was not reset');
   }
 
   if (traceIsGeneric && CHROME_WEB_TRACE_EVENTS.has(event.name as Types.Events.Name)) {
@@ -336,8 +329,8 @@ export function handleEvent(event: Types.Events.Event): void {
 }
 
 export async function finalize(): Promise<void> {
-  if (handlerState !== HandlerState.INITIALIZED) {
-    throw new Error('Handler is not initialized');
+  if (handlerState !== HandlerState.READY_TO_HANDLE) {
+    throw new Error('Handler was not reset');
   }
 
   // We try to set the minimum time by finding the event with the smallest

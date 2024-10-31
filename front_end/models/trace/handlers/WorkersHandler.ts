@@ -11,30 +11,23 @@ export interface WorkersData {
   workerIdByThread: Map<Types.Events.ThreadID, Types.Events.WorkerId>;
   workerURLById: Map<Types.Events.WorkerId, string>;
 }
-let handlerState = HandlerState.UNINITIALIZED;
+let handlerState = HandlerState.NOT_READY;
 
 const sessionIdEvents: Types.Events.TracingSessionIdForWorker[] = [];
 const workerIdByThread: Map<Types.Events.ThreadID, Types.Events.WorkerId> = new Map();
 const workerURLById: Map<Types.Events.WorkerId, string> = new Map();
 
-export function initialize(): void {
-  if (handlerState !== HandlerState.UNINITIALIZED) {
-    throw new Error('Workers Handler was not reset');
-  }
-
-  handlerState = HandlerState.INITIALIZED;
-}
 
 export function reset(): void {
   sessionIdEvents.length = 0;
   workerIdByThread.clear();
   workerURLById.clear();
-  handlerState = HandlerState.UNINITIALIZED;
+  handlerState = HandlerState.READY_TO_HANDLE;
 }
 
 export function handleEvent(event: Types.Events.Event): void {
-  if (handlerState !== HandlerState.INITIALIZED) {
-    throw new Error('Workers Handler is not initialized');
+  if (handlerState !== HandlerState.READY_TO_HANDLE) {
+    throw new Error('Workers Handler was not reset');
   }
   if (Types.Events.isTracingSessionIdForWorker(event)) {
     sessionIdEvents.push(event);
@@ -42,8 +35,8 @@ export function handleEvent(event: Types.Events.Event): void {
 }
 
 export async function finalize(): Promise<void> {
-  if (handlerState !== HandlerState.INITIALIZED) {
-    throw new Error('Handler is not initialized');
+  if (handlerState !== HandlerState.READY_TO_HANDLE) {
+    throw new Error('Handler was not reset');
   }
   for (const sessionIdEvent of sessionIdEvents) {
     if (!sessionIdEvent.args.data) {
