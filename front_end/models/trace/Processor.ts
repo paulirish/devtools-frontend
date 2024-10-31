@@ -115,18 +115,14 @@ export class TraceProcessor extends EventTarget {
   }
 
   /**
-   * When the user passes in a set of handlers, we want to ensure that we have all
-   * the required handlers. Handlers can depend on other handlers, so if the user
-   * passes in FooHandler which depends on BarHandler, they must also pass in
-   * BarHandler too. This method verifies that all dependencies are met, and
-   * throws if not.
+   * When the user passes in a set of handlers, we want to ensure that we have all the required handlers. Handlers can
+   * depend on other handlers, so if the user passes in FooHandler which depends on BarHandler, they must also pass in
+   * BarHandler too. This method verifies that all dependencies are met, and throws if not.
    **/
   #verifyHandlers(providedHandlers: Partial<Handlers.Types.Handlers>): void {
-    // Tiny optimisation: if the amount of provided handlers matches the amount
-    // of handlers in the Handlers.ModelHandlers object, that means that the
-    // user has passed in every handler we have. So therefore they cannot have
-    // missed any, and there is no need to iterate through the handlers and
-    // check the dependencies.
+    // Tiny optimisation: if the amount of provided handlers matches the amount of handlers in the
+    // Handlers.ModelHandlers object, that means that the user has passed in every handler we have. So therefore they
+    // cannot have missed any, and there is no need to iterate through the handlers and check the dependencies.
     if (Object.keys(providedHandlers).length === Object.keys(Handlers.ModelHandlers).length) {
       return;
     }
@@ -167,7 +163,7 @@ export class TraceProcessor extends EventTarget {
     this.#status = Status.IDLE;
   }
 
-  parseChunk(traceEvents: readonly Types.Events.Event[]): void {
+  parseChunk(traceEventsChunk: readonly Types.Events.Event[]): void {
     if (this.#status !== Status.IDLE && this.#status !== Status.PARSING_CHUNKS) {
       throw new Error(`Trace processor can't parse chunks. Current state: ${this.#status}`);
     }
@@ -181,10 +177,10 @@ export class TraceProcessor extends EventTarget {
       }
       this.#status = Status.PARSING_CHUNKS;
     }
-    // console.log('chunk', traceEvents.length)
+
     try {
-      for (let i = 0; i < traceEvents.length; ++i) {
-        const event = traceEvents[i];
+      for (let i = 0; i < traceEventsChunk.length; ++i) {
+        const event = traceEventsChunk[i];
         for (let j = 0; j < this.#sortedHandlers.length; ++j) {
           this.#sortedHandlers[j].handleEvent(event);
         }
@@ -199,6 +195,7 @@ export class TraceProcessor extends EventTarget {
     await this.#finalizeParse();
   }
 
+  // Parse the array of all trace events.
   async parse(traceEvents: readonly Types.Events.Event[], options: ParseOptions): Promise<void> {
     // TODO: use finalize instead of this second check
     if (this.#status !== Status.IDLE && this.#status !== Status.PARSING_CHUNKS) {
@@ -232,10 +229,7 @@ export class TraceProcessor extends EventTarget {
     const eventsPerChunk = 50_000;
     // Convert to array so that we are able to iterate all handlers multiple times.
 
-    // // Reset. -- i bet this is currently redundant with the larger reset method
-    // for (const handler of this.#sortedHandlers) {
-    //   handler.reset();
-    // }
+
 
     // // TODO: remove initialization cuz it does nothing.
     // // Initialize.
