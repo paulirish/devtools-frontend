@@ -209,8 +209,11 @@ export class TimelineController implements Trace.TracingManager.TracingManagerCl
     Extensions.ExtensionServer.ExtensionServer.instance().profilingStopped();
 
     this.client.processingStarted();
+    /// this is a weird gross hack.
+    const firstEvent = this.#collectedEvents[0] as Trace.Types.Events.Event;
+
     await this.client.loadingComplete(
-        [this.#collectedEvents.at(0)], /* exclusiveFilter= */ null, /* isCpuProfile= */ false, this.#recordingStartTime,
+        [firstEvent], /* exclusiveFilter= */ null, /* isCpuProfile= */ false, this.#recordingStartTime,
         /* metadata= */ null);
     this.client.loadingCompleteForTest();
   }
@@ -227,7 +230,7 @@ export class TimelineController implements Trace.TracingManager.TracingManagerCl
 export interface Client {
   recordingProgress(usage: number): void;
   loadingStarted(): void;
-  eventsCollected(events: TraceEngine.Types.TraceEvents.TraceEventData[]): void;
+  eventsCollected(events: Trace.Types.Events.Event[]): void;
   processingStarted(): void;
   loadingProgress(progress?: number): void;
   loadingComplete(

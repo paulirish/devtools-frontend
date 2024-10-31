@@ -2006,7 +2006,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     await this.loadingProgress(0);
   }
 
-  eventsCollected(events: TraceEngine.Types.TraceEvents.TraceEventData[]): void {
+  eventsCollected(events: Trace.Types.Events.Event[]): void {
     this.#parseCollectedEventsChunk(events);
   }
 

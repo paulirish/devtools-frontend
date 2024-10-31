@@ -132,7 +132,7 @@ export class Model extends EventTarget {
     }
   }
 
-  parseChunk(traceEvents: readonly Types.TraceEvents.TraceEventData[]): void {
+  parseChunk(traceEvents: readonly Types.Events.Event[]): void {
     void this.#processor.parseChunk(traceEvents);
   }
 
