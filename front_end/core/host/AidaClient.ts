@@ -384,6 +384,7 @@ export class AidaClient {
     const functionCalls: AidaFunctionCallResponse[] = [];
     let metadata: AidaResponseMetadata = {rpcGlobalId: 0};
     while ((chunk = await stream.read())) {
+      console.log({chunk});
       let textUpdated = false;
       // The AIDA response is a JSON array of objects, split at the object
       // boundary. Therefore each chunk may start with `[` or `,` and possibly
