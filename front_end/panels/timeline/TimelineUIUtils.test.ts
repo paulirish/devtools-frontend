@@ -69,6 +69,7 @@ describeWithMockConnection('TimelineUIUtils', function() {
   });
 
   afterEach(() => {
+    target.dispose('afterEach');
     clearMockConnectionResponseHandler('DOM.pushNodesByBackendIdsToFrontend');
   });
 

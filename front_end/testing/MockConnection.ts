@@ -82,10 +82,6 @@ async function enable({reset = true} = {}) {
     responseMap.clear();
   }
 
-  // The DevTools frontend code expects certain things to be in place
-  // before it can run. This function will ensure those things are
-  // minimally there.
-  await initializeGlobalVars({reset});
   setMockResourceTree(true);
 
   ProtocolClient.InspectorBackend.Connection.setFactory(() => new MockConnection());
@@ -136,6 +132,7 @@ async function disable() {
   }
   await cleanTestDOM();
   await deinitializeGlobalVars();
+  resetTestDOM();
   // @ts-expect-error Setting back to undefined as a hard reset.
   ProtocolClient.InspectorBackend.Connection.setFactory(undefined);
 }
@@ -144,9 +141,12 @@ export function describeWithMockConnection(title: string, fn: (this: Mocha.Suite
   reset: true,
 }) {
   return describe(title, function() {
+    before(async () => await initializeGlobalVars());
     beforeEach(async () => await enable(opts));
+    this.afterEach(disable);
+    after(async () => await deinitializeGlobalVars());
+
     fn.call(this);
-    afterEach(disable);
   });
 }
 
@@ -155,8 +155,11 @@ describeWithMockConnection.only = function(title: string, fn: (this: Mocha.Suite
 }) {
   // eslint-disable-next-line mocha/no-exclusive-tests
   return describe.only(title, function() {
+    before(async () => await initializeGlobalVars());
     beforeEach(async () => await enable(opts));
+    this.afterEach(disable);
+    after(async () => await deinitializeGlobalVars());
+
     fn.call(this);
-    afterEach(disable);
   });
 };

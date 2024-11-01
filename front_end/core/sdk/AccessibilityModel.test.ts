@@ -12,6 +12,7 @@ describeWithMockConnection('AccessibilityModel', () => {
     assert.doesNotThrow(() => {
       const target = createTarget();
       new SDK.AccessibilityModel.AccessibilityModel(target);
+      target.dispose('test done');
     });
   });
 });

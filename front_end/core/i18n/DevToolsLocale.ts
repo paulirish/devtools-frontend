@@ -55,6 +55,18 @@ export class DevToolsLocale {
     return devToolsLocaleInstance as DevToolsLocale;
   }
 
+
+  //   static instance(opts: DevToolsLocaleCreationOptions = {create: false}): DevToolsLocale {
+  //   if (!devToolsLocaleInstance) {
+  //     throw new Error('No LanguageSelector instance exists yet.');
+  //   }
+
+  //   if (opts.create) {
+  //     devToolsLocaleInstance = new DevToolsLocale(opts.data);
+  //   }
+  //   return devToolsLocaleInstance as DevToolsLocale;
+  // }
+
   static removeInstance(): void {
     devToolsLocaleInstance = null;
   }

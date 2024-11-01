@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import type * as SDK from '../../core/sdk/sdk.js';
 import {createTarget} from '../../testing/EnvironmentHelpers.js';
 import {
   describeWithMockConnection,
@@ -27,7 +28,9 @@ const fakeEvents = [
 ];
 
 describeWithMockConnection('TracingManager', () => {
+  let target: SDK.Target.Target;
   beforeEach(() => {
+    target = createTarget();
     setMockConnectionResponseHandler('Tracing.start', () => {
       return {};
     });
@@ -35,9 +38,11 @@ describeWithMockConnection('TracingManager', () => {
       return {};
     });
   });
+  afterEach(() => {
+    target.dispose('afterEach');
+  });
 
   it('sends bufferUsage to the client', async () => {
-    const target = createTarget();
     const manager = new Trace.TracingManager.TracingManager(target);
     const client = new FakeClient();
     const bufferUsageSpy = sinon.spy(client, 'tracingBufferUsage');
@@ -48,7 +53,6 @@ describeWithMockConnection('TracingManager', () => {
   });
 
   it('sends events to the client when they are collected and updates the client with progress', async () => {
-    const target = createTarget();
     const manager = new Trace.TracingManager.TracingManager(target);
     const client = new FakeClient();
     const eventsRetrievalProgressSpy = sinon.spy(client, 'eventsRetrievalProgress');
@@ -63,7 +67,6 @@ describeWithMockConnection('TracingManager', () => {
   });
 
   it('notifies the client when tracing is complete', async () => {
-    const target = createTarget();
     const manager = new Trace.TracingManager.TracingManager(target);
     const client = new FakeClient();
     const tracingCompleteSpy = sinon.spy(client, 'tracingComplete');
@@ -75,7 +78,6 @@ describeWithMockConnection('TracingManager', () => {
   });
 
   it('errors if tracing is started twice', async () => {
-    const target = createTarget();
     const manager = new Trace.TracingManager.TracingManager(target);
     const client = new FakeClient();
     await manager.start(client, 'devtools-timeline');
@@ -91,7 +93,6 @@ describeWithMockConnection('TracingManager', () => {
   });
 
   it('errors if you try to stop when tracing is not active', async () => {
-    const target = createTarget();
     const manager = new Trace.TracingManager.TracingManager(target);
     assert.throws(() => {
       manager.stop();

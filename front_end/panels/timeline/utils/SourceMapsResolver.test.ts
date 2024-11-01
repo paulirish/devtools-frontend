@@ -37,6 +37,7 @@ export async function loadCodeLocationResolvingScenario(): Promise<{
   ignoreListedURL: string,
   contentScriptURL: string,
   contentScriptId: Protocol.Runtime.ScriptId,
+  target: SDK.Target.Target,
 }> {
   const target = createTarget();
 
@@ -103,6 +104,7 @@ export async function loadCodeLocationResolvingScenario(): Promise<{
     ignoreListedURL: ignoreListedScriptURL,
     contentScriptURL: contentScriptInfo.url,
     contentScriptId: contentScript.scriptId,
+    target,
   };
 }
 
@@ -201,7 +203,7 @@ describeWithMockConnection('SourceMapsResolver', () => {
   });
   describe('code location resolving', () => {
     it('correctly stores url mappings using source maps', async () => {
-      const {authoredScriptURL, genScriptURL, scriptId} = await loadCodeLocationResolvingScenario();
+      const {authoredScriptURL, genScriptURL, scriptId, target} = await loadCodeLocationResolvingScenario();
       const profileCallWithMappings =
           makeProfileCall('function', 10, 100, Trace.Types.Events.ProcessID(1), Trace.Types.Events.ThreadID(1));
       const LINE_NUMBER = 0;
@@ -243,6 +245,7 @@ describeWithMockConnection('SourceMapsResolver', () => {
       sourceMappedURL = Utils.SourceMapsResolver.SourceMapsResolver.resolvedURLForEntry(
           traceWithoutMappings, profileCallWithNoMappings);
       assert.strictEqual(sourceMappedURL, genScriptURL);
+      target.dispose('test done');
     });
   });
   describe('unnecessary work detection', () => {

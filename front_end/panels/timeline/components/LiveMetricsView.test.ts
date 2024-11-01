@@ -700,10 +700,11 @@ describeWithMockConnection('LiveMetricsView', () => {
 
   describe('field data', () => {
     let target: SDK.Target.Target;
+    let tabTarget: SDK.Target.Target;
     let mockFieldData: CrUXManager.PageResult;
 
     beforeEach(async () => {
-      const tabTarget = createTarget({type: SDK.Target.Type.TAB});
+      tabTarget = createTarget({type: SDK.Target.Type.TAB});
       target = createTarget({parentTarget: tabTarget});
 
       mockFieldData = {
@@ -721,6 +722,11 @@ describeWithMockConnection('LiveMetricsView', () => {
       sinon.stub(CrUXManager.CrUXManager.instance(), 'getFieldDataForPage').callsFake(async () => mockFieldData);
       CrUXManager.CrUXManager.instance().getConfigSetting().set({enabled: true, override: ''});
     });
+    afterEach(() => {
+      target.dispose('afterEach');
+      tabTarget.dispose('afterEach');
+    });
+
 
     it('should not show when crux is disabled', async () => {
       CrUXManager.CrUXManager.instance().getConfigSetting().set({enabled: false, override: ''});

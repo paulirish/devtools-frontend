@@ -12,6 +12,7 @@ import {
   setMockConnectionResponseHandler,
 } from '../../../testing/MockConnection.js';
 import {TraceLoader} from '../../../testing/TraceLoader.js';
+import {B} from '../../../third_party/codemirror.next/chunk/codemirror.js';
 import * as Trace from '../trace.js';
 
 function nodeId<T extends Protocol.DOM.BackendNodeId|Protocol.DOM.NodeId>(x: number): T {
@@ -19,15 +20,20 @@ function nodeId<T extends Protocol.DOM.BackendNodeId|Protocol.DOM.NodeId>(x: num
 }
 
 describeWithMockConnection('FetchNodes', function() {
+  let target: SDK.Target.Target;
   beforeEach(async () => {
+    target = createTarget();
     clearAllMockConnectionResponseHandlers();
     Trace.Extras.FetchNodes.clearCacheForTesting();
+  });
+
+  afterEach(() => {
+    target.dispose('afterEach');
   });
 
   describe('DOMNodeLookup', function() {
     it('returns the DOM Node for the given node ID', async function() {
       // Create a mock target, dom model, document and node.
-      const target = createTarget();
       const domModel = target.model(SDK.DOMModel.DOMModel);
       assert.exists(domModel);
       const documentNode = {nodeId: nodeId(1)};
@@ -55,7 +61,6 @@ describeWithMockConnection('FetchNodes', function() {
 
     it('caches the call and does not look up a node more than once per model data', async () => {
       // Create a mock target, dom model, document and node.
-      const target = createTarget();
       const domModel = target.model(SDK.DOMModel.DOMModel);
       assert.exists(domModel);
       const documentNode = {nodeId: nodeId(1)};
@@ -83,7 +88,6 @@ describeWithMockConnection('FetchNodes', function() {
 
     it('can look up multiple nodes at once', async () => {
       // Create a mock target, dom model, document and node.
-      const target = createTarget();
       const domModel = target.model(SDK.DOMModel.DOMModel);
       assert.exists(domModel);
       const documentNode = {nodeId: nodeId(1)};
@@ -190,7 +194,6 @@ describeWithMockConnection('FetchNodes', function() {
   describe('LayoutShifts', () => {
     it('returns a list of sources for the given event', async () => {
       // Create a mock target, dom model, document and node.
-      const target = createTarget();
       const domModel = target.model(SDK.DOMModel.DOMModel);
       assert.exists(domModel);
       const documentNode = {nodeId: 1 as Protocol.DOM.NodeId};
@@ -227,7 +230,6 @@ describeWithMockConnection('FetchNodes', function() {
     });
 
     it('returns normalized nodes if we can calculate the window.devicePixelRatio', async () => {
-      createTarget();
       setMockConnectionResponseHandler('Runtime.evaluate', () => ({result: {value: 4, type: 'number'}}));
       const impactedNodes: Trace.Types.Events.TraceImpactedNode[] = [
         {

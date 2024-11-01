@@ -204,7 +204,9 @@ export class CrUXManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
 
       for (const pageScope of pageScopeList) {
         for (const deviceScope of DEVICE_SCOPE_LIST) {
+          // console.log('getscoped', normalizedUrl, pageScope, deviceScope);
           const promise = this.#getScopedData(normalizedUrl, pageScope, deviceScope).then(response => {
+            // console.log('getscoped then', response);
             pageResult[`${pageScope}-${deviceScope}`] = response;
           });
           promises.push(promise);

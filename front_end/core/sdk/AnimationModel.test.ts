@@ -39,14 +39,19 @@ function createAnimationPayload(payload: Partial<Protocol.Animation.Animation>):
 }
 
 describeWithMockConnection('AnimationModel', () => {
+  let target: SDK.Target.Target;
+  beforeEach(() => {
+    target = createTarget();
+  });
   afterEach(() => {
     clearAllMockConnectionResponseHandlers();
+    target.dispose('afterEach');
   });
 
   it('can be instantiated', () => {
     assert.doesNotThrow(() => {
-      const target = createTarget();
       new SDK.AnimationModel.AnimationModel(target);
+      target.dispose('test done');
     });
   });
 
@@ -60,7 +65,6 @@ describeWithMockConnection('AnimationModel', () => {
 
     it('should resolve the containing animation group if the animation with given name and node id exists in the group',
        async () => {
-         const target = createTarget();
          const model = new SDK.AnimationModel.AnimationModel(target);
          const animationGroupStartedPromiseWithResolvers = Promise.withResolvers<void>();
          model.addEventListener(SDK.AnimationModel.Events.AnimationGroupStarted, () => {
@@ -74,7 +78,6 @@ describeWithMockConnection('AnimationModel', () => {
        });
 
     it('should resolve null if there is no animations with matching name', async () => {
-      const target = createTarget();
       const model = new SDK.AnimationModel.AnimationModel(target);
       const animationGroupStartedPromiseWithResolvers = Promise.withResolvers<void>();
       model.addEventListener(SDK.AnimationModel.Events.AnimationGroupStarted, () => {
@@ -88,7 +91,6 @@ describeWithMockConnection('AnimationModel', () => {
     });
 
     it('should resolve null if there is an animation with the same name but for a different node id', async () => {
-      const target = createTarget();
       const model = new SDK.AnimationModel.AnimationModel(target);
       const animationGroupStartedPromiseWithResolvers = Promise.withResolvers<void>();
       model.addEventListener(SDK.AnimationModel.Events.AnimationGroupStarted, () => {
@@ -106,7 +108,6 @@ describeWithMockConnection('AnimationModel', () => {
   describe('AnimationImpl', () => {
     it('setPayload should update values returned from the relevant value functions for time based animations',
        async () => {
-         const target = createTarget();
          const model = new SDK.AnimationModel.AnimationModel(target);
          const animationImpl = await SDK.AnimationModel.AnimationImpl.parsePayload(model, {
            id: '1',
@@ -180,7 +181,6 @@ describeWithMockConnection('AnimationModel', () => {
              },
            };
          });
-         const target = createTarget();
          const model = new SDK.AnimationModel.AnimationModel(target);
          const animationImpl = await SDK.AnimationModel.AnimationImpl.parsePayload(model, {
            id: '1',
