@@ -306,9 +306,13 @@ export class DebuggerModel extends SDKModel<EventTypes> {
       this.breakpointsActiveChanged();
     }
     this.dispatchEventToListeners(Events.DebuggerWasEnabled, this);
+    enablePromise.then(r => console.log('debugger enable promise', r));
+    console.log({instrumentationPromise});
+    instrumentationPromise?.then(r => console.log('instrumentationPromise', r));
     const [enableResult] = await Promise.all([enablePromise, instrumentationPromise]);
+    console.log('neable result', enableResult);
     this.registerDebugger(enableResult);
-  }
+}
 
   async syncDebuggerId(): Promise<Protocol.Debugger.EnableResponse> {
     const isRemoteFrontend = Root.Runtime.Runtime.queryParam('remoteFrontend') || Root.Runtime.Runtime.queryParam('ws');

@@ -30,7 +30,7 @@ const {urlString} = Platform.DevToolsPath;
 const MINIFIED_FUNCTION_NAME = 'minified';
 const AUTHORED_FUNCTION_NAME = 'someFunction';
 
-export async function loadCodeLocationResolvingScenario(): Promise<{
+type Scenario = {
   authoredScriptURL: string,
   genScriptURL: string,
   scriptId: Protocol.Runtime.ScriptId,
@@ -38,7 +38,9 @@ export async function loadCodeLocationResolvingScenario(): Promise<{
   contentScriptURL: string,
   contentScriptId: Protocol.Runtime.ScriptId,
   target: SDK.Target.Target,
-}> {
+  dispose: () => void,
+};
+export async function loadCodeLocationResolvingScenario(): Promise<Scenario> {
   const target = createTarget();
 
   const targetManager = SDK.TargetManager.TargetManager.instance();
@@ -97,6 +99,10 @@ export async function loadCodeLocationResolvingScenario(): Promise<{
     backend.addScript(target, contentScriptInfo, null),
   ]);
 
+  function dispose(): void {
+    target.dispose('dispose');
+  }
+
   return {
     authoredScriptURL,
     scriptId: script.scriptId,
@@ -105,6 +111,7 @@ export async function loadCodeLocationResolvingScenario(): Promise<{
     contentScriptURL: contentScriptInfo.url,
     contentScriptId: contentScript.scriptId,
     target,
+    dispose,
   };
 }
 
@@ -147,6 +154,9 @@ describeWithMockConnection('SourceMapsResolver', () => {
         url: 'file://gen.js',
       };
       parsedTrace = parsedTraceFromProfileCalls([profileCallForNameResolving]);
+    });
+    afterEach(() => {
+      target.dispose('afterEach');
     });
 
     it('renames nodes from the profile models when the corresponding scripts and source maps have loaded',
@@ -202,8 +212,14 @@ describeWithMockConnection('SourceMapsResolver', () => {
     });
   });
   describe('code location resolving', () => {
+    let scenario: Scenario;
+    beforeEach(async () => {
+      scenario = await loadCodeLocationResolvingScenario();
+    });
+    afterEach(() => {
+      scenario.target.dispose('afterEach');
+    })
     it('correctly stores url mappings using source maps', async () => {
-      const {authoredScriptURL, genScriptURL, scriptId, target} = await loadCodeLocationResolvingScenario();
       const profileCallWithMappings =
           makeProfileCall('function', 10, 100, Trace.Types.Events.ProcessID(1), Trace.Types.Events.ThreadID(1));
       const LINE_NUMBER = 0;
@@ -212,8 +228,8 @@ describeWithMockConnection('SourceMapsResolver', () => {
         lineNumber: LINE_NUMBER,
         columnNumber: COLUMN_NUMBER,
         functionName: 'minified',
-        scriptId,
-        url: genScriptURL,
+        scriptId: scenario.scriptId,
+        url: scenario.genScriptURL,
       };
 
       const profileCallWithNoMappings =
@@ -224,8 +240,8 @@ describeWithMockConnection('SourceMapsResolver', () => {
         lineNumber: 0,
         columnNumber: 1,
         functionName: 'minified',
-        scriptId,
-        url: authoredScriptURL,
+        scriptId: scenario.scriptId,
+        url: scenario.authoredScriptURL,
       };
 
       // For a profile call with mappings, it must return the mapped script.
@@ -235,7 +251,7 @@ describeWithMockConnection('SourceMapsResolver', () => {
       await resolver.install();
       let sourceMappedURL =
           Utils.SourceMapsResolver.SourceMapsResolver.resolvedURLForEntry(traceWithMappings, profileCallWithMappings);
-      assert.strictEqual(sourceMappedURL, authoredScriptURL);
+      assert.strictEqual(sourceMappedURL, scenario.authoredScriptURL);
 
       // For a profile call without mappings, it must return the original URL
       const traceWithoutMappings = parsedTraceFromProfileCalls([profileCallWithNoMappings]);
@@ -244,8 +260,7 @@ describeWithMockConnection('SourceMapsResolver', () => {
       await resolver.install();
       sourceMappedURL = Utils.SourceMapsResolver.SourceMapsResolver.resolvedURLForEntry(
           traceWithoutMappings, profileCallWithNoMappings);
-      assert.strictEqual(sourceMappedURL, genScriptURL);
-      target.dispose('test done');
+      assert.strictEqual(sourceMappedURL, scenario.genScriptURL);
     });
   });
   describe('unnecessary work detection', () => {
