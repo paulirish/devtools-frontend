@@ -492,10 +492,7 @@ export class ObjectPropertiesSection extends UI.TreeOutline.TreeOutlineInShadow 
       } else {
         propertyValue = new ObjectPropertyValue(valueElement);
         propertyValue.element.textContent = description;
-        const formattedDescription = (type === 'number' && subtype === undefined) ?
-            Platform.NumberUtilities.withUnderscoreThousandsSeparator(description) :
-            description;
-        UI.Tooltip.Tooltip.install(propertyValue.element as HTMLElement, formattedDescription || '');
+        UI.Tooltip.Tooltip.install(propertyValue.element as HTMLElement, description);
       }
       if (!isSyntheticProperty) {
         this.appendMemoryIcon(valueElement, value, variableName);

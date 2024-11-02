@@ -81,7 +81,6 @@ export const aspectRatio = (width: number, height: number): string => {
   return commonRatios.get(result) || result;
 };
 
-// Space separator
 export const withThousandsSeparator = function(num: number): string {
   let str = String(num);
   const re = /(\d+)(\d{3})/;
@@ -90,38 +89,3 @@ export const withThousandsSeparator = function(num: number): string {
   }  // \xa0 is a non-breaking space
   return str;
 };
-
-// https://stackoverflow.com/a/22885197
-function getSignificantDigitCount(num: string): number {
-  const log10 = Math.log(10);
-  let n = Math.abs(parseInt(num.replace('.', ''), 10));  // remove decimal and make positive
-  if (n === 0) {
-    return 0;
-  }
-  while (n !== 0 && n % 10 === 0) {
-    n /= 10;
-  }                                            // kill the 0s at the end of n
-  return Math.floor(Math.log(n) / log10) + 1;  // get number of digits
-}
-
-// Constructing this formatter is costly, just do it once.
-let formatter: Intl.NumberFormat|null = null;
-
-export function withUnderscoreThousandsSeparator(num: string): string {
-  if (!formatter) {
-    // Undefined locale uses the user's preferred locale, in case their thousand formatting rules are different. (Unlikely)
-    formatter = Intl.NumberFormat(undefined, {maximumFractionDigits: 20});
-  }
-
-  // Number.MAX_SAFE_INTEGER is 16 digits, and larger numbers in exponential notation are 17 chars long
-  // While most 16-digit numbers should be ok, better to not risk it
-  if (getSignificantDigitCount(num) < 16) {
-    const parts = formatter.formatToParts(parseFloat(num));
-    parts.filter(p => p.type === 'group').forEach(p => {
-      p.value = '_';
-    });
-    const reformatted = parts.map(p => p.value).join('');
-    return reformatted;
-  }
-  return num;
-}
