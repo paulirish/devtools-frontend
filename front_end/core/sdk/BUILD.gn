@@ -9,6 +9,7 @@ import("../../../scripts/build/typescript/typescript.gni")
 devtools_module("sdk") {
   sources = [
     "AccessibilityModel.ts",
+    "AnimationModel.ts",
     "AutofillModel.ts",
     "CPUProfileDataModel.ts",
     "CPUProfilerModel.ts",
@@ -63,6 +64,7 @@ devtools_module("sdk") {
     "PerformanceMetricsModel.ts",
     "PreloadingModel.ts",
     "ProfileTreeModel.ts",
+    "RehydratingConnection.ts",
     "RehydratingObject.ts",
     "RemoteObject.ts",
     "Resource.ts",
@@ -132,6 +134,7 @@ ts_library("unittests") {
 
   sources = [
     "AccessibilityModel.test.ts",
+    "AnimationModel.test.ts",
     "AutofillModel.test.ts",
     "CPUThrottlingManager.test.ts",
     "CSSContainerQuery.test.ts",
@@ -158,6 +161,7 @@ ts_library("unittests") {
     "OverlayPersistentHighlighter.test.ts",
     "PageResourceLoader.test.ts",
     "PreloadingModel.test.ts",
+    "RehydratingConnection.test.ts",
     "RemoteObject.test.ts",
     "ResourceTreeModel.test.ts",
     "RuntimeModel.test.ts",

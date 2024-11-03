@@ -11,7 +11,7 @@ import("../visibility.gni")
 generate_css("css_files") {
   sources = [
     "./components/freestylerChatUi.css",
-    "./components/provideFeedback.css",
+    "./components/userActionRow.css",
     "./freestylerPanel.css",
   ]
 }
@@ -28,7 +28,7 @@ devtools_module("freestyler") {
     "FreestylerEvaluateAction.ts",
     "FreestylerPanel.ts",
     "components/FreestylerChatUi.ts",
-    "components/ProvideFeedback.ts",
+    "components/UserActionRow.ts",
   ]
 
   deps = [
@@ -37,10 +37,12 @@ devtools_module("freestyler") {
     "../../core/host:bundle",
     "../../core/i18n:bundle",
     "../../core/root:bundle",
+    "../../models/bindings:bundle",
     "../../models/logs:bundle",
     "../../models/trace:bundle",
     "../../models/workspace:bundle",
     "../../panels/network:bundle",
+    "../../panels/timeline/utils:bundle",
     "../../panels/utils:bundle",
     "../../third_party/marked:bundle",
     "../../ui/components/markdown_view:bundle",
@@ -77,6 +79,7 @@ ts_library("unittests") {
   testonly = true
 
   sources = [
+    "AiAgent.test.ts",
     "ChangeManager.test.ts",
     "DrJonesFileAgent.test.ts",
     "DrJonesNetworkAgent.test.ts",
@@ -85,7 +88,7 @@ ts_library("unittests") {
     "FreestylerEvaluateAction.test.ts",
     "FreestylerPanel.test.ts",
     "components/FreestylerChatUi.test.ts",
-    "components/ProvideFeedback.test.ts",
+    "components/UserActionRow.test.ts",
   ]
 
   deps = [
@@ -95,7 +98,9 @@ ts_library("unittests") {
     "../../core/platform:bundle",
     "../../core/sdk:bundle",
     "../../generated:protocol",
+    "../../models/bindings:bundle",
     "../../models/trace:bundle",
+    "../../panels/timeline/utils:bundle",
     "../../testing",
   ]
 }

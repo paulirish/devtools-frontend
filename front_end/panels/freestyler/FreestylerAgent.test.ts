@@ -517,20 +517,16 @@ c`;
         serverSideLoggingEnabled: true,
       });
       sinon.stub(agent, 'preamble').value('preamble');
-      agent.chatHistoryForTesting = new Map([[
+      agent.chatNewHistoryForTesting = new Map([[
         0,
         [
           {
-            text: 'first',
-            entity: Host.AidaClient.Entity.UNKNOWN,
+            type: Freestyler.ResponseType.QUERYING,
+            query: 'question',
           },
           {
-            text: 'second',
-            entity: Host.AidaClient.Entity.SYSTEM,
-          },
-          {
-            text: 'third',
-            entity: Host.AidaClient.Entity.USER,
+            type: Freestyler.ResponseType.ANSWER,
+            text: 'answer',
           },
         ],
       ]]);
@@ -544,16 +540,12 @@ c`;
             preamble: 'preamble',
             chat_history: [
               {
-                entity: 0,
-                text: 'first',
+                entity: 1,
+                text: 'question',
               },
               {
                 entity: 2,
-                text: 'second',
-              },
-              {
-                entity: 1,
-                text: 'third',
+                text: 'ANSWER: answer',
               },
             ],
             metadata: {
@@ -763,11 +755,14 @@ c`;
       const agent = new FreestylerAgent({
         aidaClient: mockAidaClient(generateAnswer),
         execJs,
-
       });
 
       const responses = await Array.fromAsync(agent.run('test', {selected: element}));
       assert.deepStrictEqual(responses, [
+        {
+          type: Freestyler.ResponseType.USER_QUERY,
+          query: 'test',
+        },
         {
           type: Freestyler.ResponseType.CONTEXT,
           title: 'Analyzing the prompt',
@@ -780,6 +775,7 @@ c`;
         },
         {
           type: Freestyler.ResponseType.QUERYING,
+          query: '# Inspected element\n\n* Its selector is `undefined`\n\n# User request\n\nQUERY: test',
         },
         {
           type: Freestyler.ResponseType.ANSWER,
@@ -821,6 +817,10 @@ c`;
       const responses = await Array.fromAsync(agent.run('test', {selected: element}));
       assert.deepStrictEqual(responses, [
         {
+          type: Freestyler.ResponseType.USER_QUERY,
+          query: 'test',
+        },
+        {
           type: Freestyler.ResponseType.CONTEXT,
           title: 'Analyzing the prompt',
           details: [
@@ -832,6 +832,7 @@ c`;
         },
         {
           type: Freestyler.ResponseType.QUERYING,
+          query: '# Inspected element\n\n* Its selector is `undefined`\n\n# User request\n\nQUERY: test',
         },
         {
           type: Freestyler.ResponseType.ANSWER,
@@ -866,6 +867,10 @@ c`;
       const responses = await Array.fromAsync(agent.run('test', {selected: element}));
       assert.deepStrictEqual(responses, [
         {
+          type: Freestyler.ResponseType.USER_QUERY,
+          query: 'test',
+        },
+        {
           type: Freestyler.ResponseType.CONTEXT,
           title: 'Analyzing the prompt',
           details: [
@@ -877,6 +882,7 @@ c`;
         },
         {
           type: Freestyler.ResponseType.QUERYING,
+          query: '# Inspected element\n\n* Its selector is `undefined`\n\n# User request\n\nQUERY: test',
         },
         {
           rpcId: undefined,
@@ -910,6 +916,10 @@ c`;
       const responses = await Array.fromAsync(agent.run('test', {selected: element}));
       assert.deepStrictEqual(responses, [
         {
+          type: Freestyler.ResponseType.USER_QUERY,
+          query: 'test',
+        },
+        {
           type: Freestyler.ResponseType.CONTEXT,
           title: 'Analyzing the prompt',
           details: [
@@ -921,6 +931,7 @@ c`;
         },
         {
           type: Freestyler.ResponseType.QUERYING,
+          query: '# Inspected element\n\n* Its selector is `undefined`\n\n# User request\n\nQUERY: test',
         },
         {
           type: Freestyler.ResponseType.ANSWER,
@@ -948,6 +959,10 @@ c`;
       const responses = await Array.fromAsync(agent.run('test', {selected: element}));
       assert.deepStrictEqual(responses, [
         {
+          type: Freestyler.ResponseType.USER_QUERY,
+          query: 'test',
+        },
+        {
           type: Freestyler.ResponseType.CONTEXT,
           title: 'Analyzing the prompt',
           details: [
@@ -959,6 +974,7 @@ c`;
         },
         {
           type: Freestyler.ResponseType.QUERYING,
+          query: '# Inspected element\n\n* Its selector is `undefined`\n\n# User request\n\nQUERY: test',
         },
         {
           type: Freestyler.ResponseType.ERROR,
@@ -1006,6 +1022,10 @@ ANSWER: this is the answer`,
       const responses = await Array.fromAsync(agent.run('test', {selected: element}));
       assert.deepStrictEqual(responses, [
         {
+          type: Freestyler.ResponseType.USER_QUERY,
+          query: 'test',
+        },
+        {
           type: Freestyler.ResponseType.CONTEXT,
           title: 'Analyzing the prompt',
           details: [
@@ -1017,6 +1037,7 @@ ANSWER: this is the answer`,
         },
         {
           type: Freestyler.ResponseType.QUERYING,
+          query: '# Inspected element\n\n* Its selector is `undefined`\n\n# User request\n\nQUERY: test',
         },
         {
           type: Freestyler.ResponseType.THOUGHT,
@@ -1032,6 +1053,7 @@ ANSWER: this is the answer`,
         },
         {
           type: Freestyler.ResponseType.QUERYING,
+          query: 'OBSERVATION: hello',
         },
         {
           type: Freestyler.ResponseType.ANSWER,

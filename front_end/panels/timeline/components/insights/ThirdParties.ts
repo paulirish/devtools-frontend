@@ -11,15 +11,13 @@ import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 import type * as Overlays from '../../overlays/overlays.js';
 
 import {BaseInsight, shouldRenderForCategory} from './Helpers.js';
-import type * as SidebarInsight from './SidebarInsight.js';
-import type {TableData} from './Table.js';
 import {Category} from './types.js';
 
 const {html} = LitHtml;
 
 type ThirdPartiesEntries = Array<[
-  Trace.Insights.InsightRunners.ThirdPartyWeb.Entity,
-  Trace.Insights.InsightRunners.ThirdPartyWeb.Summary,
+  Trace.Extras.ThirdParties.Entity,
+  Trace.Extras.ThirdParties.Summary,
 ]>;
 
 const UIStrings = {
@@ -49,8 +47,7 @@ export class ThirdParties extends BaseInsight {
   override userVisibleTitle: string = i18nString(UIStrings.title);
   override description: string = i18nString(UIStrings.description);
 
-  #overlaysForEntity =
-      new Map<Trace.Insights.InsightRunners.ThirdPartyWeb.Entity, Overlays.Overlays.TimelineOverlay[]>();
+  #overlaysForEntity = new Map<Trace.Extras.ThirdParties.Entity, Overlays.Overlays.TimelineOverlay[]>();
 
   override createOverlays(): Overlays.Overlays.TimelineOverlay[] {
     this.#overlaysForEntity.clear();
@@ -95,7 +92,7 @@ export class ThirdParties extends BaseInsight {
               description: this.description,
               internalName: this.internalName,
               expanded: this.isActive(),
-            } as SidebarInsight.InsightDetails}
+            }}
             @insighttoggleclick=${this.onSidebarClick}>
                 <div slot="insight-content">
                   <div class="insight-section">
@@ -110,7 +107,7 @@ export class ThirdParties extends BaseInsight {
                           ],
                           overlays: this.#overlaysForEntity.get(entity),
                         })),
-                      } as TableData}>
+                      }}>
                     </devtools-performance-table>`}
                   </div>
 
@@ -126,7 +123,7 @@ export class ThirdParties extends BaseInsight {
                           ],
                           overlays: this.#overlaysForEntity.get(entity),
                         })),
-                      } as TableData}>
+                      }}>
                     </devtools-performance-table>`}
                   </div>
                 </div>

@@ -413,6 +413,16 @@ export class MainImpl {
         'Performance panel: enable experimental performance insights',
     );
 
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.TIMELINE_DIM_UNRELATED_EVENTS,
+        'Performance panel: enable dimming unrelated events in performance insights and search results',
+    );
+
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.TIMELINE_ALTERNATIVE_NAVIGATION,
+        'Performance panel: enable a switch to an alternative timeline navigation option',
+    );
+
     Root.Runtime.experiments.enableExperimentsByDefault([
       'css-type-component-length-deprecate',
       Root.Runtime.ExperimentName.AUTOFILL_VIEW,

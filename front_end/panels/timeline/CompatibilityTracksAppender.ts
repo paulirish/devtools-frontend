@@ -21,9 +21,9 @@ import {ThreadAppender} from './ThreadAppender.js';
 import {
   EntryType,
   InstantEventVisibleDurationMs,
-  type TimelineFlameChartEntry,
 } from './TimelineFlameChartDataProvider.js';
 import {TimingsTrackAppender} from './TimingsTrackAppender.js';
+import * as TimelineUtils from './utils/utils.js';
 
 export type HighlightedEntryInfo = {
   title: string,
@@ -31,6 +31,17 @@ export type HighlightedEntryInfo = {
   warningElements?: HTMLSpanElement[],
   additionalElement?: HTMLElement,
 };
+
+let showPostMessageEvents: boolean|undefined;
+function isShowPostMessageEventsEnabled(): boolean {
+  // Everytime the experiment is toggled devtools is reloaded so the
+  // cache is updated automatically.
+  if (showPostMessageEvents === undefined) {
+    showPostMessageEvents =
+        Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_SHOW_POST_MESSAGE_EVENTS);
+  }
+  return showPostMessageEvents;
+}
 
 export function entryIsVisibleInTimeline(
     entry: Trace.Types.Events.Event, parsedTrace?: Trace.Handlers.Types.ParsedTrace): boolean {
@@ -49,9 +60,10 @@ export function entryIsVisibleInTimeline(
     return true;
   }
 
-  // Gate the visibility of post message events behind the experiement flag
-  if (Trace.Types.Events.isSchedulePostMessage(entry) || Trace.Types.Events.isHandlePostMessage(entry)) {
-    return Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_SHOW_POST_MESSAGE_EVENTS);
+  if (isShowPostMessageEventsEnabled()) {
+    if (Trace.Types.Events.isSchedulePostMessage(entry) || Trace.Types.Events.isHandlePostMessage(entry)) {
+      return true;
+    }
   }
 
   if (Trace.Types.Extensions.isSyntheticExtensionEntry(entry) || Trace.Types.Events.isSyntheticServerTiming(entry)) {
@@ -60,7 +72,7 @@ export function entryIsVisibleInTimeline(
 
   // Default styles are globally defined for each event name. Some
   // events are hidden by default.
-  const eventStyle = TimelineComponents.EntryStyles.getEventStyle(entry.name as Trace.Types.Events.Name);
+  const eventStyle = TimelineUtils.EntryStyles.getEventStyle(entry.name as Trace.Types.Events.Name);
   const eventIsTiming = Trace.Types.Events.isConsoleTime(entry) || Trace.Types.Events.isPerformanceMeasure(entry) ||
       Trace.Types.Events.isPerformanceMark(entry);
 
@@ -175,7 +187,7 @@ export class CompatibilityTracksAppender {
   #trackEventsForTreeview = new Map<TrackAppender, Trace.Types.Events.Event[]>();
   #flameChartData: PerfUI.FlameChart.FlameChartTimelineData;
   #parsedTrace: Trace.Handlers.Types.ParsedTrace;
-  #entryData: TimelineFlameChartEntry[];
+  #entryData: Trace.Types.Events.Event[];
   #colorGenerator: Common.Color.Generator;
   #allTrackAppenders: TrackAppender[] = [];
   #visibleTrackNames: Set<TrackAppenderName> = new Set([...TrackNames]);
@@ -204,7 +216,7 @@ export class CompatibilityTracksAppender {
    */
   constructor(
       flameChartData: PerfUI.FlameChart.FlameChartTimelineData, parsedTrace: Trace.Handlers.Types.ParsedTrace,
-      entryData: TimelineFlameChartEntry[], legacyEntryTypeByLevel: EntryType[]) {
+      entryData: Trace.Types.Events.Event[], legacyEntryTypeByLevel: EntryType[]) {
     this.#flameChartData = flameChartData;
     this.#parsedTrace = parsedTrace;
     this.#entryData = entryData;
@@ -244,7 +256,7 @@ export class CompatibilityTracksAppender {
   }
 
   setFlameChartDataAndEntryData(
-      flameChartData: PerfUI.FlameChart.FlameChartTimelineData, entryData: TimelineFlameChartEntry[],
+      flameChartData: PerfUI.FlameChart.FlameChartTimelineData, entryData: Trace.Types.Events.Event[],
       legacyEntryTypeByLevel: EntryType[]): void {
     this.#trackForGroup.clear();
     this.#flameChartData = flameChartData;
@@ -628,7 +640,7 @@ export class CompatibilityTracksAppender {
     if (track.titleForEvent) {
       return track.titleForEvent(event);
     }
-    return TimelineComponents.EntryName.nameForEntry(event, this.#parsedTrace);
+    return TimelineUtils.EntryName.nameForEntry(event, this.#parsedTrace);
   }
   /**
    * Returns the info shown when an event in the timeline is hovered.

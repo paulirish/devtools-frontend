@@ -12,7 +12,6 @@ import {assertNotNullOrUndefined} from '../../../../core/platform/platform.js';
 import * as SDK from '../../../../core/sdk/sdk.js';
 import * as Protocol from '../../../../generated/protocol.js';
 import type * as DataGrid from '../../../../ui/components/data_grid/data_grid.js';
-import type * as IconButton from '../../../../ui/components/icon_button/icon_button.js';
 import * as LegacyWrapper from '../../../../ui/components/legacy_wrapper/legacy_wrapper.js';
 import type * as UI from '../../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
@@ -37,11 +36,11 @@ const UIStrings = {
   /**
    *@description button: Title of button to reveal the corresponding request of rule set in Elements panel
    */
-  buttonClickToRevealInElementsPanel: 'Click to reveal in Elements panel',
+  clickToOpenInElementsPanel: 'Click to open in Elements panel',
   /**
    *@description button: Title of button to reveal the corresponding request of rule set in Network panel
    */
-  buttonClickToRevealInNetworkPanel: 'Click to reveal in Network panel',
+  clickToOpenInNetworkPanel: 'Click to open in Network panel',
   /**
    *@description Value of status, specifying rule set contains how many errors.
    */
@@ -113,9 +112,7 @@ export class RuleSetGrid extends LegacyWrapper.LegacyWrapper.WrappableComponent<
     LitHtml.render(html`
       <div class="ruleset-container"
       jslog=${VisualLogging.pane('preloading-rules')}>
-        <devtools-data-grid-controller .data=${
-            reportsGridData as DataGrid.DataGridController.DataGridControllerData}>
-        </devtools-data-grid-controller>
+        <devtools-data-grid-controller .data=${reportsGridData}></devtools-data-grid-controller>
       </div>
     `, this.#shadow, {host: this});
     // clang-format on
@@ -173,7 +170,7 @@ function ruleSetRenderer(
     return html`
       <button class="link" role="link"
         @click=${revealSpeculationRulesInElements}
-        title=${i18nString(UIStrings.buttonClickToRevealInElementsPanel)}
+        title=${i18nString(UIStrings.clickToOpenInElementsPanel)}
         style=${LitHtml.Directives.styleMap({
           border: 'none',
           background: 'none',
@@ -191,7 +188,7 @@ function ruleSetRenderer(
             color: 'var(--icon-link)',
             width: '16px',
             height: '16px',
-          } as IconButton.Icon.IconData}
+          }}
           style=${LitHtml.Directives.styleMap({
             'vertical-align': 'sub',
           })}
@@ -228,7 +225,7 @@ function ruleSetRenderer(
     return html`
       <button class="link" role="link"
         @click=${revealSpeculationRulesInNetwork}
-        title=${i18nString(UIStrings.buttonClickToRevealInNetworkPanel)}
+        title=${i18nString(UIStrings.clickToOpenInNetworkPanel)}
         style=${LitHtml.Directives.styleMap({
           border: 'none',
           background: 'none',
@@ -245,7 +242,7 @@ function ruleSetRenderer(
             color: 'var(--icon-link)',
             width: '16px',
             height: '16px',
-          } as IconButton.Icon.IconData}
+          }}
           style=${LitHtml.Directives.styleMap({
             'vertical-align': 'sub',
           })}

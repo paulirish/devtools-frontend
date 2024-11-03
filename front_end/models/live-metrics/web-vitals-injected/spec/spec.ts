@@ -7,6 +7,9 @@ import type {INPAttribution, MetricType} from '../../../../third_party/web-vital
 export const EVENT_BINDING_NAME = '__chromium_devtools_metrics_reporter';
 export const INTERNAL_KILL_SWITCH = '__chromium_devtools_kill_live_metrics';
 
+export const SCRIPTS_PER_LOAF_LIMIT = 10;
+export const LOAF_LIMIT = 5;
+
 export type MetricChangeEvent = Pick<MetricType, 'name'|'value'>;
 
 export type InteractionEntryGroupId = number&{_tag: 'InteractionEntryGroupId'};
@@ -48,6 +51,35 @@ export interface INPChangeEvent extends MetricChangeEvent {
   entryGroupId: InteractionEntryGroupId;
 }
 
+// These object keys will be user visible
+// TODO: Translate these keys before they are logged to console
+/* eslint-disable  @typescript-eslint/naming-convention */
+export interface LoAFScript {
+  'Duration': number;
+  'Invoker Type': string|null;
+  'Invoker': string|null;
+  'Function': string|null;
+  'Source': string|null;
+  'Char position': number|null;
+}
+/* eslint-enable  @typescript-eslint/naming-convention */
+
+export interface PerformanceScriptTimingJSON {
+  startTime: number;
+  duration: number;
+  invoker?: string;
+  invokerType?: string;
+  sourceFunctionName?: string;
+  sourceURL?: string;
+  sourceCharPosition?: number;
+}
+
+export interface PerformanceLongAnimationFrameTimingJSON {
+  renderStart: DOMHighResTimeStamp;
+  duration: DOMHighResTimeStamp;
+  scripts: PerformanceScriptTimingJSON[];
+}
+
 /**
  * This event is not 1:1 with the interactions that the user sees in the interactions log.
  * It is 1:1 with a `PerformanceEventTiming` entry.
@@ -62,6 +94,7 @@ export interface InteractionEntryEvent {
   duration: number;
   phases: INPPhases;
   nodeIndex?: number;
+  longAnimationFrameEntries: PerformanceLongAnimationFrameTimingJSON[];
 }
 
 export interface LayoutShiftEvent {

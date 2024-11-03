@@ -37,7 +37,7 @@ import * as SourceFrame from '../../ui/legacy/components/source_frame/source_fra
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
-import {RequestBinaryResponseView} from './RequestBinaryResponseView.js';
+import {BinaryResourceView} from './BinaryResourceView.js';
 
 const UIStrings = {
   /**
@@ -63,16 +63,12 @@ export class RequestResponseView extends UI.Widget.VBox {
     this.contentViewPromise = null;
   }
 
-  static async sourceViewForRequest(request: SDK.NetworkRequest.NetworkRequest): Promise<UI.Widget.Widget|null> {
+  static #sourceViewForRequest(
+      request: SDK.NetworkRequest.NetworkRequest,
+      contentData: TextUtils.StreamingContentData.StreamingContentData): UI.Widget.Widget|null {
     let sourceView = requestToSourceView.get(request);
     if (sourceView !== undefined) {
       return sourceView;
-    }
-
-    const contentData = await request.requestStreamingContent();
-    if (TextUtils.StreamingContentData.isError(contentData)) {
-      requestToSourceView.delete(request);
-      return null;
     }
 
     let mimeType;
@@ -96,7 +92,7 @@ export class RequestResponseView extends UI.Widget.VBox {
       // Note: Even though WASM is binary data, the source view will disassemble it and show a text representation.
       sourceView = SourceFrame.ResourceSourceFrame.ResourceSourceFrame.createSearchableView(request, mimeType);
     } else {
-      sourceView = new RequestBinaryResponseView(contentData);
+      sourceView = new BinaryResourceView(contentData, request.url(), request.resourceType());
     }
 
     requestToSourceView.set(request, sourceView);
@@ -126,7 +122,7 @@ export class RequestResponseView extends UI.Widget.VBox {
       return new UI.EmptyWidget.EmptyWidget(i18nString(UIStrings.failedToLoadResponseData) + ': ' + contentData.error);
     }
 
-    const sourceView = await RequestResponseView.sourceViewForRequest(this.request);
+    const sourceView = RequestResponseView.#sourceViewForRequest(this.request, contentData);
     if (!sourceView || this.request.statusCode === 204) {
       return new UI.EmptyWidget.EmptyWidget(i18nString(UIStrings.thisRequestHasNoResponseData));
     }

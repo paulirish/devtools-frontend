@@ -9,7 +9,6 @@ import * as Platform from '../../../core/platform/platform.js';
 import type * as SDK from '../../../core/sdk/sdk.js';
 import * as Helpers from '../../../models/trace/helpers/helpers.js';
 import * as Trace from '../../../models/trace/trace.js';
-import type * as RequestLinkIcon from '../../../ui/components/request_link_icon/request_link_icon.js';
 import * as LegacyComponents from '../../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
@@ -174,7 +173,7 @@ export class NetworkRequestDetails extends HTMLElement {
           return;
         }
         // Add a wrapper class here.
-        // The main reason is the `Reveal in Network panel` option is handled by the context menu provider, which will
+        // The main reason is the `Open in Network panel` option is handled by the context menu provider, which will
         // add this option for all supporting types. And there are a lot of context menu providers that support
         // `SDK.NetworkRequest.NetworkRequest`, for example `Override content` by PersistenceActions, but we so far just
         // want the one to reveal in network panel, so add a new class which will only be supported by Network panel.
@@ -188,8 +187,7 @@ export class NetworkRequestDetails extends HTMLElement {
       // clang-format off
       const urlElement = html`
         ${linkifiedURL}
-        <devtools-request-link-icon
-          .data=${{request: networkRequest} as RequestLinkIcon.RequestLinkIcon.RequestLinkIconData} >
+        <devtools-request-link-icon .data=${{request: networkRequest}}>
         </devtools-request-link-icon>
       `;
       // clang-format on

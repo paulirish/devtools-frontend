@@ -15,13 +15,13 @@ import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {ActiveFilters} from './ActiveFilters.js';
-import * as TimelineComponents from './components/components.js';
 import * as Extensions from './extensions/extensions.js';
 import {Tracker} from './FreshRecording.js';
 import {targetForEvent} from './TargetForEvent.js';
 import {TimelineRegExp} from './TimelineFilters.js';
-import type {TimelineSelection} from './TimelineSelection.js';
+import {rangeForSelection, type TimelineSelection} from './TimelineSelection.js';
 import {TimelineUIUtils} from './TimelineUIUtils.js';
+import * as Utils from './utils/utils.js';
 
 const UIStrings = {
   /**
@@ -259,7 +259,9 @@ export class TimelineTreeView extends UI.Widget.VBox implements UI.SearchableVie
   }
 
   updateContents(selection: TimelineSelection): void {
-    this.setRange(selection.startTime, selection.endTime);
+    const timings = rangeForSelection(selection);
+    const timingMilli = Trace.Helpers.Timing.traceWindowMicroSecondsToMilliSeconds(timings);
+    this.setRange(timingMilli.min, timingMilli.max);
   }
 
   setRange(startTime: Trace.Types.Timing.MilliSeconds, endTime: Trace.Types.Timing.MilliSeconds): void {
@@ -793,7 +795,7 @@ export class AggregatedTimelineTreeView extends TimelineTreeView {
     color: string,
     icon: (Element|undefined),
   } {
-    const categories = TimelineComponents.EntryStyles.getCategoryStyles();
+    const categories = Utils.EntryStyles.getCategoryStyles();
     const color = node.id && node.event ? TimelineUIUtils.eventColor(node.event) : categories['other'].color;
     const unattributed = i18nString(UIStrings.unattributed);
 
@@ -801,7 +803,7 @@ export class AggregatedTimelineTreeView extends TimelineTreeView {
 
     switch (this.groupBySetting.get()) {
       case AggregatedTimelineTreeView.GroupBy.Category: {
-        const idIsValid = id && TimelineComponents.EntryStyles.stringIsEventCategory(id);
+        const idIsValid = id && Utils.EntryStyles.stringIsEventCategory(id);
         const category = idIsValid ? categories[id] || categories['other'] : {title: unattributed, color: unattributed};
         return {name: category.title, color: category.color, icon: undefined};
       }

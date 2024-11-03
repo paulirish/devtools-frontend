@@ -542,9 +542,11 @@ export function getBaseTraceParseModelData(overrides: Partial<ParsedTrace> = {})
       styleRecalcInvalidationEvents: [],
       renderFrameImplCreateChildFrameEvents: [],
       domLoadingEvents: [],
+      layoutImageUnsizedEvents: [],
       beginRemoteFontLoadEvents: [],
       scoreRecords: [],
       backendNodeIds: [],
+      paintImageEvents: [],
     },
     Meta: {
       traceBounds: {
@@ -708,4 +710,12 @@ export function microsecondsTraceWindow(min: number, max: number): Trace.Types.T
       min as Trace.Types.Timing.MicroSeconds,
       max as Trace.Types.Timing.MicroSeconds,
   );
+}
+
+export function microseconds(x: number): Trace.Types.Timing.MicroSeconds {
+  return Trace.Types.Timing.MicroSeconds(x);
+}
+
+export function milliseconds(x: number): Trace.Types.Timing.MilliSeconds {
+  return Trace.Types.Timing.MilliSeconds(x);
 }

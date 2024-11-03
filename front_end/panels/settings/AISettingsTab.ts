@@ -90,11 +90,16 @@ const UIStrings = {
   /**
    *@description Text describing the 'AI assistance' feature
    */
-  helpUnderstandStylingAndNetworkRequest: 'Get help with understanding CSS styles and network requests',
+  helpUnderstandStylingAndNetworkRequest: 'Get help with understanding CSS styles, and network requests',
   /**
    *@description Text describing the 'AI assistance' feature
    */
   helpUnderstandStylingNetworkAndFile: 'Get help with understanding CSS styles, network requests, and files',
+  /**
+   *@description Text describing the 'AI assistance' feature
+   */
+  helpUnderstandStylingNetworkPerformanceAndFile:
+      'Get help with understanding CSS styles, network requests, performance, and files',
   /**
    *@description Text which is a hyperlink to more documentation
    */
@@ -111,6 +116,11 @@ const UIStrings = {
    *@description Description of the AI assistance feature
    */
   explainStylingNetworkAndFile: 'Understand CSS styles, network activity, and file origins with AI-powered insights',
+  /**
+   *@description Description of the AI assistance feature
+   */
+  explainStylingNetworkPerformanceAndFile:
+      'Understand CSS styles, network activity, performance bottlenecks, and file origins with AI-powered insights',
   /**
    *@description Description of the AI assistance feature
    */
@@ -205,10 +215,14 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
 
   #getAiAssistanceSettingDescription(): Platform.UIString.LocalizedString {
     const config = Common.Settings.Settings.instance().getHostConfig();
-    if (config.devToolsExplainThisResourceDogfood?.enabled) {
-      if (config.devToolsAiAssistanceFileAgentDogfood?.enabled) {
-        return i18nString(UIStrings.helpUnderstandStylingNetworkAndFile);
-      }
+    if (config.devToolsAiAssistancePerformanceAgent?.enabled ||
+        config.devToolsAiAssistancePerformanceAgentDogfood?.enabled) {
+      return i18nString(UIStrings.helpUnderstandStylingNetworkPerformanceAndFile);
+    }
+    if (config.devToolsAiAssistanceFileAgent?.enabled || config.devToolsAiAssistanceFileAgentDogfood?.enabled) {
+      return i18nString(UIStrings.helpUnderstandStylingNetworkAndFile);
+    }
+    if (config.devToolsAiAssistanceNetworkAgent?.enabled || config.devToolsExplainThisResourceDogfood?.enabled) {
       return i18nString(UIStrings.helpUnderstandStylingAndNetworkRequest);
     }
     return i18nString(UIStrings.helpUnderstandStyling);
@@ -216,10 +230,14 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
 
   #getAiAssistanceSettingInfo(): Platform.UIString.LocalizedString {
     const config = Common.Settings.Settings.instance().getHostConfig();
-    if (config.devToolsExplainThisResourceDogfood?.enabled) {
-      if (config.devToolsAiAssistanceFileAgentDogfood?.enabled) {
-        return i18nString(UIStrings.explainStylingNetworkAndFile);
-      }
+    if (config.devToolsAiAssistancePerformanceAgent?.enabled ||
+        config.devToolsAiAssistancePerformanceAgentDogfood?.enabled) {
+      return i18nString(UIStrings.explainStylingNetworkPerformanceAndFile);
+    }
+    if (config.devToolsAiAssistanceFileAgent?.enabled || config.devToolsAiAssistanceFileAgentDogfood?.enabled) {
+      return i18nString(UIStrings.explainStylingNetworkAndFile);
+    }
+    if (config.devToolsAiAssistanceNetworkAgent?.enabled || config.devToolsExplainThisResourceDogfood?.enabled) {
       return i18nString(UIStrings.explainStylingAndNetworkRequest);
     }
     return i18nString(UIStrings.explainStyling);
@@ -343,7 +361,7 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
     // clang-format on
   }
 
-  #getDisabledReason(setting: Common.Settings.Setting<boolean>|undefined): string|undefined {
+  #getDisabledReason(): string|undefined {
     switch (this.#aidaAvailability) {
       case Host.AidaClient.AidaAccessPreconditions.NO_ACCOUNT_EMAIL:
       case Host.AidaClient.AidaAccessPreconditions.SYNC_IS_PAUSED:
@@ -356,16 +374,16 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
     if (config?.aidaAvailability?.blockedByAge === true) {
       return i18nString(UIStrings.ageRestricted);
     }
-    return setting?.disabledReason();
+    // `consoleInsightsSetting` and `aiAssistantSetting` are both disabled for the same reason.
+    return this.#consoleInsightsSetting?.disabledReason();
   }
 
-  #renderConsoleInsightsSetting(): LitHtml.TemplateResult {
+  #renderConsoleInsightsSetting(disabledReason?: string): LitHtml.TemplateResult {
     const detailsClasses = {
       'whole-row': true,
       open: this.#isConsoleInsightsSettingExpanded,
     };
     const tabindex = this.#isConsoleInsightsSettingExpanded ? '0' : '-1';
-    const disabledReason = this.#getDisabledReason(this.#consoleInsightsSetting);
 
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
@@ -428,13 +446,12 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
     // clang-format on
   }
 
-  #renderAiAssistanceSetting(): LitHtml.TemplateResult {
+  #renderAiAssistanceSetting(disabledReason?: string): LitHtml.TemplateResult {
     const detailsClasses = {
       'whole-row': true,
       open: this.#isAiAssistanceSettingExpanded,
     };
     const tabindex = this.#isAiAssistanceSettingExpanded ? '0' : '-1';
-    const disabledReason = this.#getDisabledReason(this.#aiAssistanceSetting);
 
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
@@ -497,7 +514,27 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
     // clang-format on
   }
 
+  #renderDisabledExplainer(disabledReason: string): LitHtml.LitTemplate {
+    // Disabled until https://crbug.com/1079231 is fixed.
+    // clang-format off
+    return html`
+      <div class="disabled-explainer">
+        <devtools-icon .data=${{
+          iconName: 'warning',
+          color: 'var(--sys-color-orange)',
+          width: 'var(--sys-size-8)',
+          height: 'var(--sys-size-8)',
+        } as IconButton.Icon.IconData}>
+        </devtools-icon>
+        ${disabledReason}
+      </div>
+    `;
+    // clang-format on
+  }
+
   override async render(): Promise<void> {
+    const disabledReason = this.#getDisabledReason();
+
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     LitHtml.render(html`
@@ -507,9 +544,10 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
       <div class="settings-container-wrapper" jslog=${VisualLogging.pane('chrome-ai')}>
         ${this.#renderSharedDisclaimer()}
         ${this.#consoleInsightsSetting || this.#aiAssistanceSetting ? html`
+          ${Boolean(disabledReason) ? this.#renderDisabledExplainer(disabledReason as string) : LitHtml.nothing}
           <div class="settings-container">
-            ${this.#consoleInsightsSetting ? this.#renderConsoleInsightsSetting() : LitHtml.nothing}
-            ${this.#aiAssistanceSetting ? this.#renderAiAssistanceSetting() : LitHtml.nothing}
+            ${this.#consoleInsightsSetting ? this.#renderConsoleInsightsSetting(disabledReason) : LitHtml.nothing}
+            ${this.#aiAssistanceSetting ? this.#renderAiAssistanceSetting(disabledReason) : LitHtml.nothing}
           </div>
         ` : LitHtml.nothing}
       </div>

@@ -9,7 +9,6 @@ import type * as Overlays from '../../overlays/overlays.js';
 
 import {EventReferenceClick} from './EventRef.js';
 import {BaseInsight, shouldRenderForCategory} from './Helpers.js';
-import type * as SidebarInsight from './SidebarInsight.js';
 import {Category} from './types.js';
 
 const {html} = LitHtml;
@@ -52,6 +51,10 @@ const UIStrings = {
    * @description Text for a culprit type of Animation.
    */
   animation: 'Animation',
+  /**
+   * @description Text for a culprit type of Unsized images.
+   */
+  unsizedImages: 'Unsized Images',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/insights/CLSCulprits.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -115,6 +118,7 @@ export class CLSCulprits extends BaseInsight {
       const fontReq = culprits.fontRequests;
       const iframes = culprits.iframeIds;
       const animations = culprits.nonCompositedAnimations;
+      const unsizedImages = culprits.unsizedImages;
 
       for (let i = 0; i < fontReq.length && causes.length < MAX_TOP_CULPRITS; i++) {
         causes.push(i18nString(UIStrings.fontRequest));
@@ -124,6 +128,9 @@ export class CLSCulprits extends BaseInsight {
       }
       for (let i = 0; i < animations.length && causes.length < MAX_TOP_CULPRITS; i++) {
         causes.push(i18nString(UIStrings.animation));
+      }
+      for (let i = 0; i < unsizedImages.length && causes.length < MAX_TOP_CULPRITS; i++) {
+        causes.push(i18nString(UIStrings.unsizedImages));
       }
     }
     return causes.slice(0, MAX_TOP_CULPRITS);
@@ -147,7 +154,7 @@ export class CLSCulprits extends BaseInsight {
               description: this.description,
               internalName: this.internalName,
               expanded: this.isActive(),
-            } as SidebarInsight.InsightDetails}
+            }}
             @insighttoggleclick=${this.onSidebarClick}>
                 <div slot="insight-content" class="insight-section">
                   <span class="worst-cluster">${i18nString(UIStrings.worstCluster)}: <button type="button" class="timeline-link" @click=${() => this.#clickEvent(worstCluster)}>${i18nString(UIStrings.layoutShiftCluster, {PH1: clusterTs})}</button></span>
@@ -160,7 +167,7 @@ export class CLSCulprits extends BaseInsight {
                 </div>
             </devtools-performance-sidebar-insight>
         </div>`;
-    // clang-format on
+              // clang-format on
   }
 
   override getRelatedEvents(): Trace.Types.Events.Event[] {

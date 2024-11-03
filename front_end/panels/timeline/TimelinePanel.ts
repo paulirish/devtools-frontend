@@ -71,7 +71,12 @@ import {TimelineLandingPage} from './TimelineLandingPage.js';
 import {TimelineLoader} from './TimelineLoader.js';
 import {TimelineMiniMap} from './TimelineMiniMap.js';
 import timelinePanelStyles from './timelinePanel.css.js';
-import {TimelineSelection} from './TimelineSelection.js';
+import {
+  rangeForSelection,
+  selectionFromEvent,
+  selectionIsRange,
+  type TimelineSelection,
+} from './TimelineSelection.js';
 import timelineStatusDialogStyles from './timelineStatusDialog.css.js';
 import {TimelineUIUtils} from './TimelineUIUtils.js';
 import {UIDevtoolsController} from './UIDevtoolsController.js';
@@ -307,6 +312,10 @@ const UIStrings = {
    *@description Text of a hyperlink to documentation.
    */
   learnMore: 'Learn more',
+  /**
+   * @description Tooltip text for a button that takes the user back to the default view which shows performance metrics that are live.
+   */
+  backToLiveMetrics: 'Go back to the live metrics page',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/TimelinePanel.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -383,6 +392,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   private brickBreakerToolbarButtonAdded = false;
   private loadButton!: UI.Toolbar.ToolbarButton;
   private saveButton!: UI.Toolbar.ToolbarButton|UI.Toolbar.ToolbarMenuButton;
+  private homeButton?: UI.Toolbar.ToolbarButton;
   private statusPane!: StatusPane|null;
   private landingPage!: UI.Widget.Widget;
   private loader?: TimelineLoader;
@@ -492,7 +502,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
 
     this.showMemorySetting = Common.Settings.Settings.instance().createSetting('timeline-show-memory', false);
     this.showMemorySetting.setTitle(i18nString(UIStrings.memory));
-    this.showMemorySetting.addChangeListener(this.onModeChanged, this);
+    this.showMemorySetting.addChangeListener(this.onMemoryModeChanged, this);
 
     this.#thirdPartyTracksSetting = TimelinePanel.extensionDataVisibilitySetting();
     this.#thirdPartyTracksSetting.addChangeListener(this.#extensionDataVisibilityChanged, this);
@@ -549,8 +559,8 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     // is not on the DOM. That only happens when the sidebar tabbed pane component is set to Annotations.
     // In that case, clicking on the insight chip will do nothing.
     this.#sideBar.element.addEventListener(TimelineInsights.SidebarInsight.InsightActivated.eventName, event => {
-      const {name, insightSetKey, overlays} = event;
-      this.#setActiveInsight({name, insightSetKey, overlays});
+      const {name, insightSetKey, overlays, relatedEvents} = event;
+      this.#setActiveInsight({name, insightSetKey, overlays, relatedEvents});
     });
 
     this.#sideBar.element.addEventListener(TimelineInsights.SidebarInsight.InsightProvideOverlays.eventName, event => {
@@ -580,12 +590,12 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         });
 
     this.flameChart.element.addEventListener(TimelineInsights.EventRef.EventReferenceClick.eventName, event => {
-      const fromTraceEvent = TimelineSelection.fromTraceEvent(event.event);
+      const fromTraceEvent = selectionFromEvent(event.event);
       this.flameChart.setSelectionAndReveal(fromTraceEvent);
     });
 
     this.#sideBar.contentElement.addEventListener(TimelineInsights.EventRef.EventReferenceClick.eventName, event => {
-      this.select(TimelineSelection.fromTraceEvent(event.event));
+      this.select(selectionFromEvent(event.event));
     });
 
     this.#sideBar.element.addEventListener(TimelineComponents.Sidebar.RemoveAnnotation.eventName, event => {
@@ -610,7 +620,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
           event.bounds, {ignoreMiniMapBounds: true, shouldAnimate: true});
     });
 
-    this.onModeChanged();
+    this.onMemoryModeChanged();
     this.populateToolbar();
     // The viewMode is set by default to the landing page, so we don't call
     // `#changeView` here and can instead directly call showLandingPage();
@@ -1012,6 +1022,18 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
 
     // History
     this.panelToolbar.appendSeparator();
+
+    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_OBSERVATIONS)) {
+      this.homeButton = new UI.Toolbar.ToolbarButton(
+          i18nString(UIStrings.backToLiveMetrics), 'home', undefined, 'timeline.back-to-live-metrics');
+      this.homeButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, () => {
+        this.#changeView({mode: 'LANDING_PAGE'});
+        this.#historyManager.navigateToLandingPage();
+      });
+      this.panelToolbar.appendToolbarItem(this.homeButton);
+      this.panelToolbar.appendSeparator();
+    }
+
     this.panelToolbar.appendToolbarItem(this.#historyManager.button());
     this.panelToolbar.registerCSSFiles([historyToolbarButtonStyles]);
     this.panelToolbar.appendSeparator();
@@ -1294,7 +1316,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     });
   }
 
-  private onModeChanged(): void {
+  private onMemoryModeChanged(): void {
     this.flameChart.updateCountersGraphToggle(this.showMemorySetting.get());
     this.updateMiniMap();
     this.doResize();
@@ -1595,6 +1617,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.dropTarget.setEnabled(this.state === State.IDLE);
     this.loadButton.setEnabled(this.state === State.IDLE);
     this.saveButton.setEnabled(this.state === State.IDLE && this.#hasActiveTrace());
+    this.homeButton?.setEnabled(this.state === State.IDLE && this.#hasActiveTrace());
     if (this.#viewMode.mode === 'VIEWING_TRACE') {
       this.#addSidebarIconToToolbar();
     }
@@ -2184,38 +2207,33 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     void this.stopRecording();
   }
 
-  private frameForSelection(selection: TimelineSelection): Trace.Handlers.ModelHandlers.Frames.TimelineFrame|null {
+  private frameForSelection(selection: TimelineSelection): Trace.Types.Events.LegacyTimelineFrame|null {
     if (this.#viewMode.mode !== 'VIEWING_TRACE') {
       return null;
     }
-    if (TimelineSelection.isLegacyTimelineFrame(selection.object) &&
-        selection.object instanceof Trace.Handlers.ModelHandlers.Frames.TimelineFrame) {
-      return selection.object;
-    }
-    if (TimelineSelection.isRangeSelection(selection.object) ||
-        TimelineSelection.isSyntheticNetworkRequestDetailsEventSelection(selection.object)) {
+    if (selectionIsRange(selection)) {
       return null;
     }
-    if (TimelineSelection.isTraceEventSelection(selection.object)) {
-      const parsedTrace = this.#traceEngineModel.parsedTrace(this.#viewMode.traceIndex);
-      if (!parsedTrace) {
-        return null;
-      }
-      // If the user has selected a time range, the frame we want is the last
-      // frame in that time window, hence why the window we look for is the
-      // endTime to the endTime.
-      const endTimeMicro = Trace.Helpers.Timing.millisecondsToMicroseconds(selection.endTime);
-      const lastFrameInSelection = Trace.Handlers.ModelHandlers.Frames
-                                       .framesWithinWindow(
-                                           parsedTrace.Frames.frames,
-                                           endTimeMicro,
-                                           endTimeMicro,
-                                           )
-                                       .at(0);
-      return lastFrameInSelection || null;
+    if (Trace.Types.Events.isSyntheticNetworkRequest(selection.event)) {
+      return null;
     }
-    console.assert(false, 'Should never be reached');
-    return null;
+
+    // If the user has selected a random trace event, the frame we want is the last
+    // frame in that time window, hence why the window we look for is the
+    // endTime to the endTime.
+    const parsedTrace = this.#traceEngineModel.parsedTrace(this.#viewMode.traceIndex);
+    if (!parsedTrace) {
+      return null;
+    }
+    const endTime = rangeForSelection(selection).max;
+    const lastFrameInSelection = Trace.Handlers.ModelHandlers.Frames
+                                     .framesWithinWindow(
+                                         parsedTrace.Frames.frames,
+                                         endTime,
+                                         endTime,
+                                         )
+                                     .at(0);
+    return lastFrameInSelection || null;
   }
 
   jumpToFrame(offset: number): true|undefined {
@@ -2237,7 +2255,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.#revealTimeRange(
         Trace.Helpers.Timing.microSecondsToMilliseconds(frame.startTime),
         Trace.Helpers.Timing.microSecondsToMilliseconds(frame.endTime));
-    this.select(TimelineSelection.fromFrame(frame));
+    this.select(selectionFromEvent(frame));
     return true;
   }
 
@@ -2249,18 +2267,19 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       return;
     }
 
-    if (TimelineSelection.isRangeSelection(newSelection.object)) {
+    if (selectionIsRange(newSelection)) {
       // We don't announce here; within the annotations code we announce when
       // the user creates a new time range selection. So if we also announce
       // here we will duplicate and overwhelm rather than be useful.
       return;
     }
-    if (TimelineSelection.isLegacyTimelineFrame(newSelection.object)) {
+
+    // Announce the type of event that was selected (special casing frames.)
+    if (Trace.Types.Events.isLegacyTimelineFrame(newSelection.event)) {
       UI.ARIAUtils.alert(i18nString(UIStrings.frameSelected));
       return;
     }
-    // At this point we know the object is a trace event
-    const name = TimelineComponents.EntryName.nameForEntry(newSelection.object);
+    const name = Utils.EntryName.nameForEntry(newSelection.event);
     UI.ARIAUtils.alert(i18nString(UIStrings.eventSelected, {PH1: name}));
   }
 
@@ -2289,7 +2308,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         break;
       }
       if (ActiveFilters.instance().isVisible(event) && endTime >= time) {
-        this.select(TimelineSelection.fromTraceEvent(event));
+        this.select(selectionFromEvent(event));
         return;
       }
     }
@@ -2551,6 +2570,13 @@ export class TraceRevealer implements Common.Revealer.Revealer<SDK.TraceObject.T
   async reveal(trace: SDK.TraceObject.TraceObject): Promise<void> {
     await UI.ViewManager.ViewManager.instance().showView('timeline');
     TimelinePanel.instance().loadFromEvents(trace.traceEvents);
+  }
+}
+
+export class EventRevealer implements Common.Revealer.Revealer<SDK.TraceObject.RevealableEvent> {
+  async reveal(rEvent: SDK.TraceObject.RevealableEvent): Promise<void> {
+    await UI.ViewManager.ViewManager.instance().showView('timeline');
+    TimelinePanel.instance().select(selectionFromEvent(rEvent.event));
   }
 }
 

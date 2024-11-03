@@ -12,6 +12,7 @@ import * as UI from '../../ui/legacy/legacy.js';
 
 import {
   type ActionResponse,
+  AgentType,
   AiAgent,
   type AidaRequestOptions,
   type ContextResponse,
@@ -137,7 +138,8 @@ SUGGESTIONS: ["What is a stacking context?", "How can I change the stacking orde
 `;
 /* clang-format on */
 
-async function executeJsCode(code: string, {throwOnSideEffect}: {throwOnSideEffect: boolean}): Promise<string> {
+async function executeJsCode(
+    functionDeclaration: string, {throwOnSideEffect}: {throwOnSideEffect: boolean}): Promise<string> {
   const selectedNode = UI.Context.Context.instance().flavor(SDK.DOMModel.DOMNode);
   const target = selectedNode?.domModel().target() ?? UI.Context.Context.instance().flavor(SDK.Target.Target);
 
@@ -162,8 +164,25 @@ async function executeJsCode(code: string, {throwOnSideEffect}: {throwOnSideEffe
     throw new Error('Execution context is not found for executing code');
   }
 
+  if (executionContext.debuggerModel.selectedCallFrame()) {
+    throw new ExecutionError('Cannot evaluate JavaScript because the execution is paused on a breakpoint.');
+  }
+
+  const result = await executionContext.evaluate(
+      {
+        expression: '$0',
+        returnByValue: false,
+        includeCommandLineAPI: true,
+      },
+      false, false);
+
+  if ('error' in result) {
+    throw new ExecutionError('Cannot find $0');
+  }
+
   try {
-    return await FreestylerEvaluateAction.execute(code, executionContext, {throwOnSideEffect});
+    return await FreestylerEvaluateAction.execute(
+        functionDeclaration, [result.object], executionContext, {throwOnSideEffect});
   } catch (err) {
     if (err instanceof ExecutionError) {
       return `Error: ${err.message}`;
@@ -193,6 +212,8 @@ type AgentOptions = {
  * instance for a new conversation.
  */
 export class FreestylerAgent extends AiAgent<SDK.DOMModel.DOMNode> {
+  override type = AgentType.FREESTYLER;
+
   readonly preamble = preamble;
   readonly clientFeature = Host.AidaClient.ClientFeature.CHROME_FREESTYLER;
   get userTier(): string|undefined {
@@ -208,12 +229,12 @@ export class FreestylerAgent extends AiAgent<SDK.DOMModel.DOMNode> {
 
   get options(): AidaRequestOptions {
     const config = Common.Settings.Settings.instance().getHostConfig();
-    const temperature = AiAgent.validTemperature(config.devToolsFreestyler?.temperature);
+    const temperature = config.devToolsFreestyler?.temperature;
     const modelId = config.devToolsFreestyler?.modelId;
 
     return {
       temperature,
-      model_id: modelId,
+      modelId,
     };
   }
 
@@ -395,12 +416,10 @@ export class FreestylerAgent extends AiAgent<SDK.DOMModel.DOMNode> {
     sideEffect: boolean,
     canceled: boolean,
   }> {
-    const actionExpression = `{
-      const scope = {$0, $1, getEventListeners};
-      with (scope) {
-        ${action}
-        ;((typeof data !== "undefined") ? data : undefined)
-      }
+    const functionDeclaration = `async function ($0) {
+      ${action}
+      ;
+      return ((typeof data !== "undefined") ? data : undefined);
     }`;
     try {
       const runConfirmed = await confirm ?? Promise.resolve(true);
@@ -412,7 +431,7 @@ export class FreestylerAgent extends AiAgent<SDK.DOMModel.DOMNode> {
         };
       }
       const result = await this.#execJs(
-          actionExpression,
+          functionDeclaration,
           {throwOnSideEffect},
       );
       const byteCount = Platform.StringUtilities.countWtf8Bytes(result);
@@ -559,7 +578,13 @@ export class FreestylerAgent extends AiAgent<SDK.DOMModel.DOMNode> {
         yield {
           type: ResponseType.SIDE_EFFECT,
           code: action,
-          confirm: sideEffectConfirmationPromiseWithResolvers.resolve,
+          confirm: (result: boolean) => {
+            sideEffectConfirmationPromiseWithResolvers.resolve(result);
+            Host.userMetrics.actionTaken(
+                result ? Host.UserMetrics.Action.AiAssistanceSideEffectConfirmed :
+                         Host.UserMetrics.Action.AiAssistanceSideEffectRejected,
+            );
+          },
           rpcId,
         };
 
@@ -602,15 +627,7 @@ export class FreestylerAgent extends AiAgent<SDK.DOMModel.DOMNode> {
     return `${elementEnchantmentQuery}QUERY: ${query}`;
   }
 
-  override addToHistory(options: {id: number, query: string, response: ParsedResponse}): void {
-    const response = options.response;
-    if ('answer' in response) {
-      const answer = `ANSWER: ${response.answer}`;
-      return super.addToHistory({
-        ...options,
-        response: {answer},
-      });
-    }
-    return super.addToHistory(options);
+  override formatHistoryChunkAnswer(text: string): string {
+    return `ANSWER: ${text}`;
   }
 }

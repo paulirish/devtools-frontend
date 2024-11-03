@@ -5,53 +5,102 @@
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
-import type * as Trace from '../../models/trace/trace.js';
+import type * as TimelineUtils from '../../panels/timeline/utils/utils.js';
 
 import {
+  AgentType,
   AiAgent,
   type AidaRequestOptions,
-  type ContextDetail,
   type ContextResponse,
   type ParsedResponse,
   ResponseType,
 } from './AiAgent.js';
 
+/**
+ * Preamble clocks in at ~950 tokens.
+ *   The prose is around 4.5 chars per token.
+ * The data can be as bad as 1.8 chars per token
+ *
+ * Check token length in https://aistudio.google.com/
+ */
 const preamble = `You are a performance expert deeply integrated with Chrome DevTools.
-You specialize in analyzing web application behavior captured by Chrome DevTools Performance Panel.
-You will be provided with a string containing the JSON.stringify representation of a tree of events captured in a Chrome DevTools performance recording.
-This tree originates from the root task of a specific event that was selected by a user in the Performance panel's flame graph.
-Each node in this tree represents an event and contains the following information:
-* id: A unique identifier for the event.
-* url:  The URL of the JavaScript file where the event originated (if applicable).
-* line: The line number in the JavaScript file where the event originated (if applicable).
-* column: The column number in the JavaScript file where the event originated (if applicable).
-* function: The name of the function associated with this event.
-* start: The start time of the event in milliseconds.
-* totalTime: The total duration of the event, including the time spent in its children, in milliseconds.
-* selfTime:  The duration of the event itself, excluding the time spent in its children, in milliseconds.
-* selected: A boolean value indicating whether this is the event the user selected in the Performance panel.
-* children: An array of child events, each represented as another node with the same structure.
+You specialize in analyzing web application behavior captured by Chrome DevTools Performance Panel and Chrome tracing.
+You will be provided a text representation of a call tree of native and JavaScript callframes selected by the user from a performance trace's flame chart.
+This tree originates from the root task of a specific callframe.
 
-Your task is to analyze this event and its surrounding context within the performance recording. Your analysis may include:
-* Clearly state the name and purpose of the selected event based on its properties (e.g., function name, URL, line number). Explain what the task is broadly doing. You can also mention the function
+The format of each callframe is:
+
+    Node: $id – $name
+    Selected: true
+    dur: $duration
+    self: $self
+    URL #: $url_number
+    Children:
+      * $child.id – $child.name
+
+The fields are:
+
+* name:  A short string naming the callframe (e.g. 'Evaluate Script' or the JS function name 'InitializeApp')
+* id:  A numerical identifier for the callframe
+* Selected:  Set to true if this callframe is the one the user selected.
+* url_number:  The number of the URL referenced in the "All URLs" list
+* dur:  The total duration of the callframe (includes time spent in its descendants), in milliseconds.
+* self:  The self duration of the callframe (excludes time spent in its descendants), in milliseconds. If omitted, assume the value is 0.
+* children:  An list of child callframes, each denoted by their id and name
+
+Your task is to analyze this callframe and its surrounding context within the performance recording. Your analysis may include:
+* Clearly state the name and purpose of the selected callframe based on its properties (e.g., name, URL). Explain what the task is broadly doing.
 * Describe its execution context:
-  * Ancestors: Trace back through the tree to identify the chain of parent events that led to the execution of the selected event. Describe this execution path.
-  * Descendants:  Analyze the children of the selected event. What tasks did it initiate? Did it spawn any long-running or resource-intensive sub-tasks?
+  * Ancestors: Trace back through the tree to identify the chain of parent callframes that led to the execution of the selected callframe. Describe this execution path.
+  * Descendants:  Analyze the children of the selected callframe. What tasks did it initiate? Did it spawn any long-running or resource-intensive sub-tasks?
 * Quantify performance:
     * Duration
-    * Relative Cost:  How much did this event contribute to the overall duration of its parent tasks and the entire recorded trace?
-    * Potential Bottlenecks: Analyze the totalTime and selfTime of the selected event and its children to identify any potential performance bottlenecks. Are there any excessively long tasks or periods of idle time?
-4. (Only provide if you have specific suggestions) Based on your analysis, provide specific and actionable suggestions for improving the performance of the selected event and its related tasks.  Are there any resources being acquired or held for longer than necessary?
+    * Relative Cost:  How much did this callframe contribute to the overall duration of its parent tasks and the entire recorded trace?
+    * Potential Bottlenecks: Analyze the total and self duration of the selected callframe and its children to identify any potential performance bottlenecks. Are there any excessively long tasks or periods of idle time?
+4. Based on your analysis, provide specific and actionable suggestions for improving the performance of the selected callframe and its related tasks.  Are there any resources being acquired or held for longer than necessary? Only provide if you have specific suggestions.
 
 # Considerations
 * Keep your analysis concise and focused, highlighting only the most critical aspects for a software engineer.
-* Do not mention id of the event in your response.
+* Do not mention id of the callframe or the URL number in your response.
 * **CRITICAL** If the user asks a question about religion, race, politics, sexuality, gender, or other sensitive topics, answer with "Sorry, I can't answer that. I'm best at questions about performance of websites."
 
 ## Example session
 
-Selected call tree
-'{"id":"1","function":"main","start":0,"totalTime":500,"selfTime":100,"children":[{"id":"2","function":"update","start":100,"totalTime":200,"selfTime":50,"children":[{"id":"3","function":"animate","url":"[invalid URL removed]","line":120,"column":10,"start":150,"totalTime":150,"selfTime":20,"selected":true,"children":[{"id":"4","function":"calculatePosition","start":160,"totalTime":80,"selfTime":80,"children":[]},{"id":"5","function":"applyStyles","start":240,"totalTime":50,"selfTime":50,"children":[]}]}]}]}'
+All URL #s:
+
+* 0 – app.js
+
+Call tree:
+
+Node: 1 – main
+dur: 500
+self: 100
+Children:
+  * 2 – update
+
+Node: 2 – update
+dur: 200
+self: 50
+Children:
+  * 3 – animate
+
+Node: 3 – animate
+Selected: true
+dur: 150
+self: 20
+URL #: 0
+Children:
+  * 4 – calculatePosition
+  * 5 – applyStyles
+
+Node: 4 – calculatePosition
+dur: 80
+self: 80
+
+Node: 5 – applyStyles
+dur: 50
+self: 50
+
 Explain the selected task.
 
 
@@ -66,7 +115,7 @@ Perhaps there's room for optimization there. You could investigate whether the c
 * Strings that don't need to be translated at this time.
 */
 const UIStringsNotTranslate = {
-  analyzingStackTrace: 'Analyzing stack trace',
+  analyzingCallTree: 'Analyzing call tree',
 };
 
 const lockedString = i18n.i18n.lockedString;
@@ -75,7 +124,8 @@ const lockedString = i18n.i18n.lockedString;
  * One agent instance handles one conversation. Create a new agent
  * instance for a new conversation.
  */
-export class DrJonesPerformanceAgent extends AiAgent<Trace.Helpers.TreeHelpers.TraceEntryNodeForAI> {
+export class DrJonesPerformanceAgent extends AiAgent<TimelineUtils.AICallTree.AICallTree> {
+  override type = AgentType.DRJONES_PERFORMANCE;
   readonly preamble = preamble;
   readonly clientFeature = Host.AidaClient.ClientFeature.CHROME_DRJONES_PERFORMANCE_AGENT;
   get userTier(): string|undefined {
@@ -84,30 +134,48 @@ export class DrJonesPerformanceAgent extends AiAgent<Trace.Helpers.TreeHelpers.T
   }
   get options(): AidaRequestOptions {
     const config = Common.Settings.Settings.instance().getHostConfig();
-    const temperature = AiAgent.validTemperature(config.devToolsAiAssistancePerformanceAgentDogfood?.temperature);
+    const temperature = config.devToolsAiAssistancePerformanceAgentDogfood?.temperature;
     const modelId = config.devToolsAiAssistancePerformanceAgentDogfood?.modelId;
 
     return {
       temperature,
-      model_id: modelId,
+      modelId,
     };
   }
 
   async *
-      handleContextDetails(selectedStackTrace: Trace.Helpers.TreeHelpers.TraceEntryNodeForAI|null):
+      handleContextDetails(aiCallTree: TimelineUtils.AICallTree.AICallTree|null):
           AsyncGenerator<ContextResponse, void, void> {
     yield {
       type: ResponseType.CONTEXT,
-      title: lockedString(UIStringsNotTranslate.analyzingStackTrace),
-      details: createContextDetailsForDrJonesPerformanceAgent(selectedStackTrace),
+      title: lockedString(UIStringsNotTranslate.analyzingCallTree),
+      details: [
+        {
+          title: 'Selected call tree',
+          text: aiCallTree?.serialize() ?? '',
+        },
+      ],
     };
   }
 
-  override async enhanceQuery(query: string, selectedStackTrace: Trace.Helpers.TreeHelpers.TraceEntryNodeForAI|null):
-      Promise<string> {
-    const networkEnchantmentQuery =
-        selectedStackTrace ? `# Selected stack trace\n${JSON.stringify(selectedStackTrace)}\n\n# User request\n\n` : '';
-    return `${networkEnchantmentQuery}${query}`;
+  override async enhanceQuery(query: string, aiCallTree: TimelineUtils.AICallTree.AICallTree|null): Promise<string> {
+    const treeStr = aiCallTree?.serialize();
+
+    // Collect the queries from previous messages in this session
+    const prevQueries: string[] = [];
+    for await (const data of this.runFromHistory()) {
+      if (data.type === ResponseType.QUERYING) {
+        prevQueries.push(data.query);
+      }
+    }
+    // If this is a followup chat about the same call tree, don't include the call tree serialization again.
+    // We don't need to repeat it and we'd rather have more the context window space.
+    if (prevQueries.length && treeStr && prevQueries.find(q => q.startsWith(treeStr))) {
+      aiCallTree = null;
+    }
+
+    const perfEnhancementQuery = aiCallTree ? `${treeStr}\n\n# User request\n\n` : '';
+    return `${perfEnhancementQuery}${query}`;
   }
 
   override parseResponse(response: string): ParsedResponse {
@@ -115,16 +183,6 @@ export class DrJonesPerformanceAgent extends AiAgent<Trace.Helpers.TreeHelpers.T
       answer: response,
     };
   }
-}
-
-function createContextDetailsForDrJonesPerformanceAgent(
-    selectedStackTrace: Trace.Helpers.TreeHelpers.TraceEntryNodeForAI|null): [ContextDetail, ...ContextDetail[]] {
-  return [
-    {
-      title: 'Selected stack trace',
-      text: JSON.stringify(selectedStackTrace).trim(),
-    },
-  ];
 }
 
 function setDebugFreestylerEnabled(enabled: boolean): void {

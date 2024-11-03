@@ -8,13 +8,11 @@ import * as Platform from '../../../core/platform/platform.js';
 import * as Trace from '../../../models/trace/trace.js';
 import * as TraceBounds from '../../../services/trace_bounds/trace_bounds.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
-import type * as IconButton from '../../../ui/components/icon_button/icon_button.js';
-import type * as Settings from '../../../ui/components/settings/settings.js';
 import * as ThemeSupport from '../../../ui/legacy/theme_support/theme_support.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
+import * as Utils from '../utils/utils.js';
 
-import {nameForEntry} from './EntryName.js';
 import {RemoveAnnotation, RevealAnnotation} from './Sidebar.js';
 import sidebarAnnotationsTabStyles from './sidebarAnnotationsTab.css.js';
 
@@ -195,7 +193,7 @@ export class SidebarAnnotationsTab extends HTMLElement {
 
   #renderEntryToIdentifier(annotation: Trace.Types.File.EntriesLinkAnnotation): LitHtml.LitTemplate {
     if (annotation.entryTo) {
-      const entryToName = nameForEntry(annotation.entryTo);
+      const entryToName = Utils.EntryName.nameForEntry(annotation.entryTo);
       const toBackgroundColor = this.#annotationEntryToColorMap.get(annotation.entryTo) ?? '';
       const toTextColor = findTextColorForContrast(toBackgroundColor);
       const styleForToAnnotationIdentifier = {
@@ -226,7 +224,7 @@ export class SidebarAnnotationsTab extends HTMLElement {
   #renderAnnotationIdentifier(annotation: Trace.Types.File.Annotation): LitHtml.LitTemplate {
     switch (annotation.type) {
       case 'ENTRY_LABEL': {
-        const entryName = nameForEntry(annotation.entry);
+        const entryName = Utils.EntryName.nameForEntry(annotation.entry);
         const backgroundColor = this.#annotationEntryToColorMap.get(annotation.entry) ?? '';
         const color = findTextColorForContrast(backgroundColor);
         const styleForAnnotationIdentifier = {
@@ -255,7 +253,7 @@ export class SidebarAnnotationsTab extends HTMLElement {
         `;
       }
       case 'ENTRIES_LINK': {
-        const entryFromName = nameForEntry(annotation.entryFrom);
+        const entryFromName = Utils.EntryName.nameForEntry(annotation.entryFrom);
         const fromBackgroundColor = this.#annotationEntryToColorMap.get(annotation.entryFrom) ?? '';
         const fromTextColor = findTextColorForContrast(fromBackgroundColor);
         const styleForFromAnnotationIdentifier = {
@@ -273,12 +271,12 @@ export class SidebarAnnotationsTab extends HTMLElement {
               color: 'var(--icon-default)',
               width: '18px',
               height: '18px',
-            } as IconButton.Icon.IconData}>
+            }}>
             </devtools-icon>
             ${this.#renderEntryToIdentifier(annotation)}
           </div>
       `;
-        // clang-format on
+            // clang-format on
       }
       default:
         Platform.assertNever(annotation, 'Unsupported annotation type');
@@ -365,7 +363,7 @@ export class SidebarAnnotationsTab extends HTMLElement {
                           color: 'var(--icon-default)',
                           width: '20px',
                           height: '20px',
-                        } as IconButton.Icon.IconData}
+                        }}
                       ></devtools-icon>
                     </button>
                   </div>`;
@@ -373,7 +371,7 @@ export class SidebarAnnotationsTab extends HTMLElement {
               <setting-checkbox class="visibility-setting" .data=${{
                 setting: this.#annotationsHiddenSetting,
                 textOverride: 'Hide annotations',
-              } as Settings.SettingCheckbox.SettingCheckboxData}>
+              }}>
               </setting-checkbox>`
       }
       </span>`,
@@ -393,7 +391,7 @@ declare global {
 function detailedAriaDescriptionForAnnotation(annotation: Trace.Types.File.Annotation): string {
   switch (annotation.type) {
     case 'ENTRY_LABEL': {
-      const name = nameForEntry(annotation.entry);
+      const name = Utils.EntryName.nameForEntry(annotation.entry);
       return i18nString(UIStrings.entryLabelDescriptionLabel, {
         PH1: name,
         PH2: annotation.label,
@@ -412,8 +410,8 @@ function detailedAriaDescriptionForAnnotation(annotation: Trace.Types.File.Annot
         // Only label it if it is completed.
         return '';
       }
-      const nameFrom = nameForEntry(annotation.entryFrom);
-      const nameTo = nameForEntry(annotation.entryTo);
+      const nameFrom = Utils.EntryName.nameForEntry(annotation.entryFrom);
+      const nameTo = Utils.EntryName.nameForEntry(annotation.entryTo);
       return i18nString(UIStrings.entryLinkDescriptionLabel, {
         PH1: nameFrom,
         PH2: nameTo,

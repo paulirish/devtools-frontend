@@ -312,11 +312,6 @@ export class UserMetrics {
         EnumeratedHistogram.LighthouseCategoryUsed, type, LighthouseCategoryUsed.MAX_VALUE);
   }
 
-  colorPickerOpenedFrom(type: ColorPickerOpenedFrom): void {
-    InspectorFrontendHostInstance.recordEnumeratedHistogram(
-        EnumeratedHistogram.ColorPickerOpenedFrom, type, ColorPickerOpenedFrom.MAX_VALUE);
-  }
-
   cssPropertyDocumentation(type: CSSPropertyDocumentation): void {
     InspectorFrontendHostInstance.recordEnumeratedHistogram(
         EnumeratedHistogram.CSSPropertyDocumentation, type, CSSPropertyDocumentation.MAX_VALUE);
@@ -575,7 +570,14 @@ export enum Action {
   DrJonesOpenedFromSourcesPanelFloatingButton = 172,
   DrJonesOpenedFromPerformancePanel = 173,
   DrJonesOpenedFromNetworkPanelFloatingButton = 174,
-  MAX_VALUE = 175,
+  AiAssistancePanelOpened = 175,
+  AiAssistanceQuerySubmitted = 176,
+  AiAssistanceAnswerReceived = 177,
+  AiAssistanceDynamicSuggestionClicked = 178,
+  AiAssistanceSideEffectConfirmed = 179,
+  AiAssistanceSideEffectRejected = 180,
+  AiAssistanceError = 181,
+  MAX_VALUE = 182,
   /* eslint-enable @typescript-eslint/naming-convention */
 }
 
@@ -1025,16 +1027,12 @@ export enum DevtoolsExperiments {
   'extension-storage-viewer' = 100,
   'floating-entry-points-for-ai-assistance' = 101,
   'timeline-experimental-insights' = 102,
+  'timeline-dim-unrelated-events' = 103,
+  'timeline-alternative-navigation' = 104,
   /* eslint-enable @typescript-eslint/naming-convention */
 
   // Increment this when new experiments are added.
-  MAX_VALUE = 103,
-}
-
-export const enum ColorPickerOpenedFrom {
-  SOURCES_PANEL = 0,
-  STYLES_TAB = 1,
-  MAX_VALUE = 2,
+  MAX_VALUE = 105,
 }
 
 export const enum CSSPropertyDocumentation {

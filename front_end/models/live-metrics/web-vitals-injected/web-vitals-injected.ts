@@ -98,6 +98,29 @@ window.getNodeForIndex = (index: number): Node|undefined => {
   return nodeList[index];
 };
 
+function limitScripts(loafs: Spec.PerformanceLongAnimationFrameTimingJSON[]):
+    Spec.PerformanceLongAnimationFrameTimingJSON[] {
+  return loafs.map(loaf => {
+    const longestScripts: Spec.PerformanceScriptTimingJSON[] = [];
+    for (const script of loaf.scripts) {
+      if (longestScripts.length < Spec.SCRIPTS_PER_LOAF_LIMIT) {
+        longestScripts.push(script);
+        continue;
+      }
+
+      const shorterIndex = longestScripts.findIndex(s => s.duration < script.duration);
+      if (shorterIndex === -1) {
+        continue;
+      }
+
+      longestScripts[shorterIndex] = script;
+    }
+    longestScripts.sort((a, b) => a.startTime - b.startTime);
+    loaf.scripts = longestScripts;
+    return loaf;
+  });
+}
+
 function initialize(): void {
   sendEventToDevTools({name: 'reset'});
 
@@ -172,6 +195,9 @@ function initialize(): void {
       nextPaintTime: interaction.attribution.nextPaintTime,
       interactionType: interaction.attribution.interactionType,
       eventName: interaction.entries[0].name,
+      // To limit the amount of events, just get the last 5 LoAFs
+      longAnimationFrameEntries: limitScripts(
+          interaction.attribution.longAnimationFrameEntries.slice(-Spec.LOAF_LIMIT).map(loaf => loaf.toJSON())),
     };
     const node = interaction.attribution.interactionTargetElement;
     if (node) {

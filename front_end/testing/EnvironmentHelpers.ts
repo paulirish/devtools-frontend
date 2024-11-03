@@ -133,6 +133,8 @@ const REGISTERED_EXPERIMENTS = [
   Root.Runtime.ExperimentName.TIMELINE_ENHANCED_TRACES,
   Root.Runtime.ExperimentName.EXTENSION_STORAGE_VIEWER,
   Root.Runtime.ExperimentName.TIMELINE_EXPERIMENTAL_INSIGHTS,
+  Root.Runtime.ExperimentName.TIMELINE_DIM_UNRELATED_EVENTS,
+  Root.Runtime.ExperimentName.TIMELINE_ALTERNATIVE_NAVIGATION,
 ];
 
 export async function initializeGlobalVars({reset = true} = {}) {
@@ -523,19 +525,37 @@ export function getGetHostConfigStub(config: Root.Runtime.HostConfig): sinon.Sin
       temperature: -1,
       enabled: false,
       ...config.devToolsExplainThisResourceDogfood,
-    } as Root.Runtime.HostConfigExplainThisResourceDogfood,
+    } as Root.Runtime.HostConfigAiAssistanceNetworkAgent,
+    devToolsAiAssistanceNetworkAgent: {
+      modelId: '',
+      temperature: -1,
+      enabled: false,
+      ...config.devToolsAiAssistanceNetworkAgent,
+    } as Root.Runtime.HostConfigAiAssistanceNetworkAgent,
     devToolsAiAssistanceFileAgentDogfood: {
       modelId: '',
       temperature: -1,
       enabled: false,
       ...config.devToolsAiAssistanceFileAgentDogfood,
-    } as Root.Runtime.HostConfigAiAssistanceFileAgentDogfood,
+    } as Root.Runtime.HostConfigAiAssistanceFileAgent,
+    devToolsAiAssistanceFileAgent: {
+      modelId: '',
+      temperature: -1,
+      enabled: false,
+      ...config.devToolsAiAssistanceFileAgent,
+    } as Root.Runtime.HostConfigAiAssistanceFileAgent,
     devToolsAiAssistancePerformanceAgentDogfood: {
       modelId: '',
       temperature: -1,
       enabled: false,
       ...config.devToolsAiAssistancePerformanceAgentDogfood,
-    } as Root.Runtime.HostConfigAiAssistancePerformanceAgentDogfood,
+    } as Root.Runtime.HostConfigAiAssistancePerformanceAgent,
+    devToolsAiAssistancePerformanceAgent: {
+      modelId: '',
+      temperature: -1,
+      enabled: false,
+      ...config.devToolsAiAssistancePerformanceAgent,
+    } as Root.Runtime.HostConfigAiAssistancePerformanceAgent,
     devToolsVeLogging: {
       enabled: true,
       testing: false,

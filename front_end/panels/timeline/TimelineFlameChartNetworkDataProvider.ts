@@ -16,7 +16,12 @@ import {ModificationsManager} from './ModificationsManager.js';
 import {NetworkTrackAppender, type NetworkTrackEvent} from './NetworkTrackAppender.js';
 import timelineFlamechartPopoverStyles from './timelineFlamechartPopover.css.js';
 import {FlameChartStyle, Selection} from './TimelineFlameChartView.js';
-import {TimelineSelection} from './TimelineSelection.js';
+import {
+  selectionFromEvent,
+  selectionIsRange,
+  selectionsEqual,
+  type TimelineSelection,
+} from './TimelineSelection.js';
 import * as TimelineUtils from './utils/utils.js';
 
 export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.FlameChartDataProvider {
@@ -120,7 +125,7 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
       return null;
     }
     const event = this.#events[index];
-    this.#lastSelection = new Selection(TimelineSelection.fromTraceEvent(event), index);
+    this.#lastSelection = new Selection(selectionFromEvent(event), index);
     return this.#lastSelection.timelineSelection;
   }
 
@@ -136,11 +141,7 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
     return contextMenu;
   }
 
-  indexForEvent(event: Trace.Types.Events.Event|Trace.Handlers.ModelHandlers.Frames.TimelineFrame): number|null {
-    // In the NetworkDataProvider we will never be dealing with frames, but we need to satisfy the interface for a DataProvider.
-    if (event instanceof Trace.Handlers.ModelHandlers.Frames.TimelineFrame) {
-      return null;
-    }
+  indexForEvent(event: Trace.Types.Events.Event): number|null {
     if (!Trace.Types.Events.isNetworkTrackEntry(event)) {
       return null;
     }
@@ -177,21 +178,21 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
   }
 
   entryIndexForSelection(selection: TimelineSelection|null): number {
-    if (!selection) {
+    if (!selection || selectionIsRange(selection)) {
       return -1;
     }
 
-    if (this.#lastSelection && this.#lastSelection.timelineSelection.object === selection.object) {
+    if (this.#lastSelection && selectionsEqual(this.#lastSelection.timelineSelection, selection)) {
       return this.#lastSelection.entryIndex;
     }
 
-    if (!TimelineSelection.isNetworkEventSelection(selection.object)) {
+    if (!Trace.Types.Events.isNetworkTrackEntry(selection.event)) {
       return -1;
     }
 
-    const index = this.#events.indexOf(selection.object);
+    const index = this.#events.indexOf(selection.event);
     if (index !== -1) {
-      this.#lastSelection = new Selection(TimelineSelection.fromTraceEvent(selection.object), index);
+      this.#lastSelection = new Selection(selectionFromEvent(selection.event), index);
     }
     return index;
   }
@@ -216,7 +217,7 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
 
   entryTitle(index: number): string|null {
     const event = this.#events[index];
-    return TimelineComponents.EntryName.nameForEntry(event);
+    return TimelineUtils.EntryName.nameForEntry(event);
   }
 
   entryFont(_index: number): string|null {
@@ -488,7 +489,7 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
    */
   search(
       visibleWindow: Trace.Types.Timing.TraceWindowMicroSeconds,
-      filter: TimelineModel.TimelineModelFilter.TimelineModelFilter,
+      filter?: TimelineModel.TimelineModelFilter.TimelineModelFilter,
       ): PerfUI.FlameChart.DataProviderSearchResult[] {
     const results: PerfUI.FlameChart.DataProviderSearchResult[] = [];
     for (let i = 0; i < this.#events.length; i++) {
@@ -501,7 +502,7 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
         continue;
       }
 
-      if (filter.accept(entry, this.#parsedTrace ?? undefined)) {
+      if (!filter || filter.accept(entry, this.#parsedTrace ?? undefined)) {
         const startTimeMilli = Trace.Helpers.Timing.microSecondsToMilliseconds(entry.ts);
         results.push({startTimeMilli, index: i, provider: 'network'});
       }

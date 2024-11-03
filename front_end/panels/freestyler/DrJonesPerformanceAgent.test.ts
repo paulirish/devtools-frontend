@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as Host from '../../core/host/host.js';
-import * as Trace from '../../models/trace/trace.js';
-import {
-  describeWithEnvironment,
-  getGetHostConfigStub,
-} from '../../testing/EnvironmentHelpers.js';
+import type * as Host from '../../core/host/host.js';
+import {describeWithEnvironment, getGetHostConfigStub} from '../../testing/EnvironmentHelpers.js';
+import {TraceLoader} from '../../testing/TraceLoader.js';
+import * as TimelineUtils from '../timeline/utils/utils.js';
 
 import {DrJonesPerformanceAgent, ResponseType} from './freestyler.js';
 
@@ -65,20 +63,16 @@ describeWithEnvironment('DrJonesPerformanceAgent', () => {
         serverSideLoggingEnabled: true,
       });
       sinon.stub(agent, 'preamble').value('preamble');
-      agent.chatHistoryForTesting = new Map([[
+      agent.chatNewHistoryForTesting = new Map([[
         0,
         [
           {
-            text: 'first',
-            entity: Host.AidaClient.Entity.UNKNOWN,
+            type: ResponseType.QUERYING,
+            query: 'question',
           },
           {
-            text: 'second',
-            entity: Host.AidaClient.Entity.SYSTEM,
-          },
-          {
-            text: 'third',
-            entity: Host.AidaClient.Entity.USER,
+            type: ResponseType.ANSWER,
+            text: 'answer',
           },
         ],
       ]]);
@@ -92,16 +86,12 @@ describeWithEnvironment('DrJonesPerformanceAgent', () => {
             preamble: 'preamble',
             chat_history: [
               {
-                entity: 0,
-                text: 'first',
+                entity: 1,
+                text: 'question',
               },
               {
                 entity: 2,
-                text: 'second',
-              },
-              {
-                entity: 1,
-                text: 'third',
+                text: 'answer',
               },
             ],
             metadata: {
@@ -119,27 +109,16 @@ describeWithEnvironment('DrJonesPerformanceAgent', () => {
       );
     });
   });
-  describe('run', () => {
-    const rootNodeEntry =
-        new Trace.Helpers.TreeHelpers.TraceEntryNodeForAI('RunTask', Trace.Types.Timing.MilliSeconds(0));
-    const node1 = new Trace.Helpers.TreeHelpers.TraceEntryNodeForAI('ProfileCall', Trace.Types.Timing.MilliSeconds(1));
-    const node2 = new Trace.Helpers.TreeHelpers.TraceEntryNodeForAI('ProfileCall', Trace.Types.Timing.MilliSeconds(2));
-    const node3 = new Trace.Helpers.TreeHelpers.TraceEntryNodeForAI('ProfileCall', Trace.Types.Timing.MilliSeconds(10));
-    const node4 = new Trace.Helpers.TreeHelpers.TraceEntryNodeForAI('ProfileCall', Trace.Types.Timing.MilliSeconds(11));
-    const node5 = new Trace.Helpers.TreeHelpers.TraceEntryNodeForAI('ProfileCall', Trace.Types.Timing.MilliSeconds(15));
+  describe('run', function() {
+    it('generates an answer', async function() {
+      const {parsedTrace} = await TraceLoader.traceEngine(this, 'web-dev-outermost-frames.json.gz');
+      // A basic Layout.
+      const layoutEvt = parsedTrace.Renderer.allTraceEntries.find(event => event.ts === 465457096322);
+      assert.exists(layoutEvt);
+      const aiCallTree =
+          TimelineUtils.AICallTree.AICallTree.from(layoutEvt, parsedTrace.Renderer.allTraceEntries, parsedTrace);
+      assert.exists(aiCallTree);
 
-    beforeEach(() => {
-      rootNodeEntry.children = [node1, node3];
-      node1.function = 'foo';
-      node1.children = [node2];
-      node2.function = 'foofoo';
-      node3.function = 'foo2';
-      node3.children = [node4, node5];
-      node4.function = 'foo2foo';
-      node5.function = 'foo2foo2';
-    });
-
-    it('generates an answer', async () => {
       async function* generateAnswer() {
         yield {
           explanation: 'This is the answer',
@@ -154,23 +133,39 @@ describeWithEnvironment('DrJonesPerformanceAgent', () => {
         aidaClient: mockAidaClient(generateAnswer),
       });
 
-      // Select node3
-      node3.selected = true;
-      const responses = await Array.fromAsync(agent.run('test', {selected: rootNodeEntry}));
+      const responses = await Array.fromAsync(agent.run('test', {selected: aiCallTree}));
+      const expectedData = '\n\n' +
+          `
+
+
+# Call tree:
+
+Node: 1 – Task
+dur: 3
+Children:
+  * 2 – Layout
+
+Node: 2 – Layout
+Selected: true
+dur: 3
+self: 3
+`.trim();
 
       assert.deepStrictEqual(responses, [
         {
+          type: ResponseType.USER_QUERY,
+          query: 'test',
+        },
+        {
           type: ResponseType.CONTEXT,
-          title: 'Analyzing stack trace',
+          title: 'Analyzing call tree',
           details: [
-            {
-              title: 'Selected stack trace',
-              text: JSON.stringify(rootNodeEntry),
-            },
+            {title: 'Selected call tree', text: expectedData},
           ],
         },
         {
           type: ResponseType.QUERYING,
+          query: `${expectedData}\n\n# User request\n\ntest`,
         },
         {
           type: ResponseType.ANSWER,
@@ -183,13 +178,64 @@ describeWithEnvironment('DrJonesPerformanceAgent', () => {
       assert.deepStrictEqual(agent.chatHistoryForTesting, [
         {
           entity: 1,
-          text: `# Selected stack trace\n${JSON.stringify(rootNodeEntry)}\n\n# User request\n\ntest`,
+          text: `${aiCallTree.serialize()}\n\n# User request\n\ntest`,
         },
         {
           entity: 2,
           text: 'This is the answer',
         },
       ]);
+    });
+  });
+
+  describe('enhanceQuery', () => {
+    it('does not send the serialized calltree again if it is a followup chat about the same calltree', async () => {
+      const agent = new DrJonesPerformanceAgent({
+        aidaClient: {} as Host.AidaClient.AidaClient,
+      });
+
+      const mockAiCallTree = {
+        serialize: () => 'Mock call tree',
+      } as unknown as TimelineUtils.AICallTree.AICallTree;
+
+      const enhancedQuery1 = await agent.enhanceQuery('What is this?', mockAiCallTree);
+      assert.strictEqual(enhancedQuery1, 'Mock call tree\n\n# User request\n\nWhat is this?');
+
+      // Create history state of the above query
+      agent.chatNewHistoryForTesting = new Map([[
+        0,
+        [
+          {
+            type: ResponseType.CONTEXT,
+            title: 'Analyzing call tree',
+            details: [
+              {
+                title: 'Selected call tree',
+                text: mockAiCallTree.serialize(),
+              },
+            ],
+          },
+          {
+            type: ResponseType.QUERYING,
+            query: enhancedQuery1,
+          },
+          {
+            type: ResponseType.ANSWER,
+            text: 'test answer',
+          },
+        ],
+      ]]);
+
+      const query2 = 'But what about this follow-up question?';
+      const enhancedQuery2 = await agent.enhanceQuery(query2, mockAiCallTree);
+      assert.strictEqual(enhancedQuery2, query2);
+      assert.isFalse(enhancedQuery2.includes(mockAiCallTree.serialize()));
+
+      // Just making sure any subsequent chat doesnt include it either.
+      const query3 = 'And this 3rd question?';
+      const enhancedQuery3 = await agent.enhanceQuery(query3, mockAiCallTree);
+      assert.strictEqual(enhancedQuery3, query3);
+      assert.isFalse(enhancedQuery3.includes(mockAiCallTree.serialize()));
     });
   });
 });

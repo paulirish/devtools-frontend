@@ -7,6 +7,9 @@ import("../../../../scripts/build/ninja/devtools_module.gni")
 
 devtools_module("utils") {
   sources = [
+    "AICallTree.ts",
+    "EntryName.ts",
+    "EntryStyles.ts",
     "Helpers.ts",
     "IgnoreList.ts",
     "ImageCache.ts",
@@ -21,8 +24,10 @@ devtools_module("utils") {
     "../../../generated",
     "../../../models/bindings:bundle",
     "../../../models/source_map_scopes:bundle",
+    "../../../models/timeline_model:bundle",
     "../../../models/trace:bundle",
     "../../../models/workspace:bundle",
+    "../../../ui/legacy:bundle",
   ]
 }
 
@@ -34,9 +39,13 @@ devtools_entrypoint("bundle") {
   visibility = [
     ":*",
     "..:*",
+    "../../freestyler/*",
     "../../network/*",
     "../components:*",
     "../components/insights:*",
+
+    # only for use in tests
+    "../../../models/trace/handlers/*",
   ]
 }
 
@@ -44,6 +53,8 @@ ts_library("unittests") {
   testonly = true
 
   sources = [
+    "AICallTree.test.ts",
+    "EntryName.test.ts",
     "Helpers.test.ts",
     "IgnoreList.test.ts",
     "ImageCache.test.ts",

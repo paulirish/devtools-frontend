@@ -86,10 +86,6 @@ function getFieldMessage(view: Element): HTMLElement|null {
   return view.shadowRoot!.querySelector('#field-setup .field-data-message');
 }
 
-function getDataDescriptions(view: Element): HTMLElement {
-  return view.shadowRoot!.querySelector('.data-descriptions') as HTMLElement;
-}
-
 function getLiveMetricsTitle(view: Element): HTMLElement {
   // There may be multiple, but this should always be the first one.
   return view.shadowRoot!.querySelector('.live-metrics > .section-title') as HTMLElement;
@@ -213,6 +209,7 @@ describeWithMockConnection('LiveMetricsView', () => {
           interactionId: 'interaction-1-1',
           eventNames: ['pointerup'],
           phases: {inputDelay: 100, processingDuration: 300, presentationDelay: 100},
+          longAnimationFrameTimings: [],
         },
         {
           duration: 30,
@@ -222,6 +219,7 @@ describeWithMockConnection('LiveMetricsView', () => {
           interactionId: 'interaction-1-2',
           eventNames: ['keyup'],
           phases: {inputDelay: 10, processingDuration: 10, presentationDelay: 10},
+          longAnimationFrameTimings: [],
         },
       ]),
       layoutShifts: [],
@@ -277,6 +275,58 @@ describeWithMockConnection('LiveMetricsView', () => {
     ]);
   });
 
+  it('should show button to log script details to console', async () => {
+    const view = renderLiveMetrics();
+    LiveMetrics.LiveMetrics.instance().setStatusForTesting({
+      inp: {
+        value: 500,
+        phases: {
+          inputDelay: 100,
+          processingDuration: 300,
+          presentationDelay: 100,
+        },
+        interactionId: 'interaction-1-1',
+      },
+      interactions: createInteractionsMap([
+        {
+          duration: 500,
+          startTime: 0,
+          nextPaintTime: 500,
+          interactionType: 'pointer',
+          interactionId: 'interaction-1-1',
+          eventNames: ['pointerup'],
+          phases: {inputDelay: 100, processingDuration: 300, presentationDelay: 100},
+          longAnimationFrameTimings: [{
+            renderStart: 0,
+            duration: 0,
+            scripts: [],
+          }],
+        },
+        {
+          duration: 30,
+          startTime: 0,
+          nextPaintTime: 30,
+          interactionType: 'keyboard',
+          interactionId: 'interaction-1-2',
+          eventNames: ['keyup'],
+          phases: {inputDelay: 10, processingDuration: 10, presentationDelay: 10},
+          longAnimationFrameTimings: [],
+        },
+      ]),
+      layoutShifts: [],
+    });
+    await coordinator.done();
+
+    const interactions = getInteractions(view);
+    assert.lengthOf(interactions, 2);
+
+    assert(
+        interactions[0].querySelector('.log-extra-details-button'), 'First interaction should have log details button');
+    assert(
+        !interactions[1].querySelector('.log-extra-details-button'),
+        'Second interaction should not have log details button');
+  });
+
   it('should show help icon for interaction that is longer than INP', async () => {
     const view = renderLiveMetrics();
     LiveMetrics.LiveMetrics.instance().setStatusForTesting({
@@ -298,6 +348,7 @@ describeWithMockConnection('LiveMetricsView', () => {
           interactionId: 'interaction-1-1',
           eventNames: ['keyup'],
           phases: {inputDelay: 10, processingDuration: 30, presentationDelay: 10},
+          longAnimationFrameTimings: [],
         },
         {
           duration: 500,
@@ -307,6 +358,7 @@ describeWithMockConnection('LiveMetricsView', () => {
           interactionId: 'interaction-1-2',
           eventNames: ['pointerup'],
           phases: {inputDelay: 100, processingDuration: 300, presentationDelay: 100},
+          longAnimationFrameTimings: [],
         },
       ]),
       layoutShifts: [],
@@ -428,6 +480,7 @@ describeWithMockConnection('LiveMetricsView', () => {
           interactionId: 'interaction-1-1',
           eventNames: ['pointerup'],
           phases: {inputDelay: 100, processingDuration: 300, presentationDelay: 100},
+          longAnimationFrameTimings: [],
         },
         {
           duration: 30,
@@ -437,6 +490,7 @@ describeWithMockConnection('LiveMetricsView', () => {
           interactionId: 'interaction-1-2',
           eventNames: ['keyup'],
           phases: {inputDelay: 10, processingDuration: 10, presentationDelay: 10},
+          longAnimationFrameTimings: [],
         },
       ]),
       layoutShifts: [],
@@ -481,6 +535,7 @@ describeWithMockConnection('LiveMetricsView', () => {
           interactionId: 'interaction-1-2',
           eventNames: ['keyup'],
           phases: {inputDelay: 10, processingDuration: 10, presentationDelay: 10},
+          longAnimationFrameTimings: [],
         },
       ]),
       layoutShifts: [],
@@ -517,6 +572,7 @@ describeWithMockConnection('LiveMetricsView', () => {
           interactionId: 'interaction-1-1',
           eventNames: ['keyup'],
           phases: {inputDelay: 10, processingDuration: 30, presentationDelay: 10},
+          longAnimationFrameTimings: [],
         },
         {
           duration: 500,
@@ -526,6 +582,7 @@ describeWithMockConnection('LiveMetricsView', () => {
           interactionId: 'interaction-1-2',
           eventNames: ['pointerup'],
           phases: {inputDelay: 100, processingDuration: 300, presentationDelay: 100},
+          longAnimationFrameTimings: [],
         },
       ]),
       layoutShifts: [
@@ -572,6 +629,7 @@ describeWithMockConnection('LiveMetricsView', () => {
           interactionId: 'interaction-1-1',
           eventNames: ['keyup'],
           phases: {inputDelay: 10, processingDuration: 30, presentationDelay: 10},
+          longAnimationFrameTimings: [],
         },
         {
           duration: 500,
@@ -581,6 +639,7 @@ describeWithMockConnection('LiveMetricsView', () => {
           interactionId: 'interaction-1-2',
           eventNames: ['pointerup'],
           phases: {inputDelay: 100, processingDuration: 300, presentationDelay: 100},
+          longAnimationFrameTimings: [],
         },
       ]),
       layoutShifts: [
@@ -669,12 +728,8 @@ describeWithMockConnection('LiveMetricsView', () => {
       const fieldMessage = getFieldMessage(view);
       assert.match(fieldMessage!.innerText, /See how your local metrics compare/);
 
-      const dataDescriptions = getDataDescriptions(view);
-      assert.match(dataDescriptions.innerText, /local metrics/);
-      assert.notMatch(dataDescriptions.innerText, /field data/);
-
       const title = getLiveMetricsTitle(view);
-      assert.strictEqual(title.innerText, 'Local metrics');
+      assert.strictEqual(title.innerText, 'Local metrics ');
     });
 
     it('should show when crux is enabled', async () => {
@@ -704,12 +759,8 @@ describeWithMockConnection('LiveMetricsView', () => {
       // We expect it to say something like Jan 1 - Jan 29 2024.
       assert.match(fieldMessage!.innerText, /Jan.+2024/);
 
-      const dataDescriptions = getDataDescriptions(view);
-      assert.match(dataDescriptions.innerText, /local metrics/);
-      assert.match(dataDescriptions.innerText, /field data/);
-
       const title = getLiveMetricsTitle(view);
-      assert.strictEqual(title.innerText, 'Local and field metrics');
+      assert.strictEqual(title.innerText, 'Local and field metrics ');
     });
 
     it('should show empty values when crux is enabled but there is no field data', async () => {
@@ -732,12 +783,8 @@ describeWithMockConnection('LiveMetricsView', () => {
       const fieldMessage = getFieldMessage(view);
       assert.match(fieldMessage!.textContent!, /Not enough data/);
 
-      const dataDescriptions = getDataDescriptions(view);
-      assert.match(dataDescriptions.innerText, /local metrics/);
-      assert.match(dataDescriptions.innerText, /field data/);
-
       const title = getLiveMetricsTitle(view);
-      assert.strictEqual(title.innerText, 'Local and field metrics');
+      assert.strictEqual(title.innerText, 'Local and field metrics ');
     });
 
     it('should make initial request on render when crux is enabled', async () => {
