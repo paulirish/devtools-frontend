@@ -4,7 +4,8 @@
   "description": "",
   "main": "models/trace/trace.js",
   "scripts": {
-    "test": "node test/test-trace-engine.mjs",
+    "test": "node --test",
+    "type-check": "tsc --build ./tsconfig.json",
     "prepublishOnly": "npm test"
   },
   "type": "module",
@@ -15,6 +16,6 @@
     "third-party-web": "latest"
   },
   "devDependencies": {
-
+    "typescript": "^5.5.0-beta"
   }
 }

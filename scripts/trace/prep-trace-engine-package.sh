@@ -27,17 +27,17 @@ cp "$out_dir/gen/front_end/generated/protocol.d.ts" "$dist/generated/protocol.d.
 cp ./front_end/models/trace/package-template.json "$dist/package.json"
 
 
-# Replacement extras provides a basic URLForEntry and Third-Party-Web
+# Replacement extras provides URLForEntry and ThirdPartyWeb. Funnily the JS works for both js and d.ts
 cp $DIRNAME/replacements/extras.js $dist/models/trace/extras/extras.js
-cp $DIRNAME/replacements/extras.d.ts $dist/models/trace/extras/extras.d.ts
+cp $DIRNAME/replacements/extras.js $dist/models/trace/extras/extras.d.ts
+mkdir -p $dist/third_party/third-party-web/
+echo "import ThirdPartyWeb from 'third-party-web'; export {ThirdPartyWeb};" > $dist/third_party/third-party-web/third-party-web.js
 
 echo 'export {};' > $dist/models/trace/TracingManager.js
 echo 'export {};' > $dist/models/trace/TracingManager.d.ts
 echo 'export {};' > $dist/models/trace/LegacyTracingModel.js
 echo 'export {};' > $dist/models/trace/LegacyTracingModel.d.ts
 
-mkdir -p $dist/third_party/third-party-web/
-echo "import ThirdPartyWeb from 'third-party-web'; export {ThirdPartyWeb};" > $dist/third_party/third-party-web/third-party-web.js
 
 
 $DIRNAME/copy-build-trace-engine-for-publish.sh
