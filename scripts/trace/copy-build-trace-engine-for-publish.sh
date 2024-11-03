@@ -33,5 +33,6 @@ cp -rp "$dtfe/scripts/trace/test/test-trace-engine.mjs" "$standalone/test/test-t
 command rm "$standalone/analyze-trace.mjs.orig"
 
 echo "➕ Files copied. Testing…"
+npm -C "$standalone" install
 npm -C "$standalone" run test
 exit $?
