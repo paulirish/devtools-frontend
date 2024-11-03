@@ -3,10 +3,11 @@
 // found in the LICENSE file.
 
 import * as Common from '../../core/common/common.js';
+import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import type * as Platform from '../../core/platform/platform.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
-import * as IconButton from '../../ui/components/icon_button/icon_button.js';
+import type * as IconButton from '../../ui/components/icon_button/icon_button.js';
 import * as Input from '../../ui/components/input/input.js';
 import * as LegacyWrapper from '../../ui/components/legacy_wrapper/legacy_wrapper.js';
 import * as Switch from '../../ui/components/switch/switch.js';
@@ -91,6 +92,10 @@ const UIStrings = {
    */
   helpUnderstandStylingAndNetworkRequest: 'Get help with understanding CSS styles and network requests',
   /**
+   *@description Text describing the 'AI assistance' feature
+   */
+  helpUnderstandStylingNetworkAndFile: 'Get help with understanding CSS styles, network requests, and files',
+  /**
    *@description Text which is a hyperlink to more documentation
    */
   learnMore: 'Learn more',
@@ -102,6 +107,10 @@ const UIStrings = {
    *@description Description of the AI assistance feature
    */
   explainStylingAndNetworkRequest: 'Understand CSS styles, and network activity with AI-powered insights',
+  /**
+   *@description Description of the AI assistance feature
+   */
+  explainStylingNetworkAndFile: 'Understand CSS styles, network activity, and file origins with AI-powered insights',
   /**
    *@description Description of the AI assistance feature
    */
@@ -131,6 +140,18 @@ const UIStrings = {
    *@description Label for a toggle to enable the AI assistance feature
    */
   enableAiAssistance: 'Enable AI assistance',
+  /**
+   * @description Message shown to the user if the age check is not successful.
+   */
+  ageRestricted: 'This feature is only available to users who are 18 years of age or older',
+  /**
+   * @description The error message when the user is not logged in into Chrome.
+   */
+  notLoggedIn: 'This feature is only available when you sign into Chrome with your Google account.',
+  /**
+   * @description Message shown when the user is offline.
+   */
+  offline: 'This feature is only available with an active internet connection.',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/settings/AISettingsTab.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -139,12 +160,13 @@ const chevronDownIconUrl = new URL('../../Images/chevron-down.svg', import.meta.
 const chevronUpIconUrl = new URL('../../Images/chevron-up.svg', import.meta.url).toString();
 
 export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponent {
-  static readonly litTagName = LitHtml.literal`devtools-settings-ai-settings-tab`;
   readonly #shadow = this.attachShadow({mode: 'open'});
   #consoleInsightsSetting?: Common.Settings.Setting<boolean>;
   #aiAssistanceSetting?: Common.Settings.Setting<boolean>;
   #isConsoleInsightsSettingExpanded = false;
   #isAiAssistanceSettingExpanded = false;
+  #aidaAvailability = Host.AidaClient.AidaAccessPreconditions.NO_ACCOUNT_EMAIL;
+  #boundOnAidaAvailabilityChange: () => Promise<void>;
 
   constructor() {
     super();
@@ -158,15 +180,35 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
     } catch {
       this.#aiAssistanceSetting = undefined;
     }
+    this.#boundOnAidaAvailabilityChange = this.#onAidaAvailabilityChange.bind(this);
   }
 
   connectedCallback(): void {
     this.#shadow.adoptedStyleSheets = [Input.checkboxStyles, aiSettingsTabStyles];
+    Host.AidaClient.HostConfigTracker.instance().addEventListener(
+        Host.AidaClient.Events.AIDA_AVAILABILITY_CHANGED, this.#boundOnAidaAvailabilityChange);
+    void this.#onAidaAvailabilityChange();
+  }
+
+  disconnectedCallback(): void {
+    Host.AidaClient.HostConfigTracker.instance().removeEventListener(
+        Host.AidaClient.Events.AIDA_AVAILABILITY_CHANGED, this.#boundOnAidaAvailabilityChange);
+  }
+
+  async #onAidaAvailabilityChange(): Promise<void> {
+    const currentAidaAvailability = await Host.AidaClient.AidaClient.checkAccessPreconditions();
+    if (currentAidaAvailability !== this.#aidaAvailability) {
+      this.#aidaAvailability = currentAidaAvailability;
+      void this.render();
+    }
   }
 
   #getAiAssistanceSettingDescription(): Platform.UIString.LocalizedString {
     const config = Common.Settings.Settings.instance().getHostConfig();
     if (config.devToolsExplainThisResourceDogfood?.enabled) {
+      if (config.devToolsAiAssistanceFileAgentDogfood?.enabled) {
+        return i18nString(UIStrings.helpUnderstandStylingNetworkAndFile);
+      }
       return i18nString(UIStrings.helpUnderstandStylingAndNetworkRequest);
     }
     return i18nString(UIStrings.helpUnderstandStyling);
@@ -175,6 +217,9 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
   #getAiAssistanceSettingInfo(): Platform.UIString.LocalizedString {
     const config = Common.Settings.Settings.instance().getHostConfig();
     if (config.devToolsExplainThisResourceDogfood?.enabled) {
+      if (config.devToolsAiAssistanceFileAgentDogfood?.enabled) {
+        return i18nString(UIStrings.explainStylingNetworkAndFile);
+      }
       return i18nString(UIStrings.explainStylingAndNetworkRequest);
     }
     return i18nString(UIStrings.explainStyling);
@@ -236,13 +281,13 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
     // clang-format off
     return html`
       <div>
-        <${IconButton.Icon.Icon.litTagName} .data=${{
+        <devtools-icon .data=${{
           iconName: icon,
           color: 'var(--icon-default)',
           width: 'var(--sys-size-8)',
           height: 'var(--sys-size-8)',
         } as IconButton.Icon.IconData}>
-        </${IconButton.Icon.Icon.litTagName}>
+        </devtools-icon>
       </div>
       <div>${text}</div>
     `;
@@ -286,16 +331,32 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
     // clang-format off
     return html`
       <div>
-        <${IconButton.Icon.Icon.litTagName} .data=${{
+        <devtools-icon .data=${{
           iconName: icon,
           width: 'var(--sys-size-9)',
           height: 'var(--sys-size-9)',
         } as IconButton.Icon.IconData}>
-        </${IconButton.Icon.Icon.litTagName}>
+        </devtools-icon>
       </div>
       <div class="padded">${text}</div>
     `;
     // clang-format on
+  }
+
+  #getDisabledReason(setting: Common.Settings.Setting<boolean>|undefined): string|undefined {
+    switch (this.#aidaAvailability) {
+      case Host.AidaClient.AidaAccessPreconditions.NO_ACCOUNT_EMAIL:
+      case Host.AidaClient.AidaAccessPreconditions.SYNC_IS_PAUSED:
+        return i18nString(UIStrings.notLoggedIn);
+      case Host.AidaClient.AidaAccessPreconditions.NO_INTERNET:
+        return i18nString(UIStrings.offline);
+    }
+
+    const config = Common.Settings.Settings.instance().getHostConfig();
+    if (config?.aidaAvailability?.blockedByAge === true) {
+      return i18nString(UIStrings.ageRestricted);
+    }
+    return setting?.disabledReason();
   }
 
   #renderConsoleInsightsSetting(): LitHtml.TemplateResult {
@@ -304,20 +365,21 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
       open: this.#isConsoleInsightsSettingExpanded,
     };
     const tabindex = this.#isConsoleInsightsSettingExpanded ? '0' : '-1';
+    const disabledReason = this.#getDisabledReason(this.#consoleInsightsSetting);
 
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     return html`
       <div class="accordion-header" @click=${this.#expandConsoleInsightsSetting}>
         <div class="icon-container centered">
-          <${IconButton.Icon.Icon.litTagName} name="lightbulb-spark"></${IconButton.Icon.Icon.litTagName}>
+          <devtools-icon name="lightbulb-spark"></devtools-icon>
         </div>
         <div class="setting-card">
           <h2>${i18n.i18n.lockedString('Console Insights')}</h2>
           <div class="setting-description">${i18nString(UIStrings.helpUnderstandConsole)}</div>
         </div>
         <div class="dropdown centered">
-          <${Buttons.Button.Button.litTagName}
+          <devtools-button
             .data=${{
               title: this.#isConsoleInsightsSettingExpanded ? i18nString(UIStrings.showLess) : i18nString(UIStrings.showMore),
               size: Buttons.Button.Size.SMALL,
@@ -325,21 +387,21 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
               variant: Buttons.Button.Variant.ICON,
               jslogContext: 'console-insights.accordion',
             } as Buttons.Button.ButtonData}
-          ></${Buttons.Button.Button.litTagName}>
+          ></devtools-button>
         </div>
       </div>
       <div class="divider"></div>
       <div class="toggle-container centered"
-        title=${ifDefined(this.#consoleInsightsSetting?.disabledReason())}
+        title=${ifDefined(disabledReason)}
         @click=${this.#toggleConsoleInsightsSetting.bind(this)}
       >
-        <${Switch.Switch.Switch.litTagName}
-          .checked=${Boolean(this.#consoleInsightsSetting?.get() && !this.#consoleInsightsSetting?.disabled())}
+        <devtools-switch
+          .checked=${Boolean(this.#consoleInsightsSetting?.get()) && !Boolean(disabledReason)}
           .jslogContext=${this.#consoleInsightsSetting?.name || ''}
-          .disabled=${Boolean(this.#consoleInsightsSetting?.disabled())}
+          .disabled=${Boolean(disabledReason)}
           @switchchange=${this.#toggleConsoleInsightsSetting.bind(this)}
-          aria-label=${this.#consoleInsightsSetting?.disabledReason() || i18nString(UIStrings.enableConsoleInsights)}
-        ></${Switch.Switch.Switch.litTagName}>
+          aria-label=${disabledReason || i18nString(UIStrings.enableConsoleInsights)}
+        ></devtools-switch>
       </div>
       <div class=${classMap(detailsClasses)}>
         <div class="overflow-hidden">
@@ -372,20 +434,21 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
       open: this.#isAiAssistanceSettingExpanded,
     };
     const tabindex = this.#isAiAssistanceSettingExpanded ? '0' : '-1';
+    const disabledReason = this.#getDisabledReason(this.#aiAssistanceSetting);
 
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     return html`
       <div class="accordion-header" @click=${this.#expandAiAssistanceSetting}>
         <div class="icon-container centered">
-          <${IconButton.Icon.Icon.litTagName} name="smart-assistant"></${IconButton.Icon.Icon.litTagName}>
+          <devtools-icon name="smart-assistant"></devtools-icon>
         </div>
         <div class="setting-card">
           <h2>${i18n.i18n.lockedString('AI assistance')}</h2>
           <div class="setting-description">${this.#getAiAssistanceSettingDescription()}</div>
         </div>
         <div class="dropdown centered">
-          <${Buttons.Button.Button.litTagName}
+          <devtools-button
             .data=${{
               title: this.#isAiAssistanceSettingExpanded ? i18nString(UIStrings.showLess) : i18nString(UIStrings.showMore),
               size: Buttons.Button.Size.SMALL,
@@ -393,21 +456,21 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
               variant: Buttons.Button.Variant.ICON,
               jslogContext: 'freestyler.accordion',
             } as Buttons.Button.ButtonData}
-          ></${Buttons.Button.Button.litTagName}>
+          ></devtools-button>
         </div>
       </div>
       <div class="divider"></div>
       <div class="toggle-container centered"
-        title=${ifDefined(this.#aiAssistanceSetting?.disabledReason())}
+        title=${ifDefined(disabledReason)}
         @click=${this.#toggleAiAssistanceSetting.bind(this)}
       >
-        <${Switch.Switch.Switch.litTagName}
-          .checked=${Boolean(this.#aiAssistanceSetting?.get() && !this.#aiAssistanceSetting?.disabled())}
-          .jslogContext=${this.#aiAssistanceSetting?.name}
-          .disabled=${Boolean(this.#aiAssistanceSetting?.disabled())}
+        <devtools-switch
+          .checked=${Boolean(this.#aiAssistanceSetting?.get()) && !Boolean(disabledReason)}
+          .jslogContext=${this.#aiAssistanceSetting?.name || ''}
+          .disabled=${Boolean(disabledReason)}
           @switchchange=${this.#toggleAiAssistanceSetting.bind(this)}
-          aria-label=${this.#aiAssistanceSetting?.disabledReason() || i18nString(UIStrings.enableAiAssistance)}
-        ></${Switch.Switch.Switch.litTagName}>
+          aria-label=${disabledReason || i18nString(UIStrings.enableAiAssistance)}
+        ></devtools-switch>
       </div>
       <div class=${classMap(detailsClasses)}>
         <div class="overflow-hidden">

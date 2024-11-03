@@ -22,7 +22,6 @@ const messages: Freestyler.ChatMessage[] = [
   },
   {
     entity: Freestyler.ChatMessageEntity.MODEL,
-    suggestions: [],
     steps: [
       {
         isLoading: false,
@@ -47,6 +46,7 @@ const component = new Freestyler.FreestylerChatUi({
   onFeedbackSubmit: noop,
   onCancelClick: noop,
   onSelectedNetworkRequestClick: noop,
+  onSelectedFileRequestClick: noop,
   inspectElementToggled: false,
   state: Freestyler.State.CHAT_VIEW,
   aidaAvailability: Host.AidaClient.AidaAccessPreconditions.AVAILABLE,

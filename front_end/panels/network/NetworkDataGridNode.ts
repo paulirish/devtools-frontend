@@ -46,6 +46,7 @@ import type * as HAR from '../../models/har/har.js';
 import * as Logs from '../../models/logs/logs.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as NetworkForward from '../../panels/network/forward/forward.js';
+import * as FloatingButton from '../../ui/components/floating_button/floating_button.js';
 import * as IconButton from '../../ui/components/icon_button/icon_button.js';
 import * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
@@ -53,7 +54,7 @@ import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import {PanelUtils} from '../utils/utils.js';
 
-import {type NetworkTimeCalculator} from './NetworkTimeCalculator.js';
+import type {NetworkTimeCalculator} from './NetworkTimeCalculator.js';
 
 const UIStrings = {
   /**
@@ -383,7 +384,11 @@ export class NetworkNode extends DataGrid.SortableDataGrid.SortableDataGridNode<
   renderCell(_cell: Element, _columnId: string): void {
   }
 
-  isFailed(): boolean {
+  isError(): boolean {
+    return false;
+  }
+
+  isWarning(): boolean {
     return false;
   }
 
@@ -391,10 +396,14 @@ export class NetworkNode extends DataGrid.SortableDataGrid.SortableDataGridNode<
     const bgColors = _backgroundColors;
     const hasFocus = document.hasFocus();
     const isSelected = this.dataGrid && this.dataGrid.element === document.activeElement;
-    const isFailed = this.isFailed();
+    const isWarning = this.isWarning();
+    const isError = this.isError();
 
-    if (this.selected && hasFocus && isSelected && isFailed) {
+    if (this.selected && hasFocus && isSelected && isError) {
       return bgColors.FocusSelectedHasError;
+    }
+    if (this.selected && hasFocus && isSelected && isWarning) {
+      return bgColors.FocusSelectedHasWarning;
     }
     if (this.selected && hasFocus && isSelected) {
       return bgColors.FocusSelected;
@@ -536,6 +545,7 @@ export const _backgroundColors: {
   Selected: '--color-grid-selected',
   FocusSelected: '--color-grid-focus-selected',
   FocusSelectedHasError: '--network-grid-focus-selected-color-has-error',
+  FocusSelectedHasWarning: '--network-grid-focus-selected-color-has-warning',
   FromFrame: '--network-grid-from-frame-color',
 };
 
@@ -548,6 +558,7 @@ export class NetworkRequestNode extends NetworkNode {
   private isOnInitiatorPathInternal: boolean;
   private isOnInitiatedPathInternal: boolean;
   private linkifiedInitiatorAnchor?: HTMLElement;
+
   constructor(parentView: NetworkLogViewInterface, request: SDK.NetworkRequest.NetworkRequest) {
     super(parentView);
     this.nameCell = null;
@@ -883,11 +894,24 @@ export class NetworkRequestNode extends NetworkNode {
     return this.parentView().rowHeight();
   }
 
+  private isPrefetch(): boolean {
+    return this.requestInternal.resourceType() === Common.ResourceType.resourceTypes.Prefetch;
+  }
+
+  override isWarning(): boolean {
+    return this.isFailed() && this.isPrefetch();
+  }
+
+  override isError(): boolean {
+    return this.isFailed() && !this.isPrefetch();
+  }
+
   override createCells(element: Element): void {
     this.nameCell = null;
     this.initiatorCell = null;
 
-    element.classList.toggle('network-error-row', this.isFailed());
+    element.classList.toggle('network-warning-row', this.isWarning());
+    element.classList.toggle('network-error-row', this.isError());
     element.classList.toggle('network-navigation-row', this.isNavigationRequestInternal);
     super.createCells(element);
     this.updateBackgroundColor();
@@ -1060,7 +1084,7 @@ export class NetworkRequestNode extends NetworkNode {
     Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(this.requestInternal.url());
   }
 
-  override isFailed(): boolean {
+  private isFailed(): boolean {
     return PanelUtils.isFailedNetworkRequest(this.requestInternal);
   }
 
@@ -1084,6 +1108,12 @@ export class NetworkRequestNode extends NetworkNode {
       // render icons
       const iconElement = PanelUtils.getIconForNetworkRequest(this.requestInternal);
       cell.appendChild(iconElement);
+
+      // render Ask AI button
+      const aiButtonContainer = this.createAiButtonIfAvailable();
+      if (aiButtonContainer) {
+        cell.appendChild(aiButtonContainer);
+      }
     }
 
     if (columnId === 'name') {
@@ -1451,6 +1481,27 @@ export class NetworkRequestNode extends NetworkNode {
       UI.Tooltip.Tooltip.install(subtitleElement, tooltipText);
     }
     cellElement.appendChild(subtitleElement);
+  }
+
+  private createAiButtonIfAvailable(): HTMLSpanElement|void {
+    if (UI.ActionRegistry.ActionRegistry.instance().hasAction('drjones.network-floating-button')) {
+      const action = UI.ActionRegistry.ActionRegistry.instance().getAction('drjones.network-floating-button');
+      const aiButtonContainer = document.createElement('span');
+      aiButtonContainer.classList.add('ai-button-container');
+      const floatingButton = new FloatingButton.FloatingButton.FloatingButton({
+        iconName: 'smart-assistant',
+      });
+      floatingButton.addEventListener('click', ev => {
+        ev.stopPropagation();
+        this.select();
+        void action.execute();
+      }, {capture: true});
+      floatingButton.addEventListener('mousedown', ev => {
+        ev.stopPropagation();
+      }, {capture: true});
+      aiButtonContainer.appendChild(floatingButton);
+      return aiButtonContainer;
+    }
   }
 }
 

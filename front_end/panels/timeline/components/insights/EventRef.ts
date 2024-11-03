@@ -21,7 +21,6 @@ export class EventReferenceClick extends Event {
 }
 
 class EventRef extends HTMLElement {
-  static readonly litTagName = LitHtml.literal`devtools-performance-event-ref`;
   readonly #shadow = this.attachShadow({mode: 'open'});
   readonly #boundRender = this.#render.bind(this);
 
@@ -72,11 +71,11 @@ export function eventRef(event: EventRefSupportedEvents): LitHtml.TemplateResult
         event, `unsupported event in eventRef: ${(event as Trace.Types.Events.Event).name}`);
   }
 
-  return html`<${EventRef.litTagName}
-    .event=${event}
+  return html`<devtools-performance-event-ref
+    .event=${event as Trace.Types.Events.Event}
     .text=${text}
     title=${title}
-  ></${EventRef.litTagName}>`;
+  ></devtools-performance-event-ref>`;
 }
 
 declare global {

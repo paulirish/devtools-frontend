@@ -6,7 +6,7 @@ import * as Protocol from '../../generated/protocol.js';
 import * as Platform from '../platform/platform.js';
 
 import {CSSMetadata, cssMetadata, CSSWideKeyword} from './CSSMetadata.js';
-import {type CSSModel} from './CSSModel.js';
+import type {CSSModel} from './CSSModel.js';
 import {CSSProperty} from './CSSProperty.js';
 import * as PropertyParser from './CSSPropertyParser.js';
 import {
@@ -17,7 +17,7 @@ import {
   CSSStyleRule,
 } from './CSSRule.js';
 import {CSSStyleDeclaration, Type} from './CSSStyleDeclaration.js';
-import {type DOMNode} from './DOMModel.js';
+import type {DOMNode} from './DOMModel.js';
 
 function containsStyle(styles: CSSStyleDeclaration[]|Set<CSSStyleDeclaration>, query: CSSStyleDeclaration): boolean {
   if (!query.styleSheetId || !query.range) {
@@ -177,6 +177,7 @@ export interface CSSMatchedStylesPayload {
   propertyRules: Protocol.CSS.CSSPropertyRule[];
   cssPropertyRegistrations: Protocol.CSS.CSSPropertyRegistration[];
   fontPaletteValuesRule: Protocol.CSS.CSSFontPaletteValuesRule|undefined;
+  activePositionFallbackIndex: number;
 }
 
 export class CSSRegisteredProperty {
@@ -250,6 +251,7 @@ export class CSSMatchedStyles {
   #styleToDOMCascade: Map<CSSStyleDeclaration, DOMInheritanceCascade>;
   #parentLayoutNodeId: Protocol.DOM.NodeId|undefined;
   #positionTryRules: CSSPositionTryRule[];
+  #activePositionFallbackIndex: number;
   #mainDOMCascade?: DOMInheritanceCascade;
   #pseudoDOMCascades?: Map<Protocol.DOM.PseudoType, DOMInheritanceCascade>;
   #customHighlightPseudoDOMCascades?: Map<string, DOMInheritanceCascade>;
@@ -270,6 +272,7 @@ export class CSSMatchedStyles {
     propertyRules,
     cssPropertyRegistrations,
     fontPaletteValuesRule,
+    activePositionFallbackIndex,
   }: CSSMatchedStylesPayload) {
     this.#cssModelInternal = cssModel;
     this.#nodeInternal = node;
@@ -292,6 +295,7 @@ export class CSSMatchedStyles {
     this.#inheritedStyles = new Set();
     this.#styleToDOMCascade = new Map();
     this.#registeredPropertyMap = new Map();
+    this.#activePositionFallbackIndex = activePositionFallbackIndex;
   }
 
   private async init({
@@ -674,6 +678,10 @@ export class CSSMatchedStyles {
 
   positionTryRules(): CSSPositionTryRule[] {
     return this.#positionTryRules;
+  }
+
+  activePositionFallbackIndex(): number {
+    return this.#activePositionFallbackIndex;
   }
 
   pseudoStyles(pseudoType: Protocol.DOM.PseudoType): CSSStyleDeclaration[] {

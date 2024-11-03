@@ -7,6 +7,7 @@ import './CPUThrottlingSelector.js';
 import './FieldSettingsDialog.js';
 import './NetworkThrottlingSelector.js';
 import '../../../ui/components/menus/menus.js';
+import './MetricCard.js';
 
 import * as Common from '../../../core/common/common.js';
 import * as i18n from '../../../core/i18n/i18n.js';
@@ -18,21 +19,24 @@ import * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as LegacyWrapper from '../../../ui/components/legacy_wrapper/legacy_wrapper.js';
 import type * as Menus from '../../../ui/components/menus/menus.js';
+import * as Coordinator from '../../../ui/components/render_coordinator/render_coordinator.js';
 import type * as Settings from '../../../ui/components/settings/settings.js';
-import * as Components from '../../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 import * as MobileThrottling from '../../mobile_throttling/mobile_throttling.js';
 
 import liveMetricsViewStyles from './liveMetricsView.css.js';
-import {type MetricCardData} from './MetricCard.js';
+import type {MetricCardData} from './MetricCard.js';
 import metricValueStyles from './metricValueStyles.css.js';
-import {INP_THRESHOLDS, renderMetricValue} from './Utils.js';
+import {CLS_THRESHOLDS, INP_THRESHOLDS, renderMetricValue} from './Utils.js';
 
 const {html, nothing, Directives} = LitHtml;
 const {until} = Directives;
 
 type DeviceOption = CrUXManager.DeviceScope|'AUTO';
+
+const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
 
 const DEVICE_OPTION_LIST: DeviceOption[] = ['AUTO', ...CrUXManager.DEVICE_SCOPE_LIST];
 
@@ -49,9 +53,17 @@ const UIStrings = {
    */
   localMetrics: 'Local metrics',
   /**
+   * @description Accessible label for a section that logs user interactions and layout shifts. A layout shift is an event that shifts content in the layout of the page causing a jarring experience for the user.
+   */
+  eventLogs: 'Interaction and layout shift logs section',
+  /**
    * @description Title of a section that lists user interactions.
    */
   interactions: 'Interactions',
+  /**
+   * @description Title of a section that lists layout shifts. A layout shift is an event that shifts content in the layout of the page causing a jarring experience for the user.
+   */
+  layoutShifts: 'Layout shifts',
   /**
    * @description Title of a sidebar section that shows options for the user to take after using the main view.
    */
@@ -69,6 +81,15 @@ const UIStrings = {
    * @example {Mobile} PH1
    */
   showFieldDataForDevice: 'Show field data for device type: {PH1}',
+  /**
+   * @description Text indicating that there is not enough data to report real user statistics.
+   */
+  notEnoughData: 'Not enough data',
+  /**
+   * @description Label for a text block that describes the network connections of real users.
+   * @example {75th percentile is similar to Slow 4G throttling} PH1
+   */
+  network: 'Network: {PH1}',
   /**
    * @description Label for an select box that selects which device type field data be shown for (e.g. desktop/mobile/all devices/etc).
    * @example {Mobile} PH1
@@ -129,30 +150,20 @@ const UIStrings = {
    */
   showFieldDataForPage: 'Show field data for {PH1}',
   /**
-   * @description Tooltip text explaining that real user connections are similar to a test environment with no throttling. "latencies" refers to the time it takes for a website server to respond. "throttling" is when the network is intentionally slowed down to simulate a slower connection.
+   * @description Tooltip text explaining that real user connections are similar to a test environment with no throttling. "throttling" is when the network is intentionally slowed down to simulate a slower connection.
    */
-  tryDisablingThrottling:
-      'The 75th percentile of real users experienced network latencies similar to a connection with no throttling.',
+  tryDisablingThrottling: '75th percentile is too fast to simulate with throttling',
   /**
-   * @description Tooltip text explaining that real user connections are similar to a specif network throttling setup. "latencies" refers to the time it takes for a website server to respond. "throttling" is when the network is intentionally slowed down to simulate a slower connection.
+   * @description Tooltip text explaining that real user connections are similar to a specif network throttling setup. "throttling" is when the network is intentionally slowed down to simulate a slower connection.
    * @example {Slow 4G} PH1
    */
-  tryUsingThrottling: 'The 75th percentile of real users experienced network latencies similar to {PH1} throttling.',
+  tryUsingThrottling: '75th percentile is similar to {PH1} throttling',
   /**
-   * @description Tooltip text explaining that a majority of users are using a mobile form factor with the specific percentage.
+   * @description Text block listing what percentage of real users are on different device form factors.
    * @example {60%} PH1
+   * @example {30%} PH2
    */
-  mostUsersMobile: '{PH1} of users are on mobile.',
-  /**
-   * @description Tooltip text explaining that a majority of users are using a desktop form factor with the specific percentage.
-   * @example {60%} PH1
-   */
-  mostUsersDesktop: '{PH1} of users are on desktop.',
-  /**
-   * @description Text for a percentage value.
-   * @example {60} PH1
-   */
-  percentage: '{PH1}%',
+  percentDevices: '{PH1}% mobile, {PH2}% desktop',
   /**
    * @description Text block explaining how to simulate different mobile and desktop devices. The placeholder at the end will be a link with the text "simulate different devices" translated separately.
    * @example {simulate different devices} PH1
@@ -174,11 +185,28 @@ const UIStrings = {
   /**
    * @description Text label for a link to the Largest Contentful Paint (LCP) related page element. This element represents the largest content on the page. "LCP" should not be translated.
    */
-  lcpElement: 'LCP Element',
+  lcpElement: 'LCP element',
+  /**
+   * @description Text label for a button that reveals the user interaction associated with the Interaction to Next Paint (INP) performance metric. "INP" should not be translated.
+   */
+  inpInteractionLink: 'INP interaction',
+  /**
+   * @description Text label for a button that reveals the cluster of layout shift events that affected the page content the most. A cluster is a group of layout shift events that occur in quick succession.
+   */
+  worstCluster: 'Worst cluster',
+  /**
+   * @description [ICU Syntax] Text content of a button that reveals the cluster of layout shift events that affected the page content the most. A layout shift is an event that shifts content in the layout of the page causing a jarring experience for the user. This text will indicate how many shifts were in the cluster.
+   * @example {3} shiftCount
+   */
+  numShifts: `{shiftCount, plural,
+    =1 {{shiftCount} shift}
+    other {{shiftCount} shifts}
+  }`,
   /**
    * @description Label for a a range of dates that represents the period of time a set of field data is collected from.
+   * @example {Oct 1, 2024 - Nov 1, 2024} PH1
    */
-  collectionPeriod: 'Collection period:',
+  collectionPeriod: 'Collection period: {PH1}',
   /**
    * @description Text showing a range of dates meant to represent a period of time.
    * @example {Oct 1, 2024} PH1
@@ -214,13 +242,13 @@ const UIStrings = {
   interactionExcluded:
       'INP is calculated using the 98th percentile of interaction delays, so some interaction delays may be larger than the INP value.',
   /**
-   * @description Tooltip for a button that will remove everything from a log that lists user interactions that happened on the page.
+   * @description Tooltip for a button that will remove everything from the currently selected log.
    */
-  clearInteractionsLog: 'Clear interactions log',
+  clearCurrentLog: 'Clear the current log',
   /**
-   * @description Title for an expandable section that contains more information about real user environments. This message is meant to prompt the user to understand the conditions experienced by real users.
+   * @description Title for a section that contains more information about real user environments. This message is meant to prompt the user to understand the conditions experienced by real users.
    */
-  considerRealUser: 'Consider real user environments',
+  realUserEnvironments: 'Real user environments',
   /**
    * @description Title for a page load phase that measures the time between when the page load starts and the time when the first byte of the initial document is downloaded.
    */
@@ -257,6 +285,10 @@ const UIStrings = {
    * @description Tooltip text for a button that reveals the user interaction associated with the Interaction to Next Paint (INP) performance metric.
    */
   showInpInteraction: 'Go to the INP interaction.',
+  /**
+   * @description Tooltip text for a button that reveals the cluster of layout shift events that affected the page content the most. A layout shift is an event that shifts content in the layout of the page causing a jarring experience for the user. A cluster is a group of layout shift events that occur in quick succession.
+   */
+  showClsCluster: 'Go to worst layout shift cluster.',
 };
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/LiveMetricsView.ts', UIStrings);
@@ -268,7 +300,8 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
   #lcpValue?: LiveMetrics.LCPValue;
   #clsValue?: LiveMetrics.CLSValue;
   #inpValue?: LiveMetrics.INPValue;
-  #interactions: LiveMetrics.Interaction[] = [];
+  #interactions: LiveMetrics.InteractionMap = new Map();
+  #layoutShifts: LiveMetrics.LayoutShift[] = [];
 
   #cruxPageResult?: CrUXManager.PageResult;
 
@@ -278,29 +311,17 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
   #toggleRecordAction: UI.ActionRegistration.Action;
   #recordReloadAction: UI.ActionRegistration.Action;
 
+  #logsEl?: LiveMetricsLogs;
   #tooltipContainerEl?: Element;
   #interactionsListEl?: HTMLElement;
-  #interactionsListScrolling = false;
+  #layoutShiftsListEl?: HTMLElement;
+  #listIsScrolling = false;
 
   constructor() {
     super();
 
     this.#toggleRecordAction = UI.ActionRegistry.ActionRegistry.instance().getAction('timeline.toggle-recording');
     this.#recordReloadAction = UI.ActionRegistry.ActionRegistry.instance().getAction('timeline.record-reload');
-
-    const interactionRevealer = new InteractionRevealer(this);
-
-    Common.Revealer.registerRevealer({
-      contextTypes() {
-        return [LiveMetrics.Interaction];
-      },
-      destination: Common.Revealer.RevealerDestination.TIMELINE_PANEL,
-      async loadRevealer() {
-        return interactionRevealer;
-      },
-    });
-
-    this.#render();
   }
 
   #onMetricStatus(event: {data: LiveMetrics.StatusEvent}): void {
@@ -308,13 +329,25 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
     this.#clsValue = event.data.cls;
     this.#inpValue = event.data.inp;
 
-    const hasNewInteraction = this.#interactions.length < event.data.interactions.length;
-    this.#interactions = [...event.data.interactions];
+    const hasNewLS = this.#layoutShifts.length < event.data.layoutShifts.length;
+    this.#layoutShifts = [...event.data.layoutShifts];
+
+    const hasNewInteraction = this.#interactions.size < event.data.interactions.size;
+    this.#interactions = new Map(event.data.interactions);
 
     const renderPromise = ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
 
-    const listEl = this.#interactionsListEl;
-    if (!hasNewInteraction || !listEl) {
+    if (hasNewInteraction && this.#interactionsListEl) {
+      this.#keepScrolledToBottom(renderPromise, this.#interactionsListEl);
+    }
+
+    if (hasNewLS && this.#layoutShiftsListEl) {
+      this.#keepScrolledToBottom(renderPromise, this.#layoutShiftsListEl);
+    }
+  }
+
+  #keepScrolledToBottom(renderPromise: Promise<void>, listEl: HTMLElement): void {
+    if (!listEl.checkVisibility()) {
       return;
     }
 
@@ -324,15 +357,15 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
     // However, if a new item appears while the animation for a previous item is still going,
     // then we should "finish" the scroll by sending another scroll command even if the scroll position
     // the element hasn't scrolled all the way to the bottom yet.
-    if (!isAtBottom && !this.#interactionsListScrolling) {
+    if (!isAtBottom && !this.#listIsScrolling) {
       return;
     }
 
     void renderPromise.then(() => {
       requestAnimationFrame(() => {
-        this.#interactionsListScrolling = true;
+        this.#listIsScrolling = true;
         listEl.addEventListener('scrollend', () => {
-          this.#interactionsListScrolling = false;
+          this.#listIsScrolling = false;
         }, {once: true});
         listEl.scrollTo({top: listEl.scrollHeight, behavior: 'smooth'});
       });
@@ -382,6 +415,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
     this.#clsValue = liveMetrics.clsValue;
     this.#inpValue = liveMetrics.inpValue;
     this.#interactions = liveMetrics.interactions;
+    this.#layoutShifts = liveMetrics.layoutShifts;
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
@@ -444,6 +478,10 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
   #renderClsCard(): LitHtml.LitTemplate {
     const fieldData = this.#getFieldMetricData('cumulative_layout_shift');
 
+    const clusterIds = new Set(this.#clsValue?.clusterShiftIds || []);
+    const clusterIsVisible =
+        clusterIds.size > 0 && this.#layoutShifts.some(layoutShift => clusterIds.has(layoutShift.uniqueLayoutShiftId));
+
     // clang-format off
     return html`
       <devtools-metric-card .data=${{
@@ -453,6 +491,17 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
         histogram: fieldData?.histogram,
         tooltipContainer: this.#tooltipContainerEl,
       } as MetricCardData}>
+        ${clusterIsVisible ? html`
+          <div class="related-info" slot="extra-info">
+            <span class="related-info-label">${i18nString(UIStrings.worstCluster)}</span>
+            <button
+              class="link-to-log"
+              title=${i18nString(UIStrings.showClsCluster)}
+              @click=${() => this.#revealLayoutShiftCluster(clusterIds)}
+              jslog=${VisualLogging.action('timeline.landing.show-cls-cluster').track({click: true})}
+            >${i18nString(UIStrings.numShifts, {shiftCount: clusterIds.size})}</button>
+          </div>
+        ` : nothing}
       </devtools-metric-card>
     `;
     // clang-format on
@@ -461,20 +510,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
   #renderInpCard(): LitHtml.LitTemplate {
     const fieldData = this.#getFieldMetricData('interaction_to_next_paint');
     const phases = this.#inpValue?.phases;
-    const interaction =
-        this.#interactions.find(interaction => interaction.uniqueInteractionId === this.#inpValue?.uniqueInteractionId);
-
-    let interactionLink;
-    if (interaction) {
-      interactionLink = Components.Linkifier.Linkifier.linkifyRevealable(
-          interaction,
-          interaction.interactionType,
-          undefined,
-          i18nString(UIStrings.showInpInteraction),
-          'link-to-interaction',
-      );
-      interactionLink.tabIndex = 0;
-    }
+    const interaction = this.#inpValue && this.#interactions.get(this.#inpValue.interactionId);
 
     // clang-format off
     return html`
@@ -490,10 +526,15 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
           [i18nString(UIStrings.presentationDelay), phases.presentationDelay],
         ],
       } as MetricCardData}>
-        ${interactionLink ? html`
+        ${interaction ? html`
           <div class="related-info" slot="extra-info">
-            <span class="related-info-label">INP interaction</span>
-            ${interactionLink}
+            <span class="related-info-label">${i18nString(UIStrings.inpInteractionLink)}</span>
+            <button
+              class="link-to-log"
+              title=${i18nString(UIStrings.showInpInteraction)}
+              @click=${() => this.#revealInteraction(interaction)}
+              jslog=${VisualLogging.action('timeline.landing.show-inp-interaction').track({click: true})}
+            >${interaction.interactionType}</button>
           </div>
         ` : nothing}
       </devtools-metric-card>
@@ -569,47 +610,44 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
     return i18nString(UIStrings.tryUsingThrottling, {PH1: title});
   }
 
-  #getDeviceRec(): Common.UIString.LocalizedString|null {
+  #getDeviceRec(): string|null {
     // `form_factors` metric is only populated if CrUX data is fetched for all devices.
     const fractions = this.#cruxPageResult?.[`${this.#fieldPageScope}-ALL`]?.record.metrics.form_factors?.fractions;
     if (!fractions) {
       return null;
     }
 
-    if (fractions.desktop > 0.5) {
-      const percentage = i18nString(UIStrings.percentage, {PH1: Math.round(fractions.desktop * 100)});
-      return i18nString(UIStrings.mostUsersDesktop, {PH1: percentage});
-    }
-
-    if (fractions.phone > 0.5) {
-      const percentage = i18nString(UIStrings.percentage, {PH1: Math.round(fractions.phone * 100)});
-      return i18nString(UIStrings.mostUsersMobile, {PH1: percentage});
-    }
-
-    return null;
+    return i18nString(UIStrings.percentDevices, {
+      PH1: Math.round(fractions.phone * 100),
+      PH2: Math.round(fractions.desktop * 100),
+    });
   }
 
   #renderRecordingSettings(): LitHtml.LitTemplate {
-    const envRecs = [
-      this.#getDeviceRec(),
-      this.#getNetworkRec(),
-    ].filter(rec => rec !== null);
+    const fieldEnabled = CrUXManager.CrUXManager.instance().getConfigSetting().get().enabled;
 
     const deviceLinkEl = UI.XLink.XLink.create(
         'https://developer.chrome.com/docs/devtools/device-mode', i18nString(UIStrings.simulateDifferentDevices));
     const deviceMessage = i18n.i18n.getFormatLocalizedString(str_, UIStrings.useDeviceToolbar, {PH1: deviceLinkEl});
 
+    const deviceRecEl = document.createElement('span');
+    deviceRecEl.classList.add('environment-rec');
+    deviceRecEl.textContent = this.#getDeviceRec() || i18nString(UIStrings.notEnoughData);
+
+    const networkRecEl = document.createElement('span');
+    networkRecEl.classList.add('environment-rec');
+    networkRecEl.textContent = this.#getNetworkRec() || i18nString(UIStrings.notEnoughData);
+
     // clang-format off
     return html`
       <h3 class="card-title">${i18nString(UIStrings.environmentSettings)}</h3>
       <div class="device-toolbar-description">${deviceMessage}</div>
-      ${envRecs.length > 0 ? html`
-        <details class="environment-recs">
-          <summary>${i18nString(UIStrings.considerRealUser)}</summary>
-          <ul class="environment-recs-list">
-            ${envRecs.map(rec => html`<li>${rec}</li>`)}
-          </ul>
-        </details>
+      ${fieldEnabled ? html`
+        <div class="environment-recs-title">${i18nString(UIStrings.realUserEnvironments)}</div>
+        <ul class="environment-recs-list">
+          <li>${i18n.i18n.getFormatLocalizedString(str_, UIStrings.device, {PH1: deviceRecEl})}</li>
+          <li>${i18n.i18n.getFormatLocalizedString(str_, UIStrings.network, {PH1: networkRecEl})}</li>
+        </ul>
       ` : nothing}
       <div class="environment-option">
         <devtools-cpu-throttling-selector></devtools-cpu-throttling-selector>
@@ -796,10 +834,10 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
     // clang-format on
   }
 
-  #renderCollectionPeriod(): LitHtml.LitTemplate {
+  #getCollectionPeriodRange(): string|null {
     const selectedResponse = this.#getSelectedFieldResponse();
     if (!selectedResponse) {
-      return LitHtml.nothing;
+      return null;
     }
 
     const {firstDate, lastDate} = selectedResponse.record.collectionPeriod;
@@ -823,18 +861,25 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
       day: 'numeric',
     };
 
-    const dateEl = document.createElement('span');
-    dateEl.classList.add('collection-period-range');
-    dateEl.textContent = i18nString(UIStrings.dateRange, {
+    return i18nString(UIStrings.dateRange, {
       PH1: formattedFirstDate.toLocaleDateString(undefined, options),
       PH2: formattedLastDate.toLocaleDateString(undefined, options),
     });
+  }
+
+  #renderCollectionPeriod(): LitHtml.LitTemplate {
+    const range = this.#getCollectionPeriodRange();
+
+    const dateEl = document.createElement('span');
+    dateEl.classList.add('collection-period-range');
+    dateEl.textContent = range || i18nString(UIStrings.notEnoughData);
+
+    const message = i18n.i18n.getFormatLocalizedString(str_, UIStrings.collectionPeriod, {
+      PH1: dateEl,
+    });
 
     return html`
-      <div class="field-data-message">
-        ${i18nString(UIStrings.collectionPeriod)}
-        ${dateEl}
-      </div>
+      <div class="field-data-message">${message}</div>
     `;
   }
 
@@ -870,68 +915,183 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
     `;
   }
 
-  #clearInteractionsLog(): void {
-    LiveMetrics.LiveMetrics.instance().clearInteractions();
+  #renderLogSection(): LitHtml.LitTemplate {
+    // clang-format off
+    return html`
+      <section class="logs-section" aria-label=${i18nString(UIStrings.eventLogs)}>
+        <devtools-live-metrics-logs
+          on-render=${ComponentHelpers.Directives.nodeRenderedCallback(node => {
+            this.#logsEl = node as LiveMetricsLogs;
+          })}
+        >
+          ${this.#renderInteractionsLog()}
+          ${this.#renderLayoutShiftsLog()}
+        </devtools-live-metrics-logs>
+      </section>
+    `;
+    // clang-format on
   }
 
-  #renderInteractionsSection(): LitHtml.LitTemplate {
-    if (!this.#interactions.length) {
+  async #revealInteraction(interaction: LiveMetrics.Interaction): Promise<void> {
+    const interactionEl = this.#shadow.getElementById(interaction.interactionId);
+    if (!interactionEl || !this.#logsEl) {
+      return;
+    }
+
+    const success = this.#logsEl.selectTab('interactions');
+    if (!success) {
+      return;
+    }
+
+    await coordinator.write(() => {
+      interactionEl.scrollIntoView({
+        block: 'center',
+      });
+      interactionEl.focus();
+      UI.UIUtils.runCSSAnimationOnce(interactionEl, 'highlight');
+    });
+  }
+
+  #renderInteractionsLog(): LitHtml.LitTemplate {
+    if (!this.#interactions.size) {
       return LitHtml.nothing;
     }
 
     // clang-format off
     return html`
-      <section class="interactions-section" aria-labelledby="interactions-section-title">
-        <h2 id="interactions-section-title" class="section-title">
-          ${i18nString(UIStrings.interactions)}
-          <devtools-button
-            class="interactions-clear"
-            title=${i18nString(UIStrings.clearInteractionsLog)}
-            @click=${this.#clearInteractionsLog}
-            .data=${{
-              variant: Buttons.Button.Variant.ICON,
-              size: Buttons.Button.Size.REGULAR,
-              iconName: 'clear',
-            } as Buttons.Button.ButtonData}></devtools-button>
-        </h2>
-        <ol class="interactions-list"
-          on-render=${ComponentHelpers.Directives.nodeRenderedCallback(node => {
-            this.#interactionsListEl = node as HTMLElement;
-          })}
-        >
-          ${this.#interactions.map(interaction => {
-            const metricValue = renderMetricValue(
-              'timeline.landing.interaction-event-timing',
-              interaction.duration,
-              INP_THRESHOLDS,
-              v => i18n.TimeUtilities.millisToString(v),
-              {dim: true},
-            );
+      <ol class="log"
+        slot="interactions-log-content"
+        on-render=${ComponentHelpers.Directives.nodeRenderedCallback(node => {
+          this.#interactionsListEl = node as HTMLElement;
+        })}
+      >
+        ${this.#interactions.values().map(interaction => {
+          const metricValue = renderMetricValue(
+            'timeline.landing.interaction-event-timing',
+            interaction.duration,
+            INP_THRESHOLDS,
+            v => i18n.TimeUtilities.preciseMillisToString(v),
+            {dim: true},
+          );
 
-            const isP98Excluded = this.#inpValue && this.#inpValue.value < interaction.duration;
-            const isInp = this.#inpValue?.uniqueInteractionId === interaction.uniqueInteractionId;
+          const isP98Excluded = this.#inpValue && this.#inpValue.value < interaction.duration;
+          const isInp = this.#inpValue?.interactionId === interaction.interactionId;
 
-            return html`
-              <li id=${interaction.uniqueInteractionId} class="interaction" tabindex="-1">
-                <span class="interaction-type">
-                  ${interaction.interactionType}
-                  ${isInp ?
-                    html`<span class="interaction-inp-chip" title=${i18nString(UIStrings.inpInteraction)}>INP</span>`
-                  : nothing}
-                </span>
-                <span class="interaction-node">${
-                  interaction.node && until(Common.Linkifier.Linkifier.linkify(interaction.node))}</span>
-                ${isP98Excluded ? html`<devtools-icon
-                  class="interaction-info"
-                  name="info"
-                  title=${i18nString(UIStrings.interactionExcluded)}
-                ></devtools-icon>` : nothing}
-                <span class="interaction-duration">${metricValue}</span>
-              </li>
-            `;
-          })}
-        </ol>
-      </section>
+          return html`
+            <li id=${interaction.interactionId} class="log-item interaction" tabindex="-1">
+              <details>
+                <summary>
+                  <span class="interaction-type">
+                    ${interaction.interactionType}
+                    ${isInp ?
+                      html`<span class="interaction-inp-chip" title=${i18nString(UIStrings.inpInteraction)}>INP</span>`
+                    : nothing}
+                  </span>
+                  <span class="interaction-node">${
+                    interaction.node && until(Common.Linkifier.Linkifier.linkify(interaction.node))}</span>
+                  ${isP98Excluded ? html`<devtools-icon
+                    class="interaction-info"
+                    name="info"
+                    title=${i18nString(UIStrings.interactionExcluded)}
+                  ></devtools-icon>` : nothing}
+                  <span class="interaction-duration">${metricValue}</span>
+                </summary>
+                <div class="phase-table" role="table">
+                  <div class="phase-table-row phase-table-header-row" role="row">
+                    <div role="columnheader">Phase</div>
+                    <div role="columnheader">Local time (ms)</div>
+                  </div>
+                  <div class="phase-table-row" role="row">
+                    <div role="cell">${i18nString(UIStrings.inputDelay)}</div>
+                    <div role="cell">${Math.round(interaction.phases.inputDelay)}</div>
+                  </div>
+                  <div class="phase-table-row" role="row">
+                    <div role="cell">${i18nString(UIStrings.processingDuration)}</div>
+                    <div role="cell">${Math.round(interaction.phases.processingDuration)}</div>
+                  </div>
+                  <div class="phase-table-row" role="row">
+                    <div role="cell">${i18nString(UIStrings.presentationDelay)}</div>
+                    <div role="cell">${Math.round(interaction.phases.presentationDelay)}</div>
+                  </div>
+                </div>
+              </details>
+            </li>
+          `;
+        })}
+      </ol>
+    `;
+    // clang-format on
+  }
+
+  async #revealLayoutShiftCluster(clusterIds: Set<LiveMetrics.LayoutShift['uniqueLayoutShiftId']>): Promise<void> {
+    if (!this.#logsEl) {
+      return;
+    }
+
+    const layoutShiftEls: HTMLElement[] = [];
+    for (const shiftId of clusterIds) {
+      const layoutShiftEl = this.#shadow.getElementById(shiftId);
+      if (layoutShiftEl) {
+        layoutShiftEls.push(layoutShiftEl);
+      }
+    }
+
+    if (!layoutShiftEls.length) {
+      return;
+    }
+
+    const success = this.#logsEl.selectTab('layout-shifts');
+    if (!success) {
+      return;
+    }
+
+    await coordinator.write(() => {
+      layoutShiftEls[0].scrollIntoView({
+        block: 'start',
+      });
+      layoutShiftEls[0].focus();
+      for (const layoutShiftEl of layoutShiftEls) {
+        UI.UIUtils.runCSSAnimationOnce(layoutShiftEl, 'highlight');
+      }
+    });
+  }
+
+  #renderLayoutShiftsLog(): LitHtml.LitTemplate {
+    if (!this.#layoutShifts.length) {
+      return LitHtml.nothing;
+    }
+
+    // clang-format off
+    return html`
+      <ol class="log"
+        slot="layout-shifts-log-content"
+        on-render=${ComponentHelpers.Directives.nodeRenderedCallback(node => {
+          this.#layoutShiftsListEl = node as HTMLElement;
+        })}
+      >
+        ${this.#layoutShifts.map(layoutShift => {
+          const metricValue = renderMetricValue(
+            'timeline.landing.layout-shift-event-score',
+            layoutShift.score,
+            CLS_THRESHOLDS,
+            // CLS value is 2 decimal places, but individual shift scores tend to be much smaller
+            // so we expand the precision here.
+            v => v.toFixed(4),
+            {dim: true},
+          );
+
+          return html`
+            <li id=${layoutShift.uniqueLayoutShiftId} class="log-item layout-shift" tabindex="-1">
+              <div class="layout-shift-score">Layout shift score: ${metricValue}</div>
+              <div class="layout-shift-nodes">
+                ${layoutShift.affectedNodes.map(({node}) => html`
+                  <div class="layout-shift-node">${until(Common.Linkifier.Linkifier.linkify(node))}</div>
+                `)}
+              </div>
+            </li>
+          `;
+        })}
+      </ol>
     `;
     // clang-format on
   }
@@ -964,7 +1124,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
               </div>
             </div>
             ${this.#renderDataDescriptions()}
-            ${this.#renderInteractionsSection()}
+            ${this.#renderLogSection()}
           </main>
           <aside class="next-steps" aria-labelledby="next-steps-section-title">
             <h2 id="next-steps-section-title" class="section-title">${i18nString(UIStrings.nextSteps)}</h2>
@@ -995,31 +1155,81 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
   // clang-format on
 }
 
-export class InteractionRevealer implements Common.Revealer.Revealer<LiveMetrics.Interaction> {
-  #view: LiveMetricsView;
+class LiveMetricsLogs extends UI.Widget.WidgetElement<UI.Widget.Widget> {
+  #tabbedPane?: UI.TabbedPane.TabbedPane;
 
-  constructor(view: LiveMetricsView) {
-    this.#view = view;
+  constructor() {
+    super();
+    this.style.display = 'contents';
   }
 
-  async reveal(interaction: LiveMetrics.Interaction): Promise<void> {
-    const interactionEl = this.#view.shadowRoot?.getElementById(interaction.uniqueInteractionId);
-    if (!interactionEl) {
-      return;
+  /**
+   * Returns `true` if selecting the tab was successful.
+   */
+  selectTab(tabId: string): boolean {
+    if (!this.#tabbedPane) {
+      return false;
     }
+    return this.#tabbedPane.selectTab(tabId);
+  }
 
-    interactionEl.scrollIntoView({
-      block: 'center',
-    });
-    interactionEl.focus();
-    UI.UIUtils.runCSSAnimationOnce(interactionEl, 'highlight');
+  #clearCurrentLog(): void {
+    const liveMetrics = LiveMetrics.LiveMetrics.instance();
+
+    switch (this.#tabbedPane?.selectedTabId) {
+      case 'interactions':
+        liveMetrics.clearInteractions();
+        break;
+      case 'layout-shifts':
+        liveMetrics.clearLayoutShifts();
+        break;
+    }
+  }
+
+  override createWidget(): UI.Widget.Widget {
+    // We need a generic widget with a shadow DOM as the container widget so that we can take advantage
+    // of web component slots. Passing `this` into the container widget will make `this` the root element
+    // of that widget.
+    //
+    // Any children of the root element `this` will be matched to the slots defined within the container
+    // widget's shadow DOM.
+    const containerWidget = new UI.Widget.Widget(true, undefined, this);
+    containerWidget.contentElement.style.display = 'contents';
+
+    this.#tabbedPane = new UI.TabbedPane.TabbedPane();
+
+    // Taking advantage of web component slots allows us to render updates in the lit templates defined in the
+    // main component. This should be more performant and doesn't require us to inject live metrics styles twice.
+    const interactionsSlot = document.createElement('slot');
+    interactionsSlot.name = 'interactions-log-content';
+    const interactionsTab = UI.Widget.Widget.getOrCreateWidget(interactionsSlot);
+    this.#tabbedPane.appendTab(
+        'interactions', i18nString(UIStrings.interactions), interactionsTab, undefined, undefined, undefined, undefined,
+        undefined, 'timeline.landing.interactions-log');
+
+    const layoutShiftsSlot = document.createElement('slot');
+    layoutShiftsSlot.name = 'layout-shifts-log-content';
+    const layoutShiftsTab = UI.Widget.Widget.getOrCreateWidget(layoutShiftsSlot);
+    this.#tabbedPane.appendTab(
+        'layout-shifts', i18nString(UIStrings.layoutShifts), layoutShiftsTab, undefined, undefined, undefined,
+        undefined, undefined, 'timeline.landing.layout-shifts-log');
+
+    const clearButton = new UI.Toolbar.ToolbarButton(
+        i18nString(UIStrings.clearCurrentLog), 'clear', undefined, 'timeline.landing.clear-log');
+    clearButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, this.#clearCurrentLog, this);
+    this.#tabbedPane.rightToolbar().appendToolbarItem(clearButton);
+    this.#tabbedPane.show(containerWidget.contentElement);
+
+    return containerWidget;
   }
 }
 
 customElements.define('devtools-live-metrics-view', LiveMetricsView);
+customElements.define('devtools-live-metrics-logs', LiveMetricsLogs);
 
 declare global {
   interface HTMLElementTagNameMap {
     'devtools-live-metrics-view': LiveMetricsView;
+    'devtools-live-metrics-logs': LiveMetricsLogs;
   }
 }

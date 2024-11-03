@@ -76,6 +76,7 @@
   &:disabled {
     color: var(--sys-color-state-disabled);
     background-color: var(--sys-color-state-disabled-container);
+    border-color: transparent;
   }
 }
 
@@ -229,6 +230,11 @@
   width: 100%;
 
   .resource-link {
+    cursor: pointer;
+  }
+
+  .resource-link,
+  .resource-task {
     padding: var(--sys-size-2) var(--sys-size-4);
     font: var(--sys-typescale-body4-size);
     border: var(--sys-size-1) solid var(--sys-color-divider);
@@ -237,14 +243,38 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     max-width: var(--sys-size-32);
-    cursor: pointer;
 
-    .icon {
+    .icon,
+    devtools-file-source-icon {
       display: inline-flex;
       vertical-align: top;
       margin-right: var(--sys-size-3);
       width: var(--sys-size-9);
       height: var(--sys-size-9);
+    }
+
+    /*
+      CSS styling for `network-override-marker` is similar to
+      https://source.chromium.org/chromium/chromium/src/+/main:third_party/devtools-frontend/src/front_end/panels/network/networkLogView.css;l=379.
+      There is a difference in `left` and `top` values to make sure
+      it is placed correctly for the network icon in assistance panel.
+    */
+    .network-override-marker {
+      position: relative;
+      float: left;
+    }
+
+    .network-override-marker::before {
+      content: var(--image-file-empty);
+      width: var(--sys-size-4);
+      height: var(--sys-size-4);
+      border-radius: 50%;
+      outline: var(--sys-size-1) solid var(--icon-gap-focus-selected);
+      left: 11px;
+      position: absolute;
+      top: 13px;
+      z-index: 1;
+      background-color: var(--sys-color-purple-bright);
     }
 
     .image.icon {
@@ -260,9 +290,39 @@
     }
   }
 
-  .resource-link.not-selected {
+  .resource-link.not-selected,
+  .resource-task.not-selected {
     color: var(--sys-color-state-disabled);
     border-color: var(--sys-color-neutral-outline);
+  }
+}
+
+.no-agent-message {
+  user-select: text;
+  cursor: initial;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sys-size-5);
+  width: 100%;
+  padding: var(--sys-size-7) var(--sys-size-5);
+  height: 100%;
+
+  .header {
+    display: flex;
+    align-items: center;
+    height: var(--sys-size-11);
+    gap: var(--sys-size-4);
+
+    h2 {
+      font: var(--sys-typescale-body4-bold);
+    }
+  }
+
+  .instructions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sys-size-6);
+    line-height: 18px;
   }
 }
 
@@ -493,16 +553,17 @@ main {
   }
 }
 
-.opt-in {
+.disabled-view {
   border-radius: var(--sys-shape-corner-small);
   padding: var(--sys-size-6) var(--sys-size-8);
   box-shadow: var(--drop-shadow);
   font: var(--sys-typescale-body4-regular);
-  margin: var(--sys-size-8);
+  margin: var(--sys-size-4) 0;
   max-width: var(--sys-size-34);
   display: flex;
+  text-wrap: pretty;
 
-  .opt-in-icon-container {
+  .disabled-view-icon-container {
     border-radius: var(--sys-shape-corner-extra-small);
     width: var(--sys-size-9);
     height: var(--sys-size-9);

@@ -67,7 +67,6 @@ export interface ProvideFeedbackProps {
 }
 
 export class ProvideFeedback extends HTMLElement {
-  static readonly litTagName = LitHtml.literal`devtools-provide-feedback`;
   readonly #shadow = this.attachShadow({mode: 'open'});
   #props: ProvideFeedbackProps;
   #isShowingFeedbackForm = false;
@@ -122,7 +121,7 @@ export class ProvideFeedback extends HTMLElement {
   #renderButtons(): LitHtml.TemplateResult {
     // clang-format off
     return html`
-      <${Buttons.Button.Button.litTagName}
+      <devtools-button
         .data=${{
           variant: Buttons.Button.Variant.ICON,
           size: Buttons.Button.Size.SMALL,
@@ -134,8 +133,8 @@ export class ProvideFeedback extends HTMLElement {
           jslogContext: 'thumbs-up',
         } as Buttons.Button.ButtonData}
         @click=${() => this.#handleRateClick(Host.AidaClient.Rating.POSITIVE)}
-      ></${Buttons.Button.Button.litTagName}>
-      <${Buttons.Button.Button.litTagName}
+      ></devtools-button>
+      <devtools-button
         .data=${{
           variant: Buttons.Button.Variant.ICON,
           size: Buttons.Button.Size.SMALL,
@@ -147,9 +146,9 @@ export class ProvideFeedback extends HTMLElement {
           jslogContext: 'thumbs-down',
         } as Buttons.Button.ButtonData}
         @click=${() => this.#handleRateClick(Host.AidaClient.Rating.NEGATIVE)}
-      ></${Buttons.Button.Button.litTagName}>
+      ></devtools-button>
       <div class="vertical-separator"></div>
-      <${Buttons.Button.Button.litTagName}
+      <devtools-button
         .data=${
           {
             variant: Buttons.Button.Variant.ICON,
@@ -160,7 +159,7 @@ export class ProvideFeedback extends HTMLElement {
           } as Buttons.Button.ButtonData
         }
         @click=${this.#handleReportClick}
-      ></${Buttons.Button.Button.litTagName}>
+      ></devtools-button>
     `;
     // clang-format on
   }
@@ -173,7 +172,7 @@ export class ProvideFeedback extends HTMLElement {
           <h4 class="feedback-title">${lockedString(
               UIStringsNotTranslate.whyThisRating,
           )}</h4>
-          <${Buttons.Button.Button.litTagName}
+          <devtools-button
             aria-label=${lockedString(UIStringsNotTranslate.close)}
             @click=${this.#handleClose}
             .data=${
@@ -185,7 +184,7 @@ export class ProvideFeedback extends HTMLElement {
                 jslogContext: 'close',
               } as Buttons.Button.ButtonData
             }
-          ></${Buttons.Button.Button.litTagName}>
+          ></devtools-button>
         </div>
         <input
           type="text"
@@ -198,7 +197,7 @@ export class ProvideFeedback extends HTMLElement {
         <span class="feedback-disclaimer">${
           lockedString(UIStringsNotTranslate.disclaimer)
         }</span>
-        <${Buttons.Button.Button.litTagName}
+        <devtools-button
         aria-label=${lockedString(UIStringsNotTranslate.submit)}
         .data=${
           {
@@ -211,7 +210,7 @@ export class ProvideFeedback extends HTMLElement {
           }
         >${
           lockedString(UIStringsNotTranslate.submit)
-        }</${Buttons.Button.Button.litTagName}>
+        }</devtools-button>
       </div>
     </form>
     `;

@@ -2,13 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import './NodeLink.js';
+
 import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Trace from '../../../../models/trace/trace.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 import type * as Overlays from '../../overlays/overlays.js';
 
 import {BaseInsight, shouldRenderForCategory} from './Helpers.js';
-import {type NodeLinkData} from './NodeLink.js';
+import type {NodeLinkData} from './NodeLink.js';
 import type * as SidebarInsight from './SidebarInsight.js';
 import {Category} from './types.js';
 
@@ -53,14 +55,12 @@ export class Viewport extends BaseInsight {
               estimatedSavingsTime: insight.metricSavings?.INP,
             } as SidebarInsight.InsightDetails}
             @insighttoggleclick=${this.onSidebarClick}>
-                <div slot="insight-content" class="insight-section">
-                  ${backendNodeId !== undefined ? html`<devtools-performance-node-link
-                    .data=${{
-                      backendNodeId,
-                      options: {tooltip: insight.viewportEvent?.args.data.content},
-                    } as NodeLinkData}>
-                  </devtools-performance-node-link>` : LitHtml.nothing}
-                </div>
+              ${backendNodeId !== undefined ? html`<devtools-performance-node-link
+                .data=${{
+                  backendNodeId,
+                  options: {tooltip: insight.viewportEvent?.args.data.content},
+                } as NodeLinkData}>
+              </devtools-performance-node-link>` : LitHtml.nothing}
             </devtools-performance-sidebar-insight>
         </div>`;
     // clang-format on

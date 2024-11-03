@@ -9,7 +9,7 @@ import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 
 import * as Insights from './insights/insights.js';
-import {type ActiveInsight} from './Sidebar.js';
+import type {ActiveInsight} from './Sidebar.js';
 import styles from './sidebarSingleInsightSet.css.js';
 import {NumberWithUnit, type NumberWithUnitString} from './Utils.js';
 
@@ -186,7 +186,7 @@ export class SidebarSingleInsightSet extends HTMLElement {
               LitHtml.nothing}
     ${
         this.#renderMetricValue(
-            'CLS', cls.value.toFixed(2),
+            'CLS', cls.value ? cls.value.toFixed(2) : '0',
             Trace.Handlers.ModelHandlers.LayoutShifts.scoreClassificationForLayoutShift(cls.value),
             cls.worstShiftEvent)}
     </div>

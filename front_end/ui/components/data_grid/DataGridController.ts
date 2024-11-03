@@ -2,14 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import './DataGrid.js';
+
 import * as i18n from '../../../core/i18n/i18n.js';
 import type * as TextUtils from '../../../models/text_utils/text_utils.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as UI from '../../legacy/legacy.js';
 
-import {DataGrid, type DataGridContextMenusConfiguration, type DataGridData} from './DataGrid.js';
+import type {DataGridContextMenusConfiguration, DataGridData} from './DataGrid.js';
 import dataGridControllerStyles from './dataGridController.css.js';
-import {type ColumnHeaderClickEvent, type ContextMenuColumnSortClickEvent} from './DataGridEvents.js';
+import type {ColumnHeaderClickEvent, ContextMenuColumnSortClickEvent} from './DataGridEvents.js';
 import {
   type Column,
   getRowEntryForColumnId,
@@ -63,7 +65,6 @@ export interface DataGridControllerData {
 }
 
 export class DataGridController extends HTMLElement {
-  static readonly litTagName = LitHtml.literal`devtools-data-grid-controller`;
   readonly #shadow = this.attachShadow({mode: 'open'});
 
   #hasRenderedAtLeastOnce = false;
@@ -269,7 +270,7 @@ export class DataGridController extends HTMLElement {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     LitHtml.render(html`
-      <${DataGrid.litTagName} .data=${{
+      <devtools-data-grid .data=${{
           columns: this.#columns,
           rows: this.#rows,
           activeSort: this.#sortState,
@@ -283,7 +284,7 @@ export class DataGridController extends HTMLElement {
         @columnheaderclick=${this.#onColumnHeaderClick}
         @contextmenucolumnsortclick=${this.#onContextMenuColumnSortClick}
         @contextmenuheaderresetclick=${this.#onContextMenuHeaderResetClick}
-     ></${DataGrid.litTagName}>
+     ></devtools-data-grid>
     `, this.#shadow, {
       host: this,
     });

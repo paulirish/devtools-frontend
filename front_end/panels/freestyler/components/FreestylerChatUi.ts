@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import '../../../ui/components/spinners/spinners.js';
+import './ProvideFeedback.js';
+
 import * as Common from '../../../core/common/common.js';
 import * as Host from '../../../core/host/host.js';
 import * as i18n from '../../../core/i18n/i18n.js';
@@ -11,9 +14,8 @@ import * as Trace from '../../../models/trace/trace.js';
 import type * as Workspace from '../../../models/workspace/workspace.js';
 import * as Marked from '../../../third_party/marked/marked.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
-import * as IconButton from '../../../ui/components/icon_button/icon_button.js';
+import type * as IconButton from '../../../ui/components/icon_button/icon_button.js';
 import * as MarkdownView from '../../../ui/components/markdown_view/markdown_view.js';
-import * as Spinners from '../../../ui/components/spinners/spinners.js';
 import * as UI from '../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
@@ -21,9 +23,9 @@ import {PanelUtils} from '../../utils/utils.js';
 import {type ContextDetail, ErrorType} from '../AiAgent.js';
 
 import freestylerChatUiStyles from './freestylerChatUi.css.js';
-import {ProvideFeedback, type ProvideFeedbackProps} from './ProvideFeedback.js';
+import type {ProvideFeedbackProps} from './ProvideFeedback.js';
 
-const {html} = LitHtml;
+const {html, Directives: {ifDefined}} = LitHtml;
 
 const UIStrings = {
   /**
@@ -187,35 +189,65 @@ const UIStringsNotTranslate = {
    *@description Aria label for the cancel icon to be read by screen reader
    */
   canceled: 'Canceled',
+  /*
+   * @description Header text for instructions on how to use the AI assistance feature.
+   */
+  getStarted: 'Hi! Here’s how to get started:',
+  /**
+   * @description AI assistance for CSS.
+   */
+  cssHelp: 'CSS help:',
+  /**
+   * @description Explanation on how to use AI assistance for DOM elements.
+   */
+  cssHelpExplainer:
+      'Navigate to the Elements panel, right-click a DOM element, and select "Ask AI assistant". I’ll be happy to explain its styles or behavior.',
+  /**
+   * @description AI assistance for files.
+   */
+  fileHelp: 'File insights:',
+  /**
+   * @description Explanation on how to use AI assistance for files in the Sources panel.
+   */
+  fileHelpExplainer:
+      'Open the Sources panel, right-click a file, and select "Ask AI". I can provide insights into its purpose or origin.',
+  /**
+   * @description AI assistance for network requests.
+   */
+  networkHelp: 'Network request insights:',
+  /**
+   * @description Explanation on how to use AI assistance for network requests.
+   */
+  networkHelpExplainer:
+      'In the Network panel, right-click any request and select "Ask AI assistant". I’ll help break down what’s happening with each request.',
+  /**
+   * @description AI assistance for performance traces.
+   */
+  performanceHelp: 'Performance analysis:',
+  /**
+   * @description Explanation on how to use AI assistance for performance traces.
+   */
+  performanceHelpExplainer:
+      'In the Performance panel, run a trace. Then, right-click any function in the timeline and select "Ask AI". I’ll help you analyze its performance impact and suggest improvements.',
 };
 
 const str_ = i18n.i18n.registerUIStrings('panels/freestyler/components/FreestylerChatUi.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 const lockedString = i18n.i18n.lockedString;
 
-function getInputPlaceholderString(
-    aidaAvailability: Host.AidaClient.AidaAccessPreconditions, agentType: AgentType,
-    state: State): Platform.UIString.LocalizedString {
-  if (state === State.CONSENT_VIEW) {
+function getInputPlaceholderString(state: State, agentType?: AgentType): Platform.UIString.LocalizedString {
+  if (state === State.CONSENT_VIEW || !agentType) {
     return i18nString(UIStrings.followTheSteps);
   }
-  switch (aidaAvailability) {
-    case Host.AidaClient.AidaAccessPreconditions.AVAILABLE:
-      switch (agentType) {
-        case AgentType.FREESTYLER:
-          return lockedString(UIStringsNotTranslate.inputPlaceholderForFreestylerAgent);
-        case AgentType.DRJONES_FILE:
-          return lockedString(UIStringsNotTranslate.inputPlaceholderForDrJonesFileAgent);
-        case AgentType.DRJONES_NETWORK_REQUEST:
-          return lockedString(UIStringsNotTranslate.inputPlaceholderForDrJonesNetworkAgent);
-        case AgentType.DRJONES_PERFORMANCE:
-          return lockedString(UIStringsNotTranslate.inputPlaceholderForDrJonesPerformanceAgent);
-      }
-    case Host.AidaClient.AidaAccessPreconditions.NO_ACCOUNT_EMAIL:
-    case Host.AidaClient.AidaAccessPreconditions.SYNC_IS_PAUSED:
-      return i18nString(UIStrings.notLoggedIn);
-    case Host.AidaClient.AidaAccessPreconditions.NO_INTERNET:
-      return i18nString(UIStrings.offline);
+  switch (agentType) {
+    case AgentType.FREESTYLER:
+      return lockedString(UIStringsNotTranslate.inputPlaceholderForFreestylerAgent);
+    case AgentType.DRJONES_FILE:
+      return lockedString(UIStringsNotTranslate.inputPlaceholderForDrJonesFileAgent);
+    case AgentType.DRJONES_NETWORK_REQUEST:
+      return lockedString(UIStringsNotTranslate.inputPlaceholderForDrJonesNetworkAgent);
+    case AgentType.DRJONES_PERFORMANCE:
+      return lockedString(UIStringsNotTranslate.inputPlaceholderForDrJonesPerformanceAgent);
   }
 }
 
@@ -246,7 +278,7 @@ export interface UserChatMessage {
 export interface ModelChatMessage {
   entity: ChatMessageEntity.MODEL;
   steps: Step[];
-  suggestions?: string[];
+  suggestions?: [string, ...string[]];
   answer?: string;
   error?: ErrorType;
   rpcId?: number;
@@ -272,6 +304,7 @@ export interface Props {
   onFeedbackSubmit: (rpcId: number, rate: Host.AidaClient.Rating, feedback?: string) => void;
   onCancelClick: () => void;
   onSelectedNetworkRequestClick: () => void | Promise<void>;
+  onSelectedFileRequestClick: () => void | Promise<void>;
   inspectElementToggled: boolean;
   state: State;
   aidaAvailability: Host.AidaClient.AidaAccessPreconditions;
@@ -283,7 +316,7 @@ export interface Props {
   isLoading: boolean;
   canShowFeedbackForm: boolean;
   userInfo: Pick<Host.InspectorFrontendHostAPI.SyncInformation, 'accountImage'|'accountFullName'>;
-  agentType: AgentType;
+  agentType?: AgentType;
 }
 
 // The model returns multiline code blocks in an erroneous way with the language being in new line.
@@ -311,7 +344,6 @@ class MarkdownRendererWithCodeBlock extends MarkdownView.MarkdownView.MarkdownIn
 }
 
 export class FreestylerChatUi extends HTMLElement {
-  static readonly litTagName = LitHtml.literal`devtools-freestyler-chat-ui`;
   readonly #shadow = this.attachShadow({mode: 'open'});
   readonly #markdownRenderer = new MarkdownRendererWithCodeBlock();
   #scrollTop?: number;
@@ -388,7 +420,7 @@ export class FreestylerChatUi extends HTMLElement {
     return (this.#props.agentType === AgentType.FREESTYLER && isInputDisabledCheckForFreestylerAgent) ||
         (this.#props.agentType === AgentType.DRJONES_NETWORK_REQUEST && isInputDisabledCheckForDrJonesNetworkAgent) ||
         (this.#props.agentType === AgentType.DRJONES_FILE && isInputDisabledCheckForDrJonesFileAgent) ||
-        !isAidaAvailable || isConsentView;
+        !isAidaAvailable || isConsentView || !this.#props.agentType;
   };
 
   #handleScroll = (ev: Event): void => {
@@ -442,14 +474,14 @@ export class FreestylerChatUi extends HTMLElement {
 
   #renderRateButtons(rpcId: number): LitHtml.TemplateResult {
     // clang-format off
-    return html`<${ProvideFeedback.litTagName}
+    return html`<devtools-provide-feedback
       .props=${{
         onFeedbackSubmit: (rating, feedback) => {
           this.#props.onFeedbackSubmit(rpcId, rating, feedback);
         },
         canShowFeedbackForm: this.#props.canShowFeedbackForm,
       } as ProvideFeedbackProps}
-      ></${ProvideFeedback.litTagName}>`;
+      ></devtools-provide-feedback>`;
     // clang-format on
   }
 
@@ -472,9 +504,9 @@ export class FreestylerChatUi extends HTMLElement {
     }
 
     // clang-format off
-    return html`<${MarkdownView.MarkdownView.MarkdownView.litTagName}
+    return html`<devtools-markdown-view
       .data=${{tokens, renderer: this.#markdownRenderer} as MarkdownView.MarkdownView.MarkdownViewData}>
-    </${MarkdownView.MarkdownView.MarkdownView.litTagName}>`;
+    </devtools-markdown-view>`;
     // clang-format on
   }
 
@@ -500,23 +532,23 @@ export class FreestylerChatUi extends HTMLElement {
     // it in the data returned code block.
     // clang-format off
     const code = step.code ? html`<div class="action-result">
-        <${MarkdownView.CodeBlock.CodeBlock.litTagName}
+        <devtools-code-block
           .code=${step.code.trim()}
           .codeLang=${'js'}
           .displayNotice=${!Boolean(step.output)}
           .header=${codeHeadingText}
           .showCopyButton=${true}
-        ></${MarkdownView.CodeBlock.CodeBlock.litTagName}>
+        ></devtools-code-block>
     </div>` :
                              LitHtml.nothing;
     const output = step.output ? html`<div class="js-code-output">
-      <${MarkdownView.CodeBlock.CodeBlock.litTagName}
+      <devtools-code-block
         .code=${step.output}
         .codeLang=${'js'}
         .displayNotice=${true}
         .header=${lockedString(UIStringsNotTranslate.dataReturned)}
         .showCopyButton=${false}
-      ></${MarkdownView.CodeBlock.CodeBlock.litTagName}>
+      ></devtools-code-block>
     </div>` :
                                  LitHtml.nothing;
 
@@ -535,13 +567,13 @@ export class FreestylerChatUi extends HTMLElement {
       step.contextDetails,
         contextDetail => {
           return html`<div class="context-details">
-        <${MarkdownView.CodeBlock.CodeBlock.litTagName}
+        <devtools-code-block
           .code=${contextDetail.text}
-          .codeLang=${contextDetail.codeLang}
+          .codeLang=${contextDetail.codeLang || ''}
           .displayNotice=${false}
           .header=${contextDetail.title}
           .showCopyButton=${true}
-        ></${MarkdownView.CodeBlock.CodeBlock.litTagName}>
+        ></devtools-code-block>
       </div>`;
         },
       )}` : LitHtml.nothing;
@@ -557,28 +589,27 @@ export class FreestylerChatUi extends HTMLElement {
 
   #renderStepBadge(step: Step, options: {isLast: boolean}): LitHtml.LitTemplate {
     if (this.#props.isLoading && options.isLast && !step.sideEffect) {
-      return html`<${Spinners.Spinner.Spinner.litTagName} role="button" aria-label=${
-          lockedString(UIStringsNotTranslate.inProgress)}></${Spinners.Spinner.Spinner.litTagName}>`;
+      return html`<devtools-spinner></devtools-spinner>`;
     }
 
     let iconName: string = 'checkmark';
-    let ariaLabel: string = lockedString(UIStringsNotTranslate.completed);
-    let role: string = 'button';
+    let ariaLabel: string|undefined = lockedString(UIStringsNotTranslate.completed);
+    let role: 'button'|undefined = 'button';
     if (options.isLast && step.sideEffect) {
-      role = 'presentational';
-      ariaLabel = '';
+      role = undefined;
+      ariaLabel = undefined;
       iconName = 'pause-circle';
     } else if (step.canceled) {
       ariaLabel = lockedString(UIStringsNotTranslate.canceled);
       iconName = 'cross';
     }
 
-    return html`<${IconButton.Icon.Icon.litTagName}
+    return html`<devtools-icon
         class="indicator"
-        role=${role}
-        aria-label=${ariaLabel}
+        role=${ifDefined(role)}
+        aria-label=${ifDefined(ariaLabel)}
         .name=${iconName}
-      ></${IconButton.Icon.Icon.litTagName}>`;
+      ></devtools-icon>`;
   }
 
   #renderStep(step: Step, options: {isLast: boolean}): LitHtml.LitTemplate {
@@ -597,10 +628,10 @@ export class FreestylerChatUi extends HTMLElement {
           <div class="summary">
             ${this.#renderStepBadge(step, options)}
             ${this.#renderTitle(step)}
-            <${IconButton.Icon.Icon.litTagName}
+            <devtools-icon
               class="arrow"
               .name=${'chevron-down'}
-            ></${IconButton.Icon.Icon.litTagName}>
+            ></devtools-icon>
           </div>
         </summary>
         ${this.#renderStepDetails(step, {
@@ -614,7 +645,12 @@ export class FreestylerChatUi extends HTMLElement {
     if (!step.sideEffect) {
       return LitHtml.nothing;
     }
-    const sideEffectAction = step.sideEffect.onAnswer;
+
+    const sideEffectAction = (answer: boolean): void => {
+      step.sideEffect?.onAnswer(answer);
+      step.sideEffect = undefined;
+      this.#render();
+    };
 
     // clang-format off
     return html`<div
@@ -623,7 +659,7 @@ export class FreestylerChatUi extends HTMLElement {
     >
       <p>${lockedString(UIStringsNotTranslate.sideEffectConfirmationDescription)}</p>
       <div class="side-effect-buttons-container">
-        <${Buttons.Button.Button.litTagName}
+        <devtools-button
           .data=${
             {
               variant: Buttons.Button.Variant.OUTLINED,
@@ -633,8 +669,8 @@ export class FreestylerChatUi extends HTMLElement {
           @click=${() => sideEffectAction(false)}
         >${lockedString(
           UIStringsNotTranslate.negativeSideEffectConfirmation,
-        )}</${Buttons.Button.Button.litTagName}>
-        <${Buttons.Button.Button.litTagName}
+        )}</devtools-button>
+        <devtools-button
           .data=${
             {
               variant: Buttons.Button.Variant.PRIMARY,
@@ -645,7 +681,7 @@ export class FreestylerChatUi extends HTMLElement {
           @click=${() => sideEffectAction(true)}
         >${
             lockedString(UIStringsNotTranslate.positiveSideEffectConfirmation)
-        }</${Buttons.Button.Button.litTagName}>
+        }</devtools-button>
       </div>
     </div>`;
     // clang-format on
@@ -677,9 +713,9 @@ export class FreestylerChatUi extends HTMLElement {
       const name = this.#props.userInfo.accountFullName || lockedString(UIStringsNotTranslate.you);
       const image = this.#props.userInfo.accountImage ?
           html`<img src="data:image/png;base64, ${this.#props.userInfo.accountImage}" alt="Account avatar" />` :
-          html`<${IconButton.Icon.Icon.litTagName}
+          html`<devtools-icon
             .name=${'profile'}
-          ></${IconButton.Icon.Icon.litTagName}>`;
+          ></devtools-icon>`;
       // clang-format off
       return html`<section
         class="chat-message query"
@@ -696,15 +732,14 @@ export class FreestylerChatUi extends HTMLElement {
       // clang-format on
     }
 
-    const shouldShowSuggestions =
-        (isLast && !this.#props.isLoading && message.suggestions && message.suggestions?.length > 0);
+    const shouldShowSuggestions = (isLast && !this.#props.isLoading && message.suggestions);
     // clang-format off
     return html`
       <section class="chat-message answer" jslog=${VisualLogging.section('answer')}>
         <div class="message-info">
-          <${IconButton.Icon.Icon.litTagName}
+          <devtools-icon
             name="smart-assistant"
-          ></${IconButton.Icon.Icon.litTagName}>
+          ></devtools-icon>
           <div class="message-name">
             <h2>${lockedString(UIStringsNotTranslate.ai)}</h2>
           </div>
@@ -732,14 +767,14 @@ export class FreestylerChatUi extends HTMLElement {
           }
           ${shouldShowSuggestions ?
             html`<div class="suggestions">
-              ${message.suggestions?.map(suggestion => html`<${Buttons.Button.Button.litTagName}
+              ${message.suggestions?.map(suggestion => html`<devtools-button
                   .data=${{
                       variant: Buttons.Button.Variant.OUTLINED,
                       title: suggestion,
                       jslogContext: 'suggestion',
                   } as Buttons.Button.ButtonData}
                   @click=${() => this.#handleSuggestionClick(suggestion)}
-                >${suggestion}</${Buttons.Button.Button.litTagName}>`)}
+                >${suggestion}</devtools-button>`)}
             </div>` : LitHtml.nothing}
         </div>
       </section>
@@ -747,7 +782,10 @@ export class FreestylerChatUi extends HTMLElement {
     // clang-format on
   };
 
-  #renderSelection(): LitHtml.TemplateResult {
+  #renderSelection(): LitHtml.LitTemplate {
+    if (!this.#props.agentType) {
+      return LitHtml.nothing;
+    }
     switch (this.#props.agentType) {
       case AgentType.FREESTYLER:
         return this.#renderSelectAnElement();
@@ -770,11 +808,13 @@ export class FreestylerChatUi extends HTMLElement {
       return html`${LitHtml.nothing}`;
     }
 
-    // TODO(b/371947238): Add icon and make the div clickable
+    const icon = PanelUtils.getIconForSourceFile(this.#props.selectedFile);
+
     // clang-format off
     return html`<div class="select-element">
-    <div class=${resourceClass}>
-      ${this.#props.selectedFile?.displayName()}
+    <div role=button class=${resourceClass}
+    @click=${this.#props.onSelectedFileRequestClick}>
+      ${icon}${this.#props.selectedFile?.displayName()}
     </div></div>`;
     // clang-format on
   }
@@ -792,7 +832,7 @@ export class FreestylerChatUi extends HTMLElement {
     const icon = PanelUtils.getIconForNetworkRequest(this.#props.selectedNetworkRequest);
     // clang-format off
     return html`<div class="select-element">
-    <div class=${resourceClass}
+    <div role=button class=${resourceClass}
     @click=${this.#props.onSelectedNetworkRequestClick}>
       ${icon}${this.#props.selectedNetworkRequest?.name()}
     </div></div>`;
@@ -808,7 +848,7 @@ export class FreestylerChatUi extends HTMLElement {
     // clang-format off
     return html`
       <div class="select-element">
-        <${Buttons.Button.Button.litTagName}
+        <devtools-button
           .data=${{
               variant: Buttons.Button.Variant.ICON_TOGGLE,
               size: Buttons.Button.Size.REGULAR,
@@ -820,7 +860,7 @@ export class FreestylerChatUi extends HTMLElement {
               jslogContext: 'select-element',
           } as Buttons.Button.ButtonData}
           @click=${this.#props.onInspectElementClick}
-        ></${Buttons.Button.Button.litTagName}>
+        ></devtools-button>
         <div class=${resourceClass}>${
           this.#props.selectedElement
             ? LitHtml.Directives.until(
@@ -837,7 +877,7 @@ export class FreestylerChatUi extends HTMLElement {
   #renderSelectedTask = (): LitHtml.TemplateResult => {
     const resourceClass = LitHtml.Directives.classMap({
       'not-selected': !this.#props.selectedStackTrace,
-      'resource-link': true,
+      'resource-task': true,
     });
 
     if (!this.#props.selectedStackTrace) {
@@ -889,21 +929,21 @@ export class FreestylerChatUi extends HTMLElement {
   };
 
   #renderEmptyState = (): LitHtml.TemplateResult => {
-    const suggestions = this.#getSuggestions();
+    const suggestions = this.#getEmptyStateSuggestions();
 
     // clang-format off
     return html`<div class="empty-state-container messages-scroll-container">
       <div class="header">
         <div class="icon">
-          <${IconButton.Icon.Icon.litTagName}
+          <devtools-icon
             name="smart-assistant"
-          ></${IconButton.Icon.Icon.litTagName}>
+          ></devtools-icon>
         </div>
         <h1>${lockedString(UIStringsNotTranslate.emptyStateText)}</h1>
       </div>
       <div class="suggestions">
         ${suggestions.map(suggestion => {
-          return html`<${Buttons.Button.Button.litTagName}
+          return html`<devtools-button
             class="suggestion"
             @click=${() => this.#handleSuggestionClick(suggestion)}
             .data=${
@@ -915,32 +955,41 @@ export class FreestylerChatUi extends HTMLElement {
                 disabled: this.#isTextInputDisabled(),
               } as Buttons.Button.ButtonData
             }
-          >${suggestion}</${Buttons.Button.Button.litTagName}>`;
+          >${suggestion}</devtools-button>`;
         })}
       </div>
     </div>`;
     // clang-format on
   };
 
-  #getSuggestions = (): string[] => {
+  #getEmptyStateSuggestions = (): string[] => {
+    if (!this.#props.agentType) {
+      return [];
+    }
     switch (this.#props.agentType) {
       case AgentType.FREESTYLER:
         return [
+          'What can you help me with?',
           'Why isn’t this element visible?',
-          'Why does this element overlap another?',
           'How do I center this element?',
         ];
       case AgentType.DRJONES_FILE:
         return [
-          'What are the key functions in this file and what are they doing?',
+          'What does this script do?',
+          'Is the script optimized for performance?',
+          'Does the script handle user input safely?',
         ];
       case AgentType.DRJONES_NETWORK_REQUEST:
         return [
-          'Why is this network request taking longer to complete?',
+          'Why is this network request taking so long?',
+          'Are there any security headers present?',
+          'Why is the request failing?',
         ];
       case AgentType.DRJONES_PERFORMANCE:
         return [
-          'Is this item on the critical rendering path?',
+          'Identify performance issues in this call stack',
+          'Where is most of the time being spent in this call stack?',
+          'How can I reduce the time of this call stack?',
         ];
     }
   };
@@ -953,10 +1002,10 @@ export class FreestylerChatUi extends HTMLElement {
           .disabled=${this.#isTextInputDisabled()}
           wrap="hard"
           @keydown=${this.#handleTextAreaKeyDown}
-          placeholder=${getInputPlaceholderString(this.#props.aidaAvailability, this.#props.agentType, this.#props.state)}
+          placeholder=${getInputPlaceholderString(this.#props.state, this.#props.agentType)}
           jslog=${VisualLogging.textField('query').track({ keydown: 'Enter' })}></textarea>
           ${this.#props.isLoading
-            ? html`<${Buttons.Button.Button.litTagName}
+            ? html`<devtools-button
               class="chat-input-button"
               aria-label=${lockedString(UIStringsNotTranslate.cancelButtonTitle)}
               @click=${this.#handleCancel}
@@ -970,8 +1019,8 @@ export class FreestylerChatUi extends HTMLElement {
                   jslogContext: 'stop',
                 } as Buttons.Button.ButtonData
               }
-            ></${Buttons.Button.Button.litTagName}>`
-            : html`<${Buttons.Button.Button.litTagName}
+            ></devtools-button>`
+            : html`<devtools-button
               class="chat-input-button"
               aria-label=${lockedString(UIStringsNotTranslate.sendButtonTitle)}
               .data=${
@@ -985,13 +1034,13 @@ export class FreestylerChatUi extends HTMLElement {
                   jslogContext: 'send',
                 } as Buttons.Button.ButtonData
               }
-            ></${Buttons.Button.Button.litTagName}>`}
+            ></devtools-button>`}
       </div>`;
     // clang-format on
   };
 
   #getDisclaimerText = (): Platform.UIString.LocalizedString => {
-    if (this.#props.state === State.CONSENT_VIEW) {
+    if (this.#props.state === State.CONSENT_VIEW || !this.#props.agentType) {
       return i18nString(UIStrings.inputDisclaimerForEmptyState);
     }
     switch (this.#props.agentType) {
@@ -1006,7 +1055,7 @@ export class FreestylerChatUi extends HTMLElement {
     }
   };
 
-  #renderOptIn(): LitHtml.TemplateResult {
+  #getConsentViewContents(): LitHtml.TemplateResult {
     const settingsLink = document.createElement('button');
     settingsLink.textContent = i18nString(UIStrings.settingsLink);
     settingsLink.classList.add('link');
@@ -1016,24 +1065,42 @@ export class FreestylerChatUi extends HTMLElement {
     });
     settingsLink.setAttribute('jslog', `${VisualLogging.action('open-ai-settings').track({click: true})}`);
     const config = Common.Settings.Settings.instance().getHostConfig();
+    return html`${
+        config.devToolsExplainThisResourceDogfood?.enabled ?
+            i18n.i18n.getFormatLocalizedString(str_, UIStrings.turnOnForStylesAndRequests, {PH1: settingsLink}) :
+            i18n.i18n.getFormatLocalizedString(str_, UIStrings.turnOnForStyles, {PH1: settingsLink})}`;
+  }
 
+  #getUnavailableAidaAvailabilityContents(
+      aidaAvailability:
+          Exclude<Host.AidaClient.AidaAccessPreconditions, Host.AidaClient.AidaAccessPreconditions.AVAILABLE>):
+      LitHtml.TemplateResult {
+    switch (aidaAvailability) {
+      case Host.AidaClient.AidaAccessPreconditions.NO_ACCOUNT_EMAIL:
+      case Host.AidaClient.AidaAccessPreconditions.SYNC_IS_PAUSED: {
+        return html`${i18nString(UIStrings.notLoggedIn)}`;
+      }
+      case Host.AidaClient.AidaAccessPreconditions.NO_INTERNET: {
+        return html`${i18nString(UIStrings.offline)}`;
+      }
+    }
+  }
+
+  #renderDisabledState(contents: LitHtml.TemplateResult): LitHtml.TemplateResult {
     // clang-format off
     return html`
       <div class="empty-state-container messages-scroll-container">
-        <div class="opt-in">
-          <div class="opt-in-icon-container">
-            <${IconButton.Icon.Icon.litTagName} .data=${{
+        <div class="disabled-view">
+          <div class="disabled-view-icon-container">
+            <devtools-icon .data=${{
               iconName: 'smart-assistant',
               width: 'var(--sys-size-8)',
               height: 'var(--sys-size-8)',
             } as IconButton.Icon.IconData}>
-            </${IconButton.Icon.Icon.litTagName}>
+            </devtools-icon>
           </div>
           <div>
-            ${config.devToolsExplainThisResourceDogfood?.enabled ?
-              i18n.i18n.getFormatLocalizedString(str_, UIStrings.turnOnForStylesAndRequests, {PH1: settingsLink}) :
-              i18n.i18n.getFormatLocalizedString(str_, UIStrings.turnOnForStyles, {PH1: settingsLink})
-            }
+            ${contents}
           </div>
         </div>
       </div>
@@ -1041,18 +1108,66 @@ export class FreestylerChatUi extends HTMLElement {
     // clang-format on
   }
 
+  #renderNoAgentState(): LitHtml.TemplateResult {
+    const config = Common.Settings.Settings.instance().getHostConfig();
+
+    // clang-format off
+    return html`
+      <main class="messages-scroll-container" @scroll=${this.#handleScroll}>
+        <div class="messages-container">
+          <section class="no-agent-message" jslog=${VisualLogging.section('no-agent-entrypoint')}>
+            <div class="header">
+              <devtools-icon name="smart-assistant"></devtools-icon>
+              <h2>${lockedString(UIStringsNotTranslate.ai)}</h2>
+            </div>
+            <div class="instructions">
+              <p>${lockedString(UIStringsNotTranslate.getStarted)}</p>
+              ${config.devToolsFreestyler?.enabled ? html`
+                <p><strong>${lockedString(UIStringsNotTranslate.cssHelp)}</strong> ${lockedString(UIStringsNotTranslate.cssHelpExplainer)}</p>
+              ` : LitHtml.nothing}
+              ${config.devToolsAiAssistanceFileAgentDogfood?.enabled ? html`
+                <p><strong>${lockedString(UIStringsNotTranslate.fileHelp)}</strong> ${lockedString(UIStringsNotTranslate.fileHelpExplainer)}</p>
+              ` : LitHtml.nothing}
+              ${config.devToolsExplainThisResourceDogfood?.enabled ? html`
+                <p><strong>${lockedString(UIStringsNotTranslate.networkHelp)}</strong> ${lockedString(UIStringsNotTranslate.networkHelpExplainer)}</p>
+              ` : LitHtml.nothing}
+              ${config.devToolsAiAssistancePerformanceAgentDogfood?.enabled ? html`
+                <p><strong>${lockedString(UIStringsNotTranslate.performanceHelp)}</strong> ${lockedString(UIStringsNotTranslate.performanceHelpExplainer)}</p>
+              ` : LitHtml.nothing}
+            </div>
+          </section>
+        </div>
+      </main>
+    `;
+    // clang-format on
+  }
+
+  #renderMainContents(): LitHtml.TemplateResult {
+    if (this.#props.state === State.CONSENT_VIEW) {
+      return this.#renderDisabledState(this.#getConsentViewContents());
+    }
+
+    if (this.#props.aidaAvailability !== Host.AidaClient.AidaAccessPreconditions.AVAILABLE) {
+      return this.#renderDisabledState(this.#getUnavailableAidaAvailabilityContents(this.#props.aidaAvailability));
+    }
+
+    if (!this.#props.agentType) {
+      return this.#renderNoAgentState();
+    }
+
+    if (this.#props.messages.length > 0) {
+      return this.#renderMessages();
+    }
+
+    return this.#renderEmptyState();
+  }
+
   #render(): void {
     // clang-format off
     LitHtml.render(html`
       <div class="chat-ui">
         <main>
-          ${
-            this.#props.state === State.CONSENT_VIEW ? this.#renderOptIn()
-              : (this.#props.messages.length > 0
-                ? this.#renderMessages()
-                : this.#renderEmptyState()
-              )
-          }
+          ${this.#renderMainContents()}
           <form class="input-form" @submit=${this.#handleSubmit}>
             ${this.#props.state !== State.CONSENT_VIEW ? html`
               <div class="input-header">

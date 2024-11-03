@@ -7,11 +7,7 @@ standalone="$HOME/code/trace_engine"
 
 trace_engine_dist="$dtfe/out/TraceEngine/dist"
 
-echo "Testing before copy"
-node "$dtfe/scripts/trace/test/test-trace-engine.mjs"
-if [ $? -ne 0 ]; then
- exit $?
-fi
+# We can't test before rolling anymore because of the third-party-web resolution stuff. No biggie.
 
 echo -e "\nCopying to $standalone … \n"
 mkdir -p "$standalone"
@@ -30,11 +26,9 @@ cp -rp "$dtfe/front_end/panels/timeline/fixtures/traces/invalid-animation-events
 # tweak paths for the new location
 cp -rp "$dtfe/scripts/trace/analyze-trace.mjs" "$standalone/analyze-trace.mjs.orig"
 cat "$standalone/analyze-trace.mjs.orig"        | \
-  sed 's|../../out/TraceEngine/dist/|./|'     | \
-  sed 's|front_end/panels/timeline/fixtures/traces/|test/|'  > "$standalone/analyze-trace.mjs"
+  sed 's|../../out/TraceEngine/dist/|./|' | sed 's|../../front_end/|./|' > "$standalone/analyze-trace.mjs"
 cp -rp "$dtfe/scripts/trace/test/test-trace-engine.mjs" "$standalone/test/test-trace-engine.mjs.orig"
-cat "$standalone/test/test-trace-engine.mjs.orig"  | \
-  sed 's|front_end/panels/timeline/fixtures/traces/|test/|'  > "$standalone/test/test-trace-engine.mjs"
+cat "$standalone/test/test-trace-engine.mjs.orig"  > "$standalone/test/test-trace-engine.mjs"
 
 # cleanup
 command rm "$standalone/analyze-trace.mjs.orig"

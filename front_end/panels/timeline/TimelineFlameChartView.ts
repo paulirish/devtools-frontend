@@ -30,10 +30,10 @@ import {
 } from './TimelineFlameChartDataProvider.js';
 import {TimelineFlameChartNetworkDataProvider} from './TimelineFlameChartNetworkDataProvider.js';
 import timelineFlameChartViewStyles from './timelineFlameChartView.css.js';
-import {type TimelineModeViewDelegate} from './TimelinePanel.js';
+import type {TimelineModeViewDelegate} from './TimelinePanel.js';
 import {TimelineSelection} from './TimelineSelection.js';
 import {AggregatedTimelineTreeView} from './TimelineTreeView.js';
-import {type TimelineMarkerStyle} from './TimelineUIUtils.js';
+import type {TimelineMarkerStyle} from './TimelineUIUtils.js';
 
 const UIStrings = {
   /**
@@ -1459,17 +1459,21 @@ export class TimelineFlameChartMarker implements PerfUI.FlameChart.FlameChartMar
       return;
     }
 
-    context.save();
-    if (this.style.tall) {
-      context.strokeStyle = this.style.color;
-      context.lineWidth = this.style.lineWidth;
-      context.translate(this.style.lineWidth < 1 || (this.style.lineWidth & 1) ? 0.5 : 0, 0.5);
-      context.beginPath();
-      context.moveTo(x, 0);
-      context.setLineDash(this.style.dashStyle);
-      context.lineTo(x, context.canvas.height);
-      context.stroke();
+    if (!this.style.tall) {
+      return;
     }
+
+    context.save();
+
+    context.strokeStyle = this.style.color;
+    context.lineWidth = this.style.lineWidth;
+    context.translate(this.style.lineWidth < 1 || (this.style.lineWidth & 1) ? 0.5 : 0, 0.5);
+    context.beginPath();
+    context.moveTo(x, 0);
+    context.setLineDash(this.style.dashStyle);
+    context.lineTo(x, context.canvas.height);
+    context.stroke();
+
     context.restore();
   }
 }

@@ -2,34 +2,33 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// Run this first:
-//    front_end/models/trace/build-trace-engine-lib.sh
-
 /* eslint-disable rulesdir/es_modules_import */
 import fs from 'node:fs';
 import zlib from 'node:zlib';
 
-/** @typedef {import('../front_end/models/trace/trace.ts')} TraceEngine */
+/** @typedef {import('../../front_end/models/trace/trace.ts')} Trace */
 
 // For types... see Connor's manual hack here:
 // https://github.com/GoogleChrome/lighthouse/pull/15703/files#diff-ec7e073cf0e6135d4f2af9bc04fe6100ec0df80ad1686bee2da53871be5f1a7b
 // and https://github.com/GoogleChrome/lighthouse/pull/15703/files#diff-6dab4507247217209f5ab0f6c343ca2b00af1300878abba81fb74d51cdfbedf9
+// But maybe all this kinda works, too?
 
-/** @type {TraceEngine} */
-import * as TraceEngine from '../../out/TraceEngine/dist/models/trace/trace.js';
+/** @type {Trace} */
+import * as Trace from '../../out/TraceEngine/dist/models/trace/trace.js';
 
 polyfillDOMRect();
 
 /**
  * @param {string} filename
- * @returns {Promise<TraceEngine.TraceModel>}
+ * @returns {Promise<{parsedTrace: Trace.Handlers.Types.ParsedTrace, insights: Trace.Insights.Types.TraceInsightSets | null>}}
  */
 export async function analyzeTrace(filename) {
   const traceEvents = loadTraceEventsFromFile(filename);
-  const model = TraceEngine.TraceModel.Model.createWithAllHandlers(
-      TraceEngine.Types.Configuration.DEFAULT);  // aka `fullTraceEngine`
+  const model = Trace.TraceModel.Model.createWithAllHandlers(Trace.Types.Configuration.DEFAULT);
   await model.parse(traceEvents);
-  return model.traceParsedData();
+  const parsedTrace = model.parsedTrace();
+  const insights = model.traceInsights();
+  return {parsedTrace, insights};
 }
 
 // If run as CLI, parse the argv trace (or a fallback)

@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import './Table.js';
+
 import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Trace from '../../../../models/trace/trace.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
@@ -10,7 +12,7 @@ import type * as Overlays from '../../overlays/overlays.js';
 import {eventRef} from './EventRef.js';
 import {BaseInsight, shouldRenderForCategory} from './Helpers.js';
 import type * as SidebarInsight from './SidebarInsight.js';
-import {type TableData} from './Table.js';
+import type {TableData} from './Table.js';
 import {Category} from './types.js';
 
 const {html} = LitHtml;
@@ -22,7 +24,7 @@ const UIStrings = {
    * @description Text to tell the user about the font-display CSS feature to help improve a the UX of a page.
    */
   description:
-      'Consider using a [font-display](https://developer.chrome.com/blog/font-display) of `swap` or `optional` to ensure text is consistently visible. `swap` can be further optimized to mitigate layout shifts with [font metric overrides](https://developer.chrome.com/blog/font-fallbacks).',
+      'Consider setting [`font-display`](https://developer.chrome.com/blog/font-display) to `swap` or `optional` to ensure text is consistently visible. `swap` can be further optimized to mitigate layout shifts with [font metric overrides](https://developer.chrome.com/blog/font-fallbacks).',
   /** Column for a font loaded by the page to render text. */
   fontColumn: 'Font',
   /** Column for the amount of time wasted. */

@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import './Table.js';
+
 import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
 import * as Trace from '../../../../models/trace/trace.js';
@@ -11,7 +13,7 @@ import type * as Overlays from '../../overlays/overlays.js';
 import {eventRef} from './EventRef.js';
 import {BaseInsight, shouldRenderForCategory} from './Helpers.js';
 import type * as SidebarInsight from './SidebarInsight.js';
-import {type TableData} from './Table.js';
+import type {TableData} from './Table.js';
 import {Category} from './types.js';
 
 const {html} = LitHtml;
@@ -28,9 +30,9 @@ const UIStrings = {
       '[Deferring or inlining](https://web.dev/learn/performance/understanding-the-critical-path#render-blocking_resources/) ' +
       'can move these network requests out of the critical path.',
   /**
-   * @description Label to describe a render-blocking network request.
+   * @description Label to describe a network request (that happens to be render-blocking).
    */
-  renderBlockingRequest: 'Render-blocking request',
+  renderBlockingRequest: 'Request',
   /**
    *@description Label used for a time duration.
    */

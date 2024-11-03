@@ -587,7 +587,7 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
 
     const filterItems =
         Object.entries(Common.ResourceType.resourceCategories).map(([key, category]) => ({
-                                                                     name: category.title(),
+                                                                     name: category.name,
                                                                      label: () => category.shortTitle(),
                                                                      title: category.title(),
                                                                      jslogContext:
@@ -1822,7 +1822,7 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
     copyMenu.footerSection().appendItem(
         filtered ? i18nString(UIStrings.copyAllListedAsHarSanitized) : i18nString(UIStrings.copyAllAsHarSanitized),
         this.copyAllAsHAR.bind(this, {sanitize: true}), {jslogContext: 'copy-all-as-har'});
-    if (this.networkShowOptionsToGenerateHarWithSensitiveData) {
+    if (this.networkShowOptionsToGenerateHarWithSensitiveData.get()) {
       copyMenu.footerSection().appendItem(
           filtered ? i18nString(UIStrings.copyAllListedAsHarWithSensitiveData) :
                      i18nString(UIStrings.copyAllAsHarWithSensitiveData),

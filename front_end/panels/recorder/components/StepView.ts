@@ -9,6 +9,8 @@
 /* eslint-disable rulesdir/lit_html_host_this */
 
 import '../../../ui/components/icon_button/icon_button.js';
+import './StepEditor.js';
+import './TimelineSection.js';
 
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Platform from '../../../core/platform/platform.js';
@@ -20,11 +22,9 @@ import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 import type * as Converters from '../converters/converters.js';
 import * as Models from '../models/models.js';
 
-import {type StepEditedEvent} from './StepEditor.js';
+import type {StepEditedEvent} from './StepEditor.js';
 import stepViewStyles from './stepView.css.js';
-import {
-  type TimelineSectionData,
-} from './TimelineSection.js';
+import type {TimelineSectionData} from './TimelineSection.js';
 
 const {html} = LitHtml;
 
@@ -528,7 +528,6 @@ function viewFunction(input: ViewInput, _output: ViewOutput, target: HTMLElement
 }
 
 export class StepView extends HTMLElement {
-
   readonly #shadow = this.attachShadow({mode: 'open'});
 
   #observer: IntersectionObserver = new IntersectionObserver(result => {

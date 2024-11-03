@@ -40,7 +40,7 @@ import * as i18n from '../i18n/i18n.js';
 import * as Platform from '../platform/platform.js';
 import * as Root from '../root/root.js';
 
-import {type PageResourceLoadInitiator} from './PageResourceLoader.js';
+import type {PageResourceLoadInitiator} from './PageResourceLoader.js';
 import {type GetPropertiesResult, type RemoteObject, RemoteObjectProperty, ScopeRef} from './RemoteObject.js';
 import {Events as ResourceTreeModelEvents, ResourceTreeModel} from './ResourceTreeModel.js';
 import {type EvaluationOptions, type EvaluationResult, type ExecutionContext, RuntimeModel} from './RuntimeModel.js';
@@ -951,8 +951,14 @@ export class DebuggerModel extends SDKModel<EventTypes> {
     this.#breakpointResolvedEventTarget.removeEventListener(breakpointId, listener, thisObject);
   }
 
-  async setBlackboxPatterns(patterns: string[]): Promise<boolean> {
-    const response = await this.agent.invoke_setBlackboxPatterns({patterns});
+  async setBlackboxPatterns(patterns: string[], skipAnonymous: boolean): Promise<boolean> {
+    const response = await this.agent.invoke_setBlackboxPatterns({patterns, skipAnonymous});
+    const error = response.getError();
+    return !error;
+  }
+
+  async setBlackboxExecutionContexts(uniqueIds: string[]): Promise<boolean> {
+    const response = await this.agent.invoke_setBlackboxExecutionContexts({uniqueIds});
     const error = response.getError();
     return !error;
   }

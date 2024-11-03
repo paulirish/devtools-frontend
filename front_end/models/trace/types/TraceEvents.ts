@@ -5,7 +5,7 @@
 /* eslint-disable no-unused-private-class-members */
 import type * as Protocol from '../../../generated/protocol.js';
 
-import {type MicroSeconds, type MilliSeconds, type Seconds, type TraceWindowMicroSeconds} from './Timing.js';
+import type {MicroSeconds, MilliSeconds, Seconds, TraceWindowMicroSeconds} from './Timing.js';
 
 // Trace Events.
 export const enum Phase {
@@ -932,7 +932,8 @@ export interface SyntheticLayoutShiftCluster {
 }
 
 export type FetchPriorityHint = 'low'|'high'|'auto';
-export type RenderBlocking = 'blocking'|'non_blocking'|'in_body_parser_blocking'|'potentially_blocking';
+export type RenderBlocking =
+    'blocking'|'non_blocking'|'in_body_parser_blocking'|'potentially_blocking'|'dynamically_injected_non_blocking';
 
 export interface Initiator {
   type: Protocol.Network.InitiatorType;
@@ -950,8 +951,10 @@ export interface ResourceSendRequest extends Instant {
       requestId: string,
       url: string,
       priority: Protocol.Network.ResourcePriority,
-      resourceType: Protocol.Network.ResourceType,
-      fetchPriorityHint: FetchPriorityHint,
+      /** Added Feb 2024. https://crrev.com/c/5277583 */
+      resourceType?: Protocol.Network.ResourceType,
+      /** Added Feb 2024. https://crrev.com/c/5297615 */
+      fetchPriorityHint?: FetchPriorityHint,
       // TODO(crbug.com/1457985): change requestMethod to enum when confirm in the backend code.
       requestMethod?: string,
       renderBlocking?: RenderBlocking,

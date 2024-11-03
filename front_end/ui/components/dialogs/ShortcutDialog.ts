@@ -11,7 +11,7 @@ import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import {
   type ClickOutsideDialogEvent,
-  Dialog as DialogElement,
+  type Dialog as DialogElement,
   DialogHorizontalAlignment,
   DialogVerticalPosition,
 } from './Dialog.js';
@@ -62,7 +62,6 @@ export interface ShortcutDialogData {
 }
 
 export class ShortcutDialog extends HTMLElement {
-  static readonly litTagName = LitHtml.literal`devtools-shortcut-dialog`;
   readonly #shadow = this.attachShadow({mode: 'open'});
   readonly #renderBound = this.#render.bind(this);
 
@@ -112,7 +111,7 @@ export class ShortcutDialog extends HTMLElement {
     // clang-format off
     LitHtml.render(
       html`
-      <${Buttons.Button.Button.litTagName}
+      <devtools-button
         @click=${this.#showDialog}
         on-render=${ComponentHelpers.Directives.nodeRenderedCallback(node => {
           this.#showButton = node as Buttons.Button.Button;
@@ -122,8 +121,8 @@ export class ShortcutDialog extends HTMLElement {
           iconName: 'help',
           title: i18nString(UIStrings.showShortcutTitle),
         } as Buttons.Button.ButtonData}
-      ></${Buttons.Button.Button.litTagName}>
-      <${DialogElement.litTagName}
+      ></devtools-button>
+      <devtools-dialog
         @clickoutsidedialog=${this.#closeDialog}
         .showConnector=${true}
         .origin=${() => {
@@ -141,7 +140,7 @@ export class ShortcutDialog extends HTMLElement {
       >
         <div class="keybinds-category-header">
           <span class="keybinds-category-header-text">${i18nString(UIStrings.dialogTitle)}</span>
-          <${Buttons.Button.Button.litTagName}
+          <devtools-button
             @click=${this.#closeDialog}
             class='close-icon'
             .data=${{
@@ -150,7 +149,7 @@ export class ShortcutDialog extends HTMLElement {
               title: i18nString(UIStrings.close),
             } as Buttons.Button.ButtonData}
             jslog=${VisualLogging.close().track({click: true})}
-          ></${Buttons.Button.Button.litTagName}>
+          ></devtools-button>
         </div>
         <ul class="keybinds-list">
           ${this.#shortcuts.map(shortcut =>
@@ -170,7 +169,7 @@ export class ShortcutDialog extends HTMLElement {
               </li>`,
           )}
         </ul>
-      </${DialogElement.litTagName}>
+      </devtools-dialog>
       `,
       this.#shadow, {host: this});
     // clang-format on

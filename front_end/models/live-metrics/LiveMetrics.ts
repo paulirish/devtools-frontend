@@ -4,6 +4,7 @@
 
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
+import * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
@@ -26,6 +27,8 @@ class InjectedScript {
   }
 }
 
+export type InteractionMap = Map<InteractionId, Interaction>;
+
 export class LiveMetrics extends Common.ObjectWrapper.ObjectWrapper<EventTypes> implements SDK.TargetManager.Observer {
   #enabled = false;
   #target?: SDK.Target.Target;
@@ -34,7 +37,8 @@ export class LiveMetrics extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
   #lcpValue?: LCPValue;
   #clsValue?: CLSValue;
   #inpValue?: INPValue;
-  #interactions: Interaction[] = [];
+  #interactions: InteractionMap = new Map();
+  #interactionsByGroupId = new Map<Spec.InteractionEntryGroupId, Interaction[]>();
   #layoutShifts: LayoutShift[] = [];
   #mutex = new Common.Mutex.Mutex();
 
@@ -64,7 +68,7 @@ export class LiveMetrics extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
     return this.#inpValue;
   }
 
-  get interactions(): Interaction[] {
+  get interactions(): InteractionMap {
     return this.#interactions;
   }
 
@@ -122,6 +126,15 @@ export class LiveMetrics extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
     });
   }
 
+  setStatusForTesting(status: StatusEvent): void {
+    this.#lcpValue = status.lcp;
+    this.#clsValue = status.cls;
+    this.#inpValue = status.inp;
+    this.#interactions = status.interactions;
+    this.#layoutShifts = status.layoutShifts;
+    this.#sendStatusUpdate();
+  }
+
   /**
    * If there is a document update then any node handles we have already resolved will be invalid.
    * This function should re-resolve any relevant DOM nodes after a document update.
@@ -131,7 +144,7 @@ export class LiveMetrics extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
 
     const allLayoutAffectedNodes = this.#layoutShifts.flatMap(shift => shift.affectedNodes);
     const toRefresh: Array<{node?: SDK.DOMModel.DOMNode}> =
-        [this.#lcpValue || {}, ...this.#interactions, ...allLayoutAffectedNodes];
+        [this.#lcpValue || {}, ...this.#interactions.values(), ...allLayoutAffectedNodes];
 
     const allPromises = toRefresh.map(item => {
       const node = item.node;
@@ -184,21 +197,49 @@ export class LiveMetrics extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
         const inpEvent: INPValue = {
           value: webVitalsEvent.value,
           phases: webVitalsEvent.phases,
-          uniqueInteractionId: webVitalsEvent.uniqueInteractionId,
+          interactionId: `interaction-${webVitalsEvent.entryGroupId}-${webVitalsEvent.startTime}`,
         };
         this.#inpValue = inpEvent;
         break;
       }
-      case 'Interaction': {
-        const interaction = new Interaction(webVitalsEvent);
+      case 'InteractionEntry': {
+        const groupInteractions =
+            Platform.MapUtilities.getWithDefault(this.#interactionsByGroupId, webVitalsEvent.entryGroupId, () => []);
+
+        // `nextPaintTime` uses the event duration which is rounded to the nearest 8ms. The best we can do
+        // is check if the `nextPaintTime`s are within 8ms.
+        // https://developer.mozilla.org/en-US/docs/Web/API/PerformanceEntry/duration#event
+        let interaction = groupInteractions.find(
+            interaction => Math.abs(interaction.nextPaintTime - webVitalsEvent.nextPaintTime) < 8);
+
+        if (!interaction) {
+          interaction = {
+            interactionId: `interaction-${webVitalsEvent.entryGroupId}-${webVitalsEvent.startTime}`,
+            interactionType: webVitalsEvent.interactionType,
+            duration: webVitalsEvent.duration,
+            eventNames: [],
+            phases: webVitalsEvent.phases,
+            startTime: webVitalsEvent.startTime,
+            nextPaintTime: webVitalsEvent.nextPaintTime,
+          };
+
+          groupInteractions.push(interaction);
+          this.#interactions.set(interaction.interactionId, interaction);
+        }
+
+        // We can get multiple instances of the first input interaction since web-vitals.js installs
+        // an extra listener for events of type `first-input`. This is a simple way to de-dupe those
+        // events without adding complexity to the injected code.
+        if (!interaction.eventNames.includes(webVitalsEvent.eventName)) {
+          interaction.eventNames.push(webVitalsEvent.eventName);
+        }
+
         if (webVitalsEvent.nodeIndex !== undefined) {
           const node = await this.#resolveDomNode(webVitalsEvent.nodeIndex, executionContextId);
           if (node) {
             interaction.node = node;
           }
         }
-
-        this.#interactions.push(interaction);
         break;
       }
       case 'LayoutShift': {
@@ -222,7 +263,7 @@ export class LiveMetrics extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
         this.#lcpValue = undefined;
         this.#clsValue = undefined;
         this.#inpValue = undefined;
-        this.#interactions = [];
+        this.#interactions.clear();
         this.#layoutShifts = [];
         break;
       }
@@ -309,7 +350,12 @@ export class LiveMetrics extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
   }
 
   clearInteractions(): void {
-    this.#interactions = [];
+    this.#interactions.clear();
+    this.#sendStatusUpdate();
+  }
+
+  clearLayoutShifts(): void {
+    this.#layoutShifts = [];
     this.#sendStatusUpdate();
   }
 
@@ -426,6 +472,8 @@ export const enum Events {
   STATUS = 'status',
 }
 
+export type InteractionId = `interaction-${number}-${number}`;
+
 export type MetricValue = Pick<Spec.MetricChangeEvent, 'value'>;
 
 export interface LCPValue extends MetricValue {
@@ -435,7 +483,7 @@ export interface LCPValue extends MetricValue {
 
 export interface INPValue extends MetricValue {
   phases: Spec.INPPhases;
-  uniqueInteractionId: Spec.UniqueInteractionId;
+  interactionId: InteractionId;
 }
 
 export interface CLSValue extends MetricValue {
@@ -448,24 +496,22 @@ export interface LayoutShift {
   affectedNodes: Array<{node: SDK.DOMModel.DOMNode}>;
 }
 
-export class Interaction {
-  interactionType: Spec.InteractionEvent['interactionType'];
-  duration: Spec.InteractionEvent['duration'];
-  uniqueInteractionId: Spec.UniqueInteractionId;
+export interface Interaction {
+  interactionId: InteractionId;
+  interactionType: Spec.InteractionEntryEvent['interactionType'];
+  eventNames: string[];
+  duration: number;
+  startTime: number;
+  nextPaintTime: number;
+  phases: Spec.INPPhases;
   node?: SDK.DOMModel.DOMNode;
-
-  constructor(interactionEvent: Spec.InteractionEvent) {
-    this.interactionType = interactionEvent.interactionType;
-    this.duration = interactionEvent.duration;
-    this.uniqueInteractionId = interactionEvent.uniqueInteractionId;
-  }
 }
 
 export interface StatusEvent {
   lcp?: LCPValue;
   cls?: CLSValue;
   inp?: INPValue;
-  interactions: Interaction[];
+  interactions: InteractionMap;
   layoutShifts: LayoutShift[];
 }
 

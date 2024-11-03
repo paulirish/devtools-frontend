@@ -22,12 +22,23 @@ export class ExtensionStorage extends Common.ObjectWrapper.ObjectWrapper<{}> {
     this.#storageAreaInternal = storageArea;
   }
 
+  get model(): ExtensionStorageModel {
+    return this.#model;
+  }
+
   get extensionId(): string {
     return this.#extensionIdInternal;
   }
 
   get name(): string {
     return this.#nameInternal;
+  }
+
+  // Returns a key that uniquely identifies this extension ID and storage area,
+  // but which is not unique across targets, so we can identify two identical
+  // storage areas across frames.
+  get key(): string {
+    return `${this.extensionId}-${this.storageArea}`;
   }
 
   get storageArea(): Protocol.Extensions.StorageArea {
@@ -49,7 +60,7 @@ export class ExtensionStorage extends Common.ObjectWrapper.ObjectWrapper<{}> {
     return response.data;
   }
 
-  async setItem(key: string, value: string): Promise<void> {
+  async setItem(key: string, value: unknown): Promise<void> {
     const response = await this.#model.agent.invoke_setStorageItems(
         {id: this.#extensionIdInternal, storageArea: this.#storageAreaInternal, values: {[key]: value}});
     if (response.getError()) {
@@ -71,6 +82,15 @@ export class ExtensionStorage extends Common.ObjectWrapper.ObjectWrapper<{}> {
     if (response.getError()) {
       throw new Error(response.getError());
     }
+  }
+
+  matchesTarget(target: SDK.Target.Target|undefined): boolean {
+    if (!target) {
+      return false;
+    }
+    const targetURL = target.targetInfo()?.url;
+    const parsedURL = targetURL ? Common.ParsedURL.ParsedURL.fromString(targetURL) : null;
+    return parsedURL?.scheme === 'chrome-extension' && parsedURL?.host === this.extensionId;
   }
 }
 
@@ -131,6 +151,10 @@ export class ExtensionStorageModel extends SDK.SDKModel.SDKModel<EventTypes> {
             if (this.#storagesInternal.get(id) !== storages) {
               return;
             }
+            // The storage area may have been added in the meantime.
+            if (storages.get(storageArea)) {
+              return;
+            }
             storages.set(storageArea, storage);
             this.dispatchEventToListeners(Events.EXTENSION_STORAGE_ADDED, storage);
           })
@@ -150,8 +174,10 @@ export class ExtensionStorageModel extends SDK.SDKModel.SDKModel<EventTypes> {
     }
 
     for (const [key, storage] of storages) {
-      this.dispatchEventToListeners(Events.EXTENSION_STORAGE_REMOVED, storage);
+      // Delete this before firing the event, since this matches the behavior
+      // of other models and meets expectations for a removed event.
       storages.delete(key);
+      this.dispatchEventToListeners(Events.EXTENSION_STORAGE_REMOVED, storage);
     }
 
     this.#storagesInternal.delete(id);

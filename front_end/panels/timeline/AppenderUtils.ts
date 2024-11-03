@@ -7,7 +7,7 @@ import * as Trace from '../../models/trace/trace.js';
 import type * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
 
-import {type VisualLoggingTrackName} from './CompatibilityTracksAppender.js';
+import type {VisualLoggingTrackName} from './CompatibilityTracksAppender.js';
 
 const UIStrings = {
   /**
@@ -62,8 +62,7 @@ export function buildGroupStyle(extra?: Partial<PerfUI.FlameChart.GroupStyle>): 
  */
 export function buildTrackHeader(
     jslogContext: VisualLoggingTrackName|null, startLevel: number, name: string, style: PerfUI.FlameChart.GroupStyle,
-    selectable: boolean, expanded?: boolean, showStackContextMenu?: boolean,
-    legends?: PerfUI.FlameChart.Legend[]): PerfUI.FlameChart.Group {
+    selectable: boolean, expanded?: boolean, showStackContextMenu?: boolean): PerfUI.FlameChart.Group {
   const group: PerfUI.FlameChart.Group = {
     startLevel,
     name: name as Common.UIString.LocalizedString,
@@ -71,7 +70,6 @@ export function buildTrackHeader(
     selectable,
     expanded,
     showStackContextMenu,
-    legends,
   };
   if (jslogContext !== null) {
     group.jslogContext = jslogContext;

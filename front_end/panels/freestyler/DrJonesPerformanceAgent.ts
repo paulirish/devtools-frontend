@@ -11,13 +11,9 @@ import {
   AiAgent,
   type AidaRequestOptions,
   type ContextDetail,
-  debugLog,
-  ErrorType,
-  isDebugMode,
-  type ResponseData,
+  type ContextResponse,
+  type ParsedResponse,
   ResponseType,
-  type ThoughtResponse,
-  type TitleResponse,
 } from './AiAgent.js';
 
 const preamble = `You are a performance expert deeply integrated with Chrome DevTools.
@@ -50,6 +46,7 @@ Your task is to analyze this event and its surrounding context within the perfor
 # Considerations
 * Keep your analysis concise and focused, highlighting only the most critical aspects for a software engineer.
 * Do not mention id of the event in your response.
+* **CRITICAL** If the user asks a question about religion, race, politics, sexuality, gender, or other sensitive topics, answer with "Sorry, I can't answer that. I'm best at questions about performance of websites."
 
 ## Example session
 
@@ -70,10 +67,6 @@ Perhaps there's room for optimization there. You could investigate whether the c
 */
 const UIStringsNotTranslate = {
   analyzingStackTrace: 'Analyzing stack trace',
-  /**
-   *@description Thought text for thinking step of DrJones Performance agent.
-   */
-  dataUsedToGenerateThisResponse: 'Data used to generate this response',
 };
 
 const lockedString = i18n.i18n.lockedString;
@@ -82,11 +75,13 @@ const lockedString = i18n.i18n.lockedString;
  * One agent instance handles one conversation. Create a new agent
  * instance for a new conversation.
  */
-export class DrJonesPerformanceAgent extends AiAgent {
+export class DrJonesPerformanceAgent extends AiAgent<Trace.Helpers.TreeHelpers.TraceEntryNodeForAI> {
   readonly preamble = preamble;
-  readonly clientFeature = Host.AidaClient.ClientFeature.CHROME_FREESTYLER;
-  // TODO(b/369822364): use a feature param instead.
-  readonly userTier = 'BETA';
+  readonly clientFeature = Host.AidaClient.ClientFeature.CHROME_DRJONES_PERFORMANCE_AGENT;
+  get userTier(): string|undefined {
+    const config = Common.Settings.Settings.instance().getHostConfig();
+    return config.devToolsAiAssistancePerformanceAgentDogfood?.userTier;
+  }
   get options(): AidaRequestOptions {
     const config = Common.Settings.Settings.instance().getHostConfig();
     const temperature = AiAgent.validTemperature(config.devToolsAiAssistancePerformanceAgentDogfood?.temperature);
@@ -98,76 +93,27 @@ export class DrJonesPerformanceAgent extends AiAgent {
     };
   }
 
-  *
+  async *
       handleContextDetails(selectedStackTrace: Trace.Helpers.TreeHelpers.TraceEntryNodeForAI|null):
-          Generator<ThoughtResponse|TitleResponse, void, void> {
+          AsyncGenerator<ContextResponse, void, void> {
     yield {
-      type: ResponseType.TITLE,
+      type: ResponseType.CONTEXT,
       title: lockedString(UIStringsNotTranslate.analyzingStackTrace),
-    };
-    yield {
-      type: ResponseType.THOUGHT,
-      thought: lockedString(UIStringsNotTranslate.dataUsedToGenerateThisResponse),
-      contextDetails: createContextDetailsForDrJonesPerformanceAgent(selectedStackTrace),
+      details: createContextDetailsForDrJonesPerformanceAgent(selectedStackTrace),
     };
   }
 
-  async enhanceQuery(query: string, selectedStackTrace: Trace.Helpers.TreeHelpers.TraceEntryNodeForAI|null):
+  override async enhanceQuery(query: string, selectedStackTrace: Trace.Helpers.TreeHelpers.TraceEntryNodeForAI|null):
       Promise<string> {
     const networkEnchantmentQuery =
         selectedStackTrace ? `# Selected stack trace\n${JSON.stringify(selectedStackTrace)}\n\n# User request\n\n` : '';
     return `${networkEnchantmentQuery}${query}`;
   }
 
-  #runId = 0;
-  async * run(query: string, options: {
-    signal?: AbortSignal, selectedStackTrace: Trace.Helpers.TreeHelpers.TraceEntryNodeForAI|null,
-  }): AsyncGenerator<ResponseData, void, void> {
-    yield* this.handleContextDetails(options.selectedStackTrace);
-
-    query = await this.enhanceQuery(query, options.selectedStackTrace);
-    const currentRunId = ++this.#runId;
-
-    let response: string;
-    let rpcId: number|undefined;
-    try {
-      const fetchResult = await this.aidaFetch(query, {signal: options.signal});
-      response = fetchResult.response;
-      rpcId = fetchResult.rpcId;
-    } catch (err) {
-      debugLog('Error calling the AIDA API', err);
-      if (err instanceof Host.AidaClient.AidaAbortError) {
-        this.removeHistoryRun(currentRunId);
-        yield {
-          type: ResponseType.ERROR,
-          error: ErrorType.ABORT,
-          rpcId,
-        };
-        return;
-      }
-
-      yield {
-        type: ResponseType.ERROR,
-        error: ErrorType.UNKNOWN,
-        rpcId,
-      };
-      return;
-    }
-
-    this.addToHistory({
-      id: currentRunId,
-      query,
-      output: response,
-    });
-
-    yield {
-      type: ResponseType.ANSWER,
-      text: response,
-      rpcId,
+  override parseResponse(response: string): ParsedResponse {
+    return {
+      answer: response,
     };
-    if (isDebugMode()) {
-      window.dispatchEvent(new CustomEvent('freestylerdone'));
-    }
   }
 }
 
@@ -176,7 +122,7 @@ function createContextDetailsForDrJonesPerformanceAgent(
   return [
     {
       title: 'Selected stack trace',
-      text: JSON.stringify(selectedStackTrace),
+      text: JSON.stringify(selectedStackTrace).trim(),
     },
   ];
 }

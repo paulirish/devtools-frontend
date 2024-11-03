@@ -18,17 +18,17 @@ const {html} = LitHtml;
 
 const UIStrings = {
   /**
-   * @description Text to tell the user the estimated time or size savings for this insight.
+   * @description Text to tell the user the estimated time or size savings for this insight. "&" means "and" - space is limited to prefer abbreviated terms if possible. Text will still fit if not short, it just won't look very good, so using no abbreviations is fine if necessary.
    * @example {401 ms} PH1
    * @example {112 kB} PH1
    */
   estimatedSavings: 'Est savings: {PH1}',
   /**
-   * @description Text to tell the user the estimated time and size savings for this insight.
+   * @description Text to tell the user the estimated time and size savings for this insight. "&" means "and", "Est" means "Estimated" - space is limited to prefer abbreviated terms if possible. Text will still fit if not short, it just won't look very good, so using no abbreviations is fine if necessary.
    * @example {401 ms} PH1
    * @example {112 kB} PH2
    */
-  estimatedSavingsTimingAndBytes: 'Est savings: {PH1} && {PH2}',
+  estimatedSavingsTimingAndBytes: 'Est savings: {PH1} & {PH2}',
   /**
    * @description Used for screen-readers as a label on the button to expand an insight to view details
    * @example {LCP by phase} PH1
@@ -70,6 +70,13 @@ export class InsightSetHovered extends Event {
   }
 }
 
+export class InsightSetZoom extends Event {
+  static readonly eventName = 'insightsetzoom';
+  constructor(public bounds: Trace.Types.Timing.TraceWindowMicroSeconds) {
+    super(InsightSetZoom.eventName, {bubbles: true, composed: true});
+  }
+}
+
 export class InsightProvideOverlays extends Event {
   static readonly eventName = 'insightprovideoverlays';
 
@@ -94,13 +101,13 @@ declare global {
     [InsightActivated.eventName]: InsightActivated;
     [InsightDeactivated.eventName]: InsightDeactivated;
     [InsightSetHovered.eventName]: InsightSetHovered;
+    [InsightSetZoom.eventName]: InsightSetZoom;
     [InsightProvideOverlays.eventName]: InsightProvideOverlays;
     [InsightProvideRelatedEvents.eventName]: InsightProvideRelatedEvents;
   }
 }
 
 export class SidebarInsight extends HTMLElement {
-  static readonly litTagName = LitHtml.literal`devtools-performance-sidebar-insight`;
   readonly #shadow = this.attachShadow({mode: 'open'});
   readonly #boundRender = this.#render.bind(this);
 

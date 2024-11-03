@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import './SidebarSingleInsightSet.js';
+
 import * as Host from '../../../core/host/host.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import type * as Platform from '../../../core/platform/platform.js';
@@ -12,9 +14,9 @@ import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as Utils from '../utils/utils.js';
 
 import * as Insights from './insights/insights.js';
-import {type ActiveInsight} from './Sidebar.js';
+import type {ActiveInsight} from './Sidebar.js';
 import styles from './sidebarInsightsTab.css.js';
-import {type SidebarSingleInsightSetData} from './SidebarSingleInsightSet.js';
+import type {SidebarSingleInsightSetData} from './SidebarSingleInsightSet.js';
 
 const {html} = LitHtml;
 
@@ -54,10 +56,7 @@ export class SidebarInsightsTab extends HTMLElement {
     this.#shadow.adoptedStyleSheets = [styles];
   }
 
-  disconnectedCallback(): void {
-    this.#parsedTrace = null;
-    this.#insightSetKey = null;
-  }
+  // TODO(paulirish): add back a disconnectedCallback() to avoid memory leaks that doesn't cause b/372943062
 
   set parsedTrace(data: Trace.Handlers.Types.ParsedTrace|null) {
     if (data === this.#parsedTrace) {
@@ -133,6 +132,52 @@ export class SidebarInsightsTab extends HTMLElement {
     Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(FEEDBACK_URL);
   }
 
+  #onZoomClick(event: Event, id: string): void {
+    event.stopPropagation();
+    const data = this.#insights?.get(id);
+    if (!data) {
+      return;
+    }
+    this.dispatchEvent(new Insights.SidebarInsight.InsightSetZoom(data.bounds));
+  }
+
+  #renderZoomButton(insightSetToggled: boolean): LitHtml.TemplateResult {
+    const classes = LitHtml.Directives.classMap({
+      'zoom-icon': true,
+      active: insightSetToggled,
+    });
+
+    // clang-format off
+    return html`
+    <div class=${classes}>
+        <devtools-button .data=${{
+          variant: Buttons.Button.Variant.ICON,
+          iconName: 'center-focus-weak',
+          size: Buttons.Button.Size.SMALL,
+        } as Buttons.Button.ButtonData}
+      ></devtools-button></div>`;
+    // clang-format on
+  }
+
+  #renderDropdownIcon(insightSetToggled: boolean): LitHtml.TemplateResult {
+    const containerClasses = LitHtml.Directives.classMap({
+      'dropdown-icon': true,
+      active: insightSetToggled,
+    });
+
+    // clang-format off
+    return html`
+      <div class=${containerClasses}>
+        <devtools-button .data=${{
+          variant: Buttons.Button.Variant.ICON,
+          iconName: 'chevron-right',
+          size: Buttons.Button.Size.SMALL,
+        } as Buttons.Button.ButtonData}
+      ></devtools-button></div>
+    `;
+    // clang-format on
+  }
+
   #render(): void {
     if (!this.#parsedTrace || !this.#insights) {
       LitHtml.render(LitHtml.nothing, this.#shadow, {host: this});
@@ -169,8 +214,11 @@ export class SidebarInsightsTab extends HTMLElement {
                 @click=${() => this.#insightSetToggled(id)}
                 @mouseenter=${() => this.#insightSetHovered(id)}
                 @mouseleave=${() => this.#insightSetUnhovered()}
-                title=${url.href}
-                >${labels[index]}</summary>
+                title=${url.href}>
+                ${this.#renderDropdownIcon(id === this.#insightSetKey)}
+                <span>${labels[index]}</span>
+                <span class='zoom-button' @click=${(event: Event) => this.#onZoomClick(event, id)}>${this.#renderZoomButton(id === this.#insightSetKey)}</span>
+              </summary>
               ${contents}
             </details>`;
           }

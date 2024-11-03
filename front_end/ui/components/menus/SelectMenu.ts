@@ -10,7 +10,6 @@ import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 import * as Dialogs from '../dialogs/dialogs.js';
 
 import {
-  Menu,
   MenuGroup,
   type MenuItemSelectedEvent,
   type MenuItemValue,
@@ -88,7 +87,6 @@ type TitleCallback = () => LitHtml.TemplateResult;
 const deployMenuArrow = new URL('../../../Images/triangle-down.svg', import.meta.url).toString();
 
 export class SelectMenu extends HTMLElement {
-  static readonly litTagName = LitHtml.literal`devtools-select-menu`;
   readonly #shadow = this.attachShadow({mode: 'open'});
   readonly #renderBound = this.#render.bind(this);
   #button: SelectMenuButton|null = null;
@@ -227,13 +225,14 @@ export class SelectMenu extends HTMLElement {
     this.dispatchEvent(new SelectMenuSideButtonClickEvent());
   }
 
-  #maybeGetArrowXPosition(): number|void {
+  #maybeGetArrowXPosition(): number {
     if (this.showConnector) {
       // This block is not wrapped in a `coordinator.read` because this function's
       // only invocation is already wrapped in one (in Dialog.showDialog).
       const arrowBounds = this.#getButton().getBoundingClientRect();
       return (arrowBounds.left + arrowBounds.right) / 2;
     }
+    return NaN;
   }
 
   #getButtonText(): LitHtml.TemplateResult|string {
@@ -245,14 +244,14 @@ export class SelectMenu extends HTMLElement {
     if (!this.sideButton) {
       // clang-format off
       return html`
-          <${SelectMenuButton.litTagName}
+          <devtools-select-menu-button
             @selectmenubuttontrigger=${this.#showMenu}
             .open=${this.#open} .showArrow=${this.showArrow}
             .arrowDirection=${this.position}
             .disabled=${this.disabled}
             .jslogContext=${this.jslogContext}>
               ${buttonLabel}
-            </${SelectMenuButton.litTagName}>
+            </devtools-select-menu-button>
         `;
       // clang-format on
     }
@@ -262,7 +261,7 @@ export class SelectMenu extends HTMLElement {
       <button id="side-button" @click=${this.#sideButtonClicked} ?disabled=${this.disabled}>
         ${buttonLabel}
       </button>
-      <${SelectMenuButton.litTagName}
+      <devtools-select-menu-button
         @click=${this.#showMenu}
         @selectmenubuttontrigger=${this.#showMenu}
         .singleArrow=${true}
@@ -270,7 +269,7 @@ export class SelectMenu extends HTMLElement {
         .showArrow=${true}
         .arrowDirection=${this.position}
         .disabled=${this.disabled}>
-      </${SelectMenuButton.litTagName}>
+      </devtools-select-menu-button>
     `;
     // clang-format on
   }
@@ -296,7 +295,7 @@ export class SelectMenu extends HTMLElement {
     }
     LitHtml.render(
         html`
-      <${Menu.litTagName}
+      <devtools-menu
         @menucloserequest=${this.#onMenuClose}
         @menuitemselected=${this.#onItemSelected}
         .position=${this.position}
@@ -305,11 +304,11 @@ export class SelectMenu extends HTMLElement {
         .showDivider=${this.showDivider}
         .showSelectedItem=${this.showSelectedItem}
         .open=${this.#open}
-        .getConnectorCustomXPosition=${this.#maybeGetArrowXPosition.bind(this)}
+        .getConnectorCustomXPosition=${this.showConnector ? this.#maybeGetArrowXPosition.bind(this) : null}
       >
       <slot>
       </slot>
-      </${Menu.litTagName}>
+      </devtools-menu>
       ${this.#renderButton()}
     `,
         this.#shadow, {host: this});
@@ -325,7 +324,6 @@ export interface SelectMenuButtonData {
   jslogContext: string;
 }
 export class SelectMenuButton extends HTMLElement {
-  static readonly litTagName = LitHtml.literal`devtools-select-menu-button`;
   readonly #shadow = this.attachShadow({mode: 'open'});
   readonly #renderBound = this.#render.bind(this);
   #showButton: HTMLButtonElement|null = null;

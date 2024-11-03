@@ -15,7 +15,7 @@ import type * as Overlays from '../../overlays/overlays.js';
 
 import sidebarInsightStyles from './sidebarInsight.css.js';
 import * as SidebarInsight from './SidebarInsight.js';
-import {type TableState} from './Table.js';
+import type {TableState} from './Table.js';
 import {type ActiveInsight, Category} from './types.js';
 
 const {html} = LitHtml;
@@ -67,12 +67,14 @@ export abstract class BaseInsight extends HTMLElement {
     activeCategory: Category.ALL,
   };
 
-  readonly #boundRender = this.render.bind(this);
+  // eslint-disable-next-line rulesdir/no_bound_component_methods
+  readonly #boundRender = this.#baseRender.bind(this);
   readonly sharedTableState: TableState = {
     selectedRowEl: null,
     selectionIsSticky: false,
   };
   #initialOverlays: Overlays.Overlays.TimelineOverlay[]|null = null;
+  #hasRegisteredRelatedEvents = false;
 
   protected scheduleRender(): void {
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
@@ -85,10 +87,14 @@ export abstract class BaseInsight extends HTMLElement {
     this.dataset.insightName = this.internalName;
 
     // TODO(crbug.com/371615739): this should be moved to model/trace/insights
-    const events = this.getRelatedEvents();
-    if (events.length) {
-      this.dispatchEvent(new SidebarInsight.InsightProvideRelatedEvents(
-          this.userVisibleTitle, events, this.#dispatchInsightActivatedEvent.bind(this)));
+    if (!this.#hasRegisteredRelatedEvents) {
+      this.#hasRegisteredRelatedEvents = true;
+
+      const events = this.getRelatedEvents();
+      if (events.length) {
+        this.dispatchEvent(new SidebarInsight.InsightProvideRelatedEvents(
+            this.userVisibleTitle, events, this.#dispatchInsightActivatedEvent.bind(this)));
+      }
     }
   }
 
@@ -176,6 +182,13 @@ export abstract class BaseInsight extends HTMLElement {
   }
 
   protected abstract createOverlays(): Overlays.Overlays.TimelineOverlay[];
+
+  #baseRender(): void {
+    this.render();
+    if (this.isActive()) {
+      requestAnimationFrame(() => requestAnimationFrame(() => this.scrollIntoViewIfNeeded()));
+    }
+  }
 
   abstract render(): void;
 

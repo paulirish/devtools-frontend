@@ -6,6 +6,7 @@ import '../../../ui/components/icon_button/icon_button.js';
 import '../../../ui/components/split_view/split_view.js';
 import './ExtensionView.js';
 import './ControlButton.js';
+import './ReplaySection.js';
 
 import * as Host from '../../../core/host/host.js';
 import * as i18n from '../../../core/i18n/i18n.js';
@@ -29,10 +30,7 @@ import {PlayRecordingSpeed} from '../models/RecordingPlayer.js';
 import * as Actions from '../recorder-actions/recorder-actions.js';
 
 import recordingViewStyles from './recordingView.css.js';
-import {
-  type ReplaySectionData,
-  type StartReplayEvent,
-} from './ReplaySection.js';
+import type {ReplaySectionData, StartReplayEvent} from './ReplaySection.js';
 import {
   type CopyStepEvent,
   State,
@@ -309,7 +307,6 @@ function converterIdToStepMetric(
 }
 
 export class RecordingView extends HTMLElement {
-
   readonly #shadow = this.attachShadow({mode: 'open'});
   #replayState: ReplayState = {isPlaying: false, isPausedOnBreakpoint: false};
   #userFlow: Models.Schema.UserFlow|null = null;

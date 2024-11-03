@@ -6869,6 +6869,10 @@ export const NativeFunctions = [
     signatures: [["?x","?y","?width","?height"]]
   },
   {
+    name: "highlightsFromPoint",
+    signatures: [["x","y","?options"]]
+  },
+  {
     name: "Highlight",
     signatures: [["...initRanges"]]
   },
@@ -7257,7 +7261,7 @@ export const NativeFunctions = [
     signatures: [["length"]]
   },
   {
-    name: "supportsInputLanguage",
+    name: "languageAvailable",
     signatures: [["languageTag"]]
   },
   {
@@ -7430,6 +7434,10 @@ export const NativeFunctions = [
   {
     name: "beginLayer",
     signatures: [["?options"]]
+  },
+  {
+    name: "fillTextCluster",
+    signatures: [["textCluster","?x","?y"]]
   },
   {
     name: "placeElement",
@@ -8056,6 +8064,10 @@ export const NativeFunctions = [
     signatures: [["input","?options"]]
   },
   {
+    name: "scatterElements",
+    signatures: [["input","indices","updates","?options"]]
+  },
+  {
     name: "scatterND",
     signatures: [["input","indices","updates","?options"]]
   },
@@ -8642,10 +8654,6 @@ export const NativeFunctions = [
   {
     name: "VideoEncoder",
     signatures: [["init"]]
-  },
-  {
-    name: "VideoFrame",
-    signatures: [["source","?init"],["data","init"]]
   },
   {
     name: "changeVersion",

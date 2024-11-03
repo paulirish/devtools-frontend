@@ -11,13 +11,9 @@ import {
   AiAgent,
   type AidaRequestOptions,
   type ContextDetail,
-  debugLog,
-  ErrorType,
-  isDebugMode,
-  type ResponseData,
+  type ContextResponse,
+  type ParsedResponse,
   ResponseType,
-  type ThoughtResponse,
-  type TitleResponse,
 } from './AiAgent.js';
 
 const preamble =
@@ -61,10 +57,6 @@ const UIStringsNotTranslate = {
    *@description Title for thinking step of DrJones File agent.
    */
   analyzingFile: 'Analyzing file',
-  /**
-   *@description Thought text for thinking step of DrJones File agent.
-   */
-  dataUsedToGenerateThisResponse: 'Data used to generate this response',
 };
 
 const lockedString = i18n.i18n.lockedString;
@@ -75,11 +67,13 @@ const MAX_FILE_SIZE = 50000;
  * One agent instance handles one conversation. Create a new agent
  * instance for a new conversation.
  */
-export class DrJonesFileAgent extends AiAgent {
+export class DrJonesFileAgent extends AiAgent<Workspace.UISourceCode.UISourceCode> {
   readonly preamble = preamble;
   readonly clientFeature = Host.AidaClient.ClientFeature.CHROME_DRJONES_FILE_AGENT;
-  // TODO(b/369822364): use a feature param instead.
-  readonly userTier = 'BETA';
+  get userTier(): string|undefined {
+    const config = Common.Settings.Settings.instance().getHostConfig();
+    return config.devToolsAiAssistanceFileAgentDogfood?.userTier;
+  }
   get options(): AidaRequestOptions {
     const config = Common.Settings.Settings.instance().getHostConfig();
     const temperature = AiAgent.validTemperature(config.devToolsAiAssistanceFileAgentDogfood?.temperature);
@@ -91,79 +85,30 @@ export class DrJonesFileAgent extends AiAgent {
     };
   }
 
-  *
+  async *
       handleContextDetails(selectedFile: Workspace.UISourceCode.UISourceCode|null):
-          Generator<ThoughtResponse|TitleResponse, void, void> {
+          AsyncGenerator<ContextResponse, void, void> {
     if (!selectedFile) {
       return;
     }
 
     yield {
-      type: ResponseType.TITLE,
+      type: ResponseType.CONTEXT,
       title: lockedString(UIStringsNotTranslate.analyzingFile),
-    };
-    yield {
-      type: ResponseType.THOUGHT,
-      thought: lockedString(UIStringsNotTranslate.dataUsedToGenerateThisResponse),
-      contextDetails: createContextDetailsForDrJonesFileAgent(selectedFile),
+      details: createContextDetailsForDrJonesFileAgent(selectedFile),
     };
   }
 
-  async enhanceQuery(query: string, selectedFile: Workspace.UISourceCode.UISourceCode|null): Promise<string> {
+  override async enhanceQuery(query: string, selectedFile: Workspace.UISourceCode.UISourceCode|null): Promise<string> {
     const fileEnchantmentQuery =
         selectedFile ? `# Selected file\n${formatFile(selectedFile)}\n\n# User request\n\n` : '';
     return `${fileEnchantmentQuery}${query}`;
   }
 
-  #runId = 0;
-  async * run(query: string, options: {
-    signal?: AbortSignal, selectedFile: Workspace.UISourceCode.UISourceCode|null,
-  }): AsyncGenerator<ResponseData, void, void> {
-    yield* this.handleContextDetails(options.selectedFile);
-
-    query = await this.enhanceQuery(query, options.selectedFile);
-    const currentRunId = ++this.#runId;
-
-    let response: string;
-    let rpcId: number|undefined;
-    try {
-      const fetchResult = await this.aidaFetch(query, {signal: options.signal});
-      response = fetchResult.response;
-      rpcId = fetchResult.rpcId;
-    } catch (err) {
-      debugLog('Error calling the AIDA API', err);
-      if (err instanceof Host.AidaClient.AidaAbortError) {
-        this.removeHistoryRun(currentRunId);
-        yield {
-          type: ResponseType.ERROR,
-          error: ErrorType.ABORT,
-          rpcId,
-        };
-        return;
-      }
-
-      yield {
-        type: ResponseType.ERROR,
-        error: ErrorType.UNKNOWN,
-        rpcId,
-      };
-      return;
-    }
-
-    this.addToHistory({
-      id: currentRunId,
-      query,
-      output: response,
-    });
-
-    yield {
-      type: ResponseType.ANSWER,
-      text: response,
-      rpcId,
+  override parseResponse(response: string): ParsedResponse {
+    return {
+      answer: response,
     };
-    if (isDebugMode()) {
-      window.dispatchEvent(new CustomEvent('freestylerdone'));
-    }
   }
 }
 

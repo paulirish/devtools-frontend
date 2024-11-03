@@ -376,6 +376,15 @@ export class UserMetrics {
     InspectorFrontendHostInstance.recordEnumeratedHistogram(
         EnumeratedHistogram.ResourceTypeFilterItemSelected, resourceType, ResourceType.MAX_VALUE);
   }
+
+  freestylerQueryLength(numberOfCharacters: number): void {
+    InspectorFrontendHostInstance.recordCountHistogram(
+        'DevTools.Freestyler.QueryLength', numberOfCharacters, 0, 100_000, 100);
+  }
+
+  freestylerEvalResponseSize(bytes: number): void {
+    InspectorFrontendHostInstance.recordCountHistogram('DevTools.Freestyler.EvalResponseSize', bytes, 0, 100_000, 100);
+  }
 }
 
 /**
@@ -561,7 +570,12 @@ export enum Action {
   InsightsReminderTeaserAbortedInSettings = 167,
   GeneratingInsightWithoutDisclaimer = 168,
   FreestylerOpenedFromElementsPanelFloatingButton = 169,
-  MAX_VALUE = 170,
+  DrJonesOpenedFromNetworkPanel = 170,
+  DrJonesOpenedFromSourcesPanel = 171,
+  DrJonesOpenedFromSourcesPanelFloatingButton = 172,
+  DrJonesOpenedFromPerformancePanel = 173,
+  DrJonesOpenedFromNetworkPanelFloatingButton = 174,
+  MAX_VALUE = 175,
   /* eslint-enable @typescript-eslint/naming-convention */
 }
 

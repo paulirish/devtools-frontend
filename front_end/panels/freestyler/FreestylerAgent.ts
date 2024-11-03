@@ -14,14 +14,12 @@ import {
   type ActionResponse,
   AiAgent,
   type AidaRequestOptions,
+  type ContextResponse,
   debugLog,
-  ErrorType,
   isDebugMode,
-  type ResponseData,
+  type ParsedResponse,
   ResponseType,
   type SideEffectResponse,
-  type ThoughtResponse,
-  type TitleResponse,
 } from './AiAgent.js';
 import {ChangeManager} from './ChangeManager.js';
 import {ExtensionScope, FREESTYLER_WORLD_NAME} from './ExtensionScope.js';
@@ -175,7 +173,6 @@ async function executeJsCode(code: string, {throwOnSideEffect}: {throwOnSideEffe
   }
 }
 
-const MAX_STEPS = 10;
 const MAX_OBSERVATION_BYTE_LENGTH = 25_000;
 
 type CreateExtensionScopeFunction = (changes: ChangeManager) => {
@@ -195,7 +192,7 @@ type AgentOptions = {
  * One agent instance handles one conversation. Create a new agent
  * instance for a new conversation.
  */
-export class FreestylerAgent extends AiAgent {
+export class FreestylerAgent extends AiAgent<SDK.DOMModel.DOMNode> {
   readonly preamble = preamble;
   readonly clientFeature = Host.AidaClient.ClientFeature.CHROME_FREESTYLER;
   get userTier(): string|undefined {
@@ -220,18 +217,10 @@ export class FreestylerAgent extends AiAgent {
     };
   }
 
-  static parseResponse(response: string): {
-    thought?: string,
-    title?: string,
-    action?: string,
-  }|{
-  answer:
-    string, suggestions: string[],
-  }
-  {
+  override parseResponse(response: string): ParsedResponse {
     // We're returning an empty answer to denote the erroneous case.
     if (!response) {
-      return {answer: '', suggestions: []};
+      return {answer: ''};
     }
 
     const lines = response.split('\n');
@@ -239,7 +228,7 @@ export class FreestylerAgent extends AiAgent {
     let title: string|undefined;
     let action: string|undefined;
     let answer: string|undefined;
-    let suggestions: string[] = [];
+    let suggestions: [string, ...string[]]|undefined;
     let i = 0;
 
     // If one of these is present, it means we're going to follow the instruction tags
@@ -262,7 +251,7 @@ export class FreestylerAgent extends AiAgent {
     // The block below ensures that the response we parse always contains a defining instruction tag.
     const hasDefiningInstruction = lines.some(line => isDefiningInstructionStart(line));
     if (!hasDefiningInstruction) {
-      return FreestylerAgent.parseResponse(`ANSWER: ${response}`);
+      return this.parseResponse(`ANSWER: ${response}`);
     }
 
     while (i < lines.length) {
@@ -328,8 +317,7 @@ export class FreestylerAgent extends AiAgent {
         try {
           // TODO: Do basic validation this is an array with strings
           suggestions = JSON.parse(trimmed.substring('SUGGESTIONS:'.length).trim());
-        } catch (err) {
-          suggestions = [];
+        } catch {
         }
 
         i++;
@@ -428,6 +416,7 @@ export class FreestylerAgent extends AiAgent {
           {throwOnSideEffect},
       );
       const byteCount = Platform.StringUtilities.countWtf8Bytes(result);
+      Host.userMetrics.freestylerEvalResponseSize(byteCount);
       if (byteCount > MAX_OBSERVATION_BYTE_LENGTH) {
         throw new Error('Output exceeded the maximum allowed length.');
       }
@@ -529,23 +518,25 @@ export class FreestylerAgent extends AiAgent {
       }
     }
 
-    return output;
+    return output.trim();
   }
 
-  async * handleAction(action: string, rpcId?: number): AsyncGenerator<SideEffectResponse, ActionResponse, void> {
+  override async *
+      handleAction(action: string, rpcId?: number): AsyncGenerator<SideEffectResponse, ActionResponse, void> {
     debugLog(`Action to execute: ${action}`);
+    if (this.executionMode === Root.Runtime.HostConfigFreestylerExecutionMode.NO_SCRIPTS) {
+      return {
+        type: ResponseType.ACTION,
+        code: action,
+        output: 'Error: JavaScript execution is currently disabled.',
+        canceled: true,
+        rpcId,
+      };
+    }
+
     const scope = this.#createExtensionScope(this.#changes);
     await scope.install();
     try {
-      if (this.executionMode === Root.Runtime.HostConfigFreestylerExecutionMode.NO_SCRIPTS) {
-        return {
-          type: ResponseType.ACTION,
-          code: action,
-          output: 'Error: JavaScript execution is currently disabled.',
-          canceled: true,
-          rpcId,
-        };
-      }
       let result = await this.#generateObservation(action, {throwOnSideEffect: true});
       debugLog(`Action result: ${JSON.stringify(result)}`);
       if (result.sideEffect) {
@@ -589,162 +580,37 @@ export class FreestylerAgent extends AiAgent {
     }
   }
 
-  async *
-      handleContextDetails(selectedElement: SDK.DOMModel.DOMNode|null):
-          AsyncGenerator<ThoughtResponse|TitleResponse, void, void> {
+  override async *
+      handleContextDetails(selectedElement: SDK.DOMModel.DOMNode|null): AsyncGenerator<ContextResponse, void, void> {
     if (!selectedElement) {
       return;
     }
-
     yield {
-      type: ResponseType.TITLE,
+      type: ResponseType.CONTEXT,
       title: lockedString(UIStringsNotTranslate.analyzingThePrompt),
-    };
-    yield {
-      type: ResponseType.THOUGHT,
-      contextDetails: [{
+      details: [{
         title: lockedString(UIStringsNotTranslate.dataUsed),
         text: await FreestylerAgent.describeElement(selectedElement),
       }],
     };
   }
 
-  async enhanceQuery(query: string, selectedElement: SDK.DOMModel.DOMNode|null): Promise<string> {
+  override async enhanceQuery(query: string, selectedElement: SDK.DOMModel.DOMNode|null): Promise<string> {
     const elementEnchantmentQuery = selectedElement ?
         `# Inspected element\n\n${await FreestylerAgent.describeElement(selectedElement)}\n\n# User request\n\n` :
         '';
     return `${elementEnchantmentQuery}QUERY: ${query}`;
   }
 
-  #runId = 0;
-  async * run(query: string, options: {
-    signal?: AbortSignal, selectedElement: SDK.DOMModel.DOMNode|null,
-  }): AsyncGenerator<ResponseData, void, void> {
-    yield* this.handleContextDetails(options.selectedElement);
-
-    query = await this.enhanceQuery(query, options.selectedElement);
-    const currentRunId = ++this.#runId;
-
-    for (let i = 0; i < MAX_STEPS; i++) {
-      yield {
-        type: ResponseType.QUERYING,
-      };
-
-      let response: string;
-      let rpcId: number|undefined;
-      try {
-        const fetchResult = await this.aidaFetch(
-            query,
-            {signal: options.signal},
-        );
-        response = fetchResult.response;
-        rpcId = fetchResult.rpcId;
-      } catch (err) {
-        debugLog('Error calling the AIDA API', err);
-
-        if (err instanceof Host.AidaClient.AidaAbortError) {
-          this.removeHistoryRun(currentRunId);
-          yield {
-            type: ResponseType.ERROR,
-            error: ErrorType.ABORT,
-            rpcId,
-          };
-          break;
-        }
-
-        yield {
-          type: ResponseType.ERROR,
-          error: ErrorType.UNKNOWN,
-          rpcId,
-        };
-        break;
-      }
-
-      const parsedResponse = FreestylerAgent.parseResponse(response);
-
-      if ('answer' in parsedResponse) {
-        const {
-          answer,
-          suggestions,
-        } = parsedResponse;
-        if (answer) {
-          this.addToHistory({
-            id: currentRunId,
-            query,
-            output: `ANSWER: ${answer}`,
-          });
-          yield {
-            type: ResponseType.ANSWER,
-            text: answer,
-            rpcId,
-            suggestions,
-          };
-        } else {
-          yield {
-            type: ResponseType.ERROR,
-            error: ErrorType.UNKNOWN,
-            rpcId,
-          };
-        }
-
-        break;
-      }
-
-      const {
-        title,
-        thought,
-        action,
-      } = parsedResponse;
-
-      if (title) {
-        yield {
-          type: ResponseType.TITLE,
-          title,
-          rpcId,
-        };
-      }
-
-      if (thought) {
-        this.addToHistory({
-          id: currentRunId,
-          query,
-          output: `THOUGHT: ${thought}
-TITLE: ${title}
-ACTION
-${action}
-STOP`,
-        });
-        yield {
-          type: ResponseType.THOUGHT,
-          thought,
-          rpcId,
-        };
-      } else {
-        this.addToHistory({
-          id: currentRunId,
-          query,
-          output: `ACTION
-${action}
-STOP`,
-        });
-      }
-
-      if (action) {
-        const result = yield* this.handleAction(action, rpcId);
-        yield result;
-        query = `OBSERVATION: ${result.output}`;
-      }
-
-      if (i === MAX_STEPS - 1) {
-        yield {
-          type: ResponseType.ERROR,
-          error: ErrorType.MAX_STEPS,
-        };
-        break;
-      }
+  override addToHistory(options: {id: number, query: string, response: ParsedResponse}): void {
+    const response = options.response;
+    if ('answer' in response) {
+      const answer = `ANSWER: ${response.answer}`;
+      return super.addToHistory({
+        ...options,
+        response: {answer},
+      });
     }
-    if (isDebugMode()) {
-      window.dispatchEvent(new CustomEvent('freestylerdone'));
-    }
+    return super.addToHistory(options);
   }
 }

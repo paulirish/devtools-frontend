@@ -80,16 +80,10 @@ function launchChrome() {
     'DeferRendererTasksAfterInput',           // crbug.com/361078921
     'PMProcessPriorityPolicy',                // crbug.com/361252079
     'BoostRenderProcessForLoading',
-    'CloneDevToolsConnectionOnlyIfRequested',
     'MacAllowBackgroundingRenderProcesses',
-    'MacWebContentsOcclusion',
     'MojoChannelAssociatedCrashesOnSendError',
     'MojoChannelAssociatedSendUsesRunOrPostTask',
-    'RunTasksByBatches',
     'SimpleURLLoaderUseReadAndDiscardBodyOption',
-    'ThrottleUnimportantFrameTimers',
-    'VerifyDidCommitParams',
-    'NetworkServiceSandbox',  // crbug.com/370653886
   ];
   const launchArgs = [
     '--remote-allow-origins=*',

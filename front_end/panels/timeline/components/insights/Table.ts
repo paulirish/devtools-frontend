@@ -6,7 +6,7 @@ import * as ComponentHelpers from '../../../../ui/components/helpers/helpers.js'
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 import type * as Overlays from '../../overlays/overlays.js';
 
-import {type BaseInsight} from './Helpers.js';
+import type {BaseInsight} from './Helpers.js';
 import tableStyles from './table.css.js';
 
 const {html} = LitHtml;
@@ -18,7 +18,7 @@ const {html} = LitHtml;
  *           desaturates the relevant time range (in both the minimap and the flamegraph), and
  *           replaces the current insight's overlays with the overlays attached to that row.
  *           The currently selected trace bounds does not change.
- *           TODO(crbug.com/369102516): make the "desaturates the flamegraph" part true
+ *           TODO(crbug.com/373648873): make the "desaturates the flamegraph" part true
  *
  *           Removing the mouse from the table without clicking on any row restores the original
  *           overlays.
@@ -45,7 +45,6 @@ export type TableDataRow = {
 };
 
 export class Table extends HTMLElement {
-  static readonly litTagName = LitHtml.literal`devtools-performance-table`;
 
   readonly #shadow = this.attachShadow({mode: 'open'});
   readonly #boundRender = this.#render.bind(this);

@@ -279,9 +279,9 @@ const UIStrings = {
    */
   showSidebar: 'Show sidebar',
   /**
-   * @description Tooltip for the the sole sidebar toggle in the Performance panel. Command to close the sidebar.
+   * @description Tooltip for the the sidebar toggle in the Performance panel. Command to close the sidebar.
    */
-  hideSidebar: 'Hide sole sidebar',
+  hideSidebar: 'Hide sidebar',
   /**
    * @description Screen reader announcement when the sidebar is shown in the Performance panel.
    */
@@ -303,6 +303,10 @@ const UIStrings = {
    * @example {Paint} PH1
    */
   eventSelected: 'Event {PH1} selected',
+  /**
+   *@description Text of a hyperlink to documentation.
+   */
+  learnMore: 'Learn more',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/TimelinePanel.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -541,10 +545,12 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       this.#setActiveInsight(null);
     });
 
+    // TODO(crbug.com/372946179): when clicking on an insight chip, this event never fires if the insight tab
+    // is not on the DOM. That only happens when the sidebar tabbed pane component is set to Annotations.
+    // In that case, clicking on the insight chip will do nothing.
     this.#sideBar.element.addEventListener(TimelineInsights.SidebarInsight.InsightActivated.eventName, event => {
       const {name, insightSetKey, overlays} = event;
       this.#setActiveInsight({name, insightSetKey, overlays});
-      // TODO(crbug.com/370599988): need to scroll insight into view
     });
 
     this.#sideBar.element.addEventListener(TimelineInsights.SidebarInsight.InsightProvideOverlays.eventName, event => {
@@ -599,6 +605,11 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       }
     });
 
+    this.#sideBar.element.addEventListener(TimelineInsights.SidebarInsight.InsightSetZoom.eventName, event => {
+      TraceBounds.TraceBounds.BoundsManager.instance().setTimelineVisibleWindow(
+          event.bounds, {ignoreMiniMapBounds: true, shouldAnimate: true});
+    });
+
     this.onModeChanged();
     this.populateToolbar();
     // The viewMode is set by default to the landing page, so we don't call
@@ -638,6 +649,9 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   }
 
   #setActiveInsight(insight: TimelineComponents.Sidebar.ActiveInsight|null): void {
+    if (insight && this.#panelSidebarEnabled()) {
+      this.#splitWidget.showBoth();
+    }
     this.#sideBar.setActiveInsight(insight);
     this.flameChart.setActiveInsight(insight);
   }
@@ -1078,8 +1092,14 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
 
     const thirdPartyToolbar = new UI.Toolbar.Toolbar('', throttlingPane.element);
     thirdPartyToolbar.makeVertical();
-    thirdPartyToolbar.appendToolbarItem(
-        this.createSettingCheckbox(this.#thirdPartyTracksSetting, i18nString(UIStrings.showDataAddedByExtensions)));
+    const thirdPartyCheckbox =
+        this.createSettingCheckbox(this.#thirdPartyTracksSetting, i18nString(UIStrings.showDataAddedByExtensions));
+
+    const localLink = UI.XLink.XLink.create(
+        'https://developer.chrome.com/docs/devtools/performance/extension', i18nString(UIStrings.learnMore));
+    localLink.style.paddingLeft = '5px';
+    thirdPartyCheckbox.element.shadowRoot?.appendChild(localLink);
+    thirdPartyToolbar.appendToolbarItem(thirdPartyCheckbox);
 
     this.showSettingsPaneSetting.addChangeListener(this.updateSettingsPaneVisibility.bind(this));
     this.updateSettingsPaneVisibility();
@@ -1816,6 +1836,10 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
    * We also check that the experiments are enabled, else we reveal an entirely empty sidebar.
    */
   #showSidebarIfRequired(): void {
+    if (Root.Runtime.Runtime.queryParam('disable-auto-performance-sidebar-reveal') !== null) {
+      // Used in interaction tests & screenshot tests.
+      return;
+    }
     const needToRestore = this.#restoreSidebarVisibilityOnTraceLoad;
     const userHasSeenSidebar = this.#sideBar.userHasOpenedSidebarOnce();
     const experimentsEnabled = this.#panelSidebarEnabled();

@@ -290,6 +290,23 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     return contextMenu;
   }
 
+  entryHasAnnotations(entryIndex: number): boolean {
+    const event = this.eventByIndex(entryIndex);
+    if (!event) {
+      return false;
+    }
+    const annotations = ModificationsManager.activeManager()?.annotationsForEntry(event);
+    return annotations ? annotations.length > 0 : false;
+  }
+
+  deleteAnnotationsForEntry(entryIndex: number): void {
+    const event = this.eventByIndex(entryIndex);
+    if (!event) {
+      return;
+    }
+    ModificationsManager.activeManager()?.deleteEntryAnnotations(event);
+  }
+
   modifyTree(action: PerfUI.FlameChart.FilterAction, entryIndex: number): void {
     const entry = this.entryData[entryIndex] as Trace.Types.Events.Event;
 
@@ -1279,7 +1296,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     return true;
   }
 
-  eventByIndex(entryIndex: number): Trace.Types.Events.Event|Trace.Handlers.ModelHandlers.Frames.TimelineFrame|null {
+  eventByIndex(entryIndex: number): Trace.Types.Events.Event|null {
     if (entryIndex < 0) {
       return null;
     }
@@ -1288,7 +1305,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       return this.entryData[entryIndex] as Trace.Types.Events.Event;
     }
     if (entryType === EntryType.FRAME) {
-      return this.entryData[entryIndex] as Trace.Handlers.ModelHandlers.Frames.TimelineFrame;
+      return this.entryData[entryIndex] as Trace.Types.Events.LegacyTimelineFrame;
     }
     return null;
   }

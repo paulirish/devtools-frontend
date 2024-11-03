@@ -7,7 +7,7 @@ import * as Host from '../../core/host/host.js';
 import {assertNotNullOrUndefined} from '../../core/platform/platform.js';
 
 import {processEventForDebugging, processImpressionsForDebugging} from './Debugging.js';
-import {type Loggable} from './Loggable.js';
+import type {Loggable} from './Loggable.js';
 import {getLoggingState, type LoggingState} from './LoggingState.js';
 
 export async function logImpressions(loggables: Loggable[]): Promise<void> {
@@ -88,7 +88,7 @@ export async function logChange(loggable: Loggable): Promise<void> {
   const loggingState = getLoggingState(loggable);
   assertNotNullOrUndefined(loggingState);
   const changeEvent: Host.InspectorFrontendHostAPI.ChangeEvent = {veid: loggingState.veid};
-  const context = loggingState.lastInputEventType;
+  const context = loggingState.pendingChangeContext;
   if (context) {
     changeEvent.context = await contextAsNumber(context);
   }

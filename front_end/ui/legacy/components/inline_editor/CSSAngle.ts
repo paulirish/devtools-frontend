@@ -2,11 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import './CSSAngleSwatch.js';
+import './CSSAngleEditor.js';
+
 import * as LitHtml from '../../../lit-html/lit-html.js';
 
 import cssAngleStyles from './cssAngle.css.js';
-import {CSSAngleEditor, type CSSAngleEditorData} from './CSSAngleEditor.js';
-import {CSSAngleSwatch, type CSSAngleSwatchData} from './CSSAngleSwatch.js';
+import type {CSSAngleEditorData} from './CSSAngleEditor.js';
+import type {CSSAngleSwatchData} from './CSSAngleSwatch.js';
 import {
   type Angle,
   AngleUnit,
@@ -58,7 +61,6 @@ const DefaultAngle = {
 };
 
 export class CSSAngle extends HTMLElement {
-  static readonly litTagName = LitHtml.literal`devtools-css-angle`;
   private readonly shadow = this.attachShadow({mode: 'open'});
   private angle: Angle = DefaultAngle;
   private displayedAngle: Angle = DefaultAngle;
@@ -227,14 +229,14 @@ export class CSSAngle extends HTMLElement {
     render(html`
       <div class="css-angle" @focusout=${this.minify} @keydown=${this.onKeydown} tabindex="-1">
         <div class="preview">
-          <${CSSAngleSwatch.litTagName}
+          <devtools-css-angle-swatch
             @click=${this.onMiniIconClick}
             @mousedown=${this.consume}
             @dblclick=${this.consume}
             .data=${{
               angle: this.angle,
             } as CSSAngleSwatchData}>
-          </${CSSAngleSwatch.litTagName}><slot></slot></div>
+          </devtools-css-angle-swatch><slot></slot></div>
         ${this.popoverOpen ? this.renderPopover() : null}
       </div>
     `, this.shadow, {
@@ -252,7 +254,7 @@ export class CSSAngle extends HTMLElement {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     return html`
-    <${CSSAngleEditor.litTagName}
+    <devtools-css-angle-editor
       class="popover popover-css-angle"
       style=${styleMap({top: this.popoverStyleTop, left: this.popoverStyleLeft})}
       .data=${{
@@ -262,7 +264,7 @@ export class CSSAngle extends HTMLElement {
         },
         background: contextualBackground,
       } as CSSAngleEditorData}
-    ></${CSSAngleEditor.litTagName}>
+    ></devtools-css-angle-editor>
     `;
     // clang-format on
   }

@@ -7,18 +7,15 @@ import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import type * as SDK from '../../core/sdk/sdk.js';
 import * as Logs from '../../models/logs/logs.js';
+import * as Network from '../../panels/network/network.js';
 
 import {
   AiAgent,
   type AidaRequestOptions,
   type ContextDetail,
-  debugLog,
-  ErrorType,
-  isDebugMode,
-  type ResponseData,
+  type ContextResponse,
+  type ParsedResponse,
   ResponseType,
-  type ThoughtResponse,
-  type TitleResponse,
 } from './AiAgent.js';
 
 /* clang-format off */
@@ -64,10 +61,6 @@ const UIStringsNotTranslate = {
    */
   inspectingNetworkData: 'Inspecting network data',
   /**
-   *@description Thought text for thinking step of DrJones Network agent.
-   */
-  dataUsedToGenerateThisResponse: 'Data used to generate this response',
-  /**
    *@description Heading text for the block that shows the network request details.
    */
   request: 'Request',
@@ -107,11 +100,13 @@ const lockedString = i18n.i18n.lockedString;
  * One agent instance handles one conversation. Create a new agent
  * instance for a new conversation.
  */
-export class DrJonesNetworkAgent extends AiAgent {
+export class DrJonesNetworkAgent extends AiAgent<SDK.NetworkRequest.NetworkRequest> {
   readonly preamble = preamble;
   readonly clientFeature = Host.AidaClient.ClientFeature.CHROME_DRJONES_NETWORK_AGENT;
-  // TODO(b/369822364): use a feature param instead.
-  readonly userTier = 'BETA';
+  get userTier(): string|undefined {
+    const config = Common.Settings.Settings.instance().getHostConfig();
+    return config.devToolsExplainThisResourceDogfood?.userTier;
+  }
   get options(): AidaRequestOptions {
     const config = Common.Settings.Settings.instance().getHostConfig();
     const temperature = AiAgent.validTemperature(config.devToolsExplainThisResourceDogfood?.temperature);
@@ -123,80 +118,32 @@ export class DrJonesNetworkAgent extends AiAgent {
     };
   }
 
-  *
+  async *
       handleContextDetails(selectedNetworkRequest: SDK.NetworkRequest.NetworkRequest|null):
-          Generator<ThoughtResponse|TitleResponse, void, void> {
+          AsyncGenerator<ContextResponse, void, void> {
     if (!selectedNetworkRequest) {
       return;
     }
 
     yield {
-      type: ResponseType.TITLE,
+      type: ResponseType.CONTEXT,
       title: lockedString(UIStringsNotTranslate.inspectingNetworkData),
-    };
-    yield {
-      type: ResponseType.THOUGHT,
-      thought: lockedString(UIStringsNotTranslate.dataUsedToGenerateThisResponse),
-      contextDetails: createContextDetailsForDrJonesNetworkAgent(selectedNetworkRequest),
+      details: createContextDetailsForDrJonesNetworkAgent(selectedNetworkRequest),
     };
   }
 
-  async enhanceQuery(query: string, selectedNetworkRequest: SDK.NetworkRequest.NetworkRequest|null): Promise<string> {
+  override async enhanceQuery(query: string, selectedNetworkRequest: SDK.NetworkRequest.NetworkRequest|null):
+      Promise<string> {
     const networkEnchantmentQuery = selectedNetworkRequest ?
         `# Selected network request \n${formatNetworkRequest(selectedNetworkRequest)}\n\n# User request\n\n` :
         '';
     return `${networkEnchantmentQuery}${query}`;
   }
 
-  #runId = 0;
-  async * run(query: string, options: {
-    signal?: AbortSignal, selectedNetworkRequest: SDK.NetworkRequest.NetworkRequest|null,
-  }): AsyncGenerator<ResponseData, void, void> {
-    yield* this.handleContextDetails(options.selectedNetworkRequest);
-
-    query = await this.enhanceQuery(query, options.selectedNetworkRequest);
-    const currentRunId = ++this.#runId;
-
-    let response: string;
-    let rpcId: number|undefined;
-    try {
-      const fetchResult = await this.aidaFetch(query, {signal: options.signal});
-      response = fetchResult.response;
-      rpcId = fetchResult.rpcId;
-    } catch (err) {
-      debugLog('Error calling the AIDA API', err);
-      if (err instanceof Host.AidaClient.AidaAbortError) {
-        this.removeHistoryRun(currentRunId);
-        yield {
-          type: ResponseType.ERROR,
-          error: ErrorType.ABORT,
-          rpcId,
-        };
-        return;
-      }
-
-      yield {
-        type: ResponseType.ERROR,
-        error: ErrorType.UNKNOWN,
-        rpcId,
-      };
-      return;
-    }
-
-    this.addToHistory({
-      id: currentRunId,
-      query,
-      output: response,
-    });
-
-    yield {
-      type: ResponseType.ANSWER,
-      text: response,
-      rpcId,
+  override parseResponse(response: string): ParsedResponse {
+    return {
+      answer: response,
     };
-    if (isDebugMode()) {
-      window.dispatchEvent(new CustomEvent('freestylerdone'));
-    }
   }
 }
 
@@ -234,23 +181,54 @@ export function formatHeaders(title: string, headers: SDK.NetworkRequest.NameVal
 }
 
 export function formatNetworkRequestTiming(request: SDK.NetworkRequest.NetworkRequest): string {
-  const timing = request.timing;
+  const calculator = Network.NetworkPanel.NetworkPanel.instance().networkLogView.timeCalculator();
+  const results =
+      Network.RequestTimingView.RequestTimingView.calculateRequestTimeRanges(request, calculator.minimumBoundary());
 
-  return `Request start time: ${request.startTime}
-Request end time: ${request.endTime}
-Receiving response headers start time: ${timing?.receiveHeadersStart}
-Receiving response headers end time: ${timing?.receiveHeadersEnd}
-Proxy negotiation start time: ${timing?.proxyStart}
-Proxy negotiation end time: ${timing?.proxyEnd}
-DNS lookup start time: ${timing?.dnsStart}
-DNS lookup end time: ${timing?.dnsEnd}
-TCP start time: ${timing?.connectStart}
-TCP end time: ${timing?.connectEnd}
-SSL start time: ${timing?.sslStart}
-SSL end time: ${timing?.sslEnd}
-Sending start: ${timing?.sendStart}
-Sending end: ${timing?.sendEnd}
-`;
+  function getDuration(name: string): string|undefined {
+    const result = results.find(r => r.name === name);
+    if (!result) {
+      return;
+    }
+    return i18n.TimeUtilities.secondsToString(result.end - result.start, true);
+  }
+
+  const labels = [
+    {
+      label: 'Queued at (timestamp)',
+      value: calculator.formatValue(request.issueTime(), 2),
+    },
+    {
+      label: 'Started at (timestamp)',
+      value: calculator.formatValue(request.startTime, 2),
+    },
+    {
+      label: 'Queueing (duration)',
+      value: getDuration('queueing'),
+    },
+    {
+      label: 'Connection start (stalled) (duration)',
+      value: getDuration('blocking'),
+    },
+    {
+      label: 'Request sent (duration)',
+      value: getDuration('sending'),
+    },
+    {
+      label: 'Waiting for server response (duration)',
+      value: getDuration('waiting'),
+    },
+    {
+      label: 'Content download (duration)',
+      value: getDuration('receiving'),
+    },
+    {
+      label: 'Duration (duration)',
+      value: getDuration('total'),
+    },
+  ];
+
+  return labels.filter(label => Boolean(label.value)).map(label => `${label.label}: ${label.value}`).join('\n');
 }
 
 function formatRequestInitiated(
@@ -279,7 +257,7 @@ function formatRequestInitiatorChain(request: SDK.NetworkRequest.NetworkRequest)
     }
   }
 
-  return initiatorChain;
+  return initiatorChain.trim();
 }
 
 export function formatNetworkRequest(request: SDK.NetworkRequest.NetworkRequest): string {
