@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-/* eslint-disable rulesdir/es_modules_import */
 import fs from 'node:fs';
 import zlib from 'node:zlib';
 
-/** @typedef {import('../../front_end/models/trace/trace.ts')} Trace */
+/** @typedef {import('./models/trace/trace.ts')} Trace */
 
 // For types... see Connor's manual hack here:
 // https://github.com/GoogleChrome/lighthouse/pull/15703/files#diff-ec7e073cf0e6135d4f2af9bc04fe6100ec0df80ad1686bee2da53871be5f1a7b
@@ -14,21 +13,36 @@ import zlib from 'node:zlib';
 // But maybe all this kinda works, too?
 
 /** @type {Trace} */
-import * as Trace from '../../out/TraceEngine/dist/models/trace/trace.js';
+import * as Trace from '../out/TraceEngine/dist/models/trace/trace.js';
 
 polyfillDOMRect();
 
 /**
- * @param {string} filename
- * @returns {Promise<{parsedTrace: Trace.Handlers.Types.ParsedTrace, insights: Trace.Insights.Types.TraceInsightSets | null>}}
+ * @param {Trace.Types.Events.Event[]} traceEvents
+ * @return {Promise<{parsedTrace: Trace.Handlers.Types.ParsedTrace, insights: Trace.Insights.Types.TraceInsightSets, model: Trace.TraceModel.Model}>}
  */
-export async function analyzeTrace(filename) {
-  const traceEvents = loadTraceEventsFromFile(filename);
-  const model = Trace.TraceModel.Model.createWithAllHandlers(Trace.Types.Configuration.DEFAULT);
+export async function analyzeEvents(traceEvents) {
+  const model = Trace.TraceModel.Model.createWithAllHandlers();
   await model.parse(traceEvents);
   const parsedTrace = model.parsedTrace();
   const insights = model.traceInsights();
-  return {parsedTrace, insights};
+
+  if (!parsedTrace) {
+    throw new Error('No data');
+  }
+  if (!insights) {
+    throw new Error('No insights');
+  }
+  return {parsedTrace, insights, model};
+}
+
+/**
+ * @param {string} filename
+ * @returns {ReturnType<analyzeEvents>}
+ */
+export async function analyzeTrace(filename) {
+  const traceEvents = loadTraceEventsFromFile(filename);
+  return analyzeEvents(traceEvents);
 }
 
 // If run as CLI, parse the argv trace (or a fallback)
@@ -38,20 +52,22 @@ if (import.meta.url.endsWith(process?.argv[1])) {
 
 async function cli() {
   const filename = process.argv.at(2);
+  if (!filename)
+    throw new Error('Provide filename');
   const TraceEngine = await analyzeTrace(filename);
   console.log(TraceEngine);
 }
 
 
 /**
- * @param {string=} filename
+ * @param {string} filename
  * @returns TraceEvent[]
  */
 function loadTraceEventsFromFile(filename) {
   const fileBuf = fs.readFileSync(filename);
   let data;
   if (isGzip(fileBuf)) {
-    data = zlib.gunzipSync(fileBuf);
+    data = zlib.gunzipSync(fileBuf).toString();
   } else {
     data = fileBuf.toString('utf8');
   }
@@ -82,16 +98,34 @@ export function polyfillDOMRect() {
   // https://raw.githubusercontent.com/JakeChampion/polyfill-library/master/polyfills/DOMRect/polyfill.js
 
   (function(global) {
+    /** @param {number=} v */
     function number(v) {
       return v === undefined ? 0 : Number(v);
     }
-
+    /**
+     * @param {number} u
+     * @param {number} v
+     */
     function different(u, v) {
       return u !== v && !(isNaN(u) && isNaN(v));
     }
 
+    /**
+     * @param {number} xArg
+     * @param {number} yArg
+     * @param {number} wArg
+     * @param {number} hArg
+     * @this {DOMRect}
+     */
     function DOMRect(xArg, yArg, wArg, hArg) {
-      let x, y, width, height, left, right, top, bottom;
+      let /** @type {number} */ x;
+      let /** @type {number} */ y;
+      let /** @type {number} */ width;
+      let /** @type {number} */ height;
+      let /** @type {number=} */ left;
+      let /** @type {number=} */ right;
+      let /** @type {number=} */ top;
+      let /** @type {number=} */ bottom;
 
       x = number(xArg);
       y = number(yArg);
@@ -103,6 +137,7 @@ export function polyfillDOMRect() {
           get: function() {
             return x;
           },
+          /** @param {number} newX */
           set: function(newX) {
             if (different(x, newX)) {
               x = newX;
@@ -186,6 +221,7 @@ export function polyfillDOMRect() {
       });
     }
 
+    // @ts-expect-error It's not identical.
     globalThis.DOMRect = DOMRect;
   })(globalThis);
 }

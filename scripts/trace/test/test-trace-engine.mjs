@@ -30,8 +30,10 @@ test('numeric values are set and look legit', t => {
     Array.from(data.Meta.frameByProcessId.keys()).at(0),
   ];
   for (const datum of shouldBeNumbers) {
-    assert.equal(isNaN(datum), false);
     assert.equal(typeof datum, 'number');
+    if (typeof datum !== 'number')
+      throw new Error();
+    assert.equal(isNaN(datum), false);
     assert.equal(datum > 10, true);
   }
 });
@@ -47,6 +49,8 @@ test('string values are set and look legit', t => {
 
   for (const datum of shouldBeStrings) {
     assert.equal(typeof datum, 'string');
+    if (typeof datum !== 'string')
+      throw new Error();
     assert.equal(datum.length > 10, true);
   }
 });
@@ -57,7 +61,8 @@ test('insights look ok', t => {
   }
   // First insightset with a navigation on it, to skip over the NO_NAV one.
   const insightSet = Array.from(insights.values()).find(is => is.navigation);
-
+  if (typeof insightSet === 'undefined')
+    throw new Error();
   const keys = Object.keys(insightSet.data);
   assert.deepStrictEqual(keys, [
     'CumulativeLayoutShift',
@@ -70,11 +75,12 @@ test('insights look ok', t => {
     'ThirdPartyWeb',
     'Viewport',
   ]);
-  for (const key of keys) {
-    assert.ok(
-        insightSet.data[key] instanceof Error === false,
-        `key ${key} is an error: ${insightSet.data[key].toString()} ${insightSet.data[key].stack}`);
-    assert.ok(typeof insightSet.data[key] === 'object', `key ${key} is not an object`);
+  for (const [insightName, insightItem] of Object.entries(insightSet.data)) {
+    const msg = insightItem instanceof Error ?
+        `${insightName} is an error. ${insightItem.toString()} ${insightItem.stack?.toString()}` :
+        '';
+    assert.ok(insightItem instanceof Error === false, msg);
+    assert.ok(typeof insightItem === 'object', `insightName ${insightName} is not an object`);
   }
 
   const entityNames = Array.from(insightSet.data.ThirdPartyWeb.summaryByEntity.keys()).map(e => e.name);
