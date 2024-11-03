@@ -27,9 +27,10 @@ cp "$out_dir/gen/front_end/generated/protocol.d.ts" "$dist/generated/protocol.d.
 cp ./front_end/models/trace/package-template.json "$dist/package.json"
 
 
-# TODO: maybe something more legit than this hack
-echo 'const URLForEntry = { getNonResolved: (_, entry) => entry.callFrame?.url ?? entry.args?.data?.stackTrace ?? entry.args?.data?.url ?? null};export {URLForEntry};' > $dist/models/trace/extras/extras.js
-echo 'export {};' > $dist/models/trace/extras/extras.d.ts
+# Replacement extras provides a basic URLForEntry and Third-Party-Web
+cp $DIRNAME/replacements/extras.js $dist/models/trace/extras/extras.js
+cp $DIRNAME/replacements/extras.d.ts $dist/models/trace/extras/extras.d.ts
+
 echo 'export {};' > $dist/models/trace/TracingManager.js
 echo 'export {};' > $dist/models/trace/TracingManager.d.ts
 echo 'export {};' > $dist/models/trace/LegacyTracingModel.js

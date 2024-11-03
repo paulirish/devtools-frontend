@@ -71,7 +71,9 @@ test('insights look ok', t => {
     'Viewport',
   ]);
   for (const key of keys) {
-    assert.ok(insightSet.data[key] instanceof Error === false, `key ${key} is an error`);
+    assert.ok(
+        insightSet.data[key] instanceof Error === false,
+        `key ${key} is an error: ${insightSet.data[key].toString()} ${insightSet.data[key].stack}`);
     assert.ok(typeof insightSet.data[key] === 'object', `key ${key} is not an object`);
   }
 
@@ -85,7 +87,7 @@ test('insights look ok', t => {
       transferSize: 74145,
     },
     'paulirish.com': {
-      mainThreadTime: 5545,
+      mainThreadTime: 8983,
       transferSize: 142142,
     },
     Disqus: {
