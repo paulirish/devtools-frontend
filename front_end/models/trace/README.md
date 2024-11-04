@@ -64,7 +64,6 @@ npm publish --access public
 │NetworkRequestHandler│     │...many more handlers │
 │                     │     │                      │
 │     reset()         │     │                      │
-│     initialize()    │     │                      │
 │                     │     │                      │
 │     handleEvent()   │     │                      │
 │                     │     │                      │

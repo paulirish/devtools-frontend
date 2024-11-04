@@ -15,6 +15,7 @@ import * as LitHtml from '../../ui/lit-html/lit-html.js';
 import {
   AgentType,
   type AiAgent,
+  type ConversationContext,
   ErrorType,
   type ResponseData,
   ResponseType,
@@ -30,12 +31,14 @@ import {
 } from './components/FreestylerChatUi.js';
 import {
   DrJonesFileAgent,
+  FileContext,
 } from './DrJonesFileAgent.js';
 import {
   DrJonesNetworkAgent,
+  RequestContext,
 } from './DrJonesNetworkAgent.js';
-import {DrJonesPerformanceAgent} from './DrJonesPerformanceAgent.js';
-import {FreestylerAgent} from './FreestylerAgent.js';
+import {CallTreeContext, DrJonesPerformanceAgent} from './DrJonesPerformanceAgent.js';
+import {FreestylerAgent, NodeContext} from './FreestylerAgent.js';
 import freestylerPanelStyles from './freestylerPanel.css.js';
 
 const {html} = LitHtml;
@@ -72,6 +75,10 @@ const UIStrings = {
    *@description AI assistance UI text clearing the current chat session.
    */
   clearChat: 'Clear chat',
+  /**
+   *@description AI assistance UI text that deletes all history entries.
+   */
+  clearChatHistory: 'Clear chat history',
 };
 
 /*
@@ -106,55 +113,6 @@ function selectedElementFilter(maybeNode: SDK.DOMModel.DOMNode|null): SDK.DOMMod
   return null;
 }
 
-// TODO(ergunsh): Use the WidgetElement instead of separately creating the toolbar.
-function createToolbar(
-    target: HTMLElement,
-    {onHistoryClick, onNewAgentClick, onDeleteClick}:
-        {onHistoryClick: (event: Event) => void, onNewAgentClick: () => void, onDeleteClick: () => void}): void {
-  const toolbarContainer = target.createChild('div', 'freestyler-toolbar-container');
-  const leftToolbar = new UI.Toolbar.Toolbar('freestyler-left-toolbar', toolbarContainer);
-  const rightToolbar = new UI.Toolbar.Toolbar('freestyler-right-toolbar', toolbarContainer);
-
-  const clearButton =
-      new UI.Toolbar.ToolbarButton(i18nString(UIStrings.newChat), 'plus', undefined, 'freestyler.new-chat');
-  clearButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, onNewAgentClick);
-  leftToolbar.appendToolbarItem(clearButton);
-  leftToolbar.appendSeparator();
-  const historyButton =
-      new UI.Toolbar.ToolbarButton(i18nString(UIStrings.history), 'history', undefined, 'freestyler.history');
-  historyButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, event => {
-    onHistoryClick(event.data);
-  });
-  leftToolbar.appendToolbarItem(historyButton);
-  const deleteButton =
-      new UI.Toolbar.ToolbarButton(i18nString(UIStrings.clearChat), 'bin', undefined, 'freestyler.delete');
-  deleteButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, onDeleteClick);
-  leftToolbar.appendToolbarItem(deleteButton);
-
-  const link = UI.XLink.XLink.create(
-      AI_ASSISTANCE_SEND_FEEDBACK, i18nString(UIStrings.sendFeedback), undefined, undefined,
-      'freestyler.send-feedback');
-  link.style.setProperty('display', null);
-  link.style.setProperty('text-decoration', 'none');
-  link.style.setProperty('padding', '0 var(--sys-size-3)');
-  const linkItem = new UI.Toolbar.ToolbarItem(link);
-  rightToolbar.appendToolbarItem(linkItem);
-
-  rightToolbar.appendSeparator();
-  const helpButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.help), 'help', undefined, 'freestyler.help');
-  helpButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, () => {
-    Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(AI_ASSISTANCE_HELP);
-  });
-  rightToolbar.appendToolbarItem(helpButton);
-
-  const settingsButton =
-      new UI.Toolbar.ToolbarButton(i18nString(UIStrings.settings), 'gear', undefined, 'freestyler.settings');
-  settingsButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, () => {
-    void UI.ViewManager.ViewManager.instance().showView('chrome-ai');
-  });
-  rightToolbar.appendToolbarItem(settingsButton);
-}
-
 function defaultView(input: FreestylerChatUiProps, output: ViewOutput, target: HTMLElement): void {
   // clang-format off
   LitHtml.render(html`
@@ -169,6 +127,34 @@ function defaultView(input: FreestylerChatUiProps, output: ViewOutput, target: H
   // clang-format on
 }
 
+function createNodeContext(node: SDK.DOMModel.DOMNode|null): NodeContext|null {
+  if (!node) {
+    return null;
+  }
+  return new NodeContext(node);
+}
+
+function createFileContext(file: Workspace.UISourceCode.UISourceCode|null): FileContext|null {
+  if (!file) {
+    return null;
+  }
+  return new FileContext(file);
+}
+
+function createRequestContext(request: SDK.NetworkRequest.NetworkRequest|null): RequestContext|null {
+  if (!request) {
+    return null;
+  }
+  return new RequestContext(request);
+}
+
+function createCallTreeContext(callTree: TimelineUtils.AICallTree.AICallTree|null): CallTreeContext|null {
+  if (!callTree) {
+    return null;
+  }
+  return new CallTreeContext(callTree);
+}
+
 let freestylerPanelInstance: FreestylerPanel;
 export class FreestylerPanel extends UI.Panel.Panel {
   static panelName = 'freestyler';
@@ -176,17 +162,21 @@ export class FreestylerPanel extends UI.Panel.Panel {
   #toggleSearchElementAction: UI.ActionRegistration.Action;
   #contentContainer: HTMLElement;
   #aidaClient: Host.AidaClient.AidaClient;
-  #freestylerAgent: FreestylerAgent;
-  #drJonesFileAgent: DrJonesFileAgent;
-  #drJonesNetworkAgent: DrJonesNetworkAgent;
-  #drJonesPerformanceAgent: DrJonesPerformanceAgent;
   #viewProps: FreestylerChatUiProps;
   #viewOutput: ViewOutput = {};
   #serverSideLoggingEnabled = isFreestylerServerSideLoggingEnabled();
   #freestylerEnabledSetting: Common.Settings.Setting<boolean>|undefined;
   #changeManager = new ChangeManager();
 
+  #newChatButton =
+      new UI.Toolbar.ToolbarButton(i18nString(UIStrings.newChat), 'plus', undefined, 'freestyler.new-chat');
+  #historyEntriesButton =
+      new UI.Toolbar.ToolbarButton(i18nString(UIStrings.history), 'history', undefined, 'freestyler.history');
+  #deleteHistoryEntryButton =
+      new UI.Toolbar.ToolbarButton(i18nString(UIStrings.clearChat), 'bin', undefined, 'freestyler.delete');
+
   #agents = new Set<AiAgent<unknown>>();
+  #currentAgent?: AiAgent<unknown>;
 
   constructor(private view: View = defaultView, {aidaClient, aidaAvailability, syncInfo}: {
     aidaClient: Host.AidaClient.AidaClient,
@@ -196,11 +186,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
     super(FreestylerPanel.panelName);
     this.#freestylerEnabledSetting = this.#getAiAssistanceEnabledSetting();
 
-    createToolbar(this.contentElement, {
-      onNewAgentClick: this.#clearMessages.bind(this),
-      onHistoryClick: this.#onHistoryClicked.bind(this),
-      onDeleteClick: this.#onDeleteClicked.bind(this),
-    });
+    this.#createToolbar();
     this.#toggleSearchElementAction =
         UI.ActionRegistry.ActionRegistry.instance().getAction('elements.toggle-element-search');
     this.#aidaClient = aidaClient;
@@ -230,12 +216,49 @@ export class FreestylerPanel extends UI.Panel.Panel {
       selectedFile: null,
       selectedNetworkRequest: null,
       selectedAiCallTree: null,
+      blockedByCrossOrigin: false,
     };
+  }
 
-    this.#freestylerAgent = this.#createFreestylerAgent();
-    this.#drJonesFileAgent = this.#createDrJonesFileAgent();
-    this.#drJonesNetworkAgent = this.#createDrJonesNetworkAgent();
-    this.#drJonesPerformanceAgent = this.#createDrJonesPerformanceAgent();
+  #createToolbar(): void {
+    const toolbarContainer = this.contentElement.createChild('div', 'freestyler-toolbar-container');
+    const leftToolbar = new UI.Toolbar.Toolbar('freestyler-left-toolbar', toolbarContainer);
+    const rightToolbar = new UI.Toolbar.Toolbar('freestyler-right-toolbar', toolbarContainer);
+
+    this.#newChatButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, this.#clearMessages.bind(this));
+    leftToolbar.appendToolbarItem(this.#newChatButton);
+    leftToolbar.appendSeparator();
+
+    this.#historyEntriesButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, event => {
+      this.#onHistoryClicked(event.data);
+    });
+    leftToolbar.appendToolbarItem(this.#historyEntriesButton);
+    this.#deleteHistoryEntryButton.addEventListener(
+        UI.Toolbar.ToolbarButton.Events.CLICK, this.#onDeleteClicked.bind(this));
+    leftToolbar.appendToolbarItem(this.#deleteHistoryEntryButton);
+
+    const link = UI.XLink.XLink.create(
+        AI_ASSISTANCE_SEND_FEEDBACK, i18nString(UIStrings.sendFeedback), undefined, undefined,
+        'freestyler.send-feedback');
+    link.style.setProperty('display', null);
+    link.style.setProperty('text-decoration', 'none');
+    link.style.setProperty('padding', '0 var(--sys-size-3)');
+    const linkItem = new UI.Toolbar.ToolbarItem(link);
+    rightToolbar.appendToolbarItem(linkItem);
+
+    rightToolbar.appendSeparator();
+    const helpButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.help), 'help', undefined, 'freestyler.help');
+    helpButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, () => {
+      Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(AI_ASSISTANCE_HELP);
+    });
+    rightToolbar.appendToolbarItem(helpButton);
+
+    const settingsButton =
+        new UI.Toolbar.ToolbarButton(i18nString(UIStrings.settings), 'gear', undefined, 'freestyler.settings');
+    settingsButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, () => {
+      void UI.ViewManager.ViewManager.instance().showView('chrome-ai');
+    });
+    rightToolbar.appendToolbarItem(settingsButton);
   }
 
   #getChatUiState(): FreestylerChatUiState {
@@ -251,6 +274,30 @@ export class FreestylerPanel extends UI.Panel.Panel {
     } catch {
       return;
     }
+  }
+
+  #createAgent(agentType: AgentType): AiAgent<unknown> {
+    switch (agentType) {
+      case AgentType.FREESTYLER:
+        return this.#createFreestylerAgent();
+      case AgentType.DRJONES_FILE:
+        return this.#createDrJonesFileAgent();
+      case AgentType.DRJONES_NETWORK_REQUEST:
+        return this.#createDrJonesNetworkAgent();
+      case AgentType.DRJONES_PERFORMANCE:
+        return this.#createDrJonesPerformanceAgent();
+    }
+  }
+
+  #updateToolbarState(): void {
+    this.#historyEntriesButton.applyEnabledState([...this.#agents].some(agent => !agent.isEmpty));
+    this.#deleteHistoryEntryButton.applyEnabledState(Boolean(this.#currentAgent && !this.#currentAgent.isEmpty));
+    /*
+    * If there is no agent disable new chat button
+    * If the agent is empty disable new chat button
+    */
+    const newChatEnabled = this.#currentAgent ? (this.#currentAgent.isEmpty ? false : true) : false;
+    this.#newChatButton.applyEnabledState(newChatEnabled);
   }
 
   #createFreestylerAgent(): FreestylerAgent {
@@ -316,10 +363,13 @@ export class FreestylerPanel extends UI.Panel.Panel {
     this.#viewProps = {
       ...this.#viewProps,
       inspectElementToggled: this.#toggleSearchElementAction.toggled(),
-      selectedElement: selectedElementFilter(UI.Context.Context.instance().flavor(SDK.DOMModel.DOMNode)),
-      selectedNetworkRequest: UI.Context.Context.instance().flavor(SDK.NetworkRequest.NetworkRequest),
-      selectedAiCallTree: UI.Context.Context.instance().flavor(TimelineUtils.AICallTree.AICallTree),
-      selectedFile: UI.Context.Context.instance().flavor(Workspace.UISourceCode.UISourceCode),
+      selectedElement:
+          createNodeContext(selectedElementFilter(UI.Context.Context.instance().flavor(SDK.DOMModel.DOMNode))),
+      selectedNetworkRequest:
+          createRequestContext(UI.Context.Context.instance().flavor(SDK.NetworkRequest.NetworkRequest)),
+      selectedAiCallTree:
+          createCallTreeContext(UI.Context.Context.instance().flavor(TimelineUtils.AICallTree.AICallTree)),
+      selectedFile: createFileContext(UI.Context.Context.instance().flavor(Workspace.UISourceCode.UISourceCode)),
     };
     this.doUpdate();
 
@@ -379,42 +429,42 @@ export class FreestylerPanel extends UI.Panel.Panel {
   };
 
   #handleDOMNodeFlavorChange = (ev: Common.EventTarget.EventTargetEvent<SDK.DOMModel.DOMNode>): void => {
-    if (this.#viewProps.selectedElement === ev.data) {
+    if (this.#viewProps.selectedElement?.getItem() === ev.data) {
       return;
     }
 
-    this.#viewProps.selectedElement = selectedElementFilter(ev.data);
-    this.doUpdate();
+    this.#viewProps.selectedElement = createNodeContext(selectedElementFilter(ev.data));
+    this.#onContextSelectionChanged();
   };
 
   #handleNetworkRequestFlavorChange =
       (ev: Common.EventTarget.EventTargetEvent<SDK.NetworkRequest.NetworkRequest>): void => {
-        if (this.#viewProps.selectedNetworkRequest === ev.data) {
+        if (this.#viewProps.selectedNetworkRequest?.getItem() === ev.data) {
           return;
         }
 
-        this.#viewProps.selectedNetworkRequest = Boolean(ev.data) ? ev.data : null;
-        this.doUpdate();
+        this.#viewProps.selectedNetworkRequest = Boolean(ev.data) ? new RequestContext(ev.data) : null;
+        this.#onContextSelectionChanged();
       };
 
   #handleTraceEntryNodeFlavorChange =
       (ev: Common.EventTarget.EventTargetEvent<TimelineUtils.AICallTree.AICallTree>): void => {
-        if (this.#viewProps.selectedAiCallTree === ev.data) {
+        if (this.#viewProps.selectedAiCallTree?.getItem() === ev.data) {
           return;
         }
 
-        this.#viewProps.selectedAiCallTree = Boolean(ev.data) ? ev.data : null;
-        this.doUpdate();
+        this.#viewProps.selectedAiCallTree = Boolean(ev.data) ? new CallTreeContext(ev.data) : null;
+        this.#onContextSelectionChanged();
       };
 
   #handleUISourceCodeFlavorChange =
       (ev: Common.EventTarget.EventTargetEvent<Workspace.UISourceCode.UISourceCode>): void => {
-        if (this.#viewProps.selectedFile === ev.data) {
+        if (this.#viewProps.selectedFile?.getItem() === ev.data) {
           return;
         }
 
-        this.#viewProps.selectedFile = Boolean(ev.data) ? ev.data : null;
-        this.doUpdate();
+        this.#viewProps.selectedFile = Boolean(ev.data) ? new FileContext(ev.data) : null;
+        this.#onContextSelectionChanged();
       };
 
   #handleFreestylerEnabledSettingChanged = (): void => {
@@ -428,6 +478,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
   };
 
   doUpdate(): void {
+    this.#updateToolbarState();
     this.view(this.#viewProps, this.#viewOutput, this.#contentContainer);
   }
 
@@ -453,83 +504,74 @@ export class FreestylerPanel extends UI.Panel.Panel {
   #handleSelectedNetworkRequestClick(): void|Promise<void> {
     if (this.#viewProps.selectedNetworkRequest) {
       const requestLocation = NetworkForward.UIRequestLocation.UIRequestLocation.tab(
-          this.#viewProps.selectedNetworkRequest, NetworkForward.UIRequestLocation.UIRequestTabs.HEADERS_COMPONENT);
+          this.#viewProps.selectedNetworkRequest.getItem(),
+          NetworkForward.UIRequestLocation.UIRequestTabs.HEADERS_COMPONENT);
       return Common.Revealer.reveal(requestLocation);
     }
   }
 
   #handleSelectedFileClick(): void|Promise<void> {
     if (this.#viewProps.selectedFile) {
-      return Common.Revealer.reveal(this.#viewProps.selectedFile.uiLocation(0, 0));
+      return Common.Revealer.reveal(this.#viewProps.selectedFile.getItem().uiLocation(0, 0));
     }
   }
 
   handleAction(actionId: string): void {
+    let targetAgentType: AgentType|undefined;
     switch (actionId) {
       case 'freestyler.elements-floating-button': {
-        this.#viewOutput.freestylerChatUi?.focusTextInput();
         Host.userMetrics.actionTaken(Host.UserMetrics.Action.FreestylerOpenedFromElementsPanelFloatingButton);
-        this.#viewProps.agentType = AgentType.FREESTYLER;
-        this.#viewProps.messages = [];
-        this.doUpdate();
-        void this.#doConversation(this.#freestylerAgent.runFromHistory());
+        targetAgentType = AgentType.FREESTYLER;
         break;
       }
       case 'freestyler.element-panel-context': {
-        this.#viewOutput.freestylerChatUi?.focusTextInput();
         Host.userMetrics.actionTaken(Host.UserMetrics.Action.FreestylerOpenedFromElementsPanel);
-        this.#viewProps.agentType = AgentType.FREESTYLER;
-        this.#viewProps.messages = [];
-        this.doUpdate();
-        void this.#doConversation(this.#freestylerAgent.runFromHistory());
+        targetAgentType = AgentType.FREESTYLER;
         break;
       }
       case 'drjones.network-floating-button': {
-        this.#viewOutput.freestylerChatUi?.focusTextInput();
         Host.userMetrics.actionTaken(Host.UserMetrics.Action.DrJonesOpenedFromNetworkPanelFloatingButton);
-        this.#viewProps.agentType = AgentType.DRJONES_NETWORK_REQUEST;
-        this.#viewProps.messages = [];
-        this.doUpdate();
-        void this.#doConversation(this.#drJonesNetworkAgent.runFromHistory());
+        targetAgentType = AgentType.DRJONES_NETWORK_REQUEST;
         break;
       }
       case 'drjones.network-panel-context': {
-        this.#viewOutput.freestylerChatUi?.focusTextInput();
         Host.userMetrics.actionTaken(Host.UserMetrics.Action.DrJonesOpenedFromNetworkPanel);
-        this.#viewProps.agentType = AgentType.DRJONES_NETWORK_REQUEST;
-        this.#viewProps.messages = [];
-        this.doUpdate();
-        void this.#doConversation(this.#drJonesNetworkAgent.runFromHistory());
+        targetAgentType = AgentType.DRJONES_NETWORK_REQUEST;
         break;
       }
       case 'drjones.performance-panel-context': {
-        this.#viewOutput.freestylerChatUi?.focusTextInput();
         Host.userMetrics.actionTaken(Host.UserMetrics.Action.DrJonesOpenedFromPerformancePanel);
-        this.#viewProps.agentType = AgentType.DRJONES_PERFORMANCE;
-        this.#viewProps.messages = [];
-        this.doUpdate();
-        void this.#doConversation(this.#drJonesPerformanceAgent.runFromHistory());
+        targetAgentType = AgentType.DRJONES_PERFORMANCE;
         break;
       }
       case 'drjones.sources-floating-button': {
-        this.#viewOutput.freestylerChatUi?.focusTextInput();
         Host.userMetrics.actionTaken(Host.UserMetrics.Action.DrJonesOpenedFromSourcesPanelFloatingButton);
-        this.#viewProps.agentType = AgentType.DRJONES_FILE;
-        this.#viewProps.messages = [];
-        this.doUpdate();
-        void this.#doConversation(this.#drJonesFileAgent.runFromHistory());
+        targetAgentType = AgentType.DRJONES_FILE;
         break;
       }
       case 'drjones.sources-panel-context': {
-        this.#viewOutput.freestylerChatUi?.focusTextInput();
         Host.userMetrics.actionTaken(Host.UserMetrics.Action.DrJonesOpenedFromSourcesPanel);
-        this.#viewProps.agentType = AgentType.DRJONES_FILE;
-        this.#viewProps.messages = [];
-        this.doUpdate();
-        void this.#doConversation(this.#drJonesFileAgent.runFromHistory());
+        targetAgentType = AgentType.DRJONES_FILE;
         break;
       }
     }
+
+    if (!targetAgentType) {
+      return;
+    }
+
+    if (!this.#currentAgent) {
+      this.#currentAgent = this.#createAgent(targetAgentType);
+    } else if (this.#currentAgent.type !== targetAgentType) {
+      this.#currentAgent = this.#createAgent(targetAgentType);
+    }
+    this.#viewProps.agentType = this.#currentAgent.type;
+    this.#viewOutput.freestylerChatUi?.focusTextInput();
+    Host.userMetrics.actionTaken(Host.UserMetrics.Action.FreestylerOpenedFromElementsPanelFloatingButton);
+    this.#viewProps.messages = [];
+    this.#onContextSelectionChanged();
+    this.doUpdate();
+    void this.#doConversation(this.#currentAgent.runFromHistory());
   }
 
   #onHistoryClicked(event: Event): void {
@@ -552,64 +594,38 @@ export class FreestylerPanel extends UI.Panel.Panel {
       );
     }
 
+    contextMenu.footerSection().appendItem(
+        i18nString(UIStrings.clearChatHistory),
+        () => {
+          this.#clearHistory();
+        },
+    );
+
     void contextMenu.show();
   }
 
-  #onDeleteClicked(): void {
-    if (!this.#viewProps.agentType) {
-      return;
-    }
-
-    switch (this.#viewProps.agentType) {
-      case AgentType.FREESTYLER:
-        this.#agents.delete(this.#freestylerAgent);
-        this.#freestylerAgent = this.#createFreestylerAgent();
-        break;
-      case AgentType.DRJONES_FILE:
-        this.#agents.delete(this.#drJonesFileAgent);
-        this.#drJonesFileAgent = this.#createDrJonesFileAgent();
-        break;
-      case AgentType.DRJONES_NETWORK_REQUEST:
-        this.#agents.delete(this.#drJonesNetworkAgent);
-        this.#drJonesNetworkAgent = this.#createDrJonesNetworkAgent();
-        break;
-      case AgentType.DRJONES_PERFORMANCE:
-        this.#agents.delete(this.#drJonesPerformanceAgent);
-        this.#drJonesPerformanceAgent = this.#createDrJonesPerformanceAgent();
-        break;
-    }
+  #clearHistory(): void {
+    this.#agents = new Set();
+    this.#currentAgent = undefined;
     this.#viewProps.messages = [];
     this.#viewProps.agentType = undefined;
     this.doUpdate();
   }
 
-  async #switchAgent(agent: AiAgent<unknown>): Promise<void> {
-    switch (agent.type) {
-      case AgentType.FREESTYLER:
-        if (this.#freestylerAgent === agent && agent.type === this.#viewProps.agentType) {
-          return;
-        }
-        this.#freestylerAgent = agent as FreestylerAgent;
-        break;
-      case AgentType.DRJONES_FILE:
-        if (this.#drJonesFileAgent === agent && agent.type === this.#viewProps.agentType) {
-          return;
-        }
-        this.#drJonesFileAgent = agent as DrJonesFileAgent;
-        break;
-      case AgentType.DRJONES_NETWORK_REQUEST:
-        if (this.#drJonesNetworkAgent === agent && agent.type === this.#viewProps.agentType) {
-          return;
-        }
-        this.#drJonesNetworkAgent = agent as DrJonesNetworkAgent;
-        break;
-      case AgentType.DRJONES_PERFORMANCE:
-        if (this.#drJonesPerformanceAgent === agent && agent.type === this.#viewProps.agentType) {
-          return;
-        }
-        this.#drJonesPerformanceAgent = agent as DrJonesPerformanceAgent;
-        break;
+  #onDeleteClicked(): void {
+    if (this.#currentAgent) {
+      const agentType = this.#currentAgent.type;
+      this.#agents.delete(this.#currentAgent);
+      this.#currentAgent = this.#createAgent(agentType);
     }
+    this.#viewProps.messages = [];
+    this.#viewProps.agentType = undefined;
+    this.#onContextSelectionChanged();
+    this.doUpdate();
+  }
+
+  async #switchAgent(agent: AiAgent<unknown>): Promise<void> {
+    this.#currentAgent = agent;
     this.#viewProps.messages = [];
     this.#viewProps.agentType = agent.type;
     await this.#doConversation(agent.runFromHistory());
@@ -618,21 +634,10 @@ export class FreestylerPanel extends UI.Panel.Panel {
   #clearMessages(): void {
     this.#viewProps.messages = [];
     this.#viewProps.isLoading = false;
-    switch (this.#viewProps.agentType) {
-      case AgentType.FREESTYLER:
-        this.#freestylerAgent = this.#createFreestylerAgent();
-        break;
-      case AgentType.DRJONES_FILE:
-        this.#drJonesFileAgent = this.#createDrJonesFileAgent();
-        break;
-      case AgentType.DRJONES_NETWORK_REQUEST:
-        this.#drJonesNetworkAgent = this.#createDrJonesNetworkAgent();
-        break;
-      case AgentType.DRJONES_PERFORMANCE:
-        this.#drJonesPerformanceAgent = this.#createDrJonesPerformanceAgent();
-        break;
+    if (this.#currentAgent) {
+      this.#currentAgent = this.#createAgent(this.#currentAgent.type);
+      this.#onContextSelectionChanged();
     }
-
     this.#cancel();
     this.doUpdate();
     UI.ARIAUtils.alert(i18nString(UIStrings.chatCleared));
@@ -645,29 +650,61 @@ export class FreestylerPanel extends UI.Panel.Panel {
     this.doUpdate();
   }
 
+  #onContextSelectionChanged(): void {
+    if (!this.#currentAgent) {
+      this.#viewProps.blockedByCrossOrigin = false;
+      this.doUpdate();
+      return;
+    }
+    const currentContext = this.#getConversationContext();
+    if (!currentContext) {
+      this.#viewProps.blockedByCrossOrigin = false;
+      this.doUpdate();
+      return;
+    }
+    this.#viewProps.blockedByCrossOrigin = !currentContext.isOriginAllowed(this.#currentAgent.origin);
+    this.doUpdate();
+  }
+
+  #getConversationContext(): ConversationContext<unknown>|null {
+    if (!this.#currentAgent) {
+      return null;
+    }
+    let context: ConversationContext<unknown>|null;
+    switch (this.#currentAgent.type) {
+      case AgentType.FREESTYLER:
+        context = this.#viewProps.selectedElement;
+        break;
+      case AgentType.DRJONES_FILE:
+        context = this.#viewProps.selectedFile;
+        break;
+      case AgentType.DRJONES_NETWORK_REQUEST:
+        context = this.#viewProps.selectedNetworkRequest;
+        break;
+      case AgentType.DRJONES_PERFORMANCE:
+        context = this.#viewProps.selectedAiCallTree;
+        break;
+    }
+    return context;
+  }
+
   async #startConversation(text: string): Promise<void> {
-    if (!this.#viewProps.agentType) {
+    if (!this.#currentAgent) {
       return;
     }
     this.#runAbortController = new AbortController();
     const signal = this.#runAbortController.signal;
-
-    let runner: AsyncGenerator<ResponseData, void, void>|undefined;
-    switch (this.#viewProps.agentType) {
-      case AgentType.FREESTYLER:
-        runner = this.#freestylerAgent.run(text, {signal, selected: this.#viewProps.selectedElement});
-        break;
-      case AgentType.DRJONES_FILE:
-        runner = this.#drJonesFileAgent.run(text, {signal, selected: this.#viewProps.selectedFile});
-        break;
-      case AgentType.DRJONES_NETWORK_REQUEST:
-        runner = this.#drJonesNetworkAgent.run(text, {signal, selected: this.#viewProps.selectedNetworkRequest});
-        break;
-      case AgentType.DRJONES_PERFORMANCE:
-        runner = this.#drJonesPerformanceAgent.run(text, {signal, selected: this.#viewProps.selectedAiCallTree});
-        break;
+    const context = this.#getConversationContext();
+    // If a different context is provided, it must be from the same origin.
+    if (context && !context.isOriginAllowed(this.#currentAgent.origin)) {
+      // This error should not be reached. If it happens, some
+      // invariants do not hold anymore.
+      throw new Error('cross-origin context data should not be included');
     }
-
+    const runner = this.#currentAgent.run(text, {
+      signal,
+      selected: context,
+    });
     UI.ARIAUtils.alert(lockedString(UIStringsNotTranslate.answerLoading));
     await this.#doConversation(runner);
     UI.ARIAUtils.alert(lockedString(UIStringsNotTranslate.answerReady));

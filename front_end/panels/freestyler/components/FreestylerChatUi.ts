@@ -20,7 +20,7 @@ import * as UI from '../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 import {PanelUtils} from '../../utils/utils.js';
-import {AgentType, type ContextDetail, ErrorType} from '../AiAgent.js';
+import {AgentType, type ContextDetail, type ConversationContext, ErrorType} from '../AiAgent.js';
 
 import freestylerChatUiStyles from './freestylerChatUi.css.js';
 import type {UserActionRowProps} from './UserActionRow.js';
@@ -115,6 +115,10 @@ const UIStringsNotTranslate = {
    *@description Placeholder text for the chat UI input.
    */
   inputPlaceholderForDrJonesPerformanceAgent: 'Ask a question about the selected item and its call tree',
+  /**
+   * @description Placeholder text for the input shown when the conversation is blocked because a cross-origin context was selected.
+   */
+  crossOriginError: 'To talk about data from another origin, start a new chat',
   /**
    *@description Title for the send icon button.
    */
@@ -246,22 +250,6 @@ const str_ = i18n.i18n.registerUIStrings('panels/freestyler/components/Freestyle
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 const lockedString = i18n.i18n.lockedString;
 
-function getInputPlaceholderString(state: State, agentType?: AgentType): Platform.UIString.LocalizedString {
-  if (state === State.CONSENT_VIEW || !agentType) {
-    return i18nString(UIStrings.followTheSteps);
-  }
-  switch (agentType) {
-    case AgentType.FREESTYLER:
-      return lockedString(UIStringsNotTranslate.inputPlaceholderForFreestylerAgent);
-    case AgentType.DRJONES_FILE:
-      return lockedString(UIStringsNotTranslate.inputPlaceholderForDrJonesFileAgent);
-    case AgentType.DRJONES_NETWORK_REQUEST:
-      return lockedString(UIStringsNotTranslate.inputPlaceholderForDrJonesNetworkAgent);
-    case AgentType.DRJONES_PERFORMANCE:
-      return lockedString(UIStringsNotTranslate.inputPlaceholderForDrJonesPerformanceAgent);
-  }
-}
-
 export interface Step {
   isLoading: boolean;
   thought?: string;
@@ -313,14 +301,15 @@ export interface Props {
   state: State;
   aidaAvailability: Host.AidaClient.AidaAccessPreconditions;
   messages: ChatMessage[];
-  selectedElement: SDK.DOMModel.DOMNode|null;
-  selectedFile: Workspace.UISourceCode.UISourceCode|null;
-  selectedNetworkRequest: SDK.NetworkRequest.NetworkRequest|null;
-  selectedAiCallTree: TimelineUtils.AICallTree.AICallTree|null;
+  selectedElement: ConversationContext<SDK.DOMModel.DOMNode>|null;
+  selectedFile: ConversationContext<Workspace.UISourceCode.UISourceCode>|null;
+  selectedNetworkRequest: ConversationContext<SDK.NetworkRequest.NetworkRequest>|null;
+  selectedAiCallTree: ConversationContext<TimelineUtils.AICallTree.AICallTree>|null;
   isLoading: boolean;
   canShowFeedbackForm: boolean;
   userInfo: Pick<Host.InspectorFrontendHostAPI.SyncInformation, 'accountImage'|'accountFullName'>;
   agentType?: AgentType;
+  blockedByCrossOrigin: boolean;
 }
 
 // The model returns multiline code blocks in an erroneous way with the language being in new line.
@@ -408,6 +397,9 @@ export class FreestylerChatUi extends HTMLElement {
   }
 
   #isTextInputDisabled = (): boolean => {
+    if (this.#props.blockedByCrossOrigin) {
+      return true;
+    }
     const isAidaAvailable = this.#props.aidaAvailability === Host.AidaClient.AidaAccessPreconditions.AVAILABLE;
     const isConsentView = this.#props.state === State.CONSENT_VIEW;
     const showsSideEffects = this.#props.messages.some(message => {
@@ -416,15 +408,20 @@ export class FreestylerChatUi extends HTMLElement {
       });
     });
 
-    const isInputDisabledCheckForFreestylerAgent = !Boolean(this.#props.selectedElement) || showsSideEffects;
-    const isInputDisabledCheckForDrJonesNetworkAgent = !Boolean(this.#props.selectedNetworkRequest);
-    const isInputDisabledCheckForDrJonesFileAgent =
-        !Boolean(this.#props.selectedFile) || !this.#props.selectedFile?.contentType().isTextType();
+    if (!isAidaAvailable || isConsentView || !this.#props.agentType) {
+      return true;
+    }
 
-    return (this.#props.agentType === AgentType.FREESTYLER && isInputDisabledCheckForFreestylerAgent) ||
-        (this.#props.agentType === AgentType.DRJONES_NETWORK_REQUEST && isInputDisabledCheckForDrJonesNetworkAgent) ||
-        (this.#props.agentType === AgentType.DRJONES_FILE && isInputDisabledCheckForDrJonesFileAgent) ||
-        !isAidaAvailable || isConsentView || !this.#props.agentType;
+    switch (this.#props.agentType) {
+      case AgentType.FREESTYLER:
+        return !this.#props.selectedElement || showsSideEffects;
+      case AgentType.DRJONES_NETWORK_REQUEST:
+        return !this.#props.selectedNetworkRequest;
+      case AgentType.DRJONES_FILE:
+        return !this.#props.selectedFile || !this.#props.selectedFile.getItem().contentType().isTextType();
+      case AgentType.DRJONES_PERFORMANCE:
+        return !this.#props.selectedAiCallTree;
+    }
   };
 
   #handleScroll = (ev: Event): void => {
@@ -804,14 +801,15 @@ export class FreestylerChatUi extends HTMLElement {
       return html`${LitHtml.nothing}`;
     }
 
-    const icon = PanelUtils.getIconForSourceFile(this.#props.selectedFile);
+    const icon = PanelUtils.getIconForSourceFile(this.#props.selectedFile.getItem());
 
     // clang-format off
     return html`<div class="select-element">
-    <div role=button class=${resourceClass}
-    @click=${this.#props.onSelectedFileRequestClick}>
-      ${icon}${this.#props.selectedFile?.displayName()}
-    </div></div>`;
+      <div role=button class=${resourceClass}
+        @click=${this.#props.onSelectedFileRequestClick}>
+          ${icon}${this.#props.selectedFile?.getItem().displayName()}
+      </div>
+    </div>`;
     // clang-format on
   }
 
@@ -825,13 +823,14 @@ export class FreestylerChatUi extends HTMLElement {
       return html`${LitHtml.nothing}`;
     }
 
-    const icon = PanelUtils.getIconForNetworkRequest(this.#props.selectedNetworkRequest);
+    const icon = PanelUtils.getIconForNetworkRequest(this.#props.selectedNetworkRequest.getItem());
     // clang-format off
     return html`<div class="select-element">
-    <div role=button class=${resourceClass}
-    @click=${this.#props.onSelectedNetworkRequestClick}>
-      ${icon}${this.#props.selectedNetworkRequest?.name()}
-    </div></div>`;
+      <div role=button class=${resourceClass}
+        @click=${this.#props.onSelectedNetworkRequestClick}>
+          ${icon}${this.#props.selectedNetworkRequest?.getItem().name()}
+        </div>
+    </div>`;
     // clang-format on
   };
 
@@ -860,7 +859,7 @@ export class FreestylerChatUi extends HTMLElement {
         <div class=${resourceClass}>${
           this.#props.selectedElement
             ? LitHtml.Directives.until(
-                  Common.Linkifier.Linkifier.linkify(this.#props.selectedElement),
+                  Common.Linkifier.Linkifier.linkify(this.#props.selectedElement.getItem()),
                 )
             : html`<span>${
               lockedString(UIStringsNotTranslate.noElementSelected)
@@ -880,7 +879,7 @@ export class FreestylerChatUi extends HTMLElement {
       return html`${LitHtml.nothing}`;
     }
 
-    const {event} = this.#props.selectedAiCallTree.selectedNode;
+    const {event} = this.#props.selectedAiCallTree.getItem().selectedNode;
     if (!event) {
       return html`${LitHtml.nothing}`;
     }
@@ -987,6 +986,27 @@ export class FreestylerChatUi extends HTMLElement {
     }
   };
 
+  #getInputPlaceholderString(): Platform.UIString.LocalizedString {
+    const state = this.#props.state;
+    const agentType = this.#props.agentType;
+    if (state === State.CONSENT_VIEW || !agentType) {
+      return i18nString(UIStrings.followTheSteps);
+    }
+    if (this.#props.blockedByCrossOrigin) {
+      return lockedString(UIStringsNotTranslate.crossOriginError);
+    }
+    switch (agentType) {
+      case AgentType.FREESTYLER:
+        return lockedString(UIStringsNotTranslate.inputPlaceholderForFreestylerAgent);
+      case AgentType.DRJONES_FILE:
+        return lockedString(UIStringsNotTranslate.inputPlaceholderForDrJonesFileAgent);
+      case AgentType.DRJONES_NETWORK_REQUEST:
+        return lockedString(UIStringsNotTranslate.inputPlaceholderForDrJonesNetworkAgent);
+      case AgentType.DRJONES_PERFORMANCE:
+        return lockedString(UIStringsNotTranslate.inputPlaceholderForDrJonesPerformanceAgent);
+    }
+  }
+
   #renderChatInput = (): LitHtml.TemplateResult => {
     // clang-format off
     return html`
@@ -995,7 +1015,7 @@ export class FreestylerChatUi extends HTMLElement {
           .disabled=${this.#isTextInputDisabled()}
           wrap="hard"
           @keydown=${this.#handleTextAreaKeyDown}
-          placeholder=${getInputPlaceholderString(this.#props.state, this.#props.agentType)}
+          placeholder=${this.#getInputPlaceholderString()}
           jslog=${VisualLogging.textField('query').track({ keydown: 'Enter' })}></textarea>
           ${this.#props.isLoading
             ? html`<devtools-button
@@ -1062,14 +1082,13 @@ export class FreestylerChatUi extends HTMLElement {
 
   #getStringForConsentView(): string {
     const config = Common.Settings.Settings.instance().getHostConfig();
-    if (config.devToolsAiAssistancePerformanceAgent?.enabled ||
-        config.devToolsAiAssistancePerformanceAgentDogfood?.enabled) {
+    if (config.devToolsAiAssistancePerformanceAgent?.enabled) {
       return UIStrings.turnOnForStylesRequestsPerformanceAndFiles;
     }
-    if (config.devToolsAiAssistanceFileAgent?.enabled || config.devToolsAiAssistanceFileAgentDogfood?.enabled) {
+    if (config.devToolsAiAssistanceFileAgent?.enabled) {
       return UIStrings.turnOnForStylesRequestsAndFiles;
     }
-    if (config.devToolsAiAssistanceNetworkAgent?.enabled || config.devToolsExplainThisResourceDogfood?.enabled) {
+    if (config.devToolsAiAssistanceNetworkAgent?.enabled) {
       return UIStrings.turnOnForStylesAndRequests;
     }
     return UIStrings.turnOnForStyles;
@@ -1128,13 +1147,13 @@ export class FreestylerChatUi extends HTMLElement {
             ${config.devToolsFreestyler?.enabled ? html`
               <p><strong>${lockedString(UIStringsNotTranslate.cssHelp)}</strong> ${lockedString(UIStringsNotTranslate.cssHelpExplainer)}</p>
             ` : LitHtml.nothing}
-            ${(config.devToolsAiAssistanceFileAgent?.enabled || config.devToolsAiAssistanceFileAgentDogfood?.enabled) ? html`
+            ${(config.devToolsAiAssistanceFileAgent?.enabled) ? html`
               <p><strong>${lockedString(UIStringsNotTranslate.fileHelp)}</strong> ${lockedString(UIStringsNotTranslate.fileHelpExplainer)}</p>
             ` : LitHtml.nothing}
-            ${(config.devToolsAiAssistanceNetworkAgent?.enabled  || config.devToolsExplainThisResourceDogfood?.enabled) ? html`
+            ${(config.devToolsAiAssistanceNetworkAgent?.enabled) ? html`
               <p><strong>${lockedString(UIStringsNotTranslate.networkHelp)}</strong> ${lockedString(UIStringsNotTranslate.networkHelpExplainer)}</p>
             ` : LitHtml.nothing}
-            ${(config.devToolsAiAssistancePerformanceAgent?.enabled || config.devToolsAiAssistancePerformanceAgentDogfood?.enabled) ? html`
+            ${(config.devToolsAiAssistancePerformanceAgent?.enabled) ? html`
               <p><strong>${lockedString(UIStringsNotTranslate.performanceHelp)}</strong> ${lockedString(UIStringsNotTranslate.performanceHelpExplainer)}</p>
             ` : LitHtml.nothing}
           </div>
