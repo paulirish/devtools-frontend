@@ -32,6 +32,7 @@ cp $DIRNAME/replacements/extras.js $dist/models/trace/extras/extras.js
 cp $DIRNAME/replacements/extras.js $dist/models/trace/extras/extras.d.ts
 mkdir -p $dist/third_party/third-party-web/
 echo "import ThirdPartyWeb from 'third-party-web'; export {ThirdPartyWeb};" > $dist/third_party/third-party-web/third-party-web.js
+cp $dist/third_party/third-party-web/third-party-web.js $dist/third_party/third-party-web/third-party-web.d.ts
 
 echo 'export {};' > $dist/models/trace/TracingManager.js
 echo 'export {};' > $dist/models/trace/TracingManager.d.ts
