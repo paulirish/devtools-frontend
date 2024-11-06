@@ -43,7 +43,6 @@ const str_ = i18n.i18n.registerUIStrings('ui/components/markdown_view/CodeBlock.
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class CodeBlock extends HTMLElement {
-
   readonly #shadow = this.attachShadow({mode: 'open'});
 
   #code = '';
@@ -206,6 +205,9 @@ export class CodeBlock extends HTMLElement {
         language = CodeMirror.javascript.javascript({jsx: true});
         break;
       case 'css':
+        language = CodeMirror.css.css();
+        break;
+      case 'yaml':
         language = CodeMirror.css.css();
         break;
     }
