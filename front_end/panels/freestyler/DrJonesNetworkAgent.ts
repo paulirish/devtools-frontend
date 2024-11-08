@@ -8,6 +8,7 @@ import * as i18n from '../../core/i18n/i18n.js';
 import type * as SDK from '../../core/sdk/sdk.js';
 import * as Logs from '../../models/logs/logs.js';
 import * as Network from '../../panels/network/network.js';
+import * as PanelUtils from '../utils/utils.js';
 
 import {
   AgentType,
@@ -106,12 +107,20 @@ export class RequestContext extends ConversationContext<SDK.NetworkRequest.Netwo
     this.#request = request;
   }
 
-  getOrigin(): string {
+  override getOrigin(): string {
     return new URL(this.#request.url()).origin;
   }
 
-  getItem(): SDK.NetworkRequest.NetworkRequest {
+  override getItem(): SDK.NetworkRequest.NetworkRequest {
     return this.#request;
+  }
+
+  override getIcon(): HTMLElement {
+    return PanelUtils.PanelUtils.getIconForNetworkRequest(this.#request);
+  }
+
+  override getTitle(): string {
+    return this.#request.name();
   }
 }
 
@@ -207,9 +216,7 @@ const allowedHeaders = new Set([
   'content-disposition',
   'content-encoding',
   'content-language',
-  'content-length',
   'content-location',
-  'content-md5',
   'content-range',
   'content-security-policy',
   'content-type',
@@ -217,7 +224,6 @@ const allowedHeaders = new Set([
   'date',
   'delta-base',
   'dnt',
-  'etag',
   'expect-ct',
   'expect',
   'expires',
@@ -225,9 +231,7 @@ const allowedHeaders = new Set([
   'front-end-https',
   'host',
   'http2-settings',
-  'if-match',
   'if-modified-since',
-  'if-none-match',
   'if-range',
   'if-unmodified-source',
   'im',

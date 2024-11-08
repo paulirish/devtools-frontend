@@ -9,6 +9,7 @@ import * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as LitHtml from '../../ui/lit-html/lit-html.js';
 
 import {
   type ActionResponse,
@@ -194,6 +195,7 @@ async function executeJsCode(
 }
 
 const MAX_OBSERVATION_BYTE_LENGTH = 25_000;
+const OBSERVATION_TIMEOUT = 5_000;
 
 type CreateExtensionScopeFunction = (changes: ChangeManager) => {
   install(): Promise<void>, uninstall(): Promise<void>,
@@ -227,6 +229,16 @@ export class NodeContext extends ConversationContext<SDK.DOMModel.DOMNode> {
 
   getItem(): SDK.DOMModel.DOMNode {
     return this.#node;
+  }
+
+  override getIcon(): HTMLElement {
+    return document.createElement('span');
+  }
+
+  override getTitle(): string|ReturnType<typeof LitHtml.Directives.until> {
+    return LitHtml.Directives.until(
+        Common.Linkifier.Linkifier.linkify(this.#node),
+    );
   }
 }
 
@@ -453,10 +465,16 @@ export class FreestylerAgent extends AiAgent<SDK.DOMModel.DOMNode> {
           canceled: true,
         };
       }
-      const result = await this.#execJs(
-          functionDeclaration,
-          {throwOnSideEffect},
-      );
+      const result = await Promise.race([
+        this.#execJs(
+            functionDeclaration,
+            {throwOnSideEffect},
+            ),
+        new Promise<never>((_, reject) => {
+          setTimeout(
+              () => reject(new Error('Script execution exceeded the maximum allowed time.')), OBSERVATION_TIMEOUT);
+        }),
+      ]);
       const byteCount = Platform.StringUtilities.countWtf8Bytes(result);
       Host.userMetrics.freestylerEvalResponseSize(byteCount);
       if (byteCount > MAX_OBSERVATION_BYTE_LENGTH) {

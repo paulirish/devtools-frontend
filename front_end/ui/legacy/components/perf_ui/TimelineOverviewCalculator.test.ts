@@ -23,14 +23,14 @@ describeWithLocale('TimelineOverviewCalculator', () => {
     calculator.setDisplayWidth(200);
     calculator.setBounds(MilliSeconds(0), MilliSeconds(100));
 
-    assert.strictEqual(calculator.positionToTime(100), 50);
+    assert.strictEqual(calculator.positionToTime(100), MilliSeconds(50));
   });
 
   it('formats time values', async () => {
     const calculator = new PerfUI.TimelineOverviewCalculator.TimelineOverviewCalculator();
     calculator.setDisplayWidth(200);
     calculator.setBounds(MilliSeconds(0), MilliSeconds(100));
-    const result = calculator.formatValue(55.234);
+    const result = calculator.formatValue(MilliSeconds(55.234));
     assert.deepEqual(result, '55\u00A0ms');
   });
 
@@ -38,7 +38,7 @@ describeWithLocale('TimelineOverviewCalculator', () => {
     const calculator = new PerfUI.TimelineOverviewCalculator.TimelineOverviewCalculator();
     calculator.setDisplayWidth(200);
     calculator.setBounds(MilliSeconds(0), MilliSeconds(100));
-    const result = calculator.formatValue(55.234, 2);
+    const result = calculator.formatValue(MilliSeconds(55.234), 2);
     assert.deepEqual(result, '55.23\u00A0ms');
   });
 
@@ -49,10 +49,15 @@ describeWithLocale('TimelineOverviewCalculator', () => {
     const fakeNavStart = {
       // Trace Engine events are in microseconds
       ts: 100_000,
+      args: {
+        data: {
+          documentLoaderURL: 'https://example.com',
+        },
+      },
     } as unknown as Trace.Types.Events.NavigationStart;
     calculator.setNavStartTimes([fakeNavStart]);
     // There is a navigation at 100ms, so this time gets changed to 5ms
-    const result = calculator.formatValue(105);
+    const result = calculator.formatValue(MilliSeconds(105));
     assert.deepEqual(result, '5\u00A0ms');
   });
 

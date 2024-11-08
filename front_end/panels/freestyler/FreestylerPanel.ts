@@ -7,7 +7,11 @@ import * as i18n from '../../core/i18n/i18n.js';
 import type * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Workspace from '../../models/workspace/workspace.js';
+import * as ElementsPanel from '../../panels/elements/elements.js';
 import * as NetworkForward from '../../panels/network/forward/forward.js';
+import * as NetworkPanel from '../../panels/network/network.js';
+import * as SourcesPanel from '../../panels/sources/sources.js';
+import * as TimelinePanel from '../../panels/timeline/timeline.js';
 import * as TimelineUtils from '../../panels/timeline/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as LitHtml from '../../ui/lit-html/lit-html.js';
@@ -64,21 +68,29 @@ const UIStrings = {
    */
   sendFeedback: 'Send feedback',
   /**
-   *@description Announcement text for screen readers when the chat is cleared.
+   *@description Announcement text for screen readers when a new chat is created.
    */
-  chatCleared: 'Chat cleared',
+  newChatCreated: 'New chat created',
+  /**
+   *@description Announcement text for screen readers when the chat is deleted.
+   */
+  chatDeleted: 'Chat deleted',
   /**
    *@description AI assistance UI text creating selecting a history entry.
    */
   history: 'History',
   /**
-   *@description AI assistance UI text clearing the current chat session.
+   *@description AI assistance UI text deleting the current chat session.
    */
-  clearChat: 'Clear chat',
+  deleteChat: 'Delete chat',
   /**
    *@description AI assistance UI text that deletes all history entries.
    */
   clearChatHistory: 'Clear chat history',
+  /**
+   *@description AI assistance UI text explains that he user had no pas conversations.
+   */
+  noPastConversations: 'No past conversations',
 };
 
 /*
@@ -173,10 +185,15 @@ export class FreestylerPanel extends UI.Panel.Panel {
   #historyEntriesButton =
       new UI.Toolbar.ToolbarButton(i18nString(UIStrings.history), 'history', undefined, 'freestyler.history');
   #deleteHistoryEntryButton =
-      new UI.Toolbar.ToolbarButton(i18nString(UIStrings.clearChat), 'bin', undefined, 'freestyler.delete');
+      new UI.Toolbar.ToolbarButton(i18nString(UIStrings.deleteChat), 'bin', undefined, 'freestyler.delete');
 
   #agents = new Set<AiAgent<unknown>>();
   #currentAgent?: AiAgent<unknown>;
+
+  #selectedFile: FileContext|null = null;
+  #selectedElement: NodeContext|null = null;
+  #selectedCallTree: CallTreeContext|null = null;
+  #selectedRequest: RequestContext|null = null;
 
   constructor(private view: View = defaultView, {aidaClient, aidaAvailability, syncInfo}: {
     aidaClient: Host.AidaClient.AidaClient,
@@ -205,18 +222,17 @@ export class FreestylerPanel extends UI.Panel.Panel {
       onInspectElementClick: this.#handleSelectElementClick.bind(this),
       onFeedbackSubmit: this.#handleFeedbackSubmit.bind(this),
       onCancelClick: this.#cancel.bind(this),
-      onSelectedNetworkRequestClick: this.#handleSelectedNetworkRequestClick.bind(this),
-      onSelectedFileRequestClick: this.#handleSelectedFileClick.bind(this),
+      onContextClick: this.#handleContextClick.bind(this),
+      onNewConversation: this.#newChat.bind(this),
       canShowFeedbackForm: this.#serverSideLoggingEnabled,
       userInfo: {
         accountImage: syncInfo.accountImage,
         accountFullName: syncInfo.accountFullName,
       },
-      selectedElement: null,
-      selectedFile: null,
-      selectedNetworkRequest: null,
-      selectedAiCallTree: null,
+      selectedContext: null,
       blockedByCrossOrigin: false,
+      stripLinks: false,
+      isReadOnly: false,
     };
   }
 
@@ -225,7 +241,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
     const leftToolbar = new UI.Toolbar.Toolbar('freestyler-left-toolbar', toolbarContainer);
     const rightToolbar = new UI.Toolbar.Toolbar('freestyler-right-toolbar', toolbarContainer);
 
-    this.#newChatButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, this.#clearMessages.bind(this));
+    this.#newChatButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, this.#newChat.bind(this));
     leftToolbar.appendToolbarItem(this.#newChatButton);
     leftToolbar.appendSeparator();
 
@@ -290,14 +306,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
   }
 
   #updateToolbarState(): void {
-    this.#historyEntriesButton.applyEnabledState([...this.#agents].some(agent => !agent.isEmpty));
-    this.#deleteHistoryEntryButton.applyEnabledState(Boolean(this.#currentAgent && !this.#currentAgent.isEmpty));
-    /*
-    * If there is no agent disable new chat button
-    * If the agent is empty disable new chat button
-    */
-    const newChatEnabled = this.#currentAgent ? (this.#currentAgent.isEmpty ? false : true) : false;
-    this.#newChatButton.applyEnabledState(newChatEnabled);
+    this.#deleteHistoryEntryButton.setVisible(Boolean(this.#currentAgent && !this.#currentAgent.isEmpty));
   }
 
   #createFreestylerAgent(): FreestylerAgent {
@@ -353,23 +362,60 @@ export class FreestylerPanel extends UI.Panel.Panel {
     return freestylerPanelInstance;
   }
 
+  // We select the default agent based on the open panels if
+  // there isn't any active conversation.
+  #selectDefaultAgentIfNeeded(): void {
+    // If there already is an agent and not it is not empty,
+    // we don't automatically change the agent.
+    if (this.#currentAgent && !this.#currentAgent.isEmpty) {
+      return;
+    }
+
+    const config = Common.Settings.Settings.instance().getHostConfig();
+    const isElementsPanelVisible =
+        Boolean(UI.Context.Context.instance().flavor(ElementsPanel.ElementsPanel.ElementsPanel));
+    const isNetworkPanelVisible = Boolean(UI.Context.Context.instance().flavor(NetworkPanel.NetworkPanel.NetworkPanel));
+    const isSourcesPanelVisible = Boolean(UI.Context.Context.instance().flavor(SourcesPanel.SourcesPanel.SourcesPanel));
+    const isPerformancePanelVisible =
+        Boolean(UI.Context.Context.instance().flavor(TimelinePanel.TimelinePanel.TimelinePanel));
+
+    let targetAgentType: AgentType|undefined = undefined;
+    if (isElementsPanelVisible && config.devToolsFreestyler?.enabled) {
+      targetAgentType = AgentType.FREESTYLER;
+    } else if (isNetworkPanelVisible && config.devToolsAiAssistanceNetworkAgent?.enabled) {
+      targetAgentType = AgentType.DRJONES_NETWORK_REQUEST;
+    } else if (isSourcesPanelVisible && config.devToolsAiAssistanceFileAgent?.enabled) {
+      targetAgentType = AgentType.DRJONES_FILE;
+    } else if (isPerformancePanelVisible && config.devToolsAiAssistancePerformanceAgent?.enabled) {
+      targetAgentType = AgentType.DRJONES_PERFORMANCE;
+    }
+
+    this.#currentAgent = targetAgentType ? this.#createAgent(targetAgentType) : undefined;
+    this.#viewProps.agentType = targetAgentType;
+    this.#onContextSelectionChanged();
+    this.doUpdate();
+  }
+
   override wasShown(): void {
     this.registerCSSFiles([freestylerPanelStyles]);
     this.#viewOutput.freestylerChatUi?.restoreScrollPosition();
     this.#viewOutput.freestylerChatUi?.focusTextInput();
+    this.#selectDefaultAgentIfNeeded();
     void this.#handleAidaAvailabilityChange();
     void this
         .#handleFreestylerEnabledSettingChanged();  // If the setting was switched on/off while the FreestylerPanel was not shown.
+    this.#selectedElement =
+        createNodeContext(selectedElementFilter(UI.Context.Context.instance().flavor(SDK.DOMModel.DOMNode))),
+    this.#selectedRequest =
+        createRequestContext(UI.Context.Context.instance().flavor(SDK.NetworkRequest.NetworkRequest)),
+    this.#selectedCallTree =
+        createCallTreeContext(UI.Context.Context.instance().flavor(TimelineUtils.AICallTree.AICallTree)),
+    this.#selectedFile = createFileContext(UI.Context.Context.instance().flavor(Workspace.UISourceCode.UISourceCode)),
     this.#viewProps = {
       ...this.#viewProps,
+      agentType: this.#currentAgent?.type,
       inspectElementToggled: this.#toggleSearchElementAction.toggled(),
-      selectedElement:
-          createNodeContext(selectedElementFilter(UI.Context.Context.instance().flavor(SDK.DOMModel.DOMNode))),
-      selectedNetworkRequest:
-          createRequestContext(UI.Context.Context.instance().flavor(SDK.NetworkRequest.NetworkRequest)),
-      selectedAiCallTree:
-          createCallTreeContext(UI.Context.Context.instance().flavor(TimelineUtils.AICallTree.AICallTree)),
-      selectedFile: createFileContext(UI.Context.Context.instance().flavor(Workspace.UISourceCode.UISourceCode)),
+      selectedContext: this.#getConversationContext(),
     };
     this.doUpdate();
 
@@ -385,7 +431,14 @@ export class FreestylerPanel extends UI.Panel.Panel {
         TimelineUtils.AICallTree.AICallTree, this.#handleTraceEntryNodeFlavorChange);
     UI.Context.Context.instance().addFlavorChangeListener(
         Workspace.UISourceCode.UISourceCode, this.#handleUISourceCodeFlavorChange);
-
+    UI.Context.Context.instance().addFlavorChangeListener(
+        ElementsPanel.ElementsPanel.ElementsPanel, this.#selectDefaultAgentIfNeeded, this);
+    UI.Context.Context.instance().addFlavorChangeListener(
+        NetworkPanel.NetworkPanel.NetworkPanel, this.#selectDefaultAgentIfNeeded, this);
+    UI.Context.Context.instance().addFlavorChangeListener(
+        SourcesPanel.SourcesPanel.SourcesPanel, this.#selectDefaultAgentIfNeeded, this);
+    UI.Context.Context.instance().addFlavorChangeListener(
+        TimelinePanel.TimelinePanel.TimelinePanel, this.#selectDefaultAgentIfNeeded, this);
     Host.userMetrics.actionTaken(Host.UserMetrics.Action.AiAssistancePanelOpened);
   }
 
@@ -402,6 +455,14 @@ export class FreestylerPanel extends UI.Panel.Panel {
         TimelineUtils.AICallTree.AICallTree, this.#handleTraceEntryNodeFlavorChange);
     UI.Context.Context.instance().removeFlavorChangeListener(
         Workspace.UISourceCode.UISourceCode, this.#handleUISourceCodeFlavorChange);
+    UI.Context.Context.instance().removeFlavorChangeListener(
+        ElementsPanel.ElementsPanel.ElementsPanel, this.#selectDefaultAgentIfNeeded, this);
+    UI.Context.Context.instance().removeFlavorChangeListener(
+        NetworkPanel.NetworkPanel.NetworkPanel, this.#selectDefaultAgentIfNeeded, this);
+    UI.Context.Context.instance().removeFlavorChangeListener(
+        SourcesPanel.SourcesPanel.SourcesPanel, this.#selectDefaultAgentIfNeeded, this);
+    UI.Context.Context.instance().removeFlavorChangeListener(
+        TimelinePanel.TimelinePanel.TimelinePanel, this.#selectDefaultAgentIfNeeded, this);
   }
 
   #handleAidaAvailabilityChange = async(): Promise<void> => {
@@ -429,41 +490,44 @@ export class FreestylerPanel extends UI.Panel.Panel {
   };
 
   #handleDOMNodeFlavorChange = (ev: Common.EventTarget.EventTargetEvent<SDK.DOMModel.DOMNode>): void => {
-    if (this.#viewProps.selectedElement?.getItem() === ev.data) {
+    if (this.#selectedElement?.getItem() === ev.data) {
       return;
     }
 
-    this.#viewProps.selectedElement = createNodeContext(selectedElementFilter(ev.data));
+    this.#selectedElement = createNodeContext(selectedElementFilter(ev.data));
     this.#onContextSelectionChanged();
   };
 
   #handleNetworkRequestFlavorChange =
       (ev: Common.EventTarget.EventTargetEvent<SDK.NetworkRequest.NetworkRequest>): void => {
-        if (this.#viewProps.selectedNetworkRequest?.getItem() === ev.data) {
+        if (this.#selectedRequest?.getItem() === ev.data) {
           return;
         }
 
-        this.#viewProps.selectedNetworkRequest = Boolean(ev.data) ? new RequestContext(ev.data) : null;
+        this.#selectedRequest = Boolean(ev.data) ? new RequestContext(ev.data) : null;
         this.#onContextSelectionChanged();
       };
 
   #handleTraceEntryNodeFlavorChange =
       (ev: Common.EventTarget.EventTargetEvent<TimelineUtils.AICallTree.AICallTree>): void => {
-        if (this.#viewProps.selectedAiCallTree?.getItem() === ev.data) {
+        if (this.#selectedCallTree?.getItem() === ev.data) {
           return;
         }
 
-        this.#viewProps.selectedAiCallTree = Boolean(ev.data) ? new CallTreeContext(ev.data) : null;
+        this.#selectedCallTree = Boolean(ev.data) ? new CallTreeContext(ev.data) : null;
         this.#onContextSelectionChanged();
       };
 
   #handleUISourceCodeFlavorChange =
       (ev: Common.EventTarget.EventTargetEvent<Workspace.UISourceCode.UISourceCode>): void => {
-        if (this.#viewProps.selectedFile?.getItem() === ev.data) {
+        const newFile = ev.data;
+        if (!newFile) {
           return;
         }
-
-        this.#viewProps.selectedFile = Boolean(ev.data) ? new FileContext(ev.data) : null;
+        if (this.#selectedFile?.getItem() === newFile) {
+          return;
+        }
+        this.#selectedFile = new FileContext(ev.data);
         this.#onContextSelectionChanged();
       };
 
@@ -501,22 +565,31 @@ export class FreestylerPanel extends UI.Panel.Panel {
     });
   }
 
-  #handleSelectedNetworkRequestClick(): void|Promise<void> {
-    if (this.#viewProps.selectedNetworkRequest) {
+  #handleContextClick(): void|Promise<void> {
+    const context = this.#viewProps.selectedContext;
+    if (context instanceof RequestContext) {
       const requestLocation = NetworkForward.UIRequestLocation.UIRequestLocation.tab(
-          this.#viewProps.selectedNetworkRequest.getItem(),
-          NetworkForward.UIRequestLocation.UIRequestTabs.HEADERS_COMPONENT);
+          context.getItem(), NetworkForward.UIRequestLocation.UIRequestTabs.HEADERS_COMPONENT);
       return Common.Revealer.reveal(requestLocation);
     }
-  }
-
-  #handleSelectedFileClick(): void|Promise<void> {
-    if (this.#viewProps.selectedFile) {
-      return Common.Revealer.reveal(this.#viewProps.selectedFile.getItem().uiLocation(0, 0));
+    if (context instanceof FileContext) {
+      return Common.Revealer.reveal(context.getItem().uiLocation(0, 0));
     }
+    if (context instanceof CallTreeContext) {
+      const trace = new SDK.TraceObject.RevealableEvent(context.getItem().selectedNode.event);
+      return Common.Revealer.reveal(trace);
+    }
+    // Node picker is using linkifier.
   }
 
   handleAction(actionId: string): void {
+    if (this.#viewProps.isLoading) {
+      // If running some queries already, focus the input with the abort
+      // button and do nothing.
+      this.#viewOutput.freestylerChatUi?.focusTextInput();
+      return;
+    }
+
     let targetAgentType: AgentType|undefined;
     switch (actionId) {
       case 'freestyler.elements-floating-button': {
@@ -560,9 +633,8 @@ export class FreestylerPanel extends UI.Panel.Panel {
       return;
     }
 
-    if (!this.#currentAgent) {
-      this.#currentAgent = this.#createAgent(targetAgentType);
-    } else if (this.#currentAgent.type !== targetAgentType) {
+    if (!this.#currentAgent || this.#currentAgent.type !== targetAgentType || this.#currentAgent.isHistoryEntry ||
+        targetAgentType === AgentType.DRJONES_PERFORMANCE) {
       this.#currentAgent = this.#createAgent(targetAgentType);
     }
     this.#viewProps.agentType = this.#currentAgent.type;
@@ -571,11 +643,16 @@ export class FreestylerPanel extends UI.Panel.Panel {
     this.#viewProps.messages = [];
     this.#onContextSelectionChanged();
     this.doUpdate();
+    this.#viewProps.isReadOnly = false;
     void this.#doConversation(this.#currentAgent.runFromHistory());
   }
 
   #onHistoryClicked(event: Event): void {
-    const contextMenu = new UI.ContextMenu.ContextMenu(event);
+    const boundingRect = this.#historyEntriesButton.element.getBoundingClientRect();
+    const contextMenu = new UI.ContextMenu.ContextMenu(event, {
+      x: boundingRect.left,
+      y: boundingRect.bottom,
+    });
 
     for (const agent of [...this.#agents].reverse()) {
       if (agent.isEmpty) {
@@ -586,18 +663,25 @@ export class FreestylerPanel extends UI.Panel.Panel {
         continue;
       }
 
-      contextMenu.defaultSection().appendItem(
-          title,
-          () => {
-            void this.#switchAgent(agent);
-          },
-      );
+      contextMenu.defaultSection().appendItem(title, () => {
+        void this.#switchAgent(agent);
+      });
+    }
+
+    const historyEmpty = contextMenu.defaultSection().items.length === 0;
+    if (historyEmpty) {
+      contextMenu.defaultSection().appendItem(i18nString(UIStrings.noPastConversations), () => {}, {
+        disabled: true,
+      });
     }
 
     contextMenu.footerSection().appendItem(
         i18nString(UIStrings.clearChatHistory),
         () => {
           this.#clearHistory();
+        },
+        {
+          disabled: historyEmpty,
         },
     );
 
@@ -614,33 +698,40 @@ export class FreestylerPanel extends UI.Panel.Panel {
 
   #onDeleteClicked(): void {
     if (this.#currentAgent) {
-      const agentType = this.#currentAgent.type;
       this.#agents.delete(this.#currentAgent);
-      this.#currentAgent = this.#createAgent(agentType);
+      this.#currentAgent = undefined;
     }
+
     this.#viewProps.messages = [];
-    this.#viewProps.agentType = undefined;
+
+    this.#selectDefaultAgentIfNeeded();
     this.#onContextSelectionChanged();
     this.doUpdate();
+    UI.ARIAUtils.alert(i18nString(UIStrings.chatDeleted));
   }
 
   async #switchAgent(agent: AiAgent<unknown>): Promise<void> {
+    if (this.#currentAgent === agent) {
+      return;
+    }
+
     this.#currentAgent = agent;
     this.#viewProps.messages = [];
     this.#viewProps.agentType = agent.type;
+    this.#onContextSelectionChanged();
+    this.#viewProps.isReadOnly = true;
     await this.#doConversation(agent.runFromHistory());
   }
 
-  #clearMessages(): void {
+  #newChat(): void {
     this.#viewProps.messages = [];
     this.#viewProps.isLoading = false;
-    if (this.#currentAgent) {
-      this.#currentAgent = this.#createAgent(this.#currentAgent.type);
-      this.#onContextSelectionChanged();
-    }
+    this.#currentAgent = undefined;
     this.#cancel();
+
+    this.#selectDefaultAgentIfNeeded();
     this.doUpdate();
-    UI.ARIAUtils.alert(i18nString(UIStrings.chatCleared));
+    UI.ARIAUtils.alert(i18nString(UIStrings.newChatCreated));
   }
 
   #runAbortController = new AbortController();
@@ -657,12 +748,18 @@ export class FreestylerPanel extends UI.Panel.Panel {
       return;
     }
     const currentContext = this.#getConversationContext();
+    this.#viewProps.selectedContext = currentContext;
     if (!currentContext) {
       this.#viewProps.blockedByCrossOrigin = false;
+      this.#viewProps.requiresNewConversation = false;
       this.doUpdate();
       return;
     }
     this.#viewProps.blockedByCrossOrigin = !currentContext.isOriginAllowed(this.#currentAgent.origin);
+    this.#viewProps.isReadOnly = this.#currentAgent.isHistoryEntry;
+    this.#viewProps.requiresNewConversation = this.#currentAgent.type === AgentType.DRJONES_PERFORMANCE &&
+        Boolean(this.#currentAgent.context) && this.#currentAgent.context !== currentContext;
+    this.#viewProps.stripLinks = this.#viewProps.agentType === AgentType.DRJONES_PERFORMANCE;
     this.doUpdate();
   }
 
@@ -673,16 +770,16 @@ export class FreestylerPanel extends UI.Panel.Panel {
     let context: ConversationContext<unknown>|null;
     switch (this.#currentAgent.type) {
       case AgentType.FREESTYLER:
-        context = this.#viewProps.selectedElement;
+        context = this.#selectedElement;
         break;
       case AgentType.DRJONES_FILE:
-        context = this.#viewProps.selectedFile;
+        context = this.#selectedFile;
         break;
       case AgentType.DRJONES_NETWORK_REQUEST:
-        context = this.#viewProps.selectedNetworkRequest;
+        context = this.#selectedRequest;
         break;
       case AgentType.DRJONES_PERFORMANCE:
-        context = this.#viewProps.selectedAiCallTree;
+        context = this.#selectedCallTree;
         break;
     }
     return context;

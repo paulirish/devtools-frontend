@@ -32,7 +32,6 @@ import * as Common from '../../../../core/common/common.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
 import * as Root from '../../../../core/root/root.js';
-import type * as TimelineModel from '../../../../models/timeline_model/timeline_model.js';
 import * as Trace from '../../../../models/trace/trace.js';
 import * as VisualLogging from '../../../../ui/visual_logging/visual_logging.js';
 import * as Buttons from '../../../components/buttons/buttons.js';
@@ -2174,16 +2173,6 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
 
     const {markerIndices, colorBuckets, titleIndices} = this.getDrawableData(context, timelineData);
 
-    context.save();
-    this.forEachGroupInViewport((offset, index, group, isFirst, groupHeight) => {
-      if (this.isGroupFocused(index)) {
-        context.fillStyle =
-            ThemeSupport.ThemeSupport.instance().getComputedValue('--selected-group-background', this.contentElement);
-        context.fillRect(0, offset, canvasWidth, groupHeight - group.style.padding);
-      }
-    });
-    context.restore();
-
     const groups = this.rawTimelineData?.groups || [];
     const trackIndex = groups.findIndex(g => g.name.includes('Main'));
     const group = groups.at(trackIndex);
@@ -2678,14 +2667,9 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       if (this.isGroupCollapsible(index) && !group.expanded || group.style.shareHeaderLine) {
         // In edit mode, we draw an extra rectangle for the save icon.
         const labelBackgroundWidth = this.labelWidthForGroup(context, group);
-        if (this.isGroupFocused(index)) {
-          context.fillStyle =
-              ThemeSupport.ThemeSupport.instance().getComputedValue('--selected-group-background', this.contentElement);
-        } else {
-          const parsedColor = Common.Color.parse(group.style.backgroundColor);
-          if (parsedColor) {
-            context.fillStyle = (parsedColor.setAlpha(0.8).asString() as string);
-          }
+        const parsedColor = Common.Color.parse(group.style.backgroundColor);
+        if (parsedColor) {
+          context.fillStyle = (parsedColor.setAlpha(0.8).asString() as string);
         }
         context.fillRect(
             iconsWidth + HEADER_LEFT_PADDING, offset + HEADER_LABEL_Y_PADDING, labelBackgroundWidth,
@@ -4145,9 +4129,8 @@ export interface FlameChartDataProvider {
   customizedContextMenu?
       (event: MouseEvent, eventIndex: number, groupIndex: number): UI.ContextMenu.ContextMenu|undefined;
 
-  search?
-      (visibleWindow: Trace.Types.Timing.TraceWindowMicroSeconds,
-       filter?: TimelineModel.TimelineModelFilter.TimelineModelFilter): DataProviderSearchResult[];
+  search?(visibleWindow: Trace.Types.Timing.TraceWindowMicroSeconds, filter?: Trace.Extras.TraceFilter.TraceFilter):
+      DataProviderSearchResult[];
 
   // The following three functions are used for the flame chart entry customization.
   modifyTree?(action: FilterAction, entryIndex: number): void;

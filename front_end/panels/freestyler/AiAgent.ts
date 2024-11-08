@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import * as Host from '../../core/host/host.js';
+import type * as LitHtml from '../../ui/lit-html/lit-html.js';
 
 export const enum ResponseType {
   CONTEXT = 'context',
@@ -130,6 +131,9 @@ const MAX_STEP = 10;
 export abstract class ConversationContext<T> {
   abstract getOrigin(): string;
   abstract getItem(): T;
+  abstract getIcon(): HTMLElement;
+  abstract getTitle(): string|ReturnType<typeof LitHtml.Directives.until>;
+
   isOriginAllowed(agentOrigin: string|undefined): boolean {
     if (!agentOrigin) {
       return true;
@@ -156,6 +160,7 @@ export abstract class AiAgent<T> {
   abstract readonly clientFeature: Host.AidaClient.ClientFeature;
   abstract readonly userTier: string|undefined;
   abstract handleContextDetails(select: ConversationContext<T>|null): AsyncGenerator<ContextResponse, void, void>;
+  #generatedFromHistory = false;
 
   /**
    * Mapping between the unique request id and
@@ -167,6 +172,7 @@ export abstract class AiAgent<T> {
    * historical conversations.
    */
   #origin?: string;
+  #context?: ConversationContext<T>;
 
   constructor(opts: AgentOptions) {
     this.#aidaClient = opts.aidaClient;
@@ -189,6 +195,10 @@ export abstract class AiAgent<T> {
     return this.#origin;
   }
 
+  get context(): ConversationContext<T>|undefined {
+    return this.#context;
+  }
+
   get title(): string|undefined {
     return [...this.#history.values()]
         .flat()
@@ -197,6 +207,10 @@ export abstract class AiAgent<T> {
         })
         .at(0)
         ?.query;
+  }
+
+  get isHistoryEntry(): boolean {
+    return this.#generatedFromHistory;
   }
 
   #structuredLog: Array<{
@@ -385,9 +399,17 @@ STOP`;
   async * run(query: string, options: {
     signal?: AbortSignal, selected: ConversationContext<T>|null,
   }): AsyncGenerator<ResponseData, void, void> {
+    if (this.#generatedFromHistory) {
+      throw new Error('History entries are read-only.');
+    }
+
     // First context set on the agent determines its origin from now on.
     if (options.selected && this.#origin === undefined && options.selected) {
       this.#origin = options.selected.getOrigin();
+    }
+    // Remember if the context that is set.
+    if (options.selected && !this.#context) {
+      this.#context = options.selected;
     }
     const id = this.#runId++;
 
@@ -528,6 +550,11 @@ STOP`;
   }
 
   async * runFromHistory(): AsyncGenerator<ResponseData, void, void> {
+    if (this.isEmpty) {
+      return;
+    }
+
+    this.#generatedFromHistory = true;
     for (const historyChunk of this.#history.values()) {
       for (const entry of historyChunk) {
         yield entry;

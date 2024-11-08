@@ -7,6 +7,7 @@ import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import type * as Workspace from '../../models/workspace/workspace.js';
+import * as PanelUtils from '../utils/utils.js';
 
 import {
   AgentType,
@@ -78,12 +79,20 @@ export class FileContext extends ConversationContext<Workspace.UISourceCode.UISo
     this.#file = file;
   }
 
-  getOrigin(): string {
+  override getOrigin(): string {
     return new URL(this.#file.url()).origin;
   }
 
-  getItem(): Workspace.UISourceCode.UISourceCode {
+  override getItem(): Workspace.UISourceCode.UISourceCode {
     return this.#file;
+  }
+
+  override getIcon(): HTMLElement {
+    return PanelUtils.PanelUtils.getIconForSourceFile(this.#file);
+  }
+
+  override getTitle(): string {
+    return this.#file.displayName();
   }
 }
 
@@ -148,18 +157,25 @@ function createContextDetailsForDrJonesFileAgent(
   ];
 }
 
-function formatFile(selectedFile: Workspace.UISourceCode.UISourceCode): string {
+export function formatFile(selectedFile: Workspace.UISourceCode.UISourceCode): string {
   const debuggerWorkspaceBinding = Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance();
-  return `File Name: ${selectedFile.displayName()}
-URL: ${selectedFile.url()}
-${formatSourceMapDetails(selectedFile, debuggerWorkspaceBinding)}
-File Content:
-${formatFileContent(selectedFile.content())}`;
+  const sourceMapDetails = formatSourceMapDetails(selectedFile, debuggerWorkspaceBinding);
+  const lines = [
+    `File name: ${selectedFile.displayName()}`,
+    `URL: ${selectedFile.url()}`,
+    sourceMapDetails,
+    `File content:
+${formatFileContent(selectedFile)}`,
+  ];
+  return lines.filter(line => line.trim() !== '').join('\n');
 }
 
-function formatFileContent(content: string): string {
-  const formattedContent = content.length > MAX_FILE_SIZE ? content.slice(0, MAX_FILE_SIZE) + '...\n' : content + '\n';
-  return '```' + formattedContent + '```';
+function formatFileContent(selectedFile: Workspace.UISourceCode.UISourceCode): string {
+  const content = selectedFile.contentType().isTextType() ? selectedFile.content() : '<binary data>';
+  const truncated = content.length > MAX_FILE_SIZE ? content.slice(0, MAX_FILE_SIZE) + '...' : content;
+  return `\`\`\`
+${truncated}
+\`\`\``;
 }
 
 export function formatSourceMapDetails(

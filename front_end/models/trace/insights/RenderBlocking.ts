@@ -6,11 +6,10 @@ import * as Protocol from '../../../generated/protocol.js';
 import * as Handlers from '../handlers/handlers.js';
 import * as Helpers from '../helpers/helpers.js';
 import type * as Lantern from '../lantern/lantern.js';
-import * as Types from '../types/types.js';
+import type * as Types from '../types/types.js';
 
-import {findLCPRequest} from './Common.js';
 import {
-  type InsightResult,
+  type InsightModel,
   type InsightSetContext,
   type InsightSetContextWithNavigation,
   InsightWarning,
@@ -18,7 +17,7 @@ import {
   type RequiredData,
 } from './types.js';
 
-export type RenderBlockingInsightResult = InsightResult<{
+export type RenderBlockingInsightModel = InsightModel<{
   renderBlockingRequests: Types.Events.SyntheticNetworkRequest[],
   requestIdToWastedMs?: Map<string, number>,
 }>;
@@ -85,28 +84,13 @@ function estimateSavingsWithGraphs(
 }
 
 function hasImageLCP(parsedTrace: RequiredData<typeof deps>, context: InsightSetContextWithNavigation): boolean {
-  const frameMetrics = parsedTrace.PageLoadMetrics.metricScoresByFrameId.get(context.frameId);
-  if (!frameMetrics) {
-    throw new Error('no frame metrics');
-  }
-
-  const navMetrics = frameMetrics.get(context.navigationId);
-  if (!navMetrics) {
-    throw new Error('no navigation metrics');
-  }
-  const metricScore = navMetrics.get(Handlers.ModelHandlers.PageLoadMetrics.MetricName.LCP);
-  const lcpEvent = metricScore?.event;
-  if (!lcpEvent || !Types.Events.isLargestContentfulPaintCandidate(lcpEvent)) {
-    return false;
-  }
-
-  return findLCPRequest(parsedTrace, context, lcpEvent) !== null;
+  return parsedTrace.LargestImagePaint.lcpRequestByNavigation.get(context.navigation) !== undefined;
 }
 
 function computeSavings(
     parsedTrace: RequiredData<typeof deps>, context: InsightSetContextWithNavigation,
     renderBlockingRequests: Types.Events.SyntheticNetworkRequest[]):
-    Pick<RenderBlockingInsightResult, 'metricSavings'|'requestIdToWastedMs'>|undefined {
+    Pick<RenderBlockingInsightModel, 'metricSavings'|'requestIdToWastedMs'>|undefined {
   if (!context.lantern) {
     return;
   }
@@ -150,7 +134,7 @@ function computeSavings(
 }
 
 export function generateInsight(
-    parsedTrace: RequiredData<typeof deps>, context: InsightSetContext): RenderBlockingInsightResult {
+    parsedTrace: RequiredData<typeof deps>, context: InsightSetContext): RenderBlockingInsightModel {
   if (!context.navigation) {
     return {
       renderBlockingRequests: [],

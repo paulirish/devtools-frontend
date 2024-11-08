@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as TimelineModel from '../../../models/timeline_model/timeline_model.js';
 import * as Trace from '../../../models/trace/trace.js';
 
 import {nameForEntry} from './EntryName.js';
@@ -11,8 +10,7 @@ import {SourceMapsResolver} from './SourceMapsResolver.js';
 
 /** Iterates from a node down through its descendents. If the callback returns true, the loop stops. */
 function depthFirstWalk(
-    nodes: MapIterator<TimelineModel.TimelineProfileTree.Node>,
-    callback: (arg0: TimelineModel.TimelineProfileTree.Node) => void|true): void {
+    nodes: MapIterator<Trace.Extras.TraceTree.Node>, callback: (arg0: Trace.Extras.TraceTree.Node) => void|true): void {
   for (const node of nodes) {
     if (callback?.(node)) {
       break;
@@ -23,8 +21,8 @@ function depthFirstWalk(
 
 export class AICallTree {
   constructor(
-      public selectedNode: TimelineModel.TimelineProfileTree.Node,
-      public rootNode: TimelineModel.TimelineProfileTree.TopDownRootNode,
+      public selectedNode: Trace.Extras.TraceTree.Node,
+      public rootNode: Trace.Extras.TraceTree.TopDownRootNode,
       // TODO: see if we can avoid passing around this entire thing.
       public parsedTrace: Trace.Handlers.Types.ParsedTrace,
   ) {
@@ -33,25 +31,25 @@ export class AICallTree {
   static from(
       selectedEvent: Trace.Types.Events.Event, events: Trace.Types.Events.Event[],
       parsedTrace: Trace.Handlers.Types.ParsedTrace): AICallTree {
-    const timings = Trace.Helpers.Timing.eventTimingsMilliSeconds(selectedEvent);
-    const selectedEventBounds = Trace.Helpers.Timing.traceWindowFromMicroSeconds(
-        Trace.Helpers.Timing.millisecondsToMicroseconds(timings.startTime),
-        Trace.Helpers.Timing.millisecondsToMicroseconds(timings.endTime));
+    const {startTime, endTime} = Trace.Helpers.Timing.eventTimingsMilliSeconds(selectedEvent);
 
+    const selectedEventBounds = Trace.Helpers.Timing.traceWindowFromMicroSeconds(
+        Trace.Helpers.Timing.millisecondsToMicroseconds(startTime),
+        Trace.Helpers.Timing.millisecondsToMicroseconds(endTime));
     const threadEvents = parsedTrace.Renderer.processes.get(selectedEvent.pid)?.threads.get(selectedEvent.tid)?.entries;
     if (!threadEvents) {
       throw new Error('Cannot locate thread');
     }
     const overlappingEvents = threadEvents.filter(e => Trace.Helpers.Timing.eventIsInBounds(e, selectedEventBounds));
 
-    const visibleEventsFilter = new TimelineModel.TimelineModelFilter.TimelineVisibleEventsFilter(visibleTypes());
-    const customFilter = new AITreeFilter(timings.duration);
+    const visibleEventsFilter = new Trace.Extras.TraceFilter.VisibleEventsFilter(visibleTypes());
+    const customFilter = new AITreeFilter(selectedEvent);
     // Build a tree bounded by the selected event's timestamps, and our other filters applied
-    const rootNode = new TimelineModel.TimelineProfileTree.TopDownRootNode(
-        overlappingEvents, [visibleEventsFilter, customFilter], timings.startTime, timings.endTime, false, null);
+    const rootNode = new Trace.Extras.TraceTree.TopDownRootNode(
+        overlappingEvents, [visibleEventsFilter, customFilter], startTime, endTime, false, null, true);
 
     // Walk the tree to find selectedNode
-    let selectedNode: TimelineModel.TimelineProfileTree.Node|null = null;
+    let selectedNode: Trace.Extras.TraceTree.Node|null = null;
     depthFirstWalk([rootNode].values(), node => {
       if (node.event === selectedEvent) {
         selectedNode = node;
@@ -70,7 +68,7 @@ export class AICallTree {
 
   /** Define precisely how the call tree is serialized. Typically called from within `DrJonesPerformanceAgent` */
   serialize(): string {
-    const nodeToIdMap = new Map<TimelineModel.TimelineProfileTree.Node, number>();
+    const nodeToIdMap = new Map<Trace.Extras.TraceTree.Node, number>();
     // Keep a map of URLs. We'll output a LUT to keep size down.
     const allUrls: string[] = [];
 
@@ -90,9 +88,9 @@ export class AICallTree {
 
   /* This custom YAML-like format with an adjacency list for children is 35% more token efficient than JSON */
   static stringifyNode(
-      node: TimelineModel.TimelineProfileTree.Node, parsedTrace: Trace.Handlers.Types.ParsedTrace,
-      selectedNode: TimelineModel.TimelineProfileTree.Node,
-      nodeToIdMap: Map<TimelineModel.TimelineProfileTree.Node, number>, allUrls: string[]): string {
+      node: Trace.Extras.TraceTree.Node, parsedTrace: Trace.Handlers.Types.ParsedTrace,
+      selectedNode: Trace.Extras.TraceTree.Node, nodeToIdMap: Map<Trace.Extras.TraceTree.Node, number>,
+      allUrls: string[]): string {
     const event = node.event;
     if (!event) {
       throw new Error('Event required');
@@ -105,7 +103,7 @@ export class AICallTree {
 
     // Identifier string includes an id and name:
     //   eg "[13] Parse HTML" or "[45] parseCPUProfileFormatFromFile"
-    const getIdentifier = (node: TimelineModel.TimelineProfileTree.Node): string => {
+    const getIdentifier = (node: Trace.Extras.TraceTree.Node): string => {
       if (!node.event || typeof node.id !== 'string') {
         throw new Error('ok');
       }
@@ -147,16 +145,19 @@ export class AICallTree {
   }
 }
 
-export class AITreeFilter extends TimelineModel.TimelineModelFilter.TimelineModelFilter {
+export class AITreeFilter extends Trace.Extras.TraceFilter.TraceFilter {
   #minDuration: Trace.Types.Timing.MicroSeconds;
-  constructor(eventDuration: Trace.Types.Timing.MilliSeconds) {
+  #selectedEvent: Trace.Types.Events.Event;
+  constructor(selectedEvent: Trace.Types.Events.Event) {
     super();
     // The larger the selected event is, the less small ones matter. We'll exclude items under ½% of the selected event's size
-    // We'll always exclude items under 0.15ms of total time.
-    const minDurationMs = Math.max(Trace.Types.Timing.MilliSeconds(0.15), eventDuration * 0.005);
-    this.#minDuration = Trace.Helpers.Timing.millisecondsToMicroseconds(Trace.Types.Timing.MilliSeconds(minDurationMs));
+    this.#minDuration = Trace.Types.Timing.MicroSeconds((selectedEvent.dur ?? 1) * 0.005);
+    this.#selectedEvent = selectedEvent;
   }
   accept(event: Trace.Types.Events.Event): boolean {
+    if (event === this.#selectedEvent) {
+      return true;
+    }
     if (event.name === Trace.Types.Events.Name.COMPILE_CODE) {
       return false;
     }

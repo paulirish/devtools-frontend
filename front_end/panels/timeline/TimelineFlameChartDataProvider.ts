@@ -32,7 +32,6 @@ import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Root from '../../core/root/root.js';
 import * as Bindings from '../../models/bindings/bindings.js';
-import type * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 import * as Trace from '../../models/trace/trace.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as UI from '../../ui/legacy/legacy.js';
@@ -218,8 +217,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       return;
     }
 
-    // TODO(crbug.com/368240754): Temporarily use soft menu for the shortcuts to show, till the accelerators backend CLs land.
-    const contextMenu = new UI.ContextMenu.ContextMenu(event, {useSoftMenu: true});
+    const contextMenu = new UI.ContextMenu.ContextMenu(event);
 
     // This action and its 'execute' is defined in `freestyler-meta`
     const actionIdDrJ = 'drjones.performance-panel-context';
@@ -245,7 +243,6 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       disabled: !possibleActions?.[PerfUI.FlameChart.FilterAction.MERGE_FUNCTION],
       jslogContext: 'hide-function',
     });
-    hideEntryOption.setShortcut('H');
     hideEntryOption.setAccelerator(UI.KeyboardShortcut.Keys.H, [UI.KeyboardShortcut.Modifiers.None]);
     hideEntryOption.setIsDevToolsPerformanceMenuItem(true);
 
@@ -255,7 +252,6 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       disabled: !possibleActions?.[PerfUI.FlameChart.FilterAction.COLLAPSE_FUNCTION],
       jslogContext: 'hide-children',
     });
-    hideChildrenOption.setShortcut('C');
     hideChildrenOption.setAccelerator(UI.KeyboardShortcut.Keys.C, [UI.KeyboardShortcut.Modifiers.None]);
     hideChildrenOption.setIsDevToolsPerformanceMenuItem(true);
 
@@ -266,7 +262,6 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
           disabled: !possibleActions?.[PerfUI.FlameChart.FilterAction.COLLAPSE_REPEATING_DESCENDANTS],
           jslogContext: 'hide-repeating-children',
         });
-    hideRepeatingChildrenOption.setShortcut('R');
     hideRepeatingChildrenOption.setAccelerator(UI.KeyboardShortcut.Keys.R, [UI.KeyboardShortcut.Modifiers.None]);
     hideRepeatingChildrenOption.setIsDevToolsPerformanceMenuItem(true);
 
@@ -276,7 +271,6 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       disabled: !possibleActions?.[PerfUI.FlameChart.FilterAction.RESET_CHILDREN],
       jslogContext: 'reset-children',
     });
-    resetChildrenOption.setShortcut('U');
     resetChildrenOption.setAccelerator(UI.KeyboardShortcut.Keys.U, [UI.KeyboardShortcut.Modifiers.None]);
     resetChildrenOption.setIsDevToolsPerformanceMenuItem(true);
 
@@ -643,9 +637,8 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     return this.timeSpan;
   }
 
-  search(
-      visibleWindow: Trace.Types.Timing.TraceWindowMicroSeconds,
-      filter?: TimelineModel.TimelineModelFilter.TimelineModelFilter): PerfUI.FlameChart.DataProviderSearchResult[] {
+  search(visibleWindow: Trace.Types.Timing.TraceWindowMicroSeconds, filter?: Trace.Extras.TraceFilter.TraceFilter):
+      PerfUI.FlameChart.DataProviderSearchResult[] {
     const results: PerfUI.FlameChart.DataProviderSearchResult[] = [];
     this.timelineData();
     for (let i = 0; i < this.entryData.length; ++i) {

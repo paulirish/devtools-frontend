@@ -3312,6 +3312,10 @@ export namespace CSS {
     ranges: SourceRange[];
   }
 
+  export interface TrackComputedStyleUpdatesForNodeRequest {
+    nodeId?: DOM.NodeId;
+  }
+
   export interface TrackComputedStyleUpdatesRequest {
     propertiesToTrack: CSSComputedStyleProperty[];
   }
@@ -3507,6 +3511,13 @@ export namespace CSS {
      * Identifier of the removed stylesheet.
      */
     styleSheetId: StyleSheetId;
+  }
+
+  export interface ComputedStyleUpdatedEvent {
+    /**
+     * The node id that has updated computed styles.
+     */
+    nodeId: DOM.NodeId;
   }
 }
 
@@ -8142,7 +8153,9 @@ export namespace Network {
   export type LoaderId = OpaqueIdentifier<string, 'Protocol.Network.LoaderId'>;
 
   /**
-   * Unique request identifier.
+   * Unique network request identifier.
+   * Note that this does not identify individual HTTP requests that are part of
+   * a network request.
    */
   export type RequestId = OpaqueIdentifier<string, 'Protocol.Network.RequestId'>;
 
@@ -8895,6 +8908,7 @@ export namespace Network {
     type: InitiatorType;
     /**
      * Initiator JavaScript stack trace, set for Script only.
+     * Requires the Debugger domain to be enabled.
      */
     stack?: Runtime.StackTrace;
     /**
@@ -9053,6 +9067,8 @@ export namespace Network {
     SchemefulSameSiteUnspecifiedTreatedAsLax = 'SchemefulSameSiteUnspecifiedTreatedAsLax',
     SamePartyFromCrossPartyContext = 'SamePartyFromCrossPartyContext',
     NameValuePairExceedsMaxSize = 'NameValuePairExceedsMaxSize',
+    PortMismatch = 'PortMismatch',
+    SchemeMismatch = 'SchemeMismatch',
   }
 
   /**
@@ -13591,7 +13607,8 @@ export namespace Page {
   }
 
   /**
-   * Fired for top level page lifecycle events such as navigation, load, paint, etc.
+   * Fired for lifecycle events (navigation, load, paint, etc) in the current
+   * target (including local frames).
    */
   export interface LifecycleEventEvent {
     /**
@@ -14783,6 +14800,7 @@ export namespace Storage {
     ExcessiveReportingOrigins = 'excessiveReportingOrigins',
     NoHistograms = 'noHistograms',
     InsufficientBudget = 'insufficientBudget',
+    InsufficientNamedBudget = 'insufficientNamedBudget',
     NoMatchingSourceFilterData = 'noMatchingSourceFilterData',
     NotRegistered = 'notRegistered',
     ProhibitedByBrowserPolicy = 'prohibitedByBrowserPolicy',
@@ -16163,6 +16181,8 @@ export namespace Fetch {
 
   /**
    * Unique request identifier.
+   * Note that this does not identify individual HTTP requests that are part of
+   * a network request.
    */
   export type RequestId = OpaqueIdentifier<string, 'Protocol.Fetch.RequestId'>;
 

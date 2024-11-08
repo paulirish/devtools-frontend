@@ -5,11 +5,12 @@
 import './Table.js';
 
 import * as i18n from '../../../../core/i18n/i18n.js';
+import type {LCPPhasesInsightModel} from '../../../../models/trace/insights/LCPPhases.js';
 import * as Trace from '../../../../models/trace/trace.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 import type * as Overlays from '../../overlays/overlays.js';
 
-import {BaseInsight, shouldRenderForCategory} from './Helpers.js';
+import {BaseInsightComponent, shouldRenderForCategory} from './Helpers.js';
 import type * as SidebarInsight from './SidebarInsight.js';
 import type {TableData} from './Table.js';
 import {Category} from './types.js';
@@ -61,7 +62,7 @@ interface PhaseData {
   percent: string;
 }
 
-export class LCPPhases extends BaseInsight {
+export class LCPPhases extends BaseInsightComponent<LCPPhasesInsightModel> {
   static override readonly litTagName = LitHtml.literal`devtools-performance-lcp-by-phases`;
   override insightCategory: Category = Category.LCP;
   override internalName: string = 'lcp-by-phase';
@@ -69,21 +70,13 @@ export class LCPPhases extends BaseInsight {
   override description: string = i18nString(UIStrings.description);
   #overlay: Overlays.Overlays.TimespanBreakdown|null = null;
 
-  #getPhaseData(insights: Trace.Insights.Types.TraceInsightSets|null, navigationId: string|null): PhaseData[] {
-    if (!insights || !navigationId) {
-      return [];
-    }
-    const insightsByNavigation = insights.get(navigationId);
-    if (!insightsByNavigation) {
-      return [];
-    }
-    const lcpInsight = insightsByNavigation.data.LargestContentfulPaint;
-    if (lcpInsight instanceof Error) {
+  #getPhaseData(): PhaseData[] {
+    if (!this.model) {
       return [];
     }
 
-    const timing = lcpInsight.lcpMs;
-    const phases = lcpInsight.phases;
+    const timing = this.model.lcpMs;
+    const phases = this.model.phases;
 
     if (!timing || !phases) {
       return [];
@@ -128,31 +121,20 @@ export class LCPPhases extends BaseInsight {
   override createOverlays(): Overlays.Overlays.TimelineOverlay[] {
     this.#overlay = null;
 
-    if (!this.data.insights || !this.data.insightSetKey) {
-      return [];
-    }
-    const {insightSetKey: navigationId, insights} = this.data;
-
-    const insightsByNavigation = insights.get(navigationId);
-    if (!insightsByNavigation) {
+    if (!this.model) {
       return [];
     }
 
-    const lcpInsight = insightsByNavigation.data.LargestContentfulPaint;
-    if (lcpInsight instanceof Error) {
-      return [];
-    }
-
-    const phases = lcpInsight.phases;
-    const lcpTs = lcpInsight.lcpTs;
+    const phases = this.model.phases;
+    const lcpTs = this.model.lcpTs;
     if (!phases || !lcpTs) {
       return [];
     }
     const lcpMicroseconds = Trace.Types.Timing.MicroSeconds(Trace.Helpers.Timing.millisecondsToMicroseconds(lcpTs));
 
     const overlays: Overlays.Overlays.TimelineOverlay[] = [];
-    if (lcpInsight.lcpRequest) {
-      overlays.push({type: 'ENTRY_OUTLINE', entry: lcpInsight.lcpRequest, outlineReason: 'INFO'});
+    if (this.model.lcpRequest) {
+      overlays.push({type: 'ENTRY_OUTLINE', entry: this.model.lcpRequest, outlineReason: 'INFO'});
     }
 
     const sections = [];
@@ -261,8 +243,7 @@ export class LCPPhases extends BaseInsight {
   }
 
   override getRelatedEvents(): Trace.Types.Events.Event[] {
-    const insight =
-        Trace.Insights.Common.getInsight('LargestContentfulPaint', this.data.insights, this.data.insightSetKey);
+    const insight = this.model;
     if (!insight?.lcpEvent) {
       return [];
     }
@@ -276,7 +257,7 @@ export class LCPPhases extends BaseInsight {
   }
 
   override render(): void {
-    const phaseData = this.#getPhaseData(this.data.insights, this.data.insightSetKey);
+    const phaseData = this.#getPhaseData();
     const matchesCategory = shouldRenderForCategory({
       activeCategory: this.data.activeCategory,
       insightCategory: this.insightCategory,
