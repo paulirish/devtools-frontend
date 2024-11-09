@@ -173,9 +173,6 @@ export class TraceProcessor extends EventTarget {
       for (const handler of this.#sortedHandlers) {
         handler.reset();
       }
-      for (const handler of this.#sortedHandlers) {
-        handler.initialize?.();
-      }
       this.#status = Status.PARSING_CHUNKS;
     }
 

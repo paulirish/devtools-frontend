@@ -59,6 +59,7 @@ export class Model extends EventTarget {
       this.#config = config;
     }
     this.#processor = new TraceProcessor(handlers, this.#config);
+    this.#processor.reset();
   }
 
   /**
@@ -92,6 +93,7 @@ export class Model extends EventTarget {
     const metadata = config?.metadata || {};
     const isFreshRecording = config?.isFreshRecording || false;
     const isCPUProfile = metadata?.dataOrigin === Types.File.DataOrigin.CPU_PROFILE;
+
     // During parsing, periodically update any listeners on each processors'
     // progress (if they have any updates).
     const onTraceUpdate = (event: Event): void => {
@@ -99,6 +101,7 @@ export class Model extends EventTarget {
       this.dispatchEvent(new ModelUpdateEvent({type: ModelUpdateType.PROGRESS_UPDATE, data}));
     };
 
+    // This live here rather in constructor so it can be destroyed and avoid a memory leak
     this.#processor.addEventListener(TraceParseProgressEvent.eventName, onTraceUpdate);
 
     // Create a parsed trace file.  It will be populated with data from the processor.
@@ -135,6 +138,11 @@ export class Model extends EventTarget {
   parseChunk(traceEvents: readonly Types.Events.Event[]): void {
     void this.#processor.parseChunk(traceEvents);
   }
+
+  async finishParsingChunks(): Promise<void> {
+    await this.#processor.finishParsingChunks();
+  }
+
 
   #storeParsedFileData(
       file: ParsedTraceFile, data: Handlers.Types.ParsedTrace|null,
