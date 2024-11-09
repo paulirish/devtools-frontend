@@ -8,6 +8,7 @@ import * as i18n from '../../core/i18n/i18n.js';
 import type * as SDK from '../../core/sdk/sdk.js';
 import * as Logs from '../../models/logs/logs.js';
 import * as Network from '../../panels/network/network.js';
+import * as PanelUtils from '../utils/utils.js';
 
 import {
   AgentType,
@@ -15,6 +16,7 @@ import {
   type AidaRequestOptions,
   type ContextDetail,
   type ContextResponse,
+  ConversationContext,
   type ParsedResponse,
   ResponseType,
 } from './AiAgent.js';
@@ -97,6 +99,31 @@ const UIStringsNotTranslate = {
 
 const lockedString = i18n.i18n.lockedString;
 
+export class RequestContext extends ConversationContext<SDK.NetworkRequest.NetworkRequest> {
+  #request: SDK.NetworkRequest.NetworkRequest;
+
+  constructor(request: SDK.NetworkRequest.NetworkRequest) {
+    super();
+    this.#request = request;
+  }
+
+  override getOrigin(): string {
+    return new URL(this.#request.url()).origin;
+  }
+
+  override getItem(): SDK.NetworkRequest.NetworkRequest {
+    return this.#request;
+  }
+
+  override getIcon(): HTMLElement {
+    return PanelUtils.PanelUtils.getIconForNetworkRequest(this.#request);
+  }
+
+  override getTitle(): string {
+    return this.#request.name();
+  }
+}
+
 /**
  * One agent instance handles one conversation. Create a new agent
  * instance for a new conversation.
@@ -107,14 +134,12 @@ export class DrJonesNetworkAgent extends AiAgent<SDK.NetworkRequest.NetworkReque
   readonly clientFeature = Host.AidaClient.ClientFeature.CHROME_DRJONES_NETWORK_AGENT;
   get userTier(): string|undefined {
     const config = Common.Settings.Settings.instance().getHostConfig();
-    return config.devToolsAiAssistanceNetworkAgent?.userTier ?? config.devToolsExplainThisResourceDogfood?.userTier;
+    return config.devToolsAiAssistanceNetworkAgent?.userTier;
   }
   get options(): AidaRequestOptions {
     const config = Common.Settings.Settings.instance().getHostConfig();
-    const temperature =
-        config.devToolsAiAssistanceNetworkAgent?.temperature ?? config.devToolsExplainThisResourceDogfood?.temperature;
-    const modelId =
-        config.devToolsAiAssistanceNetworkAgent?.modelId ?? config.devToolsExplainThisResourceDogfood?.modelId;
+    const temperature = config.devToolsAiAssistanceNetworkAgent?.temperature;
+    const modelId = config.devToolsAiAssistanceNetworkAgent?.modelId;
 
     return {
       temperature,
@@ -123,7 +148,7 @@ export class DrJonesNetworkAgent extends AiAgent<SDK.NetworkRequest.NetworkReque
   }
 
   async *
-      handleContextDetails(selectedNetworkRequest: SDK.NetworkRequest.NetworkRequest|null):
+      handleContextDetails(selectedNetworkRequest: ConversationContext<SDK.NetworkRequest.NetworkRequest>|null):
           AsyncGenerator<ContextResponse, void, void> {
     if (!selectedNetworkRequest) {
       return;
@@ -132,14 +157,15 @@ export class DrJonesNetworkAgent extends AiAgent<SDK.NetworkRequest.NetworkReque
     yield {
       type: ResponseType.CONTEXT,
       title: lockedString(UIStringsNotTranslate.analyzingNetworkData),
-      details: createContextDetailsForDrJonesNetworkAgent(selectedNetworkRequest),
+      details: createContextDetailsForDrJonesNetworkAgent(selectedNetworkRequest.getItem()),
     };
   }
 
-  override async enhanceQuery(query: string, selectedNetworkRequest: SDK.NetworkRequest.NetworkRequest|null):
-      Promise<string> {
+  override async enhanceQuery(
+      query: string,
+      selectedNetworkRequest: ConversationContext<SDK.NetworkRequest.NetworkRequest>|null): Promise<string> {
     const networkEnchantmentQuery = selectedNetworkRequest ?
-        `# Selected network request \n${formatNetworkRequest(selectedNetworkRequest)}\n\n# User request\n\n` :
+        `# Selected network request \n${formatNetworkRequest(selectedNetworkRequest.getItem())}\n\n# User request\n\n` :
         '';
     return `${networkEnchantmentQuery}${query}`;
   }
@@ -190,9 +216,7 @@ const allowedHeaders = new Set([
   'content-disposition',
   'content-encoding',
   'content-language',
-  'content-length',
   'content-location',
-  'content-md5',
   'content-range',
   'content-security-policy',
   'content-type',
@@ -200,7 +224,6 @@ const allowedHeaders = new Set([
   'date',
   'delta-base',
   'dnt',
-  'etag',
   'expect-ct',
   'expect',
   'expires',
@@ -208,9 +231,7 @@ const allowedHeaders = new Set([
   'front-end-https',
   'host',
   'http2-settings',
-  'if-match',
   'if-modified-since',
-  'if-none-match',
   'if-range',
   'if-unmodified-source',
   'im',

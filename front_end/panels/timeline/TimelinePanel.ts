@@ -40,12 +40,12 @@ import * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
-import type * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 import * as Trace from '../../models/trace/trace.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as TraceBounds from '../../services/trace_bounds/trace_bounds.js';
 import * as Adorners from '../../ui/components/adorners/adorners.js';
 import type * as Buttons from '../../ui/components/buttons/buttons.js';
+import * as ShortcutDialog from '../../ui/components/dialogs/dialogs.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
@@ -368,7 +368,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
    * we store the filters by the trace index, so if the user then navigates back
    * to a previous trace we can reinstate the filters from this map.
    */
-  #exclusiveFilterPerTrace: Map<number, TimelineModel.TimelineModelFilter.TimelineModelFilter> = new Map();
+  #exclusiveFilterPerTrace: Map<number, Trace.Extras.TraceFilter.TraceFilter> = new Map();
   /**
    * This widget holds the timeline sidebar which shows Insights & Annotations,
    * and the main UI which shows the timeline
@@ -522,6 +522,12 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     topPaneElement.id = 'timeline-overview-panel';
 
     this.#minimapComponent.show(topPaneElement);
+    this.#minimapComponent.addEventListener(PerfUI.TimelineOverviewPane.Events.OVERVIEW_PANE_MOUSE_MOVE, event => {
+      this.flameChart.addTimestampMarkerOverlay(event.data.timeInMicroSeconds);
+    });
+    this.#minimapComponent.addEventListener(PerfUI.TimelineOverviewPane.Events.OVERVIEW_PANE_MOUSE_LEAVE, async () => {
+      await this.flameChart.removeTimestampMarkerOverlay();
+    });
 
     this.statusPaneContainer = this.timelinePane.element.createChild('div', 'status-pane-container fill');
 
@@ -1064,6 +1070,14 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     if (!isNode) {
       this.panelRightToolbar.appendSeparator();
       this.panelRightToolbar.appendToolbarItem(this.showSettingsPaneButton);
+    }
+
+    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_ALTERNATIVE_NAVIGATION)) {
+      // TODO: Fill the shortcuts dialog with shortcuts for the cuttently selected navigation option
+      const shortcutDialog = new ShortcutDialog.ShortcutDialog.ShortcutDialog();
+      shortcutDialog.data = {shortcuts: [{title: 'Shortcut Title', bindings: ['Ctrl+E']}]};
+      const dialogToolbarItem = new UI.Toolbar.ToolbarItem(shortcutDialog);
+      this.panelRightToolbar.appendToolbarItem(dialogToolbarItem);
     }
   }
 
@@ -1663,9 +1677,8 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.flameChart.runBrickBreakerGame();
   }
 
-  #applyActiveFilters(
-      traceIsGeneric: boolean,
-      exclusiveFilter: TimelineModel.TimelineModelFilter.TimelineModelFilter|null = null): void {
+  #applyActiveFilters(traceIsGeneric: boolean, exclusiveFilter: Trace.Extras.TraceFilter.TraceFilter|null = null):
+      void {
     if (traceIsGeneric || Root.Runtime.experiments.isEnabled('timeline-show-all-events')) {
       return;
     }
@@ -2056,9 +2069,10 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
    * code in there.
    **/
   async loadingComplete(
-      collectedEvents: Trace.Types.Events.Event[],
-      exclusiveFilter: TimelineModel.TimelineModelFilter.TimelineModelFilter|null = null, isCpuProfile: boolean,
-      recordingStartTime: number|null, metadata: Trace.Types.File.MetaData|null): Promise<void> {
+      collectedEvents: Trace.Types.Events.Event[], exclusiveFilter: Trace.Extras.TraceFilter.TraceFilter|null = null,
+      isCpuProfile: boolean, recordingStartTime: number|null, metadata: Trace.Types.File.MetaData|null): Promise<void> {
+    // this.#traceEngineModel.resetProcessor(); // ?
+
     delete this.loader;
 
     // If the user just recorded this trace via the record UI, the state will

@@ -8,7 +8,6 @@ import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
 import * as Extensions from '../../models/extensions/extensions.js';
 import * as LiveMetrics from '../../models/live-metrics/live-metrics.js';
-import type * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 import * as Trace from '../../models/trace/trace.js';
 
 const UIStrings = {
@@ -144,10 +143,22 @@ export class TimelineController implements Trace.TracingManager.TracingManagerCl
     if (this.tracingManager) {
       this.tracingManager.stop();
     }
+    // When throttling is applied to the main renderer, it can slow down the
+    // collection of trace events once tracing has completed. Therefore we
+    // temporarily disable throttling whilst the final trace event collection
+    // takes place. Once it is done, we re-enable it (this is the existing
+    // behaviour within DevTools; the throttling settling is sticky + global).
+    const throttlingManager = SDK.CPUThrottlingManager.CPUThrottlingManager.instance();
+    const rateDuringRecording = throttlingManager.cpuThrottlingRate();
+    // 1 = no throttling (CPU is 1x'd)
+    throttlingManager.setCPUThrottlingRate(1);
 
     this.client.loadingStarted();
     await this.waitForTracingToStop();
     await this.allSourcesFinished();
+
+    // Now we re-enable throttling again to maintain the setting being persistent.
+    throttlingManager.setCPUThrottlingRate(rateDuringRecording);
 
     await LiveMetrics.LiveMetrics.instance().enable();
   }
@@ -234,9 +245,8 @@ export interface Client {
   processingStarted(): void;
   loadingProgress(progress?: number): void;
   loadingComplete(
-      collectedEvents: Trace.Types.Events.Event[],
-      exclusiveFilter: TimelineModel.TimelineModelFilter.TimelineModelFilter|null, isCpuProfile: boolean,
-      recordingStartTime: number|null, metadata: Trace.Types.File.MetaData|null): Promise<void>;
+      collectedEvents: Trace.Types.Events.Event[], exclusiveFilter: Trace.Extras.TraceFilter.TraceFilter|null,
+      isCpuProfile: boolean, recordingStartTime: number|null, metadata: Trace.Types.File.MetaData|null): Promise<void>;
   loadingCompleteForTest(): void;
 }
 export interface RecordingOptions {

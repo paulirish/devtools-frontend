@@ -8,7 +8,6 @@ import * as Trace from '../trace.js';
 async function processTrace(context: Mocha.Suite|Mocha.Context|null, path: string): Promise<void> {
   const traceEvents = await TraceLoader.rawEvents(context, path);
   Trace.Handlers.ModelHandlers.Meta.reset();
-  Trace.Handlers.ModelHandlers.Meta.initialize();
   for (const event of traceEvents) {
     Trace.Handlers.ModelHandlers.Meta.handleEvent(event);
     Trace.Handlers.ModelHandlers.UserInteractions.handleEvent(event);
@@ -19,7 +18,6 @@ async function processTrace(context: Mocha.Suite|Mocha.Context|null, path: strin
 
 beforeEach(() => {
   Trace.Handlers.ModelHandlers.Meta.reset();
-  Trace.Handlers.ModelHandlers.Meta.initialize();
 });
 
 describe('UserInteractionsHandler', function() {
@@ -43,23 +41,6 @@ describe('UserInteractionsHandler', function() {
     return event as unknown as Trace.Types.Events.SyntheticInteractionPair;
   }
 
-  describe('error handling', () => {
-    it('throws if not initialized', async () => {
-      Trace.Handlers.ModelHandlers.Meta.reset();
-      Trace.Handlers.ModelHandlers.Meta.initialize();
-
-      // Finalize the handler by calling data and then finalize on it.
-      Trace.Handlers.ModelHandlers.UserInteractions.data();
-      await Trace.Handlers.ModelHandlers.Meta.finalize();
-      await Trace.Handlers.ModelHandlers.UserInteractions.finalize();
-
-      assert.throws(() => {
-        const fakeEvent = {} as Trace.Types.Events.Event;
-        Trace.Handlers.ModelHandlers.UserInteractions.handleEvent(fakeEvent);
-      }, 'Handler is not initialized');
-    });
-  });
-
   it('returns all user interactions', async function() {
     const traceEvents = await TraceLoader.rawEvents(this, 'slow-interaction-button-click.json.gz');
     for (const event of traceEvents) {
@@ -67,11 +48,7 @@ describe('UserInteractionsHandler', function() {
     }
 
     const data = Trace.Handlers.ModelHandlers.UserInteractions.data();
-    const clicks = data.allEvents.filter(event => {
-      if (!event.args.data) {
-        return false;
-      }
-
+    const clicks = data.allEvents.filter(Trace.Types.Events.isEventTimingStart).filter(event => {
       return event.args.data.type === 'click';
     });
 
@@ -184,8 +161,8 @@ describe('UserInteractionsHandler', function() {
   it('detects correct events for a click and keydown interaction', async () => {
     await processTrace(this, 'slow-interaction-keydown.json.gz');
     const data = Trace.Handlers.ModelHandlers.UserInteractions.data();
-    const foundInteractions =
-        data.allEvents.filter(e => e.args.data && e.args.data.duration > 1 && e.args.data.interactionId);
+    const foundInteractions = data.allEvents.filter(Trace.Types.Events.isEventTimingStart)
+                                  .filter(e => e.args.data && e.args.data.duration > 1 && e.args.data.interactionId);
     // We expect there to be 3 interactions:
     // User clicks on input:
     // 1.pointerdown, 2. pointerup, 3. click
@@ -276,7 +253,7 @@ describe('UserInteractionsHandler', function() {
           },
         },
       },
-    ] as unknown as Trace.Types.Events.EventTiming[];
+    ] as unknown as Trace.Types.Events.EventTimingBeginOrEnd[];
     Trace.Handlers.ModelHandlers.UserInteractions.reset();
     for (const event of events) {
       Trace.Handlers.ModelHandlers.UserInteractions.handleEvent(event);

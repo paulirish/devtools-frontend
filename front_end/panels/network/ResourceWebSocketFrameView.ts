@@ -190,7 +190,7 @@ export class ResourceWebSocketFrameView extends UI.Widget.VBox {
       refreshCallback: undefined,
     });
     this.dataGrid.setRowContextMenuCallback(onRowContextMenu.bind(this));
-    this.dataGrid.setStickToBottom(true);
+    this.dataGrid.setEnableAutoScrollToBottom(true);
     this.dataGrid.setCellClass('websocket-frame-view-td');
     this.timeComparator =
         (resourceWebSocketFrameNodeTimeComparator as
@@ -422,7 +422,7 @@ export class ResourceWebSocketFrameNode extends DataGrid.SortableDataGrid.Sortab
       description = dataText;
 
     } else if (frame.opCode === OpCodes.BINARY_FRAME) {
-      length = Platform.NumberUtilities.bytesToString(Platform.StringUtilities.base64ToSize(frame.text));
+      length = i18n.ByteUtilities.bytesToString(Platform.StringUtilities.base64ToSize(frame.text));
       description = opCodeDescriptions[frame.opCode]();
 
     } else {

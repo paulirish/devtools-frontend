@@ -5,10 +5,6 @@
 import * as Helpers from '../helpers/helpers.js';
 import * as Types from '../types/types.js';
 
-import {HandlerState} from './types.js';
-
-let handlerState = HandlerState.UNINITIALIZED;
-
 const lastScheduleStyleRecalcByFrame = new Map<string, Types.Events.ScheduleStyleRecalculation>();
 
 // This tracks the last event that is considered to have invalidated the layout
@@ -54,12 +50,6 @@ export function reset(): void {
   schedulePostTaskCallbackEventsById.clear();
   schedulePostMessageEventByTraceId.clear();
   postMessageHandlerEvents.length = 0;
-
-  handlerState = HandlerState.UNINITIALIZED;
-}
-
-export function initialize(): void {
-  handlerState = HandlerState.INITIALIZED;
 }
 
 function storeInitiator(data: {initiator: Types.Events.Event, event: Types.Events.Event}): void {
@@ -198,16 +188,10 @@ function finalizeInitiatorRelationship(): void {
 }
 
 export async function finalize(): Promise<void> {
-  if (handlerState !== HandlerState.INITIALIZED) {
-    throw new Error('InitiatorsHandler is not initialized');
-  }
-
   // During event processing, we may encounter initiators before the handler events themselves
   // (e.g dispatch events on worker and handler events on the main thread)
   // we don't want to miss out on events whose initiators haven't been processed yet
   finalizeInitiatorRelationship();
-
-  handlerState = HandlerState.FINALIZED;
 }
 
 export interface InitiatorsData {

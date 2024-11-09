@@ -7,6 +7,7 @@ import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import type * as Workspace from '../../models/workspace/workspace.js';
+import * as PanelUtils from '../utils/utils.js';
 
 import {
   AgentType,
@@ -14,6 +15,7 @@ import {
   type AidaRequestOptions,
   type ContextDetail,
   type ContextResponse,
+  ConversationContext,
   type ParsedResponse,
   ResponseType,
 } from './AiAgent.js';
@@ -69,6 +71,31 @@ const lockedString = i18n.i18n.lockedString;
 
 const MAX_FILE_SIZE = 10000;
 
+export class FileContext extends ConversationContext<Workspace.UISourceCode.UISourceCode> {
+  #file: Workspace.UISourceCode.UISourceCode;
+
+  constructor(file: Workspace.UISourceCode.UISourceCode) {
+    super();
+    this.#file = file;
+  }
+
+  override getOrigin(): string {
+    return new URL(this.#file.url()).origin;
+  }
+
+  override getItem(): Workspace.UISourceCode.UISourceCode {
+    return this.#file;
+  }
+
+  override getIcon(): HTMLElement {
+    return PanelUtils.PanelUtils.getIconForSourceFile(this.#file);
+  }
+
+  override getTitle(): string {
+    return this.#file.displayName();
+  }
+}
+
 /**
  * One agent instance handles one conversation. Create a new agent
  * instance for a new conversation.
@@ -79,14 +106,12 @@ export class DrJonesFileAgent extends AiAgent<Workspace.UISourceCode.UISourceCod
   readonly clientFeature = Host.AidaClient.ClientFeature.CHROME_DRJONES_FILE_AGENT;
   get userTier(): string|undefined {
     const config = Common.Settings.Settings.instance().getHostConfig();
-    return config.devToolsAiAssistanceFileAgent?.userTier ?? config.devToolsAiAssistanceFileAgentDogfood?.userTier;
+    return config.devToolsAiAssistanceFileAgent?.userTier;
   }
   get options(): AidaRequestOptions {
     const config = Common.Settings.Settings.instance().getHostConfig();
-    const temperature =
-        config.devToolsAiAssistanceFileAgent?.temperature ?? config.devToolsAiAssistanceFileAgentDogfood?.temperature;
-    const modelId =
-        config.devToolsAiAssistanceFileAgent?.modelId ?? config.devToolsAiAssistanceFileAgentDogfood?.modelId;
+    const temperature = config.devToolsAiAssistanceFileAgent?.temperature;
+    const modelId = config.devToolsAiAssistanceFileAgent?.modelId;
 
     return {
       temperature,
@@ -95,7 +120,7 @@ export class DrJonesFileAgent extends AiAgent<Workspace.UISourceCode.UISourceCod
   }
 
   async *
-      handleContextDetails(selectedFile: Workspace.UISourceCode.UISourceCode|null):
+      handleContextDetails(selectedFile: ConversationContext<Workspace.UISourceCode.UISourceCode>|null):
           AsyncGenerator<ContextResponse, void, void> {
     if (!selectedFile) {
       return;
@@ -108,9 +133,10 @@ export class DrJonesFileAgent extends AiAgent<Workspace.UISourceCode.UISourceCod
     };
   }
 
-  override async enhanceQuery(query: string, selectedFile: Workspace.UISourceCode.UISourceCode|null): Promise<string> {
+  override async enhanceQuery(
+      query: string, selectedFile: ConversationContext<Workspace.UISourceCode.UISourceCode>|null): Promise<string> {
     const fileEnchantmentQuery =
-        selectedFile ? `# Selected file\n${formatFile(selectedFile)}\n\n# User request\n\n` : '';
+        selectedFile ? `# Selected file\n${formatFile(selectedFile.getItem())}\n\n# User request\n\n` : '';
     return `${fileEnchantmentQuery}${query}`;
   }
 
@@ -121,28 +147,35 @@ export class DrJonesFileAgent extends AiAgent<Workspace.UISourceCode.UISourceCod
   }
 }
 
-function createContextDetailsForDrJonesFileAgent(selectedFile: Workspace.UISourceCode.UISourceCode):
-    [ContextDetail, ...ContextDetail[]] {
+function createContextDetailsForDrJonesFileAgent(
+    selectedFile: ConversationContext<Workspace.UISourceCode.UISourceCode>): [ContextDetail, ...ContextDetail[]] {
   return [
     {
       title: 'Selected file',
-      text: formatFile(selectedFile),
+      text: formatFile(selectedFile.getItem()),
     },
   ];
 }
 
-function formatFile(selectedFile: Workspace.UISourceCode.UISourceCode): string {
+export function formatFile(selectedFile: Workspace.UISourceCode.UISourceCode): string {
   const debuggerWorkspaceBinding = Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance();
-  return `File Name: ${selectedFile.displayName()}
-URL: ${selectedFile.url()}
-${formatSourceMapDetails(selectedFile, debuggerWorkspaceBinding)}
-File Content:
-${formatFileContent(selectedFile.content())}`;
+  const sourceMapDetails = formatSourceMapDetails(selectedFile, debuggerWorkspaceBinding);
+  const lines = [
+    `File name: ${selectedFile.displayName()}`,
+    `URL: ${selectedFile.url()}`,
+    sourceMapDetails,
+    `File content:
+${formatFileContent(selectedFile)}`,
+  ];
+  return lines.filter(line => line.trim() !== '').join('\n');
 }
 
-function formatFileContent(content: string): string {
-  const formattedContent = content.length > MAX_FILE_SIZE ? content.slice(0, MAX_FILE_SIZE) + '...\n' : content + '\n';
-  return '```' + formattedContent + '```';
+function formatFileContent(selectedFile: Workspace.UISourceCode.UISourceCode): string {
+  const content = selectedFile.contentType().isTextType() ? selectedFile.content() : '<binary data>';
+  const truncated = content.length > MAX_FILE_SIZE ? content.slice(0, MAX_FILE_SIZE) + '...' : content;
+  return `\`\`\`
+${truncated}
+\`\`\``;
 }
 
 export function formatSourceMapDetails(

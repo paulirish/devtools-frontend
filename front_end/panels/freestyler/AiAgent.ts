@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import * as Host from '../../core/host/host.js';
+import type * as LitHtml from '../../ui/lit-html/lit-html.js';
 
 export const enum ResponseType {
   CONTEXT = 'context',
@@ -127,6 +128,24 @@ export const enum AgentType {
 
 const MAX_STEP = 10;
 
+export abstract class ConversationContext<T> {
+  abstract getOrigin(): string;
+  abstract getItem(): T;
+  abstract getIcon(): HTMLElement;
+  abstract getTitle(): string|ReturnType<typeof LitHtml.Directives.until>;
+
+  isOriginAllowed(agentOrigin: string|undefined): boolean {
+    if (!agentOrigin) {
+      return true;
+    }
+    // Currently does not handle opaque origins because they
+    // are not available to DevTools, instead checks
+    // that serialization of the origin is the same
+    // https://html.spec.whatwg.org/#ascii-serialisation-of-an-origin.
+    return this.getOrigin() === agentOrigin;
+  }
+}
+
 export abstract class AiAgent<T> {
   static validTemperature(temperature: number|undefined): number|undefined {
     return typeof temperature === 'number' && temperature >= 0 ? temperature : undefined;
@@ -140,13 +159,20 @@ export abstract class AiAgent<T> {
   abstract readonly options: AidaRequestOptions;
   abstract readonly clientFeature: Host.AidaClient.ClientFeature;
   abstract readonly userTier: string|undefined;
-  abstract handleContextDetails(select: T|null): AsyncGenerator<ContextResponse, void, void>;
+  abstract handleContextDetails(select: ConversationContext<T>|null): AsyncGenerator<ContextResponse, void, void>;
+  #generatedFromHistory = false;
 
   /**
    * Mapping between the unique request id and
    * the history chuck it created
    */
   #history = new Map<number, ResponseData[]>();
+  /**
+   * Might need to be part of history in case we allow chatting in
+   * historical conversations.
+   */
+  #origin?: string;
+  #context?: ConversationContext<T>;
 
   constructor(opts: AgentOptions) {
     this.#aidaClient = opts.aidaClient;
@@ -165,6 +191,14 @@ export abstract class AiAgent<T> {
     return this.#history.size <= 0;
   }
 
+  get origin(): string|undefined {
+    return this.#origin;
+  }
+
+  get context(): ConversationContext<T>|undefined {
+    return this.#context;
+  }
+
   get title(): string|undefined {
     return [...this.#history.values()]
         .flat()
@@ -173,6 +207,10 @@ export abstract class AiAgent<T> {
         })
         .at(0)
         ?.query;
+  }
+
+  get isHistoryEntry(): boolean {
+    return this.#generatedFromHistory;
   }
 
   #structuredLog: Array<{
@@ -248,7 +286,7 @@ export abstract class AiAgent<T> {
     throw new Error('Unexpected action found');
   }
 
-  async enhanceQuery(query: string, selected: T|null): Promise<string>;
+  async enhanceQuery(query: string, selected: ConversationContext<T>|null): Promise<string>;
   async enhanceQuery(query: string): Promise<string> {
     return query;
   }
@@ -359,8 +397,20 @@ STOP`;
 
   #runId = 0;
   async * run(query: string, options: {
-    signal?: AbortSignal, selected: T|null,
+    signal?: AbortSignal, selected: ConversationContext<T>|null,
   }): AsyncGenerator<ResponseData, void, void> {
+    if (this.#generatedFromHistory) {
+      throw new Error('History entries are read-only.');
+    }
+
+    // First context set on the agent determines its origin from now on.
+    if (options.selected && this.#origin === undefined && options.selected) {
+      this.#origin = options.selected.getOrigin();
+    }
+    // Remember if the context that is set.
+    if (options.selected && !this.#context) {
+      this.#context = options.selected;
+    }
     const id = this.#runId++;
 
     const response = {
@@ -500,6 +550,11 @@ STOP`;
   }
 
   async * runFromHistory(): AsyncGenerator<ResponseData, void, void> {
+    if (this.isEmpty) {
+      return;
+    }
+
+    this.#generatedFromHistory = true;
     for (const historyChunk of this.#history.values()) {
       for (const entry of historyChunk) {
         yield entry;

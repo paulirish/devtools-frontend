@@ -9,6 +9,7 @@ import * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as LitHtml from '../../ui/lit-html/lit-html.js';
 
 import {
   type ActionResponse,
@@ -16,6 +17,7 @@ import {
   AiAgent,
   type AidaRequestOptions,
   type ContextResponse,
+  ConversationContext,
   debugLog,
   isDebugMode,
   type ParsedResponse,
@@ -193,6 +195,7 @@ async function executeJsCode(
 }
 
 const MAX_OBSERVATION_BYTE_LENGTH = 25_000;
+const OBSERVATION_TIMEOUT = 5_000;
 
 type CreateExtensionScopeFunction = (changes: ChangeManager) => {
   install(): Promise<void>, uninstall(): Promise<void>,
@@ -206,6 +209,38 @@ type AgentOptions = {
   createExtensionScope?: CreateExtensionScopeFunction,
   execJs?: typeof executeJsCode,
 };
+
+export class NodeContext extends ConversationContext<SDK.DOMModel.DOMNode> {
+  #node: SDK.DOMModel.DOMNode;
+
+  constructor(node: SDK.DOMModel.DOMNode) {
+    super();
+    this.#node = node;
+  }
+
+  getOrigin(): string {
+    const ownerDocument = this.#node.ownerDocument;
+    if (!ownerDocument) {
+      // The node is detached from a document.
+      return 'detached';
+    }
+    return new URL(ownerDocument.documentURL).origin;
+  }
+
+  getItem(): SDK.DOMModel.DOMNode {
+    return this.#node;
+  }
+
+  override getIcon(): HTMLElement {
+    return document.createElement('span');
+  }
+
+  override getTitle(): string|ReturnType<typeof LitHtml.Directives.until> {
+    return LitHtml.Directives.until(
+        Common.Linkifier.Linkifier.linkify(this.#node),
+    );
+  }
+}
 
 /**
  * One agent instance handles one conversation. Create a new agent
@@ -430,10 +465,16 @@ export class FreestylerAgent extends AiAgent<SDK.DOMModel.DOMNode> {
           canceled: true,
         };
       }
-      const result = await this.#execJs(
-          functionDeclaration,
-          {throwOnSideEffect},
-      );
+      const result = await Promise.race([
+        this.#execJs(
+            functionDeclaration,
+            {throwOnSideEffect},
+            ),
+        new Promise<never>((_, reject) => {
+          setTimeout(
+              () => reject(new Error('Script execution exceeded the maximum allowed time.')), OBSERVATION_TIMEOUT);
+        }),
+      ]);
       const byteCount = Platform.StringUtilities.countWtf8Bytes(result);
       Host.userMetrics.freestylerEvalResponseSize(byteCount);
       if (byteCount > MAX_OBSERVATION_BYTE_LENGTH) {
@@ -606,7 +647,8 @@ export class FreestylerAgent extends AiAgent<SDK.DOMModel.DOMNode> {
   }
 
   override async *
-      handleContextDetails(selectedElement: SDK.DOMModel.DOMNode|null): AsyncGenerator<ContextResponse, void, void> {
+      handleContextDetails(selectedElement: ConversationContext<SDK.DOMModel.DOMNode>|null):
+          AsyncGenerator<ContextResponse, void, void> {
     if (!selectedElement) {
       return;
     }
@@ -615,14 +657,16 @@ export class FreestylerAgent extends AiAgent<SDK.DOMModel.DOMNode> {
       title: lockedString(UIStringsNotTranslate.analyzingThePrompt),
       details: [{
         title: lockedString(UIStringsNotTranslate.dataUsed),
-        text: await FreestylerAgent.describeElement(selectedElement),
+        text: await FreestylerAgent.describeElement(selectedElement.getItem()),
       }],
     };
   }
 
-  override async enhanceQuery(query: string, selectedElement: SDK.DOMModel.DOMNode|null): Promise<string> {
+  override async enhanceQuery(query: string, selectedElement: ConversationContext<SDK.DOMModel.DOMNode>|null):
+      Promise<string> {
     const elementEnchantmentQuery = selectedElement ?
-        `# Inspected element\n\n${await FreestylerAgent.describeElement(selectedElement)}\n\n# User request\n\n` :
+        `# Inspected element\n\n${
+            await FreestylerAgent.describeElement(selectedElement.getItem())}\n\n# User request\n\n` :
         '';
     return `${elementEnchantmentQuery}QUERY: ${query}`;
   }

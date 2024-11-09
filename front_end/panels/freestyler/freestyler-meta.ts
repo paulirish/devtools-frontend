@@ -82,21 +82,15 @@ function isFreestylerFeatureAvailable(config?: Root.Runtime.HostConfig): boolean
 }
 
 function isDrJonesNetworkFeatureAvailable(config?: Root.Runtime.HostConfig): boolean {
-  return (config?.aidaAvailability?.enabled &&
-          (config?.devToolsExplainThisResourceDogfood?.enabled ||
-           config?.devToolsAiAssistanceNetworkAgent?.enabled)) === true;
+  return (config?.aidaAvailability?.enabled && (config?.devToolsAiAssistanceNetworkAgent?.enabled)) === true;
 }
 
 function isDrJonesPerformanceFeatureAvailable(config?: Root.Runtime.HostConfig): boolean {
-  return (config?.aidaAvailability?.enabled &&
-          (config?.devToolsAiAssistancePerformanceAgentDogfood?.enabled ||
-           config?.devToolsAiAssistancePerformanceAgent?.enabled)) === true;
+  return (config?.aidaAvailability?.enabled && (config?.devToolsAiAssistancePerformanceAgent?.enabled)) === true;
 }
 
 function isDrJonesFileFeatureAvailable(config?: Root.Runtime.HostConfig): boolean {
-  return (config?.aidaAvailability?.enabled &&
-          (config?.devToolsAiAssistanceFileAgentDogfood?.enabled || config?.devToolsAiAssistanceFileAgent?.enabled)) ===
-      true;
+  return (config?.aidaAvailability?.enabled && (config?.devToolsAiAssistanceFileAgent?.enabled)) === true;
 }
 
 function isAnyFeatureAvailable(config?: Root.Runtime.HostConfig): boolean {
@@ -206,7 +200,6 @@ UI.ActionRegistration.registerActionExtension({
   contextTypes(): [] {
     return [];
   },
-  setting,
   category: UI.ActionRegistration.ActionCategory.GLOBAL,
   title: i18nLazyString(UIStrings.askAi),
   async loadActionDelegate() {
@@ -236,7 +229,6 @@ UI.ActionRegistration.registerActionExtension({
   contextTypes() {
     return [];
   },
-  setting,
   category: UI.ActionRegistration.ActionCategory.GLOBAL,
   title: i18nLazyString(UIStrings.askAi),
   async loadActionDelegate() {

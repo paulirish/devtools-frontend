@@ -4,7 +4,7 @@
 
 import '../../../../ui/components/markdown_view/markdown_view.js';
 
-import * as Platform from '../../../../core/platform/platform.js';
+import type {InsightModel} from '../../../../models/trace/insights/types.js';
 import type * as Trace from '../../../../models/trace/trace.js';
 import * as Marked from '../../../../third_party/marked/marked.js';
 import * as ComponentHelpers from '../../../../ui/components/helpers/helpers.js';
@@ -37,7 +37,6 @@ export function insightIsActive(options: {
 }
 
 export interface BaseInsightData {
-  insights: Trace.Insights.Types.TraceInsightSets|null;
   parsedTrace: Trace.Handlers.Types.ParsedTrace|null;
   /** The key into `insights` that contains this particular insight. */
   insightSetKey: string|null;
@@ -47,19 +46,22 @@ export interface BaseInsightData {
 
 // TODO(crbug.com/371615739): BaseInsight, SidebarInsight should be combined.
 // This is an abstract base class so the component naming rules do not apply.
-export abstract class BaseInsight extends HTMLElement {
+export abstract class BaseInsightComponent<T extends InsightModel<{}>> extends HTMLElement {
   abstract internalName: string;
   abstract insightCategory: Category;
-  abstract userVisibleTitle: string;
-  abstract description: string;
   // So we can use the TypeScript BaseInsight class without getting warnings
   // about litTagName. Every child should overrwrite this.
   static readonly litTagName = LitHtml.literal``;
 
   protected readonly shadow = this.attachShadow({mode: 'open'});
 
+  #model: T|null = null;
+
+  get model(): T|null {
+    return this.#model;
+  }
+
   protected data: BaseInsightData = {
-    insights: null,
     parsedTrace: null,
     insightSetKey: null,
     activeInsight: null,
@@ -86,19 +88,19 @@ export abstract class BaseInsight extends HTMLElement {
     this.dataset.insightName = this.internalName;
 
     // TODO(crbug.com/371615739): this should be moved to model/trace/insights
-    if (!this.#hasRegisteredRelatedEvents) {
+    if (!this.#hasRegisteredRelatedEvents && this.#model) {
       this.#hasRegisteredRelatedEvents = true;
 
       const events = this.getRelatedEvents();
       if (events.length) {
         this.dispatchEvent(new SidebarInsight.InsightProvideRelatedEvents(
-            this.userVisibleTitle, events, this.#dispatchInsightActivatedEvent.bind(this)));
+            this.#model.title, events, this.#dispatchInsightActivatedEvent.bind(this)));
       }
     }
   }
 
-  set insights(insights: Trace.Insights.Types.TraceInsightSets|null) {
-    this.data.insights = insights;
+  set model(model: T) {
+    this.#model = model;
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
   }
 
@@ -199,12 +201,6 @@ export abstract class BaseInsight extends HTMLElement {
       insightName: this.internalName,
       insightSetKey: this.data.insightSetKey,
     });
-  }
-
-  getInsightSetUrl(): URL {
-    const url = this.data.insights?.get(this.data.insightSetKey ?? '')?.url;
-    Platform.TypeScriptUtilities.assertNotNullOrUndefined(url, 'Expected url for insight set');
-    return new URL(url);
   }
 }
 

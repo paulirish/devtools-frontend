@@ -53,6 +53,7 @@ declare global {
 export interface ParseOptions {
   /**
    * If the trace was just recorded on the current page, rather than an imported file.
+   * TODO(paulirish): Maybe remove. This is currently unused by the Processor and Handlers
    * @default false
    */
   isFreshRecording?: boolean;
@@ -77,9 +78,9 @@ export class TraceProcessor extends EventTarget {
     return new TraceProcessor(Handlers.ModelHandlers, Types.Configuration.defaults());
   }
 
-  static getEnabledInsightRunners(parsedTrace: Handlers.Types.ParsedTrace): Partial<Insights.Types.InsightRunnersType> {
-    const enabledInsights = {} as Insights.Types.InsightRunnersType;
-    for (const [name, insight] of Object.entries(Insights.InsightRunners)) {
+  static getEnabledInsightRunners(parsedTrace: Handlers.Types.ParsedTrace): Partial<Insights.Types.InsightModelsType> {
+    const enabledInsights = {} as Insights.Types.InsightModelsType;
+    for (const [name, insight] of Object.entries(Insights.Models)) {
       const deps = insight.deps();
       if (deps.some(dep => !parsedTrace[dep])) {
         continue;
@@ -203,7 +204,7 @@ export class TraceProcessor extends EventTarget {
     }
     try {
       this.#status = Status.PARSING;
-      await this.#computeParsedTrace(traceEvents, Boolean(options.isFreshRecording));
+      await this.#computeParsedTrace(traceEvents);
       if (this.#data && !options.isCPUProfile) {  // We do not calculate insights for CPU Profiles.
         this.#computeInsights(this.#data, traceEvents);
       }
@@ -217,7 +218,7 @@ export class TraceProcessor extends EventTarget {
   /**
    * Run all the handlers and set the result to `#data`.
    */
-  async #computeParsedTrace(traceEvents: readonly Types.Events.Event[], freshRecording: boolean): Promise<void> {
+  async #computeParsedTrace(traceEvents: readonly Types.Events.Event[]): Promise<void> {
     /**
      * We want to yield regularly to maintain responsiveness. If we yield too often, we're wasting idle time.
      * We could do this by checking `performance.now()` regularly, but it's an expensive call in such a hot loop.
@@ -229,13 +230,6 @@ export class TraceProcessor extends EventTarget {
     const eventsPerChunk = 50_000;
     // Convert to array so that we are able to iterate all handlers multiple times.
 
-
-
-    // // TODO: remove initialization cuz it does nothing.
-    // // Initialize.
-    // for (const handler of this.#sortedHandlers) {
-    //   handler.initialize?.();
-    // }
 
     // Handle each event.
     for (let i = 0; i < traceEvents.length; ++i) {
@@ -380,8 +374,8 @@ export class TraceProcessor extends EventTarget {
 
   #computeInsightSets(
       insights: Insights.Types.TraceInsightSets, parsedTrace: Handlers.Types.ParsedTrace,
-      insightRunners: Partial<typeof Insights.InsightRunners>, context: Insights.Types.InsightSetContext): void {
-    const data = {} as Insights.Types.InsightSets['data'];
+      insightRunners: Partial<typeof Insights.Models>, context: Insights.Types.InsightSetContext): void {
+    const model = {} as Insights.Types.InsightSet['model'];
 
     for (const [name, insight] of Object.entries(insightRunners)) {
       let insightResult;
@@ -390,7 +384,7 @@ export class TraceProcessor extends EventTarget {
       } catch (err) {
         insightResult = err;
       }
-      Object.assign(data, {[name]: insightResult});
+      Object.assign(model, {[name]: insightResult});
     }
 
     let id, urlString, navigation;
@@ -418,7 +412,7 @@ export class TraceProcessor extends EventTarget {
       navigation,
       frameId: context.frameId,
       bounds: context.bounds,
-      data,
+      model,
     };
     insights.set(insightSets.id, insightSets);
   }

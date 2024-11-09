@@ -5,13 +5,15 @@
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
-import type * as TimelineUtils from '../../panels/timeline/utils/utils.js';
+import * as TimelineUtils from '../../panels/timeline/utils/utils.js';
+import * as PanelUtils from '../utils/utils.js';
 
 import {
   AgentType,
   AiAgent,
   type AidaRequestOptions,
   type ContextResponse,
+  ConversationContext,
   type ParsedResponse,
   ResponseType,
 } from './AiAgent.js';
@@ -120,6 +122,43 @@ const UIStringsNotTranslate = {
 
 const lockedString = i18n.i18n.lockedString;
 
+export class CallTreeContext extends ConversationContext<TimelineUtils.AICallTree.AICallTree> {
+  #callTree: TimelineUtils.AICallTree.AICallTree;
+
+  constructor(callTree: TimelineUtils.AICallTree.AICallTree) {
+    super();
+    this.#callTree = callTree;
+  }
+
+  override getOrigin(): string {
+    // TODO: implement cross-origin checks for the PerformanceAgent.
+    return '';
+  }
+
+  override getItem(): TimelineUtils.AICallTree.AICallTree {
+    return this.#callTree;
+  }
+
+  override getIcon(): HTMLElement {
+    const iconData = {
+      iconName: 'performance',
+      color: 'var(--sys-color-on-surface-subtle)',
+    };
+    const icon = PanelUtils.PanelUtils.createIconElement(iconData, 'Performance');
+    icon.classList.add('icon');
+    return icon;
+  }
+
+  override getTitle(): string {
+    const {event} = this.#callTree.selectedNode;
+    if (!event) {
+      return 'unknown';
+    }
+
+    return TimelineUtils.EntryName.nameForEntry(event);
+  }
+}
+
 /**
  * One agent instance handles one conversation. Create a new agent
  * instance for a new conversation.
@@ -130,12 +169,12 @@ export class DrJonesPerformanceAgent extends AiAgent<TimelineUtils.AICallTree.AI
   readonly clientFeature = Host.AidaClient.ClientFeature.CHROME_DRJONES_PERFORMANCE_AGENT;
   get userTier(): string|undefined {
     const config = Common.Settings.Settings.instance().getHostConfig();
-    return config.devToolsAiAssistancePerformanceAgentDogfood?.userTier;
+    return config.devToolsAiAssistancePerformanceAgent?.userTier;
   }
   get options(): AidaRequestOptions {
     const config = Common.Settings.Settings.instance().getHostConfig();
-    const temperature = config.devToolsAiAssistancePerformanceAgentDogfood?.temperature;
-    const modelId = config.devToolsAiAssistancePerformanceAgentDogfood?.modelId;
+    const temperature = config.devToolsAiAssistancePerformanceAgent?.temperature;
+    const modelId = config.devToolsAiAssistancePerformanceAgent?.modelId;
 
     return {
       temperature,
@@ -144,7 +183,7 @@ export class DrJonesPerformanceAgent extends AiAgent<TimelineUtils.AICallTree.AI
   }
 
   async *
-      handleContextDetails(aiCallTree: TimelineUtils.AICallTree.AICallTree|null):
+      handleContextDetails(aiCallTree: ConversationContext<TimelineUtils.AICallTree.AICallTree>|null):
           AsyncGenerator<ContextResponse, void, void> {
     yield {
       type: ResponseType.CONTEXT,
@@ -152,14 +191,15 @@ export class DrJonesPerformanceAgent extends AiAgent<TimelineUtils.AICallTree.AI
       details: [
         {
           title: 'Selected call tree',
-          text: aiCallTree?.serialize() ?? '',
+          text: aiCallTree?.getItem().serialize() ?? '',
         },
       ],
     };
   }
 
-  override async enhanceQuery(query: string, aiCallTree: TimelineUtils.AICallTree.AICallTree|null): Promise<string> {
-    const treeStr = aiCallTree?.serialize();
+  override async enhanceQuery(query: string, aiCallTree: ConversationContext<TimelineUtils.AICallTree.AICallTree>|null):
+      Promise<string> {
+    const treeStr = aiCallTree?.getItem().serialize();
 
     // Collect the queries from previous messages in this session
     const prevQueries: string[] = [];
