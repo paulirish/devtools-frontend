@@ -104,5 +104,6 @@
   "overrides": {
     "tslib": "2.8.0",
     "ws": "$ws"
-  }
+  },
+  "version": "0.0.38"
 }
