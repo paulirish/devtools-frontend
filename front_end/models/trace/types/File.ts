@@ -1,7 +1,10 @@
 // Copyright 2023 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
+import type * as SDK from '../../../core/sdk/sdk.js';
 import type * as Protocol from '../../../generated/protocol.js';
+import type * as CrUXManager from '../../../models/crux-manager/crux-manager.js';
 
 import type {TraceWindowMicroSeconds} from './Timing.js';
 import type {Event, LegacyTimelineFrame, ProcessID, SampleIndex, ThreadID} from './TraceEvents.js';
@@ -177,12 +180,18 @@ export interface Modifications {
 export interface MetaData {
   source?: 'DevTools';
   startTime?: string;
+  emulatedDeviceTitle?: string;
+  // Only set if network throttling is active.
   networkThrottling?: string;
+  // Only set if network throttling is active.
+  networkThrottlingConditions?: Omit<SDK.NetworkManager.Conditions, 'title'>;
+  // Only set if CPU throttling is active.
   cpuThrottling?: number;
   hardwareConcurrency?: number;
   dataOrigin?: DataOrigin;
   modifications?: Modifications;
   enhancedTraceVersion?: number;
+  cruxFieldData?: CrUXManager.PageResult[];
 }
 
 export type Contents = TraceFile|Event[];

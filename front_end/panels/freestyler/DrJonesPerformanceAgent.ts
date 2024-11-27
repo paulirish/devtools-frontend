@@ -11,10 +11,10 @@ import * as PanelUtils from '../utils/utils.js';
 import {
   AgentType,
   AiAgent,
-  type AidaRequestOptions,
   type ContextResponse,
   ConversationContext,
   type ParsedResponse,
+  type RequestOptions,
   ResponseType,
 } from './AiAgent.js';
 
@@ -164,14 +164,14 @@ export class CallTreeContext extends ConversationContext<TimelineUtils.AICallTre
  * instance for a new conversation.
  */
 export class DrJonesPerformanceAgent extends AiAgent<TimelineUtils.AICallTree.AICallTree> {
-  override type = AgentType.DRJONES_PERFORMANCE;
+  override readonly type = AgentType.DRJONES_PERFORMANCE;
   readonly preamble = preamble;
   readonly clientFeature = Host.AidaClient.ClientFeature.CHROME_DRJONES_PERFORMANCE_AGENT;
   get userTier(): string|undefined {
     const config = Common.Settings.Settings.instance().getHostConfig();
     return config.devToolsAiAssistancePerformanceAgent?.userTier;
   }
-  get options(): AidaRequestOptions {
+  get options(): RequestOptions {
     const config = Common.Settings.Settings.instance().getHostConfig();
     const temperature = config.devToolsAiAssistancePerformanceAgent?.temperature;
     const modelId = config.devToolsAiAssistancePerformanceAgent?.modelId;
@@ -224,14 +224,3 @@ export class DrJonesPerformanceAgent extends AiAgent<TimelineUtils.AICallTree.AI
     };
   }
 }
-
-function setDebugFreestylerEnabled(enabled: boolean): void {
-  if (enabled) {
-    localStorage.setItem('debugFreestylerEnabled', 'true');
-  } else {
-    localStorage.removeItem('debugFreestylerEnabled');
-  }
-}
-
-// @ts-ignore
-globalThis.setDebugFreestylerEnabled = setDebugFreestylerEnabled;

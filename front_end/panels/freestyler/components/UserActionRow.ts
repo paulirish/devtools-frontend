@@ -155,6 +155,7 @@ export class UserActionRow extends HTMLElement {
 
   #handleClose = (): void => {
     this.#isShowingFeedbackForm = false;
+    this.#isSubmitButtonDisabled = true;
     this.#render();
   };
 
@@ -166,6 +167,7 @@ export class UserActionRow extends HTMLElement {
     }
     this.#props.onFeedbackSubmit(this.#currentRating, input.value);
     this.#isShowingFeedbackForm = false;
+    this.#isSubmitButtonDisabled = true;
     this.#render();
   };
 
@@ -288,21 +290,23 @@ export class UserActionRow extends HTMLElement {
         <span class="feedback-disclaimer">${
           lockedString(UIStringsNotTranslate.disclaimer)
         }</span>
-        <devtools-button
-        aria-label=${lockedString(UIStringsNotTranslate.submit)}
-        .data=${
-          {
-              type: 'submit',
-              disabled: this.#isSubmitButtonDisabled,
-              variant: Buttons.Button.Variant.OUTLINED,
-              size: Buttons.Button.Size.SMALL,
-              title: lockedString(UIStringsNotTranslate.submit),
-              jslogContext: 'send',
-            } as Buttons.Button.ButtonData
-          }
-        >${
-          lockedString(UIStringsNotTranslate.submit)
-        }</devtools-button>
+        <div>
+          <devtools-button
+          aria-label=${lockedString(UIStringsNotTranslate.submit)}
+          .data=${
+            {
+                type: 'submit',
+                disabled: this.#isSubmitButtonDisabled,
+                variant: Buttons.Button.Variant.OUTLINED,
+                size: Buttons.Button.Size.SMALL,
+                title: lockedString(UIStringsNotTranslate.submit),
+                jslogContext: 'send',
+              } as Buttons.Button.ButtonData
+            }
+          >${
+            lockedString(UIStringsNotTranslate.submit)
+          }</devtools-button>
+        </div>
       </div>
     </form>
     `;

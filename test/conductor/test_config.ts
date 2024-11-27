@@ -24,6 +24,7 @@ interface Config {
   chromeBinary: string;
   serverType: ServerType;
   debug: boolean;
+  headless: boolean;
   coverage: boolean;
   repetitions: number;
   onDiff: {update: boolean|string[], throw: boolean};
@@ -90,7 +91,7 @@ function configureChrome(executablePath: string) {
           path.join(SOURCE_ROOT, 'scripts', 'deps', 'set_lpac_acls.py'),
           path.dirname(executablePath),
         ],
-        {encoding: 'utf-8', stdio: 'inherit'});
+        {encoding: 'utf-8', stdio: 'inherit', shell: true});
     if (result.error || (result.status ?? 1) !== 0) {
       throw new Error('Setting permissions failed: ' + result.error?.message);
     }
@@ -103,6 +104,7 @@ export const TestConfig: Config = {
   chromeBinary: options['chrome-binary'] ?? defaultChromePath(),
   serverType: ServerType.HOSTED_MODE,
   debug: options['debug'],
+  headless: options['headless'],
   coverage: options['coverage'],
   repetitions: options['repeat'],
   onDiff: {

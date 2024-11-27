@@ -6,12 +6,14 @@ import * as Common from '../../core/common/common.js';
 import * as Platform from '../../core/platform/platform.js';
 import type * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import * as EmulationModel from '../../models/emulation/emulation.js';
 import {createTarget} from '../../testing/EnvironmentHelpers.js';
 import {describeWithMockConnection} from '../../testing/MockConnection.js';
 
 import * as CrUXManager from './crux-manager.js';
 
-function mockResponse(): CrUXManager.CrUXResponse {
+function mockResponse(scopes: {pageScope: CrUXManager.PageScope, deviceScope: CrUXManager.DeviceScope}|null = null):
+    CrUXManager.CrUXResponse {
   return {
     record: {
       key: {},
@@ -23,6 +25,8 @@ function mockResponse(): CrUXManager.CrUXResponse {
             {start: 4000, density: 0.2},
           ],
           percentiles: {p75: 1000},
+          // @ts-expect-error
+          testScopes: scopes,
         },
         cumulative_layout_shift: {
           histogram: [
@@ -31,6 +35,8 @@ function mockResponse(): CrUXManager.CrUXResponse {
             {start: 0.25, density: 0.8},
           ],
           percentiles: {p75: 0.25},
+          // @ts-expect-error
+          testScopes: scopes,
         },
       },
       collectionPeriod: {
@@ -60,6 +66,7 @@ describeWithMockConnection('CrUXManager', () => {
     cruxManager = CrUXManager.CrUXManager.instance({forceNew: true});
     mockFetch = sinon.stub(window, 'fetch');
     mockConsoleError = sinon.stub(console, 'error');
+    EmulationModel.DeviceModeModel.DeviceModeModel.instance({forceNew: true});
   });
 
   afterEach(() => {
@@ -139,6 +146,7 @@ describeWithMockConnection('CrUXManager', () => {
         'url-DESKTOP': mockResponse(),
         'url-PHONE': mockResponse(),
         'url-TABLET': null,
+        warnings: [],
       });
 
       assert.deepStrictEqual(fetchBodies, [
@@ -223,6 +231,7 @@ describeWithMockConnection('CrUXManager', () => {
         'url-DESKTOP': null,
         'url-PHONE': null,
         'url-TABLET': null,
+        warnings: [],
       });
     });
 
@@ -304,6 +313,17 @@ describeWithMockConnection('CrUXManager', () => {
 
     beforeEach(() => {
       getFieldDataMock = sinon.stub(cruxManager, 'getFieldDataForPage');
+      getFieldDataMock.resolves({
+        'origin-ALL': mockResponse({pageScope: 'origin', deviceScope: 'ALL'}),
+        'origin-DESKTOP': mockResponse({pageScope: 'origin', deviceScope: 'DESKTOP'}),
+        'origin-PHONE': mockResponse({pageScope: 'origin', deviceScope: 'PHONE'}),
+        'origin-TABLET': null,
+        'url-ALL': mockResponse({pageScope: 'url', deviceScope: 'ALL'}),
+        'url-DESKTOP': mockResponse({pageScope: 'url', deviceScope: 'DESKTOP'}),
+        'url-PHONE': mockResponse({pageScope: 'url', deviceScope: 'PHONE'}),
+        'url-TABLET': null,
+        warnings: [],
+      });
     });
 
     afterEach(() => {
@@ -320,8 +340,9 @@ describeWithMockConnection('CrUXManager', () => {
         isPrimaryFrame: () => false,
       } as SDK.ResourceTreeModel.ResourceTreeFrame);
 
-      await cruxManager.getFieldDataForCurrentPage();
+      const result = await cruxManager.getFieldDataForCurrentPage();
 
+      assert.deepStrictEqual(result.warnings, []);
       assert.strictEqual(getFieldDataMock.callCount, 1);
       assert.strictEqual(getFieldDataMock.firstCall.args[0], 'https://example.com/main/');
     });
@@ -331,8 +352,9 @@ describeWithMockConnection('CrUXManager', () => {
       cruxManager.getConfigSetting().set(
           {enabled: false, override: 'https://example.com/override', overrideEnabled: true});
 
-      await cruxManager.getFieldDataForCurrentPage();
+      const result = await cruxManager.getFieldDataForCurrentPage();
 
+      assert.deepStrictEqual(result.warnings, ['Field data is configured for a different URL than the current page.']);
       assert.strictEqual(getFieldDataMock.callCount, 1);
       assert.strictEqual(getFieldDataMock.firstCall.args[0], 'https://example.com/override');
     });
@@ -347,8 +369,9 @@ describeWithMockConnection('CrUXManager', () => {
         }],
       });
 
-      await cruxManager.getFieldDataForCurrentPage();
+      const result = await cruxManager.getFieldDataForCurrentPage();
 
+      assert.deepStrictEqual(result.warnings, ['Field data is configured for a different URL than the current page.']);
       assert.strictEqual(getFieldDataMock.callCount, 1);
       assert.strictEqual(getFieldDataMock.firstCall.args[0], 'https://example.com/inspected');
     });
@@ -365,8 +388,9 @@ describeWithMockConnection('CrUXManager', () => {
         }],
       });
 
-      await cruxManager.getFieldDataForCurrentPage();
+      const result = await cruxManager.getFieldDataForCurrentPage();
 
+      assert.deepStrictEqual(result.warnings, ['Field data is configured for a different URL than the current page.']);
       assert.strictEqual(getFieldDataMock.callCount, 1);
       assert.strictEqual(getFieldDataMock.firstCall.args[0], 'https://google.com');
     });
@@ -374,8 +398,9 @@ describeWithMockConnection('CrUXManager', () => {
     it('should use inspected URL if main document is unavailable', async () => {
       target.setInspectedURL('https://example.com/inspected' as Platform.DevToolsPath.UrlString);
 
-      await cruxManager.getFieldDataForCurrentPage();
+      const result = await cruxManager.getFieldDataForCurrentPage();
 
+      assert.deepStrictEqual(result.warnings, []);
       assert.strictEqual(getFieldDataMock.callCount, 1);
       assert.strictEqual(getFieldDataMock.firstCall.args[0], 'https://example.com/inspected');
     });
@@ -389,10 +414,65 @@ describeWithMockConnection('CrUXManager', () => {
 
       target.setInspectedURL('https://example.com/awaitInspected' as Platform.DevToolsPath.UrlString);
 
-      await finishPromise;
+      const result = await finishPromise;
 
+      assert.deepStrictEqual(result.warnings, []);
       assert.strictEqual(getFieldDataMock.callCount, 1);
       assert.strictEqual(getFieldDataMock.firstCall.args[0], 'https://example.com/awaitInspected');
+    });
+
+    it('getSelectedFieldMetricData - should take from selected page scope', async () => {
+      await cruxManager.getFieldDataForCurrentPage();
+
+      let data: CrUXManager.MetricResponse|undefined;
+
+      cruxManager.fieldPageScope = 'origin';
+      data = cruxManager.getSelectedFieldMetricData('largest_contentful_paint');
+      assert.strictEqual(data?.percentiles?.p75, 1000);
+      // @ts-expect-error
+      assert.strictEqual(data?.testScopes.pageScope, 'origin');
+
+      cruxManager.fieldPageScope = 'url';
+      data = cruxManager.getSelectedFieldMetricData('largest_contentful_paint');
+      assert.strictEqual(data?.percentiles?.p75, 1000);
+      // @ts-expect-error
+      assert.strictEqual(data?.testScopes.pageScope, 'url');
+    });
+
+    it('should take from selected device scope', async () => {
+      await cruxManager.getFieldDataForCurrentPage();
+      cruxManager.fieldPageScope = 'url';
+
+      let data: CrUXManager.MetricResponse|undefined;
+
+      cruxManager.fieldDeviceOption = 'ALL';
+      data = cruxManager.getSelectedFieldMetricData('largest_contentful_paint');
+      assert.strictEqual(data?.percentiles?.p75, 1000);
+      // @ts-expect-error
+      assert.strictEqual(data?.testScopes?.deviceScope, 'ALL');
+
+      cruxManager.fieldDeviceOption = 'PHONE';
+      data = cruxManager.getSelectedFieldMetricData('largest_contentful_paint');
+      assert.strictEqual(data?.percentiles?.p75, 1000);
+      // @ts-expect-error
+      assert.strictEqual(data?.testScopes?.deviceScope, 'PHONE');
+    });
+
+    it('auto device option should chose based on emulation', async () => {
+      cruxManager.fieldDeviceOption = 'AUTO';
+      assert.strictEqual(cruxManager.getSelectedDeviceScope(), 'ALL');
+
+      await cruxManager.getFieldDataForCurrentPage();
+      assert.strictEqual(cruxManager.getSelectedDeviceScope(), 'DESKTOP');
+
+      for (const device of EmulationModel.EmulatedDevices.EmulatedDevicesList.instance().standard()) {
+        if (device.title === 'Moto G Power') {
+          EmulationModel.DeviceModeModel.DeviceModeModel.instance().emulate(
+              EmulationModel.DeviceModeModel.Type.Device, device, device.modes[0], 1);
+        }
+      }
+
+      assert.strictEqual(cruxManager.getSelectedDeviceScope(), 'PHONE');
     });
   });
 

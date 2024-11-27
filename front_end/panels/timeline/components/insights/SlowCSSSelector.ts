@@ -15,25 +15,12 @@ import type * as Linkifier from '../../../../ui/components/linkifier/linkifier.j
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 import type * as Overlays from '../../overlays/overlays.js';
 
-import {BaseInsightComponent, shouldRenderForCategory} from './Helpers.js';
-import type * as SidebarInsight from './SidebarInsight.js';
+import {BaseInsightComponent} from './BaseInsightComponent.js';
 import type {TableData} from './Table.js';
-import {Category} from './types.js';
 
 const {html} = LitHtml;
 
 const UIStrings = {
-  /**
-   *@description Title of an insight that provides details about slow CSS selectors.
-   */
-  title: 'CSS Selector costs',
-
-  /**
-   * @description Text to describe how to improve the performance of CSS selectors.
-   */
-  description:
-      'If Recalculate Style costs remain high, selector optimization can reduce them. [Optimize the selectors](https://developer.chrome.com/docs/devtools/performance/selector-stats) with both high elapsed time and high slow-path %. Simpler selectors, fewer selectors, a smaller DOM, and a shallower DOM will all reduce matching costs.',
-
   /**
    *@description Column name for count of elements that the engine attempted to match against a style rule
    */
@@ -61,10 +48,7 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class SlowCSSSelector extends BaseInsightComponent<SlowCSSSelectorInsightModel> {
   static override readonly litTagName = LitHtml.literal`devtools-performance-slow-css-selector`;
-  override insightCategory: Category = Category.ALL;
   override internalName: string = 'slow-css-selector';
-  override userVisibleTitle: string = i18nString(UIStrings.title);
-  override description: string = i18nString(UIStrings.description);
   #selectorLocations: Map<string, Protocol.CSS.SourceRange[]> = new Map();
 
   override createOverlays(): Overlays.Overlays.TimelineOverlay[] {
@@ -132,88 +116,72 @@ export class SlowCSSSelector extends BaseInsightComponent<SlowCSSSelectorInsight
     return links;
   }
 
-  renderSlowCSSSelector(): LitHtml.LitTemplate {
+  #renderContent(): LitHtml.LitTemplate {
+    if (!this.model) {
+      return LitHtml.nothing;
+    }
+
     const target = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
     const cssModel = target?.model(SDK.CSSModel.CSSModel);
     const time = (us: Trace.Types.Timing.MicroSeconds): string =>
         i18n.TimeUtilities.millisToString(Platform.Timing.microSecondsToMilliSeconds(us));
 
     // clang-format off
-    return this.model ? html`
-      <div class="insights">
-        <devtools-performance-sidebar-insight .data=${{
-              title: this.userVisibleTitle,
-              description: this.description,
-              internalName: this.internalName,
-              expanded: this.isActive(),
-          } as SidebarInsight.InsightDetails}
-          @insighttoggleclick=${this.onSidebarClick} >
-          <div slot="insight-content">
-            <div class="insight-section">
-              ${html`<devtools-performance-table
-                .data=${{
-                  insight: this,
-                  headers: [i18nString(UIStrings.total), ''],
-                  rows: [
-                    {values: [i18nString(UIStrings.elapsed), i18n.TimeUtilities.millisToString(this.model.totalElapsedMs)]},
-                    {values: [i18nString(UIStrings.matchAttempts), this.model.totalMatchAttempts]},
-                    {values: [i18nString(UIStrings.matchCount), this.model.totalMatchCount]},
-                  ],
-                } as TableData}>
-              </devtools-performance-table>`}
-            </div>
-            <div class="insight-section">
-              ${html`<devtools-performance-table
-                .data=${{
-                  insight: this,
-                  headers: [i18nString(UIStrings.topSelectors), i18nString(UIStrings.elapsed)],
-                  rows: this.model.topElapsedMs.map(selector => {
-                    return {
-                      values: [
-                      html`${selector.selector} ${LitHtml.Directives.until(this.getSelectorLinks(cssModel, selector))}`,
-                      time(Trace.Types.Timing.MicroSeconds(selector['elapsed (us)']))],
-                    };
-                  }),
-                } as TableData}>
-              </devtools-performance-table>`}
-            </div>
-            <div class="insight-section">
-              ${html`<devtools-performance-table
-                .data=${{
-                  insight: this,
-                  headers: [i18nString(UIStrings.topSelectors), i18nString(UIStrings.matchAttempts)],
-                  rows: this.model.topMatchAttempts.map(selector => {
-                    return {
-                      values: [
-                      html`${selector.selector} ${LitHtml.Directives.until(this.getSelectorLinks(cssModel, selector))}` as unknown as string,
-                      selector['match_attempts']],
-                    };
-                  }),
-                } as TableData}>
-              </devtools-performance-table>`}
-            </div>
-          </div>
-        </devtools-performance-sidebar-insight>
-      </div>` : LitHtml.nothing;
+    return html`
+      <div>
+        <div class="insight-section">
+          ${html`<devtools-performance-table
+            .data=${{
+              insight: this,
+              headers: [i18nString(UIStrings.total), ''],
+              rows: [
+                {values: [i18nString(UIStrings.elapsed), i18n.TimeUtilities.millisToString(this.model.totalElapsedMs)]},
+                {values: [i18nString(UIStrings.matchAttempts), this.model.totalMatchAttempts]},
+                {values: [i18nString(UIStrings.matchCount), this.model.totalMatchCount]},
+              ],
+            } as TableData}>
+          </devtools-performance-table>`}
+        </div>
+        <div class="insight-section">
+          ${html`<devtools-performance-table
+            .data=${{
+              insight: this,
+              headers: [i18nString(UIStrings.topSelectors), i18nString(UIStrings.elapsed)],
+              rows: this.model.topElapsedMs.map(selector => {
+                return {
+                  values: [
+                  html`${selector.selector} ${LitHtml.Directives.until(this.getSelectorLinks(cssModel, selector))}`,
+                  time(Trace.Types.Timing.MicroSeconds(selector['elapsed (us)']))],
+                };
+              }),
+            } as TableData}>
+          </devtools-performance-table>`}
+        </div>
+        <div class="insight-section">
+          ${html`<devtools-performance-table
+            .data=${{
+              insight: this,
+              headers: [i18nString(UIStrings.topSelectors), i18nString(UIStrings.matchAttempts)],
+              rows: this.model.topMatchAttempts.map(selector => {
+                return {
+                  values: [
+                  html`${selector.selector} ${LitHtml.Directives.until(this.getSelectorLinks(cssModel, selector))}` as unknown as string,
+                  selector['match_attempts']],
+                };
+              }),
+            } as TableData}>
+          </devtools-performance-table>`}
+        </div>
+      </div>`;
     // clang-format on
   }
 
-  #hasDataToRender(): boolean {
-    return this.model !== null && this.model.topElapsedMs.length !== 0 && this.model.topMatchAttempts.length !== 0;
-  }
-
-  override getRelatedEvents(): Trace.Types.Events.Event[] {
-    return this.model?.relatedEvents ?? [];
-  }
-
   override render(): void {
-    const matchesCategory = shouldRenderForCategory({
-      activeCategory: this.data.activeCategory,
-      insightCategory: this.insightCategory,
-    });
-    const shouldRender = matchesCategory && this.#hasDataToRender();
-    const output = shouldRender ? this.renderSlowCSSSelector() : LitHtml.nothing;
-    LitHtml.render(output, this.shadow, {host: this});
+    if (!this.model) {
+      return;
+    }
+
+    this.renderWithContent(this.#renderContent());
   }
 }
 

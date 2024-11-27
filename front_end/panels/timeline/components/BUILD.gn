@@ -20,10 +20,12 @@ generate_css("css_files") {
     "networkRequestDetails.css",
     "networkRequestTooltip.css",
     "networkThrottlingSelector.css",
+    "originMap.css",
     "relatedInsightChips.css",
     "sidebarAnnotationsTab.css",
     "sidebarInsightsTab.css",
     "sidebarSingleInsightSet.css",
+    "timelineSummary.css",
   ]
 }
 
@@ -42,11 +44,13 @@ devtools_module("components") {
     "NetworkRequestDetails.ts",
     "NetworkRequestTooltip.ts",
     "NetworkThrottlingSelector.ts",
+    "OriginMap.ts",
     "RelatedInsightChips.ts",
     "Sidebar.ts",
     "SidebarAnnotationsTab.ts",
     "SidebarInsightsTab.ts",
     "SidebarSingleInsightSet.ts",
+    "TimelineSummary.ts",
     "Utils.ts",
   ]
 
@@ -113,11 +117,13 @@ ts_library("unittests") {
     "MetricCard.test.ts",
     "NetworkRequestDetails.test.ts",
     "NetworkThrottlingSelector.test.ts",
+    "OriginMap.test.ts",
     "RelatedInsightChips.test.ts",
     "Sidebar.test.ts",
     "SidebarAnnotationsTab.test.ts",
     "SidebarInsightsTab.test.ts",
     "SidebarSingleInsightSet.test.ts",
+    "TimelineSummary.test.ts",
     "Utils.test.ts",
   ]
 

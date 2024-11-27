@@ -202,8 +202,8 @@ export class TimelineMiniMap extends
     };
   }
 
-  highlightBounds(bounds: Trace.Types.Timing.TraceWindowMicroSeconds): void {
-    this.#overviewComponent.highlightBounds(bounds);
+  highlightBounds(bounds: Trace.Types.Timing.TraceWindowMicroSeconds, withBracket: boolean = false): void {
+    this.#overviewComponent.highlightBounds(bounds, withBracket);
   }
   clearBoundsHighlight(): void {
     this.#overviewComponent.clearBoundsHighlight();
@@ -240,7 +240,7 @@ export class TimelineMiniMap extends
   }
 
   #setMarkers(parsedTrace: Trace.Handlers.Types.ParsedTrace): void {
-    const markers = new Map<number, Element>();
+    const markers = new Map<number, HTMLDivElement>();
 
     const {Meta, PageLoadMetrics} = parsedTrace;
 

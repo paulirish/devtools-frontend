@@ -164,7 +164,7 @@ export class HeapProfileView extends ProfileView implements UI.SearchableView.Se
   onIdsRangeChanged(event: Common.EventTarget.EventTargetEvent<IdsRangeChangedEvent>): void {
     const {minId, maxId} = event.data;
     this.selectedSizeText.setText(
-        i18nString(UIStrings.selectedSizeS, {PH1: Platform.NumberUtilities.bytesToString(event.data.size)}));
+        i18nString(UIStrings.selectedSizeS, {PH1: i18n.ByteUtilities.bytesToString(event.data.size)}));
     this.setSelectionRange(minId, maxId);
   }
 
@@ -675,28 +675,28 @@ export class HeapFlameChartDataProvider extends ProfileFlameChartDataProvider {
     return this.timelineDataInternal;
   }
 
-  override prepareHighlightedEntryInfo(entryIndex: number): Element|null {
+  override preparePopoverElement(entryIndex: number): Element|null {
     const node = this.entryNodes[entryIndex];
     if (!node) {
       return null;
     }
-    const entryInfo: {
+    const popoverInfo: {
       title: string,
       value: string,
     }[] = [];
-    function pushEntryInfoRow(title: string, value: string): void {
-      entryInfo.push({title, value});
+    function pushRow(title: string, value: string): void {
+      popoverInfo.push({title, value});
     }
-    pushEntryInfoRow(i18nString(UIStrings.name), UI.UIUtils.beautifyFunctionName(node.functionName));
-    pushEntryInfoRow(i18nString(UIStrings.selfSize), Platform.NumberUtilities.bytesToString(node.self));
-    pushEntryInfoRow(i18nString(UIStrings.totalSize), Platform.NumberUtilities.bytesToString(node.total));
+    pushRow(i18nString(UIStrings.name), UI.UIUtils.beautifyFunctionName(node.functionName));
+    pushRow(i18nString(UIStrings.selfSize), i18n.ByteUtilities.bytesToString(node.self));
+    pushRow(i18nString(UIStrings.totalSize), i18n.ByteUtilities.bytesToString(node.total));
     const linkifier = new Components.Linkifier.Linkifier();
     const link = linkifier.maybeLinkifyConsoleCallFrame(
         this.heapProfilerModel ? this.heapProfilerModel.target() : null, node.callFrame);
     if (link) {
-      pushEntryInfoRow(i18nString(UIStrings.url), (link.textContent as string));
+      pushRow(i18nString(UIStrings.url), (link.textContent as string));
     }
     linkifier.dispose();
-    return ProfileView.buildPopoverTable(entryInfo);
+    return ProfileView.buildPopoverTable(popoverInfo);
   }
 }

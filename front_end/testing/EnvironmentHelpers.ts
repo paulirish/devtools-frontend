@@ -123,7 +123,6 @@ const REGISTERED_EXPERIMENTS = [
   'font-editor',
   Root.Runtime.ExperimentName.NETWORK_PANEL_FILTER_BAR_REDESIGN,
   Root.Runtime.ExperimentName.AUTOFILL_VIEW,
-  Root.Runtime.ExperimentName.TIMELINE_ANNOTATIONS,
   Root.Runtime.ExperimentName.TIMELINE_INSIGHTS,
   Root.Runtime.ExperimentName.TIMELINE_DEBUG_MODE,
   Root.Runtime.ExperimentName.TIMELINE_OBSERVATIONS,
@@ -131,7 +130,6 @@ const REGISTERED_EXPERIMENTS = [
   Root.Runtime.ExperimentName.FULL_ACCESSIBILITY_TREE,
   Root.Runtime.ExperimentName.TIMELINE_SHOW_POST_MESSAGE_EVENTS,
   Root.Runtime.ExperimentName.TIMELINE_ENHANCED_TRACES,
-  Root.Runtime.ExperimentName.EXTENSION_STORAGE_VIEWER,
   Root.Runtime.ExperimentName.TIMELINE_EXPERIMENTAL_INSIGHTS,
   Root.Runtime.ExperimentName.TIMELINE_DIM_UNRELATED_EVENTS,
   Root.Runtime.ExperimentName.TIMELINE_ALTERNATIVE_NAVIGATION,
@@ -287,7 +285,7 @@ export async function initializeGlobalVars({reset = true} = {}) {
     createSettingValue(
         Common.Settings.SettingCategory.CONSOLE, 'console-trace-expand', false, Common.Settings.SettingType.BOOLEAN),
     createSettingValue(
-        Common.Settings.SettingCategory.PERFORMANCE, 'flamechart-mouse-wheel-action', false,
+        Common.Settings.SettingCategory.PERFORMANCE, 'flamechart-selected-navigation', false,
         Common.Settings.SettingType.ENUM),
     createSettingValue(
         Common.Settings.SettingCategory.ELEMENTS, 'show-css-property-documentation-on-hover', false,

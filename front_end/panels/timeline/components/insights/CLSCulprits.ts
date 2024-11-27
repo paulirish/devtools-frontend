@@ -8,21 +8,12 @@ import * as Trace from '../../../../models/trace/trace.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 import type * as Overlays from '../../overlays/overlays.js';
 
+import {BaseInsightComponent} from './BaseInsightComponent.js';
 import {EventReferenceClick} from './EventRef.js';
-import {BaseInsightComponent, shouldRenderForCategory} from './Helpers.js';
-import {Category} from './types.js';
 
 const {html} = LitHtml;
 
 const UIStrings = {
-  /** Title of an insight that provides details about why elements shift/move on the page. The causes for these shifts are referred to as culprits ("reasons"). */
-  title: 'Layout shift culprits',
-  /**
-   * @description Description of a DevTools insight that identifies the reasons that elements shift on the page.
-   * This is displayed after a user expands the section to see more. No character length limits.
-   */
-  description:
-      'Layout shifts occur when elements move absent any user interaction. [Investigate the causes of layout shifts](https://web.dev/articles/optimize-cls), such as elements being added, removed, or their fonts changing as the page loads.',
   /**
    *@description Text indicating the worst layout shift cluster.
    */
@@ -62,10 +53,7 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class CLSCulprits extends BaseInsightComponent<CLSCulpritsInsightModel> {
   static override readonly litTagName = LitHtml.literal`devtools-performance-cls-culprits`;
-  override insightCategory: Category = Category.CLS;
   override internalName: string = 'cls-culprits';
-  override userVisibleTitle: string = i18nString(UIStrings.title);
-  override description: string = i18nString(UIStrings.description);
 
   override createOverlays(): Overlays.Overlays.TimelineOverlay[] {
     const clustersByScore =
@@ -137,38 +125,23 @@ export class CLSCulprits extends BaseInsightComponent<CLSCulpritsInsightModel> {
     this.dispatchEvent(new EventReferenceClick(event));
   }
 
-  #render(culprits: Array<string>, worstCluster: Trace.Types.Events.SyntheticLayoutShiftCluster):
-      LitHtml.TemplateResult {
+  #renderContent(culprits: Array<string>, worstCluster: Trace.Types.Events.SyntheticLayoutShiftCluster):
+      LitHtml.LitTemplate {
     const ts = Trace.Types.Timing.MicroSeconds(worstCluster.ts - (this.data.parsedTrace?.Meta.traceBounds.min ?? 0));
     const clusterTs = i18n.TimeUtilities.formatMicroSecondsTime(ts);
 
-    // TODO(crbug.com/369102516): use Table for hover/click ux.
     // clang-format off
     return html`
-        <div class="insights">
-            <devtools-performance-sidebar-insight .data=${{
-              title: this.userVisibleTitle,
-              description: this.description,
-              internalName: this.internalName,
-              expanded: this.isActive(),
-            }}
-            @insighttoggleclick=${this.onSidebarClick}>
-                <div slot="insight-content" class="insight-section">
-                  <span class="worst-cluster">${i18nString(UIStrings.worstCluster)}: <button type="button" class="timeline-link" @click=${() => this.#clickEvent(worstCluster)}>${i18nString(UIStrings.layoutShiftCluster, {PH1: clusterTs})}</button></span>
-                    <p>${i18nString(UIStrings.topCulprits)}:</p>
-                        ${culprits.map(culprit => {
-                          return html `
-                            <li>${culprit}</li>
-                          `;
-                        })}
-                </div>
-            </devtools-performance-sidebar-insight>
-        </div>`;
-              // clang-format on
-  }
-
-  override getRelatedEvents(): Trace.Types.Events.Event[] {
-    return this.model?.relatedEvents ?? [];
+      <div class="insight-section">
+        <span class="worst-cluster">${i18nString(UIStrings.worstCluster)}: <button type="button" class="timeline-link" @click=${() => this.#clickEvent(worstCluster)}>${i18nString(UIStrings.layoutShiftCluster, {PH1: clusterTs})}</button></span>
+          <p>${i18nString(UIStrings.topCulprits)}:</p>
+              ${culprits.map(culprit => {
+                return html `
+                  <li>${culprit}</li>
+                `;
+              })}
+      </div>`;
+    // clang-format on
   }
 
   override render(): void {
@@ -177,21 +150,17 @@ export class CLSCulprits extends BaseInsightComponent<CLSCulpritsInsightModel> {
     }
 
     const culpritsByShift = this.model.shifts;
-    const clusters = this.model.clusters ?? [];
-    if (!clusters.length || !this.model.worstCluster) {
+    if (!this.model.clusters.length || !this.model.worstCluster) {
       return;
     }
 
+    // TODO: getTopCulprits needs to move to model.
     const causes = this.getTopCulprits(this.model.worstCluster, culpritsByShift);
 
     const hasCulprits = causes.length > 0;
 
-    const matchesCategory = shouldRenderForCategory({
-      activeCategory: this.data.activeCategory,
-      insightCategory: this.insightCategory,
-    });
-    const output = hasCulprits && matchesCategory ? this.#render(causes, this.model.worstCluster) : LitHtml.nothing;
-    LitHtml.render(output, this.shadow, {host: this});
+    const output = hasCulprits ? this.#renderContent(causes, this.model.worstCluster) : LitHtml.nothing;
+    this.renderWithContent(output);
   }
 }
 

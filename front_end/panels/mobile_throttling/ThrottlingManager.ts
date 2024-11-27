@@ -21,6 +21,16 @@ import {
   ThrottlingPresets,
 } from './ThrottlingPresets.js';
 
+export interface CPUThrottlingSelectorWrapper {
+  control: UI.Toolbar.ToolbarComboBox;
+  updateRecommendedRate(recommendedRate: number|null): void;
+}
+
+export interface NetworkThrottlingSelectorWrapper {
+  selector: NetworkThrottlingSelector;
+  updateRecommendedConditions(recommendedConditions: SDK.NetworkManager.Conditions|null): void;
+}
+
 const UIStrings = {
   /**
    *@description Text with two placeholders separated by a colon
@@ -82,6 +92,12 @@ const UIStrings = {
    *@description Tooltip text for an input box that overrides navigator.hardwareConcurrency on the page
    */
   hardwareConcurrencySettingLabel: 'Override the value reported by navigator.hardwareConcurrency',
+  /**
+   * @description Text label for a selection box showing that a specific option is recommended.
+   * @example {Fast 4G} PH1
+   * @example {4x slowdown} PH1
+   */
+  recommendedThrottling: '{PH1} - recommended',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/mobile_throttling/ThrottlingManager.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -133,68 +149,6 @@ export class ThrottlingManager {
     }
 
     return throttlingManagerInstance;
-  }
-
-  decorateSelectWithNetworkThrottling(selectElement: HTMLSelectElement): NetworkThrottlingSelector {
-    let options: (SDK.NetworkManager.Conditions|null)[] = [];
-    const selector = new NetworkThrottlingSelector(populate, select, this.customNetworkConditionsSetting);
-    selectElement.setAttribute(
-        'jslog',
-        `${
-            VisualLogging.dropDown()
-                .track({change: true})
-                .context(this.currentNetworkThrottlingConditionsSetting.name)}`);
-    selectElement.addEventListener('change', optionSelected, false);
-    return selector;
-
-    function populate(groups: NetworkThrottlingConditionsGroup[]): (SDK.NetworkManager.Conditions|null)[] {
-      selectElement.removeChildren();
-      options = [];
-      for (let i = 0; i < groups.length; ++i) {
-        const group = groups[i];
-        const groupElement = selectElement.createChild('optgroup') as HTMLOptGroupElement;
-        groupElement.label = group.title;
-        for (const conditions of group.items) {
-          // The title is usually an i18nLazyString except for custom values that are stored in the local storage in the form of a string.
-          const title = typeof conditions.title === 'function' ? conditions.title() : conditions.title;
-          const option = new Option(title, title);
-          UI.ARIAUtils.setLabel(option, i18nString(UIStrings.sS, {PH1: group.title, PH2: title}));
-          const jslogContext = i === groups.length - 1 ?
-              'custom-network-throttling-item' :
-              Platform.StringUtilities.toKebabCase(conditions.i18nTitleKey || title);
-          option.setAttribute('jslog', `${VisualLogging.item(jslogContext).track({
-                                click: true,
-                              })}`);
-          groupElement.appendChild(option);
-          options.push(conditions);
-        }
-        if (i === groups.length - 1) {
-          const option = new Option(i18nString(UIStrings.add), i18nString(UIStrings.add));
-          UI.ARIAUtils.setLabel(option, i18nString(UIStrings.addS, {PH1: group.title}));
-          option.setAttribute('jslog', `${VisualLogging.action('add').track({click: true})}`);
-          groupElement.appendChild(option);
-          options.push(null);
-        }
-      }
-      return options;
-    }
-
-    function optionSelected(): void {
-      if (selectElement.selectedIndex === selectElement.options.length - 1) {
-        selector.revealAndUpdate();
-      } else {
-        const option = options[selectElement.selectedIndex];
-        if (option) {
-          selector.optionSelected(option);
-        }
-      }
-    }
-
-    function select(index: number): void {
-      if (selectElement.selectedIndex !== index) {
-        selectElement.selectedIndex = index;
-      }
-    }
   }
 
   createOfflineToolbarCheckbox(): UI.Toolbar.ToolbarCheckbox {
@@ -267,7 +221,7 @@ export class ThrottlingManager {
       const option = options[index];
       if (option) {
         button.setText(option.title);
-        button.setTitle(`${option.title} ${option.description}`);
+        button.setTitle(`${option.title}: ${option.description}`);
       }
     }
   }
@@ -296,12 +250,97 @@ export class ThrottlingManager {
     this.updatePanelIcon();
   }
 
-  createCPUThrottlingSelector(): UI.Toolbar.ToolbarComboBox {
+  createNetworkThrottlingSelector(selectElement: HTMLSelectElement): NetworkThrottlingSelectorWrapper {
+    let options: (SDK.NetworkManager.Conditions|null)[] = [];
+    let titles: string[] = [];
+    let optionEls: HTMLOptionElement[] = [];
+    const selector = new NetworkThrottlingSelector(populate, select, this.customNetworkConditionsSetting);
+    selectElement.setAttribute(
+        'jslog',
+        `${
+            VisualLogging.dropDown()
+                .track({change: true})
+                .context(this.currentNetworkThrottlingConditionsSetting.name)}`);
+    selectElement.addEventListener('change', optionSelected, false);
+
+    function populate(groups: NetworkThrottlingConditionsGroup[]): (SDK.NetworkManager.Conditions|null)[] {
+      selectElement.removeChildren();
+      options = [];
+      titles = [];
+      optionEls = [];
+      for (let i = 0; i < groups.length; ++i) {
+        const group = groups[i];
+        const groupElement = selectElement.createChild('optgroup') as HTMLOptGroupElement;
+        groupElement.label = group.title;
+        for (const conditions of group.items) {
+          // The title is usually an i18nLazyString except for custom values that are stored in the local storage in the form of a string.
+          const title = typeof conditions.title === 'function' ? conditions.title() : conditions.title;
+          const option = new Option(title, title);
+          UI.ARIAUtils.setLabel(option, i18nString(UIStrings.sS, {PH1: group.title, PH2: title}));
+          const jslogContext = i === groups.length - 1 ?
+              'custom-network-throttling-item' :
+              Platform.StringUtilities.toKebabCase(conditions.i18nTitleKey || title);
+          option.setAttribute('jslog', `${VisualLogging.item(jslogContext).track({
+                                click: true,
+                              })}`);
+          groupElement.appendChild(option);
+          options.push(conditions);
+
+          titles.push(title);
+          optionEls.push(option);
+        }
+        if (i === groups.length - 1) {
+          const option = new Option(i18nString(UIStrings.add), i18nString(UIStrings.add));
+          UI.ARIAUtils.setLabel(option, i18nString(UIStrings.addS, {PH1: group.title}));
+          option.setAttribute('jslog', `${VisualLogging.action('add').track({click: true})}`);
+          groupElement.appendChild(option);
+          options.push(null);
+        }
+      }
+      return options;
+    }
+
+    function optionSelected(): void {
+      if (selectElement.selectedIndex === selectElement.options.length - 1) {
+        selector.revealAndUpdate();
+      } else {
+        const option = options[selectElement.selectedIndex];
+        if (option) {
+          selector.optionSelected(option);
+        }
+      }
+    }
+
+    function select(index: number): void {
+      if (selectElement.selectedIndex !== index) {
+        selectElement.selectedIndex = index;
+      }
+    }
+
+    return {
+      selector,
+      updateRecommendedConditions(recommendedConditions: SDK.NetworkManager.Conditions|null) {
+        for (let i = 0; i < optionEls.length; i++) {
+          let title = titles[i];
+          if (options[i] === recommendedConditions) {
+            title = i18nString(UIStrings.recommendedThrottling, {PH1: title});
+          }
+          optionEls[i].text = title;
+        }
+      },
+    };
+  }
+
+  createCPUThrottlingSelector(): CPUThrottlingSelectorWrapper {
     const control = new UI.Toolbar.ToolbarComboBox(
         event => this.setCPUThrottlingRate(this.cpuThrottlingRates[(event.target as HTMLSelectElement).selectedIndex]),
         i18nString(UIStrings.cpuThrottling), '', 'cpu-throttling');
     this.cpuThrottlingControls.add(control);
     const currentRate = this.cpuThrottlingManager.cpuThrottlingRate();
+
+    const titles: string[] = [];
+    const optionEls: HTMLOptionElement[] = [];
+    const rates = this.cpuThrottlingRates;
 
     for (let i = 0; i < this.cpuThrottlingRates.length; ++i) {
       const rate = this.cpuThrottlingRates[i];
@@ -312,8 +351,23 @@ export class ThrottlingManager {
       if (currentRate === rate) {
         control.setSelectedIndex(i);
       }
+
+      titles.push(title);
+      optionEls.push(option);
     }
-    return control;
+
+    return {
+      control,
+      updateRecommendedRate(recommendedRate: number|null) {
+        for (let i = 0; i < optionEls.length; i++) {
+          let title = titles[i];
+          if (rates[i] === recommendedRate) {
+            title = i18nString(UIStrings.recommendedThrottling, {PH1: title});
+          }
+          optionEls[i].text = title;
+        }
+      },
+    };
   }
 
   /** Hardware Concurrency doesn't store state in a setting. */

@@ -8,6 +8,7 @@ import * as i18n from '../../core/i18n/i18n.js';
 import type * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
+import * as ThirdPartyWeb from '../../third_party/third-party-web/third-party-web.js';
 
 import {Issue, IssueCategory, IssueKind} from './Issue.js';
 import {
@@ -67,6 +68,23 @@ export const enum CookieIssueSubCategory {
   THIRD_PARTY_PHASEOUT_COOKIE = 'ThirdPartyPhaseoutCookie',
 }
 
+// Enum to show cookie status from the security panel's third-party cookie report tool
+export const enum CookieStatus {
+  BLOCKED = 0,
+  ALLOWED = 1,
+  ALLOWED_BY_GRACE_PERIOD = 2,
+  ALLOWED_BY_HEURISTICS = 3,
+}
+
+export interface CookieReportInfo {
+  name: string;
+  domain: string;
+  type?: string;
+  platform?: string;
+  status: CookieStatus;
+  insight?: Protocol.Audits.CookieIssueInsight;
+}
+
 export class CookieIssue extends Issue {
   #issueDetails: Protocol.Audits.CookieIssueDetails;
 
@@ -77,7 +95,7 @@ export class CookieIssue extends Issue {
     this.#issueDetails = issueDetails;
   }
 
-  #cookieId(): string {
+  cookieId(): string {
     if (this.#issueDetails.cookie) {
       const {domain, path, name} = this.#issueDetails.cookie;
       const cookieId = `${domain};${path};${name}`;
@@ -88,7 +106,7 @@ export class CookieIssue extends Issue {
 
   primaryKey(): string {
     const requestId = this.#issueDetails.request ? this.#issueDetails.request.requestId : 'no-request';
-    return `${this.code()}-(${this.#cookieId()})-(${requestId})`;
+    return `${this.code()}-(${this.cookieId()})-(${requestId})`;
   }
 
   /**
@@ -197,6 +215,14 @@ export class CookieIssue extends Issue {
         reason === Protocol.Audits.CookieWarningReason.WarnSameSiteLaxCrossDowngradeStrict) {
       return [Protocol.Audits.InspectorIssueCode.CookieIssue, 'WarnCrossDowngrade', operation, secure].join('::');
     }
+
+    if (reason === Protocol.Audits.CookieExclusionReason.ExcludePortMismatch) {
+      return [Protocol.Audits.InspectorIssueCode.CookieIssue, 'ExcludePortMismatch'].join('::');
+    }
+
+    if (reason === Protocol.Audits.CookieExclusionReason.ExcludeSchemeMismatch) {
+      return [Protocol.Audits.InspectorIssueCode.CookieIssue, 'ExcludeSchemeMismatch'].join('::');
+    }
     return [Protocol.Audits.InspectorIssueCode.CookieIssue, reason, operation].join('::');
   }
 
@@ -243,6 +269,46 @@ export class CookieIssue extends Issue {
       return IssueKind.PAGE_ERROR;
     }
     return IssueKind.BREAKING_CHANGE;
+  }
+
+  makeCookieReportEntry(): CookieReportInfo|undefined {
+    const status = CookieIssue.getCookieStatus(this.#issueDetails);
+    if (this.#issueDetails.cookie && this.#issueDetails.cookieUrl && status !== undefined) {
+      const entity = ThirdPartyWeb.ThirdPartyWeb.getEntity(this.#issueDetails.cookieUrl);
+      return {
+        name: this.#issueDetails.cookie.name,
+        domain: this.#issueDetails.cookie.domain,
+        type: entity?.category,
+        platform: entity?.name,
+        status,
+        insight: this.#issueDetails.insight,
+      };
+    }
+
+    return;
+  }
+
+  static getCookieStatus(cookieIssueDetails: Protocol.Audits.CookieIssueDetails): CookieStatus|undefined {
+    if (cookieIssueDetails.cookieExclusionReasons.includes(
+            Protocol.Audits.CookieExclusionReason.ExcludeThirdPartyPhaseout)) {
+      return CookieStatus.BLOCKED;
+    }
+
+    if (cookieIssueDetails.cookieWarningReasons.includes(
+            Protocol.Audits.CookieWarningReason.WarnDeprecationTrialMetadata)) {
+      return CookieStatus.ALLOWED_BY_GRACE_PERIOD;
+    }
+
+    if (cookieIssueDetails.cookieWarningReasons.includes(
+            Protocol.Audits.CookieWarningReason.WarnThirdPartyCookieHeuristic)) {
+      return CookieStatus.ALLOWED_BY_HEURISTICS;
+    }
+
+    if (cookieIssueDetails.cookieWarningReasons.includes(Protocol.Audits.CookieWarningReason.WarnThirdPartyPhaseout)) {
+      return CookieStatus.ALLOWED;
+    }
+
+    return;
   }
 
   static fromInspectorIssue(issuesModel: SDK.IssuesModel.IssuesModel, inspectorIssue: Protocol.Audits.InspectorIssue):
@@ -542,6 +608,16 @@ const cookieCrossSiteRedirectDowngrade: LazyMarkdownIssueDescription = {
   }],
 };
 
+const ExcludePortMismatch: LazyMarkdownIssueDescription = {
+  file: 'cookieExcludePortMismatch.md',
+  links: [],
+};
+
+const ExcludeSchemeMismatch: LazyMarkdownIssueDescription = {
+  file: 'cookieExcludeSchemeMismatch.md',
+  links: [],
+};
+
 // This description will be used by cookie issues that need to be added to the
 // issueManager, but aren't intended to be surfaced in the issues pane. This
 // is why they are using a placeholder description
@@ -600,4 +676,6 @@ const issueDescriptions: Map<string, LazyMarkdownIssueDescription> = new Map([
   ['CookieIssue::ExcludeThirdPartyPhaseout::ReadCookie', cookieExcludeThirdPartyPhaseoutRead],
   ['CookieIssue::ExcludeThirdPartyPhaseout::SetCookie', cookieExcludeThirdPartyPhaseoutSet],
   ['CookieIssue::CrossSiteRedirectDowngradeChangesInclusion', cookieCrossSiteRedirectDowngrade],
+  ['CookieIssue::ExcludePortMismatch', ExcludePortMismatch],
+  ['CookieIssue::ExcludeSchemeMismatch', ExcludeSchemeMismatch],
 ]);

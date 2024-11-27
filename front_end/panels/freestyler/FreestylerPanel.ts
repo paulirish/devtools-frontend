@@ -23,7 +23,11 @@ import {
   ErrorType,
   type ResponseData,
   ResponseType,
+  type SerializedAgent,
 } from './AiAgent.js';
+import {
+  AiHistoryStorage,
+} from './AiHistoryStorage.js';
 import {ChangeManager} from './ChangeManager.js';
 import {
   ChatMessageEntity,
@@ -80,13 +84,13 @@ const UIStrings = {
    */
   history: 'History',
   /**
-   *@description AI assistance UI text deleting the current chat session.
+   *@description AI assistance UI text deleting the current chat session from local history.
    */
-  deleteChat: 'Delete chat',
+  deleteChat: 'Delete local chat',
   /**
-   *@description AI assistance UI text that deletes all history entries.
+   *@description AI assistance UI text that deletes all local history entries.
    */
-  clearChatHistory: 'Clear chat history',
+  clearChatHistory: 'Clear local chats',
   /**
    *@description AI assistance UI text explains that he user had no pas conversations.
    */
@@ -190,6 +194,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
   #agents = new Set<AiAgent<unknown>>();
   #currentAgent?: AiAgent<unknown>;
 
+  #previousSameOriginContext?: ConversationContext<unknown>;
   #selectedFile: FileContext|null = null;
   #selectedElement: NodeContext|null = null;
   #selectedCallTree: CallTreeContext|null = null;
@@ -223,7 +228,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
       onFeedbackSubmit: this.#handleFeedbackSubmit.bind(this),
       onCancelClick: this.#cancel.bind(this),
       onContextClick: this.#handleContextClick.bind(this),
-      onNewConversation: this.#newChat.bind(this),
+      onNewConversation: this.#handleNewChatRequest.bind(this),
       canShowFeedbackForm: this.#serverSideLoggingEnabled,
       userInfo: {
         accountImage: syncInfo.accountImage,
@@ -234,6 +239,10 @@ export class FreestylerPanel extends UI.Panel.Panel {
       stripLinks: false,
       isReadOnly: false,
     };
+
+    for (const historyEntry of AiHistoryStorage.instance().getHistory()) {
+      this.#createAgent(historyEntry.type, historyEntry);
+    }
   }
 
   #createToolbar(): void {
@@ -241,7 +250,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
     const leftToolbar = new UI.Toolbar.Toolbar('freestyler-left-toolbar', toolbarContainer);
     const rightToolbar = new UI.Toolbar.Toolbar('freestyler-right-toolbar', toolbarContainer);
 
-    this.#newChatButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, this.#newChat.bind(this));
+    this.#newChatButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, this.#handleNewChatRequest.bind(this));
     leftToolbar.appendToolbarItem(this.#newChatButton);
     leftToolbar.appendSeparator();
 
@@ -257,8 +266,9 @@ export class FreestylerPanel extends UI.Panel.Panel {
         AI_ASSISTANCE_SEND_FEEDBACK, i18nString(UIStrings.sendFeedback), undefined, undefined,
         'freestyler.send-feedback');
     link.style.setProperty('display', null);
-    link.style.setProperty('text-decoration', 'none');
-    link.style.setProperty('padding', '0 var(--sys-size-3)');
+    link.style.setProperty('color', 'var(--sys-color-primary)');
+    link.style.setProperty('margin', '0 var(--sys-size-3)');
+    link.style.setProperty('height', 'calc(100% - 6px)');
     const linkItem = new UI.Toolbar.ToolbarItem(link);
     rightToolbar.appendToolbarItem(linkItem);
 
@@ -292,58 +302,44 @@ export class FreestylerPanel extends UI.Panel.Panel {
     }
   }
 
-  #createAgent(agentType: AgentType): AiAgent<unknown> {
+  #createAgent(agentType: AgentType, history?: SerializedAgent): AiAgent<unknown> {
+    const options = {
+      aidaClient: this.#aidaClient,
+      serverSideLoggingEnabled: this.#serverSideLoggingEnabled,
+    };
+    let agent: AiAgent<unknown>;
     switch (agentType) {
-      case AgentType.FREESTYLER:
-        return this.#createFreestylerAgent();
-      case AgentType.DRJONES_FILE:
-        return this.#createDrJonesFileAgent();
-      case AgentType.DRJONES_NETWORK_REQUEST:
-        return this.#createDrJonesNetworkAgent();
-      case AgentType.DRJONES_PERFORMANCE:
-        return this.#createDrJonesPerformanceAgent();
+      case AgentType.FREESTYLER: {
+        agent = new FreestylerAgent({
+          ...options,
+          changeManager: this.#changeManager,
+        });
+        break;
+      }
+      case AgentType.DRJONES_NETWORK_REQUEST: {
+        agent = new DrJonesNetworkAgent(options);
+        break;
+      }
+      case AgentType.DRJONES_FILE: {
+        agent = new DrJonesFileAgent(options);
+        break;
+      }
+      case AgentType.DRJONES_PERFORMANCE: {
+        agent = new DrJonesPerformanceAgent(options);
+        break;
+      }
     }
+
+    if (history) {
+      agent.populateHistoryFromStorage(history);
+    }
+
+    this.#agents.add(agent);
+    return agent;
   }
 
   #updateToolbarState(): void {
     this.#deleteHistoryEntryButton.setVisible(Boolean(this.#currentAgent && !this.#currentAgent.isEmpty));
-  }
-
-  #createFreestylerAgent(): FreestylerAgent {
-    const agent = new FreestylerAgent({
-      aidaClient: this.#aidaClient,
-      changeManager: this.#changeManager,
-      serverSideLoggingEnabled: this.#serverSideLoggingEnabled,
-    });
-    this.#agents.add(agent);
-    return agent;
-  }
-
-  #createDrJonesFileAgent(): DrJonesFileAgent {
-    const agent = new DrJonesFileAgent({
-      aidaClient: this.#aidaClient,
-      serverSideLoggingEnabled: this.#serverSideLoggingEnabled,
-    });
-    this.#agents.add(agent);
-    return agent;
-  }
-
-  #createDrJonesNetworkAgent(): DrJonesNetworkAgent {
-    const agent = new DrJonesNetworkAgent({
-      aidaClient: this.#aidaClient,
-      serverSideLoggingEnabled: this.#serverSideLoggingEnabled,
-    });
-    this.#agents.add(agent);
-    return agent;
-  }
-
-  #createDrJonesPerformanceAgent(): DrJonesPerformanceAgent {
-    const agent = new DrJonesPerformanceAgent({
-      aidaClient: this.#aidaClient,
-      serverSideLoggingEnabled: this.#serverSideLoggingEnabled,
-    });
-    this.#agents.add(agent);
-    return agent;
   }
 
   static async instance(opts: {
@@ -390,10 +386,22 @@ export class FreestylerPanel extends UI.Panel.Panel {
       targetAgentType = AgentType.DRJONES_PERFORMANCE;
     }
 
-    this.#currentAgent = targetAgentType ? this.#createAgent(targetAgentType) : undefined;
-    this.#viewProps.agentType = targetAgentType;
+    const agent = targetAgentType ? this.#createAgent(targetAgentType) : undefined;
+    this.#updateAgentState(agent);
+  }
+
+  #updateAgentState(agent?: AiAgent<unknown>): void {
+    if (this.#currentAgent !== agent) {
+      this.#cancel();
+      this.#currentAgent = agent;
+      this.#viewProps.agentType = this.#currentAgent?.type;
+      this.#viewProps.messages = [];
+      this.#viewProps.isLoading = false;
+      this.#viewProps.isReadOnly = this.#currentAgent?.isHistoryEntry ?? false;
+    }
+
     this.#onContextSelectionChanged();
-    this.doUpdate();
+    void this.doUpdate();
   }
 
   override wasShown(): void {
@@ -417,7 +425,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
       inspectElementToggled: this.#toggleSearchElementAction.toggled(),
       selectedContext: this.#getConversationContext(),
     };
-    this.doUpdate();
+    void this.doUpdate();
 
     this.#freestylerEnabledSetting?.addChangeListener(this.#handleFreestylerEnabledSettingChanged, this);
     Host.AidaClient.HostConfigTracker.instance().addEventListener(
@@ -476,7 +484,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
         accountFullName: syncInfo.accountFullName,
       };
       this.#viewProps.state = this.#getChatUiState();
-      this.doUpdate();
+      void this.doUpdate();
     }
   };
 
@@ -486,7 +494,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
     }
 
     this.#viewProps.inspectElementToggled = ev.data;
-    this.doUpdate();
+    void this.doUpdate();
   };
 
   #handleDOMNodeFlavorChange = (ev: Common.EventTarget.EventTargetEvent<SDK.DOMModel.DOMNode>): void => {
@@ -495,7 +503,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
     }
 
     this.#selectedElement = createNodeContext(selectedElementFilter(ev.data));
-    this.#onContextSelectionChanged();
+    this.#updateAgentState(this.#currentAgent);
   };
 
   #handleNetworkRequestFlavorChange =
@@ -505,7 +513,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
         }
 
         this.#selectedRequest = Boolean(ev.data) ? new RequestContext(ev.data) : null;
-        this.#onContextSelectionChanged();
+        this.#updateAgentState(this.#currentAgent);
       };
 
   #handleTraceEntryNodeFlavorChange =
@@ -515,7 +523,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
         }
 
         this.#selectedCallTree = Boolean(ev.data) ? new CallTreeContext(ev.data) : null;
-        this.#onContextSelectionChanged();
+        this.#updateAgentState(this.#currentAgent);
       };
 
   #handleUISourceCodeFlavorChange =
@@ -528,7 +536,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
           return;
         }
         this.#selectedFile = new FileContext(ev.data);
-        this.#onContextSelectionChanged();
+        this.#updateAgentState(this.#currentAgent);
       };
 
   #handleFreestylerEnabledSettingChanged = (): void => {
@@ -538,10 +546,10 @@ export class FreestylerPanel extends UI.Panel.Panel {
     }
 
     this.#viewProps.state = nextChatUiState;
-    this.doUpdate();
+    void this.doUpdate();
   };
 
-  doUpdate(): void {
+  override async doUpdate(): Promise<void> {
     this.#updateToolbarState();
     this.view(this.#viewProps, this.#viewOutput, this.#contentContainer);
   }
@@ -633,18 +641,13 @@ export class FreestylerPanel extends UI.Panel.Panel {
       return;
     }
 
+    let agent = this.#currentAgent;
     if (!this.#currentAgent || this.#currentAgent.type !== targetAgentType || this.#currentAgent.isHistoryEntry ||
         targetAgentType === AgentType.DRJONES_PERFORMANCE) {
-      this.#currentAgent = this.#createAgent(targetAgentType);
+      agent = this.#createAgent(targetAgentType);
     }
-    this.#viewProps.agentType = this.#currentAgent.type;
+    this.#updateAgentState(agent);
     this.#viewOutput.freestylerChatUi?.focusTextInput();
-    Host.userMetrics.actionTaken(Host.UserMetrics.Action.FreestylerOpenedFromElementsPanelFloatingButton);
-    this.#viewProps.messages = [];
-    this.#onContextSelectionChanged();
-    this.doUpdate();
-    this.#viewProps.isReadOnly = false;
-    void this.#doConversation(this.#currentAgent.runFromHistory());
   }
 
   #onHistoryClicked(event: Event): void {
@@ -652,6 +655,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
     const contextMenu = new UI.ContextMenu.ContextMenu(event, {
       x: boundingRect.left,
       y: boundingRect.bottom,
+      useSoftMenu: true,
     });
 
     for (const agent of [...this.#agents].reverse()) {
@@ -690,23 +694,17 @@ export class FreestylerPanel extends UI.Panel.Panel {
 
   #clearHistory(): void {
     this.#agents = new Set();
-    this.#currentAgent = undefined;
-    this.#viewProps.messages = [];
-    this.#viewProps.agentType = undefined;
-    this.doUpdate();
+    void AiHistoryStorage.instance().deleteAll();
+    this.#updateAgentState();
   }
 
   #onDeleteClicked(): void {
     if (this.#currentAgent) {
       this.#agents.delete(this.#currentAgent);
-      this.#currentAgent = undefined;
+      void AiHistoryStorage.instance().deleteHistoryEntry(this.#currentAgent.id);
     }
-
-    this.#viewProps.messages = [];
-
+    this.#updateAgentState();
     this.#selectDefaultAgentIfNeeded();
-    this.#onContextSelectionChanged();
-    this.doUpdate();
     UI.ARIAUtils.alert(i18nString(UIStrings.chatDeleted));
   }
 
@@ -714,53 +712,53 @@ export class FreestylerPanel extends UI.Panel.Panel {
     if (this.#currentAgent === agent) {
       return;
     }
-
-    this.#currentAgent = agent;
-    this.#viewProps.messages = [];
-    this.#viewProps.agentType = agent.type;
-    this.#onContextSelectionChanged();
+    this.#updateAgentState(agent);
     this.#viewProps.isReadOnly = true;
     await this.#doConversation(agent.runFromHistory());
   }
 
-  #newChat(): void {
-    this.#viewProps.messages = [];
-    this.#viewProps.isLoading = false;
-    this.#currentAgent = undefined;
-    this.#cancel();
-
+  #handleNewChatRequest(): void {
+    this.#updateAgentState();
     this.#selectDefaultAgentIfNeeded();
-    this.doUpdate();
     UI.ARIAUtils.alert(i18nString(UIStrings.newChatCreated));
+  }
+
+  #handleCrossOriginChatCancellation(): void {
+    if (this.#previousSameOriginContext) {
+      this.#onContextSelectionChanged(this.#previousSameOriginContext);
+      void this.doUpdate();
+    }
   }
 
   #runAbortController = new AbortController();
   #cancel(): void {
     this.#runAbortController.abort();
     this.#viewProps.isLoading = false;
-    this.doUpdate();
+    void this.doUpdate();
   }
 
-  #onContextSelectionChanged(): void {
+  #onContextSelectionChanged(contextToRestore?: ConversationContext<unknown>): void {
     if (!this.#currentAgent) {
       this.#viewProps.blockedByCrossOrigin = false;
-      this.doUpdate();
       return;
     }
-    const currentContext = this.#getConversationContext();
+    const currentContext = contextToRestore ?? this.#getConversationContext();
     this.#viewProps.selectedContext = currentContext;
     if (!currentContext) {
       this.#viewProps.blockedByCrossOrigin = false;
       this.#viewProps.requiresNewConversation = false;
-      this.doUpdate();
       return;
     }
     this.#viewProps.blockedByCrossOrigin = !currentContext.isOriginAllowed(this.#currentAgent.origin);
-    this.#viewProps.isReadOnly = this.#currentAgent.isHistoryEntry;
+    if (!this.#viewProps.blockedByCrossOrigin) {
+      this.#previousSameOriginContext = currentContext;
+    }
+    if (this.#viewProps.blockedByCrossOrigin && this.#previousSameOriginContext) {
+      this.#viewProps.onCancelCrossOriginChat = this.#handleCrossOriginChatCancellation.bind(this);
+    }
     this.#viewProps.requiresNewConversation = this.#currentAgent.type === AgentType.DRJONES_PERFORMANCE &&
         Boolean(this.#currentAgent.context) && this.#currentAgent.context !== currentContext;
     this.#viewProps.stripLinks = this.#viewProps.agentType === AgentType.DRJONES_PERFORMANCE;
-    this.doUpdate();
   }
 
   #getConversationContext(): ConversationContext<unknown>|null {
@@ -813,6 +811,7 @@ export class FreestylerPanel extends UI.Panel.Panel {
       steps: [],
     };
     let step: Step = {isLoading: true};
+    this.#viewProps.isLoading = true;
     for await (const data of generator) {
       step.sideEffect = undefined;
       switch (data.type) {
@@ -821,7 +820,6 @@ export class FreestylerPanel extends UI.Panel.Panel {
             entity: ChatMessageEntity.USER,
             text: data.query,
           });
-          this.#viewProps.isLoading = true;
           systemMessage = {
             entity: ChatMessageEntity.MODEL,
             steps: [],
@@ -891,13 +889,11 @@ export class FreestylerPanel extends UI.Panel.Panel {
             systemMessage.steps.pop();
           }
           step.isLoading = false;
-          this.#viewProps.isLoading = false;
           break;
         }
         case ResponseType.ERROR: {
           systemMessage.error = data.error;
           systemMessage.rpcId = undefined;
-          this.#viewProps.isLoading = false;
           const lastStep = systemMessage.steps.at(-1);
           if (lastStep) {
             // Mark the last step as cancelled to make the UI feel better.
@@ -911,9 +907,20 @@ export class FreestylerPanel extends UI.Panel.Panel {
         }
       }
 
-      this.doUpdate();
-      this.#viewOutput.freestylerChatUi?.scrollToLastMessage();
+      void this.doUpdate();
+
+      // This handles scrolling to the bottom for live conversations when:
+      // * User submits the query & the context step is shown.
+      // * There is a side effect dialog  shown.
+      if (!this.#viewProps.isReadOnly &&
+          (data.type === ResponseType.CONTEXT || data.type === ResponseType.SIDE_EFFECT)) {
+        this.#viewOutput.freestylerChatUi?.scrollToBottom();
+      }
     }
+
+    this.#viewProps.isLoading = false;
+    this.#viewOutput.freestylerChatUi?.finishTextAnimations();
+    void this.doUpdate();
   }
 }
 

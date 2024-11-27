@@ -3,43 +3,24 @@
 // found in the LICENSE file.
 
 import * as Root from '../../../core/root/root.js';
+import * as Trace from '../../../models/trace/trace.js';
 import {getCleanTextContentFromElements, renderElementIntoDOM} from '../../../testing/DOMHelpers.js';
 import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
 import {TraceLoader} from '../../../testing/TraceLoader.js';
 import * as Coordinator from '../../../ui/components/render_coordinator/render_coordinator.js';
 
 import * as Components from './components.js';
-import * as InsightComponents from './insights/insights.js';
+import type * as InsightComponents from './insights/insights.js';
+
+type BaseInsightComponent =
+    InsightComponents.BaseInsightComponent.BaseInsightComponent<Trace.Insights.Types.InsightModel<{}>>;
 
 const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
 
 function getUserVisibleInsights(component: Components.SidebarSingleInsightSet.SidebarSingleInsightSet):
-    InsightComponents.SidebarInsight.SidebarInsight[] {
+    BaseInsightComponent[] {
   assert.isOk(component.shadowRoot);
-  const insightWrappers = [...component.shadowRoot.querySelectorAll<HTMLDivElement>('[data-single-insight-wrapper]')];
-
-  // We have to jump through some hoops here => each insight is rendered in its
-  // own component, but within it they all use the
-  // devtools-performance-sidebar-insight component to render the header +
-  // body.
-  // So we first have to find the specific insight component (e.g.
-  // devtools-performance-render-blocking), then look inside its shadow dom for
-  // the devtools-performance-sidebar-insight component.
-  // If you are here debugging something, I highly recommend loading up
-  // DevTools and inspecting the DOM in the Insights sidebar. It will be much
-  // easier!
-  const userVisibleInsightComponents =
-      insightWrappers
-          .map(div => {
-            const component = div.querySelector('[data-insight-name]');
-            assert.instanceOf(component, HTMLElement);
-            const insightComponent =
-                component.shadowRoot?.querySelector<InsightComponents.SidebarInsight.SidebarInsight>(
-                    'devtools-performance-sidebar-insight');
-            return insightComponent ?? null;
-          })
-          .filter(x => x !== null);
-  return userVisibleInsightComponents;
+  return [...component.shadowRoot.querySelectorAll<BaseInsightComponent>('[data-insight-name]')];
 }
 
 describeWithEnvironment('SidebarSingleInsightSet', () => {
@@ -59,7 +40,7 @@ describeWithEnvironment('SidebarSingleInsightSet', () => {
       parsedTrace,
       insights,
       insightSetKey: navigationId,
-      activeCategory: InsightComponents.Types.Category.ALL,
+      activeCategory: Trace.Insights.Types.InsightCategory.ALL,
       activeInsight: null,
     };
     await coordinator.done();
@@ -86,7 +67,7 @@ describeWithEnvironment('SidebarSingleInsightSet', () => {
       parsedTrace,
       insights,
       insightSetKey: firstNavigation,
-      activeCategory: InsightComponents.Types.Category.ALL,
+      activeCategory: Trace.Insights.Types.InsightCategory.ALL,
       activeInsight: null,
     };
     await coordinator.done();
@@ -98,6 +79,7 @@ describeWithEnvironment('SidebarSingleInsightSet', () => {
       'LCP by phase',
       'LCP request discovery',
       'Layout shift culprits',
+      'Improve image delivery',
       'Third parties',
     ]);
   });
@@ -115,7 +97,7 @@ describeWithEnvironment('SidebarSingleInsightSet', () => {
       parsedTrace,
       insights,
       insightSetKey: firstNavigation,
-      activeCategory: InsightComponents.Types.Category.ALL,
+      activeCategory: Trace.Insights.Types.InsightCategory.ALL,
       activeInsight: null,
     };
     await coordinator.done();
@@ -127,6 +109,7 @@ describeWithEnvironment('SidebarSingleInsightSet', () => {
       'LCP by phase',
       'LCP request discovery',
       'Layout shift culprits',
+      'Improve image delivery',
       'Font display',
       'Third parties',
     ]);
@@ -142,26 +125,29 @@ describeWithEnvironment('SidebarSingleInsightSet', () => {
     const navigationId = '8463DF94CD61B265B664E7F768183DE3';
     assert.isTrue(insights.has(navigationId));
 
+    const model = insights.get(navigationId)?.model.LCPPhases;
+    if (!model) {
+      throw new Error('missing LCPPhases model');
+    }
+
     const component = new Components.SidebarSingleInsightSet.SidebarSingleInsightSet();
     renderElementIntoDOM(component);
     component.data = {
       parsedTrace,
       insights,
       insightSetKey: navigationId,
-      activeCategory: InsightComponents.Types.Category.ALL,
+      activeCategory: Trace.Insights.Types.InsightCategory.ALL,
       activeInsight: {
-        name: 'lcp-by-phase',
+        model,
         insightSetKey: navigationId,
-        overlays: [],
-        relatedEvents: [],
       },
     };
     await coordinator.done();
 
     const expandedInsight = getUserVisibleInsights(component).find(insight => {
-      return 'insightExpanded' in insight.dataset;
+      return insight.selected;
     });
     assert.isOk(expandedInsight);
-    assert.strictEqual(expandedInsight.dataset.insightTitle, 'LCP by phase');
+    assert.strictEqual(expandedInsight.model?.title, 'LCP by phase');
   });
 });

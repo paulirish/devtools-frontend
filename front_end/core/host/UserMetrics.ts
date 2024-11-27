@@ -290,13 +290,6 @@ export class UserMetrics {
         EnumeratedHistogram.StyleTextCopied, value, StyleTextCopied.MAX_VALUE);
   }
 
-  manifestSectionSelected(sectionTitle: string): void {
-    const code =
-        ManifestSectionCodes[sectionTitle as keyof typeof ManifestSectionCodes] || ManifestSectionCodes.OtherSection;
-    InspectorFrontendHostInstance.recordEnumeratedHistogram(
-        EnumeratedHistogram.ManifestSectionSelected, code, ManifestSectionCodes.MAX_VALUE);
-  }
-
   cssHintShown(type: CSSHintType): void {
     InspectorFrontendHostInstance.recordEnumeratedHistogram(
         EnumeratedHistogram.CSSHintShown, type, CSSHintType.MAX_VALUE);
@@ -1020,11 +1013,9 @@ export enum DevtoolsExperiments {
   'timeline-enhanced-traces' = 90,
   'timeline-compiled-sources' = 91,
   'timeline-debug-mode' = 93,
-  'perf-panel-annotations' = 94,
   'timeline-rpp-sidebar' = 95,
   'timeline-observations' = 96,
   'timeline-server-timings' = 98,
-  'extension-storage-viewer' = 100,
   'floating-entry-points-for-ai-assistance' = 101,
   'timeline-experimental-insights' = 102,
   'timeline-dim-unrelated-events' = 103,

@@ -2,11 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as BaseInsightComponent from './BaseInsightComponent.js';
 import * as CLSCulprits from './CLSCulprits.js';
 import * as DocumentLatency from './DocumentLatency.js';
 import * as EventRef from './EventRef.js';
 import * as FontDisplay from './FontDisplay.js';
 import * as Helpers from './Helpers.js';
+import * as ImageDelivery from './ImageDelivery.js';
 import * as InteractionToNextPaint from './InteractionToNextPaint.js';
 import * as LCPDiscovery from './LCPDiscovery.js';
 import * as LCPPhases from './LCPPhases.js';
@@ -20,11 +22,13 @@ import * as Types from './types.js';
 import * as Viewport from './Viewport.js';
 
 export {
+  BaseInsightComponent,
   CLSCulprits,
   DocumentLatency,
   EventRef,
   FontDisplay,
   Helpers,
+  ImageDelivery,
   InteractionToNextPaint,
   LCPDiscovery,
   LCPPhases,

@@ -21,7 +21,7 @@ import {AgentType, type ContextDetail, type ConversationContext, ErrorType} from
 import freestylerChatUiStyles from './freestylerChatUi.css.js';
 import type {UserActionRowProps} from './UserActionRow.js';
 
-const {html, Directives: {ifDefined}} = LitHtml;
+const {html, Directives: {ifDefined, ref}} = LitHtml;
 
 const UIStrings = {
   /**
@@ -222,6 +222,8 @@ const str_ = i18n.i18n.registerUIStrings('panels/freestyler/components/Freestyle
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 const lockedString = i18n.i18n.lockedString;
 
+const SCROLL_ROUNDING_OFFSET = 1;
+
 export interface Step {
   isLoading: boolean;
   thought?: string;
@@ -269,6 +271,7 @@ export interface Props {
   onCancelClick: () => void;
   onContextClick: () => void | Promise<void>;
   onNewConversation: () => void;
+  onCancelCrossOriginChat?: () => void;
   inspectElementToggled: boolean;
   state: State;
   aidaAvailability: Host.AidaClient.AidaAccessPreconditions;
@@ -339,6 +342,20 @@ export class FreestylerChatUi extends HTMLElement {
   #markdownRenderer = new MarkdownRendererWithCodeBlock();
   #scrollTop?: number;
   #props: Props;
+  #messagesContainerElement?: Element;
+  #mainElementRef?: LitHtml.Directives.Ref<Element> = LitHtml.Directives.createRef();
+  #lastAnswerMarkdownView?: MarkdownView.MarkdownView.MarkdownView;
+  #messagesContainerResizeObserver = new ResizeObserver(() => this.#handleMessagesContainerResize());
+  /**
+   * Indicates whether the chat scroll position should be pinned to the bottom.
+   *
+   * This is true when:
+   *   - The scroll is at the very bottom, allowing new messages to push the scroll down automatically.
+   *   - The panel is initially rendered and the user hasn't scrolled yet.
+   *
+   * It is set to false when the user scrolls up to view previous messages.
+   */
+  #pinScrollToBottom = true;
 
   constructor(props: Props) {
     super();
@@ -354,6 +371,14 @@ export class FreestylerChatUi extends HTMLElement {
   connectedCallback(): void {
     this.#shadow.adoptedStyleSheets = [freestylerChatUiStyles];
     this.#render();
+
+    if (this.#messagesContainerElement) {
+      this.#messagesContainerResizeObserver.observe(this.#messagesContainerElement);
+    }
+  }
+
+  disconnectedCallback(): void {
+    this.#messagesContainerResizeObserver.disconnect();
   }
 
   focusTextInput(): void {
@@ -370,20 +395,41 @@ export class FreestylerChatUi extends HTMLElement {
       return;
     }
 
-    const scrollContainer = this.#shadow.querySelector('.chat-ui main') as HTMLElement;
-    if (!scrollContainer) {
+    if (!this.#mainElementRef?.value) {
       return;
     }
 
-    scrollContainer.scrollTop = this.#scrollTop;
+    this.#mainElementRef.value.scrollTop = this.#scrollTop;
   }
 
-  scrollToLastMessage(): void {
-    const message = this.#shadow.querySelector('.chat-message:last-child') as HTMLDivElement;
-    if (!message) {
+  finishTextAnimations(): void {
+    if (!this.#lastAnswerMarkdownView) {
       return;
     }
-    message.scrollIntoViewIfNeeded();
+
+    this.#lastAnswerMarkdownView.finishAnimations();
+  }
+
+  scrollToBottom(): void {
+    if (!this.#mainElementRef?.value) {
+      return;
+    }
+
+    this.#mainElementRef.value.scrollTop = this.#mainElementRef.value.scrollHeight;
+  }
+
+  #handleMessagesContainerResize(): void {
+    if (!this.#pinScrollToBottom) {
+      return;
+    }
+
+    if (!this.#mainElementRef?.value) {
+      return;
+    }
+
+    if (this.#pinScrollToBottom) {
+      this.#mainElementRef.value.scrollTop = this.#mainElementRef.value.scrollHeight;
+    }
   }
 
   #setInputText(text: string): void {
@@ -428,12 +474,36 @@ export class FreestylerChatUi extends HTMLElement {
     }
   };
 
+  #handleMessageContainerRef(el: Element|undefined): void {
+    this.#messagesContainerElement = el;
+
+    if (el) {
+      this.#messagesContainerResizeObserver.observe(el);
+    } else {
+      this.#pinScrollToBottom = true;
+      this.#messagesContainerResizeObserver.disconnect();
+    }
+  }
+
+  #handleLastAnswerMarkdownViewRef(el: Element|undefined): void {
+    if (!el) {
+      this.#lastAnswerMarkdownView = undefined;
+      return;
+    }
+
+    if (el instanceof MarkdownView.MarkdownView.MarkdownView) {
+      this.#lastAnswerMarkdownView = el;
+    }
+  }
+
   #handleScroll = (ev: Event): void => {
     if (!ev.target || !(ev.target instanceof HTMLElement)) {
       return;
     }
 
     this.#scrollTop = ev.target.scrollTop;
+    this.#pinScrollToBottom =
+        ev.target.scrollTop + ev.target.clientHeight + SCROLL_ROUNDING_OFFSET > ev.target.scrollHeight;
   };
 
   #handleSubmit = (ev: SubmitEvent): void => {
@@ -497,7 +567,10 @@ export class FreestylerChatUi extends HTMLElement {
     // clang-format on
   }
 
-  #renderTextAsMarkdown(text: string): LitHtml.TemplateResult {
+  #renderTextAsMarkdown(text: string, {animate, ref: refFn}: {
+    animate?: boolean,
+    ref?: (element?: Element) => void,
+  } = {}): LitHtml.TemplateResult {
     let tokens = [];
     try {
       tokens = Marked.Marked.lexer(text);
@@ -517,7 +590,8 @@ export class FreestylerChatUi extends HTMLElement {
 
     // clang-format off
     return html`<devtools-markdown-view
-      .data=${{tokens, renderer: this.#markdownRenderer} as MarkdownView.MarkdownView.MarkdownViewData}>
+      .data=${{tokens, renderer: this.#markdownRenderer, animationEnabled: animate} as MarkdownView.MarkdownView.MarkdownViewData}
+      ${refFn ? ref(refFn) : LitHtml.nothing}>
     </devtools-markdown-view>`;
     // clang-format on
   }
@@ -766,7 +840,7 @@ export class FreestylerChatUi extends HTMLElement {
           },
         )}
         ${message.answer
-          ? html`<p>${this.#renderTextAsMarkdown(message.answer)}</p>`
+          ? html`<p>${this.#renderTextAsMarkdown(message.answer, { animate: !this.#props.isReadOnly, ref: this.#handleLastAnswerMarkdownViewRef })}</p>`
           : LitHtml.nothing}
         ${this.#renderError(message)}
         <div class="actions">
@@ -836,7 +910,7 @@ export class FreestylerChatUi extends HTMLElement {
   #renderMessages = (): LitHtml.TemplateResult => {
     // clang-format off
     return html`
-      <div class="messages-container">
+      <div class="messages-container" ${ref(this.#handleMessageContainerRef)}>
         ${this.#props.messages.map((message, _, array) =>
           this.#renderChatMessage(message, {
             isLast: array.at(-1) === message,
@@ -883,6 +957,10 @@ export class FreestylerChatUi extends HTMLElement {
 
   #onNewConversation(): void {
     this.#props.onNewConversation();
+  }
+
+  #onCancelCrossOriginChat(): void {
+    this.#props.onCancelCrossOriginChat?.();
   }
 
   #getEmptyStateSuggestions = (): string[] => {
@@ -954,6 +1032,7 @@ export class FreestylerChatUi extends HTMLElement {
       <span>${lockedString(UIStringsNotTranslate.pastConversation)}</span>
       <devtools-button
         aria-label=${lockedString(UIStringsNotTranslate.startNewChat)}
+        class="chat-inline-button"
         @click=${this.#onNewConversation}
         .data=${{
           variant: Buttons.Button.Variant.TEXT,
@@ -965,7 +1044,7 @@ export class FreestylerChatUi extends HTMLElement {
     // clang-format on
   }
 
-  #renderChatInputButton(): LitHtml.TemplateResult {
+  #renderChatInputButtons(): LitHtml.TemplateResult {
     if (this.#props.isLoading) {
       // clang-format off
       return html`<devtools-button
@@ -986,19 +1065,32 @@ export class FreestylerChatUi extends HTMLElement {
     }
     if (this.#props.blockedByCrossOrigin || this.#props.requiresNewConversation) {
       // clang-format off
-      return html`<devtools-button
-        class="chat-input-button"
-        aria-label=${lockedString(UIStringsNotTranslate.startNewChat)}
-        @click=${this.#onNewConversation}
-        .data=${
-          {
-            variant: Buttons.Button.Variant.PRIMARY,
-            size: Buttons.Button.Size.REGULAR,
-            title: lockedString(UIStringsNotTranslate.startNewChat),
-            jslogContext: 'start-new-chat',
-          } as Buttons.Button.ButtonData
-        }
-      >${lockedString(UIStringsNotTranslate.startNewChat)}</devtools-button>`;
+      return html`
+        ${this.#props.blockedByCrossOrigin && Boolean(this.#props.onCancelCrossOriginChat) ? html`<devtools-button
+          class="chat-cancel-context-button"
+          @click=${this.#onCancelCrossOriginChat}
+          .data=${
+            {
+              variant: Buttons.Button.Variant.TEXT,
+              size: Buttons.Button.Size.REGULAR,
+              jslogContext: 'cancel-cross-origin-context-chat',
+            } as Buttons.Button.ButtonData
+          }
+        >${lockedString(UIStringsNotTranslate.cancelButtonTitle)}</devtools-button>` : LitHtml.nothing}
+        <devtools-button
+          class="chat-input-button"
+          aria-label=${lockedString(UIStringsNotTranslate.startNewChat)}
+          @click=${this.#onNewConversation}
+          .data=${
+            {
+              variant: Buttons.Button.Variant.PRIMARY,
+              size: Buttons.Button.Size.REGULAR,
+              title: lockedString(UIStringsNotTranslate.startNewChat),
+              jslogContext: 'start-new-chat',
+            } as Buttons.Button.ButtonData
+          }
+        >${lockedString(UIStringsNotTranslate.startNewChat)}</devtools-button>
+      `;
       // clang-format on
     }
     // clang-format off
@@ -1024,6 +1116,12 @@ export class FreestylerChatUi extends HTMLElement {
       return LitHtml.nothing;
     }
 
+    const cls = LitHtml.Directives.classMap({
+      'chat-input': true,
+      'one-big-button': Boolean(this.#props.requiresNewConversation),
+      'two-big-buttons': this.#props.blockedByCrossOrigin,
+    });
+
     // clang-format off
     return html`
     <form class="input-form" @submit=${this.#handleSubmit}>
@@ -1035,14 +1133,16 @@ export class FreestylerChatUi extends HTMLElement {
         </div>
       ` : LitHtml.nothing}
       <div class="chat-input-container">
-        <textarea class="chat-input"
+        <textarea class=${cls}
           .disabled=${this.#isTextInputDisabled()}
           wrap="hard"
           @keydown=${this.#handleTextAreaKeyDown}
           placeholder=${this.#getInputPlaceholderString()}
           jslog=${VisualLogging.textField('query').track({ keydown: 'Enter' })}
         ></textarea>
-        ${this.#renderChatInputButton()}
+        <div class="chat-input-buttons">
+          ${this.#renderChatInputButtons()}
+        </div>
       </div>
     </form>`;
     // clang-format on
@@ -1226,7 +1326,7 @@ export class FreestylerChatUi extends HTMLElement {
     // clang-format off
     LitHtml.render(html`
       <div class="chat-ui">
-        <main @scroll=${this.#handleScroll}>
+        <main @scroll=${this.#handleScroll} ${ref(this.#mainElementRef)}>
           ${this.#renderMainContents()}
           ${this.#props.isReadOnly ?
               this.#renderReadOnlySection() :

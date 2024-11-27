@@ -12,11 +12,11 @@ import * as PanelUtils from '../utils/utils.js';
 import {
   AgentType,
   AiAgent,
-  type AidaRequestOptions,
   type ContextDetail,
   type ContextResponse,
   ConversationContext,
   type ParsedResponse,
+  type RequestOptions,
   ResponseType,
 } from './AiAgent.js';
 
@@ -94,6 +94,10 @@ export class FileContext extends ConversationContext<Workspace.UISourceCode.UISo
   override getTitle(): string {
     return this.#file.displayName();
   }
+
+  override async refresh(): Promise<void> {
+    await this.#file.requestContentData();
+  }
 }
 
 /**
@@ -101,14 +105,14 @@ export class FileContext extends ConversationContext<Workspace.UISourceCode.UISo
  * instance for a new conversation.
  */
 export class DrJonesFileAgent extends AiAgent<Workspace.UISourceCode.UISourceCode> {
-  override type = AgentType.DRJONES_FILE;
+  override readonly type = AgentType.DRJONES_FILE;
   readonly preamble = preamble;
   readonly clientFeature = Host.AidaClient.ClientFeature.CHROME_DRJONES_FILE_AGENT;
   get userTier(): string|undefined {
     const config = Common.Settings.Settings.instance().getHostConfig();
     return config.devToolsAiAssistanceFileAgent?.userTier;
   }
-  get options(): AidaRequestOptions {
+  get options(): RequestOptions {
     const config = Common.Settings.Settings.instance().getHostConfig();
     const temperature = config.devToolsAiAssistanceFileAgent?.temperature;
     const modelId = config.devToolsAiAssistanceFileAgent?.modelId;
@@ -171,7 +175,8 @@ ${formatFileContent(selectedFile)}`,
 }
 
 function formatFileContent(selectedFile: Workspace.UISourceCode.UISourceCode): string {
-  const content = selectedFile.contentType().isTextType() ? selectedFile.content() : '<binary data>';
+  const contentData = selectedFile.workingCopyContentData();
+  const content = contentData.isTextContent ? contentData.text : '<binary data>';
   const truncated = content.length > MAX_FILE_SIZE ? content.slice(0, MAX_FILE_SIZE) + '...' : content;
   return `\`\`\`
 ${truncated}
@@ -212,14 +217,3 @@ export function formatSourceMapDetails(
   }
   return sourceMapDetails;
 }
-
-function setDebugFreestylerEnabled(enabled: boolean): void {
-  if (enabled) {
-    localStorage.setItem('debugFreestylerEnabled', 'true');
-  } else {
-    localStorage.removeItem('debugFreestylerEnabled');
-  }
-}
-
-// @ts-ignore
-globalThis.setDebugFreestylerEnabled = setDebugFreestylerEnabled;

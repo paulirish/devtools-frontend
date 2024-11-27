@@ -860,7 +860,7 @@ export class AnimationTimeline extends UI.Widget.VBox implements
         this.#pauseButton.setEnabled(false);
       }
     } else {
-      this.setDuration(Math.max(500, group.finiteDuration() + 100));
+      this.setDuration(group.finiteDuration());
       this.#playbackRateButtons.forEach(button => {
         button.removeAttribute('disabled');
       });
@@ -966,7 +966,7 @@ export class AnimationTimeline extends UI.Widget.VBox implements
         lastDraw = gridWidth;
         const label = UI.UIUtils.createSVGChild(this.#grid, 'text', 'animation-timeline-grid-label');
         label.textContent = isScrollDriven ? `${time.toFixed(0)}px` : i18n.TimeUtilities.millisToString(time);
-        label.setAttribute('x', (gridWidth + 10).toString());
+        label.setAttribute('x', (gridWidth + 12).toString());
         label.setAttribute('y', '16');
       }
     }
@@ -1053,8 +1053,6 @@ export class AnimationTimeline extends UI.Widget.VBox implements
     this.setCurrentTimeText(this.#scrubberCurrentTime());
     if (this.#scrubberPlayer.playState.toString() === 'pending' || this.#scrubberPlayer.playState === 'running') {
       this.element.window().requestAnimationFrame(this.updateScrubber.bind(this));
-    } else if (this.#scrubberPlayer.playState === 'finished') {
-      this.clearCurrentTimeText();
     }
   }
 

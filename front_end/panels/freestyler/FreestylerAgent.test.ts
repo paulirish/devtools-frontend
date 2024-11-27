@@ -482,7 +482,7 @@ c`;
         aidaClient: {} as Host.AidaClient.AidaClient,
       });
       assert.strictEqual(
-          agent.buildRequest({input: 'test input'}).options?.model_id,
+          agent.buildRequest({text: 'test input'}).options?.model_id,
           'test model',
       );
     });
@@ -493,7 +493,7 @@ c`;
         aidaClient: {} as Host.AidaClient.AidaClient,
       });
       assert.strictEqual(
-          agent.buildRequest({input: 'test input'}).options?.temperature,
+          agent.buildRequest({text: 'test input'}).options?.temperature,
           1,
       );
     });
@@ -504,7 +504,7 @@ c`;
         aidaClient: {} as Host.AidaClient.AidaClient,
       });
       assert.strictEqual(
-          agent.buildRequest({input: 'test input'}).metadata?.user_tier,
+          agent.buildRequest({text: 'test input'}).metadata?.user_tier,
           3,
       );
     });
@@ -517,35 +517,36 @@ c`;
         serverSideLoggingEnabled: true,
       });
       sinon.stub(agent, 'preamble').value('preamble');
-      agent.chatNewHistoryForTesting = new Map([[
-        0,
-        [
-          {
-            type: Freestyler.ResponseType.QUERYING,
-            query: 'question',
-          },
-          {
-            type: Freestyler.ResponseType.ANSWER,
-            text: 'answer',
-          },
-        ],
-      ]]);
+      agent.chatNewHistoryForTesting = [
+        {
+          type: Freestyler.ResponseType.USER_QUERY,
+          query: 'question',
+        },
+        {
+          type: Freestyler.ResponseType.QUERYING,
+          query: 'question',
+        },
+        {
+          type: Freestyler.ResponseType.ANSWER,
+          text: 'answer',
+        },
+      ];
       assert.deepStrictEqual(
           agent.buildRequest({
-            input: 'test input',
+            text: 'test input',
           }),
           {
-            input: 'test input',
+            current_message: {role: Host.AidaClient.Role.USER, parts: [{text: 'test input'}]},
             client: 'CHROME_DEVTOOLS',
             preamble: 'preamble',
-            chat_history: [
+            historical_contexts: [
               {
-                entity: 1,
-                text: 'question',
+                role: 1,
+                parts: [{text: 'question'}],
               },
               {
-                entity: 2,
-                text: 'ANSWER: answer',
+                role: 2,
+                parts: [{text: 'ANSWER: answer'}],
               },
             ],
             metadata: {
@@ -565,7 +566,8 @@ c`;
   });
 
   function mockAidaClient(
-      fetch: (_: unknown, options?: {signal: AbortSignal}) => AsyncGenerator<Host.AidaClient.AidaResponse, void, void>,
+      fetch: (_: Host.AidaClient.AidaRequest, options?: {signal: AbortSignal}) =>
+          AsyncGenerator<Host.AidaClient.AidaResponse, void, void>,
       ): Host.AidaClient.AidaClient {
     return {
       fetch,
@@ -787,14 +789,82 @@ c`;
       sinon.assert.notCalled(execJs);
       assert.deepStrictEqual(agent.chatHistoryForTesting, [
         {
-          entity: 1,
-          text: '# Inspected element\n\n* Its selector is `undefined`\n\n# User request\n\nQUERY: test',
+          role: 1,
+          parts: [{text: '# Inspected element\n\n* Its selector is `undefined`\n\n# User request\n\nQUERY: test'}],
         },
         {
-          entity: 2,
-          text: 'ANSWER: this is the answer',
+          role: 2,
+          parts: [{text: 'ANSWER: this is the answer'}],
         },
       ]);
+    });
+
+    it('correctly handles historical_contexts in AIDA requests', async () => {
+      const requests: Host.AidaClient.AidaRequest[] = [];
+
+      let i = 0;
+      async function* generateAnswer(request: Host.AidaClient.AidaRequest) {
+        requests.push(request);
+        if (i !== 0) {
+          yield {
+            explanation: 'ANSWER: this is the actual answer',
+            metadata: {},
+            completed: true,
+          };
+          return;
+        }
+        yield {
+          explanation: `THOUGHT: I am thinking.
+TITLE: thinking
+ACTION
+const data = {"test": "observation"};
+STOP`,
+          metadata: {},
+          completed: false,
+        };
+        i++;
+      }
+
+      const execJs = sinon.mock().once();
+      execJs.onCall(0).returns('test data');
+      const agent = new FreestylerAgent({
+        aidaClient: mockAidaClient(generateAnswer),
+        createExtensionScope,
+        execJs,
+      });
+
+      await Array.fromAsync(agent.run('test', {selected: new Freestyler.NodeContext(element)}));
+
+      assert.lengthOf(requests, 2, 'Unexpected number of AIDA requests');
+      assert.isUndefined(requests[0].historical_contexts, 'Unexpected historical contexts in the initial request');
+      assert.exists(requests[0].current_message);
+      assert.lengthOf(requests[0].current_message.parts, 1);
+      assert.strictEqual(
+          requests[0].current_message.parts[0].text,
+          '# Inspected element\n\n* Its selector is `undefined`\n\n# User request\n\nQUERY: test',
+          'Unexpected input text in the initial request');
+      assert.strictEqual(requests[0].current_message.role, Host.AidaClient.Role.USER);
+      assert.deepStrictEqual(
+          requests[1].historical_contexts,
+          [
+            {
+              role: 1,
+              parts: [{text: '# Inspected element\n\n* Its selector is `undefined`\n\n# User request\n\nQUERY: test'}],
+            },
+            {
+              role: 2,
+              parts: [{
+                text:
+                    'THOUGHT: I am thinking.\nTITLE: thinking\nACTION\nconst data = {\"test\": \"observation\"};\nSTOP',
+              }],
+            },
+          ],
+          'Unexpected historical contexts in the follow-up request');
+      assert.exists(requests[1].current_message);
+      assert.lengthOf(requests[1].current_message.parts, 1);
+      assert.strictEqual(
+          requests[1].current_message.parts[0].text, 'OBSERVATION: test data',
+          'Unexpected input in the follow-up request');
     });
 
     it('generates an rpcId for the answer', async () => {
@@ -940,6 +1010,43 @@ c`;
           rpcId: 123,
         },
       ]);
+    });
+
+    it('should execute an action only once even when the partial response contains an action', async () => {
+      const execJs = sinon.spy();
+      async function* generatePartialAndFullAction() {
+        yield {
+          explanation: `THOUGHT: I am thinking.
+
+ACTION
+console.log('hel
+          `,
+          metadata: {},
+          completed: false,
+        };
+
+        sinon.assert.notCalled(execJs);
+        yield {
+          explanation: `THOUGHT: I am thinking.
+
+ACTION
+console.log('hello');
+STOP
+          `,
+          metadata: {},
+          completed: true,
+        };
+      }
+
+      const agent = new FreestylerAgent({
+        aidaClient: mockAidaClient(generatePartialAndFullAction),
+        createExtensionScope,
+        execJs,
+      });
+      await Array.fromAsync(agent.run('test', {selected: new Freestyler.NodeContext(element)}));
+
+      sinon.assert.calledOnce(execJs);
+      assert.include(execJs.lastCall.args[0], 'console.log(\'hello\');');
     });
 
     it('generates a response if nothing is returned', async () => {
@@ -1096,36 +1203,36 @@ ANSWER: this is the answer`,
 
       assert.deepStrictEqual(agent.chatHistoryForTesting, [
         {
-          entity: 1,
-          text: '# Inspected element\n\n* Its selector is `undefined`\n\n# User request\n\nQUERY: test',
+          role: 1,
+          parts: [{text: '# Inspected element\n\n* Its selector is `undefined`\n\n# User request\n\nQUERY: test'}],
         },
         {
-          entity: 2,
-          text: 'THOUGHT: thought 1\nTITLE: test\nACTION\nconsole.log(\'test\')\nSTOP',
+          role: 2,
+          parts: [{text: 'THOUGHT: thought 1\nTITLE: test\nACTION\nconsole.log(\'test\')\nSTOP'}],
         },
         {
-          entity: 1,
-          text: 'OBSERVATION: undefined',
+          role: 1,
+          parts: [{text: 'OBSERVATION: undefined'}],
         },
         {
-          entity: 2,
-          text: 'THOUGHT: thought 2\nTITLE: test\nACTION\nconsole.log(\'test\')\nSTOP',
+          role: 2,
+          parts: [{text: 'THOUGHT: thought 2\nTITLE: test\nACTION\nconsole.log(\'test\')\nSTOP'}],
         },
         {
-          entity: 1,
-          text: 'OBSERVATION: undefined',
+          role: 1,
+          parts: [{text: 'OBSERVATION: undefined'}],
         },
         {
-          entity: 2,
-          text: 'THOUGHT: thought 3\nTITLE: test\nACTION\nconsole.log(\'test\')\nSTOP',
+          role: 2,
+          parts: [{text: 'THOUGHT: thought 3\nTITLE: test\nACTION\nconsole.log(\'test\')\nSTOP'}],
         },
         {
-          entity: 1,
-          text: 'OBSERVATION: undefined',
+          role: 1,
+          parts: [{text: 'OBSERVATION: undefined'}],
         },
         {
-          entity: 2,
-          text: 'ANSWER: this is the answer',
+          role: 2,
+          parts: [{text: 'ANSWER: this is the answer'}],
         },
       ]);
     });
@@ -1165,6 +1272,91 @@ ANSWER: this is the answer`,
           agent.run('test', {selected: new Freestyler.NodeContext(element), signal: controller.signal}));
 
       assert.deepStrictEqual(agent.chatHistoryForTesting, []);
+    });
+  });
+
+  describe('history', () => {
+    let element: sinon.SinonStubbedInstance<SDK.DOMModel.DOMNode>;
+    beforeEach(() => {
+      mockHostConfig();
+      element = sinon.createStubInstance(SDK.DOMModel.DOMNode);
+      // @ts-ignore
+      setAiAssistancePersistentHistory(true);
+    });
+
+    it('stores history via AiHistoryStorage', async () => {
+      let count = 0;
+      async function* generateMultipleTimes() {
+        if (count === 1) {
+          yield {
+            explanation: 'ANSWER: this is the answer',
+            metadata: {},
+            completed: true,
+          };
+          return;
+        }
+        count++;
+        yield {
+          explanation: `THOUGHT: thought ${count}\nTITLE:test\nACTION\nconsole.log('test')\nSTOP\n`,
+          metadata: {},
+          completed: false,
+        };
+      }
+      const historyStub = sinon.stub(Freestyler.AiHistoryStorage.instance(), 'upsertHistoryEntry');
+      const execJs = sinon.spy(async () => 'undefined');
+      const agent = new FreestylerAgent({
+        aidaClient: mockAidaClient(generateMultipleTimes),
+        createExtensionScope,
+        execJs,
+      });
+
+      await Array.fromAsync(agent.run('test', {selected: new Freestyler.NodeContext(element)}));
+
+      assert.deepStrictEqual(historyStub.lastCall.args[0].history, [
+        {
+          type: Freestyler.ResponseType.USER_QUERY,
+          query: 'test',
+        },
+        {
+          type: Freestyler.ResponseType.CONTEXT,
+          title: 'Analyzing the prompt',
+          details: [{
+            text: '* Its selector is `undefined`',
+            title: 'Data used',
+          }],
+        },
+        {
+          type: Freestyler.ResponseType.QUERYING,
+          query: '# Inspected element\n\n* Its selector is `undefined`\n\n# User request\n\nQUERY: test',
+        },
+        {
+          type: Freestyler.ResponseType.TITLE,
+          title: 'test',
+          rpcId: undefined,
+        },
+        {
+          type: Freestyler.ResponseType.THOUGHT,
+          thought: 'thought 1',
+          rpcId: undefined,
+        },
+        {
+          type: Freestyler.ResponseType.ACTION,
+          code: 'console.log(\'test\')',
+          output: 'undefined',
+          canceled: false,
+          rpcId: undefined,
+        },
+        {
+          type: Freestyler.ResponseType.QUERYING,
+          query: 'OBSERVATION: undefined',
+        },
+        {
+          type: Freestyler.ResponseType.ANSWER,
+          text: 'this is the answer',
+          suggestions: undefined,
+          rpcId: undefined,
+        },
+      ]);
     });
   });
 

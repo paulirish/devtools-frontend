@@ -722,7 +722,7 @@ export class TimelineUIUtils {
       case Trace.Types.Events.Name.MAJOR_GC:
       case Trace.Types.Events.Name.MINOR_GC: {
         const delta = unsafeEventArgs['usedHeapSizeBefore'] - unsafeEventArgs['usedHeapSizeAfter'];
-        detailsText = i18nString(UIStrings.sCollected, {PH1: Platform.NumberUtilities.bytesToString(delta)});
+        detailsText = i18nString(UIStrings.sCollected, {PH1: i18n.ByteUtilities.bytesToString(delta)});
         break;
       }
       case Trace.Types.Events.Name.FUNCTION_CALL: {
@@ -1089,8 +1089,7 @@ export class TimelineUIUtils {
       contentHelper.appendTextRow(
           i18nString(UIStrings.compilationCacheStatus), i18nString(UIStrings.scriptLoadedFromCache));
       contentHelper.appendTextRow(
-          i18nString(UIStrings.compilationCacheSize),
-          Platform.NumberUtilities.bytesToString(eventData.consumedCacheSize));
+          i18nString(UIStrings.compilationCacheSize), i18n.ByteUtilities.bytesToString(eventData.consumedCacheSize));
       const cacheKind = eventData.cacheKind;
       if (cacheKind) {
         contentHelper.appendTextRow(i18nString(UIStrings.compilationCacheKind), cacheKind);
@@ -1240,7 +1239,7 @@ export class TimelineUIUtils {
       case Trace.Types.Events.Name.MAJOR_GC:
       case Trace.Types.Events.Name.MINOR_GC: {
         const delta = unsafeEventArgs['usedHeapSizeBefore'] - unsafeEventArgs['usedHeapSizeAfter'];
-        contentHelper.appendTextRow(i18nString(UIStrings.collected), Platform.NumberUtilities.bytesToString(delta));
+        contentHelper.appendTextRow(i18nString(UIStrings.collected), i18n.ByteUtilities.bytesToString(delta));
         break;
       }
 
@@ -1293,7 +1292,7 @@ export class TimelineUIUtils {
         url = unsafeEventData && unsafeEventData['url'] as Platform.DevToolsPath.UrlString;
         contentHelper.appendTextRow(
             i18nString(UIStrings.compilationCacheSize),
-            Platform.NumberUtilities.bytesToString(unsafeEventData['producedCacheSize']));
+            i18n.ByteUtilities.bytesToString(unsafeEventData['producedCacheSize']));
         break;
       }
 
@@ -1305,7 +1304,7 @@ export class TimelineUIUtils {
         }
         contentHelper.appendTextRow(
             i18nString(UIStrings.compilationCacheSize),
-            Platform.NumberUtilities.bytesToString(unsafeEventData['producedCacheSize']));
+            i18n.ByteUtilities.bytesToString(unsafeEventData['producedCacheSize']));
         break;
       }
 
@@ -2181,7 +2180,7 @@ export class TimelineUIUtils {
     return stylesContainer;
   }
 
-  static createEventDivider(event: Trace.Types.Events.Event, zeroTime: number): Element {
+  static createEventDivider(event: Trace.Types.Events.Event, zeroTime: number): HTMLDivElement {
     const eventDivider = document.createElement('div');
     eventDivider.classList.add('resources-event-divider');
     const {startTime: eventStartTime} = Trace.Helpers.Timing.eventTimingsMilliSeconds(event);
@@ -2274,6 +2273,50 @@ export class TimelineUIUtils {
     const pieChartContainer = element.createChild('div', 'vbox');
     pieChartContainer.appendChild(pieChart);
 
+    return element;
+  }
+  // Generates a Summary component given a aggregated stats for categories.
+  static generateSummaryDetails(aggregatedStats: Record<string, number>, rangeStart: number, rangeEnd: number):
+      Element {
+    let total = 0;
+    // Calculate total of all categories.
+    for (const categoryName in aggregatedStats) {
+      total += aggregatedStats[categoryName];
+    }
+
+    const element = document.createElement('div');
+    element.classList.add('timeline-details-view-summary');
+
+    const summaryTable = new TimelineComponents.TimelineSummary.TimelineSummary();
+    let categories: TimelineComponents.TimelineSummary.CategoryData[] = [];
+
+    // Get stats values from categories.
+    for (const categoryName in Utils.EntryStyles.getCategoryStyles()) {
+      const category = Utils.EntryStyles.getCategoryStyles()[categoryName as keyof Utils.EntryStyles.CategoryPalette];
+      if (category.name === Utils.EntryStyles.EventCategory.IDLE) {
+        continue;
+      }
+      const value = aggregatedStats[category.name];
+      if (!value) {
+        continue;
+      }
+      const title = category.title;
+      const color = category.getCSSValue();
+      categories.push({value, color, title});
+    }
+
+    // Keeps the most useful categories on top.
+    categories = categories.sort((a, b) => b.value - a.value);
+    const start = Trace.Types.Timing.MilliSeconds(rangeStart);
+    const end = Trace.Types.Timing.MilliSeconds(rangeEnd);
+    summaryTable.data = {
+      rangeStart: start,
+      rangeEnd: end,
+      total,
+      categories,
+    };
+    const summaryTableContainer = element.createChild('div');
+    summaryTableContainer.appendChild(summaryTable);
     return element;
   }
 

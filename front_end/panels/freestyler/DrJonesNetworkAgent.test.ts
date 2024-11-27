@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import type * as Host from '../../core/host/host.js';
+import * as Host from '../../core/host/host.js';
 import type * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
@@ -58,7 +58,7 @@ describeWithMockConnection('DrJonesNetworkAgent', () => {
         aidaClient: {} as Host.AidaClient.AidaClient,
       });
       assert.strictEqual(
-          agent.buildRequest({input: 'test input'}).options?.model_id,
+          agent.buildRequest({text: 'test input'}).options?.model_id,
           'test model',
       );
     });
@@ -69,7 +69,7 @@ describeWithMockConnection('DrJonesNetworkAgent', () => {
         aidaClient: {} as Host.AidaClient.AidaClient,
       });
       assert.strictEqual(
-          agent.buildRequest({input: 'test input'}).options?.temperature,
+          agent.buildRequest({text: 'test input'}).options?.temperature,
           1,
       );
     });
@@ -82,35 +82,36 @@ describeWithMockConnection('DrJonesNetworkAgent', () => {
         serverSideLoggingEnabled: true,
       });
       sinon.stub(agent, 'preamble').value('preamble');
-      agent.chatNewHistoryForTesting = new Map([[
-        0,
-        [
-          {
-            type: ResponseType.QUERYING,
-            query: 'questions',
-          },
-          {
-            type: ResponseType.ANSWER,
-            text: 'answer',
-          },
-        ],
-      ]]);
+      agent.chatNewHistoryForTesting = [
+        {
+          type: ResponseType.USER_QUERY,
+          query: 'questions',
+        },
+        {
+          type: ResponseType.QUERYING,
+          query: 'questions',
+        },
+        {
+          type: ResponseType.ANSWER,
+          text: 'answer',
+        },
+      ];
       assert.deepStrictEqual(
           agent.buildRequest({
-            input: 'test input',
+            text: 'test input',
           }),
           {
-            input: 'test input',
+            current_message: {parts: [{text: 'test input'}], role: Host.AidaClient.Role.USER},
             client: 'CHROME_DEVTOOLS',
             preamble: 'preamble',
-            chat_history: [
+            historical_contexts: [
               {
-                entity: 1,
-                text: 'questions',
+                role: 1,
+                parts: [{text: 'questions'}],
               },
               {
-                entity: 2,
-                text: 'answer',
+                role: 2,
+                parts: [{text: 'answer'}],
               },
             ],
             metadata: {
@@ -244,7 +245,7 @@ describeWithMockConnection('DrJonesNetworkAgent', () => {
             {
               title: 'Timing',
               text:
-                  'Queued at (timestamp): 0 μs\nStarted at (timestamp): 8.3 min\nQueueing (duration): 8.3 min\nConnection start (stalled) (duration): 800.00 ms\nRequest sent (duration): 100.00 ms\nDuration (duration): 8.3 min',
+                  'Queued at (timestamp): 0 μs\nStarted at (timestamp): 8.4 min\nQueueing (duration): 8.4 min\nConnection start (stalled) (duration): 800.00 ms\nRequest sent (duration): 100.00 ms\nDuration (duration): 8.4 min',
             },
             {
               title: 'Request initiator chain',
@@ -258,7 +259,7 @@ describeWithMockConnection('DrJonesNetworkAgent', () => {
         {
           type: ResponseType.QUERYING,
           query:
-              '# Selected network request \nRequest: https://www.example.com\n\nRequest headers:\ncontent-type: bar1\n\nResponse headers:\ncontent-type: bar2\nx-forwarded-for: bar3\n\nResponse status: 200 \n\nRequest timing:\nQueued at (timestamp): 0 μs\nStarted at (timestamp): 8.3 min\nQueueing (duration): 8.3 min\nConnection start (stalled) (duration): 800.00 ms\nRequest sent (duration): 100.00 ms\nDuration (duration): 8.3 min\n\nRequest initiator chain:\n- URL: <redacted cross-origin initiator URL>\n\t- URL: https://www.example.com\n\t\t- URL: https://www.example.com/1\n\t\t- URL: https://www.example.com/2\n\n# User request\n\ntest',
+              '# Selected network request \nRequest: https://www.example.com\n\nRequest headers:\ncontent-type: bar1\n\nResponse headers:\ncontent-type: bar2\nx-forwarded-for: bar3\n\nResponse status: 200 \n\nRequest timing:\nQueued at (timestamp): 0 μs\nStarted at (timestamp): 8.4 min\nQueueing (duration): 8.4 min\nConnection start (stalled) (duration): 800.00 ms\nRequest sent (duration): 100.00 ms\nDuration (duration): 8.4 min\n\nRequest initiator chain:\n- URL: <redacted cross-origin initiator URL>\n\t- URL: https://www.example.com\n\t\t- URL: https://www.example.com/1\n\t\t- URL: https://www.example.com/2\n\n# User request\n\ntest',
         },
         {
           type: ResponseType.ANSWER,
@@ -269,8 +270,9 @@ describeWithMockConnection('DrJonesNetworkAgent', () => {
       ]);
       assert.deepStrictEqual(agent.chatHistoryForTesting, [
         {
-          entity: 1,
-          text: `# Selected network request \nRequest: https://www.example.com
+          role: 1,
+          parts: [{
+            text: `# Selected network request \nRequest: https://www.example.com
 
 Request headers:
 content-type: bar1
@@ -282,11 +284,11 @@ x-forwarded-for: bar3
 Response status: 200 \n
 Request timing:
 Queued at (timestamp): 0 μs
-Started at (timestamp): 8.3 min
-Queueing (duration): 8.3 min
+Started at (timestamp): 8.4 min
+Queueing (duration): 8.4 min
 Connection start (stalled) (duration): 800.00 ms
 Request sent (duration): 100.00 ms
-Duration (duration): 8.3 min
+Duration (duration): 8.4 min
 
 Request initiator chain:
 - URL: <redacted cross-origin initiator URL>
@@ -297,10 +299,11 @@ Request initiator chain:
 # User request
 
 test`,
+          }],
         },
         {
-          entity: 2,
-          text: 'This is the answer',
+          role: 2,
+          parts: [{text: 'This is the answer'}],
         },
       ]);
     });

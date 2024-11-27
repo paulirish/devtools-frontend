@@ -5,6 +5,8 @@
 import * as Host from '../../core/host/host.js';
 import type * as LitHtml from '../../ui/lit-html/lit-html.js';
 
+import {AiHistoryStorage} from './AiHistoryStorage.js';
+
 export const enum ResponseType {
   CONTEXT = 'context',
   TITLE = 'title',
@@ -87,37 +89,32 @@ export interface UserQuery {
 export type ResponseData = AnswerResponse|ErrorResponse|ActionResponse|SideEffectResponse|ThoughtResponse|TitleResponse|
     QueryResponse|ContextResponse|UserQuery;
 
-export interface AidaBuildRequestOptions {
-  input: string;
-}
-
-export interface HistoryChunk {
+export interface BuildRequestOptions {
   text: string;
-  entity: Host.AidaClient.Entity;
 }
 
-export interface AidaRequestOptions {
+export interface RequestOptions {
   temperature?: number;
   modelId?: string;
 }
 
-interface AgentOptions {
+export interface AgentOptions {
   aidaClient: Host.AidaClient.AidaClient;
   serverSideLoggingEnabled?: boolean;
 }
 
-interface ParsedResponseAnswer {
+export interface ParsedAnswer {
   answer: string;
   suggestions?: [string, ...string[]];
 }
 
-interface ParsedResponseStep {
+export interface ParsedStep {
   thought?: string;
   title?: string;
   action?: string;
 }
 
-export type ParsedResponse = ParsedResponseAnswer|ParsedResponseStep;
+export type ParsedResponse = ParsedAnswer|ParsedStep;
 
 export const enum AgentType {
   FREESTYLER = 'freestyler',
@@ -126,7 +123,14 @@ export const enum AgentType {
   DRJONES_PERFORMANCE = 'drjones-performance',
 }
 
+export interface SerializedAgent {
+  id: string;
+  type: AgentType;
+  history: HistoryEntryStorage;
+}
+
 const MAX_STEP = 10;
+export type HistoryEntryStorage = ResponseData[];
 
 export abstract class ConversationContext<T> {
   abstract getOrigin(): string;
@@ -144,6 +148,14 @@ export abstract class ConversationContext<T> {
     // https://html.spec.whatwg.org/#ascii-serialisation-of-an-origin.
     return this.getOrigin() === agentOrigin;
   }
+
+  /**
+   * This method is called at the start of `AiAgent.run`.
+   * It will be overriden in subclasses to fetch data related to the context item.
+   */
+  async refresh(): Promise<void> {
+    return;
+  }
 }
 
 export abstract class AiAgent<T> {
@@ -152,43 +164,52 @@ export abstract class AiAgent<T> {
   }
 
   abstract type: AgentType;
+  #id: string = crypto.randomUUID();
   readonly #sessionId: string = crypto.randomUUID();
   #aidaClient: Host.AidaClient.AidaClient;
   #serverSideLoggingEnabled: boolean;
   abstract readonly preamble: string;
-  abstract readonly options: AidaRequestOptions;
+  abstract readonly options: RequestOptions;
   abstract readonly clientFeature: Host.AidaClient.ClientFeature;
   abstract readonly userTier: string|undefined;
   abstract handleContextDetails(select: ConversationContext<T>|null): AsyncGenerator<ContextResponse, void, void>;
   #generatedFromHistory = false;
 
   /**
-   * Mapping between the unique request id and
-   * the history chuck it created
+   * Historical responses.
    */
-  #history = new Map<number, ResponseData[]>();
+  #history: HistoryEntryStorage = [];
   /**
    * Might need to be part of history in case we allow chatting in
    * historical conversations.
    */
   #origin?: string;
   #context?: ConversationContext<T>;
+  #structuredLog: Array<{
+    request: Host.AidaClient.AidaRequest,
+    response: string,
+    rawResponse?: Host.AidaClient.AidaResponse,
+  }> = [];
 
   constructor(opts: AgentOptions) {
     this.#aidaClient = opts.aidaClient;
     this.#serverSideLoggingEnabled = opts.serverSideLoggingEnabled ?? false;
   }
 
-  get chatHistoryForTesting(): Array<HistoryChunk> {
-    return this.#historyEntry;
+  get chatHistoryForTesting(): Array<Host.AidaClient.Content> {
+    return this.#chatHistoryForAida;
   }
 
-  set chatNewHistoryForTesting(history: Map<number, ResponseData[]>) {
+  set chatNewHistoryForTesting(history: HistoryEntryStorage) {
     this.#history = history;
   }
 
+  get id(): string {
+    return this.#id;
+  }
+
   get isEmpty(): boolean {
-    return this.#history.size <= 0;
+    return this.#history.length === 0;
   }
 
   get origin(): string|undefined {
@@ -200,8 +221,7 @@ export abstract class AiAgent<T> {
   }
 
   get title(): string|undefined {
-    return [...this.#history.values()]
-        .flat()
+    return this.#history
         .filter(response => {
           return response.type === ResponseType.USER_QUERY;
         })
@@ -213,22 +233,25 @@ export abstract class AiAgent<T> {
     return this.#generatedFromHistory;
   }
 
-  #structuredLog: Array<{
-    request: Host.AidaClient.AidaRequest,
-    response: string,
-    rawResponse?: Host.AidaClient.AidaResponse,
-  }> = [];
-  async aidaFetch(
-      input: string,
-      options?: {signal?: AbortSignal},
-      ): Promise<{
-    response: string,
-    rpcId?: number,
-  }> {
-    const request = this.buildRequest({
-      input,
-    });
+  serialized(): SerializedAgent {
+    return {
+      id: this.id,
+      type: this.type,
+      history: this.#history,
+    };
+  }
 
+  populateHistoryFromStorage(entry: SerializedAgent): void {
+    this.#id = entry.id;
+    this.#history = entry.history;
+    this.#generatedFromHistory = true;
+  }
+
+  async *
+      aidaFetch(
+          request: Host.AidaClient.AidaRequest,
+          options?: {signal?: AbortSignal},
+          ): AsyncGenerator<{parsedResponse: ParsedResponse, completed: boolean, rpcId?: number}, void, void> {
     let rawResponse: Host.AidaClient.AidaResponse|undefined = undefined;
     let response = '';
     let rpcId: number|undefined;
@@ -239,6 +262,8 @@ export abstract class AiAgent<T> {
               meta => meta.attributionAction === Host.AidaClient.RecitationAction.BLOCK)) {
         throw new Error('Attribution action does not allow providing the response');
       }
+      const parsedResponse = this.parseResponse(response);
+      yield {rpcId, parsedResponse, completed: rawResponse.completed};
     }
 
     debugLog({
@@ -252,16 +277,17 @@ export abstract class AiAgent<T> {
       rawResponse,
     });
     localStorage.setItem('freestylerStructuredLog', JSON.stringify(this.#structuredLog));
-
-    return {response, rpcId};
   }
 
-  buildRequest(opts: AidaBuildRequestOptions): Host.AidaClient.AidaRequest {
+  buildRequest(opts: BuildRequestOptions): Host.AidaClient.AidaRequest {
+    const currentMessage = {parts: [{text: opts.text}], role: Host.AidaClient.Role.USER};
+    const history = this.#chatHistoryForAida;
     const request: Host.AidaClient.AidaRequest = {
-      input: opts.input,
+      // eslint-disable-next-line @typescript-eslint/naming-convention
+      current_message: currentMessage,
       preamble: this.preamble,
       // eslint-disable-next-line @typescript-eslint/naming-convention
-      chat_history: this.#history.size ? this.#historyEntry : undefined,
+      historical_contexts: history.length ? history : undefined,
       client: Host.AidaClient.CLIENT_NAME,
       options: {
         temperature: AiAgent.validTemperature(this.options.temperature),
@@ -297,111 +323,100 @@ export abstract class AiAgent<T> {
     };
   }
 
-  formatHistoryChunkAnswer(text: string): string {
-    return text;
+  formatParsedAnswer({answer}: ParsedAnswer): string {
+    return answer;
   }
 
-  formatHistoryChunkObservation(observation: {
-    title?: string,
-    thought?: string,
-    action?: string,
-  }): string {
+  formatParsedStep(step: ParsedStep): string {
     let text = '';
-    if (observation.thought) {
-      text = `THOUGHT: ${observation.thought}`;
+    if (step.thought) {
+      text = `THOUGHT: ${step.thought}`;
     }
-    if (observation.title) {
-      text += `\nTITLE: ${observation.title}`;
+    if (step.title) {
+      text += `\nTITLE: ${step.title}`;
     }
-    if (observation.action) {
+    if (step.action) {
       text += `\nACTION
-${observation.action}
+${step.action}
 STOP`;
     }
 
     return text;
   }
 
-  get #historyEntry(): HistoryChunk[] {
-    const historyAll = new Map<number, HistoryChunk[]>();
-    for (const [id, entry] of this.#history.entries()) {
-      const history: HistoryChunk[] = [];
-      historyAll.set(id, history);
-      let response: {
-        title?: string,
-        thought?: string,
-        action?: string,
-      } = {};
-      for (const data of entry) {
-        switch (data.type) {
-          case ResponseType.CONTEXT:
-          case ResponseType.SIDE_EFFECT:
-          case ResponseType.USER_QUERY:
-            continue;
-          case ResponseType.QUERYING: {
-            const observation = this.formatHistoryChunkObservation(response);
-            if (observation) {
-              history.push({
-                entity: Host.AidaClient.Entity.SYSTEM,
-                text: observation,
-              });
-              response = {};
-            }
-
-            history.push({
-              entity: Host.AidaClient.Entity.USER,
-              text: data.query,
-            });
-            break;
-          }
-          case ResponseType.ANSWER:
-            history.push({
-              entity: Host.AidaClient.Entity.SYSTEM,
-              text: this.formatHistoryChunkAnswer(data.text),
-            });
-            break;
-          case ResponseType.TITLE:
-            response.title = data.title;
-            break;
-          case ResponseType.THOUGHT:
-            response.thought = data.thought;
-            break;
-          case ResponseType.ACTION:
-            response.action = data.code;
-            break;
-          case ResponseType.ERROR:
-            historyAll.delete(id);
-            break;
-        }
-      }
-      const observation = this.formatHistoryChunkObservation(response);
-      if (observation) {
+  get #chatHistoryForAida(): Host.AidaClient.Content[] {
+    const history: Array<Host.AidaClient.Content> = [];
+    let currentParsedStep: ParsedStep = {};
+    let lastRunStartIdx = 0;
+    const flushCurrentStep = (): void => {
+      const text = this.formatParsedStep(currentParsedStep);
+      if (text) {
         history.push({
-          entity: Host.AidaClient.Entity.USER,
-          text: observation,
+          role: Host.AidaClient.Role.MODEL,
+          parts: [{text}],
         });
+        currentParsedStep = {};
+      }
+    };
+    for (const data of this.#history) {
+      switch (data.type) {
+        case ResponseType.CONTEXT:
+        case ResponseType.SIDE_EFFECT:
+          break;
+        case ResponseType.USER_QUERY:
+          lastRunStartIdx = history.length;
+          break;
+        case ResponseType.QUERYING: {
+          flushCurrentStep();
+          history.push({
+            role: Host.AidaClient.Role.USER,
+            parts: [{text: data.query}],
+          });
+          break;
+        }
+        case ResponseType.ANSWER:
+          history.push({
+            role: Host.AidaClient.Role.MODEL,
+            parts: [{text: this.formatParsedAnswer({answer: data.text})}],
+          });
+          break;
+        case ResponseType.TITLE:
+          currentParsedStep.title = data.title;
+          break;
+        case ResponseType.THOUGHT:
+          currentParsedStep.thought = data.thought;
+          break;
+        case ResponseType.ACTION:
+          currentParsedStep.action = data.code;
+          break;
+        case ResponseType.ERROR:
+          // Delete the end of history.
+          history.splice(lastRunStartIdx);
+          currentParsedStep = {};
+          break;
       }
     }
-
-    return [...historyAll.values()].flat();
+    // Flush remaining step data into history.
+    flushCurrentStep();
+    return history;
   }
 
-  #addHistory(id: number, data: ResponseData): void {
-    const currentRunEntries = this.#history.get(id);
-    if (currentRunEntries) {
-      currentRunEntries.push(data);
-      return;
+  #addHistory(data: ResponseData): void {
+    this.#history.push(data);
+    // Remove condition to store the history in storage
+    if (isHistoryEnabled()) {
+      void AiHistoryStorage.instance().upsertHistoryEntry(this.serialized());
     }
-    this.#history.set(id, [data]);
   }
 
-  #runId = 0;
   async * run(query: string, options: {
     signal?: AbortSignal, selected: ConversationContext<T>|null,
   }): AsyncGenerator<ResponseData, void, void> {
     if (this.#generatedFromHistory) {
       throw new Error('History entries are read-only.');
     }
+
+    await options.selected?.refresh();
 
     // First context set on the agent determines its origin from now on.
     if (options.selected && this.#origin === undefined && options.selected) {
@@ -411,38 +426,51 @@ STOP`;
     if (options.selected && !this.#context) {
       this.#context = options.selected;
     }
-    const id = this.#runId++;
+
+    const enhancedQuery = await this.enhanceQuery(query, options.selected);
+
+    Host.userMetrics.freestylerQueryLength(enhancedQuery.length);
+
+    // Request is built here to capture history up to this point.
+    let request = this.buildRequest({text: enhancedQuery});
 
     const response = {
       type: ResponseType.USER_QUERY,
       query,
     } as const;
-    this.#addHistory(id, response);
+    this.#addHistory(response);
     yield response;
 
     for await (const response of this.handleContextDetails(options.selected)) {
-      this.#addHistory(id, response);
+      this.#addHistory(response);
       yield response;
     }
 
-    query = await this.enhanceQuery(query, options.selected);
+    query = enhancedQuery;
 
     for (let i = 0; i < MAX_STEP; i++) {
       const queryResponse = {
         type: ResponseType.QUERYING,
         query,
       } as const;
-      this.#addHistory(id, queryResponse);
+      this.#addHistory(queryResponse);
       yield queryResponse;
-      let response: string;
       let rpcId: number|undefined;
+      let parsedResponse: ParsedResponse|undefined = undefined;
       try {
-        const fetchResult = await this.aidaFetch(
-            query,
-            {signal: options.signal},
-        );
-        response = fetchResult.response;
-        rpcId = fetchResult.rpcId;
+        for await (const fetchResult of this.aidaFetch(request, {signal: options.signal})) {
+          rpcId = fetchResult.rpcId;
+          parsedResponse = fetchResult.parsedResponse;
+
+          // Only yield partial responses here and do not add partial answers to the history.
+          if (!fetchResult.completed && 'answer' in parsedResponse && parsedResponse.answer) {
+            yield {
+              type: ResponseType.ANSWER,
+              text: parsedResponse.answer,
+              rpcId,
+            };
+          }
+        }
       } catch (err) {
         debugLog('Error calling the AIDA API', err);
 
@@ -452,7 +480,7 @@ STOP`;
             error: ErrorType.ABORT,
             rpcId,
           } as const;
-          this.#addHistory(id, response);
+          this.#addHistory(response);
           yield response;
           break;
         }
@@ -463,13 +491,23 @@ STOP`;
           rpcId,
         } as const;
         Host.userMetrics.actionTaken(Host.UserMetrics.Action.AiAssistanceError);
-        this.#addHistory(id, response);
+        this.#addHistory(response);
         yield response;
 
         break;
       }
 
-      const parsedResponse = this.parseResponse(response);
+      if (!parsedResponse) {
+        const response = {
+          type: ResponseType.ERROR,
+          error: ErrorType.UNKNOWN,
+          rpcId,
+        } as const;
+        Host.userMetrics.actionTaken(Host.UserMetrics.Action.AiAssistanceError);
+        this.#addHistory(response);
+        yield response;
+        break;
+      }
 
       if ('answer' in parsedResponse) {
         const {
@@ -484,7 +522,7 @@ STOP`;
             suggestions,
           } as const;
           Host.userMetrics.actionTaken(Host.UserMetrics.Action.AiAssistanceAnswerReceived);
-          this.#addHistory(id, response);
+          this.#addHistory(response);
           yield response;
         } else {
           const response = {
@@ -493,7 +531,7 @@ STOP`;
             rpcId,
           } as const;
           Host.userMetrics.actionTaken(Host.UserMetrics.Action.AiAssistanceError);
-          this.#addHistory(id, response);
+          this.#addHistory(response);
           yield response;
         }
 
@@ -512,7 +550,7 @@ STOP`;
           title,
           rpcId,
         } as const;
-        this.#addHistory(id, response);
+        this.#addHistory(response);
         yield response;
       }
 
@@ -522,15 +560,17 @@ STOP`;
           thought,
           rpcId,
         } as const;
-        this.#addHistory(id, response);
+        this.#addHistory(response);
         yield response;
       }
 
       if (action) {
         const result = yield* this.handleAction(action, rpcId);
-        this.#addHistory(id, result);
-        yield result;
+        this.#addHistory(result);
         query = `OBSERVATION: ${result.output}`;
+        // Capture history state for the next iteration query.
+        request = this.buildRequest({text: query});
+        yield result;
       }
 
       if (i === MAX_STEP - 1) {
@@ -539,7 +579,7 @@ STOP`;
           error: ErrorType.MAX_STEPS,
         } as const;
         Host.userMetrics.actionTaken(Host.UserMetrics.Action.AiAssistanceError);
-        this.#addHistory(id, response);
+        this.#addHistory(response);
         yield response;
         break;
       }
@@ -555,10 +595,8 @@ STOP`;
     }
 
     this.#generatedFromHistory = true;
-    for (const historyChunk of this.#history.values()) {
-      for (const entry of historyChunk) {
-        yield entry;
-      }
+    for (const entry of this.#history) {
+      yield entry;
     }
   }
 }
@@ -585,3 +623,17 @@ function setDebugFreestylerEnabled(enabled: boolean): void {
 }
 // @ts-ignore
 globalThis.setDebugFreestylerEnabled = setDebugFreestylerEnabled;
+
+export function isHistoryEnabled(): boolean {
+  return Boolean(localStorage.getItem('persistentHistoryAiAssistance'));
+}
+
+function setAiAssistancePersistentHistory(enabled: boolean): void {
+  if (enabled) {
+    localStorage.setItem('persistentHistoryAiAssistance', 'true');
+  } else {
+    localStorage.removeItem('persistentHistoryAiAssistance');
+  }
+}
+// @ts-ignore
+globalThis.setAiAssistancePersistentHistory = setAiAssistancePersistentHistory;

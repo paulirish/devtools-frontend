@@ -40,13 +40,13 @@ const viewportWidth = 1280;
 const viewportHeight = 720;
 // Adding some offset to the window size used in the headful mode
 // so to account for the size of the browser UI.
-// Values are choosen by trial and error to make sure that the window
+// Values are chosen by trial and error to make sure that the window
 // size is not much bigger than the viewport but so that the entire
 // viewport is visible.
 const windowWidth = viewportWidth + 50;
 const windowHeight = viewportHeight + 200;
 
-const headless = !TestConfig.debug;
+const headless = !TestConfig.debug || TestConfig.headless;
 // CDP commands in e2e and interaction should not generally take
 // more than 20 seconds.
 const protocolTimeout = TestConfig.debug ? 0 : 20_000;
@@ -79,6 +79,8 @@ function launchChrome() {
     'DeferRendererTasksAfterInput',                // crbug.com/361078921
     'PMProcessPriorityPolicy',                     // crbug.com/361252079
     'MojoChannelAssociatedSendUsesRunOrPostTask',  // crbug.com/376228320
+    'RasterInducingScroll',                        // crbug.com/381055647
+    'CompositeBackgroundColorAnimation',           // crbug.com/381055647
   ];
   const launchArgs = [
     '--remote-allow-origins=*',

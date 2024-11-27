@@ -174,7 +174,7 @@ export class HeapTimelineOverview extends Common.ObjectWrapper.eventMixin<EventT
     context.closePath();
 
     if (gridValue) {
-      const label = Platform.NumberUtilities.bytesToString(gridValue);
+      const label = i18n.ByteUtilities.bytesToString(gridValue);
       const labelPadding = 4;
       const labelX = 0;
       const labelY = gridY - 0.5;
@@ -215,7 +215,7 @@ export class HeapTimelineOverview extends Common.ObjectWrapper.eventMixin<EventT
     this.windowWidthRatio = this.windowRightRatio - this.windowLeftRatio;
   }
 
-  update(): void {
+  override update(): void {
     this.updateTimerId = null;
     if (!this.isShowing()) {
       return;

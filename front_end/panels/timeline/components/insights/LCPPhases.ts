@@ -10,24 +10,12 @@ import * as Trace from '../../../../models/trace/trace.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 import type * as Overlays from '../../overlays/overlays.js';
 
-import {BaseInsightComponent, shouldRenderForCategory} from './Helpers.js';
-import type * as SidebarInsight from './SidebarInsight.js';
+import {BaseInsightComponent} from './BaseInsightComponent.js';
 import type {TableData} from './Table.js';
-import {Category} from './types.js';
 
 const {html} = LitHtml;
 
 const UIStrings = {
-  /**
-   *@description Title of an insight that provides details about the LCP metric, broken down by phases / parts.
-   */
-  title: 'LCP by phase',
-  /**
-   * @description Description of a DevTools insight that presents a breakdown for the LCP metric by phases.
-   * This is displayed after a user expands the section to see more. No character length limits.
-   */
-  description:
-      'Each [phase has specific improvement strategies](https://web.dev/articles/optimize-lcp#lcp-breakdown). Ideally, most of the LCP time should be spent on loading the resources, not within delays.',
   /**
    *@description Time to first byte title for the Largest Contentful Paint's phases timespan breakdown.
    */
@@ -64,10 +52,7 @@ interface PhaseData {
 
 export class LCPPhases extends BaseInsightComponent<LCPPhasesInsightModel> {
   static override readonly litTagName = LitHtml.literal`devtools-performance-lcp-by-phases`;
-  override insightCategory: Category = Category.LCP;
   override internalName: string = 'lcp-by-phase';
-  override userVisibleTitle: string = i18nString(UIStrings.title);
-  override description: string = i18nString(UIStrings.description);
   #overlay: Overlays.Overlays.TimespanBreakdown|null = null;
 
   #getPhaseData(): PhaseData[] {
@@ -201,7 +186,11 @@ export class LCPPhases extends BaseInsightComponent<LCPPhasesInsightModel> {
     return overlays;
   }
 
-  #renderLCPPhases(phaseData: PhaseData[]): LitHtml.LitTemplate {
+  #renderContent(phaseData: PhaseData[]): LitHtml.LitTemplate {
+    if (!this.model) {
+      return LitHtml.nothing;
+    }
+
     const rows = phaseData.map(({phase, percent}) => {
       const section = this.#overlay?.sections.find(section => phase === section.label);
       return {
@@ -215,56 +204,25 @@ export class LCPPhases extends BaseInsightComponent<LCPPhasesInsightModel> {
 
     // clang-format off
     return html`
-    <div class="insights">
-      <devtools-performance-sidebar-insight .data=${{
-            title: this.userVisibleTitle,
-            description: this.description,
-            internalName: this.internalName,
-            expanded: this.isActive(),
-        } as SidebarInsight.InsightDetails}
-        @insighttoggleclick=${this.onSidebarClick}
-      >
-        <div slot="insight-content" class="insight-section">
-          ${html`<devtools-performance-table
-            .data=${{
-              insight: this,
-              headers: [i18nString(UIStrings.phase), i18nString(UIStrings.percentLCP)],
-              rows,
-            } as TableData}>
-          </devtools-performance-table>`}
-        </div>
-      </devtools-performance-sidebar-insight>
-    </div>`;
+      <div class="insight-section">
+        ${html`<devtools-performance-table
+          .data=${{
+            insight: this,
+            headers: [i18nString(UIStrings.phase), i18nString(UIStrings.percentLCP)],
+            rows,
+          } as TableData}>
+        </devtools-performance-table>`}
+      </div>`;
     // clang-format on
   }
 
-  #hasDataToRender(phaseData: PhaseData[]): boolean {
-    return phaseData ? phaseData.length > 0 : false;
-  }
-
-  override getRelatedEvents(): Trace.Types.Events.Event[] {
-    const insight = this.model;
-    if (!insight?.lcpEvent) {
-      return [];
-    }
-
-    const relatedEvents: Trace.Types.Events.Event[] = [insight.lcpEvent];
-    if (insight.lcpRequest) {
-      relatedEvents.push(insight.lcpRequest);
-    }
-
-    return relatedEvents;
-  }
-
   override render(): void {
+    if (!this.model) {
+      return;
+    }
+
     const phaseData = this.#getPhaseData();
-    const matchesCategory = shouldRenderForCategory({
-      activeCategory: this.data.activeCategory,
-      insightCategory: this.insightCategory,
-    });
-    const shouldRender = matchesCategory && this.#hasDataToRender(phaseData);
-    const output = shouldRender ? this.#renderLCPPhases(phaseData) : LitHtml.nothing;
-    LitHtml.render(output, this.shadow, {host: this});
+    this.renderWithContent(this.#renderContent(phaseData));
   }
 }
 

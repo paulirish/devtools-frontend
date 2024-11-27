@@ -5,29 +5,17 @@
 import '../../../../ui/components/icon_button/icon_button.js';
 
 import * as i18n from '../../../../core/i18n/i18n.js';
-import * as Platform from '../../../../core/platform/platform.js';
 import type {LCPDiscoveryInsightModel} from '../../../../models/trace/insights/LCPDiscovery.js';
 import * as Trace from '../../../../models/trace/trace.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 import type * as Overlays from '../../overlays/overlays.js';
 
-import {eventRef} from './EventRef.js';
-import {BaseInsightComponent, shouldRenderForCategory} from './Helpers.js';
-import type * as SidebarInsight from './SidebarInsight.js';
-import {Category} from './types.js';
+import {BaseInsightComponent} from './BaseInsightComponent.js';
+import {imageRef} from './EventRef.js';
 
 const {html} = LitHtml;
 
 const UIStrings = {
-  /**
-   *@description Title of an insight that provides details about the LCP metric, and the network requests necessary to load it. Details how the LCP request was discoverable - in other words, the path necessary to load it (ex: network requests, JavaScript)
-   */
-  title: 'LCP request discovery',
-  /**
-   *@description Description of an insight that provides details about the LCP metric, and the network requests necessary to load it.
-   */
-  description:
-      'Optimize LCP by making the LCP image [discoverable](https://web.dev/articles/optimize-lcp#1_eliminate_resource_load_delay) from the HTML immediately, and [avoiding lazy-loading](https://web.dev/articles/lcp-lazy-loading)',
   /**
    * @description Text to tell the user how long after the earliest discovery time their LCP element loaded.
    * @example {401ms} PH1
@@ -55,7 +43,6 @@ const UIStrings = {
    *@example {Server response time} PH1
    */
   failedAriaLabel: 'Insight check failed: {PH1}',
-
 };
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/insights/LCPDiscovery.ts', UIStrings);
@@ -70,11 +57,7 @@ interface LCPImageDiscoveryData {
   estimatedSavings: Trace.Types.Timing.MilliSeconds|null;
 }
 
-function getImageData(model: LCPDiscoveryInsightModel|null): LCPImageDiscoveryData|null {
-  if (!model) {
-    return null;
-  }
-
+function getImageData(model: LCPDiscoveryInsightModel): LCPImageDiscoveryData|null {
   if (model.lcpRequest === undefined) {
     return null;
   }
@@ -110,10 +93,7 @@ function getImageData(model: LCPDiscoveryInsightModel|null): LCPImageDiscoveryDa
 
 export class LCPDiscovery extends BaseInsightComponent<LCPDiscoveryInsightModel> {
   static override readonly litTagName = LitHtml.literal`devtools-performance-lcp-discovery`;
-  override insightCategory: Category = Category.LCP;
   override internalName: string = 'lcp-discovery';
-  override userVisibleTitle: string = i18nString(UIStrings.title);
-  override description: string = i18nString(UIStrings.description);
 
   #adviceIcon(didFail: boolean, label: string): LitHtml.TemplateResult {
     const icon = didFail ? 'clear' : 'check-circle';
@@ -137,6 +117,10 @@ export class LCPDiscovery extends BaseInsightComponent<LCPDiscoveryInsightModel>
   }
 
   override createOverlays(): Overlays.Overlays.TimelineOverlay[] {
+    if (!this.model) {
+      return [];
+    }
+
     const imageResults = getImageData(this.model);
     if (!imageResults || !imageResults.discoveryDelay) {
       return [];
@@ -173,83 +157,51 @@ export class LCPDiscovery extends BaseInsightComponent<LCPDiscoveryInsightModel>
     ];
   }
 
-  #handleBadImage(event: Event): void {
-    const img = event.target as HTMLImageElement;
-    img.style.display = 'none';
-  }
-
-  #renderImage(imageData: LCPImageDiscoveryData): LitHtml.TemplateResult {
-    // clang-format off
-    return html`
-      <div class="lcp-element">
-        ${imageData.request.args.data.mimeType.includes('image') ?
-          html`
-        <img
-          class="element-img"
-          src=${imageData.request.args.data.url}
-          @error=${this.#handleBadImage}
-           />`: LitHtml.nothing}
-        <span class="element-img-details">
-          ${eventRef(imageData.request)}
-          <span class="element-img-details-size">${Platform.NumberUtilities.bytesToString(imageData.request.args.data.decodedBodyLength ?? 0)}</span>
-        </span>
-      </div>`;
-    // clang-format on
-  }
-
-  #renderDiscovery(imageData: LCPImageDiscoveryData): LitHtml.TemplateResult {
-    // clang-format off
-    return html`
-        <div class="insights">
-          <devtools-performance-sidebar-insight .data=${{
-            title: this.userVisibleTitle,
-            description: this.description,
-            internalName: this.internalName,
-            expanded: this.isActive(),
-            estimatedSavingsTime: imageData.estimatedSavings,
-          } as SidebarInsight.InsightDetails}
-          @insighttoggleclick=${this.onSidebarClick}>
-            <div slot="insight-content" class="insight-section">
-              <div class="insight-results">
-                <ul class="insight-icon-results">
-                  <li class="insight-entry">
-                    ${this.#adviceIcon(imageData.shouldIncreasePriorityHint, i18nString(UIStrings.fetchPriorityApplied))}
-                    <span>${i18nString(UIStrings.fetchPriorityApplied)}</span>
-                  </li>
-                  <li class="insight-entry">
-                    ${this.#adviceIcon(imageData.shouldPreloadImage, i18nString(UIStrings.requestDiscoverable))}
-                    <span>${i18nString(UIStrings.requestDiscoverable)}</span>
-                  </li>
-                  <li class="insight-entry">
-                    ${this.#adviceIcon(imageData.shouldRemoveLazyLoading, i18nString(UIStrings.lazyLoadNotApplied))}
-                    <span>${i18nString(UIStrings.lazyLoadNotApplied)}</span>
-                  </li>
-                </ul>
-              </div>
-              ${this.#renderImage(imageData)}
-            </div>
-          </devtools-performance-sidebar-insight>
-      </div>`;
-    // clang-format on
-  }
-
-  override getRelatedEvents(): Trace.Types.Events.Event[] {
-    if (!this.model?.lcpEvent || !this.model?.lcpRequest) {
-      return [];
+  override getEstimatedSavingsTime(): Trace.Types.Timing.MilliSeconds|null {
+    if (!this.model) {
+      return null;
     }
 
-    // TODO: add entire request initiator chain?
-    return [this.model.lcpEvent, this.model.lcpRequest];
+    return getImageData(this.model)?.estimatedSavings ?? null;
+  }
+
+  #renderContent(imageData: LCPImageDiscoveryData): LitHtml.LitTemplate {
+    if (!this.model) {
+      return LitHtml.nothing;
+    }
+
+    // clang-format off
+    return html`
+      <div class="insight-section">
+        <div class="insight-results">
+          <ul class="insight-icon-results">
+            <li class="insight-entry">
+              ${this.#adviceIcon(imageData.shouldIncreasePriorityHint, i18nString(UIStrings.fetchPriorityApplied))}
+              <span>${i18nString(UIStrings.fetchPriorityApplied)}</span>
+            </li>
+            <li class="insight-entry">
+              ${this.#adviceIcon(imageData.shouldPreloadImage, i18nString(UIStrings.requestDiscoverable))}
+              <span>${i18nString(UIStrings.requestDiscoverable)}</span>
+            </li>
+            <li class="insight-entry">
+              ${this.#adviceIcon(imageData.shouldRemoveLazyLoading, i18nString(UIStrings.lazyLoadNotApplied))}
+              <span>${i18nString(UIStrings.lazyLoadNotApplied)}</span>
+            </li>
+          </ul>
+        </div>
+        ${imageRef(imageData.request)}
+      </div>`;
+    // clang-format on
   }
 
   override render(): void {
+    if (!this.model) {
+      return;
+    }
+
     const imageResults = getImageData(this.model);
-    const matchesCategory = shouldRenderForCategory({
-      activeCategory: this.data.activeCategory,
-      insightCategory: this.insightCategory,
-    });
-    const output = imageResults && matchesCategory ? this.#renderDiscovery(imageResults) : LitHtml.nothing;
-    LitHtml.render(output, this.shadow, {host: this});
+    const output = imageResults ? this.#renderContent(imageResults) : LitHtml.nothing;
+    this.renderWithContent(output);
   }
 }
 

@@ -707,6 +707,7 @@ describeWithMockConnection('LiveMetricsView', () => {
         'url-DESKTOP': null,
         'url-PHONE': null,
         'url-TABLET': null,
+        warnings: [],
       };
 
       sinon.stub(CrUXManager.CrUXManager.instance(), 'getFieldDataForCurrentPage').callsFake(async () => mockFieldData);
@@ -787,6 +788,17 @@ describeWithMockConnection('LiveMetricsView', () => {
       assert.strictEqual(title.innerText, 'Local and field metrics');
     });
 
+    it('should display any warning from crux', async () => {
+      mockFieldData.warnings.push('Warning from crux');
+
+      const view = renderLiveMetrics();
+
+      await coordinator.done();
+
+      const fieldMessage = getFieldMessage(view);
+      assert.match(fieldMessage!.textContent!, /Warning from crux/);
+    });
+
     it('should make initial request on render when crux is enabled', async () => {
       mockFieldData['url-ALL'] = createMockFieldData();
 
@@ -860,62 +872,6 @@ describeWithMockConnection('LiveMetricsView', () => {
       assert.strictEqual(lcpFieldEl2!.textContent, '2.00 s');
     });
 
-    it('auto device option should chose based on emulation', async () => {
-      mockFieldData['url-DESKTOP'] = createMockFieldData();
-
-      mockFieldData['url-PHONE'] = createMockFieldData();
-      mockFieldData['url-PHONE'].record.metrics.largest_contentful_paint!.percentiles!.p75 = 2000;
-
-      const view = renderLiveMetrics();
-
-      await coordinator.done();
-
-      selectDeviceOption(view, 'AUTO');
-
-      const lcpFieldEl1 = getFieldMetricValue(view, 'lcp');
-      assert.strictEqual(lcpFieldEl1!.textContent, '1.00 s');
-
-      for (const device of EmulationModel.EmulatedDevices.EmulatedDevicesList.instance().standard()) {
-        if (device.title === 'Moto G Power') {
-          EmulationModel.DeviceModeModel.DeviceModeModel.instance().emulate(
-              EmulationModel.DeviceModeModel.Type.Device, device, device.modes[0], 1);
-        }
-      }
-
-      await coordinator.done();
-
-      const lcpFieldEl2 = getFieldMetricValue(view, 'lcp');
-      assert.strictEqual(lcpFieldEl2!.textContent, '2.00 s');
-    });
-
-    it('auto device option should fall back to all devices', async () => {
-      mockFieldData['url-DESKTOP'] = createMockFieldData();
-
-      mockFieldData['url-ALL'] = createMockFieldData();
-      mockFieldData['url-ALL'].record.metrics.largest_contentful_paint!.percentiles!.p75 = 2000;
-
-      const view = renderLiveMetrics();
-
-      await coordinator.done();
-
-      selectDeviceOption(view, 'AUTO');
-
-      const lcpFieldEl1 = getFieldMetricValue(view, 'lcp');
-      assert.strictEqual(lcpFieldEl1!.textContent, '1.00 s');
-
-      for (const device of EmulationModel.EmulatedDevices.EmulatedDevicesList.instance().standard()) {
-        if (device.title === 'Moto G Power') {
-          EmulationModel.DeviceModeModel.DeviceModeModel.instance().emulate(
-              EmulationModel.DeviceModeModel.Type.Device, device, device.modes[0], 1);
-        }
-      }
-
-      await coordinator.done();
-
-      const lcpFieldEl2 = getFieldMetricValue(view, 'lcp');
-      assert.strictEqual(lcpFieldEl2!.textContent, '2.00 s');
-    });
-
     describe('network throttling recommendation', () => {
       it('should show for closest target RTT', async () => {
         mockFieldData['url-ALL'] = createMockFieldData();
@@ -933,6 +889,10 @@ describeWithMockConnection('LiveMetricsView', () => {
         assert.lengthOf(envRecs, 2);
         assert.strictEqual(envRecs[0].textContent, '30% mobile, 60% desktop');
         assert.match(envRecs[1].textContent!, /Slow 4G/);
+
+        const recNotice = view.shadowRoot!.querySelector('.environment-option devtools-network-throttling-selector')
+                              ?.shadowRoot!.querySelector('devtools-button');
+        assert.exists(recNotice);
       });
 
       it('should hide if no RTT data', async () => {
@@ -946,6 +906,10 @@ describeWithMockConnection('LiveMetricsView', () => {
         const envRecs = getEnvironmentRecs(view);
         assert.strictEqual(envRecs[0].textContent, '30% mobile, 60% desktop');
         assert.strictEqual(envRecs[1].textContent, 'Not enough data');
+
+        const recNotice = view.shadowRoot!.querySelector('.environment-option devtools-network-throttling-selector')
+                              ?.shadowRoot!.querySelector('devtools-button');
+        assert.notExists(recNotice);
       });
 
       it('should suggest no throttling for very low latency', async () => {
@@ -962,6 +926,10 @@ describeWithMockConnection('LiveMetricsView', () => {
         const envRecs = getEnvironmentRecs(view);
         assert.strictEqual(envRecs[0].textContent, '30% mobile, 60% desktop');
         assert.match(envRecs[1].textContent!, /too fast to simulate with throttling/);
+
+        const recNotice = view.shadowRoot!.querySelector('.environment-option devtools-network-throttling-selector')
+                              ?.shadowRoot!.querySelector('devtools-button');
+        assert.notExists(recNotice);
       });
 
       it('should ignore presets that are generally too far off', async () => {
@@ -978,6 +946,10 @@ describeWithMockConnection('LiveMetricsView', () => {
         const envRecs = getEnvironmentRecs(view);
         assert.strictEqual(envRecs[0].textContent, '30% mobile, 60% desktop');
         assert.strictEqual(envRecs[1].textContent, 'Not enough data');
+
+        const recNotice = view.shadowRoot!.querySelector('.environment-option devtools-network-throttling-selector')
+                              ?.shadowRoot!.querySelector('devtools-button');
+        assert.notExists(recNotice);
       });
     });
 

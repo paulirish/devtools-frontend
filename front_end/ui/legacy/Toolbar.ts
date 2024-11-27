@@ -1028,9 +1028,9 @@ export class ToolbarMenuButton extends ToolbarCombobox {
       useSoftMenu: this.useSoftMenu,
       x: this.element.getBoundingClientRect().left,
       y: this.element.getBoundingClientRect().top + this.element.offsetHeight,
-      // Without rAF, pointer events will be un-ignored too early, and a single click causes the
-      // context menu to be closed and immediately re-opened on Windows (https://crbug.com/339560549).
-      onSoftMenuClosed: () => requestAnimationFrame(() => this.element.removeAttribute('aria-expanded')),
+      // Without adding a delay, pointer events will be un-ignored too early, and a single click causes
+      // the context menu to be closed and immediately re-opened on Windows (https://crbug.com/339560549).
+      onSoftMenuClosed: () => setTimeout(() => this.element.removeAttribute('aria-expanded'), 50),
     });
     this.contextMenuHandler(contextMenu);
     this.element.setAttribute('aria-expanded', 'true');
@@ -1137,7 +1137,7 @@ export class ToolbarComboBox extends ToolbarItem<void> {
     this.selectElementInternal.appendChild(option);
   }
 
-  createOption(label: string, value?: string): Element {
+  createOption(label: string, value?: string): HTMLOptionElement {
     const option = (this.selectElementInternal.createChild('option') as HTMLOptionElement);
     option.text = label;
     if (typeof value !== 'undefined') {

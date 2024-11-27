@@ -40,6 +40,10 @@ function getDetailedCompareText(view: Element): HTMLElement|null {
   return view.shadowRoot!.querySelector('.detailed-compare-text');
 }
 
+function getWarnings(view: Element): string[] {
+  return Array.from(view.shadowRoot!.querySelectorAll('.warning')).map(w => w.textContent!);
+}
+
 function getEnvironmentRecs(view: Element): string[] {
   const recs = Array.from(view.shadowRoot!.querySelectorAll('.environment-recs li'));
   return recs.map(rec => rec.textContent!);
@@ -145,7 +149,7 @@ describeWithMockConnection('MetricCard', () => {
 
     const localValueEl = getLocalMetricValue(view);
     assert.strictEqual(localValueEl.className, 'metric-value poor');
-    assert.strictEqual(localValueEl.innerText, '2000 ms');
+    assert.strictEqual(localValueEl.innerText, '2,000 ms');
 
     const fieldValueEl = getFieldMetricValue(view);
     assert.strictEqual(fieldValueEl!.className, 'metric-value good');
@@ -175,6 +179,25 @@ describeWithMockConnection('MetricCard', () => {
     assert.match(histogramLabels[0], /Good\s+\(≤2.50 s\)/);
     assert.match(histogramLabels[1], /Needs improvement\s+\(2.50 s-4.00 s\)/);
     assert.match(histogramLabels[2], /Poor\s+\(>4.00 s\)/);
+  });
+
+  it('should show warnings', async () => {
+    const view = new Components.MetricCard.MetricCard();
+    view.data = {
+      metric: 'LCP',
+      localValue: 2000,
+      fieldValue: 1,
+      histogram: createMockHistogram(),
+      warnings: ['LCP warning'],
+    };
+
+    renderElementIntoDOM(view);
+    await coordinator.done();
+
+    const warnings = getWarnings(view);
+    assert.deepStrictEqual(warnings, [
+      'LCP warning',
+    ]);
   });
 
   describe('phase table', () => {

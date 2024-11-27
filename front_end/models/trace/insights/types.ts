@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import type * as Common from '../../../core/common/common.js';
 import type * as Handlers from '../handlers/handlers.js';
 import type * as Lantern from '../lantern/lantern.js';
 import type * as Types from '../types/types.js';
@@ -53,7 +54,19 @@ export interface MetricSavings {
   /* eslint-enable @typescript-eslint/naming-convention */
 }
 
+export enum InsightCategory {
+  ALL = 'All',
+  INP = 'INP',
+  LCP = 'LCP',
+  CLS = 'CLS',
+}
+
 export type InsightModel<R extends Record<string, unknown>> = R&{
+  title: Common.UIString.LocalizedString,
+  description: Common.UIString.LocalizedString,
+  category: InsightCategory,
+  /** True if there is anything of interest to display to the user. */
+  shouldShow: boolean,
   relatedEvents?: Types.Events.Event[],
   warnings?: InsightWarning[],
   metricSavings?: MetricSavings,

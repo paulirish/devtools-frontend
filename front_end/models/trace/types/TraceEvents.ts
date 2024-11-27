@@ -677,7 +677,10 @@ export interface MarkerEvent extends Event {
 }
 
 export function isMarkerEvent(event: Event): event is MarkerEvent {
-  return markerTypeGuards.some(fn => fn(event));
+  if (event.ph === Phase.INSTANT || event.ph === Phase.MARK) {
+    return markerTypeGuards.some(fn => fn(event));
+  }
+  return false;
 }
 
 const pageLoadEventTypeGuards = [
@@ -686,7 +689,10 @@ const pageLoadEventTypeGuards = [
 ];
 
 export function eventIsPageLoadEvent(event: Event): event is PageLoadEvent {
-  return pageLoadEventTypeGuards.some(fn => fn(event));
+  if (event.ph === Phase.INSTANT || event.ph === Phase.MARK) {
+    return pageLoadEventTypeGuards.some(fn => fn(event));
+  }
+  return false;
 }
 
 export interface LargestContentfulPaintCandidate extends Mark {
@@ -2635,6 +2641,7 @@ export function isJSInvocationEvent(event: Event): boolean {
   switch (event.name) {
     case Name.RUN_MICROTASKS:
     case Name.FUNCTION_CALL:
+    // TODO(paulirish): Define types for these Evaluate* events
     case Name.EVALUATE_SCRIPT:
     case Name.EVALUATE_MODULE:
     case Name.EVENT_DISPATCH:
@@ -2646,6 +2653,17 @@ export function isJSInvocationEvent(event: Event): boolean {
     return true;
   }
   return false;
+}
+
+export interface FlowEvent extends Event {
+  // Contains a flow id created by perfetto for the flow this phase
+  // event belongs to.
+  id: number;
+  ph: Phase.FLOW_START|Phase.FLOW_END|Phase.FLOW_STEP;
+}
+
+export function isFlowPhaseEvent(event: Event): event is FlowEvent {
+  return event.ph === Phase.FLOW_START || event.ph === Phase.FLOW_STEP || event.ph === Phase.FLOW_END;
 }
 
 /**

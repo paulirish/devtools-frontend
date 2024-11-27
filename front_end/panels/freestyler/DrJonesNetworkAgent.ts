@@ -13,11 +13,11 @@ import * as PanelUtils from '../utils/utils.js';
 import {
   AgentType,
   AiAgent,
-  type AidaRequestOptions,
   type ContextDetail,
   type ContextResponse,
   ConversationContext,
   type ParsedResponse,
+  type RequestOptions,
   ResponseType,
 } from './AiAgent.js';
 
@@ -129,14 +129,14 @@ export class RequestContext extends ConversationContext<SDK.NetworkRequest.Netwo
  * instance for a new conversation.
  */
 export class DrJonesNetworkAgent extends AiAgent<SDK.NetworkRequest.NetworkRequest> {
-  override type = AgentType.DRJONES_NETWORK_REQUEST;
+  override readonly type = AgentType.DRJONES_NETWORK_REQUEST;
   readonly preamble = preamble;
   readonly clientFeature = Host.AidaClient.ClientFeature.CHROME_DRJONES_NETWORK_AGENT;
   get userTier(): string|undefined {
     const config = Common.Settings.Settings.instance().getHostConfig();
     return config.devToolsAiAssistanceNetworkAgent?.userTier;
   }
-  get options(): AidaRequestOptions {
+  get options(): RequestOptions {
     const config = Common.Settings.Settings.instance().getHostConfig();
     const temperature = config.devToolsAiAssistanceNetworkAgent?.temperature;
     const modelId = config.devToolsAiAssistanceNetworkAgent?.modelId;

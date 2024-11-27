@@ -53,6 +53,7 @@ devtools_module("issues_manager") {
     "../../models/text_utils:bundle",
     "../../models/workspace:bundle",
     "../../third_party/marked:bundle",
+    "../../third_party/third-party-web:bundle",
   ]
 
   public_deps = [ ":descriptions" ]
@@ -172,6 +173,8 @@ devtools_issue_description_files = [
   "cookieWarnThirdPartyPhaseoutRead.md",
   "cookieExcludeThirdPartyPhaseoutSet.md",
   "cookieExcludeThirdPartyPhaseoutRead.md",
+  "cookieExcludePortMismatch.md",
+  "cookieExcludeSchemeMismatch.md",
   "cookieWarnMetadataGrantRead.md",
   "cookieWarnMetadataGrantSet.md",
   "propertyRuleIssue.md",
@@ -229,6 +232,7 @@ devtools_entrypoint("bundle") {
     "../../panels/elements/*",
     "../../panels/issues/*",
     "../../panels/network/*",
+    "../../panels/security/*",
     "../../panels/sources/*",
     "../../testing/*",
     "../../ui/components/docs/issue_counter/*",

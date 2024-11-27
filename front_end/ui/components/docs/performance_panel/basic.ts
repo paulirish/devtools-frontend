@@ -94,7 +94,7 @@ UI.ActionRegistration.registerActionExtension({
 
 const actionRegistry = UI.ActionRegistry.ActionRegistry.instance();
 UI.ShortcutRegistry.ShortcutRegistry.instance({forceNew: true, actionRegistry});
-Common.Settings.settingForTest('flamechart-mouse-wheel-action').set('zoom');
+Common.Settings.settingForTest('flamechart-selected-navigation').set('classic');
 const params = new URLSearchParams(window.location.search);
 const traceFileName = params.get('trace');
 const cpuprofileName = params.get('cpuprofile');
@@ -102,9 +102,8 @@ const traceUrl = params.get('loadTimelineFromURL');
 const nodeMode = params.get('isNode');
 const isNodeMode = nodeMode === 'true' ? true : false;
 
-// These are both enabled by default in Chrome M131 and will be removed in M132.
+// This experiment is enabled by default in Chrome M131.
 Root.Runtime.experiments.setEnabled(Root.Runtime.ExperimentName.TIMELINE_INSIGHTS, true);
-Root.Runtime.experiments.setEnabled(Root.Runtime.ExperimentName.TIMELINE_ANNOTATIONS, true);
 
 const timeline = Timeline.TimelinePanel.TimelinePanel.instance({forceNew: true, isNode: isNodeMode});
 const container = document.getElementById('container');

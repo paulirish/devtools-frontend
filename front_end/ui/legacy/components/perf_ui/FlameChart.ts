@@ -264,6 +264,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   private chartViewport: ChartViewport;
   private dataProvider: FlameChartDataProvider;
   private candyStripePattern: CanvasPattern|null;
+  private candyStripePatternGray: CanvasPattern|null;
   private contextMenu?: UI.ContextMenu.ContextMenu;
   private viewportElement: HTMLElement;
   private canvas: HTMLCanvasElement;
@@ -281,14 +282,13 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   private textPadding: number;
   private highlightedMarkerIndex: number;
   /**
-   * Represents the index of the entry that the user's mouse cursor is over.
-   * Note that this is updated as the user moves their cursor: they do not have
-   * to click for this to be updated.
+   * The index of the entry that's hovered (typically), or focused because of searchResult or other reasons.focused via searchResults, or focused by other means.
+   * Updated as the cursor moves. Meanwhile `selectedEntryIndex` is the entry that's been clicked.
    **/
   private highlightedEntryIndex: number;
   /**
    * Represents the index of the entry that is selected. For an entry to be
-   * selected, it has to be clicked by the user.
+   * selected, it has to be clicked by the user (generally).
    **/
   private selectedEntryIndex: number;
   private rawTimelineDataLength: number;
@@ -365,7 +365,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
 
     this.viewportElement = this.chartViewport.viewportElement;
     this.canvas = (this.viewportElement.createChild('canvas', 'fill') as HTMLCanvasElement);
-    this.candyStripePattern = null;
+    this.candyStripePattern = this.candyStripePatternGray = null;
 
     this.canvas.tabIndex = 0;
     UI.ARIAUtils.setLabel(this.canvas, i18nString(UIStrings.flameChart));
@@ -600,7 +600,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.dispatchEventToListeners(Events.ENTRY_HOVERED, -1);
   }
 
-  private createCandyStripePattern(): CanvasPattern {
+  private createCandyStripePattern(color: string): CanvasPattern {
     // Set the candy stripe pattern to 17px so it repeats well.
     const size = 17;
     const candyStripeCanvas = document.createElement('canvas');
@@ -613,7 +613,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     ctx.rotate(Math.PI * 0.25);
     ctx.translate(-size * 0.5, -size * 0.5);
 
-    ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
+    ctx.fillStyle = color;
     for (let x = -size; x < size * 2; x += 3) {
       ctx.fillRect(x, -size, 1, size * 3);
     }
@@ -804,7 +804,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
         return null;
     }
     const element = document.createElement('div');
-    element.createChild('span', 'timeline-info-title').textContent = iconTooltip;
+    element.createChild('span', 'popoverinfo-title').textContent = iconTooltip;
 
     return element;
   }
@@ -863,26 +863,35 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
         isMouseOverRevealChildrenArrow === this.lastPopoverState.hiddenEntriesPopover) {
       return this.updatePopoverOffset();
     }
-    this.popoverElement.removeChildren();
     const data = this.timelineData();
     if (!data) {
       return;
     }
     const group = data.groups.at(this.selectedGroupIndex);
     // If the mouse is hovering over the hidden descendants arrow, get an element that shows how many children are hidden, otherwise an element with the event name and length
-    const entryInfo = (isMouseOverRevealChildrenArrow && group) ?
-        this.dataProvider.prepareHighlightedHiddenEntriesArrowInfo &&
-            this.dataProvider.prepareHighlightedHiddenEntriesArrowInfo(entryIndex) :
-        entryIndex !== null && this.dataProvider.prepareHighlightedEntryInfo(entryIndex);
-    if (entryInfo) {
-      this.popoverElement.appendChild(entryInfo);
-      this.updatePopoverOffset();
+    const popoverElement = (isMouseOverRevealChildrenArrow && group) ?
+        this.dataProvider.preparePopoverForCollapsedArrow?.(entryIndex) :
+        entryIndex !== null && this.dataProvider.preparePopoverElement(entryIndex);
+    if (popoverElement) {
+      this.updatePopoverContents(popoverElement);
     }
     this.lastPopoverState = {
       entryIndex,
       groupIndex: -1,
       hiddenEntriesPopover: isMouseOverRevealChildrenArrow,
     };
+  }
+
+  updatePopoverContents(popoverElement: Element): void {
+    this.popoverElement.removeChildren();
+    this.popoverElement.appendChild(popoverElement);
+    this.updatePopoverOffset();
+    this.lastPopoverState.entryIndex = -1;
+  }
+
+  updateMouseOffset(mouseX: number, mouseY: number): void {
+    this.lastMouseOffsetX = mouseX;
+    this.lastMouseOffsetY = mouseY;
   }
 
   #updatePopoverForGroup(groupIndex: number): void {
@@ -1414,33 +1423,30 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.contextMenu = this.dataProvider.customizedContextMenu?.(event, this.selectedEntryIndex, groupIndex) ??
         new UI.ContextMenu.ContextMenu(event, {useSoftMenu: true});
 
-    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_ANNOTATIONS)) {
-      const annotationSection = this.contextMenu.section('annotations');
+    // Generate context menu entries for annotations.
+    const annotationSection = this.contextMenu.section('annotations');
+    const labelEntryAnnotationOption = annotationSection.appendItem(i18nString(UIStrings.labelEntry), () => {
+      this.dispatchEventToListeners(
+          Events.ENTRY_LABEL_ANNOTATION_ADDED, {entryIndex: this.selectedEntryIndex, withLinkCreationButton: false});
+    }, {
+      jslogContext: 'timeline.annotations.create-entry-label',
+    });
 
-      const labelEntryAnnotationOption = annotationSection.appendItem(i18nString(UIStrings.labelEntry), () => {
-        this.dispatchEventToListeners(
-            Events.ENTRY_LABEL_ANNOTATION_ADDED, {entryIndex: this.selectedEntryIndex, withLinkCreationButton: false});
-      }, {
-        jslogContext: 'timeline.annotations.create-entry-label',
-      });
+    labelEntryAnnotationOption.setShortcut('Double Click');
 
-      labelEntryAnnotationOption.setShortcut('Double Click');
+    const linkEntriesAnnotationOption = annotationSection.appendItem(i18nString(UIStrings.linkEntries), () => {
+      this.dispatchEventToListeners(Events.ENTRIES_LINK_ANNOTATION_CREATED, {entryFromIndex: this.selectedEntryIndex});
+    }, {
+      jslogContext: 'timeline.annotations.create-entries-link',
+    });
+    linkEntriesAnnotationOption.setShortcut('Double Click');
 
-      const linkEntriesAnnotationOption = annotationSection.appendItem(i18nString(UIStrings.linkEntries), () => {
-        this.dispatchEventToListeners(
-            Events.ENTRIES_LINK_ANNOTATION_CREATED, {entryFromIndex: this.selectedEntryIndex});
-      }, {
-        jslogContext: 'timeline.annotations.create-entries-link',
-      });
-      linkEntriesAnnotationOption.setShortcut('Double Click');
-
-      annotationSection.appendItem(i18nString(UIStrings.deleteAnnotations), () => {
-        this.dataProvider.deleteAnnotationsForEntry?.(this.selectedEntryIndex);
-      }, {
-        disabled: !this.dataProvider.entryHasAnnotations?.(this.selectedEntryIndex),
-        jslogContext: 'timeline.annotations.delete-entry-annotations',
-      });
-    }
+    annotationSection.appendItem(i18nString(UIStrings.deleteAnnotations), () => {
+      this.dataProvider.deleteAnnotationsForEntry?.(this.selectedEntryIndex);
+    }, {
+      disabled: !this.dataProvider.entryHasAnnotations?.(this.selectedEntryIndex),
+      jslogContext: 'timeline.annotations.delete-entry-annotations',
+    });
 
     void this.contextMenu.show();
   }
@@ -2311,8 +2317,12 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
               // If the duration of the event is less than the start time to draw the candy stripes, then we have no stripes to draw.
               continue;
             }
-            if (!this.candyStripePattern) {
-              this.candyStripePattern = this.createCandyStripePattern();
+            if (!this.candyStripePattern || !this.candyStripePatternGray) {
+              const red = 'rgba(255, 0, 0, 0.8)';
+              this.candyStripePattern = this.createCandyStripePattern(red);
+              const parsedColor = Common.Color.parse(red);
+              const dimmed = parsedColor?.asLegacyColor().grayscale().asString() ?? 'lightgrey';
+              this.candyStripePatternGray = this.createCandyStripePattern(dimmed);
             }
 
             context.save();
@@ -2330,7 +2340,8 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
               startX: barXStart,
               width: barXEnd - barXStart,
             });
-            context.fillStyle = this.candyStripePattern;
+            context.fillStyle =
+                this.#shouldDimEvent(entryIndex) ? this.candyStripePatternGray : this.candyStripePattern;
             context.fill();
             context.restore();
             break;
@@ -2359,7 +2370,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
             context.rect(barX, barY, barWidth, barHeight);
             context.clip();
             context.beginPath();
-            context.fillStyle = 'red';
+            context.fillStyle = this.#transformColor(entryIndex, 'red');
             context.moveTo(barX + barWidth - triangleWidth, barY);
             context.lineTo(barX + barWidth, barY);
             context.lineTo(barX + barWidth, barY + triangleHeight);
@@ -2877,13 +2888,14 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       }
       const unclippedBarX = this.chartViewport.timeToPosition(entryStartTime);
       if (this.dataProvider.decorateEntry(
-              entryIndex, context, text, barX, barY, barWidth, barHeight, unclippedBarX, timeToPixel)) {
+              entryIndex, context, text, barX, barY, barWidth, barHeight, unclippedBarX, timeToPixel,
+              color => this.#transformColor(entryIndex, color))) {
         continue;
       }
       if (!text || !text.length) {
         continue;
       }
-      context.fillStyle = this.dataProvider.textColor(entryIndex);
+      context.fillStyle = this.#transformColor(entryIndex, this.dataProvider.textColor(entryIndex));
       context.fillText(text, barX + textPadding, barY + barHeight - this.textBaseline);
     }
 
@@ -3051,7 +3063,8 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
           context.fillStyle = color;
           context.fillRect(barX, y, barWidth, groupBarHeight - 1);
           this.dataProvider.decorateEntry(
-              entryIndex, context, '', barX, y, barWidth, groupBarHeight, unclippedBarX, timeToPixel);
+              entryIndex, context, '', barX, y, barWidth, groupBarHeight, unclippedBarX, timeToPixel,
+              color => this.#transformColor(entryIndex, color));
           continue;
         }
         range.append(new Common.SegmentedRange.Segment(barX, endBarX, color));
@@ -3875,7 +3888,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.scheduleUpdate();
   }
 
-  update(): void {
+  override update(): void {
     if (!this.timelineData()) {
       return;
     }
@@ -4093,9 +4106,9 @@ export interface FlameChartDataProvider {
 
   timelineData(rebuild?: boolean): FlameChartTimelineData|null;
 
-  prepareHighlightedEntryInfo(entryIndex: number): Element|null;
+  preparePopoverElement(entryIndex: number): Element|null;
 
-  prepareHighlightedHiddenEntriesArrowInfo?(entryIndex: number): Element|null;
+  preparePopoverForCollapsedArrow?(entryIndex: number): Element|null;
 
   canJumpToEntry(entryIndex: number): boolean;
 
@@ -4107,7 +4120,8 @@ export interface FlameChartDataProvider {
 
   decorateEntry(
       entryIndex: number, context: CanvasRenderingContext2D, text: string|null, barX: number, barY: number,
-      barWidth: number, barHeight: number, unclippedBarX: number, timeToPixelRatio: number): boolean;
+      barWidth: number, barHeight: number, unclippedBarX: number, timeToPixelRatio: number,
+      transformColor?: (color: string) => string): boolean;
 
   forceDecoration(entryIndex: number): boolean;
 

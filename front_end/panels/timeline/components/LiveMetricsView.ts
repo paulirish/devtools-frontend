@@ -12,7 +12,6 @@ import './MetricCard.js';
 import * as Common from '../../../core/common/common.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import type * as Platform from '../../../core/platform/platform.js';
-import type * as SDK from '../../../core/sdk/sdk.js';
 import * as CrUXManager from '../../../models/crux-manager/crux-manager.js';
 import * as EmulationModel from '../../../models/emulation/emulation.js';
 import * as LiveMetrics from '../../../models/live-metrics/live-metrics.js';
@@ -26,6 +25,7 @@ import * as UI from '../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 import * as MobileThrottling from '../../mobile_throttling/mobile_throttling.js';
+import {getThrottlingRecommendations, md} from '../utils/Helpers.js';
 
 import liveMetricsViewStyles from './liveMetricsView.css.js';
 import type {MetricCardData} from './MetricCard.js';
@@ -41,7 +41,6 @@ const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
 
 const DEVICE_OPTION_LIST: DeviceOption[] = ['AUTO', ...CrUXManager.DEVICE_SCOPE_LIST];
 
-const RTT_COMPARISON_THRESHOLD = 200;
 const RTT_MINIMUM = 60;
 
 const UIStrings = {
@@ -166,14 +165,10 @@ const UIStrings = {
    */
   percentDevices: '{PH1}% mobile, {PH2}% desktop',
   /**
-   * @description Text block explaining how to simulate different mobile and desktop devices. The placeholder at the end will be a link with the text "simulate different devices" translated separately.
-   * @example {simulate different devices} PH1
+   * @description Text block explaining how to simulate different mobile and desktop devices.
    */
-  useDeviceToolbar: 'Use the device toolbar to {PH1}.',
-  /**
-   * @description Text for a link that is inserted inside a larger text block that explains how to simulate different mobile and desktop devices.
-   */
-  simulateDifferentDevices: 'simulate different devices',
+  useDeviceToolbar:
+      'Use the [device toolbar](https://developer.chrome.com/docs/devtools/device-mode) and configure throttling to simulate real user environments and identify more performance issues.',
   /**
    * @description Text label for a checkbox that controls if the network cache is disabled.
    */
@@ -232,10 +227,6 @@ const UIStrings = {
    * @description Tooltip for a button that will remove everything from the currently selected log.
    */
   clearCurrentLog: 'Clear the current log',
-  /**
-   * @description Title for a section that contains more information about real user environments. This message is meant to prompt the user to understand the conditions experienced by real users.
-   */
-  realUserEnvironments: 'Real user environments',
   /**
    * @description Title for a page load phase that measures the time between when the page load starts and the time when the first byte of the initial document is downloaded.
    */
@@ -302,10 +293,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
   #interactions: LiveMetrics.InteractionMap = new Map();
   #layoutShifts: LiveMetrics.LayoutShift[] = [];
 
-  #cruxPageResult?: CrUXManager.PageResult;
-
-  #fieldDeviceOption: DeviceOption = 'AUTO';
-  #fieldPageScope: CrUXManager.PageScope = 'url';
+  #cruxManager = CrUXManager.CrUXManager.instance();
 
   #toggleRecordAction: UI.ActionRegistration.Action;
   #recordReloadAction: UI.ActionRegistration.Action;
@@ -315,6 +303,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
   #interactionsListEl?: HTMLElement;
   #layoutShiftsListEl?: HTMLElement;
   #listIsScrolling = false;
+  #deviceModeModel = EmulationModel.DeviceModeModel.DeviceModeModel.tryInstance();
 
   constructor() {
     super();
@@ -371,8 +360,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
     });
   }
 
-  #onFieldDataChanged(event: {data: CrUXManager.PageResult|undefined}): void {
-    this.#cruxPageResult = event.data;
+  #onFieldDataChanged(): void {
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
@@ -381,17 +369,8 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
   }
 
   async #refreshFieldDataForCurrentPage(): Promise<void> {
-    this.#cruxPageResult = await CrUXManager.CrUXManager.instance().getFieldDataForCurrentPage();
+    await this.#cruxManager.refresh();
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
-  }
-
-  #getSelectedFieldResponse(): CrUXManager.CrUXResponse|null|undefined {
-    const deviceScope = this.#fieldDeviceOption === 'AUTO' ? this.#getAutoDeviceScope() : this.#fieldDeviceOption;
-    return this.#cruxPageResult?.[`${this.#fieldPageScope}-${deviceScope}`];
-  }
-
-  #getFieldMetricData(fieldMetric: CrUXManager.StandardMetricNames): CrUXManager.MetricResponse|undefined {
-    return this.#getSelectedFieldResponse()?.record.metrics[fieldMetric];
   }
 
   connectedCallback(): void {
@@ -403,8 +382,8 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
     const cruxManager = CrUXManager.CrUXManager.instance();
     cruxManager.addEventListener(CrUXManager.Events.FIELD_DATA_CHANGED, this.#onFieldDataChanged, this);
 
-    const emulationModel = this.#deviceModeModel();
-    emulationModel?.addEventListener(EmulationModel.DeviceModeModel.Events.UPDATED, this.#onEmulationChanged, this);
+    this.#deviceModeModel?.addEventListener(
+        EmulationModel.DeviceModeModel.Events.UPDATED, this.#onEmulationChanged, this);
 
     if (cruxManager.getConfigSetting().get().enabled) {
       void this.#refreshFieldDataForCurrentPage();
@@ -418,32 +397,18 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
-  #deviceModeModel(): EmulationModel.DeviceModeModel.DeviceModeModel|null {
-    // This is wrapped in a try/catch because in some DevTools entry points
-    // (such as worker_app.ts) the Emulation panel is not included and as such
-    // the below code fails; it tries to instantiate the model which requires
-    // reading the value of a setting which has not been registered.
-    // In this case, we fallback to 'ALL'. See crbug.com/361515458 for an
-    // example bug that this resolves.
-    try {
-      return EmulationModel.DeviceModeModel.DeviceModeModel.instance();
-    } catch {
-      return null;
-    }
-  }
-
   disconnectedCallback(): void {
     LiveMetrics.LiveMetrics.instance().removeEventListener(LiveMetrics.Events.STATUS, this.#onMetricStatus, this);
 
     const cruxManager = CrUXManager.CrUXManager.instance();
     cruxManager.removeEventListener(CrUXManager.Events.FIELD_DATA_CHANGED, this.#onFieldDataChanged, this);
 
-    this.#deviceModeModel()?.removeEventListener(
+    this.#deviceModeModel?.removeEventListener(
         EmulationModel.DeviceModeModel.Events.UPDATED, this.#onEmulationChanged, this);
   }
 
   #renderLcpCard(): LitHtml.LitTemplate {
-    const fieldData = this.#getFieldMetricData('largest_contentful_paint');
+    const fieldData = this.#cruxManager.getSelectedFieldMetricData('largest_contentful_paint');
     const node = this.#lcpValue?.node;
     const phases = this.#lcpValue?.phases;
 
@@ -455,6 +420,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
         fieldValue: fieldData?.percentiles?.p75,
         histogram: fieldData?.histogram,
         tooltipContainer: this.#tooltipContainerEl,
+        warnings: this.#lcpValue?.warnings,
         phases: phases && [
           [i18nString(UIStrings.timeToFirstByte), phases.timeToFirstByte],
           [i18nString(UIStrings.resourceLoadDelay), phases.resourceLoadDelay],
@@ -475,7 +441,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
   }
 
   #renderClsCard(): LitHtml.LitTemplate {
-    const fieldData = this.#getFieldMetricData('cumulative_layout_shift');
+    const fieldData = this.#cruxManager.getSelectedFieldMetricData('cumulative_layout_shift');
 
     const clusterIds = new Set(this.#clsValue?.clusterShiftIds || []);
     const clusterIsVisible =
@@ -489,6 +455,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
         fieldValue: fieldData?.percentiles?.p75,
         histogram: fieldData?.histogram,
         tooltipContainer: this.#tooltipContainerEl,
+        warnings: this.#clsValue?.warnings,
       } as MetricCardData}>
         ${clusterIsVisible ? html`
           <div class="related-info" slot="extra-info">
@@ -507,7 +474,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
   }
 
   #renderInpCard(): LitHtml.LitTemplate {
-    const fieldData = this.#getFieldMetricData('interaction_to_next_paint');
+    const fieldData = this.#cruxManager.getSelectedFieldMetricData('interaction_to_next_paint');
     const phases = this.#inpValue?.phases;
     const interaction = this.#inpValue && this.#interactions.get(this.#inpValue.interactionId);
 
@@ -519,6 +486,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
         fieldValue: fieldData?.percentiles?.p75,
         histogram: fieldData?.histogram,
         tooltipContainer: this.#tooltipContainerEl,
+        warnings: this.#inpValue?.warnings,
         phases: phases && [
           [i18nString(UIStrings.inputDelay), phases.inputDelay],
           [i18nString(UIStrings.processingDuration), phases.processingDuration],
@@ -564,8 +532,8 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
     // clang-format on
   }
 
-  #getNetworkRec(): string|null {
-    const response = this.#getFieldMetricData('round_trip_time');
+  #getNetworkRecTitle(): string|null {
+    const response = this.#cruxManager.getSelectedFieldMetricData('round_trip_time');
     if (!response?.percentiles) {
       return null;
     }
@@ -579,39 +547,19 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
       return i18nString(UIStrings.tryDisablingThrottling);
     }
 
-    let closestPreset: SDK.NetworkManager.Conditions|null = null;
-    let smallestDiff = Infinity;
-    for (const preset of MobileThrottling.ThrottlingPresets.ThrottlingPresets.networkPresets) {
-      const {targetLatency} = preset;
-      if (!targetLatency) {
-        continue;
-      }
-
-      const diff = Math.abs(targetLatency - rtt);
-      if (diff > RTT_COMPARISON_THRESHOLD) {
-        continue;
-      }
-
-      if (smallestDiff < diff) {
-        continue;
-      }
-
-      closestPreset = preset;
-      smallestDiff = diff;
-    }
-
-    if (!closestPreset) {
+    const conditions = MobileThrottling.ThrottlingPresets.ThrottlingPresets.getRecommendedNetworkPreset(rtt);
+    if (!conditions) {
       return null;
     }
 
-    const title = typeof closestPreset.title === 'function' ? closestPreset.title() : closestPreset.title;
-
+    const title = typeof conditions.title === 'function' ? conditions.title() : conditions.title;
     return i18nString(UIStrings.tryUsingThrottling, {PH1: title});
   }
 
   #getDeviceRec(): string|null {
     // `form_factors` metric is only populated if CrUX data is fetched for all devices.
-    const fractions = this.#cruxPageResult?.[`${this.#fieldPageScope}-ALL`]?.record.metrics.form_factors?.fractions;
+    const fractions = this.#cruxManager.getFieldResponse(this.#cruxManager.fieldPageScope, 'ALL')
+                          ?.record.metrics.form_factors?.fractions;
     if (!fractions) {
       return null;
     }
@@ -623,11 +571,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
   }
 
   #renderRecordingSettings(): LitHtml.LitTemplate {
-    const fieldEnabled = CrUXManager.CrUXManager.instance().getConfigSetting().get().enabled;
-
-    const deviceLinkEl = UI.XLink.XLink.create(
-        'https://developer.chrome.com/docs/devtools/device-mode', i18nString(UIStrings.simulateDifferentDevices));
-    const deviceMessage = i18n.i18n.getFormatLocalizedString(str_, UIStrings.useDeviceToolbar, {PH1: deviceLinkEl});
+    const fieldEnabled = this.#cruxManager.getConfigSetting().get().enabled;
 
     const deviceRecEl = document.createElement('span');
     deviceRecEl.classList.add('environment-rec');
@@ -635,24 +579,25 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
 
     const networkRecEl = document.createElement('span');
     networkRecEl.classList.add('environment-rec');
-    networkRecEl.textContent = this.#getNetworkRec() || i18nString(UIStrings.notEnoughData);
+    networkRecEl.textContent = this.#getNetworkRecTitle() || i18nString(UIStrings.notEnoughData);
+
+    const recs = getThrottlingRecommendations();
 
     // clang-format off
     return html`
       <h3 class="card-title">${i18nString(UIStrings.environmentSettings)}</h3>
-      <div class="device-toolbar-description">${deviceMessage}</div>
+      <div class="device-toolbar-description">${md(i18nString(UIStrings.useDeviceToolbar))}</div>
       ${fieldEnabled ? html`
-        <div class="environment-recs-title">${i18nString(UIStrings.realUserEnvironments)}</div>
         <ul class="environment-recs-list">
           <li>${i18n.i18n.getFormatLocalizedString(str_, UIStrings.device, {PH1: deviceRecEl})}</li>
           <li>${i18n.i18n.getFormatLocalizedString(str_, UIStrings.network, {PH1: networkRecEl})}</li>
         </ul>
       ` : nothing}
       <div class="environment-option">
-        <devtools-cpu-throttling-selector></devtools-cpu-throttling-selector>
+        <devtools-cpu-throttling-selector .recommendedRate=${recs.cpuRate}></devtools-cpu-throttling-selector>
       </div>
       <div class="environment-option">
-        <devtools-network-throttling-selector></devtools-network-throttling-selector>
+        <devtools-network-throttling-selector .recommendedConditions=${recs.networkConditions}></devtools-network-throttling-selector>
       </div>
       <div class="environment-option">
         <setting-checkbox
@@ -668,7 +613,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
   }
 
   #getPageScopeLabel(pageScope: CrUXManager.PageScope): string {
-    const key = this.#cruxPageResult?.[`${pageScope}-ALL`]?.record.key[pageScope];
+    const key = this.#cruxManager.pageResult?.[`${pageScope}-ALL`]?.record.key[pageScope];
     if (key) {
       return pageScope === 'url' ? i18nString(UIStrings.urlOptionWithKey, {PH1: key}) :
                                    i18nString(UIStrings.originOptionWithKey, {PH1: key});
@@ -680,26 +625,26 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
 
   #onPageScopeMenuItemSelected(event: Menus.SelectMenu.SelectMenuItemSelectedEvent): void {
     if (event.itemValue === 'url') {
-      this.#fieldPageScope = 'url';
+      this.#cruxManager.fieldPageScope = 'url';
     } else {
-      this.#fieldPageScope = 'origin';
+      this.#cruxManager.fieldPageScope = 'origin';
     }
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
   #renderPageScopeSetting(): LitHtml.LitTemplate {
-    if (!CrUXManager.CrUXManager.instance().getConfigSetting().get().enabled) {
+    if (!this.#cruxManager.getConfigSetting().get().enabled) {
       return LitHtml.nothing;
     }
 
     const urlLabel = this.#getPageScopeLabel('url');
     const originLabel = this.#getPageScopeLabel('origin');
 
-    const buttonTitle = this.#fieldPageScope === 'url' ? urlLabel : originLabel;
+    const buttonTitle = this.#cruxManager.fieldPageScope === 'url' ? urlLabel : originLabel;
     const accessibleTitle = i18nString(UIStrings.showFieldDataForPage, {PH1: buttonTitle});
 
     // If there is no data at all we should force users to switch pages or reconfigure CrUX.
-    const shouldDisable = !this.#cruxPageResult?.['url-ALL'] && !this.#cruxPageResult?.['origin-ALL'];
+    const shouldDisable = !this.#cruxManager.pageResult?.['url-ALL'] && !this.#cruxManager.pageResult?.['origin-ALL'];
 
     return html`
       <devtools-select-menu
@@ -717,13 +662,13 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
       >
         <devtools-menu-item
           .value=${'url'}
-          .selected=${this.#fieldPageScope === 'url'}
+          .selected=${this.#cruxManager.fieldPageScope === 'url'}
         >
           ${urlLabel}
         </devtools-menu-item>
         <devtools-menu-item
           .value=${'origin'}
-          .selected=${this.#fieldPageScope === 'origin'}
+          .selected=${this.#cruxManager.fieldPageScope === 'origin'}
         >
           ${originLabel}
         </devtools-menu-item>
@@ -744,38 +689,16 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
     }
   }
 
-  #getAutoDeviceScope(): CrUXManager.DeviceScope {
-    const emulationModel = this.#deviceModeModel();
-
-    if (emulationModel === null) {
-      return 'ALL';
-    }
-
-    if (emulationModel.isMobile()) {
-      if (this.#cruxPageResult?.[`${this.#fieldPageScope}-PHONE`]) {
-        return 'PHONE';
-      }
-
-      return 'ALL';
-    }
-
-    if (this.#cruxPageResult?.[`${this.#fieldPageScope}-DESKTOP`]) {
-      return 'DESKTOP';
-    }
-
-    return 'ALL';
-  }
-
   #getLabelForDeviceOption(deviceOption: DeviceOption): string {
-    const deviceScope = deviceOption === 'AUTO' ? this.#getAutoDeviceScope() : deviceOption;
+    const deviceScope = this.#cruxManager.getSelectedDeviceScope();
     const deviceScopeLabel = this.#getDeviceScopeDisplayName(deviceScope);
     const baseLabel = deviceOption === 'AUTO' ? i18nString(UIStrings.auto, {PH1: deviceScopeLabel}) : deviceScopeLabel;
 
-    if (!this.#cruxPageResult) {
+    if (!this.#cruxManager.pageResult) {
       return i18nString(UIStrings.loadingOption, {PH1: baseLabel});
     }
 
-    const result = this.#cruxPageResult[`${this.#fieldPageScope}-${deviceScope}`];
+    const result = this.#cruxManager.getSelectedFieldResponse();
     if (!result) {
       return i18nString(UIStrings.needsDataOption, {PH1: baseLabel});
     }
@@ -784,19 +707,20 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
   }
 
   #onDeviceOptionMenuItemSelected(event: Menus.SelectMenu.SelectMenuItemSelectedEvent): void {
-    this.#fieldDeviceOption = event.itemValue as DeviceOption;
+    this.#cruxManager.fieldDeviceOption = event.itemValue as DeviceOption;
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
   #renderDeviceScopeSetting(): LitHtml.LitTemplate {
-    if (!CrUXManager.CrUXManager.instance().getConfigSetting().get().enabled) {
+    if (!this.#cruxManager.getConfigSetting().get().enabled) {
       return LitHtml.nothing;
     }
+
     // If there is no data at all we should force users to try adjusting the page scope
     // before coming back to this option.
-    const shouldDisable = !this.#cruxPageResult?.[`${this.#fieldPageScope}-ALL`];
+    const shouldDisable = !this.#cruxManager.getFieldResponse(this.#cruxManager.fieldPageScope, 'ALL');
 
-    const currentDeviceLabel = this.#getLabelForDeviceOption(this.#fieldDeviceOption);
+    const currentDeviceLabel = this.#getLabelForDeviceOption(this.#cruxManager.fieldDeviceOption);
 
     // clang-format off
     return html`
@@ -817,7 +741,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
           return html`
             <devtools-menu-item
               .value=${deviceOption}
-              .selected=${this.#fieldDeviceOption === deviceOption}
+              .selected=${this.#cruxManager.fieldDeviceOption === deviceOption}
             >
               ${this.#getLabelForDeviceOption(deviceOption)}
             </devtools-menu-item>
@@ -829,7 +753,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
   }
 
   #getCollectionPeriodRange(): string|null {
-    const selectedResponse = this.#getSelectedFieldResponse();
+    const selectedResponse = this.#cruxManager.getSelectedFieldResponse();
     if (!selectedResponse) {
       return null;
     }
@@ -872,13 +796,20 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
       PH1: dateEl,
     });
 
+    const warnings = this.#cruxManager.pageResult?.warnings || [];
+
     return html`
-      <div class="field-data-message">${message}</div>
+      <div class="field-data-message">
+        <div>${message}</div>
+        ${warnings.map(warning => html`
+          <div class="field-data-warning">${warning}</div>
+        `)}
+      </div>
     `;
   }
 
   #renderFieldDataMessage(): LitHtml.LitTemplate {
-    if (CrUXManager.CrUXManager.instance().getConfigSetting().get().enabled) {
+    if (this.#cruxManager.getConfigSetting().get().enabled) {
       return this.#renderCollectionPeriod();
     }
 
@@ -1088,7 +1019,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
   }
 
   #render = (): void => {
-    const fieldEnabled = CrUXManager.CrUXManager.instance().getConfigSetting().get().enabled;
+    const fieldEnabled = this.#cruxManager.getConfigSetting().get().enabled;
     const liveMetricsTitle =
         fieldEnabled ? i18nString(UIStrings.localAndFieldMetrics) : i18nString(UIStrings.localMetrics);
 
