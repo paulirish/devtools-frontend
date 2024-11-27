@@ -57,7 +57,7 @@ export class CLSCulprits extends BaseInsightComponent<CLSCulpritsInsightModel> {
 
   override createOverlays(): Overlays.Overlays.TimelineOverlay[] {
     const clustersByScore =
-        this.model?.clusters.toSorted((a, b) => b.clusterCumulativeScore - a.clusterCumulativeScore) ?? [];
+        [...this.model?.clusters ?? []].sort((a, b) => b.clusterCumulativeScore - a.clusterCumulativeScore) ?? [];
     const worstCluster = clustersByScore[0];
     if (!worstCluster) {
       return [];

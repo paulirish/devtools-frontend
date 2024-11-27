@@ -451,7 +451,7 @@ export function generateInsight(
 
   const clusterKey = context.navigation ? context.navigationId : Types.Events.NO_NAVIGATION;
   const clusters = parsedTrace.LayoutShifts.clustersByNavigationId.get(clusterKey) ?? [];
-  const clustersByScore = clusters.toSorted((a, b) => b.clusterCumulativeScore - a.clusterCumulativeScore);
+  const clustersByScore = [...clusters].sort((a, b) => b.clusterCumulativeScore - a.clusterCumulativeScore);
   const worstCluster = clustersByScore.at(0);
   const layoutShifts = clusters.flatMap(cluster => cluster.events);
   const prePaintEvents = parsedTrace.LayoutShifts.prePaintEvents.filter(isWithinContext);

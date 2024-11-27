@@ -63,19 +63,21 @@ test('insights look ok', t => {
   const insightSet = Array.from(insights.values()).find(is => is.navigation);
   if (typeof insightSet === 'undefined')
     throw new Error();
-  const keys = Object.keys(insightSet.data);
+  const keys = Object.keys(insightSet.model);
   assert.deepStrictEqual(keys, [
-    'CumulativeLayoutShift',
+    'CLSCulprits',
     'DocumentLatency',
     'FontDisplay',
+    'ImageDelivery',
     'InteractionToNextPaint',
-    'LargestContentfulPaint',
+    'LCPDiscovery',
+    'LCPPhases',
     'RenderBlocking',
     'SlowCSSSelector',
-    'ThirdPartyWeb',
+    'ThirdParties',
     'Viewport',
   ]);
-  for (const [insightName, insightItem] of Object.entries(insightSet.data)) {
+  for (const [insightName, insightItem] of Object.entries(insightSet.model)) {
     const msg = insightItem instanceof Error ?
         `${insightName} is an error. ${insightItem.toString()} ${insightItem.stack?.toString()}` :
         '';
@@ -83,8 +85,8 @@ test('insights look ok', t => {
     assert.ok(typeof insightItem === 'object', `insightName ${insightName} is not an object`);
   }
 
-  const entityNames = Array.from(insightSet.data.ThirdPartyWeb.summaryByEntity.keys()).map(e => e.name);
-  const values = Array.from(insightSet.data.ThirdPartyWeb.summaryByEntity.values());
+  const entityNames = Array.from(insightSet.model.ThirdParties.summaryByEntity.keys()).map(e => e.name);
+  const values = Array.from(insightSet.model.ThirdParties.summaryByEntity.values());
   const simplified = Object.fromEntries(values.map((v, i) => [entityNames[i], v]));
 
   const expected = {

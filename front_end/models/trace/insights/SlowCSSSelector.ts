@@ -100,12 +100,12 @@ export function generateInsight(
   });
 
   // sort by elapsed time
-  const sortByElapsedMs = selectorTimings.toSorted((a, b) => {
+  const sortByElapsedMs = [...selectorTimings].sort((a, b) => {
     return b[SelectorTimingsKey.Elapsed] - a[SelectorTimingsKey.Elapsed];
   });
 
   // sort by match attempts
-  const sortByMatchAttempts = selectorTimings.toSorted((a, b) => {
+  const sortByMatchAttempts = [...selectorTimings].sort((a, b) => {
     return b[SelectorTimingsKey.MatchAttempts] - a[SelectorTimingsKey.MatchAttempts];
   });
 

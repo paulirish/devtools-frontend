@@ -26,6 +26,47 @@ cp "$out_dir/gen/front_end/generated/protocol.js" "$dist/generated/protocol.js"
 cp "$out_dir/gen/front_end/generated/protocol.d.ts" "$dist/generated/protocol.d.ts"
 cp ./front_end/models/trace/package-template.json "$dist/package.json"
 
+# Strip out the i18n modules and some type-only stuff.
+python3 -c "
+from pathlib import Path
+
+for p in Path('$dist/models/trace/insights').rglob('*.js'):
+    content = p.read_text()
+
+    needle = 'import * as i18n'
+    content = content.replace(needle, f'// {needle}')
+
+    needle = 'const str_ ='
+    content = content.replace(needle, f'// {needle}')
+
+    needle = 'const i18nString ='
+    content = content.replace(needle, 'const i18nString = string => string; //')
+
+    p.write_text(content)
+
+for p in Path('$dist/models').rglob('*.d.ts'):
+    content = p.read_text()
+
+    needle = 'import type * as Common'
+    content = content.replace(needle, f'// {needle}')
+
+    needle = 'Common.UIString.LocalizedString'
+    content = content.replace(needle, 'string')
+
+    needle = 'import type * as SDK'
+    content = content.replace(needle, f'// {needle}')
+
+    needle = 'SDK.NetworkManager.Conditions'
+    content = content.replace(needle, 'any')
+
+    needle = 'import type * as CrUXManager'
+    content = content.replace(needle, f'// {needle}')
+
+    needle = 'CrUXManager.PageResult'
+    content = content.replace(needle, 'any')
+
+    p.write_text(content)
+"
 
 # Replacement extras provides URLForEntry and ThirdPartyWeb. Funnily the JS works for both js and d.ts
 cp $DIRNAME/replacements/extras.js $dist/models/trace/extras/extras.js
