@@ -80,7 +80,20 @@ echo 'export {};' > $dist/models/trace/TracingManager.d.ts
 echo 'export {};' > $dist/models/trace/LegacyTracingModel.js
 echo 'export {};' > $dist/models/trace/LegacyTracingModel.d.ts
 
+# Copy i18n strings.
+python3 -c "
+from pathlib import Path
+import json
 
+locales_out_path = Path('$dist/locales')
+locales_out_path.mkdir(parents=True, exist_ok=True)
+
+for path in Path('$out_dir/gen/front_end/core/i18n/locales').glob('*.json'):
+    strings = json.loads(path.read_text())
+    keys = [key for key in strings.keys() if key.startswith('models/trace/insights/')]
+    strings = {key: strings[key] for key in keys}
+    (locales_out_path / path.name).write_text(json.dumps(strings, indent=2))
+"
 
 $DIRNAME/copy-build-trace-engine-for-publish.sh
 
