@@ -71,7 +71,7 @@
 }
 
 #timeline-overview-grid .timeline-grid-header {
-  height: 12px;
+  display: none;
 }
 
 #timeline-overview-grid .resources-dividers-label-bar {

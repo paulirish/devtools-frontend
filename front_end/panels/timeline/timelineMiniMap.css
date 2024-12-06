@@ -52,6 +52,8 @@
 
 .timeline-minimap #timeline-overview-filmstrip {
   flex-basis: 30px;
+  /* First, so no gap between overview lanes here */
+  margin-top: 0 !important; /* stylelint-disable-line declaration-no-important */
 }
 
 .timeline-minimap #timeline-overview-memory {
@@ -75,7 +77,7 @@
 
 .timeline-minimap #timeline-overview-responsiveness {
   flex-basis: 5px;
-  margin-top: 0 !important; /* stylelint-disable-line declaration-no-important */
+
 }
 
 .timeline-minimap #timeline-overview-input {

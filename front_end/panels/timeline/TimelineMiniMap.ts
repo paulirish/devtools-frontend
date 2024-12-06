@@ -16,7 +16,6 @@ import {
   TimelineEventOverviewCPUActivity,
   TimelineEventOverviewMemory,
   TimelineEventOverviewNetwork,
-  TimelineEventOverviewResponsiveness,
   TimelineFilmStripOverview,
 } from './TimelineEventOverview.js';
 import miniMapStyles from './timelineMiniMap.css.js';
@@ -270,16 +269,15 @@ export class TimelineMiniMap extends
 
     this.#setMarkers(data.parsedTrace);
     this.#setNavigationStartEvents(data.parsedTrace);
-    this.#controls.push(new TimelineEventOverviewResponsiveness(data.parsedTrace));
-    this.#controls.push(new TimelineEventOverviewCPUActivity(data.parsedTrace));
-
-    this.#controls.push(new TimelineEventOverviewNetwork(data.parsedTrace));
     if (data.settings.showScreenshots) {
       const filmStrip = Trace.Extras.FilmStrip.fromParsedTrace(data.parsedTrace);
       if (filmStrip.frames.length) {
         this.#controls.push(new TimelineFilmStripOverview(filmStrip));
       }
     }
+    this.#controls.push(new TimelineEventOverviewCPUActivity(data.parsedTrace));
+
+    this.#controls.push(new TimelineEventOverviewNetwork(data.parsedTrace));
     if (data.settings.showMemory) {
       this.#controls.push(new TimelineEventOverviewMemory(data.parsedTrace));
     }

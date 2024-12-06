@@ -106,27 +106,29 @@ export class BreadcrumbsUI extends HTMLElement {
 
   #renderElement(breadcrumb: Trace.Types.File.Breadcrumb, index: number): Lit.LitTemplate {
     const breadcrumbRange = Trace.Helpers.Timing.microToMilli(breadcrumb.window.range);
-    // clang-format off
+    // sclang-format off
     return html`
-          <div class="breadcrumb" @contextmenu=${(event: Event) => this.#onContextMenu(event, breadcrumb)} @click=${() => this.#activateBreadcrumb(breadcrumb)}
-          jslog=${VisualLogging.item('timeline.breadcrumb-select').track({click: true})}>
+          <div class="breadcrumb" @contextmenu=${(event: Event) => this.#onContextMenu(event, breadcrumb)} @click=${
+        () => this.#activateBreadcrumb(breadcrumb)}
+          jslog=${VisualLogging.item('timeline.breadcrumb-select').track({
+      click: true
+    })}>
            <span class="${(breadcrumb === this.#activeBreadcrumb) ? 'active-breadcrumb' : ''} range">
-            ${(index === 0) ?
-              `Full range (${i18n.TimeUtilities.preciseMillisToString(breadcrumbRange, 2)})` :
-              `${i18n.TimeUtilities.preciseMillisToString(breadcrumbRange, 2)}`}
+            ${
+        (index === 0) ? `Full range (${i18n.TimeUtilities.secondsToString(breadcrumbRange)})` :
+                        `${i18n.TimeUtilities.secondsToString(breadcrumbRange)}`}
             </span>
           </div>
-          ${breadcrumb.child !== null ?
-            html`
+          ${
+        breadcrumb.child !== null ?
+        html`
             <devtools-icon .data=${{
-              iconName: 'chevron-right',
-              color: 'var(--icon-default)',
-              width: '16px',
-              height: '16px',
-            }}>`
-            : ''}
+    iconName:
+      'chevron-right', color: 'var(--icon-default)', width: '16px', height: '16px',
+    }
+    }>`: ''}
       `;
-              // clang-format on
+    // clang-format on
   }
 
   #render(): void {
