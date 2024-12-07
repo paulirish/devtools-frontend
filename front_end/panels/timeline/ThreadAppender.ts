@@ -8,6 +8,7 @@ import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as Trace from '../../models/trace/trace.js';
+import {entities} from '../../third_party/third-party-web/package/lib/index.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 
 import {
@@ -147,7 +148,7 @@ export class ThreadAppender implements TrackAppender {
   #parsedTrace: Trace.Handlers.Types.ParsedTrace;
 
   #entries: Trace.Types.Events.Event[] = [];
-  #tree: Trace.Helpers.TreeHelpers.TraceEntryTree;
+  #tree: Trace.Extras.TraceTree.TopDownRootNode;
   #processId: Trace.Types.Events.ProcessID;
   #threadId: Trace.Types.Events.ThreadID;
   #threadDefaultName: string;
@@ -182,9 +183,18 @@ export class ThreadAppender implements TrackAppender {
     const entries = type === Trace.Handlers.Threads.ThreadType.CPU_PROFILE ?
         this.#parsedTrace.Samples?.profilesInProcess.get(processId)?.get(threadId)?.profileCalls :
         this.#parsedTrace.Renderer?.processes.get(processId)?.threads?.get(threadId)?.entries;
-    const tree = type === Trace.Handlers.Threads.ThreadType.CPU_PROFILE ?
-        this.#parsedTrace.Samples?.profilesInProcess.get(processId)?.get(threadId)?.profileTree :
-        this.#parsedTrace.Renderer?.processes.get(processId)?.threads?.get(threadId)?.tree;
+    // const tree = type === Trace.Handlers.Threads.ThreadType.CPU_PROFILE ?
+    //     this.#parsedTrace.Samples?.profilesInProcess.get(processId)?.get(threadId)?.profileTree :
+    //     this.#parsedTrace.Renderer?.processes.get(processId)?.threads?.get(threadId)?.tree;
+
+
+    const visibleEventsFilter = new Trace.Extras.TraceFilter.VisibleEventsFilter(Utils.EntryStyles.visibleTypes());
+
+    const tree = new Trace.Extras.TraceTree.TopDownRootNode(
+        entries ?? [], [visibleEventsFilter], Trace.Types.Timing.MilliSeconds(0),
+        Trace.Types.Timing.MilliSeconds(Infinity), false, null, false);
+
+
     if (!entries || !tree) {
       throw new Error(`Could not find data for thread with id ${threadId} in process with id ${processId}`);
     }
@@ -456,7 +466,7 @@ export class ThreadAppender implements TrackAppender {
     // We can not used the tree maxDepth in the tree from the
     // RendererHandler because ignore listing and visibility of events
     // alter the final depth of the flame chart.
-    return this.#appendNodesAtLevel(this.#tree.roots, trackStartLevel);
+    return this.#appendNodesAtLevel(this.#tree.children().values(), trackStartLevel);
   }
 
   /**
@@ -466,14 +476,14 @@ export class ThreadAppender implements TrackAppender {
    * listed is done before appending.
    */
   #appendNodesAtLevel(
-      nodes: Iterable<Trace.Helpers.TreeHelpers.TraceEntryNode>, startingLevel: number,
+      nodes: Iterable<Trace.Extras.TraceTree.Node>, startingLevel: number,
       parentIsIgnoredListed: boolean = false): number {
     const invisibleEntries =
         ModificationsManager.ModificationsManager.activeManager()?.getEntriesFilter().invisibleEntries() ?? [];
     let maxDepthInTree = startingLevel;
     for (const node of nodes) {
       let nextLevel = startingLevel;
-      const entry = node.entry;
+      const entry = node.event;
       const entryIsIgnoreListed = Utils.IgnoreList.isIgnoreListedEntry(entry);
       // Events' visibility is determined from their predefined styles,
       // which is something that's not available in the engine data.
@@ -503,7 +513,7 @@ export class ThreadAppender implements TrackAppender {
         nextLevel++;
       }
 
-      const depthInChildTree = this.#appendNodesAtLevel(node.children, nextLevel, entryIsIgnoreListed);
+      const depthInChildTree = this.#appendNodesAtLevel(node.children().values(), nextLevel, entryIsIgnoreListed);
       maxDepthInTree = Math.max(depthInChildTree, maxDepthInTree);
     }
     return maxDepthInTree;
