@@ -28,12 +28,12 @@
   margin: var(--sys-size-5) 0;
   border-radius: var(--sys-shape-corner-extra-small);
   overflow: hidden;
-  border: var(--sys-size-1) solid var(--sys-color-divider);
+  outline: var(--sys-size-1) solid var(--sys-color-divider);
   background-color: var(--sys-color-base);
 
   &.closed {
     background-color: var(--sys-color-surface3);
-    border: none;
+    outline: 1px solid transparent;
 
     &:focus-within {
       /* Ensure that if the user tabs to a closed insight, we outline it so they know it's focused. */
