@@ -463,7 +463,7 @@ export class TimelineFilmStripOverview extends TimelineEventOverview {
 
   // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
   // eslint-disable-next-line @typescript-eslint/naming-convention
-  static readonly Padding = 2;
+  static readonly Padding = 1;
 }
 
 export class TimelineEventOverviewMemory extends TimelineEventOverview {
