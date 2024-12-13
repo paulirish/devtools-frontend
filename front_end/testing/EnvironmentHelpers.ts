@@ -131,6 +131,8 @@ const REGISTERED_EXPERIMENTS = [
   Root.Runtime.ExperimentName.TIMELINE_EXPERIMENTAL_INSIGHTS,
   Root.Runtime.ExperimentName.TIMELINE_DIM_UNRELATED_EVENTS,
   Root.Runtime.ExperimentName.TIMELINE_ALTERNATIVE_NAVIGATION,
+  Root.Runtime.ExperimentName.TIMELINE_IGNORE_LIST,
+  Root.Runtime.ExperimentName.TIMELINE_THIRD_PARTY_DEPENDENCIES,
 ];
 
 export async function initializeGlobalVars({reset = true} = {}) {
@@ -411,6 +413,7 @@ export async function initializeGlobalLocaleVars() {
   try {
     await i18n.i18n.fetchAndRegisterLocaleData('en-US');
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.warn('EnvironmentHelper: Loading en-US locale failed', error.message);
   }
 }
@@ -435,7 +438,7 @@ describeWithLocale.only = function(title: string, fn: (this: Mocha.Suite) => voi
   });
 };
 describeWithLocale.skip = function(title: string, fn: (this: Mocha.Suite) => void) {
-  // eslint-disable-next-line rulesdir/check-test-definitions
+  // eslint-disable-next-line rulesdir/check_test_definitions
   return describe.skip(title, function() {
     fn.call(this);
   });

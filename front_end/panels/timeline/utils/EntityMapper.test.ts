@@ -88,7 +88,7 @@ describeWithEnvironment('EntityMapper', function() {
       });
     });
   });
-  describe('first party', () => {
+  describe('firstPartyEntity', () => {
     it('correctly captures the first party entity', async function() {
       const {parsedTrace: localhostTrace} = await TraceLoader.traceEngine(this, 'load-simple.json.gz');
       let mapper = new Utils.EntityMapper.EntityMapper(localhostTrace);

@@ -60,14 +60,12 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
  * This defines the order these markers will be rendered if they are at the
  * same timestamp. The smaller number will be shown first - e.g. so if NavigationStart, MarkFCP,
  * MarkLCPCandidate have the same timestamp, visually we
- * will render [Nav][FCP][DCL][LCP] everytime.
+ * will render [Nav][FCP][LCP] everytime.
  */
 export const SORT_ORDER_PAGE_LOAD_MARKERS: Readonly<Record<string, number>> = {
   [Trace.Types.Events.Name.NAVIGATION_START]: 0,
-  [Trace.Types.Events.Name.MARK_LOAD]: 1,
-  [Trace.Types.Events.Name.MARK_FCP]: 2,
-  [Trace.Types.Events.Name.MARK_DOM_CONTENT]: 3,
-  [Trace.Types.Events.Name.MARK_LCP_CANDIDATE]: 4,
+  [Trace.Types.Events.Name.MARK_FCP]: 1,
+  [Trace.Types.Events.Name.MARK_LCP_CANDIDATE]: 2,
 };
 
 // Threshold to match up overlay markers that are off by a tiny amount so they aren't rendered
@@ -84,8 +82,9 @@ interface FlameChartDimmer {
   outline: boolean|{main: number[] | boolean, network: number[]|boolean};
 }
 
-export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.VBox>(
-    UI.Widget.VBox) implements PerfUI.FlameChart.FlameChartDelegate, UI.SearchableView.Searchable {
+export class TimelineFlameChartView extends
+    Common.ObjectWrapper.eventMixin<TimelineTreeView.EventTypes, typeof UI.Widget.VBox>(UI.Widget.VBox)
+        implements PerfUI.FlameChart.FlameChartDelegate, UI.SearchableView.Searchable {
   private readonly delegate: TimelineModeViewDelegate;
   /**
    * Tracks the indexes of matched entries when the user searches the panel.
@@ -283,16 +282,6 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
       },
     });
 
-    this.#overlays.addEventListener(Overlays.Overlays.EntryLabelMouseClick.eventName, event => {
-      const {overlay} = (event as Overlays.Overlays.EntryLabelMouseClick);
-      this.dispatchEventToListeners(
-          Events.ENTRY_LABEL_ANNOTATION_CLICKED,
-          {
-            entry: overlay.entry,
-          },
-      );
-    });
-
     this.#overlays.addEventListener(Overlays.Overlays.AnnotationOverlayActionEvent.eventName, event => {
       const {overlay, action} = (event as Overlays.Overlays.AnnotationOverlayActionEvent);
       if (action === 'Remove') {
@@ -369,10 +358,6 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
         PerfUI.FlameChart.Events.ENTRIES_LINK_ANNOTATION_CREATED, this.#onMainEntriesLinkAnnotationCreated, this);
     this.networkFlameChart.addEventListener(
         PerfUI.FlameChart.Events.ENTRIES_LINK_ANNOTATION_CREATED, this.#onNetworkEntriesLinkAnnotationCreated, this);
-
-    this.mainFlameChart.addEventListener(PerfUI.FlameChart.Events.TRACKS_REORDER_STATE_CHANGED, event => {
-      this.#overlays.toggleAllOverlaysDisplayed(!event.data);
-    });
 
     this.detailsView.addEventListener(TimelineTreeView.Events.TREE_ROW_HOVERED, node => {
       if (!Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_DIM_UNRELATED_EVENTS)) {
@@ -625,13 +610,11 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
     // Clear out any markers.
     this.bulkRemoveOverlays(this.#markers);
     const markerEvents = parsedTrace.PageLoadMetrics.allMarkerEvents;
-    // Set markers for Navigations, LCP, FCP, DCL, L.
+    // Set markers for Navigations, LCP, FCP.
     const markers = markerEvents.filter(
         event => event.name === Trace.Types.Events.Name.NAVIGATION_START ||
             event.name === Trace.Types.Events.Name.MARK_LCP_CANDIDATE ||
-            event.name === Trace.Types.Events.Name.MARK_FCP ||
-            event.name === Trace.Types.Events.Name.MARK_DOM_CONTENT ||
-            event.name === Trace.Types.Events.Name.MARK_LOAD);
+            event.name === Trace.Types.Events.Name.MARK_FCP);
 
     this.#sortMarkersForPreferredVisualOrder(markers);
     const overlayByTs = new Map<Trace.Types.Timing.Micro, Overlays.Overlays.TimingsMarker>();
@@ -643,25 +626,18 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
           parsedTrace.Meta.navigationsByFrameId,
       );
       // If any of the markers overlap in timing, lets put them on the same marker.
-      let matchingOverlay = false;
-      for (const [ts, overlay] of overlayByTs.entries()) {
-        if (Math.abs(marker.ts - ts) <= TIMESTAMP_THRESHOLD_MS) {
-          overlay.entries.push(marker);
-          matchingOverlay = true;
-          break;
-        }
+
+      if (i > 0 && marker.ts === markerOverlays[markerOverlays.length - 1].entries[0].ts) {
+        markerOverlays[markerOverlays.length - 1].entries.push(marker);
+        return;
       }
-      if (!matchingOverlay) {
-        const overlay: Overlays.Overlays.TimingsMarker = {
-          type: 'TIMINGS_MARKER',
-          entries: [marker],
-          entryToFieldResult: new Map(),
-          adjustedTimestamp,
-        };
-        overlayByTs.set(marker.ts, overlay);
-      }
+      const overlay = {
+        type: 'TIMINGS_MARKER',
+        entries: [marker],
+        adjustedTimestamp,
+      } as Overlays.Overlays.TimingsMarker;
+      markerOverlays.push(overlay);
     });
-    const markerOverlays: Overlays.Overlays.TimingsMarker[] = [...overlayByTs.values()];
     this.#markers = markerOverlays;
     if (this.#markers.length === 0) {
       return;
@@ -1879,13 +1855,4 @@ export function groupForLevel(groups: PerfUI.FlameChart.Group[], level: number):
     return group.startLevel <= level && groupEndLevel >= level;
   });
   return groupForLevel ?? null;
-}
-
-export const enum Events {
-  ENTRY_LABEL_ANNOTATION_CLICKED = 'EntryLabelAnnotationClicked',
-}
-export interface EventTypes {
-  [Events.ENTRY_LABEL_ANNOTATION_CLICKED]: {
-    entry: Trace.Types.Events.Event,
-  };
 }

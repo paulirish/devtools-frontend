@@ -397,6 +397,16 @@ export class MainImpl {
         'Performance panel: enable a switch to an alternative timeline navigation option',
     );
 
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.TIMELINE_THIRD_PARTY_DEPENDENCIES,
+        'Performance panel: enable third party dependency features',
+    );
+
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.TIMELINE_THIRD_PARTY_DEPENDENCIES,
+        'Performance panel: enable third party depenedency features',
+    );
+
     Root.Runtime.experiments.enableExperimentsByDefault([
       Root.Runtime.ExperimentName.AUTOFILL_VIEW,
       Root.Runtime.ExperimentName.NETWORK_PANEL_FILTER_BAR_REDESIGN,
