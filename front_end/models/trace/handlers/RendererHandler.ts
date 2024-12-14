@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import * as Platform from '../../../core/platform/platform.js';
+import * as ThirdPartyWeb from '../../../third_party/third-party-web/third-party-web.js';
 import * as Helpers from '../helpers/helpers.js';
 import * as Types from '../types/types.js';
 
@@ -27,6 +28,11 @@ import type {HandlerName} from './types.js';
 
 const processes = new Map<Types.Events.ProcessID, RendererProcess>();
 
+/**
+ * These are to store ThirdParty data relationships between entities and events. To reduce iterating through data
+ * more than we have to, here we start building the caches. After this, the RendererHandler will update
+ * the relationships. When handling ThirdParty references, use the one in the RendererHandler instead.
+ */
 let entityMappings: HandlerHelpers.EntityMappings = {
   eventsByEntity: new Map<HandlerHelpers.Entity, Types.Events.Event[]>(),
   entityByEvent: new Map<Types.Events.Event, HandlerHelpers.Entity>(),
@@ -126,8 +132,27 @@ export function handleEvent(event: Types.Events.Event): void {
 }
 
 export async function finalize(): Promise<void> {
-  const {mainFrameId, rendererProcessesByFrame, threadsInProcess} = metaHandlerData();
+  const {mainFrameId, rendererProcessesByFrame, threadsInProcess, mainFrameNavigations} = metaHandlerData();
   entityMappings = networkRequestHandlerData().entityMappings;
+
+
+  const {byId} = networkRequestHandlerData();
+  // Establish entity for all network requests.
+  let currentNavIndex = 0;
+  let currentNavDomain = ThirdPartyWeb.ThirdPartyWeb.getRootDomain(
+      mainFrameNavigations.at(currentNavIndex)?.args.data.documentLoaderURL ?? '');
+  let nextNav = mainFrameNavigations.at(currentNavIndex + 1);
+
+  byId.values().forEach(req => {
+    if (nextNav && req.ts >= nextNav.ts) {
+      ++currentNavIndex;
+      currentNavDomain = ThirdPartyWeb.ThirdPartyWeb.getRootDomain(
+          mainFrameNavigations.at(currentNavIndex)?.args.data.documentLoaderURL ?? '');
+      nextNav = mainFrameNavigations.at(currentNavIndex + 1);
+    }
+    HandlerHelpers.updateEventForEntities(req, entityMappings, currentNavDomain);
+  });
+
 
   assignMeta(processes, mainFrameId, rendererProcessesByFrame, threadsInProcess);
   sanitizeProcesses(processes);
@@ -143,9 +168,9 @@ export function data(): RendererHandlerData {
     entryToNode: new Map(entryToNode),
     allTraceEntries: [...allTraceEntries],
     entityMappings: {
-      entityByEvent: new Map(entityMappings.entityByEvent),
-      eventsByEntity: new Map(entityMappings.eventsByEntity),
-      createdEntityCache: new Map(entityMappings.createdEntityCache),
+      entityByEvent: entityMappings.entityByEvent,
+      eventsByEntity: entityMappings.eventsByEntity,
+      createdEntityCache: entityMappings.createdEntityCache,
     },
   };
 }
