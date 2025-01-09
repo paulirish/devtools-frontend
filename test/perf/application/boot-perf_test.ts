@@ -2,9 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {performance} from 'perf_hooks';
+// import {performance} from 'node:perf_hooks';
+import {assert} from 'chai';
+import {HTTPRequest} from 'puppeteer-core';
 
-import {reloadDevTools} from '../../shared/helper.js';
+import {getBrowserAndPages, reloadDevTools} from '../../shared/helper.js';
 import {mean, percentile} from '../helpers/perf-helper.js';
 import {addBenchmarkResult, type Benchmark} from '../report/report.js';
 
@@ -65,4 +67,56 @@ describe('Boot performance', () => {
       testValues.values.push(Number(timeTaken));
     });
   }
+});
+
+describe.only('Module graph', () => {
+  it('is under control', async () => {
+    const {frontend} = getBrowserAndPages();
+
+    const requests: HTTPRequest[] = []
+    frontend.on('request', request => requests.push(request));
+
+    await reloadDevTools();
+
+    await frontend.waitForNetworkIdle()
+
+    const scripts = requests.filter((request) => request.url().endsWith('.js'))
+    console.log(scripts.length)
+
+    console.log(scripts[100].url(), scripts[100].initiator());
+    logScriptGraph(scripts);
+    // console.log(scripts.map((request) => request.name).slice(0, 100));
+    assert.isAtMost(scripts.length, 915);
+    // debugger
+    // console.log({entries});
+
+
+
+    function logScriptGraph(scripts: HTTPRequest[]) {
+      // Build a map of URL to scripts for easy lookup.
+      const scriptMap = new Map(scripts.map((script) => [script.url(), script]))
+      const seen = new Set();  // Keep track of logged scripts to avoid duplicates
+
+      function logScriptWithIndentation(script: HTTPRequest, indentLevel = 0) {
+        if (seen.has(script.url())) {
+          return;
+        }
+        seen.add(script.url());
+
+        const indent = '│ '.repeat(indentLevel);
+        const path = script.url().split('front_end/')[1];
+        console.log(`${indent}├${path}`);
+
+        // Find children and recursively log them
+        for (const childScript of scripts) {
+          const initiator = childScript.initiator();
+          if (initiator && initiator.type === 'script' && initiator.url === script.url()) {
+            logScriptWithIndentation(childScript, indentLevel + 1);
+          }
+        }
+      }
+
+      logScriptWithIndentation(scripts[0]);
+    }
+  });
 });
