@@ -77,46 +77,50 @@ describe.only('Module graph', () => {
     frontend.on('request', request => requests.push(request));
 
     await reloadDevTools();
-
     await frontend.waitForNetworkIdle()
 
     const scripts = requests.filter((request) => request.url().endsWith('.js'))
-    console.log(scripts.length)
 
-    console.log(scripts[100].url(), scripts[100].initiator());
-    logScriptGraph(scripts);
-    // console.log(scripts.map((request) => request.name).slice(0, 100));
+    // To debug:
+    // logScriptGraph(scripts);
     assert.isAtMost(scripts.length, 915);
-    // debugger
-    // console.log({entries});
 
 
 
     function logScriptGraph(scripts: HTTPRequest[]) {
-      // Build a map of URL to scripts for easy lookup.
-      const scriptMap = new Map(scripts.map((script) => [script.url(), script]))
-      const seen = new Set();  // Keep track of logged scripts to avoid duplicates
+      console.log('Script network request graph:');
+      const childrenMap = new Map<string|undefined, HTTPRequest[]>();
 
-      function logScriptWithIndentation(script: HTTPRequest, indentLevel = 0) {
-        if (seen.has(script.url())) {
-          return;
+      // Build a map of parent URLs to their children
+      for (const script of scripts) {
+        const initiator = script.initiator();
+        if (initiator && initiator.type === 'script') {
+          if (!childrenMap.has(initiator.url)) {
+            childrenMap.set(initiator.url, []);
+          }
+          childrenMap.get(initiator.url)?.push(script);
         }
-        seen.add(script.url());
+      }
 
-        const indent = '│ '.repeat(indentLevel);
+      function logScript(script: HTTPRequest, indent: string = '') {
         const path = script.url().split('front_end/')[1];
-        console.log(`${indent}├${path}`);
+        const parentUrl = script.initiator()?.url;
+        const siblings = parentUrl ? childrenMap.get(parentUrl) : undefined;
+        const isLastSibling = siblings ? siblings[siblings.length - 1].url() === script.url() : true;
 
-        // Find children and recursively log them
-        for (const childScript of scripts) {
-          const initiator = childScript.initiator();
-          if (initiator && initiator.type === 'script' && initiator.url === script.url()) {
-            logScriptWithIndentation(childScript, indentLevel + 1);
+        const branchChar = isLastSibling ? '└' : '├';
+        console.log(`${indent}${branchChar}${path}`);
+
+        const children = childrenMap.get(script.url());
+        if (children) {
+          const newIndent = indent + (isLastSibling ? '  ' : '│ ');
+          for (let i = 0; i < children.length; i++) {
+            logScript(children[i], newIndent);
           }
         }
       }
 
-      logScriptWithIndentation(scripts[0]);
+      logScript(scripts[0]);
     }
   });
 });
