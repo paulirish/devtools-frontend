@@ -30,7 +30,7 @@ const UIStrings = {
 };
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/components/object_ui/RemoteObjectPreviewFormatter.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
-const formatter = Intl.NumberFormat(undefined, { maximumFractionDigits: 20});
+const formatter = Intl.NumberFormat(undefined, {maximumFractionDigits: 20});
 const log10 = Math.log(10);
 
 export class RemoteObjectPreviewFormatter {
@@ -266,11 +266,15 @@ export class RemoteObjectPreviewFormatter {
   }
 
   // https://stackoverflow.com/a/22885197
-  private getSignificantDigitCount(numberStr: string):number {
-    let n = Math.abs(parseInt(numberStr.replace('.', ''), 10)); // remove decimal and make positive
-    if (n === 0) {return 0;}
-    while (n !== 0 && n % 10 === 0) {n /= 10;} // kill the 0s at the end of n
-    return Math.floor(Math.log(n) / log10) + 1; // get number of digits
+  private getSignificantDigitCount(numberStr: string): number {
+    let n = Math.abs(parseInt(numberStr.replace('.', ''), 10));  // remove decimal and make positive
+    if (n === 0) {
+      return 0;
+    }
+    while (n !== 0 && n % 10 === 0) {
+      n /= 10;
+    }                                            // kill the 0s at the end of n
+    return Math.floor(Math.log(n) / log10) + 1;  // get number of digits
   }
 
   renderPropertyPreview(type: string, subtype?: string, className?: string|null, description?: string): HTMLElement {

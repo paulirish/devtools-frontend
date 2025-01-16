@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 import type * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
-import * as TraceEngine from '../../models/trace/trace.js';
+import * as Trace from '../../models/trace/trace.js';
 import type * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 
 import {buildGroupStyle, buildTrackHeader, getFormattedTime} from './AppenderUtils.js';
@@ -25,8 +25,7 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/NewFramesTrackAppender.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-const eventLatencyBreakdownTypeNames =
-    TraceEngine.Handlers.ModelHandlers.UberFramesHandler.eventLatencyBreakdownTypeNames;
+const eventLatencyBreakdownTypeNames = Trace.Handlers.ModelHandlers.UberFramesHandler.eventLatencyBreakdownTypeNames;
 
 /**
  * Show the frame timeline in an easy to understand manner.
@@ -41,15 +40,15 @@ export class NewFramesTrackAppender implements TrackAppender {
   #colorGenerator: Common.Color.Generator;
   #compatibilityBuilder: CompatibilityTracksAppender;
   #flameChartData: PerfUI.FlameChart.FlameChartTimelineData;
-  #traceParsedData: Readonly<TraceEngine.Handlers.Migration.PartialTraceData>;
+  #parsedTrace: Readonly<Trace.Handlers.Migration.PartialTraceData>;
 
   constructor(
       compatibilityBuilder: CompatibilityTracksAppender, flameChartData: PerfUI.FlameChart.FlameChartTimelineData,
-      traceParsedData: TraceEngine.Handlers.Migration.PartialTraceData, colorGenerator: Common.Color.Generator) {
+      parsedTrace: Trace.Handlers.Migration.PartialTraceData, colorGenerator: Common.Color.Generator) {
     this.#compatibilityBuilder = compatibilityBuilder;
     this.#colorGenerator = colorGenerator;
     this.#flameChartData = flameChartData;
-    this.#traceParsedData = traceParsedData;
+    this.#parsedTrace = parsedTrace;
   }
 
   /**
@@ -62,8 +61,8 @@ export class NewFramesTrackAppender implements TrackAppender {
    * appended the track's events.
    */
   appendTrackAtLevel(trackStartLevel: number, expanded?: boolean): number {
-    const uberFrameEvts = this.#traceParsedData.UberFramesHandler.nonWaterfallEvts;
-    // const uberFrameAsyncEvts = this.#traceParsedData.UberFramesHandler.syntheticEvents;
+    const uberFrameEvts = this.#parsedTrace.UberFramesHandler.nonWaterfallEvts;
+    // const uberFrameAsyncEvts = this.#parsedTrace.UberFramesHandler.syntheticEvents;
 
     if (uberFrameEvts.length === 0) {
       return trackStartLevel;
@@ -72,7 +71,7 @@ export class NewFramesTrackAppender implements TrackAppender {
     let newLevel = 0;
 
     // do waterfall first
-    const waterFallEvts = this.#traceParsedData.UberFramesHandler.waterFallEvts;
+    const waterFallEvts = this.#parsedTrace.UberFramesHandler.waterFallEvts;
 
     // filter down to just the breakdown types we see. Figure out levelBump for the rising waterfall
     const actualNames = new Set(waterFallEvts.map(e => e.name));
@@ -118,7 +117,7 @@ export class NewFramesTrackAppender implements TrackAppender {
   /**
    * Gets the style for a page load marker event.
    */
-  markerStyleForEvent(markerEvent: TraceEngine.Types.TraceEvents.PageLoadEvent): TimelineMarkerStyle {
+  markerStyleForEvent(markerEvent: Trace.Types.Events.PageLoadEvent): TimelineMarkerStyle {
     const tallMarkerDashStyle = [6, 4];
     const color = 'grey';
 
@@ -135,7 +134,7 @@ export class NewFramesTrackAppender implements TrackAppender {
   /**
    * Gets the color an event added by this appender should be rendered with.
    */
-  colorForEvent(event: TraceEngine.Types.TraceEvents.TraceEventData): string {
+  colorForEvent(event: Trace.Types.Events.Event): string {
     // Performance and console timings.
     return this.#colorGenerator.colorForID(event.name);
   }
@@ -143,7 +142,7 @@ export class NewFramesTrackAppender implements TrackAppender {
   /**
    * Gets the title an event added by this appender should be rendered with.
    */
-  titleForEvent(event: TraceEngine.Types.TraceEvents.TraceEventData): string {
+  titleForEvent(event: Trace.Types.Events.Event): string {
     const frameSeqId = event.args.frameSeqId ?? event.args.frame_sequence ?? event.args.begin_frame_id ??
         event.args.debug?.begin_frame_id ?? event.args.args?.sequence_number ??
         event.args?.data?.beginEvent?.args?.sequence_number ??  // my additions to chrome_frame_reporter
@@ -168,7 +167,7 @@ export class NewFramesTrackAppender implements TrackAppender {
    * Returns the info shown when an event added by this appender
    * is hovered in the timeline.
    */
-  highlightedEntryInfo(event: TraceEngine.Types.TraceEvents.TraceEventData): HighlightedEntryInfo {
+  highlightedEntryInfo(event: Trace.Types.Events.Event): HighlightedEntryInfo {
     const title = this.titleForEvent(event);
 
     return {title, formattedTime: getFormattedTime(event.dur)};

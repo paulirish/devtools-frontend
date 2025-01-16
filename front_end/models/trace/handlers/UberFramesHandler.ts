@@ -7,28 +7,27 @@ import * as Helpers from '../helpers/helpers.js';
 import * as Types from '../types/types.js';
 
 import {data as metaHandlerData} from './MetaHandler.js';
-import {HandlerState, type TraceEventHandlerName} from './types.js';
+import {type HandlerName, HandlerState} from './types.js';
 
 // Each thread contains events. Events indicate the thread and process IDs, which are
 // used to store the event in the correct process thread entry below.
-const eventsInProcessThread =
-    new Map<Types.TraceEvents.ProcessID, Map<Types.TraceEvents.ThreadID, Types.TraceEvents.TraceEventSnapshot[]>>();
+const eventsInProcessThread = new Map<Types.Events.ProcessID, Map<Types.Events.ThreadID, Types.Events.Snapshot[]>>();
 
 // these types are wrong
-let relevantEvts: Types.TraceEvents.TraceEventSnapshot[] = [];
-const gpuEvents: Types.TraceEvents.TraceEventSnapshot[] = [];
-const asyncEvts: Types.TraceEvents.TraceEventSnapshot[] = [];
-let syntheticEvents: Types.TraceEvents.TraceEventSyntheticNestableAsyncEvent[] = [];
-const waterFallEvents: Types.TraceEvents.TraceEventSnapshot[] = [];
+let relevantEvts: Types.Events.Snapshot[] = [];
+const gpuEvents: Types.Events.Snapshot[] = [];
+const asyncEvts: Types.Events.Snapshot[] = [];
+let syntheticEvents: Types.Events.SyntheticNestableAsync[] = [];
+const waterFallEvents: Types.Events.Snapshot[] = [];
 let eventLatencyIdToFrameSeq: Record<string, string> = {};
 // export interface UberFramesData {
-//   relevantEvts: readonly Types.TraceEvents.TraceEventData[],
-//   syntheticEvents: readonly Types.TraceEvents.TraceEventSyntheticNestableAsyncEvent[];
+//   relevantEvts: readonly Types.Events.Event[],
+//   syntheticEvents: readonly Types.Events.SyntheticNestableAsync[];
 // }
 
 export type UberFramesData = {
-  nonWaterfallEvts: readonly Types.TraceEvents.TraceEventData[],
-  waterFallEvts: readonly Types.TraceEvents.TraceEventData[],
+  nonWaterfallEvts: readonly Types.Events.Event[],
+  waterFallEvts: readonly Types.Events.Event[],
   eventLatencyIdToFrameSeq: Record<string, string>,
 };
 
@@ -249,8 +248,8 @@ export const waterfallTypes = new Map([
   ['SubmitCompositorFrameToPresentationCompositorFrame', 2],
 ]);
 
-export function handleEvent(event: Types.TraceEvents.TraceEventData): void {
-  if (Types.TraceEvents.isTraceEventGPUTask(event)) {
+export function handleEvent(event: Types.Events.Event): void {
+  if (Types.Events.isGPUTask(event)) {
     gpuEvents.push(event);
     Helpers.Trace.addEventToProcessThread(event, eventsInProcessThread);
   } else if (
@@ -292,8 +291,8 @@ export async function finalize(): Promise<void> {
   }
 
   const matchedEvents: Map<string, {
-    begin: Types.TraceEvents.TraceEventNestableAsyncBegin | null,
-    end: Types.TraceEvents.TraceEventNestableAsyncEnd | null,
+    begin: Types.Events.NestableAsyncBegin | null,
+    end: Types.Events.NestableAsyncEnd | null,
   }> = new Map();
 
   for (let i = 0; i < asyncEvts.length - 1; i++) {
@@ -310,8 +309,8 @@ export async function finalize(): Promise<void> {
     const otherEventsWithID = Platform.MapUtilities.getWithDefault(matchedEvents, syntheticId, () => {
       return {begin: null, end: null};
     });
-    const isStartEvent = event.ph === Types.TraceEvents.Phase.ASYNC_NESTABLE_START;
-    const isEndEvent = event.ph === Types.TraceEvents.Phase.ASYNC_NESTABLE_END;
+    const isStartEvent = event.ph === Types.Events.Phase.ASYNC_NESTABLE_START;
+    const isEndEvent = event.ph === Types.Events.Phase.ASYNC_NESTABLE_END;
 
     if (isStartEvent) {
       otherEventsWithID.begin = event;
@@ -344,7 +343,7 @@ export async function finalize(): Promise<void> {
       continue;
     }
 
-    const event: Types.TraceEvents.TraceEventSyntheticNestableAsyncEvent = {
+    const event: Types.Events.SyntheticNestableAsync = {
       cat: eventsPair.end.cat,
       ph: 'X',
       pid: eventsPair.end.pid,
@@ -415,6 +414,6 @@ export function data(): UberFramesData {
   };
 }
 
-export function deps(): TraceEventHandlerName[] {
+export function deps(): HandlerName[] {
   return ['Meta'];
 }

@@ -893,7 +893,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
 
     // fullsize screenshot in popover
     if (entryType === EntryType.Screenshot) {
-      const screenshot = (this.entryData[entryIndex] as TraceEngine.Types.TraceEvents.TraceEventSnapshot);
+      const screenshot = (this.entryData[entryIndex] as Trace.Types.Events.Snapshot);
       if (!this.screenshotImageCache.has(screenshot)) {
         this.screenshotImageCache.set(screenshot, null);
         const data = screenshot.args.snapshot;

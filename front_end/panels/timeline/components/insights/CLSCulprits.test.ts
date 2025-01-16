@@ -15,14 +15,14 @@ import * as Insights from './insights.js';
 
 describeWithEnvironment('CLSCulprits component', () => {
   it('renders unsized image culprits', async function() {
-    const traceData = await TraceLoader.traceEngine(this, 'unsized-images.json.gz');
-    const firstNavInsights = traceData.insights?.values().next()?.value;
+    const parsedTrace = await TraceLoader.traceEngine(this, 'unsized-images.json.gz');
+    const firstNavInsights = parsedTrace.insights?.values().next()?.value;
     assert.isOk(firstNavInsights);
     const clsModel = firstNavInsights.model.CLSCulprits;
     const component = new Insights.CLSCulprits.CLSCulprits();
     component.model = clsModel;
     component.insightSetKey = firstNavInsights.id;
-    component.bounds = traceData.parsedTrace.Meta.traceBounds;
+    component.bounds = parsedTrace.parsedTrace.Meta.traceBounds;
     component.selected = true;
 
     renderElementIntoDOM(component);

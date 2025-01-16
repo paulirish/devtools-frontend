@@ -2249,7 +2249,6 @@ export interface Async extends Event {
   ph: Phase.ASYNC_NESTABLE_START|Phase.ASYNC_NESTABLE_INSTANT|Phase.ASYNC_NESTABLE_END|Phase.ASYNC_STEP_INTO|
       Phase.ASYNC_BEGIN|Phase.ASYNC_END|Phase.ASYNC_STEP_PAST;
 }
-
 export function isSyntheticLayoutShift(event: Event): event is SyntheticLayoutShift {
   if (!isLayoutShift(event) || !event.args.data) {
     return false;

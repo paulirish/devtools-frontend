@@ -13,6 +13,7 @@ import * as EntriesFilter from './EntriesFilter.js';
 import * as EventsSerializer from './EventsSerializer.js';
 import * as EventsTimelineTreeView from './EventsTimelineTreeView.js';
 import * as ExtensionTrackAppender from './ExtensionTrackAppender.js';
+import * as FramesWaterfallTrackAppender from './FramesWaterfallTrackAppender.js';
 import * as FreshRecording from './FreshRecording.js';
 import * as GPUTrackAppender from './GPUTrackAppender.js';
 import * as Initiators from './Initiators.js';
@@ -20,6 +21,7 @@ import * as InteractionsTrackAppender from './InteractionsTrackAppender.js';
 import * as LayoutShiftsTrackAppender from './LayoutShiftsTrackAppender.js';
 import * as ModificationsManager from './ModificationsManager.js';
 import * as NetworkTrackAppender from './NetworkTrackAppender.js';
+import * as NewFramesTrackAppender from './NewFramesTrackAppender.js';
 import * as SaveFileFormatter from './SaveFileFormatter.js';
 import * as ServerTimingsTrackAppender from './ServerTimingsTrackAppender.js';
 import * as TargetForEvent from './TargetForEvent.js';
@@ -43,8 +45,6 @@ import * as TimelineTreeView from './TimelineTreeView.js';
 import * as TimelineUIUtils from './TimelineUIUtils.js';
 import * as TimingsTrackAppender from './TimingsTrackAppender.js';
 import * as UberFramesTrackAppender from './UberFramesTrackAppender.js';
-import * as FramesWaterfallTrackAppender from './FramesWaterfallTrackAppender.js';
-import * as NewFramesTrackAppender from './NewFramesTrackAppender.js';
 import * as UIDevtoolsController from './UIDevtoolsController.js';
 import * as UIDevtoolsUtils from './UIDevtoolsUtils.js';
 import * as Utils from './utils/utils.js';
@@ -61,6 +61,7 @@ export {
   EventsSerializer,
   EventsTimelineTreeView,
   ExtensionTrackAppender,
+  FramesWaterfallTrackAppender,
   FreshRecording,
   GPUTrackAppender,
   Initiators,
@@ -68,6 +69,7 @@ export {
   LayoutShiftsTrackAppender,
   ModificationsManager,
   NetworkTrackAppender,
+  NewFramesTrackAppender,
   SaveFileFormatter,
   ServerTimingsTrackAppender,
   TargetForEvent,
@@ -91,8 +93,6 @@ export {
   TimelineUIUtils,
   TimingsTrackAppender,
   UberFramesTrackAppender,
-  NewFramesTrackAppender,
-  FramesWaterfallTrackAppender,
   UIDevtoolsController,
   UIDevtoolsUtils,
   Utils,
