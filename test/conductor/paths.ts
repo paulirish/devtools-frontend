@@ -61,13 +61,17 @@ export class PathPair {
 export function defaultChromePath() {
   if (BUILD_WITH_CHROMIUM) {
     // In a full chromium checkout, find the chrome binary in the build directory.
-    return path.join(BUILD_ROOT, 'chrome');
+    const paths = {
+      linux: path.join('chrome'),
+      darwin: path.join('Chromium.app', 'Contents', 'MacOS', 'Chromium'),
+      win32: path.join('chrome.exe'),
+    };
+    return path.join(BUILD_ROOT, paths[os.platform() as 'linux' | 'win32' | 'darwin']);
   }
   const paths = {
-    'linux': path.join('chrome-linux', 'chrome'),
-    'darwin':
-        path.join('chrome-mac', 'Google Chrome for Testing.app', 'Contents', 'MacOS', 'Google Chrome for Testing'),
-    'win32': path.join('chrome-win', 'chrome.exe'),
+    linux: path.join('chrome-linux', 'chrome'),
+    darwin: path.join('chrome-mac', 'Google Chrome for Testing.app', 'Contents', 'MacOS', 'Google Chrome for Testing'),
+    win32: path.join('chrome-win', 'chrome.exe'),
   };
   return path.join(SOURCE_ROOT, 'third_party', 'chrome', paths[os.platform() as 'linux' | 'win32' | 'darwin']);
 }

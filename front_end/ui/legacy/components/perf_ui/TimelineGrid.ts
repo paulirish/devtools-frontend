@@ -106,10 +106,10 @@ export class TimelineGrid {
       if (positionFromTime < (freeZoneAtLeft || 0)) {
         continue;
       }
-      offsets.push({position: Math.floor(positionFromTime), time: time});
+      offsets.push({position: Math.floor(positionFromTime), time});
     }
 
-    return {offsets: offsets, precision: Math.max(0, -Math.floor(Math.log(gridSliceTime * 1.01) / Math.LN10))};
+    return {offsets, precision: Math.max(0, -Math.floor(Math.log(gridSliceTime * 1.01) / Math.LN10))};
   }
 
   static drawCanvasGrid(context: CanvasRenderingContext2D, dividersData: DividersData): void {
@@ -275,9 +275,11 @@ export class TimelineGrid {
   }
 }
 
+// The TimelineGrid is used in the Performance panel and Memory panel -> Allocating sampling, so the value can be either
+// milliseconds or bytes
 export interface Calculator {
-  computePosition(time: number): number;
-  formatValue(time: number, precision?: number): string;
+  computePosition(value: number): number;
+  formatValue(value: number, precision?: number): string;
   minimumBoundary(): number;
   zeroTime(): number;
   maximumBoundary(): number;

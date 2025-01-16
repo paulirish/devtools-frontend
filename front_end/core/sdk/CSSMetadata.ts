@@ -131,9 +131,17 @@ export class CSSMetadata {
     }
   }
 
+  static isCSSWideKeyword(a: string): a is CSSWideKeyword {
+    return CSSWideKeywords.includes(a as CSSWideKeyword);
+  }
+
+  static isPositionTryOrderKeyword(a: string): a is PositionTryOrderKeyword {
+    return PositionTryOrderKeywords.includes(a as PositionTryOrderKeyword);
+  }
+
   private static sortPrefixesAndCSSWideKeywordsToEnd(a: string, b: string): 1|- 1|0 {
-    const aIsCSSWideKeyword = CSSWideKeywords.includes(a);
-    const bIsCSSWideKeyword = CSSWideKeywords.includes(b);
+    const aIsCSSWideKeyword = CSSMetadata.isCSSWideKeyword(a);
+    const bIsCSSWideKeyword = CSSMetadata.isCSSWideKeyword(b);
 
     if (aIsCSSWideKeyword && !bIsCSSWideKeyword) {
       return 1;
@@ -355,9 +363,39 @@ export class CSSMetadata {
 }
 
 // CSS-wide keywords.
+export const enum CSSWideKeyword {
+  INHERIT = 'inherit',
+  INITIAL = 'initial',
+  REVERT = 'revert',
+  REVERT_LAYER = 'revert-layer',
+  UNSET = 'unset',
+}
 // Spec: https://drafts.csswg.org/css-cascade/#defaulting-keywords
 // https://drafts.csswg.org/css-cascade-5/#revert-layer
-export const CSSWideKeywords = ['inherit', 'initial', 'revert', 'revert-layer', 'unset'];
+export const CSSWideKeywords: CSSWideKeyword[] = [
+  CSSWideKeyword.INHERIT,
+  CSSWideKeyword.INITIAL,
+  CSSWideKeyword.REVERT,
+  CSSWideKeyword.REVERT_LAYER,
+  CSSWideKeyword.UNSET,
+];
+
+// https://www.w3.org/TR/css-anchor-position-1/#typedef-try-size
+export const enum PositionTryOrderKeyword {
+  NORMAL = 'normal',
+  MOST_HEIGHT = 'most-height',
+  MOST_WIDTH = 'most-width',
+  MOST_BLOCK_SIZE = 'most-block-size',
+  MOST_INLINE_SIZE = 'most-inline-size',
+}
+
+export const PositionTryOrderKeywords: PositionTryOrderKeyword[] = [
+  PositionTryOrderKeyword.NORMAL,
+  PositionTryOrderKeyword.MOST_HEIGHT,
+  PositionTryOrderKeyword.MOST_WIDTH,
+  PositionTryOrderKeyword.MOST_BLOCK_SIZE,
+  PositionTryOrderKeyword.MOST_INLINE_SIZE,
+];
 
 export const VariableNameRegex = /(\s*--.*?)/gs;
 export const VariableRegex = /(var\(\s*--.*?\))/gs;
@@ -522,6 +560,8 @@ const colorAwareProperties = new Set<string>([
   'stroke',
   'text-decoration-color',
   'text-shadow',
+  'text-emphasis',
+  'text-emphasis-color',
   '-webkit-border-after',
   '-webkit-border-after-color',
   '-webkit-border-before',
@@ -559,6 +599,22 @@ const angleAwareProperties = new Set<string>([
   'font-style',
 ]);
 
+const textEmphasisPosition = new Set([
+  'over',
+  'under',
+  'over right',  // Initial value
+  'over left',
+  'under right',
+  'under left',
+]);
+
+// https://drafts.csswg.org/css-text-decor/#text-emphasis-style-property
+const textEmphasisStyle = new Set([
+  'none', 'dot', 'circle', 'double-circle', 'triangle', 'sesame', 'filled', 'open', 'dot open', 'circle open',
+  'double-circle open', 'triangle open', 'sesame open',
+  '"❤️"',  // <string>
+]);
+
 // manually maintained list of property #values to add into autocomplete list
 const extraPropertyValues = new Map<string, Set<string>>([
   ['background-repeat', new Set(['repeat', 'repeat-x', 'repeat-y', 'no-repeat', 'space', 'round'])],
@@ -584,7 +640,8 @@ const extraPropertyValues = new Map<string, Set<string>>([
   ['color-interpolation', new Set(['sRGB', 'linearRGB'])],
   ['word-wrap', new Set(['normal', 'break-word'])],
   ['font-weight', new Set(['100', '200', '300', '400', '500', '600', '700', '800', '900'])],
-  ['-webkit-text-emphasis', new Set(['circle', 'filled', 'open', 'dot', 'double-circle', 'triangle', 'sesame'])],
+  ['text-emphasis', textEmphasisStyle],
+  ['-webkit-text-emphasis', textEmphasisStyle],
   ['color-rendering', new Set(['optimizeSpeed', 'optimizeQuality'])],
   ['-webkit-text-combine', new Set(['horizontal'])],
   ['text-orientation', new Set(['sideways-right'])],
@@ -607,7 +664,8 @@ const extraPropertyValues = new Map<string, Set<string>>([
     ]),
   ],
   ['dominant-baseline', new Set(['text-before-edge', 'text-after-edge', 'use-script', 'no-change', 'reset-size'])],
-  ['-webkit-text-emphasis-position', new Set(['over', 'under'])],
+  ['text-emphasis-position', textEmphasisPosition],
+  ['-webkit-text-emphasis-position', textEmphasisPosition],
   ['alignment-baseline', new Set(['before-edge', 'after-edge', 'text-before-edge', 'text-after-edge', 'hanging'])],
   ['page-break-before', new Set(['left', 'right', 'always', 'avoid'])],
   ['border-image', new Set(['repeat', 'stretch', 'space', 'round'])],
@@ -694,7 +752,8 @@ const extraPropertyValues = new Map<string, Set<string>>([
   ],
   ['vertical-align', new Set(['top', 'bottom', '-webkit-baseline-middle'])],
   ['page-break-after', new Set(['left', 'right', 'always', 'avoid'])],
-  ['-webkit-text-emphasis-style', new Set(['circle', 'filled', 'open', 'dot', 'double-circle', 'triangle', 'sesame'])],
+  ['text-emphasis-style', textEmphasisStyle],
+  ['-webkit-text-emphasis-style', textEmphasisStyle],
   [
     'transform',
     new Set([
@@ -765,6 +824,7 @@ const extraPropertyValues = new Map<string, Set<string>>([
       'self-end',
       'flex-start',
       'flex-end',
+      'anchor-center',
     ]),
   ],
   [
@@ -783,6 +843,7 @@ const extraPropertyValues = new Map<string, Set<string>>([
       'left',
       'right',
       'legacy',
+      'anchor-center',
     ]),
   ],
   [
@@ -798,6 +859,7 @@ const extraPropertyValues = new Map<string, Set<string>>([
       'self-end',
       'flex-start',
       'flex-end',
+      'anchor-center',
     ]),
   ],
   [
@@ -813,6 +875,7 @@ const extraPropertyValues = new Map<string, Set<string>>([
       'self-end',
       'flex-start',
       'flex-end',
+      'anchor-center',
     ]),
   ],
   [
@@ -830,6 +893,7 @@ const extraPropertyValues = new Map<string, Set<string>>([
       'flex-end',
       'left',
       'right',
+      'anchor-center',
     ]),
   ],
   [
@@ -845,6 +909,7 @@ const extraPropertyValues = new Map<string, Set<string>>([
       'self-end',
       'flex-start',
       'flex-end',
+      'anchor-center',
     ]),
   ],
   ['perspective-origin', new Set(['left', 'center', 'right', 'top', 'bottom'])],
@@ -1266,6 +1331,23 @@ const extraPropertyValues = new Map<string, Set<string>>([
       'pre-line',      // equal to: `preserve-breaks wrap`
       'nowrap',        // equal to: `collapse nowrap`
       'break-spaces',  // equal to: `break-spaces wrap`, Chrome 76, crbug.com/767634#c28
+    ]),
+  ],
+  // https://drafts.csswg.org/css-inline-3/#text-box-edge
+  // Now we're going to allow the following rule:
+  // auto | [ text | cap | ex ] [ text | alphabetic ]?
+  // ideographic and ideographic-ink are not implemented yet.
+  // We don't add values like `cap text` because that is equivalent to `text`.
+  [
+    'text-box-edge',
+    new Set([
+      'auto',
+      'text',
+      'cap',
+      'ex',
+      'text alphabetic',
+      'cap alphabetic',
+      'ex alphabetic',
     ]),
   ],
 ]);

@@ -15,6 +15,7 @@ import {
   getResourcesPath,
   getTextContent,
   pasteText,
+  readClipboard,
   step,
   typeText,
   waitFor,
@@ -22,7 +23,6 @@ import {
   waitForElementWithTextContent,
   waitForFunction,
 } from '../../shared/helper.js';
-import {describe, it} from '../../shared/mocha-extensions.js';
 import {CONSOLE_TAB_SELECTOR, focusConsolePrompt} from '../helpers/console-helpers.js';
 import {triggerLocalFindDialog} from '../helpers/memory-helpers.js';
 import {
@@ -50,7 +50,7 @@ const configureAndCheckHeaderOverrides = async () => {
   let responseHeaderSection = await waitFor('[aria-label="Response Headers"]', networkView);
 
   let row = await waitFor('.row', responseHeaderSection);
-  assert.deepStrictEqual(await getTextFromHeadersRow(row), ['cache-control:', 'max-age=3600']);
+  assert.deepEqual(await getTextFromHeadersRow(row), ['cache-control:', 'max-age=3600']);
 
   await waitForFunction(async () => {
     await click('.header-name', {root: row});
@@ -63,7 +63,7 @@ const configureAndCheckHeaderOverrides = async () => {
 
   const headersView = await waitFor('devtools-sources-headers-view');
   const headersViewRow = await waitFor('.row.padded', headersView);
-  assert.deepStrictEqual(await getTextFromHeadersRow(headersViewRow), ['cache-control', 'Foo']);
+  assert.deepEqual(await getTextFromHeadersRow(headersViewRow), ['cache-control', 'Foo']);
 
   await navigateToNetworkTab('hello.html');
   await selectRequestByName('hello.html');
@@ -74,7 +74,7 @@ const configureAndCheckHeaderOverrides = async () => {
 
   responseHeaderSection = await waitFor('[aria-label="Response Headers"]');
   row = await waitFor('.row.header-overridden', responseHeaderSection);
-  assert.deepStrictEqual(await getTextFromHeadersRow(row), ['cache-control:', 'Foo']);
+  assert.deepEqual(await getTextFromHeadersRow(row), ['cache-control:', 'Foo']);
 };
 
 describe('The Network Request view', () => {
@@ -135,8 +135,7 @@ describe('The Network Request view', () => {
     await waitForElementWithTextContent('uuid-in-package:020111b3-437a-4c5c-ae07-adb6bbffb720', networkView);
   });
 
-  // failing test blocking the roll
-  it.skip('[crbug.com/1518454]: prevents requests on the preview tab.', async () => {
+  it('prevents requests on the preview tab.', async () => {
     await navigateToNetworkTab('embedded_requests.html');
 
     // For the issue to manifest it's mandatory to load the stylesheet by absolute URL. A relative URL would be treated
@@ -176,8 +175,7 @@ describe('The Network Request view', () => {
     await waitForFunction(async () => await styleSrcError.caught);
   });
 
-  // failing test blocking the roll
-  it.skip('[crbug.com/1518454]: permits inline styles on the preview tab.', async () => {
+  it('permits inline styles on the preview tab.', async () => {
     await navigateToNetworkTab('embedded_requests.html');
     const contents = '<head><style>p { color: red; }</style></head><body><p>Content</p></body>';
     const {target} = getBrowserAndPages();
@@ -489,6 +487,20 @@ describe('The Network Request view', () => {
     ].flat();
 
     assertOutlineMatches(expectedPayloadContent, payloadOutlineText);
+
+    // Context menu to copy single parsed entry.
+    const parsedEntry = await waitForElementWithTextContent('alpha');
+    await parsedEntry.click({button: 'right'});
+    await (await waitForElementWithTextContent('Copy value')).click();
+    assert.strictEqual(await readClipboard(), 'alpha');
+
+    // Context menu to copy the raw payload.
+    const viewSource = await waitForElementWithTextContent('view source');
+    await viewSource.click();
+    const source = await waitForElementWithTextContent('id=42&param=a%20b');
+    await source.click({button: 'right'});
+    await (await waitForElementWithTextContent('Copy')).click();
+    assert.strictEqual(await readClipboard(), 'id=42&param=a%20b');
   });
 
   it('shows raw headers', async () => {

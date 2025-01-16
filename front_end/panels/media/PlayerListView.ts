@@ -8,8 +8,8 @@ import * as IconButton from '../../ui/components/icon_button/icon_button.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
-import {type MainView, type TriggerDispatcher} from './MainView.js';
-import {type PlayerEvent} from './MediaModel.js';
+import type {MainView, TriggerDispatcher} from './MainView.js';
+import type {PlayerEvent} from './MediaModel.js';
 import playerListViewStyles from './playerListView.css.js';
 import {PlayerPropertyKeys} from './PlayerPropertiesView.js';
 
@@ -225,7 +225,7 @@ export class PlayerListView extends UI.Widget.VBox implements TriggerDispatcher 
     // title from the FrameUrl though, since the page location itself might not
     // have any relevance to the video being played, and would be shared by all
     // videos on the page.
-    if (property.name === PlayerPropertyKeys.FrameUrl) {
+    if (property.name === PlayerPropertyKeys.FRAME_URL) {
       const frameTitle = new URL(property.value).hostname;
       this.formatAndEvaluate(playerID, this.setMediaElementFrameTitle, frameTitle, 1, 20);
       return;
@@ -237,7 +237,7 @@ export class PlayerListView extends UI.Widget.VBox implements TriggerDispatcher 
     // junk, or it might be super long. If it's empty, or 1 character, It's
     // preferable to just drop it. Titles longer than 20 will have the first
     // 17 characters kept and an elipsis appended.
-    if (property.name === PlayerPropertyKeys.FrameTitle && property.value) {
+    if (property.name === PlayerPropertyKeys.FRAME_TITLE && property.value) {
       this.formatAndEvaluate(playerID, this.setMediaElementFrameTitle, property.value, 1, 20);
       return;
     }

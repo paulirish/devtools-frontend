@@ -5,8 +5,8 @@
 import type * as Protocol from '../../generated/protocol.js';
 
 import {DOMModel, type DOMNode} from './DOMModel.js';
-import {type SnapshotWithRect} from './PaintProfiler.js';
-import {type Target} from './Target.js';
+import type {SnapshotWithRect} from './PaintProfiler.js';
+import type {Target} from './Target.js';
 
 export interface Layer {
   id(): string;
@@ -38,11 +38,11 @@ export interface Layer {
 
 export namespace Layer {
   export const enum ScrollRectType {
-    NonFastScrollable = 'NonFastScrollable',
-    TouchEventHandler = 'TouchEventHandler',
-    WheelEventHandler = 'WheelEventHandler',
-    RepaintsOnScroll = 'RepaintsOnScroll',
-    MainThreadScrollingReason = 'MainThreadScrollingReason',
+    NON_FAST_SCROLLABLE = 'NonFastScrollable',
+    TOUCH_EVENT_HANDLER = 'TouchEventHandler',
+    WHEEL_EVENT_HANDLER = 'WheelEventHandler',
+    REPAINTS_ON_SCROLL = 'RepaintsOnScroll',
+    MAIN_THREAD_SCROLL_REASON = 'MainThreadScrollingReason',
   }
 }
 

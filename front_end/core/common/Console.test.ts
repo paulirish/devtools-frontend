@@ -10,34 +10,34 @@ describe('Console', () => {
   describe('addMessage', () => {
     it('adds messages', () => {
       const console = Console.instance({forceNew: true});
-      console.addMessage('Foo', Common.Console.MessageLevel.Info, true);
+      console.addMessage('Foo', Common.Console.MessageLevel.INFO, true);
       const messages = console.messages();
       assert.lengthOf(messages, 1);
       assert.strictEqual(messages[0].text, 'Foo');
-      assert.strictEqual(messages[0].level, Common.Console.MessageLevel.Info);
-      assert.strictEqual(messages[0].show, true);
+      assert.strictEqual(messages[0].level, Common.Console.MessageLevel.INFO);
+      assert.isTrue(messages[0].show);
     });
 
     it('stores messages', () => {
       const console = Console.instance({forceNew: true});
-      console.addMessage('Foo', Common.Console.MessageLevel.Info, true);
-      console.addMessage('Baz', Common.Console.MessageLevel.Warning, true);
-      console.addMessage('Bar', Common.Console.MessageLevel.Error, true);
-      console.addMessage('Donkey', Common.Console.MessageLevel.Info, true);
+      console.addMessage('Foo', Common.Console.MessageLevel.INFO, true);
+      console.addMessage('Baz', Common.Console.MessageLevel.WARNING, true);
+      console.addMessage('Bar', Common.Console.MessageLevel.ERROR, true);
+      console.addMessage('Donkey', Common.Console.MessageLevel.INFO, true);
       const messages = console.messages();
-      assert.strictEqual(messages.length, 4);
+      assert.lengthOf(messages, 4);
     });
 
     it('dispatches events to listeners', done => {
       const console = Console.instance({forceNew: true});
       const callback = ({data}: Common.EventTarget.EventTargetEvent<Common.Console.Message>) => {
-        console.removeEventListener(Common.Console.Events.MessageAdded, callback);
+        console.removeEventListener(Common.Console.Events.MESSAGE_ADDED, callback);
         assert.strictEqual(data.text, 'Foo');
         done();
       };
 
-      console.addEventListener(Common.Console.Events.MessageAdded, callback);
-      console.addMessage('Foo', Common.Console.MessageLevel.Info, true);
+      console.addEventListener(Common.Console.Events.MESSAGE_ADDED, callback);
+      console.addMessage('Foo', Common.Console.MessageLevel.INFO, true);
     });
   });
 
@@ -47,8 +47,8 @@ describe('Console', () => {
       console.log('Lorem Ipsum');
       const messages = console.messages();
       assert.lengthOf(messages, 1);
-      assert.strictEqual(messages[0].show, false);  // Infos don't popup the Console panel by default
-      assert.strictEqual(messages[0].level, Common.Console.MessageLevel.Info);
+      assert.isFalse(messages[0].show);  // Infos don't popup the Console panel by default
+      assert.strictEqual(messages[0].level, Common.Console.MessageLevel.INFO);
     });
   });
 
@@ -58,8 +58,8 @@ describe('Console', () => {
       console.warn('Lorem Ipsum');
       const messages = console.messages();
       assert.lengthOf(messages, 1);
-      assert.strictEqual(messages[0].show, false);  // Warnings don't popup the Console panel by default
-      assert.strictEqual(messages[0].level, Common.Console.MessageLevel.Warning);
+      assert.isFalse(messages[0].show);  // Warnings don't popup the Console panel by default
+      assert.strictEqual(messages[0].level, Common.Console.MessageLevel.WARNING);
     });
   });
 
@@ -69,8 +69,8 @@ describe('Console', () => {
       console.error('Lorem Ipsum');
       const messages = console.messages();
       assert.lengthOf(messages, 1);
-      assert.strictEqual(messages[0].show, true);  // Errors popup the Console panel by default
-      assert.strictEqual(messages[0].level, Common.Console.MessageLevel.Error);
+      assert.isTrue(messages[0].show);  // Errors popup the Console panel by default
+      assert.strictEqual(messages[0].level, Common.Console.MessageLevel.ERROR);
     });
 
     it('can control whether to pop up the Console panel', () => {
@@ -79,8 +79,8 @@ describe('Console', () => {
       console.error('Baz', true);
       const messages = console.messages();
       assert.lengthOf(messages, 2);
-      assert.strictEqual(messages[0].show, false);
-      assert.strictEqual(messages[1].show, true);
+      assert.isFalse(messages[0].show);
+      assert.isTrue(messages[1].show);
     });
   });
 });

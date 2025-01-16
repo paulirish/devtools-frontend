@@ -32,17 +32,24 @@ export const RECORD_BUTTON_SELECTOR = '[aria-label="Record"]';
 export const RELOAD_AND_RECORD_BUTTON_SELECTOR = '[aria-label="Record and reload"]';
 export const STOP_BUTTON_SELECTOR = '[aria-label="Stop"]';
 export const SUMMARY_TAB_SELECTOR = '[aria-label="Summary"]';
-export const BOTTOM_UP_SELECTOR = '[aria-label="Bottom-Up"]';
-export const CALL_TREE_SELECTOR = '[aria-label="Call Tree"]';
+export const BOTTOM_UP_SELECTOR = '[aria-label="Bottom-up"]';
+export const CALL_TREE_SELECTOR = '[aria-label="Call tree"]';
 export const ACTIVITY_COLUMN_SELECTOR = '.activity-column.disclosure';
 export const TOTAL_TIME_SELECTOR =
     'div:nth-child(1) > div.vbox.timeline-details-chip-body > div:nth-child(1) > div.timeline-details-view-row-value';
-const RECALCULATE_STYLE_TITLE = 'Recalculate Style';
-const SELECTOR_STATS_SELECTOR = '[aria-label="Selector Stats"]';
+const RECALCULATE_STYLE_TITLE = 'Recalculate style';
+const SELECTOR_STATS_SELECTOR = '[aria-label="Selector stats"]';
 const CSS_SELECTOR_STATS_TITLE = 'Enable CSS selector stats (slow)';
 const TIMELINE_SETTINGS_PANE = '.timeline-settings-pane';
 
 export async function navigateToPerformanceTab(testName?: string) {
+  const {frontend} = getBrowserAndPages();
+  await frontend.evaluate(() => {
+    // Prevent the Performance panel shortcuts dialog, that is automatically shown the first
+    // time the performance panel is opened, from opening in tests.
+    localStorage.setItem('hide-shortcuts-dialog-for-test', 'true');
+  });
+
   if (testName) {
     await goToResource(`performance/${testName}.html`);
   }
@@ -70,9 +77,6 @@ export async function openCaptureSettings(sectionClassName: string) {
               veImpression('Toggle', 'timeline-disable-js-sampling'),
               veImpression('DropDown', 'cpu-throttling'),
               veImpression('DropDown', 'preferred-network-condition'),
-              veImpression('Toggle', 'hardware-concurrency'),
-              veImpression('TextField', 'hardware-concurrency'),
-              veImpression('Action', 'hardware-concurrency-reset'),
               veImpression('Toggle', 'timeline-show-extension-data'),
             ]),
       ],
@@ -80,7 +84,7 @@ export async function openCaptureSettings(sectionClassName: string) {
 }
 
 export async function searchForComponent(frontend: puppeteer.Page, searchEntry: string) {
-  await waitFor('.timeline-details-chip-body');
+  await waitFor('devtools-performance-timeline-summary');
   await summonSearchBox();
   await waitFor('.search-bar');
   await frontend.keyboard.type(searchEntry);
@@ -105,28 +109,32 @@ export async function navigateToBottomUpTab() {
   await click(BOTTOM_UP_SELECTOR);
   await expectVeEvents(
       [
-        veClick('Toolbar: sidebar > PanelTabHeader: bottom-up'),
-        veImpression(
-            'Pane', 'bottom-up',
+        veClick('Section: timeline.flame-chart-view > Toolbar: sidebar > PanelTabHeader: bottom-up'),
+        veImpressionsUnder(
+            'Section: timeline.flame-chart-view',
             [
               veImpression(
-                  'Toolbar', undefined,
+                  'Pane', 'bottom-up',
                   [
-                    veImpression('Toggle', 'match-case'),
-                    veImpression('Toggle', 'regular-expression'),
-                    veImpression('Toggle', 'match-whole-word'),
-                    veImpression('TextField', 'filter'),
-                    veImpression('DropDown', 'timeline-tree-group-by'),
-                  ]),
-              veImpression('TableHeader', 'self'),
-              veImpression('TableHeader', 'total'),
-              veImpression('TableHeader', 'activity'),
-              veImpression(
-                  'TableRow', undefined,
-                  [
-                    veImpression('TableCell', 'self'),
-                    veImpression('TableCell', 'total'),
-                    veImpression('TableCell', 'activity', [veImpression('Link', 'url')]),
+                    veImpression(
+                        'Toolbar', undefined,
+                        [
+                          veImpression('Toggle', 'match-case'),
+                          veImpression('Toggle', 'regular-expression'),
+                          veImpression('Toggle', 'match-whole-word'),
+                          veImpression('TextField', 'filter'),
+                          veImpression('DropDown', 'timeline-tree-group-by'),
+                        ]),
+                    veImpression('TableHeader', 'self'),
+                    veImpression('TableHeader', 'total'),
+                    veImpression('TableHeader', 'activity'),
+                    veImpression(
+                        'TableRow', undefined,
+                        [
+                          veImpression('TableCell', 'self'),
+                          veImpression('TableCell', 'total'),
+                          veImpression('TableCell', 'activity', [veImpression('Link', 'url')]),
+                        ]),
                   ]),
             ]),
 
@@ -138,30 +146,36 @@ export async function navigateToCallTreeTab() {
   await click(CALL_TREE_SELECTOR);
   await expectVeEvents(
       [
-        veClick('Toolbar: sidebar > PanelTabHeader: call-tree'),
-        veImpression(
-            'Pane', 'call-tree',
+        veClick('Section: timeline.flame-chart-view > Toolbar: sidebar > PanelTabHeader: call-tree'),
+        veImpressionsUnder(
+            'Section: timeline.flame-chart-view',
             [
+
               veImpression(
-                  'Toolbar', undefined,
+                  'Pane', 'call-tree',
                   [
-                    veImpression('Toggle', 'match-case'),
-                    veImpression('Toggle', 'regular-expression'),
-                    veImpression('Toggle', 'match-whole-word'),
-                    veImpression('TextField', 'filter'),
-                    veImpression('DropDown', 'timeline-tree-group-by'),
+                    veImpression(
+                        'Toolbar', undefined,
+                        [
+                          veImpression('Toggle', 'match-case'),
+                          veImpression('Toggle', 'regular-expression'),
+                          veImpression('Toggle', 'match-whole-word'),
+                          veImpression('TextField', 'filter'),
+                          veImpression('DropDown', 'timeline-tree-group-by'),
+                        ]),
+                    veImpression('TableHeader: self'),
+                    veImpression('TableHeader: total'),
+                    veImpression('TableHeader: activity'),
+                    veImpression(
+                        'TableRow', undefined,
+                        [
+                          veImpression('TableCell: self'),
+                          veImpression('TableCell: total'),
+                          veImpression('TableCell: activity'),
+                        ]),
                   ]),
-              veImpression('TableHeader: self'),
-              veImpression('TableHeader: total'),
-              veImpression('TableHeader: activity'),
-              veImpression(
-                  'TableRow', undefined,
-                  [
-                    veImpression('TableCell: self'),
-                    veImpression('TableCell: total'),
-                    veImpression('TableCell: activity'),
-                  ]),
-            ]),
+            ],
+            ),
       ],
       'Panel: timeline');
 }
@@ -171,25 +185,30 @@ export async function setFilter(filter: string) {
   await filterBoxElement.type(filter);
   await expectVeEvents(
       [veChange(''), veImpression('Action', 'clear')],
-      'Panel: timeline > Pane: bottom-up > Toolbar > TextField: filter');
+      'Panel: timeline > Section: timeline.flame-chart-view > Pane: bottom-up > Toolbar > TextField: filter');
 }
 
 export async function toggleCaseSensitive() {
-  const matchCaseButton = await waitForAria('Match Case');
+  const matchCaseButton = await waitForAria('Match case');
   await matchCaseButton.click();
-  await expectVeEvents([veClick('Panel: timeline > Pane: bottom-up > Toolbar > Toggle: match-case')]);
+  await expectVeEvents([veClick(
+      'Panel: timeline > Section: timeline.flame-chart-view > Pane: bottom-up > Toolbar > Toggle: match-case')]);
 }
 
 export async function toggleRegExButtonBottomUp() {
-  const regexButton = await waitFor('[aria-label="Use Regular Expression"]');
+  const regexButton = await waitFor('[aria-label="Use regular expression"]');
   await regexButton.click();
-  await expectVeEvents([veClick('Panel: timeline > Pane: bottom-up > Toolbar > Toggle: regular-expression')]);
+  await expectVeEvents([
+    veClick(
+        'Panel: timeline > Section: timeline.flame-chart-view > Pane: bottom-up > Toolbar > Toggle: regular-expression'),
+  ]);
 }
 
 export async function toggleMatchWholeWordButtonBottomUp() {
   const wholeWordButton = await waitForAria('Match whole word');
   await wholeWordButton.click();
-  await expectVeEvents([veClick('Panel: timeline > Pane: bottom-up > Toolbar > Toggle: match-whole-word')]);
+  await expectVeEvents([veClick(
+      'Panel: timeline > Section: timeline.flame-chart-view > Pane: bottom-up > Toolbar > Toggle: match-whole-word')]);
 }
 
 export async function startRecording() {
@@ -206,7 +225,7 @@ export async function reloadAndRecord() {
   // Make sure the timeline details panel appears. It's a sure way to assert
   // that a recording is actually displayed as some of the other elements in
   // the timeline remain in the DOM even after the recording has been cleared.
-  await waitFor('.timeline-details-chip-body');
+  await waitFor('devtools-performance-timeline-summary');
   await expectVeEvents(
       [veClick('Toolbar > Action: timeline.record-reload'), veImpressionForStatusDialog()], 'Panel: timeline');
 }
@@ -217,7 +236,7 @@ export async function stopRecording() {
   // Make sure the timeline details panel appears. It's a sure way to assert
   // that a recording is actually displayed as some of the other elements in
   // the timeline remain in the DOM even after the recording has been cleared.
-  await waitFor('.timeline-details-chip-body');
+  await waitFor('devtools-performance-timeline-summary');
   await expectVeEvents(
       [
         veClick('Toolbar > Toggle: timeline.toggle-recording'),
@@ -227,20 +246,29 @@ export async function stopRecording() {
 }
 
 export async function getTotalTimeFromSummary(): Promise<number> {
+  const minCategories = 2;
+  const categoryValues = await waitForMany('.category-value', minCategories);
+
+  const totalVal = categoryValues[categoryValues.length - 1];
+  const totalText = await totalVal.evaluate(node => node.textContent as string);
+  return parseInt(totalText, 10);
+}
+
+export async function getTotalTimeFromPie(): Promise<number> {
   const pieChartTotal = await waitFor('.pie-chart-total');
   const totalText = await pieChartTotal.evaluate(node => node.textContent as string);
   return parseInt(totalText, 10);
 }
 
 export async function getRenderingTimeFromSummary(): Promise<[number, string]> {
-  const pieChartSizes = await waitForMany('.pie-chart-size', 6);
-  const pieChartNames = await waitForMany('.pie-chart-name', 6);
+  const categoryValues = await waitForMany('.category-value', 6);
+  const categoryNames = await waitForMany('.category-name', 6);
 
   // update the index if the rendering time is showing in a different row
-  const chartName = await pieChartNames[2].evaluate(node => node.textContent as string);
-  const chartSize = await pieChartSizes[2].evaluate(node => node.textContent as string);
+  const categoryName = await categoryNames[1].evaluate(node => node.textContent as string);
+  const categoryValue = await categoryValues[1].evaluate(node => node.textContent as string);
 
-  return [parseInt(chartSize, 10), chartName];
+  return [parseInt(categoryValue, 10), categoryName];
 }
 
 export async function retrieveSelectedAndExpandedActivityItems(frontend: puppeteer.Page) {
@@ -270,7 +298,7 @@ export async function navigateToSelectorStatsTab() {
               veImpression('TableRow', undefined, [veImpression('TableCell')]),
             ]),
       ],
-      'Panel: timeline');
+      'Panel: timeline > Section: timeline.flame-chart-view');
 }
 
 export async function selectRecalculateStylesEvent() {
@@ -331,7 +359,7 @@ export async function disableCSSSelectorStats() {
       [veChange('Panel: timeline > Pane: timeline-settings-pane > Toggle: timeline-capture-selector-stats')]);
 }
 
-export function veImpressionForPerformancePanel(options?: {timelineObservationLandingPage?: boolean}) {
+export function veImpressionForPerformancePanel() {
   return veImpression('Panel', 'timeline', [
     veImpression(
         'Toolbar', undefined,
@@ -340,7 +368,7 @@ export function veImpressionForPerformancePanel(options?: {timelineObservationLa
           veImpression('Action', 'timeline.record-reload'),
           veImpression('Action', 'timeline.clear'),
           veImpression('Action', 'timeline.load-from-file'),
-          veImpression('Action', 'timeline.save-to-file'),
+          veImpression('DropDown', 'timeline.save-to-file-more-options'),
           veImpression('DropDown', 'history'),
           veImpression('Toggle', 'timeline-show-screenshots'),
           veImpression('Toggle', 'timeline-show-memory'),
@@ -348,9 +376,8 @@ export function veImpressionForPerformancePanel(options?: {timelineObservationLa
         ]),
     veImpression('Action', 'timeline.toggle-recording'),
     veImpression('Action', 'timeline.record-reload'),
-    ...(options?.timelineObservationLandingPage ?
-            [veImpression('DropDown', 'cpu-throttling'), veImpression('DropDown', 'network-conditions')] :
-            [veImpression('Link', 'learn-more')]),
+    veImpression('DropDown', 'cpu-throttling'),
+    veImpression('DropDown', 'network-conditions'),
   ]);
 }
 

@@ -5,7 +5,7 @@
 import * as PuppeteerReplay from '../../../third_party/puppeteer-replay/puppeteer-replay.js';
 import * as Models from '../models/models.js';
 
-import {type Converter} from './Converter.js';
+import type {Converter} from './Converter.js';
 
 export class PuppeteerConverter implements Converter {
   #indent: string;
@@ -17,7 +17,7 @@ export class PuppeteerConverter implements Converter {
   }
 
   getId(): string {
-    return Models.ConverterIds.ConverterIds.Puppeteer;
+    return Models.ConverterIds.ConverterIds.PUPPETEER;
   }
 
   createExtension(): PuppeteerReplay.PuppeteerStringifyExtension {

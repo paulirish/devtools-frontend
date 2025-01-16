@@ -93,12 +93,12 @@ export class PerformanceMonitorImpl extends UI.Widget.HBox implements
     this.gridColor = ThemeSupport.ThemeSupport.instance().getComputedValue('--divider-line');
     this.controlPane = new ControlPane(this.contentElement);
     const chartContainer = this.contentElement.createChild('div', 'perfmon-chart-container');
-    this.canvas = chartContainer.createChild('canvas') as HTMLCanvasElement;
+    this.canvas = chartContainer.createChild('canvas');
     this.canvas.tabIndex = -1;
     UI.ARIAUtils.setLabel(this.canvas, i18nString(UIStrings.graphsDisplayingARealtimeViewOf));
     this.contentElement.createChild('div', 'perfmon-chart-suspend-overlay fill').createChild('div').textContent =
         i18nString(UIStrings.paused);
-    this.controlPane.addEventListener(Events.MetricChanged, this.recalcChartHeight, this);
+    this.controlPane.addEventListener(Events.METRIC_CHANGED, this.recalcChartHeight, this);
     SDK.TargetManager.TargetManager.instance().observeModels(SDK.PerformanceMetricsModel.PerformanceMetricsModel, this);
   }
 
@@ -116,7 +116,7 @@ export class PerformanceMonitorImpl extends UI.Widget.HBox implements
       this.draw();
     });
     SDK.TargetManager.TargetManager.instance().addEventListener(
-        SDK.TargetManager.Events.SuspendStateChanged, this.suspendStateChanged, this);
+        SDK.TargetManager.Events.SUSPEND_STATE_CHANGED, this.suspendStateChanged, this);
     void this.model.enable();
     this.suspendStateChanged();
   }
@@ -126,7 +126,7 @@ export class PerformanceMonitorImpl extends UI.Widget.HBox implements
       return;
     }
     SDK.TargetManager.TargetManager.instance().removeEventListener(
-        SDK.TargetManager.Events.SuspendStateChanged, this.suspendStateChanged, this);
+        SDK.TargetManager.Events.SUSPEND_STATE_CHANGED, this.suspendStateChanged, this);
     this.stopPolling();
     void this.model.disable();
   }
@@ -187,7 +187,7 @@ export class PerformanceMonitorImpl extends UI.Widget.HBox implements
     const data = await this.model.requestMetrics();
     const timestamp = data.timestamp;
     const metrics = data.metrics;
-    this.metricsBuffer.push({timestamp, metrics: metrics});
+    this.metricsBuffer.push({timestamp, metrics});
     const millisPerWidth = this.width / this.pixelsPerMs;
     // Multiply by 2 as the pollInterval has some jitter and to have some extra samples if window is resized.
     const maxCount = Math.ceil(millisPerWidth / this.pollIntervalMs * 2);
@@ -431,8 +431,8 @@ export class PerformanceMonitorImpl extends UI.Widget.HBox implements
 }
 
 export const enum Format {
-  Percent = 'Percent',
-  Bytes = 'Bytes',
+  PERCENT = 'Percent',
+  BYTES = 'Bytes',
 }
 
 export class ControlPane extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
@@ -487,7 +487,7 @@ export class ControlPane extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
                 themeSupport.getComputedValue('--override-color-perf-monitor-cpu-recalc-style-duration', this.element),
           },
         ],
-        format: Format.Percent,
+        format: Format.PERCENT,
         smooth: true,
         stacked: true,
         color: themeSupport.getComputedValue('--override-color-perf-monitor-cpu', this.element),
@@ -507,7 +507,7 @@ export class ControlPane extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
             color: themeSupport.getComputedValue('--override-color-perf-monitor-jsheap-used-size', this.element),
           },
         ],
-        format: Format.Bytes,
+        format: Format.BYTES,
         color: themeSupport.getComputedValue('--override-color-perf-monitor-jsheap'),
       },
       {
@@ -591,7 +591,7 @@ export class ControlPane extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
       this.enabledCharts.delete(chartName);
     }
     this.enabledChartsSetting.set(Array.from(this.enabledCharts));
-    this.dispatchEventToListeners(Events.MetricChanged);
+    this.dispatchEventToListeners(Events.METRIC_CHANGED);
   }
 
   charts(): ChartInfo[] {
@@ -616,12 +616,12 @@ export class ControlPane extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
 }
 
 const enum Events {
-  MetricChanged = 'MetricChanged',
+  METRIC_CHANGED = 'MetricChanged',
 }
 
-type EventTypes = {
-  [Events.MetricChanged]: void,
-};
+interface EventTypes {
+  [Events.METRIC_CHANGED]: void;
+}
 
 let numberFormatter: Intl.NumberFormat;
 let percentFormatter: Intl.NumberFormat;
@@ -636,7 +636,7 @@ export class MetricIndicator {
   constructor(parent: Element, info: ChartInfo, active: boolean, onToggle: (arg0: boolean) => void) {
     this.color = info.color || info.metrics[0].color;
     this.info = info;
-    this.element = parent.createChild('div', 'perfmon-indicator') as HTMLElement;
+    this.element = parent.createChild('div', 'perfmon-indicator');
     const chartName = info.metrics[0].name;
     this.swatchElement = UI.UIUtils.CheckboxLabel.create(info.title, active, undefined, chartName);
     this.element.appendChild(this.swatchElement);
@@ -644,7 +644,7 @@ export class MetricIndicator {
       onToggle(this.swatchElement.checkboxElement.checked);
       this.element.classList.toggle('active');
     });
-    this.valueElement = this.element.createChild('div', 'perfmon-indicator-value') as HTMLElement;
+    this.valueElement = this.element.createChild('div', 'perfmon-indicator-value');
     this.valueElement.style.color = this.color;
     this.element.classList.toggle('active', active);
   }
@@ -655,10 +655,10 @@ export class MetricIndicator {
       percentFormatter = new Intl.NumberFormat('en-US', {maximumFractionDigits: 1, style: 'percent'});
     }
     switch (info.format) {
-      case Format.Percent:
+      case Format.PERCENT:
         return percentFormatter.format(value);
-      case Format.Bytes:
-        return Platform.NumberUtilities.bytesToString(value);
+      case Format.BYTES:
+        return i18n.ByteUtilities.bytesToString(value);
       default:
         return numberFormatter.format(value);
     }
@@ -675,7 +675,7 @@ export interface MetricInfo {
   color: string;
 }
 export interface ChartInfo {
-  title: string;
+  title: Common.UIString.LocalizedString;
   metrics: {name: string, color: string}[];
   max?: number;
   currentMax?: number;

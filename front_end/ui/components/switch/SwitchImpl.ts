@@ -7,6 +7,8 @@ import * as VisualLogging from '../../visual_logging/visual_logging.js';
 
 import switchStyles from './switch.css.js';
 
+const {html} = LitHtml;
+
 export class SwitchChangeEvent extends Event {
   static readonly eventName = 'switchchange';
 
@@ -16,7 +18,6 @@ export class SwitchChangeEvent extends Event {
 }
 
 export class Switch extends HTMLElement {
-  static readonly litTagName = LitHtml.literal`devtools-switch`;
   readonly #shadow = this.attachShadow({mode: 'open'});
   #checked = false;
   #disabled = false;
@@ -61,20 +62,20 @@ export class Switch extends HTMLElement {
 
   #render(): void {
     const jslog = this.#jslogContext && VisualLogging.toggle(this.#jslogContext).track({change: true});
-    /* eslint-disable rulesdir/inject_checkbox_styles */
+    /* eslint-disable rulesdir/inject-checkbox-styles */
     // clang-format off
-    LitHtml.render(LitHtml.html`
-    <label role="button">
+    LitHtml.render(html`
+    <label role="button" jslog=${jslog || LitHtml.nothing}>
       <input type="checkbox"
         @change=${this.#handleChange}
         ?disabled=${this.#disabled}
         .checked=${this.#checked}
-        jslog=${jslog || LitHtml.nothing}>
+      >
       <span class="slider" @click=${(ev: Event) => ev.stopPropagation()}></span>
     </label>
     `, this.#shadow, {host: this});
     // clang-format on
-    /* eslint-enable rulesdir/inject_checkbox_styles */
+    /* eslint-enable rulesdir/inject-checkbox-styles */
   }
 }
 

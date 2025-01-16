@@ -16,16 +16,16 @@ export const enum PhysicalDirection {
   TOP_TO_BOTTOM = 'top-to-bottom',
 }
 
-type DirectionsDict = {
-  [key: string]: PhysicalDirection,
-};
+interface DirectionsDict {
+  [key: string]: PhysicalDirection;
+}
 
-export type IconInfo = {
-  iconName: string,
-  rotate: number,
-  scaleX: number,
-  scaleY: number,
-};
+export interface IconInfo {
+  iconName: string;
+  rotate: number;
+  scaleX: number;
+  scaleY: number;
+}
 
 type ComputedStyles = Map<string, string>;
 
@@ -104,7 +104,7 @@ export function rotateFlexDirectionIcon(direction: PhysicalDirection): IconInfo 
 
   return {
     iconName: 'flex-direction',
-    rotate: rotate,
+    rotate,
     scaleX: flipX ? -1 : 1,
     scaleY: flipY ? -1 : 1,
   };

@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 import * as i18n from '../../core/i18n/i18n.js';
+import type * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 
-import {type MarkdownIssueDescription} from './MarkdownIssueDescription.js';
-import {Issue, IssueKind, IssueCategory} from './Issue.js';
-import type * as SDK from '../../core/sdk/sdk.js';
+import {Issue, IssueCategory, IssueKind} from './Issue.js';
+import type {MarkdownIssueDescription} from './MarkdownIssueDescription.js';
 
 const UIStrings = {
   /**
@@ -29,7 +29,7 @@ export class SharedArrayBufferIssue extends Issue {
   }
 
   getCategory(): IssueCategory {
-    return IssueCategory.Other;
+    return IssueCategory.OTHER;
   }
 
   details(): Protocol.Audits.SharedArrayBufferIssueDetails {
@@ -52,9 +52,9 @@ export class SharedArrayBufferIssue extends Issue {
 
   getKind(): IssueKind {
     if (this.#issueDetails.isWarning) {
-      return IssueKind.BreakingChange;
+      return IssueKind.BREAKING_CHANGE;
     }
-    return IssueKind.PageError;
+    return IssueKind.PAGE_ERROR;
   }
 
   static fromInspectorIssue(issuesModel: SDK.IssuesModel.IssuesModel, inspectorIssue: Protocol.Audits.InspectorIssue):

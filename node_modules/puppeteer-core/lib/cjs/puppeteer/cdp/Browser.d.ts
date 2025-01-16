@@ -3,7 +3,6 @@
  * Copyright 2017 Google Inc.
  * SPDX-License-Identifier: Apache-2.0
  */
-/// <reference types="node" />
 import type { ChildProcess } from 'child_process';
 import type { DebugInfo } from '../api/Browser.js';
 import { Browser as BrowserBase, type BrowserCloseCallback, type BrowserContextOptions, type IsPageTargetCallback, type TargetFilterCallback } from '../api/Browser.js';
@@ -19,7 +18,7 @@ import { type TargetManager } from './TargetManager.js';
 export declare class CdpBrowser extends BrowserBase {
     #private;
     readonly protocol = "cdp";
-    static _create(product: 'firefox' | 'chrome' | undefined, connection: Connection, contextIds: string[], ignoreHTTPSErrors: boolean, defaultViewport?: Viewport | null, process?: ChildProcess, closeCallback?: BrowserCloseCallback, targetFilterCallback?: TargetFilterCallback, isPageTargetCallback?: IsPageTargetCallback, waitForInitiallyDiscoveredTargets?: boolean): Promise<CdpBrowser>;
+    static _create(product: 'firefox' | 'chrome' | undefined, connection: Connection, contextIds: string[], acceptInsecureCerts: boolean, defaultViewport?: Viewport | null, process?: ChildProcess, closeCallback?: BrowserCloseCallback, targetFilterCallback?: TargetFilterCallback, isPageTargetCallback?: IsPageTargetCallback, waitForInitiallyDiscoveredTargets?: boolean): Promise<CdpBrowser>;
     constructor(product: 'chrome' | 'firefox' | undefined, connection: Connection, contextIds: string[], defaultViewport?: Viewport | null, process?: ChildProcess, closeCallback?: BrowserCloseCallback, targetFilterCallback?: TargetFilterCallback, isPageTargetCallback?: IsPageTargetCallback, waitForInitiallyDiscoveredTargets?: boolean);
     _attach(): Promise<void>;
     _detach(): void;

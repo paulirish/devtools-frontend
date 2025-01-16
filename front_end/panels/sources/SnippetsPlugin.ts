@@ -31,8 +31,9 @@ export class SnippetsPlugin extends Plugin {
   }
 
   override rightToolbarItems(): UI.Toolbar.ToolbarItem[] {
-    const runSnippet = UI.Toolbar.Toolbar.createActionButtonForId('debugger.run-snippet');
+    const runSnippet = UI.Toolbar.Toolbar.createActionButton('debugger.run-snippet');
     runSnippet.setText(Host.Platform.isMac() ? i18nString(UIStrings.enter) : i18nString(UIStrings.ctrlenter));
+    runSnippet.setReducedFocusRing();
 
     return [runSnippet];
   }

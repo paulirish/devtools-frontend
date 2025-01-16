@@ -35,7 +35,7 @@ export class IssuesModel extends SDKModel<EventTypes> implements ProtocolProxyAp
   }
 
   issueAdded(issueAddedEvent: Protocol.Audits.IssueAddedEvent): void {
-    this.dispatchEventToListeners(Events.IssueAdded, {issuesModel: this, inspectorIssue: issueAddedEvent.issue});
+    this.dispatchEventToListeners(Events.ISSUE_ADDED, {issuesModel: this, inspectorIssue: issueAddedEvent.issue});
   }
 
   override dispose(): void {
@@ -52,7 +52,7 @@ export class IssuesModel extends SDKModel<EventTypes> implements ProtocolProxyAp
 }
 
 export const enum Events {
-  IssueAdded = 'IssueAdded',
+  ISSUE_ADDED = 'IssueAdded',
 }
 
 export interface IssueAddedEvent {
@@ -60,8 +60,8 @@ export interface IssueAddedEvent {
   inspectorIssue: Protocol.Audits.InspectorIssue;
 }
 
-export type EventTypes = {
-  [Events.IssueAdded]: IssueAddedEvent,
-};
+export interface EventTypes {
+  [Events.ISSUE_ADDED]: IssueAddedEvent;
+}
 
-SDKModel.register(IssuesModel, {capabilities: Capability.Audits, autostart: true});
+SDKModel.register(IssuesModel, {capabilities: Capability.AUDITS, autostart: true});

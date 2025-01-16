@@ -1,31 +1,9 @@
-// Copyright 2024 The Chromium Authors. All rights reserved.
+// Copyright 2025 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+/* eslint-disable @stylistic/quotes, @stylistic/quote-props */
 export const generatedProperties = [
- {
-  "longhands": [
-   "animation-duration",
-   "animation-timing-function",
-   "animation-delay",
-   "animation-iteration-count",
-   "animation-direction",
-   "animation-fill-mode",
-   "animation-play-state",
-   "animation-name",
-   "animation-timeline",
-   "animation-range-start",
-   "animation-range-end"
-  ],
-  "name": "-alternative-animation-with-timeline"
- },
- {
-  "longhands": [
-   "position-try-order",
-   "position-try-fallbacks"
-  ],
-  "name": "-alternative-position-try"
- },
  {
   "inherited": true,
   "name": "-webkit-border-horizontal-spacing"
@@ -121,6 +99,9 @@ export const generatedProperties = [
   "name": "-webkit-line-break"
  },
  {
+  "keywords": [
+   "none"
+  ],
   "name": "-webkit-line-clamp"
  },
  {
@@ -299,8 +280,6 @@ export const generatedProperties = [
  },
  {
   "longhands": [
-   "-alternative-animation-with-timeline",
-   "-alternative-position-try",
    "-webkit-border-horizontal-spacing",
    "-webkit-border-vertical-spacing",
    "-webkit-box-align",
@@ -311,14 +290,10 @@ export const generatedProperties = [
    "-webkit-box-orient",
    "-webkit-box-pack",
    "-webkit-box-reflect",
-   "-webkit-column-break-after",
-   "-webkit-column-break-before",
-   "-webkit-column-break-inside",
    "-webkit-font-smoothing",
    "-webkit-line-break",
    "-webkit-line-clamp",
    "-webkit-locale",
-   "-webkit-mask-box-image",
    "-webkit-mask-box-image-outset",
    "-webkit-mask-box-image-repeat",
    "-webkit-mask-box-image-slice",
@@ -335,7 +310,6 @@ export const generatedProperties = [
    "-webkit-text-fill-color",
    "-webkit-text-orientation",
    "-webkit-text-security",
-   "-webkit-text-stroke",
    "-webkit-text-stroke-color",
    "-webkit-text-stroke-width",
    "-webkit-user-drag",
@@ -348,7 +322,6 @@ export const generatedProperties = [
    "alignment-baseline",
    "anchor-name",
    "anchor-scope",
-   "animation",
    "animation-composition",
    "animation-delay",
    "animation-direction",
@@ -357,7 +330,6 @@ export const generatedProperties = [
    "animation-iteration-count",
    "animation-name",
    "animation-play-state",
-   "animation-range",
    "animation-range-end",
    "animation-range-start",
    "animation-timeline",
@@ -368,14 +340,12 @@ export const generatedProperties = [
    "aspect-ratio",
    "backdrop-filter",
    "backface-visibility",
-   "background",
    "background-attachment",
    "background-blend-mode",
    "background-clip",
    "background-color",
    "background-image",
    "background-origin",
-   "background-position",
    "background-position-x",
    "background-position-y",
    "background-repeat",
@@ -384,67 +354,44 @@ export const generatedProperties = [
    "baseline-shift",
    "baseline-source",
    "block-size",
-   "border",
-   "border-block",
-   "border-block-color",
-   "border-block-end",
    "border-block-end-color",
    "border-block-end-style",
    "border-block-end-width",
-   "border-block-start",
    "border-block-start-color",
    "border-block-start-style",
    "border-block-start-width",
-   "border-block-style",
-   "border-block-width",
-   "border-bottom",
    "border-bottom-color",
    "border-bottom-left-radius",
    "border-bottom-right-radius",
    "border-bottom-style",
    "border-bottom-width",
    "border-collapse",
-   "border-color",
    "border-end-end-radius",
    "border-end-start-radius",
-   "border-image",
    "border-image-outset",
    "border-image-repeat",
    "border-image-slice",
    "border-image-source",
    "border-image-width",
-   "border-inline",
-   "border-inline-color",
-   "border-inline-end",
    "border-inline-end-color",
    "border-inline-end-style",
    "border-inline-end-width",
-   "border-inline-start",
    "border-inline-start-color",
    "border-inline-start-style",
    "border-inline-start-width",
-   "border-inline-style",
-   "border-inline-width",
-   "border-left",
    "border-left-color",
    "border-left-style",
    "border-left-width",
-   "border-radius",
-   "border-right",
    "border-right-color",
    "border-right-style",
    "border-right-width",
-   "border-spacing",
    "border-start-end-radius",
    "border-start-start-radius",
-   "border-style",
-   "border-top",
    "border-top-color",
    "border-top-left-radius",
    "border-top-right-radius",
    "border-top-style",
    "border-top-width",
-   "border-width",
    "bottom",
    "box-decoration-break",
    "box-shadow",
@@ -454,6 +401,7 @@ export const generatedProperties = [
    "break-inside",
    "buffered-rendering",
    "caption-side",
+   "caret-animation",
    "caret-color",
    "clear",
    "clip",
@@ -467,20 +415,16 @@ export const generatedProperties = [
    "column-count",
    "column-fill",
    "column-gap",
-   "column-rule",
    "column-rule-color",
    "column-rule-style",
    "column-rule-width",
    "column-span",
    "column-width",
-   "columns",
    "contain",
    "contain-intrinsic-block-size",
    "contain-intrinsic-height",
    "contain-intrinsic-inline-size",
-   "contain-intrinsic-size",
    "contain-intrinsic-width",
-   "container",
    "container-name",
    "container-type",
    "content",
@@ -503,17 +447,14 @@ export const generatedProperties = [
    "fill-opacity",
    "fill-rule",
    "filter",
-   "flex",
    "flex-basis",
    "flex-direction",
-   "flex-flow",
    "flex-grow",
    "flex-shrink",
    "flex-wrap",
    "float",
    "flood-color",
    "flood-opacity",
-   "font",
    "font-display",
    "font-family",
    "font-feature-settings",
@@ -524,11 +465,9 @@ export const generatedProperties = [
    "font-size-adjust",
    "font-stretch",
    "font-style",
-   "font-synthesis",
    "font-synthesis-small-caps",
    "font-synthesis-style",
    "font-synthesis-weight",
-   "font-variant",
    "font-variant-alternates",
    "font-variant-caps",
    "font-variant-east-asian",
@@ -539,19 +478,13 @@ export const generatedProperties = [
    "font-variation-settings",
    "font-weight",
    "forced-color-adjust",
-   "gap",
-   "grid",
-   "grid-area",
    "grid-auto-columns",
    "grid-auto-flow",
    "grid-auto-rows",
-   "grid-column",
    "grid-column-end",
    "grid-column-start",
-   "grid-row",
    "grid-row-end",
    "grid-row-start",
-   "grid-template",
    "grid-template-areas",
    "grid-template-columns",
    "grid-template-rows",
@@ -565,14 +498,11 @@ export const generatedProperties = [
    "initial-letter",
    "initial-value",
    "inline-size",
-   "inset",
-   "inset-area",
-   "inset-block",
    "inset-block-end",
    "inset-block-start",
-   "inset-inline",
    "inset-inline-end",
    "inset-inline-start",
+   "interactivity",
    "interpolate-size",
    "isolation",
    "justify-content",
@@ -585,35 +515,35 @@ export const generatedProperties = [
    "line-clamp",
    "line-gap-override",
    "line-height",
-   "list-style",
    "list-style-image",
    "list-style-position",
    "list-style-type",
-   "margin",
-   "margin-block",
    "margin-block-end",
    "margin-block-start",
    "margin-bottom",
-   "margin-inline",
    "margin-inline-end",
    "margin-inline-start",
    "margin-left",
    "margin-right",
    "margin-top",
-   "marker",
    "marker-end",
    "marker-mid",
    "marker-start",
-   "mask",
    "mask-clip",
    "mask-composite",
    "mask-image",
    "mask-mode",
    "mask-origin",
-   "mask-position",
    "mask-repeat",
    "mask-size",
    "mask-type",
+   "masonry-auto-tracks",
+   "masonry-direction",
+   "masonry-fill",
+   "masonry-slack",
+   "masonry-template-tracks",
+   "masonry-track-end",
+   "masonry-track-start",
    "math-depth",
    "math-shift",
    "math-style",
@@ -631,7 +561,6 @@ export const generatedProperties = [
    "object-fit",
    "object-position",
    "object-view-box",
-   "offset",
    "offset-anchor",
    "offset-distance",
    "offset-path",
@@ -641,12 +570,10 @@ export const generatedProperties = [
    "order",
    "origin-trial-test-property",
    "orphans",
-   "outline",
    "outline-color",
    "outline-offset",
    "outline-style",
    "outline-width",
-   "overflow",
    "overflow-anchor",
    "overflow-block",
    "overflow-clip-margin",
@@ -656,43 +583,31 @@ export const generatedProperties = [
    "overflow-y",
    "overlay",
    "override-colors",
-   "overscroll-behavior",
    "overscroll-behavior-block",
    "overscroll-behavior-inline",
    "overscroll-behavior-x",
    "overscroll-behavior-y",
    "pad",
-   "padding",
-   "padding-block",
    "padding-block-end",
    "padding-block-start",
    "padding-bottom",
-   "padding-inline",
    "padding-inline-end",
    "padding-inline-start",
    "padding-left",
    "padding-right",
    "padding-top",
    "page",
-   "page-break-after",
-   "page-break-before",
-   "page-break-inside",
    "page-orientation",
    "paint-order",
    "perspective",
    "perspective-origin",
-   "place-content",
-   "place-items",
-   "place-self",
    "pointer-events",
    "popover-hide-delay",
    "popover-show-delay",
    "position",
    "position-anchor",
    "position-area",
-   "position-try",
    "position-try-fallbacks",
-   "position-try-options",
    "position-try-order",
    "position-visibility",
    "prefix",
@@ -710,24 +625,19 @@ export const generatedProperties = [
    "ry",
    "scale",
    "scroll-behavior",
-   "scroll-margin",
-   "scroll-margin-block",
+   "scroll-initial-target",
    "scroll-margin-block-end",
    "scroll-margin-block-start",
    "scroll-margin-bottom",
-   "scroll-margin-inline",
    "scroll-margin-inline-end",
    "scroll-margin-inline-start",
    "scroll-margin-left",
    "scroll-margin-right",
    "scroll-margin-top",
    "scroll-marker-group",
-   "scroll-padding",
-   "scroll-padding-block",
    "scroll-padding-block-end",
    "scroll-padding-block-start",
    "scroll-padding-bottom",
-   "scroll-padding-inline",
    "scroll-padding-inline-end",
    "scroll-padding-inline-start",
    "scroll-padding-left",
@@ -736,17 +646,10 @@ export const generatedProperties = [
    "scroll-snap-align",
    "scroll-snap-stop",
    "scroll-snap-type",
-   "scroll-start",
    "scroll-start-block",
    "scroll-start-inline",
-   "scroll-start-target",
-   "scroll-start-target-block",
-   "scroll-start-target-inline",
-   "scroll-start-target-x",
-   "scroll-start-target-y",
    "scroll-start-x",
    "scroll-start-y",
-   "scroll-timeline",
    "scroll-timeline-axis",
    "scroll-timeline-name",
    "scrollbar-color",
@@ -784,13 +687,11 @@ export const generatedProperties = [
    "text-box-edge",
    "text-box-trim",
    "text-combine-upright",
-   "text-decoration",
    "text-decoration-color",
    "text-decoration-line",
    "text-decoration-skip-ink",
    "text-decoration-style",
    "text-decoration-thickness",
-   "text-emphasis",
    "text-emphasis-color",
    "text-emphasis-position",
    "text-emphasis-style",
@@ -800,12 +701,12 @@ export const generatedProperties = [
    "text-rendering",
    "text-shadow",
    "text-size-adjust",
-   "text-spacing",
    "text-spacing-trim",
    "text-transform",
    "text-underline-offset",
    "text-underline-position",
-   "text-wrap",
+   "text-wrap-mode",
+   "text-wrap-style",
    "timeline-scope",
    "top",
    "touch-action",
@@ -813,7 +714,6 @@ export const generatedProperties = [
    "transform-box",
    "transform-origin",
    "transform-style",
-   "transition",
    "transition-behavior",
    "transition-delay",
    "transition-duration",
@@ -825,15 +725,14 @@ export const generatedProperties = [
    "user-select",
    "vector-effect",
    "vertical-align",
-   "view-timeline",
    "view-timeline-axis",
    "view-timeline-inset",
    "view-timeline-name",
+   "view-transition-capture-mode",
    "view-transition-class",
    "view-transition-group",
    "view-transition-name",
    "visibility",
-   "white-space",
    "white-space-collapse",
    "widows",
    "width",
@@ -870,7 +769,10 @@ export const generatedProperties = [
    "animation-direction",
    "animation-fill-mode",
    "animation-play-state",
-   "animation-name"
+   "animation-name",
+   "animation-timeline",
+   "animation-range-start",
+   "animation-range-end"
   ],
   "name": "animation"
  },
@@ -1614,6 +1516,14 @@ export const generatedProperties = [
    "bottom"
   ],
   "name": "caption-side"
+ },
+ {
+  "inherited": true,
+  "keywords": [
+   "auto",
+   "manual"
+  ],
+  "name": "caret-animation"
  },
  {
   "inherited": true,
@@ -2563,26 +2473,6 @@ export const generatedProperties = [
   "name": "inset"
  },
  {
-  "keywords": [
-   "none",
-   "top",
-   "bottom",
-   "center",
-   "left",
-   "right",
-   "x-start",
-   "x-end",
-   "y-start",
-   "y-end",
-   "start",
-   "end",
-   "self-start",
-   "self-end",
-   "all"
-  ],
-  "name": "inset-area"
- },
- {
   "longhands": [
    "inset-block-start",
    "inset-block-end"
@@ -2607,6 +2497,14 @@ export const generatedProperties = [
  },
  {
   "name": "inset-inline-start"
+ },
+ {
+  "inherited": true,
+  "keywords": [
+   "auto",
+   "inert"
+  ],
+  "name": "interactivity"
  },
  {
   "inherited": true,
@@ -2865,6 +2763,65 @@ export const generatedProperties = [
    "alpha"
   ],
   "name": "mask-type"
+ },
+ {
+  "keywords": [
+   "auto",
+   "min-content",
+   "max-content"
+  ],
+  "name": "masonry-auto-tracks"
+ },
+ {
+  "keywords": [
+   "row",
+   "row-reverse",
+   "column",
+   "column-reverse"
+  ],
+  "name": "masonry-direction"
+ },
+ {
+  "keywords": [
+   "normal",
+   "reverse"
+  ],
+  "name": "masonry-fill"
+ },
+ {
+  "longhands": [
+   "masonry-direction",
+   "masonry-fill"
+  ],
+  "name": "masonry-flow"
+ },
+ {
+  "keywords": [
+   "normal"
+  ],
+  "name": "masonry-slack"
+ },
+ {
+  "name": "masonry-template-tracks"
+ },
+ {
+  "longhands": [
+   "masonry-track-start",
+   "masonry-track-end"
+  ],
+  "name": "masonry-track"
+ },
+ {
+  "keywords": [
+   "auto"
+  ],
+  "name": "masonry-track-end"
+ },
+ {
+  "keywords": [
+   "auto"
+  ],
+  "name": "masonry-track-start"
  },
  {
   "inherited": true,
@@ -3344,7 +3301,7 @@ export const generatedProperties = [
  {
   "longhands": [
    "position-try-order",
-   "position-try-options"
+   "position-try-fallbacks"
   ],
   "name": "position-try"
  },
@@ -3356,9 +3313,6 @@ export const generatedProperties = [
    "flip-start"
   ],
   "name": "position-try-fallbacks"
- },
- {
-  "name": "position-try-options"
  },
  {
   "keywords": [
@@ -3471,6 +3425,13 @@ export const generatedProperties = [
    "smooth"
   ],
   "name": "scroll-behavior"
+ },
+ {
+  "keywords": [
+   "none",
+   "nearest"
+  ],
+  "name": "scroll-initial-target"
  },
  {
   "longhands": [
@@ -3639,33 +3600,6 @@ export const generatedProperties = [
  },
  {
   "name": "scroll-start-inline"
- },
- {
-  "longhands": [
-   "scroll-start-target-block",
-   "scroll-start-target-inline"
-  ],
-  "name": "scroll-start-target"
- },
- {
-  "name": "scroll-start-target-block"
- },
- {
-  "name": "scroll-start-target-inline"
- },
- {
-  "keywords": [
-   "none",
-   "auto"
-  ],
-  "name": "scroll-start-target-x"
- },
- {
-  "keywords": [
-   "none",
-   "auto"
-  ],
-  "name": "scroll-start-target-y"
  },
  {
   "name": "scroll-start-x"
@@ -3883,6 +3817,13 @@ export const generatedProperties = [
   "name": "text-autospace"
  },
  {
+  "longhands": [
+   "text-box-trim",
+   "text-box-edge"
+  ],
+  "name": "text-box"
+ },
+ {
   "inherited": true,
   "name": "text-box-edge"
  },
@@ -4073,13 +4014,29 @@ export const generatedProperties = [
  },
  {
   "inherited": true,
-  "keywords": [
-   "wrap",
-   "nowrap",
-   "balance",
-   "pretty"
+  "longhands": [
+   "text-wrap-mode",
+   "text-wrap-style"
   ],
   "name": "text-wrap"
+ },
+ {
+  "inherited": true,
+  "keywords": [
+   "wrap",
+   "nowrap"
+  ],
+  "name": "text-wrap-mode"
+ },
+ {
+  "inherited": true,
+  "keywords": [
+   "auto",
+   "balance",
+   "pretty",
+   "stable"
+  ],
+  "name": "text-wrap-style"
  },
  {
   "name": "timeline-scope"
@@ -4244,6 +4201,13 @@ export const generatedProperties = [
  },
  {
   "keywords": [
+   "flat",
+   "layered"
+  ],
+  "name": "view-transition-capture-mode"
+ },
+ {
+  "keywords": [
    "none"
   ],
   "name": "view-transition-class"
@@ -4258,7 +4222,8 @@ export const generatedProperties = [
  },
  {
   "keywords": [
-   "none"
+   "none",
+   "auto"
   ],
   "name": "view-transition-name"
  },
@@ -4275,7 +4240,7 @@ export const generatedProperties = [
   "inherited": true,
   "longhands": [
    "white-space-collapse",
-   "text-wrap"
+   "text-wrap-mode"
   ],
   "name": "white-space"
  },
@@ -4397,6 +4362,11 @@ export const generatedPropertyValues = {
    "strict",
    "after-white-space",
    "anywhere"
+  ]
+ },
+ "-webkit-line-clamp": {
+  "values": [
+   "none"
   ]
  },
  "-webkit-print-color-adjust": {
@@ -4830,6 +4800,12 @@ export const generatedPropertyValues = {
   "values": [
    "top",
    "bottom"
+  ]
+ },
+ "caret-animation": {
+  "values": [
+   "auto",
+   "manual"
   ]
  },
  "caret-color": {
@@ -5453,23 +5429,10 @@ export const generatedPropertyValues = {
    "auto"
   ]
  },
- "inset-area": {
+ "interactivity": {
   "values": [
-   "none",
-   "top",
-   "bottom",
-   "center",
-   "left",
-   "right",
-   "x-start",
-   "x-end",
-   "y-start",
-   "y-end",
-   "start",
-   "end",
-   "self-start",
-   "self-end",
-   "all"
+   "auto",
+   "inert"
   ]
  },
  "interpolate-size": {
@@ -5600,6 +5563,42 @@ export const generatedPropertyValues = {
   "values": [
    "luminance",
    "alpha"
+  ]
+ },
+ "masonry-auto-tracks": {
+  "values": [
+   "auto",
+   "min-content",
+   "max-content"
+  ]
+ },
+ "masonry-direction": {
+  "values": [
+   "row",
+   "row-reverse",
+   "column",
+   "column-reverse"
+  ]
+ },
+ "masonry-fill": {
+  "values": [
+   "normal",
+   "reverse"
+  ]
+ },
+ "masonry-slack": {
+  "values": [
+   "normal"
+  ]
+ },
+ "masonry-track-end": {
+  "values": [
+   "auto"
+  ]
+ },
+ "masonry-track-start": {
+  "values": [
+   "auto"
   ]
  },
  "math-shift": {
@@ -5940,6 +5939,12 @@ export const generatedPropertyValues = {
    "smooth"
   ]
  },
+ "scroll-initial-target": {
+  "values": [
+   "none",
+   "nearest"
+  ]
+ },
  "scroll-marker-group": {
   "values": [
    "none",
@@ -6011,18 +6016,6 @@ export const generatedPropertyValues = {
    "both",
    "mandatory",
    "proximity"
-  ]
- },
- "scroll-start-target-x": {
-  "values": [
-   "none",
-   "auto"
-  ]
- },
- "scroll-start-target-y": {
-  "values": [
-   "none",
-   "auto"
   ]
  },
  "scrollbar-color": {
@@ -6258,12 +6251,18 @@ export const generatedPropertyValues = {
    "right"
   ]
  },
- "text-wrap": {
+ "text-wrap-mode": {
   "values": [
    "wrap",
-   "nowrap",
+   "nowrap"
+  ]
+ },
+ "text-wrap-style": {
+  "values": [
+   "auto",
    "balance",
-   "pretty"
+   "pretty",
+   "stable"
   ]
  },
  "top": {
@@ -6366,6 +6365,12 @@ export const generatedPropertyValues = {
    "middle"
   ]
  },
+ "view-transition-capture-mode": {
+  "values": [
+   "flat",
+   "layered"
+  ]
+ },
  "view-transition-class": {
   "values": [
    "none"
@@ -6380,7 +6385,8 @@ export const generatedPropertyValues = {
  },
  "view-transition-name": {
   "values": [
-   "none"
+   "none",
+   "auto"
   ]
  },
  "visibility": {
@@ -6488,10 +6494,6 @@ export const generatedAliasesFor = new Map([
  [
   "-webkit-align-self",
   "align-self"
- ],
- [
-  "-webkit-alternative-animation-with-timeline",
-  "-alternative-animation-with-timeline"
  ],
  [
   "-webkit-animation",

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import type * as Platform from '../../core/platform/platform.js';
+import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as Workspace from '../../models/workspace/workspace.js';
@@ -14,15 +14,17 @@ import * as Coverage from '../coverage/coverage.js';
 
 import * as Sources from './sources.js';
 
+const {urlString} = Platform.DevToolsPath;
+
 describeWithMockConnection('CoveragePlugin', () => {
   let target: SDK.Target.Target;
   let uiSourceCode: Workspace.UISourceCode.UISourceCode;
   let model: Coverage.CoverageModel.CoverageModel;
   let coverageInfo: Coverage.CoverageModel.URLCoverageInfo;
-  const URL = 'test.js' as Platform.DevToolsPath.UrlString;
+  const URL = urlString`test.js`;
 
   beforeEach(() => {
-    const tabTarget = createTarget({type: SDK.Target.Type.Tab});
+    const tabTarget = createTarget({type: SDK.Target.Type.TAB});
     createTarget({parentTarget: tabTarget, subtype: 'prerender'});
     target = createTarget({parentTarget: tabTarget});
     const workspace = Workspace.Workspace.WorkspaceImpl.instance();

@@ -23,6 +23,11 @@ const UIStrings = {
    *@example {example.com} PH1
    */
   nodejsS: 'Node.js: {PH1}',
+  /**
+   *@description Text in DevTools window title when debugging a Node.js app
+   *@example {example.com} PH1
+   */
+  NodejsTitleS: 'DevTools - Node.js: {PH1}',
 };
 const str_ = i18n.i18n.registerUIStrings('entrypoints/node_app/NodeMain.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -40,7 +45,7 @@ export class NodeMainImpl implements Common.Runnable.Runnable {
     Host.userMetrics.actionTaken(Host.UserMetrics.Action.ConnectToNodeJSFromFrontend);
     void SDK.Connections.initMainConnection(async () => {
       const target = SDK.TargetManager.TargetManager.instance().createTarget(
-          'main', i18nString(UIStrings.main), SDK.Target.Type.Browser, null);
+          'main', i18nString(UIStrings.main), SDK.Target.Type.BROWSER, null);
       target.setInspectedURL('Node.js' as Platform.DevToolsPath.UrlString);
     }, Components.TargetDetachedDialog.TargetDetachedDialog.webSocketConnectionLost);
   }
@@ -75,7 +80,7 @@ export class NodeChildTargetManager extends SDK.SDKModel.SDKModel<void> implemen
       const parts = address.split(':');
       const port = parseInt(parts[1], 10);
       if (parts[0] && port) {
-        locations.push({host: parts[0], port: port});
+        locations.push({host: parts[0], port});
       }
     }
     void this.#targetAgent.invoke_setRemoteLocations({locations});
@@ -104,10 +109,11 @@ export class NodeChildTargetManager extends SDK.SDKModel.SDKModel<void> implemen
 
   attachedToTarget({sessionId, targetInfo}: Protocol.Target.AttachedToTargetEvent): void {
     const name = i18nString(UIStrings.nodejsS, {PH1: targetInfo.url});
+    document.title = i18nString(UIStrings.NodejsTitleS, {PH1: targetInfo.url});
     const connection = new NodeConnection(this.#targetAgent, sessionId);
     this.#childConnections.set(sessionId, connection);
     const target = this.#targetManager.createTarget(
-        targetInfo.targetId, name, SDK.Target.Type.Node, this.#parentTarget, undefined, undefined, connection);
+        targetInfo.targetId, name, SDK.Target.Type.NODE, this.#parentTarget, undefined, undefined, connection);
     this.#childTargets.set(sessionId, target);
     void target.runtimeAgent().invoke_runIfWaitingForDebugger();
   }
@@ -167,4 +173,4 @@ export class NodeConnection implements ProtocolClient.InspectorBackend.Connectio
   }
 }
 
-SDK.SDKModel.SDKModel.register(NodeChildTargetManager, {capabilities: SDK.Target.Capability.Target, autostart: true});
+SDK.SDKModel.SDKModel.register(NodeChildTargetManager, {capabilities: SDK.Target.Capability.TARGET, autostart: true});

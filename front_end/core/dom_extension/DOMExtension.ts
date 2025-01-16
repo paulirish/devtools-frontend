@@ -43,7 +43,7 @@ Node.prototype.traverseNextTextNode = function(stayWithin?: Node): Node|null {
   if (!node) {
     return null;
   }
-  const nonTextTags = {'STYLE': 1, 'SCRIPT': 1, '#document-fragment': 1};
+  const nonTextTags = {STYLE: 1, SCRIPT: 1, '#document-fragment': 1};
   while (node && (node.nodeType !== Node.TEXT_NODE || nonTextTags[node.parentNode ? node.parentNode.nodeName : ''])) {
     node = node.traverseNextNode(stayWithin);
   }
@@ -175,16 +175,17 @@ self.createDocumentFragment = function(): DocumentFragment {
   return document.createDocumentFragment();
 };
 
-Element.prototype.createChild = function(elementName: string, className?: string, customElementType?: string): Element {
-  const element = document.createElement(elementName, {is: customElementType});
+DocumentFragment.prototype.createChild = Element.prototype.createChild = function(
+    elementName: string,
+    className?: string,
+    ): Element {
+  const element = document.createElement(elementName);
   if (className) {
     element.className = className;
   }
   this.appendChild(element);
   return element;
 };
-
-DocumentFragment.prototype.createChild = Element.prototype.createChild;
 
 self.AnchorBox = class {
   constructor(x?: number, y?: number, width?: number, height?: number) {
@@ -252,7 +253,7 @@ Node.prototype.deepTextContent = function(): string {
 Node.prototype.childTextNodes = function(): Node[] {
   let node = this.traverseNextTextNode(this);
   const result = [];
-  const nonTextTags = {'STYLE': 1, 'SCRIPT': 1, '#document-fragment': 1};
+  const nonTextTags = {STYLE: 1, SCRIPT: 1, '#document-fragment': 1};
   while (node) {
     if (!nonTextTags[node.parentNode ? node.parentNode.nodeName : '']) {
       result.push(node);

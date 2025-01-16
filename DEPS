@@ -12,27 +12,27 @@ vars = {
   'build_with_chromium': False,
 
   'build_url': 'https://chromium.googlesource.com/chromium/src/build.git',
-  'build_revision': '7af600b120cb3b9f61b6d32c5fffac1aa36b7645',
+  'build_revision': 'bcf4ce6326c1bfa8adca8a210ad67c89ca4efd37',
 
   'buildtools_url': 'https://chromium.googlesource.com/chromium/src/buildtools.git',
-  'buildtools_revision': 'd32a89311cf6358a0e6e67a96b4a2bc90d185b18',
+  'buildtools_revision': 'a660247d3c14a172b74b8e832ba1066b30183c97',
 
   'depot_tools_url': 'https://chromium.googlesource.com/chromium/tools/depot_tools.git',
-  'depot_tools_revision': '39ca85acf5430c7d5f18622453cf3018584cee76',
+  'depot_tools_revision': 'c9552ffad54987afe24dfcc3767203375d2d2394',
 
   'inspector_protocol_url': 'https://chromium.googlesource.com/deps/inspector_protocol',
-  'inspector_protocol_revision': '2915acabcf62efd7257c57bb8a443a7c389c65cb',
+  'inspector_protocol_revision': '69d69ddf3aa698b171886551a4a672c5af1ad902',
 
   # Keeping track of the last time we rollerd the browser protocol files.
-  'chromium_browser_protocol_revision' : 'b4545b3cf526bfc1a532f7b5109458ab9dd2bd5e',
+  'chromium_browser_protocol_revision' : '63772cb6f24ec8e62cd1e0088fa087699bea258f',
 
   'clang_format_url': 'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/clang/tools/clang-format.git',
-  'clang_format_revision': '3c0acd2d4e73dd911309d9e970ba09d58bf23a62',
+  'clang_format_revision': '37f6e68a107df43b7d7e044fd36a13cbae3413f2',
 
   'emscripten_tag': 'ade9d780ff17c88d81aa13860361743e3c1e1396',
 
   # GN CIPD package version.
-  'gn_version': 'git_revision:54f5b539df8c4e460b18c62a11132d77b5601136',
+  'gn_version': 'git_revision:ed1abc107815210dc66ec439542bee2f6cbabc00',
 
   'cmake_version': 'version:2@3.21.3',
 
@@ -44,12 +44,12 @@ vars = {
 
   # ninja CIPD package version.
   # https://chrome-infra-packages.appspot.com/p/infra/3pp/tools/ninja
-  'ninja_version': 'version:2@1.12.1.chromium.4',
+  'ninja_version': 'version:3@1.12.1.chromium.4',
 
   # Chrome version used for tests. It should be regularly updated to
   # match the Canary version listed here:
   # https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json
-  'chrome': '129.0.6658.0',
+  'chrome': '134.0.6960.0',
 
   # 'magic' text to tell depot_tools that git submodules should be accepted but
   # but parity with DEPS file is expected.
@@ -131,7 +131,7 @@ deps = {
     'packages': [
       {
         'package': 'infra/3pp/tools/esbuild/${{platform}}',
-        'version': 'version:2@0.14.13.chromium.2',
+        'version': 'version:3@0.24.0.chromium.2',
       }
     ],
     'dep_type': 'cipd',
@@ -167,10 +167,10 @@ deps = {
     'bucket': 'chromium-nodejs',
     'objects': [
         {
-            'object_name': '20.11.0/f9a337cfa0e2b92d3e5c671c26b454bd8e99769e',
-            'sha256sum': '0ba9cc91698c1f833a1fdc1fe0cb392d825ad484c71b0d84388ac80bfd3d6079',
-            'size_bytes': 43716484,
-            'generation': 1711567575687220,
+            'object_name': 'fa98c6432de572206bc5519f85e9c96bd518b039',
+            'sha256sum': 'fb563633b5bfe2d4307075c54c6bb54664a3b5ec6bc811f5b15742720549007a',
+            'size_bytes': 50288755,
+            'generation': 1730835522207929,
             'output_file': 'node-linux-x64.tar.gz',
         },
     ],
@@ -181,10 +181,10 @@ deps = {
       'bucket': 'chromium-nodejs',
       'objects': [
           {
-              'object_name': '20.11.0/e3c0fd53caae857309815f3f8de7c2dce49d7bca',
-              'sha256sum': '20affacca2480c368b75a1d91ec1a2720604b325207ef0cf39cfef3c235dad19',
-              'size_bytes': 40649378,
-              'generation': 1711567481181885,
+              'object_name': '4c8952a65a1ce7a2e4cff6db68f9b7454c46349f',
+              'sha256sum': 'fadb4530fbe6e35ed298848c66102a0aa7d92974789e6222c4eadee26a381e7e',
+              'size_bytes': 45672893,
+              'generation': 1730835514382259,
               'output_file': 'node-darwin-x64.tar.gz',
           },
       ],
@@ -195,10 +195,10 @@ deps = {
       'bucket': 'chromium-nodejs',
       'objects': [
           {
-              'object_name': '20.11.0/5b5681e12a21cda986410f69e03e6220a21dd4d2',
-              'sha256sum': 'cecb99fbb369a9090dddc27e228b66335cd72555b44fa8839ef78e56c51682c5',
-              'size_bytes': 38989321,
-              'generation': 1711567557161126,
+              'object_name': '0886aa6a146cb5c213cb09b59ed1075982e4cb57',
+              'sha256sum': 'd39e2d44d58bb89740b9aca1073959fc92edbdbbe810a5e48448e331cf72c196',
+              'size_bytes': 44929037,
+              'generation': 1730835518292126,
               'output_file': 'node-darwin-arm64.tar.gz',
           },
       ],
@@ -209,10 +209,10 @@ deps = {
       'bucket': 'chromium-nodejs',
       'objects': [
           {
-              'object_name': '20.11.0/2cb36010af52bc5e2a2d1e3675c10361c80d8f8d',
-              'sha256sum': '5da5e201155bb3ea99134b404180adebcfa696b0dbc09571d01a09ca5489f53e',
-              'size_bytes': 70017688,
-              'generation': 1705443750949255,
+              'object_name': '907d7e104e7389dc74cec7d32527c1db704b7f96',
+              'sha256sum': '7447c4ece014aa41fb2ff866c993c708e5a8213a00913cc2ac5049ea3ffc230d',
+              'size_bytes': 80511640,
+              'generation': 1730835526374028,
               'output_file': 'node.exe',
           },
       ],
@@ -227,7 +227,7 @@ hooks = [
     'pattern': '.',
     'condition': 'build_with_chromium == False',
     'action': [
-        'python3',
+        'vpython3',
         'third_party/depot_tools/update_depot_tools_toggle.py',
         '--disable',
     ],
@@ -238,7 +238,7 @@ hooks = [
     'name': 'download_chrome_win',
     'pattern': '.',
     'condition': 'host_os == "win" and build_with_chromium == False',
-    'action': [ 'python3',
+    'action': [ 'vpython3',
                 'scripts/deps/download_chrome.py',
                 '--url=https://storage.googleapis.com/chrome-for-testing-public/' + Var('chrome') + '/win64/chrome-win64.zip',
                 '--target=third_party/chrome',
@@ -252,7 +252,7 @@ hooks = [
     'name': 'download_chrome_mac',
     'pattern': '.',
     'condition': 'host_os == "mac" and build_with_chromium == False and host_cpu != "arm64"',
-    'action': [ 'python3',
+    'action': [ 'vpython3',
                 'scripts/deps/download_chrome.py',
                 '--url=https://storage.googleapis.com/chrome-for-testing-public/' + Var('chrome') + '/mac-x64/chrome-mac-x64.zip',
                 '--target=third_party/chrome',
@@ -266,7 +266,7 @@ hooks = [
     'name': 'download_chrome_mac',
     'pattern': '.',
     'condition': 'host_os == "mac" and build_with_chromium == False and host_cpu == "arm64"',
-    'action': [ 'python3',
+    'action': [ 'vpython3',
                 'scripts/deps/download_chrome.py',
                 '--url=https://storage.googleapis.com/chrome-for-testing-public/' + Var('chrome') + '/mac-arm64/chrome-mac-arm64.zip',
                 '--target=third_party/chrome',
@@ -280,7 +280,7 @@ hooks = [
     'name': 'download_chrome_linux',
     'pattern': '.',
     'condition': 'host_os == "linux" and build_with_chromium == False',
-    'action': [ 'python3',
+    'action': [ 'vpython3',
                 'scripts/deps/download_chrome.py',
                 '--url=https://storage.googleapis.com/chrome-for-testing-public/' + Var('chrome') + '/linux64/chrome-linux64.zip',
                 '--target=third_party/chrome',
@@ -296,20 +296,20 @@ hooks = [
     'name': 'lastchange',
     'condition': 'build_with_chromium == False',
     'pattern': '.',
-    'action': ['python3', 'build/util/lastchange.py',
+    'action': ['vpython3', 'build/util/lastchange.py',
                '-o', 'build/util/LASTCHANGE'],
   },
   {
     'name': 'emscripten',
     'pattern': '.',
     'condition': 'build_with_chromium == False',
-    'action': ['python3', 'scripts/deps/download_emscripten.py', Var('emscripten_tag'), 'third_party/emscripten-releases'],
+    'action': ['vpython3', 'scripts/deps/download_emscripten.py', Var('emscripten_tag'), 'third_party/emscripten-releases'],
   },
   {
     'name': 'VS Code settings',
     'pattern': '.',
     'condition': 'build_with_chromium == False',
-    'action': ['python3', 'third_party/node/node.py', '--output', 'scripts/deps/sync-vscode-settings.js']
+    'action': ['vpython3', 'third_party/node/node.py', '--output', 'scripts/deps/sync-vscode-settings.js']
   },
 ]
 

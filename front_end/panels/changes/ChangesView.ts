@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import '../../ui/legacy/legacy.js';
+
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -45,6 +47,7 @@ const UIStrings = {
 };
 const str_ = i18n.i18n.registerUIStrings('panels/changes/ChangesView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+const i18nLazyString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined, str_);
 
 function diffStats(diff: Diff.Diff.DiffArray): string {
   const insertions =
@@ -77,12 +80,13 @@ export class ChangesView extends UI.Widget.VBox {
     splitWidget.setMainWidget(mainWidget);
     splitWidget.show(this.contentElement);
 
-    this.emptyWidget = new UI.EmptyWidget.EmptyWidget('');
+    this.emptyWidget = new UI.EmptyWidget.EmptyWidget('', '');
     this.emptyWidget.show(mainWidget.element);
 
     this.workspaceDiff = WorkspaceDiff.WorkspaceDiff.workspaceDiff();
     this.changesSidebar = new ChangesSidebar(this.workspaceDiff);
-    this.changesSidebar.addEventListener(Events.SelectedUISourceCodeChanged, this.selectedUISourceCodeChanged, this);
+    this.changesSidebar.addEventListener(
+        Events.SELECTED_UI_SOURCE_CODE_CHANGED, this.selectedUISourceCodeChanged, this);
     splitWidget.setSidebarWidget(this.changesSidebar);
 
     this.selectedUISourceCode = null;
@@ -93,18 +97,15 @@ export class ChangesView extends UI.Widget.VBox {
 
     this.diffView = this.diffContainer.appendChild(new DiffView.DiffView.DiffView());
 
-    this.toolbar = new UI.Toolbar.Toolbar('changes-toolbar', mainWidget.element);
-    this.toolbar.element.setAttribute('jslog', `${VisualLogging.toolbar()}`);
-    this.toolbar.appendToolbarItem(UI.Toolbar.Toolbar.createActionButtonForId('changes.revert'));
+    this.toolbar = mainWidget.element.createChild('devtools-toolbar', 'changes-toolbar');
+    this.toolbar.setAttribute('jslog', `${VisualLogging.toolbar()}`);
+    this.toolbar.appendToolbarItem(UI.Toolbar.Toolbar.createActionButton('changes.revert'));
     this.diffStats = new UI.Toolbar.ToolbarText('');
     this.toolbar.appendToolbarItem(this.diffStats);
 
     this.toolbar.appendToolbarItem(new UI.Toolbar.ToolbarSeparator());
-    this.toolbar.appendToolbarItem(UI.Toolbar.Toolbar.createActionButtonForId('changes.copy', {
-      showLabel: true,
-      label() {
-        return i18nString(UIStrings.copy);
-      },
+    this.toolbar.appendToolbarItem(UI.Toolbar.Toolbar.createActionButton('changes.copy', {
+      label: i18nLazyString(UIStrings.copy),
     }));
 
     this.hideDiff(i18nString(UIStrings.noChanges));
@@ -225,7 +226,7 @@ export class ChangesView extends UI.Widget.VBox {
     this.diffStats.setText('');
     this.toolbar.setEnabled(false);
     this.diffContainer.style.display = 'none';
-    this.emptyWidget.text = message;
+    this.emptyWidget.header = message;
     this.emptyWidget.showWidget();
   }
 

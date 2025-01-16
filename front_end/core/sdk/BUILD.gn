@@ -4,11 +4,12 @@
 
 import("../../../scripts/build/ninja/devtools_entrypoint.gni")
 import("../../../scripts/build/ninja/devtools_module.gni")
-import("../../../third_party/typescript/typescript.gni")
+import("../../../scripts/build/typescript/typescript.gni")
 
 devtools_module("sdk") {
   sources = [
     "AccessibilityModel.ts",
+    "AnimationModel.ts",
     "AutofillModel.ts",
     "CPUProfileDataModel.ts",
     "CPUProfilerModel.ts",
@@ -41,6 +42,7 @@ devtools_module("sdk") {
     "DOMModel.ts",
     "DebuggerModel.ts",
     "EmulationModel.ts",
+    "EnhancedTracesParser.ts",
     "EventBreakpointsModel.ts",
     "FrameAssociated.ts",
     "FrameManager.ts",
@@ -62,6 +64,8 @@ devtools_module("sdk") {
     "PerformanceMetricsModel.ts",
     "PreloadingModel.ts",
     "ProfileTreeModel.ts",
+    "RehydratingConnection.ts",
+    "RehydratingObject.ts",
     "RemoteObject.ts",
     "Resource.ts",
     "ResourceTreeModel.ts",
@@ -77,6 +81,7 @@ devtools_module("sdk") {
     "ServiceWorkerManager.ts",
     "SourceMap.ts",
     "SourceMapManager.ts",
+    "SourceMapScopeChainEntry.ts",
     "SourceMapScopes.ts",
     "SourceMapScopesInfo.ts",
     "StorageBucketsModel.ts",
@@ -129,6 +134,7 @@ ts_library("unittests") {
 
   sources = [
     "AccessibilityModel.test.ts",
+    "AnimationModel.test.ts",
     "AutofillModel.test.ts",
     "CPUThrottlingManager.test.ts",
     "CSSContainerQuery.test.ts",
@@ -146,6 +152,7 @@ ts_library("unittests") {
     "DOMModel.test.ts",
     "DebuggerModel.test.ts",
     "EmulationModel.test.ts",
+    "EnhancedTracesParser.test.ts",
     "FrameManager.test.ts",
     "NetworkManager.test.ts",
     "NetworkRequest.test.ts",
@@ -154,6 +161,7 @@ ts_library("unittests") {
     "OverlayPersistentHighlighter.test.ts",
     "PageResourceLoader.test.ts",
     "PreloadingModel.test.ts",
+    "RehydratingConnection.test.ts",
     "RemoteObject.test.ts",
     "ResourceTreeModel.test.ts",
     "RuntimeModel.test.ts",
@@ -164,6 +172,7 @@ ts_library("unittests") {
     "ServiceWorkerManager.test.ts",
     "SourceMap.test.ts",
     "SourceMapManager.test.ts",
+    "SourceMapScopeChainEntry.test.ts",
     "SourceMapScopes.test.ts",
     "SourceMapScopesInfo.test.ts",
     "StorageBucketsModel.test.ts",

@@ -5,9 +5,9 @@
 import {getBrowserAndPages} from '../../conductor/puppeteer-state.js';
 
 // Corresponds to the type in front_end/ui/visual_logging/Debugging.ts
-type TestImpressionLogEntry = {
-  impressions: string[],
-};
+interface TestImpressionLogEntry {
+  impressions: string[];
+}
 type TestLogEntry = TestImpressionLogEntry|{
   interaction: string,
 };
@@ -139,6 +139,17 @@ export function veImpressionForDrawerToolbar(options?: {
     veImpression('DropDown', 'more-tabs'),
     veImpression('Close'),
   ]);
+}
+
+// Prints all VE events that haven't been matched by expectVeEvents calls
+// Useful for writing new assertions.
+export async function dumpVeEvents(label: string) {
+  const {frontend} = getBrowserAndPages();
+  const events =
+      // @ts-ignore
+      await frontend.evaluate(async () => (await globalThis.getUnmatchedVeEvents()) as unknown as string[]);
+  // eslint-disable-next-line no-console
+  console.log(label + '\n', events);
 }
 
 // Verifies that VE events contains all the expected events in given order.

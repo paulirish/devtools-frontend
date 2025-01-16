@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import '../../ui/legacy/legacy.js';
+
 import type * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
@@ -9,7 +11,7 @@ import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
-// eslint-disable-next-line rulesdir/es_modules_import
+// eslint-disable-next-line rulesdir/es-modules-import
 import emptyWidgetStyles from '../../ui/legacy/emptyWidget.css.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
@@ -194,12 +196,12 @@ export class BackgroundServiceView extends UI.Widget.VBox {
       throw new Error('StorageKeyManager instance is missing');
     }
     this.storageKeyManager.addEventListener(
-        SDK.StorageKeyManager.Events.MainStorageKeyChanged, () => this.onStorageKeyChanged());
+        SDK.StorageKeyManager.Events.MAIN_STORAGE_KEY_CHANGED, () => this.onStorageKeyChanged());
 
     this.recordAction = UI.ActionRegistry.ActionRegistry.instance().getAction('background-service.toggle-recording');
 
-    this.toolbar = new UI.Toolbar.Toolbar('background-service-toolbar', this.contentElement);
-    this.toolbar.element.setAttribute('jslog', `${VisualLogging.toolbar()}`);
+    this.toolbar = this.contentElement.createChild('devtools-toolbar', 'background-service-toolbar');
+    this.toolbar.setAttribute('jslog', `${VisualLogging.toolbar()}`);
     void this.setupToolbar();
 
     /**
@@ -232,21 +234,21 @@ export class BackgroundServiceView extends UI.Widget.VBox {
    * Creates the toolbar UI element.
    */
   private async setupToolbar(): Promise<void> {
-    this.toolbar.makeWrappable(true);
+    this.toolbar.wrappable = true;
     this.recordButton = (UI.Toolbar.Toolbar.createActionButton(this.recordAction) as UI.Toolbar.ToolbarToggle);
     this.recordButton.toggleOnClick(false);
     this.toolbar.appendToolbarItem(this.recordButton);
 
     const clearButton =
         new UI.Toolbar.ToolbarButton(i18nString(UIStrings.clear), 'clear', undefined, 'background-service.clear');
-    clearButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, () => this.clearEvents());
+    clearButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, () => this.clearEvents());
     this.toolbar.appendToolbarItem(clearButton);
 
     this.toolbar.appendSeparator();
 
     this.saveButton = new UI.Toolbar.ToolbarButton(
         i18nString(UIStrings.saveEvents), 'download', undefined, 'background-service.save-events');
-    this.saveButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, _event => {
+    this.saveButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, _event => {
       void this.saveToFile();
     });
     this.saveButton.setEnabled(false);
@@ -376,7 +378,7 @@ export class BackgroundServiceView extends UI.Widget.VBox {
     dataGrid.setStriped(true);
 
     dataGrid.addEventListener(
-        DataGrid.DataGrid.Events.SelectedNode, event => this.showPreview((event.data as EventDataNode)));
+        DataGrid.DataGrid.Events.SELECTED_NODE, event => this.showPreview((event.data as EventDataNode)));
 
     return dataGrid;
   }

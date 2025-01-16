@@ -30,7 +30,7 @@
 
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
-import * as FormatterActions from '../../entrypoints/formatter_worker/FormatterActions.js';  // eslint-disable-line rulesdir/es_modules_import
+import * as FormatterActions from '../../entrypoints/formatter_worker/FormatterActions.js';  // eslint-disable-line rulesdir/es-modules-import
 import * as IssuesManager from '../../models/issues_manager/issues_manager.js';
 import * as Persistence from '../../models/persistence/persistence.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
@@ -44,7 +44,7 @@ import * as UI from '../../ui/legacy/legacy.js';
 import {CoveragePlugin} from './CoveragePlugin.js';
 import {CSSPlugin} from './CSSPlugin.js';
 import {DebuggerPlugin} from './DebuggerPlugin.js';
-import {type Plugin} from './Plugin.js';
+import type {Plugin} from './Plugin.js';
 import {MemoryProfilePlugin, PerformanceProfilePlugin} from './ProfilePlugin.js';
 import {ResourceOriginPlugin} from './ResourceOriginPlugin.js';
 import {SnippetsPlugin} from './SnippetsPlugin.js';
@@ -352,7 +352,7 @@ export class UISourceCodeFrame extends
       }
     }
 
-    this.dispatchEventToListeners(Events.ToolbarItemsChanged);
+    this.dispatchEventToListeners(Events.TOOLBAR_ITEMS_CHANGED);
   }
 
   private disposePlugins(): void {
@@ -484,7 +484,7 @@ export class UISourceCodeFrame extends
       return null;
     }
     const issues = anchorElement.classList.contains('cm-messageIcon-issue');
-    const messages = row.filter(msg => (msg.level() === Workspace.UISourceCode.Message.Level.Issue) === issues);
+    const messages = row.filter(msg => (msg.level() === Workspace.UISourceCode.Message.Level.ISSUE) === issues);
     if (!messages.length) {
       return null;
     }
@@ -530,13 +530,13 @@ export class UISourceCodeFrame extends
 }
 
 function getIconDataForLevel(level: Workspace.UISourceCode.Message.Level): IconButton.Icon.IconData {
-  if (level === Workspace.UISourceCode.Message.Level.Error) {
+  if (level === Workspace.UISourceCode.Message.Level.ERROR) {
     return {color: 'var(--icon-error)', width: '16px', height: '14px', iconName: 'cross-circle-filled'};
   }
-  if (level === Workspace.UISourceCode.Message.Level.Warning) {
+  if (level === Workspace.UISourceCode.Message.Level.WARNING) {
     return {color: 'var(--icon-warning)', width: '18px', height: '14px', iconName: 'warning-filled'};
   }
-  if (level === Workspace.UISourceCode.Message.Level.Issue) {
+  if (level === Workspace.UISourceCode.Message.Level.ISSUE) {
     return {color: 'var(--icon-warning)', width: '17px', height: '14px', iconName: 'issue-exclamation-filled'};
   }
   return {color: 'var(--icon-error)', width: '16px', height: '14px', iconName: 'cross-circle-filled'};
@@ -544,20 +544,20 @@ function getIconDataForLevel(level: Workspace.UISourceCode.Message.Level): IconB
 
 function getBubbleTypePerLevel(level: Workspace.UISourceCode.Message.Level): string {
   switch (level) {
-    case Workspace.UISourceCode.Message.Level.Error:
+    case Workspace.UISourceCode.Message.Level.ERROR:
       return 'error';
-    case Workspace.UISourceCode.Message.Level.Warning:
+    case Workspace.UISourceCode.Message.Level.WARNING:
       return 'warning';
-    case Workspace.UISourceCode.Message.Level.Issue:
+    case Workspace.UISourceCode.Message.Level.ISSUE:
       return 'warning';
   }
 }
 
 function messageLevelComparator(a: RowMessage, b: RowMessage): number {
   const messageLevelPriority = {
-    [Workspace.UISourceCode.Message.Level.Issue]: 2,
-    [Workspace.UISourceCode.Message.Level.Warning]: 3,
-    [Workspace.UISourceCode.Message.Level.Error]: 4,
+    [Workspace.UISourceCode.Message.Level.ISSUE]: 2,
+    [Workspace.UISourceCode.Message.Level.WARNING]: 3,
+    [Workspace.UISourceCode.Message.Level.ERROR]: 4,
   };
   return messageLevelPriority[a.level()] - messageLevelPriority[b.level()];
 }
@@ -574,12 +574,12 @@ function getIconDataForMessage(message: RowMessage): IconButton.Icon.IconData {
 }
 
 export const enum Events {
-  ToolbarItemsChanged = 'ToolbarItemsChanged',
+  TOOLBAR_ITEMS_CHANGED = 'ToolbarItemsChanged',
 }
 
-export type EventTypes = {
-  [Events.ToolbarItemsChanged]: void,
-};
+export interface EventTypes {
+  [Events.TOOLBAR_ITEMS_CHANGED]: void;
+}
 
 const pluginCompartment = new CodeMirror.Compartment();
 
@@ -696,17 +696,17 @@ class MessageWidget extends CodeMirror.WidgetType {
   toDOM(): HTMLElement {
     const wrap = document.createElement('span');
     wrap.classList.add('cm-messageIcon');
-    const nonIssues = this.messages.filter(msg => msg.level() !== Workspace.UISourceCode.Message.Level.Issue);
+    const nonIssues = this.messages.filter(msg => msg.level() !== Workspace.UISourceCode.Message.Level.ISSUE);
     if (nonIssues.length) {
       const maxIssue = nonIssues.sort(messageLevelComparator)[nonIssues.length - 1];
       const errorIcon = wrap.appendChild(new IconButton.Icon.Icon());
       errorIcon.data = getIconDataForLevel(maxIssue.level());
       errorIcon.classList.add('cm-messageIcon-error');
     }
-    const issue = this.messages.find(m => m.level() === Workspace.UISourceCode.Message.Level.Issue);
+    const issue = this.messages.find(m => m.level() === Workspace.UISourceCode.Message.Level.ISSUE);
     if (issue) {
       const issueIcon = wrap.appendChild(new IconButton.Icon.Icon());
-      issueIcon.data = getIconDataForLevel(Workspace.UISourceCode.Message.Level.Issue);
+      issueIcon.data = getIconDataForLevel(Workspace.UISourceCode.Message.Level.ISSUE);
       issueIcon.classList.add('cm-messageIcon-issue');
       issueIcon.addEventListener('click', () => (issue.clickHandler() || Math.min)());
     }
@@ -786,12 +786,9 @@ function renderMessage(message: RowMessage, count: number): HTMLElement {
     icon.classList.add('text-editor-row-message-icon');
     icon.addEventListener('click', () => (message.clickHandler() || Math.min)());
   } else {
-    const repeatCountElement =
-        document.createElement('span', {is: 'dt-small-bubble'}) as UI.UIUtils.DevToolsSmallBubble;
+    const repeatCountElement = element.createChild('dt-small-bubble', 'text-editor-row-message-repeat-count');
     repeatCountElement.textContent = String(count);
-    repeatCountElement.classList.add('text-editor-row-message-repeat-count');
     repeatCountElement.style.flexShrink = '0';
-    element.appendChild(repeatCountElement);
     repeatCountElement.type = getBubbleTypePerLevel(message.level());
   }
   const linesContainer = element.createChild('div');

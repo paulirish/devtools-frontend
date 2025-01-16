@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import '../../ui/legacy/legacy.js';
+
 import type * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
@@ -52,11 +54,11 @@ export class StorageItemsView extends UI.Widget.VBox {
     this.refreshButton.element.setAttribute(
         'jslog', `${VisualLogging.action('storage-items-view.refresh').track({click: true})}`);
 
-    this.mainToolbar = new UI.Toolbar.Toolbar('top-resources-toolbar', this.element);
-    this.mainToolbar.element.setAttribute('jslog', `${VisualLogging.toolbar()}`);
+    this.mainToolbar = this.element.createChild('devtools-toolbar', 'top-resources-toolbar');
+    this.mainToolbar.setAttribute('jslog', `${VisualLogging.toolbar()}`);
 
     this.filterItem = new UI.Toolbar.ToolbarFilter(undefined, 0.4);
-    this.filterItem.addEventListener(UI.Toolbar.ToolbarInput.Event.TextChanged, this.filterChanged, this);
+    this.filterItem.addEventListener(UI.Toolbar.ToolbarInput.Event.TEXT_CHANGED, this.filterChanged, this);
 
     const toolbarSeparator = new UI.Toolbar.ToolbarSeparator();
     this.deleteAllButton = this.addButton(i18nString(UIStrings.clearAll), 'clear', this.deleteAllItems);
@@ -94,7 +96,7 @@ export class StorageItemsView extends UI.Widget.VBox {
   private addButton(label: string, glyph: string, callback: (arg0: Common.EventTarget.EventTargetEvent<Event>) => void):
       UI.Toolbar.ToolbarButton {
     const button = new UI.Toolbar.ToolbarButton(label, glyph);
-    button.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, callback, this);
+    button.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, callback, this);
     return button;
   }
 

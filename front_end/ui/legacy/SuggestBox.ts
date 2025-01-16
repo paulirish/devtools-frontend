@@ -103,10 +103,9 @@ export class SuggestBox implements ListDelegate<Suggestion> {
         `${VisualLogging.menu().parent('mapped').track({resize: true, keydown: 'ArrowUp|ArrowDown|PageUp|PageDown'})}`);
 
     this.glassPane = new GlassPane();
-    this.glassPane.setAnchorBehavior(AnchorBehavior.PreferBottom);
+    this.glassPane.setAnchorBehavior(AnchorBehavior.PREFER_BOTTOM);
     this.glassPane.setOutsideClickCallback(this.hide.bind(this));
-    const shadowRoot = createShadowRootWithCoreStyles(
-        this.glassPane.contentElement, {cssFile: suggestBoxStyles, delegatesFocus: undefined});
+    const shadowRoot = createShadowRootWithCoreStyles(this.glassPane.contentElement, {cssFile: suggestBoxStyles});
     shadowRoot.appendChild(this.element);
   }
 

@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import '../../ui/legacy/legacy.js';
+
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as IssuesManager from '../../models/issues_manager/issues_manager.js';
@@ -122,27 +124,27 @@ class IssueCategoryView extends UI.TreeOutline.TreeElement {
 
   getCategoryName(): string {
     switch (this.#category) {
-      case IssuesManager.Issue.IssueCategory.CrossOriginEmbedderPolicy:
+      case IssuesManager.Issue.IssueCategory.CROSS_ORIGIN_EMBEDDER_POLICY:
         return i18nString(UIStrings.crossOriginEmbedderPolicy);
-      case IssuesManager.Issue.IssueCategory.MixedContent:
+      case IssuesManager.Issue.IssueCategory.MIXED_CONTENT:
         return i18nString(UIStrings.mixedContent);
-      case IssuesManager.Issue.IssueCategory.Cookie:
+      case IssuesManager.Issue.IssueCategory.COOKIE:
         return i18nString(UIStrings.samesiteCookie);
-      case IssuesManager.Issue.IssueCategory.HeavyAd:
+      case IssuesManager.Issue.IssueCategory.HEAVY_AD:
         return i18nString(UIStrings.heavyAds);
-      case IssuesManager.Issue.IssueCategory.ContentSecurityPolicy:
+      case IssuesManager.Issue.IssueCategory.CONTENT_SECURITY_POLICY:
         return i18nString(UIStrings.contentSecurityPolicy);
-      case IssuesManager.Issue.IssueCategory.LowTextContrast:
+      case IssuesManager.Issue.IssueCategory.LOW_TEXT_CONTRAST:
         return i18nString(UIStrings.lowTextContrast);
-      case IssuesManager.Issue.IssueCategory.Cors:
+      case IssuesManager.Issue.IssueCategory.CORS:
         return i18nString(UIStrings.cors);
-      case IssuesManager.Issue.IssueCategory.AttributionReporting:
+      case IssuesManager.Issue.IssueCategory.ATTRIBUTION_REPORTING:
         return i18nString(UIStrings.attributionReporting);
-      case IssuesManager.Issue.IssueCategory.QuirksMode:
+      case IssuesManager.Issue.IssueCategory.QUIRKS_MODE:
         return i18nString(UIStrings.quirksMode);
-      case IssuesManager.Issue.IssueCategory.Generic:
+      case IssuesManager.Issue.IssueCategory.GENERIC:
         return i18nString(UIStrings.generic);
-      case IssuesManager.Issue.IssueCategory.Other:
+      case IssuesManager.Issue.IssueCategory.OTHER:
         return i18nString(UIStrings.other);
     }
   }
@@ -209,12 +211,12 @@ export class IssuesPane extends UI.Widget.VBox {
 
     this.#issuesManager = IssuesManager.IssuesManager.IssuesManager.instance();
     this.#aggregator = new IssueAggregator(this.#issuesManager);
-    this.#aggregator.addEventListener(IssueAggregatorEvents.AggregatedIssueUpdated, this.#issueUpdated, this);
-    this.#aggregator.addEventListener(IssueAggregatorEvents.FullUpdateRequired, this.#onFullUpdate, this);
+    this.#aggregator.addEventListener(IssueAggregatorEvents.AGGREGATED_ISSUE_UPDATED, this.#issueUpdated, this);
+    this.#aggregator.addEventListener(IssueAggregatorEvents.FULL_UPDATE_REQUIRED, this.#onFullUpdate, this);
     this.#hiddenIssuesRow.hidden = this.#issuesManager.numberOfHiddenIssues() === 0;
     this.#onFullUpdate();
     this.#issuesManager.addEventListener(
-        IssuesManager.IssuesManager.Events.IssuesCountUpdated, this.#updateCounts, this);
+        IssuesManager.IssuesManager.Events.ISSUES_COUNT_UPDATED, this.#updateCounts, this);
   }
 
   override elementsToRestoreScrollPositionsFor(): Element[] {
@@ -224,8 +226,11 @@ export class IssuesPane extends UI.Widget.VBox {
   #createToolbars(): {toolbarContainer: Element} {
     const toolbarContainer = this.contentElement.createChild('div', 'issues-toolbar-container');
     toolbarContainer.setAttribute('jslog', `${VisualLogging.toolbar()}`);
-    new UI.Toolbar.Toolbar('issues-toolbar-left', toolbarContainer);
-    const rightToolbar = new UI.Toolbar.Toolbar('issues-toolbar-right', toolbarContainer);
+    toolbarContainer.role = 'toolbar';
+    const leftToolbar = toolbarContainer.createChild('devtools-toolbar', 'issues-toolbar-left');
+    leftToolbar.role = 'presentation';
+    const rightToolbar = toolbarContainer.createChild('devtools-toolbar', 'issues-toolbar-right');
+    rightToolbar.role = 'presentation';
 
     const groupByCategorySetting = getGroupIssuesByCategorySetting();
     const groupByCategoryCheckbox = new UI.Toolbar.ToolbarSettingCheckbox(
@@ -261,7 +266,7 @@ export class IssuesPane extends UI.Widget.VBox {
             IssuesManager.IssuesManager.IssuesManager.instance(), false);
         issueCounter.title = issueEnumeration;
       },
-      displayMode: IssueCounter.IssueCounter.DisplayMode.ShowAlways,
+      displayMode: IssueCounter.IssueCounter.DisplayMode.SHOW_ALWAYS,
       issuesManager: IssuesManager.IssuesManager.IssuesManager.instance(),
     };
     issueCounter.id = 'console-issues-counter';

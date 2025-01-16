@@ -43,7 +43,6 @@ const themeValueByTargetByName = new Map<Element|null, Map<string, string>>();
 
 export class ThemeSupport extends EventTarget {
   private themeNameInternal = 'default';
-  private customSheets: Set<string> = new Set();
   private computedStyleOfHTML = Common.Lazy.lazy(() => window.getComputedStyle(document.documentElement));
 
   readonly #documentsToTheme: Set<Document> = new Set([document]);
@@ -159,18 +158,6 @@ export class ThemeSupport extends EventTarget {
     node.appendChild(styleElement);
   }
 
-  injectCustomStyleSheets(element: Element|ShadowRoot): void {
-    for (const sheet of this.customSheets) {
-      const styleElement = document.createElement('style');
-      styleElement.textContent = sheet;
-      element.appendChild(styleElement);
-    }
-  }
-
-  addCustomStylesheet(sheetText: string): void {
-    this.customSheets.add(sheetText);
-  }
-
   #applyTheme(): void {
     for (const document of this.#documentsToTheme) {
       this.#applyThemeToDocument(document);
@@ -185,17 +172,25 @@ export class ThemeSupport extends EventTarget {
     this.themeNameInternal = useSystemPreferred ? systemPreferredTheme : this.setting.get();
     document.documentElement.classList.toggle('theme-with-dark-background', this.themeNameInternal === 'dark');
 
+    const useChromeTheme = Common.Settings.moduleSetting('chrome-theme-colors').get();
+    const hostConfig = Common.Settings.Settings.instance().getHostConfig();
+    const isIncognito = !hostConfig || hostConfig.isOffTheRecord === true;
     // Baseline is the name of Chrome's default color theme and there are two of these: default and grayscale.
     // The collective name for the rest of the color themes is dynamic.
     // In the baseline themes Chrome uses custom values for surface colors, whereas for dynamic themes these are color-mixed.
     // To match Chrome we need to know if any of the baseline themes is currently active and assign specific values to surface colors.
-    const selectedTheme = getComputedStyle(document.body).getPropertyValue('--user-color-source');
-    document.documentElement.classList.toggle('baseline-default', selectedTheme === 'baseline-default');
-    document.documentElement.classList.toggle('baseline-grayscale', selectedTheme === 'baseline-grayscale');
+    if (isIncognito) {
+      document.documentElement.classList.toggle('baseline-grayscale', true);
+    } else if (useChromeTheme) {
+      const selectedTheme = getComputedStyle(document.body).getPropertyValue('--user-color-source');
+      document.documentElement.classList.toggle('baseline-default', selectedTheme === 'baseline-default');
+      document.documentElement.classList.toggle('baseline-grayscale', selectedTheme === 'baseline-grayscale');
+    } else {
+      document.documentElement.classList.toggle('baseline-grayscale', true);
+    }
 
     // In the event the theme changes we need to clear caches and notify subscribers.
     themeValueByTargetByName.clear();
-    this.customSheets.clear();
     this.dispatchEvent(new ThemeChangeEvent());
   }
 
@@ -210,7 +205,8 @@ export class ThemeSupport extends EventTarget {
   }
 
   #fetchColorsAndApplyHostTheme(document: Document): void {
-    if (Host.InspectorFrontendHost.InspectorFrontendHostInstance.isHostedMode()) {
+    const useChromeTheme = Common.Settings.moduleSetting('chrome-theme-colors').get();
+    if (Host.InspectorFrontendHost.InspectorFrontendHostInstance.isHostedMode() || !useChromeTheme) {
       this.#applyThemeToDocument(document);
       return;
     }

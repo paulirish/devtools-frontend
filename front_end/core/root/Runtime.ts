@@ -68,7 +68,7 @@ export class Runtime {
           {
             [x: string]: boolean,
           });
-    } catch (e) {
+    } catch {
       console.error('Failed to parse localStorage[\'experiments\']');
       return {};
     }
@@ -103,7 +103,9 @@ export class Runtime {
   }
 
   loadLegacyModule(modulePath: string): Promise<void> {
-    return import(`../../${modulePath}`);
+    const importPath =
+        `../../${modulePath}`;  // Extracted as a variable so esbuild doesn't attempt to bundle all the things.
+    return import(importPath);
   }
 }
 
@@ -285,49 +287,102 @@ export const enum ExperimentName {
   HEADER_OVERRIDES = 'header-overrides',
   INSTRUMENTATION_BREAKPOINTS = 'instrumentation-breakpoints',
   AUTHORED_DEPLOYED_GROUPING = 'authored-deployed-grouping',
-  IMPORTANT_DOM_PROPERTIES = 'important-dom-properties',
   JUST_MY_CODE = 'just-my-code',
-  PRELOADING_STATUS_PANEL = 'preloading-status-panel',
-  OUTERMOST_TARGET_SELECTOR = 'outermost-target-selector',
   HIGHLIGHT_ERRORS_ELEMENTS_PANEL = 'highlight-errors-elements-panel',
   USE_SOURCE_MAP_SCOPES = 'use-source-map-scopes',
   NETWORK_PANEL_FILTER_BAR_REDESIGN = 'network-panel-filter-bar-redesign',
   AUTOFILL_VIEW = 'autofill-view',
-  INDENTATION_MARKERS_TEMP_DISABLE = 'sources-frame-indentation-markers-temporarily-disable',
   TIMELINE_SHOW_POST_MESSAGE_EVENTS = 'timeline-show-postmessage-events',
-  TIMELINE_ANNOTATIONS = 'perf-panel-annotations',
-  TIMELINE_INSIGHTS = 'timeline-rpp-sidebar',
   TIMELINE_DEBUG_MODE = 'timeline-debug-mode',
-  TIMELINE_OBSERVATIONS = 'timeline-observations',
   TIMELINE_ENHANCED_TRACES = 'timeline-enhanced-traces',
-  GEN_AI_SETTINGS_PANEL = 'gen-ai-settings-panel',
   TIMELINE_SERVER_TIMINGS = 'timeline-server-timings',
+  FLOATING_ENTRY_POINTS_FOR_AI_ASSISTANCE = 'floating-entry-points-for-ai-assistance',
+  TIMELINE_EXPERIMENTAL_INSIGHTS = 'timeline-experimental-insights',
+  TIMELINE_DIM_UNRELATED_EVENTS = 'timeline-dim-unrelated-events',
+  TIMELINE_ALTERNATIVE_NAVIGATION = 'timeline-alternative-navigation',
+  TIMELINE_THIRD_PARTY_DEPENDENCIES = 'timeline-third-party-dependencies',
+  // when adding to this enum, you'll need to also add to REGISTERED_EXPERIMENTS in EnvironmentHelpers.ts
+}
+
+export enum GenAiEnterprisePolicyValue {
+  ALLOW = 0,
+  ALLOW_WITHOUT_LOGGING = 1,
+  DISABLE = 2,
+}
+
+export interface AidaAvailability {
+  enabled: boolean;
+  blockedByAge: boolean;
+  blockedByEnterprisePolicy: boolean;
+  blockedByGeo: boolean;
+  disallowLogging: boolean;
+  enterprisePolicyValue: number;
 }
 
 export interface HostConfigConsoleInsights {
-  aidaModelId: string;
-  aidaTemperature: number;
-  blockedByAge: boolean;
-  blockedByEnterprisePolicy: boolean;
-  blockedByGeo: boolean;
-  blockedByRollout: boolean;
-  disallowLogging: boolean;
+  modelId: string;
+  temperature: number;
   enabled: boolean;
-  optIn: boolean;
 }
 
-export interface HostConfigFreestylerDogfood {
-  aidaModelId: string;
-  aidaTemperature: number;
-  blockedByAge: boolean;
-  blockedByEnterprisePolicy: boolean;
-  blockedByGeo: boolean;
+export enum HostConfigFreestylerExecutionMode {
+  ALL_SCRIPTS = 'ALL_SCRIPTS',
+  SIDE_EFFECT_FREE_SCRIPTS_ONLY = 'SIDE_EFFECT_FREE_SCRIPTS_ONLY',
+  NO_SCRIPTS = 'NO_SCRIPTS',
+}
+
+export interface HostConfigFreestyler {
+  modelId: string;
+  temperature: number;
   enabled: boolean;
+  userTier: string;
+  executionMode?: HostConfigFreestylerExecutionMode;
+}
+
+export interface HostConfigAiAssistanceNetworkAgent {
+  modelId: string;
+  temperature: number;
+  enabled: boolean;
+  userTier: string;
+}
+
+export interface HostConfigAiAssistancePerformanceAgent {
+  modelId: string;
+  temperature: number;
+  enabled: boolean;
+  userTier: string;
+}
+
+export interface HostConfigAiAssistanceFileAgent {
+  modelId: string;
+  temperature: number;
+  enabled: boolean;
+  userTier: string;
 }
 
 export interface HostConfigVeLogging {
   enabled: boolean;
   testing: boolean;
+}
+
+export interface HostConfigPrivacyUI {
+  enabled: boolean;
+}
+
+export interface HostConfigEnableOriginBoundCookies {
+  portBindingEnabled: boolean;
+  schemeBindingEnabled: boolean;
+}
+
+export interface HostConfigAnimationStylesInStylesTab {
+  enabled: boolean;
+}
+
+export interface HostConfigThirdPartyCookieControls {
+  thirdPartyCookieRestrictionEnabled: boolean;
+  thirdPartyCookieMetadataEnabled: boolean;
+  thirdPartyCookieHeuristicsEnabled: boolean;
+  managedBlockThirdPartyCookies: string|boolean;
 }
 
 // We use `RecursivePartial` here to enforce that DevTools code is able to
@@ -338,14 +393,22 @@ export interface HostConfigVeLogging {
 // window being of different versions, and consequently potentially having
 // differently shaped `HostConfig`s.
 export type HostConfig = Platform.TypeScriptUtilities.RecursivePartial<{
+  aidaAvailability: AidaAvailability,
   devToolsConsoleInsights: HostConfigConsoleInsights,
-  devToolsFreestylerDogfood: HostConfigFreestylerDogfood,
+  devToolsFreestyler: HostConfigFreestyler,
+  devToolsAiAssistanceNetworkAgent: HostConfigAiAssistanceNetworkAgent,
+  devToolsAiAssistanceFileAgent: HostConfigAiAssistanceFileAgent,
+  devToolsAiAssistancePerformanceAgent: HostConfigAiAssistancePerformanceAgent,
   devToolsVeLogging: HostConfigVeLogging,
+  devToolsPrivacyUI: HostConfigPrivacyUI,
   /**
    * OffTheRecord here indicates that the user's profile is either incognito,
    * or guest mode, rather than a "normal" profile.
    */
   isOffTheRecord: boolean,
+  devToolsEnableOriginBoundCookies: HostConfigEnableOriginBoundCookies,
+  devToolsAnimationStylesInStylesTab: HostConfigAnimationStylesInStylesTab,
+  thirdPartyCookieControls: HostConfigThirdPartyCookieControls,
 }>;
 
 /**

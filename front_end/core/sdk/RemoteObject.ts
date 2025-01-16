@@ -34,10 +34,10 @@
 
 import type * as ProtocolProxyApi from '../../generated/protocol-proxy-api.js';
 import * as Protocol from '../../generated/protocol.js';
-import {type DOMPinnedWebIDLProp, type DOMPinnedWebIDLType} from '../common/JavaScriptMetaData.js';
+import type {DOMPinnedWebIDLProp, DOMPinnedWebIDLType} from '../common/JavaScriptMetaData.js';
 
-import {type DebuggerModel, type FunctionDetails} from './DebuggerModel.js';
-import {type RuntimeModel} from './RuntimeModel.js';
+import type {DebuggerModel, FunctionDetails} from './DebuggerModel.js';
+import type {RuntimeModel} from './RuntimeModel.js';
 
 // This cannot be an interface due to "instanceof RemoteObject" checks in the code.
 export class RemoteObject {
@@ -100,10 +100,10 @@ export class RemoteObject {
     if (typeof object === 'number') {
       const description = String(object);
       if (object === 0 && 1 / object < 0) {
-        return UnserializableNumber.Negative0;
+        return UnserializableNumber.NEGATIVE_ZERO;
       }
-      if (description === UnserializableNumber.NaN || description === UnserializableNumber.Infinity ||
-          description === UnserializableNumber.NegativeInfinity) {
+      if (description === UnserializableNumber.NAN || description === UnserializableNumber.INFINITY ||
+          description === UnserializableNumber.NEGATIVE_INFINITY) {
         return description;
       }
     }
@@ -143,7 +143,7 @@ export class RemoteObject {
     if (object instanceof RemoteObject) {
       const unserializableValue = object.unserializableValue();
       if (unserializableValue !== undefined) {
-        return {unserializableValue: unserializableValue};
+        return {unserializableValue};
       }
     } else if (objectAsProtocolRemoteObject.unserializableValue !== undefined) {
       return {unserializableValue: objectAsProtocolRemoteObject.unserializableValue};
@@ -350,10 +350,10 @@ export class RemoteObjectImpl extends RemoteObject {
       this.hasChildrenInternal = false;
       if (typeof unserializableValue === 'string') {
         this.#unserializableValueInternal = unserializableValue;
-        if (unserializableValue === UnserializableNumber.Infinity ||
-            unserializableValue === UnserializableNumber.NegativeInfinity ||
-            unserializableValue === UnserializableNumber.Negative0 ||
-            unserializableValue === UnserializableNumber.NaN) {
+        if (unserializableValue === UnserializableNumber.INFINITY ||
+            unserializableValue === UnserializableNumber.NEGATIVE_INFINITY ||
+            unserializableValue === UnserializableNumber.NEGATIVE_ZERO ||
+            unserializableValue === UnserializableNumber.NAN) {
           this.#valueInternal = Number(unserializableValue);
         } else if (type === 'bigint' && unserializableValue.endsWith('n')) {
           this.#valueInternal = BigInt(unserializableValue.substring(0, unserializableValue.length - 1));
@@ -948,7 +948,7 @@ export class LocalJSONObject extends RemoteObject {
     let wasThrown = false;
     try {
       result = functionDeclaration.apply(target, rawArgs);
-    } catch (e) {
+    } catch {
       wasThrown = true;
     }
 
@@ -966,7 +966,7 @@ export class LocalJSONObject extends RemoteObject {
     let result;
     try {
       result = functionDeclaration.apply(target, rawArgs);
-    } catch (e) {
+    } catch {
       result = null;
     }
 
@@ -1152,10 +1152,10 @@ const descriptionLengthParenRegex = /\(([0-9]+)\)/;
 const descriptionLengthSquareRegex = /\[([0-9]+)\]/;
 
 const enum UnserializableNumber {
-  Negative0 = ('-0'),
-  NaN = ('NaN'),
-  Infinity = ('Infinity'),
-  NegativeInfinity = ('-Infinity'),
+  NEGATIVE_ZERO = ('-0'),
+  NAN = ('NaN'),
+  INFINITY = ('Infinity'),
+  NEGATIVE_INFINITY = ('-Infinity'),
 }
 
 export interface CallFunctionResult {

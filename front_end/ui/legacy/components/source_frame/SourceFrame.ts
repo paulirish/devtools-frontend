@@ -33,6 +33,7 @@ import * as Host from '../../../../core/host/host.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
 import * as Root from '../../../../core/root/root.js';
+import * as SDK from '../../../../core/sdk/sdk.js';
 import * as Formatter from '../../../../models/formatter/formatter.js';
 import * as TextUtils from '../../../../models/text_utils/text_utils.js';
 import * as CodeMirror from '../../../../third_party/codemirror.next/codemirror.next.js';
@@ -113,6 +114,12 @@ const UIStrings = {
    *@example {allow pasting} PH1
    */
   typeAllowPasting: 'Type \'\'{PH1}\'\'',
+  /**
+   * @description Error message shown when the user tries to open a file that contains non-readable data. "Editor" refers to
+   * a text editor.
+   */
+  binaryContentError:
+      'Editor can\'t show binary data. Use the "Response" tab in the "Network" panel to inspect this resource.',
 };
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/components/source_frame/SourceFrame.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -125,14 +132,14 @@ export interface SourceFrameOptions {
 }
 
 export const enum Events {
-  EditorUpdate = 'EditorUpdate',
-  EditorScroll = 'EditorScroll',
+  EDITOR_UPDATE = 'EditorUpdate',
+  EDITOR_SCROLL = 'EditorScroll',
 }
 
-export type EventTypes = {
-  [Events.EditorUpdate]: CodeMirror.ViewUpdate,
-  [Events.EditorScroll]: void,
-};
+export interface EventTypes {
+  [Events.EDITOR_UPDATE]: CodeMirror.ViewUpdate;
+  [Events.EDITOR_SCROLL]: void;
+}
 
 type FormatFn = (lineNo: number, state: CodeMirror.EditorState) => string;
 export const LINE_NUMBER_FORMATTER = CodeMirror.Facet.define<FormatFn, FormatFn>({
@@ -192,7 +199,7 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
     this.formattedMap = null;
     this.prettyToggle =
         new UI.Toolbar.ToolbarToggle(i18nString(UIStrings.prettyPrint), 'brackets', undefined, 'pretty-print');
-    this.prettyToggle.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, () => {
+    this.prettyToggle.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, () => {
       void this.setPretty(this.prettyToggle.isToggled());
     });
     this.shouldAutoPrettyPrint = false;
@@ -236,7 +243,7 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
     this.contentSet = false;
 
     this.selfXssWarningDisabledSetting = Common.Settings.Settings.instance().createSetting(
-        'disable-self-xss-warning', false, Common.Settings.SettingStorageType.Synced);
+        'disable-self-xss-warning', false, Common.Settings.SettingStorageType.SYNCED);
     Common.Settings.Settings.instance()
         .moduleSetting('text-editor-indent')
         .addChangeListener(this.#textEditorIndentChanged, this);
@@ -271,7 +278,7 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
 
   protected editorConfiguration(doc: string|CodeMirror.Text): CodeMirror.Extension {
     return [
-      CodeMirror.EditorView.updateListener.of(update => this.dispatchEventToListeners(Events.EditorUpdate, update)),
+      CodeMirror.EditorView.updateListener.of(update => this.dispatchEventToListeners(Events.EDITOR_UPDATE, update)),
       TextEditor.Config.baseConfiguration(doc),
       TextEditor.Config.closeBrackets.instance(),
       TextEditor.Config.autocompletion.instance(),
@@ -284,7 +291,7 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
         focus: () => this.onFocus(),
         blur: () => this.onBlur(),
         paste: () => this.onPaste(),
-        scroll: () => this.dispatchEventToListeners(Events.EditorScroll),
+        scroll: () => this.dispatchEventToListeners(Events.EDITOR_SCROLL),
         contextmenu: event => this.onContextMenu(event),
       }),
       CodeMirror.lineNumbers({
@@ -307,16 +314,14 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
       this.wasmDisassemblyInternal ? markNonBreakableLines(this.wasmDisassemblyInternal) : nonBreakableLines,
       this.options.lineWrapping ? CodeMirror.EditorView.lineWrapping : [],
       this.options.lineNumbers !== false ? CodeMirror.lineNumbers() : [],
-      Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.INDENTATION_MARKERS_TEMP_DISABLE) ?
-          [] :
-          CodeMirror.indentationMarkers({
-            colors: {
-              light: 'var(--sys-color-divider)',
-              activeLight: 'var(--sys-color-divider-prominent)',
-              dark: 'var(--sys-color-divider)',
-              activeDark: 'var(--sys-color-divider-prominent)',
-            },
-          }),
+      CodeMirror.indentationMarkers({
+        colors: {
+          light: 'var(--sys-color-divider)',
+          activeLight: 'var(--sys-color-divider-prominent)',
+          dark: 'var(--sys-color-divider)',
+          activeDark: 'var(--sys-color-divider-prominent)',
+        },
+      }),
     ];
   }
 
@@ -324,7 +329,6 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
   }
 
   protected onFocus(): void {
-    this.resetCurrentSearchResultIndex();
   }
 
   protected onPaste(): boolean {
@@ -553,7 +557,8 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
     progressIndicator.setWorked(1);
     const contentData = await contentDataPromise;
 
-    let error, content;
+    let error: string|undefined;
+    let content: CodeMirror.Text|string|null;
     let isMinified = false;
     if (TextUtils.ContentData.ContentData.isError(contentData)) {
       error = contentData.error;
@@ -561,16 +566,25 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
     } else if (contentData instanceof TextUtils.WasmDisassembly.WasmDisassembly) {
       content = CodeMirror.Text.of(contentData.lines);
       this.wasmDisassemblyInternal = contentData;
-    } else {
+    } else if (contentData.isTextContent) {
       content = contentData.text;
       isMinified = TextUtils.TextUtils.isMinified(contentData.text);
+      this.wasmDisassemblyInternal = null;
+    } else if (contentData.mimeType === 'application/wasm') {
+      // The network panel produces ContentData with raw WASM inside. We have to manually disassemble that
+      // as V8 might not know about it.
+      this.wasmDisassemblyInternal = await SDK.Script.disassembleWasm(contentData.base64);
+      content = CodeMirror.Text.of(this.wasmDisassemblyInternal.lines);
+    } else {
+      error = i18nString(UIStrings.binaryContentError);
+      content = null;
       this.wasmDisassemblyInternal = null;
     }
 
     progressIndicator.setWorked(100);
     progressIndicator.done();
 
-    if (this.rawContent === content) {
+    if (this.rawContent === content && error === undefined) {
       return;
     }
     this.rawContent = content;
@@ -1046,15 +1060,13 @@ export class SelfXssWarningDialog {
   static async show(): Promise<boolean> {
     const dialog = new UI.Dialog.Dialog('self-xss-warning');
     dialog.setMaxContentSize(new UI.Geometry.Size(504, 340));
-    dialog.setSizeBehavior(UI.GlassPane.SizeBehavior.SetExactWidthMaxHeight);
+    dialog.setSizeBehavior(UI.GlassPane.SizeBehavior.SET_EXACT_WIDTH_MAX_HEIGHT);
     dialog.setDimmed(true);
-    const shadowRoot = UI.UIUtils.createShadowRootWithCoreStyles(
-        dialog.contentElement, {cssFile: selfXssDialogStyles, delegatesFocus: undefined});
+    const shadowRoot = UI.UIUtils.createShadowRootWithCoreStyles(dialog.contentElement, {cssFile: selfXssDialogStyles});
     const content = shadowRoot.createChild('div', 'widget');
 
     const result = await new Promise<boolean>(resolve => {
-      const closeButton =
-          content.createChild('div', 'dialog-close-button', 'dt-close-button') as UI.UIUtils.DevToolsCloseButton;
+      const closeButton = content.createChild('dt-close-button', 'dialog-close-button');
       closeButton.setTabbable(true);
       self.onInvokeElement(closeButton, event => {
         dialog.hide();

@@ -1,7 +1,7 @@
 // Copyright 2014 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-/* eslint-disable indent */
+
 (function(window) {
 
 // DevToolsAPI ----------------------------------------------------------------
@@ -69,7 +69,7 @@ const DevToolsAPIImpl = class {
     if (callback) {
       this._callbacks[callId] = callback;
     }
-    const message = {'id': callId, 'method': method};
+    const message = {id: callId, method};
     if (args.length) {
       message.params = args;
     }
@@ -423,7 +423,6 @@ const EnumeratedHistogram = {
   Language: 'DevTools.Language',
   LighthouseModeRun: 'DevTools.LighthouseModeRun',
   LighthouseCategoryUsed: 'DevTools.LighthouseCategoryUsed',
-  ManifestSectionSelected: 'DevTools.ManifestSectionSelected',
   PanelShown: 'DevTools.PanelShown',
   PanelShownInLocation: 'DevTools.PanelShownInLocation',
   RecordingAssertion: 'DevTools.RecordingAssertion',
@@ -436,23 +435,16 @@ const EnumeratedHistogram = {
   RecordingReplayStarted: 'DevTools.RecordingReplayStarted',
   RecordingToggled: 'DevTools.RecordingToggled',
   SidebarPaneShown: 'DevTools.SidebarPaneShown',
-  SourcesSidebarTabShown: 'DevTools.Sources.SidebarTabShown',
   SourcesPanelFileDebugged: 'DevTools.SourcesPanelFileDebugged',
   SourcesPanelFileOpened: 'DevTools.SourcesPanelFileOpened',
   NetworkPanelResponsePreviewOpened: 'DevTools.NetworkPanelResponsePreviewOpened',
+  TimelineNavigationSettingState: 'DevTools.TimelineNavigationSettingState',
   StyleTextCopied: 'DevTools.StyleTextCopied',
   SyncSetting: 'DevTools.SyncSetting',
-  ColorPickerOpenedFrom: 'DevTools.ColorPickerOpenedFrom',
   CSSPropertyDocumentation: 'DevTools.CSSPropertyDocumentation',
   SwatchActivated: 'DevTools.SwatchActivated',
   AnimationPlaybackRateChanged: 'DevTools.AnimationPlaybackRateChanged',
   AnimationPointDragged: 'DevTools.AnimationPointDragged',
-  LegacyResourceTypeFilterNumberOfSelectedChanged: 'DevTools.LegacyResourceTypeFilterNumberOfSelectedChanged',
-  LegacyResourceTypeFilterItemSelected: 'DevTools.LegacyResourceTypeFilterItemSelected',
-  ResourceTypeFilterNumberOfSelectedChanged: 'DevTools.ResourceTypeFilterNumberOfSelectedChanged',
-  ResourceTypeFilterItemSelected: 'DevTools.ResourceTypeFilterItemSelected',
-  NetworkPanelMoreFiltersNumberOfSelectedChanged: 'DevTools.NetworkPanelMoreFiltersNumberOfSelectedChanged',
-  NetworkPanelMoreFiltersItemSelected: 'DevTools.NetworkPanelMoreFiltersItemSelected',
 };
 
 /**
@@ -641,7 +633,46 @@ const InspectorFrontendHostImpl = class {
    * @param {function(Object<string, Object<string, string|boolean>>):void} callback
    */
   getHostConfig(callback) {
-    DevToolsAPI.sendMessageToEmbedder('getHostConfig', [], /** @type {function(?Object)} */ (callback));
+    DevToolsAPI.sendMessageToEmbedder('getHostConfig', [], hostConfig => {
+      const majorVersion = getRemoteMajorVersion();
+      if (majorVersion && majorVersion < 129 && hostConfig?.aidaAvailability) {
+        return callback(this.hostConfigNewToOld(hostConfig));
+      }
+      return callback(hostConfig);
+    });
+  }
+
+  /**
+   * @param {Object<string, Object<string, string|boolean>>} newConfig
+   */
+  hostConfigNewToOld(newConfig) {
+    const devToolsConsoleInsights = {
+      enabled: (newConfig.devToolsConsoleInsights?.enabled && newConfig.aidaAvailability?.enabled) ?? false,
+      aidaModelId: newConfig.devToolsConsoleInsights?.modelId ?? '',
+      aidaTemperature: newConfig.devToolsConsoleInsights?.temperature ?? 0,
+      blockedByAge: newConfig.aidaAvailability?.blockedByAge ?? true,
+      blockedByEnterprisePolicy: newConfig.aidaAvailability?.blockedByEnterprisePolicy ?? true,
+      blockedByFeatureFlag:
+          (newConfig.devToolsConsoleInsights?.enabled && newConfig.aidaAvailability?.enabled) ?? false,
+      blockedByGeo: newConfig.aidaAvailability?.blockedByGeo ?? true,
+      blockedByRollout: false,
+      disallowLogging: newConfig.aidaAvailability?.disallowLogging ?? true,
+      optIn: false,
+    };
+    const devToolsFreestylerDogfood = {
+      enabled: (newConfig.devToolsFreestyler?.enabled && newConfig.aidaAvailability?.enabled) ?? false,
+      aidaModelId: newConfig.devToolsFreestyler?.modelId ?? '',
+      aidaTemperature: newConfig.devToolsFreestyler?.temperature ?? 0,
+      blockedByAge: newConfig.aidaAvailability?.blockedByAge ?? true,
+      blockedByEnterprisePolicy: newConfig.aidaAvailability?.blockedByEnterprisePolicy ?? true,
+      blockedByGeo: newConfig.aidaAvailability?.blockedByGeo ?? true,
+    };
+    return {
+      devToolsConsoleInsights,
+      devToolsFreestylerDogfood,
+      devToolsVeLogging: newConfig.devToolsVeLogging,
+      isOffTheRecord: newConfig.isOffTheRecord,
+    };
   }
 
   /**
@@ -1367,7 +1398,7 @@ function installObjectObserve() {
       scheduled = false;
       const changes = /** @type {!Array<!{name: string}>} */ ([]);
       changedProperties.forEach(function(name) {
-        changes.push({name: name});
+        changes.push({name});
       });
       changedProperties.clear();
       observer.call(null, changes);
@@ -1503,7 +1534,7 @@ function installBackwardsCompatibility() {
     Element.prototype.createShadowRoot = function() {
       try {
         return this.attachShadow({mode: 'open'});
-      } catch (e) {
+      } catch {
         // some elements we use to add shadow roots can no
         // longer have shadow roots.
         const fakeShadowHost = document.createElement('span');
@@ -1654,7 +1685,7 @@ function getRemoteMajorVersion() {
     }
     const majorVersion = parseInt(remoteVersion.split('.')[0], 10);
     return majorVersion;
-  } catch (e) {
+  } catch {
     return null;
   }
 }

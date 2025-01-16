@@ -33,11 +33,11 @@
 // because a root node can represent itself AND an ancestor.
 
 import * as Platform from '../../core/platform/platform.js';
+import type * as CPUProfile from '../../models/cpu_profile/cpu_profile.js';
 import type * as UI from '../../ui/legacy/legacy.js';
 
-import {ProfileDataGridNode, ProfileDataGridTree, type Formatter} from './ProfileDataGrid.js';
-import {type TopDownProfileDataGridTree} from './TopDownProfileDataGrid.js';
-import type * as CPUProfile from '../../models/cpu_profile/cpu_profile.js';
+import {type Formatter, ProfileDataGridNode, ProfileDataGridTree} from './ProfileDataGrid.js';
+import type {TopDownProfileDataGridTree} from './TopDownProfileDataGrid.js';
 
 export interface NodeInfo {
   ancestor: CPUProfile.ProfileTreeModel.ProfileNode;
@@ -219,8 +219,7 @@ export class BottomUpProfileDataGridTree extends ProfileDataGridTree {
             visitedNodes.add(uid);
           }
 
-          this.remainingNodeInfos.push(
-              {ancestor: profileNode, focusNode: profileNode, totalAccountedFor: totalAccountedFor});
+          this.remainingNodeInfos.push({ancestor: profileNode, focusNode: profileNode, totalAccountedFor});
         }
 
         const children = profileNode.children;

@@ -136,8 +136,7 @@ export async function setTextFilter(text: string): Promise<void> {
 export async function getTextFilterContent(): Promise<string> {
   const toolbarHandle = await waitFor('.text-filter');
   const textFilterContent = toolbarHandle.evaluate(toolbar => {
-    const input = toolbar.shadowRoot?.querySelector('[aria-label="Filter"]');
-    return input?.textContent ?? '';
+    return toolbar.querySelector('[aria-label="Filter"]')?.textContent ?? '';
   });
   return textFilterContent;
 }
@@ -146,7 +145,7 @@ export async function clearTextFilter(): Promise<void> {
   const textFilterContent = await getTextFilterContent();
   if (textFilterContent) {
     const toolbarHandle = await waitFor('.text-filter');
-    await click('devtools-button', {root: toolbarHandle});
+    await click('[aria-label="Clear"]', {root: toolbarHandle});
   }
 }
 
@@ -182,10 +181,7 @@ export function veImpressionForNetworkPanel(options?: {newFilterBar?: boolean}) 
         veImpression('TextField', 'filter'),
       ] :
       [
-        veImpression('TextField', 'filter'),
-        veImpression('Toggle', 'invert-filter'),
-        veImpression('Toggle', 'hide-data-urls'),
-        veImpression('Toggle', 'hide-extension-urls'),
+        veImpression('DropDown', 'more-filters'),
         veImpression(
             'Section', 'filter-bitset',
             [
@@ -202,9 +198,8 @@ export function veImpressionForNetworkPanel(options?: {newFilterBar?: boolean}) 
               veImpression('Item', 'WebAssembly'),
               veImpression('Item', 'Other'),
             ]),
-        veImpression('Toggle', 'only-show-blocked-cookies'),
-        veImpression('Toggle', 'only-show-blocked-requests'),
-        veImpression('Toggle', 'only-show-third-party'),
+        veImpression('TextField', 'filter'),
+        veImpression('Toggle', 'invert-filter'),
       ];
   return veImpression('Panel', 'network', [
     veImpression('Toolbar', 'filter-bar', filterBar),

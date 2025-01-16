@@ -8,7 +8,7 @@ import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
 import * as ObjectUI from '../../ui/legacy/components/object_ui/object_ui.js';
-/* eslint-disable rulesdir/es_modules_import */
+/* eslint-disable rulesdir/es-modules-import */
 import objectValueStyles from '../../ui/legacy/components/object_ui/objectValue.css.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
@@ -37,7 +37,7 @@ const UIStrings = {
   /**
    *@description A context menu item to reveal a node in the DOM tree of the Elements Panel
    */
-  revealInElementsPanel: 'Reveal in Elements panel',
+  openInElementsPanel: 'Open in Elements panel',
   /**
    *@description Text in Event Listeners Widget of the Elements panel
    */
@@ -170,10 +170,10 @@ export class EventListenersView extends UI.Widget.VBox {
         const objectListenerElement = listenerElement as ObjectEventListenerBar;
         const listenerOrigin = objectListenerElement.eventListener().origin();
         let hidden = false;
-        if (listenerOrigin === SDK.DOMDebuggerModel.EventListener.Origin.FrameworkUser && !showFramework) {
+        if (listenerOrigin === SDK.DOMDebuggerModel.EventListener.Origin.FRAMEWORK_USER && !showFramework) {
           hidden = true;
         }
-        if (listenerOrigin === SDK.DOMDebuggerModel.EventListener.Origin.Framework && showFramework) {
+        if (listenerOrigin === SDK.DOMDebuggerModel.EventListener.Origin.FRAMEWORK && showFramework) {
           hidden = true;
         }
         if (!showPassive && objectListenerElement.eventListener().passive()) {
@@ -340,7 +340,7 @@ export class ObjectEventListenerBar extends UI.TreeOutline.TreeElement {
       }
       if (object.subtype === 'node') {
         menu.defaultSection().appendItem(
-            i18nString(UIStrings.revealInElementsPanel), () => Common.Revealer.reveal(object),
+            i18nString(UIStrings.openInElementsPanel), () => Common.Revealer.reveal(object),
             {jslogContext: 'reveal-in-elements'});
       }
       menu.defaultSection().appendItem(

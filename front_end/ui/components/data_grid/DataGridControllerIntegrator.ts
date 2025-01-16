@@ -18,8 +18,7 @@ export class DataGridControllerIntegrator extends UI.Widget.VBox {
 
   constructor(data: DataGridControllerData) {
     /**
-     * first true = isWebComponent and tells the widget system it's rendering a
-     * component
+     * first true = useShadowDom and tells the widget system it's using a shadow dom
      * second true = delegatesFocus, which tells the widget system to
      * let the component deal with its own focusing.
      */
@@ -36,7 +35,10 @@ export class DataGridControllerIntegrator extends UI.Widget.VBox {
     return this.#data;
   }
 
-  update(data: Readonly<DataGridControllerData>): void {
+  update(data?: Readonly<DataGridControllerData>): void {
+    if (!data) {
+      return;
+    }
     this.#data = data;
     // Setting of `dataGrid.data` is compute heavy because of the
     // filtering logic. Thus, we're debouncing calls to the setter.

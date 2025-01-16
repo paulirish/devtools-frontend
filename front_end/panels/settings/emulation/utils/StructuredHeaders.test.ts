@@ -55,7 +55,7 @@ function assertParams(
   assert.lengthOf(result.items, expectParams.length);
   for (let i = 0; i < expectParams.length; ++i) {
     assert.strictEqual(result.items[i].name.value, expectParams[i][0]);
-    assert.deepStrictEqual(result.items[i].value, expectParams[i][1], 'Param ' + i + ' value mismatch');
+    assert.deepEqual(result.items[i].value, expectParams[i][1], 'Param ' + i + ' value mismatch');
   }
 }
 
@@ -88,7 +88,7 @@ function assertListItem(
     assert.fail('Unexpected inner list when an item expected');
     return;
   }
-  assert.deepStrictEqual(
+  assert.deepEqual(
       item.value, expectValue,
       'List item bare value mismatch, ' + item.value.value + ' vs expected ' + expectValue.value);
   assertItemParams(item, expectParams);
@@ -144,12 +144,12 @@ function makeItemWithParams(
 }
 
 function makeList(items: StructuredHeaders.ListMember[]): StructuredHeaders.List {
-  return {kind: StructuredHeaders.ResultKind.LIST, items: items};
+  return {kind: StructuredHeaders.ResultKind.LIST, items};
 }
 
 function makeInnerList(
     items: StructuredHeaders.Item[], params: [string, StructuredHeaders.BareItem][]): StructuredHeaders.InnerList {
-  return {kind: StructuredHeaders.ResultKind.INNER_LIST, items: items, parameters: makeParams(params)};
+  return {kind: StructuredHeaders.ResultKind.INNER_LIST, items, parameters: makeParams(params)};
 }
 
 describe('StructuredHeaders', () => {

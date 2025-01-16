@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {type Chrome} from '../../../extension-api/ExtensionAPI.js';
+import type {Chrome} from '../../../extension-api/ExtensionAPI.js';
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import type * as Platform from '../../core/platform/platform.js';
@@ -13,7 +13,7 @@ import * as TextUtils from '../text_utils/text_utils.js';
 import * as Workspace from '../workspace/workspace.js';
 
 import {ContentProviderBasedProject} from './ContentProviderBasedProject.js';
-import {type DebuggerWorkspaceBinding} from './DebuggerWorkspaceBinding.js';
+import type {DebuggerWorkspaceBinding} from './DebuggerWorkspaceBinding.js';
 import {NetworkProject} from './NetworkProject.js';
 
 const UIStrings = {
@@ -222,7 +222,7 @@ class SourceScopeRemoteObject extends SDK.RemoteObject.RemoteObjectImpl {
       properties.push(makeProperty(namespace, (namespaces[namespace] as SDK.RemoteObject.RemoteObject)));
     }
 
-    return {properties: properties, internalProperties: []};
+    return {properties, internalProperties: []};
   }
 }
 
@@ -832,7 +832,7 @@ export class DebuggerLanguagePluginManager implements
                 const resourceUrl = resource as Platform.DevToolsPath.UrlString;
                 return {resourceUrl, initiator};
               });
-              return {missingSymbolFiles: missingSymbolFiles};
+              return {missingSymbolFiles};
             }
             const sourceFileURLs = addModuleResult as Platform.DevToolsPath.UrlString[];
             if (sourceFileURLs.length === 0) {

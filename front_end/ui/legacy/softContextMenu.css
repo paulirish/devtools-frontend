@@ -23,7 +23,7 @@
   padding-right: var(--sys-size-14);
 }
 
-.dockside-title + .toolbar {
+.dockside-title + devtools-toolbar {
   margin-right: -8px;
 }
 
@@ -104,6 +104,7 @@
   text-align: right;
   padding-left: var(--sys-size-6);
 
+  .soft-context-menu-disabled &,
   .soft-context-menu-item-mouse-over & {
     color: inherit;
   }

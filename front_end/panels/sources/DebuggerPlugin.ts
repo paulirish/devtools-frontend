@@ -185,17 +185,17 @@ const MAX_POSSIBLE_BREAKPOINT_LINE = 2500;
 const MAX_CODE_SIZE_FOR_VALUE_DECORATIONS = 10000;
 const MAX_PROPERTIES_IN_SCOPE_FOR_VALUE_DECORATIONS = 500;
 
-type BreakpointDescription = {
-  position: number,
-  breakpoint: Breakpoints.BreakpointManager.Breakpoint,
-};
+interface BreakpointDescription {
+  position: number;
+  breakpoint: Breakpoints.BreakpointManager.Breakpoint;
+}
 
-type BreakpointEditRequest = {
-  line: CodeMirror.Line,
-  breakpoint: Breakpoints.BreakpointManager.Breakpoint|null,
-  location: {lineNumber: number, columnNumber: number}|null,
-  isLogpoint?: boolean,
-};
+interface BreakpointEditRequest {
+  line: CodeMirror.Line;
+  breakpoint: Breakpoints.BreakpointManager.Breakpoint|null;
+  location: {lineNumber: number, columnNumber: number}|null;
+  isLogpoint?: boolean;
+}
 
 const debuggerPluginForUISourceCode = new Map<Workspace.UISourceCode.UISourceCode, DebuggerPlugin>();
 
@@ -265,7 +265,7 @@ export class DebuggerPlugin extends Plugin {
 
     this.loader = SDK.PageResourceLoader.PageResourceLoader.instance();
     this.loader.addEventListener(
-        SDK.PageResourceLoader.Events.Update, this.showSourceMapInfobarIfNeeded.bind(this), this);
+        SDK.PageResourceLoader.Events.UPDATE, this.showSourceMapInfobarIfNeeded.bind(this), this);
 
     this.ignoreListCallback = this.showIgnoreListInfobarIfNeeded.bind(this);
     Bindings.IgnoreListManager.IgnoreListManager.instance().addChangeListener(this.ignoreListCallback);
@@ -426,7 +426,7 @@ export class DebuggerPlugin extends Plugin {
     }
 
     const infobar = new UI.Infobar.Infobar(
-        UI.Infobar.Type.Warning, i18nString(UIStrings.thisScriptIsOnTheDebuggersIgnore),
+        UI.Infobar.Type.WARNING, i18nString(UIStrings.thisScriptIsOnTheDebuggersIgnore),
         [
           {
             text: i18nString(UIStrings.removeFromIgnoreList),
@@ -566,18 +566,23 @@ export class DebuggerPlugin extends Plugin {
       scriptFile.addSourceMapURL(url);
     }
 
-    function addDebugInfoURL(scriptFile: Bindings.ResourceScriptMapping.ResourceScriptFile): void {
+    function addDebugInfoURL(
+        this: DebuggerPlugin, scriptFile: Bindings.ResourceScriptMapping.ResourceScriptFile): void {
       const dialog =
-          AddDebugInfoURLDialog.createAddDWARFSymbolsURLDialog(addDebugInfoURLDialogCallback.bind(null, scriptFile));
+          AddDebugInfoURLDialog.createAddDWARFSymbolsURLDialog(addDebugInfoURLDialogCallback.bind(this, scriptFile));
       dialog.show();
     }
 
     function addDebugInfoURLDialogCallback(
-        scriptFile: Bindings.ResourceScriptMapping.ResourceScriptFile, url: Platform.DevToolsPath.UrlString): void {
+        this: DebuggerPlugin, scriptFile: Bindings.ResourceScriptMapping.ResourceScriptFile,
+        url: Platform.DevToolsPath.UrlString): void {
       if (!url) {
         return;
       }
       scriptFile.addDebugInfoURL(url);
+      if (scriptFile.script?.debuggerModel) {
+        this.updateScriptFile(scriptFile.script?.debuggerModel);
+      }
     }
 
     if (this.uiSourceCode.project().type() === Workspace.Workspace.projectTypes.Network &&
@@ -585,7 +590,7 @@ export class DebuggerPlugin extends Plugin {
         !Bindings.IgnoreListManager.IgnoreListManager.instance().isUserIgnoreListedURL(this.uiSourceCode.url())) {
       if (this.scriptFileForDebuggerModel.size) {
         const scriptFile: Bindings.ResourceScriptMapping.ResourceScriptFile =
-            this.scriptFileForDebuggerModel.values().next().value;
+            this.scriptFileForDebuggerModel.values().next().value as Bindings.ResourceScriptMapping.ResourceScriptFile;
         const addSourceMapURLLabel = i18nString(UIStrings.addSourceMap);
         contextMenu.debugSection().appendItem(
             addSourceMapURLLabel, addSourceMapURL.bind(null, scriptFile), {jslogContext: 'add-source-map'});
@@ -593,7 +598,7 @@ export class DebuggerPlugin extends Plugin {
             !Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance().pluginManager.hasPluginForScript(
                 scriptFile.script)) {
           contextMenu.debugSection().appendItem(
-              i18nString(UIStrings.addWasmDebugInfo), addDebugInfoURL.bind(null, scriptFile),
+              i18nString(UIStrings.addWasmDebugInfo), addDebugInfoURL.bind(this, scriptFile),
               {jslogContext: 'add-wasm-debug-info'});
         }
       }
@@ -1422,9 +1427,9 @@ export class DebuggerPlugin extends Plugin {
     this.scriptFileForDebuggerModel.delete(debuggerModel);
     if (oldScriptFile) {
       oldScriptFile.removeEventListener(
-          Bindings.ResourceScriptMapping.ResourceScriptFile.Events.DidMergeToVM, this.didMergeToVM, this);
+          Bindings.ResourceScriptMapping.ResourceScriptFile.Events.DID_MERGE_TO_VM, this.didMergeToVM, this);
       oldScriptFile.removeEventListener(
-          Bindings.ResourceScriptMapping.ResourceScriptFile.Events.DidDivergeFromVM, this.didDivergeFromVM, this);
+          Bindings.ResourceScriptMapping.ResourceScriptFile.Events.DID_DIVERGE_FROM_VM, this.didDivergeFromVM, this);
       if (this.muted && !this.uiSourceCode.isDirty() && this.consistentScripts()) {
         this.setMuted(false);
       }
@@ -1434,9 +1439,9 @@ export class DebuggerPlugin extends Plugin {
     }
     this.scriptFileForDebuggerModel.set(debuggerModel, newScriptFile);
     newScriptFile.addEventListener(
-        Bindings.ResourceScriptMapping.ResourceScriptFile.Events.DidMergeToVM, this.didMergeToVM, this);
+        Bindings.ResourceScriptMapping.ResourceScriptFile.Events.DID_MERGE_TO_VM, this.didMergeToVM, this);
     newScriptFile.addEventListener(
-        Bindings.ResourceScriptMapping.ResourceScriptFile.Events.DidDivergeFromVM, this.didDivergeFromVM, this);
+        Bindings.ResourceScriptMapping.ResourceScriptFile.Events.DID_DIVERGE_FROM_VM, this.didDivergeFromVM, this);
     newScriptFile.checkMapping();
 
     void newScriptFile.missingSymbolFiles().then(resources => {
@@ -1459,7 +1464,7 @@ export class DebuggerPlugin extends Plugin {
       return;
     }
     this.missingDebugInfoBar =
-        UI.Infobar.Infobar.create(UI.Infobar.Type.Error, warning.details, [], undefined, 'missing-debug-info');
+        UI.Infobar.Infobar.create(UI.Infobar.Type.ERROR, warning.details, [], undefined, 'missing-debug-info');
     if (!this.missingDebugInfoBar) {
       return;
     }
@@ -1537,7 +1542,7 @@ export class DebuggerPlugin extends Plugin {
 
     if (!resource) {
       this.sourceMapInfobar = UI.Infobar.Infobar.create(
-          UI.Infobar.Type.Info, i18nString(UIStrings.sourceMapSkipped), [],
+          UI.Infobar.Type.INFO, i18nString(UIStrings.sourceMapSkipped), [],
           Common.Settings.Settings.instance().createSetting('source-map-skipped-infobar-disabled', false),
           'source-map-skipped');
       if (!this.sourceMapInfobar) {
@@ -1547,7 +1552,7 @@ export class DebuggerPlugin extends Plugin {
       this.sourceMapInfobar.createDetailsRowMessage(i18nString(UIStrings.reloadForSourceMap));
     } else if (resource.success) {
       this.sourceMapInfobar = UI.Infobar.Infobar.create(
-          UI.Infobar.Type.Info, i18nString(UIStrings.sourceMapLoaded), [],
+          UI.Infobar.Type.INFO, i18nString(UIStrings.sourceMapLoaded), [],
           Common.Settings.Settings.instance().createSetting('source-map-infobar-disabled', false), 'source-map-loaded');
       if (!this.sourceMapInfobar) {
         return;
@@ -1558,7 +1563,7 @@ export class DebuggerPlugin extends Plugin {
       }));
     } else {
       this.sourceMapInfobar = UI.Infobar.Infobar.create(
-          UI.Infobar.Type.Warning, i18nString(UIStrings.sourceMapFailed), [], undefined, 'source-map-failed');
+          UI.Infobar.Type.WARNING, i18nString(UIStrings.sourceMapFailed), [], undefined, 'source-map-failed');
       if (!this.sourceMapInfobar) {
         return;
       }
@@ -1719,9 +1724,9 @@ export class DebuggerPlugin extends Plugin {
     }
     for (const script of this.scriptFileForDebuggerModel.values()) {
       script.removeEventListener(
-          Bindings.ResourceScriptMapping.ResourceScriptFile.Events.DidMergeToVM, this.didMergeToVM, this);
+          Bindings.ResourceScriptMapping.ResourceScriptFile.Events.DID_MERGE_TO_VM, this.didMergeToVM, this);
       script.removeEventListener(
-          Bindings.ResourceScriptMapping.ResourceScriptFile.Events.DidDivergeFromVM, this.didDivergeFromVM, this);
+          Bindings.ResourceScriptMapping.ResourceScriptFile.Events.DID_DIVERGE_FROM_VM, this.didDivergeFromVM, this);
     }
     this.scriptFileForDebuggerModel.clear();
 
@@ -1834,10 +1839,10 @@ async function computeNonBreakableLines(
 
 // Breakpoint markers
 
-type BreakpointDecoration = {
-  content: CodeMirror.DecorationSet,
-  gutter: CodeMirror.RangeSet<CodeMirror.GutterMarker>,
-};
+interface BreakpointDecoration {
+  content: CodeMirror.DecorationSet;
+  gutter: CodeMirror.RangeSet<CodeMirror.GutterMarker>;
+}
 
 const setBreakpointDeco = CodeMirror.StateEffect.define<BreakpointDecoration>();
 const muteBreakpoints = CodeMirror.StateEffect.define<null>();
@@ -2022,7 +2027,7 @@ class ValueDecoration extends CodeMirror.WidgetType {
       } else {
         UI.UIUtils.createTextChild(widget, ', ');
       }
-      const nameValuePair = (widget.createChild('span') as HTMLElement);
+      const nameValuePair = widget.createChild('span');
       UI.UIUtils.createTextChild(nameValuePair, name + ' = ');
       const propertyCount = value.preview ? value.preview.properties.length : 0;
       const entryCount = value.preview && value.preview.entries ? value.preview.entries.length : 0;

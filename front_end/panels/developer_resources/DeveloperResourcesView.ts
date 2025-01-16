@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import '../../ui/legacy/legacy.js';
+
 import type * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
@@ -41,6 +43,14 @@ const UIStrings = {
    * total. Resources are files related to the webpage.
    */
   resources: '{n, plural, =1 {# resource} other {# resources}}',
+  /**
+   * @description Nnumber of resource(s) match
+   */
+  numberOfResourceMatch: '{n, plural, =1 {# resource matches} other {# resources match}}',
+  /**
+   * @description No resource matches
+   */
+  noResourceMatches: 'No resource matches',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/developer_resources/DeveloperResourcesView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -73,11 +83,13 @@ export class DeveloperResourcesView extends UI.ThrottledWidget.ThrottledWidget {
 
     const toolbarContainer = this.contentElement.createChild('div', 'developer-resource-view-toolbar-container');
     toolbarContainer.setAttribute('jslog', `${VisualLogging.toolbar()}`);
-    const toolbar = new UI.Toolbar.Toolbar('developer-resource-view-toolbar', toolbarContainer);
+    toolbarContainer.role = 'toolbar';
+    const toolbar = toolbarContainer.createChild('devtools-toolbar', 'developer-resource-view-toolbar');
+    toolbar.role = 'presentation';
 
     this.textFilterRegExp = null;
     this.filterInput = new UI.Toolbar.ToolbarFilter(i18nString(UIStrings.filterByText), 1);
-    this.filterInput.addEventListener(UI.Toolbar.ToolbarInput.Event.TextChanged, this.onFilterChanged, this);
+    this.filterInput.addEventListener(UI.Toolbar.ToolbarInput.Event.TEXT_CHANGED, this.onFilterChanged, this);
     toolbar.appendToolbarItem(this.filterInput);
 
     const loadThroughTarget = SDK.PageResourceLoader.getLoadThroughTargetSetting();
@@ -93,7 +105,7 @@ export class DeveloperResourcesView extends UI.ThrottledWidget.ThrottledWidget {
     this.statusMessageElement = this.statusToolbarElement.createChild('div', 'developer-resource-view-message');
 
     this.loader = SDK.PageResourceLoader.PageResourceLoader.instance();
-    this.loader.addEventListener(SDK.PageResourceLoader.Events.Update, this.update, this);
+    this.loader.addEventListener(SDK.PageResourceLoader.Events.UPDATE, this.update, this);
     this.update();
   }
 
@@ -141,6 +153,15 @@ export class DeveloperResourcesView extends UI.ThrottledWidget.ThrottledWidget {
     this.textFilterRegExp = text ? Platform.StringUtilities.createPlainTextSearchRegex(text, 'i') : null;
     this.listView.updateFilterAndHighlight(this.textFilterRegExp);
     this.updateStats();
+
+    const numberOfResourceMatch = this.listView.getNumberOfVisibleItems();
+    let resourceMatch = '';
+    if (numberOfResourceMatch === 0) {
+      resourceMatch = i18nString(UIStrings.noResourceMatches);
+    } else {
+      resourceMatch = i18nString(UIStrings.numberOfResourceMatch, {n: numberOfResourceMatch});
+    }
+    UI.ARIAUtils.alert(resourceMatch);
   }
 
   override wasShown(): void {

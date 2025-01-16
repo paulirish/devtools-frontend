@@ -55,20 +55,22 @@ import {
 const nodeToParentTreeElementMap = new WeakMap<Node, TreeElement>();
 
 export enum Events {
+  /* eslint-disable @typescript-eslint/naming-convention -- Used by web_tests. */
   ElementAttached = 'ElementAttached',
   ElementsDetached = 'ElementsDetached',
   ElementExpanded = 'ElementExpanded',
   ElementCollapsed = 'ElementCollapsed',
   ElementSelected = 'ElementSelected',
+  /* eslint-enable @typescript-eslint/naming-convention */
 }
 
-export type EventTypes = {
-  [Events.ElementAttached]: TreeElement,
-  [Events.ElementsDetached]: void,
-  [Events.ElementExpanded]: TreeElement,
-  [Events.ElementCollapsed]: TreeElement,
-  [Events.ElementSelected]: TreeElement,
-};
+export interface EventTypes {
+  [Events.ElementAttached]: TreeElement;
+  [Events.ElementsDetached]: void;
+  [Events.ElementExpanded]: TreeElement;
+  [Events.ElementCollapsed]: TreeElement;
+  [Events.ElementSelected]: TreeElement;
+}
 
 export class TreeOutline extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
   readonly rootElementInternal: TreeElement;
@@ -347,9 +349,12 @@ export class TreeOutline extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
 
       // Usually, this.element is the tree container that scrolls. But sometimes
       // (i.e. in the Elements panel), its parent is.
-      let scrollParentElement: HTMLElement = this.element;
-      while (getComputedStyle(scrollParentElement).overflow === 'visible' && scrollParentElement.parentElement) {
-        scrollParentElement = scrollParentElement.parentElement;
+      let scrollParentElement: Element = this.element;
+      while (getComputedStyle(scrollParentElement).overflow === 'visible' &&
+             scrollParentElement.parentElementOrShadowHost()) {
+        const parent = scrollParentElement.parentElementOrShadowHost();
+        Platform.assertNotNullOrUndefined(parent);
+        scrollParentElement = parent;
       }
 
       const viewRect = scrollParentElement.getBoundingClientRect();
@@ -387,20 +392,28 @@ export class TreeOutline extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
   }
 }
 
+export const enum TreeVariant {
+  NAVIGATION_TREE = 'NavigationTree',
+  OTHER = 'Other',
+}
+
 export class TreeOutlineInShadow extends TreeOutline {
   override element: HTMLElement;
   shadowRoot: ShadowRoot;
   private readonly disclosureElement: Element;
   override renderSelection: boolean;
-  constructor() {
+  constructor(variant: TreeVariant = TreeVariant.OTHER) {
     super();
     this.contentElement.classList.add('tree-outline');
     this.element = document.createElement('div');
-    this.shadowRoot =
-        createShadowRootWithCoreStyles(this.element, {cssFile: treeoutlineStyles, delegatesFocus: undefined});
+    this.shadowRoot = createShadowRootWithCoreStyles(this.element, {cssFile: treeoutlineStyles});
     this.disclosureElement = this.shadowRoot.createChild('div', 'tree-outline-disclosure');
     this.disclosureElement.appendChild(this.contentElement);
     this.renderSelection = true;
+
+    if (variant === TreeVariant.NAVIGATION_TREE) {
+      this.contentElement.classList.add('tree-variant-navigation');
+    }
   }
 
   registerRequiredCSS(cssFile: {cssContent: string}): void {
@@ -790,7 +803,7 @@ export class TreeElement {
     }
   }
 
-  setLeadingIcons(icons: IconButton.Icon.Icon[]): void {
+  setLeadingIcons(icons: IconButton.Icon.Icon[]|IconButton.FileSourceIcon.FileSourceIcon[]): void {
     if (!this.leadingIconsElement && !icons.length) {
       return;
     }

@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
-import {type ElementHandle, type Page} from 'puppeteer-core';
+import type {ElementHandle, Page} from 'puppeteer-core';
 
-import {type StepType} from '../../../front_end/panels/recorder/models/Schema.js';
+import type {StepType} from '../../../front_end/panels/recorder/models/Schema.js';
 import {
   $$,
   click,
@@ -18,10 +18,6 @@ import {
   waitForFunction,
   waitForNone,
 } from '../../../test/shared/helper.js';
-import {
-  describe,
-  it,
-} from '../../../test/shared/mocha-extensions.js';
 
 import {
   assertRecordingMatchesSnapshot,
@@ -180,8 +176,7 @@ describe('Recorder', function() {
           await waitFor('.expanded');
         }
 
-        // Flaky test
-        it.skip('[crbug.com/1443421]: should select through the selector picker', async () => {
+        it('should select through the selector picker', async () => {
           const {target, frontend} = getBrowserAndPages();
           await frontend.bringToFront();
           await frontend.waitForSelector('pierce/.settings');
@@ -201,7 +196,7 @@ describe('Recorder', function() {
         });
 
         // Flaky test
-        it.skip('[crbug.com/1443421]: should select through the selector picker twice', async () => {
+        it.skip('[crbug.com/383478771] should select through the selector picker twice', async () => {
           const {target, frontend} = getBrowserAndPages();
           await frontend.bringToFront();
           await frontend.waitForSelector('pierce/.settings');
@@ -230,8 +225,7 @@ describe('Recorder', function() {
           assertRecordingMatchesSnapshot(recording);
         });
 
-        // Flaky test
-        it.skip('[crbug.com/1443421]: should select through the selector picker during recording', async () => {
+        it('should select through the selector picker during recording', async () => {
           const {target, frontend} = getBrowserAndPages();
           await frontend.bringToFront();
           await frontend.waitForSelector('pierce/.settings');
@@ -333,13 +327,14 @@ describe('Recorder', function() {
         const {frontend} = getBrowserAndPages();
         await frontend.bringToFront();
         const shortcutDialog = await waitFor('devtools-shortcut-dialog');
+        const buttonDialog = await waitFor('devtools-button-dialog', shortcutDialog);
 
-        await click('devtools-button', {root: shortcutDialog});
+        await click('devtools-button', {root: buttonDialog});
 
-        const dialog = await waitFor('devtools-dialog', shortcutDialog);
+        const dialog = await waitFor('devtools-dialog', buttonDialog);
         assert.isOk(dialog);
 
-        const shortcuts = await $$('.keybinds-list-item', dialog);
+        const shortcuts = await $$('.keybinds-list-item', buttonDialog);
         assert.lengthOf(shortcuts, 4);
       });
     });

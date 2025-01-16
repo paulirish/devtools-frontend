@@ -40,9 +40,17 @@ import domBreakpointsSidebarPaneStyles from './domBreakpointsSidebarPane.css.js'
 
 const UIStrings = {
   /**
-   *@description Text to indicate there are no breakpoints
+   *@description Header text to indicate there are no breakpoints
    */
-  noBreakpoints: 'No breakpoints',
+  noBreakpoints: 'You\'ll find DOM breakpoints here',
+  /**
+   *@description DOM breakpoints description that shows if no DOM breakpoints are set
+   */
+  domBreakpointsDescription: 'DOM breakpoints pause on the code that changes a DOM node or its children.',
+  /**
+   *@description Link text to more information on DOM breakpoints
+   */
+  learnMore: 'Learn more',
   /**
    *@description Accessibility label for the DOM breakpoints list in the Sources panel
    */
@@ -122,6 +130,8 @@ const str_ = i18n.i18n.registerUIStrings('panels/browser_debugger/DOMBreakpoints
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 const i18nLazyString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined, str_);
 
+const DOM_BREAKPOINT_DOCUMENTATION_URL = 'https://developer.chrome.com/docs/devtools/javascript/breakpoints#dom';
+
 let domBreakpointsSidebarPaneInstance: DOMBreakpointsSidebarPane;
 
 export class DOMBreakpointsSidebarPane extends UI.Widget.VBox implements
@@ -139,8 +149,15 @@ export class DOMBreakpointsSidebarPane extends UI.Widget.VBox implements
 
     this.contentElement.setAttribute(
         'jslog', `${VisualLogging.section('sources.dom-breakpoints').track({resize: true})}`);
-    this.#emptyElement = this.contentElement.createChild('div', 'gray-info-message');
-    this.#emptyElement.textContent = i18nString(UIStrings.noBreakpoints);
+    this.contentElement.classList.add('dom-breakpoints-container');
+    this.#emptyElement = this.contentElement.createChild('div', 'empty-state');
+    this.#emptyElement.createChild('div', 'header').textContent = i18nString(UIStrings.noBreakpoints);
+    const emptyStateDescription = this.#emptyElement.createChild('div', 'description');
+    emptyStateDescription.textContent = i18nString(UIStrings.domBreakpointsDescription);
+    const learnMore = UI.XLink.XLink.create(
+        DOM_BREAKPOINT_DOCUMENTATION_URL, i18nString(UIStrings.learnMore), '', undefined, 'learn-more');
+    emptyStateDescription.appendChild(learnMore);
+
     this.#breakpoints = new UI.ListModel.ListModel();
     this.#list = new UI.ListControl.ListControl(this.#breakpoints, this, UI.ListControl.ListMode.NonViewport);
     this.contentElement.appendChild(this.#list.element);
@@ -150,13 +167,13 @@ export class DOMBreakpointsSidebarPane extends UI.Widget.VBox implements
     this.#emptyElement.tabIndex = -1;
 
     SDK.TargetManager.TargetManager.instance().addModelListener(
-        SDK.DOMDebuggerModel.DOMDebuggerModel, SDK.DOMDebuggerModel.Events.DOMBreakpointAdded, this.breakpointAdded,
+        SDK.DOMDebuggerModel.DOMDebuggerModel, SDK.DOMDebuggerModel.Events.DOM_BREAKPOINT_ADDED, this.breakpointAdded,
         this);
     SDK.TargetManager.TargetManager.instance().addModelListener(
-        SDK.DOMDebuggerModel.DOMDebuggerModel, SDK.DOMDebuggerModel.Events.DOMBreakpointToggled, this.breakpointToggled,
-        this);
+        SDK.DOMDebuggerModel.DOMDebuggerModel, SDK.DOMDebuggerModel.Events.DOM_BREAKPOINT_TOGGLED,
+        this.breakpointToggled, this);
     SDK.TargetManager.TargetManager.instance().addModelListener(
-        SDK.DOMDebuggerModel.DOMDebuggerModel, SDK.DOMDebuggerModel.Events.DOMBreakpointsRemoved,
+        SDK.DOMDebuggerModel.DOMDebuggerModel, SDK.DOMDebuggerModel.Events.DOM_BREAKPOINTS_REMOVED,
         this.breakpointsRemoved, this);
 
     for (const domDebuggerModel of SDK.TargetManager.TargetManager.instance().models(
@@ -349,7 +366,7 @@ export class DOMBreakpointsSidebarPane extends UI.Widget.VBox implements
     this.update();
   }
 
-  private update(): void {
+  update(): void {
     const details = UI.Context.Context.instance().flavor(SDK.DebuggerModel.DebuggerPausedDetails);
     if (this.#highlightedBreakpoint) {
       const oldHighlightedBreakpoint = this.#highlightedBreakpoint;

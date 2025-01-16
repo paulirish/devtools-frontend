@@ -151,26 +151,6 @@
       ],
     },
     {
-      name: "CSSCustomStateDeprecatedSyntax",
-      message: "`:--customstatename` is deprecated. Please use the `:state(customstatename)` syntax instead.",
-      translation_note: "Warning displayed to developers when their website uses `:--customstatename` in CSS. They can simply switch their CSS to `:state(customstatename)` and it will be the same.",
-      web_features: [
-        "kCSSCustomStateDeprecatedSyntax",
-      ],
-      milestone: 122,
-      chrome_status_feature: 5140610730426368,
-    },
-    {
-      name: "CSSInsetAreaProperty",
-      message: "The `inset-area` property is deprecated. Please use the `position-area` property instead.",
-      translation_note: "Warning displayed to developers when their website uses `inset-area` in CSS. They can simply switch their CSS to `position-area` and it will function in the same way.",
-      web_features: [
-        "kCSSInsetAreaProperty",
-      ],
-      milestone: 129,
-      chrome_status_feature: 5142143019253760,
-    },
-    {
       name: "CSSSelectorInternalMediaControlsOverlayCastButton",
       message: "The `disableRemotePlayback` attribute should be used in order to disable the default Cast integration instead of using `-internal-media-controls-overlay-cast-button` selector.",
       translation_note: "Warning displayed to developers when they hide the Cast button on a video element using the deprecated CSS selector instead of using the disableRemotePlayback attribute on the element.",
@@ -208,23 +188,6 @@
       ],
       chrome_status_feature: 5128825141198848,
       milestone: 119,
-    },
-    {
-      name: "DelegatedInkExpectedImprovement",
-      message: "`DelegatedInkTrailPresenter.expectedImprovement` is deprecated due to potential fingerprinting concerns.",
-      translation_note: "Warning displayed to developers that they should not be using `DelegatedInkTrailPresenter.expectedImprovement`.",
-      web_features: [
-        "kDelegatedInkExpectedImprovement",
-      ],
-    },
-    {
-      name: "DocumentDomainSettingWithoutOriginAgentClusterHeader",
-      message: "Relaxing the same-origin policy by setting `document.domain` is deprecated, and will be disabled by default. To continue using this feature, please opt-out of origin-keyed agent clusters by sending an `Origin-Agent-Cluster: ?0` header along with the HTTP response for the document and frames. See https://developer.chrome.com/blog/immutable-document-domain/ for more details.",
-      translation_note: "This warning occurs when a script modifies `document.domain` without having set on `Origin-Agent-Cluster` http header. In other words, when a script relies on the default behaviour of `Origin-Agent-Cluster` when setting document.domain.",
-      web_features: [
-        "kDocumentDomainSettingWithoutOriginAgentClusterHeader",
-      ],
-      milestone: 115,
     },
     {
       name: "DOMMutationEvents",
@@ -269,15 +232,6 @@
         "kGeolocationInsecureOriginDeprecatedNotRemoved",
         "kGeolocationInsecureOriginIframeDeprecatedNotRemoved",
       ],
-    },
-    {
-      name: "GetInnerHTML",
-      message: "The getInnerHTML() function is deprecated, and will be removed from this browser very soon. Please use getHTML() instead.",
-      translation_note: "Warning displayed to developers when non-standard getInnerHTML function is called. This function is deprecated and will be removed.",
-      web_features: [
-        "kElementGetInnerHTML",
-      ],
-      chrome_status_feature: 5081733588582400,
     },
     {
       name: "GetUserMediaInsecureOrigin",
@@ -637,6 +591,16 @@
         "kV8SharedArrayBufferConstructedInExtensionWithoutIsolation",
       ],
       milestone: 96,
+    },
+    {
+      name: "WebGPULimitMaxInterStageShaderComponents",
+      message: "The WebGPU limit `maxInterStageShaderComponents` is deprecated, instead use the WebGPU limit `maxInterStageShaderVariables`.",
+      translation_note: "This warning occurs when the website attempts to use the deprecated WebGPU limit `maxInterStageShaderComponents`.",
+      web_features: [
+        "kMaxInterStageShaderComponentsRequiredLimit",
+        "kV8GPUSupportedLimits_MaxInterStageShaderComponents_AttributeGetter",
+      ],
+      chrome_status_feature: 4853767735083008,
     },
     {
       name: "WebSQL",

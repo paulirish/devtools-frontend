@@ -1,5 +1,7 @@
 # Chromium DevTools docs
 
+[goo.gle/chromium-devtools](http://goo.gle/chromium-devtools)
+
 This directory contains [Chrome DevTools] project
 documentation in [Gitiles-flavored Markdown]. It is automatically
 [rendered by Gitiles].
@@ -21,30 +23,36 @@ below.**
 
 ### General Development
 
-*   [Get the Code](get_the_code.md)
+*   [Get the Code](./get_the_code.md)
+*   [Contribution Guide](./contributing/README.md)
 *   [UX Style Guide](./styleguide/ux/README.md)
 *   [Testing Guide](../test/README.md)
-*   [Contributing Changes](contributing_changes.md)
-*   [Chrome DevTools Design Review Guidelines](design_guidelines.md)
-*   [Release Management](release_management.md)
-*   [Dependencies](dependencies.md)
-*   [Localization](l10n.md)
-*   [V8 debugger support checklist for new language features](https://goo.gle/v8-checklist)
-*   [Chrome DevTools Protocol](devtools-protocol.md)
-*   [Visual logging in DevTools](visual_logging.md)
-*   [UMA metrics in DevTools](uma_metrics.md)
-    *   [How to add UMA metrics in DevTools frontend](add_uma_metrics.md)
-*   [How to add experiments in DevTools frontend](add_experiments.md)
+*   [Cookbook](./cookbook/README.md)
+*   [Visual logging in DevTools](../front_end/ui/visual_logging/README.md)
+*   [Style Guides](./styleguide/README.md)
 
 ### Architectural Documentation
 
 *   [Architecture of DevTools](architecture_of_devtools.md)
+*   [Chrome DevTools Protocol (CDP)](devtools-protocol.md)
 *   [Resource management in DevTools](resource_management.md)
 
 ### Chromium
 
-*   [Chromium Docs](https://chromium.googlesource.com/chromium/src/+/master/docs/README.md)
+*   [Chromium Docs](https://chromium.googlesource.com/chromium/src/+/main/docs/README.md)
 *   [V8 Documention](https://v8.dev/docs)
+
+### Checklists
+
+*   [DevTools UI feature checklist](./checklist/ui.md)
+*   [DevTools support checklist for Blink Intents](./checklist/README.md)
+*   [DevTools support checklist for JavaScript features](./checklist/javascript.md)
+*   [DevTools support checklist for WebAssembly features](./checklist/webassembly.md)
+
+### Policies
+
+*   [Chromium DevTools Slow-Close Policy](./policy/slow-close.md)
+*   [DevTools Page Zoom Accessibility Policy](./policy/gar-page-zoom-policy.md)
 
 ### Useful Commands
 

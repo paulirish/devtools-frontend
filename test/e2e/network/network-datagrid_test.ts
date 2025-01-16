@@ -5,7 +5,7 @@
 import {assert} from 'chai';
 
 import {unregisterAllServiceWorkers} from '../../conductor/hooks.js';
-import {type BrowserAndPages} from '../../conductor/puppeteer-state.js';
+import type {BrowserAndPages} from '../../conductor/puppeteer-state.js';
 import {
   click,
   getBrowserAndPages,
@@ -16,7 +16,6 @@ import {
   waitForElementWithTextContent,
   waitForFunction,
 } from '../../shared/helper.js';
-import {describe, it} from '../../shared/mocha-extensions.js';
 import {
   clearTextFilter,
   getAllRequestNames,
@@ -78,7 +77,7 @@ describe('The Network Tab', function() {
     const checkbox = await waitFor('[title^="Disable cache"]');
     const checked = await checkbox.evaluate(box => (box as HTMLInputElement).checked);
 
-    assert.strictEqual(checked, false, 'The disable cache checkbox should be unchecked');
+    assert.isFalse(checked, 'The disable cache checkbox should be unchecked');
   });
 
   it('shows Last-Modified', async () => {
@@ -421,7 +420,7 @@ describe('The Network Tab', function() {
     await waitForSomeRequestsToAppear(3);
 
     const updatedRequestNames = await getAllRequestNames();
-    assert.deepStrictEqual(updatedRequestNames, ['xhr.html', 'image.svg', 'image.svg']);
+    assert.deepEqual(updatedRequestNames, ['xhr.html', 'image.svg', 'image.svg']);
   });
 
   it('displays focused background color when request is selected via keyboard navigation', async () => {
@@ -437,7 +436,7 @@ describe('The Network Tab', function() {
       return document.querySelector('.network-log-grid tbody tr.selected')?.getAttribute('style');
     });
 
-    assert.deepStrictEqual(await getSelectedRequestBgColor(), 'background-color: var(--color-grid-focus-selected);');
+    assert.deepEqual(await getSelectedRequestBgColor(), 'background-color: var(--color-grid-focus-selected);');
   });
 
   it('shows the request panel when clicked during a websocket message (https://crbug.com/1222382)', async () => {

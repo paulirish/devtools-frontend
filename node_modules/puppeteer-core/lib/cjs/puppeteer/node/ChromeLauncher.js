@@ -8,19 +8,21 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.removeMatchingFlags = exports.getFeatures = exports.ChromeLauncher = void 0;
+exports.ChromeLauncher = void 0;
+exports.getFeatures = getFeatures;
+exports.removeMatchingFlags = removeMatchingFlags;
 const promises_1 = require("fs/promises");
 const os_1 = __importDefault(require("os"));
 const path_1 = __importDefault(require("path"));
 const browsers_1 = require("@puppeteer/browsers");
 const util_js_1 = require("../common/util.js");
 const assert_js_1 = require("../util/assert.js");
-const ProductLauncher_js_1 = require("./ProductLauncher.js");
+const BrowserLauncher_js_1 = require("./BrowserLauncher.js");
 const fs_js_1 = require("./util/fs.js");
 /**
  * @internal
  */
-class ChromeLauncher extends ProductLauncher_js_1.ProductLauncher {
+class ChromeLauncher extends BrowserLauncher_js_1.BrowserLauncher {
     constructor(puppeteer) {
         super(puppeteer, 'chrome');
     }
@@ -155,7 +157,6 @@ class ChromeLauncher extends ProductLauncher_js_1.ProductLauncher {
             '--disable-breakpad',
             '--disable-client-side-phishing-detection',
             '--disable-component-extensions-with-background-pages',
-            '--disable-component-update',
             '--disable-default-apps',
             '--disable-dev-shm-usage',
             '--disable-extensions',
@@ -247,7 +248,6 @@ function getFeatures(flag, options = []) {
         return s;
     });
 }
-exports.getFeatures = getFeatures;
 /**
  * Removes all elements in-place from the given string array
  * that match the given command-line flag.
@@ -267,5 +267,4 @@ function removeMatchingFlags(array, flag) {
     }
     return array;
 }
-exports.removeMatchingFlags = removeMatchingFlags;
 //# sourceMappingURL=ChromeLauncher.js.map

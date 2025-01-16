@@ -142,7 +142,7 @@ export async function frameworkEventListeners(object: SDK.RemoteObject.RemoteObj
         }
         return new SDK.DOMDebuggerModel.EventListener(
             domDebuggerModel as SDK.DOMDebuggerModel.DOMDebuggerModel, object, type, useCapture, passive, once, handler,
-            originalHandler, location, removeFunctionObject, SDK.DOMDebuggerModel.EventListener.Origin.FrameworkUser);
+            originalHandler, location, removeFunctionObject, SDK.DOMDebuggerModel.EventListener.Origin.FRAMEWORK_USER);
       }
     }
   }
@@ -257,7 +257,7 @@ export async function frameworkEventListeners(object: SDK.RemoteObject.RemoteObj
       internalHandlers?: (() => void)[],
       errorString?: string,
     } = {
-      eventListeners: eventListeners,
+      eventListeners,
       internalHandlers: internalHandlers.length ? internalHandlers : undefined,
       errorString: undefined,
     };
@@ -293,7 +293,7 @@ export async function frameworkEventListeners(object: SDK.RemoteObject.RemoteObj
           const len = obj.length;
           return typeof len === 'number' && (len >>> 0 === len && (len > 0 || 1 / len > 0));
         }
-      } catch (e) {
+      } catch {
       }
       return false;
     }
@@ -331,12 +331,12 @@ export async function frameworkEventListeners(object: SDK.RemoteObject.RemoteObj
           }
           if (!errorString) {
             return {
-              type: type,
-              useCapture: useCapture,
-              passive: passive,
-              once: once,
-              handler: handler,
-              remove: remove,
+              type,
+              useCapture,
+              passive,
+              once,
+              handler,
+              remove,
             } as EventListenerObjectInInspectedPage;
           }
         }
@@ -362,7 +362,7 @@ export async function frameworkEventListeners(object: SDK.RemoteObject.RemoteObj
     function toString(obj: any): string {
       try {
         return String(obj);
-      } catch (e) {
+      } catch {
         return '<error>';
       }
     }
@@ -402,7 +402,7 @@ export async function frameworkEventListeners(object: SDK.RemoteObject.RemoteObj
                 useCapture: true,
                 passive: false,
                 once: false,
-                type: type,
+                type,
                 remove: jQueryRemove.bind(node, frameworkListener.selector),
               };
               eventListeners.push(listener);
@@ -421,7 +421,7 @@ export async function frameworkEventListeners(object: SDK.RemoteObject.RemoteObj
           const events = entryEvents[type];
           for (const key in events) {
             if (typeof events[key] === 'function') {
-              const listener = {handler: events[key], useCapture: true, passive: false, once: false, type: type};
+              const listener = {handler: events[key], useCapture: true, passive: false, once: false, type};
               // We don't support removing for old version < 1.4 of jQuery because it doesn't provide API for getting "selector".
               eventListeners.push(listener);
             }
@@ -431,7 +431,7 @@ export async function frameworkEventListeners(object: SDK.RemoteObject.RemoteObj
           internalHandlers.push(entry['$handle']);
         }
       }
-      return {eventListeners: eventListeners, internalHandlers: internalHandlers};
+      return {eventListeners, internalHandlers};
     }
 
     function jQueryRemove(this: Object|null, selector: string, type: string, handler: () => void): void {
@@ -445,7 +445,8 @@ export async function frameworkEventListeners(object: SDK.RemoteObject.RemoteObj
         return;
       }
       const jQueryFunction = jQuery as (arg0: Node) => {
-        off: Function,
+        off:
+          Function,
       };
       jQueryFunction(node).off(type, selector, handler);
     }

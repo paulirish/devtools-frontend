@@ -93,7 +93,7 @@ export async function doubleClickSourceTreeItem(selector: string) {
 
 export async function waitForSourcesPanel(): Promise<void> {
   // Wait for the navigation panel to show up
-  await Promise.any([waitFor('.navigator-file-tree-item'), waitFor('.empty-view')]);
+  await waitFor('.navigator-file-tree-item, .empty-state');
 }
 
 export async function openSourcesPanel() {
@@ -174,7 +174,7 @@ export async function openOverridesSubPane() {
 
 export async function openFileInEditor(sourceFile: string) {
   await waitForSourceFiles(
-      SourceFileEvents.SourceFileLoaded, files => files.some(f => f.endsWith(sourceFile)),
+      SourceFileEvents.SOURCE_FILE_LOADED, files => files.some(f => f.endsWith(sourceFile)),
       // Open a particular file in the editor
       () => doubleClickSourceTreeItem(`[aria-label="${sourceFile}, file"]`));
 }
@@ -317,7 +317,7 @@ export async function checkBreakpointDidNotActivate() {
     const breakpointIndicator = await Promise.all(pauseIndicators.map(elements => {
       return elements.evaluate(el => el.className);
     }));
-    assert.deepEqual(breakpointIndicator.length, 0, 'script had been paused');
+    assert.lengthOf(breakpointIndicator, 0, 'script had been paused');
   });
 }
 
@@ -444,7 +444,6 @@ export async function setEventListenerBreakpoint(groupName: string, eventName: s
 }
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface Window {
     /* eslint-disable @typescript-eslint/naming-convention */
     __sourceFileEvents: Map<number, {files: string[], handler: (e: Event) => void}>;
@@ -453,8 +452,8 @@ declare global {
 }
 
 export const enum SourceFileEvents {
-  SourceFileLoaded = 'source-file-loaded',
-  AddedToSourceTree = 'source-tree-file-added',
+  SOURCE_FILE_LOADED = 'source-file-loaded',
+  ADDED_TO_SOURCE_TREE = 'source-tree-file-added',
 }
 
 let nextEventHandlerId = 0;
@@ -502,7 +501,7 @@ export async function waitForSourceFiles<T>(
 
 export async function captureAddedSourceFiles(count: number, action: () => Promise<void>): Promise<string[]> {
   let capturedFileNames!: string[];
-  await waitForSourceFiles(SourceFileEvents.AddedToSourceTree, files => {
+  await waitForSourceFiles(SourceFileEvents.ADDED_TO_SOURCE_TREE, files => {
     capturedFileNames = files;
     return files.length >= count;
   }, action);
@@ -511,7 +510,7 @@ export async function captureAddedSourceFiles(count: number, action: () => Promi
 
 export async function reloadPageAndWaitForSourceFile(target: puppeteer.Page, sourceFile: string) {
   await waitForSourceFiles(
-      SourceFileEvents.SourceFileLoaded, files => files.some(f => f.endsWith(sourceFile)), () => target.reload());
+      SourceFileEvents.SOURCE_FILE_LOADED, files => files.some(f => f.endsWith(sourceFile)), () => target.reload());
 }
 
 export function isEqualOrAbbreviation(abbreviated: string, full: string): boolean {
@@ -524,11 +523,12 @@ export function isEqualOrAbbreviation(abbreviated: string, full: string): boolea
 }
 
 // Helpers for navigating the file tree.
-export type NestedFileSelector = {
-  rootSelector: string,
-  domainSelector: string,
-  folderSelector?: string, fileSelector: string,
-};
+export interface NestedFileSelector {
+  rootSelector: string;
+  domainSelector: string;
+  folderSelector?: string;
+  fileSelector: string;
+}
 
 export function createSelectorsForWorkerFile(
     workerName: string, folderName: string, fileName: string, workerIndex = 1): NestedFileSelector {
@@ -636,7 +636,9 @@ export async function openNestedWorkerFile(selectors: NestedFileSelector) {
 
 export async function inspectMemory(variableName: string) {
   await openSoftContextMenuAndClickOnItem(
-      `[data-object-property-name-for-test="${variableName}"]`, 'Reveal in Memory inspector panel');
+      `[data-object-property-name-for-test="${variableName}"]`,
+      'Open in Memory inspector panel',
+  );
 }
 
 export async function typeIntoSourcesAndSave(text: string) {
@@ -740,14 +742,14 @@ export async function enableLocalOverrides() {
   await waitFor(CLEAR_CONFIGURATION_SELECTOR);
 }
 
-export type LabelMapping = {
-  label: string,
-  moduleOffset: number,
-  bytecode: number,
-  sourceLine: number,
-  labelLine: number,
-  labelColumn: number,
-};
+export interface LabelMapping {
+  label: string;
+  moduleOffset: number;
+  bytecode: number;
+  sourceLine: number;
+  labelLine: number;
+  labelColumn: number;
+}
 
 export class WasmLocationLabels {
   readonly #mappings: Map<string, LabelMapping[]>;

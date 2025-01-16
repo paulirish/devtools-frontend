@@ -8,6 +8,8 @@ import * as UILegacy from '../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
+const {html} = LitHtml;
+
 class SizeChangedEvent extends Event {
   static readonly eventName = 'sizechanged';
   constructor(public size: number) {
@@ -26,8 +28,6 @@ export class SizeInputElement extends HTMLElement {
   #placeholder = '';
   #title: Platform.UIString.LocalizedString;
   #jslogContext: string;
-
-  static readonly litTagName = LitHtml.literal`device-mode-emulation-size-input`;
 
   constructor(title: Platform.UIString.LocalizedString, {jslogContext}: {jslogContext: string}) {
     super();
@@ -61,8 +61,8 @@ export class SizeInputElement extends HTMLElement {
         // For now, use an inline style tag and later we can refactor this
         // to use proper constructed stylesheets, when the code runs
         // in the correct frame context.
-        // eslint-disable-next-line rulesdir/ban_style_tags_in_lit_html
-        LitHtml.html`
+        // eslint-disable-next-line rulesdir/no-style-tags-in-lit-html
+        html`
       <style>
         input {
           /*
@@ -130,6 +130,6 @@ declare global {
     'device-mode-emulation-size-input': SizeInputElement;
   }
   interface HTMLElementEventMap {
-    'sizechanged': SizeChangedEvent;
+    sizechanged: SizeChangedEvent;
   }
 }

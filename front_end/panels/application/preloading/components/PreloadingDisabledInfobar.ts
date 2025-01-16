@@ -2,20 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import '../../../../ui/components/report_view/report_view.js';
+
 import * as i18n from '../../../../core/i18n/i18n.js';
 import type * as Platform from '../../../../core/platform/platform.js';
 import type * as Protocol from '../../../../generated/protocol.js';
+import * as Buttons from '../../../../ui/components/buttons/buttons.js';
 import * as ChromeLink from '../../../../ui/components/chrome_link/chrome_link.js';
 import * as Dialogs from '../../../../ui/components/dialogs/dialogs.js';
 import * as IconButton from '../../../../ui/components/icon_button/icon_button.js';
 import * as LegacyWrapper from '../../../../ui/components/legacy_wrapper/legacy_wrapper.js';
-import * as Coordinator from '../../../../ui/components/render_coordinator/render_coordinator.js';
-import * as ReportView from '../../../../ui/components/report_view/report_view.js';
+import * as RenderCoordinator from '../../../../ui/components/render_coordinator/render_coordinator.js';
 import * as UI from '../../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../../ui/visual_logging/visual_logging.js';
 
 import preloadingDisabledInfobarStyles from './preloadingDisabledInfobar.css.js';
+
+const {html} = LitHtml;
 
 const UIStrings = {
   /**
@@ -93,10 +97,7 @@ const str_ =
     i18n.i18n.registerUIStrings('panels/application/preloading/components/PreloadingDisabledInfobar.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
-
 export class PreloadingDisabledInfobar extends LegacyWrapper.LegacyWrapper.WrappableComponent<UI.Widget.VBox> {
-  static readonly litTagName = LitHtml.literal`devtools-resources-preloading-disabled-infobar`;
 
   readonly #shadow = this.attachShadow({mode: 'open'});
   #data: Protocol.Preload.PreloadEnabledStateUpdatedEvent = {
@@ -118,7 +119,7 @@ export class PreloadingDisabledInfobar extends LegacyWrapper.LegacyWrapper.Wrapp
   }
 
   async #render(): Promise<void> {
-    await coordinator.write('PreloadingDisabledInfobar render', () => {
+    await RenderCoordinator.write('PreloadingDisabledInfobar render', () => {
       LitHtml.render(this.#renderInternal(), this.#shadow, {host: this});
     });
   }
@@ -140,30 +141,27 @@ export class PreloadingDisabledInfobar extends LegacyWrapper.LegacyWrapper.Wrapp
 
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
-    return LitHtml.html`
+    return html`
       <div id='container'>
         <span id='header'>
           ${header}
         </span>
 
-        <${Dialogs.IconDialog.IconDialog.litTagName}
+        <devtools-button-dialog
           .data=${{
-            iconData: {
-              iconName: 'info',
-              color: 'var(--icon-default-hover)',
-              width: '16px',
-              height: '16px',
-            },
+            iconName: 'info',
+            variant: Buttons.Button.Variant.ICON,
             closeButton: true,
             position: Dialogs.Dialog.DialogVerticalPosition.AUTO,
             horizontalAlignment: Dialogs.Dialog.DialogHorizontalAlignment.AUTO,
             closeOnESC: true,
             closeOnScroll: false,
-          } as Dialogs.IconDialog.IconDialogData}
+            dialogTitle: i18nString(UIStrings.titleReasonsPreventingPreloading),
+          } as Dialogs.ButtonDialog.ButtonDialogData}
           jslog=${VisualLogging.dialog('preloading-disabled').track({resize: true, keydown: 'Escape'})}
         >
           ${this.#dialogContents()}
-        </${Dialogs.IconDialog.IconDialog.litTagName}>
+        </devtools-button-dialog>
       </div>
     `;
     // clang-format on
@@ -182,21 +180,15 @@ export class PreloadingDisabledInfobar extends LegacyWrapper.LegacyWrapper.Wrapp
         .data = {iconName: 'open-externally', color: 'var(--icon-default-hover)', width: '16px', height: '16px'};
     iconLink.append(iconLinkIcon);
 
-    return LitHtml.html`
+    return html`
       <div id='contents'>
-        <div id='title'>${i18nString(UIStrings.titleReasonsPreventingPreloading)}</div>
-
-        <${ReportView.ReportView.Report.litTagName}>
+        <devtools-report>
           ${this.#maybeDisalebByPreference()}
           ${this.#maybeDisalebByDataSaver()}
           ${this.#maybeDisalebByBatterySaver()}
           ${this.#maybeDisalebByHoldbackPrefetchSpeculationRules()}
           ${this.#maybeDisalebByHoldbackPrerenderSpeculationRules()}
-
-          <${ReportView.ReportView.ReportSectionDivider.litTagName}>
-          </${ReportView.ReportView.ReportSectionDivider.litTagName}>
-        </${ReportView.ReportView.Report.litTagName}>
-
+        </devtools-report>
         <div id='footer'>
           ${learnMoreLink}
           ${iconLink}
@@ -210,7 +202,7 @@ export class PreloadingDisabledInfobar extends LegacyWrapper.LegacyWrapper.Wrapp
       return LitHtml.nothing;
     }
 
-    return LitHtml.html`
+    return html`
       <div class='key'>
         ${header}
       </div>

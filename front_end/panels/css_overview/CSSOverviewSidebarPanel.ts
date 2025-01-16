@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import '../../ui/legacy/legacy.js';
+
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as UI from '../../ui/legacy/legacy.js';
@@ -40,19 +42,18 @@ export class CSSOverviewSidebarPanel extends Common.ObjectWrapper.eventMixin<Eve
     // longest item, so that the selected item's background expands fully
     // even when the sidebar overflows.
     // Also see crbug/1408003
-    this.containerElement =
-        this.contentElement.createChild('div', 'overview-sidebar-panel-container') as HTMLDivElement;
+    this.containerElement = this.contentElement.createChild('div', 'overview-sidebar-panel-container');
     UI.ARIAUtils.setLabel(this.containerElement, i18nString(UIStrings.cssOverviewPanelSidebar));
     UI.ARIAUtils.markAsTree(this.containerElement);
 
     // Clear overview.
     const clearResultsButton = new UI.Toolbar.ToolbarButton(
         i18nString(UIStrings.clearOverview), 'clear', undefined, 'css-overview.clear-overview');
-    clearResultsButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.#reset, this);
+    clearResultsButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, this.#reset, this);
 
     // Toolbar.
     const toolbarElement = this.containerElement.createChild('div', 'overview-toolbar');
-    const toolbar = new UI.Toolbar.Toolbar('', toolbarElement);
+    const toolbar = toolbarElement.createChild('devtools-toolbar');
     toolbar.appendToolbarItem(clearResultsButton);
   }
 
@@ -71,7 +72,7 @@ export class CSSOverviewSidebarPanel extends Common.ObjectWrapper.eventMixin<Eve
   }
 
   #reset(): void {
-    this.dispatchEventToListeners(SidebarEvents.Reset);
+    this.dispatchEventToListeners(SidebarEvents.RESET);
   }
 
   #deselectAllItems(): void {
@@ -92,7 +93,7 @@ export class CSSOverviewSidebarPanel extends Common.ObjectWrapper.eventMixin<Eve
       return;
     }
     this.select(id, false);
-    this.dispatchEventToListeners(SidebarEvents.ItemSelected, {id, isMouseEvent: true, key: undefined});
+    this.dispatchEventToListeners(SidebarEvents.ITEM_SELECTED, {id, isMouseEvent: true, key: undefined});
   }
 
   #onItemKeyDown(event: KeyboardEvent): void {
@@ -111,7 +112,7 @@ export class CSSOverviewSidebarPanel extends Common.ObjectWrapper.eventMixin<Eve
 
     if (event.key === 'Enter') {
       this.select(id, false);
-      this.dispatchEventToListeners(SidebarEvents.ItemSelected, {id, isMouseEvent: false, key: event.key});
+      this.dispatchEventToListeners(SidebarEvents.ITEM_SELECTED, {id, isMouseEvent: false, key: event.key});
     } else {  // arrow up/down key
       const items = this.containerElement.querySelectorAll(`.${ITEM_CLASS_NAME}`);
 
@@ -134,7 +135,7 @@ export class CSSOverviewSidebarPanel extends Common.ObjectWrapper.eventMixin<Eve
       }
 
       this.select(nextItemId, true);
-      this.dispatchEventToListeners(SidebarEvents.ItemSelected, {id: nextItemId, isMouseEvent: false, key: event.key});
+      this.dispatchEventToListeners(SidebarEvents.ITEM_SELECTED, {id: nextItemId, isMouseEvent: false, key: event.key});
     }
 
     event.consume(true);
@@ -166,8 +167,8 @@ export class CSSOverviewSidebarPanel extends Common.ObjectWrapper.eventMixin<Eve
 }
 
 export const enum SidebarEvents {
-  ItemSelected = 'ItemSelected',
-  Reset = 'Reset',
+  ITEM_SELECTED = 'ItemSelected',
+  RESET = 'Reset',
 }
 
 export interface ItemSelectedEvent {
@@ -176,7 +177,7 @@ export interface ItemSelectedEvent {
   key: string|undefined;
 }
 
-export type EventTypes = {
-  [SidebarEvents.ItemSelected]: ItemSelectedEvent,
-  [SidebarEvents.Reset]: void,
-};
+export interface EventTypes {
+  [SidebarEvents.ITEM_SELECTED]: ItemSelectedEvent;
+  [SidebarEvents.RESET]: void;
+}

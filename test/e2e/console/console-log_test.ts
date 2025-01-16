@@ -21,7 +21,7 @@ import {
   waitForElementWithTextContent,
   waitForFunction,
 } from '../../shared/helper.js';
-import {describe, it} from '../../shared/mocha-extensions.js';
+
 import {
   CONSOLE_ALL_MESSAGES_SELECTOR,
   focusConsolePrompt,
@@ -403,9 +403,9 @@ describe('The Console Tab', () => {
 
       // Check that the 'BG' text has the background image set.
       const textsAndStyles = await getConsoleMessageTextChunksWithStyle(frontend, ['backgroundImage']);
-      assert.strictEqual(textsAndStyles.length, 1);
+      assert.lengthOf(textsAndStyles, 1);
       const message = textsAndStyles[0];
-      assert.strictEqual(message.length, 2);
+      assert.lengthOf(message, 2);
       const textWithBackground = message[1];
       assert.strictEqual(textWithBackground[0], 'BG');
       assert.include(textWithBackground[1], 'data:image/png;base64');
@@ -439,7 +439,7 @@ describe('The Console Tab', () => {
   });
 
   describe('for memory objects', () => {
-    const MEMORY_ICON_SELECTOR = '[aria-label="Reveal in Memory inspector panel"]';
+    const MEMORY_ICON_SELECTOR = '[aria-label="Open in Memory inspector panel"]';
 
     it('shows one memory icon to open memory inspector for ArrayBuffers (description)', async () => {
       const {frontend} = getBrowserAndPages();

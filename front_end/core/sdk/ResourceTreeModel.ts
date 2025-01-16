@@ -41,7 +41,7 @@ import * as Platform from '../platform/platform.js';
 import {type DeferredDOMNode, DOMModel, type DOMNode} from './DOMModel.js';
 import {FrameManager} from './FrameManager.js';
 import {Events as NetworkManagerEvents, NetworkManager, type RequestUpdateDroppedEventData} from './NetworkManager.js';
-import {type NetworkRequest} from './NetworkRequest.js';
+import type {NetworkRequest} from './NetworkRequest.js';
 import {Resource} from './Resource.js';
 import {ExecutionContext, RuntimeModel} from './RuntimeModel.js';
 import {SDKModel} from './SDKModel.js';
@@ -131,7 +131,7 @@ export class ResourceTreeModel extends SDKModel<EventTypes> {
 
   static reloadAllPages(bypassCache?: boolean, scriptToEvaluateOnLoad?: string): void {
     for (const resourceTreeModel of TargetManager.instance().models(ResourceTreeModel)) {
-      if (resourceTreeModel.target().parentTarget()?.type() !== Type.Frame) {
+      if (resourceTreeModel.target().parentTarget()?.type() !== Type.FRAME) {
         resourceTreeModel.reloadPage(bypassCache, scriptToEvaluateOnLoad);
       }
     }
@@ -141,7 +141,7 @@ export class ResourceTreeModel extends SDKModel<EventTypes> {
     if (!this.framesInternal.has(frameId)) {
       return null;
     }
-    const response = await this.storageAgent.invoke_getStorageKeyForFrame({frameId: frameId});
+    const response = await this.storageAgent.invoke_getStorageKeyForFrame({frameId});
     if (response.getError() === 'Frame tree node for given frame not found') {
       return null;
     }
@@ -238,7 +238,7 @@ export class ResourceTreeModel extends SDKModel<EventTypes> {
     this.dispatchEventToListeners(Events.FrameNavigated, frame);
 
     if (frame.isPrimaryFrame()) {
-      this.primaryPageChanged(frame, PrimaryPageChangeType.Navigation);
+      this.primaryPageChanged(frame, PrimaryPageChangeType.NAVIGATION);
     }
 
     // Fill frame with retained resources (the ones loaded using new loader).
@@ -544,9 +544,9 @@ export class ResourceTreeModel extends SDKModel<EventTypes> {
       }
     }
     return {
-      securityOrigins: securityOrigins,
-      mainSecurityOrigin: mainSecurityOrigin,
-      unreachableMainSecurityOrigin: unreachableMainSecurityOrigin,
+      securityOrigins,
+      mainSecurityOrigin,
+      unreachableMainSecurityOrigin,
     };
   }
 
@@ -567,7 +567,7 @@ export class ResourceTreeModel extends SDKModel<EventTypes> {
       }
     }
 
-    return {storageKeys: storageKeys, mainStorageKey: mainStorageKey};
+    return {storageKeys, mainStorageKey};
   }
 
   private updateSecurityOrigins(): void {
@@ -617,6 +617,7 @@ export class ResourceTreeModel extends SDKModel<EventTypes> {
 }
 
 export enum Events {
+  /* eslint-disable @typescript-eslint/naming-convention -- Used by web_tests. */
   FrameAdded = 'FrameAdded',
   FrameNavigated = 'FrameNavigated',
   FrameDetached = 'FrameDetached',
@@ -635,28 +636,29 @@ export enum Events {
   InterstitialHidden = 'InterstitialHidden',
   BackForwardCacheDetailsUpdated = 'BackForwardCacheDetailsUpdated',
   JavaScriptDialogOpening = 'JavaScriptDialogOpening',
+  /* eslint-enable @typescript-eslint/naming-convention */
 }
 
-export type EventTypes = {
-  [Events.FrameAdded]: ResourceTreeFrame,
-  [Events.FrameNavigated]: ResourceTreeFrame,
-  [Events.FrameDetached]: {frame: ResourceTreeFrame, isSwap: boolean},
-  [Events.FrameResized]: void,
-  [Events.FrameWillNavigate]: ResourceTreeFrame,
-  [Events.PrimaryPageChanged]: {frame: ResourceTreeFrame, type: PrimaryPageChangeType},
-  [Events.ResourceAdded]: Resource,
-  [Events.WillLoadCachedResources]: void,
-  [Events.CachedResourcesLoaded]: ResourceTreeModel,
-  [Events.DOMContentLoaded]: number,
-  [Events.LifecycleEvent]: {frameId: Protocol.Page.FrameId, name: string},
-  [Events.Load]: {resourceTreeModel: ResourceTreeModel, loadTime: number},
-  [Events.PageReloadRequested]: ResourceTreeModel,
-  [Events.WillReloadPage]: void,
-  [Events.InterstitialShown]: void,
-  [Events.InterstitialHidden]: void,
-  [Events.BackForwardCacheDetailsUpdated]: ResourceTreeFrame,
-  [Events.JavaScriptDialogOpening]: Protocol.Page.JavascriptDialogOpeningEvent,
-};
+export interface EventTypes {
+  [Events.FrameAdded]: ResourceTreeFrame;
+  [Events.FrameNavigated]: ResourceTreeFrame;
+  [Events.FrameDetached]: {frame: ResourceTreeFrame, isSwap: boolean};
+  [Events.FrameResized]: void;
+  [Events.FrameWillNavigate]: ResourceTreeFrame;
+  [Events.PrimaryPageChanged]: {frame: ResourceTreeFrame, type: PrimaryPageChangeType};
+  [Events.ResourceAdded]: Resource;
+  [Events.WillLoadCachedResources]: void;
+  [Events.CachedResourcesLoaded]: ResourceTreeModel;
+  [Events.DOMContentLoaded]: number;
+  [Events.LifecycleEvent]: {frameId: Protocol.Page.FrameId, name: string};
+  [Events.Load]: {resourceTreeModel: ResourceTreeModel, loadTime: number};
+  [Events.PageReloadRequested]: ResourceTreeModel;
+  [Events.WillReloadPage]: void;
+  [Events.InterstitialShown]: void;
+  [Events.InterstitialHidden]: void;
+  [Events.BackForwardCacheDetailsUpdated]: ResourceTreeFrame;
+  [Events.JavaScriptDialogOpening]: Protocol.Page.JavascriptDialogOpeningEvent;
+}
 
 export class ResourceTreeFrame {
   #model: ResourceTreeModel;
@@ -847,7 +849,7 @@ export class ResourceTreeFrame {
       return null;
     }
     const parentTarget = this.#model.target().parentTarget();
-    if (parentTarget?.type() !== Type.Frame) {
+    if (parentTarget?.type() !== Type.FRAME) {
       return null;
     }
     const parentModel = parentTarget.model(ResourceTreeModel);
@@ -886,7 +888,7 @@ export class ResourceTreeFrame {
    * https://chromium.googlesource.com/chromium/src/+/HEAD/docs/frame_trees.md
    */
   isOutermostFrame(): boolean {
-    return this.#model.target().parentTarget()?.type() !== Type.Frame && !this.#sameTargetParentFrameInternal &&
+    return this.#model.target().parentTarget()?.type() !== Type.FRAME && !this.#sameTargetParentFrameInternal &&
         !this.crossTargetParentFrameId;
   }
 
@@ -1022,7 +1024,7 @@ export class ResourceTreeFrame {
     }
 
     // Fenced frames.
-    if (parentTarget?.type() === Type.Frame) {
+    if (parentTarget?.type() === Type.FRAME) {
       const domModel = parentTarget.model(DOMModel);
       if (domModel) {
         return highlightFrameOwner(domModel);
@@ -1111,6 +1113,9 @@ export class PageDispatcher implements ProtocolProxyApi.PageDispatcher {
     this.#resourceTreeModel.frameDetached(frameId, reason === Protocol.Page.FrameDetachedEventReason.Swap);
   }
 
+  frameSubtreeWillBeDetached(_params: Protocol.Page.FrameSubtreeWillBeDetachedEvent): void {
+  }
+
   frameStartedLoading({}: Protocol.Page.FrameStartedLoadingEvent): void {
   }
 
@@ -1188,6 +1193,6 @@ export interface StorageKeyData {
 }
 
 export const enum PrimaryPageChangeType {
-  Navigation = 'Navigation',
-  Activation = 'Activation',
+  NAVIGATION = 'Navigation',
+  ACTIVATION = 'Activation',
 }

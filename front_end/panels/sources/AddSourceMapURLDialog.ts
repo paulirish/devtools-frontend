@@ -31,7 +31,7 @@ export class AddDebugInfoURLDialog extends UI.Widget.HBox {
   private constructor(
       label: Platform.UIString.LocalizedString, jslogContext: string,
       callback: (arg0: Platform.DevToolsPath.UrlString) => void) {
-    super(/* isWebComponent */ true);
+    super(/* useShadowDom */ true);
 
     this.contentElement.createChild('label').textContent = label;
 
@@ -45,7 +45,7 @@ export class AddDebugInfoURLDialog extends UI.Widget.HBox {
     this.contentElement.appendChild(addButton);
 
     this.dialog = new UI.Dialog.Dialog(jslogContext);
-    this.dialog.setSizeBehavior(UI.GlassPane.SizeBehavior.MeasureContent);
+    this.dialog.setSizeBehavior(UI.GlassPane.SizeBehavior.MEASURE_CONTENT);
     this.dialog.setDefaultFocusedElement(this.input);
 
     this.callback = callback;

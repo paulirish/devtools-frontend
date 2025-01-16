@@ -50,7 +50,11 @@ export class StreamingContentData extends Common.ObjectWrapper.ObjectWrapper<Eve
     return new StreamingContentData(content.mimeType, content.charset, content);
   }
 
+  /** @returns true, if this `ContentData` was constructed from text content or the mime type indicates text that can be decoded */
   get isTextContent(): boolean {
+    if (this.#contentData) {
+      return this.#contentData.isTextContent;
+    }
     return Platform.MimeType.isTextType(this.mimeType);
   }
 
@@ -61,7 +65,7 @@ export class StreamingContentData extends Common.ObjectWrapper.ObjectWrapper<Eve
     }
 
     this.#chunks.push(chunk);
-    this.dispatchEventToListeners(Events.ChunkAdded, {content: this, chunk});
+    this.dispatchEventToListeners(Events.CHUNK_ADDED, {content: this, chunk});
   }
 
   /** @returns An immutable ContentData with all the bytes received so far */
@@ -96,9 +100,9 @@ export const asContentDataOrError = function(contentDataOrError: StreamingConten
 };
 
 export const enum Events {
-  ChunkAdded = 'ChunkAdded',
+  CHUNK_ADDED = 'ChunkAdded',
 }
 
-export type EventTypes = {
-  [Events.ChunkAdded]: {content: StreamingContentData, chunk: string},
-};
+export interface EventTypes {
+  [Events.CHUNK_ADDED]: {content: StreamingContentData, chunk: string};
+}

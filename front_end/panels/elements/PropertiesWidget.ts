@@ -31,6 +31,8 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+import '../../ui/legacy/legacy.js';
+
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -92,9 +94,9 @@ export class PropertiesWidget extends UI.ThrottledWidget.ThrottledWidget {
     this.node = UI.Context.Context.instance().flavor(SDK.DOMModel.DOMNode);
 
     const hbox = this.contentElement.createChild('div', 'hbox properties-widget-toolbar');
-    const toolbar = new UI.Toolbar.Toolbar('styles-pane-toolbar', hbox);
+    const toolbar = hbox.createChild('devtools-toolbar', 'styles-pane-toolbar');
     const filterInput = new UI.Toolbar.ToolbarFilter(undefined, 1, 1, undefined, undefined, false);
-    filterInput.addEventListener(UI.Toolbar.ToolbarInput.Event.TextChanged, this.onFilterChanged, this);
+    filterInput.addEventListener(UI.Toolbar.ToolbarInput.Event.TEXT_CHANGED, this.onFilterChanged, this);
     toolbar.appendToolbarItem(filterInput);
     toolbar.appendToolbarItem(new UI.Toolbar.ToolbarSettingCheckbox(
         this.showAllPropertiesSetting, i18nString(UIStrings.showAllTooltip), i18nString(UIStrings.showAll)));

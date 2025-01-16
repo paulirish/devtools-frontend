@@ -31,6 +31,8 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+import '../../ui/legacy/legacy.js';
+
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -239,23 +241,23 @@ export class StylePropertiesSection {
     if (rule) {
       const newRuleButton = new UI.Toolbar.ToolbarButton(
           i18nString(UIStrings.insertStyleRuleBelow), 'plus', undefined, 'elements.new-style-rule');
-      newRuleButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, this.onNewRuleClick, this);
+      newRuleButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, this.onNewRuleClick, this);
       newRuleButton.setSize(Buttons.Button.Size.SMALL);
       newRuleButton.element.tabIndex = -1;
       if (!this.newStyleRuleToolbar) {
         this.newStyleRuleToolbar =
-            new UI.Toolbar.Toolbar('sidebar-pane-section-toolbar new-rule-toolbar', this.element);
+            this.element.createChild('devtools-toolbar', 'sidebar-pane-section-toolbar new-rule-toolbar');
       }
       this.newStyleRuleToolbar.appendToolbarItem(newRuleButton);
-      UI.ARIAUtils.markAsHidden(this.newStyleRuleToolbar.element);
+      UI.ARIAUtils.setHidden(this.newStyleRuleToolbar, true);
     }
 
     if (Root.Runtime.experiments.isEnabled('font-editor') && this.editable) {
-      this.fontEditorToolbar = new UI.Toolbar.Toolbar('sidebar-pane-section-toolbar', this.#styleRuleElement);
+      this.fontEditorToolbar = this.#styleRuleElement.createChild('devtools-toolbar', 'sidebar-pane-section-toolbar');
       this.fontEditorSectionManager = new FontEditorSectionManager(this.parentPane.swatchPopoverHelper(), this);
       this.fontEditorButton =
           new UI.Toolbar.ToolbarButton('Font Editor', 'custom-typography', undefined, 'font-editor');
-      this.fontEditorButton.addEventListener(UI.Toolbar.ToolbarButton.Events.Click, () => {
+      this.fontEditorButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, () => {
         this.onFontEditorButtonClicked();
       }, this);
       this.fontEditorButton.element.addEventListener('keydown', event => {
@@ -268,10 +270,10 @@ export class StylePropertiesSection {
 
       if (this.styleInternal.type === SDK.CSSStyleDeclaration.Type.Inline) {
         if (this.newStyleRuleToolbar) {
-          this.newStyleRuleToolbar.element.classList.add('shifted-toolbar');
+          this.newStyleRuleToolbar.classList.add('shifted-toolbar');
         }
       } else {
-        this.fontEditorToolbar.element.classList.add('font-toolbar-hidden');
+        this.fontEditorToolbar.classList.add('font-toolbar-hidden');
       }
     }
 
@@ -354,9 +356,9 @@ export class StylePropertiesSection {
       this.fontEditorSectionManager.registerFontProperty(treeElement);
     }
     if (this.fontEditorToolbar) {
-      this.fontEditorToolbar.element.classList.remove('font-toolbar-hidden');
+      this.fontEditorToolbar.classList.remove('font-toolbar-hidden');
       if (this.newStyleRuleToolbar) {
-        this.newStyleRuleToolbar.element.classList.add('shifted-toolbar');
+        this.newStyleRuleToolbar.classList.add('shifted-toolbar');
       }
     }
   }
@@ -367,10 +369,10 @@ export class StylePropertiesSection {
       return;
     }
     if (this.fontEditorToolbar) {
-      this.fontEditorToolbar.element.classList.add('font-toolbar-hidden');
+      this.fontEditorToolbar.classList.add('font-toolbar-hidden');
     }
     if (this.newStyleRuleToolbar) {
-      this.newStyleRuleToolbar.element.classList.remove('shifted-toolbar');
+      this.newStyleRuleToolbar.classList.remove('shifted-toolbar');
     }
   }
 
@@ -620,6 +622,13 @@ export class StylePropertiesSection {
     if (this.styleInternal.type === SDK.CSSStyleDeclaration.Type.Inline) {
       return this.matchedStyles.isInherited(this.styleInternal) ? i18nString(UIStrings.styleAttribute) :
                                                                   'element.style';
+    }
+    if (this.styleInternal.type === SDK.CSSStyleDeclaration.Type.Transition) {
+      return 'transitions style';
+    }
+
+    if (this.styleInternal.type === SDK.CSSStyleDeclaration.Type.Animation) {
+      return this.styleInternal.animationName() ? `${this.styleInternal.animationName()} animation` : 'animation style';
     }
     if (node && this.styleInternal.type === SDK.CSSStyleDeclaration.Type.Attributes) {
       return i18nString(UIStrings.sattributesStyle, {PH1: node.nodeNameInCorrectCase()});
@@ -1098,7 +1107,7 @@ export class StylePropertiesSection {
   }
 
   isPropertyOverloaded(property: SDK.CSSProperty.CSSProperty): boolean {
-    return this.matchedStyles.propertyState(property) === SDK.CSSMatchedStyles.PropertyState.Overloaded;
+    return this.matchedStyles.propertyState(property) === SDK.CSSMatchedStyles.PropertyState.OVERLOADED;
   }
 
   updateFilter(): boolean {
@@ -1303,8 +1312,13 @@ export class StylePropertiesSection {
   }
 
   private async editingMediaCommitted(
-      query: SDK.CSSQuery.CSSQuery, element: Element, newContent: string, _oldContent: string,
-      _context: Context|undefined, _moveDirection: string): Promise<void> {
+      query: SDK.CSSQuery.CSSQuery,
+      element: Element,
+      newContent: string,
+      _oldContent: string|null,
+      _context: Context|undefined,
+      _moveDirection: string,
+      ): Promise<void> {
     this.parentPane.setEditingStyle(false);
     this.editingMediaFinished(element);
 
@@ -1371,26 +1385,26 @@ export class StylePropertiesSection {
     contextMenu.clipboardSection().appendItem(i18nString(UIStrings.copySelector), () => {
       const selectorText = this.headerText();
       Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(selectorText);
-      Host.userMetrics.styleTextCopied(Host.UserMetrics.StyleTextCopied.SelectorViaContextMenu);
+      Host.userMetrics.styleTextCopied(Host.UserMetrics.StyleTextCopied.SELECTOR_VIA_CONTEXT_MENU);
     }, {jslogContext: 'copy-selector'});
 
     contextMenu.clipboardSection().appendItem(i18nString(UIStrings.copyRule), () => {
       const ruleText = StylesSidebarPane.formatLeadingProperties(this).ruleText;
       Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(ruleText);
-      Host.userMetrics.styleTextCopied(Host.UserMetrics.StyleTextCopied.RuleViaContextMenu);
+      Host.userMetrics.styleTextCopied(Host.UserMetrics.StyleTextCopied.RULE_VIA_CONTEXT_MENU);
     }, {jslogContext: 'copy-rule'});
 
     contextMenu.clipboardSection().appendItem(i18nString(UIStrings.copyAllDeclarations), () => {
       const allDeclarationText = StylesSidebarPane.formatLeadingProperties(this).allDeclarationText;
       Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(allDeclarationText);
-      Host.userMetrics.styleTextCopied(Host.UserMetrics.StyleTextCopied.AllDeclarationsViaContextMenu);
+      Host.userMetrics.styleTextCopied(Host.UserMetrics.StyleTextCopied.ALL_DECLARATIONS_VIA_CONTEXT_MENU);
     }, {jslogContext: 'copy-all-declarations'});
 
     // TODO(changhaohan): conditionally add this item only when there are changes to copy
     contextMenu.clipboardSection().appendItem(i18nString(UIStrings.copyAllCSSChanges), async () => {
       const allChanges = await this.parentPane.getFormattedChanges();
       Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(allChanges);
-      Host.userMetrics.styleTextCopied(Host.UserMetrics.StyleTextCopied.AllChangesViaStylesPane);
+      Host.userMetrics.styleTextCopied(Host.UserMetrics.StyleTextCopied.ALL_CHANGES_VIA_STYLES_TAB);
     }, {jslogContext: 'copy-all-css-changes'});
     void contextMenu.show();
   }
@@ -1446,8 +1460,8 @@ export class StylePropertiesSection {
       element.textContent = textContent.replace(/\s+/g, ' ').trim();
     }
 
-    const config =
-        new UI.InplaceEditor.Config(this.editingSelectorCommitted.bind(this), this.editingSelectorCancelled.bind(this));
+    const config = new UI.InplaceEditor.Config(
+        this.editingSelectorCommitted.bind(this), this.editingSelectorCancelled.bind(this), undefined);
     UI.InplaceEditor.InplaceEditor.startEditing(this.selectorElement, config);
 
     const selection = element.getComponentSelection();
@@ -1490,8 +1504,12 @@ export class StylePropertiesSection {
   }
 
   editingSelectorCommitted(
-      element: Element, newContent: string, oldContent: string, context: Context|undefined,
-      moveDirection: string): void {
+      element: Element,
+      newContent: string,
+      oldContent: string|null,
+      context: Context|undefined,
+      moveDirection: string,
+      ): void {
     this.editingSelectorEnded();
     if (newContent) {
       newContent = newContent.trim();

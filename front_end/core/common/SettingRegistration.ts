@@ -6,7 +6,7 @@ import * as i18n from '../i18n/i18n.js';
 import type * as Platform from '../platform/platform.js';
 import * as Root from '../root/root.js';
 
-import {type SettingStorageType} from './Settings.js';
+import type {SettingStorageType} from './Settings.js';
 
 const UIStrings = {
   /**
@@ -74,6 +74,10 @@ const UIStrings = {
    * section allows users to configure which DevTools data is synced via Chrome Sync.
    */
   sync: 'Sync',
+  /**
+   * @description Text for the privacy section of the page.
+   */
+  privacy: 'Privacy',
 };
 const str_ = i18n.i18n.registerUIStrings('core/common/SettingRegistration.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -142,6 +146,7 @@ export const enum SettingCategory {
   EXTENSIONS = 'EXTENSIONS',
   ADORNER = 'ADORNER',
   SYNC = 'SYNC',
+  PRIVACY = 'PRIVACY',
 }
 
 export function getLocalizedSettingsCategory(category: SettingCategory): Platform.UIString.LocalizedString {
@@ -182,6 +187,8 @@ export function getLocalizedSettingsCategory(category: SettingCategory): Platfor
       return i18n.i18n.lockedString('');
     case SettingCategory.SYNC:
       return i18nString(UIStrings.sync);
+    case SettingCategory.PRIVACY:
+      return i18nString(UIStrings.privacy);
   }
 }
 
@@ -281,13 +288,30 @@ export interface SettingRegistration {
   disabledCondition?: (config?: Root.Runtime.HostConfig) => DisabledConditionResult;
 
   /**
-   * If a setting is deprecated, define this notice to show an appropriate warning according to the `warning` propertiy.
+   * If a setting is deprecated, define this notice to show an appropriate warning according to the `warning` property.
    * If `disabled` is set, the setting will be disabled in the settings UI. In that case, `experiment` optionally can be
    * set to link to an experiment (by experiment name). The information icon in the settings UI can then be clicked to
    * jump to the experiment. If a setting is not disabled, the experiment entry will be ignored.
    */
   deprecationNotice?: {disabled: boolean, warning: () => Platform.UIString.LocalizedString, experiment?: string};
+
+  /**
+   * Optional information to learn more about the setting. If provided, a `(?)` icon will show next to the setting
+   * in the Settings panel with a link to learn more, and the `tooltip` will be presented to the user when hovering
+   * the `(?)` icon.
+   */
+  learnMore?: LearnMore;
 }
+
+/**
+ * Metadata to learn more about a setting. The `url` will be used to construct
+ * a `(?)` icon link and the `tooltip` will be shown when hovering the icon.
+ */
+export interface LearnMore {
+  tooltip: () => Platform.UIString.LocalizedString;
+  url?: Platform.DevToolsPath.UrlString;
+}
+
 interface LocalizedSettingExtensionOption {
   value: boolean|string;
   title: () => Platform.UIString.LocalizedString;
@@ -306,5 +330,5 @@ interface RawSettingExtensionOption {
 export type SettingExtensionOption = LocalizedSettingExtensionOption|RawSettingExtensionOption;
 export type DisabledConditionResult = {
   disabled: true,
-  reason: string,
+  reasons: string[],
 }|{disabled: false};

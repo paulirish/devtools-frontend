@@ -14,6 +14,7 @@ generate_css("css_files") {
 devtools_module("data_grid") {
   sources = [
     "DataGrid.ts",
+    "DataGridWithPreview.ts",
     "ShowMoreDataGridNode.ts",
     "SortableDataGrid.ts",
     "ViewportDataGrid.ts",
@@ -45,10 +46,25 @@ devtools_entrypoint("bundle") {
     "../../../../panels/media/*",
     "../../../../panels/network/*",
     "../../../../panels/profiler/*",
+    "../../../../panels/security/*",
     "../../../../panels/timeline/*",
     "../../../../panels/webauthn/*",
     "../cookie_table/*",
   ]
 
   visibility += devtools_ui_legacy_visibility
+}
+
+ts_library("unittests") {
+  testonly = true
+
+  sources = [
+    "DataGrid.test.ts",
+    "DataGridWithPreview.test.ts",
+  ]
+
+  deps = [
+    ":bundle",
+    "../../../../testing",
+  ]
 }

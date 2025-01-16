@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import './Toolbar.js';
+
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -11,11 +13,11 @@ import * as IconButton from '../components/icon_button/icon_button.js';
 import * as VisualLogging from '../visual_logging/visual_logging.js';
 
 import * as ARIAUtils from './ARIAUtils.js';
-import {type ContextMenu} from './ContextMenu.js';
+import type {ContextMenu} from './ContextMenu.js';
 import {type EventData, Events as TabbedPaneEvents, TabbedPane} from './TabbedPane.js';
-import {type ItemsProvider, Toolbar, type ToolbarItem, ToolbarMenuButton} from './Toolbar.js';
+import {type ItemsProvider, type ToolbarItem, ToolbarMenuButton} from './Toolbar.js';
 import {createTextChild} from './UIUtils.js';
-import {type TabbedViewLocation, type View, type ViewLocation} from './View.js';
+import type {TabbedViewLocation, View, ViewLocation} from './View.js';
 import viewContainersStyles from './viewContainers.css.legacy.js';
 import {
   getLocalizedViewLocationCategory,
@@ -44,6 +46,7 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export const defaultOptionsForTabs = {
   security: true,
+  freestyler: true,
 };
 
 export class PreRegisteredView implements View {
@@ -213,11 +216,11 @@ export class ViewManager {
     if (!toolbarItems.length) {
       return null;
     }
-    const toolbar = new Toolbar('');
+    const toolbar = document.createElement('devtools-toolbar');
     for (const item of toolbarItems) {
       toolbar.appendToolbarItem(item);
     }
-    return toolbar.element;
+    return toolbar;
   }
 
   locationNameForViewId(viewId: string): string {
@@ -703,14 +706,15 @@ class TabbedLocation extends Location implements TabbedViewLocation {
 
       if (view.viewId() === 'issues-pane') {
         contextMenu.defaultSection().appendItem(title, () => {
-          Host.userMetrics.issuesPanelOpenedFrom(Host.UserMetrics.IssueOpener.HamburgerMenu);
+          Host.userMetrics.issuesPanelOpenedFrom(Host.UserMetrics.IssueOpener.HAMBURGER_MENU);
           void this.showView(view, undefined, true);
         }, {jslogContext: 'issues-pane'});
         continue;
       }
 
+      const isPreviewFeature = view.isPreviewFeature();
       contextMenu.defaultSection().appendItem(
-          title, this.showView.bind(this, view, undefined, true), {jslogContext: view.viewId()});
+          title, this.showView.bind(this, view, undefined, true), {isPreviewFeature, jslogContext: view.viewId()});
     }
   }
 

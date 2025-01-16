@@ -7,7 +7,7 @@ import type * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 
 import {Issue, IssueCategory, IssueKind} from './Issue.js';
-import {type MarkdownIssueDescription} from './MarkdownIssueDescription.js';
+import type {MarkdownIssueDescription} from './MarkdownIssueDescription.js';
 
 const UIStrings = {
   /**
@@ -33,7 +33,7 @@ export class QuirksModeIssue extends Issue {
   }
 
   getCategory(): IssueCategory {
-    return IssueCategory.QuirksMode;
+    return IssueCategory.QUIRKS_MODE;
   }
 
   details(): Protocol.Audits.QuirksModeIssueDetails {
@@ -53,7 +53,7 @@ export class QuirksModeIssue extends Issue {
   }
 
   getKind(): IssueKind {
-    return IssueKind.Improvement;
+    return IssueKind.IMPROVEMENT;
   }
 
   static fromInspectorIssue(issuesModel: SDK.IssuesModel.IssuesModel, inspectorIssue: Protocol.Audits.InspectorIssue):

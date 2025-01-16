@@ -43,6 +43,7 @@ import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as CodeMirror from '../../third_party/codemirror.next/codemirror.next.js';
 import * as Adorners from '../../ui/components/adorners/adorners.js';
 import * as CodeHighlighter from '../../ui/components/code_highlighter/code_highlighter.js';
+import * as FloatingButton from '../../ui/components/floating_button/floating_button.js';
 import * as Highlighting from '../../ui/components/highlighting/highlighting.js';
 import * as IconButton from '../../ui/components/icon_button/icon_button.js';
 import * as TextEditor from '../../ui/components/text_editor/text_editor.js';
@@ -207,6 +208,10 @@ const UIStrings = {
    *@description Text of a tooltip to redirect to another element in the Elements panel
    */
   showPopoverTarget: 'Show popover target',
+  /**
+   *@description Text of the tooltip for scroll adorner.
+   */
+  elementHasScrollableOverflow: 'This element has a scrollable overflow',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/elements/ElementsTreeElement.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -216,23 +221,23 @@ const enum TagType {
   CLOSING = 'CLOSING_TAG',
 }
 
-type OpeningTagContext = {
-    tagType: TagType.OPENING,
-    readonly adornerContainer: HTMLElement,
-    adorners: Adorners.Adorner.Adorner[],
-    styleAdorners: Adorners.Adorner.Adorner[],
-    readonly adornersThrottler: Common.Throttler.Throttler,
-    canAddAttributes: boolean,
-    slot?: Adorners.Adorner.Adorner,
-};
+interface OpeningTagContext {
+  tagType: TagType.OPENING;
+  readonly adornerContainer: HTMLElement;
+  adorners: Adorners.Adorner.Adorner[];
+  styleAdorners: Adorners.Adorner.Adorner[];
+  readonly adornersThrottler: Common.Throttler.Throttler;
+  canAddAttributes: boolean;
+  slot?: Adorners.Adorner.Adorner;
+}
 
-type ClosingTagContext = {
-  tagType: TagType.CLOSING,
-};
+interface ClosingTagContext {
+  tagType: TagType.CLOSING;
+}
 
 export type TagTypeContext = OpeningTagContext|ClosingTagContext;
 
-function isOpeningTag(context: TagTypeContext): context is OpeningTagContext {
+export function isOpeningTag(context: TagTypeContext): context is OpeningTagContext {
   return context.tagType === TagType.OPENING;
 }
 
@@ -251,6 +256,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
   expandAllButtonElement: UI.TreeOutline.TreeElement|null;
   selectionElement?: HTMLDivElement;
   private hintElement?: HTMLElement;
+  private aiButtonContainer?: HTMLElement;
   private contentElement: HTMLElement;
   #elementIssues: Map<string, IssuesManager.GenericIssue.GenericIssue> = new Map();
   #nodeElementToIssue: Map<Element, IssuesManager.GenericIssue.GenericIssue> = new Map();
@@ -310,6 +316,8 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
         const adorner = this.adorn(config);
         UI.Tooltip.Tooltip.install(adorner, i18nString(UIStrings.thisFrameWasIdentifiedAsAnAd));
       }
+
+      void this.updateScrollAdorner();
     }
     this.expandAllButtonElement = null;
   }
@@ -406,6 +414,13 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
   set hovered(isHovered: boolean) {
     if (this.hoveredInternal === isHovered) {
       return;
+    }
+
+    if (isHovered && !this.aiButtonContainer) {
+      this.createAiButton();
+    } else if (!isHovered && this.aiButtonContainer) {
+      this.aiButtonContainer.remove();
+      delete this.aiButtonContainer;
     }
 
     this.hoveredInternal = isHovered;
@@ -507,7 +522,33 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
       const selectedElementCommand = '$0';
       UI.Tooltip.Tooltip.install(
           this.hintElement, i18nString(UIStrings.useSInTheConsoleToReferToThis, {PH1: selectedElementCommand}));
-      UI.ARIAUtils.markAsHidden(this.hintElement);
+      UI.ARIAUtils.setHidden(this.hintElement, true);
+    }
+  }
+
+  private createAiButton(): void {
+    const isElementNode = this.node().nodeType() === Node.ELEMENT_NODE;
+    if (!isElementNode ||
+        !UI.ActionRegistry.ActionRegistry.instance().hasAction('freestyler.elements-floating-button')) {
+      return;
+    }
+
+    const action = UI.ActionRegistry.ActionRegistry.instance().getAction('freestyler.elements-floating-button');
+    if (this.contentElement && !this.aiButtonContainer) {
+      this.aiButtonContainer = this.contentElement.createChild('span', 'ai-button-container');
+      const floatingButton = new FloatingButton.FloatingButton.FloatingButton({
+        title: action.title(),
+        iconName: 'smart-assistant',
+      });
+      floatingButton.addEventListener('click', ev => {
+        ev.stopPropagation();
+        this.select(true, false);
+        void action.execute();
+      }, {capture: true});
+      floatingButton.addEventListener('mousedown', ev => {
+        ev.stopPropagation();
+      }, {capture: true});
+      this.aiButtonContainer.appendChild(floatingButton);
     }
   }
 
@@ -757,7 +798,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     const isShadowRoot = this.nodeInternal.isShadowRoot();
 
     const createShortcut = UI.KeyboardShortcut.KeyboardShortcut.shortcutToString.bind(null);
-    const modifier = UI.KeyboardShortcut.Modifiers.CtrlOrMeta;
+    const modifier = UI.KeyboardShortcut.Modifiers.CtrlOrMeta.value;
     const treeOutline = this.treeOutline;
     if (!treeOutline) {
       return;
@@ -956,7 +997,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     removeZeroWidthSpaceRecursive(attribute);
 
     const config = new UI.InplaceEditor.Config(
-        this.attributeEditingCommitted.bind(this), this.editingCancelled.bind(this), attributeName || undefined);
+        this.attributeEditingCommitted.bind(this), this.editingCancelled.bind(this), attributeName);
 
     function postKeyDownFinishHandler(event: Event): string {
       UI.UIUtils.handleElementValueModifications(event, attribute);
@@ -992,7 +1033,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
       container.textContent = textNode.nodeValue();
     }  // Strip the CSS or JS highlighting if present.
     const config = new UI.InplaceEditor.Config(
-        this.textNodeEditingCommitted.bind(this, textNode), this.editingCancelled.bind(this));
+        this.textNodeEditingCommitted.bind(this, textNode), this.editingCancelled.bind(this), null);
     this.updateEditorHandles(textNodeElement, config);
     const componentSelection = this.listItemElement.getComponentSelection();
     componentSelection && componentSelection.selectAllChildren(textNodeElement);
@@ -1034,8 +1075,13 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     };
 
     function editingCommitted(
-        this: ElementsTreeElement, element: Element, newTagName: string, oldText: string, tagName: string|null,
-        moveDirection: string): void {
+        this: ElementsTreeElement,
+        element: Element,
+        newTagName: string,
+        oldText: string|null,
+        tagName: string|null,
+        moveDirection: string,
+        ): void {
       if (!tagNameElement) {
         return;
       }
@@ -1064,7 +1110,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     return true;
   }
 
-  private updateEditorHandles<T>(element: Element, config?: UI.InplaceEditor.Config<T>): void {
+  private updateEditorHandles<T>(element: Element, config: UI.InplaceEditor.Config<T>): void {
     const editorHandles = UI.InplaceEditor.InplaceEditor.startEditing(element, config);
     if (!editorHandles) {
       this.editing = null;
@@ -1201,7 +1247,12 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
   }
 
   private attributeEditingCommitted(
-      element: Element, newText: string, oldText: string, attributeName: string, moveDirection: string): void {
+      element: Element,
+      newText: string,
+      oldText: string|null,
+      attributeName: string|null,
+      moveDirection: string,
+      ): void {
     this.editing = null;
 
     const treeOutline = this.treeOutline;
@@ -1265,7 +1316,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
       }
     }
 
-    if ((attributeName.trim() || newText.trim()) && oldText !== newText) {
+    if (attributeName !== null && (attributeName.trim() || newText.trim()) && oldText !== newText) {
       this.nodeInternal.setAttribute(attributeName, newText, moveToNextAttributeIfNeeded.bind(this));
       return;
     }
@@ -1275,7 +1326,12 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
   }
 
   private tagNameEditingCommitted(
-      element: Element, newText: string, oldText: string, tagName: string|null, moveDirection: string): void {
+      element: Element,
+      newText: string,
+      oldText: string|null,
+      tagName: string|null,
+      moveDirection: string,
+      ): void {
     this.editing = null;
     const self = this;
 
@@ -1399,6 +1455,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     }
     delete this.selectionElement;
     delete this.hintElement;
+    delete this.aiButtonContainer;
     if (this.selected) {
       this.createSelection();
       this.createHint();
@@ -1572,7 +1629,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     }
 
     const hasText = (forceValue || value.length > 0);
-    const attrSpanElement = (parentElement.createChild('span', 'webkit-html-attribute') as HTMLElement);
+    const attrSpanElement = parentElement.createChild('span', 'webkit-html-attribute');
     attrSpanElement.setAttribute(
         'jslog', `${VisualLogging.value(name === 'style' ? 'style-attribute' : 'attribute').track({
           change: true,
@@ -1780,7 +1837,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     if (result) {
       result += text.substring(lastIndexAfterEntity);
     }
-    return {text: result || text, entityRanges: entityRanges};
+    return {text: result || text, entityRanges};
   }
 
   private nodeTitleInfo(updateRecord: UpdateRecord|null): DocumentFragment {
@@ -2040,7 +2097,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
         if (style.parentRule && style.parentRule.isUserAgent()) {
           continue;
         }
-        if (cascade.propertyState(property) !== SDK.CSSMatchedStyles.PropertyState.Active) {
+        if (cascade.propertyState(property) !== SDK.CSSMatchedStyles.PropertyState.ACTIVE) {
           continue;
         }
         lines.push(`${indent}${property.name}: ${property.value};`);
@@ -2106,8 +2163,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
   }
 
   adornSlot({name}: {name: string}, context: OpeningTagContext): Adorners.Adorner.Adorner {
-    const linkIcon = new IconButton.Icon.Icon();
-    linkIcon.name = 'select-element';
+    const linkIcon = IconButton.Icon.create('select-element');
     const slotText = document.createElement('span');
     slotText.textContent = name;
     const adornerContent = document.createElement('span');
@@ -2132,8 +2188,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     adornerContent.textContent = name;
     adornerContent.classList.add('adorner-with-icon');
 
-    const linkIcon = new IconButton.Icon.Icon();
-    linkIcon.name = 'select-element';
+    const linkIcon = IconButton.Icon.create('select-element');
     adornerContent.append(linkIcon);
 
     const adorner = new Adorners.Adorner.Adorner();
@@ -2230,9 +2285,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
         false;
 
     const containerType = styles.get('container-type');
-    const contain = styles.get('contain');
-    const isContainer =
-        SDK.CSSContainerQuery.getQueryAxis(`${containerType} ${contain}`) !== SDK.CSSContainerQuery.QueryAxis.None;
+    const isContainer = containerType && containerType !== '' && containerType !== 'normal';
 
     if (isGrid) {
       this.pushGridAdorner(this.tagTypeContext, isSubgrid);
@@ -2280,7 +2333,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     });
 
     node.domModel().overlayModel().addEventListener(
-        SDK.OverlayModel.Events.PersistentGridOverlayStateChanged, event => {
+        SDK.OverlayModel.Events.PERSISTENT_GRID_OVERLAY_STATE_CHANGED, event => {
           const {nodeId: eventNodeId, enabled} = event.data;
           if (eventNodeId !== nodeId) {
             return;
@@ -2322,7 +2375,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     });
 
     node.domModel().overlayModel().addEventListener(
-        SDK.OverlayModel.Events.PersistentScrollSnapOverlayStateChanged, event => {
+        SDK.OverlayModel.Events.PERSISTENT_SCROLL_SNAP_OVERLAY_STATE_CHANGED, event => {
           const {nodeId: eventNodeId, enabled} = event.data;
           if (eventNodeId !== nodeId) {
             return;
@@ -2365,7 +2418,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     });
 
     node.domModel().overlayModel().addEventListener(
-        SDK.OverlayModel.Events.PersistentFlexContainerOverlayStateChanged, event => {
+        SDK.OverlayModel.Events.PERSISTENT_FLEX_CONTAINER_OVERLAY_STATE_CHANGED, event => {
           const {nodeId: eventNodeId, enabled} = event.data;
           if (eventNodeId !== nodeId) {
             return;
@@ -2409,7 +2462,7 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     });
 
     node.domModel().overlayModel().addEventListener(
-        SDK.OverlayModel.Events.PersistentContainerQueryOverlayStateChanged, event => {
+        SDK.OverlayModel.Events.PERSISTENT_CONTAINER_QUERY_OVERLAY_STATE_CHANGED, event => {
           const {nodeId: eventNodeId, enabled} = event.data;
           if (eventNodeId !== nodeId) {
             return;
@@ -2446,6 +2499,29 @@ export class ElementsTreeElement extends UI.TreeOutline.TreeElement {
     });
 
     context.styleAdorners.push(adorner);
+  }
+
+  updateScrollAdorner(): void {
+    if (!isOpeningTag(this.tagTypeContext)) {
+      return;
+    }
+    const scrollAdorner = this.tagTypeContext.adorners.find(x => x.name === 'scroll');
+    // Check if the node is scrollable, or if it's the <html> element and the document is scrollable because the top-level document (#document) doesn't have a corresponding tree element.
+    const needsAScrollAdorner = (this.node().nodeName() === 'HTML' && this.node().ownerDocument?.isScrollable()) ||
+        (this.node().nodeName() !== '#document' && this.node().isScrollable());
+    if (needsAScrollAdorner && !scrollAdorner) {
+      this.pushScrollAdorner();
+    } else if (!needsAScrollAdorner && scrollAdorner) {
+      this.removeAdorner(scrollAdorner, this.tagTypeContext);
+    }
+  }
+
+  pushScrollAdorner(): void {
+    const config = ElementsComponents.AdornerManager.getRegisteredAdorner(
+        ElementsComponents.AdornerManager.RegisteredAdorners.SCROLL);
+    const adorner = this.adorn(config);
+    UI.Tooltip.Tooltip.install(adorner, i18nString(UIStrings.elementHasScrollableOverflow));
+    adorner.classList.add('scroll');
   }
 }
 

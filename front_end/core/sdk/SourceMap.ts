@@ -37,7 +37,7 @@ import * as Common from '../common/common.js';
 import * as Platform from '../platform/platform.js';
 import * as Root from '../root/root.js';
 
-import {type CallFrame} from './DebuggerModel.js';
+import type {CallFrame, ScopeChainEntry} from './DebuggerModel.js';
 import {SourceMapScopesInfo} from './SourceMapScopesInfo.js';
 
 /**
@@ -47,25 +47,25 @@ import {SourceMapScopesInfo} from './SourceMapScopesInfo.js';
  * @see {@link SourceMapV3}
  * @see {@link https://docs.google.com/document/d/1U1RGAehQwRypUTovF1KRlpiOFze0b-_2gc6fAH0KY0k Source Map Revision 3 Proposal}
  */
-export type SourceMapV3Object = {
+export interface SourceMapV3Object {
   /* eslint-disable @typescript-eslint/naming-convention */
-  'version': number,
-  'sources': string[],
-  'mappings': string,
+  version: number;
+  sources: string[];
+  mappings: string;
 
-  'file'?: string,
-  'sourceRoot'?: string,
-  'sourcesContent'?: (string|null)[],
+  file?: string;
+  sourceRoot?: string;
+  sourcesContent?: (string|null)[];
 
-  'names'?: string[],
-  'ignoreList'?: number[],
-  'originalScopes'?: string[],
-  'generatedRanges'?: string,
-  'x_google_linecount'?: number,
-  'x_google_ignoreList'?: number[],
-  'x_com_bloomberg_sourcesFunctionMappings'?: string[],
+  names?: string[];
+  ignoreList?: number[];
+  originalScopes?: string[];
+  generatedRanges?: string;
+  x_google_linecount?: number;
+  x_google_ignoreList?: number[];
+  x_com_bloomberg_sourcesFunctionMappings?: string[];
   /* eslint-enable @typescript-eslint/naming-convention */
-};
+}
 
 /**
  * Type of JSON objects that classify as valid sourcemaps per version 3 of the specification.
@@ -79,14 +79,14 @@ export type SourceMapV3Object = {
  */
 export type SourceMapV3 = SourceMapV3Object|{
   // clang-format off
-  'version': number,
-  'file'?: string,
-  'sections': ({
-    'offset': {line: number, column: number},
-    'map': SourceMapV3Object,
+  version: number,
+  file?: string,
+  sections: ({
+    offset: {line: number, column: number},
+    map: SourceMapV3Object,
   } | {
-    'offset': {line: number, column: number},
-    'url': string,
+    offset: {line: number, column: number},
+    url: string,
   })[],
   // clang-format on
 };
@@ -110,18 +110,20 @@ export function parseSourceMap(content: string): SourceMapV3 {
 }
 
 export class SourceMapEntry {
-  lineNumber: number;
-  columnNumber: number;
-  sourceURL: Platform.DevToolsPath.UrlString|undefined;
-  sourceLineNumber: number;
-  sourceColumnNumber: number;
-  name: string|undefined;
+  readonly lineNumber: number;
+  readonly columnNumber: number;
+  readonly sourceIndex?: number;
+  readonly sourceURL: Platform.DevToolsPath.UrlString|undefined;
+  readonly sourceLineNumber: number;
+  readonly sourceColumnNumber: number;
+  readonly name: string|undefined;
 
   constructor(
-      lineNumber: number, columnNumber: number, sourceURL?: Platform.DevToolsPath.UrlString, sourceLineNumber?: number,
-      sourceColumnNumber?: number, name?: string) {
+      lineNumber: number, columnNumber: number, sourceIndex?: number, sourceURL?: Platform.DevToolsPath.UrlString,
+      sourceLineNumber?: number, sourceColumnNumber?: number, name?: string) {
     this.lineNumber = lineNumber;
     this.columnNumber = columnNumber;
+    this.sourceIndex = sourceIndex;
     this.sourceURL = sourceURL;
     this.sourceLineNumber = (sourceLineNumber as number);
     this.sourceColumnNumber = (sourceColumnNumber as number);
@@ -189,7 +191,6 @@ export class SourceMap {
   #mappingsInternal: SourceMapEntry[]|null;
   readonly #sourceInfos: Map<Platform.DevToolsPath.UrlString, SourceInfo>;
 
-  /* eslint-disable-next-line no-unused-private-class-members */
   #scopesInfo: SourceMapScopesInfo|null = null;
 
   /**
@@ -245,8 +246,8 @@ export class SourceMap {
     if (inlineFrameIndex && this.#scopesInfo !== null) {
       // For inlineFrameIndex != 0 we use the callsite info for the corresponding inlining site.
       // Note that the callsite for "inlineFrameIndex" is actually in the previous frame.
-      const functions = this.#scopesInfo.findInlinedFunctions(lineNumber, columnNumber);
-      const {callsite} = functions[inlineFrameIndex - 1];
+      const {inlinedFunctions} = this.#scopesInfo.findInlinedFunctions(lineNumber, columnNumber);
+      const {callsite} = inlinedFunctions[inlineFrameIndex - 1];
       if (!callsite) {
         console.error('Malformed source map. Expected to have a callsite info for index', inlineFrameIndex);
         return null;
@@ -254,6 +255,7 @@ export class SourceMap {
       return {
         lineNumber,
         columnNumber,
+        sourceIndex: callsite.sourceIndex,
         sourceURL: this.sourceURLs()[callsite.sourceIndex],
         sourceLineNumber: callsite.line,
         sourceColumnNumber: callsite.column,
@@ -549,13 +551,13 @@ export class SourceMap {
 
       if (!tokenIter.hasNext() || this.isSeparator(tokenIter.peek())) {
         this.mappings().push(
-            new SourceMapEntry(lineNumber, columnNumber, sourceURL, sourceLineNumber, sourceColumnNumber));
+            new SourceMapEntry(lineNumber, columnNumber, sourceIndex, sourceURL, sourceLineNumber, sourceColumnNumber));
         continue;
       }
 
       nameIndex += tokenIter.nextVLQ();
       this.mappings().push(new SourceMapEntry(
-          lineNumber, columnNumber, sourceURL, sourceLineNumber, sourceColumnNumber, names[nameIndex]));
+          lineNumber, columnNumber, sourceIndex, sourceURL, sourceLineNumber, sourceColumnNumber, names[nameIndex]));
     }
 
     if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.USE_SOURCE_MAP_SCOPES)) {
@@ -645,7 +647,7 @@ export class SourceMap {
 
   #parseScopes(map: SourceMapV3Object): void {
     if (map.originalScopes && map.generatedRanges) {
-      this.#scopesInfo = SourceMapScopesInfo.parseFromMap(map);
+      this.#scopesInfo = SourceMapScopesInfo.parseFromMap(this, map);
     }
   }
 
@@ -829,13 +831,16 @@ export class SourceMap {
       return [frame];
     }
 
-    const functionNames =
-        this.#scopesInfo.findInlinedFunctions(frame.location().lineNumber, frame.location().columnNumber);
-    const result: CallFrame[] = [];
-    for (const [index, fn] of functionNames.entries()) {
-      result.push(frame.createVirtualCallFrame(index, fn.name));
+    return this.#scopesInfo.expandCallFrame(frame);
+  }
+
+  resolveScopeChain(frame: CallFrame): ScopeChainEntry[]|null {
+    this.#ensureMappingsProcessed();
+    if (this.#scopesInfo === null) {
+      return null;
     }
-    return result;
+
+    return this.#scopesInfo.resolveMappedScopeChain(frame);
   }
 }
 

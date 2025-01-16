@@ -2,30 +2,35 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as Platform from '../../core/platform/platform.js';
 import {assertNotNullOrUndefined} from '../../core/platform/platform.js';
 
-import {type Loggable} from './Loggable.js';
+import type {Loggable} from './Loggable.js';
 import {type LoggingConfig, VisualElements} from './LoggingConfig.js';
-import {pendingWorkComplete} from './LoggingDriver.js';
 import {getLoggingState, type LoggingState} from './LoggingState.js';
 
 let veDebuggingEnabled = false;
 let debugPopover: HTMLElement|null = null;
+let hightlightedElement: HTMLElement|null = null;
 const nonDomDebugElements = new WeakMap<Loggable, HTMLElement>();
+let onInspect: ((query: string) => void)|undefined = undefined;
 
-function setVeDebuggingEnabled(enabled: boolean): void {
+export function setVeDebuggingEnabled(enabled: boolean, inpsect?: (query: string) => void): void {
   veDebuggingEnabled = enabled;
   if (enabled && !debugPopover) {
     debugPopover = document.createElement('div');
     debugPopover.classList.add('ve-debug');
     debugPopover.style.position = 'absolute';
-    debugPopover.style.bottom = '100px';
-    debugPopover.style.left = '100px';
-    debugPopover.style.background = 'black';
-    debugPopover.style.color = 'white';
+    debugPopover.style.background = 'var(--sys-color-cdt-base-container)';
+    debugPopover.style.borderRadius = '2px';
+    debugPopover.style.padding = '8px';
+    debugPopover.style.boxShadow = 'var(--drop-shadow)';
     debugPopover.style.zIndex = '100000';
     document.body.appendChild(debugPopover);
+  }
+  onInspect = inpsect;
+  if (!enabled && hightlightedElement) {
+    hightlightedElement.style.backgroundColor = '';
+    hightlightedElement.style.outline = '';
   }
 }
 
@@ -37,40 +42,62 @@ export function processForDebugging(loggable: Loggable): void {
   if (!veDebuggingEnabled || !loggingState || loggingState.processedForDebugging) {
     return;
   }
-  if (loggable instanceof Element) {
+  if (loggable instanceof HTMLElement) {
     processElementForDebugging(loggable, loggingState);
   } else {
     processNonDomLoggableForDebugging(loggable, loggingState);
   }
 }
 
-function showDebugPopover(content: string): void {
+function showDebugPopover(content: string, rect?: DOMRect): void {
   if (!debugPopover) {
     return;
   }
+  if (rect) {
+    debugPopover.style.left = `${rect.left}px`;
+    debugPopover.style.top = `${rect.bottom + 8}px`;
+  }
   debugPopover.style.display = 'block';
-  debugPopover.innerHTML = content;
+  debugPopover.textContent = content;
 }
 
-function processElementForDebugging(element: Element, loggingState: LoggingState): void {
+function processElementForDebugging(element: HTMLElement, loggingState: LoggingState): void {
   if (element.tagName === 'OPTION') {
     if (loggingState.parent?.selectOpen && debugPopover) {
       debugPopover.innerHTML += '<br>' + debugString(loggingState.config);
       loggingState.processedForDebugging = true;
     }
   } else {
-    (element as HTMLElement).style.outline = 'solid 1px red';
+    element.addEventListener('mousedown', event => {
+      if (event.currentTarget === hightlightedElement && onInspect && debugPopover && veDebuggingEnabled) {
+        onInspect(debugPopover.textContent || '');
+        event.stopImmediatePropagation();
+        event.preventDefault();
+      }
+    }, {capture: true});
     element.addEventListener('mouseenter', () => {
+      if (!veDebuggingEnabled) {
+        return;
+      }
+      if (hightlightedElement) {
+        hightlightedElement.style.backgroundColor = '';
+        hightlightedElement.style.outline = '';
+      }
+      element.style.backgroundColor = '#A7C3E4';
+      element.style.outline = 'dashed 1px #7327C6';
+      hightlightedElement = element;
       assertNotNullOrUndefined(debugPopover);
       const pathToRoot = [loggingState];
       let ancestor = loggingState.parent;
       while (ancestor) {
-        pathToRoot.push(ancestor);
+        pathToRoot.unshift(ancestor);
         ancestor = ancestor.parent;
       }
-      showDebugPopover(pathToRoot.map(s => debugString(s.config)).join('<br>'));
+      showDebugPopover(pathToRoot.map(s => elementKey(s.config)).join(' > '), element.getBoundingClientRect());
     }, {capture: true});
     element.addEventListener('mouseleave', () => {
+      element.style.backgroundColor = '';
+      element.style.outline = '';
       assertNotNullOrUndefined(debugPopover);
       debugPopover.style.display = 'none';
     }, {capture: true});
@@ -87,13 +114,13 @@ export function processEventForDebugging(
   }
 
   switch (format) {
-    case DebugLoggingFormat.Intuitive:
+    case DebugLoggingFormat.INTUITIVE:
       processEventForIntuitiveDebugging(event, state, extraInfo);
       break;
-    case DebugLoggingFormat.Test:
+    case DebugLoggingFormat.TEST:
       processEventForTestDebugging(event, state, extraInfo);
       break;
-    case DebugLoggingFormat.AdHocAnalysis:
+    case DebugLoggingFormat.AD_HOC_ANALYSIS:
       processEventForAdHocAnalysisDebugging(event, state, extraInfo);
       break;
   }
@@ -140,21 +167,21 @@ function deleteUndefinedFields<T>(entry: T): void {
   }
 }
 
-export type EventAttributes = {
-  context?: string,
-  width?: number,
-  height?: number,
-  mouseButton?: number,
-  doubleClick?: boolean,
-};
+export interface EventAttributes {
+  context?: string;
+  width?: number;
+  height?: number;
+  mouseButton?: number;
+  doubleClick?: boolean;
+}
 
-type VisualElementAttributes = {
-  ve: string,
-  veid: number,
-  context?: string,
-  width?: number,
-  height?: number,
-};
+interface VisualElementAttributes {
+  ve: string;
+  veid: number;
+  context?: string;
+  width?: number;
+  height?: number;
+}
 
 type IntuitiveLogEntry = {
   event?: EventType|'Impression'|'SessionStart',
@@ -186,13 +213,13 @@ type TestLogEntry = {
 export function processImpressionsForDebugging(states: LoggingState[]): void {
   const format = localStorage.getItem('veDebugLoggingEnabled');
   switch (format) {
-    case DebugLoggingFormat.Intuitive:
+    case DebugLoggingFormat.INTUITIVE:
       processImpressionsForIntuitiveDebugLog(states);
       break;
-    case DebugLoggingFormat.Test:
+    case DebugLoggingFormat.TEST:
       processImpressionsForTestDebugLog(states);
       break;
-    case DebugLoggingFormat.AdHocAnalysis:
+    case DebugLoggingFormat.AD_HOC_ANALYSIS:
       processImpressionsForAdHocAnalysisDebugLog(states);
       break;
     default:
@@ -307,6 +334,10 @@ function processNonDomLoggableForDebugging(loggable: Loggable, loggingState: Log
   }
 }
 
+function elementKey(config: LoggingConfig): string {
+  return `${VisualElements[config.ve]}${config.context ? `: ${config.context}` : ''}`;
+}
+
 export function debugString(config: LoggingConfig): string {
   const components = [VisualElements[config.ve]];
   if (config.context) {
@@ -332,19 +363,19 @@ function maybeLogDebugEvent(entry: IntuitiveLogEntry|AdHocAnalysisLogEntry|TestL
     return;
   }
   veDebugEventsLog.push(entry);
-  if (format === DebugLoggingFormat.Intuitive) {
+  if (format === DebugLoggingFormat.INTUITIVE) {
     // eslint-disable-next-line no-console
     console.info('VE Debug:', entry);
   }
 }
 
-export enum DebugLoggingFormat {
-  Intuitive = 'Intuitive',
-  Test = 'Test',
-  AdHocAnalysis = 'AdHocAnalysis',
+export const enum DebugLoggingFormat {
+  INTUITIVE = 'Intuitive',
+  TEST = 'Test',
+  AD_HOC_ANALYSIS = 'AdHocAnalysis',
 }
 
-export function setVeDebugLoggingEnabled(enabled: boolean, format = DebugLoggingFormat.Intuitive): void {
+export function setVeDebugLoggingEnabled(enabled: boolean, format = DebugLoggingFormat.INTUITIVE): void {
   if (enabled) {
     localStorage.setItem('veDebugLoggingEnabled', format);
   } else {
@@ -568,15 +599,9 @@ let sessionStartTime: number = Date.now();
 
 export function processStartLoggingForDebugging(): void {
   sessionStartTime = Date.now();
-  if (localStorage.getItem('veDebugLoggingEnabled') === DebugLoggingFormat.Intuitive) {
+  if (localStorage.getItem('veDebugLoggingEnabled') === DebugLoggingFormat.INTUITIVE) {
     maybeLogDebugEvent({event: 'SessionStart'});
   }
-}
-
-async function getVeDebugEventsLog(): Promise<(IntuitiveLogEntry | AdHocAnalysisLogEntry | TestLogEntry)[]> {
-  await pendingWorkComplete();
-  lastImpressionLogEntry = null;
-  return veDebugEventsLog;
 }
 
 // Compares the 'actual' log entry against the 'expected'.
@@ -625,7 +650,7 @@ export async function expectVeEvents(expectedEvents: TestLogEntry[]): Promise<vo
   if (pendingEventExpectation) {
     throw new Error('VE events expectation already set. Cannot set another one until the previous is resolved');
   }
-  const {promise, resolve: success, reject: fail} = Platform.PromiseUtilities.promiseWithResolvers<void>();
+  const {promise, resolve: success, reject: fail} = Promise.withResolvers<void>();
   pendingEventExpectation = {expectedEvents, success, fail};
   checkPendingEventExpectation();
   setTimeout(() => {
@@ -639,6 +664,8 @@ export async function expectVeEvents(expectedEvents: TestLogEntry[]): Promise<vo
   }, EVENT_EXPECTATION_TIMEOUT);
   return promise;
 }
+
+let numMatchedEvents = 0;
 
 function checkPendingEventExpectation(): void {
   if (!pendingEventExpectation) {
@@ -659,12 +686,22 @@ function checkPendingEventExpectation(): void {
       }
     }
   }
+  numMatchedEvents = veDebugEventsLog.length - actualEvents.length + pendingEventExpectation.expectedEvents.length;
   pendingEventExpectation.success();
   pendingEventExpectation = null;
 }
 
+function getUnmatchedVeEvents(): string {
+  console.error(numMatchedEvents);
+  return (veDebugEventsLog.slice(numMatchedEvents) as TestLogEntry[])
+      .map(e => 'interaction' in e ? e.interaction : formatImpressions(e.impressions))
+      .join('\n');
+}
+
 // @ts-ignore
 globalThis.setVeDebugLoggingEnabled = setVeDebugLoggingEnabled;
+// @ts-ignore
+globalThis.getUnmatchedVeEvents = getUnmatchedVeEvents;
 // @ts-ignore
 globalThis.veDebugEventsLog = veDebugEventsLog;
 // @ts-ignore
@@ -673,7 +710,5 @@ globalThis.findVeDebugImpression = findVeDebugImpression;
 globalThis.exportAdHocAnalysisLogForSql = exportAdHocAnalysisLogForSql;
 // @ts-ignore
 globalThis.buildStateFlow = buildStateFlow;
-// @ts-ignore
-globalThis.getVeDebugEventsLog = getVeDebugEventsLog;
 // @ts-ignore
 globalThis.expectVeEvents = expectVeEvents;

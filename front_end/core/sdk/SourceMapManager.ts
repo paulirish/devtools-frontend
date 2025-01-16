@@ -5,14 +5,10 @@
 import * as Common from '../common/common.js';
 import * as Platform from '../platform/platform.js';
 
-import {type FrameAssociated} from './FrameAssociated.js';
-
-import {Type, type Target} from './Target.js';
-import {Events as TargetManagerEvents, TargetManager} from './TargetManager.js';
-
+import type {FrameAssociated} from './FrameAssociated.js';
 import {PageResourceLoader, type PageResourceLoadInitiator} from './PageResourceLoader.js';
-
 import {parseSourceMap, SourceMap, type SourceMapV3} from './SourceMap.js';
+import {type Target, Type} from './Target.js';
 
 export class SourceMapManager<T extends FrameAssociated> extends Common.ObjectWrapper.ObjectWrapper<EventTypes<T>> {
   readonly #target: Target;
@@ -29,8 +25,6 @@ export class SourceMapManager<T extends FrameAssociated> extends Common.ObjectWr
     this.#attachingClient = null;
     this.#clientData = new Map();
     this.#sourceMaps = new Map();
-
-    TargetManager.instance().addEventListener(TargetManagerEvents.InspectedURLChanged, this.inspectedURLChanged, this);
   }
 
   setEnabled(isEnabled: boolean): void {
@@ -52,7 +46,7 @@ export class SourceMapManager<T extends FrameAssociated> extends Common.ObjectWr
   }
 
   private static getBaseUrl(target: Target|null): Platform.DevToolsPath.UrlString {
-    while (target && target.type() !== Type.Frame) {
+    while (target && target.type() !== Type.FRAME) {
       target = target.parentTarget();
     }
     return target?.inspectedURL() ?? Platform.DevToolsPath.EmptyUrlString;
@@ -62,21 +56,6 @@ export class SourceMapManager<T extends FrameAssociated> extends Common.ObjectWr
       Platform.DevToolsPath.UrlString {
     url = Common.ParsedURL.ParsedURL.completeURL(SourceMapManager.getBaseUrl(target), url) ?? url;
     return url;
-  }
-
-  private inspectedURLChanged(event: Common.EventTarget.EventTargetEvent<Target>): void {
-    if (event.data !== this.#target) {
-      return;
-    }
-
-    // We need this copy, because `this.#clientData` is getting modified
-    // in the loop body and trying to iterate over it at the same time
-    // leads to an infinite loop.
-    const clientData = [...this.#clientData.entries()];
-    for (const [client, {relativeSourceURL, relativeSourceMapURL}] of clientData) {
-      this.detachSourceMap(client);
-      this.attachSourceMap(client, relativeSourceURL, relativeSourceMapURL);
-    }
   }
 
   sourceMapForClient(client: T): SourceMap|undefined {
@@ -193,11 +172,6 @@ export class SourceMapManager<T extends FrameAssociated> extends Common.ObjectWr
       this.dispatchEventToListeners(Events.SourceMapFailedToAttach, {client});
     }
   }
-
-  dispose(): void {
-    TargetManager.instance().removeEventListener(
-        TargetManagerEvents.InspectedURLChanged, this.inspectedURLChanged, this);
-  }
 }
 
 async function loadSourceMap(
@@ -210,25 +184,27 @@ async function loadSourceMap(
   }
 }
 
-type ClientData = {
-  relativeSourceURL: Platform.DevToolsPath.UrlString,
+interface ClientData {
+  relativeSourceURL: Platform.DevToolsPath.UrlString;
   // Stores the raw sourceMappingURL as provided by V8. These are not guaranteed to
   // be valid URLs and will be checked and resolved once `attachSourceMap` is called.
-  relativeSourceMapURL: string,
-  sourceMap: SourceMap|undefined,
-  sourceMapPromise: Promise<SourceMap|undefined>,
-};
+  relativeSourceMapURL: string;
+  sourceMap: SourceMap|undefined;
+  sourceMapPromise: Promise<SourceMap|undefined>;
+}
 
 export enum Events {
+  /* eslint-disable @typescript-eslint/naming-convention -- Used by web_tests. */
   SourceMapWillAttach = 'SourceMapWillAttach',
   SourceMapFailedToAttach = 'SourceMapFailedToAttach',
   SourceMapAttached = 'SourceMapAttached',
   SourceMapDetached = 'SourceMapDetached',
+  /* eslint-enable @typescript-eslint/naming-convention */
 }
 
-export type EventTypes<T extends FrameAssociated> = {
-  [Events.SourceMapWillAttach]: {client: T},
-  [Events.SourceMapFailedToAttach]: {client: T},
-  [Events.SourceMapAttached]: {client: T, sourceMap: SourceMap},
-  [Events.SourceMapDetached]: {client: T, sourceMap: SourceMap},
-};
+export interface EventTypes<T extends FrameAssociated> {
+  [Events.SourceMapWillAttach]: {client: T};
+  [Events.SourceMapFailedToAttach]: {client: T};
+  [Events.SourceMapAttached]: {client: T, sourceMap: SourceMap};
+  [Events.SourceMapDetached]: {client: T, sourceMap: SourceMap};
+}

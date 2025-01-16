@@ -52,12 +52,11 @@ export enum CSSLengthUnit {
 export const CSS_LENGTH_REGEX =
     new RegExp(`(?<value>[+-]?\\d*\\.?\\d+([Ee][+-]?\\d+)?)(?<unit>${Object.values(CSSLengthUnit).join('|')})`);
 
-type CSSLengthData = {
-  lengthText: string,
-};
+interface CSSLengthData {
+  lengthText: string;
+}
 
 export class CSSLength extends HTMLElement {
-  static readonly litTagName = LitHtml.literal`devtools-css-length`;
 
   private readonly shadow = this.attachShadow({mode: 'open'});
   private readonly onDraggingValue = this.dragValue.bind(this);
@@ -94,7 +93,7 @@ export class CSSLength extends HTMLElement {
     if (newValue) {
       this.value = newValue;
       this.dispatchEvent(new ValueChangedEvent(`${this.value}${this.unit}`));
-      Host.userMetrics.swatchActivated(Host.UserMetrics.SwatchType.Length);
+      Host.userMetrics.swatchActivated(Host.UserMetrics.SwatchType.LENGTH);
       this.render();
     }
   }

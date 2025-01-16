@@ -4,7 +4,7 @@
 
 import * as Common from '../../../core/common/common.js';
 import * as Host from '../../../core/host/host.js';
-import type * as Platform from '../../../core/platform/platform.js';
+import * as Platform from '../../../core/platform/platform.js';
 import * as SDK from '../../../core/sdk/sdk.js';
 import * as Protocol from '../../../generated/protocol.js';
 import type * as Persistence from '../../../models/persistence/persistence.js';
@@ -23,16 +23,15 @@ import {
   recordedMetricsContain,
   resetRecordedMetrics,
 } from '../../../testing/UserMetricsHelpers.js';
-import * as Coordinator from '../../../ui/components/render_coordinator/render_coordinator.js';
+import * as RenderCoordinator from '../../../ui/components/render_coordinator/render_coordinator.js';
 import * as NetworkForward from '../forward/forward.js';
 
 import * as NetworkComponents from './components.js';
 
-const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
-
+const {urlString} = Platform.DevToolsPath;
 const enum HeaderAttribute {
-  HeaderName = 'HeaderName',
-  HeaderValue = 'HeaderValue',
+  HEADER_NAME = 'HeaderName',
+  HEADER_VALUE = 'HeaderValue',
 }
 
 async function renderResponseHeaderSection(request: SDK.NetworkRequest.NetworkRequest):
@@ -42,9 +41,9 @@ async function renderResponseHeaderSection(request: SDK.NetworkRequest.NetworkRe
   Object.setPrototypeOf(request, SDK.NetworkRequest.NetworkRequest.prototype);
   component.data = {
     request,
-    toReveal: {section: NetworkForward.UIRequestLocation.UIHeaderSection.Response, header: 'highlighted-header'},
+    toReveal: {section: NetworkForward.UIRequestLocation.UIHeaderSection.RESPONSE, header: 'highlighted-header'},
   };
-  await coordinator.done();
+  await RenderCoordinator.done();
   assert.instanceOf(component, HTMLElement);
   assert.isNotNull(component.shadowRoot);
   return component;
@@ -58,7 +57,7 @@ async function editHeaderRow(
   assert.isTrue(rows.length >= index + 1, 'Trying to edit row with index greater than # of rows.');
   const row = rows[index];
   assert.isNotNull(row.shadowRoot);
-  const selector = headerAttribute === HeaderAttribute.HeaderName ? '.header-name' : '.header-value';
+  const selector = headerAttribute === HeaderAttribute.HEADER_NAME ? '.header-name' : '.header-value';
   const editableComponent = row.shadowRoot.querySelector(`${selector} devtools-editable-span`);
   assert.instanceOf(editableComponent, HTMLElement);
   assert.isNotNull(editableComponent.shadowRoot);
@@ -68,7 +67,7 @@ async function editHeaderRow(
   editable.innerText = newValue;
   dispatchInputEvent(editable, {inputType: 'insertText', data: newValue, bubbles: true, composed: true});
   editable.blur();
-  await coordinator.done();
+  await RenderCoordinator.done();
 }
 
 async function removeHeaderRow(
@@ -80,7 +79,7 @@ async function removeHeaderRow(
   const button = row.shadowRoot.querySelector('.remove-header');
   assert.instanceOf(button, HTMLElement);
   button.click();
-  await coordinator.done();
+  await RenderCoordinator.done();
 }
 
 async function setupHeaderEditing(
@@ -102,20 +101,18 @@ async function setupHeaderEditing(
 
 async function setupHeaderEditingWithRequest(
     headerOverridesFileContent: string, request: SDK.NetworkRequest.NetworkRequest) {
-  const networkPersistenceManager =
-      await createWorkspaceProject('file:///path/to/overrides' as Platform.DevToolsPath.UrlString, [
-        {
-          name: '.headers',
-          path: 'www.example.com/',
-          content: headerOverridesFileContent,
-        },
-      ]);
+  const networkPersistenceManager = await createWorkspaceProject(urlString`file:///path/to/overrides`, [
+    {
+      name: '.headers',
+      path: 'www.example.com/',
+      content: headerOverridesFileContent,
+    },
+  ]);
 
   const project = networkPersistenceManager.project();
   let spy = sinon.spy();
   if (project) {
-    const uiSourceCode = project.uiSourceCodeForURL(
-        'file:///path/to/overrides/www.example.com/.headers' as Platform.DevToolsPath.UrlString);
+    const uiSourceCode = project.uiSourceCodeForURL(urlString`file:///path/to/overrides/www.example.com/.headers`);
     if (uiSourceCode) {
       spy = sinon.spy(uiSourceCode, 'setWorkingCopy');
     }
@@ -147,7 +144,7 @@ function checkHeaderSectionRow(
         nameEditable.textContent?.trim() + (row.shadowRoot.querySelector('.header-name')?.textContent || '').trim();
     assert.strictEqual(textContent, headerName);
   } else {
-    assert.strictEqual(nameEditableComponent, null);
+    assert.isNull(nameEditableComponent);
     assert.strictEqual(row.shadowRoot.querySelector('.header-name')?.textContent?.trim(), headerName);
   }
 
@@ -160,7 +157,7 @@ function checkHeaderSectionRow(
     assert.instanceOf(valueEditable, HTMLSpanElement);
     assert.strictEqual(valueEditable.textContent?.trim(), headerValue);
   } else {
-    assert.strictEqual(valueEditableComponent, null);
+    assert.isNull(valueEditableComponent);
     assert.strictEqual(row.shadowRoot.querySelector('.header-value')?.textContent?.trim(), headerValue);
   }
 }
@@ -207,10 +204,10 @@ describeWithEnvironment('ResponseHeaderSection', () => {
     assert.strictEqual(
         getCleanTextContentFromElements(row.shadowRoot, '.call-to-action')[0],
         'To use this resource from a different origin, the server needs to specify a cross-origin ' +
-            'resource policy in the response headers:Cross-Origin-Resource-Policy: same-siteChoose ' +
-            'this option if the resource and the document are served from the same site.' +
-            'Cross-Origin-Resource-Policy: cross-originOnly choose this option if an arbitrary website ' +
-            'including this resource does not impose a security risk.Learn more',
+            'resource policy in the response headers: Cross-Origin-Resource-Policy: same-site Choose ' +
+            'this option if the resource and the document are served from the same site. ' +
+            'Cross-Origin-Resource-Policy: cross-origin Only choose this option if an arbitrary website ' +
+            'including this resource does not impose a security risk. Learn more',
     );
   });
 
@@ -343,7 +340,7 @@ describeWithEnvironment('ResponseHeaderSection', () => {
   });
 
   it('correctly sets headers as "editable" when matching ".headers" file exists and setting is turned on', async () => {
-    await createWorkspaceProject('file:///path/to/overrides' as Platform.DevToolsPath.UrlString, [
+    await createWorkspaceProject(urlString`file:///path/to/overrides`, [
       {
         name: '.headers',
         path: 'www.example.com/',
@@ -385,7 +382,7 @@ describeWithEnvironment('ResponseHeaderSection', () => {
 
     Common.Settings.Settings.instance().moduleSetting('persistence-network-overrides-enabled').set(false);
     component.data = {request};
-    await coordinator.done();
+    await RenderCoordinator.done();
 
     checkHeaderSectionRow(rows[0], 'cache-control:', 'max-age=600', false, false, false);
     checkHeaderSectionRow(rows[1], 'server:', 'overridden server', true, false, false);
@@ -394,7 +391,7 @@ describeWithEnvironment('ResponseHeaderSection', () => {
   });
 
   it('does not set headers as "editable" when matching ".headers" file cannot be parsed correctly', async () => {
-    await createWorkspaceProject('file:///path/to/overrides' as Platform.DevToolsPath.UrlString, [
+    await createWorkspaceProject(urlString`file:///path/to/overrides`, [
       {
         name: '.headers',
         path: 'www.example.com/',
@@ -465,7 +462,7 @@ describeWithEnvironment('ResponseHeaderSection', () => {
     ];
 
     const {component, spy} = await setupHeaderEditing(headerOverridesFileContent, actualHeaders, originalHeaders);
-    await editHeaderRow(component, 0, HeaderAttribute.HeaderValue, 'max-age=9999');
+    await editHeaderRow(component, 0, HeaderAttribute.HEADER_VALUE, 'max-age=9999');
 
     const expected = [{
       applyTo: 'index.html',
@@ -494,14 +491,14 @@ describeWithEnvironment('ResponseHeaderSection', () => {
     assert.isNotNull(component.shadowRoot);
 
     const rows = component.shadowRoot.querySelectorAll('devtools-header-section-row');
-    assert.strictEqual(rows.length, 1);
+    assert.lengthOf(rows, 1);
     checkHeaderSectionRow(rows[0], 'foo:', 'syn ax', false, false, true);
 
-    await editHeaderRow(component, 0, HeaderAttribute.HeaderValue, 'syn ax');
+    await editHeaderRow(component, 0, HeaderAttribute.HEADER_VALUE, 'syn ax');
     assert.isTrue(spy.notCalled);
     checkHeaderSectionRow(rows[0], 'foo:', 'syn ax', false, false, true);
 
-    await editHeaderRow(component, 0, HeaderAttribute.HeaderValue, 'syntax');
+    await editHeaderRow(component, 0, HeaderAttribute.HEADER_VALUE, 'syntax');
     const expected = [{
       applyTo: 'index.html',
       headers: [
@@ -537,7 +534,7 @@ describeWithEnvironment('ResponseHeaderSection', () => {
     ];
 
     const {component, spy} = await setupHeaderEditing(headerOverridesFileContent, actualHeaders, originalHeaders);
-    await editHeaderRow(component, 1, HeaderAttribute.HeaderValue, 'edited value');
+    await editHeaderRow(component, 1, HeaderAttribute.HEADER_VALUE, 'edited value');
 
     const expected = [{
       applyTo: 'index.html',
@@ -589,7 +586,7 @@ describeWithEnvironment('ResponseHeaderSection', () => {
     const {component, spy} = await setupHeaderEditing(headerOverridesFileContent, actualHeaders, originalHeaders);
     assert.isNotNull(component.shadowRoot);
     let rows = component.shadowRoot.querySelectorAll('devtools-header-section-row');
-    assert.strictEqual(rows.length, 3);
+    assert.lengthOf(rows, 3);
     checkHeaderSectionRow(rows[0], 'added:', 'foo', true, false, true);
     checkHeaderSectionRow(rows[1], 'cache-control:', 'max-age=9999', true, false, true);
     checkHeaderSectionRow(rows[2], 'highlighted-header:', 'overridden highlighted-header', true, false, true, true);
@@ -615,7 +612,7 @@ describeWithEnvironment('ResponseHeaderSection', () => {
         Host.UserMetrics.Action.HeaderOverrideHeaderRemoved));
 
     rows = component.shadowRoot.querySelectorAll('devtools-header-section-row');
-    assert.strictEqual(rows.length, 3);
+    assert.lengthOf(rows, 3);
     checkHeaderSectionRow(rows[0], 'added:', 'foo', true, false, true);
     checkHeaderSectionRow(rows[1], 'cache-control:', 'max-age=9999', true, false, true);
     checkHeaderSectionRow(
@@ -636,7 +633,7 @@ describeWithEnvironment('ResponseHeaderSection', () => {
     assert.strictEqual(spy.callCount, 1);
     assert.isTrue(spy.calledOnceWith(JSON.stringify(expected, null, 2)));
     rows = component.shadowRoot.querySelectorAll('devtools-header-section-row');
-    assert.strictEqual(rows.length, 3);
+    assert.lengthOf(rows, 3);
     checkHeaderSectionRow(rows[0], 'added:', 'foo', true, false, false, false, true);
     checkHeaderSectionRow(rows[1], 'cache-control:', 'max-age=9999', true, false, true);
     checkHeaderSectionRow(
@@ -700,7 +697,7 @@ describeWithEnvironment('ResponseHeaderSection', () => {
     const {component, spy} = await setupHeaderEditing(headerOverridesFileContent, actualHeaders, originalHeaders);
     assert.isNotNull(component.shadowRoot);
     let rows = component.shadowRoot.querySelectorAll('devtools-header-section-row');
-    assert.strictEqual(rows.length, 2);
+    assert.lengthOf(rows, 2);
     checkHeaderSectionRow(rows[0], 'added:', 'space between', true, false, true);
     checkHeaderSectionRow(rows[1], 'cache-control:', 'max-age=600', false, false, true);
     await removeHeaderRow(component, 0);
@@ -710,7 +707,7 @@ describeWithEnvironment('ResponseHeaderSection', () => {
     assert.isTrue(spy.calledOnceWith(JSON.stringify(expected, null, 2)));
 
     rows = component.shadowRoot.querySelectorAll('devtools-header-section-row');
-    assert.strictEqual(rows.length, 2);
+    assert.lengthOf(rows, 2);
     checkHeaderSectionRow(rows[0], 'added:', 'space between', true, false, false, false, true);
     checkHeaderSectionRow(rows[1], 'cache-control:', 'max-age=600', false, false, true);
   });
@@ -720,7 +717,7 @@ describeWithEnvironment('ResponseHeaderSection', () => {
       {name: 'server', value: 'original server'},
     ];
     const {component, spy} = await setupHeaderEditing('[]', actualHeaders, actualHeaders);
-    await editHeaderRow(component, 0, HeaderAttribute.HeaderValue, 'overridden server');
+    await editHeaderRow(component, 0, HeaderAttribute.HEADER_VALUE, 'overridden server');
 
     const expected = [{
       applyTo: 'index.html',
@@ -735,7 +732,7 @@ describeWithEnvironment('ResponseHeaderSection', () => {
     assert.isTrue(spy.calledOnceWith(JSON.stringify(expected, null, 2)));
 
     spy.resetHistory();
-    await editHeaderRow(component, 0, HeaderAttribute.HeaderValue, 'original server');
+    await editHeaderRow(component, 0, HeaderAttribute.HEADER_VALUE, 'original server');
     assert.strictEqual(spy.callCount, 1);
     assert.isTrue(spy.calledOnceWith(JSON.stringify([], null, 2)));
   });
@@ -758,7 +755,7 @@ describeWithEnvironment('ResponseHeaderSection', () => {
     const addHeaderButton = component.shadowRoot.querySelector('.add-header-button');
     assert.instanceOf(addHeaderButton, HTMLElement);
     addHeaderButton.click();
-    await coordinator.done();
+    await RenderCoordinator.done();
 
     let expected = [{
       applyTo: 'index.html',
@@ -779,7 +776,7 @@ describeWithEnvironment('ResponseHeaderSection', () => {
         Host.InspectorFrontendHostAPI.EnumeratedHistogram.ActionTaken,
         Host.UserMetrics.Action.HeaderOverrideHeaderAdded));
 
-    await editHeaderRow(component, 1, HeaderAttribute.HeaderName, 'foo');
+    await editHeaderRow(component, 1, HeaderAttribute.HEADER_NAME, 'foo');
     expected = [{
       applyTo: 'index.html',
       headers: [
@@ -795,7 +792,7 @@ describeWithEnvironment('ResponseHeaderSection', () => {
     }];
     assert.isTrue(spy.getCall(-1).calledWith(JSON.stringify(expected, null, 2)));
 
-    await editHeaderRow(component, 1, HeaderAttribute.HeaderValue, 'bar');
+    await editHeaderRow(component, 1, HeaderAttribute.HEADER_VALUE, 'bar');
     expected = [{
       applyTo: 'index.html',
       headers: [
@@ -830,12 +827,12 @@ describeWithEnvironment('ResponseHeaderSection', () => {
     const addHeaderButton = component.shadowRoot.querySelector('.add-header-button');
     assert.instanceOf(addHeaderButton, HTMLElement);
     addHeaderButton.click();
-    await coordinator.done();
+    await RenderCoordinator.done();
 
     assert.strictEqual(spy.callCount, 1);
-    await editHeaderRow(component, 1, HeaderAttribute.HeaderName, 'valid');
+    await editHeaderRow(component, 1, HeaderAttribute.HEADER_NAME, 'valid');
     assert.strictEqual(spy.callCount, 2);
-    await editHeaderRow(component, 1, HeaderAttribute.HeaderName, 'in:valid');
+    await editHeaderRow(component, 1, HeaderAttribute.HEADER_NAME, 'in:valid');
     assert.strictEqual(spy.callCount, 2);
   });
 
@@ -848,7 +845,7 @@ describeWithEnvironment('ResponseHeaderSection', () => {
     const addHeaderButton = component.shadowRoot.querySelector('.add-header-button');
     assert.instanceOf(addHeaderButton, HTMLElement);
     addHeaderButton.click();
-    await coordinator.done();
+    await RenderCoordinator.done();
 
     const expected = [{
       applyTo: 'index.html',
@@ -861,7 +858,7 @@ describeWithEnvironment('ResponseHeaderSection', () => {
     }];
     assert.isTrue(spy.getCall(-1).calledWith(JSON.stringify(expected, null, 2)));
     let rows = component.shadowRoot.querySelectorAll('devtools-header-section-row');
-    assert.strictEqual(rows.length, 2);
+    assert.lengthOf(rows, 2);
     checkHeaderSectionRow(rows[0], 'server:', 'original server', false, false, true);
     checkHeaderSectionRow(rows[1], 'header-name:', 'header value', true, true, true);
 
@@ -871,16 +868,15 @@ describeWithEnvironment('ResponseHeaderSection', () => {
     assert.strictEqual(spy.callCount, 1);
     assert.isTrue(spy.calledOnceWith(JSON.stringify([], null, 2)));
     rows = component.shadowRoot.querySelectorAll('devtools-header-section-row');
-    assert.strictEqual(rows.length, 2);
+    assert.lengthOf(rows, 2);
     checkHeaderSectionRow(rows[0], 'server:', 'original server', false, false, true);
     checkHeaderSectionRow(rows[1], 'header-name:', 'header value', true, false, false, false, true);
   });
 
   it('renders headers as (not) editable depending on overall overrides setting', async () => {
     const request = SDK.NetworkRequest.NetworkRequest.create(
-        'requestId' as Protocol.Network.RequestId,
-        'https://www.example.com/index.html' as Platform.DevToolsPath.UrlString, '' as Platform.DevToolsPath.UrlString,
-        null, null, null);
+        'requestId' as Protocol.Network.RequestId, urlString`https://www.example.com/index.html`, urlString``, null,
+        null, null);
     request.responseHeaders = [{name: 'server', value: 'overridden server'}];
     request.originalResponseHeaders = [{name: 'server', value: 'original server'}];
 
@@ -889,10 +885,10 @@ describeWithEnvironment('ResponseHeaderSection', () => {
     const addHeaderButton = component.shadowRoot.querySelector('.add-header-button');
     assert.instanceOf(addHeaderButton, HTMLElement);
     addHeaderButton.click();
-    await coordinator.done();
+    await RenderCoordinator.done();
 
     let rows = component.shadowRoot.querySelectorAll('devtools-header-section-row');
-    assert.strictEqual(rows.length, 2);
+    assert.lengthOf(rows, 2);
     checkHeaderSectionRow(rows[0], 'server:', 'overridden server', true, false, true);
     checkHeaderSectionRow(rows[1], 'header-name:', 'header value', true, true, true);
 
@@ -902,7 +898,7 @@ describeWithEnvironment('ResponseHeaderSection', () => {
     assert.isNotNull(component2.shadowRoot);
 
     rows = component2.shadowRoot.querySelectorAll('devtools-header-section-row');
-    assert.strictEqual(rows.length, 2);
+    assert.lengthOf(rows, 2);
     checkHeaderSectionRow(rows[0], 'server:', 'overridden server', true, false, false);
     checkHeaderSectionRow(rows[1], 'header-name:', 'header value', true, false, false);
 
@@ -912,37 +908,36 @@ describeWithEnvironment('ResponseHeaderSection', () => {
     assert.isNotNull(component3.shadowRoot);
 
     rows = component3.shadowRoot.querySelectorAll('devtools-header-section-row');
-    assert.strictEqual(rows.length, 2);
+    assert.lengthOf(rows, 2);
     checkHeaderSectionRow(rows[0], 'server:', 'overridden server', true, false, true);
     checkHeaderSectionRow(rows[1], 'header-name:', 'header value', true, true, true);
   });
 
   it('can show the "edit header" button', async () => {
     const request = SDK.NetworkRequest.NetworkRequest.create(
-        'requestId' as Protocol.Network.RequestId, 'https://www.foo.com/index.html' as Platform.DevToolsPath.UrlString,
-        '' as Platform.DevToolsPath.UrlString, null, null, null);
+        'requestId' as Protocol.Network.RequestId, urlString`https://www.foo.com/index.html`, urlString``, null, null,
+        null);
     request.responseHeaders = [{name: 'foo', value: 'bar'}];
     request.originalResponseHeaders = [{name: 'foo', value: 'bar'}];
 
     const {component} = await setupHeaderEditingWithRequest('[]', request);
     assert.isNotNull(component.shadowRoot);
     const rows = component.shadowRoot.querySelectorAll('devtools-header-section-row');
-    assert.strictEqual(rows.length, 1);
+    assert.lengthOf(rows, 1);
     assert.isNotNull(rows[0].shadowRoot);
     assert.isNotNull(rows[0].shadowRoot.querySelector('.enable-editing'));
   });
 
   it('does not show the "edit header" button for requests with a forbidden URL', async () => {
     const request = SDK.NetworkRequest.NetworkRequest.create(
-        'requestId' as Protocol.Network.RequestId, 'chrome://terms/' as Platform.DevToolsPath.UrlString,
-        '' as Platform.DevToolsPath.UrlString, null, null, null);
+        'requestId' as Protocol.Network.RequestId, urlString`chrome://terms/`, urlString``, null, null, null);
     request.responseHeaders = [{name: 'foo', value: 'bar'}];
     request.originalResponseHeaders = [{name: 'foo', value: 'bar'}];
 
     const {component} = await setupHeaderEditingWithRequest('[]', request);
     assert.isNotNull(component.shadowRoot);
     const rows = component.shadowRoot.querySelectorAll('devtools-header-section-row');
-    assert.strictEqual(rows.length, 1);
+    assert.lengthOf(rows, 1);
     assert.isNotNull(rows[0].shadowRoot);
     assert.isNull(rows[0].shadowRoot.querySelector('.enable-editing'));
   });
@@ -969,8 +964,8 @@ describeWithEnvironment('ResponseHeaderSection', () => {
     ];
 
     const {component, spy} = await setupHeaderEditing(headerOverridesFileContent, actualHeaders, originalHeaders);
-    await editHeaderRow(component, 0, HeaderAttribute.HeaderValue, 'edited cache-control');
-    await editHeaderRow(component, 1, HeaderAttribute.HeaderValue, 'edited server');
+    await editHeaderRow(component, 0, HeaderAttribute.HEADER_VALUE, 'edited cache-control');
+    await editHeaderRow(component, 1, HeaderAttribute.HEADER_VALUE, 'edited server');
 
     const expected = [{
       applyTo: 'index.html',
@@ -1002,7 +997,7 @@ describeWithEnvironment('ResponseHeaderSection', () => {
     ];
 
     const {component, spy} = await setupHeaderEditing(headerOverridesFileContent, actualHeaders, originalHeaders);
-    await editHeaderRow(component, 0, HeaderAttribute.HeaderValue, 'third value');
+    await editHeaderRow(component, 0, HeaderAttribute.HEADER_VALUE, 'third value');
 
     let expected = [{
       applyTo: 'index.html',
@@ -1015,7 +1010,7 @@ describeWithEnvironment('ResponseHeaderSection', () => {
     }];
     assert.isTrue(spy.lastCall.calledWith(JSON.stringify(expected, null, 2)));
 
-    await editHeaderRow(component, 1, HeaderAttribute.HeaderValue, 'fourth value');
+    await editHeaderRow(component, 1, HeaderAttribute.HEADER_VALUE, 'fourth value');
     expected = [{
       applyTo: 'index.html',
       headers: [
@@ -1060,7 +1055,7 @@ describeWithEnvironment('ResponseHeaderSection', () => {
     ];
 
     const {component, spy} = await setupHeaderEditing(headerOverridesFileContent, actualHeaders, originalHeaders);
-    await editHeaderRow(component, 1, HeaderAttribute.HeaderValue, 'fifth value');
+    await editHeaderRow(component, 1, HeaderAttribute.HEADER_VALUE, 'fifth value');
 
     let expected = [{
       applyTo: 'index.html',
@@ -1077,7 +1072,7 @@ describeWithEnvironment('ResponseHeaderSection', () => {
     }];
     assert.isTrue(spy.lastCall.calledWith(JSON.stringify(expected, null, 2)));
 
-    await editHeaderRow(component, 0, HeaderAttribute.HeaderValue, 'sixth value');
+    await editHeaderRow(component, 0, HeaderAttribute.HEADER_VALUE, 'sixth value');
     expected = [{
       applyTo: 'index.html',
       headers: [
@@ -1096,9 +1091,8 @@ describeWithEnvironment('ResponseHeaderSection', () => {
 
   it('persists edits to header overrides and resurfaces them upon component (re-)creation', async () => {
     const request = SDK.NetworkRequest.NetworkRequest.create(
-        'requestId' as Protocol.Network.RequestId,
-        'https://www.example.com/index.html' as Platform.DevToolsPath.UrlString, '' as Platform.DevToolsPath.UrlString,
-        null, null, null);
+        'requestId' as Protocol.Network.RequestId, urlString`https://www.example.com/index.html`, urlString``, null,
+        null, null);
     request.responseHeaders = [{name: 'server', value: 'overridden server'}];
     request.originalResponseHeaders = [{name: 'server', value: 'original server'}];
 
@@ -1117,11 +1111,11 @@ describeWithEnvironment('ResponseHeaderSection', () => {
     const addHeaderButton = component.shadowRoot.querySelector('.add-header-button');
     assert.instanceOf(addHeaderButton, HTMLElement);
     addHeaderButton.click();
-    await coordinator.done();
+    await RenderCoordinator.done();
 
-    await editHeaderRow(component, 0, HeaderAttribute.HeaderValue, 'unit test');
-    await editHeaderRow(component, 1, HeaderAttribute.HeaderName, 'foo');
-    await editHeaderRow(component, 1, HeaderAttribute.HeaderValue, 'bar');
+    await editHeaderRow(component, 0, HeaderAttribute.HEADER_VALUE, 'unit test');
+    await editHeaderRow(component, 1, HeaderAttribute.HEADER_NAME, 'foo');
+    await editHeaderRow(component, 1, HeaderAttribute.HEADER_VALUE, 'bar');
     const expected = [{
       applyTo: 'index.html',
       headers: [
@@ -1142,16 +1136,15 @@ describeWithEnvironment('ResponseHeaderSection', () => {
     assert.isNotNull(component2.shadowRoot);
 
     const rows = component2.shadowRoot.querySelectorAll('devtools-header-section-row');
-    assert.strictEqual(rows.length, 2);
+    assert.lengthOf(rows, 2);
     checkHeaderSectionRow(rows[0], 'server:', 'unit test', true, false, true);
     checkHeaderSectionRow(rows[1], 'foo:', 'bar', true, true, true);
   });
 
   it('focuses on newly added header rows on initial render', async () => {
     const request = SDK.NetworkRequest.NetworkRequest.create(
-        'requestId' as Protocol.Network.RequestId,
-        'https://www.example.com/index.html' as Platform.DevToolsPath.UrlString, '' as Platform.DevToolsPath.UrlString,
-        null, null, null);
+        'requestId' as Protocol.Network.RequestId, urlString`https://www.example.com/index.html`, urlString``, null,
+        null, null);
     request.responseHeaders = [{name: 'server', value: 'overridden server'}];
     request.originalResponseHeaders = [{name: 'server', value: 'original server'}];
 
@@ -1170,7 +1163,7 @@ describeWithEnvironment('ResponseHeaderSection', () => {
     const addHeaderButton = component.shadowRoot.querySelector('.add-header-button');
     assert.instanceOf(addHeaderButton, HTMLElement);
     addHeaderButton.click();
-    await coordinator.done();
+    await RenderCoordinator.done();
     assert.isFalse(isRowFocused(component, 0));
     assert.isTrue(isRowFocused(component, 1));
 
@@ -1183,9 +1176,8 @@ describeWithEnvironment('ResponseHeaderSection', () => {
 
   it('can handle removal of ".headers" file', async () => {
     const request = SDK.NetworkRequest.NetworkRequest.create(
-        'requestId' as Protocol.Network.RequestId,
-        'https://www.example.com/index.html' as Platform.DevToolsPath.UrlString, '' as Platform.DevToolsPath.UrlString,
-        null, null, null);
+        'requestId' as Protocol.Network.RequestId, urlString`https://www.example.com/index.html`, urlString``, null,
+        null, null);
     request.responseHeaders = [{name: 'server', value: 'overridden server'}];
     request.originalResponseHeaders = [{name: 'server', value: 'original server'}];
 
@@ -1204,17 +1196,17 @@ describeWithEnvironment('ResponseHeaderSection', () => {
     let addHeaderButton = component.shadowRoot.querySelector('.add-header-button');
     assert.instanceOf(addHeaderButton, HTMLElement);
     addHeaderButton.click();
-    await coordinator.done();
+    await RenderCoordinator.done();
 
-    await editHeaderRow(component, 0, HeaderAttribute.HeaderValue, 'unit test');
+    await editHeaderRow(component, 0, HeaderAttribute.HEADER_VALUE, 'unit test');
 
     sinon.stub(Workspace.Workspace.WorkspaceImpl.instance(), 'uiSourceCodeForURL').callsFake(() => null);
 
     component.data = {request};
-    await coordinator.done();
+    await RenderCoordinator.done();
 
     const rows = component.shadowRoot.querySelectorAll('devtools-header-section-row');
-    assert.strictEqual(rows.length, 1);
+    assert.lengthOf(rows, 1);
     checkHeaderSectionRow(rows[0], 'server:', 'overridden server', true, false, false);
     addHeaderButton = component.shadowRoot.querySelector('.add-header-button');
     assert.isNull(addHeaderButton);
@@ -1222,9 +1214,8 @@ describeWithEnvironment('ResponseHeaderSection', () => {
 
   it('handles rendering and editing \'set-cookie\' headers', async () => {
     const request = SDK.NetworkRequest.NetworkRequest.create(
-        'requestId' as Protocol.Network.RequestId,
-        'https://www.example.com/index.html' as Platform.DevToolsPath.UrlString, '' as Platform.DevToolsPath.UrlString,
-        null, null, null);
+        'requestId' as Protocol.Network.RequestId, urlString`https://www.example.com/index.html`, urlString``, null,
+        null, null);
     request.responseHeaders = [
       {name: 'Cache-Control', value: 'max-age=600'},
       {name: 'Z-Header', value: 'zzz'},
@@ -1267,7 +1258,7 @@ describeWithEnvironment('ResponseHeaderSection', () => {
     const {component, spy} = await setupHeaderEditingWithRequest(headerOverridesFileContent, request);
     assert.isNotNull(component.shadowRoot);
     const rows = component.shadowRoot.querySelectorAll('devtools-header-section-row');
-    assert.strictEqual(rows.length, 7);
+    assert.lengthOf(rows, 7);
     assert.isNotNull(rows[0].shadowRoot);
     checkHeaderSectionRow(rows[0], 'cache-control:', 'max-age=600', false, false, true);
     assert.isNotNull(rows[1].shadowRoot);
@@ -1283,7 +1274,7 @@ describeWithEnvironment('ResponseHeaderSection', () => {
     assert.isNotNull(rows[6].shadowRoot);
     checkHeaderSectionRow(rows[6], 'z-header:', 'zzz', false, false, true);
 
-    await editHeaderRow(component, 2, HeaderAttribute.HeaderValue, 'foo=edited');
+    await editHeaderRow(component, 2, HeaderAttribute.HEADER_VALUE, 'foo=edited');
     const expected = [{
       applyTo: 'index.html',
       headers: [
@@ -1303,7 +1294,7 @@ describeWithEnvironment('ResponseHeaderSection', () => {
     }];
     assert.isTrue(spy.getCall(-1).calledWith(JSON.stringify(expected, null, 2)));
 
-    await editHeaderRow(component, 1, HeaderAttribute.HeaderValue, 'bar=edited');
+    await editHeaderRow(component, 1, HeaderAttribute.HEADER_VALUE, 'bar=edited');
     expected[0].headers.push({name: 'set-cookie', value: 'bar=edited'});
     assert.isTrue(spy.getCall(-1).calledWith(JSON.stringify(expected, null, 2)));
   });
@@ -1331,7 +1322,7 @@ describeWithEnvironment('ResponseHeaderSection', () => {
     assert.isNotNull(rows[0].shadowRoot);
     assert.strictEqual(rows[0].shadowRoot.querySelector('.header-name')?.textContent?.trim(), 'set-cookie:');
     assert.strictEqual(rows[0].shadowRoot.querySelector('.header-value')?.textContent?.trim(), 'user=123');
-    assert.strictEqual(rows[0].shadowRoot.querySelector('.row')?.classList.contains('header-overridden'), false);
+    assert.isFalse(rows[0].shadowRoot.querySelector('.row')?.classList.contains('header-overridden'));
   });
 
   it('does not mark unset headers (which cause the request to be blocked) as overridden', async () => {
@@ -1364,6 +1355,6 @@ describeWithEnvironment('ResponseHeaderSection', () => {
     assert.isNotNull(rows[0].shadowRoot);
     checkRow(rows[0].shadowRoot, 'abc:', 'def', false);
     assert.isNotNull(rows[1].shadowRoot);
-    checkRow(rows[1].shadowRoot, 'not-setcross-origin-embedder-policy:', '', false);
+    checkRow(rows[1].shadowRoot, 'not-set cross-origin-embedder-policy:', '', false);
   });
 });

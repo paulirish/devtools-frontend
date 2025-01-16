@@ -52,7 +52,7 @@ describeWithMockConnection('AutofillModel', () => {
     const autofillModel = target.model(SDK.AutofillModel.AutofillModel);
 
     const dispatchedEvents: Array<SDK.AutofillModel.AddressFormFilledEvent> = [];
-    autofillModel!.addEventListener(SDK.AutofillModel.Events.AddressFormFilled, e => dispatchedEvents.push(e.data));
+    autofillModel!.addEventListener(SDK.AutofillModel.Events.ADDRESS_FORM_FILLED, e => dispatchedEvents.push(e.data));
 
     const addressFormFilledEvent: Protocol.Autofill.AddressFormFilledEvent = {
       addressUi: {
@@ -79,6 +79,6 @@ describeWithMockConnection('AutofillModel', () => {
     };
     autofillModel!.addressFormFilled(addressFormFilledEvent);
     assert.lengthOf(dispatchedEvents, 1);
-    assert.deepStrictEqual(dispatchedEvents[0].event, addressFormFilledEvent);
+    assert.deepEqual(dispatchedEvents[0].event, addressFormFilledEvent);
   });
 });

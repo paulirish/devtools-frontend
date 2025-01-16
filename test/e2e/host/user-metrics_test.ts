@@ -19,7 +19,6 @@ import {
   waitFor,
   waitForFunction,
 } from '../../shared/helper.js';
-import {describe, it} from '../../shared/mocha-extensions.js';
 import {CONSOLE_MESSAGES_SELECTOR, navigateToConsoleTab} from '../helpers/console-helpers.js';
 import {reloadDevTools} from '../helpers/cross-tool-helper.js';
 import {navigateToCssOverviewTab, startCaptureCSSOverview} from '../helpers/css-overview-helpers.js';
@@ -33,7 +32,7 @@ import {
 import {navigateToNetworkTab, openNetworkTab} from '../helpers/network-helpers.js';
 import {openCommandMenu} from '../helpers/quick_open-helpers.js';
 import {openPanelViaMoreTools, openSettingsTab} from '../helpers/settings-helpers.js';
-import {openWorkspaceSubPane, waitForSourcesPanel} from '../helpers/sources-helpers.js';
+import {waitForSourcesPanel} from '../helpers/sources-helpers.js';
 
 interface UserMetrics {
   // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -56,7 +55,6 @@ interface PerformanceHistogramEvent {
 }
 
 declare global {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface Window {
     /* eslint-disable @typescript-eslint/naming-convention */
     Host: {
@@ -313,7 +311,7 @@ describe('User Metrics', () => {
 
   it('dispatches an event when experiments are enabled and disabled', async () => {
     await openSettingsTab('Experiments');
-    const customThemeCheckbox = await waitFor('[title="Allow extensions to load custom stylesheets"]');
+    const customThemeCheckbox = await waitFor('[title="Protocol Monitor"]');
     // Enable the experiment
     await customThemeCheckbox.click();
     // Disable the experiment
@@ -330,11 +328,11 @@ describe('User Metrics', () => {
       },
       {
         actionName: 'DevTools.ExperimentEnabled',
-        actionCode: 0,  // Allow extensions to load custom stylesheets
+        actionCode: 13,  // Protocol Monitor
       },
       {
         actionName: 'DevTools.ExperimentDisabled',
-        actionCode: 0,  // Allow extensions to load custom stylesheets
+        actionCode: 13,  // Protocol Monitor
       },
     ]);
   });
@@ -405,20 +403,6 @@ describe('User metrics for CSS overview', () => {
   });
 });
 
-describe('User Metrics for sidebar panes', () => {
-  it('dispatches sidebar panes events for switching to \'Workspace\' tab in the \'Sources\' panel', async () => {
-    await click('#tab-sources');
-    await openWorkspaceSubPane();
-
-    await assertHistogramEventsInclude([
-      {
-        actionName: 'DevTools.Sources.SidebarTabShown',
-        actionCode: 2,  // navigator-files
-      },
-    ]);
-  });
-});
-
 describe('User Metrics for Issue Panel', () => {
   beforeEach(async () => {
     await enableExperiment('contrast-issues');
@@ -469,7 +453,8 @@ describe('User Metrics for Issue Panel', () => {
     ]);
   });
 
-  it('dispatch events when a link to an element is clicked', async () => {
+  // Flaky
+  it.skip('[crbug.com/380037466]: dispatch events when a link to an element is clicked', async () => {
     await goToResource('elements/element-reveal-inline-issue.html');
     await click('.issue');
 

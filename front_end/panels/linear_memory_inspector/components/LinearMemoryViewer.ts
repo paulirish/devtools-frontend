@@ -7,7 +7,7 @@ import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import {toHexString} from './LinearMemoryInspectorUtils.js';
 import linearMemoryViewerStyles from './linearMemoryViewer.css.js';
-import {type HighlightInfo} from './LinearMemoryViewerUtils.js';
+import type {HighlightInfo} from './LinearMemoryViewerUtils.js';
 
 const {render, html} = LitHtml;
 
@@ -44,8 +44,6 @@ const BYTE_GROUP_MARGIN = 8;
 const BYTE_GROUP_SIZE = 4;
 
 export class LinearMemoryViewer extends HTMLElement {
-  static readonly litTagName = LitHtml.literal`devtools-linear-memory-inspector-viewer`;
-
   readonly #shadow = this.attachShadow({mode: 'open'});
 
   readonly #resizeObserver = new ResizeObserver(() => this.#resize());
@@ -248,7 +246,7 @@ export class LinearMemoryViewer extends HTMLElement {
       const shouldBeHighlighted = this.#shouldBeHighlighted(actualIndex);
       const focusedMemoryArea = this.#isFocusedArea(actualIndex);
       const classMap = {
-        'cell': true,
+        cell: true,
         'byte-cell': true,
         'byte-group-margin': addMargin,
         selected,
@@ -271,7 +269,7 @@ export class LinearMemoryViewer extends HTMLElement {
       const shouldBeHighlighted = this.#shouldBeHighlighted(actualIndex);
       const focusedMemoryArea = this.#isFocusedArea(actualIndex);
       const classMap = {
-        'cell': true,
+        cell: true,
         'text-cell': true,
         selected: this.#address - this.#memoryOffset === i,
         'highlight-area': shouldBeHighlighted,

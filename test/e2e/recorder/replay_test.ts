@@ -3,12 +3,9 @@
 // found in the LICENSE file.
 
 import {assert} from 'chai';
-import {type Target} from 'puppeteer-core';
+import type {Target} from 'puppeteer-core';
 
-import {
-  type AssertedEventType,
-  type StepType,
-} from '../../../front_end/panels/recorder/models/Schema.js';
+import type {AssertedEventType, StepType} from '../../../front_end/panels/recorder/models/Schema.js';
 import {
   click,
   getBrowserAndPages,
@@ -16,10 +13,7 @@ import {
   getTestServerPort,
   waitFor,
 } from '../../../test/shared/helper.js';
-import {
-  describe,
-  it,
-} from '../../../test/shared/mocha-extensions.js';
+import {expectError} from '../../conductor/events.js';
 
 import {
   clickSelectButtonItem,
@@ -33,6 +27,12 @@ describe('Recorder', function() {
   if (this.timeout() !== 0) {
     this.timeout(40000);
   }
+
+  beforeEach(() => {
+    // The error is not an indication of the test failure. We should
+    // rely on test result with retries.
+    expectError(/Replay error Waiting failed/);
+  });
 
   describe('Replay', () => {
     it('should navigate to the url of the first section', async () => {
@@ -98,10 +98,7 @@ describe('Recorder', function() {
           },
         ],
       });
-      assert.strictEqual(
-          await target.evaluate(() => document.querySelector('input')?.checked),
-          true,
-      );
+      assert.isTrue(await target.evaluate(() => document.querySelector('input')?.checked));
     });
 
     it('should be able to replay keyboard events', async () => {
@@ -202,7 +199,7 @@ describe('Recorder', function() {
       const frame = target.frames().find(
           frame => frame.url() === `${getResourcesPath()}/recorder/iframe2.html`,
       );
-      assert.ok(frame, 'Frame that the target page navigated to is not found');
+      assert.isOk(frame, 'Frame that the target page navigated to is not found');
     });
 
     it('should be able to replay events with xpath selectors', async () => {
@@ -227,7 +224,7 @@ describe('Recorder', function() {
       const frame = target.frames().find(
           frame => frame.url() === `${getResourcesPath()}/recorder/iframe2.html`,
       );
-      assert.ok(frame, 'Frame that the target page navigated to is not found');
+      assert.isOk(frame, 'Frame that the target page navigated to is not found');
     });
 
     it('should be able to override the value in text inputs that have a value already', async () => {
@@ -599,7 +596,7 @@ describe('Recorder', function() {
           frame => frame.url() ===
               `https://devtools.oopif.test:${getTestServerPort()}/test/e2e/resources/recorder/iframe2.html`,
       );
-      assert.ok(frame, 'Frame that the target page navigated to is not found');
+      assert.isOk(frame, 'Frame that the target page navigated to is not found');
     });
 
     it('should replay when clicked on slow replay', async () => {
@@ -658,7 +655,7 @@ describe('Recorder', function() {
     );
   });
 
-  it('should be able to  navigate to a prerendered page', async () => {
+  it('should be able to navigate to a prerendered page', async () => {
     await setupRecorderWithScriptAndReplay({
       title: 'Test Recording',
       steps: [

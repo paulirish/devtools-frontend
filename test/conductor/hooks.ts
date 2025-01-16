@@ -8,8 +8,6 @@
 // https://github.com/evanw/esbuild/issues/587#issuecomment-901397213
 import puppeteer = require('puppeteer-core');
 
-import {type CoverageMapData} from 'istanbul-lib-coverage';
-
 import {
   clearPuppeteerState,
   getBrowserAndPages,
@@ -32,7 +30,6 @@ import {TestConfig} from './test_config.js';
 
 // Workaround for mismatching versions of puppeteer types and puppeteer library.
 declare module 'puppeteer-core' {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface ConsoleMessage {
     stackTrace(): ConsoleMessageLocation[];
   }
@@ -42,13 +39,17 @@ const viewportWidth = 1280;
 const viewportHeight = 720;
 // Adding some offset to the window size used in the headful mode
 // so to account for the size of the browser UI.
-// Values are choosen by trial and error to make sure that the window
+// Values are chosen by trial and error to make sure that the window
 // size is not much bigger than the viewport but so that the entire
 // viewport is visible.
 const windowWidth = viewportWidth + 50;
 const windowHeight = viewportHeight + 200;
 
-const headless = !TestConfig.debug;
+const headless = !TestConfig.debug || TestConfig.headless;
+// CDP commands in e2e and interaction should not generally take
+// more than 20 seconds.
+const protocolTimeout = TestConfig.debug ? 0 : 20_000;
+
 const envSlowMo = process.env['STRESS'] ? 50 : undefined;
 const envThrottleRate = process.env['STRESS'] ? 3 : 1;
 const envLatePromises = process.env['LATE_PROMISES'] !== undefined ?
@@ -61,34 +62,6 @@ let targetTab: TargetTab;
 
 const envChromeFeatures = process.env['CHROME_FEATURES'];
 
-export async function watchForHang<T>(
-    currentTest: string|undefined, stepFn: (currentTest: string|undefined) => Promise<T>): Promise<T> {
-  const stepName = stepFn.name || stepFn.toString();
-  const stackTrace = new Error().stack;
-  function logTime(label: string) {
-    const end = performance.now();
-    console.error(`\n${stepName} ${label} ${end - start}ms\nTrace: ${stackTrace}\nTest: ${currentTest}\n`);
-  }
-  let tripped = false;
-  const timerId = setTimeout(() => {
-    logTime('takes at least');
-    tripped = true;
-  }, 10000);
-  const start = performance.now();
-  try {
-    const result = await stepFn(currentTest);
-    if (tripped) {
-      logTime('succeded after');
-    }
-    return result;
-  } catch (err) {
-    logTime('errored after');
-    throw err;
-  } finally {
-    clearTimeout(timerId);
-  }
-}
-
 function launchChrome() {
   // Use port 0 to request any free port.
   const enabledFeatures = [
@@ -99,6 +72,14 @@ function launchChrome() {
     'FencedFrames',
     'PrivacySandboxAdsAPIsOverride',
     'AutofillEnableDevtoolsIssues',
+  ];
+
+  const disabledFeatures = [
+    'DeferRendererTasksAfterInput',                // crbug.com/361078921
+    'PMProcessPriorityPolicy',                     // crbug.com/361252079
+    'MojoChannelAssociatedSendUsesRunOrPostTask',  // crbug.com/376228320
+    'RasterInducingScroll',                        // crbug.com/381055647
+    'CompositeBackgroundColorAnimation',           // crbug.com/381055647
   ];
   const launchArgs = [
     '--remote-allow-origins=*',
@@ -112,14 +93,18 @@ function launchChrome() {
     '--disable-gpu',
     '--enable-blink-features=CSSContainerQueries,HighlightInheritance',  // TODO(crbug.com/1218390) Remove globally enabled flags and conditionally enable them
     '--disable-blink-features=WebAssemblyJSPromiseIntegration',  // TODO(crbug.com/325123665) Remove once heap snapshots work again with JSPI
-    '--disable-field-trial-config',
+    `--disable-features=${disabledFeatures.join(',')}`,
   ];
+  const executablePath = TestConfig.chromeBinary;
   const opts: puppeteer.LaunchOptions&puppeteer.BrowserLaunchArgumentOptions&puppeteer.BrowserConnectOptions = {
     headless,
-    executablePath: TestConfig.chromeBinary,
+    executablePath,
     dumpio: !headless || Boolean(process.env['LUCI_CONTEXT']),
     slowMo: envSlowMo,
+    protocolTimeout,
   };
+
+  TestConfig.configureChrome(executablePath);
 
   // Always set the default viewport because setting only the window size for
   // headful mode would result in much smaller actual viewport.
@@ -185,21 +170,24 @@ export async function unregisterAllServiceWorkers() {
   });
 }
 
-export async function resetPages(currentTest: string|undefined) {
+export async function setupPages() {
+  const {frontend} = getBrowserAndPages();
+  await throttleCPUIfRequired(frontend);
+  await delayPromisesIfRequired(frontend);
+}
+
+export async function resetPages() {
   const {frontend, target} = getBrowserAndPages();
 
-  await watchForHang(currentTest, () => target.bringToFront());
-  await watchForHang(currentTest, () => targetTab.reset());
-
-  await watchForHang(currentTest, () => frontend.bringToFront());
-  await watchForHang(currentTest, () => throttleCPUIfRequired(frontend));
-  await watchForHang(currentTest, () => delayPromisesIfRequired(frontend));
+  await target.bringToFront();
+  await targetTab.reset();
+  await frontend.bringToFront();
 
   if (TestConfig.serverType === 'hosted-mode') {
-    await watchForHang(currentTest, () => frontendTab.reset());
+    await frontendTab.reset();
   } else if (TestConfig.serverType === 'component-docs') {
     // Reset the frontend back to an empty page for the component docs server.
-    await watchForHang(currentTest, () => loadEmptyPageAndWaitForContent(frontend));
+    await loadEmptyPageAndWaitForContent(frontend);
   }
 }
 
@@ -252,12 +240,6 @@ export async function postFileTeardown() {
 
   clearPuppeteerState();
   dumpCollectedErrors();
-}
-
-export function collectCoverageFromPage(): Promise<CoverageMapData|undefined> {
-  const {frontend} = getBrowserAndPages();
-
-  return frontend.evaluate('window.__coverage__') as Promise<CoverageMapData|undefined>;
 }
 
 export function getDevToolsFrontendHostname(): string {

@@ -37,7 +37,7 @@ import type * as Protocol from '../../../../generated/protocol.js';
 import * as Bindings from '../../../../models/bindings/bindings.js';
 import * as Breakpoints from '../../../../models/breakpoints/breakpoints.js';
 import * as TextUtils from '../../../../models/text_utils/text_utils.js';
-import type * as TraceEngine from '../../../../models/trace/trace.js';
+import type * as Trace from '../../../../models/trace/trace.js';
 import * as Workspace from '../../../../models/workspace/workspace.js';
 import type * as IconButton from '../../../components/icon_button/icon_button.js';
 import * as VisualLogging from '../../../visual_logging/visual_logging.js';
@@ -108,7 +108,7 @@ export class Linkifier extends Common.ObjectWrapper.ObjectWrapper<EventTypes> im
   static setLinkDecorator(linkDecorator: LinkDecorator): void {
     console.assert(!decorator, 'Cannot re-register link decorator.');
     decorator = linkDecorator;
-    linkDecorator.addEventListener(LinkDecorator.Events.LinkIconChanged, onLinkIconChanged);
+    linkDecorator.addEventListener(LinkDecorator.Events.LINK_ICON_CHANGED, onLinkIconChanged);
     for (const linkifier of instances) {
       linkifier.updateAllAnchorDecorations();
     }
@@ -146,6 +146,10 @@ export class Linkifier extends Common.ObjectWrapper.ObjectWrapper<EventTypes> im
       anchorsByUISourceCode.set(uiSourceCode, sourceCodeAnchors);
     }
     sourceCodeAnchors.add(anchor);
+  }
+
+  static bindUILocationForTest(anchor: Element, uiLocation: Workspace.UISourceCode.UILocation): void {
+    Linkifier.bindUILocation(anchor, uiLocation);
   }
 
   private static unbindUILocation(anchor: Element): void {
@@ -281,7 +285,7 @@ export class Linkifier extends Common.ObjectWrapper.ObjectWrapper<EventTypes> im
 
     const updateDelegate = async(liveLocation: Bindings.LiveLocation.LiveLocation): Promise<void> => {
       await this.updateAnchor(link, linkDisplayOptions, liveLocation);
-      this.dispatchEventToListeners(Events.LiveLocationUpdated, liveLocation);
+      this.dispatchEventToListeners(Events.LIVE_LOCATION_UPDATED, liveLocation);
     };
     void Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance()
         .createLiveLocation(rawLocation, updateDelegate.bind(this), pool)
@@ -327,8 +331,7 @@ export class Linkifier extends Common.ObjectWrapper.ObjectWrapper<EventTypes> im
   }
 
   maybeLinkifyConsoleCallFrame(
-      target: SDK.Target.Target|null,
-      callFrame: Protocol.Runtime.CallFrame|TraceEngine.Types.TraceEvents.TraceEventCallFrame,
+      target: SDK.Target.Target|null, callFrame: Protocol.Runtime.CallFrame|Trace.Types.Events.CallFrame,
       options?: LinkifyOptions): HTMLElement|null {
     const linkifyOptions: LinkifyOptions = {
       ...options,
@@ -380,7 +383,7 @@ export class Linkifier extends Common.ObjectWrapper.ObjectWrapper<EventTypes> im
 
     const updateDelegate = async(liveLocation: Bindings.LiveLocation.LiveLocation): Promise<void> => {
       await this.updateAnchor(link, linkDisplayOptions, liveLocation);
-      this.dispatchEventToListeners(Events.LiveLocationUpdated, liveLocation);
+      this.dispatchEventToListeners(Events.LIVE_LOCATION_UPDATED, liveLocation);
     };
     void Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance()
         .createStackTraceTopFrameLiveLocation(
@@ -411,7 +414,7 @@ export class Linkifier extends Common.ObjectWrapper.ObjectWrapper<EventTypes> im
 
     const updateDelegate = async(liveLocation: Bindings.LiveLocation.LiveLocation): Promise<void> => {
       await this.updateAnchor(link, linkDisplayOptions, liveLocation);
-      this.dispatchEventToListeners(Events.LiveLocationUpdated, liveLocation);
+      this.dispatchEventToListeners(Events.LIVE_LOCATION_UPDATED, liveLocation);
     };
     void Bindings.CSSWorkspaceBinding.CSSWorkspaceBinding.instance()
         .createLiveLocation(rawLocation, updateDelegate.bind(this), pool)
@@ -837,12 +840,12 @@ export interface LinkDecorator extends Common.EventTarget.EventTarget<LinkDecora
 
 export namespace LinkDecorator {
   export const enum Events {
-    LinkIconChanged = 'LinkIconChanged',
+    LINK_ICON_CHANGED = 'LinkIconChanged',
   }
 
-  export type EventTypes = {
-    [Events.LinkIconChanged]: Workspace.UISourceCode.UISourceCode,
-  };
+  export interface EventTypes {
+    [Events.LINK_ICON_CHANGED]: Workspace.UISourceCode.UISourceCode;
+  }
 }
 
 export class LinkContextMenuProvider implements UI.ContextMenu.Provider<Node> {
@@ -871,7 +874,6 @@ export class LinkHandlerSettingUI implements UI.SettingsUI.SettingUI {
 
   private constructor() {
     this.element = document.createElement('select');
-    this.element.classList.add('chrome-select');
     this.element.addEventListener('change', this.onChange.bind(this), false);
     this.update();
   }
@@ -1058,9 +1060,9 @@ interface LinkDisplayOptions {
 export type LinkHandler = (arg0: TextUtils.ContentProvider.ContentProvider, arg1: number) => void;
 
 export const enum Events {
-  LiveLocationUpdated = 'liveLocationUpdated',
+  LIVE_LOCATION_UPDATED = 'liveLocationUpdated',
 }
 
-export type EventTypes = {
-  [Events.LiveLocationUpdated]: Bindings.LiveLocation.LiveLocation,
-};
+export interface EventTypes {
+  [Events.LIVE_LOCATION_UPDATED]: Bindings.LiveLocation.LiveLocation;
+}

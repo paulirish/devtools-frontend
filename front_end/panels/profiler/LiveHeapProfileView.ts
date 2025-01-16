@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import '../../ui/legacy/legacy.js';
+
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
@@ -69,7 +71,7 @@ export class LiveHeapProfileView extends UI.Widget.VBox {
     this.gridNodeByUrl = new Map();
 
     this.setting = Common.Settings.Settings.instance().moduleSetting('memory-live-heap-profile');
-    const toolbar = new UI.Toolbar.Toolbar('live-heap-profile-toolbar', this.contentElement);
+    const toolbar = this.contentElement.createChild('devtools-toolbar', 'live-heap-profile-toolbar');
     this.toggleRecordAction =
         UI.ActionRegistry.ActionRegistry.instance().getAction('live-heap-profile.toggle-recording');
     this.toggleRecordButton =
@@ -105,7 +107,7 @@ export class LiveHeapProfileView extends UI.Widget.VBox {
       width: undefined,
       fixedWidth: true,
       sortable: true,
-      align: DataGrid.DataGrid.Align.Right,
+      align: DataGrid.DataGrid.Align.RIGHT,
       sort: DataGrid.DataGrid.Order.Descending,
       titleDOMFragment: undefined,
       editable: undefined,
@@ -125,7 +127,7 @@ export class LiveHeapProfileView extends UI.Widget.VBox {
         width: '72px',
         fixedWidth: true,
         sortable: true,
-        align: DataGrid.DataGrid.Align.Right,
+        align: DataGrid.DataGrid.Align.RIGHT,
         sort: DataGrid.DataGrid.Order.Descending,
         tooltip: i18nString(UIStrings.allocatedJsHeapSizeCurrentlyIn),
       },
@@ -135,7 +137,7 @@ export class LiveHeapProfileView extends UI.Widget.VBox {
         title: i18nString(UIStrings.vms),
         width: '40px',
         fixedWidth: true,
-        align: DataGrid.DataGrid.Align.Right,
+        align: DataGrid.DataGrid.Align.RIGHT,
         tooltip: i18nString(UIStrings.numberOfVmsSharingTheSameScript),
       },
       {
@@ -154,11 +156,11 @@ export class LiveHeapProfileView extends UI.Widget.VBox {
       deleteCallback: undefined,
       refreshCallback: undefined,
     });
-    dataGrid.setResizeMethod(DataGrid.DataGrid.ResizeMethod.Last);
+    dataGrid.setResizeMethod(DataGrid.DataGrid.ResizeMethod.LAST);
     dataGrid.element.classList.add('flex-auto');
     dataGrid.element.addEventListener('keydown', this.onKeyDown.bind(this), false);
-    dataGrid.addEventListener(DataGrid.DataGrid.Events.OpenedNode, this.revealSourceForSelectedNode, this);
-    dataGrid.addEventListener(DataGrid.DataGrid.Events.SortingChanged, this.sortingChanged, this);
+    dataGrid.addEventListener(DataGrid.DataGrid.Events.OPENED_NODE, this.revealSourceForSelectedNode, this);
+    dataGrid.addEventListener(DataGrid.DataGrid.Events.SORTING_CHANGED, this.sortingChanged, this);
     for (const info of columns) {
       const headerCell = dataGrid.headerTableHeader(info.id);
       if (headerCell) {
@@ -204,7 +206,9 @@ export class LiveHeapProfileView extends UI.Widget.VBox {
     } while (this.currentPollId === pollId);
   }
 
-  update(isolates: SDK.IsolateManager.Isolate[], profiles: (Protocol.HeapProfiler.SamplingHeapProfile|null)[]): void {
+  update(
+      isolates: SDK.IsolateManager.Isolate[] = [],
+      profiles: (Protocol.HeapProfiler.SamplingHeapProfile|null)[] = []): void {
     const dataByUrl = new Map<string, {
       size: number,
       isolates: Set<SDK.IsolateManager.Isolate>,

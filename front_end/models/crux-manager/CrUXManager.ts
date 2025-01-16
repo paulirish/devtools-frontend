@@ -3,7 +3,19 @@
 // found in the LICENSE file.
 
 import * as Common from '../../core/common/common.js';
+import * as i18n from '../../core/i18n/i18n.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import * as EmulationModel from '../../models/emulation/emulation.js';
+
+const UIStrings = {
+  /**
+   * @description Warning message indicating that the user will see real user data for a URL which is different from the URL they are currently looking at.
+   */
+  fieldOverrideWarning: 'Field data is configured for a different URL than the current page.',
+};
+
+const str_ = i18n.i18n.registerUIStrings('models/crux-manager/CrUXManager.ts', UIStrings);
+const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 // This key is expected to be visible in the frontend.
 // b/349721878
@@ -15,6 +27,7 @@ export type StandardMetricNames = 'cumulative_layout_shift'|'first_contentful_pa
 export type MetricNames = StandardMetricNames|'form_factors';
 export type FormFactor = 'DESKTOP'|'PHONE'|'TABLET';
 export type DeviceScope = FormFactor|'ALL';
+export type DeviceOption = DeviceScope|'AUTO';
 export type PageScope = 'url'|'origin';
 export type ConnectionType = 'offline'|'slow-2G'|'2G'|'3G'|'4G';
 
@@ -67,6 +80,8 @@ export interface CrUXResponse {
 
 export type PageResult = {
   [K in`${PageScope}-${DeviceScope}`]: CrUXResponse|null;
+}&{
+  warnings: string[],
 };
 
 export interface OriginMapping {
@@ -76,7 +91,8 @@ export interface OriginMapping {
 
 export interface ConfigSetting {
   enabled: boolean;
-  override: string;
+  override?: string;
+  overrideEnabled?: boolean;
   originMappings?: OriginMapping[];
 }
 
@@ -100,6 +116,9 @@ export class CrUXManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
   #mainDocumentUrl?: string;
   #configSetting: Common.Settings.Setting<ConfigSetting>;
   #endpoint = DEFAULT_ENDPOINT;
+  #pageResult?: PageResult;
+  fieldDeviceOption: DeviceOption = 'AUTO';
+  fieldPageScope: PageScope = 'url';
 
   private constructor() {
     super();
@@ -118,13 +137,14 @@ export class CrUXManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
     const hostConfig = Common.Settings.Settings.instance().getHostConfig();
     const useSessionStorage = !hostConfig || hostConfig.isOffTheRecord === true;
     const storageTypeForConsent =
-        useSessionStorage ? Common.Settings.SettingStorageType.Session : Common.Settings.SettingStorageType.Global;
+        useSessionStorage ? Common.Settings.SettingStorageType.SESSION : Common.Settings.SettingStorageType.GLOBAL;
 
     this.#configSetting = Common.Settings.Settings.instance().createSetting<ConfigSetting>(
-        'field-data', {enabled: false, override: '', originMappings: []}, storageTypeForConsent);
+        'field-data', {enabled: false, override: '', originMappings: [], overrideEnabled: false},
+        storageTypeForConsent);
 
     this.#configSetting.addChangeListener(() => {
-      void this.#automaticRefresh();
+      void this.refresh();
     });
 
     SDK.TargetManager.TargetManager.instance().addModelListener(
@@ -139,6 +159,11 @@ export class CrUXManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
     }
 
     return cruxManagerInstance;
+  }
+
+  /** The most recent page result from the CrUX service. */
+  get pageResult(): PageResult|undefined {
+    return this.#pageResult;
   }
 
   getConfigSetting(): Common.Settings.Setting<ConfigSetting> {
@@ -159,6 +184,7 @@ export class CrUXManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
       'url-DESKTOP': null,
       'url-PHONE': null,
       'url-TABLET': null,
+      warnings: [],
     };
 
     try {
@@ -175,6 +201,7 @@ export class CrUXManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
       }
 
       await Promise.all(promises);
+      this.#pageResult = pageResult;
     } catch (err) {
       console.error(err);
     } finally {
@@ -210,9 +237,16 @@ export class CrUXManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
    * the main document URL cannot be found.
    */
   async getFieldDataForCurrentPage(): Promise<PageResult> {
-    const pageUrl = this.#configSetting.get().override ||
-        this.#getMappedUrl(this.#mainDocumentUrl || await this.#getInspectedURL());
-    return this.getFieldDataForPage(pageUrl);
+    const currentUrl = this.#mainDocumentUrl || await this.#getInspectedURL();
+    const urlForCrux = this.#configSetting.get().overrideEnabled ? this.#configSetting.get().override || '' :
+                                                                   this.#getMappedUrl(currentUrl);
+
+    const result = await this.getFieldDataForPage(urlForCrux);
+    this.#pageResult = result;
+    if (currentUrl !== urlForCrux) {
+      result.warnings.push(i18nString(UIStrings.fieldOverrideWarning));
+    }
+    return result;
   }
 
   async #getInspectedURL(): Promise<string> {
@@ -224,10 +258,10 @@ export class CrUXManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
           const newInspectedURL = event.data.inspectedURL();
           if (newInspectedURL) {
             resolve(newInspectedURL);
-            targetManager.removeEventListener(SDK.TargetManager.Events.InspectedURLChanged, handler);
+            targetManager.removeEventListener(SDK.TargetManager.Events.INSPECTED_URL_CHANGED, handler);
           }
         }
-        targetManager.addEventListener(SDK.TargetManager.Events.InspectedURLChanged, handler);
+        targetManager.addEventListener(SDK.TargetManager.Events.INSPECTED_URL_CHANGED, handler);
       });
     }
     return inspectedURL;
@@ -240,22 +274,22 @@ export class CrUXManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
 
     this.#mainDocumentUrl = event.data.url;
 
-    await this.#automaticRefresh();
+    await this.refresh();
   }
 
-  async #automaticRefresh(): Promise<void> {
+  async refresh(): Promise<void> {
     // This does 2 things:
     // - Tells listeners to clear old data so it isn't shown during a URL transition
     // - Tells listeners to clear old data when field data is disabled.
-    this.dispatchEventToListeners(Events.FieldDataChanged, undefined);
+    this.#pageResult = undefined;
+    this.dispatchEventToListeners(Events.FIELD_DATA_CHANGED, undefined);
 
     if (!this.#configSetting.get().enabled) {
       return;
     }
 
-    const pageResult = await this.getFieldDataForCurrentPage();
-
-    this.dispatchEventToListeners(Events.FieldDataChanged, pageResult);
+    this.#pageResult = await this.getFieldDataForCurrentPage();
+    this.dispatchEventToListeners(Events.FIELD_DATA_CHANGED, this.#pageResult);
   }
 
   #normalizeUrl(inputUrl: string): URL {
@@ -268,7 +302,7 @@ export class CrUXManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
   async #getScopedData(normalizedUrl: URL, pageScope: PageScope, deviceScope: DeviceScope): Promise<CrUXResponse|null> {
     const {origin, href: url, hostname} = normalizedUrl;
 
-    if (hostname === 'localhost') {
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || !origin.startsWith('http')) {
       return null;
     }
 
@@ -322,15 +356,54 @@ export class CrUXManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
     return responseData;
   }
 
+  #getAutoDeviceScope(): DeviceScope {
+    const emulationModel = EmulationModel.DeviceModeModel.DeviceModeModel.tryInstance();
+    if (emulationModel === null) {
+      return 'ALL';
+    }
+
+    if (emulationModel.isMobile()) {
+      if (this.#pageResult?.[`${this.fieldPageScope}-PHONE`]) {
+        return 'PHONE';
+      }
+
+      return 'ALL';
+    }
+
+    if (this.#pageResult?.[`${this.fieldPageScope}-DESKTOP`]) {
+      return 'DESKTOP';
+    }
+
+    return 'ALL';
+  }
+
+  getSelectedDeviceScope(): DeviceScope {
+    return this.fieldDeviceOption === 'AUTO' ? this.#getAutoDeviceScope() : this.fieldDeviceOption;
+  }
+
+  getSelectedFieldResponse(): CrUXResponse|null|undefined {
+    const pageScope = this.fieldPageScope;
+    const deviceScope = this.getSelectedDeviceScope();
+    return this.getFieldResponse(pageScope, deviceScope);
+  }
+
+  getSelectedFieldMetricData(fieldMetric: StandardMetricNames): MetricResponse|undefined {
+    return this.getSelectedFieldResponse()?.record.metrics[fieldMetric];
+  }
+
+  getFieldResponse(pageScope: PageScope, deviceScope: DeviceScope): CrUXResponse|null|undefined {
+    return this.#pageResult?.[`${pageScope}-${deviceScope}`];
+  }
+
   setEndpointForTesting(endpoint: string): void {
     this.#endpoint = endpoint;
   }
 }
 
 export const enum Events {
-  FieldDataChanged = 'field-data-changed',
+  FIELD_DATA_CHANGED = 'field-data-changed',
 }
 
-type EventTypes = {
-  [Events.FieldDataChanged]: PageResult|undefined,
-};
+interface EventTypes {
+  [Events.FIELD_DATA_CHANGED]: PageResult|undefined;
+}

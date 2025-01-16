@@ -494,14 +494,16 @@ export class BreakpointManager extends Common.ObjectWrapper.ObjectWrapper<EventT
 }
 
 export enum Events {
+  /* eslint-disable @typescript-eslint/naming-convention -- Used by web_tests. */
   BreakpointAdded = 'breakpoint-added',
   BreakpointRemoved = 'breakpoint-removed',
+  /* eslint-enable @typescript-eslint/naming-convention */
 }
 
-export type EventTypes = {
-  [Events.BreakpointAdded]: BreakpointLocation,
-  [Events.BreakpointRemoved]: BreakpointLocation,
-};
+export interface EventTypes {
+  [Events.BreakpointAdded]: BreakpointLocation;
+  [Events.BreakpointRemoved]: BreakpointLocation;
+}
 
 export const enum DebuggerUpdateResult {
   OK = 'OK',

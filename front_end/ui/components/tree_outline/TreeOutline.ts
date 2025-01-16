@@ -7,7 +7,7 @@ import * as LitHtml from '../../lit-html/lit-html.js';
 import * as VisualLogging from '../../visual_logging/visual_logging.js';
 import * as CodeHighlighter from '../code_highlighter/code_highlighter.js';
 import * as ComponentHelpers from '../helpers/helpers.js';
-import * as Coordinator from '../render_coordinator/render_coordinator.js';
+import * as RenderCoordinator from '../render_coordinator/render_coordinator.js';
 
 import treeOutlineStyles from './treeOutline.css.js';
 import {
@@ -21,7 +21,7 @@ import {
   type TreeNodeWithChildren,
 } from './TreeOutlineUtils.js';
 
-const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
+const {html, Directives: {ifDefined}} = LitHtml;
 
 export interface TreeOutlineData<TreeNodeDataType> {
   defaultRenderer: (node: TreeNode<TreeNodeDataType>, state: {isExpanded: boolean}) => LitHtml.TemplateResult;
@@ -37,7 +37,7 @@ export interface TreeOutlineData<TreeNodeDataType> {
 }
 
 export function defaultRenderer(node: TreeNode<string>): LitHtml.TemplateResult {
-  return LitHtml.html`${node.treeNodeData}`;
+  return html`${node.treeNodeData}`;
 }
 
 export class ItemSelectedEvent<TreeNodeDataType> extends Event {
@@ -90,7 +90,6 @@ export const enum FilterOption {
 }
 
 export class TreeOutline<TreeNodeDataType> extends HTMLElement {
-  static readonly litTagName = LitHtml.literal`devtools-tree-outline`;
   readonly #shadow = this.attachShadow({mode: 'open'});
   #treeData: readonly TreeNode<TreeNodeDataType>[] = [];
   #nodeExpandedMap: Map<string, boolean> = new Map();
@@ -111,7 +110,7 @@ export class TreeOutline<TreeNodeDataType> extends HTMLElement {
               node.treeNodeData, null,
               2)}. Consider providing a different defaultRenderer that can handle nodes of this type.`);
     }
-    return LitHtml.html`${String(node.treeNodeData)}`;
+    return html`${String(node.treeNodeData)}`;
   };
   #nodeFilter?: ((node: TreeNodeDataType) => FilterOption);
   #compact = false;
@@ -336,7 +335,7 @@ export class TreeOutline<TreeNodeDataType> extends HTMLElement {
     this.#selectedTreeNode = treeNode;
     await this.#render();
     this.dispatchEvent(new ItemSelectedEvent(treeNode));
-    void coordinator.write('DOMNode focus', () => {
+    void RenderCoordinator.write('DOMNode focus', () => {
       domNode.focus();
     });
   }
@@ -439,7 +438,7 @@ export class TreeOutline<TreeNodeDataType> extends HTMLElement {
       });
       // Disabled until https://crbug.com/1079231 is fixed.
       // clang-format off
-      childrenToRender = LitHtml.html`<ul role="group">${LitHtml.Directives.until(childNodes)}</ul>`;
+      childrenToRender = html`<ul role="group">${LitHtml.Directives.until(childNodes)}</ul>`;
       // clang-format on
     }
 
@@ -452,8 +451,7 @@ export class TreeOutline<TreeNodeDataType> extends HTMLElement {
       'is-top-level': depth === 0,
       compact: this.#compact,
     });
-    const ariaExpandedAttribute =
-        LitHtml.Directives.ifDefined(isExpandableNode(node) ? String(nodeIsExpanded) : undefined);
+    const ariaExpandedAttribute = !isExpandableNode(node) ? undefined : nodeIsExpanded ? 'true' : 'false';
 
     let renderedNodeKey: LitHtml.TemplateResult;
     if (node.renderer) {
@@ -464,11 +462,11 @@ export class TreeOutline<TreeNodeDataType> extends HTMLElement {
 
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
-    return LitHtml.html`
+    return html`
       <li role="treeitem"
         tabindex=${tabIndex}
         aria-setsize=${setSize}
-        aria-expanded=${ariaExpandedAttribute}
+        aria-expanded=${ifDefined(ariaExpandedAttribute)}
         aria-level=${depth + 1}
         aria-posinset=${positionInSet + 1}
         class=${listItemClasses}
@@ -520,10 +518,10 @@ export class TreeOutline<TreeNodeDataType> extends HTMLElement {
 
     this.#scheduledRender = true;
 
-    await coordinator.write('TreeOutline render', () => {
+    await RenderCoordinator.write('TreeOutline render', () => {
       // Disabled until https://crbug.com/1079231 is fixed.
       // clang-format off
-      LitHtml.render(LitHtml.html`
+      LitHtml.render(html`
       <div class="wrapping-container">
         <ul role="tree" @keydown=${this.#onTreeKeyDown}>
           ${this.#treeData.map((topLevelNode, index) => {

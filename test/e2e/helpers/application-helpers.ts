@@ -41,7 +41,7 @@ export async function navigateToServiceWorkers() {
 
 export async function navigateToFrame(name: string) {
   await doubleClickTreeItem(`[aria-label="${name}"]`);
-  await waitFor('[title="Click to reveal in Sources panel"]');
+  await waitFor('[title="Click to open in Sources panel"]');
   await expectVeEvents([
     veClick('Panel: resources > Pane: sidebar > Tree > TreeItem: frames > TreeItem: frame'),
     veImpressionsUnder('Panel: resources', [veImpressionForFrameDetails()]),
@@ -67,7 +67,7 @@ export async function navigateToStorage() {
 
 export async function navigateToOpenedWindows() {
   await doubleClickTreeItem('[aria-label="Opened Windows"]');
-  await waitFor('.empty-view');
+  await waitFor('.empty-state');
   await expectVeEvents([
     veClick('Panel: resources > Pane: sidebar > Tree > TreeItem: frames > TreeItem: frame > TreeItem: opened-windows'),
     veImpressionsUnder(
@@ -82,7 +82,7 @@ export async function navigateToWebWorkers() {
       [veImpression('TreeItem', 'web-workers')])]);
   await doubleClickTreeItem(WEB_WORKERS_SELECTOR);
   await waitFor(`${WEB_WORKERS_SELECTOR} + ol li:first-child`);
-  await waitFor('.empty-view');
+  await waitFor('.empty-state');
   await expectVeEvents([
     veClick('Panel: resources > Pane: sidebar > Tree > TreeItem: frames > TreeItem: frame > TreeItem: web-workers'),
     veImpressionsUnder(
@@ -96,7 +96,7 @@ export async function navigateToFrameServiceWorkers(frameName: string) {
 
   await doubleClickTreeItem(SERVICE_WORKERS_SELECTOR);
   await waitFor(`${SERVICE_WORKERS_SELECTOR} + ol li:first-child`);
-  await waitFor('.empty-view');
+  await waitFor('.empty-state');
   await expectVeEvents([
     veClick('Panel: resources > Pane: sidebar > Tree > TreeItem: frames > TreeItem: frame > TreeItem: service-workers'),
     veImpressionsUnder(
@@ -297,7 +297,7 @@ export async function getQuotaUsage() {
   const storageRow = await waitFor('.quota-usage-row');
   const quotaString = await storageRow.evaluate(el => el.textContent || '');
   const [usedQuotaText, modifier] =
-      quotaString.replace(/^\D*([\d.]+)\D*(kM?)B.used.out.of\D*\d+\D*.?B.*$/, '$1 $2').split(' ');
+      quotaString.replaceAll(',', '').replace(/^\D*([\d.]+)\D*(kM?)B.used.out.of\D*\d+\D*.?B.*$/, '$1 $2').split(' ');
   let usedQuota = Number.parseInt(usedQuotaText, 10);
   if (modifier === 'k') {
     usedQuota *= 1000;

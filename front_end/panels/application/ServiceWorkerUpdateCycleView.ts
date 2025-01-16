@@ -61,18 +61,18 @@ export class ServiceWorkerUpdateCycleView {
         ranges: Array<ServiceWorkerUpdateRange>, id: string, startInstallTime: number, endInstallTime: number,
         startActivateTime: number, endActivateTime: number,
         status: Protocol.ServiceWorker.ServiceWorkerVersionStatus): void {
-      addRange(ranges, {id, phase: ServiceWorkerUpdateNames.Install, start: startInstallTime, end: endInstallTime});
+      addRange(ranges, {id, phase: ServiceWorkerUpdateNames.INSTALL, start: startInstallTime, end: endInstallTime});
       if (status === Protocol.ServiceWorker.ServiceWorkerVersionStatus.Activating ||
           status === Protocol.ServiceWorker.ServiceWorkerVersionStatus.Activated ||
           status === Protocol.ServiceWorker.ServiceWorkerVersionStatus.Redundant) {
         addRange(ranges, {
           id,
-          phase: ServiceWorkerUpdateNames.Wait,
+          phase: ServiceWorkerUpdateNames.WAIT,
           start: endInstallTime,
           end: startActivateTime,
         });
         addRange(
-            ranges, {id, phase: ServiceWorkerUpdateNames.Activate, start: startActivateTime, end: endActivateTime});
+            ranges, {id, phase: ServiceWorkerUpdateNames.ACTIVATE, start: startActivateTime, end: endActivateTime});
       }
     }
 
@@ -114,10 +114,10 @@ export class ServiceWorkerUpdateCycleView {
 
     const versions = this.registration.versionsByMode();
     const modes = [
-      SDK.ServiceWorkerManager.ServiceWorkerVersion.Modes.Active,
-      SDK.ServiceWorkerManager.ServiceWorkerVersion.Modes.Waiting,
-      SDK.ServiceWorkerManager.ServiceWorkerVersion.Modes.Installing,
-      SDK.ServiceWorkerManager.ServiceWorkerVersion.Modes.Redundant,
+      SDK.ServiceWorkerManager.ServiceWorkerVersion.Modes.ACTIVE,
+      SDK.ServiceWorkerManager.ServiceWorkerVersion.Modes.WAITING,
+      SDK.ServiceWorkerManager.ServiceWorkerVersion.Modes.INSTALLING,
+      SDK.ServiceWorkerManager.ServiceWorkerVersion.Modes.REDUNDANT,
     ];
 
     for (const mode of modes) {
@@ -212,7 +212,7 @@ export class ServiceWorkerUpdateCycleView {
   private constructUpdateDetails(tr: HTMLElement, range: ServiceWorkerUpdateRange): void {
     const startRow = this.tableElement.createChild('tr', 'service-worker-update-timing-bar-details');
     startRow.classList.add('service-worker-update-timing-bar-details-collapsed');
-    const startTimeItem = startRow.createChild('td') as HTMLTableCellElement;
+    const startTimeItem = startRow.createChild('td');
     startTimeItem.colSpan = 3;
     const startTime = (new Date(range.start)).toISOString();
     UI.UIUtils.createTextChild(startTimeItem.createChild('span'), i18nString(UIStrings.startTimeS, {PH1: startTime}));
@@ -220,7 +220,7 @@ export class ServiceWorkerUpdateCycleView {
 
     const endRow = this.tableElement.createChild('tr', 'service-worker-update-timing-bar-details');
     endRow.classList.add('service-worker-update-timing-bar-details-collapsed');
-    const endTimeItem = endRow.createChild('td') as HTMLTableCellElement;
+    const endTimeItem = endRow.createChild('td');
     endTimeItem.colSpan = 3;
     const endTime = (new Date(range.end)).toISOString();
     UI.UIUtils.createTextChild(endTimeItem.createChild('span'), i18nString(UIStrings.endTimeS, {PH1: endTime}));
@@ -362,9 +362,9 @@ export class ServiceWorkerUpdateCycleView {
 }
 
 export const enum ServiceWorkerUpdateNames {
-  Install = 'Install',
-  Wait = 'Wait',
-  Activate = 'Activate',
+  INSTALL = 'Install',
+  WAIT = 'Wait',
+  ACTIVATE = 'Activate',
 }
 
 export interface ServiceWorkerUpdateRange {

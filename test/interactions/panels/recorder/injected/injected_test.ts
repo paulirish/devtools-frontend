@@ -4,22 +4,15 @@
 
 import {assert} from 'chai';
 
-import {type DevToolsRecorder} from '../../../../../front_end/panels/recorder/injected/injected.js';
-import {type Schema} from '../../../../../front_end/panels/recorder/models/models.js';
+import type {DevToolsRecorder} from '../../../../../front_end/panels/recorder/injected/injected.js';
+import type {Schema} from '../../../../../front_end/panels/recorder/models/models.js';
 import {
   loadComponentDocExample,
-  preloadForCodeCoverage,
 } from '../../../../../test/interactions/helpers/shared.js';
 import {getBrowserAndPages} from '../../../../../test/shared/helper.js';
-import {
-  describe,
-  it,
-} from '../../../../../test/shared/mocha-extensions.js';
 import {assertMatchesJSONSnapshot} from '../../../../../test/shared/snapshots.js';
 
 describe('Injected', () => {
-  preloadForCodeCoverage('recorder_injected/basic.html');
-
   beforeEach(async () => {
     await loadComponentDocExample('recorder_injected/basic.html');
 
@@ -177,7 +170,7 @@ describe('Injected', () => {
               .length,
         ];
       });
-      assert.deepStrictEqual(results, [1, 1, 1, 0, 0, 2]);
+      assert.deepEqual(results, [1, 1, 1, 0, 0, 2]);
     });
 
     it('should return not-optimized CSS selectors for duplicate elements', async () => {
@@ -230,7 +223,7 @@ describe('Injected', () => {
     });
     it('should not return a text selector for elements > maximum length', async () => {
       const selectors = await getSelectorOfButtonWithLength(MAXIMUM_LENGTH + 1);
-      assert.deepStrictEqual(selectors, undefined);
+      assert.isUndefined(selectors);
     });
     it('should return a text selector correctly with same prefix elements', async () => {
       let selectors = await getSelectorOfButtonWithLength(

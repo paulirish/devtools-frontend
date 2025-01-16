@@ -10,7 +10,7 @@ import {
   waitFor,
   waitForFunction,
 } from '../../shared/helper.js';
-import {describe, it} from '../../shared/mocha-extensions.js';
+
 import {
   elementContainsTextWithSelector,
   navigateToNetworkTab,
@@ -62,7 +62,7 @@ describe('The Network Tab', function() {
         '}',
       ];
 
-      assert.deepStrictEqual(textFromResponse, expectedTextFromResponse);
+      assert.deepEqual(textFromResponse, expectedTextFromResponse);
     });
 
     await step('can highlight the pretty-printed text', async () => {
@@ -127,7 +127,7 @@ describe('The Network Tab', function() {
         '}',
       ];
 
-      assert.deepStrictEqual(textFromResponse, expectedTextFromResponse);
+      assert.deepEqual(textFromResponse, expectedTextFromResponse);
     });
 
     await step('can highlight the pretty-printed text', async () => {

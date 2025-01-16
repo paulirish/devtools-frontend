@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import '../../ui/legacy/legacy.js';
+
 import type * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
@@ -72,19 +74,19 @@ export class BlockedURLsPane extends UI.Widget.VBox implements
 
     this.manager = SDK.NetworkManager.MultitargetNetworkManager.instance();
     this.manager.addEventListener(
-        SDK.NetworkManager.MultitargetNetworkManager.Events.BlockedPatternsChanged, this.update, this);
+        SDK.NetworkManager.MultitargetNetworkManager.Events.BLOCKED_PATTERNS_CHANGED, this.update, this);
 
-    this.toolbar = new UI.Toolbar.Toolbar('', this.contentElement);
+    this.toolbar = this.contentElement.createChild('devtools-toolbar');
     this.enabledCheckbox = new UI.Toolbar.ToolbarCheckbox(
         i18nString(UIStrings.enableNetworkRequestBlocking), undefined, this.toggleEnabled.bind(this),
         'network.enable-request-blocking');
     this.toolbar.appendToolbarItem(this.enabledCheckbox);
     this.toolbar.appendSeparator();
     this.toolbar.appendToolbarItem(
-        UI.Toolbar.Toolbar.createActionButtonForId('network.add-network-request-blocking-pattern'));
+        UI.Toolbar.Toolbar.createActionButton('network.add-network-request-blocking-pattern'));
     this.toolbar.appendToolbarItem(
-        UI.Toolbar.Toolbar.createActionButtonForId('network.remove-all-network-request-blocking-patterns'));
-    this.toolbar.element.setAttribute('jslog', `${VisualLogging.toolbar()}`);
+        UI.Toolbar.Toolbar.createActionButton('network.remove-all-network-request-blocking-patterns'));
+    this.toolbar.setAttribute('jslog', `${VisualLogging.toolbar()}`);
 
     this.list = new UI.ListWidget.ListWidget(this);
     this.list.element.classList.add('blocked-urls');
@@ -129,7 +131,7 @@ export class BlockedURLsPane extends UI.Widget.VBox implements
     const count = this.blockedRequestsCount(pattern.url);
     const element = document.createElement('div');
     element.classList.add('blocked-url');
-    const checkbox = (element.createChild('input', 'blocked-url-checkbox') as HTMLInputElement);
+    const checkbox = element.createChild('input', 'blocked-url-checkbox');
     checkbox.type = 'checkbox';
     checkbox.checked = pattern.enabled;
     checkbox.disabled = !editable;
@@ -174,9 +176,9 @@ export class BlockedURLsPane extends UI.Widget.VBox implements
     const url = editor.control('url').value as Platform.DevToolsPath.UrlString;
     const patterns = this.manager.blockedPatterns();
     if (isNew) {
-      patterns.push({enabled: true, url: url});
+      patterns.push({enabled: true, url});
     } else {
-      patterns.splice(patterns.indexOf(item), 1, {enabled: true, url: url});
+      patterns.splice(patterns.indexOf(item), 1, {enabled: true, url});
     }
 
     this.manager.setBlockedPatterns(patterns);

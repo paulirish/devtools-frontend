@@ -10,8 +10,8 @@ import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 import * as ARIAUtils from './ARIAUtils.js';
 import infobarStyles from './infobar.css.legacy.js';
 import {Keys} from './KeyboardShortcut.js';
-import {createShadowRootWithCoreStyles, createTextButton} from './UIUtils.js';
-import {type Widget} from './Widget.js';
+import {createShadowRootWithCoreStyles, createTextButton, type DevToolsCloseButton} from './UIUtils.js';
+import type {Widget} from './Widget.js';
 
 const UIStrings = {
   /**
@@ -47,7 +47,7 @@ export class Infobar {
   private readonly disableSetting: Common.Settings.Setting<any>|null;
   private readonly closeContainer: HTMLElement;
   private readonly toggleElement: Buttons.Button.Button;
-  private readonly closeButton: HTMLElement;
+  private readonly closeButton: DevToolsCloseButton;
   private closeCallback: (() => void)|null;
   #firstFocusableElement: HTMLElement|null = null;
   private parentView?: Widget;
@@ -64,9 +64,9 @@ export class Infobar {
           'jslog', `${VisualLogging.dialog(jslogContext).track({resize: true, keydown: 'Enter|Escape'})}`);
     }
     this.element.classList.add('flex-none');
-    this.shadowRoot = createShadowRootWithCoreStyles(this.element, {cssFile: infobarStyles, delegatesFocus: undefined});
+    this.shadowRoot = createShadowRootWithCoreStyles(this.element, {cssFile: infobarStyles});
 
-    this.contentElement = this.shadowRoot.createChild('div', 'infobar infobar-' + type) as HTMLDivElement;
+    this.contentElement = this.shadowRoot.createChild('div', 'infobar infobar-' + type);
 
     this.mainRow = this.contentElement.createChild('div', 'infobar-main-row');
     this.detailsRows = this.contentElement.createChild('div', 'infobar-details-rows hidden');
@@ -95,9 +95,13 @@ export class Infobar {
           buttonClass += ' primary-button';
         }
 
+        const buttonVariant = action.buttonVariant ?? Buttons.Button.Variant.OUTLINED;
+
         const button = createTextButton(action.text, actionCallback, {
           className: buttonClass,
           jslogContext: action.jslogContext,
+          variant: buttonVariant,
+          icon: action.icon,
         });
         if (action.highlight && !this.#firstFocusableElement) {
           this.#firstFocusableElement = button;
@@ -119,15 +123,13 @@ export class Infobar {
         {className: 'hidden show-more', jslogContext: 'show-more', variant: Buttons.Button.Variant.TEXT});
     this.toggleElement.setAttribute('role', 'link');
     this.closeContainer.appendChild(this.toggleElement);
-    this.closeButton = this.closeContainer.createChild('div', 'close-button', 'dt-close-button');
+    this.closeButton = this.closeContainer.createChild('dt-close-button', 'close-button');
     this.closeButton.hidden = !isCloseable;
-    // @ts-ignore This is a custom element defined in UIUitls.js that has a `setTabbable` that TS doesn't
-    //            know about.
     this.closeButton.setTabbable(true);
     ARIAUtils.setDescription(this.closeButton, i18nString(UIStrings.close));
     self.onInvokeElement(this.closeButton, this.dispose.bind(this));
 
-    if (type !== Type.Issue) {
+    if (type !== Type.ISSUE) {
       this.contentElement.tabIndex = 0;
     }
     ARIAUtils.setLabel(this.contentElement, text);
@@ -246,12 +248,14 @@ export interface InfobarAction {
   highlight: boolean;
   delegate: (() => void)|null;
   dismiss: boolean;
+  buttonVariant?: Buttons.Button.Variant;
+  icon?: string;
   jslogContext?: string;
 }
 
 export const enum Type {
-  Warning = 'warning',
-  Info = 'info',
-  Issue = 'issue',
-  Error = 'error',
+  WARNING = 'warning',
+  INFO = 'info',
+  ISSUE = 'issue',
+  ERROR = 'error',
 }

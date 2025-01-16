@@ -153,7 +153,7 @@ describe('Matchers for SDK.CSSPropertyParser.BottomUpTreeMatching', () => {
           new Elements.PropertyMatchers.ColorMixMatcher());
       assert.exists(ast, text);
       assert.exists(match, text);
-      assert.deepStrictEqual(match.space.map(n => ast.text(n)), ['in', 'srgb', 'var(--interpolation)', 'hue']);
+      assert.deepEqual(match.space.map(n => ast.text(n)), ['in', 'srgb', 'var(--interpolation)', 'hue']);
       assert.strictEqual(match.color1.map(n => ast.text(n)).join(), 'red,var(--percentage)');
       assert.strictEqual(match.color2.map(n => ast.text(n)).join(), 'rgb(var(--rgb))');
     }
@@ -189,7 +189,7 @@ describe('Matchers for SDK.CSSPropertyParser.BottomUpTreeMatching', () => {
       assert.exists(ast, text);
       assert.exists(match, text);
 
-      assert.deepStrictEqual(match.space.map(n => ast.text(n)).join(' '), space, text);
+      assert.deepEqual(match.space.map(n => ast.text(n)).join(' '), space, text);
       assert.strictEqual(match.color1.map(n => ast.text(n)).join(' '), color1, text);
       assert.strictEqual(match.color2.map(n => ast.text(n)).join(' '), color2, text);
     }
@@ -252,34 +252,40 @@ describe('Matchers for SDK.CSSPropertyParser.BottomUpTreeMatching', () => {
       return matches.map(m => matchedResult.getMatch(m)?.text);
     }
 
-    assert.deepStrictEqual(match('animation-name', 'first, second, -moz-third'), ['first', 'second', '-moz-third']);
-    assert.deepStrictEqual(match('animation-name', 'first'), ['first']);
-    assert.deepStrictEqual(match('font-palette', 'first'), ['first']);
+    assert.deepEqual(match('animation-name', 'first, second, -moz-third'), ['first', 'second', '-moz-third']);
+    assert.deepEqual(match('animation-name', 'first'), ['first']);
+    assert.deepEqual(match('font-palette', 'first'), ['first']);
     {
-      assert.deepStrictEqual(match('position-try-fallbacks', 'flip-block'), []);
-      assert.deepStrictEqual(match('position-try-fallbacks', '--one'), ['--one']);
-      assert.deepStrictEqual(match('position-try-fallbacks', '--one, --two'), ['--one', '--two']);
+      assert.deepEqual(match('position-try-fallbacks', 'flip-block'), []);
+      assert.deepEqual(match('position-try-fallbacks', '--one'), ['--one']);
+      assert.deepEqual(match('position-try-fallbacks', '--one, --two'), ['--one', '--two']);
     }
     {
-      assert.deepStrictEqual(match('position-try', 'flip-block'), []);
-      assert.deepStrictEqual(match('position-try', '--one'), ['--one']);
-      assert.deepStrictEqual(match('position-try', '--one, --two'), ['--one', '--two']);
+      assert.deepEqual(match('position-try', 'flip-block'), []);
+      assert.deepEqual(match('position-try', '--one'), ['--one']);
+      assert.deepEqual(match('position-try', '--one, --two'), ['--one', '--two']);
     }
     {
       injectVariableSubstitutions({
         '--duration-and-easing': '1s linear',
       });
-      assert.deepStrictEqual(match('animation', '1s linear --animation-name'), ['--animation-name']);
-      assert.deepStrictEqual(match('animation', '1s linear linear'), ['linear']);
-      assert.deepStrictEqual(
+      assert.deepEqual(match('animation', '1s linear --animation-name'), ['--animation-name']);
+      assert.deepEqual(match('animation', '1s linear linear'), ['linear']);
+      assert.deepEqual(
           match('animation', '1s linear --first-name, 1s ease-in --second-name'), ['--first-name', '--second-name']);
-      assert.deepStrictEqual(match('animation', '1s linear'), []);
+      assert.deepEqual(match('animation', '1s linear'), []);
       // Matching to variable names inside `var()` functions are fine as it is handled by variable renderer in usage.
-      assert.deepStrictEqual(
-          match('animation', 'var(--duration-and-easing) linear'), ['--duration-and-easing', 'linear']);
-      assert.deepStrictEqual(
+      assert.deepEqual(match('animation', 'var(--duration-and-easing) linear'), ['--duration-and-easing', 'linear']);
+      assert.deepEqual(
           match('animation', '1s linear var(--non-existent, --animation-name)'),
           ['--non-existent', '--animation-name']);
+      assert.deepEqual(match('animation', '1s step-start 0s kf'), ['kf']);
+      assert.deepEqual(match('animation', '1s step-end 0s kf'), ['kf']);
+      assert.deepEqual(match('animation', '1s steps(1, jump-start) 0s kf'), ['kf']);
+      assert.deepEqual(match('animation', '1s steps(1, jump-end) 0s kf'), ['kf']);
+      assert.deepEqual(match('animation', '1s steps(1, jump-none) 0s kf'), ['kf']);
+      assert.deepEqual(match('animation', '1s steps(1, start) 0s kf'), ['kf']);
+      assert.deepEqual(match('animation', '1s steps(1, end) 0s kf'), ['kf']);
     }
   });
 
@@ -341,7 +347,7 @@ describe('Matchers for SDK.CSSPropertyParser.BottomUpTreeMatching', () => {
 
       const matches = SDK.CSSPropertyParser.TreeSearch.findAll(
           ast, node => matchedResult.getMatch(node) instanceof Elements.PropertyMatchers.FontMatch);
-      assert.deepStrictEqual(matches.map(m => matchedResult.getMatch(m)?.text), ['"Gill Sans"', 'sans-serif']);
+      assert.deepEqual(matches.map(m => matchedResult.getMatch(m)?.text), ['"Gill Sans"', 'sans-serif']);
     }
   });
 
@@ -364,7 +370,7 @@ describe('Matchers for SDK.CSSPropertyParser.BottomUpTreeMatching', () => {
           'grid-template-areas', '"a a a" "b b b" "c c c"', new Elements.PropertyMatchers.GridTemplateMatcher());
       assert.exists(ast, text);
       assert.exists(match, text);
-      assert.deepStrictEqual(
+      assert.deepEqual(
           match.lines.map(line => line.map(n => ast.text(n)).join(' ')), ['"a a a"', '"b b b"', '"c c c"']);
     }
     {
@@ -372,7 +378,7 @@ describe('Matchers for SDK.CSSPropertyParser.BottomUpTreeMatching', () => {
           'grid-template', '"a a a" var(--row) / auto 1fr auto', new Elements.PropertyMatchers.GridTemplateMatcher());
       assert.exists(ast, text);
       assert.exists(match, text);
-      assert.deepStrictEqual(
+      assert.deepEqual(
           match.lines.map(line => line.map(n => ast.text(n)).join(' ')), ['"a a a"', 'var(--row) / auto 1fr auto']);
     }
     {
@@ -382,7 +388,7 @@ describe('Matchers for SDK.CSSPropertyParser.BottomUpTreeMatching', () => {
           new Elements.PropertyMatchers.GridTemplateMatcher());
       assert.exists(ast, text);
       assert.exists(match, text);
-      assert.deepStrictEqual(
+      assert.deepEqual(
           match.lines.map(line => line.map(n => ast.text(n)).join(' ')),
           ['[header-top] "a a" var(--row-with-names)', '[main-top] "b b b" 1fr [main-bottom] / auto 1fr auto']);
     }
@@ -393,7 +399,7 @@ describe('Matchers for SDK.CSSPropertyParser.BottomUpTreeMatching', () => {
           new Elements.PropertyMatchers.GridTemplateMatcher());
       assert.exists(ast, text);
       assert.exists(match, text);
-      assert.deepStrictEqual(
+      assert.deepEqual(
           match.lines.map(line => line.map(n => ast.text(n)).join(' ')),
           ['[header-top] "a a"', '"b b b" var(--line-name)', '"c c" / auto 1fr auto']);
     }
@@ -404,7 +410,7 @@ describe('Matchers for SDK.CSSPropertyParser.BottomUpTreeMatching', () => {
           new Elements.PropertyMatchers.GridTemplateMatcher());
       assert.exists(ast, text);
       assert.exists(match, text);
-      assert.deepStrictEqual(
+      assert.deepEqual(
           match.lines.map(line => line.map(n => ast.text(n)).join(' ')),
           ['[line1] "a a" [line2]', 'var(--double-row)', '"b b" / auto 1fr auto']);
     }
@@ -413,7 +419,7 @@ describe('Matchers for SDK.CSSPropertyParser.BottomUpTreeMatching', () => {
           'grid', '"a a" var(--unresolved) / auto 1fr auto;', new Elements.PropertyMatchers.GridTemplateMatcher());
       assert.exists(ast, text);
       assert.exists(match, text);
-      assert.deepStrictEqual(
+      assert.deepEqual(
           match.lines.map(line => line.map(n => ast.text(n)).join(' ')), ['"a a" var(--unresolved) / auto 1fr auto']);
     }
   });
@@ -451,14 +457,16 @@ describe('Matchers for SDK.CSSPropertyParser.BottomUpTreeMatching', () => {
       assert.isNull(match, text);
     });
 
-    it('should not match if the anchor() and anchor-size() calls dont have any arguments', () => {
+    it('should not match anchor() call without arguments', () => {
       const {match: anchorMatch} =
           matchSingleValue('left', 'anchor()', new Elements.PropertyMatchers.AnchorFunctionMatcher());
       assert.isNull(anchorMatch);
+    });
 
-      const {match: anchorSizeMatch} =
+    it('should match anchor-size() call without arguments', () => {
+      const {match: anchorSizeMatch, text: anchorSizeText} =
           matchSingleValue('width', 'anchor-size()', new Elements.PropertyMatchers.AnchorFunctionMatcher());
-      assert.isNull(anchorSizeMatch);
+      assert.exists(anchorSizeMatch, anchorSizeText);
     });
 
     it('should match if it is an anchor() or anchor-size() call', () => {
@@ -472,15 +480,27 @@ describe('Matchers for SDK.CSSPropertyParser.BottomUpTreeMatching', () => {
     });
 
     it('should match dashed identifier as name from the first argument', () => {
-      const {ast: anchorAst, match: anchorMatch, text: anchorText} = matchSingleValue(
+      const {match: anchorMatch, text: anchorText} = matchSingleValue(
           'left', 'anchor(--dashed-ident left)', new Elements.PropertyMatchers.AnchorFunctionMatcher());
       assert.exists(anchorMatch, anchorText);
-      assert.strictEqual(anchorAst!.text(anchorMatch.args[0]), '--dashed-ident');
+      assert.strictEqual(anchorMatch.text, '--dashed-ident');
 
-      const {ast: anchorSizeAst, match: anchorSizeMatch, text: anchorSizeText} = matchSingleValue(
+      const {match: anchorSizeMatch, text: anchorSizeText} = matchSingleValue(
           'width', 'anchor-size(--dashed-ident width)', new Elements.PropertyMatchers.AnchorFunctionMatcher());
       assert.exists(anchorSizeMatch, anchorSizeText);
-      assert.strictEqual(anchorSizeAst!.text(anchorSizeMatch.args[0]), '--dashed-ident');
+      assert.strictEqual(anchorSizeMatch.text, '--dashed-ident');
+    });
+
+    it('should match dashed identifier as name from the second argument', () => {
+      const {match: anchorMatch, text: anchorText} = matchSingleValue(
+          'left', 'anchor(right --dashed-ident)', new Elements.PropertyMatchers.AnchorFunctionMatcher());
+      assert.exists(anchorMatch, anchorText);
+      assert.strictEqual(anchorMatch.text, '--dashed-ident');
+
+      const {match: anchorSizeMatch, text: anchorSizeText} = matchSingleValue(
+          'width', 'anchor-size(height --dashed-ident)', new Elements.PropertyMatchers.AnchorFunctionMatcher());
+      assert.exists(anchorSizeMatch, anchorSizeText);
+      assert.strictEqual(anchorSizeMatch.text, '--dashed-ident');
     });
   });
 
@@ -499,9 +519,82 @@ describe('Matchers for SDK.CSSPropertyParser.BottomUpTreeMatching', () => {
     });
   });
 
+  describe('PositionTryMatcher', () => {
+    it('should match `position-try[-fallbacks]` property with linkable names', () => {
+      {
+        const {match, text} = matchSingleValue(
+            'position-try', 'flip-block, --top, --bottom', new Elements.PropertyMatchers.PositionTryMatcher());
+        assert.exists(match, text);
+        assert.strictEqual(match.text, 'flip-block, --top, --bottom');
+        assert.lengthOf(match.preamble, 0);
+      } {
+        const {ast, match, text} = matchSingleValue(
+            'position-try', '/* comment */ most-height --top, --bottom',
+            new Elements.PropertyMatchers.PositionTryMatcher());
+        assert.exists(ast, text);
+        assert.exists(match, text);
+        assert.strictEqual(match.text, '/* comment */ most-height --top, --bottom');
+        assert.strictEqual(
+            ast.textRange(match.preamble[0], match.preamble[match.preamble.length - 1]), '/* comment */ most-height');
+
+      } {
+        const {match, text} = matchSingleValue(
+            'position-try-fallbacks', '/* comment */ flip-block, --top, /* comment */ --bottom',
+            new Elements.PropertyMatchers.PositionTryMatcher());
+        assert.exists(match, text);
+        assert.strictEqual(match.text, '/* comment */ flip-block, --top, /* comment */ --bottom');
+        assert.lengthOf(match.preamble, 0);
+      } {
+        const {match} = matchSingleValue('position-try', 'revert', new Elements.PropertyMatchers.PositionTryMatcher());
+        assert.isNull(match);
+      }
+    });
+  });
+
   it('matches lengths', () => {
     const {match, text} = matchSingleValue('min-width', '100px', new Elements.PropertyMatchers.LengthMatcher());
     assert.exists(match, text);
     assert.strictEqual(match.text, '100px');
+  });
+
+  it('match css keywords', () => {
+    const propertyStub = sinon.createStubInstance(SDK.CSSProperty.CSSProperty);
+    const matchedStylesStub = sinon.createStubInstance(SDK.CSSMatchedStyles.CSSMatchedStyles);
+    for (const keyword of SDK.CSSMetadata.CSSWideKeywords) {
+      const {match, text} = matchSingleValue(
+          '--property', keyword, new Elements.PropertyMatchers.CSSWideKeywordMatcher(propertyStub, matchedStylesStub));
+      assert.exists(match, text);
+      assert.strictEqual(match.text, keyword);
+    }
+
+    const {match, text} = matchSingleValue(
+        '--property', '1px inherits',
+        new Elements.PropertyMatchers.CSSWideKeywordMatcher(propertyStub, matchedStylesStub));
+    assert.notExists(match, text);
+  });
+
+  it('match flex and grid values', () => {
+    const good = [
+      'flex',
+      'grid',
+      'inline-flex',
+      'inline-grid',
+      'block flex',
+      'block grid',
+      'inline   flex',
+      'inline grid',
+      'inline grid !important',
+      'grid /* comment */',
+    ];
+    const bad = ['flex block', 'grid inline', 'block', 'inline'];
+    for (const value of good) {
+      const {match, text} = matchSingleValue('display', value, new Elements.PropertyMatchers.FlexGridMatcher());
+      assert.exists(match, text);
+      assert.strictEqual(match.text.includes('flex'), match.isFlex);
+    }
+    for (const value of bad) {
+      const {match, text} = matchSingleValue('display', value, new Elements.PropertyMatchers.FlexGridMatcher());
+      assert.notExists(match, text);
+    }
   });
 });

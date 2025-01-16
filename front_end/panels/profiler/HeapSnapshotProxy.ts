@@ -32,7 +32,7 @@ import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import type * as HeapSnapshotModel from '../../models/heap_snapshot_model/heap_snapshot_model.js';
 
-import {type ChildrenProvider} from './ChildrenProvider.js';
+import type {ChildrenProvider} from './ChildrenProvider.js';
 
 const UIStrings = {
   /**
@@ -76,7 +76,7 @@ export class HeapSnapshotWorkerProxy extends Common.ObjectWrapper.ObjectWrapper<
     this.postMessage({
       callId: this.nextCallId++,
       disposition: 'createLoader',
-      objectId: objectId,
+      objectId,
     });
     return proxy;
   }
@@ -89,13 +89,13 @@ export class HeapSnapshotWorkerProxy extends Common.ObjectWrapper.ObjectWrapper<
   }
 
   disposeObject(objectId: number): void {
-    this.postMessage({callId: this.nextCallId++, disposition: 'dispose', objectId: objectId});
+    this.postMessage({callId: this.nextCallId++, disposition: 'dispose', objectId});
   }
 
   evaluateForTest(script: string, callback: (...arg0: any[]) => void): void {
     const callId = this.nextCallId++;
     this.callbacks.set(callId, callback);
-    this.postMessage({callId: callId, disposition: 'evaluateForTest', source: script});
+    this.postMessage({callId, disposition: 'evaluateForTest', source: script});
   }
 
   callFactoryMethod<T extends Object>(
@@ -115,22 +115,22 @@ export class HeapSnapshotWorkerProxy extends Common.ObjectWrapper.ObjectWrapper<
         callback(remoteResult ? new proxyConstructor(this, newObjectId) : null);
       });
       this.postMessage({
-        callId: callId,
+        callId,
         disposition: 'factory',
-        objectId: objectId,
-        methodName: methodName,
-        methodArguments: methodArguments,
-        newObjectId: newObjectId,
+        objectId,
+        methodName,
+        methodArguments,
+        newObjectId,
       });
       return null;
     }
     this.postMessage({
-      callId: callId,
+      callId,
       disposition: 'factory',
-      objectId: objectId,
-      methodName: methodName,
-      methodArguments: methodArguments,
-      newObjectId: newObjectId,
+      objectId,
+      methodName,
+      methodArguments,
+      newObjectId,
     });
     return new proxyConstructor(this, newObjectId);
   }
@@ -142,11 +142,11 @@ export class HeapSnapshotWorkerProxy extends Common.ObjectWrapper.ObjectWrapper<
       this.callbacks.set(callId, callback);
     }
     this.postMessage({
-      callId: callId,
+      callId,
       disposition: 'method',
-      objectId: objectId,
-      methodName: methodName,
-      methodArguments: methodArguments,
+      objectId,
+      methodName,
+      methodArguments,
     });
   }
 
@@ -165,7 +165,7 @@ export class HeapSnapshotWorkerProxy extends Common.ObjectWrapper.ObjectWrapper<
       }
     }
     const hasLongRunningCalls = Boolean(this.previousCallbacks.size);
-    this.dispatchEventToListeners(HeapSnapshotWorkerProxy.Events.Wait, hasLongRunningCalls);
+    this.dispatchEventToListeners(HeapSnapshotWorkerProxy.Events.WAIT, hasLongRunningCalls);
     for (const callId of this.callbacks.keys()) {
       this.previousCallbacks.add(callId);
     }
@@ -206,14 +206,13 @@ export class HeapSnapshotWorkerProxy extends Common.ObjectWrapper.ObjectWrapper<
 }
 
 export namespace HeapSnapshotWorkerProxy {
-
   export const enum Events {
-    Wait = 'Wait',
+    WAIT = 'Wait',
   }
 
-  export type EventTypes = {
-    [Events.Wait]: boolean,
-  };
+  export interface EventTypes {
+    [Events.WAIT]: boolean;
+  }
 }
 
 export class HeapSnapshotProxyObject {
@@ -291,16 +290,20 @@ export class HeapSnapshotProxy extends HeapSnapshotProxyObject {
     return this.callMethodPromise('search', searchConfig, filter);
   }
 
+  interfaceDefinitions(): Promise<string> {
+    return this.callMethodPromise('interfaceDefinitions');
+  }
+
   aggregatesWithFilter(filter: HeapSnapshotModel.HeapSnapshotModel.NodeFilter): Promise<{
     [x: string]: HeapSnapshotModel.HeapSnapshotModel.Aggregate,
   }> {
     return this.callMethodPromise('aggregatesWithFilter', filter);
   }
 
-  aggregatesForDiff(): Promise<{
+  aggregatesForDiff(interfaceDefinitions: string): Promise<{
     [x: string]: HeapSnapshotModel.HeapSnapshotModel.AggregateForDiff,
   }> {
-    return this.callMethodPromise('aggregatesForDiff');
+    return this.callMethodPromise('aggregatesForDiff', interfaceDefinitions);
   }
 
   calculateSnapshotDiff(baseSnapshotId: string, baseSnapshotAggregates: {
@@ -311,8 +314,8 @@ export class HeapSnapshotProxy extends HeapSnapshotProxyObject {
     return this.callMethodPromise('calculateSnapshotDiff', baseSnapshotId, baseSnapshotAggregates);
   }
 
-  nodeClassName(snapshotObjectId: number): Promise<string|null> {
-    return this.callMethodPromise('nodeClassName', snapshotObjectId);
+  nodeClassKey(snapshotObjectId: number): Promise<string|null> {
+    return this.callMethodPromise('nodeClassKey', snapshotObjectId);
   }
 
   createEdgesProvider(nodeIndex: number): HeapSnapshotProviderProxy {
@@ -323,8 +326,8 @@ export class HeapSnapshotProxy extends HeapSnapshotProxyObject {
     return this.callFactoryMethod('createRetainingEdgesProvider', HeapSnapshotProviderProxy, nodeIndex);
   }
 
-  createAddedNodesProvider(baseSnapshotId: string, className: string): HeapSnapshotProviderProxy {
-    return this.callFactoryMethod('createAddedNodesProvider', HeapSnapshotProviderProxy, baseSnapshotId, className);
+  createAddedNodesProvider(baseSnapshotId: string, classKey: string): HeapSnapshotProviderProxy {
+    return this.callFactoryMethod('createAddedNodesProvider', HeapSnapshotProviderProxy, baseSnapshotId, classKey);
   }
 
   createDeletedNodesProvider(nodeIndexes: number[]): HeapSnapshotProviderProxy {
@@ -335,9 +338,9 @@ export class HeapSnapshotProxy extends HeapSnapshotProxyObject {
     return this.callFactoryMethod('createNodesProvider', HeapSnapshotProviderProxy, filter);
   }
 
-  createNodesProviderForClass(className: string, nodeFilter: HeapSnapshotModel.HeapSnapshotModel.NodeFilter):
+  createNodesProviderForClass(classKey: string, nodeFilter: HeapSnapshotModel.HeapSnapshotModel.NodeFilter):
       HeapSnapshotProviderProxy {
-    return this.callFactoryMethod('createNodesProviderForClass', HeapSnapshotProviderProxy, className, nodeFilter);
+    return this.callFactoryMethod('createNodesProviderForClass', HeapSnapshotProviderProxy, classKey, nodeFilter);
   }
 
   allocationTracesTops(): Promise<HeapSnapshotModel.HeapSnapshotModel.SerializedAllocationNode[]> {

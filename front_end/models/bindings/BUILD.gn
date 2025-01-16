@@ -4,7 +4,7 @@
 
 import("../../../scripts/build/ninja/devtools_entrypoint.gni")
 import("../../../scripts/build/ninja/devtools_module.gni")
-import("../../../third_party/typescript/typescript.gni")
+import("../../../scripts/build/typescript/typescript.gni")
 import("../visibility.gni")
 
 devtools_module("bindings") {
@@ -52,6 +52,7 @@ devtools_entrypoint("bundle") {
     "../../core/sdk:unittests",
     "../../entrypoints/main/*",
     "../../legacy_test_runner/*",
+    "../../panels/ai_assistance/*",
     "../../panels/application/*",
     "../../panels/console/*",
     "../../panels/coverage/*",
@@ -59,6 +60,7 @@ devtools_entrypoint("bundle") {
     "../../panels/emulation/*",
     "../../panels/network/*",
     "../../panels/profiler/*",
+    "../../panels/protocol_monitor/*",
     "../../panels/recorder/*",
     "../../panels/sources/*",
     "../../panels/timeline/*",

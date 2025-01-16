@@ -34,9 +34,9 @@ import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
-import {type ActionDelegate} from './ActionRegistration.js';
+import type {ActionDelegate} from './ActionRegistration.js';
 import {alert} from './ARIAUtils.js';
-import {type Context} from './Context.js';
+import type {Context} from './Context.js';
 import {type Provider, ToolbarButton, type ToolbarItem} from './Toolbar.js';
 
 const UIStrings = {
@@ -91,7 +91,7 @@ export class DockController extends Common.ObjectWrapper.ObjectWrapper<EventType
     this.closeButton.element.setAttribute('jslog', `${VisualLogging.close().track({click: true})}`);
     this.closeButton.element.classList.add('close-devtools');
     this.closeButton.addEventListener(
-        ToolbarButton.Events.Click,
+        ToolbarButton.Events.CLICK,
         Host.InspectorFrontendHost.InspectorFrontendHostInstance.closeWindow.bind(
             Host.InspectorFrontendHost.InspectorFrontendHostInstance));
 
@@ -177,18 +177,18 @@ export class DockController extends Common.ObjectWrapper.ObjectWrapper<EventType
 
     this.savedFocus = Platform.DOMUtilities.deepActiveElement(document);
     const eventData = {from: this.dockSideInternal, to: dockSide};
-    this.dispatchEventToListeners(Events.BeforeDockSideChanged, eventData);
+    this.dispatchEventToListeners(Events.BEFORE_DOCK_SIDE_CHANGED, eventData);
     console.timeStamp('DockController.setIsDocked');
     this.dockSideInternal = dockSide;
     this.currentDockStateSetting.set(dockSide);
     Host.InspectorFrontendHost.InspectorFrontendHostInstance.setIsDocked(
         dockSide !== DockState.UNDOCKED, this.setIsDockedResponse.bind(this, eventData));
     this.closeButton.setVisible(this.dockSideInternal !== DockState.UNDOCKED);
-    this.dispatchEventToListeners(Events.DockSideChanged, eventData);
+    this.dispatchEventToListeners(Events.DOCK_SIDE_CHANGED, eventData);
   }
 
   private setIsDockedResponse(eventData: ChangeEvent): void {
-    this.dispatchEventToListeners(Events.AfterDockSideChanged, eventData);
+    this.dispatchEventToListeners(Events.AFTER_DOCK_SIDE_CHANGED, eventData);
     if (this.savedFocus) {
       (this.savedFocus as HTMLElement).focus();
       this.savedFocus = null;
@@ -226,9 +226,9 @@ const states = [DockState.RIGHT, DockState.BOTTOM, DockState.LEFT, DockState.UND
 // after frontend is docked/undocked in the browser.
 
 export const enum Events {
-  BeforeDockSideChanged = 'BeforeDockSideChanged',
-  DockSideChanged = 'DockSideChanged',
-  AfterDockSideChanged = 'AfterDockSideChanged',
+  BEFORE_DOCK_SIDE_CHANGED = 'BeforeDockSideChanged',
+  DOCK_SIDE_CHANGED = 'DockSideChanged',
+  AFTER_DOCK_SIDE_CHANGED = 'AfterDockSideChanged',
 }
 
 export interface ChangeEvent {
@@ -236,11 +236,11 @@ export interface ChangeEvent {
   to: DockState;
 }
 
-export type EventTypes = {
-  [Events.BeforeDockSideChanged]: ChangeEvent,
-  [Events.DockSideChanged]: ChangeEvent,
-  [Events.AfterDockSideChanged]: ChangeEvent,
-};
+export interface EventTypes {
+  [Events.BEFORE_DOCK_SIDE_CHANGED]: ChangeEvent;
+  [Events.DOCK_SIDE_CHANGED]: ChangeEvent;
+  [Events.AFTER_DOCK_SIDE_CHANGED]: ChangeEvent;
+}
 
 export class ToggleDockActionDelegate implements ActionDelegate {
   handleAction(_context: Context, _actionId: string): boolean {

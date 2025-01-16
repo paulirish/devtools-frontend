@@ -198,7 +198,7 @@ export class UISourceCode extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
     }
     this.dispatchEventToListeners(Events.TitleChanged, this);
     this.project().workspace().dispatchEventToListeners(
-        WorkspaceImplEvents.UISourceCodeRenamed, {oldURL: oldURL, uiSourceCode: this});
+        WorkspaceImplEvents.UISourceCodeRenamed, {oldURL, uiSourceCode: this});
   }
 
   contentURL(): Platform.DevToolsPath.UrlString {
@@ -545,12 +545,14 @@ export class UISourceCode extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
 }
 
 export enum Events {
+  /* eslint-disable @typescript-eslint/naming-convention -- Used by web_tests. */
   WorkingCopyChanged = 'WorkingCopyChanged',
   WorkingCopyCommitted = 'WorkingCopyCommitted',
   TitleChanged = 'TitleChanged',
   MessageAdded = 'MessageAdded',
   MessageRemoved = 'MessageRemoved',
   DecorationChanged = 'DecorationChanged',
+  /* eslint-enable @typescript-eslint/naming-convention */
 }
 
 export interface WorkingCopyCommitedEvent {
@@ -559,14 +561,14 @@ export interface WorkingCopyCommitedEvent {
   encoded: boolean|undefined;
 }
 
-export type EventTypes = {
-  [Events.WorkingCopyChanged]: UISourceCode,
-  [Events.WorkingCopyCommitted]: WorkingCopyCommitedEvent,
-  [Events.TitleChanged]: UISourceCode,
-  [Events.MessageAdded]: Message,
-  [Events.MessageRemoved]: Message,
-  [Events.DecorationChanged]: string,
-};
+export interface EventTypes {
+  [Events.WorkingCopyChanged]: UISourceCode;
+  [Events.WorkingCopyCommitted]: WorkingCopyCommitedEvent;
+  [Events.TitleChanged]: UISourceCode;
+  [Events.MessageAdded]: Message;
+  [Events.MessageRemoved]: Message;
+  [Events.DecorationChanged]: string;
+}
 
 export class UILocation {
   uiSourceCode: UISourceCode;
@@ -706,9 +708,9 @@ export class Message {
 
 export namespace Message {
   export const enum Level {
-    Error = 'Error',
-    Issue = 'Issue',
-    Warning = 'Warning',
+    ERROR = 'Error',
+    ISSUE = 'Issue',
+    WARNING = 'Warning',
   }
 }
 

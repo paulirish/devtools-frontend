@@ -5,7 +5,7 @@
 import * as Common from '../../core/common/common.js';
 import * as Root from '../../core/root/root.js';  // eslint-disable-line @typescript-eslint/no-unused-vars
 
-import {type ContextFlavorListener} from './ContextFlavorListener.js';
+import type {ContextFlavorListener} from './ContextFlavorListener.js';
 
 let contextInstance: Context|undefined;
 
@@ -61,7 +61,7 @@ export class Context {
     if (!dispatcher) {
       return;
     }
-    dispatcher.dispatchEventToListeners(Events.FlavorChanged, flavorValue);
+    dispatcher.dispatchEventToListeners(Events.FLAVOR_CHANGED, flavorValue);
   }
 
   addFlavorChangeListener<T>(
@@ -72,7 +72,7 @@ export class Context {
       dispatcher = new Common.ObjectWrapper.ObjectWrapper<EventTypes>();
       this.eventDispatchers.set(flavorType, dispatcher);
     }
-    dispatcher.addEventListener(Events.FlavorChanged, listener, thisObject);
+    dispatcher.addEventListener(Events.FLAVOR_CHANGED, listener, thisObject);
   }
 
   removeFlavorChangeListener<T>(
@@ -82,8 +82,8 @@ export class Context {
     if (!dispatcher) {
       return;
     }
-    dispatcher.removeEventListener(Events.FlavorChanged, listener, thisObject);
-    if (!dispatcher.hasEventListeners(Events.FlavorChanged)) {
+    dispatcher.removeEventListener(Events.FLAVOR_CHANGED, listener, thisObject);
+    if (!dispatcher.hasEventListeners(Events.FLAVOR_CHANGED)) {
       this.eventDispatchers.delete(flavorType);
     }
   }
@@ -98,13 +98,13 @@ export class Context {
 }
 
 const enum Events {
-  FlavorChanged = 'FlavorChanged',
+  FLAVOR_CHANGED = 'FlavorChanged',
 }
 
-export type EventTypes = {
+export interface EventTypes {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [Events.FlavorChanged]: any,
-};
+  [Events.FLAVOR_CHANGED]: any;
+}
 
 const registeredListeners: ContextFlavorListenerRegistration[] = [];
 

@@ -77,7 +77,7 @@
   background-color: unset;
 }
 
-.tree-outline li.issue:not(.expanded):not(.selected):hover .selection {
+.tree-outline li.issue:not(.expanded, .selected):hover .selection {
   background-color: var(--sys-color-state-hover-on-subtle);
 }
 
@@ -90,8 +90,7 @@
 }
 
 p {
-  margin-block-start: 2px;
-  margin-block-end: 2px;
+  margin-block: 2px;
 }
 
 /* Override selected tree item styles for issues to avoid changing width. */
@@ -137,7 +136,7 @@ p {
   font-weight: 450;
 }
 
-.body.children {
+.issue-body.children {
   border-bottom: 1px solid var(--sys-color-divider);
   padding: 6px 0;
   position: relative;
@@ -154,7 +153,7 @@ p {
 }
 
 /* Show a colored border on the left side of opened issues. */
-.body::before {
+.issue-body::before {
   content: "";
   display: block;
   position: absolute;
@@ -164,16 +163,20 @@ p {
   width: 2px;
 }
 
-.issue-kind-breaking-change.body::before {
+.issue-kind-breaking-change.issue-body::before {
   border-left: 2px solid var(--issue-color-yellow);
 }
 
-.issue-kind-page-error.body::before {
+.issue-kind-page-error.issue-body::before {
   border-left: 2px solid var(--issue-color-red);
 }
 
-.issue-kind-improvement.body::before {
+.issue-kind-improvement.issue-body::before {
   border-left: 2px solid var(--issue-color-blue);
+}
+
+.tree-outline .issue-body li:hover:not(:has(dt-checkbox)) .selection {
+  background-color: unset;
 }
 
 devtools-icon.leading-issue-icon {

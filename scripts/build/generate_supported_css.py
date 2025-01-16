@@ -73,7 +73,8 @@ def properties_from_file(file_name):
             continue
         # affected_by_all defaults to True if missing
         if "affected_by_all" not in entry or entry["affected_by_all"]:
-            affected_by_all.add(entry['name'])
+            if not 'longhands' in entry:
+                affected_by_all.add(entry['name'])
         properties.append(_keep_only_required_keys(entry))
         property_names[entry["name"]] = entry
         if "keywords" in entry:
@@ -124,6 +125,7 @@ with open(GENERATED_LOCATION, "w+") as f:
     )
     f.write('// found in the LICENSE file.\n')
     f.write('\n')
+    f.write('/* eslint-disable @stylistic/quotes, @stylistic/quote-props */\n')
     f.write("export const generatedProperties = %s;\n" %
             json.dumps(properties, sort_keys=True, indent=1))
     # sort keys to ensure entries are generated in a deterministic way to avoid inconsistencies across different OS

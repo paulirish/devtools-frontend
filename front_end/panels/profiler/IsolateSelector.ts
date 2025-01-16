@@ -4,7 +4,6 @@
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
-import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
@@ -90,32 +89,34 @@ export class IsolateSelector extends UI.Widget.VBox implements UI.ListControl.Li
 
     SDK.IsolateManager.IsolateManager.instance().observeIsolates(this);
     SDK.TargetManager.TargetManager.instance().addEventListener(
-        SDK.TargetManager.Events.NameChanged, this.targetChanged, this);
+        SDK.TargetManager.Events.NAME_CHANGED, this.targetChanged, this);
     SDK.TargetManager.TargetManager.instance().addEventListener(
-        SDK.TargetManager.Events.InspectedURLChanged, this.targetChanged, this);
+        SDK.TargetManager.Events.INSPECTED_URL_CHANGED, this.targetChanged, this);
   }
 
   override wasShown(): void {
     super.wasShown();
     SDK.IsolateManager.IsolateManager.instance().addEventListener(
-        SDK.IsolateManager.Events.MemoryChanged, this.heapStatsChanged, this);
+        SDK.IsolateManager.Events.MEMORY_CHANGED, this.heapStatsChanged, this);
   }
 
   override willHide(): void {
     SDK.IsolateManager.IsolateManager.instance().removeEventListener(
-        SDK.IsolateManager.Events.MemoryChanged, this.heapStatsChanged, this);
+        SDK.IsolateManager.Events.MEMORY_CHANGED, this.heapStatsChanged, this);
   }
 
   isolateAdded(isolate: SDK.IsolateManager.Isolate): void {
     this.list.element.tabIndex = 0;
     const item = new ListItem(isolate);
+    // Insert the primary page target at the top of the list.
     const index = (item.model() as SDK.RuntimeModel.RuntimeModel).target() ===
-            SDK.TargetManager.TargetManager.instance().rootTarget() ?
+            SDK.TargetManager.TargetManager.instance().primaryPageTarget() ?
         0 :
         this.items.length;
     this.items.insert(index, item);
     this.itemByIsolate.set(isolate, item);
-    if (this.items.length === 1 || isolate.isMainThread()) {
+    // Select the first item by default.
+    if (index === 0) {
       this.list.selectItem(item);
     }
     this.update();
@@ -170,7 +171,7 @@ export class IsolateSelector extends UI.Widget.VBox implements UI.ListControl.Li
       total += isolate.usedHeapSize();
       trend += isolate.usedHeapSizeGrowRate();
     }
-    this.totalValueDiv.textContent = Platform.NumberUtilities.bytesToString(total);
+    this.totalValueDiv.textContent = i18n.ByteUtilities.bytesToString(total);
     IsolateSelector.formatTrendElement(trend, this.totalTrendDiv);
   }
 
@@ -180,7 +181,7 @@ export class IsolateSelector extends UI.Widget.VBox implements UI.ListControl.Li
     if (Math.abs(changeRateBytesPerSecond) < changeRateThresholdBytesPerSecond) {
       return;
     }
-    const changeRateText = Platform.NumberUtilities.bytesToString(Math.abs(changeRateBytesPerSecond));
+    const changeRateText = i18n.ByteUtilities.bytesToString(Math.abs(changeRateBytesPerSecond));
     let changeText, changeLabel;
     if (changeRateBytesPerSecond > 0) {
       changeText = '\u2B06' + i18nString(UIStrings.changeRate, {PH1: changeRateText});
@@ -265,7 +266,7 @@ export class ListItem {
   }
 
   updateStats(): void {
-    this.heapDiv.textContent = Platform.NumberUtilities.bytesToString(this.isolate.usedHeapSize());
+    this.heapDiv.textContent = i18n.ByteUtilities.bytesToString(this.isolate.usedHeapSize());
     IsolateSelector.formatTrendElement(this.isolate.usedHeapSizeGrowRate(), this.trendDiv);
   }
 
@@ -273,7 +274,7 @@ export class ListItem {
     const modelCountByName = new Map<string, number>();
     for (const model of this.isolate.models()) {
       const target = model.target();
-      const name = SDK.TargetManager.TargetManager.instance().rootTarget() !== target ? target.name() : '';
+      const name = SDK.TargetManager.TargetManager.instance().primaryPageTarget() !== target ? target.name() : '';
       const parsedURL = new Common.ParsedURL.ParsedURL(target.inspectedURL());
       const domain = parsedURL.isValid ? parsedURL.domain() : '';
       const title =

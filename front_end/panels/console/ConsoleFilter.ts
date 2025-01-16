@@ -6,11 +6,11 @@ import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
 
-import {type ConsoleGroupViewMessage, type ConsoleViewMessage} from './ConsoleViewMessage.js';
+import type {ConsoleGroupViewMessage, ConsoleViewMessage} from './ConsoleViewMessage.js';
 
-export type LevelsMask = {
-  [x: string]: boolean,
-};
+export interface LevelsMask {
+  [x: string]: boolean;
+}
 
 export class ConsoleFilter {
   name: string;
@@ -148,7 +148,9 @@ export class ConsoleFilter {
 }
 
 export enum FilterType {
+  /* eslint-disable @typescript-eslint/naming-convention -- Used by web_tests. */
   Context = 'context',
   Source = 'source',
   Url = 'url',
+  /* eslint-enable @typescript-eslint/naming-convention */
 }

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {type DevToolsFrontendReloadOptions} from '../../conductor/frontend_tab.js';
+import type {DevToolsFrontendReloadOptions} from '../../conductor/frontend_tab.js';
 import {getBrowserAndPages} from '../../conductor/puppeteer-state.js';
 import {click, reloadDevTools as baseReloadDevTools, waitFor} from '../../shared/helper.js';
 
@@ -32,8 +32,8 @@ export async function clickOnContextMenuItemFromTab(tabId: string, menuItemSelec
 
 export const MOVE_TO_DRAWER_SELECTOR = '[aria-label="Move to bottom"]';
 export const MOVE_TO_MAIN_PANEL_SELECTOR = '[aria-label="Move to top"]';
-export const MAIN_PANEL_SELECTOR = 'div[class*="main-tabbed-pane"][slot*="insertion-point-main"]';
-export const DRAWER_PANEL_SELECTOR = 'div[class*="drawer-tabbed-pane"][slot*="insertion-point-sidebar"]';
+export const MAIN_PANEL_SELECTOR = 'div[class*="main-tabbed-pane"][slot*="main"]';
+export const DRAWER_PANEL_SELECTOR = 'div[class*="drawer-tabbed-pane"][slot*="sidebar"]';
 export const TAB_HEADER_SELECTOR = 'div[class*="tabbed-pane-header"]';
 
 export async function tabExistsInMainPanel(tabId: string) {
@@ -60,6 +60,11 @@ export async function reloadDevTools(options?: DevToolsFrontendReloadOptions&{
   removeBackendState?: boolean,
 }) {
   const {frontend, target} = getBrowserAndPages();
+  await frontend.evaluate(() => {
+    // Prevent the Performance panel shortcuts dialog, that is automatically shown the first
+    // time the performance panel is opened, from opening in tests.
+    localStorage.setItem('hide-shortcuts-dialog-for-test', 'true');
+  });
   const enableExperiments = options?.enableExperiments || [];
   const disableExperiments = options?.disableExperiments || [];
   if (enableExperiments.length || disableExperiments.length) {
@@ -82,7 +87,6 @@ export async function reloadDevTools(options?: DevToolsFrontendReloadOptions&{
   await waitFor(`.panel.${selectedPanel}`);
   const expectClosedPanels = options?.expectClosedPanels;
   const newFilterBar = enableExperiments.includes('network-panel-filter-bar-redesign');
-  const timelineObservationLandingPage = enableExperiments.includes('timeline-observations');
   const dockable = options?.canDock;
   const panelImpression = selectedPanel === 'elements' ? veImpressionForElementsPanel({dockable}) :
       selectedPanel === 'animations'                   ? veImpressionForAnimationsPanel() :
@@ -90,12 +94,12 @@ export async function reloadDevTools(options?: DevToolsFrontendReloadOptions&{
       selectedPanel === 'layers'                       ? veImpressionForLayersPanel() :
       selectedPanel === 'network'                      ? veImpressionForNetworkPanel({newFilterBar}) :
       selectedPanel === 'console'                      ? veImpressionForConsolePanel() :
-      selectedPanel === 'timeline'   ? veImpressionForPerformancePanel({timelineObservationLandingPage}) :
-      selectedPanel === 'sources'    ? veImpressionForSourcesPanel() :
-      selectedPanel === 'animations' ? veImpressionForSourcesPanel() :
-      selectedPanel === 'changes'    ? veImpressionForChangesPanel() :
-      selectedPanel === 'resources'  ? veImpressionForApplicationPanel() :
-                                       veImpression('Panel', selectedPanel);
+      selectedPanel === 'timeline'                     ? veImpressionForPerformancePanel() :
+      selectedPanel === 'sources'                      ? veImpressionForSourcesPanel() :
+      selectedPanel === 'animations'                   ? veImpressionForSourcesPanel() :
+      selectedPanel === 'changes'                      ? veImpressionForChangesPanel() :
+      selectedPanel === 'resources'                    ? veImpressionForApplicationPanel() :
+                                                         veImpression('Panel', selectedPanel);
   const expectedVeEvents = [veImpressionForMainToolbar({selectedPanel, expectClosedPanels, dockable}), panelImpression];
   if (options?.drawerShown) {
     expectedVeEvents.push(veImpression('Drawer', undefined, [

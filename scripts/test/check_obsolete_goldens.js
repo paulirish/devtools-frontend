@@ -51,7 +51,7 @@ async function checkGoldensForPlatform(platform) {
                                             unixRelativeGoldenPath}" -CaseSensitive` :
                                         `grep -r ${unixRelativeGoldenPath} ${interactionTestRoot}`;
       // If this doesn't throw, that means we found a match and we're fine.
-      await exec(textSearchCommand, isWin ? {'shell': 'powershell.exe'} : undefined);
+      await exec(textSearchCommand, isWin ? {shell: 'powershell.exe'} : undefined);
     } catch (error) {
       if (error.code === 1) {
         // This is what grep returns when the image is missing
@@ -72,16 +72,14 @@ async function run() {
     ...await checkGoldensForPlatform('win32')
   ];
   if (obsoleteImages.length > 0) {
-    // eslint-disable-next-line no-console
     console.log('Obsolete screenshots found. These can safely be deleted from the repository as part of this CL');
     if (!shouldRemoveFiles) {
-      // eslint-disable-next-line no-console
       console.log('Alternatively, run this script with --remove-files to have the script remove these files.');
     }
 
     for (const image of obsoleteImages) {
       const imagePath = path.relative(process.cwd(), path.join(GOLDENS_LOCATION, image));
-      // eslint-disable-next-line no-console
+
       console.log(shouldRemoveFiles ? 'Removing: ' : '', imagePath);
       if (shouldRemoveFiles) {
         await exec(`rm ${imagePath}`);

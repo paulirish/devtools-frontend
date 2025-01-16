@@ -15,6 +15,7 @@ import * as Platform from '../platform/platform.js';
 
 import * as SDK from './sdk.js';
 
+const {urlString} = Platform.DevToolsPath;
 const LONG_URL_PART =
     'LoremIpsumDolorSitAmetConsecteturAdipiscingElitPhasellusVitaeOrciInAugueCondimentumTinciduntUtEgetDolorQuisqueEfficiturUltricesTinciduntVivamusVelitPurusCommodoQuisErosSitAmetTemporMalesuadaNislNullamTtempusVulputateAugueEgetScelerisqueLacusVestibulumNon/index.html';
 
@@ -37,14 +38,14 @@ describeWithMockConnection('MultitargetNetworkManager', () => {
           {requestId: 'mockId', request: {url: 'example.com'}} as Protocol.Network.RequestWillBeSentEvent);
 
       // 3) Check that the resulting NetworkRequest has the Trust Token Event data associated with it.
-      assert.strictEqual(startedRequests.length, 1);
+      assert.lengthOf(startedRequests, 1);
       assert.strictEqual(startedRequests[0].trustTokenOperationDoneEvent(), mockEvent);
     });
   });
 
   it('uses main frame to get certificate', () => {
     SDK.ChildTargetManager.ChildTargetManager.install();
-    const tabTarget = createTarget({type: SDK.Target.Type.Tab});
+    const tabTarget = createTarget({type: SDK.Target.Type.TAB});
     const mainFrameTarget = createTarget({parentTarget: tabTarget});
     const prerenderTarget = createTarget({parentTarget: tabTarget, subtype: 'prerender'});
     const subframeTarget = createTarget({parentTarget: mainFrameTarget, subtype: ''});
@@ -57,6 +58,56 @@ describeWithMockConnection('MultitargetNetworkManager', () => {
       assert.isTrue(unexpectedCall.notCalled);
     }
     assert.isTrue(expectedCall.calledOnceWith({origin: 'https://example.com'}));
+  });
+
+  it('blocking settings are consistent after change', async () => {
+    const multitargetNetworkManager = SDK.NetworkManager.MultitargetNetworkManager.instance({forceNew: true});
+    let eventCounter = 0;
+    multitargetNetworkManager.addEventListener(
+        SDK.NetworkManager.MultitargetNetworkManager.Events.BLOCKED_PATTERNS_CHANGED, () => eventCounter++);
+    const blockingEnabledSetting = Common.Settings.Settings.instance().moduleSetting('request-blocking-enabled');
+    const blockedPatternsSetting: Common.Settings.Setting<SDK.NetworkManager.BlockedPattern[]> =
+        Common.Settings.Settings.instance().createSetting('network-blocked-patterns', []);
+
+    // Change blocking setting via Common.Settings.Settings.
+    assert.isFalse(multitargetNetworkManager.isBlocking());
+    assert.isFalse(multitargetNetworkManager.blockingEnabled());
+    blockingEnabledSetting.set(true);
+    assert.strictEqual(eventCounter, 1);
+    assert.isFalse(multitargetNetworkManager.isBlocking());
+    assert.isTrue(multitargetNetworkManager.blockingEnabled());
+    blockedPatternsSetting.set([{url: 'example.com', enabled: true}]);
+    assert.strictEqual(eventCounter, 2);
+    assert.isTrue(multitargetNetworkManager.isBlocking());
+    assert.isTrue(multitargetNetworkManager.blockingEnabled());
+    blockedPatternsSetting.set([]);
+    assert.strictEqual(eventCounter, 3);
+    assert.isFalse(multitargetNetworkManager.isBlocking());
+    assert.isTrue(multitargetNetworkManager.blockingEnabled());
+    blockingEnabledSetting.set(false);
+    assert.strictEqual(eventCounter, 4);
+    assert.isFalse(multitargetNetworkManager.isBlocking());
+    assert.isFalse(multitargetNetworkManager.blockingEnabled());
+
+    // Change blocking setting via MultitargetNetworkManager.
+    assert.isFalse(multitargetNetworkManager.isBlocking());
+    assert.isFalse(multitargetNetworkManager.blockingEnabled());
+    multitargetNetworkManager.setBlockingEnabled(true);
+    assert.strictEqual(eventCounter, 5);
+    assert.isFalse(multitargetNetworkManager.isBlocking());
+    assert.isTrue(multitargetNetworkManager.blockingEnabled());
+    multitargetNetworkManager.setBlockedPatterns([{url: 'example.com', enabled: true}]);
+    assert.strictEqual(eventCounter, 6);
+    assert.isTrue(multitargetNetworkManager.isBlocking());
+    assert.isTrue(multitargetNetworkManager.blockingEnabled());
+    multitargetNetworkManager.setBlockedPatterns([]);
+    assert.strictEqual(eventCounter, 7);
+    assert.isFalse(multitargetNetworkManager.isBlocking());
+    assert.isTrue(multitargetNetworkManager.blockingEnabled());
+    multitargetNetworkManager.setBlockingEnabled(false);
+    assert.strictEqual(eventCounter, 8);
+    assert.isFalse(multitargetNetworkManager.isBlocking());
+    assert.isFalse(multitargetNetworkManager.blockingEnabled());
   });
 });
 
@@ -154,7 +205,7 @@ describe('NetworkDispatcher', () => {
 
       // ResponseReceived does overwrite response headers if request is marked as intercepted.
       SDK.NetworkManager.MultitargetNetworkManager.instance().dispatchEventToListeners(
-          SDK.NetworkManager.MultitargetNetworkManager.Events.RequestIntercepted, 'mockId');
+          SDK.NetworkManager.MultitargetNetworkManager.Events.REQUEST_INTERCEPTED, 'mockId');
       networkDispatcher.responseReceived(mockResponseReceivedEventWithHeaders({'test-header': 'third'}));
       assert.deepEqual(
           networkDispatcher.requestForId('mockId')?.responseHeaders, [{name: 'test-header', value: 'third'}]);
@@ -208,14 +259,14 @@ describe('NetworkDispatcher', () => {
       networkDispatcher.requestWillBeSent(requestWillBeSentEvent);
       networkDispatcher.responseReceived(responseReceivedEvent);
 
-      assert.deepEqual(networkDispatcher.requestForId('mockId')?.fromEarlyHints(), true);
+      assert.isTrue(networkDispatcher.requestForId('mockId')?.fromEarlyHints());
     });
 
     it('has populated early hints headers after receiving \'repsonseReceivedEarlyHints\'', () => {
       const earlyHintsEvent = {
         requestId: 'mockId' as Protocol.Network.RequestId,
         headers: {
-          'link': '</style.css>; as=style;',
+          link: '</style.css>; as=style;',
         } as Protocol.Network.Headers,
       };
       networkDispatcher.requestWillBeSent(requestWillBeSentEvent);
@@ -346,11 +397,11 @@ describeWithMockConnection('InterceptedRequest', () => {
 
     const fulfilledRequest = new Promise(resolve => {
       multitargetNetworkManager.addEventListener(
-          SDK.NetworkManager.MultitargetNetworkManager.Events.RequestFulfilled, resolve);
+          SDK.NetworkManager.MultitargetNetworkManager.Events.REQUEST_FULFILLED, resolve);
     });
     const networkRequest = SDK.NetworkRequest.NetworkRequest.create(
-        requestId as unknown as Protocol.Network.RequestId, request.url as Platform.DevToolsPath.UrlString,
-        request.url as Platform.DevToolsPath.UrlString, null, null, null);
+        requestId as unknown as Protocol.Network.RequestId, urlString`${request.url}`, urlString`${request.url}`, null,
+        null, null);
 
     networkRequest.originalResponseHeaders = responseHeaders;
 
@@ -398,12 +449,11 @@ describeWithMockConnection('InterceptedRequest', () => {
   beforeEach(async () => {
     SDK.NetworkManager.MultitargetNetworkManager.dispose();
     target = createTarget();
-    const networkPersistenceManager =
-        await createWorkspaceProject('file:///path/to/overrides' as Platform.DevToolsPath.UrlString, [
-          {
-            name: '.headers',
-            path: 'www.example.com/',
-            content: `[
+    const networkPersistenceManager = await createWorkspaceProject(urlString`file:///path/to/overrides`, [
+      {
+        name: '.headers',
+        path: 'www.example.com/',
+        content: `[
             {
               "applyTo": "index.html",
               "headers": [{
@@ -485,11 +535,11 @@ describeWithMockConnection('InterceptedRequest', () => {
               ]
             }
           ]`,
-          },
-          {
-            name: '.headers',
-            path: '',
-            content: `[
+      },
+      {
+        name: '.headers',
+        path: '',
+        content: `[
             {
               "applyTo": "*",
               "headers": [{
@@ -498,14 +548,14 @@ describeWithMockConnection('InterceptedRequest', () => {
               }]
             }
           ]`,
-          },
-          {name: 'helloWorld.html', path: 'www.example.com/', content: 'Hello World!'},
-          {name: 'utf16.html', path: 'www.example.com/', content: 'Overwritten with non-UTF16 (TODO: fix this!)'},
-          {name: 'something.html', path: 'file:/usr/local/foo/content/', content: 'Override for something'},
-          {
-            name: '.headers',
-            path: 'file:/usr/local/example/',
-            content: `[
+      },
+      {name: 'helloWorld.html', path: 'www.example.com/', content: 'Hello World!'},
+      {name: 'utf16.html', path: 'www.example.com/', content: 'Overwritten with non-UTF16 (TODO: fix this!)'},
+      {name: 'something.html', path: 'file:/usr/local/foo/content/', content: 'Override for something'},
+      {
+        name: '.headers',
+        path: 'file:/usr/local/example/',
+        content: `[
             {
               "applyTo": "*",
               "headers": [{
@@ -514,48 +564,47 @@ describeWithMockConnection('InterceptedRequest', () => {
               }]
             }
           ]`,
-          },
-          {name: 'index.html', path: 'file:/usr/local/example/', content: 'Overridden file content'},
-          {
-            name: '.headers',
-            path: 'www.longurl.com/longurls/',
-            content: `[
+      },
+      {name: 'index.html', path: 'file:/usr/local/example/', content: 'Overridden file content'},
+      {
+        name: '.headers',
+        path: 'www.longurl.com/longurls/',
+        content: `[
             {
               "applyTo": "index.html-${
-                Platform.StringUtilities.hashCode('www.longurl.com/' + LONG_URL_PART).toString(16)}.html",
+            Platform.StringUtilities.hashCode('www.longurl.com/' + LONG_URL_PART).toString(16)}.html",
               "headers": [{
                 "name": "long-url-header",
                 "value": "long url header value"
               }]
             }
           ]`,
-          },
-          {
-            name:
-                `index.html-${Platform.StringUtilities.hashCode('www.longurl.com/' + LONG_URL_PART).toString(16)}.html`,
-            path: 'www.longurl.com/longurls/',
-            content: 'Overridden long URL file content',
-          },
-          {
-            name: '.headers',
-            path: 'file:/longurls/',
-            content: `[
+      },
+      {
+        name: `index.html-${Platform.StringUtilities.hashCode('www.longurl.com/' + LONG_URL_PART).toString(16)}.html`,
+        path: 'www.longurl.com/longurls/',
+        content: 'Overridden long URL file content',
+      },
+      {
+        name: '.headers',
+        path: 'file:/longurls/',
+        content: `[
             {
               "applyTo": "index.html-${
-                Platform.StringUtilities
-                    .hashCode(
-                        Persistence.NetworkPersistenceManager.NetworkPersistenceManager
-                            .encodeEncodedPathToLocalPathParts('file:' as Platform.DevToolsPath.EncodedPathString)[0] +
-                        '/' + LONG_URL_PART)
-                    .toString(16)}.html",
+            Platform.StringUtilities
+                .hashCode(
+                    Persistence.NetworkPersistenceManager.NetworkPersistenceManager.encodeEncodedPathToLocalPathParts(
+                        'file:' as Platform.DevToolsPath.EncodedPathString)[0] +
+                    '/' + LONG_URL_PART)
+                .toString(16)}.html",
               "headers": [{
                 "name": "long-file-url-header",
                 "value": "long file url header value"
               }]
             }
           ]`,
-          },
-        ]);
+      },
+    ]);
     sinon.stub(target.fetchAgent(), 'invoke_enable');
     fulfillRequestSpy = sinon.spy(target.fetchAgent(), 'invoke_fulfillRequest');
     await networkPersistenceManager.updateInterceptionPatternsForTests();
@@ -592,8 +641,8 @@ describeWithMockConnection('InterceptedRequest', () => {
     const continueRequestSpy = sinon.spy(fetchAgent, 'invoke_continueRequest');
 
     const networkRequest = SDK.NetworkRequest.NetworkRequest.create(
-        requestId as unknown as Protocol.Network.RequestId, request.url as Platform.DevToolsPath.UrlString,
-        request.url as Platform.DevToolsPath.UrlString, null, null, null);
+        requestId as unknown as Protocol.Network.RequestId, urlString`${request.url}`, urlString`${request.url}`, null,
+        null, null);
 
     const interceptedRequest = new SDK.NetworkManager.InterceptedRequest(
         fetchAgent, request, Protocol.Network.ResourceType.Document, requestId, networkRequest);
@@ -638,8 +687,8 @@ describeWithMockConnection('InterceptedRequest', () => {
       sinon.spy(fetchAgent, 'invoke_continueRequest');
 
       const networkRequest = SDK.NetworkRequest.NetworkRequest.create(
-          requestId as unknown as Protocol.Network.RequestId, request.url as Platform.DevToolsPath.UrlString,
-          request.url as Platform.DevToolsPath.UrlString, null, null, null);
+          requestId as unknown as Protocol.Network.RequestId, urlString`${request.url}`, urlString`${request.url}`,
+          null, null, null);
       networkRequest.originalResponseHeaders = [{name: 'content-type', value: 'text/html; charset-utf-16'}];
 
       // Create a quick'n dirty network UISourceCode for the request manually. We need to establish a binding to the
@@ -649,8 +698,7 @@ describeWithMockConnection('InterceptedRequest', () => {
           'Override network project', false);
       Workspace.Workspace.WorkspaceImpl.instance().addProject(networkProject);
       const uiSourceCode = networkProject.createUISourceCode(
-          'https://www.example.com/utf16.html' as Platform.DevToolsPath.UrlString,
-          Common.ResourceType.resourceTypes.Document);
+          urlString`https://www.example.com/utf16.html`, Common.ResourceType.resourceTypes.Document);
       networkProject.addUISourceCode(uiSourceCode);
 
       const interceptedRequest = new SDK.NetworkManager.InterceptedRequest(
@@ -1053,6 +1101,6 @@ describeWithMockConnection('InterceptedRequest', () => {
       {name: 'set-cookie', value: 'override_duplicate'},
       {name: 'set-cookie', value: 'malformed_override'},
     ];
-    assert.deepStrictEqual(SDK.NetworkManager.InterceptedRequest.mergeSetCookieHeaders(original, overrides), expected);
+    assert.deepEqual(SDK.NetworkManager.InterceptedRequest.mergeSetCookieHeaders(original, overrides), expected);
   });
 });

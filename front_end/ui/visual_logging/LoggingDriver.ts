@@ -4,11 +4,11 @@
 
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
-import * as Coordinator from '../components/render_coordinator/render_coordinator.js';
+import * as RenderCoordinator from '../components/render_coordinator/render_coordinator.js';
 
 import {processForDebugging, processStartLoggingForDebugging} from './Debugging.js';
 import {getDomState, visibleOverlap} from './DomState.js';
-import {type Loggable} from './Loggable.js';
+import type {Loggable} from './Loggable.js';
 import {getLoggingConfig} from './LoggingConfig.js';
 import {logChange, logClick, logDrag, logHover, logImpressions, logKeyDown, logResize} from './LoggingEvents.js';
 import {getLoggingState, getOrCreateLoggingState, type LoggingState} from './LoggingState.js';
@@ -83,7 +83,7 @@ export async function addDocument(document: Document): Promise<void> {
 }
 
 export async function stopLogging(): Promise<void> {
-  await keyboardLogThrottler.process?.();
+  await keyboardLogThrottler.schedule(async () => {}, Common.Throttler.Scheduling.AS_SOON_AS_POSSIBLE);
   logging = false;
   unregisterAllLoggables();
   for (const document of documents) {
@@ -138,12 +138,11 @@ function flushPendingChangeEvents(): void {
   }
 }
 
-export async function scheduleProcessing(): Promise<void> {
+export function scheduleProcessing(): void {
   if (!processingThrottler) {
     return;
   }
-  void processingThrottler.schedule(
-      () => Coordinator.RenderCoordinator.RenderCoordinator.instance().read('processForLogging', process));
+  void processingThrottler.schedule(() => RenderCoordinator.read('processForLogging', process));
 }
 
 const viewportRects = new Map<Document, DOMRect>();
@@ -200,7 +199,8 @@ async function process(): Promise<void> {
       if (trackHover) {
         element.addEventListener('mouseover', logHover(hoverLogThrottler), {capture: true});
         element.addEventListener(
-            'mouseout', () => hoverLogThrottler.schedule(cancelLogging, Common.Throttler.Scheduling.AsSoonAsPossible),
+            'mouseout',
+            () => hoverLogThrottler.schedule(cancelLogging, Common.Throttler.Scheduling.AS_SOON_AS_POSSIBLE),
             {capture: true});
       }
       const trackDrag = loggingState.config.track?.drag;
@@ -214,15 +214,21 @@ async function process(): Promise<void> {
           if (!(event instanceof InputEvent)) {
             return;
           }
-          if (loggingState.lastInputEventType && loggingState.lastInputEventType !== event.inputType) {
+          if (loggingState.pendingChangeContext && loggingState.pendingChangeContext !== event.inputType) {
             void logPendingChange(element);
           }
-          loggingState.lastInputEventType = event.inputType;
+          loggingState.pendingChangeContext = event.inputType;
           pendingChange.add(element);
         }, {capture: true});
-        element.addEventListener('change', () => logPendingChange(element), {capture: true});
+        element.addEventListener('change', (event: Event) => {
+          const target = event?.target ?? element;
+          if (['checkbox', 'radio'].includes((target as HTMLInputElement).type)) {
+            loggingState.pendingChangeContext = (target as HTMLInputElement).checked ? 'on' : 'off';
+          }
+          logPendingChange(element);
+        }, {capture: true});
         element.addEventListener('focusout', () => {
-          if (loggingState.lastInputEventType) {
+          if (loggingState.pendingChangeContext) {
             void logPendingChange(element);
           }
         }, {capture: true});
@@ -301,7 +307,7 @@ function logPendingChange(element: Element): void {
     return;
   }
   void logChange(element);
-  delete loggingState.lastInputEventType;
+  delete loggingState.pendingChangeContext;
   pendingChange.delete(element);
 }
 
@@ -327,7 +333,7 @@ function maybeCancelDrag(event: Event): void {
       Math.abs(event.screenY - dragStartY) >= DRAG_REPORT_THRESHOLD) {
     return;
   }
-  void dragLogThrottler.schedule(cancelLogging, Common.Throttler.Scheduling.AsSoonAsPossible);
+  void dragLogThrottler.schedule(cancelLogging, Common.Throttler.Scheduling.AS_SOON_AS_POSSIBLE);
 }
 
 function isAncestorOf(state1: LoggingState|null, state2: LoggingState|null): boolean {
@@ -383,6 +389,6 @@ async function onResizeOrIntersection(entries: ResizeObserverEntry[]|Intersectio
         }
       }
       pendingResize.clear();
-    }, Common.Throttler.Scheduling.Delayed);
+    }, Common.Throttler.Scheduling.DELAYED);
   }
 }
