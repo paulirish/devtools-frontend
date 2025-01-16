@@ -82,7 +82,7 @@ describe.only('Module graph', () => {
     const scripts = requests.filter((request) => request.url().endsWith('.js'))
 
     // To debug:
-    // logScriptGraph(scripts);
+    logScriptGraph(scripts);
     assert.isAtMost(scripts.length, 915);
 
 
