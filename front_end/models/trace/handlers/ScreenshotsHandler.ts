@@ -13,7 +13,8 @@ const unpairedAsyncEvents: Types.Events.PipelineReporter[] = [];
 
 const snapshotEvents: Types.Events.Screenshot[] = [];
 const syntheticScreenshots: Types.Events.SyntheticScreenshot[] = [];
-let frameSequenceToTs: Record<string, Types.Timing.MicroSeconds> = {};
+let frameSequenceToTs: Record<number, Types.Timing.MicroSeconds> = {};
+const sourceToSequenceToTs: Record<number, Record<number, Types.Timing.MicroSeconds>> = {};
 
 export function reset(): void {
   unpairedAsyncEvents.length = 0;
@@ -35,12 +36,21 @@ export async function finalize(): Promise<void> {
 
   frameSequenceToTs = Object.fromEntries(pipelineReporterEvents.map(evt => {
     const frameSequenceId = evt.args.data.beginEvent.args.chrome_frame_reporter.frame_sequence;
+    const sourceId = evt.args.data.beginEvent.args.chrome_frame_reporter.frame_source;
     const presentationTs = Types.Timing.MicroSeconds(evt.ts + evt.dur);
+
+    sourceToSequenceToTs[sourceId] ??= {};
+    sourceToSequenceToTs[sourceId][frameSequenceId] = presentationTs;
+
     return [frameSequenceId, presentationTs];
   }));
 
+
   for (const snapshotEvent of snapshotEvents) {
     const {cat, name, ph, pid, tid} = snapshotEvent;
+
+    console.log((getPresentationTimestamp(snapshotEvent) - snapshotEvent.ts) / 1000, 'ms adjusted to the right');
+
     const syntheticEvent = Helpers.SyntheticEvents.SyntheticEventsManager.registerSyntheticEvent<
         Types.Events.SyntheticScreenshot>({
       rawSourceEvent: snapshotEvent,
@@ -51,7 +61,7 @@ export async function finalize(): Promise<void> {
       tid,
       // TODO(paulirish, crbug.com/41363012): investigate why getPresentationTimestamp(snapshotEvent) seems less accurate. Resolve screenshot timing innaccuracy.
       // `getPresentationTimestamp(snapshotEvent) - snapshotEvent.ts` is how many microsec the screenshot should be adjusted to the right/later
-      ts: snapshotEvent.ts,
+      ts: getPresentationTimestamp(snapshotEvent),
       args: {
         dataUri: `data:image/jpg;base64,${snapshotEvent.args.snapshot}`,
       },
@@ -77,12 +87,26 @@ function getPresentationTimestamp(screenshotEvent: Types.Events.Screenshot): Typ
   // It is set by the compositor frame sink from the `expected_display_time`, which is based on a previously known
   // frame start PLUS the vsync interval (eg 16.6ms)
   const updatedTs = frameSequenceToTs[frameSequence];
+
+  const {frame_sequence, source_id} = screenshotEvent.args;
+  const BetterupdatedTs = sourceToSequenceToTs[source_id]?.[frame_sequence];
+
+  if (BetterupdatedTs === undefined) {
+    console.log('better timestamp not found', source_id, frame_sequence);
+  } else if (BetterupdatedTs !== updatedTs) {
+    console.log(
+        'different result thanks to sourceid', source_id, frame_sequence, BetterupdatedTs - updatedTs, BetterupdatedTs,
+        updatedTs);
+  } else {
+    console.log('better ts and reg timestamp are same.', source_id, frame_sequence);
+  }
+
   // Do we always find a match? No...
   // We generally don't match the very first screenshot and, sometimes, the last
   // The very first screenshot is requested immediately (even if nothing is painting). As a result there's no compositor
   // instrumentation running alongside.
   // The last one is sometimes missing as because the trace terminates right before the associated PipelineReporter is emitted.
-  return updatedTs ?? screenshotEvent.ts;
+  return BetterupdatedTs ?? screenshotEvent.ts;
 }
 
 // TODO(crbug/41484172): should be readonly
