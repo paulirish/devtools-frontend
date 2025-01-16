@@ -7,18 +7,18 @@ import * as Helpers from '../helpers/helpers.js';
 import * as Types from '../types/types.js';
 
 import {data as metaHandlerData} from './MetaHandler.js';
-import {type HandlerName, HandlerState} from './types.js';
+import {type HandlerName} from './types.js';
 
 // Each thread contains events. Events indicate the thread and process IDs, which are
 // used to store the event in the correct process thread entry below.
 const eventsInProcessThread = new Map<Types.Events.ProcessID, Map<Types.Events.ThreadID, Types.Events.Snapshot[]>>();
 
 // these types are wrong
-let relevantEvts: Types.Events.Snapshot[] = [];
-const gpuEvents: Types.Events.Snapshot[] = [];
-const asyncEvts: Types.Events.Snapshot[] = [];
-let syntheticEvents: Types.Events.SyntheticNestableAsync[] = [];
-const waterFallEvents: Types.Events.Snapshot[] = [];
+let relevantEvts: Types.Events.Event[] = [];
+const gpuEvents: Types.Events.Event[] = [];
+const asyncEvts: Types.Events.Event[] = [];
+let syntheticEvents: Types.Events.SyntheticPipelineReporterPair[] = [];
+const waterFallEvents: Types.Events.Event[] = [];
 let eventLatencyIdToFrameSeq: Record<string, string> = {};
 // export interface UberFramesData {
 //   relevantEvts: readonly Types.Events.Event[],
@@ -39,10 +39,8 @@ export function reset(): void {
   asyncEvts.length = 0;
   waterFallEvents.length = 0;
   eventLatencyIdToFrameSeq = {};
-  handlerState = HandlerState.INITIALIZED;
 }
 
-let handlerState = HandlerState.UNINITIALIZED;
 
 const someStuff = {
   CompositeLayers: 'CompositeLayers',
@@ -286,13 +284,10 @@ export async function finalize(): Promise<void> {
   const ourRendererGPUTasks = gpuEvents.filter(e => topLevelRendererIds.has(e.args.data.renderer_pid));
   relevantEvts = [...relevantEvts, ...ourRendererGPUTasks];
 
-  if (handlerState !== HandlerState.INITIALIZED) {
-    throw new Error('UberFrames handler is not initialized');
-  }
 
   const matchedEvents: Map<string, {
-    begin: Types.Events.NestableAsyncBegin | null,
-    end: Types.Events.NestableAsyncEnd | null,
+    begin: Types.Events.PipelineReporter | null,
+    end: Types.Events.PipelineReporter | null,
   }> = new Map();
 
   for (let i = 0; i < asyncEvts.length - 1; i++) {
@@ -343,7 +338,7 @@ export async function finalize(): Promise<void> {
       continue;
     }
 
-    const event: Types.Events.SyntheticNestableAsync = {
+    const event: Types.Events.SyntheticPipelineReporterPair = {
       cat: eventsPair.end.cat,
       ph: 'X',
       pid: eventsPair.end.pid,
@@ -397,16 +392,11 @@ export async function finalize(): Promise<void> {
         e.args.data.beginEvent.args.chrome_frame_reporter.frame_type !== 'FORKED' &&
         e.args.data.beginEvent.args.chrome_frame_reporter.state === 'STATE_PRESENTED_ALL';
   });
-
-  handlerState = HandlerState.FINALIZED;
 }
 
 // TODO: is it okay to do work here? this is only called once? (or should i put the _work_ in finalize)
 // so far looks like its only called once, so whatev.
 export function data(): UberFramesData {
-  if (handlerState !== HandlerState.FINALIZED) {
-    throw new Error('UberFrames handler is not finalized');
-  }
   return {
     nonWaterfallEvts: [...relevantEvts, ...syntheticEvents].sort((event1, event2) => event1.ts - event2.ts),
     waterFallEvts: [...waterFallEvents].sort((event1, event2) => event1.ts - event2.ts),
