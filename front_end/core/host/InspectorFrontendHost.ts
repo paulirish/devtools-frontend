@@ -168,6 +168,7 @@ export class InspectorFrontendHostStub implements InspectorFrontendHostAPI {
   }): void {
   }
 
+  /** Sent to bindings to for the `DevTools.InspectElement` timing histogram */
   inspectElementCompleted(): void {
   }
 
