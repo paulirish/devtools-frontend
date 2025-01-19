@@ -954,9 +954,9 @@ export class ElementsPanel extends UI.Panel.Panel implements UI.SearchableView.S
       ElementsPanel.firstInspectElementCompletedForTest();
 
       Host.InspectorFrontendHost.InspectorFrontendHostInstance.inspectElementCompleted();
-      // If DevTools was opened specifically to inspect element
+      // If DevTools was opened specifically to inspect element, record the measure locally.
       if (new URLSearchParams(location.search).get('panel') === 'elements') {
-        const measure = performance.measure('Launch.InspectElement', {start: 0, end: performance.now()});
+        performance.measure('Launch.InspectElement', {start: 0, end: performance.now()});
       }
     }
     this.notFirstInspectElement = true;
