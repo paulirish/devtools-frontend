@@ -129,20 +129,6 @@ export class MainImpl {
     void this.#loaded();
   }
 
-  static time(label: string): void {
-    if (Host.InspectorFrontendHost.isUnderTest()) {
-      return;
-    }
-    console.time(label);
-  }
-
-  static timeEnd(label: string): void {
-    if (Host.InspectorFrontendHost.isUnderTest()) {
-      return;
-    }
-    console.timeEnd(label);
-  }
-
   async #loaded(): Promise<void> {
     console.timeStamp('Main._loaded');
     Root.Runtime.Runtime.setPlatform(Host.Platform.platform());
@@ -405,8 +391,6 @@ export class MainImpl {
     }
   }
   async #createAppUI(): Promise<void> {
-    MainImpl.time('Main._createAppUI');
-
     // Request filesystems early, we won't create connections until callback is fired. Things will happen in parallel.
     Persistence.IsolatedFileSystemManager.IsolatedFileSystemManager.instance();
 
@@ -533,7 +517,6 @@ export class MainImpl {
     UI.ShortcutRegistry.ShortcutRegistry.instance({forceNew: true, actionRegistry: actionRegistryInstance});
     this.#registerMessageSinkListener();
 
-    MainImpl.timeEnd('Main._createAppUI');
 
     const appProvider = Common.AppProvider.getRegisteredAppProviders()[0];
     if (!appProvider) {
@@ -543,7 +526,6 @@ export class MainImpl {
   }
 
   async #showAppUI(appProvider: Object): Promise<void> {
-    MainImpl.time('Main._showAppUI');
     const app = (appProvider as Common.AppProvider.AppProvider).createApp();
     // It is important to kick controller lifetime after apps are instantiated.
     UI.DockController.DockController.instance().initialize();
@@ -579,12 +561,9 @@ export class MainImpl {
 
     // Allow UI cycles to repaint prior to creating connection.
     window.setTimeout(this.#initializeTarget.bind(this), 0);
-    MainImpl.timeEnd('Main._showAppUI');
   }
 
   async #initializeTarget(): Promise<void> {
-    MainImpl.time('Main._initializeTarget');
-
     // We rely on having the early initialization runnables registered in Common when an app loads its
     // modules, so that we don't have to exhaustively check the app DevTools is running as to
     // start the applicable runnables.
@@ -597,8 +576,6 @@ export class MainImpl {
     // Asynchronously run the extensions.
     window.setTimeout(this.#lateInitialization.bind(this), 100);
     await this.#maybeInstallVeInspectionBinding();
-
-    MainImpl.timeEnd('Main._initializeTarget');
   }
 
   async #maybeInstallVeInspectionBinding(): Promise<void> {
@@ -631,7 +608,6 @@ export class MainImpl {
   }
 
   async #lateInitialization(): Promise<void> {
-    MainImpl.time('Main._lateInitialization');
     Extensions.ExtensionServer.ExtensionServer.instance().initializeExtensions();
     const promises: Array<Promise<void>> =
         Common.Runnable.lateInitializationRunnables().map(async lateInitializationLoader => {
@@ -654,8 +630,6 @@ export class MainImpl {
         Common.Settings.Settings.instance().moduleSetting(setting).addChangeListener(changeListener);
       }
     }
-
-    MainImpl.timeEnd('Main._lateInitialization');
   }
 
   readyForTest(): Promise<void> {
