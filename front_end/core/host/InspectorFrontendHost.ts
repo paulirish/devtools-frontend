@@ -272,6 +272,15 @@ export class InspectorFrontendHostStub implements InspectorFrontendHostAPI {
     this.recordedPerformanceHistograms.push({histogramName, duration});
   }
 
+  // Preferred if values might exceed 10 seconds. https://chromium.googlesource.com/chromium/src/tools/+/HEAD/metrics/histograms/README.md#Timing-Histograms
+  recordPerformanceHistogramMedium(histogramName: string, duration: number): void {
+    if (this.recordedPerformanceHistograms.length >= MAX_RECORDED_HISTOGRAMS_SIZE) {
+      this.recordedPerformanceHistograms.shift();
+    }
+    this.recordedPerformanceHistograms.push({histogramName, duration});
+  }
+
+
   recordUserMetricsAction(_umaName: string): void {
   }
 

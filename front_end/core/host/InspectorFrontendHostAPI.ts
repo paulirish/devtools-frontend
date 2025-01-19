@@ -344,6 +344,8 @@ export interface InspectorFrontendHostAPI {
 
   recordPerformanceHistogram(histogramName: string, duration: number): void;
 
+  recordPerformanceHistogramMedium(histogramName: string, duration: number): void;
+
   recordUserMetricsAction(umaName: string): void;
 
   sendMessageToBackend(message: string): void;

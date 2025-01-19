@@ -793,6 +793,15 @@ const InspectorFrontendHostImpl = class {
 
   /**
    * @override
+   * @param {string} histogramName
+   * @param {number} duration
+   */
+  recordPerformanceHistogramMedium(histogramName, duration) {
+    DevToolsAPI.sendMessageToEmbedder('recordPerformanceHistogramMedium', [histogramName, duration], null);
+  }
+
+  /**
+   * @override
    * @param {string} umaName
    */
   recordUserMetricsAction(umaName) {
