@@ -2,9 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// import {performance} from 'node:perf_hooks';
 import {assert} from 'chai';
-import {HTTPRequest} from 'puppeteer-core';
+import type {HTTPRequest} from 'puppeteer-core';
 
 import {getBrowserAndPages, reloadDevTools} from '../../shared/helper.js';
 import {mean, percentile} from '../helpers/perf-helper.js';
@@ -69,26 +68,18 @@ describe('Boot performance', () => {
   }
 });
 
-describe.only('Module graph', () => {
-  it('is under control', async () => {
+describe('Module graph', () => {
+  it('loads expected scripts', async () => {
     const {frontend} = getBrowserAndPages();
-
-    const requests: HTTPRequest[] = []
+    const requests: HTTPRequest[] = [];
     frontend.on('request', request => requests.push(request));
 
     await reloadDevTools();
-    await frontend.waitForNetworkIdle()
+    await frontend.waitForNetworkIdle();
+    const scripts = requests.filter(request => request.url().endsWith('.js'));
 
-    const scripts = requests.filter((request) => request.url().endsWith('.js'))
-
-    // To debug:
-    logScriptGraph(scripts);
-    assert.isAtMost(scripts.length, 915);
-
-
-
-    function logScriptGraph(scripts: HTTPRequest[]) {
-      console.log('Script network request graph:');
+    function buildModuleGraph(scripts: HTTPRequest[]) {
+      const lines: string[] = [];
       const childrenMap = new Map<string|undefined, HTTPRequest[]>();
 
       // Build a map of parent URLs to their children
@@ -102,25 +93,132 @@ describe.only('Module graph', () => {
         }
       }
 
-      function logScript(script: HTTPRequest, indent: string = '') {
+      function logModule(script: HTTPRequest, indent: string = '') {
         const path = script.url().split('front_end/')[1];
         const parentUrl = script.initiator()?.url;
         const siblings = parentUrl ? childrenMap.get(parentUrl) : undefined;
         const isLastSibling = siblings ? siblings[siblings.length - 1].url() === script.url() : true;
 
         const branchChar = isLastSibling ? '└' : '├';
-        console.log(`${indent}${branchChar}${path}`);
+        lines.push(`${indent}${branchChar}${path}`);
 
         const children = childrenMap.get(script.url());
         if (children) {
           const newIndent = indent + (isLastSibling ? '  ' : '│ ');
           for (let i = 0; i < children.length; i++) {
-            logScript(children[i], newIndent);
+            logModule(children[i], newIndent);
           }
         }
       }
 
-      logScript(scripts[0]);
+      logModule(scripts[0]);
+      return lines.join('\n');
     }
+
+    const graphSerialized = buildModuleGraph(scripts);
+    const expectedGraph = `
+
+ └entrypoints/devtools_app/devtools_app.js
+  ├entrypoints/shell/shell.js
+  │ ├Images/Images.js
+  │ ├core/dom_extension/dom_extension.js
+  │ ├ui/legacy/components/object_ui/object_ui.js
+  │ │ └third_party/acorn/acorn.js
+  │ ├ui/legacy/components/quick_open/quick_open.js
+  │ │ ├third_party/diff/diff.js
+  │ │ └ui/components/text_prompt/text_prompt.js
+  │ └panels/console/console.js
+  │   ├ui/components/code_highlighter/code_highlighter.js
+  │   ├ui/components/issue_counter/issue_counter.js
+  │   ├ui/components/request_link_icon/request_link_icon.js
+  │   └ui/legacy/components/data_grid/data_grid.js
+  ├core/i18n/i18n.js
+  │ ├third_party/i18n/i18n.js
+  │ │ └third_party/intl-messageformat/intl-messageformat.js
+  │ └core/platform/platform.js
+  ├ui/legacy/legacy.js
+  │ ├ui/components/buttons/buttons.js
+  │ ├ui/components/adorners/adorners.js
+  │ ├ui/components/helpers/helpers.js
+  │ └ui/components/settings/settings.js
+  │   └ui/components/input/input.js
+  ├core/common/common.js
+  ├core/root/root.js
+  ├core/sdk/sdk.js
+  │ └models/cpu_profile/cpu_profile.js
+  ├models/extensions/extensions.js
+  │ ├models/logs/logs.js
+  │ ├ui/legacy/components/utils/utils.js
+  │ └models/har/har.js
+  ├models/workspace/workspace.js
+  │ ├core/host/host.js
+  │ └models/text_utils/text_utils.js
+  │   └third_party/codemirror.next/codemirror.next.js
+  │     └third_party/codemirror.next/chunk/codemirror.js
+  ├panels/timeline/utils/utils.js
+  │ ├models/trace/trace.js
+  │ │ ├models/trace/extras/extras.js
+  │ │ ├models/trace/handlers/handlers.js
+  │ │ ├models/trace/helpers/helpers.js
+  │ │ ├models/trace/insights/insights.js
+  │ │ ├models/trace/lantern/lantern.js
+  │ │ │ ├models/trace/lantern/core/core.js
+  │ │ │ ├models/trace/lantern/graph/graph.js
+  │ │ │ ├models/trace/lantern/metrics/metrics.js
+  │ │ │ ├models/trace/lantern/simulation/simulation.js
+  │ │ │ └models/trace/lantern/types/types.js
+  │ │ ├models/trace/types/types.js
+  │ │ └models/trace/root-causes/root-causes.js
+  │ ├ui/legacy/theme_support/theme_support.js
+  │ ├models/bindings/bindings.js
+  │ ├models/source_map_scopes/source_map_scopes.js
+  │ │ └models/formatter/formatter.js
+  │ ├ui/components/markdown_view/markdown_view.js
+  │ │ └ui/components/text_editor/text_editor.js
+  │ │   ├services/window_bounds/window_bounds.js
+  │ │   └models/javascript_metadata/javascript_metadata.js
+  │ ├models/crux-manager/crux-manager.js
+  │ │ └models/emulation/emulation.js
+  │ ├third_party/marked/marked.js
+  │ ├ui/lit-html/lit-html.js
+  │ │ └third_party/lit/lit.js
+  │ └panels/mobile_throttling/mobile_throttling.js
+  │   └ui/components/cards/cards.js
+  ├panels/network/forward/forward.js
+  ├ui/components/legacy_wrapper/legacy_wrapper.js
+  │ └ui/visual_logging/visual_logging.js
+  │   └ui/components/render_coordinator/render_coordinator.js
+  ├panels/application/preloading/helper/helper.js
+  ├models/issues_manager/issues_manager.js
+  │ └third_party/third-party-web/third-party-web.js
+  └entrypoints/main/main.js
+    ├core/protocol_client/protocol_client.js
+    ├models/autofill_manager/autofill_manager.js
+    ├models/breakpoints/breakpoints.js
+    ├models/live-metrics/live-metrics.js
+    │ └models/live-metrics/web-vitals-injected/spec/spec.js
+    ├models/persistence/persistence.js
+    ├panels/snippets/snippets.js
+    └ui/components/icon_button/icon_button.js
+
+    `.trim();
+
+    if (graphSerialized.includes('core/host/Platform.js')) {
+      // In debug mode, there's current 915 modules loaded, enough that it'd be annoying to update the assertions here.
+      // We only want to test this in Release mode.
+      return;
+    }
+    if (graphSerialized !== expectedGraph) {
+      // Output the actual graph, allowing engineers to more easily update the text golden, especially if failing on CQ bots.
+      // eslint-disable-next-line no-console
+      console.log('Update boot-perf_test.ts\'s expectedGraph with the following:\n', graphSerialized);
+    }
+
+    // Assert the above list matches DevTools' modules loaded.
+    // This test allows you to explicitly acknowledge the impact of your change, and prevent
+    // accidental imports that may slow down the bootup of DevTools UI.
+    assert.strictEqual(
+        graphSerialized, expectedGraph,
+        'Module graph mismatch. Scroll up to `expectedGraph` for updated golden to paste.');
   });
 });
