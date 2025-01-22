@@ -160,8 +160,8 @@ export class FramesWaterfallTrackAppender implements TrackAppender {
    */
   static seqNo(event: Trace.Types.Events.Event, parsedTrace?: Trace.Handlers.Types.ParsedTrace): number|null {
     // my additions to chrome_frame_reporter
-    const frameSeqId = event.args.data?.beginEvent?.args.animation_frame_timing_info?.begin_frame_id.sequence_number ??
-        event.args.data?.beginEvent?.args.animation_frame_timing_info?.begin_frame_id.sequence_number ??
+    const frameSeqId = event.args.data?.beginEvent?.args.animation_frame_timing_info?.begin_frame_id?.sequence_number ??
+        event.args.data?.beginEvent?.args.animation_frame_timing_info?.begin_frame_id?.sequence_number ??
         event.args.frameSeqId ?? event.args.frame_sequence ?? event.args.begin_frame_id?.sequence_number ??
         event.rawSourceEvent?.args.frame_sequence ?? event.args.begin_frame_id ?? event.args.args?.sequence_number ??
         event.args?.data?.beginEvent?.args?.sequence_number ??

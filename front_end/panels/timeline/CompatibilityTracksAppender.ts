@@ -37,7 +37,7 @@ export interface PopoverInfo {
   additionalElements: HTMLElement[];
 }
 
-const showAllEvents = Root.Runtime.experiments.isEnabled('timeline-show-all-events');
+const showAllEvents = true;  // Root.Runtime.experiments.isEnabled('timeline-show-all-events');
 
 export function entryIsVisibleInTimeline(
     entry: Trace.Types.Events.Event, parsedTrace?: Trace.Handlers.Types.ParsedTrace): boolean {
