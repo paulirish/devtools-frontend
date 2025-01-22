@@ -176,7 +176,7 @@ const someRelevantTraceEventTypes = [
   'BufferAvailableToBufferReady',
   'BufferReadyToLatch',
   'LatchToSwapEnd',
-  'SwapEndToPresentationCompositorFrame',
+  'SwapEndToPresentationCompositorFrame',  // this one is important but its SOO LONG
 
   'Screenshot',
 

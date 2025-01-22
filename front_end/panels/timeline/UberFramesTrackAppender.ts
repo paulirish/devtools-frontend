@@ -124,6 +124,12 @@ export class UberFramesTrackAppender implements TrackAppender {
    */
   colorForEvent(event: Trace.Types.Events.Event): string {
     // Performance and console timings.
+    const frameSeq = FramesWaterfallTrackAppender.seqNo(event, this.#parsedTrace);
+    if (frameSeq) {
+      return this.#colorGenerator.colorForID(frameSeq?.toString(16) || event.name);
+    }
+
+
     return this.#colorGenerator.colorForID(event.name);
   }
 

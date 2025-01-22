@@ -72,7 +72,14 @@ export class FramesWaterfallTrackAppender implements TrackAppender {
     let newLevel = 0;
 
     // do waterfall first
-    const waterFallEvts = this.#parsedTrace.UberFramesHandler.waterFallEvts;
+    const counts = {};
+
+    const topMost = this.#parsedTrace.UberFramesHandler.waterFallEvts.filter(
+        event => event.name === 'SwapEndToPresentationCompositorFrame');
+    newLevel = this.#compatibilityBuilder.appendEventsAtLevel(topMost, trackStartLevel, this);
+
+    const waterFallEvts = this.#parsedTrace.UberFramesHandler.waterFallEvts.filter(event => !topMost.includes(event));
+
 
     // filter down to just the breakdown types we see. Figure out levelBump for the rising waterfall
     const actualNames = new Set(waterFallEvts.map(e => e.name));
@@ -83,13 +90,19 @@ export class FramesWaterfallTrackAppender implements TrackAppender {
     );
 
     for (const event of waterFallEvts) {
-      const levelBump = typeNamesToLevel[event.name];
-      this.#compatibilityBuilder.appendEventAtLevel(event, trackStartLevel + levelBump, this);
+      let levelBump = typeNamesToLevel[event.name];
+      counts[event.name] = (counts[event.name] ?? 0) + 1;
+
+      // to avoid overlap
+      if (event.name === 'SwapEndToPresentationCompositorFrame' && counts[event.name] % 2 === 0) {
+        levelBump++;
+      }
+      this.#compatibilityBuilder.appendEventAtLevel(event, newLevel + levelBump, this);
     }
     // move y axis..
-    newLevel += trackStartLevel;
+    // newLevel += trackStartLevel;
     newLevel += reversed.length;
-    return newLevel;
+    return newLevel + 1;  // this one because of the SwapEndToPresentationCompositorFrame hacks
   }
 
   /**
