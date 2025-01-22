@@ -173,7 +173,6 @@ export class StorageView extends UI.ThrottledWidget.ThrottledWidget {
     this.contentElement.classList.add('clear-storage-container');
     this.contentElement.setAttribute('jslog', `${VisualLogging.pane('clear-storage')}`);
     this.pieColors = new Map([
-      [Protocol.Storage.StorageType.Appcache, 'rgb(110, 161, 226)'],        // blue
       [Protocol.Storage.StorageType.Cache_storage, 'rgb(229, 113, 113)'],   // red
       [Protocol.Storage.StorageType.Cookies, 'rgb(239, 196, 87)'],          // yellow
       [Protocol.Storage.StorageType.Indexeddb, 'rgb(155, 127, 230)'],       // purple
@@ -221,15 +220,13 @@ export class StorageView extends UI.ThrottledWidget.ThrottledWidget {
     this.previousOverrideFieldValue = '';
     const quotaOverrideCheckboxRow = quota.appendRow();
     quotaOverrideCheckboxRow.classList.add('quota-override-row');
-    this.quotaOverrideCheckbox =
-        UI.UIUtils.CheckboxLabel.create(i18nString(UIStrings.simulateCustomStorage), false, '');
+    this.quotaOverrideCheckbox = UI.UIUtils.CheckboxLabel.create(i18nString(UIStrings.simulateCustomStorage), false);
     this.quotaOverrideCheckbox.setAttribute(
         'jslog', `${VisualLogging.toggle('simulate-custom-quota').track({change: true})}`);
     quotaOverrideCheckboxRow.appendChild(this.quotaOverrideCheckbox);
     this.quotaOverrideCheckbox.checkboxElement.addEventListener('click', this.onClickCheckbox.bind(this), false);
     this.quotaOverrideControlRow = quota.appendRow();
-    this.quotaOverrideEditor =
-        this.quotaOverrideControlRow.createChild('input', 'quota-override-notification-editor') as HTMLInputElement;
+    this.quotaOverrideEditor = this.quotaOverrideControlRow.createChild('input', 'quota-override-notification-editor');
     this.quotaOverrideEditor.setAttribute(
         'jslog', `${VisualLogging.textField('quota-override').track({change: true})}`);
     this.quotaOverrideControlRow.appendChild(UI.UIUtils.createLabel(i18nString(UIStrings.mb)));
@@ -255,7 +252,7 @@ export class StorageView extends UI.ThrottledWidget.ThrottledWidget {
     clearButtonSection.appendChild(this.clearButton);
 
     const includeThirdPartyCookiesCheckbox = UI.SettingsUI.createSettingCheckbox(
-        i18nString(UIStrings.includingThirdPartyCookies), this.includeThirdPartyCookiesSetting, true);
+        i18nString(UIStrings.includingThirdPartyCookies), this.includeThirdPartyCookiesSetting);
     includeThirdPartyCookiesCheckbox.classList.add('include-third-party-cookies');
     clearButtonSection.appendChild(includeThirdPartyCookiesCheckbox);
 
@@ -277,11 +274,13 @@ export class StorageView extends UI.ThrottledWidget.ThrottledWidget {
     SDK.TargetManager.TargetManager.instance().observeTargets(this);
   }
 
-  private appendItem(section: UI.ReportView.Section, title: string, settingName: Protocol.Storage.StorageType): void {
+  private appendItem(
+      section: UI.ReportView.Section, title: Platform.UIString.LocalizedString,
+      settingName: Protocol.Storage.StorageType): void {
     const row = section.appendRow();
     const setting = this.settings.get(settingName);
     if (setting) {
-      row.appendChild(UI.SettingsUI.createSettingCheckbox(title, setting, true));
+      row.appendChild(UI.SettingsUI.createSettingCheckbox(title, setting));
     }
   }
 
@@ -563,8 +562,6 @@ export class StorageView extends UI.ThrottledWidget.ThrottledWidget {
         return i18nString(UIStrings.fileSystem);
       case Protocol.Storage.StorageType.Websql:
         return i18nString(UIStrings.webSql);
-      case Protocol.Storage.StorageType.Appcache:
-        return i18nString(UIStrings.application);
       case Protocol.Storage.StorageType.Indexeddb:
         return i18nString(UIStrings.indexDB);
       case Protocol.Storage.StorageType.Cache_storage:
@@ -583,7 +580,6 @@ export class StorageView extends UI.ThrottledWidget.ThrottledWidget {
 }
 
 export const AllStorageTypes = [
-  Protocol.Storage.StorageType.Appcache,
   Protocol.Storage.StorageType.Cache_storage,
   Protocol.Storage.StorageType.Cookies,
   Protocol.Storage.StorageType.Indexeddb,

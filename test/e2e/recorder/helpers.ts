@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-/* eslint-disable rulesdir/es_modules_import */
-
 import type {ElementHandle, Page} from 'puppeteer-core';
 
 import type {UserFlow} from '../../../front_end/panels/recorder/models/Schema.js';
@@ -121,11 +119,11 @@ export async function openRecorderPanel() {
   await waitFor('devtools-recording-view');
 }
 
-type StartRecordingOptions = {
-  networkCondition?: string,
-  untrustedEvents?: boolean,
-  selectorAttribute?: string,
-};
+interface StartRecordingOptions {
+  networkCondition?: string;
+  untrustedEvents?: boolean;
+  selectorAttribute?: string;
+}
 
 export async function startRecording(
     path: string,

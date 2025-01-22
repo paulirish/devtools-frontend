@@ -29,6 +29,7 @@
  */
 
 import '../../ui/components/report_view/report_view.js';
+import '../../ui/legacy/legacy.js';
 
 import * as i18n from '../../core/i18n/i18n.js';
 import * as SDK from '../../core/sdk/sdk.js';
@@ -412,8 +413,8 @@ export class IDBDataView extends UI.View.SimpleView {
   }
 
   private createEditorToolbar(): void {
-    const editorToolbar = new UI.Toolbar.Toolbar('data-view-toolbar', this.element);
-    editorToolbar.element.setAttribute('jslog', `${VisualLogging.toolbar()}`);
+    const editorToolbar = this.element.createChild('devtools-toolbar', 'data-view-toolbar');
+    editorToolbar.setAttribute('jslog', `${VisualLogging.toolbar()}`);
 
     editorToolbar.appendToolbarItem(this.refreshButton);
     editorToolbar.appendToolbarItem(this.clearButton);
@@ -473,7 +474,7 @@ export class IDBDataView extends UI.View.SimpleView {
     this.updateData(true);
   }
 
-  override update(objectStore: ObjectStore|null = null, index: Index|null = null): void {
+  update(objectStore: ObjectStore|null = null, index: Index|null = null): void {
     if (!objectStore) {
       return;
     }
@@ -497,7 +498,7 @@ export class IDBDataView extends UI.View.SimpleView {
     let result;
     try {
       result = JSON.parse(keyString);
-    } catch (e) {
+    } catch {
       result = keyString;
     }
     return result;

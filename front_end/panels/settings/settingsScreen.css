@@ -10,8 +10,7 @@
 }
 
 .settings-content {
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden auto;
   margin: 8px 8px 8px 0;
   padding: 0 4px;
   flex: auto;
@@ -92,7 +91,7 @@ div:has(.settings-select) + div:has(.settings-select) {
   > devtools-button {
     min-width: var(--sys-size-31);
     max-width: var(--sys-size-35);
-    width: 100%;
+    width: calc(100% - var(--sys-size-5));
     margin-left: var(--sys-size-5);
   }
 }
@@ -145,7 +144,8 @@ devtools-button.link-icon {
 }
 
 .experiment-label {
-  margin-right: 2px;
+  margin: var(--sys-size-3) var(--sys-size-2) var(--sys-size-3) 0;
+  white-space: normal;
 }
 
 .settings-experiment-unstable {

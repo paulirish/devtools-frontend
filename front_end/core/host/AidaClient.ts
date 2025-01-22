@@ -31,10 +31,63 @@ export interface Content {
   role: Role;
 }
 
-export interface Part {
-  text?: string;
+export type Part = {
+  text: string,
+}|{
+  functionCall: {
+    name: string,
+    args: Record<string, unknown>,
+  },
+}|{
+  functionResponse: {
+    name: string,
+    response: Record<string, unknown>,
+  },
+}|{
   // Inline media bytes.
-  inlineData?: MediaBlob;
+  inlineData: MediaBlob,
+};
+
+export const enum ParametersTypes {
+  STRING = 1,
+  NUMBER = 2,
+  INTEGER = 3,
+  BOOLEAN = 4,
+  ARRAY = 5,
+  OBJECT = 6,
+}
+
+interface BaseFunctionParam {
+  description: string;
+  nullable?: boolean;
+}
+
+export interface FunctionPrimitiveParams extends BaseFunctionParam {
+  type: ParametersTypes.BOOLEAN|ParametersTypes.INTEGER|ParametersTypes.STRING|ParametersTypes.BOOLEAN;
+}
+
+interface FunctionArrayParam extends BaseFunctionParam {
+  type: ParametersTypes.ARRAY;
+  items: FunctionPrimitiveParams;
+}
+
+export interface FunctionObjectParam extends BaseFunctionParam {
+  type: ParametersTypes.OBJECT;
+  // TODO: this can be also be ObjectParams
+  properties: {[Key in string]: FunctionPrimitiveParams|FunctionArrayParam};
+}
+
+/**
+ * More about function declaration can be read at
+ * https://ai.google.dev/gemini-api/docs/function-calling
+ */
+export interface FunctionDeclaration {
+  name: string;
+  /**
+   * A description for the LLM to understand what the specific function will do once called.
+   */
+  description: string;
+  parameters: FunctionObjectParam|FunctionPrimitiveParams|FunctionArrayParam;
 }
 
 // Raw media bytes.
@@ -54,6 +107,7 @@ export enum FunctionalityType {
   CHAT = 1,
   // The explain error functionality.
   EXPLAIN_ERROR = 2,
+  AGENTIC_CHAT = 5,
 }
 
 export enum ClientFeature {
@@ -61,14 +115,16 @@ export enum ClientFeature {
   CLIENT_FEATURE_UNSPECIFIED = 0,
   // Chrome console insights feature.
   CHROME_CONSOLE_INSIGHTS = 1,
-  // Chrome freestyler.
-  CHROME_FREESTYLER = 2,
-  // Chrome DrJones Network Agent.
-  CHROME_DRJONES_NETWORK_AGENT = 7,
-  // Chrome DrJones Performance Agent.
-  CHROME_DRJONES_PERFORMANCE_AGENT = 8,
-  // Chrome DrJones File Agent.
-  CHROME_DRJONES_FILE_AGENT = 9,
+  // Chrome AI Assistance Styling Agent.
+  CHROME_STYLING_AGENT = 2,
+  // Chrome AI Assistance Network Agent.
+  CHROME_NETWORK_AGENT = 7,
+  // Chrome AI Assistance Performance Agent.
+  CHROME_PERFORMANCE_AGENT = 8,
+  // Chrome AI Assistance File Agent.
+  CHROME_FILE_AGENT = 9,
+  // Chrome AI Patch Agent.
+  CHROME_PATCH_AGENT = 12,
 }
 
 export enum UserTier {
@@ -82,13 +138,17 @@ export enum UserTier {
   PUBLIC = 3,
 }
 
+export type RpcGlobalId = string|number;
+
 export interface AidaRequest {
+  client: string;
   // eslint-disable-next-line @typescript-eslint/naming-convention
-  current_message?: Content;
+  current_message: Content;
   preamble?: string;
   // eslint-disable-next-line @typescript-eslint/naming-convention
   historical_contexts?: Content[];
-  client: string;
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  function_declarations?: FunctionDeclaration[];
   options?: {
     temperature?: number,
     // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -110,7 +170,7 @@ export interface AidaRequest {
 
 export interface AidaDoConversationClientEvent {
   // eslint-disable-next-line @typescript-eslint/naming-convention
-  corresponding_aida_rpc_global_id: number;
+  corresponding_aida_rpc_global_id: RpcGlobalId;
   // eslint-disable-next-line @typescript-eslint/naming-convention
   disable_user_content_logging: boolean;
   // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -134,10 +194,20 @@ export enum RecitationAction {
   EXEMPT_FOUND_IN_PROMPT = 'EXEMPT_FOUND_IN_PROMPT',
 }
 
+export enum CitationSourceType {
+  CITATION_SOURCE_TYPE_UNSPECIFIED = 'CITATION_SOURCE_TYPE_UNSPECIFIED',
+  TRAINING_DATA = 'TRAINING_DATA',
+  WORLD_FACTS = 'WORLD_FACTS',
+  LOCAL_FACTS = 'LOCAL_FACTS',
+  INDIRECT = 'INDERECT',
+}
+
 export interface Citation {
-  startIndex: number;
-  endIndex: number;
-  url: string;
+  startIndex?: number;
+  endIndex?: number;
+  uri?: string;
+  sourceType?: CitationSourceType;
+  repository?: string;
 }
 
 export interface AttributionMetadata {
@@ -145,14 +215,29 @@ export interface AttributionMetadata {
   citations: Citation[];
 }
 
+export interface AidaFunctionCallResponse {
+  name: string;
+  args: Record<string, unknown>;
+}
+
+export interface FactualityFact {
+  sourceUri?: string;
+}
+
+export interface FactualityMetadata {
+  facts: FactualityFact[];
+}
+
 export interface AidaResponseMetadata {
-  rpcGlobalId?: number;
-  attributionMetadata?: AttributionMetadata[];
+  rpcGlobalId?: RpcGlobalId;
+  attributionMetadata?: AttributionMetadata;
+  factualityMetadata?: FactualityMetadata;
 }
 
 export interface AidaResponse {
   explanation: string;
   metadata: AidaResponseMetadata;
+  functionCalls?: [AidaFunctionCallResponse, ...AidaFunctionCallResponse[]];
   completed: boolean;
 }
 
@@ -170,6 +255,7 @@ export const CLIENT_NAME = 'CHROME_DEVTOOLS';
 const CODE_CHUNK_SEPARATOR = '\n`````\n';
 
 export class AidaAbortError extends Error {}
+export class AidaBlockError extends Error {}
 
 export class AidaClient {
   static buildConsoleInsightsRequest(input: string): AidaRequest {
@@ -260,7 +346,8 @@ export class AidaClient {
     let chunk;
     const text = [];
     let inCodeChunk = false;
-    const metadata: AidaResponseMetadata = {rpcGlobalId: 0};
+    const functionCalls: AidaFunctionCallResponse[] = [];
+    let metadata: AidaResponseMetadata = {rpcGlobalId: 0};
     while ((chunk = await stream.read())) {
       let textUpdated = false;
       // The AIDA response is a JSON array of objects, split at the object
@@ -289,12 +376,9 @@ export class AidaClient {
 
       for (const result of results) {
         if ('metadata' in result) {
-          metadata.rpcGlobalId = result.metadata.rpcGlobalId;
-          if ('attributionMetadata' in result.metadata) {
-            if (!metadata.attributionMetadata) {
-              metadata.attributionMetadata = [];
-            }
-            metadata.attributionMetadata.push(result.metadata.attributionMetadata);
+          metadata = result.metadata;
+          if (metadata?.attributionMetadata?.attributionAction === RecitationAction.BLOCK) {
+            throw new AidaBlockError();
           }
         }
         if ('textChunk' in result) {
@@ -311,6 +395,11 @@ export class AidaClient {
           }
           text.push(result.codeChunk.code);
           textUpdated = true;
+        } else if ('functionCallChunk' in result) {
+          functionCalls.push({
+            name: result.functionCallChunk.functionCall.name,
+            args: result.functionCallChunk.functionCall.args,
+          });
         } else if ('error' in result) {
           throw new Error(`Server responded: ${JSON.stringify(result)}`);
         } else {
@@ -328,6 +417,8 @@ export class AidaClient {
     yield {
       explanation: text.join('') + (inCodeChunk ? CODE_CHUNK_SEPARATOR : ''),
       metadata,
+      functionCalls: functionCalls.length ? functionCalls as [AidaFunctionCallResponse, ...AidaFunctionCallResponse[]] :
+                                            undefined,
       completed: true,
     };
   }
@@ -414,6 +505,6 @@ export const enum Events {
   AIDA_AVAILABILITY_CHANGED = 'aidaAvailabilityChanged',
 }
 
-export type EventTypes = {
-  [Events.AIDA_AVAILABILITY_CHANGED]: void,
-};
+export interface EventTypes {
+  [Events.AIDA_AVAILABILITY_CHANGED]: void;
+}

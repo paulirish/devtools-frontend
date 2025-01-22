@@ -63,11 +63,11 @@ export interface LinearMemoryInspectorData {
   hideValueInspector?: boolean;
 }
 
-export type Settings = {
-  valueTypes: Set<ValueType>,
-  modes: Map<ValueType, ValueTypeMode>,
-  endianness: Endianness,
-};
+export interface Settings {
+  valueTypes: Set<ValueType>;
+  modes: Map<ValueType, ValueTypeMode>;
+  endianness: Endianness;
+}
 
 export class MemoryRequestEvent extends Event {
   static readonly eventName = 'memoryrequest';
@@ -400,9 +400,9 @@ declare global {
   }
 
   interface HTMLElementEventMap {
-    'memoryrequest': MemoryRequestEvent;
-    'addresschanged': AddressChangedEvent;
-    'settingschanged': SettingsChangedEvent;
-    'deletememoryhighlight': DeleteMemoryHighlightEvent;
+    memoryrequest: MemoryRequestEvent;
+    addresschanged: AddressChangedEvent;
+    settingschanged: SettingsChangedEvent;
+    deletememoryhighlight: DeleteMemoryHighlightEvent;
   }
 }

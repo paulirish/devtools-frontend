@@ -19,7 +19,7 @@ import * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as LegacyWrapper from '../../../ui/components/legacy_wrapper/legacy_wrapper.js';
 import type * as Menus from '../../../ui/components/menus/menus.js';
-import * as Coordinator from '../../../ui/components/render_coordinator/render_coordinator.js';
+import * as RenderCoordinator from '../../../ui/components/render_coordinator/render_coordinator.js';
 import type * as Settings from '../../../ui/components/settings/settings.js';
 import * as UI from '../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
@@ -32,12 +32,9 @@ import type {MetricCardData} from './MetricCard.js';
 import metricValueStyles from './metricValueStyles.css.js';
 import {CLS_THRESHOLDS, INP_THRESHOLDS, renderMetricValue} from './Utils.js';
 
-const {html, nothing, Directives} = LitHtml;
-const {until} = Directives;
+const {html, nothing} = LitHtml;
 
 type DeviceOption = CrUXManager.DeviceScope|'AUTO';
-
-const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
 
 const DEVICE_OPTION_LIST: DeviceOption[] = ['AUTO', ...CrUXManager.DEVICE_SCOPE_LIST];
 
@@ -45,7 +42,7 @@ const RTT_MINIMUM = 60;
 
 const UIStrings = {
   /**
-   * @description Title of a view that shows performance metrics from the local environment and field metrics collected from real users in the field.
+   * @description Title of a view that shows performance metrics from the local environment and field metrics collected from real users. "field metrics" should be interpreted as "real user metrics".
    */
   localAndFieldMetrics: 'Local and field metrics',
   /**
@@ -69,7 +66,7 @@ const UIStrings = {
    */
   nextSteps: 'Next steps',
   /**
-   * @description Title of a section that shows options for how real user data in the field should be fetched.
+   * @description Title of a section that shows options for how real user data in the field should be fetched. This should be interpreted as "Real user data".
    */
   fieldData: 'Field data',
   /**
@@ -77,7 +74,7 @@ const UIStrings = {
    */
   environmentSettings: 'Environment settings',
   /**
-   * @description Label for an select box that selects which device type field data be shown for (e.g. desktop/mobile/all devices/etc).
+   * @description Label for an select box that selects which device type field data be shown for (e.g. desktop/mobile/all devices/etc). "field data" should be interpreted as "real user data".
    * @example {Mobile} PH1
    */
   showFieldDataForDevice: 'Show field data for device type: {PH1}',
@@ -91,7 +88,7 @@ const UIStrings = {
    */
   network: 'Network: {PH1}',
   /**
-   * @description Label for an select box that selects which device type field data be shown for (e.g. desktop/mobile/all devices/etc).
+   * @description Label for an select box that selects which device type real user data should be shown for (e.g. desktop/mobile/all devices/etc).
    * @example {Mobile} PH1
    */
   device: 'Device: {PH1}',
@@ -145,7 +142,7 @@ const UIStrings = {
    */
   originOptionWithKey: 'Origin: {PH1}',
   /**
-   * @description Label for an combo-box that indicates if field data should be taken from the page's URL or it's origin/domain.
+   * @description Label for an combo-box that indicates if field data should be taken from the page's URL or it's origin/domain. "field data" should be interpreted as "real user data".
    * @example {Origin: https://example.com} PH1
    */
   showFieldDataForPage: 'Show field data for {PH1}',
@@ -210,11 +207,11 @@ const UIStrings = {
    */
   seeHowYourLocalMetricsCompare: 'See how your local metrics compare to real user data in the {PH1}.',
   /**
-   * @description Text for a link that goes to more documentation about local and field data. "Local" refers to performance metrics measured in the developers local environment. "field data" is data measured by real users in the field.
+   * @description Text for a link that goes to more documentation about local and field data. "Local" refers to performance metrics measured in the developers local environment. "field data" should be interpreted as "real user data".
    */
   localFieldLearnMoreLink: 'Learn more about local and field data',
   /**
-   * @description Tooltip text for a link that goes to documentation explaining the difference between local and field metrics. "Local metrics" are performance metrics measured in the developers local environment. "field data" is data measured by real users in the field.
+   * @description Tooltip text for a link that goes to documentation explaining the difference between local and field metrics. "Local metrics" are performance metrics measured in the developers local environment. "field data" should be interpreted as "real user data".
    */
   localFieldLearnMoreTooltip:
       'Local metrics are captured from the current page using your network connection and device. Field data is measured by real users using many different network connections and devices.',
@@ -279,6 +276,14 @@ const UIStrings = {
    * @description Tooltip text for a button that will open the Chrome DevTools console to and log additional details about a user interaction.
    */
   logToConsole: 'Log additional interaction data to the console',
+  /**
+   * @description Title of a view that can be used to analyze the performance of a Node process as a timeline. "Node" is a product name and should not be translated.
+   */
+  nodePerformanceTimeline: 'Node performance',
+  /**
+   * @description Description of a view that can be used to analyze the performance of a Node process as a timeline. "Node" is a product name and should not be translated.
+   */
+  nodeClickToRecord: 'Record a performance timeline of the connected Node process.',
 };
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/LiveMetricsView.ts', UIStrings);
@@ -287,9 +292,11 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableComponent {
   readonly #shadow = this.attachShadow({mode: 'open'});
 
-  #lcpValue?: LiveMetrics.LCPValue;
-  #clsValue?: LiveMetrics.CLSValue;
-  #inpValue?: LiveMetrics.INPValue;
+  #isNode: boolean = false;
+
+  #lcpValue?: LiveMetrics.LcpValue;
+  #clsValue?: LiveMetrics.ClsValue;
+  #inpValue?: LiveMetrics.InpValue;
   #interactions: LiveMetrics.InteractionMap = new Map();
   #layoutShifts: LiveMetrics.LayoutShift[] = [];
 
@@ -310,6 +317,11 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
 
     this.#toggleRecordAction = UI.ActionRegistry.ActionRegistry.instance().getAction('timeline.toggle-recording');
     this.#recordReloadAction = UI.ActionRegistry.ActionRegistry.instance().getAction('timeline.record-reload');
+  }
+
+  set isNode(isNode: boolean) {
+    this.#isNode = isNode;
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
   #onMetricStatus(event: {data: LiveMetrics.StatusEvent}): void {
@@ -409,7 +421,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
 
   #renderLcpCard(): LitHtml.LitTemplate {
     const fieldData = this.#cruxManager.getSelectedFieldMetricData('largest_contentful_paint');
-    const node = this.#lcpValue?.node;
+    const nodeLink = this.#lcpValue?.nodeRef?.link;
     const phases = this.#lcpValue?.phases;
 
     // clang-format off
@@ -428,10 +440,10 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
           [i18nString(UIStrings.elementRenderDelay), phases.elementRenderDelay],
         ],
       } as MetricCardData}>
-        ${node ? html`
+        ${nodeLink ? html`
             <div class="related-info" slot="extra-info">
               <span class="related-info-label">${i18nString(UIStrings.lcpElement)}</span>
-              <span class="related-info-link">${until(Common.Linkifier.Linkifier.linkify(node))}</span>
+              <span class="related-info-link">${nodeLink}</span>
             </div>
           `
           : nothing}
@@ -594,7 +606,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
         </ul>
       ` : nothing}
       <div class="environment-option">
-        <devtools-cpu-throttling-selector .recommendedRate=${recs.cpuRate}></devtools-cpu-throttling-selector>
+        <devtools-cpu-throttling-selector .recommendedOption=${recs.cpuOption}></devtools-cpu-throttling-selector>
       </div>
       <div class="environment-option">
         <devtools-network-throttling-selector .recommendedConditions=${recs.networkConditions}></devtools-network-throttling-selector>
@@ -655,7 +667,6 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
         .showArrow=${true}
         .sideButton=${false}
         .showSelectedItem=${true}
-        .showConnector=${false}
         .buttonTitle=${buttonTitle}
         .disabled=${shouldDisable}
         title=${accessibleTitle}
@@ -690,9 +701,14 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
   }
 
   #getLabelForDeviceOption(deviceOption: DeviceOption): string {
-    const deviceScope = this.#cruxManager.getSelectedDeviceScope();
-    const deviceScopeLabel = this.#getDeviceScopeDisplayName(deviceScope);
-    const baseLabel = deviceOption === 'AUTO' ? i18nString(UIStrings.auto, {PH1: deviceScopeLabel}) : deviceScopeLabel;
+    let baseLabel;
+    if (deviceOption === 'AUTO') {
+      const deviceScope = this.#cruxManager.getSelectedDeviceScope();
+      const deviceScopeLabel = this.#getDeviceScopeDisplayName(deviceScope);
+      baseLabel = i18nString(UIStrings.auto, {PH1: deviceScopeLabel});
+    } else {
+      baseLabel = this.#getDeviceScopeDisplayName(deviceOption);
+    }
 
     if (!this.#cruxManager.pageResult) {
       return i18nString(UIStrings.loadingOption, {PH1: baseLabel});
@@ -732,7 +748,6 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
         .showArrow=${true}
         .sideButton=${false}
         .showSelectedItem=${true}
-        .showConnector=${false}
         .buttonTitle=${i18nString(UIStrings.device, {PH1: currentDeviceLabel})}
         .disabled=${shouldDisable}
         title=${i18nString(UIStrings.showFieldDataForDevice, {PH1: currentDeviceLabel})}
@@ -850,7 +865,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
       return;
     }
 
-    await coordinator.write(() => {
+    await RenderCoordinator.write(() => {
       interactionEl.scrollIntoView({
         block: 'center',
       });
@@ -901,8 +916,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
                       html`<span class="interaction-inp-chip" title=${i18nString(UIStrings.inpInteraction)}>INP</span>`
                     : nothing}
                   </span>
-                  <span class="interaction-node">${
-                    interaction.node && until(Common.Linkifier.Linkifier.linkify(interaction.node))}</span>
+                  <span class="interaction-node">${interaction.nodeRef?.link}</span>
                   ${isP98Excluded ? html`<devtools-icon
                     class="interaction-info"
                     name="info"
@@ -967,7 +981,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
       return;
     }
 
-    await coordinator.write(() => {
+    await RenderCoordinator.write(() => {
       layoutShiftEls[0].scrollIntoView({
         block: 'start',
       });
@@ -1006,8 +1020,8 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
             <li id=${layoutShift.uniqueLayoutShiftId} class="log-item layout-shift" tabindex="-1">
               <div class="layout-shift-score">Layout shift score: ${metricValue}</div>
               <div class="layout-shift-nodes">
-                ${layoutShift.affectedNodes.map(({node}) => html`
-                  <div class="layout-shift-node">${until(Common.Linkifier.Linkifier.linkify(node))}</div>
+                ${layoutShift.affectedNodeRefs.map(({link}) => html`
+                  <div class="layout-shift-node">${link}</div>
                 `)}
               </div>
             </li>
@@ -1018,7 +1032,24 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
     // clang-format on
   }
 
+  #renderNodeView(): LitHtml.LitTemplate {
+    return html`
+      <div class="node-view">
+        <main>
+          <h2 class="section-title">${i18nString(UIStrings.nodePerformanceTimeline)}</h2>
+          <div class="node-description">${i18nString(UIStrings.nodeClickToRecord)}</div>
+          <div class="record-action-card">${this.#renderRecordAction(this.#toggleRecordAction)}</div>
+        </main>
+      </div>
+    `;
+  }
+
   #render = (): void => {
+    if (this.#isNode) {
+      LitHtml.render(this.#renderNodeView(), this.#shadow, {host: this});
+      return;
+    }
+
     const fieldEnabled = this.#cruxManager.getConfigSetting().get().enabled;
     const liveMetricsTitle =
         fieldEnabled ? i18nString(UIStrings.localAndFieldMetrics) : i18nString(UIStrings.localMetrics);

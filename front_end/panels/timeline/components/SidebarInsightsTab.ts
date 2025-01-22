@@ -41,6 +41,7 @@ export class SidebarInsightsTab extends HTMLElement {
   readonly #shadow = this.attachShadow({mode: 'open'});
 
   #parsedTrace: Trace.Handlers.Types.ParsedTrace|null = null;
+  #traceMetadata: Trace.Types.File.MetaData|null = null;
   #insights: Trace.Insights.Types.TraceInsightSets|null = null;
   #activeInsight: ActiveInsight|null = null;
   #selectedCategory = Trace.Insights.Types.InsightCategory.ALL;
@@ -68,6 +69,16 @@ export class SidebarInsightsTab extends HTMLElement {
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
   }
 
+  set traceMetadata(data: Trace.Types.File.MetaData|null) {
+    if (data === this.#traceMetadata) {
+      return;
+    }
+    this.#traceMetadata = data;
+    this.#insightSetKey = null;
+
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
+  }
+
   set insights(data: Trace.Insights.Types.TraceInsightSets|null) {
     if (data === this.#insights) {
       return;
@@ -83,7 +94,7 @@ export class SidebarInsightsTab extends HTMLElement {
     // - greater than 5s in duration
     // - or, has a navigation
     // In practice this means selecting either the first or the second insight set.
-    const trivialThreshold = Trace.Helpers.Timing.millisecondsToMicroseconds(Trace.Types.Timing.MilliSeconds(5000));
+    const trivialThreshold = Trace.Helpers.Timing.milliToMicro(Trace.Types.Timing.MilliSeconds(5000));
     const insightSets = [...this.#insights.values()];
     this.#insightSetKey =
         insightSets.find(insightSet => insightSet.navigation || insightSet.bounds.range > trivialThreshold)?.id
@@ -192,17 +203,18 @@ export class SidebarInsightsTab extends HTMLElement {
      html`
       <div class="insight-sets-wrapper">
         ${[...this.#insights.values()].map(({id, url}, index) => {
-          const data = {
-            parsedTrace: this.#parsedTrace,
+          const data: SidebarSingleInsightSetData = {
             insights: this.#insights,
             insightSetKey: id,
             activeCategory: this.#selectedCategory,
             activeInsight: this.#activeInsight,
+            parsedTrace: this.#parsedTrace,
+            traceMetadata: this.#traceMetadata,
           };
 
           const contents = html`
             <devtools-performance-sidebar-single-navigation
-              .data=${data as SidebarSingleInsightSetData}>
+              .data=${data}>
             </devtools-performance-sidebar-single-navigation>
           `;
 

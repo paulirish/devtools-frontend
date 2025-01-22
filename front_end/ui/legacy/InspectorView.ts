@@ -214,7 +214,7 @@ export class InspectorView extends VBox implements ViewLocationResolver {
     // to prevent to prevent a shift in the tab layout. Note that when DevTools cannot be docked,
     // the Device mode button is not added and so the allocated space is smaller.
     const allocatedSpace = Root.Runtime.conditions.canDock() ? '69px' : '41px';
-    this.tabbedPane.leftToolbar().element.style.minWidth = allocatedSpace;
+    this.tabbedPane.leftToolbar().style.minWidth = allocatedSpace;
     this.tabbedPane.registerRequiredCSS(inspectorViewTabbedPaneStyles);
     this.tabbedPane.addEventListener(
         TabbedPaneEvents.TabSelected,
@@ -492,9 +492,7 @@ export class InspectorView extends VBox implements ViewLocationResolver {
               highlight: true,
               delegate: () => {
                 reloadDebuggedTab();
-                if (this.reloadRequiredInfobar) {
-                  this.reloadRequiredInfobar.dispose();
-                }
+                this.removeDebuggedTabReloadRequiredWarning();
               },
               dismiss: false,
               buttonVariant: Buttons.Button.Variant.PRIMARY,
@@ -502,13 +500,19 @@ export class InspectorView extends VBox implements ViewLocationResolver {
               jslogContext: 'main.debug-reload',
             },
           ],
-          undefined, undefined, 'reload-required');
+          undefined, 'reload-required');
       infobar.setParentView(this);
       this.attachInfobar(infobar);
       this.reloadRequiredInfobar = infobar;
       infobar.setCloseCallback(() => {
         delete this.reloadRequiredInfobar;
       });
+    }
+  }
+
+  removeDebuggedTabReloadRequiredWarning(): void {
+    if (this.reloadRequiredInfobar) {
+      this.reloadRequiredInfobar.dispose();
     }
   }
 
@@ -525,7 +529,7 @@ export class InspectorView extends VBox implements ViewLocationResolver {
               jslogContext: 'main.debug-reload',
             },
           ],
-          undefined, undefined, 'reload-required');
+          undefined, 'reload-required');
       infobar.setParentView(this);
       this.attachInfobar(infobar);
       this.reloadRequiredInfobar = infobar;
@@ -548,7 +552,7 @@ export class InspectorView extends VBox implements ViewLocationResolver {
               jslogContext: 'select-folder',
             },
           ],
-          undefined, undefined, 'select-override-folder');
+          undefined, 'select-override-folder');
       infobar.setParentView(this);
       this.attachInfobar(infobar);
       this.#selectOverrideFolderInfobar = infobar;
@@ -628,7 +632,7 @@ function createLocaleInfobar(): Infobar {
           jslogContext: 'set-to-specific-language',
         },
       ],
-      getDisableLocaleInfoBarSetting(), undefined, 'language-mismatch');
+      getDisableLocaleInfoBarSetting(), 'language-mismatch');
 }
 
 function reloadDevTools(): void {

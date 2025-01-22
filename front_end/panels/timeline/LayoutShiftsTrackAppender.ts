@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
-import * as Root from '../../core/root/root.js';
 import * as Trace from '../../models/trace/trace.js';
 import * as ComponentHelpers from '../../ui/components/helpers/helpers.js';
 import * as UI from '../../ui/legacy/legacy.js';
@@ -100,13 +99,10 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
    * layout shifts (the first available level to append more data).
    */
   #appendLayoutShiftsAtLevel(currentLevel: number): number {
+    const allClusters = this.#parsedTrace.LayoutShifts.clusters;
+    this.#compatibilityBuilder.appendEventsAtLevel(allClusters, currentLevel, this);
+
     const allLayoutShifts = this.#parsedTrace.LayoutShifts.clusters.flatMap(cluster => cluster.events);
-
-    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_INSIGHTS)) {
-      const allClusters = this.#parsedTrace.LayoutShifts.clusters;
-      this.#compatibilityBuilder.appendEventsAtLevel(allClusters, currentLevel, this);
-    }
-
     void this.preloadScreenshots(allLayoutShifts);
     return this.#compatibilityBuilder.appendEventsAtLevel(allLayoutShifts, currentLevel, this);
   }
@@ -133,25 +129,15 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
     return renderingColor;
   }
 
-  /**
-   * Gets the title an event added by this appender should be rendered with.
-   */
-  titleForEvent(event: Trace.Types.Events.Event): string {
-    if (Trace.Types.Events.isLayoutShift(event)) {
-      return i18nString(UIStrings.layoutShift);
-    }
-    return '';
-  }
-
   setPopoverInfo(event: Trace.Types.Events.Event, info: PopoverInfo): void {
-    const score = Trace.Types.Events.isLayoutShift(event)       ? event.args.data?.weighted_score_delta ?? 0 :
-        Trace.Types.Events.isSyntheticLayoutShiftCluster(event) ? event.clusterCumulativeScore :
-                                                                  -1;
+    const score = Trace.Types.Events.isSyntheticLayoutShift(event) ? event.args.data?.weighted_score_delta ?? 0 :
+        Trace.Types.Events.isSyntheticLayoutShiftCluster(event)    ? event.clusterCumulativeScore :
+                                                                     -1;
     // Score isn't a duration, but the UI works anyhow.
     info.formattedTime = score.toFixed(4);
-    info.title = Trace.Types.Events.isLayoutShift(event)        ? i18nString(UIStrings.layoutShift) :
-        Trace.Types.Events.isSyntheticLayoutShiftCluster(event) ? i18nString(UIStrings.layoutShiftCluster) :
-                                                                  event.name;
+    info.title = Trace.Types.Events.isSyntheticLayoutShift(event) ? i18nString(UIStrings.layoutShift) :
+        Trace.Types.Events.isSyntheticLayoutShiftCluster(event)   ? i18nString(UIStrings.layoutShiftCluster) :
+                                                                    event.name;
 
     if (Trace.Types.Events.isSyntheticLayoutShift(event)) {
       // Screenshots are max 500x500 naturally, but on a laptop in dock-to-right, 500px tall usually doesn't fit.
@@ -165,26 +151,7 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
   }
 
   getDrawOverride(event: Trace.Types.Events.Event): DrawOverride|undefined {
-    if (!Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_INSIGHTS)) {
-      // If the new CLS experience isn't on.. Continue to present that Shifts are 5ms long. (but now via drawOverrides)
-      // TODO: Remove this when the experiment ships
-      if (Trace.Types.Events.isLayoutShift(event)) {
-        return (context, x, y, _width, levelHeight, timeToPosition, transformColor) => {
-          const fakeDurMs = Trace.Helpers.Timing.microSecondsToMilliseconds(
-              Trace.Types.Timing.MicroSeconds(event.ts + LAYOUT_SHIFT_SYNTHETIC_DURATION));
-          const barEnd = timeToPosition(fakeDurMs);
-          const barWidth = barEnd - x;
-          context.fillStyle = transformColor(this.colorForEvent(event));
-          context.fillRect(x, y, barWidth - 0.5, levelHeight - 1);
-          return {
-            x,
-            width: barWidth,
-          };
-        };
-      }
-    }
-
-    if (Trace.Types.Events.isLayoutShift(event)) {
+    if (Trace.Types.Events.isSyntheticLayoutShift(event)) {
       const score = event.args.data?.weighted_score_delta || 0;
 
       // `buffer` is how much space is between the actual diamond shape and the
@@ -242,6 +209,18 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
 
     const screenshots = Array.from(screenshotsToLoad);
     return Utils.ImageCache.preload(screenshots);
+  }
+
+  titleForEvent(_event: Trace.Types.Events.Event): string {
+    /**
+     * This method defines the titles drawn on the track for the events in this
+     * appender. In the case of the Layout Shifts, we do not draw any titles. We
+     * draw layout shifts which are represented as diamonds, and clusters, which
+     * are represented as the purple lines through the diamonds. We do not want
+     * to put any text on top of these, hence overriding this method to return
+     * the empty string.
+     */
+    return '';
   }
 
   static createShiftViz(

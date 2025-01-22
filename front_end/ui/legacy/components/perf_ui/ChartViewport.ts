@@ -4,13 +4,11 @@
 
 import * as Common from '../../../../core/common/common.js';
 import * as Platform from '../../../../core/platform/platform.js';
-import * as Coordinator from '../../../components/render_coordinator/render_coordinator.js';
+import * as RenderCoordinator from '../../../components/render_coordinator/render_coordinator.js';
 import * as UI from '../../legacy.js';
 
 import chartViewPortStyles from './chartViewport.css.legacy.js';
 import {MinimalTimeWindowMs} from './FlameChart.js';
-
-const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
 
 export interface ChartViewportDelegate {
   windowChanged(startTime: number, endTime: number, animate: boolean): void;
@@ -206,23 +204,54 @@ export class ChartViewport extends UI.Widget.VBox {
     this.totalTime = totalTime;
   }
 
-  private onMouseWheel(e: Event): void {
-    const wheelEvent = (e as WheelEvent);
-    const doZoomInstead = wheelEvent.shiftKey !==
-        (Common.Settings.Settings.instance().moduleSetting('flamechart-selected-navigation').get() === 'classic');
-    const panVertically = !doZoomInstead && (wheelEvent.deltaY || Math.abs(wheelEvent.deltaX) === 53);
-    const panHorizontally = doZoomInstead && Math.abs(wheelEvent.deltaX) > Math.abs(wheelEvent.deltaY);
-    if (panVertically) {
-      this.vScrollElement.scrollTop += (wheelEvent.deltaY || wheelEvent.deltaX) / 53 * this.offsetHeight / 8;
-    } else if (panHorizontally) {
-      this.handlePanGesture(wheelEvent.deltaX, /* animate */ true);
-    } else {  // Zoom.
-      const wheelZoomSpeed = 1 / 53;
-      this.handleZoomGesture(Math.pow(1.2, (wheelEvent.deltaY || wheelEvent.deltaX) * wheelZoomSpeed) - 1);
+  /**
+   * The mouse wheel can results in flamechart zoom, scroll and pan actions, depending on the scroll deltas and the selected navigation:
+   *
+   * Classic navigation:
+   * 1. Mouse Wheel --> Zoom
+   * 2. Mouse Wheel + Shift --> Scroll
+   * 3. Trackpad: Mouse Wheel AND horizontal scroll (deltaX > deltaY): --> Pan left/right
+   *
+   * Modern navigation:
+   * 1. Mouse Wheel -> Scroll
+   * 2. Mouse Wheel + Shift -> Pan left/right
+   * 3. Mouse Wheel + Ctrl/Cmd -> Zoom
+   * 4. Trackpad: Mouse Wheel AND horizontal scroll (deltaX > deltaY): --> Zoom
+   */
+  private onMouseWheel(wheelEvent: WheelEvent): void {
+    const navigation = Common.Settings.Settings.instance().moduleSetting('flamechart-selected-navigation').get();
+    // Delta for navigation left, right, up and down.
+    // Calculated from horizontal or vertical scroll delta, depending on which one exists.
+    const panDelta = (wheelEvent.deltaY || wheelEvent.deltaX) / 53 * this.offsetHeight / 8;
+    const zoomDelta = Math.pow(1.2, (wheelEvent.deltaY || wheelEvent.deltaX) * 1 / 53) - 1;
+
+    if (navigation === 'classic') {
+      if (wheelEvent.shiftKey) {  // Scroll
+        this.vScrollElement.scrollTop += panDelta;
+      } else if (
+          Math.abs(wheelEvent.deltaX) > Math.abs(wheelEvent.deltaY)) {  // Pan left/right on trackpad horizontal scroll
+        // Horizontal scroll on the trackpad feels smoother when only deltaX is taken into account
+        this.handleHorizontalPanGesture(wheelEvent.deltaX, /* animate */ true);
+      } else {  // Zoom
+        this.handleZoomGesture(zoomDelta);
+      }
+    } else if (navigation === 'modern') {
+      const isCtrlOrCmd = UI.KeyboardShortcut.KeyboardShortcut.eventHasCtrlEquivalentKey(wheelEvent);
+      if (wheelEvent.shiftKey) {  // Pan left/right
+        this.handleHorizontalPanGesture(panDelta, /* animate */ true);
+      } else if (
+          Math.abs(wheelEvent.deltaX) > Math.abs(wheelEvent.deltaY)) {  // Pan left/right on trackpad horizontal scroll
+        // Horizontal scroll on the trackpad feels smoother when only deltaX is taken into account
+        this.handleHorizontalPanGesture(wheelEvent.deltaX, /* animate */ true);
+      } else if (isCtrlOrCmd) {  // Zoom
+        this.handleZoomGesture(zoomDelta);
+      } else {  // Scroll
+        this.vScrollElement.scrollTop += panDelta;
+      }
     }
 
     // Block swipe gesture.
-    e.consume(true);
+    wheelEvent.consume(true);
   }
 
   private startDragging(event: MouseEvent): boolean {
@@ -240,7 +269,7 @@ export class ChartViewport extends UI.Widget.VBox {
   private dragging(event: MouseEvent): void {
     const pixelShift = this.dragStartPointX - event.pageX;
     this.dragStartPointX = event.pageX;
-    this.handlePanGesture(pixelShift);
+    this.handleHorizontalPanGesture(pixelShift);
     const pixelScroll = this.dragStartPointY - event.pageY;
     this.vScrollElement.scrollTop = this.dragStartScrollTop + pixelScroll;
   }
@@ -342,42 +371,62 @@ export class ChartViewport extends UI.Widget.VBox {
     this.cursorElement.classList.toggle('hidden', !visible || this.isDraggingInternal);
   }
 
-  private onChartKeyDown(e: Event): void {
-    const mouseEvent = (e as MouseEvent);
-    this.showCursor(mouseEvent.shiftKey);
-    this.handleZoomPanKeys(e);
+  private onChartKeyDown(keyboardEvent: KeyboardEvent): void {
+    this.showCursor(keyboardEvent.shiftKey);
+    this.handleZoomPanScrollKeys(keyboardEvent);
   }
 
-  private onChartKeyUp(e: Event): void {
-    const mouseEvent = (e as MouseEvent);
-    this.showCursor(mouseEvent.shiftKey);
+  private onChartKeyUp(keyboardEvent: KeyboardEvent): void {
+    this.showCursor(keyboardEvent.shiftKey);
   }
 
-  private handleZoomPanKeys(e: Event): void {
-    const keyboardEvent = (e as KeyboardEvent);
-    // Do not zoom if the key combination has any modifiers other than shift key
-    if (UI.KeyboardShortcut.KeyboardShortcut.hasAtLeastOneModifier(e) && !keyboardEvent.shiftKey) {
+  private handleZoomPanScrollKeys(keyboardEvent: KeyboardEvent): void {
+    // Do not zoom, pan or scroll if the key combination has any modifiers other than shift key
+    if (UI.KeyboardShortcut.KeyboardShortcut.hasAtLeastOneModifier(keyboardEvent) && !keyboardEvent.shiftKey) {
       return;
     }
     const zoomFactor = keyboardEvent.shiftKey ? 0.8 : 0.3;
-    const panOffset = keyboardEvent.shiftKey ? 320 : 160;
+    const panOffset = 160;
+    const scrollOffset = 50;
     switch (keyboardEvent.code) {
       case 'KeyA':
-        this.handlePanGesture(-panOffset, /* animate */ true);
+        this.handleHorizontalPanGesture(-panOffset, /* animate */ true);
         break;
       case 'KeyD':
-        this.handlePanGesture(panOffset, /* animate */ true);
+        this.handleHorizontalPanGesture(panOffset, /* animate */ true);
         break;
+      case 'Equal':  // '+' key for zoom in
       case 'KeyW':
         this.handleZoomGesture(-zoomFactor);
         break;
+      case 'Minus':  // '-' key for zoom out
       case 'KeyS':
         this.handleZoomGesture(zoomFactor);
+        break;
+      case 'ArrowUp':
+        if (keyboardEvent.shiftKey) {
+          this.vScrollElement.scrollTop -= scrollOffset;
+        }
+        break;
+      case 'ArrowDown':
+        if (keyboardEvent.shiftKey) {
+          this.vScrollElement.scrollTop += scrollOffset;
+        }
+        break;
+      case 'ArrowLeft':
+        if (keyboardEvent.shiftKey) {
+          this.handleHorizontalPanGesture(-panOffset, /* animate */ true);
+        }
+        break;
+      case 'ArrowRight':
+        if (keyboardEvent.shiftKey) {
+          this.handleHorizontalPanGesture(panOffset, /* animate */ true);
+        }
         break;
       default:
         return;
     }
-    e.consume(true);
+    keyboardEvent.consume(true);
   }
 
   private handleZoomGesture(zoom: number): void {
@@ -391,7 +440,7 @@ export class ChartViewport extends UI.Widget.VBox {
     this.requestWindowTimes(bounds, /* animate */ true);
   }
 
-  private handlePanGesture(offset: number, animate?: boolean): void {
+  private handleHorizontalPanGesture(offset: number, animate?: boolean): void {
     const bounds = {left: this.targetLeftTime, right: this.targetRightTime};
     const timeOffset = Platform.NumberUtilities.clamp(
         this.pixelToTimeOffset(offset), this.minimumBoundary - bounds.left,
@@ -426,13 +475,13 @@ export class ChartViewport extends UI.Widget.VBox {
       return;
     }
     this.isUpdateScheduled = true;
-    void coordinator.write(() => {
+    void RenderCoordinator.write(() => {
       this.isUpdateScheduled = false;
       this.update();
     });
   }
 
-  override update(): void {
+  update(): void {
     this.delegate.update();
   }
 

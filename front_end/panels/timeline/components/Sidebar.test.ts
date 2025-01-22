@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as Root from '../../../core/root/root.js';
 import type * as Trace from '../../../models/trace/trace.js';
 import {raf, renderElementIntoDOM} from '../../../testing/DOMHelpers.js';
-import {describeWithEnvironment, enableFeatureForTest} from '../../../testing/EnvironmentHelpers.js';
+import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
 import {TraceLoader} from '../../../testing/TraceLoader.js';
 
 import * as Components from './components.js';
@@ -13,27 +12,24 @@ import * as Components from './components.js';
 describeWithEnvironment('Sidebar', () => {
   async function renderSidebar(
       parsedTrace: Trace.Handlers.Types.ParsedTrace,
+      metadata: Trace.Types.File.MetaData|null,
       insights: Trace.Insights.Types.TraceInsightSets|null,
       ): Promise<Components.Sidebar.SidebarWidget> {
     const container = document.createElement('div');
     renderElementIntoDOM(container);
     const sidebar = new Components.Sidebar.SidebarWidget();
     sidebar.markAsRoot();
-    sidebar.setParsedTrace(parsedTrace);
+    sidebar.setParsedTrace(parsedTrace, metadata);
     sidebar.setInsights(insights);
     sidebar.show(container);
     await raf();
     return sidebar;
   }
 
-  beforeEach(() => {
-    enableFeatureForTest(Root.Runtime.ExperimentName.TIMELINE_INSIGHTS);
-  });
-
   it('renders with two tabs for insights & annotations', async function() {
-    const {parsedTrace, insights} = await TraceLoader.traceEngine(this, 'web-dev-with-commit.json.gz');
+    const {parsedTrace, metadata, insights} = await TraceLoader.traceEngine(this, 'web-dev-with-commit.json.gz');
 
-    const sidebar = await renderSidebar(parsedTrace, insights);
+    const sidebar = await renderSidebar(parsedTrace, metadata, insights);
     const tabbedPane = sidebar.element.querySelector('.tabbed-pane')?.shadowRoot;
     assert.isOk(tabbedPane);
     const tabs = Array.from(tabbedPane.querySelectorAll('[role="tab"]'));
@@ -43,9 +39,9 @@ describeWithEnvironment('Sidebar', () => {
   });
 
   it('selects the insights tab by default', async function() {
-    const {parsedTrace, insights} = await TraceLoader.traceEngine(this, 'web-dev-with-commit.json.gz');
+    const {parsedTrace, metadata, insights} = await TraceLoader.traceEngine(this, 'web-dev-with-commit.json.gz');
 
-    const sidebar = await renderSidebar(parsedTrace, insights);
+    const sidebar = await renderSidebar(parsedTrace, metadata, insights);
     const tabbedPane = sidebar.element.querySelector('.tabbed-pane')?.shadowRoot;
     assert.isOk(tabbedPane);
 
@@ -56,8 +52,8 @@ describeWithEnvironment('Sidebar', () => {
   });
 
   it('disables the insights tab if there are no insights', async function() {
-    const {parsedTrace} = await TraceLoader.traceEngine(this, 'web-dev-with-commit.json.gz');
-    const sidebar = await renderSidebar(parsedTrace, null);
+    const {parsedTrace, metadata} = await TraceLoader.traceEngine(this, 'web-dev-with-commit.json.gz');
+    const sidebar = await renderSidebar(parsedTrace, metadata, null);
     const tabbedPane = sidebar.element.querySelector('.tabbed-pane')?.shadowRoot;
     assert.isOk(tabbedPane);
     const tabs = Array.from(tabbedPane.querySelectorAll('[role="tab"]'));

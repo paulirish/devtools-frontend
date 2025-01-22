@@ -15,11 +15,6 @@ import {BaseInsightComponent} from './BaseInsightComponent.js';
 
 const {html} = LitHtml;
 
-type ThirdPartiesEntries = Array<[
-  Trace.Extras.ThirdParties.Entity,
-  Trace.Extras.ThirdParties.Summary,
-]>;
-
 const UIStrings = {
   /** Label for a table column that displays the name of a third-party provider. */
   columnThirdParty: 'Third party',
@@ -27,13 +22,17 @@ const UIStrings = {
   columnTransferSize: 'Transfer size',
   /** Label for a table column that displays how much time each row spent blocking other work on the main thread, entries will be the number of milliseconds spent. */
   columnBlockingTime: 'Blocking time',
+  /**
+   * @description Text block indicating that no third party content was detected on the page
+   */
+  noThirdParties: 'No third parties found',
 };
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/insights/ThirdParties.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class ThirdParties extends BaseInsightComponent<ThirdPartiesInsightModel> {
-  static override readonly litTagName = LitHtml.literal`devtools-performance-third-parties`;
+  static override readonly litTagName = LitHtml.StaticHtml.literal`devtools-performance-third-parties`;
   override internalName: string = 'third-parties';
 
   #overlaysForEntity = new Map<Trace.Extras.ThirdParties.Entity, Overlays.Overlays.TimelineOverlay[]>();
@@ -68,19 +67,25 @@ export class ThirdParties extends BaseInsightComponent<ThirdPartiesInsightModel>
     return overlays;
   }
 
-  #renderContent(entries: ThirdPartiesEntries): LitHtml.LitTemplate {
+  override renderContent(): LitHtml.LitTemplate {
     if (!this.model) {
       return LitHtml.nothing;
+    }
+
+    const entries = [...this.model.summaryByEntity.entries()].filter(kv => kv[0] !== this.model?.firstPartyEntity);
+    if (!entries.length) {
+      return html`<div class="insight-section">${i18nString(UIStrings.noThirdParties)}</div>`;
     }
 
     const topTransferSizeEntries = entries.sort((a, b) => b[1].transferSize - a[1].transferSize).slice(0, 6);
     const topMainThreadTimeEntries = entries.sort((a, b) => b[1].mainThreadTime - a[1].mainThreadTime).slice(0, 6);
 
-    // clang-format off
-    return html`
-      <div>
+    const sections = [];
+    if (topTransferSizeEntries.length) {
+      // clang-format off
+      sections.push(html`
         <div class="insight-section">
-          ${html`<devtools-performance-table
+          <devtools-performance-table
             .data=${{
               insight: this,
               headers: [i18nString(UIStrings.columnThirdParty), i18nString(UIStrings.columnTransferSize)],
@@ -92,11 +97,17 @@ export class ThirdParties extends BaseInsightComponent<ThirdPartiesInsightModel>
                 overlays: this.#overlaysForEntity.get(entity),
               })),
             }}>
-          </devtools-performance-table>`}
+          </devtools-performance-table>
         </div>
+      `);
+      // clang-format on
+    }
 
+    if (topMainThreadTimeEntries.length) {
+      // clang-format off
+      sections.push(html`
         <div class="insight-section">
-          ${html`<devtools-performance-table
+          <devtools-performance-table
             .data=${{
               insight: this,
               headers: [i18nString(UIStrings.columnThirdParty), i18nString(UIStrings.columnBlockingTime)],
@@ -108,19 +119,13 @@ export class ThirdParties extends BaseInsightComponent<ThirdPartiesInsightModel>
                 overlays: this.#overlaysForEntity.get(entity),
               })),
             }}>
-          </devtools-performance-table>`}
+          </devtools-performance-table>
         </div>
-      </div>`;
-    // clang-format on
-  }
-
-  override render(): void {
-    if (!this.model) {
-      return;
+      `);
+      // clang-format on
     }
 
-    const entries = [...this.model.summaryByEntity.entries()].filter(kv => kv[0] !== this.model?.firstPartyEntity);
-    this.renderWithContent(this.#renderContent(entries));
+    return html`${sections}`;
   }
 }
 

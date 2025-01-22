@@ -8,6 +8,7 @@ import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 import type * as Overlays from '../../overlays/overlays.js';
 
 import type * as BaseInsightComponent from './BaseInsightComponent.js';
+import {EventReferenceClick} from './EventRef.js';
 import tableStyles from './table.css.js';
 
 const {html} = LitHtml;
@@ -30,10 +31,10 @@ type BaseInsightComponent = BaseInsightComponent.BaseInsightComponent<Trace.Insi
  *           the current trace bounds to fit the bounds of the row's overlays.
  */
 
-export type TableState = {
-  selectedRowEl: HTMLElement|null,
-  selectionIsSticky: boolean,
-};
+export interface TableState {
+  selectedRowEl: HTMLElement|null;
+  selectionIsSticky: boolean;
+}
 
 export interface TableData {
   insight: BaseInsightComponent;
@@ -41,10 +42,10 @@ export interface TableData {
   rows: TableDataRow[];
 }
 
-export type TableDataRow = {
-  values: Array<string|LitHtml.LitTemplate>,
-  overlays?: Overlays.Overlays.TimelineOverlay[],
-};
+export interface TableDataRow {
+  values: Array<number|string|LitHtml.LitTemplate>;
+  overlays?: Overlays.Overlays.TimelineOverlay[];
+}
 
 export class Table extends HTMLElement {
 
@@ -104,6 +105,14 @@ export class Table extends HTMLElement {
 
     const index = [...rowEl.parentElement.children].indexOf(rowEl);
     if (index === -1) {
+      return;
+    }
+
+    // If the desired overlays consist of just a single ENTRY_OUTLINE, then
+    // it is more intuitive to just select the target event.
+    const overlays = this.#rows?.[index]?.overlays;
+    if (overlays?.length === 1 && overlays[0].type === 'ENTRY_OUTLINE') {
+      this.dispatchEvent(new EventReferenceClick(overlays[0].entry));
       return;
     }
 

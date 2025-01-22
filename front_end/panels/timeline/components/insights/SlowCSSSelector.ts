@@ -41,13 +41,18 @@ const UIStrings = {
    *@description Column name for a total sum.
    */
   total: 'Total',
+  /**
+   * @description Text status indicating that no CSS selector data was found.
+   */
+  enableSelectorData:
+      'No CSS selector data was found. CSS selector stats need to be enabled in the performance panel settings.',
 };
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/insights/SlowCSSSelector.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class SlowCSSSelector extends BaseInsightComponent<SlowCSSSelectorInsightModel> {
-  static override readonly litTagName = LitHtml.literal`devtools-performance-slow-css-selector`;
+  static override readonly litTagName = LitHtml.StaticHtml.literal`devtools-performance-slow-css-selector`;
   override internalName: string = 'slow-css-selector';
   #selectorLocations: Map<string, Protocol.CSS.SourceRange[]> = new Map();
 
@@ -116,7 +121,7 @@ export class SlowCSSSelector extends BaseInsightComponent<SlowCSSSelectorInsight
     return links;
   }
 
-  #renderContent(): LitHtml.LitTemplate {
+  override renderContent(): LitHtml.LitTemplate {
     if (!this.model) {
       return LitHtml.nothing;
     }
@@ -126,24 +131,33 @@ export class SlowCSSSelector extends BaseInsightComponent<SlowCSSSelectorInsight
     const time = (us: Trace.Types.Timing.MicroSeconds): string =>
         i18n.TimeUtilities.millisToString(Platform.Timing.microSecondsToMilliSeconds(us));
 
+    if (!this.model.topMatchAttempts.length && !this.model.topElapsedMs.length) {
+      return html`<div class="insight-section">${i18nString(UIStrings.enableSelectorData)}</div>`;
+    }
+
     // clang-format off
-    return html`
-      <div>
+    const sections = [html`
+      <div class="insight-section">
+        <devtools-performance-table
+          .data=${{
+            insight: this,
+            headers: [i18nString(UIStrings.total), ''],
+            rows: [
+              {values: [i18nString(UIStrings.elapsed), i18n.TimeUtilities.millisToString(this.model.totalElapsedMs)]},
+              {values: [i18nString(UIStrings.matchAttempts), this.model.totalMatchAttempts]},
+              {values: [i18nString(UIStrings.matchCount), this.model.totalMatchCount]},
+            ],
+          } as TableData}>
+        </devtools-performance-table>
+      </div>
+    `];
+    // clang-format on
+
+    if (this.model.topElapsedMs.length) {
+      // clang-format off
+      sections.push(html`
         <div class="insight-section">
-          ${html`<devtools-performance-table
-            .data=${{
-              insight: this,
-              headers: [i18nString(UIStrings.total), ''],
-              rows: [
-                {values: [i18nString(UIStrings.elapsed), i18n.TimeUtilities.millisToString(this.model.totalElapsedMs)]},
-                {values: [i18nString(UIStrings.matchAttempts), this.model.totalMatchAttempts]},
-                {values: [i18nString(UIStrings.matchCount), this.model.totalMatchCount]},
-              ],
-            } as TableData}>
-          </devtools-performance-table>`}
-        </div>
-        <div class="insight-section">
-          ${html`<devtools-performance-table
+          <devtools-performance-table
             .data=${{
               insight: this,
               headers: [i18nString(UIStrings.topSelectors), i18nString(UIStrings.elapsed)],
@@ -155,10 +169,17 @@ export class SlowCSSSelector extends BaseInsightComponent<SlowCSSSelectorInsight
                 };
               }),
             } as TableData}>
-          </devtools-performance-table>`}
+          </devtools-performance-table>
         </div>
+      `);
+      // clang-format on
+    }
+
+    if (this.model.topMatchAttempts.length) {
+      // clang-format off
+      sections.push(html`
         <div class="insight-section">
-          ${html`<devtools-performance-table
+          <devtools-performance-table
             .data=${{
               insight: this,
               headers: [i18nString(UIStrings.topSelectors), i18nString(UIStrings.matchAttempts)],
@@ -170,18 +191,13 @@ export class SlowCSSSelector extends BaseInsightComponent<SlowCSSSelectorInsight
                 };
               }),
             } as TableData}>
-          </devtools-performance-table>`}
+          </devtools-performance-table>
         </div>
-      </div>`;
-    // clang-format on
-  }
-
-  override render(): void {
-    if (!this.model) {
-      return;
+      `);
+      // clang-format on
     }
 
-    this.renderWithContent(this.#renderContent());
+    return html`${sections}`;
   }
 }
 

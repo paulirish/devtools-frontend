@@ -64,6 +64,7 @@ enum SpecificPseudoStates {
   INDETERMINATE = 'indeterminate',
   PLACEHOLDER_SHOWN = 'placeholder-shown',
   AUTOFILL = 'autofill',
+  OPEN = 'open',
 }
 
 export class ElementStatePaneWidget extends UI.Widget.Widget {
@@ -109,7 +110,8 @@ export class ElementStatePaneWidget extends UI.Widget.Widget {
     const createElementStateCheckbox = (state: string): HTMLDivElement => {
       const div = document.createElement('div');
       div.id = state;
-      const label = UI.UIUtils.CheckboxLabel.create(':' + state, undefined, undefined, undefined, true);
+      const label =
+          UI.UIUtils.CheckboxLabel.createWithStringLiteral(':' + state, undefined, undefined, undefined, true);
       const input = label.checkboxElement;
       this.inputStates.set(input, state);
       input.addEventListener('click', (clickListener as EventListener), false);
@@ -217,6 +219,7 @@ export class ElementStatePaneWidget extends UI.Widget.Widget {
         SpecificPseudoStates.PLACEHOLDER_SHOWN, createElementStateCheckbox(SpecificPseudoStates.PLACEHOLDER_SHOWN));
     this.specificPseudoStateDivs.set(
         SpecificPseudoStates.AUTOFILL, createElementStateCheckbox(SpecificPseudoStates.AUTOFILL));
+    this.specificPseudoStateDivs.set(SpecificPseudoStates.OPEN, createElementStateCheckbox(SpecificPseudoStates.OPEN));
 
     this.specificPseudoStateDivs.forEach(div => {
       elementSpecificContainer.appendChild(div);
@@ -262,7 +265,7 @@ export class ElementStatePaneWidget extends UI.Widget.Widget {
     this.registerCSSFiles([elementStatePaneWidgetStyles]);
     this.update();
   }
-  override update(): void {
+  update(): void {
     let node = UI.Context.Context.instance().flavor(SDK.DOMModel.DOMNode);
     if (node) {
       node = node.enclosingElementOrSelf();
@@ -412,6 +415,12 @@ export class ElementStatePaneWidget extends UI.Widget.Widget {
       hideSpecificCheckbox(SpecificPseudoStates.AUTOFILL, false);
     } else {
       hideSpecificCheckbox(SpecificPseudoStates.AUTOFILL, true);
+    }
+
+    if (isElementOfTypes(node, ['input', 'select', 'dialog', 'details'])) {
+      hideSpecificCheckbox(SpecificPseudoStates.OPEN, false);
+    } else {
+      hideSpecificCheckbox(SpecificPseudoStates.OPEN, true);
     }
 
     this.specificHeader.hidden = showedACheckbox ? false : true;

@@ -12,27 +12,27 @@ vars = {
   'build_with_chromium': False,
 
   'build_url': 'https://chromium.googlesource.com/chromium/src/build.git',
-  'build_revision': 'd84079d273c4264b54411e1eaf78bd4dc039b1eb',
+  'build_revision': '8fe56cd1b654eeb75096141dc8fbd353cb1b9e21',
 
   'buildtools_url': 'https://chromium.googlesource.com/chromium/src/buildtools.git',
-  'buildtools_revision': '9a87238031745c726cd12a673dcc0cda2d57186e',
+  'buildtools_revision': 'a660247d3c14a172b74b8e832ba1066b30183c97',
 
   'depot_tools_url': 'https://chromium.googlesource.com/chromium/tools/depot_tools.git',
-  'depot_tools_revision': '4d581d7b3f63cac3dc2f51ebdb8c598269412ce8',
+  'depot_tools_revision': 'a4131b94475c8c023304993678b6f7d0e347fe0c',
 
   'inspector_protocol_url': 'https://chromium.googlesource.com/deps/inspector_protocol',
-  'inspector_protocol_revision': 'f43f7515bcf291ed7413ba70b0c8514f842f9f5d',
+  'inspector_protocol_revision': '69d69ddf3aa698b171886551a4a672c5af1ad902',
 
   # Keeping track of the last time we rollerd the browser protocol files.
-  'chromium_browser_protocol_revision' : '1b9620229a34bbcf0dfb72b6014cc060460d618f',
+  'chromium_browser_protocol_revision' : '97c9c2548bcd25b4d3c5f4107eb4c12840ae3656',
 
   'clang_format_url': 'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/clang/tools/clang-format.git',
-  'clang_format_revision': '3c0acd2d4e73dd911309d9e970ba09d58bf23a62',
+  'clang_format_revision': '37f6e68a107df43b7d7e044fd36a13cbae3413f2',
 
   'emscripten_tag': 'ade9d780ff17c88d81aa13860361743e3c1e1396',
 
   # GN CIPD package version.
-  'gn_version': 'git_revision:468c6128db7fabe32a29d4753460ef53594406fc',
+  'gn_version': 'git_revision:ed1abc107815210dc66ec439542bee2f6cbabc00',
 
   'cmake_version': 'version:2@3.21.3',
 
@@ -49,7 +49,7 @@ vars = {
   # Chrome version used for tests. It should be regularly updated to
   # match the Canary version listed here:
   # https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json
-  'chrome': '133.0.6862.0',
+  'chrome': '134.0.6971.2',
 
   # 'magic' text to tell depot_tools that git submodules should be accepted but
   # but parity with DEPS file is expected.

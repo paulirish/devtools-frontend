@@ -88,7 +88,7 @@ export class TextPrompt extends Common.ObjectWrapper.ObjectWrapper<EventTypes> i
     this.ghostTextElement.setAttribute('contenteditable', 'false');
     this.leftParenthesesIndices = [];
     this.changed = false;
-    ARIAUtils.markAsHidden(this.ghostTextElement);
+    ARIAUtils.setHidden(this.ghostTextElement, true);
   }
 
   initialize(
@@ -808,6 +808,6 @@ export const enum Events {
   TEXT_CHANGED = 'TextChanged',
 }
 
-export type EventTypes = {
-  [Events.TEXT_CHANGED]: void,
-};
+export interface EventTypes {
+  [Events.TEXT_CHANGED]: void;
+}

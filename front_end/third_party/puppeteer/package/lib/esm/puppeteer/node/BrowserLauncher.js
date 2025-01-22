@@ -42,6 +42,9 @@ export class BrowserLauncher {
         if (this.#browser === 'firefox' && protocol === undefined) {
             protocol = 'webDriverBiDi';
         }
+        if (this.#browser === 'firefox' && protocol === 'cdp') {
+            throw new Error('Connecting to Firefox using CDP is no longer supported');
+        }
         const launchArgs = await this.computeLaunchArguments({
             ...options,
             protocol,
@@ -55,13 +58,6 @@ export class BrowserLauncher {
                 isTemp: launchArgs.isTempUserDataDir,
             });
         };
-        if (this.#browser === 'firefox' &&
-            protocol !== 'webDriverBiDi' &&
-            this.puppeteer.configuration.logLevel === 'warn') {
-            console.warn(`Chrome DevTools Protocol (CDP) support for Firefox is deprecated in Puppeteer ` +
-                `and it will be eventually removed. ` +
-                `Use WebDriver BiDi instead (see https://pptr.dev/webdriver-bidi#get-started).`);
-        }
         if (this.#browser === 'firefox' &&
             protocol === 'webDriverBiDi' &&
             usePipe) {
@@ -120,7 +116,7 @@ export class BrowserLauncher {
                     });
                 }
                 else {
-                    browser = await CdpBrowser._create(this.browser, cdpConnection, [], acceptInsecureCerts, defaultViewport, downloadBehavior, browserProcess.nodeProcess, browserCloseCallback, options.targetFilter);
+                    browser = await CdpBrowser._create(cdpConnection, [], acceptInsecureCerts, defaultViewport, downloadBehavior, browserProcess.nodeProcess, browserCloseCallback, options.targetFilter);
                 }
             }
         }
@@ -230,10 +226,10 @@ export class BrowserLauncher {
     /**
      * @internal
      */
-    resolveExecutablePath(headless) {
+    resolveExecutablePath(headless, validatePath = true) {
         let executablePath = this.puppeteer.configuration.executablePath;
         if (executablePath) {
-            if (!existsSync(executablePath)) {
+            if (validatePath && !existsSync(executablePath)) {
                 throw new Error(`Tried to find the browser at the configured path (${executablePath}), but no executable was found.`);
             }
             return executablePath;
@@ -256,7 +252,7 @@ export class BrowserLauncher {
             browser: browserType,
             buildId: this.puppeteer.browserVersion,
         });
-        if (!existsSync(executablePath)) {
+        if (validatePath && !existsSync(executablePath)) {
             const configVersion = this.puppeteer.configuration?.[this.browser]?.version;
             if (configVersion) {
                 throw new Error(`Tried to find the browser at the configured path (${executablePath}) for version ${configVersion}, but no executable was found.`);

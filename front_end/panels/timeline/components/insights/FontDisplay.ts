@@ -27,7 +27,7 @@ const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/insights/Fo
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class FontDisplay extends BaseInsightComponent<FontDisplayInsightModel> {
-  static override readonly litTagName = LitHtml.literal`devtools-performance-font-display`;
+  static override readonly litTagName = LitHtml.StaticHtml.literal`devtools-performance-font-display`;
   override internalName: string = 'font-display';
 
   #overlayForRequest = new Map<Trace.Types.Events.SyntheticNetworkRequest, Overlays.Overlays.TimelineOverlay>();
@@ -54,7 +54,7 @@ export class FontDisplay extends BaseInsightComponent<FontDisplayInsightModel> {
     return this.model?.metricSavings?.FCP ?? null;
   }
 
-  #renderContent(): LitHtml.LitTemplate {
+  override renderContent(): LitHtml.LitTemplate {
     if (!this.model) {
       return LitHtml.nothing;
     }
@@ -79,14 +79,6 @@ export class FontDisplay extends BaseInsightComponent<FontDisplayInsightModel> {
         </devtools-performance-table>`}
       </div>`;
     // clang-format on
-  }
-
-  override render(): void {
-    if (!this.model) {
-      return;
-    }
-
-    this.renderWithContent(this.#renderContent());
   }
 }
 

@@ -4,9 +4,11 @@
 
 import '../../../../ui/components/markdown_view/markdown_view.js';
 
+import * as Common from '../../../../core/common/common.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
+import type * as Protocol from '../../../../generated/protocol.js';
 import type {InsightModel} from '../../../../models/trace/insights/types.js';
-import type * as Trace from '../../../../models/trace/trace.js';
+import * as Trace from '../../../../models/trace/trace.js';
 import * as Buttons from '../../../../ui/components/buttons/buttons.js';
 import * as ComponentHelpers from '../../../../ui/components/helpers/helpers.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
@@ -44,7 +46,7 @@ const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/insights/Ba
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export interface BaseInsightData {
-  parsedTrace: Trace.Handlers.Types.ParsedTrace|null;
+  bounds: Trace.Types.Timing.TraceWindowMicroSeconds|null;
   /** The key into `insights` that contains this particular insight. */
   insightSetKey: string|null;
 }
@@ -53,24 +55,24 @@ export abstract class BaseInsightComponent<T extends InsightModel<{}>> extends H
   abstract internalName: string;
   // So we can use the TypeScript BaseInsight class without getting warnings
   // about litTagName. Every child should overrwrite this.
-  static readonly litTagName = LitHtml.literal``;
+  static readonly litTagName = LitHtml.StaticHtml.literal``;
 
   readonly #shadowRoot = this.attachShadow({mode: 'open'});
 
   #selected = false;
   #model: T|null = null;
+  #parsedTrace: Trace.Handlers.Types.ParsedTrace|null = null;
 
   get model(): T|null {
     return this.#model;
   }
 
   protected data: BaseInsightData = {
-    parsedTrace: null,
+    bounds: null,
     insightSetKey: null,
   };
 
-  // eslint-disable-next-line rulesdir/no_bound_component_methods
-  readonly #boundRender = this.render.bind(this);
+  readonly #boundRender = this.#render.bind(this);
   readonly sharedTableState: TableState = {
     selectedRowEl: null,
     selectionIsSticky: false,
@@ -107,14 +109,22 @@ export abstract class BaseInsightComponent<T extends InsightModel<{}>> extends H
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
   }
 
-  set parsedTrace(parsedTrace: Trace.Handlers.Types.ParsedTrace|null) {
-    this.data.parsedTrace = parsedTrace;
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
-  }
-
   set insightSetKey(insightSetKey: string|null) {
     this.data.insightSetKey = insightSetKey;
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
+  }
+
+  get bounds(): Trace.Types.Timing.TraceWindowMicroSeconds|null {
+    return this.data.bounds;
+  }
+
+  set bounds(bounds: Trace.Types.Timing.TraceWindowMicroSeconds|null) {
+    this.data.bounds = bounds;
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
+  }
+
+  set parsedTrace(parsedTrace: Trace.Handlers.Types.ParsedTrace) {
+    this.#parsedTrace = parsedTrace;
   }
 
   #dispatchInsightToggle(): void {
@@ -196,7 +206,16 @@ export abstract class BaseInsightComponent<T extends InsightModel<{}>> extends H
 
   protected abstract createOverlays(): Overlays.Overlays.TimelineOverlay[];
 
-  protected abstract render(): void;
+  protected abstract renderContent(): LitHtml.LitTemplate;
+
+  #render(): void {
+    if (!this.model) {
+      return;
+    }
+
+    const output = this.renderContent();
+    this.#renderWithContent(output);
+  }
 
   getEstimatedSavingsTime(): Trace.Types.Timing.MilliSeconds|null {
     return null;
@@ -238,8 +257,25 @@ export abstract class BaseInsightComponent<T extends InsightModel<{}>> extends H
     return null;
   }
 
-  protected renderWithContent(content: LitHtml.LitTemplate): void {
-    if (content === LitHtml.nothing || !this.#model) {
+  protected renderNode(backendNodeId: Protocol.DOM.BackendNodeId, fallbackText?: string): LitHtml.LitTemplate {
+    const fallback = fallbackText ?? LitHtml.nothing;
+    if (!this.#parsedTrace) {
+      return html`${fallback}`;
+    }
+
+    const domNodePromise =
+        Trace.Extras.FetchNodes.domNodeForBackendNodeID(this.#parsedTrace, backendNodeId).then((node): unknown => {
+          if (!node) {
+            return fallback;
+          }
+          return Common.Linkifier.Linkifier.linkify(node);
+        });
+
+    return html`${LitHtml.Directives.until(domNodePromise, fallback)}`;
+  }
+
+  #renderWithContent(content: LitHtml.LitTemplate): void {
+    if (!this.#model) {
       LitHtml.render(LitHtml.nothing, this.#shadowRoot, {host: this});
       return;
     }

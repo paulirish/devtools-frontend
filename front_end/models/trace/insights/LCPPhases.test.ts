@@ -3,18 +3,8 @@
 // found in the LICENSE file.
 
 import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
-import {getFirstOrError, getInsightOrError} from '../../../testing/InsightHelpers.js';
-import {TraceLoader} from '../../../testing/TraceLoader.js';
+import {getFirstOrError, getInsightOrError, processTrace} from '../../../testing/InsightHelpers.js';
 import * as Types from '../types/types.js';
-
-export async function processTrace(testContext: Mocha.Suite|Mocha.Context|null, traceFile: string) {
-  const {parsedTrace, insights} = await TraceLoader.traceEngine(testContext, traceFile);
-  if (!insights) {
-    throw new Error('No insights');
-  }
-
-  return {data: parsedTrace, insights};
-}
 
 describeWithEnvironment('LCPPhases', function() {
   it('calculates text lcp phases', async () => {
@@ -55,8 +45,8 @@ describeWithEnvironment('LCPPhases', function() {
       const firstNav = getFirstOrError(data.Meta.navigationsByNavigationId.values());
       const insight = getInsightOrError('LCPPhases', insights, firstNav);
 
-      assert.strictEqual(insight.lcpMs, undefined);
-      assert.strictEqual(insight.phases, undefined);
+      assert.isUndefined(insight.lcpMs);
+      assert.isUndefined(insight.phases);
       assert.strictEqual(insight.warnings?.[0], 'NO_LCP');
     });
 
@@ -66,7 +56,7 @@ describeWithEnvironment('LCPPhases', function() {
       const insight = getInsightOrError('LCPPhases', insights, firstNav);
 
       assert.strictEqual(insight.lcpMs, 204.909);
-      assert.strictEqual(insight.phases, undefined);
+      assert.isUndefined(insight.phases);
       assert.strictEqual(insight.warnings?.[0], 'NO_DOCUMENT_REQUEST');
     });
   });

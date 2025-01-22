@@ -29,7 +29,7 @@ describe('NetworkRequestsHandler', function() {
       assert.strictEqual(requestsByOrigin.size, 3, 'Too many origins detected');
 
       const topLevelRequests = requestsByOrigin.get('localhost:8080') || {all: []};
-      assert.strictEqual(topLevelRequests.all.length, 4, 'Incorrect number of requests');
+      assert.lengthOf(topLevelRequests.all, 4, 'Incorrect number of requests');
 
       // Page Request.
       const pageRequestExpected: DataArgsProcessedDataMap = new Map([
@@ -108,7 +108,7 @@ describe('NetworkRequestsHandler', function() {
 
       // Google Fonts CSS Request (cached).
       const fontCSSRequests = requestsByOrigin.get('fonts.googleapis.com') || {all: []};
-      assert.strictEqual(fontCSSRequests.all.length, 1, 'Incorrect number of requests');
+      assert.lengthOf(fontCSSRequests.all, 1, 'Incorrect number of requests');
 
       const fontCSSRequestExpected: DataArgsProcessedDataMap = new Map([
         ['queueing', Trace.Types.Timing.MicroSeconds(0)],
@@ -135,7 +135,7 @@ describe('NetworkRequestsHandler', function() {
 
       // Google Fonts Data Request (cached).
       const fontDataRequests = requestsByOrigin.get('fonts.gstatic.com') || {all: []};
-      assert.strictEqual(fontDataRequests.all.length, 1, 'Incorrect number of requests');
+      assert.lengthOf(fontDataRequests.all, 1, 'Incorrect number of requests');
 
       const fontDataRequestExpected: DataArgsProcessedDataMap = new Map([
         ['queueing', Trace.Types.Timing.MicroSeconds(0)],
@@ -173,7 +173,7 @@ describe('NetworkRequestsHandler', function() {
 
       const webSocketEvents = Trace.Handlers.ModelHandlers.NetworkRequests.data().webSocket;
 
-      assert.strictEqual(webSocketEvents[0].events.length, 9, 'Incorrect number of events');
+      assert.lengthOf(webSocketEvents[0].events, 9, 'Incorrect number of events');
     });
   });
 
@@ -222,9 +222,9 @@ describe('NetworkRequestsHandler', function() {
       await Trace.Handlers.ModelHandlers.NetworkRequests.finalize();
 
       const {byTime} = Trace.Handlers.ModelHandlers.NetworkRequests.data();
-      assert.strictEqual(byTime.length, 2, 'Incorrect number of requests');
-      assert.strictEqual(byTime[0].args.data.redirects.length, 0, 'Incorrect number of redirects (request 0)');
-      assert.deepStrictEqual(
+      assert.lengthOf(byTime, 2, 'Incorrect number of requests');
+      assert.lengthOf(byTime[0].args.data.redirects, 0, 'Incorrect number of redirects (request 0)');
+      assert.deepEqual(
           byTime[1].args.data.redirects,
           [
             {
@@ -255,9 +255,9 @@ describe('NetworkRequestsHandler', function() {
       await Trace.Handlers.ModelHandlers.NetworkRequests.finalize();
 
       const {byTime} = Trace.Handlers.ModelHandlers.NetworkRequests.data();
-      assert.strictEqual(byTime.length, 2, 'Incorrect number of requests');
-      assert.strictEqual(byTime[0].args.data.redirects.length, 0, 'Incorrect number of redirects (request 0)');
-      assert.deepStrictEqual(
+      assert.lengthOf(byTime, 2, 'Incorrect number of requests');
+      assert.lengthOf(byTime[0].args.data.redirects, 0, 'Incorrect number of redirects (request 0)');
+      assert.deepEqual(
           byTime[1].args.data.redirects,
           [
             {
@@ -340,6 +340,112 @@ describe('NetworkRequestsHandler', function() {
           'https://www.youtube.com/s/desktop/28bb7000/jsbin/desktop_polymer.vflset/desktop_polymer.js');
       assert.isUndefined(event.args.data.initiator?.url);
       assert.strictEqual(initiator.args.data.url, event.args.data.stackTrace?.[0].url);
+    });
+  });
+  describe('ThirdParty caches', () => {
+    it('Correctly captures entities by network event', async function() {
+      const traceEvents = await TraceLoader.rawEvents(this, 'lantern/paul/trace.json.gz');
+      for (const event of traceEvents) {
+        Trace.Handlers.ModelHandlers.Meta.handleEvent(event);
+        Trace.Handlers.ModelHandlers.NetworkRequests.handleEvent(event);
+      }
+      await Trace.Handlers.ModelHandlers.Meta.finalize();
+      await Trace.Handlers.ModelHandlers.NetworkRequests.finalize();
+
+      const {entityMappings} = Trace.Handlers.ModelHandlers.NetworkRequests.data();
+      const syntheticNetworkEventsByEntity = new Map(
+          Array.from(entityMappings.eventsByEntity.entries()).map(([entity, events]) => {
+            const syntheticNetworkEvents = events.filter(
+                event => Trace.Types.Events.isSyntheticNetworkRequest(event),
+            );
+            return [entity, syntheticNetworkEvents];
+          }),
+      );
+      const requestsByEntityResult = [...syntheticNetworkEventsByEntity.entries()].map(([entity, requests]) => {
+        return [entity.name, requests.map(r => r.args?.data?.url)];
+      });
+      assert.deepEqual(
+          requestsByEntityResult,
+          [
+            [
+              'paulirish.com',
+              [
+                'https://www.paulirish.com/',
+                'https://www.paulirish.com/assets/wikipedia-flamechart.jpg',
+                'https://www.paulirish.com/avatar150.jpg',
+                'https://www.paulirish.com/javascripts/modernizr-2.0.js',
+                'https://www.paulirish.com/javascripts/ender.js',
+                'https://www.paulirish.com/javascripts/octopress.js',
+                'https://www.paulirish.com/javascripts/firebase-performance-standalone.js',
+                'https://www.paulirish.com/images/noise.png?1418840251',
+                'https://www.paulirish.com/images/code_bg.png?1418840251',
+                'https://www.paulirish.com/favicon.ico',
+              ],
+            ],
+            [
+              'Google Tag Manager',
+              [
+                'https://www.googletagmanager.com/gtag/js?id=G-PGXNGYWP8E',
+              ],
+            ],
+            [
+              'Google Fonts',
+              [
+                'https://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold|PT+Sans:regular,italic,bold|Droid+Sans:400,700|Lato:700,900',
+                'https://fonts.gstatic.com/s/droidsans/v18/SlGVmQWMvZQIdix7AFxXkHNSbRYXags.woff2',
+                'https://fonts.gstatic.com/s/lato/v24/S6u9w4BMUTPHh6UVSwiPGQ3q5d0.woff2',
+                'https://fonts.gstatic.com/s/ptsans/v17/jizaRExUiTo99u79D0KExcOPIDU.woff2',
+                'https://fonts.gstatic.com/s/ptsans/v17/jizfRExUiTo99u79B_mh0O6tLR8a8zI.woff2',
+                'https://fonts.gstatic.com/s/droidsans/v18/SlGWmQWMvZQIdix7AFxXmMh3eDs1ZyHKpWg.woff2',
+                'https://fonts.gstatic.com/s/ptserif/v18/EJRVQgYoZZY2vCFuvAFWzr-_dSb_.woff2',
+              ],
+            ],
+            [
+              'Google Analytics',
+              [
+                'https://www.google-analytics.com/analytics.js',
+                'https://www.google-analytics.com/g/collect?v=2&tid=G-PGXNGYWP8E&gtm=45je4580v880158425za200&_p=1715625261583&gcd=13l3l3l3l1&npa=0&dma=0&cid=414801335.1715625262&ul=en-us&sr=412x823&uaa=&uab=64&uafvl=Not%252FA)Brand%3B8.0.0.0%7CChromium%3B126.0.6475.0%7CGoogle%2520Chrome%3B126.0.6475.0&uamb=1&uam=moto%20g%20power%20(2022)&uap=Android&uapv=11.0&uaw=0&are=1&frm=0&pscdl=noapi&_s=1&sid=1715625261&sct=1&seg=0&dl=https%3A%2F%2Fwww.paulirish.com%2F&dt=Paul%20Irish&en=page_view&_fv=1&_nsi=1&_ss=1&_ee=1&tfd=353',
+                'https://www.google-analytics.com/j/collect?v=1&_v=j101&a=272264939&t=pageview&_s=1&dl=https%3A%2F%2Fwww.paulirish.com%2F&ul=en-us&de=UTF-8&dt=Paul%20Irish&sd=30-bit&sr=412x823&vp=412x823&je=0&_u=IADAAEABAAAAACAAI~&jid=1388679807&gjid=654531532&cid=414801335.1715625262&tid=UA-692547-2&_gid=1964734610.1715625262&_r=1&_slc=1&z=1746264594',
+              ],
+            ],
+            [
+              'Disqus',
+              [
+                'https://paulirish.disqus.com/count.js',
+              ],
+            ],
+            [
+              'Firebase',
+              [
+                'https://firebaseinstallations.googleapis.com/v1/projects/paulirishcom/installations',
+                'https://firebaseremoteconfig.googleapis.com/v1/projects/paulirishcom/namespaces/fireperf:fetch?key=AIzaSyCGxLbbFQxH4BV1fY0RODlxTos9nJa2l_g',
+              ],
+            ],
+          ],
+      );
+    });
+    it('Correctly captures entities', async function() {
+      const traceEvents = await TraceLoader.rawEvents(this, 'lantern/paul/trace.json.gz');
+      for (const event of traceEvents) {
+        Trace.Handlers.ModelHandlers.Meta.handleEvent(event);
+        Trace.Handlers.ModelHandlers.NetworkRequests.handleEvent(event);
+      }
+      await Trace.Handlers.ModelHandlers.Meta.finalize();
+      await Trace.Handlers.ModelHandlers.NetworkRequests.finalize();
+
+      const {entityMappings} = Trace.Handlers.ModelHandlers.NetworkRequests.data();
+      const expectedEntities = [
+        'paulirish.com',
+        'Google Tag Manager',
+        'Google Fonts',
+        'Google Analytics',
+        'Disqus',
+        'Firebase',
+      ];
+      const gotEntities = Array.from(entityMappings.entityByEvent.values()).map(enity => enity.name);
+      expectedEntities.forEach(entity => {
+        assert.isTrue(gotEntities.includes(entity));
+      });
     });
   });
 });

@@ -161,7 +161,6 @@ export namespace ProtocolMapping {
     'DOMStorage.domStorageItemRemoved': [Protocol.DOMStorage.DomStorageItemRemovedEvent];
     'DOMStorage.domStorageItemUpdated': [Protocol.DOMStorage.DomStorageItemUpdatedEvent];
     'DOMStorage.domStorageItemsCleared': [Protocol.DOMStorage.DomStorageItemsClearedEvent];
-    'Database.addDatabase': [Protocol.Database.AddDatabaseEvent];
     /**
      * Notification sent after the virtual time budget for the current VirtualTimePolicy has run out.
      */
@@ -1239,6 +1238,13 @@ export namespace ProtocolMapping {
       paramsType: [Protocol.CSS.ForcePseudoStateRequest];
       returnType: void;
     };
+    /**
+     * Ensures that the given node is in its starting-style state.
+     */
+    'CSS.forceStartingStyle': {
+      paramsType: [Protocol.CSS.ForceStartingStyleRequest];
+      returnType: void;
+    };
     'CSS.getBackgroundColors': {
       paramsType: [Protocol.CSS.GetBackgroundColorsRequest];
       returnType: Protocol.CSS.GetBackgroundColorsResponse;
@@ -1251,12 +1257,34 @@ export namespace ProtocolMapping {
       returnType: Protocol.CSS.GetComputedStyleForNodeResponse;
     };
     /**
+     * Resolve the specified values in the context of the provided element.
+     * For example, a value of '1em' is evaluated according to the computed
+     * 'font-size' of the element and a value 'calc(1px + 2px)' will be
+     * resolved to '3px'.
+     */
+    'CSS.resolveValues': {
+      paramsType: [Protocol.CSS.ResolveValuesRequest];
+      returnType: Protocol.CSS.ResolveValuesResponse;
+    };
+    'CSS.getLonghandProperties': {
+      paramsType: [Protocol.CSS.GetLonghandPropertiesRequest];
+      returnType: Protocol.CSS.GetLonghandPropertiesResponse;
+    };
+    /**
      * Returns the styles defined inline (explicitly in the "style" attribute and implicitly, using DOM
      * attributes) for a DOM node identified by `nodeId`.
      */
     'CSS.getInlineStylesForNode': {
       paramsType: [Protocol.CSS.GetInlineStylesForNodeRequest];
       returnType: Protocol.CSS.GetInlineStylesForNodeResponse;
+    };
+    /**
+     * Returns the styles coming from animations & transitions
+     * including the animation & transition styles coming from inheritance chain.
+     */
+    'CSS.getAnimatedStylesForNode': {
+      paramsType: [Protocol.CSS.GetAnimatedStylesForNodeRequest];
+      returnType: Protocol.CSS.GetAnimatedStylesForNodeResponse;
     };
     /**
      * Returns requested styles for a DOM node identified by `nodeId`.
@@ -2064,28 +2092,6 @@ export namespace ProtocolMapping {
     'DOMStorage.setDOMStorageItem': {
       paramsType: [Protocol.DOMStorage.SetDOMStorageItemRequest];
       returnType: void;
-    };
-    /**
-     * Disables database tracking, prevents database events from being sent to the client.
-     */
-    'Database.disable': {
-      paramsType: [];
-      returnType: void;
-    };
-    /**
-     * Enables database tracking, database events will now be delivered to the client.
-     */
-    'Database.enable': {
-      paramsType: [];
-      returnType: void;
-    };
-    'Database.executeSQL': {
-      paramsType: [Protocol.Database.ExecuteSQLRequest];
-      returnType: Protocol.Database.ExecuteSQLResponse;
-    };
-    'Database.getDatabaseTableNames': {
-      paramsType: [Protocol.Database.GetDatabaseTableNamesRequest];
-      returnType: Protocol.Database.GetDatabaseTableNamesResponse;
     };
     /**
      * Clears the overridden Device Orientation.
@@ -3007,6 +3013,14 @@ export namespace ProtocolMapping {
     'Network.loadNetworkResource': {
       paramsType: [Protocol.Network.LoadNetworkResourceRequest];
       returnType: Protocol.Network.LoadNetworkResourceResponse;
+    };
+    /**
+     * Sets Controls for third-party cookie access
+     * Page reload is required before the new cookie bahavior will be observed
+     */
+    'Network.setCookieControls': {
+      paramsType: [Protocol.Network.SetCookieControlsRequest];
+      returnType: void;
     };
     /**
      * Disables domain notifications.
@@ -4021,6 +4035,15 @@ export namespace ProtocolMapping {
     'Storage.getRelatedWebsiteSets': {
       paramsType: [];
       returnType: Protocol.Storage.GetRelatedWebsiteSetsResponse;
+    };
+    /**
+     * Returns the list of URLs from a page and its embedded resources that match
+     * existing grace period URL pattern rules.
+     * https://developers.google.com/privacy-sandbox/cookies/temporary-exceptions/grace-period
+     */
+    'Storage.getAffectedUrlsForThirdPartyCookieMetadata': {
+      paramsType: [Protocol.Storage.GetAffectedUrlsForThirdPartyCookieMetadataRequest];
+      returnType: Protocol.Storage.GetAffectedUrlsForThirdPartyCookieMetadataResponse;
     };
     /**
      * Returns information about the system.

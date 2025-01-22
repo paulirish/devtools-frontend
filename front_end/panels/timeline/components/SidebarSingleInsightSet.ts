@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import * as i18n from '../../../core/i18n/i18n.js';
+import * as Platform from '../../../core/platform/platform.js';
 import * as Root from '../../../core/root/root.js';
 import * as Trace from '../../../models/trace/trace.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
@@ -12,9 +13,9 @@ import {shouldRenderForCategory} from './insights/Helpers.js';
 import * as Insights from './insights/insights.js';
 import type {ActiveInsight} from './Sidebar.js';
 import styles from './sidebarSingleInsightSet.css.js';
-import {NumberWithUnit, type NumberWithUnitString} from './Utils.js';
+import {NumberWithUnit} from './Utils.js';
 
-const {html} = LitHtml;
+const {html} = LitHtml.StaticHtml;
 
 const UIStrings = {
   /**
@@ -24,16 +25,27 @@ const UIStrings = {
    *@example {poor} PH3
    */
   metricScore: '{PH1}: {PH2} {PH3} score',
+  /**
+   *@description title used for a metric value to tell the user that the data is unavailable
+   *@example {INP} PH1
+   */
+  metricScoreUnavailable: '{PH1}: unavailable',
+  /**
+   * @description Summary text for an expandable dropdown that contains all insights in a passing state.
+   * @example {4} PH1
+   */
+  passedInsights: 'Passed insights ({PH1})',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/SidebarSingleInsightSet.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export interface SidebarSingleInsightSetData {
-  parsedTrace: Trace.Handlers.Types.ParsedTrace|null;
   insights: Trace.Insights.Types.TraceInsightSets|null;
   insightSetKey: Trace.Types.Events.NavigationId|null;
   activeCategory: Trace.Insights.Types.InsightCategory;
   activeInsight: ActiveInsight|null;
+  parsedTrace: Trace.Handlers.Types.ParsedTrace|null;
+  traceMetadata: Trace.Types.File.MetaData|null;
 }
 
 /**
@@ -45,23 +57,27 @@ const EXPERIMENTAL_INSIGHTS: ReadonlySet<string> = new Set([
   'FontDisplay',
 ]);
 
+type InsightNameToComponentMapping =
+    Record<string, typeof Insights.BaseInsightComponent.BaseInsightComponent<Trace.Insights.Types.InsightModel<{}>>>;
+
 /**
- * Every insight (INCLUDING experimental ones)
- * The order of these properties is the order the insights will be shown in the sidebar.
- * TODO(crbug.com/368135130): sort this in a smart way!
+ * Every insight (INCLUDING experimental ones).
+ *
+ * Order does not matter (but keep alphabetized).
  */
-const INSIGHT_NAME_TO_COMPONENT = {
-  InteractionToNextPaint: Insights.InteractionToNextPaint.InteractionToNextPaint,
-  LCPPhases: Insights.LCPPhases.LCPPhases,
-  LCPDiscovery: Insights.LCPDiscovery.LCPDiscovery,
+const INSIGHT_NAME_TO_COMPONENT: InsightNameToComponentMapping = {
   CLSCulprits: Insights.CLSCulprits.CLSCulprits,
-  RenderBlocking: Insights.RenderBlocking.RenderBlocking,
-  ImageDelivery: Insights.ImageDelivery.ImageDelivery,
+  DOMSize: Insights.DOMSize.DOMSize,
   DocumentLatency: Insights.DocumentLatency.DocumentLatency,
   FontDisplay: Insights.FontDisplay.FontDisplay,
-  Viewport: Insights.Viewport.Viewport,
-  ThirdParties: Insights.ThirdParties.ThirdParties,
+  ImageDelivery: Insights.ImageDelivery.ImageDelivery,
+  InteractionToNextPaint: Insights.InteractionToNextPaint.InteractionToNextPaint,
+  LCPDiscovery: Insights.LCPDiscovery.LCPDiscovery,
+  LCPPhases: Insights.LCPPhases.LCPPhases,
+  RenderBlocking: Insights.RenderBlocking.RenderBlocking,
   SlowCSSSelector: Insights.SlowCSSSelector.SlowCSSSelector,
+  ThirdParties: Insights.ThirdParties.ThirdParties,
+  Viewport: Insights.Viewport.Viewport,
 };
 
 export class SidebarSingleInsightSet extends HTMLElement {
@@ -69,11 +85,12 @@ export class SidebarSingleInsightSet extends HTMLElement {
   #renderBound = this.#render.bind(this);
 
   #data: SidebarSingleInsightSetData = {
-    parsedTrace: null,
     insights: null,
     insightSetKey: null,
     activeCategory: Trace.Insights.Types.InsightCategory.ALL,
     activeInsight: null,
+    parsedTrace: null,
+    traceMetadata: null,
   };
 
   set data(data: SidebarSingleInsightSetData) {
@@ -96,12 +113,34 @@ export class SidebarSingleInsightSet extends HTMLElement {
     this.dispatchEvent(new Insights.EventRef.EventReferenceClick(traceEvent));
   }
 
-  #renderMetricValue(
-      label: 'LCP'|'CLS'|'INP', value: string|NumberWithUnitString,
-      classification: Trace.Handlers.ModelHandlers.PageLoadMetrics.ScoreClassification,
-      eventToSelectOnClick: Trace.Types.Events.Event|null): LitHtml.LitTemplate {
-    const valueText = typeof value === 'string' ? value : value.text;
-    const valueDisplay = typeof value === 'string' ? value : value.element;
+  #renderMetricValue(metric: 'LCP'|'CLS'|'INP', value: number|null, relevantEvent: Trace.Types.Events.Event|null):
+      LitHtml.LitTemplate {
+    let valueText: string;
+    let valueDisplay: HTMLElement|string;
+    let classification;
+    if (value === null) {
+      valueText = valueDisplay = '-';
+      classification = Trace.Handlers.ModelHandlers.PageLoadMetrics.ScoreClassification.UNCLASSIFIED;
+    } else if (metric === 'LCP') {
+      const micros = value as Trace.Types.Timing.MicroSeconds;
+      const {text, element} = NumberWithUnit.formatMicroSecondsAsSeconds(micros);
+      valueText = text;
+      valueDisplay = element;
+      classification =
+          Trace.Handlers.ModelHandlers.PageLoadMetrics.scoreClassificationForLargestContentfulPaint(micros);
+    } else if (metric === 'CLS') {
+      valueText = valueDisplay = value ? value.toFixed(2) : '0';
+      classification = Trace.Handlers.ModelHandlers.LayoutShifts.scoreClassificationForLayoutShift(value);
+    } else if (metric === 'INP') {
+      const micros = value as Trace.Types.Timing.MicroSeconds;
+      const {text, element} = NumberWithUnit.formatMicroSecondsAsMillisFixed(micros);
+      valueText = text;
+      valueDisplay = element;
+      classification =
+          Trace.Handlers.ModelHandlers.UserInteractions.scoreClassificationForInteractionToNextPaint(micros);
+    } else {
+      Platform.TypeScriptUtilities.assertNever(metric, `Unexpected metric ${metric}`);
+    }
 
     // NOTE: it is deliberate to use the same value for the title and
     // aria-label; the aria-label is used to give more context to
@@ -109,114 +148,118 @@ export class SidebarSingleInsightSet extends HTMLElement {
     // the red/orange/green classification is, or those who are unable to
     // easily distinguish the visual colour differences.
     // clang-format off
-    const title = i18nString(UIStrings.metricScore, {PH1: label, PH2: valueText, PH3: classification});
+    const title = value !== null ?
+      i18nString(UIStrings.metricScore, {PH1: metric, PH2: valueText, PH3: classification}) :
+      i18nString(UIStrings.metricScoreUnavailable, {PH1: metric});
 
-    return this.#metricIsVisible(label) ? html`
+    return this.#metricIsVisible(metric) ? html`
       <button class="metric"
-        @click=${eventToSelectOnClick ? this.#onClickMetric.bind(this, eventToSelectOnClick) : null}
+        @click=${relevantEvent ? this.#onClickMetric.bind(this, relevantEvent) : null}
         title=${title}
         aria-label=${title}
       >
         <div class="metric-value metric-value-${classification}">${valueDisplay}</div>
-        <div class="metric-label">${label}</div>
       </button>
     ` : LitHtml.nothing;
     // clang-format on
   }
 
-  #getINP(insightSetKey: string):
-      {value: Trace.Types.Timing.MicroSeconds, event: Trace.Types.Events.SyntheticInteractionPair}|null {
-    const insight = Trace.Insights.Common.getInsight('InteractionToNextPaint', this.#data.insights, insightSetKey);
-    if (!insight?.longestInteractionEvent?.dur) {
-      return null;
-    }
+  #renderMetrics(insightSetKey: string): LitHtml.TemplateResult {
+    const lcp = Trace.Insights.Common.getLCP(this.#data.insights, insightSetKey);
+    const cls = Trace.Insights.Common.getCLS(this.#data.insights, insightSetKey);
+    const inp = Trace.Insights.Common.getINP(this.#data.insights, insightSetKey);
 
-    const value = insight.longestInteractionEvent.dur;
-    return {value, event: insight.longestInteractionEvent};
-  }
+    const lcpEl = this.#renderMetricValue('LCP', lcp?.value ?? null, lcp?.event ?? null);
+    const inpEl = this.#renderMetricValue('INP', inp?.value ?? null, inp?.event ?? null);
+    const clsEl = this.#renderMetricValue('CLS', cls.value ?? null, cls?.worstShiftEvent ?? null);
 
-  #getLCP(insightSetKey: string):
-      {value: Trace.Types.Timing.MicroSeconds, event: Trace.Types.Events.LargestContentfulPaintCandidate}|null {
-    const insight = Trace.Insights.Common.getInsight('LCPPhases', this.#data.insights, insightSetKey);
-    if (!insight || !insight.lcpMs || !insight.lcpEvent) {
-      return null;
-    }
+    const localMetricsTemplateResult = html`
+      <div class="metrics-row">
+        <span>${lcpEl}</span>
+        <span>${inpEl}</span>
+        <span>${clsEl}</span>
+        <span class="row-label">Local</span>
+      </div>
+      <span class="row-border"></span>
+    `;
 
-    const value = Trace.Helpers.Timing.millisecondsToMicroseconds(insight.lcpMs);
-    return {value, event: insight.lcpEvent};
-  }
+    const insightSet = this.#data.insights?.get(insightSetKey);
+    const fieldMetricsResults =
+        insightSet && Trace.Insights.Common.getFieldMetricsForInsightSet(insightSet, this.#data.traceMetadata);
+    let fieldMetricsTemplateResult;
+    if (fieldMetricsResults) {
+      let {lcp, inp, cls} = fieldMetricsResults;
 
-  #getCLS(insightSetKey: string): {value: number, worstShiftEvent: Trace.Types.Events.Event|null} {
-    const insight = Trace.Insights.Common.getInsight('CLSCulprits', this.#data.insights, insightSetKey);
-    if (!insight) {
-      // Unlike the other metrics, there is still a value for this metric even with no data.
-      // This means this view will always display a CLS score.
-      return {value: 0, worstShiftEvent: null};
-    }
+      // This UI shows field data from the Origin or URL datasets, but never a mix.
+      if (lcp?.pageScope === 'url' || inp?.pageScope === 'url' || cls?.pageScope === 'url') {
+        if (lcp?.pageScope === 'origin') {
+          lcp = null;
+        }
+        if (inp?.pageScope === 'origin') {
+          inp = null;
+        }
+        if (cls?.pageScope === 'origin') {
+          cls = null;
+        }
+      }
 
-    // TODO(cjamcl): the CLS insight should be doing this for us.
-    let maxScore = 0;
-    let worstCluster;
-    for (const cluster of insight.clusters) {
-      if (cluster.clusterCumulativeScore > maxScore) {
-        maxScore = cluster.clusterCumulativeScore;
-        worstCluster = cluster;
+      if (lcp || inp || cls) {
+        const lcpEl = this.#renderMetricValue('LCP', lcp?.value ?? null, null);
+        const inpEl = this.#renderMetricValue('INP', inp?.value ?? null, null);
+        const clsEl = this.#renderMetricValue('CLS', cls?.value ?? null, null);
+
+        fieldMetricsTemplateResult = html`
+          <div class="metrics-row">
+            <span>${lcpEl}</span>
+            <span>${inpEl}</span>
+            <span>${clsEl}</span>
+            <span class="row-label">Field (Origin)</span>
+          </div>
+          <span class="row-border"></span>
+        `;
       }
     }
 
-    return {value: maxScore, worstShiftEvent: worstCluster?.worstShiftEvent ?? null};
-  }
-
-  #renderMetrics(insightSetKey: string): LitHtml.TemplateResult {
-    const lcp = this.#getLCP(insightSetKey);
-    const cls = this.#getCLS(insightSetKey);
-    const inp = this.#getINP(insightSetKey);
-
-    return html`
-    <div class="metrics-row">
-    ${
-        lcp ? this.#renderMetricValue(
-                  'LCP', NumberWithUnit.formatMicroSecondsAsSeconds(lcp.value),
-                  Trace.Handlers.ModelHandlers.PageLoadMetrics.scoreClassificationForLargestContentfulPaint(lcp.value),
-                  lcp.event ?? null) :
-              LitHtml.nothing}
-    ${
-        inp ? this.#renderMetricValue(
-                  'INP', NumberWithUnit.formatMicroSecondsAsMillisFixed(inp.value),
-                  Trace.Handlers.ModelHandlers.UserInteractions.scoreClassificationForInteractionToNextPaint(inp.value),
-                  inp.event) :
-              LitHtml.nothing}
-    ${
-        this.#renderMetricValue(
-            'CLS', cls.value ? cls.value.toFixed(2) : '0',
-            Trace.Handlers.ModelHandlers.LayoutShifts.scoreClassificationForLayoutShift(cls.value),
-            cls.worstShiftEvent)}
-    </div>
-    `;
+    const classes = {metrics: true, 'metrics--field': Boolean(fieldMetricsTemplateResult)};
+    return html`<div class=${LitHtml.Directives.classMap(classes)}>
+      <div class="metrics-row">
+        <span class="metric-label">LCP</span>
+        <span class="metric-label">INP</span>
+        <span class="metric-label">CLS</span>
+        <span class="row-label"></span>
+      </div>
+      ${localMetricsTemplateResult}
+      ${fieldMetricsTemplateResult}
+    </div>`;
   }
 
   #renderInsights(
       insightSets: Trace.Insights.Types.TraceInsightSets|null,
-      parsedTrace: Trace.Handlers.Types.ParsedTrace|null,
       insightSetKey: string,
       ): LitHtml.LitTemplate {
     const includeExperimental = Root.Runtime.experiments.isEnabled(
         Root.Runtime.ExperimentName.TIMELINE_EXPERIMENTAL_INSIGHTS,
     );
 
-    const models = insightSets?.get(insightSetKey)?.model;
-    if (!models) {
+    const insightSet = insightSets?.get(insightSetKey);
+    if (!insightSet) {
       return LitHtml.nothing;
     }
 
-    const components: LitHtml.TemplateResult[] = [];
-    for (const [name, componentClass] of Object.entries(INSIGHT_NAME_TO_COMPONENT)) {
+    const models = insightSet.model;
+    const shownInsights: LitHtml.TemplateResult[] = [];
+    const passedInsights: LitHtml.TemplateResult[] = [];
+    for (const [name, model] of Object.entries(models)) {
+      const componentClass = INSIGHT_NAME_TO_COMPONENT[name as keyof Trace.Insights.Types.InsightModels];
+      if (!componentClass) {
+        continue;
+      }
+
       if (!includeExperimental && EXPERIMENTAL_INSIGHTS.has(name)) {
         continue;
       }
 
-      const model = models[name as keyof typeof models];
-      if (!model || !model.shouldShow ||
+      if (!model ||
           !shouldRenderForCategory({activeCategory: this.#data.activeCategory, insightCategory: model.category})) {
         continue;
       }
@@ -226,25 +269,41 @@ export class SidebarSingleInsightSet extends HTMLElement {
         <${componentClass.litTagName}
           .selected=${this.#data.activeInsight?.model === model}
           .model=${model}
-          .parsedTrace=${parsedTrace}
+          .bounds=${insightSet.bounds}
           .insightSetKey=${insightSetKey}
+          .parsedTrace=${this.#data.parsedTrace}>
         </${componentClass.litTagName}>
       </div>`;
       // clang-format on
 
-      components.push(component);
+      if (model.shouldShow) {
+        shownInsights.push(component);
+      } else {
+        passedInsights.push(component);
+      }
     }
 
-    return html`${components}`;
+    // clang-format off
+    return html`
+      ${shownInsights}
+      ${passedInsights.length ? html`
+        <details class="passed-insights-section">
+          <summary>${i18nString(UIStrings.passedInsights, {
+            PH1: passedInsights.length,
+          })}</summary>
+          ${passedInsights}
+        </details>
+      ` : LitHtml.nothing}
+    `;
+    // clang-format on
   }
 
   #render(): void {
     const {
-      parsedTrace,
       insights,
       insightSetKey,
     } = this.#data;
-    if (!parsedTrace || !insights || !insightSetKey) {
+    if (!insights || !insightSetKey) {
       LitHtml.render(html``, this.#shadow, {host: this});
       return;
     }
@@ -253,7 +312,7 @@ export class SidebarSingleInsightSet extends HTMLElement {
     LitHtml.render(html`
       <div class="navigation">
         ${this.#renderMetrics(insightSetKey)}
-        ${this.#renderInsights(insights, parsedTrace, insightSetKey)}
+        ${this.#renderInsights(insights, insightSetKey)}
         </div>
       `, this.#shadow, {host: this});
     // clang-format on

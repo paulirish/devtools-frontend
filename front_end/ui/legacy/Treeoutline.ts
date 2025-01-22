@@ -64,13 +64,13 @@ export enum Events {
   /* eslint-enable @typescript-eslint/naming-convention */
 }
 
-export type EventTypes = {
-  [Events.ElementAttached]: TreeElement,
-  [Events.ElementsDetached]: void,
-  [Events.ElementExpanded]: TreeElement,
-  [Events.ElementCollapsed]: TreeElement,
-  [Events.ElementSelected]: TreeElement,
-};
+export interface EventTypes {
+  [Events.ElementAttached]: TreeElement;
+  [Events.ElementsDetached]: void;
+  [Events.ElementExpanded]: TreeElement;
+  [Events.ElementCollapsed]: TreeElement;
+  [Events.ElementSelected]: TreeElement;
+}
 
 export class TreeOutline extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
   readonly rootElementInternal: TreeElement;
@@ -406,8 +406,7 @@ export class TreeOutlineInShadow extends TreeOutline {
     super();
     this.contentElement.classList.add('tree-outline');
     this.element = document.createElement('div');
-    this.shadowRoot =
-        createShadowRootWithCoreStyles(this.element, {cssFile: treeoutlineStyles, delegatesFocus: undefined});
+    this.shadowRoot = createShadowRootWithCoreStyles(this.element, {cssFile: treeoutlineStyles});
     this.disclosureElement = this.shadowRoot.createChild('div', 'tree-outline-disclosure');
     this.disclosureElement.appendChild(this.contentElement);
     this.renderSelection = true;

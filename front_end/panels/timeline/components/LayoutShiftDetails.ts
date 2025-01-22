@@ -8,8 +8,8 @@ import * as SDK from '../../../core/sdk/sdk.js';
 import type * as Protocol from '../../../generated/protocol.js';
 import * as Helpers from '../../../models/trace/helpers/helpers.js';
 import * as Trace from '../../../models/trace/trace.js';
+import * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as LegacyComponents from '../../../ui/legacy/components/utils/utils.js';
-import * as UI from '../../../ui/legacy/legacy.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as Utils from '../utils/utils.js';
 
@@ -89,9 +89,11 @@ export class LayoutShiftDetails extends HTMLElement {
   #isFreshRecording: Boolean = false;
 
   connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [layoutShiftDetailsStyles];
-    // Styles for linkifier button.
-    UI.UIUtils.injectTextButtonStyles(this.#shadow);
+    this.#shadow.adoptedStyleSheets = [
+      layoutShiftDetailsStyles,
+      // Styles for linkifier button.
+      Buttons.textButtonStyles,
+    ];
     this.#render();
   }
 
@@ -120,13 +122,20 @@ export class LayoutShiftDetails extends HTMLElement {
     `;
   }
 
-  #renderShiftedElements(elementsShifted: Trace.Types.Events.TraceImpactedNode[]|undefined): LitHtml.LitTemplate {
+  #renderShiftedElements(
+      shift: Trace.Types.Events.SyntheticLayoutShift,
+      elementsShifted: Trace.Types.Events.TraceImpactedNode[]|undefined): LitHtml.LitTemplate {
     // clang-format off
     return html`
       ${elementsShifted?.map(el => {
         if (el.node_id !== undefined) {
           return html`
-            <devtools-performance-node-link .data=${{backendNodeId: el.node_id}}>
+            <devtools-performance-node-link
+              .data=${{
+                backendNodeId: el.node_id,
+                frame: shift.args.frame,
+                // TODO(crbug.com/371620361): if ever rendered for non-fresh traces, this needs to set a fallback text value.
+              } as Insights.NodeLink.NodeLinkData}>
             </devtools-performance-node-link>`;
         }
           return LitHtml.nothing;
@@ -188,12 +197,15 @@ export class LayoutShiftDetails extends HTMLElement {
     // clang-format on
   }
 
-  #renderUnsizedImage(node: Protocol.DOM.BackendNodeId): LitHtml.TemplateResult|null {
+  #renderUnsizedImage(frame: string, backendNodeId: Protocol.DOM.BackendNodeId): LitHtml.TemplateResult|null {
     // clang-format off
     const el = html`
       <devtools-performance-node-link
         .data=${{
-          backendNodeId: node,
+          backendNodeId,
+          frame,
+          // TODO(crbug.com/371620361): if ever rendered for non-fresh traces, this needs to set a fallback text value. This requires
+          // `rootCauses.unsizedImages` to have more than just the backend node id.
         } as Insights.NodeLink.NodeLinkData}>
       </devtools-performance-node-link>`;
     return html`
@@ -201,13 +213,14 @@ export class LayoutShiftDetails extends HTMLElement {
     // clang-format on
   }
 
-  #renderRootCauseValues(rootCauses: Trace.Insights.Models.CLSCulprits.LayoutShiftRootCausesData|
-                         undefined): LitHtml.TemplateResult|null {
+  #renderRootCauseValues(
+      frame: string,
+      rootCauses: Trace.Insights.Models.CLSCulprits.LayoutShiftRootCausesData|undefined): LitHtml.TemplateResult|null {
     return html`
       ${rootCauses?.fontRequests.map(fontReq => this.#renderFontRequest(fontReq))}
       ${rootCauses?.iframeIds.map(iframe => this.#renderIframe(iframe))}
       ${rootCauses?.nonCompositedAnimations.map(failure => this.#renderAnimation(failure))}
-      ${rootCauses?.unsizedImages.map(image => this.#renderUnsizedImage(image))}
+      ${rootCauses?.unsizedImages.map(backendNodeId => this.#renderUnsizedImage(frame, backendNodeId))}
     `;
   }
 
@@ -215,7 +228,7 @@ export class LayoutShiftDetails extends HTMLElement {
       LitHtml.TemplateResult|null {
     const ts = Trace.Types.Timing.MicroSeconds(shift.ts - parsedTrace.Meta.traceBounds.min);
     if (shift === this.#event) {
-      return html`${i18n.TimeUtilities.preciseMillisToString(Helpers.Timing.microSecondsToMilliseconds(ts))}`;
+      return html`${i18n.TimeUtilities.preciseMillisToString(Helpers.Timing.microToMilli(ts))}`;
     }
     const shiftTs = i18n.TimeUtilities.formatMicroSecondsTime(ts);
     // clang-format off
@@ -237,6 +250,8 @@ export class LayoutShiftDetails extends HTMLElement {
         (rootCauses.fontRequests.length || rootCauses.iframeIds.length || rootCauses.nonCompositedAnimations.length ||
          rootCauses.unsizedImages.length));
 
+    // TODO(crbug.com/371620361): Needs to show something for non-fresh recordings.
+
     // clang-format off
     return html`
       <tr class="shift-row" data-ts=${shift.ts}>
@@ -245,12 +260,12 @@ export class LayoutShiftDetails extends HTMLElement {
         ${this.#isFreshRecording ? html`
           <td>
             <div class="elements-shifted">
-              ${this.#renderShiftedElements(elementsShifted)}
+              ${this.#renderShiftedElements(shift, elementsShifted)}
             </div>
           </td>` : LitHtml.nothing}
         ${hasCulprits && this.#isFreshRecording ? html`
           <td class="culprits">
-            ${this.#renderRootCauseValues(rootCauses)}
+            ${this.#renderRootCauseValues(shift.args.frame, rootCauses)}
           </td>` : LitHtml.nothing}
       </tr>`;
     // clang-format on

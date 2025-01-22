@@ -135,7 +135,7 @@ export class EventsTimelineTreeView extends TimelineTreeView {
     if (!traceEvent) {
       return false;
     }
-    void TimelineUIUtils.buildTraceEventDetails(parsedTrace, traceEvent, this.linkifier, false)
+    void TimelineUIUtils.buildTraceEventDetails(parsedTrace, traceEvent, this.linkifier, false, null)
         .then(fragment => this.detailsView.element.appendChild(fragment));
     return true;
   }
@@ -212,6 +212,6 @@ const enum Events {
   FILTER_CHANGED = 'FilterChanged',
 }
 
-type EventTypes = {
-  [Events.FILTER_CHANGED]: void,
-};
+interface EventTypes {
+  [Events.FILTER_CHANGED]: void;
+}

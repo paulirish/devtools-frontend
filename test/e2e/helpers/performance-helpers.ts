@@ -43,6 +43,13 @@ const CSS_SELECTOR_STATS_TITLE = 'Enable CSS selector stats (slow)';
 const TIMELINE_SETTINGS_PANE = '.timeline-settings-pane';
 
 export async function navigateToPerformanceTab(testName?: string) {
+  const {frontend} = getBrowserAndPages();
+  await frontend.evaluate(() => {
+    // Prevent the Performance panel shortcuts dialog, that is automatically shown the first
+    // time the performance panel is opened, from opening in tests.
+    localStorage.setItem('hide-shortcuts-dialog-for-test', 'true');
+  });
+
   if (testName) {
     await goToResource(`performance/${testName}.html`);
   }
@@ -352,7 +359,7 @@ export async function disableCSSSelectorStats() {
       [veChange('Panel: timeline > Pane: timeline-settings-pane > Toggle: timeline-capture-selector-stats')]);
 }
 
-export function veImpressionForPerformancePanel(options?: {timelineLegacyLandingPage?: boolean}) {
+export function veImpressionForPerformancePanel() {
   return veImpression('Panel', 'timeline', [
     veImpression(
         'Toolbar', undefined,
@@ -369,14 +376,11 @@ export function veImpressionForPerformancePanel(options?: {timelineLegacyLanding
         ]),
     veImpression('Action', 'timeline.toggle-recording'),
     veImpression('Action', 'timeline.record-reload'),
-    ...(options?.timelineLegacyLandingPage ?
-            [veImpression('Link', 'learn-more')] :
-            [veImpression('DropDown', 'cpu-throttling'), veImpression('DropDown', 'network-conditions')]),
+    veImpression('DropDown', 'cpu-throttling'),
+    veImpression('DropDown', 'network-conditions'),
   ]);
 }
 
 function veImpressionForStatusDialog() {
-  return veImpression(
-      'Dialog', 'timeline-status',
-      [veImpression('Action', 'timeline.download-after-error'), veImpression('Action', 'timeline.stop-recording')]);
+  return veImpression('Dialog', 'timeline-status');
 }

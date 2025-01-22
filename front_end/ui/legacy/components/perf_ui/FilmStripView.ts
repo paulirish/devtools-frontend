@@ -57,7 +57,7 @@ export class FilmStripView extends Common.ObjectWrapper.eventMixin<EventTypes, t
 
   setModel(filmStrip: Trace.Extras.FilmStrip.Data): void {
     this.#filmStrip = filmStrip;
-    this.zeroTime = Trace.Helpers.Timing.microSecondsToMilliseconds(filmStrip.zeroTime);
+    this.zeroTime = Trace.Helpers.Timing.microToMilli(filmStrip.zeroTime);
 
     if (!this.#filmStrip.frames.length) {
       this.reset();
@@ -67,7 +67,7 @@ export class FilmStripView extends Common.ObjectWrapper.eventMixin<EventTypes, t
   }
 
   createFrameElement(frame: Trace.Extras.FilmStrip.Frame): HTMLButtonElement {
-    const time = Trace.Helpers.Timing.microSecondsToMilliseconds(frame.screenshotEvent.ts);
+    const time = Trace.Helpers.Timing.microToMilli(frame.screenshotEvent.ts);
     const frameTime = i18n.TimeUtilities.millisToString(time - this.zeroTime);
     const element = document.createElement('button');
     element.classList.add('frame');
@@ -77,7 +77,7 @@ export class FilmStripView extends Common.ObjectWrapper.eventMixin<EventTypes, t
     element.setAttribute('jslog', `${VisualLogging.preview('film-strip').track({click: true, dblclick: true})}`);
     element.setAttribute('aria-label', i18nString(UIStrings.screenshotForSSelectToView, {PH1: frameTime}));
     UI.ARIAUtils.markAsButton(element);
-    const imageElement = (element.createChild('div', 'thumbnail').createChild('img') as HTMLImageElement);
+    const imageElement = element.createChild('div', 'thumbnail').createChild('img');
     imageElement.alt = i18nString(UIStrings.screenshot);
     element.addEventListener('mousedown', this.onMouseEvent.bind(this, Events.FRAME_SELECTED, time), false);
     element.addEventListener('mouseenter', this.onMouseEvent.bind(this, Events.FRAME_ENTER, time), false);
@@ -90,7 +90,7 @@ export class FilmStripView extends Common.ObjectWrapper.eventMixin<EventTypes, t
     return element;
   }
 
-  override update(): void {
+  update(): void {
     const frames = this.#filmStrip?.frames;
     if (!frames || frames.length < 1) {
       return;
@@ -133,11 +133,11 @@ export const enum Events {
   FRAME_EXIT = 'FrameExit',
 }
 
-export type EventTypes = {
-  [Events.FRAME_SELECTED]: number,
-  [Events.FRAME_ENTER]: number,
-  [Events.FRAME_EXIT]: number,
-};
+export interface EventTypes {
+  [Events.FRAME_SELECTED]: number;
+  [Events.FRAME_ENTER]: number;
+  [Events.FRAME_EXIT]: number;
+}
 
 interface DialogParsedTrace {
   source: 'Trace';
@@ -159,7 +159,7 @@ export class Dialog {
       source: 'Trace',
       frames: filmStrip.frames,
       index: selectedFrameIndex,
-      zeroTime: Trace.Helpers.Timing.microSecondsToMilliseconds(filmStrip.zeroTime),
+      zeroTime: Trace.Helpers.Timing.microToMilli(filmStrip.zeroTime),
     };
     return new Dialog(data);
   }
@@ -270,7 +270,7 @@ export class Dialog {
 
   private render(): void {
     const frame = this.#data.frames[this.index];
-    const timestamp = Trace.Helpers.Timing.microSecondsToMilliseconds(frame.screenshotEvent.ts);
+    const timestamp = Trace.Helpers.Timing.microToMilli(frame.screenshotEvent.ts);
     this.fragment.$('time').textContent = i18n.TimeUtilities.millisToString(timestamp - this.#zeroTime());
     const image = (this.fragment.$('image') as HTMLImageElement);
     image.setAttribute('data-frame-index', this.index.toString());

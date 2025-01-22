@@ -67,7 +67,7 @@ const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/insights/Do
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class DocumentLatency extends BaseInsightComponent<DocumentLatencyInsightModel> {
-  static override readonly litTagName = LitHtml.literal`devtools-performance-document-latency`;
+  static override readonly litTagName = LitHtml.StaticHtml.literal`devtools-performance-document-latency`;
   override internalName: string = 'document-latency';
 
   #check(didPass: boolean, good: string, bad: string): LitHtml.TemplateResult {
@@ -92,7 +92,7 @@ export class DocumentLatency extends BaseInsightComponent<DocumentLatencyInsight
 
     const overlays: Overlays.Overlays.TimelineOverlay[] = [];
     const event = this.model.data.documentRequest;
-    const redirectDurationMicro = Trace.Helpers.Timing.millisecondsToMicroseconds(this.model.data.redirectDuration);
+    const redirectDurationMicro = Trace.Helpers.Timing.milliToMicro(this.model.data.redirectDuration);
 
     const sections = [];
     if (this.model.data.redirectDuration) {
@@ -104,11 +104,10 @@ export class DocumentLatency extends BaseInsightComponent<DocumentLatencyInsight
       overlays.push({type: 'CANDY_STRIPED_TIME_RANGE', bounds, entry: event});
     }
     if (this.model.data.serverResponseTooSlow) {
-      const serverResponseTimeMicro =
-          Trace.Helpers.Timing.millisecondsToMicroseconds(this.model.data.serverResponseTime);
+      const serverResponseTimeMicro = Trace.Helpers.Timing.milliToMicro(this.model.data.serverResponseTime);
       // NOTE: NetworkRequestHandlers never makes a synthetic network request event if `timing` is missing.
       const sendEnd = event.args.data.timing?.sendEnd ?? Trace.Types.Timing.MilliSeconds(0);
-      const sendEndMicro = Trace.Helpers.Timing.millisecondsToMicroseconds(sendEnd);
+      const sendEndMicro = Trace.Helpers.Timing.milliToMicro(sendEnd);
       const bounds = Trace.Helpers.Timing.traceWindowFromMicroSeconds(
           sendEndMicro,
           (sendEndMicro + serverResponseTimeMicro) as Trace.Types.Timing.MicroSeconds,
@@ -151,7 +150,7 @@ export class DocumentLatency extends BaseInsightComponent<DocumentLatencyInsight
     return this.model?.data?.uncompressedResponseBytes ?? null;
   }
 
-  #renderContent(): LitHtml.LitTemplate {
+  override renderContent(): LitHtml.LitTemplate {
     if (!this.model?.data) {
       return LitHtml.nothing;
     }
@@ -175,14 +174,6 @@ export class DocumentLatency extends BaseInsightComponent<DocumentLatencyInsight
         </ul>
       </div>`;
     // clang-format on
-  }
-
-  override render(): void {
-    if (this.model?.data === undefined) {
-      return;
-    }
-
-    this.renderWithContent(this.#renderContent());
   }
 }
 

@@ -47,12 +47,20 @@ const UIStrings = {
    * @description Text for a culprit type of Unsized images.
    */
   unsizedImages: 'Unsized Images',
+  /**
+   * @description Text status when there were no layout shifts detected.
+   */
+  noLayoutShifts: 'No layout shifts',
+  /**
+   * @description Text status when there no layout shifts culprits/root causes were found.
+   */
+  noCulprits: 'Could not detect any layout shift culprits',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/insights/CLSCulprits.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class CLSCulprits extends BaseInsightComponent<CLSCulpritsInsightModel> {
-  static override readonly litTagName = LitHtml.literal`devtools-performance-cls-culprits`;
+  static override readonly litTagName = LitHtml.StaticHtml.literal`devtools-performance-cls-culprits`;
   override internalName: string = 'cls-culprits';
 
   override createOverlays(): Overlays.Overlays.TimelineOverlay[] {
@@ -84,7 +92,8 @@ export class CLSCulprits extends BaseInsightComponent<CLSCulpritsInsightModel> {
   getTopCulprits(
       cluster: Trace.Types.Events.SyntheticLayoutShiftCluster,
       culpritsByShift:
-          Map<Trace.Types.Events.LayoutShift, Trace.Insights.Models.CLSCulprits.LayoutShiftRootCausesData>): string[] {
+          Map<Trace.Types.Events.SyntheticLayoutShift, Trace.Insights.Models.CLSCulprits.LayoutShiftRootCausesData>):
+      string[] {
     const MAX_TOP_CULPRITS = 3;
     const causes: Array<string> = [];
     if (causes.length === MAX_TOP_CULPRITS) {
@@ -125,42 +134,41 @@ export class CLSCulprits extends BaseInsightComponent<CLSCulpritsInsightModel> {
     this.dispatchEvent(new EventReferenceClick(event));
   }
 
-  #renderContent(culprits: Array<string>, worstCluster: Trace.Types.Events.SyntheticLayoutShiftCluster):
-      LitHtml.LitTemplate {
-    const ts = Trace.Types.Timing.MicroSeconds(worstCluster.ts - (this.data.parsedTrace?.Meta.traceBounds.min ?? 0));
+  override renderContent(): LitHtml.LitTemplate {
+    if (!this.model || !this.bounds) {
+      return LitHtml.nothing;
+    }
+
+    if (!this.model.clusters.length || !this.model.worstCluster) {
+      return html`<div class="insight-section">${i18nString(UIStrings.noLayoutShifts)}</div>`;
+    }
+
+    const worstCluster = this.model.worstCluster;
+    const culpritsByShift = this.model.shifts;
+
+    // TODO: getTopCulprits needs to move to model.
+    const culprits = this.getTopCulprits(worstCluster, culpritsByShift);
+    if (culprits.length === 0) {
+      return html`<div class="insight-section">${i18nString(UIStrings.noCulprits)}</div>`;
+    }
+
+    const ts = Trace.Types.Timing.MicroSeconds(worstCluster.ts - this.bounds.min);
     const clusterTs = i18n.TimeUtilities.formatMicroSecondsTime(ts);
 
     // clang-format off
     return html`
       <div class="insight-section">
         <span class="worst-cluster">${i18nString(UIStrings.worstCluster)}: <button type="button" class="timeline-link" @click=${() => this.#clickEvent(worstCluster)}>${i18nString(UIStrings.layoutShiftCluster, {PH1: clusterTs})}</button></span>
-          <p>${i18nString(UIStrings.topCulprits)}:</p>
-              ${culprits.map(culprit => {
-                return html `
-                  <li>${culprit}</li>
-                `;
-              })}
+          <p class="list-title">${i18nString(UIStrings.topCulprits)}:</p>
+          <ul class="worst-culprits">
+            ${culprits.map(culprit => {
+              return html `
+                <li>${culprit}</li>
+              `;
+            })}
+          </ul>
       </div>`;
     // clang-format on
-  }
-
-  override render(): void {
-    if (!this.model) {
-      return;
-    }
-
-    const culpritsByShift = this.model.shifts;
-    if (!this.model.clusters.length || !this.model.worstCluster) {
-      return;
-    }
-
-    // TODO: getTopCulprits needs to move to model.
-    const causes = this.getTopCulprits(this.model.worstCluster, culpritsByShift);
-
-    const hasCulprits = causes.length > 0;
-
-    const output = hasCulprits ? this.#renderContent(causes, this.model.worstCluster) : LitHtml.nothing;
-    this.renderWithContent(output);
   }
 }
 

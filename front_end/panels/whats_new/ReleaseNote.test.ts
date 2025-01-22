@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 import * as Common from '../../core/common/common.js';
-import type * as Platform from '../../core/platform/platform.js';
+import * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
-// eslint-disable-next-line rulesdir/es_modules_import
+
 import {
   deinitializeGlobalVars,
   initializeGlobalVars,
@@ -13,6 +13,8 @@ import {
 import * as UI from '../../ui/legacy/legacy.js';
 
 import type * as WhatsNewModule from './whats_new.js';
+
+const {urlString} = Platform.DevToolsPath;
 
 describe('Release Note', () => {
   // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -27,7 +29,8 @@ describe('Release Note', () => {
           version: 99,
           header: 'Highlights from Chrome 100 update',
           markdownLinks: [],
-          link: 'https://developers.google.com/web/tools/chrome-devtools/' as Platform.DevToolsPath.UrlString,
+          link: urlString`https://developers.google.com/web/tools/chrome-devtools/`,
+          videoLinks: [],
         },
     );
 
@@ -41,7 +44,7 @@ describe('Release Note', () => {
       persistence: UI.ViewManager.ViewPersistence.CLOSEABLE,
       order: 1,
       async loadView() {
-        return WhatsNew.ReleaseNoteView.ReleaseNoteViewWrapper.instance();
+        return new WhatsNew.ReleaseNoteView.ReleaseNoteView();
       },
     });
 

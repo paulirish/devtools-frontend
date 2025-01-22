@@ -192,10 +192,7 @@ export class ObjectPropertiesSection extends UI.TreeOutline.TreeOutlineInShadow 
       readOnly?: boolean): ObjectPropertiesSection {
     const titleElement = document.createElement('span');
     titleElement.classList.add('source-code');
-    const shadowRoot = UI.UIUtils.createShadowRootWithCoreStyles(titleElement, {
-      cssFile: [objectValueStyles],
-      delegatesFocus: undefined,
-    });
+    const shadowRoot = UI.UIUtils.createShadowRootWithCoreStyles(titleElement, {cssFile: [objectValueStyles]});
     const propertyValue =
         ObjectPropertiesSection.createPropertyValue(object, /* wasThrown */ false, /* showPreview */ true);
     shadowRoot.appendChild(propertyValue.element);
@@ -1176,7 +1173,7 @@ export class ObjectPropertyTreeElement extends UI.TreeOutline.TreeElement {
     if (this.prompt || !treeOutline || !treeOutline.editable || this.readOnly) {
       return;
     }
-    this.editableDiv = (this.rowContainer.createChild('span', 'editable-div') as HTMLElement);
+    this.editableDiv = this.rowContainer.createChild('span', 'editable-div');
 
     if (this.property.value) {
       let text: string|(string | undefined) = this.property.value.description;

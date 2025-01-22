@@ -122,9 +122,7 @@ export class SettingsScreen extends UI.Widget.VBox implements UI.View.ViewLocati
     const settingsLabelElement = document.createElement('div');
     settingsLabelElement.classList.add('settings-window-label-element');
     const settingsTitleElement =
-        UI.UIUtils
-            .createShadowRootWithCoreStyles(
-                settingsLabelElement, {cssFile: [settingsScreenStyles], delegatesFocus: undefined})
+        UI.UIUtils.createShadowRootWithCoreStyles(settingsLabelElement, {cssFile: [settingsScreenStyles]})
             .createChild('div', 'settings-window-title');
 
     UI.ARIAUtils.markAsHeading(settingsTitleElement, 1);
@@ -166,6 +164,7 @@ export class SettingsScreen extends UI.Widget.VBox implements UI.View.ViewLocati
 
     settingsScreen.reportTabOnReveal = true;
     const dialog = new UI.Dialog.Dialog('settings');
+    dialog.contentElement.removeAttribute('aria-modal');
     dialog.contentElement.tabIndex = -1;
     dialog.addCloseButton();
     dialog.setOutsideClickCallback(() => {});
@@ -477,7 +476,8 @@ export class ExperimentsSettingsTab extends SettingsTab {
   }
 
   private createExperimentCheckbox(experiment: Root.Runtime.Experiment): HTMLParagraphElement {
-    const label = UI.UIUtils.CheckboxLabel.create(experiment.title, experiment.isEnabled(), undefined, experiment.name);
+    const label = UI.UIUtils.CheckboxLabel.createWithStringLiteral(
+        experiment.title, experiment.isEnabled(), undefined, experiment.name);
     label.classList.add('experiment-label');
     const input = label.checkboxElement;
     input.name = experiment.name;

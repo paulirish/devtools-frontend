@@ -5,7 +5,7 @@
 import '../../../ui/components/icon_button/icon_button.js';
 
 import * as i18n from '../../../core/i18n/i18n.js';
-// eslint-disable-next-line rulesdir/es_modules_import
+// eslint-disable-next-line rulesdir/es-modules-import
 import inspectorCommonStyles from '../../../ui/legacy/inspectorCommon.css.js';
 import * as LitHtml from '../../../ui/lit-html/lit-html.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
@@ -186,7 +186,6 @@ export class ValueInterpreterDisplay extends HTMLElement {
       <div>
         <select title=${i18nString(UIStrings.changeValueTypeMode)}
           data-mode-settings="true"
-          class="chrome-select"
           style="border: none; background-color: transparent; cursor: pointer; color: var(--sys-color-token-subtle);"
           jslog=${VisualLogging.dropDown('linear-memory-inspector.value-type-mode').track({change: true})}
           @change=${this.#onValueTypeModeChange.bind(this, type)}>

@@ -28,6 +28,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+import './Toolbar.js';
+
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -40,7 +42,7 @@ import {KeyboardShortcut, Modifiers} from './KeyboardShortcut.js';
 import {bindCheckbox} from './SettingsUI.js';
 import type {Suggestions} from './SuggestBox.js';
 import * as ThemeSupport from './theme_support/theme_support.js';
-import {Toolbar, type ToolbarButton, ToolbarFilter, ToolbarInput, ToolbarSettingToggle} from './Toolbar.js';
+import {type ToolbarButton, ToolbarFilter, ToolbarInput, ToolbarSettingToggle} from './Toolbar.js';
 import {Tooltip} from './Tooltip.js';
 import {CheckboxLabel, createTextChild} from './UIUtils.js';
 import {HBox} from './Widget.js';
@@ -192,9 +194,9 @@ export const enum FilterBarEvents {
   CHANGED = 'Changed',
 }
 
-export type FilterBarEventTypes = {
-  [FilterBarEvents.CHANGED]: void,
-};
+export interface FilterBarEventTypes {
+  [FilterBarEvents.CHANGED]: void;
+}
 
 export interface FilterUI extends Common.EventTarget.EventTarget<FilterUIEventTypes> {
   isActive(): boolean;
@@ -205,9 +207,9 @@ export const enum FilterUIEvents {
   FILTER_CHANGED = 'FilterChanged',
 }
 
-export type FilterUIEventTypes = {
-  [FilterUIEvents.FILTER_CHANGED]: void,
-};
+export interface FilterUIEventTypes {
+  [FilterUIEvents.FILTER_CHANGED]: void;
+}
 
 export class TextFilterUI extends Common.ObjectWrapper.ObjectWrapper<FilterUIEventTypes> implements FilterUI {
   private readonly filterElement: HTMLDivElement;
@@ -216,9 +218,9 @@ export class TextFilterUI extends Common.ObjectWrapper.ObjectWrapper<FilterUIEve
   constructor() {
     super();
     this.filterElement = document.createElement('div');
-    const filterToolbar = new Toolbar('text-filter', this.filterElement);
+    const filterToolbar = this.filterElement.createChild('devtools-toolbar', 'text-filter');
     // Set the style directly on the element to overwrite parent css styling.
-    filterToolbar.element.style.borderBottom = 'none';
+    filterToolbar.style.borderBottom = 'none';
     this.#filter = new ToolbarFilter(undefined, 1, 1, UIStrings.egSmalldUrlacomb, this.completions.bind(this));
     filterToolbar.appendToolbarItem(this.#filter);
     this.#filter.addEventListener(ToolbarInput.Event.TEXT_CHANGED, () => this.valueChanged());
@@ -393,7 +395,7 @@ export class NamedBitSetFilterUI extends Common.ObjectWrapper.ObjectWrapper<Filt
   }
 
   private addBit(name: string, label: string, title?: string): void {
-    const typeFilterElement = (this.filtersElement.createChild('span', name) as HTMLElement);
+    const typeFilterElement = this.filtersElement.createChild('span', name);
     typeFilterElement.tabIndex = -1;
     this.typeFilterElementTypeNames.set(typeFilterElement, name);
     createTextChild(typeFilterElement, label);
@@ -470,13 +472,11 @@ export class NamedBitSetFilterUI extends Common.ObjectWrapper.ObjectWrapper<Filt
       this.allowedTypes.delete(typeName);
     } else {
       this.allowedTypes.add(typeName);
-      Host.userMetrics.legacyResourceTypeFilterItemSelected(typeName);
     }
 
     if (this.allowedTypes.size === 0) {
       this.allowedTypes.add(NamedBitSetFilterUI.ALL_TYPES);
     }
-    Host.userMetrics.legacyResourceTypeFilterNumberOfSelectedChanged(this.allowedTypes.size);
 
     if (this.setting) {
       // Settings do not support `Sets` so convert it back to the Map-like object.
@@ -499,8 +499,8 @@ export class CheckboxFilterUI extends Common.ObjectWrapper.ObjectWrapper<FilterU
   private label: CheckboxLabel;
   private checkboxElement: HTMLInputElement;
   constructor(
-      className: string, title: string, activeWhenChecked?: boolean, setting?: Common.Settings.Setting<boolean>,
-      jslogContext?: string) {
+      className: string, title: Common.UIString.LocalizedString, activeWhenChecked?: boolean,
+      setting?: Common.Settings.Setting<boolean>, jslogContext?: string) {
     super();
     this.filterElement = document.createElement('div');
     this.filterElement.classList.add('filter-checkbox-filter');

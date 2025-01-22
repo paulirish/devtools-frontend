@@ -6,7 +6,7 @@ import type * as Common from '../../../../core/common/common.js';
 import * as Trace from '../../../../models/trace/trace.js';
 import {renderElementIntoDOM} from '../../../../testing/DOMHelpers.js';
 import {describeWithEnvironment} from '../../../../testing/EnvironmentHelpers.js';
-import * as Coordinator from '../../../../ui/components/render_coordinator/render_coordinator.js';
+import * as RenderCoordinator from '../../../../ui/components/render_coordinator/render_coordinator.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 import type {TimelineOverlay} from '../../overlays/OverlaysImpl.js';
 
@@ -16,15 +16,13 @@ const {html} = LitHtml;
 
 describeWithEnvironment('BaseInsightComponent', () => {
   const {BaseInsightComponent} = Insights.BaseInsightComponent;
-  const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
-
   class TestInsightComponent extends BaseInsightComponent<Trace.Insights.Types.InsightModel<{}>> {
     override internalName = 'test-insight';
     override createOverlays(): TimelineOverlay[] {
       return [];
     }
-    override render(): void {
-      this.renderWithContent(html`<div>test content</div>`);
+    override renderContent(): LitHtml.LitTemplate {
+      return html`<div>test content</div>`;
     }
   }
   customElements.define('test-insight-component', TestInsightComponent);
@@ -41,7 +39,7 @@ describeWithEnvironment('BaseInsightComponent', () => {
       };
       renderElementIntoDOM(component);
 
-      await coordinator.done();
+      await RenderCoordinator.done();
 
       assert.isNotNull(component.shadowRoot);
       const titleElement = component.shadowRoot.querySelector<HTMLElement>('.insight-title');
@@ -64,7 +62,7 @@ describeWithEnvironment('BaseInsightComponent', () => {
       };
       renderElementIntoDOM(component);
 
-      await coordinator.done();
+      await RenderCoordinator.done();
 
       assert.isNotNull(component.shadowRoot);
       const titleElement = component.shadowRoot.querySelector<HTMLElement>('.insight-title');

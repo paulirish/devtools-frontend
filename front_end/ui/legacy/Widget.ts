@@ -33,7 +33,6 @@ import '../../core/dom_extension/dom_extension.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as LitHtml from '../../ui/lit-html/lit-html.js';
 import * as Helpers from '../components/helpers/helpers.js';
-import * as RenderCoordinator from '../components/render_coordinator/render_coordinator.js';
 
 import {Constraints, Size} from './Geometry.js';
 import * as ThemeSupport from './theme_support/theme_support.js';
@@ -72,9 +71,9 @@ export class WidgetElement<WidgetT extends Widget> extends HTMLElement {
 
 customElements.define('devtools-widget', WidgetElement);
 
-type Constructor<T, Args extends unknown[]> = {
-  new (...args: Args): T,
-};
+interface Constructor<T, Args extends unknown[]> {
+  new(...args: Args): T;
+}
 
 export function widgetRef<T extends Widget, Args extends unknown[]>(
     type: Constructor<T, Args>, callback: (_: T) => void): ReturnType<typeof LitHtml.Directives.ref> {
@@ -110,12 +109,16 @@ function decrementWidgetCounter(parentElement: Element, childElement: Element): 
   }
 }
 
-let id = 0;
+// The resolved `updateComplete` promise, which is used as a marker for the
+// Widget's `#updateComplete` private property to indicate that there's no
+// pending update.
+const UPDATE_COMPLETE = Promise.resolve(true);
+const UPDATE_COMPLETE_RESOLVE = (_result: boolean): void => {};
 
 export class Widget {
   readonly element: HTMLElement;
   contentElement: HTMLElement;
-  private shadowRoot: ShadowRoot|undefined;
+  private shadowRoot: typeof Element.prototype.shadowRoot;
   protected visibleInternal: boolean;
   private isRoot: boolean;
   private isShowingInternal: boolean;
@@ -130,17 +133,16 @@ export class Widget {
   private constraintsInternal?: Constraints;
   private invalidationsRequested?: boolean;
   private externallyManaged?: boolean;
-  #id = `${this.constructor.name}_${id++}`;
+  #updateComplete = UPDATE_COMPLETE;
+  #updateCompleteResolve = UPDATE_COMPLETE_RESOLVE;
+  #updateRequestID = 0;
   constructor(useShadowDom?: boolean, delegatesFocus?: boolean, element?: HTMLElement) {
     this.element = element || document.createElement('div');
-    this.shadowRoot = this.element.shadowRoot || undefined;
+    this.shadowRoot = this.element.shadowRoot;
     if (useShadowDom && !this.shadowRoot) {
       this.element.classList.add('vbox');
       this.element.classList.add('flex-auto');
-      this.shadowRoot = createShadowRootWithCoreStyles(this.element, {
-        cssFile: undefined,
-        delegatesFocus,
-      });
+      this.shadowRoot = createShadowRootWithCoreStyles(this.element, {delegatesFocus});
       this.contentElement = document.createElement('div');
       this.shadowRoot.appendChild(this.contentElement);
     } else {
@@ -438,6 +440,15 @@ export class Widget {
       return;
     }
 
+    // Cancel any pending update.
+    if (this.#updateRequestID !== 0) {
+      cancelAnimationFrame(this.#updateRequestID);
+      this.#updateCompleteResolve(true);
+      this.#updateCompleteResolve = UPDATE_COMPLETE_RESOLVE;
+      this.#updateComplete = UPDATE_COMPLETE;
+      this.#updateRequestID = 0;
+    }
+
     // hideOnDetach means that we should never remove element from dom - content
     // has iframes and detaching it will hurt.
     //
@@ -518,20 +529,11 @@ export class Widget {
   }
 
   registerRequiredCSS(cssFile: {cssContent: string}): void {
-    if (this.shadowRoot) {
-      ThemeSupport.ThemeSupport.instance().appendStyle((this.shadowRoot as DocumentFragment), cssFile);
-    } else {
-      ThemeSupport.ThemeSupport.instance().appendStyle(this.element, cssFile);
-    }
+    ThemeSupport.ThemeSupport.instance().appendStyle(this.shadowRoot ?? this.element, cssFile);
   }
 
   registerCSSFiles(cssFiles: CSSStyleSheet[]): void {
-    let root: ShadowRoot|Document;
-    if (this.shadowRoot) {
-      root = this.shadowRoot;
-    } else {
-      root = Helpers.GetRootNode.getRootNode(this.contentElement);
-    }
+    const root = this.shadowRoot ?? Helpers.GetRootNode.getRootNode(this.contentElement);
     root.adoptedStyleSheets = root.adoptedStyleSheets.concat(cssFiles);
   }
 
@@ -671,31 +673,76 @@ export class Widget {
   }
 
   /**
-   * Called by the RenderCoordinator to perform an update.
-   * This is not meant to be called directly. Instead, use update() to schedule an asynchronous update.
+   * Override this method in derived classes to perform the actual view update.
    *
-   * @returns A promise that resolves when the update is complete.
+   * This is not meant to be called directly, but invoked (indirectly) through
+   * the `requestAnimationFrame` and executed with the animation frame. Instead,
+   * use the `requestUpdate()` method to schedule an asynchronous update.
+   *
+   * @return can either return nothing or a promise; in that latter case, the
+   *         update logic will await the resolution of the returned promise
+   *         before proceeding.
    */
-  protected doUpdate(): Promise<void> {
-    return Promise.resolve();
+  performUpdate(): Promise<void>|void {
+  }
+
+  async #performUpdateCallback(): Promise<boolean> {
+    // Mark this update cycle as complete by assigning
+    // the marker sentinel.
+    this.#updateComplete = UPDATE_COMPLETE;
+    this.#updateCompleteResolve = UPDATE_COMPLETE_RESOLVE;
+    this.#updateRequestID = 0;
+
+    // Run the actual update logic.
+    await this.performUpdate();
+
+    // Resolve the `updateComplete` with `true` if no
+    // new update was triggered during this cycle.
+    return this.#updateComplete === UPDATE_COMPLETE;
   }
 
   /**
-   * Schedules an asynchronous update. The update will be deduplicated and executed with the animation frame.
+   * Schedules an asynchronous update for this widget.
+   *
+   * The update will be deduplicated and executed with the next animation
+   * frame.
    */
-  update(): void {
-    void RenderCoordinator.RenderCoordinator.RenderCoordinator.instance().write(this.#id, () => this.doUpdate());
+  requestUpdate(): void {
+    if (this.#updateComplete === UPDATE_COMPLETE) {
+      this.#updateComplete = new Promise((resolve, reject) => {
+        this.#updateCompleteResolve = resolve;
+        this.#updateRequestID = requestAnimationFrame(() => this.#performUpdateCallback().then(resolve, reject));
+      });
+    }
   }
 
   /**
-   * Returns a promise that resolves when the pending update is complete.
-   * Returns a resolved promise if there is no pending update.
-`  *
-   * @returns A probleme that resolves when the pending update is complete.
+   * The `updateComplete` promise resolves when the widget has finished updating.
+   *
+   * Use `updateComplete` to wait for an update:
+   * ```js
+   * await widget.updateComplete;
+   * // do stuff
+   * ```
+   *
+   * This method is primarily useful for unit tests, to wait for widgets to build
+   * their DOM. For example:
+   * ```js
+   * // Set up the test widget, and wait for the initial update cycle to complete.
+   * const widget = new SomeWidget(someData);
+   * widget.requestUpdate();
+   * await widget.updateComplete;
+   *
+   * // Assert state of the widget.
+   * assert.isTrue(widget.someDataLoaded);
+   * ```
+   *
+   * @returns a promise that resolves to a `boolean` when the widget has finished
+   *          updating, the value is `true` if there are no more pending updates,
+   *          and `false` if the update cycle triggered another update.
    */
-  pendingUpdate(): Promise<void> {
-    return RenderCoordinator.RenderCoordinator.RenderCoordinator.instance().findPendingWrite(this.#id) ||
-        Promise.resolve();
+  get updateComplete(): Promise<boolean> {
+    return this.#updateComplete;
   }
 }
 

@@ -1407,7 +1407,7 @@ export const NativeFunctions = [
   {
     name: "item",
     signatures: [["index"]],
-    receivers: ["CSSRuleList","CSSStyleDeclaration","DOMRectList","DOMStringList","DOMTokenList","FileList","HTMLCollectionBase","HTMLCollectionOf","HTMLSelectElement","MediaList","MimeTypeArray","NamedNodeMap","NodeList","NodeListOf","Plugin","PluginArray","SpeechRecognitionResult","SpeechRecognitionResultList","StyleSheetList","TouchList","HTMLCollection","SpeechGrammarList","SQLResultSetRowList"]
+    receivers: ["CSSRuleList","CSSStyleDeclaration","DOMRectList","DOMStringList","DOMTokenList","FileList","HTMLCollectionBase","HTMLCollectionOf","HTMLSelectElement","MediaList","MimeTypeArray","NamedNodeMap","NodeList","NodeListOf","Plugin","PluginArray","SpeechRecognitionResult","SpeechRecognitionResultList","StyleSheetList","TouchList","HTMLCollection","SpeechGrammarList","SpeechRecognitionPhraseList","SQLResultSetRowList"]
   },
   {
     name: "item",
@@ -1668,12 +1668,7 @@ export const NativeFunctions = [
   {
     name: "createConicGradient",
     signatures: [["startAngle","cx","cy"]],
-    receivers: ["CanvasRenderingContext2D","PaintRenderingContext2D"]
-  },
-  {
-    name: "createConicGradient",
-    signatures: [["startAngle","centerX","centerY"]],
-    receivers: ["OffscreenCanvasRenderingContext2D"]
+    receivers: ["CanvasRenderingContext2D","OffscreenCanvasRenderingContext2D","PaintRenderingContext2D"]
   },
   {
     name: "createLinearGradient",
@@ -3503,11 +3498,6 @@ export const NativeFunctions = [
     signatures: [["?measureName"]]
   },
   {
-    name: "getEntries",
-    signatures: [["?options"]],
-    receivers: ["Performance"]
-  },
-  {
     name: "getEntriesByName",
     signatures: [["name","?type"],["name","?entryType"]]
   },
@@ -5282,11 +5272,23 @@ export const NativeFunctions = [
   },
   {
     name: "atob",
-    signatures: [["data"]]
+    signatures: [["data"]],
+    receivers: ["Window","WorkerGlobalScope"]
+  },
+  {
+    name: "atob",
+    signatures: [["atob"]],
+    receivers: ["Window","ShadowRealmGlobalScope","WorkerGlobalScope"]
   },
   {
     name: "btoa",
-    signatures: [["data"]]
+    signatures: [["data"]],
+    receivers: ["Window","WorkerGlobalScope"]
+  },
+  {
+    name: "btoa",
+    signatures: [["btoa"]],
+    receivers: ["Window","ShadowRealmGlobalScope","WorkerGlobalScope"]
   },
   {
     name: "clearInterval",
@@ -6469,13 +6471,7 @@ export const NativeFunctions = [
   },
   {
     name: "caretPositionFromPoint",
-    signatures: [["x","y","?options"]],
-    receivers: ["Document"]
-  },
-  {
-    name: "caretPositionFromPoint",
-    signatures: [["x"]],
-    receivers: ["TextMetrics"]
+    signatures: [["x","y","?options"]]
   },
   {
     name: "hasPrivateToken",
@@ -6526,10 +6522,6 @@ export const NativeFunctions = [
     signatures: [["root","node","?init"]]
   },
   {
-    name: "moveBefore",
-    signatures: [["node","child"]]
-  },
-  {
     name: "Observable",
     signatures: [["callback"]]
   },
@@ -6560,6 +6552,10 @@ export const NativeFunctions = [
   {
     name: "last",
     signatures: [["?options"]]
+  },
+  {
+    name: "moveBefore",
+    signatures: [["node","child"]]
   },
   {
     name: "expand",
@@ -6876,6 +6872,10 @@ export const NativeFunctions = [
   {
     name: "ImageData",
     signatures: [["sw","sh","?settings"],["data","sw","?sh","?settings"]]
+  },
+  {
+    name: "getIndexFromOffset",
+    signatures: [["x"]]
   },
   {
     name: "getSelectionRects",
@@ -7267,6 +7267,10 @@ export const NativeFunctions = [
     signatures: [["feature"]]
   },
   {
+    name: "availability",
+    signatures: [["?options"]]
+  },
+  {
     name: "rewrite",
     signatures: [["input","?options"]]
   },
@@ -7275,16 +7279,8 @@ export const NativeFunctions = [
     signatures: [["input","?options"]]
   },
   {
-    name: "supportsType",
-    signatures: [["type"]]
-  },
-  {
-    name: "supportsFormat",
-    signatures: [["format"]]
-  },
-  {
-    name: "supportsLength",
-    signatures: [["length"]]
+    name: "createOptionsAvailable",
+    signatures: [["options"]]
   },
   {
     name: "languageAvailable",
@@ -7301,13 +7297,12 @@ export const NativeFunctions = [
   },
   {
     name: "detect",
-    signatures: [["input"]],
-    receivers: ["LanguageDetector"]
-  },
-  {
-    name: "detect",
     signatures: [["image"]],
     receivers: ["BarcodeDetector","FaceDetector","TextDetector"]
+  },
+  {
+    name: "languagePairAvailable",
+    signatures: [["sourceLanguage","targetLanguage"]]
   },
   {
     name: "registerAnimator",
@@ -7445,6 +7440,10 @@ export const NativeFunctions = [
     signatures: [["expires"]]
   },
   {
+    name: "fillTextCluster",
+    signatures: [["textCluster","x","y","?options"]]
+  },
+  {
     name: "transferToGPUTexture",
     signatures: [["options"]]
   },
@@ -7455,14 +7454,6 @@ export const NativeFunctions = [
   {
     name: "beginLayer",
     signatures: [["?options"]]
-  },
-  {
-    name: "fillTextCluster",
-    signatures: [["textCluster","x","y"]]
-  },
-  {
-    name: "placeElement",
-    signatures: [["element","x","y"]]
   },
   {
     name: "createMesh2DVertexBuffer",
@@ -7479,6 +7470,10 @@ export const NativeFunctions = [
   {
     name: "drawMesh",
     signatures: [["vertex_buffer","uv_buffer","index_buffer","image"]]
+  },
+  {
+    name: "placeElement",
+    signatures: [["element","x","y"]]
   },
   {
     name: "Path2D",
@@ -7514,7 +7509,7 @@ export const NativeFunctions = [
   },
   {
     name: "setStatus",
-    signatures: [["status"]]
+    signatures: [["status","?options"]]
   },
   {
     name: "PasswordCredential",
@@ -7597,10 +7592,6 @@ export const NativeFunctions = [
   {
     name: "EventSource",
     signatures: [["url","?eventSourceInitDict"]]
-  },
-  {
-    name: "FileSystemChangeRecord",
-    signatures: [["root","changedHandle","relativePathComponents","type","?relativePathMovedFrom"]]
   },
   {
     name: "queryPermission",
@@ -7821,6 +7812,10 @@ export const NativeFunctions = [
     signatures: [["?config"]]
   },
   {
+    name: "setPreferredSinkId",
+    signatures: [["sinkId"]]
+  },
+  {
     name: "MediaStreamEvent",
     signatures: [["type","?eventInitDict"]]
   },
@@ -7854,7 +7849,7 @@ export const NativeFunctions = [
   },
   {
     name: "constant",
-    signatures: [["desc","bufferView"]]
+    signatures: [["desc","buffer"]]
   },
   {
     name: "argMin",
@@ -7902,6 +7897,10 @@ export const NativeFunctions = [
   },
   {
     name: "lesserOrEqual",
+    signatures: [["a","b","?options"]]
+  },
+  {
+    name: "notEqual",
     signatures: [["a","b","?options"]]
   },
   {
@@ -8457,6 +8456,22 @@ export const NativeFunctions = [
     signatures: [["?options"]]
   },
   {
+    name: "SharedStorageAppendMethod",
+    signatures: [["key","value","?options"]]
+  },
+  {
+    name: "SharedStorageClearMethod",
+    signatures: [["?options"]]
+  },
+  {
+    name: "SharedStorageDeleteMethod",
+    signatures: [["key","?options"]]
+  },
+  {
+    name: "SharedStorageSetMethod",
+    signatures: [["key","value","?options"]]
+  },
+  {
     name: "selectURL",
     signatures: [["name","urls","?options"]]
   },
@@ -8493,12 +8508,24 @@ export const NativeFunctions = [
     signatures: [["string","?weight"]]
   },
   {
+    name: "SpeechRecognitionContext",
+    signatures: [["phrases"]]
+  },
+  {
     name: "SpeechRecognitionErrorEvent",
     signatures: [["type","?eventInitDict"]]
   },
   {
     name: "SpeechRecognitionEvent",
     signatures: [["type","?initDict"]]
+  },
+  {
+    name: "addItem",
+    signatures: [["item"]]
+  },
+  {
+    name: "SpeechRecognitionPhrase",
+    signatures: [["phrase","?boost"]]
   },
   {
     name: "onDeviceWebSpeechAvailable",

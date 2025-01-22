@@ -6,9 +6,7 @@ import '../../../../ui/components/icon_button/icon_button.js';
 import './Table.js';
 
 import * as i18n from '../../../../core/i18n/i18n.js';
-import type {
-  ImageDeliveryInsightModel, ImageOptimizationType, OptimizableImage} from
-  '../../../../models/trace/insights/ImageDelivery.js';
+import type {ImageDeliveryInsightModel} from '../../../../models/trace/insights/ImageDelivery.js';
 import type * as Trace from '../../../../models/trace/trace.js';
 import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
 import type * as Overlays from '../../overlays/overlays.js';
@@ -21,10 +19,6 @@ const {html} = LitHtml;
 
 const UIStrings = {
   /**
-   * @description Column header for a table column containing network requests for images that are not sized correctly for how they are displayed on the page.
-   */
-  sizeAppropriately: 'Size appropriately',
-  /**
    * @description Column header for a table column containing network requests for images which can improve their file size (e.g. use a different format, increase compression, etc).
    */
   optimizeFile: 'Optimize file size',
@@ -33,13 +27,19 @@ const UIStrings = {
    * @example {5} PH1
    */
   others: '{PH1} others',
+  /**
+   * @description Text status indicating that no potential optimizations were found for any image file
+   */
+  noOptimizableImages: 'No optimizable images',
 };
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/insights/ImageDelivery.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
+const MAX_REQUESTS = 10;
+
 export class ImageDelivery extends BaseInsightComponent<ImageDeliveryInsightModel> {
-  static override readonly litTagName = LitHtml.literal`devtools-performance-image-delivery`;
+  static override readonly litTagName = LitHtml.StaticHtml.literal`devtools-performance-image-delivery`;
   override internalName: string = 'image-delivery';
 
   override createOverlays(): Overlays.Overlays.TimelineOverlay[] {
@@ -59,93 +59,52 @@ export class ImageDelivery extends BaseInsightComponent<ImageDeliveryInsightMode
     };
   }
 
-  #getTopImagesAsRows(
-      optimizableImages: OptimizableImage[], typeFilter: (type: ImageOptimizationType) => boolean,
-      showDimensions?: boolean): TableDataRow[] {
-    const MAX_REQUESTS = 3;
+  override getEstimatedSavingsBytes(): number|null {
+    return this.model?.totalByteSavings ?? null;
+  }
+
+  override renderContent(): LitHtml.LitTemplate {
+    if (!this.model) {
+      return LitHtml.nothing;
+    }
+
+    const optimizableImages = [...this.model.optimizableImages];
+
     const topImages =
-        optimizableImages.filter(image => image.optimizations.some(o => typeFilter(o.type)))
-            .sort((a, b) => b.request.args.data.decodedBodyLength - a.request.args.data.decodedBodyLength);
+        optimizableImages.sort((a, b) => b.request.args.data.decodedBodyLength - a.request.args.data.decodedBodyLength);
 
     const remaining = topImages.splice(MAX_REQUESTS);
-
     const rows: TableDataRow[] = topImages.map(image => ({
-                                                 values: [
-                                                   imageRef(
-                                                       image.request,
-                                                       showDimensions ? image.largestImagePaint : undefined,
-                                                       ),
-                                                 ],
+                                                 values: [imageRef(image.request)],
                                                  overlays: [this.#createOverlayForRequest(image.request)],
                                                }));
 
     if (remaining.length > 0) {
-      const value = remaining.length > 1 ? i18nString(UIStrings.others, {PH1: remaining.length}) :
-                                           imageRef(
-                                               remaining[0].request,
-                                               showDimensions ? remaining[0].largestImagePaint : undefined,
-                                           );
+      const value =
+          remaining.length > 1 ? i18nString(UIStrings.others, {PH1: remaining.length}) : imageRef(remaining[0].request);
       rows.push({
         values: [value],
         overlays: remaining.map(r => this.#createOverlayForRequest(r.request)),
       });
     }
 
-    return rows;
-  }
-
-  #renderContent(): LitHtml.LitTemplate {
-    if (!this.model) {
-      return LitHtml.nothing;
+    if (!rows.length) {
+      return html`<div class="insight-section">${i18nString(UIStrings.noOptimizableImages)}</div>`;
     }
 
-    const optimizableImages = this.model.optimizableImages;
-
-    const sections = [];
-
-    const responsiveSizeRows = this.#getTopImagesAsRows(optimizableImages, type => type === 'responsive-size', true);
-    if (responsiveSizeRows.length) {
-      // clang-format off
-      sections.push(html`
-        <div class="insight-section">
-          <devtools-performance-table
-            .data=${{
-              insight: this,
-              headers: [i18nString(UIStrings.sizeAppropriately)],
-              rows: responsiveSizeRows,
-            }}>
-          </devtools-performance-table>
-        </div>
-      `);
-      // clang-format on
-    }
-
-    const optimizeFormatRows = this.#getTopImagesAsRows(optimizableImages, type => type !== 'responsive-size');
-    if (optimizeFormatRows.length) {
-      // clang-format off
-      sections.push(html`
-        <div class="insight-section">
-          <devtools-performance-table
-            .data=${{
-              insight: this,
-              headers: [i18nString(UIStrings.optimizeFile)],
-              rows: optimizeFormatRows,
-            }}>
-          </devtools-performance-table>
-        </div>
-      `);
-      // clang-format on
-    }
-
-    return html`${sections}`;
-  }
-
-  override render(): void {
-    if (!this.model) {
-      return;
-    }
-
-    this.renderWithContent(this.#renderContent());
+    // clang-format off
+    return html`
+      <div class="insight-section">
+        <devtools-performance-table
+          .data=${{
+            insight: this,
+            headers: [i18nString(UIStrings.optimizeFile)],
+            rows,
+          }}>
+        </devtools-performance-table>
+      </div>
+    `;
+    // clang-format on
   }
 }
 

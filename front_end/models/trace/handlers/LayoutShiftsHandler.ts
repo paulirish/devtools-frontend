@@ -61,11 +61,11 @@ interface LayoutShifts {
 
 // This represents the maximum #time we will allow a cluster to go before we
 // reset it.
-export const MAX_CLUSTER_DURATION = Helpers.Timing.millisecondsToMicroseconds(Types.Timing.MilliSeconds(5000));
+export const MAX_CLUSTER_DURATION = Helpers.Timing.milliToMicro(Types.Timing.MilliSeconds(5000));
 
 // This represents the maximum #time we will allow between layout shift events
 // before considering it to be the start of a new cluster.
-export const MAX_SHIFT_TIME_DELTA = Helpers.Timing.millisecondsToMicroseconds(Types.Timing.MilliSeconds(1000));
+export const MAX_SHIFT_TIME_DELTA = Helpers.Timing.milliToMicro(Types.Timing.MilliSeconds(1000));
 
 // Layout shifts are reported globally to the developer, irrespective of which
 // frame they originated in. However, each process does have its own individual
@@ -105,10 +105,10 @@ const clustersByNavigationId = new Map<Types.Events.NavigationId, Types.Events.S
 
 // Represents a point in time in which a  LS score change
 // was recorded.
-type ScoreRecord = {
-  ts: number,
-  score: number,
-};
+interface ScoreRecord {
+  ts: number;
+  score: number;
+}
 
 // The complete timeline of LS score changes in a trace.
 // Includes drops to 0 when session windows end.
@@ -362,6 +362,7 @@ async function buildLayoutShiftsClusters(): Promise<void> {
         Helpers.SyntheticEvents.SyntheticEventsManager.registerSyntheticEvent<Types.Events.SyntheticLayoutShift>({
           rawSourceEvent: event,
           ...event,
+          name: Types.Events.Name.SYNTHETIC_LAYOUT_SHIFT,
           args: {
             frame: event.args.frame,
             data: {

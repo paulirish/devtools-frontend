@@ -6,7 +6,7 @@
    bind all of them upfront. We disable the lit_html_host_this since we
    do not define any host for LitHtml.render and the rule is not happy
    about it. */
-/* eslint-disable rulesdir/lit_html_host_this */
+/* eslint-disable rulesdir/lit-html-host-this */
 
 import '../../../ui/components/icon_button/icon_button.js';
 import './StepEditor.js';
@@ -272,13 +272,13 @@ export class RemoveBreakpointEvent extends Event {
 
 const COPY_ACTION_PREFIX = 'copy-step-as-';
 
-type Action = {
-  id: string,
-  label: string,
-  group: string,
-  groupTitle: string,
-  jslogContext?: string,
-};
+interface Action {
+  id: string;
+  label: string;
+  group: string;
+  groupTitle: string;
+  jslogContext?: string;
+}
 
 export interface ViewInput extends StepViewData {
   step?: Models.Schema.Step;
@@ -366,8 +366,8 @@ function getElementRoleTitle(role: string): string {
   }
 }
 
-function getSelectorPreview(step?: Models.Schema.Step): string {
-  if (!step || !('selectors' in step)) {
+function getSelectorPreview(step: Models.Schema.Step): string {
+  if (!('selectors' in step)) {
     return '';
   }
 
@@ -438,7 +438,7 @@ function viewFunction(input: ViewInput, _output: ViewOutput, target: HTMLElement
     step: input.step,
     section: input.section,
   });
-  const subtitle = input.step ? getSelectorPreview() : getSectionPreview();
+  const subtitle = input.step ? getSelectorPreview(input.step) : getSectionPreview();
 
   // clang-format off
   LitHtml.render(

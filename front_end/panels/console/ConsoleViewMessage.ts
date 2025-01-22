@@ -50,7 +50,7 @@ import * as IssueCounter from '../../ui/components/issue_counter/issue_counter.j
 import * as RequestLinkIcon from '../../ui/components/request_link_icon/request_link_icon.js';
 import * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
 import * as ObjectUI from '../../ui/legacy/components/object_ui/object_ui.js';
-// eslint-disable-next-line rulesdir/es_modules_import
+// eslint-disable-next-line rulesdir/es-modules-import
 import objectValueStyles from '../../ui/legacy/components/object_ui/objectValue.css.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
@@ -1327,7 +1327,7 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
       this.elementInternal.classList.add('console-from-api');
     }
     if (this.inSimilarGroup) {
-      this.similarGroupMarker = (this.consoleRowWrapper.createChild('div', 'nesting-level-marker') as HTMLElement);
+      this.similarGroupMarker = this.consoleRowWrapper.createChild('div', 'nesting-level-marker');
       this.similarGroupMarker.classList.toggle('group-closed', this.lastInSimilarGroup);
     }
 
@@ -1546,8 +1546,7 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
     }
 
     if (!this.repeatCountElement) {
-      this.repeatCountElement =
-          (document.createElement('span', {is: 'dt-small-bubble'}) as UI.UIUtils.DevToolsSmallBubble);
+      this.repeatCountElement = document.createElement('dt-small-bubble');
       this.repeatCountElement.classList.add('console-message-repeat-count');
       switch (this.message.level) {
         case Protocol.Log.LogEntryLevel.Warning:
@@ -1740,7 +1739,7 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
 
     for (let i = 0; i < linkInfos.length; ++i) {
       const newline = i < linkInfos.length - 1 ? '\n' : '';
-      const {line, link} = linkInfos[i];
+      const {line, link, isCallFrame} = linkInfos[i];
       // Syntax errors don't have a stack frame that points to the source position
       // where the error occurred. We use the source location from the
       // exceptionDetails and append it to the end of the message instead.
@@ -1755,11 +1754,17 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
         formattedResult.append(newline);
         continue;
       }
-      if (!link) {
+      if (!isCallFrame) {
         formattedResult.appendChild(this.linkifyStringAsFragment(`${line}${newline}`));
         continue;
       }
       const formattedLine = document.createElement('span');
+      if (!link) {
+        formattedLine.appendChild(this.linkifyStringAsFragment(`${line}${newline}`));
+        formattedLine.classList.add('formatted-builtin-stack-frame');
+        formattedResult.appendChild(formattedLine);
+        continue;
+      }
       const suffix = `${link.suffix}${newline}`;
       formattedLine.appendChild(this.linkifyStringAsFragment(link.prefix));
       const scriptLocationLink = this.linkifier.linkifyScriptLocation(

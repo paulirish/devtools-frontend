@@ -60,6 +60,10 @@ const UIStrings = {
    */
   filter: 'Filter',
   /**
+   *@description Text in Resource Web Socket Frame View of the Network panel that shows if no message is selected for viewing its content
+   */
+  noMessageSelected: 'No message selected',
+  /**
    *@description Text in Resource Web Socket Frame View of the Network panel
    */
   selectMessageToBrowseItsContent: 'Select message to browse its content.',
@@ -206,7 +210,7 @@ export class ResourceWebSocketFrameView extends UI.Widget.VBox {
     }, this);
     this.dataGrid.addEventListener(DataGrid.DataGrid.Events.DESELECTED_NODE, this.onFrameDeselected, this);
 
-    this.mainToolbar = new UI.Toolbar.Toolbar('');
+    this.mainToolbar = document.createElement('devtools-toolbar');
 
     this.clearAllButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.clearAll), 'clear');
     this.clearAllButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, this.clearFrames, this);
@@ -232,12 +236,13 @@ export class ResourceWebSocketFrameView extends UI.Widget.VBox {
     this.mainToolbar.appendToolbarItem(this.filterTextInput);
 
     const mainContainer = new UI.Widget.VBox();
-    mainContainer.element.appendChild(this.mainToolbar.element);
+    mainContainer.element.appendChild(this.mainToolbar);
     this.dataGrid.asWidget().show(mainContainer.element);
     mainContainer.setMinimumSize(0, 72);
     this.splitWidget.setMainWidget(mainContainer);
 
-    this.frameEmptyWidget = new UI.EmptyWidget.EmptyWidget(i18nString(UIStrings.selectMessageToBrowseItsContent));
+    this.frameEmptyWidget = new UI.EmptyWidget.EmptyWidget(
+        i18nString(UIStrings.noMessageSelected), i18nString(UIStrings.selectMessageToBrowseItsContent));
     this.splitWidget.setSidebarWidget(this.frameEmptyWidget);
 
     this.selectedNode = null;
@@ -314,7 +319,7 @@ export class ResourceWebSocketFrameView extends UI.Widget.VBox {
     if (text) {
       try {
         this.filterRegex = new RegExp(text, 'i');
-      } catch (e: unknown) {
+      } catch {
         this.filterRegex = new RegExp(Platform.StringUtilities.escapeForRegExp(text), 'i');
       }
     } else {

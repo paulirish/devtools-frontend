@@ -12,7 +12,6 @@ import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
 import {AnimationsTrackAppender} from './AnimationsTrackAppender.js';
 import {getEventLevel, getFormattedTime, type LastTimestampByLevel} from './AppenderUtils.js';
 import * as TimelineComponents from './components/components.js';
-import {ExtensionDataGatherer} from './ExtensionDataGatherer.js';
 import {ExtensionTrackAppender} from './ExtensionTrackAppender.js';
 import {GPUTrackAppender} from './GPUTrackAppender.js';
 import {InteractionsTrackAppender} from './InteractionsTrackAppender.js';
@@ -23,16 +22,17 @@ import {
   EntryType,
   InstantEventVisibleDurationMs,
 } from './TimelineFlameChartDataProvider.js';
+import {TimelinePanel} from './TimelinePanel.js';
 import {TimingsTrackAppender} from './TimingsTrackAppender.js';
 import * as TimelineUtils from './utils/utils.js';
 
-export type PopoverInfo = {
-  title: string,
-  formattedTime: string,
-  url: string|null,
-  warningElements: HTMLSpanElement[],
-  additionalElements: HTMLElement[],
-};
+export interface PopoverInfo {
+  title: string;
+  formattedTime: string;
+  url: string|null;
+  warningElements: HTMLSpanElement[];
+  additionalElements: HTMLElement[];
+}
 
 let showPostMessageEvents: boolean|undefined;
 function isShowPostMessageEventsEnabled(): boolean {
@@ -280,7 +280,10 @@ export class CompatibilityTracksAppender {
   }
 
   #addExtensionAppenders(): void {
-    const tracks = ExtensionDataGatherer.instance().getExtensionData().extensionTrackData;
+    if (!TimelinePanel.extensionDataVisibilitySetting().get()) {
+      return;
+    }
+    const tracks = this.#parsedTrace.ExtensionTraceData.extensionTrackData;
     for (const trackData of tracks) {
       this.#allTrackAppenders.push(new ExtensionTrackAppender(this, trackData));
     }
@@ -530,9 +533,9 @@ export class CompatibilityTracksAppender {
     this.#entryData.push(event);
     this.#legacyEntryTypeByLevel[level] = EntryType.TRACK_APPENDER;
     this.#flameChartData.entryLevels[index] = level;
-    this.#flameChartData.entryStartTimes[index] = Trace.Helpers.Timing.microSecondsToMilliseconds(event.ts);
-    const dur = event.dur || Trace.Helpers.Timing.millisecondsToMicroseconds(InstantEventVisibleDurationMs);
-    this.#flameChartData.entryTotalTimes[index] = Trace.Helpers.Timing.microSecondsToMilliseconds(dur);
+    this.#flameChartData.entryStartTimes[index] = Trace.Helpers.Timing.microToMilli(event.ts);
+    const dur = event.dur || Trace.Helpers.Timing.milliToMicro(InstantEventVisibleDurationMs);
+    this.#flameChartData.entryTotalTimes[index] = Trace.Helpers.Timing.microToMilli(dur);
     return index;
   }
 
@@ -634,11 +637,14 @@ export class CompatibilityTracksAppender {
       throw new Error('Track not found for level');
     }
 
-    // Historically all tracks would have a titleForEvent() method.
-    // However, we are working on migrating all event title logic into one place (components/EntryName)
-    // TODO(crbug.com/365047728):
-    // Once this migration is complete, no tracks will have a custom
-    // titleForEvent method and we can remove titleForEvent entirely.
+    // Historically all tracks would have a titleForEvent() method. However a
+    // lot of these were duplicated so we worked on removing them in favour of
+    // the EntryName.nameForEntry method called below (see crbug.com/365047728).
+    // However, sometimes an appender needs to customise the titles slightly;
+    // for example the LayoutShiftsTrackAppender does not show any titles as we
+    // use diamonds to represent layout shifts.
+    // So whilst we expect most appenders to not define this method, we do
+    // allow appenders to override it.
     if (track.titleForEvent) {
       return track.titleForEvent(event);
     }

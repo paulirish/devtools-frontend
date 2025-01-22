@@ -46,8 +46,6 @@ import {
   FontMatcher,
   type GridTemplateMatch,
   GridTemplateMatcher,
-  type LengthMatch,
-  LengthMatcher,
   type LightDarkColorMatch,
   LightDarkColorMatcher,
   type LinearGradientMatch,
@@ -458,10 +456,7 @@ export class ColorRenderer implements MatchRenderer<ColorMatch> {
       const swatchIcon =
           new ColorSwatchPopoverIcon(this.treeElement, this.treeElement.parentPane().swatchPopoverHelper(), swatch);
       swatchIcon.addEventListener(ColorSwatchPopoverIconEvents.COLOR_CHANGED, ev => {
-        const color = Common.Color.parse(ev.data);
-        if (color) {
-          swatch.setColorText(color);
-        }
+        swatch.setColorText(ev.data);
       });
       void this.#addColorContrastInfo(swatchIcon);
     }
@@ -835,12 +830,12 @@ export const enum ShadowPropertyType {
   COLOR = 'color',
 }
 
-type ShadowProperty = {
-  value: string|CodeMirror.SyntaxNode,
-  source: CodeMirror.SyntaxNode|null,
-  expansionContext: RenderingContext|null,
-  propertyType: ShadowPropertyType,
-};
+interface ShadowProperty {
+  value: string|CodeMirror.SyntaxNode;
+  source: CodeMirror.SyntaxNode|null;
+  expansionContext: RenderingContext|null;
+  propertyType: ShadowPropertyType;
+}
 
 type ShadowLengthProperty = ShadowProperty&{
   length: InlineEditor.CSSShadowEditor.CSSLength,
@@ -1159,46 +1154,6 @@ export class GridTemplateRenderer implements MatchRenderer<GridTemplateMatch> {
   }
 }
 
-export class LengthRenderer implements MatchRenderer<LengthMatch> {
-  readonly #treeElement: StylePropertyTreeElement;
-  constructor(treeElement: StylePropertyTreeElement) {
-    this.#treeElement = treeElement;
-  }
-
-  render(match: LengthMatch, _context: RenderingContext): Node[] {
-    const lengthText = match.text;
-    if (!this.#treeElement.editable()) {
-      return [document.createTextNode(lengthText)];
-    }
-    const cssLength = new InlineEditor.CSSLength.CSSLength();
-    const valueElement = document.createElement('span');
-    valueElement.textContent = lengthText;
-    cssLength.data = {lengthText};
-    cssLength.append(valueElement);
-
-    const onValueChanged = (event: Event): void => {
-      const {data} = (event as InlineEditor.InlineEditorUtils.ValueChangedEvent);
-
-      valueElement.textContent = data.value;
-      this.#treeElement.parentPane().setEditingStyle(true);
-      void this.#treeElement.applyStyleText(this.#treeElement.renderedPropertyText(), false);
-    };
-
-    const onDraggingFinished = (): void => {
-      this.#treeElement.parentPane().setEditingStyle(false);
-    };
-
-    cssLength.addEventListener('valuechanged', onValueChanged);
-    cssLength.addEventListener('draggingfinished', onDraggingFinished);
-
-    return [cssLength];
-  }
-
-  matcher(): LengthMatcher {
-    return new LengthMatcher();
-  }
-}
-
 async function decorateAnchorForAnchorLink(container: HTMLElement, treeElement: StylePropertyTreeElement, options: {
   identifier?: string, needsSpace: boolean,
 }): Promise<void> {
@@ -1384,6 +1339,10 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
     this.lastComputedValue = null;
 
     this.#propertyTextFromSource = property.propertyText || '';
+
+    this.property.addEventListener(SDK.CSSProperty.Events.LOCAL_VALUE_UPDATED, () => {
+      this.updateTitle();
+    });
   }
 
   async gridNames(): Promise<Set<string>> {
@@ -1758,10 +1717,6 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
           new FontRenderer(this),
         ] :
         [];
-
-    if (!Root.Runtime.experiments.isEnabled('css-type-component-length-deprecate') && this.property.parsedOk) {
-      renderers.push(new LengthRenderer(this));
-    }
 
     this.listItemElement.removeChildren();
     this.valueElement = Renderer.renderValueElement(this.name, this.value, renderers);
@@ -2189,7 +2144,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
 
     this.originalPropertyText = this.property.propertyText || '';
 
-    this.parentPaneInternal.setEditingStyle(true, this);
+    this.parentPaneInternal.setEditingStyle(true);
     selectedElement.parentElement?.scrollIntoViewIfNeeded(false);
 
     this.prompt = new CSSPropertyPrompt(this, context.isEditingName, Array.from(this.#gridNames ?? []));
@@ -2586,7 +2541,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
 
   private async innerApplyStyleText(
       styleText: string, majorChange: boolean, property?: SDK.CSSProperty.CSSProperty|null): Promise<void> {
-    // this.property might have been nulled at the end of the last innerApplyStyleText
+    // this.property might have been nulled at the end of the last innerApplyStyleText.
     if (!this.treeOutline || !this.property) {
       return;
     }

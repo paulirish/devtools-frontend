@@ -5,7 +5,6 @@
 import './SDKModel.js';
 import './CSSMetadata.js';
 import '../../generated/SupportedCSSProperties.js';
-import './ProfileTreeModel.js';
 import './NetworkRequest.js';
 import './NetworkManager.js';
 import './RuntimeModel.js';
@@ -21,7 +20,6 @@ import * as ConsoleModel from './ConsoleModel.js';
 import * as Cookie from './Cookie.js';
 import * as CookieModel from './CookieModel.js';
 import * as CookieParser from './CookieParser.js';
-import * as CPUProfileDataModel from './CPUProfileDataModel.js';
 import * as CPUProfilerModel from './CPUProfilerModel.js';
 import * as CPUThrottlingManager from './CPUThrottlingManager.js';
 import * as CSSContainerQuery from './CSSContainerQuery.js';
@@ -63,7 +61,6 @@ import * as PageResourceLoader from './PageResourceLoader.js';
 import * as PaintProfiler from './PaintProfiler.js';
 import * as PerformanceMetricsModel from './PerformanceMetricsModel.js';
 import * as PreloadingModel from './PreloadingModel.js';
-import * as ProfileTreeModel from './ProfileTreeModel.js';
 import * as RemoteObject from './RemoteObject.js';
 import * as Resource from './Resource.js';
 import * as ResourceTreeModel from './ResourceTreeModel.js';
@@ -77,6 +74,7 @@ import * as ServerTiming from './ServerTiming.js';
 import * as ServiceWorkerCacheModel from './ServiceWorkerCacheModel.js';
 import * as ServiceWorkerManager from './ServiceWorkerManager.js';
 import * as SourceMap from './SourceMap.js';
+import * as SourceMapFunctionRanges from './SourceMapFunctionRanges.js';
 import * as SourceMapManager from './SourceMapManager.js';
 import * as SourceMapScopeChainEntry from './SourceMapScopeChainEntry.js';
 import * as SourceMapScopes from './SourceMapScopes.js';
@@ -100,7 +98,6 @@ export {
   Cookie,
   CookieModel,
   CookieParser,
-  CPUProfileDataModel,
   CPUProfilerModel,
   CPUThrottlingManager,
   CSSContainerQuery,
@@ -142,7 +139,6 @@ export {
   PaintProfiler,
   PerformanceMetricsModel,
   PreloadingModel,
-  ProfileTreeModel,
   RemoteObject,
   Resource,
   ResourceTreeModel,
@@ -156,6 +152,7 @@ export {
   ServiceWorkerCacheModel,
   ServiceWorkerManager,
   SourceMap,
+  SourceMapFunctionRanges,
   SourceMapManager,
   SourceMapScopeChainEntry,
   SourceMapScopes,

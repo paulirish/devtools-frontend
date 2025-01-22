@@ -144,9 +144,9 @@ export const enum Events {
   FILTER_SELECTED = 'FilterSelected',
 }
 
-export type EventTypes = {
-  [Events.FILTER_SELECTED]: void,
-};
+export interface EventTypes {
+  [Events.FILTER_SELECTED]: void;
+}
 
 class ConsoleSidebarTreeElement extends UI.TreeOutline.TreeElement {
   protected filterInternal: ConsoleFilter;
@@ -242,7 +242,7 @@ export class FilterTreeElement extends ConsoleSidebarTreeElement {
 
   private updateGroupTitle(messageCount: number): string {
     if (this.uiStringForFilterCount) {
-      // eslint-disable-next-line rulesdir/l10n_i18nString_call_only_with_uistrings
+      // eslint-disable-next-line rulesdir/l10n-i18nString-call-only-with-uistrings
       return i18nString(this.uiStringForFilterCount, {n: messageCount});
     }
     return '';

@@ -44,7 +44,7 @@ describeWithEnvironment('LayoutShiftsTrackAppender', function() {
   it('marks all levels used by the track with the TrackAppender type', async function() {
     const {entryTypeByLevel} = await renderTrackAppender(this, 'cls-single-frame.json.gz');
     // Only one row of layout shifts.
-    assert.strictEqual(entryTypeByLevel.length, 1);
+    assert.lengthOf(entryTypeByLevel, 1);
     assert.deepEqual(entryTypeByLevel, [
       Timeline.TimelineFlameChartDataProvider.EntryType.TRACK_APPENDER,
     ]);
@@ -58,7 +58,7 @@ describeWithEnvironment('LayoutShiftsTrackAppender', function() {
 
   it('creates a flamechart group', async function() {
     const {flameChartData} = await renderTrackAppender(this, 'cls-single-frame.json.gz');
-    assert.strictEqual(flameChartData.groups.length, 1);
+    assert.lengthOf(flameChartData.groups, 1);
     assert.strictEqual(flameChartData.groups[0].name, 'Layout shifts');
   });
 
@@ -68,16 +68,18 @@ describeWithEnvironment('LayoutShiftsTrackAppender', function() {
     for (const event of events) {
       const markerIndex = entryData.indexOf(event);
       assert.exists(markerIndex);
-      assert.strictEqual(
-          flameChartData.entryStartTimes[markerIndex], Trace.Helpers.Timing.microSecondsToMilliseconds(event.ts));
+      assert.strictEqual(flameChartData.entryStartTimes[markerIndex], Trace.Helpers.Timing.microToMilli(event.ts));
     }
   });
 
-  it('returns the correct title for a layout shift', async function() {
-    const {layoutShiftsTrackAppender, parsedTrace} = await renderTrackAppender(this, 'cls-single-frame.json.gz');
-    const shifts = parsedTrace.LayoutShifts.clusters.flatMap(c => c.events);
-    const title = layoutShiftsTrackAppender.titleForEvent(shifts[0]);
-    assert.strictEqual(title, 'Layout shift');
+  it('does not define any title for a layout shift or a cluster', async () => {
+    const {layoutShiftsTrackAppender, parsedTrace} = await renderTrackAppender(this, 'cls-no-nav.json.gz');
+    const cluster = parsedTrace.LayoutShifts.clusters.at(0);
+    assert.isOk(cluster);
+    const shift = cluster.events.at(0);
+    assert.isOk(shift);
+    assert.strictEqual(layoutShiftsTrackAppender.titleForEvent(cluster), '');
+    assert.strictEqual(layoutShiftsTrackAppender.titleForEvent(shift), '');
   });
 
   it('shows "Layout shift" tooltip on hover', async function() {

@@ -10,7 +10,7 @@ import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 import * as ARIAUtils from './ARIAUtils.js';
 import infobarStyles from './infobar.css.legacy.js';
 import {Keys} from './KeyboardShortcut.js';
-import {createShadowRootWithCoreStyles, createTextButton} from './UIUtils.js';
+import {createShadowRootWithCoreStyles, createTextButton, type DevToolsCloseButton} from './UIUtils.js';
 import type {Widget} from './Widget.js';
 
 const UIStrings = {
@@ -42,21 +42,16 @@ export class Infobar {
   private readonly infoMessage: HTMLElement;
   private infoText: HTMLElement;
   private readonly actionContainer: HTMLElement;
-  // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private readonly disableSetting: Common.Settings.Setting<any>|null;
+  private readonly disableSetting: Common.Settings.Setting<boolean>|null;
   private readonly closeContainer: HTMLElement;
   private readonly toggleElement: Buttons.Button.Button;
-  private readonly closeButton: HTMLElement;
+  private readonly closeButton: DevToolsCloseButton;
   private closeCallback: (() => void)|null;
   #firstFocusableElement: HTMLElement|null = null;
   private parentView?: Widget;
 
   constructor(
-      // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      type: Type, text: string, actions?: InfobarAction[], disableSetting?: Common.Settings.Setting<any>,
-      /* TODO(crbug.com/1354548) Remove with JS Profiler deprecation */ isCloseable: boolean = true,
+      type: Type, text: string, actions?: InfobarAction[], disableSetting?: Common.Settings.Setting<boolean>,
       jslogContext?: string) {
     this.element = document.createElement('div');
     if (jslogContext) {
@@ -64,9 +59,9 @@ export class Infobar {
           'jslog', `${VisualLogging.dialog(jslogContext).track({resize: true, keydown: 'Enter|Escape'})}`);
     }
     this.element.classList.add('flex-none');
-    this.shadowRoot = createShadowRootWithCoreStyles(this.element, {cssFile: infobarStyles, delegatesFocus: undefined});
+    this.shadowRoot = createShadowRootWithCoreStyles(this.element, {cssFile: infobarStyles});
 
-    this.contentElement = this.shadowRoot.createChild('div', 'infobar infobar-' + type) as HTMLDivElement;
+    this.contentElement = this.shadowRoot.createChild('div', 'infobar infobar-' + type);
 
     this.mainRow = this.contentElement.createChild('div', 'infobar-main-row');
     this.detailsRows = this.contentElement.createChild('div', 'infobar-details-rows hidden');
@@ -123,10 +118,7 @@ export class Infobar {
         {className: 'hidden show-more', jslogContext: 'show-more', variant: Buttons.Button.Variant.TEXT});
     this.toggleElement.setAttribute('role', 'link');
     this.closeContainer.appendChild(this.toggleElement);
-    this.closeButton = this.closeContainer.createChild('div', 'close-button', 'dt-close-button');
-    this.closeButton.hidden = !isCloseable;
-    // @ts-ignore This is a custom element defined in UIUitls.js that has a `setTabbable` that TS doesn't
-    //            know about.
+    this.closeButton = this.closeContainer.createChild('dt-close-button', 'close-button');
     this.closeButton.setTabbable(true);
     ARIAUtils.setDescription(this.closeButton, i18nString(UIStrings.close));
     self.onInvokeElement(this.closeButton, this.dispose.bind(this));
@@ -157,14 +149,12 @@ export class Infobar {
   }
 
   static create(
-      // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      type: Type, text: string, actions?: InfobarAction[], disableSetting?: Common.Settings.Setting<any>,
+      type: Type, text: string, actions?: InfobarAction[], disableSetting?: Common.Settings.Setting<boolean>,
       jslogContext?: string): Infobar|null {
     if (disableSetting && disableSetting.get()) {
       return null;
     }
-    return new Infobar(type, text, actions, disableSetting, undefined, jslogContext);
+    return new Infobar(type, text, actions, disableSetting, jslogContext);
   }
 
   dispose(): void {

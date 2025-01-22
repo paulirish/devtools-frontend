@@ -116,7 +116,7 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
     const timeWindow = this.overviewGrid.calculateWindowValue();
     if (Trace.Types.Timing.MilliSeconds(timeWindow.rawStartValue) <= timeInMilliSeconds &&
         timeInMilliSeconds <= Trace.Types.Timing.MilliSeconds(timeWindow.rawEndValue)) {
-      const timeInMicroSeconds = Trace.Helpers.Timing.millisecondsToMicroseconds(timeInMilliSeconds);
+      const timeInMicroSeconds = Trace.Helpers.Timing.milliToMicro(timeInMilliSeconds);
       this.dispatchEventToListeners(Events.OVERVIEW_PANE_MOUSE_MOVE, {timeInMicroSeconds});
     } else {
       this.dispatchEventToListeners(Events.OVERVIEW_PANE_MOUSE_LEAVE);
@@ -196,7 +196,7 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
     });
   }
 
-  override update(start?: Trace.Types.Timing.MilliSeconds, end?: Trace.Types.Timing.MilliSeconds): void {
+  update(start?: Trace.Types.Timing.MilliSeconds, end?: Trace.Types.Timing.MilliSeconds): void {
     if (!this.isShowing()) {
       return;
     }
@@ -228,7 +228,7 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
       if (!marker) {
         continue;
       }
-      const timeInMicroSeconds = Trace.Helpers.Timing.millisecondsToMicroseconds(Trace.Types.Timing.MilliSeconds(time));
+      const timeInMicroSeconds = Trace.Helpers.Timing.milliToMicro(Trace.Types.Timing.MilliSeconds(time));
       const dim = highlightBounds && !Trace.Helpers.Timing.timestampIsInBounds(highlightBounds, timeInMicroSeconds);
 
       // `filter: grayscale(1)`  will make the element fully completely grayscale.
@@ -400,8 +400,8 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
   }
 
   highlightBounds(bounds: Trace.Types.Timing.TraceWindowMicroSeconds, withBracket: boolean): void {
-    const left = this.overviewCalculator.computePosition(Trace.Helpers.Timing.microSecondsToMilliseconds(bounds.min));
-    const right = this.overviewCalculator.computePosition(Trace.Helpers.Timing.microSecondsToMilliseconds(bounds.max));
+    const left = this.overviewCalculator.computePosition(Trace.Helpers.Timing.microToMilli(bounds.min));
+    const right = this.overviewCalculator.computePosition(Trace.Helpers.Timing.microToMilli(bounds.max));
     this.#dimMarkers(bounds);
     // Update the punch out rectangle to the not-to-desaturate time range.
     const punchRect = this.#dimHighlightSVG.querySelector('rect.punch');
@@ -444,12 +444,12 @@ export interface OverviewPaneMouseMoveEvent {
   timeInMicroSeconds: Trace.Types.Timing.MicroSeconds;
 }
 
-export type EventTypes = {
-  [Events.OVERVIEW_PANE_WINDOW_CHANGED]: OverviewPaneWindowChangedEvent,
-  [Events.OVERVIEW_PANE_BREADCRUMB_ADDED]: OverviewPaneBreadcrumbAddedEvent,
-  [Events.OVERVIEW_PANE_MOUSE_MOVE]: OverviewPaneMouseMoveEvent,
-  [Events.OVERVIEW_PANE_MOUSE_LEAVE]: void,
-};
+export interface EventTypes {
+  [Events.OVERVIEW_PANE_WINDOW_CHANGED]: OverviewPaneWindowChangedEvent;
+  [Events.OVERVIEW_PANE_BREADCRUMB_ADDED]: OverviewPaneBreadcrumbAddedEvent;
+  [Events.OVERVIEW_PANE_MOUSE_MOVE]: OverviewPaneMouseMoveEvent;
+  [Events.OVERVIEW_PANE_MOUSE_LEAVE]: void;
+}
 
 export interface TimelineOverview {
   show(parentElement: Element, insertBefore?: Element|null): void;
@@ -470,7 +470,7 @@ export class TimelineOverviewBase extends UI.Widget.VBox implements TimelineOver
   constructor() {
     super();
     this.calculatorInternal = null;
-    this.canvas = (this.element.createChild('canvas', 'fill') as HTMLCanvasElement);
+    this.canvas = this.element.createChild('canvas', 'fill');
     this.contextInternal = this.canvas.getContext('2d');
   }
 
@@ -493,7 +493,7 @@ export class TimelineOverviewBase extends UI.Widget.VBox implements TimelineOver
     return this.calculatorInternal;
   }
 
-  override update(): void {
+  update(): void {
     throw new Error('Not implemented');
   }
 
@@ -541,12 +541,10 @@ export class OverviewInfo {
     this.glassPane.setMarginBehavior(UI.GlassPane.MarginBehavior.ARROW);
     this.glassPane.setSizeBehavior(UI.GlassPane.SizeBehavior.MEASURE_CONTENT);
     this.visible = false;
-    this.element = UI.UIUtils
-                       .createShadowRootWithCoreStyles(this.glassPane.contentElement, {
-                         cssFile: [timelineOverviewInfoStyles],
-                         delegatesFocus: undefined,
-                       })
-                       .createChild('div', 'overview-info');
+    this.element =
+        UI.UIUtils
+            .createShadowRootWithCoreStyles(this.glassPane.contentElement, {cssFile: [timelineOverviewInfoStyles]})
+            .createChild('div', 'overview-info');
   }
 
   async setContent(contentPromise: Promise<DocumentFragment>): Promise<void> {
