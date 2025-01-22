@@ -108,5 +108,5 @@
     "@typescript-eslint/utils": "8.19.0",
     "ws": "$ws"
   },
-  "version": "0.0.38"
+  "version": "0.0.40"
 }
