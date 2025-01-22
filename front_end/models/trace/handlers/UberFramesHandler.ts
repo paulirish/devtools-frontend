@@ -19,6 +19,8 @@ const gpuEvents: Types.Events.Event[] = [];
 const asyncEvts: Types.Events.Event[] = [];
 let syntheticEvents: Types.Events.SyntheticPipelineReporterPair[] = [];
 const waterFallEvents: Types.Events.Event[] = [];
+const prIDsToSkip: string[] = [];
+
 let eventLatencyIdToFrameSeq: Record<string, number> = {};
 // export interface UberFramesData {
 //   relevantEvts: readonly Types.Events.Event[],
@@ -29,6 +31,7 @@ export type UberFramesData = {
   nonWaterfallEvts: readonly Types.Events.Event[],
   waterFallEvts: readonly Types.Events.Event[],
   eventLatencyIdToFrameSeq: Record<string, number>,
+
 };
 
 export function reset(): void {
@@ -287,10 +290,13 @@ export async function finalize(): Promise<void> {
 
 
   const syntheticPairs = Helpers.Trace.createMatchedSortedSyntheticEvents(asyncEvts);
-  console.log({syntheticPairs});
 
 
   for (const event of syntheticPairs) {
+    // avoid ones from other processes.
+    if (!topLevelRendererIds.has(event.pid)) {
+      continue;
+    }
     if (event.name === 'EventLatency') {
       eventLatencyIdToFrameSeq[event.args.data.beginEvent.id2.local] =
           event.args.data.beginEvent.args.event_latency.frame_sequence ?? null;
@@ -298,6 +304,14 @@ export async function finalize(): Promise<void> {
     if (event.name === 'PipelineReporter') {
       eventLatencyIdToFrameSeq[event.args.data.beginEvent.id2.local] =
           event.args.data.beginEvent.args.chrome_frame_reporter.frame_sequence ?? null;
+
+
+      // drop pipelinereporter that werent presented. or browser process.
+      /// by including this you get multiple PR events for a single frame, which is .. confusing at least. it gets into partial frames.. and.. i dont understand it.
+      if (event.args.data.beginEvent.args.chrome_frame_reporter.frame_type !== 'FORKED' &&
+          event.args.data.beginEvent.args.chrome_frame_reporter.state === 'STATE_PRESENTED_ALL') {
+        prIDsToSkip.push(event.args.data.beginEvent.id2.local);
+      }
     }
 
 
@@ -306,30 +320,24 @@ export async function finalize(): Promise<void> {
     }
     syntheticEvents.push(event);
   }
-
-  // drop pipelinereporter that werent presented. or browser process.
-  // TODO: do this earlier? iunno
-  // EDIT: disabled filtering since ubeframes is a mess anyway.
-  syntheticEvents = syntheticEvents.filter(e => {
-    return true;
-    if (e.name !== 'PipelineReporter') {
-      return true;
-    }
-    return topLevelRendererIds.has(e.pid) &&
-        e.args.data.beginEvent.args.chrome_frame_reporter.frame_type !== 'FORKED' &&
-        e.args.data.beginEvent.args.chrome_frame_reporter.state === 'STATE_PRESENTED_ALL';
-  });
 }
 
 // TODO: is it okay to do work here? this is only called once? (or should i put the _work_ in finalize)
 // so far looks like its only called once, so whatev.
 export function data(): UberFramesData {
-  const nonWaterfallEvts = [...relevantEvts, ...syntheticEvents].filter(e => !waterFallEvents.includes(e));
+  const excludePartialPR = (event: Types.Events.Event): boolean => {
+    const localID = event.args?.data?.beginEvent?.id2?.local;
+    return prIDsToSkip.includes(localID) === false;
+  };
+
+  const nonWaterfallEvts =
+      [...relevantEvts, ...syntheticEvents].filter(e => !waterFallEvents.includes(e)).filter(excludePartialPR);
 
   return {
     nonWaterfallEvts: nonWaterfallEvts.sort((event1, event2) => event1.ts - event2.ts),
-    waterFallEvts: [...waterFallEvents].sort((event1, event2) => event1.ts - event2.ts),
+    waterFallEvts: [...waterFallEvents].filter(excludePartialPR).sort((event1, event2) => event1.ts - event2.ts),
     eventLatencyIdToFrameSeq,
+
   };
 }
 
