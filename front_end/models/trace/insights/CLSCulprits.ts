@@ -10,7 +10,7 @@ import * as Types from '../types/types.js';
 
 import {InsightCategory, type InsightModel, type InsightSetContext, type RequiredData} from './types.js';
 
-const UIStrings = {
+export const UIStrings = {
   /** Title of an insight that provides details about why elements shift/move on the page. The causes for these shifts are referred to as culprits ("reasons"). */
   title: 'Layout shift culprits',
   /**

@@ -19,7 +19,7 @@ import {
   type RequiredData,
 } from './types.js';
 
-const UIStrings = {
+export const UIStrings = {
   /**
    * @description Title of an insight that provides the user with the list of network requests that blocked and therefore slowed down the page rendering and becoming visible to the user.
    */

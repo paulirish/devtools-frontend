@@ -15,7 +15,7 @@ import {
   type RequiredData,
 } from './types.js';
 
-const UIStrings = {
+export const UIStrings = {
   /**
    *@description Title of an insight that provides details about the LCP metric, and the network requests necessary to load it. Details how the LCP request was discoverable - in other words, the path necessary to load it (ex: network requests, JavaScript)
    */

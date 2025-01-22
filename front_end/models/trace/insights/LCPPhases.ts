@@ -15,7 +15,7 @@ import {
   type RequiredData,
 } from './types.js';
 
-const UIStrings = {
+export const UIStrings = {
   /**
    *@description Title of an insight that provides details about the LCP metric, broken down by phases / parts.
    */

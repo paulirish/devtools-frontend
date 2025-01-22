@@ -9,7 +9,7 @@ import * as Types from '../types/types.js';
 
 import {InsightCategory, type InsightModel, type InsightSetContext, type RequiredData} from './types.js';
 
-const UIStrings = {
+export const UIStrings = {
   /**
    * @description Title of an insight that recommends reducing the size of the DOM tree as a means to improve page responsiveness. "DOM" is an acronym and should not be translated.
    */

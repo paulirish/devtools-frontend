@@ -9,7 +9,7 @@ import * as Types from '../types/types.js';
 
 import {InsightCategory, type InsightModel, type InsightSetContext, type RequiredData} from './types.js';
 
-const UIStrings = {
+export const UIStrings = {
   /** Title of an insight that provides details about the fonts used on the page, and the value of their `font-display` properties. */
   title: 'Font display',
   /**

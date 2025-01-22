@@ -11,7 +11,7 @@ import type * as Types from '../types/types.js';
 
 import {InsightCategory, type InsightModel, type InsightSetContext, type RequiredData} from './types.js';
 
-const UIStrings = {
+export const UIStrings = {
   /** Title of an insight that provides details about the code on a web page that the user doesn't control (referred to as "third-party code"). */
   title: 'Third parties',
   /**

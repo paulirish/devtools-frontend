@@ -14,7 +14,7 @@ import {
   type RequiredData,
 } from './types.js';
 
-const UIStrings = {
+export const UIStrings = {
   /** Title of an insight that provides details about if the page's viewport is optimized for mobile viewing. */
   title: 'Optimize viewport for mobile',
   /**

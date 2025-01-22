@@ -13,7 +13,7 @@ import {
   type RequiredData,
 } from './types.js';
 
-const UIStrings = {
+export const UIStrings = {
   /**
    * @description Title of an insight that recommends ways to reduce the size of images downloaded and used on the page.
    */

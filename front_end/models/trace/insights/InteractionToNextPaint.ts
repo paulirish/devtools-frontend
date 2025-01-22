@@ -8,7 +8,7 @@ import type {SyntheticInteractionPair} from '../types/TraceEvents.js';
 
 import {InsightCategory, type InsightModel, type InsightSetContext, type RequiredData} from './types.js';
 
-const UIStrings = {
+export const UIStrings = {
   /**
    * @description Text to tell the user about the longest user interaction.
    */
