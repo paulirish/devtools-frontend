@@ -4,6 +4,7 @@
 
 import * as i18n from '../../../core/i18n/i18n.js';
 import type * as Platform from '../../../core/platform/platform.js';
+import * as Root from '../../../core/root/root.js';
 import * as Trace from '../../../models/trace/trace.js';
 import * as ThemeSupport from '../../../ui/legacy/theme_support/theme_support.js';
 
@@ -1070,6 +1071,14 @@ export function maybeInitSylesMap(): EventStylesMap {
     [Trace.Types.Events.Name.V8_CONSOLE_RUN_TASK]:
         new TimelineRecordStyle(i18nString(UIStrings.consoleTaskRun), defaultCategoryStyles.scripting),
   };
+
+  if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_SHOW_POST_MESSAGE_EVENTS)) {
+    eventStylesMap[Trace.Types.Events.Name.SCHEDULE_POST_MESSAGE] =
+        new TimelineRecordStyle('Schedule postMessage', defaultCategoryStyles.scripting);
+    eventStylesMap[Trace.Types.Events.Name.HANDLE_POST_MESSAGE] =
+        new TimelineRecordStyle('Handle postMessage', defaultCategoryStyles.scripting);
+  }
+
   return eventStylesMap;
 }
 

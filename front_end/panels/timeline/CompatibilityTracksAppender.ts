@@ -37,20 +37,20 @@ export interface PopoverInfo {
   additionalElements: HTMLElement[];
 }
 
-let showPostMessageEvents: boolean|undefined;
-function isShowPostMessageEventsEnabled(): boolean {
-  // Everytime the experiment is toggled devtools is reloaded so the
-  // cache is updated automatically.
-  if (showPostMessageEvents === undefined) {
-    showPostMessageEvents =
-        Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_SHOW_POST_MESSAGE_EVENTS);
-  }
-  return showPostMessageEvents;
-}
+const showAllEvents = Root.Runtime.experiments.isEnabled('timeline-show-all-events');
 
 export function entryIsVisibleInTimeline(
     entry: Trace.Types.Events.Event, parsedTrace?: Trace.Handlers.Types.ParsedTrace): boolean {
-  if (parsedTrace && parsedTrace.Meta.traceIsGeneric) {
+  if (parsedTrace?.Meta.traceIsGeneric) {
+    return true;
+  }
+  if (showAllEvents) {
+    return true;
+  }
+  // Default styles are globally defined for each event name. Some
+  // events are hidden by default.
+  const eventStyle = TimelineUtils.EntryStyles.getEventStyle(entry.name as Trace.Types.Events.Name);
+  if (eventStyle && !eventStyle.hidden) {
     return true;
   }
 
@@ -65,23 +65,15 @@ export function entryIsVisibleInTimeline(
     return true;
   }
 
-  if (isShowPostMessageEventsEnabled()) {
-    if (Trace.Types.Events.isSchedulePostMessage(entry) || Trace.Types.Events.isHandlePostMessage(entry)) {
-      return true;
-    }
-  }
-
   if (Trace.Types.Extensions.isSyntheticExtensionEntry(entry) || Trace.Types.Events.isSyntheticServerTiming(entry)) {
     return true;
   }
 
-  // Default styles are globally defined for each event name. Some
-  // events are hidden by default.
-  const eventStyle = TimelineUtils.EntryStyles.getEventStyle(entry.name as Trace.Types.Events.Name);
-  const eventIsTiming = Trace.Types.Events.isConsoleTime(entry) || Trace.Types.Events.isPerformanceMeasure(entry) ||
-      Trace.Types.Events.isPerformanceMark(entry);
-
-  return (eventStyle && !eventStyle.hidden) || eventIsTiming;
+  if (Trace.Types.Events.isConsoleTime(entry) || Trace.Types.Events.isPerformanceMeasure(entry) ||
+      Trace.Types.Events.isPerformanceMark(entry)) {
+    return true;
+  }
+  return false;
 }
 
 /**

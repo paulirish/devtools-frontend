@@ -19,7 +19,7 @@ const UIStrings = {
   /**
    *@description Text in Timeline Flame Chart Data Provider of the Performance panel
    */
-  trackTitle: 'UberFrames',
+  trackTitle: 'UberFrames - enable show ALL events!',
 };
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/UberFramesTrackAppender.ts', UIStrings);
@@ -61,7 +61,10 @@ export class UberFramesTrackAppender implements TrackAppender {
    * appended the track's events.
    */
   appendTrackAtLevel(trackStartLevel: number, expanded?: boolean): number {
-    const uberNonWaterfallEvts = this.#parsedTrace.UberFramesHandler.nonWaterfallEvts;
+    const skipThese = ['PipelineReporter', 'SubmitCompositorFrameToPresentationCompositorFrame'];
+    const uberNonWaterfallEvts = this.#parsedTrace.UberFramesHandler.nonWaterfallEvts.filter(e => {
+      return !skipThese.includes(e.name);
+    });
 
     if (uberNonWaterfallEvts.length === 0) {
       return trackStartLevel;

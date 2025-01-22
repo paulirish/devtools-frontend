@@ -49,7 +49,7 @@ export async function finalize(): Promise<void> {
   for (const snapshotEvent of snapshotEvents) {
     const {cat, name, ph, pid, tid} = snapshotEvent;
 
-    console.log((getPresentationTimestamp(snapshotEvent) - snapshotEvent.ts) / 1000, 'ms adjusted to the right');
+    // console.log((getPresentationTimestamp(snapshotEvent) - snapshotEvent.ts) / 1000, 'ms adjusted to the right');
 
     const syntheticEvent = Helpers.SyntheticEvents.SyntheticEventsManager.registerSyntheticEvent<
         Types.Events.SyntheticScreenshot>({
@@ -92,13 +92,13 @@ function getPresentationTimestamp(screenshotEvent: Types.Events.Screenshot): Typ
   const BetterupdatedTs = sourceToSequenceToTs[source_id]?.[frame_sequence];
 
   if (BetterupdatedTs === undefined) {
-    console.log('better timestamp not found', source_id, frame_sequence);
+    // console.log('better timestamp not found', source_id, frame_sequence);
   } else if (BetterupdatedTs !== updatedTs) {
-    console.log(
-        'different result thanks to sourceid', source_id, frame_sequence, BetterupdatedTs - updatedTs, BetterupdatedTs,
-        updatedTs);
+    // console.log(
+    // 'different result thanks to sourceid', source_id, frame_sequence, BetterupdatedTs - updatedTs, BetterupdatedTs,
+    // updatedTs);
   } else {
-    console.log('better ts and reg timestamp are same.', source_id, frame_sequence);
+    // console.log('better ts and reg timestamp are same.', source_id, frame_sequence);
   }
 
   // Do we always find a match? No...
