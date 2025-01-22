@@ -38,6 +38,7 @@ import * as UI from '../../ui/legacy/legacy.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
 
 import {CompatibilityTracksAppender, type DrawOverride, type TrackAppenderName} from './CompatibilityTracksAppender.js';
+import {FramesWaterfallTrackAppender} from './FramesWaterfallTrackAppender.js';
 import {initiatorsDataToDraw} from './Initiators.js';
 import {ModificationsManager} from './ModificationsManager.js';
 import {ThreadAppender} from './ThreadAppender.js';
@@ -1072,6 +1073,21 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     context.drawImage(image, imageX, imageY, imageWidth, imageHeight);
     context.strokeStyle = '#ccc';
     context.strokeRect(imageX - 0.5, imageY - 0.5, Math.min(barWidth - 1, imageWidth + 1), imageHeight);
+
+    const seqNo = FramesWaterfallTrackAppender.seqNo(screenshot);
+    if (seqNo) {
+      const entryTitle = `shot sq${seqNo % 1000}`;
+      const textWidth = UI.UIUtils.measureTextWidth(context, entryTitle);
+      const textPadding = 5;
+      const textBaseline = 5;
+      const bgcolor = this.compatibilityTracksAppender?.framesWaterfallTrackAppender().colorForEvent(screenshot);
+      context.fillStyle = bgcolor ?? 'blue';
+      const textY = barY + barHeight - textBaseline;
+      context.fillRect(imageX, textY - 10, textWidth * 1.3, textBaseline * 2);
+      context.fillStyle = 'white';
+      context.fillText(entryTitle, barX + textPadding, textY);
+    }
+
     context.restore();
   }
 

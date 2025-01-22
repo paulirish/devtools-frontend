@@ -163,7 +163,7 @@ export class FramesWaterfallTrackAppender implements TrackAppender {
     const frameSeqId = event.args.data?.beginEvent?.args.animation_frame_timing_info?.begin_frame_id.sequence_number ??
         event.args.data?.beginEvent?.args.animation_frame_timing_info?.begin_frame_id.sequence_number ??
         event.args.frameSeqId ?? event.args.frame_sequence ?? event.args.begin_frame_id?.sequence_number ??
-        event.args.begin_frame_id ?? event.args.args?.sequence_number ??
+        event.rawSourceEvent?.args.frame_sequence ?? event.args.begin_frame_id ?? event.args.args?.sequence_number ??
         event.args?.data?.beginEvent?.args?.sequence_number ??
         event.args?.data?.beginEvent?.args?.data?.sequence_number ??
         event.args?.data?.beginEvent?.args?.event_latency?.frame_sequence ??

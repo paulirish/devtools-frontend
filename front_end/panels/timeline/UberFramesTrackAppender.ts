@@ -63,7 +63,7 @@ export class UberFramesTrackAppender implements TrackAppender {
    * appended the track's events.
    */
   appendTrackAtLevel(trackStartLevel: number, expanded?: boolean): number {
-    const skipThese = ['SubmitCompositorFrameToPresentationCompositorFrame', 'PipelineReporter'];
+    const skipThese = ['SubmitCompositorFrameToPresentationCompositorFrame'];  // , 'PipelineReporter'];
     const uberNonWaterfallEvts = this.#parsedTrace.UberFramesHandler.nonWaterfallEvts.filter(e => {
       return !skipThese.includes(e.name);
     });
