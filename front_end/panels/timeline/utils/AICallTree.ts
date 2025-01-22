@@ -36,6 +36,7 @@ export class AICallTree {
         Trace.Helpers.Timing.millisecondsToMicroseconds(endTime));
     const threadEvents = parsedTrace.Renderer.processes.get(selectedEvent.pid)?.threads.get(selectedEvent.tid)?.entries;
     if (!threadEvents) {
+      return;
       throw new Error('Cannot locate thread');
     }
     const overlappingEvents = threadEvents.filter(e => Trace.Helpers.Timing.eventIsInBounds(e, selectedEventBounds));
@@ -57,7 +58,7 @@ export class AICallTree {
     });
 
     if (selectedNode === null) {
-      throw new Error('Node not within its own tree. Unexpected.');
+      return;
     }
     const instance = new AICallTree(selectedNode, rootNode, parsedTrace);
     // instance.logDebug();

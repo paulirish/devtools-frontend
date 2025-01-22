@@ -149,7 +149,7 @@ export const TrackNames = [
   'Extension',
   'UberFrames',
   'FramesWaterfall',
-  'NewFrames',
+  // 'NewFrames',
   'ServerTimings',
 ] as const;
 // Network track will use TrackAppender interface, but it won't be shown in Main flamechart.
@@ -204,7 +204,7 @@ export class CompatibilityTracksAppender {
   #timingsTrackAppender: TimingsTrackAppender;
   #uberFramesTrackAppender: UberFramesTrackAppender;
   #framesWaterfallTrackAppender: FramesWaterfallTrackAppender;
-  #newFramesTrackAppender: NewFramesTrackAppender;
+  // #newFramesTrackAppender: NewFramesTrackAppender;
   #animationsTrackAppender: AnimationsTrackAppender;
   #interactionsTrackAppender: InteractionsTrackAppender;
   #gpuTrackAppender: GPUTrackAppender;
@@ -249,9 +249,9 @@ export class CompatibilityTracksAppender {
         new FramesWaterfallTrackAppender(this, this.#flameChartData, this.#parsedTrace, uberFramesColorGenerator);
     this.#allTrackAppenders.push(this.#framesWaterfallTrackAppender);
 
-    this.#newFramesTrackAppender =
-        new NewFramesTrackAppender(this, this.#flameChartData, this.#parsedTrace, uberFramesColorGenerator);
-    this.#allTrackAppenders.push(this.#newFramesTrackAppender);
+    // this.#newFramesTrackAppender =
+    //     new NewFramesTrackAppender(this, this.#flameChartData, this.#parsedTrace, uberFramesColorGenerator);
+    // this.#allTrackAppenders.push(this.#newFramesTrackAppender);
 
     this.#uberFramesTrackAppender =
         new UberFramesTrackAppender(this, this.#flameChartData, this.#parsedTrace, uberFramesColorGenerator);
@@ -398,9 +398,9 @@ export class CompatibilityTracksAppender {
     return this.#framesWaterfallTrackAppender;
   }
 
-  newFramesTrackAppender(): NewFramesTrackAppender {
-    return this.#newFramesTrackAppender;
-  }
+  // newFramesTrackAppender(): NewFramesTrackAppender {
+  //   return this.#newFramesTrackAppender;
+  // }
 
   uberFramesTrackAppender(): UberFramesTrackAppender {
     return this.#uberFramesTrackAppender;

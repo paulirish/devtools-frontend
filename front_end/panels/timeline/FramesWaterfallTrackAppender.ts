@@ -136,23 +136,26 @@ export class FramesWaterfallTrackAppender implements TrackAppender {
    * Gets the color an event added by this appender should be rendered with.
    */
   colorForEvent(event: Trace.Types.Events.Event): string {
-    return this.#colorGenerator.colorForID(event.name);
+    const frameSeq = this.seqNo(event);
+
+
+    return this.#colorGenerator.colorForID(frameSeq?.toString(16) || event.name);
   }
 
   /**
    * Gets the title an event added by this appender should be rendered with.
    */
-  titleForEvent(event: Trace.Types.Events.Event): string {
+  seqNo(event: Trace.Types.Events.Event): number|null {
+    // my additions to chrome_frame_reporter
     const frameSeqId = event.args.frameSeqId ?? event.args.frame_sequence ?? event.args.begin_frame_id ??
-        event.args.args?.sequence_number ??
-        event.args?.data?.beginEvent?.args?.sequence_number ??  // my additions to chrome_frame_reporter
+        event.args.args?.sequence_number ?? event.args?.data?.beginEvent?.args?.sequence_number ??
         event.args?.data?.beginEvent?.args?.data?.sequence_number ??
         event.args?.data?.beginEvent?.args?.event_latency?.frame_sequence ??
         event.args?.data?.beginEvent?.args?.chrome_frame_reporter?.frame_sequence ??
         event.args?.data?.beginEvent?.args?.send_begin_mainframe_to_commit_breakdown?.frame_sequence ?? '';
 
     if (frameSeqId) {
-      return `${event.name} sq${frameSeqId % 1000}`;
+      return frameSeqId;
     }
 
     const localID = event.args?.data?.beginEvent?.id2?.local;
@@ -160,12 +163,23 @@ export class FramesWaterfallTrackAppender implements TrackAppender {
     if (localID) {
       const frameSeq = this.#parsedTrace.UberFramesHandler.eventLatencyIdToFrameSeq[localID];
       if (frameSeq) {
-        return `${event.name} SQ${frameSeq % 1000}`;
+        return frameSeq;
       }
 
-      return `${event.name} c${localID}`;
+      return null;  // `${event.name} c${localID}`;
+    }
+  }
+
+  titleForEvent(event: Trace.Types.Events.Event): string {
+    const frameSeq = this.seqNo(event);
+    if (frameSeq) {
+      return `${event.name} sq${frameSeq % 1000}`;
     }
 
+    const localID = event.args?.data?.beginEvent?.id2?.local;
+    if (localID) {
+      return `${event.name} c${localID}`;
+    }
     return event.name;
   }
 

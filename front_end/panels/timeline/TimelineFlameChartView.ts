@@ -1268,7 +1268,7 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
     if (selectionIsEvent(selection) && this.#parsedTrace) {
       // TODO: should we cache this?
       const aiCallTree = Utils.AICallTree.AICallTree.from(selection.event, this.#parsedTrace);
-      UI.Context.Context.instance().setFlavor(Utils.AICallTree.AICallTree, aiCallTree);
+      aiCallTree && UI.Context.Context.instance().setFlavor(Utils.AICallTree.AICallTree, aiCallTree);
     } else {
       UI.Context.Context.instance().setFlavor(Utils.AICallTree.AICallTree, null);
     }

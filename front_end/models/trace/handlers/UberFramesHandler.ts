@@ -83,10 +83,12 @@ const someRelevantTraceEventTypes = [
   'SetLayerTreeId',
 
   'AnimationFrame',
-  'AnimationFrame::FirstUIEvent',
-  'AnimationFrame::StyleAndLayout',
   'AnimationFrame::Presentation',
-
+  'AnimationFrame::FirstUIEvent',
+  'AnimationFrame::Script::Compile',
+  'AnimationFrame::Script::Execute',
+  'AnimationFrame::Render',
+  'AnimationFrame::StyleAndLayout',
 
 
   'MainFrame.NotifyReadyToCommitOnImpl',
