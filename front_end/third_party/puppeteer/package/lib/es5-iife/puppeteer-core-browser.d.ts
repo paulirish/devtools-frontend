@@ -376,12 +376,6 @@ export declare abstract class Browser extends EventEmitter<BrowserEvents> {
 }
 
 /**
- * @deprecated Use {@link ConnectOptions}.
- * @public
- */
-export declare type BrowserConnectOptions = ConnectOptions;
-
-/**
  * {@link BrowserContext} represents individual user contexts within a
  * {@link Browser | browser}.
  *
@@ -642,12 +636,6 @@ export declare interface BrowserEvents extends Record<EventType, unknown> {
     [BrowserEvent.TargetChanged]: Target;
 
 }
-
-/**
- * @deprecated Use {@link LaunchOptions}.
- * @public
- */
-export declare type BrowserLaunchArgumentOptions = LaunchOptions;
 
 /**
  * Describes a launcher - a class that is able to create and launch a browser instance.
@@ -3928,7 +3916,8 @@ launch: (options?: Puppeteer_2.LaunchOptions) => Promise<Puppeteer_2.Browser>;
  */
 export declare interface LaunchOptions extends ConnectOptions {
     /**
-     * Chrome Release Channel
+     * If specified for Chrome, looks for a regular Chrome installation at a known
+     * system location instead of using the bundled Chrome binary.
      */
     channel?: ChromeReleaseChannel;
     /**
@@ -5701,6 +5690,9 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      *   await page.emulateVisionDeficiency('blurredVision');
      *   await page.screenshot({path: 'blurred-vision.png'});
      *
+     *   await page.emulateVisionDeficiency('reducedContrast');
+     *   await page.screenshot({path: 'reduced-contrast.png'});
+     *
      *   await browser.close();
      * })();
      * ```
@@ -6943,7 +6935,6 @@ declare namespace Puppeteer_2 {
         SupportedWebDriverCapability,
         SupportedWebDriverCapabilities,
         ConnectOptions,
-        BrowserConnectOptions,
         ConsoleMessageLocation,
         ConsoleMessageType,
         ConsoleMessage,
@@ -6994,8 +6985,6 @@ declare namespace Puppeteer_2 {
         DownloadBehavior,
         ChromeReleaseChannel,
         LaunchOptions,
-        BrowserLaunchArgumentOptions,
-        PuppeteerNodeLaunchOptions,
         BrowserLauncher,
         PuppeteerNode,
         ScreenRecorder
@@ -7179,12 +7168,6 @@ export declare class PuppeteerNode extends Puppeteer {
      */
     trimCache(): Promise<void>;
 }
-
-/**
- * @deprecated Use {@link LaunchOptions}.
- * @public
- */
-export declare type PuppeteerNodeLaunchOptions = LaunchOptions;
 
 /**
  * @public
@@ -7492,6 +7475,13 @@ export declare interface SnapshotOptions {
      * @defaultValue `true`
      */
     interestingOnly?: boolean;
+    /**
+     * If true, gets accessibility trees for each of the iframes in the frame
+     * subtree.
+     *
+     * @defaultValue `false`
+     */
+    includeIframes?: boolean;
     /**
      * Root node to get the accessibility tree for
      * @defaultValue The root node of the entire page.

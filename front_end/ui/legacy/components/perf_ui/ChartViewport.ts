@@ -4,13 +4,11 @@
 
 import * as Common from '../../../../core/common/common.js';
 import * as Platform from '../../../../core/platform/platform.js';
-import * as Coordinator from '../../../components/render_coordinator/render_coordinator.js';
+import * as RenderCoordinator from '../../../components/render_coordinator/render_coordinator.js';
 import * as UI from '../../legacy.js';
 
 import chartViewPortStyles from './chartViewport.css.legacy.js';
 import {MinimalTimeWindowMs} from './FlameChart.js';
-
-const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
 
 export interface ChartViewportDelegate {
   windowChanged(startTime: number, endTime: number, animate: boolean): void;
@@ -222,24 +220,33 @@ export class ChartViewport extends UI.Widget.VBox {
    */
   private onMouseWheel(wheelEvent: WheelEvent): void {
     const navigation = Common.Settings.Settings.instance().moduleSetting('flamechart-selected-navigation').get();
-    const scrollDelta = (wheelEvent.deltaY || wheelEvent.deltaX) / 53 * this.offsetHeight / 8;
+    // Delta for navigation left, right, up and down.
+    // Calculated from horizontal or vertical scroll delta, depending on which one exists.
+    const panDelta = (wheelEvent.deltaY || wheelEvent.deltaX) / 53 * this.offsetHeight / 8;
     const zoomDelta = Math.pow(1.2, (wheelEvent.deltaY || wheelEvent.deltaX) * 1 / 53) - 1;
 
     if (navigation === 'classic') {
       if (wheelEvent.shiftKey) {  // Scroll
-        this.vScrollElement.scrollTop += scrollDelta;
-      } else if (Math.abs(wheelEvent.deltaX) > Math.abs(wheelEvent.deltaY)) {  // Pan left/right
-        this.handlePanGesture(wheelEvent.deltaX, /* animate */ true);
+        this.vScrollElement.scrollTop += panDelta;
+      } else if (
+          Math.abs(wheelEvent.deltaX) > Math.abs(wheelEvent.deltaY)) {  // Pan left/right on trackpad horizontal scroll
+        // Horizontal scroll on the trackpad feels smoother when only deltaX is taken into account
+        this.handleHorizontalPanGesture(wheelEvent.deltaX, /* animate */ true);
       } else {  // Zoom
         this.handleZoomGesture(zoomDelta);
       }
     } else if (navigation === 'modern') {
+      const isCtrlOrCmd = UI.KeyboardShortcut.KeyboardShortcut.eventHasCtrlEquivalentKey(wheelEvent);
       if (wheelEvent.shiftKey) {  // Pan left/right
-        this.handlePanGesture(wheelEvent.deltaY, /* animate */ true);
-      } else if (wheelEvent.ctrlKey || Math.abs(wheelEvent.deltaX) > Math.abs(wheelEvent.deltaY)) {  // Zoom
+        this.handleHorizontalPanGesture(panDelta, /* animate */ true);
+      } else if (
+          Math.abs(wheelEvent.deltaX) > Math.abs(wheelEvent.deltaY)) {  // Pan left/right on trackpad horizontal scroll
+        // Horizontal scroll on the trackpad feels smoother when only deltaX is taken into account
+        this.handleHorizontalPanGesture(wheelEvent.deltaX, /* animate */ true);
+      } else if (isCtrlOrCmd) {  // Zoom
         this.handleZoomGesture(zoomDelta);
       } else {  // Scroll
-        this.vScrollElement.scrollTop += scrollDelta;
+        this.vScrollElement.scrollTop += panDelta;
       }
     }
 
@@ -262,7 +269,7 @@ export class ChartViewport extends UI.Widget.VBox {
   private dragging(event: MouseEvent): void {
     const pixelShift = this.dragStartPointX - event.pageX;
     this.dragStartPointX = event.pageX;
-    this.handlePanGesture(pixelShift);
+    this.handleHorizontalPanGesture(pixelShift);
     const pixelScroll = this.dragStartPointY - event.pageY;
     this.vScrollElement.scrollTop = this.dragStartScrollTop + pixelScroll;
   }
@@ -379,14 +386,14 @@ export class ChartViewport extends UI.Widget.VBox {
       return;
     }
     const zoomFactor = keyboardEvent.shiftKey ? 0.8 : 0.3;
-    const panOffset = keyboardEvent.shiftKey ? 320 : 160;
+    const panOffset = 160;
     const scrollOffset = 50;
     switch (keyboardEvent.code) {
       case 'KeyA':
-        this.handlePanGesture(-panOffset, /* animate */ true);
+        this.handleHorizontalPanGesture(-panOffset, /* animate */ true);
         break;
       case 'KeyD':
-        this.handlePanGesture(panOffset, /* animate */ true);
+        this.handleHorizontalPanGesture(panOffset, /* animate */ true);
         break;
       case 'Equal':  // '+' key for zoom in
       case 'KeyW':
@@ -406,6 +413,16 @@ export class ChartViewport extends UI.Widget.VBox {
           this.vScrollElement.scrollTop += scrollOffset;
         }
         break;
+      case 'ArrowLeft':
+        if (keyboardEvent.shiftKey) {
+          this.handleHorizontalPanGesture(-panOffset, /* animate */ true);
+        }
+        break;
+      case 'ArrowRight':
+        if (keyboardEvent.shiftKey) {
+          this.handleHorizontalPanGesture(panOffset, /* animate */ true);
+        }
+        break;
       default:
         return;
     }
@@ -423,7 +440,7 @@ export class ChartViewport extends UI.Widget.VBox {
     this.requestWindowTimes(bounds, /* animate */ true);
   }
 
-  private handlePanGesture(offset: number, animate?: boolean): void {
+  private handleHorizontalPanGesture(offset: number, animate?: boolean): void {
     const bounds = {left: this.targetLeftTime, right: this.targetRightTime};
     const timeOffset = Platform.NumberUtilities.clamp(
         this.pixelToTimeOffset(offset), this.minimumBoundary - bounds.left,
@@ -458,13 +475,13 @@ export class ChartViewport extends UI.Widget.VBox {
       return;
     }
     this.isUpdateScheduled = true;
-    void coordinator.write(() => {
+    void RenderCoordinator.write(() => {
       this.isUpdateScheduled = false;
       this.update();
     });
   }
 
-  override update(): void {
+  update(): void {
     this.delegate.update();
   }
 

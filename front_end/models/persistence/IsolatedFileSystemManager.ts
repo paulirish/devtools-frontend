@@ -82,7 +82,6 @@ export class IsolatedFileSystemManager extends Common.ObjectWrapper.ObjectWrappe
     // Initialize exclude pattern settings
     const defaultCommonExcludedFolders = [
       '/node_modules/',
-      '/bower_components/',
       '/\\.devtools',
       '/\\.git/',
       '/\\.sass-cache/',
@@ -355,12 +354,12 @@ export enum Events {
   /* eslint-enable @typescript-eslint/naming-convention */
 }
 
-export type EventTypes = {
-  [Events.FileSystemAdded]: PlatformFileSystem,
-  [Events.FileSystemRemoved]: PlatformFileSystem,
-  [Events.FileSystemFilesChanged]: FilesChangedData,
-  [Events.ExcludedFolderAdded]: Platform.DevToolsPath.EncodedPathString,
-  [Events.ExcludedFolderRemoved]: Platform.DevToolsPath.EncodedPathString,
-};
+export interface EventTypes {
+  [Events.FileSystemAdded]: PlatformFileSystem;
+  [Events.FileSystemRemoved]: PlatformFileSystem;
+  [Events.FileSystemFilesChanged]: FilesChangedData;
+  [Events.ExcludedFolderAdded]: Platform.DevToolsPath.EncodedPathString;
+  [Events.ExcludedFolderRemoved]: Platform.DevToolsPath.EncodedPathString;
+}
 
 let lastRequestId = 0;

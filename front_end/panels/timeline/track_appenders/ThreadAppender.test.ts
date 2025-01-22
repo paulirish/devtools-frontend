@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import type * as Platform from '../../../core/platform/platform.js';
+import * as Platform from '../../../core/platform/platform.js';
 import * as Root from '../../../core/root/root.js';
 import * as SDK from '../../../core/sdk/sdk.js';
 import * as Bindings from '../../../models/bindings/bindings.js';
@@ -17,6 +17,8 @@ import {
 import {TraceLoader} from '../../../testing/TraceLoader.js';
 import * as PerfUI from '../../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as Timeline from '../timeline.js';
+
+const {urlString} = Platform.DevToolsPath;
 
 function initTrackAppender(
     flameChartData: PerfUI.FlameChart.FlameChartTimelineData,
@@ -75,7 +77,7 @@ describeWithEnvironment('ThreadAppender', function() {
       'Thread',
       'Thread',
     ];
-    assert.deepStrictEqual(threadAppenders.map(g => g.appenderName), expectedAppenderNames);
+    assert.deepEqual(threadAppenders.map(g => g.appenderName), expectedAppenderNames);
   });
 
   it('renders tracks for threads in correct order', async function() {
@@ -87,7 +89,7 @@ describeWithEnvironment('ThreadAppender', function() {
   it('renders tracks for threads in correct order when a process url is about:blank', async function() {
     const {flameChartData} = await renderThreadAppendersFromTrace(this, 'about-blank-first.json.gz');
     const groupNames = flameChartData.groups.map(g => g.name.replace(/(new-tab-page\/).*/, '$1'));
-    assert.deepStrictEqual(groupNames.slice(0, 3), [
+    assert.deepEqual(groupNames.slice(0, 3), [
       'Frame — chrome-untrusted://new-tab-page/',
       'Main — chrome://new-tab-page/',
       'Main — about:blank',
@@ -109,7 +111,7 @@ describeWithEnvironment('ThreadAppender', function() {
       Timeline.TimelineFlameChartDataProvider.EntryType.TRACK_APPENDER,
       Timeline.TimelineFlameChartDataProvider.EntryType.TRACK_APPENDER,
     ];
-    assert.deepStrictEqual(entryTypeByLevel, execptedLevelTypes);
+    assert.deepEqual(entryTypeByLevel, execptedLevelTypes);
   });
 
   it('creates a flamechart groups for track headers and titles', async function() {
@@ -122,7 +124,7 @@ describeWithEnvironment('ThreadAppender', function() {
       'Thread pool',
       'Thread pool worker 1',
     ];
-    assert.deepStrictEqual(flameChartData.groups.map(g => g.name), expectedTrackNames);
+    assert.deepEqual(flameChartData.groups.map(g => g.name), expectedTrackNames);
   });
 
   it('builds flamechart groups for nested tracks correctly', async function() {
@@ -130,18 +132,18 @@ describeWithEnvironment('ThreadAppender', function() {
     // This group corresponds to the header that wraps the raster tracks
     // together. It isn't selectable and isn't nested
     assert.strictEqual(flameChartData.groups[1].name, 'Raster');
-    assert.strictEqual(flameChartData.groups[1].selectable, false);
+    assert.isFalse(flameChartData.groups[1].selectable);
     assert.strictEqual(flameChartData.groups[1].style.nestingLevel, 0);
 
     // These groups correspond to the raster tracks titles, or the
     // individual raster tracks themselves. They are selectable and
     // nested
     assert.strictEqual(flameChartData.groups[2].name, 'Rasterizer thread 1');
-    assert.strictEqual(flameChartData.groups[2].selectable, true);
+    assert.isTrue(flameChartData.groups[2].selectable);
     assert.strictEqual(flameChartData.groups[2].style.nestingLevel, 1);
 
     assert.strictEqual(flameChartData.groups[3].name, 'Rasterizer thread 2');
-    assert.strictEqual(flameChartData.groups[3].selectable, true);
+    assert.isTrue(flameChartData.groups[3].selectable);
     assert.strictEqual(flameChartData.groups[3].style.nestingLevel, 1);
   });
 
@@ -153,7 +155,7 @@ describeWithEnvironment('ThreadAppender', function() {
       'Thread pool worker 1',
       'Thread pool worker 2',
     ];
-    assert.deepStrictEqual(flameChartData.groups.map(g => g.name), expectedTrackNames);
+    assert.deepEqual(flameChartData.groups.map(g => g.name), expectedTrackNames);
   });
 
   it('adds thread IDs onto tracks when the trace is generic', async () => {
@@ -184,7 +186,7 @@ describeWithEnvironment('ThreadAppender', function() {
       'Thread pool worker 1',
       'Thread pool worker 2',
     ];
-    assert.deepStrictEqual(flameChartData.groups.map(g => g.name), expectedTrackNames);
+    assert.deepEqual(flameChartData.groups.map(g => g.name), expectedTrackNames);
   });
 
   it('returns the correct title for a renderer event', async function() {
@@ -370,7 +372,7 @@ describeWithEnvironment('ThreadAppender', function() {
       // This second "worker" is the ThreadPoolServiceThread. TODO: perhaps hide ThreadPoolServiceThread completely?
       'Thread pool worker 2',
     ];
-    assert.deepStrictEqual(flameChartData.groups.map(g => g.name), expectedTrackNames);
+    assert.deepEqual(flameChartData.groups.map(g => g.name), expectedTrackNames);
   });
 
   describe('ignore listing', () => {
@@ -399,8 +401,7 @@ describeWithEnvironment('ThreadAppender', function() {
       const initialTimelineData = await renderThreadAppendersFromTrace(this, 'react-hello-world.json.gz');
       const initialFlamechartData = initialTimelineData.flameChartData;
       const eventCountBeforeIgnoreList = initialFlamechartData.entryStartTimes.length;
-      const SCRIPT_TO_IGNORE =
-          'https://unpkg.com/react@18.2.0/umd/react.development.js' as Platform.DevToolsPath.UrlString;
+      const SCRIPT_TO_IGNORE = urlString`https://unpkg.com/react@18.2.0/umd/react.development.js`;
       // Clear the data provider cache and add the React script to the ignore list.
       ignoreListManager.ignoreListURL(SCRIPT_TO_IGNORE);
       const finalTimelineData = await renderThreadAppendersFromTrace(this, 'react-hello-world.json.gz');
@@ -420,7 +421,7 @@ describeWithEnvironment('ThreadAppender', function() {
     });
 
     it('appends a tree that contains ignore listed entries correctly', async function() {
-      const SCRIPT_TO_IGNORE = 'https://some-framework/bundled.js' as Platform.DevToolsPath.UrlString;
+      const SCRIPT_TO_IGNORE = urlString`https://some-framework/bundled.js`;
 
       // Create the following hierarchy with profile calls. Events marked
       // with \\\\ represent ignored listed events.
@@ -464,7 +465,8 @@ describeWithEnvironment('ThreadAppender', function() {
         Meta: {
           traceIsGeneric: false,
         },
-      } as Trace.Handlers.Types.ParsedTrace;
+        ExtensionTraceData: {entryToNode: new Map(), extensionMarkers: [], extensionTrackData: []},
+      } as unknown as Trace.Handlers.Types.ParsedTrace;
 
       // Add the script to ignore list and then append the flamechart data
       ignoreListManager.ignoreListURL(SCRIPT_TO_IGNORE);
@@ -480,7 +482,7 @@ describeWithEnvironment('ThreadAppender', function() {
       assert.deepEqual(flameChartData.entryLevels, [0, 1, 2, 1]);
       assert.deepEqual(flameChartData.entryStartTimes, [0.1, 0.1, 0.1, 0.2]);
       assert.deepEqual(flameChartData.entryTotalTimes, [0.2, 0.1, 0.025, 0.1]);
-      assert.strictEqual(threadAppenders.length, 1);
+      assert.lengthOf(threadAppenders, 1);
       assert.strictEqual(threadAppenders[0].titleForEvent(callFrameB), 'On ignore list (\\\/bundled\\.js$)');
     });
   });

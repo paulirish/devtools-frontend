@@ -195,7 +195,8 @@ describe('Recorder', function() {
           assertRecordingMatchesSnapshot(recording);
         });
 
-        it('should select through the selector picker twice', async () => {
+        // Flaky test
+        it.skip('[crbug.com/383478771] should select through the selector picker twice', async () => {
           const {target, frontend} = getBrowserAndPages();
           await frontend.bringToFront();
           await frontend.waitForSelector('pierce/.settings');

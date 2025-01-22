@@ -31,6 +31,8 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+import '../../ui/legacy/legacy.js';
+
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
@@ -42,7 +44,7 @@ import * as UI from '../../ui/legacy/legacy.js';
 import * as LitHtml from '../../ui/lit-html/lit-html.js';
 
 import * as ElementsComponents from './components/components.js';
-import {type ComputedStyle, ComputedStyleModel, Events} from './ComputedStyleModel.js';
+import {type ComputedStyle, type ComputedStyleModel, Events} from './ComputedStyleModel.js';
 import computedStyleSidebarPaneStyles from './computedStyleSidebarPane.css.js';
 import {ImagePreviewPopover} from './ImagePreviewPopover.js';
 import {PlatformFontsWidget} from './PlatformFontsWidget.js';
@@ -156,8 +158,19 @@ const createTraceElement =
       if (rule) {
         ruleOriginNode = StylePropertiesSection.createRuleOriginNode(matchedStyles, linkifier, rule);
       }
+
+      let selector = 'element.style';
+      if (rule) {
+        selector = rule.selectorText();
+      } else if (property.ownerStyle.type === SDK.CSSStyleDeclaration.Type.Animation) {
+        selector = property.ownerStyle.animationName() ? `${property.ownerStyle.animationName()} animation` :
+                                                         'animation style';
+      } else if (property.ownerStyle.type === SDK.CSSStyleDeclaration.Type.Transition) {
+        selector = 'transitions style';
+      }
+
       trace.data = {
-        selector: rule ? rule.selectorText() : 'element.style',
+        selector,
         active: !isPropertyOverloaded,
         onNavigateToSource: navigateToSource.bind(null, property),
         ruleOriginNode,
@@ -242,12 +255,13 @@ export class ComputedStyleWidget extends UI.ThrottledWidget.ThrottledWidget {
   #computedStylesTree = new TreeOutline.TreeOutline.TreeOutline<ComputedStyleData>();
   #treeData?: TreeOutline.TreeOutline.TreeOutlineData<ComputedStyleData>;
 
-  constructor() {
+  constructor(computedStyleModel: ComputedStyleModel) {
     super(true);
 
     this.contentElement.classList.add('styles-sidebar-computed-style-widget');
 
-    this.computedStyleModel = new ComputedStyleModel();
+    this.computedStyleModel = computedStyleModel;
+    this.computedStyleModel.addEventListener(Events.CSS_MODEL_CHANGED, this.update, this);
     this.computedStyleModel.addEventListener(Events.COMPUTED_STYLE_CHANGED, this.update, this);
 
     this.showInheritedComputedStylePropertiesSetting =
@@ -260,7 +274,7 @@ export class ComputedStyleWidget extends UI.ThrottledWidget.ThrottledWidget {
     });
 
     const hbox = this.contentElement.createChild('div', 'hbox styles-sidebar-pane-toolbar');
-    const toolbar = new UI.Toolbar.Toolbar('styles-pane-toolbar', hbox);
+    const toolbar = hbox.createChild('devtools-toolbar', 'styles-pane-toolbar');
     const filterInput = new UI.Toolbar.ToolbarFilter(undefined, 1, 1, undefined, undefined, false);
     filterInput.addEventListener(UI.Toolbar.ToolbarInput.Event.TEXT_CHANGED, this.onFilterChanged, this);
     toolbar.appendToolbarItem(filterInput);
@@ -291,26 +305,19 @@ export class ComputedStyleWidget extends UI.ThrottledWidget.ThrottledWidget {
     fontsWidget.show(this.contentElement);
   }
 
-  #handleNodeChange(event: Common.EventTarget.EventTargetEvent<SDK.DOMModel.DOMNode|null>): void {
-    void this.computedStyleModel.cssModel()?.trackComputedStyleUpdatesForNode(event.data?.id);
-  }
-
   override onResize(): void {
     const isNarrow = this.contentElement.offsetWidth < 260;
     this.#computedStylesTree.classList.toggle('computed-narrow', isNarrow);
   }
 
   override wasShown(): void {
+    UI.Context.Context.instance().setFlavor(ComputedStyleWidget, this);
     super.wasShown();
     this.registerCSSFiles([computedStyleSidebarPaneStyles]);
-
-    void this.computedStyleModel.cssModel()?.trackComputedStyleUpdatesForNode(this.computedStyleModel.node()?.id);
-    UI.Context.Context.instance().addFlavorChangeListener(SDK.DOMModel.DOMNode, this.#handleNodeChange, this);
   }
 
   override willHide(): void {
-    void this.computedStyleModel.cssModel()?.trackComputedStyleUpdatesForNode(undefined);
-    UI.Context.Context.instance().removeFlavorChangeListener(SDK.DOMModel.DOMNode, this.#handleNodeChange, this);
+    UI.Context.Context.instance().setFlavor(ComputedStyleWidget, null);
   }
 
   override async doUpdate(): Promise<void> {
@@ -496,7 +503,7 @@ export class ComputedStyleWidget extends UI.ThrottledWidget.ThrottledWidget {
             'contextmenu', this.handleContextMenuEvent.bind(this, matchedStyles, data.property));
         return html`${traceElement}`;
       }
-      return html`<span style="cursor: text; color: var(--sys-color-token-subtle);">${data.name}</span>`;
+      return html`<span style="cursor: text; color: var(--sys-color-on-surface-subtle);">${data.name}</span>`;
     };
   }
 

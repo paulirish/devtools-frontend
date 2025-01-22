@@ -737,8 +737,8 @@ export namespace Audits {
     /**
      * The unique request id.
      */
-    requestId: Network.RequestId;
-    url?: string;
+    requestId?: Network.RequestId;
+    url: string;
   }
 
   /**
@@ -1241,6 +1241,7 @@ export namespace Audits {
     InvalidFieldsSpecified = 'InvalidFieldsSpecified',
     RelyingPartyOriginIsOpaque = 'RelyingPartyOriginIsOpaque',
     TypeNotMatching = 'TypeNotMatching',
+    UiDismissedNoEmbargo = 'UiDismissedNoEmbargo',
   }
 
   export interface FederatedAuthUserInfoRequestIssueDetails {
@@ -1283,6 +1284,23 @@ export namespace Audits {
      */
     failureMessage: string;
     requestId?: Network.RequestId;
+  }
+
+  export const enum SelectElementAccessibilityIssueReason {
+    DisallowedSelectChild = 'DisallowedSelectChild',
+    DisallowedOptGroupChild = 'DisallowedOptGroupChild',
+    NonPhrasingContentOptionChild = 'NonPhrasingContentOptionChild',
+    InteractiveContentOptionChild = 'InteractiveContentOptionChild',
+    InteractiveContentLegendChild = 'InteractiveContentLegendChild',
+  }
+
+  /**
+   * This issue warns about errors in the select element content model.
+   */
+  export interface SelectElementAccessibilityIssueDetails {
+    nodeId: DOM.BackendNodeId;
+    selectElementAccessibilityIssueReason: SelectElementAccessibilityIssueReason;
+    hasDisallowedAttributes: boolean;
   }
 
   export const enum StyleSheetLoadingIssueReason {
@@ -1361,6 +1379,7 @@ export namespace Audits {
     FederatedAuthUserInfoRequestIssue = 'FederatedAuthUserInfoRequestIssue',
     PropertyRuleIssue = 'PropertyRuleIssue',
     SharedDictionaryIssue = 'SharedDictionaryIssue',
+    SelectElementAccessibilityIssue = 'SelectElementAccessibilityIssue',
   }
 
   /**
@@ -1390,6 +1409,7 @@ export namespace Audits {
     propertyRuleIssueDetails?: PropertyRuleIssueDetails;
     federatedAuthUserInfoRequestIssueDetails?: FederatedAuthUserInfoRequestIssueDetails;
     sharedDictionaryIssueDetails?: SharedDictionaryIssueDetails;
+    selectElementAccessibilityIssueDetails?: SelectElementAccessibilityIssueDetails;
   }
 
   /**
@@ -2273,6 +2293,20 @@ export namespace CSS {
   }
 
   /**
+   * CSS style coming from animations with the name of the animation.
+   */
+  export interface CSSAnimationStyle {
+    /**
+     * The name of the animation.
+     */
+    name?: string;
+    /**
+     * The style coming from the animation.
+     */
+    style: CSSStyle;
+  }
+
+  /**
    * Inherited CSS rule collection from ancestor node.
    */
   export interface InheritedStyleEntry {
@@ -2284,6 +2318,20 @@ export namespace CSS {
      * Matches of CSS rules matching the ancestor node in the style inheritance chain.
      */
     matchedCSSRules: RuleMatch[];
+  }
+
+  /**
+   * Inherited CSS style collection for animated styles from ancestor node.
+   */
+  export interface InheritedAnimatedStyleEntry {
+    /**
+     * Styles coming from the animations of the ancestor, if any, in the style inheritance chain.
+     */
+    animationStyles?: CSSAnimationStyle[];
+    /**
+     * The style coming from the transitions of the ancestor, if any, in the style inheritance chain.
+     */
+    transitionsStyle?: CSSStyle;
   }
 
   /**
@@ -3187,6 +3235,17 @@ export namespace CSS {
     forcedPseudoClasses: string[];
   }
 
+  export interface ForceStartingStyleRequest {
+    /**
+     * The element id for which to force the starting-style state.
+     */
+    nodeId: DOM.NodeId;
+    /**
+     * Boolean indicating if this is on or off.
+     */
+    forced: boolean;
+  }
+
   export interface GetBackgroundColorsRequest {
     /**
      * Id of the node to get background colors for.
@@ -3254,6 +3313,15 @@ export namespace CSS {
     results: string[];
   }
 
+  export interface GetLonghandPropertiesRequest {
+    shorthandName: string;
+    value: string;
+  }
+
+  export interface GetLonghandPropertiesResponse extends ProtocolResponseWithError {
+    longhandProperties: CSSProperty[];
+  }
+
   export interface GetInlineStylesForNodeRequest {
     nodeId: DOM.NodeId;
   }
@@ -3267,6 +3335,26 @@ export namespace CSS {
      * Attribute-defined element style (e.g. resulting from "width=20 height=100%").
      */
     attributesStyle?: CSSStyle;
+  }
+
+  export interface GetAnimatedStylesForNodeRequest {
+    nodeId: DOM.NodeId;
+  }
+
+  export interface GetAnimatedStylesForNodeResponse extends ProtocolResponseWithError {
+    /**
+     * Styles coming from animations.
+     */
+    animationStyles?: CSSAnimationStyle[];
+    /**
+     * Style coming from transitions.
+     */
+    transitionsStyle?: CSSStyle;
+    /**
+     * Inherited style entries for animationsStyle and transitionsStyle from
+     * the inheritance chain of the element.
+     */
+    inherited?: InheritedAnimatedStyleEntry[];
   }
 
   export interface GetMatchedStylesForNodeRequest {
@@ -5952,73 +6040,6 @@ export namespace DOMStorage {
 
   export interface DomStorageItemsClearedEvent {
     storageId: StorageId;
-  }
-}
-
-export namespace Database {
-
-  /**
-   * Unique identifier of Database object.
-   */
-  export type DatabaseId = OpaqueIdentifier<string, 'Protocol.Database.DatabaseId'>;
-
-  /**
-   * Database object.
-   */
-  export interface Database {
-    /**
-     * Database ID.
-     */
-    id: DatabaseId;
-    /**
-     * Database domain.
-     */
-    domain: string;
-    /**
-     * Database name.
-     */
-    name: string;
-    /**
-     * Database version.
-     */
-    version: string;
-  }
-
-  /**
-   * Database error.
-   */
-  export interface Error {
-    /**
-     * Error message.
-     */
-    message: string;
-    /**
-     * Error code.
-     */
-    code: integer;
-  }
-
-  export interface ExecuteSQLRequest {
-    databaseId: DatabaseId;
-    query: string;
-  }
-
-  export interface ExecuteSQLResponse extends ProtocolResponseWithError {
-    columnNames?: string[];
-    values?: any[];
-    sqlError?: Error;
-  }
-
-  export interface GetDatabaseTableNamesRequest {
-    databaseId: DatabaseId;
-  }
-
-  export interface GetDatabaseTableNamesResponse extends ProtocolResponseWithError {
-    tableNames: string[];
-  }
-
-  export interface AddDatabaseEvent {
-    database: Database;
   }
 }
 
@@ -10106,6 +10127,21 @@ export namespace Network {
     resource: LoadNetworkResourcePageResult;
   }
 
+  export interface SetCookieControlsRequest {
+    /**
+     * Whether 3pc restriction is enabled.
+     */
+    enableThirdPartyCookieRestriction: boolean;
+    /**
+     * Whether 3pc grace period exception should be enabled; false by default.
+     */
+    disableThirdPartyCookieMetadata: boolean;
+    /**
+     * Whether 3pc heuristics exceptions should be enabled; false by default.
+     */
+    disableThirdPartyCookieHeuristics: boolean;
+  }
+
   /**
    * Fired when data chunk was received over the network.
    */
@@ -10701,6 +10737,7 @@ export namespace Network {
     InternalError = 'InternalError',
     UnknownError = 'UnknownError',
     FulfilledLocally = 'FulfilledLocally',
+    SiteIssuerLimit = 'SiteIssuerLimit',
   }
 
   /**
@@ -11679,6 +11716,7 @@ export namespace Page {
     ChUa = 'ch-ua',
     ChUaArch = 'ch-ua-arch',
     ChUaBitness = 'ch-ua-bitness',
+    ChUaHighEntropyValues = 'ch-ua-high-entropy-values',
     ChUaPlatform = 'ch-ua-platform',
     ChUaModel = 'ch-ua-model',
     ChUaMobile = 'ch-ua-mobile',
@@ -14401,7 +14439,6 @@ export namespace Storage {
    * Enum of possible storage types.
    */
   export const enum StorageType {
-    Appcache = 'appcache',
     Cookies = 'cookies',
     File_systems = 'file_systems',
     Indexeddb = 'indexeddb',
@@ -15667,6 +15704,16 @@ export namespace Target {
     port: integer;
   }
 
+  /**
+   * The state of the target window.
+   */
+  export const enum WindowState {
+    Normal = 'normal',
+    Minimized = 'minimized',
+    Maximized = 'maximized',
+    Fullscreen = 'fullscreen',
+  }
+
   export interface ActivateTargetRequest {
     targetId: TargetID;
   }
@@ -15754,29 +15801,42 @@ export namespace Target {
      */
     url: string;
     /**
-     * Frame width in DIP (headless chrome only).
+     * Frame left origin in DIP (requires newWindow to be true or headless shell).
+     */
+    left?: integer;
+    /**
+     * Frame top origin in DIP (requires newWindow to be true or headless shell).
+     */
+    top?: integer;
+    /**
+     * Frame width in DIP (requires newWindow to be true or headless shell).
      */
     width?: integer;
     /**
-     * Frame height in DIP (headless chrome only).
+     * Frame height in DIP (requires newWindow to be true or headless shell).
      */
     height?: integer;
+    /**
+     * Frame window state (requires newWindow to be true or headless shell).
+     * Default is normal.
+     */
+    windowState?: WindowState;
     /**
      * The browser context to create the page in.
      */
     browserContextId?: Browser.BrowserContextID;
     /**
-     * Whether BeginFrames for this target will be controlled via DevTools (headless chrome only,
+     * Whether BeginFrames for this target will be controlled via DevTools (headless shell only,
      * not supported on MacOS yet, false by default).
      */
     enableBeginFrameControl?: boolean;
     /**
-     * Whether to create a new Window or Tab (chrome-only, false by default).
+     * Whether to create a new Window or Tab (false by default, not supported by headless shell).
      */
     newWindow?: boolean;
     /**
-     * Whether to create the target in background or foreground (chrome-only,
-     * false by default).
+     * Whether to create the target in background or foreground (false by default, not supported
+     * by headless shell).
      */
     background?: boolean;
     /**
@@ -18742,6 +18802,10 @@ export namespace Debugger {
      */
     hash: string;
     /**
+     * For Wasm modules, the content of the `build_id` custom section.
+     */
+    buildId: string;
+    /**
      * Embedder-specific auxiliary data likely matching {isDefault: boolean, type: 'default'|'isolated'|'worker', frameId: string}
      */
     executionContextAuxData?: any;
@@ -18816,6 +18880,10 @@ export namespace Debugger {
      * Content hash of the script, SHA-256.
      */
     hash: string;
+    /**
+     * For Wasm modules, the content of the `build_id` custom section.
+     */
+    buildId: string;
     /**
      * Embedder-specific auxiliary data likely matching {isDefault: boolean, type: 'default'|'isolated'|'worker', frameId: string}
      */

@@ -1,8 +1,8 @@
-// Copyright 2024 The Chromium Authors. All rights reserved.
+// Copyright 2025 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-/* eslint-disable quotes, quote-props */
+/* eslint-disable @stylistic/quotes, @stylistic/quote-props */
 export const generatedProperties = [
  {
   "inherited": true,
@@ -537,6 +537,9 @@ export const generatedProperties = [
    "mask-repeat",
    "mask-size",
    "mask-type",
+   "masonry-auto-tracks",
+   "masonry-direction",
+   "masonry-fill",
    "masonry-slack",
    "masonry-template-tracks",
    "masonry-track-end",
@@ -613,6 +616,7 @@ export const generatedProperties = [
    "range",
    "reading-flow",
    "resize",
+   "result",
    "right",
    "rotate",
    "row-gap",
@@ -622,6 +626,7 @@ export const generatedProperties = [
    "ry",
    "scale",
    "scroll-behavior",
+   "scroll-initial-target",
    "scroll-margin-block-end",
    "scroll-margin-block-start",
    "scroll-margin-bottom",
@@ -644,7 +649,6 @@ export const generatedProperties = [
    "scroll-snap-type",
    "scroll-start-block",
    "scroll-start-inline",
-   "scroll-start-target",
    "scroll-start-x",
    "scroll-start-y",
    "scroll-timeline-axis",
@@ -2763,6 +2767,37 @@ export const generatedProperties = [
  },
  {
   "keywords": [
+   "auto",
+   "min-content",
+   "max-content"
+  ],
+  "name": "masonry-auto-tracks"
+ },
+ {
+  "keywords": [
+   "row",
+   "row-reverse",
+   "column",
+   "column-reverse"
+  ],
+  "name": "masonry-direction"
+ },
+ {
+  "keywords": [
+   "normal",
+   "reverse"
+  ],
+  "name": "masonry-fill"
+ },
+ {
+  "longhands": [
+   "masonry-direction",
+   "masonry-fill"
+  ],
+  "name": "masonry-flow"
+ },
+ {
+  "keywords": [
    "normal"
   ],
   "name": "masonry-slack"
@@ -3338,6 +3373,9 @@ export const generatedProperties = [
   "name": "resize"
  },
  {
+  "name": "result"
+ },
+ {
   "keywords": [
    "auto"
   ],
@@ -3391,6 +3429,13 @@ export const generatedProperties = [
    "smooth"
   ],
   "name": "scroll-behavior"
+ },
+ {
+  "keywords": [
+   "none",
+   "nearest"
+  ],
+  "name": "scroll-initial-target"
  },
  {
   "longhands": [
@@ -3559,13 +3604,6 @@ export const generatedProperties = [
  },
  {
   "name": "scroll-start-inline"
- },
- {
-  "keywords": [
-   "none",
-   "auto"
-  ],
-  "name": "scroll-start-target"
  },
  {
   "name": "scroll-start-x"
@@ -5531,6 +5569,27 @@ export const generatedPropertyValues = {
    "alpha"
   ]
  },
+ "masonry-auto-tracks": {
+  "values": [
+   "auto",
+   "min-content",
+   "max-content"
+  ]
+ },
+ "masonry-direction": {
+  "values": [
+   "row",
+   "row-reverse",
+   "column",
+   "column-reverse"
+  ]
+ },
+ "masonry-fill": {
+  "values": [
+   "normal",
+   "reverse"
+  ]
+ },
  "masonry-slack": {
   "values": [
    "normal"
@@ -5884,6 +5943,12 @@ export const generatedPropertyValues = {
    "smooth"
   ]
  },
+ "scroll-initial-target": {
+  "values": [
+   "none",
+   "nearest"
+  ]
+ },
  "scroll-marker-group": {
   "values": [
    "none",
@@ -5955,12 +6020,6 @@ export const generatedPropertyValues = {
    "both",
    "mandatory",
    "proximity"
-  ]
- },
- "scroll-start-target": {
-  "values": [
-   "none",
-   "auto"
   ]
  },
  "scrollbar-color": {

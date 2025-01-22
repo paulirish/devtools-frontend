@@ -25,13 +25,17 @@ const UIStrings = {
    *@description Label used for a time duration.
    */
   duration: 'Duration',
+  /**
+   * @description Text status indicating that no requests blocked the initial render of a navigation
+   */
+  noRenderBlocking: 'No render blocking requests for this navigation',
 };
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/insights/RenderBlocking.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class RenderBlocking extends BaseInsightComponent<RenderBlockingInsightModel> {
-  static override readonly litTagName = LitHtml.literal`devtools-performance-render-blocking-requests`;
+  static override readonly litTagName = LitHtml.StaticHtml.literal`devtools-performance-render-blocking-requests`;
   override internalName: string = 'render-blocking-requests';
 
   override createOverlays(): Overlays.Overlays.TimelineOverlay[] {
@@ -63,7 +67,7 @@ export class RenderBlocking extends BaseInsightComponent<RenderBlockingInsightMo
     const topRequests = this.model.renderBlockingRequests.slice(0, MAX_REQUESTS);
 
     if (!topRequests.length) {
-      return LitHtml.nothing;
+      return html`<div class="insight-section">${i18nString(UIStrings.noRenderBlocking)}</div>`;
     }
 
     // clang-format off

@@ -5,7 +5,7 @@
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as ThirdPartyWeb from '../../../third_party/third-party-web/third-party-web.js';
 import * as Extras from '../extras/extras.js';
-import type * as Handlers from '../handlers/handlers.js';
+import * as Handlers from '../handlers/handlers.js';
 import * as Helpers from '../helpers/helpers.js';
 import type * as Types from '../types/types.js';
 
@@ -31,8 +31,8 @@ export function deps(): ['Meta', 'NetworkRequests', 'Renderer', 'ImagePainting']
 
 export type ThirdPartiesInsightModel = InsightModel<{
   entityByRequest: Map<Types.Events.SyntheticNetworkRequest, Extras.ThirdParties.Entity>,
-  requestsByEntity: Map<Extras.ThirdParties.Entity, Types.Events.SyntheticNetworkRequest[]>,
-  summaryByRequest: Map<Types.Events.SyntheticNetworkRequest, Extras.ThirdParties.Summary>,
+  requestsByEntity: Map<Extras.ThirdParties.Entity, Types.Events.Event[]>,
+  summaryByEvent: Map<Types.Events.Event, Extras.ThirdParties.Summary>,
   summaryByEntity: Map<Extras.ThirdParties.Entity, Extras.ThirdParties.Summary>,
   /** The entity for this navigation's URL. Any other entity is from a third party. */
   firstPartyEntity?: Extras.ThirdParties.Entity,
@@ -43,7 +43,7 @@ function getRelatedEvents(
     firstPartyEntity: Extras.ThirdParties.Entity|undefined): Types.Events.Event[] {
   const events = [];
 
-  for (const [entity, requests] of summaries.requestsByEntity.entries()) {
+  for (const [entity, requests] of summaries.eventsByEntity.entries()) {
     if (entity !== firstPartyEntity) {
       events.push(...requests);
     }
@@ -83,13 +83,13 @@ export function generateInsight(
 
   const firstPartyUrl = context.navigation?.args.data?.documentLoaderURL ?? parsedTrace.Meta.mainFrameURL;
   const firstPartyEntity = ThirdPartyWeb.ThirdPartyWeb.getEntity(firstPartyUrl) ||
-      Extras.ThirdParties.makeUpEntity(madeUpEntityCache, firstPartyUrl);
+      Handlers.Helpers.makeUpEntity(madeUpEntityCache, firstPartyUrl);
 
   return finalize({
     relatedEvents: getRelatedEvents(summaries, firstPartyEntity),
     entityByRequest,
-    requestsByEntity: summaries.requestsByEntity,
-    summaryByRequest: summaries.byRequest,
+    requestsByEntity: summaries.eventsByEntity,
+    summaryByEvent: summaries.byEvent,
     summaryByEntity: summaries.byEntity,
     firstPartyEntity,
   });

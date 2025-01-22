@@ -450,14 +450,14 @@ export type ParsedSize = {
   formatted: string,
 };
 
-type Screenshot = {
-  src: string,
-  type?: string,
-  sizes?: string,
-  label?: string,
-  form_factor?: string,  // eslint-disable-line @typescript-eslint/naming-convention
-  platform?: string,
-};
+interface Screenshot {
+  src: string;
+  type?: string;
+  sizes?: string;
+  label?: string;
+  form_factor?: string;  // eslint-disable-line @typescript-eslint/naming-convention
+  platform?: string;
+}
 
 export class AppManifestView extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.VBox>(UI.Widget.VBox)
     implements SDK.TargetManager.Observer {
@@ -1091,7 +1091,7 @@ export class AppManifestView extends Common.ObjectWrapper.eventMixin<EventTypes,
     try {
       await result;
       return {wrapper, image};
-    } catch (e) {
+    } catch {
     }
     return null;
   }
@@ -1259,7 +1259,7 @@ export class AppManifestView extends Common.ObjectWrapper.eventMixin<EventTypes,
       await this.overlayModel?.toggleWindowControlsToolbar(wcoOsCheckbox.checkboxElement.checked);
     });
 
-    const osSelectElement = (wcoOsCheckbox.createChild('select', 'chrome-select') as HTMLSelectElement);
+    const osSelectElement = wcoOsCheckbox.createChild('select');
     osSelectElement.appendChild(UI.UIUtils.createOption('Windows', SDK.OverlayModel.EmulatedOSType.WINDOWS, 'windows'));
     osSelectElement.appendChild(UI.UIUtils.createOption('macOS', SDK.OverlayModel.EmulatedOSType.MAC, 'macos'));
     osSelectElement.appendChild(UI.UIUtils.createOption('Linux', SDK.OverlayModel.EmulatedOSType.LINUX, 'linux'));
@@ -1289,7 +1289,7 @@ export const enum Events {
   MANIFEST_RENDERED = 'ManifestRendered',
 }
 
-export type EventTypes = {
-  [Events.MANIFEST_DETECTED]: boolean,
-  [Events.MANIFEST_RENDERED]: void,
-};
+export interface EventTypes {
+  [Events.MANIFEST_DETECTED]: boolean;
+  [Events.MANIFEST_RENDERED]: void;
+}

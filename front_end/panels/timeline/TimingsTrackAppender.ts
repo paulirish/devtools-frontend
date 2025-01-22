@@ -13,9 +13,9 @@ import {
   type TrackAppenderName,
   VisualLoggingTrackName,
 } from './CompatibilityTracksAppender.js';
-import {ExtensionDataGatherer} from './ExtensionDataGatherer.js';
 import * as Extensions from './extensions/extensions.js';
 import {TimelineFlameChartMarker} from './TimelineFlameChartView.js';
+import {TimelinePanel} from './TimelinePanel.js';
 import type {TimelineMarkerStyle} from './TimelineUIUtils.js';
 
 const UIStrings = {
@@ -49,13 +49,15 @@ export class TimingsTrackAppender implements TrackAppender {
   #colorGenerator: Common.Color.Generator;
   #compatibilityBuilder: CompatibilityTracksAppender;
   #parsedTrace: Readonly<Trace.Handlers.Types.ParsedTrace>;
-
+  #extensionMarkers: readonly Trace.Types.Extensions.SyntheticExtensionMarker[];
   constructor(
       compatibilityBuilder: CompatibilityTracksAppender, parsedTrace: Trace.Handlers.Types.ParsedTrace,
       colorGenerator: Common.Color.Generator) {
     this.#compatibilityBuilder = compatibilityBuilder;
     this.#colorGenerator = colorGenerator;
     this.#parsedTrace = parsedTrace;
+    const extensionDataEnabled = TimelinePanel.extensionDataVisibilitySetting().get();
+    this.#extensionMarkers = extensionDataEnabled ? this.#parsedTrace.ExtensionTraceData.extensionMarkers : [];
   }
 
   /**
@@ -68,8 +70,7 @@ export class TimingsTrackAppender implements TrackAppender {
    * appended the track's events.
    */
   appendTrackAtLevel(trackStartLevel: number, expanded?: boolean): number {
-    const extensionMarkers = ExtensionDataGatherer.instance().getExtensionData().extensionMarkers;
-    const extensionMarkersAreEmpty = extensionMarkers.length === 0;
+    const extensionMarkersAreEmpty = this.#extensionMarkers.length === 0;
     const performanceMarks = this.#parsedTrace.UserTimings.performanceMarks.filter(
         m => !Trace.Handlers.ModelHandlers.ExtensionTraceData.extensionDataInTiming(m));
     const performanceMeasures = this.#parsedTrace.UserTimings.performanceMeasures.filter(
@@ -115,8 +116,7 @@ export class TimingsTrackAppender implements TrackAppender {
    */
   #appendExtensionsAtLevel(currentLevel: number): number {
     let markers: Trace.Types.Extensions.SyntheticExtensionMarker[] = [];
-    markers = markers.concat(ExtensionDataGatherer.instance().getExtensionData().extensionMarkers)
-                  .sort((m1, m2) => m1.ts - m2.ts);
+    markers = markers.concat(this.#extensionMarkers).sort((m1, m2) => m1.ts - m2.ts);
     if (markers.length === 0) {
       return currentLevel;
     }
@@ -243,8 +243,8 @@ export class TimingsTrackAppender implements TrackAppender {
           return event.name;
       }
     }
-    if (Trace.Types.Events.isTimeStamp(event)) {
-      return `${event.name}: ${event.args.data.message}`;
+    if (Trace.Types.Events.isConsoleTimeStamp(event)) {
+      return `TimeStamp: ${event.args.data.name}`;
     }
     if (Trace.Types.Events.isPerformanceMark(event)) {
       return `[mark]: ${event.name}`;
@@ -261,7 +261,7 @@ export class TimingsTrackAppender implements TrackAppender {
     // performance.mark() events
     // console.timestamp() events
     if (Trace.Types.Events.isMarkerEvent(event) || Trace.Types.Events.isPerformanceMark(event) ||
-        Trace.Types.Events.isTimeStamp(event)) {
+        Trace.Types.Events.isConsoleTimeStamp(event)) {
       const timeOfEvent = Trace.Helpers.Timing.timeStampForEventAdjustedByClosestNavigation(
           event,
           this.#parsedTrace.Meta.traceBounds,

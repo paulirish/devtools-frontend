@@ -91,34 +91,72 @@ describe('AsyncJSCallsHandler', function() {
       assert.strictEqual(testRunEntryPoints?.length, 1);
       assert.strictEqual(testRunEntryPoints?.[0], jsTaskRunEntryPoint);
     });
-    it('returns multiple JS entry point descendants of a debuggerTaskRun when they are not in the same subtree',
+
+    it('falls back to a JS invocation as task scheduler if no profile call is found before in the debuggerTaskScheduled ancestors',
        async function() {
-         const jsTaskScheduler = makeProfileCall('setTimeout', 0, 30, pid, tid);
+         const jsTaskScheduler = makeCompleteEvent(Trace.Types.Events.Name.FUNCTION_CALL, 0, 30, cat, tid, pid);
          const asyncTaskScheduled =
-             makeCompleteEvent(Trace.Types.Events.Name.DEBUGGER_ASYNC_TASK_SCHEDULED, 0, 0, cat, pid, tid);
+             makeCompleteEvent(Trace.Types.Events.Name.DEBUGGER_ASYNC_TASK_SCHEDULED, 5, 0, cat, pid, tid);
 
          const asyncTaskRun =
              makeCompleteEvent(Trace.Types.Events.Name.DEBUGGER_ASYNC_TASK_RUN, 60, 100, cat, tid, pid);
 
-         // Two JS entry points belonging to different subtrees are
-         // descendants to the debuggerTaskRun event. Test both are
-         // used.
-         const firstJSTaskRunEntryPoint =
-             makeCompleteEvent(Trace.Types.Events.Name.FUNCTION_CALL, 70, 20, cat, tid, pid);
-         const secondJSTaskRunEntryPoint =
-             makeCompleteEvent(Trace.Types.Events.Name.FUNCTION_CALL, 90, 10, cat, tid, pid);
+         // Two JS entry points belonging to the same subtree are
+         // descendants to the debuggerTaskRun event. Test the one closest
+         // to the debuggerTaskRun in the global tree is picked.
+         const jsTaskRunEntryPoint = makeCompleteEvent(Trace.Types.Events.Name.FUNCTION_CALL, 70, 20, cat, tid, pid);
+         const secondFakeEntryPoint = makeCompleteEvent(Trace.Types.Events.Name.FUNCTION_CALL, 71, 10, cat, tid, pid);
 
          const flowEvents = makeFlowEvents([asyncTaskScheduled, asyncTaskRun]);
          const rendererEvents =
-             [jsTaskScheduler, asyncTaskScheduled, asyncTaskRun, firstJSTaskRunEntryPoint, secondJSTaskRunEntryPoint];
+             [jsTaskScheduler, asyncTaskScheduled, asyncTaskRun, jsTaskRunEntryPoint, secondFakeEntryPoint];
          const allEvents = [...rendererEvents, ...flowEvents];
 
          const asyncCallStacksData = await buildAsyncJSCallsHandlerData(allEvents);
          const testRunEntryPoints = asyncCallStacksData.schedulerToRunEntryPoints.get(jsTaskScheduler);
-         assert.strictEqual(testRunEntryPoints?.length, 2);
-         assert.strictEqual(testRunEntryPoints?.[0], firstJSTaskRunEntryPoint);
-         assert.strictEqual(testRunEntryPoints?.[1], secondJSTaskRunEntryPoint);
+         assert.strictEqual(testRunEntryPoints?.length, 1);
+         assert.strictEqual(testRunEntryPoints?.[0], jsTaskRunEntryPoint);
        });
+
+    it('returns multiple JS entry points when scheduled by the same function', async function() {
+      const jsTaskScheduler = makeCompleteEvent(Trace.Types.Events.Name.FUNCTION_CALL, 0, 30, cat, tid, pid);
+      // Two asyncTaskScheduled events right under the function call.
+      const asyncTaskScheduled1 =
+          makeCompleteEvent(Trace.Types.Events.Name.DEBUGGER_ASYNC_TASK_SCHEDULED, 5, 0, cat, pid, tid);
+
+      const asyncTaskScheduled2 =
+          makeCompleteEvent(Trace.Types.Events.Name.DEBUGGER_ASYNC_TASK_SCHEDULED, 10, 0, cat, pid, tid);
+
+      const asyncTaskRun1 = makeCompleteEvent(Trace.Types.Events.Name.DEBUGGER_ASYNC_TASK_RUN, 60, 100, cat, tid, pid);
+
+      const asyncTaskRun2 = makeCompleteEvent(Trace.Types.Events.Name.DEBUGGER_ASYNC_TASK_RUN, 200, 100, cat, tid, pid);
+
+      // Two JS entry points,
+      const firstJSTaskRunEntryPoint = makeCompleteEvent(Trace.Types.Events.Name.FUNCTION_CALL, 70, 20, cat, tid, pid);
+      const secondJSTaskRunEntryPoint =
+          makeCompleteEvent(Trace.Types.Events.Name.FUNCTION_CALL, 210, 10, cat, tid, pid);
+
+      const flow1Events = makeFlowEvents([asyncTaskScheduled1, asyncTaskRun1], 1);
+      const flow2Events = makeFlowEvents([asyncTaskScheduled2, asyncTaskRun2], 2);
+      const flowEvents = [...flow1Events, ...flow2Events].sort((a, b) => a.ts - b.ts);
+      const rendererEvents = [
+        jsTaskScheduler,
+        asyncTaskScheduled1,
+        asyncTaskRun1,
+        asyncTaskScheduled2,
+        firstJSTaskRunEntryPoint,
+        asyncTaskRun2,
+        secondJSTaskRunEntryPoint,
+      ];
+      const allEvents = [...rendererEvents, ...flowEvents];
+
+      const asyncCallStacksData = await buildAsyncJSCallsHandlerData(allEvents);
+
+      const testRunEntryPoints = asyncCallStacksData.schedulerToRunEntryPoints.get(jsTaskScheduler);
+      assert.strictEqual(testRunEntryPoints?.length, 2);
+      assert.strictEqual(testRunEntryPoints?.[0], firstJSTaskRunEntryPoint);
+      assert.strictEqual(testRunEntryPoints?.[1], secondJSTaskRunEntryPoint);
+    });
   });
   describe('Resolving async JS tasks to schedulers', function() {
     it('associates an async JS task to its scheduler', async function() {

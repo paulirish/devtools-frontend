@@ -109,7 +109,7 @@ export class PaintProfilerView extends Common.ObjectWrapper.eventMixin<EventType
     this.contentElement.appendChild(this.pieChart);
 
     this.showImageCallback = showImageCallback;
-    this.canvas = this.canvasContainer.createChild('canvas', 'fill') as HTMLCanvasElement;
+    this.canvas = this.canvasContainer.createChild('canvas', 'fill');
     this.context = this.canvas.getContext('2d') as CanvasRenderingContext2D;
     this.selectionWindowInternal = new PerfUI.OverviewGrid.Window(this.canvasContainer);
     this.selectionWindowInternal.addEventListener(
@@ -242,7 +242,7 @@ export class PaintProfilerView extends Common.ObjectWrapper.eventMixin<EventType
     }
   }
 
-  override update(): void {
+  update(): void {
     this.canvas.width = this.canvasContainer.clientWidth * window.devicePixelRatio;
     this.canvas.height = this.canvasContainer.clientHeight * window.devicePixelRatio;
     this.samplesPerBar = 0;
@@ -421,9 +421,9 @@ export const enum Events {
   WINDOW_CHANGED = 'WindowChanged',
 }
 
-export type EventTypes = {
-  [Events.WINDOW_CHANGED]: void,
-};
+export interface EventTypes {
+  [Events.WINDOW_CHANGED]: void;
+}
 
 export class PaintProfilerCommandLogView extends UI.ThrottledWidget.ThrottledWidget {
   private readonly treeOutline: UI.TreeOutline.TreeOutlineInShadow;

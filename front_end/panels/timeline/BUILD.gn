@@ -39,7 +39,6 @@ devtools_pre_built("easter-egg") {
 
 generate_css("css_files") {
   sources = [
-    "historyToolbarButton.css",
     "timelineFlameChartView.css",
     "timelineFlamechartPopover.css",
     "timelineHistoryManager.css",
@@ -63,7 +62,6 @@ devtools_module("timeline") {
     "EntriesFilter.ts",
     "EventsSerializer.ts",
     "EventsTimelineTreeView.ts",
-    "ExtensionDataGatherer.ts",
     "ExtensionTrackAppender.ts",
     "FreshRecording.ts",
     "GPUTrackAppender.ts",
@@ -76,6 +74,7 @@ devtools_module("timeline") {
     "SaveFileFormatter.ts",
     "ServerTimingsTrackAppender.ts",
     "TargetForEvent.ts",
+    "ThirdPartyTreeView.ts",
     "ThreadAppender.ts",
     "TimelineController.ts",
     "TimelineDetailsView.ts",
@@ -150,7 +149,7 @@ devtools_entrypoint("bundle") {
     "../../../test/perf/*",
     "../../entrypoints/*",
     "../../models/trace/handlers:unittests",
-    "../../panels/freestyler/*",
+    "../../panels/ai_assistance/*",
     "../../testing",
     "../../testing/*",
     "../../ui/components/docs/performance_panel/*",
@@ -192,6 +191,7 @@ ts_library("unittests") {
     "Initiators.test.ts",
     "ModificationsManager.test.ts",
     "SaveFileFormatter.test.ts",
+    "ThirdPartyTreeView.test.ts",
     "TimelineController.test.ts",
     "TimelineDetailsView.test.ts",
     "TimelineFilters.test.ts",

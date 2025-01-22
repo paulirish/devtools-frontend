@@ -27,8 +27,16 @@ export async function navigateToLighthouseTab(path?: string): Promise<ElementHan
     lighthouseTabButton = await waitForElementWithTextContent('Lighthouse');
   }
 
-  await lighthouseTabButton.click();
-  await waitFor('.view-container > .lighthouse');
+  // TODO(b/388183157): Investigate why a single click doesn't open the tab properly sometimes
+  const interval = setInterval(() => {
+    void lighthouseTabButton.click();
+  }, 500);
+
+  try {
+    await waitFor('.view-container > .lighthouse');
+  } finally {
+    clearInterval(interval);
+  }
 
   const {target, frontend} = getBrowserAndPages();
   if (path) {
@@ -112,7 +120,7 @@ export async function selectDevice(device: 'mobile'|'desktop') {
 }
 
 export async function setToolbarCheckboxWithText(enabled: boolean, textContext: string) {
-  const toolbarHandle = await waitFor('.lighthouse-settings-pane .toolbar');
+  const toolbarHandle = await waitFor('.lighthouse-settings-pane .lighthouse-settings-toolbar');
   const label = await waitForElementWithTextContent(textContext, toolbarHandle);
   await label.evaluate((label, enabled: boolean) => {
     const rootNode = label.getRootNode() as ShadowRoot;
@@ -124,9 +132,9 @@ export async function setToolbarCheckboxWithText(enabled: boolean, textContext: 
 }
 
 export async function setThrottlingMethod(throttlingMethod: 'simulate'|'devtools') {
-  const toolbarHandle = await waitFor('.lighthouse-settings-pane .toolbar');
+  const toolbarHandle = await waitFor('.lighthouse-settings-pane .lighthouse-settings-toolbar');
   await toolbarHandle.evaluate((toolbar, throttlingMethod) => {
-    const selectElem = toolbar.shadowRoot?.querySelector('select') as HTMLSelectElement;
+    const selectElem = toolbar.querySelector('select')!;
     const optionElem = selectElem.querySelector(`option[value="${throttlingMethod}"]`) as HTMLOptionElement;
     optionElem.selected = true;
     selectElem.dispatchEvent(new Event('change'));  // Need change event to update the backing setting.

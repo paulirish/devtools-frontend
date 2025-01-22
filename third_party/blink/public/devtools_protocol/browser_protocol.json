@@ -1017,11 +1017,11 @@
                         {
                             "name": "requestId",
                             "description": "The unique request id.",
+                            "optional": true,
                             "$ref": "Network.RequestId"
                         },
                         {
                             "name": "url",
-                            "optional": true,
                             "type": "string"
                         }
                     ]
@@ -1820,7 +1820,8 @@
                         "ReplacedByActiveMode",
                         "InvalidFieldsSpecified",
                         "RelyingPartyOriginIsOpaque",
-                        "TypeNotMatching"
+                        "TypeNotMatching",
+                        "UiDismissedNoEmbargo"
                     ]
                 },
                 {
@@ -1882,6 +1883,36 @@
                             "name": "requestId",
                             "optional": true,
                             "$ref": "Network.RequestId"
+                        }
+                    ]
+                },
+                {
+                    "id": "SelectElementAccessibilityIssueReason",
+                    "type": "string",
+                    "enum": [
+                        "DisallowedSelectChild",
+                        "DisallowedOptGroupChild",
+                        "NonPhrasingContentOptionChild",
+                        "InteractiveContentOptionChild",
+                        "InteractiveContentLegendChild"
+                    ]
+                },
+                {
+                    "id": "SelectElementAccessibilityIssueDetails",
+                    "description": "This issue warns about errors in the select element content model.",
+                    "type": "object",
+                    "properties": [
+                        {
+                            "name": "nodeId",
+                            "$ref": "DOM.BackendNodeId"
+                        },
+                        {
+                            "name": "selectElementAccessibilityIssueReason",
+                            "$ref": "SelectElementAccessibilityIssueReason"
+                        },
+                        {
+                            "name": "hasDisallowedAttributes",
+                            "type": "boolean"
                         }
                     ]
                 },
@@ -1974,7 +2005,8 @@
                         "StylesheetLoadingIssue",
                         "FederatedAuthUserInfoRequestIssue",
                         "PropertyRuleIssue",
-                        "SharedDictionaryIssue"
+                        "SharedDictionaryIssue",
+                        "SelectElementAccessibilityIssue"
                     ]
                 },
                 {
@@ -2087,6 +2119,11 @@
                             "name": "sharedDictionaryIssueDetails",
                             "optional": true,
                             "$ref": "SharedDictionaryIssueDetails"
+                        },
+                        {
+                            "name": "selectElementAccessibilityIssueDetails",
+                            "optional": true,
+                            "$ref": "SelectElementAccessibilityIssueDetails"
                         }
                     ]
                 },
@@ -3394,6 +3431,24 @@
                     ]
                 },
                 {
+                    "id": "CSSAnimationStyle",
+                    "description": "CSS style coming from animations with the name of the animation.",
+                    "type": "object",
+                    "properties": [
+                        {
+                            "name": "name",
+                            "description": "The name of the animation.",
+                            "optional": true,
+                            "type": "string"
+                        },
+                        {
+                            "name": "style",
+                            "description": "The style coming from the animation.",
+                            "$ref": "CSSStyle"
+                        }
+                    ]
+                },
+                {
                     "id": "InheritedStyleEntry",
                     "description": "Inherited CSS rule collection from ancestor node.",
                     "type": "object",
@@ -3411,6 +3466,28 @@
                             "items": {
                                 "$ref": "RuleMatch"
                             }
+                        }
+                    ]
+                },
+                {
+                    "id": "InheritedAnimatedStyleEntry",
+                    "description": "Inherited CSS style collection for animated styles from ancestor node.",
+                    "type": "object",
+                    "properties": [
+                        {
+                            "name": "animationStyles",
+                            "description": "Styles coming from the animations of the ancestor, if any, in the style inheritance chain.",
+                            "optional": true,
+                            "type": "array",
+                            "items": {
+                                "$ref": "CSSAnimationStyle"
+                            }
+                        },
+                        {
+                            "name": "transitionsStyle",
+                            "description": "The style coming from the transitions of the ancestor, if any, in the style inheritance chain.",
+                            "optional": true,
+                            "$ref": "CSSStyle"
                         }
                     ]
                 },
@@ -4645,6 +4722,22 @@
                     ]
                 },
                 {
+                    "name": "forceStartingStyle",
+                    "description": "Ensures that the given node is in its starting-style state.",
+                    "parameters": [
+                        {
+                            "name": "nodeId",
+                            "description": "The element id for which to force the starting-style state.",
+                            "$ref": "DOM.NodeId"
+                        },
+                        {
+                            "name": "forced",
+                            "description": "Boolean indicating if this is on or off.",
+                            "type": "boolean"
+                        }
+                    ]
+                },
+                {
                     "name": "getBackgroundColors",
                     "parameters": [
                         {
@@ -4746,6 +4839,29 @@
                     ]
                 },
                 {
+                    "name": "getLonghandProperties",
+                    "experimental": true,
+                    "parameters": [
+                        {
+                            "name": "shorthandName",
+                            "type": "string"
+                        },
+                        {
+                            "name": "value",
+                            "type": "string"
+                        }
+                    ],
+                    "returns": [
+                        {
+                            "name": "longhandProperties",
+                            "type": "array",
+                            "items": {
+                                "$ref": "CSSProperty"
+                            }
+                        }
+                    ]
+                },
+                {
                     "name": "getInlineStylesForNode",
                     "description": "Returns the styles defined inline (explicitly in the \"style\" attribute and implicitly, using DOM\nattributes) for a DOM node identified by `nodeId`.",
                     "parameters": [
@@ -4766,6 +4882,43 @@
                             "description": "Attribute-defined element style (e.g. resulting from \"width=20 height=100%\").",
                             "optional": true,
                             "$ref": "CSSStyle"
+                        }
+                    ]
+                },
+                {
+                    "name": "getAnimatedStylesForNode",
+                    "description": "Returns the styles coming from animations & transitions\nincluding the animation & transition styles coming from inheritance chain.",
+                    "experimental": true,
+                    "parameters": [
+                        {
+                            "name": "nodeId",
+                            "$ref": "DOM.NodeId"
+                        }
+                    ],
+                    "returns": [
+                        {
+                            "name": "animationStyles",
+                            "description": "Styles coming from animations.",
+                            "optional": true,
+                            "type": "array",
+                            "items": {
+                                "$ref": "CSSAnimationStyle"
+                            }
+                        },
+                        {
+                            "name": "transitionsStyle",
+                            "description": "Style coming from transitions.",
+                            "optional": true,
+                            "$ref": "CSSStyle"
+                        },
+                        {
+                            "name": "inherited",
+                            "description": "Inherited style entries for animationsStyle and transitionsStyle from\nthe inheritance chain of the element.",
+                            "optional": true,
+                            "type": "array",
+                            "items": {
+                                "$ref": "InheritedAnimatedStyleEntry"
+                            }
                         }
                     ]
                 },
@@ -8969,136 +9122,6 @@
                         {
                             "name": "storageId",
                             "$ref": "StorageId"
-                        }
-                    ]
-                }
-            ]
-        },
-        {
-            "domain": "Database",
-            "experimental": true,
-            "types": [
-                {
-                    "id": "DatabaseId",
-                    "description": "Unique identifier of Database object.",
-                    "type": "string"
-                },
-                {
-                    "id": "Database",
-                    "description": "Database object.",
-                    "type": "object",
-                    "properties": [
-                        {
-                            "name": "id",
-                            "description": "Database ID.",
-                            "$ref": "DatabaseId"
-                        },
-                        {
-                            "name": "domain",
-                            "description": "Database domain.",
-                            "type": "string"
-                        },
-                        {
-                            "name": "name",
-                            "description": "Database name.",
-                            "type": "string"
-                        },
-                        {
-                            "name": "version",
-                            "description": "Database version.",
-                            "type": "string"
-                        }
-                    ]
-                },
-                {
-                    "id": "Error",
-                    "description": "Database error.",
-                    "type": "object",
-                    "properties": [
-                        {
-                            "name": "message",
-                            "description": "Error message.",
-                            "type": "string"
-                        },
-                        {
-                            "name": "code",
-                            "description": "Error code.",
-                            "type": "integer"
-                        }
-                    ]
-                }
-            ],
-            "commands": [
-                {
-                    "name": "disable",
-                    "description": "Disables database tracking, prevents database events from being sent to the client."
-                },
-                {
-                    "name": "enable",
-                    "description": "Enables database tracking, database events will now be delivered to the client."
-                },
-                {
-                    "name": "executeSQL",
-                    "parameters": [
-                        {
-                            "name": "databaseId",
-                            "$ref": "DatabaseId"
-                        },
-                        {
-                            "name": "query",
-                            "type": "string"
-                        }
-                    ],
-                    "returns": [
-                        {
-                            "name": "columnNames",
-                            "optional": true,
-                            "type": "array",
-                            "items": {
-                                "type": "string"
-                            }
-                        },
-                        {
-                            "name": "values",
-                            "optional": true,
-                            "type": "array",
-                            "items": {
-                                "type": "any"
-                            }
-                        },
-                        {
-                            "name": "sqlError",
-                            "optional": true,
-                            "$ref": "Error"
-                        }
-                    ]
-                },
-                {
-                    "name": "getDatabaseTableNames",
-                    "parameters": [
-                        {
-                            "name": "databaseId",
-                            "$ref": "DatabaseId"
-                        }
-                    ],
-                    "returns": [
-                        {
-                            "name": "tableNames",
-                            "type": "array",
-                            "items": {
-                                "type": "string"
-                            }
-                        }
-                    ]
-                }
-            ],
-            "events": [
-                {
-                    "name": "addDatabase",
-                    "parameters": [
-                        {
-                            "name": "database",
-                            "$ref": "Database"
                         }
                     ]
                 }
@@ -15180,6 +15203,28 @@
                             "$ref": "LoadNetworkResourcePageResult"
                         }
                     ]
+                },
+                {
+                    "name": "setCookieControls",
+                    "description": "Sets Controls for third-party cookie access\nPage reload is required before the new cookie bahavior will be observed",
+                    "experimental": true,
+                    "parameters": [
+                        {
+                            "name": "enableThirdPartyCookieRestriction",
+                            "description": "Whether 3pc restriction is enabled.",
+                            "type": "boolean"
+                        },
+                        {
+                            "name": "disableThirdPartyCookieMetadata",
+                            "description": "Whether 3pc grace period exception should be enabled; false by default.",
+                            "type": "boolean"
+                        },
+                        {
+                            "name": "disableThirdPartyCookieHeuristics",
+                            "description": "Whether 3pc heuristics exceptions should be enabled; false by default.",
+                            "type": "boolean"
+                        }
+                    ]
                 }
             ],
             "events": [
@@ -15901,7 +15946,8 @@
                                 "BadResponse",
                                 "InternalError",
                                 "UnknownError",
-                                "FulfilledLocally"
+                                "FulfilledLocally",
+                                "SiteIssuerLimit"
                             ]
                         },
                         {
@@ -17333,6 +17379,7 @@
                         "ch-ua",
                         "ch-ua-arch",
                         "ch-ua-bitness",
+                        "ch-ua-high-entropy-values",
                         "ch-ua-platform",
                         "ch-ua-model",
                         "ch-ua-mobile",
@@ -21587,7 +21634,6 @@
                     "description": "Enum of possible storage types.",
                     "type": "string",
                     "enum": [
-                        "appcache",
                         "cookies",
                         "file_systems",
                         "indexeddb",
@@ -23725,6 +23771,18 @@
                             "type": "integer"
                         }
                     ]
+                },
+                {
+                    "id": "WindowState",
+                    "description": "The state of the target window.",
+                    "experimental": true,
+                    "type": "string",
+                    "enum": [
+                        "normal",
+                        "minimized",
+                        "maximized",
+                        "fullscreen"
+                    ]
                 }
             ],
             "commands": [
@@ -23876,16 +23934,36 @@
                             "type": "string"
                         },
                         {
+                            "name": "left",
+                            "description": "Frame left origin in DIP (requires newWindow to be true or headless shell).",
+                            "experimental": true,
+                            "optional": true,
+                            "type": "integer"
+                        },
+                        {
+                            "name": "top",
+                            "description": "Frame top origin in DIP (requires newWindow to be true or headless shell).",
+                            "experimental": true,
+                            "optional": true,
+                            "type": "integer"
+                        },
+                        {
                             "name": "width",
-                            "description": "Frame width in DIP (headless chrome only).",
+                            "description": "Frame width in DIP (requires newWindow to be true or headless shell).",
                             "optional": true,
                             "type": "integer"
                         },
                         {
                             "name": "height",
-                            "description": "Frame height in DIP (headless chrome only).",
+                            "description": "Frame height in DIP (requires newWindow to be true or headless shell).",
                             "optional": true,
                             "type": "integer"
+                        },
+                        {
+                            "name": "windowState",
+                            "description": "Frame window state (requires newWindow to be true or headless shell).\nDefault is normal.",
+                            "optional": true,
+                            "$ref": "WindowState"
                         },
                         {
                             "name": "browserContextId",
@@ -23896,20 +23974,20 @@
                         },
                         {
                             "name": "enableBeginFrameControl",
-                            "description": "Whether BeginFrames for this target will be controlled via DevTools (headless chrome only,\nnot supported on MacOS yet, false by default).",
+                            "description": "Whether BeginFrames for this target will be controlled via DevTools (headless shell only,\nnot supported on MacOS yet, false by default).",
                             "experimental": true,
                             "optional": true,
                             "type": "boolean"
                         },
                         {
                             "name": "newWindow",
-                            "description": "Whether to create a new Window or Tab (chrome-only, false by default).",
+                            "description": "Whether to create a new Window or Tab (false by default, not supported by headless shell).",
                             "optional": true,
                             "type": "boolean"
                         },
                         {
                             "name": "background",
-                            "description": "Whether to create the target in background or foreground (chrome-only,\nfalse by default).",
+                            "description": "Whether to create the target in background or foreground (false by default, not supported\nby headless shell).",
                             "optional": true,
                             "type": "boolean"
                         },
@@ -28565,6 +28643,11 @@
                             "type": "string"
                         },
                         {
+                            "name": "buildId",
+                            "description": "For Wasm modules, the content of the `build_id` custom section.",
+                            "type": "string"
+                        },
+                        {
                             "name": "executionContextAuxData",
                             "description": "Embedder-specific auxiliary data likely matching {isDefault: boolean, type: 'default'|'isolated'|'worker', frameId: string}",
                             "optional": true,
@@ -28666,6 +28749,11 @@
                         {
                             "name": "hash",
                             "description": "Content hash of the script, SHA-256.",
+                            "type": "string"
+                        },
+                        {
+                            "name": "buildId",
+                            "description": "For Wasm modules, the content of the `build_id` custom section.",
                             "type": "string"
                         },
                         {

@@ -24,7 +24,7 @@
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable rulesdir/check_license_header */
+/* eslint-disable rulesdir/check-license-header */
 
 import * as Common from '../../../../core/common/common.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
@@ -213,13 +213,13 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
 
     this.dataTableColumnGroup = this.dataTable.createChild('colgroup');
 
-    this.dataTableHeadInternal = this.dataTable.createChild('thead') as HTMLTableSectionElement;
+    this.dataTableHeadInternal = this.dataTable.createChild('thead');
     this.headerRow = this.dataTableHeadInternal.createChild('tr');
 
     this.dataTableBody = this.dataTable.createChild('tbody');
-    this.topFillerRow = (this.dataTableBody.createChild('tr', 'data-grid-filler-row revealed') as HTMLElement);
+    this.topFillerRow = this.dataTableBody.createChild('tr', 'data-grid-filler-row revealed');
     UI.ARIAUtils.setHidden(this.topFillerRow, true);
-    this.bottomFillerRow = (this.dataTableBody.createChild('tr', 'data-grid-filler-row revealed') as HTMLElement);
+    this.bottomFillerRow = this.dataTableBody.createChild('tr', 'data-grid-filler-row revealed');
     UI.ARIAUtils.setHidden(this.bottomFillerRow, true);
 
     this.setVerticalPadding(0, 0, true);
@@ -367,6 +367,10 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     }
   }
 
+  protected getNumberOfRows(): number {
+    return this.rootNodeInternal ? this.enumerateChildren(this.rootNodeInternal, [], 1).length : 0;
+  }
+
   updateGridAccessibleNameOnFocus(): void {
     // When a grid gets focus
     // 1) If an item is selected - Read the content of the row
@@ -384,8 +388,8 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
       if (!this.rootNodeInternal) {
         return;
       }
-      const children = this.enumerateChildren(this.rootNodeInternal, [], 1);
-      const items = i18nString(UIStrings.rowsS, {PH1: children.length});
+      const numberOfRows = this.getNumberOfRows();
+      const items = i18nString(UIStrings.rowsS, {PH1: numberOfRows});
       accessibleText = i18nString(UIStrings.sSUseTheUpAndDownArrowKeysTo, {PH1: this.displayName, PH2: items});
     }
     UI.ARIAUtils.alert(accessibleText);
@@ -478,12 +482,12 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     for (let i = 0; i < this.visibleColumnsArray.length; ++i) {
       const column = this.visibleColumnsArray[i];
       const columnId = column.id;
-      const dataColumn = (this.dataTableColumnGroup.createChild('col') as HTMLElement);
+      const dataColumn = this.dataTableColumnGroup.createChild('col');
       if (column.width) {
         dataColumn.style.width = column.width;
       }
       this.headerRow.appendChild(this.dataTableHeaders[columnId]);
-      const topFillerRowCell = (this.topFillerRow.createChild('th', 'top-filler-td') as HTMLTableCellElement);
+      const topFillerRowCell = this.topFillerRow.createChild('th', 'top-filler-td');
       topFillerRowCell.textContent = column.title || null;
       topFillerRowCell.scope = 'col';
       const bottomFillerRowChild = this.bottomFillerRow.createChild('td', 'bottom-filler-td');
@@ -493,7 +497,7 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     const headerCorner = this.headerRow.createChild('th', 'corner');
     UI.ARIAUtils.setHidden(headerCorner, true);
 
-    const topFillerRowCornerCell = (this.topFillerRow.createChild('th', 'corner') as HTMLTableCellElement);
+    const topFillerRowCornerCell = this.topFillerRow.createChild('th', 'corner');
     topFillerRowCornerCell.classList.add('top-filler-td');
     topFillerRowCornerCell.scope = 'col';
 
@@ -1602,13 +1606,13 @@ export const enum Events {
   PADDING_CHANGED = 'PaddingChanged',
 }
 
-export type EventTypes<T> = {
-  [Events.SELECTED_NODE]: DataGridNode<T>,
-  [Events.DESELECTED_NODE]: void,
-  [Events.OPENED_NODE]: DataGridNode<T>,
-  [Events.SORTING_CHANGED]: void,
-  [Events.PADDING_CHANGED]: void,
-};
+export interface EventTypes<T> {
+  [Events.SELECTED_NODE]: DataGridNode<T>;
+  [Events.DESELECTED_NODE]: void;
+  [Events.OPENED_NODE]: DataGridNode<T>;
+  [Events.SORTING_CHANGED]: void;
+  [Events.PADDING_CHANGED]: void;
+}
 
 export enum Order {
   /* eslint-disable @typescript-eslint/naming-convention -- Used by web_tests. */
@@ -1636,9 +1640,9 @@ export const enum ResizeMethod {
   LAST = 'last',
 }
 
-export type DataGridData = {
-  [key: string]: any,
-};
+export interface DataGridData {
+  [key: string]: any;
+}
 
 export class DataGridNode<T> {
   elementInternal: HTMLElement|null;
@@ -1646,7 +1650,6 @@ export class DataGridNode<T> {
   private selectedInternal: boolean;
   private dirty: boolean;
   private inactive: boolean;
-  key!: string;
   private depthInternal!: number|undefined;
   revealedInternal!: boolean|undefined;
   protected attachedInternal: boolean;
@@ -2003,7 +2006,7 @@ export class DataGridNode<T> {
     this.cellAccessibleTextMap.set(columnId, name);
     // Mark all direct children of cell as hidden so cell name is properly announced
     for (let i = 0; i < cell.children.length; i++) {
-      UI.ARIAUtils.markAsHidden(cell.children[i]);
+      UI.ARIAUtils.setHidden(cell.children[i], true);
     }
     UI.ARIAUtils.setLabel(cell, name);
   }
@@ -2474,6 +2477,7 @@ export class DataGridWidget<T> extends UI.Widget.VBox {
 export type DataGridWidgetOptions<T> = Parameters&{
   markAsRoot?: boolean,
   striped?: boolean, nodes: DataGridNode<T>[],
+  rowContextMenuCallback?: ((arg0: UI.ContextMenu.ContextMenu, arg1: DataGridNode<T>) => void),
 };
 
 export class DataGridWidgetElement<T> extends UI.Widget.WidgetElement<DataGridWidget<T>> {
@@ -2526,6 +2530,8 @@ export class DataGridWidgetElement<T> extends UI.Widget.WidgetElement<DataGridWi
       if (this.#options.striped) {
         this.widget.dataGrid.setStriped(true);
       }
+
+      this.widget.dataGrid.setRowContextMenuCallback(this.#options.rowContextMenuCallback ?? null);
     }
   }
 

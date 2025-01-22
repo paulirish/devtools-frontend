@@ -55,8 +55,8 @@ export function extractExtensionEntries(timings: (Types.Events.SyntheticUserTimi
     const extensionSyntheticEntry = {
       name: timing.name,
       ph: Types.Events.Phase.COMPLETE,
-      pid: Types.Events.ProcessID(0),
-      tid: Types.Events.ThreadID(0),
+      pid: timing.pid,
+      tid: timing.tid,
       ts: timing.ts,
       dur: timing.dur as Types.Timing.MicroSeconds,
       cat: 'devtools.extension',
@@ -106,7 +106,7 @@ export function extensionDataInTiming(timing: Types.Events.SyntheticUserTimingPa
       return null;
     }
     return detailObj.devtools;
-  } catch (e) {
+  } catch {
     // No need to worry about this error, just discard this event and don't
     // treat it as having any useful information for the purposes of extensions
     return null;

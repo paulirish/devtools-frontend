@@ -126,8 +126,7 @@ export class ElementsTreeOutline extends
     this.treeElementByNode = new WeakMap();
     const shadowContainer = document.createElement('div');
     this.shadowRoot = UI.UIUtils.createShadowRootWithCoreStyles(
-        shadowContainer,
-        {cssFile: [elementsTreeOutlineStyles, CodeHighlighter.Style.default], delegatesFocus: undefined});
+        shadowContainer, {cssFile: [elementsTreeOutlineStyles, CodeHighlighter.Style.default]});
     const outlineDisclosureElement = this.shadowRoot.createChild('div', 'elements-disclosure');
 
     this.elementInternal = this.element;
@@ -1626,10 +1625,10 @@ export namespace ElementsTreeOutline {
     /* eslint-enable @typescript-eslint/naming-convention */
   }
 
-  export type EventTypes = {
-    [Events.SelectedNodeChanged]: {node: SDK.DOMModel.DOMNode|null, focus: boolean},
-    [Events.ElementsTreeUpdated]: SDK.DOMModel.DOMNode[],
-  };
+  export interface EventTypes {
+    [Events.SelectedNodeChanged]: {node: SDK.DOMModel.DOMNode|null, focus: boolean};
+    [Events.ElementsTreeUpdated]: SDK.DOMModel.DOMNode[];
+  }
 }
 
 // clang-format off
@@ -1790,8 +1789,7 @@ export class ShortcutTreeElement extends UI.TreeOutline.TreeElement {
         ElementsComponents.AdornerManager.RegisteredAdorners.REVEAL);
     const name = config.name;
     const adornerContent = document.createElement('span');
-    const linkIcon = new IconButton.Icon.Icon();
-    linkIcon.name = 'select-element';
+    const linkIcon = IconButton.Icon.create('select-element');
     const slotText = document.createElement('span');
     slotText.textContent = name;
     adornerContent.append(linkIcon);

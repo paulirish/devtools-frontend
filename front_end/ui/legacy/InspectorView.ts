@@ -214,7 +214,7 @@ export class InspectorView extends VBox implements ViewLocationResolver {
     // to prevent to prevent a shift in the tab layout. Note that when DevTools cannot be docked,
     // the Device mode button is not added and so the allocated space is smaller.
     const allocatedSpace = Root.Runtime.conditions.canDock() ? '69px' : '41px';
-    this.tabbedPane.leftToolbar().element.style.minWidth = allocatedSpace;
+    this.tabbedPane.leftToolbar().style.minWidth = allocatedSpace;
     this.tabbedPane.registerRequiredCSS(inspectorViewTabbedPaneStyles);
     this.tabbedPane.addEventListener(
         TabbedPaneEvents.TabSelected,
@@ -492,9 +492,7 @@ export class InspectorView extends VBox implements ViewLocationResolver {
               highlight: true,
               delegate: () => {
                 reloadDebuggedTab();
-                if (this.reloadRequiredInfobar) {
-                  this.reloadRequiredInfobar.dispose();
-                }
+                this.removeDebuggedTabReloadRequiredWarning();
               },
               dismiss: false,
               buttonVariant: Buttons.Button.Variant.PRIMARY,
@@ -509,6 +507,12 @@ export class InspectorView extends VBox implements ViewLocationResolver {
       infobar.setCloseCallback(() => {
         delete this.reloadRequiredInfobar;
       });
+    }
+  }
+
+  removeDebuggedTabReloadRequiredWarning(): void {
+    if (this.reloadRequiredInfobar) {
+      this.reloadRequiredInfobar.dispose();
     }
   }
 

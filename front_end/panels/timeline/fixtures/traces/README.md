@@ -218,3 +218,31 @@ Generated from the [scheduler story](https://github.com/ChromeDevTools/performan
 ### image-delivery
 
 Generate from a page load [this HTML file](https://gist.github.com/adamraine/397e2bd08665f9e45f6072e446715115). Contains a series of test cases for the image delivery insight.
+
+### dom-size
+
+Generate from a recording of [this HTML file](https://gist.github.com/adamraine/bfdb3cecca2322bf74f1e725d9a4699d) with the following steps:
+1. Set CPU throttling to 4x
+2. Start recording without reloading the page
+3. Click the button once
+4. Reload the page
+5. Click the button once
+6. End recording
+
+### dom-size-long
+Contains a trace from a site with a large DOM. It also happens to have many flows with duplicated flow bindings, so it's useful to test the FlowsHandler remains quick.
+
+### lcp-multiple-frames
+
+Generated from [lcp-iframes story](https://github.com/ChromeDevTools/performance-stories/tree/main/lcp-iframes).
+
+Contains a page load that has two frames (main frame + iframe). There are two images loaded in each:
+
+- the iframe loads placeholder.co/50.jpg and placeholder.co/2000.jpg
+- the main frame loads placeholder.co/100.jpg and placeholder.co/1000.jpg
+
+This trace is used to verify the fix for a bug [crbug.com/384000716] where we incorrectly associated image requests to the wrong navigation when calculating the LCP image.
+
+### lcp-lates-paint-event
+
+This is a trace where a `LargestImagePaint` event occurs after the last `largestContentfulPaint::Candidate` event.

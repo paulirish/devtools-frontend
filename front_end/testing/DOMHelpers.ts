@@ -21,7 +21,7 @@ interface RenderOptions {
 /**
  * Renders a given element into the DOM. By default it will error if it finds an element already rendered but this can be controlled via the options.
  **/
-export const renderElementIntoDOM = (element: HTMLElement, renderOptions: RenderOptions = {}) => {
+export function renderElementIntoDOM<E extends Element>(element: E, renderOptions: RenderOptions = {}): E {
   const container = document.getElementById(TEST_CONTAINER_ID);
 
   if (!container) {
@@ -33,10 +33,9 @@ export const renderElementIntoDOM = (element: HTMLElement, renderOptions: Render
   if (container.childNodes.length !== 0 && !allowMultipleChildren) {
     throw new Error(`renderElementIntoDOM expects the container to be empty ${container.innerHTML}`);
   }
-
   container.appendChild(element);
   return element;
-};
+}
 
 function removeChildren(node: Node): void {
   while (true) {
@@ -73,9 +72,9 @@ export const resetTestDOM = () => {
   document.body.appendChild(newContainer);
 };
 
-type Constructor<T> = {
-  new (...args: unknown[]): T,
-};
+interface Constructor<T> {
+  new(...args: unknown[]): T;
+}
 
 /**
  * Asserts that all emenents of `nodeList` are at least of type `T`.
@@ -251,9 +250,10 @@ export function stripLitHtmlCommentNodes(text: string) {
    * LitHtml comments take the form of:
    * <!--?lit$1234?--> or:
    * <!--?-->
-   * And this regex matches both.
+   * <!---->
+   * And this regex matches all of them.
    */
-  return text.replaceAll(/<!--\?(lit\$[0-9]+\$)?-->/g, '');
+  return text.replaceAll(/<!--(\?)?(lit\$[0-9]+\$)?-->/g, '');
 }
 
 /**

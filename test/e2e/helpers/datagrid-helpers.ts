@@ -10,25 +10,25 @@ import {$, $$, getBrowserAndPages, waitFor, waitForFunction} from '../../shared/
 export async function getDataGridRows(
     expectedNumberOfRows: number, root?: ElementHandle<Node>,
     matchExactNumberOfRows: boolean = true): Promise<ElementHandle<HTMLTableCellElement>[][]> {
-  const dataGrid = !root ? await waitFor('devtools-data-grid') : root;
+  const dataGrid = !root ? await waitFor('devtools-data-grid,devtools-new-data-grid') : root;
   const handlers = await (async () => {
     if (matchExactNumberOfRows) {
       return await waitForFunction(async () => {
-        const rows = await $$('tbody > tr:not(.padding-row):not(.hidden)', dataGrid);
+        const rows = await $$('tbody > tr[jslog]:not(.hidden)', dataGrid);
         return rows.length === expectedNumberOfRows ? rows : undefined;
       });
     }
     return await waitForFunction(async () => {
-      const rows = await $$('tbody > tr:not(.padding-row):not(.hidden)', dataGrid);
+      const rows = await $$('tbody > tr[jslog]:not(.hidden)', dataGrid);
       return rows.length >= expectedNumberOfRows ? rows : undefined;
     });
   })();
 
-  return Promise.all(handlers.map(handler => $$<HTMLTableCellElement>('td[data-row-index]:not(.hidden)', handler)));
+  return Promise.all(handlers.map(handler => $$<HTMLTableCellElement>('td[jslog]:not(.hidden)', handler)));
 }
 
 export async function getDataGrid(root?: ElementHandle) {
-  const dataGrid = await waitFor('devtools-data-grid', root);
+  const dataGrid = await waitFor('devtools-data-grid,devtools-new-data-grid', root);
   if (!dataGrid) {
     assert.fail('Could not find data-grid');
   }

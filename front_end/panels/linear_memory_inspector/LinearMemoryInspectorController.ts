@@ -82,15 +82,14 @@ export function isDWARFMemoryObject(obj: SDK.RemoteObject.RemoteObject): boolean
   return false;
 }
 
-type SerializableSettings = {
-  valueTypes: LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType[],
-  valueTypeModes:
-      [
-        LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType,
-        LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueTypeMode,
-      ][],
-  endianness: LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.Endianness,
-};
+interface SerializableSettings {
+  valueTypes: LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType[];
+  valueTypeModes: [
+    LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType,
+    LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueTypeMode,
+  ][];
+  endianness: LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.Endianness;
+}
 
 export class LinearMemoryInspectorController extends SDK.TargetManager.SDKModelObserver<SDK.RuntimeModel.RuntimeModel>
     implements Common.Revealer.Revealer<SDK.RemoteObject.LinearMemoryInspectable>,
@@ -350,7 +349,7 @@ export class LinearMemoryInspectorController extends SDK.TargetManager.SDKModelO
         name: expression ? LinearMemoryInspectorController.extractObjectName(obj, expression) : expression,
         type: LinearMemoryInspectorController.extractObjectTypeDescription(obj),
       };
-    } catch (err) {
+    } catch {
       highlightInfo = undefined;
     }
     return highlightInfo;

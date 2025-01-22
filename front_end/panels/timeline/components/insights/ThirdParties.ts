@@ -22,13 +22,17 @@ const UIStrings = {
   columnTransferSize: 'Transfer size',
   /** Label for a table column that displays how much time each row spent blocking other work on the main thread, entries will be the number of milliseconds spent. */
   columnBlockingTime: 'Blocking time',
+  /**
+   * @description Text block indicating that no third party content was detected on the page
+   */
+  noThirdParties: 'No third parties found',
 };
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/insights/ThirdParties.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class ThirdParties extends BaseInsightComponent<ThirdPartiesInsightModel> {
-  static override readonly litTagName = LitHtml.literal`devtools-performance-third-parties`;
+  static override readonly litTagName = LitHtml.StaticHtml.literal`devtools-performance-third-parties`;
   override internalName: string = 'third-parties';
 
   #overlaysForEntity = new Map<Trace.Extras.ThirdParties.Entity, Overlays.Overlays.TimelineOverlay[]>();
@@ -69,6 +73,9 @@ export class ThirdParties extends BaseInsightComponent<ThirdPartiesInsightModel>
     }
 
     const entries = [...this.model.summaryByEntity.entries()].filter(kv => kv[0] !== this.model?.firstPartyEntity);
+    if (!entries.length) {
+      return html`<div class="insight-section">${i18nString(UIStrings.noThirdParties)}</div>`;
+    }
 
     const topTransferSizeEntries = entries.sort((a, b) => b[1].transferSize - a[1].transferSize).slice(0, 6);
     const topMainThreadTimeEntries = entries.sort((a, b) => b[1].mainThreadTime - a[1].mainThreadTime).slice(0, 6);

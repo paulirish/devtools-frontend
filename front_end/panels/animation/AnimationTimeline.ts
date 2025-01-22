@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import '../../ui/legacy/legacy.js';
+
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -302,7 +304,9 @@ export class AnimationTimeline extends UI.Widget.VBox implements
   private createHeader(): HTMLElement {
     const toolbarContainer = this.contentElement.createChild('div', 'animation-timeline-toolbar-container');
     toolbarContainer.setAttribute('jslog', `${VisualLogging.toolbar()}`);
-    const topToolbar = new UI.Toolbar.Toolbar('animation-timeline-toolbar', toolbarContainer);
+    toolbarContainer.role = 'toolbar';
+    const topToolbar = toolbarContainer.createChild('devtools-toolbar', 'animation-timeline-toolbar');
+    topToolbar.role = 'presentation';
     this.#clearButton =
         new UI.Toolbar.ToolbarButton(i18nString(UIStrings.clearAll), 'clear', undefined, 'animations.clear');
     this.#clearButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, () => {
@@ -326,7 +330,7 @@ export class AnimationTimeline extends UI.Widget.VBox implements
 
     this.#playbackRateButtons = [];
     for (const playbackRate of GlobalPlaybackRates) {
-      const button = (playbackRateControl.createChild('button', 'animation-playback-rate-button') as HTMLElement);
+      const button = playbackRateControl.createChild('button', 'animation-playback-rate-button');
       button.textContent = playbackRate ? i18nString(UIStrings.playbackRatePlaceholder, {PH1: playbackRate * 100}) :
                                           i18nString(UIStrings.pause);
       button.setAttribute(
@@ -342,7 +346,7 @@ export class AnimationTimeline extends UI.Widget.VBox implements
       this.#playbackRateButtons.push(button);
     }
     this.updatePlaybackControls();
-    this.#previewContainer = (this.contentElement.createChild('div', 'animation-timeline-buffer') as HTMLElement);
+    this.#previewContainer = this.contentElement.createChild('div', 'animation-timeline-buffer');
     this.#previewContainer.setAttribute('jslog', `${VisualLogging.section('film-strip')}`);
     UI.ARIAUtils.markAsListBox(this.#previewContainer);
     UI.ARIAUtils.setLabel(this.#previewContainer, i18nString(UIStrings.animationPreviews));
@@ -350,9 +354,9 @@ export class AnimationTimeline extends UI.Widget.VBox implements
     emptyBufferHint.textContent = i18nString(UIStrings.waitingForAnimations);
     const container = this.contentElement.createChild('div', 'animation-timeline-header');
     const controls = container.createChild('div', 'animation-controls');
-    this.#currentTime = (controls.createChild('div', 'animation-timeline-current-time monospace') as HTMLElement);
+    this.#currentTime = controls.createChild('div', 'animation-timeline-current-time monospace');
 
-    const toolbar = new UI.Toolbar.Toolbar('animation-controls-toolbar', controls);
+    const toolbar = controls.createChild('devtools-toolbar', 'animation-controls-toolbar');
     this.#controlButton = new UI.Toolbar.ToolbarButton(
         i18nString(UIStrings.replayTimeline), 'replay', undefined, 'animations.play-replay-pause-animation-group');
     this.#controlButton.element.classList.add('toolbar-state-on');

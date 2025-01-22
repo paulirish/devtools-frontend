@@ -27,15 +27,19 @@ const UIStrings = {
    * @example {5} PH1
    */
   others: '{PH1} others',
+  /**
+   * @description Text status indicating that no potential optimizations were found for any image file
+   */
+  noOptimizableImages: 'No optimizable images',
 };
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/insights/ImageDelivery.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-const MAX_REQUESTS = 6;
+const MAX_REQUESTS = 10;
 
 export class ImageDelivery extends BaseInsightComponent<ImageDeliveryInsightModel> {
-  static override readonly litTagName = LitHtml.literal`devtools-performance-image-delivery`;
+  static override readonly litTagName = LitHtml.StaticHtml.literal`devtools-performance-image-delivery`;
   override internalName: string = 'image-delivery';
 
   override createOverlays(): Overlays.Overlays.TimelineOverlay[] {
@@ -55,12 +59,16 @@ export class ImageDelivery extends BaseInsightComponent<ImageDeliveryInsightMode
     };
   }
 
+  override getEstimatedSavingsBytes(): number|null {
+    return this.model?.totalByteSavings ?? null;
+  }
+
   override renderContent(): LitHtml.LitTemplate {
     if (!this.model) {
       return LitHtml.nothing;
     }
 
-    const optimizableImages = this.model.optimizableImages;
+    const optimizableImages = [...this.model.optimizableImages];
 
     const topImages =
         optimizableImages.sort((a, b) => b.request.args.data.decodedBodyLength - a.request.args.data.decodedBodyLength);
@@ -81,7 +89,7 @@ export class ImageDelivery extends BaseInsightComponent<ImageDeliveryInsightMode
     }
 
     if (!rows.length) {
-      return LitHtml.nothing;
+      return html`<div class="insight-section">${i18nString(UIStrings.noOptimizableImages)}</div>`;
     }
 
     // clang-format off

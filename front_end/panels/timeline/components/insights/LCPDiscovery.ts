@@ -43,6 +43,14 @@ const UIStrings = {
    *@example {Server response time} PH1
    */
   failedAriaLabel: 'Insight check failed: {PH1}',
+  /**
+   * @description Text status indicating that the the Largest Contentful Paint (LCP) metric timing was not found. "LCP" is an acronym and should not be translated.
+   */
+  noLcp: 'No LCP detected',
+  /**
+   * @description Text status indicating that the Largest Contentful Paint (LCP) metric was text rather than an image. "LCP" is an acronym and should not be translated.
+   */
+  noLcpResource: 'No LCP resource detected because the LCP is not an image',
 };
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/insights/LCPDiscovery.ts', UIStrings);
@@ -92,7 +100,7 @@ function getImageData(model: LCPDiscoveryInsightModel): LCPImageDiscoveryData|nu
 }
 
 export class LCPDiscovery extends BaseInsightComponent<LCPDiscoveryInsightModel> {
-  static override readonly litTagName = LitHtml.literal`devtools-performance-lcp-discovery`;
+  static override readonly litTagName = LitHtml.StaticHtml.literal`devtools-performance-lcp-discovery`;
   override internalName: string = 'lcp-discovery';
 
   #adviceIcon(didFail: boolean, label: string): LitHtml.TemplateResult {
@@ -172,7 +180,10 @@ export class LCPDiscovery extends BaseInsightComponent<LCPDiscoveryInsightModel>
 
     const imageData = getImageData(this.model);
     if (!imageData) {
-      return LitHtml.nothing;
+      if (!this.model.lcpEvent) {
+        return html`<div class="insight-section">${i18nString(UIStrings.noLcp)}</div>`;
+      }
+      return html`<div class="insight-section">${i18nString(UIStrings.noLcpResource)}</div>`;
     }
 
     // clang-format off

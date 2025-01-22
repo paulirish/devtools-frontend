@@ -434,7 +434,16 @@ export class InspectorFrontendHostStub implements InspectorFrontendHostAPI {
         portBindingEnabled: false,
         schemeBindingEnabled: false,
       },
+      devToolsAnimationStylesInStylesTab: {
+        enabled: false,
+      },
       isOffTheRecord: false,
+      thirdPartyCookieControls: {
+        thirdPartyCookieRestrictionEnabled: false,
+        thirdPartyCookieMetadataEnabled: true,
+        thirdPartyCookieHeuristicsEnabled: true,
+        managedBlockThirdPartyCookies: 'Unset',
+      },
     };
     if ('hostConfigForTesting' in globalThis) {
       const {hostConfigForTesting} = (globalThis as unknown as {hostConfigForTesting: Root.Runtime.HostConfig});

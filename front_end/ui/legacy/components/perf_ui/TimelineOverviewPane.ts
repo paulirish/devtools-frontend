@@ -196,7 +196,7 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
     });
   }
 
-  override update(start?: Trace.Types.Timing.MilliSeconds, end?: Trace.Types.Timing.MilliSeconds): void {
+  update(start?: Trace.Types.Timing.MilliSeconds, end?: Trace.Types.Timing.MilliSeconds): void {
     if (!this.isShowing()) {
       return;
     }
@@ -444,12 +444,12 @@ export interface OverviewPaneMouseMoveEvent {
   timeInMicroSeconds: Trace.Types.Timing.MicroSeconds;
 }
 
-export type EventTypes = {
-  [Events.OVERVIEW_PANE_WINDOW_CHANGED]: OverviewPaneWindowChangedEvent,
-  [Events.OVERVIEW_PANE_BREADCRUMB_ADDED]: OverviewPaneBreadcrumbAddedEvent,
-  [Events.OVERVIEW_PANE_MOUSE_MOVE]: OverviewPaneMouseMoveEvent,
-  [Events.OVERVIEW_PANE_MOUSE_LEAVE]: void,
-};
+export interface EventTypes {
+  [Events.OVERVIEW_PANE_WINDOW_CHANGED]: OverviewPaneWindowChangedEvent;
+  [Events.OVERVIEW_PANE_BREADCRUMB_ADDED]: OverviewPaneBreadcrumbAddedEvent;
+  [Events.OVERVIEW_PANE_MOUSE_MOVE]: OverviewPaneMouseMoveEvent;
+  [Events.OVERVIEW_PANE_MOUSE_LEAVE]: void;
+}
 
 export interface TimelineOverview {
   show(parentElement: Element, insertBefore?: Element|null): void;
@@ -470,7 +470,7 @@ export class TimelineOverviewBase extends UI.Widget.VBox implements TimelineOver
   constructor() {
     super();
     this.calculatorInternal = null;
-    this.canvas = (this.element.createChild('canvas', 'fill') as HTMLCanvasElement);
+    this.canvas = this.element.createChild('canvas', 'fill');
     this.contextInternal = this.canvas.getContext('2d');
   }
 
@@ -493,7 +493,7 @@ export class TimelineOverviewBase extends UI.Widget.VBox implements TimelineOver
     return this.calculatorInternal;
   }
 
-  override update(): void {
+  update(): void {
     throw new Error('Not implemented');
   }
 
@@ -541,12 +541,10 @@ export class OverviewInfo {
     this.glassPane.setMarginBehavior(UI.GlassPane.MarginBehavior.ARROW);
     this.glassPane.setSizeBehavior(UI.GlassPane.SizeBehavior.MEASURE_CONTENT);
     this.visible = false;
-    this.element = UI.UIUtils
-                       .createShadowRootWithCoreStyles(this.glassPane.contentElement, {
-                         cssFile: [timelineOverviewInfoStyles],
-                         delegatesFocus: undefined,
-                       })
-                       .createChild('div', 'overview-info');
+    this.element =
+        UI.UIUtils
+            .createShadowRootWithCoreStyles(this.glassPane.contentElement, {cssFile: [timelineOverviewInfoStyles]})
+            .createChild('div', 'overview-info');
   }
 
   async setContent(contentPromise: Promise<DocumentFragment>): Promise<void> {

@@ -313,6 +313,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   private forceDecorationCache?: boolean[]|null;
   private entryColorsCache?: string[]|null;
   private entryIndicesToNotDim?: number[]|null;
+  private entryIndicesToDim?: number[]|null;
   private colorDimmingCache = new Map<string, string>();
   private totalTime?: number;
   private lastPopoverState: PopoverState;
@@ -331,6 +332,8 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   #selectedElementOutlineEnabled = true;
 
   #indexToDrawOverride = new Map<number, DrawOverride>();
+
+  #shouldAddOutlines: boolean = true;
 
   constructor(
       dataProvider: FlameChartDataProvider, flameChartDelegate: FlameChartDelegate,
@@ -363,7 +366,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.dataProvider = dataProvider;
 
     this.viewportElement = this.chartViewport.viewportElement;
-    this.canvas = (this.viewportElement.createChild('canvas', 'fill') as HTMLCanvasElement);
+    this.canvas = this.viewportElement.createChild('canvas', 'fill');
     this.candyStripePattern = this.candyStripePatternGray = null;
 
     this.canvas.tabIndex = 0;
@@ -496,22 +499,36 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
 
   #shouldDimEvent(entryIndex: number): boolean {
     // If a search is active, that enables a mode where we dim all events that do not match the search results.
-    // Otherwise the events to not dim are defined by the last call to `enableDimming`.
+    if (this.entryIndicesToDim?.length && !this.#searchResultEntries) {
+      return this.entryIndicesToDim.includes(entryIndex);
+    }
+
+    // Otherwise the events to not dim are defined by the last call to `enableDimmingForUnrelatedEntries` or
+    // `enableDimming`.
     const entriesToNotDim = this.#searchResultEntries ?? this.entryIndicesToNotDim;
     if (!entriesToNotDim) {
       return false;
     }
-
     return !entriesToNotDim.includes(entryIndex);
   }
 
-  enableDimming(entryIndicesToNotDim: number[]): void {
+  enableDimming(entryIndices: number[], shouldAddOutlines: boolean): void {
+    this.entryIndicesToDim = entryIndices;
+    this.#shouldAddOutlines = shouldAddOutlines;
+    this.entryIndicesToNotDim = [];
+    this.draw();
+  }
+
+  enableDimmingForUnrelatedEntries(entryIndicesToNotDim: number[], shouldAddOutlines: boolean = true): void {
     this.entryIndicesToNotDim = entryIndicesToNotDim;
+    this.entryIndicesToDim = [];
+    this.#shouldAddOutlines = shouldAddOutlines;
     this.draw();
   }
 
   disableDimming(): void {
     this.entryIndicesToNotDim = null;
+    this.entryIndicesToDim = null;
     this.draw();
   }
 
@@ -749,8 +766,13 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
         this.viewportElement.style.cursor = 'pointer';
         return;
       case HoverType.INSIDE_TRACK:
+      case HoverType.OUTSIDE_TRACKS:
         this.updateHighlight();
         return;
+      case HoverType.ERROR:
+        return;
+      default:
+        Platform.assertNever(hoverType, `Invalid hovering type: ${hoverType}`);
     }
   }
 
@@ -773,7 +795,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
         iconTooltip = `Move ${displayName} track down`;
         break;
       case HoverType.TRACK_CONFIG_HIDE_BUTTON:
-        if (this.groupIsLastVisibleTopLevel(group)) {
+        if (this.groupIsLastVisibleTopLevel(groupIndex)) {
           iconTooltip = 'Can not hide the last top level track';
         } else {
           iconTooltip = `Hide ${displayName} track`;
@@ -1007,42 +1029,45 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
 
     // If any button is clicked, we should handle the action only and ignore others.
     const {groupIndex, hoverType} = this.coordinatesToGroupIndexAndHoverType(mouseEvent.offsetX, mouseEvent.offsetY);
-    if (groupIndex >= 0) {
-      switch (hoverType) {
-        case HoverType.TRACK_CONFIG_UP_BUTTON:
-          this.moveGroupUp(groupIndex);
-          return;
-        case HoverType.TRACK_CONFIG_DOWN_BUTTON:
-          this.moveGroupDown(groupIndex);
-          return;
-        case HoverType.TRACK_CONFIG_HIDE_BUTTON:
-          if (this.groupIsLastVisibleTopLevel(this.rawTimelineData?.groups[groupIndex])) {
-            // If this is the last visible top-level group, we will not allow you hiding the track.
-            return;
-          }
-          this.hideGroup(groupIndex);
-          return;
-        case HoverType.TRACK_CONFIG_SHOW_BUTTON:
-          this.showGroup(groupIndex);
-          return;
-        case HoverType.INSIDE_TRACK_HEADER:
-          this.#selectGroup(groupIndex);
-          this.toggleGroupExpand(groupIndex);
-          return;
-        case HoverType.INSIDE_TRACK: {
-          this.#selectGroup(groupIndex);
-
-          const timelineData = this.timelineData();
-          if (mouseEvent.shiftKey && this.highlightedEntryIndex !== -1 && timelineData) {
-            const start = timelineData.entryStartTimes[this.highlightedEntryIndex];
-            const end = start + timelineData.entryTotalTimes[this.highlightedEntryIndex];
-            this.chartViewport.setRangeSelection(start, end);
-          } else {
-            this.chartViewport.onClick(mouseEvent);
-            this.dispatchEventToListeners(Events.ENTRY_INVOKED, this.highlightedEntryIndex);
-          }
+    // There could be a special case, when there is no group and all entries are appended directly, for example the
+    // Memory panel.
+    // In this case, the |groupIndex| will be -1, and |groups| should be empty.
+    // All the functions here can handle the -1 groupIndex properly, so we don't need to add extra check here.
+    switch (hoverType) {
+      case HoverType.TRACK_CONFIG_UP_BUTTON:
+        this.moveGroupUp(groupIndex);
+        return;
+      case HoverType.TRACK_CONFIG_DOWN_BUTTON:
+        this.moveGroupDown(groupIndex);
+        return;
+      case HoverType.TRACK_CONFIG_HIDE_BUTTON:
+        if (this.groupIsLastVisibleTopLevel(groupIndex)) {
+          // If this is the last visible top-level group, we will not allow you hiding the track.
           return;
         }
+        this.hideGroup(groupIndex);
+        return;
+      case HoverType.TRACK_CONFIG_SHOW_BUTTON:
+        this.showGroup(groupIndex);
+        return;
+      case HoverType.INSIDE_TRACK_HEADER:
+        this.#selectGroup(groupIndex);
+        this.toggleGroupExpand(groupIndex);
+        return;
+      case HoverType.INSIDE_TRACK:
+      case HoverType.OUTSIDE_TRACKS: {
+        this.#selectGroup(groupIndex);
+
+        const timelineData = this.timelineData();
+        if (mouseEvent.shiftKey && this.highlightedEntryIndex !== -1 && timelineData) {
+          const start = timelineData.entryStartTimes[this.highlightedEntryIndex];
+          const end = start + timelineData.entryTotalTimes[this.highlightedEntryIndex];
+          this.chartViewport.setRangeSelection(start, end);
+        } else {
+          this.chartViewport.onClick(mouseEvent);
+          this.dispatchEventToListeners(Events.ENTRY_INVOKED, this.highlightedEntryIndex);
+        }
+        return;
       }
     }
   }
@@ -2087,6 +2112,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
 
     this.viewportElement.appendChild(div);
     this.#inTrackConfigEditMode = true;
+    this.dispatchEventToListeners(Events.TRACKS_REORDER_STATE_CHANGED, true);
     this.updateLevelPositions();
     this.draw();
   }
@@ -2101,6 +2127,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   #exitEditMode(): void {
     this.#removeEditModeButton();
     this.#inTrackConfigEditMode = false;
+    this.dispatchEventToListeners(Events.TRACKS_REORDER_STATE_CHANGED, false);
     this.updateLevelPositions();
     this.draw();
   }
@@ -2265,7 +2292,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       this.#drawEventRect(context, timelineData, entryIndex);
     }
 
-    if (!shouldDim) {
+    if (!shouldDim && this.#shouldAddOutlines) {
       // In some scenarios we want to draw outlines around events for added visual contrast.
       // But we only do this if the events are not being dimmed.
       this.#maybeAddOutlines(context, color);
@@ -2687,9 +2714,9 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     // When it is normal mode, there are no icons to the left of a track.
     // When it is in edit mode, there are three icons to customize the groups.
     const iconsWidth = this.#inTrackConfigEditMode ? EDIT_MODE_TOTAL_ICON_WIDTH : 0;
-    this.forEachGroupInViewport((offset, index, group) => {
+    this.forEachGroupInViewport((offset, groupIndex, group) => {
       context.font = this.#font;
-      if (this.isGroupCollapsible(index) && !group.expanded || group.style.shareHeaderLine) {
+      if (this.isGroupCollapsible(groupIndex) && !group.expanded || group.style.shareHeaderLine) {
         // In edit mode, we draw an extra rectangle for the save icon.
         const labelBackgroundWidth = this.labelWidthForGroup(context, group);
         const parsedColor = Common.Color.parse(group.style.backgroundColor);
@@ -2735,7 +2762,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
           // If this is the last visible top-level group, we will disable the hide action.
           drawIcon(
               context, HIDE_ICON_LEFT, offset, EDIT_ICON_WIDTH, group.hidden ? showIconPath : hideIconPath,
-              this.groupIsLastVisibleTopLevel(group) ? '--sys-color-state-disabled' : iconColor);
+              this.groupIsLastVisibleTopLevel(groupIndex) ? '--sys-color-state-disabled' : iconColor);
         }
       }
     });
@@ -3326,6 +3353,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       this.forceDecorationCache = null;
       this.entryColorsCache = null;
       this.entryIndicesToNotDim = null;
+      this.entryIndicesToDim = null;
       this.colorDimmingCache.clear();
       this.rawTimelineDataLength = 0;
       this.#groupTreeRoot = null;
@@ -3706,10 +3734,11 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     return style.height !== style.itemsHeight;
   }
 
-  groupIsLastVisibleTopLevel(group?: Group): boolean {
-    if (!group) {
+  groupIsLastVisibleTopLevel(groupIndex: number): boolean {
+    if (groupIndex < 0 || !this.rawTimelineData) {
       return true;
     }
+    const group = this.rawTimelineData.groups[groupIndex];
     const visibleTopLevelGroupNumber =
         this.#groupTreeRoot?.children.filter(track => !this.rawTimelineData?.groups[track.index].hidden).length;
     return visibleTopLevelGroupNumber === 1 && group.style.nestingLevel === 0 && !group.hidden;
@@ -3757,7 +3786,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   }
 
   /**
-   * Update position of an Element. By default, the element is treated as a full entry and it's dimentions are set to the full entry width/length/height.
+   * Update position of an Element. By default, the element is treated as a full entry and it's dimensions are set to the full entry width/length/height.
    * If isDecoration parameter is set to true, the element will be positioned on the right side of the entry and have a square shape where width == height of the entry.
    */
   private updateElementPosition(element: Element|null, entryIndex: number, isDecoration?: boolean): void {
@@ -3808,7 +3837,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     const barHeight = this.levelHeight(entryLevel);
     const style = (element as HTMLElement).style;
 
-    // TODO(paulirish): make these changes within a coordinator.write callback.
+    // TODO(paulirish): make these changes within a RenderCoordinator.write callback.
     // Currently these (plus the scrollOffset() right above) trigger layout thrashing.
     if (isDecoration) {
       style.top = barY + 'px';
@@ -3908,7 +3937,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.scheduleUpdate();
   }
 
-  override update(): void {
+  update(): void {
     if (!this.timelineData()) {
       return;
     }
@@ -3937,6 +3966,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.rawTimelineDataLength = 0;
     this.#groupTreeRoot = null;
     this.entryIndicesToNotDim = null;
+    this.entryIndicesToDim = null;
     this.colorDimmingCache.clear();
     this.highlightedMarkerIndex = -1;
     this.highlightedEntryIndex = -1;
@@ -4169,8 +4199,6 @@ export interface FlameChartDataProvider {
   // The following three functions are used for the flame chart entry customization.
   modifyTree?(action: FilterAction, entryIndex: number): void;
 
-  getAIEventNodeTreeFromEntryIndex?(entryIndex: number): Trace.Helpers.TreeHelpers.AINode|null;
-
   entryHasAnnotations?(entryIndex: number): boolean;
 
   deleteAnnotationsForEntry?(entryIndex: number): void;
@@ -4211,6 +4239,12 @@ export const enum Events {
   // Emmited when entries link annotation is added through a shotcut or a context menu.
   ENTRIES_LINK_ANNOTATION_CREATED = 'EntriesLinkAnnotationCreated',
   /**
+   * Emmited when the user enters or exits 'reorder tracks' view.
+   * If the event value is 'true', the 'reorder tracks' state was entered,
+   * if it's false, the reorder state was exited.
+   */
+  TRACKS_REORDER_STATE_CHANGED = 'TracksReorderStateChange',
+  /**
    * Emitted when an event is selected via keyboard navigation using the arrow
    * keys.
    *
@@ -4233,19 +4267,20 @@ export const enum Events {
   MOUSE_MOVE = 'MouseMove',
 }
 
-export type EventTypes = {
+export interface EventTypes {
   [Events.ENTRY_LABEL_ANNOTATION_ADDED]: {
     entryIndex: number,
     withLinkCreationButton: boolean,
-  },
+  };
   [Events.ENTRIES_LINK_ANNOTATION_CREATED]: {
     entryFromIndex: number,
-  },
-  [Events.CANVAS_FOCUSED]: number|void,
-  [Events.ENTRY_INVOKED]: number,
-  [Events.ENTRY_SELECTED]: number,
-  [Events.ENTRY_HOVERED]: number,
-  [Events.CHART_PLAYABLE_STATE_CHANGED]: boolean,
+  };
+  [Events.TRACKS_REORDER_STATE_CHANGED]: boolean;
+  [Events.CANVAS_FOCUSED]: number|void;
+  [Events.ENTRY_INVOKED]: number;
+  [Events.ENTRY_SELECTED]: number;
+  [Events.ENTRY_HOVERED]: number;
+  [Events.CHART_PLAYABLE_STATE_CHANGED]: boolean;
   [Events.LATEST_DRAW_DIMENSIONS]: {
     chart: {
       widthPixels: number,
@@ -4254,12 +4289,12 @@ export type EventTypes = {
       allGroupsCollapsed: boolean,
     },
     traceWindow: Trace.Types.Timing.TraceWindowMicroSeconds,
-  },
+  };
   [Events.MOUSE_MOVE]: {
     mouseEvent: MouseEvent,
     timeInMicroSeconds: Trace.Types.Timing.MicroSeconds,
-  },
-};
+  };
+}
 
 export interface Group {
   name: Common.UIString.LocalizedString;

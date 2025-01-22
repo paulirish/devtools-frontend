@@ -9,6 +9,7 @@ const queryParamsObject = new URLSearchParams(location.search);
 let runtimePlatform = '';
 
 let runtimeInstance: Runtime|undefined;
+let isNode: boolean|undefined;
 
 export function getRemoteBase(location: string = self.location.toString()): {
   base: string,
@@ -30,6 +31,11 @@ export function getRemoteBase(location: string = self.location.toString()): {
 
 export function getPathName(): string {
   return window.location.pathname;
+}
+
+export function isNodeEntry(pathname: string): boolean {
+  const nodeEntryPoints = ['node_app', 'js_app'];
+  return nodeEntryPoints.some(component => pathname.includes(component));
 }
 
 export class Runtime {
@@ -68,10 +74,17 @@ export class Runtime {
           {
             [x: string]: boolean,
           });
-    } catch (e) {
+    } catch {
       console.error('Failed to parse localStorage[\'experiments\']');
       return {};
     }
+  }
+
+  static isNode(): boolean {
+    if (isNode === undefined) {
+      isNode = isNodeEntry(getPathName());
+    }
+    return isNode;
   }
 
   static setPlatform(platform: string): void {
@@ -300,7 +313,7 @@ export const enum ExperimentName {
   TIMELINE_EXPERIMENTAL_INSIGHTS = 'timeline-experimental-insights',
   TIMELINE_DIM_UNRELATED_EVENTS = 'timeline-dim-unrelated-events',
   TIMELINE_ALTERNATIVE_NAVIGATION = 'timeline-alternative-navigation',
-  TIMELINE_IGNORE_LIST = 'timeline-ignore-list',
+  TIMELINE_THIRD_PARTY_DEPENDENCIES = 'timeline-third-party-dependencies',
   // when adding to this enum, you'll need to also add to REGISTERED_EXPERIMENTS in EnvironmentHelpers.ts
 }
 
@@ -374,6 +387,17 @@ export interface HostConfigEnableOriginBoundCookies {
   schemeBindingEnabled: boolean;
 }
 
+export interface HostConfigAnimationStylesInStylesTab {
+  enabled: boolean;
+}
+
+export interface HostConfigThirdPartyCookieControls {
+  thirdPartyCookieRestrictionEnabled: boolean;
+  thirdPartyCookieMetadataEnabled: boolean;
+  thirdPartyCookieHeuristicsEnabled: boolean;
+  managedBlockThirdPartyCookies: string|boolean;
+}
+
 // We use `RecursivePartial` here to enforce that DevTools code is able to
 // handle `HostConfig` objects of an unexpected shape. This can happen if
 // the implementation in the Chromium backend is changed without correctly
@@ -396,6 +420,8 @@ export type HostConfig = Platform.TypeScriptUtilities.RecursivePartial<{
    */
   isOffTheRecord: boolean,
   devToolsEnableOriginBoundCookies: HostConfigEnableOriginBoundCookies,
+  devToolsAnimationStylesInStylesTab: HostConfigAnimationStylesInStylesTab,
+  thirdPartyCookieControls: HostConfigThirdPartyCookieControls,
 }>;
 
 /**

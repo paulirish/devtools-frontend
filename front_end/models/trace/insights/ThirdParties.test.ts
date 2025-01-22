@@ -3,17 +3,7 @@
 // found in the LICENSE file.
 
 import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
-import {getFirstOrError, getInsightOrError} from '../../../testing/InsightHelpers.js';
-import {TraceLoader} from '../../../testing/TraceLoader.js';
-
-export async function processTrace(testContext: Mocha.Suite|Mocha.Context|null, traceFile: string) {
-  const {parsedTrace, insights} = await TraceLoader.traceEngine(testContext, traceFile);
-  if (!insights) {
-    throw new Error('No insights');
-  }
-
-  return {data: parsedTrace, insights};
-}
+import {getFirstOrError, getInsightOrError, processTrace} from '../../../testing/InsightHelpers.js';
 
 describeWithEnvironment('ThirdParties', function() {
   it('categorizes third party web requests (simple)', async () => {
@@ -35,7 +25,7 @@ describeWithEnvironment('ThirdParties', function() {
     ]);
 
     const requestsByEntityResult = [...insight.requestsByEntity.entries()].map(([entity, requests]) => {
-      return [entity.name, requests.map(r => r.args.data.url)];
+      return [entity.name, requests.map(r => r?.args?.data?.url)];
     });
     assert.deepEqual(
         requestsByEntityResult,
@@ -85,7 +75,7 @@ describeWithEnvironment('ThirdParties', function() {
     ]);
 
     const requestsByEntityResult = [...insight.requestsByEntity.entries()].map(([entity, requests]) => {
-      return [entity.name, requests.map(r => r.args.data.url)];
+      return [entity.name, requests.map(r => r?.args?.data?.url)];
     });
     assert.deepEqual(
         requestsByEntityResult,

@@ -42,11 +42,11 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 let ignoreListManagerInstance: IgnoreListManager|undefined;
 
-export type IgnoreListGeneralRules = {
-  isContentScript?: boolean,
-  isKnownThirdParty?: boolean,
-  isCurrentlyIgnoreListed?: boolean,
-};
+export interface IgnoreListGeneralRules {
+  isContentScript?: boolean;
+  isKnownThirdParty?: boolean;
+  isCurrentlyIgnoreListed?: boolean;
+}
 
 export class IgnoreListManager implements SDK.TargetManager.SDKModelObserver<SDK.DebuggerModel.DebuggerModel> {
   readonly #debuggerWorkspaceBinding: DebuggerWorkspaceBinding;
@@ -449,7 +449,7 @@ export class IgnoreListManager implements SDK.TargetManager.SDKModelObserver<SDK
           item.disabled = true;
           item.disabledForUrl = url;
         }
-      } catch (e) {
+      } catch {
       }
     }
     this.getSkipStackFramesPatternSetting().setAsArray(regexPatterns);

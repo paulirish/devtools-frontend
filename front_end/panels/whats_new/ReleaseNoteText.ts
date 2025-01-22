@@ -6,15 +6,23 @@
 // be shown in Canary (e.g. make sure the release notes are accurate).
 // https://github.com/ChromeDevTools/devtools-frontend/wiki/Release-Notes
 
+import type * as Platform from '../../core/platform/platform.js';
 import * as MarkdownView from '../../ui/components/markdown_view/markdown_view.js';
 
 let registeredLinks = false;
 
-interface ReleaseNote {
+export interface ReleaseNote {
   version: number;
   header: string;
   markdownLinks: {key: string, link: string}[];
+  videoLinks: {description: string, link: Platform.DevToolsPath.UrlString, type?: VideoType}[];
   link: string;
+}
+
+export const enum VideoType {
+  WHATS_NEW = 'WhatsNew',
+  DEVTOOLS_TIPS = 'DevtoolsTips',
+  OTHER = 'Other',
 }
 
 export function setReleaseNoteForTest(testReleaseNote: ReleaseNote): void {
@@ -32,21 +40,28 @@ export function getReleaseNote(): ReleaseNote {
 }
 
 let releaseNote: ReleaseNote = {
-  version: 73,
-  header: 'Highlights from the Chrome 132 update',
+  version: 74,
+  header: 'What\'s new in DevTools 133',
   markdownLinks: [
     {
-      key: 'ai-assistance',
-      link: 'https://developer.chrome.com/blog/new-in-devtools-132/#ai-assistance',
+      key: 'persistent-chat-history',
+      link: 'https://developer.chrome.com/blog/new-in-devtools-133/#persistent-chat-history',
     },
     {
-      key: 'chat-history',
-      link: 'https://developer.chrome.com/blog/new-in-devtools-132/#chat-history',
+      key: 'perf-nav',
+      link: 'https://developer.chrome.com/blog/new-in-devtools-133/#perf-nav',
     },
     {
-      key: 'interaction-phases',
-      link: 'https://developer.chrome.com/blog/new-in-devtools-132/#interaction-phases',
+      key: 'perf-image-delivery',
+      link: 'https://developer.chrome.com/blog/new-in-devtools-133/#perf-image-delivery',
     },
   ],
-  link: 'https://developer.chrome.com/blog/new-in-devtools-132/',
+  videoLinks: [
+    {
+      description: 'Highlights of updates from Chrome 130-132',
+      link: 'https://www.youtube.com/watch?v=kzDUe-f4gac' as Platform.DevToolsPath.UrlString,
+      type: VideoType.WHATS_NEW,
+    },
+  ],
+  link: 'https://developer.chrome.com/blog/new-in-devtools-133/',
 };

@@ -103,6 +103,7 @@ export const DEVICE_SCOPE_LIST: DeviceScope[] = ['ALL', 'DESKTOP', 'PHONE'];
 
 const pageScopeList: PageScope[] = ['origin', 'url'];
 const metrics: MetricNames[] = [
+  'first_contentful_paint',
   'largest_contentful_paint',
   'cumulative_layout_shift',
   'interaction_to_next_paint',
@@ -404,6 +405,6 @@ export const enum Events {
   FIELD_DATA_CHANGED = 'field-data-changed',
 }
 
-type EventTypes = {
-  [Events.FIELD_DATA_CHANGED]: PageResult|undefined,
-};
+interface EventTypes {
+  [Events.FIELD_DATA_CHANGED]: PageResult|undefined;
+}

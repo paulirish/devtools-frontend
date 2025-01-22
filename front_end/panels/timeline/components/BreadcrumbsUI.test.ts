@@ -5,7 +5,7 @@
 import * as Trace from '../../../models/trace/trace.js';
 import {renderElementIntoDOM} from '../../../testing/DOMHelpers.js';
 import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
-import * as Coordinator from '../../../ui/components/render_coordinator/render_coordinator.js';
+import * as RenderCoordinator from '../../../ui/components/render_coordinator/render_coordinator.js';
 
 import * as TimelineComponents from './components.js';
 
@@ -35,7 +35,6 @@ describeWithEnvironment('BreadcrumbsUI', () => {
   }
 
   it('renders one breadcrumb', async () => {
-    const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
     const component = new BreadcrumbsUI();
     renderElementIntoDOM(component);
 
@@ -52,16 +51,15 @@ describeWithEnvironment('BreadcrumbsUI', () => {
 
     component.data = {initialBreadcrumb: breadcrumb, activeBreadcrumb: breadcrumb};
 
-    await coordinator.done();
+    await RenderCoordinator.done();
 
     const breadcrumbsRanges = queryBreadcrumbs(component);
 
-    assert.deepStrictEqual(breadcrumbsRanges.length, 1);
-    assert.deepStrictEqual(breadcrumbsRanges, ['Full range (9.00 ms)']);
+    assert.lengthOf(breadcrumbsRanges, 1);
+    assert.deepEqual(breadcrumbsRanges, ['Full range (9.00 ms)']);
   });
 
   it('renders all the breadcrumbs provided', async () => {
-    const coordinator = Coordinator.RenderCoordinator.RenderCoordinator.instance();
     const component = new BreadcrumbsUI();
     renderElementIntoDOM(component);
 
@@ -89,15 +87,15 @@ describeWithEnvironment('BreadcrumbsUI', () => {
 
     component.data = {initialBreadcrumb: breadcrumb, activeBreadcrumb: breadcrumb2};
 
-    await coordinator.done();
+    await RenderCoordinator.done();
 
     const breadcrumbsRanges = queryBreadcrumbs(component);
 
-    assert.deepStrictEqual(breadcrumbsRanges.length, 2);
-    assert.deepStrictEqual(breadcrumbsRanges, ['Full range (9.00 ms)', '7.00 ms']);
+    assert.lengthOf(breadcrumbsRanges, 2);
+    assert.deepEqual(breadcrumbsRanges, ['Full range (9.00 ms)', '7.00 ms']);
 
     // There should always be one active breadcrumb
     const activeRange = queryActiveBreadcrumb(component);
-    assert.deepStrictEqual(activeRange.length, 1);
+    assert.lengthOf(activeRange, 1);
   });
 });

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import * as i18n from '../../../core/i18n/i18n.js';
+import type * as Platform from '../../../core/platform/platform.js';
 import * as Trace from '../../../models/trace/trace.js';
 import * as ThemeSupport from '../../../ui/legacy/theme_support/theme_support.js';
 
@@ -47,6 +48,10 @@ const UIStrings = {
    *@description Text in Timeline UIUtils of the Performance panel
    */
   task: 'Task',
+  /**
+   *@description Text in Timeline UIUtils of the Performance panel
+   */
+  consoleTaskRun: 'Run console task',
   /**
    *@description Text for other types of items
    */
@@ -551,13 +556,15 @@ export class TimelineRecordStyle {
 }
 export class TimelineCategory {
   name: EventCategory;
-  title: string;
+  title: Platform.UIString.LocalizedString;
   visible: boolean;
   childColor: string;
   colorInternal: string;
   #hidden?: boolean;
 
-  constructor(name: EventCategory, title: string, visible: boolean, childColor: string, color: string) {
+  constructor(
+      name: EventCategory, title: Platform.UIString.LocalizedString, visible: boolean, childColor: string,
+      color: string) {
     this.name = name;
     this.title = title;
     this.visible = visible;
@@ -901,7 +908,7 @@ export function maybeInitSylesMap(): EventStylesMap {
         true,
         ),
 
-    [Trace.Types.Events.Name.TIME_STAMP]:
+    [Trace.Types.Events.Name.CONSOLE_TIME_STAMP]:
         new TimelineRecordStyle(i18nString(UIStrings.timestamp), defaultCategoryStyles.scripting),
 
     [Trace.Types.Events.Name.CONSOLE_TIME]:
@@ -1060,6 +1067,8 @@ export function maybeInitSylesMap(): EventStylesMap {
 
     [Trace.Types.Events.Name.ABORT_POST_TASK_CALLBACK]:
         new TimelineRecordStyle(i18nString(UIStrings.abortPostTaskCallback), defaultCategoryStyles.scripting),
+    [Trace.Types.Events.Name.V8_CONSOLE_RUN_TASK]:
+        new TimelineRecordStyle(i18nString(UIStrings.consoleTaskRun), defaultCategoryStyles.scripting),
   };
   return eventStylesMap;
 }
@@ -1121,6 +1130,14 @@ export function markerDetailsForEvent(event: Trace.Types.Events.Event): {
   if (Trace.Types.Events.isNavigationStart(event)) {
     color = 'var(--color-text-primary)';
     title = Trace.Handlers.ModelHandlers.PageLoadMetrics.MetricName.NAV;
+  }
+  if (Trace.Types.Events.isMarkDOMContent(event)) {
+    color = 'var(--color-text-disabled)';
+    title = Trace.Handlers.ModelHandlers.PageLoadMetrics.MetricName.DCL;
+  }
+  if (Trace.Types.Events.isMarkLoad(event)) {
+    color = 'var(--color-text-disabled)';
+    title = Trace.Handlers.ModelHandlers.PageLoadMetrics.MetricName.L;
   }
   return {color, title};
 }

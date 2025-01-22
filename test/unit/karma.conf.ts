@@ -8,7 +8,6 @@ import * as path from 'path';
 
 import {formatAsPatch, resultAssertionsDiff, ResultsDBReporter} from '../../test/conductor/karma-resultsdb-reporter.js';
 import {CHECKOUT_ROOT, GEN_DIR, SOURCE_ROOT} from '../../test/conductor/paths.js';
-// eslint-disable-next-line  rulesdir/es_modules_import
 import * as ResultsDb from '../../test/conductor/resultsdb.js';
 import {loadTests, TestConfig} from '../../test/conductor/test_config.js';
 
@@ -75,7 +74,7 @@ module.exports = function(config: any) {
   const targetDir = path.relative(SOURCE_ROOT, GEN_DIR);
   const options = {
     basePath: CHECKOUT_ROOT,
-    autoWatchBatchDelay: 3000,
+    autoWatchBatchDelay: 1000,
 
     files: [
       // Global hooks in test_setup must go first

@@ -14,7 +14,7 @@ import {BaseInsightComponent} from './BaseInsightComponent.js';
 const {html} = LitHtml;
 
 export class Viewport extends BaseInsightComponent<ViewportInsightModel> {
-  static override readonly litTagName = LitHtml.literal`devtools-performance-viewport`;
+  static override readonly litTagName = LitHtml.StaticHtml.literal`devtools-performance-viewport`;
   override internalName: string = 'viewport';
 
   override createOverlays(): Overlays.Overlays.TimelineOverlay[] {
@@ -26,22 +26,27 @@ export class Viewport extends BaseInsightComponent<ViewportInsightModel> {
     return this.model?.metricSavings?.INP ?? null;
   }
 
-  override renderContent(): LitHtml.LitTemplate {
-    if (!this.model) {
+  renderContent(): LitHtml.LitTemplate {
+    if (!this.model || !this.model.viewportEvent) {
       return LitHtml.nothing;
     }
 
-    const backendNodeId = this.model.viewportEvent?.args.data.node_id;
+    const backendNodeId = this.model.viewportEvent.args.data.node_id;
+    if (backendNodeId === undefined) {
+      return LitHtml.nothing;
+    }
 
     // clang-format off
     return html`
       <div>
-        ${backendNodeId !== undefined ? html`<devtools-performance-node-link
+        <devtools-performance-node-link
           .data=${{
             backendNodeId,
-            options: {tooltip: this.model.viewportEvent?.args.data.content},
+            frame: this.model.viewportEvent.args.data.frame ?? '',
+            options: {tooltip: this.model.viewportEvent.args.data.content},
+            fallbackHtmlSnippet: `<meta name=viewport content="${this.model.viewportEvent.args.data.content}">`,
           }}>
-        </devtools-performance-node-link>` : LitHtml.nothing}
+        </devtools-performance-node-link>
       </div>`;
     // clang-format on
   }

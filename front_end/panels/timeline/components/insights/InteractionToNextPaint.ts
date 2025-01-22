@@ -38,13 +38,17 @@ const UIStrings = {
    *@description Text shown next to the interaction event's presentation delay time in the detail view.
    */
   presentationDelay: 'Presentation delay',
+  /**
+   * @description Text status indicating that no user interactions were detected.
+   */
+  noInteractions: 'No interactions detected',
 };
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/insights/InteractionToNextPaint.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class InteractionToNextPaint extends BaseInsightComponent<INPInsightModel> {
-  static override readonly litTagName = LitHtml.literal`devtools-performance-inp`;
+  static override readonly litTagName = LitHtml.StaticHtml.literal`devtools-performance-inp`;
   override internalName: string = 'inp';
 
   override createOverlays(): Overlays.Overlays.TimelineOverlay[] {
@@ -97,7 +101,7 @@ export class InteractionToNextPaint extends BaseInsightComponent<INPInsightModel
   override renderContent(): LitHtml.LitTemplate {
     const event = this.model?.longestInteractionEvent;
     if (!event) {
-      return LitHtml.nothing;
+      return html`<div class="insight-section">${i18nString(UIStrings.noInteractions)}</div>`;
     }
 
     const time = (us: Trace.Types.Timing.MicroSeconds): string =>

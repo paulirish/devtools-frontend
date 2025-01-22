@@ -15,7 +15,6 @@ function initTrackAppender(
     entryData: Trace.Types.Events.Event[],
     entryTypeByLevel: Timeline.TimelineFlameChartDataProvider.EntryType[],
     ): Timeline.TimingsTrackAppender.TimingsTrackAppender {
-  Timeline.ExtensionDataGatherer.ExtensionDataGatherer.instance().modelChanged(parsedTrace);
   const compatibilityTracksAppender = new Timeline.CompatibilityTracksAppender.CompatibilityTracksAppender(
       flameChartData, parsedTrace, entryData, entryTypeByLevel);
   return compatibilityTracksAppender.timingsTrackAppender();
@@ -156,7 +155,7 @@ describeWithEnvironment('TimingTrackAppender', function() {
     it('returns the correct title for console timestamps', () => {
       const traceMarkers = parsedTrace.UserTimings.timestampEvents;
       for (const mark of traceMarkers) {
-        assert.strictEqual(timingsTrackAppender.titleForEvent(mark), `TimeStamp: ${mark.args.data.message}`);
+        assert.strictEqual(timingsTrackAppender.titleForEvent(mark), `TimeStamp: ${mark.args.data.name}`);
       }
     });
   });
@@ -213,7 +212,7 @@ describeWithEnvironment('TimingTrackAppender', function() {
 
       assert.deepInclude(popoverInfo, {
         title: 'TimeStamp: a timestamp',
-        formattedTime: '615.25\u00A0ms',
+        formattedTime: '615.88\u00A0ms',
       });
     });
 
@@ -327,7 +326,6 @@ describeWithEnvironment('TimingTrackAppender', function() {
     });
     describe('toggling', function() {
       it('Does not append extension data when the configuration is set to disabled', async function() {
-        Timeline.ExtensionDataGatherer.ExtensionDataGatherer.removeInstance();
         entryData = [];
         flameChartData = PerfUI.FlameChart.FlameChartTimelineData.createEmpty();
         entryTypeByLevel = [];

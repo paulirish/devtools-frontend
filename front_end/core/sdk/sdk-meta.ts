@@ -328,7 +328,7 @@ Common.Settings.registerSettingExtension({
   storageType: Common.Settings.SettingStorageType.SYNCED,
   settingName: 'skip-stack-frames-pattern',
   settingType: Common.Settings.SettingType.REGEX,
-  defaultValue: '/node_modules/|/bower_components/',
+  defaultValue: '/node_modules/|^node:',
 });
 
 Common.Settings.registerSettingExtension({
@@ -1048,33 +1048,6 @@ Common.Settings.registerSettingExtension({
   learnMore: {
     tooltip: i18nLazyString(UIStrings.networkCacheExplanation),
   },
-});
-
-Common.Settings.registerSettingExtension({
-  category: Common.Settings.SettingCategory.PRIVACY,
-  title: i18nLazyString(UIStrings.disableCache),
-  settingName: 'cookie-control-override-enabled',
-  settingType: Common.Settings.SettingType.BOOLEAN,
-  storageType: Common.Settings.SettingStorageType.GLOBAL,
-  defaultValue: false,
-});
-
-Common.Settings.registerSettingExtension({
-  category: Common.Settings.SettingCategory.PRIVACY,
-  title: i18nLazyString(UIStrings.disableCache),
-  settingName: 'grace-period-mitigation-disabled',
-  settingType: Common.Settings.SettingType.BOOLEAN,
-  storageType: Common.Settings.SettingStorageType.GLOBAL,
-  defaultValue: false,
-});
-
-Common.Settings.registerSettingExtension({
-  category: Common.Settings.SettingCategory.PRIVACY,
-  title: i18nLazyString(UIStrings.disableCache),
-  settingName: 'heuristic-mitigation-disabled',
-  settingType: Common.Settings.SettingType.BOOLEAN,
-  storageType: Common.Settings.SettingStorageType.GLOBAL,
-  defaultValue: false,
 });
 
 Common.Settings.registerSettingExtension({

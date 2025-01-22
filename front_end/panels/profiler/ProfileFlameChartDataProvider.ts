@@ -208,7 +208,7 @@ export class ProfileFlameChart extends
     this.dispatchEventToListeners(PerfUI.FlameChart.Events.ENTRY_INVOKED, event.data);
   }
 
-  override update(): void {
+  update(): void {
     this.overviewPane.update();
     this.mainPane.update();
   }
@@ -325,8 +325,7 @@ export class OverviewPane extends Common.ObjectWrapper.eventMixin<OverviewPaneEv
     this.overviewCalculator = new OverviewCalculator(dataProvider.formatValue);
     this.overviewGrid = new PerfUI.OverviewGrid.OverviewGrid('cpu-profile-flame-chart', this.overviewCalculator);
     this.overviewGrid.element.classList.add('fill');
-    this.overviewCanvas =
-        (this.overviewContainer.createChild('canvas', 'cpu-profile-flame-chart-overview-canvas') as HTMLCanvasElement);
+    this.overviewCanvas = this.overviewContainer.createChild('canvas', 'cpu-profile-flame-chart-overview-canvas');
     this.overviewContainer.appendChild(this.overviewGrid.element);
     this.dataProvider = dataProvider;
     this.overviewGrid.addEventListener(
@@ -373,7 +372,7 @@ export class OverviewPane extends Common.ObjectWrapper.eventMixin<OverviewPaneEv
     this.updateTimerId = this.element.window().requestAnimationFrame(this.update.bind(this));
   }
 
-  override update(): void {
+  update(): void {
     this.updateTimerId = 0;
     const timelineData = this.timelineData();
     if (!timelineData) {
@@ -457,6 +456,6 @@ export interface OverviewPaneWindowChangedEvent {
   windowTimeRight: number;
 }
 
-export type OverviewPaneEventTypes = {
-  [OverviewPaneEvents.WINDOW_CHANGED]: OverviewPaneWindowChangedEvent,
-};
+export interface OverviewPaneEventTypes {
+  [OverviewPaneEvents.WINDOW_CHANGED]: OverviewPaneWindowChangedEvent;
+}

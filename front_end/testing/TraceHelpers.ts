@@ -56,7 +56,7 @@ export async function getMainFlameChartWithTracks(
   dataProvider.setModel(parsedTrace);
   const tracksAppender = dataProvider.compatibilityTracksAppenderInstance();
   tracksAppender.setVisibleTracks(trackAppenderNames);
-  dataProvider.buildFromTrackAppenders(
+  dataProvider.buildFromTrackAppendersForTest(
       {filterThreadsByName: trackName, expandedTracks: expanded ? trackAppenderNames : undefined});
   const delegate = new MockFlameChartDelegate();
   const flameChart = new PerfUI.FlameChart.FlameChart(dataProvider, delegate);
@@ -418,6 +418,8 @@ export function makeMockRendererHandlerData(entries: Trace.Types.Events.Event[],
     name: 'thread',
     entries,
     profileCalls: entries.filter(Trace.Types.Events.isProfileCall),
+    layoutEvents: entries.filter(Trace.Types.Events.isLayout),
+    updateLayoutTreeEvents: entries.filter(Trace.Types.Events.isUpdateLayoutTree),
   };
 
   const mockProcess: Trace.Handlers.ModelHandlers.Renderer.RendererProcess = {
@@ -438,6 +440,11 @@ export function makeMockRendererHandlerData(entries: Trace.Types.Events.Event[],
     compositorTileWorkers: new Map(),
     entryToNode,
     allTraceEntries: renderereEvents,
+    entityMappings: {
+      entityByEvent: new Map(),
+      eventsByEntity: new Map(),
+      createdEntityCache: new Map(),
+    },
   };
 }
 
@@ -484,6 +491,27 @@ export function makeMockSamplesHandlerData(profileCalls: Trace.Types.Events.Synt
     profilesInProcess: new Map([[1 as Trace.Types.Events.ProcessID, profilesInThread]]),
     entryToNode,
   };
+}
+
+export function makeMockEntityData(events: Trace.Types.Events.Event[]): Trace.Handlers.Helpers.EntityMappings {
+  const eventsByEntity = new Map<Trace.Handlers.Helpers.Entity, Trace.Types.Events.Event[]>();
+  const entityByEvent = new Map<Trace.Types.Events.Event, Trace.Handlers.Helpers.Entity>();
+  const createdEntityCache = new Map<string, Trace.Handlers.Helpers.Entity>();
+
+  events.forEach(event => {
+    const entity = Trace.Handlers.Helpers.getEntityForEvent(event, createdEntityCache);
+    if (!entity) {
+      return;
+    }
+    if (eventsByEntity.has(entity)) {
+      const events = eventsByEntity.get(entity) ?? [];
+      events?.push(event);
+    } else {
+      eventsByEntity.set(entity, [event]);
+    }
+    entityByEvent.set(event, entity);
+  });
+  return {eventsByEntity, entityByEvent, createdEntityCache};
 }
 
 export class FakeFlameChartProvider implements PerfUI.FlameChart.FlameChartDataProvider {
@@ -579,6 +607,9 @@ export function getBaseTraceParseModelData(overrides: Partial<ParsedTrace> = {})
       animationFrames: [],
       presentationForFrame: new Map(),
     },
+    DOMStats: {
+      domStatsByFrameId: new Map(),
+    },
     LayoutShifts: {
       clusters: [],
       clustersByNavigationId: new Map(),
@@ -623,6 +654,11 @@ export function getBaseTraceParseModelData(overrides: Partial<ParsedTrace> = {})
       compositorTileWorkers: new Map(),
       entryToNode: new Map(),
       allTraceEntries: [],
+      entityMappings: {
+        entityByEvent: new Map(),
+        eventsByEntity: new Map(),
+        createdEntityCache: new Map(),
+      },
     },
     Screenshots: {
       all: [],
@@ -647,6 +683,11 @@ export function getBaseTraceParseModelData(overrides: Partial<ParsedTrace> = {})
       byOrigin: new Map(),
       byTime: [],
       webSocket: [],
+      entityMappings: {
+        entityByEvent: new Map(),
+        eventsByEntity: new Map(),
+        createdEntityCache: new Map(),
+      },
     },
     GPU: {
       mainGPUThreadTasks: [],
@@ -657,7 +698,7 @@ export function getBaseTraceParseModelData(overrides: Partial<ParsedTrace> = {})
       performanceMeasures: [],
       timestampEvents: [],
     },
-    LargestImagePaint: {imageByDOMNodeId: new Map(), lcpRequestByNavigation: new Map()},
+    LargestImagePaint: {lcpRequestByNavigation: new Map()},
     LargestTextPaint: new Map(),
     AuctionWorklets: {
       worklets: new Map(),
