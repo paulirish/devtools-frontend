@@ -846,13 +846,23 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       title = popoverInfo.title;
 
       // Add stringified frame to the tooltip.
-      title += '\n' + JSON.stringify(event, null, 2).slice(0, 2000);
 
       time = popoverInfo.formattedTime;
       warningElements = popoverInfo.warningElements || warningElements;
       if (popoverInfo.additionalElements?.length) {
         additionalContent.push(...popoverInfo.additionalElements);
       }
+
+      const evtjson = document.createElement('div');
+      evtjson.textContent = JSON.stringify(event, null, 2).slice(0, 2000);
+      evtjson.style.cssText = `
+        white-space: pre-wrap;
+        font-size: 77%;
+        font-family: "Roboto Mono DG", "Roboto Mono", monospace;
+        line-height: 1;
+      `;
+      additionalContent.push(evtjson);
+
 
       this.dispatchEventToListeners(Events.FLAME_CHART_ITEM_HOVERED, event);
 

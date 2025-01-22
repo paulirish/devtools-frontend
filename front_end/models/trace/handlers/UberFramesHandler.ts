@@ -178,6 +178,8 @@ const someRelevantTraceEventTypes = [
   'LatchToSwapEnd',
   'SwapEndToPresentationCompositorFrame',
 
+  'Screenshot',
+
   //
   'EventTiming',
 
@@ -252,10 +254,7 @@ export function handleEvent(event: Types.Events.Event): void {
   if (Types.Events.isGPUTask(event)) {
     gpuEvents.push(event);
     Helpers.Trace.addEventToProcessThread(event, eventsInProcessThread);
-  } else if (
-      event.name === 'Screenshot'
-      // || event.cat === 'blink.user_timing'
-      || someRelevantTraceEventTypes.some(type => event.name === type)) {
+  } else if (someRelevantTraceEventTypes.some(name => event.name === name)) {
     if (event.ph === 'b' || event.ph === 'e') {
       asyncEvts.push(event);
     } else {
@@ -287,101 +286,27 @@ export async function finalize(): Promise<void> {
   relevantEvts = [...relevantEvts, ...ourRendererGPUTasks];
 
 
-  const matchedEvents: Map<string, {
-    begin: Types.Events.PipelineReporter | null,
-    end: Types.Events.PipelineReporter | null,
-  }> = new Map();
-
-  for (let i = 0; i < asyncEvts.length - 1; i++) {
-    const event = asyncEvts[i];
-
-    const id = Helpers.Trace.extractId(event);
-    if (id === undefined) {
-      continue;
-    }
-    // Create a synthetic id to prevent collisions across categories.
-    // Console timings can be dispatched with the same id, so use the
-    // event name as well to generate unique ids.
-    const syntheticId = `${event.cat}:${id}:${event.name}`;
-    const otherEventsWithID = Platform.MapUtilities.getWithDefault(matchedEvents, syntheticId, () => {
-      return {begin: null, end: null};
-    });
-    const isStartEvent = event.ph === Types.Events.Phase.ASYNC_NESTABLE_START;
-    const isEndEvent = event.ph === Types.Events.Phase.ASYNC_NESTABLE_END;
-
-    if (isStartEvent) {
-      otherEventsWithID.begin = event;
-      const beginEvent = event;
-      // Choose next chronological end event as match.. (since we dont ahve ids to pair)
-      if (!beginEvent.name.startsWith('AnimationFrame')) {
-        continue;
-      }
-      for (let j = i + 1; j < asyncEvts.length; j++) {
-        const endEvent = asyncEvts[j];
-        if (endEvent.ph === 'e' && endEvent.name === beginEvent.name && endEvent.pid === beginEvent.pid &&
-            endEvent.tid === beginEvent.tid) {
-          matchedEvents.set(syntheticId, {begin: beginEvent, end: endEvent});
-          break;
-        }
-      }
-    } else if (isEndEvent) {
-      otherEventsWithID.end = event;
-    }
-  }
-
-  // Create synthetic events for each matched pair of begin and end events.
+  const syntheticPairs = Helpers.Trace.createMatchedSortedSyntheticEvents(asyncEvts);
+  console.log({syntheticPairs});
 
 
-  for (const [id, eventsPair] of matchedEvents.entries()) {
-    if (!eventsPair.begin || !eventsPair.end) {
-      // This should never happen, the backend only creates the events once it
-      // has them both, so we should never get into this state.
-      // If we do, something is very wrong, so let's just drop that problematic event.
-      continue;
-    }
-
-    const event: Types.Events.SyntheticPipelineReporterPair = {
-      cat: eventsPair.end.cat,
-      ph: 'X',
-      pid: eventsPair.end.pid,
-      tid: eventsPair.end.tid,
-      id,
-      // Both events have the same name, so it doesn't matter which we pick to
-      // use as the description
-      name: eventsPair.begin.name,
-      dur: Types.Timing.MicroSeconds(eventsPair.end.ts - eventsPair.begin.ts),
-      ts: eventsPair.begin.ts,
-      args: {
-        data: {
-          beginEvent: eventsPair.begin,
-          endEvent: eventsPair.end,
-        },
-      },
-    };
-
-    // still I do see some 0's in the real trace. i messed up the c++ side.
+  for (const event of syntheticPairs) {
     if (event.name === 'EventLatency') {
-      eventLatencyIdToFrameSeq[eventsPair.begin.id2.local] = eventsPair.begin.args.event_latency.frame_sequence ?? null;
+      eventLatencyIdToFrameSeq[event.args.data.beginEvent.id2.local] =
+          event.args.data.beginEvent.args.event_latency.frame_sequence ?? null;
     }
     if (event.name === 'PipelineReporter') {
-      eventLatencyIdToFrameSeq[eventsPair.begin.id2.local] =
-          eventsPair.begin.args.chrome_frame_reporter.frame_sequence ?? null;
+      eventLatencyIdToFrameSeq[event.args.data.beginEvent.id2.local] =
+          event.args.data.beginEvent.args.chrome_frame_reporter.frame_sequence ?? null;
     }
 
-    const existingDuplicate = syntheticEvents.find(e => {
-      return e.name === event.name && e.ts === event.ts && e.dur === event.dur && e.id2?.local === event.id2?.local &&
-          e.tid === event.tid && e.pid === event.pid;
-    });
-    // Some eventlatnecy evts are emitted on multiple categories separtely. leave them otu
-    if (existingDuplicate) {
-      continue;
-    }
 
     if (eventLatencyBreakdownTypeNames.includes(event.name)) {
       waterFallEvents.push(event);
     }
     syntheticEvents.push(event);
   }
+
   // drop pipelinereporter that werent presented. or browser process.
   // TODO: do this earlier? iunno
   // EDIT: disabled filtering since ubeframes is a mess anyway.
@@ -399,8 +324,10 @@ export async function finalize(): Promise<void> {
 // TODO: is it okay to do work here? this is only called once? (or should i put the _work_ in finalize)
 // so far looks like its only called once, so whatev.
 export function data(): UberFramesData {
+  const nonWaterfallEvts = [...relevantEvts, ...syntheticEvents].filter(e => !waterFallEvents.includes(e));
+
   return {
-    nonWaterfallEvts: [...relevantEvts, ...syntheticEvents].sort((event1, event2) => event1.ts - event2.ts),
+    nonWaterfallEvts: nonWaterfallEvts.sort((event1, event2) => event1.ts - event2.ts),
     waterFallEvts: [...waterFallEvents].sort((event1, event2) => event1.ts - event2.ts),
     eventLatencyIdToFrameSeq,
   };
