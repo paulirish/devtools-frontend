@@ -65,17 +65,18 @@ test('insights look ok', t => {
     throw new Error();
   const keys = Object.keys(insightSet.model);
   assert.deepStrictEqual(keys, [
+    'InteractionToNextPaint',
+    'LCPPhases',
+    'LCPDiscovery',
     'CLSCulprits',
+    'RenderBlocking',
+    'ImageDelivery',
     'DocumentLatency',
     'FontDisplay',
-    'ImageDelivery',
-    'InteractionToNextPaint',
-    'LCPDiscovery',
-    'LCPPhases',
-    'RenderBlocking',
-    'SlowCSSSelector',
-    'ThirdParties',
     'Viewport',
+    'DOMSize',
+    'ThirdParties',
+    'SlowCSSSelector',
   ]);
   for (const [insightName, insightItem] of Object.entries(insightSet.model)) {
     const msg = insightItem instanceof Error ?

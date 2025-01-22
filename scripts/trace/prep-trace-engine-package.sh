@@ -65,6 +65,9 @@ for p in Path('$dist/models').rglob('*.d.ts'):
     needle = 'CrUXManager.PageResult'
     content = content.replace(needle, 'any')
 
+    needle = 'CrUXManager.PageScope'
+    content = content.replace(needle, 'any')
+
     p.write_text(content)
 "
 
