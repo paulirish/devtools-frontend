@@ -853,16 +853,6 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
         additionalContent.push(...popoverInfo.additionalElements);
       }
 
-      const evtjson = document.createElement('div');
-      evtjson.textContent = JSON.stringify(event, null, 2).slice(0, 2000);
-      evtjson.style.cssText = `
-        white-space: pre-wrap;
-        font-size: 77%;
-        font-family: "Roboto Mono DG", "Roboto Mono", monospace;
-        line-height: 1;
-      `;
-      additionalContent.push(evtjson);
-
 
       this.dispatchEventToListeners(Events.FLAME_CHART_ITEM_HOVERED, event);
 
@@ -880,15 +870,26 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
         title = i18nString(UIStrings.frame);
       }
 
-      // Add stringified frame to the tooltip.
-      title += '\n' + JSON.stringify(frame, null, 2).slice(0, 2000);
 
-    } else if (entryType === EntryType.Screenshot) {
+    } else if (entryType === EntryType.SCREENSHOT) {
       title = '';  // dumb but avoiding the early return
     } else {
       this.dispatchEventToListeners(Events.FLAME_CHART_ITEM_HOVERED, null);
       return null;
     }
+
+
+    const evtjson = document.createElement('div');
+    const data = (this.entryData[entryIndex] as Trace.Types.Events.Event);
+    evtjson.textContent = JSON.stringify(data, null, 2).slice(0, 2000);
+    evtjson.style.cssText = `
+        white-space: pre-wrap;
+        word-break: break-all;
+        font-size: 77%;
+        font-family: "Roboto Mono DG", "Roboto Mono", monospace;
+        line-height: 1;
+      `;
+    additionalContent.push(evtjson);
 
     const popoverElement = document.createElement('div');
     const root =
@@ -902,22 +903,12 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     }
 
     // fullsize screenshot in popover
-    if (entryType === EntryType.Screenshot) {
-      const screenshot = (this.entryData[entryIndex] as Trace.Types.Events.Snapshot);
-      if (!this.screenshotImageCache.has(screenshot)) {
-        this.screenshotImageCache.set(screenshot, null);
-        const data = screenshot.args.snapshot;
-        void UI.UIUtils.loadImageFromData(data).then(image => {
-          this.screenshotImageCache.set(screenshot, image);
-          this.dispatchEventToListeners(Events.DataChanged);
-        });
-        return element;
-      }
-
-      const image = this.screenshotImageCache.get(screenshot);
+    if (entryType === EntryType.SCREENSHOT) {
+      const screenshot = (this.entryData[entryIndex] as Trace.Types.Events.SyntheticScreenshot);
+      const image = Utils.ImageCache.getOrQueue(screenshot);
       if (image) {
         image.style.display = 'block';  // minor thing.
-        contents.append(image);
+        additionalContent.push(image);
       }
     }
 

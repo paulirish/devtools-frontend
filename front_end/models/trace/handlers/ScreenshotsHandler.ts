@@ -34,7 +34,11 @@ export function handleEvent(event: Types.Events.Event): void {
 export async function finalize(): Promise<void> {
   const pipelineReporterEvents = Helpers.Trace.createMatchedSortedSyntheticEvents(unpairedAsyncEvents);
 
-  frameSequenceToTs = Object.fromEntries(pipelineReporterEvents.map(evt => {
+  const presentedPRs = pipelineReporterEvents.filter(
+      event => {return event.args.data.beginEvent.args.chrome_frame_reporter.frame_type !== 'FORKED' &&
+                event.args.data.beginEvent.args.chrome_frame_reporter.state === 'STATE_PRESENTED_ALL'});
+
+  const frameSeqToPres = presentedPRs.map(evt => {
     const frameSequenceId = evt.args.data.beginEvent.args.chrome_frame_reporter.frame_sequence;
     const sourceId = evt.args.data.beginEvent.args.chrome_frame_reporter.frame_source;
     const presentationTs = Types.Timing.MicroSeconds(evt.ts + evt.dur);
@@ -43,7 +47,10 @@ export async function finalize(): Promise<void> {
     sourceToSequenceToTs[sourceId][frameSequenceId] = presentationTs;
 
     return [frameSequenceId, presentationTs];
-  }));
+  });
+
+
+  frameSequenceToTs = Object.fromEntries(frameSeqToPres);
 
 
   for (const snapshotEvent of snapshotEvents) {
@@ -91,14 +98,15 @@ function getPresentationTimestamp(screenshotEvent: Types.Events.Screenshot): Typ
   const {frame_sequence, source_id} = screenshotEvent.args;
   const BetterupdatedTs = sourceToSequenceToTs[source_id]?.[frame_sequence];
 
+  // log stuff
   if (BetterupdatedTs === undefined) {
-    // console.log('better timestamp not found', source_id, frame_sequence);
+    console.log('better timestamp not found', source_id, frame_sequence);
   } else if (BetterupdatedTs !== updatedTs) {
-    // console.log(
-    // 'different result thanks to sourceid', source_id, frame_sequence, BetterupdatedTs - updatedTs, BetterupdatedTs,
-    // updatedTs);
+    console.log(
+        'different result thanks to sourceid', source_id, frame_sequence, BetterupdatedTs - updatedTs, BetterupdatedTs,
+        updatedTs);
   } else {
-    // console.log('better ts and reg timestamp are same.', source_id, frame_sequence);
+    console.log('better ts and reg timestamp are same.', source_id, frame_sequence);
   }
 
   // Do we always find a match? No...
