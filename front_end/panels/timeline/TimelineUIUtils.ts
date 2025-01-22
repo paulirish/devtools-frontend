@@ -54,6 +54,7 @@ import * as UI from '../../ui/legacy/legacy.js';
 import {CLSRect} from './CLSLinkifier.js';
 import * as TimelineComponents from './components/components.js';
 import * as Extensions from './extensions/extensions.js';
+import {FramesWaterfallTrackAppender} from './FramesWaterfallTrackAppender.js';
 import {Tracker} from './FreshRecording.js';
 import {ModificationsManager} from './ModificationsManager.js';
 import {targetForEvent} from './TargetForEvent.js';
@@ -707,23 +708,18 @@ export class TimelineUIUtils {
     if (Trace.Types.Events.isDispatch(event)) {
       return i18nString(UIStrings.sS, {PH1: title, PH2: event.args.data.type});
     }
-    const frameSeqId = event.args.frameSeqId ?? event.args.frame_sequence ?? event.args.begin_frame_id ??
-        event.args.args?.sequence_number ??
-        event.args?.data?.beginEvent?.args?.sequence_number ??  // my additions to chrome_frame_reporter
-        event.args?.data?.beginEvent?.args?.data?.sequence_number ??
-        event.args?.data?.beginEvent?.args?.event_latency?.frame_sequence ??
-        event.args?.data?.beginEvent?.args?.chrome_frame_reporter?.frame_sequence ??
-        event.args?.data?.beginEvent?.args?.send_begin_mainframe_to_commit_breakdown?.frame_sequence ?? '';
 
-    if (frameSeqId) {
-      return `${title} sq${frameSeqId % 1000}`;
+
+
+    const frameSeq = FramesWaterfallTrackAppender.seqNo(event);
+    if (frameSeq) {
+      return `${event.name} sq${frameSeq % 1000}`;
     }
 
     const localID = event.args?.data?.beginEvent?.id2?.local;
     if (localID) {
       return `${event.name} c${localID}`;
     }
-
     return title;
   }
 

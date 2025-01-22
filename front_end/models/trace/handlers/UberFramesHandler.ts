@@ -19,7 +19,7 @@ const gpuEvents: Types.Events.Event[] = [];
 const asyncEvts: Types.Events.Event[] = [];
 let syntheticEvents: Types.Events.SyntheticPipelineReporterPair[] = [];
 const waterFallEvents: Types.Events.Event[] = [];
-let eventLatencyIdToFrameSeq: Record<string, string> = {};
+let eventLatencyIdToFrameSeq: Record<string, number> = {};
 // export interface UberFramesData {
 //   relevantEvts: readonly Types.Events.Event[],
 //   syntheticEvents: readonly Types.Events.SyntheticNestableAsync[];
@@ -28,7 +28,7 @@ let eventLatencyIdToFrameSeq: Record<string, string> = {};
 export type UberFramesData = {
   nonWaterfallEvts: readonly Types.Events.Event[],
   waterFallEvts: readonly Types.Events.Event[],
-  eventLatencyIdToFrameSeq: Record<string, string>,
+  eventLatencyIdToFrameSeq: Record<string, number>,
 };
 
 export function reset(): void {

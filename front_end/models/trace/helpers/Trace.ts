@@ -288,7 +288,8 @@ export function matchEvents(pairableEvents: Types.Events.PairableAsync[]): Map<s
       otherEventsWithID.begin = event as Types.Events.PairableAsyncBegin;
       mostRecentOfType[`${event.name}${event.pid}${event.tid}`] = event;
     } else if (isEndEvent) {
-      // an end already set. hacky solution to pair it up with the most recent start event.
+      // an end already set. hacky solution to pair it up with the most recent start event. HACKY and shoudl be done better.
+      // perfetto UI seems to do it this way too. a json trace will even get animationframes recndered the way you expect.
       if (otherEventsWithID.end) {
         const begin = mostRecentOfType[`${event.name}${event.pid}${event.tid}`];
         if (begin) {

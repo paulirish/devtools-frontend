@@ -13,6 +13,7 @@ import {
   type TrackAppender,
   type TrackAppenderName,
 } from './CompatibilityTracksAppender.js';
+import {FramesWaterfallTrackAppender} from './FramesWaterfallTrackAppender.js';
 import {type TimelineMarkerStyle} from './TimelineUIUtils.js';
 
 const UIStrings = {
@@ -126,33 +127,17 @@ export class UberFramesTrackAppender implements TrackAppender {
     return this.#colorGenerator.colorForID(event.name);
   }
 
-  /**
-   * Gets the title an event added by this appender should be rendered with.
-   */
-  titleForEvent(event: Trace.Types.Events.Event): string {
-    const frameSeqId = event.args.frameSeqId ?? event.args.frame_sequence ?? event.args.begin_frame_id ??
-        event.args.args?.sequence_number ??
-        event.args?.data?.beginEvent?.args?.sequence_number ??  // my additions to chrome_frame_reporter
-        event.args?.data?.beginEvent?.args?.data?.sequence_number ??
-        event.args?.data?.beginEvent?.args?.event_latency?.frame_sequence ??
-        event.args?.data?.beginEvent?.args?.chrome_frame_reporter?.frame_sequence ??
-        event.args?.data?.beginEvent?.args?.send_begin_mainframe_to_commit_breakdown?.frame_sequence ?? '';
 
-    if (frameSeqId) {
-      return `${event.name} sq${frameSeqId % 1000}`;
+  titleForEvent(event: Trace.Types.Events.Event): string {
+    const frameSeq = FramesWaterfallTrackAppender.seqNo(event, this.#parsedTrace);
+    if (frameSeq) {
+      return `${event.name} sq${frameSeq % 1000}`;
     }
 
     const localID = event.args?.data?.beginEvent?.id2?.local;
-
     if (localID) {
-      const frameSeq = this.#parsedTrace.UberFramesHandler.eventLatencyIdToFrameSeq[localID];
-      if (frameSeq) {
-        return `${event.name} res${frameSeq % 1000}`;
-      }
-
       return `${event.name} c${localID}`;
     }
-
     return event.name;
   }
 
