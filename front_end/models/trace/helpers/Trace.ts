@@ -259,20 +259,24 @@ export function makeProfileCall(
  *
  * @returns {Map<string, MatchingPairableAsyncEvents>} Map of the animation's ID to it's matching events.
  */
-export function matchEvents(unpairedEvents: Types.Events.PairableAsync[]): Map<string, MatchingPairableAsyncEvents> {
+export function matchEvents(pairableEvents: Types.Events.PairableAsync[]): Map<string, MatchingPairableAsyncEvents> {
   // map to store begin and end of the event
   const matchedPairs: Map<string, MatchingPairableAsyncEvents> = new Map();
+  const mostRecentOfType = {};
 
+  const unmatchedEvents: Types.Events.PairableAsync[] = [];
   // looking for start and end
-  for (const event of unpairedEvents) {
+  for (const event of pairableEvents) {
     const syntheticId = getSyntheticId(event);
     if (syntheticId === undefined) {
+      unmatchedEvents.push(event);
       continue;
     }
+
     // Create a synthetic id to prevent collisions across categories.
     // Console timings can be dispatched with the same id, so use the
     // event name as well to generate unique ids.
-    const otherEventsWithID = Platform.MapUtilities.getWithDefault(matchedPairs, syntheticId, () => {
+    let otherEventsWithID = Platform.MapUtilities.getWithDefault(matchedPairs, syntheticId, () => {
       return {begin: null, end: null, instant: []};
     });
 
@@ -282,7 +286,18 @@ export function matchEvents(unpairedEvents: Types.Events.PairableAsync[]): Map<s
 
     if (isStartEvent) {
       otherEventsWithID.begin = event as Types.Events.PairableAsyncBegin;
+      mostRecentOfType[`${event.name}${event.pid}${event.tid}`] = event;
     } else if (isEndEvent) {
+      // an end already set. hacky solution to pair it up with the most recent start event.
+      if (otherEventsWithID.end) {
+        const begin = mostRecentOfType[`${event.name}${event.pid}${event.tid}`];
+        if (begin) {
+          otherEventsWithID = Platform.MapUtilities.getWithDefault(
+              matchedPairs, `${begin.name}${begin.pid}${begin.tid}${begin.ts}`, () => {
+                return {begin: begin, end: null, instant: []};
+              });
+        }
+      }
       otherEventsWithID.end = event as Types.Events.PairableAsyncEnd;
     } else if (isInstantEvent) {
       if (!otherEventsWithID.instant) {
@@ -319,23 +334,23 @@ export function createSortedSyntheticEvents<T extends Types.Events.PairableAsync
       continue;
     }
     const triplet = {beginEvent, endEvent, instantEvents};
-    /**
-     * When trying to pair events with instant events present, there are times when these
-     * ASYNC_NESTABLE_INSTANT ('n') don't have a corresponding ASYNC_NESTABLE_END ('e') event.
-     * In these cases, pair without needing the endEvent.
-     */
-    function eventsArePairable(data: {
-      beginEvent: Types.Events.PairableAsyncBegin,
-      endEvent: Types.Events.PairableAsyncEnd|null,
-      instantEvents?: Types.Events.PairableAsyncInstant[],
-    }): data is Types.Events.SyntheticEventPair<T>['args']['data'] {
-      const instantEventsMatch = data.instantEvents ? data.instantEvents.some(e => id === getSyntheticId(e)) : false;
-      const endEventMatch = data.endEvent ? id === getSyntheticId(data.endEvent) : false;
-      return Boolean(id) && (instantEventsMatch || endEventMatch);
-    }
-    if (!eventsArePairable(triplet)) {
-      continue;
-    }
+    // /**
+    //  * When trying to pair events with instant events present, there are times when these
+    //  * ASYNC_NESTABLE_INSTANT ('n') don't have a corresponding ASYNC_NESTABLE_END ('e') event.
+    //  * In these cases, pair without needing the endEvent.
+    //  */
+    // function eventsArePairable(data: {
+    //   beginEvent: Types.Events.PairableAsyncBegin,
+    //   endEvent: Types.Events.PairableAsyncEnd|null,
+    //   instantEvents?: Types.Events.PairableAsyncInstant[],
+    // }): data is Types.Events.SyntheticEventPair<T>['args']['data'] {
+    //   const instantEventsMatch = data.instantEvents ? data.instantEvents.some(e => id === getSyntheticId(e)) : false;
+    //   const endEventMatch = data.endEvent ? id === getSyntheticId(data.endEvent) : false;
+    //   return Boolean(id) && (instantEventsMatch || endEventMatch);
+    // }
+    // if (!eventsArePairable(triplet)) {
+    //   continue;
+    // }
     const targetEvent = endEvent || beginEvent;
 
     const event = SyntheticEventsManager.registerSyntheticEvent<Types.Events.SyntheticEventPair<T>>({

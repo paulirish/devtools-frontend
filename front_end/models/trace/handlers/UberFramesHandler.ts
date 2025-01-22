@@ -266,8 +266,8 @@ export function handleEvent(event: Types.Events.Event): void {
         }
       }
       relevantEvts.push(event);
+      Helpers.Trace.addEventToProcessThread(event, eventsInProcessThread);
     }
-    Helpers.Trace.addEventToProcessThread(event, eventsInProcessThread);
   }
 }
 
