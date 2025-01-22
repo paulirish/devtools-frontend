@@ -9,6 +9,7 @@ import type * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import {buildGroupStyle, buildTrackHeader, getFormattedTime} from './AppenderUtils.js';
 import {
   type CompatibilityTracksAppender,
+  type DrawOverride,
   type HighlightedEntryInfo,
   type TrackAppender,
   type TrackAppenderName,
@@ -62,7 +63,7 @@ export class UberFramesTrackAppender implements TrackAppender {
    * appended the track's events.
    */
   appendTrackAtLevel(trackStartLevel: number, expanded?: boolean): number {
-    const skipThese = ['SubmitCompositorFrameToPresentationCompositorFrame'];  // 'PipelineReporter',
+    const skipThese = ['SubmitCompositorFrameToPresentationCompositorFrame', 'PipelineReporter'];
     const uberNonWaterfallEvts = this.#parsedTrace.UberFramesHandler.nonWaterfallEvts.filter(e => {
       return !skipThese.includes(e.name);
     });
@@ -95,28 +96,37 @@ export class UberFramesTrackAppender implements TrackAppender {
     this.#compatibilityBuilder.registerTrackForGroup(group, this);
   }
 
-  /*
-    ------------------------------------------------------------------------------------
-     The following methods  are invoked by the flame chart renderer to query features about
-     events on rendering.
-    ------------------------------------------------------------------------------------
-  */
 
-  /**
-   * Gets the style for a page load marker event.
-   */
-  markerStyleForEvent(markerEvent: Trace.Types.Events.PageLoadEvent): TimelineMarkerStyle {
-    const tallMarkerDashStyle = [6, 4];
-    const color = 'grey';
 
-    return {
-      title: markerEvent.name,
-      dashStyle: tallMarkerDashStyle,
-      lineWidth: 0.5,
-      color: color,
-      tall: true,
-      lowPriority: false,
-    };
+  getDrawOverride(event: Trace.Types.Events.Event): DrawOverride|undefined {
+    // draw a star
+    if (event.name === 'AnimationFrame::Presentation') {
+      return (context, x, y, _width, levelHeight, _, transformColor) => {
+        const width = 9;
+        const height = levelHeight * 0.6;
+        const centerX = x + width / 2;
+        const centerY = y + height / 2;
+        const outerRadius = Math.min(width, height) / 2;
+        const innerRadius = outerRadius * 0.4;
+
+        context.beginPath();
+        for (let i = 0; i < 5; i++) {
+          const outerAngle = Math.PI / 10 + i * (2 * Math.PI / 5) + Math.PI / 5;
+          const innerAngle = outerAngle + Math.PI / 5;
+          context.lineTo(centerX + outerRadius * Math.cos(outerAngle), centerY + outerRadius * Math.sin(outerAngle));
+          context.lineTo(centerX + innerRadius * Math.cos(innerAngle), centerY + innerRadius * Math.sin(innerAngle));
+        }
+        context.closePath();
+
+        const color = this.colorForEvent(event);  // Assuming 'this' and 'event' are available in the scope
+        context.fillStyle = color;
+        context.strokeStyle = color.replace(/\d+% \/ /, (str) => (parseInt(str, 10) * 0.4).toString() + '% / ');
+        context.lineWidth = 0.5;
+        context.fill();
+        context.stroke();
+        return {x: centerX - width / 2, width};
+      };
+    }
   }
 
   /**

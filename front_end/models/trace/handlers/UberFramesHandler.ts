@@ -308,8 +308,8 @@ export async function finalize(): Promise<void> {
 
       // drop pipelinereporter that werent presented. or browser process.
       /// by including this you get multiple PR events for a single frame, which is .. confusing at least. it gets into partial frames.. and.. i dont understand it.
-      if (event.args.data.beginEvent.args.chrome_frame_reporter.frame_type !== 'FORKED' &&
-          event.args.data.beginEvent.args.chrome_frame_reporter.state === 'STATE_PRESENTED_ALL') {
+      if (event.args.data.beginEvent.args.chrome_frame_reporter.frame_type === 'FORKED' ||
+          event.args.data.beginEvent.args.chrome_frame_reporter.state !== 'STATE_PRESENTED_ALL') {
         prIDsToSkip.push(event.args.data.beginEvent.id2.local);
       }
     }
