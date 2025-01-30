@@ -12,6 +12,7 @@ import type {TraceFilter} from './TraceFilter.js';
 export class Node {
   totalTime: number;
   selfTime: number;
+  transferSize: number;
   id: string|symbol;
   /** The first trace event encountered that necessitated the creation of this tree node. */
   event: Types.Events.Event;
@@ -27,6 +28,7 @@ export class Node {
   constructor(id: string|symbol, event: Types.Events.Event) {
     this.totalTime = 0;
     this.selfTime = 0;
+    this.transferSize = 0;
     this.id = id;
     this.event = event;
     this.events = [event];
@@ -191,6 +193,9 @@ export class TopDownNode extends Node {
       }
       node.selfTime += duration;
       node.totalTime += duration;
+      if (Types.Events.isSyntheticNetworkRequest(e)) {
+        node.transferSize += e.args.data.encodedDataLength;
+      }
       currentDirectChild = node;
     }
 
@@ -301,7 +306,7 @@ export class TopDownRootNode extends TopDownNode {
       } else {
         groupNode.events.push(...node.events);
       }
-      groupNode.addChild(node as BottomUpNode, node.selfTime, node.totalTime);
+      groupNode.addChild(node as BottomUpNode, node.selfTime, node.totalTime, node.transferSize);
     }
     this.childrenInternal = groupNodes;
     return groupNodes;
@@ -438,7 +443,7 @@ export class BottomUpRootNode extends Node {
       } else {
         groupNode.events.push(...node.events);
       }
-      groupNode.addChild(node as BottomUpNode, node.selfTime, node.selfTime);
+      groupNode.addChild(node as BottomUpNode, node.selfTime, node.selfTime, node.transferSize);
     }
     return groupNodes;
   }
@@ -457,10 +462,11 @@ export class GroupNode extends Node {
     this.isGroupNodeInternal = true;
   }
 
-  addChild(child: BottomUpNode, selfTime: number, totalTime: number): void {
+  addChild(child: BottomUpNode, selfTime: number, totalTime: number, transferSize: number): void {
     this.childrenInternal.set(child.id, child);
     this.selfTime += selfTime;
     this.totalTime += totalTime;
+    this.transferSize += transferSize;
     child.parent = this;
   }
 

@@ -455,6 +455,9 @@ export class TimelineTreeView extends
         ({id: 'total', title: i18nString(UIStrings.totalTime), width: '120px', fixedWidth: true, sortable: true} as
          DataGrid.DataGrid.ColumnDescriptor));
     columns.push(
+        ({id: 'transfer-size', title: 'transfersize', width: '120px', fixedWidth: true, sortable: true} as
+         DataGrid.DataGrid.ColumnDescriptor));
+    columns.push(
         ({id: 'activity', title: i18nString(UIStrings.activity), disclosure: true, sortable: true} as
          DataGrid.DataGrid.ColumnDescriptor));
   }
@@ -797,7 +800,7 @@ export class GridNode extends DataGrid.SortableDataGrid.SortableDataGridNode<Gri
         showPercents = true;
         break;
       case 'transfer-size':
-        value = thirdPartyView.extractThirdPartySummary(this.profileNode).transferSize;
+        value = this.profileNode.transferSize;
         isSize = true;
         break;
       default:

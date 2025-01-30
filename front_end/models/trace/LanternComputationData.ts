@@ -155,11 +155,14 @@ function createLanternRequest(
   // TODO: set decodedBodyLength for data urls in Trace Engine.
   let resourceSize = request.args.data.decodedBodyLength ?? 0;
   if (url.protocol === 'data:' && resourceSize === 0) {
-    const commaIndex = url.pathname.indexOf(',');
-    if (url.pathname.substring(0, commaIndex).includes(';base64')) {
-      resourceSize = atob(url.pathname.substring(commaIndex + 1)).length;
-    } else {
-      resourceSize = url.pathname.length - commaIndex - 1;
+    const needle = 'base64,';
+    const index = url.pathname.indexOf(needle);
+    if (index !== -1) {
+      try {
+        resourceSize = atob(url.pathname.substring(index + needle.length)).length;
+      } catch (e) {
+        resourceSize = url.pathname.length;
+      }
     }
   }
 

@@ -79,15 +79,18 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
       });
     }
 
-    // Update summaries.
-    const min = Trace.Helpers.Timing.milliToMicro(this.startTime);
-    const max = Trace.Helpers.Timing.milliToMicro(this.endTime);
-    const bounds: Trace.Types.Timing.TraceWindowMicro = {max, min, range: Trace.Types.Timing.Micro(max - min)};
-    this.#thirdPartySummaries =
-        Trace.Extras.ThirdParties.getSummariesAndEntitiesWithMapping(parsedTrace, bounds, entityMapper.mappings());
 
-    const events = this.#thirdPartySummaries?.entityByEvent.keys();
-    const relatedEvents = Array.from(events ?? []).sort(Trace.Helpers.Trace.eventTimeComparator);
+
+    // Update summaries.
+    // const min = Trace.Helpers.Timing.milliToMicro(this.startTime);
+    // const max = Trace.Helpers.Timing.milliToMicro(this.endTime);
+    // const bounds: Trace.Types.Timing.TraceWindowMicro = {max, min, range: Trace.Types.Timing.Micro(max - min)};
+    // this.#thirdPartySummaries =
+    //     Trace.Extras.ThirdParties.getSummariesAndEntitiesWithMapping(parsedTrace, bounds, entityMapper.mappings());
+
+    // const events = this.#thirdPartySummaries?.entityByEvent.keys();
+    // const relatedEvents = Array.from(events ?? []);
+
 
     // The filters for this view are slightly different; we want to use the set
     // of visible event types, but also include network events, which by
@@ -109,7 +112,6 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
    * Third party tree view doesn't require the select feature, as this expands the node.
    */
   override selectProfileNode(): void {
-    return;
   }
 
   protected groupingFunction(): ((arg0: Trace.Types.Events.Event) => string)|null {
