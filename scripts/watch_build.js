@@ -104,7 +104,6 @@ const runGenerateCssFiles = ({fileName, isLegacy}) => {
   const scriptArgs = [
     /* buildTimestamp */ Date.now(),
     /* isDebugString */ 'true',
-    /* isLegacyString */ isLegacy ? 'true' : 'false',
     /* targetName */ target,
     /* srcDir */ '',
     /* targetGenDir */ TARGET_GEN_DIR,

@@ -1154,6 +1154,7 @@ export class TreeElement {
       currentAncestor = currentAncestor.parent;
     }
 
+    this.reduceIndentation();
     if (this.treeOutline) {
       this.treeOutline.deferredScrollIntoView(this, Boolean(center));
     }
@@ -1215,6 +1216,7 @@ export class TreeElement {
       this.listItemElement.focus();
     }
 
+    this.reduceIndentation();
     this.listItemNode.classList.add('selected');
     ARIAUtils.setSelected(this.listItemNode, true);
     this.treeOutline.dispatchEventToListeners(Events.ElementSelected, this);
@@ -1252,6 +1254,22 @@ export class TreeElement {
     if (!this.treeOutline.contentElement.classList.contains('hide-selection-when-blurred')) {
       this.listItemNode.classList.remove('force-white-icons');
     }
+  }
+
+  reduceIndentation() {
+    // get all ancestors matching a selector
+    const closestAll = (el: HTMLElement|null, s: string) => {
+      const ancestors = [];
+      for (; (el = el?.parentElement ?? null); el.matches(s) && ancestors.push(el))
+        ;
+      return ancestors;
+    };
+
+    // this.treeOutline?.element.querySelectorAll('ol.dedented');
+    // keep the 6 parent levels at typical indentation, but any ancestors past that get barely any.
+    closestAll(this.childrenListNode, '.elements-disclosure ol').forEach((e, i) => {
+      e.classList.toggle('dedented', i > 6);
+    });
   }
 
   revealAndSelect(omitFocus?: boolean): void {

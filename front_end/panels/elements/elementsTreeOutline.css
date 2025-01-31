@@ -176,6 +176,14 @@
   /** Keep it in sync with ElementsTreeElements.updateDecorations **/
   padding-inline-start: 12px;
   margin: 0;
+
+  .dedented {
+    padding-inline-start: 2px;
+
+    & > li.expanded:first-child::before {
+      transform: scale(0.7, 2) translateY(-1px);
+    }
+  }
 }
 
 .elements-disclosure ol.children {
