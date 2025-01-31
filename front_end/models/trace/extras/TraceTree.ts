@@ -398,6 +398,14 @@ export class BottomUpRootNode extends Node {
         totalTimeById.set(id, duration);
       }
       firstNodeStack.push(noNodeOnStack);
+      if (Types.Events.isSyntheticNetworkRequest(e)) {
+        let node = nodeById.get(id);
+        if (!node) {
+          node = new BottomUpNode(root, id, e, false, root);
+          nodeById.set(id, node);
+        }
+        node.transferSize += e.args.data.encodedDataLength;
+      }
     }
 
     function onEndEvent(event: Types.Events.Event): void {
@@ -604,6 +612,9 @@ export function generateEventID(event: Types.Events.Event): string {
     return `f:${name}@${location}`;
   }
 
+  if (Types.Events.isSyntheticNetworkRequest(event)) {
+    return `${event.name}:${event.args?.data?.url}`;
+  }
   if (Types.Events.isConsoleTimeStamp(event) && event.args.data) {
     return `${event.name}:${event.args.data.name}`;
   }
