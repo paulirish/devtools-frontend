@@ -39,7 +39,7 @@ let tId = -1;
 
 // Extract the target if it's provided.
 const target = extractArgument('--target') || 'Default';
-const PORT = 8080;
+const PORT = 9443;
 const TARGET_GEN_DIR = path.join('out', target, 'gen');
 
 // Make sure that the target has
@@ -100,11 +100,10 @@ const startWebSocketServerForCssChanges = () => {
   });
 };
 
-const runGenerateCssFiles = ({fileName, isLegacy}) => {
+const runGenerateCssFiles = ({fileName}) => {
   const scriptArgs = [
     /* buildTimestamp */ Date.now(),
     /* isDebugString */ 'true',
-    /* isLegacyString */ isLegacy ? 'true' : 'false',
     /* targetName */ target,
     /* srcDir */ '',
     /* targetGenDir */ TARGET_GEN_DIR,

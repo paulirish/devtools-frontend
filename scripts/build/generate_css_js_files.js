@@ -26,7 +26,7 @@ async function codeForFile({srcDir, fileName, input, isDebug, hotReloadEnabled, 
 window.HOT_STYLE_SHEETS = window.HOT_STYLE_SHEETS || {};
 window.HOT_STYLE_SHEETS["${path.resolve(srcDir, fileName)}"] = styles;
 if (!window.HOT_STYLE_SHEETS_WEB_SOCKET) {
-  const ws = new WebSocket("ws://localhost:8080");
+  const ws = new WebSocket("ws://localhost:9443");
   ws.addEventListener('close', () => {
     console.warn("Connection to watch script is closed, CSS changes won't be applied");
   });
@@ -48,10 +48,10 @@ if (!window.HOT_STYLE_SHEETS_WEB_SOCKET) {
 
   let exportStatement;
   if (isLegacy) {
+    const equivalentPath = `devtools://devtools/bundled/${srcDir.replace('../../front_end/', '')}/${fileName}`;
     exportStatement = `export default {
   cssContent: \`${stylesheetContents}
-/*# sourceURL=${fileName} */
-\`
+/*# sourceURL=${equivalentPath} */\`
 };`;
   } else {
     exportStatement = `const styles = new CSSStyleSheet();
@@ -81,6 +81,7 @@ async function runMain() {
   const [, , buildTimestamp, isDebugString, targetName, srcDir, targetGenDir, files, hotReloadEnabledString] =
       process.argv;
 
+  console.log({buildTimestamp, isDebugString, targetName, srcDir, targetGenDir, files, hotReloadEnabledString})
   const filenames = files.split(',');
   const configFiles = [];
   const isDebug = isDebugString === 'true';
@@ -94,6 +95,7 @@ async function runMain() {
     const generatedFileLocation = path.join(targetGenDir, generatedFileName);
 
     writeIfChanged(generatedFileLocation, newContents);
+    console.log(generatedFileLocation)
 
     configFiles.push(`\"${generatedFileName}\"`);
   }
