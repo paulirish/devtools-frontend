@@ -123,6 +123,9 @@ describe('Module graph', () => {
   │ ├Images/Images.js
   │ ├core/dom_extension/dom_extension.js
   │ ├ui/legacy/components/object_ui/object_ui.js
+  │ │ ├ui/components/text_editor/text_editor.js
+  │ │ │ ├services/window_bounds/window_bounds.js
+  │ │ │ └models/javascript_metadata/javascript_metadata.js
   │ │ └third_party/acorn/acorn.js
   │ ├ui/legacy/components/quick_open/quick_open.js
   │ │ ├third_party/diff/diff.js
@@ -130,76 +133,59 @@ describe('Module graph', () => {
   │ └panels/console/console.js
   │   ├ui/components/code_highlighter/code_highlighter.js
   │   ├ui/components/issue_counter/issue_counter.js
-  │   ├ui/components/request_link_icon/request_link_icon.js
-  │   └ui/legacy/components/data_grid/data_grid.js
+  │   └ui/components/request_link_icon/request_link_icon.js
   ├core/i18n/i18n.js
   │ ├third_party/i18n/i18n.js
   │ │ └third_party/intl-messageformat/intl-messageformat.js
   │ └core/platform/platform.js
   ├ui/legacy/legacy.js
-  │ ├ui/components/buttons/buttons.js
   │ ├ui/components/adorners/adorners.js
-  │ ├ui/components/helpers/helpers.js
   │ └ui/components/settings/settings.js
-  │   └ui/components/input/input.js
   ├core/common/common.js
   ├core/root/root.js
   ├core/sdk/sdk.js
-  │ └models/cpu_profile/cpu_profile.js
   ├models/extensions/extensions.js
   │ ├models/logs/logs.js
   │ ├ui/legacy/components/utils/utils.js
+  │ ├ui/legacy/theme_support/theme_support.js
+  │ ├models/bindings/bindings.js
   │ └models/har/har.js
   ├models/workspace/workspace.js
   │ ├core/host/host.js
   │ └models/text_utils/text_utils.js
   │   └third_party/codemirror.next/codemirror.next.js
   │     └third_party/codemirror.next/chunk/codemirror.js
-  ├panels/timeline/utils/utils.js
-  │ ├models/trace/trace.js
-  │ │ ├models/trace/extras/extras.js
-  │ │ ├models/trace/handlers/handlers.js
-  │ │ ├models/trace/helpers/helpers.js
-  │ │ ├models/trace/insights/insights.js
-  │ │ ├models/trace/lantern/lantern.js
-  │ │ │ ├models/trace/lantern/core/core.js
-  │ │ │ ├models/trace/lantern/graph/graph.js
-  │ │ │ ├models/trace/lantern/metrics/metrics.js
-  │ │ │ ├models/trace/lantern/simulation/simulation.js
-  │ │ │ └models/trace/lantern/types/types.js
-  │ │ ├models/trace/types/types.js
-  │ │ └models/trace/root-causes/root-causes.js
-  │ ├ui/legacy/theme_support/theme_support.js
-  │ ├models/bindings/bindings.js
-  │ ├models/source_map_scopes/source_map_scopes.js
-  │ │ └models/formatter/formatter.js
-  │ ├ui/components/markdown_view/markdown_view.js
-  │ │ └ui/components/text_editor/text_editor.js
-  │ │   ├services/window_bounds/window_bounds.js
-  │ │   └models/javascript_metadata/javascript_metadata.js
-  │ ├models/crux-manager/crux-manager.js
-  │ │ └models/emulation/emulation.js
-  │ ├third_party/marked/marked.js
-  │ ├ui/lit-html/lit-html.js
-  │ │ └third_party/lit/lit.js
-  │ └panels/mobile_throttling/mobile_throttling.js
-  │   └ui/components/cards/cards.js
   ├panels/network/forward/forward.js
+  ├panels/security/security.js
+  │ ├ui/components/switch/switch.js
+  │ ├ui/components/cards/cards.js
+  │ ├ui/components/chrome_link/chrome_link.js
+  │ │ └ui/components/helpers/helpers.js
+  │ ├ui/components/input/input.js
+  │ └ui/legacy/components/data_grid/data_grid.js
   ├ui/components/legacy_wrapper/legacy_wrapper.js
   │ └ui/visual_logging/visual_logging.js
   │   └ui/components/render_coordinator/render_coordinator.js
   ├panels/application/preloading/helper/helper.js
   ├models/issues_manager/issues_manager.js
+  │ ├third_party/marked/marked.js
   │ └third_party/third-party-web/third-party-web.js
   └entrypoints/main/main.js
     ├core/protocol_client/protocol_client.js
     ├models/autofill_manager/autofill_manager.js
     ├models/breakpoints/breakpoints.js
+    │ ├models/formatter/formatter.js
+    │ └models/source_map_scopes/source_map_scopes.js
+    ├models/crux-manager/crux-manager.js
+    │ └models/emulation/emulation.js
     ├models/live-metrics/live-metrics.js
     │ └models/live-metrics/web-vitals-injected/spec/spec.js
     ├models/persistence/persistence.js
     ├panels/snippets/snippets.js
-    └ui/components/icon_button/icon_button.js
+    ├ui/components/buttons/buttons.js
+    ├ui/components/icon_button/icon_button.js
+    └ui/lit/lit.js
+      └third_party/lit/lit.js
 
     `.trim();
 
@@ -211,7 +197,7 @@ describe('Module graph', () => {
     if (graphSerialized !== expectedGraph) {
       // Output the actual graph, allowing engineers to more easily update the text golden, especially if failing on CQ bots.
       // eslint-disable-next-line no-console
-      console.log('Update boot-perf_test.ts\'s expectedGraph with the following:\n', graphSerialized);
+      console.log('Update boot-perf_test.ts\'s expectedGraph with the following:\n\n', graphSerialized, '\n\n');
     }
 
     // Assert the above list matches DevTools' modules loaded.
