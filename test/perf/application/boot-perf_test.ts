@@ -145,10 +145,6 @@ describe('Module graph', () => {
   ├core/root/root.js
   ├core/sdk/sdk.js
   ├models/extensions/extensions.js
-  │ ├models/logs/logs.js
-  │ ├ui/legacy/components/utils/utils.js
-  │ ├ui/legacy/theme_support/theme_support.js
-  │ ├models/bindings/bindings.js
   │ └models/har/har.js
   ├models/workspace/workspace.js
   │ ├core/host/host.js
@@ -173,6 +169,7 @@ describe('Module graph', () => {
   └entrypoints/main/main.js
     ├core/protocol_client/protocol_client.js
     ├models/autofill_manager/autofill_manager.js
+    ├models/bindings/bindings.js
     ├models/breakpoints/breakpoints.js
     │ ├models/formatter/formatter.js
     │ └models/source_map_scopes/source_map_scopes.js
@@ -180,10 +177,13 @@ describe('Module graph', () => {
     │ └models/emulation/emulation.js
     ├models/live-metrics/live-metrics.js
     │ └models/live-metrics/web-vitals-injected/spec/spec.js
+    ├models/logs/logs.js
     ├models/persistence/persistence.js
     ├panels/snippets/snippets.js
     ├ui/components/buttons/buttons.js
     ├ui/components/icon_button/icon_button.js
+    ├ui/legacy/components/utils/utils.js
+    ├ui/legacy/theme_support/theme_support.js
     └ui/lit/lit.js
       └third_party/lit/lit.js
 
