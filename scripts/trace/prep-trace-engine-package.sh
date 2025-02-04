@@ -10,6 +10,9 @@ cd $dtfe
 out_dir="./out/TraceEngine"
 dist="$out_dir/dist"  # This doesn't match up with typical obj,gen,resources layout but that's fine!
 
+# Prevent old files from being copied to the dist folder. Yes, this forces a rebuild every time. Got a better idea?
+rm -rf "$out_dir/gen"
+
 # build devtools first!
 gn --args="is_debug=true" gen -C $out_dir
 autoninja -C $out_dir front_end
