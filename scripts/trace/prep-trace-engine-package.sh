@@ -53,6 +53,12 @@ for p in Path('$dist/models').rglob('*.d.ts'):
     needle = 'Common.UIString.LocalizedString'
     content = content.replace(needle, 'string')
 
+    needle = 'import(\"../../../core/i18n/i18nTypes.js\").Values'
+    content = content.replace(needle, 'Record<string, string>')
+
+    needle = 'import(\"../../../core/platform/UIString.js\").LocalizedString'
+    content = content.replace(needle, 'Record<string, string>')
+
     needle = 'import type * as SDK'
     content = content.replace(needle, f'// {needle}')
 
@@ -66,6 +72,9 @@ for p in Path('$dist/models').rglob('*.d.ts'):
     content = content.replace(needle, 'any')
 
     needle = 'CrUXManager.PageScope'
+    content = content.replace(needle, 'any')
+
+    needle = 'CrUXManager.Scope'
     content = content.replace(needle, 'any')
 
     p.write_text(content)

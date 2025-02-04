@@ -12,7 +12,7 @@ const {parsedTrace: data, insights} = await analyzeTrace(filename);
 
 test('key values are populated', t => {
   assert.equal(data.Renderer.allTraceEntries.length > 90_000, true);
-  assert.equal(data.Screenshots.all.length > 2, true);
+  assert.equal((data.Screenshots.legacySyntheticScreenshots?.length ?? 0) > 2, true);
   assert.equal(data.Meta.threadsInProcess.size > 2, true);
   assert.equal(data.Meta.mainFrameNavigations.length > 0, true);
 });
@@ -61,8 +61,9 @@ test('insights look ok', t => {
   }
   // First insightset with a navigation on it, to skip over the NO_NAV one.
   const insightSet = Array.from(insights.values()).find(is => is.navigation);
-  if (typeof insightSet === 'undefined')
+  if (typeof insightSet === 'undefined') {
     throw new Error();
+  }
   const keys = Object.keys(insightSet.model);
   assert.deepStrictEqual(keys, [
     'InteractionToNextPaint',
@@ -77,6 +78,8 @@ test('insights look ok', t => {
     'DOMSize',
     'ThirdParties',
     'SlowCSSSelector',
+    'LongCriticalNetworkTree',
+    'ForcedReflow',
   ]);
   for (const [insightName, insightItem] of Object.entries(insightSet.model)) {
     const msg = insightItem instanceof Error ?
@@ -91,18 +94,19 @@ test('insights look ok', t => {
   const simplified = Object.fromEntries(values.map((v, i) => [entityNames[i], v]));
 
   const expected = {
-    'Google Fonts': {
-      mainThreadTime: 0,
-      transferSize: 74145,
-    },
-    'paulirish.com': {
-      mainThreadTime: 8983,
-      transferSize: 142142,
-    },
-    Disqus: {
-      mainThreadTime: 413,
-      transferSize: 1550,
-    },
+    ahfhijdlegdabablpippeagghigmibma: { transferSize: 0, mainThreadTime: 2189 },
+    'paulirish.com': { transferSize: 142142, mainThreadTime: 8995 },
+    cjpalhdlnbpafiamejdnhcphjbkeiagm: { transferSize: 0, mainThreadTime: 2607 },
+    jinjaccalgkegednnccohejagnlnfdag: { transferSize: 0, mainThreadTime: 841 },
+    noondiphcddnnabmjcihcjfbhfklnnep: { transferSize: 0, mainThreadTime: 1832 },
+    'Google Tag Manager': { transferSize: 0, mainThreadTime: 124 },
+    Disqus: { transferSize: 1550, mainThreadTime: 413 },
+    'Google Analytics': { transferSize: 0, mainThreadTime: 117 },
+    bknnlbamapndemiekhkcnmdclnkijlhb: { transferSize: 0, mainThreadTime: 387 },
+    kljjfejkagofbgklifblndjelgabcmig: { transferSize: 0, mainThreadTime: 149 },
+    nffaoalbilbmmfgbnbgppjihopabppdk: { transferSize: 0, mainThreadTime: 812 },
+    obadmbiiipafnncogfkdfionggeckfia: { transferSize: 0, mainThreadTime: 1477 },
+    'Google Fonts': { transferSize: 74145, mainThreadTime: 0 }
   };
   assert.deepStrictEqual(simplified, expected);
 });
