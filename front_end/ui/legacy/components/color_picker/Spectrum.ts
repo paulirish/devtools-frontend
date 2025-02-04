@@ -270,6 +270,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
   private colorStringInternal?: string;
   constructor(contrastInfo?: ContrastInfo|null) {
     super(true);
+    this.registerRequiredCSS(spectrumStyles);
 
     this.contentElement.tabIndex = 0;
     this.contentElement.setAttribute(
@@ -1339,7 +1340,6 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
   }
 
   override wasShown(): void {
-    this.registerCSSFiles([spectrumStyles]);
     this.hueAlphaWidth = this.hueElement.offsetWidth;
     this.slideHelperWidth = this.hueSlider.offsetWidth / 2;
     this.dragWidth = this.colorElement.offsetWidth;

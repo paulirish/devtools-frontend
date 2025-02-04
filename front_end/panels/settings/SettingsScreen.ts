@@ -28,13 +28,15 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+import '../../ui/components/cards/cards.js';
+
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import type * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
-import * as Cards from '../../ui/components/cards/cards.js';
+import type * as Cards from '../../ui/components/cards/cards.js';
 import * as IconButton from '../../ui/components/icon_button/icon_button.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
@@ -103,8 +105,9 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 let settingsScreenInstance: SettingsScreen;
 
 function createSettingsCard(heading: Common.UIString.LocalizedString, ...content: HTMLElement[]): Cards.Card.Card {
-  const card = new Cards.Card.Card();
-  card.data = {heading, content};
+  const card = document.createElement('devtools-card');
+  card.heading = heading;
+  card.append(...content);
   return card;
 }
 
@@ -115,6 +118,7 @@ export class SettingsScreen extends UI.Widget.VBox implements UI.View.ViewLocati
 
   private constructor() {
     super(true);
+    this.registerRequiredCSS(settingsScreenStyles);
 
     this.contentElement.classList.add('settings-window-main');
     this.contentElement.classList.add('vbox');
@@ -122,7 +126,7 @@ export class SettingsScreen extends UI.Widget.VBox implements UI.View.ViewLocati
     const settingsLabelElement = document.createElement('div');
     settingsLabelElement.classList.add('settings-window-label-element');
     const settingsTitleElement =
-        UI.UIUtils.createShadowRootWithCoreStyles(settingsLabelElement, {cssFile: [settingsScreenStyles]})
+        UI.UIUtils.createShadowRootWithCoreStyles(settingsLabelElement, {cssFile: settingsScreenStyles})
             .createChild('div', 'settings-window-title');
 
     UI.ARIAUtils.markAsHeading(settingsTitleElement, 1);
@@ -131,7 +135,7 @@ export class SettingsScreen extends UI.Widget.VBox implements UI.View.ViewLocati
     this.tabbedLocation = UI.ViewManager.ViewManager.instance().createTabbedLocation(
         () => SettingsScreen.revealSettingsScreen(), 'settings-view');
     const tabbedPane = this.tabbedLocation.tabbedPane();
-    tabbedPane.registerCSSFiles([settingsScreenStyles]);
+    tabbedPane.registerRequiredCSS(settingsScreenStyles);
     tabbedPane.headerElement().prepend(settingsLabelElement);
     tabbedPane.setShrinkableTabs(false);
     tabbedPane.makeVerticalTabLayout();
@@ -234,10 +238,6 @@ export class SettingsScreen extends UI.Widget.VBox implements UI.View.ViewLocati
     if (this.tabbedLocation.tabbedPane().selectedTabId === 'keybinds' && this.keybindsTab) {
       this.keybindsTab.onEscapeKeyPressed(event);
     }
-  }
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([settingsScreenStyles]);
   }
 }
 

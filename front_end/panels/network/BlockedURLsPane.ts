@@ -69,6 +69,7 @@ export class BlockedURLsPane extends UI.Widget.VBox implements
 
   constructor() {
     super(true);
+    this.registerRequiredCSS(blockedURLsPaneStyles);
 
     this.element.setAttribute('jslog', `${VisualLogging.panel('network.blocked-urls').track({resize: true})}`);
 
@@ -89,6 +90,7 @@ export class BlockedURLsPane extends UI.Widget.VBox implements
     this.toolbar.setAttribute('jslog', `${VisualLogging.toolbar()}`);
 
     this.list = new UI.ListWidget.ListWidget(this);
+    this.list.registerRequiredCSS(blockedURLsPaneStyles);
     this.list.element.classList.add('blocked-urls');
 
     this.list.setEmptyPlaceholder(this.createEmptyPlaceholder());
@@ -272,8 +274,6 @@ export class BlockedURLsPane extends UI.Widget.VBox implements
   override wasShown(): void {
     UI.Context.Context.instance().setFlavor(BlockedURLsPane, this);
     super.wasShown();
-    this.list.registerCSSFiles([blockedURLsPaneStyles]);
-    this.registerCSSFiles([blockedURLsPaneStyles]);
   }
 
   override willHide(): void {

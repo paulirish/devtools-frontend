@@ -5,11 +5,11 @@
 import * as i18n from '../../../core/i18n/i18n.js';
 import type * as Trace from '../../../models/trace/trace.js';
 import * as UI from '../../../ui/legacy/legacy.js';
-import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import * as Lit from '../../../ui/lit/lit.js';
 
 import timelineSummaryStyles from './timelineSummary.css.js';
 
-const {render, html} = LitHtml;
+const {render, html} = Lit;
 
 const UIStrings = {
   /**
@@ -40,9 +40,9 @@ export interface SummaryTableData {
   selectedEvents: Trace.Types.Events.Event[];
 }
 
-export class TimelineSummary extends HTMLElement {
+export class CategorySummary extends HTMLElement {
   readonly #shadow =
-      UI.UIUtils.createShadowRootWithCoreStyles(this, {cssFile: [timelineSummaryStyles], delegatesFocus: undefined});
+      UI.UIUtils.createShadowRootWithCoreStyles(this, {cssFile: timelineSummaryStyles, delegatesFocus: undefined});
 
   #rangeStart = 0;
   #rangeEnd = 0;
@@ -89,17 +89,17 @@ export class TimelineSummary extends HTMLElement {
                 </div>
           </div>
           </div>
-          <slot name="third-party-table"></slot>
+
         </div>`;
     // clang-format on
     render(output, this.#shadow, {host: this});
   }
 }
 
-customElements.define('devtools-performance-timeline-summary', TimelineSummary);
+customElements.define('devtools-performance-timeline-summary', CategorySummary);
 
 declare global {
   interface HTMLElementTagNameMap {
-    'devtools-performance-timeline-summary': TimelineSummary;
+    'devtools-performance-timeline-summary': CategorySummary;
   }
 }

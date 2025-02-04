@@ -102,6 +102,7 @@ export class WatchExpressionsSidebarPane extends UI.ThrottledWidget.ThrottledWid
   private readonly linkifier: Components.Linkifier.Linkifier;
   private constructor() {
     super(true);
+    this.registerRequiredCSS(watchExpressionsSidebarPaneStyles, objectValueStyles);
 
     // TODO(szuend): Replace with a Set once the web test
     // panels/sources/debugger-ui/watch-expressions-preserve-expansion.js is either converted
@@ -125,6 +126,7 @@ export class WatchExpressionsSidebarPane extends UI.ThrottledWidget.ThrottledWid
     this.contentElement.setAttribute('jslog', `${VisualLogging.section('sources.watch')}`);
     this.contentElement.addEventListener('contextmenu', this.contextMenu.bind(this), false);
     this.treeOutline = new ObjectUI.ObjectPropertiesSection.ObjectPropertiesSectionsTreeOutline();
+    this.treeOutline.registerRequiredCSS(watchExpressionsSidebarPaneStyles);
     this.treeOutline.hideOverflow();
 
     this.treeOutline.setShowSelectionOnKeyboardFocus(/* show */ true);
@@ -300,12 +302,6 @@ export class WatchExpressionsSidebarPane extends UI.ThrottledWidget.ThrottledWid
     }
 
     contextMenu.debugSection().appendAction('sources.add-to-watch');
-  }
-
-  override wasShown(): void {
-    super.wasShown();
-    this.treeOutline.registerCSSFiles([watchExpressionsSidebarPaneStyles]);
-    this.registerCSSFiles([watchExpressionsSidebarPaneStyles, objectValueStyles]);
   }
 }
 

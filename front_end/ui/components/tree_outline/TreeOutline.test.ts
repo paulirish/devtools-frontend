@@ -11,12 +11,10 @@ import {
   renderElementIntoDOM,
   stripLitHtmlCommentNodes,
 } from '../../../testing/DOMHelpers.js';
-import * as LitHtml from '../../lit-html/lit-html.js';
+import {html} from '../../lit/lit.js';
 import * as RenderCoordinator from '../render_coordinator/render_coordinator.js';
 
 import * as TreeOutline from './tree_outline.js';
-
-const {html} = LitHtml;
 
 async function renderTreeOutline<TreeNodeDataType>({
   tree,
@@ -50,7 +48,7 @@ async function renderTreeOutline<TreeNodeDataType>({
 
 /**
  * Wait for a certain number of children are rendered. We need this as the
- * component uses LitHtml's until directive, which is async and not within the
+ * component uses Lit's until directive, which is async and not within the
  * render coordinator's control.
  */
 async function waitForRenderedTreeNodeCount(shadowRoot: ShadowRoot, expectedNodeCount: number): Promise<void> {

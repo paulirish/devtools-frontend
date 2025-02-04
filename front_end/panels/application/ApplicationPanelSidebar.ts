@@ -373,10 +373,10 @@ export class ApplicationPanelSidebar extends UI.Widget.VBox implements SDK.Targe
 
   constructor(panel: ResourcesPanel) {
     super();
-
     this.panel = panel;
 
     this.sidebarTree = new UI.TreeOutline.TreeOutlineInShadow(UI.TreeOutline.TreeVariant.NAVIGATION_TREE);
+    this.sidebarTree.registerRequiredCSS(resourcesSidebarStyles);
     this.sidebarTree.element.classList.add('resources-sidebar');
     this.sidebarTree.hideOverflow();
 
@@ -1059,10 +1059,6 @@ export class ApplicationPanelSidebar extends UI.Widget.VBox implements SDK.Targe
       this.previousHoveredElement.hovered = false;
       delete this.previousHoveredElement;
     }
-  }
-  override wasShown(): void {
-    super.wasShown();
-    this.sidebarTree.registerCSSFiles([resourcesSidebarStyles]);
   }
 }
 

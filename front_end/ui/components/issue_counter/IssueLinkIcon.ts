@@ -10,13 +10,17 @@ import type * as Platform from '../../../core/platform/platform.js';
 import type * as Protocol from '../../../generated/protocol.js';
 import * as IssuesManager from '../../../models/issues_manager/issues_manager.js';
 import * as RenderCoordinator from '../../../ui/components/render_coordinator/render_coordinator.js';
-import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import * as Lit from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import {getIssueKindIconData} from './IssueCounter.js';
-import IssueLinkIconStyles from './issueLinkIcon.css.js';
+import IssueLinkIconStylesRaw from './issueLinkIcon.css.js';
 
-const {html} = LitHtml;
+// TODO(crbug.com/391381439): Fully migrate off of constructed style sheets.
+const IssueLinkIconStyles = new CSSStyleSheet();
+IssueLinkIconStyles.replaceSync(IssueLinkIconStylesRaw.cssContent);
+
+const {html} = Lit;
 
 const UIStrings = {
   /**
@@ -144,8 +148,8 @@ export class IssueLinkIcon extends HTMLElement {
   #render(): Promise<void> {
     return RenderCoordinator.write(() => {
       // clang-format off
-      LitHtml.render(html`
-      <button class=${LitHtml.Directives.classMap({link: Boolean(this.#issue)})}
+      Lit.render(html`
+      <button class=${Lit.Directives.classMap({link: Boolean(this.#issue)})}
               title=${this.#getTooltip()}
               jslog=${VisualLogging.link('issue').track({click: true})}
               @click=${this.handleClick}>

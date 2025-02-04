@@ -189,7 +189,7 @@ export class StatusView {
 
   private render(): void {
     const dialogRoot =
-        UI.UIUtils.createShadowRootWithCoreStyles(this.dialog.contentElement, {cssFile: [lighthouseDialogStyles]});
+        UI.UIUtils.createShadowRootWithCoreStyles(this.dialog.contentElement, {cssFile: lighthouseDialogStyles});
     const lighthouseViewElement = dialogRoot.createChild('div', 'lighthouse-view vbox');
 
     const cancelButton = UI.UIUtils.createTextButton(i18nString(UIStrings.cancel), this.cancel.bind(this), {

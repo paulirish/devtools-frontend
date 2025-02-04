@@ -15,7 +15,6 @@ import {
   describeWithMockConnection,
   dispatchEvent,
 } from '../../../testing/MockConnection.js';
-import * as DataGrid from '../../../ui/components/data_grid/data_grid.js';
 import * as RenderCoordinator from '../../../ui/components/render_coordinator/render_coordinator.js';
 import * as ReportView from '../../../ui/components/report_view/report_view.js';
 import * as UI from '../../../ui/legacy/legacy.js';
@@ -245,6 +244,10 @@ function createRuleSetView(target: SDK.Target.Target): Resources.PreloadingView.
   const view = new Resources.PreloadingView.PreloadingRuleSetView(model);
   const container = new UI.Widget.VBox();
   const div = document.createElement('div');
+  view.contentElement.style.display = 'block';
+  view.contentElement.style.width = '640px';
+  view.contentElement.style.height = '480px';
+
   renderElementIntoDOM(div);
   container.markAsRoot();
   container.show(div);
@@ -261,6 +264,8 @@ function createAttemptView(target: SDK.Target.Target): Resources.PreloadingView.
   const view = new Resources.PreloadingView.PreloadingAttemptView(model);
   const container = new UI.Widget.VBox();
   const div = document.createElement('div');
+  view.contentElement.style.width = '640px';
+  view.contentElement.style.height = '480px';
   renderElementIntoDOM(div);
   container.markAsRoot();
   container.show(div);
@@ -366,12 +371,7 @@ describeWithMockConnection('PreloadingRuleSetView', () => {
 
     );
 
-    const cells = [
-      {columnId: 'id', value: 'ruleSetId:0.2'},
-      {columnId: 'Validity', value: 'Invalid'},
-    ];
-    ruleSetGridComponent.dispatchEvent(
-        new DataGrid.DataGridEvents.BodyCellFocusedEvent({columnId: 'Validity', value: 'Invalid'}, {cells}));
+    ruleSetGridComponent.dispatchEvent(new CustomEvent('select', {detail: 'ruleSetId:0.2'}));
 
     await RenderCoordinator.done();
 
@@ -538,9 +538,11 @@ describeWithMockConnection('PreloadingAttemptView', () => {
         ],
     );
 
-    const placeholder = preloadingDetailsComponent.shadowRoot.querySelector('div.preloading-noselected div p');
+    const placeholderHeader = preloadingDetailsComponent.shadowRoot.querySelector('.empty-state-header');
+    assert.strictEqual(placeholderHeader?.textContent?.trim(), 'No element selected');
 
-    assert.strictEqual(placeholder?.textContent, 'Select an element for more details');
+    const placeholderDescription = preloadingDetailsComponent.shadowRoot.querySelector('.empty-state-description');
+    assert.strictEqual(placeholderDescription?.textContent, 'Select an element for more details');
   });
 
   // See https://crbug.com/1432880
@@ -600,9 +602,11 @@ describeWithMockConnection('PreloadingAttemptView', () => {
         ],
     );
 
-    const placeholder = preloadingDetailsComponent.shadowRoot.querySelector('div.preloading-noselected div p');
+    const placeholderHeader = preloadingDetailsComponent.shadowRoot.querySelector('.empty-state-header');
+    assert.strictEqual(placeholderHeader?.textContent?.trim(), 'No element selected');
 
-    assert.strictEqual(placeholder?.textContent, 'Select an element for more details');
+    const placeholderDescription = preloadingDetailsComponent.shadowRoot.querySelector('.empty-state-description');
+    assert.strictEqual(placeholderDescription?.textContent, 'Select an element for more details');
   });
 
   it('filters preloading attempts by selected rule set', async () => {
@@ -767,12 +771,8 @@ describeWithMockConnection('PreloadingAttemptView', () => {
         ],
     );
 
-    const cells = [
-      {columnId: 'id', value: 'loaderId:1:Prerender:https://example.com/prerendered.html:undefined'},
-      // Omit other columns.
-    ];
     preloadingGridComponent.dispatchEvent(
-        new DataGrid.DataGridEvents.BodyCellFocusedEvent({columnId: 'URL', value: '/prerendered.html'}, {cells}));
+        new CustomEvent('select', {detail: 'loaderId:1:Prerender:https://example.com/prerendered.html:undefined'}));
 
     await RenderCoordinator.done();
 
@@ -838,12 +838,8 @@ describeWithMockConnection('PreloadingAttemptView', () => {
         ],
     );
 
-    const cells = [
-      {columnId: 'id', value: 'loaderId:1:Prerender:https://example.com/prerendered.html:undefined'},
-      // Omit other columns.
-    ];
     preloadingGridComponent.dispatchEvent(
-        new DataGrid.DataGridEvents.BodyCellFocusedEvent({columnId: 'URL', value: '/prerendered.html'}, {cells}));
+        new CustomEvent('select', {detail: 'loaderId:1:Prerender:https://example.com/prerendered.html:undefined'}));
 
     await RenderCoordinator.done();
 
@@ -917,12 +913,8 @@ describeWithMockConnection('PreloadingAttemptView', () => {
         ],
     );
 
-    const cells = [
-      {columnId: 'id', value: 'loaderId:1:Prerender:https://example.com/prerendered.html:undefined'},
-      // Omit other columns.
-    ];
     preloadingGridComponent.dispatchEvent(
-        new DataGrid.DataGridEvents.BodyCellFocusedEvent({columnId: 'URL', value: '/prerendered.html'}, {cells}));
+        new CustomEvent('select', {detail: 'loaderId:1:Prerender:https://example.com/prerendered.html:undefined'}));
 
     await RenderCoordinator.done();
 

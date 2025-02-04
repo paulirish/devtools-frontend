@@ -171,7 +171,7 @@ const createAccessibilityTreeToggleButton = (isActive: boolean): HTMLElement => 
   button.data = {
     active: isActive,
     variant: Buttons.Button.Variant.TOOLBAR,
-    iconUrl: new URL('../../Images/person.svg', import.meta.url).toString(),
+    iconName: 'person',
     title,
     jslogContext: 'toggle-accessibility-tree',
   };
@@ -229,6 +229,7 @@ export class ElementsPanel extends UI.Panel.Panel implements UI.SearchableView.S
 
   constructor() {
     super('elements');
+    this.registerRequiredCSS(elementsPanelStyles);
 
     this.splitWidget = new UI.SplitWidget.SplitWidget(true, true, 'elements-panel-split-view-state', 325, 325);
     this.splitWidget.addEventListener(
@@ -480,7 +481,6 @@ export class ElementsPanel extends UI.Panel.Panel implements UI.SearchableView.S
   override wasShown(): void {
     super.wasShown();
     UI.Context.Context.instance().setFlavor(ElementsPanel, this);
-    this.registerCSSFiles([elementsPanelStyles]);
 
     for (const treeOutline of this.treeOutlines) {
       // Attach heavy component lazily

@@ -81,6 +81,9 @@ function createExtensionFlameChartEntries(): void {
 export function extractConsoleAPIExtensionEntries(): void {
   const consoleTimeStamps: readonly Types.Events.ConsoleTimeStamp[] = userTimingsData().timestampEvents;
   for (const currentTimeStamp of consoleTimeStamps) {
+    if (!currentTimeStamp.args.data) {
+      continue;
+    }
     const timeStampName = String(currentTimeStamp.args.data.name);
     timeStampByName.set(timeStampName, currentTimeStamp);
     const extensionData = extensionDataInConsoleTimeStamp(currentTimeStamp);
@@ -104,7 +107,7 @@ export function extractConsoleAPIExtensionEntries(): void {
         cat: 'devtools.extension',
         args: extensionData,
         rawSourceEvent: currentTimeStamp,
-        dur: Types.Timing.MicroSeconds(entryEndTime - entryStartTime),
+        dur: Types.Timing.Micro(entryEndTime - entryStartTime),
         ts: entryStartTime,
       };
       const extensionEntry =
@@ -123,7 +126,7 @@ export function extractConsoleAPIExtensionEntries(): void {
       cat: 'disabled-by-default-v8.inspector',
       ph: Types.Events.Phase.COMPLETE,
       ts: entryStartTime,
-      dur: Types.Timing.MicroSeconds(entryEndTime - entryStartTime),
+      dur: Types.Timing.Micro(entryEndTime - entryStartTime),
       rawSourceEvent: currentTimeStamp
     };
     const syntheticTimeStamp =
@@ -177,7 +180,7 @@ export function extractPerformanceAPIExtensionEntries(
       pid: timing.pid,
       tid: timing.tid,
       ts: timing.ts,
-      dur: timing.dur as Types.Timing.MicroSeconds,
+      dur: timing.dur as Types.Timing.Micro,
       cat: 'devtools.extension',
       args: extensionPayload,
       rawSourceEvent: Types.Events.isSyntheticUserTiming(timing) ? timing.rawSourceEvent : timing,
@@ -254,6 +257,9 @@ export function extensionDataInPerformanceTiming(timing: Types.Events.SyntheticU
  */
 export function extensionDataInConsoleTimeStamp(timeStamp: Types.Events.ConsoleTimeStamp):
     Types.Extensions.ExtensionTrackEntryPayload|null {
+  if (!timeStamp.args.data) {
+    return null;
+  }
   const trackName = timeStamp.args.data.track;
   if (trackName === '' || trackName === undefined) {
     return null;

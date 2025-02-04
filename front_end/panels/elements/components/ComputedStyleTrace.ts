@@ -3,11 +3,13 @@
 // found in the LICENSE file.
 
 import * as UI from '../../../ui/legacy/legacy.js';
-import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import {html, render} from '../../../ui/lit/lit.js';
 
-import computedStyleTraceStyles from './computedStyleTrace.css.js';
+import computedStyleTraceStylesRaw from './computedStyleTrace.css.js';
 
-const {render, html} = LitHtml;
+// TODO(crbug.com/391381439): Fully migrate off of constructed style sheets.
+const computedStyleTraceStyles = new CSSStyleSheet();
+computedStyleTraceStyles.replaceSync(computedStyleTraceStylesRaw.cssContent);
 
 export interface ComputedStyleTraceData {
   selector: string;

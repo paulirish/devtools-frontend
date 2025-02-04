@@ -182,6 +182,7 @@ export class LayerDetailsView extends Common.ObjectWrapper.eventMixin<EventTypes
 
   constructor(layerViewHost: LayerViewHost) {
     super(true);
+    this.registerRequiredCSS(layerDetailsViewStyles);
     this.element.setAttribute('jslog', `${VisualLogging.pane('layers-details')}`);
     this.contentElement.classList.add('layer-details-container');
 
@@ -210,7 +211,6 @@ export class LayerDetailsView extends Common.ObjectWrapper.eventMixin<EventTypes
 
   override wasShown(): void {
     super.wasShown();
-    this.registerCSSFiles([layerDetailsViewStyles]);
     this.update();
   }
 

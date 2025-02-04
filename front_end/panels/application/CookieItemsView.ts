@@ -176,6 +176,7 @@ export class CookieItemsView extends StorageItemsView {
   private selectedCookie: SDK.Cookie.Cookie|null;
   constructor(model: SDK.CookieModel.CookieModel, cookieDomain: string) {
     super(i18nString(UIStrings.cookies), 'cookiesPanel');
+    this.registerRequiredCSS(cookieItemsViewStyles);
 
     this.element.classList.add('storage-view');
     this.element.setAttribute('jslog', `${VisualLogging.pane('cookies-data')}`);
@@ -324,10 +325,5 @@ export class CookieItemsView extends StorageItemsView {
 
   override refreshItems(): void {
     void this.model.getCookiesForDomain(this.cookieDomain, true).then(this.updateWithCookies.bind(this));
-  }
-
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([cookieItemsViewStyles]);
   }
 }

@@ -69,6 +69,7 @@ export class LiveHeapProfileView extends UI.Widget.VBox {
   private constructor() {
     super(true);
     this.gridNodeByUrl = new Map();
+    this.registerRequiredCSS(liveHeapProfileStyles);
 
     this.setting = Common.Settings.Settings.instance().moduleSetting('memory-live-heap-profile');
     const toolbar = this.contentElement.createChild('devtools-toolbar', 'live-heap-profile-toolbar');
@@ -173,7 +174,6 @@ export class LiveHeapProfileView extends UI.Widget.VBox {
   override wasShown(): void {
     super.wasShown();
     void this.poll();
-    this.registerCSSFiles([liveHeapProfileStyles]);
     this.setting.addChangeListener(this.settingChanged, this);
   }
 

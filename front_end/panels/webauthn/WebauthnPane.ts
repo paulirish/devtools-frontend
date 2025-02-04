@@ -265,6 +265,7 @@ export class WebauthnPaneImpl extends UI.Widget.VBox implements
 
   constructor() {
     super(true);
+    this.registerRequiredCSS(webauthnPaneStyles);
 
     this.element.setAttribute('jslog', `${VisualLogging.panel('webauthn').track({resize: true})}`);
 
@@ -937,9 +938,5 @@ export class WebauthnPaneImpl extends UI.Widget.VBox implements
     }
     this.#activeAuthId = null;
     this.#updateActiveButtons();
-  }
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([webauthnPaneStyles]);
   }
 }

@@ -246,8 +246,8 @@ export class TopDownNode extends Node {
 
 export class TopDownRootNode extends TopDownNode {
   readonly filter: (e: Types.Events.Event) => boolean;
-  readonly startTime: Types.Timing.MilliSeconds;
-  readonly endTime: Types.Timing.MilliSeconds;
+  readonly startTime: Types.Timing.Milli;
+  readonly endTime: Types.Timing.Milli;
   eventGroupIdCallback: ((arg0: Types.Events.Event) => string)|null|undefined;
   /** Default behavior is to aggregate similar trace events into one Node based on generateEventID(), eventGroupIdCallback(), etc. Set true to keep nodes 1:1 with events. */
   readonly doNotAggregate: boolean|undefined;
@@ -256,9 +256,9 @@ export class TopDownRootNode extends TopDownNode {
   override selfTime: number;
 
   constructor(
-      events: Types.Events.Event[], filters: TraceFilter[], startTime: Types.Timing.MilliSeconds,
-      endTime: Types.Timing.MilliSeconds, doNotAggregate?: boolean,
-      eventGroupIdCallback?: ((arg0: Types.Events.Event) => string)|null, includeInstantEvents?: boolean) {
+      events: Types.Events.Event[], filters: TraceFilter[], startTime: Types.Timing.Milli, endTime: Types.Timing.Milli,
+      doNotAggregate?: boolean, eventGroupIdCallback?: ((arg0: Types.Events.Event) => string)|null,
+      includeInstantEvents?: boolean) {
     super('', events[0], null);
     this.event = events[0];
     this.root = this;
@@ -311,14 +311,14 @@ export class BottomUpRootNode extends Node {
   private childrenInternal: ChildrenCache|null;
   private textFilter: TraceFilter;
   readonly filter: (e: Types.Events.Event) => boolean;
-  readonly startTime: Types.Timing.MilliSeconds;
-  readonly endTime: Types.Timing.MilliSeconds;
+  readonly startTime: Types.Timing.Milli;
+  readonly endTime: Types.Timing.Milli;
   private eventGroupIdCallback: ((arg0: Types.Events.Event) => string)|null;
   override totalTime: number;
 
   constructor(
-      events: Types.Events.Event[], textFilter: TraceFilter, filters: TraceFilter[],
-      startTime: Types.Timing.MilliSeconds, endTime: Types.Timing.MilliSeconds,
+      events: Types.Events.Event[], textFilter: TraceFilter, filters: readonly TraceFilter[],
+      startTime: Types.Timing.Milli, endTime: Types.Timing.Milli,
       eventGroupIdCallback: ((arg0: Types.Events.Event) => string)|null) {
     super('', events[0]);
     this.childrenInternal = null;
@@ -590,8 +590,11 @@ export function generateEventID(event: Types.Events.Event): string {
     return `f:${name}@${location}`;
   }
 
-  if (Types.Events.isConsoleTimeStamp(event)) {
+  if (Types.Events.isConsoleTimeStamp(event) && event.args.data) {
     return `${event.name}:${event.args.data.name}`;
+  }
+  if (Types.Events.isSyntheticNetworkRequest(event)) {
+    return `${event.name}:${event.args.data.url}`;
   }
 
   return event.name;

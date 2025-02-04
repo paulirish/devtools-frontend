@@ -37,6 +37,7 @@ export class ResourcesPanel extends UI.Panel.PanelWithSidebar {
 
   private constructor() {
     super('resources');
+    this.registerRequiredCSS(resourcesPanelStyles);
 
     this.resourcesLastSelectedItemSetting =
         Common.Settings.Settings.instance().createSetting('resources-last-selected-element-path', []);
@@ -204,10 +205,6 @@ export class ResourcesPanel extends UI.Panel.PanelWithSidebar {
         this.cookieView.refreshItems();
       }
     });
-  }
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([resourcesPanelStyles]);
   }
 }
 

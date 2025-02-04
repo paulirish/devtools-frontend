@@ -170,6 +170,7 @@ export class BackgroundServiceView extends UI.Widget.VBox {
 
   constructor(serviceName: Protocol.BackgroundService.ServiceName, model: BackgroundServiceModel) {
     super(true);
+    this.registerRequiredCSS(emptyWidgetStyles, backgroundServiceViewStyles);
 
     this.serviceName = serviceName;
     const kebabName = Platform.StringUtilities.toKebabCase(serviceName);
@@ -516,10 +517,6 @@ export class BackgroundServiceView extends UI.Widget.VBox {
     const events = this.model.getEvents(this.serviceName).filter(event => this.acceptEvent(event));
     await stream.write(JSON.stringify(events, undefined, 2));
     void stream.close();
-  }
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([emptyWidgetStyles, backgroundServiceViewStyles]);
   }
 }
 

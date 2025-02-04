@@ -104,6 +104,7 @@ export class ServiceWorkerCacheView extends UI.View.SimpleView {
 
   constructor(model: SDK.ServiceWorkerCacheModel.ServiceWorkerCacheModel, cache: SDK.ServiceWorkerCacheModel.Cache) {
     super(i18nString(UIStrings.cache));
+    this.registerRequiredCSS(serviceWorkerCacheViewsStyles);
 
     this.model = model;
     this.entriesForTest = null;
@@ -178,7 +179,6 @@ export class ServiceWorkerCacheView extends UI.View.SimpleView {
   override wasShown(): void {
     this.model.addEventListener(
         SDK.ServiceWorkerCacheModel.Events.CACHE_STORAGE_CONTENT_UPDATED, this.cacheContentUpdated, this);
-    this.registerCSSFiles([serviceWorkerCacheViewsStyles]);
     void this.updateData(true);
   }
 

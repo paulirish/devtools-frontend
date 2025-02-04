@@ -11,6 +11,8 @@ import * as Timeline from './timeline.js';
 class MockViewDelegate implements Timeline.TimelinePanel.TimelineModeViewDelegate {
   select(_selection: Timeline.TimelineSelection.TimelineSelection|null): void {
   }
+  set3PCheckboxDisabled(_disabled: boolean): void {
+  }
   selectEntryAtTime(_events: Trace.Types.Events.Event[]|null, _time: number): void {
   }
   highlightEvent(_event: Trace.Types.Events.Event|null): void {
@@ -154,7 +156,7 @@ describeWithEnvironment('TimelineTreeView', function() {
       const startTime = Trace.Helpers.Timing.microToMilli(parsedTrace.Meta.traceBounds.min);
       const endTime = Trace.Helpers.Timing.microToMilli(parsedTrace.Meta.traceBounds.max);
       callTreeView.setRange(startTime, endTime);
-      callTreeView.setGroupBySettingForTests(Timeline.TimelineTreeView.AggregatedTimelineTreeView.GroupBy.Category);
+      callTreeView.setGroupBySetting(Timeline.TimelineTreeView.AggregatedTimelineTreeView.GroupBy.Category);
       callTreeView.setModelWithEvents(consoleTimings, parsedTrace);
       const tree = callTreeView.buildTree();
       const treeEntries = tree.children().entries();
@@ -176,7 +178,7 @@ describeWithEnvironment('TimelineTreeView', function() {
       const startTime = Trace.Helpers.Timing.microToMilli(parsedTrace.Meta.traceBounds.min);
       const endTime = Trace.Helpers.Timing.microToMilli(parsedTrace.Meta.traceBounds.max);
       callTreeView.setRange(startTime, endTime);
-      callTreeView.setGroupBySettingForTests(Timeline.TimelineTreeView.AggregatedTimelineTreeView.GroupBy.Category);
+      callTreeView.setGroupBySetting(Timeline.TimelineTreeView.AggregatedTimelineTreeView.GroupBy.Category);
       callTreeView.setModelWithEvents(consoleTimings, parsedTrace);
       const tree = callTreeView.buildTree();
       const treeEntries = tree.children().entries();
@@ -200,7 +202,7 @@ describeWithEnvironment('TimelineTreeView', function() {
       const endTime = Trace.Helpers.Timing.microToMilli(parsedTrace.Meta.traceBounds.max);
 
       callTreeView.setRange(startTime, endTime);
-      callTreeView.setGroupBySettingForTests(Timeline.TimelineTreeView.AggregatedTimelineTreeView.GroupBy.Domain);
+      callTreeView.setGroupBySetting(Timeline.TimelineTreeView.AggregatedTimelineTreeView.GroupBy.Domain);
       callTreeView.setModelWithEvents(parsedTrace.Renderer.allTraceEntries, parsedTrace);
 
       const tree = callTreeView.buildTree();
@@ -225,7 +227,7 @@ describeWithEnvironment('TimelineTreeView', function() {
       const endTime = Trace.Helpers.Timing.microToMilli(parsedTrace.Meta.traceBounds.max);
 
       callTreeView.setRange(startTime, endTime);
-      callTreeView.setGroupBySettingForTests(Timeline.TimelineTreeView.AggregatedTimelineTreeView.GroupBy.ThirdParties);
+      callTreeView.setGroupBySetting(Timeline.TimelineTreeView.AggregatedTimelineTreeView.GroupBy.ThirdParties);
       callTreeView.setModelWithEvents(parsedTrace.Renderer.allTraceEntries, parsedTrace);
 
       const tree = callTreeView.buildTree();
@@ -250,7 +252,7 @@ describeWithEnvironment('TimelineTreeView', function() {
       const endTime = Trace.Helpers.Timing.microToMilli(parsedTrace.Meta.traceBounds.max);
 
       callTreeView.setRange(startTime, endTime);
-      callTreeView.setGroupBySettingForTests(Timeline.TimelineTreeView.AggregatedTimelineTreeView.GroupBy.Frame);
+      callTreeView.setGroupBySetting(Timeline.TimelineTreeView.AggregatedTimelineTreeView.GroupBy.Frame);
       callTreeView.setModelWithEvents(parsedTrace.Renderer.allTraceEntries, parsedTrace);
 
       const tree = callTreeView.buildTree();
@@ -269,7 +271,7 @@ describeWithEnvironment('TimelineTreeView', function() {
       const endTime = Trace.Helpers.Timing.microToMilli(parsedTrace.Meta.traceBounds.max);
 
       callTreeView.setRange(startTime, endTime);
-      callTreeView.setGroupBySettingForTests(Timeline.TimelineTreeView.AggregatedTimelineTreeView.GroupBy.URL);
+      callTreeView.setGroupBySetting(Timeline.TimelineTreeView.AggregatedTimelineTreeView.GroupBy.URL);
       callTreeView.setModelWithEvents(parsedTrace.Renderer.allTraceEntries, parsedTrace);
 
       const tree = callTreeView.buildTree();

@@ -55,6 +55,7 @@ export class AXBreadcrumbsPane extends AccessibilitySubPane {
 
   constructor(axSidebarView: AccessibilitySidebarView) {
     super(i18nString(UIStrings.accessibilityTree));
+    this.registerRequiredCSS(axBreadcrumbsStyles);
 
     this.element.classList.add('ax-subpane');
     this.element.tabIndex = -1;
@@ -423,10 +424,6 @@ export class AXBreadcrumbsPane extends AccessibilitySubPane {
       contextMenu.appendApplicableItems(deferredNode);
     }
     void contextMenu.show();
-  }
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([axBreadcrumbsStyles]);
   }
 }
 

@@ -352,6 +352,9 @@ export interface HostConfigFreestyler {
   enabled: boolean;
   userTier: string;
   executionMode?: HostConfigFreestylerExecutionMode;
+  patching?: boolean;
+  multimodal?: boolean;
+  functionCalling?: boolean;
 }
 
 export interface HostConfigAiAssistanceNetworkAgent {
@@ -373,6 +376,10 @@ export interface HostConfigAiAssistanceFileAgent {
   temperature: number;
   enabled: boolean;
   userTier: string;
+}
+
+export interface HostConfigImprovedWorkspaces {
+  enabled: boolean;
 }
 
 export interface HostConfigVeLogging {
@@ -414,6 +421,7 @@ export type HostConfig = Platform.TypeScriptUtilities.RecursivePartial<{
   devToolsAiAssistanceNetworkAgent: HostConfigAiAssistanceNetworkAgent,
   devToolsAiAssistanceFileAgent: HostConfigAiAssistanceFileAgent,
   devToolsAiAssistancePerformanceAgent: HostConfigAiAssistancePerformanceAgent,
+  devToolsImprovedWorkspaces: HostConfigImprovedWorkspaces,
   devToolsVeLogging: HostConfigVeLogging,
   devToolsPrivacyUI: HostConfigPrivacyUI,
   /**

@@ -11,16 +11,24 @@
 .controls {
   display: flex;
   flex-direction: column;
-  padding: var(--sys-size-5) var(--sys-size-8) var(--sys-size-5) var(--sys-size-5);
+  padding: var(--sys-size-5) var(--sys-size-3) var(--sys-size-5) var(--sys-size-5);
   min-width: var(--sys-size-33);
 }
 
 .header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sys-size-2);
   padding-left: var(--sys-size-5);
 }
 
-.title {
+h1 {
+  margin: 0;
   font: var(--sys-typescale-headline4);
+}
+
+.card-container {
+  max-width: 100%;
 }
 
 .card {
@@ -58,8 +66,9 @@
   gap: var(--sys-size-2);
 }
 
-.card-title {
+h2 {
   font: var(--sys-typescale-headline5);
+  margin: 0;
 }
 
 .body {
@@ -78,8 +87,9 @@
   padding-left: var(--sys-size-8);
 }
 
-.card-row-title {
+h3 {
   font: var(--sys-typescale-body4-medium);
+  margin: 0;
 }
 
 .x-link {
@@ -91,9 +101,16 @@
 .enterprise {
   display: flex;
   flex-direction: row;
+  justify-content: space-between;
   gap: var(--sys-size-9);
   padding: var(--sys-size-6) var(--sys-size-8) var(--sys-size-6) var(--sys-size-11);
   align-items: center;
+
+  > .anchor{
+    display: flex;
+    flex-direction: row;
+    gap: var(--sys-size-9);
+  }
 }
 
 input[type="checkbox"] {

@@ -166,6 +166,7 @@ export class ResourceWebSocketFrameView extends UI.Widget.VBox {
 
   constructor(request: SDK.NetworkRequest.NetworkRequest) {
     super();
+    this.registerRequiredCSS(webSocketFrameViewStyles);
 
     this.element.classList.add('websocket-frame-view');
     this.element.setAttribute('jslog', `${VisualLogging.pane('web-socket-messages').track({resize: true})}`);
@@ -278,8 +279,8 @@ export class ResourceWebSocketFrameView extends UI.Widget.VBox {
   }
 
   override wasShown(): void {
+    super.wasShown();
     this.refresh();
-    this.registerCSSFiles([webSocketFrameViewStyles]);
     this.request.addEventListener(SDK.NetworkRequest.Events.WEBSOCKET_FRAME_ADDED, this.frameAdded, this);
   }
 

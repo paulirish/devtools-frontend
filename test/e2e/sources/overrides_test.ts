@@ -18,7 +18,6 @@ import {
   waitForFunction,
   waitForNone,
 } from '../../shared/helper.js';
-
 import {openSoftContextMenuAndClickOnItem} from '../helpers/context-menu-helpers.js';
 import {
   openNetworkTab,
@@ -152,6 +151,8 @@ describe('Overrides panel', function() {
 
       // File permission pop up
       const infoBar = await waitForAria('Select a folder to store override files in.');
+      // Allow time for infobar to animate in before clicking the button
+      await new Promise<void>(resolve => setTimeout(resolve, 550));
       await click('.infobar-main-row .infobar-button', {root: infoBar});
 
       // Open & close the file in the Sources panel
@@ -204,7 +205,7 @@ describe('Overrides panel', function() {
 
       await openNetworkTab();
       const networkPanel = await waitFor('.tabbed-pane-header-tab.selected');
-      const icons = await networkPanel.$$('.tabbed-pane-header-tab-icon');
+      const icons = await networkPanel.$$('devtools-icon.warning');
 
       assert.lengthOf(icons, 0);
     });
@@ -216,17 +217,20 @@ describe('Overrides panel', function() {
 
       // File permission pop up
       const infoBar = await waitForAria('Select a folder to store override files in.');
+      // Allow time for infobar to animate in before clicking the button
+      await new Promise<void>(resolve => setTimeout(resolve, 550));
       await click('.infobar-main-row .infobar-button', {root: infoBar});
       await waitFor('[aria-label="coffees.json, file"]');
 
       await openNetworkTab();
       await setCacheDisabled(false);
       const networkPanel = await waitFor('.tabbed-pane-header-tab.selected');
-      const icons = await networkPanel.$$('.tabbed-pane-header-tab-icon');
-      const iconTitleElement = await icons[0].$('[title="Requests may be overridden locally, see the Sources panel"]');
+      const icons = await networkPanel.$$('devtools-icon.warning');
 
       assert.lengthOf(icons, 1);
-      assert.isNotNull(iconTitleElement);
+      assert.strictEqual(
+          'Requests may be overridden locally, see the Sources panel',
+          await icons[0].evaluate(icon => (icon as HTMLElement).title));
     });
 
     await step('no indicator after clearing overrides configuration', async () => {
@@ -237,7 +241,7 @@ describe('Overrides panel', function() {
       await openNetworkTab();
       await setCacheDisabled(false);
       const networkPanel = await waitFor('.tabbed-pane-header-tab.selected');
-      const icons = await networkPanel.$$('.tabbed-pane-header-tab-icon');
+      const icons = await networkPanel.$$('devtools-icon.warning');
 
       assert.lengthOf(icons, 0);
     });
@@ -251,11 +255,12 @@ describe('Overrides panel', function() {
       await openNetworkTab();
       await setCacheDisabled(false);
       const networkPanel = await waitFor('.tabbed-pane-header-tab.selected');
-      const icons = await networkPanel.$$('.tabbed-pane-header-tab-icon');
-      const iconTitleElement = await icons[0].$('[title="Requests may be overridden locally, see the Sources panel"]');
+      const icons = await networkPanel.$$('devtools-icon.warning');
 
       assert.lengthOf(icons, 1);
-      assert.isNotNull(iconTitleElement);
+      assert.strictEqual(
+          'Requests may be overridden locally, see the Sources panel',
+          await icons[0].evaluate(icon => (icon as HTMLElement).title));
     });
   });
 
@@ -299,6 +304,7 @@ describe('Overrides panel', function() {
 
     // File permission pop up
     const infoBar = await waitForAria('Select a folder to store override files in.');
+    await new Promise<void>(resolve => setTimeout(resolve, 550));
     await click('.infobar-main-row .infobar-button', {root: infoBar});
 
     // Open the file in the Sources panel
@@ -324,6 +330,8 @@ describe('Overrides panel', function() {
 
     // File permission pop up
     const infoBar = await waitForAria('Select a folder to store override files in.');
+    // Allow time for infobar to animate in before clicking the button
+    await new Promise<void>(resolve => setTimeout(resolve, 550));
     await click('.infobar-main-row .infobar-button', {root: infoBar});
 
     // Open the main folder in the Sources panel
@@ -348,6 +356,8 @@ describe('Overrides panel', function() {
 
     // File permission pop up
     const infoBar = await waitForAria('Select a folder to store override files in.');
+    // Allow time for infobar to animate in before clicking the button
+    await new Promise<void>(resolve => setTimeout(resolve, 550));
     await click('.infobar-main-row .infobar-button', {root: infoBar});
 
     // Open the sub folder in the Sources panel

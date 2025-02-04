@@ -98,6 +98,7 @@ export class PaintProfilerView extends Common.ObjectWrapper.eventMixin<EventType
 
   constructor(showImageCallback: (arg0?: string|undefined) => void) {
     super(true);
+    this.registerRequiredCSS(paintProfilerStyles);
 
     this.contentElement.classList.add('paint-profiler-overview');
     this.canvasContainer = this.contentElement.createChild('div', 'paint-profiler-canvas-container');
@@ -410,10 +411,6 @@ export class PaintProfilerView extends Common.ObjectWrapper.eventMixin<EventType
     this.profiles = null;
     this.selectionWindowInternal.reset();
     this.selectionWindowInternal.setResizeEnabled(false);
-  }
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([paintProfilerStyles]);
   }
 }
 

@@ -66,6 +66,7 @@ export class StartView extends UI.Widget.Widget {
 
   constructor(controller: LighthouseController, panel: LighthousePanel) {
     super(true /* useShadowDom */);
+    this.registerRequiredCSS(lighthouseStartViewStyles);
 
     this.controller = controller;
     this.panel = panel;
@@ -306,7 +307,6 @@ export class StartView extends UI.Widget.Widget {
   override wasShown(): void {
     super.wasShown();
     this.controller.recomputePageAuditability();
-    this.registerCSSFiles([lighthouseStartViewStyles]);
   }
 
   settingsToolbar(): UI.Toolbar.Toolbar {

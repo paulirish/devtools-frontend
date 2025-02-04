@@ -4,12 +4,12 @@
 
 import '../icon_button/icon_button.js';
 
-import * as LitHtml from '../../lit-html/lit-html.js';
+import * as Lit from '../../lit/lit.js';
 import * as VisualLogging from '../../visual_logging/visual_logging.js';
 
 import buttonStyles from './button.css.js';
 
-const {html, Directives: {ifDefined, ref, classMap}} = LitHtml;
+const {html, Directives: {ifDefined, ref, classMap}} = Lit;
 
 declare global {
   interface HTMLElementTagNameMap {
@@ -44,7 +44,6 @@ export const enum ToggleType {
 type ButtonType = 'button'|'submit'|'reset';
 
 interface ButtonState {
-  iconUrl?: string;
   variant: Variant;
   size?: Size;
   reducedFocusRing?: boolean;
@@ -66,7 +65,6 @@ interface ButtonState {
 
 interface CommonButtonData {
   variant: Variant;
-  iconUrl?: string;
   iconName?: string;
   toggledIconName?: string;
   toggleType?: ToggleType;
@@ -86,9 +84,6 @@ interface CommonButtonData {
 }
 
 export type ButtonData = CommonButtonData&(|{
-  variant: Variant.PRIMARY_TOOLBAR | Variant.TOOLBAR | Variant.ICON,
-  iconUrl: string,
-}|{
   variant: Variant.PRIMARY_TOOLBAR | Variant.TOOLBAR | Variant.ICON,
   iconName: string,
 }|{
@@ -116,12 +111,19 @@ export class Button extends HTMLElement {
     longClickable: false,
   };
   #internals = this.attachInternals();
-  #slotRef = LitHtml.Directives.createRef();
+  #slotRef = Lit.Directives.createRef();
 
   constructor() {
     super();
     this.setAttribute('role', 'presentation');
     this.addEventListener('click', this.#boundOnClick, true);
+  }
+
+  override cloneNode(deep?: boolean): Node {
+    const node = super.cloneNode(deep) as Button;
+    Object.assign(node.#props, this.#props);
+    node.#render();
+    return node;
   }
 
   /**
@@ -130,7 +132,6 @@ export class Button extends HTMLElement {
    */
   set data(data: ButtonData) {
     this.#props.variant = data.variant;
-    this.#props.iconUrl = data.iconUrl;
     this.#props.iconName = data.iconName;
     this.#props.toggledIconName = data.toggledIconName;
     this.#props.toggleOnClick = data.toggleOnClick !== undefined ? data.toggleOnClick : true;
@@ -154,11 +155,6 @@ export class Button extends HTMLElement {
     this.#props.title = data.title;
     this.#props.jslogContext = data.jslogContext;
     this.#props.longClickable = data.longClickable;
-    this.#render();
-  }
-
-  set iconUrl(iconUrl: string|undefined) {
-    this.#props.iconUrl = iconUrl;
     this.#render();
   }
 
@@ -264,7 +260,6 @@ export class Button extends HTMLElement {
   }
 
   connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [buttonStyles];
     this.#render();
   }
 
@@ -322,7 +317,7 @@ export class Button extends HTMLElement {
       throw new Error('Button requires a variant to be defined');
     }
     if (this.#isToolbarVariant()) {
-      if (!this.#props.iconUrl && !this.#props.iconName) {
+      if (!this.#props.iconName) {
         throw new Error('Toolbar button requires an icon');
       }
       if (!isEmpty) {
@@ -330,17 +325,14 @@ export class Button extends HTMLElement {
       }
     }
     if (this.#props.variant === Variant.ICON) {
-      if (!this.#props.iconUrl && !this.#props.iconName) {
+      if (!this.#props.iconName) {
         throw new Error('Icon button requires an icon');
       }
       if (!isEmpty) {
         throw new Error('Icon button does not accept children');
       }
     }
-    if (this.#props.iconName && this.#props.iconUrl) {
-      throw new Error('Both iconName and iconUrl are provided.');
-    }
-    const hasIcon = Boolean(this.#props.iconUrl) || Boolean(this.#props.iconName);
+    const hasIcon = Boolean(this.#props.iconName);
     const classes = {
       primary: this.#props.variant === Variant.PRIMARY,
       tonal: this.#props.variant === Variant.TONAL,
@@ -370,8 +362,9 @@ export class Button extends HTMLElement {
     const jslog =
         this.#props.jslogContext && VisualLogging.action().track({click: true}).context(this.#props.jslogContext);
     // clang-format off
-    LitHtml.render(
+    Lit.render(
       html`
+        <style>${buttonStyles.cssContent}</style>
         <button title=${ifDefined(this.#props.title)}
                 .disabled=${this.#props.disabled}
                 class=${classMap(classes)}
@@ -380,7 +373,7 @@ export class Button extends HTMLElement {
                 @keydown=${this.#onKeydown}
         >${hasIcon
             ? html`
-                <devtools-icon name=${ifDefined(this.#props.toggled ? this.#props.toggledIconName : this.#props.iconName || this.#props.iconUrl)}>
+                <devtools-icon name=${ifDefined(this.#props.toggled ? this.#props.toggledIconName : this.#props.iconName)}>
                 </devtools-icon>`
             : ''}
           ${this.#props.longClickable ? html`<devtools-icon name=${'triangle-bottom-right'} class="long-click"

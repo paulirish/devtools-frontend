@@ -63,6 +63,7 @@ export class EventSourceMessagesView extends UI.Widget.VBox {
 
   constructor(request: SDK.NetworkRequest.NetworkRequest) {
     super();
+    this.registerRequiredCSS(eventSourceMessagesViewStyles);
 
     this.element.classList.add('event-source-messages-view');
     this.element.setAttribute('jslog', `${VisualLogging.pane('event-stream').track({resize: true})}`);
@@ -111,8 +112,8 @@ export class EventSourceMessagesView extends UI.Widget.VBox {
   }
 
   override wasShown(): void {
+    super.wasShown();
     this.refresh();
-    this.registerCSSFiles([eventSourceMessagesViewStyles]);
     this.request.addEventListener(SDK.NetworkRequest.Events.EVENT_SOURCE_MESSAGE_ADDED, this.messageAdded, this);
   }
 

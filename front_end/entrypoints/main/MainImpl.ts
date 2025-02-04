@@ -32,8 +32,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import '../../ui/legacy/legacy.js';
-
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -57,12 +55,10 @@ import * as IconButton from '../../ui/components/icon_button/icon_button.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
-import * as LitHtml from '../../ui/lit-html/lit-html.js';
+import {html, render} from '../../ui/lit/lit.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {ExecutionContextSelector} from './ExecutionContextSelector.js';
-
-const {html, render} = LitHtml;
 
 const UIStrings = {
   /**
@@ -414,6 +410,8 @@ export class MainImpl {
       Root.Runtime.ExperimentName.NETWORK_PANEL_FILTER_BAR_REDESIGN,
       Root.Runtime.ExperimentName.FLOATING_ENTRY_POINTS_FOR_AI_ASSISTANCE,
       Root.Runtime.ExperimentName.TIMELINE_ALTERNATIVE_NAVIGATION,
+      Root.Runtime.ExperimentName.TIMELINE_THIRD_PARTY_DEPENDENCIES,
+      Root.Runtime.ExperimentName.TIMELINE_DIM_UNRELATED_EVENTS,
       ...(Root.Runtime.Runtime.queryParam('isChromeForTesting') ? ['protocol-monitor'] : []),
     ]);
 
@@ -894,6 +892,15 @@ export class MainMenuItem implements UI.Toolbar.Provider {
                            .variant=${Buttons.Button.Variant.ICON_TOGGLE}
                            @click=${setDockSide.bind(null, UI.DockController.DockState.UNDOCKED)}></devtools-button>
           <devtools-button class="toolbar-button"
+                           jslog=${VisualLogging.toggle().track({click: true}).context('current-dock-state-left')}
+                           title=${i18nString(UIStrings.dockToLeft)}
+                           .iconName=${'dock-left'}
+                           .toggled=${dockController.dockSide() === UI.DockController.DockState.LEFT}
+                           .toggledIconName=${'dock-left'}
+                           .toggleType=${Buttons.Button.ToggleType.PRIMARY}
+                           .variant=${Buttons.Button.Variant.ICON_TOGGLE}
+                           @click=${setDockSide.bind(null, UI.DockController.DockState.LEFT)}></devtools-button>
+          <devtools-button class="toolbar-button"
                            jslog=${VisualLogging.toggle().track({click: true}).context('current-dock-state-bottom')}
                            title=${i18nString(UIStrings.dockToBottom)}
                            .iconName=${'dock-bottom'}
@@ -911,15 +918,6 @@ export class MainMenuItem implements UI.Toolbar.Provider {
                            .toggleType=${Buttons.Button.ToggleType.PRIMARY}
                            .variant=${Buttons.Button.Variant.ICON_TOGGLE}
                            @click=${setDockSide.bind(null, UI.DockController.DockState.RIGHT)}></devtools-button>
-          <devtools-button class="toolbar-button"
-                           jslog=${VisualLogging.toggle().track({click: true}).context('current-dock-state-left')}
-                           title=${i18nString(UIStrings.dockToLeft)}
-                           .iconName=${'dock-left'}
-                           .toggled=${dockController.dockSide() === UI.DockController.DockState.LEFT}
-                           .toggledIconName=${'dock-left'}
-                           .toggleType=${Buttons.Button.ToggleType.PRIMARY}
-                           .variant=${Buttons.Button.Variant.ICON_TOGGLE}
-                           @click=${setDockSide.bind(null, UI.DockController.DockState.LEFT)}></devtools-button>
         </devtools-toolbar>
       `, dockItemElement, {host: this});
       // clang-format on

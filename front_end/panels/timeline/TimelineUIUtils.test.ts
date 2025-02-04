@@ -100,8 +100,8 @@ describeWithMockConnection('TimelineUIUtils', function() {
            name: Trace.Types.Events.Name.FUNCTION_CALL,
            ph: Trace.Types.Events.Phase.COMPLETE,
            cat: 'devtools-timeline',
-           dur: Trace.Types.Timing.MicroSeconds(100),
-           ts: Trace.Types.Timing.MicroSeconds(100),
+           dur: Trace.Types.Timing.Micro(100),
+           ts: Trace.Types.Timing.Micro(100),
            pid: Trace.Types.Events.ProcessID(1),
            tid: Trace.Types.Events.ThreadID(1),
            args: {
@@ -133,8 +133,8 @@ describeWithMockConnection('TimelineUIUtils', function() {
            name: Trace.Types.Events.Name.FUNCTION_CALL,
            ph: Trace.Types.Events.Phase.COMPLETE,
            cat: 'devtools-timeline',
-           dur: Trace.Types.Timing.MicroSeconds(100),
-           ts: Trace.Types.Timing.MicroSeconds(100),
+           dur: Trace.Types.Timing.Micro(100),
+           ts: Trace.Types.Timing.Micro(100),
            pid: Trace.Types.Events.ProcessID(1),
            tid: Trace.Types.Events.ThreadID(1),
            args: {
@@ -346,7 +346,7 @@ describeWithMockConnection('TimelineUIUtils', function() {
       // Round the time to 2DP to avoid needlessly long expectation numbers!
       const unadjustedStartTimeMilliseconds = Trace.Helpers.Timing
                                                   .microToMilli(
-                                                      Trace.Types.Timing.MicroSeconds(dclEvent.ts - traceMinBound),
+                                                      Trace.Types.Timing.Micro(dclEvent.ts - traceMinBound),
                                                       )
                                                   .toFixed(2);
       assert.strictEqual(unadjustedStartTimeMilliseconds, String(190.79));
@@ -1254,12 +1254,12 @@ describeWithMockConnection('TimelineUIUtils', function() {
 
     const rowData = getRowDataForDetailsElement(details)[2];
     assert.deepEqual(rowData, {
-      title: '3rd party entity',
+      title: 'Third party',
       value: 'Google Analytics',
     });
   });
 
-  it('can generate details for a frame', async function() {
+  it('can generate details for a frame with the old screenshots format', async function() {
     const {parsedTrace} = await TraceLoader.traceEngine(this, 'web-dev-with-commit.json.gz');
     const frame = parsedTrace.Frames.frames.at(0);
     if (!frame) {
@@ -1274,7 +1274,11 @@ describeWithMockConnection('TimelineUIUtils', function() {
     // Give the image element time to render and load.
     await doubleRaf();
     const img = container.querySelector<HTMLImageElement>('.timeline-filmstrip-preview img');
-    assert.isTrue(img?.currentSrc.includes(filmStrip.frames[0].screenshotEvent.args.dataUri));
+    assert.isOk(img);
+    const filmStripFrame = filmStrip.frames[0];
+    assert.isTrue(
+        Trace.Types.Events.isLegacySyntheticScreenshot(filmStripFrame.screenshotEvent) &&
+        img.currentSrc.includes(filmStripFrame.screenshotEvent.args.dataUri));
 
     const durationRow = container.querySelector<HTMLElement>('[data-row-title="Duration"]');
     const durationValue = durationRow?.querySelector<HTMLSpanElement>('.timeline-details-view-row-value span');
@@ -1285,6 +1289,39 @@ describeWithMockConnection('TimelineUIUtils', function() {
     // assertions.
     const value = (durationValue.innerText.replaceAll(/\s/g, ' '));
     assert.strictEqual(value, '37.85 ms (at 109.82 ms)');
+  });
+
+  it('can generate details for a frame with the new screenshots format', async function() {
+    const {parsedTrace} = await TraceLoader.traceEngine(this, 'web-dev-screenshot-source-ids.json.gz');
+    const frame = parsedTrace.Frames.frames.at(0);
+    if (!frame) {
+      throw new Error('Could not find expected frame');
+    }
+    const filmStrip = Trace.Extras.FilmStrip.fromParsedTrace(parsedTrace);
+    const details =
+        Timeline.TimelineUIUtils.TimelineUIUtils.generateDetailsContentForFrame(frame, filmStrip, filmStrip.frames[0]);
+    const container = document.createElement('div');
+    renderElementIntoDOM(container);
+    container.appendChild(details);
+    // Give the image element time to render and load.
+    await doubleRaf();
+    const img = container.querySelector<HTMLImageElement>('.timeline-filmstrip-preview img');
+    assert.isOk(img);
+    const filmStripFrame = filmStrip.frames[0];
+    assert.isTrue(
+        Trace.Types.Events.isScreenshot(filmStripFrame.screenshotEvent) &&
+        img.currentSrc.includes(
+            Trace.Handlers.ModelHandlers.Screenshots.screenshotImageDataUri(filmStripFrame.screenshotEvent)));
+
+    const durationRow = container.querySelector<HTMLElement>('[data-row-title="Duration"]');
+    const durationValue = durationRow?.querySelector<HTMLSpanElement>('.timeline-details-view-row-value span');
+    if (!durationValue) {
+      throw new Error('Could not find duration');
+    }
+    // Strip the unicode spaces out and replace with simple spaces for easy
+    // assertions.
+    const value = (durationValue.innerText.replaceAll(/\s/g, ' '));
+    assert.strictEqual(value, '208.33 ms (at 1.53 s)');
   });
 
   describe('eventTitle', function() {
@@ -1335,8 +1372,8 @@ describeWithMockConnection('TimelineUIUtils', function() {
     it('correctly aggregates up stats', async () => {
       const mainThread = Trace.Types.Events.ThreadID(1);
       const pid = Trace.Types.Events.ProcessID(100);
-      function microsec(x: number): Trace.Types.Timing.MicroSeconds {
-        return Trace.Types.Timing.MicroSeconds(x);
+      function microsec(x: number): Trace.Types.Timing.Micro {
+        return Trace.Types.Timing.Micro(x);
       }
 
       const events: Trace.Types.Events.Event[] = [
@@ -1455,8 +1492,8 @@ describeWithMockConnection('TimelineUIUtils', function() {
 
       const rangeStats101To103 = Timeline.TimelineUIUtils.TimelineUIUtils.statsForTimeRange(
           events,
-          Trace.Types.Timing.MilliSeconds(101),
-          Trace.Types.Timing.MilliSeconds(103),
+          Trace.Types.Timing.Milli(101),
+          Trace.Types.Timing.Milli(103),
       );
       assert.deepEqual(rangeStats101To103, {
         other: 1,
@@ -1466,8 +1503,8 @@ describeWithMockConnection('TimelineUIUtils', function() {
       });
       const rangeStats104To109 = Timeline.TimelineUIUtils.TimelineUIUtils.statsForTimeRange(
           events,
-          Trace.Types.Timing.MilliSeconds(104),
-          Trace.Types.Timing.MilliSeconds(109),
+          Trace.Types.Timing.Milli(104),
+          Trace.Types.Timing.Milli(109),
       );
       assert.deepEqual(rangeStats104To109, {
         other: 2,

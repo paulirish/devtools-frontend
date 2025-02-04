@@ -86,6 +86,7 @@ export class ProfileLauncherView extends Common.ObjectWrapper.eventMixin<EventTy
 
   constructor(profilesPanel: ProfilesPanel) {
     super();
+    this.registerRequiredCSS(profileLauncherViewStyles);
 
     this.panel = profilesPanel;
     this.element.classList.add('profile-launcher-view');
@@ -226,10 +227,6 @@ export class ProfileLauncherView extends Common.ObjectWrapper.eventMixin<EventTy
     this.isEnabled = profileType.isEnabled();
     this.updateControls();
     this.selectedProfileTypeSetting.set(profileType.id);
-  }
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([profileLauncherViewStyles]);
   }
 }
 

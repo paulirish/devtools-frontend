@@ -16,15 +16,13 @@ import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
 import * as SourceFrame from '../../ui/legacy/components/source_frame/source_frame.js';
 import * as UI from '../../ui/legacy/legacy.js';
-import * as LitHtml from '../../ui/lit-html/lit-html.js';
+import {html, render} from '../../ui/lit/lit.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {type Command, Events as JSONEditorEvents, JSONEditor, type Parameter} from './JSONEditor.js';
 import protocolMonitorStyles from './protocolMonitor.css.js';
 
-const {widgetRef} = UI.Widget;
-const {render, html} = LitHtml;
-
+const {widgetConfig} = UI.Widget;
 const UIStrings = {
   /**
    *@description Text for one or a group of functions
@@ -86,6 +84,10 @@ const UIStrings = {
    *@description Text in Protocol Monitor of the Protocol Monitor tab
    */
   noMessageSelected: 'No message selected',
+  /**
+   *@description Text in Protocol Monitor of the Protocol Monitor tab if no message is selected
+   */
+  selectAMessageToView: 'Select a message to see its details',
   /**
    *@description Text in Protocol Monitor for the save button
    */
@@ -174,6 +176,7 @@ export interface ProtocolDomain {
 
 export interface ViewInput {
   messages: Message[];
+  selectedMessage?: Message;
   filters: TextUtils.TextUtils.ParsedFilter[];
   onRecord: (e: Event) => void;
   onClear: () => void;
@@ -186,9 +189,7 @@ export interface ViewInput {
   selector: UI.Toolbar.ToolbarComboBox;
 }
 
-export interface ViewOutput {
-  infoWidget: InfoWidget;
-}
+export interface ViewOutput {}
 
 export type View = (input: ViewInput, output: ViewOutput, target: HTMLElement) => void;
 
@@ -197,7 +198,6 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
   private started: boolean;
   private startTime: number;
   private readonly messageForId = new Map<number, Message>();
-  private infoWidget!: InfoWidget;
   private readonly filterParser: TextUtils.TextUtils.FilterParser;
   private readonly suggestionBuilder: UI.FilterSuggestionBuilder.FilterSuggestionBuilder;
   private readonly textFilterUI: UI.Toolbar.ToolbarInput;
@@ -208,6 +208,7 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
   #showHideSidebarButton: UI.Toolbar.ToolbarButton;
   #view: View;
   #messages: Message[] = [];
+  #selectedMessage: Message|undefined;
   #filters: TextUtils.TextUtils.ParsedFilter[] = [];
   #splitWidget: UI.SplitWidget.SplitWidget;
   constructor(splitWidget: UI.SplitWidget.SplitWidget, view: View = (input, output, target) => {
@@ -240,7 +241,8 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
                 secondIsSidebar: true,
                 settingName: 'protocol-monitor-panel-split',
               defaultSidebarWidth: 250}}>
-              <devtools-new-data-grid
+              <devtools-data-grid
+                  striped
                   slot="main"
                   @select=${input.onSelect}
                   @contextmenu=${input.onContextMenu}
@@ -277,21 +279,26 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
                                 message.error ? html`<code>${JSON.stringify(message.error)}</code>` :
                                                 '(pending)'}
                         </td>
-                        <td>
+                        <td data-value=${message.elapsedTime || 0}>
                           ${!('id' in message)  ? '' :
                             message.elapsedTime ? i18nString(UIStrings.sMs, {PH1: String(message.elapsedTime)})
                                                 : '(pending)'}
                         </td>
-                        <td>${i18nString(UIStrings.sMs, {PH1: String(message.requestTime)})}</td>
+                        <td data-value=${message.requestTime}>${i18nString(UIStrings.sMs, {PH1: String(message.requestTime)})}</td>
                         <td>${this.targetToString(message.target)}</td>
                         <td>${message.sessionId || ''}</td>
                       </tr>`)}
                   </table>
-              </devtools-new-data-grid>
-              <devtools-widget .widgetClass=${InfoWidget}
-                   class="protocol-monitor-info"
-                   ${widgetRef(InfoWidget, e => { output.infoWidget = e; })}
-                   slot="sidebar"></devtools-widget>
+              </devtools-data-grid>
+              <devtools-widget .widgetConfig=${widgetConfig(InfoWidget, {
+                    request: input.selectedMessage?.params,
+                    response: input.selectedMessage?.result || input.selectedMessage?.error,
+                    type: !input.selectedMessage           ? undefined :
+                          ('id' in input?.selectedMessage) ? 'sent'
+                                                           : 'received',
+                  })}
+                  class="protocol-monitor-info"
+                  slot="sidebar"></devtools-widget>
             </devtools-split-widget>
             <devtools-toolbar class="protocol-monitor-bottom-toolbar"
                jslog=${VisualLogging.toolbar('bottom')}>
@@ -300,7 +307,7 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
               ${input.selector.element}
             </devtools-toolbar>`,
         target,
-        {host: input},  // eslint-disable-line rulesdir/lit-html-host-this
+        {host: input}
     );
     // clang-format on
   }) {
@@ -371,6 +378,7 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
   override performUpdate(): void {
     const viewInput = {
       messages: this.#messages,
+      selectedMessage: this.#selectedMessage,
       filters: this.#filters,
       onRecord: (e: Event) => {
         this.setRecording((e.target as Buttons.Button.Button).toggled);
@@ -378,7 +386,6 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
       onClear: () => {
         this.#messages = [];
         this.messageForId.clear();
-        this.infoWidget.render(null);
         this.requestUpdate();
       },
       onSave: () => {
@@ -386,18 +393,8 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
       },
       onSelect: (e: CustomEvent<HTMLElement|null>) => {
         const index = parseInt(e.detail?.dataset?.index ?? '', 10);
-        const message = index && this.#messages[index];
-        if (message) {
-          this.infoWidget.render({
-            request: message.params,
-            response: message.result || message.error,
-            targetId: message.target?.id(),
-            type: ('id' in message) ? 'sent' : 'received',
-            selectedTab: undefined,
-          });
-        } else {
-          this.infoWidget.render(null);
-        }
+        this.#selectedMessage = index ? this.#messages[index] : undefined;
+        this.requestUpdate();
       },
       onContextMenu: (e: CustomEvent<{menu: UI.ContextMenu.ContextMenu, element: HTMLElement}>) => {
         const message = this.#messages[parseInt(e.detail?.element?.dataset?.index || '', 10)];
@@ -410,14 +407,7 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
       commandInput: this.#commandInput,
       selector: this.selector,
     };
-    const that = this;
-    const viewOutput = {
-      set infoWidget(infoWidget: InfoWidget) {
-        if (infoWidget) {
-          that.infoWidget = infoWidget;
-        }
-      }
-    };
+    const viewOutput = {};
     this.#view(viewInput, viewOutput, this.contentElement);
   }
 
@@ -427,8 +417,11 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
      * taken to the CDP editor with the filled with the selected command.
      */
     menu.editSection().appendItem(i18nString(UIStrings.editAndResend), () => {
-      const parameters = this.infoWidget.request as {[x: string]: unknown};
-      const targetId = this.infoWidget.targetId;
+      if (!this.#selectedMessage) {
+        return;
+      }
+      const parameters = this.#selectedMessage.params as {[x: string]: unknown};
+      const targetId = this.#selectedMessage.target?.id() || '';
       const command = message.method;
       if (this.#splitWidget.showMode() === UI.SplitWidget.ShowMode.ONLY_MAIN) {
         this.#splitWidget.toggleSidebar();
@@ -514,7 +507,7 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
     if (this.started) {
       return;
     }
-    this.registerCSSFiles([protocolMonitorStyles]);
+    this.registerRequiredCSS(protocolMonitorStyles);
     this.started = true;
     this.startTime = Date.now();
     this.setRecording(true);
@@ -672,7 +665,9 @@ export class CommandAutocompleteSuggestionProvider {
 export class InfoWidget extends UI.Widget.VBox {
   private readonly tabbedPane: UI.TabbedPane.TabbedPane;
   request: {[x: string]: unknown}|undefined;
-  targetId = '';
+  response: {[x: string]: unknown}|undefined;
+  type: 'sent'|'received'|undefined;
+  selectedTab: 'request'|'response'|undefined;
   constructor(element: HTMLElement) {
     super(undefined, undefined, element);
     this.tabbedPane = new UI.TabbedPane.TabbedPane();
@@ -681,35 +676,31 @@ export class InfoWidget extends UI.Widget.VBox {
     this.tabbedPane.show(this.contentElement);
     this.tabbedPane.selectTab('response');
     this.request = {};
-    this.render(null);
   }
 
-  render(data: {
-    request: Object|undefined,
-    response: Object|undefined,
-    targetId: string|undefined,
-    type: 'sent'|'received'|undefined,
-    selectedTab: 'request'|'response'|undefined,
-  }|null): void {
-    if (!data) {
+  override performUpdate(): void {
+    if (!this.request && !this.response) {
       this.tabbedPane.changeTabView(
-          'request', new UI.EmptyWidget.EmptyWidget(i18nString(UIStrings.noMessageSelected), ''));
+          'request',
+          new UI.EmptyWidget.EmptyWidget(
+              i18nString(UIStrings.noMessageSelected), i18nString(UIStrings.selectAMessageToView)));
       this.tabbedPane.changeTabView(
-          'response', new UI.EmptyWidget.EmptyWidget(i18nString(UIStrings.noMessageSelected), ''));
+          'response',
+          new UI.EmptyWidget.EmptyWidget(
+              i18nString(UIStrings.noMessageSelected), i18nString(UIStrings.selectAMessageToView)));
       return;
     }
 
-    const requestEnabled = data && data.type && data.type === 'sent';
+    const requestEnabled = this.type && this.type === 'sent';
     this.tabbedPane.setTabEnabled('request', Boolean(requestEnabled));
     if (!requestEnabled) {
       this.tabbedPane.selectTab('response');
     }
 
-    this.request = data.request as {[x: string]: unknown} | undefined;
-    this.tabbedPane.changeTabView('request', SourceFrame.JSONView.JSONView.createViewSync(data.request || null));
-    this.tabbedPane.changeTabView('response', SourceFrame.JSONView.JSONView.createViewSync(data.response || null));
-    if (data.selectedTab) {
-      this.tabbedPane.selectTab(data.selectedTab);
+    this.tabbedPane.changeTabView('request', SourceFrame.JSONView.JSONView.createViewSync(this.request || null));
+    this.tabbedPane.changeTabView('response', SourceFrame.JSONView.JSONView.createViewSync(this.response || null));
+    if (this.selectedTab) {
+      this.tabbedPane.selectTab(this.selectedTab);
     }
   }
 }

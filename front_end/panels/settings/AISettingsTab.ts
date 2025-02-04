@@ -13,12 +13,16 @@ import * as Input from '../../ui/components/input/input.js';
 import * as LegacyWrapper from '../../ui/components/legacy_wrapper/legacy_wrapper.js';
 import * as Switch from '../../ui/components/switch/switch.js';
 import * as UI from '../../ui/legacy/legacy.js';
-import * as LitHtml from '../../ui/lit-html/lit-html.js';
+import * as Lit from '../../ui/lit/lit.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
-import aiSettingsTabStyles from './aiSettingsTab.css.js';
+import aiSettingsTabStylesRaw from './aiSettingsTab.css.js';
 
-const {html, Directives: {ifDefined, classMap}} = LitHtml;
+// TODO(crbug.com/391381439): Fully migrate off of constructed style sheets.
+const aiSettingsTabStyles = new CSSStyleSheet();
+aiSettingsTabStyles.replaceSync(aiSettingsTabStylesRaw.cssContent);
+
+const {html, Directives: {ifDefined, classMap}} = Lit;
 
 const UIStrings = {
   /**
@@ -84,6 +88,11 @@ const UIStrings = {
   consoleInsightsSendsData:
       'The console message, associated stack trace, related source code, and the associated network headers are sent to Google to generate explanations. This data may be seen by human reviewers to improve this feature.',
   /**
+   *@description Explainer for which data is being sent by the console insights feature
+   */
+  consoleInsightsSendsDataNoLogging:
+      'The console message, associated stack trace, related source code, and the associated network headers are sent to Google to generate explanations. This data will not be used to improve Google’s AI models.',
+  /**
    *@description Reference to the terms of service and privacy notice
    *@example {Google Terms of Service} PH1
    *@example {Privacy Notice} PH2
@@ -137,6 +146,11 @@ const UIStrings = {
   freestylerSendsData:
       'Any data the inspected page can access via Web APIs, network requests, files, and performance traces are sent to Google to generate explanations. This data may be seen by human reviewers to improve this feature. Don’t use on pages with personal or sensitive information.',
   /**
+   *@description Explainer for which data is being sent by the AI assistance feature
+   */
+  freestylerSendsDataNoLogging:
+      'Any data the inspected page can access via Web APIs, network requests, files, and performance traces are sent to Google to generate explanations. This data will not be used to improve Google’s AI models.',
+  /**
    *@description Label for a link to the terms of service
    */
   termsOfService: 'Google Terms of Service',
@@ -167,9 +181,6 @@ const UIStrings = {
 };
 const str_ = i18n.i18n.registerUIStrings('panels/settings/AISettingsTab.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
-
-const chevronDownIconUrl = new URL('../../Images/chevron-down.svg', import.meta.url).toString();
-const chevronUpIconUrl = new URL('../../Images/chevron-up.svg', import.meta.url).toString();
 
 export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponent {
   readonly #shadow = this.attachShadow({mode: 'open'});
@@ -306,8 +317,8 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
     void this.render();
   }
 
-  #renderSharedDisclaimerItem(icon: string, text: Common.UIString.LocalizedString|LitHtml.TemplateResult):
-      LitHtml.TemplateResult {
+  #renderSharedDisclaimerItem(icon: string, text: Common.UIString.LocalizedString|Lit.TemplateResult):
+      Lit.TemplateResult {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     return html`
@@ -325,7 +336,7 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
     // clang-format on
   }
 
-  #renderSharedDisclaimer(): LitHtml.TemplateResult {
+  #renderSharedDisclaimer(): Lit.TemplateResult {
     const tosLink = UI.XLink.XLink.create(
         'https://policies.google.com/terms', i18nString(UIStrings.termsOfService), undefined, undefined,
         'terms-of-service');
@@ -364,7 +375,7 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
     `;
   }
 
-  #renderSettingItem(icon: string, text: Common.UIString.LocalizedString): LitHtml.TemplateResult {
+  #renderSettingItem(icon: string, text: Common.UIString.LocalizedString): Lit.TemplateResult {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     return html`
@@ -405,7 +416,7 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
     return reasons;
   }
 
-  #renderConsoleInsightsSetting(disabledReasons: string[]): LitHtml.TemplateResult {
+  #renderConsoleInsightsSetting(disabledReasons: string[]): Lit.TemplateResult {
     const isDisabled = disabledReasons.length > 0;
     const disabledReasonsJoined = disabledReasons.join('\n') || undefined;
     const detailsClasses = {
@@ -413,6 +424,8 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
       open: this.#isConsoleInsightsSettingExpanded,
     };
     const tabindex = this.#isConsoleInsightsSettingExpanded ? '0' : '-1';
+    const noLogging = Common.Settings.Settings.instance().getHostConfig().aidaAvailability?.enterprisePolicyValue ===
+        Root.Runtime.GenAiEnterprisePolicyValue.ALLOW_WITHOUT_LOGGING;
 
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
@@ -430,7 +443,7 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
             .data=${{
               title: this.#isConsoleInsightsSettingExpanded ? i18nString(UIStrings.showLess) : i18nString(UIStrings.showMore),
               size: Buttons.Button.Size.SMALL,
-              iconUrl: this.#isConsoleInsightsSettingExpanded ? chevronUpIconUrl : chevronDownIconUrl,
+              iconName: this.#isConsoleInsightsSettingExpanded ? 'chevron-up' : 'chevron-down',
               variant: Buttons.Button.Variant.ICON,
               jslogContext: 'console-insights.accordion',
             } as Buttons.Button.ButtonData}
@@ -457,7 +470,7 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
             ${this.#renderSettingItem('lightbulb', i18nString(UIStrings.explainConsole))}
             ${this.#renderSettingItem('code', i18nString(UIStrings.receiveSuggestions))}
             <h3 class="expansion-grid-whole-row">${i18nString(UIStrings.thingsToConsider)}</h3>
-            ${this.#renderSettingItem('google', i18nString(UIStrings.consoleInsightsSendsData))}
+            ${this.#renderSettingItem('google', noLogging ? i18nString(UIStrings.consoleInsightsSendsDataNoLogging) : i18nString(UIStrings.consoleInsightsSendsData))}
             <div class="expansion-grid-whole-row">
               <x-link
                 href="https://goo.gle/devtools-console-messages-ai"
@@ -475,7 +488,7 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
     // clang-format on
   }
 
-  #renderAiAssistanceSetting(disabledReasons: string[]): LitHtml.TemplateResult {
+  #renderAiAssistanceSetting(disabledReasons: string[]): Lit.TemplateResult {
     const isDisabled = disabledReasons.length > 0;
     const disabledReasonsJoined = disabledReasons.join('\n') || undefined;
     const detailsClasses = {
@@ -483,6 +496,8 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
       open: this.#isAiAssistanceSettingExpanded,
     };
     const tabindex = this.#isAiAssistanceSettingExpanded ? '0' : '-1';
+    const noLogging = Common.Settings.Settings.instance().getHostConfig().aidaAvailability?.enterprisePolicyValue ===
+        Root.Runtime.GenAiEnterprisePolicyValue.ALLOW_WITHOUT_LOGGING;
 
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
@@ -500,7 +515,7 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
             .data=${{
               title: this.#isAiAssistanceSettingExpanded ? i18nString(UIStrings.showLess) : i18nString(UIStrings.showMore),
               size: Buttons.Button.Size.SMALL,
-              iconUrl: this.#isAiAssistanceSettingExpanded ? chevronUpIconUrl : chevronDownIconUrl,
+              iconName: this.#isAiAssistanceSettingExpanded ? 'chevron-up' : 'chevron-down',
               variant: Buttons.Button.Variant.ICON,
               jslogContext: 'freestyler.accordion',
             } as Buttons.Button.ButtonData}
@@ -527,7 +542,7 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
             ${this.#renderSettingItem('info', this.#getAiAssistanceSettingInfo())}
             ${this.#renderSettingItem('pen-spark', i18nString(UIStrings.receiveStylingSuggestions))}
             <h3 class="expansion-grid-whole-row">${i18nString(UIStrings.thingsToConsider)}</h3>
-            ${this.#renderSettingItem('google', i18nString(UIStrings.freestylerSendsData))}
+            ${this.#renderSettingItem('google', noLogging ? i18nString(UIStrings.freestylerSendsDataNoLogging) : i18nString(UIStrings.freestylerSendsData))}
             <div class="expansion-grid-whole-row">
               <x-link
                 href="https://goo.gle/devtools-ai-assistance"
@@ -545,7 +560,7 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
     // clang-format on
   }
 
-  #renderDisabledExplainer(disabledReasons: string[]): LitHtml.LitTemplate {
+  #renderDisabledExplainer(disabledReasons: string[]): Lit.LitTemplate {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     return html`
@@ -572,16 +587,16 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
 
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
-    LitHtml.render(html`
+    Lit.render(html`
       <div class="settings-container-wrapper" jslog=${VisualLogging.pane('chrome-ai')}>
         ${this.#renderSharedDisclaimer()}
         ${this.#consoleInsightsSetting || this.#aiAssistanceSetting ? html`
-          ${disabledReasons.length ? this.#renderDisabledExplainer(disabledReasons) : LitHtml.nothing}
+          ${disabledReasons.length ? this.#renderDisabledExplainer(disabledReasons) : Lit.nothing}
           <div class="settings-container">
-            ${this.#consoleInsightsSetting ? this.#renderConsoleInsightsSetting(disabledReasons) : LitHtml.nothing}
-            ${this.#aiAssistanceSetting ? this.#renderAiAssistanceSetting(disabledReasons) : LitHtml.nothing}
+            ${this.#consoleInsightsSetting ? this.#renderConsoleInsightsSetting(disabledReasons) : Lit.nothing}
+            ${this.#aiAssistanceSetting ? this.#renderAiAssistanceSetting(disabledReasons) : Lit.nothing}
           </div>
-        ` : LitHtml.nothing}
+        ` : Lit.nothing}
       </div>
     `, this.#shadow, {host: this});
     // clang-format on

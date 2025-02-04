@@ -137,6 +137,7 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
 
   constructor(layerViewHost: LayerViewHost) {
     super(true);
+    this.registerRequiredCSS(layers3DViewStyles);
     this.element.setAttribute('jslog', `${VisualLogging.pane('layers-3d-view')}`);
 
     this.contentElement.classList.add('layers-3d-view');
@@ -211,7 +212,6 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
 
   override wasShown(): void {
     this.textureManager.resume();
-    this.registerCSSFiles([layers3DViewStyles]);
     if (!this.needsUpdate) {
       return;
     }

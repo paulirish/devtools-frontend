@@ -80,15 +80,12 @@ export class ImagePreview {
       }|undefined = {precomputedFeatures: undefined, imageAltText: undefined, align: Align.CENTER}):
       Promise<Element|null> {
     const {precomputedFeatures, imageAltText, align} = options;
-    const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
-    if (!resourceTreeModel) {
-      return null;
-    }
-    let resource = resourceTreeModel.resourceForURL(originalImageURL);
+
+    let resource = SDK.ResourceTreeModel.ResourceTreeModel.resourceForURL(originalImageURL);
     let imageURL = originalImageURL;
     if (!isImageResource(resource) && precomputedFeatures && precomputedFeatures.currentSrc) {
       imageURL = precomputedFeatures.currentSrc;
-      resource = resourceTreeModel.resourceForURL(imageURL);
+      resource = SDK.ResourceTreeModel.ResourceTreeModel.resourceForURL(imageURL);
     }
     if (!resource || !isImageResource(resource)) {
       return null;
@@ -115,7 +112,7 @@ export class ImagePreview {
       function buildContent(): void {
         const shadowBoundary = document.createElement('div');
         const shadowRoot = shadowBoundary.attachShadow({mode: 'open'});
-        shadowRoot.adoptedStyleSheets = [imagePreviewStyles];
+        shadowRoot.createChild('style').textContent = imagePreviewStyles.cssContent;
         const container = shadowRoot.createChild('table');
         container.className = 'image-preview-container';
 

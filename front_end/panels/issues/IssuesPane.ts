@@ -184,6 +184,7 @@ export class IssuesPane extends UI.Widget.VBox {
 
   constructor() {
     super(true);
+    this.registerRequiredCSS(issuesPaneStyles);
 
     this.element.setAttribute('jslog', `${VisualLogging.panel('issues')}`);
 
@@ -200,6 +201,7 @@ export class IssuesPane extends UI.Widget.VBox {
 
     this.#issuesTree.setShowSelectionOnKeyboardFocus(true);
     this.#issuesTree.contentElement.classList.add('issues');
+    this.#issuesTree.registerRequiredCSS(issuesTreeStyles);
     this.contentElement.appendChild(this.#issuesTree.element);
 
     this.#hiddenIssuesRow = new HiddenIssuesRow();
@@ -471,11 +473,5 @@ export class IssuesPane extends UI.Widget.VBox {
       issueView.reveal();
       issueView.select(false, true);
     }
-  }
-
-  override wasShown(): void {
-    super.wasShown();
-    this.#issuesTree.registerCSSFiles([issuesTreeStyles]);
-    this.registerCSSFiles([issuesPaneStyles]);
   }
 }

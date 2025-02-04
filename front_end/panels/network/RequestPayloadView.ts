@@ -47,6 +47,7 @@ import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import requestPayloadTreeStyles from './requestPayloadTree.css.js';
 import requestPayloadViewStyles from './requestPayloadView.css.js';
+
 const UIStrings = {
   /**
    *@description A context menu item Payload View of the Network panel to copy a parsed value.
@@ -129,6 +130,7 @@ export class RequestPayloadView extends UI.Widget.VBox {
 
   constructor(request: SDK.NetworkRequest.NetworkRequest) {
     super();
+    this.registerRequiredCSS(requestPayloadViewStyles);
     this.element.classList.add('request-payload-view');
     this.element.setAttribute('jslog', `${VisualLogging.pane('payload').track({resize: true})}`);
 
@@ -141,7 +143,7 @@ export class RequestPayloadView extends UI.Widget.VBox {
     }
 
     const root = new UI.TreeOutline.TreeOutlineInShadow();
-    root.registerCSSFiles([objectValueStyles, objectPropertiesSectionStyles, requestPayloadTreeStyles]);
+    root.registerRequiredCSS(objectValueStyles, objectPropertiesSectionStyles, requestPayloadTreeStyles);
     root.element.classList.add('request-payload-tree');
     root.makeDense();
     this.element.appendChild(root.element);
@@ -152,7 +154,7 @@ export class RequestPayloadView extends UI.Widget.VBox {
   }
 
   override wasShown(): void {
-    this.registerCSSFiles([requestPayloadViewStyles]);
+    super.wasShown();
     this.request.addEventListener(SDK.NetworkRequest.Events.REQUEST_HEADERS_CHANGED, this.refreshFormData, this);
 
     this.refreshQueryString();

@@ -7,12 +7,10 @@ import '../icon_button/icon_button.js';
 import * as Common from '../../../core/common/common.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as IssuesManager from '../../../models/issues_manager/issues_manager.js';
-import * as LitHtml from '../../lit-html/lit-html.js';
+import {html, render} from '../../lit/lit.js';
 import type * as IconButton from '../icon_button/icon_button.js';
 
 import issueCounterStyles from './issueCounter.css.js';
-
-const {html} = LitHtml;
 
 const UIStrings = {
   /**
@@ -118,10 +116,6 @@ export class IssueCounter extends HTMLElement {
     }
   }
 
-  connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [issueCounterStyles];
-  }
-
   set data(data: IssueCounterData) {
     this.#clickHandler = data.clickHandler;
     this.#leadingText = data.leadingText ?? '';
@@ -205,8 +199,9 @@ export class IssueCounter extends HTMLElement {
       accessibleName: this.#accessibleName,
       compact: this.#compact,
     };
-    LitHtml.render(
+    render(
         html`
+        <style>${issueCounterStyles.cssContent}</style>
         <icon-button .data=${data} .accessibleName=${this.#accessibleName}></icon-button>
         `,
         this.#shadow, {host: this});

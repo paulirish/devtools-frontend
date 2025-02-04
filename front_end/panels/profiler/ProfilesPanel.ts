@@ -103,6 +103,7 @@ export class ProfilesPanel extends UI.Panel.PanelWithSidebar implements DataDisp
   constructor(name: string, profileTypes: ProfileType[], recordingActionId: string) {
     super(name);
     this.profileTypes = profileTypes;
+    this.registerRequiredCSS(objectValueStyles, profilesPanelStyles, heapProfilerStyles);
 
     const mainContainer = new UI.Widget.VBox();
     this.splitWidget().setMainWidget(mainContainer);
@@ -110,7 +111,7 @@ export class ProfilesPanel extends UI.Panel.PanelWithSidebar implements DataDisp
     this.profilesItemTreeElement = new ProfilesSidebarTreeElement(this);
 
     this.sidebarTree = new UI.TreeOutline.TreeOutlineInShadow();
-
+    this.sidebarTree.registerRequiredCSS(profilesSidebarTreeStyles);
     this.sidebarTree.element.classList.add('profiles-sidebar-tree-box');
     this.panelSidebarElement().appendChild(this.sidebarTree.element);
 
@@ -460,8 +461,6 @@ export class ProfilesPanel extends UI.Panel.PanelWithSidebar implements DataDisp
   override wasShown(): void {
     super.wasShown();
     UI.Context.Context.instance().setFlavor(ProfilesPanel, this);
-    this.registerCSSFiles([objectValueStyles, profilesPanelStyles, heapProfilerStyles]);
-    this.sidebarTree.registerCSSFiles([profilesSidebarTreeStyles]);
   }
 
   override willHide(): void {

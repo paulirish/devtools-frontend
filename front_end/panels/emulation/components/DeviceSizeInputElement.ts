@@ -5,10 +5,8 @@
 import type * as Platform from '../../../core/platform/platform.js';
 import * as EmulationModel from '../../../models/emulation/emulation.js';
 import * as UILegacy from '../../../ui/legacy/legacy.js';
-import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import {html, render} from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
-
-const {html} = LitHtml;
 
 class SizeChangedEvent extends Event {
   static readonly eventName = 'sizechanged';
@@ -55,13 +53,12 @@ export class SizeInputElement extends HTMLElement {
   }
 
   render(): void {
-    LitHtml.render(
+    render(
         // Since the emulation code runs in a different frame, we can't
         // use constructed stylesheets (they are disallowed cross-frame).
         // For now, use an inline style tag and later we can refactor this
         // to use proper constructed stylesheets, when the code runs
         // in the correct frame context.
-        // eslint-disable-next-line rulesdir/no-style-tags-in-lit-html
         html`
       <style>
         input {

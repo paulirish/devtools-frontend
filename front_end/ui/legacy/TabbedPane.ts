@@ -40,7 +40,7 @@ import * as IconButton from '../components/icon_button/icon_button.js';
 import * as ARIAUtils from './ARIAUtils.js';
 import {ContextMenu} from './ContextMenu.js';
 import {Constraints, Size} from './Geometry.js';
-import tabbedPaneStyles from './tabbedPane.css.legacy.js';
+import tabbedPaneStyles from './tabbedPane.css.js';
 import type {Toolbar} from './Toolbar.js';
 import {Tooltip} from './Tooltip.js';
 import {installDragHandle, invokeOnceAfterBatchUpdate} from './UIUtils.js';
@@ -429,6 +429,14 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.updateTabElements();
   }
 
+  setTrailingTabIcon(id: string, icon: IconButton.Icon.Icon|null): void {
+    const tab = this.tabsById.get(id);
+    if (!tab) {
+      return;
+    }
+    tab.setSuffixElement(icon);
+  }
+
   setSuffixElement(id: string, suffixElement: HTMLElement|null): void {
     const tab = this.tabsById.get(id);
     if (!tab) {
@@ -436,6 +444,13 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
     }
     tab.setSuffixElement(suffixElement);
     this.updateTabElements();
+  }
+
+  setBadge(id: string, content: string|null): void {
+    const badge = document.createElement('span');
+    badge.textContent = content;
+    badge.classList.add('badge');
+    this.setSuffixElement(id, content ? badge : null);
   }
 
   setTabEnabled(id: string, enabled: boolean): void {
@@ -1260,7 +1275,7 @@ export class TabbedPaneTab {
     const closeButton = new Buttons.Button.Button();
     closeButton.data = {
       variant: Buttons.Button.Variant.ICON,
-      size: Buttons.Button.Size.SMALL,
+      size: Buttons.Button.Size.MICRO,
       iconName: 'cross',
       title: i18nString(UIStrings.closeS, {PH1: this.title}),
     };
@@ -1278,7 +1293,8 @@ export class TabbedPaneTab {
     closeIcon.data = {
       iconName: 'experiment',
       color: 'var(--override-tabbed-pane-preview-icon-color)',
-      width: '16px',
+      height: '14px',
+      width: '14px',
     };
     previewIcon.appendChild(closeIcon);
     previewIcon.setAttribute('title', i18nString(UIStrings.previewFeature));

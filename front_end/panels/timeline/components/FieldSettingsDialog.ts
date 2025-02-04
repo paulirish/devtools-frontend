@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import '../../../ui/components/data_grid/data_grid.js';
 import './OriginMap.js';
 
 import * as i18n from '../../../core/i18n/i18n.js';
@@ -12,11 +11,15 @@ import * as Dialogs from '../../../ui/components/dialogs/dialogs.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as Input from '../../../ui/components/input/input.js';
 import * as UI from '../../../ui/legacy/legacy.js';
-import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import * as Lit from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
-import fieldSettingsDialogStyles from './fieldSettingsDialog.css.js';
+import fieldSettingsDialogStylesRaw from './fieldSettingsDialog.css.js';
 import type {OriginMap} from './OriginMap.js';
+
+// TODO(crbug.com/391381439): Fully migrate off of constructed style sheets.
+const fieldSettingsDialogStyles = new CSSStyleSheet();
+fieldSettingsDialogStyles.replaceSync(fieldSettingsDialogStylesRaw.cssContent);
 
 const UIStrings = {
   /**
@@ -92,7 +95,7 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/FieldSettingsDialog.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-const {html, nothing, Directives: {ifDefined}} = LitHtml;
+const {html, nothing, Directives: {ifDefined}} = Lit;
 
 export class ShowDialog extends Event {
   static readonly eventName = 'showdialog';
@@ -211,7 +214,7 @@ export class FieldSettingsDialog extends HTMLElement {
     this.#configSetting.removeChangeListener(this.#onSettingsChanged, this);
   }
 
-  #renderOpenButton(): LitHtml.LitTemplate {
+  #renderOpenButton(): Lit.LitTemplate {
     if (this.#configSetting.get().enabled) {
       // clang-format off
       return html`
@@ -243,7 +246,7 @@ export class FieldSettingsDialog extends HTMLElement {
     // clang-format on
   }
 
-  #renderEnableButton(): LitHtml.LitTemplate {
+  #renderEnableButton(): Lit.LitTemplate {
     // clang-format off
     return html`
       <devtools-button
@@ -261,7 +264,7 @@ export class FieldSettingsDialog extends HTMLElement {
     // clang-format on
   }
 
-  #renderDisableButton(): LitHtml.LitTemplate {
+  #renderDisableButton(): Lit.LitTemplate {
     const label = this.#configSetting.get().enabled ? i18nString(UIStrings.optOut) : i18nString(UIStrings.cancel);
     // clang-format off
     return html`
@@ -304,7 +307,7 @@ export class FieldSettingsDialog extends HTMLElement {
     }
   }
 
-  #renderOriginMapGrid(): LitHtml.LitTemplate {
+  #renderOriginMapGrid(): Lit.LitTemplate {
     // clang-format off
     return html`
       <div class="origin-mapping-description">${i18nString(UIStrings.mapDevelopmentOrigins)}</div>
@@ -391,7 +394,7 @@ export class FieldSettingsDialog extends HTMLElement {
       </devtools-dialog>
     `;
     // clang-format on
-    LitHtml.render(output, this.#shadow, {host: this});
+    Lit.render(output, this.#shadow, {host: this});
   };
 }
 

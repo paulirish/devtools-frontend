@@ -12,7 +12,7 @@ import * as SDK from '../../core/sdk/sdk.js';
 import * as Persistence from '../../models/persistence/persistence.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as UI from '../../ui/legacy/legacy.js';
-import * as LitHtml from '../../ui/lit-html/lit-html.js';
+import * as Lit from '../../ui/lit/lit.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 import * as ElementsPanel from '../elements/elements.js';
 import * as NetworkForward from '../network/forward/forward.js';
@@ -40,8 +40,8 @@ import {
 } from './agents/NetworkAgent.js';
 import {PatchAgent, ProjectContext} from './agents/PatchAgent.js';
 import {CallTreeContext, PerformanceAgent} from './agents/PerformanceAgent.js';
-import {NodeContext, StylingAgent} from './agents/StylingAgent.js';
-import styles from './aiAssistancePanel.css.js';
+import {NodeContext, StylingAgent, StylingAgentWithFunctionCalling} from './agents/StylingAgent.js';
+import aiAssistancePanelStyles from './aiAssistancePanel.css.js';
 import {
   AiHistoryStorage,
 } from './AiHistoryStorage.js';
@@ -55,7 +55,7 @@ import {
   type Step,
 } from './components/ChatView.js';
 
-const {html} = LitHtml;
+const {html} = Lit;
 
 const AI_ASSISTANCE_SEND_FEEDBACK = 'https://crbug.com/364805393' as Platform.DevToolsPath.UrlString;
 const AI_ASSISTANCE_HELP = 'https://goo.gle/devtools-ai-assistance' as Platform.DevToolsPath.UrlString;
@@ -137,15 +137,15 @@ function selectedElementFilter(maybeNode: SDK.DOMModel.DOMNode|null): SDK.DOMMod
 
 function defaultView(input: ChatViewProps, output: ViewOutput, target: HTMLElement): void {
   // clang-format off
-  LitHtml.render(html`
-    <devtools-ai-chat-view .props=${input} ${LitHtml.Directives.ref((el: Element|undefined) => {
+  Lit.render(html`
+    <devtools-ai-chat-view .props=${input} ${Lit.Directives.ref((el: Element|undefined) => {
       if (!el || !(el instanceof ChatView)) {
         return;
       }
 
       output.chatView = el;
     })}></devtools-ai-chat-view>
-  `, target, {host: input}); // eslint-disable-line rulesdir/lit-html-host-this
+  `, target, {host: input});
   // clang-format on
 }
 
@@ -221,6 +221,7 @@ export class AiAssistancePanel extends UI.Panel.Panel {
     syncInfo: Host.InspectorFrontendHostAPI.SyncInformation,
   }) {
     super(AiAssistancePanel.panelName);
+    this.registerRequiredCSS(aiAssistancePanelStyles);
     this.#aiAssistanceEnabledSetting = this.#getAiAssistanceEnabledSetting();
 
     this.#createToolbar();
@@ -333,6 +334,13 @@ export class AiAssistancePanel extends UI.Panel.Panel {
           ...options,
           changeManager: this.#changeManager,
         });
+        if (isAiAssistanceStylingWithFunctionCallingEnabled()) {
+          agent = new StylingAgentWithFunctionCalling({
+            ...options,
+            changeManager: this.#changeManager,
+          });
+        }
+
         break;
       }
       case AgentType.NETWORK: {
@@ -419,6 +427,7 @@ export class AiAssistancePanel extends UI.Panel.Panel {
       this.#currentAgent = agent;
       this.#viewProps.agentType = this.#currentAgent?.type;
       this.#viewProps.messages = [];
+      this.#viewProps.changeSummary = undefined;
       this.#viewProps.isLoading = false;
       this.#viewProps.isReadOnly = this.#currentAgent?.isHistoryEntry ?? false;
     }
@@ -428,7 +437,7 @@ export class AiAssistancePanel extends UI.Panel.Panel {
   }
 
   override wasShown(): void {
-    this.registerCSSFiles([styles]);
+    super.wasShown();
     this.#viewOutput.chatView?.restoreScrollPosition();
     this.#viewOutput.chatView?.focusTextInput();
     this.#selectDefaultAgentIfNeeded();
@@ -937,9 +946,13 @@ export class AiAssistancePanel extends UI.Panel.Panel {
             commitStep();
             break;
           }
+          case ResponseType.SUGGESTIONS: {
+            systemMessage.suggestions = data.suggestions;
+            break;
+          }
           case ResponseType.SIDE_EFFECT: {
             step.isLoading = false;
-            step.code = data.code;
+            step.code ??= data.code;
             step.sideEffect = {
               onAnswer: data.confirm,
             };
@@ -948,14 +961,17 @@ export class AiAssistancePanel extends UI.Panel.Panel {
           }
           case ResponseType.ACTION: {
             step.isLoading = false;
-            step.code = data.code;
-            step.output = data.output;
+            step.code ??= data.code;
+            step.output ??= data.output;
             step.canceled = data.canceled;
+            if (isAiAssistancePatchingEnabled() && this.#currentAgent && !this.#currentAgent.isHistoryEntry) {
+              this.#viewProps.changeSummary = this.#changeManager.formatChanges(this.#currentAgent.id);
+            }
             commitStep();
             break;
           }
           case ResponseType.ANSWER: {
-            systemMessage.suggestions = data.suggestions;
+            systemMessage.suggestions ??= data.suggestions;
             systemMessage.answer = data.text;
             systemMessage.rpcId = data.rpcId;
             // When there is an answer without any thinking steps, we don't want to show the thinking step.
@@ -1042,6 +1058,11 @@ export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
   }
 }
 
+function isAiAssistancePatchingEnabled(): boolean {
+  const config = Common.Settings.Settings.instance().getHostConfig();
+  return Boolean(config.devToolsFreestyler?.patching);
+}
+
 function setAiAssistanceServerSideLoggingEnabled(enabled: boolean): void {
   if (enabled) {
     localStorage.setItem('aiAssistance_enableServerSideLogging', 'true');
@@ -1058,5 +1079,19 @@ function isAiAssistanceServerSideLoggingEnabled(): boolean {
   return localStorage.getItem('aiAssistance_enableServerSideLogging') !== 'false';
 }
 
+function setAiAssistanceStylingWithFunctionCalling(enabled: boolean): void {
+  if (enabled) {
+    localStorage.setItem('aiAssistance_stylingFunctionCalling', 'true');
+  } else {
+    localStorage.setItem('aiAssistance_stylingFunctionCalling', 'false');
+  }
+}
+
+function isAiAssistanceStylingWithFunctionCallingEnabled(): boolean {
+  return localStorage.getItem('aiAssistance_stylingFunctionCalling') === 'true';
+}
+
 // @ts-ignore
 globalThis.setAiAssistanceServerSideLoggingEnabled = setAiAssistanceServerSideLoggingEnabled;
+// @ts-ignore
+globalThis.setAiAssistanceStylingWithFunctionCalling = setAiAssistanceStylingWithFunctionCalling;

@@ -7,12 +7,12 @@ import '../../../../ui/components/icon_button/icon_button.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
 import type {DocumentLatencyInsightModel} from '../../../../models/trace/insights/DocumentLatency.js';
 import * as Trace from '../../../../models/trace/trace.js';
-import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
+import * as Lit from '../../../../ui/lit/lit.js';
 import type * as Overlays from '../../overlays/overlays.js';
 
 import {BaseInsightComponent} from './BaseInsightComponent.js';
 
-const {html} = LitHtml;
+const {html} = Lit;
 
 const UIStrings = {
   /**
@@ -67,10 +67,10 @@ const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/insights/Do
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class DocumentLatency extends BaseInsightComponent<DocumentLatencyInsightModel> {
-  static override readonly litTagName = LitHtml.StaticHtml.literal`devtools-performance-document-latency`;
+  static override readonly litTagName = Lit.StaticHtml.literal`devtools-performance-document-latency`;
   override internalName: string = 'document-latency';
 
-  #check(didPass: boolean, good: string, bad: string): LitHtml.TemplateResult {
+  #check(didPass: boolean, good: string, bad: string): Lit.TemplateResult {
     const icon = didPass ? 'check-circle' : 'clear';
 
     const ariaLabel = didPass ? i18nString(UIStrings.successAriaLabel, {PH1: good}) :
@@ -98,7 +98,7 @@ export class DocumentLatency extends BaseInsightComponent<DocumentLatencyInsight
     if (this.model.data.redirectDuration) {
       const bounds = Trace.Helpers.Timing.traceWindowFromMicroSeconds(
           event.ts,
-          (event.ts + redirectDurationMicro) as Trace.Types.Timing.MicroSeconds,
+          (event.ts + redirectDurationMicro) as Trace.Types.Timing.Micro,
       );
       sections.push({bounds, label: i18nString(UIStrings.redirectsLabel), showDuration: true});
       overlays.push({type: 'CANDY_STRIPED_TIME_RANGE', bounds, entry: event});
@@ -106,11 +106,11 @@ export class DocumentLatency extends BaseInsightComponent<DocumentLatencyInsight
     if (this.model.data.serverResponseTooSlow) {
       const serverResponseTimeMicro = Trace.Helpers.Timing.milliToMicro(this.model.data.serverResponseTime);
       // NOTE: NetworkRequestHandlers never makes a synthetic network request event if `timing` is missing.
-      const sendEnd = event.args.data.timing?.sendEnd ?? Trace.Types.Timing.MilliSeconds(0);
+      const sendEnd = event.args.data.timing?.sendEnd ?? Trace.Types.Timing.Milli(0);
       const sendEndMicro = Trace.Helpers.Timing.milliToMicro(sendEnd);
       const bounds = Trace.Helpers.Timing.traceWindowFromMicroSeconds(
           sendEndMicro,
-          (sendEndMicro + serverResponseTimeMicro) as Trace.Types.Timing.MicroSeconds,
+          (sendEndMicro + serverResponseTimeMicro) as Trace.Types.Timing.Micro,
       );
       sections.push({bounds, label: i18nString(UIStrings.serverResponseTimeLabel), showDuration: true});
     }
@@ -118,7 +118,7 @@ export class DocumentLatency extends BaseInsightComponent<DocumentLatencyInsight
       const bounds = Trace.Helpers.Timing.traceWindowFromMicroSeconds(
           event.args.data.syntheticData.downloadStart,
           (event.args.data.syntheticData.downloadStart + event.args.data.syntheticData.download) as
-              Trace.Types.Timing.MicroSeconds,
+              Trace.Types.Timing.Micro,
       );
       sections.push({bounds, label: i18nString(UIStrings.uncompressedDownload), showDuration: true});
       overlays.push({type: 'CANDY_STRIPED_TIME_RANGE', bounds, entry: event});
@@ -142,7 +142,7 @@ export class DocumentLatency extends BaseInsightComponent<DocumentLatencyInsight
     return overlays;
   }
 
-  override getEstimatedSavingsTime(): Trace.Types.Timing.MilliSeconds|null {
+  override getEstimatedSavingsTime(): Trace.Types.Timing.Milli|null {
     return this.model?.metricSavings?.FCP ?? null;
   }
 
@@ -150,9 +150,9 @@ export class DocumentLatency extends BaseInsightComponent<DocumentLatencyInsight
     return this.model?.data?.uncompressedResponseBytes ?? null;
   }
 
-  override renderContent(): LitHtml.LitTemplate {
+  override renderContent(): Lit.LitTemplate {
     if (!this.model?.data) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
 
     // clang-format off

@@ -35,6 +35,7 @@ export class LayersWidget extends UI.Widget.Widget {
 
   constructor() {
     super(true);
+    this.registerRequiredCSS(layersWidgetStyles);
 
     this.contentElement.className = 'styles-layers-pane';
     this.contentElement.setAttribute('jslog', `${VisualLogging.pane('css-layers')}`);
@@ -58,9 +59,8 @@ export class LayersWidget extends UI.Widget.Widget {
     }
   }
 
-  override async wasShown(): Promise<void> {
+  override wasShown(): Promise<void> {
     super.wasShown();
-    this.registerCSSFiles([layersWidgetStyles]);
     return this.update();
   }
 

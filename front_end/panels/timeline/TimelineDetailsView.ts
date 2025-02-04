@@ -63,7 +63,7 @@ const UIStrings = {
 };
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/TimelineDetailsView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
-export class TimelineDetailsView extends
+export class TimelineDetailsPane extends
     Common.ObjectWrapper.eventMixin<TimelineTreeView.EventTypes, typeof UI.Widget.VBox>(UI.Widget.VBox) {
   private readonly detailsLinkifier: Components.Linkifier.Linkifier;
   private tabbedPane: UI.TabbedPane.TabbedPane;
@@ -132,6 +132,9 @@ export class TimelineDetailsView extends
       this.dispatchEventToListeners(TimelineTreeView.Events.THIRD_PARTY_ROW_HOVERED, node.data);
     });
 
+    this.#thirdPartyTree.addEventListener(
+        TimelineTreeView.Events.BOTTOM_UP_BUTTON_CLICKED, node => this.#bottomUpClicked(node));
+
     this.#networkRequestDetails =
         new TimelineComponents.NetworkRequestDetails.NetworkRequestDetails(this.detailsLinkifier);
 
@@ -142,6 +145,38 @@ export class TimelineDetailsView extends
     TraceBounds.TraceBounds.onChange(this.#onTraceBoundsChangeBound);
 
     this.lazySelectorStatsView = null;
+  }
+
+  #bottomUpClicked(event: Common.EventTarget.EventTargetEvent<Trace.Extras.TraceTree.Node|null>): void {
+    // Select bottom up tree.
+    this.tabbedPane.selectTab(Tab.BottomUp, true, true);
+    if (!(this.tabbedPane.visibleView instanceof BottomUpTimelineTreeView)) {
+      return;
+    }
+    /**
+     * For a11y, ensure that the header is focused.
+     */
+    this.tabbedPane.focusSelectedTabHeader();
+    const bottomUp = this.tabbedPane.visibleView;
+    const thirdPartyNodeSelected = event.data;
+    if (!thirdPartyNodeSelected) {
+      return;
+    }
+    // Group by 3P.
+    bottomUp.setGroupBySetting(BottomUpTimelineTreeView.GroupBy.ThirdParties);
+    bottomUp.refreshTree();
+
+    // Look for the matching node in the bottom up tree using selected node event data.
+    const treeNode = bottomUp.eventToTreeNode.get(thirdPartyNodeSelected.event);
+    if (!treeNode) {
+      return;
+    }
+    bottomUp.selectProfileNode(treeNode, true);
+    // Reveal/expand the bottom up tree grid node.
+    const gridNode = bottomUp.dataGridNodeForTreeNode(treeNode);
+    if (gridNode) {
+      gridNode.expand();
+    }
   }
 
   #createContentWidget(): UI.Widget.VBox {
@@ -225,7 +260,7 @@ export class TimelineDetailsView extends
     await this.setSelection(null);
   }
 
-  private setContent(node: Node): void {
+  private setSummaryContent(node: Node): void {
     const allTabs = this.tabbedPane.otherTabs(Tab.Details);
     for (let i = 0; i < allTabs.length; ++i) {
       if (!this.rangeDetailViews.has(allTabs[i])) {
@@ -234,7 +269,7 @@ export class TimelineDetailsView extends
     }
     this.defaultDetailsContentWidget.detach();
     this.defaultDetailsContentWidget = this.#createContentWidget();
-    this.defaultDetailsContentWidget.contentElement.appendChild(node);
+    this.defaultDetailsContentWidget.contentElement.append(node);
     if (this.#relatedInsightChips) {
       this.defaultDetailsContentWidget.contentElement.appendChild(this.#relatedInsightChips);
     }
@@ -283,7 +318,7 @@ export class TimelineDetailsView extends
    */
   private scheduleUpdateContentsFromWindow(forceImmediateUpdate: boolean = false): void {
     if (!this.#parsedTrace) {
-      this.setContent(UI.Fragment.html`<div/>`);
+      this.setSummaryContent(UI.Fragment.html`<div/>`);
       return;
     }
     if (forceImmediateUpdate) {
@@ -326,7 +361,8 @@ export class TimelineDetailsView extends
 
   #setSelectionForTimelineFrame(frame: Trace.Types.Events.LegacyTimelineFrame): void {
     const matchedFilmStripFrame = this.#getFilmStripFrame(frame);
-    this.setContent(TimelineUIUtils.generateDetailsContentForFrame(frame, this.#filmStrip, matchedFilmStripFrame));
+    this.setSummaryContent(
+        TimelineUIUtils.generateDetailsContentForFrame(frame, this.#filmStrip, matchedFilmStripFrame));
     const target = SDK.TargetManager.TargetManager.instance().rootTarget();
     if (frame.layerTree && target) {
       const layerTreeForFrame = new TimelineModel.TracingLayerTree.TracingFrameLayerTree(target, frame.layerTree);
@@ -349,7 +385,7 @@ export class TimelineDetailsView extends
       this.#relatedInsightChips.eventToRelatedInsightsMap = this.#eventToRelatedInsightsMap;
     }
 
-    this.setContent(this.#networkRequestDetails);
+    this.setSummaryContent(this.#networkRequestDetails);
   }
 
   async #setSelectionForTraceEvent(event: Trace.Types.Events.Event): Promise<void> {
@@ -367,7 +403,7 @@ export class TimelineDetailsView extends
     if (Trace.Types.Events.isSyntheticLayoutShift(event) || Trace.Types.Events.isSyntheticLayoutShiftCluster(event)) {
       const isFreshRecording = Boolean(this.#parsedTrace && Tracker.instance().recordingIsFresh(this.#parsedTrace));
       this.#layoutShiftDetails.setData(event, this.#traceInsightsSets, this.#parsedTrace, isFreshRecording);
-      this.setContent(this.#layoutShiftDetails);
+      this.setSummaryContent(this.#layoutShiftDetails);
       return;
     }
 
@@ -462,7 +498,7 @@ export class TimelineDetailsView extends
   }
 
   private appendDetailsTabsForTraceEventAndShowDetails(event: Trace.Types.Events.Event, content: Node): void {
-    this.setContent(content);
+    this.setSummaryContent(content);
     if (Trace.Types.Events.isPaint(event) || Trace.Types.Events.isRasterTask(event)) {
       this.showEventInPaintProfiler(event);
     }
@@ -492,8 +528,7 @@ export class TimelineDetailsView extends
     this.appendTab(Tab.PaintProfiler, i18nString(UIStrings.paintProfiler), paintProfilerView);
   }
 
-  private updateSelectedRangeStats(
-      startTime: Trace.Types.Timing.MilliSeconds, endTime: Trace.Types.Timing.MilliSeconds): void {
+  private updateSelectedRangeStats(startTime: Trace.Types.Timing.Milli, endTime: Trace.Types.Timing.Milli): void {
     if (!this.#selectedEvents || !this.#parsedTrace || !this.#entityMapper) {
       return;
     }
@@ -502,9 +537,10 @@ export class TimelineDetailsView extends
     const aggregatedStats = TimelineUIUtils.statsForTimeRange(this.#selectedEvents, startTime, endTime);
     const startOffset = startTime - minBoundsMilli;
     const endOffset = endTime - minBoundsMilli;
-    const summaryDetails = TimelineUIUtils.generateSummaryDetails(
+    const summaryDetailElem = TimelineUIUtils.generateSummaryDetails(
         aggregatedStats, startOffset, endOffset, this.#selectedEvents, this.#thirdPartyTree);
-    this.setContent(summaryDetails);
+
+    this.setSummaryContent(summaryDetailElem);
 
     // Find all recalculate style events data from range
     const isSelectorStatsEnabled =

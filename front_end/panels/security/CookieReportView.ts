@@ -9,13 +9,13 @@ import * as Protocol from '../../generated/protocol.js';
 import * as IssuesManager from '../../models/issues_manager/issues_manager.js';
 import * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
 import * as UI from '../../ui/legacy/legacy.js';
-import * as LitHtml from '../../ui/lit-html/lit-html.js';
+import * as Lit from '../../ui/lit/lit.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 import * as NetworkForward from '../network/forward/forward.js';
 
 import cookieReportViewStyles from './cookieReportView.css.js';
 
-const {render, html, Directives: {ref}} = LitHtml;
+const {render, html, Directives: {ref}} = Lit;
 
 const UIStrings = {
   /**
@@ -25,7 +25,7 @@ const UIStrings = {
   /**
    *@description Explaination in the header about the cookies listed in the report
    */
-  body: 'This site might not work if third-party cookies are limited in Chrome.',
+  body: 'This site might not work if third-party cookies and other cookies are limited in Chrome.',
   /**
    *@description A link the user can follow to learn more about third party cookie usage
    */
@@ -186,6 +186,7 @@ export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export interface ViewInput {
   gridData: DataGrid.DataGrid.DataGridNode<CookieReportNodeData>[];
+  filterItems: UI.FilterBar.Item[];
   onFilterChanged: () => void;
   onSortingChanged: () => void;
   populateContextMenu:
@@ -214,6 +215,7 @@ export class CookieReportView extends UI.Widget.VBox {
   #view: View;
   dataGrid?: DataGrid.DataGrid.DataGridImpl<CookieReportNodeData>;
   gridData: DataGrid.DataGrid.DataGridNode<CookieReportNodeData>[] = [];
+  filterItems: UI.FilterBar.Item[] = [];
 
   constructor(element?: HTMLElement, view: View = (input, output, target) => {
     const dataGridOptions: DataGrid.DataGrid.DataGridWidgetOptions<CookieReportNodeData> = {
@@ -231,46 +233,20 @@ export class CookieReportView extends UI.Widget.VBox {
       rowContextMenuCallback: input.populateContextMenu.bind(input),
     };
 
-    const filterItems: UI.FilterBar.Item[] = [];
-
-    if (input.gridData.some(n => n.data['status'] === i18nString(UIStrings.blocked))) {
-      filterItems.push({
-        name: UIStrings.blocked,
-        label: () => i18nString(UIStrings.blocked),
-        title: UIStrings.blocked,
-        jslogContext: UIStrings.blocked,
-      });
-    }
-    if (input.gridData.some(n => n.data['status'] === i18nString(UIStrings.allowed))) {
-      filterItems.push({
-        name: UIStrings.allowed,
-        label: () => i18nString(UIStrings.allowed),
-        title: UIStrings.allowed,
-        jslogContext: UIStrings.allowed,
-      });
-    }
-    if (input.gridData.some(n => n.data['status'] === i18nString(UIStrings.allowedByException))) {
-      filterItems.push({
-        name: UIStrings.allowedByException,
-        label: () => i18nString(UIStrings.allowedByException),
-        title: UIStrings.allowedByException,
-        jslogContext: UIStrings.allowedByException,
-      });
-    }
-
     // clang-format off
     render(html `
         <div class="report overflow-auto">
             <div class="header">
-              <div class="title">${i18nString(UIStrings.title)}</div>
-              <div class="body">${i18nString(UIStrings.body)} <x-link class="x-link" href="https://developers.google.com/privacy-sandbox/cookies/prepare/audit-cookies" jslog=${VisualLogging.link('learn-more').track({click: true})}>${i18nString(UIStrings.learnMoreLink)}</x-link></div>
+              <h1>${i18nString(UIStrings.title)}</h1>
+              <div class="body">${i18nString(UIStrings.body)} <x-link class="devtools-link" href="https://developers.google.com/privacy-sandbox/cookies/prepare/audit-cookies" jslog=${VisualLogging.link('learn-more').track({click: true})}>${i18nString(UIStrings.learnMoreLink)}</x-link></div>
             </div>
             ${input.gridData.length > 0 ?
               html`
                 <devtools-named-bit-set-filter
                   class="filter"
+                  aria-label="Third-party cookie status filters"
                   @filterChanged=${input.onFilterChanged}
-                  .options=${{items: filterItems}}
+                  .options=${{items: input.filterItems}}
                   ${ref((el?: Element) => {
                     if(el instanceof UI.FilterBar.NamedBitSetFilterUIElement){
                       output.namedBitSetFilterUI = el.getOrCreateNamedBitSetFilterUI();
@@ -308,6 +284,7 @@ export class CookieReportView extends UI.Widget.VBox {
   }) {
     super(true, undefined, element);
     this.#view = view;
+    this.registerRequiredCSS(cookieReportViewStyles);
 
     SDK.TargetManager.TargetManager.instance().addModelListener(
         SDK.ResourceTreeModel.ResourceTreeModel, SDK.ResourceTreeModel.Events.PrimaryPageChanged,
@@ -327,6 +304,7 @@ export class CookieReportView extends UI.Widget.VBox {
 
   override performUpdate(): void {
     this.gridData = this.#buildNodes();
+    this.filterItems = this.#buildFilterItems();
     this.#view(this, this, this.contentElement);
   }
 
@@ -359,6 +337,39 @@ export class CookieReportView extends UI.Widget.VBox {
     if (info) {
       this.#cookieRows.set(issue.cookieId(), info);
     }
+  }
+
+  #buildFilterItems(): UI.FilterBar.Item[] {
+    const filterItems: UI.FilterBar.Item[] = [];
+
+    if (this.#cookieRows.values().some(n => n.status === IssuesManager.CookieIssue.CookieStatus.BLOCKED)) {
+      filterItems.push({
+        name: UIStrings.blocked,
+        label: () => i18nString(UIStrings.blocked),
+        title: UIStrings.blocked,
+        jslogContext: UIStrings.blocked,
+      });
+    }
+    if (this.#cookieRows.values().some(n => n.status === IssuesManager.CookieIssue.CookieStatus.ALLOWED)) {
+      filterItems.push({
+        name: UIStrings.allowed,
+        label: () => i18nString(UIStrings.allowed),
+        title: UIStrings.allowed,
+        jslogContext: UIStrings.allowed,
+      });
+    }
+    if (this.#cookieRows.values().some(
+            n => n.status === IssuesManager.CookieIssue.CookieStatus.ALLOWED_BY_GRACE_PERIOD ||
+                n.status === IssuesManager.CookieIssue.CookieStatus.ALLOWED_BY_HEURISTICS)) {
+      filterItems.push({
+        name: UIStrings.allowedByException,
+        label: () => i18nString(UIStrings.allowedByException),
+        title: UIStrings.allowedByException,
+        jslogContext: UIStrings.allowedByException,
+      });
+    }
+
+    return filterItems;
   }
 
   #buildNodes(): DataGrid.DataGrid.DataGridNode<CookieReportNodeData>[] {
@@ -428,11 +439,6 @@ export class CookieReportView extends UI.Widget.VBox {
     }, {jslogContext: 'show-requests-with-this-cookie'});
   }
 
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([cookieReportViewStyles]);
-  }
-
   static getStatusString(status: IssuesManager.CookieIssue.CookieStatus): string {
     switch (status) {
       case IssuesManager.CookieIssue.CookieStatus.BLOCKED:
@@ -469,7 +475,7 @@ export class CookieReportView extends UI.Widget.VBox {
     return recElem;
   }
 
-  static getRecommendationText(domain: string, insight?: Protocol.Audits.CookieIssueInsight): LitHtml.TemplateResult {
+  static getRecommendationText(domain: string, insight?: Protocol.Audits.CookieIssueInsight): Lit.TemplateResult {
     if (!insight) {
       return html`${i18nString(UIStrings.other)}`;
     }

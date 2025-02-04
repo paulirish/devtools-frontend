@@ -206,6 +206,7 @@ const supportsPrefersContrast = (): boolean => {
 export class RenderingOptionsView extends UI.Widget.VBox {
   constructor() {
     super(true);
+    this.registerRequiredCSS(renderingOptionsStyles);
 
     this.element.setAttribute('jslog', `${VisualLogging.panel('rendering').track({resize: true})}`);
 
@@ -303,10 +304,6 @@ export class RenderingOptionsView extends UI.Widget.VBox {
     if (control) {
       this.contentElement.appendChild(control);
     }
-  }
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([renderingOptionsStyles]);
   }
 }
 

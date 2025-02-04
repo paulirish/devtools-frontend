@@ -37,11 +37,10 @@ import * as Platform from '../../core/platform/platform.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import * as ARIAUtils from './ARIAUtils.js';
-import filterStyles from './filter.css.legacy.js';
+import filterStyles from './filter.css.js';
 import {KeyboardShortcut, Modifiers} from './KeyboardShortcut.js';
 import {bindCheckbox} from './SettingsUI.js';
 import type {Suggestions} from './SuggestBox.js';
-import * as ThemeSupport from './theme_support/theme_support.js';
 import {type ToolbarButton, ToolbarFilter, ToolbarInput, ToolbarSettingToggle} from './Toolbar.js';
 import {Tooltip} from './Tooltip.js';
 import {CheckboxLabel, createTextChild} from './UIUtils.js';
@@ -274,13 +273,26 @@ interface NamedBitSetFilterUIOptions {
   items: Item[];
   setting?: Common.Settings.Setting<{[key: string]: boolean}>;
 }
+
+// TODO(crbug.com/391381439): Fully migrate off of constructed style sheets.
+const filterStyleSheet = new CSSStyleSheet();
+filterStyleSheet.replaceSync(filterStyles.cssContent);
+
 export class NamedBitSetFilterUIElement extends HTMLElement {
   #options: NamedBitSetFilterUIOptions = {items: []};
   readonly #shadow = this.attachShadow({mode: 'open'});
   #namedBitSetFilterUI?: NamedBitSetFilterUI;
 
   set options(options: NamedBitSetFilterUIOptions) {
+    // return if they are the same
+    if (this.#options.items.toString() === options.items.toString() && this.#options.setting === options.setting) {
+      return;
+    }
+
     this.#options = options;
+    // When options are updated, clear the UI so that a new one is created with the new options
+    this.#shadow.innerHTML = '';
+    this.#namedBitSetFilterUI = undefined;
   }
 
   getOrCreateNamedBitSetFilterUI(): NamedBitSetFilterUI {
@@ -303,7 +315,9 @@ export class NamedBitSetFilterUIElement extends HTMLElement {
   }
 
   connectedCallback(): void {
-    ThemeSupport.ThemeSupport.instance().appendStyle(this.#shadow, filterStyles);
+    // TODO(crbug.com/391381439): We cannot simply add a `<style>` element here, because
+    // the `options` setter above clears the shadow DOM.
+    this.#shadow.adoptedStyleSheets = [filterStyleSheet];
   }
 
   #filterChanged(): void {

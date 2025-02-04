@@ -22,10 +22,10 @@ import * as LegacyWrapper from '../../../ui/components/legacy_wrapper/legacy_wra
 import * as RenderCoordinator from '../../../ui/components/render_coordinator/render_coordinator.js';
 import type * as ReportView from '../../../ui/components/report_view/report_view.js';
 import * as Components from '../../../ui/legacy/components/utils/utils.js';
-import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import * as Lit from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
-import frameDetailsReportViewStyles from './frameDetailsReportView.css.js';
+import frameDetailsReportViewStylesRaw from './frameDetailsReportView.css.js';
 import {OriginTrialTreeView} from './OriginTrialTreeView.js';
 import {
   type PermissionsPolicySectionData,
@@ -33,7 +33,11 @@ import {
 } from './PermissionsPolicySection.js';
 import type {StackTraceData} from './StackTrace.js';
 
-const {html} = LitHtml;
+// TODO(crbug.com/391381439): Fully migrate off of constructed style sheets.
+const frameDetailsReportViewStyles = new CSSStyleSheet();
+frameDetailsReportViewStyles.replaceSync(frameDetailsReportViewStylesRaw.cssContent);
+
+const {html} = Lit;
 
 const UIStrings = {
   /**
@@ -310,14 +314,14 @@ export class FrameDetailsReportView extends LegacyWrapper.LegacyWrapper.Wrappabl
 
       // Disabled until https://crbug.com/1079231 is fixed.
       // clang-format off
-      LitHtml.render(html`
+      Lit.render(html`
         <devtools-report .data=${{reportTitle: this.#frame.displayName()} as ReportView.ReportView.ReportData}
         jslog=${VisualLogging.pane('frames')}>
           ${this.#renderDocumentSection()}
           ${this.#renderIsolationSection()}
           ${this.#renderApiAvailabilitySection()}
           ${this.#renderOriginTrial()}
-          ${LitHtml.Directives.until(this.#permissionsPolicies?.then(policies => {
+          ${Lit.Directives.until(this.#permissionsPolicies?.then(policies => {
             this.#permissionsPolicySectionData.policies = policies || [];
             return html`
               <devtools-resources-permissions-policy-section
@@ -325,17 +329,17 @@ export class FrameDetailsReportView extends LegacyWrapper.LegacyWrapper.Wrappabl
               >
               </devtools-resources-permissions-policy-section>
             `;
-          }), LitHtml.nothing)}
-          ${this.#protocolMonitorExperimentEnabled ? this.#renderAdditionalInfoSection() : LitHtml.nothing}
+          }), Lit.nothing)}
+          ${this.#protocolMonitorExperimentEnabled ? this.#renderAdditionalInfoSection() : Lit.nothing}
         </devtools-report>
       `, this.#shadow, {host: this});
       // clang-format on
     });
   }
 
-  #renderOriginTrial(): LitHtml.LitTemplate {
+  #renderOriginTrial(): Lit.LitTemplate {
     if (!this.#frame) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
 
     this.#originTrialTreeView.classList.add('span-cols');
@@ -358,9 +362,9 @@ export class FrameDetailsReportView extends LegacyWrapper.LegacyWrapper.Wrappabl
     // clang-format on
   }
 
-  #renderDocumentSection(): LitHtml.LitTemplate {
+  #renderDocumentSection(): Lit.LitTemplate {
     if (!this.#frame) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
 
     return html`
@@ -375,16 +379,16 @@ export class FrameDetailsReportView extends LegacyWrapper.LegacyWrapper.Wrappabl
       </devtools-report-value>
       ${this.#maybeRenderUnreachableURL()}
       ${this.#maybeRenderOrigin()}
-      ${LitHtml.Directives.until(this.#renderOwnerElement(), LitHtml.nothing)}
+      ${Lit.Directives.until(this.#renderOwnerElement(), Lit.nothing)}
       ${this.#maybeRenderCreationStacktrace()}
       ${this.#maybeRenderAdStatus()}
       <devtools-report-divider></devtools-report-divider>
     `;
   }
 
-  #maybeRenderSourcesLinkForURL(): LitHtml.LitTemplate {
+  #maybeRenderSourcesLinkForURL(): Lit.LitTemplate {
     if (!this.#frame || this.#frame.unreachableUrl()) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
     const sourceCode = this.#uiSourceCodeForFrame(this.#frame);
     return renderIconLink(
@@ -395,7 +399,7 @@ export class FrameDetailsReportView extends LegacyWrapper.LegacyWrapper.Wrappabl
     );
   }
 
-  #maybeRenderNetworkLinkForURL(): LitHtml.LitTemplate {
+  #maybeRenderNetworkLinkForURL(): Lit.LitTemplate {
     if (this.#frame) {
       const resource = this.#frame.resourceForURL(this.#frame.url);
       if (resource && resource.request) {
@@ -407,7 +411,7 @@ export class FrameDetailsReportView extends LegacyWrapper.LegacyWrapper.Wrappabl
         }, 'reveal-in-network');
       }
     }
-    return LitHtml.nothing;
+    return Lit.nothing;
   }
 
   #uiSourceCodeForFrame(frame: SDK.ResourceTreeModel.ResourceTreeFrame): Workspace.UISourceCode.UISourceCode|null {
@@ -423,9 +427,9 @@ export class FrameDetailsReportView extends LegacyWrapper.LegacyWrapper.Wrappabl
     return null;
   }
 
-  #maybeRenderUnreachableURL(): LitHtml.LitTemplate {
+  #maybeRenderUnreachableURL(): Lit.LitTemplate {
     if (!this.#frame || !this.#frame.unreachableUrl()) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
     return html`
       <devtools-report-key>${i18nString(UIStrings.unreachableUrl)}</devtools-report-key>
@@ -438,7 +442,7 @@ export class FrameDetailsReportView extends LegacyWrapper.LegacyWrapper.Wrappabl
     `;
   }
 
-  #renderNetworkLinkForUnreachableURL(): LitHtml.LitTemplate {
+  #renderNetworkLinkForUnreachableURL(): Lit.LitTemplate {
     if (this.#frame) {
       const unreachableUrl = Common.ParsedURL.ParsedURL.fromString(this.#frame.unreachableUrl());
       if (unreachableUrl) {
@@ -462,10 +466,10 @@ export class FrameDetailsReportView extends LegacyWrapper.LegacyWrapper.Wrappabl
         );
       }
     }
-    return LitHtml.nothing;
+    return Lit.nothing;
   }
 
-  #maybeRenderOrigin(): LitHtml.LitTemplate {
+  #maybeRenderOrigin(): Lit.LitTemplate {
     if (this.#frame && this.#frame.securityOrigin && this.#frame.securityOrigin !== '://') {
       return html`
         <devtools-report-key>${i18nString(UIStrings.origin)}</devtools-report-key>
@@ -474,10 +478,10 @@ export class FrameDetailsReportView extends LegacyWrapper.LegacyWrapper.Wrappabl
         </devtools-report-value>
       `;
     }
-    return LitHtml.nothing;
+    return Lit.nothing;
   }
 
-  async #renderOwnerElement(): Promise<LitHtml.LitTemplate> {
+  async #renderOwnerElement(): Promise<Lit.LitTemplate> {
     if (this.#frame) {
       const linkTargetDOMNode = await this.#frame.getOwnerDOMNodeOrDocument();
       if (linkTargetDOMNode) {
@@ -501,10 +505,10 @@ export class FrameDetailsReportView extends LegacyWrapper.LegacyWrapper.Wrappabl
         // clang-format on
       }
     }
-    return LitHtml.nothing;
+    return Lit.nothing;
   }
 
-  #maybeRenderCreationStacktrace(): LitHtml.LitTemplate {
+  #maybeRenderCreationStacktrace(): Lit.LitTemplate {
     const creationStackTraceData = this.#frame?.getCreationStackTraceData();
     if (creationStackTraceData && creationStackTraceData.creationStackTrace) {
       // Disabled until https://crbug.com/1079231 is fixed.
@@ -524,7 +528,7 @@ export class FrameDetailsReportView extends LegacyWrapper.LegacyWrapper.Wrappabl
       `;
       // clang-format on
     }
-    return LitHtml.nothing;
+    return Lit.nothing;
   }
 
   #getAdFrameTypeStrings(type: Protocol.Page.AdFrameType.Child|Protocol.Page.AdFrameType.Root):
@@ -548,13 +552,13 @@ export class FrameDetailsReportView extends LegacyWrapper.LegacyWrapper.Wrappabl
     }
   }
 
-  #maybeRenderAdStatus(): LitHtml.LitTemplate {
+  #maybeRenderAdStatus(): Lit.LitTemplate {
     if (!this.#frame) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
     const adFrameType = this.#frame.adFrameType();
     if (adFrameType === Protocol.Page.AdFrameType.None) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
     const typeStrings = this.#getAdFrameTypeStrings(adFrameType);
     const rows = [html`<div title=${typeStrings.description}>${typeStrings.value}</div>`];
@@ -578,14 +582,14 @@ export class FrameDetailsReportView extends LegacyWrapper.LegacyWrapper.Wrappabl
       ${this.#target ? html`
         <devtools-report-key>${i18nString(UIStrings.creatorAdScript)}</devtools-report-key>
         <devtools-report-value class="ad-script-link">${adScriptLinkElement?.setAttribute('jslog', `${VisualLogging.link('ad-script').track({click: true})}`)}</devtools-report-value>
-      ` : LitHtml.nothing}
+      ` : Lit.nothing}
     `;
     // clang-format on
   }
 
-  #renderIsolationSection(): LitHtml.LitTemplate {
+  #renderIsolationSection(): Lit.LitTemplate {
     if (!this.#frame) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
     return html`
       <devtools-report-section-header>${i18nString(UIStrings.securityIsolation)}</devtools-report-section-header>
@@ -598,17 +602,17 @@ export class FrameDetailsReportView extends LegacyWrapper.LegacyWrapper.Wrappabl
       <devtools-report-value>
         ${this.#frame.isCrossOriginIsolated() ? i18nString(UIStrings.yes) : i18nString(UIStrings.no)}
       </devtools-report-value>
-      ${LitHtml.Directives.until(this.#maybeRenderCoopCoepCSPStatus(), LitHtml.nothing)}
+      ${Lit.Directives.until(this.#maybeRenderCoopCoepCSPStatus(), Lit.nothing)}
       <devtools-report-divider></devtools-report-divider>
     `;
   }
 
-  #maybeRenderSecureContextExplanation(): LitHtml.LitTemplate {
+  #maybeRenderSecureContextExplanation(): Lit.LitTemplate {
     const explanation = this.#getSecureContextExplanation();
     if (explanation) {
       return html`<span class="inline-comment">${explanation}</span>`;
     }
-    return LitHtml.nothing;
+    return Lit.nothing;
   }
 
   #getSecureContextExplanation(): Platform.UIString.LocalizedString|null {
@@ -625,7 +629,7 @@ export class FrameDetailsReportView extends LegacyWrapper.LegacyWrapper.Wrappabl
     return null;
   }
 
-  async #maybeRenderCoopCoepCSPStatus(): Promise<LitHtml.LitTemplate> {
+  async #maybeRenderCoopCoepCSPStatus(): Promise<Lit.LitTemplate> {
     if (this.#frame) {
       const model = this.#frame.resourceTreeModel().target().model(SDK.NetworkManager.NetworkManager);
       const info = model && await model.getSecurityIsolationStatus(this.#frame.id);
@@ -643,16 +647,16 @@ export class FrameDetailsReportView extends LegacyWrapper.LegacyWrapper.Wrappabl
         `;
       }
     }
-    return LitHtml.nothing;
+    return Lit.nothing;
   }
 
   #maybeRenderCrossOriginStatus(
       info: Protocol.Network.CrossOriginEmbedderPolicyStatus|Protocol.Network.CrossOriginOpenerPolicyStatus|undefined,
       policyName: string,
       noneValue: Protocol.Network.CrossOriginEmbedderPolicyValue|
-      Protocol.Network.CrossOriginOpenerPolicyValue): LitHtml.LitTemplate {
+      Protocol.Network.CrossOriginOpenerPolicyValue): Lit.LitTemplate {
     if (!info) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
     const isEnabled = info.value !== noneValue;
     const isReportOnly = (!isEnabled && info.reportOnlyValue !== noneValue);
@@ -661,15 +665,14 @@ export class FrameDetailsReportView extends LegacyWrapper.LegacyWrapper.Wrappabl
       <devtools-report-key>${policyName}</devtools-report-key>
       <devtools-report-value>
         ${isEnabled ? info.value : info.reportOnlyValue}
-        ${isReportOnly ? html`<span class="inline-comment">report-only</span>` : LitHtml.nothing}
+        ${isReportOnly ? html`<span class="inline-comment">report-only</span>` : Lit.nothing}
         ${
-        endpoint ? html`<span class="inline-name">${i18nString(UIStrings.reportingTo)}</span>${endpoint}` :
-                   LitHtml.nothing}
+        endpoint ? html`<span class="inline-name">${i18nString(UIStrings.reportingTo)}</span>${endpoint}` : Lit.nothing}
       </devtools-report-value>
     `;
   }
 
-  #renderEffectiveDirectives(directives: string): LitHtml.LitTemplate[] {
+  #renderEffectiveDirectives(directives: string): Lit.LitTemplate[] {
     const parsedDirectives = new CspEvaluator.CspParser.CspParser(directives).csp.directives;
     const result = [];
     for (const directive in parsedDirectives) {
@@ -679,7 +682,7 @@ export class FrameDetailsReportView extends LegacyWrapper.LegacyWrapper.Wrappabl
     return result;
   }
 
-  #renderSingleCSP(cspInfo: Protocol.Network.ContentSecurityPolicyStatus): LitHtml.LitTemplate {
+  #renderSingleCSP(cspInfo: Protocol.Network.ContentSecurityPolicyStatus): Lit.LitTemplate {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     return html`
@@ -705,7 +708,7 @@ export class FrameDetailsReportView extends LegacyWrapper.LegacyWrapper.Wrappabl
     // clang-format on
   }
 
-  #renderCSPSection(cspInfos: Protocol.Network.ContentSecurityPolicyStatus[]|undefined): LitHtml.LitTemplate {
+  #renderCSPSection(cspInfos: Protocol.Network.ContentSecurityPolicyStatus[]|undefined): Lit.LitTemplate {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     return html`
@@ -724,9 +727,9 @@ export class FrameDetailsReportView extends LegacyWrapper.LegacyWrapper.Wrappabl
     // clang-format on
   }
 
-  #renderApiAvailabilitySection(): LitHtml.LitTemplate {
+  #renderApiAvailabilitySection(): Lit.LitTemplate {
     if (!this.#frame) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
 
     return html`
@@ -742,7 +745,7 @@ export class FrameDetailsReportView extends LegacyWrapper.LegacyWrapper.Wrappabl
     `;
   }
 
-  #renderSharedArrayBufferAvailability(): LitHtml.LitTemplate {
+  #renderSharedArrayBufferAvailability(): Lit.LitTemplate {
     if (this.#frame) {
       const features = this.#frame.getGatedAPIFeatures();
       if (features) {
@@ -756,10 +759,10 @@ export class FrameDetailsReportView extends LegacyWrapper.LegacyWrapper.Wrappabl
             i18nString(UIStrings.sharedarraybufferConstructorIs) :
             (sabAvailable ? i18nString(UIStrings.sharedarraybufferConstructorIsAvailable) : '');
 
-        function renderHint(frame: SDK.ResourceTreeModel.ResourceTreeFrame): LitHtml.LitTemplate {
+        function renderHint(frame: SDK.ResourceTreeModel.ResourceTreeFrame): Lit.LitTemplate {
           switch (frame.getCrossOriginIsolatedContextType()) {
             case Protocol.Page.CrossOriginIsolatedContextType.Isolated:
-              return LitHtml.nothing;
+              return Lit.nothing;
             case Protocol.Page.CrossOriginIsolatedContextType.NotIsolated:
               if (sabAvailable) {
                 return html`<span class="inline-comment">${
@@ -775,7 +778,7 @@ export class FrameDetailsReportView extends LegacyWrapper.LegacyWrapper.Wrappabl
               }
               break;
           }
-          return LitHtml.nothing;
+          return Lit.nothing;
         }
 
         // SharedArrayBuffer is an API name, so we don't translate it.
@@ -787,10 +790,10 @@ export class FrameDetailsReportView extends LegacyWrapper.LegacyWrapper.Wrappabl
         `;
       }
     }
-    return LitHtml.nothing;
+    return Lit.nothing;
   }
 
-  #renderMeasureMemoryAvailability(): LitHtml.LitTemplate {
+  #renderMeasureMemoryAvailability(): Lit.LitTemplate {
     if (this.#frame) {
       const measureMemoryAvailable = this.#frame.isCrossOriginIsolated();
       const availabilityText =
@@ -807,12 +810,12 @@ export class FrameDetailsReportView extends LegacyWrapper.LegacyWrapper.Wrappabl
         </devtools-report-value>
       `;
     }
-    return LitHtml.nothing;
+    return Lit.nothing;
   }
 
-  #renderAdditionalInfoSection(): LitHtml.LitTemplate {
+  #renderAdditionalInfoSection(): Lit.LitTemplate {
     if (!this.#frame) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
 
     return html`

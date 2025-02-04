@@ -31,8 +31,7 @@
 import '../../core/dom_extension/dom_extension.js';
 
 import * as Platform from '../../core/platform/platform.js';
-import * as LitHtml from '../../ui/lit-html/lit-html.js';
-import * as Helpers from '../components/helpers/helpers.js';
+import * as Lit from '../../ui/lit/lit.js';
 
 import {Constraints, Size} from './Geometry.js';
 import * as ThemeSupport from './theme_support/theme_support.js';
@@ -52,20 +51,63 @@ function assert(condition: unknown, message: string): void {
   }
 }
 
-export class WidgetElement<WidgetT extends Widget> extends HTMLElement {
-  widgetClass?: new(...args: any[]) => WidgetT;
-  widgetParams: unknown[] = [];
+interface WidgetConstructor<WidgetT extends Widget&WidgetParams, WidgetParams> {
+  new(element: WidgetElement<WidgetT, WidgetParams>): WidgetT;
+}
 
+export class WidgetConfig<WidgetT extends Widget&WidgetParams, WidgetParams> {
+  constructor(readonly widgetClass: WidgetConstructor<WidgetT, WidgetParams>, readonly widgetParams?: WidgetParams) {
+  }
+}
+
+export function widgetConfig<WidgetT extends Widget&WidgetParams, WidgetParams>(
+    widgetClass: WidgetConstructor<WidgetT, WidgetParams>, widgetParams?: WidgetParams):
+    // This is a workaround for https://github.com/runem/lit-analyzer/issues/163
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    WidgetConfig<any, any> {
+  return new WidgetConfig(widgetClass, widgetParams);
+}
+
+export class WidgetElement<WidgetT extends Widget&WidgetParams, WidgetParams = {}> extends HTMLElement {
+  #widgetClass?: WidgetConstructor<WidgetT, WidgetParams>;
+  #widgetParams?: WidgetParams;
   createWidget(): WidgetT {
-    if (!this.widgetClass) {
+    if (!this.#widgetClass) {
       throw new Error('No widgetClass defined');
     }
 
-    return new this.widgetClass(...this.widgetParams, this);
+    const widget = new this.#widgetClass(this);
+    if (this.#widgetParams) {
+      Object.assign(widget, this.#widgetParams);
+    }
+    widget.requestUpdate();
+    return widget;
+  }
+
+  set widgetConfig(config: WidgetConfig<WidgetT, WidgetParams>) {
+    const widget = Widget.get(this);
+    if (widget) {
+      let needsUpdate = false;
+      for (const key in config.widgetParams) {
+        if (config.widgetParams.hasOwnProperty(key) && config.widgetParams[key] !== this.#widgetParams?.[key]) {
+          needsUpdate = true;
+        }
+      }
+      if (needsUpdate) {
+        Object.assign(widget, config.widgetParams);
+        widget.requestUpdate();
+      }
+    }
+    this.#widgetClass = config.widgetClass;
+    this.#widgetParams = config.widgetParams;
   }
 
   connectedCallback(): void {
-    Widget.getOrCreateWidget(this).show(this.parentElement as HTMLElement);
+    // When using <devtools-widget> we suppress
+    // suppressOrphanWidgetError and allow the Widget instance to be
+    // treated as a root instance if no root widget was found.
+    Widget.getOrCreateWidget(this).show(
+        this.parentElement as HTMLElement, undefined, /* suppressOrphanWidgetError= */ true);
   }
 }
 
@@ -76,8 +118,8 @@ interface Constructor<T, Args extends unknown[]> {
 }
 
 export function widgetRef<T extends Widget, Args extends unknown[]>(
-    type: Constructor<T, Args>, callback: (_: T) => void): ReturnType<typeof LitHtml.Directives.ref> {
-  return LitHtml.Directives.ref((e?: Element) => {
+    type: Constructor<T, Args>, callback: (_: T) => void): ReturnType<typeof Lit.Directives.ref> {
+  return Lit.Directives.ref((e?: Element) => {
     if (!(e instanceof HTMLElement)) {
       return;
     }
@@ -310,7 +352,7 @@ export class Widget {
   async ownerViewDisposed(): Promise<void> {
   }
 
-  show(parentElement: Element, insertBefore?: Node|null): void {
+  show(parentElement: Element, insertBefore?: Node|null, suppressOrphanWidgetError = false): void {
     assert(parentElement, 'Attempt to attach widget with no parent element');
 
     if (!this.isRoot) {
@@ -319,6 +361,12 @@ export class Widget {
       let currentWidget = undefined;
       while (!currentWidget) {
         if (!currentParent) {
+          if (suppressOrphanWidgetError) {
+            this.isRoot = true;
+            console.warn('A Widget has silently been marked as a root widget');
+            this.show(parentElement, insertBefore);
+            return;
+          }
           throw new Error('Attempt to attach widget to orphan node');
         }
         currentWidget = widgetMap.get(currentParent);
@@ -528,13 +576,10 @@ export class Widget {
     this.doResize();
   }
 
-  registerRequiredCSS(cssFile: {cssContent: string}): void {
-    ThemeSupport.ThemeSupport.instance().appendStyle(this.shadowRoot ?? this.element, cssFile);
-  }
-
-  registerCSSFiles(cssFiles: CSSStyleSheet[]): void {
-    const root = this.shadowRoot ?? Helpers.GetRootNode.getRootNode(this.contentElement);
-    root.adoptedStyleSheets = root.adoptedStyleSheets.concat(cssFiles);
+  registerRequiredCSS(...cssFiles: {cssContent: string}[]): void {
+    for (const cssFile of cssFiles) {
+      ThemeSupport.ThemeSupport.instance().appendStyle(this.shadowRoot ?? this.element, cssFile);
+    }
   }
 
   printWidgetHierarchy(): void {

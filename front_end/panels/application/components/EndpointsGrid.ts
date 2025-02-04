@@ -6,10 +6,14 @@ import '../../../ui/legacy/components/data_grid/data_grid.js';
 
 import * as i18n from '../../../core/i18n/i18n.js';
 import type * as Protocol from '../../../generated/protocol.js';
-import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import * as Lit from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
-import reportingApiGridStyles from './reportingApiGrid.css.js';
+import reportingApiGridStylesRaw from './reportingApiGrid.css.js';
+
+// TODO(crbug.com/391381439): Fully migrate off of constructed style sheets.
+const reportingApiGridStyles = new CSSStyleSheet();
+reportingApiGridStyles.replaceSync(reportingApiGridStylesRaw.cssContent);
 
 const UIStrings = {
   /**
@@ -21,7 +25,7 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('panels/application/components/EndpointsGrid.ts', UIStrings);
 export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-const {render, html} = LitHtml;
+const {render, html} = Lit;
 
 export interface EndpointsGridData {
   endpoints: Map<string, Protocol.Network.ReportingApiEndpoint[]>;
@@ -49,7 +53,7 @@ export class EndpointsGrid extends HTMLElement {
       <div class="reporting-container" jslog=${VisualLogging.section('endpoints')}>
         <div class="reporting-header">${i18n.i18n.lockedString('Endpoints')}</div>
         ${this.#endpoints.size > 0 ? html`
-          <devtools-new-data-grid striped>
+          <devtools-data-grid striped>
            <table>
             <tr>
               <th id="origin" weight="30">${i18n.i18n.lockedString('Origin')}</th>
@@ -64,7 +68,7 @@ export class EndpointsGrid extends HTMLElement {
                 </tr>`))
                 .flat()}
             </table>
-          </devtools-new-data-grid>
+          </devtools-data-grid>
         ` : html`
           <div class="reporting-placeholder">
             <div>${i18nString(UIStrings.noEndpointsToDisplay)}</div>

@@ -334,6 +334,10 @@ export const generatedProperties = [
    "animation-range-start",
    "animation-timeline",
    "animation-timing-function",
+   "animation-trigger-exit-range-end",
+   "animation-trigger-exit-range-start",
+   "animation-trigger-range-end",
+   "animation-trigger-range-start",
    "animation-trigger-timeline",
    "animation-trigger-type",
    "app-region",
@@ -417,6 +421,7 @@ export const generatedProperties = [
    "column-count",
    "column-fill",
    "column-gap",
+   "column-rule-break",
    "column-rule-color",
    "column-rule-style",
    "column-rule-width",
@@ -505,6 +510,8 @@ export const generatedProperties = [
    "inset-inline-end",
    "inset-inline-start",
    "interactivity",
+   "interest-target-hide-delay",
+   "interest-target-show-delay",
    "interpolate-size",
    "isolation",
    "justify-content",
@@ -604,8 +611,6 @@ export const generatedProperties = [
    "perspective",
    "perspective-origin",
    "pointer-events",
-   "popover-hide-delay",
-   "popover-show-delay",
    "position",
    "position-anchor",
    "position-area",
@@ -865,6 +870,43 @@ export const generatedProperties = [
    "step-end"
   ],
   "name": "animation-timing-function"
+ },
+ {
+  "longhands": [
+   "animation-trigger-timeline",
+   "animation-trigger-type",
+   "animation-trigger-range-start",
+   "animation-trigger-range-end",
+   "animation-trigger-exit-range-start",
+   "animation-trigger-exit-range-end"
+  ],
+  "name": "animation-trigger"
+ },
+ {
+  "longhands": [
+   "animation-trigger-exit-range-start",
+   "animation-trigger-exit-range-end"
+  ],
+  "name": "animation-trigger-exit-range"
+ },
+ {
+  "name": "animation-trigger-exit-range-end"
+ },
+ {
+  "name": "animation-trigger-exit-range-start"
+ },
+ {
+  "longhands": [
+   "animation-trigger-range-start",
+   "animation-trigger-range-end"
+  ],
+  "name": "animation-trigger-range"
+ },
+ {
+  "name": "animation-trigger-range-end"
+ },
+ {
+  "name": "animation-trigger-range-start"
  },
  {
   "keywords": [
@@ -1654,6 +1696,15 @@ export const generatedProperties = [
    "column-rule-color"
   ],
   "name": "column-rule"
+ },
+ {
+  "inherited": false,
+  "keywords": [
+   "none",
+   "spanning-item",
+   "intersection"
+  ],
+  "name": "column-rule-break"
  },
  {
   "keywords": [
@@ -2526,6 +2577,19 @@ export const generatedProperties = [
   "name": "interactivity"
  },
  {
+  "longhands": [
+   "interest-target-show-delay",
+   "interest-target-hide-delay"
+  ],
+  "name": "interest-target-delay"
+ },
+ {
+  "name": "interest-target-hide-delay"
+ },
+ {
+  "name": "interest-target-show-delay"
+ },
+ {
   "inherited": true,
   "keywords": [
    "numeric-only",
@@ -3274,12 +3338,6 @@ export const generatedProperties = [
    "all"
   ],
   "name": "pointer-events"
- },
- {
-  "name": "popover-hide-delay"
- },
- {
-  "name": "popover-show-delay"
  },
  {
   "keywords": [
@@ -4923,6 +4981,13 @@ export const generatedPropertyValues = {
  "column-gap": {
   "values": [
    "normal"
+  ]
+ },
+ "column-rule-break": {
+  "values": [
+   "none",
+   "spanning-item",
+   "intersection"
   ]
  },
  "column-rule-color": {

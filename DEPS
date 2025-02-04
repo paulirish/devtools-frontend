@@ -12,19 +12,19 @@ vars = {
   'build_with_chromium': False,
 
   'build_url': 'https://chromium.googlesource.com/chromium/src/build.git',
-  'build_revision': '8fe56cd1b654eeb75096141dc8fbd353cb1b9e21',
+  'build_revision': 'dc7b3561cdb982e8961e0f9930bb0bd532722625',
 
   'buildtools_url': 'https://chromium.googlesource.com/chromium/src/buildtools.git',
-  'buildtools_revision': 'a660247d3c14a172b74b8e832ba1066b30183c97',
+  'buildtools_revision': '6377d6649b0a2160ab8bb0b88d3cc64e3fd897cf',
 
   'depot_tools_url': 'https://chromium.googlesource.com/chromium/tools/depot_tools.git',
-  'depot_tools_revision': 'a4131b94475c8c023304993678b6f7d0e347fe0c',
+  'depot_tools_revision': '0cc30c3bafbabf75bc9c79bff5457741e742beb1',
 
   'inspector_protocol_url': 'https://chromium.googlesource.com/deps/inspector_protocol',
-  'inspector_protocol_revision': '69d69ddf3aa698b171886551a4a672c5af1ad902',
+  'inspector_protocol_revision': '940abfc668be2591483f7132145593c6a047f3cf',
 
   # Keeping track of the last time we rollerd the browser protocol files.
-  'chromium_browser_protocol_revision' : '97c9c2548bcd25b4d3c5f4107eb4c12840ae3656',
+  'chromium_browser_protocol_revision' : '649fa7c5bb52d1176c8dfcda03163d2c9bbe8a2a',
 
   'clang_format_url': 'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/clang/tools/clang-format.git',
   'clang_format_revision': '37f6e68a107df43b7d7e044fd36a13cbae3413f2',
@@ -49,7 +49,7 @@ vars = {
   # Chrome version used for tests. It should be regularly updated to
   # match the Canary version listed here:
   # https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json
-  'chrome': '134.0.6971.2',
+  'chrome': '134.0.6998.0',
 
   # 'magic' text to tell depot_tools that git submodules should be accepted but
   # but parity with DEPS file is expected.
@@ -309,7 +309,14 @@ hooks = [
     'name': 'VS Code settings',
     'pattern': '.',
     'condition': 'build_with_chromium == False',
-    'action': ['vpython3', 'third_party/node/node.py', '--output', 'scripts/deps/sync-vscode-settings.js']
+    'action': [
+      'vpython3',
+      'third_party/node/node.py',
+      '--output',
+      # Silence the "Importing JSON modules" warning
+      '--no-warnings=ExperimentalWarning',
+      'scripts/deps/sync-vscode-settings.mjs'
+    ]
   },
 ]
 

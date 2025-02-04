@@ -39,7 +39,6 @@ import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
-import * as Bindings from '../../models/bindings/bindings.js';
 import type * as Extensions from '../../models/extensions/extensions.js';
 import * as Logs from '../../models/logs/logs.js';
 import * as Trace from '../../models/trace/trace.js';
@@ -226,6 +225,7 @@ export class NetworkPanel extends UI.Panel.Panel implements
 
   constructor(displayScreenshotDelay: number) {
     super('network');
+    this.registerRequiredCSS(networkPanelStyles);
 
     this.displayScreenshotDelay = displayScreenshotDelay;
     this.networkLogShowOverviewSetting =
@@ -647,8 +647,8 @@ export class NetworkPanel extends UI.Panel.Panel implements
   }
 
   override wasShown(): void {
+    super.wasShown();
     UI.Context.Context.instance().setFlavor(NetworkPanel, this);
-    this.registerCSSFiles([networkPanelStyles]);
 
     // Record the network tool load time after the panel has loaded.
     Host.userMetrics.panelLoaded('network', 'DevTools.Launch.Network');
@@ -656,6 +656,7 @@ export class NetworkPanel extends UI.Panel.Panel implements
 
   override willHide(): void {
     UI.Context.Context.instance().setFlavor(NetworkPanel, null);
+    super.willHide();
   }
 
   revealAndHighlightRequest(request: SDK.NetworkRequest.NetworkRequest): void {
@@ -807,7 +808,7 @@ export class NetworkPanel extends UI.Panel.Panel implements
       return;
     }
     if (target instanceof Workspace.UISourceCode.UISourceCode) {
-      const resource = Bindings.ResourceUtils.resourceForURL(target.url());
+      const resource = SDK.ResourceTreeModel.ResourceTreeModel.resourceForURL(target.url());
       if (resource && resource.request) {
         appendRevealItem(resource.request);
       } else {
@@ -849,8 +850,8 @@ export class NetworkPanel extends UI.Panel.Panel implements
     this.calculator.updateBoundaries(request);
     // FIXME: Unify all time units across the frontend!
     this.overviewPane.setBounds(
-        Trace.Types.Timing.MilliSeconds(this.calculator.minimumBoundary() * 1000),
-        Trace.Types.Timing.MilliSeconds(this.calculator.maximumBoundary() * 1000));
+        Trace.Types.Timing.Milli(this.calculator.minimumBoundary() * 1000),
+        Trace.Types.Timing.Milli(this.calculator.maximumBoundary() * 1000));
     this.networkOverview.updateRequest(request);
   }
 

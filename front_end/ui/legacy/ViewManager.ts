@@ -18,7 +18,7 @@ import {type EventData, Events as TabbedPaneEvents, TabbedPane} from './TabbedPa
 import {type ItemsProvider, type ToolbarItem, ToolbarMenuButton} from './Toolbar.js';
 import {createTextChild} from './UIUtils.js';
 import type {TabbedViewLocation, View, ViewLocation} from './View.js';
-import viewContainersStyles from './viewContainers.css.legacy.js';
+import viewContainersStyles from './viewContainers.css.js';
 import {
   getLocalizedViewLocationCategory,
   getRegisteredLocationResolvers,
@@ -453,6 +453,7 @@ class ExpandableContainerWidget extends VBox {
   }
 
   override wasShown(): void {
+    super.wasShown();
     if (this.widget && this.materializePromise) {
       void this.materializePromise.then(() => {
         if (this.titleElement.classList.contains('expanded') && this.widget) {
@@ -914,15 +915,15 @@ class StackLocation extends Location implements ViewLocation {
 }
 
 export {
-  ViewRegistration,
-  ViewPersistence,
+  getLocalizedViewLocationCategory,
+  getRegisteredLocationResolvers,
   getRegisteredViewExtensions,
   maybeRemoveViewExtension,
-  registerViewExtension,
-  ViewLocationValues,
-  getRegisteredLocationResolvers,
   registerLocationResolver,
-  ViewLocationCategory,
-  getLocalizedViewLocationCategory,
+  registerViewExtension,
   resetViewRegistration,
+  ViewLocationCategory,
+  ViewLocationValues,
+  ViewPersistence,
+  ViewRegistration,
 };

@@ -24,7 +24,13 @@ export const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('models/trace/insights/DOMSize.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-const DOM_UPDATE_LIMIT = 800;
+const DOM_SIZE_DURATION_THRESHOLD = Helpers.Timing.milliToMicro(Types.Timing.Milli(40));
+
+// These thresholds were selected to maximize the number of long (>40ms) events above
+// the threshold while maximizing the number of short (<40ms) events below the threshold.
+// See go/rpp-dom-size-thresholds for the analysis that produced these thresholds.
+const LAYOUT_OBJECTS_THRESHOLD = 100;
+const STYLE_RECALC_ELEMENTS_THRESHOLD = 300;
 
 export type DOMSizeInsightModel = InsightModel<{
   largeLayoutUpdates: Types.Events.Layout[],
@@ -87,29 +93,29 @@ export function generateInsight(
     const first = entries[0];
     const last = entries[entries.length - 1];
     const timeRange =
-        Helpers.Timing.traceWindowFromMicroSeconds(first.ts, Types.Timing.MicroSeconds(last.ts + (last.dur ?? 0)));
+        Helpers.Timing.traceWindowFromMicroSeconds(first.ts, Types.Timing.Micro(last.ts + (last.dur ?? 0)));
     if (!Helpers.Timing.boundsIncludeTimeRange({timeRange, bounds: context.bounds})) {
       continue;
     }
 
     for (const event of layoutEvents) {
-      if (!isWithinContext(event)) {
+      if (event.dur < DOM_SIZE_DURATION_THRESHOLD || !isWithinContext(event)) {
         continue;
       }
 
       const {dirtyObjects} = event.args.beginData;
-      if (dirtyObjects > DOM_UPDATE_LIMIT) {
+      if (dirtyObjects > LAYOUT_OBJECTS_THRESHOLD) {
         largeLayoutUpdates.push(event);
       }
     }
 
     for (const event of updateLayoutTreeEvents) {
-      if (!isWithinContext(event)) {
+      if (event.dur < DOM_SIZE_DURATION_THRESHOLD || !isWithinContext(event)) {
         continue;
       }
 
       const {elementCount} = event.args;
-      if (elementCount > DOM_UPDATE_LIMIT) {
+      if (elementCount > STYLE_RECALC_ELEMENTS_THRESHOLD) {
         largeStyleRecalcs.push(event);
       }
     }
@@ -118,6 +124,14 @@ export function generateInsight(
   const domStatsEvents = parsedTrace.DOMStats.domStatsByFrameId.get(context.frameId)?.filter(isWithinContext) ?? [];
   let maxDOMStats: Types.Events.DOMStats|undefined;
   for (const domStats of domStatsEvents) {
+    // While recording a cross-origin navigation, there can be overlapping dom stats from before & after
+    // the navigation which share a frameId. In this case we should also ensure the pid matches up with
+    // the navigation we care about (i.e. from after the navigation event).
+    const navigationPid = context.navigation?.pid;
+    if (navigationPid && domStats.pid !== navigationPid) {
+      continue;
+    }
+
     if (!maxDOMStats || domStats.args.data.totalElements > maxDOMStats.args.data.totalElements) {
       maxDOMStats = domStats;
     }

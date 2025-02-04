@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import type * as Sinon from 'sinon';
+
 import * as Common from '../core/common/common.js';
 import * as Host from '../core/host/host.js';
 import * as i18n from '../core/i18n/i18n.js';
@@ -91,7 +93,7 @@ export function stubNoopSettings() {
       type: () => Common.Settings.SettingType.BOOLEAN,
       getAsArray: () => [],
     }),
-    getHostConfig: () => {},
+    getHostConfig: () => ({} as Root.Runtime.HostConfig),
   } as unknown as Common.Settings.Settings);
 }
 
@@ -500,9 +502,17 @@ export function expectConsoleLogs(expectedLogs: {warn?: string[], log?: string[]
   });
 }
 
+// This is needed as trying to stub a stub throws
+let hostConfigStub: Sinon.SinonStub<
+    Parameters<Common.Settings.Settings['getHostConfig']>, ReturnType<Common.Settings.Settings['getHostConfig']>>;
 export function getGetHostConfigStub(config: Root.Runtime.HostConfig): sinon.SinonStub {
   const settings = Common.Settings.Settings.instance();
-  return sinon.stub(settings, 'getHostConfig').returns({
+
+  if (settings.getHostConfig !== hostConfigStub) {
+    hostConfigStub = sinon.stub(settings, 'getHostConfig');
+  }
+
+  return hostConfigStub.returns({
     aidaAvailability: {
       disallowLogging: false,
       enterprisePolicyValue: 0,
@@ -538,6 +548,9 @@ export function getGetHostConfigStub(config: Root.Runtime.HostConfig): sinon.Sin
       enabled: false,
       ...config.devToolsAiAssistancePerformanceAgent,
     } as Root.Runtime.HostConfigAiAssistancePerformanceAgent,
+    devToolsImprovedWorkspaces: {
+      enabled: false,
+    },
     devToolsVeLogging: {
       enabled: true,
       testing: false,

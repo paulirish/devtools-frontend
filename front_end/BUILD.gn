@@ -35,11 +35,9 @@ group("front_end") {
 
 copy_to_gen("integration_test_runner-gen") {
   sources = [
-    "application_color_tokens.css",
-    "design_tokens.css",
+    "application_tokens.css",
+    "design_system_tokens.css",
     "integration_test_runner.html",
-    "theme_colors.css",
-    "tokens.css",
   ]
 }
 
@@ -216,7 +214,6 @@ group("unittests") {
     "ui/components/cards:unittests",
     "ui/components/chrome_link:unittests",
     "ui/components/code_highlighter:unittests",
-    "ui/components/data_grid:unittests",
     "ui/components/dialogs:unittests",
     "ui/components/diff_view:unittests",
     "ui/components/expandable_list:unittests",
@@ -250,7 +247,7 @@ group("unittests") {
     "ui/legacy/components/source_frame:unittests",
     "ui/legacy/components/utils:unittests",
     "ui/legacy/theme_support:unittests",
-    "ui/lit-html:unittests",
+    "ui/lit:unittests",
     "ui/visual_logging:unittests",
   ]
 }

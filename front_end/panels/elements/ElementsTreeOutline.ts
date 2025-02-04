@@ -126,7 +126,7 @@ export class ElementsTreeOutline extends
     this.treeElementByNode = new WeakMap();
     const shadowContainer = document.createElement('div');
     this.shadowRoot = UI.UIUtils.createShadowRootWithCoreStyles(
-        shadowContainer, {cssFile: [elementsTreeOutlineStyles, CodeHighlighter.Style.default]});
+        shadowContainer, {cssFile: [elementsTreeOutlineStyles, CodeHighlighter.codeHighlighterStyles]});
     const outlineDisclosureElement = this.shadowRoot.createChild('div', 'elements-disclosure');
 
     this.elementInternal = this.element;
@@ -1382,10 +1382,17 @@ export class ElementsTreeOutline extends
       visibleChildren.push(markerPseudoElement);
     }
 
+    const checkmarkPseudoElement = node.checkmarkPseudoElement();
+    if (checkmarkPseudoElement) {
+      visibleChildren.push(checkmarkPseudoElement);
+    }
+
     const beforePseudoElement = node.beforePseudoElement();
     if (beforePseudoElement) {
       visibleChildren.push(beforePseudoElement);
     }
+
+    visibleChildren.push(...node.carouselPseudoElements());
 
     if (node.childNodeCount()) {
       // Children may be stale when the outline is not wired to receive DOMModel updates.
@@ -1399,6 +1406,11 @@ export class ElementsTreeOutline extends
     const afterPseudoElement = node.afterPseudoElement();
     if (afterPseudoElement) {
       visibleChildren.push(afterPseudoElement);
+    }
+
+    const pickerIconPseudoElement = node.pickerIconPseudoElement();
+    if (pickerIconPseudoElement) {
+      visibleChildren.push(pickerIconPseudoElement);
     }
 
     const backdropPseudoElement = node.backdropPseudoElement();

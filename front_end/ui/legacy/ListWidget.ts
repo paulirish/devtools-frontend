@@ -7,16 +7,14 @@ import './Toolbar.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
-import * as LitHtml from '../lit-html/lit-html.js';
+import {html, render} from '../lit/lit.js';
 import * as VisualLogging from '../visual_logging/visual_logging.js';
 
 import * as ARIAUtils from './ARIAUtils.js';
-import listWidgetStyles from './listWidget.css.legacy.js';
+import listWidgetStyles from './listWidget.css.js';
 import {Tooltip} from './Tooltip.js';
 import {createInput, createTextButton, ElementFocusRestorer} from './UIUtils.js';
 import {VBox} from './Widget.js';
-
-const {html, render} = LitHtml;
 
 const UIStrings = {
   /**

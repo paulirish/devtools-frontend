@@ -47,7 +47,7 @@ import * as CodeHighlighter from '../../ui/components/code_highlighter/code_high
 import codeHighlighterStyles from '../../ui/components/code_highlighter/codeHighlighter.css.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 // eslint-disable-next-line rulesdir/es-modules-import
-import imagePreviewStyles from '../../ui/legacy/components/utils/imagePreview.css.js';
+import imagePreviewStylesRaw from '../../ui/legacy/components/utils/imagePreview.css.js';
 import * as LegacyComponents from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
@@ -60,6 +60,10 @@ import * as ThirdPartyTreeView from './ThirdPartyTreeView.js';
 import {TimelinePanel} from './TimelinePanel.js';
 import {selectionFromEvent} from './TimelineSelection.js';
 import * as Utils from './utils/utils.js';
+
+// TODO(crbug.com/391381439): Fully migrate off of constructed style sheets.
+const imagePreviewStyles = new CSSStyleSheet();
+imagePreviewStyles.replaceSync(imagePreviewStylesRaw.cssContent);
 
 const UIStrings = {
   /**
@@ -509,7 +513,11 @@ const UIStrings = {
   /**
    * @description Text to refer to a 3rd Party entity.
    */
-  entity: '3rd party entity',
+  entity: 'Third party',
+  /**
+   * @description Label for third party table.
+   */
+  thirdPartyTable: '1st / 3rd party table',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/TimelineUIUtils.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -647,7 +655,7 @@ export class TimelineUIUtils {
     if (Trace.Helpers.Trace.eventHasCategory(event, Trace.Types.Events.Categories.Console)) {
       return title;
     }
-    if (Trace.Types.Events.isConsoleTimeStamp(event)) {
+    if (Trace.Types.Events.isConsoleTimeStamp(event) && event.args.data) {
       return i18nString(UIStrings.sS, {PH1: title, PH2: event.args.data.name});
     }
     if (Trace.Types.Events.isAnimation(event) && event.args.data.name) {
@@ -1600,8 +1608,7 @@ export class TimelineUIUtils {
   }
 
   static statsForTimeRange(
-      events: Trace.Types.Events.Event[], startTime: Trace.Types.Timing.MilliSeconds,
-      endTime: Trace.Types.Timing.MilliSeconds): {
+      events: Trace.Types.Events.Event[], startTime: Trace.Types.Timing.Milli, endTime: Trace.Types.Timing.Milli): {
     [x: string]: number,
   } {
     if (!events.length) {
@@ -1751,8 +1758,7 @@ export class TimelineUIUtils {
 
     // Use CodeHighlighter for syntax highlighting.
     const highlightContainer = document.createElement('div');
-    const shadowRoot =
-        UI.UIUtils.createShadowRootWithCoreStyles(highlightContainer, {cssFile: [codeHighlighterStyles]});
+    const shadowRoot = UI.UIUtils.createShadowRootWithCoreStyles(highlightContainer, {cssFile: codeHighlighterStyles});
     const elem = shadowRoot.createChild('div');
     elem.classList.add('monospace', 'source-code');
     elem.textContent = eventStr;
@@ -2020,8 +2026,7 @@ export class TimelineUIUtils {
           aggregatedTotal += total[categoryName];
         }
 
-        const deltaInMillis =
-            Trace.Helpers.Timing.microToMilli((endTime - startTime) as Trace.Types.Timing.MicroSeconds);
+        const deltaInMillis = Trace.Helpers.Timing.microToMilli((endTime - startTime) as Trace.Types.Timing.Micro);
         total['idle'] = Math.max(0, deltaInMillis - aggregatedTotal);
       }
       return false;
@@ -2182,16 +2187,16 @@ export class TimelineUIUtils {
       aggregatedStats: Record<string, number>, rangeStart: number, rangeEnd: number,
       selectedEvents: Trace.Types.Events.Event[],
       thirdPartyTree: ThirdPartyTreeView.ThirdPartyTreeViewWidget): Element {
+    const element = document.createElement('div');
+    element.classList.add('timeline-details-range-summary', 'hbox');
+
+    // First, the category bar chart.
     let total = 0;
+    let categories: TimelineComponents.TimelineSummary.CategoryData[] = [];
     // Calculate total of all categories.
     for (const categoryName in aggregatedStats) {
       total += aggregatedStats[categoryName];
     }
-
-    const element = document.createElement('div');
-    element.classList.add('timeline-details-view-summary');
-
-    let categories: TimelineComponents.TimelineSummary.CategoryData[] = [];
 
     // Get stats values from categories.
     for (const categoryName in Utils.EntryStyles.getCategoryStyles()) {
@@ -2210,37 +2215,26 @@ export class TimelineUIUtils {
 
     // Keeps the most useful categories on top.
     categories = categories.sort((a, b) => b.value - a.value);
-    const start = Trace.Types.Timing.MilliSeconds(rangeStart);
-    const end = Trace.Types.Timing.MilliSeconds(rangeEnd);
-    const summaryTable = new TimelineComponents.TimelineSummary.TimelineSummary();
-    summaryTable.data = {
+    const start = Trace.Types.Timing.Milli(rangeStart);
+    const end = Trace.Types.Timing.Milli(rangeEnd);
+    const categorySummaryTable = new TimelineComponents.TimelineSummary.CategorySummary();
+    categorySummaryTable.data = {
       rangeStart: start,
       rangeEnd: end,
       total,
       categories,
       selectedEvents,
     };
-    const summaryTableContainer = element.createChild('div');
-    summaryTableContainer.appendChild(summaryTable);
+    element.append(categorySummaryTable);
 
-    if (!Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_THIRD_PARTY_DEPENDENCIES)) {
-      return element;
+    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_THIRD_PARTY_DEPENDENCIES)) {
+      // Add the 3p datagrid
+      const treeView = new ThirdPartyTreeView.ThirdPartyTreeElement();
+      treeView.treeView = thirdPartyTree;
+      UI.ARIAUtils.setLabel(treeView, i18nString(UIStrings.thirdPartyTable));
+      element.append(treeView);
     }
 
-    const treeView = new ThirdPartyTreeView.ThirdPartyTreeView();
-    treeView.treeView = thirdPartyTree;
-    const treeSlot = document.createElement('slot');
-
-    const thirdPartyDiv = document.createElement('div');
-    thirdPartyDiv.className = 'third-party-table';
-
-    treeSlot.name = 'third-party-table';
-    treeSlot.append(treeView);
-
-    thirdPartyDiv.appendChild(treeSlot);
-    if (summaryTable.shadowRoot) {
-      summaryTable.shadowRoot?.appendChild(thirdPartyDiv);
-    }
     return element;
   }
 
@@ -2256,8 +2250,8 @@ export class TimelineUIUtils {
       const filmStripPreview = document.createElement('div');
       filmStripPreview.classList.add('timeline-filmstrip-preview');
       // TODO(paulirish): Adopt Util.ImageCache
-      void UI.UIUtils.loadImage(filmStripFrame.screenshotEvent.args.dataUri)
-          .then(image => image && filmStripPreview.appendChild(image));
+      const uri = Trace.Handlers.ModelHandlers.Screenshots.screenshotImageDataUri(filmStripFrame.screenshotEvent);
+      void UI.UIUtils.loadImage(uri).then(image => image && filmStripPreview.appendChild(image));
       contentHelper.appendElementRow('', filmStripPreview);
       filmStripPreview.addEventListener('click', frameClicked.bind(null, filmStrip, filmStripFrame), false);
     }
@@ -2271,8 +2265,7 @@ export class TimelineUIUtils {
 
   static frameDuration(frame: Trace.Types.Events.LegacyTimelineFrame): Element {
     const offsetMilli = Trace.Helpers.Timing.microToMilli(frame.startTimeOffset);
-    const durationMilli =
-        Trace.Helpers.Timing.microToMilli(Trace.Types.Timing.MicroSeconds(frame.endTime - frame.startTime));
+    const durationMilli = Trace.Helpers.Timing.microToMilli(Trace.Types.Timing.Micro(frame.endTime - frame.startTime));
 
     const durationText = i18nString(UIStrings.sAtSParentheses, {
       PH1: i18n.TimeUtilities.millisToString(durationMilli, true),
@@ -2552,8 +2545,7 @@ export interface TimelineMarkerStyle {
  * the LCP (for example) relative to the last navigation.
  **/
 export function timeStampForEventAdjustedForClosestNavigationIfPossible(
-    event: Trace.Types.Events.Event,
-    parsedTrace: Trace.Handlers.Types.ParsedTrace|null): Trace.Types.Timing.MilliSeconds {
+    event: Trace.Types.Events.Event, parsedTrace: Trace.Handlers.Types.ParsedTrace|null): Trace.Types.Timing.Milli {
   if (!parsedTrace) {
     const {startTime} = Trace.Helpers.Timing.eventTimingsMilliSeconds(event);
     return startTime;
@@ -2606,10 +2598,10 @@ export function isMarkerEvent(parsedTrace: Trace.Handlers.Types.ParsedTrace, eve
 }
 
 function getEventSelfTime(
-    event: Trace.Types.Events.Event, parsedTrace: Trace.Handlers.Types.ParsedTrace): Trace.Types.Timing.MilliSeconds {
+    event: Trace.Types.Events.Event, parsedTrace: Trace.Handlers.Types.ParsedTrace): Trace.Types.Timing.Milli {
   const mapToUse = Trace.Types.Extensions.isSyntheticExtensionEntry(event) ?
       parsedTrace.ExtensionTraceData.entryToNode :
       parsedTrace.Renderer.entryToNode;
   const selfTime = mapToUse.get(event)?.selfTime;
-  return selfTime ? Trace.Helpers.Timing.microToMilli(selfTime) : Trace.Types.Timing.MilliSeconds(0);
+  return selfTime ? Trace.Helpers.Timing.microToMilli(selfTime) : Trace.Types.Timing.Milli(0);
 }

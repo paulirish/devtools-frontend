@@ -333,12 +333,16 @@ const UIStrings = {
   /**
    * @description Title for the Dim 3rd Parties checkbox.
    */
-  dimThirdParties: 'Dim 3rd Parties',
+  dimThirdParties: 'Dim 3rd parties',
+  /**
+   * @description Description for the Dim 3rd Parties checkbox tooltip describing how 3rd parties are classified.
+   */
+  thirdPartiesByThirdPartyWeb: '3rd parties classified by third-party-web',
 };
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/TimelinePanel.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-let timelinePanelInstance: TimelinePanel;
+let timelinePanelInstance: TimelinePanel|undefined;
 let isNode: boolean;
 
 /**
@@ -380,6 +384,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   readonly #minimapComponent = new TimelineMiniMap();
   #viewMode: ViewMode = {mode: 'LANDING_PAGE'};
   readonly #dimThirdPartiesSetting: Common.Settings.Setting<boolean>|null = null;
+  #thirdPartyCheckbox: UI.Toolbar.ToolbarSettingCheckbox|null = null;
 
   /**
    * We get given any filters for a new trace when it is recorded/imported.
@@ -421,7 +426,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   private cpuThrottlingSelect?: MobileThrottling.ThrottlingManager.CPUThrottlingSelectorWrapper;
   private fileSelectorElement?: HTMLInputElement;
   private selection: TimelineSelection|null = null;
-  private traceLoadStart!: Trace.Types.Timing.MilliSeconds|null;
+  private traceLoadStart!: Trace.Types.Timing.Milli|null;
   private primaryPageTargetPromiseCallback = (_target: SDK.Target.Target): void => {};
   // Note: this is technically unused, but we need it to define the promiseCallback function above.
   private primaryPageTargetPromise = new Promise<SDK.Target.Target>(res => {
@@ -484,8 +489,9 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
 
   #onMainEntryHovered: (event: Common.EventTarget.EventTargetEvent<number>) => void;
 
-  constructor() {
+  constructor(traceModel?: Trace.TraceModel.Model) {
     super('timeline');
+    this.registerRequiredCSS(timelinePanelStyles);
     const adornerContent = document.createElement('span');
     adornerContent.innerHTML = `<div style="
       font-size: 12px;
@@ -504,7 +510,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.brickBreakerToolbarButton.addEventListener(
         UI.Toolbar.ToolbarButton.Events.CLICK, () => this.#onBrickBreakerEasterEggClick());
 
-    this.#traceEngineModel = this.#instantiateNewModel();
+    this.#traceEngineModel = traceModel || this.#instantiateNewModel();
     this.#listenForProcessingProgress();
 
     this.element.addEventListener('contextmenu', this.contextMenu.bind(this), false);
@@ -720,6 +726,8 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   }
 
   #setActiveInsight(insight: TimelineComponents.Sidebar.ActiveInsight|null): void {
+    // When an insight is selected, ensure that the 3P checkbox is disabled
+    // to avoid dimming interference.
     if (insight) {
       this.#splitWidget.showBoth();
     }
@@ -727,18 +735,42 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.flameChart.setActiveInsight(insight);
   }
 
+  /**
+   * This "disables" the 3P checkbox in the toolbar.
+   * Disabling here does a couple of things:
+   * 1) makes the checkbox dimmed and unclickable
+   * 2) gives the checkbox UI an indeterminate state
+   */
+  set3PCheckboxDisabled(disabled: boolean): void {
+    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_DIM_UNRELATED_EVENTS)) {
+      this.#thirdPartyCheckbox?.applyEnabledState(!disabled);
+      this.#thirdPartyCheckbox?.setIndeterminate(disabled);
+    }
+  }
+
   static instance(opts: {
     forceNew: boolean|null,
     isNode: boolean,
+    traceModel?: Trace.TraceModel.Model,
   }|undefined = {forceNew: null, isNode: false}): TimelinePanel {
     const {forceNew, isNode: isNodeMode} = opts;
     isNode = isNodeMode;
 
     if (!timelinePanelInstance || forceNew) {
-      timelinePanelInstance = new TimelinePanel();
+      timelinePanelInstance = new TimelinePanel(opts.traceModel);
     }
 
     return timelinePanelInstance;
+  }
+  static removeInstance(): void {
+    // TODO(crbug.com/358583420): Simplify attached data management
+    // so that we don't have to maintain all of these singletons.
+    Utils.SourceMapsResolver.SourceMapsResolver.clearResolvedNodeNames();
+    Trace.Helpers.SyntheticEvents.SyntheticEventsManager.reset();
+    TraceBounds.TraceBounds.BoundsManager.removeInstance();
+    ModificationsManager.reset();
+    ActiveFilters.removeInstance();
+    timelinePanelInstance = undefined;
   }
 
   #instantiateNewModel(): Trace.TraceModel.Model {
@@ -762,7 +794,6 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   override wasShown(): void {
     super.wasShown();
     UI.Context.Context.instance().setFlavor(TimelinePanel, this);
-    this.registerCSSFiles([timelinePanelStyles]);
     // Record the performance tool load time.
     Host.userMetrics.panelLoaded('timeline', 'DevTools.Launch.Timeline');
 
@@ -1011,7 +1042,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   }
 
   private createSettingCheckbox(setting: Common.Settings.Setting<boolean>, tooltip: Platform.UIString.LocalizedString):
-      UI.Toolbar.ToolbarItem {
+      UI.Toolbar.ToolbarSettingCheckbox {
     const checkboxItem = new UI.Toolbar.ToolbarSettingCheckbox(setting, tooltip);
     this.recordingOptionUIControls.push(checkboxItem);
     return checkboxItem;
@@ -1133,7 +1164,8 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_THIRD_PARTY_DEPENDENCIES) &&
         this.#dimThirdPartiesSetting) {
       const dimThirdPartiesCheckbox =
-          this.createSettingCheckbox(this.#dimThirdPartiesSetting, i18nString(UIStrings.dimThirdParties));
+          this.createSettingCheckbox(this.#dimThirdPartiesSetting, i18nString(UIStrings.thirdPartiesByThirdPartyWeb));
+      this.#thirdPartyCheckbox = dimThirdPartiesCheckbox;
       this.panelToolbar.appendToolbarItem(dimThirdPartiesCheckbox);
     }
 
@@ -1522,7 +1554,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   }
 
   #extensionDataVisibilityChanged(): void {
-    this.flameChart.extensionDataVisibilityChanged();
+    this.flameChart.rebuildDataForTrace();
   }
 
   private updateSettingsPaneVisibility(): void {
@@ -1964,8 +1996,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     }
     this.flameChart.setInsights(traceInsightsSets, this.#eventToRelatedInsights);
 
-    const isCpuProfile = traceMetadata?.dataOrigin === Trace.Types.File.DataOrigin.CPU_PROFILE;
-    this.flameChart.setModel(parsedTrace, traceMetadata, isCpuProfile);
+    this.flameChart.setModel(parsedTrace, traceMetadata);
     this.flameChart.resizeToPreferredHeights();
     // Reset the visual selection as we've just swapped to a new trace.
     this.flameChart.setSelectionAndReveal(null);
@@ -2131,14 +2162,14 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     if (!parsedTrace) {
       return;
     }
-    const checkboxState = this.#dimThirdPartiesSetting?.get() ?? false;
-    this.flameChart.setActiveThirdPartyDimmingSetting(checkboxState);
+
+    const checkboxState = this.#dimThirdPartiesSetting?.getIfNotDisabled() ?? false;
     const thirdPartyEvents = this.#entityMapper?.thirdPartyEvents() ?? [];
-    if (this.#dimThirdPartiesSetting?.get() && thirdPartyEvents.length) {
-      this.flameChart.dimEvents(thirdPartyEvents);
+
+    if (checkboxState && thirdPartyEvents.length) {
+      this.flameChart.setActiveThirdPartyDimmingSetting(thirdPartyEvents);
     } else {
-      // Ensure dimming stores are cleared, and there is no dimming.
-      this.flameChart.disableAllDimming();
+      this.flameChart.setActiveThirdPartyDimmingSetting(null);
     }
   }
 
@@ -2274,7 +2305,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     if (!this.loader) {
       this.statusPane.finish();
     }
-    this.traceLoadStart = Trace.Types.Timing.MilliSeconds(performance.now());
+    this.traceLoadStart = Trace.Types.Timing.Milli(performance.now());
     await this.loadingProgress(0);
   }
 
@@ -2320,7 +2351,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
    *
    * IMPORTANT: All the code in here should be code that is only required when we have
    * recorded or loaded a brand new trace. If you need the code to run when the
-   * user switches to an existing trace, please {@see setModel} and put your
+   * user switches to an existing trace, please @see #setModelForActiveTrace and put your
    * code in there.
    **/
   async loadingComplete(
@@ -2408,9 +2439,9 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     // for the first paint of the flamechart
     requestAnimationFrame(() => {
       setTimeout(() => {
-        const end = Trace.Types.Timing.MilliSeconds(performance.now());
+        const end = Trace.Types.Timing.Milli(performance.now());
         const measure = performance.measure('TraceLoad', {start, end});
-        const duration = Trace.Types.Timing.MilliSeconds(measure.duration);
+        const duration = Trace.Types.Timing.Milli(measure.duration);
         this.element.dispatchEvent(new TraceLoadEvent(duration));
         Host.userMetrics.performanceTraceLoad(measure);
       }, 0);
@@ -2587,7 +2618,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.flameChart.highlightEvent(event);
   }
 
-  #revealTimeRange(startTime: Trace.Types.Timing.MilliSeconds, endTime: Trace.Types.Timing.MilliSeconds): void {
+  #revealTimeRange(startTime: Trace.Types.Timing.Milli, endTime: Trace.Types.Timing.Milli): void {
     const traceBoundsState = TraceBounds.TraceBounds.BoundsManager.instance().state();
     if (!traceBoundsState) {
       return;
@@ -2602,8 +2633,8 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     }
     TraceBounds.TraceBounds.BoundsManager.instance().setTimelineVisibleWindow(
         Trace.Helpers.Timing.traceWindowFromMilliSeconds(
-            Trace.Types.Timing.MilliSeconds(traceWindow.min + offset),
-            Trace.Types.Timing.MilliSeconds(traceWindow.max + offset),
+            Trace.Types.Timing.Milli(traceWindow.min + offset),
+            Trace.Types.Timing.Milli(traceWindow.max + offset),
             ),
         {
           shouldAnimate: true,
@@ -2649,6 +2680,7 @@ export const headerHeight = 20;
 export interface TimelineModeViewDelegate {
   select(selection: TimelineSelection|null): void;
   element: Element;
+  set3PCheckboxDisabled(disabled: boolean): void;
   selectEntryAtTime(events: Trace.Types.Events.Event[]|null, time: number): void;
   highlightEvent(event: Trace.Types.Events.Event|null): void;
 }
@@ -2800,7 +2832,7 @@ export class StatusPane extends UI.Widget.VBox {
 
   override wasShown(): void {
     super.wasShown();
-    this.registerCSSFiles([timelineStatusDialogStyles]);
+    this.registerRequiredCSS(timelineStatusDialogStyles);
   }
 }
 

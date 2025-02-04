@@ -30,6 +30,7 @@
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
+import type * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 import * as UI from '../../ui/legacy/legacy.js';
@@ -42,15 +43,11 @@ const UIStrings = {
   /**
    *@description Header text to indicate there are no breakpoints
    */
-  noBreakpoints: 'You\'ll find DOM breakpoints here',
+  noBreakpoints: 'No DOM breakpoints set',
   /**
    *@description DOM breakpoints description that shows if no DOM breakpoints are set
    */
   domBreakpointsDescription: 'DOM breakpoints pause on the code that changes a DOM node or its children.',
-  /**
-   *@description Link text to more information on DOM breakpoints
-   */
-  learnMore: 'Learn more',
   /**
    *@description Accessibility label for the DOM breakpoints list in the Sources panel
    */
@@ -130,33 +127,32 @@ const str_ = i18n.i18n.registerUIStrings('panels/browser_debugger/DOMBreakpoints
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 const i18nLazyString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined, str_);
 
-const DOM_BREAKPOINT_DOCUMENTATION_URL = 'https://developer.chrome.com/docs/devtools/javascript/breakpoints#dom';
+const DOM_BREAKPOINT_DOCUMENTATION_URL =
+    'https://developer.chrome.com/docs/devtools/javascript/breakpoints#dom' as Platform.DevToolsPath.UrlString;
 
 let domBreakpointsSidebarPaneInstance: DOMBreakpointsSidebarPane;
 
 export class DOMBreakpointsSidebarPane extends UI.Widget.VBox implements
     UI.ContextFlavorListener.ContextFlavorListener, UI.ListControl.ListDelegate<SDK.DOMDebuggerModel.DOMBreakpoint> {
   elementToCheckboxes: WeakMap<Element, HTMLInputElement>;
-  readonly #emptyElement: HTMLElement;
+  readonly #emptyElement: UI.EmptyWidget.EmptyWidget;
   readonly #breakpoints: UI.ListModel.ListModel<SDK.DOMDebuggerModel.DOMBreakpoint>;
   #list: UI.ListControl.ListControl<SDK.DOMDebuggerModel.DOMBreakpoint>;
   #highlightedBreakpoint: SDK.DOMDebuggerModel.DOMBreakpoint|null;
 
   private constructor() {
     super(true);
+    this.registerRequiredCSS(domBreakpointsSidebarPaneStyles);
 
     this.elementToCheckboxes = new WeakMap();
 
     this.contentElement.setAttribute(
         'jslog', `${VisualLogging.section('sources.dom-breakpoints').track({resize: true})}`);
     this.contentElement.classList.add('dom-breakpoints-container');
-    this.#emptyElement = this.contentElement.createChild('div', 'empty-state');
-    this.#emptyElement.createChild('div', 'header').textContent = i18nString(UIStrings.noBreakpoints);
-    const emptyStateDescription = this.#emptyElement.createChild('div', 'description');
-    emptyStateDescription.textContent = i18nString(UIStrings.domBreakpointsDescription);
-    const learnMore = UI.XLink.XLink.create(
-        DOM_BREAKPOINT_DOCUMENTATION_URL, i18nString(UIStrings.learnMore), '', undefined, 'learn-more');
-    emptyStateDescription.appendChild(learnMore);
+    this.#emptyElement =
+        new UI.EmptyWidget.EmptyWidget(UIStrings.noBreakpoints, i18nString(UIStrings.domBreakpointsDescription));
+    this.#emptyElement.appendLink(DOM_BREAKPOINT_DOCUMENTATION_URL);
+    this.#emptyElement.show(this.contentElement);
 
     this.#breakpoints = new UI.ListModel.ListModel();
     this.#list = new UI.ListControl.ListControl(this.#breakpoints, this, UI.ListControl.ListMode.NonViewport);
@@ -164,7 +160,6 @@ export class DOMBreakpointsSidebarPane extends UI.Widget.VBox implements
     this.#list.element.classList.add('breakpoint-list', 'hidden');
     UI.ARIAUtils.markAsList(this.#list.element);
     UI.ARIAUtils.setLabel(this.#list.element, i18nString(UIStrings.domBreakpointsList));
-    this.#emptyElement.tabIndex = -1;
 
     SDK.TargetManager.TargetManager.instance().addModelListener(
         SDK.DOMDebuggerModel.DOMDebuggerModel, SDK.DOMDebuggerModel.Events.DOM_BREAKPOINT_ADDED, this.breakpointAdded,
@@ -255,7 +250,7 @@ export class DOMBreakpointsSidebarPane extends UI.Widget.VBox implements
       UI.ARIAUtils.setDescription(element, checkedStateText);
     }
 
-    this.#emptyElement.classList.add('hidden');
+    this.#emptyElement.hideWidget();
     this.#list.element.classList.remove('hidden');
 
     return element;
@@ -314,8 +309,8 @@ export class DOMBreakpointsSidebarPane extends UI.Widget.VBox implements
       }
     }
     if (this.#breakpoints.length === 0) {
-      this.#emptyElement.classList.remove('hidden');
-      this.setDefaultFocusedElement(this.#emptyElement);
+      this.#emptyElement.showWidget();
+      this.setDefaultFocusedElement(this.#emptyElement.element);
       this.#list.element.classList.add('hidden');
     } else if (lastIndex >= 0) {
       const breakpointToSelect = this.#breakpoints.at(lastIndex);
@@ -397,10 +392,6 @@ export class DOMBreakpointsSidebarPane extends UI.Widget.VBox implements
       this.#list.refreshItem(this.#highlightedBreakpoint);
     }
     void UI.ViewManager.ViewManager.instance().showView('sources.dom-breakpoints');
-  }
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([domBreakpointsSidebarPaneStyles]);
   }
 }
 

@@ -6,13 +6,12 @@ import * as Platform from '../../../core/platform/platform.js';
 import {renderElementIntoDOM} from '../../../testing/DOMHelpers.js';
 import {createTarget} from '../../../testing/EnvironmentHelpers.js';
 import {describeWithMockConnection} from '../../../testing/MockConnection.js';
-import * as LitHtml from '../../lit-html/lit-html.js';
+import {html, render} from '../../lit/lit.js';
 import * as RenderCoordinator from '../render_coordinator/render_coordinator.js';
 
 import * as ChromeLink from './chrome_link.js';
 
 const {urlString} = Platform.DevToolsPath;
-const {html} = LitHtml;
 
 describeWithMockConnection('ChromeLink', () => {
   it('renders a link when given a \'chrome://\' URL', async () => {
@@ -21,7 +20,7 @@ describeWithMockConnection('ChromeLink', () => {
 
     const container = document.createElement('div');
     // clang-format off
-    LitHtml.render(
+    render(
       html`
         <devtools-chrome-link .href=${urlString`chrome://settings`}>
           link text

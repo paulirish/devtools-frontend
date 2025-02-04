@@ -78,6 +78,7 @@ export class PropertiesWidget extends UI.ThrottledWidget.ThrottledWidget {
   private lastRequestedNode?: SDK.DOMModel.DOMNode;
   constructor(throttlingTimeout?: number) {
     super(true /* isWebComponent */, throttlingTimeout);
+    this.registerRequiredCSS(propertiesWidgetStyles);
 
     this.showAllPropertiesSetting = Common.Settings.Settings.instance().createSetting('show-all-properties', false);
     this.showAllPropertiesSetting.addChangeListener(this.filterList.bind(this));
@@ -183,10 +184,5 @@ export class PropertiesWidget extends UI.ThrottledWidget.ThrottledWidget {
       return;
     }
     this.update();
-  }
-
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([propertiesWidgetStyles]);
   }
 }

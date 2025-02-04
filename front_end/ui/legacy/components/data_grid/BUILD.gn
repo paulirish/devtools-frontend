@@ -39,17 +39,7 @@ devtools_entrypoint("bundle") {
 
   visibility = [
     ":*",
-    "../../../../panels/application/*",
-    "../../../../panels/console/*",
-    "../../../../panels/coverage/*",
-    "../../../../panels/css_overview/*",
-    "../../../../panels/developer_resources/*",
-    "../../../../panels/media/*",
-    "../../../../panels/network/*",
-    "../../../../panels/profiler/*",
-    "../../../../panels/security/*",
-    "../../../../panels/timeline/*",
-    "../../../../panels/webauthn/*",
+    "../../../../panels/*",
     "../cookie_table/*",
   ]
 

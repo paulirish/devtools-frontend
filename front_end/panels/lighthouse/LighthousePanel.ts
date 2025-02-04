@@ -82,6 +82,7 @@ export class LighthousePanel extends UI.Panel.Panel {
       controller: LighthouseController,
   ) {
     super('lighthouse');
+    this.registerRequiredCSS(lighthousePanelStyles);
 
     this.controller = controller;
     this.startView = new StartView(this.controller, this);
@@ -362,10 +363,5 @@ export class LighthousePanel extends UI.Panel.Panel {
       els.push(lhContainerEl);
     }
     return els;
-  }
-
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([lighthousePanelStyles]);
   }
 }

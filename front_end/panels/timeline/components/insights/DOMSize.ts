@@ -4,14 +4,16 @@
 
 import '../../../../ui/components/icon_button/icon_button.js';
 import './Table.js';
+import './NodeLink.js';
 
 import * as i18n from '../../../../core/i18n/i18n.js';
 import type {DOMSizeInsightModel} from '../../../../models/trace/insights/DOMSize.js';
 import type * as Trace from '../../../../models/trace/trace.js';
-import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
+import * as Lit from '../../../../ui/lit/lit.js';
 import type * as Overlays from '../../overlays/overlays.js';
 
 import {BaseInsightComponent} from './BaseInsightComponent.js';
+import type * as NodeLink from './NodeLink.js';
 import type {TableData} from './Table.js';
 
 const UIStrings = {
@@ -44,10 +46,10 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/insights/DOMSize.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-const {html} = LitHtml;
+const {html} = Lit;
 
 export class DOMSize extends BaseInsightComponent<DOMSizeInsightModel> {
-  static override readonly litTagName = LitHtml.StaticHtml.literal`devtools-performance-dom-size`;
+  static override readonly litTagName = Lit.StaticHtml.literal`devtools-performance-dom-size`;
   override internalName: string = 'dom-size';
 
   override createOverlays(): Overlays.Overlays.TimelineOverlay[] {
@@ -63,21 +65,43 @@ export class DOMSize extends BaseInsightComponent<DOMSizeInsightModel> {
                        }));
   }
 
-  #renderNodeTable(domStatsData: Trace.Types.Events.DOMStats['args']['data']): LitHtml.LitTemplate {
+  #renderNodeTable(domStatsData: Trace.Types.Events.DOMStats['args']['data']): Lit.LitTemplate {
     const rows: TableData['rows'] = [];
 
     if (domStatsData.maxDepth) {
       const {nodeId, nodeName} = domStatsData.maxDepth;
-      rows.push({values: [i18nString(UIStrings.maxDOMDepth), this.renderNode(nodeId, nodeName)]});
+      // clang-format off
+      const template = html`
+        <devtools-performance-node-link
+          .data=${{
+            backendNodeId: nodeId,
+            frame: domStatsData.frame,
+            fallbackText: nodeName,
+          } as NodeLink.NodeLinkData}>
+        </devtools-performance-node-link>
+      `;
+      // clang-format on
+      rows.push({values: [i18nString(UIStrings.maxDOMDepth), template]});
     }
 
     if (domStatsData.maxChildren) {
       const {nodeId, nodeName} = domStatsData.maxChildren;
-      rows.push({values: [i18nString(UIStrings.maxChildren), this.renderNode(nodeId, nodeName)]});
+      // clang-format off
+      const template = html`
+        <devtools-performance-node-link
+          .data=${{
+            backendNodeId: nodeId,
+            frame: domStatsData.frame,
+            fallbackText: nodeName,
+          } as NodeLink.NodeLinkData}>
+        </devtools-performance-node-link>
+      `;
+      // clang-format on
+      rows.push({values: [i18nString(UIStrings.maxChildren), template]});
     }
 
     if (!rows.length) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
 
     // clang-format off
@@ -93,14 +117,14 @@ export class DOMSize extends BaseInsightComponent<DOMSizeInsightModel> {
     // clang-format on
   }
 
-  override renderContent(): LitHtml.LitTemplate {
+  override renderContent(): Lit.LitTemplate {
     if (!this.model) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
 
     const domStatsData = this.model.maxDOMStats?.args.data;
     if (!domStatsData) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
 
     // clang-format off

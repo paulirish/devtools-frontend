@@ -9,7 +9,7 @@ import * as Trace from '../../../../models/trace/trace.js';
 import * as VisualLogging from '../../../visual_logging/visual_logging.js';
 import * as UI from '../../legacy.js';
 
-import filmStripViewStyles from './filmStripView.css.legacy.js';
+import filmStripViewStyles from './filmStripView.css.js';
 
 const UIStrings = {
   /**
@@ -38,7 +38,7 @@ const str_ = i18n.i18n.registerUIStrings('ui/legacy/components/perf_ui/FilmStrip
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export class FilmStripView extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.HBox>(UI.Widget.HBox) {
   private statusLabel: HTMLElement;
-  private zeroTime: Trace.Types.Timing.MilliSeconds = Trace.Types.Timing.MilliSeconds(0);
+  private zeroTime: Trace.Types.Timing.Milli = Trace.Types.Timing.Milli(0);
   #filmStrip: Trace.Extras.FilmStrip.Data|null = null;
 
   constructor() {
@@ -86,7 +86,8 @@ export class FilmStripView extends Common.ObjectWrapper.eventMixin<EventTypes, t
     element.addEventListener('focusin', this.onMouseEvent.bind(this, Events.FRAME_ENTER, time), false);
     element.addEventListener('focusout', this.onMouseEvent.bind(this, Events.FRAME_EXIT, time), false);
 
-    FilmStripView.setImageData(imageElement, frame.screenshotEvent.args.dataUri);
+    const imgData = Trace.Handlers.ModelHandlers.Screenshots.screenshotImageDataUri(frame.screenshotEvent);
+    FilmStripView.setImageData(imageElement, imgData);
     return element;
   }
 
@@ -117,7 +118,7 @@ export class FilmStripView extends Common.ObjectWrapper.eventMixin<EventTypes, t
   }
 
   reset(): void {
-    this.zeroTime = Trace.Types.Timing.MilliSeconds(0);
+    this.zeroTime = Trace.Types.Timing.Milli(0);
     this.contentElement.removeChildren();
     this.contentElement.appendChild(this.statusLabel);
   }
@@ -142,7 +143,7 @@ export interface EventTypes {
 interface DialogParsedTrace {
   source: 'Trace';
   index: number;
-  zeroTime: Trace.Types.Timing.MilliSeconds;
+  zeroTime: Trace.Types.Timing.Milli;
   frames: readonly Trace.Extras.FilmStrip.Frame[];
 }
 
@@ -201,7 +202,7 @@ export class Dialog {
     return this.#data.frames.length;
   }
 
-  #zeroTime(): Trace.Types.Timing.MilliSeconds {
+  #zeroTime(): Trace.Types.Timing.Milli {
     return this.#data.zeroTime;
   }
 
@@ -274,7 +275,8 @@ export class Dialog {
     this.fragment.$('time').textContent = i18n.TimeUtilities.millisToString(timestamp - this.#zeroTime());
     const image = (this.fragment.$('image') as HTMLImageElement);
     image.setAttribute('data-frame-index', this.index.toString());
-    FilmStripView.setImageData(image, frame.screenshotEvent.args.dataUri);
+    const imgData = Trace.Handlers.ModelHandlers.Screenshots.screenshotImageDataUri(frame.screenshotEvent);
+    FilmStripView.setImageData(image, imgData);
     this.resize();
   }
 }

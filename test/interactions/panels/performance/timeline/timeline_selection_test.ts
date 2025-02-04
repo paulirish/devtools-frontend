@@ -10,7 +10,6 @@ import {getBrowserAndPages, waitFor, waitForMany} from '../../../../shared/helpe
 import {loadComponentDocExample} from '../../../helpers/shared.js';
 
 describe('FlameChart', function() {
-  ('performance_panel/basic.html');
   // TODO(crbug.com/1472155): Improve perf panel trace load speed to prevent timeout bump.
   if (this.timeout() !== 0) {
     this.timeout(20_000);
@@ -79,9 +78,9 @@ describe('FlameChart', function() {
     }, title);
   }
   async function createTimelineBreadcrumb(
-      startTime: Trace.Types.Timing.MilliSeconds, endTime: Trace.Types.Timing.MilliSeconds): Promise<void> {
+      startTime: Trace.Types.Timing.Milli, endTime: Trace.Types.Timing.Milli): Promise<void> {
     const {frontend} = getBrowserAndPages();
-    await frontend.evaluate((startTime: Trace.Types.Timing.MilliSeconds, endTime: Trace.Types.Timing.MilliSeconds) => {
+    await frontend.evaluate((startTime: Trace.Types.Timing.Milli, endTime: Trace.Types.Timing.Milli) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const timelinePanel = (window as any).UI.panels.timeline as Timeline.TimelinePanel.TimelinePanel;
       timelinePanel.getMinimap().addBreadcrumb({startTime, endTime});
@@ -225,8 +224,8 @@ describe('FlameChart', function() {
        assert.strictEqual(initiatorLinkText, 'Schedule style recalculation');
 
        // Create a breadcrumb that is outside of the entry the displayed link is linking to.
-       const breadcrumbStart = 1020034993.608 as Trace.Types.Timing.MilliSeconds;
-       const breadcrumbEnd = 1020035017.841 as Trace.Types.Timing.MilliSeconds;
+       const breadcrumbStart = 1020034993.608 as Trace.Types.Timing.Milli;
+       const breadcrumbEnd = 1020035017.841 as Trace.Types.Timing.Milli;
        await createTimelineBreadcrumb(breadcrumbStart, breadcrumbEnd);
 
        // The link to the initiator is now deactivated and the name is followed by 'outside of the breadcrumb range'

@@ -11,16 +11,20 @@ import type {InsightModel} from '../../../../models/trace/insights/types.js';
 import * as Trace from '../../../../models/trace/trace.js';
 import * as Buttons from '../../../../ui/components/buttons/buttons.js';
 import * as ComponentHelpers from '../../../../ui/components/helpers/helpers.js';
-import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
+import * as Lit from '../../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../../ui/visual_logging/visual_logging.js';
 import type * as Overlays from '../../overlays/overlays.js';
 import {md} from '../../utils/Helpers.js';
 
-import baseInsightComponentStyles from './baseInsightComponent.css.js';
+import baseInsightComponentStylesRaw from './baseInsightComponent.css.js';
 import * as SidebarInsight from './SidebarInsight.js';
 import type {TableState} from './Table.js';
 
-const {html} = LitHtml;
+// TODO(crbug.com/391381439): Fully migrate off of constructed style sheets.
+const baseInsightComponentStyles = new CSSStyleSheet();
+baseInsightComponentStyles.replaceSync(baseInsightComponentStylesRaw.cssContent);
+
+const {html} = Lit;
 
 const UIStrings = {
   /**
@@ -46,7 +50,7 @@ const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/insights/Ba
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export interface BaseInsightData {
-  bounds: Trace.Types.Timing.TraceWindowMicroSeconds|null;
+  bounds: Trace.Types.Timing.TraceWindowMicro|null;
   /** The key into `insights` that contains this particular insight. */
   insightSetKey: string|null;
 }
@@ -55,7 +59,7 @@ export abstract class BaseInsightComponent<T extends InsightModel<{}>> extends H
   abstract internalName: string;
   // So we can use the TypeScript BaseInsight class without getting warnings
   // about litTagName. Every child should overrwrite this.
-  static readonly litTagName = LitHtml.StaticHtml.literal``;
+  static readonly litTagName = Lit.StaticHtml.literal``;
 
   readonly #shadowRoot = this.attachShadow({mode: 'open'});
 
@@ -114,11 +118,11 @@ export abstract class BaseInsightComponent<T extends InsightModel<{}>> extends H
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
   }
 
-  get bounds(): Trace.Types.Timing.TraceWindowMicroSeconds|null {
+  get bounds(): Trace.Types.Timing.TraceWindowMicro|null {
     return this.data.bounds;
   }
 
-  set bounds(bounds: Trace.Types.Timing.TraceWindowMicroSeconds|null) {
+  set bounds(bounds: Trace.Types.Timing.TraceWindowMicro|null) {
     this.data.bounds = bounds;
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
   }
@@ -145,9 +149,9 @@ export abstract class BaseInsightComponent<T extends InsightModel<{}>> extends H
     this.dispatchEvent(new SidebarInsight.InsightActivated(this.model, this.data.insightSetKey));
   }
 
-  #renderHoverIcon(insightIsActive: boolean): LitHtml.TemplateResult {
+  #renderHoverIcon(insightIsActive: boolean): Lit.TemplateResult {
     // clang-format off
-    const containerClasses = LitHtml.Directives.classMap({
+    const containerClasses = Lit.Directives.classMap({
       'insight-hover-icon': true,
       active: insightIsActive,
     });
@@ -206,7 +210,7 @@ export abstract class BaseInsightComponent<T extends InsightModel<{}>> extends H
 
   protected abstract createOverlays(): Overlays.Overlays.TimelineOverlay[];
 
-  protected abstract renderContent(): LitHtml.LitTemplate;
+  protected abstract renderContent(): Lit.LitTemplate;
 
   #render(): void {
     if (!this.model) {
@@ -217,7 +221,7 @@ export abstract class BaseInsightComponent<T extends InsightModel<{}>> extends H
     this.#renderWithContent(output);
   }
 
-  getEstimatedSavingsTime(): Trace.Types.Timing.MilliSeconds|null {
+  getEstimatedSavingsTime(): Trace.Types.Timing.Milli|null {
     return null;
   }
 
@@ -257,8 +261,8 @@ export abstract class BaseInsightComponent<T extends InsightModel<{}>> extends H
     return null;
   }
 
-  protected renderNode(backendNodeId: Protocol.DOM.BackendNodeId, fallbackText?: string): LitHtml.LitTemplate {
-    const fallback = fallbackText ?? LitHtml.nothing;
+  protected renderNode(backendNodeId: Protocol.DOM.BackendNodeId, fallbackText?: string): Lit.LitTemplate {
+    const fallback = fallbackText ?? Lit.nothing;
     if (!this.#parsedTrace) {
       return html`${fallback}`;
     }
@@ -271,16 +275,16 @@ export abstract class BaseInsightComponent<T extends InsightModel<{}>> extends H
           return Common.Linkifier.Linkifier.linkify(node);
         });
 
-    return html`${LitHtml.Directives.until(domNodePromise, fallback)}`;
+    return html`${Lit.Directives.until(domNodePromise, fallback)}`;
   }
 
-  #renderWithContent(content: LitHtml.LitTemplate): void {
+  #renderWithContent(content: Lit.LitTemplate): void {
     if (!this.#model) {
-      LitHtml.render(LitHtml.nothing, this.#shadowRoot, {host: this});
+      Lit.render(Lit.nothing, this.#shadowRoot, {host: this});
       return;
     }
 
-    const containerClasses = LitHtml.Directives.classMap({
+    const containerClasses = Lit.Directives.classMap({
       insight: true,
       closed: !this.#selected,
     });
@@ -305,20 +309,20 @@ export abstract class BaseInsightComponent<T extends InsightModel<{}>> extends H
               ${estimatedSavingsString}
             </slot>
           </div>`
-          : LitHtml.nothing}
+          : Lit.nothing}
         </header>
         ${this.#selected ? html`
           <div class="insight-body">
             <div class="insight-description">${md(this.#model.description)}</div>
             <div class="insight-content">${content}</div>
           </div>`
-          : LitHtml.nothing
+          : Lit.nothing
         }
       </div>
     `;
     // clang-format on
 
-    LitHtml.render(output, this.#shadowRoot, {host: this});
+    Lit.render(output, this.#shadowRoot, {host: this});
 
     if (this.#selected) {
       requestAnimationFrame(() => requestAnimationFrame(() => this.scrollIntoViewIfNeeded()));

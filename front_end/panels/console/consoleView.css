@@ -209,6 +209,7 @@
 
     & ::selection {
       background-color: var(--sys-color-state-focus-select);
+      color: currentcolor;
     }
   }
 }
@@ -457,6 +458,11 @@
   text-align: right;
   max-width: 100%;
   margin-left: 4px;
+}
+
+.cookie-report-anchor {
+  margin-top: -3px;
+  margin-bottom: -5px;
 }
 
 .console-message-badge {

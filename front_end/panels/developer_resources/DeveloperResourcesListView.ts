@@ -11,11 +11,9 @@ import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
-import * as LitHtml from '../../ui/lit-html/lit-html.js';
+import {html, nothing, render} from '../../ui/lit/lit.js';
 
 import developerResourcesListViewStyles from './developerResourcesListView.css.js';
-
-const {render, html, nothing} = LitHtml;
 
 const UIStrings = {
   /**
@@ -93,7 +91,7 @@ export class DeveloperResourcesListView extends UI.Widget.VBox {
   constructor(view: View = (input, output, target) => {
     // clang-format off
         render(html`
-            <devtools-new-data-grid
+            <devtools-data-grid
               name=${i18nString(UIStrings.developerResources)}
               striped
               .filters=${input.filters}
@@ -148,8 +146,8 @@ export class DeveloperResourcesListView extends UI.Widget.VBox {
                       })()}</td>
                   </tr>`)}
               </table>
-            </devtools-new-data-grid>`,
-            target, {host: input});  // eslint-disable-line rulesdir/lit-html-host-this
+            </devtools-data-grid>`,
+            target, {host: input});
     // clang-format on
     function renderUrl(url: string): HTMLElement {
       const outer = document.createElement('div');
@@ -167,6 +165,7 @@ export class DeveloperResourcesListView extends UI.Widget.VBox {
   }) {
     super(true);
     this.#view = view;
+    this.registerRequiredCSS(developerResourcesListViewStyles);
   }
 
   select(item: SDK.PageResourceLoader.PageResource): void {
@@ -210,15 +209,10 @@ export class DeveloperResourcesListView extends UI.Widget.VBox {
   }
 
   getNumberOfVisibleItems(): number {
-    return parseInt(
-               this.contentElement.querySelector('devtools-new-data-grid')?.getAttribute('aria-rowcount') || '', 10) ??
+    return parseInt(this.contentElement.querySelector('devtools-data-grid')?.getAttribute('aria-rowcount') || '', 10) ??
         0;
   }
 
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([developerResourcesListViewStyles]);
-  }
   override performUpdate(): void {
     const input = {
       items: this.#items,

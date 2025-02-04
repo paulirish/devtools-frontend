@@ -137,6 +137,7 @@ export abstract class CategorizedBreakpointsSidebarPane extends UI.Widget.VBox {
       detailsPausedReason: Protocol.Debugger.PausedEventReason) {
     super(true);
     this.#categoriesTreeOutline = new UI.TreeOutline.TreeOutlineInShadow();
+    this.#categoriesTreeOutline.registerRequiredCSS(categorizedBreakpointsSidebarPaneStyles);
 
     this.#categoriesTreeOutline.setShowSelectionOnKeyboardFocus(/* show */ true);
     this.contentElement.appendChild(this.#categoriesTreeOutline.element);
@@ -339,10 +340,6 @@ export abstract class CategorizedBreakpointsSidebarPane extends UI.Widget.VBox {
     } else {
       UI.ARIAUtils.setChecked(category.element.listItemElement, hasEnabled);
     }
-  }
-  override wasShown(): void {
-    super.wasShown();
-    this.#categoriesTreeOutline.registerCSSFiles([categorizedBreakpointsSidebarPaneStyles]);
   }
 }
 export interface Item {

@@ -76,6 +76,7 @@ export class BinaryResourceView extends UI.Widget.VBox {
       content: TextUtils.StreamingContentData.StreamingContentData, contentUrl: Platform.DevToolsPath.UrlString,
       resourceType: Common.ResourceType.ResourceType) {
     super();
+    this.registerRequiredCSS(binaryResourceViewStyles);
 
     this.binaryResourceViewFactory =
         new SourceFrame.BinaryResourceViewFactory.BinaryResourceViewFactory(content, contentUrl, resourceType);
@@ -147,11 +148,6 @@ export class BinaryResourceView extends UI.Widget.VBox {
       this.addFadeoutSettimeoutId = null;
     }
     this.addFadeoutSettimeoutId = window.setTimeout(addFadeoutClass.bind(this), 2000);
-  }
-
-  override wasShown(): void {
-    this.updateView();
-    this.registerCSSFiles([binaryResourceViewStyles]);
   }
 
   private updateView(): void {

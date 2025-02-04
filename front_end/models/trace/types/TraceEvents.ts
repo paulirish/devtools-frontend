@@ -5,7 +5,7 @@
 /* eslint-disable no-unused-private-class-members */
 import type * as Protocol from '../../../generated/protocol.js';
 
-import type {MicroSeconds, MilliSeconds, Seconds, TraceWindowMicroSeconds} from './Timing.js';
+import type {Micro, Milli, Seconds, TraceWindowMicro} from './Timing.js';
 
 // Trace Events.
 export const enum Phase {
@@ -52,8 +52,6 @@ export const enum Phase {
   CLOCK_SYNC = 'c',
 }
 
-export type NonEmptyString = string&{_tag: 'NonEmptyString'};
-
 export function isNestableAsyncPhase(phase: Phase): boolean {
   return phase === Phase.ASYNC_NESTABLE_START || phase === Phase.ASYNC_NESTABLE_END ||
       phase === Phase.ASYNC_NESTABLE_INSTANT;
@@ -81,10 +79,10 @@ export interface Event {
   ph: Phase;
   pid: ProcessID;
   tid: ThreadID;
-  tts?: MicroSeconds;
-  ts: MicroSeconds;
-  tdur?: MicroSeconds;
-  dur?: MicroSeconds;
+  tts?: Micro;
+  ts: Micro;
+  tdur?: Micro;
+  dur?: Micro;
 }
 
 export interface Args {
@@ -155,7 +153,7 @@ export interface Profile extends Sample {
   id: ProfileID;
   args: Args&{
     data: ArgsData & {
-      startTime: MicroSeconds,
+      startTime: Micro,
     },
   };
 }
@@ -167,8 +165,8 @@ export interface ProfileChunk extends Sample {
     // `data` is only missing in "fake" traces
     data?: ArgsData & {
       cpuProfile?: PartialProfile,
-      timeDeltas?: MicroSeconds[],
-      lines?: MicroSeconds[],
+      timeDeltas?: Micro[],
+      lines?: Micro[],
     },
   };
 }
@@ -176,6 +174,14 @@ export interface ProfileChunk extends Sample {
 export interface PartialProfile {
   nodes?: PartialNode[];
   samples: CallFrameID[];
+  /**
+   * Contains trace ids assigned to samples, if any. Trace ids are
+   * keyed by the sample index in the profile (the keys of the object
+   * are strings containing the numeric index).
+   */
+  /* eslint-disable @typescript-eslint/naming-convention */
+  trace_ids?: Record<string, number>;
+  /* eslint-enable @typescript-eslint/naming-convention */
 }
 
 export interface PartialNode {
@@ -188,7 +194,7 @@ export interface PartialNode {
 
 export interface Complete extends Event {
   ph: Phase.COMPLETE;
-  dur: MicroSeconds;
+  dur: Micro;
 }
 
 export interface RunTask extends Complete {
@@ -202,7 +208,7 @@ export interface FireIdleCallback extends Complete {
   name: Name.FIRE_IDLE_CALLBACK;
   args: Args&{
     data: ArgsData & {
-      allottedMilliseconds: MilliSeconds,
+      allottedMilliseconds: Milli,
       frame: string,
       id: number,
       timedOut: boolean,
@@ -280,17 +286,17 @@ export interface EventTimingBegin extends Event {
     // https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/renderer/core/timing/performance_event_timing.cc;l=297;drc=4f00803ca25c0d0480ed14844d6406933c21e80e
     data: ArgsData & {
       cancelable: boolean,
-      duration: MilliSeconds,
+      duration: Milli,
       type: string,
       interactionId: number,
       interactionOffset: number,
       nodeId: Protocol.DOM.BackendNodeId,
       frame?: string,  // From May 2022 onwards, this is where frame is located. https://chromium-review.googlesource.com/c/chromium/src/+/3632661
-      processingEnd?: MilliSeconds,
-      processingStart?: MilliSeconds,
-      timeStamp?: MilliSeconds,
-      enqueuedToMainThreadTime?: MilliSeconds,
-      commitFinishTime?: MilliSeconds,
+      processingEnd?: Milli,
+      processingStart?: Milli,
+      timeStamp?: Milli,
+      enqueuedToMainThreadTime?: Milli,
+      commitFinishTime?: Milli,
     },
     frame?: string,  // Prior to May 2022, `frame` was here in args.
   };
@@ -318,35 +324,35 @@ export interface SyntheticNetworkRedirect {
   url: string;
   priority: string;
   requestMethod?: string;
-  ts: MicroSeconds;
-  dur: MicroSeconds;
+  ts: Micro;
+  dur: Micro;
 }
 
 // ProcessedArgsData is used to store the processed data of a network
 // request. Which is used to distinguish from the date we extract from the
 // trace event directly.
 interface SyntheticArgsData {
-  dnsLookup: MicroSeconds;
-  download: MicroSeconds;
-  downloadStart: MicroSeconds;
-  finishTime: MicroSeconds;
-  initialConnection: MicroSeconds;
+  dnsLookup: Micro;
+  download: Micro;
+  downloadStart: Micro;
+  finishTime: Micro;
+  initialConnection: Micro;
   isDiskCached: boolean;
   isHttps: boolean;
   isMemoryCached: boolean;
   isPushedResource: boolean;
-  networkDuration: MicroSeconds;
-  processingDuration: MicroSeconds;
-  proxyNegotiation: MicroSeconds;
-  queueing: MicroSeconds;
-  redirectionDuration: MicroSeconds;
-  requestSent: MicroSeconds;
-  sendStartTime: MicroSeconds;
-  ssl: MicroSeconds;
-  stalled: MicroSeconds;
-  totalTime: MicroSeconds;
+  networkDuration: Micro;
+  processingDuration: Micro;
+  proxyNegotiation: Micro;
+  queueing: Micro;
+  redirectionDuration: Micro;
+  requestSent: Micro;
+  sendStartTime: Micro;
+  ssl: Micro;
+  stalled: Micro;
+  totalTime: Micro;
   /** Server response time (receiveHeadersEnd - sendEnd) */
-  waiting: MicroSeconds;
+  waiting: Micro;
 }
 
 export interface SyntheticNetworkRequest extends Complete, SyntheticBased<Phase.COMPLETE> {
@@ -400,12 +406,12 @@ export interface SyntheticNetworkRequest extends Complete, SyntheticBased<Phase.
     },
   };
   cat: 'loading';
-  name: 'SyntheticNetworkRequest';
+  name: Name.SYNTHETIC_NETWORK_REQUEST;
   ph: Phase.COMPLETE;
-  dur: MicroSeconds;
-  tdur: MicroSeconds;
-  ts: MicroSeconds;
-  tts: MicroSeconds;
+  dur: Micro;
+  tdur: Micro;
+  ts: Micro;
+  tts: Micro;
   pid: ProcessID;
   tid: ThreadID;
 }
@@ -422,8 +428,8 @@ export interface SyntheticWebSocketConnection extends Complete, SyntheticBased<P
   cat: string;
   name: 'SyntheticWebSocketConnection';
   ph: Phase.COMPLETE;
-  dur: MicroSeconds;
-  ts: MicroSeconds;
+  dur: Micro;
+  ts: Micro;
   pid: ProcessID;
   tid: ThreadID;
   s: Scope;
@@ -517,11 +523,27 @@ export function isAuctionWorkletDoneWithProcess(event: Event): event is AuctionW
 
 // Snapshot events.
 
-export interface Screenshot extends Event {
+/**
+ * In January 2025 when crrev.com/c/6197645 landed, it changed the format of screenshot events.
+ * That is why we two screenshot types:
+ * `LegacyScreenshot` and `LegacySyntheticScreenshot`: BEFORE the above CL.
+ * `Screenshot`: AFTER the above CL.
+ * Important things to note:
+ * 1. Both the "old" and "new" events share the name "Screenshot" but their format is very different.
+ * 2. The old events had both a raw event (LegacyScreenshot) and a synthetic
+ *    event (LegacySyntheticScreenshot). The new events only have a raw event, as
+ *    we do not need the additional complexity of a synthetic event.
+ * 3. Because we like to support "old" traces, DevTools will maintain its
+ *    support for both screenshot events for the foreseeable future. If you are
+ *    consuming screenshot events from the ScreenshotHandler, you must make sure
+ *    to have your code deal with the two different formats.
+ */
+// These are nullable because in January 2025 a CL in Chromium
+export interface LegacyScreenshot extends Event {
   /**
    * @deprecated This value is incorrect. Use ScreenshotHandler.getPresentationTimestamp()
    */
-  ts: MicroSeconds;
+  ts: Micro;
   /** The id is the frame sequence number in hex */
   id: string;
   args: Args&{
@@ -531,20 +553,39 @@ export interface Screenshot extends Event {
   cat: 'disabled-by-default-devtools.screenshot';
   ph: Phase.OBJECT_SNAPSHOT;
 }
-export function isScreenshot(event: Event): event is Screenshot {
-  return event.name === Name.SCREENSHOT;
+export function isLegacyScreenshot(event: Event): event is LegacyScreenshot {
+  return event.name === Name.SCREENSHOT && 'id' in event;
+}
+export function isLegacySyntheticScreenshot(event: Event): event is LegacySyntheticScreenshot {
+  return event.name === Name.SCREENSHOT && 'dataUri' in (event.args ?? {});
 }
 
-export interface SyntheticScreenshot extends Event, SyntheticBased {
-  rawSourceEvent: Screenshot;
+export function isScreenshot(event: Event): event is Screenshot {
+  return event.name === Name.SCREENSHOT && 'source_id' in (event.args ?? {});
+}
+
+export interface LegacySyntheticScreenshot extends Event, SyntheticBased {
+  rawSourceEvent: LegacyScreenshot;
   /** This is the correct presentation timestamp. */
-  ts: MicroSeconds;
+  ts: Micro;
   args: Args&{
     dataUri: string,
   };
   name: Name.SCREENSHOT;
   cat: 'disabled-by-default-devtools.screenshot';
   ph: Phase.OBJECT_SNAPSHOT;
+}
+
+export interface Screenshot extends Instant {
+  args: Args&{
+    snapshot: string,
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    source_id: number,
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    frame_sequence: number,
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    expected_display_time: number,
+  };
 }
 
 // Animation events.
@@ -596,43 +637,29 @@ export interface Mark extends Event {
   ph: Phase.MARK;
 }
 
-// An unreliable and non-legit navigationStart. See NavigationStartWithUrl
-export interface NavigationStartUnreliable extends Mark {
+export interface NavigationStart extends Mark {
   name: 'navigationStart';
   args: Args&{
-    data?: ArgsData & {
-      /** An empty documentLoaderURL means this navigationStart is unreliable noise and can be ignored. */
-      documentLoaderURL: never,
+    frame: string,
+    data?: ArgsData&{
+      /** Must be non-empty to be valid. An empty documentLoaderURL means the event can be ignored. */
+      documentLoaderURL: string,
       isLoadingMainFrame: boolean,
-      // isOutermostMainFrame was introduced in crrev.com/c/3625434 and exists
-      // because of Fenced Frames
-      // [github.com/WICG/fenced-frame/tree/master/explainer].
-      // Fenced frames introduce a situation where isLoadingMainFrame could be
-      // true for a navigation, but that navigation be within an embedded "main
-      // frame", and therefore it wouldn't be on the top level main frame.
-      // In situations where we need to distinguish that, we can rely on
-      // isOutermostMainFrame, which will only be true for navigations on the
-      // top level main frame.
-
-      // This flag is optional as it was introduced in May 2022; so users
-      // reasonably may import traces from before that date that do not have
-      // this field present.
-      isOutermostMainFrame?: boolean, navigationId: string,
+      navigationId: string,
+      /**
+       * `isOutermostMainFrame` was introduced in crrev.com/c/3625434 and exists because of Fenced Frames
+       * [github.com/WICG/fenced-frame/tree/master/explainer]. Fenced frames introduce a situation where
+       * `isLoadingMainFrame` could be true for a navigation, but that navigation be within an embedded "main frame", and
+       * therefore it wouldn't be on the top level main frame. In situations where we need to distinguish that, we can
+       * rely on `isOutermostMainFrame`, which will only be true for navigations on the top level main frame.
+       * This flag is optional as it was introduced in May 2022; so users reasonably may import traces from before that
+       * date that do not have this field present.
+       */
+      isOutermostMainFrame?: boolean,
       /**
        * @deprecated use documentLoaderURL for navigation events URLs
        */
       url?: string,
-    },
-        frame: string,
-  };
-}
-
-// NavigationStart but definitely has a populated documentLoaderURL
-export interface NavigationStart extends NavigationStartUnreliable {
-  args: NavigationStartUnreliable['args']&{
-    data: NavigationStartUnreliable['args']['data'] & {
-      /** This navigationStart is valid, as the documentLoaderURL isn't empty. */
-      documentLoaderURL: NonEmptyString,
     },
   };
 }
@@ -921,8 +948,8 @@ interface LayoutShiftSessionWindowData {
 }
 export interface LayoutShiftParsedData {
   /** screenshot taken before and after this shift. Before *should* always exist, but after might not at the end of a trace. */
-  screenshots: {before: SyntheticScreenshot|null, after: SyntheticScreenshot|null};
-  timeFromNavigation?: MicroSeconds;
+  screenshots: {before: LegacySyntheticScreenshot|Screenshot|null, after: LegacySyntheticScreenshot|Screenshot|null};
+  timeFromNavigation?: Micro;
   // The sum of the weighted scores of the shifts that
   // belong to a session window up until this shift
   // (inclusive).
@@ -957,25 +984,25 @@ export type NavigationId = string|typeof NO_NAVIGATION;
  */
 export interface SyntheticLayoutShiftCluster {
   name: 'SyntheticLayoutShiftCluster';
-  clusterWindow: TraceWindowMicroSeconds;
+  clusterWindow: TraceWindowMicro;
   clusterCumulativeScore: number;
   events: SyntheticLayoutShift[];
   // For convenience we split apart the cluster into good, NI, and bad windows.
   // Since a cluster may remain in the good window, we mark NI and bad as being
   // possibly null.
   scoreWindows: {
-    good: TraceWindowMicroSeconds,
-    needsImprovement?: TraceWindowMicroSeconds,
-    bad?: TraceWindowMicroSeconds,
+    good: TraceWindowMicro,
+    needsImprovement?: TraceWindowMicro,
+    bad?: TraceWindowMicro,
   };
   // The last navigation that happened before this cluster.
   navigationId?: NavigationId;
   worstShiftEvent?: Event;
   // This is the start of the cluster: the start of the first layout shift of the cluster.
-  ts: MicroSeconds;
+  ts: Micro;
   // The duration of the cluster. This should include up until the end of the last
   // layout shift in this cluster.
-  dur: MicroSeconds;
+  dur: Micro;
   cat: '';
   ph: Phase.COMPLETE;
   pid: ProcessID;
@@ -1061,24 +1088,24 @@ export interface ResourceReceivedData extends Instant {
 
 /** See https://mdn.github.io/shared-assets/images/diagrams/api/performance/timestamp-diagram.svg  */
 interface ResourceReceiveResponseTimingData {
-  connectEnd: MilliSeconds;
-  connectStart: MilliSeconds;
-  dnsEnd: MilliSeconds;
-  dnsStart: MilliSeconds;
-  proxyEnd: MilliSeconds;
-  proxyStart: MilliSeconds;
-  pushEnd: MilliSeconds;
-  pushStart: MilliSeconds;
-  receiveHeadersEnd: MilliSeconds;
-  receiveHeadersStart: MilliSeconds;
+  connectEnd: Milli;
+  connectStart: Milli;
+  dnsEnd: Milli;
+  dnsStart: Milli;
+  proxyEnd: Milli;
+  proxyStart: Milli;
+  pushEnd: Milli;
+  pushStart: Milli;
+  receiveHeadersEnd: Milli;
+  receiveHeadersStart: Milli;
   /** When the network service is about to handle a request, ie. just before going to the HTTP cache or going to the network for DNS/connection setup. */
   requestTime: Seconds;
-  sendEnd: MilliSeconds;
-  sendStart: MilliSeconds;
-  sslEnd: MilliSeconds;
-  sslStart: MilliSeconds;
-  workerReady: MilliSeconds;
-  workerStart: MilliSeconds;
+  sendEnd: Milli;
+  sendStart: Milli;
+  sslEnd: Milli;
+  sslStart: Milli;
+  workerReady: Milli;
+  workerStart: Milli;
 }
 
 export interface ResourceReceiveResponse extends Instant {
@@ -1099,7 +1126,7 @@ export interface ResourceReceiveResponse extends Instant {
       fromServiceWorker: boolean,
       mimeType: string,
       requestId: string,
-      responseTime: MilliSeconds,
+      responseTime: Milli,
       statusCode: number,
       // Some cached events don't have this field
       timing?: ResourceReceiveResponseTimingData, connectionId: number, connectionReused: boolean,
@@ -1359,7 +1386,7 @@ export interface PerformanceMeasureBegin extends PairableUserTiming {
   args: Args&{
     detail?: string,
     stackTrace?: CallFrame[],
-    callTime?: MicroSeconds,
+    callTime?: Micro,
   };
   ph: Phase.ASYNC_NESTABLE_START;
 }
@@ -1372,7 +1399,7 @@ export interface PerformanceMark extends UserTiming {
     data?: ArgsData & {
       detail?: string,
       stackTrace?: CallFrame[],
-      callTime?: MicroSeconds,
+      callTime?: Micro,
     },
   };
   ph: Phase.INSTANT|Phase.MARK|Phase.ASYNC_NESTABLE_INSTANT;
@@ -1393,7 +1420,7 @@ export interface ConsoleTimeStamp extends Event {
   name: Name.CONSOLE_TIME_STAMP;
   ph: Phase.COMPLETE;
   args: Args&{
-    data: ArgsData & {
+    data?: ArgsData & {
       // The console.timeStamp allows to pass integers as values as well
       // as strings
       name: string | number,
@@ -1402,6 +1429,7 @@ export interface ConsoleTimeStamp extends Event {
       track?: string|number,
       trackGroup?: string|number,
       color?: string|number,
+      sampleTraceId?: number,
     },
   };
 }
@@ -1535,7 +1563,7 @@ export interface SyntheticEventPair<T extends PairableAsync = PairableAsync> ext
   id?: string;
   id2?: {local?: string, global?: string};
 
-  dur: MicroSeconds;
+  dur: Micro;
   args: Args&{
     data: {
       beginEvent: T & PairableAsyncBegin,
@@ -1560,23 +1588,23 @@ export interface SyntheticInteractionPair extends SyntheticEventPair<EventTiming
   interactionId: number;
   type: string;
   // This is equivalent to startEvent.ts;
-  ts: MicroSeconds;
+  ts: Micro;
   // This duration can be calculated via endEvent.ts - startEvent.ts, but we do
   // that and put it here to make it easier. This also makes these events
   // consistent with real events that have a dur field.
-  dur: MicroSeconds;
+  dur: Micro;
   // These values are provided in the startEvent's args.data field as
   // millisecond values, but during the handler phase we parse these into
   // microseconds and put them on the top level for easy access.
-  processingStart: MicroSeconds;
-  processingEnd: MicroSeconds;
+  processingStart: Micro;
+  processingEnd: Micro;
   // These 3 values represent the breakdown of the parts of an interaction:
   // 1. inputDelay: time from the user clicking to the input being handled
-  inputDelay: MicroSeconds;
+  inputDelay: Micro;
   // 2. mainThreadHandling: time spent processing the event handler
-  mainThreadHandling: MicroSeconds;
+  mainThreadHandling: Micro;
   // 3. presentationDelay: delay between the event being processed and the frame being rendered
-  presentationDelay: MicroSeconds;
+  presentationDelay: Micro;
 }
 
 /**
@@ -1624,7 +1652,8 @@ export interface SyntheticJSSample extends Event {
   name: Name.JS_SAMPLE;
   args: Args&{
     data: ArgsData & {
-      stackTrace: Protocol.Runtime.CallFrame[],
+      // Used to associate a stack sample with a trace event.
+      traceId?: number, stackTrace: Protocol.Runtime.CallFrame[],
     },
   };
   ph: Phase.INSTANT;
@@ -2050,13 +2079,6 @@ export function isCommitLoad(
   return event.name === 'CommitLoad';
 }
 
-/** @deprecated You probably want `isNavigationStart` instead. */
-export function isNavigationStartUnreliable(
-    event: Event,
-    ): event is NavigationStartUnreliable {
-  return event.name === 'navigationStart';
-}
-
 export function isAnimation(
     event: Event,
     ): event is Animation {
@@ -2189,7 +2211,7 @@ export function isResourceReceivedData(
 export function isSyntheticNetworkRequest(
     event: Event,
     ): event is SyntheticNetworkRequest {
-  return event.name === 'SyntheticNetworkRequest';
+  return event.name === Name.SYNTHETIC_NETWORK_REQUEST;
 }
 
 export function isSyntheticWebSocketConnection(
@@ -2210,7 +2232,7 @@ export function isPrePaint(
 
 /** A VALID navigation start (as it has a populated documentLoaderURL) */
 export function isNavigationStart(event: Event): event is NavigationStart {
-  return Boolean(isNavigationStartUnreliable(event) && event.args.data && event.args.data.documentLoaderURL !== '');
+  return event.name === 'navigationStart' && (event as NavigationStart).args?.data?.documentLoaderURL !== '';
 }
 
 export function isMainFrameViewport(
@@ -2683,7 +2705,7 @@ export interface SchedulePostTaskCallback extends Instant {
     data: {
       taskId: number,
       priority: 'user-blocking'|'user-visible'|'background',
-      delay: MilliSeconds,
+      delay: Milli,
       frame?: string,
       stackTrace?: CallFrame,
     },
@@ -2699,7 +2721,7 @@ export interface RunPostTaskCallback extends Complete {
     data: {
       taskId: number,
       priority: 'user-blocking'|'user-visible'|'background',
-      delay: MilliSeconds,
+      delay: Milli,
       frame?: string,
     },
   };
@@ -2750,6 +2772,11 @@ export function isJSInvocationEvent(event: Event): boolean {
   return false;
 }
 export interface ConsoleRunTask extends Event {
+  args: Args&{
+    data: ArgsData & {
+      sampleTraceId?: number,
+    },
+  };
   name: Name.V8_CONSOLE_RUN_TASK;
 }
 
@@ -2981,6 +3008,8 @@ export const enum Name {
 
   ANIMATION_FRAME = 'AnimationFrame',
   ANIMATION_FRAME_PRESENTATION = 'AnimationFrame::Presentation',
+
+  SYNTHETIC_NETWORK_REQUEST = 'SyntheticNetworkRequest'
 }
 
 // NOT AN EXHAUSTIVE LIST: just some categories we use and refer
@@ -3006,10 +3035,10 @@ export const Categories = {
  * handlers.
  */
 export interface LegacyTimelineFrame extends Event {
-  startTime: MicroSeconds;
-  startTimeOffset: MicroSeconds;
-  endTime: MicroSeconds;
-  duration: MicroSeconds;
+  startTime: Micro;
+  startTimeOffset: Micro;
+  endTime: Micro;
+  duration: Micro;
   idle: boolean;
   dropped: boolean;
   isPartial: boolean;

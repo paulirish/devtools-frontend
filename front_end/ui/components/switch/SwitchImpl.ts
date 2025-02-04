@@ -2,12 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as LitHtml from '../../lit-html/lit-html.js';
+import {html, nothing, render} from '../../lit/lit.js';
 import * as VisualLogging from '../../visual_logging/visual_logging.js';
 
-import switchStyles from './switch.css.js';
+import switchStylesRaw from './switch.css.js';
 
-const {html} = LitHtml;
+// TODO(crbug.com/391381439): Fully migrate off of constructed style sheets.
+const switchStyles = new CSSStyleSheet();
+switchStyles.replaceSync(switchStylesRaw.cssContent);
 
 export class SwitchChangeEvent extends Event {
   static readonly eventName = 'switchchange';
@@ -64,8 +66,8 @@ export class Switch extends HTMLElement {
     const jslog = this.#jslogContext && VisualLogging.toggle(this.#jslogContext).track({change: true});
     /* eslint-disable rulesdir/inject-checkbox-styles */
     // clang-format off
-    LitHtml.render(html`
-    <label role="button" jslog=${jslog || LitHtml.nothing}>
+    render(html`
+    <label role="button" jslog=${jslog || nothing}>
       <input type="checkbox"
         @change=${this.#handleChange}
         ?disabled=${this.#disabled}

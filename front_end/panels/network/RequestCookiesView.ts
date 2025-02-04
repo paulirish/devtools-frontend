@@ -112,6 +112,7 @@ export class RequestCookiesView extends UI.Widget.Widget {
 
   constructor(request: SDK.NetworkRequest.NetworkRequest) {
     super();
+    this.registerRequiredCSS(requestCookiesViewStyles);
 
     this.element.classList.add('request-cookies-view');
     this.element.setAttribute('jslog', `${VisualLogging.pane('cookies').track({resize: true})}`);
@@ -333,7 +334,6 @@ export class RequestCookiesView extends UI.Widget.Widget {
 
   override wasShown(): void {
     super.wasShown();
-    this.registerCSSFiles([requestCookiesViewStyles]);
     this.request.addEventListener(
         SDK.NetworkRequest.Events.REQUEST_HEADERS_CHANGED, this.refreshRequestCookiesView, this);
     this.request.addEventListener(

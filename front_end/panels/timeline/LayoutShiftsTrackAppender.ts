@@ -43,7 +43,7 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 // them more easily. Long term we will explore a better UI solution to
 // allow us to do this properly and not hack around it.
 // TODO: Delete this once the new Layout Shift UI ships out of the TIMELINE_LAYOUT_SHIFT_DETAILS experiment
-export const LAYOUT_SHIFT_SYNTHETIC_DURATION = Trace.Types.Timing.MicroSeconds(5_000);
+export const LAYOUT_SHIFT_SYNTHETIC_DURATION = Trace.Types.Timing.Micro(5_000);
 
 export class LayoutShiftsTrackAppender implements TrackAppender {
   readonly appenderName: TrackAppenderName = 'LayoutShifts';
@@ -200,7 +200,8 @@ export class LayoutShiftsTrackAppender implements TrackAppender {
   }
 
   preloadScreenshots(events: Trace.Types.Events.SyntheticLayoutShift[]): Promise<(void|undefined)[]> {
-    const screenshotsToLoad: Set<Trace.Types.Events.SyntheticScreenshot> = new Set();
+    const screenshotsToLoad: Set<Trace.Types.Events.LegacySyntheticScreenshot|Trace.Types.Events.Screenshot> =
+        new Set();
     for (const event of events) {
       const shots = event.parsedData.screenshots;
       shots.before && screenshotsToLoad.add(shots.before);

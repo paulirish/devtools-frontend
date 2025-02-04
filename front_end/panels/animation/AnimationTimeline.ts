@@ -134,6 +134,7 @@ export class AnimationTimeline extends UI.Widget.VBox implements
 
   private constructor() {
     super(true);
+    this.registerRequiredCSS(animationTimelineStyles);
 
     this.element.classList.add('animations-timeline');
     this.element.setAttribute('jslog', `${VisualLogging.panel('animations').track({resize: true})}`);
@@ -219,12 +220,12 @@ export class AnimationTimeline extends UI.Widget.VBox implements
   }
 
   override wasShown(): void {
+    super.wasShown();
     for (const animationModel of SDK.TargetManager.TargetManager.instance().models(
              SDK.AnimationModel.AnimationModel, {scoped: true})) {
       this.#addExistingAnimationGroups(animationModel);
       this.addEventListeners(animationModel);
     }
-    this.registerCSSFiles([animationTimelineStyles]);
   }
 
   override willHide(): void {

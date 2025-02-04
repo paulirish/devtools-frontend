@@ -109,6 +109,7 @@ export class CallStackSidebarPane extends UI.View.SimpleView implements UI.Conte
 
   private constructor() {
     super(i18nString(UIStrings.callStack), true, 'sources.callstack');
+    this.registerRequiredCSS(callStackSidebarPaneStyles);
 
     this.contentElement.setAttribute('jslog', `${VisualLogging.section('sources.callstack')}`);
     ({element: this.ignoreListMessageElement, checkbox: this.ignoreListCheckboxElement} =
@@ -539,10 +540,6 @@ export class CallStackSidebarPane extends UI.View.SimpleView implements UI.Conte
       text.push(itemText);
     }
     Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(text.join('\n'));
-  }
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([callStackSidebarPaneStyles]);
   }
 }
 

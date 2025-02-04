@@ -10,15 +10,19 @@ import type * as Platform from '../../../core/platform/platform.js';
 import * as Trace from '../../../models/trace/trace.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
-import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import * as Lit from '../../../ui/lit/lit.js';
 import * as Utils from '../utils/utils.js';
 
 import * as Insights from './insights/insights.js';
 import type {ActiveInsight} from './Sidebar.js';
-import styles from './sidebarInsightsTab.css.js';
+import stylesRaw from './sidebarInsightsTab.css.js';
 import type {SidebarSingleInsightSetData} from './SidebarSingleInsightSet.js';
 
-const {html} = LitHtml;
+// TODO(crbug.com/391381439): Fully migrate off of constructed style sheets.
+const styles = new CSSStyleSheet();
+styles.replaceSync(stylesRaw.cssContent);
+
+const {html} = Lit;
 
 const FEEDBACK_URL = 'https://crbug.com/371170842' as Platform.DevToolsPath.UrlString;
 
@@ -94,7 +98,7 @@ export class SidebarInsightsTab extends HTMLElement {
     // - greater than 5s in duration
     // - or, has a navigation
     // In practice this means selecting either the first or the second insight set.
-    const trivialThreshold = Trace.Helpers.Timing.milliToMicro(Trace.Types.Timing.MilliSeconds(5000));
+    const trivialThreshold = Trace.Helpers.Timing.milliToMicro(Trace.Types.Timing.Milli(5000));
     const insightSets = [...this.#insights.values()];
     this.#insightSetKey =
         insightSets.find(insightSet => insightSet.navigation || insightSet.bounds.range > trivialThreshold)?.id
@@ -152,8 +156,8 @@ export class SidebarInsightsTab extends HTMLElement {
     this.dispatchEvent(new Insights.SidebarInsight.InsightSetZoom(data.bounds));
   }
 
-  #renderZoomButton(insightSetToggled: boolean): LitHtml.TemplateResult {
-    const classes = LitHtml.Directives.classMap({
+  #renderZoomButton(insightSetToggled: boolean): Lit.TemplateResult {
+    const classes = Lit.Directives.classMap({
       'zoom-icon': true,
       active: insightSetToggled,
     });
@@ -170,8 +174,8 @@ export class SidebarInsightsTab extends HTMLElement {
     // clang-format on
   }
 
-  #renderDropdownIcon(insightSetToggled: boolean): LitHtml.TemplateResult {
-    const containerClasses = LitHtml.Directives.classMap({
+  #renderDropdownIcon(insightSetToggled: boolean): Lit.TemplateResult {
+    const containerClasses = Lit.Directives.classMap({
       'dropdown-icon': true,
       active: insightSetToggled,
     });
@@ -191,7 +195,7 @@ export class SidebarInsightsTab extends HTMLElement {
 
   #render(): void {
     if (!this.#parsedTrace || !this.#insights) {
-      LitHtml.render(LitHtml.nothing, this.#shadow, {host: this});
+      Lit.render(Lit.nothing, this.#shadow, {host: this});
       return;
     }
 
@@ -252,8 +256,8 @@ export class SidebarInsightsTab extends HTMLElement {
     // Insight components contain state, so to prevent insights from previous trace loads breaking things we use the parsedTrace
     // as a render key.
     // Note: newer Lit has `keyed`, but we don't have that, so we do it manually. https://lit.dev/docs/templates/directives/#keyed
-    const result = LitHtml.Directives.repeat([contents], () => this.#parsedTrace, template => template);
-    LitHtml.render(result, this.#shadow, {host: this});
+    const result = Lit.Directives.repeat([contents], () => this.#parsedTrace, template => template);
+    Lit.render(result, this.#shadow, {host: this});
   }
 }
 

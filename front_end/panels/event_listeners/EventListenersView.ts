@@ -61,6 +61,7 @@ export class EventListenersView extends UI.Widget.VBox {
     this.treeOutline.element.classList.add('monospace');
     this.treeOutline.setShowSelectionOnKeyboardFocus(true);
     this.treeOutline.setFocusable(true);
+    this.treeOutline.registerRequiredCSS(eventListenersViewStyles, objectValueStyles);
     this.element.appendChild(this.treeOutline.element);
     this.emptyHolder = document.createElement('div');
     this.emptyHolder.classList.add('gray-info-message');
@@ -231,10 +232,6 @@ export class EventListenersView extends UI.Widget.VBox {
 
   private eventListenersArrivedForTest(): void {
   }
-  override wasShown(): void {
-    super.wasShown();
-    this.treeOutline.registerCSSFiles([eventListenersViewStyles, objectValueStyles]);
-  }
 }
 
 export class EventListenersTreeElement extends UI.TreeOutline.TreeElement {
@@ -304,7 +301,7 @@ export class ObjectEventListenerBar extends UI.TreeOutline.TreeElement {
       const deleteButton = new Buttons.Button.Button();
       deleteButton.data = {
         variant: Buttons.Button.Variant.ICON,
-        size: Buttons.Button.Size.SMALL,
+        size: Buttons.Button.Size.MICRO,
         iconName: 'bin',
         jslogContext: 'delete-event-listener',
       };

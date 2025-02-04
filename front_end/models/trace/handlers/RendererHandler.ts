@@ -356,7 +356,7 @@ export function buildHierarchy(
       // Update the entryToNode map with the entries from this thread
       for (const [entry, node] of treeData.entryToNode) {
         entryToNode.set(entry, node);
-        HandlerHelpers.updateEventForEntities(entry, entityMappings);
+        HandlerHelpers.addEventToEntityMapping(entry, entityMappings);
       }
     }
   }
@@ -378,7 +378,7 @@ export function makeCompleteEvent(event: Types.Events.Begin|Types.Events.End): T
     }
     // Update the begin event's duration using the timestamp of the end
     // event.
-    beginEvent.dur = Types.Timing.MicroSeconds(event.ts - beginEvent.ts);
+    beginEvent.dur = Types.Timing.Micro(event.ts - beginEvent.ts);
     return null;
   }
 
@@ -387,7 +387,7 @@ export function makeCompleteEvent(event: Types.Events.Begin|Types.Events.End): T
   const syntheticComplete: Types.Events.SyntheticComplete = {
     ...event,
     ph: Types.Events.Phase.COMPLETE,
-    dur: Types.Timing.MicroSeconds(0),
+    dur: Types.Timing.Micro(0),
   };
 
   completeEventStack.push(syntheticComplete);

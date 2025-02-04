@@ -510,6 +510,7 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
       filterBar: UI.FilterBar.FilterBar, progressBarContainer: Element,
       networkLogLargeRowsSetting: Common.Settings.Setting<boolean>) {
     super();
+    this.registerRequiredCSS(networkLogViewStyles);
     this.setMinimumSize(50, 64);
 
     this.element.id = 'network-container';
@@ -1407,8 +1408,8 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
   }
 
   override wasShown(): void {
+    super.wasShown();
     this.refreshIfNeeded();
-    this.registerCSSFiles([networkLogViewStyles]);
     this.columnsInternal.wasShown();
   }
 

@@ -5,7 +5,7 @@
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
-import type * as Trace from '../../models/trace/trace.js';
+import * as Trace from '../../models/trace/trace.js';
 import * as IconButton from '../../ui/components/icon_button/icon_button.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
@@ -398,7 +398,8 @@ export class TimelineHistoryManager {
       return container;
     }
     // TODO(paulirish): Adopt Util.ImageCache
-    void UI.UIUtils.loadImage(lastFrame.screenshotEvent.args.dataUri).then(img => {
+    const uri = Trace.Handlers.ModelHandlers.Screenshots.screenshotImageDataUri(lastFrame.screenshotEvent);
+    void UI.UIUtils.loadImage(uri).then(img => {
       if (img) {
         container.appendChild(img);
       }
@@ -465,7 +466,7 @@ export class DropDown implements UI.ListControl.ListDelegate<number> {
     this.glassPane.element.addEventListener('blur', () => this.close(null));
 
     const shadowRoot = UI.UIUtils.createShadowRootWithCoreStyles(
-        this.glassPane.contentElement, {cssFile: [timelineHistoryManagerStyles]});
+        this.glassPane.contentElement, {cssFile: timelineHistoryManagerStyles});
     const contentElement = shadowRoot.createChild('div', 'drop-down');
 
     const listModel = new UI.ListModel.ListModel<number>();

@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import { loadESLint } from 'eslint';
-import stylelint from 'stylelint';
-
-import { extname, join } from 'path';
+import { spawn } from 'child_process';
+import { ESLint } from 'eslint';
+import { readFileSync } from 'fs';
 import { sync } from 'globby';
+import { extname, join } from 'path';
+import stylelint from 'stylelint';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
-import { spawn } from 'child_process';
-import { readFileSync } from 'fs';
 
 import {
   devtoolsRootPath,
@@ -25,6 +24,12 @@ const flags = yargs(hideBin(process.argv))
     default: true,
     describe: 'Automatically fix, where possible, problems reported by rules.',
   })
+  .option('debug', {
+    type: 'boolean',
+    default: false,
+    describe:
+      'Disable cache validations during debugging, useful for custom rule creation/debugging.',
+  })
   .usage('$0 [<files...>]', 'Run the linter on the provided files', yargs => {
     yargs.positional('files', {
       describe: 'File(s), glob(s), or directories',
@@ -38,31 +43,45 @@ const flags = yargs(hideBin(process.argv))
       ],
     });
   })
-  .parse();
+  .parseSync();
 
 if (!flags.fix) {
   console.log('[lint]: fix is disabled; no errors will be autofixed.');
 }
+if (flags.debug) {
+  console.log('[lint]: Cache disabled, linting may take longer.');
+}
+const cacheLinters = !flags.debug;
 
-async function runESLint(files) {
-  const EsLintFlat = await loadESLint({ useFlatConfig: true });
-  const cli = new EsLintFlat({
+async function runESLint(scriptFiles) {
+  const cli = new ESLint({
     cwd: join(import.meta.dirname, '..', '..'),
     fix: flags.fix,
+    cache: cacheLinters,
   });
 
-  // We filter out certain files in the `.eslintignore`. However, ESLint produces warnings
+  // We filter out certain files in the `eslint.config.mjs` `Ignore list` entry.
+  // However, ESLint produces warnings
   // when you include a particular file that is ignored. This means that if you edit a file
-  // that is directly ignored in the `.eslintignore`, ESLint would report a failure.
+  // that is directly ignored. ESLint would report a failure.
   // This was originally reported in https://github.com/eslint/eslint/issues/9977
   // The suggested workaround is to use the CLIEngine to preemptively filter out these
   // problematic paths.
-  files = await Promise.all(
-    files.map(async file => {
-      return (await cli.isPathIgnored(file)) ? null : file;
-    }),
-  );
-  files = files.filter(file => file !== null);
+  const files = (
+    await Promise.all(
+      scriptFiles.map(async file => {
+        return (await cli.isPathIgnored(file)) ? null : file;
+      }),
+    )
+  ).filter(file => file !== null);
+
+  if (files.length === 0) {
+    // When an empty array is pass lint CWD
+    // This can happen only if we pass things that will
+    // be ignored by the above filter
+    // https://github.com/eslint/eslint/pull/17644
+    return true;
+  }
 
   const results = await cli.lintFiles(files);
 
@@ -79,7 +98,7 @@ async function runESLint(files) {
   }
 
   if (flags.fix) {
-    await EsLintFlat.outputFixes(results);
+    await ESLint.outputFixes(results);
   }
 
   const formatter = await cli.loadFormatter('stylish');
@@ -98,6 +117,8 @@ async function runStylelint(files) {
     fix: flags.fix,
     files,
     formatter: 'string',
+    cache: cacheLinters,
+    allowEmptyInput: true,
   });
 
   if (report) {

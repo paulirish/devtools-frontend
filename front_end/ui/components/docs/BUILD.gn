@@ -21,8 +21,6 @@ group("docs") {
     "./computed_style_trace",
     "./console_insight",
     "./css_overview",
-    "./data_grid",
-    "./data_grid_controller",
     "./dialog",
     "./elements_breadcrumbs",
     "./expandable_list",
@@ -50,7 +48,6 @@ group("docs") {
     "./recorder_recording_view",
     "./recorder_select_button",
     "./recorder_split_view",
-    "./recorder_start_view",
     "./report",
     "./request_link_icon",
     "./select_menu",
@@ -80,5 +77,5 @@ ts_library("bundle") {
     "toggle_fonts.ts",
   ]
 
-  deps = [ "../../../ui/lit-html:bundle" ]
+  deps = [ "../../../ui/lit:bundle" ]
 }

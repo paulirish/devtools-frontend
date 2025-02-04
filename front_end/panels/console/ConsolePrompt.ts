@@ -87,6 +87,7 @@ export class ConsolePrompt extends Common.ObjectWrapper.eventMixin<EventTypes, t
 
   constructor() {
     super();
+    this.registerRequiredCSS(consolePromptStyles);
     this.addCompletionsFromHistory = true;
     this.historyInternal = new TextEditor.AutocompleteHistory.AutocompleteHistory(
         Common.Settings.Settings.instance().createLocalSetting('console-history', []));
@@ -220,12 +221,8 @@ export class ConsolePrompt extends Common.ObjectWrapper.eventMixin<EventTypes, t
     }
   }
 
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([consolePromptStyles]);
-  }
-
   override willHide(): void {
+    super.willHide();
     if (this.highlightingNode) {
       this.highlightingNode = false;
       SDK.OverlayModel.OverlayModel.hideDOMNodeHighlight();

@@ -477,6 +477,7 @@ export class PlayerPropertiesView extends UI.Widget.VBox {
 
   constructor() {
     super();
+    this.registerRequiredCSS(playerPropertiesViewStyles);
 
     this.element.setAttribute('jslog', `${VisualLogging.pane('properties')}`);
 
@@ -667,9 +668,5 @@ export class PlayerPropertiesView extends UI.Widget.VBox {
 
     const textTrackManager = new TextTrackManager(this);
     this.attributeMap.set(PlayerPropertyKeys.TEXT_TRACKS, textTrackManager);
-  }
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([playerPropertiesViewStyles]);
   }
 }

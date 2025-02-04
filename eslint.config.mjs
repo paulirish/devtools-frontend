@@ -2,14 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+/* eslint-disable import/no-default-export */
+
+import stylisticPlugin from '@stylistic/eslint-plugin';
 import typescriptPlugin from '@typescript-eslint/eslint-plugin';
-import mochaPlugin from 'eslint-plugin-mocha';
-import rulesdirPlugin from 'eslint-plugin-rulesdir';
+import tsParser from '@typescript-eslint/parser';
 import importPlugin from 'eslint-plugin-import';
 import jsdocPlugin from 'eslint-plugin-jsdoc';
+import mochaPlugin from 'eslint-plugin-mocha';
+import rulesdirPlugin from 'eslint-plugin-rulesdir';
 import globals from 'globals';
-import tsParser from '@typescript-eslint/parser';
-import stylisticPlugin from '@stylistic/eslint-plugin';
 import { join } from 'path';
 
 rulesdirPlugin.RULES_DIR = join(
@@ -26,6 +28,10 @@ export default [
   {
     name: 'Ignore list',
     ignores: [
+      // Git submodules that are not in third_party
+      'build/',
+      'buildtools/',
+
       'front_end/diff/diff_match_patch.jD',
       'front_end/models/javascript_metadata/NativeFunctions.js',
       // All of these scripts are auto-generated so don't lint them.
@@ -82,6 +88,10 @@ export default [
       globals: {
         ...globals.browser,
       },
+    },
+
+    linterOptions: {
+      reportUnusedDisableDirectives: 'error',
     },
 
     rules: {
@@ -240,6 +250,8 @@ export default [
       'no-implicit-globals': 'off',
       'no-unused-private-class-members': 'error',
 
+      // Sort imports first
+      'import/first': 'error',
       // Closure does not properly typecheck default exports
       'import/no-default-export': 'error',
       /**
@@ -248,6 +260,24 @@ export default [
        * import * as FooModule from './foo.js'
        **/
       'import/no-duplicates': 'error',
+      /**
+       * Provides more consistency in the imports.
+       */
+      'import/order': [
+        'error',
+        {
+          // We need to group the builtin and external as clang-format
+          // can't differentiate the two
+          groups: [['builtin', 'external'], 'parent', 'sibling', 'index'],
+          'newlines-between': 'always',
+          // clang-format has it's own logic overriding this
+          named: false,
+          alphabetize: {
+            order: 'asc',
+            caseInsensitive: true,
+          },
+        },
+      ],
       // Try to spot '// console.log()' left over from debugging
       'rulesdir/no-commented-out-console': 'error',
       // Prevent imports being commented out rather than deleted.
@@ -521,15 +551,13 @@ export default [
       'rulesdir/no-bound-component-methods': 'error',
       'rulesdir/no-customized-builtin-elements': 'error',
       'rulesdir/no-self-closing-custom-element-tagnames': 'error',
-      'rulesdir/no-style-tags-in-lit-html': 'error',
-      'rulesdir/no-a-tags-in-lit-html': 'error',
+      'rulesdir/no-a-tags-in-lit': 'error',
       'rulesdir/check-css-import': 'error',
       'rulesdir/enforce-optional-properties-last': 'error',
       'rulesdir/check-enumerated-histograms': 'error',
       'rulesdir/check-was-shown-methods': 'error',
       'rulesdir/static-custom-event-names': 'error',
-      'rulesdir/lit-html-host-this': 'error',
-      'rulesdir/lit-html-no-attribute-quotes': 'error',
+      'rulesdir/lit-no-attribute-quotes': 'error',
       'rulesdir/lit-template-result-or-nothing': 'error',
       'rulesdir/inject-checkbox-styles': 'error',
       'rulesdir/jslog-context-list': 'error',
@@ -676,10 +704,9 @@ export default [
       // anything, so we leave return types to the developer within the
       // component_docs folder.
       '@typescript-eslint/explicit-function-return-type': 'off',
-      'rulesdir/no-style-tags-in-lit-html': 'off',
-      // We use LitHtml to help render examples sometimes and we don't use
+      // We use Lit to help render examples sometimes and we don't use
       // {host: this} as often the `this` is the window.
-      'rulesdir/lit-html-host-this': 'off',
+      'rulesdir/lit-host-this': 'off',
     },
   },
   {

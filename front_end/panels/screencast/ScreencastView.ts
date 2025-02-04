@@ -135,6 +135,7 @@ export class ScreencastView extends UI.Widget.VBox implements SDK.OverlayModel.H
   private historyEntries?: Protocol.Page.NavigationEntry[];
   constructor(screenCaptureModel: SDK.ScreenCaptureModel.ScreenCaptureModel) {
     super();
+    this.registerRequiredCSS(screencastViewStyles);
     this.screenCaptureModel = screenCaptureModel;
     this.domModel = screenCaptureModel.target().model(SDK.DOMModel.DOMModel);
     this.overlayModel = screenCaptureModel.target().model(SDK.OverlayModel.OverlayModel);
@@ -197,11 +198,6 @@ export class ScreencastView extends UI.Widget.VBox implements SDK.OverlayModel.H
     SDK.TargetManager.TargetManager.instance().addEventListener(
         SDK.TargetManager.Events.SUSPEND_STATE_CHANGED, this.onSuspendStateChange, this);
     this.updateGlasspane();
-  }
-
-  override wasShown(): void {
-    this.startCasting();
-    this.registerCSSFiles([screencastViewStyles]);
   }
 
   override willHide(): void {

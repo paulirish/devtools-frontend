@@ -493,6 +493,7 @@ export class AppManifestView extends Common.ObjectWrapper.eventMixin<EventTypes,
       emptyView: UI.EmptyWidget.EmptyWidget, reportView: UI.ReportView.ReportView,
       throttler: Common.Throttler.Throttler) {
     super(true);
+    this.registerRequiredCSS(appManifestViewStyles);
 
     this.contentElement.classList.add('manifest-container');
     this.contentElement.setAttribute('jslog', `${VisualLogging.pane('manifest')}`);
@@ -504,7 +505,7 @@ export class AppManifestView extends Common.ObjectWrapper.eventMixin<EventTypes,
     this.emptyView.hideWidget();
 
     this.reportView = reportView;
-
+    this.reportView.registerRequiredCSS(appManifestViewStyles);
     this.reportView.element.classList.add('manifest-view-header');
     this.reportView.show(this.contentElement);
     this.reportView.hideWidget();
@@ -1234,11 +1235,6 @@ export class AppManifestView extends Common.ObjectWrapper.eventMixin<EventTypes,
 
     field.appendChild(wrapper);
     return {imageResourceErrors, squareSizedIconAvailable, naturalWidth, naturalHeight};
-  }
-  override wasShown(): void {
-    super.wasShown();
-    this.reportView.registerCSSFiles([appManifestViewStyles]);
-    this.registerCSSFiles([appManifestViewStyles]);
   }
 
   private async appendWindowControlsToSection(

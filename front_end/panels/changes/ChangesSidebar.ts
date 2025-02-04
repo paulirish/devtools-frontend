@@ -31,9 +31,10 @@ export class ChangesSidebar extends Common.ObjectWrapper.eventMixin<EventTypes, 
   private readonly workspaceDiff: WorkspaceDiff.WorkspaceDiff.WorkspaceDiffImpl;
   constructor(workspaceDiff: WorkspaceDiff.WorkspaceDiff.WorkspaceDiffImpl) {
     super();
-    this.treeoutline = new UI.TreeOutline.TreeOutlineInShadow();
+    this.treeoutline = new UI.TreeOutline.TreeOutlineInShadow(UI.TreeOutline.TreeVariant.NAVIGATION_TREE);
+    this.treeoutline.registerRequiredCSS(changesSidebarStyles);
     this.treeoutline.setFocusable(false);
-
+    this.treeoutline.hideOverflow();
     this.treeoutline.setComparator((a, b) => Platform.StringUtilities.compare(a.titleAsText(), b.titleAsText()));
     this.treeoutline.addEventListener(UI.TreeOutline.Events.ElementSelected, this.selectionChanged, this);
     UI.ARIAUtils.markAsTablist(this.treeoutline.contentElement);
@@ -103,10 +104,6 @@ export class ChangesSidebar extends Common.ObjectWrapper.eventMixin<EventTypes, 
     if (!this.treeoutline.selectedTreeElement) {
       treeElement.select(true);
     }
-  }
-  override wasShown(): void {
-    super.wasShown();
-    this.treeoutline.registerCSSFiles([changesSidebarStyles]);
   }
 }
 

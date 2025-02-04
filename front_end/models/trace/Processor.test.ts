@@ -408,6 +408,8 @@ describeWithEnvironment('TraceProcessor', function() {
         'DOMSize',
         'ThirdParties',
         'SlowCSSSelector',
+        'LongCriticalNetworkTree',
+        'ForcedReflow',
       ]);
 
       const orderWithMetadata = await getInsightOrder(true);
@@ -425,6 +427,8 @@ describeWithEnvironment('TraceProcessor', function() {
         'DOMSize',
         'ThirdParties',
         'SlowCSSSelector',
+        'LongCriticalNetworkTree',
+        'ForcedReflow',
       ]);
     });
   });

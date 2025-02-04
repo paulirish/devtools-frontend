@@ -53,7 +53,7 @@ export class ReportingApiReportsView extends UI.SplitWidget.SplitWidget {
     super.wasShown();
     const sbw = this.sidebarWidget();
     if (sbw) {
-      sbw.registerCSSFiles([reportingApiReportsViewStyles]);
+      sbw.registerRequiredCSS(reportingApiReportsViewStyles);
     }
   }
 

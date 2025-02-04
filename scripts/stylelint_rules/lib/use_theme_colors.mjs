@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import stylelint from 'stylelint';
-import { parse, comment } from 'postcss';
-import { join } from 'path';
 import { readFileSync } from 'fs';
+import { join } from 'path';
+import { comment, parse } from 'postcss';
+import stylelint from 'stylelint';
 
 const {
   createPlugin,
@@ -55,29 +55,21 @@ const COLOR_INDICATOR_REGEXES = new Set([
 
 const CUSTOM_VARIABLE_OVERRIDE_PREFIX = '--override-';
 
-const applicationColorsPath = join(
+const applicationTokensPath = join(
     import.meta.dirname,
     '..',
     '..',
     '..',
     'front_end',
-    'application_color_tokens.css',
+    'application_tokens.css',
 );
-const themeColorsPath = join(
+const designSystemTokensPath = join(
     import.meta.dirname,
     '..',
     '..',
     '..',
     'front_end',
-    'theme_colors.css',
-);
-const tokensPath = join(
-    import.meta.dirname,
-    '..',
-    '..',
-    '..',
-    'front_end',
-    'tokens.css',
+    'design_system_tokens.css',
 );
 const inspectorCommonPath = join(
   import.meta.dirname,
@@ -106,18 +98,15 @@ function getRootVariableDeclarationsFromCSSFile(filePath) {
 }
 
 const DEFINED_APPLICATION_COLOR_VARIABLES =
-  getRootVariableDeclarationsFromCSSFile(applicationColorsPath);
+  getRootVariableDeclarationsFromCSSFile(applicationTokensPath);
 const DEFINED_THEME_COLOR_VARIABLES =
-  getRootVariableDeclarationsFromCSSFile(themeColorsPath);
-const DEFINED_COLOR_TOKEN_VARIABLES =
-  getRootVariableDeclarationsFromCSSFile(tokensPath);
+  getRootVariableDeclarationsFromCSSFile(designSystemTokensPath);
 const DEFINED_INSPECTOR_STYLE_VARIABLES =
   getRootVariableDeclarationsFromCSSFile(inspectorCommonPath);
 const ALL_DEFINED_VARIABLES = new Set([
   ...DEFINED_APPLICATION_COLOR_VARIABLES,
   ...DEFINED_THEME_COLOR_VARIABLES,
-  ...DEFINED_COLOR_TOKEN_VARIABLES,
-  ...DEFINED_INSPECTOR_STYLE_VARIABLES,
+    ...DEFINED_INSPECTOR_STYLE_VARIABLES,
 ]);
 
 const BOX_SHADOW_VARIABLES = new Set(

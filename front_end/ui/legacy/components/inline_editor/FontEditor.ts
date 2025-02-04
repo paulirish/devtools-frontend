@@ -128,6 +128,7 @@ export class FontEditor extends Common.ObjectWrapper.eventMixin<EventTypes, type
 
   constructor(propertyMap: Map<string, string>) {
     super(true);
+    this.registerRequiredCSS(fontEditorStyles);
     this.selectedNode = UI.Context.Context.instance().flavor(SDK.DOMModel.DOMNode);
 
     this.propertyMap = propertyMap;
@@ -178,10 +179,6 @@ export class FontEditor extends Common.ObjectWrapper.eventMixin<EventTypes, type
         'letter-spacing', i18nString(UIStrings.spacing), cssPropertySection, letterSpacingPropertyInfo,
         FontEditorUtils.LetterSpacingStaticParams, this.updatePropertyValue.bind(this), this.resizePopout.bind(this),
         /** hasUnits= */ true);
-  }
-
-  override wasShown(): void {
-    this.registerCSSFiles([fontEditorStyles]);
   }
 
   private async createFontSelectorSection(propertyValue?: string): Promise<void> {

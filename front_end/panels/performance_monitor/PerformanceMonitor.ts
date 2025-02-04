@@ -77,6 +77,7 @@ export class PerformanceMonitorImpl extends UI.Widget.HBox implements
 
   constructor(pollIntervalMs: number = 500) {
     super(true);
+    this.registerRequiredCSS(performanceMonitorStyles);
 
     this.element.setAttribute('jslog', `${VisualLogging.panel('performance.monitor').track({resize: true})}`);
 
@@ -106,7 +107,6 @@ export class PerformanceMonitorImpl extends UI.Widget.HBox implements
     if (!this.model) {
       return;
     }
-    this.registerCSSFiles([performanceMonitorStyles]);
     this.controlPane.instantiateMetricData();
     const themeSupport = ThemeSupport.ThemeSupport.instance();
     themeSupport.addEventListener(ThemeSupport.ThemeChangeEvent.eventName, () => {

@@ -132,6 +132,7 @@ export class CoverageView extends UI.Widget.VBox {
 
   constructor() {
     super(true);
+    this.registerRequiredCSS(coverageViewStyles);
 
     this.element.setAttribute('jslog', `${VisualLogging.panel('coverage').track({resize: true})}`);
 
@@ -621,7 +622,6 @@ export class CoverageView extends UI.Widget.VBox {
   override wasShown(): void {
     UI.Context.Context.instance().setFlavor(CoverageView, this);
     super.wasShown();
-    this.registerCSSFiles([coverageViewStyles]);
   }
 
   override willHide(): void {

@@ -54,6 +54,7 @@ export class MetricsSidebarPane extends ElementsSidebarPane {
 
   constructor(computedStyleModel: ComputedStyleModel) {
     super(computedStyleModel);
+    this.registerRequiredCSS(metricsSidebarPaneStyles);
 
     this.originalPropertyData = null;
     this.previousPropertyDataCandidate = null;
@@ -533,9 +534,5 @@ export class MetricsSidebarPane extends ElementsSidebarPane {
       ): void {
     this.editingEnded(element, context);
     this.applyUserInput(element, userInput, previousContent, context, true);
-  }
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([metricsSidebarPaneStyles]);
   }
 }

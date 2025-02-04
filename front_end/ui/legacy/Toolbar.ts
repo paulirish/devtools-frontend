@@ -90,6 +90,7 @@ export class Toolbar extends HTMLElement {
 
   constructor() {
     super();
+    this.#shadowRoot.createChild('style').textContent = toolbarStyles.cssContent;
     this.#shadowRoot.createChild('slot');
   }
 
@@ -97,7 +98,6 @@ export class Toolbar extends HTMLElement {
     if (!this.hasAttribute('role')) {
       this.setAttribute('role', 'toolbar');
     }
-    this.#shadowRoot.adoptedStyleSheets = [toolbarStyles];
   }
 
   /**

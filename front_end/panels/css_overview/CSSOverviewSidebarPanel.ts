@@ -33,6 +33,7 @@ export class CSSOverviewSidebarPanel extends Common.ObjectWrapper.eventMixin<Eve
 
   constructor() {
     super(true);
+    this.registerRequiredCSS(cssOverviewSidebarPanelStyles);
 
     this.contentElement.classList.add('overview-sidebar-panel');
     this.contentElement.addEventListener('click', this.#onItemClick.bind(this));
@@ -159,10 +160,6 @@ export class CSSOverviewSidebarPanel extends Common.ObjectWrapper.eventMixin<Eve
       target.focus();
       target.contentEditable = 'false';
     }
-  }
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([cssOverviewSidebarPanelStyles]);
   }
 }
 

@@ -61,6 +61,7 @@ export class FilteredListWidget extends Common.ObjectWrapper.eventMixin<EventTyp
 
   constructor(provider: Provider|null, promptHistory?: string[], queryChangedCallback?: ((arg0: string) => void)) {
     super(true);
+    this.registerRequiredCSS(filteredListWidgetStyles);
     this.promptHistory = promptHistory || [];
 
     this.scoringTimer = 0;
@@ -225,7 +226,7 @@ export class FilteredListWidget extends Common.ObjectWrapper.eventMixin<EventTyp
   }
 
   override wasShown(): void {
-    this.registerCSSFiles([filteredListWidgetStyles]);
+    super.wasShown();
     this.attachProvider();
   }
 

@@ -205,6 +205,7 @@ export class SensorsView extends UI.Widget.VBox {
 
   constructor() {
     super(true);
+    this.registerRequiredCSS(sensorsStyles);
     this.element.setAttribute('jslog', `${VisualLogging.panel('sensors').track({resize: true})}`);
     this.contentElement.classList.add('sensors-view');
 
@@ -240,11 +241,6 @@ export class SensorsView extends UI.Widget.VBox {
     this.createPressureSection();
 
     this.createPanelSeparator();
-  }
-
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([sensorsStyles]);
   }
 
   private createPanelSeparator(): void {

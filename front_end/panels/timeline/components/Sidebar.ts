@@ -4,7 +4,6 @@
 
 import * as Common from '../../../core/common/common.js';
 import type * as Trace from '../../../models/trace/trace.js';
-import * as Adorners from '../../../ui/components/adorners/adorners.js';
 import * as UI from '../../../ui/legacy/legacy.js';
 
 import {SidebarAnnotationsTab} from './SidebarAnnotationsTab.js';
@@ -51,8 +50,6 @@ export class SidebarWidget extends UI.Widget.VBox {
 
   #insightsView = new InsightsView();
   #annotationsView = new AnnotationsView();
-
-  #annotationCount = 0;
 
   /**
    * Track if the user has opened the sidebar before. We do this so that the
@@ -103,23 +100,14 @@ export class SidebarWidget extends UI.Widget.VBox {
       updatedAnnotations: Trace.Types.File.Annotation[],
       annotationEntryToColorMap: Map<Trace.Types.Events.Event, string>): void {
     this.#annotationsView.setAnnotations(updatedAnnotations, annotationEntryToColorMap);
-    this.#annotationCount = updatedAnnotations.length;
     this.#updateAnnotationsCountBadge();
   }
 
   #updateAnnotationsCountBadge(): void {
-    let countAdorner: Adorners.Adorner.Adorner|null = null;
-    if (this.#annotationCount > 0) {
-      countAdorner = new Adorners.Adorner.Adorner();
-      const countSpan = document.createElement('span');
-      countSpan.textContent = this.#annotationCount.toString();
-      countAdorner.data = {
-        name: 'countWrapper',
-        content: countSpan,
-      };
-      countAdorner.classList.add('annotations-count');
+    const annotations = this.#annotationsView.deduplicatedAnnotations();
+    if (annotations.length) {
+      this.#tabbedPane.setBadge('annotations', annotations.length.toString());
     }
-    this.#tabbedPane.setSuffixElement('annotations', countAdorner);
   }
 
   setParsedTrace(parsedTrace: Trace.Handlers.Types.ParsedTrace|null, metadata: Trace.Types.File.MetaData|null): void {
@@ -183,5 +171,15 @@ class AnnotationsView extends UI.Widget.VBox {
     // set the `annotationEntryToColorMap` first.
     this.#component.annotationEntryToColorMap = annotationEntryToColorMap;
     this.#component.annotations = annotations;
+  }
+
+  /**
+   * The component "de-duplicates" annotations to ensure implementation details
+   * about how we create pending annotations don't leak into the UI. We expose
+   * these here because we use this count to show the number of annotations in
+   * the small adorner in the sidebar tab.
+   */
+  deduplicatedAnnotations(): readonly Trace.Types.File.Annotation[] {
+    return this.#component.deduplicatedAnnotations();
   }
 }

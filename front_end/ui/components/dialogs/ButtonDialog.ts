@@ -4,9 +4,9 @@
 
 import type * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
-import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import {html, render} from '../../../ui/lit/lit.js';
 
-import buttonDialogStyles from './buttonDialog.css.js';
+import buttonDialogStylesRaw from './buttonDialog.css.js';
 import {
   type ClickOutsideDialogEvent,
   type Dialog as DialogElement,
@@ -14,7 +14,9 @@ import {
   DialogVerticalPosition,
 } from './Dialog.js';
 
-const {html} = LitHtml;
+// TODO(crbug.com/391381439): Fully migrate off of constructed style sheets.
+const buttonDialogStyles = new CSSStyleSheet();
+buttonDialogStyles.replaceSync(buttonDialogStylesRaw.cssContent);
 
 export interface ButtonDialogData {
   openOnRender?: boolean;
@@ -78,7 +80,7 @@ export class ButtonDialog extends HTMLElement {
     }
 
     // clang-format off
-    LitHtml.render(
+    render(
       html`
       <devtools-button
         @click=${this.#showDialog}
