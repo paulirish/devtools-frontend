@@ -35,7 +35,7 @@ export class EntityMapper {
     const networkEventsByEntity = parsedTrace.NetworkRequests.entityMappings.eventsByEntity;
     const networkCreatedCache = parsedTrace.NetworkRequests.entityMappings.createdEntityCache;
 
-    // RendrerHandler caches.
+    // RendererHandler caches.
     const entityByRendererEvent = parsedTrace.Renderer.entityMappings.entityByEvent;
     const rendererEventsByEntity = parsedTrace.Renderer.entityMappings.eventsByEntity;
     const rendererCreatedCache = parsedTrace.Renderer.entityMappings.createdEntityCache;
