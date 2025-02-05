@@ -437,10 +437,15 @@ export class TimelineTreeView extends
     throw new Error('Not Implemented');
   }
 
-  buildTopDownTree(doNotAggregate: boolean, groupIdCallback: ((arg0: Trace.Types.Events.Event) => string)|null):
+  buildTopDownTree(doNotAggregate: boolean, eventGroupIdCallback: ((arg0: Trace.Types.Events.Event) => string)|null):
       Trace.Extras.TraceTree.Node {
-    return new Trace.Extras.TraceTree.TopDownRootNode(
-        this.selectedEvents(), this.filters(), this.startTime, this.endTime, doNotAggregate, groupIdCallback);
+    return new Trace.Extras.TraceTree.TopDownRootNode(this.selectedEvents(), {
+      filters: this.filters(),
+      startTime: this.startTime,
+      endTime: this.endTime,
+      doNotAggregate,
+      eventGroupIdCallback,
+    });
   }
 
   populateColumns(columns: DataGrid.DataGrid.ColumnDescriptor[]): void {
@@ -846,6 +851,9 @@ export class GridNode extends DataGrid.SortableDataGrid.SortableDataGridNode<Gri
   }
 
   #bottomUpButtonClicked(): void {
+    // We should also trigger an event to "unhover" the 3P tree row. Since this isn't
+    // triggered when clicking the bottom up button.
+    this.treeView.dispatchEventToListeners(TimelineTreeView.Events.THIRD_PARTY_ROW_HOVERED, null);
     this.treeView.dispatchEventToListeners(TimelineTreeView.Events.BOTTOM_UP_BUTTON_CLICKED, this.profileNode);
   }
 }
@@ -1150,9 +1158,13 @@ export class BottomUpTimelineTreeView extends AggregatedTimelineTreeView {
   }
 
   override buildTree(): Trace.Extras.TraceTree.Node {
-    return new Trace.Extras.TraceTree.BottomUpRootNode(
-        this.selectedEvents(), this.textFilter(), this.filtersWithoutTextFilter(), this.startTime, this.endTime,
-        this.groupingFunction(this.groupBySetting.get()));
+    return new Trace.Extras.TraceTree.BottomUpRootNode(this.selectedEvents(), {
+      textFilter: this.textFilter(),
+      filters: this.filtersWithoutTextFilter(),
+      startTime: this.startTime,
+      endTime: this.endTime,
+      eventGroupIdCallback: this.groupingFunction(this.groupBySetting.get()),
+    });
   }
 }
 

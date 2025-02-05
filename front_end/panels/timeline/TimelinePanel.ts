@@ -934,7 +934,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         this.#setModelForActiveTrace();
         this.#removeStatusPane();
         this.#showSidebarIfRequired();
-        this.#dimThirdPartiesIfRequired(newMode.traceIndex);
+        this.flameChart.dimThirdPartiesIfRequired();
         return;
       }
 
@@ -1550,7 +1550,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     if (this.#viewMode.mode !== 'VIEWING_TRACE') {
       return;
     }
-    this.#dimThirdPartiesIfRequired(this.#viewMode.traceIndex);
+    this.flameChart.dimThirdPartiesIfRequired();
   }
 
   #extensionDataVisibilityChanged(): void {
@@ -1982,18 +1982,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     }
     this.statusPane?.updateProgressBar(i18nString(UIStrings.processed), 70);
 
-    let traceInsightsSets = this.#traceEngineModel.traceInsights(traceIndex);
-    if (traceInsightsSets) {
-      // Omit insight sets that don't have anything of interest to show to the user.
-      const filteredTraceInsightsSets = new Map();
-      for (const [key, insightSet] of traceInsightsSets) {
-        if (Object.values(insightSet.model).some(model => model.shouldShow)) {
-          filteredTraceInsightsSets.set(key, insightSet);
-        }
-      }
-
-      traceInsightsSets = filteredTraceInsightsSets.size ? filteredTraceInsightsSets : null;
-    }
+    const traceInsightsSets = this.#traceEngineModel.traceInsights(traceIndex);
     this.flameChart.setInsights(traceInsightsSets, this.#eventToRelatedInsights);
 
     this.flameChart.setModel(parsedTrace, traceMetadata);
@@ -2154,23 +2143,6 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       this.#splitWidget.showBoth();
     }
     this.#restoreSidebarVisibilityOnTraceLoad = false;
-  }
-
-  // Activates or disables dimming when checkbox is clicked.
-  #dimThirdPartiesIfRequired(traceIndex: number): void {
-    const parsedTrace = this.#traceEngineModel.parsedTrace(traceIndex);
-    if (!parsedTrace) {
-      return;
-    }
-
-    const checkboxState = this.#dimThirdPartiesSetting?.getIfNotDisabled() ?? false;
-    const thirdPartyEvents = this.#entityMapper?.thirdPartyEvents() ?? [];
-
-    if (checkboxState && thirdPartyEvents.length) {
-      this.flameChart.setActiveThirdPartyDimmingSetting(thirdPartyEvents);
-    } else {
-      this.flameChart.setActiveThirdPartyDimmingSetting(null);
-    }
   }
 
   // Build a map mapping annotated entries to the colours that are used to display them in the FlameChart.

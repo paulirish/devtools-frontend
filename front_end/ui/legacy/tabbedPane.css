@@ -196,6 +196,13 @@
   color: var(--sys-color-on-error);
   font-size: var(--sys-typescale-body5-size);
   font-weight: var(--ref-typeface-weight-bold);
+
+  &.primary {
+    background: var(--sys-color-cdt-base-container);
+    color: var(--sys-color-primary);
+    border: var(--sys-size-1) solid var(--sys-color-primary);
+    font-weight: normal;
+  }
 }
 
 
@@ -243,12 +250,12 @@
   color: var(--sys-color-primary);
 }
 
-.tabbed-pane-header-tab.dragging {
+.tabbed-pane-header-tab.selected.dragging {
   --override-dragging-box-shadow-color: rgb(0 0 0 / 37%);
 
   position: relative;
   box-shadow: 0 1px 4px 0 var(--override-dragging-box-shadow-color);
-  background-color: var(--sys-color-state-hover-on-subtle);
+  background-color: var(--app-color-toolbar-background);
 }
 
 .theme-with-dark-background .tabbed-pane-header-tab.dragging,

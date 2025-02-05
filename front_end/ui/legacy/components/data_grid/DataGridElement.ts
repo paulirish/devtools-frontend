@@ -4,6 +4,7 @@
 
 import type * as Platform from '../../../../core/platform/platform.js';
 import type * as TextUtils from '../../../../models/text_utils/text_utils.js';
+import inspectorCommonStyles from '../../inspectorCommon.css.js';
 
 import dataGridStyles from './dataGrid.css.js';
 import {Align, Events as DataGridEvents} from './DataGrid.js';
@@ -62,6 +63,7 @@ class DataGridElement extends HTMLElement {
 
     this.#shadowRoot = this.attachShadow({mode: 'open', delegatesFocus: true});
     this.#shadowRoot.createChild('style').textContent = dataGridStyles.cssContent;
+    this.#shadowRoot.createChild('style').textContent = inspectorCommonStyles.cssContent;
     this.#shadowRoot.appendChild(this.#dataGrid.element);
 
     this.#dataGrid.addEventListener(
@@ -118,7 +120,7 @@ class DataGridElement extends HTMLElement {
   }
 
   get striped(): boolean {
-    return this.hasAttribute('striped');
+    return hasBooleanAttribute(this, 'striped');
   }
 
   set inline(striped: boolean) {
@@ -126,7 +128,7 @@ class DataGridElement extends HTMLElement {
   }
 
   get inline(): boolean {
-    return this.hasAttribute('inline');
+    return hasBooleanAttribute(this, 'inline');
   }
 
   set displayName(displayName: string) {
@@ -152,6 +154,7 @@ class DataGridElement extends HTMLElement {
     }
     this.#hideableColumns.clear();
     this.#columnsOrder = [];
+    let hasEditableColumn = false;
     for (const column of this.querySelectorAll('th[id]') || []) {
       const id = column.id as Lowercase<string>;
       this.#columnsOrder.push(id);
@@ -164,7 +167,7 @@ class DataGridElement extends HTMLElement {
           title += child.shadowRoot ? child.shadowRoot.textContent : child.textContent;
         }
       }
-      const sortable = column.hasAttribute('sortable');
+      const sortable = hasBooleanAttribute(column, 'sortable');
       const width = column.getAttribute('width') ?? undefined;
       const fixedWidth = column.hasAttribute('fixed');
       let align = column.getAttribute('align') ?? undefined;
@@ -172,6 +175,10 @@ class DataGridElement extends HTMLElement {
         align = undefined;
       }
       const weight = parseFloat(column.getAttribute('weight') || '') ?? undefined;
+      const editable = column.hasAttribute('editable');
+      if (editable) {
+        hasEditableColumn = true;
+      }
       this.#dataGrid.addColumn({
         id,
         title: title as Platform.UIString.LocalizedString,
@@ -180,9 +187,10 @@ class DataGridElement extends HTMLElement {
         fixedWidth,
         width,
         align,
-        weight
+        weight,
+        editable
       });
-      if (column.hasAttribute('hideable')) {
+      if (hasBooleanAttribute(column, 'hideable')) {
         this.#hideableColumns.add(id);
       }
     }
@@ -190,12 +198,17 @@ class DataGridElement extends HTMLElement {
     if (visibleColumns.size) {
       this.#dataGrid.setColumnsVisibility(visibleColumns);
     }
+    this.#dataGrid.editCallback = hasEditableColumn ? this.#editCallback.bind(this) : undefined;
+    this.#dataGrid.deleteCallback = hasEditableColumn ? this.#deleteCallback.bind(this) : undefined;
   }
 
   #needUpdateColumns(mutationList: MutationRecord[]): boolean {
     for (const mutation of mutationList) {
       for (const element of [...mutation.removedNodes, ...mutation.addedNodes]) {
-        if (element.nodeName === 'TH') {
+        if (!(element instanceof HTMLElement)) {
+          continue;
+        }
+        if (element.nodeName === 'TH' || element.querySelector('th')) {
           return true;
         }
       }
@@ -206,15 +219,32 @@ class DataGridElement extends HTMLElement {
     return false;
   }
 
+  #getDataRows(nodes: NodeList): HTMLElement[] {
+    return [...nodes]
+        .flatMap(node => {
+          if (node instanceof HTMLTableRowElement) {
+            return [node];
+          }
+          if (node instanceof HTMLElement) {
+            return [...node.querySelectorAll('tr')];
+          }
+          return [] as HTMLElement[];
+        })
+        .filter(node => node.querySelector('td'));
+  }
+
   #addNodes(nodes: NodeList): void {
-    for (const element of nodes) {
+    for (const element of this.#getDataRows(nodes)) {
+      if (!element.querySelector('td')) {
+        continue;
+      }
       if (element instanceof HTMLTableRowElement && element.querySelector('td')) {
         const parentNode = this.#dataGrid.rootNode();  // TODO(dsv): support nested nodes
         const nextNode = element.nextElementSibling ? DataGridElementNode.get(element.nextElementSibling) : null;
         const index = nextNode ? parentNode.children.indexOf(nextNode) : parentNode.children.length;
         const node = new DataGridElementNode(element, this);
         parentNode.insertChild(node, index);
-        if (element.hasAttribute('selected')) {
+        if (hasBooleanAttribute(element, 'selected')) {
           node.select();
         }
       }
@@ -222,7 +252,10 @@ class DataGridElement extends HTMLElement {
   }
 
   #removeNodes(nodes: NodeList): void {
-    for (const element of nodes) {
+    for (const element of this.#getDataRows(nodes)) {
+      if (!element.querySelector('td')) {
+        continue;
+      }
       if (element instanceof HTMLTableRowElement && element.querySelector('td')) {
         const node = DataGridElementNode.get(element);
         if (node) {
@@ -232,11 +265,19 @@ class DataGridElement extends HTMLElement {
     }
   }
 
-  #updateNode(node: Node): void {
+  #updateNode(node: Node, selectionOnly: boolean): void {
     const dataRow = node instanceof HTMLElement ? node.closest('tr') : null;
     const dataGridNode = dataRow ? DataGridElementNode.get(dataRow) : null;
     if (dataGridNode) {
-      dataGridNode.refresh();
+      if (selectionOnly) {
+        if (dataRow && hasBooleanAttribute(dataRow, 'selected')) {
+          dataGridNode.select();
+        } else {
+          dataGridNode.deselect();
+        }
+      } else {
+        dataGridNode.refresh();
+      }
     }
   }
 
@@ -248,8 +289,17 @@ class DataGridElement extends HTMLElement {
     for (const mutation of mutationList) {
       this.#removeNodes(mutation.removedNodes);
       this.#addNodes(mutation.addedNodes);
-      this.#updateNode(mutation.target);
+      this.#updateNode(mutation.target, mutation.attributeName === 'selected');
     }
+  }
+
+  #editCallback(node: DataGridElementNode, columnId: string, valueBeforeEditing: string, newText: string): void {
+    this.dispatchEvent(
+        new CustomEvent('edit', {detail: {node: node.configElement, columnId, valueBeforeEditing, newText}}));
+  }
+
+  #deleteCallback(node: DataGridElementNode): void {
+    this.dispatchEvent(new CustomEvent('delete', {detail: node.configElement}));
   }
 }
 
@@ -279,9 +329,6 @@ class DataGridElementNode extends SortableDataGridNode<DataGridElementNode> {
       const cell = cells[i];
       const columnId = this.#dataGridElement.columnsOrder[i];
       this.data[columnId] = cell.dataset.value ?? cell.textContent ?? '';
-    }
-    if (this.#configElement.hasAttribute('selected')) {
-      this.select();
     }
   }
 
@@ -346,5 +393,8 @@ class DataGridElementNode extends SortableDataGridNode<DataGridElementNode> {
   }
 }
 
-// TODO(dsv): Rename to devtools-data-grid once the other one is removed.
 customElements.define('devtools-data-grid', DataGridElement);
+
+function hasBooleanAttribute(element: Element, name: string): boolean {
+  return element.hasAttribute(name) && element.getAttribute(name) !== 'false';
+}
