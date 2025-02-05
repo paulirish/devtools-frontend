@@ -379,6 +379,12 @@ export class BottomUpRootNode extends Node {
         {
           onStartEvent,
           onEndEvent,
+
+          onInstantEvent: (e: Types.Events.Event): void => {
+            if (Types.Events.isReceivedDataEvent(e)) {
+              debugger;
+            }
+          },
           startTime: Helpers.Timing.milliToMicro(this.startTime),
           endTime: Helpers.Timing.milliToMicro(this.endTime),
           eventFilter: this.filter,
