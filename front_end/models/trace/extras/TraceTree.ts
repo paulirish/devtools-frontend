@@ -388,12 +388,10 @@ export class BottomUpRootNode extends Node {
     const selfTimeStack: number[] = [endTime - startTime];
     const firstNodeStack: boolean[] = [];
     const totalTimeById = new Map<string, number>();
-    const transferSizeById = new Map<string, number>();
 
     // encodedDataLength is provided solely on on instant events.
     const sumTransferSizeOfInstantEvent = (e: Types.Events.Event): void => {
       if (Types.Events.isReceivedDataEvent(e)) {
-        // debugger;
         const id = generateEventID(e);
         let node = nodeById.get(id);
         if (!node) {
@@ -402,8 +400,7 @@ export class BottomUpRootNode extends Node {
         } else {
           node.events.push(e);
         }
-        const currentTransferSize = transferSizeById.get(id) ?? 0;
-        transferSizeById.set(id, currentTransferSize + e.args.data.encodedDataLength);
+        node.transferSize += e.args.data.encodedDataLength;
       }
     };
 
@@ -455,8 +452,9 @@ export class BottomUpRootNode extends Node {
     }
 
     this.selfTime = selfTimeStack.pop() || 0;
+    // Delete any nodes that have no selfTime (or transferSize, if it's being calculated)
     for (const pair of nodeById) {
-      if (pair[1].selfTime <= 0) {
+      if (pair[1].selfTime <= 0 && (!this.calculateTransferSize || pair[1].transferSize <= 0)) {
         nodeById.delete((pair[0]));
       }
     }
@@ -651,6 +649,9 @@ export function generateEventID(event: Types.Events.Event): string {
     return `networkreq:${event.args.data.requestId}`;
   }
   if (Types.Events.isResourceFinish(event)) {
+    return `networkreq:${event.args.data.requestId}`;
+  }
+  if (Types.Events.isResourceReceiveResponse(event)) {
     return `networkreq:${event.args.data.requestId}`;
   }
 
