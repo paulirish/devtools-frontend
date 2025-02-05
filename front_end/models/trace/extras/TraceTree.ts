@@ -285,6 +285,7 @@ export class TopDownRootNode extends TopDownNode {
     this.selfTime = this.totalTime;
   }
   override children(): ChildrenCache {
+    // FYI tree nodes are built lazily. https://codereview.chromium.org/2674283003
     return this.childrenInternal || this.grouppedTopNodes();
   }
 
@@ -359,6 +360,7 @@ export class BottomUpRootNode extends Node {
   }
 
   override children(): ChildrenCache {
+    // FYI tree nodes are built lazily. https://codereview.chromium.org/2674283003
     if (!this.childrenInternal) {
       this.childrenInternal = this.filterChildren(this.grouppedTopNodes());
     }
