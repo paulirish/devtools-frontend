@@ -66,8 +66,8 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
   }
 
   override buildTree(): Trace.Extras.TraceTree.Node {
-    const parsedTrace = this.parsedTrace();
-    const entityMapper = this.entityMapper();
+    const parsedTrace = this.parsedTrace;
+    const entityMapper = this.entityMapper;
 
     if (!parsedTrace || !entityMapper) {
       return new Trace.Extras.TraceTree.BottomUpRootNode([], {
@@ -113,7 +113,7 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
 
   // This is our groupingFunction aka eventGroupIdCallback.
   private eventToEntity(event: Trace.Types.Events.Event): string {
-    const entity = this.entityMapper()?.entityForEvent(event);
+    const entity = this.entityMapper?.entityForEvent(event);
     if (!entity) {
       return '';
     }
@@ -196,7 +196,7 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
   }
 
   override onHover(node: Trace.Extras.TraceTree.Node|null): void {
-    const entityMappings = this.entityMapper();
+    const entityMappings = this.entityMapper;
     if (!entityMappings || !node?.event) {
       return;
     }
@@ -237,7 +237,7 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
   }
 
   nodeIsFirstParty(node: Trace.Extras.TraceTree.Node): boolean {
-    const mapper = this.entityMapper();
+    const mapper = this.entityMapper;
     if (!mapper) {
       return false;
     }
@@ -246,7 +246,7 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
   }
 
   nodeIsExtension(node: Trace.Extras.TraceTree.Node): boolean {
-    const mapper = this.entityMapper();
+    const mapper = this.entityMapper;
     if (!mapper) {
       return false;
     }
