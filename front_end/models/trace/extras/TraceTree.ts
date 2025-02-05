@@ -193,7 +193,7 @@ export class TopDownNode extends Node {
       }
       node.selfTime += duration;
       node.totalTime += duration;
-      if (Types.Events.isSyntheticNetworkRequest(e)) {
+      if (Types.Events.isReceivedDataEvent(e)) {
         node.transferSize += e.args.data.encodedDataLength;
       }
       currentDirectChild = node;
@@ -373,6 +373,7 @@ export class BottomUpRootNode extends Node {
     const selfTimeStack: number[] = [endTime - startTime];
     const firstNodeStack: boolean[] = [];
     const totalTimeById = new Map<string, number>();
+    const transferSizeById = new Map<string, number>();
     Helpers.Trace.forEachEvent(
         this.events,
         {
@@ -396,16 +397,18 @@ export class BottomUpRootNode extends Node {
       const noNodeOnStack = !totalTimeById.has(id);
       if (noNodeOnStack) {
         totalTimeById.set(id, duration);
+
+        if (Types.Events.isReceivedDataEvent(e)) {
+          transferSizeById.set(id, e.args.data.encodedDataLength);
+        }
       }
       firstNodeStack.push(noNodeOnStack);
-      if (Types.Events.isSyntheticNetworkRequest(e)) {
-        let node = nodeById.get(id);
-        if (!node) {
-          node = new BottomUpNode(root, id, e, false, root);
-          nodeById.set(id, node);
-        }
-        node.transferSize += e.args.data.encodedDataLength;
-      }
+
+      // if (Types.Events.isReceivedDataEvent(e)) {
+      //   const noNodeOnStack = !transferSizeById.has(id);
+      //   if (noNodeOnStack) {
+      //   }
+      // }
     }
 
     function onEndEvent(event: Types.Events.Event): void {
@@ -421,6 +424,9 @@ export class BottomUpRootNode extends Node {
       if (firstNodeStack.pop()) {
         node.totalTime += totalTimeById.get(id) || 0;
         totalTimeById.delete(id);
+
+        node.transferSize += transferSizeById.get(id) || 0;
+        transferSizeById.delete(id);
       }
       if (firstNodeStack.length) {
         node.setHasChildren(true);
@@ -528,6 +534,11 @@ export class BottomUpNode extends Node {
         {
           onStartEvent,
           onEndEvent,
+          onInstantEvent: (e: Types.Events.Event): void => {
+            if (Types.Events.isReceivedDataEvent(e)) {
+              debugger;
+            }
+          },
           startTime: Helpers.Timing.milliToMicro(startTime),
           endTime: Helpers.Timing.milliToMicro(endTime),
           eventFilter: this.root.filter,
@@ -576,6 +587,7 @@ export class BottomUpNode extends Node {
       const totalTime = actualEndTime - Math.max(currentStartTime, lastTimeMarker);
       node.selfTime += selfTime || 0;
       node.totalTime += totalTime;
+      // something? nah dont think so. xfer size only goes up when we see those instant events.
       lastTimeMarker = actualEndTime;
     }
 
@@ -612,14 +624,17 @@ export function generateEventID(event: Types.Events.Event): string {
     return `f:${name}@${location}`;
   }
 
-  if (Types.Events.isSyntheticNetworkRequest(event)) {
-    return `${event.name}:${event.args?.data?.url}`;
-  }
   if (Types.Events.isConsoleTimeStamp(event) && event.args.data) {
     return `${event.name}:${event.args.data.name}`;
   }
   if (Types.Events.isSyntheticNetworkRequest(event)) {
-    return `${event.name}:${event.args.data.url}`;
+    return `networkreq:${event.args.data.requestId}`;
+  }
+  if (Types.Events.isResourceReceivedData(event)) {
+    return `networkreq:${event.args.data.requestId}`;
+  }
+  if (Types.Events.isResourceFinish(event)) {
+    return `networkreq:${event.args.data.requestId}`;
   }
 
   return event.name;

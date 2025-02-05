@@ -17,7 +17,7 @@ export class VisibleEventsFilter extends TraceFilter {
   }
 
   accept(event: Types.Events.Event): boolean {
-    if (Types.Extensions.isSyntheticExtensionEntry(event) || Types.Events.isSyntheticNetworkRequest(event)) {
+    if (Types.Extensions.isSyntheticExtensionEntry(event)) {
       return true;
     }
     return this.visibleTypes.has(VisibleEventsFilter.eventType(event));
