@@ -444,6 +444,7 @@ export class TimelineTreeView extends
       endTime: this.endTime,
       doNotAggregate,
       eventGroupIdCallback,
+      includeInstantEvents: true,  // TODO: remove. temporary for debugging
     });
   }
 

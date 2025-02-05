@@ -75,7 +75,7 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
         filters: this.filtersWithoutTextFilter(),
         startTime: this.startTime,
         endTime: this.endTime,
-        eventGroupIdCallback: this.groupingFunction(),
+        eventGroupIdCallback: this.eventToEntity.bind(this),
       });
     }
 
@@ -98,7 +98,8 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
       filters: [filter],
       startTime: this.startTime,
       endTime: this.endTime,
-      eventGroupIdCallback: this.groupingFunction(),
+      eventGroupIdCallback: this.eventToEntity.bind(this),
+      calculateTransferSize: true,
     });
     return node;
   }
@@ -110,22 +111,9 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
     return;
   }
 
-  protected groupingFunction(): ((arg0: Trace.Types.Events.Event) => string)|null {
-    return this.domainByEvent.bind(this);
-  }
-
-  private domainByEvent(event: Trace.Types.Events.Event): string {
-    const parsedTrace = this.parsedTrace();
-    if (!parsedTrace) {
-      return '';
-    }
-
-    const entityMappings = this.entityMapper();
-    if (!entityMappings) {
-      return '';
-    }
-
-    const entity = entityMappings.entityForEvent(event);
+  // This is our groupingFunction aka eventGroupIdCallback.
+  private eventToEntity(event: Trace.Types.Events.Event): string {
+    const entity = this.entityMapper()?.entityForEvent(event);
     if (!entity) {
       return '';
     }
@@ -228,7 +216,7 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
     const color = 'gray';
     const unattributed = i18nString(UIStrings.unattributed);
     const id = typeof node.id === 'symbol' ? undefined : node.id;
-    const domainName = id ? this.domainByEvent(node.event) : undefined;
+    const domainName = id ? this.eventToEntity(node.event) : undefined;
     return {name: domainName || unattributed, color, icon: undefined};
   }
 

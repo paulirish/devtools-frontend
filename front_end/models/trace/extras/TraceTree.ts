@@ -326,13 +326,22 @@ export class BottomUpRootNode extends Node {
   readonly endTime: Types.Timing.Milli;
   private eventGroupIdCallback: ((arg0: Types.Events.Event) => string)|null|undefined;
   override totalTime: number;
+  private calculateTransferSize?: boolean;
 
-  constructor(events: Types.Events.Event[], {textFilter, filters, startTime, endTime, eventGroupIdCallback}: {
+  constructor(events: Types.Events.Event[], {
+    textFilter,
+    filters,
+    startTime,
+    endTime,
+    eventGroupIdCallback,
+    calculateTransferSize,
+  }: {
     textFilter: TraceFilter,
     filters: readonly TraceFilter[],
     startTime: Types.Timing.Milli,
     endTime: Types.Timing.Milli,
     eventGroupIdCallback?: ((arg0: Types.Events.Event) => string)|null,
+    calculateTransferSize?: boolean,
   }) {
     super('', events[0]);
     this.childrenInternal = null;
@@ -343,6 +352,7 @@ export class BottomUpRootNode extends Node {
     this.endTime = endTime;
     this.eventGroupIdCallback = eventGroupIdCallback;
     this.totalTime = endTime - startTime;
+    this.calculateTransferSize = calculateTransferSize;
   }
 
   override hasChildren(): boolean {
@@ -367,6 +377,9 @@ export class BottomUpRootNode extends Node {
     return this.childrenInternal;
   }
 
+  // If no grouping is applied, the nodes returned here are what's initially shown in the bottom-up view.
+  // "No grouping" == no grouping in UI dropdown == no groupingFunction…
+  // … HOWEVER, nodes are still aggregated via `generateEventID`, which is ~= the event name.
   private ungrouppedTopNodes(): ChildrenCache {
     const root = this;
     const startTime = this.startTime;
@@ -376,17 +389,30 @@ export class BottomUpRootNode extends Node {
     const firstNodeStack: boolean[] = [];
     const totalTimeById = new Map<string, number>();
     const transferSizeById = new Map<string, number>();
+
+    // encodedDataLength is provided solely on on instant events.
+    const sumTransferSizeOfInstantEvent = (e: Types.Events.Event): void => {
+      if (Types.Events.isReceivedDataEvent(e)) {
+        // debugger;
+        const id = generateEventID(e);
+        let node = nodeById.get(id);
+        if (!node) {
+          node = new BottomUpNode(root, id, e, false, root);
+          nodeById.set(id, node);
+        } else {
+          node.events.push(e);
+        }
+        const currentTransferSize = transferSizeById.get(id) ?? 0;
+        transferSizeById.set(id, currentTransferSize + e.args.data.encodedDataLength);
+      }
+    };
+
     Helpers.Trace.forEachEvent(
         this.events,
         {
           onStartEvent,
           onEndEvent,
-
-          onInstantEvent: (e: Types.Events.Event): void => {
-            if (Types.Events.isReceivedDataEvent(e)) {
-              debugger;
-            }
-          },
+          onInstantEvent: this.calculateTransferSize ? sumTransferSizeOfInstantEvent : undefined,
           startTime: Helpers.Timing.milliToMicro(this.startTime),
           endTime: Helpers.Timing.milliToMicro(this.endTime),
           eventFilter: this.filter,
@@ -405,18 +431,8 @@ export class BottomUpRootNode extends Node {
       const noNodeOnStack = !totalTimeById.has(id);
       if (noNodeOnStack) {
         totalTimeById.set(id, duration);
-
-        if (Types.Events.isReceivedDataEvent(e)) {
-          transferSizeById.set(id, e.args.data.encodedDataLength);
-        }
       }
       firstNodeStack.push(noNodeOnStack);
-
-      // if (Types.Events.isReceivedDataEvent(e)) {
-      //   const noNodeOnStack = !transferSizeById.has(id);
-      //   if (noNodeOnStack) {
-      //   }
-      // }
     }
 
     function onEndEvent(event: Types.Events.Event): void {
@@ -432,9 +448,6 @@ export class BottomUpRootNode extends Node {
       if (firstNodeStack.pop()) {
         node.totalTime += totalTimeById.get(id) || 0;
         totalTimeById.delete(id);
-
-        node.transferSize += transferSizeById.get(id) || 0;
-        transferSizeById.delete(id);
       }
       if (firstNodeStack.length) {
         node.setHasChildren(true);
@@ -542,11 +555,7 @@ export class BottomUpNode extends Node {
         {
           onStartEvent,
           onEndEvent,
-          onInstantEvent: (e: Types.Events.Event): void => {
-            if (Types.Events.isReceivedDataEvent(e)) {
-              debugger;
-            }
-          },
+          // Not exactly sure why our transferSize never shows up in this onInstantEvent
           startTime: Helpers.Timing.milliToMicro(startTime),
           endTime: Helpers.Timing.milliToMicro(endTime),
           eventFilter: this.root.filter,
