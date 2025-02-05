@@ -274,14 +274,14 @@ export class TopDownRootNode extends TopDownNode {
     this.event = events[0];
     this.root = this;
     this.events = events;
-    this.filter = (e: Types.Events.Event): boolean => options.filters.every(f => f.accept(e));
-    this.startTime = options.startTime;
-    this.endTime = options.endTime;
-    this.eventGroupIdCallback = options.eventGroupIdCallback;
-    this.doNotAggregate = options.doNotAggregate;
-    this.includeInstantEvents = options.includeInstantEvents;
+    this.filter = (e: Types.Events.Event): boolean => filters.every(f => f.accept(e));
+    this.startTime = startTime;
+    this.endTime = endTime;
+    this.eventGroupIdCallback = eventGroupIdCallback;
+    this.doNotAggregate = doNotAggregate;
+    this.includeInstantEvents = includeInstantEvents;
 
-    this.totalTime = options.endTime - options.startTime;
+    this.totalTime = endTime - startTime;
     this.selfTime = this.totalTime;
   }
   override children(): ChildrenCache {
@@ -336,12 +336,12 @@ export class BottomUpRootNode extends Node {
     super('', events[0]);
     this.childrenInternal = null;
     this.events = events;
-    this.textFilter = options.textFilter;
-    this.filter = (e: Types.Events.Event): boolean => options.filters.every(f => f.accept(e));
-    this.startTime = options.startTime;
-    this.endTime = options.endTime;
-    this.eventGroupIdCallback = options.eventGroupIdCallback;
-    this.totalTime = options.endTime - options.startTime;
+    this.textFilter = textFilter;
+    this.filter = (e: Types.Events.Event): boolean => filters.every(f => f.accept(e));
+    this.startTime = startTime;
+    this.endTime = endTime;
+    this.eventGroupIdCallback = eventGroupIdCallback;
+    this.totalTime = endTime - startTime;
   }
 
   override hasChildren(): boolean {
