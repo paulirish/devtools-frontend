@@ -121,7 +121,7 @@ describeWithMockConnection('NetworkLogView', () => {
   });
 
   // Note this isn't an ideal test as the internal headers are generated rather than explicitly added,
-  // are only added on HTTP/2 and HTTP/3, have a preceeding colon like `:authority` but it still tests
+  // are only added on HTTP/2 and HTTP/3, have a preceding colon like `:authority` but it still tests
   // the stripping function.
   it('generates a valid curl command while stripping internal headers', async () => {
     const request = createNetworkRequest(urlString`http://localhost`, {

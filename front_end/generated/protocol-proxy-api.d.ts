@@ -1966,12 +1966,12 @@ declare namespace ProtocolProxyApi {
 
   export interface MemoryApi {
     /**
-     * Retruns current DOM object counters.
+     * Returns current DOM object counters.
      */
     invoke_getDOMCounters(): Promise<Protocol.Memory.GetDOMCountersResponse>;
 
     /**
-     * Retruns DOM object counters after preparing renderer for leak detection.
+     * Returns DOM object counters after preparing renderer for leak detection.
      */
     invoke_getDOMCountersForLeakDetection(): Promise<Protocol.Memory.GetDOMCountersForLeakDetectionResponse>;
 
@@ -2216,7 +2216,7 @@ declare namespace ProtocolProxyApi {
 
     /**
      * Sets Controls for third-party cookie access
-     * Page reload is required before the new cookie bahavior will be observed
+     * Page reload is required before the new cookie behavior will be observed
      */
     invoke_setCookieControls(params: Protocol.Network.SetCookieControlsRequest): Promise<Protocol.ProtocolResponseWithError>;
 
@@ -4231,7 +4231,7 @@ declare namespace ProtocolProxyApi {
      * Restarts particular call frame from the beginning. The old, deprecated
      * behavior of `restartFrame` is to stay paused and allow further CDP commands
      * after a restart was scheduled. This can cause problems with restarting, so
-     * we now continue execution immediatly after it has been scheduled until we
+     * we now continue execution immediately after it has been scheduled until we
      * reach the beginning of the restarted frame.
      *
      * To stay back-wards compatible, `restartFrame` now expects a `mode`
@@ -4492,7 +4492,7 @@ declare namespace ProtocolProxyApi {
     /**
      * Reports coverage delta since the last poll (either from an event like this, or from
      * `takePreciseCoverage` for the current isolate. May only be sent if precise code
-     * coverage has been started. This event can be trigged by the embedder to, for example,
+     * coverage has been started. This event can be triggered by the embedder to, for example,
      * trigger collection of coverage data immediately at a certain point in time.
      */
     preciseCoverageDeltaUpdate(params: Protocol.Profiler.PreciseCoverageDeltaUpdateEvent): void;

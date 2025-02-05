@@ -36,7 +36,7 @@ export interface PopoverInfo {
 
 let showPostMessageEvents: boolean|undefined;
 function isShowPostMessageEventsEnabled(): boolean {
-  // Everytime the experiment is toggled devtools is reloaded so the
+  // Every time the experiment is toggled devtools is reloaded so the
   // cache is updated automatically.
   if (showPostMessageEvents === undefined) {
     showPostMessageEvents =
@@ -112,7 +112,7 @@ export interface TrackAppender {
    * Appends into the flame chart data the data corresponding to a track.
    * @param level the horizontal level of the flame chart events where the
    * track's events will start being appended.
-   * @param expanded wether the track should be rendered expanded.
+   * @param expanded weather the track should be rendered expanded.
    * @returns the first available level to append more data after having
    * appended the track's events.
    */

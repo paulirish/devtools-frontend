@@ -8,7 +8,7 @@ import * as SDK from '../../core/sdk/sdk.js';
 /**
  * Responsible for asking autofill for current form issues. This currently happens when devtools is first open.
  */
-// TODO(crbug.com/1399414): Trigger check form issues when an element with an associated issue is editted in the issues panel.
+// TODO(crbug.com/1399414): Trigger check form issues when an element with an associated issue is edited in the issues panel.
 let checkFormsIssuesTriggerInstance: CheckFormsIssuesTrigger|null = null;
 export class CheckFormsIssuesTrigger {
   constructor() {

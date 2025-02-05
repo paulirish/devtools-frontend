@@ -238,16 +238,16 @@ const UIStrings = {
   creationStackTraceExplanation:
       'This frame was created programmatically. The `stack trace` shows where this happened.',
   /**
-   *@description Text descripting why a frame has been indentified as an advertisement.
+   *@description Text descripting why a frame has been identified as an advertisement.
    */
   parentIsAdExplanation: 'This frame is considered an ad frame because its parent frame is an ad frame.',
   /**
-   *@description Text descripting why a frame has been indentified as an advertisement.
+   *@description Text descripting why a frame has been identified as an advertisement.
    */
   matchedBlockingRuleExplanation:
       'This frame is considered an ad frame because its current (or previous) main document is an ad resource.',
   /**
-   *@description Text descripting why a frame has been indentified as an advertisement.
+   *@description Text descripting why a frame has been identified as an advertisement.
    */
   createdByAdScriptExplanation:
       'There was an ad script in the `(async) stack` when this frame was created. Examining the creation `stack trace` of this frame might provide more insight.',

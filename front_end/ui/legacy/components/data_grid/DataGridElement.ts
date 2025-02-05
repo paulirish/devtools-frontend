@@ -33,7 +33,7 @@ const DUMMY_COLUMN_ID = 'dummy';  // SortableDataGrid.create requires at least o
  * where a row with <th> configures the columns and rows with <td> provide the data.
  *
  * Under the hood it uses SortableDataGrid, which extends ViewportDataGrid so only
- * visible rows are layed out and sorting is provided out of the box.
+ * visible rows are laid out and sorting is provided out of the box.
  *
  * @attr striped
  * @attr displayName

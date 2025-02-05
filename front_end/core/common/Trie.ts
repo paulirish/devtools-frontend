@@ -7,7 +7,7 @@
 // ElementTYpe<string> -> string
 type ElementType<T extends ArrayLike<unknown>> = T extends ArrayLike<infer E>? E : never;
 
-// Abstracts some generic operations that have different implementions depending
+// Abstracts some generic operations that have different implementations depending
 // on whether we operate on strings or array of things.
 interface TrieableTrait<T extends ArrayLike<ElementType<T>>> {
   empty(): T;

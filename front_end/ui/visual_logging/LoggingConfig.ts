@@ -179,7 +179,7 @@ export interface ConfigStringBuilder {
   context: (value: string|number|undefined) => ConfigStringBuilder;
 
   /**
-   * Speficies the name of a `ParentProvider` used to lookup the parent visual element.
+   * Specifies the name of a `ParentProvider` used to lookup the parent visual element.
    *
    * @param value The name of a previously registered `ParentProvider`.
    * @returns The builder itself.

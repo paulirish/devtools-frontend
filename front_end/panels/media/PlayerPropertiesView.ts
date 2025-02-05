@@ -308,7 +308,7 @@ export class DimensionPropertyRenderer extends PropertyRenderer {
       this.height = Number(propvalue);
       needsUpdate = true;
     }
-    // If both properties arent set, don't bother updating, since
+    // If both properties aren't set, don't bother updating, since
     // temporarily showing ie: 1920x0 is meaningless.
     if (this.width === 0 || this.height === 0) {
       this.changeContents(null);

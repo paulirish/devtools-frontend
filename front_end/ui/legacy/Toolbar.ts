@@ -428,7 +428,7 @@ export class Toolbar extends HTMLElement {
       if (actionId) {
         return Toolbar.createActionButton(actionId, {label});
       }
-      // TODO(crbug.com/1134103) constratint the case checked with this if using TS type definitions once UI is TS-authored.
+      // TODO(crbug.com/1134103) constraint the case checked with this if using TS type definitions once UI is TS-authored.
       if (!loadItem) {
         throw new Error('Could not load a toolbar item registration with no loadItem function');
       }

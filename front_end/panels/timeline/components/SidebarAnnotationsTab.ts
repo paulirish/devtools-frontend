@@ -220,7 +220,7 @@ export class SidebarAnnotationsTab extends HTMLElement {
 
   /**
    * Renders the Annotation 'identifier' or 'name' in the annotations list.
-   * This is the text rendered before the annotation label that we use to indentify the annotation.
+   * This is the text rendered before the annotation label that we use to identify the annotation.
    *
    * Annotations identifiers for different annotations:
    * Entry label -> Entry name

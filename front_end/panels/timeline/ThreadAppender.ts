@@ -186,7 +186,7 @@ export class ThreadAppender implements TrackAppender {
     this.#threadDefaultName = threadName || i18nString(UIStrings.threadS, {PH1: threadId});
     this.isOnMainFrame = Boolean(this.#parsedTrace.Renderer?.processes.get(processId)?.isOnMainFrame);
     this.threadType = type;
-    // AuctionWorklets are threads, so we re-use this appender rather than
+    // AuctionWorklets are threads, so we reuse this appender rather than
     // duplicate it, but we change the name because we want to render these
     // lower down than other threads.
     if (this.#parsedTrace.AuctionWorklets.worklets.has(processId)) {
@@ -208,7 +208,7 @@ export class ThreadAppender implements TrackAppender {
    * this thread.
    * @param trackStartLevel the horizontal level of the flame chart events where
    * the track's events will start being appended.
-   * @param expanded wether the track should be rendered expanded.
+   * @param expanded weather the track should be rendered expanded.
    * @returns the first available level to append more data after having
    * appended the track's events.
    */
@@ -486,7 +486,7 @@ export class ThreadAppender implements TrackAppender {
       //    URLs).
       // This means that all of the ignore listed calls are ignored (not
       // appended), except if it is the bottom call of an ignored stack.
-      // This is becaue to represent ignore listed stack frames, we add
+      // This is because to represent ignore listed stack frames, we add
       // a flame chart entry with the length and position of the bottom
       // frame, which is distictively marked to denote an ignored listed
       // stack.

@@ -22,7 +22,7 @@ import {resolveScopeChain} from './NamesResolver.js';
 export class ScopeChainModel extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
   readonly #callFrame: SDK.DebuggerModel.CallFrame;
 
-  /** We use the `Throttler` here to make sure that `#boundUpdate` is not run multiple times simultanously */
+  /** We use the `Throttler` here to make sure that `#boundUpdate` is not run multiple times simultaneously */
   readonly #throttler = new Common.Throttler.Throttler(5);
   readonly #boundUpdate = this.#update.bind(this);
 

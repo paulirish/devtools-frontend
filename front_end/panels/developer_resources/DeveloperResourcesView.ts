@@ -44,7 +44,7 @@ const UIStrings = {
    */
   resources: '{n, plural, =1 {# resource} other {# resources}}',
   /**
-   * @description Nnumber of resource(s) match
+   * @description Number of resource(s) match
    */
   numberOfResourceMatch: '{n, plural, =1 {# resource matches} other {# resources match}}',
   /**

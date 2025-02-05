@@ -172,7 +172,7 @@ export class FrameManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes>
   /**
    * Looks for the outermost frame in `#frames` and sets `#outermostFrame` accordingly.
    *
-   * Important: This method needs to be called everytime `#frames` is updated.
+   * Important: This method needs to be called every time `#frames` is updated.
    */
   private resetOutermostFrame(): void {
     const outermostFrames = this.getAllFrames().filter(frame => frame.isOutermostFrame());

@@ -166,7 +166,7 @@ describeWithEnvironment('ModificationsManager', () => {
       entryTo: entry2,
     });
 
-    // Chech if a connection between entries 1 and 3 exists
+    // Check if a connection between entries 1 and 3 exists
     const existsBetween1And3 = modificationsManager.linkAnnotationBetweenEntriesExists(entry1, entry3);
     // Make sure the link does not exists
     assert.isFalse(existsBetween1And3);
@@ -197,7 +197,7 @@ describeWithEnvironment('ModificationsManager', () => {
       label: 'label',
     });
 
-    // Create time range with empty label that shoud be removed
+    // Create time range with empty label that should be removed
     modificationsManager.createAnnotation({
       type: 'TIME_RANGE',
       bounds: {
@@ -208,7 +208,7 @@ describeWithEnvironment('ModificationsManager', () => {
       label: '',
     });
 
-    // Create time range with empty label that shoud be removed
+    // Create time range with empty label that should be removed
     modificationsManager.createAnnotation({
       type: 'TIME_RANGE',
       bounds: {

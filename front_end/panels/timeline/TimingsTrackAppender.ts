@@ -32,7 +32,7 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
  * This defines the order these markers will be rendered if they are at the
  * same timestamp. The smaller number will be shown first - e.g. so if MarkFCP,
  * MarkDOMContent and MarkLCPCandidate have the same timestamp, visually we
- * will render [FCP][DCL][LCP] everytime.
+ * will render [FCP][DCL][LCP] every time.
  */
 export const SORT_ORDER_PAGE_LOAD_MARKERS: Readonly<Record<string, number>> = {
   [Trace.Types.Events.Name.NAVIGATION_START]: 0,
@@ -65,7 +65,7 @@ export class TimingsTrackAppender implements TrackAppender {
    * timings track.
    * @param trackStartLevel the horizontal level of the flame chart events where
    * the track's events will start being appended.
-   * @param expanded wether the track should be rendered expanded.
+   * @param expanded weather the track should be rendered expanded.
    * @returns the first available level to append more data after having
    * appended the track's events.
    */

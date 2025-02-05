@@ -270,7 +270,7 @@ export class Cookie {
     // it.
 
     // Arguably this should only apply to "http" or "https" cookies, but
-    // extension cookie tests currently use the funtionality, and if we
+    // extension cookie tests currently use the functionality, and if we
     // ever decide to implement that it should be done by preventing
     // such cookies from being set.
     if (!domain || domain[0] !== '.') {

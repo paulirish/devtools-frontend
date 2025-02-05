@@ -5,7 +5,7 @@
 import type * as Protocol from '../../generated/protocol.js';
 
 /**
- * Implements Server-Sent-Events protocl parsing as described by
+ * Implements Server-Sent-Events protocol parsing as described by
  * https://html.spec.whatwg.org/multipage/server-sent-events.html#parsing-an-event-stream
  *
  * Webpages can use SSE over fetch/XHR and not go through EventSource. DevTools
@@ -77,7 +77,7 @@ export class ServerSentEventsParser {
     } else {
       fieldValueStart = fieldNameEnd + 1;
       if (fieldValueStart < this.#line.length && this.#line[fieldValueStart] === ' ') {
-        // Skip a single space preceeding the value.
+        // Skip a single space preceding the value.
         ++fieldValueStart;
       }
     }

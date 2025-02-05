@@ -254,7 +254,7 @@ export class Script implements TextUtils.ContentProvider.ContentProvider, FrameA
 
   requestContentData(): Promise<TextUtils.ContentData.ContentDataOrError> {
     if (!this.#contentPromise) {
-      const fileSizeToCache = 65535;  // We won't bother cacheing files under 64K
+      const fileSizeToCache = 65535;  // We won't bother caching files under 64K
       if (this.hash && !this.#isLiveEditInternal && this.contentLength > fileSizeToCache) {
         // For large files that aren't live edits and have a hash, we keep a content-addressed cache
         // so we don't need to load multiple copies or disassemble wasm modules multiple times.

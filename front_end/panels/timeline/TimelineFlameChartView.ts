@@ -59,7 +59,7 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
  * This defines the order these markers will be rendered if they are at the
  * same timestamp. The smaller number will be shown first - e.g. so if NavigationStart, MarkFCP,
  * MarkLCPCandidate have the same timestamp, visually we
- * will render [Nav][FCP][DCL][LCP] everytime.
+ * will render [Nav][FCP][DCL][LCP] every time.
  */
 export const SORT_ORDER_PAGE_LOAD_MARKERS: Readonly<Record<string, number>> = {
   [Trace.Types.Events.Name.NAVIGATION_START]: 0,
@@ -394,7 +394,7 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
      * NOTE: ENTRY_SELECTED, ENTRY_INVOKED and ENTRY_HOVERED are not always super obvious:
      * ENTRY_SELECTED: is KEYBOARD ONLY selection of events (e.g. navigating through the flamechart with your arrow keys)
      * ENTRY_HOVERED: is MOUSE ONLY when an event is hovered over with the mouse.
-     * ENTRY_INVOKED: is when the user cilcks on an event, or hits the "enter" key whilst an event is selected.
+     * ENTRY_INVOKED: is when the user clicks on an event, or hits the "enter" key whilst an event is selected.
      */
     this.onMainEntrySelected = this.onEntrySelected.bind(this, this.mainDataProvider);
     this.onNetworkEntrySelected = this.onEntrySelected.bind(this, this.networkDataProvider);
@@ -856,7 +856,7 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
 
   /**
    * Handles key presses that could impact the creation of a time range overlay with the keyboard.
-   * @returns `true` if the event should not be propogated + have its default behaviour stopped.
+   * @returns `true` if the event should not be propagated + have its default behaviour stopped.
    */
   #handleTimeRangeKeyboardCreation(event: KeyboardEvent): boolean {
     const visibleWindow = TraceBounds.TraceBounds.BoundsManager.instance().state()?.micro.timelineTraceWindow;
@@ -963,7 +963,7 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
     if (this.#linkSelectionAnnotation &&
         this.#linkSelectionAnnotation.state === Trace.Types.File.EntriesLinkState.CREATION_NOT_STARTED) {
       this.#clearLinkSelectionAnnotation(true);
-      // We have dealt with the keypress as the user is typing into the label, so do not let it propogate up.
+      // We have dealt with the keypress as the user is typing into the label, so do not let it propagate up.
       // This also ensures that if the user uses "Escape" they don't toggle the DevTools drawer.
       event.stopPropagation();
     }
@@ -1410,7 +1410,7 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
   }
 
   // Only opens the details view of a selection. This is used for Timing Markers. Timing markers replace
-  // their entry with a new UI. Becuase of that, thier entries can no longer be "selected" in the timings track,
+  // their entry with a new UI. Because of that, their entries can no longer be "selected" in the timings track,
   // so if clicked, we only open their details view.
   openSelectionDetailsView(selection: TimelineSelection|null): void {
     if (this.detailsView) {

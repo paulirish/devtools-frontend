@@ -55,7 +55,7 @@ const UIStrings = {
   unknown: 'Unknown Status',
   /**
    * @description Status text for the status of the back/forward cache status indicating that
-   * the back/forward cache was not used and a normal navigation occured instead.
+   * the back/forward cache was not used and a normal navigation occurred instead.
    */
   normalNavigation:
       'Not served from back/forward cache: to trigger back/forward cache, use Chrome\'s back/forward buttons, or use the test button below to automatically navigate away and back.',
@@ -383,7 +383,7 @@ export class BackForwardCacheView extends LegacyWrapper.LegacyWrapper.WrappableC
     // clang-format on
   }
 
-  // Builds a subtree of the frame tree, conaining only frames with BFCache issues and their ancestors.
+  // Builds a subtree of the frame tree, containing only frames with BFCache issues and their ancestors.
   // Returns the root node, the number of frames in the subtree, and the number of issues in the subtree.
   #buildFrameTreeDataRecursive(
       explanationTree: Protocol.Page.BackForwardCacheNotRestoredExplanationTree,

@@ -99,7 +99,7 @@ export class TimelineSelectorStatsView extends UI.Widget.VBox {
   #selectorLocations: Map<string, Protocol.CSS.SourceRange[]>;
   #parsedTrace: Trace.Handlers.Types.ParsedTrace|null = null;
   /**
-   * We store the last event (or array of events) that we renderered. We do
+   * We store the last event (or array of events) that we rendered. We do
    * this because as the user zooms around the panel this view is updated,
    * however if the set of events that are populating the view is the same as it
    * was the last time, we can bail without doing any re-rendering work.

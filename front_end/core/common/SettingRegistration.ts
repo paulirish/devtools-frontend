@@ -128,7 +128,7 @@ export function maybeRemoveSettingExtension(settingName: string): boolean {
 }
 
 export const enum SettingCategory {
-  NONE = '',  // `NONE` must be a falsy value. Legacy code uses if-checks for the category.
+  NONE = '',  // `NONE` must be a falsely value. Legacy code uses if-checks for the category.
   ELEMENTS = 'ELEMENTS',
   APPEARANCE = 'APPEARANCE',
   SOURCES = 'SOURCES',
@@ -212,7 +212,7 @@ export interface RegExpSettingItem {
    * When a rule is disabled due to requesting through a script's context menu
    * that it no longer be ignore listed, this field is set to the URL of that
    * script, so that if the user requests through the same context menu to
-   * enable ignore listing, the rule can be reenabled.
+   * enable ignore listing, the rule can be re-enabled.
    */
   disabledForUrl?: Platform.DevToolsPath.UrlString;
 }

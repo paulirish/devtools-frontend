@@ -83,7 +83,7 @@ const UIStrings = {
    */
   showIssueAssociatedWithThis: 'Show issue associated with this cookie',
   /**
-   *@description Tooltip for the cell that shows the sourcePort property of a cookie in the cookie table. The source port is numberic attribute of a cookie.
+   *@description Tooltip for the cell that shows the sourcePort property of a cookie in the cookie table. The source port is numeric attribute of a cookie.
    */
   sourcePortTooltip:
       'Shows the source port (range 1-65535) the cookie was set on. If the port is unknown, this shows -1.',

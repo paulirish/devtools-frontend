@@ -11,87 +11,87 @@ import {Context} from './Context.js';
 
 const UIStrings = {
   /**
-   *@description Title of the keybind category 'Elements' in Settings' Shortcuts pannel.
+   *@description Title of the keybind category 'Elements' in Settings' Shortcuts panel.
    */
   elements: 'Elements',
   /**
-   *@description Title of the keybind category 'Screenshot' in Settings' Shortcuts pannel.
+   *@description Title of the keybind category 'Screenshot' in Settings' Shortcuts panel.
    */
   screenshot: 'Screenshot',
   /**
-   *@description Title of the keybind category 'Network' in Settings' Shortcuts pannel.
+   *@description Title of the keybind category 'Network' in Settings' Shortcuts panel.
    */
   network: 'Network',
   /**
-   *@description Title of the keybind category 'Memory' in Settings' Shortcuts pannel.
+   *@description Title of the keybind category 'Memory' in Settings' Shortcuts panel.
    */
   memory: 'Memory',
   /**
-   *@description Title of the keybind category 'JavaScript Profiler' in Settings' Shortcuts pannel.
+   *@description Title of the keybind category 'JavaScript Profiler' in Settings' Shortcuts panel.
    */
   javascript_profiler: 'JavaScript Profiler',
   /**
-   *@description Title of the keybind category 'Console' in Settings' Shortcuts pannel.
+   *@description Title of the keybind category 'Console' in Settings' Shortcuts panel.
    */
   console: 'Console',
   /**
-   *@description Title of the keybind category 'Performance' in Settings' Shortcuts pannel.
+   *@description Title of the keybind category 'Performance' in Settings' Shortcuts panel.
    */
   performance: 'Performance',
   /**
-   *@description Title of the keybind category 'Mobile' in Settings' Shortcuts pannel.
+   *@description Title of the keybind category 'Mobile' in Settings' Shortcuts panel.
    */
   mobile: 'Mobile',
   /**
-   *@description Title of the keybind category 'Help' in Settings' Shortcuts pannel.
+   *@description Title of the keybind category 'Help' in Settings' Shortcuts panel.
    */
   help: 'Help',
   /**
-   *@description Title of the keybind category 'Layers' in Settings' Shortcuts pannel.
+   *@description Title of the keybind category 'Layers' in Settings' Shortcuts panel.
    */
   layers: 'Layers',
   /**
-   *@description Title of the keybind category 'Navigation' in Settings' Shortcuts pannel.
+   *@description Title of the keybind category 'Navigation' in Settings' Shortcuts panel.
    */
   navigation: 'Navigation',
   /**
-   *@description Title of the keybind category 'Drawer' in Settings' Shortcuts pannel.
+   *@description Title of the keybind category 'Drawer' in Settings' Shortcuts panel.
    */
   drawer: 'Drawer',
   /**
-   *@description Title of the keybind category 'Global' in Settings' Shortcuts pannel.
+   *@description Title of the keybind category 'Global' in Settings' Shortcuts panel.
    */
   global: 'Global',
   /**
-   *@description Title of the keybind category 'Resources' in Settings' Shortcuts pannel.
+   *@description Title of the keybind category 'Resources' in Settings' Shortcuts panel.
    */
   resources: 'Resources',
   /**
-   *@description Title of the keybind category 'Background Services' in Settings' Shortcuts pannel.
+   *@description Title of the keybind category 'Background Services' in Settings' Shortcuts panel.
    */
   background_services: 'Background Services',
   /**
-   *@description Title of the keybind category 'Settings' in Settings' Shortcuts pannel.
+   *@description Title of the keybind category 'Settings' in Settings' Shortcuts panel.
    */
   settings: 'Settings',
   /**
-   *@description Title of the keybind category 'Debugger' in Settings' Shortcuts pannel.
+   *@description Title of the keybind category 'Debugger' in Settings' Shortcuts panel.
    */
   debugger: 'Debugger',
   /**
-   *@description Title of the keybind category 'Sources' in Settings' Shortcuts pannel.
+   *@description Title of the keybind category 'Sources' in Settings' Shortcuts panel.
    */
   sources: 'Sources',
   /**
-   *@description Title of the keybind category 'Rendering' in Settings' Shortcuts pannel.
+   *@description Title of the keybind category 'Rendering' in Settings' Shortcuts panel.
    */
   rendering: 'Rendering',
   /**
-   *@description Title of the keybind category 'Recorder' in Settings' Shortcuts pannel.
+   *@description Title of the keybind category 'Recorder' in Settings' Shortcuts panel.
    */
   recorder: 'Recorder',
   /**
-   *@description Title of the keybind category 'Changes' in Settings' Shortcuts pannel.
+   *@description Title of the keybind category 'Changes' in Settings' Shortcuts panel.
    */
   changes: 'Changes',
 };
@@ -301,7 +301,7 @@ export interface EventTypes {
 }
 
 export const enum ActionCategory {
-  NONE = '',  // `NONE` must be a falsy value. Legacy code uses if-checks for the category.
+  NONE = '',  // `NONE` must be a falsely value. Legacy code uses if-checks for the category.
   ELEMENTS = 'ELEMENTS',
   SCREENSHOT = 'SCREENSHOT',
   NETWORK = 'NETWORK',
@@ -532,7 +532,7 @@ export interface ActionRegistration {
    * and the keybindSet property.
    *
    * Keybinds also depend on the context types of their corresponding action, and so they will only be available when such context types
-   * are flavors of the current appliaction context.
+   * are flavors of the current application context.
    */
   bindings?: Array<Binding>;
   /**

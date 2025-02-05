@@ -146,7 +146,7 @@ export class HeapSnapshotLoader {
   }
 
   #fetchChunk(): Promise<string> {
-    // This method shoudln't be entered more than once since parsing happens
+    // This method shouldn't be entered more than once since parsing happens
     // sequentially. This means it's fine to stash away a single #dataCallback
     // instead of an array of them.
     if (this.#buffer.length > 0) {

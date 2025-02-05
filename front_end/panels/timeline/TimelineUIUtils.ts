@@ -92,7 +92,7 @@ const UIStrings = {
    */
   presentationDelay: 'Presentation delay',
   /**
-   *@description Text shown when the user has selected an event that represents script compiliation.
+   *@description Text shown when the user has selected an event that represents script compilation.
    */
   compile: 'Compile',
   /**
@@ -133,7 +133,7 @@ const UIStrings = {
    */
   compilationCacheStatus: 'Compilation cache status',
   /**
-   *@description Text referring to the size of the browser's compiliation cache.
+   *@description Text referring to the size of the browser's compilation cache.
    */
   compilationCacheSize: 'Compilation cache size',
   /**
@@ -337,7 +337,7 @@ const UIStrings = {
    */
   initiatorFor: 'Initiator for',
   /**
-   *@description Text for the underlying data behing a specific flamechart selection. Trace events are the browser instrumentation that are emitted as JSON objects.
+   *@description Text for the underlying data behind a specific flamechart selection. Trace events are the browser instrumentation that are emitted as JSON objects.
    */
   traceEvent: 'Trace event',
   /**
@@ -413,7 +413,7 @@ const UIStrings = {
   compositingFailedAnimationHasNoVisibleChange: 'Animation has no visible change',
   /** Descriptive reason for why a user-provided animation failed to be optimized by the browser due to an effect affecting an important property. Shown in a table with a list of other potential failure reasons.  */
   compositingFailedAffectsImportantProperty: 'Effect affects a property with !important',
-  /** Descriptive reason for why a user-provided animation failed to be optimized by the browser due to the SVG target having an independent transfrom property. Shown in a table with a list of other potential failure reasons.  */
+  /** Descriptive reason for why a user-provided animation failed to be optimized by the browser due to the SVG target having an independent transform property. Shown in a table with a list of other potential failure reasons.  */
   compositingFailedSVGTargetHasIndependentTransformProperty: 'SVG target has independent transform property',
   /** Descriptive reason for why a user-provided animation failed to be optimized by the browser due to an unknown reason. Shown in a table with a list of other potential failure reasons.  */
   compositingFailedUnknownReason: 'Unknown Reason',
@@ -482,11 +482,11 @@ const UIStrings = {
    */
   invalidationWithCallFrame: '{PH1} at {PH2}',
   /**
-   *@description Text indicating that something is outside of the Performace Panel Timeline Minimap range
+   *@description Text indicating that something is outside of the Performance Panel Timeline Minimap range
    */
   outsideBreadcrumbRange: '(outside of the breadcrumb range)',
   /**
-   *@description Text indicating that something is hidden from the Performace Panel Timeline
+   *@description Text indicating that something is hidden from the Performance Panel Timeline
    */
   entryIsHidden: '(entry is hidden)',
   /**
@@ -2540,7 +2540,7 @@ export interface TimelineMarkerStyle {
 
 /**
  * Given a particular event, this method can adjust its timestamp by
- * substracting the timestamp of the previous navigation. This helps in cases
+ * subtracting the timestamp of the previous navigation. This helps in cases
  * where the user has navigated multiple times in the trace, so that we can show
  * the LCP (for example) relative to the last navigation.
  **/

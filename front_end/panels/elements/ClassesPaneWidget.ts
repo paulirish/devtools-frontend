@@ -116,7 +116,7 @@ export class ClassesPaneWidget extends UI.Widget.Widget {
       this.toggleClass(node, className, true);
     }
 
-    // annoucementString is used for screen reader to announce that the class(es) has been added successfully.
+    // announcementString is used for screen reader to announce that the class(es) has been added successfully.
     const joinClassString = classNames.join(' ');
     const announcementString = classNames.length > 1 ? i18nString(UIStrings.classesSAdded, {PH1: joinClassString}) :
                                                        i18nString(UIStrings.classSAdded, {PH1: joinClassString});

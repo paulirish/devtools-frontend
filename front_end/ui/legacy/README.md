@@ -159,4 +159,4 @@ UI.ActionRegistration.registerActionExtension({
   ],
 });
 ```
-In this case, they keybindings are declared for different keybind sets and thus do not result in duplcation.
+In this case, they keybindings are declared for different keybind sets and thus do not result in duplication.

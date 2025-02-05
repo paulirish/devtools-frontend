@@ -176,7 +176,7 @@ export class Resource implements TextUtils.ContentProvider.ContentProvider {
       return this.#pendingContentData;
     }
     this.#pendingContentData = this.innerRequestContent().then(contentData => {
-      // If an error happended we don't set `this.#contentData` so future `requestContentData` will
+      // If an error happened we don't set `this.#contentData` so future `requestContentData` will
       // attempt again to hit the backend for this Resource.
       if (!TextUtils.ContentData.ContentData.isError(contentData)) {
         this.#contentData = contentData;

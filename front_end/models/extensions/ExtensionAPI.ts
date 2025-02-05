@@ -951,7 +951,7 @@ self.injectedExtensionAPI = function(
               return plugin.getProperties(request.parameters.objectId);
             }
             if (!('evaluate' in plugin &&
-                  plugin.evaluate)) {  // If evalute is defined but the remote objects methods aren't, that's a bug
+                  plugin.evaluate)) {  // If evaluate is defined but the remote objects methods aren't, that's a bug
               return Promise.resolve(undefined);
             }
             break;

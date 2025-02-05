@@ -280,7 +280,7 @@ describeWithMockConnection('NetworkNavigatorView', () => {
       assert.isTrue(nodeCSelectSpy.notCalled);
       assert.isTrue(nodeExampleComSelectSpy.called);
 
-      // Note that the last asserion is slightly misleading since the empty example.com node is removed.
+      // Note that the last assertion is slightly misleading since the empty example.com node is removed.
       // Let us make that clear here.
       assert.strictEqual(rootElement.childCount(), 0);
     });

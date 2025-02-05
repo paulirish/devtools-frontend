@@ -80,14 +80,14 @@ describe('Timeline breadcrumbs', () => {
     // Last added breadcrumb should be active
     assert.deepEqual(crumbs.activeBreadcrumb, breadcrumb2);
 
-    // Make sure breadcrumb 1 can be actived
+    // Make sure breadcrumb 1 can be activated
     crumbs.setActiveBreadcrumb(breadcrumb1, {
       removeChildBreadcrumbs: false,
       updateVisibleWindow: true,
     });
     assert.deepEqual(crumbs.activeBreadcrumb, breadcrumb1);
 
-    // Make sure initial breadcrumb can be actived
+    // Make sure initial breadcrumb can be activated
     crumbs.setActiveBreadcrumb(initialBreadcrumb, {
       removeChildBreadcrumbs: false,
       updateVisibleWindow: true,

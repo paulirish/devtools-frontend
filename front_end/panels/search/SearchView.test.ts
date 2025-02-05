@@ -52,7 +52,7 @@ class TestSearchView extends Search.SearchView.SearchView {
   readonly #scopeCreator: () => Search.SearchScope.SearchScope;
   /**
    * `SearchView` resets and lazily re-creates the search results pane for each search.
-   * To provide a fake instance we install a get/set accesssor for the original property
+   * To provide a fake instance we install a get/set accessor for the original property
    * that behaves normally with no override, but returns the mock if one is provided.
    */
   #searchResultsPane: Search.SearchResultsPane.SearchResultsPane|null = null;

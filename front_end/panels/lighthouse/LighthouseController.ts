@@ -298,7 +298,7 @@ export class LighthouseController extends Common.ObjectWrapper.ObjectWrapper<Eve
      * This added support for chrome-extension:// pages (not overlays/popups) as they satisfy CAN_DOCK.
      *
      * We wanted remote-debugging support restored, and the crashes were fixed,
-     * so we renabled auditing in all CAN_DOCK cases in Feb 2019 (crbug.com/931849). This included all chrome extensions views.
+     * so we re-enabled auditing in all CAN_DOCK cases in Feb 2019 (crbug.com/931849). This included all chrome extensions views.
      *
      * Auditing overlay windows/popups cause problems with viewport emulation (eg crbug.com/1116347)
      * And even full-page extension tabs (like OneTab) have NO_NAVSTART problems and others (crbug.com/1065323)

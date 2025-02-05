@@ -11,7 +11,7 @@ const MEMORY_TRANSFER_MIN_CHUNK_SIZE = 1000;
 /**
  * This is a slightly reduced version of `panels/LinearMemoryInspectorPane.LinearMemoryInspectorView.
  *
- * It's not hooked up to the LinearMemoryInspectorController and it operates on a fixed memory array thats
+ * It's not hooked up to the LinearMemoryInspectorController and it operates on a fixed memory array that's
  * known upfront.
  */
 class LinearMemoryInspectorView extends UI.Widget.VBox {

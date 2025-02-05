@@ -396,7 +396,7 @@ export const resolveScopeChain =
 };
 
 /**
- * @returns A mapping from original name -> compiled name. If the orignal name is unavailable (e.g. because the compiled name was
+ * @returns A mapping from original name -> compiled name. If the original name is unavailable (e.g. because the compiled name was
  * shadowed) we set it to `null`.
  */
 export const allVariablesInCallFrame =
@@ -431,7 +431,7 @@ export const allVariablesInCallFrame =
 };
 
 /**
- * @returns A mapping from original name -> compiled name. If the orignal name is unavailable (e.g. because the compiled name was
+ * @returns A mapping from original name -> compiled name. If the original name is unavailable (e.g. because the compiled name was
  * shadowed) we set it to `null`.
  */
 export const allVariablesAtPosition =
@@ -477,7 +477,7 @@ export const resolveExpression = async(
     callFrame: SDK.DebuggerModel.CallFrame, originalText: string, uiSourceCode: Workspace.UISourceCode.UISourceCode,
     lineNumber: number, startColumnNumber: number, endColumnNumber: number): Promise<string> => {
   if (uiSourceCode.mimeType() === 'application/wasm') {
-    // For WebAssembly disassembly, lookup the different possiblities.
+    // For WebAssembly disassembly, lookup the different possibilities.
     return `memories["${originalText}"] ?? locals["${originalText}"] ?? tables["${originalText}"] ?? functions["${
         originalText}"] ?? globals["${originalText}"]`;
   }
@@ -536,7 +536,7 @@ export const resolveExpression = async(
     return '';
   }
 
-  // Merge `startRange` with `endRange`. This might not be 100% correct if there are interleaved ranges inbetween.
+  // Merge `startRange` with `endRange`. This might not be 100% correct if there are interleaved ranges between.
   const mappedAuthoredText = authoredText.extract(new TextUtils.TextRange.TextRange(
       startRange.sourceRange.startLine, startRange.sourceRange.startColumn, endRange.sourceRange.endLine,
       endRange.sourceRange.endColumn));

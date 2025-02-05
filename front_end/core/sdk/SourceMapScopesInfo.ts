@@ -51,7 +51,7 @@ export class SourceMapScopesInfo {
    * all the original function names that got inlined into the surrounding generated function and their
    * respective callsites in the original code (ordered from inner to outer).
    *
-   * @returns a list with inlined functions. Every entry in the list has a callsite in the orignal code,
+   * @returns a list with inlined functions. Every entry in the list has a callsite in the original code,
    * except the last function (since the last function didn't get inlined).
    */
   findInlinedFunctions(generatedLine: number, generatedColumn: number): InlineInfo {

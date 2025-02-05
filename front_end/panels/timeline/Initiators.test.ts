@@ -71,7 +71,7 @@ describeWithEnvironment('Initiators', () => {
           e => Trace.Types.Events.isProfileCall(e) && e.callFrame.functionName === 'bar');
       assert.exists(barCall);
 
-      // Find the initator data but starting at the fibonacci()
+      // Find the initiator data but starting at the fibonacci()
       // call.
       const initiatorsData = Timeline.Initiators.initiatorsDataToDraw(parsedTrace, barCall, [], []);
 
@@ -88,7 +88,7 @@ describeWithEnvironment('Initiators', () => {
           e => Trace.Types.Events.isProfileCall(e) && e.callFrame.functionName === 'baz');
       assert.exists(bazCall);
 
-      // Find the initators data but starting at the baz()
+      // Find the initiators data but starting at the baz()
       // call. We expect to find 3 initiatorData objects here:
       // 1. baz() ===> FunctionCall caused by requestIdleCallback
       // 2. The requestIdleCallback from (1), caused by a prior setTimeout.

@@ -12,7 +12,7 @@ import * as TraceBounds from '../services/trace_bounds/trace_bounds.js';
 // 2. The trace engine models for a given file (used by the traceEngine function)
 // Both the file contents and the model data are not expected to change during
 // the lifetime of an instance of DevTools, so they are safe to cache and
-// re-use across tests to avoid extra time spent loading and parsing the same
+// reuse across tests to avoid extra time spent loading and parsing the same
 // inputs.
 // In the future once the data layer migration is complete, we can hopefully
 // simplify this into one method that loads the new engine and none of the old
@@ -108,7 +108,7 @@ export class TraceLoader {
   /**
    * Load an array of raw events from the trace file.
    * Will default to typing those events using the types from Trace Engine, but
-   * can be overriden by passing the legacy EventPayload type as the generic.
+   * can be overridden by passing the legacy EventPayload type as the generic.
    **/
   static async rawCPUProfile(context: Mocha.Context|Mocha.Suite|null, name: string):
       Promise<Protocol.Profiler.Profile> {

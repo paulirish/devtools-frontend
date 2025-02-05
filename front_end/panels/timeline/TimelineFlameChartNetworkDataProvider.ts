@@ -273,7 +273,7 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
    * @param barHeight The height of the visible part request
    * @param unclippedBarX The start pixel of the request compare to the visible area. It is calculated with request.beginTime() in FlameChart.
    * @param timeToPixelRatio
-   * @returns if the entry needs to be decorate, which is alway true if the request has "timing" field
+   * @returns if the entry needs to be decorate, which is always true if the request has "timing" field
    */
   decorateEntry(
       index: number, context: CanvasRenderingContext2D, _text: string|null, barX: number, barY: number,

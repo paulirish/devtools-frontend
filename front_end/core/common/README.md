@@ -6,7 +6,7 @@ A settings registration is represented by the `SettingRegistration` interface, d
 
 All settings have to be registered using the function `Common.Settings.registerSettingExtension` which expects an object of type `SettingRegistration` as parameter.
 
-As an example, take the registration of the `showHTMLComments` settting,  which allows users to determine if HTML comments are shown in the Elements tree:
+As an example, take the registration of the `showHTMLComments` setting,  which allows users to determine if HTML comments are shown in the Elements tree:
 ```js
 Common.Settings.registerSettingExtension({
   category:  Common.Settings.SettingCategory.ELEMENTS,

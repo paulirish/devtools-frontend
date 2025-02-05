@@ -66,7 +66,7 @@ export interface GeneratedRange {
    * or an array of `BindingRange`s, e.g. if computing the value requires different expressions
    * throughout the range or if the variable is only available in parts of the `GeneratedRange`.
    *
-   * `undefined` denotes that the value of a variable is unavailble in the whole range.
+   * `undefined` denotes that the value of a variable is unavailable in the whole range.
    * This can happen e.g. if the variable was optimized out and can't be recomputed.
    */
   values: (string|undefined|BindingRange[])[];
@@ -369,7 +369,7 @@ function*
   let line = basePosition.line;
 
   // The state are the fields of the last produced item, tracked because many
-  // are relative to the preceeding item.
+  // are relative to the preceding item.
   const state = {
     line: basePosition.line,
     column: basePosition.column,

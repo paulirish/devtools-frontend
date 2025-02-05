@@ -203,7 +203,7 @@ describe('EnhancedTracesParser', () => {
           assert.lengthOf(executionContexts, 2);
           for (const executionContext of executionContexts) {
             // We should be able to get the correct execution context without specifying isolate
-            // as the contexts and scripts are grouped under its repsective target already.
+            // as the contexts and scripts are grouped under its respective target already.
             if (executionContext.id === 1) {
               assert.deepEqual(executionContext, executionContext1);
             } else if (executionContext.id === 2) {

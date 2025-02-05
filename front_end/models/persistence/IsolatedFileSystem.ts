@@ -188,7 +188,7 @@ export class IsolatedFileSystem extends PlatformFileSystem {
   }
 
   private async createFoldersIfNotExist(folderPath: Platform.DevToolsPath.RawPathString): Promise<DirectoryEntry|null> {
-    // Fast-path. If parent directory already exists we return it immidiatly.
+    // Fast-path. If parent directory already exists we return it immediately.
     let dirEntry = await new Promise<DirectoryEntry|null>(
         resolve => this.domFileSystem.root.getDirectory(folderPath, undefined, resolve, () => resolve(null)));
     if (dirEntry) {
@@ -548,7 +548,7 @@ export class IsolatedFileSystem extends PlatformFileSystem {
     return Boolean(path) && this.type() !== 'overrides';
   }
 
-  // path not typed as Branded Types as here we are interested in extention only
+  // path not typed as Branded Types as here we are interested in extension only
   override contentType(path: string): Common.ResourceType.ResourceType {
     const extension = Common.ParsedURL.ParsedURL.extractExtension(path);
     if (STYLE_SHEET_EXTENSIONS.has(extension)) {

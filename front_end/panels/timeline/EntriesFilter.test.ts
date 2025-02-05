@@ -354,7 +354,7 @@ describeWithEnvironment('EntriesFilter', function() {
     assert.isTrue(
         allFooExceptFirstInStackAreHidden, 'First foo is invisible or some following foo calls are still visible');
 
-    // All of the foo2 calls that were inbetween foo calls should still be visible.
+    // All of the foo2 calls that were between foo calls should still be visible.
     const allFoo2InStackAreVisible = foo2Calls.every(fooCall => {
       return !stack.invisibleEntries().includes(fooCall);
     });
@@ -629,7 +629,7 @@ describeWithEnvironment('EntriesFilter', function() {
   it('correctly returns the amount of hidden children of a node', async function() {
     const {parsedTrace} = await TraceLoader.traceEngine(this, 'two-functions-recursion.json.gz');
     const mainThread = getMainThread(parsedTrace.Renderer);
-    /** This stack looks roughly like so (with some erlier events omitted):
+    /** This stack looks roughly like so (with some earlier events omitted):
      * ======== onclick ============
      * =========== foo =============
      *               ==== foo2 =====

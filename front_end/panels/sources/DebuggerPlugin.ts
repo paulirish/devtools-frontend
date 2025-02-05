@@ -723,7 +723,7 @@ export class DebuggerPlugin extends Plugin {
           }
         }
         // We use side-effect free debug-evaluate when the highlighted expression contains a
-        // function/method call. Otherwise we allow side-effects. The motiviation here are
+        // function/method call. Otherwise we allow side-effects. The motivation here are
         // frameworks like Vue, that heavily use proxies for caching:
         //
         //   * We deem a simple property access of a proxy as deterministic so it should be

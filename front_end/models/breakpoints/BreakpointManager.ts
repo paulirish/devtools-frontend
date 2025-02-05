@@ -1035,7 +1035,7 @@ export class ModelBreakpoint {
         // sure that v8 knows about the breakpoint and is able to restore it whenever the script is parsed.
         const lastResolvedState = this.#breakpoint.getLastResolvedState();
         if (lastResolvedState) {
-          // Re-use position information from fallback but use up-to-date condition.
+          // Reuse position information from fallback but use up-to-date condition.
           newState = lastResolvedState.map(position => ({...position, condition}));
         } else {
           // TODO(bmeurer): This fallback doesn't make a whole lot of sense, we should
@@ -1376,7 +1376,7 @@ export interface ScriptBreakpointLocation {
 }
 
 /**
- * All the data for a single `Breakpoint` thats stored in the settings.
+ * All the data for a single `Breakpoint` that's stored in the settings.
  * Whenever any of these change, we need to update the settings.
  */
 export interface BreakpointStorageState {

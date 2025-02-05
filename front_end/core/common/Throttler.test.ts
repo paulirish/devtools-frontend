@@ -14,7 +14,7 @@ describe('Throttler class', () => {
 
   beforeEach(async () => {
     clock = sinon.useFakeTimers();
-    // When nothing was run, throttler has 0 as the last exectution time.
+    // When nothing was run, throttler has 0 as the last execution time.
     // With mock time, current time is also 0 initially. Advance the clock
     // to get more realistic initial state.
     await ensureNoRecentRun();

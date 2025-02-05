@@ -45,7 +45,7 @@ They must also define a `constructor` which takes in any data that you want to b
 Within the constructor, we call `super` with our custom event name. We then pass two options in which are recommended (but not required if you know you do not need them):
 
 1. `bubbles`: setting this to `true` means that when this event is emitted it will bubble up through the DOM tree. You usually want this because it is how built in browser events behave and it means that any listeners can be anywhere "above" the element that is dispatching the event and still be able to listen for it.
-2. `composed`: this setting declares if the event will propogate through the shadow boundary and into the standard DOM. Setting this to `false` means that all event listeners must be within the shadow DOM to be able to listen to the event.
+2. `composed`: this setting declares if the event will propagate through the shadow boundary and into the standard DOM. Setting this to `false` means that all event listeners must be within the shadow DOM to be able to listen to the event.
 
 MDN has some useful articles on these concepts if you want to learn more:
 

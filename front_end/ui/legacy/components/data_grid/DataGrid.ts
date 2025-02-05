@@ -932,7 +932,7 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
   // If this function is not called after the DataGrid is attached to its
   // parent element, then the DataGrid's columns will not be resizable.
   updateWidths(): void {
-    // Do not attempt to use offsetes if we're not attached to the document tree yet.
+    // Do not attempt to use offsets if we're not attached to the document tree yet.
     if (!this.columnWidthsInitialized && this.element.offsetWidth) {
       // Give all the columns initial widths now so that during a resize,
       // when the two columns that get resized get a percent value for
@@ -1801,7 +1801,7 @@ export class DataGridNode<T> {
     for (let i = 0; i < columnsArray.length; ++i) {
       const column = columnsArray[i];
       const cell = element.appendChild(this.createCell(column.id));
-      // Add each visibile cell to the node's accessible text by gathering 'Column Title: content'
+      // Add each visible cell to the node's accessible text by gathering 'Column Title: content'
 
       if (column.dataType === DataType.BOOLEAN && this.data[column.id] === true) {
         this.setCellAccessibleName(i18nString(UIStrings.checked), cell, column.id);

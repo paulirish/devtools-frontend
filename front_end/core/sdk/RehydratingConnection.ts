@@ -17,7 +17,7 @@
  * Note on the methodology to derive runtime/debugger domain behavior below:
  * We can use protocol monitor in the devtools to look at how dt-fe
  * communicates with the backend, and it's also how majority of the behavior
- * in the rehydrated sesion was derived at the first place. In the event of
+ * in the rehydrated session was derived at the first place. In the event of
  * adding more support and capability to rehydrated session, developers will
  * want to look at protocol monitor to imitate the behavior in a real session
  *
@@ -170,7 +170,7 @@ export class RehydratingConnection implements ProtocolClient.InspectorBackend.Co
   // sending message to the backend via CDP. In this case, given that Rehydrating
   // connection is an emulation of devtool back-end, sendRawMessage here
   // is in fact rehydrating connection directly handling and acting on the
-  // receieved message.
+  // received message.
   sendRawMessage(message: string|object): void {
     if (typeof message === 'string') {
       message = JSON.parse(message);

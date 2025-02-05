@@ -55,7 +55,7 @@ export interface SelectMenuData {
   showArrow: boolean;
   /**
    * Determines if the component is formed by two buttons:
-   * one to open the meny and another that triggers a
+   * one to open the menu and another that triggers a
    * selectmenusidebuttonclickEvent. The RecordMenu instance of
    * the component is an example of this use case.
    * Defaults to false.

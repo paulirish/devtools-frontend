@@ -149,7 +149,7 @@ export class Icon extends HTMLElement {
 }
 
 /**
- * Helper function to programmatically create an `Icon` isntance with a given
+ * Helper function to programmatically create an `Icon` instance with a given
  * `name` and an optional CSS `className`.
  *
  * @param name the name of the icon to use.

@@ -26,7 +26,7 @@ return html`${foo}`
 
 Now, we wil recreate `foo` on each re-render. This is not only wasted effort, but can mess with the user's experience if they had focused the node, only to have it destroyed and recreated.
 
-You should always let Lit manage instances of components. If you cannot do this, you should ensure some layer of caching to make sure instnaces are re-used whenver possible. However, **be careful!** It is very hard to implement a reliable cache for elements, and should be done only as a last resort.
+You should always let Lit manage instances of components. If you cannot do this, you should ensure some layer of caching to make sure instances are reused whenever possible. However, **be careful!** It is very hard to implement a reliable cache for elements, and should be done only as a last resort.
 
 ## Integrating DevTools widgets & Lit and causing re-renders
 
@@ -82,7 +82,7 @@ set y(y: number) {
 
 We did this to avoid having to immediately implement batched rendering.
 
-However, this decision came with a performance penalty. Lit will only trigger a re-render of a component if one of its properties changes. But when we pass in a new object on each render, we are effectively triggering a re-render every time. Normally this impact isn't noticable, and most components don't re-render with the frequency required to cause performance issues. When a component that takes an object via `set data()` is frequently re-rendered, that causes a non-negligible amount of garbage collection to tidy up the one-use objects we create.
+However, this decision came with a performance penalty. Lit will only trigger a re-render of a component if one of its properties changes. But when we pass in a new object on each render, we are effectively triggering a re-render every time. Normally this impact isn't noticeable, and most components don't re-render with the frequency required to cause performance issues. When a component that takes an object via `set data()` is frequently re-rendered, that causes a non-negligible amount of garbage collection to tidy up the one-use objects we create.
 
 Therefore, if a component is re-rendered often and you are seeing issues, you can switch it to:
 

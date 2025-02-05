@@ -299,7 +299,7 @@ export class HTMLModel {
       // For now we ducktape the first problem by merging a '/' token
       // following a string token in the HTML formatter, which does the trick, and
       // also merging the error tokens for unescaped ampersands with text tokens
-      // (where `type` is `null`) preceeding and following the error tokens.
+      // (where `type` is `null`) preceding and following the error tokens.
       //
       // [^1]: https://github.com/codemirror/codemirror5/blob/742627a/mode/xml/xml.js#L137
       //

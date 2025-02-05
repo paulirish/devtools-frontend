@@ -78,7 +78,7 @@ describeWithEnvironment('ActionRegistration', () => {
     Root.Runtime.experiments.clearForTest();
     await initializeGlobalVars();
     // A ShortcutRegistry instance is needed to add a command to execute an action to the
-    // command menu and an instance of ActionRegistry is needed to instatiate the ShorcutRegistry.
+    // command menu and an instance of ActionRegistry is needed to instantiate the ShortcutRegistry.
     const actionRegistryInstance = UI.ActionRegistry.ActionRegistry.instance({forceNew: true});
     UI.ShortcutRegistry.ShortcutRegistry.instance({forceNew: true, actionRegistry: actionRegistryInstance});
     UI.Context.Context.instance().setFlavor(MockContextType, new MockContextType());

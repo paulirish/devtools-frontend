@@ -68,7 +68,7 @@ describeWithLocale('SurveyLink', () => {
     linkNode.click();
 
     // The only output signal we have is the link text which we don't want to assert exactly, so we
-    // assume that the pending state has an elipsis.
+    // assume that the pending state has an ellipsis.
     const pendingLink = link.shadowRoot.querySelector('button');
     assert.exists(pendingLink);
     assert.include(pendingLink.textContent?.trim(), '…');

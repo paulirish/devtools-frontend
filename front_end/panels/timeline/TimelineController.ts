@@ -232,7 +232,7 @@ export class TimelineController implements Trace.TracingManager.TracingManagerCl
 
   // CPUProfiler::StartProfiling has a non-trivial cost and we'd prefer it not happen within an
   // interaction as that complicates debugging interaction latency.
-  // To trigger the StartProfiling interrupt and get the warmup cost out of the way, we send a
+  // To trigger the StartProfiling interrupt and get the warm up cost out of the way, we send a
   // very soft invocation to V8.https://crbug.com/1358602
   async warmupJsProfiler(): Promise<void> {
     // primaryPageTarget has RuntimeModel whereas rootTarget (Tab) does not.

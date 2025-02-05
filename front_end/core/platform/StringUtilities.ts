@@ -249,7 +249,7 @@ export const stripLineBreaks = (inputStr: string): string => {
 const EXTENDED_KEBAB_CASE_REGEXP = /^([a-z0-9]+(?:-[a-z0-9]+)*\.)*[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /**
- * Tests if the `inputStr` is following the extended Kebab Case naming convetion,
+ * Tests if the `inputStr` is following the extended Kebab Case naming convention,
  * where words are separated with either a dash (`-`) or a dot (`.`), and all
  * characters must be lower-case alphanumeric.
  *
@@ -328,7 +328,7 @@ export const hashCode = function(string?: string): number {
   if (!string) {
     return 0;
   }
-  // Hash algorithm for substrings is described in "Über die Komplexität der Multiplikation in
+  // Hash algorithm for substrings is described in "Über die Komplexität der Multiplication in
   // eingeschränkten Branchingprogrammmodellen" by Woelfe.
   // http://opendatastructures.org/versions/edition-0.1d/ods-java/node33.html#SECTION00832000000000000000
   const p = ((1 << 30) * 4 - 5);  // prime: 2^32 - 5
@@ -529,7 +529,7 @@ export function toKebabCaseKeys(settingValue: {
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
-// Replaces the last ocurrence of parameter `search` with parameter `replacement` in `input`
+// Replaces the last occurrence of parameter `search` with parameter `replacement` in `input`
 export const replaceLast = function(input: string, search: string, replacement: string): string {
   const replacementStartIndex = input.lastIndexOf(search);
   if (replacementStartIndex === -1) {

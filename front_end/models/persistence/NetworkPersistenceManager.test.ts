@@ -285,7 +285,7 @@ describeWithMockConnection('NetworkPersistenceManager', () => {
     assert.deepEqual(actual.sort((a, b) => (a.name.localeCompare(b.name))), expected);
   });
 
-  it('merges headers while leaving muliple headers with the same name unchanged', async () => {
+  it('merges headers while leaving multiple headers with the same name unchanged', async () => {
     const interceptedRequest = {
       request: {
         url: 'https://www.example.com/index.html',
@@ -308,7 +308,7 @@ describeWithMockConnection('NetworkPersistenceManager', () => {
     assert.deepEqual(actual.sort((a, b) => (a.name.localeCompare(b.name))), expected);
   });
 
-  it('merges headers and can override muliple headers with the same name', async () => {
+  it('merges headers and can override multiple headers with the same name', async () => {
     const interceptedRequest = {
       request: {
         url: 'https://www.example.com/repeated.html',

@@ -98,7 +98,7 @@ export const getSelectorPart = (
     return;
   }
 
-  // Declared attibutes have the greatest priority.
+  // Declared attributes have the greatest priority.
   for (const attribute of attributes) {
     const value = node.getAttribute(attribute);
     if (value) {

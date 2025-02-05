@@ -10,13 +10,13 @@ export class ElementBreadcrumbs extends HTMLElement {
 
 ## Where to put components
 
-If the component is for a specific panel, and not expected to be re-usable, it should be created within the panel's folder, within a sub-directory of `components`:
+If the component is for a specific panel, and not expected to be reusable, it should be created within the panel's folder, within a sub-directory of `components`:
 
 ```
 front_end/panels/elements/components/ElementsBreadcrumbs.ts
 ```
 
-If a component is designed to be re-usable, it should live in `front_end/ui/components`, in its own folder. That folder also contains an entrypoint, along with files for the component's definition.
+If a component is designed to be reusable, it should live in `front_end/ui/components`, in its own folder. That folder also contains an entrypoint, along with files for the component's definition.
 
 ```
 front_end/ui/components/button/button.ts // entrypoint

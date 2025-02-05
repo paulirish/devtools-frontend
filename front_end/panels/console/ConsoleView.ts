@@ -1254,7 +1254,7 @@ export class ConsoleView extends UI.Widget.VBox implements
         }
         this.appendMessageToEnd(
             consoleMessage,
-            true /* crbug.com/1082963: prevent collaps`e of same messages when "Group similar" is false */);
+            true /* crbug.com/1082963: prevent collapse`e of same messages when "Group similar" is false */);
       }
     }
     this.updateFilterStatus();

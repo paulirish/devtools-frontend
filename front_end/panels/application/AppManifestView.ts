@@ -412,7 +412,7 @@ const UIStrings = {
   screenshotsMustHaveSameAspectRatio:
       'All screenshots with the same `form_factor` must have the same aspect ratio as the first screenshot with that `form_factor`. Some screenshots will be ignored.',
   /**
-   *@description Message for Window Controls Overlay value succsessfully found with links to documnetation
+   *@description Message for Window Controls Overlay value successfully found with links to documentation
    *@example {window-controls-overlay} PH1
    *@example {https://developer.mozilla.org/en-US/docs/Web/Manifest/display_override} PH2
    *@example {https://developer.mozilla.org/en-US/docs/Web/Manifest} PH3

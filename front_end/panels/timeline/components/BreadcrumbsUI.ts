@@ -37,7 +37,7 @@ const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/Breadcrumbs
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 // `initialBreadcrumb` is the first breadcrumb in the breadcrumbs linked list. Since
-// breadcrumbs are a linked list, the first breadcrumb is enought to be able to iterate through all of them.
+// breadcrumbs are a linked list, the first breadcrumb is enough to be able to iterate through all of them.
 //
 // `activeBreadcrumb` is the currently active breadcrumb that the timeline is limited to.
 export interface BreadcrumbsUIData {

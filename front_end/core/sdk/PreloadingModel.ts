@@ -134,7 +134,7 @@ export class PreloadingModel extends SDKModel<EventTypes> {
     return document.preloadingAttempts.getById(id, document.sources) || null;
   }
 
-  // Returs preloading attempts of the current page that triggered by the rule set with `ruleSetId`.
+  // Returns preloading attempts of the current page that triggered by the rule set with `ruleSetId`.
   // `ruleSetId === null` means "do not filter".
   //
   // Returns array of pairs of id and reference. Don't save returned references.
@@ -149,7 +149,7 @@ export class PreloadingModel extends SDKModel<EventTypes> {
     return document.preloadingAttempts.getAllRepresentative(ruleSetId, document.sources);
   }
 
-  // Returs preloading attempts of the previousPgae.
+  // Returns preloading attempts of the previousPgae.
   //
   // Returns array of pairs of id and reference. Don't save returned references.
   // Returned values may or may not be updated as the time grows.
@@ -178,7 +178,7 @@ export class PreloadingModel extends SDKModel<EventTypes> {
     return document.preloadingAttempts.getPipeline(pipelineId, document.sources);
   }
 
-  // Returns attemtps that are sit in the same preload pipeline.
+  // Returns attempts that are sit in the same preload pipeline.
   getPipeline(attempt: PreloadingAttempt): PreloadPipeline {
     let pipelineNullable = null;
     if (attempt.pipelineId !== null) {
@@ -239,7 +239,7 @@ export class PreloadingModel extends SDKModel<EventTypes> {
 
     const loaderId = ruleSet.loaderId;
 
-    // Infer current loaderId if DevTools is opned at the current page.
+    // Infer current loaderId if DevTools is opened at the current page.
     if (this.currentLoaderId() === null) {
       this.loaderIds = [loaderId];
       this.targetJustAttached = false;

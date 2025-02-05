@@ -5,12 +5,12 @@
 const DARK_THEME_CLASS = 'theme-with-dark-background';
 
 function toggleDarkMode(force?: boolean): void {
-  // Only use the second arg if its not undefined. The spec treats `undefined` as falsy. :/
+  // Only use the second arg if its not undefined. The spec treats `undefined` as falsely. :/
   document.body.classList.toggle(...[DARK_THEME_CLASS, ...force !== undefined ? [force] : []]);
 }
 
 export function init(): void {
-  // To keep consistent test results, we don't auto-initialize darkmode. This'd do it, though:
+  // To keep consistent test results, we don't auto-initialize darkmode. This would do it, though:
   //    toggleDarkMode(window.matchMedia('(prefers-color-scheme: dark)').matches);
 
   window.addEventListener('load', () => {

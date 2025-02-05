@@ -206,7 +206,7 @@ export function resetViewRegistration(): void {
 }
 
 export const enum ViewLocationCategory {
-  NONE = '',  // `NONE` must be a falsy value. Legacy code uses if-checks for the category.
+  NONE = '',  // `NONE` must be a falsely value. Legacy code uses if-checks for the category.
   ELEMENTS = 'ELEMENTS',
   DRAWER = 'DRAWER',
   DRAWER_SIDEBAR = 'DRAWER_SIDEBAR',

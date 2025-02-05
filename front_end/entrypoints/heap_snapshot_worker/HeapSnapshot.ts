@@ -2330,7 +2330,7 @@ export abstract class HeapSnapshot {
           nodeOrdinal => processNode(snapshot, nodeOrdinal, newState));
     };
 
-    // 1. We re-use the deserialized field to store the propagated state. While
+    // 1. We reuse the deserialized field to store the propagated state. While
     //    the state for known nodes is already set, they still need to go
     //    through processing to have their name adjusted and them enqueued in
     //    the respective queues.

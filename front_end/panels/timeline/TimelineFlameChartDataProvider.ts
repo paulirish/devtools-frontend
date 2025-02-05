@@ -124,7 +124,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
   // all - will not appear in this array and it will change per-render. For
   // example, if a user collapses an icicle in the flamechart, those entries
   // that are now hidden will no longer be in this array.
-  // This also includes entrys that used to be special cased (e.g.
+  // This also includes entries that used to be special cased (e.g.
   // TimelineFrames) that are now of type Types.Events.Event and so the old
   // `TimelineFlameChartEntry` type has been removed in faovur of using
   // Trace.Types.Events.Event directly. See crrev.com/c/5973695 for details.
@@ -645,7 +645,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
 
       // If there is not a selected group, we want to default to selecting the
       // main thread track. Therefore in this check we look to see if the
-      // current appender is a ThreadAppender and represnets the Main Thread.
+      // current appender is a ThreadAppender and represents the Main Thread.
       // If it is, we mark the group as selected.
       if (this.timelineDataInternal && !this.timelineDataInternal.selectedGroup) {
         if (appender instanceof ThreadAppender &&
@@ -1077,7 +1077,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       context.lineTo(end, y);
     }
 
-    // The left whisker starts at the enty timestamp, and continues until the start of the box (processingStart).
+    // The left whisker starts at the entry timestamp, and continues until the start of the box (processingStart).
     const leftWhiskerX = timeToPixel(entry.ts);
     // The right whisker ends at (entry.ts + entry.dur). We draw the line from the end of the box (processingEnd).
     const rightWhiskerX = timeToPixel(Trace.Types.Timing.Micro(entry.ts + entry.dur));

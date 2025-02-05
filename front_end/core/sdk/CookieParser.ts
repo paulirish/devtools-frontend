@@ -137,7 +137,7 @@ export class CookieParser {
 
   private flushCookie(): void {
     if (this.#lastCookie) {
-      // if we have a last cookie we know that these valeus all exist, hence the typecasts
+      // if we have a last cookie we know that these values all exist, hence the typecasts
       this.#lastCookie.setSize(
           this.#originalInputLength - (this.#input as string).length - (this.#lastCookiePosition as number));
       this.#lastCookie.setCookieLine((this.#lastCookieLine as string).replace('\n', ''));

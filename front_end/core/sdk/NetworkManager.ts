@@ -1202,7 +1202,7 @@ export class NetworkDispatcher implements ProtocolProxyApi.NetworkDispatcher {
 
     // This dummy deltas are needed to show this request as being
     // downloaded(blue) given typical WebTransport is kept for a while.
-    // TODO(yoichio): Add appropreate events to fix these dummy datas.
+    // TODO(yoichio): Add appropreate events to fix these dummy data.
     // DNS lookup?
     networkRequest.responseReceivedTime = time;
     networkRequest.endTime = time + 0.001;
@@ -2039,7 +2039,7 @@ export interface Conditions {
   // this particular case, the title (along with other properties)
   // doubles as both part of group of fields which (loosely) uniquely
   // identify instances, as well as the literal string displayed in the
-  // UI, which leads to complications around persistance.
+  // UI, which leads to complications around persistence.
   title: string|(() => string);
   // Instances may be serialized to local storage, so localized titles
   // should not be irrecoverably baked, just in case the string changes

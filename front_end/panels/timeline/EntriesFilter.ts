@@ -125,7 +125,7 @@ export class EntriesFilter {
     // We apply new user action to the set of all entries, and mark
     // any that should be hidden by adding them to this set.
     // Another approach would be to use splice() to remove items from the
-    // array, but doing this would be a mutation of the arry for every hidden
+    // array, but doing this would be a mutation of the array for every hidden
     // event. Instead, we add entries to this set and return it as an array at the end.
     const entriesToHide = new Set<Trace.Types.Events.Event>();
 

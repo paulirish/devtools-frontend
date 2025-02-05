@@ -212,7 +212,7 @@ describeWithEnvironment('SidebarAnnotationsTab', () => {
 
     annotationLabelElements = component.shadowRoot.querySelectorAll<HTMLElement>('.label');
 
-    // Ensure the labels changed to new ones and a labbel range was added
+    // Ensure the labels changed to new ones and a label range was added
     assert.lengthOf(annotationLabelElements, 3);
     assert.strictEqual(annotationLabelElements[0].innerText, 'New Entry Label 1');
     assert.strictEqual(annotationLabelElements[1].innerText, 'New Entry Label 2');

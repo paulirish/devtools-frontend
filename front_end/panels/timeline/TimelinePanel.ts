@@ -223,7 +223,7 @@ const UIStrings = {
   recordingFailed: 'Recording failed',
   /**
    * @description Text to indicate the progress of a profile. Informs the user that we are currently
-   * creating a peformance profile.
+   * creating a performance profile.
    */
   profiling: 'Profiling…',
   /**
@@ -1440,7 +1440,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
 
   navigateHistory(direction: number): boolean {
     const recordingData = this.#historyManager.navigate(direction);
-    // When navigating programatically, you cannot navigate to the landing page
+    // When navigating programmatically, you cannot navigate to the landing page
     // view, so we can discount that possibility here.
     if (recordingData && recordingData.type === 'TRACE_INDEX') {
       this.#changeView({

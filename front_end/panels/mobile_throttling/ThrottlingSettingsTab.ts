@@ -73,7 +73,7 @@ const UIStrings = {
    */
   optional: 'optional',
   /**
-   *@description Error message for Profile Name input in Throtting pane of the Settings
+   *@description Error message for Profile Name input in Throttling pane of the Settings
    *@example {49} PH1
    */
   profileNameCharactersLengthMust: 'Profile Name characters length must be between 1 to {PH1} inclusive',

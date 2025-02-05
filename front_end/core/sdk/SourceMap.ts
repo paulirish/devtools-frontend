@@ -270,7 +270,7 @@ export class SourceMap {
       // If the line and column are preceding all the entries, then there is nothing to map.
       return null;
     }
-    // startIndex must be within mappings range because endIndex must be not falsy
+    // startIndex must be within mappings range because endIndex must be not falsely
     const startIndex = endIndex - 1;
     const sourceURL = mappings[startIndex].sourceURL;
     if (!sourceURL) {

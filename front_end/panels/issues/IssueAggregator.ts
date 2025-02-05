@@ -20,7 +20,7 @@ export type AggregationKey = {
 }&AggregationKeyTag;
 
 /**
- * An `AggregatedIssue` representes a number of `IssuesManager.Issue.Issue` objects that are displayed together.
+ * An `AggregatedIssue` represents a number of `IssuesManager.Issue.Issue` objects that are displayed together.
  * Currently only grouping by issue code, is supported. The class provides helpers to support displaying
  * of all resources that are affected by the aggregated issues.
  */

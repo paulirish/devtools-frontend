@@ -751,7 +751,7 @@ describeWithMockConnection('PreloadingModel', () => {
       requestId: 'requestId:1',
     });
 
-    // Here, we get two different attemtps, which should sit in the same pipeline actually.
+    // Here, we get two different attempts, which should sit in the same pipeline actually.
     // It is because
     //
     // - The `NOT_TRIGGERED` entry is synthesized from

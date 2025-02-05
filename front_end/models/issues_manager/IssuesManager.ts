@@ -404,7 +404,7 @@ export class IssuesManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes
     const code = issue.code();
     // All issues are hidden via their code.
     // For hiding we check whether the issue code is present and has a value of IssueStatus.Hidden
-    // assosciated with it. If all these conditions are met the issue is hidden.
+    // associated with it. If all these conditions are met the issue is hidden.
     // IssueStatus is set in hidden issues menu.
     // In case a user wants to hide a specific issue, the issue code is added to "code" section
     // of our setting and its value is set to IssueStatus.Hidden. Then issue then gets hidden.

@@ -82,7 +82,7 @@ function parseHostAndPort(pattern: string, scheme: string): {host: string, port:
     return undefined;
   }
 
-  // The URL constructor strips off the default port for the scheme, even if it was given explicitely
+  // The URL constructor strips off the default port for the scheme, even if it was given explicitly
   const httpPort = defaultPort('http');
   if (!httpPort) {
     return undefined;

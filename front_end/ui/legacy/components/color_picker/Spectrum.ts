@@ -1083,7 +1083,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
     // `colorStringInternal` to be empty specifically. The difference is:
     // * If we give `undefined` as an argument to this function, it means
     // we don't want to change `colorStringInternal`
-    // * If we give "" as an argument to this funciton, it means
+    // * If we give "" as an argument to this function, it means
     // we want to clear the `colorStringInternal`.
     if (colorString !== undefined) {
       this.colorStringInternal = colorString;
@@ -1522,7 +1522,7 @@ export class PaletteGenerator {
     text = text.toLowerCase();
     const regexResult = text.matchAll(/((?:rgb|hsl|hwb)a?\([^)]+\)|#[0-9a-f]{6}|#[0-9a-f]{3})/g);
     for (const {0: c, index} of regexResult) {
-      // Check whether the match occured in a property value and not in a property name or a selector by verifying
+      // Check whether the match occurred in a property value and not in a property name or a selector by verifying
       // that there's no colon after the match and before the next semicolon.
       if (text.indexOf(';', index) < 0 ||
           text.indexOf(':', index) > -1 && text.indexOf(':', index) < text.indexOf(';', index)) {

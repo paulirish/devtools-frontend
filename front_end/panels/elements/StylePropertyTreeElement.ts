@@ -241,7 +241,7 @@ export class VariableRenderer implements MatchRenderer<SDK.CSSPropertyParser.Var
     };
 
     if (renderedFallback?.nodes.length) {
-      // When slotting someting into the fallback slot, also emit text children so that .textContent produces the
+      // When slotting something into the fallback slot, also emit text children so that .textContent produces the
       // correct var value.
       varSwatch.appendChild(document.createTextNode(`var(${match.name}`));
       const span = varSwatch.appendChild(document.createElement('span'));

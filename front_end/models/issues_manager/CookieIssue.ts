@@ -27,7 +27,7 @@ const UIStrings = {
    */
   howSchemefulSamesiteWorks: 'How Schemeful Same-Site Works',
   /**
-   *@description Phrase used to describe the security of a context. Substitued like 'a secure context' or 'a secure origin'.
+   *@description Phrase used to describe the security of a context. Substituted like 'a secure context' or 'a secure origin'.
    */
   aSecure: 'a secure',  // eslint-disable-line rulesdir/l10n-no-unused-message
   /**

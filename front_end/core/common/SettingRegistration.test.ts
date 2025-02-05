@@ -18,7 +18,7 @@ const enableTitle = 'Enable mock setting';
 const disableTitle = 'Disable mock setting';
 
 describe('SettingRegistration', () => {
-  // const enum `SettingCategory` not available in top level scope, thats why
+  // const enum `SettingCategory` not available in top level scope, that's why
   // its initialized here.
   const settingCategory = Common.Settings.SettingCategory.CONSOLE;
 

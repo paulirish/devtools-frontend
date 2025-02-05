@@ -429,7 +429,7 @@ export class TimelineTreeView extends
     }
     const rootNode = this.dataGrid.rootNode();
     if (this.autoSelectFirstChildOnRefresh && rootNode.children.length > 0) {
-      rootNode.children[0].select(/* supressSelectedEvent */ true);
+      rootNode.children[0].select(/* suppressSelectedEvent */ true);
     }
   }
 

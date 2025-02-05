@@ -581,7 +581,7 @@ export class MainImpl {
 
     const value = Root.Runtime.Runtime.queryParam('loadTimelineFromURL');
     if (value !== null) {
-      // Only import Timeline if neeeded. If this was a static import, every load of devtools
+      // Only import Timeline if needed. If this was a static import, every load of devtools
       // would request and evaluate the Timeline panel dep tree, slowing down the UI's load.
       const Timeline = await import('../../panels/timeline/timeline.js');
       Timeline.TimelinePanel.LoadTimelineHandler.instance().handleQueryParam(value);

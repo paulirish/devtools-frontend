@@ -1173,7 +1173,7 @@ export class Rectangle {
 
   /**
    * Finds coordinates of point on layer quad, having offsets (ratioX * width) and (ratioY * height)
-   * from the left corner of the initial layer rect, where width and heigth are layer bounds.
+   * from the left corner of the initial layer rect, where width and height are layer bounds.
    */
   private calculatePointOnQuad(quad: number[], ratioX: number, ratioY: number): number[] {
     const x0 = quad[0];

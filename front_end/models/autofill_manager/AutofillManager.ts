@@ -87,7 +87,7 @@ export class AutofillManager extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     this.#matches = [];
 
     // Populate a list of matches by searching in the address string for
-    // occurences of filled field values.
+    // occurrences of filled field values.
     for (let i = 0; i < this.#filledFields.length; i++) {
       if (this.#filledFields[i].value === '') {
         continue;

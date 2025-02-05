@@ -5,7 +5,7 @@
 import type {Brand} from './Brand.js';
 
 /**
- * URLs are in DevTools are repsented as encoded URL strings.
+ * URLs are in DevTools are represented as encoded URL strings.
  *
  * @example 'file:///Hello%20World/file/js'
  */

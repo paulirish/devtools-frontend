@@ -72,7 +72,7 @@ export function dissambleWASM(
       }
       parser.setData(buffer.buffer, 0, bufferSize, i === data.length);
 
-      // The disassemble will attemp to fetch the data as much as possible.
+      // The disassemble will attempt to fetch the data as much as possible.
       const finished = dis.disassembleChunk(parser, offsetInModule);
 
       const result = (dis.getResult() as {

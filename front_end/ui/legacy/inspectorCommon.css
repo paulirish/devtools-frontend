@@ -706,7 +706,7 @@ devtools-toolbar {
     max-width: 100%;
     color: var(--icon-default);
 
-    /* Some toolbars have a different cursor on hover (for example, resizeable
+    /* Some toolbars have a different cursor on hover (for example, resizable
      * ones which can be clicked + dragged to move). But we want to make sure
      * by default each toolbar item shows the default cursor, because you
      * cannot click + drag on the item to resize the toolbar container, you

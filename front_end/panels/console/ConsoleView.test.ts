@@ -44,7 +44,7 @@ describeWithMockConnection('ConsoleView', () => {
     }
     // This test transitively schedules a task which may cause errors if the task
     // is run without the environments set in this test. Thus wait for its completion
-    // before proceding to the next test.
+    // before proceeding to the next test.
     await consoleView.getScheduledRefreshPromiseForTest();
   });
 

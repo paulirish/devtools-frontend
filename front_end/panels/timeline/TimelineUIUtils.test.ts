@@ -1090,7 +1090,7 @@ describeWithMockConnection('TimelineUIUtils', function() {
            {title: 'URL', value: 'wss://socketsbay.com/wss/v2/1/demo/'},
            // The initiator stack trace
            {title: undefined, value: 'connect @ socketsbay.com/test-websockets:314:25'},
-           // The 2 entries under "Initiator for" are displayed as seperate links and in the UI it is obvious they are seperate
+           // The 2 entries under "Initiator for" are displayed as separate links and in the UI it is obvious they are separate
            {title: 'Initiator for', value: 'Send WebSocket handshake Receive WebSocket handshake'},
          ];
          assert.deepEqual(

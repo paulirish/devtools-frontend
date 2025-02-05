@@ -446,7 +446,7 @@ export class IssuesPane extends UI.Widget.VBox {
       if (this.#showThirdPartyCheckbox) {
         this.setDefaultFocusedElement(this.#showThirdPartyCheckbox.inputElement);
       }
-      // We alreay know that issesCount is zero here.
+      // We already know that issuesCount is zero here.
       const hasOnlyThirdPartyIssues = this.#issuesManager.numberOfAllStoredIssues() > 0;
       this.#noIssuesMessageDiv.textContent = hasOnlyThirdPartyIssues ?
           i18nString(UIStrings.onlyThirdpartyCookieIssues) :

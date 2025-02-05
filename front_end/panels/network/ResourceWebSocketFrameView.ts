@@ -304,7 +304,7 @@ export class ResourceWebSocketFrameView extends UI.Widget.VBox {
   }
 
   private clearFrames(): void {
-    // TODO(allada): actially remove frames from request.
+    // TODO(allada): actually remove frames from request.
     clearFrameOffsets.set(this.request, this.request.frames().length);
     this.refresh();
   }

@@ -169,7 +169,7 @@ export abstract class ProjectStore implements Project {
     this.#uiSourceCodes.delete(oldPath);
   }
 
-  // No-op implementation for a handfull of interface methods.
+  // No-op implementation for a handful of interface methods.
 
   rename(
       _uiSourceCode: UISourceCode, _newName: string,

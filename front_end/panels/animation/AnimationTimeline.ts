@@ -953,7 +953,7 @@ export class AnimationTimeline extends UI.Widget.VBox implements
 
   private renderGrid(): void {
     const isScrollDriven = this.#selectedGroup?.isScrollDriven();
-    // For scroll driven animations, show divider lines for each 10% progres.
+    // For scroll driven animations, show divider lines for each 10% progress.
     // For time based animations, show divider lines for each 250ms progress.
     const gridSize = isScrollDriven ? this.duration() / 10 : 250;
     this.#grid.removeChildren();

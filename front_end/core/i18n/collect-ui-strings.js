@@ -72,7 +72,7 @@ for (const directory of inputDirectories) {
 const outputDirectory = yargsObject['output-directory'];
 convertCtcToLhLAndSave(outputDirectory, 'en-US', collectedStrings);
 if (yargsObject['include-en-xl']) {
-  convertCtcToLhLAndSave(outputDirectory, 'en-XL', createPsuedoLocaleStrings(collectedStrings));
+  convertCtcToLhLAndSave(outputDirectory, 'en-XL', createPseudoLocaleStrings(collectedStrings));
 }
 
 // Write the depfile. This is necessary to properly rebuild en-US.json/en-XL.json

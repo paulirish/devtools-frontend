@@ -142,7 +142,7 @@ describe('parseContentType', () => {
       contentType: 'text/',
       expectedMimeType: 'text/',
     },
-    // */* is ignored unless it has parmas or is not an exact match.
+    // */* is ignored unless it has params or is not an exact match.
     {
       contentType: '*/*',
       expectedMimeType: null,

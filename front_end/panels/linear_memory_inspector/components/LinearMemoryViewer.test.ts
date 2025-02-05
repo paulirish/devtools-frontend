@@ -37,7 +37,7 @@ describe('LinearMemoryViewer', () => {
     const data = createComponentData();
     const highlightInfo: LinearMemoryInspectorComponents.LinearMemoryViewerUtils.HighlightInfo = {
       startAddress: 2,
-      size: 21,  // A large enough odd number so that the highlight spans mulitple rows.
+      size: 21,  // A large enough odd number so that the highlight spans multiple rows.
       type: 'bool[]',
     };
     const dataWithHighlightInfo = {

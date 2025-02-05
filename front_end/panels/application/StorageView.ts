@@ -19,13 +19,13 @@ import storageViewStyles from './storageView.css.js';
 
 const UIStrings = {
   /**
-   * @description Text in the Storage View that expresses the amout of used and available storage quota
+   * @description Text in the Storage View that expresses the amount of used and available storage quota
    * @example {1.5 MB} PH1
    * @example {123.1 MB} PH2
    */
   storageQuotaUsed: '{PH1} used out of {PH2} storage quota',
   /**
-   * @description Tooltip in the Storage View that expresses the precise amout of used and available storage quota
+   * @description Tooltip in the Storage View that expresses the precise amount of used and available storage quota
    * @example {200} PH1
    * @example {400} PH2
    */
@@ -56,7 +56,7 @@ const UIStrings = {
    */
   clearSiteData: 'Clear site data',
   /**
-   * @description Annouce message when the "clear site data" task is complete
+   * @description Announce message when the "clear site data" task is complete
    */
   SiteDataCleared: 'Site data cleared',
   /**

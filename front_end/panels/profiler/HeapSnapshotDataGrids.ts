@@ -1003,7 +1003,7 @@ export class HeapSnapshotDiffDataGrid extends HeapSnapshotViewportDataGrid {
     }
     // Two snapshots live in different workers isolated from each other. That is why
     // we first need to collect information about the nodes in the first snapshot and
-    // then pass it to the second snapshot to calclulate the diff.
+    // then pass it to the second snapshot to calculate the diff.
     const interfaceDefinitions = await this.snapshot.interfaceDefinitions();
     const aggregatesForDiff = await this.baseSnapshot.aggregatesForDiff(interfaceDefinitions);
     const diffByClassKey = await this.snapshot.calculateSnapshotDiff(this.baseSnapshot.uid, aggregatesForDiff);

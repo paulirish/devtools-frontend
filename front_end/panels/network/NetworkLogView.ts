@@ -288,7 +288,7 @@ const UIStrings = {
    */
   copyAsCurlBash: 'Copy as `cURL` (`bash`)',
   /**
-   *@description A context menu command in the Network panel, for copying the URLs of all requestes to the clipboard.
+   *@description A context menu command in the Network panel, for copying the URLs of all requests to the clipboard.
    */
   copyAllURLs: 'Copy all URLs',
   /**

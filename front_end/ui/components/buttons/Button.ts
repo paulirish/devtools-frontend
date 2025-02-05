@@ -127,7 +127,7 @@ export class Button extends HTMLElement {
   }
 
   /**
-   * Perfer using the .data= setter instead of setting the individual properties
+   * Prefer using the .data= setter instead of setting the individual properties
    * for increased type-safety.
    */
   set data(data: ButtonData) {

@@ -414,7 +414,7 @@ export class ComputedText {
   }
 }
 
-// This function determines whether concatenating two pieces of text requires any spacing inbetween. For example, there
+// This function determines whether concatenating two pieces of text requires any spacing between. For example, there
 // shouldn't be any space between 'var' and '(', but there should be a space between '1px' and 'solid'. The node
 // sequences that make up the pieces of text may contain non-text nodes/trees. Any such element inbetween the texts is
 // ignored for the spacing requirement.

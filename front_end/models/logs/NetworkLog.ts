@@ -278,7 +278,7 @@ export class NetworkLog extends Common.ObjectWrapper.ObjectWrapper<EventTypes> i
     for (const otherRequest of this.requestsInternal) {
       const otherRequestManager = SDK.NetworkManager.NetworkManager.forRequest(otherRequest);
       if (networkManager === otherRequestManager && this.initiatorChain(otherRequest).has(request)) {
-        // save parent request of otherRequst in order to build the initiator chain table later
+        // save parent request of otherRequest in order to build the initiator chain table later
         const initiatorRequest = this.initiatorRequest(otherRequest);
         if (initiatorRequest) {
           initiated.set(otherRequest, initiatorRequest);

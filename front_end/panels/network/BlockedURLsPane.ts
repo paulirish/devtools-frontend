@@ -29,7 +29,7 @@ const UIStrings = {
    */
   addNetworkRequestBlockingPattern: 'Add network request blocking pattern',
   /**
-   *@description Button to add a pattern to block netwrok requests in the Network request blocking tool
+   *@description Button to add a pattern to block network requests in the Network request blocking tool
    *@example {Add pattern} PH1
    */
   networkRequestsAreNotBlockedS: 'Network requests are not blocked. {PH1}',

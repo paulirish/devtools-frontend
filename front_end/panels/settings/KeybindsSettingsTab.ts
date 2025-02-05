@@ -85,15 +85,15 @@ const UIStrings = {
    */
   shortcutRemoved: '{PH1} Shortcut removed',
   /**
-   *@description Screen reader announcment for shortcut restored to default
+   *@description Screen reader announcement for shortcut restored to default
    */
   shortcutChangesRestored: 'Changes to shortcut restored to default',
   /**
-   *@description Screen reader announcment for applied short cut changes
+   *@description Screen reader announcement for applied short cut changes
    */
   shortcutChangesApplied: 'Changes to shortcut applied',
   /**
-   *@description Screen reader announcment for discarded short cut changes
+   *@description Screen reader announcement for discarded short cut changes
    */
   shortcutChangesDiscared: 'Changes to shortcut discarded',
 };

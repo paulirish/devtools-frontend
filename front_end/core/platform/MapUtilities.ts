@@ -80,7 +80,7 @@ export class Multimap<K, V> {
 }
 
 /**
- * Gets value for key, assigning a default if value is falsy.
+ * Gets value for key, assigning a default if value is falsely.
  */
 export function getWithDefault<K extends {}, V>(
     map: WeakMap<K, V>|Map<K, V>, key: K, defaultValueFactory: (key?: K) => V): V {

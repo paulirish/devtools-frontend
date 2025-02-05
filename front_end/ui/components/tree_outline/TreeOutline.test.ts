@@ -22,7 +22,7 @@ async function renderTreeOutline<TreeNodeDataType>({
   filter,
 }: {
   tree: TreeOutline.TreeOutline.TreeOutlineData<TreeNodeDataType>['tree'],
-  // defaultRenderer is required usually but here we make it optinal and provide a default one as part of renderTreeOutline, to save duplication in every single test where we want to use a simple string renderer.
+  // defaultRenderer is required usually but here we make it optional and provide a default one as part of renderTreeOutline, to save duplication in every single test where we want to use a simple string renderer.
   defaultRenderer?: TreeOutline.TreeOutline.TreeOutlineData<TreeNodeDataType>['defaultRenderer'],
   filter?: TreeOutline.TreeOutline.TreeOutlineData<TreeNodeDataType>['filter'],
 }): Promise<{
