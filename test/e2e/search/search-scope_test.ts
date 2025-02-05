@@ -102,9 +102,9 @@ describe('The Search Panel', () => {
     assert.deepEqual(entries, [
       {line: '7', content: 'div.searchTestUniqueString {'},
       {line: '11', content: 'div.searchTestUniqueString:hover {'},
-      {line: '12', content: '/* another searchTestUniqueString occurence */'},
+      {line: '12', content: '/* another searchTestUniqueString occurrence */'},
       {line: '4', content: 'function searchTestUniqueString() {'},
-      {line: '6', content: '// searchTestUniqueString two occurences on the same line searchTestUniqueString'},
+      {line: '6', content: '// searchTestUniqueString two occurrences on the same line searchTestUniqueString'},
       {line: '6', content: '…urences on the same line searchTestUniqueString'},
       {line: '7', content: '// searchTestUniqueString on the next line.'},
       {line: '12', content: 'searchTestUniqueString();'},

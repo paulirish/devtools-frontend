@@ -83,7 +83,7 @@ module.exports = {
         // we have nothing to restore as we did not save anything in this
         // scope. Either the user has forgotten a save() call, or this
         // restore() has been accidentally left behind after a refactor and
-        // shold be removed.
+        // should be removed.
         if(stackForCurrentScope.length === 0) {
           context.report({
             messageId: 'uselessRestore',

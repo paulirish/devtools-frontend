@@ -417,7 +417,7 @@ describe('The Console Tab', () => {
 
       await waitForConsoleMessages(1);
 
-      // Check that the 'BG' text has no bakcground image.
+      // Check that the 'BG' text has no background image.
       const textsAndStyles = await getConsoleMessageTextChunksWithStyle(frontend, ['backgroundImage']);
       assert.deepEqual(textsAndStyles, [[['PRE', ''], ['BG', '']]]);
     });

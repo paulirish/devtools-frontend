@@ -270,7 +270,7 @@ function drawFlexSpace(
 
   // Start with the case where we want to draw all types of space, with the same style. This is important because it's
   // a common case that we can optimize by drawing in one go, and therefore avoiding having visual offsets between
-  // mutliple hatch patterns.
+  // multiple hatch patterns.
   if (isSameStyle) {
     // Draw in one go by constructing a path that covers the entire container but punches holes where items are.
     const allItemQuads = lineQuads.map(line => line.extendedItems).flat().map(item => item);
@@ -746,7 +746,7 @@ function rectPathToQuad(commands: PathCommands): Quad {
 
 /**
  * Get a quad that bounds the provided 2 quads.
- * This only works if both quads have their respective sides parallel to eachother.
+ * This only works if both quads have their respective sides parallel to each other.
  * Note that it is more complicated because rectangles can be transformed (i.e. their sides aren't necessarily parallel
  * to the x and y axes).
  * @param quad1
@@ -817,7 +817,7 @@ export function uniteQuads(quad1: Quad, quad2: Quad, isHorizontalFlow: boolean, 
 
 /**
  * Given 2 quads, with one being contained inside the other, grow the inner one, along one direction, so it ends up
- * flush aginst the outer one.
+ * flush against the outer one.
  * @param innerQuad
  * @param outerQuad
  * @param horizontally The direction to grow the inner quad along

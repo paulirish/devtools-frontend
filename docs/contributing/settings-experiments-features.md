@@ -92,7 +92,7 @@ useful for features which have both a DevTools front-end and a Chromium back-end
 component, and allows configuration from a single source of truth. For live
 demos of features which are still under development, this can be very helpful
 as well. Presenters would have peace of mind, knowing that their feature is
-working correctly, as long as they are re-using the right command to launch
+working correctly, as long as they are reusing the right command to launch
 Chromium.
 
 ### Define a new `base::Feature`

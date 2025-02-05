@@ -80,7 +80,7 @@ for all inline callees for the function (or inline frame) that the given raw loc
 When paused, DevTools will populate the Scope View with all variables in the current scope using the
 `listVariablesInScope` which takes a raw location argument. It returns an array of variable details, which is an object
 with the string properties `scope`, `name`, `type`, and optionally `nestedName` which is an array of nested namespace
-names incase the variable has a fully qualified name.
+names in case the variable has a fully qualified name.
 
 The scope property returns the name of the scope that the variable lives in. Additional information on a scope can be
 provided by name via the `getScopeInfo` function, which returns an object with string properties `type`, `typeName`, and

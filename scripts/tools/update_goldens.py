@@ -264,7 +264,7 @@ def read_try_results(patchset):
 
 
 def filter_screenshots(project_config, results):
-    """Remove results comming from other builders."""
+    """Remove results coming from other builders."""
     sht_results = []
 
     for r in results:
@@ -386,7 +386,7 @@ def builder_status(results, builders):
 
 def download_patches(project_config, results, destination_dir, verbose):
     """Interact with GS and retrieve the patches. Since we have build results
-    from successfull screenshot builds we know that they uploaded patches in
+    from successful screenshot builds we know that they uploaded patches in
     the expected location in the cloud.
     """
     patches = []

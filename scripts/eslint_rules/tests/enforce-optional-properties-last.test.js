@@ -34,7 +34,7 @@ ruleTester.run('optional-properties-last', rule, {
       `,
     },
     {
-      // As a TSInterfaceDeclaration this isn't targetted by the rule.
+      // As a TSInterfaceDeclaration this isn't targeted by the rule.
       // But that's fine as clang-format doesn't touch it.
       code: `
 export interface LCPPhases {

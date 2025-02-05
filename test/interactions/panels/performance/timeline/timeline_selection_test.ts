@@ -215,7 +215,7 @@ describe('FlameChart', function() {
        assert.isTrue(styleRecalcTitle.includes(queryForStyleRecalc));
        let initiatorLink = await waitFor('[data-row-title="Initiated by"] .timeline-details-view-row-value');
 
-       // Before a breadcrumb is created, the link to the entry initiator is activated. Check it by getting the 'role' attribute and ckecking if it is 'link'.
+       // Before a breadcrumb is created, the link to the entry initiator is activated. Check it by getting the 'role' attribute and checking if it is 'link'.
        let initiatorLinkRole =
            await initiatorLink.evaluate(element => element.querySelector('span')?.getAttribute('role'));
        assert.strictEqual(initiatorLinkRole, 'link');

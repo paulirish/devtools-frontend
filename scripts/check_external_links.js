@@ -31,7 +31,7 @@ const REQUEST_TIMEOUT = 5000;
 const REDIRECTS_CONSIDERED_ERROR = new Set([
   /* Multiple Choices */ 300,
   /* Moved permanently */ 301,
-  /* Permament redirect */ 308,
+  /* Permanent redirect */ 308,
 ]);
 
 const ROOT_REPOSITORY_PATH = path.resolve(__dirname, '..');

@@ -30,7 +30,7 @@ describe('Deprecation Issues', () => {
               lineNumber: 1,
               columnNumber: 1,
             },
-            // This value needs maintanance to always point to an exising deprecation.
+            // This value needs maintenance to always point to an existing deprecation.
             type: 'LocalCSSFileExtensionRejected',
           },
         },

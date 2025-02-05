@@ -281,7 +281,7 @@ async function compare(golden: string, generated: string, maximumDiffThreshold: 
     // When checking test coverage locally the tests get sped up significantly
     // if we do not do the actual image comparison. Obviously this makes the
     // tests all pass, but it is useful to quickly get coverage stats.
-    // Therefore you can pass this flag to skip all screenshot comparisions. We
+    // Therefore you can pass this flag to skip all screenshot comparisons. We
     // make sure this is only possible if not on a CQ bot and 99.9% of the time
     // this should not be used!
     return;

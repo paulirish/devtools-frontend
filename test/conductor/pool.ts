@@ -77,7 +77,7 @@ export class FrontendTargetPool {
 }
 
 /**
- * A simple Promise-based pool. Esentially a queue.
+ * A simple Promise-based pool. Essentially a queue.
  *
  * When the pool is empty, consumers get a promise that resolves as soon as
  * the pool is refilled.

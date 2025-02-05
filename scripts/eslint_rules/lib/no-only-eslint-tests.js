@@ -38,7 +38,7 @@ module.exports = {
               // To delete the property, the trailing comma, and then the
               // resulting new line, we find the next node after the comma and
               // delete up to that. That ensures that when we remove the
-              // property we also remove the emtpy line.
+              // property we also remove the empty line.
               if (nextNode?.value === ',') {
                 nextNode = sourceCode.getTokenAfter(nextNode);
               }

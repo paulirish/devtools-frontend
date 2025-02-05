@@ -1,6 +1,6 @@
 # Performance Testing
 
-These are performance tests that run benchmarks of automated userflows. The resuls are aggregated using the [Skia Perf format](https://skia.googlesource.com/buildbot/+/refs/heads/main/perf/FORMAT.md) and stored under perf-data/devtools-perf.json.
+These are performance tests that run benchmarks of automated userflows. The results are aggregated using the [Skia Perf format](https://skia.googlesource.com/buildbot/+/refs/heads/main/perf/FORMAT.md) and stored under perf-data/devtools-perf.json.
 
 The tests are run on devtools CI on the "Standalone Linux" bot. The result of each run is [uploaded](https://source.chromium.org/chromium/infra/infra_superproject/+/main:build/recipes/recipes/devtools/devtools-frontend.py?q=publish_performance_benchmarks) to Skia Perf  so that the benchmarks can be monitored in [devtools own dashboard instance](https://devtools-frontend-perf.corp.goog/e/) .
 

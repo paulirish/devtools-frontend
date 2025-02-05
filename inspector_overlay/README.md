@@ -33,7 +33,7 @@ In this mode, JS modules will be served without bundling.
 
 ## Importing modules from DevTools
 
-It's possible to re-use modules from DevTools for the overlay implementation.
+It's possible to reuse modules from DevTools for the overlay implementation.
 To import a module, use the `import` statement with a relative path to the module.
 It's important to keep the size of the shipped overlay modules minimal so it's better to
 include only small standalone utilities. The build tooling will also check the size of the

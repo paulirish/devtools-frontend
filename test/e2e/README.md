@@ -80,8 +80,8 @@ Current limitations when using VSCode for e2e and interactions tests:
 
 To skip a flaky E2E test, create a new bug on [crbug.com](https://crbug.com) in the
 `Chromium > Platform > DevTools` component, and modify the `it` or `describe`
-block accordingly by adding `.skip` to it, adding a preceeding comment
-why the test is skipp and adding the `crbug.com` reference to the test
+block accordingly by adding `.skip` to it, adding a preceding comment
+why the test is skip and adding the `crbug.com` reference to the test
 block string. For example
 
 ```js

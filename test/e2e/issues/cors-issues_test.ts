@@ -316,7 +316,7 @@ describe('CORS issues', () => {
         const {target} = getBrowserAndPages();
         await target.evaluate(async () => {
           try {
-            // We can re-use `method-disallowed.rawresponse` for this test.
+            // We can reuse `method-disallowed.rawresponse` for this test.
             const url = new URL('./issues/method-disallowed.rawresponse', document.location.toString())
                             .toString()
                             .replace('localhost', 'devtools.oopif.test');

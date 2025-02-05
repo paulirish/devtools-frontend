@@ -122,7 +122,7 @@ export class DevToolsFrontendTab {
 
   /**
    * Returns the current hostname of this frontend tab. This might not be
-   * consistent with the intial URL in case the page was navigated to
+   * consistent with the initial URL in case the page was navigated to
    * a different origin.
    */
   hostname(): string {

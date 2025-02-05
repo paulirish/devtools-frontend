@@ -402,7 +402,7 @@ describe('The Network Tab', function() {
     // We need to wait for the network log to update.
     await waitForFunction(async () => {
       const {status} = await getRequestRowInfo(frontend, 'sendBeacon');
-      // Depending on timing of the reporting, the status infomation (404) might reach DevTools in time.
+      // Depending on timing of the reporting, the status information (404) might reach DevTools in time.
       return (status === '(unknown)' || status === '404Not Found');
     });
   });

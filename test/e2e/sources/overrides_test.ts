@@ -472,7 +472,7 @@ describe('Network panel', () => {
 
 describe('Overrides panel > Delete context menus', () => {
   beforeEach(async () => {
-    // set up 3 overriden files - .header, json, custom js
+    // set up 3 overridden files - .header, json, custom js
     await goToResource('network/fetch-json.html');
     await openSourcesPanel();
     await enableLocalOverrides();

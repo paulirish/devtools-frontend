@@ -40,7 +40,7 @@ We can collect code coverage for the source code that is tested: `npm run test -
 unit tests.
 
 The code coverage output is written to `/karma-coverage` in the repository root. The
-location can be overriden with `--artifacts-dir`.  You can open `/karma-coverage/index.html` in a browser to inspect
+location can be overridden with `--artifacts-dir`.  You can open `/karma-coverage/index.html` in a browser to inspect
 coverage for individual files.
 
 ## Layout tests
@@ -95,7 +95,7 @@ will automatically check for type consistency.
 
 The [`PRESUBMIT.py`](../PRESUBMIT.py) script includes various checks related to code ownership, localization rules,
 license headers, formatting, and the like that are automatically run while uploading a CL (change list), as part of
-the CQ (commit queue), and on the [CI (continous integration)](https://ci.chromium.org/p/devtools-frontend/g/main/console).
+the CQ (commit queue), and on the [CI (continuous integration)](https://ci.chromium.org/p/devtools-frontend/g/main/console).
 
 You can manually trigger the presubmit checks with
 ```

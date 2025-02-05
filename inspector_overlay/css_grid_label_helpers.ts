@@ -49,7 +49,7 @@ const gridArrowWidth = 3;
 // The minimum distance (in px) a label has to be from the edge of the viewport
 // to avoid being flipped inside the grid.
 const gridPageMargin = 20;
-// The minimum distance (in px) 2 labels can be to eachother. This is set to
+// The minimum distance (in px) 2 labels can be to each other. This is set to
 // allow 2 consecutive 2-digits labels to not overlap.
 const gridLabelDistance = 20;
 // The maximum number of custom line names that can be displayed in a label.
@@ -217,7 +217,7 @@ export function drawGridLabels(
 
 /**
  * This is a generator function used to iterate over grid label positions in a way
- * that skips the ones that are too close to eachother, in order to avoid overlaps.
+ * that skips the ones that are too close to each other, in order to avoid overlaps.
  */
 function* positionIterator(positions: Position[], axis: 'x'|'y'): Generator<[number, Position]> {
   let lastEmittedPos = null;
@@ -230,7 +230,7 @@ function* positionIterator(positions: Position[], axis: 'x'|'y'): Generator<[num
     // Or if there is some minimum distance between the last emitted position.
     const isFarEnoughFromPrevious =
         Math.abs(pos[axis] - (lastEmittedPos ? lastEmittedPos[axis] : 0)) > gridLabelDistance;
-    // And if there is also some minium distance from the very last position.
+    // And if there is also some minimum distance from the very last position.
     const isFarEnoughFromLast =
         !isLast && Math.abs(positions[positions.length - 1][axis] - pos[axis]) > gridLabelDistance;
 
@@ -809,7 +809,7 @@ function flipArrowTypeIfNeeded(arrowType: GridArrowType, flipIn: boolean): GridA
 }
 
 /**
- * Given an arrow type for the standard horizontal-tb writing-mode, return the corresponding type for a differnet
+ * Given an arrow type for the standard horizontal-tb writing-mode, return the corresponding type for a different
  * writing-mode.
  */
 function adaptArrowTypeForWritingMode(arrowType: GridArrowType, writingMode: string): GridArrowType {

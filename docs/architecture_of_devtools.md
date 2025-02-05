@@ -193,7 +193,7 @@ async function loadNetworkModule(): Promise<typeof Network> {
 }
 
 // Retrieve any context types from the lazily loaded module, but only if the module has
-// already been loaded at least once. The context types are used to determine the availibility
+// already been loaded at least once. The context types are used to determine the availability
 // of certain DevTools extensions, for example certain feature-specific command menu entries
 // like the debugger actions when debugging source code. For more information, see the usage
 // of this function down below.

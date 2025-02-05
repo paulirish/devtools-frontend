@@ -43,7 +43,7 @@ async function checkGoldensForPlatform(platform) {
   for await (const golden of goldens) {
     const relativeGoldenPath = path.relative(platformRoot, golden);
     // Filepaths in screenshot tests assertions are used using forward slashes.
-    // If this is excecuted in windows `relativeGoldenPath` will come with
+    // If this is executed in windows `relativeGoldenPath` will come with
     // backward slashes, so the path needs to be fixed.
     const unixRelativeGoldenPath = relativeGoldenPath.replace(/\\/g, '/');
     const isWin = process.platform === 'win32';

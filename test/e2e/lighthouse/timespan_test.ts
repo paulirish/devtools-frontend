@@ -80,7 +80,7 @@ describe('Timespan', function() {
 
     assert.strictEqual(lhr.gatherMode, 'timespan');
 
-    // Even though the dropdown is set to "simulate", throttling method should be overriden to "devtools".
+    // Even though the dropdown is set to "simulate", throttling method should be overridden to "devtools".
     assert.strictEqual(lhr.configSettings.throttlingMethod, 'devtools');
 
     const {innerWidth, innerHeight, devicePixelRatio} = artifacts.ViewportDimensions;

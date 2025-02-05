@@ -56,7 +56,7 @@ export class DragResizeHandler {
   }
 
   /**
-   * Updates the cursor style of the mouse is hovered over a resizeable area.
+   * Updates the cursor style of the mouse is hovered over a resizable area.
    */
   private onMousemove(event: MouseEvent) {
     const match = this.delegate.getDraggable(event.clientX, event.clientY);
