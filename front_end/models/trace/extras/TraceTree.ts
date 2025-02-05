@@ -336,12 +336,12 @@ export class BottomUpRootNode extends Node {
     super('', events[0]);
     this.childrenInternal = null;
     this.events = events;
-    this.textFilter = textFilter;
-    this.filter = (e: Types.Events.Event): boolean => filters.every(f => f.accept(e));
-    this.startTime = startTime;
-    this.endTime = endTime;
-    this.eventGroupIdCallback = eventGroupIdCallback;
-    this.totalTime = endTime - startTime;
+    this.textFilter = options.textFilter;
+    this.filter = (e: Types.Events.Event): boolean => options.filters.every(f => f.accept(e));
+    this.startTime = options.startTime;
+    this.endTime = options.endTime;
+    this.eventGroupIdCallback = options.eventGroupIdCallback;
+    this.totalTime = options.endTime - options.startTime;
   }
 
   override hasChildren(): boolean {

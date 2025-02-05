@@ -1161,7 +1161,6 @@ export class BottomUpTimelineTreeView extends AggregatedTimelineTreeView {
   }
 
   override buildTree(): Trace.Extras.TraceTree.Node {
-<<<<<<< HEAD
     return new Trace.Extras.TraceTree.BottomUpRootNode(this.selectedEvents(), {
       textFilter: this.textFilter(),
       filters: this.filtersWithoutTextFilter(),
@@ -1169,11 +1168,6 @@ export class BottomUpTimelineTreeView extends AggregatedTimelineTreeView {
       endTime: this.endTime,
       eventGroupIdCallback: this.groupingFunction(this.groupBySetting.get()),
     });
-=======
-    return new Trace.Extras.TraceTree.BottomUpRootNode(
-        this.selectedEvents(), this.textFilter(), this.filtersWithoutTextFilter(), this.startTime, this.endTime,
-        this.groupingFunction(this.groupBySetting.get()));
->>>>>>> 4ca08a94f6 (i see our ResourceFinish in the root nodes events)
   }
 }
 
