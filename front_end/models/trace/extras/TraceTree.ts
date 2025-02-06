@@ -553,7 +553,6 @@ export class BottomUpNode extends Node {
         {
           onStartEvent,
           onEndEvent,
-          // Not exactly sure why our transferSize never shows up in this onInstantEvent
           startTime: Helpers.Timing.milliToMicro(startTime),
           endTime: Helpers.Timing.milliToMicro(endTime),
           eventFilter: this.root.filter,
@@ -602,7 +601,6 @@ export class BottomUpNode extends Node {
       const totalTime = actualEndTime - Math.max(currentStartTime, lastTimeMarker);
       node.selfTime += selfTime || 0;
       node.totalTime += totalTime;
-      // something? nah dont think so. xfer size only goes up when we see those instant events.
       lastTimeMarker = actualEndTime;
     }
 
@@ -645,13 +643,7 @@ export function generateEventID(event: Types.Events.Event): string {
   if (Types.Events.isSyntheticNetworkRequest(event)) {
     return `networkreq:${event.args.data.requestId}`;
   }
-  if (Types.Events.isResourceReceivedData(event)) {
-    return `networkreq:${event.args.data.requestId}`;
-  }
-  if (Types.Events.isResourceFinish(event)) {
-    return `networkreq:${event.args.data.requestId}`;
-  }
-  if (Types.Events.isResourceReceiveResponse(event)) {
+  if (Types.Events.isReceivedDataEvent(event)) {
     return `networkreq:${event.args.data.requestId}`;
   }
 
