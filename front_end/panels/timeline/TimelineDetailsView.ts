@@ -134,13 +134,6 @@ export class TimelineDetailsPane extends
       view.addEventListener(
           TimelineTreeView.Events.TREE_ROW_HOVERED,
           node => this.dispatchEventToListeners(TimelineTreeView.Events.TREE_ROW_HOVERED, node.data));
-
-      // If there's a heaviest stack sidebar view, also listen to hover within it.
-      if (view instanceof AggregatedTimelineTreeView) {
-        view.stackView.addEventListener(
-            TimelineStackView.Events.TREE_ROW_HOVERED,
-            node => this.dispatchEventToListeners(TimelineTreeView.Events.TREE_ROW_HOVERED, node.data));
-      }
     });
     this.#thirdPartyTree.addEventListener(TimelineTreeView.Events.THIRD_PARTY_ROW_HOVERED, node => {
       this.dispatchEventToListeners(TimelineTreeView.Events.THIRD_PARTY_ROW_HOVERED, node.data);
