@@ -77,7 +77,6 @@ export function getNonResolvedURL(
     return entry.args.data.url as Platform.DevToolsPath.UrlString;
   }
 
-
   return null;
 }
 
