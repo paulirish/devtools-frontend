@@ -219,6 +219,7 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
     // To avoid showing [unattributed] in the 3P table. We'll magically treat all unattributed as 1P.
     // Is this fair? Not entirely, but mostly.  (How do you attribute the cost of a large recalc style??)
     const domainName = id ? this.eventToEntity(node.event) : this.entityMapper?.firstPartyEntity()?.name ?? '';
+    // TODO(aixba,paulirish): Use beautifyDomainName by extending AggregatedTimelineTreeView or something else.
     return {name: domainName || unattributed, color, icon: undefined};
   }
 

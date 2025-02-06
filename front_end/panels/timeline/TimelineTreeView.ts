@@ -917,7 +917,7 @@ export class AggregatedTimelineTreeView extends TimelineTreeView {
     }
   }
 
-  private beautifyDomainName(this: AggregatedTimelineTreeView, name: string): string {
+  beautifyDomainName(this: AggregatedTimelineTreeView, name: string): string {
     if (AggregatedTimelineTreeView.isExtensionInternalURL(name as Platform.DevToolsPath.UrlString)) {
       name = i18nString(UIStrings.chromeExtensionsOverhead);
     } else if (AggregatedTimelineTreeView.isV8NativeURL(name as Platform.DevToolsPath.UrlString)) {
@@ -947,9 +947,14 @@ export class AggregatedTimelineTreeView extends TimelineTreeView {
       }
 
       case AggregatedTimelineTreeView.GroupBy.Domain:
-      case AggregatedTimelineTreeView.GroupBy.Subdomain:
-      case AggregatedTimelineTreeView.GroupBy.ThirdParties: {
+      case AggregatedTimelineTreeView.GroupBy.Subdomain: {
         const domainName = id ? this.beautifyDomainName(id) : undefined;
+        return {name: domainName || unattributed, color, icon: undefined};
+      }
+
+      case AggregatedTimelineTreeView.GroupBy.ThirdParties: {
+        // Classify unattributed as 1st party.
+        const domainName = id ? this.beautifyDomainName(id) : this.entityMapper?.firstPartyEntity()?.name;
         return {name: domainName || unattributed, color, icon: undefined};
       }
 
