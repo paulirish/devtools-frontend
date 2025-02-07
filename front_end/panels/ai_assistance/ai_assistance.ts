@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+export * from './debug.js';
 export * from './agents/AiAgent.js';
 export * from './agents/FileAgent.js';
 export * from './agents/NetworkAgent.js';
@@ -14,3 +15,5 @@ export * from './components/ChatView.js';
 export * from './components/UserActionRow.js';
 export * from './EvaluateAction.js';
 export * from './ExtensionScope.js';
+export * from './data_formatters/FileFormatter.js';
+export * from './data_formatters/NetworkRequestFormatter.js';

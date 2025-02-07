@@ -423,6 +423,7 @@ export const generatedProperties = [
    "column-gap",
    "column-rule-break",
    "column-rule-color",
+   "column-rule-outset",
    "column-rule-style",
    "column-rule-width",
    "column-span",
@@ -436,6 +437,14 @@ export const generatedProperties = [
    "container-type",
    "content",
    "content-visibility",
+   "corner-bottom-left-shape",
+   "corner-bottom-right-shape",
+   "corner-end-end-shape",
+   "corner-end-start-shape",
+   "corner-start-end-shape",
+   "corner-start-start-shape",
+   "corner-top-left-shape",
+   "corner-top-right-shape",
    "counter-increment",
    "counter-reset",
    "counter-set",
@@ -622,12 +631,14 @@ export const generatedProperties = [
    "r",
    "range",
    "reading-flow",
+   "reading-order",
    "resize",
    "result",
    "right",
    "rotate",
    "row-gap",
    "row-rule-break",
+   "row-rule-outset",
    "ruby-align",
    "ruby-position",
    "rx",
@@ -1714,6 +1725,10 @@ export const generatedProperties = [
   "name": "column-rule-color"
  },
  {
+  "inherited": false,
+  "name": "column-rule-outset"
+ },
+ {
   "keywords": [
    "none",
    "hidden",
@@ -1827,6 +1842,30 @@ export const generatedProperties = [
    "hidden"
   ],
   "name": "content-visibility"
+ },
+ {
+  "name": "corner-bottom-left-shape"
+ },
+ {
+  "name": "corner-bottom-right-shape"
+ },
+ {
+  "name": "corner-end-end-shape"
+ },
+ {
+  "name": "corner-end-start-shape"
+ },
+ {
+  "name": "corner-start-end-shape"
+ },
+ {
+  "name": "corner-start-start-shape"
+ },
+ {
+  "name": "corner-top-left-shape"
+ },
+ {
+  "name": "corner-top-right-shape"
  },
  {
   "keywords": [
@@ -3439,6 +3478,9 @@ export const generatedProperties = [
   "name": "reading-flow"
  },
  {
+  "name": "reading-order"
+ },
+ {
   "keywords": [
    "none",
    "both",
@@ -3475,6 +3517,10 @@ export const generatedProperties = [
    "intersection"
   ],
   "name": "row-rule-break"
+ },
+ {
+  "inherited": false,
+  "name": "row-rule-outset"
  },
  {
   "inherited": true,

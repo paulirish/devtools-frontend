@@ -49,9 +49,13 @@ body {
   font-size: var(--source-code-font-size) !important; /* stylelint-disable-line declaration-no-important */
   white-space: pre-wrap;
 
-  &::selection {
+  &:not(input)::selection {
     color: var(--sys-color-on-surface);
   }
+}
+
+.source-code.breakpoint {
+  white-space: nowrap;
 }
 
 .source-code .devtools-link.text-button {
