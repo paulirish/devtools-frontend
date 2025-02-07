@@ -27,14 +27,6 @@ const longMilliseconds = defineFormatter({
   maximumFractionDigits: 0,
 });
 
-const narrowMicrosecondsInteger = defineFormatter({
-  style: 'unit',
-  unit: 'microsecond',
-  unitDisplay: 'narrow',
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 0,
-});
-
 const narrowMillisecondsDecimal = defineFormatter({
   style: 'unit',
   unit: 'millisecond',
@@ -114,9 +106,6 @@ export function millisToString(ms: number, higherResolution?: boolean): string {
     return '-';
   }
 
-  if (higherResolution && ms < 0.1) {
-    return narrowMicrosecondsInteger.format(ms * 1000);
-  }
   if (higherResolution && ms < 1000) {
     return narrowMillisecondsDecimal.format(ms);
   }
