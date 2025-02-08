@@ -43,7 +43,7 @@ for p in Path('$dist/models/trace/insights').rglob('*.js'):
     content = content.replace(needle, f'// {needle}')
 
     needle = 'const i18nString ='
-    content = content.replace(needle, 'const i18nString = string => string; //')
+    content = content.replace(needle, 'const i18nString = (i18nId, values) => ({i18nId, values}); //')
 
     p.write_text(content)
 
@@ -54,7 +54,7 @@ for p in Path('$dist/models').rglob('*.d.ts'):
     content = content.replace(needle, f'// {needle}')
 
     needle = 'Common.UIString.LocalizedString'
-    content = content.replace(needle, 'string')
+    content = content.replace(needle, '{i18nId: string, values: {[key: string]: string|number}, formattedDefault: string}')
 
     needle = 'import(\"../../../core/i18n/i18nTypes.js\").Values'
     content = content.replace(needle, 'Record<string, string>')
