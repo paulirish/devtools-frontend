@@ -45,6 +45,9 @@ for p in Path('$dist/models/trace/insights').rglob('*.js'):
     needle = 'const i18nString ='
     content = content.replace(needle, 'const i18nString = (i18nId, values) => ({i18nId, values}); //')
 
+    needle = 'i18n.ByteUtilities.bytesToString'
+    content = content.replace(needle, '(bytes => ({__i18nBytes: bytes}))')
+
     p.write_text(content)
 
 for p in Path('$dist/models').rglob('*.d.ts'):
