@@ -48,6 +48,8 @@ export function deps(): ['Meta', 'NetworkRequests', 'Renderer', 'ImagePainting']
 export type ThirdPartiesInsightModel = InsightModel<typeof UIStrings, {
   eventsByEntity: Map<Extras.ThirdParties.Entity, Types.Events.Event[]>,
   summaryByEntity: Map<Extras.ThirdParties.Entity, Extras.ThirdParties.Summary>,
+  summaryByUrl: Map<string, Extras.ThirdParties.Summary>,
+  urlsByEntity: Map<Extras.ThirdParties.Entity, Set<string>>,
   /** The entity for this navigation's URL. Any other entity is from a third party. */
   firstPartyEntity?: Extras.ThirdParties.Entity,
 }>;
@@ -103,6 +105,8 @@ export function generateInsight(
     relatedEvents: getRelatedEvents(thirdPartySummary, firstPartyEntity),
     eventsByEntity: thirdPartySummary.eventsByEntity,
     summaryByEntity: thirdPartySummary.byEntity,
+    summaryByUrl: thirdPartySummary.byUrl,
+    urlsByEntity: thirdPartySummary.urlsByEntity,
     firstPartyEntity,
   });
 }
