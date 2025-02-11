@@ -27,7 +27,12 @@ import {
   type TimelineSelection,
 } from './TimelineSelection.js';
 import {TimelineSelectorStatsView} from './TimelineSelectorStatsView.js';
-import {BottomUpTimelineTreeView, CallTreeTimelineTreeView, TimelineTreeView} from './TimelineTreeView.js';
+import {
+  AggregatedTimelineTreeView,
+  BottomUpTimelineTreeView,
+  CallTreeTimelineTreeView,
+  TimelineTreeView
+} from './TimelineTreeView.js';
 import {TimelineUIUtils} from './TimelineUIUtils.js';
 import * as Utils from './utils/utils.js';
 
@@ -132,8 +137,9 @@ export class TimelineDetailsPane extends
       this.dispatchEventToListeners(TimelineTreeView.Events.THIRD_PARTY_ROW_HOVERED, node.data);
     });
 
-    this.#thirdPartyTree.addEventListener(
-        TimelineTreeView.Events.BOTTOM_UP_BUTTON_CLICKED, node => this.#bottomUpClicked(node));
+    this.#thirdPartyTree.addEventListener(TimelineTreeView.Events.BOTTOM_UP_BUTTON_CLICKED, node => {
+      this.selectTab(Tab.BottomUp, node.data, AggregatedTimelineTreeView.GroupBy.ThirdParties);
+    });
 
     this.#networkRequestDetails =
         new TimelineComponents.NetworkRequestDetails.NetworkRequestDetails(this.detailsLinkifier);
@@ -147,35 +153,55 @@ export class TimelineDetailsPane extends
     this.lazySelectorStatsView = null;
   }
 
-  #bottomUpClicked(event: Common.EventTarget.EventTargetEvent<Trace.Extras.TraceTree.Node|null>): void {
-    // Select bottom up tree.
-    this.tabbedPane.selectTab(Tab.BottomUp, true, true);
-    if (!(this.tabbedPane.visibleView instanceof BottomUpTimelineTreeView)) {
-      return;
-    }
+  /**
+   * This selects a given tabbedPane tab.
+   * Additionally, if provided a node, we open that node and
+   * if a groupBySetting is included, we groupBy.
+   */
+  selectTab(tabName: Tab, node?: Trace.Extras.TraceTree.Node|null, groupBySetting?: AggregatedTimelineTreeView.GroupBy):
+      void {
+    this.tabbedPane.selectTab(tabName, true, true);
     /**
      * For a11y, ensure that the header is focused.
      */
     this.tabbedPane.focusSelectedTabHeader();
-    const bottomUp = this.tabbedPane.visibleView;
-    const thirdPartyNodeSelected = event.data;
-    if (!thirdPartyNodeSelected) {
-      return;
-    }
-    // Group by 3P.
-    bottomUp.setGroupBySetting(BottomUpTimelineTreeView.GroupBy.ThirdParties);
-    bottomUp.refreshTree();
 
-    // Look for the matching node in the bottom up tree using selected node event data.
-    const treeNode = bottomUp.eventToTreeNode.get(thirdPartyNodeSelected.event);
-    if (!treeNode) {
-      return;
-    }
-    bottomUp.selectProfileNode(treeNode, true);
-    // Reveal/expand the bottom up tree grid node.
-    const gridNode = bottomUp.dataGridNodeForTreeNode(treeNode);
-    if (gridNode) {
-      gridNode.expand();
+    switch (tabName) {
+      case Tab.Details: {
+        this.updateContentsFromWindow();
+        break;
+      }
+      case Tab.BottomUp: {
+        if (!(this.tabbedPane.visibleView instanceof BottomUpTimelineTreeView)) {
+          return;
+        }
+        // Set grouping if necessary.
+        const bottomUp = this.tabbedPane.visibleView;
+        if (groupBySetting) {
+          bottomUp.setGroupBySetting(groupBySetting);
+          bottomUp.refreshTree();
+        }
+
+        if (!node) {
+          return;
+        }
+
+        // Look for the matching node in the bottom up tree using selected node event data.
+        const treeNode = bottomUp.eventToTreeNode.get(node.event);
+        if (!treeNode) {
+          return;
+        }
+        bottomUp.selectProfileNode(treeNode, true);
+        // Reveal/expand the bottom up tree grid node.
+        const gridNode = bottomUp.dataGridNodeForTreeNode(treeNode);
+        if (gridNode) {
+          gridNode.expand();
+        }
+        break;
+      }
+      default: {
+        break;
+      }
     }
   }
 

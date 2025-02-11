@@ -68,6 +68,7 @@ import {AnnotationModifiedEvent, ModificationsManager} from './ModificationsMana
 import * as Overlays from './overlays/overlays.js';
 import {cpuprofileJsonGenerator, traceJsonGenerator} from './SaveFileFormatter.js';
 import {type Client, TimelineController} from './TimelineController.js';
+import {Tab} from './TimelineDetailsView.js';
 import type {TimelineFlameChartDataProvider} from './TimelineFlameChartDataProvider.js';
 import {Events as TimelineFlameChartViewEvents, TimelineFlameChartView} from './TimelineFlameChartView.js';
 import {TimelineHistoryManager} from './TimelineHistoryManager.js';
@@ -683,6 +684,12 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.#sideBar.element.addEventListener(TimelineInsights.SidebarInsight.InsightSetZoom.eventName, event => {
       TraceBounds.TraceBounds.BoundsManager.instance().setTimelineVisibleWindow(
           event.bounds, {ignoreMiniMapBounds: true, shouldAnimate: true});
+    });
+
+    this.#sideBar.element.addEventListener(TimelineInsights.SidebarInsight.TriggerSelectSummaryTab.eventName, () => {
+      // If we have a selection, we should remove it.
+      this.flameChart.setSelectionAndReveal(null);
+      this.flameChart.selectTab(Tab.Details);
     });
 
     this.onMemoryModeChanged();

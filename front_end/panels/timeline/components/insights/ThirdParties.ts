@@ -12,6 +12,7 @@ import * as Lit from '../../../../ui/lit/lit.js';
 import type * as Overlays from '../../overlays/overlays.js';
 
 import {BaseInsightComponent} from './BaseInsightComponent.js';
+import * as SidebarInsight from './SidebarInsight.js';
 
 const {UIStrings, i18nString} = Trace.Insights.Models.ThirdParties;
 
@@ -58,13 +59,16 @@ export class ThirdParties extends BaseInsightComponent<ThirdPartiesInsightModel>
       return Lit.nothing;
     }
 
+    // Have the Summary tab open when user opens this insight.
+    this.dispatchEvent(new SidebarInsight.TriggerSelectSummaryTab());
+
     const entries = [...this.model.summaryByEntity.entries()].filter(kv => kv[0] !== this.model?.firstPartyEntity);
     if (!entries.length) {
       return html`<div class="insight-section">${i18nString(UIStrings.noThirdParties)}</div>`;
     }
 
-    const topTransferSizeEntries = entries.sort((a, b) => b[1].transferSize - a[1].transferSize).slice(0, 6);
-    const topMainThreadTimeEntries = entries.sort((a, b) => b[1].mainThreadTime - a[1].mainThreadTime).slice(0, 6);
+    const topTransferSizeEntries = entries.sort((a, b) => b[1].transferSize - a[1].transferSize).slice(0, 3);
+    const topMainThreadTimeEntries = entries.sort((a, b) => b[1].mainThreadTime - a[1].mainThreadTime).slice(0, 3);
 
     const sections = [];
     if (topTransferSizeEntries.length) {

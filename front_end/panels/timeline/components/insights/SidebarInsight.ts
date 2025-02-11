@@ -56,6 +56,14 @@ export class InsightProvideOverlays extends Event {
   }
 }
 
+export class TriggerSelectSummaryTab extends Event {
+  static readonly eventName = 'triggerselectsummarytab';
+
+  constructor() {
+    super(TriggerSelectSummaryTab.eventName, {bubbles: true, composed: true});
+  }
+}
+
 declare global {
   interface GlobalEventHandlersEventMap {
     [InsightActivated.eventName]: InsightActivated;
@@ -63,5 +71,6 @@ declare global {
     [InsightSetHovered.eventName]: InsightSetHovered;
     [InsightSetZoom.eventName]: InsightSetZoom;
     [InsightProvideOverlays.eventName]: InsightProvideOverlays;
+    [TriggerSelectSummaryTab.eventName]: TriggerSelectSummaryTab;
   }
 }
