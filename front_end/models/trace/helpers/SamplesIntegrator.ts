@@ -458,12 +458,12 @@ export class SamplesIntegrator {
     return runtimeCallStatsEnabled && Boolean(SamplesIntegrator.nativeGroup(name));
   }
 
-  static nativeGroup(nativeName: string): 'Parse'|'Compile'|null {
+  static nativeGroup(nativeName: string): SamplesIntegrator.NativeGroups|null {
     if (nativeName.startsWith('Parse')) {
-      return 'Parse';
+      return SamplesIntegrator.NativeGroups.PARSE;
     }
     if (nativeName.startsWith('Compile') || nativeName.startsWith('Recompile')) {
-      return 'Compile';
+      return SamplesIntegrator.NativeGroups.COMPILE;
     }
     return null;
   }
@@ -495,5 +495,12 @@ export class SamplesIntegrator {
       stack[j++] = stack[i];
     }
     stack.length = j;
+  }
+}
+
+export namespace SamplesIntegrator {
+  export const enum NativeGroups {
+    COMPILE = 'Compile',
+    PARSE = 'Parse',
   }
 }

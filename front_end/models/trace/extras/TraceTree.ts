@@ -4,6 +4,7 @@
 
 import type * as Protocol from '../../../generated/protocol.js';
 import * as Helpers from '../helpers/helpers.js';
+import {SamplesIntegrator} from '../helpers/SamplesIntegrator.js';
 import * as Types from '../types/types.js';
 
 import {TimelineJSProfileProcessor} from './TimelineJSProfile.js';
@@ -591,8 +592,8 @@ export function eventStackFrame(event: Types.Events.Event): Protocol.Runtime.Cal
 
 export function generateEventID(event: Types.Events.Event): string {
   if (Types.Events.isProfileCall(event)) {
-    const name = TimelineJSProfileProcessor.isNativeRuntimeFrame(event.callFrame) ?
-        TimelineJSProfileProcessor.nativeGroup(event.callFrame.functionName) :
+    const name = SamplesIntegrator.isNativeRuntimeFrame(event.callFrame) ?
+        SamplesIntegrator.nativeGroup(event.callFrame.functionName) :
         event.callFrame.functionName;
     const location = event.callFrame.scriptId || event.callFrame.url || '';
     return `f:${name}@${location}`;

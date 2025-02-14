@@ -8,22 +8,9 @@ import type * as Protocol from '../../../generated/protocol.js';
 import * as Types from '../types/types.js';
 
 // TODO(paulirish): Delete this file.
-//   - Move isNativeRuntimeFrame and nativeGroup to TraceEvents.d.ts (or TraceTree)
 //   - Move createFakeTraceFromCpuProfile to TimelineLoader
 export class TimelineJSProfileProcessor {
-  static isNativeRuntimeFrame(frame: Protocol.Runtime.CallFrame): boolean {
-    return frame.url === 'native V8Runtime';
-  }
 
-  static nativeGroup(nativeName: string): string|null {
-    if (nativeName.startsWith('Parse')) {
-      return TimelineJSProfileProcessor.NativeGroups.PARSE;
-    }
-    if (nativeName.startsWith('Compile') || nativeName.startsWith('Recompile')) {
-      return TimelineJSProfileProcessor.NativeGroups.COMPILE;
-    }
-    return null;
-  }
 
   static createFakeTraceFromCpuProfile(profile: Protocol.Profiler.Profile, tid: Types.Events.ThreadID):
       Types.File.TraceFile {
@@ -70,12 +57,5 @@ export class TimelineJSProfileProcessor {
       events.push(event);
       return event;
     }
-  }
-}
-
-export namespace TimelineJSProfileProcessor {
-  export const enum NativeGroups {
-    COMPILE = 'Compile',
-    PARSE = 'Parse',
   }
 }
