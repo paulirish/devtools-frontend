@@ -50,7 +50,7 @@ devtools_entrypoint("bundle") {
     "../overlays/*",
 
     # only for use in tests
-    "../../../models/trace/handlers/*",
+    "../../../models/trace/*",
   ]
 }
 

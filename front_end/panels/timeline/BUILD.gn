@@ -148,7 +148,7 @@ devtools_entrypoint("bundle") {
     "../../../test/interactions/panels/performance/timeline/*",
     "../../../test/perf/*",
     "../../entrypoints/*",
-    "../../models/trace/handlers:unittests",
+    "../../models/trace:unittests",
     "../../panels/ai_assistance/*",
     "../../testing",
     "../../testing/*",

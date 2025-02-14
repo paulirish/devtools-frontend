@@ -100,7 +100,7 @@ devtools_entrypoint("bundle") {
     "..:*",
 
     # only for use in tests
-    "../../../models/trace/handlers/*",
+    "../../../models/trace/*",
     "../../../ui/components/docs/*",
   ]
 }
