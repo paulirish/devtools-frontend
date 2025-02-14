@@ -883,7 +883,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     if (this.#viewModesEquivalent(this.#viewMode, newMode)) {
       return;
     }
-
+    const start = performance.now();
     if (this.#viewMode.mode === 'VIEWING_TRACE') {
       // If the current / about to be "old" view was viewing a trace
       // we also uninstall any source maps resolver for the trace that was active.

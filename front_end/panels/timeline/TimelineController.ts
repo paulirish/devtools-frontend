@@ -177,8 +177,15 @@ export class TimelineController implements Trace.TracingManager.TracingManagerCl
     throttlingManager.setCPUThrottlingOption(SDK.CPUThrottlingManager.NoThrottlingOption);
 
     this.client.loadingStarted();
-    this.#fieldData = await this.fetchFieldData();
-    await this.waitForTracingToStop();
+
+    // Let target resumption and trace data collection race against eachother as they both take a while
+    // Field data won't take too long, but we'll keep it parallel as well.
+    const [fieldData] = await Promise.all([
+      this.fetchFieldData(),
+      this.waitForDataFullyCollected(),
+      SDK.TargetManager.TargetManager.instance().resumeAllTargets(),
+    ]);
+    this.#fieldData = fieldData;
 
     // Now we re-enable throttling again to maintain the setting being persistent.
     throttlingManager.setCPUThrottlingOption(optionDuringRecording);
@@ -209,7 +216,7 @@ export class TimelineController implements Trace.TracingManager.TracingManagerCl
         false, this.#recordingStartTime ?? undefined, emulatedDeviceTitle, this.#fieldData ?? undefined);
   }
 
-  private async waitForTracingToStop(): Promise<void> {
+  private async waitForDataFullyCollected(): Promise<void> {
     if (this.tracingManager) {
       await this.tracingCompletePromise?.promise;
     }
@@ -259,8 +266,6 @@ export class TimelineController implements Trace.TracingManager.TracingManagerCl
   }
 
   private async allSourcesFinished(): Promise<void> {
-    // TODO(crbug.com/366072294): Report the progress of this resumption, as it can be lengthy on heavy pages.
-    await SDK.TargetManager.TargetManager.instance().resumeAllTargets();
     Extensions.ExtensionServer.ExtensionServer.instance().profilingStopped();
 
     this.client.processingStarted();

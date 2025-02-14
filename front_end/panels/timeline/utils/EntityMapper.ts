@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Platform from '../../../core/platform/platform.js';
+import * as SDK from '../../../core/sdk/sdk.js';
 import type * as Protocol from '../../../generated/protocol.js';
 import * as Trace from '../../../models/trace/trace.js';
 
@@ -10,6 +12,7 @@ export class EntityMapper {
   #entityMappings: Trace.Handlers.Helpers.EntityMappings;
   #firstPartyEntity: Trace.Handlers.Helpers.Entity|null;
   #thirdPartyEvents: Trace.Types.Events.Event[] = [];
+  #executionContextNamesByOrigin = new Map<Platform.DevToolsPath.UrlString, string>();
   /**
    * When resolving urls and updating our entity mapping in the
    * SourceMapsResolver, a single call frame can appear multiple times
@@ -19,10 +22,20 @@ export class EntityMapper {
   #resolvedCallFrames: Set<Protocol.Runtime.CallFrame> = new Set();
 
   constructor(parsedTrace: Trace.Handlers.Types.ParsedTrace) {
+    const start = performance.now();
+
     this.#parsedTrace = parsedTrace;
     this.#entityMappings = this.#initializeEntityMappings(this.#parsedTrace);
     this.#firstPartyEntity = this.#findFirstPartyEntity();
     this.#thirdPartyEvents = this.#getThirdPartyEvents();
+
+    // Duplicated from AggregatedTimelineTreeView's updateExtensionResolver()
+    for (const runtimeModel of SDK.TargetManager.TargetManager.instance().models(SDK.RuntimeModel.RuntimeModel)) {
+      for (const context of runtimeModel.executionContexts()) {
+        this.#executionContextNamesByOrigin.set(context.origin, context.name);
+      }
+    }
+    performance.measure('entitymapper', {start, end: performance.now()});
   }
 
   /**

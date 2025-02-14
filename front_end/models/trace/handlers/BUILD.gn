@@ -51,7 +51,7 @@ devtools_module("handlers") {
     "../../../third_party/third-party-web:bundle",
     "../../cpu_profile:bundle",
     "../helpers:bundle",
-    "../types:bundle",
+    "../types:types",
   ]
 }
 

@@ -90,10 +90,12 @@ export class TargetManager extends Common.ObjectWrapper.ObjectWrapper<EventTypes
     if (!this.#isSuspended) {
       return;
     }
+    const start = performance.now();
     this.#isSuspended = false;
     this.dispatchEventToListeners(Events.SUSPEND_STATE_CHANGED);
     const resumePromises = Array.from(this.#targetsInternal.values(), target => target.resume());
     await Promise.all(resumePromises);
+    performance.measure('resumeAllTargets', {start, end: performance.now()});
   }
 
   allTargetsSuspended(): boolean {
