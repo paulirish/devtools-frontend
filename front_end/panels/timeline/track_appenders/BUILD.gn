@@ -23,7 +23,6 @@ ts_library("unittests") {
 
   deps = [
     "../../../core/sdk:bundle",
-    "../../../models/timeline_model:bundle",
     "../../../models/trace:unittests",
     "../../../panels/timeline:bundle",
     "../../../testing",
