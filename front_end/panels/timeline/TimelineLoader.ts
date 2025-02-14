@@ -261,14 +261,63 @@ export class TimelineLoader implements Common.StringOutputStream.OutputStream {
   }
 
   #parseCPUProfileFormatFromFile(parsedTrace: Protocol.Profiler.Profile): void {
-    const traceFile = Trace.Extras.TimelineJSProfile.TimelineJSProfileProcessor.createFakeTraceFromCpuProfile(
-        parsedTrace, Trace.Types.Events.ThreadID(1));
+    const traceFile = TimelineLoader.createFakeTraceFromCpuProfile(parsedTrace, Trace.Types.Events.ThreadID(1));
 
     this.#collectEvents(traceFile.traceEvents);
   }
 
   #collectEvents(events: readonly Trace.Types.Events.Event[]): void {
     this.#collectedEvents = this.#collectedEvents.concat(events);
+  }
+
+  static createFakeTraceFromCpuProfile(profile: Protocol.Profiler.Profile, tid: Trace.Types.Events.ThreadID):
+      Trace.Types.File.TraceFile {
+    const events: Trace.Types.Events.Event[] = [];
+
+    const threadName = `Thread ${tid}`;
+    appendEvent('TracingStartedInPage', {data: {sessionId: '1'}}, 0, 0, Trace.Types.Events.Phase.METADATA);
+    appendEvent(
+        Trace.Types.Events.Name.THREAD_NAME, {name: threadName}, 0, 0, Trace.Types.Events.Phase.METADATA, '__metadata');
+    if (!profile) {
+      return {traceEvents: events, metadata: {}};
+    }
+
+    // Append a root to show the start time of the profile (which is earlier than first sample), so the Performance
+    // panel won't truncate this time period.
+    // 'JSRoot' doesn't exist in the new engine and is not the name of an actual trace event, but changing it might break other trace processing tools that rely on this, so we stick with this name.
+    // TODO(crbug.com/341234884): consider removing this or clarify why it's required.
+    appendEvent(
+        'JSRoot', {}, profile.startTime, profile.endTime - profile.startTime, Trace.Types.Events.Phase.COMPLETE,
+        'toplevel');
+
+    // TODO: create a `Profile` event instead, as `cpuProfile` is legacy
+    appendEvent('CpuProfile', {data: {cpuProfile: profile}}, profile.endTime, 0, Trace.Types.Events.Phase.COMPLETE);
+    return {
+      traceEvents: events,
+      metadata: {
+        dataOrigin: Trace.Types.File.DataOrigin.CPU_PROFILE,
+      }
+    };
+
+    function appendEvent(
+        name: string, args: any, ts: number, dur?: number, ph?: Trace.Types.Events.Phase,
+        cat?: string): Trace.Types.Events.Event {
+      const event: Trace.Types.Events.Event = {
+        cat: cat || 'disabled-by-default-devtools.timeline',
+        name,
+        ph: ph || Trace.Types.Events.Phase.COMPLETE,
+        pid: Trace.Types.Events.ProcessID(1),
+        tid,
+        ts: Trace.Types.Timing.Micro(ts),
+        args,
+      };
+
+      if (dur) {
+        event.dur = Trace.Types.Timing.Micro(dur);
+      }
+      events.push(event);
+      return event;
+    }
   }
 }
 
