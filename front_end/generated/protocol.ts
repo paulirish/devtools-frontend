@@ -10684,7 +10684,7 @@ export namespace Network {
     /**
      * Raw response headers as they were received over the wire.
      * Duplicate headers in the response are represented as a single key with their values
-     * concatenated using `\n` as the separator.
+     * concatentated using `\n` as the separator.
      * See also `headersText` that contains verbatim text for HTTP/1.*.
      */
     headers: Headers;
@@ -10733,7 +10733,7 @@ export namespace Network {
     /**
      * Raw response headers as they were received over the wire.
      * Duplicate headers in the response are represented as a single key with their values
-     * concatenated using `\n` as the separator.
+     * concatentated using `\n` as the separator.
      * See also `headersText` that contains verbatim text for HTTP/1.*.
      */
     headers: Headers;
@@ -12455,7 +12455,7 @@ export namespace Page {
     dir?: string;
     display?: string;
     /**
-     * The overrode display mode controlled by the user.
+     * The overrided display mode controlled by the user.
      */
     displayOverrides?: string[];
     /**
@@ -19446,7 +19446,7 @@ export namespace Profiler {
   /**
    * Reports coverage delta since the last poll (either from an event like this, or from
    * `takePreciseCoverage` for the current isolate. May only be sent if precise code
-   * coverage has been started. This event can be triggered by the embedder to, for example,
+   * coverage has been started. This event can be trigged by the embedder to, for example,
    * trigger collection of coverage data immediately at a certain point in time.
    */
   export interface PreciseCoverageDeltaUpdateEvent {
@@ -20090,7 +20090,7 @@ export namespace Runtime {
     silent?: boolean;
     /**
      * Whether the result is expected to be a JSON object which should be sent by value.
-     * Can be overridden by `serializationOptions`.
+     * Can be overriden by `serializationOptions`.
      */
     returnByValue?: boolean;
     /**
@@ -20236,7 +20236,7 @@ export namespace Runtime {
     disableBreaks?: boolean;
     /**
      * Setting this flag to true enables `let` re-declaration and top-level `await`.
-     * Note that `let` variables can only be redeclared if they originate from
+     * Note that `let` variables can only be re-declared if they originate from
      * `replMode` themselves.
      */
     replMode?: boolean;
