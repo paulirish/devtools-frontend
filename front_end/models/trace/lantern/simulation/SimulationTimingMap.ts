@@ -10,6 +10,8 @@
  * as nodes are queued, partially simulated, and completed.
  */
 
+import * as Core from '../core/core.js';
+import * as Graph from '../graph/graph.js';
 
 interface NodeTimingComplete {
   startTime: number;

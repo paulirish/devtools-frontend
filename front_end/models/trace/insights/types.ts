@@ -4,6 +4,8 @@
 
 import type * as Common from '../../../core/common/common.js';
 import type * as Protocol from '../../../generated/protocol.js';
+import type * as Handlers from '../handlers/handlers.js';
+import type * as Lantern from '../lantern/lantern.js';
 import type * as Types from '../types/types.js';
 
 import type * as Models from './Models.js';

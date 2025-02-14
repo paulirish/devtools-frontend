@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 import * as i18n from '../../../core/i18n/i18n.js';
+import * as Extras from '../extras/extras.js';
+import * as Helpers from '../helpers/helpers.js';
 
 import {
   InsightCategory,

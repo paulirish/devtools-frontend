@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import {TraceLoader} from '../../../../testing/TraceLoader.js';
+import * as Lantern from '../lantern.js';
 import {getComputationDataFromFixture, toLanternTrace} from '../testing/testing.js';
 
 const {Interactive, FirstContentfulPaint, LargestContentfulPaint} = Lantern.Metrics;

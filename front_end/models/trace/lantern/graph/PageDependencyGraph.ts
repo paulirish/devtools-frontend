@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Core from '../core/core.js';
+import type * as Lantern from '../types/types.js';
 
 import type {Node} from './BaseNode.js';
 import {CPUNode} from './CPUNode.js';

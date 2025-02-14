@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import type * as Protocol from '../../../generated/protocol.js';
+import * as Helpers from '../helpers/helpers.js';
 import * as Types from '../types/types.js';
 
 import {TimelineJSProfileProcessor} from './TimelineJSProfile.js';

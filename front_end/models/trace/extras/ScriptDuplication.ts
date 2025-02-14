@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import type * as SDK from '../../../core/sdk/sdk.js';
+import type * as Handlers from '../handlers/handlers.js';
 
 const RELATIVE_SIZE_THRESHOLD = 0.1;
 const ABSOLUTE_SIZE_THRESHOLD_BYTES = 1024 * 0.5;

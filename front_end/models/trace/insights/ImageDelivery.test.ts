@@ -5,6 +5,7 @@
 import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
 import {getFirstOrError, getInsightOrError, processTrace} from '../../../testing/InsightHelpers.js';
 
+import * as Insights from './insights.js';
 
 const {ImageOptimizationType} = Insights.Models.ImageDelivery;
 

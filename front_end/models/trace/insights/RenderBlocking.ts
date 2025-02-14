@@ -4,6 +4,9 @@
 
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Protocol from '../../../generated/protocol.js';
+import * as Handlers from '../handlers/handlers.js';
+import * as Helpers from '../helpers/helpers.js';
+import type * as Lantern from '../lantern/lantern.js';
 import type * as Types from '../types/types.js';
 
 import {

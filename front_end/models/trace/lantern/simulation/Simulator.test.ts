@@ -5,6 +5,7 @@
 import type * as Protocol from '../../../../generated/protocol.js';
 import {TraceLoader} from '../../../../testing/TraceLoader.js';
 import * as Trace from '../../trace.js';
+import * as Lantern from '../lantern.js';
 import {runTrace, toLanternTrace} from '../testing/testing.js';
 
 const {NetworkNode, CPUNode} = Lantern.Graph;

@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Core from '../core/core.js';
+import * as Graph from '../graph/graph.js';
+import type * as Lantern from '../types/types.js';
 
 import {ConnectionPool} from './ConnectionPool.js';
 import {Constants} from './Constants.js';

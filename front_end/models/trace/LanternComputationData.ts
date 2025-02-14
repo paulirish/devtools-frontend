@@ -4,6 +4,8 @@
 
 import * as Protocol from '../../generated/protocol.js';
 
+import * as Handlers from './handlers/handlers.js';
+import * as Lantern from './lantern/lantern.js';
 import type * as Types from './types/types.js';
 
 type NetworkRequest = Lantern.Types.NetworkRequest<Types.Events.SyntheticNetworkRequest>;

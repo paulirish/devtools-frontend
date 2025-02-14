@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import * as Trace from '../../trace.js';
+import * as Lantern from '../lantern.js';
 
 function toLanternTrace(traceEvents: readonly Trace.Types.Events.Event[]): Lantern.Types.Trace {
   return {

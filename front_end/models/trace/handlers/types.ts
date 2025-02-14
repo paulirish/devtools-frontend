@@ -2,18 +2,16 @@
 // Copyright 2022 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-
-import type * as Configuration from '../types/Configuration.js';
-
+import type * as Types from './../types/types.js';
 import type * as ModelHandlers from './ModelHandlers.js';
 
 export interface Handler {
   reset(): void;
   handleEvent(data: {}): void;
-  finalize(options?: Configuration.ParseOptions): Promise<void>;
+  finalize(options?: Types.Configuration.ParseOptions): Promise<void>;
   data(): unknown;
   deps?(): HandlerName[];
-  handleUserConfig?(config: Configuration.Configuration): void;
+  handleUserConfig?(config: Types.Configuration.Configuration): void;
 }
 
 export type HandlerName = keyof typeof ModelHandlers;

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Graph from '../graph/graph.js';
 import type * as Types from '../types/types.js';
 
 import {Metric, type MetricCoefficients} from './Metric.js';
