@@ -20,7 +20,6 @@ devtools_module("trace") {
     "extras/ScriptDuplication.ts",
     "extras/StackTraceForEvent.ts",
     "extras/ThirdParties.ts",
-    "extras/TimelineJSProfile.ts",
     "extras/TraceFilter.ts",
     "extras/TraceTree.ts",
     "extras/extras.ts",

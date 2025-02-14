@@ -7,7 +7,6 @@ import * as Helpers from '../helpers/helpers.js';
 import {SamplesIntegrator} from '../helpers/SamplesIntegrator.js';
 import * as Types from '../types/types.js';
 
-import {TimelineJSProfileProcessor} from './TimelineJSProfile.js';
 import type {TraceFilter} from './TraceFilter.js';
 
 export class Node {
