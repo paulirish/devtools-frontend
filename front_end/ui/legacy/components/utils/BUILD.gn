@@ -34,7 +34,6 @@ devtools_module("utils") {
     "../../../../models/bindings:bundle",
     "../../../../models/breakpoints:bundle",
     "../../../../models/text_utils:bundle",
-    "../../../../models/trace:bundle",
     "../../../../models/workspace:bundle",
     "../../../../ui/legacy:bundle",
   ]
