@@ -115,22 +115,17 @@ devtools_module("trace") {
   ]
 
   deps = [
-    "../../../core/common:bundle",
-    "../../../core/platform:bundle",
-    "../../../core/root:bundle",
-    "../../../core/sdk:bundle",
-    "../../../generated",
-    "../../../generated:protocol",
-    "../../../models/cpu_profile:bundle",
-    "../../../third_party/third-party-web:bundle",
     "../../core/common:bundle",
     "../../core/platform:bundle",
+    "../../core/root:bundle",
     "../../core/sdk:bundle",
-    "../../cpu_profile:bundle",
-    "../../crux-manager:bundle",
+    "../../generated",
+    "../../generated:protocol",
     "../../generated:protocol",
     "../../testing",
+    "../../third_party/third-party-web:bundle",
     "../cpu_profile:bundle",
+    "../crux-manager:bundle",
   ]
 }
 
