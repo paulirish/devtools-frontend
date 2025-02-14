@@ -989,7 +989,8 @@ export class TimelineUIUtils {
       lineNumber: frame.lineNumber,
     };
     if (isFreshRecording) {
-      return linkifier.maybeLinkifyConsoleCallFrame(target, frame, {showColumnNumber: true, inlineFrameIndex: 0});
+      return linkifier.maybeLinkifyConsoleCallFrame(
+          target, frame as Protocol.Runtime.CallFrame, {showColumnNumber: true, inlineFrameIndex: 0});
     }
     return LegacyComponents.Linkifier.Linkifier.linkifyURL(frame.url as Platform.DevToolsPath.UrlString, options);
   }

@@ -7,6 +7,7 @@ import '../../../ui/components/request_link_icon/request_link_icon.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import type * as Platform from '../../../core/platform/platform.js';
 import * as SDK from '../../../core/sdk/sdk.js';
+import type * as Protocol from '../../../generated/protocol.js';
 import * as Helpers from '../../../models/trace/helpers/helpers.js';
 import * as Trace from '../../../models/trace/trace.js';
 import * as LegacyComponents from '../../../ui/legacy/components/utils/utils.js';
@@ -255,7 +256,8 @@ export class NetworkRequestDetails extends HTMLElement {
       const topFrame = Trace.Helpers.Trace.getZeroIndexedStackTraceForEvent(this.#networkRequest)?.at(0) ?? null;
       if (topFrame) {
         const link = this.#linkifier.maybeLinkifyConsoleCallFrame(
-            this.#maybeTarget, topFrame, {tabStop: true, inlineFrameIndex: 0, showColumnNumber: true});
+            this.#maybeTarget, topFrame as Protocol.Runtime.CallFrame,
+            {tabStop: true, inlineFrameIndex: 0, showColumnNumber: true});
         if (link) {
           return this.#renderRow(i18nString(UIStrings.initiatedBy), link);
         }
