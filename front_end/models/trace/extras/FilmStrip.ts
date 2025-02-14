@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 //
 import * as Platform from '../../../core/platform/platform.js';
-import type * as Handlers from '../handlers/handlers.js';
 import type * as Types from '../types/types.js';
 
 export interface Data {

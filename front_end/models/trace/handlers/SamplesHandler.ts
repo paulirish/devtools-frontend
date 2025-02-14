@@ -5,7 +5,6 @@
 import * as Platform from '../../../core/platform/platform.js';
 import type * as Protocol from '../../../generated/protocol.js';
 import * as CPUProfile from '../../cpu_profile/cpu_profile.js';
-import * as Helpers from '../helpers/helpers.js';
 import * as Types from '../types/types.js';
 
 const events = new Map<Types.Events.ProcessID, Map<Types.Events.ThreadID, Types.Events.Complete[]>>();

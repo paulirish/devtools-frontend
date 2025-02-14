@@ -3,8 +3,6 @@
 // found in the LICENSE file.
 
 import * as ThirdPartyWeb from '../../../third_party/third-party-web/third-party-web.js';
-import * as Handlers from '../handlers/handlers.js';
-import * as Helpers from '../helpers/helpers.js';
 import * as Types from '../types/types.js';
 
 export type Entity = typeof ThirdPartyWeb.ThirdPartyWeb.entities[number];

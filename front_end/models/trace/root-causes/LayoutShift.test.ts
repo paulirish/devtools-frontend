@@ -9,7 +9,6 @@ import {
 import {getBaseTraceParseModelData} from '../../../testing/TraceHelpers.js';
 import * as Trace from '../trace.js';
 
-import * as RootCauses from './RootCauses.js';
 
 type ParsedTrace = Trace.Handlers.Types.ParsedTrace;
 type ParsedTraceMutable = Trace.Handlers.Types.ParsedTraceMutable;

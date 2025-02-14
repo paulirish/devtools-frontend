@@ -2,9 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as Core from '../core/core.js';
-import * as Graph from '../graph/graph.js';
-import type * as Simulation from '../simulation/simulation.js';
 
 import {
   type Extras,

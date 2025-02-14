@@ -1,13 +1,10 @@
 // Copyright 2023 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-import * as Handlers from './handlers/handlers.js';
-import * as Helpers from './helpers/helpers.js';
-import * as Insights from './insights/insights.js';
-import * as Lantern from './lantern/lantern.js';
-import * as LanternComputationData from './LanternComputationData.js';
+import * as ModelHandlers from './handlers/ModelHandlers.js';
+import type {Handlers, ParsedTrace} from './handlers/types.js';
+import type {TraceInsightSets} from './insights/types.js';
 import type * as Model from './ModelImpl.js';
-import * as Types from './types/types.js';
 
 const enum Status {
   IDLE = 'IDLE',
@@ -52,17 +49,17 @@ declare global {
 export class TraceProcessor extends EventTarget {
   // We force the Meta handler to be enabled, so the TraceHandlers type here is
   // the model handlers the user passes in and the Meta handler.
-  readonly #traceHandlers: Partial<Handlers.Types.Handlers>;
+  readonly #traceHandlers: Partial<Handlers>;
   #status = Status.IDLE;
   #modelConfiguration = Types.Configuration.defaults();
-  #data: Handlers.Types.ParsedTrace|null = null;
-  #insights: Insights.Types.TraceInsightSets|null = null;
+  #data: ParsedTrace|null = null;
+  #insights: TraceInsightSets|null = null;
 
   static createWithAllHandlers(): TraceProcessor {
-    return new TraceProcessor(Handlers.ModelHandlers, Types.Configuration.defaults());
+    return new TraceProcessor(ModelHandlers, Types.Configuration.defaults());
   }
 
-  static getEnabledInsightRunners(parsedTrace: Handlers.Types.ParsedTrace): Partial<Insights.Types.InsightModelsType> {
+  static getEnabledInsightRunners(parsedTrace: ParsedTrace): Partial<Insights.Types.InsightModelsType> {
     const enabledInsights = {} as Insights.Types.InsightModelsType;
     for (const [name, insight] of Object.entries(Insights.Models)) {
       const deps = insight.deps();
@@ -74,12 +71,12 @@ export class TraceProcessor extends EventTarget {
     return enabledInsights;
   }
 
-  constructor(traceHandlers: Partial<Handlers.Types.Handlers>, modelConfiguration?: Types.Configuration.Configuration) {
+  constructor(traceHandlers: Partial<Handlers>, modelConfiguration?: Types.Configuration.Configuration) {
     super();
 
     this.#verifyHandlers(traceHandlers);
     this.#traceHandlers = {
-      Meta: Handlers.ModelHandlers.Meta,
+      Meta: ModelHandlers.Meta,
       ...traceHandlers,
     };
     if (modelConfiguration) {
@@ -105,13 +102,13 @@ export class TraceProcessor extends EventTarget {
    * BarHandler too. This method verifies that all dependencies are met, and
    * throws if not.
    **/
-  #verifyHandlers(providedHandlers: Partial<Handlers.Types.Handlers>): void {
+  #verifyHandlers(providedHandlers: Partial<Handlers>): void {
     // Tiny optimisation: if the amount of provided handlers matches the amount
-    // of handlers in the Handlers.ModelHandlers object, that means that the
+    // of handlers in the ModelHandlers object, that means that the
     // user has passed in every handler we have. So therefore they cannot have
     // missed any, and there is no need to iterate through the handlers and
     // check the dependencies.
-    if (Object.keys(providedHandlers).length === Object.keys(Handlers.ModelHandlers).length) {
+    if (Object.keys(providedHandlers).length === Object.keys(ModelHandlers).length) {
       return;
     }
     const requiredHandlerKeys: Set<Handlers.Types.HandlerName> = new Set();
@@ -251,10 +248,10 @@ export class TraceProcessor extends EventTarget {
     }
     this.dispatchEvent(new TraceParseProgressEvent({percent: ProgressPhase.CLONE}));
 
-    this.#data = parsedTrace as Handlers.Types.ParsedTrace;
+    this.#data = parsedTrace as ParsedTrace;
   }
 
-  get parsedTrace(): Handlers.Types.ParsedTrace|null {
+  get parsedTrace(): ParsedTrace|null {
     if (this.#status !== Status.FINISHED_PARSING) {
       return null;
     }
@@ -262,7 +259,7 @@ export class TraceProcessor extends EventTarget {
     return this.#data;
   }
 
-  get insights(): Insights.Types.TraceInsightSets|null {
+  get insights(): TraceInsightSets|null {
     if (this.#status !== Status.FINISHED_PARSING) {
       return null;
     }
@@ -271,7 +268,7 @@ export class TraceProcessor extends EventTarget {
   }
 
   #createLanternContext(
-      parsedTrace: Handlers.Types.ParsedTrace, traceEvents: readonly Types.Events.Event[], frameId: string,
+      parsedTrace: ParsedTrace, traceEvents: readonly Types.Events.Event[], frameId: string,
       navigationId: string): Insights.Types.LanternContext|undefined {
     // Check for required handlers.
     if (!parsedTrace.NetworkRequests || !parsedTrace.Workers || !parsedTrace.PageLoadMetrics) {
@@ -333,9 +330,8 @@ export class TraceProcessor extends EventTarget {
    * Sort the insight models based on the impact of each insight's estimated savings, additionally weighted by the
    * worst metrics according to field data (if present).
    */
-  sortInsightSet(
-      insights: Insights.Types.TraceInsightSets, insightSet: Insights.Types.InsightSet,
-      metadata: Types.File.MetaData|null): void {
+  sortInsightSet(insights: TraceInsightSets, insightSet: Insights.Types.InsightSet, metadata: Types.File.MetaData|null):
+      void {
     // The initial order of the insights is alphabetical, based on `front_end/models/trace/insights/Models.ts`.
     // The order here provides a baseline that groups insights in a more logical way.
     const baselineOrder: Record<keyof Insights.Types.InsightModels, null> = {
@@ -427,9 +423,8 @@ export class TraceProcessor extends EventTarget {
   }
 
   #computeInsightSet(
-      insights: Insights.Types.TraceInsightSets, parsedTrace: Handlers.Types.ParsedTrace,
-      insightRunners: Partial<typeof Insights.Models>, context: Insights.Types.InsightSetContext,
-      options: Types.Configuration.ParseOptions): void {
+      insights: TraceInsightSets, parsedTrace: ParsedTrace, insightRunners: Partial<typeof Insights.Models>,
+      context: Insights.Types.InsightSetContext, options: Types.Configuration.ParseOptions): void {
     const model = {} as Insights.Types.InsightSet['model'];
 
     for (const [name, insight] of Object.entries(insightRunners)) {
@@ -477,7 +472,7 @@ export class TraceProcessor extends EventTarget {
    * Run all the insights and set the result to `#insights`.
    */
   #computeInsights(
-      parsedTrace: Handlers.Types.ParsedTrace, traceEvents: readonly Types.Events.Event[],
+      parsedTrace: ParsedTrace, traceEvents: readonly Types.Events.Event[],
       options: Types.Configuration.ParseOptions): void {
     this.#insights = new Map();
 

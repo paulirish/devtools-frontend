@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 import * as Platform from '../../../core/platform/platform.js';
-import * as Helpers from '../helpers/helpers.js';
 import * as Types from '../types/types.js';
 
 import {type AuctionWorkletsData, data as auctionWorkletsData} from './AuctionWorkletsHandler.js';

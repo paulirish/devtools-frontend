@@ -4,7 +4,6 @@
 
 import {TraceLoader} from '../../../../testing/TraceLoader.js';
 import * as Trace from '../../trace.js';
-import * as Lantern from '../lantern.js';
 import {runTrace, toLanternTrace} from '../testing/testing.js';
 
 const {NetworkAnalyzer} = Lantern.Core;

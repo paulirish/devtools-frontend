@@ -14,7 +14,6 @@
  */
 
 import * as Platform from '../../../core/platform/platform.js';
-import * as Helpers from '../helpers/helpers.js';
 import * as Types from '../types/types.js';
 
 import {data as metaHandlerData} from './MetaHandler.js';

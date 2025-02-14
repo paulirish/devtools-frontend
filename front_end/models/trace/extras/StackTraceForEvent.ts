@@ -3,8 +3,6 @@
 // found in the LICENSE file.
 
 import type * as Protocol from '../../../generated/protocol.js';
-import type * as Handlers from '../handlers/handlers.js';
-import type * as Helpers from '../helpers/helpers.js';
 import * as Types from '../types/types.js';
 
 export const stackTraceForEventInTrace =

@@ -3,8 +3,6 @@
 // found in the LICENSE file.
 
 import type * as CrUXManager from '../../crux-manager/crux-manager.js';
-import * as Helpers from '../helpers/helpers.js';
-import type * as Lantern from '../lantern/lantern.js';
 import * as Types from '../types/types.js';
 
 import {getLogNormalScore} from './Statistics.js';

@@ -5,7 +5,6 @@
 import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
 import {getFirstOrError, processTrace} from '../../../testing/InsightHelpers.js';
 
-import * as Insights from './insights.js';
 
 const {calculateMetricWeightsForSorting} = Insights.Common;
 

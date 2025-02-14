@@ -4,9 +4,6 @@
 
 import * as Platform from '../../core/platform/platform.js';
 
-import * as Handlers from './handlers/handlers.js';
-import * as Helpers from './helpers/helpers.js';
-import type * as Insights from './insights/insights.js';
 import {TraceParseProgressEvent, TraceProcessor} from './Processor.js';
 import * as Types from './types/types.js';
 

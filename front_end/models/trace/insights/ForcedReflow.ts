@@ -5,7 +5,6 @@
 import * as i18n from '../../../core/i18n/i18n.js';
 import type * as Protocol from '../../../generated/protocol.js';
 import type {Warning} from '../handlers/WarningsHandler.js';
-import * as Helpers from '../helpers/helpers.js';
 import * as Types from '../types/types.js';
 
 import {

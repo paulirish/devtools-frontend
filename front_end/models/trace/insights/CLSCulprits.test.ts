@@ -4,7 +4,6 @@
 
 import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
 import {getFirstOrError, getInsightOrError, processTrace} from '../../../testing/InsightHelpers.js';
-import * as Helpers from '../helpers/helpers.js';
 import * as Types from '../types/types.js';
 
 import {Models} from './insights.js';

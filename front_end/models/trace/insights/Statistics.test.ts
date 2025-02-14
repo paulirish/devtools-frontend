@@ -10,7 +10,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as Insights from './insights.js';
 
 const {getLogNormalScore} = Insights.Statistics;
 
