@@ -18,6 +18,8 @@ This naming strategy is a firm rule, there are no exceptions and **all new folde
 
 Entrypoints are used to export what is considered the public API of a module and thus is what other modules can depend on. If you have code that you only want to be available within one module, you can define it in that module and not expose it in the entrypoint.
 
+Modules do not need to be 1:1 with folder structure. It's likely preferred to have just one module per model/panel, as going per-folder will add friction to refactors and will also slow down the load the devtools front-end for users.
+
 ## Depending on other modules
 
 Let's imagine you are in `front_end/panels/timeline` and you need to depend on some code from `front_end/core/sdk`. When you need to depend on code from another module, you **must import and refer to that module via its entrypoint**:
