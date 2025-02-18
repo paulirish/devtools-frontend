@@ -5,6 +5,7 @@ import * as SDK from '../core/sdk/sdk.js';
 import type * as Protocol from '../generated/protocol.js';
 import * as Bindings from '../models/bindings/bindings.js';
 import * as CPUProfile from '../models/cpu_profile/cpu_profile.js';
+import {EntityMapper} from '../models/trace/handlers/Entities.js';
 import * as Trace from '../models/trace/trace.js';
 import * as Workspace from '../models/workspace/workspace.js';
 import * as Timeline from '../panels/timeline/timeline.js';
@@ -49,12 +50,11 @@ export async function getMainFlameChartWithTracks(
 
   // This function is used to load a component example.
   const {parsedTrace} = await TraceLoader.traceEngine(/* context= */ null, traceFileName);
-  const entityMapper = new Timeline.Utils.EntityMapper.EntityMapper(parsedTrace);
 
   const dataProvider = new Timeline.TimelineFlameChartDataProvider.TimelineFlameChartDataProvider();
   // The data provider still needs a reference to the legacy model to
   // work properly.
-  dataProvider.setModel(parsedTrace, entityMapper);
+  dataProvider.setModel(parsedTrace);
   const tracksAppender = dataProvider.compatibilityTracksAppenderInstance();
   tracksAppender.setVisibleTracks(trackAppenderNames);
   dataProvider.buildFromTrackAppendersForTest(
@@ -84,11 +84,10 @@ export async function getNetworkFlameChart(traceFileName: string, expanded: bool
   await initializeGlobalVars();
 
   const {parsedTrace} = await TraceLoader.traceEngine(/* context= */ null, traceFileName);
-  const entityMapper = new Timeline.Utils.EntityMapper.EntityMapper(parsedTrace);
   const minTime = Trace.Helpers.Timing.microToMilli(parsedTrace.Meta.traceBounds.min);
   const maxTime = Trace.Helpers.Timing.microToMilli(parsedTrace.Meta.traceBounds.max);
   const dataProvider = new Timeline.TimelineFlameChartNetworkDataProvider.TimelineFlameChartNetworkDataProvider();
-  dataProvider.setModel(parsedTrace, entityMapper);
+  dataProvider.setModel(parsedTrace);
   dataProvider.setWindowTimes(minTime, maxTime);
   dataProvider.timelineData().groups.forEach(group => {
     group.expanded = expanded;
@@ -493,7 +492,7 @@ export function makeMockEntityData(events: Trace.Types.Events.Event[]): Trace.Ha
   const createdEntityCache = new Map<string, Trace.Handlers.Entities.Entity>();
 
   events.forEach(event => {
-    const entity = Trace.Handlers.Helpers.getEntityForEvent(event, createdEntityCache);
+    const entity = Trace.Handlers.Entities.getEntityForEvent(event, createdEntityCache);
     if (!entity) {
       return;
     }
@@ -595,7 +594,7 @@ export function getMainThread(data: Trace.Handlers.ModelHandlers.Renderer.Render
 type ParsedTrace = Trace.TraceModel.ParsedTrace;
 
 export function getBaseTraceParseModelData(overrides: Partial<ParsedTrace> = {}): ParsedTrace {
-  return {
+  const parsedTrace = {
     Animations: {animations: []},
     AnimationFrames: {
       animationFrames: [],
@@ -760,6 +759,8 @@ export function getBaseTraceParseModelData(overrides: Partial<ParsedTrace> = {})
     },
     ...overrides,
   };
+  parsedTrace.entity = new EntityMapper(parsedTrace as ParsedTrace);
+  return parsedTrace as ParsedTrace;  // This cast...
 }
 
 /**
