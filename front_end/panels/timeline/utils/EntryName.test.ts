@@ -142,7 +142,7 @@ describeWithEnvironment('EntryName', () => {
     });
 
     // Finds a particular event from the react-hello-world trace which is used for our test example.
-    function getProfileEventAndNodeForReactTrace(parsedTrace: Trace.TraceModel.ParsedTrace): {
+    function getProfileEventAndNodeForReactTrace(parsedTrace: Trace.Handlers.Types.ParsedTrace): {
       entry: Trace.Types.Events.SyntheticProfileCall,
       profileNode: CPUProfile.ProfileTreeModel.ProfileNode,
     } {

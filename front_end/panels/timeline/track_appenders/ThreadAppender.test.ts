@@ -22,7 +22,7 @@ const {urlString} = Platform.DevToolsPath;
 
 function initTrackAppender(
     flameChartData: PerfUI.FlameChart.FlameChartTimelineData,
-    parsedTrace: Trace.TraceModel.ParsedTrace,
+    parsedTrace: Trace.Handlers.Types.ParsedTrace,
     entryData: Trace.Types.Events.Event[],
     entryTypeByLevel: Timeline.TimelineFlameChartDataProvider.EntryType[],
     ): {
@@ -41,12 +41,12 @@ async function renderThreadAppendersFromTrace(context: Mocha.Context|Mocha.Suite
   return renderThreadAppendersFromParsedData(parsedTrace);
 }
 
-function renderThreadAppendersFromParsedData(parsedTrace: Trace.TraceModel.ParsedTrace): {
+function renderThreadAppendersFromParsedData(parsedTrace: Trace.Handlers.Types.ParsedTrace): {
   entryTypeByLevel: Timeline.TimelineFlameChartDataProvider.EntryType[],
   flameChartData: PerfUI.FlameChart.FlameChartTimelineData,
   threadAppenders: Timeline.ThreadAppender.ThreadAppender[],
   entryData: Trace.Types.Events.Event[],
-  parsedTrace: Readonly<Trace.TraceModel.ParsedTrace>,
+  parsedTrace: Readonly<Trace.Handlers.Types.ParsedTrace>,
   compatibilityTracksAppender: Timeline.CompatibilityTracksAppender.CompatibilityTracksAppender,
 } {
   const entryTypeByLevel: Timeline.TimelineFlameChartDataProvider.EntryType[] = [];
@@ -469,7 +469,7 @@ describeWithEnvironment('ThreadAppender', function() {
         NetworkRequests:
             {entityMappings: {entityByEvent: new Map(), eventsByEntity: new Map(), createdEntityCache: new Map()}},
         ExtensionTraceData: {entryToNode: new Map(), extensionMarkers: [], extensionTrackData: []},
-      } as unknown as Trace.TraceModel.ParsedTrace;
+      } as unknown as Trace.Handlers.Types.ParsedTrace;
 
       // Add the script to ignore list and then append the flamechart data
       ignoreListManager.ignoreListURL(SCRIPT_TO_IGNORE);

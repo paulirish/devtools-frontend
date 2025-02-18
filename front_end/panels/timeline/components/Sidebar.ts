@@ -106,7 +106,7 @@ export class SidebarWidget extends UI.Widget.VBox {
     this.#tabbedPane.setBadge('annotations', annotations.length > 0 ? annotations.length.toString() : null);
   }
 
-  setParsedTrace(parsedTrace: Trace.TraceModel.ParsedTrace|null, metadata: Trace.Types.File.MetaData|null): void {
+  setParsedTrace(parsedTrace: Trace.Handlers.Types.ParsedTrace|null, metadata: Trace.Types.File.MetaData|null): void {
     this.#insightsView.setParsedTrace(parsedTrace, metadata);
   }
 
@@ -137,7 +137,7 @@ class InsightsView extends UI.Widget.VBox {
     this.element.appendChild(this.#component);
   }
 
-  setParsedTrace(parsedTrace: Trace.TraceModel.ParsedTrace|null, metadata: Trace.Types.File.MetaData|null): void {
+  setParsedTrace(parsedTrace: Trace.Handlers.Types.ParsedTrace|null, metadata: Trace.Types.File.MetaData|null): void {
     this.#component.parsedTrace = parsedTrace;
     this.#component.traceMetadata = metadata;
   }

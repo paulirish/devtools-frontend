@@ -47,7 +47,7 @@ export class TimelineRegExp extends Trace.Extras.TraceFilter.TraceFilter {
     return this.regExpInternal;
   }
 
-  accept(event: Trace.Types.Events.Event, parsedTrace?: Trace.TraceModel.ParsedTrace): boolean {
+  accept(event: Trace.Types.Events.Event, parsedTrace?: Trace.Handlers.Types.ParsedTrace): boolean {
     return !this.regExpInternal || TimelineUIUtils.testContentMatching(event, this.regExpInternal, parsedTrace);
   }
 }

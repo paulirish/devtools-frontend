@@ -27,7 +27,7 @@ const FAKE_LCP_MODEL = {
   category: Trace.Insights.Types.InsightCategory.ALL,
   state: 'fail',
 } as const;
-const FAKE_PARSED_TRACE = {} as unknown as Trace.TraceModel.ParsedTrace;
+const FAKE_PARSED_TRACE = {} as unknown as Trace.Handlers.Types.ParsedTrace;
 
 describeWithEnvironment('PerformanceInsightsAgent', () => {
   describe('handleContextDetails', () => {

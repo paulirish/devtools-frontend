@@ -87,7 +87,7 @@ describeWithEnvironment('BaseInsightComponent', () => {
   });
 
   describe('Ask AI Insights', () => {
-    const FAKE_PARSED_TRACE = {} as unknown as Trace.TraceModel.ParsedTrace;
+    const FAKE_PARSED_TRACE = {} as unknown as Trace.Handlers.Types.ParsedTrace;
     const FAKE_LCP_MODEL = {
       insightKey: 'LCPPhases',
       strings: {},

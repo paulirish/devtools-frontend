@@ -590,7 +590,7 @@ export function getMainThread(data: Trace.Handlers.ModelHandlers.Renderer.Render
   return mainThread;
 }
 
-type ParsedTrace = Trace.TraceModel.ParsedTrace;
+type ParsedTrace = Trace.Handlers.Types.ParsedTrace;
 
 export function getBaseTraceParseModelData(overrides: Partial<ParsedTrace> = {}): ParsedTrace {
   const parsedTrace = {

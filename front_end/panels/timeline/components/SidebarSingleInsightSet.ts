@@ -80,7 +80,7 @@ export interface SidebarSingleInsightSetData {
   insightSetKey: Trace.Types.Events.NavigationId|null;
   activeCategory: Trace.Insights.Types.InsightCategory;
   activeInsight: ActiveInsight|null;
-  parsedTrace: Trace.TraceModel.ParsedTrace|null;
+  parsedTrace: Trace.Handlers.Types.ParsedTrace|null;
   traceMetadata: Trace.Types.File.MetaData|null;
 }
 

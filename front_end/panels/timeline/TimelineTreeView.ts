@@ -189,7 +189,7 @@ export class TimelineTreeView extends
   private caseSensitiveButton: UI.Toolbar.ToolbarToggle|undefined;
   private regexButton: UI.Toolbar.ToolbarToggle|undefined;
   private matchWholeWord: UI.Toolbar.ToolbarToggle|undefined;
-  #parsedTrace: Trace.TraceModel.ParsedTrace|null = null;
+  #parsedTrace: Trace.Handlers.Types.ParsedTrace|null = null;
   #lastHighlightedEvent: HTMLElement|null = null;
   eventToTreeNode: WeakMap<Trace.Types.Events.Event, Trace.Extras.TraceTree.Node> = new WeakMap();
 
@@ -221,14 +221,14 @@ export class TimelineTreeView extends
 
   setModelWithEvents(
       selectedEvents: Trace.Types.Events.Event[]|null,
-      parsedTrace: Trace.TraceModel.ParsedTrace|null = null,
+      parsedTrace: Trace.Handlers.Types.ParsedTrace|null = null,
       ): void {
     this.#parsedTrace = parsedTrace;
     this.#selectedEvents = selectedEvents;
     this.refreshTree();
   }
 
-  parsedTrace(): Trace.TraceModel.ParsedTrace|null {
+  parsedTrace(): Trace.Handlers.Types.ParsedTrace|null {
     return this.#parsedTrace;
   }
 

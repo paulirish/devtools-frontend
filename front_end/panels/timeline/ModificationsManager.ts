@@ -29,7 +29,7 @@ export class AnnotationModifiedEvent extends Event {
 }
 
 interface ModificationsManagerData {
-  parsedTrace: Trace.TraceModel.ParsedTrace;
+  parsedTrace: Trace.Handlers.Types.ParsedTrace;
   traceBounds: Trace.Types.Timing.TraceWindowMicro;
   rawTraceEvents: readonly Trace.Types.Events.Event[];
   syntheticEvents: Trace.Types.Events.SyntheticBased[];
@@ -40,7 +40,7 @@ export class ModificationsManager extends EventTarget {
   #entriesFilter: EntriesFilter;
   #timelineBreadcrumbs: TimelineComponents.Breadcrumbs.Breadcrumbs;
   #modifications: Trace.Types.File.Modifications|null = null;
-  #parsedTrace: Trace.TraceModel.ParsedTrace;
+  #parsedTrace: Trace.Handlers.Types.ParsedTrace;
   #eventsSerializer: EventsSerializer;
   #overlayForAnnotation: Map<Trace.Types.File.Annotation, Overlays.Overlays.TimelineOverlay>;
   readonly #annotationsHiddenSetting: Common.Settings.Setting<boolean>;
