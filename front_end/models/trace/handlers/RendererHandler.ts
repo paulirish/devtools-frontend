@@ -4,10 +4,10 @@
 
 import * as Platform from '../../../core/platform/platform.js';
 import * as Helpers from '../helpers/helpers.js';
+import * as Trace from '../trace.js';
 import * as Types from '../types/types.js';
 
 import {data as auctionWorkletsData} from './AuctionWorkletsHandler.js';
-import * as HandlerHelpers from './helpers.js';
 import {data as metaHandlerData, type FrameProcessData} from './MetaHandler.js';
 import {data as networkRequestHandlerData} from './NetworkRequestsHandler.js';
 import {data as samplesHandlerData} from './SamplesHandler.js';
@@ -27,10 +27,10 @@ import type {HandlerName} from './types.js';
 
 const processes = new Map<Types.Events.ProcessID, RendererProcess>();
 
-const entityMappings: HandlerHelpers.EntityMappings = {
-  eventsByEntity: new Map<HandlerHelpers.Entity, Types.Events.Event[]>(),
-  entityByEvent: new Map<Types.Events.Event, HandlerHelpers.Entity>(),
-  createdEntityCache: new Map<string, HandlerHelpers.Entity>(),
+const entityMappings: Trace.EntityMapper.EntityMappings = {
+  eventsByEntity: new Map<Trace.EntityMapper.Entity, Types.Events.Event[]>(),
+  entityByEvent: new Map<Types.Events.Event, Trace.EntityMapper.Entity>(),
+  createdEntityCache: new Map<string, Trace.EntityMapper.Entity>(),
 };
 
 // We track the compositor tile worker thread name events so that at the end we
@@ -356,7 +356,7 @@ export function buildHierarchy(
       // Update the entryToNode map with the entries from this thread
       for (const [entry, node] of treeData.entryToNode) {
         entryToNode.set(entry, node);
-        HandlerHelpers.addEventToEntityMapping(entry, entityMappings);
+        Trace.EntityMapper.addEventToEntityMapping(entry, entityMappings);
       }
     }
   }
@@ -411,7 +411,7 @@ export interface RendererHandlerData {
    * samples.
    */
   allTraceEntries: Types.Events.Event[];
-  entityMappings: HandlerHelpers.EntityMappings;
+  entityMappings: Trace.EntityMapper.EntityMappings;
 }
 
 export interface RendererProcess {

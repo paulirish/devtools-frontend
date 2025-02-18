@@ -4,6 +4,7 @@
 
 import * as Platform from '../../../core/platform/platform.js';
 import * as Protocol from '../../../generated/protocol.js';
+import * as EntityMapperJs from '../EntityMapper.js';
 import * as Helpers from '../helpers/helpers.js';
 import * as Types from '../types/types.js';
 
@@ -486,7 +487,7 @@ export async function finalize(): Promise<void> {
     requestsByTime.push(networkEvent);
     requestsById.set(networkEvent.args.data.requestId, networkEvent);
     // Update entity relationships for network events.
-    HandlerHelpers.addEventToEntityMapping(networkEvent, entityMappings);
+    EntityMapperJs.addEventToEntityMapping(networkEvent, entityMappings);
     const initiatorUrl = networkEvent.args.data.initiator?.url ||
         Helpers.Trace.getZeroIndexedStackTraceForEvent(networkEvent)?.at(0)?.url;
     if (initiatorUrl) {
