@@ -7,7 +7,7 @@ import type * as Protocol from '../../generated/protocol.js';
 import {Handlers, Helpers, type Types} from './trace.js';
 
 export class EntityMapper {
-  #parsedTrace: Handlers.Types.ParsedTrace;
+  #handlerData: Handlers.Types.HandlerData;
   #entityMappings: Handlers.Helpers.EntityMappings;
   #firstPartyEntity: Handlers.Helpers.Entity|null;
   #thirdPartyEvents: Types.Events.Event[] = [];
@@ -19,27 +19,27 @@ export class EntityMapper {
    */
   #resolvedCallFrames: Set<Protocol.Runtime.CallFrame> = new Set();
 
-  constructor(parsedTrace: Handlers.Types.ParsedTrace) {
-    this.#parsedTrace = parsedTrace;
-    this.#entityMappings = this.#initializeEntityMappings(this.#parsedTrace);
+  constructor(handlerData: Handlers.Types.HandlerData) {
+    this.#handlerData = handlerData;
+    this.#entityMappings = this.#initializeEntityMappings(this.#handlerData);
     this.#firstPartyEntity = this.#findFirstPartyEntity();
     this.#thirdPartyEvents = this.#getThirdPartyEvents();
   }
 
   /**
-   * This initializes our maps using the parsedTrace data from both the RendererHandler and
+   * This initializes our maps using the handlerData data from both the RendererHandler and
    * the NetworkRequestsHandler.
    */
-  #initializeEntityMappings(parsedTrace: Handlers.Types.ParsedTrace): Handlers.Helpers.EntityMappings {
+  #initializeEntityMappings(handlerData: Handlers.Types.HandlerData): Handlers.Helpers.EntityMappings {
     // NetworkRequestHandler caches.
-    const entityByNetworkEvent = parsedTrace.NetworkRequests.entityMappings.entityByEvent;
-    const networkEventsByEntity = parsedTrace.NetworkRequests.entityMappings.eventsByEntity;
-    const networkCreatedCache = parsedTrace.NetworkRequests.entityMappings.createdEntityCache;
+    const entityByNetworkEvent = handlerData.NetworkRequests.entityMappings.entityByEvent;
+    const networkEventsByEntity = handlerData.NetworkRequests.entityMappings.eventsByEntity;
+    const networkCreatedCache = handlerData.NetworkRequests.entityMappings.createdEntityCache;
 
     // RendrerHandler caches.
-    const entityByRendererEvent = parsedTrace.Renderer.entityMappings.entityByEvent;
-    const rendererEventsByEntity = parsedTrace.Renderer.entityMappings.eventsByEntity;
-    const rendererCreatedCache = parsedTrace.Renderer.entityMappings.createdEntityCache;
+    const entityByRendererEvent = handlerData.Renderer.entityMappings.entityByEvent;
+    const rendererEventsByEntity = handlerData.Renderer.entityMappings.eventsByEntity;
+    const rendererCreatedCache = handlerData.Renderer.entityMappings.createdEntityCache;
 
     // Build caches.
     const entityByEvent = new Map([...entityByNetworkEvent, ...entityByRendererEvent]);
@@ -55,8 +55,8 @@ export class EntityMapper {
 
   #findFirstPartyEntity(): Handlers.Helpers.Entity|null {
     // As a starting point, we consider the first navigation as the 1P.
-    const nav = Array.from(this.#parsedTrace.Meta.navigationsByNavigationId.values()).sort((a, b) => a.ts - b.ts)[0];
-    const firstPartyUrl = nav?.args.data?.documentLoaderURL ?? this.#parsedTrace.Meta.mainFrameURL;
+    const nav = Array.from(this.#handlerData.Meta.navigationsByNavigationId.values()).sort((a, b) => a.ts - b.ts)[0];
+    const firstPartyUrl = nav?.args.data?.documentLoaderURL ?? this.#handlerData.Meta.mainFrameURL;
     if (!firstPartyUrl) {
       return null;
     }
