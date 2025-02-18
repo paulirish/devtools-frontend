@@ -11,8 +11,8 @@ import * as Trace from '../trace.js';
 
 import * as RootCauses from './RootCauses.js';
 
-type ParsedTrace = Trace.Handlers.Types.ParsedTrace;
-type ParsedTraceMutable = Trace.Handlers.Types.ParsedTraceMutable;
+type ParsedTrace = Trace.TraceModel.ParsedTrace;
+type ParsedTraceMutable = Trace.TraceModel.ParsedTraceMutable;
 
 function assertArrayHasNoNulls<T>(inputArray: Array<T|null>): asserts inputArray is T[] {
   inputArray.forEach((item, index) => {

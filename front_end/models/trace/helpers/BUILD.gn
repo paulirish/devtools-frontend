@@ -9,6 +9,7 @@ import("../../visibility.gni")
 
 devtools_module("helpers") {
   sources = [
+    "EntityMapper.ts",
     "Extensions.ts",
     "Network.ts",
     "SamplesIntegrator.ts",
@@ -43,6 +44,7 @@ ts_library("unittests") {
   testonly = true
 
   sources = [
+    "EntityMapper.test.ts",
     "SamplesIntegrator.test.ts",
     "SyntheticEvents.test.ts",
     "Timing.test.ts",

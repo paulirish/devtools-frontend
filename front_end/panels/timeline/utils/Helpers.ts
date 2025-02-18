@@ -149,7 +149,7 @@ export function md(markdown: Common.UIString.LocalizedString): Lit.TemplateResul
  * @example 'securepubads.g.doubleclick.net (Google/Doubleclick Ads)'
  */
 export function formatOriginWithEntity(
-    url: URL, entity: Trace.Handlers.Helpers.Entity|null, parenthesizeEntity?: boolean): string {
+    url: URL, entity: Trace.Helpers.EntityMapper.Entity|null, parenthesizeEntity?: boolean): string {
   const origin = url.origin.replace('https://', '');
   if (!entity) {
     return origin;

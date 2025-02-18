@@ -7,7 +7,6 @@ import * as Insights from './insights/insights.js';
 import * as Lantern from './lantern/lantern.js';
 import * as LanternComputationData from './LanternComputationData.js';
 import type * as Model from './ModelImpl.js';
-import {EntityMapper} from './trace.js';
 import * as Types from './types/types.js';
 
 const enum Status {
@@ -56,14 +55,14 @@ export class TraceProcessor extends EventTarget {
   readonly #traceHandlers: Partial<Handlers.Types.Handlers>;
   #status = Status.IDLE;
   #modelConfiguration = Types.Configuration.defaults();
-  #data: Handlers.Types.ParsedTrace|null = null;
+  #data: Model.ParsedTrace|null = null;
   #insights: Insights.Types.TraceInsightSets|null = null;
 
   static createWithAllHandlers(): TraceProcessor {
     return new TraceProcessor(Handlers.ModelHandlers, Types.Configuration.defaults());
   }
 
-  static getEnabledInsightRunners(parsedTrace: Handlers.Types.ParsedTrace): Partial<Insights.Types.InsightModelsType> {
+  static getEnabledInsightRunners(parsedTrace: Model.ParsedTrace): Partial<Insights.Types.InsightModelsType> {
     const enabledInsights = {} as Insights.Types.InsightModelsType;
     for (const [name, insight] of Object.entries(Insights.Models)) {
       const deps = insight.deps();
@@ -252,16 +251,16 @@ export class TraceProcessor extends EventTarget {
     }
     this.dispatchEvent(new TraceParseProgressEvent({percent: ProgressPhase.CLONE}));
 
-    const parsedTrace = handlerData as Handlers.Types.ParsedTrace;
+    const parsedTrace = handlerData as Model.ParsedTrace;
 
     // The parsedTrace is data from handlers plus this entityMapper.
-    const entityMapper = new EntityMapper.EntityMapper(handlerData);
+    const entityMapper = new Helpers.EntityMapper.EntityMapper(handlerData);
     parsedTrace.entity = entityMapper;
 
     this.#data = parsedTrace;
   }
 
-  get parsedTrace(): Handlers.Types.ParsedTrace|null {
+  get parsedTrace(): Model.ParsedTrace|null {
     if (this.#status !== Status.FINISHED_PARSING) {
       return null;
     }
@@ -278,7 +277,7 @@ export class TraceProcessor extends EventTarget {
   }
 
   #createLanternContext(
-      parsedTrace: Handlers.Types.ParsedTrace, traceEvents: readonly Types.Events.Event[], frameId: string,
+      parsedTrace: Model.ParsedTrace, traceEvents: readonly Types.Events.Event[], frameId: string,
       navigationId: string): Insights.Types.LanternContext|undefined {
     // Check for required handlers.
     if (!parsedTrace.NetworkRequests || !parsedTrace.Workers || !parsedTrace.PageLoadMetrics) {
@@ -434,7 +433,7 @@ export class TraceProcessor extends EventTarget {
   }
 
   #computeInsightSet(
-      insights: Insights.Types.TraceInsightSets, parsedTrace: Handlers.Types.ParsedTrace,
+      insights: Insights.Types.TraceInsightSets, parsedTrace: Model.ParsedTrace,
       insightRunners: Partial<typeof Insights.Models>, context: Insights.Types.InsightSetContext,
       options: Types.Configuration.ParseOptions): void {
     const model = {} as Insights.Types.InsightSet['model'];
@@ -484,7 +483,7 @@ export class TraceProcessor extends EventTarget {
    * Run all the insights and set the result to `#insights`.
    */
   #computeInsights(
-      parsedTrace: Handlers.Types.ParsedTrace, traceEvents: readonly Types.Events.Event[],
+      parsedTrace: Model.ParsedTrace, traceEvents: readonly Types.Events.Event[],
       options: Types.Configuration.ParseOptions): void {
     this.#insights = new Map();
 

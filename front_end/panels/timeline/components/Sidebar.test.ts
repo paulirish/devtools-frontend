@@ -12,7 +12,7 @@ import * as Components from './components.js';
 
 describeWithEnvironment('Sidebar', () => {
   async function renderSidebar(
-      parsedTrace: Trace.Handlers.Types.ParsedTrace,
+      parsedTrace: Trace.TraceModel.ParsedTrace,
       metadata: Trace.Types.File.MetaData|null,
       insights: Trace.Insights.Types.TraceInsightSets|null,
       ): Promise<Components.Sidebar.SidebarWidget> {

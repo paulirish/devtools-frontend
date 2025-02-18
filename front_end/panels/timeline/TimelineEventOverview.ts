@@ -79,8 +79,8 @@ export abstract class TimelineEventOverview extends PerfUI.TimelineOverviewPane.
 }
 
 export class TimelineEventOverviewNetwork extends TimelineEventOverview {
-  #parsedTrace: Trace.Handlers.Types.ParsedTrace;
-  constructor(parsedTrace: Trace.Handlers.Types.ParsedTrace) {
+  #parsedTrace: Trace.TraceModel.ParsedTrace;
+  constructor(parsedTrace: Trace.TraceModel.ParsedTrace) {
     super('network', i18nString(UIStrings.net));
     this.#parsedTrace = parsedTrace;
   }
@@ -143,12 +143,12 @@ const categoryToIndex = new WeakMap<Utils.EntryStyles.TimelineCategory, number>(
 
 export class TimelineEventOverviewCPUActivity extends TimelineEventOverview {
   private backgroundCanvas: HTMLCanvasElement;
-  #parsedTrace: Trace.Handlers.Types.ParsedTrace;
+  #parsedTrace: Trace.TraceModel.ParsedTrace;
   #drawn = false;
   #start: Trace.Types.Timing.Milli;
   #end: Trace.Types.Timing.Milli;
 
-  constructor(parsedTrace: Trace.Handlers.Types.ParsedTrace) {
+  constructor(parsedTrace: Trace.TraceModel.ParsedTrace) {
     // During the sync tracks migration this component can use either legacy
     // Performance Model data or the new engine's data. Once the migration is
     // complete this will be updated to only use the new engine and mentions of
@@ -181,7 +181,7 @@ export class TimelineEventOverviewCPUActivity extends TimelineEventOverview {
     this.backgroundCanvas.height = this.element.clientHeight * window.devicePixelRatio;
   }
 
-  #draw(parsedTrace: Trace.Handlers.Types.ParsedTrace): void {
+  #draw(parsedTrace: Trace.TraceModel.ParsedTrace): void {
     const quantSizePx = 4 * window.devicePixelRatio;
     const width = this.width();
     const height = this.height();
@@ -324,8 +324,8 @@ export class TimelineEventOverviewCPUActivity extends TimelineEventOverview {
 }
 
 export class TimelineEventOverviewResponsiveness extends TimelineEventOverview {
-  #parsedTrace: Trace.Handlers.Types.ParsedTrace;
-  constructor(parsedTrace: Trace.Handlers.Types.ParsedTrace) {
+  #parsedTrace: Trace.TraceModel.ParsedTrace;
+  constructor(parsedTrace: Trace.TraceModel.ParsedTrace) {
     super('responsiveness', null);
     this.#parsedTrace = parsedTrace;
   }
@@ -539,9 +539,9 @@ export class TimelineFilmStripOverview extends TimelineEventOverview {
 
 export class TimelineEventOverviewMemory extends TimelineEventOverview {
   private heapSizeLabel: HTMLElement;
-  #parsedTrace: Trace.Handlers.Types.ParsedTrace;
+  #parsedTrace: Trace.TraceModel.ParsedTrace;
 
-  constructor(parsedTrace: Trace.Handlers.Types.ParsedTrace) {
+  constructor(parsedTrace: Trace.TraceModel.ParsedTrace) {
     super('memory', i18nString(UIStrings.heap));
     this.heapSizeLabel = this.element.createChild('div', 'memory-graph-label');
     this.#parsedTrace = parsedTrace;

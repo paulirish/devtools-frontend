@@ -2,12 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import type * as Platform from '../../core/platform/platform.js';
-import type * as Protocol from '../../generated/protocol.js';
-import * as ThirdPartyWeb from '../../third_party/third-party-web/third-party-web.js';
+import type * as Platform from '../../../core/platform/platform.js';
+import type * as Protocol from '../../../generated/protocol.js';
+import * as ThirdPartyWeb from '../../../third_party/third-party-web/third-party-web.js';
+import type * as Handlers from '../handlers/handlers.js';
+import type {ParsedTrace} from '../ModelImpl.js';
+import * as Types from '../types/types.js';
 
-import type {ParsedTrace} from './handlers/types.js';
-import {Handlers, Helpers, Types} from './trace.js';
+import {getZeroIndexedStackTraceForEvent, isMatchingCallFrame} from './Trace.js';
 
 export type Entity = (typeof ThirdPartyWeb.ThirdPartyWeb.entities)[number]&{
   isUnrecognized?: boolean,
@@ -77,7 +79,7 @@ export class EntityMapper {
     if (!firstPartyUrl) {
       return null;
     }
-    return Handlers.Helpers.getEntityForUrl(firstPartyUrl, this.#entityMappings.createdEntityCache) ?? null;
+    return getEntityForUrl(firstPartyUrl, this.#entityMappings.createdEntityCache) ?? null;
   }
 
   #getThirdPartyEvents(): Types.Events.Event[] {
@@ -146,8 +148,8 @@ export class EntityMapper {
     }
 
     const compiledURL = callFrame.url;
-    const currentEntity = Handlers.Helpers.getEntityForUrl(compiledURL, this.#entityMappings.createdEntityCache);
-    const resolvedEntity = Handlers.Helpers.getEntityForUrl(sourceURL, this.#entityMappings.createdEntityCache);
+    const currentEntity = getEntityForUrl(compiledURL, this.#entityMappings.createdEntityCache);
+    const resolvedEntity = getEntityForUrl(sourceURL, this.#entityMappings.createdEntityCache);
     // If the entity changed, then we should update our caches. If we don't have a currentEntity,
     // we can't do much with that. Additionally without our current entity, we don't have a reference to the related
     // events so there are no relationships to be made.
@@ -160,10 +162,10 @@ export class EntityMapper {
     // The events that don't match the source location, but that we should keep mapped to its current entity.
     const unrelatedEvents: Types.Events.Event[] = [];
     currentEntityEvents?.forEach(e => {
-      const stackTrace = Helpers.Trace.getZeroIndexedStackTraceForEvent(e);
+      const stackTrace = getZeroIndexedStackTraceForEvent(e);
       const cf = stackTrace?.at(0);
 
-      const matchesCallFrame = cf && Helpers.Trace.isMatchingCallFrame(cf, callFrame);
+      const matchesCallFrame = cf && isMatchingCallFrame(cf, callFrame);
       if (matchesCallFrame) {
         sourceLocationEvents.push(e);
       } else {

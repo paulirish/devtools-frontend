@@ -10,7 +10,7 @@ import * as TimelineComponents from '../components/components.js';
 import * as Timeline from '../timeline.js';
 
 describeWithEnvironment('NetworkTrackAppender', function() {
-  let parsedTrace: Trace.Handlers.Types.ParsedTrace;
+  let parsedTrace: Trace.TraceModel.ParsedTrace;
   let networkTrackAppender: Timeline.NetworkTrackAppender.NetworkTrackAppender;
   let flameChartData = PerfUI.FlameChart.FlameChartTimelineData.createEmpty();
 

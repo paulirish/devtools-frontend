@@ -141,7 +141,7 @@ export class CallTreeContext extends ConversationContext<TimelineUtils.AICallTre
     // Get the non-resolved (ignore sourcemaps) URL for the event. We use the
     // non-resolved URL as in the context of the AI Assistance panel, we care
     // about the origin it was served on.
-    const nonResolvedURL = Trace.Handlers.Helpers.getNonResolvedURL(selectedEvent, this.#callTree.parsedTrace);
+    const nonResolvedURL = Trace.Helpers.EntityMapper.getNonResolvedURL(selectedEvent, this.#callTree.parsedTrace);
     if (nonResolvedURL) {
       const origin = Common.ParsedURL.ParsedURL.extractOrigin(nonResolvedURL);
       if (origin) {  // origin could be the empty string.

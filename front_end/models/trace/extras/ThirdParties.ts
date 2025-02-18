@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 import * as ThirdPartyWeb from '../../../third_party/third-party-web/third-party-web.js';
-import * as Handlers from '../handlers/handlers.js';
 import * as Helpers from '../helpers/helpers.js';
+import type * as TraceModel from '../ModelImpl.js';
 import * as Types from '../types/types.js';
 
 export type Entity = typeof ThirdPartyWeb.ThirdPartyWeb.entities[number];
@@ -25,7 +25,7 @@ export interface ThirdPartySummary {
 function getOrMakeSummaryByEntity(
     thirdPartySummary: ThirdPartySummary, event: Types.Events.Event, url: string): Summary|null {
   const entity = ThirdPartyWeb.ThirdPartyWeb.getEntity(url) ??
-      Handlers.Helpers.makeUpEntity(thirdPartySummary.madeUpEntityCache, url);
+      Helpers.EntityMapper.makeUpEntity(thirdPartySummary.madeUpEntityCache, url);
   if (!entity) {
     return null;
   }
@@ -60,7 +60,7 @@ function getOrMakeSummaryByURL(thirdPartySummary: ThirdPartySummary, url: string
 }
 
 function collectMainThreadActivity(
-    thirdPartySummary: ThirdPartySummary, parsedTrace: Handlers.Types.ParsedTrace,
+    thirdPartySummary: ThirdPartySummary, parsedTrace: TraceModel.ParsedTrace,
     bounds: Types.Timing.TraceWindowMicro): void {
   for (const process of parsedTrace.Renderer.processes.values()) {
     if (!process.isOnMainFrame) {
@@ -83,7 +83,7 @@ function collectMainThreadActivity(
             continue;
           }
 
-          const url = Handlers.Helpers.getNonResolvedURL(event, parsedTrace as Handlers.Types.ParsedTrace);
+          const url = Helpers.EntityMapper.getNonResolvedURL(event, parsedTrace as TraceModel.ParsedTrace);
           if (!url) {
             continue;
           }
@@ -124,7 +124,7 @@ function collectNetworkActivity(
  * @param networkRequests Won't be filtered by trace bounds, so callers should ensure it is filtered.
  */
 export function summarizeThirdParties(
-    parsedTrace: Handlers.Types.ParsedTrace, traceBounds: Types.Timing.TraceWindowMicro,
+    parsedTrace: TraceModel.ParsedTrace, traceBounds: Types.Timing.TraceWindowMicro,
     networkRequests: Types.Events.SyntheticNetworkRequest[]): ThirdPartySummary {
   const thirdPartySummary: ThirdPartySummary = {
     byEntity: new Map(),
@@ -141,10 +141,10 @@ export function summarizeThirdParties(
 }
 
 function getSummaryMapWithMapping(
-    events: Types.Events.Event[], entityByEvent: Map<Types.Events.Event, Handlers.Helpers.Entity>,
-    eventsByEntity: Map<Handlers.Helpers.Entity, Types.Events.Event[]>): ThirdPartySummary {
+    events: Types.Events.Event[], entityByEvent: Map<Types.Events.Event, Helpers.EntityMapper.Entity>,
+    eventsByEntity: Map<Helpers.EntityMapper.Entity, Types.Events.Event[]>): ThirdPartySummary {
   const byEvent = new Map<Types.Events.Event, Summary>();
-  const byEntity = new Map<Handlers.Helpers.Entity, Summary>();
+  const byEntity = new Map<Helpers.EntityMapper.Entity, Summary>();
   const defaultSummary: Summary = {transferSize: 0, mainThreadTime: Types.Timing.Micro(0)};
 
   for (const event of events) {
@@ -178,10 +178,10 @@ function getSummaryMapWithMapping(
  * If it is ever needed, we need to make getSelfTimeByUrl (see deleted code/blame) much faster (cache + bucket?).
  */
 export function getSummariesAndEntitiesWithMapping(
-    parsedTrace: Handlers.Types.ParsedTrace, traceBounds: Types.Timing.TraceWindowMicro,
-    entityMapping: Handlers.Helpers.EntityMappings): {
+    parsedTrace: TraceModel.ParsedTrace, traceBounds: Types.Timing.TraceWindowMicro,
+    entityMapping: Helpers.EntityMapper.EntityMappings): {
   summaries: ThirdPartySummary,
-  entityByEvent: Map<Types.Events.Event, Handlers.Helpers.Entity>,
+  entityByEvent: Map<Types.Events.Event, Helpers.EntityMapper.Entity>,
 } {
   const entityByEvent = new Map(entityMapping.entityByEvent);
   const eventsByEntity = new Map(entityMapping.eventsByEntity);

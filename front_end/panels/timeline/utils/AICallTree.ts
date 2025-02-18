@@ -24,7 +24,7 @@ export class AICallTree {
       public selectedNode: Trace.Extras.TraceTree.Node|null,
       public rootNode: Trace.Extras.TraceTree.TopDownRootNode,
       // TODO: see if we can avoid passing around this entire thing.
-      public parsedTrace: Trace.Handlers.Types.ParsedTrace,
+      public parsedTrace: Trace.TraceModel.ParsedTrace,
   ) {
   }
 
@@ -37,7 +37,7 @@ export class AICallTree {
    */
   static fromTime(
       start: Trace.Types.Timing.Micro, end: Trace.Types.Timing.Micro,
-      parsedTrace: Trace.Handlers.Types.ParsedTrace): AICallTree|null {
+      parsedTrace: Trace.TraceModel.ParsedTrace): AICallTree|null {
     const threads = Trace.Handlers.Threads.threadsInTrace(parsedTrace);
     let mainThread = threads.find(thread => {
       return thread.type === Trace.Handlers.Threads.ThreadType.MAIN_THREAD;
@@ -95,7 +95,7 @@ export class AICallTree {
    * This filters out other events we make such as SyntheticLayoutShifts which are not valid
    * If the event is not valid, or there is an unexpected error building the tree, `null` is returned.
    */
-  static fromEvent(selectedEvent: Trace.Types.Events.Event, parsedTrace: Trace.Handlers.Types.ParsedTrace): AICallTree
+  static fromEvent(selectedEvent: Trace.Types.Events.Event, parsedTrace: Trace.TraceModel.ParsedTrace): AICallTree
       |null {
     // First: check that the selected event is on the thread we have identified as the main thread.
     const threads = Trace.Handlers.Threads.threadsInTrace(parsedTrace);
@@ -193,7 +193,7 @@ export class AICallTree {
 
   /* This custom YAML-like format with an adjacency list for children is 35% more token efficient than JSON */
   static stringifyNode(
-      node: Trace.Extras.TraceTree.Node, parsedTrace: Trace.Handlers.Types.ParsedTrace,
+      node: Trace.Extras.TraceTree.Node, parsedTrace: Trace.TraceModel.ParsedTrace,
       selectedNode: Trace.Extras.TraceTree.Node|null, nodeToIdMap: Map<Trace.Extras.TraceTree.Node, number>,
       allUrls: string[]): string {
     const event = node.event;

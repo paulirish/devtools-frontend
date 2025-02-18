@@ -204,8 +204,8 @@ export function prettyPrint(
     out: string = ''): string {
   let skipped = false;
   return printNodes(tree.roots);
-  function printNodes(nodes: Set<Trace.Helpers.TreeHelpers.TraceEntryNode>|
-                      Trace.Helpers.TreeHelpers.TraceEntryNode[]): string {
+  function printNodes(nodes: Set<Trace.Helpers.TreeHelpers.TraceEntryNode>|Trace.Helpers.TreeHelpers.TraceEntryNode[]):
+      string {
     for (const node of nodes) {
       const event = node.entry;
       if (!predicate(node, event)) {
@@ -487,10 +487,10 @@ export function makeMockSamplesHandlerData(profileCalls: Trace.Types.Events.Synt
   };
 }
 
-export function makeMockEntityData(events: Trace.Types.Events.Event[]): Trace.Handlers.Helpers.EntityMappings {
-  const eventsByEntity = new Map<Trace.Handlers.Helpers.Entity, Trace.Types.Events.Event[]>();
-  const entityByEvent = new Map<Trace.Types.Events.Event, Trace.Handlers.Helpers.Entity>();
-  const createdEntityCache = new Map<string, Trace.Handlers.Helpers.Entity>();
+export function makeMockEntityData(events: Trace.Types.Events.Event[]): Trace.Helpers.EntityMapper.EntityMappings {
+  const eventsByEntity = new Map<Trace.Helpers.EntityMapper.Entity, Trace.Types.Events.Event[]>();
+  const entityByEvent = new Map<Trace.Types.Events.Event, Trace.Helpers.EntityMapper.Entity>();
+  const createdEntityCache = new Map<string, Trace.Helpers.EntityMapper.Entity>();
 
   events.forEach(event => {
     const entity = Trace.Handlers.Helpers.getEntityForEvent(event, createdEntityCache);
@@ -592,7 +592,7 @@ export function getMainThread(data: Trace.Handlers.ModelHandlers.Renderer.Render
   return mainThread;
 }
 
-type ParsedTrace = Trace.Handlers.Types.ParsedTrace;
+type ParsedTrace = Trace.TraceModel.ParsedTrace;
 
 export function getBaseTraceParseModelData(overrides: Partial<ParsedTrace> = {}): ParsedTrace {
   return {

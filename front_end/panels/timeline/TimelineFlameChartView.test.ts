@@ -324,7 +324,7 @@ describeWithEnvironment('TimelineFlameChartView', function() {
 
   describe('Context Menu', function() {
     let flameChartView: Timeline.TimelineFlameChartView.TimelineFlameChartView;
-    let parsedTrace: Trace.Handlers.Types.ParsedTrace;
+    let parsedTrace: Trace.TraceModel.ParsedTrace;
     let metadata: Trace.Types.File.MetaData|null;
 
     this.beforeEach(async () => {
@@ -804,7 +804,7 @@ describeWithEnvironment('TimelineFlameChartView', function() {
 
   describe('Link between entries annotation in progress', function() {
     let flameChartView: Timeline.TimelineFlameChartView.TimelineFlameChartView;
-    let parsedTrace: Trace.Handlers.Types.ParsedTrace;
+    let parsedTrace: Trace.TraceModel.ParsedTrace;
     let metadata: Trace.Types.File.MetaData|null;
 
     this.beforeEach(async () => {

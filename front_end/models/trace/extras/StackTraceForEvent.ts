@@ -3,14 +3,14 @@
 // found in the LICENSE file.
 
 import type * as Protocol from '../../../generated/protocol.js';
-import type * as Handlers from '../handlers/handlers.js';
 import type * as Helpers from '../helpers/helpers.js';
+import type * as TraceModel from '../ModelImpl.js';
 import * as Types from '../types/types.js';
 
 export const stackTraceForEventInTrace =
-    new Map<Handlers.Types.ParsedTrace, Map<Types.Events.Event, Protocol.Runtime.StackTrace>>();
+    new Map<TraceModel.ParsedTrace, Map<Types.Events.Event, Protocol.Runtime.StackTrace>>();
 
-export function clearCacheForTrace(parsedTrace: Handlers.Types.ParsedTrace): void {
+export function clearCacheForTrace(parsedTrace: TraceModel.ParsedTrace): void {
   stackTraceForEventInTrace.delete(parsedTrace);
 }
 /**
@@ -19,8 +19,7 @@ export function clearCacheForTrace(parsedTrace: Handlers.Types.ParsedTrace): voi
  * stacks and trace event instrumentation on the V8 debugger to stitch
  * them together.
  */
-export function get(event: Types.Events.Event, parsedTrace: Handlers.Types.ParsedTrace): Protocol.Runtime.StackTrace|
-    null {
+export function get(event: Types.Events.Event, parsedTrace: TraceModel.ParsedTrace): Protocol.Runtime.StackTrace|null {
   let cacheForTrace = stackTraceForEventInTrace.get(parsedTrace);
   if (!cacheForTrace) {
     cacheForTrace = new Map();
@@ -45,7 +44,7 @@ export function get(event: Types.Events.Event, parsedTrace: Handlers.Types.Parse
 }
 
 function getForProfileCall(
-    event: Types.Events.SyntheticProfileCall, parsedTrace: Handlers.Types.ParsedTrace): Protocol.Runtime.StackTrace {
+    event: Types.Events.SyntheticProfileCall, parsedTrace: TraceModel.ParsedTrace): Protocol.Runtime.StackTrace {
   // When working with a CPU profile the renderer handler won't have
   // entries in its tree.
   const entryToNode =
@@ -113,7 +112,7 @@ function getForProfileCall(
  * code location that called the extension API), and returns its stack
  * trace.
  */
-function getForExtensionEntry(event: Types.Extensions.SyntheticExtensionEntry, parsedTrace: Handlers.Types.ParsedTrace):
+function getForExtensionEntry(event: Types.Extensions.SyntheticExtensionEntry, parsedTrace: TraceModel.ParsedTrace):
     Protocol.Runtime.StackTrace|null {
   return getForUserTiming(event.rawSourceEvent, parsedTrace);
 }
@@ -124,7 +123,7 @@ function getForExtensionEntry(event: Types.Extensions.SyntheticExtensionEntry, p
  */
 function getForUserTiming(
     event: Types.Events.UserTiming|Types.Events.ConsoleTimeStamp,
-    parsedTrace: Handlers.Types.ParsedTrace): Protocol.Runtime.StackTrace|null {
+    parsedTrace: TraceModel.ParsedTrace): Protocol.Runtime.StackTrace|null {
   let rawEvent: Types.Events.Event|undefined = event;
   if (Types.Events.isPerformanceMeasureBegin(event)) {
     if (event.args.traceId === undefined) {

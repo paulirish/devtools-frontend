@@ -107,7 +107,7 @@ export async function loadCodeLocationResolvingScenario(): Promise<{
 }
 
 function parsedTraceFromProfileCalls(profileCalls: Trace.Types.Events.SyntheticProfileCall[]):
-    Trace.Handlers.Types.ParsedTrace {
+    Trace.TraceModel.ParsedTrace {
   const workersData: Trace.Handlers.ModelHandlers.Workers.WorkersData = {
     workerSessionIdEvents: [],
     workerIdByThread: new Map(),
@@ -121,14 +121,14 @@ function parsedTraceFromProfileCalls(profileCalls: Trace.Types.Events.SyntheticP
     NetworkRequests:
         {entityMappings: {entityByEvent: new Map(), eventsByEntity: new Map(), createdEntityCache: new Map()}},
     Meta: {mainFrameURL: 'https://example.com', navigationsByNavigationId: new Map()},
-  } as Trace.Handlers.Types.ParsedTrace;
+  } as Trace.TraceModel.ParsedTrace;
 }
 
 describeWithMockConnection('SourceMapsResolver', () => {
   describe('function name resolving', () => {
     let target: SDK.Target.Target;
     let script: SDK.Script.Script;
-    let parsedTrace: Trace.Handlers.Types.ParsedTrace;
+    let parsedTrace: Trace.TraceModel.ParsedTrace;
     let profileCallForNameResolving: Trace.Types.Events.SyntheticProfileCall;
     beforeEach(async function() {
       target = createTarget();
