@@ -435,7 +435,6 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
 
   #traceEngineModel: Trace.TraceModel.Model;
   #sourceMapsResolver: Utils.SourceMapsResolver.SourceMapsResolver|null = null;
-  #entityMapper: Utils.EntityMapper.EntityMapper|null = null;
   #onSourceMapsNodeNamesResolvedBound = this.#onSourceMapsNodeNamesResolved.bind(this);
   readonly #onChartPlayableStateChangeBound: (event: Common.EventTarget.EventTargetEvent<boolean>) => void;
   #sidebarToggleButton = this.#splitWidget.createShowHideSidebarButton(
@@ -2057,19 +2056,13 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       }
     }
 
-    // Initialize EntityMapper
-    this.#entityMapper = new Utils.EntityMapper.EntityMapper(parsedTrace);
-
     // Set up SourceMapsResolver to ensure we resolve any function names in
     // profile calls.
     // Pass in the entity mapper.
-    this.#sourceMapsResolver = new Utils.SourceMapsResolver.SourceMapsResolver(parsedTrace, this.#entityMapper);
+    this.#sourceMapsResolver = new Utils.SourceMapsResolver.SourceMapsResolver(parsedTrace);
     this.#sourceMapsResolver.addEventListener(
         Utils.SourceMapsResolver.SourceMappingsUpdated.eventName, this.#onSourceMapsNodeNamesResolvedBound);
     void this.#sourceMapsResolver.install();
-
-    // Initialize EntityMapper
-    this.#entityMapper = new Utils.EntityMapper.EntityMapper(parsedTrace);
 
     this.statusPane?.updateProgressBar(i18nString(UIStrings.processed), 80);
     this.updateMiniMap();

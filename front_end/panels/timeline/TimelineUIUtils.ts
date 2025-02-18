@@ -1049,7 +1049,6 @@ export class TimelineUIUtils {
       event: Trace.Types.Events.Event,
       linkifier: LegacyComponents.Linkifier.Linkifier,
       canShowPieChart: boolean,
-      entityMapper: Utils.EntityMapper.EntityMapper|null,
       ): Promise<DocumentFragment> {
     const maybeTarget = targetForEvent(parsedTrace, event);
     const {duration} = Trace.Helpers.Timing.eventTimingsMicroSeconds(event);
@@ -1572,7 +1571,7 @@ export class TimelineUIUtils {
     }
 
     // Third party entity
-    const entity = entityMapper?.entityForEvent(event);
+    const entity = parsedTrace.entity.entityForEvent(event);
     if (entity) {
       contentHelper.appendTextRow(i18nString(UIStrings.entity), entity.name);
     }

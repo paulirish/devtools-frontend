@@ -29,7 +29,6 @@ import {TimelineSelectorStatsView} from './TimelineSelectorStatsView.js';
 import {BottomUpTimelineTreeView, CallTreeTimelineTreeView, TimelineTreeView} from './TimelineTreeView.js';
 import {TimelineUIUtils} from './TimelineUIUtils.js';
 import {TracingFrameLayerTree} from './TracingLayerTree.js';
-import * as Utils from './utils/utils.js';
 
 const UIStrings = {
   /**
@@ -87,7 +86,6 @@ export class TimelineDetailsPane extends
   #onTraceBoundsChangeBound = this.#onTraceBoundsChange.bind(this);
   #relatedInsightChips = new TimelineComponents.RelatedInsightChips.RelatedInsightChips();
   #thirdPartyTree = new ThirdPartyTreeViewWidget();
-  #entityMapper: Utils.EntityMapper.EntityMapper|null = null;
 
   constructor(delegate: TimelineModeViewDelegate) {
     super();
@@ -230,7 +228,6 @@ export class TimelineDetailsPane extends
     selectedEvents: Trace.Types.Events.Event[]|null,
     traceInsightsSets: Trace.Insights.Types.TraceInsightSets|null,
     eventToRelatedInsightsMap: TimelineComponents.RelatedInsightChips.EventToRelatedInsightsMap|null,
-    entityMapper: Utils.EntityMapper.EntityMapper|null,
   }): Promise<void> {
     if (this.#parsedTrace !== data.parsedTrace) {
       // Clear the selector stats view, so the next time the user views it we
@@ -241,7 +238,6 @@ export class TimelineDetailsPane extends
     }
     if (data.parsedTrace) {
       this.#filmStrip = Trace.Extras.FilmStrip.fromParsedTrace(data.parsedTrace);
-      this.#entityMapper = new Utils.EntityMapper.EntityMapper(data.parsedTrace);
     }
     this.#selectedEvents = data.selectedEvents;
     this.#traceInsightsSets = data.traceInsightsSets;
@@ -254,7 +250,7 @@ export class TimelineDetailsPane extends
       view.setModelWithEvents(data.selectedEvents, data.parsedTrace);
     }
     // Set the 3p tree model.
-    this.#thirdPartyTree.setModelWithEvents(data.selectedEvents, data.parsedTrace, data.entityMapper);
+    this.#thirdPartyTree.setModelWithEvents(data.selectedEvents, data.parsedTrace);
     this.lazyPaintProfilerView = null;
     this.lazyLayersView = null;
     await this.setSelection(null);
@@ -379,7 +375,7 @@ export class TimelineDetailsPane extends
       return;
     }
     const maybeTarget = targetForEvent(this.#parsedTrace, networkRequest);
-    await this.#networkRequestDetails.setData(this.#parsedTrace, networkRequest, maybeTarget, this.#entityMapper);
+    await this.#networkRequestDetails.setData(this.#parsedTrace, networkRequest, maybeTarget);
     this.#relatedInsightChips.activeEvent = networkRequest;
     if (this.#eventToRelatedInsightsMap) {
       this.#relatedInsightChips.eventToRelatedInsightsMap = this.#eventToRelatedInsightsMap;
@@ -408,8 +404,8 @@ export class TimelineDetailsPane extends
     }
 
     // Otherwise, build the generic trace event details UI.
-    const traceEventDetails = await TimelineUIUtils.buildTraceEventDetails(
-        this.#parsedTrace, event, this.detailsLinkifier, true, this.#entityMapper);
+    const traceEventDetails =
+        await TimelineUIUtils.buildTraceEventDetails(this.#parsedTrace, event, this.detailsLinkifier, true);
     this.appendDetailsTabsForTraceEventAndShowDetails(event, traceEventDetails);
   }
 
@@ -529,7 +525,7 @@ export class TimelineDetailsPane extends
   }
 
   private updateSelectedRangeStats(startTime: Trace.Types.Timing.Milli, endTime: Trace.Types.Timing.Milli): void {
-    if (!this.#selectedEvents || !this.#parsedTrace || !this.#entityMapper) {
+    if (!this.#selectedEvents || !this.#parsedTrace) {
       return;
     }
 

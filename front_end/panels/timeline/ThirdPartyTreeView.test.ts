@@ -8,16 +8,15 @@ import {TraceLoader} from '../../testing/TraceLoader.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
 import * as Timeline from './timeline.js';
-import * as Utils from './utils/utils.js';
 
 describeWithEnvironment('TimelineTreeView', function() {
   describe('Third party tree', function() {
     it('does not select the first row by default', async function() {
       const {parsedTrace} = await TraceLoader.traceEngine(this, 'web-dev-with-commit.json.gz');
       const treeView = new Timeline.ThirdPartyTreeView.ThirdPartyTreeViewWidget();
-      const mapper = new Utils.EntityMapper.EntityMapper(parsedTrace);
+      const mapper = parsedTrace.entity;
       const events = [...mapper.mappings().eventsByEntity.values()].flat();
-      treeView.setModelWithEvents(events, parsedTrace, mapper);
+      treeView.setModelWithEvents(events, parsedTrace);
       const sel: Timeline.TimelineSelection.TimeRangeSelection = {
         bounds: parsedTrace.Meta.traceBounds,
       };
@@ -31,10 +30,10 @@ describeWithEnvironment('TimelineTreeView', function() {
       // a chrome extension.
       const {parsedTrace} = await TraceLoader.traceEngine(this, 'extension-tracks-and-marks.json.gz');
       const treeView = new Timeline.ThirdPartyTreeView.ThirdPartyTreeViewWidget();
-      const mapper = new Utils.EntityMapper.EntityMapper(parsedTrace);
+      const mapper = parsedTrace.entity;
       const events = [...mapper.mappings().eventsByEntity.values()].flat();
 
-      treeView.setModelWithEvents(events, parsedTrace, mapper);
+      treeView.setModelWithEvents(events, parsedTrace);
       const sel: Timeline.TimelineSelection.TimeRangeSelection = {
         bounds: parsedTrace.Meta.traceBounds,
       };
