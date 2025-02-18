@@ -578,6 +578,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.flameChart = new TimelineFlameChartView(this);
     this.element.addEventListener(
         'toggle-popover', event => this.flameChart.togglePopover((event as CustomEvent).detail));
+    this.element.addEventListener('downloadclick', event => this.saveToFile((event as CustomEvent).detail));
 
     this.#onMainEntryHovered = this.#onEntryHovered.bind(this, this.flameChart.getMainDataProvider());
     this.flameChart.getMainFlameChart().addEventListener(
@@ -1034,7 +1035,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   #populateDownloadMenu(contextMenu: UI.ContextMenu.ContextMenu): void {
     contextMenu.viewSection().appendCheckboxItem(i18nString(UIStrings.saveTraceWithAnnotationsMenuOption), () => {
       Host.userMetrics.actionTaken(Host.UserMetrics.Action.PerfPanelTraceExported);
-      void this.saveToFile(/* isEnhancedTrace */ false, /* addModifications */ true);
+      void this.saveToFile({addModifications: true});
     }, {jslogContext: 'timeline.save-to-file-with-annotations', checked: true});
 
 
@@ -1078,7 +1079,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
             void this.saveToFile();
           });
           contextMenu.saveSection().appendItem(i18nString(UIStrings.exportEnhancedTraces), () => {
-            void this.saveToFile(/* isEnhancedTrace */ true);
+            void this.saveToFile({savingEnhancedTrace: true});
           });
 
           void contextMenu.show();
@@ -1348,7 +1349,10 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     void contextMenu.show();
   }
 
-  async saveToFile(savingEnhancedTrace = false, addModifications = false): Promise<void> {
+  async saveToFile({savingEnhancedTrace, addModifications}: {
+    savingEnhancedTrace?: boolean,
+    addModifications?: boolean,
+  } = {savingEnhancedTrace: false, addModifications: false}): Promise<void> {
     if (this.state !== State.IDLE) {
       return;
     }
