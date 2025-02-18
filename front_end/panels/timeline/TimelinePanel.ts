@@ -1032,17 +1032,18 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   }
 
   #populateDownloadMenu(contextMenu: UI.ContextMenu.ContextMenu): void {
-    contextMenu.viewSection().appendItem(i18nString(UIStrings.saveTraceWithAnnotationsMenuOption), () => {
+    contextMenu.viewSection().appendCheckboxItem(i18nString(UIStrings.saveTraceWithAnnotationsMenuOption), () => {
       Host.userMetrics.actionTaken(Host.UserMetrics.Action.PerfPanelTraceExported);
       void this.saveToFile(/* isEnhancedTrace */ false, /* addModifications */ true);
-    }, {
-      jslogContext: 'timeline.save-to-file-with-annotations',
-    });
-    contextMenu.viewSection().appendItem(i18nString(UIStrings.saveTraceWithoutAnnotationsMenuOption), () => {
+    }, {jslogContext: 'timeline.save-to-file-with-annotations', checked: true});
+
+
+    contextMenu.viewSection().appendCheckboxItem(i18nString(UIStrings.saveTraceWithoutAnnotationsMenuOption), () => {
       Host.userMetrics.actionTaken(Host.UserMetrics.Action.PerfPanelTraceExported);
       void this.saveToFile();
     }, {
       jslogContext: 'timeline.save-to-file-without-annotations',
+      checked: true,
     });
   }
 
@@ -1061,6 +1062,9 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       Host.userMetrics.actionTaken(Host.UserMetrics.Action.PerfPanelTraceImported);
       this.selectFileToLoad();
     });
+
+    const downloadChoiceButton = new TimelineComponents.SaveDialog.SaveDialog();
+    this.panelToolbar.appendToolbarItem(new UI.Toolbar.ToolbarItem(downloadChoiceButton));
 
     this.saveButton = new UI.Toolbar.ToolbarMenuButton(
         this.#populateDownloadMenu.bind(this), true, true, 'timeline.save-to-file-more-options', 'download');

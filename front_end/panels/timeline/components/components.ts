@@ -17,6 +17,7 @@ import * as NetworkRequestTooltip from './NetworkRequestTooltip.js';
 import * as NetworkThrottlingSelector from './NetworkThrottlingSelector.js';
 import * as OriginMap from './OriginMap.js';
 import * as RelatedInsightChips from './RelatedInsightChips.js';
+import * as SaveDialog from './SaveDialog.js';
 import * as Sidebar from './Sidebar.js';
 import * as SidebarAnnotationsTab from './SidebarAnnotationsTab.js';
 import * as SidebarInsightsTab from './SidebarInsightsTab.js';
@@ -40,6 +41,7 @@ export {
   NetworkThrottlingSelector,
   OriginMap,
   RelatedInsightChips,
+  SaveDialog,
   Sidebar,
   SidebarAnnotationsTab,
   SidebarInsightsTab,
