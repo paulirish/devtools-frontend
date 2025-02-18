@@ -5,7 +5,6 @@ import * as SDK from '../core/sdk/sdk.js';
 import type * as Protocol from '../generated/protocol.js';
 import * as Bindings from '../models/bindings/bindings.js';
 import * as CPUProfile from '../models/cpu_profile/cpu_profile.js';
-import {EntityMapper} from '../models/trace/handlers/Entities.js';
 import * as Trace from '../models/trace/trace.js';
 import * as Workspace from '../models/workspace/workspace.js';
 import * as Timeline from '../panels/timeline/timeline.js';
@@ -759,8 +758,8 @@ export function getBaseTraceParseModelData(overrides: Partial<ParsedTrace> = {})
     },
     ...overrides,
   };
-  parsedTrace.entity = new EntityMapper(parsedTrace as ParsedTrace);
-  return parsedTrace as ParsedTrace;  // This cast...
+  parsedTrace.entity = new Trace.Handlers.Entities.EntityMapper(parsedTrace as Trace.Handlers.Types.HandlerData);
+  return parsedTrace as ParsedTrace;
 }
 
 /**
