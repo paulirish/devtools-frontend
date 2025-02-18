@@ -96,12 +96,12 @@ export function generateInsight(
     return Helpers.Timing.eventIsInBounds(event, context.bounds);
   });
 
-  const thirdPartySummary = Extras.ThirdParties.summarizeThirdParties(
-      parsedTrace as Handlers.Types.ParsedTrace, context.bounds, networkRequests);
+  const thirdPartySummary =
+      Extras.ThirdParties.summarizeThirdParties(parsedTrace as TraceModel.ParsedTrace, context.bounds, networkRequests);
 
   const firstPartyUrl = context.navigation?.args.data?.documentLoaderURL ?? parsedTrace.Meta.mainFrameURL;
   const firstPartyEntity = ThirdPartyWeb.ThirdPartyWeb.getEntity(firstPartyUrl) ||
-      Handlers.Helpers.makeUpEntity(thirdPartySummary.madeUpEntityCache, firstPartyUrl);
+      Helpers.EntityMapper.makeUpEntity(thirdPartySummary.madeUpEntityCache, firstPartyUrl);
 
   return finalize({
     relatedEvents: getRelatedEvents(thirdPartySummary, firstPartyEntity),

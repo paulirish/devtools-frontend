@@ -55,7 +55,7 @@ export class NodeLink extends HTMLElement {
     // is an abuse of this API, but it's currently alright since the first parameter
     // is only used as a cache key.
     const domNodesMap = await Trace.Extras.FetchNodes.domNodesForMultipleBackendNodeIds(
-        this as unknown as Trace.Handlers.Types.ParsedTrace, [this.#backendNodeId]);
+        this as unknown as Trace.TraceModel.ParsedTrace, [this.#backendNodeId]);
     const node = domNodesMap.get(this.#backendNodeId);
     if (!node) {
       return;

@@ -29,7 +29,7 @@ const fileContentsCache = new Map<string, Trace.Types.File.Contents>();
 // and will reparse. This is required as some of the settings and experiments
 // change if events are kept and dropped.
 const traceEngineCache = new Map<string, Map<string, {
-                                   parsedTrace: Trace.Handlers.Types.ParsedTrace,
+                                   parsedTrace: Trace.TraceModel.ParsedTrace,
                                    insights: Trace.Insights.Types.TraceInsightSets | null,
                                    metadata: Trace.Types.File.MetaData | null,
                                    model: Trace.TraceModel.Model,
@@ -138,7 +138,7 @@ export class TraceLoader {
   static async traceEngine(
       context: Mocha.Context|Mocha.Suite|null, name: string,
       config: Trace.Types.Configuration.Configuration = Trace.Types.Configuration.defaults()): Promise<{
-    parsedTrace: Trace.Handlers.Types.ParsedTrace,
+    parsedTrace: Trace.TraceModel.ParsedTrace,
     insights: Trace.Insights.Types.TraceInsightSets|null,
     metadata: Trace.Types.File.MetaData|null,
   }> {
@@ -170,7 +170,7 @@ export class TraceLoader {
         await TraceLoader.executeTraceEngineOnFileContents(fileContents, /* emulate fresh recording */ false, config);
 
     const cacheByName = traceEngineCache.get(name) ?? new Map<string, {
-                          parsedTrace: Trace.Handlers.Types.ParsedTrace,
+                          parsedTrace: Trace.TraceModel.ParsedTrace,
                           insights: Trace.Insights.Types.TraceInsightSets | null,
                           metadata: Trace.Types.File.MetaData | null,
                           model: Trace.TraceModel.Model,
@@ -194,7 +194,7 @@ export class TraceLoader {
    * level - rely on this being set. This is always set in the actual panel, but
    * parsing a trace in a test does not automatically set it.
    **/
-  static initTraceBoundsManager(data: Trace.Handlers.Types.ParsedTrace): void {
+  static initTraceBoundsManager(data: Trace.TraceModel.ParsedTrace): void {
     TraceBounds.TraceBounds.BoundsManager
         .instance({
           forceNew: true,
@@ -207,7 +207,7 @@ export class TraceLoader {
       traceEngineConfig?: Trace.Types.Configuration.Configuration): Promise<{
     model: Trace.TraceModel.Model,
     metadata: Trace.Types.File.MetaData,
-    parsedTrace: Trace.Handlers.Types.ParsedTrace,
+    parsedTrace: Trace.TraceModel.ParsedTrace,
     insights: Trace.Insights.Types.TraceInsightSets|null,
   }> {
     const events = 'traceEvents' in contents ? contents.traceEvents : contents;

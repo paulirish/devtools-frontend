@@ -91,7 +91,7 @@ export class LayoutShiftDetails extends HTMLElement {
 
   #event: Trace.Types.Events.SyntheticLayoutShift|Trace.Types.Events.SyntheticLayoutShiftCluster|null = null;
   #traceInsightsSets: Trace.Insights.Types.TraceInsightSets|null = null;
-  #parsedTrace: Trace.Handlers.Types.ParsedTrace|null = null;
+  #parsedTrace: Trace.TraceModel.ParsedTrace|null = null;
   #isFreshRecording: Boolean = false;
 
   connectedCallback(): void {
@@ -105,7 +105,7 @@ export class LayoutShiftDetails extends HTMLElement {
 
   setData(
       event: Trace.Types.Events.SyntheticLayoutShift|Trace.Types.Events.SyntheticLayoutShiftCluster,
-      traceInsightsSets: Trace.Insights.Types.TraceInsightSets|null, parsedTrace: Trace.Handlers.Types.ParsedTrace|null,
+      traceInsightsSets: Trace.Insights.Types.TraceInsightSets|null, parsedTrace: Trace.TraceModel.ParsedTrace|null,
       isFreshRecording: Boolean): void {
     if (this.#event === event) {
       return;
@@ -117,8 +117,8 @@ export class LayoutShiftDetails extends HTMLElement {
     this.#render();
   }
 
-  #renderTitle(event: Trace.Types.Events.SyntheticLayoutShift|
-               Trace.Types.Events.SyntheticLayoutShiftCluster): Lit.TemplateResult {
+  #renderTitle(event: Trace.Types.Events.SyntheticLayoutShift|Trace.Types.Events.SyntheticLayoutShiftCluster):
+      Lit.TemplateResult {
     const title = Utils.EntryName.nameForEntry(event);
     return html`
       <div class="layout-shift-details-title">
@@ -229,7 +229,7 @@ export class LayoutShiftDetails extends HTMLElement {
     `;
   }
 
-  #renderStartTime(shift: Trace.Types.Events.SyntheticLayoutShift, parsedTrace: Trace.Handlers.Types.ParsedTrace):
+  #renderStartTime(shift: Trace.Types.Events.SyntheticLayoutShift, parsedTrace: Trace.TraceModel.ParsedTrace):
       Lit.TemplateResult|null {
     const ts = Trace.Types.Timing.Micro(shift.ts - parsedTrace.Meta.traceBounds.min);
     if (shift === this.#event) {
@@ -243,7 +243,7 @@ export class LayoutShiftDetails extends HTMLElement {
   }
 
   #renderShiftRow(
-      shift: Trace.Types.Events.SyntheticLayoutShift, parsedTrace: Trace.Handlers.Types.ParsedTrace,
+      shift: Trace.Types.Events.SyntheticLayoutShift, parsedTrace: Trace.TraceModel.ParsedTrace,
       elementsShifted: Trace.Types.Events.TraceImpactedNode[],
       rootCauses: Trace.Insights.Models.CLSCulprits.LayoutShiftRootCausesData|undefined): Lit.TemplateResult|null {
     const score = shift.args.data?.weighted_score_delta;
@@ -278,7 +278,7 @@ export class LayoutShiftDetails extends HTMLElement {
 
   #renderParentCluster(
       cluster: Trace.Types.Events.SyntheticLayoutShiftCluster|undefined,
-      parsedTrace: Trace.Handlers.Types.ParsedTrace): Lit.TemplateResult|null {
+      parsedTrace: Trace.TraceModel.ParsedTrace): Lit.TemplateResult|null {
     if (!cluster) {
       return null;
     }
@@ -304,7 +304,7 @@ export class LayoutShiftDetails extends HTMLElement {
   #renderShiftDetails(
       layoutShift: Trace.Types.Events.SyntheticLayoutShift,
       traceInsightsSets: Trace.Insights.Types.TraceInsightSets|null,
-      parsedTrace: Trace.Handlers.Types.ParsedTrace,
+      parsedTrace: Trace.TraceModel.ParsedTrace,
       ): Lit.TemplateResult|null {
     if (!traceInsightsSets) {
       return null;
@@ -351,7 +351,7 @@ export class LayoutShiftDetails extends HTMLElement {
   #renderClusterDetails(
       cluster: Trace.Types.Events.SyntheticLayoutShiftCluster,
       traceInsightsSets: Trace.Insights.Types.TraceInsightSets|null,
-      parsedTrace: Trace.Handlers.Types.ParsedTrace): Lit.TemplateResult|null {
+      parsedTrace: Trace.TraceModel.ParsedTrace): Lit.TemplateResult|null {
     if (!traceInsightsSets) {
       return null;
     }

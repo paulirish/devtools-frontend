@@ -4,7 +4,6 @@
 
 import * as Platform from '../../../core/platform/platform.js';
 import * as Helpers from '../helpers/helpers.js';
-import * as Trace from '../trace.js';
 import * as Types from '../types/types.js';
 
 import {data as auctionWorkletsData} from './AuctionWorkletsHandler.js';
@@ -27,10 +26,10 @@ import type {HandlerName} from './types.js';
 
 const processes = new Map<Types.Events.ProcessID, RendererProcess>();
 
-const entityMappings: Trace.EntityMapper.EntityMappings = {
-  eventsByEntity: new Map<Trace.EntityMapper.Entity, Types.Events.Event[]>(),
-  entityByEvent: new Map<Types.Events.Event, Trace.EntityMapper.Entity>(),
-  createdEntityCache: new Map<string, Trace.EntityMapper.Entity>(),
+const entityMappings: Helpers.EntityMapper.EntityMappings = {
+  eventsByEntity: new Map<Helpers.EntityMapper.Entity, Types.Events.Event[]>(),
+  entityByEvent: new Map<Types.Events.Event, Helpers.EntityMapper.Entity>(),
+  createdEntityCache: new Map<string, Helpers.EntityMapper.Entity>(),
 };
 
 // We track the compositor tile worker thread name events so that at the end we
@@ -356,7 +355,7 @@ export function buildHierarchy(
       // Update the entryToNode map with the entries from this thread
       for (const [entry, node] of treeData.entryToNode) {
         entryToNode.set(entry, node);
-        Trace.EntityMapper.addEventToEntityMapping(entry, entityMappings);
+        Helpers.EntityMapper.addEventToEntityMapping(entry, entityMappings);
       }
     }
   }
@@ -411,7 +410,7 @@ export interface RendererHandlerData {
    * samples.
    */
   allTraceEntries: Types.Events.Event[];
-  entityMappings: Trace.EntityMapper.EntityMappings;
+  entityMappings: Helpers.EntityMapper.EntityMappings;
 }
 
 export interface RendererProcess {

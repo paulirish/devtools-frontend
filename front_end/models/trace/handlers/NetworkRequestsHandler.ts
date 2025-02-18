@@ -4,11 +4,9 @@
 
 import * as Platform from '../../../core/platform/platform.js';
 import * as Protocol from '../../../generated/protocol.js';
-import * as EntityMapperJs from '../EntityMapper.js';
 import * as Helpers from '../helpers/helpers.js';
 import * as Types from '../types/types.js';
 
-import * as HandlerHelpers from './helpers.js';
 import {data as metaHandlerData} from './MetaHandler.js';
 import type {HandlerName} from './types.js';
 
@@ -58,7 +56,7 @@ interface NetworkRequestData {
   byTime: Types.Events.SyntheticNetworkRequest[];
   eventToInitiator: Map<Types.Events.SyntheticNetworkRequest, Types.Events.SyntheticNetworkRequest>;
   webSocket: WebSocketTraceData[];
-  entityMappings: HandlerHelpers.EntityMappings;
+  entityMappings: Helpers.EntityMapper.EntityMappings;
 }
 
 const requestMap = new Map<string, TraceEventsForNetworkRequest>();
@@ -78,10 +76,10 @@ const eventToInitiatorMap = new Map<Types.Events.SyntheticNetworkRequest, Types.
  * more than we have to, here we start building the caches. After this, the RendererHandler will update
  * the relationships. When handling ThirdParty references, use the one in the RendererHandler instead.
  */
-const entityMappings: HandlerHelpers.EntityMappings = {
-  eventsByEntity: new Map<HandlerHelpers.Entity, Types.Events.Event[]>(),
-  entityByEvent: new Map<Types.Events.Event, HandlerHelpers.Entity>(),
-  createdEntityCache: new Map<string, HandlerHelpers.Entity>(),
+const entityMappings: Helpers.EntityMapper.EntityMappings = {
+  eventsByEntity: new Map<Helpers.EntityMapper.Entity, Types.Events.Event[]>(),
+  entityByEvent: new Map<Types.Events.Event, Helpers.EntityMapper.Entity>(),
+  createdEntityCache: new Map<string, Helpers.EntityMapper.Entity>(),
 };
 
 function storeTraceEventWithRequestId<K extends keyof TraceEventsForNetworkRequest>(
@@ -487,7 +485,7 @@ export async function finalize(): Promise<void> {
     requestsByTime.push(networkEvent);
     requestsById.set(networkEvent.args.data.requestId, networkEvent);
     // Update entity relationships for network events.
-    EntityMapperJs.addEventToEntityMapping(networkEvent, entityMappings);
+    Helpers.EntityMapper.addEventToEntityMapping(networkEvent, entityMappings);
     const initiatorUrl = networkEvent.args.data.initiator?.url ||
         Helpers.Trace.getZeroIndexedStackTraceForEvent(networkEvent)?.at(0)?.url;
     if (initiatorUrl) {

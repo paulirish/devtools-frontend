@@ -48,10 +48,10 @@ export class TimingsTrackAppender implements TrackAppender {
 
   #colorGenerator: Common.Color.Generator;
   #compatibilityBuilder: CompatibilityTracksAppender;
-  #parsedTrace: Readonly<Trace.Handlers.Types.ParsedTrace>;
+  #parsedTrace: Readonly<Trace.TraceModel.ParsedTrace>;
   #extensionMarkers: readonly Trace.Types.Extensions.SyntheticExtensionMarker[];
   constructor(
-      compatibilityBuilder: CompatibilityTracksAppender, parsedTrace: Trace.Handlers.Types.ParsedTrace,
+      compatibilityBuilder: CompatibilityTracksAppender, parsedTrace: Trace.TraceModel.ParsedTrace,
       colorGenerator: Common.Color.Generator) {
     this.#compatibilityBuilder = compatibilityBuilder;
     this.#colorGenerator = colorGenerator;

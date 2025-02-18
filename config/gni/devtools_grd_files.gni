@@ -1132,6 +1132,7 @@ grd_files_debug_sources = [
   "front_end/models/trace/handlers/WorkersHandler.js",
   "front_end/models/trace/handlers/helpers.js",
   "front_end/models/trace/handlers/types.js",
+  "front_end/models/trace/helpers/EntityMapper.js",
   "front_end/models/trace/helpers/Extensions.js",
   "front_end/models/trace/helpers/Network.js",
   "front_end/models/trace/helpers/SamplesIntegrator.js",

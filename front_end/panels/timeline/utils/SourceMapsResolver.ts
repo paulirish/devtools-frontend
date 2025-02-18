@@ -30,7 +30,7 @@ export class SourceMappingsUpdated extends Event {
 export const resolvedCodeLocationDataNames: Map<string, ResolvedCodeLocationData|null> = new Map();
 
 export class SourceMapsResolver extends EventTarget {
-  #parsedTrace: Trace.Handlers.Types.ParsedTrace;
+  #parsedTrace: Trace.TraceModel.ParsedTrace;
 
   #isResolving = false;
 
@@ -41,7 +41,7 @@ export class SourceMapsResolver extends EventTarget {
   // those workers too.
   #debuggerModelsToListen = new Set<SDK.DebuggerModel.DebuggerModel>();
 
-  constructor(parsedTrace: Trace.Handlers.Types.ParsedTrace) {
+  constructor(parsedTrace: Trace.TraceModel.ParsedTrace) {
     super();
     this.#parsedTrace = parsedTrace;
   }
@@ -86,7 +86,7 @@ export class SourceMapsResolver extends EventTarget {
     return SourceMapsResolver.resolvedCodeLocationForCallFrame(callFrame as Protocol.Runtime.CallFrame);
   }
 
-  static resolvedURLForEntry(parsedTrace: Trace.Handlers.Types.ParsedTrace, entry: Trace.Types.Events.Event):
+  static resolvedURLForEntry(parsedTrace: Trace.TraceModel.ParsedTrace, entry: Trace.Types.Events.Event):
       Platform.DevToolsPath.UrlString|null {
     const resolvedCallFrameURL =
         SourceMapsResolver.resolvedCodeLocationForEntry(entry)?.devtoolsLocation?.uiSourceCode.url();
@@ -95,7 +95,7 @@ export class SourceMapsResolver extends EventTarget {
     }
     // If no source mapping was found for an entry's URL, then default
     // to the URL value contained in the event itself, if any.
-    const url = Trace.Handlers.Helpers.getNonResolvedURL(entry, parsedTrace);
+    const url = Trace.Helpers.EntityMapper.getNonResolvedURL(entry, parsedTrace);
     if (url) {
       return Workspace.Workspace.WorkspaceImpl.instance().uiSourceCodeForURL(url)?.url() ?? url;
     }

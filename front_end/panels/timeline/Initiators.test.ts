@@ -17,7 +17,7 @@ describeWithEnvironment('Initiators', () => {
     let rAFCall: Trace.Types.Events.SyntheticProfileCall;
     let functionCallByRAF: Trace.Types.Events.Event;
 
-    let parsedTrace: Trace.Handlers.Types.ParsedTrace;
+    let parsedTrace: Trace.TraceModel.ParsedTrace;
     beforeEach(async function() {
       parsedTrace = (await TraceLoader.traceEngine(this, 'async-js-calls.json.gz')).parsedTrace;
       setTimeoutCall =

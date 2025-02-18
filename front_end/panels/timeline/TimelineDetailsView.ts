@@ -76,7 +76,7 @@ export class TimelineDetailsPane extends
   private selection?: TimelineSelection|null;
   private updateContentsScheduled: boolean;
   private lazySelectorStatsView: TimelineSelectorStatsView|null;
-  #parsedTrace: Trace.Handlers.Types.ParsedTrace|null = null;
+  #parsedTrace: Trace.TraceModel.ParsedTrace|null = null;
   #traceInsightsSets: Trace.Insights.Types.TraceInsightSets|null = null;
 
   #eventToRelatedInsightsMap: TimelineComponents.RelatedInsightChips.EventToRelatedInsightsMap|null = null;
@@ -224,7 +224,7 @@ export class TimelineDetailsPane extends
   }
 
   async setModel(data: {
-    parsedTrace: Trace.Handlers.Types.ParsedTrace|null,
+    parsedTrace: Trace.TraceModel.ParsedTrace|null,
     selectedEvents: Trace.Types.Events.Event[]|null,
     traceInsightsSets: Trace.Insights.Types.TraceInsightSets|null,
     eventToRelatedInsightsMap: TimelineComponents.RelatedInsightChips.EventToRelatedInsightsMap|null,

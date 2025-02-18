@@ -33,9 +33,9 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export class ServerTimingsTrackAppender implements TrackAppender {
   readonly appenderName: TrackAppenderName = 'ServerTimings';
 
-  #parsedTrace: Readonly<Trace.Handlers.Types.ParsedTrace>;
+  #parsedTrace: Readonly<Trace.TraceModel.ParsedTrace>;
   #compatibilityBuilder: CompatibilityTracksAppender;
-  constructor(compatibilityBuilder: CompatibilityTracksAppender, parsedTrace: Trace.Handlers.Types.ParsedTrace) {
+  constructor(compatibilityBuilder: CompatibilityTracksAppender, parsedTrace: Trace.TraceModel.ParsedTrace) {
     this.#parsedTrace = parsedTrace;
     this.#compatibilityBuilder = compatibilityBuilder;
   }

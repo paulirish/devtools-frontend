@@ -15,7 +15,7 @@ import * as ThemeSupport from '../../../ui/legacy/theme_support/theme_support.js
 import * as Timeline from '../timeline.js';
 
 function initTrackAppender(
-    flameChartData: PerfUI.FlameChart.FlameChartTimelineData, parsedTrace: Trace.Handlers.Types.ParsedTrace,
+    flameChartData: PerfUI.FlameChart.FlameChartTimelineData, parsedTrace: Trace.TraceModel.ParsedTrace,
     entryData: Trace.Types.Events.Event[], entryTypeByLevel: Timeline.TimelineFlameChartDataProvider.EntryType[]):
     Timeline.ExtensionTrackAppender.ExtensionTrackAppender[] {
   const entityMapper = new Timeline.Utils.EntityMapper.EntityMapper(parsedTrace);
@@ -27,7 +27,7 @@ function initTrackAppender(
 }
 
 describeWithEnvironment('ExtensionTrackAppender', function() {
-  let parsedTrace: Trace.Handlers.Types.ParsedTrace;
+  let parsedTrace: Trace.TraceModel.ParsedTrace;
   let extensionTrackAppenders: Timeline.ExtensionTrackAppender.ExtensionTrackAppender[];
   let entryData: Trace.Types.Events.Event[] = [];
   let flameChartData = PerfUI.FlameChart.FlameChartTimelineData.createEmpty();

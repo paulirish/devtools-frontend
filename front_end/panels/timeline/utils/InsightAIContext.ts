@@ -15,9 +15,9 @@ import {AICallTree} from './AICallTree.js';
  */
 export class ActiveInsight {
   #insight: Trace.Insights.Types.InsightModel<{}, {}>;
-  #parsedTrace: Trace.Handlers.Types.ParsedTrace;
+  #parsedTrace: Trace.TraceModel.ParsedTrace;
 
-  constructor(insight: Trace.Insights.Types.InsightModel<{}, {}>, parsedTrace: Trace.Handlers.Types.ParsedTrace) {
+  constructor(insight: Trace.Insights.Types.InsightModel<{}, {}>, parsedTrace: Trace.TraceModel.ParsedTrace) {
     this.#insight = insight;
     this.#parsedTrace = parsedTrace;
   }
