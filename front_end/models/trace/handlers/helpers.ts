@@ -8,6 +8,7 @@ import * as Types from '../types/types.js';
 
 import type {ParsedTrace} from './types.js';
 
+// TODO(paulirish): move all these entity methods to entityMapper
 export type Entity = typeof ThirdPartyWeb.ThirdPartyWeb.entities[number]&{
   isUnrecognized?: boolean,
 };
