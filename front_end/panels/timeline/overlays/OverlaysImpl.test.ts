@@ -37,9 +37,8 @@ function createCharts(parsedTrace?: Trace.TraceModel.ParsedTrace): Overlays.Over
   const mainProvider = new Timeline.TimelineFlameChartDataProvider.TimelineFlameChartDataProvider();
   const networkProvider = new Timeline.TimelineFlameChartNetworkDataProvider.TimelineFlameChartNetworkDataProvider();
   if (parsedTrace) {
-    const entityMapper = new Timeline.Utils.EntityMapper.EntityMapper(parsedTrace);
-    mainProvider.setModel(parsedTrace, entityMapper);
-    networkProvider.setModel(parsedTrace, entityMapper);
+    mainProvider.setModel(parsedTrace);
+    networkProvider.setModel(parsedTrace);
   }
 
   const delegate = new MockFlameChartDelegate();

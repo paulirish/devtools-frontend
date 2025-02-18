@@ -228,8 +228,7 @@ describeWithMockConnection('SourceMapsResolver', () => {
 
       // For a profile call with mappings, it must return the mapped script.
       const traceWithMappings = parsedTraceFromProfileCalls([profileCallWithMappings]);
-      const mapperWithMappings = new Utils.EntityMapper.EntityMapper(traceWithMappings);
-      let resolver = new Utils.SourceMapsResolver.SourceMapsResolver(traceWithMappings, mapperWithMappings);
+      let resolver = new Utils.SourceMapsResolver.SourceMapsResolver(traceWithMappings);
       await resolver.install();
       let sourceMappedURL =
           Utils.SourceMapsResolver.SourceMapsResolver.resolvedURLForEntry(traceWithMappings, profileCallWithMappings);
@@ -237,8 +236,7 @@ describeWithMockConnection('SourceMapsResolver', () => {
 
       // For a profile call without mappings, it must return the original URL
       const traceWithoutMappings = parsedTraceFromProfileCalls([profileCallWithNoMappings]);
-      const mapperWithoutMappings = new Utils.EntityMapper.EntityMapper(traceWithoutMappings);
-      resolver = new Utils.SourceMapsResolver.SourceMapsResolver(traceWithoutMappings, mapperWithoutMappings);
+      resolver = new Utils.SourceMapsResolver.SourceMapsResolver(traceWithoutMappings);
       await resolver.install();
       sourceMappedURL = Utils.SourceMapsResolver.SourceMapsResolver.resolvedURLForEntry(
           traceWithoutMappings, profileCallWithNoMappings);
@@ -282,7 +280,6 @@ describeWithMockConnection('SourceMapsResolver', () => {
       };
 
       const trace = parsedTraceFromProfileCalls([profileCall, profileCallUnmapped]);
-      const mapper = new Utils.EntityMapper.EntityMapper(trace);
 
       const testEntity = {
         name: 'example-domain.com',
@@ -297,15 +294,15 @@ describeWithMockConnection('SourceMapsResolver', () => {
       };
       // Set a fake entity for this event that should get overridden. Initially
       // both traces are mapped together, after the sourcemap that should change
-      mapper.mappings().entityByEvent.set(profileCall, testEntity);
-      mapper.mappings().entityByEvent.set(profileCallUnmapped, testEntity);
-      mapper.mappings().eventsByEntity.set(testEntity, [profileCall, profileCallUnmapped]);
-      mapper.mappings().createdEntityCache.set('example-domain.com', testEntity);
+      trace.entity.mappings().entityByEvent.set(profileCall, testEntity);
+      trace.entity.mappings().entityByEvent.set(profileCallUnmapped, testEntity);
+      trace.entity.mappings().eventsByEntity.set(testEntity, [profileCall, profileCallUnmapped]);
+      trace.entity.mappings().createdEntityCache.set('example-domain.com', testEntity);
 
-      const resolver = new Utils.SourceMapsResolver.SourceMapsResolver(trace, mapper);
+      const resolver = new Utils.SourceMapsResolver.SourceMapsResolver(trace);
       // This should update the entities
       await resolver.install();
-      const afterEntityOfEvent = mapper.entityForEvent(profileCall);
+      const afterEntityOfEvent = trace.entity.entityForEvent(profileCall);
       const expected = {
         name: 'example.com',
         company: 'example.com',
@@ -320,13 +317,13 @@ describeWithMockConnection('SourceMapsResolver', () => {
       assert.exists(afterEntityOfEvent);
       assert.deepEqual(afterEntityOfEvent, expected);
       // The mapped event should now map to its new entity.
-      const gotEventsMapped = mapper.eventsForEntity(afterEntityOfEvent) ?? [];
+      const gotEventsMapped = trace.entity.eventsForEntity(afterEntityOfEvent) ?? [];
       assert.deepEqual(gotEventsMapped, [profileCall]);
 
       // The unmapped event should keep its original entity.
-      const gotEventsUnmapped = mapper.eventsForEntity(testEntity) ?? [];
+      const gotEventsUnmapped = trace.entity.eventsForEntity(testEntity) ?? [];
       assert.deepEqual(gotEventsUnmapped, [profileCallUnmapped]);
-      const gotUnmappedEntity = mapper.entityForEvent(profileCallUnmapped);
+      const gotUnmappedEntity = trace.entity.entityForEvent(profileCallUnmapped);
       assert.deepEqual(gotUnmappedEntity, testEntity);
     });
   });
