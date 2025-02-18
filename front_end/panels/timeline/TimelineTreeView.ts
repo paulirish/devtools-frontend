@@ -437,7 +437,6 @@ export class TimelineTreeView extends
       endTime: this.endTime,
       doNotAggregate,
       eventGroupIdCallback,
-      includeInstantEvents: true,  // TODO: remove. temporary for debugging
     });
   }
 
@@ -1075,6 +1074,15 @@ export class AggregatedTimelineTreeView extends TimelineTreeView {
     if (!parsedTrace) {
       return '';
     }
+    if (groupBy === AggregatedTimelineTreeView.GroupBy.ThirdParties) {
+      const entity = this.entityMapper?.entityForEvent(event);
+      if (!entity) {
+        return '';
+      }
+
+      return entity.name;
+    }
+
     const url = Trace.Handlers.Helpers.getNonResolvedURL(event, parsedTrace);
     if (!url) {
       return '';
@@ -1091,13 +1099,6 @@ export class AggregatedTimelineTreeView extends TimelineTreeView {
     }
     if (parsedURL.scheme === 'chrome-extension') {
       return parsedURL.scheme + '://' + parsedURL.host;
-    }
-    if (groupBy === AggregatedTimelineTreeView.GroupBy.ThirdParties) {
-      const entity = ThirdPartyWeb.ThirdPartyWeb.getEntity(url);
-      if (!entity) {
-        return parsedURL.host;
-      }
-      return entity.name;
     }
     if (groupBy === AggregatedTimelineTreeView.GroupBy.Subdomain) {
       return parsedURL.host;

@@ -86,10 +86,6 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
     // of visible event types, but also include network events, which by
     // default are not in the set of visible entries (as they are not shown on
     // the main flame chart).
-
-    // const onInstantEventCallback = (e: Trace.Types.Events.Event) => {
-
-    // }
     const filter = new Trace.Extras.TraceFilter.VisibleEventsFilter(
         Utils.EntryStyles.visibleTypes().concat([Trace.Types.Events.Name.SYNTHETIC_NETWORK_REQUEST]));
 

@@ -389,7 +389,7 @@ export class BottomUpRootNode extends Node {
     const firstNodeStack: boolean[] = [];
     const totalTimeById = new Map<string, number>();
 
-    // encodedDataLength is provided solely on on instant events.
+    // encodedDataLength is provided solely on instant events.
     const sumTransferSizeOfInstantEvent = (e: Types.Events.Event): void => {
       if (Types.Events.isReceivedDataEvent(e)) {
         const id = generateEventID(e);
