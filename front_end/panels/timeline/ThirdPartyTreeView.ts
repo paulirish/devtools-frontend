@@ -67,9 +67,8 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
 
   override buildTree(): Trace.Extras.TraceTree.Node {
     const parsedTrace = this.parsedTrace();
-    const entityMapper = this.entityMapper();
 
-    if (!parsedTrace || !entityMapper) {
+    if (!parsedTrace) {
       return new Trace.Extras.TraceTree.BottomUpRootNode([], {
         textFilter: this.textFilter(),
         filters: this.filtersWithoutTextFilter(),
@@ -83,8 +82,8 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
     const min = Trace.Helpers.Timing.milliToMicro(this.startTime);
     const max = Trace.Helpers.Timing.milliToMicro(this.endTime);
     const bounds: Trace.Types.Timing.TraceWindowMicro = {max, min, range: Trace.Types.Timing.Micro(max - min)};
-    this.#thirdPartySummaries =
-        Trace.Extras.ThirdParties.getSummariesAndEntitiesWithMapping(parsedTrace, bounds, entityMapper.mappings());
+    this.#thirdPartySummaries = Trace.Extras.ThirdParties.getSummariesAndEntitiesWithMapping(
+        parsedTrace, bounds, parsedTrace.entity.mappings());
 
     const events = this.#thirdPartySummaries?.entityByEvent.keys();
     const relatedEvents = Array.from(events ?? []).sort(Trace.Helpers.Trace.eventTimeComparator);
@@ -117,17 +116,7 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
   }
 
   private domainByEvent(event: Trace.Types.Events.Event): string {
-    const parsedTrace = this.parsedTrace();
-    if (!parsedTrace) {
-      return '';
-    }
-
-    const entityMappings = this.entityMapper();
-    if (!entityMappings) {
-      return '';
-    }
-
-    const entity = entityMappings.entityForEvent(event);
+    const entity = this.parsedTrace()?.entity.entityForEvent(event);
     if (!entity) {
       return '';
     }
@@ -210,7 +199,7 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
   }
 
   override onHover(node: Trace.Extras.TraceTree.Node|null): void {
-    const entityMappings = this.entityMapper();
+    const entityMappings = this.parsedTrace()?.entity;
     if (!entityMappings || !node?.event) {
       return;
     }
@@ -251,7 +240,7 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
   }
 
   nodeIsFirstParty(node: Trace.Extras.TraceTree.Node): boolean {
-    const mapper = this.entityMapper();
+    const mapper = this.parsedTrace()?.entity;
     if (!mapper) {
       return false;
     }
@@ -260,7 +249,7 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
   }
 
   nodeIsExtension(node: Trace.Extras.TraceTree.Node): boolean {
-    const mapper = this.entityMapper();
+    const mapper = this.parsedTrace()?.entity;
     if (!mapper) {
       return false;
     }
