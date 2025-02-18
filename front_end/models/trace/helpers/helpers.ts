@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-export * as EntityMapper from './EntityMapper.js';
 export * as Extensions from './Extensions.js';
 export * as Network from './Network.js';
 export * as SamplesIntegrator from './SamplesIntegrator.js';

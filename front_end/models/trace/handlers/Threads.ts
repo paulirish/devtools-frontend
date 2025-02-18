@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 //
 import type * as Helpers from '../helpers/helpers.js';
-import type {ParsedTrace} from '../ModelImpl.js';
 import type * as Types from '../types/types.js';
 
 import type {AuctionWorkletsData} from './AuctionWorkletsHandler.js';
 import type * as Renderer from './RendererHandler.js';
+import type {HandlerData} from './types.js';
 
 export interface ThreadData {
   pid: Types.Events.ProcessID;
@@ -82,7 +82,7 @@ export function threadsInRenderer(
   return foundThreads;
 }
 
-const threadsInTraceCache = new WeakMap<ParsedTrace, readonly ThreadData[]>();
+const threadsInTraceCache = new WeakMap<HandlerData, readonly ThreadData[]>();
 
 /**
  * Given trace parsed data, this helper will return a high level array of
@@ -92,7 +92,7 @@ const threadsInTraceCache = new WeakMap<ParsedTrace, readonly ThreadData[]>();
  * for both trace types.
  * The resulting data is cached per-trace, so you can safely call this multiple times.
  */
-export function threadsInTrace(parsedTrace: ParsedTrace): readonly ThreadData[] {
+export function threadsInTrace(parsedTrace: HandlerData): readonly ThreadData[] {
   const cached = threadsInTraceCache.get(parsedTrace);
   if (cached) {
     return cached;

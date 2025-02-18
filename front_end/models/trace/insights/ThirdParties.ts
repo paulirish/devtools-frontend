@@ -101,7 +101,7 @@ export function generateInsight(
 
   const firstPartyUrl = context.navigation?.args.data?.documentLoaderURL ?? parsedTrace.Meta.mainFrameURL;
   const firstPartyEntity = ThirdPartyWeb.ThirdPartyWeb.getEntity(firstPartyUrl) ||
-      Helpers.EntityMapper.makeUpEntity(thirdPartySummary.madeUpEntityCache, firstPartyUrl);
+      Handlers.Entities.makeUpEntity(thirdPartySummary.madeUpEntityCache, firstPartyUrl);
 
   return finalize({
     relatedEvents: getRelatedEvents(thirdPartySummary, firstPartyEntity),

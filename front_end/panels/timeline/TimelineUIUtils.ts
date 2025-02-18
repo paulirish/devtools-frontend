@@ -572,7 +572,7 @@ export class TimelineUIUtils {
       }
     }
     if (parsedTrace) {
-      const url = Trace.Helpers.EntityMapper.getNonResolvedURL(traceEvent, parsedTrace);
+      const url = Trace.Handlers.Helpers.getNonResolvedURL(traceEvent, parsedTrace);
       if (url) {
         tokens.push(url);
       }
@@ -769,7 +769,7 @@ export class TimelineUIUtils {
       case Trace.Types.Events.Name.PAINT_IMAGE:
       case Trace.Types.Events.Name.DECODE_IMAGE:
       case Trace.Types.Events.Name.DECODE_LAZY_PIXEL_REF: {
-        const url = Trace.Helpers.EntityMapper.getNonResolvedURL(event, parsedTrace);
+        const url = Trace.Handlers.Helpers.getNonResolvedURL(event, parsedTrace);
         if (url) {
           detailsText = Bindings.ResourceUtils.displayNameForURL(url);
         }
@@ -851,7 +851,7 @@ export class TimelineUIUtils {
       case Trace.Types.Events.Name.RESOURCE_RECEIVE_DATA:
       case Trace.Types.Events.Name.RESOURCE_RECEIVE_RESPONSE:
       case Trace.Types.Events.Name.RESOURCE_FINISH: {
-        const url = Trace.Helpers.EntityMapper.getNonResolvedURL(event, parsedTrace);
+        const url = Trace.Handlers.Helpers.getNonResolvedURL(event, parsedTrace);
         if (url) {
           const options = {
             tabStop: true,
@@ -1062,7 +1062,7 @@ export class TimelineUIUtils {
       // @ts-ignore TODO(crbug.com/1011811): Remove symbol usage.
       if (typeof event[previewElementSymbol] === 'undefined') {
         let previewElement: (Element|null)|null = null;
-        const url = Trace.Helpers.EntityMapper.getNonResolvedURL(event, parsedTrace);
+        const url = Trace.Handlers.Helpers.getNonResolvedURL(event, parsedTrace);
         if (url) {
           previewElement = await LegacyComponents.ImagePreview.ImagePreview.build(maybeTarget, url, false, {
             imageAltText: LegacyComponents.ImagePreview.ImagePreview.defaultAltTextForImageURL(url),
@@ -1296,7 +1296,7 @@ export class TimelineUIUtils {
       case Trace.Types.Events.Name.DECODE_IMAGE:
       case Trace.Types.Events.Name.DRAW_LAZY_PIXEL_REF: {
         relatedNodeLabel = i18nString(UIStrings.ownerElement);
-        url = Trace.Helpers.EntityMapper.getNonResolvedURL(event, parsedTrace);
+        url = Trace.Handlers.Helpers.getNonResolvedURL(event, parsedTrace);
         if (url) {
           const options = {
             tabStop: true,

@@ -57,7 +57,7 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export interface NetworkTooltipData {
   networkRequest: Trace.Types.Events.SyntheticNetworkRequest|null;
-  entity: Trace.Helpers.EntityMapper.Entity|null;
+  entity: Trace.Handlers.Entities.Entity|null;
 }
 
 export class NetworkRequestTooltip extends HTMLElement {

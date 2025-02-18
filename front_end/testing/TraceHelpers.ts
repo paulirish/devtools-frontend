@@ -487,10 +487,10 @@ export function makeMockSamplesHandlerData(profileCalls: Trace.Types.Events.Synt
   };
 }
 
-export function makeMockEntityData(events: Trace.Types.Events.Event[]): Trace.Helpers.EntityMapper.EntityMappings {
-  const eventsByEntity = new Map<Trace.Helpers.EntityMapper.Entity, Trace.Types.Events.Event[]>();
-  const entityByEvent = new Map<Trace.Types.Events.Event, Trace.Helpers.EntityMapper.Entity>();
-  const createdEntityCache = new Map<string, Trace.Helpers.EntityMapper.Entity>();
+export function makeMockEntityData(events: Trace.Types.Events.Event[]): Trace.Handlers.Entities.EntityMappings {
+  const eventsByEntity = new Map<Trace.Handlers.Entities.Entity, Trace.Types.Events.Event[]>();
+  const entityByEvent = new Map<Trace.Types.Events.Event, Trace.Handlers.Entities.Entity>();
+  const createdEntityCache = new Map<string, Trace.Handlers.Entities.Entity>();
 
   events.forEach(event => {
     const entity = Trace.Handlers.Helpers.getEntityForEvent(event, createdEntityCache);

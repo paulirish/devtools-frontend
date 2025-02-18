@@ -7,6 +7,7 @@ import * as Protocol from '../../../generated/protocol.js';
 import * as Helpers from '../helpers/helpers.js';
 import * as Types from '../types/types.js';
 
+import {addEventToEntityMapping, type Entity, type EntityMappings} from './Entities.js';
 import {data as metaHandlerData} from './MetaHandler.js';
 import type {HandlerName} from './types.js';
 
@@ -56,7 +57,7 @@ interface NetworkRequestData {
   byTime: Types.Events.SyntheticNetworkRequest[];
   eventToInitiator: Map<Types.Events.SyntheticNetworkRequest, Types.Events.SyntheticNetworkRequest>;
   webSocket: WebSocketTraceData[];
-  entityMappings: Helpers.EntityMapper.EntityMappings;
+  entityMappings: EntityMappings;
 }
 
 const requestMap = new Map<string, TraceEventsForNetworkRequest>();
@@ -76,10 +77,10 @@ const eventToInitiatorMap = new Map<Types.Events.SyntheticNetworkRequest, Types.
  * more than we have to, here we start building the caches. After this, the RendererHandler will update
  * the relationships. When handling ThirdParty references, use the one in the RendererHandler instead.
  */
-const entityMappings: Helpers.EntityMapper.EntityMappings = {
-  eventsByEntity: new Map<Helpers.EntityMapper.Entity, Types.Events.Event[]>(),
-  entityByEvent: new Map<Types.Events.Event, Helpers.EntityMapper.Entity>(),
-  createdEntityCache: new Map<string, Helpers.EntityMapper.Entity>(),
+const entityMappings: EntityMappings = {
+  eventsByEntity: new Map<Entity, Types.Events.Event[]>(),
+  entityByEvent: new Map<Types.Events.Event, Entity>(),
+  createdEntityCache: new Map<string, Entity>(),
 };
 
 function storeTraceEventWithRequestId<K extends keyof TraceEventsForNetworkRequest>(
@@ -485,7 +486,7 @@ export async function finalize(): Promise<void> {
     requestsByTime.push(networkEvent);
     requestsById.set(networkEvent.args.data.requestId, networkEvent);
     // Update entity relationships for network events.
-    Helpers.EntityMapper.addEventToEntityMapping(networkEvent, entityMappings);
+    addEventToEntityMapping(networkEvent, entityMappings);
     const initiatorUrl = networkEvent.args.data.initiator?.url ||
         Helpers.Trace.getZeroIndexedStackTraceForEvent(networkEvent)?.at(0)?.url;
     if (initiatorUrl) {

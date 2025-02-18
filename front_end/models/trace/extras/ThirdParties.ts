@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import * as ThirdPartyWeb from '../../../third_party/third-party-web/third-party-web.js';
+import * as Handlers from '../handlers/handlers.js';
 import * as Helpers from '../helpers/helpers.js';
 import type * as TraceModel from '../ModelImpl.js';
 import * as Types from '../types/types.js';
@@ -25,7 +26,7 @@ export interface ThirdPartySummary {
 function getOrMakeSummaryByEntity(
     thirdPartySummary: ThirdPartySummary, event: Types.Events.Event, url: string): Summary|null {
   const entity = ThirdPartyWeb.ThirdPartyWeb.getEntity(url) ??
-      Helpers.EntityMapper.makeUpEntity(thirdPartySummary.madeUpEntityCache, url);
+      Handlers.Entities.makeUpEntity(thirdPartySummary.madeUpEntityCache, url);
   if (!entity) {
     return null;
   }
@@ -83,7 +84,7 @@ function collectMainThreadActivity(
             continue;
           }
 
-          const url = Helpers.EntityMapper.getNonResolvedURL(event, parsedTrace as TraceModel.ParsedTrace);
+          const url = Handlers.Helpers.getNonResolvedURL(event, parsedTrace as TraceModel.ParsedTrace);
           if (!url) {
             continue;
           }
@@ -141,10 +142,10 @@ export function summarizeThirdParties(
 }
 
 function getSummaryMapWithMapping(
-    events: Types.Events.Event[], entityByEvent: Map<Types.Events.Event, Helpers.EntityMapper.Entity>,
-    eventsByEntity: Map<Helpers.EntityMapper.Entity, Types.Events.Event[]>): ThirdPartySummary {
+    events: Types.Events.Event[], entityByEvent: Map<Types.Events.Event, Handlers.Entities.Entity>,
+    eventsByEntity: Map<Handlers.Entities.Entity, Types.Events.Event[]>): ThirdPartySummary {
   const byEvent = new Map<Types.Events.Event, Summary>();
-  const byEntity = new Map<Helpers.EntityMapper.Entity, Summary>();
+  const byEntity = new Map<Handlers.Entities.Entity, Summary>();
   const defaultSummary: Summary = {transferSize: 0, mainThreadTime: Types.Timing.Micro(0)};
 
   for (const event of events) {
@@ -179,9 +180,9 @@ function getSummaryMapWithMapping(
  */
 export function getSummariesAndEntitiesWithMapping(
     parsedTrace: TraceModel.ParsedTrace, traceBounds: Types.Timing.TraceWindowMicro,
-    entityMapping: Helpers.EntityMapper.EntityMappings): {
+    entityMapping: Handlers.Entities.EntityMappings): {
   summaries: ThirdPartySummary,
-  entityByEvent: Map<Types.Events.Event, Helpers.EntityMapper.Entity>,
+  entityByEvent: Map<Types.Events.Event, Handlers.Entities.Entity>,
 } {
   const entityByEvent = new Map(entityMapping.entityByEvent);
   const eventsByEntity = new Map(entityMapping.eventsByEntity);

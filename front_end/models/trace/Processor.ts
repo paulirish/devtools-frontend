@@ -255,7 +255,7 @@ export class TraceProcessor extends EventTarget {
     const parsedTrace = handlerData as Model.ParsedTrace;
 
     // The parsedTrace is data from handlers plus this entityMapper.
-    const entityMapper = new Helpers.EntityMapper.EntityMapper(handlerData);
+    const entityMapper = new Handlers.Entities.EntityMapper(handlerData);
     parsedTrace.entity = entityMapper;
 
     this.#data = parsedTrace;

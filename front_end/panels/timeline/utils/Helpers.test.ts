@@ -45,7 +45,7 @@ describe('Helpers', () => {
   describe('formatOriginWithEntity', () => {
     it('recognized entities', function() {
       const url = new URL('https://securepubads.g.doubleclick.net/tag/js/gpt.js');
-      const mockEntity: Trace.Helpers.EntityMapper.Entity = {
+      const mockEntity: Trace.Handlers.Entities.Entity = {
         name: 'Google/Doubleclick Ads',
         company: url.toString(),
         category: '',
@@ -63,7 +63,7 @@ describe('Helpers', () => {
     });
     it('unrecognized entities', function() {
       const url = new URL('https://securepubads.g.doubleclick.net/tag/js/gpt.js');
-      const mockEntity: Trace.Helpers.EntityMapper.Entity = {
+      const mockEntity: Trace.Handlers.Entities.Entity = {
         name: 'securepubads.g.doubleclick.net',
         company: url.toString(),
         category: '',
