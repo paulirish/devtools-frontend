@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as Trace from '../../../models/trace/trace.js';
-import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
-import {TraceLoader} from '../../../testing/TraceLoader.js';
+import {describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
+import {TraceLoader} from '../../testing/TraceLoader.js';
 
-import * as Utils from './utils.js';
+import * as Trace from './trace.js';
 
 describeWithEnvironment('EntityMapper', function() {
   it('correctly merges handler data', async function() {
@@ -15,7 +14,7 @@ describeWithEnvironment('EntityMapper', function() {
     const fromRenderer = new Map(parsedTrace.Renderer.entityMappings.eventsByEntity);
     const fromNetwork = new Map(parsedTrace.NetworkRequests.entityMappings.eventsByEntity);
 
-    const mapper = new Utils.EntityMapper.EntityMapper(parsedTrace);
+    const mapper = new Trace.EntityMapper.EntityMapper(parsedTrace);
     const mappings = mapper.mappings();
 
     // [paulirish.com, Google Tag Manager, Google Fonts, Google Analytics, Disqus, Firebase]
@@ -50,7 +49,7 @@ describeWithEnvironment('EntityMapper', function() {
   describe('entityForEvent', () => {
     it('correctly contains network req entity mappings', async function() {
       const {parsedTrace} = await TraceLoader.traceEngine(this, 'lantern/paul/trace.json.gz');
-      const mapper = new Utils.EntityMapper.EntityMapper(parsedTrace);
+      const mapper = new Trace.EntityMapper.EntityMapper(parsedTrace);
 
       // Check entities for network requests.
       const reqs = parsedTrace.NetworkRequests.byOrigin.get('www.paulirish.com')?.all ?? [];
@@ -64,7 +63,7 @@ describeWithEnvironment('EntityMapper', function() {
 
     it('correctly contains main event entity mappings', async function() {
       const {parsedTrace} = await TraceLoader.traceEngine(this, 'lantern/paul/trace.json.gz');
-      const mapper = new Utils.EntityMapper.EntityMapper(parsedTrace);
+      const mapper = new Trace.EntityMapper.EntityMapper(parsedTrace);
 
       const funcCall = parsedTrace.Renderer.allTraceEntries.find(e => Trace.Types.Events.isFunctionCall(e));
       assert.exists(funcCall);
@@ -77,7 +76,7 @@ describeWithEnvironment('EntityMapper', function() {
   describe('eventsForEntity', () => {
     it('correctly contains network req entity mappings', async function() {
       const {parsedTrace} = await TraceLoader.traceEngine(this, 'lantern/paul/trace.json.gz');
-      const mapper = new Utils.EntityMapper.EntityMapper(parsedTrace);
+      const mapper = new Trace.EntityMapper.EntityMapper(parsedTrace);
 
       const reqs = parsedTrace.NetworkRequests.byOrigin.get('www.paulirish.com')?.all ?? [];
       const entity = mapper.entityForEvent(reqs[0]);
@@ -94,23 +93,23 @@ describeWithEnvironment('EntityMapper', function() {
   describe('first party', () => {
     it('correctly captures the first party entity', async function() {
       const {parsedTrace: localhostTrace} = await TraceLoader.traceEngine(this, 'load-simple.json.gz');
-      let mapper = new Utils.EntityMapper.EntityMapper(localhostTrace);
+      let mapper = new Trace.EntityMapper.EntityMapper(localhostTrace);
       let got = mapper.firstPartyEntity();
       assert.deepEqual(got?.name, 'localhost');
 
       const {parsedTrace: paulTrace} = await TraceLoader.traceEngine(this, 'lantern/paul/trace.json.gz');
-      mapper = new Utils.EntityMapper.EntityMapper(paulTrace);
+      mapper = new Trace.EntityMapper.EntityMapper(paulTrace);
       got = mapper.firstPartyEntity();
       assert.deepEqual(got?.name, 'paulirish.com');
 
       const {parsedTrace: webDevTrace} = await TraceLoader.traceEngine(this, 'web-dev.json.gz');
-      mapper = new Utils.EntityMapper.EntityMapper(webDevTrace);
+      mapper = new Trace.EntityMapper.EntityMapper(webDevTrace);
       got = mapper.firstPartyEntity();
       assert.deepEqual(got?.name, 'web.dev');
     });
     it('correctly captures 3p events', async function() {
       const {parsedTrace: paulTrace} = await TraceLoader.traceEngine(this, 'lantern/paul/trace.json.gz');
-      const mapper = new Utils.EntityMapper.EntityMapper(paulTrace);
+      const mapper = new Trace.EntityMapper.EntityMapper(paulTrace);
       const got = mapper.firstPartyEntity();
       assert.exists(got);
       assert.deepEqual(got.name, 'paulirish.com');

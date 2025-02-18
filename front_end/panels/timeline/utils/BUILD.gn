@@ -8,7 +8,6 @@ import("../../../../scripts/build/ninja/devtools_module.gni")
 devtools_module("utils") {
   sources = [
     "AICallTree.ts",
-    "EntityMapper.ts",
     "EntryName.ts",
     "EntryStyles.ts",
     "Helpers.ts",
@@ -59,7 +58,6 @@ ts_library("unittests") {
 
   sources = [
     "AICallTree.test.ts",
-    "EntityMapper.test.ts",
     "EntryName.test.ts",
     "Helpers.test.ts",
     "IgnoreList.test.ts",
