@@ -4,13 +4,13 @@
 
 import * as SDK from '../../../core/sdk/sdk.js';
 import type * as Protocol from '../../../generated/protocol.js';
-import type * as TraceModel from '../ModelImpl.js';
+import type * as Handlers from '../handlers/handlers.js';
 import * as Types from '../types/types.js';
 
 const domLookUpSingleNodeCache =
-    new Map<TraceModel.ParsedTrace, Map<Protocol.DOM.BackendNodeId, SDK.DOMModel.DOMNode|null>>();
+    new Map<Handlers.Types.HandlerData, Map<Protocol.DOM.BackendNodeId, SDK.DOMModel.DOMNode|null>>();
 const domLookUpBatchNodesCache = new Map<
-    TraceModel.ParsedTrace,
+    Handlers.Types.HandlerData,
     Map<Protocol.DOM.BackendNodeId[], Map<Protocol.DOM.BackendNodeId, SDK.DOMModel.DOMNode|null>>>();
 
 export function clearCacheForTesting(): void {
@@ -26,7 +26,7 @@ export function clearCacheForTesting(): void {
  * first lookup.
  */
 export async function domNodeForBackendNodeID(
-    modelData: TraceModel.ParsedTrace, nodeId: Protocol.DOM.BackendNodeId): Promise<SDK.DOMModel.DOMNode|null> {
+    modelData: Handlers.Types.HandlerData, nodeId: Protocol.DOM.BackendNodeId): Promise<SDK.DOMModel.DOMNode|null> {
   const fromCache = domLookUpSingleNodeCache.get(modelData)?.get(nodeId);
   if (fromCache !== undefined) {
     return fromCache;
@@ -58,7 +58,7 @@ const nodeIdsForEventCache = new WeakMap<Types.Events.Event, Set<Protocol.DOM.Ba
  * without having to mock the CDP layer.
  **/
 export function nodeIdsForEvent(
-    modelData: TraceModel.ParsedTrace,
+    modelData: Handlers.Types.HandlerData,
     event: Types.Events.Event,
     ): Set<Protocol.DOM.BackendNodeId> {
   const fromCache = nodeIdsForEventCache.get(event);
@@ -108,7 +108,7 @@ export function nodeIdsForEvent(
  * This method should be progressively updated to support more events
  * containing node ids which we want to resolve.
  */
-export async function extractRelatedDOMNodesFromEvent(modelData: TraceModel.ParsedTrace, event: Types.Events.Event):
+export async function extractRelatedDOMNodesFromEvent(modelData: Handlers.Types.HandlerData, event: Types.Events.Event):
     Promise<Map<Protocol.DOM.BackendNodeId, SDK.DOMModel.DOMNode|null>|null> {
   const nodeIds = nodeIdsForEvent(modelData, event);
   if (nodeIds.size) {
@@ -122,7 +122,7 @@ export async function extractRelatedDOMNodesFromEvent(modelData: TraceModel.Pars
  * Results are cached based on 1) the provided ParsedTrace and 2) the provided set of IDs.
  */
 export async function domNodesForMultipleBackendNodeIds(
-    modelData: TraceModel.ParsedTrace,
+    modelData: Handlers.Types.HandlerData,
     nodeIds: Protocol.DOM.BackendNodeId[]): Promise<Map<Protocol.DOM.BackendNodeId, SDK.DOMModel.DOMNode|null>> {
   const fromCache = domLookUpBatchNodesCache.get(modelData)?.get(nodeIds);
   if (fromCache) {
@@ -145,10 +145,10 @@ export async function domNodesForMultipleBackendNodeIds(
 }
 
 const layoutShiftSourcesCache =
-    new Map<TraceModel.ParsedTrace, Map<Types.Events.LayoutShift, readonly LayoutShiftSource[]>>();
+    new Map<Handlers.Types.HandlerData, Map<Types.Events.LayoutShift, readonly LayoutShiftSource[]>>();
 
 const normalizedLayoutShiftNodesCache =
-    new Map<TraceModel.ParsedTrace, Map<Types.Events.LayoutShift, readonly Types.Events.TraceImpactedNode[]>>();
+    new Map<Handlers.Types.HandlerData, Map<Types.Events.LayoutShift, readonly Types.Events.TraceImpactedNode[]>>();
 
 export interface LayoutShiftSource {
   previousRect: DOMRect;
@@ -168,7 +168,7 @@ export interface LayoutShiftSource {
  * shift, so it is is safe to call multiple times with the same input.
  */
 export async function sourcesForLayoutShift(
-    modelData: TraceModel.ParsedTrace, event: Types.Events.LayoutShift): Promise<readonly LayoutShiftSource[]> {
+    modelData: Handlers.Types.HandlerData, event: Types.Events.LayoutShift): Promise<readonly LayoutShiftSource[]> {
   const fromCache = layoutShiftSourcesCache.get(modelData)?.get(event);
   if (fromCache) {
     return fromCache;
@@ -208,7 +208,7 @@ export async function sourcesForLayoutShift(
  * See https://crbug.com/1300309 for details.
  */
 export async function normalizedImpactedNodesForLayoutShift(
-    modelData: TraceModel.ParsedTrace,
+    modelData: Handlers.Types.HandlerData,
     event: Types.Events.LayoutShift): Promise<readonly Types.Events.TraceImpactedNode[]> {
   const fromCache = normalizedLayoutShiftNodesCache.get(modelData)?.get(event);
   if (fromCache) {

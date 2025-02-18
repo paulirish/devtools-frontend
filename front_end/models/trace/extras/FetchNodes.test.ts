@@ -70,8 +70,8 @@ describeWithMockConnection('FetchNodes', function() {
       domModel.registerNode(domNode);
 
       // The model data is only used as a cache key, so we don't need it to be real to test this.
-      const modelData1 = {} as unknown as Trace.TraceModel.ParsedTrace;
-      const modelData2 = {} as unknown as Trace.TraceModel.ParsedTrace;
+      const modelData1 = {} as unknown as Trace.Handlers.Types.HandlerData;
+      const modelData2 = {} as unknown as Trace.Handlers.Types.HandlerData;
       const result = await Trace.Extras.FetchNodes.domNodeForBackendNodeID(modelData1, nodeId(2));
       assert.isNotNull(result);
       // Look it up again to test the cache.
@@ -101,7 +101,7 @@ describeWithMockConnection('FetchNodes', function() {
       domModel.registerNode(domNodeId3);
 
       // The model data is only used as a cache key, so we don't need it to be real to test this.
-      const modelData = {} as unknown as Trace.TraceModel.ParsedTrace;
+      const modelData = {} as unknown as Trace.Handlers.Types.HandlerData;
       const result = await Trace.Extras.FetchNodes.domNodesForMultipleBackendNodeIds(modelData, [nodeId(2), nodeId(3)]);
       assert.isNotNull(result);
       const entries = Array.from(result.entries());
@@ -205,7 +205,7 @@ describeWithMockConnection('FetchNodes', function() {
       await domModel.requestDocument();
       domModel.registerNode(domNode);
 
-      const modelData = {} as unknown as Trace.TraceModel.ParsedTrace;
+      const modelData = {} as unknown as Trace.Handlers.Types.HandlerData;
       const event = {
         args: {
           data: {
@@ -242,7 +242,7 @@ describeWithMockConnection('FetchNodes', function() {
         },
       ];
       const mockShift = {args: {data: {impacted_nodes: impactedNodes}}} as Trace.Types.Events.LayoutShift;
-      const modelData = {} as unknown as Trace.TraceModel.ParsedTrace;
+      const modelData = {} as unknown as Trace.Handlers.Types.HandlerData;
       const normalized = await Trace.Extras.FetchNodes.normalizedImpactedNodesForLayoutShift(modelData, mockShift);
       assert.deepEqual(normalized, [
         {
