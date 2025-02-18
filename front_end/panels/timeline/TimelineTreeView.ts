@@ -212,7 +212,7 @@ export class TimelineTreeView extends
     if (!this.#parsedTrace) {
       return name;
     }
-    return name + ':@' + Trace.Helpers.EntityMapper.getNonResolvedURL(event, this.#parsedTrace);
+    return name + ':@' + Trace.Handlers.Helpers.getNonResolvedURL(event, this.#parsedTrace);
   }
 
   setSearchableView(searchableView: UI.SearchableView.SearchableView): void {
@@ -1053,7 +1053,7 @@ export class AggregatedTimelineTreeView extends TimelineTreeView {
       case GroupBy.URL:
         return (event: Trace.Types.Events.Event) => {
           const parsedTrace = this.parsedTrace();
-          return parsedTrace ? Trace.Helpers.EntityMapper.getNonResolvedURL(event, parsedTrace) ?? '' : '';
+          return parsedTrace ? Trace.Handlers.Helpers.getNonResolvedURL(event, parsedTrace) ?? '' : '';
         };
       case GroupBy.Frame:
         return (event: Trace.Types.Events.Event) => {
@@ -1071,7 +1071,7 @@ export class AggregatedTimelineTreeView extends TimelineTreeView {
     if (!parsedTrace) {
       return '';
     }
-    const url = Trace.Helpers.EntityMapper.getNonResolvedURL(event, parsedTrace);
+    const url = Trace.Handlers.Helpers.getNonResolvedURL(event, parsedTrace);
     if (!url) {
       return '';
     }
