@@ -57,13 +57,13 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export interface NetworkTooltipData {
   networkRequest: Trace.Types.Events.SyntheticNetworkRequest|null;
-  entityMapper: TimelineUtils.EntityMapper.EntityMapper|null;
+  entity: Trace.Handlers.Helpers.Entity|null;
 }
 
 export class NetworkRequestTooltip extends HTMLElement {
   readonly #shadow = this.attachShadow({mode: 'open'});
 
-  #data: NetworkTooltipData = {networkRequest: null, entityMapper: null};
+  #data: NetworkTooltipData = {networkRequest: null, entity: null};
 
   connectedCallback(): void {
     this.#shadow.adoptedStyleSheets = [networkRequestTooltipStyles];
@@ -74,10 +74,8 @@ export class NetworkRequestTooltip extends HTMLElement {
     if (this.#data.networkRequest === data.networkRequest) {
       return;
     }
-    if (this.#data.entityMapper === data.entityMapper) {
-      return;
-    }
-    this.#data = {networkRequest: data.networkRequest, entityMapper: data.entityMapper};
+    const {networkRequest, entity} = data;
+    this.#data = {networkRequest, entity};
     this.#render();
   }
 
@@ -151,8 +149,7 @@ export class NetworkRequestTooltip extends HTMLElement {
       backgroundColor: `${colorForNetworkRequest(this.#data.networkRequest)}`,
     };
     const url = new URL(this.#data.networkRequest.args.data.url);
-    const entity = (this.#data.entityMapper) ? this.#data.entityMapper.entityForEvent(this.#data.networkRequest) : null;
-    const originWithEntity = TimelineUtils.Helpers.formatOriginWithEntity(url, entity, true);
+    const originWithEntity = TimelineUtils.Helpers.formatOriginWithEntity(url, this.#data.entity, true);
 
     // clang-format off
     const output = html`

@@ -138,7 +138,6 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
   private lastSelection: Selection|null = null;
   readonly #font = `${PerfUI.Font.DEFAULT_FONT_SIZE} ${PerfUI.Font.getFontFamilyForCanvas()}`;
   #eventIndexByEvent: WeakMap<Trace.Types.Events.Event, number|null> = new WeakMap();
-  #entityMapper: Utils.EntityMapper.EntityMapper|null = null;
 
   constructor() {
     super();
@@ -400,7 +399,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     return Object.assign(defaultGroupStyle, extra);
   }
 
-  setModel(parsedTrace: Trace.Handlers.Types.ParsedTrace, entityMapper: Utils.EntityMapper.EntityMapper): void {
+  setModel(parsedTrace: Trace.Handlers.Types.ParsedTrace): void {
     this.reset();
     this.parsedTrace = parsedTrace;
     const {traceBounds} = parsedTrace.Meta;
@@ -408,7 +407,6 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     const maxTime = Trace.Helpers.Timing.microToMilli(traceBounds.max);
     this.#minimumBoundary = minTime;
     this.timeSpan = minTime === maxTime ? 1000 : maxTime - this.#minimumBoundary;
-    this.#entityMapper = entityMapper;
   }
 
   /**
@@ -426,7 +424,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       }
       this.timelineDataInternal = this.#instantiateTimelineData();
       this.compatibilityTracksAppender = new CompatibilityTracksAppender(
-          this.timelineDataInternal, this.parsedTrace, this.entryData, this.entryTypeByLevel, this.#entityMapper);
+          this.timelineDataInternal, this.parsedTrace, this.entryData, this.entryTypeByLevel);
     }
     return this.compatibilityTracksAppender;
   }
@@ -542,7 +540,6 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
     this.compatibilityTracksAppender = null;
     this.timelineDataInternal = null;
     this.parsedTrace = null;
-    this.#entityMapper = null;
   }
 
   maxStackDepth(): number {

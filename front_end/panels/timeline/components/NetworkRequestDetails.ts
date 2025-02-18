@@ -12,7 +12,6 @@ import * as Trace from '../../../models/trace/trace.js';
 import * as LegacyComponents from '../../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../../ui/legacy/legacy.js';
 import * as Lit from '../../../ui/lit/lit.js';
-import type * as TimelineUtils from '../utils/utils.js';
 
 import NetworkRequestDetailsStylesRaw from './networkRequestDetails.css.js';
 import networkRequestTooltipStylesRaw from './networkRequestTooltip.css.js';
@@ -116,7 +115,6 @@ export class NetworkRequestDetails extends HTMLElement {
   #requestPreviewElements = new WeakMap<Trace.Types.Events.SyntheticNetworkRequest, HTMLImageElement>();
   #linkifier: LegacyComponents.Linkifier.Linkifier;
   #parsedTrace: Trace.Handlers.Types.ParsedTrace|null = null;
-  #entityMapper: TimelineUtils.EntityMapper.EntityMapper|null = null;
   constructor(linkifier: LegacyComponents.Linkifier.Linkifier) {
     super();
     this.#linkifier = linkifier;
@@ -128,14 +126,13 @@ export class NetworkRequestDetails extends HTMLElement {
 
   async setData(
       parsedTrace: Trace.Handlers.Types.ParsedTrace, networkRequest: Trace.Types.Events.SyntheticNetworkRequest,
-      maybeTarget: SDK.Target.Target|null, entityMapper: TimelineUtils.EntityMapper.EntityMapper|null): Promise<void> {
+      maybeTarget: SDK.Target.Target|null): Promise<void> {
     if (this.#networkRequest === networkRequest && parsedTrace === this.#parsedTrace) {
       return;
     }
     this.#parsedTrace = parsedTrace;
     this.#networkRequest = networkRequest;
     this.#maybeTarget = maybeTarget;
-    this.#entityMapper = entityMapper;
     await this.#render();
   }
 
@@ -212,10 +209,10 @@ export class NetworkRequestDetails extends HTMLElement {
   }
 
   #renderThirdPartyEntity(): Lit.TemplateResult|null {
-    if (!this.#entityMapper || !this.#networkRequest) {
+    if (!this.#parsedTrace || !this.#networkRequest) {
       return null;
     }
-    const entity = this.#entityMapper.entityForEvent(this.#networkRequest);
+    const entity = this.#parsedTrace.entity.entityForEvent(this.#networkRequest);
     if (!entity) {
       return null;
     }
