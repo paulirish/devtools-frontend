@@ -11,7 +11,6 @@ import type * as Model from './ModelImpl.js';
 import {EntityMapper} from './trace.js';
 import * as Types from './types/types.js';
 
-
 const enum Status {
   IDLE = 'IDLE',
   PARSING = 'PARSING',
@@ -254,17 +253,13 @@ export class TraceProcessor extends EventTarget {
     }
     this.dispatchEvent(new TraceParseProgressEvent({percent: ProgressPhase.CLONE}));
 
-    // Augment parsedTrace with EntityMapper methods.
     const parsedTrace = handlerData as Handlers.Types.ParsedTrace;
-    const entityMapper = new EntityMapper.EntityMapper(handlerData);
-    parsedTrace.entityForEvent = entityMapper.entityForEvent;
-    parsedTrace.eventsForEntity = entityMapper.eventsForEntity;
-    parsedTrace.firstPartyEntity = entityMapper.firstPartyEntity;
-    parsedTrace.thirdPartyEvents = entityMapper.thirdPartyEvents;
-    parsedTrace.mappings = entityMapper.mappings;
-    parsedTrace.updateSourceMapEntities = entityMapper.updateSourceMapEntities;
 
-    this.#data = parsedTrace as Handlers.Types.ParsedTrace;
+    // The parsedTrace is data from handlers plus this entityMapper.
+    const entityMapper = new EntityMapper.EntityMapper(handlerData);
+    parsedTrace.entity = entityMapper;
+
+    this.#data = parsedTrace;
   }
 
   get parsedTrace(): Handlers.Types.ParsedTrace|null {

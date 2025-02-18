@@ -2,10 +2,10 @@
 // Copyright 2022 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-import type * as Protocol from '../../../generated/protocol.js';
+
+import type {EntityMapper} from '../EntityMapper.js';
 
 import type * as Types from './../types/types.js';
-import type {Entity, EntityMappings} from './helpers.js';
 import type * as ModelHandlers from './ModelHandlers.js';
 
 export interface Handler {
@@ -57,21 +57,14 @@ export type HandlersWithMeta<T extends {[key: string]: Handler}> = {
   [K in keyof T]: T[K];
 };
 
-export type HandlerData = Readonly<EnabledHandlerDataWithMeta<typeof ModelHandlers>>;
-
-export interface EntityMapperPublicMethods {
-  entityForEvent(event: Types.Events.Event): Entity|null;
-  eventsForEntity(entity: Entity): Types.Events.Event[];
-  firstPartyEntity(): Entity|null;
-  thirdPartyEvents(): Types.Events.Event[];
-  mappings(): EntityMappings;
-  updateSourceMapEntities(callFrame: Protocol.Runtime.CallFrame, sourceURL: string): void;
-}
-
 // Represents the final parsed data from all of the handlers. If you instantiate a
 // TraceProcessor with a subset of handlers, you should instead use
 // `EnabledHandlerDataWithMeta<>`.
-export type ParsedTrace = HandlerData&EntityMapperPublicMethods;
+export type HandlerData = Readonly<EnabledHandlerDataWithMeta<typeof ModelHandlers>>;
+
+export type ParsedTrace = HandlerData&{
+  entity: EntityMapper,
+};
 
 type DeepWriteable<T> = {
   -readonly[P in keyof T]: DeepWriteable<T[P]>
