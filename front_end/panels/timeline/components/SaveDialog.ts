@@ -89,7 +89,7 @@ export class SaveDialog extends HTMLElement {
     this.dispatchEvent(event);
   }
 
-  #render(): Lit.TemplateResult {
+  #render(): void {
     const annotationsCheckbox = UI.UIUtils.CheckboxLabel.create(
         i18nString(UIStrings.includeAnnotations),
         this.#includeAnnotations,
@@ -101,13 +101,18 @@ export class SaveDialog extends HTMLElement {
         i18nString(UIStrings.includeSource), this.#includeSource, i18nString(UIStrings.includeSourceTooltip));
     sourceCheckbox.checkboxElement.addEventListener('change', this.#onSourceChange.bind(this));
 
-    return html`
+    const output = html`
       <devtools-button-dialog .data=${{
       openOnRender: false,
+      jslogContext: 'timeline.save-dialog',
+      variant: Buttons.Button.Variant.TOOLBAR,
+      iconTitle: 'download dude',
       iconName: 'download',
+      closeButton: false,
       horizontalAlignment: Dialogs.Dialog.DialogHorizontalAlignment.AUTO,
     } as Dialogs.ButtonDialog.ButtonDialogData}>
         <div class="save-dialog-content">
+          <h2>hi</h2>
           ${annotationsCheckbox}
           ${sourceCheckbox}
           <devtools-button  @click=${this.#onDownloadClick} .data=${{
@@ -118,6 +123,7 @@ export class SaveDialog extends HTMLElement {
         </div>
       </devtools-button-dialog>
     `;
+    Lit.render(output, this.#shadow, {host: this});
   }
 }
 

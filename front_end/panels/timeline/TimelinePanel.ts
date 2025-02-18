@@ -1063,9 +1063,6 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       this.selectFileToLoad();
     });
 
-    const downloadChoiceButton = new TimelineComponents.SaveDialog.SaveDialog();
-    this.panelToolbar.appendToolbarItem(new UI.Toolbar.ToolbarItem(downloadChoiceButton));
-
     this.saveButton = new UI.Toolbar.ToolbarMenuButton(
         this.#populateDownloadMenu.bind(this), true, true, 'timeline.save-to-file-more-options', 'download');
     this.saveButton.setTitle(i18nString(UIStrings.saveProfile));
@@ -1094,6 +1091,9 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.panelToolbar.appendSeparator();
     this.panelToolbar.appendToolbarItem(this.loadButton);
     this.panelToolbar.appendToolbarItem(this.saveButton);
+
+    const downloadChoiceButton = new TimelineComponents.SaveDialog.SaveDialog();
+    this.panelToolbar.appendToolbarItem(new UI.Toolbar.ToolbarItem(downloadChoiceButton));
 
     // History
     this.panelToolbar.appendSeparator();
