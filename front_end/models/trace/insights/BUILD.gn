@@ -31,7 +31,6 @@ devtools_module("insights") {
 
   deps = [
     "../../../third_party/third-party-web:bundle",
-    "../extras:bundle",
     "../handlers:bundle",
     "../lantern:bundle",
   ]
