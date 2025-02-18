@@ -4,8 +4,8 @@
 
 import * as Platform from '../../../core/platform/platform.js';
 import type * as Protocol from '../../../generated/protocol.js';
+import type * as Handlers from '../handlers/handlers.js';
 import * as Helpers from '../helpers/helpers.js';
-import type {ParsedTrace} from '../ModelImpl.js';
 import * as Types from '../types/types.js';
 
 import type {RootCauseProtocolInterface} from './RootCauses.js';
@@ -90,7 +90,7 @@ export class LayoutShiftRootCauses {
    * events the first time that it's called. That then populates the cache for
    * each shift, so any subsequent calls are just a constant lookup.
    */
-  async rootCausesForEvent(modelData: ParsedTrace, event: Types.Events.SyntheticLayoutShift):
+  async rootCausesForEvent(modelData: Handlers.Types.HandlerData, event: Types.Events.SyntheticLayoutShift):
       Promise<Readonly<LayoutShiftRootCausesData>|null> {
     const cachedResult = this.#rootCauseCacheMap.get(event);
     if (cachedResult) {
@@ -122,7 +122,7 @@ export class LayoutShiftRootCauses {
    */
   async blameShifts(
       layoutShifts: Types.Events.SyntheticLayoutShift[],
-      modelData: ParsedTrace,
+      modelData: Handlers.Types.HandlerData,
       ): Promise<void> {
     await this.linkShiftsToLayoutInvalidations(layoutShifts, modelData);
     this.linkShiftsToLayoutEvents(layoutShifts, modelData);
@@ -134,8 +134,8 @@ export class LayoutShiftRootCauses {
    * rendering pipeline. This function utilizes this event to flag potential root causes
    * to layout shifts.
    */
-  async linkShiftsToLayoutInvalidations(layoutShifts: Types.Events.SyntheticLayoutShift[], modelData: ParsedTrace):
-      Promise<void> {
+  async linkShiftsToLayoutInvalidations(
+      layoutShifts: Types.Events.SyntheticLayoutShift[], modelData: Handlers.Types.HandlerData): Promise<void> {
     const {prePaintEvents, layoutInvalidationEvents, scheduleStyleInvalidationEvents, backendNodeIds} =
         modelData.LayoutShifts;
 
@@ -225,7 +225,8 @@ export class LayoutShiftRootCauses {
    * Note that a Layout cannot always be linked to a script, in that case, we cannot add a
    * "script causing reflow" as a potential root cause to the corresponding shift.
    */
-  linkShiftsToLayoutEvents(layoutShifts: Types.Events.SyntheticLayoutShift[], modelData: ParsedTrace): void {
+  linkShiftsToLayoutEvents(layoutShifts: Types.Events.SyntheticLayoutShift[], modelData: Handlers.Types.HandlerData):
+      void {
     const {prePaintEvents} = modelData.LayoutShifts;
     // Maps from PrePaint events to LayoutShifts that occurred in each one.
     const shiftsByPrePaint = getShiftsByPrePaintEvents(layoutShifts, prePaintEvents);
@@ -351,7 +352,7 @@ export class LayoutShiftRootCauses {
    */
   requestsInInvalidationWindow(
       layoutInvalidation: Types.Events.LayoutInvalidationTracking|Types.Events.ScheduleStyleInvalidationTracking,
-      modelData: ParsedTrace): RootCauseRequest[] {
+      modelData: Handlers.Types.HandlerData): RootCauseRequest[] {
     const requestsSortedByEndTime = modelData.NetworkRequests.byTime.sort((req1, req2) => {
       const req1EndTime = req1.ts + req1.dur;
       const req2EndTime = req2.ts + req2.dur;
@@ -398,7 +399,7 @@ export class LayoutShiftRootCauses {
    */
   getFontChangeRootCause(
       layoutInvalidation: Types.Events.LayoutInvalidationTracking|Types.Events.ScheduleStyleInvalidationTracking,
-      nextPrePaint: Types.Events.PrePaint, modelData: ParsedTrace): FontChange[]|null {
+      nextPrePaint: Types.Events.PrePaint, modelData: Handlers.Types.HandlerData): FontChange[]|null {
     if (layoutInvalidation.args.data.reason !== Types.Events.LayoutInvalidationReason.FONTS_CHANGED) {
       return null;
     }
@@ -450,7 +451,7 @@ export class LayoutShiftRootCauses {
    */
   getRenderBlockRootCause(
       layoutInvalidation: Types.Events.LayoutInvalidationTracking|Types.Events.ScheduleStyleInvalidationTracking,
-      nextPrePaint: Types.Events.PrePaint, modelData: ParsedTrace): RenderBlockingRequest[]|null {
+      nextPrePaint: Types.Events.PrePaint, modelData: Handlers.Types.HandlerData): RenderBlockingRequest[]|null {
     // Prevent computing the result of this function multiple times per PrePaint event.
     const renderBlocksInPrepaint = renderBlocksByPrePaint.get(nextPrePaint);
     if (renderBlocksInPrepaint !== undefined) {

@@ -10,7 +10,7 @@ import type * as Types from './types/types.js';
 
 type NetworkRequest = Lantern.Types.NetworkRequest<Types.Events.SyntheticNetworkRequest>;
 
-function createProcessedNavigation(parsedTrace: TraceModel.ParsedTrace, frameId: string, navigationId: string):
+function createProcessedNavigation(parsedTrace: Handlers.Types.HandlerData, frameId: string, navigationId: string):
     Lantern.Types.Simulation.ProcessedNavigation {
   const scoresByNav = parsedTrace.PageLoadMetrics.metricScoresByFrameId.get(frameId);
   if (!scoresByNav) {
@@ -85,7 +85,7 @@ function findWorkerThreads(trace: Lantern.Types.Trace): Map<number, number[]> {
 }
 
 function createLanternRequest(
-    parsedTrace: Readonly<TraceModel.ParsedTrace>, workerThreads: Map<number, number[]>,
+    parsedTrace: Readonly<Handlers.Types.HandlerData>, workerThreads: Map<number, number[]>,
     request: Types.Events.SyntheticNetworkRequest): NetworkRequest|undefined {
   if (request.args.data.connectionId === undefined || request.args.data.connectionReused === undefined) {
     throw new Lantern.Core.LanternError('Trace is too old');
@@ -272,7 +272,7 @@ function linkInitiators(lanternRequests: NetworkRequest[]): void {
 }
 
 function createNetworkRequests(
-    trace: Lantern.Types.Trace, parsedTrace: TraceModel.ParsedTrace, startTime = 0,
+    trace: Lantern.Types.Trace, parsedTrace: Handlers.Types.HandlerData, startTime = 0,
     endTime = Number.POSITIVE_INFINITY): NetworkRequest[] {
   const workerThreads = findWorkerThreads(trace);
 
@@ -368,7 +368,7 @@ function createNetworkRequests(
 }
 
 function collectMainThreadEvents(
-    trace: Lantern.Types.Trace, parsedTrace: TraceModel.ParsedTrace): Lantern.Types.TraceEvent[] {
+    trace: Lantern.Types.Trace, parsedTrace: Handlers.Types.HandlerData): Lantern.Types.TraceEvent[] {
   const Meta = parsedTrace.Meta;
   const mainFramePids = Meta.mainFrameNavigations.length ? new Set(Meta.mainFrameNavigations.map(nav => nav.pid)) :
                                                            Meta.topLevelRendererIds;
@@ -405,7 +405,7 @@ function collectMainThreadEvents(
 }
 
 function createGraph(
-    requests: Lantern.Types.NetworkRequest[], trace: Lantern.Types.Trace, parsedTrace: TraceModel.ParsedTrace,
+    requests: Lantern.Types.NetworkRequest[], trace: Lantern.Types.Trace, parsedTrace: Handlers.Types.HandlerData,
     url?: Lantern.Types.Simulation.URL): Lantern.Graph.Node<Types.Events.SyntheticNetworkRequest> {
   const mainThreadEvents = collectMainThreadEvents(trace, parsedTrace);
 

@@ -21,7 +21,7 @@ export interface ParseConfig {
 }
 
 export type ParsedTrace = HandlerData&{
-  entity: Helpers.EntityMapper.EntityMapper,
+  entity: Handlers.Entities.EntityMapper,
 };
 
 export type ParsedTraceMutable = DeepWriteable<ParsedTrace>;

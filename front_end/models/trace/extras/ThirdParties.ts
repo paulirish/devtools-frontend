@@ -5,7 +5,6 @@
 import * as ThirdPartyWeb from '../../../third_party/third-party-web/third-party-web.js';
 import * as Handlers from '../handlers/handlers.js';
 import * as Helpers from '../helpers/helpers.js';
-import type * as TraceModel from '../ModelImpl.js';
 import * as Types from '../types/types.js';
 
 export type Entity = typeof ThirdPartyWeb.ThirdPartyWeb.entities[number];
@@ -61,7 +60,7 @@ function getOrMakeSummaryByURL(thirdPartySummary: ThirdPartySummary, url: string
 }
 
 function collectMainThreadActivity(
-    thirdPartySummary: ThirdPartySummary, parsedTrace: TraceModel.ParsedTrace,
+    thirdPartySummary: ThirdPartySummary, parsedTrace: Handlers.Types.HandlerData,
     bounds: Types.Timing.TraceWindowMicro): void {
   for (const process of parsedTrace.Renderer.processes.values()) {
     if (!process.isOnMainFrame) {
@@ -84,7 +83,7 @@ function collectMainThreadActivity(
             continue;
           }
 
-          const url = Handlers.Helpers.getNonResolvedURL(event, parsedTrace as TraceModel.ParsedTrace);
+          const url = Handlers.Helpers.getNonResolvedURL(event, parsedTrace as Handlers.Types.HandlerData);
           if (!url) {
             continue;
           }
@@ -125,7 +124,7 @@ function collectNetworkActivity(
  * @param networkRequests Won't be filtered by trace bounds, so callers should ensure it is filtered.
  */
 export function summarizeThirdParties(
-    parsedTrace: TraceModel.ParsedTrace, traceBounds: Types.Timing.TraceWindowMicro,
+    parsedTrace: Handlers.Types.HandlerData, traceBounds: Types.Timing.TraceWindowMicro,
     networkRequests: Types.Events.SyntheticNetworkRequest[]): ThirdPartySummary {
   const thirdPartySummary: ThirdPartySummary = {
     byEntity: new Map(),
@@ -179,7 +178,7 @@ function getSummaryMapWithMapping(
  * If it is ever needed, we need to make getSelfTimeByUrl (see deleted code/blame) much faster (cache + bucket?).
  */
 export function getSummariesAndEntitiesWithMapping(
-    parsedTrace: TraceModel.ParsedTrace, traceBounds: Types.Timing.TraceWindowMicro,
+    parsedTrace: Handlers.Types.HandlerData, traceBounds: Types.Timing.TraceWindowMicro,
     entityMapping: Handlers.Entities.EntityMappings): {
   summaries: ThirdPartySummary,
   entityByEvent: Map<Types.Events.Event, Handlers.Entities.Entity>,

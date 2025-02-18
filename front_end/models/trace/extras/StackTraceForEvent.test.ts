@@ -22,7 +22,7 @@ function shapeStackTraceAsArray(stackTrace: Protocol.Runtime.StackTrace):
   return stackTraceAsArray;
 }
 describeWithEnvironment('StackTraceForTraceEvent', function() {
-  let parsedTrace: Trace.TraceModel.ParsedTrace;
+  let parsedTrace: Trace.Handlers.Types.HandlerData;
   beforeEach(async function() {
     const traceEngineData = await TraceLoader.traceEngine(this, 'async-js-calls.json.gz');
     parsedTrace = traceEngineData.parsedTrace;

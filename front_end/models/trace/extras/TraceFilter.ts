@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import type * as TraceModel from '../ModelImpl.js';
+import type * as Handlers from '../handlers/handlers.js';
 import * as Types from '../types/types.js';
 
 export abstract class TraceFilter {
-  abstract accept(_event: Types.Events.Event, parsedTrace?: TraceModel.ParsedTrace): boolean;
+  abstract accept(_event: Types.Events.Event, parsedTrace?: Handlers.Types.HandlerData): boolean;
 }
 
 export class VisibleEventsFilter extends TraceFilter {
