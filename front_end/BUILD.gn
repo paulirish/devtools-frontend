@@ -135,6 +135,7 @@ group("unittests") {
     "models/source_map_scopes:unittests",
     "models/text_utils:unittests",
     "models/trace:unittests",
+    "models/trace/extras:unittests",
     "models/trace/handlers:unittests",
     "models/trace/helpers:unittests",
     "models/trace/insights:unittests",
