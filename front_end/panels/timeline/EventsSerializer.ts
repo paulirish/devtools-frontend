@@ -29,7 +29,7 @@ export class EventsSerializer {
     return key;
   }
 
-  eventForKey(key: Trace.Types.File.SerializableKey, parsedTrace: Trace.TraceModel.ParsedTrace):
+  eventForKey(key: Trace.Types.File.SerializableKey, parsedTrace: Trace.Handlers.Types.ParsedTrace):
       Trace.Types.Events.Event {
     const eventValues = Trace.Types.File.traceEventKeyToValues(key);
 
@@ -80,7 +80,7 @@ export class EventsSerializer {
 
   #getModifiedProfileCallByKeyValues(
       key: Trace.Types.File.ProfileCallKeyValues,
-      parsedTrace: Trace.TraceModel.ParsedTrace): Trace.Types.Events.SyntheticProfileCall {
+      parsedTrace: Trace.Handlers.Types.ParsedTrace): Trace.Types.Events.SyntheticProfileCall {
     const cacheResult = this.#modifiedProfileCallByKey.get(key);
     if (cacheResult) {
       return cacheResult;

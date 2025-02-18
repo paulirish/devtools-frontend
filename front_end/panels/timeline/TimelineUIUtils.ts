@@ -552,7 +552,7 @@ export class TimelineUIUtils {
   }
 
   static testContentMatching(
-      traceEvent: Trace.Types.Events.Event, regExp: RegExp, parsedTrace?: Trace.TraceModel.ParsedTrace): boolean {
+      traceEvent: Trace.Types.Events.Event, regExp: RegExp, parsedTrace?: Trace.Handlers.Types.ParsedTrace): boolean {
     const title = TimelineUIUtils.eventStyle(traceEvent).title;
     const tokens = [title];
 
@@ -670,7 +670,7 @@ export class TimelineUIUtils {
   }
 
   static async buildDetailsTextForTraceEvent(
-      event: Trace.Types.Events.Event, parsedTrace: Trace.TraceModel.ParsedTrace): Promise<string|null> {
+      event: Trace.Types.Events.Event, parsedTrace: Trace.Handlers.Types.ParsedTrace): Promise<string|null> {
     let detailsText;
 
     // TODO(40287735): update this code with type-safe data checks.
@@ -805,7 +805,7 @@ export class TimelineUIUtils {
 
   static async buildDetailsNodeForTraceEvent(
       event: Trace.Types.Events.Event, target: SDK.Target.Target|null, linkifier: LegacyComponents.Linkifier.Linkifier,
-      isFreshRecording = false, parsedTrace: Trace.TraceModel.ParsedTrace): Promise<Node|null> {
+      isFreshRecording = false, parsedTrace: Trace.Handlers.Types.ParsedTrace): Promise<Node|null> {
     let details: HTMLElement|HTMLSpanElement|(Element | null)|Text|null = null;
     let detailsText;
     // TODO(40287735): update this code with type-safe data checks.
@@ -1043,7 +1043,7 @@ export class TimelineUIUtils {
   }
 
   static async buildTraceEventDetails(
-      parsedTrace: Trace.TraceModel.ParsedTrace,
+      parsedTrace: Trace.Handlers.Types.ParsedTrace,
       event: Trace.Types.Events.Event,
       linkifier: LegacyComponents.Linkifier.Linkifier,
       canShowPieChart: boolean,
@@ -1750,7 +1750,7 @@ export class TimelineUIUtils {
 
   static async generateCauses(
       event: Trace.Types.Events.Event, contentHelper: TimelineDetailsContentHelper,
-      parsedTrace: Trace.TraceModel.ParsedTrace): Promise<void> {
+      parsedTrace: Trace.Handlers.Types.ParsedTrace): Promise<void> {
     const {startTime} = Trace.Helpers.Timing.eventTimingsMilliSeconds(event);
     let initiatorStackLabel = i18nString(UIStrings.initiatorStackTrace);
     let stackLabel = i18nString(UIStrings.stackTrace);
@@ -1959,7 +1959,7 @@ export class TimelineUIUtils {
 
   /** Populates the passed object then returns true/false if it makes sense to show the pie chart */
   private static aggregatedStatsForTraceEvent(
-      total: TimeRangeCategoryStats, parsedTrace: Trace.TraceModel.ParsedTrace,
+      total: TimeRangeCategoryStats, parsedTrace: Trace.Handlers.Types.ParsedTrace,
       event: Trace.Types.Events.Event): boolean {
     const events = parsedTrace.Renderer?.allTraceEntries || [];
     const {startTime, endTime} = Trace.Helpers.Timing.eventTimingsMicroSeconds(event);
@@ -2016,7 +2016,7 @@ export class TimelineUIUtils {
   }
 
   static async buildPicturePreviewContent(
-      parsedTrace: Trace.TraceModel.ParsedTrace, event: Trace.Types.Events.Paint,
+      parsedTrace: Trace.Handlers.Types.ParsedTrace, event: Trace.Types.Events.Paint,
       target: SDK.Target.Target): Promise<Element|null> {
     const snapshotEvent = parsedTrace.LayerTree.paintsToSnapshots.get(event);
     if (!snapshotEvent) {
@@ -2522,7 +2522,7 @@ export interface TimelineMarkerStyle {
  * the LCP (for example) relative to the last navigation.
  **/
 export function timeStampForEventAdjustedForClosestNavigationIfPossible(
-    event: Trace.Types.Events.Event, parsedTrace: Trace.TraceModel.ParsedTrace|null): Trace.Types.Timing.Milli {
+    event: Trace.Types.Events.Event, parsedTrace: Trace.Handlers.Types.ParsedTrace|null): Trace.Types.Timing.Milli {
   if (!parsedTrace) {
     const {startTime} = Trace.Helpers.Timing.eventTimingsMilliSeconds(event);
     return startTime;
@@ -2543,7 +2543,7 @@ export function timeStampForEventAdjustedForClosestNavigationIfPossible(
  * the LCP time. This method does not filter out events: for example, it treats
  * every LCP Candidate event as a potential marker event.
  **/
-export function isMarkerEvent(parsedTrace: Trace.TraceModel.ParsedTrace, event: Trace.Types.Events.Event): boolean {
+export function isMarkerEvent(parsedTrace: Trace.Handlers.Types.ParsedTrace, event: Trace.Types.Events.Event): boolean {
   const {Name} = Trace.Types.Events;
 
   if (event.name === Name.CONSOLE_TIME_STAMP || event.name === Name.NAVIGATION_START) {
@@ -2575,7 +2575,7 @@ export function isMarkerEvent(parsedTrace: Trace.TraceModel.ParsedTrace, event: 
 }
 
 function getEventSelfTime(
-    event: Trace.Types.Events.Event, parsedTrace: Trace.TraceModel.ParsedTrace): Trace.Types.Timing.Micro {
+    event: Trace.Types.Events.Event, parsedTrace: Trace.Handlers.Types.ParsedTrace): Trace.Types.Timing.Micro {
   const mapToUse = Trace.Types.Extensions.isSyntheticExtensionEntry(event) ?
       parsedTrace.ExtensionTraceData.entryToNode :
       parsedTrace.Renderer.entryToNode;

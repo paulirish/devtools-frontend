@@ -33,7 +33,7 @@ const FAKE_OVERLAY_ENTRY_QUERIES: Overlays.Overlays.OverlayEntryQueries = {
  * and data providers. This function creates all of those and optionally sets
  * the trace data for the providers if it is provided.
  */
-function createCharts(parsedTrace?: Trace.TraceModel.ParsedTrace): Overlays.Overlays.TimelineCharts {
+function createCharts(parsedTrace?: Trace.Handlers.Types.ParsedTrace): Overlays.Overlays.TimelineCharts {
   const mainProvider = new Timeline.TimelineFlameChartDataProvider.TimelineFlameChartDataProvider();
   const networkProvider = new Timeline.TimelineFlameChartNetworkDataProvider.TimelineFlameChartNetworkDataProvider();
   if (parsedTrace) {
@@ -253,7 +253,7 @@ describeWithEnvironment('Overlays', () => {
   });
 
   describe('rendering overlays', () => {
-    function setupChartWithDimensionsAndAnnotationOverlayListeners(parsedTrace: Trace.TraceModel.ParsedTrace): {
+    function setupChartWithDimensionsAndAnnotationOverlayListeners(parsedTrace: Trace.Handlers.Types.ParsedTrace): {
       container: HTMLElement,
       overlays: Overlays.Overlays.Overlays,
       charts: Overlays.Overlays.TimelineCharts,

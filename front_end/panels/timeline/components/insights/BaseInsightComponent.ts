@@ -68,7 +68,7 @@ export abstract class BaseInsightComponent<T extends InsightModel<{}, {}>> exten
 
   #selected = false;
   #model: T|null = null;
-  #parsedTrace: Trace.TraceModel.ParsedTrace|null = null;
+  #parsedTrace: Trace.Handlers.Types.ParsedTrace|null = null;
 
   #insightsAskAiEnabled = false;
 
@@ -136,7 +136,7 @@ export abstract class BaseInsightComponent<T extends InsightModel<{}, {}>> exten
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
   }
 
-  set parsedTrace(parsedTrace: Trace.TraceModel.ParsedTrace) {
+  set parsedTrace(parsedTrace: Trace.Handlers.Types.ParsedTrace) {
     this.#parsedTrace = parsedTrace;
   }
 

@@ -16,7 +16,7 @@ export async function processTrace(testContext: Mocha.Suite|Mocha.Context|null, 
 }
 
 export function createContextForNavigation(
-    parsedTrace: Trace.TraceModel.ParsedTrace, navigation: Trace.Types.Events.NavigationStart,
+    parsedTrace: Trace.Handlers.Types.ParsedTrace, navigation: Trace.Types.Events.NavigationStart,
     frameId: string): Trace.Insights.Types.InsightSetContextWithNavigation {
   if (!navigation.args.data?.navigationId) {
     throw new Error('expected navigationId');

@@ -5,7 +5,6 @@
 import * as Platform from '../../core/platform/platform.js';
 
 import * as Handlers from './handlers/handlers.js';
-import type {DeepWriteable, HandlerData} from './handlers/types.js';
 import * as Helpers from './helpers/helpers.js';
 import type * as Insights from './insights/insights.js';
 import {TraceParseProgressEvent, TraceProcessor} from './Processor.js';
@@ -19,12 +18,6 @@ export interface ParseConfig {
   metadata?: Types.File.MetaData;
   isFreshRecording?: boolean;
 }
-
-export type ParsedTrace = HandlerData&{
-  entity: Handlers.Entities.EntityMapper,
-};
-
-export type ParsedTraceMutable = DeepWriteable<ParsedTrace>;
 
 /**
  * The Model is responsible for parsing arrays of raw trace events and storing the
@@ -140,8 +133,9 @@ export class Model extends EventTarget {
     }
   }
 
-  #storeParsedFileData(file: ParsedTraceFile, data: ParsedTrace|null, insights: Insights.Types.TraceInsightSets|null):
-      void {
+  #storeParsedFileData(
+      file: ParsedTraceFile, data: Handlers.Types.ParsedTrace|null,
+      insights: Insights.Types.TraceInsightSets|null): void {
     file.parsedTrace = data;
     file.traceInsights = insights;
     this.#lastRecordingIndex++;
@@ -166,7 +160,7 @@ export class Model extends EventTarget {
    * Returns the parsed trace data indexed by the order in which it was stored.
    * If no index is given, the last stored parsed data is returned.
    */
-  parsedTrace(index: number = this.#traces.length - 1): ParsedTrace|null {
+  parsedTrace(index: number = this.#traces.length - 1): Handlers.Types.ParsedTrace|null {
     return this.#traces.at(index)?.parsedTrace ?? null;
   }
 
@@ -217,7 +211,7 @@ export class Model extends EventTarget {
  * essentially the TraceFile plus whatever the model has parsed from it.
  */
 export type ParsedTraceFile = Types.File.TraceFile&{
-  parsedTrace: ParsedTrace | null,
+  parsedTrace: Handlers.Types.ParsedTrace | null,
   traceInsights: Insights.Types.TraceInsightSets | null,
 };
 

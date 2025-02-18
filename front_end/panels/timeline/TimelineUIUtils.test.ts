@@ -908,7 +908,7 @@ describeWithMockConnection('TimelineUIUtils', function() {
           ['(anonymous) @ web.dev/js/app.js?v=1423cda3:1:183'],
       );
     });
-    async function basicStackTraceParsedTrace(): Promise<Trace.TraceModel.ParsedTrace> {
+    async function basicStackTraceParsedTrace(): Promise<Trace.Handlers.Types.ParsedTrace> {
       const pid = 0;
       const traceId = 0;
       const tid = 0;

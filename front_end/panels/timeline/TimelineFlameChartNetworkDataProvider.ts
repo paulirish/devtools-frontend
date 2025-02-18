@@ -33,7 +33,7 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
 
   #timelineDataInternal: PerfUI.FlameChart.FlameChartTimelineData|null = null;
   #lastSelection: Selection|null = null;
-  #parsedTrace: Trace.TraceModel.ParsedTrace|null = null;
+  #parsedTrace: Trace.Handlers.Types.ParsedTrace|null = null;
   #eventIndexByEvent: Map<NetworkTrackEvent, number|null> = new Map();
   // -1 means no entry is selected.
   #lastInitiatorEntry: number = -1;
@@ -60,7 +60,7 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
     this.#networkTrackAppender = null;
   }
 
-  setModel(parsedTrace: Trace.TraceModel.ParsedTrace): void {
+  setModel(parsedTrace: Trace.Handlers.Types.ParsedTrace): void {
     this.reset();
     this.#parsedTrace = parsedTrace;
 
@@ -68,7 +68,7 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
     this.#setTimingBoundsData(this.#parsedTrace);
   }
 
-  setEvents(parsedTrace: Trace.TraceModel.ParsedTrace): void {
+  setEvents(parsedTrace: Trace.Handlers.Types.ParsedTrace): void {
     if (parsedTrace.NetworkRequests.webSocket) {
       parsedTrace.NetworkRequests.webSocket.forEach(webSocketData => {
         if (webSocketData.syntheticConnection) {
@@ -427,7 +427,7 @@ export class TimelineFlameChartNetworkDataProvider implements PerfUI.FlameChart.
    * Sets the minimum time and total time span of a trace using the
    * new engine data.
    */
-  #setTimingBoundsData(newParsedTrace: Trace.TraceModel.ParsedTrace): void {
+  #setTimingBoundsData(newParsedTrace: Trace.Handlers.Types.ParsedTrace): void {
     const {traceBounds} = newParsedTrace.Meta;
     const minTime = Trace.Helpers.Timing.microToMilli(traceBounds.min);
     const maxTime = Trace.Helpers.Timing.microToMilli(traceBounds.max);

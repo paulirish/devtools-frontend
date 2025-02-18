@@ -22,7 +22,7 @@ import miniMapStyles from './timelineMiniMap.css.js';
 import {TimelineUIUtils} from './TimelineUIUtils.js';
 
 export interface OverviewData {
-  parsedTrace: Trace.TraceModel.ParsedTrace;
+  parsedTrace: Trace.Handlers.Types.ParsedTrace;
   isCpuProfile?: boolean;
   settings: {
     showScreenshots: boolean,
@@ -235,7 +235,7 @@ export class TimelineMiniMap extends
     this.#overviewComponent.reset();
   }
 
-  #setMarkers(parsedTrace: Trace.TraceModel.ParsedTrace): void {
+  #setMarkers(parsedTrace: Trace.Handlers.Types.ParsedTrace): void {
     const markers = new Map<number, HTMLDivElement>();
 
     const {Meta} = parsedTrace;
@@ -252,7 +252,7 @@ export class TimelineMiniMap extends
     this.#overviewComponent.setMarkers(markers);
   }
 
-  #setNavigationStartEvents(parsedTrace: Trace.TraceModel.ParsedTrace): void {
+  #setNavigationStartEvents(parsedTrace: Trace.Handlers.Types.ParsedTrace): void {
     this.#overviewComponent.setNavStartTimes(parsedTrace.Meta.mainFrameNavigations);
   }
 

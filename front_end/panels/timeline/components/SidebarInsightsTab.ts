@@ -44,7 +44,7 @@ export class SidebarInsightsTab extends HTMLElement {
   readonly #boundRender = this.#render.bind(this);
   readonly #shadow = this.attachShadow({mode: 'open'});
 
-  #parsedTrace: Trace.TraceModel.ParsedTrace|null = null;
+  #parsedTrace: Trace.Handlers.Types.ParsedTrace|null = null;
   #traceMetadata: Trace.Types.File.MetaData|null = null;
   #insights: Trace.Insights.Types.TraceInsightSets|null = null;
   #activeInsight: ActiveInsight|null = null;
@@ -63,7 +63,7 @@ export class SidebarInsightsTab extends HTMLElement {
 
   // TODO(paulirish): add back a disconnectedCallback() to avoid memory leaks that doesn't cause b/372943062
 
-  set parsedTrace(data: Trace.TraceModel.ParsedTrace|null) {
+  set parsedTrace(data: Trace.Handlers.Types.ParsedTrace|null) {
     if (data === this.#parsedTrace) {
       return;
     }

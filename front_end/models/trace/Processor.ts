@@ -55,14 +55,14 @@ export class TraceProcessor extends EventTarget {
   readonly #traceHandlers: Partial<Handlers.Types.Handlers>;
   #status = Status.IDLE;
   #modelConfiguration = Types.Configuration.defaults();
-  #data: Model.ParsedTrace|null = null;
+  #data: Handlers.Types.ParsedTrace|null = null;
   #insights: Insights.Types.TraceInsightSets|null = null;
 
   static createWithAllHandlers(): TraceProcessor {
     return new TraceProcessor(Handlers.ModelHandlers, Types.Configuration.defaults());
   }
 
-  static getEnabledInsightRunners(parsedTrace: Model.ParsedTrace): Partial<Insights.Types.InsightModelsType> {
+  static getEnabledInsightRunners(parsedTrace: Handlers.Types.ParsedTrace): Partial<Insights.Types.InsightModelsType> {
     const enabledInsights = {} as Insights.Types.InsightModelsType;
     for (const [name, insight] of Object.entries(Insights.Models)) {
       const deps = insight.deps();
@@ -251,7 +251,7 @@ export class TraceProcessor extends EventTarget {
     }
     this.dispatchEvent(new TraceParseProgressEvent({percent: ProgressPhase.CLONE}));
 
-    const parsedTrace = handlerData as Model.ParsedTrace;
+    const parsedTrace = handlerData as Handlers.Types.ParsedTrace;
 
     // The parsedTrace is data from handlers plus this entityMapper.
     const entityMapper = new Handlers.Entities.EntityMapper(handlerData);
@@ -260,7 +260,7 @@ export class TraceProcessor extends EventTarget {
     this.#data = parsedTrace;
   }
 
-  get parsedTrace(): Model.ParsedTrace|null {
+  get parsedTrace(): Handlers.Types.ParsedTrace|null {
     if (this.#status !== Status.FINISHED_PARSING) {
       return null;
     }
@@ -277,7 +277,7 @@ export class TraceProcessor extends EventTarget {
   }
 
   #createLanternContext(
-      parsedTrace: Model.ParsedTrace, traceEvents: readonly Types.Events.Event[], frameId: string,
+      parsedTrace: Handlers.Types.ParsedTrace, traceEvents: readonly Types.Events.Event[], frameId: string,
       navigationId: string): Insights.Types.LanternContext|undefined {
     // Check for required handlers.
     if (!parsedTrace.NetworkRequests || !parsedTrace.Workers || !parsedTrace.PageLoadMetrics) {
@@ -433,7 +433,7 @@ export class TraceProcessor extends EventTarget {
   }
 
   #computeInsightSet(
-      insights: Insights.Types.TraceInsightSets, parsedTrace: Model.ParsedTrace,
+      insights: Insights.Types.TraceInsightSets, parsedTrace: Handlers.Types.ParsedTrace,
       insightRunners: Partial<typeof Insights.Models>, context: Insights.Types.InsightSetContext,
       options: Types.Configuration.ParseOptions): void {
     const model = {} as Insights.Types.InsightSet['model'];
@@ -483,7 +483,7 @@ export class TraceProcessor extends EventTarget {
    * Run all the insights and set the result to `#insights`.
    */
   #computeInsights(
-      parsedTrace: Model.ParsedTrace, traceEvents: readonly Types.Events.Event[],
+      parsedTrace: Handlers.Types.ParsedTrace, traceEvents: readonly Types.Events.Event[],
       options: Types.Configuration.ParseOptions): void {
     this.#insights = new Map();
 

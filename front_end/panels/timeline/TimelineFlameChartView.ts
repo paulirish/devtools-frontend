@@ -131,7 +131,7 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
   private needsResizeToPreferredHeights?: boolean;
   private selectedSearchResult?: PerfUI.FlameChart.DataProviderSearchResult;
   private searchRegex?: RegExp;
-  #parsedTrace: Trace.TraceModel.ParsedTrace|null;
+  #parsedTrace: Trace.Handlers.Types.ParsedTrace|null;
   #traceMetadata: Trace.Types.File.MetaData|null;
   #traceInsightSets: Trace.Insights.Types.TraceInsightSets|null = null;
   #eventToRelatedInsightsMap: TimelineComponents.RelatedInsightChips.EventToRelatedInsightsMap|null = null;
@@ -608,7 +608,7 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
     }
   }
 
-  setMarkers(parsedTrace: Trace.TraceModel.ParsedTrace|null): void {
+  setMarkers(parsedTrace: Trace.Handlers.Types.ParsedTrace|null): void {
     if (!parsedTrace) {
       return;
     }
@@ -1126,7 +1126,7 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
     this.#updateDetailViews();
   }
 
-  setModel(newParsedTrace: Trace.TraceModel.ParsedTrace, traceMetadata: Trace.Types.File.MetaData|null): void {
+  setModel(newParsedTrace: Trace.Handlers.Types.ParsedTrace, traceMetadata: Trace.Types.File.MetaData|null): void {
     if (newParsedTrace === this.#parsedTrace) {
       return;
     }

@@ -114,7 +114,7 @@ export class NetworkRequestDetails extends HTMLElement {
   #maybeTarget: SDK.Target.Target|null = null;
   #requestPreviewElements = new WeakMap<Trace.Types.Events.SyntheticNetworkRequest, HTMLImageElement>();
   #linkifier: LegacyComponents.Linkifier.Linkifier;
-  #parsedTrace: Trace.TraceModel.ParsedTrace|null = null;
+  #parsedTrace: Trace.Handlers.Types.ParsedTrace|null = null;
   constructor(linkifier: LegacyComponents.Linkifier.Linkifier) {
     super();
     this.#linkifier = linkifier;
@@ -125,7 +125,7 @@ export class NetworkRequestDetails extends HTMLElement {
   }
 
   async setData(
-      parsedTrace: Trace.TraceModel.ParsedTrace, networkRequest: Trace.Types.Events.SyntheticNetworkRequest,
+      parsedTrace: Trace.Handlers.Types.ParsedTrace, networkRequest: Trace.Types.Events.SyntheticNetworkRequest,
       maybeTarget: SDK.Target.Target|null): Promise<void> {
     if (this.#networkRequest === networkRequest && parsedTrace === this.#parsedTrace) {
       return;

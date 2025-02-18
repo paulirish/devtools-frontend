@@ -4,6 +4,7 @@
 // found in the LICENSE file.
 
 import type * as Types from './../types/types.js';
+import type * as Entities from './Entities.js';
 import type * as ModelHandlers from './ModelHandlers.js';
 
 export interface Handler {
@@ -59,6 +60,12 @@ export type HandlersWithMeta<T extends {[key: string]: Handler}> = {
 // TraceProcessor with a subset of handlers, you should instead use
 // `EnabledHandlerDataWithMeta<>`.
 export type HandlerData = Readonly<EnabledHandlerDataWithMeta<typeof ModelHandlers>>;
+
+export type ParsedTrace = HandlerData&{
+  entity: Entities.EntityMapper,
+};
+
+export type ParsedTraceMutable = DeepWriteable<ParsedTrace>;
 
 export type DeepWriteable<T> = {
   -readonly[P in keyof T]: DeepWriteable<T[P]>

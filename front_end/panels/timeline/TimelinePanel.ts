@@ -964,7 +964,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
    * within DevTools you are warned when using the method.
    * @deprecated
    **/
-  getParsedTraceForLayoutTests(): Trace.TraceModel.ParsedTrace {
+  getParsedTraceForLayoutTests(): Trace.Handlers.Types.ParsedTrace {
     const traceIndex = this.#activeTraceIndex();
     if (traceIndex === null) {
       throw new Error('No trace index active.');
