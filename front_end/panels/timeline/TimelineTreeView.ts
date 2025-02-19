@@ -9,7 +9,6 @@ import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Trace from '../../models/trace/trace.js';
-import * as ThirdPartyWeb from '../../third_party/third-party-web/third-party-web.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
 import * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
@@ -168,6 +167,7 @@ export class TimelineTreeView extends
     Common.ObjectWrapper.eventMixin<TimelineTreeView.EventTypes, typeof UI.Widget.VBox>(UI.Widget.VBox)
         implements UI.SearchableView.Searchable {
   #selectedEvents: Trace.Types.Events.Event[]|null;
+  private executionContextNamesByOrigin = new Map<Platform.DevToolsPath.UrlString, string>();
   private searchResults: Trace.Extras.TraceTree.Node[];
   linkifier!: Components.Linkifier.Linkifier;
   dataGrid!: DataGrid.SortableDataGrid.SortableDataGrid<GridNode>;
@@ -284,6 +284,8 @@ export class TimelineTreeView extends
   }
 
   updateContents(selection: TimelineSelection): void {
+    this.updateExtensionResolver();
+
     const timings = rangeForSelection(selection);
     const timingMilli = Trace.Helpers.Timing.traceWindowMicroSecondsToMilliSeconds(timings);
     this.setRange(timingMilli.min, timingMilli.max);
@@ -657,6 +659,37 @@ export class TimelineTreeView extends
   supportsRegexSearch(): boolean {
     return true;
   }
+
+  private updateExtensionResolver(): void {
+    this.executionContextNamesByOrigin = new Map();
+    for (const runtimeModel of SDK.TargetManager.TargetManager.instance().models(SDK.RuntimeModel.RuntimeModel)) {
+      for (const context of runtimeModel.executionContexts()) {
+        this.executionContextNamesByOrigin.set(context.origin, context.name);
+      }
+    }
+  }
+
+  beautifyDomainName(name: string): string {
+    if (TimelineTreeView.isExtensionInternalURL(name as Platform.DevToolsPath.UrlString)) {
+      name = i18nString(UIStrings.chromeExtensionsOverhead);
+    } else if (TimelineTreeView.isV8NativeURL(name as Platform.DevToolsPath.UrlString)) {
+      name = i18nString(UIStrings.vRuntime);
+    } else if (name.startsWith('chrome-extension')) {
+      name = this.executionContextNamesByOrigin.get(name as Platform.DevToolsPath.UrlString) || name;
+    }
+    return name;
+  }
+
+  static isExtensionInternalURL(url: Platform.DevToolsPath.UrlString): boolean {
+    return url.startsWith(AggregatedTimelineTreeView.extensionInternalPrefix);
+  }
+
+  static isV8NativeURL(url: Platform.DevToolsPath.UrlString): boolean {
+    return url.startsWith(AggregatedTimelineTreeView.v8NativePrefix);
+  }
+
+  static readonly extensionInternalPrefix = 'extensions::';
+  static readonly v8NativePrefix = 'native ';
 }
 
 export namespace TimelineTreeView {
@@ -881,7 +914,6 @@ const treeNodeToGridNode = new WeakMap<Trace.Extras.TraceTree.Node, TreeGridNode
 export class AggregatedTimelineTreeView extends TimelineTreeView {
   protected readonly groupBySetting: Common.Settings.Setting<AggregatedTimelineTreeView.GroupBy>;
   private readonly stackView: TimelineStackView;
-  private executionContextNamesByOrigin = new Map<Platform.DevToolsPath.UrlString, string>();
 
   constructor() {
     super();
@@ -898,33 +930,12 @@ export class AggregatedTimelineTreeView extends TimelineTreeView {
   }
 
   override updateContents(selection: TimelineSelection): void {
-    this.updateExtensionResolver();
     super.updateContents(selection);
     const rootNode = this.dataGrid.rootNode();
     if (rootNode.children.length) {
       rootNode.children[0].select(/* suppressSelectedEvent */ true);
     }
     this.updateDetailsForSelection();
-  }
-
-  private updateExtensionResolver(): void {
-    this.executionContextNamesByOrigin = new Map();
-    for (const runtimeModel of SDK.TargetManager.TargetManager.instance().models(SDK.RuntimeModel.RuntimeModel)) {
-      for (const context of runtimeModel.executionContexts()) {
-        this.executionContextNamesByOrigin.set(context.origin, context.name);
-      }
-    }
-  }
-
-  beautifyDomainName(this: AggregatedTimelineTreeView, name: string): string {
-    if (AggregatedTimelineTreeView.isExtensionInternalURL(name as Platform.DevToolsPath.UrlString)) {
-      name = i18nString(UIStrings.chromeExtensionsOverhead);
-    } else if (AggregatedTimelineTreeView.isV8NativeURL(name as Platform.DevToolsPath.UrlString)) {
-      name = i18nString(UIStrings.vRuntime);
-    } else if (name.startsWith('chrome-extension')) {
-      name = this.executionContextNamesByOrigin.get(name as Platform.DevToolsPath.UrlString) || name;
-    }
-    return name;
   }
 
   displayInfoForGroupNode(node: Trace.Extras.TraceTree.Node): {
@@ -1087,11 +1098,11 @@ export class AggregatedTimelineTreeView extends TimelineTreeView {
     if (!url) {
       return '';
     }
-    if (AggregatedTimelineTreeView.isExtensionInternalURL(url)) {
-      return AggregatedTimelineTreeView.extensionInternalPrefix;
+    if (TimelineTreeView.isExtensionInternalURL(url)) {
+      return TimelineTreeView.extensionInternalPrefix;
     }
-    if (AggregatedTimelineTreeView.isV8NativeURL(url)) {
-      return AggregatedTimelineTreeView.v8NativePrefix;
+    if (TimelineTreeView.isV8NativeURL(url)) {
+      return TimelineTreeView.v8NativePrefix;
     }
     const parsedURL = Common.ParsedURL.ParsedURL.fromString(url);
     if (!parsedURL) {
@@ -1109,17 +1120,6 @@ export class AggregatedTimelineTreeView extends TimelineTreeView {
     const domainMatch = /([^.]*\.)?[^.]*$/.exec(parsedURL.host);
     return domainMatch?.[0] || '';
   }
-
-  private static isExtensionInternalURL(url: Platform.DevToolsPath.UrlString): boolean {
-    return url.startsWith(AggregatedTimelineTreeView.extensionInternalPrefix);
-  }
-
-  private static isV8NativeURL(url: Platform.DevToolsPath.UrlString): boolean {
-    return url.startsWith(AggregatedTimelineTreeView.v8NativePrefix);
-  }
-
-  private static readonly extensionInternalPrefix = 'extensions::';
-  private static readonly v8NativePrefix = 'native ';
 }
 export namespace AggregatedTimelineTreeView {
   export enum GroupBy {
