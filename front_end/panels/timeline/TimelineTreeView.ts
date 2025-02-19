@@ -660,6 +660,48 @@ export class TimelineTreeView extends
     return true;
   }
 
+  protected domainByEvent(groupBy: AggregatedTimelineTreeView.GroupBy, event: Trace.Types.Events.Event): string {
+    const parsedTrace = this.parsedTrace;
+    if (!parsedTrace) {
+      return '';
+    }
+    const url = Trace.Handlers.Helpers.getNonResolvedURL(event, parsedTrace);
+    if (!url) {
+      return '';
+    }
+    if (TimelineTreeView.isExtensionInternalURL(url)) {
+      return TimelineTreeView.extensionInternalPrefix;
+    }
+    if (TimelineTreeView.isV8NativeURL(url)) {
+      return TimelineTreeView.v8NativePrefix;
+    }
+
+    const parsedURL = Common.ParsedURL.ParsedURL.fromString(url);
+    if (!parsedURL) {
+      return '';
+    }
+    if (parsedURL.scheme === 'chrome-extension') {
+      return parsedURL.scheme + '://' + parsedURL.host;
+    }
+    // This must follow after the extension checks.
+    if (groupBy === AggregatedTimelineTreeView.GroupBy.ThirdParties) {
+      const entity = this.entityMapper?.entityForEvent(event);
+      if (!entity) {
+        return '';
+      }
+
+      return entity.name;
+    }
+    if (groupBy === AggregatedTimelineTreeView.GroupBy.Subdomain) {
+      return parsedURL.host;
+    }
+    if (/^[.0-9]+$/.test(parsedURL.host)) {
+      return parsedURL.host;
+    }
+    const domainMatch = /([^.]*\.)?[^.]*$/.exec(parsedURL.host);
+    return domainMatch && domainMatch[0] || '';
+  }
+
   private updateExtensionResolver(): void {
     this.executionContextNamesByOrigin = new Map();
     for (const runtimeModel of SDK.TargetManager.TargetManager.instance().models(SDK.RuntimeModel.RuntimeModel)) {
