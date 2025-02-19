@@ -153,8 +153,8 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
       b: DataGrid.SortableDataGrid.SortableDataGridNode<TimelineTreeView.GridNode>): number {
     const nodeA = a as TimelineTreeView.TreeGridNode;
     const nodeB = b as TimelineTreeView.TreeGridNode;
-    const transferA = this.extractThirdPartySummary(nodeA.profileNode).transferSize ?? 0;
-    const transferB = this.extractThirdPartySummary(nodeB.profileNode).transferSize ?? 0;
+    const transferA = nodeA.profileNode.transferSize ?? 0;
+    const transferB = nodeB.profileNode.transferSize ?? 0;
     return transferA - transferB;
   }
 

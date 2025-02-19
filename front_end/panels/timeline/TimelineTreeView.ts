@@ -963,7 +963,8 @@ export class AggregatedTimelineTreeView extends TimelineTreeView {
       }
 
       case AggregatedTimelineTreeView.GroupBy.ThirdParties: {
-        // Classify unattributed as 1st party.
+        // To avoid showing [unattributed] in the 3P table. We'll magically treat all unattributed as 1P.
+        // Is this fair? Not entirely, but mostly.  (How do you attribute the cost of a large recalc style??)
         const domainName = id ? this.beautifyDomainName(id) : this.entityMapper?.firstPartyEntity()?.name;
         return {name: domainName || unattributed, color, icon: undefined};
       }
@@ -1085,15 +1086,6 @@ export class AggregatedTimelineTreeView extends TimelineTreeView {
     if (!parsedTrace) {
       return '';
     }
-    if (groupBy === AggregatedTimelineTreeView.GroupBy.ThirdParties) {
-      const entity = this.entityMapper?.entityForEvent(event);
-      if (!entity) {
-        return '';
-      }
-
-      return entity.name;
-    }
-
     const url = Trace.Handlers.Helpers.getNonResolvedURL(event, parsedTrace);
     if (!url) {
       return '';
@@ -1104,12 +1096,22 @@ export class AggregatedTimelineTreeView extends TimelineTreeView {
     if (TimelineTreeView.isV8NativeURL(url)) {
       return TimelineTreeView.v8NativePrefix;
     }
+
     const parsedURL = Common.ParsedURL.ParsedURL.fromString(url);
     if (!parsedURL) {
       return '';
     }
     if (parsedURL.scheme === 'chrome-extension') {
       return parsedURL.scheme + '://' + parsedURL.host;
+    }
+    // This must follow after the extension checks.
+    if (groupBy === AggregatedTimelineTreeView.GroupBy.ThirdParties) {
+      const entity = this.entityMapper?.entityForEvent(event);
+      if (!entity) {
+        return '';
+      }
+
+      return entity.name;
     }
     if (groupBy === AggregatedTimelineTreeView.GroupBy.Subdomain) {
       return parsedURL.host;
