@@ -33,7 +33,7 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/ThirdPartyTreeView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-export class ThirdPartyTreeViewWidget extends TimelineTreeView.AggregatedTimelineTreeView {
+export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView {
   #thirdPartySummaries: {
     summaries: Trace.Extras.ThirdParties.ThirdPartySummary,
     entityByEvent: Map<Trace.Types.Events.Event, Trace.Extras.ThirdParties.Entity>,
@@ -46,7 +46,6 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.AggregatedTimelin
 
   constructor() {
     super();
-    this.setGroupBySetting(TimelineTreeView.AggregatedTimelineTreeView.GroupBy.ThirdParties);
     this.element.setAttribute('jslog', `${VisualLogging.pane('third-party-tree').track({hover: true})}`);
     this.init();
     this.dataGrid.markColumnAsSortedBy('self', DataGrid.DataGrid.Order.Descending);
@@ -95,7 +94,7 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.AggregatedTimelin
       filters: [filter],
       startTime: this.startTime,
       endTime: this.endTime,
-      eventGroupIdCallback: this.groupingFunction(TimelineTreeView.AggregatedTimelineTreeView.GroupBy.ThirdParties),
+      eventGroupIdCallback: this.eventToEntity.bind(this),
       calculateTransferSize: true,
     });
     return node;
@@ -106,6 +105,16 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.AggregatedTimelin
    */
   override selectProfileNode(): void {
     return;
+  }
+
+  // This is our groupingFunction aka eventGroupIdCallback.
+  private eventToEntity(event: Trace.Types.Events.Event): string {
+    const entity = this.entityMapper?.entityForEvent(event);
+    if (!entity) {
+      return '';
+    }
+
+    return entity.name;
   }
 
   override populateColumns(columns: DataGrid.DataGrid.ColumnDescriptor[]): void {
@@ -193,6 +202,21 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.AggregatedTimelin
     }
     const eventsForEntity = entityMappings.eventsForEntity(nodeEntity);
     this.dispatchEventToListeners(TimelineTreeView.TimelineTreeView.Events.THIRD_PARTY_ROW_HOVERED, eventsForEntity);
+  }
+
+  displayInfoForGroupNode(node: Trace.Extras.TraceTree.Node): {
+    name: string,
+    color: string,
+    icon: (Element|undefined),
+  } {
+    const color = 'gray';
+    const unattributed = i18nString(UIStrings.unattributed);
+    const id = typeof node.id === 'symbol' ? undefined : node.id;
+    // To avoid showing [unattributed] in the 3P table. We'll magically treat all unattributed as 1P.
+    // Is this fair? Not entirely, but mostly.  (How do you attribute the cost of a large recalc style??)
+    const domainName = id ? this.beautifyDomainName(id) : this.entityMapper?.firstPartyEntity()?.name;
+    // TODO(aixba,paulirish): Use beautifyDomainName by extending AggregatedTimelineTreeView or something else.
+    return {name: domainName || unattributed, color, icon: undefined};
   }
 
   extractThirdPartySummary(node: Trace.Extras.TraceTree.Node): {transferSize: number} {
