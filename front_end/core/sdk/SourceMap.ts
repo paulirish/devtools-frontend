@@ -768,6 +768,35 @@ export class SourceMap {
     this.#ensureMappingsProcessed();
     return this.#scopesInfo?.findOriginalFunctionName(position) ?? null;
   }
+
+  /**
+   * Serializes the {@link SourceMap} instance into a Source Map V3 object
+   * (`SourceMapV3Object` type).
+   *
+   * @returns the {@link SourceMapV3Object} representation of this {@link SourceMap}.
+   */
+  toJSON(): SourceMapV3Object {
+    this.#ensureMappingsProcessed();
+    const json: SourceMapV3Object = {
+      version: 3,  // SourceMap V3
+      sources: this.sourceURLs(),
+      mappings: '',  // needs to be implemented
+    };
+
+    const sourcesContent = this.#sourceInfos.map(info => info.content);
+    if (sourcesContent.some(content => content !== null)) {
+      json.sourcesContent = sourcesContent;
+    }
+
+    const sourceRoot = this.#json && 'sourceRoot' in this.#json ? this.#json.sourceRoot : undefined;
+    if (sourceRoot) {
+      json.sourceRoot = sourceRoot;
+    }
+
+    // Names and ignoreList are not serialized for now.
+
+    return json;
+  }
 }
 
 const VLQ_BASE_SHIFT = 5;

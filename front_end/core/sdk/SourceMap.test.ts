@@ -55,6 +55,22 @@ describeWithEnvironment('SourceMap', () => {
   const sourceUrlExample = urlString`example.js`;
   const sourceUrlOther = urlString`other.js`;
 
+  describe('toJSON', () => {
+    it('should serialize to a SourceMapV3Object', () => {
+      const sourceMap = new SDK.SourceMap.SourceMap(compiledUrl, sourceMapJsonUrl, {
+        version: 3,
+        sources: ['foo.ts'],
+        mappings: '',
+      });
+      const json = sourceMap.toJSON();
+      assert.deepStrictEqual(json, {
+        version: 3,
+        sources: ['foo.ts'],
+        mappings: '',
+      });
+    });
+  });
+
   describe('TokenIterator', () => {
     it('detects when it has reached the end', () => {
       const emptyIterator = new SDK.SourceMap.TokenIterator('');
@@ -785,13 +801,13 @@ describeWithEnvironment('SourceMap', () => {
 
     for (const {sourceRoot, sourceURL, sourceMapURL, expected} of cases) {
       it(`can resolve sourceURL "${sourceURL}" with sourceRoot "${sourceRoot}" and sourceMapURL "${sourceMapURL}"`,
-         () => {
-           const mappingPayload = {mappings: 'AAAA;;;CACA', sourceRoot, sources: [sourceURL], version: 3};
-           const sourceMap = new SDK.SourceMap.SourceMap(compiledUrl, urlString`${sourceMapURL}`, mappingPayload);
-           const sourceURLs = sourceMap.sourceURLs();
-           assert.lengthOf(sourceURLs, 1, 'unexpected number of original source URLs');
-           assert.strictEqual(sourceURLs[0], expected);
-         });
+          () => {
+            const mappingPayload = {mappings: 'AAAA;;;CACA', sourceRoot, sources: [sourceURL], version: 3};
+            const sourceMap = new SDK.SourceMap.SourceMap(compiledUrl, urlString`${sourceMapURL}`, mappingPayload);
+            const sourceURLs = sourceMap.sourceURLs();
+            assert.lengthOf(sourceURLs, 1, 'unexpected number of original source URLs');
+            assert.strictEqual(sourceURLs[0], expected);
+          });
     }
 
     it('does not touch sourceURLs that conflict with the compiled URL', () => {
