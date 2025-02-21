@@ -76,8 +76,6 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
         startTime: this.startTime,
         endTime: this.endTime,
         eventGroupIdCallback: this.eventToEntity.bind(this),
-        // eventGroupIdCallback:
-        //     this.domainByEvent.bind(this, TimelineTreeView.AggregatedTimelineTreeView.GroupBy.ThirdParties),
       });
     }
 
@@ -97,9 +95,6 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
       startTime: this.startTime,
       endTime: this.endTime,
       eventGroupIdCallback: this.eventToEntity.bind(this),
-      // TODO: i dont know why but switching to use the same grouping means i lose transfer size.
-      // eventGroupIdCallback:
-      //     this.domainByEvent.bind(this, TimelineTreeView.AggregatedTimelineTreeView.GroupBy.ThirdParties),
       calculateTransferSize: true,
     });
     return node;
@@ -121,7 +116,6 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
 
     return entity.name;
   }
-
 
   override populateColumns(columns: DataGrid.DataGrid.ColumnDescriptor[]): void {
     columns.push(
@@ -221,7 +215,24 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
     // To avoid showing [unattributed] in the 3P table. We'll magically treat all unattributed as 1P.
     // Is this fair? Not entirely, but mostly.  (How do you attribute the cost of a large recalc style??)
     const domainName = id ? this.beautifyDomainName(id) : this.entityMapper?.firstPartyEntity()?.name;
+    // TODO(aixba,paulirish): Use beautifyDomainName by extending AggregatedTimelineTreeView or something else.
     return {name: domainName || unattributed, color, icon: undefined};
+  }
+
+  extractThirdPartySummary(node: Trace.Extras.TraceTree.Node): {transferSize: number} {
+    if (!this.#thirdPartySummaries) {
+      return {transferSize: 0};
+    }
+
+    const entity = this.#thirdPartySummaries.entityByEvent.get(node.event);
+    if (!entity) {
+      return {transferSize: 0};
+    }
+    const summary = this.#thirdPartySummaries.summaries.byEntity.get(entity);
+    if (!summary) {
+      return {transferSize: 0};
+    }
+    return {transferSize: summary.transferSize};
   }
 
   nodeIsFirstParty(node: Trace.Extras.TraceTree.Node): boolean {
