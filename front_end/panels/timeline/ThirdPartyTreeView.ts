@@ -230,7 +230,6 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
     const color = 'gray';
     const unattributed = i18nString(UIStrings.unattributed);
     const id = typeof node.id === 'symbol' ? undefined : node.id;
-    console.log(this.beautifyDomainName(id));
     const domainName = id ? this.domainByEvent(node.event) : undefined;
     return {name: domainName || unattributed, color, icon: undefined};
   }
