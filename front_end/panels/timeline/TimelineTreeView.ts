@@ -7,7 +7,6 @@ import '../../ui/legacy/legacy.js';
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
-import * as SDK from '../../core/sdk/sdk.js';
 import * as Trace from '../../models/trace/trace.js';
 import * as ThirdPartyWeb from '../../third_party/third-party-web/third-party-web.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
@@ -889,8 +888,6 @@ const treeNodeToGridNode = new WeakMap<Trace.Extras.TraceTree.Node, TreeGridNode
 export class AggregatedTimelineTreeView extends TimelineTreeView {
   protected readonly groupBySetting: Common.Settings.Setting<AggregatedTimelineTreeView.GroupBy>;
   readonly stackView: TimelineStackView;
-  // TODO: remove this in this CL
-  private executionContextNamesByOrigin = new Map<Platform.DevToolsPath.UrlString, string>();
 
   constructor() {
     super();
@@ -907,22 +904,12 @@ export class AggregatedTimelineTreeView extends TimelineTreeView {
   }
 
   override updateContents(selection: TimelineSelection): void {
-    this.updateExtensionResolver();
     super.updateContents(selection);
     const rootNode = this.dataGrid.rootNode();
     if (rootNode.children.length) {
       rootNode.children[0].select(/* suppressSelectedEvent */ true);
     }
     this.updateDetailsForSelection();
-  }
-
-  private updateExtensionResolver(): void {
-    this.executionContextNamesByOrigin = new Map();
-    for (const runtimeModel of SDK.TargetManager.TargetManager.instance().models(SDK.RuntimeModel.RuntimeModel)) {
-      for (const context of runtimeModel.executionContexts()) {
-        this.executionContextNamesByOrigin.set(context.origin, context.name);
-      }
-    }
   }
 
   private beautifyDomainName(this: AggregatedTimelineTreeView, name: string, node: Trace.Extras.TraceTree.Node):

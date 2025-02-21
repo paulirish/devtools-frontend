@@ -127,7 +127,6 @@ function makeUpChromeExtensionEntity(entityCache: Map<string, Entity>, url: stri
     return cachedEntity;
   }
 
-
   const chromeExtensionEntity = {
     name,
     company: name,
