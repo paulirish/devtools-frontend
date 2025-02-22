@@ -177,7 +177,7 @@ export function addNetworkRequestToEntityMapping(
   }
   // In addition to mapping the network request, we'll also assign this entity to its "child" instant events like receiveData, willSendRequest, finishLoading, etc,
   const eventsToMap = [networkRequest, ...Object.values(requestTraceEvents).flat()];
-  console.log('eventsToMap', eventsToMap.map(e => e.name));
+  // console.log('eventsToMap', eventsToMap.map(e => e.name));
   const mappedEvents = entityMappings.eventsByEntity.get(entity);
   if (mappedEvents) {
     mappedEvents.push(...eventsToMap);

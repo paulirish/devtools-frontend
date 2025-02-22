@@ -12,14 +12,19 @@ describeWithEnvironment.only('EntityMapper', function() {
   it('correctly merges handler data', async function() {
     const {parsedTrace} = await TraceLoader.traceEngine(this, 'lantern/paul/trace.json.gz');
 
-    const fromRenderer = new Map(parsedTrace.Renderer.entityMappings.eventsByEntity);
-    const fromNetwork = new Map(parsedTrace.NetworkRequests.entityMappings.eventsByEntity);
+    const fromRenderer = parsedTrace.Renderer.entityMappings.eventsByEntity;
+    const fromNetwork = parsedTrace.NetworkRequests.entityMappings.eventsByEntity;
 
     const mapper = new Utils.EntityMapper.EntityMapper(parsedTrace);
     const mappings = mapper.mappings();
 
     // [paulirish.com, Google Tag Manager, Google Fonts, Google Analytics, Disqus, Firebase]
     assert.deepEqual(mappings.eventsByEntity.size, 6);
+
+    // // They're the same identity.
+    // assert.equal(fromRenderer, fromNetwork);
+    // // The shallow-clone means not same identity but same contents.
+    // assert.deepEqual(fromRenderer, mappings.eventsByEntity);
 
     // Check that mappings.eventsByEntity includes all the events of RendererHandler.
     fromRenderer.entries().forEach(([entity, events]) => {

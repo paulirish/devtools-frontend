@@ -37,7 +37,6 @@ export interface TraceEventsForNetworkRequest {
 //     U :
 //     TraceEventsForNetworkRequest[keyof TraceEventsForNetworkRequest];
 
-
 export interface WebSocketTraceDataForFrame {
   frame: string;
   webSocketIdentifier: number;
