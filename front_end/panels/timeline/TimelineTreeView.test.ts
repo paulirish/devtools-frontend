@@ -243,7 +243,8 @@ describeWithEnvironment('TimelineTreeView', function() {
         'imgix',
         'Google Tag Manager',
         'Google Analytics',
-        'shared-storage-demo-content-producer.web.app',
+        // This is not 'shared-storage-demo-web.app' because the entity is based on the site, the full domain.
+        'web.app',
       ]);
     });
 
