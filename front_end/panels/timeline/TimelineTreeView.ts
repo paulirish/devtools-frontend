@@ -267,8 +267,6 @@ export class TimelineTreeView extends
     this.dataGrid.element.addEventListener('mousemove', this.onMouseMove.bind(this), true);
     this.dataGrid.element.addEventListener(
         'mouseleave', () => this.dispatchEventToListeners(TimelineTreeView.Events.TREE_ROW_HOVERED, null));
-    this.dataGrid.element.addEventListener(
-        'mouseleave', () => this.dispatchEventToListeners(TimelineTreeView.Events.THIRD_PARTY_ROW_HOVERED, null));
     this.dataGrid.addEventListener(DataGrid.DataGrid.Events.OPENED_NODE, this.onGridNodeOpened, this);
     this.dataGrid.setResizeMethod(DataGrid.DataGrid.ResizeMethod.LAST);
     this.dataGrid.setRowContextMenuCallback(this.onContextMenu.bind(this));
@@ -590,7 +588,24 @@ export class TimelineTreeView extends
     this.dispatchEventToListeners(TimelineTreeView.Events.TREE_ROW_HOVERED, node);
   }
 
-  // TODO: do this on selection (before opened)
+  override wasShown(): void {
+    this.dataGrid.addEventListener(DataGrid.DataGrid.Events.SELECTED_NODE, this.#onDataGridSelectionChange, this);
+  }
+
+  override childWasDetached(_widget: UI.Widget.Widget): void {
+    this.dataGrid.removeEventListener(DataGrid.DataGrid.Events.SELECTED_NODE, this.#onDataGridSelectionChange);
+  }
+
+  /**
+   * This event fires when the user selects a row in the grid, either by
+   * clicking or by using the arrow keys. We want to have the same effect as
+   * when the user hover overs a row.
+   */
+  #onDataGridSelectionChange(event: Common.EventTarget.EventTargetEvent<DataGrid.DataGrid.DataGridNode<GridNode>>):
+      void {
+    this.onHover((event.data as GridNode).profileNode);
+  }
+
   onGridNodeOpened(): void {
     const gridNode = this.dataGrid.selectedNode as TreeGridNode;
     this.dispatchEventToListeners(TimelineTreeView.Events.TREE_ROW_HOVERED, gridNode.profileNode);

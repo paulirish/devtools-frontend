@@ -57,14 +57,6 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
     this.dataGrid.expandNodesWhenArrowing = false;
   }
 
-  override wasShown(): void {
-    this.dataGrid.addEventListener(DataGrid.DataGrid.Events.SELECTED_NODE, this.#onDataGridSelectionChange, this);
-  }
-
-  override childWasDetached(_widget: UI.Widget.Widget): void {
-    this.dataGrid.removeEventListener(DataGrid.DataGrid.Events.SELECTED_NODE, this.#onDataGridSelectionChange);
-  }
-
   override buildTree(): Trace.Extras.TraceTree.Node {
     const parsedTrace = this.parsedTrace();
     const entityMapper = this.entityMapper();
@@ -179,17 +171,6 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
       this.dataGrid.sortNodes(sortFunction, !this.dataGrid.isSortOrderAscending());
     }
   }
-
-  /**
-   * This event fires when the user selects a row in the grid, either by
-   * clicking or by using the arrow keys. We want to have the same effect as
-   * when the user hover overs a row.
-   */
-  #onDataGridSelectionChange(
-      event: Common.EventTarget.EventTargetEvent<DataGrid.DataGrid.DataGridNode<TimelineTreeView.GridNode>>): void {
-    this.onHover((event.data as TimelineTreeView.GridNode).profileNode);
-  }
-
 
   displayInfoForGroupNode(node: Trace.Extras.TraceTree.Node): {
     name: string,
