@@ -944,9 +944,7 @@ export class AggregatedTimelineTreeView extends TimelineTreeView {
       case AggregatedTimelineTreeView.GroupBy.Domain:
       case AggregatedTimelineTreeView.GroupBy.Subdomain:
       case AggregatedTimelineTreeView.GroupBy.ThirdParties: {
-        // To avoid showing [unattributed] in the 3P table. We'll magically treat all unattributed as 1P.
-        // Is this fair? Not entirely, but mostly.  (How do you attribute the cost of a large recalc style??)
-        // TODO: instead of undefined actually assign               this.entityMapper()?.firstPartyEntity()?.name
+        // TODO(paulirish,aixba): Improve attribution to reduce amount of items in [unattributed].
         const domainName = id ? this.beautifyDomainName(id, node) : undefined;
         return {name: domainName || unattributed, color, icon: undefined};
       }
