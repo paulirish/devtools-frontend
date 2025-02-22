@@ -21,7 +21,7 @@ class MockViewDelegate implements Timeline.TimelinePanel.TimelineModeViewDelegat
   element = document.createElement('div');
 }
 
-describeWithEnvironment('TimelineTreeView', function() {
+describeWithEnvironment.only('TimelineTreeView', function() {
   const mockViewDelegate = new MockViewDelegate();
 
   describe('EventsTimelineTreeView', function() {

@@ -24,6 +24,8 @@ export class EntityMapper {
     this.#entityMappings = this.#initializeEntityMappings(this.#parsedTrace);
     this.#firstPartyEntity = this.#findFirstPartyEntity();
     this.#thirdPartyEvents = this.#getThirdPartyEvents();
+
+    // console.log(this.eventsForEntity(this.#firstPartyEntity).find(e => e.ts === 343577513062))
   }
 
   /**
@@ -32,25 +34,26 @@ export class EntityMapper {
    */
   #initializeEntityMappings(parsedTrace: Trace.Handlers.Types.ParsedTrace): Trace.Handlers.Helpers.EntityMappings {
     // NetworkRequestHandler caches.
-    const entityByNetworkEvent = parsedTrace.NetworkRequests.entityMappings.entityByEvent;
-    const networkEventsByEntity = parsedTrace.NetworkRequests.entityMappings.eventsByEntity;
-    const networkCreatedCache = parsedTrace.NetworkRequests.entityMappings.createdEntityCache;
+    // const entityByNetworkEvent = parsedTrace.NetworkRequests.entityMappings.entityByEvent;
+    // const networkEventsByEntity = parsedTrace.NetworkRequests.entityMappings.eventsByEntity;
+    // const networkCreatedCache = parsedTrace.NetworkRequests.entityMappings.createdEntityCache;
 
-    // RendererHandler caches.
-    const entityByRendererEvent = parsedTrace.Renderer.entityMappings.entityByEvent;
-    const rendererEventsByEntity = parsedTrace.Renderer.entityMappings.eventsByEntity;
-    const rendererCreatedCache = parsedTrace.Renderer.entityMappings.createdEntityCache;
+    // // RendererHandler caches.
+    // const entityByRendererEvent = parsedTrace.Renderer.entityMappings.entityByEvent;
+    // const rendererEventsByEntity = parsedTrace.Renderer.entityMappings.eventsByEntity;
+    // const rendererCreatedCache = parsedTrace.Renderer.entityMappings.createdEntityCache;
 
-    // Build caches.
-    const entityByEvent = new Map([...entityByNetworkEvent, ...entityByRendererEvent]);
-    const createdEntityCache = new Map([...networkCreatedCache, ...rendererCreatedCache]);
-    const eventsByEntity = this.#mergeEventsByEntities(rendererEventsByEntity, networkEventsByEntity);
+    // // Build caches.
+    // const entityByEvent = new Map([...entityByNetworkEvent, ...entityByRendererEvent]);
+    // const createdEntityCache = new Map([...networkCreatedCache, ...rendererCreatedCache]);
+    // const eventsByEntity = this.#mergeEventsByEntities(rendererEventsByEntity, networkEventsByEntity);
 
-    return {
-      entityByEvent,
-      eventsByEntity,
-      createdEntityCache,
-    };
+    return parsedTrace.Renderer.entityMappings;
+    // return {
+    //   entityByEvent,
+    //   eventsByEntity,
+    //   createdEntityCache,
+    // };
   }
 
   #findFirstPartyEntity(): Trace.Handlers.Helpers.Entity|null {

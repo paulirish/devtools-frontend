@@ -150,6 +150,14 @@ export function addEventToEntityMapping(event: Types.Events.Event, entityMapping
     return;
   }
 
+  // i'll have ResourceSendRequest coming in here that were already assigned thx to addNetworkRequestToEntityMapping
+  // either
+  //   we check to see if the incoming event is one of those types (within TraceEventsForNetworkRequest) or
+  //   if the event is already mapped we skip
+  if (entityMappings.entityByEvent.has(event)) {
+    return;
+  }
+
   const mappedEvents = entityMappings.eventsByEntity.get(entity);
   if (mappedEvents) {
     mappedEvents.push(event);
@@ -169,14 +177,14 @@ export function addNetworkRequestToEntityMapping(
   }
   // In addition to mapping the network request, we'll also assign this entity to its "child" instant events like receiveData, willSendRequest, finishLoading, etc,
   const eventsToMap = [networkRequest, ...Object.values(requestTraceEvents).flat()];
-
+  console.log('eventsToMap', eventsToMap.map(e => e.name));
   const mappedEvents = entityMappings.eventsByEntity.get(entity);
   if (mappedEvents) {
     mappedEvents.push(...eventsToMap);
   } else {
     entityMappings.eventsByEntity.set(entity, eventsToMap);
   }
-  for (const event of eventsToMap) {
-    entityMappings.entityByEvent.set(event, entity);
+  for (const evt of eventsToMap) {
+    entityMappings.entityByEvent.set(evt, entity);
   }
 }

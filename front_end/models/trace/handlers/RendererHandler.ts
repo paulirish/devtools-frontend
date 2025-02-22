@@ -129,7 +129,9 @@ export async function finalize(): Promise<void> {
   const {mainFrameId, rendererProcessesByFrame, threadsInProcess} = metaHandlerData();
   const {entityMappings: networkEntityMappings} = networkRequestHandlerData();
   // Build on top of the created entity cache to avoid de-dupes of entities that are made up.
-  entityMappings.createdEntityCache = new Map(networkEntityMappings.createdEntityCache);
+  entityMappings.createdEntityCache = networkEntityMappings.createdEntityCache;
+  entityMappings.entityByEvent = networkEntityMappings.entityByEvent;
+  entityMappings.eventsByEntity = networkEntityMappings.eventsByEntity;
 
   assignMeta(processes, mainFrameId, rendererProcessesByFrame, threadsInProcess);
   sanitizeProcesses(processes);

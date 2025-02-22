@@ -8,7 +8,7 @@ import {TraceLoader} from '../../../testing/TraceLoader.js';
 
 import * as Utils from './utils.js';
 
-describeWithEnvironment('EntityMapper', function() {
+describeWithEnvironment.only('EntityMapper', function() {
   it('correctly merges handler data', async function() {
     const {parsedTrace} = await TraceLoader.traceEngine(this, 'lantern/paul/trace.json.gz');
 
@@ -116,7 +116,13 @@ describeWithEnvironment('EntityMapper', function() {
       assert.deepEqual(got.name, 'paulirish.com');
       const firstPartyEvents = mapper.eventsForEntity(got);
       const gotThirdPartyEvents = mapper.thirdPartyEvents();
+      console.log(firstPartyEvents.length, gotThirdPartyEvents.length);
+      // If any found in here the event is categorized as both 1p AND 3p.
       gotThirdPartyEvents.forEach(e => {
+        // if (firstPartyEvents.includes(e) === true) {
+        //   console.log(e.name, e.ts, Trace.Handlers.Helpers.getNonResolvedURL(e), {e, entity: mapper.entityForEvent(e)})
+        // }
+
         assert.isTrue(!firstPartyEvents.includes(e));
       });
     });
