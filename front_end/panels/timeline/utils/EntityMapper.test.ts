@@ -8,7 +8,7 @@ import {TraceLoader} from '../../../testing/TraceLoader.js';
 
 import * as Utils from './utils.js';
 
-describeWithEnvironment.only('EntityMapper', function() {
+describeWithEnvironment('EntityMapper', function() {
   it('correctly merges handler data', async function() {
     const {parsedTrace} = await TraceLoader.traceEngine(this, 'lantern/paul/trace.json.gz');
 
