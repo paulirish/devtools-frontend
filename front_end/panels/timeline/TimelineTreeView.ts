@@ -7,7 +7,6 @@ import '../../ui/legacy/legacy.js';
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
-import * as SDK from '../../core/sdk/sdk.js';
 import * as Trace from '../../models/trace/trace.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
 import * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
@@ -920,7 +919,7 @@ const treeNodeToGridNode = new WeakMap<Trace.Extras.TraceTree.Node, TreeGridNode
 
 export class AggregatedTimelineTreeView extends TimelineTreeView {
   protected readonly groupBySetting: Common.Settings.Setting<AggregatedTimelineTreeView.GroupBy>;
-  private readonly stackView: TimelineStackView;
+  readonly stackView: TimelineStackView;
 
   constructor() {
     super();
@@ -945,6 +944,18 @@ export class AggregatedTimelineTreeView extends TimelineTreeView {
     this.updateDetailsForSelection();
   }
 
+  private beautifyDomainName(this: AggregatedTimelineTreeView, name: string, node: Trace.Extras.TraceTree.Node):
+      string {
+    if (AggregatedTimelineTreeView.isExtensionInternalURL(name as Platform.DevToolsPath.UrlString)) {
+      name = i18nString(UIStrings.chromeExtensionsOverhead);
+    } else if (AggregatedTimelineTreeView.isV8NativeURL(name as Platform.DevToolsPath.UrlString)) {
+      name = i18nString(UIStrings.vRuntime);
+    } else if (name.startsWith('chrome-extension')) {
+      name = this.entityMapper()?.entityForEvent(node.event)?.name || name;
+    }
+    return name;
+  }
+
   displayInfoForGroupNode(node: Trace.Extras.TraceTree.Node): {
     name: string,
     color: string,
@@ -964,15 +975,12 @@ export class AggregatedTimelineTreeView extends TimelineTreeView {
       }
 
       case AggregatedTimelineTreeView.GroupBy.Domain:
-      case AggregatedTimelineTreeView.GroupBy.Subdomain: {
-        const domainName = id ? this.beautifyDomainName(id) : undefined;
-        return {name: domainName || unattributed, color, icon: undefined};
-      }
-
+      case AggregatedTimelineTreeView.GroupBy.Subdomain:
       case AggregatedTimelineTreeView.GroupBy.ThirdParties: {
         // To avoid showing [unattributed] in the 3P table. We'll magically treat all unattributed as 1P.
         // Is this fair? Not entirely, but mostly.  (How do you attribute the cost of a large recalc style??)
-        const domainName = id ? this.beautifyDomainName(id) : this.entityMapper()?.firstPartyEntity()?.name;
+        // TODO: instead of undefined actually assign               this.entityMapper()?.firstPartyEntity()?.name
+        const domainName = id ? this.beautifyDomainName(id, node) : undefined;
         return {name: domainName || unattributed, color, icon: undefined};
       }
 
