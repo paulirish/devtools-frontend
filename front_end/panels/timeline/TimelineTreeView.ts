@@ -592,8 +592,8 @@ export class TimelineTreeView extends
 
   // TODO: do this on selection (before opened)
   onGridNodeOpened(): void {
-    const node = this.dataGrid.selectedNode as TreeGridNode;
-    this.dispatchEventToListeners(TimelineTreeView.Events.TREE_ROW_HOVERED, node.profileNode);
+    const gridNode = this.dataGrid.selectedNode as TreeGridNode;
+    this.dispatchEventToListeners(TimelineTreeView.Events.TREE_ROW_HOVERED, gridNode.profileNode);
     this.updateDetailsForSelection();
   }
 
@@ -674,7 +674,7 @@ export namespace TimelineTreeView {
 
   export interface EventTypes {
     [Events.TREE_ROW_HOVERED]: Trace.Extras.TraceTree.Node|null;
-    [Events.THIRD_PARTY_ROW_HOVERED]: Trace.Types.Events.Event[]|null;
+    [Events.THIRD_PARTY_ROW_HOVERED]: Trace.Extras.TraceTree.Node|null;
     [Events.BOTTOM_UP_BUTTON_CLICKED]: Trace.Extras.TraceTree.Node|null;
   }
 }
