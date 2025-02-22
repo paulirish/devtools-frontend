@@ -189,8 +189,8 @@ export class TimelineTreeView extends
   private caseSensitiveButton: UI.Toolbar.ToolbarToggle|undefined;
   private regexButton: UI.Toolbar.ToolbarToggle|undefined;
   private matchWholeWord: UI.Toolbar.ToolbarToggle|undefined;
-  parsedTrace: Trace.Handlers.Types.ParsedTrace|null = null;
-  entityMapper: Utils.EntityMapper.EntityMapper|null = null;
+  #parsedTrace: Trace.Handlers.Types.ParsedTrace|null = null;
+  #entityMapper: Utils.EntityMapper.EntityMapper|null = null;
   #lastHighlightedEvent: HTMLElement|null = null;
   eventToTreeNode = new WeakMap<Trace.Types.Events.Event, Trace.Extras.TraceTree.Node>();
 
@@ -210,10 +210,10 @@ export class TimelineTreeView extends
 
   #eventNameForSorting(event: Trace.Types.Events.Event): string {
     const name = TimelineUIUtils.eventTitle(event) || event.name;
-    if (!this.parsedTrace) {
+    if (!this.#parsedTrace) {
       return name;
     }
-    return name + ':@' + Trace.Handlers.Helpers.getNonResolvedURL(event, this.parsedTrace);
+    return name + ':@' + Trace.Handlers.Helpers.getNonResolvedURL(event, this.#parsedTrace);
   }
 
   setSearchableView(searchableView: UI.SearchableView.SearchableView): void {
@@ -225,10 +225,17 @@ export class TimelineTreeView extends
       parsedTrace: Trace.Handlers.Types.ParsedTrace|null = null,
       entityMappings: Utils.EntityMapper.EntityMapper|null = null,
       ): void {
-    this.parsedTrace = parsedTrace;
+    this.#parsedTrace = parsedTrace;
     this.#selectedEvents = selectedEvents;
-    this.entityMapper = entityMappings;
+    this.#entityMapper = entityMappings;
     this.refreshTree();
+  }
+
+  entityMapper(): Utils.EntityMapper.EntityMapper|null {
+    return this.#entityMapper;
+  }
+  parsedTrace(): Trace.Handlers.Types.ParsedTrace|null {
+    return this.#parsedTrace;
   }
 
   init(): void {
@@ -395,7 +402,7 @@ export class TimelineTreeView extends
     }
     this.linkifier.reset();
     this.dataGrid.rootNode().removeChildren();
-    if (!this.parsedTrace) {
+    if (!this.#parsedTrace) {
       this.updateDetailsForSelection();
       return;
     }
@@ -632,7 +639,7 @@ export class TimelineTreeView extends
     }
     const searchRegex = searchConfig.toSearchRegex();
     this.searchResults = this.root.searchTree(
-        event => TimelineUIUtils.testContentMatching(event, searchRegex.regex, this.parsedTrace || undefined));
+        event => TimelineUIUtils.testContentMatching(event, searchRegex.regex, this.#parsedTrace || undefined));
     this.searchableView.updateSearchMatchesCount(this.searchResults.length);
   }
 
@@ -770,7 +777,7 @@ export class GridNode extends DataGrid.SortableDataGrid.SortableDataGridNode<Gri
       }
     } else if (event) {
       name.textContent = TimelineUIUtils.eventTitle(event);
-      const parsedTrace = this.treeView.parsedTrace;
+      const parsedTrace = this.treeView.parsedTrace();
       const target = parsedTrace ? targetForEvent(parsedTrace, event) : null;
       const linkifier = this.treeView.linkifier;
       const isFreshRecording = Boolean(parsedTrace && Tracker.instance().recordingIsFresh(parsedTrace));
@@ -802,7 +809,7 @@ export class GridNode extends DataGrid.SortableDataGrid.SortableDataGridNode<Gri
     switch (columnId) {
       case 'start-time': {
         event = this.profileNode.event;
-        const parsedTrace = this.treeView.parsedTrace;
+        const parsedTrace = this.treeView.parsedTrace();
         if (!parsedTrace) {
           throw new Error('Unable to load trace data for tree view');
         }
@@ -965,7 +972,7 @@ export class AggregatedTimelineTreeView extends TimelineTreeView {
       case AggregatedTimelineTreeView.GroupBy.ThirdParties: {
         // To avoid showing [unattributed] in the 3P table. We'll magically treat all unattributed as 1P.
         // Is this fair? Not entirely, but mostly.  (How do you attribute the cost of a large recalc style??)
-        const domainName = id ? this.beautifyDomainName(id) : this.entityMapper?.firstPartyEntity()?.name;
+        const domainName = id ? this.beautifyDomainName(id) : this.entityMapper()?.firstPartyEntity()?.name;
         return {name: domainName || unattributed, color, icon: undefined};
       }
 
@@ -985,7 +992,7 @@ export class AggregatedTimelineTreeView extends TimelineTreeView {
         break;
 
       case AggregatedTimelineTreeView.GroupBy.Frame: {
-        const frame = id ? this.parsedTrace?.PageFrames.frames.get(id) : undefined;
+        const frame = id ? this.parsedTrace()?.PageFrames.frames.get(id) : undefined;
         const frameName = frame ? TimelineUIUtils.displayNameForFrame(frame) : i18nString(UIStrings.page);
         return {name: frameName, color, icon: undefined};
       }
@@ -1067,13 +1074,13 @@ export class AggregatedTimelineTreeView extends TimelineTreeView {
         return this.domainByEvent.bind(this, groupBy);
       case GroupBy.URL:
         return (event: Trace.Types.Events.Event) => {
-          const parsedTrace = this.parsedTrace;
+          const parsedTrace = this.parsedTrace();
           return parsedTrace ? Trace.Handlers.Helpers.getNonResolvedURL(event, parsedTrace) ?? '' : '';
         };
       case GroupBy.Frame:
         return (event: Trace.Types.Events.Event) => {
           const frameId = Trace.Helpers.Trace.frameIDForEvent(event);
-          return frameId || this.parsedTrace?.Meta.mainFrameId || '';
+          return frameId || this.parsedTrace()?.Meta.mainFrameId || '';
         };
       default:
         console.assert(false, `Unexpected aggregation setting: ${groupBy}`);
@@ -1082,7 +1089,7 @@ export class AggregatedTimelineTreeView extends TimelineTreeView {
   }
 
   private domainByEvent(groupBy: AggregatedTimelineTreeView.GroupBy, event: Trace.Types.Events.Event): string {
-    const parsedTrace = this.parsedTrace;
+    const parsedTrace = this.parsedTrace();
     if (!parsedTrace) {
       return '';
     }
@@ -1106,7 +1113,7 @@ export class AggregatedTimelineTreeView extends TimelineTreeView {
     }
     // This must follow after the extension checks.
     if (groupBy === AggregatedTimelineTreeView.GroupBy.ThirdParties) {
-      const entity = this.entityMapper?.entityForEvent(event);
+      const entity = this.entityMapper()?.entityForEvent(event);
       if (!entity) {
         return '';
       }
@@ -1189,6 +1196,7 @@ export class TimelineStackView extends
       deleteCallback: undefined,
       refreshCallback: undefined,
     });
+
     this.dataGrid.setResizeMethod(DataGrid.DataGrid.ResizeMethod.LAST);
     this.dataGrid.addEventListener(DataGrid.DataGrid.Events.SELECTED_NODE, this.onSelectionChanged, this);
 
@@ -1217,6 +1225,14 @@ export class TimelineStackView extends
     }
   }
 
+  onMouseMove(event: Event): void {
+    const gridNode = event.target && (event.target instanceof Node) ?
+        (this.dataGrid.dataGridNodeFromNode((event.target as Node))) :
+        null;
+    const profileNode = (gridNode as TreeGridNode)?.profileNode;
+    this.dispatchEventToListeners(TimelineStackView.Events.TREE_ROW_HOVERED, profileNode);
+  }
+
   selectedTreeNode(): Trace.Extras.TraceTree.Node|null {
     const selectedNode = this.dataGrid.selectedNode;
     return selectedNode && (selectedNode as GridNode).profileNode;
@@ -1230,9 +1246,11 @@ export class TimelineStackView extends
 export namespace TimelineStackView {
   export const enum Events {
     SELECTION_CHANGED = 'SelectionChanged',
+    TREE_ROW_HOVERED = 'TreeRowHovered',
   }
 
   export interface EventTypes {
+    [Events.TREE_ROW_HOVERED]: Trace.Extras.TraceTree.Node|null;
     [Events.SELECTION_CHANGED]: void;
   }
 }

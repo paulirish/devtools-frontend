@@ -66,8 +66,8 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
   }
 
   override buildTree(): Trace.Extras.TraceTree.Node {
-    const parsedTrace = this.parsedTrace;
-    const entityMapper = this.entityMapper;
+    const parsedTrace = this.parsedTrace();
+    const entityMapper = this.entityMapper();
 
     if (!parsedTrace || !entityMapper) {
       return new Trace.Extras.TraceTree.BottomUpRootNode([], {
@@ -75,7 +75,7 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
         filters: this.filtersWithoutTextFilter(),
         startTime: this.startTime,
         endTime: this.endTime,
-        eventGroupIdCallback: this.eventToEntity.bind(this),
+        eventGroupIdCallback: this.groupingFunction.bind(this),
       });
     }
 
@@ -94,7 +94,7 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
       filters: [filter],
       startTime: this.startTime,
       endTime: this.endTime,
-      eventGroupIdCallback: this.eventToEntity.bind(this),
+      eventGroupIdCallback: this.groupingFunction.bind(this),
       calculateTransferSize: true,
     });
     return node;
@@ -107,9 +107,8 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
     return;
   }
 
-  // This is our groupingFunction aka eventGroupIdCallback.
-  private eventToEntity(event: Trace.Types.Events.Event): string {
-    const entity = this.entityMapper?.entityForEvent(event);
+  private groupingFunction(event: Trace.Types.Events.Event): string {
+    const entity = this.entityMapper()?.entityForEvent(event);
     if (!entity) {
       return '';
     }
@@ -192,7 +191,7 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
   }
 
   override onHover(node: Trace.Extras.TraceTree.Node|null): void {
-    const entityMappings = this.entityMapper;
+    const entityMappings = this.entityMapper();
     if (!entityMappings || !node?.event) {
       return;
     }
@@ -214,8 +213,7 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
     const id = typeof node.id === 'symbol' ? undefined : node.id;
     // To avoid showing [unattributed] in the 3P table. We'll magically treat all unattributed as 1P.
     // Is this fair? Not entirely, but mostly.  (How do you attribute the cost of a large recalc style??)
-    const domainName = id ? this.beautifyDomainName(id) : this.entityMapper?.firstPartyEntity()?.name;
-    // TODO(aixba,paulirish): Use beautifyDomainName by extending AggregatedTimelineTreeView or something else.
+    const domainName = id ? this.beautifyDomainName(id) : this.entityMapper()?.firstPartyEntity()?.name;
     return {name: domainName || unattributed, color, icon: undefined};
   }
 
@@ -236,7 +234,7 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
   }
 
   nodeIsFirstParty(node: Trace.Extras.TraceTree.Node): boolean {
-    const mapper = this.entityMapper;
+    const mapper = this.entityMapper();
     if (!mapper) {
       return false;
     }
@@ -245,7 +243,7 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
   }
 
   nodeIsExtension(node: Trace.Extras.TraceTree.Node): boolean {
-    const mapper = this.entityMapper;
+    const mapper = this.entityMapper();
     if (!mapper) {
       return false;
     }

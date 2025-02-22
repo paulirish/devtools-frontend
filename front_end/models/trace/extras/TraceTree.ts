@@ -640,11 +640,8 @@ export function generateEventID(event: Types.Events.Event): string {
   if (Types.Events.isConsoleTimeStamp(event) && event.args.data) {
     return `${event.name}:${event.args.data.name}`;
   }
-  if (Types.Events.isSyntheticNetworkRequest(event)) {
-    return `networkreq:${event.args.data.requestId}`;
-  }
-  if (Types.Events.isReceivedDataEvent(event)) {
-    return `networkreq:${event.args.data.requestId}`;
+  if (Types.Events.isSyntheticNetworkRequest(event) || Types.Events.isReceivedDataEvent(event)) {
+    return `req:${event.args.data.requestId}`;
   }
 
   return event.name;
