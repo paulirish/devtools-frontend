@@ -8,7 +8,6 @@ import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as Trace from '../../models/trace/trace.js';
-import * as ThirdPartyWeb from '../../third_party/third-party-web/third-party-web.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
 import * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
@@ -796,7 +795,7 @@ export class GridNode extends DataGrid.SortableDataGrid.SortableDataGridNode<Gri
         showPercents = true;
         break;
       case 'transfer-size':
-        value = thirdPartyView.extractThirdPartySummary(this.profileNode).transferSize;
+        value = this.profileNode.transferSize;
         isSize = true;
         break;
       default:
@@ -945,6 +944,7 @@ export class AggregatedTimelineTreeView extends TimelineTreeView {
       case AggregatedTimelineTreeView.GroupBy.Domain:
       case AggregatedTimelineTreeView.GroupBy.Subdomain:
       case AggregatedTimelineTreeView.GroupBy.ThirdParties: {
+        // TODO(paulirish,aixba): Improve attribution to reduce amount of items in [unattributed].
         const domainName = id ? this.beautifyDomainName(id, node) : undefined;
         return {name: domainName || unattributed, color, icon: undefined};
       }
@@ -1083,11 +1083,13 @@ export class AggregatedTimelineTreeView extends TimelineTreeView {
     if (parsedURL.scheme === 'chrome-extension') {
       return parsedURL.scheme + '://' + parsedURL.host;
     }
+    // This must follow after the extension checks.
     if (groupBy === AggregatedTimelineTreeView.GroupBy.ThirdParties) {
-      const entity = ThirdPartyWeb.ThirdPartyWeb.getEntity(url);
+      const entity = this.entityMapper()?.entityForEvent(event);
       if (!entity) {
-        return parsedURL.host;
+        return '';
       }
+
       return entity.name;
     }
     if (groupBy === AggregatedTimelineTreeView.GroupBy.Subdomain) {
