@@ -211,9 +211,8 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
     const color = 'gray';
     const unattributed = i18nString(UIStrings.unattributed);
     const id = typeof node.id === 'symbol' ? undefined : node.id;
-    // To avoid showing [unattributed] in the 3P table. We'll magically treat all unattributed as 1P.
-    // Is this fair? Not entirely, but mostly.  (How do you attribute the cost of a large recalc style??)
-    const domainName = id ? this.beautifyDomainName(id) : this.entityMapper()?.firstPartyEntity()?.name;
+    // TODO(paulirish,aixba): Improve attribution to reduce amount of items in [unattributed].
+    const domainName = id ? this.entityMapper()?.entityForEvent(node.event)?.name || id : undefined;
     return {name: domainName || unattributed, color, icon: undefined};
   }
 
