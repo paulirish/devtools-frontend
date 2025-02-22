@@ -268,8 +268,6 @@ export class TimelineTreeView extends
     this.dataGrid.element.addEventListener('mousemove', this.onMouseMove.bind(this), true);
     this.dataGrid.element.addEventListener(
         'mouseleave', () => this.dispatchEventToListeners(TimelineTreeView.Events.TREE_ROW_HOVERED, null));
-    this.dataGrid.element.addEventListener(
-        'mouseleave', () => this.dispatchEventToListeners(TimelineTreeView.Events.THIRD_PARTY_ROW_HOVERED, null));
     this.dataGrid.addEventListener(DataGrid.DataGrid.Events.OPENED_NODE, this.onGridNodeOpened, this);
     this.dataGrid.setResizeMethod(DataGrid.DataGrid.ResizeMethod.LAST);
     this.dataGrid.setRowContextMenuCallback(this.onContextMenu.bind(this));
@@ -593,10 +591,28 @@ export class TimelineTreeView extends
     this.dispatchEventToListeners(TimelineTreeView.Events.TREE_ROW_HOVERED, node);
   }
 
-  // TODO: do this on selection (before opened)
+  override wasShown(): void {
+    this.dataGrid.addEventListener(DataGrid.DataGrid.Events.SELECTED_NODE, this.#onDataGridSelectionChange, this);
+  }
+
+  override childWasDetached(_widget: UI.Widget.Widget): void {
+    this.dataGrid.removeEventListener(DataGrid.DataGrid.Events.SELECTED_NODE, this.#onDataGridSelectionChange);
+  }
+
+  /**
+   * This event fires when the user selects a row in the grid, either by
+   * clicking or by using the arrow keys. We want to have the same effect as
+   * when the user hover overs a row.
+   */
+  #onDataGridSelectionChange(event: Common.EventTarget.EventTargetEvent<DataGrid.DataGrid.DataGridNode<GridNode>>):
+      void {
+    this.onHover((event.data as GridNode).profileNode);
+  }
+
   onGridNodeOpened(): void {
-    const node = this.dataGrid.selectedNode as TreeGridNode;
-    this.dispatchEventToListeners(TimelineTreeView.Events.TREE_ROW_HOVERED, node.profileNode);
+    const gridNode = this.dataGrid.selectedNode as TreeGridNode;
+    this.dispatchEventToListeners(TimelineTreeView.Events.TREE_ROW_HOVERED, gridNode.profileNode);
+    this.updateDetailsForSelection();
   }
 
   private onContextMenu(
@@ -707,7 +723,7 @@ export namespace TimelineTreeView {
 
   export interface EventTypes {
     [Events.TREE_ROW_HOVERED]: Trace.Extras.TraceTree.Node|null;
-    [Events.THIRD_PARTY_ROW_HOVERED]: Trace.Types.Events.Event[]|null;
+    [Events.THIRD_PARTY_ROW_HOVERED]: Trace.Extras.TraceTree.Node|null;
     [Events.BOTTOM_UP_BUTTON_CLICKED]: Trace.Extras.TraceTree.Node|null;
   }
 }
@@ -979,13 +995,6 @@ export class AggregatedTimelineTreeView extends TimelineTreeView {
       case AggregatedTimelineTreeView.GroupBy.ThirdParties: {
         // TODO(paulirish,aixba): Improve attribution to reduce amount of items in [unattributed].
         const domainName = id ? this.beautifyDomainName(id, node) : undefined;
-        return {name: domainName || unattributed, color, icon: undefined};
-      }
-
-      case AggregatedTimelineTreeView.GroupBy.ThirdParties: {
-        // To avoid showing [unattributed] in the 3P table. We'll magically treat all unattributed as 1P.
-        // Is this fair? Not entirely, but mostly.  (How do you attribute the cost of a large recalc style??)
-        const domainName = id ? this.beautifyDomainName(id) : this.entityMapper()?.firstPartyEntity()?.name;
         return {name: domainName || unattributed, color, icon: undefined};
       }
 

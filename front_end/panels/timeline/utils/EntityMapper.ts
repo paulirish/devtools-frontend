@@ -65,8 +65,8 @@ export class EntityMapper {
 
   #getThirdPartyEvents(): Trace.Types.Events.Event[] {
     const entries = Array.from(this.#entityMappings.eventsByEntity.entries());
-    const thirdPartyEvents = entries.flatMap(([entity, requests]) => {
-      return entity.name !== this.#firstPartyEntity?.name ? requests : [];
+    const thirdPartyEvents = entries.flatMap(([entity, events]) => {
+      return entity !== this.#firstPartyEntity ? events : [];
     });
     return thirdPartyEvents;
   }
