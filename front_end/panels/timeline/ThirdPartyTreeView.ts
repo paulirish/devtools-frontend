@@ -75,19 +75,12 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
         filters: this.filtersWithoutTextFilter(),
         startTime: this.startTime,
         endTime: this.endTime,
-        eventGroupIdCallback: this.groupingFunction(),
+        eventGroupIdCallback: this.groupingFunction.bind(this),
       });
     }
 
-    // Update summaries.
-    const min = Trace.Helpers.Timing.milliToMicro(this.startTime);
-    const max = Trace.Helpers.Timing.milliToMicro(this.endTime);
-    const bounds: Trace.Types.Timing.TraceWindowMicro = {max, min, range: Trace.Types.Timing.Micro(max - min)};
-    this.#thirdPartySummaries =
-        Trace.Extras.ThirdParties.getSummariesAndEntitiesWithMapping(parsedTrace, bounds, entityMapper.mappings());
-
-    const events = this.#thirdPartySummaries?.entityByEvent.keys();
-    const relatedEvents = Array.from(events ?? []).sort(Trace.Helpers.Trace.eventTimeComparator);
+    // const events = this.#thirdPartySummaries.entityByEvent.keys();
+    const relatedEvents = this.selectedEvents().sort(Trace.Helpers.Trace.eventTimeComparator);
 
     // The filters for this view are slightly different; we want to use the set
     // of visible event types, but also include network events, which by
@@ -95,12 +88,14 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
     // the main flame chart).
     const filter = new Trace.Extras.TraceFilter.VisibleEventsFilter(
         Utils.EntryStyles.visibleTypes().concat([Trace.Types.Events.Name.SYNTHETIC_NETWORK_REQUEST]));
+
     const node = new Trace.Extras.TraceTree.BottomUpRootNode(relatedEvents, {
       textFilter: this.textFilter(),
       filters: [filter],
       startTime: this.startTime,
       endTime: this.endTime,
-      eventGroupIdCallback: this.groupingFunction(),
+      eventGroupIdCallback: this.groupingFunction.bind(this),
+      calculateTransferSize: true,
     });
     return node;
   }
@@ -112,22 +107,8 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
     return;
   }
 
-  protected groupingFunction(): ((arg0: Trace.Types.Events.Event) => string)|null {
-    return this.domainByEvent.bind(this);
-  }
-
-  private domainByEvent(event: Trace.Types.Events.Event): string {
-    const parsedTrace = this.parsedTrace();
-    if (!parsedTrace) {
-      return '';
-    }
-
-    const entityMappings = this.entityMapper();
-    if (!entityMappings) {
-      return '';
-    }
-
-    const entity = entityMappings.entityForEvent(event);
+  private groupingFunction(event: Trace.Types.Events.Event): string {
+    const entity = this.entityMapper()?.entityForEvent(event);
     if (!entity) {
       return '';
     }
@@ -171,8 +152,8 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
       b: DataGrid.SortableDataGrid.SortableDataGridNode<TimelineTreeView.GridNode>): number {
     const nodeA = a as TimelineTreeView.TreeGridNode;
     const nodeB = b as TimelineTreeView.TreeGridNode;
-    const transferA = this.extractThirdPartySummary(nodeA.profileNode).transferSize ?? 0;
-    const transferB = this.extractThirdPartySummary(nodeB.profileNode).transferSize ?? 0;
+    const transferA = nodeA.profileNode.transferSize ?? 0;
+    const transferB = nodeB.profileNode.transferSize ?? 0;
     return transferA - transferB;
   }
 
@@ -230,7 +211,9 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
     const color = 'gray';
     const unattributed = i18nString(UIStrings.unattributed);
     const id = typeof node.id === 'symbol' ? undefined : node.id;
-    const domainName = id ? this.domainByEvent(node.event) : undefined;
+    // To avoid showing [unattributed] in the 3P table. We'll magically treat all unattributed as 1P.
+    // Is this fair? Not entirely, but mostly.  (How do you attribute the cost of a large recalc style??)
+    const domainName = id ? this.beautifyDomainName(id) : this.entityMapper()?.firstPartyEntity()?.name;
     return {name: domainName || unattributed, color, icon: undefined};
   }
 
