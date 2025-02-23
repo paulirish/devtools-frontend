@@ -27,7 +27,7 @@ import type {HandlerName} from './types.js';
 
 const processes = new Map<Types.Events.ProcessID, RendererProcess>();
 
-const entityMappings: HandlerHelpers.EntityMappings = {
+let entityMappings: HandlerHelpers.EntityMappings = {
   eventsByEntity: new Map<HandlerHelpers.Entity, Types.Events.Event[]>(),
   entityByEvent: new Map<Types.Events.Event, HandlerHelpers.Entity>(),
   createdEntityCache: new Map<string, HandlerHelpers.Entity>(),
@@ -127,11 +127,7 @@ export function handleEvent(event: Types.Events.Event): void {
 
 export async function finalize(): Promise<void> {
   const {mainFrameId, rendererProcessesByFrame, threadsInProcess} = metaHandlerData();
-  const {entityMappings: networkEntityMappings} = networkRequestHandlerData();
-  // Build on top of the created entity cache to avoid de-dupes of entities that are made up.
-  entityMappings.createdEntityCache = networkEntityMappings.createdEntityCache;
-  entityMappings.entityByEvent = networkEntityMappings.entityByEvent;
-  entityMappings.eventsByEntity = networkEntityMappings.eventsByEntity;
+  entityMappings = networkRequestHandlerData().entityMappings;
 
   assignMeta(processes, mainFrameId, rendererProcessesByFrame, threadsInProcess);
   sanitizeProcesses(processes);

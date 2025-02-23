@@ -113,7 +113,7 @@ describeWithEnvironment('EntityMapper', function() {
       assert.deepEqual(got.name, 'paulirish.com');
       const firstPartyEvents = mapper.eventsForEntity(got);
       const gotThirdPartyEvents = mapper.thirdPartyEvents();
-      // If any found in here the event is categorized as both 1p AND 3p.
+      // If any failure is found in here, the event is categorized as both 1p AND 3p.
       gotThirdPartyEvents.forEach(e => {
         assert.isTrue(!firstPartyEvents.includes(e));
       });

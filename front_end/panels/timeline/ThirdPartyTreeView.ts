@@ -179,6 +179,7 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
     const color = 'gray';
     const unattributed = i18nString(UIStrings.unattributed);
     const id = typeof node.id === 'symbol' ? undefined : node.id;
+    // This `undefined` is [unattributed]
     // TODO(paulirish,aixba): Improve attribution to reduce amount of items in [unattributed].
     const domainName = id ? this.entityMapper()?.entityForEvent(node.event)?.name || id : undefined;
     return {name: domainName || unattributed, color, icon: undefined};
