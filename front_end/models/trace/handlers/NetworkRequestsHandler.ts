@@ -31,11 +31,6 @@ export interface TraceEventsForNetworkRequest {
   receivedData?: Types.Events.ResourceReceivedData[];
   resourceMarkAsCached?: Types.Events.ResourceMarkAsCached;
 }
-// Basically an enum of the above member types. TODO REMOVE
-// export type TraceEventsTypesForNetworkRequest =
-//     TraceEventsForNetworkRequest[keyof TraceEventsForNetworkRequest] extends(infer U)[] ?
-//     U :
-//     TraceEventsForNetworkRequest[keyof TraceEventsForNetworkRequest];
 
 export interface WebSocketTraceDataForFrame {
   frame: string;
