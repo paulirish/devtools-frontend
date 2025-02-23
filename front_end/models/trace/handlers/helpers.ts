@@ -150,10 +150,8 @@ export function addEventToEntityMapping(event: Types.Events.Event, entityMapping
     return;
   }
 
-  // i'll have ResourceSendRequest coming in here that were already assigned thx to addNetworkRequestToEntityMapping
-  // either
-  //   we check to see if the incoming event is one of those types (within TraceEventsForNetworkRequest) or
-  //   if the event is already mapped we skip
+  // As we share the entityMappings between Network and Renderer... We can have ResourceSendRequest events passed in here
+  // that were already mapped in Network. So, to avoid mapping twice, we always check that we didn't yet.
   if (entityMappings.entityByEvent.has(event)) {
     return;
   }
