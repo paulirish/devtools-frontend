@@ -71,6 +71,9 @@ for p in Path('$dist/models').rglob('*.d.ts'):
     needle = 'SDK.NetworkManager.Conditions'
     content = content.replace(needle, 'any')
 
+    needle = 'SDK.SourceMap.SourceMap'
+    content = content.replace(needle, 'any')
+
     needle = 'import type * as CrUXManager'
     content = content.replace(needle, f'// {needle}')
 
@@ -99,6 +102,7 @@ echo 'export {};' > $dist/models/trace/LegacyTracingModel.js
 echo 'export {};' > $dist/models/trace/LegacyTracingModel.d.ts
 
 # Copy i18n strings.
+# Also copies generated/Deprecation.ts strings, since Lighthouse benefits from that too.
 python3 -c "
 from pathlib import Path
 import json
@@ -108,7 +112,10 @@ locales_out_path.mkdir(parents=True, exist_ok=True)
 
 for path in Path('$out_dir/gen/front_end/core/i18n/locales').glob('*.json'):
     strings = json.loads(path.read_text())
-    keys = [key for key in strings.keys() if key.startswith('models/trace/insights/')]
+    keys = [
+        key for key in strings.keys()
+        if key.startswith('models/trace/insights/') or key.startswith('generated/Deprecation.ts')
+    ]
     strings = {key: strings[key] for key in keys}
     (locales_out_path / path.name).write_text(json.dumps(strings, indent=2))
 "
