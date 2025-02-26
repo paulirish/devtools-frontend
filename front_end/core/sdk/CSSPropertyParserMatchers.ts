@@ -6,7 +6,7 @@ import * as Common from '../../core/common/common.js';
 import type * as Platform from '../../core/platform/platform.js';
 import type * as CodeMirror from '../../third_party/codemirror.next/codemirror.next.js';
 
-import type {CSSMatchedStyles, CSSValueSource} from './CSSMatchedStyles.js';
+import type {CSSMatchedStyles, CSSValueSource, CSSVariableValue} from './CSSMatchedStyles.js';
 import {
   CSSMetadata,
   cssMetadata,
@@ -22,9 +22,154 @@ import {
   type Match,
   matcherBase,
   type SyntaxTree,
-  tokenizeDeclaration,
-  VariableMatch
+  tokenizeDeclaration
 } from './CSSPropertyParser.js';
+import type {CSSStyleDeclaration} from './CSSStyleDeclaration.js';
+
+export class BaseVariableMatch implements Match {
+  constructor(
+      readonly text: string,
+      readonly node: CodeMirror.SyntaxNode,
+      readonly name: string,
+      readonly fallback: CodeMirror.SyntaxNode[],
+      readonly matching: BottomUpTreeMatching,
+      readonly computedTextCallback: (match: BaseVariableMatch, matching: BottomUpTreeMatching) => string | null,
+  ) {
+  }
+
+  computedText(): string|null {
+    return this.computedTextCallback(this, this.matching);
+  }
+}
+
+// This matcher provides matching for var() functions and basic computedText support. Computed text is resolved by a
+// callback. This matcher is intended to be used directly only in environments where CSSMatchedStyles is not available.
+// A more ergonomic version of this matcher exists in VariableMatcher, which uses CSSMatchedStyles to correctly resolve
+// variable references automatically.
+// clang-format off
+export class BaseVariableMatcher extends matcherBase(BaseVariableMatch) {
+  // clang-format on
+  readonly #computedTextCallback: (match: BaseVariableMatch, matching: BottomUpTreeMatching) => string | null;
+  constructor(computedTextCallback: (match: BaseVariableMatch, matching: BottomUpTreeMatching) => string | null) {
+    super();
+    this.#computedTextCallback = computedTextCallback;
+  }
+
+  override matches(node: CodeMirror.SyntaxNode, matching: BottomUpTreeMatching): BaseVariableMatch|null {
+    const callee = node.getChild('Callee');
+    const args = node.getChild('ArgList');
+    if (node.name !== 'CallExpression' || !callee || (matching.ast.text(callee) !== 'var') || !args) {
+      return null;
+    }
+
+    const [lparenNode, nameNode, ...fallbackOrRParenNodes] = ASTUtils.children(args);
+
+    if (lparenNode?.name !== '(' || nameNode?.name !== 'VariableName') {
+      return null;
+    }
+
+    if (fallbackOrRParenNodes.length <= 1 && fallbackOrRParenNodes[0]?.name !== ')') {
+      return null;
+    }
+
+    let fallback: CodeMirror.SyntaxNode[] = [];
+    if (fallbackOrRParenNodes.length > 1) {
+      if (fallbackOrRParenNodes.shift()?.name !== ',') {
+        return null;
+      }
+      if (fallbackOrRParenNodes.pop()?.name !== ')') {
+        return null;
+      }
+      fallback = fallbackOrRParenNodes;
+      if (fallback.length === 0) {
+        return null;
+      }
+      if (fallback.some(n => n.name === ',')) {
+        return null;
+      }
+    }
+
+    const varName = matching.ast.text(nameNode);
+    if (!varName.startsWith('--')) {
+      return null;
+    }
+
+    return new BaseVariableMatch(
+        matching.ast.text(node), node, varName, fallback, matching, this.#computedTextCallback);
+  }
+}
+
+export class VariableMatch extends BaseVariableMatch {
+  constructor(
+      text: string,
+      node: CodeMirror.SyntaxNode,
+      name: string,
+      fallback: CodeMirror.SyntaxNode[],
+      matching: BottomUpTreeMatching,
+      readonly matchedStyles: CSSMatchedStyles,
+      readonly style: CSSStyleDeclaration,
+  ) {
+    super(text, node, name, fallback, matching, () => this.resolveVariable()?.value ?? this.fallbackValue());
+  }
+
+  resolveVariable(): CSSVariableValue|null {
+    return this.matchedStyles.computeCSSVariable(this.style, this.name);
+  }
+
+  fallbackValue(): string|null {
+    if (this.fallback.length === 0 ||
+        this.matching.hasUnresolvedVarsRange(this.fallback[0], this.fallback[this.fallback.length - 1])) {
+      return null;
+    }
+    return this.matching.getComputedTextRange(this.fallback[0], this.fallback[this.fallback.length - 1]);
+  }
+}
+
+// clang-format off
+export class VariableMatcher extends matcherBase(VariableMatch) {
+  // clang-format on
+  constructor(readonly matchedStyles: CSSMatchedStyles, readonly style: CSSStyleDeclaration) {
+    super();
+  }
+
+  override matches(node: CodeMirror.SyntaxNode, matching: BottomUpTreeMatching): VariableMatch|null {
+    const match = new BaseVariableMatcher(() => null).matches(node, matching);
+    return match ?
+        new VariableMatch(
+            match.text, match.node, match.name, match.fallback, match.matching, this.matchedStyles, this.style) :
+        null;
+  }
+}
+
+export class TextMatch implements Match {
+  computedText?: () => string;
+  constructor(readonly text: string, readonly node: CodeMirror.SyntaxNode) {
+    if (node.name === 'Comment') {
+      this.computedText = () => '';
+    }
+  }
+  render(): Node[] {
+    return [document.createTextNode(this.text)];
+  }
+}
+
+// clang-format off
+export class TextMatcher extends matcherBase(TextMatch) {
+  // clang-format on
+  override accepts(): boolean {
+    return true;
+  }
+  override matches(node: CodeMirror.SyntaxNode, matching: BottomUpTreeMatching): TextMatch|null {
+    if (!node.firstChild || node.name === 'NumberLiteral' /* may have a Unit child */) {
+      // Leaf node, just emit text
+      const text = matching.ast.text(node);
+      if (text.length) {
+        return new TextMatch(text, node);
+      }
+    }
+    return null;
+  }
+}
 
 export class AngleMatch implements Match {
   constructor(readonly text: string, readonly node: CodeMirror.SyntaxNode) {
@@ -224,13 +369,16 @@ export class ColorMatcher extends matcherBase(ColorMatch) {
 export class LightDarkColorMatch implements Match {
   constructor(
       readonly text: string, readonly node: CodeMirror.SyntaxNode, readonly light: CodeMirror.SyntaxNode[],
-      readonly dark: CodeMirror.SyntaxNode[]) {
+      readonly dark: CodeMirror.SyntaxNode[], readonly property: CSSProperty) {
   }
 }
 
 // clang-format off
 export class LightDarkColorMatcher extends matcherBase(LightDarkColorMatch) {
   // clang-format on
+  constructor(readonly property: CSSProperty) {
+    super();
+  }
   override accepts(propertyName: string): boolean {
     return cssMetadata().isColorAwareProperty(propertyName);
   }
@@ -243,7 +391,7 @@ export class LightDarkColorMatcher extends matcherBase(LightDarkColorMatch) {
     if (args.length !== 2 || args[0].length === 0 || args[1].length === 0) {
       return null;
     }
-    return new LightDarkColorMatch(matching.ast.text(node), node, args[0], args[1]);
+    return new LightDarkColorMatch(matching.ast.text(node), node, args[0], args[1], this.property);
   }
 }
 
@@ -307,7 +455,7 @@ export class LinkableNameMatcher extends matcherBase(LinkableNameMatch) {
     return names.includes(propertyName);
   }
 
-  static readonly identifierAnimationLonghandMap: Map<string, AnimationLonghandPart> = new Map(
+  static readonly identifierAnimationLonghandMap = new Map<string, AnimationLonghandPart>(
       Object.entries({
         normal: AnimationLonghandPart.DIRECTION,
         alternate: AnimationLonghandPart.DIRECTION,
@@ -515,10 +663,10 @@ export class LengthMatch implements Match {
 export class LengthMatcher extends matcherBase(LengthMatch) {
   // clang-format on
   static readonly LENGTH_UNITS = new Set([
-    'em',    'ex',    'ch',    'cap', 'ic',  'lh',    'rem',   'rex',   'rch',   'rlh',  'ric',  'rcap', 'px',  'pt',
-    'pc',    'in',    'cm',    'mm',  'Q',   'vw',    'vh',    'vi',    'vb',    'vmin', 'vmax', 'dvw',  'dvh', 'dvi',
-    'dvb',   'dvmin', 'dvmax', 'svw', 'svh', 'svi',   'svb',   'svmin', 'svmax', 'lvw',  'lvh',  'lvi',  'lvb', 'lvmin',
-    'lvmax', 'cqw',   'cqh',   'cqi', 'cqb', 'cqmin', 'cqmax', 'cqem',  'cqlh',  'cqex', 'cqch',
+    'em',  'ex',    'ch',    'cap',   'ic',  'lh',  'rem', 'rex',   'rch',   'rlh',   'ric',  'rcap', 'pt',
+    'pc',  'in',    'cm',    'mm',    'Q',   'vw',  'vh',  'vi',    'vb',    'vmin',  'vmax', 'dvw',  'dvh',
+    'dvi', 'dvb',   'dvmin', 'dvmax', 'svw', 'svh', 'svi', 'svb',   'svmin', 'svmax', 'lvw',  'lvh',  'lvi',
+    'lvb', 'lvmin', 'lvmax', 'cqw',   'cqh', 'cqi', 'cqb', 'cqmin', 'cqmax', 'cqem',  'cqlh', 'cqex', 'cqch',
   ]);
   override matches(node: CodeMirror.SyntaxNode, matching: BottomUpTreeMatching): LengthMatch|null {
     if (node.name !== 'NumberLiteral') {
@@ -533,7 +681,7 @@ export class LengthMatcher extends matcherBase(LengthMatch) {
   }
 }
 
-export class SelectFunctionMatch implements Match {
+export class MathFunctionMatch implements Match {
   constructor(
       readonly text: string, readonly node: CodeMirror.SyntaxNode, readonly func: string,
       readonly args: CodeMirror.SyntaxNode[][]) {
@@ -541,14 +689,14 @@ export class SelectFunctionMatch implements Match {
 }
 
 // clang-format off
-export class SelectFunctionMatcher extends matcherBase(SelectFunctionMatch) {
+export class MathFunctionMatcher extends matcherBase(MathFunctionMatch) {
   // clang-format on
-  override matches(node: CodeMirror.SyntaxNode, matching: BottomUpTreeMatching): SelectFunctionMatch|null {
+  override matches(node: CodeMirror.SyntaxNode, matching: BottomUpTreeMatching): MathFunctionMatch|null {
     if (node.name !== 'CallExpression') {
       return null;
     }
     const callee = matching.ast.text(node.getChild('Callee'));
-    if (!['min', 'max', 'clamp'].includes(callee)) {
+    if (!['min', 'max', 'clamp', 'calc'].includes(callee)) {
       return null;
     }
     const args = ASTUtils.callArgs(node);
@@ -556,7 +704,7 @@ export class SelectFunctionMatcher extends matcherBase(SelectFunctionMatch) {
       return null;
     }
     const text = matching.ast.text(node);
-    return new SelectFunctionMatch(text, node, callee, args);
+    return new MathFunctionMatch(text, node, callee, args);
   }
 }
 
@@ -629,7 +777,7 @@ export class GridTemplateMatcher extends matcherBase(GridTemplateMatch) {
     // be rendered into separate lines.
     function parseNodes(nodes: CodeMirror.SyntaxNode[], varParsingMode = false): void {
       for (const curNode of nodes) {
-        if (matching.getMatch(curNode) instanceof VariableMatch) {
+        if (matching.getMatch(curNode) instanceof BaseVariableMatch) {
           const computedValueTree = tokenizeDeclaration('--property', matching.getComputedText(curNode));
           if (!computedValueTree) {
             continue;

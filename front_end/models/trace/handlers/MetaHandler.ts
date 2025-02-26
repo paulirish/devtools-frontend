@@ -11,8 +11,8 @@ const rendererProcessesByFrameId: FrameProcessData = new Map();
 
 // We will often want to key data by Frame IDs, and commonly we'll care most
 // about the main frame's ID, so we store and expose that.
-let mainFrameId: string = '';
-let mainFrameURL: string = '';
+let mainFrameId = '';
+let mainFrameURL = '';
 
 const framesByProcessId = new Map<Types.Events.ProcessID, Map<string, Types.Events.TraceFrame>>();
 
@@ -25,7 +25,7 @@ let gpuThreadId: Types.Events.ThreadID = Types.Events.ThreadID(-1);
 let viewportRect: DOMRect|null = null;
 let devicePixelRatio: number|null = null;
 
-const processNames: Map<Types.Events.ProcessID, Types.Events.ProcessName> = new Map();
+const processNames = new Map<Types.Events.ProcessID, Types.Events.ProcessName>();
 
 const topLevelRendererIds = new Set<Types.Events.ProcessID>();
 const traceBounds: Types.Timing.TraceWindowMicro = {
@@ -109,8 +109,8 @@ function updateRendererProcessByFrame(event: Types.Events.Event, frame: Types.Ev
 
   const rendererProcessInFrame = Platform.MapUtilities.getWithDefault(
       rendererProcessesByFrameId, frame.frame,
-      () =>
-          new Map<Types.Events.ProcessID, {frame: Types.Events.TraceFrame, window: Types.Timing.TraceWindowMicro}[]>());
+      () => new Map<
+          Types.Events.ProcessID, Array<{frame: Types.Events.TraceFrame, window: Types.Timing.TraceWindowMicro}>>());
   const rendererProcessInfo = Platform.MapUtilities.getWithDefault(rendererProcessInFrame, frame.processId, () => {
     return [];
   });
@@ -241,12 +241,10 @@ export function handleEvent(event: Types.Events.Event): void {
           mainFrameId = frame.frame;
           mainFrameURL = frame.url;
         }
-      } else {
         // Worst case: guess by seeing if the frame doesn't have a parent, and does have a URL.
-        if (!frame.parent && frame.url) {
-          mainFrameId = frame.frame;
-          mainFrameURL = frame.url;
-        }
+      } else if (!frame.parent && frame.url) {
+        mainFrameId = frame.frame;
+        mainFrameURL = frame.url;
       }
     }
 
@@ -436,7 +434,8 @@ export interface MetaHandlerData {
 // https://developer.chrome.com/articles/renderingng-architecture/#threads
 // and https://web.dev/same-site-same-origin/
 export type FrameProcessData =
-    Map<string, Map<Types.Events.ProcessID, {frame: Types.Events.TraceFrame, window: Types.Timing.TraceWindowMicro}[]>>;
+    Map<string,
+        Map<Types.Events.ProcessID, Array<{frame: Types.Events.TraceFrame, window: Types.Timing.TraceWindowMicro}>>>;
 
 export function data(): MetaHandlerData {
   return {

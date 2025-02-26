@@ -282,13 +282,13 @@ export class SplitWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typ
       return;
     }
     this.secondIsSidebar = secondIsSidebar;
-    if (!this.mainWidgetInternal || !this.mainWidgetInternal.shouldHideOnDetach()) {
+    if (!this.mainWidgetInternal?.shouldHideOnDetach()) {
       if (secondIsSidebar) {
         this.contentElement.insertBefore(this.mainElement, this.sidebarElementInternal);
       } else {
         this.contentElement.insertBefore(this.mainElement, this.resizerElementInternal);
       }
-    } else if (!this.sidebarWidgetInternal || !this.sidebarWidgetInternal.shouldHideOnDetach()) {
+    } else if (!this.sidebarWidgetInternal?.shouldHideOnDetach()) {
       if (secondIsSidebar) {
         this.contentElement.insertBefore(this.sidebarElementInternal, this.resizerElementInternal);
       } else {
@@ -298,14 +298,6 @@ export class SplitWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typ
       console.error('Could not swap split widget side. Both children widgets contain iframes.');
       this.secondIsSidebar = !secondIsSidebar;
     }
-  }
-
-  sidebarSide(): string|null {
-    if (this.showModeInternal !== ShowMode.BOTH) {
-      return null;
-    }
-    return this.isVerticalInternal ? (this.secondIsSidebar ? 'right' : 'left') :
-                                     (this.secondIsSidebar ? 'bottom' : 'top');
   }
 
   resizerElement(): Element {
@@ -435,6 +427,7 @@ export class SplitWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typ
     this.resizerWidget.setEnabled(resizable);
   }
 
+  // Currently unused
   forceSetSidebarWidth(width: number): void {
     this.defaultSidebarWidth = width;
     this.savedSidebarSizeDIP = width;
@@ -524,14 +517,12 @@ export class SplitWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typ
         this.resizerElementInternal.style.left = sidebarSizeValue;
         this.resizerElementInternal.style.marginLeft = -this.resizerElementSize / 2 + 'px';
       }
+    } else if (this.secondIsSidebar) {
+      this.resizerElementInternal.style.bottom = sidebarSizeValue;
+      this.resizerElementInternal.style.marginBottom = -this.resizerElementSize / 2 + 'px';
     } else {
-      if (this.secondIsSidebar) {
-        this.resizerElementInternal.style.bottom = sidebarSizeValue;
-        this.resizerElementInternal.style.marginBottom = -this.resizerElementSize / 2 + 'px';
-      } else {
-        this.resizerElementInternal.style.top = sidebarSizeValue;
-        this.resizerElementInternal.style.marginTop = -this.resizerElementSize / 2 + 'px';
-      }
+      this.resizerElementInternal.style.top = sidebarSizeValue;
+      this.resizerElementInternal.style.marginTop = -this.resizerElementSize / 2 + 'px';
     }
 
     this.sidebarSizeDIP = sizeDIP;
@@ -766,11 +757,6 @@ export class SplitWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typ
     this.resizerWidget.removeElement((resizerElement as HTMLElement));
   }
 
-  hasCustomResizer(): boolean {
-    const elements = this.resizerWidget.elements();
-    return elements.length > 1 || (elements.length === 1 && elements[0] !== this.resizerElementInternal);
-  }
-
   toggleResizer(resizer: Element, on: boolean): void {
     if (on) {
       this.installResizer(resizer);
@@ -804,8 +790,7 @@ export class SplitWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typ
 
   private restoreAndApplyShowModeFromSettings(): void {
     const orientationState = this.settingForOrientation();
-    this.savedShowMode =
-        orientationState && orientationState.showMode ? orientationState.showMode : this.showModeInternal;
+    this.savedShowMode = orientationState?.showMode ? orientationState.showMode : this.showModeInternal;
     this.showModeInternal = this.savedShowMode;
 
     switch (this.savedShowMode) {

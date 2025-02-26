@@ -98,7 +98,7 @@ const UIStrings = {
    * @description Title of a link to the developer documentation.
    */
   learnMore: 'Learn more',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings(
     'panels/recorder/components/CreateRecordingView.ts',
     UIStrings,
@@ -146,7 +146,7 @@ export interface CreateRecordingViewData {
 
 export class CreateRecordingView extends HTMLElement {
   readonly #shadow = this.attachShadow({mode: 'open'});
-  #defaultRecordingName: string = '';
+  #defaultRecordingName = '';
   #error?: Error;
   #recorderSettings?: Models.RecorderSettings.RecorderSettings;
 

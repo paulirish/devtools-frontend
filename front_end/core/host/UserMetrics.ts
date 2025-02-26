@@ -290,11 +290,6 @@ export class UserMetrics {
         EnumeratedHistogram.RecordingCopiedToClipboard, value, RecordingCopiedToClipboard.MAX_VALUE);
   }
 
-  styleTextCopied(value: StyleTextCopied): void {
-    InspectorFrontendHostInstance.recordEnumeratedHistogram(
-        EnumeratedHistogram.StyleTextCopied, value, StyleTextCopied.MAX_VALUE);
-  }
-
   cssHintShown(type: CSSHintType): void {
     InspectorFrontendHostInstance.recordEnumeratedHistogram(
         EnumeratedHistogram.CSSHintShown, type, CSSHintType.MAX_VALUE);
@@ -540,7 +535,8 @@ export enum Action {
   AiAssistanceSideEffectConfirmed = 179,
   AiAssistanceSideEffectRejected = 180,
   AiAssistanceError = 181,
-  MAX_VALUE = 182,
+  AiAssistanceOpenedFromPerformanceInsight = 182,
+  MAX_VALUE = 183,
   /* eslint-enable @typescript-eslint/naming-convention */
 }
 
@@ -988,11 +984,12 @@ export enum DevtoolsExperiments {
   'timeline-experimental-insights' = 102,
   'timeline-dim-unrelated-events' = 103,
   'timeline-alternative-navigation' = 104,
-  'timeline-third-party-dependencies' = 106,
+  // 106 was historically used [https://chromium-review.googlesource.com/c/devtools/devtools-frontend/+/6230097]
+  // next experiment should be 107
   /* eslint-enable @typescript-eslint/naming-convention */
 
   // Increment this when new experiments are added.
-  MAX_VALUE = 107,
+  MAX_VALUE = 106,
 }
 
 // Update DevToolsIssuesPanelIssueExpanded from tools/metrics/histograms/enums.xml if new enum is added.
@@ -1117,8 +1114,28 @@ export enum IssueCreated {
   'SelectElementAccessibilityIssue::NonPhrasingContentOptionChild' = 88,
   'SelectElementAccessibilityIssue::InteractiveContentOptionChild' = 89,
   'SelectElementAccessibilityIssue::InteractiveContentLegendChild' = 90,
+  'SRIMessageSignatureIssue::MissingSignatureHeader' = 91,
+  'SRIMessageSignatureIssue::MissingSignatureInputHeader' = 92,
+  'SRIMessageSignatureIssue::InvalidSignatureHeader' = 93,
+  'SRIMessageSignatureIssue::InvalidSignatureInputHeader' = 94,
+  'SRIMessageSignatureIssue::SignatureHeaderValueIsNotByteSequence' = 95,
+  'SRIMessageSignatureIssue::SignatureHeaderValueIsParameterized' = 96,
+  'SRIMessageSignatureIssue::SignatureHeaderValueIsIncorrectLength' = 97,
+  'SRIMessageSignatureIssue::SignatureInputHeaderMissingLabel' = 98,
+  'SRIMessageSignatureIssue::SignatureInputHeaderValueNotInnerList' = 99,
+  'SRIMessageSignatureIssue::SignatureInputHeaderValueMissingComponents' = 100,
+  'SRIMessageSignatureIssue::SignatureInputHeaderInvalidComponentType' = 101,
+  'SRIMessageSignatureIssue::SignatureInputHeaderInvalidComponentName' = 102,
+  'SRIMessageSignatureIssue::SignatureInputHeaderInvalidHeaderComponentParameter' = 103,
+  'SRIMessageSignatureIssue::SignatureInputHeaderInvalidDerivedComponentParameter' = 104,
+  'SRIMessageSignatureIssue::SignatureInputHeaderKeyIdLength' = 105,
+  'SRIMessageSignatureIssue::SignatureInputHeaderInvalidParameter' = 106,
+  'SRIMessageSignatureIssue::SignatureInputHeaderMissingRequiredParameters' = 107,
+  'SRIMessageSignatureIssue::ValidationFailedSignatureExpired' = 108,
+  'SRIMessageSignatureIssue::ValidationFailedInvalidLength' = 109,
+  'SRIMessageSignatureIssue::ValidationFailedSignatureMismatch' = 110,
   /* eslint-enable @typescript-eslint/naming-convention */
-  MAX_VALUE = 91,
+  MAX_VALUE = 111,
 }
 
 export const enum DeveloperResourceLoaded {
@@ -1317,20 +1334,6 @@ export const enum RecordingCopiedToClipboard {
   COPIED_STEP_WITH_REPLAY = 7,
   COPIED_STEP_WITH_EXTENSION = 8,
   MAX_VALUE = 9,
-}
-
-export const enum StyleTextCopied {
-  DECLARATION_VIA_CHANGED_LINE = 1,
-  ALL_CHANGES_VIA_STYLES_TAB = 2,
-  DECLARATION_VIA_CONTEXT_MENU = 3,
-  PROPERTY_VIA_CONTEXT_MENU = 4,
-  VALUE_VIA_CONTEXT_MENU = 5,
-  DECLARATION_AS_JS_VIA_CONTEXT_MENU = 6,
-  RULE_VIA_CONTEXT_MENU = 7,
-  ALL_DECLARATIONS_VIA_CONTEXT_MENU = 8,
-  ALL_DECLARATINS_AS_JS_VIA_CONTEXT_MENU = 9,
-  SELECTOR_VIA_CONTEXT_MENU = 10,
-  MAX_VALUE = 11,
 }
 
 export enum ManifestSectionCodes {

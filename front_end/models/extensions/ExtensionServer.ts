@@ -55,7 +55,7 @@ import {LanguageExtensionEndpoint} from './LanguageExtensionEndpoint.js';
 import {RecorderExtensionEndpoint} from './RecorderExtensionEndpoint.js';
 import {RecorderPluginManager} from './RecorderPluginManager.js';
 
-const extensionOrigins: WeakMap<MessagePort, Platform.DevToolsPath.UrlString> = new WeakMap();
+const extensionOrigins = new WeakMap<MessagePort, Platform.DevToolsPath.UrlString>();
 const kPermittedSchemes = ['http:', 'https:', 'file:', 'data:', 'chrome-extension:', 'about:'];
 
 declare global {
@@ -161,7 +161,7 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
   private extensionsEnabled: boolean;
   private inspectedTabId?: string;
   private readonly extensionAPITestHook?: (server: unknown, api: unknown) => unknown;
-  private themeChangeHandlers: Map<string, MessagePort> = new Map();
+  private themeChangeHandlers = new Map<string, MessagePort>();
   readonly #pendingExtensions: Host.InspectorFrontendHostAPI.ExtensionDescriptor[] = [];
 
   private constructor() {
@@ -219,8 +219,7 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     this.registerHandler(PrivateAPI.Commands.ShowNetworkPanel, this.onShowNetworkPanel.bind(this));
     window.addEventListener('message', this.onWindowMessage, false);  // Only for main window.
 
-    const existingTabId =
-        window.DevToolsAPI && window.DevToolsAPI.getInspectedTabId && window.DevToolsAPI.getInspectedTabId();
+    const existingTabId = window.DevToolsAPI?.getInspectedTabId?.();
 
     if (existingTabId) {
       this.setInspectedTabId({data: existingTabId});
@@ -454,7 +453,7 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
       return this.status.E_BADARG('command', `expected ${PrivateAPI.Commands.SetFunctionRangesForScript}`);
     }
     const {scriptUrl, ranges} = message;
-    if (!scriptUrl || !ranges || !ranges.length) {
+    if (!scriptUrl || !ranges?.length) {
       return this.status.E_BADARG('command', 'expected valid scriptUrl and non-empty NamedFunctionRanges');
     }
     const uiSourceCode =
@@ -919,7 +918,7 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
         Logs.NetworkLog.NetworkLog.instance().requests().filter(r => this.extensionAllowedOnURL(r.url(), port));
     const harLog = await HAR.Log.Log.build(requests, {sanitize: false});
     for (let i = 0; i < harLog.entries.length; ++i) {
-      // @ts-ignore
+      // @ts-expect-error
       harLog.entries[i]._requestId = this.requestId(requests[i]);
     }
     return harLog;
@@ -929,7 +928,7 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     return {url: contentProvider.contentURL(), type: contentProvider.contentType().name()};
   }
 
-  private onGetPageResources(_message: unknown, port: MessagePort): {url: string, type: string}[] {
+  private onGetPageResources(_message: unknown, port: MessagePort): Array<{url: string, type: string}> {
     const resources = new Map<unknown, {
       url: string,
       type: string,
@@ -1018,8 +1017,7 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     const scriptFiles = debuggerBindingsInstance.scriptsForUISourceCode(contentProvider);
     if (scriptFiles.length > 0) {
       for (const script of scriptFiles) {
-        const resourceFile = debuggerBindingsInstance.scriptFile(
-            contentProvider as Workspace.UISourceCode.UISourceCode, script.debuggerModel);
+        const resourceFile = debuggerBindingsInstance.scriptFile(contentProvider, script.debuggerModel);
         resourceFile?.addSourceMapURL(message.sourceMapURL as Platform.DevToolsPath.UrlString);
       }
     }
@@ -1043,7 +1041,7 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
 
     const uiSourceCode =
         Workspace.Workspace.WorkspaceImpl.instance().uiSourceCodeForURL(url as Platform.DevToolsPath.UrlString);
-    if (!uiSourceCode || !uiSourceCode.contentType().isDocumentOrScriptOrStyleSheet()) {
+    if (!uiSourceCode?.contentType().isDocumentOrScriptOrStyleSheet()) {
       const resource = SDK.ResourceTreeModel.ResourceTreeModel.resourceForURL(url as Platform.DevToolsPath.UrlString);
       if (!resource) {
         return this.status.E_NOTFOUND(url);
@@ -1093,7 +1091,7 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
         metaKey: entry.metaKey,
       });
 
-      // @ts-ignore
+      // @ts-expect-error
       event.__keyCode = keyCodeForEntry(entry);
       document.dispatchEvent(event);
     }
@@ -1213,7 +1211,7 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
       return;
     }
     try {
-      const startPageURL = new URL((startPage as string));
+      const startPageURL = new URL((startPage));
       const extensionOrigin = startPageURL.origin;
       const name = extensionInfo.name || `Extension ${extensionOrigin}`;
       const extensionRegistration = new RegisteredExtension(name, hostsPolicy, Boolean(extensionInfo.allowFileAccess));
@@ -1377,8 +1375,8 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
       frame = resolveURLToFrame(options.frameURL as Platform.DevToolsPath.UrlString);
     } else {
       const target = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
-      const resourceTreeModel = target && target.model(SDK.ResourceTreeModel.ResourceTreeModel);
-      frame = resourceTreeModel && resourceTreeModel.mainFrame;
+      const resourceTreeModel = target?.model(SDK.ResourceTreeModel.ResourceTreeModel);
+      frame = resourceTreeModel?.mainFrame;
     }
     if (!frame) {
       if (options.frameURL) {
@@ -1468,9 +1466,7 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
       return false;
     }
 
-    if ((window.DevToolsAPI && window.DevToolsAPI.getOriginsForbiddenForExtensions &&
-             window.DevToolsAPI.getOriginsForbiddenForExtensions() ||
-         []).includes(parsedURL.origin)) {
+    if ((window.DevToolsAPI?.getOriginsForbiddenForExtensions?.() || []).includes(parsedURL.origin)) {
       return false;
     }
 

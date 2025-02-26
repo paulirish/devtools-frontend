@@ -59,7 +59,7 @@ describeWithEnvironment('SidebarSingleInsightSet', () => {
       'LCP request discovery',
       'Render blocking requests',
       'Document request latency',
-      'Third parties',
+      '3rd parties',
       'INP by phase',
       'Layout shift culprits',
       'Improve image delivery',
@@ -106,7 +106,7 @@ describeWithEnvironment('SidebarSingleInsightSet', () => {
       'LCP by phase',
       'Layout shift culprits',
       'Improve image delivery',
-      'Third parties',
+      '3rd parties',
       'INP by phase',
       'LCP request discovery',
       'Render blocking requests',
@@ -158,9 +158,10 @@ describeWithEnvironment('SidebarSingleInsightSet', () => {
     assert.deepEqual(userVisibleTitles, [
       'LCP by phase',
       'Layout shift culprits',
+      'Network dependency tree',
       'Improve image delivery',
       'Font display',
-      'Third parties',
+      '3rd parties',
       'INP by phase',
       'LCP request discovery',
       'Render blocking requests',
@@ -168,7 +169,6 @@ describeWithEnvironment('SidebarSingleInsightSet', () => {
       'Optimize viewport for mobile',
       'Optimize DOM size',
       'CSS Selector costs',
-      'Long critical network tree',
       'Forced reflow',
     ]);
 
@@ -183,7 +183,6 @@ describeWithEnvironment('SidebarSingleInsightSet', () => {
       'Optimize viewport for mobile',
       'Optimize DOM size',
       'CSS Selector costs',
-      'Long critical network tree',
       'Forced reflow',
     ]);
   });

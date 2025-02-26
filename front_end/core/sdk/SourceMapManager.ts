@@ -145,13 +145,11 @@ export class SourceMapManager<T extends FrameAssociated> extends Common.ObjectWr
   cancelAttachSourceMap(client: T): void {
     if (client === this.#attachingClient) {
       this.#attachingClient = null;
-    } else {
       // This should not happen.
-      if (this.#attachingClient) {
-        console.error('cancel attach source map requested but a different source map was being attached');
-      } else {
-        console.error('cancel attach source map requested but no source map was being attached');
-      }
+    } else if (this.#attachingClient) {
+      console.error('cancel attach source map requested but a different source map was being attached');
+    } else {
+      console.error('cancel attach source map requested but no source map was being attached');
     }
   }
 
@@ -174,7 +172,7 @@ export class SourceMapManager<T extends FrameAssociated> extends Common.ObjectWr
   }
 }
 
-async function loadSourceMap(
+export async function loadSourceMap(
     url: Platform.DevToolsPath.UrlString, initiator: PageResourceLoadInitiator): Promise<SourceMapV3> {
   try {
     const {content} = await PageResourceLoader.instance().loadResource(url, initiator);

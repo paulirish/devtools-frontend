@@ -9,10 +9,12 @@ import * as SDK from '../core/sdk/sdk.js';
 import type * as Protocol from '../generated/protocol.js';
 import * as Logs from '../models/logs/logs.js';
 import type * as Workspace from '../models/workspace/workspace.js';
+import * as AiAssistance from '../panels/ai_assistance/ai_assistance.js';
 
 import {
   createTarget,
 } from './EnvironmentHelpers.js';
+import {expectCall} from './ExpectStubCall.js';
 import {createContentProviderUISourceCodes} from './UISourceCodeHelpers.js';
 
 function createMockAidaClient(fetch: Host.AidaClient.AidaClient['fetch']): Host.AidaClient.AidaClient {
@@ -24,7 +26,7 @@ function createMockAidaClient(fetch: Host.AidaClient.AidaClient['fetch']): Host.
   };
 }
 
-type MockAidaResponse =
+export type MockAidaResponse =
     Omit<Host.AidaClient.AidaResponse, 'completed'|'metadata'>&{metadata?: Host.AidaClient.AidaResponseMetadata};
 
 /**
@@ -50,14 +52,21 @@ export function mockAidaClient(data: Array<[MockAidaResponse, ...MockAidaRespons
       if (metadata?.attributionMetadata?.attributionAction === Host.AidaClient.RecitationAction.BLOCK) {
         throw new Host.AidaClient.AidaBlockError();
       }
+      if (chunk.functionCalls?.length) {
+        callId++;
+        yield {...chunk, metadata, completed: true};
+        break;
+      }
+      const completed = idx === data[callId].length - 1;
+      if (completed) {
+        callId++;
+      }
       yield {
         ...chunk,
         metadata,
-        completed: idx === data[callId].length - 1,
+        completed,
       };
     }
-
-    callId++;
   }
 
   return createMockAidaClient(provideAnswer);
@@ -96,47 +105,117 @@ export async function createUISourceCode(options?: {
   return uiSourceCode;
 }
 
-export function createNetworkRequest(): SDK.NetworkRequest.NetworkRequest {
+export function createNetworkRequest(opts?: {
+  url?: Platform.DevToolsPath.UrlString,
+  includeInitiators?: boolean,
+}): SDK.NetworkRequest.NetworkRequest {
   const networkRequest = SDK.NetworkRequest.NetworkRequest.create(
-      'requestId' as Protocol.Network.RequestId, Platform.DevToolsPath.urlString`https://www.example.com/script.js`,
+      'requestId' as Protocol.Network.RequestId,
+      opts?.url ?? Platform.DevToolsPath.urlString`https://www.example.com/script.js`,
       Platform.DevToolsPath.urlString``, null, null, null);
   networkRequest.statusCode = 200;
   networkRequest.setRequestHeaders([{name: 'content-type', value: 'bar1'}]);
   networkRequest.responseHeaders = [{name: 'content-type', value: 'bar2'}, {name: 'x-forwarded-for', value: 'bar3'}];
 
-  const initiatorNetworkRequest = SDK.NetworkRequest.NetworkRequest.create(
-      'requestId' as Protocol.Network.RequestId, Platform.DevToolsPath.urlString`https://www.initiator.com`,
-      Platform.DevToolsPath.urlString``, null, null, null);
-  const initiatedNetworkRequest1 = SDK.NetworkRequest.NetworkRequest.create(
-      'requestId' as Protocol.Network.RequestId, Platform.DevToolsPath.urlString`https://www.example.com/1`,
-      Platform.DevToolsPath.urlString``, null, null, null);
-  const initiatedNetworkRequest2 = SDK.NetworkRequest.NetworkRequest.create(
-      'requestId' as Protocol.Network.RequestId, Platform.DevToolsPath.urlString`https://www.example.com/2`,
-      Platform.DevToolsPath.urlString``, null, null, null);
+  if (opts?.includeInitiators) {
+    const initiatorNetworkRequest = SDK.NetworkRequest.NetworkRequest.create(
+        'requestId' as Protocol.Network.RequestId, Platform.DevToolsPath.urlString`https://www.initiator.com`,
+        Platform.DevToolsPath.urlString``, null, null, null);
+    const initiatedNetworkRequest1 = SDK.NetworkRequest.NetworkRequest.create(
+        'requestId' as Protocol.Network.RequestId, Platform.DevToolsPath.urlString`https://www.example.com/1`,
+        Platform.DevToolsPath.urlString``, null, null, null);
+    const initiatedNetworkRequest2 = SDK.NetworkRequest.NetworkRequest.create(
+        'requestId' as Protocol.Network.RequestId, Platform.DevToolsPath.urlString`https://www.example.com/2`,
+        Platform.DevToolsPath.urlString``, null, null, null);
 
-  sinon.stub(Logs.NetworkLog.NetworkLog.instance(), 'initiatorGraphForRequest')
-      .withArgs(networkRequest)
-      .returns({
-        initiators: new Set([networkRequest, initiatorNetworkRequest]),
-        initiated: new Map([
-          [networkRequest, initiatorNetworkRequest],
-          [initiatedNetworkRequest1, networkRequest],
-          [initiatedNetworkRequest2, networkRequest],
-        ]),
-      })
-      .withArgs(initiatedNetworkRequest1)
-      .returns({
-        initiators: new Set([]),
-        initiated: new Map([
-          [initiatedNetworkRequest1, networkRequest],
-        ]),
-      })
-      .withArgs(initiatedNetworkRequest2)
-      .returns({
-        initiators: new Set([]),
-        initiated: new Map([
-          [initiatedNetworkRequest2, networkRequest],
-        ]),
-      });
+    sinon.stub(Logs.NetworkLog.NetworkLog.instance(), 'initiatorGraphForRequest')
+        .withArgs(networkRequest)
+        .returns({
+          initiators: new Set([networkRequest, initiatorNetworkRequest]),
+          initiated: new Map([
+            [networkRequest, initiatorNetworkRequest],
+            [initiatedNetworkRequest1, networkRequest],
+            [initiatedNetworkRequest2, networkRequest],
+          ]),
+        })
+        .withArgs(initiatedNetworkRequest1)
+        .returns({
+          initiators: new Set([]),
+          initiated: new Map([
+            [initiatedNetworkRequest1, networkRequest],
+          ]),
+        })
+        .withArgs(initiatedNetworkRequest2)
+        .returns({
+          initiators: new Set([]),
+          initiated: new Map([
+            [initiatedNetworkRequest2, networkRequest],
+          ]),
+        });
+  }
+
   return networkRequest;
+}
+
+let panels: AiAssistance.AiAssistancePanel[] = [];
+/**
+ * Creates and shows an AiAssistancePanel instance returning the view
+ * stubs and the initial view input caused by Widget.show().
+ */
+export async function createAiAssistancePanel(options?: {
+  aidaClient?: Host.AidaClient.AidaClient,
+  aidaAvailability?: Host.AidaClient.AidaAccessPreconditions,
+  syncInfo?: Host.InspectorFrontendHostAPI.SyncInformation,
+}) {
+  let aidaAvailabilityForStub = options?.aidaAvailability ?? Host.AidaClient.AidaAccessPreconditions.AVAILABLE;
+
+  const view = sinon.stub<[AiAssistance.ViewInput, unknown, HTMLElement]>();
+  const aidaClient = options?.aidaClient ?? mockAidaClient();
+  const checkAccessPreconditionsStub =
+      sinon.stub(Host.AidaClient.AidaClient, 'checkAccessPreconditions').callsFake(() => {
+        return Promise.resolve(aidaAvailabilityForStub);
+      });
+  const panel = new AiAssistance.AiAssistancePanel(view, {
+    aidaClient,
+    aidaAvailability: aidaAvailabilityForStub,
+    syncInfo: options?.syncInfo ?? {isSyncActive: true},
+  });
+  panels.push(panel);
+
+  /**
+   * Triggers the action and returns args of the next view function
+   * call.
+   */
+  async function expectViewUpdate(action: () => void) {
+    const result = expectCall(view);
+    action();
+    const viewArgs = await result;
+    return viewArgs[0];
+  }
+
+  const initialViewInput = await expectViewUpdate(() => {
+    panel.markAsRoot();
+    panel.show(document.body);
+  });
+
+  const stubAidaCheckAccessPreconditions = (aidaAvailability: Host.AidaClient.AidaAccessPreconditions) => {
+    aidaAvailabilityForStub = aidaAvailability;
+    return checkAccessPreconditionsStub;
+  };
+
+  return {
+    initialViewInput,
+    panel,
+    view,
+    aidaClient,
+    expectViewUpdate,
+    stubAidaCheckAccessPreconditions,
+  };
+}
+
+export function detachPanels() {
+  for (const panel of panels) {
+    panel.detach();
+  }
+  panels = [];
 }

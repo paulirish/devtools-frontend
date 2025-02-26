@@ -82,7 +82,7 @@ export interface EyeDropperPickedColorEvent {
 }
 
 export interface DevToolsFileSystem {
-  type: string;
+  type: ''|'automatic'|'snippets'|'overrides';
   fileSystemName: string;
   rootURL: string;
   fileSystemPath: Platform.DevToolsPath.RawPathString;
@@ -236,6 +236,15 @@ export interface EventTypes {
 }
 
 export interface InspectorFrontendHostAPI {
+  connectAutomaticFileSystem(
+      fileSystemPath: Platform.DevToolsPath.RawPathString,
+      fileSystemUUID: string,
+      addIfMissing: boolean,
+      callback: (result: {success: boolean}) => void,
+      ): void;
+
+  disconnectAutomaticFileSystem(fileSystemPath: Platform.DevToolsPath.RawPathString): void;
+
   addFileSystem(type?: string): void;
 
   loadCompleted(): void;
@@ -479,7 +488,6 @@ export const enum EnumeratedHistogram {
   SourcesPanelFileOpened = 'DevTools.SourcesPanelFileOpened',
   NetworkPanelResponsePreviewOpened = 'DevTools.NetworkPanelResponsePreviewOpened',
   TimelineNavigationSettingState = 'DevTools.TimelineNavigationSettingState',
-  StyleTextCopied = 'DevTools.StyleTextCopied',
   CSSHintShown = 'DevTools.CSSHintShown',
   LighthouseModeRun = 'DevTools.LighthouseModeRun',
   LighthouseCategoryUsed = 'DevTools.LighthouseCategoryUsed',

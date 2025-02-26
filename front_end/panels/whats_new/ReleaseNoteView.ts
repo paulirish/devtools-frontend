@@ -20,7 +20,7 @@ const UIStrings = {
    *@description Text that is usually a hyperlink to more documentation
    */
   seeFeatures: 'See all new features',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/whats_new/ReleaseNoteView.ts', UIStrings);
 
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -116,7 +116,7 @@ export class ReleaseNoteView extends UI.Widget.VBox {
     const url = new URL('./resources/WNDT.md', import.meta.url);
     try {
       const response = await fetch(url.toString());
-      return response.text();
+      return await response.text();
     } catch {
       throw new Error(`Markdown file ${
           url.toString()} not found. Make sure it is correctly listed in the relevant BUILD.gn files.`);

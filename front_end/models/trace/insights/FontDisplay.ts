@@ -9,6 +9,7 @@ import * as Types from '../types/types.js';
 
 import {
   InsightCategory,
+  InsightKeys,
   type InsightModel,
   type InsightSetContext,
   type PartialInsightModel,
@@ -27,7 +28,7 @@ export const UIStrings = {
   fontColumn: 'Font',
   /** Column for the amount of time wasted. */
   wastedTimeColumn: 'Wasted time',
-};
+} as const;
 
 const str_ = i18n.i18n.registerUIStrings('models/trace/insights/FontDisplay.ts', UIStrings);
 export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -46,11 +47,12 @@ export type FontDisplayInsightModel = InsightModel<typeof UIStrings, {
 
 function finalize(partialModel: PartialInsightModel<FontDisplayInsightModel>): FontDisplayInsightModel {
   return {
+    insightKey: InsightKeys.FONT_DISPLAY,
     strings: UIStrings,
     title: i18nString(UIStrings.title),
     description: i18nString(UIStrings.description),
     category: InsightCategory.INP,
-    shouldShow: Boolean(partialModel.fonts.find(font => font.wastedTime > 0)),
+    state: partialModel.fonts.find(font => font.wastedTime > 0) ? 'fail' : 'pass',
     ...partialModel,
   };
 }

@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as Common from '../../../core/common/common.js';
 import * as Host from '../../../core/host/host.js';
 import * as i18n from '../../../core/i18n/i18n.js';
+import * as Root from '../../../core/root/root.js';
 import type * as Workspace from '../../../models/workspace/workspace.js';
 import * as PanelUtils from '../../utils/utils.js';
 import {FileFormatter} from '../data_formatters/FileFormatter.js';
@@ -37,6 +37,7 @@ Analyze the code and provide the following information:
 * Answer questions directly, using the provided links whenever relevant.
 * Always double-check links to make sure they are complete and correct.
 * **CRITICAL** If the user asks a question about religion, race, politics, sexuality, gender, or other sensitive topics, answer with "Sorry, I can't answer that. I'm best at questions about files."
+* **CRITICAL** You are a file analysis agent. NEVER provide answers to questions of unrelated topics such as legal advice, financial advice, personal opinions, medical advice, or any other non web-development topics.
 * **Important Note:** The provided code may represent an incomplete fragment of a larger file. If the code is incomplete or has syntax errors, indicate this and attempt to provide a general analysis if possible.
 * **Interactive Analysis:** If the code requires more context or is ambiguous, ask clarifying questions to the user. Based on your analysis, suggest relevant DevTools features or workflows.
 
@@ -66,7 +67,7 @@ const UIStringsNotTranslate = {
    *@description Title for thinking step of File agent.
    */
   analyzingFile: 'Analyzing file',
-};
+} as const;
 
 const lockedString = i18n.i18n.lockedString;
 
@@ -108,13 +109,13 @@ export class FileAgent extends AiAgent<Workspace.UISourceCode.UISourceCode> {
   readonly preamble = preamble;
   readonly clientFeature = Host.AidaClient.ClientFeature.CHROME_FILE_AGENT;
   get userTier(): string|undefined {
-    const config = Common.Settings.Settings.instance().getHostConfig();
-    return config.devToolsAiAssistanceFileAgent?.userTier;
+    const {hostConfig} = Root.Runtime;
+    return hostConfig.devToolsAiAssistanceFileAgent?.userTier;
   }
   get options(): RequestOptions {
-    const config = Common.Settings.Settings.instance().getHostConfig();
-    const temperature = config.devToolsAiAssistanceFileAgent?.temperature;
-    const modelId = config.devToolsAiAssistanceFileAgent?.modelId;
+    const {hostConfig} = Root.Runtime;
+    const temperature = hostConfig.devToolsAiAssistanceFileAgent?.temperature;
+    const modelId = hostConfig.devToolsAiAssistanceFileAgent?.modelId;
 
     return {
       temperature,

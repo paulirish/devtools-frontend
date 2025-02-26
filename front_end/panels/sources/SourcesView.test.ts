@@ -111,7 +111,7 @@ describeWithEnvironment('SourcesView', () => {
       const contentLoadedPromise = new Promise(res => window.addEventListener('source-file-loaded', res));
       const widget = sourcesView.viewForFile(uiSourceCode);
       assert.instanceOf(widget, Sources.UISourceCodeFrame.UISourceCodeFrame);
-      const uiSourceCodeFrame = widget as Sources.UISourceCodeFrame.UISourceCodeFrame;
+      const uiSourceCodeFrame = widget;
 
       // Skip creating the DebuggerPlugin, which times out and simulate DOM attach/showing.
       sinon.stub(uiSourceCodeFrame, 'loadPlugins' as keyof typeof uiSourceCodeFrame).callsFake(() => {});
@@ -193,7 +193,7 @@ describeWithMockConnection('SourcesView', () => {
     createFileSystemUISourceCode({
       url: urlString`snippet:///foo.js`,
       mimeType: 'application/javascript',
-      type: 'snippets',
+      type: Persistence.PlatformFileSystem.PlatformFileSystemType.SNIPPETS,
     });
 
     const sourcesView = new Sources.SourcesView.SourcesView();

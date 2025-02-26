@@ -37,8 +37,9 @@ function createCharts(parsedTrace?: Trace.Handlers.Types.ParsedTrace): Overlays.
   const mainProvider = new Timeline.TimelineFlameChartDataProvider.TimelineFlameChartDataProvider();
   const networkProvider = new Timeline.TimelineFlameChartNetworkDataProvider.TimelineFlameChartNetworkDataProvider();
   if (parsedTrace) {
-    mainProvider.setModel(parsedTrace);
-    networkProvider.setModel(parsedTrace);
+    const entityMapper = new Timeline.Utils.EntityMapper.EntityMapper(parsedTrace);
+    mainProvider.setModel(parsedTrace, entityMapper);
+    networkProvider.setModel(parsedTrace, entityMapper);
   }
 
   const delegate = new MockFlameChartDelegate();
@@ -643,7 +644,7 @@ describeWithEnvironment('Overlays', () => {
       // Create an entry label overlay
       Timeline.ModificationsManager.ModificationsManager.activeManager()?.createAnnotation({
         type: 'ENTRY_LABEL',
-        entry: event as Trace.Types.Events.Event,
+        entry: event,
         label: '',
       });
       await overlays.update();
@@ -684,7 +685,7 @@ describeWithEnvironment('Overlays', () => {
       // Create an entry label overlay
       Timeline.ModificationsManager.ModificationsManager.activeManager()?.createAnnotation({
         type: 'ENTRY_LABEL',
-        entry: event as Trace.Types.Events.Event,
+        entry: event,
         label: '',
       });
       await overlays.update();
@@ -886,7 +887,7 @@ describeWithEnvironment('Overlays', () => {
       Timeline.ModificationsManager.ModificationsManager.activeManager()?.createAnnotation({
         type: 'ENTRY_LABEL',
         label: '',
-        entry: event as Trace.Types.Events.Event,
+        entry: event,
       });
 
       await overlays.update();
@@ -913,7 +914,7 @@ describeWithEnvironment('Overlays', () => {
       Timeline.ModificationsManager.ModificationsManager.activeManager()?.createAnnotation({
         type: 'ENTRY_LABEL',
         label: '',
-        entry: event as Trace.Types.Events.Event,
+        entry: event,
       });
 
       await overlays.update();

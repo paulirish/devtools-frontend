@@ -15,7 +15,7 @@ const UIStrings = {
    *@description Text to find an item
    */
   find: 'Find',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/components/source_frame/XMLView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -229,7 +229,7 @@ export class XMLViewNode extends UI.TreeOutline.TreeElement {
       node = node.nextSibling;
       const nodeType = currentNode.nodeType;
       // ignore empty TEXT
-      if (nodeType === 3 && currentNode.nodeValue && currentNode.nodeValue.match(/\s+/)) {
+      if (nodeType === 3 && currentNode.nodeValue?.match(/\s+/)) {
         continue;
       }
       // ignore ATTRIBUTE, ENTITY_REFERENCE, ENTITY, DOCUMENT, DOCUMENT_TYPE, DOCUMENT_FRAGMENT, NOTATION

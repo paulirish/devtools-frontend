@@ -37,7 +37,7 @@ const UIStrings = {
    *@description Link text the user can click to see documentation.
    */
   learnMoreLink: 'Learn More',
-};
+} as const;
 
 const str_ = i18n.i18n.registerUIStrings('ui/components/panel_feedback/PreviewToggle.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -49,7 +49,7 @@ export class PreviewToggle extends HTMLElement {
   #helperText: string|null = null;
   #feedbackURL: string|null = null;
   #learnMoreURL: string|undefined;
-  #experiment: string = '';
+  #experiment = '';
   #onChangeCallback?: (checked: boolean) => void;
 
   connectedCallback(): void {

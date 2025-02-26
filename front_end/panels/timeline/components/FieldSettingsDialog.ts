@@ -90,7 +90,7 @@ const UIStrings = {
    * @example {http//malformed.com} PH1
    */
   invalidOrigin: '"{PH1}" is not a valid origin or URL.',
-};
+} as const;
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/FieldSettingsDialog.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -112,8 +112,8 @@ export class FieldSettingsDialog extends HTMLElement {
 
   #configSetting = CrUXManager.CrUXManager.instance().getConfigSetting();
 
-  #urlOverride: string = '';
-  #urlOverrideEnabled: boolean = false;
+  #urlOverride = '';
+  #urlOverrideEnabled = false;
   #urlOverrideWarning = '';
   #originMap?: OriginMap;
 

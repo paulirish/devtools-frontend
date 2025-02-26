@@ -10,6 +10,7 @@ import * as Types from '../types/types.js';
 import {
   type Checklist,
   InsightCategory,
+  InsightKeys,
   type InsightModel,
   type InsightSetContext,
   InsightWarning,
@@ -56,7 +57,7 @@ export const UIStrings = {
    * @description Text status indicating that the Largest Contentful Paint (LCP) metric was text rather than an image. "LCP" is an acronym and should not be translated.
    */
   noLcpResource: 'No LCP resource detected because the LCP is not an image',
-};
+} as const;
 
 const str_ = i18n.i18n.registerUIStrings('models/trace/insights/LCPDiscovery.ts', UIStrings);
 export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -79,14 +80,16 @@ function finalize(partialModel: PartialInsightModel<LCPDiscoveryInsightModel>): 
       [partialModel.lcpEvent, partialModel.lcpRequest] :
       [];
   return {
+    insightKey: InsightKeys.LCP_DISCOVERY,
     strings: UIStrings,
     title: i18nString(UIStrings.title),
     description: i18nString(UIStrings.description),
     category: InsightCategory.LCP,
-    shouldShow: Boolean(
-        partialModel.lcpRequest && partialModel.checklist &&
-        (!partialModel.checklist.eagerlyLoaded.value || !partialModel.checklist.requestDiscoverable.value ||
-         !partialModel.checklist.priorityHinted.value)),
+    state: partialModel.lcpRequest && partialModel.checklist &&
+            (!partialModel.checklist.eagerlyLoaded.value || !partialModel.checklist.requestDiscoverable.value ||
+             !partialModel.checklist.priorityHinted.value) ?
+        'fail' :
+        'pass',
     ...partialModel,
     relatedEvents,
   };
@@ -135,7 +138,7 @@ export function generateInsight(
   const imageLoadingAttr = lcpEvent.args.data?.loadingAttr;
   const imageFetchPriorityHint = lcpRequest?.args.data.fetchPriorityHint;
   // This is the earliest discovery time an LCP request could have - it's TTFB.
-  const earliestDiscoveryTime = docRequest && docRequest.args.data.timing ?
+  const earliestDiscoveryTime = docRequest?.args.data.timing ?
       Helpers.Timing.secondsToMicro(docRequest.args.data.timing.requestTime) +
           Helpers.Timing.milliToMicro(docRequest.args.data.timing.receiveHeadersStart) :
       undefined;

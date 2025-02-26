@@ -16,12 +16,13 @@ import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
 import * as SourceFrame from '../../ui/legacy/components/source_frame/source_frame.js';
 import * as UI from '../../ui/legacy/legacy.js';
-import {html, render} from '../../ui/lit/lit.js';
+import {Directives, html, render} from '../../ui/lit/lit.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {type Command, Events as JSONEditorEvents, JSONEditor, type Parameter} from './JSONEditor.js';
 import protocolMonitorStyles from './protocolMonitor.css.js';
 
+const {styleMap} = Directives;
 const {widgetConfig} = UI.Widget;
 const UIStrings = {
   /**
@@ -128,14 +129,13 @@ const UIStrings = {
    * @description Screen reader announcement when the sidebar is hidden in the Console panel.
    */
   CDPCommandEditorHidden: 'CDP command editor hidden',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/protocol_monitor/ProtocolMonitor.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export const buildProtocolMetadata = (domains: Iterable<ProtocolDomain>):
     Map<string, {parameters: Parameter[], description: string, replyArgs: string[]}> => {
-      const metadataByCommand: Map<string, {parameters: Parameter[], description: string, replyArgs: string[]}> =
-          new Map();
+      const metadataByCommand = new Map<string, {parameters: Parameter[], description: string, replyArgs: string[]}>();
       for (const domain of domains) {
         for (const command of Object.keys(domain.metadata)) {
           metadataByCommand.set(command, domain.metadata[command]);
@@ -177,16 +177,24 @@ export interface ProtocolDomain {
 export interface ViewInput {
   messages: Message[];
   selectedMessage?: Message;
-  filters: TextUtils.TextUtils.ParsedFilter[];
+  hideInputBar: boolean;
+  command: string;
+  commandSuggestions: string[];
+  filterKeys: string[];
+  filter: string;
+  parseFilter: (filter: string) => TextUtils.TextUtils.ParsedFilter[];
   onRecord: (e: Event) => void;
   onClear: () => void;
   onSave: () => void;
   onSelect: (e: CustomEvent<HTMLElement|null>) => void;
   onContextMenu: (e: CustomEvent<{menu: UI.ContextMenu.ContextMenu, element: HTMLElement}>) => void;
-  textFilterUI: UI.Toolbar.ToolbarInput;
+  onFilterChanged: (e: CustomEvent<string>) => void;
+  onCommandChange: (e: CustomEvent<string>) => void;
+  onCommandSubmitted: (e: CustomEvent<string>) => void;
+  onTargetChange: (e: Event) => void;
   showHideSidebarButton: UI.Toolbar.ToolbarButton;
-  commandInput: UI.Toolbar.ToolbarInput;
-  selector: UI.Toolbar.ToolbarComboBox;
+  targets: SDK.Target.Target[];
+  selectedTargetId: string;
 }
 
 export interface ViewOutput {}
@@ -199,17 +207,16 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
   private startTime: number;
   private readonly messageForId = new Map<number, Message>();
   private readonly filterParser: TextUtils.TextUtils.FilterParser;
-  private readonly suggestionBuilder: UI.FilterSuggestionBuilder.FilterSuggestionBuilder;
-  private readonly textFilterUI: UI.Toolbar.ToolbarInput;
-  readonly selector: UI.Toolbar.ToolbarComboBox;
+  #filterKeys = ['method', 'request', 'response', 'target', 'session'];
   #commandAutocompleteSuggestionProvider = new CommandAutocompleteSuggestionProvider();
-  #selectedTargetId?: string;
-  #commandInput: UI.Toolbar.ToolbarInput;
+  #selectedTargetId: string;
+  #command = '';
+  #hideInputBar = false;
   #showHideSidebarButton: UI.Toolbar.ToolbarButton;
   #view: View;
   #messages: Message[] = [];
   #selectedMessage: Message|undefined;
-  #filters: TextUtils.TextUtils.ParsedFilter[] = [];
+  #filter = '';
   #splitWidget: UI.SplitWidget.SplitWidget;
   constructor(splitWidget: UI.SplitWidget.SplitWidget, view: View = (input, output, target) => {
     // clang-format off
@@ -234,7 +241,17 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
                                .variant=${Buttons.Button.Variant.TOOLBAR}
                                .jslogContext=${'protocol-monitor.save'}
                                @click=${input.onSave}></devtools-button>
-              ${input.textFilterUI.element}
+              <devtools-toolbar-input type="filter"
+                                      list="filter-suggestions"
+                                      style="flex-grow: 1"
+                                      value=${input.filter}
+                                      @change=${input.onFilterChanged}>
+                <datalist id="filter-suggestions">
+                  ${input.filterKeys.map(key => html`
+                        <option value=${key + ':'}></option>
+                        <option value=${'-' + key + ':'}></option>`)}
+                </datalist>
+              </devtools-toolbar-input>
             </devtools-toolbar>
             <devtools-split-widget .options=${{
                 vertical: true,
@@ -246,7 +263,7 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
                   slot="main"
                   @select=${input.onSelect}
                   @contextmenu=${input.onContextMenu}
-                  .filters=${input.filters}>
+                  .filters=${input.parseFilter(input.filter)}>
                 <table>
                     <tr>
                       <th id="type" sortable style="text-align: center" hideable weight="1">${i18nString(UIStrings.type)}</th>
@@ -303,8 +320,31 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
             <devtools-toolbar class="protocol-monitor-bottom-toolbar"
                jslog=${VisualLogging.toolbar('bottom')}>
               ${input.showHideSidebarButton.element}
-              ${input.commandInput.element}
-              ${input.selector.element}
+              <devtools-toolbar-input id="command-input"
+                                      style=${styleMap({
+                                        'flex-grow': 1,
+                                        display: input.hideInputBar ? 'none' : 'flex'})}
+                                      value=${input.command}
+                                      list="command-input-suggestions"
+                                      placeholder=${i18nString(UIStrings.sendRawCDPCommand)}
+                                      title=${i18nString(UIStrings.sendRawCDPCommandExplanation)}
+                                      @change=${input.onCommandChange}
+                                      @submit=${input.onCommandSubmitted}>
+                <datalist id="command-input-suggestions">
+                  ${input.commandSuggestions.map(c => html`<option value=${c}></option>`)}
+                </datalist>
+              </devtools-toolbar-input>
+              <select class="target-selector"
+                      title=${i18nString(UIStrings.selectTarget)}
+                      style=${styleMap({display: input.hideInputBar ? 'none' : 'flex'})}
+                      jslog=${VisualLogging.dropDown('target-selector').track({change: true})}
+                      @change=${input.onTargetChange}>
+                ${input.targets.map(target => html`
+                  <option jslog=${VisualLogging.item('target').track({click: true})}
+                          value=${target.id()} ?selected=${target.id() === input.selectedTargetId}>
+                    ${target.name()} (${target.inspectedURL()})
+                  </option>`)}
+              </select>
             </devtools-toolbar>`,
         target,
         {host: input}
@@ -317,69 +357,62 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
     this.started = false;
     this.startTime = 0;
     this.contentElement.classList.add('protocol-monitor');
-    this.selector = this.#createTargetSelector();
 
-    const keys = ['method', 'request', 'response', 'type', 'target', 'session'];
-    this.filterParser = new TextUtils.TextUtils.FilterParser(keys);
-    this.suggestionBuilder = new UI.FilterSuggestionBuilder.FilterSuggestionBuilder(keys);
+    this.#filterKeys = ['method', 'request', 'response', 'type', 'target', 'session'];
+    this.filterParser = new TextUtils.TextUtils.FilterParser(this.#filterKeys);
 
-    this.textFilterUI = new UI.Toolbar.ToolbarFilter(
-        undefined, 1, .2, '', this.suggestionBuilder.completions.bind(this.suggestionBuilder), true);
-    this.textFilterUI.addEventListener(UI.Toolbar.ToolbarInput.Event.TEXT_CHANGED, event => {
-      const query = event.data as string;
-      this.#filters = this.filterParser.parse(query);
-      this.requestUpdate();
-    });
     this.#showHideSidebarButton = splitWidget.createShowHideSidebarButton(
         i18nString(UIStrings.showCDPCommandEditor), i18nString(UIStrings.hideCDPCommandEditor),
         i18nString(UIStrings.CDPCommandEditorShown), i18nString(UIStrings.CDPCommandEditorHidden),
         'protocol-monitor.toggle-command-editor');
-    this.#commandInput = this.#createCommandInput();
-    const inputBar = this.#commandInput.element;
-    const tabSelector = this.selector.element;
 
     const populateToolbarInput = (): void => {
       const editorWidget = splitWidget.sidebarWidget();
-      if (!(editorWidget instanceof EditorWidget)) {
+      if (!(editorWidget instanceof JSONEditor)) {
         return;
       }
-      const commandJson = editorWidget.jsonEditor.getCommandJson();
-      const targetId = editorWidget.jsonEditor.targetId;
+      const commandJson = editorWidget.getCommandJson();
+      const targetId = editorWidget.targetId;
       if (targetId) {
-        const selectedIndex = this.selector.options().findIndex(option => option.value === targetId);
-        if (selectedIndex !== -1) {
-          this.selector.setSelectedIndex(selectedIndex);
-          this.#selectedTargetId = targetId;
-        }
+        this.#selectedTargetId = targetId;
       }
       if (commandJson) {
-        this.#commandInput.setValue(commandJson);
+        this.#command = commandJson;
+        this.requestUpdate();
       }
     };
 
     splitWidget.addEventListener(UI.SplitWidget.Events.SHOW_MODE_CHANGED, (event => {
                                    if (event.data === 'OnlyMain') {
                                      populateToolbarInput();
-
-                                     inputBar?.setAttribute('style', 'display:flex; flex-grow: 1');
-                                     tabSelector?.setAttribute('style', 'display:flex');
+                                     this.#hideInputBar = false;
                                    } else {
-                                     const {command, parameters} = parseCommandInput(this.#commandInput.value());
+                                     const {command, parameters} = parseCommandInput(this.#command);
                                      this.dispatchEventToListeners(
                                          Events.COMMAND_CHANGE,
                                          {command, parameters, targetId: this.#selectedTargetId});
-                                     inputBar?.setAttribute('style', 'display:none');
-                                     tabSelector?.setAttribute('style', 'display:none');
+                                     this.#hideInputBar = true;
                                    }
+                                   this.requestUpdate();
                                  }));
+    this.#selectedTargetId = 'main';
     this.performUpdate();
+    SDK.TargetManager.TargetManager.instance().addEventListener(
+        SDK.TargetManager.Events.AVAILABLE_TARGETS_CHANGED, () => {
+          this.requestUpdate();
+        });
   }
 
   override performUpdate(): void {
     const viewInput = {
       messages: this.#messages,
       selectedMessage: this.#selectedMessage,
-      filters: this.#filters,
+      hideInputBar: this.#hideInputBar,
+      command: this.#command,
+      commandSuggestions: this.#commandAutocompleteSuggestionProvider.allSuggestions(),
+      filterKeys: this.#filterKeys,
+      filter: this.#filter,
+      parseFilter: this.filterParser.parse.bind(this.filterParser),
       onRecord: (e: Event) => {
         this.setRecording((e.target as Buttons.Button.Button).toggled);
       },
@@ -393,7 +426,7 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
       },
       onSelect: (e: CustomEvent<HTMLElement|null>) => {
         const index = parseInt(e.detail?.dataset?.index ?? '', 10);
-        this.#selectedMessage = index ? this.#messages[index] : undefined;
+        this.#selectedMessage = !isNaN(index) ? this.#messages[index] : undefined;
         this.requestUpdate();
       },
       onContextMenu: (e: CustomEvent<{menu: UI.ContextMenu.ContextMenu, element: HTMLElement}>) => {
@@ -402,10 +435,26 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
           this.#populateContextMenu(e.detail.menu, message);
         }
       },
-      textFilterUI: this.textFilterUI,
+      onCommandChange: (e: CustomEvent<string>) => {
+        this.#command = e.detail;
+      },
+      onCommandSubmitted: (e: CustomEvent<string>) => {
+        this.#commandAutocompleteSuggestionProvider.addEntry(e.detail);
+        const {command, parameters} = parseCommandInput(e.detail);
+        this.onCommandSend(command, parameters, this.#selectedTargetId);
+      },
+      onFilterChanged: (e: CustomEvent<string>) => {
+        this.#filter = e.detail;
+        this.requestUpdate();
+      },
+      onTargetChange: (e: Event) => {
+        if (e.target instanceof HTMLSelectElement) {
+          this.#selectedTargetId = e.target.value;
+        }
+      },
       showHideSidebarButton: this.#showHideSidebarButton,
-      commandInput: this.#commandInput,
-      selector: this.selector,
+      targets: SDK.TargetManager.TargetManager.instance().targets(),
+      selectedTargetId: this.#selectedTargetId,
     };
     const viewOutput = {};
     this.#view(viewInput, viewOutput, this.contentElement);
@@ -435,7 +484,8 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
      * current row.
      */
     menu.editSection().appendItem(i18nString(UIStrings.filter), () => {
-      this.textFilterUI.setValue(`method:${message.method}`, true);
+      this.#filter = `method:${message.method}`;
+      this.requestUpdate();
     }, {jslogContext: 'filter'});
 
     /**
@@ -451,47 +501,6 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
     }, {jslogContext: 'documentation'});
   }
 
-  #createCommandInput(): UI.Toolbar.ToolbarInput {
-    const placeholder = i18nString(UIStrings.sendRawCDPCommand);
-    const accessiblePlaceholder = placeholder;
-    const growFactor = 1;
-    const shrinkFactor = 0.2;
-    const tooltip = i18nString(UIStrings.sendRawCDPCommandExplanation);
-    const input = new UI.Toolbar.ToolbarInput(
-        placeholder,
-        accessiblePlaceholder,
-        growFactor,
-        shrinkFactor,
-        tooltip,
-        this.#commandAutocompleteSuggestionProvider.buildTextPromptCompletions,
-        false,
-        'command-input',
-    );
-    input.addEventListener(UI.Toolbar.ToolbarInput.Event.ENTER_PRESSED, () => {
-      this.#commandAutocompleteSuggestionProvider.addEntry(input.value());
-      const {command, parameters} = parseCommandInput(input.value());
-      this.onCommandSend(command, parameters, this.#selectedTargetId);
-    });
-    return input;
-  }
-
-  #createTargetSelector(): UI.Toolbar.ToolbarComboBox {
-    const selector = new UI.Toolbar.ToolbarComboBox(() => {
-      this.#selectedTargetId = selector.selectedOption()?.value;
-    }, i18nString(UIStrings.selectTarget), undefined, 'target-selector');
-    selector.setMaxWidth(120);
-    const targetManager = SDK.TargetManager.TargetManager.instance();
-    const syncTargets = (): void => {
-      selector.removeOptions();
-      for (const target of targetManager.targets()) {
-        selector.createOption(`${target.name()} (${target.inspectedURL()})`, target.id());
-      }
-    };
-    targetManager.addEventListener(SDK.TargetManager.Events.AVAILABLE_TARGETS_CHANGED, syncTargets);
-    syncTargets();
-    return selector;
-  }
-
   onCommandSend(command: string, parameters: object, target?: string): void {
     const test = ProtocolClient.InspectorBackend.test;
     const targetManager = SDK.TargetManager.TargetManager.instance();
@@ -499,7 +508,7 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
     const sessionId = selectedTarget ? selectedTarget.sessionId : '';
     // TS thinks that properties are read-only because
     // in TS test is defined as a namespace.
-    // @ts-ignore
+    // @ts-expect-error
     test.sendRawMessage(command, parameters, () => {}, sessionId);
   }
 
@@ -516,16 +525,11 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
   private setRecording(recording: boolean): void {
     const test = ProtocolClient.InspectorBackend.test;
     if (recording) {
-      // TODO: TS thinks that properties are read-only because
-      // in TS test is defined as a namespace.
-      // @ts-ignore
       test.onMessageSent = this.messageSent.bind(this);
-      // @ts-ignore
+      // @ts-expect-error
       test.onMessageReceived = this.messageReceived.bind(this);
     } else {
-      // @ts-ignore
       test.onMessageSent = null;
-      // @ts-ignore
       test.onMessageReceived = null;
     }
   }
@@ -601,7 +605,7 @@ export class ProtocolMonitorDataGrid extends Common.ObjectWrapper.eventMixin<Eve
 
 export class ProtocolMonitorImpl extends UI.Widget.VBox {
   #split: UI.SplitWidget.SplitWidget;
-  #editorWidget = new EditorWidget();
+  #editorWidget = new JSONEditor(metadataByCommand, typesByName as Map<string, Parameter[]>, enumsByName);
   #protocolMonitorDataGrid: ProtocolMonitorDataGrid;
   // This width corresponds to the optimal width to use the editor properly
   // It is randomly chosen
@@ -614,14 +618,14 @@ export class ProtocolMonitorImpl extends UI.Widget.VBox {
     this.#split.show(this.contentElement);
     this.#protocolMonitorDataGrid = new ProtocolMonitorDataGrid(this.#split);
     this.#protocolMonitorDataGrid.addEventListener(Events.COMMAND_CHANGE, event => {
-      this.#editorWidget.jsonEditor.displayCommand(event.data.command, event.data.parameters, event.data.targetId);
+      this.#editorWidget.displayCommand(event.data.command, event.data.parameters, event.data.targetId);
     });
 
     this.#editorWidget.element.style.overflow = 'hidden';
     this.#split.setMainWidget(this.#protocolMonitorDataGrid);
     this.#split.setSidebarWidget(this.#editorWidget);
     this.#split.hideSidebar(true);
-    this.#editorWidget.addEventListener(Events.COMMAND_SENT, event => {
+    this.#editorWidget.addEventListener(JSONEditorEvents.SUBMIT_EDITOR, event => {
       this.#protocolMonitorDataGrid.onCommandSend(event.data.command, event.data.parameters, event.data.targetId);
     });
   }
@@ -637,14 +641,19 @@ export class CommandAutocompleteSuggestionProvider {
     }
   }
 
+  allSuggestions(): string[] {
+    const newestToOldest = [...this.#commandHistory].reverse();
+    newestToOldest.push(...metadataByCommand.keys());
+    return newestToOldest;
+  }
+
   buildTextPromptCompletions =
       async(expression: string, prefix: string, force?: boolean): Promise<UI.SuggestBox.Suggestions> => {
     if (!prefix && !force && expression) {
       return [];
     }
 
-    const newestToOldest = [...this.#commandHistory].reverse();
-    newestToOldest.push(...metadataByCommand.keys());
+    const newestToOldest = this.allSuggestions();
     return newestToOldest.filter(cmd => cmd.startsWith(prefix)).map(text => ({
                                                                       text,
                                                                     }));
@@ -713,20 +722,6 @@ export const enum Events {
 export interface EventTypes {
   [Events.COMMAND_SENT]: Command;
   [Events.COMMAND_CHANGE]: Command;
-}
-
-export class EditorWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.VBox>(UI.Widget.VBox) {
-  readonly jsonEditor: JSONEditor;
-  constructor() {
-    super();
-    this.element.setAttribute('jslog', `${VisualLogging.pane('command-editor').track({resize: true})}`);
-    this.jsonEditor = new JSONEditor(metadataByCommand, typesByName as Map<string, Parameter[]>, enumsByName);
-    this.jsonEditor.show(this.element);
-    this.jsonEditor.addEventListener(
-        JSONEditorEvents.SUBMIT_EDITOR,
-        ({data}: Common.EventTarget.EventTargetEvent<Command>) =>
-            this.dispatchEventToListeners(Events.COMMAND_SENT, data));
-  }
 }
 
 export function parseCommandInput(input: string): {command: string, parameters: {[paramName: string]: unknown}} {

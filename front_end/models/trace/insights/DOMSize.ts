@@ -9,6 +9,7 @@ import * as Types from '../types/types.js';
 
 import {
   InsightCategory,
+  InsightKeys,
   type InsightModel,
   type InsightSetContext,
   type PartialInsightModel,
@@ -49,7 +50,7 @@ export const UIStrings = {
    * @description Label for a value representing the maximum number of child elements of any parent element on the page.
    */
   maxChildren: 'Most children',
-};
+} as const;
 
 const str_ = i18n.i18n.registerUIStrings('models/trace/insights/DOMSize.ts', UIStrings);
 export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -75,11 +76,12 @@ export function deps(): ['Renderer', 'AuctionWorklets', 'DOMStats'] {
 function finalize(partialModel: PartialInsightModel<DOMSizeInsightModel>): DOMSizeInsightModel {
   const relatedEvents = [...partialModel.largeLayoutUpdates, ...partialModel.largeStyleRecalcs];
   return {
+    insightKey: InsightKeys.DOM_SIZE,
     strings: UIStrings,
     title: i18nString(UIStrings.title),
     description: i18nString(UIStrings.description),
     category: InsightCategory.INP,
-    shouldShow: relatedEvents.length > 0,
+    state: relatedEvents.length > 0 ? 'fail' : 'pass',
     ...partialModel,
     relatedEvents,
   };

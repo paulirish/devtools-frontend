@@ -70,7 +70,7 @@ const UIStrings = {
    *@description Screen reader announcement when opening color picker tool.
    */
   colorPickerOpened: 'Color picker opened.',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/elements/components/LayoutPane.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export {LayoutElement};
@@ -176,7 +176,7 @@ let layoutPaneWrapperInstance: LegacyWrapper.LegacyWrapper.LegacyWrapper<UI.Widg
 
 export class LayoutPane extends LegacyWrapper.LegacyWrapper.WrappableComponent {
   readonly #shadow = this.attachShadow({mode: 'open'});
-  #settings: Readonly<Setting[]> = [];
+  #settings: readonly Setting[] = [];
   readonly #uaShadowDOMSetting: Common.Settings.Setting<boolean>;
   #domModels: SDK.DOMModel.DOMModel[];
 
@@ -217,10 +217,10 @@ export class LayoutPane extends LegacyWrapper.LegacyWrapper.WrappableComponent {
     this.#domModels = this.#domModels.filter(model => model !== domModel);
   }
 
-  async #fetchNodesByStyle(style: {
+  async #fetchNodesByStyle(style: Array<{
     name: string,
     value: string,
-  }[]): Promise<SDK.DOMModel.DOMNode[]> {
+  }>): Promise<SDK.DOMModel.DOMNode[]> {
     const showUAShadowDOM = this.#uaShadowDOMSetting.get();
 
     const nodes = [];

@@ -11,6 +11,7 @@ import type * as Types from '../types/types.js';
 
 import {
   InsightCategory,
+  InsightKeys,
   type InsightModel,
   type InsightSetContext,
   type InsightSetContextWithNavigation,
@@ -43,7 +44,7 @@ export const UIStrings = {
    * @description Text status indicating that no requests blocked the initial render of a navigation
    */
   noRenderBlocking: 'No render blocking requests for this navigation',
-};
+} as const;
 
 const str_ = i18n.i18n.registerUIStrings('models/trace/insights/RenderBlocking.ts', UIStrings);
 export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -165,11 +166,12 @@ function computeSavings(
 
 function finalize(partialModel: PartialInsightModel<RenderBlockingInsightModel>): RenderBlockingInsightModel {
   return {
+    insightKey: InsightKeys.RENDER_BLOCKING,
     strings: UIStrings,
     title: i18nString(UIStrings.title),
     description: i18nString(UIStrings.description),
     category: InsightCategory.LCP,
-    shouldShow: partialModel.renderBlockingRequests.length > 0,
+    state: partialModel.renderBlockingRequests.length > 0 ? 'fail' : 'pass',
     ...partialModel,
   };
 }

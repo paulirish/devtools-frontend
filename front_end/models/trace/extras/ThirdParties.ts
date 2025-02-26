@@ -59,6 +59,7 @@ function getOrMakeSummaryByURL(thirdPartySummary: ThirdPartySummary, url: string
   return summary;
 }
 
+// TODO: Remove and use the the BottomUpRootNode defined in ThirdPartyTreeView instead.
 function collectMainThreadActivity(
     thirdPartySummary: ThirdPartySummary, parsedTrace: Handlers.Types.ParsedTrace,
     bounds: Types.Timing.TraceWindowMicro): void {
@@ -83,7 +84,7 @@ function collectMainThreadActivity(
             continue;
           }
 
-          const url = Handlers.Helpers.getNonResolvedURL(event, parsedTrace as Handlers.Types.ParsedTrace);
+          const url = Handlers.Helpers.getNonResolvedURL(event, parsedTrace);
           if (!url) {
             continue;
           }

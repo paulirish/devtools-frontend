@@ -17,9 +17,11 @@ const {UIStrings, i18nString} = Trace.Insights.Models.ThirdParties;
 
 const {html} = Lit;
 
+const MAX_TO_SHOW = 3;
+
 export class ThirdParties extends BaseInsightComponent<ThirdPartiesInsightModel> {
   static override readonly litTagName = Lit.StaticHtml.literal`devtools-performance-third-parties`;
-  override internalName: string = 'third-parties';
+  override internalName = 'third-parties';
 
   #overlaysForEntity = new Map<Trace.Extras.ThirdParties.Entity, Overlays.Overlays.TimelineOverlay[]>();
 
@@ -63,8 +65,9 @@ export class ThirdParties extends BaseInsightComponent<ThirdPartiesInsightModel>
       return html`<div class="insight-section">${i18nString(UIStrings.noThirdParties)}</div>`;
     }
 
-    const topTransferSizeEntries = entries.sort((a, b) => b[1].transferSize - a[1].transferSize).slice(0, 6);
-    const topMainThreadTimeEntries = entries.sort((a, b) => b[1].mainThreadTime - a[1].mainThreadTime).slice(0, 6);
+    const topTransferSizeEntries = entries.sort((a, b) => b[1].transferSize - a[1].transferSize).slice(0, MAX_TO_SHOW);
+    const topMainThreadTimeEntries =
+        entries.sort((a, b) => b[1].mainThreadTime - a[1].mainThreadTime).slice(0, MAX_TO_SHOW);
 
     const sections = [];
     if (topTransferSizeEntries.length) {

@@ -15,8 +15,9 @@ function initTrackAppender(
     entryData: Trace.Types.Events.Event[],
     entryTypeByLevel: Timeline.TimelineFlameChartDataProvider.EntryType[],
     ): Timeline.TimingsTrackAppender.TimingsTrackAppender {
+  const entityMapper = new Timeline.Utils.EntityMapper.EntityMapper(parsedTrace);
   const compatibilityTracksAppender = new Timeline.CompatibilityTracksAppender.CompatibilityTracksAppender(
-      flameChartData, parsedTrace, entryData, entryTypeByLevel);
+      flameChartData, parsedTrace, entryData, entryTypeByLevel, entityMapper);
   return compatibilityTracksAppender.timingsTrackAppender();
 }
 
@@ -40,7 +41,7 @@ describeWithEnvironment('TimingTrackAppender', function() {
   function getMockInfo(event?: Trace.Types.Events.Event) {
     const defaultInfo: Timeline.CompatibilityTracksAppender.PopoverInfo = {
       title: event ? timingsTrackAppender.titleForEvent(event) : 'title',
-      formattedTime: event ? Timeline.AppenderUtils.getFormattedTime(event.dur) : 'time',
+      formattedTime: event ? Timeline.AppenderUtils.getDurationString(event.dur) : 'time',
       warningElements: [],
       additionalElements: [],
       url: null,

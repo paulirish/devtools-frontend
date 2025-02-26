@@ -48,7 +48,7 @@ const UIStrings = {
    * @description Text to indicate that there is an error loading the log
    */
   errorLoadingLog: 'Error loading log',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('core/sdk/RehydratingConnection.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -67,7 +67,7 @@ export class RehydratingConnection implements ProtocolClient.InspectorBackend.Co
   onDisconnect: ((arg0: string) => void)|null = null;
   onMessage: ((arg0: Object) => void)|null = null;
   traceEvents: unknown[] = [];
-  sessions: Map<number, RehydratingSessionBase> = new Map();
+  sessions = new Map<number, RehydratingSessionBase>();
   #onConnectionLost: (message: Platform.UIString.LocalizedString) => void;
   #rehydratingWindow: Window&typeof globalThis;
   #onReceiveHostWindowPayloadBound = this.#onReceiveHostWindowPayload.bind(this);
@@ -246,7 +246,7 @@ export class RehydratingSession extends RehydratingSessionBase {
     this.sessionAttachToTarget();
   }
 
-  override sendMessageToFrontend(payload: ServerMessage, attachSessionId: boolean = true): void {
+  override sendMessageToFrontend(payload: ServerMessage, attachSessionId = true): void {
     // Attach the session's Id to the message.
     if (this.sessionId !== 0 && attachSessionId) {
       payload.sessionId = this.sessionId;

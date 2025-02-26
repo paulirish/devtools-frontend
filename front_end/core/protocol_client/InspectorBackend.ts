@@ -100,8 +100,8 @@ interface CallbackWithDebugInfo {
 }
 
 export class InspectorBackend {
-  readonly agentPrototypes: Map<ProtocolDomainName, AgentPrototype> = new Map();
-  #initialized: boolean = false;
+  readonly agentPrototypes = new Map<ProtocolDomainName, AgentPrototype>();
+  #initialized = false;
   #eventParameterNamesForDomain = new Map<ProtocolDomainName, EventParameterNames>();
   readonly typeMap = new Map<QualifiedName, CommandParameter[]>();
   readonly enumMap = new Map<QualifiedName, Record<string, string>>();
@@ -153,13 +153,13 @@ export class InspectorBackend {
 
   registerEnum(type: QualifiedName, values: Record<string, string>): void {
     const [domain, name] = splitQualifiedName(type);
-    // @ts-ignore globalThis global namespace pollution
+    // @ts-expect-error globalThis global namespace pollution
     if (!globalThis.Protocol[domain]) {
-      // @ts-ignore globalThis global namespace pollution
+      // @ts-expect-error globalThis global namespace pollution
       globalThis.Protocol[domain] = {};
     }
 
-    // @ts-ignore globalThis global namespace pollution
+    // @ts-expect-error globalThis global namespace pollution
     globalThis.Protocol[domain][name] = values;
     this.enumMap.set(type, values);
     this.#initialized = true;
@@ -259,7 +259,7 @@ export class SessionRouter {
     callbacks: Map<number, CallbackWithDebugInfo>,
     proxyConnection: ((Connection | undefined)|null),
   }>;
-  #pendingScripts: (() => void)[];
+  #pendingScripts: Array<() => void>;
 
   constructor(connection: Connection) {
     this.#connectionInternal = connection;
@@ -532,7 +532,7 @@ export class TargetBase {
     }
 
     let router: SessionRouter;
-    if (sessionId && parentTarget && parentTarget.routerInternal) {
+    if (sessionId && parentTarget?.routerInternal) {
       router = parentTarget.routerInternal;
     } else if (connection) {
       router = new SessionRouter(connection);
@@ -545,7 +545,7 @@ export class TargetBase {
     router.registerSession(this, this.sessionId);
 
     for (const [domain, agentPrototype] of inspectorBackend.agentPrototypes) {
-      const agent = Object.create((agentPrototype as AgentPrototype));
+      const agent = Object.create((agentPrototype));
       agent.target = this;
       this.#agents.set(domain, agent);
     }
@@ -947,7 +947,7 @@ class AgentPrototype {
     function sendMessagePromise(this: AgentPrototype, ...args: unknown[]): Promise<unknown> {
       return AgentPrototype.prototype.sendMessageToBackendPromise.call(this, domainAndMethod, parameters, args);
     }
-    // @ts-ignore Method code generation
+    // @ts-expect-error Method code generation
     this[methodName] = sendMessagePromise;
     this.metadata[domainAndMethod] = {parameters, description, replyArgs};
 
@@ -955,7 +955,7 @@ class AgentPrototype {
       return this.invoke(domainAndMethod, request);
     }
 
-    // @ts-ignore Method code generation
+    // @ts-expect-error Method code generation
     this['invoke_' + methodName] = invoke;
     this.replyArgs[domainAndMethod] = replyArgs;
   }
@@ -1072,7 +1072,7 @@ class AgentPrototype {
  */
 class DispatcherManager<Domain extends ProtocolDomainName> {
   #eventArgs: ReadonlyEventParameterNames;
-  #dispatchers: ProtocolProxyApi.ProtocolDispatchers[Domain][] = [];
+  #dispatchers: Array<ProtocolProxyApi.ProtocolDispatchers[Domain]> = [];
 
   constructor(eventArgs: ReadonlyEventParameterNames) {
     this.#eventArgs = eventArgs;
@@ -1107,7 +1107,7 @@ class DispatcherManager<Domain extends ProtocolDomainName> {
 
       if (event in dispatcher) {
         const f = dispatcher[event as string as keyof ProtocolProxyApi.ProtocolDispatchers[Domain]];
-        // @ts-ignore Can't type check the dispatch.
+        // @ts-expect-error Can't type check the dispatch.
         f.call(dispatcher, messageParams);
       }
     }

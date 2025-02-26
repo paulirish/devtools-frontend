@@ -9,10 +9,11 @@ import * as Types from '../types/types.js';
 
 import {
   InsightCategory,
+  InsightKeys,
   type InsightModel,
   type InsightSetContext,
   type PartialInsightModel,
-  type RequiredData
+  type RequiredData,
 } from './types.js';
 
 export const UIStrings = {
@@ -51,7 +52,7 @@ export const UIStrings = {
    */
   enableSelectorData:
       'No CSS selector data was found. CSS selector stats need to be enabled in the performance panel settings.',
-};
+} as const;
 
 const str_ = i18n.i18n.registerUIStrings('models/trace/insights/SlowCSSSelector.ts', UIStrings);
 export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -101,11 +102,13 @@ function aggregateSelectorStats(
 
 function finalize(partialModel: PartialInsightModel<SlowCSSSelectorInsightModel>): SlowCSSSelectorInsightModel {
   return {
+    insightKey: InsightKeys.SLOW_CSS_SELECTOR,
     strings: UIStrings,
     title: i18nString(UIStrings.title),
     description: i18nString(UIStrings.description),
     category: InsightCategory.ALL,
-    shouldShow: partialModel.topElapsedMs.length !== 0 && partialModel.topMatchAttempts.length !== 0,
+    state: partialModel.topElapsedMs.length !== 0 && partialModel.topMatchAttempts.length !== 0 ? 'informative' :
+                                                                                                  'pass',
     ...partialModel,
   };
 }

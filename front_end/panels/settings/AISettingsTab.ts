@@ -144,12 +144,12 @@ const UIStrings = {
    *@description Explainer for which data is being sent by the AI assistance feature
    */
   freestylerSendsData:
-      'Any data the inspected page can access via Web APIs, network requests, files, and performance traces are sent to Google to generate explanations. This data may be seen by human reviewers to improve this feature. Don’t use on pages with personal or sensitive information.',
+      'Any user query and data the inspected page can access via Web APIs, network requests, files, and performance traces are sent to Google to generate explanations. This data may be seen by human reviewers to improve this feature. Don’t use on pages with personal or sensitive information.',
   /**
    *@description Explainer for which data is being sent by the AI assistance feature
    */
   freestylerSendsDataNoLogging:
-      'Any data the inspected page can access via Web APIs, network requests, files, and performance traces are sent to Google to generate explanations. This data will not be used to improve Google’s AI models.',
+      'Any user query and data the inspected page can access via Web APIs, network requests, files, and performance traces are sent to Google to generate explanations. This data will not be used to improve Google’s AI models.',
   /**
    *@description Label for a link to the terms of service
    */
@@ -178,7 +178,7 @@ const UIStrings = {
    * @description Message shown when the user is offline.
    */
   offline: 'This feature is only available with an active internet connection.',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/settings/AISettingsTab.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -235,28 +235,28 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
   }
 
   #getAiAssistanceSettingDescription(): Platform.UIString.LocalizedString {
-    const config = Common.Settings.Settings.instance().getHostConfig();
-    if (config.devToolsAiAssistancePerformanceAgent?.enabled) {
+    const {hostConfig} = Root.Runtime;
+    if (hostConfig.devToolsAiAssistancePerformanceAgent?.enabled) {
       return i18nString(UIStrings.helpUnderstandStylingNetworkPerformanceAndFile);
     }
-    if (config.devToolsAiAssistanceFileAgent?.enabled) {
+    if (hostConfig.devToolsAiAssistanceFileAgent?.enabled) {
       return i18nString(UIStrings.helpUnderstandStylingNetworkAndFile);
     }
-    if (config.devToolsAiAssistanceNetworkAgent?.enabled) {
+    if (hostConfig.devToolsAiAssistanceNetworkAgent?.enabled) {
       return i18nString(UIStrings.helpUnderstandStylingAndNetworkRequest);
     }
     return i18nString(UIStrings.helpUnderstandStyling);
   }
 
   #getAiAssistanceSettingInfo(): Platform.UIString.LocalizedString {
-    const config = Common.Settings.Settings.instance().getHostConfig();
-    if (config.devToolsAiAssistancePerformanceAgent?.enabled) {
+    const {hostConfig} = Root.Runtime;
+    if (hostConfig.devToolsAiAssistancePerformanceAgent?.enabled) {
       return i18nString(UIStrings.explainStylingNetworkPerformanceAndFile);
     }
-    if (config.devToolsAiAssistanceFileAgent?.enabled) {
+    if (hostConfig.devToolsAiAssistanceFileAgent?.enabled) {
       return i18nString(UIStrings.explainStylingNetworkAndFile);
     }
-    if (config.devToolsAiAssistanceNetworkAgent?.enabled) {
+    if (hostConfig.devToolsAiAssistanceNetworkAgent?.enabled) {
       return i18nString(UIStrings.explainStylingAndNetworkRequest);
     }
     return i18nString(UIStrings.explainStyling);
@@ -343,7 +343,7 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
     const privacyNoticeLink = UI.XLink.XLink.create(
         'https://policies.google.com/privacy', i18nString(UIStrings.privacyNotice), undefined, undefined,
         'privacy-notice');
-    const noLogging = Common.Settings.Settings.instance().getHostConfig().aidaAvailability?.enterprisePolicyValue ===
+    const noLogging = Root.Runtime.hostConfig.aidaAvailability?.enterprisePolicyValue ===
         Root.Runtime.GenAiEnterprisePolicyValue.ALLOW_WITHOUT_LOGGING;
 
     const bulletPoints = [
@@ -364,6 +364,7 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
         })}`,
       },
     ];
+
     return html`
       <div class="shared-disclaimer">
         <h2>${i18nString(UIStrings.boostYourProductivity)}</h2>
@@ -404,8 +405,8 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
         reasons.push(i18nString(UIStrings.offline));
       case Host.AidaClient.AidaAccessPreconditions.AVAILABLE: {
         // No age check if there is no logged in user. Age check would always fail in that case.
-        const config = Common.Settings.Settings.instance().getHostConfig();
-        if (config?.aidaAvailability?.blockedByAge === true) {
+        const {hostConfig} = Root.Runtime;
+        if (hostConfig?.aidaAvailability?.blockedByAge === true) {
           reasons.push(i18nString(UIStrings.ageRestricted));
         }
       }
@@ -424,7 +425,7 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
       open: this.#isConsoleInsightsSettingExpanded,
     };
     const tabindex = this.#isConsoleInsightsSettingExpanded ? '0' : '-1';
-    const noLogging = Common.Settings.Settings.instance().getHostConfig().aidaAvailability?.enterprisePolicyValue ===
+    const noLogging = Root.Runtime.hostConfig.aidaAvailability?.enterprisePolicyValue ===
         Root.Runtime.GenAiEnterprisePolicyValue.ALLOW_WITHOUT_LOGGING;
 
     // Disabled until https://crbug.com/1079231 is fixed.
@@ -496,7 +497,7 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
       open: this.#isAiAssistanceSettingExpanded,
     };
     const tabindex = this.#isAiAssistanceSettingExpanded ? '0' : '-1';
-    const noLogging = Common.Settings.Settings.instance().getHostConfig().aidaAvailability?.enterprisePolicyValue ===
+    const noLogging = Root.Runtime.hostConfig.aidaAvailability?.enterprisePolicyValue ===
         Root.Runtime.GenAiEnterprisePolicyValue.ALLOW_WITHOUT_LOGGING;
 
     // Disabled until https://crbug.com/1079231 is fixed.

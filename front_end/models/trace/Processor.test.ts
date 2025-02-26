@@ -406,13 +406,14 @@ describeWithEnvironment('TraceProcessor', function() {
         'LCPPhases',
         'LCPDiscovery',
         'RenderBlocking',
+        'NetworkDependencyTree',
         'ImageDelivery',
         'DocumentLatency',
         'FontDisplay',
         'DOMSize',
         'ThirdParties',
+        'DuplicateJavaScript',
         'SlowCSSSelector',
-        'LongCriticalNetworkTree',
         'ForcedReflow',
       ]);
 
@@ -425,13 +426,14 @@ describeWithEnvironment('TraceProcessor', function() {
         'LCPPhases',
         'LCPDiscovery',
         'RenderBlocking',
+        'NetworkDependencyTree',
         'ImageDelivery',
         'DocumentLatency',
         'FontDisplay',
         'DOMSize',
         'ThirdParties',
+        'DuplicateJavaScript',
         'SlowCSSSelector',
-        'LongCriticalNetworkTree',
         'ForcedReflow',
       ]);
     });

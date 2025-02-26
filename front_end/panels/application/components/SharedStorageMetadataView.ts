@@ -51,7 +51,7 @@ const UIStrings = {
    *@description The number of bytes used by entries currently in the origin's database
    */
   numBytesUsed: 'Number of Bytes Used',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/application/components/SharedStorageMetadataView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -63,9 +63,9 @@ interface SharedStorageMetadataGetter {
 export class SharedStorageMetadataView extends StorageMetadataView {
   #sharedStorageMetadataGetter: SharedStorageMetadataGetter;
   #creationTime: Protocol.Network.TimeSinceEpoch|null = null;
-  #length: number = 0;
-  #bytesUsed: number = 0;
-  #remainingBudget: number = 0;
+  #length = 0;
+  #bytesUsed = 0;
+  #remainingBudget = 0;
 
   constructor(sharedStorageMetadataGetter: SharedStorageMetadataGetter, owner: string) {
     super();
@@ -113,7 +113,7 @@ export class SharedStorageMetadataView extends StorageMetadataView {
     if (!this.#creationTime) {
       return html`${i18nString(UIStrings.notYetCreated)}`;
     }
-    const date = new Date(1e3 * (this.#creationTime as number));
+    const date = new Date(1e3 * (this.#creationTime));
     return html`${date.toLocaleString()}`;
   }
 

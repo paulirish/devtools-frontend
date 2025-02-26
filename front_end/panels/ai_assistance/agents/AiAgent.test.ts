@@ -224,17 +224,21 @@ describeWithEnvironment('AiAgent', () => {
           {
             type: ResponseType.USER_QUERY,
             query: 'query',
+            imageInput: undefined,
+            imageId: undefined,
           },
           {
             type: ResponseType.QUERYING,
           },
           {
             type: ResponseType.ANSWER,
+            complete: false,
             text: 'Partial ans',
           },
           {
             type: ResponseType.ANSWER,
             text: 'Partial answer is now completed',
+            complete: true,
             rpcId: undefined,
             suggestions: undefined,
           },
@@ -279,6 +283,8 @@ describeWithEnvironment('AiAgent', () => {
         {
           type: ResponseType.USER_QUERY,
           query: 'query',
+          imageInput: undefined,
+          imageId: undefined,
         },
         {
           type: ResponseType.QUERYING,

@@ -5,14 +5,19 @@
 import * as Host from '../../../core/host/host.js';
 import * as Trace from '../../../models/trace/trace.js';
 import {mockAidaClient} from '../../../testing/AiAssistanceHelpers.js';
-import {describeWithEnvironment, getGetHostConfigStub} from '../../../testing/EnvironmentHelpers.js';
+import {
+  describeWithEnvironment,
+  restoreUserAgentForTesting,
+  setUserAgentForTesting,
+  updateHostConfig
+} from '../../../testing/EnvironmentHelpers.js';
 import {TraceLoader} from '../../../testing/TraceLoader.js';
 import * as TimelineUtils from '../../timeline/utils/utils.js';
 import {CallTreeContext, PerformanceAgent, ResponseType} from '../ai_assistance.js';
 
 describeWithEnvironment('PerformanceAgent', () => {
   function mockHostConfig(modelId?: string, temperature?: number) {
-    getGetHostConfigStub({
+    updateHostConfig({
       devToolsAiAssistancePerformanceAgent: {
         modelId,
         temperature,
@@ -27,7 +32,7 @@ describeWithEnvironment('PerformanceAgent', () => {
       const evalScriptEvent = parsedTrace.Renderer.allTraceEntries.find(
           event => event.name === Trace.Types.Events.Name.EVALUATE_SCRIPT && event.ts === 122411195649);
       assert.exists(evalScriptEvent);
-      const aiCallTree = TimelineUtils.AICallTree.AICallTree.from(evalScriptEvent, parsedTrace);
+      const aiCallTree = TimelineUtils.AICallTree.AICallTree.fromEvent(evalScriptEvent, parsedTrace);
       assert.isOk(aiCallTree);
       const callTreeContext = new CallTreeContext(aiCallTree);
       assert.strictEqual(callTreeContext.getOrigin(), 'https://www.googletagmanager.com');
@@ -39,7 +44,7 @@ describeWithEnvironment('PerformanceAgent', () => {
       const layoutEvent = parsedTrace.Renderer.allTraceEntries.find(
           event => event.name === Trace.Types.Events.Name.LAYOUT && event.ts === 122411130078);
       assert.exists(layoutEvent);
-      const aiCallTree = TimelineUtils.AICallTree.AICallTree.from(layoutEvent, parsedTrace);
+      const aiCallTree = TimelineUtils.AICallTree.AICallTree.fromEvent(layoutEvent, parsedTrace);
       assert.isOk(aiCallTree);
       const callTreeContext = new CallTreeContext(aiCallTree);
       assert.strictEqual(callTreeContext.getOrigin(), 'Layout_90829_259_122411130078');
@@ -83,6 +88,7 @@ describeWithEnvironment('PerformanceAgent', () => {
       sinon.stub(agent, 'preamble').value('preamble');
 
       await Array.fromAsync(agent.run('question', {selected: null}));
+      setUserAgentForTesting();
 
       assert.deepEqual(
           agent.buildRequest(
@@ -108,6 +114,7 @@ describeWithEnvironment('PerformanceAgent', () => {
               disable_user_content_logging: false,
               string_session_id: 'sessionId',
               user_tier: 2,
+              client_version: 'unit_test',
             },
             options: {
               model_id: 'test model',
@@ -117,6 +124,7 @@ describeWithEnvironment('PerformanceAgent', () => {
             functionality_type: 1,
           },
       );
+      restoreUserAgentForTesting();
     });
   });
   describe('run', function() {
@@ -125,7 +133,7 @@ describeWithEnvironment('PerformanceAgent', () => {
       // A basic Layout.
       const layoutEvt = parsedTrace.Renderer.allTraceEntries.find(event => event.ts === 465457096322);
       assert.exists(layoutEvt);
-      const aiCallTree = TimelineUtils.AICallTree.AICallTree.from(layoutEvt, parsedTrace);
+      const aiCallTree = TimelineUtils.AICallTree.AICallTree.fromEvent(layoutEvt, parsedTrace);
       assert.exists(aiCallTree);
 
       const agent = new PerformanceAgent({
@@ -159,6 +167,8 @@ self: 3
         {
           type: ResponseType.USER_QUERY,
           query: 'test',
+          imageInput: undefined,
+          imageId: undefined,
         },
         {
           type: ResponseType.CONTEXT,
@@ -173,6 +183,7 @@ self: 3
         {
           type: ResponseType.ANSWER,
           text: 'This is the answer',
+          complete: true,
           suggestions: undefined,
           rpcId: 123,
         },

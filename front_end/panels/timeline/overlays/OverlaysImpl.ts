@@ -32,7 +32,7 @@ const UIStrings = {
    * @description Label for an option that selects the page's entire origin/domain as opposed to it's specific URL.
    */
   originOption: 'Origin',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/overlays/OverlaysImpl.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -291,7 +291,7 @@ export interface CandyStripedTimeRange {
  */
 export interface TimespanBreakdown {
   type: 'TIMESPAN_BREAKDOWN';
-  sections: Array<Components.TimespanBreakdownOverlay.EntryBreakdown>;
+  sections: Components.TimespanBreakdownOverlay.EntryBreakdown[];
   entry?: Trace.Types.Events.Event;
   renderLocation?: 'BOTTOM_OF_TIMELINE'|'BELOW_EVENT'|'ABOVE_EVENT';
 }
@@ -452,7 +452,7 @@ export class Overlays extends EventTarget {
    * subsequent renders we do not destroy and recreate it, instead we update it
    * based on the new position of the timeline.
    */
-  #overlaysToElements: Map<TimelineOverlay, HTMLElement|null> = new Map();
+  #overlaysToElements = new Map<TimelineOverlay, HTMLElement|null>();
 
   // When the Entries Link Annotation is created, the arrow needs to follow the mouse.
   // Update the mouse coordinates while it is being created.
@@ -656,7 +656,7 @@ export class Overlays extends EventTarget {
   /**
    * @returns all overlays that match the provided type.
    */
-  overlaysOfType<T extends TimelineOverlay>(type: T['type']): NoInfer<T>[] {
+  overlaysOfType<T extends TimelineOverlay>(type: T['type']): Array<NoInfer<T>> {
     const matches: T[] = [];
 
     function overlayIsOfType(overlay: TimelineOverlay): overlay is T {
@@ -781,7 +781,7 @@ export class Overlays extends EventTarget {
     // This isn't bi-directional: if we find that O2 overlaps O1, we will
     // store O1 => [O2]. We will not then also store O2 => [O1], because we
     // only need to deal with the overlap once.
-    const overlapsByOverlay: Map<TimeRangeLabel, TimeRangeLabel[]> = new Map();
+    const overlapsByOverlay = new Map<TimeRangeLabel, TimeRangeLabel[]>();
 
     for (let i = 0; i < overlaysSorted.length; i++) {
       const current = overlaysSorted[i];

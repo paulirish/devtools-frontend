@@ -67,7 +67,7 @@ describe('AI Assistance', function() {
     await frontend.bringToFront();
     await frontend.evaluate(messages => {
       let call = 0;
-      // @ts-ignore devtools context.
+      // @ts-expect-error devtools context.
       globalThis.InspectorFrontendHost.doAidaConversation = async (request, streamId, cb) => {
         const response = JSON.stringify([
           {
@@ -81,7 +81,7 @@ describe('AI Assistance', function() {
         let first = true;
         for (const chunk of response.split(',{')) {
           await new Promise(resolve => setTimeout(resolve, 0));
-          // @ts-ignore devtools context.
+          // @ts-expect-error devtools context.
           globalThis.InspectorFrontendAPI.streamWrite(streamId, first ? chunk : ',{' + chunk);
           first = false;
         }
@@ -128,7 +128,7 @@ describe('AI Assistance', function() {
       return 'setDebugAiAssistanceEnabled' in window;
     });
     await frontend.evaluate(() => {
-      // @ts-ignore
+      // @ts-expect-error
       setDebugAiAssistanceEnabled(true);
     });
   }
@@ -148,7 +148,7 @@ describe('AI Assistance', function() {
     };
   }
 
-  async function submitAndWaitTillDone(waitForSideEffect?: boolean): Promise<Array<Log>> {
+  async function submitAndWaitTillDone(waitForSideEffect?: boolean): Promise<Log[]> {
     const {frontend} = getBrowserAndPages();
     const done = frontend.evaluate(() => {
       return new Promise(resolve => {
@@ -163,7 +163,7 @@ describe('AI Assistance', function() {
       await frontend.waitForSelector('aria/Continue');
       return JSON.parse(await frontend.evaluate((): string => {
         return localStorage.getItem('aiAssistanceStructuredLog') as string;
-      })) as Array<Log>;
+      })) as Log[];
     }
 
     const abort = new AbortController();
@@ -178,7 +178,7 @@ describe('AI Assistance', function() {
     abort.abort();
     return JSON.parse(await frontend.evaluate((): string => {
       return localStorage.getItem('aiAssistanceStructuredLog') as string;
-    })) as Array<Log>;
+    })) as Log[];
   }
 
   async function runAiAssistance(options: {
@@ -202,7 +202,11 @@ describe('AI Assistance', function() {
 
     await setupMocks(
         {
-          aidaAvailability: {},
+          aidaAvailability: {
+            enabled: true,
+            disallowLogging: true,
+            enterprisePolicyValue: 0,
+          },
           devToolsFreestyler: {
             enabled: true,
           },
@@ -327,9 +331,9 @@ STOP`,
     const {target} = getBrowserAndPages();
     await target.bringToFront();
     await target.waitForFunction(() => {
-      // @ts-ignore page context.
+      // @ts-expect-error page context.
       return window.getComputedStyle(document.querySelector('div')).backgroundColor === 'rgb(0, 0, 255)' &&
-          // @ts-ignore page context.
+          // @ts-expect-error page context.
           window.getComputedStyle(document.querySelector('body')).backgroundColor === 'rgb(0, 128, 0)';
     });
   });
@@ -351,7 +355,7 @@ STOP`,
     const {target} = getBrowserAndPages();
     await target.bringToFront();
     await target.waitForFunction(() => {
-      // @ts-ignore page context.
+      // @ts-expect-error page context.
       return window.getComputedStyle(document.querySelector('div')).backgroundColor === 'rgb(0, 0, 255)';
     });
 
@@ -370,7 +374,7 @@ STOP`,
 
     await target.bringToFront();
     await target.waitForFunction(() => {
-      // @ts-ignore page context.
+      // @ts-expect-error page context.
       return window.getComputedStyle(document.querySelector('button')).backgroundColor === 'rgb(0, 128, 0)';
     });
   });
@@ -394,7 +398,7 @@ STOP`,
     const {target} = getBrowserAndPages();
     await target.bringToFront();
     await target.waitForFunction(() => {
-      // @ts-ignore page context.
+      // @ts-expect-error page context.
       return window.getComputedStyle(document.querySelector('login-element').shadowRoot.querySelector('button'))
                  .backgroundColor === 'rgb(0, 0, 255)';
     });
@@ -416,7 +420,7 @@ STOP`,
     await target.bringToFront();
     await target.waitForFunction(() => {
       const buttonStyles =
-          // @ts-ignore page context.
+          // @ts-expect-error page context.
           window.getComputedStyle(document.querySelector('login-element').shadowRoot.querySelector('button'));
       return buttonStyles.backgroundColor === 'rgb(0, 0, 255)' && buttonStyles.color === 'rgb(0, 128, 0)';
     });
@@ -468,7 +472,7 @@ STOP`,
     const {target} = getBrowserAndPages();
     await target.bringToFront();
     await target.waitForFunction(() => {
-      // @ts-ignore page context.
+      // @ts-expect-error page context.
       return window.getComputedStyle(document.querySelector('div')).backgroundColor === 'rgba(0, 0, 0, 0)';
     });
 
@@ -492,14 +496,36 @@ STOP`,
       });
     });
     await frontend.keyboard.press('Enter');
-    await await frontend.locator('aria/Continue').click();
+    await frontend.locator('aria/Continue').click();
     await done;
 
     await target.bringToFront();
-    await new Promise(resolve => setTimeout(resolve, 10000));
     await target.waitForFunction(() => {
-      // @ts-ignore page context.
+      // @ts-expect-error page context.
       return window.getComputedStyle(document.querySelector('div')).backgroundColor === 'rgb(0, 128, 0)';
+    });
+  });
+
+  it('modifies styles to a selector with high specificity', async () => {
+    await runAiAssistance({
+      query: 'Change the color for this element to rebeccapurple',
+      messages: [
+        `THOUGHT: I can change the color of an element by setting the color CSS property.
+TITLE: changing the property
+ACTION
+await setElementStyles($0, { 'color': 'rebeccapurple' });
+STOP`,
+        'ANSWER: changed styles',
+      ],
+      resource: '../resources/ai_assistance/high-specificity.html',
+      node: 'h1',
+    });
+
+    const {target} = getBrowserAndPages();
+    await target.bringToFront();
+    await target.waitForFunction(() => {
+      // @ts-expect-error page context.
+      return window.getComputedStyle(document.querySelector('h1')).color === 'rgb(102, 51, 153)';
     });
   });
 });

@@ -45,7 +45,7 @@ const UIStrings = {
    * @description The intrinsic aspect ratio of an image.
    */
   intrinsicAspectRatio: 'Intrinsic aspect ratio:',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/components/utils/ImagePreview.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -100,7 +100,7 @@ export class ImagePreview {
     const resourceSize = contentSize ? contentSize : Platform.StringUtilities.base64ToSize(content);
     const resourceSizeText = resourceSize > 0 ? i18n.ByteUtilities.bytesToString(resourceSize) : '';
 
-    return new Promise(resolve => {
+    return await new Promise(resolve => {
       const imageElement = document.createElement('img');
       imageElement.addEventListener('load', buildContent, false);
       imageElement.addEventListener('error', () => resolve(null), false);

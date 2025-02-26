@@ -395,7 +395,7 @@ export class SubMenu extends Item {
 
       const itemLocation = item.location;
       const actionId = item.actionId;
-      if (!itemLocation || !itemLocation.startsWith(location + '/')) {
+      if (!itemLocation?.startsWith(location + '/')) {
         continue;
       }
 
@@ -410,7 +410,7 @@ export class SubMenu extends Item {
     }
   }
 
-  private static uniqueSectionName: number = 0;
+  private static uniqueSectionName = 0;
 }
 
 export interface ContextMenuOptions {
@@ -573,13 +573,13 @@ export class ContextMenu extends SubMenu {
       const isMouseEvent =
           (this.event as PointerEvent).pointerType === 'mouse' && (this.event as PointerEvent).button >= 0;
       this.softMenu.setFocusOnTheFirstItem(!isMouseEvent);
-      this.softMenu.show((ownerDocument as Document), new AnchorBox(this.x, this.y, 0, 0));
+      this.softMenu.show((ownerDocument), new AnchorBox(this.x, this.y, 0, 0));
       if (this.contextMenuLabel) {
         this.softMenu.setContextMenuElementLabel(this.contextMenuLabel);
       }
     } else {
       Host.InspectorFrontendHost.InspectorFrontendHostInstance.showContextMenuAtPoint(
-          this.x, this.y, menuObject, (ownerDocument as Document));
+          this.x, this.y, menuObject, (ownerDocument));
 
       function listenToEvents(this: ContextMenu): void {
         Host.InspectorFrontendHost.InspectorFrontendHostInstance.events.addEventListener(
@@ -594,10 +594,6 @@ export class ContextMenu extends SubMenu {
       // so we skip it before subscribing to the clear event.
       queueMicrotask(listenToEvents.bind(this));
     }
-  }
-
-  setContextMenuLabel(label: string): void {
-    this.contextMenuLabel = label;
   }
 
   setX(x: number): void {
@@ -621,9 +617,9 @@ export class ContextMenu extends SubMenu {
     }
   }
 
-  private buildMenuDescriptors(): (SoftContextMenuDescriptor|Host.InspectorFrontendHostAPI.ContextMenuDescriptor)[] {
-    return super.buildDescriptor().subItems as (
-               SoftContextMenuDescriptor | Host.InspectorFrontendHostAPI.ContextMenuDescriptor)[];
+  private buildMenuDescriptors(): Array<SoftContextMenuDescriptor|Host.InspectorFrontendHostAPI.ContextMenuDescriptor> {
+    return super.buildDescriptor().subItems as
+        Array<SoftContextMenuDescriptor|Host.InspectorFrontendHostAPI.ContextMenuDescriptor>;
   }
 
   private onItemSelected(event: Common.EventTarget.EventTargetEvent<number>): void {
@@ -647,7 +643,7 @@ export class ContextMenu extends SubMenu {
         return null;
       };
       const item = itemWithId(this.openHostedMenu, id);
-      if (item && item.jslogContext) {
+      if (item?.jslogContext) {
         void VisualLogging.logClick(item, new MouseEvent('click'));
       }
     }
@@ -701,7 +697,7 @@ export interface Provider<T> {
   appendApplicableItems(event: Event, contextMenu: ContextMenu, target: T): void;
 }
 
-const registeredProviders: ProviderRegistration<unknown>[] = [];
+const registeredProviders: Array<ProviderRegistration<unknown>> = [];
 
 export function registerProvider<T>(registration: ProviderRegistration<T>): void {
   registeredProviders.push(registration);

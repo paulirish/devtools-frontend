@@ -81,7 +81,7 @@ const UIStrings = {
    * @description Text for a culprit type of Unsized image.
    */
   unsizedImage: 'Unsized image',
-};
+} as const;
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/LayoutShiftDetails.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -431,7 +431,7 @@ export class LayoutShiftDetails extends HTMLElement {
       return;
     }
     const rowEl = e.target.closest('tbody tr');
-    if (!rowEl || !rowEl.parentElement) {
+    if (!rowEl?.parentElement) {
       return;
     }
 

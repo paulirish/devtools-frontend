@@ -14,7 +14,7 @@ export class SortableDataGrid<T> extends ViewportDataGrid<SortableDataGridNode<T
   constructor(dataGridParameters: Parameters) {
     super(dataGridParameters);
     this.sortingFunction = SortableDataGrid.TrivialComparator;
-    this.setRootNode((new SortableDataGridNode() as SortableDataGridNode<T>));
+    this.setRootNode((new SortableDataGridNode()));
   }
 
   static TrivialComparator<T>(_a: SortableDataGridNode<T>, _b: SortableDataGridNode<T>): number {
@@ -134,7 +134,7 @@ export class SortableDataGridNode<T> extends ViewportDataGridNode<SortableDataGr
       this.insertChild(
           node,
           Platform.ArrayUtilities.upperBound(
-              (this.children as SortableDataGridNode<T>[]), node, dataGrid.sortingFunction));
+              (this.children as Array<SortableDataGridNode<T>>), node, dataGrid.sortingFunction));
     }
   }
 
@@ -143,7 +143,7 @@ export class SortableDataGridNode<T> extends ViewportDataGridNode<SortableDataGr
     if (!dataGrid) {
       return;
     }
-    (this.children as SortableDataGridNode<T>[]).sort(dataGrid.sortingFunction);
+    (this.children as Array<SortableDataGridNode<T>>).sort(dataGrid.sortingFunction);
     for (let i = 0; i < this.children.length; ++i) {
       const child = (this.children[i] as SortableDataGridNode<T>);
       child.recalculateSiblings(i);

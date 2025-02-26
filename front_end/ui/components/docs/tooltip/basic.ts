@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import '../../tooltip/Tooltip.js';
-
 import * as FrontendHelpers from '../../../../testing/EnvironmentHelpers.js';
 import * as Lit from '../../../lit/lit.js';
 import * as ComponentHelpers from '../../helpers/helpers.js';
+import {Tooltip} from '../../tooltip/Tooltip.js';
 
 const {html} = Lit;
 
@@ -26,20 +25,30 @@ Lit.render(
       <devtools-tooltip id="simple-tooltip">Simple content</devtools-tooltip>
     </div>
     <div style="position: relative; z-index: 0;">
-      <button aria-describedby="rich-tooltip" style="position: absolute; left: 16px; top: 116px;">
-        Rich
-      </button>
-      <devtools-tooltip id="rich-tooltip" variant="rich">
+      <span aria-details="rich-tooltip" style="position: absolute; left: 16px; top: 116px; border: 1px solid black;">
+        Non-button click trigger
+      </span>
+      <devtools-tooltip id="rich-tooltip" variant="rich" use-click>
         <p>Rich tooltip</p>
         <button>Action</button>
       </devtools-tooltip>
     </div>
+    <div>
+      <button class="anchor" style="position: absolute; left: 16px; top: 216px;">
+        Programmatic creation
+      </button>
+    </div>
   `,
     container);
 
+const anchor = container.querySelector('.anchor') as HTMLElement;
+const programmaticTooltip = new Tooltip({id: 'programatic', variant: 'rich', anchor});
+programmaticTooltip.append('Text content');
+anchor.appendChild(programmaticTooltip);
+
 // Make the buttons draggable, so that we can experiment with the position of the tooltip.
-container.querySelectorAll('button').forEach(draggable);
-function draggable(element: HTMLElement|null) {
+container.querySelectorAll('button,span').forEach(anchor => draggable(anchor as HTMLElement));
+function draggable(element: HTMLElement|null): void {
   if (!element) {
     return;
   }

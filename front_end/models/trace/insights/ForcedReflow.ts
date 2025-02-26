@@ -12,6 +12,7 @@ import {
   type BottomUpCallStack,
   type ForcedReflowAggregatedData,
   InsightCategory,
+  InsightKeys,
   type InsightModel,
   type PartialInsightModel,
   type RequiredData,
@@ -43,7 +44,7 @@ export const UIStrings = {
    * @description Text to describe the total reflow time
    */
   totalReflowTime: 'Total reflow time',
-};
+} as const;
 
 const str_ = i18n.i18n.registerUIStrings('models/trace/insights/ForcedReflow.ts', UIStrings);
 export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -72,7 +73,7 @@ function aggregateForcedReflow(
       return;
     }
     // Compute call stack fully
-    const bottomUpData: (Types.Events.CallFrame|Protocol.Runtime.CallFrame)[] = [];
+    const bottomUpData: Array<Types.Events.CallFrame|Protocol.Runtime.CallFrame> = [];
     let currentNode = traceNode;
     let previousNode;
     const childStack: Protocol.Runtime.CallFrame[] = [];
@@ -190,11 +191,14 @@ function aggregateForcedReflow(
 
 function finalize(partialModel: PartialInsightModel<ForcedReflowInsightModel>): ForcedReflowInsightModel {
   return {
+    insightKey: InsightKeys.FORCED_REFLOW,
     strings: UIStrings,
     title: i18nString(UIStrings.title),
     description: i18nString(UIStrings.description),
     category: InsightCategory.ALL,
-    shouldShow: partialModel.topLevelFunctionCallData !== undefined && partialModel.aggregatedBottomUpData.length !== 0,
+    state: partialModel.topLevelFunctionCallData !== undefined && partialModel.aggregatedBottomUpData.length !== 0 ?
+        'fail' :
+        'pass',
     ...partialModel,
   };
 }

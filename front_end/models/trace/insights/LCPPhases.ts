@@ -9,6 +9,7 @@ import * as Types from '../types/types.js';
 
 import {
   InsightCategory,
+  InsightKeys,
   type InsightModel,
   type InsightSetContext,
   InsightWarning,
@@ -48,14 +49,18 @@ export const UIStrings = {
    */
   phase: 'Phase',
   /**
-   *@description Label used for the percentage a single phase/component/stage/section takes up of a larger duration.
+   * @description Label used for the duration a single phase/component/stage/section takes up of a larger duration.
    */
-  percentLCP: '% of LCP',
+  duration: 'Duration',
+  /**
+   * @description Label used for the duration a single phase/component/stage/section takes up of a larger duration. The value will be the 75th percentile of aggregate data. "Field" means that the data was collected from real users in the field as opposed to the developers local environment. "Field" is synonymous with "Real user data".
+   */
+  fieldDuration: 'Field 75th percentile',
   /**
    * @description Text status indicating that the the Largest Contentful Paint (LCP) metric timing was not found. "LCP" is an acronym and should not be translated.
    */
   noLcp: 'No LCP detected',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('models/trace/insights/LCPPhases.ts', UIStrings);
 export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -85,6 +90,9 @@ interface LCPPhases {
   renderDelay: Types.Timing.Milli;
 }
 
+export function isLCPPhases(model: InsightModel<{}, {}>): model is LCPPhasesInsightModel {
+  return model.insightKey === 'LCPPhases';
+}
 export type LCPPhasesInsightModel = InsightModel<typeof UIStrings, {
   lcpMs?: Types.Timing.Milli,
   lcpTs?: Types.Timing.Milli,
@@ -154,12 +162,12 @@ function finalize(partialModel: PartialInsightModel<LCPPhasesInsightModel>): LCP
     relatedEvents.push(partialModel.lcpRequest);
   }
   return {
+    insightKey: InsightKeys.LCP_PHASES,
     strings: UIStrings,
     title: i18nString(UIStrings.title),
     description: i18nString(UIStrings.description),
     category: InsightCategory.LCP,
-    // TODO: should move the component's "getPhaseData" to model.
-    shouldShow: Boolean(partialModel.phases) && (partialModel.lcpMs ?? 0) > 0,
+    state: partialModel.lcpEvent || partialModel.lcpRequest ? 'informative' : 'pass',
     ...partialModel,
     relatedEvents,
   };

@@ -39,7 +39,7 @@ import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import type {ExtensionStorage} from './ExtensionStorageModel.js';
-import {KeyValueStorageItemsView} from './KeyValueStorageItemsView.js';
+import {KeyValueStorageItemsView, type View as KeyValueStorageItemsViewFunction} from './KeyValueStorageItemsView.js';
 
 const UIStrings = {
   /**
@@ -51,7 +51,7 @@ const UIStrings = {
    * entries were deleted.
    */
   extensionStorageItemsCleared: 'Extension Storage Items cleared',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/application/ExtensionStorageItemsView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -72,8 +72,8 @@ export class ExtensionStorageItemsView extends KeyValueStorageItemsView {
   readonly extensionStorageItemsDispatcher:
       Common.ObjectWrapper.ObjectWrapper<ExtensionStorageItemsDispatcher.EventTypes>;
 
-  constructor(extensionStorage: ExtensionStorage) {
-    super(i18nString(UIStrings.extensionStorageItems), 'extension-storage', true);
+  constructor(extensionStorage: ExtensionStorage, view?: KeyValueStorageItemsViewFunction) {
+    super(i18nString(UIStrings.extensionStorageItems), 'extension-storage', true, view);
 
     this.element.setAttribute('jslog', `${VisualLogging.pane().context('extension-storage-data')}`);
     this.element.classList.add('storage-view', 'table');
@@ -121,7 +121,7 @@ export class ExtensionStorageItemsView extends KeyValueStorageItemsView {
     const provider = TextUtils.StaticContentProvider.StaticContentProvider.fromString(
         url,
         Common.ResourceType.resourceTypes.XHR,
-        value as string,
+        value,
     );
     return SourceFrame.PreviewFactory.PreviewFactory.createPreview(
         provider,
@@ -182,12 +182,5 @@ export class ExtensionStorageItemsView extends KeyValueStorageItemsView {
         () => {
           throw new Error('Unable to clear storage.');
         });
-  }
-
-  getEntriesForTesting(): Array<{key: string, value: string}> {
-    return this.dataGridForTesting.rootNode().children.filter(node => node.data.key).map(node => (node.data as {
-                                                                                           key: string,
-                                                                                           value: string,
-                                                                                         }));
   }
 }

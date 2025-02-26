@@ -8,14 +8,16 @@ import * as Bindings from '../../../models/bindings/bindings.js';
 import * as Workspace from '../../../models/workspace/workspace.js';
 import {createUISourceCode, mockAidaClient} from '../../../testing/AiAssistanceHelpers.js';
 import {
-  getGetHostConfigStub,
+  restoreUserAgentForTesting,
+  setUserAgentForTesting,
+  updateHostConfig,
 } from '../../../testing/EnvironmentHelpers.js';
 import {describeWithMockConnection} from '../../../testing/MockConnection.js';
 import {FileAgent, FileContext, ResponseType} from '../ai_assistance.js';
 
 describeWithMockConnection('FileAgent', () => {
   function mockHostConfig(modelId?: string, temperature?: number) {
-    getGetHostConfigStub({
+    updateHostConfig({
       devToolsAiAssistanceFileAgent: {
         modelId,
         temperature,
@@ -76,6 +78,7 @@ describeWithMockConnection('FileAgent', () => {
       sinon.stub(agent, 'preamble').value('preamble');
       await Array.fromAsync(agent.run('question', {selected: null}));
 
+      setUserAgentForTesting();
       assert.deepEqual(
           agent.buildRequest({text: 'test input'}, Host.AidaClient.Role.USER),
           {
@@ -96,6 +99,7 @@ describeWithMockConnection('FileAgent', () => {
               disable_user_content_logging: false,
               string_session_id: 'sessionId',
               user_tier: 2,
+              client_version: 'unit_test',
             },
             options: {
               model_id: 'test model',
@@ -105,6 +109,7 @@ describeWithMockConnection('FileAgent', () => {
             functionality_type: 1,
           },
       );
+      restoreUserAgentForTesting();
     });
   });
 
@@ -142,6 +147,8 @@ describeWithMockConnection('FileAgent', () => {
           {
             type: ResponseType.USER_QUERY,
             query: 'test',
+            imageInput: undefined,
+            imageId: undefined,
           },
           {
             type: ResponseType.CONTEXT,
@@ -175,6 +182,7 @@ content
           {
             type: ResponseType.ANSWER,
             text: 'This is the answer',
+            complete: true,
             suggestions: undefined,
             rpcId: 123,
           },

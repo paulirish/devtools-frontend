@@ -60,7 +60,7 @@ export class Table extends HTMLElement {
   #state?: TableState;
   #headers?: string[];
   #rows?: TableDataRow[];
-  #interactive: boolean = false;
+  #interactive = false;
   #currentHoverIndex: number|null = null;
 
   set data(data: TableData) {
@@ -86,7 +86,7 @@ export class Table extends HTMLElement {
     }
 
     const rowEl = e.target.closest('tr');
-    if (!rowEl || !rowEl.parentElement) {
+    if (!rowEl?.parentElement) {
       return;
     }
 
@@ -106,7 +106,7 @@ export class Table extends HTMLElement {
     }
 
     const rowEl = e.target.closest('tr');
-    if (!rowEl || !rowEl.parentElement) {
+    if (!rowEl?.parentElement) {
       return;
     }
 

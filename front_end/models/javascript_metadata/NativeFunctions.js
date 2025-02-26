@@ -6018,6 +6018,10 @@ export const NativeFunctions = [
     receivers: ["Navigation"]
   },
   {
+    name: "AnimationTrigger",
+    signatures: [["?options"]]
+  },
+  {
     name: "Animation",
     signatures: [["?effect","?timeline"]]
   },
@@ -6762,7 +6766,13 @@ export const NativeFunctions = [
   },
   {
     name: "redirect",
-    signatures: [["url","?status"]]
+    signatures: [["url","?status"]],
+    receivers: ["Response"]
+  },
+  {
+    name: "redirect",
+    signatures: [["url"]],
+    receivers: ["NavigateEvent"]
   },
   {
     name: "Blob",
@@ -7061,7 +7071,7 @@ export const NativeFunctions = [
   },
   {
     name: "setValueAndClosePopup",
-    signatures: [["numberValue","stringValue"]]
+    signatures: [["numberValue","stringValue","?is_keyboard_event"]]
   },
   {
     name: "setValue",
@@ -7109,7 +7119,7 @@ export const NativeFunctions = [
   },
   {
     name: "Sanitizer",
-    signatures: [["?config"]]
+    signatures: [["?configuration"]]
   },
   {
     name: "allowElement",
@@ -8537,11 +8547,11 @@ export const NativeFunctions = [
     signatures: [["context"]]
   },
   {
-    name: "onDeviceWebSpeechAvailable",
+    name: "availableOnDevice",
     signatures: [["lang"]]
   },
   {
-    name: "installOnDeviceSpeechRecognition",
+    name: "installOnDevice",
     signatures: [["lang"]]
   },
   {

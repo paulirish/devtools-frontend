@@ -7,7 +7,7 @@ import type * as TextUtils from '../../../../models/text_utils/text_utils.js';
 import inspectorCommonStyles from '../../inspectorCommon.css.js';
 
 import dataGridStyles from './dataGrid.css.js';
-import {Align, Events as DataGridEvents} from './DataGrid.js';
+import {Align, type ColumnDescriptor, DataType, Events as DataGridEvents} from './DataGrid.js';
 import {SortableDataGrid, SortableDataGridNode} from './SortableDataGrid.js';
 
 const DUMMY_COLUMN_ID = 'dummy';  // SortableDataGrid.create requires at least one column.
@@ -37,7 +37,6 @@ const DUMMY_COLUMN_ID = 'dummy';  // SortableDataGrid.create requires at least o
  *
  * @attr striped
  * @attr displayName
- * @prop columnsOrder
  * @prop filters
  */
 class DataGridElement extends HTMLElement {
@@ -51,7 +50,7 @@ class DataGridElement extends HTMLElement {
     }
   });
   #shadowRoot: ShadowRoot;
-  #columnsOrder: string[] = [];
+  #columns: ColumnDescriptor[] = [];
   #hideableColumns = new Set<string>();
   #hiddenColumns = new Set<string>();
   #usedCreationNode: DataGridElementNode|null = null;
@@ -72,23 +71,26 @@ class DataGridElement extends HTMLElement {
         e => this.dispatchEvent(new CustomEvent('select', {detail: (e.data as DataGridElementNode).configElement})));
     this.#dataGrid.addEventListener(
         DataGridEvents.DESELECTED_NODE, () => this.dispatchEvent(new CustomEvent('select', {detail: null})));
+    this.#dataGrid.addEventListener(DataGridEvents.SORTING_CHANGED, () => this.dispatchEvent(new CustomEvent('sort', {
+      detail: {columnId: this.#dataGrid.sortColumnId(), ascending: this.#dataGrid.isSortOrderAscending()}
+    })));
     this.#dataGrid.setRowContextMenuCallback((menu, node) => {
       this.dispatchEvent(
           new CustomEvent('contextmenu', {detail: {menu, element: (node as DataGridElementNode).configElement}}));
     });
     this.#dataGrid.setHeaderContextMenuCallback(menu => {
-      for (const columnId of this.#columnsOrder) {
-        if (this.#hideableColumns.has(columnId)) {
+      for (const column of this.#columns) {
+        if (this.#hideableColumns.has(column.id)) {
           menu.defaultSection().appendCheckboxItem(
-              this.#dataGrid.columns[columnId].title as Platform.UIString.LocalizedString, () => {
-                if (this.#hiddenColumns.has(columnId)) {
-                  this.#hiddenColumns.delete(columnId);
+              this.#dataGrid.columns[column.id].title as Platform.UIString.LocalizedString, () => {
+                if (this.#hiddenColumns.has(column.id)) {
+                  this.#hiddenColumns.delete(column.id);
                 } else {
-                  this.#hiddenColumns.add(columnId);
+                  this.#hiddenColumns.add(column.id);
                 }
                 this.#dataGrid.setColumnsVisibility(
-                    new Set(this.#columnsOrder.filter(column => !this.#hiddenColumns.has(column))));
-              });
+                    new Set(this.#columns.map(({id}) => id).filter(column => !this.#hiddenColumns.has(column))));
+              }, {checked: !this.#hiddenColumns.has(column.id)});
         }
       }
     });
@@ -145,8 +147,8 @@ class DataGridElement extends HTMLElement {
     this.#dataGrid.element.setAttribute('aria-rowcount', String(this.#dataGrid.getNumberOfRows()));
   }
 
-  get columnsOrder(): string[] {
-    return this.#columnsOrder;
+  get columns(): ColumnDescriptor[] {
+    return this.#columns;
   }
 
   #updateColumns(): void {
@@ -154,11 +156,10 @@ class DataGridElement extends HTMLElement {
       this.#dataGrid.removeColumn(column);
     }
     this.#hideableColumns.clear();
-    this.#columnsOrder = [];
+    this.#columns = [];
     let hasEditableColumn = false;
     for (const column of this.querySelectorAll('th[id]') || []) {
       const id = column.id as Lowercase<string>;
-      this.#columnsOrder.push(id);
       let title = column.textContent?.trim() || '';
       const titleDOMFragment = column.firstElementChild ? document.createDocumentFragment() : undefined;
       if (titleDOMFragment) {
@@ -175,12 +176,13 @@ class DataGridElement extends HTMLElement {
       if (align !== Align.CENTER && align !== Align.RIGHT) {
         align = undefined;
       }
+      const dataType = column.getAttribute('type') === 'boolean' ? DataType.BOOLEAN : DataType.STRING;
       const weight = parseFloat(column.getAttribute('weight') || '') ?? undefined;
       const editable = column.hasAttribute('editable');
       if (editable) {
         hasEditableColumn = true;
       }
-      this.#dataGrid.addColumn({
+      const columnDescriptor = {
         id,
         title: title as Platform.UIString.LocalizedString,
         titleDOMFragment,
@@ -189,17 +191,20 @@ class DataGridElement extends HTMLElement {
         width,
         align,
         weight,
-        editable
-      });
+        editable,
+        dataType,
+      };
+      this.#dataGrid.addColumn(columnDescriptor);
+      this.#columns.push(columnDescriptor);
       if (hasBooleanAttribute(column, 'hideable')) {
         this.#hideableColumns.add(id);
       }
     }
-    const visibleColumns = new Set(this.#columnsOrder.filter(column => !this.#hiddenColumns.has(column)));
+    const visibleColumns = new Set(this.#columns.map(({id}) => id).filter(id => !this.#hiddenColumns.has(id)));
     if (visibleColumns.size) {
       this.#dataGrid.setColumnsVisibility(visibleColumns);
     }
-    this.#dataGrid.editCallback = hasEditableColumn ? this.#editCallback.bind(this) : undefined;
+    this.#dataGrid.setEditCallback(hasEditableColumn ? this.#editCallback.bind(this) : undefined, INTERNAL_TOKEN);
     this.#dataGrid.deleteCallback = hasEditableColumn ? this.#deleteCallback.bind(this) : undefined;
   }
 
@@ -254,6 +259,15 @@ class DataGridElement extends HTMLElement {
       if (hasBooleanAttribute(element, 'selected')) {
         node.select();
       }
+      if (hasBooleanAttribute(element, 'dirty')) {
+        node.setDirty(true);
+      }
+      if (hasBooleanAttribute(element, 'inactive')) {
+        node.setInactive(true);
+      }
+      if (hasBooleanAttribute(element, 'highlighted')) {
+        node.setHighlighted(true);
+      }
     }
   }
 
@@ -266,16 +280,22 @@ class DataGridElement extends HTMLElement {
     }
   }
 
-  #updateNode(node: Node, selectionOnly: boolean): void {
+  #updateNode(node: Node, attributeName: string|null): void {
     const dataRow = node instanceof HTMLElement ? node.closest('tr') : null;
     const dataGridNode = dataRow ? DataGridElementNode.get(dataRow) : null;
-    if (dataGridNode) {
-      if (selectionOnly) {
-        if (dataRow && hasBooleanAttribute(dataRow, 'selected')) {
+    if (dataGridNode && dataRow) {
+      if (attributeName === 'selected') {
+        if (hasBooleanAttribute(dataRow, 'selected')) {
           dataGridNode.select();
         } else {
           dataGridNode.deselect();
         }
+      } else if (attributeName === 'dirty') {
+        dataGridNode.setDirty(hasBooleanAttribute(dataRow, 'dirty'));
+      } else if (attributeName === 'inactive') {
+        dataGridNode.setInactive(hasBooleanAttribute(dataRow, 'inactive'));
+      } else if (attributeName === 'highlighted') {
+        dataGridNode.setHighlighted(hasBooleanAttribute(dataRow, 'highlighted'));
       } else {
         dataGridNode.refresh();
       }
@@ -309,7 +329,7 @@ class DataGridElement extends HTMLElement {
     for (const mutation of mutationList) {
       this.#removeNodes(mutation.removedNodes);
       this.#addNodes(mutation.addedNodes);
-      this.#updateNode(mutation.target, mutation.attributeName === 'selected');
+      this.#updateNode(mutation.target, mutation.attributeName);
     }
   }
 
@@ -319,8 +339,8 @@ class DataGridElement extends HTMLElement {
     if (node.isCreationNode) {
       this.#usedCreationNode = node;
       if (moveDirection === 'forward') {
-        const hasNextEditableColumn = this.columnsOrder.slice(this.columnsOrder.indexOf(columnId) + 1)
-                                          .some(columnId => this.#dataGrid.columns[columnId].editable);
+        const hasNextEditableColumn =
+            this.#columns.slice(this.#columns.findIndex(({id}) => id === columnId) + 1).some(({editable}) => editable);
         if (!hasNextEditableColumn) {
           node.deselect();
         }
@@ -335,12 +355,30 @@ class DataGridElement extends HTMLElement {
   #deleteCallback(node: DataGridElementNode): void {
     this.dispatchEvent(new CustomEvent('delete', {detail: node.configElement}));
   }
+
+  override addEventListener<K extends keyof HTMLElementEventMap>(
+      type: K, listener: (this: HTMLElement, ev: HTMLElementEventMap[K]) => void,
+      options?: boolean|AddEventListenerOptions|undefined): void;
+  override addEventListener(
+      type: string, listener: EventListenerOrEventListenerObject,
+      options?: boolean|AddEventListenerOptions|undefined): void;
+  override addEventListener(...args: Parameters<HTMLElement['addEventListener']>): void {
+    super.addEventListener(...args);
+    if (args[0] === 'refresh') {
+      this.#dataGrid.refreshCallback = this.#refreshCallback.bind(this);
+    }
+  }
+
+  #refreshCallback(): void {
+    this.dispatchEvent(new CustomEvent('refresh'));
+  }
 }
 
 class DataGridElementNode extends SortableDataGridNode<DataGridElementNode> {
   static #elementToNode = new WeakMap<Element, DataGridElementNode>();
   #configElement: Element;
   #dataGridElement: DataGridElement;
+  #addedClasses = new Set<string>();
   constructor(configElement: Element, dataGridElement: DataGridElement) {
     super();
     this.#configElement = configElement;
@@ -362,8 +400,12 @@ class DataGridElementNode extends SortableDataGridNode<DataGridElementNode> {
     const cells = this.#configElement.querySelectorAll('td');
     for (let i = 0; i < cells.length; ++i) {
       const cell = cells[i];
-      const columnId = this.#dataGridElement.columnsOrder[i];
-      this.data[columnId] = cell.dataset.value ?? cell.textContent ?? '';
+      const column = this.#dataGridElement.columns[i];
+      if (column.dataType === DataType.BOOLEAN) {
+        this.data[column.id] = hasBooleanAttribute(cell, 'data-value');
+      } else {
+        this.data[column.id] = cell.dataset.value ?? cell.textContent ?? '';
+      }
     }
   }
 
@@ -375,6 +417,9 @@ class DataGridElementNode extends SortableDataGridNode<DataGridElementNode> {
     if (this.#configElement.hasAttribute('style')) {
       element.setAttribute('style', this.#configElement.getAttribute('style') || '');
     }
+    for (const classToAdd of this.#configElement.classList) {
+      element.classList.add(classToAdd);
+    }
     return element;
   }
 
@@ -382,8 +427,17 @@ class DataGridElementNode extends SortableDataGridNode<DataGridElementNode> {
     this.#updateData();
     super.refresh();
     const existingElement = this.existingElement();
-    if (existingElement && this.#configElement.hasAttribute('style')) {
+    if (!existingElement) {
+      return;
+    }
+    if (this.#configElement.hasAttribute('style')) {
       existingElement.setAttribute('style', this.#configElement.getAttribute('style') || '');
+    }
+    for (const addedClass of this.#addedClasses) {
+      existingElement.classList.remove(addedClass);
+    }
+    for (const classToAdd of this.#configElement.classList) {
+      existingElement.classList.add(classToAdd);
     }
   }
 
@@ -407,11 +461,14 @@ class DataGridElementNode extends SortableDataGridNode<DataGridElementNode> {
   }
 
   override createCell(columnId: string): HTMLElement {
+    const index = this.#dataGridElement.columns.findIndex(({id}) => id === columnId);
+    if (this.#dataGridElement.columns[index].dataType === DataType.BOOLEAN) {
+      return super.createCell(columnId);
+    }
     const cell = this.createTD(columnId);
     if (this.isCreationNode) {
       return cell;
     }
-    const index = this.#dataGridElement.columnsOrder.indexOf(columnId);
     const configCell = this.#configElement.querySelectorAll('td')[index];
     if (!configCell) {
       throw new Error(`Column ${columnId} not found in the data grid`);
@@ -448,3 +505,11 @@ customElements.define('devtools-data-grid', DataGridElement);
 function hasBooleanAttribute(element: Element, name: string): boolean {
   return element.hasAttribute(name) && element.getAttribute(name) !== 'false';
 }
+
+export interface DataGridInternalToken {
+  token: 'DataGridInternalToken';
+}
+
+const INTERNAL_TOKEN: DataGridInternalToken = {
+  token: 'DataGridInternalToken'
+};

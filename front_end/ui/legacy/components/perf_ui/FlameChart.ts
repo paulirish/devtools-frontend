@@ -102,7 +102,7 @@ const UIStrings = {
    *@description Shown in the context menu when right clicking on a track header to allow the user to exit track configuration mode.
    */
   exitTrackConfigurationMode: 'Finish configuring tracks',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/components/perf_ui/FlameChart.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -319,13 +319,13 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   /** When true, all undimmed entries are outlined. When an array, only those indices are outlined (if not dimmed). */
   private dimShouldOutlineUndimmedEntries: boolean|Uint8Array = false;
 
-  #tooltipPopoverYAdjustment: number = 0;
+  #tooltipPopoverYAdjustment = 0;
 
   #font: string;
   #groupTreeRoot?: GroupTreeNode|null;
   #searchResultEntryIndex: number|null = null;
-  #inTrackConfigEditMode: boolean = false;
-  #linkSelectionAnnotationIsInProgress: boolean = false;
+  #inTrackConfigEditMode = false;
+  #linkSelectionAnnotationIsInProgress = false;
 
   // Stored because we cache this value to save extra lookups and layoffs.
   #canvasBoundingClientRect: DOMRect|null = null;
@@ -840,8 +840,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       if (hoverType === HoverType.INSIDE_TRACK_HEADER) {
         this.#updatePopoverForGroup(groupIndex);
       }
-      if (groupIndex >= 0 && this.rawTimelineData && this.rawTimelineData.groups &&
-          this.rawTimelineData.groups[groupIndex].selectable) {
+      if (groupIndex >= 0 && this.rawTimelineData?.groups?.[groupIndex].selectable) {
         // This means the mouse is in a selectable group's area, and not hovering any entry.
         this.viewportElement.style.cursor = 'pointer';
       } else {
@@ -1176,7 +1175,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       return;
     }
 
-    if (!this.rawTimelineData || !this.rawTimelineData.groups) {
+    if (!this.rawTimelineData?.groups) {
       return;
     }
 
@@ -1239,7 +1238,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       return;
     }
 
-    if (!this.rawTimelineData || !this.rawTimelineData.groups) {
+    if (!this.rawTimelineData?.groups) {
       return;
     }
 
@@ -1271,7 +1270,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       return;
     }
 
-    if (!this.rawTimelineData || !this.rawTimelineData.groups) {
+    if (!this.rawTimelineData?.groups) {
       return;
     }
 
@@ -1311,7 +1310,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       return;
     }
 
-    if (!this.rawTimelineData || !this.rawTimelineData.groups) {
+    if (!this.rawTimelineData?.groups) {
       return;
     }
 
@@ -1376,7 +1375,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   #hasTrackConfigurationMode(): boolean {
     // Track Configuration mode is off by default: a provider must define the
     // function and have it return `true` to enable it.
-    return Boolean(this.dataProvider.hasTrackConfigurationMode && this.dataProvider.hasTrackConfigurationMode());
+    return Boolean(this.dataProvider.hasTrackConfigurationMode?.());
   }
 
   onContextMenu(event: MouseEvent): void {
@@ -1517,7 +1516,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     let eventHandled = this.handleSelectionNavigation(e);
 
     // Handle keyboard navigation in groups
-    if (!eventHandled && this.rawTimelineData && this.rawTimelineData.groups) {
+    if (!eventHandled && this.rawTimelineData?.groups) {
       eventHandled = this.handleKeyboardGroupNavigation(e);
     }
 
@@ -1698,7 +1697,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   }
 
   private selectNextGroup(): boolean {
-    if (!this.rawTimelineData || !this.rawTimelineData.groups) {
+    if (!this.rawTimelineData?.groups) {
       return false;
     }
 
@@ -1712,7 +1711,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   }
 
   private getGroupIndexToSelect(offset: number): number {
-    if (!this.rawTimelineData || !this.rawTimelineData.groups) {
+    if (!this.rawTimelineData?.groups) {
       throw new Error('No raw timeline data');
     }
     const allGroups = this.rawTimelineData.groups;
@@ -1731,7 +1730,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
   }
 
   private selectFirstChild(): void {
-    if (!this.rawTimelineData || !this.rawTimelineData.groups) {
+    if (!this.rawTimelineData?.groups) {
       return;
     }
 
@@ -1774,7 +1773,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       return start1 < end2 && start2 < end1;
     }
 
-    const keyboardEvent = (event as KeyboardEvent);
+    const keyboardEvent = (event);
     const keys = UI.KeyboardShortcut.Keys;
     if (keyboardEvent.keyCode === keys.Left.code || keyboardEvent.keyCode === keys.Right.code) {
       const level = timelineData.entryLevels[this.selectedEntryIndex];
@@ -1872,7 +1871,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
         continue;
       }
       if (pos.x <= x && x < pos.x + pos.width) {
-        return index as number;
+        return index;
       }
     }
 
@@ -1882,14 +1881,14 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
         continue;
       }
       if (pos.x <= x && x < pos.x + pos.width) {
-        return index as number;
+        return index;
       }
     }
 
     // Check regular entries.
     const entryStartTimes = timelineData.entryStartTimes;
     const entriesOnLevel: number[] = this.timelineLevels ? this.timelineLevels[cursorLevel] : [];
-    if (!entriesOnLevel || !entriesOnLevel.length) {
+    if (!entriesOnLevel?.length) {
       return -1;
     }
 
@@ -2015,7 +2014,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
    * undefined.
    */
   coordinatesToGroupIndexAndHoverType(x: number, y: number): {groupIndex: number, hoverType: HoverType} {
-    if (!this.rawTimelineData || !this.rawTimelineData.groups || !this.groupOffsets) {
+    if (!this.rawTimelineData?.groups || !this.groupOffsets) {
       return {groupIndex: -1, hoverType: HoverType.ERROR};
     }
 
@@ -2210,7 +2209,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       return timelineData.entryLevels[index] >= startLevel && timelineData.entryLevels[index] < endLevel &&
           barWidth > 10;
     };
-    let wideEntryExists: boolean = false;
+    let wideEntryExists = false;
     for (const [{color, outline}, {indexes}] of drawBatches) {
       if (!wideEntryExists) {
         wideEntryExists = indexes.some(entryIndexIsInTrack);
@@ -2576,7 +2575,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
           this.levelToOffset(level) > top + this.offsetHeight) {
         continue;
       }
-      if (!this.visibleLevels || !this.visibleLevels[level]) {
+      if (!this.visibleLevels?.[level]) {
         continue;
       }
       if (!this.timelineLevels) {
@@ -2733,7 +2732,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
         const labelBackgroundWidth = this.labelWidthForGroup(context, group);
         const parsedColor = Common.Color.parse(group.style.backgroundColor);
         if (parsedColor) {
-          context.fillStyle = (parsedColor.setAlpha(0.8).asString() as string);
+          context.fillStyle = (parsedColor.setAlpha(0.8).asString());
         }
         context.fillRect(
             iconsWidth + HEADER_LEFT_PADDING, offset + HEADER_LABEL_Y_PADDING, labelBackgroundWidth,
@@ -2832,7 +2831,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     context.save();
     context.beginPath();
     let lastMarkerLevel = -1;
-    let lastMarkerX: number = -Infinity;
+    let lastMarkerX = -Infinity;
     // Markers are sorted top to bottom, right to left.
     for (let m = markerIndices.length - 1; m >= 0; --m) {
       const entryIndex = markerIndices[m];
@@ -2930,7 +2929,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       const barY = this.levelToOffset(barLevel);
       let text = this.dataProvider.entryTitle(entryIndex);
       const barHeight = this.#eventBarHeight(timelineData, entryIndex);
-      if (text && text.length) {
+      if (text?.length) {
         context.font = this.#font;
         const hasArrowDecoration =
             this.entryHasDecoration(entryIndex, FlameChartDecorationType.HIDDEN_DESCENDANTS_ARROW);
@@ -2951,7 +2950,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
               color => this.#transformColor(entryIndex, color))) {
         continue;
       }
-      if (!text || !text.length) {
+      if (!text?.length) {
         continue;
       }
       context.fillStyle = this.#transformColor(entryIndex, this.dataProvider.textColor(entryIndex));
@@ -2988,10 +2987,10 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       return;
     }
 
-    const groupStack: {
+    const groupStack: Array<{
       nestingLevel: number,
       visible: boolean,
-    }[] = [{nestingLevel: -1, visible: true}];
+    }> = [{nestingLevel: -1, visible: true}];
     for (let i = 0; i < groups.length; ++i) {
       const groupTop = groupOffsets[i];
       const group = groups[i];
@@ -3098,7 +3097,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
           Platform.ArrayUtilities.lowerBound(
               levelIndexes, timeWindowRight, (time, entryIndex) => time - entryStartTimes[entryIndex]) -
           1;
-      let lastDrawOffset: number = Infinity;
+      let lastDrawOffset = Infinity;
 
       for (let entryIndexOnLevel = rightIndexOnLevel; entryIndexOnLevel >= 0; --entryIndexOnLevel) {
         const entryIndex = levelIndexes[entryIndexOnLevel];
@@ -3263,8 +3262,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       timelineData: FlameChartTimelineData): {circleStartX?: number, circleEndX?: number} {
     const decorationsForEvent = timelineData.entryDecorations.at(entryIndex);
     // The circle is only drawn when the initiator arrow is going to/from some hidden entry. Make sure that the entry also has a decoration for hidden children.
-    if (!decorationsForEvent ||
-        !decorationsForEvent.find(
+    if (!decorationsForEvent?.find(
             decoration => decoration.type === FlameChartDecorationType.HIDDEN_DESCENDANTS_ARROW)) {
       // This should not happen, break if it does.
       return {};

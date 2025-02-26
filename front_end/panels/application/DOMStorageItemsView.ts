@@ -53,7 +53,7 @@ const UIStrings = {
    *@description Text for announcing a DOM Storage key/value item has been deleted
    */
   domStorageItemDeleted: 'The storage item was deleted.',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/application/DOMStorageItemsView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export class DOMStorageItemsView extends KeyValueStorageItemsView {
@@ -82,7 +82,7 @@ export class DOMStorageItemsView extends KeyValueStorageItemsView {
     const provider = TextUtils.StaticContentProvider.StaticContentProvider.fromString(
         url,
         Common.ResourceType.resourceTypes.XHR,
-        value as string,
+        value,
     );
     return SourceFrame.PreviewFactory.PreviewFactory.createPreview(
         provider,

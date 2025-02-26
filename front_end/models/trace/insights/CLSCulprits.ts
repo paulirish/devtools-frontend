@@ -5,15 +5,17 @@
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Platform from '../../../core/platform/platform.js';
 import type * as Protocol from '../../../generated/protocol.js';
+import * as Handlers from '../handlers/handlers.js';
 import * as Helpers from '../helpers/helpers.js';
 import * as Types from '../types/types.js';
 
 import {
   InsightCategory,
+  InsightKeys,
   type InsightModel,
   type InsightSetContext,
   type PartialInsightModel,
-  type RequiredData
+  type RequiredData,
 } from './types.js';
 
 export const UIStrings = {
@@ -66,7 +68,7 @@ export const UIStrings = {
    * @description Text status when there no layout shifts culprits/root causes were found.
    */
   noCulprits: 'Could not detect any layout shift culprits',
-};
+} as const;
 
 const str_ = i18n.i18n.registerUIStrings('models/trace/insights/CLSCulprits.ts', UIStrings);
 export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -391,7 +393,7 @@ function getIframeRootCauses(
         const maxIframe = Types.Timing.Micro(iframeEvent.ts + (iframeEvent.dur ?? 0));
         return e.ts >= iframeEvent.ts && e.ts <= maxIframe;
       });
-      if (domEvent && domEvent.args.frame) {
+      if (domEvent?.args.frame) {
         rootCausesForShift.iframeIds.push(domEvent.args.frame);
       }
     }
@@ -519,15 +521,24 @@ function getTopCulprits(
 }
 
 function finalize(partialModel: PartialInsightModel<CLSCulpritsInsightModel>): CLSCulpritsInsightModel {
-  const topCulprits =
-      partialModel.worstCluster ? partialModel.topCulpritsByCluster.get(partialModel.worstCluster) ?? [] : [];
+  let state: CLSCulpritsInsightModel['state'] = 'pass';
+  if (partialModel.worstCluster) {
+    const classification = Handlers.ModelHandlers.LayoutShifts.scoreClassificationForLayoutShift(
+        partialModel.worstCluster.clusterCumulativeScore);
+    if (classification === Handlers.ModelHandlers.PageLoadMetrics.ScoreClassification.GOOD) {
+      state = 'informative';
+    } else {
+      state = 'fail';
+    }
+  }
 
   return {
+    insightKey: InsightKeys.CLS_CULPRITS,
     strings: UIStrings,
     title: i18nString(UIStrings.title),
     description: i18nString(UIStrings.description),
     category: InsightCategory.CLS,
-    shouldShow: topCulprits.length > 0,
+    state,
     ...partialModel,
   };
 }

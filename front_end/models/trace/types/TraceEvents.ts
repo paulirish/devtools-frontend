@@ -87,11 +87,13 @@ export interface Event {
 
 export interface Args {
   data?: ArgsData;
+  sampleTraceId?: number;
   stackTrace?: CallFrame[];
 }
 
 export interface ArgsData {
   stackTrace?: CallFrame[];
+  sampleTraceId?: number;
   url?: string;
   navigationId?: string;
   frame?: string;
@@ -247,9 +249,7 @@ export interface ParseHTML extends Complete {
   name: 'ParseHTML';
   args: Args&{
     beginData: {
-      frame: string,
-      startLine: number,
-      url: string,
+      sampleTraceId?: number, frame: string, startLine: number, url: string,
     },
     endData?: {
       endLine: number,
@@ -1385,8 +1385,8 @@ export type PairableUserTiming = UserTiming&PairableAsync;
 export interface PerformanceMeasureBegin extends PairableUserTiming {
   args: Args&{
     detail?: string,
-    stackTrace?: CallFrame[],
     callTime?: Micro,
+    traceId?: number,
   };
   ph: Phase.ASYNC_NESTABLE_START;
 }
@@ -1398,7 +1398,6 @@ export interface PerformanceMark extends UserTiming {
   args: Args&{
     data?: ArgsData & {
       detail?: string,
-      stackTrace?: CallFrame[],
       callTime?: Micro,
     },
   };
@@ -1437,6 +1436,16 @@ export interface ConsoleTimeStamp extends Event {
 export interface SyntheticConsoleTimeStamp extends Event, SyntheticBased {
   cat: 'disabled-by-default-v8.inspector';
   ph: Phase.COMPLETE;
+}
+
+export interface UserTimingMeasure extends Event {
+  cat: 'devtools.timeline';
+  ph: Phase.COMPLETE;
+  name: Name.USER_TIMING_MEASURE;
+  args: Args&{
+    sampleTraceId: number,
+    traceId: number,
+  };
 }
 
 /** ChromeFrameReporter args for PipelineReporter event.
@@ -1876,7 +1885,7 @@ export interface UpdateLayoutTree extends Complete {
   args: Args&{
     elementCount: number,
     beginData?: {
-      frame: string,
+      sampleTraceId?: number, frame: string,
       stackTrace?: CallFrame[],
     },
   };
@@ -1889,10 +1898,7 @@ export interface Layout extends Complete {
   name: Name.LAYOUT;
   args: Args&{
     beginData: {
-      frame: string,
-      dirtyObjects: number,
-      partialLayout: boolean,
-      totalObjects: number,
+      sampleTraceId?: number, frame: string, dirtyObjects: number, partialLayout: boolean, totalObjects: number,
     },
     // endData is not reliably populated.
     // Why? TBD. https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/renderer/core/frame/local_frame_view.cc;l=847-851;drc=8b6aaad8027390ce6b32d82d57328e93f34bb8e5
@@ -2197,6 +2203,14 @@ export function isResourceReceivedData(
   return event.name === 'ResourceReceivedData';
 }
 
+// Any event where we receive data (and get an encodedDataLength)
+export function isReceivedDataEvent(
+    event: Event,
+    ): event is ResourceReceivedData|ResourceFinish|ResourceReceiveResponse {
+  return event.name === 'ResourceReceivedData' || event.name === 'ResourceFinish' ||
+      event.name === 'ResourceReceiveResponse';
+}
+
 export function isSyntheticNetworkRequest(
     event: Event,
     ): event is SyntheticNetworkRequest {
@@ -2282,6 +2296,10 @@ export function isConsoleTime(event: Event): event is ConsoleTime {
 
 export function isConsoleTimeStamp(event: Event): event is ConsoleTimeStamp {
   return event.ph === Phase.COMPLETE && event.name === Name.CONSOLE_TIME_STAMP;
+}
+
+export function isUserTimingMeasure(event: Event): event is UserTimingMeasure {
+  return event.name === Name.USER_TIMING_MEASURE;
 }
 
 export function isParseHTML(event: Event): event is ParseHTML {
@@ -2998,7 +3016,8 @@ export const enum Name {
   ANIMATION_FRAME = 'AnimationFrame',
   ANIMATION_FRAME_PRESENTATION = 'AnimationFrame::Presentation',
 
-  SYNTHETIC_NETWORK_REQUEST = 'SyntheticNetworkRequest'
+  SYNTHETIC_NETWORK_REQUEST = 'SyntheticNetworkRequest',
+  USER_TIMING_MEASURE = 'UserTiming::Measure',
 }
 
 // NOT AN EXHAUSTIVE LIST: just some categories we use and refer
@@ -3054,6 +3073,91 @@ export interface LegacyLayerPaintEvent {
 }
 
 export interface LegacyLayerPaintEventPicture {
-  rect: Array<number>;
+  rect: number[];
   serializedPicture: string;
+}
+
+export interface TargetRundownEvent extends Event {
+  cat: 'disabled-by-default-devtools.target-rundown';
+  name: 'ScriptCompiled';
+  args: Args&{
+    data?: {
+      frame: Protocol.Page.FrameId,
+      frameType: string,
+      url: string,
+      isolate: string,
+      v8context: string,
+      origin: string,
+      scriptId: number,
+      isDefault?: boolean,
+      contextType?: string,
+    },
+  };
+}
+
+export function isTargetRundownEvent(event: Event): event is TargetRundownEvent {
+  return event.cat === 'disabled-by-default-devtools.target-rundown' && event.name === 'ScriptCompiled';
+}
+
+export interface V8SourceRundownEvent extends Event {
+  cat: 'disabled-by-default-devtools.v8-source-rundown';
+  name: 'ScriptCatchup';
+  args: Args&{
+    data: {
+      isolate: string,
+      executionContextId: Protocol.Runtime.ExecutionContextId,
+      scriptId: number,
+      startLine: number,
+      startColumn: number,
+      endLine: number,
+      endColumn: number,
+      hash: string,
+      isModule: boolean,
+      hasSourceUrl: boolean,
+      url?: string,
+      sourceUrl?: string,
+      sourceMapUrl?: string,
+    },
+  };
+}
+
+export function isV8SourceRundownEvent(event: Event): event is V8SourceRundownEvent {
+  return event.cat === 'disabled-by-default-devtools.v8-source-rundown' && event.name === 'ScriptCatchup';
+}
+
+export interface V8SourceRundownSourcesScriptCatchupEvent extends Event {
+  cat: 'disabled-by-default-devtools.v8-source-rundown-sources';
+  name: 'ScriptCatchup';
+  args: Args&{
+    data: {
+      isolate: string,
+      scriptId: number,
+      length: number,
+      sourceText: string,
+    },
+  };
+}
+
+export function isV8SourceRundownSourcesScriptCatchupEvent(event: Event):
+    event is V8SourceRundownSourcesScriptCatchupEvent {
+  return event.cat === 'disabled-by-default-devtools.v8-source-rundown-sources' && event.name === 'ScriptCatchup';
+}
+
+export interface V8SourceRundownSourcesLargeScriptCatchupEvent extends Event {
+  cat: 'disabled-by-default-devtools.v8-source-rundown-sources';
+  name: 'LargeScriptCatchup';
+  args: Args&{
+    data: {
+      isolate: string,
+      scriptId: number,
+      splitIndex: number,
+      splitCount: number,
+      sourceText: string,
+    },
+  };
+}
+
+export function isV8SourceRundownSourcesLargeScriptCatchupEvent(event: Event):
+    event is V8SourceRundownSourcesLargeScriptCatchupEvent {
+  return event.cat === 'disabled-by-default-devtools.v8-source-rundown-sources' && event.name === 'LargeScriptCatchup';
 }

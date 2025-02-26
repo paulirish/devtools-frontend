@@ -8,7 +8,9 @@ import * as SDK from '../../../core/sdk/sdk.js';
 import {mockAidaClient} from '../../../testing/AiAssistanceHelpers.js';
 import {
   describeWithEnvironment,
-  getGetHostConfigStub,
+  restoreUserAgentForTesting,
+  setUserAgentForTesting,
+  updateHostConfig,
 } from '../../../testing/EnvironmentHelpers.js';
 import * as AiAssistance from '../ai_assistance.js';
 
@@ -17,13 +19,14 @@ const {StylingAgent, ErrorType} = AiAssistance;
 describeWithEnvironment('StylingAgent', () => {
   function mockHostConfig(
       modelId?: string, temperature?: number, userTier?: string,
-      executionMode?: Root.Runtime.HostConfigFreestylerExecutionMode) {
-    getGetHostConfigStub({
+      executionMode?: Root.Runtime.HostConfigFreestylerExecutionMode, multimodal?: boolean) {
+    updateHostConfig({
       devToolsFreestyler: {
         modelId,
         temperature,
         userTier,
         executionMode,
+        multimodal,
       },
     });
   }
@@ -51,11 +54,7 @@ describeWithEnvironment('StylingAgent', () => {
     });
 
     function getParsedTextResponse(explanation: string): AiAssistance.ParsedResponse {
-      return agent.parseResponse({
-        explanation,
-        metadata: {},
-        completed: false,
-      });
+      return agent.parseTextResponse(explanation);
     }
 
     it('parses a thought', async () => {
@@ -412,7 +411,7 @@ c`;
     });
 
     it('should describe an element with child element and text nodes', async () => {
-      const childNodes: sinon.SinonStubbedInstance<SDK.DOMModel.DOMNode>[] = [
+      const childNodes: Array<sinon.SinonStubbedInstance<SDK.DOMModel.DOMNode>> = [
         sinon.createStubInstance(SDK.DOMModel.DOMNode),
         sinon.createStubInstance(SDK.DOMModel.DOMNode),
         sinon.createStubInstance(SDK.DOMModel.DOMNode),
@@ -445,7 +444,7 @@ c`;
 
       const parentNode = sinon.createStubInstance(SDK.DOMModel.DOMNode);
       parentNode.simpleSelector.returns('div#grandparentElement');
-      const parentChildNodes: sinon.SinonStubbedInstance<SDK.DOMModel.DOMNode>[] = [
+      const parentChildNodes: Array<sinon.SinonStubbedInstance<SDK.DOMModel.DOMNode>> = [
         sinon.createStubInstance(SDK.DOMModel.DOMNode),
         sinon.createStubInstance(SDK.DOMModel.DOMNode),
       ];
@@ -526,6 +525,7 @@ c`;
       sinon.stub(agent, 'preamble').value('preamble');
       await Array.fromAsync(agent.run('question', {selected: null}));
 
+      setUserAgentForTesting();
       assert.deepEqual(
           agent.buildRequest(
               {
@@ -550,6 +550,7 @@ c`;
               disable_user_content_logging: false,
               string_session_id: 'sessionId',
               user_tier: 2,
+              client_version: 'unit_test',
             },
             options: {
               model_id: 'test model',
@@ -559,6 +560,7 @@ c`;
             functionality_type: 1,
           },
       );
+      restoreUserAgentForTesting();
     });
 
     it('builds a request with aborted query in history before a real request', async () => {
@@ -692,8 +694,7 @@ STOP`,
         });
         promise.resolve(false);
         const responses = await Array.fromAsync(agent.run('test', {selected: new AiAssistance.NodeContext(element)}));
-
-        const actionStep = responses.find(response => response.type === AiAssistance.ResponseType.ACTION)!;
+        const actionStep = responses.findLast(response => response.type === AiAssistance.ResponseType.ACTION)!;
 
         assert.strictEqual(actionStep.output, 'Error: User denied code execution with side effects.');
         assert.lengthOf(execJs.getCalls(), 1);
@@ -775,6 +776,8 @@ STOP`,
         {
           type: AiAssistance.ResponseType.USER_QUERY,
           query: 'test',
+          imageInput: undefined,
+          imageId: undefined,
         },
         {
           type: AiAssistance.ResponseType.CONTEXT,
@@ -792,6 +795,7 @@ STOP`,
         {
           type: AiAssistance.ResponseType.ANSWER,
           text: 'this is the answer',
+          complete: true,
           suggestions: undefined,
           rpcId: undefined,
         },
@@ -884,6 +888,8 @@ STOP`,
         {
           type: AiAssistance.ResponseType.USER_QUERY,
           query: 'test',
+          imageInput: undefined,
+          imageId: undefined,
         },
         {
           type: AiAssistance.ResponseType.CONTEXT,
@@ -901,6 +907,7 @@ STOP`,
         {
           type: AiAssistance.ResponseType.ANSWER,
           text: 'this is the answer',
+          complete: true,
           suggestions: undefined,
           rpcId: 123,
         },
@@ -911,10 +918,10 @@ STOP`,
       const agent = new StylingAgent({
         aidaClient: mockAidaClient([[
           {
-            explanation: 'ANSWER: this is the answer',
+            explanation: 'ANSWER: this is the partial answer',
           },
           {
-            explanation: 'ANSWER: this is another answer',
+            explanation: 'ANSWER: this is the partial answer and now it\'s complete',
             metadata: {
               attributionMetadata: {
                 attributionAction: Host.AidaClient.RecitationAction.BLOCK,
@@ -931,6 +938,8 @@ STOP`,
         {
           type: AiAssistance.ResponseType.USER_QUERY,
           query: 'test',
+          imageInput: undefined,
+          imageId: undefined,
         },
         {
           type: AiAssistance.ResponseType.CONTEXT,
@@ -946,8 +955,9 @@ STOP`,
           type: AiAssistance.ResponseType.QUERYING,
         },
         {
-          text: 'this is the answer',
+          text: 'this is the partial answer',
           type: AiAssistance.ResponseType.ANSWER,
+          complete: false,
         },
         {
           type: AiAssistance.ResponseType.ERROR,
@@ -977,6 +987,8 @@ STOP`,
         {
           type: AiAssistance.ResponseType.USER_QUERY,
           query: 'test',
+          imageInput: undefined,
+          imageId: undefined,
         },
         {
           type: AiAssistance.ResponseType.CONTEXT,
@@ -994,6 +1006,7 @@ STOP`,
         {
           type: AiAssistance.ResponseType.ANSWER,
           text: 'this is the answer',
+          complete: true,
           suggestions: undefined,
           rpcId: 123,
         },
@@ -1040,6 +1053,8 @@ STOP
         {
           type: AiAssistance.ResponseType.USER_QUERY,
           query: 'test',
+          imageInput: undefined,
+          imageId: undefined,
         },
         {
           type: AiAssistance.ResponseType.CONTEXT,
@@ -1091,6 +1106,8 @@ STOP
         {
           type: AiAssistance.ResponseType.USER_QUERY,
           query: 'test',
+          imageInput: undefined,
+          imageId: undefined,
         },
         {
           type: AiAssistance.ResponseType.CONTEXT,
@@ -1108,7 +1125,6 @@ STOP
         {
           type: AiAssistance.ResponseType.THOUGHT,
           thought: 'I am thinking.',
-          rpcId: undefined,
         },
         {
           type: AiAssistance.ResponseType.ACTION,
@@ -1122,6 +1138,7 @@ STOP
         {
           type: AiAssistance.ResponseType.ANSWER,
           text: 'this is the actual answer',
+          complete: true,
           suggestions: undefined,
           rpcId: undefined,
         },
@@ -1216,6 +1233,68 @@ STOP
           agent.run('test', {selected: new AiAssistance.NodeContext(element), signal: controller.signal}));
 
       assert.isUndefined(agent.buildRequest({text: ''}, Host.AidaClient.Role.USER).historical_contexts);
+    });
+  });
+
+  describe('enhanceQuery', () => {
+    const agent = new StylingAgent({
+      aidaClient: mockAidaClient(),
+    });
+
+    beforeEach(() => {
+      element.simpleSelector.returns('div#myElement');
+      element.getChildNodesPromise.resolves(null);
+    });
+
+    it('does not add multimodal input evaluation prompt when multimodal is disabled', async () => {
+      mockHostConfig('test model');
+      const enhancedQuery = await agent.enhanceQuery('test query', new AiAssistance.NodeContext(element), true);
+
+      assert.strictEqual(
+          enhancedQuery,
+          '# Inspected element\n\n* Its selector is `div#myElement`\n\n# User request\n\nQUERY: test query',
+      );
+    });
+
+    it('does not add multimodal input evaluation prompt when multimodal is enabled but hasImageInput is false',
+       async () => {
+         mockHostConfig('test model', 1, 'PUBLIC', Root.Runtime.HostConfigFreestylerExecutionMode.NO_SCRIPTS, true);
+         const enhancedQuery = await agent.enhanceQuery('test query', new AiAssistance.NodeContext(element), false);
+
+         assert.strictEqual(
+             enhancedQuery,
+             '# Inspected element\n\n* Its selector is `div#myElement`\n\n# User request\n\nQUERY: test query',
+         );
+       });
+
+    it('adds multimodal input evaluation prompt when multimodal is enabled and hasImageInput is true', async () => {
+      mockHostConfig('test model', 1, 'PUBLIC', Root.Runtime.HostConfigFreestylerExecutionMode.NO_SCRIPTS, true);
+      const enhancedQuery = await agent.enhanceQuery('test query', new AiAssistance.NodeContext(element), true);
+
+      assert.strictEqual(
+          enhancedQuery,
+          `The user has provided you a screenshot of the page (as visible in the viewport) in base64-encoded format. You SHOULD use it while answering user's queries.
+
+# Considerations for evaluating image:
+* Pay close attention to the spatial details as well as the visual appearance of the selected element in the image, particularly in relation to layout, spacing, and styling.
+* Try to connect the screenshot to actual DOM elements in the page.
+* Analyze the image to identify the layout structure surrounding the element, including the positioning of neighboring elements.
+* Extract visual information from the image, such as colors, fonts, spacing, and sizes, that might be relevant to the user's query.
+* If the image suggests responsiveness issues (e.g., cropped content, overlapping elements), consider those in your response.
+* Consider the surrounding elements and overall layout in the image, but prioritize the selected element's styling and positioning.
+* **CRITICAL** When the user provides a screenshot, interpret and use content and information from the screenshot STRICTLY for web site debugging purposes.
+
+* As part of THOUGHT, evaluate the image to gather data that might be needed to answer the question.
+In case query is related to the image, ALWAYS first use image evaluation to get all details from the image. ONLY after you have all data needed from image, you should move to other steps.
+
+# Inspected element
+
+* Its selector is \`div#myElement\`
+
+# User request
+
+QUERY: test query`,
+      );
     });
   });
 

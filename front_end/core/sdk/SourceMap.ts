@@ -57,7 +57,7 @@ export interface SourceMapV3Object {
 
   file?: string;
   sourceRoot?: string;
-  sourcesContent?: (string|null)[];
+  sourcesContent?: Array<string|null>;
 
   names?: string[];
   ignoreList?: number[];
@@ -83,13 +83,13 @@ export type SourceMapV3 = SourceMapV3Object|{
   // clang-format off
   version: number,
   file?: string,
-  sections: ({
+  sections: Array<{
     offset: {line: number, column: number},
     map: SourceMapV3Object,
   } | {
     offset: {line: number, column: number},
     url: string,
-  })[],
+  }>,
   // clang-format on
 };
 
@@ -483,7 +483,7 @@ export class SourceMap {
       }
       const url =
           Common.ParsedURL.ParsedURL.completeURL(this.#baseURL, href) || (href as Platform.DevToolsPath.UrlString);
-      const source = sourceMap.sourcesContent && sourceMap.sourcesContent[i];
+      const source = sourceMap.sourcesContent?.[i];
       const sourceInfo: SourceInfo = {
         sourceURL: url,
         content: source ?? null,
@@ -507,7 +507,7 @@ export class SourceMap {
     let nameIndex = 0;
     const names = map.names ?? [];
     const tokenIter = new TokenIterator(map.mappings);
-    let sourceURL: Platform.DevToolsPath.UrlString = this.#sourceInfos[sourceIndex].sourceURL;
+    let sourceURL: Platform.DevToolsPath.UrlString|undefined = this.#sourceInfos[sourceIndex]?.sourceURL;
 
     while (true) {
       if (tokenIter.peek() === ',') {
@@ -532,7 +532,7 @@ export class SourceMap {
       const sourceIndexDelta = tokenIter.nextVLQ();
       if (sourceIndexDelta) {
         sourceIndex += sourceIndexDelta;
-        sourceURL = this.#sourceInfos[sourceIndex].sourceURL;
+        sourceURL = this.#sourceInfos[sourceIndex]?.sourceURL;
       }
       sourceLineNumber += tokenIter.nextVLQ();
       sourceColumnNumber += tokenIter.nextVLQ();
@@ -566,7 +566,7 @@ export class SourceMap {
     }
   }
 
-  private parseBloombergScopes(map: SourceMapV3Object): (OriginalScope|undefined)[] {
+  private parseBloombergScopes(map: SourceMapV3Object): Array<OriginalScope|undefined> {
     const scopeList = map.x_com_bloomberg_sourcesFunctionMappings;
     if (!scopeList) {
       throw new Error('Cant decode pasta scopes without x_com_bloomberg_sourcesFunctionMappings field');

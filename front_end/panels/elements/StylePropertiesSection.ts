@@ -110,7 +110,7 @@ const UIStrings = {
    *@description Text that is announced by the screen reader when the user focuses on an input field for editing the name of a CSS selector in the Styles panel
    */
   cssSelector: '`CSS` selector',
-};
+} as const;
 
 const str_ = i18n.i18n.registerUIStrings('panels/elements/StylePropertiesSection.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -155,7 +155,7 @@ export class StylePropertiesSection {
   private sectionIdx = 0;
 
   // Used to keep track of Specificity Information
-  static #nodeElementToSpecificity: WeakMap<Element, Protocol.CSS.Specificity> = new WeakMap();
+  static #nodeElementToSpecificity = new WeakMap<Element, Protocol.CSS.Specificity>();
   #customHeaderText: string|undefined;
 
   constructor(
@@ -293,12 +293,10 @@ export class StylePropertiesSection {
       // Prevent editing the user agent and user rules.
       if (rule.isUserAgent() || rule.isInjected()) {
         this.editable = false;
-      } else {
         // Check this is a real CSSRule, not a bogus object coming from BlankStylePropertiesSection.
-        if (rule.styleSheetId) {
-          const header = rule.cssModel().styleSheetHeaderForId(rule.styleSheetId);
-          this.navigable = header && !header.isAnonymousInlineStyleSheet();
-        }
+      } else if (rule.styleSheetId) {
+        const header = rule.cssModel().styleSheetHeaderForId(rule.styleSheetId);
+        this.navigable = header && !header.isAnonymousInlineStyleSheet();
       }
     }
 
@@ -594,12 +592,12 @@ export class StylePropertiesSection {
 
     const treeElement = this.propertiesTreeOutline.treeElementFromEvent(event);
     if (treeElement instanceof StylePropertyTreeElement) {
-      this.parentPane.setActiveProperty((treeElement as StylePropertyTreeElement));
+      this.parentPane.setActiveProperty((treeElement));
     } else {
       this.parentPane.setActiveProperty(null);
     }
     const selection = this.element.getComponentSelection();
-    if (!this.selectedSinceMouseDown && selection && selection.toString()) {
+    if (!this.selectedSinceMouseDown && selection?.toString()) {
       this.selectedSinceMouseDown = true;
     }
   }
@@ -754,7 +752,7 @@ export class StylePropertiesSection {
   private onNewRuleClick(event: Common.EventTarget.EventTargetEvent<Event>): void {
     event.data.consume();
     const rule = this.styleInternal.parentRule;
-    if (!rule || !rule.style.range || rule.styleSheetId === undefined) {
+    if (!rule?.style.range || rule.styleSheetId === undefined) {
       return;
     }
     const range =
@@ -999,7 +997,7 @@ export class StylePropertiesSection {
       }
     }
 
-    return (curSection && curSection.editable) ? curSection : null;
+    return (curSection?.editable) ? curSection : null;
   }
 
   previousEditableSibling(): StylePropertiesSection|null {
@@ -1015,7 +1013,7 @@ export class StylePropertiesSection {
       }
     }
 
-    return (curSection && curSection.editable) ? curSection : null;
+    return (curSection?.editable) ? curSection : null;
   }
 
   refreshUpdate(editedTreeElement: StylePropertyTreeElement): void {
@@ -1162,7 +1160,7 @@ export class StylePropertiesSection {
   }
 
   static renderSelectors(
-      selectors: {text: string, specificity: Protocol.CSS.Specificity|undefined}[], matchingSelectors: boolean[],
+      selectors: Array<{text: string, specificity?: Protocol.CSS.Specificity}>, matchingSelectors: boolean[],
       elementToSelectorIndex: WeakMap<Element, number>): DocumentFragment {
     const fragment = document.createDocumentFragment();
     for (const [i, selector] of selectors.entries()) {
@@ -1186,7 +1184,7 @@ export class StylePropertiesSection {
     const selectors = this.selectorElement.getElementsByClassName('simple-selector');
     const regex = this.parentPane.filterRegex();
     for (let i = 0; i < selectors.length; ++i) {
-      const selectorMatchesFilter = regex !== null && regex.test(selectors[i].textContent || '');
+      const selectorMatchesFilter = regex?.test(selectors[i].textContent || '');
       selectors[i].classList.toggle('filter-match', selectorMatchesFilter);
     }
   }
@@ -1385,26 +1383,22 @@ export class StylePropertiesSection {
     contextMenu.clipboardSection().appendItem(i18nString(UIStrings.copySelector), () => {
       const selectorText = this.headerText();
       Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(selectorText);
-      Host.userMetrics.styleTextCopied(Host.UserMetrics.StyleTextCopied.SELECTOR_VIA_CONTEXT_MENU);
     }, {jslogContext: 'copy-selector'});
 
     contextMenu.clipboardSection().appendItem(i18nString(UIStrings.copyRule), () => {
       const ruleText = StylesSidebarPane.formatLeadingProperties(this).ruleText;
       Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(ruleText);
-      Host.userMetrics.styleTextCopied(Host.UserMetrics.StyleTextCopied.RULE_VIA_CONTEXT_MENU);
     }, {jslogContext: 'copy-rule'});
 
     contextMenu.clipboardSection().appendItem(i18nString(UIStrings.copyAllDeclarations), () => {
       const allDeclarationText = StylesSidebarPane.formatLeadingProperties(this).allDeclarationText;
       Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(allDeclarationText);
-      Host.userMetrics.styleTextCopied(Host.UserMetrics.StyleTextCopied.ALL_DECLARATIONS_VIA_CONTEXT_MENU);
     }, {jslogContext: 'copy-all-declarations'});
 
     // TODO(changhaohan): conditionally add this item only when there are changes to copy
     contextMenu.clipboardSection().appendItem(i18nString(UIStrings.copyAllCSSChanges), async () => {
       const allChanges = await this.parentPane.getFormattedChanges();
       Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(allChanges);
-      Host.userMetrics.styleTextCopied(Host.UserMetrics.StyleTextCopied.ALL_CHANGES_VIA_STYLES_TAB);
     }, {jslogContext: 'copy-all-css-changes'});
     void contextMenu.show();
   }
@@ -1415,7 +1409,7 @@ export class StylePropertiesSection {
       return;
     }
     const rule = (this.styleInternal.parentRule as SDK.CSSRule.CSSStyleRule | null);
-    if (!rule || rule.styleSheetId === undefined) {
+    if (rule?.styleSheetId === undefined) {
       return;
     }
     const header = cssModel.styleSheetHeaderForId(rule.styleSheetId);
@@ -1484,7 +1478,7 @@ export class StylePropertiesSection {
     if (moveDirection === 'forward') {
       const firstChild = (this.propertiesTreeOutline.firstChild() as StylePropertyTreeElement);
       let currentChild: (StylePropertyTreeElement|null)|StylePropertyTreeElement = firstChild;
-      while (currentChild && currentChild.inherited()) {
+      while (currentChild?.inherited()) {
         const sibling: UI.TreeOutline.TreeElement|null = currentChild.nextSibling;
         currentChild = sibling instanceof StylePropertyTreeElement ? sibling : null;
       }
@@ -1617,8 +1611,7 @@ export class BlankStylePropertiesSection extends StylePropertiesSection {
     this.selectorRefElement.removeChildren();
     this.selectorRefElement.appendChild(StylePropertiesSection.linkifyRuleLocation(
         cssModel, this.parentPane.linkifier, styleSheetId, this.actualRuleLocation()));
-    if (insertAfterStyle && insertAfterStyle.parentRule &&
-        insertAfterStyle.parentRule instanceof SDK.CSSRule.CSSStyleRule) {
+    if (insertAfterStyle?.parentRule && insertAfterStyle.parentRule instanceof SDK.CSSRule.CSSStyleRule) {
       this.createAncestorRules(insertAfterStyle.parentRule);
     }
     this.element.classList.add('blank-section');

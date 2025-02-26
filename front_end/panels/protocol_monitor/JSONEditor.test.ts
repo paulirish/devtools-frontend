@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import * as Host from '../../core/host/host.js';
+import * as SDK from '../../core/sdk/sdk.js';
 import {
   dispatchClickEvent,
   dispatchKeyDownEvent,
@@ -333,7 +334,7 @@ describeWithEnvironment('JSONEditor', () => {
     // inputs[0] corresponds to the devtools-suggestion-input of the command
     const input = jsonEditor.contentElement.querySelectorAll('devtools-suggestion-input')[1];
     if (!input) {
-      throw Error('No editable content displayed');
+      throw new Error('No editable content displayed');
     }
     input.value = 'Not an accepted value';
     await jsonEditor.updateComplete;
@@ -342,7 +343,7 @@ describeWithEnvironment('JSONEditor', () => {
     await jsonEditor.updateComplete;
     const warningIcon = jsonEditor.contentElement.querySelector('devtools-icon');
     if (!warningIcon) {
-      throw Error('No icon displayed');
+      throw new Error('No icon displayed');
     }
     return warningIcon;
   };
@@ -479,8 +480,7 @@ describeWithEnvironment('JSONEditor', () => {
   describe('Display command written in editor inside input bar', () => {
     it('should display the command edited inside the CDP editor into the input bar', async () => {
       const split = new UI.SplitWidget.SplitWidget(true, false, 'protocol-monitor-split-container', 400);
-      const editorWidget = new ProtocolMonitor.ProtocolMonitor.EditorWidget();
-      const jsonEditor = editorWidget.jsonEditor;
+      const jsonEditor = new ProtocolMonitor.JSONEditor.JSONEditor(new Map(), new Map(), new Map());
       jsonEditor.command = 'Test.test';
       jsonEditor.parameters = [
         {
@@ -493,7 +493,7 @@ describeWithEnvironment('JSONEditor', () => {
       ];
       const dataGrid = new ProtocolMonitor.ProtocolMonitor.ProtocolMonitorDataGrid(split);
       split.setMainWidget(dataGrid);
-      split.setSidebarWidget(editorWidget);
+      split.setSidebarWidget(jsonEditor);
       split.toggleSidebar();
       split.markAsRoot();
       split.show(renderElementIntoDOM(document.createElement('main')));
@@ -507,24 +507,22 @@ describeWithEnvironment('JSONEditor', () => {
 
     it('should update the selected target inside the input bar', async () => {
       const split = new UI.SplitWidget.SplitWidget(true, false, 'protocol-monitor-split-container', 400);
-      const editorWidget = new ProtocolMonitor.ProtocolMonitor.EditorWidget();
-      const jsonEditor = editorWidget.jsonEditor;
+      const jsonEditor = new ProtocolMonitor.JSONEditor.JSONEditor(new Map(), new Map(), new Map());
       jsonEditor.targetId = 'value2';
-      const dataGrid = new ProtocolMonitor.ProtocolMonitor.ProtocolMonitorDataGrid(split);
-      const selector = dataGrid.selector;
-
-      selector.createOption('Option 1', 'value1');
-      selector.createOption('Option 2', 'value2');
-      selector.createOption('Option 3', 'value3');
+      sinon.stub(SDK.TargetManager.TargetManager.instance(), 'targets').returns([
+        {id: () => 'value1'} as SDK.Target.Target,
+        {id: () => 'value2'} as SDK.Target.Target,
+      ]);
+      const view = sinon.stub();
+      const dataGrid = new ProtocolMonitor.ProtocolMonitor.ProtocolMonitorDataGrid(split, view);
 
       split.setMainWidget(dataGrid);
-      split.setSidebarWidget(editorWidget);
+      split.setSidebarWidget(jsonEditor);
 
       split.toggleSidebar();
-      await RenderCoordinator.done();
+      await RenderCoordinator.done({waitForWork: true});
 
-      // Should be index 1 because the targetId equals "value2" which corresponds to the index number 1
-      assert.deepEqual(selector.selectedIndex(), 1);
+      assert.deepEqual(view.lastCall.firstArg.selectedTargetId, 'value2');
     });
 
     // Flaky test.
@@ -532,12 +530,11 @@ describeWithEnvironment('JSONEditor', () => {
         '[crbug.com/1484534]: should not display the command into the input bar if the command is empty string',
         async () => {
           const split = new UI.SplitWidget.SplitWidget(true, false, 'protocol-monitor-split-container', 400);
-          const editorWidget = new ProtocolMonitor.ProtocolMonitor.EditorWidget();
-          const jsonEditor = editorWidget.jsonEditor;
+          const jsonEditor = new ProtocolMonitor.JSONEditor.JSONEditor(new Map(), new Map(), new Map());
           jsonEditor.command = '';
           const dataGrid = new ProtocolMonitor.ProtocolMonitor.ProtocolMonitorDataGrid(split);
           split.setMainWidget(dataGrid);
-          split.setSidebarWidget(editorWidget);
+          split.setSidebarWidget(jsonEditor);
           split.toggleSidebar();
 
           await RenderCoordinator.done();
@@ -1099,7 +1096,7 @@ describeWithEnvironment('JSONEditor', () => {
 
          const toolbar = jsonEditor.contentElement.querySelector('devtools-toolbar');
          if (!toolbar) {
-           throw Error('No toolbar found !');
+           throw new Error('No toolbar found !');
          }
 
          const promise = jsonEditor.once(ProtocolMonitor.JSONEditor.Events.SUBMIT_EDITOR);
@@ -1188,7 +1185,7 @@ describeWithEnvironment('JSONEditor', () => {
         ));
     const toolbar = jsonEditor.contentElement.querySelector('devtools-toolbar');
     if (!toolbar) {
-      throw Error('No toolbar found !');
+      throw new Error('No toolbar found !');
     }
     dispatchClickEvent(toolbar.querySelector('devtools-button[title="Copy command"]')!);
     const [text] = await copyText;

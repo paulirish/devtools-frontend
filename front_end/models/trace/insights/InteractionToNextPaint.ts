@@ -8,10 +8,11 @@ import type {SyntheticInteractionPair} from '../types/TraceEvents.js';
 
 import {
   InsightCategory,
+  InsightKeys,
   type InsightModel,
   type InsightSetContext,
   type PartialInsightModel,
-  type RequiredData
+  type RequiredData,
 } from './types.js';
 
 export const UIStrings = {
@@ -50,7 +51,7 @@ export const UIStrings = {
    * @description Text status indicating that no user interactions were detected.
    */
   noInteractions: 'No interactions detected',
-};
+} as const;
 
 const str_ = i18n.i18n.registerUIStrings('models/trace/insights/InteractionToNextPaint.ts', UIStrings);
 export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -66,11 +67,12 @@ export type INPInsightModel = InsightModel<typeof UIStrings, {
 
 function finalize(partialModel: PartialInsightModel<INPInsightModel>): INPInsightModel {
   return {
+    insightKey: InsightKeys.INTERACTION_TO_NEXT_PAINT,
     strings: UIStrings,
     title: i18nString(UIStrings.title),
     description: i18nString(UIStrings.description),
     category: InsightCategory.INP,
-    shouldShow: Boolean(partialModel.longestInteractionEvent),
+    state: partialModel.longestInteractionEvent ? 'informative' : 'pass',
     ...partialModel,
   };
 }

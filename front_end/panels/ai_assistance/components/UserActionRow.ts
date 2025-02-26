@@ -65,7 +65,7 @@ const UIStringsNotTranslate = {
    * @description The title of the button for scrolling to see previous suggestions
    */
   scrollToPrevious: 'Scroll to previous suggestions',
-};
+} as const;
 
 const lockedString = i18n.i18n.lockedString;
 
@@ -95,7 +95,7 @@ export interface FeedbackFormViewInput {
   isSubmitButtonDisabled: boolean;
 }
 
-export type ViewInput = RatingViewInput&SuggestionViewInput&FeedbackFormViewInput;
+export type UserActionRowViewInput = RatingViewInput&SuggestionViewInput&FeedbackFormViewInput;
 
 export interface ViewOutput {
   suggestionsLeftScrollButtonContainer?: Element;
@@ -111,7 +111,7 @@ export interface UserActionRowWidgetParams {
   canShowFeedbackForm: boolean;
 }
 
-export type View = (input: ViewInput, output: ViewOutput, target: HTMLElement) => void;
+export type View = (input: UserActionRowViewInput, output: ViewOutput, target: HTMLElement) => void;
 
 /**
  * This presenter has too many responsibilities (rating buttons, feedback

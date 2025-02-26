@@ -98,7 +98,7 @@ const UIStrings = {
    *@description Text that is usually a hyperlink to a feedback form
    */
   sendFeedback: 'Send feedback',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/settings/SettingsScreen.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -177,10 +177,6 @@ export class SettingsScreen extends UI.Widget.VBox implements UI.View.ViewLocati
     settingsScreen.show(dialog.contentElement);
     dialog.setEscapeKeyCallback(settingsScreen.onEscapeKeyPressed.bind(settingsScreen));
     dialog.setMarginBehavior(UI.GlassPane.MarginBehavior.NO_MARGIN);
-    // UI.Dialog extends GlassPane and overrides the `show` method with a wider
-    // accepted type. However, TypeScript uses the supertype declaration to
-    // determine the full type, which requires a `!Document`.
-    // @ts-ignore
     dialog.show();
 
     return settingsScreen;
@@ -597,8 +593,7 @@ export class Revealer implements Common.Revealer.Revealer<Root.Runtime.Experimen
     }
 
     // Reveal settings views
-    for (const view of UI.ViewManager.getRegisteredViewExtensions(
-             Common.Settings.Settings.instance().getHostConfig())) {
+    for (const view of UI.ViewManager.getRegisteredViewExtensions()) {
       const id = view.viewId();
       const location = view.location();
       if (location !== UI.ViewManager.ViewLocationValues.SETTINGS_VIEW) {

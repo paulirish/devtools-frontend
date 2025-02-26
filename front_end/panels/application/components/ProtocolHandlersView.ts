@@ -69,7 +69,7 @@ const UIStrings = {
    * @description Placeholder for textbox input field, rest of the URL of protocol to test.
    */
   textboxPlaceholder: 'Enter URL',
-};
+} as const;
 
 const str_ = i18n.i18n.registerUIStrings('panels/application/components/ProtocolHandlersView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -96,8 +96,8 @@ export class ProtocolHandlersView extends HTMLElement {
   readonly #shadow = this.attachShadow({mode: 'open'});
   #protocolHandlers: ProtocolHandler[] = [];
   #manifestLink: Platform.DevToolsPath.UrlString = Platform.DevToolsPath.EmptyUrlString;
-  #selectedProtocolState: string = '';
-  #queryInputState: string = '';
+  #selectedProtocolState = '';
+  #queryInputState = '';
 
   set data(data: ProtocolHandlersData) {
     const isNewManifest = this.#manifestLink !== data.manifestLink;

@@ -19,7 +19,7 @@ const UIStrings = {
    *@description Accessible label used to explain to a user that they are viewing an entry label.
    */
   timeRange: 'Time range',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/overlays/components/TimeRangeOverlay.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -47,7 +47,7 @@ export class TimeRangeOverlay extends HTMLElement {
 
   // The label is set to editable and in focus anytime the label is empty and when the label it is double clicked.
   // If the user clicks away from the selected range element and the label is not empty, the label is set to not editable until it is double clicked.
-  #isLabelEditable: boolean = true;
+  #isLabelEditable = true;
 
   #rangeContainer: HTMLElement|null = null;
   #labelBox: HTMLElement|null = null;

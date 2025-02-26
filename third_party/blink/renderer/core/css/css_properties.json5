@@ -1040,7 +1040,7 @@
       },
       separator: ",",
       valid_for_marker: true,
-      runtime_flag: "CSSAnimationTriggerRange",
+      runtime_flag: "AnimationTrigger",
     },
     {
       name: "animation-trigger-range-end",
@@ -1051,7 +1051,7 @@
       },
       separator: ",",
       valid_for_marker: true,
-      runtime_flag: "CSSAnimationTriggerRange",
+      runtime_flag: "AnimationTrigger",
     },
     {
       name: "animation-trigger-exit-range-start",
@@ -1062,7 +1062,7 @@
       },
       separator: ",",
       valid_for_marker: true,
-      runtime_flag: "CSSAnimationTriggerRange",
+      runtime_flag: "AnimationTrigger",
     },
     {
       name: "animation-trigger-exit-range-end",
@@ -1073,7 +1073,7 @@
       },
       separator: ",",
       valid_for_marker: true,
-      runtime_flag: "CSSAnimationTriggerRange",
+      runtime_flag: "AnimationTrigger",
     },
     {
       name: "animation-trigger-timeline",
@@ -1086,7 +1086,7 @@
       typedom_types: ["Keyword"],
       separator: ",",
       valid_for_marker: true,
-      runtime_flag: "CSSAnimationTriggerTimeline",
+      runtime_flag: "AnimationTrigger",
     },
     {
       name: "animation-trigger-type",
@@ -1099,7 +1099,7 @@
       typedom_types: ["Keyword"],
       separator: ",",
       valid_for_marker: true,
-      runtime_flag: "CSSAnimationTriggerType",
+      runtime_flag: "AnimationTrigger",
     },
     {
       name: "transition-delay",
@@ -3622,6 +3622,7 @@
       name: "interactivity",
       property_methods: ["CSSValueFromComputedStyleInternal"],
       inherited: true,
+      independent: true,
       field_group: "*",
       field_template: "keyword",
       keywords: ["auto", "inert"],
@@ -5849,17 +5850,15 @@
       style_builder_custom_functions: ["initial", "inherit", "value"],
       default_value: "TextSizeAdjust::AdjustAuto()",
       getter: "GetTextSizeAdjust",
-      // When `TextSizeAdjustImprovements` is enabled, this affects font-size
-      // during style building and needs to apply before it.
+      // Affects font-size during style building and needs to apply before it.
       priority: 2,
       type_name: "TextSizeAdjust",
       converter: "ConvertTextSizeAdjust",
       keywords: ["none", "auto"],
       typedom_types: ["Keyword", "Percentage"],
-      // When `TextSizeAdjustImprovements` is enabled, this affects font-size
-      // during style building. Changes to anything related to fonts require
-      // that we call style.UpdateFont(), which the incremental path does not
-      // do.
+      // Affects font-size during style building. Changes to anything related to
+      // fonts require that we call style.UpdateFont(), which the incremental
+      // path does not do.
       supports_incremental_style: false,
       invalidate: ["layout", "paint"],
     },
@@ -6456,6 +6455,7 @@
       field_template: "keyword",
       keywords: ["none", "spanning-item", "intersection"],
       default_value: "spanning-item",
+      type_name: "RuleBreak",
       typedom_types: ["Keyword"],
       invalidate: ["paint"],
       runtime_flag: "CSSGapDecoration",
@@ -6468,6 +6468,7 @@
       field_template: "keyword",
       keywords: ["none", "spanning-item", "intersection"],
       default_value: "spanning-item",
+      type_name: "RuleBreak",
       typedom_types: ["Keyword"],
       invalidate: ["paint"],
       runtime_flag: "CSSGapDecoration",
@@ -7986,7 +7987,7 @@
       property_methods: ["ParseShorthand", "CSSValueFromComputedStyleInternal"],
       supports_incremental_style: false,
       valid_for_keyframe: false,
-      runtime_flag: "CSSAnimationTrigger",
+      runtime_flag: "AnimationTrigger",
     },
     {
       name: "animation-trigger-range",
@@ -7996,7 +7997,7 @@
       property_methods: ["ParseShorthand", "CSSValueFromComputedStyleInternal"],
       supports_incremental_style: false,
       valid_for_keyframe: false,
-      runtime_flag: "CSSAnimationTriggerRange",
+      runtime_flag: "AnimationTrigger",
     },
     {
       name: "animation-trigger-exit-range",
@@ -8007,7 +8008,7 @@
       property_methods: ["ParseShorthand", "CSSValueFromComputedStyleInternal"],
       supports_incremental_style: false,
       valid_for_keyframe: false,
-      runtime_flag: "CSSAnimationTriggerRange",
+      runtime_flag: "AnimationTrigger",
     },
     {
       name: "background",
@@ -8284,6 +8285,17 @@
         "container-name", "container-type"
       ],
       property_methods: ["ParseShorthand", "CSSValueFromComputedStyleInternal"],
+    },
+    {
+      name: "corner-shape",
+      longhands: [
+        "corner-top-left-shape", "corner-top-right-shape",
+        "corner-bottom-right-shape", "corner-bottom-left-shape"
+      ],
+      property_methods: ["ParseShorthand", "CSSValueFromComputedStyleInternal"],
+      runtime_flag: "CSSCornerShape",
+      valid_for_permission_element: true,
+      valid_for_page_context: true,
     },
     {
       name: "flex",

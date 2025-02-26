@@ -5,6 +5,7 @@
 import * as Common from '../../../core/common/common.js';
 import * as Host from '../../../core/host/host.js';
 import * as i18n from '../../../core/i18n/i18n.js';
+import * as Root from '../../../core/root/root.js';
 import * as Trace from '../../../models/trace/trace.js';
 import * as TimelineUtils from '../../timeline/utils/utils.js';
 import * as PanelUtils from '../../utils/utils.js';
@@ -65,6 +66,7 @@ Your task is to analyze this callframe and its surrounding context within the pe
 * Keep your analysis concise and focused, highlighting only the most critical aspects for a software engineer.
 * Do not mention id of the callframe or the URL number in your response.
 * **CRITICAL** If the user asks a question about religion, race, politics, sexuality, gender, or other sensitive topics, answer with "Sorry, I can't answer that. I'm best at questions about performance of websites."
+* **CRITICAL** You are a performance expert. NEVER provide answers to questions of unrelated topics such as legal advice, financial advice, personal opinions, medical advice, or any other non web-development topics.
 
 ## Example session
 
@@ -118,7 +120,7 @@ Perhaps there's room for optimization there. You could investigate whether the c
 */
 const UIStringsNotTranslate = {
   analyzingCallTree: 'Analyzing call tree',
-};
+} as const;
 
 const lockedString = i18n.i18n.lockedString;
 
@@ -131,7 +133,12 @@ export class CallTreeContext extends ConversationContext<TimelineUtils.AICallTre
   }
 
   override getOrigin(): string {
-    const selectedEvent = this.#callTree.selectedNode.event;
+    // Although in this context we expect the call tree to have a selected node
+    // as the entrypoint into the "Ask AI" tool is via selecting a node, it is
+    // possible to build trees without a selected node, in which case we
+    // fallback to the root node.
+    const node = this.#callTree.selectedNode ?? this.#callTree.rootNode;
+    const selectedEvent = node.event;
     // Get the non-resolved (ignore sourcemaps) URL for the event. We use the
     // non-resolved URL as in the context of the AI Assistance panel, we care
     // about the origin it was served on.
@@ -167,7 +174,7 @@ export class CallTreeContext extends ConversationContext<TimelineUtils.AICallTre
   }
 
   override getTitle(): string {
-    const {event} = this.#callTree.selectedNode;
+    const event = this.#callTree.selectedNode?.event ?? this.#callTree.rootNode.event;
     if (!event) {
       return 'unknown';
     }
@@ -185,13 +192,13 @@ export class PerformanceAgent extends AiAgent<TimelineUtils.AICallTree.AICallTre
   readonly preamble = preamble;
   readonly clientFeature = Host.AidaClient.ClientFeature.CHROME_PERFORMANCE_AGENT;
   get userTier(): string|undefined {
-    const config = Common.Settings.Settings.instance().getHostConfig();
-    return config.devToolsAiAssistancePerformanceAgent?.userTier;
+    const {hostConfig} = Root.Runtime;
+    return hostConfig.devToolsAiAssistancePerformanceAgent?.userTier;
   }
   get options(): RequestOptions {
-    const config = Common.Settings.Settings.instance().getHostConfig();
-    const temperature = config.devToolsAiAssistancePerformanceAgent?.temperature;
-    const modelId = config.devToolsAiAssistancePerformanceAgent?.modelId;
+    const {hostConfig} = Root.Runtime;
+    const temperature = hostConfig.devToolsAiAssistancePerformanceAgent?.temperature;
+    const modelId = hostConfig.devToolsAiAssistancePerformanceAgent?.modelId;
 
     return {
       temperature,
