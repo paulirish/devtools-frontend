@@ -441,6 +441,10 @@ const UIStrings = {
    */
   blockRequestDomain: 'Block request domain',
   /**
+   *@description A context menu item in the Network Log View of the Network panel
+   */
+  blockThirdPartyDomain: 'Block third-party domain',
+  /**
    *@description Text to replay an XHR request
    */
   replayXhr: 'Replay XHR',
@@ -1890,6 +1894,11 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
         contextMenu.debugSection().appendItem(
             i18nString(UIStrings.blockRequestDomain), addBlockedURL.bind(null, domain),
             {jslogContext: 'block-request-domain'});
+        
+        // Add the new option to block third-party domain
+        contextMenu.debugSection().appendItem(
+            i18nString(UIStrings.blockThirdPartyDomain), this.blockThirdPartyDomain.bind(this, request),
+            {jslogContext: 'block-third-party-domain'});
       } else if (domain) {
         const croppedDomain = Platform.StringUtilities.trimMiddle(domain, maxBlockedURLLength);
         contextMenu.debugSection().appendItem(
@@ -2005,6 +2014,62 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
   private clearBrowserCookies(): void {
     if (confirm(i18nString(UIStrings.areYouSureYouWantToClearBrowserCookies))) {
       SDK.NetworkManager.MultitargetNetworkManager.instance().clearBrowserCookies();
+    }
+  }
+
+  private blockThirdPartyDomain(request: SDK.NetworkRequest.NetworkRequest): void {
+    const domain = request.parsedURL.domain();
+    if (!domain) {
+      return;
+    }
+    
+    // Handle IP addresses
+    if (/^(\d{1,3}\.){3}\d{1,3}$/.test(domain)) {
+      // For IP addresses, block the exact IP
+      const pattern = domain;
+      this.addBlockedPattern(pattern);
+      return;
+    }
+    
+    // Extract the effective top-level domain plus one level (eTLD+1)
+    // This handles special cases like .co.uk, .com.au, etc.
+    const domainParts = domain.split('.');
+    let baseDomain = domain;
+    
+    // List of known special TLDs that need special handling
+    const specialTLDs = ['co.uk', 'com.au', 'co.jp', 'co.nz', 'co.za', 'com.br', 'com.mx'];
+    
+    if (domainParts.length >= 3) {
+      const potentialSpecialTLD = domainParts.slice(domainParts.length - 2).join('.');
+      if (specialTLDs.includes(potentialSpecialTLD)) {
+        // For special TLDs, include 3 parts (e.g., example.co.uk)
+        baseDomain = domainParts.slice(domainParts.length - 3).join('.');
+      } else {
+        // For normal domains, include 2 parts (e.g., example.com)
+        baseDomain = domainParts.slice(domainParts.length - 2).join('.');
+      }
+    }
+    
+    // Create a pattern that will match all subdomains
+    const pattern = `*.${baseDomain}`;
+    
+    // Add the pattern to the blocked URLs
+    this.addBlockedPattern(pattern);
+  }
+
+  private addBlockedPattern(pattern: string): void {
+    const manager = SDK.NetworkManager.MultitargetNetworkManager.instance();
+    let patterns = manager.blockedPatterns();
+    
+    // Check if pattern already exists
+    if (!patterns.find(p => p.url === pattern)) {
+      patterns.push({enabled: true, url: pattern as Platform.DevToolsPath.UrlString});
+      manager.setBlockedPatterns(patterns);
+      manager.setBlockingEnabled(true);
+      void UI.ViewManager.ViewManager.instance().showView('network.blocked-urls');
+      
+      // Show feedback to the user
+      Common.Console.Console.instance().info(`Domain pattern ${pattern} has been blocked.`);
     }
   }
 
