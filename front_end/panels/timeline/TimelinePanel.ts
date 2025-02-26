@@ -116,6 +116,14 @@ const UIStrings = {
    */
   saveProfile: 'Save profile…',
   /**
+   *@description Text for the save annotations checkbox in the save dialog
+   */
+  saveAnnotations: 'Save annotations (modifications)',
+  /**
+   *@description Text for the save trace button in the save dialog
+   */
+  saveTrace: 'Save trace',
+  /**
    *@description Text to take screenshots
    */
   captureScreenshots: 'Capture screenshots',
@@ -812,67 +820,105 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     if (this.state !== State.Idle) {
       return;
     }
-    const traceEvents = this.#traceEngineModel.rawTraceEvents(this.#traceEngineActiveTraceIndex);
-    const metadata = this.#traceEngineModel.metadata(this.#traceEngineActiveTraceIndex);
-    // Save modifications into the metadata if modifications experiment is on
-    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_ANNOTATIONS_OVERLAYS) && metadata) {
-      metadata.modifications = ModificationsManager.activeManager()?.toJSON();
-    }
-    if (metadata && isEnhancedTraces) {
-      metadata.enhancedTraceVersion = TraceEngine.Handlers.ModelHandlers.EnhancedTraces.EnhancedTracesVersion;
-    }
-    if (!traceEvents) {
-      return;
-    }
-
-    const traceStart = Platform.DateUtilities.toISO8601Compact(new Date());
-    let fileName: Platform.DevToolsPath.RawPathString;
-    if (metadata?.dataOrigin === TraceEngine.Types.File.DataOrigin.CPUProfile) {
-      fileName = `CPU-${traceStart}.cpuprofile` as Platform.DevToolsPath.RawPathString;
-    } else if (metadata && metadata.enhancedTraceVersion) {
-      fileName = `EnhancedTraces-${traceStart}.json` as Platform.DevToolsPath.RawPathString;
-    } else {
-      fileName = `Trace-${traceStart}.json` as Platform.DevToolsPath.RawPathString;
-    }
-
-    try {
-      // TODO(crbug.com/1456818): Extract this logic and add more tests.
-      let traceAsString;
-      if (metadata?.dataOrigin === TraceEngine.Types.File.DataOrigin.CPUProfile) {
-        const profileEvent = traceEvents.find(e => e.name === 'CpuProfile');
-        if (!profileEvent || !profileEvent.args?.data) {
-          return;
-        }
-        const profileEventData = profileEvent.args?.data;
-        if (profileEventData.hasOwnProperty('cpuProfile')) {
-          // TODO(crbug.com/1456799): Currently use a hack way because we can't differentiate
-          // cpuprofile from trace events when loading a file.
-          // The loader will directly add the fake trace created from CpuProfile to the tracingModel.
-          // And there is where the old saving logic saves the cpuprofile.
-          // This will be solved when the CPUProfileHandler is done. Then we can directly get it
-          // from the new traceEngine
-          const profile = (profileEventData as {cpuProfile: Protocol.Profiler.Profile}).cpuProfile;
-          traceAsString = cpuprofileJsonGenerator(profile as Protocol.Profiler.Profile);
-        }
-      } else {
-        const formattedTraceIter = traceJsonGenerator(traceEvents, metadata);
-        traceAsString = Array.from(formattedTraceIter).join('');
+    
+    // Create and show the save dialog
+    const dialog = new UI.Dialog.Dialog('save-trace-dialog');
+    dialog.registerCSSFiles([timelineSaveDialogStyles]);
+    dialog.setDimmed(true);
+    dialog.setOutsideClickCallback(() => dialog.hide());
+    dialog.addCloseButton();
+    dialog.setOutsideTabIndexBehavior(UI.Dialog.OutsideTabIndexBehavior.PreserveMainViewTabIndex);
+    
+    const dialogContentElement = dialog.contentElement.createChild('div', 'save-dialog-content');
+    dialogContentElement.classList.add('timeline-save-dialog');
+    
+    const saveAnnotationsCheckboxLabel = dialogContentElement.createChild('label', 'save-dialog-checkbox-label');
+    const saveAnnotationsCheckbox = saveAnnotationsCheckboxLabel.createChild('input');
+    saveAnnotationsCheckbox.type = 'checkbox';
+    saveAnnotationsCheckbox.checked = true;
+    saveAnnotationsCheckboxLabel.createTextChild(i18nString(UIStrings.saveAnnotations));
+    
+    const buttonsRow = dialogContentElement.createChild('div', 'save-dialog-buttons');
+    const cancelButton = buttonsRow.createChild('button');
+    cancelButton.textContent = i18nString(UIStrings.close);
+    cancelButton.addEventListener('click', () => dialog.hide(), false);
+    
+    const saveButton = buttonsRow.createChild('button');
+    saveButton.textContent = i18nString(UIStrings.saveTrace);
+    saveButton.classList.add('primary-button');
+    
+    saveButton.addEventListener('click', async () => {
+      dialog.hide();
+      
+      const traceEvents = this.#traceEngineModel.rawTraceEvents(this.#traceEngineActiveTraceIndex);
+      const metadata = this.#traceEngineModel.metadata(this.#traceEngineActiveTraceIndex);
+      
+      // Save modifications into the metadata if checkbox is checked and modifications experiment is on
+      if (saveAnnotationsCheckbox.checked && 
+          Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_ANNOTATIONS_OVERLAYS) && 
+          metadata) {
+        metadata.modifications = ModificationsManager.activeManager()?.toJSON();
       }
-      if (!traceAsString) {
-        throw new Error('Trace content empty');
+      
+      if (metadata && isEnhancedTraces) {
+        metadata.enhancedTraceVersion = TraceEngine.Handlers.ModelHandlers.EnhancedTraces.EnhancedTracesVersion;
       }
-      await Workspace.FileManager.FileManager.instance().save(
-          fileName, traceAsString, true /* forceSaveAs */, false /* isBase64 */);
-      Workspace.FileManager.FileManager.instance().close(fileName);
-    } catch (error) {
-      console.error(error.stack);
-      if (error.name === 'AbortError') {
-        // The user cancelled the action, so this is not an error we need to report.
+      
+      if (!traceEvents) {
         return;
       }
-      Common.Console.Console.instance().error(
-          i18nString(UIStrings.failedToSaveTimelineSS, {PH1: error.message, PH2: error.name}));
-    }
+
+      const traceStart = Platform.DateUtilities.toISO8601Compact(new Date());
+      let fileName: Platform.DevToolsPath.RawPathString;
+      if (metadata?.dataOrigin === TraceEngine.Types.File.DataOrigin.CPUProfile) {
+        fileName = `CPU-${traceStart}.cpuprofile` as Platform.DevToolsPath.RawPathString;
+      } else if (metadata && metadata.enhancedTraceVersion) {
+        fileName = `EnhancedTraces-${traceStart}.json` as Platform.DevToolsPath.RawPathString;
+      } else {
+        fileName = `Trace-${traceStart}.json` as Platform.DevToolsPath.RawPathString;
+      }
+
+      try {
+        // TODO(crbug.com/1456818): Extract this logic and add more tests.
+        let traceAsString;
+        if (metadata?.dataOrigin === TraceEngine.Types.File.DataOrigin.CPUProfile) {
+          const profileEvent = traceEvents.find(e => e.name === 'CpuProfile');
+          if (!profileEvent || !profileEvent.args?.data) {
+            return;
+          }
+          const profileEventData = profileEvent.args?.data;
+          if (profileEventData.hasOwnProperty('cpuProfile')) {
+            // TODO(crbug.com/1456799): Currently use a hack way because we can't differentiate
+            // cpuprofile from trace events when loading a file.
+            // The loader will directly add the fake trace created from CpuProfile to the tracingModel.
+            // And there is where the old saving logic saves the cpuprofile.
+            // This will be solved when the CPUProfileHandler is done. Then we can directly get it
+            // from the new traceEngine
+            const profile = (profileEventData as {cpuProfile: Protocol.Profiler.Profile}).cpuProfile;
+            traceAsString = cpuprofileJsonGenerator(profile as Protocol.Profiler.Profile);
+          }
+        } else {
+          const formattedTraceIter = traceJsonGenerator(traceEvents, metadata);
+          traceAsString = Array.from(formattedTraceIter).join('');
+        }
+        if (!traceAsString) {
+          throw new Error('Trace content empty');
+        }
+        await Workspace.FileManager.FileManager.instance().save(
+            fileName, traceAsString, true /* forceSaveAs */, false /* isBase64 */);
+        Workspace.FileManager.FileManager.instance().close(fileName);
+      } catch (error) {
+        console.error(error.stack);
+        if (error.name === 'AbortError') {
+          // The user cancelled the action, so this is not an error we need to report.
+          return;
+        }
+        Common.Console.Console.instance().error(
+            i18nString(UIStrings.failedToSaveTimelineSS, {PH1: error.message, PH2: error.name}));
+      }
+    });
+    
+    dialog.show();
   }
 
   async showHistory(): Promise<void> {
