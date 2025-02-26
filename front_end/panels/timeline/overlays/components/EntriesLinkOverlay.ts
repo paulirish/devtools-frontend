@@ -188,51 +188,89 @@ export class EntriesLinkOverlay extends HTMLElement {
     this.#entryFromConnector.setAttribute('visibility', drawFromEntryConnectorCircle ? 'visible' : 'hidden');
     this.#entryToConnector.setAttribute('visibility', drawToEntryConnectorCircle ? 'visible' : 'hidden');
 
-    // If the entry is visible, the entry arrow starts from the middle of the right edge of the entry (end on the X axis and middle of the Y axis).
-    // If not, draw it to the y coordinate of the entry and the edge of the timeline so it is pointing in the direction of the entry.
+    let fromX, fromY, toX, toY;
     const halfFromEntryHeight = this.#fromEntryDimensions.height / 2;
+
+    // Calculate the from entry coordinates
     if (this.#entryFromVisible) {
-      const endConnectionPointX = String(this.#coordinateFrom.x + this.#fromEntryDimensions.width);
-      const endConnectionPointY = String(this.#coordinateFrom.y + halfFromEntryHeight);
-
-      this.#connector.setAttribute('x1', endConnectionPointX);
-      this.#connector.setAttribute('y1', endConnectionPointY);
-
-      this.#entryFromConnector.setAttribute('cx', endConnectionPointX);
-      this.#entryFromConnector.setAttribute('cy', endConnectionPointY);
+      // If the from entry is visible, use its actual coordinates
+      fromX = this.#coordinateFrom.x + this.#fromEntryDimensions.width;
+      fromY = this.#coordinateFrom.y + halfFromEntryHeight;
+      
       this.#entryFromWrapper.style.visibility = 'visible';
     } else {
-      this.#connector.setAttribute('x1', (this.#coordinateFrom.x + this.#fromEntryDimensions.width).toString());
-      this.#connector.setAttribute('y1', String(this.#coordinateFrom.y + halfFromEntryHeight));
+      // If the from entry is not visible, calculate a plausible location
+      if (this.#toEntryDimensions && this.#entryToVisible) {
+        // If the to entry is visible, calculate the plausible location based on it
+        const toCoord = {
+          x: this.#coordinateTo.x,
+          y: this.#coordinateTo.y + (this.#toEntryDimensions.height / 2)
+        };
+        const plausibleLocation = this.#calculatePlausibleLocation(
+          true, 
+          {x: this.#coordinateFrom.x + this.#fromEntryDimensions.width, y: this.#coordinateFrom.y + halfFromEntryHeight},
+          toCoord
+        );
+        fromX = plausibleLocation.x;
+        fromY = plausibleLocation.y;
+      } else {
+        // If neither entry is visible, use the original coordinates
+        fromX = this.#coordinateFrom.x + this.#fromEntryDimensions.width;
+        fromY = this.#coordinateFrom.y + halfFromEntryHeight;
+      }
+      
       this.#entryFromWrapper.style.visibility = 'hidden';
     }
 
-    // If the arrow is pointing to the entry and that entry is visible, point it to the middle of the entry.
-    // If the entry is not visible, point the arrow to the edge of the screen towards the entry.
-    // Otherwise, the arrow is following the mouse so we assign it to the provided coordinates.
+    // Calculate the to entry coordinates
     if (this.#toEntryDimensions && this.#entryToVisible) {
-      const connectionPointX = String(this.#coordinateTo.x);
-      const connectionPointY = String(this.#coordinateTo.y + this.#toEntryDimensions.height / 2);
-
-      this.#connector.setAttribute('x2', connectionPointX);
-      this.#connector.setAttribute('y2', connectionPointY);
-
-      this.#entryToConnector.setAttribute('cx', connectionPointX);
-      this.#entryToConnector.setAttribute('cy', connectionPointY);
-
+      // If the to entry is visible, use its actual coordinates
+      toX = this.#coordinateTo.x;
+      toY = this.#coordinateTo.y + (this.#toEntryDimensions.height / 2);
+      
       this.#entryToWrapper.style.visibility = 'visible';
     } else {
-      this.#entryToWrapper.style.visibility = 'hidden';
-      this.#connector.setAttribute('x2', this.#coordinateTo.x.toString());
-      // If `toEntryDimensions` exist, the arrow points to the entry and we need to take its height into account.
-      // Otherwise, it is following the mouse.
+      // If the to entry is not visible, calculate a plausible location
       if (this.#toEntryDimensions) {
-        const halfToEntryHeight = this.#toEntryDimensions.height / 2;
-        this.#connector.setAttribute('y2', String(this.#coordinateTo.y + halfToEntryHeight));
+        // If we have dimensions for the to entry but it's not visible
+        if (this.#entryFromVisible) {
+          // If the from entry is visible, calculate the plausible location based on it
+          const fromCoord = {
+            x: this.#coordinateFrom.x + this.#fromEntryDimensions.width,
+            y: this.#coordinateFrom.y + halfFromEntryHeight
+          };
+          const plausibleLocation = this.#calculatePlausibleLocation(
+            false,
+            {x: this.#coordinateTo.x, y: this.#coordinateTo.y + (this.#toEntryDimensions.height / 2)},
+            fromCoord
+          );
+          toX = plausibleLocation.x;
+          toY = plausibleLocation.y;
+        } else {
+          // If neither entry is visible, use the original coordinates
+          toX = this.#coordinateTo.x;
+          toY = this.#coordinateTo.y + (this.#toEntryDimensions.height / 2);
+        }
       } else {
-        this.#connector.setAttribute('y2', (this.#coordinateTo.y).toString());
+        // If we don't have dimensions for the to entry (e.g., it's following the mouse)
+        toX = this.#coordinateTo.x;
+        toY = this.#coordinateTo.y;
       }
+      
+      this.#entryToWrapper.style.visibility = 'hidden';
     }
+
+    // Set the coordinates for the connector line
+    this.#connector.setAttribute('x1', String(fromX));
+    this.#connector.setAttribute('y1', String(fromY));
+    this.#connector.setAttribute('x2', String(toX));
+    this.#connector.setAttribute('y2', String(toY));
+
+    // Set the coordinates for the connector circles
+    this.#entryFromConnector.setAttribute('cx', String(fromX));
+    this.#entryFromConnector.setAttribute('cy', String(fromY));
+    this.#entryToConnector.setAttribute('cx', String(toX));
+    this.#entryToConnector.setAttribute('cy', String(toY));
 
     this.#connector.setAttribute('stroke-width', '2');
 
@@ -278,6 +316,75 @@ export class EntriesLinkOverlay extends HTMLElement {
     const visibleLineFromTotalPercentage = (visibleLineLength * 100) / lineLength;
 
     return (visibleLineFromTotalPercentage < 100) ? visibleLineFromTotalPercentage : 100;
+  }
+
+  /**
+   * Calculate a plausible location for a non-visible entry.
+   * If the entry is not visible (due to zoom, collapsed track, or scroll position),
+   * we need to calculate a plausible location at the edge of the visible area
+   * in the direction of the entry.
+   */
+  #calculatePlausibleLocation(
+      isFromEntry: boolean, 
+      entryCoordinate: {x: number, y: number}, 
+      otherEntryCoordinate: {x: number, y: number}
+  ): {x: number, y: number} {
+    if (!this.#canvasRect) {
+      return entryCoordinate;
+    }
+
+    // Clone the coordinates to avoid modifying the original
+    const result = {x: entryCoordinate.x, y: entryCoordinate.y};
+    
+    // Calculate the direction vector from the visible entry to the non-visible entry
+    const directionX = entryCoordinate.x - otherEntryCoordinate.x;
+    const directionY = entryCoordinate.y - otherEntryCoordinate.y;
+    
+    // Normalize the direction vector
+    const length = Math.sqrt(directionX * directionX + directionY * directionY);
+    const normalizedDirX = length > 0 ? directionX / length : 0;
+    const normalizedDirY = length > 0 ? directionY / length : 0;
+    
+    // Determine the edge of the canvas in the direction of the non-visible entry
+    if (Math.abs(normalizedDirX) > Math.abs(normalizedDirY)) {
+      // Horizontal direction is dominant
+      if (directionX > 0) {
+        // Non-visible entry is to the right
+        result.x = this.#canvasRect.width;
+      } else {
+        // Non-visible entry is to the left
+        result.x = 0;
+      }
+      
+      // Adjust y-coordinate to maintain the same slope
+      if (directionX !== 0) {
+        const slope = directionY / directionX;
+        const dx = result.x - otherEntryCoordinate.x;
+        result.y = otherEntryCoordinate.y + slope * dx;
+      }
+    } else {
+      // Vertical direction is dominant
+      if (directionY > 0) {
+        // Non-visible entry is below
+        result.y = this.#canvasRect.height;
+      } else {
+        // Non-visible entry is above
+        result.y = 0;
+      }
+      
+      // Adjust x-coordinate to maintain the same slope
+      if (directionY !== 0) {
+        const inverseSlope = directionX / directionY;
+        const dy = result.y - otherEntryCoordinate.y;
+        result.x = otherEntryCoordinate.x + inverseSlope * dy;
+      }
+    }
+    
+    // Ensure the coordinates are within the canvas bounds
+    result.x = Math.max(0, Math.min(this.#canvasRect.width, result.x));
+    result.y = Math.max(0, Math.min(this.#canvasRect.height, result.y));
+    
+    return result;
   }
 
   #updateCreateLinkBox(): void {
