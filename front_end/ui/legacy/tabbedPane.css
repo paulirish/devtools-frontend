@@ -222,6 +222,7 @@
   top: 0.75px;
 }
 
+
 .tabbed-pane-header-tab {
   font: var(--sys-typescale-body4-medium);
   color: var(--sys-color-on-surface-subtle);

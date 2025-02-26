@@ -50,9 +50,11 @@ import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import imagePreviewStylesRaw from '../../ui/legacy/components/utils/imagePreview.css.js';
 import * as LegacyComponents from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import * as Lit from '../../ui/lit/lit.js';
 
 import {getDurationString} from './AppenderUtils.js';
 import * as TimelineComponents from './components/components.js';
+import * as InsightComponents from './components/insights/insights.js';
 import * as Extensions from './extensions/extensions.js';
 import {Tracker} from './FreshRecording.js';
 import {ModificationsManager} from './ModificationsManager.js';
@@ -1897,6 +1899,9 @@ export class TimelineUIUtils {
 
   private static createEntryLink(entry: Trace.Types.Events.Event): HTMLElement {
     const link = document.createElement('span');
+
+    const eventRef = InsightComponents.EventRef.eventRef(entry);
+    return Lit.render(eventRef, link).parentNode as HTMLElement;
 
     const traceBoundsState = TraceBounds.TraceBounds.BoundsManager.instance().state();
 
