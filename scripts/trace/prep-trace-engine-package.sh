@@ -114,7 +114,7 @@ for path in Path('$out_dir/gen/front_end/core/i18n/locales').glob('*.json'):
     strings = json.loads(path.read_text())
     keys = [
         key for key in strings.keys()
-        if key.startswith('models/trace/insights/') or key.startswith('generated/Deprecation.ts')
+        if key.startswith('models/trace/insights/') or key.startswith('panels/application/components/BackForwardCacheStrings.ts') or key.startswith('generated/Deprecation.ts')
     ]
     strings = {key: strings[key] for key in keys}
     (locales_out_path / path.name).write_text(json.dumps(strings, indent=2))
