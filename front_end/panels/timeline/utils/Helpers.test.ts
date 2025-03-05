@@ -37,11 +37,26 @@ describe('Helpers', () => {
   });
 
   it('shortenUrl', function() {
-    const url = new URL('https://cdn.permutive.com/models/v2/d2fb08da-1c03-4c8a-978f-ad8a96b4c31f-models.bin');
+    let url = new URL('https://cdn.permutive.com/models/v2/d2fb08da-1c03-4c8a-978f-ad8a96b4c31f-models.bin');
     // Shows lastPath and then reveals more of it, per maxCharacters
-    assert.strictEqual(Helpers.shortenUrl(url, 40), 'd2fb08da-1c03-4c8a-9…96b4c31f-models.bin');
+    assert.strictEqual(Helpers.shortenUrl(url, 40), 'd2fb…models.bin');
     assert.strictEqual(Helpers.shortenUrl(url, 70), '/models/v2/d2fb08da-1c03-4c8a-978f-ad8a96b4c31f-models.bin');
+
+    url = new URL('https://github.githubassets.com/assets/delegated-events_catalyst_lib_index_js-f6223d90c7ba.js');
+    assert.strictEqual(Helpers.shortenUrl(url, 70), '/assets/delegated-events_catalyst_lib_index_js-f6223d90c7ba.js');
+    assert.strictEqual(Helpers.shortenUrl(url, 40), 'delegated-events_cat…ib_index_js-f62….js');
+
+    // Don't allow adjacent ellipsis
+    url = new URL('https://yeah.cool/scripts/sekshn-aef425827-cutethings-toys.js');
+    const shortUrl = Helpers.shortenUrl(url, 23);
+    assert.notStrictEqual(shortUrl, 'sekshn-aef……ngs-toys.js');
+    assert.strictEqual(shortUrl, 'sekshn-aef…ngs-toys.js');
+
+    // Drop words like 'chunk' and 'bundle'
+    url = new URL('https://yeah.cool/scripts/bundle-app-aef425827.js');
+    assert.strictEqual(Helpers.shortenUrl(url, 20), '…-app-aef….js');
   });
+
   describe('formatOriginWithEntity', () => {
     it('recognized entities', function() {
       const url = new URL('https://securepubads.g.doubleclick.net/tag/js/gpt.js');

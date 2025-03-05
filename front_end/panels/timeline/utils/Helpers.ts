@@ -100,6 +100,8 @@ export function createUrlLabels(urls: URL[]): string[] {
   return labels.map(label => label.length > 1 && label.endsWith('/') ? label.substring(0, label.length - 1) : label);
 }
 
+const ELLIPSIS = '\u2026';
+
 /**
  * Shortens the provided URL for use within a narrow display usecase.
  *
@@ -110,21 +112,36 @@ export function createUrlLabels(urls: URL[]): string[] {
  * If the last path component is larger than maxChars characters, the middle is elided.
  */
 export function shortenUrl(url: URL, maxChars = 20): string {
-  const parts = url.pathname === '/' ? [url.host] : url.pathname.split('/');
+  let parts = url.pathname === '/' ? [url.host] : url.pathname.split('/');
   let shortenedUrl = parts.at(-1) ?? '';
 
+  // Elide hexadecimal hashes (including hyphen/underscore, like a UUID) of 8+ chars. Replacement is first 4 chars plus …
+  const elideHexHashes = (str: string) =>
+      str.replace(/\b([a-f0-9-_]{8,})\b/g, match => match.substring(0, 4) + ELLIPSIS);
+  // Terms like 'chunk' and 'bundle' don't help identify scripts
+  const removeNoisyWords = (str: string) => str.replace(/(?:\b|_)(?:chunk|bundle)(?:\b|_)/, ELLIPSIS)
+  // After all adjustments, we don't want two+ ellipsis next to eachother
+  const mergeAdjacentEllipses = (str: string) => str.replace(/\u2026+/g, ELLIPSIS);
+
+  // If only the filename is still too long…
   if (shortenedUrl.length > maxChars) {
-    return Platform.StringUtilities.trimMiddle(shortenedUrl, maxChars);
+    shortenedUrl = removeNoisyWords(elideHexHashes(shortenedUrl));
+    return mergeAdjacentEllipses(Platform.StringUtilities.trimMiddle(shortenedUrl, maxChars));
   }
+
+  // Filename can fit, so lets add path parts in, until they can't fit.
+  const pathName = removeNoisyWords(url.pathname);
+  parts = pathName === '/' ? [url.host] : pathName.split('/');
 
   let i = parts.length - 1;
   while (--i >= 0) {
     if (shortenedUrl.length + parts[i].length <= maxChars) {
-      shortenedUrl = `${parts[i]}/${shortenedUrl}`;
+      const part = parts[i];
+      shortenedUrl = `${part}/${shortenedUrl}`;
     }
   }
 
-  return shortenedUrl;
+  return mergeAdjacentEllipses(shortenedUrl);
 }
 
 /**
