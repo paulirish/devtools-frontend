@@ -79,7 +79,7 @@ export class ResourceSourceFrame extends SourceFrameImpl {
   }
 
   static createSearchableView(resource: TextUtils.ContentProvider.ContentProvider, contentType: string):
-      UI.Widget.Widget {
+      SearchableContainer {
     return new SearchableContainer(resource, contentType);
   }
 
@@ -99,7 +99,7 @@ export class ResourceSourceFrame extends SourceFrameImpl {
 }
 
 export class SearchableContainer extends UI.Widget.VBox {
-  private readonly sourceFrame: ResourceSourceFrame;
+  readonly sourceFrame: ResourceSourceFrame;
 
   constructor(resource: TextUtils.ContentProvider.ContentProvider, contentType: string) {
     super(true);

@@ -344,8 +344,13 @@ export class Linkifier extends Common.ObjectWrapper.ObjectWrapper<EventTypes> im
           return Promise.resolve(false);
         }
 
-        const resourceSourceFrame =
-            new ResourceSourceFrame(linkInfo.uiLocation.uiSourceCode, linkInfo.uiLocation.uiSourceCode.mimeType());
+
+        const resourceSourceFrame = ResourceSourceFrame.createSearchableView(
+            linkInfo.uiLocation.uiSourceCode, linkInfo.uiLocation.uiSourceCode.mimeType());
+
+
+        // const resourceSourceFrame =
+        //     new ResourceSourceFrame(linkInfo.uiLocation.uiSourceCode, linkInfo.uiLocation.uiSourceCode.mimeType());
 
         const position = {
           lineNumber: linkInfo.uiLocation.lineNumber,
@@ -353,7 +358,10 @@ export class Linkifier extends Common.ObjectWrapper.ObjectWrapper<EventTypes> im
         };
         const to = {...position, columnNumber: 35};
         resourceSourceFrame.show(popover.contentElement);
-        resourceSourceFrame.revealPosition({to, from: position}, true);
+
+        // reveal needs to set x:center too.   it currently ends up in the first !empty case for some reason.
+        // need to have from/to and prettyprint (via searchableview (or something else)) to get actual RANGE highlight that uses columnnumber
+        resourceSourceFrame.sourceFrame.revealPosition({to, from: position}, true);
 
         popover.setAnchorBehavior(UI.GlassPane.AnchorBehavior.PREFER_TOP);
         popover.setSizeBehavior(UI.GlassPane.SizeBehavior.SET_EXACT_SIZE);
