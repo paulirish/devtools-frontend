@@ -331,13 +331,8 @@ export class Linkifier extends Common.ObjectWrapper.ObjectWrapper<EventTypes> im
     this.popoverHelper = new UI.PopoverHelper.PopoverHelper(
         link, (event: MouseEvent|KeyboardEvent) => this.getPopoverRequest(event, link));
 
-    link.addEventListener('mouseover', () => {
-      console.log('mouseover');
-    });
-
-    link.addEventListener('mouseout', () => {
-      console.log('mouseout');
-    });
+    link.addEventListener('mouseover', () => console.log('mouseover'));
+    link.addEventListener('mouseout', () => console.log('mouseout'));
   }
 
   private getPopoverRequest(event: MouseEvent|KeyboardEvent, link: HTMLElement): UI.PopoverHelper.PopoverRequest|null {
@@ -352,9 +347,13 @@ export class Linkifier extends Common.ObjectWrapper.ObjectWrapper<EventTypes> im
         const resourceSourceFrame =
             new ResourceSourceFrame(linkInfo.uiLocation.uiSourceCode, linkInfo.uiLocation.uiSourceCode.mimeType());
 
-        const position = {lineNumber: linkInfo.uiLocation.lineNumber, columnNumber: linkInfo.uiLocation.columnNumber};
-        resourceSourceFrame.revealPosition(position);
+        const position = {
+          lineNumber: linkInfo.uiLocation.lineNumber,
+          columnNumber: linkInfo.uiLocation.columnNumber ?? 0
+        };
+        const to = {...position, columnNumber: 35};
         resourceSourceFrame.show(popover.contentElement);
+        resourceSourceFrame.revealPosition({to, from: position}, true);
 
         popover.setAnchorBehavior(UI.GlassPane.AnchorBehavior.PREFER_TOP);
         popover.setSizeBehavior(UI.GlassPane.SizeBehavior.SET_EXACT_SIZE);

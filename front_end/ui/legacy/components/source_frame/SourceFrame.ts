@@ -605,6 +605,7 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
     this.lineToScrollTo = null;
     this.selectionToSet = null;
     if (typeof position === 'number') {
+      // We were passed a single number; interpret it as a position (characters from start)
       let line = 0, column = 0;
       const {doc} = this.textEditor.state;
       if (position > doc.length) {
@@ -616,9 +617,11 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
       }
       this.positionToReveal = {to: {lineNumber: line, columnNumber: column}, shouldHighlight};
     } else if ('lineNumber' in position) {
+      // We were passed a single position; set it as the `to`
       const {lineNumber, columnNumber} = position;
       this.positionToReveal = {to: {lineNumber, columnNumber: columnNumber ?? 0}, shouldHighlight};
     } else {
+      // We were passed a range, both `from` and `to` positions.
       this.positionToReveal = {...position, shouldHighlight};
     }
     this.innerRevealPositionIfNeeded();
