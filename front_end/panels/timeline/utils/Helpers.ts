@@ -120,7 +120,7 @@ export function shortenUrl(url: URL, maxChars = 20): string {
       str.replace(/\b([a-f0-9-_]{8,})\b/g, match => match.substring(0, 4) + ELLIPSIS);
   // Terms like 'chunk' and 'bundle' don't help identify scripts
   const removeNoisyWords = (str: string): string => str.replace(/(?:\b|_)(?:chunk|bundle)(?:\b|_)/, ELLIPSIS);
-  // After all adjustments, we don't want two+ ellipsis next to eachother
+  // After all adjustments, we don't want two+ ellipsis next to each other
   const mergeAdjacentEllipses = (str: string): string => str.replace(/\u2026+/g, ELLIPSIS);
 
   // If only the filename is still too long…
