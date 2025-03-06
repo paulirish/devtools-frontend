@@ -44,6 +44,7 @@ import * as Workspace from '../../../../models/workspace/workspace.js';
 import type * as IconButton from '../../../components/icon_button/icon_button.js';
 import * as VisualLogging from '../../../visual_logging/visual_logging.js';
 import * as UI from '../../legacy.js';
+import {ResourceSourceFrame} from '../source_frame/ResourceSourceFrame.js';
 
 const UIStrings = {
   /**
@@ -97,6 +98,7 @@ export class Linkifier extends Common.ObjectWrapper.ObjectWrapper<EventTypes> im
   private readonly locationPoolByTarget = new Map<SDK.Target.Target, Bindings.LiveLocation.LiveLocationPool>();
   private useLinkDecorator: boolean;
   readonly #anchorUpdaters: WeakMap<Element, (this: Linkifier, anchor: HTMLElement) => void>;
+  private popoverHelper?: UI.PopoverHelper.PopoverHelper;
 
   constructor(maxLengthForDisplayedURLs?: number, useLinkDecorator?: boolean) {
     super();
@@ -126,6 +128,7 @@ export class Linkifier extends Common.ObjectWrapper.ObjectWrapper<EventTypes> im
       updater.call(this, anchor as HTMLElement);
     }
   }
+
 
   static setLinkDecorator(linkDecorator: LinkDecorator): void {
     console.assert(!decorator, 'Cannot re-register link decorator.');
@@ -325,6 +328,9 @@ export class Linkifier extends Common.ObjectWrapper.ObjectWrapper<EventTypes> im
   }
 
   private setupPopover(link: HTMLElement): void {
+    this.popoverHelper = new UI.PopoverHelper.PopoverHelper(
+        link, (event: MouseEvent|KeyboardEvent) => this.getPopoverRequest(event, link));
+
     link.addEventListener('mouseover', () => {
       console.log('mouseover');
     });
@@ -333,6 +339,32 @@ export class Linkifier extends Common.ObjectWrapper.ObjectWrapper<EventTypes> im
       console.log('mouseout');
     });
   }
+
+  private getPopoverRequest(event: MouseEvent|KeyboardEvent, link: HTMLElement): UI.PopoverHelper.PopoverRequest|null {
+    return {
+      box: link.boxInWindow(),
+      show: (popover: UI.GlassPane.GlassPane) => {
+        const linkInfo = Linkifier.linkInfo(link);
+        if (!linkInfo || !linkInfo.uiLocation) {
+          return Promise.resolve(false);
+        }
+
+        const resourceSourceFrame =
+            new ResourceSourceFrame(linkInfo.uiLocation.uiSourceCode, linkInfo.uiLocation.uiSourceCode.mimeType());
+
+        const position = {lineNumber: linkInfo.uiLocation.lineNumber, columnNumber: linkInfo.uiLocation.columnNumber};
+        resourceSourceFrame.revealPosition(position);
+        resourceSourceFrame.show(popover.contentElement);
+
+        popover.setAnchorBehavior(UI.GlassPane.AnchorBehavior.PREFER_TOP);
+        popover.setSizeBehavior(UI.GlassPane.SizeBehavior.SET_EXACT_SIZE);
+        popover.setMaxContentSize(new UI.Geometry.Size(600, 400));
+        return Promise.resolve(true);
+      },
+      hide: undefined,
+    };
+  }
+
 
   linkifyScriptLocation(
       target: SDK.Target.Target|null, scriptId: Protocol.Runtime.ScriptId|null,
