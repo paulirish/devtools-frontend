@@ -320,7 +320,18 @@ export class Linkifier extends Common.ObjectWrapper.ObjectWrapper<EventTypes> im
 
     const anchors = (this.anchorsByTarget.get(rawLocation.debuggerModel.target()) as Element[]);
     anchors.push(link);
+    this.setupPopover(link);
     return link;
+  }
+
+  private setupPopover(link: HTMLElement): void {
+    link.addEventListener('mouseover', () => {
+      console.log('mouseover');
+    });
+
+    link.addEventListener('mouseout', () => {
+      console.log('mouseout');
+    });
   }
 
   linkifyScriptLocation(
