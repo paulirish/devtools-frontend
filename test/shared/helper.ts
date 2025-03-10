@@ -9,7 +9,8 @@ import {AsyncScope} from '../conductor/async-scope.js';
 import type {DevToolsFrontendReloadOptions} from '../conductor/frontend_tab.js';
 import {getDevToolsFrontendHostname, reloadDevTools} from '../conductor/hooks.js';
 import {platform} from '../conductor/mocha-interface-helpers.js';
-import {getBrowserAndPages, getTestServerPort} from '../conductor/puppeteer-state.js';
+import {getBrowserAndPages} from '../conductor/puppeteer-state.js';
+import {getTestServerPort} from '../conductor/server_port.js';
 
 export {platform} from '../conductor/mocha-interface-helpers.js';
 
@@ -470,7 +471,7 @@ export const getResourcesPath = (host = 'localhost') => {
   return `https://${host}:${getTestServerPort()}/test/e2e/resources`;
 };
 
-export const step = async (description: string, step: Function) => {
+export const step = async<T = unknown>(description: string, step: () => Promise<T>| T): Promise<Awaited<T>> => {
   try {
     return await step();
   } catch (error) {

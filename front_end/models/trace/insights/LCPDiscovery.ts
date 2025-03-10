@@ -15,7 +15,6 @@ import {
   type InsightSetContext,
   InsightWarning,
   type PartialInsightModel,
-  type RequiredData,
 } from './types.js';
 
 export const UIStrings = {
@@ -62,10 +61,9 @@ export const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('models/trace/insights/LCPDiscovery.ts', UIStrings);
 export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-export function deps(): ['NetworkRequests', 'PageLoadMetrics', 'LargestImagePaint', 'Meta'] {
-  return ['NetworkRequests', 'PageLoadMetrics', 'LargestImagePaint', 'Meta'];
+export function isLCPDiscovery(model: InsightModel): model is LCPDiscoveryInsightModel {
+  return model.insightKey === 'LCPDiscovery';
 }
-
 export type LCPDiscoveryInsightModel = InsightModel<typeof UIStrings, {
   lcpEvent?: Types.Events.LargestContentfulPaintCandidate,
   /** The network request for the LCP image, if there was one. */
@@ -96,9 +94,12 @@ function finalize(partialModel: PartialInsightModel<LCPDiscoveryInsightModel>): 
 }
 
 export function generateInsight(
-    parsedTrace: RequiredData<typeof deps>, context: InsightSetContext): LCPDiscoveryInsightModel {
+    parsedTrace: Handlers.Types.ParsedTrace, context: InsightSetContext): LCPDiscoveryInsightModel {
   if (!context.navigation) {
-    return finalize({});
+    return finalize({
+
+      frameId: context.frameId,
+    });
   }
 
   const networkRequests = parsedTrace.NetworkRequests;
@@ -115,17 +116,17 @@ export function generateInsight(
   const metricScore = navMetrics.get(Handlers.ModelHandlers.PageLoadMetrics.MetricName.LCP);
   const lcpEvent = metricScore?.event;
   if (!lcpEvent || !Types.Events.isLargestContentfulPaintCandidate(lcpEvent)) {
-    return finalize({warnings: [InsightWarning.NO_LCP]});
+    return finalize({frameId: context.frameId, warnings: [InsightWarning.NO_LCP]});
   }
 
   const docRequest = networkRequests.byTime.find(req => req.args.data.requestId === context.navigationId);
   if (!docRequest) {
-    return finalize({lcpEvent, warnings: [InsightWarning.NO_DOCUMENT_REQUEST]});
+    return finalize({frameId: context.frameId, lcpEvent, warnings: [InsightWarning.NO_DOCUMENT_REQUEST]});
   }
 
   const lcpRequest = parsedTrace.LargestImagePaint.lcpRequestByNavigation.get(context.navigation);
   if (!lcpRequest) {
-    return finalize({lcpEvent});
+    return finalize({frameId: context.frameId, lcpEvent});
   }
 
   const initiatorUrl = lcpRequest.args.data.initiator?.url;
@@ -146,6 +147,7 @@ export function generateInsight(
   const priorityHintFound = imageFetchPriorityHint === 'high';
 
   return finalize({
+    frameId: context.frameId,
     lcpEvent,
     lcpRequest,
     earliestDiscoveryTimeTs: earliestDiscoveryTime ? Types.Timing.Micro(earliestDiscoveryTime) : undefined,

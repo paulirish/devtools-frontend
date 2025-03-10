@@ -11,9 +11,9 @@ import type {
 import * as Trace from '../../../../models/trace/trace.js';
 import * as Lit from '../../../../ui/lit/lit.js';
 import type * as Overlays from '../../overlays/overlays.js';
-import * as Utils from '../../utils/utils.js';
 
 import {BaseInsightComponent} from './BaseInsightComponent.js';
+import {eventRef} from './EventRef.js';
 import networkDependencyTreeInsightRaw from './networkDependencyTreeInsight.css.js';
 
 const {UIStrings, i18nString} = Trace.Insights.Models.NetworkDependencyTree;
@@ -27,6 +27,8 @@ networkDependencyTreeInsightComponentStyles.replaceSync(networkDependencyTreeIns
 export class NetworkDependencyTree extends BaseInsightComponent<NetworkDependencyTreeInsightModel> {
   static override readonly litTagName = Lit.StaticHtml.literal`devtools-performance-long-critical-network-tree`;
   override internalName = 'long-critical-network-tree';
+
+  hoveredChain: Trace.Types.Events.SyntheticNetworkRequest[] = [];
 
   override connectedCallback(): void {
     super.connectedCallback();
@@ -44,6 +46,32 @@ export class NetworkDependencyTree extends BaseInsightComponent<NetworkDependenc
     return overlays;
   }
 
+  #createOverlayForChain(chain: Trace.Types.Events.SyntheticNetworkRequest[]): Overlays.Overlays.EntryOutline[] {
+    return chain.map(entry => ({
+                       type: 'ENTRY_OUTLINE',
+                       entry,
+                       outlineReason: 'ERROR',
+                     }));
+  }
+
+  #onMouseOver(chain: Trace.Types.Events.SyntheticNetworkRequest[]|undefined): void {
+    this.hoveredChain = chain ?? [];
+    const overlays = this.#createOverlayForChain(this.hoveredChain);
+    this.toggleTemporaryOverlays(overlays, {
+      // The trace window doesn't need to be updated because the request is being hovered.
+      updateTraceWindow: false,
+    });
+    this.scheduleRender();
+  }
+
+  #onMouseOut(): void {
+    this.hoveredChain = [];
+    this.toggleTemporaryOverlays(null, {
+      updateTraceWindow: false,
+    });
+    this.scheduleRender();
+  }
+
   renderTree(nodes: CriticalRequestNode[]): Lit.LitTemplate|null {
     if (nodes.length === 0) {
       return null;
@@ -51,20 +79,24 @@ export class NetworkDependencyTree extends BaseInsightComponent<NetworkDependenc
     // clang-format off
     return html`
       <ul>
-        ${nodes.map(({request, timeFromInitialRequest, children}) => {
+        ${nodes.map(({request, timeFromInitialRequest, children, isLongest, chain}) => {
           const hasChildren = children.length > 0;
+
+          const requestClasses = Lit.Directives.classMap({
+            request: true,
+            longest: Boolean(isLongest),
+            highlighted: this.hoveredChain.includes(request),
+          });
 
           return html`
             <li>
-              <div class="request">
-                <span class="url">${Utils.Helpers.shortenUrl(new URL(request.args.data.url))}</span>
-                ${
-                  // If this is the last request, show the chain time
-                  hasChildren ? Lit.nothing :html`
-                    <span class="chain-time">
-                      ${i18n.TimeUtilities.formatMicroSecondsTime(Trace.Types.Timing.Micro(timeFromInitialRequest))}
-                    </span>
-                `}
+              <div class=${requestClasses}
+                   @mouseover=${hasChildren ? null : this.#onMouseOver.bind(this, chain)}
+                   @mouseout=${hasChildren ? null : this.#onMouseOut.bind(this)}>
+                <span class="url">${eventRef(request)}</span>
+                <span class="chain-time">
+                  ${i18n.TimeUtilities.formatMicroSecondsTime(Trace.Types.Timing.Micro(timeFromInitialRequest))}
+                </span>
               </div>
             </li>
             ${hasChildren ? html`${this.renderTree(children)}` : Lit.nothing}
@@ -89,7 +121,7 @@ export class NetworkDependencyTree extends BaseInsightComponent<NetworkDependenc
         <div class="max-time">
           ${i18nString(UIStrings.maxCriticalPathLatency)}
           <br>
-          ${i18n.TimeUtilities.formatMicroSecondsTime((this.model.maxTime))}
+          <span class='longest'> ${i18n.TimeUtilities.formatMicroSecondsTime((this.model.maxTime))}</span>
         </div>
 
         <!-- a divider is added here, through |tree-view| element's border-top -->

@@ -19,6 +19,7 @@ import {
   ResponseType,
 } from './AiAgent.js';
 
+// Sync with the server-side.
 /**
  * Preamble clocks in at ~950 tokens.
  *   The prose is around 4.5 chars per token.
@@ -192,13 +193,11 @@ export class PerformanceAgent extends AiAgent<TimelineUtils.AICallTree.AICallTre
   readonly preamble = preamble;
   readonly clientFeature = Host.AidaClient.ClientFeature.CHROME_PERFORMANCE_AGENT;
   get userTier(): string|undefined {
-    const {hostConfig} = Root.Runtime;
-    return hostConfig.devToolsAiAssistancePerformanceAgent?.userTier;
+    return Root.Runtime.hostConfig.devToolsAiAssistancePerformanceAgent?.userTier;
   }
   get options(): RequestOptions {
-    const {hostConfig} = Root.Runtime;
-    const temperature = hostConfig.devToolsAiAssistancePerformanceAgent?.temperature;
-    const modelId = hostConfig.devToolsAiAssistancePerformanceAgent?.modelId;
+    const temperature = Root.Runtime.hostConfig.devToolsAiAssistancePerformanceAgent?.temperature;
+    const modelId = Root.Runtime.hostConfig.devToolsAiAssistancePerformanceAgent?.modelId;
 
     return {
       temperature,

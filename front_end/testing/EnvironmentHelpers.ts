@@ -295,6 +295,9 @@ export async function initializeGlobalVars({reset = true} = {}) {
     createSettingValue(
         Common.Settings.SettingCategory.NONE, 'ai-assistance-history-entries', [], Common.Settings.SettingType.ARRAY),
     createSettingValue(
+        Common.Settings.SettingCategory.NONE, 'ai-assistance-patching-fre-completed', false,
+        Common.Settings.SettingType.BOOLEAN),
+    createSettingValue(
         Common.Settings.SettingCategory.MOBILE, 'emulation.show-device-outline', false,
         Common.Settings.SettingType.BOOLEAN),
     createSettingValue(
@@ -326,7 +329,7 @@ export async function initializeGlobalVars({reset = true} = {}) {
 export async function deinitializeGlobalVars() {
   // Remove the global SDK.
   // eslint-disable-next-line @typescript-eslint/naming-convention
-  const globalObject = (globalThis as unknown as {SDK?: {}, ls?: {}});
+  const globalObject = (globalThis as unknown as {SDK?: unknown, ls?: unknown});
   delete globalObject.SDK;
   delete globalObject.ls;
 
@@ -514,7 +517,7 @@ export function restoreUserAgentForTesting(): void {
 
 export function resetHostConfig() {
   for (const key of Object.keys(Root.Runtime.hostConfig)) {
-    // @ts-expect-error
+    // @ts-expect-error TypeScript does not deduce the correct type
     delete Root.Runtime.hostConfig[key];
   }
 }

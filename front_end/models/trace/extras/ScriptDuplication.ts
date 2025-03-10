@@ -119,7 +119,8 @@ function shouldIgnoreSource(source: string): boolean {
  * denotes that this source was used, along with the estimated resource size it takes
  * up in the script.
  */
-export type ScriptDuplication = Map<string, Array<{scriptId: string, resourceSize: number}>>;
+export type ScriptDuplication =
+    Map<string, Array<{script: Handlers.ModelHandlers.Scripts.Script, resourceSize: number}>>;
 
 /**
  * Sorts each array within @see ScriptDuplication by resource size, and drops information
@@ -174,7 +175,7 @@ function computeLastGeneratedColumnMap(map: SDK.SourceMap.SourceMap): Map<SDK.So
  */
 export function computeScriptDuplication(scriptsData: Handlers.ModelHandlers.Scripts.ScriptsData): ScriptDuplication {
   const sizesMap = new Map<Handlers.ModelHandlers.Scripts.Script, GeneratedFileSizes>();
-  for (const script of scriptsData.scripts.values()) {
+  for (const script of scriptsData.scripts) {
     if (script.content && script.sourceMap) {
       sizesMap.set(script, computeGeneratedFileSizes(script));
     }
@@ -219,7 +220,7 @@ export function computeScriptDuplication(scriptsData: Handlers.ModelHandlers.Scr
         moduleNameToSourceData.set(sourceData.source, data);
       }
       data.push({
-        scriptId: script.scriptId,
+        script,
         resourceSize: sourceData.resourceSize,
       });
     }

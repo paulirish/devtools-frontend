@@ -1508,6 +1508,12 @@ declare namespace ProtocolProxyApi {
     invoke_setDefaultBackgroundColorOverride(params: Protocol.Emulation.SetDefaultBackgroundColorOverrideRequest): Promise<Protocol.ProtocolResponseWithError>;
 
     /**
+     * Overrides the values for env(safe-area-inset-*) and env(safe-area-max-inset-*). Unset values will cause the
+     * respective variables to be undefined, even if previously overridden.
+     */
+    invoke_setSafeAreaInsetsOverride(params: Protocol.Emulation.SetSafeAreaInsetsOverrideRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
      * Overrides the values of device screen dimensions (window.screen.width, window.screen.height,
      * window.innerWidth, window.innerHeight, and "device-width"/"device-height"-related CSS media
      * query results).
@@ -2325,6 +2331,26 @@ declare namespace ProtocolProxyApi {
     webTransportClosed(params: Protocol.Network.WebTransportClosedEvent): void;
 
     /**
+     * Fired upon direct_socket.TCPSocket creation.
+     */
+    directTCPSocketCreated(params: Protocol.Network.DirectTCPSocketCreatedEvent): void;
+
+    /**
+     * Fired when direct_socket.TCPSocket connection is opened.
+     */
+    directTCPSocketOpened(params: Protocol.Network.DirectTCPSocketOpenedEvent): void;
+
+    /**
+     * Fired when direct_socket.TCPSocket is aborted.
+     */
+    directTCPSocketAborted(params: Protocol.Network.DirectTCPSocketAbortedEvent): void;
+
+    /**
+     * Fired when direct_socket.TCPSocket is closed.
+     */
+    directTCPSocketClosed(params: Protocol.Network.DirectTCPSocketClosedEvent): void;
+
+    /**
      * Fired when additional information about a requestWillBeSent event is available from the
      * network stack. Not every requestWillBeSent event will have an additional
      * requestWillBeSentExtraInfo fired for it, and there is no guarantee whether requestWillBeSent
@@ -2618,7 +2644,7 @@ declare namespace ProtocolProxyApi {
     /**
      * Enables page domain notifications.
      */
-    invoke_enable(): Promise<Protocol.ProtocolResponseWithError>;
+    invoke_enable(params: Protocol.Page.EnableRequest): Promise<Protocol.ProtocolResponseWithError>;
 
     /**
      * Gets the processed manifest for this current document.
@@ -4140,6 +4166,11 @@ declare namespace ProtocolProxyApi {
      * Enable the BluetoothEmulation domain.
      */
     invoke_enable(params: Protocol.BluetoothEmulation.EnableRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Set the state of the simulated central.
+     */
+    invoke_setSimulatedCentralState(params: Protocol.BluetoothEmulation.SetSimulatedCentralStateRequest): Promise<Protocol.ProtocolResponseWithError>;
 
     /**
      * Disable the BluetoothEmulation domain.

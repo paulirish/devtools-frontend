@@ -94,7 +94,7 @@ describe('Navigation', function() {
     // 1 refresh after auditing to reset state
     assert.strictEqual(numNavigations, 5);
 
-    assert.strictEqual(lhr.lighthouseVersion, '12.3.0');
+    assert.strictEqual(lhr.lighthouseVersion, '12.4.0');
     assert.match(lhr.finalUrl, /^https:\/\/localhost:[0-9]+\/test\/e2e\/resources\/lighthouse\/hello.html/);
 
     assert.strictEqual(lhr.configSettings.throttlingMethod, 'simulate');
@@ -120,7 +120,7 @@ describe('Navigation', function() {
     });
 
     const {auditResults, erroredAudits, failedAudits} = getAuditsBreakdown(lhr, ['max-potential-fid']);
-    assert.lengthOf(auditResults, 157);
+    assert.lengthOf(auditResults, 172);
     assert.deepEqual(erroredAudits, []);
     assert.deepEqual(failedAudits.map(audit => audit.id), [
       'document-title',
@@ -193,12 +193,14 @@ describe('Navigation', function() {
     // [crbug.com/1347220] DevTools throttling can force resources to load slow enough for these audits to fail sometimes.
     const flakyAudits = [
       'server-response-time',
+      'document-latency-insight',
       'render-blocking-resources',
+      'render-blocking-insight',
       'max-potential-fid',
     ];
 
     const {auditResults, erroredAudits, failedAudits} = getAuditsBreakdown(lhr, flakyAudits);
-    assert.lengthOf(auditResults, 157);
+    assert.lengthOf(auditResults, 172);
     assert.deepEqual(erroredAudits, []);
     assert.deepEqual(failedAudits.map(audit => audit.id), [
       'document-title',

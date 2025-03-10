@@ -338,7 +338,6 @@ export class MainImpl {
         Root.Runtime.ExperimentName.STYLES_PANE_CSS_CHANGES, 'Sync CSS changes in the Styles tab');
 
     // Highlights a violating node or attribute by rendering a squiggly line under it and adding a tooltip linking to the issues panel.
-    // Right now violating nodes are exclusively form fields that contain an HTML issue, for example, and <input /> whose id is duplicate inside the form.
     Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.HIGHLIGHT_ERRORS_ELEMENTS_PANEL,
         'Highlights a violating node or attribute in the Elements panel DOM tree');
@@ -650,26 +649,6 @@ export class MainImpl {
     }
   }
 
-  // TODO(crbug.com/350668580) Move this to AISettingsTab once the setting is only available
-  // there and not in the general settings screen anymore.
-  // The ConsoleInsightsEnabledSetting represents the toggle/checkbox allowing the user to turn the feature on/off.
-  // If the user turns the feature off, we want them to go through the full onboarding flow should they later turn
-  // the feature on again. We achieve this by resetting the onboardig setting.
-  #onConsoleInsightsEnabledSettingChanged(): void {
-    const settingValue = this.#getConsoleInsightsEnabledSetting()?.get();
-    if (settingValue === false) {
-      Common.Settings.Settings.instance().createLocalSetting('console-insights-onboarding-finished', false).set(false);
-    }
-  }
-
-  #getConsoleInsightsEnabledSetting(): Common.Settings.Setting<boolean>|undefined {
-    try {
-      return Common.Settings.moduleSetting('console-insights-enabled') as Common.Settings.Setting<boolean>;
-    } catch {
-      return;
-    }
-  }
-
   async #lateInitialization(): Promise<void> {
     MainImpl.time('Main._lateInitialization');
     Extensions.ExtensionServer.ExtensionServer.instance().initializeExtensions();
@@ -693,13 +672,6 @@ export class MainImpl {
         };
         Common.Settings.Settings.instance().moduleSetting(setting).addChangeListener(changeListener);
       }
-    }
-
-    // TODO(crbug.com/350668580) Move this to AISettingsTab once the setting is only available
-    // there and not in the general settings screen anymore.
-    const consoleInsightsSetting = this.#getConsoleInsightsEnabledSetting();
-    if (consoleInsightsSetting) {
-      consoleInsightsSetting.addChangeListener(this.#onConsoleInsightsEnabledSettingChanged, this);
     }
 
     MainImpl.timeEnd('Main._lateInitialization');

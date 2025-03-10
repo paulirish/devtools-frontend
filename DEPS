@@ -15,16 +15,16 @@ vars = {
   'build_revision': 'e13953ced04ed05f45aa3c961bd6d802aced74ec',
 
   'buildtools_url': 'https://chromium.googlesource.com/chromium/src/buildtools.git',
-  'buildtools_revision': '648cc69690f7344e569d1b26f69c7f278e71051f',
+  'buildtools_revision': '50e9c3d18e43dee92cd466e7d12325c71d73441d',
 
   'depot_tools_url': 'https://chromium.googlesource.com/chromium/tools/depot_tools.git',
-  'depot_tools_revision': 'deb5575fbdc5b3f7cdd0a0aaed73b1f43af39eab',
+  'depot_tools_revision': 'f40ddcd8d51626fb7be3ab3c418b3f3be801623f',
 
   'inspector_protocol_url': 'https://chromium.googlesource.com/deps/inspector_protocol',
   'inspector_protocol_revision': '940abfc668be2591483f7132145593c6a047f3cf',
 
   # Keeping track of the last time we rollerd the browser protocol files.
-  'chromium_browser_protocol_revision' : '935ce46c51ff9b569f2528306475d1773d6a142e',
+  'chromium_browser_protocol_revision' : '29d5367216f2c75672e14069f1acb0ab1f10c716',
 
   'clang_format_url': 'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/clang/tools/clang-format.git',
   'clang_format_revision': '37f6e68a107df43b7d7e044fd36a13cbae3413f2',
@@ -32,7 +32,7 @@ vars = {
   'emscripten_tag': 'ade9d780ff17c88d81aa13860361743e3c1e1396',
 
   # GN CIPD package version.
-  'gn_version': 'git_revision:4a8016dc391553fa1644c0740cc04eaac844121e',
+  'gn_version': 'git_revision:7a8aa3a08a13521336853a28c46537ec04338a2d',
 
   'cmake_version': 'version:2@3.21.3',
 
@@ -49,7 +49,7 @@ vars = {
   # Chrome version used for tests. It should be regularly updated to
   # match the Canary version listed here:
   # https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json
-  'chrome': '135.0.7036.0',
+  'chrome': '136.0.7059.0',
 
   # 'magic' text to tell depot_tools that git submodules should be accepted but
   # but parity with DEPS file is expected.
@@ -59,7 +59,7 @@ vars = {
   'non_git_source': 'True',
 
   # siso CIPD package version
-  'siso_version': 'git_revision:b146378738dc716f49267d22ed7b7953cdbccecb',
+  'siso_version': 'git_revision:6b0b080aea4fa142b573795daa977e8751947452',
 }
 
 # Only these hosts are allowed for dependencies in this DEPS file.

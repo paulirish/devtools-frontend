@@ -2252,6 +2252,51 @@ experimental domain CSS
       # Associated style declaration.
       CSSStyle style
 
+  # CSS function argument representation.
+  type CSSFunctionParameter extends object
+    properties
+      # The parameter name.
+      string name
+      # The parameter type.
+      string type
+
+  # CSS function conditional block representation.
+  type CSSFunctionConditionNode extends object
+    properties
+      # Media query for this conditional block. Only one type of condition should be set.
+      optional CSSMedia media
+      # Container query for this conditional block. Only one type of condition should be set.
+      optional CSSContainerQuery containerQueries
+      # @supports CSS at-rule condition. Only one type of condition should be set.
+      optional CSSSupports supports
+      # Block body.
+      array of CSSFunctionNode children
+      # The condition text.
+      string conditionText
+
+  # Section of the body of a CSS function rule.
+  type CSSFunctionNode extends object
+    properties
+      # A conditional block. If set, style should not be set.
+      optional CSSFunctionConditionNode condition
+      # Values set by this node. If set, condition should not be set.
+      optional CSSStyle style
+
+  # CSS function at-rule representation.
+  type CSSFunctionRule extends object
+    properties
+      # Name of the function.
+      Value name
+      # The css style sheet identifier (absent for user agent stylesheet and user-specified
+      # stylesheet rules) this rule came from.
+      optional StyleSheetId styleSheetId
+      # Parent stylesheet's origin.
+      StyleSheetOrigin origin
+      # List of parameters.
+      array of CSSFunctionParameter parameters
+      # Function body.
+      array of CSSFunctionNode children
+
   # CSS keyframe rule representation.
   type CSSKeyframeRule extends object
     properties
@@ -2449,6 +2494,8 @@ experimental domain CSS
       optional CSSFontPaletteValuesRule cssFontPaletteValuesRule
       # Id of the first parent element that does not have display: contents.
       experimental optional DOM.NodeId parentLayoutNodeId
+      # A list of CSS at-function rules referenced by styles of this node.
+      experimental optional array of CSSFunctionRule cssFunctionRules
 
   # Returns all media queries parsed by the rendering engine.
   command getMediaQueries
@@ -4299,6 +4346,25 @@ domain Emulation
   depends on Page
   depends on Runtime
 
+  experimental type SafeAreaInsets extends object
+    properties
+      # Overrides safe-area-inset-top.
+      optional integer top
+      # Overrides safe-area-max-inset-top.
+      optional integer topMax
+      # Overrides safe-area-inset-left.
+      optional integer left
+      # Overrides safe-area-max-inset-left.
+      optional integer leftMax
+      # Overrides safe-area-inset-bottom.
+      optional integer bottom
+      # Overrides safe-area-max-inset-bottom.
+      optional integer bottomMax
+      # Overrides safe-area-inset-right.
+      optional integer right
+      # Overrides safe-area-max-inset-right.
+      optional integer rightMax
+
   # Screen orientation.
   type ScreenOrientation extends object
     properties
@@ -4468,6 +4534,12 @@ domain Emulation
       # RGBA of the default background color. If not specified, any existing override will be
       # cleared.
       optional DOM.RGBA color
+
+  # Overrides the values for env(safe-area-inset-*) and env(safe-area-max-inset-*). Unset values will cause the
+  # respective variables to be undefined, even if previously overridden.
+  experimental command setSafeAreaInsetsOverride
+    parameters
+      SafeAreaInsets insets
 
   # Overrides the values of device screen dimensions (window.screen.width, window.screen.height,
   # window.innerWidth, window.innerHeight, and "device-width"/"device-height"-related CSS media
@@ -6145,6 +6217,9 @@ domain Network
       # Request was a private network request and is denied by user permission.
       # https://github.com/WICG/private-network-access/blob/main/permission_prompt/explainer.md
       PrivateNetworkAccessPermissionDenied
+      # Request was a local network request and is denied by user permission.
+      # https://github.com/explainers-by-googlers/local-network-access
+      LocalNetworkAccessPermissionDenied
 
   type CorsErrorStatus extends object
     properties
@@ -7329,6 +7404,60 @@ domain Network
       # Timestamp.
       MonotonicTime timestamp
 
+  experimental type DirectSocketDnsQueryType extends string
+    enum
+      ipv4
+      ipv6
+
+  experimental type DirectTCPSocketOptions extends object
+    properties
+      # TCP_NODELAY option
+      boolean noDelay
+      # Expected to be unsigned integer.
+      optional number keepAliveDelay
+      # Expected to be unsigned integer.
+      optional number sendBufferSize
+      # Expected to be unsigned integer.
+      optional number receiveBufferSize
+      optional DirectSocketDnsQueryType dnsQueryType
+
+
+  # Fired upon direct_socket.TCPSocket creation.
+  experimental event directTCPSocketCreated
+    parameters
+      RequestId identifier
+      string remoteAddr
+      # Unsigned int 16.
+      integer remotePort
+      DirectTCPSocketOptions options
+      MonotonicTime timestamp
+      optional Initiator initiator
+
+  # Fired when direct_socket.TCPSocket connection is opened.
+  experimental event directTCPSocketOpened
+    parameters
+      RequestId identifier
+      string remoteAddr
+      # Expected to be unsigned integer.
+      integer remotePort
+      MonotonicTime timestamp
+      optional string localAddr
+      # Expected to be unsigned integer.
+      optional integer localPort
+
+  # Fired when direct_socket.TCPSocket is aborted.
+  experimental event directTCPSocketAborted
+    parameters
+      RequestId identifier
+      string errorMessage
+      MonotonicTime timestamp
+
+  # Fired when direct_socket.TCPSocket is closed.
+  experimental event directTCPSocketClosed
+    parameters
+      RequestId identifier
+      MonotonicTime timestamp
+
   experimental type PrivateNetworkRequestPolicy extends string
     enum
       Allow
@@ -7336,6 +7465,7 @@ domain Network
       WarnFromInsecureToMorePrivate
       PreflightBlock
       PreflightWarn
+      PermissionBlock
 
   experimental type IPAddressSpace extends string
     enum
@@ -8235,7 +8365,7 @@ domain Page
       PerformanceProfile
 
   # All Permissions Policy features. This enum should match the one defined
-  # in third_party/blink/renderer/core/permissions_policy/permissions_policy_features.json5.
+  # in services/network/public/cpp/permissions_policy/permissions_policy_features.json5.
   experimental type PermissionsPolicyFeature extends string
     enum
       accelerometer
@@ -8811,6 +8941,10 @@ domain Page
 
   # Enables page domain notifications.
   command enable
+    parameters
+      # If true, the `Page.fileChooserOpened` event will be emitted regardless of the state set by
+      # `Page.setInterceptFileChooserDialog` command (default: false).
+      experimental optional boolean enableFileChooserOpenedEvent
 
   # The manifest of a webapp, see
   # https://www.w3.org/TR/appmanifest/#dfn-manifest.
@@ -9364,7 +9498,7 @@ domain Page
       autoReject
       autoOptOut
 
-# Sets the Secure Payment Confirmation transaction mode.
+  # Sets the Secure Payment Confirmation transaction mode.
   # https://w3c.github.io/secure-payment-confirmation/#sctn-automation-set-spc-transaction-mode
   experimental command setSPCTransactionMode
     parameters
@@ -9751,6 +9885,7 @@ domain Page
       EmbedderExtensionSentMessageToCachedFrame
       RequestedByWebViewClient
       PostMessageByWebViewClient
+      CacheControlNoStoreDeviceBoundSessionTerminated
 
   # Types of not restored reasons for back-forward cache.
   experimental type BackForwardCacheNotRestoredReasonType extends string
@@ -12759,6 +12894,9 @@ experimental domain Preload
       PrefetchNotEligibleSchemeIsNotHttps
       PrefetchNotEligibleUserHasCookies
       PrefetchNotEligibleUserHasServiceWorker
+      PrefetchNotEligibleUserHasServiceWorkerNoFetchHandler
+      PrefetchNotEligibleRedirectFromServiceWorker
+      PrefetchNotEligibleRedirectToServiceWorker
       PrefetchNotEligibleBatterySaverEnabled
       PrefetchNotEligiblePreloadingDisabled
       PrefetchNotFinishedInTime
@@ -13068,6 +13206,14 @@ experimental domain BluetoothEmulation
 
   # Enable the BluetoothEmulation domain.
   command enable
+    parameters
+      # State of the simulated central.
+      CentralState state
+      # If the simulated central supports low-energy.
+      boolean leSupported
+
+  # Set the state of the simulated central.
+  command setSimulatedCentralState
     parameters
       # State of the simulated central.
       CentralState state

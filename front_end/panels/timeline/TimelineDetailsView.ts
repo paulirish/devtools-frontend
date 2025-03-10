@@ -136,6 +136,11 @@ export class TimelineDetailsPane extends
           TimelineTreeView.Events.TREE_ROW_HOVERED,
           node => this.dispatchEventToListeners(TimelineTreeView.Events.TREE_ROW_HOVERED, node.data));
 
+      view.addEventListener(TimelineTreeView.Events.TREE_ROW_CLICKED, node => {
+        // Re-dispatch to reach the tree row dimmer.
+        this.dispatchEventToListeners(TimelineTreeView.Events.TREE_ROW_CLICKED, node.data);
+      });
+
       // If there's a heaviest stack sidebar view, also listen to hover within it.
       if (view instanceof AggregatedTimelineTreeView) {
         view.stackView.addEventListener(
@@ -144,12 +149,16 @@ export class TimelineDetailsPane extends
       }
     });
     this.#thirdPartyTree.addEventListener(TimelineTreeView.Events.TREE_ROW_HOVERED, node => {
-      // Redispatch through 3P event to get 3P dimmer.
-      this.dispatchEventToListeners(TimelineTreeView.Events.THIRD_PARTY_ROW_HOVERED, node.data);
+      // Re-dispatch through 3P event to get 3P dimmer.
+      this.dispatchEventToListeners(TimelineTreeView.Events.TREE_ROW_HOVERED, node.data);
     });
 
     this.#thirdPartyTree.addEventListener(TimelineTreeView.Events.BOTTOM_UP_BUTTON_CLICKED, node => {
       this.selectTab(Tab.BottomUp, node.data, AggregatedTimelineTreeView.GroupBy.ThirdParties);
+    });
+    this.#thirdPartyTree.addEventListener(TimelineTreeView.Events.TREE_ROW_CLICKED, node => {
+      // Re-dispatch through 3P event to get 3P dimmer.
+      this.dispatchEventToListeners(TimelineTreeView.Events.TREE_ROW_CLICKED, node.data);
     });
 
     this.#networkRequestDetails =
@@ -312,12 +321,14 @@ export class TimelineDetailsPane extends
         this.tabbedPane.closeTab(allTabs[i]);
       }
     }
+
+    // Append relatedChips inside of the node being shown.
+    const chipParent = (node instanceof Element && node.shadowRoot || node);
+    chipParent.appendChild(this.#relatedInsightChips);
+
     this.defaultDetailsContentWidget.detach();
     this.defaultDetailsContentWidget = this.#createContentWidget();
     this.defaultDetailsContentWidget.contentElement.append(node);
-    if (this.#relatedInsightChips) {
-      this.defaultDetailsContentWidget.contentElement.appendChild(this.#relatedInsightChips);
-    }
   }
 
   private updateContents(): void {
@@ -330,10 +341,6 @@ export class TimelineDetailsPane extends
     const view = this.rangeDetailViews.get(this.tabbedPane.selectedTabId || '');
     if (view) {
       view.updateContents(this.selection || selectionFromRangeMilliSeconds(visibleWindow.min, visibleWindow.max));
-    } else {
-      // If no view, we must be in the summary tab, update the 3p tree.
-      this.#thirdPartyTree.updateContents(
-          this.selection || selectionFromRangeMilliSeconds(visibleWindow.min, visibleWindow.max));
     }
   }
 
@@ -584,6 +591,8 @@ export class TimelineDetailsPane extends
     const endOffset = endTime - minBoundsMilli;
     const summaryDetailElem = TimelineUIUtils.generateSummaryDetails(
         aggregatedStats, startOffset, endOffset, this.#selectedEvents, this.#thirdPartyTree);
+
+    this.#thirdPartyTree.updateContents(this.selection || selectionFromRangeMilliSeconds(startTime, endTime));
 
     this.setSummaryContent(summaryDetailElem);
 

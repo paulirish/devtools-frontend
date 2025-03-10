@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import * as i18n from '../../../core/i18n/i18n.js';
+import type * as Handlers from '../handlers/handlers.js';
 import * as Helpers from '../helpers/helpers.js';
 import type * as Types from '../types/types.js';
 
@@ -13,7 +14,6 @@ import {
   type InsightModel,
   type InsightSetContext,
   type PartialInsightModel,
-  type RequiredData,
 } from './types.js';
 
 export const UIStrings = {
@@ -95,9 +95,8 @@ const GIF_SIZE_THRESHOLD = 100 * 1024;
 
 const BYTE_SAVINGS_THRESHOLD = 4096;
 
-export function deps(): ['NetworkRequests', 'Meta', 'ImagePainting'] {
-  return ['NetworkRequests', 'Meta', 'ImagePainting'];
-}
+// Ignore up to 12KB of waste for responsive images if an effort was made with breakpoints.
+const BYTE_SAVINGS_THRESHOLD_RESPONSIVE_BREAKPOINTS = 12288;
 
 export enum ImageOptimizationType {
   ADJUST_COMPRESSION = 'ADJUST_COMPRESSION',
@@ -187,7 +186,7 @@ function getPixelCounts(paintImage: Types.Events.PaintImage): {displayedPixels: 
 }
 
 export function generateInsight(
-    parsedTrace: RequiredData<typeof deps>, context: InsightSetContext): ImageDeliveryInsightModel {
+    parsedTrace: Handlers.Types.ParsedTrace, context: InsightSetContext): ImageDeliveryInsightModel {
   const isWithinContext = (event: Types.Events.Event): boolean => Helpers.Timing.eventIsInBounds(event, context.bounds);
 
   const contextRequests = parsedTrace.NetworkRequests.byTime.filter(isWithinContext);
@@ -202,8 +201,9 @@ export function generateInsight(
       continue;
     }
 
-    const imagePaints =
-        parsedTrace.ImagePainting.paintImageEventForUrl.get(request.args.data.url)?.filter(isWithinContext);
+    // If the request was redirected, the image paints will have the pre-redirect URL.
+    const url = request.args.data.redirects[0]?.url ?? request.args.data.url;
+    const imagePaints = parsedTrace.ImagePainting.paintImageEventForUrl.get(url)?.filter(isWithinContext);
 
     // This will filter out things like preloaded image requests where an image file is downloaded
     // but never rendered on the page.
@@ -255,25 +255,31 @@ export function generateInsight(
     let imageByteSavings = imageByteSavingsFromFormat;
 
     const wastedPixelRatio = 1 - (largestImageDisplayPixels / imageFilePixels);
-    if (wastedPixelRatio > 0) {
+
+    // Ignore CSS images because it's difficult to determine what is a spritesheet,
+    // and the reward-to-effort ratio for responsive CSS images is quite low https://css-tricks.com/responsive-images-css/.
+    if (wastedPixelRatio > 0 && !largestImagePaint.args.data.isCSS) {
       const byteSavings = Math.round(wastedPixelRatio * imageBytes);
 
-      // This will compound the byte savings from any potential format changes with the image size
-      // optimization added here.
-      imageByteSavings += Math.round(wastedPixelRatio * (imageBytes - imageByteSavingsFromFormat));
+      const hadBreakpoints = largestImagePaint.args.data.isPicture || largestImagePaint.args.data.srcsetAttribute;
+      if (!hadBreakpoints || byteSavings > BYTE_SAVINGS_THRESHOLD_RESPONSIVE_BREAKPOINTS) {
+        // This will compound the byte savings from any potential format changes with the image size
+        // optimization added here.
+        imageByteSavings += Math.round(wastedPixelRatio * (imageBytes - imageByteSavingsFromFormat));
 
-      optimizations.push({
-        type: ImageOptimizationType.RESPONSIVE_SIZE,
-        byteSavings,
-        fileDimensions: {
-          width: Math.round(largestImagePaint.args.data.srcWidth),
-          height: Math.round(largestImagePaint.args.data.srcHeight),
-        },
-        displayDimensions: {
-          width: Math.round(largestImagePaint.args.data.width),
-          height: Math.round(largestImagePaint.args.data.height),
-        },
-      });
+        optimizations.push({
+          type: ImageOptimizationType.RESPONSIVE_SIZE,
+          byteSavings,
+          fileDimensions: {
+            width: Math.round(largestImagePaint.args.data.srcWidth),
+            height: Math.round(largestImagePaint.args.data.srcHeight),
+          },
+          displayDimensions: {
+            width: Math.round(largestImagePaint.args.data.width),
+            height: Math.round(largestImagePaint.args.data.height),
+          },
+        });
+      }
     }
 
     optimizations = optimizations.filter(optimization => optimization.byteSavings > BYTE_SAVINGS_THRESHOLD);
@@ -303,6 +309,7 @@ export function generateInsight(
   });
 
   return finalize({
+    frameId: context.frameId,
     optimizableImages,
     totalByteSavings: optimizableImages.reduce((total, img) => total + img.byteSavings, 0),
     metricSavings: metricSavingsForWastedBytes(wastedBytesByRequestId, context),

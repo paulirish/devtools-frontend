@@ -13,16 +13,20 @@ generate_css("css_files") {
     "./aiAssistancePanel.css",
     "./components/chatView.css",
     "./components/userActionRow.css",
+    "./selectWorkspaceDialog.css",
   ]
 }
 
 devtools_module("ai_assistance") {
   sources = [
+    "AgentProject.ts",
     "AiAssistancePanel.ts",
     "AiHistoryStorage.ts",
     "ChangeManager.ts",
     "EvaluateAction.ts",
     "ExtensionScope.ts",
+    "PatchWidget.ts",
+    "SelectWorkspaceDialog.ts",
     "agents/AiAgent.ts",
     "agents/FileAgent.ts",
     "agents/NetworkAgent.ts",
@@ -52,15 +56,20 @@ devtools_module("ai_assistance") {
     "../../models/text_utils:bundle",
     "../../models/trace:bundle",
     "../../models/workspace:bundle",
+    "../../models/workspace_diff:bundle",
+    "../../panels/changes:bundle",
+    "../../panels/common:bundle",
     "../../panels/elements:bundle",
     "../../panels/network:bundle",
     "../../panels/sources:bundle",
     "../../panels/timeline:bundle",
     "../../panels/timeline/utils:bundle",
     "../../panels/utils:bundle",
+    "../../third_party/diff:bundle",
     "../../third_party/marked:bundle",
     "../../ui/components/markdown_view:bundle",
     "../../ui/components/spinners:bundle",
+    "../../ui/components/tooltips:bundle",
     "../../ui/legacy:bundle",
     "../../ui/lit:bundle",
   ]
@@ -94,11 +103,14 @@ ts_library("unittests") {
   testonly = true
 
   sources = [
+    "AgentProject.test.ts",
     "AiAssistancePanel.test.ts",
     "AiHistoryStorage.test.ts",
     "ChangeManager.test.ts",
     "EvaluateAction.test.ts",
     "ExtensionScope.test.ts",
+    "PatchWidget.test.ts",
+    "SelectWorkspaceDialog.test.ts",
     "agents/AiAgent.test.ts",
     "agents/FileAgent.test.ts",
     "agents/NetworkAgent.test.ts",

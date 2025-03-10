@@ -4,6 +4,7 @@
 
 import * as i18n from '../../../core/i18n/i18n.js';
 import type * as Protocol from '../../../generated/protocol.js';
+import type * as Handlers from '../handlers/handlers.js';
 import type {Warning} from '../handlers/WarningsHandler.js';
 import * as Helpers from '../helpers/helpers.js';
 import * as Types from '../types/types.js';
@@ -14,13 +15,9 @@ import {
   InsightCategory,
   InsightKeys,
   type InsightModel,
+  type InsightSetContext,
   type PartialInsightModel,
-  type RequiredData,
 } from './types.js';
-
-export function deps(): ['Warnings', 'Renderer'] {
-  return ['Warnings', 'Renderer'];
-}
 
 export const UIStrings = {
   /**
@@ -203,7 +200,8 @@ function finalize(partialModel: PartialInsightModel<ForcedReflowInsightModel>): 
   };
 }
 
-export function generateInsight(traceParsedData: RequiredData<typeof deps>): ForcedReflowInsightModel {
+export function generateInsight(
+    traceParsedData: Handlers.Types.ParsedTrace, context: InsightSetContext): ForcedReflowInsightModel {
   const warningsData = traceParsedData.Warnings;
   const entryToNodeMap = traceParsedData.Renderer.entryToNode;
 
@@ -219,6 +217,7 @@ export function generateInsight(traceParsedData: RequiredData<typeof deps>): For
       aggregateForcedReflow(warningsData.perWarning, entryToNodeMap);
 
   return finalize({
+    frameId: context.frameId,
     relatedEvents: topLevelFunctionCallData?.topLevelFunctionCallEvents,
     topLevelFunctionCallData,
     aggregatedBottomUpData,

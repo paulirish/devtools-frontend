@@ -74,7 +74,6 @@ export default [
       'test/**/fixtures/',
       'test/e2e/**/*.js',
       'test/shared/**/*.js',
-      '**/*.d.ts',
     ],
   },
   {
@@ -209,6 +208,8 @@ export default [
       'valid-typeof': 'error',
       'no-return-assign': ['error', 'always'],
       'no-implicit-coercion': 'error',
+
+      'no-array-constructor': 'error',
 
       // es2015 features
       'require-yield': 'error',
@@ -541,6 +542,18 @@ export default [
 
       '@typescript-eslint/prefer-optional-chain': 'error',
 
+      '@typescript-eslint/no-unsafe-function-type': 'error',
+
+      '@typescript-eslint/no-empty-object-type': [
+        'error',
+        {
+          allowInterfaces: 'with-single-extends',
+        },
+      ],
+
+      'no-array-constructor': 'off',
+      '@typescript-eslint/no-array-constructor': 'error',
+
       'rulesdir/no-underscored-properties': 'error',
       'rulesdir/inline-type-imports': 'error',
 
@@ -818,6 +831,15 @@ export default [
       // expensive rule to run and we do not need it
       // for any code that doesn't use Canvas.
       'rulesdir/canvas-context-tracking': 'error',
+    },
+  },
+  {
+    name: 'TypeScript type-definitions',
+    files: ['**/*.d.ts'],
+    rules: {
+      // Not a useful rule for .d.ts files where we are
+      // representing an existing module.
+      'import/no-default-export': 'off',
     },
   },
 ];

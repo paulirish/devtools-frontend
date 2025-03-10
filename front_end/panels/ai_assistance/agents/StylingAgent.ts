@@ -45,6 +45,7 @@ const UIStringsNotTranslate = {
 
 const lockedString = i18n.i18n.lockedString;
 
+// Sync with the server-side.
 /* clang-format off */
 const preamble = `You are the most advanced CSS debugging assistant integrated into Chrome DevTools.
 You always suggest considering the best web development practices and the newest platform features such as view transitions.
@@ -263,18 +264,16 @@ export class StylingAgent extends AiAgent<SDK.DOMModel.DOMNode> {
   preamble = preamble;
   readonly clientFeature = Host.AidaClient.ClientFeature.CHROME_STYLING_AGENT;
   get userTier(): string|undefined {
-    const {hostConfig} = Root.Runtime;
-    return hostConfig.devToolsFreestyler?.userTier;
+    return Root.Runtime.hostConfig.devToolsFreestyler?.userTier;
   }
   get executionMode(): Root.Runtime.HostConfigFreestylerExecutionMode {
-    const {hostConfig} = Root.Runtime;
-    return hostConfig.devToolsFreestyler?.executionMode ?? Root.Runtime.HostConfigFreestylerExecutionMode.ALL_SCRIPTS;
+    return Root.Runtime.hostConfig.devToolsFreestyler?.executionMode ??
+        Root.Runtime.HostConfigFreestylerExecutionMode.ALL_SCRIPTS;
   }
 
   get options(): RequestOptions {
-    const {hostConfig} = Root.Runtime;
-    const temperature = hostConfig.devToolsFreestyler?.temperature;
-    const modelId = hostConfig.devToolsFreestyler?.modelId;
+    const temperature = Root.Runtime.hostConfig.devToolsFreestyler?.temperature;
+    const modelId = Root.Runtime.hostConfig.devToolsFreestyler?.modelId;
 
     return {
       temperature,
@@ -283,8 +282,7 @@ export class StylingAgent extends AiAgent<SDK.DOMModel.DOMNode> {
   }
 
   get multimodalInputEnabled(): boolean {
-    const {hostConfig} = Root.Runtime;
-    return Boolean(hostConfig.devToolsFreestyler?.multimodal);
+    return Boolean(Root.Runtime.hostConfig.devToolsFreestyler?.multimodal);
   }
 
   override parseTextResponse(text: string): ParsedResponse {

@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 import '../../../ui/components/icon_button/icon_button.js';
-import '../../../ui/components/split_view/split_view.js';
 import './ExtensionView.js';
 import './ControlButton.js';
 import './ReplaySection.js';
@@ -869,14 +868,18 @@ export class RecordingView extends HTMLElement {
     const currentConverter = this.#getCurrentConverter();
     const converterFormatName = currentConverter?.getFormatName();
     // clang-format off
-    return !this.#showCodeView
-      ? this.#renderSections()
-      : html`
-        <devtools-split-view>
+    return html`
+        <devtools-split-view
+          direction="auto"
+          sidebar-position="second"
+          sidebar-initial-size="300"
+          sidebar-visibility=${this.#showCodeView ? '' : 'hidden'}
+        >
           <div slot="main">
             ${this.#renderSections()}
           </div>
           <div slot="sidebar" jslog=${VisualLogging.pane('source-code').track({resize: true})}>
+            ${this.#showCodeView ? html`
             <div class="section-toolbar" jslog=${VisualLogging.toolbar()}>
               <devtools-select-menu
                 @selectmenuselected=${this.#onCodeFormatChange}
@@ -923,7 +926,8 @@ export class RecordingView extends HTMLElement {
                 jslog=${VisualLogging.close().track({click: true})}
               ></devtools-button>
             </div>
-            ${this.#renderTextEditor()}
+            ${this.#renderTextEditor()}`
+            : Lit.nothing}
           </div>
         </devtools-split-view>
       `;

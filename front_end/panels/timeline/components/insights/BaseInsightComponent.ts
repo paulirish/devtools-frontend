@@ -58,7 +58,7 @@ export interface BaseInsightData {
   insightSetKey: string|null;
 }
 
-export abstract class BaseInsightComponent<T extends InsightModel<{}, {}>> extends HTMLElement {
+export abstract class BaseInsightComponent<T extends InsightModel> extends HTMLElement {
   abstract internalName: string;
   // So we can use the TypeScript BaseInsight class without getting warnings
   // about litTagName. Every child should overrwrite this.
@@ -156,7 +156,7 @@ export abstract class BaseInsightComponent<T extends InsightModel<{}, {}>> exten
       return;
     }
 
-    if (!this.data.insightSetKey) {
+    if (!this.data.insightSetKey || !this.model) {
       // Shouldn't happen, but needed to satisfy TS.
       return;
     }
@@ -328,7 +328,14 @@ export abstract class BaseInsightComponent<T extends InsightModel<{}, {}>> exten
         <div class="insight-description">${md(insightModel.description)}</div>
         <div class="insight-content">${content}</div>
         ${this.#insightsAskAiEnabled ? html`
-          <devtools-button data-ask-ai @click=${this.#askAIButtonClick}>Ask AI (placeholder UX)</devtools-button>
+          <div class="ask-ai-btn-wrap">
+            <devtools-button class="ask-ai"
+              .variant=${Buttons.Button.Variant.OUTLINED}
+              .iconName=${'smart-assistant'}
+              data-insights-ask-ai
+              @click=${this.#askAIButtonClick}
+            >Ask AI</devtools-button>
+          </div>
         `: Lit.nothing}
       </div>`;
     // clang-format on

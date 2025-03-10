@@ -11,11 +11,13 @@ import * as Root from '../../../core/root/root.js';
 import * as Marked from '../../../third_party/marked/marked.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
 import type * as IconButton from '../../../ui/components/icon_button/icon_button.js';
-import * as MarkdownView from '../../../ui/components/markdown_view/markdown_view.js';
+import type * as MarkdownView from '../../../ui/components/markdown_view/markdown_view.js';
 import * as UI from '../../../ui/legacy/legacy.js';
 import * as Lit from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
-import {AgentType, type ContextDetail, type ConversationContext, ErrorType} from '../agents/AiAgent.js';
+import {type ContextDetail, type ConversationContext, ErrorType} from '../agents/AiAgent.js';
+import {ConversationType, NOT_FOUND_IMAGE_DATA} from '../AiHistoryStorage.js';
+import {PatchWidget} from '../PatchWidget.js';
 
 import stylesRaw from './chatView.css.js';
 import {MarkdownRendererWithCodeBlock} from './MarkdownRendererWithCodeBlock.js';
@@ -100,12 +102,12 @@ const UIStringsNotTranslate = {
    */
   noAgentStateText: 'Explore AI assistance',
   /**
-   * @description The error message when the LLM loop is stopped for some reason (Max steps reached or request to LLM failed)
+   * @description The error message when the request to the LLM failed for some reason.
    */
   systemError:
       'Something unforeseen happened and I can no longer continue. Try your request again and see if that resolves the issue.',
   /**
-   * @description The error message when the LLM loop is stopped for some reason (Max steps reached or request to LLM failed)
+   * @description The error message when the LLM gets stuck in a loop (max steps reached).
    */
   maxStepsError: 'Seems like I am stuck with the investigation. It would be better if you start over.',
   /**
@@ -197,6 +199,10 @@ const UIStringsNotTranslate = {
    */
   openImageInNewTab: 'Open image in a new tab',
   /**
+   *@description Alt text for image when it is not available.
+   */
+  imageUnavailable: 'Image unavailable',
+  /**
    *@description Button text to change the selected workspace
    */
   change: 'Change',
@@ -215,6 +221,7 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 const lockedString = i18n.i18n.lockedString;
 
 const SCROLL_ROUNDING_OFFSET = 1;
+const JPEG_MIME_TYPE = 'image/jpeg';
 
 export interface Step {
   isLoading: boolean;
@@ -235,6 +242,13 @@ export const enum ChatMessageEntity {
   MODEL = 'model',
   USER = 'user',
 }
+
+export type ImageInputData = {
+  isLoading: true,
+}|{
+  isLoading: false,
+  data: string,
+};
 
 export interface UserChatMessage {
   entity: ChatMessageEntity.USER;
@@ -266,6 +280,7 @@ export interface Props {
   onNewConversation: () => void;
   onTakeScreenshot?: () => void;
   onRemoveImageInput?: () => void;
+  onTextInputChange: (input: string) => void;
   inspectElementToggled: boolean;
   state: State;
   aidaAvailability: Host.AidaClient.AidaAccessPreconditions;
@@ -274,7 +289,7 @@ export interface Props {
   isLoading: boolean;
   canShowFeedbackForm: boolean;
   userInfo: Pick<Host.InspectorFrontendHostAPI.SyncInformation, 'accountImage'|'accountFullName'>;
-  agentType?: AgentType;
+  conversationType?: ConversationType;
   isReadOnly: boolean;
   blockedByCrossOrigin: boolean;
   changeSummary?: string;
@@ -282,12 +297,13 @@ export interface Props {
   patchSuggestionLoading?: boolean;
   projectName?: string;
   multimodalInputEnabled?: boolean;
-  imageInput?: string;
+  imageInput?: ImageInputData;
   onApplyToWorkspace?: () => void;
   isTextInputDisabled: boolean;
   emptyStateSuggestions: string[];
   inputPlaceholder: Platform.UIString.LocalizedString;
   disclaimerText: Platform.UIString.LocalizedString;
+  isTextInputEmpty: boolean;
 }
 
 export class ChatView extends HTMLElement {
@@ -297,7 +313,6 @@ export class ChatView extends HTMLElement {
   #props: Props;
   #messagesContainerElement?: Element;
   #mainElementRef?: Lit.Directives.Ref<Element> = Lit.Directives.createRef();
-  #lastAnswerMarkdownView?: MarkdownView.MarkdownView.MarkdownView;
   #messagesContainerResizeObserver = new ResizeObserver(() => this.#handleMessagesContainerResize());
   /**
    * Indicates whether the chat scroll position should be pinned to the bottom.
@@ -355,14 +370,6 @@ export class ChatView extends HTMLElement {
     this.#mainElementRef.value.scrollTop = this.#scrollTop;
   }
 
-  finishTextAnimations(): void {
-    if (!this.#lastAnswerMarkdownView) {
-      return;
-    }
-
-    this.#lastAnswerMarkdownView.finishAnimations();
-  }
-
   scrollToBottom(): void {
     if (!this.#mainElementRef?.value) {
       return;
@@ -392,6 +399,7 @@ export class ChatView extends HTMLElement {
     }
 
     textArea.value = text;
+    this.#props.onTextInputChange(text);
   }
 
   #handleMessageContainerRef(el: Element|undefined): void {
@@ -402,17 +410,6 @@ export class ChatView extends HTMLElement {
     } else {
       this.#pinScrollToBottom = true;
       this.#messagesContainerResizeObserver.disconnect();
-    }
-  }
-
-  #handleLastAnswerMarkdownViewRef(el: Element|undefined): void {
-    if (!el) {
-      this.#lastAnswerMarkdownView = undefined;
-      return;
-    }
-
-    if (el instanceof MarkdownView.MarkdownView.MarkdownView) {
-      this.#lastAnswerMarkdownView = el;
     }
   }
 
@@ -428,12 +425,17 @@ export class ChatView extends HTMLElement {
 
   #handleSubmit = (ev: SubmitEvent): void => {
     ev.preventDefault();
+    if (this.#props.imageInput?.isLoading) {
+      return;
+    }
+
     const textArea = this.#shadow.querySelector('.chat-input') as HTMLTextAreaElement;
     if (!textArea?.value) {
       return;
     }
-    const imageInput =
-        this.#props.imageInput ? {inlineData: {data: this.#props.imageInput, mimeType: 'image/jpeg'}} : undefined;
+    const imageInput = !this.#props.imageInput?.isLoading && this.#props.imageInput?.data ?
+        {inlineData: {data: this.#props.imageInput.data, mimeType: JPEG_MIME_TYPE}} :
+        undefined;
     void this.#props.onTextSubmit(textArea.value, imageInput);
     textArea.value = '';
   };
@@ -446,11 +448,12 @@ export class ChatView extends HTMLElement {
     // Go to a new line only when Shift + Enter is pressed.
     if (ev.key === 'Enter' && !ev.shiftKey) {
       ev.preventDefault();
-      if (!ev.target?.value) {
+      if (!ev.target?.value || this.#props.imageInput?.isLoading) {
         return;
       }
-      const imageInput =
-          this.#props.imageInput ? {inlineData: {data: this.#props.imageInput, mimeType: 'image/jpeg'}} : undefined;
+      const imageInput = !this.#props.imageInput?.isLoading && this.#props.imageInput?.data ?
+          {inlineData: {data: this.#props.imageInput.data, mimeType: JPEG_MIME_TYPE}} :
+          undefined;
       void this.#props.onTextSubmit(ev.target.value, imageInput);
       ev.target.value = '';
     }
@@ -488,20 +491,15 @@ export class ChatView extends HTMLElement {
             suggestions: this.#props.emptyStateSuggestions,
             userInfo: this.#props.userInfo,
             markdownRenderer: this.#markdownRenderer,
-            agentType: this.#props.agentType,
+            conversationType: this.#props.conversationType,
             changeSummary: this.#props.changeSummary,
-            patchSuggestion: this.#props.patchSuggestion,
-            patchSuggestionLoading: this.#props.patchSuggestionLoading,
-            projectName: this.#props.projectName,
             onSuggestionClick: this.#handleSuggestionClick,
             onFeedbackSubmit: this.#props.onFeedbackSubmit,
-            onLastAnswerMarkdownViewRef: this.#handleLastAnswerMarkdownViewRef,
             onMessageContainerRef: this.#handleMessageContainerRef,
-            onApplyToWorkspace: this.#props.onApplyToWorkspace,
           })}
           ${this.#props.isReadOnly
             ? renderReadOnlySection({
-                agentType: this.#props.agentType,
+                conversationType: this.#props.conversationType,
                 onNewConversation: this.#props.onNewConversation,
               })
             : renderChatInput({
@@ -513,8 +511,9 @@ export class ChatView extends HTMLElement {
                 selectedContext: this.#props.selectedContext,
                 inspectElementToggled: this.#props.inspectElementToggled,
                 multimodalInputEnabled: this.#props.multimodalInputEnabled,
-                agentType: this.#props.agentType,
+                conversationType: this.#props.conversationType,
                 imageInput: this.#props.imageInput,
+                isTextInputEmpty: this.#props.isTextInputEmpty,
                 onContextClick: this.#props.onContextClick,
                 onInspectElementClick: this.#props.onInspectElementClick,
                 onSubmit: this.#handleSubmit,
@@ -523,6 +522,7 @@ export class ChatView extends HTMLElement {
                 onNewConversation: this.#props.onNewConversation,
                 onTakeScreenshot: this.#props.onTakeScreenshot,
                 onRemoveImageInput: this.#props.onRemoveImageInput,
+                onTextInputChange: this.#props.onTextInputChange,
               })
           }
         </main>
@@ -545,70 +545,6 @@ export class ChatView extends HTMLElement {
     `, this.#shadow, {host: this});
     // clang-format on
   }
-}
-
-async function onChangeWorkspaceClick(): Promise<void> {
-  await UI.UIUtils.ConfirmDialog.show(
-      'Changing workspace is not implemented yet', 'Change workspace', undefined,
-      {jslogContext: 'change-workspace-dialog'});
-}
-
-function renderChangeSummary({
-  changeSummary,
-  patchSuggestion,
-  patchSuggestionLoading,
-  projectName,
-  onApplyToWorkspace,
-}: {
-  changeSummary: string,
-  patchSuggestion?: string,
-  patchSuggestionLoading?: boolean,
-  projectName?: string,
-  onApplyToWorkspace?: () => void,
-}): Lit.LitTemplate {
-  // clang-format off
-  return html`<details class="change-summary">
-      <summary>
-        <devtools-icon class="difference-icon" .name=${'pen-spark'}
-        ></devtools-icon>
-        <span class="header-text">
-          ${lockedString(UIStringsNotTranslate.changeSummary)}
-        </span>
-        <devtools-icon
-          class="arrow"
-          .name=${'chevron-down'}
-        ></devtools-icon>
-      </summary>
-      <devtools-code-block
-        .code=${changeSummary}
-        .codeLang=${'css'}
-        .displayNotice=${true}
-      ></devtools-code-block>
-      <div class="workspace">
-        <div class="change-workspace">
-          <div class="selected-folder">
-            ${lockedString(UIStringsNotTranslate.selectedFolder)} ${projectName}
-          </div>
-          <devtools-button
-            @click=${onChangeWorkspaceClick}
-            .jslogContext=${'change-workspace'}
-            .variant=${Buttons.Button.Variant.TEXT}>
-              ${lockedString(UIStringsNotTranslate.change)}
-          </devtools-button>
-        </div>
-        <devtools-button
-          class='apply-to-workspace'
-          @click=${onApplyToWorkspace}
-          .jslogContext=${'stage-to-workspace'}
-          .variant=${Buttons.Button.Variant.OUTLINED}>
-            ${!patchSuggestionLoading ? lockedString(UIStringsNotTranslate.applyToWorkspace) : lockedString(UIStringsNotTranslate.loading)}
-        </devtools-button>
-      </div>
-      ${patchSuggestion ? html`<div class="patch-tmp-message">
-        ${patchSuggestion}
-      </div>` : Lit.nothing}
-    </details>`;
-  // clang-format on
 }
 
 function renderTextAsMarkdown(text: string, markdownRenderer: MarkdownRendererWithCodeBlock, {animate, ref: refFn}: {
@@ -857,7 +793,6 @@ function renderChatMessage({
   markdownRenderer,
   onSuggestionClick,
   onFeedbackSubmit,
-  onLastAnswerMarkdownViewRef,
 }: {
   message: ChatMessage,
   isLoading: boolean,
@@ -868,7 +803,6 @@ function renderChatMessage({
   markdownRenderer: MarkdownRendererWithCodeBlock,
   onSuggestionClick: (suggestion: string) => void,
   onFeedbackSubmit: (rpcId: Host.AidaClient.RpcGlobalId, rate: Host.AidaClient.Rating, feedback?: string) => void,
-  onLastAnswerMarkdownViewRef: (el: Element|undefined) => void,
 }): Lit.TemplateResult {
   if (message.entity === ChatMessageEntity.USER) {
     const name = userInfo.accountFullName || lockedString(UIStringsNotTranslate.you);
@@ -877,18 +811,9 @@ function renderChatMessage({
         html`<devtools-icon
           .name=${'profile'}
         ></devtools-icon>`;
-    let imageInput = html``;
-    if (message.imageInput && 'inlineData' in message.imageInput) {
-      const imageUrl = `data:image/jpeg;base64,${message.imageInput.inlineData.data}`;
-      // clang-format off
-      imageInput = html`<x-link
-        class="image-link" title=${UIStringsNotTranslate.openImageInNewTab}
-        href=${imageUrl}
-      >
-        <img src=${imageUrl} alt=${UIStringsNotTranslate.imageInputSentToTheModel} />
-      </x-link>`;
-      // clang-format on
-    }
+    const imageInput = message.imageInput && 'inlineData' in message.imageInput ?
+        renderImageChatMessage(message.imageInput.inlineData) :
+        Lit.nothing;
     // clang-format off
     return html`<section
       class="chat-message query"
@@ -931,7 +856,7 @@ function renderChatMessage({
         },
       )}
       ${message.answer
-        ? html`<p>${renderTextAsMarkdown(message.answer, markdownRenderer, { animate: !isReadOnly, ref: onLastAnswerMarkdownViewRef })}</p>`
+        ? html`<p>${renderTextAsMarkdown(message.answer, markdownRenderer, { animate: !isReadOnly && isLoading && isLast })}</p>`
         : Lit.nothing}
       ${renderError(message)}
       ${isLast && isLoading
@@ -954,23 +879,42 @@ function renderChatMessage({
   // clang-format on
 }
 
+function renderImageChatMessage(inlineData: Host.AidaClient.MediaBlob): Lit.LitTemplate {
+  if (inlineData.data === NOT_FOUND_IMAGE_DATA) {
+    // clang-format off
+    return html`<div class="unavailable-image" title=${UIStringsNotTranslate.imageUnavailable}>
+      <devtools-icon name='file-image'></devtools-icon>
+    </div>`;
+    // clang-format on
+  }
+  const imageUrl = `data:image/jpeg;base64,${inlineData.data}`;
+  // clang-format off
+    return html`<x-link
+      class="image-link" title=${UIStringsNotTranslate.openImageInNewTab}
+      href=${imageUrl}
+    >
+      <img src=${imageUrl} alt=${UIStringsNotTranslate.imageInputSentToTheModel} />
+    </x-link>`;
+  // clang-format on
+}
+
 function renderSelection({
   selectedContext,
   inspectElementToggled,
-  agentType,
+  conversationType,
   onContextClick,
   onInspectElementClick,
 }: {
   selectedContext: ConversationContext<unknown>|null,
   inspectElementToggled: boolean,
-  agentType?: AgentType, onContextClick: () => void | Promise<void>, onInspectElementClick: () => void,
+  conversationType?: ConversationType, onContextClick: () => void | Promise<void>, onInspectElementClick: () => void,
 }): Lit.LitTemplate {
-  if (!agentType) {
+  if (!conversationType) {
     return Lit.nothing;
   }
 
   // TODO: currently the picker behavior is SDKNode specific.
-  const hasPickerBehavior = agentType === AgentType.STYLING;
+  const hasPickerBehavior = conversationType === ConversationType.STYLING;
 
   const resourceClass = Lit.Directives.classMap({
     'not-selected': !selectedContext,
@@ -1032,14 +976,9 @@ function renderMessages({
   userInfo,
   markdownRenderer,
   changeSummary,
-  patchSuggestion,
-  patchSuggestionLoading,
-  projectName,
   onSuggestionClick,
   onFeedbackSubmit,
-  onLastAnswerMarkdownViewRef,
   onMessageContainerRef,
-  onApplyToWorkspace,
 }: {
   messages: ChatMessage[],
   isLoading: boolean,
@@ -1048,15 +987,10 @@ function renderMessages({
   userInfo: Pick<Host.InspectorFrontendHostAPI.SyncInformation, 'accountImage'|'accountFullName'>,
   markdownRenderer: MarkdownRendererWithCodeBlock,
   changeSummary?: string,
-  patchSuggestion?: string,
-  patchSuggestionLoading?: boolean,
-  projectName?: string,
-  onApplyToWorkspace?: () => void,
-                    onSuggestionClick: (suggestion: string) => void,
-                    onFeedbackSubmit:
-                        (rpcId: Host.AidaClient.RpcGlobalId, rate: Host.AidaClient.Rating, feedback?: string) => void,
-                    onLastAnswerMarkdownViewRef: (el: Element|undefined) => void,
-                    onMessageContainerRef: (el: Element|undefined) => void,
+               onSuggestionClick: (suggestion: string) => void,
+               onFeedbackSubmit:
+                   (rpcId: Host.AidaClient.RpcGlobalId, rate: Host.AidaClient.Rating, feedback?: string) => void,
+               onMessageContainerRef: (el: Element|undefined) => void,
 }): Lit.TemplateResult {
   // clang-format off
   return html`
@@ -1072,16 +1006,11 @@ function renderMessages({
           markdownRenderer,
           onSuggestionClick,
           onFeedbackSubmit,
-          onLastAnswerMarkdownViewRef,
         }),
       )}
-      ${(changeSummary && !isLoading) ? renderChangeSummary({
-          changeSummary,
-          patchSuggestion,
-          patchSuggestionLoading,
-          projectName,
-          onApplyToWorkspace,
-        }) : Lit.nothing}
+      ${(changeSummary && !isLoading) ? html`<devtools-widget .widgetConfig=${UI.Widget.widgetConfig(PatchWidget, {
+        changeSummary,
+      })}></devtools-widget>` : Lit.nothing}
     </div>
   `;
   // clang-format on
@@ -1123,11 +1052,11 @@ function renderEmptyState({isTextInputDisabled, suggestions, onSuggestionClick}:
   // clang-format on
 }
 
-function renderReadOnlySection({onNewConversation, agentType}: {
+function renderReadOnlySection({onNewConversation, conversationType}: {
   onNewConversation: () => void,
-  agentType?: AgentType,
+  conversationType?: ConversationType,
 }): Lit.LitTemplate {
-  if (!agentType) {
+  if (!conversationType) {
     return Lit.nothing;
   }
 
@@ -1151,13 +1080,14 @@ function renderReadOnlySection({onNewConversation, agentType}: {
   // clang-format on
 }
 
-function renderChatInputButtons({isLoading, blockedByCrossOrigin, isTextInputDisabled, onCancel, onNewConversation}: {
-  isLoading: boolean,
-  blockedByCrossOrigin: boolean,
-  isTextInputDisabled: boolean,
-  onCancel: (ev: SubmitEvent) => void,
-  onNewConversation: () => void,
-}): Lit.TemplateResult {
+function renderChatInputButtons(
+    {isLoading, blockedByCrossOrigin, isTextInputDisabled, isTextInputEmpty, imageInput, onCancel, onNewConversation}: {
+      isLoading: boolean,
+      blockedByCrossOrigin: boolean,
+      isTextInputDisabled: boolean,
+      isTextInputEmpty: boolean,
+      imageInput?: ImageInputData, onCancel: (ev: SubmitEvent) => void, onNewConversation: () => void,
+    }): Lit.TemplateResult {
   if (isLoading) {
     // clang-format off
     return html`<devtools-button
@@ -1204,7 +1134,7 @@ function renderChatInputButtons({isLoading, blockedByCrossOrigin, isTextInputDis
         type: 'submit',
         variant: Buttons.Button.Variant.ICON,
         size: Buttons.Button.Size.REGULAR,
-        disabled: isTextInputDisabled,
+        disabled: isTextInputDisabled || isTextInputEmpty || imageInput?.isLoading,
         iconName: 'send',
         title: lockedString(UIStringsNotTranslate.sendButtonTitle),
         jslogContext: 'send',
@@ -1217,11 +1147,13 @@ function renderTakeScreenshotButton({
   multimodalInputEnabled,
   blockedByCrossOrigin,
   isTextInputDisabled,
+  imageInput,
   onTakeScreenshot,
 }: {
   isTextInputDisabled: boolean,
   blockedByCrossOrigin: boolean,
   multimodalInputEnabled?: boolean,
+  imageInput?: ImageInputData,
   onTakeScreenshot?: () => void,
 }): Lit.LitTemplate {
     if (!multimodalInputEnabled || blockedByCrossOrigin) {
@@ -1235,7 +1167,7 @@ function renderTakeScreenshotButton({
         {
           variant: Buttons.Button.Variant.ICON,
           size: Buttons.Button.Size.REGULAR,
-          disabled: isTextInputDisabled,
+          disabled: isTextInputDisabled || imageInput?.isLoading,
           iconName: 'photo-camera',
           title: lockedString(UIStringsNotTranslate.takeScreenshotButtonTitle),
           jslogContext: 'take-screenshot',
@@ -1250,15 +1182,14 @@ function renderImageInput({
   onRemoveImageInput,
 }: {
   multimodalInputEnabled?: boolean,
-  imageInput?: string,
+  imageInput?: ImageInputData,
   onRemoveImageInput?: () => void,
 }): Lit.LitTemplate {
-    if (!multimodalInputEnabled || !imageInput || imageInput==='') {
+    if (!multimodalInputEnabled || !imageInput) {
       return Lit.nothing;
     }
-    return  html`
-    <div class="image-input-container">
-      <devtools-button
+
+    const crossButton = html`<devtools-button
       aria-label=${lockedString(UIStringsNotTranslate.removeImageInputButtonTitle)}
       @click=${onRemoveImageInput}
       .data=${
@@ -1269,8 +1200,20 @@ function renderImageInput({
           title: lockedString(UIStringsNotTranslate.removeImageInputButtonTitle),
         } as Buttons.Button.ButtonData
       }
-    ></devtools-button>
-      <img src="data:image/jpeg;base64, ${imageInput}" alt="Screenshot input" />
+    ></devtools-button>`;
+
+    if (imageInput.isLoading) {
+      return html`<div class="image-input-container">
+        ${crossButton}
+        <div class="loading">
+          <devtools-spinner></devtools-spinner>
+        </div>
+      </div>`;
+    }
+    return  html`
+    <div class="image-input-container">
+      ${crossButton}
+      <img src="data:image/jpeg;base64, ${imageInput.data}" alt="Screenshot input" />
     </div>`;
   }
 
@@ -1283,8 +1226,9 @@ function renderChatInput({
   selectedContext,
   inspectElementToggled,
   multimodalInputEnabled,
-  agentType,
+  conversationType,
   imageInput,
+  isTextInputEmpty,
   onContextClick,
   onInspectElementClick,
   onSubmit,
@@ -1293,6 +1237,7 @@ function renderChatInput({
   onNewConversation,
   onTakeScreenshot,
   onRemoveImageInput,
+  onTextInputChange,
 }: {
   isLoading: boolean,
   blockedByCrossOrigin: boolean,
@@ -1302,8 +1247,9 @@ function renderChatInput({
   selectedContext: ConversationContext<unknown> | null,
   inspectElementToggled: boolean,
   multimodalInputEnabled?: boolean,
-  agentType?: AgentType,
-  imageInput?: string,
+  conversationType?: ConversationType,
+  imageInput?: ImageInputData,
+  isTextInputEmpty: boolean,
   onContextClick: () => void ,
   onInspectElementClick: () => void,
   onSubmit: (ev: SubmitEvent) => void,
@@ -1312,8 +1258,9 @@ function renderChatInput({
   onNewConversation: () => void,
   onTakeScreenshot?: () => void,
   onRemoveImageInput?: () => void,
+  onTextInputChange: (input: string) => void,
 }): Lit.LitTemplate {
-  if (!agentType) {
+  if (!conversationType) {
     return Lit.nothing;
   }
 
@@ -1323,10 +1270,10 @@ function renderChatInput({
     'screenshot-button': Boolean(multimodalInputEnabled) && !blockedByCrossOrigin,
   });
 
-    const chatInputContainerCls = Lit.Directives.classMap({
-      'chat-input-container': true,
-      disabled: isTextInputDisabled,
-    });
+  const chatInputContainerCls = Lit.Directives.classMap({
+    'chat-input-container': true,
+    disabled: isTextInputDisabled,
+  });
 
   // clang-format off
   return html`
@@ -1340,7 +1287,7 @@ function renderChatInput({
           ${renderSelection({
             selectedContext,
             inspectElementToggled,
-            agentType,
+            conversationType,
             onContextClick,
             onInspectElementClick,
           })}
@@ -1356,63 +1303,66 @@ function renderChatInput({
         wrap="hard"
         maxlength="10000"
         @keydown=${onTextAreaKeyDown}
+        @input=${(event: KeyboardEvent) => onTextInputChange((event.target as HTMLInputElement).value)}
         placeholder=${inputPlaceholder}
         jslog=${VisualLogging.textField('query').track({ keydown: 'Enter' })}
       ></textarea>
       <div class="chat-input-buttons">
         ${renderTakeScreenshotButton({
-          multimodalInputEnabled, blockedByCrossOrigin, isTextInputDisabled, onTakeScreenshot
+          multimodalInputEnabled, blockedByCrossOrigin, isTextInputDisabled, imageInput, onTakeScreenshot
         })}
-        ${renderChatInputButtons({ isLoading, blockedByCrossOrigin, isTextInputDisabled, onCancel, onNewConversation })}
+        ${renderChatInputButtons({
+          isLoading, blockedByCrossOrigin, isTextInputDisabled, isTextInputEmpty, imageInput, onCancel, onNewConversation
+        })}
       </div>
     </div>
   </form>`;
-    // clang-format on
-  }
+  // clang-format on
+}
 
-  function renderAidaUnavailableContents(
-      aidaAvailability:
-          Exclude<Host.AidaClient.AidaAccessPreconditions, Host.AidaClient.AidaAccessPreconditions.AVAILABLE>):
-      Lit.TemplateResult {
-    switch (aidaAvailability) {
-      case Host.AidaClient.AidaAccessPreconditions.NO_ACCOUNT_EMAIL:
-      case Host.AidaClient.AidaAccessPreconditions.SYNC_IS_PAUSED: {
-        return html`${i18nString(UIStrings.notLoggedIn)}`;
-      }
-      case Host.AidaClient.AidaAccessPreconditions.NO_INTERNET: {
-        return html`${i18nString(UIStrings.offline)}`;
-      }
+function renderAidaUnavailableContents(
+    aidaAvailability:
+        Exclude<Host.AidaClient.AidaAccessPreconditions, Host.AidaClient.AidaAccessPreconditions.AVAILABLE>):
+    Lit.TemplateResult {
+  switch (aidaAvailability) {
+    case Host.AidaClient.AidaAccessPreconditions.NO_ACCOUNT_EMAIL:
+    case Host.AidaClient.AidaAccessPreconditions.SYNC_IS_PAUSED: {
+      return html`${i18nString(UIStrings.notLoggedIn)}`;
+    }
+    case Host.AidaClient.AidaAccessPreconditions.NO_INTERNET: {
+      return html`${i18nString(UIStrings.offline)}`;
     }
   }
+}
 
-  function renderConsentViewContents(): Lit.TemplateResult {
-    const settingsLink = document.createElement('button');
-    settingsLink.textContent = i18nString(UIStrings.settingsLink);
-    settingsLink.classList.add('link');
-    UI.ARIAUtils.markAsLink(settingsLink);
-    settingsLink.addEventListener('click', () => {
-      void UI.ViewManager.ViewManager.instance().showView('chrome-ai');
-    });
-    settingsLink.setAttribute('jslog', `${VisualLogging.action('open-ai-settings').track({click: true})}`);
+function renderConsentViewContents(): Lit.TemplateResult {
+  const settingsLink = document.createElement('button');
+  settingsLink.textContent = i18nString(UIStrings.settingsLink);
+  settingsLink.classList.add('link');
+  UI.ARIAUtils.markAsLink(settingsLink);
+  settingsLink.addEventListener('click', () => {
+    void UI.ViewManager.ViewManager.instance().showView('chrome-ai');
+  });
+  settingsLink.setAttribute('jslog', `${VisualLogging.action('open-ai-settings').track({click: true})}`);
 
-    let consentViewContents: HTMLSpanElement;
-    // TODO(ergunsh): Should this `view` access `hostConfig` at all?
-    const config = Root.Runtime.hostConfig;
-    if (config.devToolsAiAssistancePerformanceAgent?.enabled) {
-      consentViewContents = i18n.i18n.getFormatLocalizedString(
-          str_, UIStrings.turnOnForStylesRequestsPerformanceAndFiles, {PH1: settingsLink});
-    } else if (config.devToolsAiAssistanceFileAgent?.enabled) {
-      consentViewContents =
-          i18n.i18n.getFormatLocalizedString(str_, UIStrings.turnOnForStylesRequestsAndFiles, {PH1: settingsLink});
-    } else if (config.devToolsAiAssistanceNetworkAgent?.enabled) {
-      consentViewContents =
-          i18n.i18n.getFormatLocalizedString(str_, UIStrings.turnOnForStylesAndRequests, {PH1: settingsLink});
-    } else {
-      consentViewContents = i18n.i18n.getFormatLocalizedString(str_, UIStrings.turnOnForStyles, {PH1: settingsLink});
-    }
-
-    return html`${consentViewContents}`;
+  let consentViewContents: HTMLSpanElement;
+  // TODO(ergunsh): Should this `view` access `hostConfig` at all?
+  const config = Root.Runtime.hostConfig;
+  if (config.devToolsAiAssistancePerformanceAgent?.enabled) {
+    consentViewContents = i18n.i18n.getFormatLocalizedString(
+        str_, UIStrings.turnOnForStylesRequestsPerformanceAndFiles, {PH1: settingsLink});
+  } else if (config.devToolsAiAssistanceFileAgent?.enabled) {
+    consentViewContents =
+        i18n.i18n.getFormatLocalizedString(str_, UIStrings.turnOnForStylesRequestsAndFiles, {PH1: settingsLink});
+  } else if (config.devToolsAiAssistanceNetworkAgent?.enabled) {
+    consentViewContents =
+        i18n.i18n.getFormatLocalizedString(str_, UIStrings.turnOnForStylesAndRequests, {PH1: settingsLink});
+  } else {
+    consentViewContents = i18n.i18n.getFormatLocalizedString(str_, UIStrings.turnOnForStyles, {PH1: settingsLink});
   }
+
+  return html`${consentViewContents}`;
+}
 
 function renderDisabledState(contents: Lit.TemplateResult): Lit.TemplateResult {
   // clang-format off
@@ -1522,16 +1472,11 @@ function renderMainContents({
   suggestions,
   userInfo,
   markdownRenderer,
-  agentType,
+  conversationType,
   changeSummary,
-  patchSuggestion,
-  patchSuggestionLoading,
-  projectName,
   onSuggestionClick,
   onFeedbackSubmit,
-  onLastAnswerMarkdownViewRef,
   onMessageContainerRef,
-  onApplyToWorkspace,
 }: {
   state: State,
   aidaAvailability: Host.AidaClient.AidaAccessPreconditions,
@@ -1543,17 +1488,12 @@ function renderMainContents({
   suggestions: string[],
   userInfo: Pick<Host.InspectorFrontendHostAPI.SyncInformation, 'accountImage'|'accountFullName'>,
   markdownRenderer: MarkdownRendererWithCodeBlock,
-  agentType?: AgentType,
+  conversationType?: ConversationType,
   changeSummary?: string,
-  patchSuggestion?: string,
-  patchSuggestionLoading?: boolean,
-  projectName?: string,
-             onSuggestionClick: (suggestion: string) => void,
-             onFeedbackSubmit: (rpcId: Host.AidaClient.RpcGlobalId, rate: Host.AidaClient.Rating, feedback?: string) =>
-                 void,
-             onLastAnswerMarkdownViewRef: (el: Element|undefined) => void,
-             onMessageContainerRef: (el: Element|undefined) => void,
-  onApplyToWorkspace?: () => void,
+               onSuggestionClick: (suggestion: string) => void,
+               onFeedbackSubmit:
+                   (rpcId: Host.AidaClient.RpcGlobalId, rate: Host.AidaClient.Rating, feedback?: string) => void,
+               onMessageContainerRef: (el: Element|undefined) => void,
 }): Lit.TemplateResult {
   if (state === State.CONSENT_VIEW) {
     return renderDisabledState(renderConsentViewContents());
@@ -1563,7 +1503,7 @@ function renderMainContents({
     return renderDisabledState(renderAidaUnavailableContents(aidaAvailability));
   }
 
-  if (!agentType) {
+  if (!conversationType) {
     return renderNoAgentState();
   }
 
@@ -1576,13 +1516,8 @@ function renderMainContents({
       userInfo,
       markdownRenderer,
       changeSummary,
-      patchSuggestion,
-      patchSuggestionLoading,
-      projectName,
-      onApplyToWorkspace,
       onSuggestionClick,
       onFeedbackSubmit,
-      onLastAnswerMarkdownViewRef,
       onMessageContainerRef,
     });
   }

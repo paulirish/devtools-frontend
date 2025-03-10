@@ -56,6 +56,7 @@ export interface PageResource {
   initiator: PageResourceLoadInitiator;
   url: Platform.DevToolsPath.UrlString;
   size: number|null;
+  duration: number|null;
 }
 
 // Used for revealing a resource.
@@ -201,12 +202,12 @@ export class PageResourceLoader extends Common.ObjectWrapper.ObjectWrapper<Event
       this.#currentlyLoadingPerTarget.set(target.id(), currentCount + 1);
     }
     if (this.#currentlyLoading > this.#maxConcurrentLoads) {
-      const entry: LoadQueueEntry = {resolve: () => {}, reject: (): void => {}};
-      const waitForCapacity = new Promise<void>((resolve, reject) => {
-        entry.resolve = resolve;
-        entry.reject = reject;
-      });
-      this.#queuedLoads.push(entry);
+      const {
+        promise: waitForCapacity,
+        resolve,
+        reject,
+      } = Promise.withResolvers<void>();
+      this.#queuedLoads.push({resolve, reject});
       await waitForCapacity;
     }
   }
@@ -255,9 +256,11 @@ export class PageResourceLoader extends Common.ObjectWrapper.ObjectWrapper<Event
       throw new Error('Invalid initiator');
     }
     const key = PageResourceLoader.makeKey(url, initiator);
-    const pageResource: PageResource = {success: null, size: null, errorMessage: undefined, url, initiator};
+    const pageResource:
+        PageResource = {success: null, size: null, duration: null, errorMessage: undefined, url, initiator};
     this.#pageResources.set(key, pageResource);
     this.dispatchEventToListeners(Events.UPDATE);
+    const startTime = performance.now();
     try {
       await this.acquireLoadSlot(initiator.target);
       const resultPromise = this.dispatchLoad(url, initiator);
@@ -278,6 +281,7 @@ export class PageResourceLoader extends Common.ObjectWrapper.ObjectWrapper<Event
       }
       throw e;
     } finally {
+      pageResource.duration = performance.now() - startTime;
       this.releaseLoadSlot(initiator.target);
       this.dispatchEventToListeners(Events.UPDATE);
     }
@@ -341,8 +345,8 @@ export class PageResourceLoader extends Common.ObjectWrapper.ObjectWrapper<Event
     return result;
   }
 
-  private getDeveloperResourceScheme(parsedURL: Common.ParsedURL.ParsedURL|
-                                     null): Host.UserMetrics.DeveloperResourceScheme {
+  private getDeveloperResourceScheme(parsedURL: Common.ParsedURL.ParsedURL|null):
+      Host.UserMetrics.DeveloperResourceScheme {
     if (!parsedURL || parsedURL.scheme === '') {
       return Host.UserMetrics.DeveloperResourceScheme.UKNOWN;
     }

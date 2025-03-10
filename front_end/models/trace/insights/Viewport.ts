@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import * as i18n from '../../../core/i18n/i18n.js';
+import type * as Handlers from '../handlers/handlers.js';
 import * as Helpers from '../helpers/helpers.js';
 import type * as Types from '../types/types.js';
 
@@ -13,7 +14,6 @@ import {
   type InsightSetContext,
   InsightWarning,
   type PartialInsightModel,
-  type RequiredData,
 } from './types.js';
 
 export const UIStrings = {
@@ -28,10 +28,6 @@ export const UIStrings = {
 
 const str_ = i18n.i18n.registerUIStrings('models/trace/insights/Viewport.ts', UIStrings);
 export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
-
-export function deps(): ['Meta', 'UserInteractions'] {
-  return ['Meta', 'UserInteractions'];
-}
 
 export type ViewportInsightModel = InsightModel<typeof UIStrings, {
   mobileOptimized: boolean | null,
@@ -51,9 +47,23 @@ function finalize(partialModel: PartialInsightModel<ViewportInsightModel>): View
 }
 
 export function generateInsight(
-    parsedTrace: RequiredData<typeof deps>, context: InsightSetContext): ViewportInsightModel {
+    parsedTrace: Handlers.Types.ParsedTrace, context: InsightSetContext): ViewportInsightModel {
+  const viewportEvent = parsedTrace.UserInteractions.parseMetaViewportEvents.find(event => {
+    if (event.args.data.frame !== context.frameId) {
+      return false;
+    }
+
+    return Helpers.Timing.eventIsInBounds(event, context.bounds);
+  });
+
   const compositorEvents = parsedTrace.UserInteractions.beginCommitCompositorFrameEvents.filter(event => {
     if (event.args.frame !== context.frameId) {
+      return false;
+    }
+
+    // Commit compositor frame events can be emitted before the viewport tag is parsed.
+    // We shouldn't count these since the browser hasn't had time to make the viewport mobile optimized.
+    if (viewportEvent && event.ts < viewportEvent.ts) {
       return false;
     }
 
@@ -63,23 +73,17 @@ export function generateInsight(
   if (!compositorEvents.length) {
     // Trace doesn't have the data we need.
     return finalize({
+      frameId: context.frameId,
       mobileOptimized: null,
       warnings: [InsightWarning.NO_LAYOUT],
     });
   }
 
-  const viewportEvent = parsedTrace.UserInteractions.parseMetaViewportEvents.find(event => {
-    if (event.args.data.frame !== context.frameId) {
-      return false;
-    }
-
-    return Helpers.Timing.eventIsInBounds(event, context.bounds);
-  });
-
   // Returns true only if all events are mobile optimized.
   for (const event of compositorEvents) {
     if (!event.args.is_mobile_optimized) {
       return finalize({
+        frameId: context.frameId,
         mobileOptimized: false,
         viewportEvent,
         metricSavings: {INP: 300 as Types.Timing.Milli},
@@ -88,6 +92,7 @@ export function generateInsight(
   }
 
   return finalize({
+    frameId: context.frameId,
     mobileOptimized: true,
     viewportEvent,
   });

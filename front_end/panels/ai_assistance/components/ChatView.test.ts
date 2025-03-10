@@ -21,9 +21,10 @@ describeWithEnvironment('ChatView', () => {
       onCancelClick: noop,
       onContextClick: noop,
       onNewConversation: noop,
+      onTextInputChange: noop,
       inspectElementToggled: false,
       state: AiAssistance.State.CHAT_VIEW,
-      agentType: AiAssistance.AgentType.STYLING,
+      conversationType: AiAssistance.ConversationType.STYLING,
       aidaAvailability: Host.AidaClient.AidaAccessPreconditions.AVAILABLE,
       messages,
       selectedContext,
@@ -36,6 +37,7 @@ describeWithEnvironment('ChatView', () => {
       emptyStateSuggestions: [],
       inputPlaceholder: i18n.i18n.lockedString('input placeholder'),
       disclaimerText: i18n.i18n.lockedString('disclaimer text'),
+      isTextInputEmpty: true,
       ...options,
     };
   }
@@ -108,7 +110,7 @@ describeWithEnvironment('ChatView', () => {
           },
         });
         const props = getProp({
-          agentType: undefined,
+          conversationType: undefined,
         });
         const chat = new AiAssistance.ChatView(props);
         renderElementIntoDOM(chat);
@@ -137,7 +139,7 @@ describeWithEnvironment('ChatView', () => {
           },
         });
         const props = getProp({
-          agentType: undefined,
+          conversationType: undefined,
         });
         const chat = new AiAssistance.ChatView(props);
         renderElementIntoDOM(chat);

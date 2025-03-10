@@ -13,7 +13,7 @@ import * as Components from './components.js';
 import type * as InsightComponents from './insights/insights.js';
 
 type BaseInsightComponent =
-    InsightComponents.BaseInsightComponent.BaseInsightComponent<Trace.Insights.Types.InsightModel<{}, {}>>;
+    InsightComponents.BaseInsightComponent.BaseInsightComponent<Trace.Insights.Types.InsightModel>;
 
 function getUserVisibleInsights(component: Components.SidebarSingleInsightSet.SidebarSingleInsightSet):
     BaseInsightComponent[] {
@@ -62,7 +62,9 @@ describeWithEnvironment('SidebarSingleInsightSet', () => {
       '3rd parties',
       'INP by phase',
       'Layout shift culprits',
+      'Network dependency tree',
       'Improve image delivery',
+      'Font display',
       'Optimize viewport for mobile',
       'Optimize DOM size',
       'CSS Selector costs',
@@ -75,7 +77,9 @@ describeWithEnvironment('SidebarSingleInsightSet', () => {
     assert.deepEqual(passedInsightTitles, [
       'INP by phase',
       'Layout shift culprits',
+      'Network dependency tree',
       'Improve image delivery',
+      'Font display',
       'Optimize viewport for mobile',
       'Optimize DOM size',
       'CSS Selector costs',
@@ -105,7 +109,9 @@ describeWithEnvironment('SidebarSingleInsightSet', () => {
     assert.deepEqual(userVisibleTitles, [
       'LCP by phase',
       'Layout shift culprits',
+      'Network dependency tree',
       'Improve image delivery',
+      'Font display',
       '3rd parties',
       'INP by phase',
       'LCP request discovery',

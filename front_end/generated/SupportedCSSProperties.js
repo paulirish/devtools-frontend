@@ -494,6 +494,7 @@ export const generatedProperties = [
    "font-variation-settings",
    "font-weight",
    "forced-color-adjust",
+   "gap-rule-paint-order",
    "grid-auto-columns",
    "grid-auto-flow",
    "grid-auto-rows",
@@ -638,7 +639,10 @@ export const generatedProperties = [
    "rotate",
    "row-gap",
    "row-rule-break",
+   "row-rule-color",
    "row-rule-outset",
+   "row-rule-style",
+   "row-rule-width",
    "ruby-align",
    "ruby-position",
    "rx",
@@ -654,6 +658,7 @@ export const generatedProperties = [
    "scroll-margin-left",
    "scroll-margin-right",
    "scroll-margin-top",
+   "scroll-marker-contain",
    "scroll-marker-group",
    "scroll-padding-block-end",
    "scroll-padding-block-start",
@@ -748,7 +753,6 @@ export const generatedProperties = [
    "view-timeline-axis",
    "view-timeline-inset",
    "view-timeline-name",
-   "view-transition-capture-mode",
    "view-transition-class",
    "view-transition-group",
    "view-transition-name",
@@ -2411,6 +2415,14 @@ export const generatedProperties = [
   "name": "gap"
  },
  {
+  "inherited": false,
+  "keywords": [
+   "row-over-column",
+   "column-over-row"
+  ],
+  "name": "gap-rule-paint-order"
+ },
+ {
   "longhands": [
    "grid-template-rows",
    "grid-template-columns",
@@ -3482,7 +3494,8 @@ export const generatedProperties = [
    "flex-flow",
    "grid-rows",
    "grid-columns",
-   "grid-order"
+   "grid-order",
+   "source-order"
   ],
   "name": "reading-flow"
  },
@@ -3528,8 +3541,37 @@ export const generatedProperties = [
   "name": "row-rule-break"
  },
  {
+  "keywords": [
+   "currentcolor"
+  ],
+  "name": "row-rule-color"
+ },
+ {
   "inherited": false,
   "name": "row-rule-outset"
+ },
+ {
+  "keywords": [
+   "none",
+   "hidden",
+   "inset",
+   "groove",
+   "outset",
+   "ridge",
+   "dotted",
+   "dashed",
+   "solid",
+   "double"
+  ],
+  "name": "row-rule-style"
+ },
+ {
+  "keywords": [
+   "thin",
+   "medium",
+   "thick"
+  ],
+  "name": "row-rule-width"
  },
  {
   "inherited": true,
@@ -3624,6 +3666,13 @@ export const generatedProperties = [
  },
  {
   "name": "scroll-margin-top"
+ },
+ {
+  "keywords": [
+   "none",
+   "auto"
+  ],
+  "name": "scroll-marker-contain"
  },
  {
   "keywords": [
@@ -4343,13 +4392,6 @@ export const generatedProperties = [
  },
  {
   "name": "view-timeline-name"
- },
- {
-  "keywords": [
-   "flat",
-   "layered"
-  ],
-  "name": "view-transition-capture-mode"
  },
  {
   "keywords": [
@@ -5499,6 +5541,12 @@ export const generatedPropertyValues = {
    "preserve-parent-color"
   ]
  },
+ "gap-rule-paint-order": {
+  "values": [
+   "row-over-column",
+   "column-over-row"
+  ]
+ },
  "grid-auto-columns": {
   "values": [
    "auto",
@@ -6052,7 +6100,8 @@ export const generatedPropertyValues = {
    "flex-flow",
    "grid-rows",
    "grid-columns",
-   "grid-order"
+   "grid-order",
+   "source-order"
   ]
  },
  "resize": {
@@ -6080,6 +6129,32 @@ export const generatedPropertyValues = {
    "none",
    "spanning-item",
    "intersection"
+  ]
+ },
+ "row-rule-color": {
+  "values": [
+   "currentcolor"
+  ]
+ },
+ "row-rule-style": {
+  "values": [
+   "none",
+   "hidden",
+   "inset",
+   "groove",
+   "outset",
+   "ridge",
+   "dotted",
+   "dashed",
+   "solid",
+   "double"
+  ]
+ },
+ "row-rule-width": {
+  "values": [
+   "thin",
+   "medium",
+   "thick"
   ]
  },
  "ruby-align": {
@@ -6116,6 +6191,12 @@ export const generatedPropertyValues = {
   "values": [
    "none",
    "nearest"
+  ]
+ },
+ "scroll-marker-contain": {
+  "values": [
+   "none",
+   "auto"
   ]
  },
  "scroll-marker-group": {
@@ -6536,12 +6617,6 @@ export const generatedPropertyValues = {
    "text-top",
    "text-bottom",
    "middle"
-  ]
- },
- "view-transition-capture-mode": {
-  "values": [
-   "flat",
-   "layered"
   ]
  },
  "view-transition-class": {

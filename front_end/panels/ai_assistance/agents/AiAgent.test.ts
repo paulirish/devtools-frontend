@@ -28,6 +28,10 @@ function mockConversationContext(): AiAssistance.ConversationContext<unknown> {
     override getTitle(): string {
       return 'title';
     }
+
+    override getSuggestions(): undefined {
+      return;
+    }
   })();
 }
 
@@ -85,6 +89,14 @@ describeWithEnvironment('AiAgent', () => {
           agent.buildRequest({text: 'test input'}, Host.AidaClient.Role.USER).options?.model_id,
           'test model',
       );
+    });
+
+    it('builds a request without a model id it is configured as an empty string', async () => {
+      const agent = new AiAgentMock({
+        aidaClient: mockAidaClient(),
+      });
+      agent.options.modelId = '';
+      assert.isUndefined(agent.buildRequest({text: 'test input'}, Host.AidaClient.Role.USER).options?.model_id);
     });
 
     it('builds a request with logging', async () => {
@@ -312,6 +324,10 @@ describeWithEnvironment('AiAgent', () => {
         override getItem(): undefined {
           return undefined;
         }
+
+        override getSuggestions(): undefined {
+          return;
+        }
       }
       return new TestContext();
     }
@@ -369,10 +385,10 @@ describeWithEnvironment('AiAgent', () => {
         });
       }
 
-      async #test(args: {}) {
+      async #test(...args: any[]) {
         this.called++;
         return {
-          result: args,
+          result: args[0],
         };
       }
 

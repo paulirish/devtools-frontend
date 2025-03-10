@@ -3188,6 +3188,87 @@ export namespace CSS {
   }
 
   /**
+   * CSS function argument representation.
+   */
+  export interface CSSFunctionParameter {
+    /**
+     * The parameter name.
+     */
+    name: string;
+    /**
+     * The parameter type.
+     */
+    type: string;
+  }
+
+  /**
+   * CSS function conditional block representation.
+   */
+  export interface CSSFunctionConditionNode {
+    /**
+     * Media query for this conditional block. Only one type of condition should be set.
+     */
+    media?: CSSMedia;
+    /**
+     * Container query for this conditional block. Only one type of condition should be set.
+     */
+    containerQueries?: CSSContainerQuery;
+    /**
+     * @supports CSS at-rule condition. Only one type of condition should be set.
+     */
+    supports?: CSSSupports;
+    /**
+     * Block body.
+     */
+    children: CSSFunctionNode[];
+    /**
+     * The condition text.
+     */
+    conditionText: string;
+  }
+
+  /**
+   * Section of the body of a CSS function rule.
+   */
+  export interface CSSFunctionNode {
+    /**
+     * A conditional block. If set, style should not be set.
+     */
+    condition?: CSSFunctionConditionNode;
+    /**
+     * Values set by this node. If set, condition should not be set.
+     */
+    style?: CSSStyle;
+  }
+
+  /**
+   * CSS function at-rule representation.
+   */
+  export interface CSSFunctionRule {
+    /**
+     * Name of the function.
+     */
+    name: Value;
+    /**
+     * The css style sheet identifier (absent for user agent stylesheet and user-specified
+     * stylesheet rules) this rule came from.
+     */
+    styleSheetId?: StyleSheetId;
+    /**
+     * Parent stylesheet's origin.
+     */
+    origin: StyleSheetOrigin;
+    /**
+     * List of parameters.
+     */
+    parameters: CSSFunctionParameter[];
+    /**
+     * Function body.
+     */
+    children: CSSFunctionNode[];
+  }
+
+  /**
    * CSS keyframe rule representation.
    */
   export interface CSSKeyframeRule {
@@ -3479,6 +3560,10 @@ export namespace CSS {
      * Id of the first parent element that does not have display: contents.
      */
     parentLayoutNodeId?: DOM.NodeId;
+    /**
+     * A list of CSS at-function rules referenced by styles of this node.
+     */
+    cssFunctionRules?: CSSFunctionRule[];
   }
 
   export interface GetMediaQueriesResponse extends ProtocolResponseWithError {
@@ -6131,6 +6216,41 @@ export namespace DeviceOrientation {
  */
 export namespace Emulation {
 
+  export interface SafeAreaInsets {
+    /**
+     * Overrides safe-area-inset-top.
+     */
+    top?: integer;
+    /**
+     * Overrides safe-area-max-inset-top.
+     */
+    topMax?: integer;
+    /**
+     * Overrides safe-area-inset-left.
+     */
+    left?: integer;
+    /**
+     * Overrides safe-area-max-inset-left.
+     */
+    leftMax?: integer;
+    /**
+     * Overrides safe-area-inset-bottom.
+     */
+    bottom?: integer;
+    /**
+     * Overrides safe-area-max-inset-bottom.
+     */
+    bottomMax?: integer;
+    /**
+     * Overrides safe-area-inset-right.
+     */
+    right?: integer;
+    /**
+     * Overrides safe-area-max-inset-right.
+     */
+    rightMax?: integer;
+  }
+
   export const enum ScreenOrientationType {
     PortraitPrimary = 'portraitPrimary',
     PortraitSecondary = 'portraitSecondary',
@@ -6337,6 +6457,10 @@ export namespace Emulation {
      * cleared.
      */
     color?: DOM.RGBA;
+  }
+
+  export interface SetSafeAreaInsetsOverrideRequest {
+    insets: SafeAreaInsets;
   }
 
   export interface SetDeviceMetricsOverrideRequest {
@@ -8748,6 +8872,7 @@ export namespace Network {
     PreflightMissingPrivateNetworkAccessName = 'PreflightMissingPrivateNetworkAccessName',
     PrivateNetworkAccessPermissionUnavailable = 'PrivateNetworkAccessPermissionUnavailable',
     PrivateNetworkAccessPermissionDenied = 'PrivateNetworkAccessPermissionDenied',
+    LocalNetworkAccessPermissionDenied = 'LocalNetworkAccessPermissionDenied',
   }
 
   export interface CorsErrorStatus {
@@ -9574,12 +9699,38 @@ export namespace Network {
     Zstd = 'zstd',
   }
 
+  export const enum DirectSocketDnsQueryType {
+    Ipv4 = 'ipv4',
+    Ipv6 = 'ipv6',
+  }
+
+  export interface DirectTCPSocketOptions {
+    /**
+     * TCP_NODELAY option
+     */
+    noDelay: boolean;
+    /**
+     * Expected to be unsigned integer.
+     */
+    keepAliveDelay?: number;
+    /**
+     * Expected to be unsigned integer.
+     */
+    sendBufferSize?: number;
+    /**
+     * Expected to be unsigned integer.
+     */
+    receiveBufferSize?: number;
+    dnsQueryType?: DirectSocketDnsQueryType;
+  }
+
   export const enum PrivateNetworkRequestPolicy {
     Allow = 'Allow',
     BlockFromInsecureToMorePrivate = 'BlockFromInsecureToMorePrivate',
     WarnFromInsecureToMorePrivate = 'WarnFromInsecureToMorePrivate',
     PreflightBlock = 'PreflightBlock',
     PreflightWarn = 'PreflightWarn',
+    PermissionBlock = 'PermissionBlock',
   }
 
   export const enum IPAddressSpace {
@@ -10683,6 +10834,56 @@ export namespace Network {
   }
 
   /**
+   * Fired upon direct_socket.TCPSocket creation.
+   */
+  export interface DirectTCPSocketCreatedEvent {
+    identifier: RequestId;
+    remoteAddr: string;
+    /**
+     * Unsigned int 16.
+     */
+    remotePort: integer;
+    options: DirectTCPSocketOptions;
+    timestamp: MonotonicTime;
+    initiator?: Initiator;
+  }
+
+  /**
+   * Fired when direct_socket.TCPSocket connection is opened.
+   */
+  export interface DirectTCPSocketOpenedEvent {
+    identifier: RequestId;
+    remoteAddr: string;
+    /**
+     * Expected to be unsigned integer.
+     */
+    remotePort: integer;
+    timestamp: MonotonicTime;
+    localAddr?: string;
+    /**
+     * Expected to be unsigned integer.
+     */
+    localPort?: integer;
+  }
+
+  /**
+   * Fired when direct_socket.TCPSocket is aborted.
+   */
+  export interface DirectTCPSocketAbortedEvent {
+    identifier: RequestId;
+    errorMessage: string;
+    timestamp: MonotonicTime;
+  }
+
+  /**
+   * Fired when direct_socket.TCPSocket is closed.
+   */
+  export interface DirectTCPSocketClosedEvent {
+    identifier: RequestId;
+    timestamp: MonotonicTime;
+  }
+
+  /**
    * Fired when additional information about a requestWillBeSent event is available from the
    * network stack. Not every requestWillBeSent event will have an additional
    * requestWillBeSentExtraInfo fired for it, and there is no guarantee whether requestWillBeSent
@@ -11758,7 +11959,7 @@ export namespace Page {
 
   /**
    * All Permissions Policy features. This enum should match the one defined
-   * in third_party/blink/renderer/core/permissions_policy/permissions_policy_features.json5.
+   * in services/network/public/cpp/permissions_policy/permissions_policy_features.json5.
    */
   export const enum PermissionsPolicyFeature {
     Accelerometer = 'accelerometer',
@@ -12724,6 +12925,7 @@ export namespace Page {
     EmbedderExtensionSentMessageToCachedFrame = 'EmbedderExtensionSentMessageToCachedFrame',
     RequestedByWebViewClient = 'RequestedByWebViewClient',
     PostMessageByWebViewClient = 'PostMessageByWebViewClient',
+    CacheControlNoStoreDeviceBoundSessionTerminated = 'CacheControlNoStoreDeviceBoundSessionTerminated',
   }
 
   /**
@@ -12915,6 +13117,14 @@ export namespace Page {
      * URL to match cooke domain and path.
      */
     url: string;
+  }
+
+  export interface EnableRequest {
+    /**
+     * If true, the `Page.fileChooserOpened` event will be emitted regardless of the state set by
+     * `Page.setInterceptFileChooserDialog` command (default: false).
+     */
+    enableFileChooserOpenedEvent?: boolean;
   }
 
   export interface GetAppManifestRequest {
@@ -17725,6 +17935,9 @@ export namespace Preload {
     PrefetchNotEligibleSchemeIsNotHttps = 'PrefetchNotEligibleSchemeIsNotHttps',
     PrefetchNotEligibleUserHasCookies = 'PrefetchNotEligibleUserHasCookies',
     PrefetchNotEligibleUserHasServiceWorker = 'PrefetchNotEligibleUserHasServiceWorker',
+    PrefetchNotEligibleUserHasServiceWorkerNoFetchHandler = 'PrefetchNotEligibleUserHasServiceWorkerNoFetchHandler',
+    PrefetchNotEligibleRedirectFromServiceWorker = 'PrefetchNotEligibleRedirectFromServiceWorker',
+    PrefetchNotEligibleRedirectToServiceWorker = 'PrefetchNotEligibleRedirectToServiceWorker',
     PrefetchNotEligibleBatterySaverEnabled = 'PrefetchNotEligibleBatterySaverEnabled',
     PrefetchNotEligiblePreloadingDisabled = 'PrefetchNotEligiblePreloadingDisabled',
     PrefetchNotFinishedInTime = 'PrefetchNotFinishedInTime',
@@ -18088,6 +18301,17 @@ export namespace BluetoothEmulation {
   }
 
   export interface EnableRequest {
+    /**
+     * State of the simulated central.
+     */
+    state: CentralState;
+    /**
+     * If the simulated central supports low-energy.
+     */
+    leSupported: boolean;
+  }
+
+  export interface SetSimulatedCentralStateRequest {
     /**
      * State of the simulated central.
      */

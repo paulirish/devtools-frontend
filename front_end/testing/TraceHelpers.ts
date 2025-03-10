@@ -612,7 +612,7 @@ export function getBaseTraceParseModelData(overrides: Partial<ParsedTrace> = {})
       renderFrameImplCreateChildFrameEvents: [],
       domLoadingEvents: [],
       layoutImageUnsizedEvents: [],
-      beginRemoteFontLoadEvents: [],
+      remoteFonts: [],
       scoreRecords: [],
       backendNodeIds: [],
       paintImageEvents: [],
@@ -752,7 +752,7 @@ export function getBaseTraceParseModelData(overrides: Partial<ParsedTrace> = {})
       asyncCallToScheduler: new Map(),
     },
     Scripts: {
-      scripts: new Map(),
+      scripts: [],
     },
     ...overrides,
   };

@@ -187,7 +187,7 @@ describe('ChangeManager', () => {
     it('returns empty string when there are no changes from the given agent', async () => {
       const changeManager = new AiAssistance.ChangeManager();
 
-      assert.strictEqual(changeManager.formatChanges(agentId), '');
+      assert.strictEqual(changeManager.formatChangesForPatching(agentId), '');
     });
 
     it('returns formatted changes for an agent without `.ai-style-change` classes', async () => {
@@ -201,7 +201,27 @@ describe('ChangeManager', () => {
         styles: {color: 'blue', 'background-color': 'green'},
       });
 
-      assert.strictEqual(changeManager.formatChanges(agentId), `div {
+      assert.strictEqual(changeManager.formatChangesForPatching(agentId), `div {
+  color: blue;
+  background-color: green;
+}`);
+    });
+
+    it('formats source location', async () => {
+      const changeManager = new AiAssistance.ChangeManager();
+      const cssModel = createModel();
+      await changeManager.addChange(cssModel, frameId, {
+        groupId: agentId,
+        sourceLocation: 'button.scss:1:1',
+        selector: 'div',
+        className: 'ai-style-change-1',
+        styles: {color: 'blue', 'background-color': 'green'},
+      });
+
+      assert.strictEqual(
+          changeManager.formatChangesForPatching(agentId, /* includeSourceLocation=*/ true),
+          `/* related resource: button.scss:1:1 */
+div {
   color: blue;
   background-color: green;
 }`);

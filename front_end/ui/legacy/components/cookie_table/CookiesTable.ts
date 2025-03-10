@@ -55,13 +55,13 @@ interface ViewInput {
   schemeBindingEnabled?: boolean;
   onEdit:
       (event: CustomEvent<{node: HTMLElement, columnId: string, valueBeforeEditing: string, newText: string}>) => void;
+  onCreate: (event: CustomEvent<CookieData>) => void;
   onRefresh: () => void;
   onDelete: (event: CustomEvent<HTMLElement>) => void;
   onContextMenu: (event: CustomEvent<{menu: UI.ContextMenu.ContextMenu, element: HTMLElement}>) => void;
   onSelect: (event: CustomEvent<HTMLElement|null>) => void;
 }
-interface ViewOutput {}
-type ViewFunction = (input: ViewInput, output: ViewOutput, target: HTMLElement) => void;
+type ViewFunction = (input: ViewInput, output: object, target: HTMLElement) => void;
 type AttributeWithIcon = SDK.Cookie.Attribute.NAME|SDK.Cookie.Attribute.VALUE|SDK.Cookie.Attribute.DOMAIN|
                          SDK.Cookie.Attribute.PATH|SDK.Cookie.Attribute.SECURE|SDK.Cookie.Attribute.SAME_SITE;
 
@@ -175,7 +175,7 @@ export class CookiesTable extends UI.Widget.VBox {
       deleteCallback?: ((arg0: SDK.Cookie.Cookie, arg1: () => void) => void), view?: ViewFunction) {
     super();
     if (!view) {
-      view = (input, output, target) => {
+      view = (input, _, target) => {
         // clang-format off
         render(html`
           <devtools-data-grid
@@ -184,6 +184,7 @@ export class CookiesTable extends UI.Widget.VBox {
                striped
                ?inline=${input.renderInline}
                @edit=${input.onEdit}
+               @create=${input.onCreate}
                @refresh=${input.onRefresh}
                @delete=${input.onDelete}
                @contextmenu=${input.onContextMenu}
@@ -355,6 +356,7 @@ export class CookiesTable extends UI.Widget.VBox {
       portBindingEnabled: this.portBindingEnabled,
       onEdit: event => this.onUpdateCookie(
           event.detail.node, event.detail.columnId, event.detail.valueBeforeEditing, event.detail.newText),
+      onCreate: event => this.onCreateCookie(event.detail),
       onRefresh: () => this.refresh(),
       onDelete: event => this.onDeleteCookie(event.detail),
       onSelect: event => this.onSelect(event.detail),
@@ -473,9 +475,8 @@ export class CookiesTable extends UI.Widget.VBox {
     const isRequest = cookie.type() === SDK.Cookie.Type.REQUEST;
     const data: CookieData = {name: cookie.name(), value: cookie.value()};
     for (const attribute
-             of [SDK.Cookie.Attribute.SIZE, SDK.Cookie.Attribute.HTTP_ONLY, SDK.Cookie.Attribute.SECURE,
-                 SDK.Cookie.Attribute.SAME_SITE, SDK.Cookie.Attribute.SOURCE_SCHEME, SDK.Cookie.Attribute.SOURCE_PORT,
-                 SDK.Cookie.Attribute.PRIORITY]) {
+             of [SDK.Cookie.Attribute.HTTP_ONLY, SDK.Cookie.Attribute.SECURE, SDK.Cookie.Attribute.SAME_SITE,
+                 SDK.Cookie.Attribute.SOURCE_SCHEME, SDK.Cookie.Attribute.SOURCE_PORT]) {
       if (cookie.hasAttribute(attribute)) {
         data[attribute] = String(cookie.getAttribute(attribute) ?? true);
       }
@@ -496,6 +497,8 @@ export class CookiesTable extends UI.Widget.VBox {
     data[SDK.Cookie.Attribute.PARTITION_KEY_SITE] =
         cookie.partitionKeyOpaque() ? i18nString(UIStrings.opaquePartitionKey) : cookie.topLevelSite();
     data[SDK.Cookie.Attribute.HAS_CROSS_SITE_ANCESTOR] = cookie.hasCrossSiteAncestor() ? 'true' : '';
+    data[SDK.Cookie.Attribute.SIZE] = String(cookie.size());
+    data[SDK.Cookie.Attribute.PRIORITY] = cookie.priority();
     data.priorityValue = ['Low', 'Medium', 'High'].indexOf(cookie.priority());
     const blockedReasons = this.cookieToBlockedReasons?.get(cookie) || [];
     for (const blockedReason of blockedReasons) {

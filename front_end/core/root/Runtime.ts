@@ -140,7 +140,7 @@ export class ExperimentsSupport {
       experimentName: string, experimentTitle: string, unstable?: boolean, docLink?: string,
       feedbackLink?: string): void {
     if (this.#experimentNames.has(experimentName)) {
-      throw new Error(`Duplicate registraction of experiment '${experimentName}'`);
+      throw new Error(`Duplicate registration of experiment '${experimentName}'`);
     }
     this.#experimentNames.add(experimentName);
     this.#experiments.push(new Experiment(
@@ -314,6 +314,7 @@ export const enum ExperimentName {
   TIMELINE_SHOW_POST_MESSAGE_EVENTS = 'timeline-show-postmessage-events',
   TIMELINE_DEBUG_MODE = 'timeline-debug-mode',
   TIMELINE_ENHANCED_TRACES = 'timeline-enhanced-traces',
+  TIMELINE_COMPILED_SOURCES = 'timeline-compiled-sources',
   TIMELINE_SERVER_TIMINGS = 'timeline-server-timings',
   FLOATING_ENTRY_POINTS_FOR_AI_ASSISTANCE = 'floating-entry-points-for-ai-assistance',
   TIMELINE_EXPERIMENTAL_INSIGHTS = 'timeline-experimental-insights',
@@ -480,7 +481,7 @@ export type HostConfig = Platform.TypeScriptUtilities.RecursivePartial<{
  * Object.assign(Root.runtime.hostConfig, config);
  * ```
  */
-export const hostConfig: HostConfig = Object.create(null);
+export const hostConfig: Platform.TypeScriptUtilities.RecursiveReadonly<HostConfig> = Object.create(null);
 
 /**
  * When defining conditions make sure that objects used by the function have

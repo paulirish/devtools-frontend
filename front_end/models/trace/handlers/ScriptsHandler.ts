@@ -9,6 +9,8 @@ import type * as Protocol from '../../../generated/protocol.js';
 import * as Types from '../types/types.js';
 
 import {data as metaHandlerData, type MetaHandlerData} from './MetaHandler.js';
+import {data as networkRequestsHandlerData} from './NetworkRequestsHandler.js';
+import type {HandlerName} from './types.js';
 
 function completeURL(base: string, url: string): string|null {
   if (url.startsWith('data:') || url.startsWith('blob:') || url.startsWith('javascript:') || url.startsWith('mailto:')) {
@@ -24,10 +26,11 @@ function completeURL(base: string, url: string): string|null {
 
 export interface ScriptsData {
   /** Note: this is only populated when the "Enhanced Traces" feature is enabled. */
-  scripts: Map<Protocol.Runtime.ScriptId, Script>;
+  scripts: Script[];
 }
 
 export interface Script {
+  isolate: string;
   scriptId: Protocol.Runtime.ScriptId;
   frame: string;
   ts: Types.Timing.Micro;
@@ -37,23 +40,30 @@ export interface Script {
   /** Note: this is the literal text given as the sourceMappingURL value. It has not been resolved relative to the script url. */
   sourceMapUrl?: string;
   sourceMap?: SDK.SourceMap.SourceMap;
+  request?: Types.Events.SyntheticNetworkRequest;
 }
 
-const scriptById = new Map<Protocol.Runtime.ScriptId, Script>();
+const scriptById = new Map<string, Script>();
+
+export function deps(): HandlerName[] {
+  return ['Meta', 'NetworkRequests'];
+}
 
 export function reset(): void {
   scriptById.clear();
 }
 
 export function handleEvent(event: Types.Events.Event): void {
-  const getOrMakeScript = (scriptIdAsNumber: number): Script => {
+  const getOrMakeScript = (isolate: string, scriptIdAsNumber: number): Script => {
     const scriptId = String(scriptIdAsNumber) as Protocol.Runtime.ScriptId;
-    return Platform.MapUtilities.getWithDefault(scriptById, scriptId, () => ({scriptId, frame: '', ts: 0} as Script));
+    const key = `${isolate}.${scriptId}`;
+    return Platform.MapUtilities.getWithDefault(
+        scriptById, key, () => ({isolate, scriptId, frame: '', ts: 0} as Script));
   };
 
   if (Types.Events.isTargetRundownEvent(event) && event.args.data) {
-    const {scriptId, frame} = event.args.data;
-    const script = getOrMakeScript(scriptId);
+    const {isolate, scriptId, frame} = event.args.data;
+    const script = getOrMakeScript(isolate, scriptId);
     script.frame = frame;
     script.ts = event.ts;
 
@@ -61,8 +71,8 @@ export function handleEvent(event: Types.Events.Event): void {
   }
 
   if (Types.Events.isV8SourceRundownEvent(event)) {
-    const {scriptId, url, sourceUrl, sourceMapUrl} = event.args.data;
-    const script = getOrMakeScript(scriptId);
+    const {isolate, scriptId, url, sourceUrl, sourceMapUrl} = event.args.data;
+    const script = getOrMakeScript(isolate, scriptId);
     script.url = url;
     if (sourceUrl) {
       script.sourceUrl = sourceUrl;
@@ -74,15 +84,15 @@ export function handleEvent(event: Types.Events.Event): void {
   }
 
   if (Types.Events.isV8SourceRundownSourcesScriptCatchupEvent(event)) {
-    const {scriptId, sourceText} = event.args.data;
-    const script = getOrMakeScript(scriptId);
+    const {isolate, scriptId, sourceText} = event.args.data;
+    const script = getOrMakeScript(isolate, scriptId);
     script.content = sourceText;
     return;
   }
 
   if (Types.Events.isV8SourceRundownSourcesLargeScriptCatchupEvent(event)) {
-    const {scriptId, sourceText} = event.args.data;
-    const script = getOrMakeScript(scriptId);
+    const {isolate, scriptId, sourceText} = event.args.data;
+    const script = getOrMakeScript(isolate, scriptId);
     script.content = (script.content ?? '') + sourceText;
     return;
   }
@@ -99,7 +109,17 @@ function findFrame(meta: MetaHandlerData, frameId: string): Types.Events.TraceFr
   return null;
 }
 
+function findNetworkRequest(networkRequests: Types.Events.SyntheticNetworkRequest[], script: Script):
+    Types.Events.SyntheticNetworkRequest|null {
+  return networkRequests.find(request => request.args.data.url === script.url) ?? null;
+}
+
 export async function finalize(options: Types.Configuration.ParseOptions): Promise<void> {
+  const networkRequests = [...networkRequestsHandlerData().byId.values()];
+  for (const script of scriptById.values()) {
+    script.request = findNetworkRequest(networkRequests, script) ?? undefined;
+  }
+
   if (!options.resolveSourceMap) {
     return;
   }
@@ -135,6 +155,8 @@ export async function finalize(options: Types.Configuration.ParseOptions): Promi
       continue;
     }
 
+    script.sourceMapUrl = sourceMapUrl;
+
     const params: Types.Configuration.ResolveSourceMapParams = {
       scriptId: script.scriptId,
       scriptUrl: sourceUrl as Platform.DevToolsPath.UrlString,
@@ -153,6 +175,6 @@ export async function finalize(options: Types.Configuration.ParseOptions): Promi
 
 export function data(): ScriptsData {
   return {
-    scripts: scriptById,
+    scripts: [...scriptById.values()],
   };
 }

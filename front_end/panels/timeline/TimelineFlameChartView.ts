@@ -163,7 +163,7 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
   // the reference for each group that we log. By storing these symbols in
   // a map keyed off the context of the group, we ensure we persist the
   // loggable even if the group gets rebuilt at some point in time.
-  #loggableForGroupByLogContext = new Map<string, Symbol>();
+  #loggableForGroupByLogContext = new Map<string, symbol>();
 
   #onMainEntryInvoked: (event: Common.EventTarget.EventTargetEvent<number>) => void;
   #onNetworkEntryInvoked: (event: Common.EventTarget.EventTargetEvent<number>) => void;
@@ -175,7 +175,7 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
   #flameChartDimmers: FlameChartDimmer[] = [];
   #searchDimmer = this.#registerFlameChartDimmer({inclusive: false, outline: true});
   #treeRowHoverDimmer = this.#registerFlameChartDimmer({inclusive: false, outline: true});
-  #thirdPartyRowHoverDimmer = this.#registerFlameChartDimmer({inclusive: false, outline: false});
+  #treeRowClickDimmer = this.#registerFlameChartDimmer({inclusive: false, outline: false});
   #activeInsightDimmer = this.#registerFlameChartDimmer({inclusive: false, outline: true});
   #thirdPartyCheckboxDimmer = this.#registerFlameChartDimmer({inclusive: true, outline: false});
 
@@ -383,9 +383,9 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
       this.#updateFlameChartDimmerWithEvents(this.#treeRowHoverDimmer, events);
     });
 
-    this.detailsView.addEventListener(TimelineTreeView.Events.THIRD_PARTY_ROW_HOVERED, node => {
+    this.detailsView.addEventListener(TimelineTreeView.Events.TREE_ROW_CLICKED, node => {
       const events = node?.data?.events ?? null;
-      this.#updateFlameChartDimmerWithEvents(this.#thirdPartyRowHoverDimmer, events);
+      this.#updateFlameChartDimmerWithEvents(this.#treeRowClickDimmer, events);
     });
 
     /**
@@ -692,11 +692,6 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
       entries.push(...Overlays.Overlays.entriesForOverlay(overlay));
     }
 
-    for (const entry of entries) {
-      // Ensure that the track for the entries are open.
-      this.#expandEntryTrack(entry);
-    }
-
     if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_DIM_UNRELATED_EVENTS)) {
       // The insight's `relatedEvents` property likely already includes the events associated with
       // an overlay, but just in case not, include both arrays. Duplicates are fine.
@@ -710,6 +705,13 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
     }
 
     if (options.updateTraceWindow) {
+      // We should only expand the entry track when we are updating the trace window
+      // (eg. when insight cards are initially opened).
+      // Otherwise the track will open when not intending to.
+      for (const entry of entries) {
+        // Ensure that the track for the entries are open.
+        this.#expandEntryTrack(entry);
+      }
       const overlaysBounds = Overlays.Overlays.traceWindowContainingOverlays(this.#currentInsightOverlays);
       if (overlaysBounds) {
         // Trace window covering all overlays expanded by 100% so that the overlays cover 50% of the visible window.
@@ -1382,6 +1384,12 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
         !this.#timeRangeSelectionAnnotation.label) {
       ModificationsManager.activeManager()?.removeAnnotation(this.#timeRangeSelectionAnnotation);
       this.#timeRangeSelectionAnnotation = null;
+    }
+
+    // If we don't have a selection, update the tree view row click dimmer events to null.
+    // This is a user disabling the persistent hovering from a row click, ensure the events are cleared.
+    if ((selection === null)) {
+      this.#updateFlameChartDimmerWithEvents(this.#treeRowClickDimmer, null);
     }
 
     // Check if this is an entry from main flame chart or network flame chart.

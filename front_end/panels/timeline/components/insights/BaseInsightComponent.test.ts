@@ -18,7 +18,7 @@ const {html} = Lit;
 
 describeWithEnvironment('BaseInsightComponent', () => {
   const {BaseInsightComponent} = Insights.BaseInsightComponent;
-  class TestInsightComponent extends BaseInsightComponent<Trace.Insights.Types.InsightModel<{}, {}>> {
+  class TestInsightComponent extends BaseInsightComponent<Trace.Insights.Types.InsightModel> {
     override internalName = 'test-insight';
     override createOverlays(): TimelineOverlay[] {
       return [];
@@ -40,6 +40,7 @@ describeWithEnvironment('BaseInsightComponent', () => {
         description: 'some description' as Common.UIString.LocalizedString,
         category: Trace.Insights.Types.InsightCategory.ALL,
         state: 'fail',
+        frameId: '123',
       };
       renderElementIntoDOM(component);
 
@@ -65,6 +66,7 @@ describeWithEnvironment('BaseInsightComponent', () => {
         description: 'some description' as Common.UIString.LocalizedString,
         category: Trace.Insights.Types.InsightCategory.ALL,
         state: 'fail',
+        frameId: '123',
       };
       renderElementIntoDOM(component);
 
@@ -95,6 +97,7 @@ describeWithEnvironment('BaseInsightComponent', () => {
       description: 'some description' as Common.UIString.LocalizedString,
       category: Trace.Insights.Types.InsightCategory.ALL,
       state: 'fail',
+      frameId: '123',
     } as const;
     async function renderComponent(): Promise<TestInsightComponent> {
       const component = new TestInsightComponent();
@@ -117,7 +120,7 @@ describeWithEnvironment('BaseInsightComponent', () => {
       });
       const component = await renderComponent();
       assert.isOk(component.shadowRoot);
-      const button = component.shadowRoot.querySelector('devtools-button[data-ask-ai]');
+      const button = component.shadowRoot.querySelector('devtools-button[data-insights-ask-ai]');
       assert.isOk(button);
     });
 
@@ -130,7 +133,7 @@ describeWithEnvironment('BaseInsightComponent', () => {
       });
       const component = await renderComponent();
       assert.isOk(component.shadowRoot);
-      const button = component.shadowRoot.querySelector('devtools-button[data-ask-ai]');
+      const button = component.shadowRoot.querySelector('devtools-button[data-insights-ask-ai]');
       assert.isOk(button);
       sinon.stub(UI.ActionRegistry.ActionRegistry.instance(), 'hasAction')
           .withArgs(sinon.match(/drjones\.performance-insight-context/))
@@ -165,7 +168,7 @@ describeWithEnvironment('BaseInsightComponent', () => {
       });
       const component = await renderComponent();
       assert.isOk(component.shadowRoot);
-      const button = component.shadowRoot.querySelector('devtools-button[data-ask-ai]');
+      const button = component.shadowRoot.querySelector('devtools-button[data-insights-ask-ai]');
       assert.isNull(button);
     });
 
@@ -178,7 +181,7 @@ describeWithEnvironment('BaseInsightComponent', () => {
       });
       const component = await renderComponent();
       assert.isOk(component.shadowRoot);
-      const button = component.shadowRoot.querySelector('devtools-button[data-ask-ai]');
+      const button = component.shadowRoot.querySelector('devtools-button[data-insights-ask-ai]');
       assert.isNull(button);
     });
   });

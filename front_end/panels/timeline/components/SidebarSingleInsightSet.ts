@@ -90,12 +90,10 @@ export interface SidebarSingleInsightSetData {
  * us to ship incrementally without turning insights on by default for all
  * users. */
 const EXPERIMENTAL_INSIGHTS: ReadonlySet<string> = new Set([
-  'FontDisplay',
-  'NetworkDependencyTree',
 ]);
 
-type InsightNameToComponentMapping = Record<
-    string, typeof Insights.BaseInsightComponent.BaseInsightComponent<Trace.Insights.Types.InsightModel<{}, {}>>>;
+type InsightNameToComponentMapping =
+    Record<string, typeof Insights.BaseInsightComponent.BaseInsightComponent<Trace.Insights.Types.InsightModel>>;
 
 /**
  * Every insight (INCLUDING experimental ones).

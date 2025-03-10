@@ -20,14 +20,16 @@
   margin-right: 4px;
 }
 
+.network-request-details-content {
+  border-bottom: 1px solid var(--sys-color-divider);
+}
+
 .network-request-details-cols {
   display: flex;
 }
 
 :host {
-  border-bottom: 1px solid var(--sys-color-divider);
-  display: block;
-  padding-bottom: 5px;
+  display: contents; /* needed to avoid a floating border when scrolling */
 }
 
 .network-request-details-col {
@@ -36,7 +38,7 @@
 
 .network-request-details-row {
   padding: 0 10px;
-  min-height: 20px;
+  min-height: min-content;
 }
 
 .title {

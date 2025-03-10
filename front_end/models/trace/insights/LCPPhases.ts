@@ -14,7 +14,6 @@ import {
   type InsightSetContext,
   InsightWarning,
   type PartialInsightModel,
-  type RequiredData,
 } from './types.js';
 
 export const UIStrings = {
@@ -64,10 +63,6 @@ export const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('models/trace/insights/LCPPhases.ts', UIStrings);
 export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-export function deps(): ['NetworkRequests', 'PageLoadMetrics', 'LargestImagePaint', 'Meta'] {
-  return ['NetworkRequests', 'PageLoadMetrics', 'LargestImagePaint', 'Meta'];
-}
-
 interface LCPPhases {
   /**
    * The time between when the user initiates loading the page until when
@@ -90,7 +85,7 @@ interface LCPPhases {
   renderDelay: Types.Timing.Milli;
 }
 
-export function isLCPPhases(model: InsightModel<{}, {}>): model is LCPPhasesInsightModel {
+export function isLCPPhases(model: InsightModel): model is LCPPhasesInsightModel {
   return model.insightKey === 'LCPPhases';
 }
 export type LCPPhasesInsightModel = InsightModel<typeof UIStrings, {
@@ -174,9 +169,12 @@ function finalize(partialModel: PartialInsightModel<LCPPhasesInsightModel>): LCP
 }
 
 export function generateInsight(
-    parsedTrace: RequiredData<typeof deps>, context: InsightSetContext): LCPPhasesInsightModel {
+    parsedTrace: Handlers.Types.ParsedTrace, context: InsightSetContext): LCPPhasesInsightModel {
   if (!context.navigation) {
-    return finalize({});
+    return finalize({
+
+      frameId: context.frameId,
+    });
   }
 
   const networkRequests = parsedTrace.NetworkRequests;
@@ -193,7 +191,7 @@ export function generateInsight(
   const metricScore = navMetrics.get(Handlers.ModelHandlers.PageLoadMetrics.MetricName.LCP);
   const lcpEvent = metricScore?.event;
   if (!lcpEvent || !Types.Events.isLargestContentfulPaintCandidate(lcpEvent)) {
-    return finalize({warnings: [InsightWarning.NO_LCP]});
+    return finalize({frameId: context.frameId, warnings: [InsightWarning.NO_LCP]});
   }
 
   // This helps calculate the phases.
@@ -204,11 +202,13 @@ export function generateInsight(
 
   const docRequest = networkRequests.byTime.find(req => req.args.data.requestId === context.navigationId);
   if (!docRequest) {
-    return finalize({lcpMs, lcpTs, lcpEvent, lcpRequest, warnings: [InsightWarning.NO_DOCUMENT_REQUEST]});
+    return finalize(
+        {frameId: context.frameId, lcpMs, lcpTs, lcpEvent, lcpRequest, warnings: [InsightWarning.NO_DOCUMENT_REQUEST]});
   }
 
   if (!lcpRequest) {
     return finalize({
+      frameId: context.frameId,
       lcpMs,
       lcpTs,
       lcpEvent,
@@ -218,6 +218,7 @@ export function generateInsight(
   }
 
   return finalize({
+    frameId: context.frameId,
     lcpMs,
     lcpTs,
     lcpEvent,

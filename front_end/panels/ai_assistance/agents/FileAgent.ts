@@ -19,6 +19,7 @@ import {
   ResponseType,
 } from './AiAgent.js';
 
+// Sync with the server-side.
 const preamble =
     `You are a highly skilled software engineer with expertise in various programming languages and frameworks.
 You are provided with the content of a file from the Chrome DevTools Sources panel. To aid your analysis, you've been given the below links to understand the context of the code and its relationship to other files. When answering questions, prioritize providing these links directly.
@@ -109,13 +110,11 @@ export class FileAgent extends AiAgent<Workspace.UISourceCode.UISourceCode> {
   readonly preamble = preamble;
   readonly clientFeature = Host.AidaClient.ClientFeature.CHROME_FILE_AGENT;
   get userTier(): string|undefined {
-    const {hostConfig} = Root.Runtime;
-    return hostConfig.devToolsAiAssistanceFileAgent?.userTier;
+    return Root.Runtime.hostConfig.devToolsAiAssistanceFileAgent?.userTier;
   }
   get options(): RequestOptions {
-    const {hostConfig} = Root.Runtime;
-    const temperature = hostConfig.devToolsAiAssistanceFileAgent?.temperature;
-    const modelId = hostConfig.devToolsAiAssistanceFileAgent?.modelId;
+    const temperature = Root.Runtime.hostConfig.devToolsAiAssistanceFileAgent?.temperature;
+    const modelId = Root.Runtime.hostConfig.devToolsAiAssistanceFileAgent?.modelId;
 
     return {
       temperature,

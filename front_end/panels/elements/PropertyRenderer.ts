@@ -39,14 +39,14 @@ function mergeWithSpacing(nodes: Node[], merge: Node[]): Node[] {
 }
 
 export interface MatchRenderer<MatchT extends SDK.CSSPropertyParser.Match> {
-  readonly matchType: SDK.CSSPropertyParser.Constructor<MatchT>;
+  readonly matchType: Platform.Constructor.Constructor<MatchT>;
   render(match: MatchT, context: RenderingContext): Node[];
 }
 
 // A mixin to automatically expose the match type on specific renrerers
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 export function rendererBase<MatchT extends SDK.CSSPropertyParser.Match>(
-    matchT: SDK.CSSPropertyParser.Constructor<MatchT>) {
+    matchT: Platform.Constructor.Constructor<MatchT>) {
   abstract class RendererBase implements MatchRenderer<MatchT> {
     readonly matchType = matchT;
     render(_match: MatchT, _context: RenderingContext): Node[] {
@@ -184,7 +184,7 @@ export class RenderingContext {
   constructor(
       readonly ast: SDK.CSSPropertyParser.SyntaxTree,
       readonly renderers:
-          Map<SDK.CSSPropertyParser.Constructor<SDK.CSSPropertyParser.Match>,
+          Map<Platform.Constructor.Constructor<SDK.CSSPropertyParser.Match>,
               MatchRenderer<SDK.CSSPropertyParser.Match>>,
       readonly matchedResult: SDK.CSSPropertyParser.BottomUpTreeMatching,
       readonly cssControls?: SDK.CSSPropertyParser.CSSControlMap, readonly options: {readonly?: boolean} = {},
@@ -211,7 +211,7 @@ export class Renderer extends SDK.CSSPropertyParser.TreeWalker {
   constructor(
       ast: SDK.CSSPropertyParser.SyntaxTree,
       renderers:
-          Map<SDK.CSSPropertyParser.Constructor<SDK.CSSPropertyParser.Match>,
+          Map<Platform.Constructor.Constructor<SDK.CSSPropertyParser.Match>,
               MatchRenderer<SDK.CSSPropertyParser.Match>>,
       matchedResult: SDK.CSSPropertyParser.BottomUpTreeMatching,
       cssControls: SDK.CSSPropertyParser.CSSControlMap,
@@ -256,8 +256,7 @@ export class Renderer extends SDK.CSSPropertyParser.TreeWalker {
   protected override enter({node}: SDK.CSSPropertyParser.SyntaxNodeRef): boolean {
     const match = this.#matchedResult.getMatch(node);
     const renderer = match &&
-        this.#context.renderers.get(
-            match.constructor as SDK.CSSPropertyParser.Constructor<SDK.CSSPropertyParser.Match>);
+        this.#context.renderers.get(match.constructor as Platform.Constructor.Constructor<SDK.CSSPropertyParser.Match>);
     if (renderer || match instanceof SDK.CSSPropertyParserMatchers.TextMatch) {
       const output = renderer ? renderer.render(match, this.#context) :
                                 (match as SDK.CSSPropertyParserMatchers.TextMatch).render();
@@ -293,7 +292,8 @@ export class Renderer extends SDK.CSSPropertyParser.TreeWalker {
   // unmatched text and around rendered matching results.
   static renderValueElement(
       name: string, value: string, matchedResult: SDK.CSSPropertyParser.BottomUpTreeMatching|null,
-      renderers: Array<MatchRenderer<SDK.CSSPropertyParser.Match>>, tracing?: TracingContext): HTMLElement {
+      renderers: Array<MatchRenderer<SDK.CSSPropertyParser.Match>>,
+      tracing?: TracingContext): {valueElement: HTMLElement, cssControls: SDK.CSSPropertyParser.CSSControlMap} {
     const valueElement = document.createElement('span');
     valueElement.setAttribute(
         'jslog', `${VisualLogging.value().track({
@@ -305,19 +305,19 @@ export class Renderer extends SDK.CSSPropertyParser.TreeWalker {
 
     if (!matchedResult) {
       valueElement.appendChild(document.createTextNode(value));
-      return valueElement;
+      return {valueElement, cssControls: new Map()};
     }
     const rendererMap = new Map<
-        SDK.CSSPropertyParser.Constructor<SDK.CSSPropertyParser.Match>, MatchRenderer<SDK.CSSPropertyParser.Match>>();
+        Platform.Constructor.Constructor<SDK.CSSPropertyParser.Match>, MatchRenderer<SDK.CSSPropertyParser.Match>>();
     for (const renderer of renderers) {
       rendererMap.set(renderer.matchType, renderer);
     }
 
     const context = new RenderingContext(matchedResult.ast, rendererMap, matchedResult, undefined, {}, tracing);
-    Renderer.render([matchedResult.ast.tree, ...matchedResult.ast.trailingNodes], context)
-        .nodes.forEach(node => valueElement.appendChild(node));
+    const {nodes, cssControls} = Renderer.render([matchedResult.ast.tree, ...matchedResult.ast.trailingNodes], context);
+    nodes.forEach(node => valueElement.appendChild(node));
     valueElement.normalize();
-    return valueElement;
+    return {valueElement, cssControls};
   }
 }
 
@@ -354,10 +354,6 @@ export class URLRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.URLM
     UI.UIUtils.createTextChild(container, ')');
     return [container];
   }
-
-  matcher(): SDK.CSSPropertyParserMatchers.URLMatcher {
-    return new SDK.CSSPropertyParserMatchers.URLMatcher();
-  }
 }
 
 // clang-format off
@@ -369,8 +365,15 @@ export class StringRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.S
     UI.Tooltip.Tooltip.install(element, unescapeCssString(match.text));
     return [element];
   }
+}
 
-  matcher(): SDK.CSSPropertyParserMatchers.StringMatcher {
-    return new SDK.CSSPropertyParserMatchers.StringMatcher();
+// clang-format off
+export class BinOpRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.BinOpMatch) {
+  // clang-format on
+  override render(match: SDK.CSSPropertyParserMatchers.BinOpMatch, context: RenderingContext): Node[] {
+    const [lhs, binop, rhs] =
+        SDK.CSSPropertyParser.ASTUtils.children(match.node).map(child => Renderer.render(child, context).nodes);
+
+    return [lhs, document.createTextNode(' '), binop, document.createTextNode(' '), rhs].flat();
   }
 }

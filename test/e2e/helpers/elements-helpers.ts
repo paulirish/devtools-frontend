@@ -296,6 +296,9 @@ export const waitForElementsStyleSection = async () => {
   // Wait for the file to be loaded and selectors to be shown
   await waitFor('.styles-selector');
   await expectVeEvents([veImpressionsUnder('Panel: elements', [veImpression('Pane', 'styles')])]);
+
+  // Check to make sure we have the correct node selected after opening a file.
+  await waitForPartialContentOfSelectedElementsNode('<body');
 };
 
 export const waitForElementsComputedSection = async () => {
@@ -878,7 +881,7 @@ export const toggleClassesPane = async () => {
 };
 
 export const typeInClassesPaneInput =
-    async (text: string, commitWith: puppeteer.KeyInput = 'Enter', waitForNodeChange: Boolean = true) => {
+    async (text: string, commitWith: puppeteer.KeyInput = 'Enter', waitForNodeChange = true) => {
   await step(`Typing in new class names ${text}`, async () => {
     const clsInput = await waitFor(CLS_INPUT_SELECTOR);
     await clsInput.type(text, {delay: 50});
@@ -1031,9 +1034,6 @@ export const assertSearchResultMatchesText = async (text: string) => {
 export const goToResourceAndWaitForStyleSection = async (path: string) => {
   await goToResource(path);
   await waitForElementsStyleSection();
-
-  // Check to make sure we have the correct node selected after opening a file.
-  await waitForPartialContentOfSelectedElementsNode('<body>\u200B');
 };
 
 export const checkStyleAttributes = async (expectedStyles: string[]) => {

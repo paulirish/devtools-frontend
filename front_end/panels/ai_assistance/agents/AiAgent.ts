@@ -165,6 +165,10 @@ export abstract class ConversationContext<T> {
   async refresh(): Promise<void> {
     return;
   }
+
+  getSuggestions(): [string, ...string[]]|undefined {
+    return;
+  }
 }
 
 export type FunctionCallHandlerResult<Result> = {
@@ -302,7 +306,7 @@ export abstract class AiAgent<T> {
       ...(enableAidaFunctionCalling ? {function_declarations: declarations} : {}),
       options: {
         temperature: validTemperature(this.options.temperature),
-        model_id: this.options.modelId,
+        model_id: this.options.modelId || undefined,
       },
       metadata: {
         disable_user_content_logging: !(this.#serverSideLoggingEnabled ?? false),
@@ -321,10 +325,6 @@ export abstract class AiAgent<T> {
 
   get id(): string {
     return this.#id;
-  }
-
-  get isEmpty(): boolean {
-    return this.#history.length === 0;
   }
 
   get origin(): string|undefined {
