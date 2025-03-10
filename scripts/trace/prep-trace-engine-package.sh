@@ -86,6 +86,9 @@ for p in Path('$dist/models').rglob('*.d.ts'):
     needle = 'CrUXManager.Scope'
     content = content.replace(needle, 'any')
 
+    needle = 'anyV3'
+    content = content.replace(needle, 'any')
+
     p.write_text(content)
 "
 
