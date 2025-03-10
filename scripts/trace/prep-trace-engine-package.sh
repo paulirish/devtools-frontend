@@ -56,8 +56,8 @@ for p in Path('$dist/models').rglob('*.d.ts'):
     needle = 'import type * as Common'
     content = content.replace(needle, f'// {needle}')
 
-    needle = 'Common.UIString.LocalizedString'
-    content = content.replace(needle, '{i18nId: string, values: {[key: string]: string|number}, formattedDefault: string}')
+    for needle in ['Common.UIString.LocalizedString', 'Platform.UIString.LocalizedString']:
+        content = content.replace(needle, '{i18nId: string, values: Record<string, string|number>, formattedDefault: string}')
 
     needle = 'import(\"../../../core/i18n/i18nTypes.js\").Values'
     content = content.replace(needle, 'Record<string, string>')
