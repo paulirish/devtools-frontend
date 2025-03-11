@@ -14,6 +14,7 @@ export interface LoggingState {
   size: DOMRect;
   selectOpen?: boolean;
   pendingChangeContext?: string;
+  elem?: Element;
 }
 
 const state = new WeakMap<Loggable, LoggingState>();
@@ -46,6 +47,7 @@ export function getOrCreateLoggingState(loggable: Loggable, config: LoggingConfi
     veid: nextVeId(),
     parent: parent ? getLoggingState(parent) : null,
     size: new DOMRect(0, 0, 0, 0),
+    elem: loggable instanceof Element ? loggable : undefined,
   };
   state.set(loggable, loggableState);
   return loggableState;

@@ -155,6 +155,7 @@ export function processEventForIntuitiveDebugging(
     veid: state?.veid,
     context: state?.config.context,
     time: Date.now() - sessionStartTime,
+    elem: state?.elem,
     ...extraInfo,
   };
   deleteUndefinedFields(entry);
@@ -207,6 +208,7 @@ interface VisualElementAttributes {
   context?: string;
   width?: number;
   height?: number;
+  elem?: Element,
 }
 
 type IntuitiveLogEntry = {
@@ -214,6 +216,7 @@ type IntuitiveLogEntry = {
   children?: IntuitiveLogEntry[],
   parent?: number,
   time?: number,
+  elem?: Element,
 }&Partial<VisualElementAttributes>;
 
 type AdHocAnalysisVisualElement = VisualElementAttributes&{
@@ -262,6 +265,7 @@ function processImpressionsForIntuitiveDebugLog(states: LoggingState[]): void {
       width: state.size.width,
       height: state.size.height,
       veid: state.veid,
+      elem: state.elem,
     };
     deleteUndefinedFields(entry);
 
@@ -318,6 +322,7 @@ function processImpressionsForAdHocAnalysisDebugLog(states: LoggingState[]): voi
         width: state.size?.width,
         height: state.size?.height,
         context: state.config.context,
+        elem: state.elem,
       };
       deleteUndefinedFields(ve);
       if (state.parent) {
@@ -390,10 +395,52 @@ function maybeLogDebugEvent(entry: IntuitiveLogEntry|AdHocAnalysisLogEntry|TestL
   }
   veDebugEventsLog.push(entry);
   if (format === DebugLoggingFormat.INTUITIVE) {
-    // eslint-disable-next-line no-console
-    console.info('VE Debug:', entry);
+    const obj = entry as EventData;
+    logEventTree(obj);
+    // console.info('[VE]:', obj);
   }
 }
+
+
+
+interface EventData {
+  event: string;
+  ve?: string;
+  context?: string;
+  width?: number;
+  height?: number;
+  veid?: number;
+  children?: EventData[];
+  time?: number;
+}
+
+
+// ex clickingon a PanelTabHeader
+// elem.dispatchEvent(new MouseEvent('mousedown', {
+//     bubbles: true,
+//     cancelable: true,
+//     view: window,
+//   }))
+
+
+function logEventTree(eventData: EventData, indent = '', isLast = true): void {
+  const {event, ve, context} = eventData;
+  const area = eventData.width ? `${eventData.width}x${eventData.height}` : '';
+  const marker = isLast ? '└─' : '├─';
+  const mainText = [context, ve, event.replace('Impression', '')].map(x => x || '').filter(Boolean).join(' | ')
+  const line = `${indent}${marker} ${mainText}`;
+  console.debug(line, {obj: eventData});
+
+  if (eventData.children) {
+    const childrenCount = eventData.children.length;
+    eventData.children.forEach((child, index) => {
+      const isChildLast = index === childrenCount - 1;
+      const childIndent = indent + (isLast ? '    ' : '│   ');
+      logEventTree(child, childIndent, isChildLast);
+    });
+  }
+}
+
 
 export const enum DebugLoggingFormat {
   INTUITIVE = 'Intuitive',
