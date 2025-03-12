@@ -114,7 +114,7 @@ function estimateSavingsWithGraphs(deferredIds: Set<string>, lanternContext: Lan
 }
 
 function hasImageLCP(parsedTrace: Handlers.Types.ParsedTrace, context: InsightSetContextWithNavigation): boolean {
-  return parsedTrace.LargestImagePaint.lcpRequestByNavigation.get(context.navigation) !== undefined;
+  return parsedTrace.LargestImagePaint.lcpRequestByNavigationId.has(context.navigationId);
 }
 
 function computeSavings(
@@ -179,7 +179,6 @@ export function generateInsight(
     parsedTrace: Handlers.Types.ParsedTrace, context: InsightSetContext): RenderBlockingInsightModel {
   if (!context.navigation) {
     return finalize({
-      frameId: context.frameId,
       renderBlockingRequests: [],
     });
   }
@@ -190,7 +189,6 @@ export function generateInsight(
                            ?.event?.ts;
   if (!firstPaintTs) {
     return finalize({
-      frameId: context.frameId,
       renderBlockingRequests: [],
       warnings: [InsightWarning.NO_FP],
     });
@@ -240,7 +238,6 @@ export function generateInsight(
   });
 
   return finalize({
-    frameId: context.frameId,
     relatedEvents: renderBlockingRequests,
     renderBlockingRequests,
     ...savings,

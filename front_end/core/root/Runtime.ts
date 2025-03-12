@@ -338,6 +338,8 @@ export interface AidaAvailability {
   enterprisePolicyValue: number;
 }
 
+type Channel = 'stable'|'beta'|'dev'|'canary';
+
 export interface HostConfigConsoleInsights {
   modelId: string;
   temperature: number;
@@ -391,10 +393,6 @@ export interface HostConfigAutomaticFileSystems {
   enabled: boolean;
 }
 
-export interface HostConfigImprovedWorkspaces {
-  enabled: boolean;
-}
-
 export interface HostConfigVeLogging {
   enabled: boolean;
   testing: boolean;
@@ -431,6 +429,10 @@ interface CSSValueTracing {
   enabled: boolean;
 }
 
+interface AiGeneratedTimelineLabels {
+  enabled: boolean;
+}
+
 /**
  * The host configuration that we expect from the DevTools back-end.
  *
@@ -446,13 +448,13 @@ interface CSSValueTracing {
  */
 export type HostConfig = Platform.TypeScriptUtilities.RecursivePartial<{
   aidaAvailability: AidaAvailability,
+  channel: Channel,
   devToolsConsoleInsights: HostConfigConsoleInsights,
   devToolsFreestyler: HostConfigFreestyler,
   devToolsAiAssistanceNetworkAgent: HostConfigAiAssistanceNetworkAgent,
   devToolsAiAssistanceFileAgent: HostConfigAiAssistanceFileAgent,
   devToolsAiAssistancePerformanceAgent: HostConfigAiAssistancePerformanceAgent,
   devToolsAutomaticFileSystems: HostConfigAutomaticFileSystems,
-  devToolsImprovedWorkspaces: HostConfigImprovedWorkspaces,
   devToolsVeLogging: HostConfigVeLogging,
   devToolsWellKnown: HostConfigWellKnown,
   devToolsPrivacyUI: HostConfigPrivacyUI,
@@ -465,6 +467,7 @@ export type HostConfig = Platform.TypeScriptUtilities.RecursivePartial<{
   devToolsAnimationStylesInStylesTab: HostConfigAnimationStylesInStylesTab,
   thirdPartyCookieControls: HostConfigThirdPartyCookieControls,
   devToolsCssValueTracing: CSSValueTracing,
+  devToolsAiGeneratedTimelineLabels: AiGeneratedTimelineLabels,
 }>;
 
 /**

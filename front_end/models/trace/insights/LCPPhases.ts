@@ -171,10 +171,7 @@ function finalize(partialModel: PartialInsightModel<LCPPhasesInsightModel>): LCP
 export function generateInsight(
     parsedTrace: Handlers.Types.ParsedTrace, context: InsightSetContext): LCPPhasesInsightModel {
   if (!context.navigation) {
-    return finalize({
-
-      frameId: context.frameId,
-    });
+    return finalize({});
   }
 
   const networkRequests = parsedTrace.NetworkRequests;
@@ -191,24 +188,22 @@ export function generateInsight(
   const metricScore = navMetrics.get(Handlers.ModelHandlers.PageLoadMetrics.MetricName.LCP);
   const lcpEvent = metricScore?.event;
   if (!lcpEvent || !Types.Events.isLargestContentfulPaintCandidate(lcpEvent)) {
-    return finalize({frameId: context.frameId, warnings: [InsightWarning.NO_LCP]});
+    return finalize({warnings: [InsightWarning.NO_LCP]});
   }
 
   // This helps calculate the phases.
   const lcpMs = Helpers.Timing.microToMilli(metricScore.timing);
   // This helps position things on the timeline's UI accurately for a trace.
   const lcpTs = metricScore.event?.ts ? Helpers.Timing.microToMilli(metricScore.event?.ts) : undefined;
-  const lcpRequest = parsedTrace.LargestImagePaint.lcpRequestByNavigation.get(context.navigation);
+  const lcpRequest = parsedTrace.LargestImagePaint.lcpRequestByNavigationId.get(context.navigationId);
 
   const docRequest = networkRequests.byTime.find(req => req.args.data.requestId === context.navigationId);
   if (!docRequest) {
-    return finalize(
-        {frameId: context.frameId, lcpMs, lcpTs, lcpEvent, lcpRequest, warnings: [InsightWarning.NO_DOCUMENT_REQUEST]});
+    return finalize({lcpMs, lcpTs, lcpEvent, lcpRequest, warnings: [InsightWarning.NO_DOCUMENT_REQUEST]});
   }
 
   if (!lcpRequest) {
     return finalize({
-      frameId: context.frameId,
       lcpMs,
       lcpTs,
       lcpEvent,
@@ -218,7 +213,6 @@ export function generateInsight(
   }
 
   return finalize({
-    frameId: context.frameId,
     lcpMs,
     lcpTs,
     lcpEvent,

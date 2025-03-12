@@ -114,7 +114,7 @@ const UIStrings = {
    *              workspace folder is detected.
    * @example {/path/to/foo} PH1
    */
-  automaticWorkspaceFolderDetected: 'Workspace folder {PH1} detected.',
+  automaticWorkspaceFolderDetected: 'Workspace folder {PH1} detected',
   /**
    * @description Button description in Workspaces tab in the Sources panel
    *              to connect to an automatic workspace folder.
@@ -203,7 +203,7 @@ export class FilesNavigatorView extends NavigatorView {
     const placeholder =
         new UI.EmptyWidget.EmptyWidget(i18nString(UIStrings.noWorkspace), i18nString(UIStrings.explainWorkspace));
     this.setPlaceholder(placeholder);
-    placeholder.appendLink('https://goo.gle/devtools-workspace' as Platform.DevToolsPath.UrlString);
+    placeholder.appendLink('https://developer.chrome.com/docs/devtools/workspaces/' as Platform.DevToolsPath.UrlString);
 
     const toolbar = document.createElement('devtools-toolbar');
     toolbar.classList.add('navigator-toolbar');
@@ -260,7 +260,6 @@ export class FilesNavigatorView extends NavigatorView {
           i18nString(UIStrings.automaticWorkspaceFolderDetected, {PH1: automaticFileSystem.root}),
           [{
             text: i18nString(UIStrings.automaticWorkspaceFolderConnect),
-            highlight: true,
             delegate: () => this.#automaticFileSystemManager.connectAutomaticFileSystem(/* addIfMissing= */ true),
             dismiss: true,
             jslogContext: 'automatic-workspace-folders.connect',
@@ -285,7 +284,7 @@ export class OverridesNavigatorView extends NavigatorView {
     const placeholder = new UI.EmptyWidget.EmptyWidget(
         i18nString(UIStrings.noLocalOverrides), i18nString(UIStrings.explainLocalOverrides));
     this.setPlaceholder(placeholder);
-    placeholder.appendLink('https://goo.gle/devtools-overrides' as Platform.DevToolsPath.UrlString);
+    placeholder.appendLink('https://developer.chrome.com/docs/devtools/overrides/' as Platform.DevToolsPath.UrlString);
 
     this.toolbar = document.createElement('devtools-toolbar');
     this.toolbar.classList.add('navigator-toolbar');
@@ -390,9 +389,11 @@ export class ContentScriptsNavigatorView extends NavigatorView {
 export class SnippetsNavigatorView extends NavigatorView {
   constructor() {
     super('navigator-snippets');
-    const placeholder = new UI.EmptyWidget.EmptyWidget(UIStrings.noSnippets, UIStrings.explainSnippets);
+    const placeholder =
+        new UI.EmptyWidget.EmptyWidget(i18nString(UIStrings.noSnippets), i18nString(UIStrings.explainSnippets));
     this.setPlaceholder(placeholder);
-    placeholder.appendLink('https://goo.gle/devtools-snippets' as Platform.DevToolsPath.UrlString);
+    placeholder.appendLink(
+        'https://developer.chrome.com/docs/devtools/javascript/snippets/' as Platform.DevToolsPath.UrlString);
 
     const toolbar = document.createElement('devtools-toolbar');
     toolbar.classList.add('navigator-toolbar');

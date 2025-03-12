@@ -292,13 +292,15 @@ export const navigateToSidePane = async (paneName: string) => {
   ]);
 };
 
-export const waitForElementsStyleSection = async () => {
+export const waitForElementsStyleSection = async (expectedNodeText: string|null = '<body') => {
   // Wait for the file to be loaded and selectors to be shown
   await waitFor('.styles-selector');
   await expectVeEvents([veImpressionsUnder('Panel: elements', [veImpression('Pane', 'styles')])]);
 
   // Check to make sure we have the correct node selected after opening a file.
-  await waitForPartialContentOfSelectedElementsNode('<body');
+  if (expectedNodeText) {
+    await waitForPartialContentOfSelectedElementsNode(expectedNodeText);
+  }
 };
 
 export const waitForElementsComputedSection = async () => {
@@ -806,7 +808,8 @@ export async function waitForCSSPropertyValue(selector: string, name: string, va
       return undefined;
     }
 
-    const matches = await valueHandle.evaluate((node, value) => node.textContent === value, value);
+    const matches = await valueHandle.evaluate(
+        (node, value) => ((node instanceof HTMLElement ? node.innerText : '') || node.textContent) === value, value);
     if (matches) {
       return valueHandle;
     }

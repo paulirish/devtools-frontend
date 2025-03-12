@@ -151,16 +151,24 @@ export class TraceProcessor extends EventTarget {
     if (this.#status !== Status.IDLE) {
       throw new Error(`Trace processor can't start parsing when not idle. Current state: ${this.#status}`);
     }
+
+    options.logger?.start('total');
     try {
       this.#status = Status.PARSING;
+      options.logger?.start('parse');
       await this.#computeParsedTrace(traceEvents, options);
+      options.logger?.end('parse');
       if (this.#data && !options.isCPUProfile) {  // We do not calculate insights for CPU Profiles.
+        options.logger?.start('insights');
         this.#computeInsights(this.#data, traceEvents, options);
+        options.logger?.end('insights');
       }
       this.#status = Status.FINISHED_PARSING;
     } catch (e) {
       this.#status = Status.ERRORED_WHILE_PARSING;
       throw e;
+    } finally {
+      options.logger?.end('total');
     }
   }
 
@@ -179,12 +187,14 @@ export class TraceProcessor extends EventTarget {
      */
     const eventsPerChunk = 50_000;
     // Convert to array so that we are able to iterate all handlers multiple times.
-    const sortedHandlers = [...sortHandlers(this.#traceHandlers).values()];
+    const sortedHandlers = [...sortHandlers(this.#traceHandlers).entries()];
 
     // Reset.
-    for (const handler of sortedHandlers) {
+    for (const [, handler] of sortedHandlers) {
       handler.reset();
     }
+
+    options.logger?.start('parse:handleEvent');
 
     // Handle each event.
     for (let i = 0; i < traceEvents.length; ++i) {
@@ -198,17 +208,23 @@ export class TraceProcessor extends EventTarget {
       }
       const event = traceEvents[i];
       for (let j = 0; j < sortedHandlers.length; ++j) {
-        sortedHandlers[j].handleEvent(event);
+        const [, handler] = sortedHandlers[j];
+        handler.handleEvent(event);
       }
     }
 
+    options.logger?.end('parse:handleEvent');
+
     // Finalize.
-    for (const [i, handler] of sortedHandlers.entries()) {
+    for (let i = 0; i < sortedHandlers.length; i++) {
+      const [name, handler] = sortedHandlers[i];
       if (handler.finalize) {
+        options.logger?.start(`parse:${name}:finalize`);
         // Yield to the UI because finalize() calls can be expensive
         // TODO(jacktfranklin): consider using `scheduler.yield()` or `scheduler.postTask(() => {}, {priority: 'user-blocking'})`
         await new Promise(resolve => setTimeout(resolve, 0));
         await handler.finalize(options);
+        options.logger?.end(`parse:${name}:finalize`);
       }
       const percent = calculateProgress(i / sortedHandlers.length, ProgressPhase.FINALIZE);
       this.dispatchEvent(new TraceParseProgressEvent({percent}));
@@ -240,11 +256,14 @@ export class TraceProcessor extends EventTarget {
       return value;
     };
 
+    options.logger?.start('parse:clone');
     const parsedTrace = {};
     for (const [name, handler] of Object.entries(this.#traceHandlers)) {
       const data = shallowClone(handler.data());
       Object.assign(parsedTrace, {[name]: data});
     }
+    options.logger?.end('parse:clone');
+
     this.dispatchEvent(new TraceParseProgressEvent({percent: ProgressPhase.CLONE}));
 
     this.#data = parsedTrace as Handlers.Types.ParsedTrace;
@@ -268,7 +287,7 @@ export class TraceProcessor extends EventTarget {
 
   #createLanternContext(
       parsedTrace: Handlers.Types.ParsedTrace, traceEvents: readonly Types.Events.Event[], frameId: string,
-      navigationId: string): Insights.Types.LanternContext|undefined {
+      navigationId: string, options: Types.Configuration.ParseOptions): Insights.Types.LanternContext|undefined {
     // Check for required handlers.
     if (!parsedTrace.NetworkRequests || !parsedTrace.Workers || !parsedTrace.PageLoadMetrics) {
       return;
@@ -302,13 +321,15 @@ export class TraceProcessor extends EventTarget {
       return;
     }
 
+    const lanternSettings: Lantern.Types.Simulation.Settings = {
+      // TODO(crbug.com/372674229): if devtools throttling was on, does this network analysis capture
+      // that? Do we need to set 'devtools' throttlingMethod?
+      networkAnalysis,
+      throttlingMethod: 'provided',
+      ...options.lanternSettings,
+    };
     const simulator: Lantern.Simulation.Simulator<Types.Events.SyntheticNetworkRequest> =
-        Lantern.Simulation.Simulator.createSimulator({
-          // TODO(crbug.com/372674229): if devtools throttling was on, does this network analysis capture
-          // that? Do we need to set 'devtools' throttlingMethod?
-          networkAnalysis,
-          throttlingMethod: 'provided',
-        });
+        Lantern.Simulation.Simulator.createSimulator(lanternSettings);
 
     const computeData = {graph, simulator, processedNavigation};
     const fcpResult = Lantern.Metrics.FirstContentfulPaint.compute(computeData);
@@ -440,13 +461,17 @@ export class TraceProcessor extends EventTarget {
     for (const [name, insight] of Object.entries(TraceProcessor.getInsightRunners())) {
       let insightResult;
       try {
+        options.logger?.start(`insights:${name}`);
         insightResult = insight.generateInsight(parsedTrace, context);
+        insightResult.frameId = context.frameId;
         const navId = context.navigation?.args.data?.navigationId;
         if (navId) {
           insightResult.navigationId = navId;
         }
       } catch (err) {
         insightResult = err;
+      } finally {
+        options.logger?.end(`insights:${name}`);
       }
       Object.assign(model, {[name]: insightResult});
     }
@@ -517,7 +542,8 @@ export class TraceProcessor extends EventTarget {
       // Additionally, many trace fixtures are too old to be processed by Lantern.
       let lantern;
       try {
-        lantern = this.#createLanternContext(parsedTrace, traceEvents, frameId, navigationId);
+        options.logger?.start('insights:createLanternContext');
+        lantern = this.#createLanternContext(parsedTrace, traceEvents, frameId, navigationId, options);
       } catch (e) {
         // Don't allow an error in constructing the Lantern graphs to break the rest of the trace processor.
         // Log unexpected errors, but suppress anything that occurs from a trace being too old.
@@ -538,6 +564,8 @@ export class TraceProcessor extends EventTarget {
           // too old (for which there is no single check).
           console.error(e);
         }
+      } finally {
+        options.logger?.end('insights:createLanternContext');
       }
 
       const min = navigation.ts;

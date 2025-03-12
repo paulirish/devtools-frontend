@@ -62,7 +62,13 @@ export class EmptyWidget extends VBox {
   }
 
   appendLink(link: Platform.DevToolsPath.UrlString): HTMLElement {
-    const learnMoreLink = XLink.create(link, i18nString(UIStrings.learnMore), undefined, undefined, 'learn-more');
+    const learnMoreLink = XLink.create(
+        link,
+        i18nString(UIStrings.learnMore),
+        undefined,
+        undefined,
+        'learn-more',
+    );
     this.#textElement.insertAdjacentElement('afterend', learnMoreLink);
     return learnMoreLink;
   }

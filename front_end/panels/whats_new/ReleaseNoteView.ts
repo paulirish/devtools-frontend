@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import type * as Platform from '../../core/platform/platform.js';
 import * as Marked from '../../third_party/marked/marked.js';
@@ -128,7 +127,7 @@ export class ReleaseNoteView extends UI.Widget.VBox {
     this.#view(
         {
           getReleaseNote,
-          openNewTab: this.#openNewTab,
+          openNewTab: UI.UIUtils.openInNewTab,
           markdownContent,
           getThumbnailPath: this.#getThumbnailPath,
         },
@@ -149,9 +148,5 @@ export class ReleaseNoteView extends UI.Widget.VBox {
         break;
     }
     return new URL(img, import.meta.url).toString() as Platform.DevToolsPath.UrlString;
-  }
-
-  #openNewTab(link: string): void {
-    Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(link as Platform.DevToolsPath.UrlString);
   }
 }
