@@ -90,7 +90,7 @@ if not os.path.exists(GSUTILS_PATH):
 
 def RunGsutilCommand(args, can_fail=False, ignore_fail=False):
     if not GSUTILS_PATH:
-        raise BisectException('gsutils is not found in path.')
+        raise Exception('gsutils is not found in path.')
     logging.debug('Running gsutil command: ' +
                   str([sys.executable, GSUTILS_PATH] + args))
     gsutil = subprocess.Popen([sys.executable, GSUTILS_PATH] + args,
@@ -113,7 +113,7 @@ def RunGsutilCommand(args, can_fail=False, ignore_fail=False):
                 'Warning: You might have an outdated .boto file. If this issue '
                 'persists after running `gsutil.py config`, try removing your '
                 '.boto, usually located in your home directory.')
-            raise BisectException('gsutil credential error')
+            raise Exception('gsutil credential error')
         elif can_fail:
             return stderr
         elif ignore_fail:
