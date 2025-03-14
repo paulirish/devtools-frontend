@@ -3,10 +3,12 @@
 # Copyright 2025 The Chromium Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Download Chrome Release Build
+"""Download Chrome branded release Build
 
 This script downloads a specific Chrome release version for a specified platform
 from the Google Cloud Storage release bucket.
+
+It'll only work for Googlers.
 
 ex:
 
@@ -27,7 +29,7 @@ import tarfile
 import re
 import subprocess
 
-# Constants (Borrowed/Adapted from bisect-builds.py)
+# Constants (Borrowed from https://source.chromium.org/chromium/chromium/src/+/main:tools/bisect-builds.py)
 RELEASE_BASE_URL = 'gs://chrome-unsigned/desktop-5c0tCh'
 
 PATH_CONTEXT = {
@@ -231,7 +233,7 @@ def download_chrome_release(options):
             found_version_number = file.read().strip()
             if found_version_number == options.version_number:
                 assert os.path.exists(EXPECTED_BINARY)
-                print.info(
+                logging.info(
                     'Found existing %s binary of %s. Skipping download' %
                     (options.platform, options.version_number))
                 return
