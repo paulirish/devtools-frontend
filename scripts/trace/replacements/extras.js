@@ -8,6 +8,7 @@
 // Exclude the parts of extras.ts that have painful dependencies. Include these cuz they don't and are needed.
 export * as ThirdParties from './ThirdParties.js';
 export * as ScriptDuplication from './ScriptDuplication.js';
+export * as StackTraceForEvent from './StackTraceForEvent.js';
 
 // The rest of this file is a polyfill :)
 // Remove once Lighthouse drops Node 18 support.
