@@ -218,7 +218,7 @@ export class CSSWideKeywordRenderer extends rendererBase(SDK.CSSPropertyParserMa
     UI.UIUtils.createTextChild(swatch, match.text);
     swatch.data = {
       text: match.text,
-      title: resolvedProperty ? undefined : i18nString(UIStrings.sIsNotDefined, {PH1: match.text}),
+      tooltip: resolvedProperty ? undefined : {title: i18nString(UIStrings.sIsNotDefined, {PH1: match.text})},
       isDefined: Boolean(resolvedProperty),
       onLinkActivate: () => resolvedProperty && this.#stylesPane.jumpToDeclaration(resolvedProperty),
       jslogContext: 'css-wide-keyword-link',
@@ -247,7 +247,7 @@ function getTracingTooltip(
   // clang-format off
   return html`<span tabIndex=-1 aria-details=${tooltipId}>${functionName}</span><devtools-tooltip
         id=${tooltipId}
-        heavy-focus
+        use-hotkey
         variant=rich
         jslogContext=elements.css-value-trace
         @beforetoggle=${function(this: Tooltips.Tooltip.Tooltip, e: ToggleEvent) {
@@ -261,7 +261,25 @@ function getTracingTooltip(
                   computedStyles));
           }
         }}
+        @toggle=${function(this: Tooltips.Tooltip.Tooltip,e: ToggleEvent) {
+          if (e.newState === 'open') {
+            (this.querySelector('devtools-widget') as UI.Widget.WidgetElement<CSSValueTraceView>| null)
+              ?.getWidget()
+              ?.focus();
+          }
+        }}
         ><devtools-widget
+          @keydown=${(e: KeyboardEvent) => {
+            const maybeTooltip = (e.target as Element).parentElement ;
+            if (!(maybeTooltip instanceof Tooltips.Tooltip.Tooltip)) {
+              return;
+            }
+            if (e.key === 'Escape' || (e.altKey && e.key === 'ArrowDown')){
+              maybeTooltip.hideTooltip();
+              maybeTooltip.anchor?.focus();
+              e.consume();
+            }
+          }}
           .widgetConfig=${UI.Widget.widgetConfig(CSSValueTraceView, {})}
           ></devtools-widget></devtools-tooltip>`;
   // clang-format on
@@ -294,14 +312,14 @@ export class VariableRenderer extends rendererBase(SDK.CSSPropertyParserMatchers
     const substitution = context.tracing?.substitution();
     if (substitution) {
       if (declaration?.declaration instanceof SDK.CSSProperty.CSSProperty) {
-        const {valueElement, cssControls} = Renderer.renderValueElement(
+        const {nodes, cssControls} = Renderer.renderValueNodes(
             declaration.declaration,
             substitution.cachedParsedValue(declaration.declaration, this.#matchedStyles, this.#computedStyles),
             getPropertyRenderers(
                 declaration.declaration.ownerStyle, this.#stylesPane, this.#matchedStyles, null, this.#computedStyles),
             substitution);
         cssControls.forEach((value, key) => value.forEach(control => context.addControl(key, control)));
-        return [valueElement];
+        return nodes;
       }
       if (!declaration && match.fallback.length > 0) {
         return Renderer.render(match.fallback, substitution.renderingContext(context)).nodes;
@@ -322,11 +340,10 @@ export class VariableRenderer extends rendererBase(SDK.CSSPropertyParserMatchers
           jslog=${VisualLogging.link('css-variable').track({click: true, hover: true})}
           >${varCall}(<devtools-link-swatch
             class=css-var-link
-            aria-details=${tooltipId}
             .data=${{
+              tooltip: {tooltipId},
               text: match.name,
               isDefined: computedValue !== null && !fromFallback,
-              title: undefined,
               onLinkActivate,
             } as InlineEditor.LinkSwatch.LinkSwatchRenderData}
             ></devtools-link-swatch>${
@@ -842,7 +859,7 @@ export class LinkableNameRenderer extends rendererBase(SDK.CSSPropertyParserMatc
     const {metric, jslogContext, ruleBlock, isDefined} = this.#getLinkData(match);
     swatch.data = {
       text: match.text,
-      title: isDefined ? undefined : i18nString(UIStrings.sIsNotDefined, {PH1: match.text}),
+      tooltip: isDefined ? undefined : {title: i18nString(UIStrings.sIsNotDefined, {PH1: match.text})},
       isDefined,
       onLinkActivate: (): void => {
         metric && Host.userMetrics.swatchActivated(metric);
@@ -2318,7 +2335,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
     const computedStyleWidget = ElementsPanel.instance().getComputedStyleWidget();
 
     if (!computedStyleWidget.isShowing()) {
-      await UI.ViewManager.ViewManager.instance().showView('Computed');
+      await UI.ViewManager.ViewManager.instance().showView('computed');
     }
 
     let propertyNamePattern = '';

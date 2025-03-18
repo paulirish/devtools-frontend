@@ -3,16 +3,22 @@
 // found in the LICENSE file.
 
 import * as Common from '../../core/common/common.js';
+import * as Root from '../../core/root/root.js';
+import type * as Persistence from '../../models/persistence/persistence.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as PanelCommon from '../../panels/common/common.js';
 import {
   cleanup,
   createPatchWidget,
+  createPatchWidgetWithDiffView,
   createTestFilesystem,
   initializePersistenceImplForTests,
+  mockAidaClient,
 } from '../../testing/AiAssistanceHelpers.js';
 import {updateHostConfig} from '../../testing/EnvironmentHelpers.js';
 import {describeWithMockConnection} from '../../testing/MockConnection.js';
+
+import * as AiAssistance from './ai_assistance.js';
 
 describeWithMockConnection('PatchWidget', () => {
   let showFreDialogStub: sinon.SinonStub<Parameters<typeof PanelCommon.FreDialog.show>, Promise<boolean>>;
@@ -30,11 +36,87 @@ describeWithMockConnection('PatchWidget', () => {
   describe('applyToWorkspace', () => {
     beforeEach(() => {
       createTestFilesystem('file://test');
+      Common.Settings.Settings.instance().createSetting('ai-assistance-patching-selected-project-id', 'file://test');
       updateHostConfig({
         devToolsFreestyler: {
           enabled: true,
           patching: true,
         },
+      });
+    });
+
+    describe('enterprise text cases', () => {
+      it('should FRE text include no logging case when the enterprise policy value is ALLOW_WITHOUT_LOGGING',
+         async () => {
+           Common.Settings.moduleSetting('ai-assistance-patching-fre-completed').set(false);
+           updateHostConfig({
+             devToolsFreestyler: {
+               enabled: true,
+               patching: true,
+             },
+             aidaAvailability: {enterprisePolicyValue: Root.Runtime.GenAiEnterprisePolicyValue.ALLOW_WITHOUT_LOGGING}
+           });
+           const {view, panel} = await createPatchWidget();
+           panel.changeSummary = 'body { background-color: red; }';
+
+           view.input.onApplyToWorkspace();
+
+           assert.isTrue(showFreDialogStub.called, 'Expected FreDialog to be shown but it\'s not shown');
+           assert.exists(showFreDialogStub.lastCall.args[0].reminderItems.find(
+               reminderItem => reminderItem.content.toString().includes(
+                   'This data will not be used to improve Google’s AI models.')));
+         });
+
+      it('should FRE text not include no logging case when the enterprise policy value is ALLOW_WITHOUT_LOGGING',
+         async () => {
+           Common.Settings.moduleSetting('ai-assistance-patching-fre-completed').set(false);
+           updateHostConfig({
+             devToolsFreestyler: {
+               enabled: true,
+               patching: true,
+             },
+             aidaAvailability: {enterprisePolicyValue: Root.Runtime.GenAiEnterprisePolicyValue.ALLOW}
+           });
+           const {view, panel} = await createPatchWidget();
+           panel.changeSummary = 'body { background-color: red; }';
+
+           view.input.onApplyToWorkspace();
+
+           assert.isTrue(showFreDialogStub.called, 'Expected FreDialog to be shown but it\'s not shown');
+           assert.notExists(showFreDialogStub.lastCall.args[0].reminderItems.find(
+               reminderItem => reminderItem.content.toString().includes(
+                   'This data will not be used to improve Google’s AI models.')));
+         });
+
+      it('should tooltip text include no logging case when the enterprise policy value is ALLOW_WITHOUT_LOGGING',
+         async () => {
+           Common.Settings.moduleSetting('ai-assistance-patching-fre-completed').set(false);
+           updateHostConfig({
+             devToolsFreestyler: {
+               enabled: true,
+               patching: true,
+             },
+             aidaAvailability: {enterprisePolicyValue: Root.Runtime.GenAiEnterprisePolicyValue.ALLOW_WITHOUT_LOGGING}
+           });
+           const {view} = await createPatchWidget();
+
+           assert.include(
+               view.input.applyToWorkspaceTooltipText, 'This data will not be used to improve Google’s AI models.');
+         });
+
+      it('should tooltip text not include no logging case when the enterprise policy value is ALLOW', async () => {
+        Common.Settings.moduleSetting('ai-assistance-patching-fre-completed').set(false);
+        updateHostConfig({
+          devToolsFreestyler: {
+            enabled: true,
+            patching: true,
+          },
+          aidaAvailability: {enterprisePolicyValue: Root.Runtime.GenAiEnterprisePolicyValue.ALLOW}
+        });
+        const {view} = await createPatchWidget();
+
+        assert.notInclude(
+            view.input.applyToWorkspaceTooltipText, 'This data will not be used to improve Google’s AI models.');
       });
     });
 
@@ -57,11 +139,40 @@ describeWithMockConnection('PatchWidget', () => {
 
       assert.isFalse(showFreDialogStub.called, 'Expected FreDialog to be not shown but it\'s shown');
     });
+
+    it('should show files uploaded', async () => {
+      Common.Settings.moduleSetting('ai-assistance-patching-fre-completed').set(true);
+      const {view, panel} = await createPatchWidget({
+        aidaClient: mockAidaClient([
+          [{explanation: '', functionCalls: [{name: 'updateFiles', args: {files: ['index.html']}}]}], [{
+            explanation: 'done',
+          }]
+        ]),
+      });
+      panel.changeSummary = 'body { background-color: red; }';
+
+      view.input.onApplyToWorkspace();
+
+      assert.strictEqual((await view.nextInput).sources, `Filenames in test.
+Files:
+* index.html`);
+    });
   });
 
   describe('workspace', () => {
-    it('does not report a workspace project if disabled', async () => {
-      createTestFilesystem('file://test');
+    let project: Persistence.FileSystemWorkspaceBinding.FileSystem;
+
+    beforeEach(() => {
+      project = createTestFilesystem('file://test').project;
+      updateHostConfig({
+        devToolsFreestyler: {
+          enabled: true,
+          patching: true,
+        },
+      });
+    });
+
+    it('does not select a workspace project if patching is disabled', async () => {
       updateHostConfig({
         devToolsFreestyler: {
           enabled: true,
@@ -72,32 +183,121 @@ describeWithMockConnection('PatchWidget', () => {
       assert.isUndefined(view.input.projectName);
     });
 
-    it('reports a current workspace project', async () => {
-      createTestFilesystem('file://test');
-      updateHostConfig({
-        devToolsFreestyler: {
-          enabled: true,
-          patching: true,
-        },
-      });
+    it('does not select a workspace project if setting does not exist', async () => {
+      const {view} = await createPatchWidget();
+      assert.isUndefined(view.input.projectName);
+    });
+
+    it('selects a workspace project matching the setting', async () => {
+      Common.Settings.Settings.instance().createSetting('ai-assistance-patching-selected-project-id', 'file://test');
       const {view} = await createPatchWidget();
       assert.strictEqual(view.input.projectName, 'test');
     });
 
-    it('reports an updated project', async () => {
-      const {project} = createTestFilesystem('file://test');
+    it('removes a selected workspace project upon workspace removal', async () => {
+      Common.Settings.Settings.instance().createSetting('ai-assistance-patching-selected-project-id', 'file://test');
+      const {view} = await createPatchWidget();
+      assert.strictEqual(view.input.projectName, 'test');
+
+      Workspace.Workspace.WorkspaceImpl.instance().removeProject(project);
+      const input = await view.nextInput;
+      assert.isUndefined(input.projectName);
+    });
+
+    it('selection is triggered by applyToWorkspace click if no workspace is (pre-)selected', async () => {
+      let handler: (project: Workspace.Workspace.Project) => void = () => {};
+      const showSelectWorkspaceDialogStub =
+          sinon.stub(AiAssistance.SelectWorkspaceDialog, 'show').callsFake((handleProjectSelected, _project) => {
+            handler = handleProjectSelected;
+          });
+      const {view, panel} = await createPatchWidget({aidaClient: mockAidaClient([[{explanation: 'suggested patch'}]])});
+      panel.changeSummary = 'body { background-color: red; }';
+      assert.isUndefined(view.input.projectName);
+
+      // Simulate clicking the "Apply to workspace" button
+      view.input.onApplyToWorkspace();
+      await new Promise(resolve => setTimeout(resolve, 0));
+      assert.isTrue(showSelectWorkspaceDialogStub.calledOnce);
+
+      // Simulate selecting a workspace with the SelectWorkspaceDialog
+      handler(project);
+      const input = await view.nextInput;
+
+      // Assert that a patch has been generated and a project has been selected
+      assert.strictEqual(input.patchSuggestion, 'suggested patch');
+      assert.strictEqual(input.projectName, 'test');
+    });
+
+    it('selection is triggered by the "change"-button if a workspace is already (pre-)selected', async () => {
+      const {project: project2} = createTestFilesystem('file://test2');
+      Common.Settings.Settings.instance().createSetting('ai-assistance-patching-selected-project-id', 'file://test');
+      let handler: (project: Workspace.Workspace.Project) => void = () => {};
+      const showSelectWorkspaceDialogStub =
+          sinon.stub(AiAssistance.SelectWorkspaceDialog, 'show').callsFake((onProjectSelected, _project) => {
+            handler = onProjectSelected;
+          });
+      const {view, panel} = await createPatchWidget();
+      panel.changeSummary = 'body { background-color: red; }';
+      assert.strictEqual(view.input.projectName, 'test');
+
+      // Simulate clicking the "Change" button
+      assert.isTrue(showSelectWorkspaceDialogStub.notCalled);
+      view.input.onChangeWorkspaceClick();
+      assert.isTrue(showSelectWorkspaceDialogStub.calledOnce);
+
+      // Simulate selecting a different workspace with the SelectWorkspaceDialog
+      handler(project2);
+      const input = await view.nextInput;
+
+      // Assert that the project has been updated
+      assert.strictEqual(input.projectName, 'test2');
+    });
+  });
+
+  describe('diff view', () => {
+    let uiSourceCode: Workspace.UISourceCode.UISourceCode;
+    let commitWorkingCopyStub:
+        sinon.SinonStub<Parameters<typeof Workspace.UISourceCode.UISourceCode.prototype.commitWorkingCopy>>;
+    let resetWorkingCopyStub:
+        sinon.SinonStub<Parameters<typeof Workspace.UISourceCode.UISourceCode.prototype.resetWorkingCopy>>;
+
+    beforeEach(() => {
+      uiSourceCode = createTestFilesystem('file://test').uiSourceCode;
+      Common.Settings.Settings.instance().createSetting('ai-assistance-patching-selected-project-id', 'file://test');
       updateHostConfig({
         devToolsFreestyler: {
           enabled: true,
           patching: true,
         },
       });
-      const {view} = await createPatchWidget();
-      assert.strictEqual(view.input.projectName, 'test');
 
-      Workspace.Workspace.WorkspaceImpl.instance().removeProject(project);
-      createTestFilesystem('file://test2');
-      assert.strictEqual((await view.nextInput).projectName, 'test2');
+      commitWorkingCopyStub =
+          sinon.stub(Workspace.UISourceCode.UISourceCode.prototype, 'commitWorkingCopy').callThrough();
+      resetWorkingCopyStub =
+          sinon.stub(Workspace.UISourceCode.UISourceCode.prototype, 'resetWorkingCopy').callThrough();
+    });
+
+    it('save all should commit the working copy of the changed UI codes to the disk and render savedToDisk view',
+       async () => {
+         const {view} = await createPatchWidgetWithDiffView();
+         uiSourceCode.setWorkingCopy('working copy');
+
+         view.input.onSaveAll();
+         const nextInput = await view.nextInput;
+
+         assert.isTrue(nextInput.savedToDisk);
+         assert.isTrue(commitWorkingCopyStub.called, 'Expected commitWorkingCopy to be called but it is not called');
+       });
+
+    it('discard should discard the working copy and render the view without patchSuggestion', async () => {
+      const {view} = await createPatchWidgetWithDiffView();
+      uiSourceCode.setWorkingCopy('working copy');
+
+      view.input.onDiscard();
+      const nextInput = await view.nextInput;
+
+      assert.notExists(nextInput.patchSuggestion);
+      assert.isTrue(resetWorkingCopyStub.called, 'Expected resetWorkingCopy to be called but it is not called');
     });
   });
 });

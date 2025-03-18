@@ -786,7 +786,7 @@ main {
       margin-right: var(--sys-size-3);
     }
 
-    & devtools-icon {
+    & devtools-icon.summary-badge {
       width: var(--sys-size-8);
       height: var(--sys-size-8);
     }
@@ -847,9 +847,15 @@ main {
     display: flex;
     flex-direction: row;
     justify-content: space-between;
-    margin: var(--sys-size-5) 0;
+    margin: var(--sys-size-5) 0 var(--sys-size-5) var(--sys-size-2);
+    gap: var(--sys-size-6);
 
     .disclaimer-link {
+      align-self: center;
+    }
+
+    .sources-link {
+      flex-grow: 1;
       align-self: center;
     }
 
@@ -865,6 +871,16 @@ main {
       gap: var(--sys-size-2);
     }
 
+    .info-tooltip-container {
+      max-width: var(--sys-size-28);
+
+      .tooltip-link {
+        display: block;
+        margin-top: var(--sys-size-4);
+        color: var(--sys-color-primary);
+      }
+    }
+
     .loading-text-container {
       margin-right: var(--sys-size-3);
       display: flex;
@@ -877,6 +893,7 @@ main {
       display: flex;
       align-items: center;
       gap: var(--sys-size-3);
+      margin-left: auto;
 
       devtools-icon {
         /* var(--sys-size-8) is too small and var(--sys-size-9) is too big. */

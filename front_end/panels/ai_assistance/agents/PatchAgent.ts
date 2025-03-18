@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import * as Host from '../../../core/host/host.js';
+import * as Root from '../../../core/root/root.js';
 import type * as Workspace from '../../../models/workspace/workspace.js';
 import {AgentProject} from '../AgentProject.js';
 import {debugLog} from '../debug.js';
@@ -18,7 +19,11 @@ import {
   ResponseType,
 } from './AiAgent.js';
 
-// Sync with the server-side.
+/**
+ * WARNING: preamble defined in code is only used when userTier is
+ * TESTERS. Otherwise, a server-side preamble is used (see
+ * chrome_preambles.gcl). Sync local changes with the server-side.
+ */
 /* clang-format off */
 const preamble = `You are a highly skilled software engineer with expertise in web development.
 The user asks you to apply changes to a source code folder.
@@ -46,7 +51,7 @@ export class PatchAgent extends AiAgent<Workspace.Workspace.Project> {
   readonly clientFeature = Host.AidaClient.ClientFeature.CHROME_PATCH_AGENT;
 
   get userTier(): string|undefined {
-    return 'TESTERS';
+    return Root.Runtime.hostConfig.devToolsFreestyler?.userTier;
   }
 
   get options(): RequestOptions {
@@ -182,9 +187,10 @@ ${content}
     });
   }
 
-  async *
-      applyChanges(changeSummary: string, {signal}: {signal?: AbortSignal} = {}):
-          AsyncGenerator<ResponseData, void, void> {
+  async applyChanges(changeSummary: string, {signal}: {signal?: AbortSignal} = {}): Promise<{
+    responses: ResponseData[],
+    processedFiles: string[],
+  }> {
     this.#changeSummary = changeSummary;
     const prompt =
         `I have applied the following CSS changes to my page in Chrome DevTools, what are the files in my source code that I need to change to apply the same change?
@@ -202,7 +208,11 @@ CRITICAL: before searching always call listFiles first.
 CRITICAL: never call updateFiles with files that do not need updates.
 `;
 
-    yield* this.run(prompt, {selected: null, signal});
+    const responses = await Array.fromAsync(this.run(prompt, {selected: null, signal}));
+    return {
+      responses,
+      processedFiles: this.#project.getProcessedFiles(),
+    };
   }
 }
 
@@ -222,7 +232,7 @@ export class FileUpdateAgent extends AiAgent<Workspace.Workspace.Project> {
   readonly clientFeature = Host.AidaClient.ClientFeature.CHROME_PATCH_AGENT;
 
   get userTier(): string|undefined {
-    return 'TESTERS';
+    return Root.Runtime.hostConfig.devToolsFreestyler?.userTier;
   }
 
   get options(): RequestOptions {

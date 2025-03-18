@@ -64,7 +64,7 @@ import * as Utils from './utils/utils.js';
 
 // TODO(crbug.com/391381439): Fully migrate off of constructed style sheets.
 const imagePreviewStyles = new CSSStyleSheet();
-imagePreviewStyles.replaceSync(imagePreviewStylesRaw.cssContent);
+imagePreviewStyles.replaceSync(imagePreviewStylesRaw.cssText);
 
 const UIStrings = {
   /**
@@ -661,7 +661,7 @@ export class TimelineUIUtils {
       return title;
     }
     if (Trace.Types.Events.isConsoleTimeStamp(event) && event.args.data) {
-      return i18nString(UIStrings.sS, {PH1: title, PH2: event.args.data.name});
+      return i18nString(UIStrings.sS, {PH1: title, PH2: event.args.data.name ?? event.args.data.message});
     }
     if (Trace.Types.Events.isAnimation(event) && event.args.data.name) {
       return i18nString(UIStrings.sS, {PH1: title, PH2: event.args.data.name});

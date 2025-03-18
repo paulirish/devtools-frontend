@@ -12,7 +12,7 @@ devtools_module("insights") {
     "Common.ts",
     "DOMSize.ts",
     "DocumentLatency.ts",
-    "DuplicateJavaScript.ts",
+    "DuplicatedJavaScript.ts",
     "FontDisplay.ts",
     "ForcedReflow.ts",
     "ImageDelivery.ts",
@@ -25,6 +25,7 @@ devtools_module("insights") {
     "SlowCSSSelector.ts",
     "Statistics.ts",
     "ThirdParties.ts",
+    "UseCache.ts",
     "Viewport.ts",
     "types.ts",
   ]
@@ -67,6 +68,7 @@ ts_library("unittests") {
     "SlowCSSSelector.test.ts",
     "Statistics.test.ts",
     "ThirdParties.test.ts",
+    "UseCache.test.ts",
     "Viewport.test.ts",
   ]
 

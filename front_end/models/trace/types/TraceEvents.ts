@@ -1424,14 +1424,15 @@ export interface ConsoleTimeEnd extends PairableAsyncEnd {
 export type ConsoleTime = ConsoleTimeBegin|ConsoleTimeEnd;
 
 export interface ConsoleTimeStamp extends Event {
-  cat: 'disabled-by-default-v8.inspector';
+  cat: 'devtools.timeline';
   name: Name.CONSOLE_TIME_STAMP;
-  ph: Phase.COMPLETE;
+  ph: Phase.INSTANT;
   args: Args&{
     data?: ArgsData & {
       // The console.timeStamp allows to pass integers as values as well
       // as strings
-      name: string | number,
+      message: string,
+      name?: string|number,
       start?: string|number,
       end?: string|number,
       track?: string|number,
@@ -1908,6 +1909,7 @@ export interface Layout extends Complete {
   args: Args&{
     beginData: {
       sampleTraceId?: number, frame: string, dirtyObjects: number, partialLayout: boolean, totalObjects: number,
+      stackTrace?: CallFrame[],
     },
     // endData is not reliably populated.
     // Why? TBD. https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/renderer/core/frame/local_frame_view.cc;l=847-851;drc=8b6aaad8027390ce6b32d82d57328e93f34bb8e5
@@ -2247,6 +2249,20 @@ export function isNavigationStart(event: Event): event is NavigationStart {
   return event.name === 'navigationStart' && (event as NavigationStart).args?.data?.documentLoaderURL !== '';
 }
 
+export interface DidCommitSameDocumentNavigation extends Complete {
+  name: 'RenderFrameHostImpl::DidCommitSameDocumentNavigation';
+  args: Args&{
+    url: string,
+    render_frame_host: {
+      frame_type: string,
+    },
+  };
+}
+
+export function isDidCommitSameDocumentNavigation(event: Event): event is DidCommitSameDocumentNavigation {
+  return event.name === 'RenderFrameHostImpl::DidCommitSameDocumentNavigation';
+}
+
 export function isMainFrameViewport(
     event: Event,
     ): event is MainFrameViewport {
@@ -2308,7 +2324,7 @@ export function isConsoleTime(event: Event): event is ConsoleTime {
 }
 
 export function isConsoleTimeStamp(event: Event): event is ConsoleTimeStamp {
-  return event.ph === Phase.COMPLETE && event.name === Name.CONSOLE_TIME_STAMP;
+  return event.ph === Phase.INSTANT && event.name === Name.CONSOLE_TIME_STAMP;
 }
 
 export function isUserTimingMeasure(event: Event): event is UserTimingMeasure {
@@ -2973,7 +2989,7 @@ export const enum Name {
   CONSOLE_TIME = 'ConsoleTime',
   USER_TIMING = 'UserTiming',
   INTERACTIVE_TIME = 'InteractiveTime',
-  CONSOLE_TIME_STAMP = 'V8Console::TimeStamp',
+  CONSOLE_TIME_STAMP = 'TimeStamp',
 
   /* Frames */
   BEGIN_FRAME = 'BeginFrame',

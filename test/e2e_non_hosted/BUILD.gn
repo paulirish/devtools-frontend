@@ -16,7 +16,8 @@ node_ts_library("tests") {
   deps = [
     "../conductor:implementation",
     "assertion",
-    "dummy",
+    "targets",
+    "webaudio",
   ]
   sources = [ "mocharc.ts" ]
 }

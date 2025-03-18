@@ -7,6 +7,7 @@ import * as Checklist from './Checklist.js';
 import * as CLSCulprits from './CLSCulprits.js';
 import * as DocumentLatency from './DocumentLatency.js';
 import * as DOMSize from './DOMSize.js';
+import * as DuplicatedJavaScript from './DuplicatedJavaScript.js';
 import * as EventRef from './EventRef.js';
 import * as FontDisplay from './FontDisplay.js';
 import * as ForcedReflow from './ForcedReflow.js';
@@ -23,6 +24,7 @@ import * as SlowCSSSelector from './SlowCSSSelector.js';
 import * as Table from './Table.js';
 import * as ThirdParties from './ThirdParties.js';
 import * as Types from './types.js';
+import * as UseCache from './UseCache.js';
 import * as Viewport from './Viewport.js';
 
 export {
@@ -31,6 +33,7 @@ export {
   CLSCulprits,
   DocumentLatency,
   DOMSize,
+  DuplicatedJavaScript,
   EventRef,
   FontDisplay,
   ForcedReflow,
@@ -47,5 +50,6 @@ export {
   Table,
   ThirdParties,
   Types,
+  UseCache,
   Viewport,
 };

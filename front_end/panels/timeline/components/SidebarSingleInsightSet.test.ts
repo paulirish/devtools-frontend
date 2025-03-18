@@ -69,6 +69,7 @@ describeWithEnvironment('SidebarSingleInsightSet', () => {
       'Optimize DOM size',
       'CSS Selector costs',
       'Forced reflow',
+      'Use efficient cache lifetimes',
     ]);
 
     const passedInsightTitles = getPassedInsights(component).flatMap(component => {
@@ -84,6 +85,7 @@ describeWithEnvironment('SidebarSingleInsightSet', () => {
       'Optimize DOM size',
       'CSS Selector costs',
       'Forced reflow',
+      'Use efficient cache lifetimes',
     ]);
   });
 
@@ -113,6 +115,7 @@ describeWithEnvironment('SidebarSingleInsightSet', () => {
       'Improve image delivery',
       'Font display',
       '3rd parties',
+      'Use efficient cache lifetimes',
       'INP by phase',
       'LCP request discovery',
       'Render blocking requests',
@@ -160,7 +163,6 @@ describeWithEnvironment('SidebarSingleInsightSet', () => {
     const userVisibleTitles = getUserVisibleInsights(component).flatMap(component => {
       return getCleanTextContentFromElements(component.shadowRoot!, '.insight-title');
     });
-    // Includes "font display", which is experimental.
     assert.deepEqual(userVisibleTitles, [
       'LCP by phase',
       'Layout shift culprits',
@@ -168,12 +170,14 @@ describeWithEnvironment('SidebarSingleInsightSet', () => {
       'Improve image delivery',
       'Font display',
       '3rd parties',
+      'Use efficient cache lifetimes',
       'INP by phase',
       'LCP request discovery',
       'Render blocking requests',
       'Document request latency',
       'Optimize viewport for mobile',
       'Optimize DOM size',
+      'Duplicated JavaScript',
       'CSS Selector costs',
       'Forced reflow',
     ]);
@@ -188,6 +192,7 @@ describeWithEnvironment('SidebarSingleInsightSet', () => {
       'Document request latency',
       'Optimize viewport for mobile',
       'Optimize DOM size',
+      'Duplicated JavaScript',
       'CSS Selector costs',
       'Forced reflow',
     ]);

@@ -25,7 +25,7 @@ import {UserActionRow} from './UserActionRow.js';
 
 // TODO(crbug.com/391381439): Fully migrate off of constructed style sheets.
 const styles = new CSSStyleSheet();
-styles.replaceSync(stylesRaw.cssContent);
+styles.replaceSync(stylesRaw.cssText);
 
 const {html, Directives: {ifDefined, ref}} = Lit;
 
@@ -105,7 +105,7 @@ const UIStringsNotTranslate = {
    * @description The error message when the request to the LLM failed for some reason.
    */
   systemError:
-      'Something unforeseen happened and I can no longer continue. Try your request again and see if that resolves the issue.',
+      'Something unforeseen happened and I can no longer continue. Try your request again and see if that resolves the issue. If this keeps happening, update Chrome to the latest version.',
   /**
    * @description The error message when the LLM gets stuck in a loop (max steps reached).
    */

@@ -4,8 +4,9 @@
  * found in the LICENSE file.
  */
 
- .dialog-container {
+ .widget.dialog-container {
   width: 100%;
+  box-shadow: none;
  }
 
 .dialog-header {
@@ -60,4 +61,10 @@ li.selected {
 
 .selected .folder-icon {
   color: var(--icon-file-authored);
+}
+
+.theme-with-dark-background, :host-context(.theme-with-dark-background) {
+  li.selected, .selected .folder-icon {
+    color: var(--app-color-navigation-drawer-label-selected);
+  }
 }

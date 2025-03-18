@@ -62,12 +62,15 @@ export interface CriticalRequestNode {
   timeFromInitialRequest: Types.Timing.Micro;
   children: CriticalRequestNode[];
   isLongest?: boolean;
-  chain?: Types.Events.SyntheticNetworkRequest[];
+  // Store all the requests that appear in any chains this request appears in.
+  // Use set to avoid duplication.
+  relatedRequests: Set<Types.Events.SyntheticNetworkRequest>;
 }
 
 export type NetworkDependencyTreeInsightModel = InsightModel<typeof UIStrings, {
   rootNodes: CriticalRequestNode[],
   maxTime: Types.Timing.Micro,
+  fail: boolean,
 }>;
 
 function finalize(partialModel: PartialInsightModel<NetworkDependencyTreeInsightModel>):
@@ -78,7 +81,7 @@ function finalize(partialModel: PartialInsightModel<NetworkDependencyTreeInsight
     title: i18nString(UIStrings.title),
     description: i18nString(UIStrings.description),
     category: InsightCategory.LCP,
-    state: partialModel.rootNodes.length > 0 ? 'fail' : 'pass',
+    state: partialModel.fail ? 'fail' : 'pass',
     ...partialModel,
   };
 }
@@ -123,18 +126,23 @@ export function generateInsight(
     return finalize({
       rootNodes: [],
       maxTime: Types.Timing.Micro(0),
+      fail: false,
     });
   }
 
   const rootNodes: CriticalRequestNode[] = [];
   const relatedEvents: RelatedEventsMap = new Map();
   let maxTime = Types.Timing.Micro(0);
+  let fail = false;
 
   let longestChain: Types.Events.SyntheticNetworkRequest[] = [];
 
   function addChain(path: Types.Events.SyntheticNetworkRequest[]): void {
     if (path.length === 0) {
       return;
+    }
+    if (path.length >= 2) {
+      fail = true;
     }
     const initialRequest = path[0];
     const lastRequest = path[path.length - 1];
@@ -157,13 +165,13 @@ export function generateInsight(
           request,
           timeFromInitialRequest,
           children: [],
+          relatedRequests: new Set(),
         };
         currentNodes.push(found);
       }
 
-      if (request === lastRequest) {
-        found.chain = path;
-      }
+      path.forEach(request => found?.relatedRequests.add(request));
+
       // TODO(b/372897712) Switch the UIString to markdown.
       relatedEvents.set(request, depth < 2 ? [] : [i18nString(UIStrings.warningDescription)]);
 
@@ -221,6 +229,7 @@ export function generateInsight(
   return finalize({
     rootNodes,
     maxTime,
+    fail,
     relatedEvents,
   });
 }

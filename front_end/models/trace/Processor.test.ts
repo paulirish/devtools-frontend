@@ -393,9 +393,10 @@ describeWithEnvironment('TraceProcessor', function() {
         'FontDisplay',
         'DOMSize',
         'ThirdParties',
-        'DuplicateJavaScript',
+        'DuplicatedJavaScript',
         'SlowCSSSelector',
         'ForcedReflow',
+        'UseCache',
       ]);
 
       const orderWithMetadata = await getInsightOrder(true);
@@ -413,9 +414,10 @@ describeWithEnvironment('TraceProcessor', function() {
         'FontDisplay',
         'DOMSize',
         'ThirdParties',
-        'DuplicateJavaScript',
+        'DuplicatedJavaScript',
         'SlowCSSSelector',
         'ForcedReflow',
+        'UseCache',
       ]);
     });
   });

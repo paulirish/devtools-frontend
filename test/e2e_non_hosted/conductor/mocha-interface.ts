@@ -61,7 +61,7 @@ function instumentWith(withDefaultFn: (fn: Mocha.AsyncFunc) => void) {
 function describeTitle(file: string, title: string) {
   const parsedPath = Path.parse(file);
   const directories = parsedPath.dir.split(Path.sep);
-  const index = directories.lastIndexOf('e2e');
+  const index = directories.lastIndexOf('e2e_non_hosted');
   let prefix = parsedPath.name;
   if (index >= 0) {
     prefix = [...directories.slice(index + 1), `${parsedPath.name}.ts`].join('/');
@@ -108,7 +108,7 @@ function iterationSuffix(iteration: number): string {
 function customIt(testImplementation: TestFunctions, suite: Mocha.Suite, file: string) {
   function instrumentWithState(fn: TestCallbackWithState) {
     const fnWithState = async function(this: Mocha.Context) {
-      return await StateProvider.instance.callWithState(suite, fn);
+      return await StateProvider.instance.callWithState(this, suite, fn);
     };
     return makeInstrumentedTestFunction(fnWithState, 'test');
   }

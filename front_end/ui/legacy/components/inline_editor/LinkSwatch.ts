@@ -12,7 +12,7 @@ import linkSwatchStyles from './linkSwatch.css.js';
 const {render, html, nothing, Directives: {ref, ifDefined, classMap}} = Lit;
 
 export interface LinkSwatchRenderData {
-  title: string|undefined;
+  tooltip: {tooltipId: string}|{title: string}|undefined;
   text: string;
   isDefined: boolean;
   jslogContext?: string;
@@ -46,7 +46,7 @@ export class LinkSwatch extends HTMLElement {
   }
 
   private render(data: LinkSwatchRenderData): void {
-    const {isDefined, text, jslogContext, title} = data;
+    const {isDefined, text, jslogContext, tooltip} = data;
     const classes = classMap({
       'link-style': true,
       'text-button': true,
@@ -56,18 +56,22 @@ export class LinkSwatch extends HTMLElement {
     // The linkText's space must be removed, otherwise it cannot be triggered when clicked.
     const onActivate = isDefined ? this.onLinkActivate.bind(this, text.trim()) : null;
 
+    const title = tooltip && 'title' in tooltip && tooltip.title || undefined;
+    const tooltipId = tooltip && 'tooltipId' in tooltip && tooltip.tooltipId || undefined;
+
     render(
         // clang-format off
-        html`<style>${Buttons.textButtonStyles.cssContent}</style><style>${linkSwatchStyles.cssContent}</style><button
+        html`<style>${Buttons.textButtonStyles.cssText}</style><style>${linkSwatchStyles.cssText}</style><button
           .disabled=${!isDefined}
           jslog=${jslogContext ? VisualLogging.link().track({click: true}).context(jslogContext) : nothing}
           class=${classes}
           type="button"
           title=${ifDefined(title)}
+          aria-details=${ifDefined(tooltipId)}
           @click=${onActivate}
           @keydown=${onActivate}
           role="link"
-          tabindex="-1"
+          tabindex=${ifDefined(isDefined ? -1 : undefined)}
           ${ref(e => {
             this.#linkElement = e as HTMLElement;
           })}

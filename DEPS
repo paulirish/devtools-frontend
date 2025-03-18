@@ -15,7 +15,7 @@ vars = {
   'build_revision': 'e13953ced04ed05f45aa3c961bd6d802aced74ec',
 
   'buildtools_url': 'https://chromium.googlesource.com/chromium/src/buildtools.git',
-  'buildtools_revision': '50e9c3d18e43dee92cd466e7d12325c71d73441d',
+  'buildtools_revision': '7f1053216c227a9bebf3b0b858ab6705876bc461',
 
   'depot_tools_url': 'https://chromium.googlesource.com/chromium/tools/depot_tools.git',
   'depot_tools_revision': 'f40ddcd8d51626fb7be3ab3c418b3f3be801623f',
@@ -24,7 +24,7 @@ vars = {
   'inspector_protocol_revision': '940abfc668be2591483f7132145593c6a047f3cf',
 
   # Keeping track of the last time we rollerd the browser protocol files.
-  'chromium_browser_protocol_revision' : '56cfc4af1dc0afe87bc582e9f0a642ac1e4cb8fc',
+  'chromium_browser_protocol_revision' : '02eeb8baedf61eb9b6fbb97409ed0b382c05f38b',
 
   'clang_format_url': 'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/clang/tools/clang-format.git',
   'clang_format_revision': '37f6e68a107df43b7d7e044fd36a13cbae3413f2',
@@ -49,7 +49,7 @@ vars = {
   # Chrome version used for tests. It should be regularly updated to
   # match the Canary version listed here:
   # https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json
-  'chrome': '136.0.7064.0',
+  'chrome': '136.0.7075.0',
 
   # 'magic' text to tell depot_tools that git submodules should be accepted but
   # but parity with DEPS file is expected.
@@ -59,7 +59,7 @@ vars = {
   'non_git_source': 'True',
 
   # siso CIPD package version
-  'siso_version': 'git_revision:6b0b080aea4fa142b573795daa977e8751947452',
+  'siso_version': 'git_revision:3a38836e06344016dce6092148a07a114807f9f0',
 }
 
 # Only these hosts are allowed for dependencies in this DEPS file.
