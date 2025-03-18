@@ -78,9 +78,10 @@ test('insights look ok', t => {
     'Viewport',
     'DOMSize',
     'ThirdParties',
-    'DuplicateJavaScript',
+    'DuplicatedJavaScript',
     'SlowCSSSelector',
     'ForcedReflow',
+    'UseCache',
   ]);
   for (const [insightName, insightItem] of Object.entries(insightSet.model)) {
     const msg = insightItem instanceof Error ?
