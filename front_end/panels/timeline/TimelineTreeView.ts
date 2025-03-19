@@ -366,8 +366,9 @@ export class TimelineTreeView extends
   appendContextMenuItems(_contextMenu: UI.ContextMenu.ContextMenu, _node: Trace.Extras.TraceTree.Node): void {
   }
 
+  //  TODO(paulirish): rename profileNode to treeNode
   selectProfileNode(treeNode: Trace.Extras.TraceTree.Node, suppressSelectedEvent: boolean): void {
-    const pathToRoot = [];
+    const pathToRoot: Trace.Extras.TraceTree.Node[] = [];
     let node: (Trace.Extras.TraceTree.Node|null)|Trace.Extras.TraceTree.Node = treeNode;
     for (; node; node = node.parent) {
       pathToRoot.push(node);
@@ -695,6 +696,12 @@ export namespace TimelineTreeView {
   }
 }
 
+/**
+ * GridNodes are 1:1 with `TraceTree.Node`s but represent them within the DataGrid. It handles the representation as a row.
+ * `TreeGridNode` extends this to maintain relationship to the tree, and handles populate().
+ *
+ * `TimelineStackView` (aka heaviest stack) uses GridNode directly (as there's no heirarchy there), otherwise these TreeGridNode could probably be consolidated.
+ */
 export class GridNode extends DataGrid.SortableDataGrid.SortableDataGridNode<GridNode> {
   protected populated: boolean;
   profileNode: Trace.Extras.TraceTree.Node;
@@ -787,7 +794,7 @@ export class GridNode extends DataGrid.SortableDataGrid.SortableDataGridNode<Gri
     let event: Trace.Types.Events.Event|null;
     let isSize = false;
     let showBottomUpButton = false;
-    const thirdPartyView = this.treeView as ThirdPartyTreeView.ThirdPartyTreeViewWidget;
+    const thirdPartyView = this.treeView;
     switch (columnId) {
       case 'start-time': {
         event = this.profileNode.event;
@@ -871,6 +878,9 @@ export class GridNode extends DataGrid.SortableDataGrid.SortableDataGridNode<Gri
   }
 }
 
+/**
+ * `TreeGridNode` lets a `GridNode` (row) populate based on its tree children.
+ */
 export class TreeGridNode extends GridNode {
   constructor(
       profileNode: Trace.Extras.TraceTree.Node, grandTotalTime: number, maxSelfTime: number, maxTotalTime: number,
