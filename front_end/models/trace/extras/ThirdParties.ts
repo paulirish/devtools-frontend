@@ -19,14 +19,6 @@ export interface Summary {
   entity: Entity;
 }
 
-export interface ThirdPartySummary {
-  byEntity: Map<Entity, Summary>;
-  byUrl: Map<string, Summary>;
-  urlsByEntity: Map<Entity, Set<string>>;
-  eventsByEntity: Map<Entity, Types.Events.Event[]>;
-  madeUpEntityCache: Map<string, Entity>;
-}
-
 /**
  *
  * Returns Main frame main thread events.
