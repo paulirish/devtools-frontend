@@ -10,9 +10,16 @@ import importPlugin from 'eslint-plugin-import';
 import jsdocPlugin from 'eslint-plugin-jsdoc';
 import mochaPlugin from 'eslint-plugin-mocha';
 import globals from 'globals';
-import { join } from 'path';
+import {join} from 'path';
 
 import rulesdirPlugin from './scripts/eslint_rules/rules-dir.mjs';
+
+rulesdirPlugin.RULES_DIR = join(
+    import.meta.dirname,
+    'scripts',
+    'eslint_rules',
+    'lib',
+);
 
 /**
  * @type {import('eslint').Linter.Config[]}
@@ -691,6 +698,7 @@ export default [
       'rulesdir/no-assert-strict-equal-for-arrays-and-objects': 'error',
       'rulesdir/no-assert-deep-strict-equal': 'error',
       'rulesdir/no-assert-equal': 'error',
+      'rulesdir/consistent-tagged-arithmetic': 'error',
       'rulesdir/no-assert-equal-boolean-null-undefined': 'error',
       'rulesdir/no-imperative-dom-api': 'off',
       'rulesdir/no-lit-render-outside-of-view': 'off',
