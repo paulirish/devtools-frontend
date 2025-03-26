@@ -303,18 +303,6 @@ hooks = [
                 '--version_number=' + Var('chrome'),
     ],
   },
-
-    # Pull branded Chrome binaries
-  {
-    'name': 'download_branded_chrome',
-    'pattern': '.',
-    'condition': 'build_with_chromium == False',
-    'action': [ 'vpython3',
-                'scripts/deps/download_branded_chrome.py',
-                '--target=third_party/branded_chrome',
-                '--version_number=' + Var('chrome'),
-    ],
-  },
   {
     # Update LASTCHANGE for build script timestamps
     'name': 'lastchange',
