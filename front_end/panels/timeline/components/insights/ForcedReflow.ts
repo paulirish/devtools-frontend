@@ -46,21 +46,17 @@ export class ForcedReflow extends BaseInsightComponent<ForcedReflowInsightModel>
     }
 
     const linkifier = new LegacyComponents.Linkifier.Linkifier();
-    const stackTrace: Protocol.Runtime.StackTrace = {
-      callFrames: [
-        {
-          functionName: callFrame.functionName,
-          scriptId: callFrame.scriptId as Protocol.Runtime.ScriptId,
-          url: callFrame.url,
-          lineNumber: callFrame.lineNumber,
-          columnNumber: callFrame.columnNumber,
-        },
-      ],
-    };
     const target = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
-    const callFrameContents = LegacyComponents.JSPresentationUtils.buildStackTracePreviewContents(
-        target, linkifier, {stackTrace, tabStops: true, showColumnNumber: true});
-    return html`${callFrameContents.element}`;
+    
+    // Create a link for a single call frame instead of a full stack trace
+    const link = linkifier.maybeLinkifyConsoleCallFrame(
+        target, callFrame, {showColumnNumber: true, tabStop: true});
+    
+    if (!link) {
+      return html`<div style="margin: 4px 10px;">${callFrame.functionName || callFrame.url || i18nString(UIStrings.unattributed)}</div>`;
+    }
+    
+    return html`<div style="margin: 4px 10px;">${link}</div>`;
   }
 
   override renderContent(): Lit.LitTemplate {
