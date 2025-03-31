@@ -580,7 +580,8 @@ export class RequestTimingView extends UI.Widget.VBox {
       const metricEl = tr.createChild('td', 'network-timing-metric');
       const metricDesc = [serverTiming.metric, serverTiming.description].filter(Boolean).join(' — ');
 
-      if (serverTiming.metric.startsWith(SDK.ServerTiming.cloudflarePrefix)) {
+      // Mark entries from a bespoke format
+      if (serverTiming.metric.startsWith('(c')) {
         tr.classList.add('synthetic');
       }
 

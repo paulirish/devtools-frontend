@@ -56,6 +56,7 @@ export interface ServerTimingMetric {
 }
 
 export const cloudflarePrefix = '(cf) ';
+export const cloudinaryPrefix = '(cld) ';
 
 export class ServerTiming {
   metric: string;
@@ -197,16 +198,17 @@ export class ServerTiming {
 
       // Special parsing for cloudflare's bespoke format. https://blog.cloudflare.com/new-standards/#measuring-impact
       // We extract the individual items of the cfL4 server-timing for clear presentation
-      if (entry.name === 'cfL4' && 'desc' in entry) {
+      if (entry.name === 'cfL4' && entry.desc) {
         new URLSearchParams(entry.desc).entries().forEach(([key, val]) => {
-          const cfEntry = {name: `${cloudflarePrefix}${key}`, desc: ''};
-          const parser = this.getParserForParameter(key);
-          if (parser) {
-            parser.call(this, cfEntry, val);
-          } else {
-            cfEntry.desc = val;
-          }
-          result.push(cfEntry);
+          result.push({name: `${cloudflarePrefix}${key}`, desc: val});
+        });
+      }
+
+      // Special parsing for cloudinary's bespoke format. https://cloudinary.com/blog/inside_the_black_box_with_server_timing#what_details_are_you_sharing_
+      // The format has changed since this blog post
+      if (entry.name === 'content-info' && entry.desc) {
+        new URLSearchParams(entry.desc.replace(/,/g, '&')).entries().forEach(([key, val]) => {
+          result.push({name: `${cloudinaryPrefix}${key}`, desc: val});
         });
       }
 
