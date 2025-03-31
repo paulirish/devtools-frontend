@@ -190,6 +190,7 @@ export class ServerTiming {
           parseParameter.call(this, entry, paramValue);
         } else {
           // paramName is not valid
+          // TODO(paulirish): consider showing other included params, like `start`: https://github.com/w3c/server-timing/issues/43
           this.showWarning(i18nString(UIStrings.unrecognizedParameterS, {PH1: paramName}));
         }
       }
