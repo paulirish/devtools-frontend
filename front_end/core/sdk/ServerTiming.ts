@@ -59,15 +59,14 @@ export class ServerTiming {
       return null;
     }
 
-    const serverTimings = rawServerTimingHeaders.reduce((memo, header) => {
+    const serverTimings = rawServerTimingHeaders.reduce((timings, header) => {
       const timing = this.createFromHeaderValue(header.value);
-      memo.push(...timing.map(function(entry) {
+      timings.push(...timing.map(function(entry) {
         return new ServerTiming(
             entry.name, entry.hasOwnProperty('dur') ? entry.dur : null, entry.hasOwnProperty('desc') ? entry.desc : '');
       }));
-      return memo;
+      return timings;
     }, ([] as ServerTiming[]));
-    serverTimings.sort((a, b) => Platform.StringUtilities.compare(a.metric.toLowerCase(), b.metric.toLowerCase()));
     return serverTimings;
   }
 
@@ -152,6 +151,7 @@ export class ServerTiming {
       const entry = {name};
 
       if (valueString.charAt(0) === '=') {
+        console.error(entry, valueString);
         this.showWarning(i18nString(UIStrings.deprecatedSyntaxFoundPleaseUse));
       }
 
@@ -189,6 +189,21 @@ export class ServerTiming {
       }
 
       result.push(entry);
+
+      // Special parsing for cloudflare's bespoke format. https://blog.cloudflare.com/new-standards/#measuring-impact
+      if (entry.name === 'cfL4' && entry.desc) {
+        new URLSearchParams(entry.desc).entries().forEach(([key, val]) => {
+          const cfEntry = {name: `(CF) ${key}`, desc: ''};
+          const parser = this.getParserForParameter(key);
+          if (parser) {
+            parser.call(this, cfEntry, val);
+          } else {
+            cfEntry.desc = val;
+          }
+          result.push(cfEntry);
+        });
+      }
+
       if (!consumeDelimiter(',')) {
         break;
       }
@@ -229,6 +244,28 @@ export class ServerTiming {
           }
         }
         return durParser;
+      }
+      case 'start': {
+        function startParser(
+            entry: {
+              // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              [x: string]: any,
+            },
+            // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            paramValue: any): void {
+          entry.start = null;
+          if (paramValue !== null) {
+            const start = parseFloat(paramValue);
+            if (isNaN(start)) {
+              ServerTiming.showWarning(i18nString(UIStrings.unableToParseSValueS, {PH1: paramName, PH2: paramValue}));
+              return;
+            }
+            entry.start = start;
+          }
+        }
+        return startParser;
       }
 
       case 'desc': {

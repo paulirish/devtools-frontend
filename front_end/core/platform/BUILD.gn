@@ -49,7 +49,6 @@ ts_library("unittests") {
     "MapUtilities.test.ts",
     "MimeType.test.ts",
     "NumberUtilities.test.ts",
-    "ServerTiming.test.ts",
     "StringUtilities.test.ts",
     "TypedArrayUtilities.test.ts",
   ]

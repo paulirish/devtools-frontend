@@ -65,6 +65,34 @@ describeWithLocale('SDK.ServerTiming.ServerTiming.createFromHeaderValue', () => 
     assert.deepEqual(actual, expected);
   });
 
+
+  it('parses the custom non-standard cfL4 headers correctly', () => {
+    const actual = SDK.ServerTiming.ServerTiming.createFromHeaderValue(
+        'cfL4;desc="?proto=TCP&rtt=6699&sent=35&recv=35&lost=0&retrans=0&sent_bytes=29507&recv_bytes=3329&delivery_rate=2064884&cwnd=228&unsent_bytes=0&cid=2c16ce0a54b8174d&ts=215&x=0"');
+    const expected = [
+      {
+        name: 'cfL4',
+        desc:
+            '?proto=TCP&rtt=6699&sent=35&recv=35&lost=0&retrans=0&sent_bytes=29507&recv_bytes=3329&delivery_rate=2064884&cwnd=228&unsent_bytes=0&cid=2c16ce0a54b8174d&ts=215&x=0',
+      },
+      {name: 'proto', desc: 'TCP'},
+      {name: 'rtt', dur: 6699},
+      {name: 'sent', desc: '35'},
+      {name: 'recv', desc: '35'},
+      {name: 'lost', desc: '0'},
+      {name: 'retrans', desc: '0'},
+      {name: 'sent_bytes', desc: '29507'},
+      {name: 'recv_bytes', desc: '3329'},
+      {name: 'delivery_rate', desc: '2064884'},
+      {name: 'cwnd', desc: '228'},
+      {name: 'unsent_bytes', desc: '0'},
+      {name: 'cid', desc: '2c16ce0a54b8174d'},
+      {name: 'ts', start: 215},
+      {name: 'x', desc: '0'},
+    ];
+    assert.deepEqual(actual, expected);
+  });
+
   it('parses Server Timing metric names correctly', () => {
     assert.deepEqual(SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric'), [{name: 'metric'}]);
     assert.deepEqual(
