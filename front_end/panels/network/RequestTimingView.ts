@@ -579,6 +579,11 @@ export class RequestTimingView extends UI.Widget.VBox {
       const tr = tableElement.createChild('tr', isTotal ? 'network-timing-footer' : 'server-timing-row');
       const metricEl = tr.createChild('td', 'network-timing-metric');
       const metricDesc = [serverTiming.metric, serverTiming.description].filter(Boolean).join(' — ');
+
+      if (serverTiming.metric.startsWith(SDK.ServerTiming.cloudflarePrefix)) {
+        tr.classList.add('synthetic');
+      }
+
       UI.UIUtils.createTextChild(metricEl, metricDesc);
       UI.Tooltip.Tooltip.install(metricEl, metricDesc);
 
