@@ -578,16 +578,10 @@ export class RequestTimingView extends UI.Widget.VBox {
       const isTotal = serverTiming.metric.toLowerCase() === 'total';
       const tr = tableElement.createChild('tr', isTotal ? 'network-timing-footer' : 'server-timing-row');
       const metricEl = tr.createChild('td', 'network-timing-metric');
-      const metric = serverTiming.metric;
-      UI.UIUtils.createTextChild(metricEl, metric);
-      UI.Tooltip.Tooltip.install(metricEl, metric);
+      const metricDesc = [serverTiming.metric, serverTiming.description].filter(Boolean).join(' — ');
+      UI.UIUtils.createTextChild(metricEl, metricDesc);
+      UI.Tooltip.Tooltip.install(metricEl, metricDesc);
 
-      const descriptionEl = tr.createChild('td', 'network-timing-metric');
-      const description = serverTiming.description;
-      if (description) {
-        UI.UIUtils.createTextChild(descriptionEl, description);
-        UI.Tooltip.Tooltip.install(descriptionEl, description);
-      }
       const row = tr.createChild('td', 'server-timing-cell--value-bar').createChild('div', 'network-timing-row');
 
       if (serverTiming.value === null) {

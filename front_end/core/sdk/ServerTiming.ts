@@ -11,8 +11,10 @@ import type {NameValue} from './NetworkRequest.js';
 const UIStrings = {
   /**
    *@description Text in Server Timing
+   *@example {sql-lookup} PH1
    */
-  deprecatedSyntaxFoundPleaseUse: 'Deprecated syntax found. Please use: <name>;dur=<duration>;desc=<description>',
+  deprecatedSyntaxFoundPleaseUse:
+      'Deprecated syntax found for metric "{PH1}". Please use: <name>;dur=<duration>;desc=<description>',
   /**
    *@description Text in Server Timing
    *@example {https} PH1
@@ -151,8 +153,7 @@ export class ServerTiming {
       const entry = {name};
 
       if (valueString.charAt(0) === '=') {
-        console.error(entry, valueString);
-        this.showWarning(i18nString(UIStrings.deprecatedSyntaxFoundPleaseUse));
+        this.showWarning(i18nString(UIStrings.deprecatedSyntaxFoundPleaseUse, {PH1: name}));
       }
 
       while (consumeDelimiter(';')) {
