@@ -3230,42 +3230,42 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
       const endLevel = entryLevels[initiatorsData.eventIndex];
       const startY = this.levelToOffset(startLevel) + this.levelHeight(startLevel) / 2;
       const endY = this.levelToOffset(endLevel) + this.levelHeight(endLevel) / 2;
-      const lineLength = endX - startX;
+      const distanceX = Math.abs(endX - startX);
+
+      // Draw bezier arrow perfetto-style
+      // https://github.com/google/perfetto/blob/74cf5e884e04c87d561c74f73ef89b4e21b1f835/ui/src/frontend/flow_events_renderer.ts#L250-L273
+      const hasArrowHead = distanceX > 3 * arrowWidth;
+      // Defaults to 30, but can shrink as the distance goes down, to avoid arrows that curl backwards
+      const bezierOffset = Math.min(30, distanceX);
+      const endOffset = hasArrowHead ? arrowWidth : 0;
 
       context.lineWidth = 1;
       context.shadowColor = 'rgba(0, 0, 0, 0.3)';
       context.shadowOffsetX = 2;
       context.shadowOffsetY = 2;
       context.shadowBlur = 3;
-      if (lineLength > arrowWidth) {
-        // Add an arrow to the line if the line is long enough.
+      if (hasArrowHead) {
+        // Draw (left) half-circle on the right edge of the start
+        context.beginPath();
+        context.arc(startX, startY, 2, -Math.PI / 2, Math.PI / 2, false);
+        context.fill();
+
+        // Add an arrowhead to the line if the line is long enough.
         context.beginPath();
         context.moveTo(endX, endY);
         context.lineTo(endX - arrowLineWidth, endY - 3);
         context.lineTo(endX - arrowLineWidth, endY + 3);
         context.fill();
+
+        // Adjust endX for below curve
+        endX -= arrowWidth;
       }
 
-      if (initiatorEndsBeforeInitiatedStart) {
-        // ---
-        //   |
-        //   --->
-        context.beginPath();
-        context.moveTo(startX, startY);
-        context.lineTo(startX + lineLength / 2, startY);
-        context.lineTo(startX + lineLength / 2, endY);
-        context.lineTo(endX, endY);
-        context.stroke();
-      } else {
-        // |
-        // |
-        // ---->
-        context.beginPath();
-        context.moveTo(startX, startY);
-        context.lineTo(startX, endY);
-        context.lineTo(endX, endY);
-        context.stroke();
-      }
+      context.beginPath();
+      context.moveTo(startX, startY);
+      context.bezierCurveTo(
+          startX + bezierOffset, startY, endX - (bezierOffset + endOffset), endY, endX - endOffset, endY);
+      context.stroke();
     }
     context.restore();
   }
