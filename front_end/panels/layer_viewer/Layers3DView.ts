@@ -140,7 +140,6 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
   private showPaintsSetting?: Common.Settings.Setting<boolean>;
   private mouseDownX?: number;
   private mouseDownY?: number;
-  private middleMouseDown = false;
 
   constructor(layerViewHost: LayerViewHost) {
     super(true);
@@ -878,7 +877,6 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
     const mouseEvent = event as MouseEvent;
     this.mouseDownX = mouseEvent.clientX;
     this.mouseDownY = mouseEvent.clientY;
-    this.middleMouseDown = mouseEvent.button === 1;
   }
 
   private onMouseUp(event: Event): void {
@@ -891,7 +889,6 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
     }
     delete this.mouseDownX;
     delete this.mouseDownY;
-    this.middleMouseDown = false;
   }
 
   private onDoubleClick(event: Event): void {
