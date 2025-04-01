@@ -43,7 +43,7 @@ export class TransformController extends Common.ObjectWrapper.ObjectWrapper<Even
   private maxScale: number;
   private readonly controlPanelToolbar: UI.Toolbar.Toolbar;
   private readonly modeButtons: {[x: string]: UI.Toolbar.ToolbarToggle};
-  constructor(element: HTMLElement, disableRotate?: boolean) {
+  constructor(element: HTMLElement) {
     super();
     this.scaleInternal = 1;
     this.offsetXInternal = 0;
@@ -67,18 +67,18 @@ export class TransformController extends Common.ObjectWrapper.ObjectWrapper<Even
     this.controlPanelToolbar.setAttribute('jslog', `${VisualLogging.toolbar()}`);
 
     this.modeButtons = {};
-    if (!disableRotate) {
-      const panModeButton = new UI.Toolbar.ToolbarToggle(
-          i18nString(UIStrings.panModeX), '3d-pan', undefined, 'layers.3d-pan', /* toggleOnClick */ false);
-      panModeButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, this.setMode.bind(this, Modes.PAN));
-      this.modeButtons[Modes.PAN] = panModeButton;
-      this.controlPanelToolbar.appendToolbarItem(panModeButton);
-      const rotateModeButton = new UI.Toolbar.ToolbarToggle(
-          i18nString(UIStrings.rotateModeV), '3d-rotate', undefined, 'layers.3d-rotate', /* toggleOnClick */ false);
-      rotateModeButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, this.setMode.bind(this, Modes.ROTATE));
-      this.modeButtons[Modes.ROTATE] = rotateModeButton;
-      this.controlPanelToolbar.appendToolbarItem(rotateModeButton);
-    }
+
+    const panModeButton = new UI.Toolbar.ToolbarToggle(
+        i18nString(UIStrings.panModeX), '3d-pan', undefined, 'layers.3d-pan', /* toggleOnClick */ false);
+    panModeButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, this.setMode.bind(this, Modes.PAN));
+    this.modeButtons[Modes.PAN] = panModeButton;
+    this.controlPanelToolbar.appendToolbarItem(panModeButton);
+    const rotateModeButton = new UI.Toolbar.ToolbarToggle(
+        i18nString(UIStrings.rotateModeV), '3d-rotate', undefined, 'layers.3d-rotate', /* toggleOnClick */ false);
+    rotateModeButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, this.setMode.bind(this, Modes.ROTATE));
+    this.modeButtons[Modes.ROTATE] = rotateModeButton;
+    this.controlPanelToolbar.appendToolbarItem(rotateModeButton);
+
     this.setMode(Modes.PAN);
 
     const resetButton =
