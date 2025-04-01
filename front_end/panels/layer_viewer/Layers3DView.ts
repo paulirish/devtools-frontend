@@ -529,7 +529,7 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
         fillColor[3] * maskColor[3],
       ];
     } else {
-      rect.borderColor = BorderColor;
+      rect.borderColor = rect.borderColor ?? BorderColor;
     }
     rect.lineWidth = isSelected ? SelectedBorderWidth : BorderWidth;
     this.rects.push(rect);
@@ -540,8 +540,11 @@ export class Layers3DView extends Common.ObjectWrapper.eventMixin<EventTypes, ty
     for (let i = 0; i < scrollRects.length; ++i) {
       const selection = new ScrollRectSelection(layer, i);
       const rect = new Rectangle(selection);
-      rect.calculateVerticesFromRect(layer, scrollRects[i].rect, this.calculateScrollRectDepth(layer, i));
+      // Only add more depth if there are multiple scroll rects.
+      const depth = scrollRects.length > 1 ? this.calculateScrollRectDepth(layer, i) : (this.depthForLayer(layer) + 1);
+      rect.calculateVerticesFromRect(layer, scrollRects[i].rect, depth);
       rect.fillColor = ScrollRectBackgroundColor;
+      rect.borderColor = [150, 50, 250, 1];
       this.appendRect(rect);
     }
   }
@@ -962,7 +965,7 @@ export const HoveredBorderColor = [0, 0, 255, 1];
 export const SelectedBorderColor = [0, 255, 0, 1];
 export const BorderColor = [0, 0, 0, 1];
 export const ViewportBorderColor = [160, 160, 160, 1];
-export const ScrollRectBackgroundColor = [178, 100, 100, 0.6];
+export const ScrollRectBackgroundColor = [178, 130, 130, 0.50];
 export const HoveredImageMaskColor = [200, 200, 255, 1];
 export const BorderWidth = 1;
 export const SelectedBorderWidth = 2;

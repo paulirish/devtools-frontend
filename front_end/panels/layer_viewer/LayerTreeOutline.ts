@@ -226,12 +226,15 @@ export class LayerTreeOutline extends Common.ObjectWrapper.eventMixin<EventTypes
         node = nextNode;
       }
     }
+    // Select root layer by default.
     if (!this.treeOutline.selectedTreeElement && this.layerTree) {
       const elementToSelect = this.layerTree.contentRoot() || this.layerTree.root();
       if (elementToSelect) {
         const layer = layerToTreeElement.get(elementToSelect);
         if (layer) {
           layer.revealAndSelect(true);
+          // Show the tree's children
+          layer.expand();
         }
       }
     }
