@@ -1228,8 +1228,12 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         {
           title: i18nString(UIStrings.timelineScrollPan),
           rows: [
-            [{key: 'Shift'}, {joinText: '+'}, {key: 'Scroll ↕'}, {key: 'Scroll ↔'}],
-            [{key: 'A'}, {key: 'D'}, {joinText: 'or'}, {key: '↑'}, {key: '↓'}, {key: '←'}, {key: '→'}],
+            [{key: 'Shift'}, {joinText: '+'}, {key: 'Scroll ↕'}],
+            [{key: 'Scroll ↔'}, {joinText: 'or'}, {key: 'A'}, {key: 'D'}],
+            [
+              {key: 'Drag'}, {joinText: 'or'}, {key: 'Shift'}, {joinText: '+'}, {key: '↑'}, {key: '↓'}, {key: '←'},
+              {key: '→'}
+            ],
           ]
         }
       ];
@@ -1241,15 +1245,23 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         title: i18nString(UIStrings.timelineZoom),
         rows: [
           [{key: metaKey}, {joinText: '+'}, {key: 'Scroll ↕'}],
-          [{key: 'W'}, {key: 'S'}, {joinText: 'or'}, {key: '+'}, {key: '-'}]
+          [{key: 'W'}, {key: 'S'}, {joinText: 'or'}, {key: '+'}, {key: '-'}], {footnote: ''}
         ]
       },
       {
         title: i18nString(UIStrings.timelineScrollPan),
         rows: [
-          [{key: 'Scroll ↕'}, {key: 'Scroll ↔'}],
-          [{key: 'Shift'}, {key: 'Scroll ↕'}],
-          [{key: 'A'}, {key: 'D'}, {joinText: 'or'}, {key: '↑'}, {key: '↓'}, {key: '←'}, {key: '→'}],
+
+          [{key: 'Scroll ↕'}],
+          [
+            {key: 'Shift'}, {joinText: '+'}, {key: 'Scroll ↕'}, {joinText: 'or'}, {key: 'Scroll ↔'}, {joinText: 'or'},
+            {key: 'A'}, {key: 'D'}
+          ],
+          [
+            {key: 'Drag'}, {joinText: 'or'}, {key: 'Shift'}, {joinText: '+'}, {key: '↑'}, {key: '↓'}, {key: '←'},
+            {key: '→'}
+          ],
+
         ]
       }
     ];
