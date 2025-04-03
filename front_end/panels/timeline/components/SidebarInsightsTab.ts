@@ -50,7 +50,7 @@ export class SidebarInsightsTab extends HTMLElement {
    * beginning of the trace up to the first navigation.
    * You can only have one of these open at any time, and we track it via this ID.
    */
-  #insightSetKey: string|null = null;
+  #selectedInsightSetKey: string|null = null;
 
   // TODO(paulirish): add back a disconnectedCallback() to avoid memory leaks that doesn't cause b/372943062
 
@@ -59,7 +59,7 @@ export class SidebarInsightsTab extends HTMLElement {
       return;
     }
     this.#parsedTrace = data;
-    this.#insightSetKey = null;
+    this.#selectedInsightSetKey = null;
 
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
@@ -69,7 +69,7 @@ export class SidebarInsightsTab extends HTMLElement {
       return;
     }
     this.#traceMetadata = data;
-    this.#insightSetKey = null;
+    this.#selectedInsightSetKey = null;
 
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
@@ -80,18 +80,28 @@ export class SidebarInsightsTab extends HTMLElement {
     }
 
     this.#insights = data;
-    this.#insightSetKey = null;
+    this.#selectedInsightSetKey = null;
     if (!this.#insights || !this.#parsedTrace) {
       return;
     }
+
+    const trivialThreshold = Trace.Helpers.Timing.milliToMicro(Trace.Types.Timing.Milli(5000));
+
+    // If there's no insights, no navigation, and the duration is trivial, then don't show it at all.
+    // These are typically the very short "before reload" time ranges.
+    this.#insights.entries().forEach(([id, insightSet]) => {
+      const {shownInsights} = SidebarSingleInsightSet.categorizeInsights(data, id, this.#selectedCategory);
+      if (shownInsights.length === 0 && !insightSet.navigation && insightSet.bounds.range < trivialThreshold) {
+        this.#insights?.delete(id);
+      }
+    });
 
     // Select by default the first non-trivial insight set:
     // - greater than 5s in duration
     // - or, has a navigation
     // In practice this means selecting either the first or the second insight set.
-    const trivialThreshold = Trace.Helpers.Timing.milliToMicro(Trace.Types.Timing.Milli(5000));
     const insightSets = [...this.#insights.values()];
-    this.#insightSetKey =
+    this.#selectedInsightSetKey =
         insightSets.find(insightSet => insightSet.navigation || insightSet.bounds.range > trivialThreshold)?.id
         // If everything is "trivial", just select the first one.
         ?? insightSets[0]?.id ?? null;
@@ -111,15 +121,15 @@ export class SidebarInsightsTab extends HTMLElement {
     // be activated by clicking on a insight chip in the Summary panel, which may require opening
     // a different insight set.
     if (this.#activeInsight) {
-      this.#insightSetKey = this.#activeInsight.insightSetKey;
+      this.#selectedInsightSetKey = this.#activeInsight.insightSetKey;
     }
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
   #insightSetToggled(id: string): void {
-    this.#insightSetKey = this.#insightSetKey === id ? null : id;
+    this.#selectedInsightSetKey = this.#selectedInsightSetKey === id ? null : id;
     // Update the active insight set.
-    if (this.#insightSetKey !== this.#activeInsight?.insightSetKey) {
+    if (this.#selectedInsightSetKey !== this.#activeInsight?.insightSetKey) {
       this.dispatchEvent(new Insights.SidebarInsight.InsightDeactivated());
     }
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
@@ -230,16 +240,16 @@ export class SidebarInsightsTab extends HTMLElement {
 
           if (hasMultipleInsightSets) {
             return html`<details
-              ?open=${id === this.#insightSetKey}
+              ?open=${id === this.#selectedInsightSetKey}
             >
               <summary
                 @click=${() => this.#insightSetToggled(id)}
                 @mouseenter=${() => this.#insightSetHovered(id)}
                 @mouseleave=${() => this.#insightSetUnhovered()}
                 title=${url.href}>
-                ${this.#renderDropdownIcon(id === this.#insightSetKey)}
+                ${this.#renderDropdownIcon(id === this.#selectedInsightSetKey)}
                 <span>${labels[index]}</span>
-                <span class='zoom-button' @click=${(event: Event) => this.#onZoomClick(event, id)}>${this.#renderZoomButton(id === this.#insightSetKey)}</span>
+                <span class='zoom-button' @click=${(event: Event) => this.#onZoomClick(event, id)}>${this.#renderZoomButton(id === this.#selectedInsightSetKey)}</span>
               </summary>
               ${contents}
             </details>`;
