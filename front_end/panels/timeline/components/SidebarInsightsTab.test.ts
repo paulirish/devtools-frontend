@@ -41,3 +41,45 @@ describeWithEnvironment('SidebarInsightsTab', () => {
     assert.lengthOf(sets, 4);  // same number of sets as there are navigations
   });
 });
+
+
+describeWithEnvironment('SidebarInsightsTab', () => {
+  it('skips rendering trivial insight sets', async function() {
+    const {parsedTrace, insights} = await TraceLoader.traceEngine(this, 'multiple-navigations-with-iframes.json.gz');
+    assert.isOk(insights);
+    assert.deepEqual(Array.from(insights.keys()), [
+      'NO_NAVIGATION',
+      '05059ACF683224E6FC7E344F544A4050',
+      '550FC08C662EF691E1535F305CBC0FCA',
+    ]);
+
+    const component = new Components.SidebarInsightsTab.SidebarInsightsTab();
+    renderElementIntoDOM(component);
+    component.parsedTrace = parsedTrace;
+    component.insights = insights;
+    // The component should have removed the NO_NAVIGATION insight set, as it was deemed trivial.
+    assert.deepEqual(Array.from(insights.keys()), [
+      '05059ACF683224E6FC7E344F544A4050',
+      '550FC08C662EF691E1535F305CBC0FCA',
+    ]);
+    await RenderCoordinator.done();
+    assert.isOk(component.shadowRoot);
+
+    const navigationURLs =
+        Array.from(component.shadowRoot.querySelectorAll<HTMLElement>('details > summary')).map(elem => elem.title);
+    assert.deepEqual(navigationURLs, [
+      'http://localhost:5000/',
+      'http://localhost:5000/page2.html',
+    ]);
+
+    const navigationURLLabels =
+        Array.from(component.shadowRoot.querySelectorAll<HTMLElement>('details > summary')).map(elem => elem.innerText);
+    assert.deepEqual(navigationURLLabels, [
+      'http://localhost:5000',
+      'http://localhost:5000/page2.html',
+    ]);
+
+    const sets = component.shadowRoot.querySelectorAll('devtools-performance-sidebar-single-navigation');
+    assert.lengthOf(sets, 2);  // same number of sets as there are navigations
+  });
+});
