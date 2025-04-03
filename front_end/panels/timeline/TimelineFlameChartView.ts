@@ -738,9 +738,9 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
       }
       const overlaysBounds = Overlays.Overlays.traceWindowContainingOverlays(this.#currentInsightOverlays);
       if (overlaysBounds) {
-        // Trace window covering all overlays expanded by 100% so that the overlays cover 50% of the visible window.
+        // Trace window covering all overlays expanded by 50% so that the overlays cover 2/3 of the visible window.
         const expandedBounds =
-            Trace.Helpers.Timing.expandWindowByPercentOrToOneMillisecond(overlaysBounds, traceBounds, 100);
+            Trace.Helpers.Timing.expandWindowByPercentOrToOneMillisecond(overlaysBounds, traceBounds, 50);
 
         // Set the timeline visible window and ignore the minimap bounds. This
         // allows us to pick a visible window even if the overlays are outside of
@@ -1416,6 +1416,9 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
     // This is a user disabling the persistent hovering from a row click, ensure the events are cleared.
     if ((selection === null)) {
       this.#updateFlameChartDimmerWithEvents(this.#treeRowClickDimmer, null);
+      // clear out any initiator arrows as well
+      this.mainDataProvider.timelineData().initiatorsData = [];
+      this.networkDataProvider.timelineData().initiatorsData = [];
     }
 
     // Check if this is an entry from main flame chart or network flame chart.
