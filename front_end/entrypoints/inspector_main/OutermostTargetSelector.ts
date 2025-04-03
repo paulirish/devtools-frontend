@@ -1,6 +1,7 @@
 // Copyright 2023 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import type * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -30,12 +31,11 @@ let outermostTargetSelectorInstance: OutermostTargetSelector;
 
 export class OutermostTargetSelector implements SDK.TargetManager.Observer, UI.SoftDropDown.Delegate<SDK.Target.Target>,
                                                 UI.Toolbar.Provider {
-  readonly listItems: UI.ListModel.ListModel<SDK.Target.Target>;
+  readonly listItems = new UI.ListModel.ListModel<SDK.Target.Target>();
   readonly #dropDown: UI.SoftDropDown.SoftDropDown<SDK.Target.Target>;
   readonly #toolbarItem: UI.Toolbar.ToolbarItem;
 
   constructor() {
-    this.listItems = new UI.ListModel.ListModel();
     this.#dropDown = new UI.SoftDropDown.SoftDropDown(this.listItems, this);
     this.#dropDown.setRowHeight(36);
     this.#toolbarItem = new UI.Toolbar.ToolbarItem(this.#dropDown.element);

@@ -32,6 +32,7 @@ import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Root from '../../core/root/root.js';
+import * as SDK from '../../core/sdk/sdk.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
 import * as IconButton from '../components/icon_button/icon_button.js';
 import * as VisualLogging from '../visual_logging/visual_logging.js';
@@ -181,11 +182,10 @@ export class InspectorView extends VBox implements ViewLocationResolver {
     closeDrawerButton.addEventListener(ToolbarButton.Events.CLICK, this.closeDrawer, this);
     this.drawerTabbedPane.addEventListener(
         TabbedPaneEvents.TabSelected,
-        (event: Common.EventTarget.EventTargetEvent<EventData>) => this.tabSelected(event.data.tabId, 'drawer'), this);
+        (event: Common.EventTarget.EventTargetEvent<EventData>) => this.tabSelected(event.data.tabId), this);
     const selectedDrawerTab = this.drawerTabbedPane.selectedTabId;
     if (this.drawerSplitWidget.showMode() !== ShowMode.ONLY_MAIN && selectedDrawerTab) {
       Host.userMetrics.panelShown(selectedDrawerTab, true);
-      Host.userMetrics.panelShownInLocation(selectedDrawerTab, 'drawer');
     }
     this.drawerTabbedPane.setTabDelegate(this.tabDelegate);
 
@@ -218,11 +218,10 @@ export class InspectorView extends VBox implements ViewLocationResolver {
     this.tabbedPane.registerRequiredCSS(inspectorViewTabbedPaneStyles);
     this.tabbedPane.addEventListener(
         TabbedPaneEvents.TabSelected,
-        (event: Common.EventTarget.EventTargetEvent<EventData>) => this.tabSelected(event.data.tabId, 'main'), this);
+        (event: Common.EventTarget.EventTargetEvent<EventData>) => this.tabSelected(event.data.tabId), this);
     const selectedTab = this.tabbedPane.selectedTabId;
     if (selectedTab) {
       Host.userMetrics.panelShown(selectedTab, true);
-      Host.userMetrics.panelShownInLocation(selectedTab, 'main');
     }
     this.tabbedPane.setAccessibleName(i18nString(UIStrings.panels));
     this.tabbedPane.setTabDelegate(this.tabDelegate);
@@ -453,9 +452,8 @@ export class InspectorView extends VBox implements ViewLocationResolver {
     this.tabbedPane.headerResized();
   }
 
-  private tabSelected(tabId: string, location: 'main'|'drawer'): void {
+  private tabSelected(tabId: string): void {
     Host.userMetrics.panelShown(tabId);
-    Host.userMetrics.panelShownInLocation(tabId, location);
   }
 
   setOwnerSplit(splitWidget: SplitWidget): void {
@@ -501,12 +499,19 @@ export class InspectorView extends VBox implements ViewLocationResolver {
       infobar.setCloseCallback(() => {
         delete this.reloadRequiredInfobar;
       });
+
+      SDK.TargetManager.TargetManager.instance().addModelListener(
+          SDK.ResourceTreeModel.ResourceTreeModel, SDK.ResourceTreeModel.Events.PrimaryPageChanged,
+          this.removeDebuggedTabReloadRequiredWarning, this);
     }
   }
 
   removeDebuggedTabReloadRequiredWarning(): void {
     if (this.reloadRequiredInfobar) {
       this.reloadRequiredInfobar.dispose();
+      SDK.TargetManager.TargetManager.instance().removeModelListener(
+          SDK.ResourceTreeModel.ResourceTreeModel, SDK.ResourceTreeModel.Events.PrimaryPageChanged,
+          this.removeDebuggedTabReloadRequiredWarning, this);
     }
   }
 

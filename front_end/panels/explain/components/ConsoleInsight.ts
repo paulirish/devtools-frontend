@@ -1,6 +1,8 @@
 // Copyright 2023 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import '../../../ui/components/spinners/spinners.js';
 
@@ -89,7 +91,7 @@ const UIStrings = {
    */
   errorBody: 'Something went wrong. Try again.',
   /**
-   * @description Label for screenreaders that is added to the end of the link
+   * @description Label for screen readers that is added to the end of the link
    * title to indicate that the link will be opened in a new tab.
    */
   opensInNewTab: '(opens in a new tab)',
@@ -152,6 +154,10 @@ const UIStrings = {
    * @description Error message shown when the request to get an AI response times out.
    */
   timedOut: 'Generating a response took too long. Please try again.',
+  /**
+   *@description Text informing the user that AI assistance is not available in Incognito mode or Guest mode.
+   */
+  notAvailableInIncognitoMode: 'AI assistance is not available in Incognito mode or Guest mode',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/explain/components/ConsoleInsight.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -185,7 +191,7 @@ function localizeType(sourceType: SourceType): string {
 const TERMS_OF_SERVICE_URL = 'https://policies.google.com/terms';
 const PRIVACY_POLICY_URL = 'https://policies.google.com/privacy';
 const CODE_SNIPPET_WARNING_URL = 'https://support.google.com/legal/answer/13505487';
-const LEARNMORE_URL = 'https://goo.gle/devtools-console-messages-ai' as Platform.DevToolsPath.UrlString;
+const LEARN_MORE_URL = 'https://goo.gle/devtools-console-messages-ai' as Platform.DevToolsPath.UrlString;
 const REPORT_URL = 'https://support.google.com/legal/troubleshooter/1114905?hl=en#ts=1115658%2C13380504' as
     Platform.DevToolsPath.UrlString;
 const SIGN_IN_URL = 'https://accounts.google.com' as Platform.DevToolsPath.UrlString;
@@ -667,7 +673,7 @@ export class ConsoleInsight extends HTMLElement {
 
   #renderLearnMoreAboutInsights(): Lit.TemplateResult {
     // clang-format off
-    return html`<x-link href=${LEARNMORE_URL} class="link" jslog=${VisualLogging.link('learn-more').track({click: true})}>
+    return html`<x-link href=${LEARN_MORE_URL} class="link" jslog=${VisualLogging.link('learn-more').track({click: true})}>
       ${i18nString(UIStrings.learnMore)}
     </x-link>`;
     // clang-format on
@@ -886,7 +892,7 @@ export class ConsoleInsight extends HTMLElement {
       case State.SYNC_IS_PAUSED:
         return html`
           <main jslog=${jslog}>
-            <div class="error">${i18nString(UIStrings.notLoggedIn)}</div>
+            <div class="error">${Root.Runtime.hostConfig.isOffTheRecord ? i18nString(UIStrings.notAvailableInIncognitoMode) : i18nString(UIStrings.notLoggedIn)}</div>
           </main>`;
       case State.OFFLINE:
         return html`
@@ -911,7 +917,7 @@ export class ConsoleInsight extends HTMLElement {
         jslog=${VisualLogging.action('open-ai-settings').track({click: true})}
       >Open settings</button>
       or
-      <x-link href=${LEARNMORE_URL} class="link" jslog=${VisualLogging.link('learn-more').track({click: true})}>learn more</x-link>
+      <x-link href=${LEARN_MORE_URL} class="link" jslog=${VisualLogging.link('learn-more').track({click: true})}>learn more</x-link>
     </span>`;
     // clang-format on
   }
@@ -933,6 +939,9 @@ export class ConsoleInsight extends HTMLElement {
         </footer>`;
       case State.NOT_LOGGED_IN:
       case State.SYNC_IS_PAUSED:
+        if (Root.Runtime.hostConfig.isOffTheRecord) {
+          return Lit.nothing;
+        }
         return html`<footer jslog=${VisualLogging.section('footer')}>
         <div class="filler"></div>
         <div>

@@ -34,14 +34,21 @@ devtools_module("trace") {
 devtools_entrypoint("bundle") {
   entrypoint = "trace.ts"
 
-  deps = [ ":trace" ]
+  deps = [
+    ":trace",
+    "extras:bundle",
+    "handlers:bundle",
+    "helpers:bundle",
+    "insights:bundle",
+    "lantern:bundle",
+    "types:bundle",
+  ]
 
   visibility = [
     ":*",
     "../../../test/interactions/*",
     "../../core/sdk:unittests",
     "../../legacy_test_runner/*",
-    "../../panels/ai_assistance/*",
     "../../panels/lighthouse/*",
     "../../panels/network/*",
     "../../panels/recorder/*",
@@ -51,6 +58,7 @@ devtools_entrypoint("bundle") {
     "../../testing/*",
     "../../ui/components/docs/*",
     "../../ui/legacy/components/utils/*",
+    "../ai_assistance/*",
     "../live-metrics/*",
     "./*",
   ]

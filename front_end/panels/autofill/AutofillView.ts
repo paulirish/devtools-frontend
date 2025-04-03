@@ -1,6 +1,7 @@
 // Copyright 2023 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import '../../ui/components/adorners/adorners.js';
 import '../../ui/legacy/components/data_grid/data_grid.js';
@@ -367,11 +368,11 @@ export class AutofillView extends LegacyWrapper.LegacyWrapper.WrappableComponent
                       ${field.autofillType}
                       ${field.fillingStrategy === FillingStrategy.AutocompleteAttribute ?
                             html`<devtools-adorner title=${i18nString(UIStrings.autocompleteAttribute)} .data=${{name: field.fillingStrategy}}>
-                              <span slot="content">${i18nString(UIStrings.attr)}</span>
+                              <span>${i18nString(UIStrings.attr)}</span>
                             </devtools-adorner>` :
                         field.fillingStrategy === FillingStrategy.AutofillInferred ?
                             html`<devtools-adorner title=${i18nString(UIStrings.inferredByHeuristics)} .data=${{name: field.fillingStrategy}}>
-                              <span slot="content">${i18nString(UIStrings.heur)}</span>
+                              <span>${i18nString(UIStrings.heur)}</span>
                             </devtools-adorner>` :
                             Lit.nothing}
                   </td>

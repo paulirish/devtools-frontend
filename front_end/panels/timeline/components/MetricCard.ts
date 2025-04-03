@@ -1,6 +1,7 @@
 // Copyright 2024 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Platform from '../../../core/platform/platform.js';
@@ -584,22 +585,22 @@ export class MetricCard extends HTMLElement {
       <div class="phase-table" role="table">
         <div class="phase-table-row phase-table-header-row" role="row">
           <div role="columnheader" style="grid-column: 1">${i18nString(UIStrings.phase)}</div>
+          <div role="columnheader" class="phase-table-value" style="grid-column: 2">${i18nString(UIStrings.localValue)}</div>
           ${hasFieldData ? html`
             <div
               role="columnheader"
               class="phase-table-value"
-              style="grid-column: 2"
+              style="grid-column: 3"
               title=${i18nString(UIStrings.field75thPercentile)}>${i18nString(UIStrings.fieldP75)}</div>
           ` : nothing}
-          <div role="columnheader" class="phase-table-value" style=${hasFieldData ? 'grid-column: 3' : 'grid-column: 2'}>${i18nString(UIStrings.localValue)}</div>
         </div>
         ${phases.map(phase => html`
           <div class="phase-table-row" role="row">
             <div role="cell">${phase[0]}</div>
+            <div role="cell" class="phase-table-value">${i18n.TimeUtilities.preciseMillisToString(phase[1])}</div>
             ${phase[2] !== undefined ? html`
               <div role="cell" class="phase-table-value">${i18n.TimeUtilities.preciseMillisToString(phase[2])}</div>
             ` : nothing}
-            <div role="cell" class="phase-table-value">${i18n.TimeUtilities.preciseMillisToString(phase[1])}</div>
           </div>
         `)}
       </div>

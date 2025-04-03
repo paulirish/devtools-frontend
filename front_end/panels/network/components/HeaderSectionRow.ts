@@ -1,6 +1,7 @@
 // Copyright 2022 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import '../../../ui/legacy/legacy.js';
 
@@ -203,7 +204,7 @@ export class HeaderSectionRow extends HTMLElement {
               @paste=${this.#onHeaderNamePaste}
               .data=${{value: this.#header.name}}
             ></devtools-editable-span>` :
-            this.#header.name}:
+            this.#header.name}
         </div>
         <div
           class=${headerValueClasses}

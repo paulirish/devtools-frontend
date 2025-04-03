@@ -15,7 +15,7 @@ vars = {
   'build_revision': 'e13953ced04ed05f45aa3c961bd6d802aced74ec',
 
   'buildtools_url': 'https://chromium.googlesource.com/chromium/src/buildtools.git',
-  'buildtools_revision': '7f1053216c227a9bebf3b0b858ab6705876bc461',
+  'buildtools_revision': '299cb62c60f608d3b152fd3ba337f4e084e1a3b4',
 
   'depot_tools_url': 'https://chromium.googlesource.com/chromium/tools/depot_tools.git',
   'depot_tools_revision': 'f40ddcd8d51626fb7be3ab3c418b3f3be801623f',
@@ -24,7 +24,7 @@ vars = {
   'inspector_protocol_revision': '940abfc668be2591483f7132145593c6a047f3cf',
 
   # Keeping track of the last time we rollerd the browser protocol files.
-  'chromium_browser_protocol_revision' : '02eeb8baedf61eb9b6fbb97409ed0b382c05f38b',
+  'chromium_browser_protocol_revision' : 'a378d80bfbb44011499907b1282f71a050b4a16e',
 
   'clang_format_url': 'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/clang/tools/clang-format.git',
   'clang_format_revision': '37f6e68a107df43b7d7e044fd36a13cbae3413f2',
@@ -32,7 +32,7 @@ vars = {
   'emscripten_tag': 'ade9d780ff17c88d81aa13860361743e3c1e1396',
 
   # GN CIPD package version.
-  'gn_version': 'git_revision:18602f6cf1168cf78302024043edc02e8bad2ffb',
+  'gn_version': 'git_revision:6e8e0d6d4a151ab2ed9b4a35366e630c55888444',
 
   'cmake_version': 'version:2@3.21.3',
 
@@ -49,7 +49,7 @@ vars = {
   # Chrome version used for tests. It should be regularly updated to
   # match the Canary version listed here:
   # https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json
-  'chrome': '136.0.7075.0',
+  'chrome': '137.0.7104.0',
 
   # 'magic' text to tell depot_tools that git submodules should be accepted but
   # but parity with DEPS file is expected.
@@ -59,7 +59,7 @@ vars = {
   'non_git_source': 'True',
 
   # siso CIPD package version
-  'siso_version': 'git_revision:3a38836e06344016dce6092148a07a114807f9f0',
+  'siso_version': 'git_revision:9e4e007a51fdfd51e809d2817a3d6bbd3ec3b648',
 }
 
 # Only these hosts are allowed for dependencies in this DEPS file.
@@ -134,7 +134,7 @@ deps = {
     'packages': [
       {
         'package': 'infra/3pp/tools/esbuild/${{platform}}',
-        'version': 'version:3@0.24.0.chromium.2',
+        'version': 'version:3@0.25.1.chromium.2',
       }
     ],
     'dep_type': 'cipd',

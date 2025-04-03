@@ -11,7 +11,7 @@ import * as Path from 'path';
 import {platform, type Platform} from '../../conductor/platform.js';
 import {TestConfig} from '../../conductor/test_config.js';
 
-import {makeInstrumentedTestFunction, type TestCallbackWithState} from './mocha-interface-helpers.js';
+import {makeInstrumentedTestFunction} from './mocha-interface-helpers.js';
 import {StateProvider} from './state-provider.js';
 
 type SuiteFunction = ((this: Mocha.Suite) => void)|undefined;
@@ -19,10 +19,12 @@ type SuiteFunction = ((this: Mocha.Suite) => void)|undefined;
 function devtoolsTestInterface(rootSuite: Mocha.Suite) {
   let defaultImplementation: CommonFunctions;
   let mochaGlobals: Mocha.MochaGlobals;
+  let mochaRoot: Mocha;
   rootSuite.on(
       Mocha.Suite.constants.EVENT_FILE_PRE_REQUIRE,
       (context: Mocha.MochaGlobals, file: string, mocha: Mocha) => {
         mochaGlobals = context;
+        mochaRoot = mocha;
         // Different module outputs between tsc and esbuild.
         const defaultFactory = ('default' in commonInterface ? commonInterface.default : commonInterface);
         defaultImplementation = defaultFactory([rootSuite], context, mocha) as CommonFunctions;
@@ -47,7 +49,7 @@ function devtoolsTestInterface(rootSuite: Mocha.Suite) {
     mochaGlobals.setup = function(suiteSettings: SuiteSettings) {
       StateProvider.instance.registerSettingsCallback(suite, suiteSettings);
     };
-    const it = customIt(defaultImplementation.test, suite, suite.file || '');
+    const it = customIt(defaultImplementation.test, suite, suite.file || '', mochaRoot);
     // @ts-expect-error Custom interface.
     mochaGlobals.it = it;
   });
@@ -105,8 +107,8 @@ function iterationSuffix(iteration: number): string {
   }
   return ` (#${iteration})`;
 }
-function customIt(testImplementation: TestFunctions, suite: Mocha.Suite, file: string) {
-  function instrumentWithState(fn: TestCallbackWithState) {
+function customIt(testImplementation: TestFunctions, suite: Mocha.Suite, file: string, mocha: Mocha) {
+  function instrumentWithState(fn: E2E.TestAsyncCallbackWithState) {
     const fnWithState = async function(this: Mocha.Context) {
       return await StateProvider.instance.callWithState(this, suite, fn);
     };

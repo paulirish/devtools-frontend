@@ -26,6 +26,7 @@ copy_to_gen("traces") {
     "dom-size-long.json.gz",
     "dom-size-overlap.json.gz",
     "dom-size.json.gz",
+    "dupe-js.json.gz",
     "enhanced-traces.json.gz",
     "example-dot-com.json.gz",
     "extension-tracks-and-marks.json.gz",
@@ -35,6 +36,7 @@ copy_to_gen("traces") {
     "forced-reflow.json.gz",
     "generic-about-tracing.json.gz",
     "history-api-no-nav.json.gz",
+    "http1.1.json.gz",
     "idle-callback.json.gz",
     "idle-tasks.json.gz",
     "iframe-shift.json.gz",
@@ -133,5 +135,6 @@ copy_to_gen("traces") {
     "web-dev.json.gz",
     "web-sockets.json.gz",
     "wrong-main-frame-bug.json.gz",
+    "yahoo-news.json.gz",
   ]
 }

@@ -1,6 +1,7 @@
 // Copyright 2017 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import '../../../ui/components/report_view/report_view.js';
 
@@ -240,6 +241,7 @@ export class StorageMetadataView extends LegacyWrapper.LegacyWrapper.WrappableCo
   #renderBucketControls(): Lit.TemplateResult {
     // clang-format off
     return html`
+      <devtools-report-divider></devtools-report-divider>
       <devtools-report-section>
         <devtools-button
           aria-label=${i18nString(UIStrings.deleteBucket)}

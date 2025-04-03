@@ -1,6 +1,7 @@
 // Copyright 2024 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import '../../../../ui/components/markdown_view/markdown_view.js';
 
@@ -61,7 +62,7 @@ export interface BaseInsightData {
 export abstract class BaseInsightComponent<T extends InsightModel> extends HTMLElement {
   abstract internalName: string;
   // So we can use the TypeScript BaseInsight class without getting warnings
-  // about litTagName. Every child should overrwrite this.
+  // about litTagName. Every child should overwrite this.
   static readonly litTagName = Lit.StaticHtml.literal``;
 
   protected readonly shadow = this.attachShadow({mode: 'open'});
@@ -323,7 +324,10 @@ export abstract class BaseInsightComponent<T extends InsightModel> extends HTMLE
   }
 
   #canShowAskAI(): boolean {
-    return this.#insightsAskAiEnabled && this.hasAskAISupport;
+    const aiDisabledByEnterprisePolicy = Root.Runtime.hostConfig.aidaAvailability?.enterprisePolicyValue ===
+        Root.Runtime.GenAiEnterprisePolicyValue.DISABLE;
+
+    return !aiDisabledByEnterprisePolicy && this.#insightsAskAiEnabled && this.hasAskAISupport;
   }
 
   #renderInsightContent(insightModel: T): Lit.LitTemplate {

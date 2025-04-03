@@ -27,6 +27,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as Common from '../../../../core/common/common.js';
 import * as Host from '../../../../core/host/host.js';
@@ -100,7 +101,7 @@ const UIStrings = {
    */
   allowPasting: 'allow pasting',
   /**
-   *@description Input box placeholder which instructs the user to type 'allow pasing' into the input box.
+   *@description Input box placeholder which instructs the user to type 'allow pasting' into the input box.
    *@example {allow pasting} PH1
    */
   typeAllowPasting: 'Type \'\'{PH1}\'\'',
@@ -312,6 +313,7 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
           activeDark: 'var(--sys-color-divider-prominent)',
         },
       }),
+      infobarState,
     ];
   }
 
@@ -1247,3 +1249,28 @@ const sourceFrameTheme = CodeMirror.EditorView.theme({
  */
 export type RevealPosition = number|{lineNumber: number, columnNumber?: number}|
     {from: {lineNumber: number, columnNumber: number}, to: {lineNumber: number, columnNumber: number}};
+
+// Infobar panel state, used to show additional panels below the editor.
+
+export const addInfobar = CodeMirror.StateEffect.define<UI.Infobar.Infobar>();
+export const removeInfobar = CodeMirror.StateEffect.define<UI.Infobar.Infobar>();
+
+const infobarState = CodeMirror.StateField.define<UI.Infobar.Infobar[]>({
+  create(): UI.Infobar.Infobar[] {
+    return [];
+  },
+  update(current, tr): UI.Infobar.Infobar[] {
+    for (const effect of tr.effects) {
+      if (effect.is(addInfobar)) {
+        current = current.concat(effect.value);
+      } else if (effect.is(removeInfobar)) {
+        current = current.filter(b => b !== effect.value);
+      }
+    }
+    return current;
+  },
+  provide: (field): CodeMirror.Extension => CodeMirror.showPanel.computeN(
+      [field],
+      (state): Array<() => CodeMirror.Panel> =>
+          state.field(field).map((bar): (() => CodeMirror.Panel) => (): CodeMirror.Panel => ({dom: bar.element}))),
+});

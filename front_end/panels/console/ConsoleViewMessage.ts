@@ -1,6 +1,7 @@
 // Copyright 2020 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 /*
  * Copyright (C) 2011 Google Inc.  All rights reserved.
@@ -1675,8 +1676,7 @@ export class ConsoleViewMessage implements ConsoleViewportElement {
       lineNumber: number|undefined, columnNumber: number|undefined): Promise<{frames: Chrome.DevTools.FunctionInfo[]}> {
     const debuggerWorkspaceBinding = Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance();
     const projects = Workspace.Workspace.WorkspaceImpl.instance().projects();
-    const uiSourceCodes = projects.map(project => project.uiSourceCodeForURL(url)).flat().filter(f => Boolean(f)) as
-        Workspace.UISourceCode.UISourceCode[];
+    const uiSourceCodes = projects.map(project => project.uiSourceCodeForURL(url)).flat().filter(f => !!f);
     const scripts =
         uiSourceCodes.map(uiSourceCode => debuggerWorkspaceBinding.scriptsForUISourceCode(uiSourceCode)).flat();
     if (scripts.length) {

@@ -1,6 +1,7 @@
 // Copyright 2021 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import * as Platform from '../../../core/platform/platform.js';
 import {html, render} from '../../lit/lit.js';
@@ -124,7 +125,8 @@ export class TextPrompt extends HTMLElement {
       <span class="prefix">${this.#prefixText} </span>
       <span class="text-prompt-input"><input class="input" aria-label=${
         this.#ariaLabelText} spellcheck="false" @input=${this.onInput} @keydown=${
-        this.onKeyDown}/><input class="suggestion" aria-label=${this.#ariaLabelText + ' Suggestion'}></span>`;
+        this.onKeyDown}/><input class="suggestion" tabindex=-1 aria-label=${
+        this.#ariaLabelText + ' Suggestion'}></span>`;
     render(output, this.#shadow, {host: this});
   }
 }

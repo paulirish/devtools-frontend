@@ -1,6 +1,7 @@
 // Copyright 2016 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as Common from '../../core/common/common.js';
 import type * as SDK from '../../core/sdk/sdk.js';
@@ -76,7 +77,6 @@ export class NetworkWaterfallColumn extends UI.Widget.VBox {
 
     this.popoverHelper =
         new UI.PopoverHelper.PopoverHelper(this.element, this.getPopoverRequest.bind(this), 'network.timing');
-    this.popoverHelper.setHasPadding(true);
     this.popoverHelper.setTimeout(300, 300);
 
     this.nodes = [];

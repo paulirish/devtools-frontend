@@ -1,6 +1,7 @@
 // Copyright 2022 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import './RequestHeaderSection.js';
 
@@ -505,7 +506,7 @@ export class RequestHeadersView extends LegacyWrapper.LegacyWrapper.WrappableCom
         name.toLowerCase() === this.#toReveal?.header?.toLowerCase();
     return html`
       <div class="row ${isHighlighted ? 'header-highlight' : ''}">
-        <div class="header-name">${name}:</div>
+        <div class="header-name">${name}</div>
         <div
           class="header-value ${classNames?.join(' ')}"
           @copy=${() => Host.userMetrics.actionTaken(Host.UserMetrics.Action.NetworkPanelCopyValue)}

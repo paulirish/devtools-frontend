@@ -4,6 +4,7 @@
 
 import * as Common from '../../core/common/common.js';
 import * as Root from '../../core/root/root.js';
+import * as AiAssistanceModel from '../../models/ai_assistance/ai_assistance.js';
 import type * as Persistence from '../../models/persistence/persistence.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as PanelCommon from '../../panels/common/common.js';
@@ -13,7 +14,9 @@ import {
   createPatchWidgetWithDiffView,
   createTestFilesystem,
   initializePersistenceImplForTests,
+  MockAidaAbortError,
   mockAidaClient,
+  MockAidaFetchError,
 } from '../../testing/AiAssistanceHelpers.js';
 import {updateHostConfig} from '../../testing/EnvironmentHelpers.js';
 import {describeWithMockConnection} from '../../testing/MockConnection.js';
@@ -56,8 +59,8 @@ describeWithMockConnection('PatchWidget', () => {
              },
              aidaAvailability: {enterprisePolicyValue: Root.Runtime.GenAiEnterprisePolicyValue.ALLOW_WITHOUT_LOGGING}
            });
-           const {view, panel} = await createPatchWidget();
-           panel.changeSummary = 'body { background-color: red; }';
+           const {view, widget} = await createPatchWidget();
+           widget.changeSummary = 'body { background-color: red; }';
 
            view.input.onApplyToWorkspace();
 
@@ -77,8 +80,8 @@ describeWithMockConnection('PatchWidget', () => {
              },
              aidaAvailability: {enterprisePolicyValue: Root.Runtime.GenAiEnterprisePolicyValue.ALLOW}
            });
-           const {view, panel} = await createPatchWidget();
-           panel.changeSummary = 'body { background-color: red; }';
+           const {view, widget} = await createPatchWidget();
+           widget.changeSummary = 'body { background-color: red; }';
 
            view.input.onApplyToWorkspace();
 
@@ -122,8 +125,8 @@ describeWithMockConnection('PatchWidget', () => {
 
     it('should show FRE dialog on applyToWorkspace click if the setting is false', async () => {
       Common.Settings.moduleSetting('ai-assistance-patching-fre-completed').set(false);
-      const {view, panel} = await createPatchWidget();
-      panel.changeSummary = 'body { background-color: red; }';
+      const {view, widget} = await createPatchWidget();
+      widget.changeSummary = 'body { background-color: red; }';
 
       view.input.onApplyToWorkspace();
 
@@ -132,8 +135,8 @@ describeWithMockConnection('PatchWidget', () => {
 
     it('should not show FRE dialog on applyToWorkspace click if the setting is true', async () => {
       Common.Settings.moduleSetting('ai-assistance-patching-fre-completed').set(true);
-      const {view, panel} = await createPatchWidget();
-      panel.changeSummary = 'body { background-color: red; }';
+      const {view, widget} = await createPatchWidget();
+      widget.changeSummary = 'body { background-color: red; }';
 
       view.input.onApplyToWorkspace();
 
@@ -141,21 +144,40 @@ describeWithMockConnection('PatchWidget', () => {
     });
 
     it('should show files uploaded', async () => {
-      Common.Settings.moduleSetting('ai-assistance-patching-fre-completed').set(true);
-      const {view, panel} = await createPatchWidget({
+      const {view, widget} = await createPatchWidget({
         aidaClient: mockAidaClient([
           [{explanation: '', functionCalls: [{name: 'updateFiles', args: {files: ['index.html']}}]}], [{
             explanation: 'done',
           }]
         ]),
       });
-      panel.changeSummary = 'body { background-color: red; }';
+      widget.changeSummary = 'body { background-color: red; }';
 
       view.input.onApplyToWorkspace();
 
       assert.strictEqual((await view.nextInput).sources, `Filenames in test.
 Files:
 * index.html`);
+    });
+
+    it('should show error state when applyToWorkspace fails', async () => {
+      const {view, widget} = await createPatchWidget({aidaClient: mockAidaClient([[MockAidaFetchError]])});
+      widget.changeSummary = 'body { background-color: red; }';
+
+      view.input.onApplyToWorkspace();
+
+      const input = await view.nextInput;
+      assert.strictEqual(input.patchSuggestionState, AiAssistance.PatchWidget.PatchSuggestionState.ERROR);
+    });
+
+    it('should return back to initial state when the user aborts applying to workspace', async () => {
+      const {view, widget} = await createPatchWidget({aidaClient: mockAidaClient([[MockAidaAbortError]])});
+      widget.changeSummary = 'body { background-color: red; }';
+
+      view.input.onApplyToWorkspace();
+
+      const input = await view.nextInput;
+      assert.strictEqual(input.patchSuggestionState, AiAssistance.PatchWidget.PatchSuggestionState.INITIAL);
     });
   });
 
@@ -210,8 +232,9 @@ Files:
           sinon.stub(AiAssistance.SelectWorkspaceDialog, 'show').callsFake((handleProjectSelected, _project) => {
             handler = handleProjectSelected;
           });
-      const {view, panel} = await createPatchWidget({aidaClient: mockAidaClient([[{explanation: 'suggested patch'}]])});
-      panel.changeSummary = 'body { background-color: red; }';
+      const {view, widget} =
+          await createPatchWidget({aidaClient: mockAidaClient([[{explanation: 'suggested patch'}]])});
+      widget.changeSummary = 'body { background-color: red; }';
       assert.isUndefined(view.input.projectName);
 
       // Simulate clicking the "Apply to workspace" button
@@ -224,7 +247,7 @@ Files:
       const input = await view.nextInput;
 
       // Assert that a patch has been generated and a project has been selected
-      assert.strictEqual(input.patchSuggestion, 'suggested patch');
+      assert.strictEqual(input.patchSuggestionState, AiAssistance.PatchWidget.PatchSuggestionState.SUCCESS);
       assert.strictEqual(input.projectName, 'test');
     });
 
@@ -236,8 +259,8 @@ Files:
           sinon.stub(AiAssistance.SelectWorkspaceDialog, 'show').callsFake((onProjectSelected, _project) => {
             handler = onProjectSelected;
           });
-      const {view, panel} = await createPatchWidget();
-      panel.changeSummary = 'body { background-color: red; }';
+      const {view, widget} = await createPatchWidget();
+      widget.changeSummary = 'body { background-color: red; }';
       assert.strictEqual(view.input.projectName, 'test');
 
       // Simulate clicking the "Change" button
@@ -277,9 +300,24 @@ Files:
           sinon.stub(Workspace.UISourceCode.UISourceCode.prototype, 'resetWorkingCopy').callThrough();
     });
 
+    it('on apply should call handle function and stash changes', async () => {
+      const {
+        view,
+        widget,
+      } = await createPatchWidget({aidaClient: mockAidaClient([[{explanation: 'patch applied'}]])});
+      widget.changeSummary = 'body { background-color: red; }';
+      const changeManager = sinon.createStubInstance(AiAssistanceModel.ChangeManager);
+      widget.changeManager = changeManager;
+      view.input.onApplyToWorkspace();
+      await view.nextInput;
+      assert.isTrue(changeManager.stashChanges.calledOnce);
+    });
+
     it('save all should commit the working copy of the changed UI codes to the disk and render savedToDisk view',
        async () => {
-         const {view} = await createPatchWidgetWithDiffView();
+         const {view, widget} = await createPatchWidgetWithDiffView();
+         const changeManager = sinon.createStubInstance(AiAssistanceModel.ChangeManager);
+         widget.changeManager = changeManager;
          uiSourceCode.setWorkingCopy('working copy');
 
          view.input.onSaveAll();
@@ -287,17 +325,21 @@ Files:
 
          assert.isTrue(nextInput.savedToDisk);
          assert.isTrue(commitWorkingCopyStub.called, 'Expected commitWorkingCopy to be called but it is not called');
+         assert.isTrue(changeManager.dropStashedChanges.calledOnce);
        });
 
     it('discard should discard the working copy and render the view without patchSuggestion', async () => {
-      const {view} = await createPatchWidgetWithDiffView();
+      const {view, widget} = await createPatchWidgetWithDiffView();
+      const changeManager = sinon.createStubInstance(AiAssistanceModel.ChangeManager);
+      widget.changeManager = changeManager;
       uiSourceCode.setWorkingCopy('working copy');
 
       view.input.onDiscard();
       const nextInput = await view.nextInput;
 
-      assert.notExists(nextInput.patchSuggestion);
+      assert.strictEqual(nextInput.patchSuggestionState, AiAssistance.PatchWidget.PatchSuggestionState.INITIAL);
       assert.isTrue(resetWorkingCopyStub.called, 'Expected resetWorkingCopy to be called but it is not called');
+      assert.isTrue(changeManager.popStashedChanges.calledOnce);
     });
   });
 });

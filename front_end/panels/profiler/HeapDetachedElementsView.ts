@@ -1,6 +1,7 @@
 // Copyright 2024 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -118,9 +119,14 @@ export class DetachedElementsProfileType extends
     const heapProfilerModel = UI.Context.Context.instance().flavor(SDK.HeapProfilerModel.HeapProfilerModel);
     const target = heapProfilerModel?.target();
     const domModel = target?.model(SDK.DOMModel.DOMModel);
-
     if (!heapProfilerModel || !target || !domModel) {
       return;
+    }
+
+    const animationModel = target?.model(SDK.AnimationModel.AnimationModel);
+    if (animationModel) {
+      // TODO(b/406904348): Remove this once we correctly release animations on the backend.
+      await animationModel.releaseAllAnimations();
     }
     const data = await domModel.getDetachedDOMNodes();
 

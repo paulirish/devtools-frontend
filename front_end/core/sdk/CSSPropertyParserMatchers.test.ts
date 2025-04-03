@@ -94,8 +94,18 @@ describe('Matchers for SDK.CSSPropertyParser.BottomUpTreeMatching', () => {
 
   it('parses colors in logical border properties', () => {
     for (const success
-             of ['border-block-end', 'border-block-end-color', 'border-block-start', 'border-block-start-color',
-                 'border-inline-end', 'border-inline-end-color', 'border-inline-start', 'border-inline-start-color']) {
+             of ['border-inline', 'border-block', 'border-inline-color', 'border-block-color', 'border-block-end',
+                 'border-block-end-color', 'border-block-start', 'border-block-start-color', 'border-inline-end',
+                 'border-inline-end-color', 'border-inline-start', 'border-inline-start-color']) {
+      const {ast, match, text} = matchSingleValue(success, 'red', new SDK.CSSPropertyParserMatchers.ColorMatcher());
+      assert.exists(match, text);
+      assert.strictEqual(match.text, 'red');
+      assert.strictEqual(ast?.propertyName, success);
+    }
+  });
+
+  it('parses colors in SVG color properties', () => {
+    for (const success of ['flood-color', 'lighting-color', 'stop-color']) {
       const {ast, match, text} = matchSingleValue(success, 'red', new SDK.CSSPropertyParserMatchers.ColorMatcher());
       assert.exists(match, text);
       assert.strictEqual(match.text, 'red');
@@ -432,7 +442,7 @@ describe('Matchers for SDK.CSSPropertyParser.BottomUpTreeMatching', () => {
       const {match, text} = matchSingleValue(
           'color', fail,
           new SDK.CSSPropertyParserMatchers.LightDarkColorMatcher(
-              sinon.createStubInstance(SDK.CSSProperty.CSSProperty)));
+              sinon.createStubInstance(SDK.CSSStyleDeclaration.CSSStyleDeclaration)));
       assert.isNull(match, text);
     }
 
@@ -442,7 +452,7 @@ describe('Matchers for SDK.CSSPropertyParser.BottomUpTreeMatching', () => {
       const {ast, match, text} = matchSingleValue(
           'color', succeed,
           new SDK.CSSPropertyParserMatchers.LightDarkColorMatcher(
-              sinon.createStubInstance(SDK.CSSProperty.CSSProperty)));
+              sinon.createStubInstance(SDK.CSSStyleDeclaration.CSSStyleDeclaration)));
       assert.exists(ast, text);
       assert.exists(match, text);
 
@@ -456,7 +466,8 @@ describe('Matchers for SDK.CSSPropertyParser.BottomUpTreeMatching', () => {
     // light-dark only applies to color properties
     const {match, text} = matchSingleValue(
         'width', 'light-dark(red, blue)',
-        new SDK.CSSPropertyParserMatchers.LightDarkColorMatcher(sinon.createStubInstance(SDK.CSSProperty.CSSProperty)));
+        new SDK.CSSPropertyParserMatchers.LightDarkColorMatcher(
+            sinon.createStubInstance(SDK.CSSStyleDeclaration.CSSStyleDeclaration)));
     assert.isNull(match, text);
   });
 

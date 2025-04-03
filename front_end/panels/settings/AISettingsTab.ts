@@ -1,6 +1,7 @@
 // Copyright 2024 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
@@ -196,6 +197,10 @@ const UIStrings = {
    * @description Message shown when the user is offline.
    */
   offline: 'This feature is only available with an active internet connection.',
+  /**
+   *@description Text informing the user that AI assistance is not available in Incognito mode or Guest mode.
+   */
+  notAvailableInIncognitoMode: 'AI assistance is not available in Incognito mode or Guest mode',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/settings/AISettingsTab.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -330,20 +335,22 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
 
     if (this.#aiAnnotationsSetting) {
       const aiAssistanceData: AiSettingParams = {
-        settingName: i18n.i18n.lockedString('AI annotations'),
+        settingName: i18n.i18n.lockedString('Auto annotations'),
         iconName: 'pen-spark',
         settingDescription: i18nString(UIStrings.getAIAnnotationsSuggestions),
         enableSettingText: i18nString(UIStrings.enableAiSuggestedAnnotations),
         settingItems: [
-          {iconName: 'pen', text: i18nString(UIStrings.getAIAnnotationsSuggestions)},
+          {iconName: 'pen-spark', text: i18nString(UIStrings.getAIAnnotationsSuggestions)},
         ],
         toConsiderSettingItems: [{
           iconName: 'google',
           text: noLogging ? i18nString(UIStrings.generatedAiAnnotationsSendDataNoLogging) :
                             i18nString(UIStrings.generatedAiAnnotationsSendData)
         }],
-        // TODO: Add a relevant link
-        learnMoreLink: {url: '', linkJSLogContext: 'learn-more.ai-annotations'},
+        learnMoreLink: {
+          url: 'https://developer.chrome.com/docs/devtools/performance/reference#auto-annotations',
+          linkJSLogContext: 'learn-more.auto-annotations'
+        },
         settingExpandState: {
           isSettingExpanded: false,
           expandSettingJSLogContext: 'freestyler.accordion',
@@ -518,6 +525,9 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
 
   #getDisabledReasons(): string[] {
     const reasons = [];
+    if (Root.Runtime.hostConfig.isOffTheRecord) {
+      reasons.push(i18nString(UIStrings.notAvailableInIncognitoMode));
+    }
     switch (this.#aidaAvailability) {
       case Host.AidaClient.AidaAccessPreconditions.NO_ACCOUNT_EMAIL:
       case Host.AidaClient.AidaAccessPreconditions.SYNC_IS_PAUSED:

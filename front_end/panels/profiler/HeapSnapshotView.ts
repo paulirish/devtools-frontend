@@ -28,6 +28,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* eslint-disable rulesdir/no-imperative-dom-api */
+
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -475,7 +477,6 @@ export class HeapSnapshotView extends UI.View.SimpleView implements DataDisplayD
     this.popoverHelper = new UI.PopoverHelper.PopoverHelper(
         this.element, this.getPopoverRequest.bind(this), 'profiler.heap-snapshot-object');
     this.popoverHelper.setDisableOnClick(true);
-    this.popoverHelper.setHasPadding(true);
     this.element.addEventListener('scroll', this.popoverHelper.hidePopover.bind(this.popoverHelper), true);
 
     this.currentPerspectiveIndex = 0;
@@ -1527,13 +1528,19 @@ export class TrackingHeapSnapshotProfileType extends
     return this.toggleRecording();
   }
 
-  startRecordingProfile(): void {
+  async startRecordingProfile(): Promise<void> {
     if (this.profileBeingRecorded()) {
       return;
     }
     const heapProfilerModel = this.addNewProfile();
     if (!heapProfilerModel) {
       return;
+    }
+
+    const animationModel = heapProfilerModel.target().model(SDK.AnimationModel.AnimationModel);
+    if (animationModel) {
+      // TODO(b/406904348): Remove this once we correctly release animations on the backend.
+      await animationModel.releaseAllAnimations();
     }
     void heapProfilerModel.startTrackingHeapObjects(this.recordAllocationStacksSettingInternal.get());
   }
@@ -1594,7 +1601,7 @@ export class TrackingHeapSnapshotProfileType extends
     if (this.recording) {
       void this.stopRecordingProfile();
     } else {
-      this.startRecordingProfile();
+      void this.startRecordingProfile();
     }
     return this.recording;
   }
@@ -1657,7 +1664,7 @@ export class HeapProfileHeader extends ProfileHeader {
   receiver: Common.StringOutputStream.OutputStream|null;
   snapshotProxy: HeapSnapshotProxy|null;
   readonly loadPromise: Promise<HeapSnapshotProxy>;
-  fulfillLoad?: (value: HeapSnapshotProxy|PromiseLike<HeapSnapshotProxy>) => void;
+  fulfillLoad: (value: HeapSnapshotProxy|PromiseLike<HeapSnapshotProxy>) => void;
   totalNumberOfChunks: number;
   bufferedWriter: Bindings.TempFile.TempFile|null;
   onTempFileReady: (() => void)|null;
@@ -1673,9 +1680,9 @@ export class HeapProfileHeader extends ProfileHeader {
     this.workerProxy = null;
     this.receiver = null;
     this.snapshotProxy = null;
-    this.loadPromise = new Promise(resolve => {
-      this.fulfillLoad = resolve;
-    });
+    const {promise, resolve} = Promise.withResolvers<HeapSnapshotProxy>();
+    this.loadPromise = promise;
+    this.fulfillLoad = resolve;
     this.totalNumberOfChunks = 0;
     this.bufferedWriter = null;
     this.onTempFileReady = null;
@@ -1803,10 +1810,10 @@ export class HeapProfileHeader extends ProfileHeader {
   }
 
   notifySnapshotReceived(): void {
-    if (this.snapshotProxy && this.fulfillLoad) {
+    if (this.snapshotProxy) {
       this.fulfillLoad(this.snapshotProxy);
     }
-    (this.profileType()).snapshotReceived(this);
+    this.profileType().snapshotReceived(this);
   }
 
   override canSaveToFile(): boolean {

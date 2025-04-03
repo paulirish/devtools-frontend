@@ -823,6 +823,7 @@ experimental domain Audits
       ValidationFailedSignatureExpired
       ValidationFailedInvalidLength
       ValidationFailedSignatureMismatch
+      ValidationFailedIntegrityMismatch
 
   # Details for issues around "Attribution Reporting API" usage.
   # Explainer: https://github.com/WICG/attribution-reporting-api
@@ -858,6 +859,8 @@ experimental domain Audits
   type SRIMessageSignatureIssueDetails extends object
     properties
       SRIMessageSignatureError error
+      string signatureBase
+      array of string integrityAssertions
       AffectedRequest request
 
   type GenericIssueErrorType extends string
@@ -980,6 +983,7 @@ experimental domain Audits
       TypeNotMatching
       UiDismissedNoEmbargo
       CorsError
+      SuppressedBySegmentationPlatform
 
   type FederatedAuthUserInfoRequestIssueDetails extends object
     properties
@@ -2433,7 +2437,12 @@ experimental domain CSS
   # For example, a value of '1em' is evaluated according to the computed
   # 'font-size' of the element and a value 'calc(1px + 2px)' will be
   # resolved to '3px'.
-  command resolveValues
+  # If the `propertyName` was specified the `values` are resolved as if
+  # they were property's declaration. If a value cannot be parsed according
+  # to the provided property syntax, the value is parsed using combined
+  # syntax as if null `propertyName` was provided. If the value cannot be
+  # resolved even then, return the provided value without any changes.
+  experimental command resolveValues
     parameters
       # Substitution functions (var()/env()/attr()) and cascade-dependent
       # keywords (revert/revert-layer) do not work.
@@ -2444,9 +2453,9 @@ experimental domain CSS
       optional string propertyName
       # Pseudo element type, only works for pseudo elements that generate
       # elements in the tree, such as ::before and ::after.
-      experimental optional DOM.PseudoType pseudoType
+      optional DOM.PseudoType pseudoType
       # Pseudo element custom ident.
-      experimental optional string pseudoIdentifier
+      optional string pseudoIdentifier
     returns
       array of string results
 
@@ -4594,7 +4603,8 @@ domain Emulation
       experimental optional Page.Viewport viewport
       # If set, the display feature of a multi-segment screen. If not set, multi-segment support
       # is turned-off.
-      experimental optional DisplayFeature displayFeature
+      # Deprecated, use Emulation.setDisplayFeaturesOverride.
+      experimental deprecated optional DisplayFeature displayFeature
       # If set, the posture of a foldable device. If not set the posture is set
       # to continuous.
       # Deprecated, use Emulation.setDevicePostureOverride.
@@ -4611,6 +4621,18 @@ domain Emulation
   # platform again.
   # Does nothing if no override is set.
   experimental command clearDevicePostureOverride
+
+  # Start using the given display features to pupulate the Viewport Segments API.
+  # This override can also be set in setDeviceMetricsOverride().
+  experimental command setDisplayFeaturesOverride
+    parameters
+      array of DisplayFeature features
+
+  # Clears the display features override set with either setDeviceMetricsOverride()
+  # or setDisplayFeaturesOverride() and starts using display features from the
+  # platform again.
+  # Does nothing if no override is set.
+  experimental command clearDisplayFeaturesOverride
 
   experimental command setScrollbarsHidden
     parameters
@@ -6626,6 +6648,8 @@ domain Network
       PortMismatch
       # The cookie's source scheme value does not match the request origin's scheme.
       SchemeMismatch
+      # Unpartitioned cookie access from an anonymous context was blocked.
+      AnonymousContext
 
   # Types of reasons why a cookie should have been blocked by 3PCD but is exempted for the request.
   experimental type CookieExemptionReason extends string
@@ -8450,6 +8474,7 @@ domain Page
       interest-cohort
       join-ad-interest-group
       keyboard-map
+      language-detector
       local-fonts
       magnetometer
       media-playback-while-not-visible
@@ -8464,6 +8489,7 @@ domain Page
       private-state-token-redemption
       publickey-credentials-create
       publickey-credentials-get
+      rewriter
       run-ad-auction
       screen-wake-lock
       serial
@@ -8474,7 +8500,9 @@ domain Page
       speaker-selection
       storage-access
       sub-apps
+      summarizer
       sync-xhr
+      translator
       unload
       usb
       usb-unrestricted
@@ -8483,6 +8511,7 @@ domain Page
       web-printing
       web-share
       window-management
+      writer
       xr-spatial-tracking
 
   # Reason for a permissions policy feature to be disabled.
@@ -10535,30 +10564,32 @@ experimental domain Storage
       bidderTrustedSignals
       sellerTrustedSignals
 
-  # Enum of shared storage access types.
-  type SharedStorageAccessType extends string
+  # Enum of shared storage access scopes.
+  type SharedStorageAccessScope extends string
     enum
-      documentAddModule
-      documentSelectURL
-      documentRun
-      documentSet
-      documentAppend
-      documentDelete
-      documentClear
-      documentGet
-      workletSet
-      workletAppend
-      workletDelete
-      workletClear
-      workletGet
-      workletKeys
-      workletEntries
-      workletLength
-      workletRemainingBudget
-      headerSet
-      headerAppend
-      headerDelete
-      headerClear
+      window
+      sharedStorageWorklet
+      protectedAudienceWorklet
+      header
+
+  # Enum of shared storage access methods.
+  type SharedStorageAccessMethod extends string
+    enum
+      addModule
+      createWorklet
+      selectURL
+      run
+      batchUpdate
+      set
+      append
+      delete
+      clear
+      get
+      keys
+      values
+      entries
+      length
+      remainingBudget
 
   # Struct for a single key-value pair in an origin's shared storage.
   type SharedStorageEntry extends object
@@ -10974,12 +11005,16 @@ experimental domain Storage
     parameters
       # Time of the access.
       Network.TimeSinceEpoch accessTime
+      # Enum value indicating the access scope.
+      SharedStorageAccessScope scope
       # Enum value indicating the Shared Storage API method invoked.
-      SharedStorageAccessType type
+      SharedStorageAccessMethod method
       # DevTools Frame Token for the primary frame tree's root.
       Page.FrameId mainFrameId
-      # Serialized origin for the context that invoked the Shared Storage API.
+      # Serialization of the origin owning the Shared Storage data.
       string ownerOrigin
+      # Serialization of the site owning the Shared Storage data.
+      string ownerSite
       # The sub-parameters wrapped by `params` are all optional and their
       # presence/absence depends on `type`.
       SharedStorageAccessParams params
@@ -11556,6 +11591,10 @@ domain Target
       optional boolean background
       # Whether to create the target of type "tab".
       experimental optional boolean forTab
+      # Whether to create a hidden target. The hidden target is observable via protocol, but not
+      # present in the tab UI strip. Cannot be created with `forTab: true`, `newWindow: true` or
+      # `background: false`. The life-time of the tab is limited to the life-time of the session.
+      experimental optional boolean hidden
     returns
       # The id of the page opened.
       TargetID targetId
@@ -12903,6 +12942,7 @@ experimental domain Preload
       PrefetchFailedMIMENotSupported
       PrefetchFailedNetError
       PrefetchFailedNon2XX
+      PrefetchEvictedAfterBrowsingDataRemoved
       PrefetchEvictedAfterCandidateRemoved
       PrefetchEvictedForNewerPrefetch
       PrefetchHeldback
@@ -13200,6 +13240,12 @@ experimental domain BluetoothEmulation
       powered-off
       powered-on
 
+  # Indicates the various types of GATT event.
+  type GATTOperationType extends string
+    enum
+      connection
+      discovery
+
   # Stores the manufacturer data
   type ManufacturerData extends object
     properties
@@ -13229,6 +13275,19 @@ experimental domain BluetoothEmulation
       string deviceAddress
       integer rssi
       ScanRecord scanRecord
+
+  # Describes the properties of a characteristic. This follows Bluetooth Core
+  # Specification BT 4.2 Vol 3 Part G 3.3.1. Characteristic Properties.
+  type CharacteristicProperties extends object
+    properties
+      optional boolean broadcast
+      optional boolean read
+      optional boolean writeWithoutResponse
+      optional boolean write
+      optional boolean notify
+      optional boolean indicate
+      optional boolean authenticatedSignedWrites
+      optional boolean extendedProperties
 
   # Enable the BluetoothEmulation domain.
   command enable
@@ -13261,3 +13320,78 @@ experimental domain BluetoothEmulation
   command simulateAdvertisement
     parameters
       ScanEntry entry
+
+  # Simulates the response code from the peripheral with |address| for a
+  # GATT operation of |type|. The |code| value follows the HCI Error Codes from
+  # Bluetooth Core Specification Vol 2 Part D 1.3 List Of Error Codes.
+  command simulateGATTOperationResponse
+    parameters
+      string address
+      GATTOperationType type
+      integer code
+
+  # Adds a service with |serviceUuid| to the peripheral with |address|.
+  command addService
+    parameters
+      string address
+      string serviceUuid
+    returns
+      # An identifier that uniquely represents this service.
+      string serviceId
+
+  # Removes the service respresented by |serviceId| from the peripheral with
+  # |address|.
+  command removeService
+    parameters
+      string address
+      string serviceId
+
+  # Adds a characteristic with |characteristicUuid| and |properties| to the
+  # service represented by |serviceId| in the peripheral with |address|.
+  command addCharacteristic
+    parameters
+      string address
+      string serviceId
+      string characteristicUuid
+      CharacteristicProperties properties
+    returns
+      # An identifier that uniquely represents this characteristic.
+      string characteristicId
+
+  # Removes the characteristic respresented by |characteristicId| from the
+  # service respresented by |serviceId| in the peripheral with |address|.
+  command removeCharacteristic
+    parameters
+      string address
+      string serviceId
+      string characteristicId
+
+  # Adds a descriptor with |descriptorUuid| to the characteristic respresented
+  # by |characteristicId| in the service represented by |serviceId| of the
+  # peripheral with |address|.
+  command addDescriptor
+    parameters
+      string address
+      string serviceId
+      string characteristicId
+      string descriptorUuid
+    returns
+      # An identifier that uniquely represents this descriptor.
+      string descriptorId
+
+  # Removes the descriptor with |descriptorId| from the characteristic
+  # respresented by |characteristicId| in the service represented by |serviceId|
+  # of the peripheral with |address|.
+  command removeDescriptor
+    parameters
+      string address
+      string serviceId
+      string characteristicId
+      string descriptorId
+
+  # Event for when a GATT operation of |type| to the peripheral with |address|
+  # happened.
+  event gattOperationReceived
+    parameters
+      string address
+      GATTOperationType type

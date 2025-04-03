@@ -1,6 +1,7 @@
 // Copyright (c) 2016 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import './Toolbar.js';
 
@@ -109,10 +110,10 @@ export class ReportView extends VBox {
 
 export class Section extends VBox {
   private readonly headerElement: HTMLElement;
-  private headerButtons: Buttons.Button.Button[];
+  private headerButtons: Buttons.Button.Button[] = [];
   private titleElement: HTMLElement;
   private fieldList: HTMLElement;
-  private readonly fieldMap: Map<string, Element>;
+  private readonly fieldMap = new Map<string, Element>();
   constructor(title: string, className?: string, public jslogContext?: string) {
     super();
     this.element.classList.add('report-section');
@@ -123,13 +124,11 @@ export class Section extends VBox {
       this.element.setAttribute('jslog', `${VisualLogging.section(jslogContext)}`);
     }
     this.jslogContext = jslogContext;
-    this.headerButtons = [];
     this.headerElement = this.element.createChild('div', 'report-section-header');
     this.titleElement = this.headerElement.createChild('div', 'report-section-title');
     this.setTitle(title);
     ARIAUtils.markAsHeading(this.titleElement, 2);
     this.fieldList = this.element.createChild('div', 'vbox');
-    this.fieldMap = new Map();
   }
 
   title(): string {

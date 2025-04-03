@@ -1,6 +1,7 @@
 // Copyright 2021 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Protocol from '../../generated/protocol.js';
@@ -87,9 +88,9 @@ export class InterestGroupStorageView extends UI.SplitWidget.SplitWidget {
 
   override wasShown(): void {
     super.wasShown();
-    const sbw = this.sidebarWidget();
-    if (sbw) {
-      sbw.registerRequiredCSS(interestGroupStorageViewStyles);
+    const mainWidget = this.mainWidget();
+    if (mainWidget) {
+      mainWidget.registerRequiredCSS(interestGroupStorageViewStyles);
     }
   }
 

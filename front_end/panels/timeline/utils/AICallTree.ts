@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Root from '../../../core/root/root.js';
 import * as Trace from '../../../models/trace/trace.js';
 
 import {nameForEntry} from './EntryName.js';
@@ -109,8 +110,8 @@ export class AICallTree {
       return null;
     }
 
+    const allEventsEnabled = Root.Runtime.experiments.isEnabled('timeline-show-all-events');
     const {startTime, endTime} = Trace.Helpers.Timing.eventTimingsMilliSeconds(selectedEvent);
-
     const selectedEventBounds = Trace.Helpers.Timing.traceWindowFromMicroSeconds(
         Trace.Helpers.Timing.milliToMicro(startTime), Trace.Helpers.Timing.milliToMicro(endTime));
     let threadEvents = parsedTrace.Renderer.processes.get(selectedEvent.pid)?.threads.get(selectedEvent.tid)?.entries;
@@ -125,13 +126,19 @@ export class AICallTree {
     }
     const overlappingEvents = threadEvents.filter(e => Trace.Helpers.Timing.eventIsInBounds(e, selectedEventBounds));
 
-    const visibleEventsFilter = new Trace.Extras.TraceFilter.VisibleEventsFilter(visibleTypes());
-    const customFilter = new SelectedEventDurationFilter(selectedEvent);
-    const compileCodeFilter = new ExcludeCompileCodeFilter(selectedEvent);
-    // Build a tree bounded by the selected event's timestamps, and our other filters applied
+    const filters: Trace.Extras.TraceFilter.TraceFilter[] =
+        [new SelectedEventDurationFilter(selectedEvent), new ExcludeCompileCodeFilter(selectedEvent)];
 
+    // If the "Show all events" experiment is on, we don't filter out any
+    // events here, otherwise the generated call tree will not match what the
+    // user is seeing.
+    if (!allEventsEnabled) {
+      filters.push(new Trace.Extras.TraceFilter.VisibleEventsFilter(visibleTypes()));
+    }
+
+    // Build a tree bounded by the selected event's timestamps, and our other filters applied
     const rootNode = new Trace.Extras.TraceTree.TopDownRootNode(overlappingEvents, {
-      filters: [compileCodeFilter, visibleEventsFilter, customFilter],
+      filters,
       startTime,
       endTime,
       includeInstantEvents: true,
@@ -225,7 +232,7 @@ export class AICallTree {
     // eslint-disable-next-line no-console
     console.log('🎆', str);
     if (str.length > 45_000) {
-      // Manual testing shows 45k fits. 50k doesnt.
+      // Manual testing shows 45k fits. 50k doesn't.
       // Max is 32k _tokens_, but tokens to bytes is wishywashy, so... hard to know for sure.
       console.warn('Output will likely not fit in the context window. Expect an AIDA error.');
     }

@@ -1,6 +1,7 @@
 // Copyright 2016 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -273,6 +274,9 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
         networkProvider: this.networkDataProvider,
       },
       entryQueries: {
+        parsedTrace: () => {
+          return this.#parsedTrace;
+        },
         isEntryCollapsedByUser: (entry: Trace.Types.Events.Event): boolean => {
           return ModificationsManager.activeManager()?.getEntriesFilter().entryIsInvisible(entry) ?? false;
         },
@@ -281,6 +285,18 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
               null;
         },
       },
+    });
+
+    this.#overlays.addEventListener(Overlays.Overlays.ConsentDialogVisibilityChange.eventName, e => {
+      const event = e as Overlays.Overlays.ConsentDialogVisibilityChange;
+      if (event.isVisible) {
+        // If the dialog is visible, we do not want anything in the performance
+        // panel capturing tab focus.
+        // https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/inert
+        this.element.setAttribute('inert', 'inert');
+      } else {
+        this.element.removeAttribute('inert');
+      }
     });
 
     this.#overlays.addEventListener(Overlays.Overlays.EntryLabelMouseClick.eventName, event => {
@@ -374,17 +390,25 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
       this.#overlays.toggleAllOverlaysDisplayed(!event.data);
     });
 
-    this.detailsView.addEventListener(TimelineTreeView.Events.TREE_ROW_HOVERED, node => {
+    this.detailsView.addEventListener(TimelineTreeView.Events.TREE_ROW_HOVERED, e => {
       if (!Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_DIM_UNRELATED_EVENTS)) {
         return;
       }
 
-      const events = node?.data?.events ?? null;
+      if (e.data.events) {
+        this.#updateFlameChartDimmerWithEvents(this.#treeRowHoverDimmer, e.data.events);
+        return;
+      }
+      const events = e?.data?.node?.events ?? null;
       this.#updateFlameChartDimmerWithEvents(this.#treeRowHoverDimmer, events);
     });
 
-    this.detailsView.addEventListener(TimelineTreeView.Events.TREE_ROW_CLICKED, node => {
-      const events = node?.data?.events ?? null;
+    this.detailsView.addEventListener(TimelineTreeView.Events.TREE_ROW_CLICKED, e => {
+      if (e.data.events) {
+        this.#updateFlameChartDimmerWithEvents(this.#treeRowClickDimmer, e.data.events);
+        return;
+      }
+      const events = e?.data?.node?.events ?? null;
       this.#updateFlameChartDimmerWithEvents(this.#treeRowClickDimmer, events);
     });
 
@@ -392,7 +416,7 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
      * NOTE: ENTRY_SELECTED, ENTRY_INVOKED and ENTRY_HOVERED are not always super obvious:
      * ENTRY_SELECTED: is KEYBOARD ONLY selection of events (e.g. navigating through the flamechart with your arrow keys)
      * ENTRY_HOVERED: is MOUSE ONLY when an event is hovered over with the mouse.
-     * ENTRY_INVOKED: is when the user cilcks on an event, or hits the "enter" key whilst an event is selected.
+     * ENTRY_INVOKED: is when the user clicks on an event, or hits the "enter" key whilst an event is selected.
      */
     this.onMainEntrySelected = this.onEntrySelected.bind(this, this.mainDataProvider);
     this.onNetworkEntrySelected = this.onEntrySelected.bind(this, this.networkDataProvider);
@@ -1178,6 +1202,7 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
     this.resizeToPreferredHeights();
     this.setMarkers(this.#parsedTrace);
     this.dimThirdPartiesIfRequired();
+    ModificationsManager.activeManager()?.applyAnnotationsFromCache();
   }
 
   setInsights(
@@ -1428,11 +1453,17 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
     // Note that we do not change the Context back to `null` if the user picks
     // an invalid event - we don't want to reset it back as it may be they are
     // clicking around in order to understand something.
+    // We also do this in a rAF to not block the UI updating to show the selected event first.
     if (selectionIsEvent(selection) && this.#parsedTrace) {
-      const aiCallTree = Utils.AICallTree.AICallTree.fromEvent(selection.event, this.#parsedTrace);
-      if (aiCallTree) {
-        UI.Context.Context.instance().setFlavor(Utils.AICallTree.AICallTree, aiCallTree);
-      }
+      requestAnimationFrame(() => {
+        if (!this.#parsedTrace) {
+          return;
+        }
+        const aiCallTree = Utils.AICallTree.AICallTree.fromEvent(selection.event, this.#parsedTrace);
+        if (aiCallTree) {
+          UI.Context.Context.instance().setFlavor(Utils.AICallTree.AICallTree, aiCallTree);
+        }
+      });
     }
   }
 

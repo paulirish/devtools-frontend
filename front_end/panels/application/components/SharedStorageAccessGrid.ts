@@ -1,6 +1,7 @@
 // Copyright 2022 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import '../../../ui/legacy/components/data_grid/data_grid.js';
 
@@ -37,15 +38,26 @@ const UIStrings = {
   eventTime: 'Event Time',
   /**
    *@description Text in Shared Storage Events View of the Application panel
-   * Type of shared storage event such as 'documentAddModule', 'documentRun',
-   * 'documentSet', 'workletDelete', or 'workletGet'.
+   * Scope of shared storage event such as 'window', 'sharedStorageWorklet',
+   * 'protectedAudienceWorklet', or 'header'.
    */
-  eventType: 'Access Type',
+  eventScope: 'Access Scope',
+  /**
+   *@description Text in Shared Storage Events View of the Application panel
+   * Method of shared storage event such as 'addModule', 'run', 'set', 'delete',
+   * or 'get'.
+   */
+  eventMethod: 'Access Method',
   /**
    *@description Text in Shared Storage Events View of the Application panel
    * Owner origin of the shared storage for this access event.
    */
   ownerOrigin: 'Owner Origin',
+  /**
+   *@description Text in Shared Storage Events View of the Application panel
+   * Owner site of the shared storage for this access event.
+   */
+  ownerSite: 'Owner Site',
   /**
    *@description Text in Shared Storage Events View of the Application panel
    * Event parameters whose presence/absence depend on the access type.
@@ -125,11 +137,17 @@ export class SharedStorageAccessGrid extends HTMLElement {
               <th id="event-time" weight="10" sortable>
                 ${i18nString(UIStrings.eventTime)}
               </th>
-              <th id="event-type" weight="10" sortable>
-                ${i18nString(UIStrings.eventType)}
+              <th id="event-scope" weight="10" sortable>
+                ${i18nString(UIStrings.eventScope)}
+              </th>
+              <th id="event-method" weight="10" sortable>
+                ${i18nString(UIStrings.eventMethod)}
               </th>
               <th id="event-owner-origin" weight="10" sortable>
                 ${i18nString(UIStrings.ownerOrigin)}
+              </th>
+              <th id="event-owner-site" weight="10" sortable>
+                ${i18nString(UIStrings.ownerSite)}
               </th>
               <th id="event-params" weight="10" sortable>
                 ${i18nString(UIStrings.eventParams)}
@@ -143,8 +161,10 @@ export class SharedStorageAccessGrid extends HTMLElement {
             new Date(1e3 * event.accessTime)
                 .toLocaleString()}
                 </td>
-                <td>${event.type}</td>
+                <td>${event.scope}</td>
+                <td>${event.method}</td>
                 <td>${event.ownerOrigin}</td>
+                <td>${event.ownerSite}</td>
                 <td>${JSON.stringify(event.params)}</td>
               </tr>
             `)}

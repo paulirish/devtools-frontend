@@ -1,6 +1,7 @@
 // Copyright 2021 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 /*
  * Copyright (C) 2007, 2008 Apple Inc.  All rights reserved.
@@ -1288,15 +1289,15 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
       this.summaryToolbarInternal.appendSeparator();
       appendChunk(
           i18nString(UIStrings.sSTransferred, {
-            PH1: i18n.ByteUtilities.bytesToString(selectedTransferSize),
-            PH2: i18n.ByteUtilities.bytesToString(transferSize),
+            PH1: i18n.ByteUtilities.formatBytesToKb(selectedTransferSize),
+            PH2: i18n.ByteUtilities.formatBytesToKb(transferSize),
           }),
           i18nString(UIStrings.sBSBTransferredOverNetwork, {PH1: selectedTransferSize, PH2: transferSize}));
       this.summaryToolbarInternal.appendSeparator();
       appendChunk(
           i18nString(UIStrings.sSResources, {
-            PH1: i18n.ByteUtilities.bytesToString(selectedResourceSize),
-            PH2: i18n.ByteUtilities.bytesToString(resourceSize),
+            PH1: i18n.ByteUtilities.formatBytesToKb(selectedResourceSize),
+            PH2: i18n.ByteUtilities.formatBytesToKb(resourceSize),
           }),
           i18nString(UIStrings.sBSBResourcesLoadedByThePage, {PH1: selectedResourceSize, PH2: resourceSize}));
     } else {

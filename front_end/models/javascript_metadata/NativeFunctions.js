@@ -112,11 +112,6 @@ export const NativeFunctions = [
     receivers: ["CookieStore"]
   },
   {
-    name: "get",
-    signatures: [["instrumentKey"]],
-    receivers: ["PaymentInstruments"]
-  },
-  {
     name: "set",
     signatures: [["v"]],
     receivers: ["PropertyDescriptor"]
@@ -172,11 +167,6 @@ export const NativeFunctions = [
     receivers: ["CookieStore"]
   },
   {
-    name: "set",
-    signatures: [["instrumentKey","details"]],
-    receivers: ["PaymentInstruments"]
-  },
-  {
     name: "toLocaleString",
     signatures: [["?locales","?options"]],
     receivers: ["Date","ReadonlyArray","Array","Int8Array","Uint8Array","Uint8ClampedArray","Int16Array","Uint16Array","Int32Array","Uint32Array","Float32Array","Float64Array","Number","Float16Array","BigInt","BigInt64Array","BigUint64Array"]
@@ -225,12 +215,7 @@ export const NativeFunctions = [
   {
     name: "create",
     signatures: [["?options"]],
-    receivers: ["CredentialsContainer","AILanguageModelFactory","AIRewriterFactory","AISummarizerFactory","AIWriterFactory","AILanguageDetectorFactory"]
-  },
-  {
-    name: "create",
-    signatures: [["options"]],
-    receivers: ["AITranslatorFactory"]
+    receivers: ["CredentialsContainer","LanguageModelFactory"]
   },
   {
     name: "defineProperty",
@@ -1587,11 +1572,6 @@ export const NativeFunctions = [
     receivers: ["CookieStore"]
   },
   {
-    name: "delete",
-    signatures: [["instrumentKey"]],
-    receivers: ["PaymentInstruments"]
-  },
-  {
     name: "matchAll",
     signatures: [["?request","?options"]],
     receivers: ["Cache","BackgroundFetchRegistration"]
@@ -1660,11 +1640,6 @@ export const NativeFunctions = [
     name: "has",
     signatures: [["value"]],
     receivers: ["Set","ReadonlySet","WeakSet","ReadonlySetLike"]
-  },
-  {
-    name: "has",
-    signatures: [["instrumentKey"]],
-    receivers: ["PaymentInstruments"]
   },
   {
     name: "open",
@@ -3849,7 +3824,7 @@ export const NativeFunctions = [
   {
     name: "removeItem",
     signatures: [["index"]],
-    receivers: ["SVGLengthList","SVGNumberList","SVGPointList","SVGStringList","SVGTransformList"]
+    receivers: ["SVGLengthList","SVGNumberList","SVGPointList","SVGStringList","SVGTransformList","SpeechRecognitionPhraseList"]
   },
   {
     name: "removeItem",
@@ -6794,7 +6769,7 @@ export const NativeFunctions = [
   {
     name: "redirect",
     signatures: [["url"]],
-    receivers: ["NavigateEvent"]
+    receivers: ["NavigationPrecommitController"]
   },
   {
     name: "Blob",
@@ -6978,6 +6953,10 @@ export const NativeFunctions = [
   {
     name: "SubmitEvent",
     signatures: [["type","?eventInitDict"]]
+  },
+  {
+    name: "isTypeSupported",
+    signatures: [["type"]]
   },
   {
     name: "TrackEvent",
@@ -7317,23 +7296,7 @@ export const NativeFunctions = [
   },
   {
     name: "availability",
-    signatures: [["?options"]],
-    receivers: ["AILanguageModelFactory","AIRewriterFactory","AISummarizerFactory","AIWriterFactory"]
-  },
-  {
-    name: "availability",
-    signatures: [["options"]],
-    receivers: ["AITranslatorFactory"]
-  },
-  {
-    name: "detect",
-    signatures: [["input","?options"]],
-    receivers: ["AILanguageDetector"]
-  },
-  {
-    name: "detect",
-    signatures: [["image"]],
-    receivers: ["BarcodeDetector","FaceDetector","TextDetector"]
+    signatures: [["?options"]]
   },
   {
     name: "registerAnimator",
@@ -7793,10 +7756,6 @@ export const NativeFunctions = [
   {
     name: "MediaRecorder",
     signatures: [["stream","?options"]]
-  },
-  {
-    name: "isTypeSupported",
-    signatures: [["type"]]
   },
   {
     name: "MediaMetadata",
@@ -8471,12 +8430,20 @@ export const NativeFunctions = [
     signatures: [["?barcodeDetectorOptions"]]
   },
   {
+    name: "detect",
+    signatures: [["image"]]
+  },
+  {
     name: "FaceDetector",
     signatures: [["?faceDetectorOptions"]]
   },
   {
     name: "contributeToHistogram",
     signatures: [["contribution"]]
+  },
+  {
+    name: "contributeToHistogramOnEvent",
+    signatures: [["event","contribution"]]
   },
   {
     name: "enableDebugMode",
@@ -8547,16 +8514,16 @@ export const NativeFunctions = [
     signatures: [["type","?initDict"]]
   },
   {
+    name: "SpeechRecognitionPhraseList",
+    signatures: [["phrases"]]
+  },
+  {
     name: "addItem",
     signatures: [["item"]]
   },
   {
     name: "SpeechRecognitionPhrase",
     signatures: [["phrase","?boost"]]
-  },
-  {
-    name: "updateContext",
-    signatures: [["context"]]
   },
   {
     name: "availableOnDevice",
@@ -8868,7 +8835,7 @@ export const NativeFunctions = [
   },
   {
     name: "copyBufferToBuffer",
-    signatures: [["src","srcOffset","dst","dstOffset","size"]]
+    signatures: [["source","destination","?size"],["source","sourceOffset","destination","destinationOffset","?size"]]
   },
   {
     name: "copyBufferToTexture",

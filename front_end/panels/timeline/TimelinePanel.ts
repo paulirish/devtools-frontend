@@ -1,6 +1,7 @@
 // Copyright 2021 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 /*
  * Copyright (C) 2012 Google Inc. All rights reserved.
@@ -61,7 +62,6 @@ import * as AnnotationHelpers from './AnnotationHelpers.js';
 import {TraceLoadEvent} from './BenchmarkEvents.js';
 import * as TimelineComponents from './components/components.js';
 import * as TimelineInsights from './components/insights/insights.js';
-import {SHOULD_SHOW_EASTER_EGG} from './EasterEgg.js';
 import {Tracker} from './FreshRecording.js';
 import {IsolateSelector} from './IsolateSelector.js';
 import {AnnotationModifiedEvent, ModificationsManager} from './ModificationsManager.js';
@@ -79,6 +79,7 @@ import {
   rangeForSelection,
   selectionFromEvent,
   selectionIsRange,
+  selectionsEqual,
   type TimelineSelection,
 } from './TimelineSelection.js';
 import timelineStatusDialogStyles from './timelineStatusDialog.css.js';
@@ -316,21 +317,13 @@ const UIStrings = {
    */
   backToLiveMetrics: 'Go back to the live metrics page',
   /**
-   * @description Description of the Timeline up/down scroll action that appears in the Performance panel shortcuts dialog.
+   * @description Description of the Timeline zoom keyboard instructions that appear in the shortcuts dialog
    */
-  timelineScrollUpDown: 'Move up/down',
+  timelineZoom: 'Zoom',
   /**
-   * @description Description of the Timeline left/right panning action that appears in the Performance panel shortcuts dialog.
+   * @description Description of the Timeline scrolling & panning instructions that appear in the shortcuts dialog.
    */
-  timelinePanLeftRight: 'Move left/right',
-  /**
-   * @description Description of the Timeline in/out zoom action that appears in the Performance panel shortcuts dialog.
-   */
-  timelineZoomInOut: 'Zoom in/out',
-  /**
-   * @description Description of the Timeline fast in/out zoom action that appears in the Performance panel shortcuts dialog.
-   */
-  timelineFastZoomInOut: 'Fast zoom in/out',
+  timelineScrollPan: 'Scroll & Pan',
   /**
    * @description Title for the Dim 3rd Parties checkbox.
    */
@@ -339,6 +332,10 @@ const UIStrings = {
    * @description Description for the Dim 3rd Parties checkbox tooltip describing how 3rd parties are classified.
    */
   thirdPartiesByThirdPartyWeb: '3rd parties classified by third-party-web',
+  /**
+   * @description Title of the shortcuts dialog shown to the user that lists keyboard shortcuts.
+   */
+  shortcutsDialogTitle: 'Keyboard shortcuts for flamechart'
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/TimelinePanel.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -413,8 +410,6 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   private controller!: TimelineController|null;
   private cpuProfiler!: SDK.CPUProfilerModel.CPUProfilerModel|null;
   private clearButton!: UI.Toolbar.ToolbarButton;
-  private brickBreakerToolbarButton: UI.Toolbar.ToolbarButton;
-  private brickBreakerToolbarButtonAdded = false;
   private loadButton!: UI.Toolbar.ToolbarButton;
   private saveButton!: UI.Toolbar.ToolbarButton|UI.Toolbar.ToolbarMenuButton;
   private homeButton?: UI.Toolbar.ToolbarButton;
@@ -438,7 +433,6 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   #sourceMapsResolver: Utils.SourceMapsResolver.SourceMapsResolver|null = null;
   #entityMapper: Utils.EntityMapper.EntityMapper|null = null;
   #onSourceMapsNodeNamesResolvedBound = this.#onSourceMapsNodeNamesResolved.bind(this);
-  readonly #onChartPlayableStateChangeBound: (event: Common.EventTarget.EventTargetEvent<boolean>) => void;
   #sidebarToggleButton = this.#splitWidget.createShowHideSidebarButton(
       i18nString(UIStrings.showSidebar),
       i18nString(UIStrings.hideSidebar),
@@ -483,10 +477,10 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
    * Navigation radio buttons located in the shortcuts dialog.
    */
   #navigationRadioButtons = document.createElement('form');
-  #modernNavRadioButton =
-      UI.UIUtils.createRadioButton('flamechart-selected-navigation', 'Modern', 'timeline.select-modern-navigation');
-  #classicNavRadioButton =
-      UI.UIUtils.createRadioButton('flamechart-selected-navigation', 'Classic', 'timeline.select-classic-navigation');
+  #modernNavRadioButton = UI.UIUtils.createRadioButton(
+      'flamechart-selected-navigation', 'Modern - normal scrolling', 'timeline.select-modern-navigation');
+  #classicNavRadioButton = UI.UIUtils.createRadioButton(
+      'flamechart-selected-navigation', 'Classic - scroll to zoom', 'timeline.select-classic-navigation');
 
   #onMainEntryHovered: (event: Common.EventTarget.EventTargetEvent<number>) => void;
 
@@ -507,10 +501,6 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       name: i18nString(UIStrings.fixMe),
       content: adornerContent,
     };
-    this.brickBreakerToolbarButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.fixMe), adorner);
-    this.brickBreakerToolbarButton.addEventListener(
-        UI.Toolbar.ToolbarButton.Events.CLICK, () => this.#onBrickBreakerEasterEggClick());
-
     this.#traceEngineModel = traceModel || this.#instantiateNewModel();
     this.#listenForProcessingProgress();
 
@@ -591,12 +581,8 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         SDK.ResourceTreeModel.ResourceTreeModel, SDK.ResourceTreeModel.Events.Load, this.loadEventFired, this);
 
     this.flameChart = new TimelineFlameChartView(this);
-    this.#onChartPlayableStateChangeBound = this.#onChartPlayableStateChange.bind(this);
     this.element.addEventListener(
         'toggle-popover', event => this.flameChart.togglePopover((event as CustomEvent).detail));
-
-    this.flameChart.getMainFlameChart().addEventListener(
-        PerfUI.FlameChart.Events.CHART_PLAYABLE_STATE_CHANGED, this.#onChartPlayableStateChangeBound, this);
 
     this.#onMainEntryHovered = this.#onEntryHovered.bind(this, this.flameChart.getMainDataProvider());
     this.flameChart.getMainFlameChart().addEventListener(
@@ -644,21 +630,25 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
 
       // Open the summary panel for the 3p insight.
       if (model.insightKey === Trace.Insights.Types.InsightKeys.THIRD_PARTIES) {
-        this.#openSummaryTab();
+        void window.scheduler.postTask(() => {
+          this.#openSummaryTab();
+        }, {priority: 'background'});
       }
     });
 
     this.#sideBar.element.addEventListener(TimelineInsights.SidebarInsight.InsightProvideOverlays.eventName, event => {
       const {overlays, options} = event;
 
-      this.flameChart.setOverlays(overlays, options);
+      void window.scheduler.postTask(() => {
+        this.flameChart.setOverlays(overlays, options);
 
-      const overlaysBounds = Overlays.Overlays.traceWindowContainingOverlays(overlays);
-      if (overlaysBounds) {
-        this.#minimapComponent.highlightBounds(overlaysBounds, /* withBracket */ true);
-      } else {
-        this.#minimapComponent.clearBoundsHighlight();
-      }
+        const overlaysBounds = Overlays.Overlays.traceWindowContainingOverlays(overlays);
+        if (overlaysBounds) {
+          this.#minimapComponent.highlightBounds(overlaysBounds, /* withBracket */ true);
+        } else {
+          this.#minimapComponent.clearBoundsHighlight();
+        }
+      }, {priority: 'user-visible'});
     });
 
     this.#sideBar.contentElement.addEventListener(TimelineInsights.EventRef.EventReferenceClick.eventName, event => {
@@ -929,10 +919,6 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         // Whilst we don't reset this, we hide it, mainly so the user cannot
         // hit Ctrl/Cmd-F and try to search when it isn't visible.
         this.searchableViewInternal.hideWidget();
-
-        // Hide the brick-breaker easter egg
-        this.brickBreakerToolbarButtonAdded = false;
-        this.panelToolbar.removeToolbarItem(this.brickBreakerToolbarButton);
         return;
       }
 
@@ -1002,22 +988,6 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       throw new Error('No trace engine data found.');
     }
     return data;
-  }
-
-  #onChartPlayableStateChange(event: Common.EventTarget.EventTargetEvent<boolean, unknown>): void {
-    if (event.data) {
-      const dateObj = new Date();
-      const month = dateObj.getUTCMonth() + 1;
-      const day = dateObj.getUTCDate();
-      const isAprilFools = (month === 4 && (day === 1 || day === 2));  // Show only on April fools and the next day
-      if (isAprilFools && !this.brickBreakerToolbarButtonAdded && SHOULD_SHOW_EASTER_EGG) {
-        this.brickBreakerToolbarButtonAdded = true;
-        this.panelToolbar.appendToolbarItem(this.brickBreakerToolbarButton);
-      }
-    } else {
-      this.brickBreakerToolbarButtonAdded = false;
-      this.panelToolbar.removeToolbarItem(this.brickBreakerToolbarButton);
-    }
   }
 
   #onEntryHovered(dataProvider: TimelineFlameChartDataProvider, event: Common.EventTarget.EventTargetEvent<number>):
@@ -1206,6 +1176,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     // need to update the radio buttons selection when the dialog is open.
     this.#shortcutsDialog.addEventListener('click', this.#updateNavigationSettingSelection.bind(this));
     this.#shortcutsDialog.data = {
+      customTitle: i18nString(UIStrings.shortcutsDialogTitle),
       shortcuts: this.#getShortcutsInfo(currentNavSetting === 'classic'),
       open: !userHadShortcutsDialogOpenedOnce && hideTheDialogForTests !== 'true' &&
           !Host.InspectorFrontendHost.isUnderTest(),
@@ -1244,29 +1215,54 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   }
 
   #getShortcutsInfo(isNavClassic: boolean): Dialogs.ShortcutDialog.Shortcut[] {
+    const metaKey = Host.Platform.isMac() ? '⌘' : 'Ctrl';
     if (isNavClassic) {
+      // Classic navigation = scroll to zoom.
       return [
-        {title: i18nString(UIStrings.timelineScrollUpDown), bindings: [['Shift', 'Scroll up/down'], ['Shift', '↑/↓']]},
         {
-          title: i18nString(UIStrings.timelinePanLeftRight),
-          bindings: [['Shift', '←/→'], ['Scroll left/right'], ['A/D']]
+          title: i18nString(UIStrings.timelineZoom),
+          rows: [
+            [{key: 'Scroll ↕'}], [{key: 'W'}, {key: 'S'}, {joinText: 'or'}, {key: '+'}, {key: '-'}],
+            {footnote: 'hold shift for fast zoom'}
+          ]
         },
-        {title: i18nString(UIStrings.timelineZoomInOut), bindings: [['Scroll up/down'], ['W/S'], ['+/-']]},
-        {title: i18nString(UIStrings.timelineFastZoomInOut), bindings: [['Shift', 'W/S'], ['Shift', '+/-']]},
+        {
+          title: i18nString(UIStrings.timelineScrollPan),
+          rows: [
+            [{key: 'Shift'}, {joinText: '+'}, {key: 'Scroll ↕'}],
+            [{key: 'Scroll ↔'}, {joinText: 'or'}, {key: 'A'}, {key: 'D'}],
+            [
+              {key: 'Drag'}, {joinText: 'or'}, {key: 'Shift'}, {joinText: '+'}, {key: '↑'}, {key: '↓'}, {key: '←'},
+              {key: '→'}
+            ],
+          ]
+        }
       ];
     }
 
+    // New navigation where scroll = scroll.
     return [
-      {title: i18nString(UIStrings.timelineScrollUpDown), bindings: [['Scroll up/down'], ['Shift', '↑/↓']]},
       {
-        title: i18nString(UIStrings.timelinePanLeftRight),
-        bindings: [['Shift', 'Scroll up/down'], ['Scroll left/right'], ['Shift', '←/→'], ['A/D']],
+        title: i18nString(UIStrings.timelineZoom),
+        rows: [
+          [{key: metaKey}, {joinText: '+'}, {key: 'Scroll ↕'}],
+          [{key: 'W'}, {key: 'S'}, {joinText: 'or'}, {key: '+'}, {key: '-'}], {footnote: ''}
+        ]
       },
       {
-        title: i18nString(UIStrings.timelineZoomInOut),
-        bindings: [[Host.Platform.isMac() ? '⌘' : 'Ctrl', 'Scroll up/down'], ['W/S'], ['+/-']],
-      },
-      {title: i18nString(UIStrings.timelineFastZoomInOut), bindings: [['Shift', 'W/S'], ['Shift', '+/-']]},
+        title: i18nString(UIStrings.timelineScrollPan),
+        rows: [
+          [{key: 'Scroll ↕'}],
+          [
+            {key: 'Shift'}, {joinText: '+'}, {key: 'Scroll ↕'}, {joinText: 'or'}, {key: 'Scroll ↔'}, {joinText: 'or'},
+            {key: 'A'}, {key: 'D'}
+          ],
+          [
+            {key: 'Drag'}, {joinText: 'or'}, {key: 'Shift'}, {joinText: '+'}, {key: '↑'}, {key: '↓'}, {key: '←'},
+            {key: '→'}
+          ],
+        ]
+      }
     ];
   }
 
@@ -1353,7 +1349,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     if (this.flameChart.getMainFlameChart().coordinatesToEntryIndex(mouseEvent.offsetX, mouseEvent.offsetY) !== -1) {
       return;
     }
-    const contextMenu = new UI.ContextMenu.ContextMenu(event, {useSoftMenu: true});
+    const contextMenu = new UI.ContextMenu.ContextMenu(event);
     contextMenu.appendItemsAtLocation('timelineMenu');
     void contextMenu.show();
   }
@@ -1453,7 +1449,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
 
   navigateHistory(direction: number): boolean {
     const recordingData = this.#historyManager.navigate(direction);
-    // When navigating programatically, you cannot navigate to the landing page
+    // When navigating programmatically, you cannot navigate to the landing page
     // view, so we can discount that possibility here.
     if (recordingData && recordingData.type === 'TRACE_INDEX') {
       this.#changeView({
@@ -1492,7 +1488,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     const blob = file.slice(0, maximumTraceFileLengthToDetermineEnhancedTraces);
     const content = await blob.text();
     if (content.includes('enhancedTraceVersion')) {
-      await window.scheduler?.postTask(() => {
+      await window.scheduler.postTask(() => {
         this.#launchRehydratedSession(file);
       }, {priority: 'background'});
     } else {
@@ -1896,13 +1892,6 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
 
   #hasActiveTrace(): boolean {
     return this.#viewMode.mode === 'VIEWING_TRACE';
-  }
-
-  #onBrickBreakerEasterEggClick(): void {
-    if (!this.#hasActiveTrace()) {
-      return;
-    }
-    this.flameChart.runBrickBreakerGame();
   }
 
   #applyActiveFilters(traceIsGeneric: boolean, exclusiveFilter: Trace.Extras.TraceFilter.TraceFilter|null = null):
@@ -2521,7 +2510,11 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     }
 
     return async function resolveSourceMap(params: Trace.Types.Configuration.ResolveSourceMapParams) {
-      const {scriptId, scriptUrl, sourceMapUrl, frame} = params;
+      const {scriptId, scriptUrl, sourceMapUrl, frame, cachedRawSourceMap} = params;
+
+      if (cachedRawSourceMap) {
+        return new SDK.SourceMap.SourceMap(scriptUrl, sourceMapUrl, cachedRawSourceMap);
+      }
 
       // For still-active frames, the source map is likely already fetched or at least in-flight.
       if (isFreshRecording) {
@@ -2693,6 +2686,11 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       UI.ARIAUtils.alert(i18nString(UIStrings.selectionCleared));
     }
     if (newSelection === null) {
+      return;
+    }
+
+    if (oldSelection && selectionsEqual(oldSelection, newSelection)) {
+      // Don't announce to the user if the selection has not changed.
       return;
     }
 

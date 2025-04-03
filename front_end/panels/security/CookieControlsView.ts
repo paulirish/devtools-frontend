@@ -1,6 +1,7 @@
 // Copyright 2024 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import '../../ui/components/switch/switch.js';
 import '../../ui/components/cards/cards.js';
@@ -352,8 +353,6 @@ export class CookieControlsView extends UI.Widget.VBox {
     this.checkGracePeriodActive().catch(error => {
       console.error(error);
     });
-
-    UI.InspectorView.InspectorView.instance().removeDebuggedTabReloadRequiredWarning();
   }
 
   async checkGracePeriodActive(event?: Common.EventTarget.EventTargetEvent<SDK.Resource.Resource>): Promise<void> {

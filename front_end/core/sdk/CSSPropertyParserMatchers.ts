@@ -1,6 +1,7 @@
 // Copyright 2023 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as Common from '../../core/common/common.js';
 import type * as Platform from '../../core/platform/platform.js';
@@ -385,14 +386,14 @@ export class ColorMatcher extends matcherBase(ColorMatch) {
 export class LightDarkColorMatch implements Match {
   constructor(
       readonly text: string, readonly node: CodeMirror.SyntaxNode, readonly light: CodeMirror.SyntaxNode[],
-      readonly dark: CodeMirror.SyntaxNode[], readonly property: CSSProperty) {
+      readonly dark: CodeMirror.SyntaxNode[], readonly style: CSSStyleDeclaration) {
   }
 }
 
 // clang-format off
 export class LightDarkColorMatcher extends matcherBase(LightDarkColorMatch) {
   // clang-format on
-  constructor(readonly property: CSSProperty) {
+  constructor(readonly style: CSSStyleDeclaration) {
     super();
   }
   override accepts(propertyName: string): boolean {
@@ -407,7 +408,7 @@ export class LightDarkColorMatcher extends matcherBase(LightDarkColorMatch) {
     if (args.length !== 2 || args[0].length === 0 || args[1].length === 0) {
       return null;
     }
-    return new LightDarkColorMatch(matching.ast.text(node), node, args[0], args[1], this.property);
+    return new LightDarkColorMatch(matching.ast.text(node), node, args[0], args[1], this.style);
   }
 }
 
@@ -684,10 +685,10 @@ export class LengthMatch implements Match {
 export class LengthMatcher extends matcherBase(LengthMatch) {
   // clang-format on
   static readonly LENGTH_UNITS = new Set([
-    'em',  'ex',    'ch',    'cap',   'ic',  'lh',  'rem', 'rex',   'rch',   'rlh',   'ric',  'rcap', 'pt',
-    'pc',  'in',    'cm',    'mm',    'Q',   'vw',  'vh',  'vi',    'vb',    'vmin',  'vmax', 'dvw',  'dvh',
-    'dvi', 'dvb',   'dvmin', 'dvmax', 'svw', 'svh', 'svi', 'svb',   'svmin', 'svmax', 'lvw',  'lvh',  'lvi',
-    'lvb', 'lvmin', 'lvmax', 'cqw',   'cqh', 'cqi', 'cqb', 'cqmin', 'cqmax', 'cqem',  'cqlh', 'cqex', 'cqch',
+    'em',    'ex',    'ch',  'cap', 'ic',    'lh',    'rem',   'rex',   'rch',  'rlh',  'ric', 'rcap', 'pt',    'pc',
+    'in',    'cm',    'mm',  'Q',   'vw',    'vh',    'vi',    'vb',    'vmin', 'vmax', 'dvw', 'dvh',  'dvi',   'dvb',
+    'dvmin', 'dvmax', 'svw', 'svh', 'svi',   'svb',   'svmin', 'svmax', 'lvw',  'lvh',  'lvi', 'lvb',  'lvmin', 'lvmax',
+    'cqw',   'cqh',   'cqi', 'cqb', 'cqmin', 'cqmax', 'cqem',  'cqlh',  'cqex', 'cqch', '%'
   ]);
   override matches(node: CodeMirror.SyntaxNode, matching: BottomUpTreeMatching): LengthMatch|null {
     if (node.name !== 'NumberLiteral') {

@@ -1,6 +1,7 @@
 // Copyright 2019 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import type * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -177,6 +178,7 @@ export class MainView extends UI.Panel.PanelWithSidebar implements SDK.TargetMan
 
     this.sidebar = new PlayerListView(this);
     this.sidebar.show(this.panelSidebarElement());
+    this.splitWidget().hideSidebar();
 
     this.#placeholder =
         new UI.EmptyWidget.EmptyWidget(i18nString(UIStrings.noMediaPlayer), UIStrings.mediaPlayerDescription);
@@ -317,6 +319,9 @@ export class MainView extends UI.Panel.PanelWithSidebar implements SDK.TargetMan
   }
 
   private playersCreated(event: Common.EventTarget.EventTargetEvent<Protocol.Media.PlayerId[]>): void {
+    if (event.data.length > 0 && this.splitWidget().showMode() !== UI.SplitWidget.ShowMode.BOTH) {
+      this.splitWidget().showBoth();
+    }
     for (const playerID of event.data) {
       this.onPlayerCreated(playerID);
     }
@@ -331,6 +336,12 @@ export class MainView extends UI.Panel.PanelWithSidebar implements SDK.TargetMan
     if (this.detailPanels.size === 0) {
       this.#placeholder.header = i18nString(UIStrings.noMediaPlayer);
       this.#placeholder.text = i18nString(UIStrings.mediaPlayerDescription);
+      this.splitWidget().hideSidebar();
+      const mainWidget = this.splitWidget().mainWidget();
+      if (mainWidget) {
+        mainWidget.detachChildWidgets();
+      }
+      this.#placeholder.show(this.mainElement());
     }
   }
 

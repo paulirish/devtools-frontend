@@ -73,7 +73,7 @@ async function showTrace(
   view.showTrace(
       property, null, matchedStyles, new Map(),
       Elements.StylePropertyTreeElement.getPropertyRenderers(
-          property.ownerStyle, treeElement.parentPane(), matchedStyles, treeElement,
+          property.name, property.ownerStyle, treeElement.parentPane(), matchedStyles, treeElement,
           treeElement.getComputedStyles() ?? new Map()));
   return await viewFunction.nextInput;
 }
@@ -84,13 +84,19 @@ function getLineText(line: Node[][]) {
       renderElementIntoDOM(node, {allowMultipleChildren: true});
     }
   }
-  return line.map(
+  const text = line.map(
       nodes => nodes
                    .map(
                        node =>
                            (node instanceof HTMLElement ? node.innerText :
                                                           (node.nodeType === Node.TEXT_NODE ? node.textContent : '')))
                    .join());
+  for (const node of line.flat()) {
+    if (node instanceof HTMLElement) {
+      node.remove();
+    }
+  }
+  return text;
 }
 
 describeWithMockConnection('CSSValueTraceView', () => {

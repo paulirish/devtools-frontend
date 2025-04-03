@@ -27,6 +27,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as Common from '../../../../core/common/common.js';
 import * as Trace from '../../../../models/trace/trace.js';
@@ -44,16 +45,16 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
   private readonly overviewGrid: OverviewGrid;
   private readonly cursorArea: HTMLElement;
   private cursorElement: HTMLElement;
-  private overviewControls: TimelineOverview[];
-  private markers: Map<number, HTMLDivElement>;
+  private overviewControls: TimelineOverview[] = [];
+  private markers = new Map<number, HTMLDivElement>();
   private readonly overviewInfo: OverviewInfo;
-  private readonly updateThrottler: Common.Throttler.Throttler;
-  private cursorEnabled: boolean;
-  private cursorPosition: number;
-  private lastWidth: number;
-  private windowStartTime: number;
-  private windowEndTime: number;
-  private muteOnWindowChanged: boolean;
+  private readonly updateThrottler = new Common.Throttler.Throttler(100);
+  private cursorEnabled = false;
+  private cursorPosition = 0;
+  private lastWidth = 0;
+  private windowStartTime = 0;
+  private windowEndTime = Infinity;
+  private muteOnWindowChanged = false;
   #dimHighlightSVG: Element;
 
   constructor(prefix: string) {
@@ -74,19 +75,8 @@ export class TimelineOverviewPane extends Common.ObjectWrapper.eventMixin<EventT
     this.overviewGrid.addEventListener(OverviewGridEvents.WINDOW_CHANGED_WITH_POSITION, this.onWindowChanged, this);
     this.overviewGrid.addEventListener(OverviewGridEvents.BREADCRUMB_ADDED, this.onBreadcrumbAdded, this);
     this.overviewGrid.setClickHandler(this.onClick.bind(this));
-    this.overviewControls = [];
-    this.markers = new Map();
 
     this.overviewInfo = new OverviewInfo(this.cursorElement);
-    this.updateThrottler = new Common.Throttler.Throttler(100);
-
-    this.cursorEnabled = false;
-    this.cursorPosition = 0;
-    this.lastWidth = 0;
-
-    this.windowStartTime = 0;
-    this.windowEndTime = Infinity;
-    this.muteOnWindowChanged = false;
 
     this.#dimHighlightSVG = UI.UIUtils.createSVGChild(this.element, 'svg', 'timeline-minimap-dim-highlight-svg hidden');
     this.#initializeDimHighlightSVG();
@@ -534,7 +524,7 @@ export class OverviewInfo {
     this.anchorElement = anchor;
     this.glassPane = new UI.GlassPane.GlassPane();
     this.glassPane.setPointerEventsBehavior(UI.GlassPane.PointerEventsBehavior.PIERCE_CONTENTS);
-    this.glassPane.setMarginBehavior(UI.GlassPane.MarginBehavior.ARROW);
+    this.glassPane.setMarginBehavior(UI.GlassPane.MarginBehavior.DEFAULT_MARGIN);
     this.glassPane.setSizeBehavior(UI.GlassPane.SizeBehavior.MEASURE_CONTENT);
     this.visible = false;
     this.element =

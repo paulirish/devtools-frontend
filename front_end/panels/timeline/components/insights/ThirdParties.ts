@@ -21,68 +21,73 @@ export class ThirdParties extends BaseInsightComponent<ThirdPartiesInsightModel>
   static override readonly litTagName = Lit.StaticHtml.literal`devtools-performance-third-parties`;
   override internalName = 'third-parties';
 
-  #overlaysForEntity = new Map<Trace.Extras.ThirdParties.Entity, Overlays.Overlays.TimelineOverlay[]>();
-
   override createOverlays(): Overlays.Overlays.TimelineOverlay[] {
-    this.#overlaysForEntity.clear();
-
     if (!this.model) {
       return [];
     }
 
     const overlays: Overlays.Overlays.TimelineOverlay[] = [];
-    for (const [entity, events] of this.model.eventsByEntity) {
-      if (entity === this.model.firstPartyEntity) {
+    const summaries = this.model.summaries ?? [];
+    for (const summary of summaries) {
+      if (summary.entity === this.model.firstPartyEntity) {
         continue;
       }
 
-      const overlaysForThisEntity = [];
-      for (const event of events) {
-        const overlay: Overlays.Overlays.TimelineOverlay = {
-          type: 'ENTRY_OUTLINE',
-          entry: event,
-          outlineReason: 'INFO',
-        };
-        overlaysForThisEntity.push(overlay);
-        overlays.push(overlay);
-      }
-
-      this.#overlaysForEntity.set(entity, overlaysForThisEntity);
+      const summaryOverlays = this.#createOverlaysForSummary(summary);
+      overlays.push(...summaryOverlays);
     }
-
     return overlays;
   }
 
-  #mainThreadTimeAggregator:
-      RowLimitAggregator<[Trace.Extras.ThirdParties.Entity, Trace.Extras.ThirdParties.Summary]> = {
-        mapToRow: ([entity, summary]) => ({
-          values: [entity.name, i18n.TimeUtilities.formatMicroSecondsTime(summary.mainThreadTime)],
-          overlays: this.#overlaysForEntity.get(entity),
-        }),
-        createAggregatedTableRow:
-            remaining => {
-              const totalMainThreadTime =
-                  remaining.reduce((acc, [, summary]) => acc + summary.mainThreadTime, 0) as Trace.Types.Timing.Micro;
-              return {
-                values: [
-                  renderOthersLabel(remaining.length), i18n.TimeUtilities.formatMicroSecondsTime(totalMainThreadTime)
-                ],
-                overlays: remaining.flatMap(([entity]) => this.#overlaysForEntity.get(entity) ?? []),
-              };
-            },
-      };
+  #createOverlaysForSummary(summary: Trace.Extras.ThirdParties.Summary): Overlays.Overlays.TimelineOverlay[] {
+    const overlays = [];
+    const events = summary.relatedEvents ?? [];
+    for (const event of events) {
+      // The events found for a third party can be vast, as they gather every
+      // single main thread task along with everything else on the page. If the
+      // main thread is busy with large icicles, we can easily create tens of
+      // thousands of overlays. Therefore, only create overlays for events of at least 1ms.
+      if (event.dur === undefined || event.dur < 1_000) {
+        continue;
+      }
 
-  #transferSizeAggregator: RowLimitAggregator<[Trace.Extras.ThirdParties.Entity, Trace.Extras.ThirdParties.Summary]> = {
-    mapToRow: ([entity, summary]) => ({
-      values: [entity.name, i18n.ByteUtilities.bytesToString(summary.transferSize)],
-      overlays: this.#overlaysForEntity.get(entity),
+      const overlay: Overlays.Overlays.TimelineOverlay = {
+        type: 'ENTRY_OUTLINE',
+        entry: event,
+        outlineReason: 'INFO',
+      };
+      overlays.push(overlay);
+    }
+    return overlays;
+  }
+
+  #mainThreadTimeAggregator: RowLimitAggregator<Trace.Extras.ThirdParties.Summary> = {
+    mapToRow: summary => ({
+      values: [summary.entity.name, i18n.TimeUtilities.millisToString(summary.mainThreadTime)],
+      overlays: this.#createOverlaysForSummary(summary),
     }),
     createAggregatedTableRow:
         remaining => {
-          const totalBytes = remaining.reduce((acc, [, summary]) => acc + summary.transferSize, 0);
+          const totalMainThreadTime = remaining.reduce<Trace.Types.Timing.Milli>(
+              (acc, summary) => Trace.Types.Timing.Milli(acc + summary.mainThreadTime), Trace.Types.Timing.Milli(0));
           return {
-            values: [renderOthersLabel(remaining.length), i18n.ByteUtilities.bytesToString(totalBytes)],
-            overlays: remaining.flatMap(([entity]) => this.#overlaysForEntity.get(entity) ?? []),
+            values: [renderOthersLabel(remaining.length), i18n.TimeUtilities.millisToString(totalMainThreadTime)],
+            overlays: remaining.flatMap(summary => this.#createOverlaysForSummary(summary) ?? []),
+          };
+        },
+  };
+
+  #transferSizeAggregator: RowLimitAggregator<Trace.Extras.ThirdParties.Summary> = {
+    mapToRow: summary => ({
+      values: [summary.entity.name, i18n.ByteUtilities.formatBytesToKb(summary.transferSize)],
+      overlays: this.#createOverlaysForSummary(summary),
+    }),
+    createAggregatedTableRow:
+        remaining => {
+          const totalBytes = remaining.reduce((acc, summary) => acc + summary.transferSize, 0);
+          return {
+            values: [renderOthersLabel(remaining.length), i18n.ByteUtilities.formatBytesToKb(totalBytes)],
+            overlays: remaining.flatMap(summary => this.#createOverlaysForSummary(summary) ?? []),
           };
         },
   };
@@ -92,19 +97,21 @@ export class ThirdParties extends BaseInsightComponent<ThirdPartiesInsightModel>
       return Lit.nothing;
     }
 
-    const entries = [...this.model.summaryByEntity.entries()].filter(kv => kv[0] !== this.model?.firstPartyEntity);
-    if (!entries.length) {
+    let result = this.model.summaries ?? [];
+
+    if (this.model.firstPartyEntity) {
+      result = result.filter(s => s.entity !== this.model?.firstPartyEntity || null);
+    }
+    if (!result.length) {
       return html`<div class="insight-section">${i18nString(UIStrings.noThirdParties)}</div>`;
     }
 
-    const topTransferSizeEntries = entries.toSorted((a, b) => b[1].transferSize - a[1].transferSize);
-    const topMainThreadTimeEntries = entries.toSorted((a, b) => b[1].mainThreadTime - a[1].mainThreadTime);
+    const topTransferSizeEntries = result.toSorted((a, b) => b.transferSize - a.transferSize);
+    const topMainThreadTimeEntries = result.toSorted((a, b) => b.mainThreadTime - a.mainThreadTime);
 
     const sections = [];
-
     if (topTransferSizeEntries.length) {
       const rows = createLimitedRows(topTransferSizeEntries, this.#transferSizeAggregator, MAX_TO_SHOW);
-
       // clang-format off
       sections.push(html`
         <div class="insight-section">
@@ -122,7 +129,6 @@ export class ThirdParties extends BaseInsightComponent<ThirdPartiesInsightModel>
 
     if (topMainThreadTimeEntries.length) {
       const rows = createLimitedRows(topMainThreadTimeEntries, this.#mainThreadTimeAggregator, MAX_TO_SHOW);
-
       // clang-format off
       sections.push(html`
         <div class="insight-section">

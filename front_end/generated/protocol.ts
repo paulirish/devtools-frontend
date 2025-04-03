@@ -1099,6 +1099,7 @@ export namespace Audits {
     ValidationFailedSignatureExpired = 'ValidationFailedSignatureExpired',
     ValidationFailedInvalidLength = 'ValidationFailedInvalidLength',
     ValidationFailedSignatureMismatch = 'ValidationFailedSignatureMismatch',
+    ValidationFailedIntegrityMismatch = 'ValidationFailedIntegrityMismatch',
   }
 
   /**
@@ -1140,6 +1141,8 @@ export namespace Audits {
 
   export interface SRIMessageSignatureIssueDetails {
     error: SRIMessageSignatureError;
+    signatureBase: string;
+    integrityAssertions: string[];
     request: AffectedRequest;
   }
 
@@ -1272,6 +1275,7 @@ export namespace Audits {
     TypeNotMatching = 'TypeNotMatching',
     UiDismissedNoEmbargo = 'UiDismissedNoEmbargo',
     CorsError = 'CorsError',
+    SuppressedBySegmentationPlatform = 'SuppressedBySegmentationPlatform',
   }
 
   export interface FederatedAuthUserInfoRequestIssueDetails {
@@ -6534,6 +6538,7 @@ export namespace Emulation {
     /**
      * If set, the display feature of a multi-segment screen. If not set, multi-segment support
      * is turned-off.
+     * Deprecated, use Emulation.setDisplayFeaturesOverride.
      */
     displayFeature?: DisplayFeature;
     /**
@@ -6546,6 +6551,10 @@ export namespace Emulation {
 
   export interface SetDevicePostureOverrideRequest {
     posture: DevicePosture;
+  }
+
+  export interface SetDisplayFeaturesOverrideRequest {
+    features: DisplayFeature[];
   }
 
   export interface SetScrollbarsHiddenRequest {
@@ -9357,6 +9366,7 @@ export namespace Network {
     NameValuePairExceedsMaxSize = 'NameValuePairExceedsMaxSize',
     PortMismatch = 'PortMismatch',
     SchemeMismatch = 'SchemeMismatch',
+    AnonymousContext = 'AnonymousContext',
   }
 
   /**
@@ -12041,6 +12051,7 @@ export namespace Page {
     InterestCohort = 'interest-cohort',
     JoinAdInterestGroup = 'join-ad-interest-group',
     KeyboardMap = 'keyboard-map',
+    LanguageDetector = 'language-detector',
     LocalFonts = 'local-fonts',
     Magnetometer = 'magnetometer',
     MediaPlaybackWhileNotVisible = 'media-playback-while-not-visible',
@@ -12055,6 +12066,7 @@ export namespace Page {
     PrivateStateTokenRedemption = 'private-state-token-redemption',
     PublickeyCredentialsCreate = 'publickey-credentials-create',
     PublickeyCredentialsGet = 'publickey-credentials-get',
+    Rewriter = 'rewriter',
     RunAdAuction = 'run-ad-auction',
     ScreenWakeLock = 'screen-wake-lock',
     Serial = 'serial',
@@ -12065,7 +12077,9 @@ export namespace Page {
     SpeakerSelection = 'speaker-selection',
     StorageAccess = 'storage-access',
     SubApps = 'sub-apps',
+    Summarizer = 'summarizer',
     SyncXhr = 'sync-xhr',
+    Translator = 'translator',
     Unload = 'unload',
     Usb = 'usb',
     UsbUnrestricted = 'usb-unrestricted',
@@ -12074,6 +12088,7 @@ export namespace Page {
     WebPrinting = 'web-printing',
     WebShare = 'web-share',
     WindowManagement = 'window-management',
+    Writer = 'writer',
     XrSpatialTracking = 'xr-spatial-tracking',
   }
 
@@ -14875,30 +14890,34 @@ export namespace Storage {
   }
 
   /**
-   * Enum of shared storage access types.
+   * Enum of shared storage access scopes.
    */
-  export const enum SharedStorageAccessType {
-    DocumentAddModule = 'documentAddModule',
-    DocumentSelectURL = 'documentSelectURL',
-    DocumentRun = 'documentRun',
-    DocumentSet = 'documentSet',
-    DocumentAppend = 'documentAppend',
-    DocumentDelete = 'documentDelete',
-    DocumentClear = 'documentClear',
-    DocumentGet = 'documentGet',
-    WorkletSet = 'workletSet',
-    WorkletAppend = 'workletAppend',
-    WorkletDelete = 'workletDelete',
-    WorkletClear = 'workletClear',
-    WorkletGet = 'workletGet',
-    WorkletKeys = 'workletKeys',
-    WorkletEntries = 'workletEntries',
-    WorkletLength = 'workletLength',
-    WorkletRemainingBudget = 'workletRemainingBudget',
-    HeaderSet = 'headerSet',
-    HeaderAppend = 'headerAppend',
-    HeaderDelete = 'headerDelete',
-    HeaderClear = 'headerClear',
+  export const enum SharedStorageAccessScope {
+    Window = 'window',
+    SharedStorageWorklet = 'sharedStorageWorklet',
+    ProtectedAudienceWorklet = 'protectedAudienceWorklet',
+    Header = 'header',
+  }
+
+  /**
+   * Enum of shared storage access methods.
+   */
+  export const enum SharedStorageAccessMethod {
+    AddModule = 'addModule',
+    CreateWorklet = 'createWorklet',
+    SelectURL = 'selectURL',
+    Run = 'run',
+    BatchUpdate = 'batchUpdate',
+    Set = 'set',
+    Append = 'append',
+    Delete = 'delete',
+    Clear = 'clear',
+    Get = 'get',
+    Keys = 'keys',
+    Values = 'values',
+    Entries = 'entries',
+    Length = 'length',
+    RemainingBudget = 'remainingBudget',
   }
 
   /**
@@ -15738,17 +15757,25 @@ export namespace Storage {
      */
     accessTime: Network.TimeSinceEpoch;
     /**
+     * Enum value indicating the access scope.
+     */
+    scope: SharedStorageAccessScope;
+    /**
      * Enum value indicating the Shared Storage API method invoked.
      */
-    type: SharedStorageAccessType;
+    method: SharedStorageAccessMethod;
     /**
      * DevTools Frame Token for the primary frame tree's root.
      */
     mainFrameId: Page.FrameId;
     /**
-     * Serialized origin for the context that invoked the Shared Storage API.
+     * Serialization of the origin owning the Shared Storage data.
      */
     ownerOrigin: string;
+    /**
+     * Serialization of the site owning the Shared Storage data.
+     */
+    ownerSite: string;
     /**
      * The sub-parameters wrapped by `params` are all optional and their
      * presence/absence depends on `type`.
@@ -16222,6 +16249,12 @@ export namespace Target {
      * Whether to create the target of type "tab".
      */
     forTab?: boolean;
+    /**
+     * Whether to create a hidden target. The hidden target is observable via protocol, but not
+     * present in the tab UI strip. Cannot be created with `forTab: true`, `newWindow: true` or
+     * `background: false`. The life-time of the tab is limited to the life-time of the session.
+     */
+    hidden?: boolean;
   }
 
   export interface CreateTargetResponse extends ProtocolResponseWithError {
@@ -17945,6 +17978,7 @@ export namespace Preload {
     PrefetchFailedMIMENotSupported = 'PrefetchFailedMIMENotSupported',
     PrefetchFailedNetError = 'PrefetchFailedNetError',
     PrefetchFailedNon2XX = 'PrefetchFailedNon2XX',
+    PrefetchEvictedAfterBrowsingDataRemoved = 'PrefetchEvictedAfterBrowsingDataRemoved',
     PrefetchEvictedAfterCandidateRemoved = 'PrefetchEvictedAfterCandidateRemoved',
     PrefetchEvictedForNewerPrefetch = 'PrefetchEvictedForNewerPrefetch',
     PrefetchHeldback = 'PrefetchHeldback',
@@ -18280,6 +18314,14 @@ export namespace BluetoothEmulation {
   }
 
   /**
+   * Indicates the various types of GATT event.
+   */
+  export const enum GATTOperationType {
+    Connection = 'connection',
+    Discovery = 'discovery',
+  }
+
+  /**
    * Stores the manufacturer data
    */
   export interface ManufacturerData {
@@ -18325,6 +18367,21 @@ export namespace BluetoothEmulation {
     scanRecord: ScanRecord;
   }
 
+  /**
+   * Describes the properties of a characteristic. This follows Bluetooth Core
+   * Specification BT 4.2 Vol 3 Part G 3.3.1. Characteristic Properties.
+   */
+  export interface CharacteristicProperties {
+    broadcast?: boolean;
+    read?: boolean;
+    writeWithoutResponse?: boolean;
+    write?: boolean;
+    notify?: boolean;
+    indicate?: boolean;
+    authenticatedSignedWrites?: boolean;
+    extendedProperties?: boolean;
+  }
+
   export interface EnableRequest {
     /**
      * State of the simulated central.
@@ -18352,6 +18409,79 @@ export namespace BluetoothEmulation {
 
   export interface SimulateAdvertisementRequest {
     entry: ScanEntry;
+  }
+
+  export interface SimulateGATTOperationResponseRequest {
+    address: string;
+    type: GATTOperationType;
+    code: integer;
+  }
+
+  export interface AddServiceRequest {
+    address: string;
+    serviceUuid: string;
+  }
+
+  export interface AddServiceResponse extends ProtocolResponseWithError {
+    /**
+     * An identifier that uniquely represents this service.
+     */
+    serviceId: string;
+  }
+
+  export interface RemoveServiceRequest {
+    address: string;
+    serviceId: string;
+  }
+
+  export interface AddCharacteristicRequest {
+    address: string;
+    serviceId: string;
+    characteristicUuid: string;
+    properties: CharacteristicProperties;
+  }
+
+  export interface AddCharacteristicResponse extends ProtocolResponseWithError {
+    /**
+     * An identifier that uniquely represents this characteristic.
+     */
+    characteristicId: string;
+  }
+
+  export interface RemoveCharacteristicRequest {
+    address: string;
+    serviceId: string;
+    characteristicId: string;
+  }
+
+  export interface AddDescriptorRequest {
+    address: string;
+    serviceId: string;
+    characteristicId: string;
+    descriptorUuid: string;
+  }
+
+  export interface AddDescriptorResponse extends ProtocolResponseWithError {
+    /**
+     * An identifier that uniquely represents this descriptor.
+     */
+    descriptorId: string;
+  }
+
+  export interface RemoveDescriptorRequest {
+    address: string;
+    serviceId: string;
+    characteristicId: string;
+    descriptorId: string;
+  }
+
+  /**
+   * Event for when a GATT operation of |type| to the peripheral with |address|
+   * happened.
+   */
+  export interface GattOperationReceivedEvent {
+    address: string;
+    type: GATTOperationType;
   }
 }
 

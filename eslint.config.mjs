@@ -9,16 +9,10 @@ import eslintPlugin from 'eslint-plugin-eslint-plugin';
 import importPlugin from 'eslint-plugin-import';
 import jsdocPlugin from 'eslint-plugin-jsdoc';
 import mochaPlugin from 'eslint-plugin-mocha';
-import rulesdirPlugin from 'eslint-plugin-rulesdir';
 import globals from 'globals';
 import { join } from 'path';
 
-rulesdirPlugin.RULES_DIR = join(
-  import.meta.dirname,
-  'scripts',
-  'eslint_rules',
-  'lib',
-);
+import rulesdirPlugin from './scripts/eslint_rules/rules-dir.mjs';
 
 /**
  * @type {import('eslint').Linter.Config[]}
@@ -205,7 +199,7 @@ export default [
       radix: 'error',
       'valid-typeof': 'error',
       'no-return-assign': ['error', 'always'],
-      'no-implicit-coercion': 'error',
+      'no-implicit-coercion': ['error', { allow: ['!!'] }],
 
       'no-array-constructor': 'error',
 
@@ -577,6 +571,7 @@ export default [
     rules: {
       'no-console': 'off',
       'rulesdir/es-modules-import': 'off',
+      'import/no-default-export': 'off',
     },
   },
   {
@@ -609,6 +604,8 @@ export default [
           allowIIFEs: true,
         },
       ],
+      'rulesdir/no-imperative-dom-api': 'error',
+      'rulesdir/no-lit-render-outside-of-view': 'error',
       'rulesdir/no-importing-images-from-src': 'error',
       'rulesdir/enforce-bound-render-for-schedule-render': 'error',
       'rulesdir/enforce-custom-event-names': 'error',
@@ -696,6 +693,8 @@ export default [
       'rulesdir/no-assert-deep-strict-equal': 'error',
       'rulesdir/no-assert-equal': 'error',
       'rulesdir/no-assert-equal-boolean-null-undefined': 'error',
+      'rulesdir/no-imperative-dom-api': 'off',
+      'rulesdir/no-lit-render-outside-of-view': 'off',
       'rulesdir/no-screenshot-test-outside-perf-panel': 'error',
       'rulesdir/prefer-assert-instance-of': 'error',
       'rulesdir/prefer-assert-is-ok': 'error',
@@ -795,6 +794,8 @@ export default [
       // We use Lit to help render examples sometimes and we don't use
       // {host: this} as often the `this` is the window.
       'rulesdir/lit-host-this': 'off',
+      'rulesdir/no-imperative-dom-api': 'off',
+      'rulesdir/no-lit-render-outside-of-view': 'off',
     },
   },
   {

@@ -7,6 +7,7 @@ import * as Platform from '../../core/platform/platform.js';
 import * as ProtocolClient from '../../core/protocol_client/protocol_client.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import {findMenuItemWithLabel} from '../../testing/ContextMenuHelpers.js';
+import {assertScreenshot, renderElementIntoDOM} from '../../testing/DOMHelpers.js';
 import {describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
 import {expectCall} from '../../testing/ExpectStubCall.js';
 import {stubFileManager} from '../../testing/FileManagerHelpers.js';
@@ -27,13 +28,18 @@ let jsonEditor!: JSONEditor;
 let sendRawMessageStub!: sinon.SinonStub;
 
 describeWithEnvironment('ProtocolMonitor', () => {
+  let originalSendRawMessage: typeof InspectorBackend.test.sendRawMessage;
   beforeEach(() => {
-    // sendRawMessageStub = sinon.stub(InspectorBackend.test,'sendRawMessage');
     sendRawMessageStub = sinon.stub();
+    originalSendRawMessage = InspectorBackend.test.sendRawMessage;
     InspectorBackend.test.sendRawMessage = sendRawMessageStub;
     jsonEditor = new JSONEditor(document.createElement('div'));
     view = createViewFunctionStub(ProtocolMonitorImpl, {editorWidget: jsonEditor});
     protocolMonitor = new ProtocolMonitorImpl(view);
+  });
+
+  afterEach(() => {
+    InspectorBackend.test.sendRawMessage = originalSendRawMessage;
   });
 
   it('sends commands', async () => {
@@ -44,6 +50,14 @@ describeWithEnvironment('ProtocolMonitor', () => {
     assert.strictEqual(sendRawMessageStub.getCall(0).args[0], 'Test.test');
     assert.deepEqual(sendRawMessageStub.getCall(0).args[1], {test: 'test'});
     assert.deepEqual(sendRawMessageStub.getCall(0).args[3], '');
+  });
+
+  it('includes previous commands into autocomplete', async () => {
+    view.input.onCommandSubmitted(new CustomEvent('submit', {detail: 'Test.test1'}));
+    view.input.onCommandSubmitted(new CustomEvent('submit', {detail: 'Test.test2'}));
+    protocolMonitor.requestUpdate();
+    assert.includeOrderedMembers(
+        (await view.nextInput).commandSuggestions, ['Test.test2', 'Test.test1', 'Accessibility.disable']);
   });
 
   it('records commands', async () => {
@@ -402,5 +416,131 @@ describeWithEnvironment('ProtocolMonitor', () => {
         {text: 'test2'},
       ]);
     });
+  });
+});
+
+describeWithEnvironment('view', () => {
+  let target!: HTMLElement;
+  const view = ProtocolMonitor.ProtocolMonitor.DEFAULT_VIEW;
+
+  beforeEach(async () => {
+    const container = document.createElement('div');
+    renderElementIntoDOM(container);
+    const widget = new UI.Widget.Widget();
+    widget.markAsRoot();
+    widget.show(container);
+    target = widget.element;
+    target.style.display = 'flex';
+    target.style.width = '780px';
+    target.style.height = '400px';
+  });
+
+  it('basic', async () => {
+    const viewInput = {
+      messages: [
+        {
+          id: 1,
+          method: 'Test.test1',
+          result: {result: 'Test1'},
+          params: {test: 'Test'},
+          requestTime: 1,
+          elapsedTime: 2,
+        },
+        {
+          id: 2,
+          method: 'Test.test2',
+          params: {test: 'Test'},
+          requestTime: 1,
+          elapsedTime: 2,
+        },
+        {
+          method: 'Test.test2',
+          result: {test: 'Test'},
+          requestTime: 1,
+          elapsedTime: 2,
+        }
+      ],
+      selectedMessage: undefined,
+      sidebarVisible: false,
+      command: 'Test.test3',
+      commandSuggestions: [],
+      filterKeys: ['method', 'request', 'response', 'target', 'session'],
+      filter: '',
+      parseFilter: (_: string) => [],
+      onSplitChange: (_: CustomEvent<string>) => {},
+      onRecord: (_: Event) => {},
+      onClear: () => {},
+      onSave: () => {},
+      onSelect: (_: CustomEvent<HTMLElement|null>) => {},
+      onContextMenu: (_: CustomEvent<{menu: UI.ContextMenu.ContextMenu, element: HTMLElement}>) => {},
+      onCommandChange: (_: CustomEvent<string>) => {},
+      onCommandSubmitted: (_: CustomEvent<string>) => {},
+      onFilterChanged: (_: CustomEvent<string>) => {},
+      onTargetChange: (_: Event) => {},
+      onToggleSidebar: (_: Event) => {},
+      targets: [],
+      selectedTargetId: 'main',
+    };
+    const viewOutput = {set editorWidget(value: ProtocolMonitor.JSONEditor.JSONEditor) {}};
+
+    view(viewInput, viewOutput, target);
+    await assertScreenshot('protocol_monitor/basic.png');
+  });
+
+  it('advanced', async () => {
+    const messages = [
+      {
+        id: 1,
+        method: 'Test.test1',
+        result: {result: 'Test1'},
+        params: {test: 'Test'},
+        requestTime: 1,
+        elapsedTime: 2,
+      },
+      {
+        id: 2,
+        method: 'Test.test2',
+        params: {test: 'Test'},
+        requestTime: 1,
+        elapsedTime: 2,
+      },
+      {
+        method: 'Test.test3',
+        result: {test: 'Test'},
+        requestTime: 1,
+        elapsedTime: 2,
+      }
+    ];
+
+    const viewInput = {
+      messages,
+      selectedMessage: messages[2],
+      sidebarVisible: false,
+      command: '{"command": "Test.test3"}',
+      commandSuggestions: [],
+      filterKeys: ['method', 'request', 'response', 'target', 'session'],
+      filter: 'method:Test.test3',
+      parseFilter: (_: string) => [{key: 'method', text: 'test3', negative: false}],
+      onSplitChange: (_: CustomEvent<string>) => {},
+      onRecord: (_: Event) => {},
+      onClear: () => {},
+      onSave: () => {},
+      onSelect: (_: CustomEvent<HTMLElement|null>) => {},
+      onContextMenu: (_: CustomEvent<{menu: UI.ContextMenu.ContextMenu, element: HTMLElement}>) => {},
+      onCommandChange: (_: CustomEvent<string>) => {},
+      onCommandSubmitted: (_: CustomEvent<string>) => {},
+      onFilterChanged: (_: CustomEvent<string>) => {},
+      onTargetChange: (_: Event) => {},
+      onToggleSidebar: (_: Event) => {},
+      targets: [
+        {id: () => 'main', name: () => 'Main', inspectedURL: () => 'www.example.com'},
+        {id: () => 'prerender', name: () => 'Prerender', inspectedURL: () => 'www.example.com/prerender'}
+      ] as SDK.Target.Target[],
+      selectedTargetId: 'prerender',
+    };
+    const viewOutput = {set editorWidget(value: ProtocolMonitor.JSONEditor.JSONEditor) {}};
+
+    view(viewInput, viewOutput, target);
+    await assertScreenshot('protocol_monitor/advanced.png');
   });
 });

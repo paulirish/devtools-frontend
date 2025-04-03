@@ -51,16 +51,6 @@ export class UserMetrics {
     }
   }
 
-  panelShownInLocation(panelName: string, location: 'main'|'drawer'): void {
-    const panelWithLocationName = `${panelName}-${location}`;
-    const panelWithLocation = PanelWithLocation[panelWithLocationName as keyof typeof PanelWithLocation] || 0;
-    InspectorFrontendHostInstance.recordEnumeratedHistogram(
-        EnumeratedHistogram.PanelShownInLocation,
-        panelWithLocation,
-        PanelWithLocation.MAX_VALUE,
-    );
-  }
-
   settingsPanelShown(settingsViewId: string): void {
     this.panelShown('settings-' + settingsViewId);
   }
@@ -967,20 +957,16 @@ export enum DevtoolsExperiments {
   'full-accessibility-tree' = 42,
   'contrast-issues' = 44,
   'experimental-cookie-features' = 45,
-  'styles-pane-css-changes' = 55,
   'instrumentation-breakpoints' = 61,
   'authored-deployed-grouping' = 63,
   'just-my-code' = 65,
   'highlight-errors-elements-panel' = 73,
   'use-source-map-scopes' = 76,
   'network-panel-filter-bar-redesign' = 79,
-  'autofill-view' = 82,
   'timeline-show-postmessage-events' = 86,
   'timeline-enhanced-traces' = 90,
   'timeline-compiled-sources' = 91,
   'timeline-debug-mode' = 93,
-  'timeline-server-timings' = 98,
-  'floating-entry-points-for-ai-assistance' = 101,
   'timeline-experimental-insights' = 102,
   'timeline-dim-unrelated-events' = 103,
   'timeline-alternative-navigation' = 104,
@@ -1135,8 +1121,9 @@ export enum IssueCreated {
   'SRIMessageSignatureIssue::ValidationFailedInvalidLength' = 109,
   'SRIMessageSignatureIssue::ValidationFailedSignatureMismatch' = 110,
   'CorsIssue::LocalNetworkAccessPermissionDenied' = 111,
+  'SRIMessageSignatureIssue::ValidationFailedIntegrityMismatch' = 112,
   /* eslint-enable @typescript-eslint/naming-convention */
-  MAX_VALUE = 112,
+  MAX_VALUE = 113,
 }
 
 export const enum DeveloperResourceLoaded {

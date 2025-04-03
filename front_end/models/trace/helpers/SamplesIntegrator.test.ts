@@ -243,7 +243,7 @@ describeWithEnvironment('SamplesIntegrator', function() {
           {id: 5, callFrame: {functionName: 'sheep', scriptId, url, lineNumber, columnNumber}},
         ],
         samples: [3, 3, 3, 5],
-        traceIds: {3: traceId},
+        traceIds: {[traceId]: 5},
         timeDeltas: new Array(4).fill(100),
       };
 
@@ -272,7 +272,7 @@ describeWithEnvironment('SamplesIntegrator', function() {
       const evaluateScript = makeCompleteEvent(Trace.Types.Events.Name.EVALUATE_SCRIPT, 0, 500);
       const v8Run = makeCompleteEvent('v8.run', 10, 490);
       const consoleTimeStamp =
-          makeInstantEvent(Trace.Types.Events.Name.CONSOLE_TIME_STAMP, 350) as Trace.Types.Events.ConsoleTimeStamp;
+          makeInstantEvent(Trace.Types.Events.Name.TIME_STAMP, 350) as Trace.Types.Events.ConsoleTimeStamp;
       consoleTimeStamp.args = {data: {message: 'A timestamp', sampleTraceId: traceId}};
       const traceEvents = [evaluateScript, v8Run, consoleTimeStamp];
       const constructedCalls = integrator.buildProfileCalls(traceEvents);

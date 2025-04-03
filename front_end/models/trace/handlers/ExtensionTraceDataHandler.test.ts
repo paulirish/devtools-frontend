@@ -62,7 +62,7 @@ function makeTimingEventWithConsoleExtensionData({name, ts, start, end, track, t
     cat: 'devtools.timeline',
     pid: Trace.Types.Events.ProcessID(2017),
     tid: Trace.Types.Events.ThreadID(259),
-    name: Trace.Types.Events.Name.CONSOLE_TIME_STAMP,
+    name: Trace.Types.Events.Name.TIME_STAMP,
     args: {
       data: {
         message: name,

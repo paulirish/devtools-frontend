@@ -9,9 +9,33 @@ import {CSSMetadata, cssMetadata, CSSWideKeyword} from './CSSMetadata.js';
 import type {CSSModel} from './CSSModel.js';
 import {CSSProperty} from './CSSProperty.js';
 import * as PropertyParser from './CSSPropertyParser.js';
-import {BaseVariableMatcher} from './CSSPropertyParserMatchers.js';
+import type {Match, Matcher} from './CSSPropertyParser.js';
+import {
+  AnchorFunctionMatcher,
+  AngleMatcher,
+  AutoBaseMatcher,
+  BaseVariableMatcher,
+  BezierMatcher,
+  BinOpMatcher,
+  ColorMatcher,
+  ColorMixMatcher,
+  FlexGridMatcher,
+  GridTemplateMatcher,
+  LengthMatcher,
+  LightDarkColorMatcher,
+  LinearGradientMatcher,
+  LinkableNameMatcher,
+  MathFunctionMatcher,
+  PositionAnchorMatcher,
+  PositionTryMatcher,
+  ShadowMatcher,
+  StringMatcher,
+  URLMatcher,
+  VariableMatcher
+} from './CSSPropertyParserMatchers.js';
 import {
   CSSFontPaletteValuesRule,
+  CSSFunctionRule,
   CSSKeyframesRule,
   CSSPositionTryRule,
   CSSPropertyRule,
@@ -182,6 +206,7 @@ export interface CSSMatchedStylesPayload {
   animationStylesPayload: Protocol.CSS.CSSAnimationStyle[];
   transitionsStylePayload: Protocol.CSS.CSSStyle|null;
   inheritedAnimatedPayload: Protocol.CSS.InheritedAnimatedStyleEntry[];
+  functionRules: Protocol.CSS.CSSFunctionRule[];
 }
 
 export class CSSRegisteredProperty {
@@ -210,6 +235,17 @@ export class CSSRegisteredProperty {
   syntax(): string {
     return this.#registration instanceof CSSPropertyRule ? this.#registration.syntax() :
                                                            `"${this.#registration.syntax}"`;
+  }
+
+  parseValue(matchedStyles: CSSMatchedStyles, computedStyles: Map<string, string>|null):
+      PropertyParser.BottomUpTreeMatching|null {
+    const value = this.initialValue();
+    if (!value) {
+      return null;
+    }
+
+    return PropertyParser.matchDeclaration(
+        this.propertyName(), value, matchedStyles.propertyMatchers(this.style(), computedStyles));
   }
 
   #asCSSProperties(): Protocol.CSS.CSSProperty[] {
@@ -255,6 +291,7 @@ export class CSSMatchedStyles {
   #mainDOMCascade?: DOMInheritanceCascade;
   #pseudoDOMCascades?: Map<Protocol.DOM.PseudoType, DOMInheritanceCascade>;
   #customHighlightPseudoDOMCascades?: Map<string, DOMInheritanceCascade>;
+  #functionRules: CSSFunctionRule[];
   readonly #fontPaletteValuesRule: CSSFontPaletteValuesRule|undefined;
 
   static async create(payload: CSSMatchedStylesPayload): Promise<CSSMatchedStyles> {
@@ -273,6 +310,7 @@ export class CSSMatchedStyles {
     cssPropertyRegistrations,
     fontPaletteValuesRule,
     activePositionFallbackIndex,
+    functionRules,
   }: CSSMatchedStylesPayload) {
     this.#cssModelInternal = cssModel;
     this.#nodeInternal = node;
@@ -289,6 +327,7 @@ export class CSSMatchedStyles {
         fontPaletteValuesRule ? new CSSFontPaletteValuesRule(cssModel, fontPaletteValuesRule) : undefined;
 
     this.#activePositionFallbackIndex = activePositionFallbackIndex;
+    this.#functionRules = functionRules.map(rule => new CSSFunctionRule(cssModel, rule));
   }
 
   private async init({
@@ -725,6 +764,10 @@ export class CSSMatchedStyles {
     return this.#registeredPropertyMap.get(name);
   }
 
+  functionRules(): CSSFunctionRule[] {
+    return this.#functionRules;
+  }
+
   fontPaletteValuesRule(): CSSFontPaletteValuesRule|undefined {
     return this.#fontPaletteValuesRule;
   }
@@ -807,6 +850,31 @@ export class CSSMatchedStyles {
     for (const domCascade of this.#customHighlightPseudoDOMCascades.values()) {
       domCascade.reset();
     }
+  }
+
+  propertyMatchers(style: CSSStyleDeclaration, computedStyles: Map<string, string>|null): Array<Matcher<Match>> {
+    return [
+      new VariableMatcher(this, style),
+      new ColorMatcher(() => computedStyles?.get('color') ?? null),
+      new ColorMixMatcher(),
+      new URLMatcher(),
+      new AngleMatcher(),
+      new LinkableNameMatcher(),
+      new BezierMatcher(),
+      new StringMatcher(),
+      new ShadowMatcher(),
+      new LightDarkColorMatcher(style),
+      new GridTemplateMatcher(),
+      new LinearGradientMatcher(),
+      new AnchorFunctionMatcher(),
+      new PositionAnchorMatcher(),
+      new FlexGridMatcher(),
+      new PositionTryMatcher(),
+      new LengthMatcher(),
+      new MathFunctionMatcher(),
+      new AutoBaseMatcher(),
+      new BinOpMatcher(),
+    ];
   }
 }
 
@@ -989,22 +1057,17 @@ function* forEachInclusive<T>(array: T[], startAt?: T): Generator<T> {
 }
 
 class DOMInheritanceCascade {
+  readonly #propertiesState = new Map<CSSProperty, PropertyState>();
+  readonly #availableCSSVariables = new Map<NodeCascade, Map<string, CSSVariableValue|null>>();
+  readonly #computedCSSVariables = new Map<NodeCascade, Map<string, CSSVariableValue|null>>();
+  readonly #styleToNodeCascade = new Map<CSSStyleDeclaration, NodeCascade>();
+  #initialized = false;
   readonly #nodeCascades: NodeCascade[];
-  readonly #propertiesState: Map<CSSProperty, PropertyState>;
-  readonly #availableCSSVariables: Map<NodeCascade, Map<string, CSSVariableValue|null>>;
-  readonly #computedCSSVariables: Map<NodeCascade, Map<string, CSSVariableValue|null>>;
-  #initialized: boolean;
-  readonly #styleToNodeCascade: Map<CSSStyleDeclaration, NodeCascade>;
   #registeredProperties: CSSRegisteredProperty[];
   constructor(nodeCascades: NodeCascade[], registeredProperties: CSSRegisteredProperty[]) {
     this.#nodeCascades = nodeCascades;
-    this.#propertiesState = new Map();
-    this.#availableCSSVariables = new Map();
-    this.#computedCSSVariables = new Map();
-    this.#initialized = false;
     this.#registeredProperties = registeredProperties;
 
-    this.#styleToNodeCascade = new Map();
     for (const nodeCascade of nodeCascades) {
       for (const style of nodeCascade.styles) {
         this.#styleToNodeCascade.set(style, nodeCascade);

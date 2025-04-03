@@ -67,9 +67,12 @@ describeWithEnvironment('SidebarSingleInsightSet', () => {
       'Font display',
       'Optimize viewport for mobile',
       'Optimize DOM size',
+      'Duplicated JavaScript',
       'CSS Selector costs',
       'Forced reflow',
       'Use efficient cache lifetimes',
+      'Modern HTTP',
+      'Legacy JavaScript',
     ]);
 
     const passedInsightTitles = getPassedInsights(component).flatMap(component => {
@@ -83,9 +86,12 @@ describeWithEnvironment('SidebarSingleInsightSet', () => {
       'Font display',
       'Optimize viewport for mobile',
       'Optimize DOM size',
+      'Duplicated JavaScript',
       'CSS Selector costs',
       'Forced reflow',
       'Use efficient cache lifetimes',
+      'Modern HTTP',
+      'Legacy JavaScript',
     ]);
   });
 
@@ -122,8 +128,11 @@ describeWithEnvironment('SidebarSingleInsightSet', () => {
       'Document request latency',
       'Optimize viewport for mobile',
       'Optimize DOM size',
+      'Duplicated JavaScript',
       'CSS Selector costs',
       'Forced reflow',
+      'Modern HTTP',
+      'Legacy JavaScript',
     ]);
 
     const passedInsightTitles = getPassedInsights(component).flatMap(component => {
@@ -137,8 +146,11 @@ describeWithEnvironment('SidebarSingleInsightSet', () => {
       'Document request latency',
       'Optimize viewport for mobile',
       'Optimize DOM size',
+      'Duplicated JavaScript',
       'CSS Selector costs',
       'Forced reflow',
+      'Modern HTTP',
+      'Legacy JavaScript',
     ]);
   });
 
@@ -180,6 +192,8 @@ describeWithEnvironment('SidebarSingleInsightSet', () => {
       'Duplicated JavaScript',
       'CSS Selector costs',
       'Forced reflow',
+      'Modern HTTP',
+      'Legacy JavaScript',
     ]);
 
     const passedInsightTitles = getPassedInsights(component).flatMap(component => {
@@ -195,6 +209,8 @@ describeWithEnvironment('SidebarSingleInsightSet', () => {
       'Duplicated JavaScript',
       'CSS Selector costs',
       'Forced reflow',
+      'Modern HTTP',
+      'Legacy JavaScript',
     ]);
   });
 

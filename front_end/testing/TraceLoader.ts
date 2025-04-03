@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as SDK from '../core/sdk/sdk.js';
 import type * as Protocol from '../generated/protocol.js';
 import * as Trace from '../models/trace/trace.js';
 import * as Timeline from '../panels/timeline/timeline.js';
@@ -57,7 +58,7 @@ export class TraceLoader {
     if (!context || context.timeout() >= 10_000) {
       return;
     }
-    context?.timeout(10_000);
+    context.timeout(15_000);
   }
 
   /**
@@ -236,7 +237,21 @@ export class TraceLoader {
         }
       });
 
-      void model.parse(events, {metadata, isFreshRecording: emulateFreshRecording}).catch(e => console.error(e));
+      void model
+          .parse(events, {
+            metadata,
+            isFreshRecording: emulateFreshRecording,
+            async resolveSourceMap(params) {
+              const {scriptUrl, sourceMapUrl, cachedRawSourceMap} = params;
+
+              if (cachedRawSourceMap) {
+                return new SDK.SourceMap.SourceMap(scriptUrl, sourceMapUrl, cachedRawSourceMap);
+              }
+
+              return null;
+            },
+          })
+          .catch(e => console.error(e));
     });
   }
 }

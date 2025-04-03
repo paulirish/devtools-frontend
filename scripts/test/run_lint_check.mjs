@@ -15,6 +15,7 @@ import {
   devtoolsRootPath,
   litAnalyzerExecutablePath,
   nodePath,
+  nodeModulesPath,
   tsconfigJsonPath,
 } from '../devtools_paths.js';
 
@@ -268,6 +269,62 @@ function shouldIgnoreFile(path) {
   return false;
 }
 
+async function runEslintRulesTypeCheck(_files) {
+  debugLogging('[lint]: Running EsLint custom rules typechecking...');
+  const tscPath = join(nodeModulesPath(), 'typescript', 'bin', 'tsc');
+  const tsConfigEslintRules = join(
+    devtoolsRootPath(),
+    'scripts',
+    'eslint_rules',
+    'tsconfig.json',
+  );
+  const args = [tscPath, '-b', tsConfigEslintRules];
+  /**
+   * @returns {Promise<{output: string, error: string, status:boolean}>}
+   */
+  async function runTypeCheck() {
+    const result = {
+      output: '',
+      error: '',
+      status: false,
+    };
+
+    return await new Promise(resolve => {
+      const tscProcess = spawn(nodePath(), args, {
+        encoding: 'utf-8',
+        cwd: devtoolsRootPath(),
+      });
+
+      tscProcess.stdout.on('data', data => {
+        result.output += `\n${data.toString()}`;
+      });
+      tscProcess.stderr.on('data', data => {
+        result.error += `\n${data.toString()}`;
+      });
+
+      tscProcess.on('error', message => {
+        result.error += `\n${message}`;
+        resolve(result);
+      });
+
+      tscProcess.on('exit', code => {
+        result.status = code === 0;
+        resolve(result);
+      });
+    });
+  }
+
+  const result = await runTypeCheck();
+
+  if (result.output) {
+    console.log(result.output);
+  }
+  if (result.error) {
+    console.log(result.error);
+  }
+  return result.status;
+}
+
 async function run() {
   const scripts = [];
   const styles = [];
@@ -287,6 +344,9 @@ async function run() {
   }
 
   const frontEndFiles = scripts.filter(script => script.includes('front_end'));
+  const esLintRules = scripts.filter(script =>
+    script.includes('scripts/eslint_rules'),
+  );
 
   let succeed = true;
   if (scripts.length !== 0) {
@@ -298,6 +358,10 @@ async function run() {
   if (styles.length !== 0) {
     succeed &&= await runStylelint(styles);
   }
+  if (esLintRules.length !== 0) {
+    succeed &&= await runEslintRulesTypeCheck();
+  }
+
   return succeed;
 }
 

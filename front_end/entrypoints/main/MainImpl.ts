@@ -1,6 +1,8 @@
 // Copyright 2021 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 /*
  * Copyright (C) 2006, 2007, 2008 Apple Inc.  All rights reserved.
@@ -120,14 +122,10 @@ const str_ = i18n.i18n.registerUIStrings('entrypoints/main/MainImpl.ts', UIStrin
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class MainImpl {
-  #readyForTestPromise: Promise<void>;
-  #resolveReadyForTestPromise!: () => void;
+  #readyForTestPromise = Promise.withResolvers<void>();
 
   constructor() {
     MainImpl.instanceForTest = this;
-    this.#readyForTestPromise = new Promise(resolve => {
-      this.#resolveReadyForTestPromise = resolve;
-    });
     void this.#loaded();
   }
 
@@ -334,10 +332,6 @@ export class MainImpl {
     // New cookie features.
     Root.Runtime.experiments.register('experimental-cookie-features', 'Enable experimental cookie features');
 
-    // Integrate CSS changes in the Styles pane.
-    Root.Runtime.experiments.register(
-        Root.Runtime.ExperimentName.STYLES_PANE_CSS_CHANGES, 'Sync CSS changes in the Styles tab');
-
     // Highlights a violating node or attribute by rendering a squiggly line under it and adding a tooltip linking to the issues panel.
     Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.HIGHLIGHT_ERRORS_ELEMENTS_PANEL,
@@ -361,26 +355,9 @@ export class MainImpl {
     );
 
     Root.Runtime.experiments.register(
-        Root.Runtime.ExperimentName.AUTOFILL_VIEW,
-        'Autofill panel',
-        false,
-        'https://goo.gle/devtools-autofill-panel',
-        'https://crbug.com/329106326',
-    );
-
-    Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.TIMELINE_SHOW_POST_MESSAGE_EVENTS,
         'Performance panel: show postMessage dispatch and handling flows',
     );
-
-    Root.Runtime.experiments.register(
-        Root.Runtime.ExperimentName.TIMELINE_SERVER_TIMINGS,
-        'Performance panel: enable server timings in the timeline',
-    );
-
-    Root.Runtime.experiments.register(
-        Root.Runtime.ExperimentName.FLOATING_ENTRY_POINTS_FOR_AI_ASSISTANCE,
-        'Floating entry points for the AI assistance panel');
 
     Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.TIMELINE_EXPERIMENTAL_INSIGHTS,
@@ -398,9 +375,7 @@ export class MainImpl {
     );
 
     Root.Runtime.experiments.enableExperimentsByDefault([
-      Root.Runtime.ExperimentName.AUTOFILL_VIEW,
       Root.Runtime.ExperimentName.NETWORK_PANEL_FILTER_BAR_REDESIGN,
-      Root.Runtime.ExperimentName.FLOATING_ENTRY_POINTS_FOR_AI_ASSISTANCE,
       Root.Runtime.ExperimentName.TIMELINE_ALTERNATIVE_NAVIGATION,
       Root.Runtime.ExperimentName.TIMELINE_DIM_UNRELATED_EVENTS,
       Root.Runtime.ExperimentName.FULL_ACCESSIBILITY_TREE,
@@ -613,7 +588,7 @@ export class MainImpl {
     }
     // Used for browser tests.
     Host.InspectorFrontendHost.InspectorFrontendHostInstance.readyForTest();
-    this.#resolveReadyForTestPromise();
+    this.#readyForTestPromise.resolve();
     // Asynchronously run the extensions.
     window.setTimeout(this.#lateInitialization.bind(this), 100);
     await this.#maybeInstallVeInspectionBinding();
@@ -679,7 +654,7 @@ export class MainImpl {
   }
 
   readyForTest(): Promise<void> {
-    return this.#readyForTestPromise;
+    return this.#readyForTestPromise.promise;
   }
 
   #registerMessageSinkListener(): void {

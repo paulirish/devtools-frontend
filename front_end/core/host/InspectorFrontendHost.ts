@@ -30,6 +30,7 @@
 
 // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
 /* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as Common from '../common/common.js';
 import * as i18n from '../i18n/i18n.js';
@@ -94,7 +95,7 @@ const OVERRIDES_FILE_SYSTEM_PATH = '/overrides' as Platform.DevToolsPath.RawPath
  * The native implementations live in devtools_ui_bindings.cc: https://source.chromium.org/chromium/chromium/src/+/main:chrome/browser/devtools/devtools_ui_bindings.cc
  */
 export class InspectorFrontendHostStub implements InspectorFrontendHostAPI {
-  readonly #urlsBeingSaved: Map<Platform.DevToolsPath.RawPathString|Platform.DevToolsPath.UrlString, string[]>;
+  readonly #urlsBeingSaved = new Map<Platform.DevToolsPath.RawPathString|Platform.DevToolsPath.UrlString, string[]>();
   events!: Common.EventTarget.EventTarget<EventTypes>;
   #fileSystem: FileSystem|null = null;
 
@@ -104,8 +105,6 @@ export class InspectorFrontendHostStub implements InspectorFrontendHostAPI {
   recordedPerformanceHistograms: Array<{histogramName: string, duration: number}> = [];
 
   constructor() {
-    this.#urlsBeingSaved = new Map();
-
     // Guard against errors should this file ever be imported at the top level
     // within a worker - in which case this constructor is run. If there's no
     // document, we can early exit.

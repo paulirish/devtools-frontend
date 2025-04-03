@@ -1,7 +1,10 @@
 // Copyright 2025 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
+import type * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import type * as Platform from '../../core/platform/platform.js';
 import * as Persistence from '../../models/persistence/persistence.js';
@@ -33,10 +36,14 @@ const UIStringsNotTranslate = {
    */
   addFolder: 'Add folder',
   /*
+   *@description Explanation for selecting the correct workspace folder.
+   */
+  selectProjectRoot:
+      'To save patches directly to your project, select the project root folder containing the source files of the inspected page.',
+  /*
    *@description Explainer stating that selected folder's contents are being sent to Google.
    */
-  sourceCodeSent:
-      'To save patches directly to your project, select the project root folder containing the source files of the inspected page. Relevant code snippets will be sent to Google to generate code suggestions.'
+  sourceCodeSent: 'Relevant code snippets will be sent to Google to generate code suggestions.'
 } as const;
 
 const lockedString = i18n.i18n.lockedString;
@@ -89,20 +96,25 @@ export class SelectWorkspaceDialog extends UI.Widget.VBox {
       render(
         html`
           <div class="dialog-header">${lockedString(UIStringsNotTranslate.selectFolder)}</div>
-          <div class="main-content">${lockedString(UIStringsNotTranslate.sourceCodeSent)}</div>
-          <ul>
-            ${input.projects.map((project, index) => {
-              return html`
-                <li
-                  @click=${() => input.onProjectSelected(index)}
-                  class=${index === input.selectedIndex ? 'selected' : ''}
-                  title=${project.path}
-                >
-                  <devtools-icon class="folder-icon" .name=${'folder'}></devtools-icon>
-                  ${project.name}
-                </li>`;
-            })}
-          </ul>
+          <div class="main-content">
+            <div class="select-project-root">${lockedString(UIStringsNotTranslate.selectProjectRoot)}</div>
+            <div>${lockedString(UIStringsNotTranslate.sourceCodeSent)}</div>
+          </div>
+          ${input.projects.length > 0 ? html`
+            <ul>
+              ${input.projects.map((project, index) => {
+                return html`
+                  <li
+                    @click=${() => input.onProjectSelected(index)}
+                    class=${index === input.selectedIndex ? 'selected' : ''}
+                    title=${project.path}
+                  >
+                    <devtools-icon class="folder-icon" .name=${'folder'}></devtools-icon>
+                    ${project.name}
+                  </li>`;
+              })}
+            </ul>
+          ` : nothing}
           <div class="buttons">
             <devtools-button
               title=${lockedString(UIStringsNotTranslate.cancel)}
@@ -140,12 +152,14 @@ export class SelectWorkspaceDialog extends UI.Widget.VBox {
     const document = UI.InspectorView.InspectorView.instance().element.ownerDocument;
     document.addEventListener('keydown', this.#boundOnKeyDown, true);
     this.#workspace.addEventListener(Workspace.Workspace.Events.ProjectAdded, this.#onProjectAdded, this);
+    this.#workspace.addEventListener(Workspace.Workspace.Events.ProjectRemoved, this.#onProjectRemoved, this);
   }
 
   override willHide(): void {
     const document = UI.InspectorView.InspectorView.instance().element.ownerDocument;
     document.removeEventListener('keydown', this.#boundOnKeyDown, true);
     this.#workspace.removeEventListener(Workspace.Workspace.Events.ProjectAdded, this.#onProjectAdded, this);
+    this.#workspace.removeEventListener(Workspace.Workspace.Events.ProjectRemoved, this.#onProjectRemoved, this);
   }
 
   #onKeyDown(event: KeyboardEvent): void {
@@ -197,8 +211,32 @@ export class SelectWorkspaceDialog extends UI.Widget.VBox {
                     Persistence.PlatformFileSystem.PlatformFileSystemType.WORKSPACE_PROJECT);
   }
 
-  #onProjectAdded(): void {
+  #onProjectAdded(event: Common.EventTarget.EventTargetEvent<Workspace.Workspace.Project>): void {
+    const addedProject = event.data;
     this.#projects = this.#getProjects();
+    const projectIndex = this.#projects.indexOf(addedProject);
+    if (projectIndex !== -1) {
+      this.#selectedIndex = projectIndex;
+    }
+    this.requestUpdate();
+  }
+
+  #onProjectRemoved(): void {
+    const selectedProject = (this.#selectedIndex >= 0 && this.#selectedIndex < this.#projects.length) ?
+        this.#projects[this.#selectedIndex] :
+        null;
+    this.#projects = this.#getProjects();
+    if (selectedProject) {
+      const projectIndex = this.#projects.indexOf(selectedProject);
+      // If the previously selected project still exists, select it again.
+      // If the previously selected project has been removed, select the project which is now in its
+      // position. If the previously selected and now removed project was in last position, select
+      // the project which is now in last position.
+      this.#selectedIndex =
+          projectIndex === -1 ? Math.min(this.#projects.length - 1, this.#selectedIndex) : projectIndex;
+    } else {
+      this.#selectedIndex = 0;
+    }
     this.requestUpdate();
   }
 

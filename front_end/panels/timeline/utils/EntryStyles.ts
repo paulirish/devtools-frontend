@@ -908,7 +908,7 @@ export function maybeInitSylesMap(): EventStylesMap {
         true,
         ),
 
-    [Trace.Types.Events.Name.CONSOLE_TIME_STAMP]:
+    [Trace.Types.Events.Name.TIME_STAMP]:
         new TimelineRecordStyle(i18nString(UIStrings.timestamp), defaultCategoryStyles.scripting),
 
     [Trace.Types.Events.Name.CONSOLE_TIME]:
@@ -1076,6 +1076,20 @@ export function maybeInitSylesMap(): EventStylesMap {
     [Trace.Types.Events.Name.V8_CONSOLE_RUN_TASK]:
         new TimelineRecordStyle(i18nString(UIStrings.consoleTaskRun), defaultCategoryStyles.scripting),
   };
+
+  // TODO: remove assertion after deduped eventStylesMap for VISIBLE_TRACE_EVENT_TYPES.
+  const visibleTraceEventsComplete = (Object.keys(eventStylesMap)).every(eventType => {
+    return Trace.Helpers.Trace.VISIBLE_TRACE_EVENT_TYPES.has(eventType as Trace.Types.Events.Name);
+  });
+
+  const eventStylesMapKeys = Object.keys(eventStylesMap) as Trace.Types.Events.Name[];
+  const eventStylesComplete = Array.from(Trace.Helpers.Trace.VISIBLE_TRACE_EVENT_TYPES).every(eventType => {
+    return eventStylesMapKeys.includes(eventType);
+  });
+
+  if (!visibleTraceEventsComplete || !eventStylesComplete) {
+    throw new Error('eventStylesMap and VISIBLE_TRACE_EVENT_TYPES are out of sync!');
+  }
   return eventStylesMap;
 }
 

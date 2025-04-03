@@ -683,6 +683,11 @@ declare namespace ProtocolProxyApi {
      * For example, a value of '1em' is evaluated according to the computed
      * 'font-size' of the element and a value 'calc(1px + 2px)' will be
      * resolved to '3px'.
+     * If the `propertyName` was specified the `values` are resolved as if
+     * they were property's declaration. If a value cannot be parsed according
+     * to the provided property syntax, the value is parsed using combined
+     * syntax as if null `propertyName` was provided. If the value cannot be
+     * resolved even then, return the provided value without any changes.
      */
     invoke_resolveValues(params: Protocol.CSS.ResolveValuesRequest): Promise<Protocol.CSS.ResolveValuesResponse>;
 
@@ -1541,6 +1546,20 @@ declare namespace ProtocolProxyApi {
      * Does nothing if no override is set.
      */
     invoke_clearDevicePostureOverride(): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Start using the given display features to pupulate the Viewport Segments API.
+     * This override can also be set in setDeviceMetricsOverride().
+     */
+    invoke_setDisplayFeaturesOverride(params: Protocol.Emulation.SetDisplayFeaturesOverrideRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Clears the display features override set with either setDeviceMetricsOverride()
+     * or setDisplayFeaturesOverride() and starts using display features from the
+     * platform again.
+     * Does nothing if no override is set.
+     */
+    invoke_clearDisplayFeaturesOverride(): Promise<Protocol.ProtocolResponseWithError>;
 
     invoke_setScrollbarsHidden(params: Protocol.Emulation.SetScrollbarsHiddenRequest): Promise<Protocol.ProtocolResponseWithError>;
 
@@ -4197,8 +4216,58 @@ declare namespace ProtocolProxyApi {
      */
     invoke_simulateAdvertisement(params: Protocol.BluetoothEmulation.SimulateAdvertisementRequest): Promise<Protocol.ProtocolResponseWithError>;
 
+    /**
+     * Simulates the response code from the peripheral with |address| for a
+     * GATT operation of |type|. The |code| value follows the HCI Error Codes from
+     * Bluetooth Core Specification Vol 2 Part D 1.3 List Of Error Codes.
+     */
+    invoke_simulateGATTOperationResponse(params: Protocol.BluetoothEmulation.SimulateGATTOperationResponseRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Adds a service with |serviceUuid| to the peripheral with |address|.
+     */
+    invoke_addService(params: Protocol.BluetoothEmulation.AddServiceRequest): Promise<Protocol.BluetoothEmulation.AddServiceResponse>;
+
+    /**
+     * Removes the service respresented by |serviceId| from the peripheral with
+     * |address|.
+     */
+    invoke_removeService(params: Protocol.BluetoothEmulation.RemoveServiceRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Adds a characteristic with |characteristicUuid| and |properties| to the
+     * service represented by |serviceId| in the peripheral with |address|.
+     */
+    invoke_addCharacteristic(params: Protocol.BluetoothEmulation.AddCharacteristicRequest): Promise<Protocol.BluetoothEmulation.AddCharacteristicResponse>;
+
+    /**
+     * Removes the characteristic respresented by |characteristicId| from the
+     * service respresented by |serviceId| in the peripheral with |address|.
+     */
+    invoke_removeCharacteristic(params: Protocol.BluetoothEmulation.RemoveCharacteristicRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Adds a descriptor with |descriptorUuid| to the characteristic respresented
+     * by |characteristicId| in the service represented by |serviceId| of the
+     * peripheral with |address|.
+     */
+    invoke_addDescriptor(params: Protocol.BluetoothEmulation.AddDescriptorRequest): Promise<Protocol.BluetoothEmulation.AddDescriptorResponse>;
+
+    /**
+     * Removes the descriptor with |descriptorId| from the characteristic
+     * respresented by |characteristicId| in the service represented by |serviceId|
+     * of the peripheral with |address|.
+     */
+    invoke_removeDescriptor(params: Protocol.BluetoothEmulation.RemoveDescriptorRequest): Promise<Protocol.ProtocolResponseWithError>;
+
   }
   export interface BluetoothEmulationDispatcher {
+    /**
+     * Event for when a GATT operation of |type| to the peripheral with |address|
+     * happened.
+     */
+    gattOperationReceived(params: Protocol.BluetoothEmulation.GattOperationReceivedEvent): void;
+
   }
 
   export interface DebuggerApi {

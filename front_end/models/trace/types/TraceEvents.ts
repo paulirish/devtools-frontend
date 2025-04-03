@@ -402,7 +402,6 @@ export interface SyntheticNetworkRequest extends Complete, SyntheticBased<Phase.
       initiator?: Initiator,
       requestMethod?: string,
       timing?: ResourceReceiveResponseTimingData,
-      syntheticServerTimings?: SyntheticServerTiming[],
     },
   };
   cat: 'loading';
@@ -1425,7 +1424,7 @@ export type ConsoleTime = ConsoleTimeBegin|ConsoleTimeEnd;
 
 export interface ConsoleTimeStamp extends Event {
   cat: 'devtools.timeline';
-  name: Name.CONSOLE_TIME_STAMP;
+  name: Name.TIME_STAMP;
   ph: Phase.INSTANT;
   args: Args&{
     data?: ArgsData & {
@@ -1643,25 +1642,6 @@ export interface SyntheticProfileCall extends Event {
   nodeId: Protocol.integer;
   sampleIndex: number;
   profileId: ProfileID;
-}
-
-/**
- * A synthetic event created from the Server-Timing header of network
- * request. In order to create these synthetic events, the corresponding
- * metric (timing) in the header must contain a "start" param, which
- * corresponds to the timestamp of the metric in the server. The
- * ServerTimingsHandler implements a heuristic to estimate the offset
- * between the client clock and the server clock so that the server
- * timestamp can be translated to the tracing clock.
- */
-export interface SyntheticServerTiming<T extends Phase = Phase.COMPLETE> extends SyntheticBased<T> {
-  rawSourceEvent: ResourceSendRequest;
-  cat: 'devtools.server-timing';
-  args: Args&{
-    data: ArgsData & {
-      desc?: string, origin: string,
-    },
-  };
 }
 
 /**
@@ -2324,7 +2304,7 @@ export function isConsoleTime(event: Event): event is ConsoleTime {
 }
 
 export function isConsoleTimeStamp(event: Event): event is ConsoleTimeStamp {
-  return event.ph === Phase.INSTANT && event.name === Name.CONSOLE_TIME_STAMP;
+  return event.ph === Phase.INSTANT && event.name === Name.TIME_STAMP;
 }
 
 export function isUserTimingMeasure(event: Event): event is UserTimingMeasure {
@@ -2736,10 +2716,6 @@ export function isFunctionCall(event: Event): event is FunctionCall {
   return event.name === Name.FUNCTION_CALL;
 }
 
-export function isSyntheticServerTiming(event: Event): event is SyntheticServerTiming {
-  return event.cat === 'devtools.server-timing';
-}
-
 export interface SchedulePostTaskCallback extends Instant {
   name: Name.SCHEDULE_POST_TASK_CALLBACK;
   args: Args&{
@@ -2989,7 +2965,7 @@ export const enum Name {
   CONSOLE_TIME = 'ConsoleTime',
   USER_TIMING = 'UserTiming',
   INTERACTIVE_TIME = 'InteractiveTime',
-  CONSOLE_TIME_STAMP = 'TimeStamp',
+  TIME_STAMP = 'TimeStamp',
 
   /* Frames */
   BEGIN_FRAME = 'BeginFrame',

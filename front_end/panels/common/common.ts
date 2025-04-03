@@ -1,6 +1,7 @@
 // Copyright 2025 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -40,11 +41,7 @@ const str_ = i18n.i18n.registerUIStrings('panels/common/common.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class FreDialog {
-  static show({
-    header,
-    reminderItems,
-    onLearnMoreClick,
-  }: {
+  static show({header, reminderItems, onLearnMoreClick, ariaLabel, learnMoreButtonTitle}: {
     header: {
       iconName: string,
       text: Platform.UIString.LocalizedString,
@@ -54,8 +51,13 @@ export class FreDialog {
       content: Platform.UIString.LocalizedString|Lit.LitTemplate,
     }>,
     onLearnMoreClick: () => void,
+    ariaLabel?: string,
+    learnMoreButtonTitle?: string,
   }): Promise<boolean> {
     const dialog = new UI.Dialog.Dialog();
+    if (ariaLabel) {
+      dialog.setAriaLabel(ariaLabel);
+    }
     const result = Promise.withResolvers<boolean>();
     // clang-format off
     Lit.render(html`
@@ -85,7 +87,7 @@ export class FreDialog {
             @click=${onLearnMoreClick}
             .jslogContext=${'fre-disclaimer.learn-more'}
             .variant=${Buttons.Button.Variant.OUTLINED}>
-            ${i18nString(UIStrings.learnMore)}
+            ${learnMoreButtonTitle ?? i18nString(UIStrings.learnMore)}
           </devtools-button>
           <div class="right-buttons">
             <devtools-button
@@ -117,7 +119,6 @@ export class FreDialog {
       result.resolve(false);
     });
     dialog.setSizeBehavior(UI.GlassPane.SizeBehavior.MEASURE_CONTENT);
-    dialog.setMaxContentSize(new UI.Geometry.Size(448, 600));
     dialog.setDimmed(true);
     dialog.show();
 

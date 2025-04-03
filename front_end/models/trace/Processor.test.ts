@@ -383,12 +383,13 @@ describeWithEnvironment('TraceProcessor', function() {
       assert.deepEqual(orderWithoutMetadata, [
         'CLSCulprits',
         'Viewport',
+        'Cache',
+        'ImageDelivery',
         'InteractionToNextPaint',
         'LCPPhases',
         'LCPDiscovery',
         'RenderBlocking',
         'NetworkDependencyTree',
-        'ImageDelivery',
         'DocumentLatency',
         'FontDisplay',
         'DOMSize',
@@ -396,7 +397,8 @@ describeWithEnvironment('TraceProcessor', function() {
         'DuplicatedJavaScript',
         'SlowCSSSelector',
         'ForcedReflow',
-        'UseCache',
+        'ModernHTTP',
+        'LegacyJavaScript',
       ]);
 
       const orderWithMetadata = await getInsightOrder(true);
@@ -404,12 +406,13 @@ describeWithEnvironment('TraceProcessor', function() {
       assert.deepEqual(orderWithMetadata, [
         'Viewport',
         'CLSCulprits',
+        'Cache',
+        'ImageDelivery',
         'InteractionToNextPaint',
         'LCPPhases',
         'LCPDiscovery',
         'RenderBlocking',
         'NetworkDependencyTree',
-        'ImageDelivery',
         'DocumentLatency',
         'FontDisplay',
         'DOMSize',
@@ -417,7 +420,8 @@ describeWithEnvironment('TraceProcessor', function() {
         'DuplicatedJavaScript',
         'SlowCSSSelector',
         'ForcedReflow',
-        'UseCache',
+        'ModernHTTP',
+        'LegacyJavaScript',
       ]);
     });
   });

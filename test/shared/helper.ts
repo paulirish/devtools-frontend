@@ -11,6 +11,7 @@ import {getDevToolsFrontendHostname, reloadDevTools} from '../conductor/hooks.js
 import {platform} from '../conductor/mocha-interface-helpers.js';
 import {getBrowserAndPages} from '../conductor/puppeteer-state.js';
 import {getTestServerPort} from '../conductor/server_port.js';
+import type {DevToolsPage} from '../e2e_non_hosted/shared/frontend-helper.js';
 
 import {getBrowserAndPagesWrappers} from './non_hosted_wrappers.js';
 
@@ -74,17 +75,10 @@ export async function drainFrontendTaskQueue(): Promise<void> {
 /**
  * @deprecated This method is not able to recover from unstable DOM. Use click(selector) instead.
  */
-export async function clickElement(element: puppeteer.ElementHandle, options?: ClickOptions): Promise<void> {
-  // Retries here just in case the element gets connected to DOM / becomes visible.
-  await waitForFunction(async () => {
-    try {
-      await element.click(options?.clickOptions);
-      await drainFrontendTaskQueue();
-      return true;
-    } catch {
-      return false;
-    }
-  });
+export async function clickElement(
+    element: puppeteer.ElementHandle, options?: ClickOptions, devToolsPage?: DevToolsPage): Promise<void> {
+  devToolsPage = devToolsPage || getBrowserAndPagesWrappers().devToolsPage;
+  await devToolsPage.clickElement(element, options);
 }
 
 /**
@@ -230,14 +224,14 @@ export const getVisibleTextContents = async (selector: string) => {
   return texts.filter(content => typeof (content) === 'string');
 };
 
-export const waitFor = async<ElementType extends Element = Element>(
-    selector: string, root?: puppeteer.ElementHandle, asyncScope = new AsyncScope(), handler?: string) => {
+export const waitFor = async<ElementType extends Element|null = null, Selector extends string = string>(
+    selector: Selector, root?: puppeteer.ElementHandle, asyncScope = new AsyncScope(), handler?: string) => {
   const {devToolsPage} = getBrowserAndPagesWrappers();
-  return await devToolsPage.waitFor<ElementType>(selector, root, asyncScope, handler);
+  return await devToolsPage.waitFor<ElementType, Selector>(selector, root, asyncScope, handler);
 };
 
-export const waitForVisible = async<ElementType extends Element = Element>(
-    selector: string, root?: puppeteer.ElementHandle, asyncScope = new AsyncScope(), handler?: string) => {
+export const waitForVisible = async<ElementType extends Element|null = null, Selector extends string = string>(
+    selector: Selector, root?: puppeteer.ElementHandle, asyncScope = new AsyncScope(), handler?: string) => {
   return await asyncScope.exec(() => waitForFunction(async () => {
                                  const element = await $<ElementType, typeof selector>(selector, root, handler);
                                  const visible = await element.evaluate(node => node.checkVisibility());
@@ -245,11 +239,11 @@ export const waitForVisible = async<ElementType extends Element = Element>(
                                }, asyncScope), `Waiting for element matching selector '${selector}' to be visible`);
 };
 
-export const waitForMany = async (
-    selector: string, count: number, root?: puppeteer.ElementHandle, asyncScope = new AsyncScope(),
+export const waitForMany = async<ElementType extends Element|null = null, Selector extends string = string>(
+    selector: Selector, count: number, root?: puppeteer.ElementHandle, asyncScope = new AsyncScope(),
     handler?: string) => {
   return await asyncScope.exec(() => waitForFunction(async () => {
-                                 const elements = await $$(selector, root, handler);
+                                 const elements = await $$<ElementType, typeof selector>(selector, root, handler);
                                  return elements.length >= count ? elements : undefined;
                                }, asyncScope), `Waiting for ${count} elements to match selector '${selector}'`);
 };
@@ -451,7 +445,7 @@ export const activeElement = async () => {
 
   await waitForAnimationFrame();
 
-  return frontend.evaluateHandle(() => {
+  return await frontend.evaluateHandle(() => {
     let activeElement = document.activeElement;
 
     while (activeElement?.shadowRoot) {
@@ -468,12 +462,12 @@ export const activeElement = async () => {
 
 export const activeElementTextContent = async () => {
   const element = await activeElement();
-  return element.evaluate(node => node.textContent);
+  return await element.evaluate(node => node.textContent);
 };
 
 export const activeElementAccessibleName = async () => {
   const element = await activeElement();
-  return element.evaluate(node => node.getAttribute('aria-label') || node.getAttribute('title'));
+  return await element.evaluate(node => node.getAttribute('aria-label') || node.getAttribute('title'));
 };
 
 export const tabForward = async (page?: puppeteer.Page) => {
@@ -511,7 +505,7 @@ export const selectTextFromNodeToNode = async (
   // The clipboard api does not allow you to copy, unless the tab is focused.
   await target.bringToFront();
 
-  return target.evaluate(async (from, to, direction) => {
+  return await target.evaluate(async (from, to, direction) => {
     const selection = (from.getRootNode() as Document).getSelection();
     const range = document.createRange();
     if (direction === 'down') {

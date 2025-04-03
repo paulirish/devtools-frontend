@@ -1,6 +1,7 @@
 // Copyright 2023 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as Common from '../../core/common/common.js';
 import * as Platform from '../../core/platform/platform.js';
@@ -16,7 +17,6 @@ import {ExtensionTrackAppender} from './ExtensionTrackAppender.js';
 import {GPUTrackAppender} from './GPUTrackAppender.js';
 import {InteractionsTrackAppender} from './InteractionsTrackAppender.js';
 import {LayoutShiftsTrackAppender} from './LayoutShiftsTrackAppender.js';
-import {ServerTimingsTrackAppender} from './ServerTimingsTrackAppender.js';
 import {ThreadAppender} from './ThreadAppender.js';
 import {
   EntryType,
@@ -68,7 +68,7 @@ export function entryIsVisibleInTimeline(
     }
   }
 
-  if (Trace.Types.Extensions.isSyntheticExtensionEntry(entry) || Trace.Types.Events.isSyntheticServerTiming(entry)) {
+  if (Trace.Types.Extensions.isSyntheticExtensionEntry(entry)) {
     return true;
   }
 
@@ -76,8 +76,7 @@ export function entryIsVisibleInTimeline(
   // events are hidden by default.
   const eventStyle = TimelineUtils.EntryStyles.getEventStyle(entry.name as Trace.Types.Events.Name);
   const eventIsTiming = Trace.Types.Events.isConsoleTime(entry) || Trace.Types.Events.isPerformanceMeasure(entry) ||
-      Trace.Types.Events.isPerformanceMark(entry);
-
+      Trace.Types.Events.isPerformanceMark(entry) || Trace.Types.Events.isConsoleTimeStamp(entry);
   return (eventStyle && !eventStyle.hidden) || eventIsTiming;
 }
 
@@ -201,7 +200,6 @@ export class CompatibilityTracksAppender {
   #gpuTrackAppender: GPUTrackAppender;
   #layoutShiftsTrackAppender: LayoutShiftsTrackAppender;
   #threadAppenders: ThreadAppender[] = [];
-  #serverTimingsTrackAppender: ServerTimingsTrackAppender;
   #entityMapper: TimelineUtils.EntityMapper.EntityMapper|null;
 
   /**
@@ -247,8 +245,6 @@ export class CompatibilityTracksAppender {
     this.#layoutShiftsTrackAppender = new LayoutShiftsTrackAppender(this, this.#parsedTrace);
     this.#allTrackAppenders.push(this.#layoutShiftsTrackAppender);
 
-    this.#serverTimingsTrackAppender = new ServerTimingsTrackAppender(this, this.#parsedTrace);
-    this.#allTrackAppenders.push(this.#serverTimingsTrackAppender);
     this.#addThreadAppenders();
     this.#addExtensionAppenders();
 
@@ -382,10 +378,6 @@ export class CompatibilityTracksAppender {
 
   threadAppenders(): ThreadAppender[] {
     return this.#threadAppenders;
-  }
-
-  serverTimingsTrackAppender(): ServerTimingsTrackAppender {
-    return this.#serverTimingsTrackAppender;
   }
 
   eventsInTrack(trackAppender: TrackAppender): Trace.Types.Events.Event[] {

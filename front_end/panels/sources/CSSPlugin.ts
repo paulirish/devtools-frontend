@@ -1,6 +1,7 @@
 // Copyright 2021 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -245,7 +246,7 @@ type ActiveTooltip = {
 function createCSSTooltip(active: ActiveTooltip): CodeMirror.Tooltip {
   return {
     pos: active.pos,
-    arrow: true,
+    arrow: false,
     create(view): CodeMirror.TooltipView {
       let text = active.text;
       let widget: UI.Widget.VBox, addListener: (handler: (event: {data: string}) => void) => void;
@@ -365,7 +366,7 @@ decorations:
 });
 
 function cssSwatches(): CodeMirror.Extension {
-  return [cssSwatchPlugin, cssTooltipState];
+  return [cssSwatchPlugin, cssTooltipState, theme];
 }
 
 function getNumberAt(node: CodeMirror.SyntaxNode): {from: number, to: number}|null {
@@ -487,3 +488,12 @@ export class CSSPlugin extends Plugin implements SDK.TargetManager.SDKModelObser
     }
   }
 }
+
+const theme = CodeMirror.EditorView.baseTheme({
+  '.cm-tooltip.cm-tooltip-swatchEdit': {
+    'box-shadow': 'var(--sys-elevation-level2)',
+    'background-color': 'var(--sys-color-base-container-elevated)',
+    'border-radius': 'var(--sys-shape-corner-small)',
+    padding: 'var(--sys-size-6) var(--sys-size-8)',
+  },
+});

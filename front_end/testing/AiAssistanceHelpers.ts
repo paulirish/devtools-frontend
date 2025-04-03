@@ -13,7 +13,7 @@ import * as Logs from '../models/logs/logs.js';
 import * as Persistence from '../models/persistence/persistence.js';
 import * as Workspace from '../models/workspace/workspace.js';
 import * as WorkspaceDiff from '../models/workspace_diff/workspace_diff.js';
-import * as AiAssistance from '../panels/ai_assistance/ai_assistance.js';
+import * as AiAssistancePanel from '../panels/ai_assistance/ai_assistance.js';
 
 import {findMenuItemWithLabel, getMenu} from './ContextMenuHelpers.js';
 import {
@@ -31,8 +31,16 @@ function createMockAidaClient(fetch: Host.AidaClient.AidaClient['fetch']): Host.
   };
 }
 
-export type MockAidaResponse =
-    Omit<Host.AidaClient.AidaResponse, 'completed'|'metadata'>&{metadata?: Host.AidaClient.AidaResponseMetadata};
+export const MockAidaAbortError = {
+  abortError: true,
+} as const;
+
+export const MockAidaFetchError = {
+  fetchError: true,
+} as const;
+
+export type MockAidaResponse = Omit<Host.AidaClient.AidaResponse, 'completed'|'metadata'>&
+    {metadata?: Host.AidaClient.AidaResponseMetadata}|typeof MockAidaAbortError|typeof MockAidaFetchError;
 
 /**
  * Creates a mock AIDA client that responds using `data`.
@@ -50,8 +58,11 @@ export function mockAidaClient(data: Array<[MockAidaResponse, ...MockAidaRespons
     }
 
     for (const [idx, chunk] of data[callId].entries()) {
-      if (options?.signal?.aborted) {
+      if (options?.signal?.aborted || ('abortError' in chunk)) {
         throw new Host.AidaClient.AidaAbortError();
+      }
+      if ('fetchError' in chunk) {
+        throw new Error('Fetch error');
       }
       const metadata = chunk.metadata ?? {};
       if (metadata?.attributionMetadata?.attributionAction === Host.AidaClient.RecitationAction.BLOCK) {
@@ -162,7 +173,7 @@ export function createNetworkRequest(opts?: {
   return networkRequest;
 }
 
-let panels: AiAssistance.AiAssistancePanel[] = [];
+let panels: AiAssistancePanel.AiAssistancePanel[] = [];
 /**
  * Creates and shows an AiAssistancePanel instance returning the view
  * stubs and the initial view input caused by Widget.show().
@@ -174,13 +185,13 @@ export async function createAiAssistancePanel(options?: {
 }) {
   let aidaAvailabilityForStub = options?.aidaAvailability ?? Host.AidaClient.AidaAccessPreconditions.AVAILABLE;
 
-  const view = createViewFunctionStub(AiAssistance.AiAssistancePanel);
+  const view = createViewFunctionStub(AiAssistancePanel.AiAssistancePanel);
   const aidaClient = options?.aidaClient ?? mockAidaClient();
   const checkAccessPreconditionsStub =
       sinon.stub(Host.AidaClient.AidaClient, 'checkAccessPreconditions').callsFake(() => {
         return Promise.resolve(aidaAvailabilityForStub);
       });
-  const panel = new AiAssistance.AiAssistancePanel(view, {
+  const panel = new AiAssistancePanel.AiAssistancePanel(view, {
     aidaClient,
     aidaAvailability: aidaAvailabilityForStub,
     syncInfo: options?.syncInfo ?? {isSyncActive: true},
@@ -204,7 +215,7 @@ export async function createAiAssistancePanel(options?: {
   };
 }
 
-let patchWidgets: AiAssistance.PatchWidget.PatchWidget[] = [];
+let patchWidgets: AiAssistancePanel.PatchWidget.PatchWidget[] = [];
 /**
  * Creates and shows an AiAssistancePanel instance returning the view
  * stubs and the initial view input caused by Widget.show().
@@ -212,9 +223,9 @@ let patchWidgets: AiAssistance.PatchWidget.PatchWidget[] = [];
 export async function createPatchWidget(options?: {
   aidaClient?: Host.AidaClient.AidaClient,
 }) {
-  const view = createViewFunctionStub(AiAssistance.PatchWidget.PatchWidget);
+  const view = createViewFunctionStub(AiAssistancePanel.PatchWidget.PatchWidget);
   const aidaClient = options?.aidaClient ?? mockAidaClient();
-  const widget = new AiAssistance.PatchWidget.PatchWidget(undefined, view, {
+  const widget = new AiAssistancePanel.PatchWidget.PatchWidget(undefined, view, {
     aidaClient,
   });
   patchWidgets.push(widget);
@@ -224,20 +235,21 @@ export async function createPatchWidget(options?: {
   await view.nextInput;
 
   return {
-    panel: widget,
+    widget,
     view,
     aidaClient,
   };
 }
 
 export async function createPatchWidgetWithDiffView() {
-  const {view, panel, aidaClient} =
+  const {view, widget, aidaClient} =
       await createPatchWidget({aidaClient: mockAidaClient([[{explanation: 'patch applied'}]])});
-  panel.changeSummary = 'body { background-color: red; }';
+  widget.changeSummary = 'body { background-color: red; }';
   view.input.onApplyToWorkspace();
-  assert.exists((await view.nextInput).patchSuggestion);
+  assert.strictEqual(
+      (await view.nextInput).patchSuggestionState, AiAssistancePanel.PatchWidget.PatchSuggestionState.SUCCESS);
 
-  return {panel, view, aidaClient};
+  return {widget, view, aidaClient};
 }
 
 export function initializePersistenceImplForTests(): void {
@@ -270,7 +282,7 @@ export function cleanup() {
 }
 
 export function openHistoryContextMenu(
-    lastUpdate: AiAssistance.ViewInput,
+    lastUpdate: AiAssistancePanel.ViewInput,
     item: string,
 ) {
   const contextMenu = getMenu(() => {

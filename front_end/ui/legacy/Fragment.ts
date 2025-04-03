@@ -1,6 +1,7 @@
 // Copyright 2017 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 function getNodeData(node: Node): string {
   return (node as unknown as {
@@ -17,12 +18,10 @@ function setNodeData<T>(node: Node, value: T): void {
 
 export class Fragment {
   private readonly elementInternal: Element;
-  private readonly elementsById: Map<string, Element>;
+  private readonly elementsById = new Map<string, Element>();
 
   constructor(element: Element) {
     this.elementInternal = element;
-
-    this.elementsById = new Map();
   }
 
   element(): Element {

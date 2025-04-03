@@ -104,10 +104,16 @@ export class Runtime {
     return condition ? condition(hostConfig) : true;
   }
 
-  loadLegacyModule(modulePath: string): Promise<void> {
+  loadLegacyModule(modulePath: string): Promise<unknown> {
+    // eslint-disable-next-line no-console
+    console.log('Loading legacy module: ' + modulePath);
     const importPath =
         `../../${modulePath}`;  // Extracted as a variable so esbuild doesn't attempt to bundle all the things.
-    return import(importPath);
+    return import(importPath).then(m => {
+      // eslint-disable-next-line no-console
+      console.log('Loaded legacy module: ' + modulePath);
+      return m;
+    });
   }
 }
 
@@ -302,7 +308,6 @@ export const enum ExperimentName {
   ALL = '*',
   PROTOCOL_MONITOR = 'protocol-monitor',
   FULL_ACCESSIBILITY_TREE = 'full-accessibility-tree',
-  STYLES_PANE_CSS_CHANGES = 'styles-pane-css-changes',
   HEADER_OVERRIDES = 'header-overrides',
   INSTRUMENTATION_BREAKPOINTS = 'instrumentation-breakpoints',
   AUTHORED_DEPLOYED_GROUPING = 'authored-deployed-grouping',
@@ -310,13 +315,10 @@ export const enum ExperimentName {
   HIGHLIGHT_ERRORS_ELEMENTS_PANEL = 'highlight-errors-elements-panel',
   USE_SOURCE_MAP_SCOPES = 'use-source-map-scopes',
   NETWORK_PANEL_FILTER_BAR_REDESIGN = 'network-panel-filter-bar-redesign',
-  AUTOFILL_VIEW = 'autofill-view',
   TIMELINE_SHOW_POST_MESSAGE_EVENTS = 'timeline-show-postmessage-events',
   TIMELINE_DEBUG_MODE = 'timeline-debug-mode',
   TIMELINE_ENHANCED_TRACES = 'timeline-enhanced-traces',
   TIMELINE_COMPILED_SOURCES = 'timeline-compiled-sources',
-  TIMELINE_SERVER_TIMINGS = 'timeline-server-timings',
-  FLOATING_ENTRY_POINTS_FOR_AI_ASSISTANCE = 'floating-entry-points-for-ai-assistance',
   TIMELINE_EXPERIMENTAL_INSIGHTS = 'timeline-experimental-insights',
   TIMELINE_DIM_UNRELATED_EVENTS = 'timeline-dim-unrelated-events',
   TIMELINE_ALTERNATIVE_NAVIGATION = 'timeline-alternative-navigation',

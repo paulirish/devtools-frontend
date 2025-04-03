@@ -1,6 +1,7 @@
 // Copyright 2019 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import './Toolbar.js';
 
@@ -591,7 +592,7 @@ class TabbedLocation extends Location implements TabbedViewLocation {
   private readonly tabOrderSetting: Common.Settings.Setting<TabOrderSetting>;
   private readonly lastSelectedTabSetting?: Common.Settings.Setting<string>;
   private readonly defaultTab: string|null|undefined;
-  private readonly views: Map<string, View>;
+  private readonly views = new Map<string, View>();
 
   constructor(
       manager: ViewManager, revealCallback?: (() => void), location?: string, restoreSelection?: boolean,
@@ -619,8 +620,6 @@ class TabbedLocation extends Location implements TabbedViewLocation {
       this.lastSelectedTabSetting = Common.Settings.Settings.instance().createSetting(location + '-selected-tab', '');
     }
     this.defaultTab = defaultTab;
-
-    this.views = new Map();
 
     if (location) {
       this.appendApplicableItems(location);

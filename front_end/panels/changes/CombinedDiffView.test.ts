@@ -9,15 +9,17 @@ import * as Breakpoints from '../../models/breakpoints/breakpoints.js';
 import * as Persistence from '../../models/persistence/persistence.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as WorkspaceDiff from '../../models/workspace_diff/workspace_diff.js';
+import {renderElementIntoDOM} from '../../testing/DOMHelpers.js';
 import {describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
-import {createFileSystemUISourceCode} from '../../testing/UISourceCodeHelpers.js';
+import {createContentProviderUISourceCode, createFileSystemUISourceCode} from '../../testing/UISourceCodeHelpers.js';
 import {createViewFunctionStub} from '../../testing/ViewFunctionHelpers.js';
 
 import * as CombinedDiffView from './CombinedDiffView.js';
 
 const {urlString} = Platform.DevToolsPath;
 
-const URL = urlString`file:///tmp/example.html`;
+const ORIGINAL_CONTENT = 'const data={original:true}';
+const URL = urlString`file:///workspace/example.html`;
 
 function createWorkspace(): Workspace.Workspace.WorkspaceImpl {
   return Workspace.Workspace.WorkspaceImpl.instance({forceNew: true});
@@ -44,14 +46,16 @@ function createWorkspaceDiff({workspace}: {workspace: Workspace.Workspace.Worksp
 
 async function createCombinedDiffView({workspaceDiff}: {workspaceDiff: WorkspaceDiff.WorkspaceDiff.WorkspaceDiffImpl}) {
   const view = createViewFunctionStub(CombinedDiffView.CombinedDiffView);
-  const combinedDiffView = new CombinedDiffView.CombinedDiffView(undefined, view);
-  combinedDiffView.workspaceDiff = workspaceDiff;
+  const widget = new CombinedDiffView.CombinedDiffView(undefined, view);
+  widget.workspaceDiff = workspaceDiff;
 
-  combinedDiffView.markAsRoot();
-  combinedDiffView.show(document.body);
+  const container = document.createElement('div');
+  renderElementIntoDOM(container);
+  widget.markAsRoot();
+  widget.show(container);
   await view.nextInput;
 
-  return {combinedDiffView, view};
+  return {widget, view};
 }
 
 describeWithEnvironment('CombinedDiffView', () => {
@@ -60,8 +64,8 @@ describeWithEnvironment('CombinedDiffView', () => {
   beforeEach(() => {
     const workspace = createWorkspace();
     workspaceDiff = createWorkspaceDiff({workspace});
-    ({uiSourceCode} =
-         createFileSystemUISourceCode({url: URL, content: 'const data={original:true}', mimeType: 'text/javascript'}));
+    ({uiSourceCode} = createFileSystemUISourceCode(
+         {url: URL, content: ORIGINAL_CONTENT, mimeType: 'text/javascript', fileSystemPath: 'file:///workspace'}));
   });
 
   it('should render modified UISourceCode from a workspaceDiff on initial render', async () => {
@@ -87,5 +91,43 @@ describeWithEnvironment('CombinedDiffView', () => {
 
     uiSourceCode.setWorkingCopy('const data={modified:true}');
     await view.nextInput;
+  });
+
+  describe('file name', () => {
+    it('should render workspace relative name with workspace name prefix if the UISourceCode is coming from a workspace',
+       async () => {
+         createFileSystemUISourceCode({
+           url: URL,
+           content: ORIGINAL_CONTENT,
+           autoMapping: true,
+           mimeType: 'text/javascript',
+           fileSystemPath: 'file:///workspace'
+         });
+         const {uiSourceCode: contentProviderUiSourceCode} = createContentProviderUISourceCode({
+           url: URL,
+           content: ORIGINAL_CONTENT,
+           projectType: Workspace.Workspace.projectTypes.Network,
+           mimeType: 'text/javascript',
+         });
+         const {view} = await createCombinedDiffView({workspaceDiff});
+
+         contentProviderUiSourceCode.setWorkingCopy('const data={original:false}');
+
+         assert.strictEqual((await view.nextInput).singleDiffViewInputs[0].fileName, '*workspace/example.html');
+       });
+
+    it('should render full display name if the UISourceCode is not coming from a workspace', async () => {
+      const {uiSourceCode} = createContentProviderUISourceCode({
+        url: urlString`file:///tmp/non-mapped.html`,
+        content: ORIGINAL_CONTENT,
+        projectType: Workspace.Workspace.projectTypes.Network,
+        mimeType: 'text/javascript',
+      });
+      const {view} = await createCombinedDiffView({workspaceDiff});
+
+      uiSourceCode.setWorkingCopy('const data={original:false}');
+
+      assert.strictEqual((await view.nextInput).singleDiffViewInputs[0].fileName, '*/tmp/non-mapped.html');
+    });
   });
 });

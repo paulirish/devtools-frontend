@@ -290,7 +290,11 @@ export function getCleanTextContentFromElements(el: ShadowRoot|HTMLElement, sele
 export function getCleanTextContentFromSingleElement(el: ShadowRoot|HTMLElement, selector: string): string {
   const element = el.querySelector(selector);
   assert.isOk(element, `Could not find element with selector ${selector}`);
-  return element.textContent ? element.textContent.trim().replace(/[ \n]{2,}/g, ' ') : '';
+  return element.textContent ? cleanTextContent(element.textContent) : '';
+}
+
+export function cleanTextContent(input: string): string {
+  return input.trim().replace(/[ \n]{2,}/g, ' ');
 }
 
 export function assertNodeTextContent(component: NodeText.NodeText.NodeText, expectedContent: string) {
@@ -320,6 +324,11 @@ export function querySelectorErrorOnMissing<T extends HTMLElement = HTMLElement>
 export async function assertScreenshot(filename: string) {
   // To avoid a lot of empty space in the screenshot.
   document.getElementById(TEST_CONTAINER_ID)!.style.width = 'fit-content';
+  let frame: Window|null = window;
+  while (frame) {
+    frame.scrollTo(0, 0);
+    frame = frame.parent !== frame ? frame.parent : null;
+  }
   await raf();
   // @ts-expect-error see karma config.
   const result = await window.assertScreenshot(`#${TEST_CONTAINER_ID}`, filename);

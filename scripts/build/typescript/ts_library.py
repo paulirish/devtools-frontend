@@ -10,7 +10,6 @@ import shlex
 import subprocess
 import sys
 import re
-from pathlib import Path
 
 from os import path
 
@@ -45,9 +44,6 @@ GLOBAL_TYPESCRIPT_DEFINITION_FILES = [
               'global_defs.d.ts'),
     # Types for W3C FileSystem API
     path.join(NODE_MODULES_DIRECTORY, '@types', 'filesystem', 'index.d.ts'),
-    # Types for wicg task scheduling API
-    path.join(NODE_MODULES_DIRECTORY, '@types', 'wicg-task-scheduling',
-              'index.d.ts'),
 ]
 
 logging.basicConfig(
@@ -173,18 +169,14 @@ def runEsbuild(opts, tsconfig_output_location, tsconfig_output_directory):
 
 
 def rewriteTypeScriptErrorPaths(stderr: str):
-    root_path = Path(ROOT_DIRECTORY_OF_REPOSITORY).resolve()
-
     def rewriteLine(match: re.Match[str]) -> str:
-        absolute_path = Path(match[1]).resolve()
-        relative_path = absolute_path.relative_to(root_path)
-        return f"{relative_path}({match[2]}): error {match[3]}: {match[4]}"
+        return f"{match[1]}({match[2]}): error {match[3]}: {match[4]}"
 
     lines = stderr.splitlines()
     for i, line in enumerate(lines):
         lines[i] = re.sub(
             # We use similar pattern in ".vscode/devtools-workspace-tasks.json"
-            r'^([^\s].*)\((\d+,\d+)\): error (TS\d+):\s*(.*)$',
+            r'^\.\./\.\./([^\s].*)\((\d+,\d+)\): error (TS\d+):\s*(.*)$',
             rewriteLine,
             line)
 

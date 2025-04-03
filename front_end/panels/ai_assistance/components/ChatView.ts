@@ -1,6 +1,8 @@
 // Copyright 2024 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import '../../../ui/components/spinners/spinners.js';
 
@@ -8,6 +10,7 @@ import * as Host from '../../../core/host/host.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import type * as Platform from '../../../core/platform/platform.js';
 import * as Root from '../../../core/root/root.js';
+import * as AiAssistanceModel from '../../../models/ai_assistance/ai_assistance.js';
 import * as Marked from '../../../third_party/marked/marked.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
 import type * as IconButton from '../../../ui/components/icon_button/icon_button.js';
@@ -15,8 +18,6 @@ import type * as MarkdownView from '../../../ui/components/markdown_view/markdow
 import * as UI from '../../../ui/legacy/legacy.js';
 import * as Lit from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
-import {type ContextDetail, type ConversationContext, ErrorType} from '../agents/AiAgent.js';
-import {ConversationType, NOT_FOUND_IMAGE_DATA} from '../AiHistoryStorage.js';
 import {PatchWidget} from '../PatchWidget.js';
 
 import stylesRaw from './chatView.css.js';
@@ -67,6 +68,10 @@ const UIStrings = {
    *@description The footer disclaimer that links to more information about the AI feature.
    */
   learnAbout: 'Learn about AI in DevTools',
+  /**
+   *@description Text informing the user that AI assistance is not available in Incognito mode or Guest mode.
+   */
+  notAvailableInIncognitoMode: 'AI assistance is not available in Incognito mode or Guest mode',
 } as const;
 
 /*
@@ -159,10 +164,6 @@ const UIStringsNotTranslate = {
    */
   completed: 'Completed',
   /**
-   *@description Aria label for the loading icon to be read by screen reader
-   */
-  inProgress: 'In progress',
-  /**
    *@description Aria label for the cancel icon to be read by screen reader
    */
   canceled: 'Canceled',
@@ -170,14 +171,6 @@ const UIStringsNotTranslate = {
    *@description Text displayed when the chat input is disabled due to reading past conversation.
    */
   pastConversation: 'You\'re viewing a past conversation.',
-  /**
-   *@description Text displayed for showing change summary view.
-   */
-  changeSummary: 'Changes summary',
-  /**
-   *@description Button text for staging changes to workspace.
-   */
-  applyToWorkspace: 'Apply to workspace',
   /**
    *@description Title for the take screenshot button.
    */
@@ -202,18 +195,6 @@ const UIStringsNotTranslate = {
    *@description Alt text for image when it is not available.
    */
   imageUnavailable: 'Image unavailable',
-  /**
-   *@description Button text to change the selected workspace
-   */
-  change: 'Change',
-  /**
-   *@description Button text while data is being loaded
-   */
-  loading: 'Loading...',
-  /**
-   *@description Label for the selected workspace/folder
-   */
-  selectedFolder: 'Selected folder:'
 } as const;
 
 const str_ = i18n.i18n.registerUIStrings('panels/ai_assistance/components/ChatView.ts', UIStrings);
@@ -231,7 +212,7 @@ export interface Step {
   output?: string;
   canceled?: boolean;
   sideEffect?: ConfirmSideEffectDialog;
-  contextDetails?: [ContextDetail, ...ContextDetail[]];
+  contextDetails?: [AiAssistanceModel.ContextDetail, ...AiAssistanceModel.ContextDetail[]];
 }
 
 interface ConfirmSideEffectDialog {
@@ -260,7 +241,7 @@ export interface ModelChatMessage {
   steps: Step[];
   suggestions?: [string, ...string[]];
   answer?: string;
-  error?: ErrorType;
+  error?: AiAssistanceModel.ErrorType;
   rpcId?: Host.AidaClient.RpcGlobalId;
 }
 
@@ -281,24 +262,21 @@ export interface Props {
   onTakeScreenshot?: () => void;
   onRemoveImageInput?: () => void;
   onTextInputChange: (input: string) => void;
+  changeManager: AiAssistanceModel.ChangeManager;
   inspectElementToggled: boolean;
   state: State;
   aidaAvailability: Host.AidaClient.AidaAccessPreconditions;
   messages: ChatMessage[];
-  selectedContext: ConversationContext<unknown>|null;
+  selectedContext: AiAssistanceModel.ConversationContext<unknown>|null;
   isLoading: boolean;
   canShowFeedbackForm: boolean;
   userInfo: Pick<Host.InspectorFrontendHostAPI.SyncInformation, 'accountImage'|'accountFullName'>;
-  conversationType?: ConversationType;
+  conversationType?: AiAssistanceModel.ConversationType;
   isReadOnly: boolean;
   blockedByCrossOrigin: boolean;
   changeSummary?: string;
-  patchSuggestion?: string;
-  patchSuggestionLoading?: boolean;
-  projectName?: string;
   multimodalInputEnabled?: boolean;
   imageInput?: ImageInputData;
-  onApplyToWorkspace?: () => void;
   isTextInputDisabled: boolean;
   emptyStateSuggestions: string[];
   inputPlaceholder: Platform.UIString.LocalizedString;
@@ -493,6 +471,7 @@ export class ChatView extends HTMLElement {
             markdownRenderer: this.#markdownRenderer,
             conversationType: this.#props.conversationType,
             changeSummary: this.#props.changeSummary,
+            changeManager: this.#props.changeManager,
             onSuggestionClick: this.#handleSuggestionClick,
             onFeedbackSubmit: this.#props.onFeedbackSubmit,
             onMessageContainerRef: this.#handleMessageContainerRef,
@@ -765,14 +744,14 @@ function renderError(message: ModelChatMessage): Lit.LitTemplate {
   if (message.error) {
     let errorMessage;
     switch (message.error) {
-      case ErrorType.UNKNOWN:
-      case ErrorType.BLOCK:
+      case AiAssistanceModel.ErrorType.UNKNOWN:
+      case AiAssistanceModel.ErrorType.BLOCK:
         errorMessage = UIStringsNotTranslate.systemError;
         break;
-      case ErrorType.MAX_STEPS:
+      case AiAssistanceModel.ErrorType.MAX_STEPS:
         errorMessage = UIStringsNotTranslate.maxStepsError;
         break;
-      case ErrorType.ABORT:
+      case AiAssistanceModel.ErrorType.ABORT:
         return html`<p class="aborted" jslog=${VisualLogging.section('aborted')}>${
             lockedString(UIStringsNotTranslate.stoppedResponse)}</p>`;
     }
@@ -880,7 +859,7 @@ function renderChatMessage({
 }
 
 function renderImageChatMessage(inlineData: Host.AidaClient.MediaBlob): Lit.LitTemplate {
-  if (inlineData.data === NOT_FOUND_IMAGE_DATA) {
+  if (inlineData.data === AiAssistanceModel.NOT_FOUND_IMAGE_DATA) {
     // clang-format off
     return html`<div class="unavailable-image" title=${UIStringsNotTranslate.imageUnavailable}>
       <devtools-icon name='file-image'></devtools-icon>
@@ -905,16 +884,18 @@ function renderSelection({
   onContextClick,
   onInspectElementClick,
 }: {
-  selectedContext: ConversationContext<unknown>|null,
+  selectedContext: AiAssistanceModel.ConversationContext<unknown>|null,
   inspectElementToggled: boolean,
-  conversationType?: ConversationType, onContextClick: () => void | Promise<void>, onInspectElementClick: () => void,
+  conversationType?: AiAssistanceModel.ConversationType,
+                  onContextClick: () => void | Promise<void>,
+                  onInspectElementClick: () => void,
 }): Lit.LitTemplate {
   if (!conversationType) {
     return Lit.nothing;
   }
 
   // TODO: currently the picker behavior is SDKNode specific.
-  const hasPickerBehavior = conversationType === ConversationType.STYLING;
+  const hasPickerBehavior = conversationType === AiAssistanceModel.ConversationType.STYLING;
 
   const resourceClass = Lit.Directives.classMap({
     'not-selected': !selectedContext,
@@ -976,6 +957,7 @@ function renderMessages({
   userInfo,
   markdownRenderer,
   changeSummary,
+  changeManager,
   onSuggestionClick,
   onFeedbackSubmit,
   onMessageContainerRef,
@@ -987,11 +969,27 @@ function renderMessages({
   userInfo: Pick<Host.InspectorFrontendHostAPI.SyncInformation, 'accountImage'|'accountFullName'>,
   markdownRenderer: MarkdownRendererWithCodeBlock,
   changeSummary?: string,
+  changeManager?: AiAssistanceModel.ChangeManager,
                onSuggestionClick: (suggestion: string) => void,
                onFeedbackSubmit:
                    (rpcId: Host.AidaClient.RpcGlobalId, rate: Host.AidaClient.Rating, feedback?: string) => void,
                onMessageContainerRef: (el: Element|undefined) => void,
 }): Lit.TemplateResult {
+  function renderPatchWidget(): Lit.LitTemplate {
+    if (isLoading) {
+      return Lit.nothing;
+    }
+
+    // clang-format off
+    return html`<devtools-widget
+      .widgetConfig=${UI.Widget.widgetConfig(PatchWidget, {
+        changeSummary,
+        changeManager,
+      })}
+    ></devtools-widget>`;
+    // clang-format on
+  }
+
   // clang-format off
   return html`
     <div class="messages-container" ${ref(onMessageContainerRef)}>
@@ -1008,9 +1006,7 @@ function renderMessages({
           onFeedbackSubmit,
         }),
       )}
-      ${(changeSummary && !isLoading) ? html`<devtools-widget .widgetConfig=${UI.Widget.widgetConfig(PatchWidget, {
-        changeSummary,
-      })}></devtools-widget>` : Lit.nothing}
+      ${renderPatchWidget()}
     </div>
   `;
   // clang-format on
@@ -1054,7 +1050,7 @@ function renderEmptyState({isTextInputDisabled, suggestions, onSuggestionClick}:
 
 function renderReadOnlySection({onNewConversation, conversationType}: {
   onNewConversation: () => void,
-  conversationType?: ConversationType,
+  conversationType?: AiAssistanceModel.ConversationType,
 }): Lit.LitTemplate {
   if (!conversationType) {
     return Lit.nothing;
@@ -1244,10 +1240,10 @@ function renderChatInput({
   isTextInputDisabled: boolean,
   inputPlaceholder: Platform.UIString.LocalizedString,
   state: State,
-  selectedContext: ConversationContext<unknown> | null,
+  selectedContext: AiAssistanceModel.ConversationContext<unknown> | null,
   inspectElementToggled: boolean,
   multimodalInputEnabled?: boolean,
-  conversationType?: ConversationType,
+  conversationType?: AiAssistanceModel.ConversationType,
   imageInput?: ImageInputData,
   isTextInputEmpty: boolean,
   onContextClick: () => void ,
@@ -1348,6 +1344,9 @@ function renderConsentViewContents(): Lit.TemplateResult {
   let consentViewContents: HTMLSpanElement;
   // TODO(ergunsh): Should this `view` access `hostConfig` at all?
   const config = Root.Runtime.hostConfig;
+  if (config.isOffTheRecord) {
+    return html`${i18nString(UIStrings.notAvailableInIncognitoMode)}`;
+  }
   if (config.devToolsAiAssistancePerformanceAgent?.enabled) {
     consentViewContents = i18n.i18n.getFormatLocalizedString(
         str_, UIStrings.turnOnForStylesRequestsPerformanceAndFiles, {PH1: settingsLink});
@@ -1474,6 +1473,7 @@ function renderMainContents({
   markdownRenderer,
   conversationType,
   changeSummary,
+  changeManager,
   onSuggestionClick,
   onFeedbackSubmit,
   onMessageContainerRef,
@@ -1488,8 +1488,9 @@ function renderMainContents({
   suggestions: string[],
   userInfo: Pick<Host.InspectorFrontendHostAPI.SyncInformation, 'accountImage'|'accountFullName'>,
   markdownRenderer: MarkdownRendererWithCodeBlock,
-  conversationType?: ConversationType,
+  conversationType?: AiAssistanceModel.ConversationType,
   changeSummary?: string,
+               changeManager: AiAssistanceModel.ChangeManager,
                onSuggestionClick: (suggestion: string) => void,
                onFeedbackSubmit:
                    (rpcId: Host.AidaClient.RpcGlobalId, rate: Host.AidaClient.Rating, feedback?: string) => void,
@@ -1516,9 +1517,11 @@ function renderMainContents({
       userInfo,
       markdownRenderer,
       changeSummary,
+      changeManager,
       onSuggestionClick,
       onFeedbackSubmit,
       onMessageContainerRef,
+
     });
   }
 

@@ -1,6 +1,7 @@
 // Copyright 2024 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -165,7 +166,7 @@ export class TracingContext {
   #appliedEvaluations = 0;
   #hasMoreEvaluations = true;
   readonly #highlighting: Highlighting;
-  #parsedValueCache = new Map<SDK.CSSProperty.CSSProperty, {
+  #parsedValueCache = new Map<SDK.CSSProperty.CSSProperty|SDK.CSSMatchedStyles.CSSRegisteredProperty, {
     matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles,
     computedStyles: Map<string, string>,
     parsedValue: SDK.CSSPropertyParser.BottomUpTreeMatching|null,
@@ -282,7 +283,8 @@ export class TracingContext {
   }
 
   cachedParsedValue(
-      declaration: SDK.CSSProperty.CSSProperty, matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles,
+      declaration: SDK.CSSProperty.CSSProperty|SDK.CSSMatchedStyles.CSSRegisteredProperty,
+      matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles,
       computedStyles: Map<string, string>): SDK.CSSPropertyParser.BottomUpTreeMatching|null {
     const cachedValue = this.#parsedValueCache.get(declaration);
     if (cachedValue?.matchedStyles === matchedStyles && cachedValue?.computedStyles === computedStyles) {
@@ -497,9 +499,12 @@ export class StringRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.S
 export class BinOpRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.BinOpMatch) {
   // clang-format on
   override render(match: SDK.CSSPropertyParserMatchers.BinOpMatch, context: RenderingContext): Node[] {
-    const [lhs, binop, rhs] =
-        SDK.CSSPropertyParser.ASTUtils.children(match.node).map(child => Renderer.render(child, context).nodes);
+    const [lhs, binop, rhs] = SDK.CSSPropertyParser.ASTUtils.children(match.node).map(child => {
+      const span = document.createElement('span');
+      Renderer.renderInto(child, context, span);
+      return span;
+    });
 
-    return [lhs, document.createTextNode(' '), binop, document.createTextNode(' '), rhs].flat();
+    return [lhs, document.createTextNode(' '), binop, document.createTextNode(' '), rhs];
   }
 }

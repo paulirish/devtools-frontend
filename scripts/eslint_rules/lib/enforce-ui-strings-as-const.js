@@ -4,7 +4,7 @@
 
 /**
  * @fileoverview Rule to check ES import usage
- * @author ergunsh@
+ * @author Ergün Erdoğmuş
  */
 'use strict';
 
@@ -44,7 +44,8 @@ module.exports = {
         const [declaration] = node.declarations;
         // We look for `startsWith` because we want to capture other variations as well
         // such as `UIStringsNotTranslate` from the AIAssistancePanel.
-        const isIdentifierUIStrings = declaration.id.type === 'Identifier' && declaration.id.name.startsWith('UIStrings');
+        const isIdentifierUIStrings =
+            declaration.id.type === 'Identifier' && declaration.id.name.startsWith('UIStrings');
         const isAValidObjectExpression = declaration.init?.type === 'ObjectExpression';
         if (!isIdentifierUIStrings || !isAValidObjectExpression) {
           return;
@@ -58,8 +59,15 @@ module.exports = {
           node: declaration,
           messageId: 'invalidUIStringsObject',
           fix: fixer => {
-            const objectEnd = declaration.init.range[1];
-            return fixer.insertTextAfterRange([objectEnd - 1, objectEnd], ' as const');
+            const objectEnd = declaration.init?.range?.[1];
+            if (!objectEnd) {
+              return null;
+            }
+
+            return fixer.insertTextAfterRange(
+                [objectEnd - 1, objectEnd],
+                ' as const',
+            );
           },
         });
       },

@@ -4,15 +4,16 @@
 
 import * as Host from '../../../core/host/host.js';
 import * as i18n from '../../../core/i18n/i18n.js';
+import * as AiAssistanceModel from '../../../models/ai_assistance/ai_assistance.js';
 import {renderElementIntoDOM} from '../../../testing/DOMHelpers.js';
 import {describeWithEnvironment, updateHostConfig} from '../../../testing/EnvironmentHelpers.js';
-import * as AiAssistance from '../ai_assistance.js';
+import * as AiAssistancePanel from '../ai_assistance.js';
 
 describeWithEnvironment('ChatView', () => {
-  function getProp(options: Partial<AiAssistance.Props>): AiAssistance.Props {
+  function getProp(options: Partial<AiAssistancePanel.Props>): AiAssistancePanel.Props {
     const noop = () => {};
-    const messages: AiAssistance.ChatMessage[] = options.messages ?? [];
-    const selectedContext = sinon.createStubInstance(AiAssistance.NodeContext);
+    const messages: AiAssistancePanel.ChatMessage[] = options.messages ?? [];
+    const selectedContext = sinon.createStubInstance(AiAssistanceModel.NodeContext);
     selectedContext.getTitle.returns('');
     return {
       onTextSubmit: noop,
@@ -22,9 +23,10 @@ describeWithEnvironment('ChatView', () => {
       onContextClick: noop,
       onNewConversation: noop,
       onTextInputChange: noop,
+      changeManager: new AiAssistanceModel.ChangeManager(),
       inspectElementToggled: false,
-      state: AiAssistance.State.CHAT_VIEW,
-      conversationType: AiAssistance.ConversationType.STYLING,
+      state: AiAssistancePanel.State.CHAT_VIEW,
+      conversationType: AiAssistanceModel.ConversationType.STYLING,
       aidaAvailability: Host.AidaClient.AidaAccessPreconditions.AVAILABLE,
       messages,
       selectedContext,
@@ -47,7 +49,7 @@ describeWithEnvironment('ChatView', () => {
       const props = getProp({
         messages: [
           {
-            entity: AiAssistance.ChatMessageEntity.MODEL,
+            entity: AiAssistancePanel.ChatMessageEntity.MODEL,
             steps: [
               {
                 isLoading: false,
@@ -62,7 +64,7 @@ describeWithEnvironment('ChatView', () => {
           },
         ],
       });
-      const chat = new AiAssistance.ChatView(props);
+      const chat = new AiAssistancePanel.ChatView(props);
       renderElementIntoDOM(chat);
 
       const sideEffect = chat.shadowRoot!.querySelector('.side-effect-confirmation');
@@ -71,9 +73,9 @@ describeWithEnvironment('ChatView', () => {
 
     it('shows the disabled view when the state is CONSENT_VIEW', async () => {
       const props = getProp({
-        state: AiAssistance.State.CONSENT_VIEW,
+        state: AiAssistancePanel.State.CONSENT_VIEW,
       });
-      const chat = new AiAssistance.ChatView(props);
+      const chat = new AiAssistancePanel.ChatView(props);
       renderElementIntoDOM(chat);
 
       const optIn = chat.shadowRoot?.querySelector('.disabled-view');
@@ -83,10 +85,10 @@ describeWithEnvironment('ChatView', () => {
 
     it('shows the disabled view when the AIDA is not available', async () => {
       const props = getProp({
-        state: AiAssistance.State.CHAT_VIEW,
+        state: AiAssistancePanel.State.CHAT_VIEW,
         aidaAvailability: Host.AidaClient.AidaAccessPreconditions.NO_INTERNET,
       });
-      const chat = new AiAssistance.ChatView(props);
+      const chat = new AiAssistancePanel.ChatView(props);
       renderElementIntoDOM(chat);
 
       const optIn = chat.shadowRoot?.querySelector('.disabled-view');
@@ -112,7 +114,7 @@ describeWithEnvironment('ChatView', () => {
         const props = getProp({
           conversationType: undefined,
         });
-        const chat = new AiAssistance.ChatView(props);
+        const chat = new AiAssistancePanel.ChatView(props);
         renderElementIntoDOM(chat);
         const featureCards = chat.shadowRoot?.querySelectorAll('.feature-card');
         assert.isDefined(featureCards);
@@ -141,7 +143,7 @@ describeWithEnvironment('ChatView', () => {
         const props = getProp({
           conversationType: undefined,
         });
-        const chat = new AiAssistance.ChatView(props);
+        const chat = new AiAssistancePanel.ChatView(props);
         renderElementIntoDOM(chat);
         const featureCards = chat.shadowRoot?.querySelectorAll('.feature-card');
         assert.isDefined(featureCards);

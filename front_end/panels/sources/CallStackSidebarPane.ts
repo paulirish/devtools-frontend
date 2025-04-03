@@ -1,6 +1,7 @@
 // Copyright 2021 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 /*
  * Copyright (C) 2008 Apple Inc. All Rights Reserved.
@@ -78,7 +79,7 @@ const UIStrings = {
    */
   debugFileNotFound: 'Failed to load debug file "{PH1}".',
   /**
-   * @description A contex menu item in the Call Stack Sidebar Pane. "Restart" is a verb and
+   * @description A context menu item in the Call Stack Sidebar Pane. "Restart" is a verb and
    * "frame" is a noun. "Frame" refers to an individual item in the call stack, i.e. a call frame.
    * The user opens this context menu by selecting a specific call frame in the call stack sidebar pane.
    */

@@ -1,10 +1,13 @@
 // Copyright 2025 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
+import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
+import * as Persistence from '../../models/persistence/persistence.js';
 import type * as Workspace from '../../models/workspace/workspace.js';
 import * as WorkspaceDiff from '../../models/workspace_diff/workspace_diff.js';
 import type * as Diff from '../../third_party/diff/diff.js';
@@ -37,7 +40,8 @@ interface SingleDiffViewInput {
   icon: HTMLElement;
   diff: Diff.Diff.DiffArray;
   copied: boolean;
-  onCopy: (fileUrl: string, diff: Diff.Diff.DiffArray) => void;
+  onCopy: (fileUrl: string) => void;
+  onFileNameClick: (fileUrl: string) => void;
 }
 
 export interface ViewInput {
@@ -47,7 +51,7 @@ export interface ViewInput {
 type View = (input: ViewInput, output: undefined, target: HTMLElement) => void;
 
 function renderSingleDiffView(singleDiffViewInput: SingleDiffViewInput): Lit.TemplateResult {
-  const {fileName, fileUrl, mimeType, icon, diff, copied, onCopy} = singleDiffViewInput;
+  const {fileName, fileUrl, mimeType, icon, diff, copied, onCopy, onFileNameClick} = singleDiffViewInput;
 
   return html`
     <details open>
@@ -55,7 +59,7 @@ function renderSingleDiffView(singleDiffViewInput: SingleDiffViewInput): Lit.Tem
         <div class="summary-left">
           <devtools-icon class="drop-down-icon" .name=${'arrow-drop-down'}></devtools-icon>
           ${icon}
-          <span class="file-name">${fileName}</span>
+          <button class="file-name-link" @click=${() => onFileNameClick(fileUrl)}>${fileName}</button>
         </div>
         <div class="summary-right">
           ${copied ? html`<span class="copied">${i18nString(UIStrings.copied)}</span>` : html`
@@ -65,7 +69,7 @@ function renderSingleDiffView(singleDiffViewInput: SingleDiffViewInput): Lit.Tem
               .iconName=${'copy'}
               .jslogContext=${'combined-diff-view.copy'}
               .variant=${Buttons.Button.Variant.ICON}
-              @click=${() => onCopy(fileUrl, diff)}></devtools-button>
+              @click=${() => onCopy(fileUrl)}></devtools-button>
           `}
         </div>
       </summary>
@@ -83,7 +87,7 @@ export class CombinedDiffView extends UI.Widget.Widget {
   #modifiedUISourceCodes: Workspace.UISourceCode.UISourceCode[] = [];
   #copiedFiles: Record<string, boolean> = {};
   #view: View;
-  constructor(element?: HTMLElement, view: View = (input, output, target) => {
+  constructor(element?: HTMLElement, view: View = (input, _output, target) => {
     Lit.render(
         html`
       <div class="combined-diff-view">
@@ -114,15 +118,28 @@ export class CombinedDiffView extends UI.Widget.Widget {
     void this.#initializeModifiedUISourceCodes();
   }
 
-  async #onCopyDiff(fileUrl: string, diff: Diff.Diff.DiffArray): Promise<void> {
-    const changes = await PanelUtils.PanelUtils.formatCSSChangesFromDiff(diff);
-    Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(changes);
+  async #onCopyFileContent(fileUrl: string): Promise<void> {
+    const file = this.#modifiedUISourceCodes.find(uiSource => uiSource.url() === fileUrl);
+    if (!file) {
+      return;
+    }
+    const content = file.workingCopyContentData();
+    if (!content.isTextContent) {
+      return;
+    }
+
+    Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(content.text);
     this.#copiedFiles[fileUrl] = true;
     this.requestUpdate();
     setTimeout(() => {
       delete this.#copiedFiles[fileUrl];
       this.requestUpdate();
     }, COPIED_TO_CLIPBOARD_TEXT_TIMEOUT_MS);
+  }
+
+  #onFileNameClick(fileUrl: string): void {
+    const uiSourceCode = this.#modifiedUISourceCodes.find(uiSourceCode => uiSourceCode.url() === fileUrl);
+    void Common.Revealer.reveal(uiSourceCode);
   }
 
   async #initializeModifiedUISourceCodes(): Promise<void> {
@@ -162,27 +179,43 @@ export class CombinedDiffView extends UI.Widget.Widget {
   }
 
   override async performUpdate(): Promise<void> {
-    const uiSourceCodeAndDiffs = await Promise.all(this.#modifiedUISourceCodes.map(async modifiedUISourceCode => {
-      // `requestDiff` caches the response from the previous `requestDiff` calls if the file did not change
-      // so we can safely call it here without concerns for performance.
-      const diffResponse = await this.#workspaceDiff?.requestDiff(modifiedUISourceCode);
-      return {
-        diff: diffResponse?.diff,
-        uiSourceCode: modifiedUISourceCode,
-      };
-    }));
+    const uiSourceCodeAndDiffs = (await Promise.all(this.#modifiedUISourceCodes.map(async modifiedUISourceCode => {
+                                   // `requestDiff` caches the response from the previous `requestDiff` calls if the file did not change
+                                   // so we can safely call it here without concerns for performance.
+                                   const diffResponse = await this.#workspaceDiff?.requestDiff(modifiedUISourceCode);
+                                   if (!diffResponse || diffResponse.diff.length === 0) {
+                                     return;
+                                   }
+
+                                   return {
+                                     diff: diffResponse.diff,
+                                     uiSourceCode: modifiedUISourceCode,
+                                   };
+                                 }))).filter(uiSourceCodeAndDiff => !!uiSourceCodeAndDiff);
 
     const singleDiffViewInputs =
-        uiSourceCodeAndDiffs.filter(uiSourceCodeAndDiff => uiSourceCodeAndDiff.diff)
+        uiSourceCodeAndDiffs
             .map(({uiSourceCode, diff}) => {
+              let displayText = uiSourceCode.fullDisplayName();
+              // If the UISourceCode is backed by a workspace, we show the path as "{workspace-name}/path/relative/to/workspace"
+              const fileSystemUiSourceCode =
+                  Persistence.Persistence.PersistenceImpl.instance().fileSystem(uiSourceCode);
+              if (fileSystemUiSourceCode) {
+                displayText = [
+                  fileSystemUiSourceCode.project().displayName(),
+                  ...Persistence.FileSystemWorkspaceBinding.FileSystemWorkspaceBinding.relativePath(
+                      fileSystemUiSourceCode)
+                ].join('/');
+              }
               return {
-                diff: diff as Diff.Diff.DiffArray,  // We already filter above the ones that does not have `diff`.
-                fileName: `${uiSourceCode.isDirty() ? '*' : ''}${uiSourceCode.displayName()}`,
+                diff,
+                fileName: `${uiSourceCode.isDirty() ? '*' : ''}${displayText}`,
                 fileUrl: uiSourceCode.url(),
                 mimeType: uiSourceCode.mimeType(),
                 icon: PanelUtils.PanelUtils.getIconForSourceFile(uiSourceCode, {width: 18, height: 18}),
                 copied: this.#copiedFiles[uiSourceCode.url()],
-                onCopy: this.#onCopyDiff.bind(this),
+                onCopy: this.#onCopyFileContent.bind(this),
+                onFileNameClick: this.#onFileNameClick.bind(this),
               };
             })
             .sort((a, b) => Platform.StringUtilities.compare(a.fileName, b.fileName));

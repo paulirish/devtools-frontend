@@ -1,6 +1,7 @@
 // Copyright 2025 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Trace from '../../models/trace/trace.js';
@@ -87,6 +88,8 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
       endTime: this.endTime,
       eventGroupIdCallback: this.groupingFunction.bind(this),
       calculateTransferSize: true,
+      // Ensure we group by 3P alongside eventID for correct 3P grouping.
+      forceGroupIdCallback: true,
     });
     return node;
   }
@@ -169,6 +172,40 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
     if (sortFunction) {
       this.dataGrid.sortNodes(sortFunction, !this.dataGrid.isSortOrderAscending());
     }
+  }
+
+  override onHover(node: Trace.Extras.TraceTree.Node|null): void {
+    if (!node) {
+      this.dispatchEventToListeners(TimelineTreeView.TimelineTreeView.Events.TREE_ROW_HOVERED, {node: null});
+      return;
+    }
+    this.#getEventsForEventDispatch(node);
+    const events = this.#getEventsForEventDispatch(node);
+    this.dispatchEventToListeners(
+        TimelineTreeView.TimelineTreeView.Events.TREE_ROW_HOVERED,
+        {node, events: events && events.length > 0 ? events : undefined});
+  }
+
+  override onClick(node: Trace.Extras.TraceTree.Node|null): void {
+    if (!node) {
+      this.dispatchEventToListeners(TimelineTreeView.TimelineTreeView.Events.TREE_ROW_CLICKED, {node: null});
+      return;
+    }
+    const events = this.#getEventsForEventDispatch(node);
+    this.dispatchEventToListeners(
+        TimelineTreeView.TimelineTreeView.Events.TREE_ROW_CLICKED,
+        {node, events: events && events.length > 0 ? events : undefined});
+  }
+
+  // For ThirdPartyTree, we should include everything in our entity mapper for full coverage.
+  #getEventsForEventDispatch(node: Trace.Extras.TraceTree.Node): Trace.Types.Events.Event[]|null {
+    const mapper = this.entityMapper();
+    if (!mapper) {
+      return null;
+    }
+
+    const entity = mapper.entityForEvent(node.event);
+    return entity ? mapper.eventsForEntity(entity) ?? [] : [];
   }
 
   displayInfoForGroupNode(node: Trace.Extras.TraceTree.Node): {

@@ -1,6 +1,7 @@
 // Copyright (c) 2020 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import {html, nothing, render} from '../../lit/lit.js';
 
@@ -75,8 +76,8 @@ export class Report extends HTMLElement {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     render(html`
+      ${this.#reportTitle ? html`<div class="report-title">${this.#reportTitle}</div>` : nothing}
       <div class="content">
-        ${this.#reportTitle ? html`<div class="report-title">${this.#reportTitle}</div>` : nothing}
         <slot></slot>
       </div>
     `, this.#shadow, {host: this});

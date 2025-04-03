@@ -739,6 +739,11 @@ export namespace ProtocolMapping {
      */
     'FedCm.dialogClosed': [Protocol.FedCm.DialogClosedEvent];
     /**
+     * Event for when a GATT operation of |type| to the peripheral with |address|
+     * happened.
+     */
+    'BluetoothEmulation.gattOperationReceived': [Protocol.BluetoothEmulation.GattOperationReceivedEvent];
+    /**
      * Fired when breakpoint is resolved to an actual script and location.
      * Deprecated in favor of `resolvedBreakpoints` in the `scriptParsed` event.
      */
@@ -1307,6 +1312,11 @@ export namespace ProtocolMapping {
      * For example, a value of '1em' is evaluated according to the computed
      * 'font-size' of the element and a value 'calc(1px + 2px)' will be
      * resolved to '3px'.
+     * If the `propertyName` was specified the `values` are resolved as if
+     * they were property's declaration. If a value cannot be parsed according
+     * to the provided property syntax, the value is parsed using combined
+     * syntax as if null `propertyName` was provided. If the value cannot be
+     * resolved even then, return the provided value without any changes.
      */
     'CSS.resolveValues': {
       paramsType: [Protocol.CSS.ResolveValuesRequest];
@@ -2242,6 +2252,24 @@ export namespace ProtocolMapping {
      * Does nothing if no override is set.
      */
     'Emulation.clearDevicePostureOverride': {
+      paramsType: [];
+      returnType: void;
+    };
+    /**
+     * Start using the given display features to pupulate the Viewport Segments API.
+     * This override can also be set in setDeviceMetricsOverride().
+     */
+    'Emulation.setDisplayFeaturesOverride': {
+      paramsType: [Protocol.Emulation.SetDisplayFeaturesOverrideRequest];
+      returnType: void;
+    };
+    /**
+     * Clears the display features override set with either setDeviceMetricsOverride()
+     * or setDisplayFeaturesOverride() and starts using display features from the
+     * platform again.
+     * Does nothing if no override is set.
+     */
+    'Emulation.clearDisplayFeaturesOverride': {
       paramsType: [];
       returnType: void;
     };
@@ -4709,6 +4737,64 @@ export namespace ProtocolMapping {
      */
     'BluetoothEmulation.simulateAdvertisement': {
       paramsType: [Protocol.BluetoothEmulation.SimulateAdvertisementRequest];
+      returnType: void;
+    };
+    /**
+     * Simulates the response code from the peripheral with |address| for a
+     * GATT operation of |type|. The |code| value follows the HCI Error Codes from
+     * Bluetooth Core Specification Vol 2 Part D 1.3 List Of Error Codes.
+     */
+    'BluetoothEmulation.simulateGATTOperationResponse': {
+      paramsType: [Protocol.BluetoothEmulation.SimulateGATTOperationResponseRequest];
+      returnType: void;
+    };
+    /**
+     * Adds a service with |serviceUuid| to the peripheral with |address|.
+     */
+    'BluetoothEmulation.addService': {
+      paramsType: [Protocol.BluetoothEmulation.AddServiceRequest];
+      returnType: Protocol.BluetoothEmulation.AddServiceResponse;
+    };
+    /**
+     * Removes the service respresented by |serviceId| from the peripheral with
+     * |address|.
+     */
+    'BluetoothEmulation.removeService': {
+      paramsType: [Protocol.BluetoothEmulation.RemoveServiceRequest];
+      returnType: void;
+    };
+    /**
+     * Adds a characteristic with |characteristicUuid| and |properties| to the
+     * service represented by |serviceId| in the peripheral with |address|.
+     */
+    'BluetoothEmulation.addCharacteristic': {
+      paramsType: [Protocol.BluetoothEmulation.AddCharacteristicRequest];
+      returnType: Protocol.BluetoothEmulation.AddCharacteristicResponse;
+    };
+    /**
+     * Removes the characteristic respresented by |characteristicId| from the
+     * service respresented by |serviceId| in the peripheral with |address|.
+     */
+    'BluetoothEmulation.removeCharacteristic': {
+      paramsType: [Protocol.BluetoothEmulation.RemoveCharacteristicRequest];
+      returnType: void;
+    };
+    /**
+     * Adds a descriptor with |descriptorUuid| to the characteristic respresented
+     * by |characteristicId| in the service represented by |serviceId| of the
+     * peripheral with |address|.
+     */
+    'BluetoothEmulation.addDescriptor': {
+      paramsType: [Protocol.BluetoothEmulation.AddDescriptorRequest];
+      returnType: Protocol.BluetoothEmulation.AddDescriptorResponse;
+    };
+    /**
+     * Removes the descriptor with |descriptorId| from the characteristic
+     * respresented by |characteristicId| in the service represented by |serviceId|
+     * of the peripheral with |address|.
+     */
+    'BluetoothEmulation.removeDescriptor': {
+      paramsType: [Protocol.BluetoothEmulation.RemoveDescriptorRequest];
       returnType: void;
     };
     /**

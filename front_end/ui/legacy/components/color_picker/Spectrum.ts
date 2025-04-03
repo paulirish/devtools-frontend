@@ -1,6 +1,7 @@
 // Copyright 2020 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 /*
  * Copyright (C) 2011 Brian Grinstead All rights reserved.
@@ -1450,10 +1451,9 @@ const GeneratedPaletteTitle = 'Page colors';
 
 export class PaletteGenerator {
   private readonly callback: (arg0: Palette) => void;
-  private readonly frequencyMap: Map<string, number>;
+  private readonly frequencyMap = new Map<string, number>();
   constructor(callback: (arg0: Palette) => void) {
     this.callback = callback;
-    this.frequencyMap = new Map();
     const stylesheetPromises = [];
     for (const cssModel of SDK.TargetManager.TargetManager.instance().models(SDK.CSSModel.CSSModel)) {
       for (const stylesheet of cssModel.allStyleSheets()) {

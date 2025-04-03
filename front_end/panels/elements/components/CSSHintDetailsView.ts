@@ -1,6 +1,7 @@
 // Copyright 2022 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import '../../../ui/legacy/legacy.js';
 
@@ -50,13 +51,15 @@ export class CSSHintDetailsView extends HTMLElement {
           ${this.#authoringHint.getPossibleFixMessage() ? html`
               <div class="hint-popup-possible-fix">
                   ${Directives.unsafeHTML(this.#authoringHint.getPossibleFixMessage())}
-                  ${link ? html`
-                      <x-link id="learn-more" href=${link} class="clickable underlined unbreakable-text">
-                          ${i18nString(UIStrings.learnMore)}
-                      </x-link>
-                  `: ''}
               </div>
           ` : ''}
+          ${link ? html`
+                      <div class="footer">
+                        <x-link id="learn-more" href=${link} class="clickable underlined unbreakable-text">
+                            ${i18nString(UIStrings.learnMore)}
+                        </x-link>
+                      </div>
+                  `: ''}
         </div>
       `, this.#shadow, {
         host: this,

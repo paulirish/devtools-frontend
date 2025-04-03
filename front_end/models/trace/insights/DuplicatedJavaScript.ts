@@ -7,6 +7,7 @@ import * as Extras from '../extras/extras.js';
 import type * as Handlers from '../handlers/handlers.js';
 import * as Helpers from '../helpers/helpers.js';
 
+import {estimateCompressionRatioForScript, metricSavingsForWastedBytes} from './Common.js';
 import {
   InsightCategory,
   InsightKeys,
@@ -27,21 +28,24 @@ export const UIStrings = {
       'Remove large, duplicate JavaScript modules from bundles to reduce unnecessary bytes consumed by network activity.',
   /** Label for a column in a data table; entries will be the locations of JavaScript or CSS code, e.g. the name of a Javascript package or module. */
   columnSource: 'Source',
-  /** Label for a column in a data table; entries will be the file size of a web resource in kilobytes. */
-  columnResourceSize: 'Resource size',
+  /** Label for a column in a data table; entries will be the number of wasted bytes due to duplication of a web resource. */
+  columnDuplicatedBytes: 'Duplicated bytes',
 } as const;
 
 const str_ = i18n.i18n.registerUIStrings('models/trace/insights/DuplicatedJavaScript.ts', UIStrings);
 export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-export type DuplicateJavaScriptInsightModel = InsightModel<typeof UIStrings, {
+export type DuplicatedJavaScriptInsightModel = InsightModel<typeof UIStrings, {
   duplication: Extras.ScriptDuplication.ScriptDuplication,
+  duplicationGroupedByNodeModules: Extras.ScriptDuplication.ScriptDuplication,
   scriptsWithDuplication: Handlers.ModelHandlers.Scripts.Script[],
+  scripts: Handlers.ModelHandlers.Scripts.Script[],
+  mainDocumentUrl: string,
 }>;
 
-function finalize(partialModel: PartialInsightModel<DuplicateJavaScriptInsightModel>): DuplicateJavaScriptInsightModel {
-  const requests = partialModel.scriptsWithDuplication.map(script => script.request)
-                       .filter(e => !!e);  // eslint-disable-line no-implicit-coercion
+function finalize(partialModel: PartialInsightModel<DuplicatedJavaScriptInsightModel>):
+    DuplicatedJavaScriptInsightModel {
+  const requests = partialModel.scriptsWithDuplication.map(script => script.request).filter(e => !!e);
 
   return {
     insightKey: InsightKeys.DUPLICATE_JAVASCRIPT,
@@ -56,7 +60,7 @@ function finalize(partialModel: PartialInsightModel<DuplicateJavaScriptInsightMo
 }
 
 export function generateInsight(
-    parsedTrace: Handlers.Types.ParsedTrace, context: InsightSetContext): DuplicateJavaScriptInsightModel {
+    parsedTrace: Handlers.Types.ParsedTrace, context: InsightSetContext): DuplicatedJavaScriptInsightModel {
   const scripts = parsedTrace.Scripts.scripts.filter(script => {
     if (!context.navigation) {
       return false;
@@ -66,13 +70,37 @@ export function generateInsight(
       return false;
     }
 
+    if (script.url?.startsWith('chrome-extension://')) {
+      return false;
+    }
+
     return Helpers.Timing.timestampIsInBounds(context.bounds, script.ts);
   });
 
-  const duplication = Extras.ScriptDuplication.computeScriptDuplication({scripts});
+  const {duplication, duplicationGroupedByNodeModules} = Extras.ScriptDuplication.computeScriptDuplication({scripts});
   const scriptsWithDuplication = [...duplication.values().flatMap(data => data.duplicates.map(d => d.script))];
+
+  const wastedBytesByRequestId = new Map<string, number>();
+  for (const {duplicates} of duplication.values()) {
+    for (let i = 1; i < duplicates.length; i++) {
+      const sourceData = duplicates[i];
+      if (!sourceData.script.request) {
+        continue;
+      }
+
+      const compressionRatio = estimateCompressionRatioForScript(sourceData.script);
+      const transferSize = Math.round(sourceData.attributedSize * compressionRatio);
+      const requestId = sourceData.script.request.args.data.requestId;
+      wastedBytesByRequestId.set(requestId, (wastedBytesByRequestId.get(requestId) || 0) + transferSize);
+    }
+  }
+
   return finalize({
     duplication,
+    duplicationGroupedByNodeModules,
     scriptsWithDuplication: [...new Set(scriptsWithDuplication)],
+    scripts,
+    mainDocumentUrl: context.navigation?.args.data?.url ?? parsedTrace.Meta.mainFrameURL,
+    metricSavings: metricSavingsForWastedBytes(wastedBytesByRequestId, context),
   });
 }

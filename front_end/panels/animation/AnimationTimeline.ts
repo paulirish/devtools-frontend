@@ -1,6 +1,7 @@
 // Copyright (c) 2015 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import '../../ui/legacy/legacy.js';
 
@@ -144,8 +145,8 @@ export class AnimationTimeline extends UI.Widget.VBox implements
   #gridHeader!: HTMLElement;
   #scrollListenerId?: number|null;
   #collectedGroups: SDK.AnimationModel.AnimationGroup[];
-  #createPreviewForCollectedGroupsThrottler: Common.Throttler.Throttler = new Common.Throttler.Throttler(10);
-  #animationGroupUpdatedThrottler: Common.Throttler.Throttler = new Common.Throttler.Throttler(10);
+  #createPreviewForCollectedGroupsThrottler = new Common.Throttler.Throttler(10);
+  #animationGroupUpdatedThrottler = new Common.Throttler.Throttler(10);
 
   private constructor() {
     super(true);
