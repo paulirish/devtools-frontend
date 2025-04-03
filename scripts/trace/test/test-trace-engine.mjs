@@ -81,7 +81,9 @@ test('insights look ok', t => {
     'DuplicatedJavaScript',
     'SlowCSSSelector',
     'ForcedReflow',
-    'UseCache',
+    'Cache',
+    'ModernHTTP',
+    'LegacyJavaScript',
   ]);
   for (const [insightName, insightItem] of Object.entries(insightSet.model)) {
     const msg = insightItem instanceof Error ?
@@ -91,9 +93,9 @@ test('insights look ok', t => {
     assert.ok(typeof insightItem === 'object', `insightName ${insightName} is not an object`);
   }
 
-  const entityNames = Array.from(insightSet.model.ThirdParties.summaryByEntity.keys()).map(e => e.name);
-  const values = Array.from(insightSet.model.ThirdParties.summaryByEntity.values());
-  const simplified = Object.fromEntries(values.map((v, i) => [entityNames[i], v]));
+  const entityNames = insightSet.model.ThirdParties.summaries.map(s => s.entity.name);
+  const values = insightSet.model.ThirdParties.summaries.values();
+  const simplified = Object.fromEntries(values.map((v, i) => [entityNames[i], {transferSize: v.transferSize, mainThreadTime: v.mainThreadTime}]));
 
   const expected = {
     ahfhijdlegdabablpippeagghigmibma: { transferSize: 0, mainThreadTime: 2189 },

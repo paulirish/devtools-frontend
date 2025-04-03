@@ -99,6 +99,10 @@ mkdir -p $dist/third_party/third-party-web/
 echo "import ThirdPartyWeb from 'third-party-web'; export {ThirdPartyWeb};" > $dist/third_party/third-party-web/third-party-web.js
 cp $dist/third_party/third-party-web/third-party-web.js $dist/third_party/third-party-web/third-party-web.d.ts
 
+mkdir -p $dist/third_party/legacy-javascript/
+echo "import * as LegacyJavaScript from 'legacy-javascript'; export {LegacyJavaScript};" > $dist/third_party/legacy-javascript/legacy-javascript.js
+cp $dist/third_party/legacy-javascript/legacy-javascript.js $dist/third_party/legacy-javascript/legacy-javascript.d.ts
+
 echo 'export {};' > $dist/models/trace/TracingManager.js
 echo 'export {};' > $dist/models/trace/TracingManager.d.ts
 echo 'export {};' > $dist/models/trace/LegacyTracingModel.js
