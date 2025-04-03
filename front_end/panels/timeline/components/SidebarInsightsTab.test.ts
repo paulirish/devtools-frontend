@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as Trace from '../../../models/trace/trace.js';
 import {renderElementIntoDOM} from '../../../testing/DOMHelpers.js';
 import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
 import {TraceLoader} from '../../../testing/TraceLoader.js';
@@ -43,7 +42,6 @@ describeWithEnvironment('SidebarInsightsTab', () => {
     assert.lengthOf(sets, 4);  // same number of sets as there are navigations
   });
 });
-
 
 describeWithEnvironment('SidebarInsightsTab', () => {
   it('skips rendering trivial insight sets', async function() {
