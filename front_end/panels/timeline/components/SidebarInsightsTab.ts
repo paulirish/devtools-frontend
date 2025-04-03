@@ -89,9 +89,8 @@ export class SidebarInsightsTab extends HTMLElement {
       return;
     }
 
-    this.#insights = data;
     this.#selectedInsightSetKey = null;
-    if (!this.#insights || !this.#parsedTrace) {
+    if (!data || !this.#parsedTrace) {
       return;
     }
 
@@ -99,12 +98,11 @@ export class SidebarInsightsTab extends HTMLElement {
 
     // If there's no insights, no navigation, and the duration is trivial, then don't show it at all.
     // These are typically the very short "before reload" time ranges.
-    this.#insights.entries().forEach(([id, insightSet]) => {
+    const nonTrivialEntries = Array.from(data?.entries()).filter(([id, insightSet]) => {
       const {shownInsights} = SidebarSingleInsightSet.categorizeInsights(data, id, this.#selectedCategory);
-      if (shownInsights.length === 0 && !insightSet.navigation && insightSet.bounds.range < trivialThreshold) {
-        this.#insights?.delete(id);
-      }
+      return shownInsights.length > 0 || insightSet.navigation || insightSet.bounds.range > trivialThreshold;
     });
+    this.#insights = new Map(nonTrivialEntries);
 
     // Select by default the first non-trivial insight set:
     // - greater than 5s in duration
