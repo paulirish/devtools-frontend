@@ -92,11 +92,10 @@ const EXPERIMENTAL_INSIGHTS: ReadonlySet<string> = new Set([]);
 type InsightNameToComponentMapping =
     Record<string, typeof Insights.BaseInsightComponent.BaseInsightComponent<Trace.Insights.Types.InsightModel>>;
 
-// New return type for categorizeInsights
-type CategorizedInsightData = {
-  componentClass: typeof Insights.BaseInsightComponent.BaseInsightComponent<Trace.Insights.Types.InsightModel>,
-  model: Trace.Insights.Types.InsightModel,
-};
+interface CategorizedInsightData {
+  componentClass: typeof Insights.BaseInsightComponent.BaseInsightComponent<Trace.Insights.Types.InsightModel>;
+  model: Trace.Insights.Types.InsightModel;
+}
 
 /**
  * Every insight (INCLUDING experimental ones).
@@ -402,7 +401,7 @@ export class SidebarSingleInsightSet extends HTMLElement {
         continue;
       }
 
-      if (!model || !shouldRenderForCategory({activeCategory: activeCategory, insightCategory: model.category})) {
+      if (!model || !shouldRenderForCategory({activeCategory, insightCategory: model.category})) {
         continue;
       }
 
