@@ -2,12 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Trace from '../../../models/trace/trace.js';
 import {renderElementIntoDOM} from '../../../testing/DOMHelpers.js';
 import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
 import {TraceLoader} from '../../../testing/TraceLoader.js';
 import * as RenderCoordinator from '../../../ui/components/render_coordinator/render_coordinator.js';
 
 import * as Components from './components.js';
+
 describeWithEnvironment('SidebarInsightsTab', () => {
   it('renders a list of insights per navigation in the sidebar', async function() {
     const {parsedTrace, insights} = await TraceLoader.traceEngine(this, 'multiple-navigations.json.gz');
@@ -47,39 +49,34 @@ describeWithEnvironment('SidebarInsightsTab', () => {
   it('skips rendering trivial insight sets', async function() {
     const {parsedTrace, insights} = await TraceLoader.traceEngine(this, 'multiple-navigations-with-iframes.json.gz');
     assert.isOk(insights);
-    assert.deepEqual(Array.from(insights.keys()), [
+    const expectedInsightSetKeys = [
       'NO_NAVIGATION',
       '05059ACF683224E6FC7E344F544A4050',
       '550FC08C662EF691E1535F305CBC0FCA',
-    ]);
+    ];
+    assert.deepEqual(Array.from(insights.keys()), expectedInsightSetKeys);
+    const insightSetUrls = [
+      'http://localhost:5000/',
+      'http://localhost:5000/',
+      'http://localhost:5000/page2.html',
+    ];
+    assert.deepEqual(Array.from(insights.values()).map(insightSet => insightSet.url.href), insightSetUrls);
 
     const component = new Components.SidebarInsightsTab.SidebarInsightsTab();
     renderElementIntoDOM(component);
     component.parsedTrace = parsedTrace;
     component.insights = insights;
-    // The component should have removed the NO_NAVIGATION insight set, as it was deemed trivial.
-    assert.deepEqual(Array.from(insights.keys()), [
-      '05059ACF683224E6FC7E344F544A4050',
-      '550FC08C662EF691E1535F305CBC0FCA',
-    ]);
+
+    // The insight keys have NOT been mutated
+    assert.deepEqual(Array.from(insights.keys()), expectedInsightSetKeys);
     await RenderCoordinator.done();
     assert.isOk(component.shadowRoot);
 
     const navigationURLs =
         Array.from(component.shadowRoot.querySelectorAll<HTMLElement>('details > summary')).map(elem => elem.title);
-    assert.deepEqual(navigationURLs, [
-      'http://localhost:5000/',
-      'http://localhost:5000/page2.html',
-    ]);
-
-    const navigationURLLabels =
-        Array.from(component.shadowRoot.querySelectorAll<HTMLElement>('details > summary')).map(elem => elem.innerText);
-    assert.deepEqual(navigationURLLabels, [
-      'http://localhost:5000',
-      'http://localhost:5000/page2.html',
-    ]);
-
     const sets = component.shadowRoot.querySelectorAll('devtools-performance-sidebar-single-navigation');
+    // The first one is skipped because it's trivial.
+    assert.deepEqual(navigationURLs, insightSetUrls.slice(1));
     assert.lengthOf(sets, 2);  // same number of sets as there are navigations
   });
 });
