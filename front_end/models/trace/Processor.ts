@@ -350,9 +350,7 @@ export class TraceProcessor extends EventTarget {
    * Sort the insight models based on the impact of each insight's estimated savings, additionally weighted by the
    * worst metrics according to field data (if present).
    */
-  sortInsightSet(
-      insights: Insights.Types.TraceInsightSets, insightSet: Insights.Types.InsightSet,
-      metadata: Types.File.MetaData|null): void {
+  sortInsightSet(insightSet: Insights.Types.InsightSet, metadata: Types.File.MetaData|null): void {
     // The initial order of the insights is alphabetical, based on `front_end/models/trace/insights/Models.ts`.
     // The order here provides a baseline that groups insights in a more logical way.
     const baselineOrder: Record<keyof Insights.Types.InsightModels, null> = {
@@ -381,14 +379,14 @@ export class TraceProcessor extends EventTarget {
 
     // Normalize the estimated savings to a single number, weighted by its relative impact
     // to the page experience based on the same scoring curve that Lighthouse uses.
-    const observedLcpMicro = Insights.Common.getLCP(insights, insightSet.id)?.value;
+    const observedLcpMicro = Insights.Common.getLCP(this.#insights, insightSet.id)?.value;
     const observedLcp = observedLcpMicro ? Helpers.Timing.microToMilli(observedLcpMicro) : Types.Timing.Milli(0);
-    const observedCls = Insights.Common.getCLS(insights, insightSet.id).value;
+    const observedCls = Insights.Common.getCLS(this.#insights, insightSet.id).value;
 
     // INP is special - if users did not interact with the page, we'll have no INP, but we should still
     // be able to prioritize insights based on this metric. When we observe no interaction, instead use
     // a default value for the baseline INP.
-    const observedInpMicro = Insights.Common.getINP(insights, insightSet.id)?.value;
+    const observedInpMicro = Insights.Common.getINP(this.#insights, insightSet.id)?.value;
     const observedInp = observedInpMicro ? Helpers.Timing.microToMilli(observedInpMicro) : Types.Timing.Milli(200);
 
     const observedLcpScore =
@@ -450,8 +448,8 @@ export class TraceProcessor extends EventTarget {
   }
 
   #computeInsightSet(
-      insights: Insights.Types.TraceInsightSets, parsedTrace: Handlers.Types.ParsedTrace,
-      context: Insights.Types.InsightSetContext, options: Types.Configuration.ParseOptions): void {
+      parsedTrace: Handlers.Types.ParsedTrace, context: Insights.Types.InsightSetContext,
+      options: Types.Configuration.ParseOptions): void {
     let id, urlString, navigation;
     if (context.navigation) {
       id = context.navigationId;
@@ -500,8 +498,11 @@ export class TraceProcessor extends EventTarget {
       bounds: context.bounds,
       model,
     };
-    insights.set(insightSet.id, insightSet);
-    this.sortInsightSet(insights, insightSet, options.metadata ?? null);
+    if (!this.#insights) {
+      this.#insights = new Map();
+    }
+    this.#insights.set(insightSet.id, insightSet);
+    this.sortInsightSet(insightSet, options.metadata ?? null);
   }
 
   /**
@@ -510,7 +511,7 @@ export class TraceProcessor extends EventTarget {
   #computeInsights(
       parsedTrace: Handlers.Types.ParsedTrace, traceEvents: readonly Types.Events.Event[],
       options: Types.Configuration.ParseOptions): void {
-    // 1. Initialize insights map. This map will be populated by the helper methods.
+    // 1. This insights map will be populated by the helper methods.
     this.#insights = new Map();
 
     // 2. Filter main frame navigations to those that have the necessary data (frameId and navigationId).
@@ -535,11 +536,6 @@ export class TraceProcessor extends EventTarget {
   #computeInsightsForInitialTracePeriod(
       parsedTrace: Handlers.Types.ParsedTrace, navigations: readonly Types.Events.NavigationStart[],
       options: Types.Configuration.ParseOptions): void {
-    if (!this.#insights) {
-      console.error('Insights map not initialized before calling #computeInsightsForInitialTracePeriod');
-      return;
-    }
-
     // Determine bounds: Use the period before the first navigation if navigations exist, otherwise use the entire trace bounds.
     const bounds = navigations.length > 0 ?
         Helpers.Timing.traceWindowFromMicroSeconds(parsedTrace.Meta.traceBounds.min, navigations[0].ts) :
@@ -557,11 +553,11 @@ export class TraceProcessor extends EventTarget {
     // If navigations exist but the initial period is below the threshold, we intentionally do nothing.
     if (shouldComputeInsights) {
       const context: Insights.Types.InsightSetContext = {
-        bounds,  // Use the bounds determined above
+        bounds,
         frameId: parsedTrace.Meta.mainFrameId,
         // No navigation or lantern context applies to this initial/no-navigation period.
       };
-      this.#computeInsightSet(this.#insights, parsedTrace, context, options);
+      this.#computeInsightSet(parsedTrace, context, options);
     }
   }
 
@@ -573,17 +569,10 @@ export class TraceProcessor extends EventTarget {
       navigations: readonly Types.Events.NavigationStart[],  // The filtered list of navigations
       parsedTrace: Handlers.Types.ParsedTrace, traceEvents: readonly Types.Events.Event[],
       options: Types.Configuration.ParseOptions): void {
-    if (!this.#insights) {
-      // This should not happen if called from #computeInsights.
-      console.error('Insights map not initialized before calling #computeInsightsForNavigation');
-      return;
-    }
-
+    const frameId = navigation.args.frame;
     // Guaranteed by the filter in #computeInsights
-    const frameId = navigation.args.frame!;
-    const navigationId = navigation.args.data?.navigationId!;
+    const navigationId = navigation.args.data?.navigationId as string;
 
-    // Create Lantern context (optional, handles errors)
     // The lantern sub-context is optional on InsightSetContext, so not setting it is OK.
     // This is also a hedge against an error inside Lantern resulting in breaking the entire performance panel.
     // Additionally, many trace fixtures are too old to be processed by Lantern.
@@ -616,25 +605,21 @@ export class TraceProcessor extends EventTarget {
       options.logger?.end('insights:createLanternContext');
     }
 
-    // Calculate bounds for this navigation
     const min = navigation.ts;
     // Use trace end for the last navigation, otherwise use the start of the next navigation.
-    const max = navigationIndex + 1 < navigations.length ?
-        navigations[navigationIndex + 1].ts :  // Use the passed navigations array
-        parsedTrace.Meta.traceBounds.max;
+    const max = navigationIndex + 1 < navigations.length ? navigations[navigationIndex + 1].ts :
+                                                           parsedTrace.Meta.traceBounds.max;
     const bounds = Helpers.Timing.traceWindowFromMicroSeconds(min, max);
 
-    // Create context for this navigation
     const context: Insights.Types.InsightSetContext = {
       bounds,
       frameId,
       navigation,
       navigationId,
-      lantern,  // Include optional Lantern context
+      lantern,
     };
 
-    // Compute insights for this navigation's context
-    this.#computeInsightSet(this.#insights, parsedTrace, context, options);
+    this.#computeInsightSet(parsedTrace, context, options);
   }
 }
 
