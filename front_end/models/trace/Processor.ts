@@ -562,6 +562,7 @@ export class TraceProcessor extends EventTarget {
     if (shouldExclude) {
       this.#insights?.delete(insightSet.id);
     }
+    // If navigations exist but the initial period is below the threshold, we intentionally do nothing.
   }
 
   /**
