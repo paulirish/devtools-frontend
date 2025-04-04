@@ -7,6 +7,7 @@ import * as Common from '../../../core/common/common.js';
 import type * as Trace from '../../../models/trace/trace.js';
 import * as UI from '../../../ui/legacy/legacy.js';
 
+import * as Insights from './insights/insights.js';
 import {SidebarAnnotationsTab} from './SidebarAnnotationsTab.js';
 import {SidebarInsightsTab} from './SidebarInsightsTab.js';
 
@@ -93,6 +94,11 @@ export class SidebarWidget extends UI.Widget.VBox {
         this.#tabbedPane.tabIsDisabled(SidebarTabs.INSIGHTS)) {
       this.#tabbedPane.selectTab(SidebarTabs.ANNOTATIONS);
     }
+  }
+
+  override willHide(): void {
+    // When hiding sidebar, reset activeInsight to clear the active dimmer.
+    this.element.dispatchEvent(new Insights.SidebarInsight.InsightDeactivated());
   }
 
   setAnnotations(
