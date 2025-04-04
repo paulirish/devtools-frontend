@@ -512,36 +512,33 @@ export class TraceProcessor extends EventTarget {
       parsedTrace: Handlers.Types.ParsedTrace, navigations: readonly Types.Events.NavigationStart[],
       options: Types.Configuration.ParseOptions): void {
     if (!this.#insights) {
-      // This should not happen if called from #computeInsights, which initializes the map.
       console.error('Insights map not initialized before calling #computeInsightsForInitialTracePeriod');
       return;
     }
 
-    if (navigations.length) {
-      // Handle pre-navigation period if significant
-      const firstNavigationTs = navigations[0].ts;
-      const bounds = Helpers.Timing.traceWindowFromMicroSeconds(parsedTrace.Meta.traceBounds.min, firstNavigationTs);
-      // When using "Record and reload" option, it typically takes ~5ms. So use 50ms to be safe.
-      const threshold = Helpers.Timing.milliToMicro(50 as Types.Timing.Milli);
+    // Determine bounds: Use the period before the first navigation if navigations exist, otherwise use the entire trace bounds.
+    const bounds = navigations.length > 0 ?
+        Helpers.Timing.traceWindowFromMicroSeconds(parsedTrace.Meta.traceBounds.min, navigations[0].ts) :
+        parsedTrace.Meta.traceBounds;
 
-      if (bounds.range > threshold) {
-        const context: Insights.Types.InsightSetContext = {
-          bounds,
-          frameId: parsedTrace.Meta.mainFrameId,
-          // No navigation or lantern context for the initial period.
-        };
-        this.#computeInsightSet(this.#insights, parsedTrace, context, options);
-      }
-      // If threshold is not met, this period is ignored by the insights engine.
-    } else {
-      // Handle no-navigation case (entire trace)
+    // Define threshold for considering the pre-navigation period significant enough to analyze.
+    // When using "Record and reload" option, it typically takes ~5ms. So use 50ms to be safe.
+    const threshold = Helpers.Timing.milliToMicro(50 as Types.Timing.Milli);
+
+    // Compute insights if either:
+    // 1. There are no navigations (we analyze the whole trace).
+    // 2. There are navigations, AND the initial period before the first navigation is longer than the threshold.
+    const shouldComputeInsights = navigations.length === 0 || bounds.range > threshold;
+
+    if (shouldComputeInsights) {
       const context: Insights.Types.InsightSetContext = {
-        bounds: parsedTrace.Meta.traceBounds,
+        bounds,  // Use the bounds determined above
         frameId: parsedTrace.Meta.mainFrameId,
-        // No navigation or lantern context for the no-navigation case.
+        // No navigation or lantern context applies to this initial/no-navigation period.
       };
       this.#computeInsightSet(this.#insights, parsedTrace, context, options);
     }
+    // If navigations exist but the initial period is below the threshold, we intentionally do nothing.
   }
 
   /**
