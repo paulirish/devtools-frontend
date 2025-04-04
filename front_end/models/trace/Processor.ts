@@ -541,6 +541,13 @@ export class TraceProcessor extends EventTarget {
         Helpers.Timing.traceWindowFromMicroSeconds(parsedTrace.Meta.traceBounds.min, navigations[0].ts) :
         parsedTrace.Meta.traceBounds;
 
+    const context: Insights.Types.InsightSetContext = {
+      bounds,
+      frameId: parsedTrace.Meta.mainFrameId,
+      // No navigation or lantern context applies to this initial/no-navigation period.
+    };
+    this.#computeInsightSet(parsedTrace, context, options);
+
     // After computing the insights for this NO_NAVIGATION, we may choose to exclude the insightSet if it's trivial. Trivial means:
     //   1. There's no navigation (it's an initial trace period)
     //   2. All the insights are passing (aka no insights to show the user)
@@ -562,7 +569,6 @@ export class TraceProcessor extends EventTarget {
     if (shouldExclude) {
       this.#insights?.delete(insightSet.id);
     }
-    // If navigations exist but the initial period is below the threshold, we intentionally do nothing.
   }
 
   /**
