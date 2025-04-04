@@ -506,10 +506,11 @@ export class TraceProcessor extends EventTarget {
   }
 
   /**
-   * Run all the insights and set the result to `#insights`.
+   * Computes insights for the period before the first navigation, or for the
+   * entire trace if no navigations exist. Populates the #insights map.
    */
-  #computeInsights(
-      parsedTrace: Handlers.Types.ParsedTrace, traceEvents: readonly Types.Events.Event[],
+  #computeInsightsForInitialTracePeriod(
+      parsedTrace: Handlers.Types.ParsedTrace, navigations: readonly Types.Events.NavigationStart[],
       options: Types.Configuration.ParseOptions): void {
     // This insights map will be populated by the helper methods.
     this.#insights = new Map();
