@@ -505,88 +505,141 @@ export class TraceProcessor extends EventTarget {
   }
 
   /**
-   * Run all the insights and set the result to `#insights`.
+   * Computes insights for the period before the first navigation, or for the
+   * entire trace if no navigations exist. Populates the #insights map.
    */
-  #computeInsights(
-      parsedTrace: Handlers.Types.ParsedTrace, traceEvents: readonly Types.Events.Event[],
+  #computeInsightsForInitialTracePeriod(
+      parsedTrace: Handlers.Types.ParsedTrace, navigations: readonly Types.Events.NavigationStart[],
       options: Types.Configuration.ParseOptions): void {
-    this.#insights = new Map();
+    if (!this.#insights) {
+      // This should not happen if called from #computeInsights, which initializes the map.
+      console.error('Insights map not initialized before calling #computeInsightsForInitialTracePeriod');
+      return;
+    }
 
-    const navigations = parsedTrace.Meta.mainFrameNavigations.filter(
-        navigation => navigation.args.frame && navigation.args.data?.navigationId);
-
-    // Check if there is a meaningful chunk of work happening prior to the first navigation.
-    // If so, we run the insights on that initial bounds.
-    // Otherwise, there are no navigations and we do a no-navigation insights pass on the entire trace.
     if (navigations.length) {
-      const bounds = Helpers.Timing.traceWindowFromMicroSeconds(parsedTrace.Meta.traceBounds.min, navigations[0].ts);
+      // Handle pre-navigation period if significant
+      const firstNavigationTs = navigations[0].ts;
+      const bounds = Helpers.Timing.traceWindowFromMicroSeconds(parsedTrace.Meta.traceBounds.min, firstNavigationTs);
       // When using "Record and reload" option, it typically takes ~5ms. So use 50ms to be safe.
       const threshold = Helpers.Timing.milliToMicro(50 as Types.Timing.Milli);
+
       if (bounds.range > threshold) {
         const context: Insights.Types.InsightSetContext = {
           bounds,
           frameId: parsedTrace.Meta.mainFrameId,
+          // No navigation or lantern context for the initial period.
         };
         this.#computeInsightSet(this.#insights, parsedTrace, context, options);
       }
-      // If threshold is not met, then the very beginning of the trace is ignored by the insights engine.
+      // If threshold is not met, this period is ignored by the insights engine.
     } else {
+      // Handle no-navigation case (entire trace)
       const context: Insights.Types.InsightSetContext = {
         bounds: parsedTrace.Meta.traceBounds,
         frameId: parsedTrace.Meta.mainFrameId,
+        // No navigation or lantern context for the no-navigation case.
       };
       this.#computeInsightSet(this.#insights, parsedTrace, context, options);
     }
+  }
 
-    // Now run the insights for each navigation in isolation.
-    for (const [i, navigation] of navigations.entries()) {
-      // The above filter guarantees these are present.
-      const frameId = navigation.args.frame;
-      const navigationId = navigation.args.data?.navigationId as string;
+  /**
+   * Computes insights for a specific navigation event. Populates the #insights map.
+   */
+  #computeInsightsForNavigation(
+      navigation: Types.Events.NavigationStart, navigationIndex: number,
+      navigations: readonly Types.Events.NavigationStart[],  // The filtered list of navigations
+      parsedTrace: Handlers.Types.ParsedTrace, traceEvents: readonly Types.Events.Event[],
+      options: Types.Configuration.ParseOptions): void {
+    if (!this.#insights) {
+      // This should not happen if called from #computeInsights.
+      console.error('Insights map not initialized before calling #computeInsightsForNavigation');
+      return;
+    }
 
-      // The lantern sub-context is optional on InsightSetContext, so not setting it is OK.
-      // This is also a hedge against an error inside Lantern resulting in breaking the entire performance panel.
-      // Additionally, many trace fixtures are too old to be processed by Lantern.
-      let lantern;
-      try {
-        options.logger?.start('insights:createLanternContext');
-        lantern = this.#createLanternContext(parsedTrace, traceEvents, frameId, navigationId, options);
-      } catch (e) {
-        // Don't allow an error in constructing the Lantern graphs to break the rest of the trace processor.
-        // Log unexpected errors, but suppress anything that occurs from a trace being too old.
-        // Otherwise tests using old fixtures become way too noisy.
-        const expectedErrors = [
-          'mainDocumentRequest not found',
-          'missing metric scores for main frame',
-          'missing metric: FCP',
-          'missing metric: LCP',
-          'No network requests found in trace',
-          'Trace is too old',
-        ];
-        if (!(e instanceof Lantern.Core.LanternError)) {
-          // If this wasn't a managed LanternError, the stack trace is likely needed for debugging.
-          console.error(e);
-        } else if (!expectedErrors.some(err => e.message === err)) {
-          // To reduce noise from tests, only print errors that are not expected to occur because a trace is
-          // too old (for which there is no single check).
-          console.error(e);
-        }
-      } finally {
-        options.logger?.end('insights:createLanternContext');
+    // Guaranteed by the filter in #computeInsights
+    const frameId = navigation.args.frame!;
+    const navigationId = navigation.args.data?.navigationId!;
+
+    // Create Lantern context (optional, handles errors)
+    // The lantern sub-context is optional on InsightSetContext, so not setting it is OK.
+    // This is also a hedge against an error inside Lantern resulting in breaking the entire performance panel.
+    // Additionally, many trace fixtures are too old to be processed by Lantern.
+    let lantern: Insights.Types.LanternContext|undefined;
+    try {
+      options.logger?.start('insights:createLanternContext');
+      lantern = this.#createLanternContext(parsedTrace, traceEvents, frameId, navigationId, options);
+    } catch (e) {
+      // Handle Lantern errors gracefully
+      // Don't allow an error in constructing the Lantern graphs to break the rest of the trace processor.
+      // Log unexpected errors, but suppress anything that occurs from a trace being too old.
+      // Otherwise tests using old fixtures become way too noisy.
+      const expectedErrors = [
+        'mainDocumentRequest not found',
+        'missing metric scores for main frame',
+        'missing metric: FCP',
+        'missing metric: LCP',
+        'No network requests found in trace',
+        'Trace is too old',
+      ];
+      if (!(e instanceof Lantern.Core.LanternError)) {
+        // If this wasn't a managed LanternError, the stack trace is likely needed for debugging.
+        console.error(e);
+      } else if (!expectedErrors.some(err => e.message === err)) {
+        // To reduce noise from tests, only print errors that are not expected to occur because a trace is
+        // too old (for which there is no single check).
+        console.error(e);
       }
+    } finally {
+      options.logger?.end('insights:createLanternContext');
+    }
 
-      const min = navigation.ts;
-      const max = i + 1 < navigations.length ? navigations[i + 1].ts : parsedTrace.Meta.traceBounds.max;
-      const bounds = Helpers.Timing.traceWindowFromMicroSeconds(min, max);
-      const context: Insights.Types.InsightSetContext = {
-        bounds,
-        frameId,
-        navigation,
-        navigationId,
-        lantern,
-      };
+    // Calculate bounds for this navigation
+    const min = navigation.ts;
+    // Use trace end for the last navigation, otherwise use the start of the next navigation.
+    const max = navigationIndex + 1 < navigations.length ?
+        navigations[navigationIndex + 1].ts :  // Use the passed navigations array
+        parsedTrace.Meta.traceBounds.max;
+    const bounds = Helpers.Timing.traceWindowFromMicroSeconds(min, max);
 
-      this.#computeInsightSet(this.#insights, parsedTrace, context, options);
+    // Create context for this navigation
+    const context: Insights.Types.InsightSetContext = {
+      bounds,
+      frameId,
+      navigation,
+      navigationId,
+      lantern,  // Include optional Lantern context
+    };
+
+    // Compute insights for this navigation's context
+    this.#computeInsightSet(this.#insights, parsedTrace, context, options);
+  }
+
+
+  /**
+   * Run all the insights and set the result to `#insights`.
+   * This is the main entry point for computing insights after the trace is parsed.
+   */
+  #computeInsights(
+      parsedTrace: Handlers.Types.ParsedTrace, traceEvents: readonly Types.Events.Event[],
+      options: Types.Configuration.ParseOptions): void {
+    // 1. Initialize insights map. This map will be populated by the helper methods.
+    this.#insights = new Map();
+
+    // 2. Filter main frame navigations to those that have the necessary data (frameId and navigationId).
+    // These are the navigations we will generate insights for.
+    const navigationsWithData = parsedTrace.Meta.mainFrameNavigations.filter(
+        navigation => navigation.args.frame && navigation.args.data?.navigationId);
+
+    // 3. Compute insights for the initial period.
+    // This handles either the time before the first navigation (if significant)
+    // or the entire trace if there are no navigations.
+    this.#computeInsightsForInitialTracePeriod(parsedTrace, navigationsWithData, options);
+
+    // 4. Compute insights for each navigation individually.
+    for (const [index, navigation] of navigationsWithData.entries()) {
+      this.#computeInsightsForNavigation(navigation, index, navigationsWithData, parsedTrace, traceEvents, options);
     }
   }
 }
