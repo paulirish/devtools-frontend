@@ -560,6 +560,7 @@ export class TraceProcessor extends EventTarget {
       };
       this.#computeInsightSet(parsedTrace, context, options);
     }
+    // If navigations exist but the initial period is below the threshold, we intentionally do nothing.
   }
 
   /**
