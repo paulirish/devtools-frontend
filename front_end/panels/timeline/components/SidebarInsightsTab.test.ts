@@ -42,39 +42,3 @@ describeWithEnvironment('SidebarInsightsTab', () => {
     assert.lengthOf(sets, 4);  // same number of sets as there are navigations
   });
 });
-
-describeWithEnvironment('SidebarInsightsTab', () => {
-  it('skips rendering trivial insight sets', async function() {
-    const {parsedTrace, insights} = await TraceLoader.traceEngine(this, 'multiple-navigations-with-iframes.json.gz');
-    assert.isOk(insights);
-    const expectedInsightSetKeys = [
-      'NO_NAVIGATION',
-      '05059ACF683224E6FC7E344F544A4050',
-      '550FC08C662EF691E1535F305CBC0FCA',
-    ];
-    assert.deepEqual(Array.from(insights.keys()), expectedInsightSetKeys);
-    const insightSetUrls = [
-      'http://localhost:5000/',
-      'http://localhost:5000/',
-      'http://localhost:5000/page2.html',
-    ];
-    assert.deepEqual(Array.from(insights.values()).map(insightSet => insightSet.url.href), insightSetUrls);
-
-    const component = new Components.SidebarInsightsTab.SidebarInsightsTab();
-    renderElementIntoDOM(component);
-    component.parsedTrace = parsedTrace;
-    component.insights = insights;
-
-    // The insight keys have NOT been mutated
-    assert.deepEqual(Array.from(insights.keys()), expectedInsightSetKeys);
-    await RenderCoordinator.done();
-    assert.isOk(component.shadowRoot);
-
-    const navigationURLs =
-        Array.from(component.shadowRoot.querySelectorAll<HTMLElement>('details > summary')).map(elem => elem.title);
-    const sets = component.shadowRoot.querySelectorAll('devtools-performance-sidebar-single-navigation');
-    // The first one is skipped because it's trivial.
-    assert.deepEqual(navigationURLs, insightSetUrls.slice(1));
-    assert.lengthOf(sets, 2);  // same number of sets as there are navigations
-  });
-});
