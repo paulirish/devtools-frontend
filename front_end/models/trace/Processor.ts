@@ -550,7 +550,7 @@ export class TraceProcessor extends EventTarget {
 
     // After computing the insights for this NO_NAVIGATION, we may choose to exclude the insightSet if it's trivial. Trivial means:
     //   1. There's no navigation (it's an initial trace period)
-    //   2. All the insights are passing
+    //   2. All the insights are passing (aka no insights to show the user)
     //   3. It has no metrics to report (apart from a CLS of 0, which is default)
     //   4. The duration is short.
     // Generally, these cases are the short time ranges before a page reload starts.
@@ -559,14 +559,13 @@ export class TraceProcessor extends EventTarget {
       return;
     }
     const trivialThreshold = Helpers.Timing.milliToMicro(Types.Timing.Milli(5000));
-    const {shownInsights} = Insights.Common.categorizeInsights(insightSet)
+    const everyInsightPasses = Object.values(insightSet.model).every(model => model.state === 'pass');
     const fakeInsightSets = new Map([[insightSet.id, insightSet]]);
     const lcp = Insights.Common.getINP(fakeInsightSets, insightSet.id);
     const cls = Insights.Common.getCLS(fakeInsightSets, insightSet.id);
     const inp = Insights.Common.getLCP(fakeInsightSets, insightSet.id);
     const noLayoutShifts = !cls || cls.value === 0;
-    const shouldExclude =
-        bounds.range < trivialThreshold && shownInsights.length === 0 && !lcp && !inp && noLayoutShifts;
+    const shouldExclude = bounds.range < trivialThreshold && everyInsightPasses && !lcp && !inp && noLayoutShifts;
     if (shouldExclude) {
       this.#insights?.delete(insightSet.id);
     }
