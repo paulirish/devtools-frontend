@@ -511,20 +511,16 @@ export class TraceProcessor extends EventTarget {
   #computeInsights(
       parsedTrace: Handlers.Types.ParsedTrace, traceEvents: readonly Types.Events.Event[],
       options: Types.Configuration.ParseOptions): void {
-    // 1. This insights map will be populated by the helper methods.
+    // This insights map will be populated by the helper methods.
     this.#insights = new Map();
 
-    // 2. Filter main frame navigations to those that have the necessary data (frameId and navigationId).
+    // Filter main frame navigations to those that have the necessary data (frameId and navigationId).
     // These are the navigations we will generate insights for.
     const navigationsWithData = parsedTrace.Meta.mainFrameNavigations.filter(
         navigation => navigation.args.frame && navigation.args.data?.navigationId);
 
-    // 3. Compute insights for the initial period.
-    // This handles either the time before the first navigation (if significant)
-    // or the entire trace if there are no navigations.
     this.#computeInsightsForInitialTracePeriod(parsedTrace, navigationsWithData, options);
 
-    // 4. Compute insights for each navigation individually.
     for (const [index, navigation] of navigationsWithData.entries()) {
       this.#computeInsightsForNavigation(navigation, index, navigationsWithData, parsedTrace, traceEvents, options);
     }
@@ -550,7 +546,7 @@ export class TraceProcessor extends EventTarget {
     // 2. There are navigations, AND the initial period before the first navigation is longer than the threshold.
     const shouldComputeInsights = navigations.length === 0 || bounds.range > threshold;
 
-    // If navigations exist but the initial period is below the threshold, we intentionally do nothing.
+    // If navigations exist but the initial period is below the threshold, we intentionally do nothing for this portion of the trace.
     if (shouldComputeInsights) {
       const context: Insights.Types.InsightSetContext = {
         bounds,
