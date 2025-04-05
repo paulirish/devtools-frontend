@@ -498,12 +498,36 @@ export class TraceProcessor extends EventTarget {
       bounds: context.bounds,
       model,
     };
-
     if (!this.#insights) {
       this.#insights = new Map();
     }
     this.#insights.set(insightSet.id, insightSet);
     this.sortInsightSet(insightSet, options.metadata ?? null);
+  }
+
+  /**
+   * Run all the insights and set the result to `#insights`.
+   */
+  #computeInsights(
+      parsedTrace: Handlers.Types.ParsedTrace, traceEvents: readonly Types.Events.Event[],
+      options: Types.Configuration.ParseOptions): void {
+    // This insights map will be populated by the helper methods.
+    this.#insights = new Map();
+
+    // Filter main frame navigations to those that have the necessary data (frameId and navigationId).
+    // TODO(cjamcl): Does this filtering makes the "use the next nav as the end time" logic potentially broken? Are navs without nav id or frame even real?
+    const navigations = parsedTrace.Meta.mainFrameNavigations.filter(
+        navigation => navigation.args.frame && navigation.args.data?.navigationId);
+
+    this.#computeInsightsForInitialTracePeriod(parsedTrace, navigations, options);
+
+    for (const [index, navigation] of navigations.entries()) {
+      const min = navigation.ts;
+      // Use trace end for the last navigation, otherwise use the start of the next navigation.
+      const max = index + 1 < navigations.length ? navigations[index + 1].ts : parsedTrace.Meta.traceBounds.max;
+      const bounds = Helpers.Timing.traceWindowFromMicroSeconds(min, max);
+      this.#computeInsightsForNavigation(navigation, bounds, parsedTrace, traceEvents, options);
+    }
   }
 
   /**
