@@ -19,6 +19,12 @@ import {
   type TraceInsightSets
 } from './types.js';
 
+// Define the return type structure using existing InsightModel types
+export interface CategorizedInsights {
+  shownInsights: InsightModels[keyof InsightModels][];
+  passedInsights: InsightModels[keyof InsightModels][];
+}
+
 const GRAPH_SAVINGS_PRECISION = 50;
 
 export function getInsight<InsightName extends keyof InsightModels>(
@@ -389,4 +395,27 @@ export function estimateCompressionRatioForScript(script: Handlers.ModelHandlers
   const compressedSize = estimateCompressedContentSize(request, contentLength, Protocol.Network.ResourceType.Script);
   const compressionRatio = compressedSize / contentLength;
   return compressionRatio;
+}
+
+export function categorizeInsights(insightSet: InsightSet): CategorizedInsights {
+  const shownInsights: InsightModels[keyof InsightModels][] = [];
+  const passedInsights: InsightModels[keyof InsightModels][] = [];
+
+  // Use `keyof InsightModels` for type safety when iterating.
+  for (const name in insightSet.model) {
+    const model = insightSet.model[name as keyof InsightModels];
+
+    // Skip if the model is invalid or an error
+    if (!model || model instanceof Error) {
+      continue;
+    }
+
+    // Categorize based on state
+    if (model.state === 'pass') {
+      passedInsights.push(model);
+    } else {
+      shownInsights.push(model);
+    }
+  }
+  return {shownInsights, passedInsights};
 }

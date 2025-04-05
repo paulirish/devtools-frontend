@@ -498,6 +498,7 @@ export class TraceProcessor extends EventTarget {
       bounds: context.bounds,
       model,
     };
+
     if (!this.#insights) {
       this.#insights = new Map();
     }
@@ -542,25 +543,35 @@ export class TraceProcessor extends EventTarget {
         Helpers.Timing.traceWindowFromMicroSeconds(parsedTrace.Meta.traceBounds.min, navigations[0].ts) :
         parsedTrace.Meta.traceBounds;
 
-    // Define threshold for considering the pre-navigation period significant enough to analyze.
-    // When using "Record and reload" option, it typically takes ~5ms. So use 50ms to be safe.
-    const threshold = Helpers.Timing.milliToMicro(50 as Types.Timing.Milli);
+    const context: Insights.Types.InsightSetContext = {
+      bounds,
+      frameId: parsedTrace.Meta.mainFrameId,
+      // No navigation or lantern context applies to this initial/no-navigation period.
+    };
+    this.#computeInsightSet(parsedTrace, context, options);
 
-    // Compute insights if either:
-    // 1. There are no navigations (we analyze the whole trace).
-    // 2. There are navigations, AND the initial period before the first navigation is longer than the threshold.
-    const shouldComputeInsights = navigations.length === 0 || bounds.range > threshold;
-
-    // If navigations exist but the initial period is below the threshold, we intentionally do nothing for this portion of the trace.
-    if (shouldComputeInsights) {
-      const context: Insights.Types.InsightSetContext = {
-        bounds,
-        frameId: parsedTrace.Meta.mainFrameId,
-        // No navigation or lantern context applies to this initial/no-navigation period.
-      };
-      this.#computeInsightSet(parsedTrace, context, options);
+    // After computing the insights for this NO_NAVIGATION, we may choose to exclude the insightSet if it's trivial. Trivial means:
+    //   1. There's no navigation (it's an initial trace period)
+    //   2. All the insights are passing
+    //   3. It has no metrics to report (apart from a CLS of 0, which is default)
+    //   4. The duration is short.
+    // Generally, these cases are the short time ranges before a page reload starts.
+    const insightSet = this.#insights?.get(Types.Events.NO_NAVIGATION);
+    if (!insightSet) {
+      return;
     }
-    // If navigations exist but the initial period is below the threshold, we intentionally do nothing.
+    const trivialThreshold = Helpers.Timing.milliToMicro(Types.Timing.Milli(5000));
+    const {shownInsights} = Insights.Common.categorizeInsights(insightSet)
+    const fakeInsightSets = new Map([[insightSet.id, insightSet]]);
+    const lcp = Insights.Common.getINP(fakeInsightSets, insightSet.id);
+    const cls = Insights.Common.getCLS(fakeInsightSets, insightSet.id);
+    const inp = Insights.Common.getLCP(fakeInsightSets, insightSet.id);
+    const noLayoutShifts = !cls || cls.value === 0;
+    const shouldExclude =
+        bounds.range < trivialThreshold && shownInsights.length === 0 && !lcp && !inp && noLayoutShifts;
+    if (shouldExclude) {
+      this.#insights?.delete(insightSet.id);
+    }
   }
 
   /**
