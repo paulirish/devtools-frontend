@@ -498,6 +498,21 @@ export class TraceProcessor extends EventTarget {
       bounds: context.bounds,
       model,
     };
+
+    // If there's no navigation, no insights or metrics, and the duration is trivial, then we don't need to include it.
+    // These are typically the very short "before reload" time ranges.
+    const trivialThreshold = Helpers.Timing.milliToMicro(Types.Timing.Milli(5000));
+    const {shownInsights} = Insights.Common.categorizeInsights(insightSet)
+    const fakeInsightSets = new Map([[insightSet.id, insightSet]]);
+    const lcp = Insights.Common.getINP(fakeInsightSets, insightSet.id);
+    const cls = Insights.Common.getCLS(fakeInsightSets, insightSet.id);
+    const inp = Insights.Common.getLCP(fakeInsightSets, insightSet.id);
+    const noLayoutShifts = !cls || cls.value === 0;
+    if (!context.navigation && context.bounds.range < trivialThreshold && shownInsights.length === 0 && !lcp && !inp &&
+        noLayoutShifts) {
+      return;
+    }
+
     if (!this.#insights) {
       this.#insights = new Map();
     }
