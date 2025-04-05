@@ -84,27 +84,10 @@ export class SidebarInsightsTab extends HTMLElement {
       return;
     }
 
-    const trivialThreshold = Trace.Helpers.Timing.milliToMicro(Trace.Types.Timing.Milli(5000));
-
-    // If there's no insights, no navigation, and the duration is trivial, then don't show it at all.
-    // These are typically the very short "before reload" time ranges.
-    const nonTrivialEntries = Array.from(data?.entries()).filter(([id, insightSet]) => {
-      const {shownInsights} = SidebarSingleInsightSet.categorizeInsights(data, id, this.#selectedCategory);
-      return shownInsights.length > 0 || insightSet.navigation || insightSet.bounds.range > trivialThreshold;
-    });
-    this.#insights = new Map(nonTrivialEntries);
-
-    // Select by default the first non-trivial insight set:
-    // - greater than 5s in duration
-    // - or, has a navigation
-    // In practice this means selecting either the first or the second insight set.
-    const insightSets = [...this.#insights.values()];
-    this.#selectedInsightSetKey =
-        insightSets.find(insightSet => insightSet.navigation || insightSet.bounds.range > trivialThreshold)?.id
-        // If everything is "trivial", just select the first one.
-        ?? insightSets[0]?.id ?? null;
-
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
+    this.#insights = new Map(data);
+    /** Select the first set. Filtering out trivial sets was done back in {@link Trace.Processor.#computeInsightsForInitialTracePeriod} */
+    this.#selectedInsightSetKey = [...this.#insights.keys()].at(0) ?? null;
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
   }
 
   set activeInsight(active: ActiveInsight|null) {
