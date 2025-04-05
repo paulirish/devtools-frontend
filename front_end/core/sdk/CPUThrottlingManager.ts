@@ -48,7 +48,7 @@ export class CPUThrottlingManager extends Common.ObjectWrapper.ObjectWrapper<Eve
     super();
     this.#cpuThrottlingOptionInternal = NoThrottlingOption;
     this.#calibratedThrottlingSetting = Common.Settings.Settings.instance().createSetting<CalibratedCPUThrottling>(
-        'calibrated-cpu-throttling', {}, Common.Settings.SettingStorageType.GLOBAL);
+        'calibrated-cpu-throttling', {}, Common.Settings.SettingStorageType.SESSION);
     this.#calibratedThrottlingSetting.addChangeListener(this.#onCalibratedSettingChanged, this);
     TargetManager.instance().observeModels(EmulationModel, this);
   }

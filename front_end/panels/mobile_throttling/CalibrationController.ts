@@ -81,6 +81,9 @@ export class CalibrationController {
     this.#originalUrl = primaryPageTarget.inspectedURL();
 
     function setupTestPage(text: string): void {
+      const metaEl = document.head.appendChild(document.createElement('meta'));
+      metaEl.setAttribute('name', 'viewport')
+      metaEl.setAttribute('content', 'width=device-width');
       const textEl = document.createElement('span');
       textEl.textContent = text;
 

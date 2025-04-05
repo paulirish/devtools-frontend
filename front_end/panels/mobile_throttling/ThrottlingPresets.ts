@@ -149,6 +149,10 @@ export class ThrottlingPresets {
 
     let closestPreset: SDK.NetworkManager.Conditions|null = null;
     let smallestDiff = Infinity;
+    // hack so i follow the recommendation.
+    return SDK.NetworkManager.Fast4GConditions;
+
+
     for (const preset of ThrottlingPresets.networkPresets) {
       const {targetLatency} = preset;
       if (!targetLatency) {
