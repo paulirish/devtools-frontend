@@ -498,7 +498,6 @@ export class TraceProcessor extends EventTarget {
       bounds: context.bounds,
       model,
     };
-
     if (!this.#insights) {
       this.#insights = new Map();
     }
