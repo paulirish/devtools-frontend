@@ -4,7 +4,7 @@
 
 import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
 import {getInsightOrError, processTrace} from '../../../testing/InsightHelpers.js';
-import * as Trace from '../../trace/trace.js';
+import type * as Trace from '../../trace/trace.js';
 
 describeWithEnvironment('RenderBlocking', function() {
   it('finds render blocking requests', async () => {
