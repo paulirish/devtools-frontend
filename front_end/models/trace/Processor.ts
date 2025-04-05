@@ -515,14 +515,18 @@ export class TraceProcessor extends EventTarget {
     this.#insights = new Map();
 
     // Filter main frame navigations to those that have the necessary data (frameId and navigationId).
-    // These are the navigations we will generate insights for.
-    const navigationsWithData = parsedTrace.Meta.mainFrameNavigations.filter(
+    // TODO(cjamcl): Does this filtering makes the "use the next nav as the end time" logic potentially broken? Are navs without nav id or frame even real?
+    const navigations = parsedTrace.Meta.mainFrameNavigations.filter(
         navigation => navigation.args.frame && navigation.args.data?.navigationId);
 
-    this.#computeInsightsForInitialTracePeriod(parsedTrace, navigationsWithData, options);
+    this.#computeInsightsForInitialTracePeriod(parsedTrace, navigations, options);
 
-    for (const [index, navigation] of navigationsWithData.entries()) {
-      this.#computeInsightsForNavigation(navigation, index, navigationsWithData, parsedTrace, traceEvents, options);
+    for (const [index, navigation] of navigations.entries()) {
+      const min = navigation.ts;
+      // Use trace end for the last navigation, otherwise use the start of the next navigation.
+      const max = index + 1 < navigations.length ? navigations[index + 1].ts : parsedTrace.Meta.traceBounds.max;
+      const bounds = Helpers.Timing.traceWindowFromMicroSeconds(min, max);
+      this.#computeInsightsForNavigation(navigation, bounds, parsedTrace, traceEvents, options);
     }
   }
 
@@ -561,8 +565,7 @@ export class TraceProcessor extends EventTarget {
    * Computes insights for a specific navigation event.
    */
   #computeInsightsForNavigation(
-      navigation: Types.Events.NavigationStart, navigationIndex: number,
-      navigations: readonly Types.Events.NavigationStart[],  // The filtered list of navigations
+      navigation: Types.Events.NavigationStart, bounds: Types.Timing.TraceWindowMicro,
       parsedTrace: Handlers.Types.ParsedTrace, traceEvents: readonly Types.Events.Event[],
       options: Types.Configuration.ParseOptions): void {
     const frameId = navigation.args.frame;
@@ -601,12 +604,6 @@ export class TraceProcessor extends EventTarget {
       options.logger?.end('insights:createLanternContext');
     }
 
-    const min = navigation.ts;
-    // Use trace end for the last navigation, otherwise use the start of the next navigation.
-    const max = navigationIndex + 1 < navigations.length ? navigations[navigationIndex + 1].ts :
-                                                           parsedTrace.Meta.traceBounds.max;
-    const bounds = Helpers.Timing.traceWindowFromMicroSeconds(min, max);
-
     const context: Insights.Types.InsightSetContext = {
       bounds,
       frameId,
@@ -614,7 +611,6 @@ export class TraceProcessor extends EventTarget {
       navigationId,
       lantern,
     };
-
     this.#computeInsightSet(parsedTrace, context, options);
   }
 }
