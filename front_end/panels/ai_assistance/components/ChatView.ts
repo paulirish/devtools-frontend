@@ -67,7 +67,7 @@ const UIStrings = {
   /**
    *@description The footer disclaimer that links to more information about the AI feature.
    */
-  learnAbout: 'Learn about AI in DevTools',
+  relevantData: 'Relevant data',
   /**
    *@description Text informing the user that AI assistance is not available in Incognito mode or Guest mode.
    */
@@ -491,6 +491,7 @@ export class ChatView extends HTMLElement {
                 inspectElementToggled: this.#props.inspectElementToggled,
                 multimodalInputEnabled: this.#props.multimodalInputEnabled,
                 conversationType: this.#props.conversationType,
+                disclaimerText: this.#props.disclaimerText,
                 imageInput: this.#props.imageInput,
                 isTextInputEmpty: this.#props.isTextInputEmpty,
                 onContextClick: this.#props.onContextClick,
@@ -505,21 +506,6 @@ export class ChatView extends HTMLElement {
               })
           }
         </main>
-        <footer class="disclaimer" jslog=${VisualLogging.section('footer')}>
-          <p class="disclaimer-text">
-            ${this.#props.disclaimerText}
-            <button
-              class="link"
-              role="link"
-              jslog=${VisualLogging.link('open-ai-settings').track({
-                click: true,
-              })}
-              @click=${() => {
-                void UI.ViewManager.ViewManager.instance().showView('chrome-ai');
-              }}
-            >${i18nString(UIStrings.learnAbout)}</button>
-          </p>
-        </footer>
       </div>
     `, this.#shadow, {host: this});
     // clang-format on
@@ -1223,6 +1209,7 @@ function renderChatInput({
   inspectElementToggled,
   multimodalInputEnabled,
   conversationType,
+  disclaimerText,
   imageInput,
   isTextInputEmpty,
   onContextClick,
@@ -1244,6 +1231,7 @@ function renderChatInput({
   inspectElementToggled: boolean,
   multimodalInputEnabled?: boolean,
   conversationType?: AiAssistanceModel.ConversationType,
+  disclaimerText: Platform.UIString.LocalizedString,
   imageInput?: ImageInputData,
   isTextInputEmpty: boolean,
   onContextClick: () => void ,
@@ -1277,19 +1265,6 @@ function renderChatInput({
     <div class="input-form-shadow-container">
       <div class="input-form-shadow"></div>
     </div>
-    ${state !== State.CONSENT_VIEW ? html`
-      <div class="input-header">
-        <div class="header-link-container">
-          ${renderSelection({
-            selectedContext,
-            inspectElementToggled,
-            conversationType,
-            onContextClick,
-            onInspectElementClick,
-          })}
-        </div>
-      </div>
-    ` : Lit.nothing}
     <div class=${chatInputContainerCls}>
       ${renderImageInput(
         {multimodalInputEnabled, imageInput, onRemoveImageInput}
@@ -1300,16 +1275,44 @@ function renderChatInput({
         maxlength="10000"
         @keydown=${onTextAreaKeyDown}
         @input=${(event: KeyboardEvent) => onTextInputChange((event.target as HTMLInputElement).value)}
-        placeholder=${inputPlaceholder}
-        jslog=${VisualLogging.textField('query').track({ keydown: 'Enter' })}
+        .placeholder=${inputPlaceholder}
+        .jslog=${VisualLogging.textField('query').track({ keydown: 'Enter' })}
       ></textarea>
-      <div class="chat-input-buttons">
-        ${renderTakeScreenshotButton({
-          multimodalInputEnabled, blockedByCrossOrigin, isTextInputDisabled, imageInput, onTakeScreenshot
-        })}
-        ${renderChatInputButtons({
-          isLoading, blockedByCrossOrigin, isTextInputDisabled, isTextInputEmpty, imageInput, onCancel, onNewConversation
-        })}
+      <div class="input-footer">
+        ${state !== State.CONSENT_VIEW ? html`
+        <div class="header-link-container">
+          ${renderSelection({
+            selectedContext,
+            inspectElementToggled,
+            conversationType,
+            onContextClick,
+            onInspectElementClick,
+          })}
+        </div>
+        ` : Lit.nothing}
+        <footer class="disclaimer" .jslog=${VisualLogging.section('footer')}>
+          <p class="disclaimer-text">
+            <button
+              class="link"
+              role="link"
+              .jslog=${VisualLogging.link('open-ai-settings').track({
+                click: true,
+              })}
+              @click=${() => {
+                void UI.ViewManager.ViewManager.instance().showView('chrome-ai');
+              }}
+            >${i18nString(UIStrings.relevantData)}</button>
+             is sent to Google
+          </p>
+        </footer>
+        <div class="chat-input-buttons">
+          ${renderTakeScreenshotButton({
+            multimodalInputEnabled, blockedByCrossOrigin, isTextInputDisabled, imageInput, onTakeScreenshot
+          })}
+          ${renderChatInputButtons({
+            isLoading, blockedByCrossOrigin, isTextInputDisabled, isTextInputEmpty, imageInput, onCancel, onNewConversation
+          })}
+        </div>
       </div>
     </div>
   </form>`;

@@ -205,9 +205,6 @@
 }
 
 .chat-input-buttons {
-  position: absolute;
-  right: 0;
-  bottom: 0;
   display: flex;
   flex-direction: row;
 }
@@ -229,7 +226,6 @@
 .disclaimer {
   display: flex;
   justify-content: center;
-  border-top: var(--sys-size-1) solid var(--sys-color-divider);
 
   .disclaimer-text {
     max-width: var(--sys-size-38);
@@ -548,14 +544,14 @@
   }
 }
 
-.input-header {
+.input-footer {
   display: inline-flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
-  margin-bottom: 2px;
   line-height: 20px;
   gap: var(--sys-size-8);
   position: relative;
+  padding: 0 var(--sys-size-4) var(--sys-size-4);
 
   & .feedback-icon {
     width: var(--sys-size-8);
@@ -572,6 +568,7 @@
   & .header-link-container:first-of-type {
     flex-shrink: 1;
     min-width: 0;
+    flex-grow: 1;
   }
 }
 
