@@ -53,7 +53,7 @@ describeWithEnvironment('PerformanceInsightsAgent', () => {
   });
 
   it('outputs the right title for the selected insight', async () => {
-    const mockInsight = new TimelineUtils.InsightAIContext.ActiveInsight(FAKE_LCP_MODEL, FAKE_PARSED_TRACE);
+    const mockInsight = new TimelineUtils.InsightAIContext.ActiveInsight(FAKE_LCP_MODEL, FAKE_PARSED_TRACE, null);
     const context = new InsightContext(mockInsight);
     assert.strictEqual(context.getTitle(), 'Insight: LCP by phase');
   });
@@ -105,7 +105,7 @@ code
 
   describe('handleContextDetails', () => {
     it('outputs the right context for the initial query from the user', async () => {
-      const mockInsight = new TimelineUtils.InsightAIContext.ActiveInsight(FAKE_LCP_MODEL, FAKE_PARSED_TRACE);
+      const mockInsight = new TimelineUtils.InsightAIContext.ActiveInsight(FAKE_LCP_MODEL, FAKE_PARSED_TRACE, null);
       const context = new InsightContext(mockInsight);
       const agent = new PerformanceInsightsAgent({
         aidaClient: mockAidaClient([[{
@@ -153,7 +153,7 @@ code
         aidaClient: {} as Host.AidaClient.AidaClient,
       });
 
-      const mockInsight = new TimelineUtils.InsightAIContext.ActiveInsight(FAKE_LCP_MODEL, FAKE_PARSED_TRACE);
+      const mockInsight = new TimelineUtils.InsightAIContext.ActiveInsight(FAKE_LCP_MODEL, FAKE_PARSED_TRACE, null);
       const context = new InsightContext(mockInsight);
       const extraContext = new PerformanceInsightFormatter(mockInsight).formatInsight();
 
@@ -171,7 +171,7 @@ What is this?`;
         aidaClient: {} as Host.AidaClient.AidaClient,
       });
 
-      const mockInsight = new TimelineUtils.InsightAIContext.ActiveInsight(FAKE_LCP_MODEL, FAKE_PARSED_TRACE);
+      const mockInsight = new TimelineUtils.InsightAIContext.ActiveInsight(FAKE_LCP_MODEL, FAKE_PARSED_TRACE, null);
       const context = new InsightContext(mockInsight);
 
       await agent.enhanceQuery('What is this?', context);
@@ -186,9 +186,9 @@ Help me understand?`;
       const agent = new PerformanceInsightsAgent({
         aidaClient: {} as Host.AidaClient.AidaClient,
       });
-      const mockInsight1 = new TimelineUtils.InsightAIContext.ActiveInsight(FAKE_LCP_MODEL, FAKE_PARSED_TRACE);
-      const mockInsight2 = new TimelineUtils.InsightAIContext.ActiveInsight(FAKE_INP_MODEL, FAKE_PARSED_TRACE);
-      const context1 = new InsightContext(mockInsight1);
+      const mockInsight = new TimelineUtils.InsightAIContext.ActiveInsight(FAKE_LCP_MODEL, FAKE_PARSED_TRACE, null);
+      const mockInsight2 = new TimelineUtils.InsightAIContext.ActiveInsight(FAKE_INP_MODEL, FAKE_PARSED_TRACE, null);
+      const context1 = new InsightContext(mockInsight);
       const context2 = new InsightContext(mockInsight2);
       const firstQuery = await agent.enhanceQuery('Q1', context1);
       const secondQuery = await agent.enhanceQuery('Q2', context1);
@@ -210,7 +210,7 @@ Help me understand?`;
           [{explanation: '', functionCalls: [{name: 'getNetworkActivitySummary', args: {}}]}], [{explanation: 'done'}]
         ])
       });
-      const activeInsight = new TimelineUtils.InsightAIContext.ActiveInsight(lcpPhases, parsedTrace);
+      const activeInsight = new TimelineUtils.InsightAIContext.ActiveInsight(lcpPhases, parsedTrace, null);
       const context = new InsightContext(activeInsight);
 
       const responses = await Array.fromAsync(agent.run('test', {selected: context}));
@@ -258,7 +258,7 @@ Help me understand?`;
           [{explanation: 'done'}]
         ])
       });
-      const activeInsight = new TimelineUtils.InsightAIContext.ActiveInsight(lcpPhases, parsedTrace);
+      const activeInsight = new TimelineUtils.InsightAIContext.ActiveInsight(lcpPhases, parsedTrace, null);
       const context = new InsightContext(activeInsight);
 
       const responses = await Array.fromAsync(agent.run('test', {selected: context}));
@@ -290,7 +290,7 @@ Help me understand?`;
         aidaClient: mockAidaClient(
             [[{explanation: '', functionCalls: [{name: 'getMainThreadActivity', args: {}}]}], [{explanation: 'done'}]])
       });
-      const activeInsight = new TimelineUtils.InsightAIContext.ActiveInsight(lcpPhases, parsedTrace);
+      const activeInsight = new TimelineUtils.InsightAIContext.ActiveInsight(lcpPhases, parsedTrace, null);
       const context = new InsightContext(activeInsight);
 
       const responses = await Array.fromAsync(agent.run('test', {selected: context}));
@@ -301,7 +301,7 @@ Help me understand?`;
       const action = responses.find(response => response.type === ResponseType.ACTION);
       assert.exists(action);
 
-      const expectedTree = TimelineUtils.InsightAIContext.AIQueries.mainThreadActivity(lcpPhases, parsedTrace);
+      const expectedTree = TimelineUtils.InsightAIContext.AIQueries.mainThreadActivity(activeInsight);
       assert.isOk(expectedTree);
       const expectedOutput = JSON.stringify({activity: expectedTree.serialize()});
 

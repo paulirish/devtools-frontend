@@ -15,7 +15,7 @@ describeWithEnvironment('InsightAIContext', () => {
     assert.isOk(insights);
     const firstNav = getFirstOrError(parsedTrace.Meta.navigationsByNavigationId.values());
     const insight = getInsightOrError('LCPPhases', insights, firstNav);
-    const aiContext = new Utils.InsightAIContext.ActiveInsight(insight, parsedTrace);
+    const aiContext = new Utils.InsightAIContext.ActiveInsight(insight, parsedTrace, null);
     assert.strictEqual(aiContext.title(), 'LCP by phase');
   });
 });
@@ -27,7 +27,8 @@ describeWithEnvironment('AIQueries', () => {
     const firstNav = getFirstOrError(parsedTrace.Meta.navigationsByNavigationId.values());
     const insight = getInsightOrError('LCPPhases', insights, firstNav);
 
-    const requests = Utils.InsightAIContext.AIQueries.networkRequests(insight, parsedTrace);
+    const activeInsight = new Utils.InsightAIContext.ActiveInsight(insight, parsedTrace, null);
+    const requests = Utils.InsightAIContext.AIQueries.networkRequests(activeInsight);
     const expected = [
       'https://web.dev/', 'https://web.dev/css/next.css?v=013a61aa',
       'https://web.dev/fonts/material-icons/regular.woff2', 'https://web.dev/fonts/google-sans/regular/latin.woff2',
@@ -51,8 +52,10 @@ describeWithEnvironment('AIQueries', () => {
     const lcpNav1 = getInsightOrError('LCPPhases', insights, firstNav);
     const lcpNav2 = getInsightOrError('LCPPhases', insights, secondNav);
 
-    const requests1 = Utils.InsightAIContext.AIQueries.networkRequests(lcpNav1, parsedTrace);
-    const requests2 = Utils.InsightAIContext.AIQueries.networkRequests(lcpNav2, parsedTrace);
+    const activeInsight1 = new Utils.InsightAIContext.ActiveInsight(lcpNav1, parsedTrace, null);
+    const requests1 = Utils.InsightAIContext.AIQueries.networkRequests(activeInsight1);
+    const activeInsight2 = new Utils.InsightAIContext.ActiveInsight(lcpNav2, parsedTrace, null);
+    const requests2 = Utils.InsightAIContext.AIQueries.networkRequests(activeInsight2);
 
     // Both navigations load the same page, so we expect the set of URLs to be the same.
     const expected = ['http://localhost:8080/render-blocking', 'http://localhost:8080/render-blocking/script.js'];
@@ -72,7 +75,8 @@ describeWithEnvironment('AIQueries', () => {
     assert.isOk(insights);
     const firstNav = getFirstOrError(parsedTrace.Meta.navigationsByNavigationId.values());
     const insight = getInsightOrError('LCPPhases', insights, firstNav);
-    const activity = Utils.InsightAIContext.AIQueries.mainThreadActivity(insight, parsedTrace);
+    const activeInsight = new Utils.InsightAIContext.ActiveInsight(insight, parsedTrace, null);
+    const activity = Utils.InsightAIContext.AIQueries.mainThreadActivity(activeInsight);
     assert.instanceOf(activity, Utils.AICallTree.AICallTree);
     // There are a few smaller tasks but for this test we want to make sure we
     // found the long task of ~999ms.

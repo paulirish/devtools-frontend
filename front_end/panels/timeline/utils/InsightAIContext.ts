@@ -14,23 +14,20 @@ import {AICallTree} from './AICallTree.js';
  * and the parsed trace.
  */
 export class ActiveInsight {
-  #insight: Trace.Insights.Types.InsightModel;
-  #parsedTrace: Trace.Handlers.Types.ParsedTrace;
+  insight: Trace.Insights.Types.InsightModel;
+  parsedTrace: Trace.Handlers.Types.ParsedTrace;
+  bounds: Trace.Types.Timing.TraceWindowMicro|null;
 
-  constructor(insight: Trace.Insights.Types.InsightModel, parsedTrace: Trace.Handlers.Types.ParsedTrace) {
-    this.#insight = insight;
-    this.#parsedTrace = parsedTrace;
-  }
-
-  get insight(): Readonly<Trace.Insights.Types.InsightModel> {
-    return this.#insight;
-  }
-  get parsedTrace(): Trace.Handlers.Types.ParsedTrace {
-    return this.#parsedTrace;
+  constructor(
+      insight: Trace.Insights.Types.InsightModel, parsedTrace: Trace.Handlers.Types.ParsedTrace,
+      bounds: Trace.Types.Timing.TraceWindowMicro|null) {
+    this.insight = insight;
+    this.parsedTrace = parsedTrace;
+    this.bounds = bounds;
   }
 
   title(): string {
-    return this.#insight.title;
+    return this.insight.title;
   }
 }
 
@@ -38,15 +35,14 @@ export class AIQueries {
   /**
    * Returns the set of network requests that occurred within the timeframe of this Insight.
    */
-  static networkRequests(insight: Trace.Insights.Types.InsightModel, parsedTrace: Trace.Handlers.Types.ParsedTrace):
-      readonly Trace.Types.Events.SyntheticNetworkRequest[] {
-    const bounds = insightBounds(insight, parsedTrace);
+  static networkRequests(activeInsight: ActiveInsight): readonly Trace.Types.Events.SyntheticNetworkRequest[] {
+    const bounds = activeInsight.bounds ?? fallbackInsightBounds(activeInsight);
 
     // Now we find network requests that:
     // 1. began within the bounds
     // 2. completed within the bounds
     const matchedRequests: Trace.Types.Events.SyntheticNetworkRequest[] = [];
-    for (const request of parsedTrace.NetworkRequests.byTime) {
+    for (const request of activeInsight.parsedTrace.NetworkRequests.byTime) {
       // Requests are ordered by time ASC, so if we find one request that is
       // beyond the max, the rest are guaranteed to be also and we can break early.
       if (request.ts > bounds.max) {
@@ -80,8 +76,9 @@ export class AIQueries {
    * Returns an AI Call Tree representing the activity on the main thread for
    * the relevant time range of the given insight.
    */
-  static mainThreadActivity(insight: Trace.Insights.Types.InsightModel, parsedTrace: Trace.Handlers.Types.ParsedTrace):
-      AICallTree|null {
+  static mainThreadActivity(activeInsight: ActiveInsight): AICallTree|null {
+    const {insight, parsedTrace, bounds} = activeInsight;
+
     /**
      * We cannot assume that there is one main thread as there are scenarios
      * where there can be multiple (see crbug.com/402658800) as an example.
@@ -117,28 +114,28 @@ export class AIQueries {
       return null;
     }
 
-    const bounds = insightBounds(insight, parsedTrace);
     return AICallTree.fromTimeOnThread({
       thread: {
         pid: thread.pid,
         tid: thread.tid,
       },
       parsedTrace,
-      bounds,
+      bounds: bounds ?? fallbackInsightBounds(activeInsight),
     });
   }
 }
 
 /**
- * Calculates the time bounds for the given insight that are relevant.
+ * If the insight doesn't have overlays, we determine rough bounds for it.
+ *
  * If the insight is attached to a navigation, this will be the start of that
  * navigation through to either the next navigation, or the end of the trace.
  * For some insights we change the bounds; for LCP insights we treat the max
  * bound as LCP time, as anything that happens after that cannot have impacted
  * it.
  */
-function insightBounds(insight: Trace.Insights.Types.InsightModel, parsedTrace: Trace.Handlers.Types.ParsedTrace):
-    Trace.Types.Timing.TraceWindowMicro {
+function fallbackInsightBounds(activeInsight: ActiveInsight): Trace.Types.Timing.TraceWindowMicro {
+  const {insight, parsedTrace} = activeInsight;
   const navigationStart =
       insight.navigationId ? parsedTrace.Meta.navigationsByNavigationId.get(insight.navigationId) : undefined;
   const minBound = navigationStart?.ts ?? parsedTrace.Meta.traceBounds.min;
