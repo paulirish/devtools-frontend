@@ -16,7 +16,7 @@ import * as ComponentHelpers from '../../../../ui/components/helpers/helpers.js'
 import * as UI from '../../../../ui/legacy/legacy.js';
 import * as Lit from '../../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../../ui/visual_logging/visual_logging.js';
-import type * as Overlays from '../../overlays/overlays.js';
+import * as Overlays from '../../overlays/overlays.js';
 import {md} from '../../utils/Helpers.js';
 import * as Utils from '../../utils/utils.js';
 
@@ -315,7 +315,8 @@ export abstract class BaseInsightComponent<T extends InsightModel> extends HTMLE
       return;
     }
 
-    const context = new Utils.InsightAIContext.ActiveInsight(this.#model, this.#parsedTrace);
+    const overlaysBounds = Overlays.Overlays.traceWindowContainingOverlays(this.getInitialOverlays());
+    const context = new Utils.InsightAIContext.ActiveInsight(this.#model, this.#parsedTrace, overlaysBounds);
     UI.Context.Context.instance().setFlavor(Utils.InsightAIContext.ActiveInsight, context);
 
     // Trigger the AI Assistance panel to open.

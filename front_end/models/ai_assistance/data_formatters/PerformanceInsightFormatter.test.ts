@@ -17,7 +17,7 @@ describeWithEnvironment('PerformanceInsightFormatter', () => {
       assert.isOk(insights);
       const firstNav = getFirstOrError(parsedTrace.Meta.navigationsByNavigationId.values());
       const insight = getInsightOrError('LCPPhases', insights, firstNav);
-      const formatter = new PerformanceInsightFormatter(new ActiveInsight(insight, parsedTrace));
+      const formatter = new PerformanceInsightFormatter(new ActiveInsight(insight, parsedTrace, null));
       const output = formatter.formatInsight();
 
       assert.isOk(insight.lcpRequest);
@@ -50,7 +50,7 @@ We can break this time down into the 4 phases that combine to make up the LCP ti
       const firstNav = getFirstOrError(parsedTrace.Meta.navigationsByNavigationId.values());
       const insight = getInsightOrError('LCPPhases', insights, firstNav);
 
-      const formatter = new PerformanceInsightFormatter(new ActiveInsight(insight, parsedTrace));
+      const formatter = new PerformanceInsightFormatter(new ActiveInsight(insight, parsedTrace, null));
       const output = formatter.formatInsight();
       const expected = `## Insight Title: LCP by phase
 
@@ -79,7 +79,7 @@ We can break this time down into the 2 phases that combine to make up the LCP ti
       assert.isOk(insights);
       const firstNav = getFirstOrError(parsedTrace.Meta.navigationsByNavigationId.values());
       const insight = getInsightOrError('RenderBlocking', insights, firstNav);
-      const formatter = new PerformanceInsightFormatter(new ActiveInsight(insight, parsedTrace));
+      const formatter = new PerformanceInsightFormatter(new ActiveInsight(insight, parsedTrace, null));
       const output = formatter.formatInsight();
 
       const expected = `## Insight Title: Render blocking requests
@@ -122,7 +122,7 @@ Here is a list of the network requests that were render blocking on this page an
       const firstNav = getFirstOrError(parsedTrace.Meta.navigationsByNavigationId.values());
       const insight = getInsightOrError('LCPDiscovery', insights, firstNav);
 
-      const formatter = new PerformanceInsightFormatter(new ActiveInsight(insight, parsedTrace));
+      const formatter = new PerformanceInsightFormatter(new ActiveInsight(insight, parsedTrace, null));
       const output = formatter.formatInsight();
 
       assert.isOk(insight.lcpRequest);
@@ -160,7 +160,7 @@ The result of the checks for this insight are:
       const firstNav = getFirstOrError(parsedTrace.Meta.navigationsByNavigationId.values());
       const insight = getInsightOrError('DocumentLatency', insights, firstNav);
 
-      const formatter = new PerformanceInsightFormatter(new ActiveInsight(insight, parsedTrace));
+      const formatter = new PerformanceInsightFormatter(new ActiveInsight(insight, parsedTrace, null));
       const output = formatter.formatInsight();
 
       const request = insight.data?.documentRequest;
@@ -201,7 +201,7 @@ The result of the checks for this insight are:
       assert.isOk(insights);
       const insight = getInsightOrError('InteractionToNextPaint', insights);
 
-      const formatter = new PerformanceInsightFormatter(new ActiveInsight(insight, parsedTrace));
+      const formatter = new PerformanceInsightFormatter(new ActiveInsight(insight, parsedTrace, null));
       const output = formatter.formatInsight();
 
       const expected = `## Insight Title: INP by phase

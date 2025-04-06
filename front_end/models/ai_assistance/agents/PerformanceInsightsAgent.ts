@@ -245,10 +245,7 @@ export class PerformanceInsightsAgent extends AiAgent<TimelineUtils.InsightAICon
           return {error: 'No insight available'};
         }
         const activeInsight = this.#insight.getItem();
-        const requests = TimelineUtils.InsightAIContext.AIQueries.networkRequests(
-            activeInsight.insight,
-            activeInsight.parsedTrace,
-        );
+        const requests = TimelineUtils.InsightAIContext.AIQueries.networkRequests(activeInsight);
         const formatted =
             requests.map(r => TraceEventFormatter.networkRequest(r, activeInsight.parsedTrace, {verbose: false}));
         return {result: {requests: formatted}};
@@ -330,10 +327,7 @@ The fields are:
           return {error: 'No insight available'};
         }
         const activeInsight = this.#insight.getItem();
-        const tree = TimelineUtils.InsightAIContext.AIQueries.mainThreadActivity(
-            activeInsight.insight,
-            activeInsight.parsedTrace,
-        );
+        const tree = TimelineUtils.InsightAIContext.AIQueries.mainThreadActivity(activeInsight);
         if (!tree) {
           return {error: 'No main thread activity found'};
         }
