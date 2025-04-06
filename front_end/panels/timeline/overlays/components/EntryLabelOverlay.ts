@@ -539,7 +539,8 @@ export class EntryLabelOverlay extends HTMLElement {
         this.#isAILabelLoading = false;
         // Trigger a re-render to hide the AI Button and display the generated label.
         this.#render();
-      } catch {
+      } catch (e) {
+        console.warn(e);
         this.#isAILabelLoading = false;
         this.#isAILabelGenerationFailed = true;
         void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);

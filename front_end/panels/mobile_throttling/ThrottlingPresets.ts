@@ -153,26 +153,26 @@ export class ThrottlingPresets {
     return SDK.NetworkManager.Fast4GConditions;
 
 
-    for (const preset of ThrottlingPresets.networkPresets) {
-      const {targetLatency} = preset;
-      if (!targetLatency) {
-        continue;
-      }
+    // for (const preset of ThrottlingPresets.networkPresets) {
+    //   const {targetLatency} = preset;
+    //   if (!targetLatency) {
+    //     continue;
+    //   }
 
-      const diff = Math.abs(targetLatency - rtt);
-      if (diff > RTT_COMPARISON_THRESHOLD) {
-        continue;
-      }
+    //   const diff = Math.abs(targetLatency - rtt);
+    //   if (diff > RTT_COMPARISON_THRESHOLD) {
+    //     continue;
+    //   }
 
-      if (smallestDiff < diff) {
-        continue;
-      }
+    //   if (smallestDiff < diff) {
+    //     continue;
+    //   }
 
-      closestPreset = preset;
-      smallestDiff = diff;
-    }
+    //   closestPreset = preset;
+    //   smallestDiff = diff;
+    // }
 
-    return closestPreset;
+    // return closestPreset;
   }
 
   static networkPresets: SDK.NetworkManager.Conditions[] = [
@@ -187,8 +187,8 @@ export class ThrottlingPresets {
     SDK.CPUThrottlingManager.MidTierThrottlingOption,
     SDK.CPUThrottlingManager.LowTierThrottlingOption,
     SDK.CPUThrottlingManager.ExtraSlowThrottlingOption,
-    SDK.CPUThrottlingManager.CalibratedLowTierMobileThrottlingOption,
     SDK.CPUThrottlingManager.CalibratedMidTierMobileThrottlingOption,
+    SDK.CPUThrottlingManager.CalibratedLowTierMobileThrottlingOption,
   ];
 }
 
