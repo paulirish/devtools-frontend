@@ -284,7 +284,7 @@ describeWithEnvironment('TraceProcessor', function() {
       }
 
       const insights = Array.from(processor.insights.values());
-      assert.lengthOf(insights, 1);
+      assert.lengthOf(insights, 2);
       assert.instanceOf(insights[0].model.RenderBlocking, Error, 'RenderBlocking did not throw an error');
       assert.strictEqual(insights[0].model.RenderBlocking.message, 'forced error');
     });
