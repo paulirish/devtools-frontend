@@ -28,10 +28,6 @@ function mockConversationContext(): AiAssistance.ConversationContext<unknown> {
     override getTitle(): string {
       return 'title';
     }
-
-    override getSuggestions(): undefined {
-      return;
-    }
   })();
 }
 
@@ -185,6 +181,47 @@ describeWithEnvironment('AiAgent', () => {
       assert.isUndefined(request.historical_contexts);
     });
 
+    it('builds a request with a fact', async () => {
+      const agent = new AiAgentMock({
+        aidaClient: mockAidaClient([[{
+          explanation: 'answer',
+        }]]),
+        serverSideLoggingEnabled: true,
+      });
+      const fact: Host.AidaClient.RequestFact = {text: 'This is a fact', metadata: {source: 'devtools'}};
+      agent.addFact(fact);
+      await Array.fromAsync(agent.run('question', {selected: null}));
+      const request = agent.buildRequest({text: 'test input'}, Host.AidaClient.Role.USER);
+      assert.deepEqual(request.facts, [fact]);
+    });
+
+    it('can manage multiple facts and remove them', async () => {
+      const agent = new AiAgentMock({
+        aidaClient: mockAidaClient([[{
+          explanation: 'answer',
+        }]]),
+        serverSideLoggingEnabled: true,
+      });
+      const f1: Host.AidaClient.RequestFact = {text: 'f1', metadata: {source: 'devtools'}};
+      const f2 = {text: 'f2', metadata: {source: 'devtools'}};
+      agent.addFact(f1);
+      agent.addFact(f2);
+
+      await Array.fromAsync(agent.run('question', {selected: null}));
+      const request1 = agent.buildRequest({text: 'test input'}, Host.AidaClient.Role.USER);
+      assert.deepEqual(request1.facts, [f1, f2]);
+
+      agent.removeFact(f1);
+      await Array.fromAsync(agent.run('question', {selected: null}));
+      const request2 = agent.buildRequest({text: 'test input'}, Host.AidaClient.Role.USER);
+      assert.deepEqual(request2.facts, [f2]);
+
+      agent.clearFacts();
+      await Array.fromAsync(agent.run('question', {selected: null}));
+      const request3 = agent.buildRequest({text: 'test input'}, Host.AidaClient.Role.USER);
+      assert.isUndefined(request3.facts);
+    });
+
     it('builds a request with chat history', async () => {
       const agent = new AiAgentMock({
         aidaClient: mockAidaClient([[{
@@ -333,10 +370,6 @@ describeWithEnvironment('AiAgent', () => {
         }
         override getItem(): undefined {
           return undefined;
-        }
-
-        override getSuggestions(): undefined {
-          return;
         }
       }
       return new TestContext();

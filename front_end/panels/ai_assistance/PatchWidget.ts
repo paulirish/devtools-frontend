@@ -11,10 +11,9 @@ import '../../ui/components/tooltips/tooltips.js';
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
-import type * as Platform from '../../core/platform/platform.js';
+import * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 import * as AiAssistanceModel from '../../models/ai_assistance/ai_assistance.js';
-import * as Persistence from '../../models/persistence/persistence.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as WorkspaceDiff from '../../models/workspace_diff/workspace_diff.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
@@ -147,7 +146,7 @@ export interface ViewInput {
   sources?: string;
   projectName?: string;
   savedToDisk?: boolean;
-  projectPath: Platform.DevToolsPath.UrlString;
+  projectPath: Platform.DevToolsPath.RawPathString;
   applyToWorkspaceTooltipText: Platform.UIString.LocalizedString;
   onLearnMoreTooltipClick: () => void;
   onApplyToWorkspace: () => void;
@@ -255,6 +254,8 @@ export class PatchWidget extends UI.Widget.Widget {
         if (input.patchSuggestionState === PatchSuggestionState.SUCCESS) {
           return html`<devtools-widget .widgetConfig=${UI.Widget.widgetConfig(ChangesPanel.CombinedDiffView.CombinedDiffView, {
             workspaceDiff: input.workspaceDiff,
+            // Ignore user creates inspector-stylesheets
+            ignoredUrls: ['inspector://']
           })}></devtools-widget>`;
         }
 
@@ -309,7 +310,7 @@ export class PatchWidget extends UI.Widget.Widget {
           ${input.projectName ? html`
             <div class="change-workspace">
               <div class="selected-folder">
-                <devtools-icon .name=${'folder'}></devtools-icon> <span title=${input.projectPath}>${input.projectName}</span>
+                <devtools-icon .name=${'folder'}></devtools-icon> <span class="folder-name" title=${input.projectPath}>${input.projectName}</span>
               </div>
               <devtools-button
                 @click=${input.onChangeWorkspaceClick}
@@ -390,15 +391,21 @@ export class PatchWidget extends UI.Widget.Widget {
   }
 
   override performUpdate(): void {
+    const projectName = this.#project ? Common.ParsedURL.ParsedURL.encodedPathToRawPathString(
+                                            this.#project.displayName() as Platform.DevToolsPath.EncodedPathString) :
+                                        undefined;
+    const projectPath = this.#project ?
+        Common.ParsedURL.ParsedURL.urlToRawPathString(
+            this.#project.id() as Platform.DevToolsPath.UrlString, Host.Platform.isWin()) :
+        Platform.DevToolsPath.EmptyRawPathString;
     this.#view(
         {
           workspaceDiff: this.#workspaceDiff,
           changeSummary: this.changeSummary,
           patchSuggestionState: this.#patchSuggestionState,
           sources: this.#patchSources,
-          projectName: this.#project?.displayName(),
-          projectPath: Persistence.FileSystemWorkspaceBinding.FileSystemWorkspaceBinding.fileSystemPath(
-              (this.#project?.id() || '') as Platform.DevToolsPath.UrlString),
+          projectName,
+          projectPath,
           savedToDisk: this.#savedToDisk,
           applyToWorkspaceTooltipText: this.#noLogging ?
               lockedString(UIStringsNotTranslate.applyToWorkspaceTooltipNoLogging) :
@@ -539,7 +546,6 @@ export class PatchWidget extends UI.Widget.Widget {
     this.requestUpdate();
     const {response, processedFiles} = await this.#applyPatch(changeSummary);
     if (response?.type === AiAssistanceModel.ResponseType.ANSWER) {
-      await this.changeManager?.stashChanges();
       this.#patchSuggestionState = PatchSuggestionState.SUCCESS;
     } else if (
         response?.type === AiAssistanceModel.ResponseType.ERROR &&
@@ -567,13 +573,16 @@ ${processedFiles.map(filename => `* ${filename}`).join('\n')}`;
   }
 
   #onSaveAll(): void {
-    // TODO: What should we do for the inspector stylesheet?
     this.#workspaceDiff.modifiedUISourceCodes().forEach(modifiedUISourceCode => {
-      modifiedUISourceCode.commitWorkingCopy();
+      if (!modifiedUISourceCode.url().startsWith('inspector://')) {
+        modifiedUISourceCode.commitWorkingCopy();
+      }
+    });
+    void this.changeManager?.stashChanges().then(() => {
+      this.changeManager?.dropStashedChanges();
     });
 
     this.#savedToDisk = true;
-    void this.changeManager?.dropStashedChanges();
     this.requestUpdate();
   }
 

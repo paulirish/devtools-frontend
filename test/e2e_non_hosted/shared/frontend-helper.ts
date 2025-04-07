@@ -6,6 +6,8 @@ import type * as puppeteer from 'puppeteer-core';
 
 import {AsyncScope} from '../../conductor/async-scope.js';
 import {installPageErrorHandlers} from '../../conductor/events.js';
+import {platform} from '../../conductor/platform.js';
+import {TestConfig} from '../../conductor/test_config.js';
 
 import {PageWrapper} from './page-wrapper.js';
 
@@ -26,6 +28,8 @@ type DeducedElementType<ElementType extends Element|null, Selector extends strin
     ElementType extends null ? puppeteer.NodeFor<Selector>: ElementType;
 
 export class DevToolsPage extends PageWrapper {
+  #currentHighlightedElement?: HighlightedElement;
+
   async setExperimentEnabled(experiment: string, enabled: boolean) {
     await this.evaluate(`(async () => {
       const Root = await import('./core/root/root.js');
@@ -76,10 +80,6 @@ export class DevToolsPage extends PageWrapper {
     })()`);
   }
 
-  async reload() {
-    await this.page.reload();
-  }
-
   async setDockingSide(side: string) {
     await this.evaluate(`
       (async function() {
@@ -116,7 +116,22 @@ export class DevToolsPage extends PageWrapper {
     const rootElement = root ? root : this.page;
     const element = await rootElement.$(`${handler}/${selector}`) as
         puppeteer.ElementHandle<DeducedElementType<ElementType, Selector>>;
+    await this.#maybeHighlight(element);
     return element;
+  }
+
+  async #maybeHighlight(element: puppeteer.ElementHandle) {
+    if (!TestConfig.debug) {
+      return;
+    }
+    if (!element) {
+      return;
+    }
+    if (this.#currentHighlightedElement) {
+      await this.#currentHighlightedElement.reset();
+    }
+    this.#currentHighlightedElement = new HighlightedElement(element);
+    await this.#currentHighlightedElement.highlight();
   }
 
   async performActionOnSelector(selector: string, options: {root?: puppeteer.ElementHandle}, action: Action):
@@ -188,6 +203,47 @@ export class DevToolsPage extends PageWrapper {
     return new Promise<void>(resolve => setTimeout(resolve, duration));
   }
 
+  async typeText(text: string) {
+    await this.page.keyboard.type(text);
+    await this.drainFrontendTaskQueue();
+  }
+
+  async pressKey(key: puppeteer.KeyInput, modifiers?: {control?: boolean, alt?: boolean, shift?: boolean}) {
+    if (modifiers) {
+      if (modifiers.control) {
+        if (platform === 'mac') {
+          // Use command key on mac
+          await this.page.keyboard.down('Meta');
+        } else {
+          await this.page.keyboard.down('Control');
+        }
+      }
+      if (modifiers.alt) {
+        await this.page.keyboard.down('Alt');
+      }
+      if (modifiers.shift) {
+        await this.page.keyboard.down('Shift');
+      }
+    }
+    await this.page.keyboard.press(key);
+    if (modifiers) {
+      if (modifiers.shift) {
+        await this.page.keyboard.up('Shift');
+      }
+      if (modifiers.alt) {
+        await this.page.keyboard.up('Alt');
+      }
+      if (modifiers.control) {
+        if (platform === 'mac') {
+          // Use command key on mac
+          await this.page.keyboard.up('Meta');
+        } else {
+          await this.page.keyboard.up('Control');
+        }
+      }
+    }
+  }
+
   async click(selector: string, options?: ClickOptions) {
     return await this.performActionOnSelector(
         selector,
@@ -245,6 +301,22 @@ export class DevToolsPage extends PageWrapper {
       }
     });
   }
+
+  waitForElementWithTextContent(textContent: string, root?: puppeteer.ElementHandle, asyncScope = new AsyncScope()) {
+    return this.waitFor(textContent, root, asyncScope, 'pierceShadowText');
+  }
+
+  async scrollElementIntoView(selector: string, root?: puppeteer.ElementHandle) {
+    const element = await this.$(selector, root);
+
+    if (!element) {
+      throw new Error(`Unable to find element with selector "${selector}"`);
+    }
+
+    await element.evaluate(el => {
+      el.scrollIntoView();
+    });
+  }
 }
 
 export interface DevtoolsSettings {
@@ -258,7 +330,7 @@ export const DEFAULT_DEVTOOLS_SETTINGS = {
   devToolsSettings: {
     isUnderTest: true,
   },
-  dockingMode: 'UNDOCKED',
+  dockingMode: 'right',
 };
 
 export async function setupDevToolsPage(context: puppeteer.BrowserContext, settings: DevtoolsSettings) {
@@ -276,11 +348,32 @@ export async function setupDevToolsPage(context: puppeteer.BrowserContext, setti
   for (const experiment of settings.enabledDevToolsExperiments) {
     await devToolsPage.enableExperiment(experiment);
   }
-  await devToolsPage.setDockingSide(settings.dockingMode);
   await devToolsPage.reload();
   await devToolsPage.ensureReadyForTesting();
   await devToolsPage.throttleCPUIfRequired();
   await devToolsPage.delayPromisesIfRequired();
   await devToolsPage.useSoftMenu();
+  await devToolsPage.setDockingSide(settings.dockingMode);
   return devToolsPage;
+}
+
+class HighlightedElement {
+  constructor(readonly element: puppeteer.ElementHandle) {
+  }
+
+  async reset() {
+    await this.element.evaluate(el => {
+      if (el instanceof HTMLElement) {
+        el.style.outline = '';
+      }
+    });
+  }
+
+  async highlight() {
+    await this.element.evaluate(el => {
+      if (el instanceof HTMLElement) {
+        el.style.outline = '2px solid red';
+      }
+    });
+  }
 }

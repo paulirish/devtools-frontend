@@ -131,7 +131,7 @@ export enum ClientFeature {
   // Chrome AI Patch Agent.
   CHROME_PATCH_AGENT = 12,
   // Chrome AI Assistance Performance Insights Agent.
-  CHROME_PERFORMANCE_INSIGHTS_AGENT = 14,
+  CHROME_PERFORMANCE_INSIGHTS_AGENT = 13,
 }
 
 export enum UserTier {
@@ -145,6 +145,25 @@ export enum UserTier {
   PUBLIC = 3,
 }
 
+// Googlers: see the Aida `retrieval` proto; this type is based on that.
+export interface RequestFactMetadata {
+  /**
+   * A description of where the fact comes from.
+   */
+  source: string;
+  /**
+   * Optional: a score to give this fact. Used because if there are more facts than space in the context window, higher scoring facts will be prioritised.
+   */
+  score?: number;
+}
+export interface RequestFact {
+  /**
+   * Content of the fact.
+   */
+  text: string;
+  metadata: RequestFactMetadata;
+}
+
 export type RpcGlobalId = string|number;
 
 export interface AidaRequest {
@@ -156,6 +175,7 @@ export interface AidaRequest {
   historical_contexts?: Content[];
   // eslint-disable-next-line @typescript-eslint/naming-convention
   function_declarations?: FunctionDeclaration[];
+  facts?: RequestFact[];
   options?: {
     temperature?: number,
     // eslint-disable-next-line @typescript-eslint/naming-convention

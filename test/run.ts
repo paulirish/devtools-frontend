@@ -24,7 +24,7 @@ const options = commandLineArgs(yargs(process.argv.slice(2)))
                     .options('skip-ninja', {type: 'boolean', desc: 'Skip rebuilding'})
                     .options('debug-driver', {type: 'boolean', hidden: true, desc: 'Debug the driver part of tests'})
                     .options('verbose', {alias: 'v', type: 'count', desc: 'Increases the log level'})
-                    .options('bail', {alias: 'b', desc: ' bail after first test failure'})
+                    .options('bail', {type: 'boolean', alias: 'b', desc: ' bail after first test failure'})
                     .options('auto-watch', {
                       desc: 'watch changes to files and run tests automatically on file change (only for unit tests)'
                     })
@@ -38,7 +38,7 @@ const options = commandLineArgs(yargs(process.argv.slice(2)))
                     .strict()
                     .parseSync();
 
-const CONSUMED_OPTIONS = ['tests', 'skip-ninja', 'debug-driver', 'bail', 'b', 'verbose', 'v', 'watch'];
+const CONSUMED_OPTIONS = ['tests', 'skip-ninja', 'debug-driver', 'verbose', 'v', 'watch'];
 
 let logLevel = 'error';
 if (options['verbose'] === 1) {
@@ -184,9 +184,8 @@ class ScriptsMochaTests extends Tests {
     return super.run(
         tests.map(test => ScriptPathPair.getFromPair(test)),
         [
-          '--experimental-strip-types',
-          '--no-warnings=ExperimentalWarning',
-          path.join(SOURCE_ROOT, 'node_modules', 'mocha', 'bin', 'mocha'),
+          '--experimental-strip-types', '--no-warnings=ExperimentalWarning',
+          path.join(SOURCE_ROOT, 'node_modules', 'mocha', 'bin', 'mocha'), '--extension=ts,js'
         ],
     );
   }

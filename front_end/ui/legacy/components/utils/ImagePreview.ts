@@ -79,7 +79,7 @@ export class ImagePreview {
         align: Align,
         hideFileData?: boolean,
       }|undefined = {precomputedFeatures: undefined, imageAltText: undefined, align: Align.CENTER}):
-      Promise<Element|null> {
+      Promise<HTMLDivElement|null> {
     const {precomputedFeatures, imageAltText, align} = options;
 
     let resource = SDK.ResourceTreeModel.ResourceTreeModel.resourceForURL(originalImageURL);
@@ -194,7 +194,7 @@ export class ImagePreview {
 
     const featuresObject = await object.callFunctionJSON(features, undefined);
     object.release();
-    return featuresObject;
+    return featuresObject ?? undefined;
 
     function features(this: HTMLImageElement): PrecomputedFeatures {
       return {

@@ -111,47 +111,14 @@ export const doubleClick =
 };
 
 export const typeText = async (text: string) => {
-  const {frontend} = getBrowserAndPages();
-  await frontend.keyboard.type(text);
-  await drainFrontendTaskQueue();
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  await devToolsPage.typeText(text);
 };
 
 export const pressKey =
     async (key: puppeteer.KeyInput, modifiers?: {control?: boolean, alt?: boolean, shift?: boolean}) => {
-  const {frontend} = getBrowserAndPages();
-  if (modifiers) {
-    if (modifiers.control) {
-      if (platform === 'mac') {
-        // Use command key on mac
-        await frontend.keyboard.down('Meta');
-      } else {
-        await frontend.keyboard.down('Control');
-      }
-    }
-    if (modifiers.alt) {
-      await frontend.keyboard.down('Alt');
-    }
-    if (modifiers.shift) {
-      await frontend.keyboard.down('Shift');
-    }
-  }
-  await frontend.keyboard.press(key);
-  if (modifiers) {
-    if (modifiers.shift) {
-      await frontend.keyboard.up('Shift');
-    }
-    if (modifiers.alt) {
-      await frontend.keyboard.up('Alt');
-    }
-    if (modifiers.control) {
-      if (platform === 'mac') {
-        // Use command key on mac
-        await frontend.keyboard.up('Meta');
-      } else {
-        await frontend.keyboard.up('Control');
-      }
-    }
-  }
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  await devToolsPage.pressKey(key, modifiers);
 };
 
 export const pasteText = async (text: string) => {
@@ -265,8 +232,9 @@ export const waitForAriaNone = (selector: string, root?: puppeteer.ElementHandle
 };
 
 export const waitForElementWithTextContent =
-    (textContent: string, root?: puppeteer.ElementHandle, asyncScope = new AsyncScope()) => {
-      return waitFor(textContent, root, asyncScope, 'pierceShadowText');
+    (textContent: string, root?: puppeteer.ElementHandle, asyncScope = new AsyncScope(),
+     devToolsPage = getBrowserAndPagesWrappers().devToolsPage) => {
+      return devToolsPage.waitForElementWithTextContent(textContent, root, asyncScope);
     };
 
 export const waitForElementsWithTextContent =
@@ -597,16 +565,10 @@ export const selectOption = async (select: puppeteer.ElementHandle<HTMLSelectEle
   }, value);
 };
 
-export const scrollElementIntoView = async (selector: string, root?: puppeteer.ElementHandle) => {
-  const element = await $(selector, root);
-
-  if (!element) {
-    throw new Error(`Unable to find element with selector "${selector}"`);
-  }
-
-  await element.evaluate(el => {
-    el.scrollIntoView();
-  });
+export const scrollElementIntoView = async (
+    selector: string, root?: puppeteer.ElementHandle,
+    devToolsPage: DevToolsPage = getBrowserAndPagesWrappers().devToolsPage) => {
+  await devToolsPage.scrollElementIntoView(selector, root);
 };
 
 export const installEventListener = function(frontend: puppeteer.Page, eventType: string) {

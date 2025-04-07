@@ -157,7 +157,7 @@ export abstract class ConversationContext<T> {
     return;
   }
 
-  getSuggestions(): [string, ...string[]]|undefined {
+  async getSuggestions(): Promise<[string, ...string[]]|undefined> {
     return;
   }
 }
@@ -244,8 +244,7 @@ export abstract class AiAgent<T> {
    */
   readonly #structuredLog: Array<{
     request: Host.AidaClient.AidaRequest,
-    response: string,
-    aidaResponse?: Host.AidaClient.AidaResponse,
+    aidaResponse: Host.AidaClient.AidaResponse,
   }> = [];
 
   /**
@@ -257,6 +256,8 @@ export abstract class AiAgent<T> {
   #id: string = crypto.randomUUID();
   #history: Host.AidaClient.Content[] = [];
 
+  #facts: Set<Host.AidaClient.RequestFact> = new Set<Host.AidaClient.RequestFact>();
+
   constructor(opts: AgentOptions) {
     this.#aidaClient = opts.aidaClient;
     this.#serverSideLoggingEnabled = opts.serverSideLoggingEnabled ?? false;
@@ -266,6 +267,28 @@ export abstract class AiAgent<T> {
   async enhanceQuery(query: string, selected: ConversationContext<T>|null, hasImageInput?: boolean): Promise<string>;
   async enhanceQuery(query: string): Promise<string> {
     return query;
+  }
+
+  currentFacts(): ReadonlySet<Host.AidaClient.RequestFact> {
+    return this.#facts;
+  }
+
+  /**
+   * Add a fact which will be sent for any subsequent requests.
+   * Returns the new list of all facts.
+   * Facts are never automatically removed.
+   */
+  addFact(fact: Host.AidaClient.RequestFact): ReadonlySet<Host.AidaClient.RequestFact> {
+    this.#facts.add(fact);
+    return this.#facts;
+  }
+
+  removeFact(fact: Host.AidaClient.RequestFact): boolean {
+    return this.#facts.delete(fact);
+  }
+
+  clearFacts(): void {
+    this.#facts.clear();
   }
 
   buildRequest(
@@ -291,13 +314,14 @@ export abstract class AiAgent<T> {
     const enableAidaFunctionCalling = declarations.length && !this.functionCallEmulationEnabled;
     const userTier = Host.AidaClient.convertToUserTierEnum(this.userTier);
     const premable = userTier === Host.AidaClient.UserTier.TESTERS ? this.preamble : undefined;
+    const facts = Array.from(this.#facts);
     const request: Host.AidaClient.AidaRequest = {
       client: Host.AidaClient.CLIENT_NAME,
-
       current_message: currentMessage,
       preamble: premable,
 
       historical_contexts: history.length ? history : undefined,
+      facts: facts.length ? facts : undefined,
 
       ...(enableAidaFunctionCalling ? {function_declarations: declarations} : {}),
       options: {
@@ -428,9 +452,6 @@ export abstract class AiAgent<T> {
               text: partialAnswer,
               complete: false,
             };
-          }
-          if (functionCall) {
-            break;
           }
         }
       } catch (err) {
@@ -629,7 +650,6 @@ export abstract class AiAgent<T> {
       #aidaFetch(request: Host.AidaClient.AidaRequest, options?: {signal?: AbortSignal}):
           AsyncGenerator<AidaFetchResult, void, void> {
     let aidaResponse: Host.AidaClient.AidaResponse|undefined = undefined;
-    let response = '';
     let rpcId: Host.AidaClient.RpcGlobalId|undefined;
 
     for await (aidaResponse of this.#aidaClient.fetch(request, options)) {
@@ -658,7 +678,6 @@ export abstract class AiAgent<T> {
         }
       }
 
-      response = aidaResponse.explanation;
       rpcId = aidaResponse.metadata.rpcGlobalId ?? rpcId;
       yield {
         rpcId,
@@ -671,10 +690,9 @@ export abstract class AiAgent<T> {
       request,
       response: aidaResponse,
     });
-    if (isDebugMode()) {
+    if (isDebugMode() && aidaResponse) {
       this.#structuredLog.push({
         request: structuredClone(request),
-        response,
         aidaResponse,
       });
       localStorage.setItem('aiAssistanceStructuredLog', JSON.stringify(this.#structuredLog));

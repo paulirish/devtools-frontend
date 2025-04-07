@@ -205,11 +205,11 @@ function selectedElementFilter(maybeNode: SDK.DOMModel.DOMNode|null): SDK.DOMMod
   return null;
 }
 
-function getEmptyStateSuggestions(
+async function getEmptyStateSuggestions(
     context: AiAssistanceModel.ConversationContext<unknown>|null,
-    conversationType?: AiAssistanceModel.ConversationType): string[] {
+    conversationType?: AiAssistanceModel.ConversationType): Promise<string[]> {
   if (context) {
-    const specialSuggestions = context.getSuggestions();
+    const specialSuggestions = await context.getSuggestions();
 
     if (specialSuggestions) {
       return specialSuggestions;
@@ -246,8 +246,7 @@ function getEmptyStateSuggestions(
         'How can I reduce the time of this call tree?',
       ];
     case AiAssistanceModel.ConversationType.PERFORMANCE_INSIGHT:
-      // TODO(b/405925760): Define these.
-      return ['Help me optimize my LCP', 'Help me optimize my INP', 'For now'];
+      return ['Help me optimize my page load performance'];
   }
 }
 
@@ -821,6 +820,8 @@ export class AiAssistancePanel extends UI.Panel.Panel {
   }
 
   override async performUpdate(): Promise<void> {
+    const emptyStateSuggestions = await getEmptyStateSuggestions(this.#selectedContext, this.#conversation?.type);
+
     this.view(
         {
           state: this.#getChatUiState(),
@@ -840,7 +841,7 @@ export class AiAssistancePanel extends UI.Panel.Panel {
           imageInput: this.#imageInput,
           isDeleteHistoryButtonVisible: Boolean(this.#conversation && !this.#conversation.isEmpty),
           isTextInputDisabled: this.#isTextInputDisabled(),
-          emptyStateSuggestions: getEmptyStateSuggestions(this.#selectedContext, this.#conversation?.type),
+          emptyStateSuggestions,
           inputPlaceholder: this.#getChatInputPlaceholder(),
           disclaimerText: this.#getDisclaimerText(),
           isTextInputEmpty: this.#isTextInputEmpty,
@@ -1197,18 +1198,21 @@ export class AiAssistancePanel extends UI.Panel.Panel {
     this.#runAbortController = new AbortController();
   }
 
-  #onContextSelectionChanged(contextToRestore?: AiAssistanceModel.ConversationContext<unknown>): void {
+  #onContextSelectionChanged(): void {
     if (!this.#conversationAgent) {
       this.#blockedByCrossOrigin = false;
       return;
     }
-    const currentContext = contextToRestore ?? this.#getConversationContext();
-    this.#selectedContext = currentContext;
-    if (!currentContext) {
+    this.#selectedContext = this.#getConversationContext();
+    if (!this.#selectedContext) {
       this.#blockedByCrossOrigin = false;
+
+      // Clear out any text the user has entered into the input but never
+      // submitted now they have no active context
+      this.#viewOutput.chatView?.clearTextInput();
       return;
     }
-    this.#blockedByCrossOrigin = !currentContext.isOriginAllowed(this.#conversationAgent.origin);
+    this.#blockedByCrossOrigin = !this.#selectedContext.isOriginAllowed(this.#conversationAgent.origin);
   }
 
   #getConversationContext(): AiAssistanceModel.ConversationContext<unknown>|null {
