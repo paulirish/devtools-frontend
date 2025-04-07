@@ -52,7 +52,7 @@ export class AIQueries {
         // For the sake of the LLM querying data, we don't care about data: URLs.
         continue;
       }
-      if (request.ts >= bounds.min && request.ts + request.dur <= bounds.max) {
+      if (Trace.Helpers.Timing.eventIsInBounds(request, bounds)) {
         matchedRequests.push(request);
       }
     }
@@ -140,14 +140,11 @@ function fallbackInsightBounds(activeInsight: ActiveInsight): Trace.Types.Timing
       insight.navigationId ? parsedTrace.Meta.navigationsByNavigationId.get(insight.navigationId) : undefined;
   const minBound = navigationStart?.ts ?? parsedTrace.Meta.traceBounds.min;
 
-  let maxBound = customMaxBoundForInsight(insight);
-  if (!maxBound) {
-    maxBound = parsedTrace.Meta.traceBounds.max;
-    if (navigationStart) {
-      const nextNavigation = getNextNavigation(navigationStart, parsedTrace);
-      if (nextNavigation) {
-        maxBound = nextNavigation.ts;
-      }
+  let maxBound = parsedTrace.Meta.traceBounds.max;
+  if (navigationStart) {
+    const nextNavigation = getNextNavigation(navigationStart, parsedTrace);
+    if (nextNavigation) {
+      maxBound = nextNavigation.ts;
     }
   }
   return Trace.Helpers.Timing.traceWindowFromMicroSeconds(minBound, maxBound);
@@ -164,13 +161,6 @@ function getNextNavigation(
     if (currentNavigationStart.args.data?.navigationId === navigation.args.data?.navigationId) {
       return parsedTrace.Meta.mainFrameNavigations.at(i + 1) ?? null;
     }
-  }
-  return null;
-}
-
-function customMaxBoundForInsight(insight: Trace.Insights.Types.InsightModel): Trace.Types.Timing.Micro|null {
-  if (Trace.Insights.Models.LCPPhases.isLCPPhases(insight) && insight.lcpEvent) {
-    return insight.lcpEvent.ts;
   }
   return null;
 }

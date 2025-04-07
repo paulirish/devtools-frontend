@@ -26,19 +26,29 @@ describeWithEnvironment('AIQueries', () => {
     assert.isOk(insights);
     const firstNav = getFirstOrError(parsedTrace.Meta.navigationsByNavigationId.values());
     const insight = getInsightOrError('LCPPhases', insights, firstNav);
+    assert.isOk(insight.lcpRequest);
+    assert.isOk(insight.lcpEvent);
+    const lcpBounds = Trace.Helpers.Timing.traceWindowFromMicroSeconds(insight.lcpRequest.ts, insight.lcpEvent.ts);
 
-    const activeInsight = new Utils.InsightAIContext.ActiveInsight(insight, parsedTrace, null);
+    const activeInsight = new Utils.InsightAIContext.ActiveInsight(insight, parsedTrace, lcpBounds);
     const requests = Utils.InsightAIContext.AIQueries.networkRequests(activeInsight);
     const expected = [
-      'https://web.dev/', 'https://web.dev/css/next.css?v=013a61aa',
-      'https://web.dev/fonts/material-icons/regular.woff2', 'https://web.dev/fonts/google-sans/regular/latin.woff2',
+      'https://web.dev/',
+      'https://web.dev/css/next.css?v=013a61aa',
+      'https://web.dev/fonts/material-icons/regular.woff2',
+      'https://web.dev/fonts/google-sans/regular/latin.woff2',
       'https://web.dev/fonts/google-sans/bold/latin.woff2',
       'https://web-dev.imgix.net/image/jxu1OdD7LKOGIDU7jURMpSH2lyK2/zrBPJq27O4Hs8haszVnK.svg',
       'https://web-dev.imgix.net/image/kheDArv5csY6rvQUJDbWRscckLr1/4i7JstVZvgTFk9dxCe4a.svg',
       'https://web-dev.imgix.net/image/jL3OLOhcWUQDnR4XjewLBx4e3PC3/3164So5aDk7vKTkhx9Vm.png?auto=format&w=1140',
-      'https://web.dev/js/app.js?v=fedf5fbe', 'https://web.dev/js/home.js?v=73b0d143',
-      'https://web.dev/js/index-7e29abb6.js', 'https://web.dev/js/index-578d2db7.js',
-      'https://web.dev/js/index-f45448ab.js', 'https://web.dev/js/actions-f0eb5c8e.js'
+      'https://web.dev/js/app.js?v=fedf5fbe',
+      'https://web.dev/js/home.js?v=73b0d143',
+      'https://shared-storage-demo-content-producer.web.app/paa/scripts/private-aggregation-test.js',
+      'https://web.dev/js/index-7e29abb6.js',
+      'https://web.dev/js/index-578d2db7.js',
+      'https://web.dev/js/index-f45448ab.js',
+      'https://web.dev/js/actions-f0eb5c8e.js',
+      'https://www.googletagmanager.com/gtm.js?id=GTM-MZWCJPP',
     ];
     assert.deepEqual(requests.map(r => r.args.data.url), expected);
   });
@@ -84,5 +94,68 @@ describeWithEnvironment('AIQueries', () => {
     const children = Array.from(rootNode.children().values()).map(n => n.event);
     const longTaskDuration = Trace.Types.Timing.Micro(999544);
     assert.isTrue(children.some(event => event.dur === longTaskDuration));
+  });
+
+  it('filters network events based on provided bounds', async function() {
+    const {parsedTrace, insights} = await TraceLoader.traceEngine(this, 'web-dev-with-commit.json.gz');
+    assert.isOk(insights);
+    const firstNav = getFirstOrError(parsedTrace.Meta.navigationsByNavigationId.values());
+    const insight = getInsightOrError('LCPPhases', insights, firstNav);
+
+    // Define bounds that are narrower than the full insight/navigation time.
+    // These bounds should capture only the initial HTML and CSS requests.
+    const minBound = firstNav.ts;
+    // Determined by inspecting the trace timings. The CSS request finishes around 142ms after nav start.
+    const maxBound = Trace.Types.Timing.Micro(firstNav.ts + 142_000);
+    const bounds: Trace.Types.Timing.TraceWindowMicro = {
+      min: minBound,
+      max: maxBound,
+      range: Trace.Types.Timing.Micro(maxBound - minBound),
+    };
+
+    const activeInsight = new Utils.InsightAIContext.ActiveInsight(insight, parsedTrace, bounds);
+    const requests = Utils.InsightAIContext.AIQueries.networkRequests(activeInsight);
+    const expected = [
+      'https://web.dev/',
+      'https://web.dev/css/next.css?v=013a61aa',
+      'https://web.dev/fonts/material-icons/regular.woff2',
+      'https://web.dev/fonts/google-sans/regular/latin.woff2',
+      'https://web.dev/fonts/google-sans/bold/latin.woff2',
+      'https://web-dev.imgix.net/image/jxu1OdD7LKOGIDU7jURMpSH2lyK2/zrBPJq27O4Hs8haszVnK.svg',
+      'https://web-dev.imgix.net/image/kheDArv5csY6rvQUJDbWRscckLr1/4i7JstVZvgTFk9dxCe4a.svg',
+      'https://web-dev.imgix.net/image/jL3OLOhcWUQDnR4XjewLBx4e3PC3/3164So5aDk7vKTkhx9Vm.png?auto=format&w=1140',
+      'https://web.dev/js/app.js?v=fedf5fbe',
+      'https://web.dev/js/home.js?v=73b0d143',
+      'https://shared-storage-demo-content-producer.web.app/paa/scripts/private-aggregation-test.js',
+      'https://web.dev/js/index-7e29abb6.js',
+      'https://web.dev/js/index-578d2db7.js',
+      'https://web.dev/js/index-f45448ab.js',
+      'https://web.dev/js/actions-f0eb5c8e.js',
+      'https://www.googletagmanager.com/gtm.js?id=GTM-MZWCJPP',
+    ];
+    assert.deepEqual(
+        requests.map(r => r.args.data.url), expected, 'Should only return requests within the explicit bounds');
+
+
+    const activeInsight2 = new Utils.InsightAIContext.ActiveInsight(insight, parsedTrace, null);
+    const requests2 = Utils.InsightAIContext.AIQueries.networkRequests(activeInsight2);
+    const expected2 = [
+      'https://web.dev/',
+      'https://web.dev/css/next.css?v=013a61aa',
+      'https://web.dev/fonts/material-icons/regular.woff2',
+      'https://web.dev/fonts/google-sans/regular/latin.woff2',
+      'https://web.dev/fonts/google-sans/bold/latin.woff2',
+      'https://web-dev.imgix.net/image/jxu1OdD7LKOGIDU7jURMpSH2lyK2/zrBPJq27O4Hs8haszVnK.svg',
+      'https://web-dev.imgix.net/image/kheDArv5csY6rvQUJDbWRscckLr1/4i7JstVZvgTFk9dxCe4a.svg',
+      'https://web-dev.imgix.net/image/jL3OLOhcWUQDnR4XjewLBx4e3PC3/3164So5aDk7vKTkhx9Vm.png?auto=format&w=1140',
+      'https://web.dev/js/app.js?v=fedf5fbe',
+      'https://web.dev/js/home.js?v=73b0d143',
+      'https://web.dev/js/index-7e29abb6.js',
+      'https://web.dev/js/index-578d2db7.js',
+      'https://web.dev/js/index-f45448ab.js',
+      'https://web.dev/js/actions-f0eb5c8e.js',
+    ];
+    assert.deepEqual(
+        requests2.map(r => r.args.data.url), expected2, 'Should only return requests within the explicit bounds');
   });
 });
