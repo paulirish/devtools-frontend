@@ -3431,6 +3431,7 @@ export const knownContextValues = new Set([
   'terms-of-service.console-insights',
   'test',
   'test-action',
+  'test-combo-box-setting',
   'test-device',
   'test-font',
   'test-setting',

@@ -473,6 +473,7 @@ class SomeWidget extends UI.Widget.Widget {
     anchor.href = 'https://www.google.com';
     anchor.innerText = 'some-text';
     anchor.dataset.someKey = 'some-value';
+    anchor.role = 'some-role';
     this.contentElement.insertBefore(anchor, input);
 
     const img = document.createElement('img');
@@ -495,12 +496,47 @@ class SomeWidget extends UI.Widget.Widget {
 export const DEFAULT_VIEW = (input, _output, target) => {
   render(html\`
     <div>
-      <a href="https://www.google.com" data-some-key="some-value">some-text</a>
+      <a href="https://www.google.com" data-some-key="some-value" role="some-role">some-text</a>
       <img src="https://www.google.com/some-image.png" alt="some-alt" draggable="true" height="100"
           hidden="hidden" href="https://www.google.com" id="some-id" name="some-name" rel="some-rel"
           scope="some-scope"></img>
       <input type="text" placeholder="some-placeholder" value="some-value"
           ?disabled=\${!this.enabled} ?checked=\${true}></input>
+    </div>\`,
+    target, {host: input});
+};
+
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+  }
+}`,
+      errors: [{messageId: 'preferTemplateLiterals'}],
+    },
+    {
+      filename: 'front_end/ui/components/component/file.ts',
+      code: `
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+    const toolbar = this.contentElement.createChild('devtools-toolbar');
+    this.filterInput = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.editName), 'edit', undefined, 'edit-name');
+    toolbar.appendToolbarItem(this.filterInput);
+    this.#banner = this.contentElement.createChild('div', 'banner');
+    this.#banner.textContent = 'some-text';
+  }
+}`,
+      output: `
+
+export const DEFAULT_VIEW = (input, _output, target) => {
+  render(html\`
+    <div>
+      <devtools-toolbar>
+        <devtools-button title=\${i18nString(UIStrings.editName)}
+            .variant=\${Buttons.Button.Variant.TOOLBAR} .iconName=\${'edit'}
+            .jslogContext=\${'edit-name'}></devtools-button>
+      </devtools-toolbar>
+      <div class="banner">some-text</div>
     </div>\`,
     target, {host: input});
 };

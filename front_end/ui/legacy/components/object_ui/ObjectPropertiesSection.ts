@@ -587,11 +587,9 @@ const ARRAY_LOAD_THRESHOLD = 100;
 const maxRenderableStringLength = 10000;
 
 export class ObjectPropertiesSectionsTreeOutline extends UI.TreeOutline.TreeOutlineInShadow {
-  private readonly editable: boolean;
-  constructor(options?: TreeOutlineOptions|null) {
+  constructor() {
     super();
     this.registerRequiredCSS(objectValueStyles, objectPropertiesSectionStyles);
-    this.editable = !(options?.readOnly);
     this.contentElement.classList.add('source-code');
     this.contentElement.classList.add('object-properties-section');
   }
@@ -1424,7 +1422,7 @@ export class ArrayGroupingTreeElement extends UI.TreeOutline.TreeElement {
       return {ranges};
     }
 
-    async function callback(result: {ranges: number[][]}|undefined): Promise<void> {
+    async function callback(result: {ranges: number[][]}|undefined|null): Promise<void> {
       if (!result) {
         return;
       }
@@ -1737,7 +1735,4 @@ export class ExpandableTextPropertyValue extends ObjectPropertyValue {
   private copyText(): void {
     Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(this.text);
   }
-}
-export interface TreeOutlineOptions {
-  readOnly?: boolean;
 }

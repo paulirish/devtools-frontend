@@ -754,6 +754,7 @@ main {
   position: relative;
   margin: 0 var(--sys-size-5);
   padding: 0 var(--sys-size-5);
+  min-width: var(--sys-size-31);
 
   &.saved-to-disk {
     pointer-events: none;
@@ -789,6 +790,9 @@ main {
     & .header-text {
       font: var(--sys-typescale-body4);
       color: var(--sys-color-on-surface);
+      white-space: nowrap;
+      overflow-x: hidden;
+      text-overflow: ellipsis;
     }
 
     & .arrow {
@@ -852,21 +856,32 @@ main {
       align-self: center;
     }
 
-    .sources-link {
+    .left-side {
       flex-grow: 1;
+      display: flex;
       align-self: center;
+      gap: var(--sys-size-3);
     }
 
     .selected-folder {
       display: flex;
       align-items: center;
       gap: var(--sys-size-3);
+      overflow-x: hidden;
+
+      .folder-name {
+        white-space: nowrap;
+        overflow-x: hidden;
+        text-overflow: ellipsis;
+      }
     }
 
     .change-workspace {
       display: flex;
       flex-direction: row;
       gap: var(--sys-size-2);
+      max-width: 50%;
+      min-width: 0;
     }
 
     .info-tooltip-container {
@@ -892,6 +907,7 @@ main {
       align-items: center;
       gap: var(--sys-size-3);
       margin-left: auto;
+      min-width: fit-content;
 
       devtools-icon {
         /* var(--sys-size-8) is too small and var(--sys-size-9) is too big. */

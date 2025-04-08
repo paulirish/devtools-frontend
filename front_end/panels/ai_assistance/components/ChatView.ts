@@ -72,6 +72,11 @@ const UIStrings = {
    *@description Text informing the user that AI assistance is not available in Incognito mode or Guest mode.
    */
   notAvailableInIncognitoMode: 'AI assistance is not available in Incognito mode or Guest mode',
+
+  /**
+   *@description Label added to the text input to describe the context for screen readers. Not shown visibly on screen.
+   */
+  inputTextAriraDescription: 'You can also use one of the suggested prompts above to start your conversation'
 } as const;
 
 /*
@@ -325,6 +330,14 @@ export class ChatView extends HTMLElement {
 
   disconnectedCallback(): void {
     this.#messagesContainerResizeObserver.disconnect();
+  }
+
+  clearTextInput(): void {
+    const textArea = this.#shadow.querySelector('.chat-input') as HTMLTextAreaElement;
+    if (!textArea) {
+      return;
+    }
+    textArea.value = '';
   }
 
   focusTextInput(): void {
@@ -1277,6 +1290,8 @@ function renderChatInput({
         @input=${(event: KeyboardEvent) => onTextInputChange((event.target as HTMLInputElement).value)}
         .placeholder=${inputPlaceholder}
         .jslog=${VisualLogging.textField('query').track({ keydown: 'Enter' })}
+        jslog=${VisualLogging.textField('query').track({ keydown: 'Enter' })}
+        aria-description=${i18nString(UIStrings.inputTextAriraDescription)}
       ></textarea>
       <div class="input-footer">
         ${state !== State.CONSENT_VIEW ? html`

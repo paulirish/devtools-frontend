@@ -11,7 +11,7 @@ import '../../ui/components/tooltips/tooltips.js';
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
-import type * as Platform from '../../core/platform/platform.js';
+import * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 import * as AiAssistanceModel from '../../models/ai_assistance/ai_assistance.js';
 import * as Persistence from '../../models/persistence/persistence.js';
@@ -49,6 +49,11 @@ const UIStringsNotTranslate = {
    */
   change: 'Change',
   /**
+   * @description Accessible title of the Change button to indicate that
+   * the button can be used to change the root folder.
+   */
+  changeRootFolder: 'Change project root folder',
+  /**
    *@description Button text to cancel applying to workspace
    */
   cancel: 'Cancel',
@@ -78,9 +83,10 @@ const UIStringsNotTranslate = {
   applyToWorkspaceTooltipNoLogging:
       'Source code from the selected folder is sent to Google to generate code suggestions. This data will not be used to improve Google’s AI models.',
   /**
-   *@description Tooltip link for the navigating to "AI innovations" page in settings.
+   *@description The footer disclaimer that links to more information
+   * about the AI feature. Same text as in ChatView.
    */
-  learnMore: 'Learn more',
+  learnMore: 'Learn about AI in DevTools',
   /**
    *@description Header text for the AI-powered code suggestions disclaimer dialog.
    */
@@ -147,18 +153,19 @@ export interface ViewInput {
   sources?: string;
   projectName?: string;
   savedToDisk?: boolean;
-  projectPath: Platform.DevToolsPath.UrlString;
+  projectPath: Platform.DevToolsPath.RawPathString;
   applyToWorkspaceTooltipText: Platform.UIString.LocalizedString;
   onLearnMoreTooltipClick: () => void;
   onApplyToWorkspace: () => void;
   onCancel: () => void;
   onDiscard: () => void;
   onSaveAll: () => void;
-  onChangeWorkspaceClick: () => void;
+  onChangeWorkspaceClick?: () => void;
 }
 
 export interface ViewOutput {
   tooltipRef?: Directives.Ref<HTMLElement>;
+  changeRef?: Directives.Ref<HTMLElement>;
 }
 
 type View = (input: ViewInput, output: ViewOutput, target: HTMLElement) => void;
@@ -182,6 +189,8 @@ export class PatchWidget extends UI.Widget.Widget {
   #patchSuggestionState = PatchSuggestionState.INITIAL;
   #workspaceDiff = WorkspaceDiff.WorkspaceDiff.workspaceDiff();
   #workspace = Workspace.Workspace.WorkspaceImpl.instance();
+  #automaticFileSystem =
+      Persistence.AutomaticFileSystemManager.AutomaticFileSystemManager.instance().automaticFileSystem;
 
   constructor(element?: HTMLElement, view?: View, opts?: {
     aidaClient: Host.AidaClient.AidaClient,
@@ -197,6 +206,7 @@ export class PatchWidget extends UI.Widget.Widget {
         return;
       }
       output.tooltipRef = output.tooltipRef ?? Directives.createRef<HTMLElement>();
+      output.changeRef = output.changeRef ?? Directives.createRef<HTMLElement>();
 
       function renderSourcesLink(): LitTemplate {
         if (!input.sources) {
@@ -204,7 +214,7 @@ export class PatchWidget extends UI.Widget.Widget {
         }
 
         return html`<x-link
-          class="link sources-link"
+          class="link"
           title="${UIStringsNotTranslate.viewUploadedFiles} ${UIStringsNotTranslate.opensInNewTab}"
           href="data:text/plain,${encodeURIComponent(input.sources)}"
           jslog=${VisualLogging.link('files-used-in-patching').track({click: true})}>
@@ -267,7 +277,9 @@ export class PatchWidget extends UI.Widget.Widget {
         ></devtools-code-block>
         ${input.patchSuggestionState === PatchSuggestionState.ERROR
           ? html`<div class="error-container">
-              <devtools-icon .name=${'cross-circle-filled'}></devtools-icon>${lockedString(UIStringsNotTranslate.genericErrorMessage)} ${renderSourcesLink()}
+              <devtools-icon .name=${'cross-circle-filled'}></devtools-icon>${
+              lockedString(UIStringsNotTranslate.genericErrorMessage)
+              } ${renderSourcesLink()}
             </div>`
           : nothing
         }`;
@@ -281,13 +293,15 @@ export class PatchWidget extends UI.Widget.Widget {
         if (input.patchSuggestionState === PatchSuggestionState.SUCCESS) {
           return html`
           <div class="footer">
-            <x-link class="link disclaimer-link" href="https://support.google.com/legal/answer/13505487" jslog=${
-              VisualLogging.link('code-disclaimer').track({
-                click: true,
-              })}>
-              ${lockedString(UIStringsNotTranslate.codeDisclaimer)}
-            </x-link>
-            ${renderSourcesLink()}
+            <div class="left-side">
+              <x-link class="link disclaimer-link" href="https://support.google.com/legal/answer/13505487" jslog=${
+                VisualLogging.link('code-disclaimer').track({
+                  click: true,
+                })}>
+                ${lockedString(UIStringsNotTranslate.codeDisclaimer)}
+              </x-link>
+              ${renderSourcesLink()}
+            </div>
             <div class="save-or-discard-buttons">
               <devtools-button
                 @click=${input.onDiscard}
@@ -311,14 +325,17 @@ export class PatchWidget extends UI.Widget.Widget {
           ${input.projectName ? html`
             <div class="change-workspace">
               <div class="selected-folder">
-                <devtools-icon .name=${'folder'}></devtools-icon> <span title=${input.projectPath}>${input.projectName}</span>
+                <devtools-icon .name=${'folder'}></devtools-icon> <span class="folder-name" title=${input.projectPath}>${input.projectName}</span>
               </div>
-              <devtools-button
-                @click=${input.onChangeWorkspaceClick}
-                .jslogContext=${'change-workspace'}
-                .variant=${Buttons.Button.Variant.TEXT}>
-                  ${lockedString(UIStringsNotTranslate.change)}
-              </devtools-button>
+              ${input.onChangeWorkspaceClick ? html`
+                <devtools-button
+                  @click=${input.onChangeWorkspaceClick}
+                  .jslogContext=${'change-workspace'}
+                  .variant=${Buttons.Button.Variant.TEXT}
+                  .title=${lockedString(UIStringsNotTranslate.changeRootFolder)}
+                  ${Directives.ref(output.changeRef)}
+                >${lockedString(UIStringsNotTranslate.change)}</devtools-button>
+              ` : nothing}
             </div>
           ` : nothing}
           <div class="apply-to-workspace-container">
@@ -347,7 +364,8 @@ export class PatchWidget extends UI.Widget.Widget {
               aria-details="info-tooltip"
               .iconName=${'info'}
               .variant=${Buttons.Button.Variant.ICON}
-              ></devtools-button>
+              .title=${input.applyToWorkspaceTooltipText}
+            ></devtools-button>
             <devtools-tooltip variant="rich" id="info-tooltip" ${Directives.ref(output.tooltipRef)}>
               <div class="info-tooltip-container">
                 ${input.applyToWorkspaceTooltipText}
@@ -392,15 +410,30 @@ export class PatchWidget extends UI.Widget.Widget {
   }
 
   override performUpdate(): void {
+    const projectName = this.#project ? Common.ParsedURL.ParsedURL.encodedPathToRawPathString(
+                                            this.#project.displayName() as Platform.DevToolsPath.EncodedPathString) :
+                                        undefined;
+    const projectPath = this.#project ?
+        Common.ParsedURL.ParsedURL.urlToRawPathString(
+            this.#project.id() as Platform.DevToolsPath.UrlString, Host.Platform.isWin()) :
+        Platform.DevToolsPath.EmptyRawPathString;
+    const automaticFileSystemProject =
+        this.#automaticFileSystem ? this.#workspace.projectForFileSystemRoot(this.#automaticFileSystem.root) : null;
+    const projects = this.#workspace.projectsForType(Workspace.Workspace.projectTypes.FileSystem)
+                         .filter(
+                             project => project instanceof Persistence.FileSystemWorkspaceBinding.FileSystem &&
+                                 project.fileSystem().type() ===
+                                     Persistence.PlatformFileSystem.PlatformFileSystemType.WORKSPACE_PROJECT);
+    const showChangeButton = projects.length > 1 || this.#project !== automaticFileSystemProject;
+
     this.#view(
         {
           workspaceDiff: this.#workspaceDiff,
           changeSummary: this.changeSummary,
           patchSuggestionState: this.#patchSuggestionState,
           sources: this.#patchSources,
-          projectName: this.#project?.displayName(),
-          projectPath: Persistence.FileSystemWorkspaceBinding.FileSystemWorkspaceBinding.fileSystemPath(
-              (this.#project?.id() || '') as Platform.DevToolsPath.UrlString),
+          projectName,
+          projectPath,
           savedToDisk: this.#savedToDisk,
           applyToWorkspaceTooltipText: this.#noLogging ?
               lockedString(UIStringsNotTranslate.applyToWorkspaceTooltipNoLogging) :
@@ -412,7 +445,8 @@ export class PatchWidget extends UI.Widget.Widget {
           },
           onDiscard: this.#onDiscard.bind(this),
           onSaveAll: this.#onSaveAll.bind(this),
-          onChangeWorkspaceClick: this.#showSelectWorkspaceDialog.bind(this, {applyPatch: false}),
+          onChangeWorkspaceClick: showChangeButton ? this.#showSelectWorkspaceDialog.bind(this, {applyPatch: false}) :
+                                                     undefined,
         },
         this.#viewOutput, this.contentElement);
   }
@@ -480,7 +514,9 @@ export class PatchWidget extends UI.Widget.Widget {
   }
 
   #selectDefaultProject(): void {
-    const project = this.#workspace.project(this.#projectIdSetting.get());
+    const automaticFileSystemProject =
+        this.#automaticFileSystem ? this.#workspace.projectForFileSystemRoot(this.#automaticFileSystem.root) : null;
+    const project = automaticFileSystemProject || this.#workspace.project(this.#projectIdSetting.get());
     if (project) {
       this.#project = project;
     } else {
@@ -565,6 +601,9 @@ ${processedFiles.map(filename => `* ${filename}`).join('\n')}`;
     this.#patchSources = undefined;
     void this.changeManager?.popStashedChanges();
     this.requestUpdate();
+    void this.updateComplete.then(() => {
+      this.#viewOutput.changeRef?.value?.focus();
+    });
   }
 
   #onSaveAll(): void {
