@@ -103,6 +103,11 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
 
   private groupingFunction(event: Trace.Types.Events.Event): string {
     const entity = this.entityMapper()?.entityForEvent(event);
+
+    // dont show corp extensions
+    if (entity?.name === 'IP Protect' || entity?.name === 'Watchword') {
+      return '';
+    }
     if (!entity) {
       return '';
     }

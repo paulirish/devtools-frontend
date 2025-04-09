@@ -118,7 +118,7 @@ const INSIGHT_NAME_TO_COMPONENT: InsightNameToComponentMapping = {
   LCPDiscovery: Insights.LCPDiscovery.LCPDiscovery,
   LCPPhases: Insights.LCPPhases.LCPPhases,
   LegacyJavaScript: Insights.LegacyJavaScript.LegacyJavaScript,
-  ModernHTTP: Insights.ModernHTTP.ModernHTTP,
+  // ModernHTTP: Insights.ModernHTTP.ModernHTTP,
   NetworkDependencyTree: Insights.NetworkDependencyTree.NetworkDependencyTree,
   RenderBlocking: Insights.RenderBlocking.RenderBlocking,
   SlowCSSSelector: Insights.SlowCSSSelector.SlowCSSSelector,
