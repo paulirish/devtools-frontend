@@ -98,19 +98,19 @@ test('insights look ok', t => {
   const simplified = Object.fromEntries(values.map((v, i) => [entityNames[i], {transferSize: v.transferSize, mainThreadTime: v.mainThreadTime}]));
 
   const expected = {
-    ahfhijdlegdabablpippeagghigmibma: { transferSize: 0, mainThreadTime: 2189 },
-    'paulirish.com': { transferSize: 142142, mainThreadTime: 8995 },
-    cjpalhdlnbpafiamejdnhcphjbkeiagm: { transferSize: 0, mainThreadTime: 2607 },
-    jinjaccalgkegednnccohejagnlnfdag: { transferSize: 0, mainThreadTime: 841 },
-    noondiphcddnnabmjcihcjfbhfklnnep: { transferSize: 0, mainThreadTime: 1811 },
-    'Google Tag Manager': { transferSize: 0, mainThreadTime: 124 },
-    Disqus: { transferSize: 1550, mainThreadTime: 413 },
-    'Google Analytics': { transferSize: 0, mainThreadTime: 117 },
-    bknnlbamapndemiekhkcnmdclnkijlhb: { transferSize: 0, mainThreadTime: 387 },
-    kljjfejkagofbgklifblndjelgabcmig: { transferSize: 0, mainThreadTime: 149 },
-    nffaoalbilbmmfgbnbgppjihopabppdk: { transferSize: 0, mainThreadTime: 812 },
-    obadmbiiipafnncogfkdfionggeckfia: { transferSize: 0, mainThreadTime: 1477 },
-    'Google Fonts': { transferSize: 74145, mainThreadTime: 0 }
+    ahfhijdlegdabablpippeagghigmibma: { transferSize: 0, mainThreadTime: 3.953000009059906 },
+    'paulirish.com': { transferSize: 142142, mainThreadTime: 17.631999850273132 },
+    cjpalhdlnbpafiamejdnhcphjbkeiagm: { transferSize: 0, mainThreadTime: 4.081999972462654 },
+    jinjaccalgkegednnccohejagnlnfdag: { transferSize: 0, mainThreadTime: 1.2049999833106995 },
+    noondiphcddnnabmjcihcjfbhfklnnep: { transferSize: 0, mainThreadTime: 2.2430000007152557 },
+    'Google Tag Manager': { transferSize: 0, mainThreadTime: 0.2629999965429306 },
+    'Google Fonts': { transferSize: 74145, mainThreadTime: 0 },
+    Disqus: { transferSize: 1550, mainThreadTime: 0.4229999780654907 },
+    'Google Analytics': { transferSize: 0, mainThreadTime: 0.2199999839067459 },
+    bknnlbamapndemiekhkcnmdclnkijlhb: { transferSize: 0, mainThreadTime: 0.601999968290329 },
+    kljjfejkagofbgklifblndjelgabcmig: { transferSize: 0, mainThreadTime: 0.27699998021125793 },
+    nffaoalbilbmmfgbnbgppjihopabppdk: { transferSize: 0, mainThreadTime: 1.246999979019165 },
+    obadmbiiipafnncogfkdfionggeckfia: { transferSize: 0, mainThreadTime: 1.696999967098236 },
   };
   assert.deepStrictEqual(simplified, expected);
 });

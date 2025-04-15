@@ -71,7 +71,6 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
       });
     }
 
-    // const events = this.#thirdPartySummaries.entityByEvent.keys();
     const relatedEvents = this.selectedEvents().sort(Trace.Helpers.Trace.eventTimeComparator);
 
     // The filters for this view are slightly different; we want to use the set
