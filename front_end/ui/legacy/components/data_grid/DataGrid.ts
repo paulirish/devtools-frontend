@@ -28,6 +28,7 @@
 /* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as Common from '../../../../core/common/common.js';
+import * as Host from '../../../../core/host/host.js';
 import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
 import * as VisualLogging from '../../../visual_logging/visual_logging.js';
@@ -605,12 +606,11 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     }
     const column = this.visibleColumnsArray[cellIndex];
     if (column.dataType === DataType.BOOLEAN) {
-      const checkboxLabel = UI.UIUtils.CheckboxLabel.create(undefined, (node.data[column.id] as boolean));
-      UI.ARIAUtils.setLabel(checkboxLabel, column.title || '');
+      const checkboxElement = UI.UIUtils.CheckboxLabel.create(undefined, (node.data[column.id] as boolean));
+      UI.ARIAUtils.setLabel(checkboxElement, column.title || '');
 
       let hasChanged = false;
-      checkboxLabel.style.height = '100%';
-      const checkboxElement = checkboxLabel.checkboxElement;
+      checkboxElement.style.height = '100%';
       checkboxElement.classList.add('inside-datagrid');
       const initialValue = checkboxElement.checked;
 
@@ -644,7 +644,7 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
       }, false);
 
       element.innerHTML = '';
-      element.appendChild(checkboxLabel);
+      element.appendChild(checkboxElement);
       checkboxElement.focus();
     } else {
       UI.InplaceEditor.InplaceEditor.startEditing(element, this.startEditingConfig(element));
@@ -1307,6 +1307,20 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     return (cellElement && nodeToColumnIdMap.get(cellElement)) || null;
   }
 
+  /**
+   * Mark the data-grid as inert, meaning that it will not capture any user interactions.
+   * Useful in some panels where the empty state is actually an absolutely
+   * positioned div put over the panel, and in that case we need to ensure the
+   * hidden, empty data grid, does not capture any user interaction - in particular if they tab through the UI.
+   */
+  setInert(isInert: boolean): void {
+    if (isInert) {
+      this.element.setAttribute('inert', 'inert');
+    } else {
+      this.element.removeAttribute('inert');
+    }
+  }
+
   private clickInHeaderCell(event: Event): void {
     const cell = UI.UIUtils.enclosingNodeOrSelfWithNodeName((event.target as Node), 'th');
     if (!cell) {
@@ -1375,7 +1389,20 @@ export class DataGridImpl<T> extends Common.ObjectWrapper.ObjectWrapper<EventTyp
       return;
     }
 
-    if ((event as MouseEvent).metaKey) {
+    /**
+     * Support Meta-Click (Cmd/Alt) or Ctrl-Click to toggle; if the row is
+     * selected we will then deselect it. You might think: why do we even gate
+     * this behind an additional key?
+     * Well, we tried to change that, but there are instances where we have
+     * multiple click handlers on a row, and so we cannot rely on select() only
+     * being called once. Sometimes by the time this event listener gets called,
+     * another click() handler has already marked this node as selected, so if
+     * we deselect it here, we are making the user unable to actually select a
+     * node. See crbug.com/409474445 for some cotext
+     */
+    const mouseEvent = event as MouseEvent;
+    const modifier = Host.Platform.platform() === 'mac' ? mouseEvent.metaKey : mouseEvent.ctrlKey;
+    if (modifier) {
       if (gridNode.selected) {
         gridNode.deselect();
       } else {

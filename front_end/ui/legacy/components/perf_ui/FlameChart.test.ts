@@ -79,7 +79,7 @@ describeWithEnvironment('FlameChart', () => {
     chartInstance = new PerfUI.FlameChart.FlameChart(provider, delegate);
     renderChart(chartInstance);
     chartInstance.windowChanged(0, 5, false);
-    assert.isTrue(windowChangedSpy.calledWith(0, 5, false));
+    sinon.assert.calledWith(windowChangedSpy, 0, 5, false);
   });
 
   it('notifies the delegate when the range selection has changed', async () => {
@@ -89,7 +89,7 @@ describeWithEnvironment('FlameChart', () => {
     chartInstance = new PerfUI.FlameChart.FlameChart(provider, delegate);
     renderChart(chartInstance);
     chartInstance.updateRangeSelection(0, 5);
-    assert.isTrue(updateRangeSpy.calledWith(0, 5));
+    sinon.assert.calledWith(updateRangeSpy, 0, 5);
   });
 
   describe('setSelectedEntry', () => {
@@ -123,7 +123,7 @@ describeWithEnvironment('FlameChart', () => {
       renderChart(chartInstance);
       // Pick the first event which is only 50ms long and therefore should be in view already.
       chartInstance.setSelectedEntry(0);
-      assert.strictEqual(windowChangedSpy.callCount, 0);
+      sinon.assert.callCount(windowChangedSpy, 0);
     });
 
     it('will change the window time to reveal the selected entry when the entry is off the right of the screen',
@@ -138,7 +138,7 @@ describeWithEnvironment('FlameChart', () => {
          chartInstance.setWindowTimes(0, 100);
          renderChart(chartInstance);
          chartInstance.setSelectedEntry(3);
-         assert.isTrue(windowChangedSpy.calledOnceWithExactly(300, 400, true));
+         sinon.assert.calledOnceWithExactly(windowChangedSpy, 300, 400, true);
        });
 
     it('will change the window time to reveal the selected entry when the entry is off the left of the screen',
@@ -153,7 +153,7 @@ describeWithEnvironment('FlameChart', () => {
          chartInstance.setWindowTimes(250, 600);
          renderChart(chartInstance);
          chartInstance.setSelectedEntry(0);
-         assert.isTrue(windowChangedSpy.calledOnceWithExactly(5, 355, true));
+         sinon.assert.calledOnceWithExactly(windowChangedSpy, 5, 355, true);
        });
   });
 
@@ -184,7 +184,7 @@ describeWithEnvironment('FlameChart', () => {
       assert.isFalse(chartInstance.highlightElement.classList.contains('hidden'));
 
       // Ensure that the event listener was called with the right index
-      assert.strictEqual(highlightedEventListener.callCount, 1);
+      sinon.assert.callCount(highlightedEventListener, 1);
       const event = highlightedEventListener.args[0][0] as Common.EventTarget.EventTargetEvent<number>;
       assert.strictEqual(event.data, entryIndexToHighlight);
     });
@@ -202,7 +202,7 @@ describeWithEnvironment('FlameChart', () => {
       // Ensure that there is only one event listener called, despite the
       // highlightEntry method being called twice, because it was called with
       // the same ID.
-      assert.strictEqual(highlightedEventListener.callCount, 1);
+      sinon.assert.callCount(highlightedEventListener, 1);
     });
 
     it('does nothing if the DataProvider entryColor() method returns a falsey value', async () => {
@@ -220,7 +220,7 @@ describeWithEnvironment('FlameChart', () => {
       chartInstance.addEventListener(PerfUI.FlameChart.Events.ENTRY_HOVERED, highlightedEventListener);
       chartInstance.highlightEntry(2);
       // No calls because entryColor returned a false value.
-      assert.strictEqual(highlightedEventListener.callCount, 0);
+      sinon.assert.callCount(highlightedEventListener, 0);
     });
 
     it('dispatches the highlight event with an ID of -1 when the highlight is hidden', async () => {

@@ -433,6 +433,8 @@ class SomeWidget extends UI.Widget.Widget {
     label.addEventListener('click', () => this.doSomething.bind(this));
     this.contentElement.appendChild(details);
     details.createChild('span');
+    const banner = createBanner();
+    this.contentElement.appendChild(banner);
   }
 }`,
       output: `
@@ -442,6 +444,7 @@ export const DEFAULT_VIEW = (input, _output, target) => {
     <div>
       \${label}
       \${details}
+      \${createBanner()}
     </div>\`,
     target, {host: input});
 };
@@ -473,6 +476,7 @@ class SomeWidget extends UI.Widget.Widget {
     anchor.href = 'https://www.google.com';
     anchor.innerText = 'some-text';
     anchor.dataset.someKey = 'some-value';
+    anchor.role = 'some-role';
     this.contentElement.insertBefore(anchor, input);
 
     const img = document.createElement('img');
@@ -495,12 +499,88 @@ class SomeWidget extends UI.Widget.Widget {
 export const DEFAULT_VIEW = (input, _output, target) => {
   render(html\`
     <div>
-      <a href="https://www.google.com" data-some-key="some-value">some-text</a>
+      <a href="https://www.google.com" data-some-key="some-value" role="some-role">some-text</a>
       <img src="https://www.google.com/some-image.png" alt="some-alt" draggable="true" height="100"
           hidden="hidden" href="https://www.google.com" id="some-id" name="some-name" rel="some-rel"
           scope="some-scope"></img>
       <input type="text" placeholder="some-placeholder" value="some-value"
           ?disabled=\${!this.enabled} ?checked=\${true}></input>
+    </div>\`,
+    target, {host: input});
+};
+
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+  }
+}`,
+      errors: [{messageId: 'preferTemplateLiterals'}],
+    },
+    {
+      filename: 'front_end/ui/components/component/file.ts',
+      code: `
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+    const toolbar = this.contentElement.createChild('devtools-toolbar');
+    this.filterInput = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.editName), 'edit', undefined, 'edit-name');
+    toolbar.appendToolbarItem(this.filterInput);
+    this.#banner = this.contentElement.createChild('div', 'banner');
+    this.#banner.textContent = 'some-text';
+  }
+}`,
+      output: `
+
+export const DEFAULT_VIEW = (input, _output, target) => {
+  render(html\`
+    <div>
+      <devtools-toolbar>
+        <devtools-button title=\${i18nString(UIStrings.editName)}
+            .variant=\${Buttons.Button.Variant.TOOLBAR} .iconName=\${'edit'}
+            .jslogContext=\${'edit-name'}></devtools-button>
+      </devtools-toolbar>
+      <div class="banner">some-text</div>
+    </div>\`,
+    target, {host: input});
+};
+
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+  }
+}`,
+      errors: [{messageId: 'preferTemplateLiterals'}],
+    },
+    {
+      filename: 'front_end/ui/components/component/file.ts',
+      code: `
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+    const select = document.createElement('select');
+    select.add(UI.UIUtils.createOption('Option 1', '1', 'option-1'));
+    this.contentElement.appendChild(UI.UIUtils.createLabel('Some label:', 'some-label', select));
+    this.contentElement.appendChild(UI.UIUtils.createTextButton('Some button', onClick, {
+      className: 'some-class',
+      jslogContext: 'some-button',
+      variant: Buttons.Button.Variant.PRIMARY,
+      title: i18nString(UIStrings.someTitle),
+      iconName: 'some-icon'
+    }));
+  }
+}`,
+      output: `
+
+export const DEFAULT_VIEW = (input, _output, target) => {
+  render(html\`
+    <div>
+      <label class="some-label">Some label:
+        <select>
+          <option value="1" jslog=\${VisualLogging.dropDown('1').track({click: true})}>Option 1</option>
+        </select>
+      </label>
+      <devtools-button class="some-class" title=\${i18nString(UIStrings.someTitle)} @click=\${onClick}
+          .jslogContext=\${'some-button'} .variant=\${Buttons.Button.Variant.PRIMARY}>Some button</devtools-button>
     </div>\`,
     target, {host: input});
 };

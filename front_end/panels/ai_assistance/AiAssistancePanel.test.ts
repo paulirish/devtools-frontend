@@ -295,7 +295,7 @@ describeWithMockConnection('AI Assistance Panel', () => {
           throw new Error('Context is not available');
         }
         UI.Context.Context.instance().setFlavor(test.flavor, contextItem);
-        assert.strictEqual(view.callCount, callCount);
+        sinon.assert.callCount(view, callCount);
       });
     }
 
@@ -324,7 +324,7 @@ describeWithMockConnection('AI Assistance Panel', () => {
 
       // Now clear the context and check we cleared out the text
       UI.Context.Context.instance().setFlavor(TimelineUtils.AICallTree.AICallTree, null);
-      assert.strictEqual(chatView.clearTextInput.callCount, 1);
+      sinon.assert.callCount(chatView.clearTextInput, 1);
     });
   });
 
@@ -362,7 +362,7 @@ describeWithMockConnection('AI Assistance Panel', () => {
       const uiSourceCode = sinon.createStubInstance(Workspace.UISourceCode.UISourceCode);
       UI.Context.Context.instance().setFlavor(Workspace.UISourceCode.UISourceCode, uiSourceCode);
 
-      assert.strictEqual(view.callCount, callCount);
+      sinon.assert.callCount(view, callCount);
     });
   });
 
@@ -371,7 +371,50 @@ describeWithMockConnection('AI Assistance Panel', () => {
       const stub = sinon.stub(UI.ViewManager.ViewManager.instance(), 'showView');
       const {view} = await createAiAssistancePanel();
       view.input.onSettingsClick();
-      assert.isTrue(stub.calledWith('chrome-ai'));
+      sinon.assert.calledWith(stub, 'chrome-ai');
+    });
+
+    it('should not show chat and delete history actions when ai assistance enabled setting is disabled', async () => {
+      Common.Settings.moduleSetting('ai-assistance-enabled').setDisabled(true);
+
+      const {view} = await createAiAssistancePanel();
+
+      assert.isFalse(view.input.showChatActions);
+      assert.isFalse(view.input.showDeleteHistoryAction);
+    });
+
+    it('should not show chat and delete history actions when ai assistance setting is marked as false', async () => {
+      Common.Settings.moduleSetting('ai-assistance-enabled').set(false);
+
+      const {view} = await createAiAssistancePanel();
+
+      assert.isFalse(view.input.showChatActions);
+      assert.isFalse(view.input.showDeleteHistoryAction);
+    });
+
+    it('should not show chat and delete history actions when the user is blocked by age', async () => {
+      Common.Settings.moduleSetting('ai-assistance-enabled').set(true);
+      updateHostConfig({
+        aidaAvailability: {
+          blockedByAge: true,
+        },
+      });
+
+      const {view} = await createAiAssistancePanel();
+
+      assert.isFalse(view.input.showChatActions);
+      assert.isFalse(view.input.showDeleteHistoryAction);
+    });
+
+    it('should not show chat and delete history actions when Aida availability status is SYNC IS PAUSED', async () => {
+      Common.Settings.moduleSetting('ai-assistance-enabled').set(true);
+      Common.Settings.moduleSetting('ai-assistance-enabled').set(true);
+
+      const {view} =
+          await createAiAssistancePanel({aidaAvailability: Host.AidaClient.AidaAccessPreconditions.SYNC_IS_PAUSED});
+
+      assert.isFalse(view.input.showChatActions);
+      assert.isFalse(view.input.showDeleteHistoryAction);
     });
   });
 
@@ -639,7 +682,7 @@ describeWithMockConnection('AI Assistance Panel', () => {
       view.input.onDeleteClick();
 
       assert.deepEqual((await view.nextInput).messages, []);
-      assert.strictEqual(deleteHistoryEntryStub.callCount, 1);
+      sinon.assert.callCount(deleteHistoryEntryStub, 1);
       assert.isString(deleteHistoryEntryStub.lastCall.args[0]);
 
       const menuAfterDelete = openHistoryContextMenu(view.input, 'User question to Freestyler?');

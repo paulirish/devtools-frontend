@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-/* eslint-disable no-unused-private-class-members */
+import type * as Platform from '../../../core/platform/platform.js';
 import type * as Protocol from '../../../generated/protocol.js';
 
 import type {Micro, Milli, Seconds, TraceWindowMicro} from './Timing.js';
@@ -1540,14 +1540,22 @@ const enum FrameType {
   BACKFILL = 'BACKFILL',
 }
 
+// TODO(crbug.com/409484302): Remove once Chrome migrates from
+// ChromeTrackEvent.chrome_frame_reporter to ChromeTrackEvent.frame_reporter.
+export interface OldChromeFrameReporterArgs {
+  chrome_frame_reporter: ChromeFrameReporter;
+}
+
+export interface NewChromeFrameReporterArgs {
+  frame_reporter: ChromeFrameReporter;
+}
+
 export interface PipelineReporter extends Event {
   id2?: {
     local?: string,
   };
   ph: Phase.ASYNC_NESTABLE_START|Phase.ASYNC_NESTABLE_END;
-  args: Args&{
-    chrome_frame_reporter: ChromeFrameReporter,
-  };
+  args: Args&(OldChromeFrameReporterArgs|NewChromeFrameReporterArgs);
 }
 
 export function isPipelineReporter(event: Event): event is PipelineReporter {
@@ -1937,55 +1945,37 @@ export function isDebuggerAsyncTaskRun(event: Event): event is DebuggerAsyncTask
   return event.name === Name.DEBUGGER_ASYNC_TASK_RUN;
 }
 
-class ProfileIdTag {
-  readonly #profileIdTag: (symbol|undefined);
-}
-export type ProfileID = string&ProfileIdTag;
+export type ProfileID = Platform.Brand.Brand<string, 'profileIdTag'>;
 
 export function ProfileID(value: string): ProfileID {
   return value as ProfileID;
 }
 
-class CallFrameIdTag {
-  readonly #callFrameIdTag: (symbol|undefined);
-}
-export type CallFrameID = number&CallFrameIdTag;
+export type CallFrameID = Platform.Brand.Brand<number, 'callFrameIdTag'>;
 
 export function CallFrameID(value: number): CallFrameID {
   return value as CallFrameID;
 }
 
-class SampleIndexTag {
-  readonly #sampleIndexTag: (symbol|undefined);
-}
-export type SampleIndex = number&SampleIndexTag;
+export type SampleIndex = Platform.Brand.Brand<number, 'sampleIndexTag'>;
 
 export function SampleIndex(value: number): SampleIndex {
   return value as SampleIndex;
 }
 
-class ProcessIdTag {
-  readonly #processIdTag: (symbol|undefined);
-}
-export type ProcessID = number&ProcessIdTag;
+export type ProcessID = Platform.Brand.Brand<number, 'processIdTag'>;
 
 export function ProcessID(value: number): ProcessID {
   return value as ProcessID;
 }
 
-class ThreadIdTag {
-  readonly #threadIdTag: (symbol|undefined);
-}
-export type ThreadID = number&ThreadIdTag;
+export type ThreadID = Platform.Brand.Brand<number, 'threadIdTag'>;
 
 export function ThreadID(value: number): ThreadID {
   return value as ThreadID;
 }
 
-class WorkerIdTag {
-  readonly #workerIdTag: (symbol|undefined);
-}
-export type WorkerId = string&WorkerIdTag;
+export type WorkerId = Platform.Brand.Brand<string, 'workerIdTag'>;
 
 export function WorkerId(value: string): WorkerId {
   return value as WorkerId;
@@ -2068,7 +2058,7 @@ export function isCommitLoad(
 export function isAnimation(
     event: Event,
     ): event is Animation {
-  // We've found some rare traces with an Animtation trace event from a different category: https://crbug.com/1472375#comment7
+  // We've found some rare traces with an Animation trace event from a different category: https://crbug.com/1472375#comment7
   return event.name === 'Animation' && event.cat.includes('devtools.timeline');
 }
 
@@ -3171,4 +3161,25 @@ export interface V8SourceRundownSourcesLargeScriptCatchupEvent extends Event {
 export function isV8SourceRundownSourcesLargeScriptCatchupEvent(event: Event):
     event is V8SourceRundownSourcesLargeScriptCatchupEvent {
   return event.cat === 'disabled-by-default-devtools.v8-source-rundown-sources' && event.name === 'LargeScriptCatchup';
+}
+
+export interface V8SourceRundownSourcesStubScriptCatchupEvent extends Event {
+  cat: 'disabled-by-default-devtools.v8-source-rundown-sources';
+  name: 'StubScriptCatchup';
+  args: Args&{
+    data: {
+      isolate: string,
+      scriptId: number,
+    },
+  };
+}
+
+export function isV8SourceRundownSourcesStubScriptCatchupEvent(event: Event):
+    event is V8SourceRundownSourcesStubScriptCatchupEvent {
+  return event.cat === 'disabled-by-default-devtools.v8-source-rundown-sources' && event.name === 'StubScriptCatchup';
+}
+
+export function isAnyScriptCatchupEvent(event: Event): event is V8SourceRundownSourcesScriptCatchupEvent|
+    V8SourceRundownSourcesLargeScriptCatchupEvent|V8SourceRundownSourcesStubScriptCatchupEvent {
+  return event.cat === 'disabled-by-default-devtools.v8-source-rundown-sources';
 }

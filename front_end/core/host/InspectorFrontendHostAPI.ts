@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import type * as Platform from '../../core/platform/platform.js';
+import type * as Common from '../common/common.js';
 import type * as Root from '../root/root.js';
 
 export enum Events {
@@ -67,7 +68,7 @@ export const EventDescriptors = [
   [Events.SetInspectedTabId, 'setInspectedTabId', ['tabId']],
   [Events.SetUseSoftMenu, 'setUseSoftMenu', ['useSoftMenu']],
   [Events.ShowPanel, 'showPanel', ['panelName']],
-];
+] as const;
 
 export interface DispatchMessageChunkEvent {
   messageChunk: string;
@@ -242,6 +243,8 @@ export interface EventTypes {
 }
 
 export interface InspectorFrontendHostAPI {
+  events: Common.EventTarget.EventTarget<EventTypes>;
+
   connectAutomaticFileSystem(
       fileSystemPath: Platform.DevToolsPath.RawPathString,
       fileSystemUUID: string,
@@ -299,6 +302,10 @@ export interface InspectorFrontendHostAPI {
 
   closeWindow(): void;
 
+  /**
+   * Don't use directly - use {@link CopyToClipboard.copyTextToClipboard} instead.
+   * @deprecated Marked to restrict usage.
+   */
   copyText(text: string|null|undefined): void;
 
   inspectedURLChanged(url: Platform.DevToolsPath.UrlString): void;

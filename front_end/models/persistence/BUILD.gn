@@ -19,6 +19,7 @@ devtools_module("persistence") {
   sources = [
     "Automapping.ts",
     "AutomaticFileSystemManager.ts",
+    "AutomaticFileSystemWorkspaceBinding.ts",
     "EditFileSystemView.ts",
     "FileSystemWorkspaceBinding.ts",
     "IsolatedFileSystem.ts",
@@ -97,6 +98,7 @@ ts_library("unittests") {
 
   sources = [
     "AutomaticFileSystemManager.test.ts",
+    "AutomaticFileSystemWorkspaceBinding.test.ts",
     "NetworkPersistenceManager.test.ts",
     "PersistenceAction.test.ts",
     "PersistenceImpl.test.ts",

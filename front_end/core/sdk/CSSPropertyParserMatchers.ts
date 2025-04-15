@@ -342,9 +342,7 @@ export class LinearGradientMatcher extends matcherBase(LinearGradientMatch) {
 
 export class ColorMatch implements Match {
   computedText: (() => string | null)|undefined;
-  constructor(
-      readonly text: string, readonly node: CodeMirror.SyntaxNode,
-      private readonly currentColorCallback?: () => string | null) {
+  constructor(readonly text: string, readonly node: CodeMirror.SyntaxNode, currentColorCallback?: () => string | null) {
     this.computedText = currentColorCallback;
   }
 }
@@ -685,10 +683,10 @@ export class LengthMatch implements Match {
 export class LengthMatcher extends matcherBase(LengthMatch) {
   // clang-format on
   static readonly LENGTH_UNITS = new Set([
-    'em',    'ex',    'ch',  'cap', 'ic',    'lh',    'rem',   'rex',   'rch',  'rlh',  'ric', 'rcap', 'pt',    'pc',
-    'in',    'cm',    'mm',  'Q',   'vw',    'vh',    'vi',    'vb',    'vmin', 'vmax', 'dvw', 'dvh',  'dvi',   'dvb',
-    'dvmin', 'dvmax', 'svw', 'svh', 'svi',   'svb',   'svmin', 'svmax', 'lvw',  'lvh',  'lvi', 'lvb',  'lvmin', 'lvmax',
-    'cqw',   'cqh',   'cqi', 'cqb', 'cqmin', 'cqmax', 'cqem',  'cqlh',  'cqex', 'cqch', '%'
+    'em',  'ex',    'ch',    'cap',   'ic',  'lh',  'rem', 'rex',   'rch',   'rlh',   'ric',  'rcap', 'pt',
+    'pc',  'in',    'cm',    'mm',    'Q',   'vw',  'vh',  'vi',    'vb',    'vmin',  'vmax', 'dvw',  'dvh',
+    'dvi', 'dvb',   'dvmin', 'dvmax', 'svw', 'svh', 'svi', 'svb',   'svmin', 'svmax', 'lvw',  'lvh',  'lvi',
+    'lvb', 'lvmin', 'lvmax', 'cqw',   'cqh', 'cqi', 'cqb', 'cqmin', 'cqmax', 'cqem',  'cqlh', 'cqex', 'cqch',
   ]);
   override matches(node: CodeMirror.SyntaxNode, matching: BottomUpTreeMatching): LengthMatch|null {
     if (node.name !== 'NumberLiteral') {

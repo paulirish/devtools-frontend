@@ -423,8 +423,7 @@ export class NamedBitSetFilterUI extends Common.ObjectWrapper.ObjectWrapper<Filt
     }
   }
 
-  private onTypeFilterKeydown(ev: Event): void {
-    const event = (ev as KeyboardEvent);
+  private onTypeFilterKeydown(event: KeyboardEvent): void {
     const element = (event.target as HTMLElement | null);
     if (!element) {
       return;
@@ -495,40 +494,37 @@ export class NamedBitSetFilterUI extends Common.ObjectWrapper.ObjectWrapper<Filt
 export class CheckboxFilterUI extends Common.ObjectWrapper.ObjectWrapper<FilterUIEventTypes> implements FilterUI {
   private readonly filterElement: HTMLDivElement;
   private readonly activeWhenChecked: boolean;
-  private label: CheckboxLabel;
-  private checkboxElement: HTMLInputElement;
+  private checkbox: CheckboxLabel;
   constructor(
-      className: string, title: Common.UIString.LocalizedString, activeWhenChecked?: boolean,
-      setting?: Common.Settings.Setting<boolean>, jslogContext?: string) {
+      title: Common.UIString.LocalizedString,
+      activeWhenChecked?: boolean,
+      setting?: Common.Settings.Setting<boolean>,
+      jslogContext?: string,
+  ) {
     super();
     this.filterElement = document.createElement('div');
     this.filterElement.classList.add('filter-checkbox-filter');
     this.activeWhenChecked = Boolean(activeWhenChecked);
-    this.label = CheckboxLabel.create(title);
-    this.filterElement.appendChild(this.label);
-    this.checkboxElement = this.label.checkboxElement;
+    this.checkbox = CheckboxLabel.create(title, undefined, undefined, jslogContext);
+    this.filterElement.appendChild(this.checkbox);
     if (setting) {
-      bindCheckbox(this.checkboxElement, setting);
+      bindCheckbox(this.checkbox, setting);
     } else {
-      this.checkboxElement.checked = true;
+      this.checkbox.checked = true;
     }
-    this.checkboxElement.addEventListener('change', this.fireUpdated.bind(this), false);
-    if (jslogContext) {
-      this.checkboxElement.setAttribute(
-          'jslog', `${VisualLogging.toggle().track({change: true}).context(jslogContext)}`);
-    }
+    this.checkbox.addEventListener('change', this.fireUpdated.bind(this), false);
   }
 
   isActive(): boolean {
-    return this.activeWhenChecked === this.checkboxElement.checked;
+    return this.activeWhenChecked === this.checkbox.checked;
   }
 
   checked(): boolean {
-    return this.checkboxElement.checked;
+    return this.checkbox.checked;
   }
 
   setChecked(checked: boolean): void {
-    this.checkboxElement.checked = checked;
+    this.checkbox.checked = checked;
   }
 
   element(): HTMLDivElement {
@@ -536,7 +532,7 @@ export class CheckboxFilterUI extends Common.ObjectWrapper.ObjectWrapper<FilterU
   }
 
   labelElement(): Element {
-    return this.label;
+    return this.checkbox;
   }
 
   private fireUpdated(): void {

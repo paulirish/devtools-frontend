@@ -772,7 +772,7 @@ export class AppManifestView extends Common.ObjectWrapper.eventMixin<EventTypes,
     setIconMaskedCheckbox.setAttribute(
         'jslog', `${VisualLogging.toggle('show-minimal-safe-area-for-maskable-icons').track({change: true})}`);
     setIconMaskedCheckbox.addEventListener('click', () => {
-      this.iconsSection.setIconMasked(setIconMaskedCheckbox.checkboxElement.checked);
+      this.iconsSection.setIconMasked(setIconMaskedCheckbox.checked);
     });
     this.iconsSection.appendRow().appendChild(setIconMaskedCheckbox);
     const documentationLink = UI.XLink.XLink.create(
@@ -1107,8 +1107,7 @@ export class AppManifestView extends Common.ObjectWrapper.eventMixin<EventTypes,
   }
 
   checkSizeProblem(
-      size: ParsedSize, type: string|undefined, image: HTMLImageElement,
-      resourceName: Platform.UIString.LocalizedString,
+      size: ParsedSize, image: HTMLImageElement, resourceName: Platform.UIString.LocalizedString,
       imageUrl: string): {error?: Platform.UIString.LocalizedString, hasSquareSize: boolean} {
     if ('any' in size) {
       return {hasSquareSize: image.naturalWidth === image.naturalHeight};
@@ -1186,8 +1185,7 @@ export class AppManifestView extends Common.ObjectWrapper.eventMixin<EventTypes,
         imageResourceErrors.push(i18nString(UIStrings.screenshotPixelSize, {url: imageUrl}));
       }
       for (const size of sizes) {
-        const {error, hasSquareSize} =
-            this.checkSizeProblem(size, imageResource['type'], image, resourceName, imageUrl);
+        const {error, hasSquareSize} = this.checkSizeProblem(size, image, resourceName, imageUrl);
         squareSizedIconAvailable = squareSizedIconAvailable || hasSquareSize;
         if (error) {
           imageResourceErrors.push(error);
@@ -1235,8 +1233,8 @@ export class AppManifestView extends Common.ObjectWrapper.eventMixin<EventTypes,
     const wcoOsCheckbox =
         UI.UIUtils.CheckboxLabel.create(i18nString(UIStrings.selectWindowControlsOverlayEmulationOs), false);
 
-    wcoOsCheckbox.checkboxElement.addEventListener('click', async () => {
-      await this.overlayModel?.toggleWindowControlsToolbar(wcoOsCheckbox.checkboxElement.checked);
+    wcoOsCheckbox.addEventListener('click', async () => {
+      await this.overlayModel?.toggleWindowControlsToolbar(wcoOsCheckbox.checked);
     });
 
     const osSelectElement = wcoOsCheckbox.createChild('select');
@@ -1254,7 +1252,7 @@ export class AppManifestView extends Common.ObjectWrapper.eventMixin<EventTypes,
           osSelectElement.options[osSelectElement.selectedIndex].value as SDK.OverlayModel.EmulatedOSType;
       if (this.overlayModel) {
         this.overlayModel.setWindowControlsPlatform(selectedOS);
-        await this.overlayModel.toggleWindowControlsToolbar(wcoOsCheckbox.checkboxElement.checked);
+        await this.overlayModel.toggleWindowControlsToolbar(wcoOsCheckbox.checked);
       }
     });
 

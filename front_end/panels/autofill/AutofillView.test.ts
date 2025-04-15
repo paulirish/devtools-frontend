@@ -159,7 +159,7 @@ describeWithMockConnection('AutofillView', () => {
 
   it('shows content if the view is created after the event was received', async () => {
     autofillModel.addressFormFilled(addressFormFilledEvent);
-    assert.isTrue(showViewStub.calledOnceWithExactly('autofill-view'));
+    sinon.assert.calledOnceWithExactly(showViewStub, 'autofill-view');
     const view = await renderAutofillView();
     assert.isNotNull(view.shadowRoot);
     assertViewShowsEventData(view);
@@ -170,7 +170,7 @@ describeWithMockConnection('AutofillView', () => {
     const view = await renderAutofillView();
 
     autofillModel.addressFormFilled(addressFormFilledEvent);
-    assert.isTrue(showViewStub.calledOnceWithExactly('autofill-view'));
+    sinon.assert.calledOnceWithExactly(showViewStub, 'autofill-view');
     showViewStub.reset();
 
     // The auto-opening checkbox is the second one.
@@ -182,14 +182,14 @@ describeWithMockConnection('AutofillView', () => {
     checkbox.dispatchEvent(event);
 
     autofillModel.addressFormFilled(addressFormFilledEvent);
-    assert.isTrue(showViewStub.notCalled);
+    sinon.assert.notCalled(showViewStub);
 
     checkbox.checked = true;
     event = new Event('change');
     checkbox.dispatchEvent(event);
 
     autofillModel.addressFormFilled(addressFormFilledEvent);
-    assert.isTrue(showViewStub.calledOnceWithExactly('autofill-view'));
+    sinon.assert.calledOnceWithExactly(showViewStub, 'autofill-view');
     await RenderCoordinator.done();
   });
 
@@ -197,7 +197,7 @@ describeWithMockConnection('AutofillView', () => {
     const view = await renderAutofillView();
 
     autofillModel.addressFormFilled(addressFormFilledEvent);
-    assert.isTrue(showViewStub.calledOnceWithExactly('autofill-view'));
+    sinon.assert.calledOnceWithExactly(showViewStub, 'autofill-view');
     showViewStub.reset();
 
     // The show test addresses checkbox is the first one.
@@ -206,12 +206,12 @@ describeWithMockConnection('AutofillView', () => {
     assert.isFalse(checkbox.checked);
 
     const setAddressSpy = sinon.spy(autofillModel!.agent, 'invoke_setAddresses');
-    assert.isTrue(setAddressSpy.notCalled);
+    sinon.assert.notCalled(setAddressSpy);
 
     checkbox.checked = true;
     const event = new Event('change');
     checkbox.dispatchEvent(event);
-    assert.isTrue(setAddressSpy.calledOnce);
+    sinon.assert.calledOnce(setAddressSpy);
 
     await RenderCoordinator.done();
   });
@@ -220,7 +220,7 @@ describeWithMockConnection('AutofillView', () => {
     const monospaceStyles = 'font-family:var(--monospace-font-family);font-size:var(--monospace-font-size);';
 
     autofillModel.addressFormFilled(addressFormFilledEvent);
-    assert.isTrue(showViewStub.calledOnceWithExactly('autofill-view'));
+    sinon.assert.calledOnceWithExactly(showViewStub, 'autofill-view');
     const view = await renderAutofillView();
     assertViewShowsEventData(view);
 
@@ -260,7 +260,7 @@ describeWithMockConnection('AutofillView', () => {
     });
 
     autofillModel.addressFormFilled(addressFormFilledEvent);
-    assert.isTrue(showViewStub.calledOnceWithExactly('autofill-view'));
+    sinon.assert.calledOnceWithExactly(showViewStub, 'autofill-view');
     const view = await renderAutofillView();
     assertViewShowsEventData(view);
 
@@ -280,16 +280,16 @@ describeWithMockConnection('AutofillView', () => {
     fourthGridRow.dispatchEvent(new MouseEvent('mouseenter'));
     await RenderCoordinator.done({waitForWork: true});
     assert.isTrue(zipCodeSpan.classList.contains('highlighted'));
-    assert.isTrue(overlaySpy.calledOnce);
+    sinon.assert.calledOnce(overlaySpy);
     const deferredNode =
         (overlaySpy.getCall(0).args[0] as unknown as SDK.OverlayModel.HighlightDeferredNode).deferredNode;
     assert.strictEqual(deferredNode.backendNodeId(), 4);
-    assert.isTrue(hideOverlaySpy.notCalled);
+    sinon.assert.notCalled(hideOverlaySpy);
 
     fourthGridRow.dispatchEvent(new MouseEvent('mouseleave'));
     await RenderCoordinator.done({waitForWork: true});
     assert.isFalse(zipCodeSpan.classList.contains('highlighted'));
-    assert.isTrue(hideOverlaySpy.calledOnce);
+    sinon.assert.calledOnce(hideOverlaySpy);
     getFrameStub.restore();
   });
 });

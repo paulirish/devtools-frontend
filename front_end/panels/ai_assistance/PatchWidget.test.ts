@@ -17,6 +17,7 @@ import {
   MockAidaAbortError,
   mockAidaClient,
   MockAidaFetchError,
+  setupAutomaticFileSystem,
 } from '../../testing/AiAssistanceHelpers.js';
 import {updateHostConfig} from '../../testing/EnvironmentHelpers.js';
 import {describeWithMockConnection} from '../../testing/MockConnection.js';
@@ -30,6 +31,7 @@ describeWithMockConnection('PatchWidget', () => {
     showFreDialogStub = sinon.stub(PanelCommon.FreDialog, 'show');
 
     initializePersistenceImplForTests();
+    setupAutomaticFileSystem();
   });
 
   afterEach(() => {
@@ -202,12 +204,12 @@ Files:
         },
       });
       const {view} = await createPatchWidget();
-      assert.isUndefined(view.input.projectName);
+      assert.strictEqual(view.input.projectName, '');
     });
 
     it('does not select a workspace project if setting does not exist', async () => {
       const {view} = await createPatchWidget();
-      assert.isUndefined(view.input.projectName);
+      assert.strictEqual(view.input.projectName, '');
     });
 
     it('selects a workspace project matching the setting', async () => {
@@ -223,7 +225,7 @@ Files:
 
       Workspace.Workspace.WorkspaceImpl.instance().removeProject(project);
       const input = await view.nextInput;
-      assert.isUndefined(input.projectName);
+      assert.strictEqual(input.projectName, '');
     });
 
     it('selection is triggered by applyToWorkspace click if no workspace is (pre-)selected', async () => {
@@ -235,12 +237,12 @@ Files:
       const {view, widget} =
           await createPatchWidget({aidaClient: mockAidaClient([[{explanation: 'suggested patch'}]])});
       widget.changeSummary = 'body { background-color: red; }';
-      assert.isUndefined(view.input.projectName);
+      assert.strictEqual(view.input.projectName, '');
 
       // Simulate clicking the "Apply to workspace" button
       view.input.onApplyToWorkspace();
       await new Promise(resolve => setTimeout(resolve, 0));
-      assert.isTrue(showSelectWorkspaceDialogStub.calledOnce);
+      sinon.assert.calledOnce(showSelectWorkspaceDialogStub);
 
       // Simulate selecting a workspace with the SelectWorkspaceDialog
       handler(project);
@@ -264,9 +266,10 @@ Files:
       assert.strictEqual(view.input.projectName, 'test');
 
       // Simulate clicking the "Change" button
-      assert.isTrue(showSelectWorkspaceDialogStub.notCalled);
+      sinon.assert.notCalled(showSelectWorkspaceDialogStub);
+      assert.isDefined(view.input.onChangeWorkspaceClick);
       view.input.onChangeWorkspaceClick();
-      assert.isTrue(showSelectWorkspaceDialogStub.calledOnce);
+      sinon.assert.calledOnce(showSelectWorkspaceDialogStub);
 
       // Simulate selecting a different workspace with the SelectWorkspaceDialog
       handler(project2);
@@ -274,6 +277,27 @@ Files:
 
       // Assert that the project has been updated
       assert.strictEqual(input.projectName, 'test2');
+    });
+
+    it('preselects an automatic workspace folder and allows connecting to it', async () => {
+      setupAutomaticFileSystem({hasFileSystem: true});
+      const showSelectWorkspaceDialogSpy = sinon.spy(AiAssistance.SelectWorkspaceDialog, 'show');
+      const applyChangesSpy = sinon.spy(AiAssistanceModel.PatchAgent.prototype, 'applyChanges');
+
+      const {view, widget} = await createPatchWidget();
+      widget.changeSummary = 'body { background-color: red; }';
+      assert.strictEqual(view.input.projectName, 'my-automatic-file-system');
+      assert.strictEqual(view.input.projectPath, '/path/to/my-automatic-file-system');
+
+      // Clicking on "Apply to workspace" does not open a SelectWorkspaceDialog
+      view.input.onApplyToWorkspace();
+      sinon.assert.notCalled(showSelectWorkspaceDialogSpy);
+      await new Promise(resolve => setTimeout(resolve, 0));
+      sinon.assert.notCalled(applyChangesSpy);
+
+      // This simulates the user confirming the file permissions dialog
+      createTestFilesystem('file:///path/to/my-automatic-file-system');
+      sinon.assert.calledOnce(applyChangesSpy);
     });
   });
 
@@ -309,7 +333,7 @@ Files:
       widget.changeManager = changeManager;
       view.input.onApplyToWorkspace();
       await view.nextInput;
-      assert.isTrue(changeManager.stashChanges.notCalled);
+      sinon.assert.notCalled(changeManager.stashChanges);
     });
 
     it('on save should stash changes', async () => {
@@ -324,7 +348,7 @@ Files:
 
       assert.isTrue(nextInput.savedToDisk);
       assert.isTrue(commitWorkingCopyStub.called, 'Expected commitWorkingCopy to be called but it is not called');
-      assert.isTrue(changeManager.stashChanges.calledOnce);
+      sinon.assert.calledOnce(changeManager.stashChanges);
     });
 
     it('discard should discard the working copy and render the view without patchSuggestion', async () => {
@@ -338,7 +362,7 @@ Files:
       const nextInput = await view.nextInput;
 
       assert.strictEqual(nextInput.patchSuggestionState, AiAssistance.PatchWidget.PatchSuggestionState.INITIAL);
-      assert.isTrue(changeManager.popStashedChanges.calledOnce);
+      sinon.assert.calledOnce(changeManager.popStashedChanges);
     });
   });
 });

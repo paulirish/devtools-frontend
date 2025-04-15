@@ -222,7 +222,7 @@ const AutoDetectIndent = CM.StateField.define<string>({
 
 function preservedLength(ch: CM.ChangeDesc): number {
   let len = 0;
-  ch.iterGaps((from, to, l) => {
+  ch.iterGaps((_from, _to, l) => {
     len += l;
   });
   return len;
@@ -428,10 +428,8 @@ class CompletionHint extends CM.WidgetType {
 }
 
 export const showCompletionHint = CM.ViewPlugin.fromClass(class {
-decorations:
-  CM.DecorationSet = CM.Decoration.none;
-currentHint:
-  string|null = null;
+  decorations: CM.DecorationSet = CM.Decoration.none;
+  currentHint: string|null = null;
 
   update(update: CM.ViewUpdate): void {
     const top = this.currentHint = this.topCompletion(update.state);

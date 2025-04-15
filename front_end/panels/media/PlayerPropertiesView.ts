@@ -172,7 +172,6 @@ export const enum PlayerPropertyKeys {
 }
 
 export class PropertyRenderer extends UI.Widget.VBox {
-  private readonly title: Platform.UIString.LocalizedString;
   private readonly contents: HTMLElement;
   private value: string|null;
   private pseudoColorProtectionElement: HTMLDivElement|null;
@@ -183,16 +182,15 @@ export class PropertyRenderer extends UI.Widget.VBox {
     const titleElement = this.contentElement.createChild('span', 'media-property-renderer-title');
     this.contents = this.contentElement.createChild('div', 'media-property-renderer-contents');
     UI.UIUtils.createTextChild(titleElement, title);
-    this.title = title;
     this.value = null;
     this.pseudoColorProtectionElement = null;
     this.contentElement.classList.add('media-property-renderer-hidden');
   }
 
-  updateData(propname: string, propvalue: string): void {
+  updateData(propvalue: string): void {
     // convert all empty possibilities into nulls for easier handling.
     if (propvalue === '' || propvalue === null) {
-      return this.updateDataInternal(propname, null);
+      return this.updateDataInternal(null);
     }
     try {
       propvalue = JSON.parse(propvalue) as string;
@@ -201,10 +199,10 @@ export class PropertyRenderer extends UI.Widget.VBox {
       // something defined or sourced from the c++ definitions.
       // Do nothing, some strings just stay strings!
     }
-    return this.updateDataInternal(propname, propvalue);
+    return this.updateDataInternal(propvalue);
   }
 
-  protected updateDataInternal(propname: string, propvalue: string|null): void {
+  protected updateDataInternal(propvalue: string|null): void {
     if (propvalue === null) {
       this.changeContents(null);
     } else if (this.value === propvalue) {
@@ -266,7 +264,7 @@ export class FormattedPropertyRenderer extends PropertyRenderer {
     this.formatfunction = formatfunction;
   }
 
-  override updateDataInternal(propname: string, propvalue: string|null): void {
+  override updateDataInternal(propvalue: string|null): void {
     if (propvalue === null) {
       this.changeContents(null);
     } else {
@@ -322,7 +320,7 @@ export class TrackManager {
     this.view = propertiesView;
   }
 
-  updateData(_name: string, value: string): void {
+  updateData(value: string): void {
     const tabs = this.view.getTabs(this.type);
 
     const newTabs = JSON.parse(value) as TabData[];
@@ -437,7 +435,6 @@ export class PlayerPropertiesView extends UI.Widget.VBox {
   private readonly mediaElements: PropertyRenderer[];
   private readonly videoDecoderElements: PropertyRenderer[];
   private readonly audioDecoderElements: PropertyRenderer[];
-  private readonly textTrackElements: PropertyRenderer[];
   private readonly attributeMap: Map<string, PropertyRenderer|TrackManager>;
   private readonly videoProperties: AttributesView;
   private readonly videoDecoderProperties: AttributesView;
@@ -457,7 +454,6 @@ export class PlayerPropertiesView extends UI.Widget.VBox {
     this.mediaElements = [];
     this.videoDecoderElements = [];
     this.audioDecoderElements = [];
-    this.textTrackElements = [];
     this.attributeMap = new Map();
 
     this.populateAttributesAndElements();
@@ -504,7 +500,7 @@ export class PlayerPropertiesView extends UI.Widget.VBox {
     if (!renderer) {
       throw new Error(`Player property "${property.name}" not supported.`);
     }
-    renderer.updateData(property.name, property.value);
+    renderer.updateData(property.value);
   }
 
   formatKbps(bitsPerSecond: string|number): string {

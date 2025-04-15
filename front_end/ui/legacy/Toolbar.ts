@@ -89,7 +89,6 @@ export class Toolbar extends HTMLElement {
   private items: ToolbarItem[] = [];
   enabled = true;
   private compactLayout = false;
-  private mutationObserver = new MutationObserver(this.onItemsChange.bind(this));
 
   constructor() {
     super();
@@ -906,7 +905,7 @@ class ToolbarInputElement extends HTMLElement {
     return [...options].map((({value}) => value)).filter(value => value.startsWith(prefix)).map(text => ({text}));
   }
 
-  attributeChangedCallback(name: string, oldValue: string, newValue: string): void {
+  attributeChangedCallback(name: string, _oldValue: string, newValue: string): void {
     if (name === 'value') {
       if (this.item && this.item.value() !== newValue) {
         this.item.setValue(newValue, true);
@@ -931,12 +930,10 @@ export namespace ToolbarInput {
 }
 
 export class ToolbarToggle extends ToolbarButton {
-  private readonly untoggledGlyph: string|undefined;
   private readonly toggledGlyph: string|undefined;
 
   constructor(title: string, glyph?: string, toggledGlyph?: string, jslogContext?: string, toggleOnClick?: boolean) {
     super(title, glyph, '');
-    this.untoggledGlyph = glyph;
     this.toggledGlyph = toggledGlyph ? toggledGlyph : glyph;
     this.setToggledIcon(this.toggledGlyph || '');
     this.setToggleType(Buttons.Button.ToggleType.PRIMARY);
@@ -1313,41 +1310,33 @@ export class ToolbarSettingComboBox extends ToolbarComboBox {
 }
 
 export class ToolbarCheckbox extends ToolbarItem<void> {
-  inputElement: HTMLInputElement;
-
   constructor(
       text: Common.UIString.LocalizedString, tooltip?: Common.UIString.LocalizedString,
       listener?: ((arg0: MouseEvent) => void), jslogContext?: string) {
-    super(CheckboxLabel.create(text));
-    this.inputElement = (this.element as CheckboxLabel).checkboxElement;
+    super(CheckboxLabel.create(text, undefined, undefined, jslogContext));
     if (tooltip) {
-      // install on the checkbox
-      Tooltip.install(this.inputElement, tooltip);
-      Tooltip.install((this.element as CheckboxLabel).textElement, tooltip);
+      Tooltip.install(this.element, tooltip);
     }
     if (listener) {
-      this.inputElement.addEventListener('click', listener, false);
-    }
-    if (jslogContext) {
-      this.inputElement.setAttribute('jslog', `${VisualLogging.toggle().track({change: true}).context(jslogContext)}`);
+      this.element.addEventListener('click', listener, false);
     }
   }
 
   checked(): boolean {
-    return this.inputElement.checked;
+    return (this.element as CheckboxLabel).checked;
   }
 
   setChecked(value: boolean): void {
-    this.inputElement.checked = value;
+    (this.element as CheckboxLabel).checked = value;
   }
 
   override applyEnabledState(enabled: boolean): void {
     super.applyEnabledState(enabled);
-    this.inputElement.disabled = !enabled;
+    (this.element as CheckboxLabel).disabled = !enabled;
   }
 
   setIndeterminate(indeterminate: boolean): void {
-    this.inputElement.indeterminate = indeterminate;
+    (this.element as CheckboxLabel).indeterminate = indeterminate;
   }
 }
 
@@ -1356,7 +1345,7 @@ export class ToolbarSettingCheckbox extends ToolbarCheckbox {
       setting: Common.Settings.Setting<boolean>, tooltip?: Common.UIString.LocalizedString,
       alternateTitle?: Common.UIString.LocalizedString) {
     super(alternateTitle || setting.title(), tooltip, undefined, setting.name);
-    bindCheckbox(this.inputElement, setting);
+    bindCheckbox(this.element, setting);
   }
 }
 

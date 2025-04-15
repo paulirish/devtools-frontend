@@ -9,6 +9,14 @@ import type * as Workspace from '../workspace/workspace.js';
 
 import {debugLog} from './debug.js';
 
+const LINE_END_RE = /\r\n?|\n/;
+const MAX_RESULTS_PER_FILE = 10;
+
+export const enum ReplaceStrategy {
+  FULL_FILE = 'full',
+  UNIFIED_DIFF = 'unified'
+}
+
 /**
  * AgentProject wraps around a Workspace.Workspace.Project and
  * implements AI Assistance-specific logic for accessing workspace files
@@ -16,9 +24,9 @@ import {debugLog} from './debug.js';
  */
 export class AgentProject {
   #project: Workspace.Workspace.Project;
-  #ignoredFolderNames = new Set(['node_modules']);
+  #ignoredFileOrFolderNames = new Set(['node_modules', 'package-lock.json']);
   #filesChanged = new Set<string>();
-  #linesChanged = 0;
+  #totalLinesChanged = 0;
 
   readonly #maxFilesChanged: number;
   readonly #maxLinesChanged: number;
@@ -55,16 +63,18 @@ export class AgentProject {
    * Provides access to the file content in the working copy
    * of the matching UiSourceCode.
    */
-  readFile(filepath: string): string|undefined {
+  async readFile(filepath: string): Promise<string|undefined> {
     const {map} = this.#indexFiles();
     const uiSourceCode = map.get(filepath);
     if (!uiSourceCode) {
       return;
     }
+    const content =
+        uiSourceCode.isDirty() ? uiSourceCode.workingCopyContentData() : await uiSourceCode.requestContentData();
+
     this.#processedFiles.add(filepath);
-    // TODO: needs additional handling for binary files.
-    const content = uiSourceCode.workingCopyContentData();
-    if (!content.isTextContent) {
+
+    if (TextUtils.ContentData.ContentData.isError(content) || !content.isTextContent) {
       return;
     }
 
@@ -75,27 +85,26 @@ export class AgentProject {
    * This method updates the file content in the working copy of the
    * UiSourceCode identified by the filepath.
    */
-  writeFile(filepath: string, content: string): void {
+  async writeFile(filepath: string, update: string, mode = ReplaceStrategy.FULL_FILE): Promise<void> {
     const {map} = this.#indexFiles();
     const uiSourceCode = map.get(filepath);
     if (!uiSourceCode) {
       throw new Error(`UISourceCode ${filepath} not found`);
     }
-    const currentContent = this.readFile(filepath);
-    const lineEndRe = /\r\n?|\n/;
-    let linesChanged = 0;
-    if (currentContent) {
-      const diff = Diff.Diff.DiffWrapper.lineDiff(currentContent.split(lineEndRe), content.split(lineEndRe));
-      for (const item of diff) {
-        if (item[0] !== Diff.Diff.Operation.Equal) {
-          linesChanged++;
-        }
-      }
-    } else {
-      linesChanged += content.split(lineEndRe).length;
+    const currentContent = await this.readFile(filepath);
+    let content: string;
+    switch (mode) {
+      case ReplaceStrategy.FULL_FILE:
+        content = update;
+        break;
+      case ReplaceStrategy.UNIFIED_DIFF:
+        content = this.#writeWithUnifiedDiff(update, currentContent);
+        break;
     }
 
-    if (this.#linesChanged + linesChanged > this.#maxLinesChanged) {
+    const linesChanged = this.getLinesChanged(currentContent, content);
+
+    if (this.#totalLinesChanged + linesChanged > this.#maxLinesChanged) {
       throw new Error('Too many lines changed');
     }
 
@@ -104,9 +113,90 @@ export class AgentProject {
       this.#filesChanged.delete(filepath);
       throw new Error('Too many files changed');
     }
-    this.#linesChanged += linesChanged;
+    this.#totalLinesChanged += linesChanged;
     uiSourceCode.setWorkingCopy(content);
     uiSourceCode.setContainsAiChanges(true);
+  }
+
+  #writeWithUnifiedDiff(llmDiff: string, content = ''): string {
+    let updatedContent = content;
+    const diffChunk = llmDiff.trim();
+    const normalizedDiffLines = diffChunk.split(LINE_END_RE);
+
+    const lineAfterSeparatorRegEx = /^@@.*@@([- +].*)/;
+    const changeChunk: string[][] = [];
+    let currentChunk: string[] = [];
+    for (const line of normalizedDiffLines) {
+      if (line.startsWith('```')) {
+        continue;
+      }
+
+      // The ending is not always @@
+      if (line.startsWith('@@')) {
+        line.search('@@');
+        currentChunk = [];
+        changeChunk.push(currentChunk);
+        if (!line.endsWith('@@')) {
+          const match = line.match(lineAfterSeparatorRegEx);
+          if (match?.[1]) {
+            currentChunk.push(match[1]);
+          }
+        }
+      } else {
+        currentChunk.push(line);
+      }
+    }
+
+    for (const chunk of changeChunk) {
+      const search = [];
+      const replace = [];
+      for (const changeLine of chunk) {
+        // Unified diff first char is ' ', '-', '+'
+        // to represent what happened to the line
+        const line = changeLine.slice(1);
+
+        if (changeLine.startsWith('-')) {
+          search.push(line);
+        } else if (changeLine.startsWith('+')) {
+          replace.push(line);
+        } else {
+          search.push(line);
+          replace.push(line);
+        }
+      }
+      if (replace.length === 0) {
+        const searchString = search.join('\n');
+        // If we remove we want to
+        if (updatedContent.search(searchString + '\n') !== -1) {
+          updatedContent = updatedContent.replace(searchString + '\n', '');
+        } else {
+          updatedContent = updatedContent.replace(searchString, '');
+        }
+      } else if (search.length === 0) {
+        // This just adds it to the beginning of the file
+        updatedContent = updatedContent.replace('', replace.join('\n'));
+      } else {
+        updatedContent = updatedContent.replace(search.join('\n'), replace.join('\n'));
+      }
+    }
+
+    return updatedContent;
+  }
+
+  getLinesChanged(currentContent: string|undefined, updatedContent: string): number {
+    let linesChanged = 0;
+    if (currentContent) {
+      const diff = Diff.Diff.DiffWrapper.lineDiff(updatedContent.split(LINE_END_RE), currentContent.split(LINE_END_RE));
+      for (const item of diff) {
+        if (item[0] !== Diff.Diff.Operation.Equal) {
+          linesChanged++;
+        }
+      }
+    } else {
+      linesChanged += updatedContent.split(LINE_END_RE).length;
+    }
+
+    return linesChanged;
   }
 
   /**
@@ -127,12 +217,11 @@ export class AgentProject {
         break;
       }
 
-      await file.requestContentData();
       debugLog('searching in', filepath, 'for', query);
       const content = file.isDirty() ? file.workingCopyContentData() : await file.requestContentData();
       const results =
           TextUtils.TextUtils.performSearchInContentData(content, query, caseSensitive ?? true, isRegex ?? false);
-      for (const result of results) {
+      for (const result of results.slice(0, MAX_RESULTS_PER_FILE)) {
         debugLog('matches in', filepath);
         matches.push({
           filepath,
@@ -147,7 +236,7 @@ export class AgentProject {
 
   #shouldSkipPath(pathParts: string[]): boolean {
     for (const part of pathParts) {
-      if (this.#ignoredFolderNames.has(part) || part.startsWith('.')) {
+      if (this.#ignoredFileOrFolderNames.has(part) || part.startsWith('.')) {
         return true;
       }
     }
@@ -159,11 +248,11 @@ export class AgentProject {
     const map = new Map();
     // TODO: this could be optimized and cached.
     for (const uiSourceCode of this.#project.uiSourceCodes()) {
-      const pathParths = Persistence.FileSystemWorkspaceBinding.FileSystemWorkspaceBinding.relativePath(uiSourceCode);
-      if (this.#shouldSkipPath(pathParths)) {
+      const pathParts = Persistence.FileSystemWorkspaceBinding.FileSystemWorkspaceBinding.relativePath(uiSourceCode);
+      if (this.#shouldSkipPath(pathParts)) {
         continue;
       }
-      const path = pathParths.join('/');
+      const path = pathParts.join('/');
       files.push(path);
       map.set(path, uiSourceCode);
     }

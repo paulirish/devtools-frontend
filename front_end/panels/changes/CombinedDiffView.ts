@@ -4,7 +4,6 @@
 /* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import * as Common from '../../core/common/common.js';
-import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as Persistence from '../../models/persistence/persistence.js';
@@ -12,6 +11,7 @@ import type * as Workspace from '../../models/workspace/workspace.js';
 import * as WorkspaceDiff from '../../models/workspace_diff/workspace_diff.js';
 import type * as Diff from '../../third_party/diff/diff.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
+import * as CopyToClipboard from '../../ui/components/copy_to_clipboard/copy_to_clipboard.js';
 import type * as DiffView from '../../ui/components/diff_view/diff_view.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as Lit from '../../ui/lit/lit.js';
@@ -28,6 +28,11 @@ const UIStrings = {
    * @description The title of the button after it was pressed and the text was copied to clipboard.
    */
   copied: 'Copied to clipboard',
+  /**
+   * @description The title of the copy file to clipboard button
+   * @example {index.css} PH1
+   */
+  copyFile: 'Copy file {PH1} to clipboard',
 } as const;
 
 const str_ = i18n.i18n.registerUIStrings('panels/changes/CombinedDiffView.ts', UIStrings);
@@ -53,6 +58,7 @@ type View = (input: ViewInput, output: undefined, target: HTMLElement) => void;
 function renderSingleDiffView(singleDiffViewInput: SingleDiffViewInput): Lit.TemplateResult {
   const {fileName, fileUrl, mimeType, icon, diff, copied, onCopy, onFileNameClick} = singleDiffViewInput;
 
+  // clang-format off
   return html`
     <details open>
       <summary>
@@ -62,24 +68,27 @@ function renderSingleDiffView(singleDiffViewInput: SingleDiffViewInput): Lit.Tem
           <button class="file-name-link" @click=${() => onFileNameClick(fileUrl)}>${fileName}</button>
         </div>
         <div class="summary-right">
-          ${copied ? html`<span class="copied">${i18nString(UIStrings.copied)}</span>` : html`
-            <devtools-button
-              title=${'Copy'}
-              .size=${Buttons.Button.Size.SMALL}
-              .iconName=${'copy'}
-              .jslogContext=${'combined-diff-view.copy'}
-              .variant=${Buttons.Button.Variant.ICON}
-              @click=${() => onCopy(fileUrl)}></devtools-button>
-          `}
+          <devtools-button
+            title=${i18nString(UIStrings.copyFile, { PH1: fileName })}
+            .size=${Buttons.Button.Size.SMALL}
+            .iconName=${'copy'}
+            .jslogContext=${'combined-diff-view.copy'}
+            .variant=${Buttons.Button.Variant.ICON}
+            @click=${() => onCopy(fileUrl)}
+          ></devtools-button>
+          ${copied
+            ? html`<span class="copied">${i18nString(UIStrings.copied)}</span>`
+            : Lit.nothing}
         </div>
       </summary>
-      <div class='diff-view-container'>
+      <div class="diff-view-container">
         <devtools-diff-view
           .data=${{diff, mimeType} as DiffView.DiffView.DiffViewData}>
         </devtools-diff-view>
       </div>
     </details>
   `;
+  // clang-format on
 }
 
 export class CombinedDiffView extends UI.Widget.Widget {
@@ -133,7 +142,7 @@ export class CombinedDiffView extends UI.Widget.Widget {
       return;
     }
 
-    Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(content.text);
+    CopyToClipboard.copyTextToClipboard(content.text, i18nString(UIStrings.copied));
     this.#copiedFiles[fileUrl] = true;
     this.requestUpdate();
     setTimeout(() => {

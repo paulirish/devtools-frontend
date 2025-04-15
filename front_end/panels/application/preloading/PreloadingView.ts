@@ -202,7 +202,6 @@ function pageURL(): Platform.DevToolsPath.UrlString {
 export class PreloadingRuleSetView extends UI.Widget.VBox {
   private model: SDK.PreloadingModel.PreloadingModel;
   private focusedRuleSetId: Protocol.Preload.RuleSetId|null = null;
-  private focusedPreloadingAttemptId: SDK.PreloadingModel.PreloadingAttemptId|null = null;
 
   private readonly warningsContainer: HTMLDivElement;
   private readonly warningsView = new PreloadingWarningsView();
@@ -677,6 +676,12 @@ class PreloadingRuleSetSelector implements
     const ruleSet = this.model.getRuleSetById(convertedId);
     if (ruleSet === null) {
       return i18n.i18n.lockedString('Internal error');
+    }
+
+    // TODO(https://crbug.com/393408589): Use `PreloadingString.ruleSetTagOrLocationShort` to reduce code redundancy.
+    const sourceJson = JSON.parse(ruleSet['sourceText']);
+    if ('tag' in sourceJson) {
+      return '"' + sourceJson['tag'] + '"';
     }
     return PreloadingUIUtils.ruleSetLocationShort(ruleSet, pageURL());
   }

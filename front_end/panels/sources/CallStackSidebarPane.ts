@@ -453,13 +453,6 @@ export class CallStackSidebarPane extends UI.View.SimpleView implements UI.Conte
     void contextMenu.show();
   }
 
-  private onClick(event: Event): void {
-    const item = this.list.itemForNode((event.target as Node | null));
-    if (item) {
-      this.activateItem(item);
-    }
-  }
-
   private activateItem(item: Item): void {
     const uiLocation = item.uiLocation;
     if (this.muteActivateItem || !uiLocation) {
@@ -548,7 +541,7 @@ export const elementSymbol = Symbol('element');
 export const defaultMaxAsyncStackChainDepth = 32;
 
 export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
-  handleAction(context: UI.Context.Context, actionId: string): boolean {
+  handleAction(_context: UI.Context.Context, actionId: string): boolean {
     switch (actionId) {
       case 'debugger.next-call-frame':
         CallStackSidebarPane.instance().selectNextCallFrameOnStack();

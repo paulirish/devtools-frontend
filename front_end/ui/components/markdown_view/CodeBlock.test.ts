@@ -31,7 +31,7 @@ describeWithEnvironment('CodeBlock', () => {
         bubbles: true,
         composed: true,
       });
-      assert.isTrue(copyText.calledWith('test'));
+      sinon.assert.calledWith(copyText, 'test');
 
       clock.tick(100);
       let buttonContainer = component.shadowRoot!.querySelector('.copy-button-container');
@@ -51,7 +51,7 @@ describeWithEnvironment('CodeBlock', () => {
     component.code = 'test';
     renderElementIntoDOM(component);
     const notice = component.shadowRoot!.querySelector('.notice') as HTMLElement;
-    assert(notice === null, '.notice was found');
+    assert.isNull(notice, '.notice was found');
   });
 
   it('renders legal notice if configured', () => {

@@ -95,6 +95,16 @@ describe('Tooltip', () => {
     assert.isFalse(container.querySelector('devtools-tooltip')?.open);
   });
 
+  it('should not be activated if dragged', async () => {
+    const container = renderTooltip();
+
+    const button = container.querySelector('button');
+    button?.dispatchEvent(new MouseEvent('mouseenter', {buttons: 1}));
+
+    await checkForPendingActivity();
+    assert.isFalse(container.querySelector('devtools-tooltip')?.open);
+  });
+
   it('should not be activated if un-focused', async () => {
     const container = renderTooltip();
 
@@ -165,15 +175,15 @@ describe('Tooltip', () => {
       const tooltip = container.querySelector('devtools-tooltip');
       tooltip?.dispatchEvent(new Event(eventName, {bubbles: true}));
 
-      assert.isFalse(callback.called);
+      sinon.assert.notCalled(callback);
       container.removeEventListener(eventName, callback);
     });
   });
 
   it('should print a warning if rich tooltip is used with wrong aria label on anchor', () => {
-    const consoleSpy = sinon.spy(console, 'warn');
+    const consoleSpy = sinon.stub(console, 'warn');
     renderTooltip({variant: 'rich'});
-    assert.isTrue(consoleSpy.calledOnce);
+    sinon.assert.calledOnce(consoleSpy);
   });
 
   it('can be instantiated programatically', () => {

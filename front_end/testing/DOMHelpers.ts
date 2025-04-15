@@ -9,6 +9,7 @@
  * Note that `resetTestDOM` is automatically run before each test (see `test_setup.ts`).
  **/
 
+import type * as Platform from '../core/platform/platform.js';
 import type * as NodeText from '../ui/components/node_text/node_text.js';
 import * as UI from '../ui/legacy/legacy.js';
 
@@ -88,20 +89,17 @@ export const cleanTestDOM = async () => {
   await raf();
 };
 
-interface Constructor<T> {
-  new(...args: unknown[]): T;
-}
-
 /**
  * Asserts that all emenents of `nodeList` are at least of type `T`.
  */
 export function assertElements<T extends Element>(
-    nodeList: NodeListOf<Element>, elementClass: Constructor<T>): asserts nodeList is NodeListOf<T> {
+    nodeList: NodeListOf<Element>,
+    elementClass: Platform.Constructor.Constructor<T>): asserts nodeList is NodeListOf<T> {
   nodeList.forEach(e => assert.instanceOf(e, elementClass));
 }
 
 export function getElementWithinComponent<T extends HTMLElement, V extends Element>(
-    component: T, selector: string, elementClass: Constructor<V>) {
+    component: T, selector: string, elementClass: Platform.Constructor.Constructor<V>) {
   assert.isNotNull(component.shadowRoot);
   const element = component.shadowRoot.querySelector(selector);
   assert.instanceOf(element, elementClass);
@@ -109,7 +107,7 @@ export function getElementWithinComponent<T extends HTMLElement, V extends Eleme
 }
 
 export function getElementsWithinComponent<T extends HTMLElement, V extends Element>(
-    component: T, selector: string, elementClass: Constructor<V>) {
+    component: T, selector: string, elementClass: Platform.Constructor.Constructor<V>) {
   assert.isNotNull(component.shadowRoot);
   const elements = component.shadowRoot.querySelectorAll(selector);
   assertElements(elements, elementClass);
@@ -331,8 +329,8 @@ export async function assertScreenshot(filename: string) {
   }
   await raf();
   // @ts-expect-error see karma config.
-  const result = await window.assertScreenshot(`#${TEST_CONTAINER_ID}`, filename);
-  if (result) {
-    throw new Error(result);
+  const errorMessage = await window.assertScreenshot(`#${TEST_CONTAINER_ID}`, filename);
+  if (errorMessage) {
+    throw new Error(errorMessage);
   }
 }

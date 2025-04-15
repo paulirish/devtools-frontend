@@ -10,6 +10,7 @@ import {formatAsPatch, resultAssertionsDiff, ResultsDBReporter} from '../../test
 import {CHECKOUT_ROOT, GEN_DIR, SOURCE_ROOT} from '../../test/conductor/paths.js';
 import * as ResultsDb from '../../test/conductor/resultsdb.js';
 import {loadTests, TestConfig} from '../../test/conductor/test_config.js';
+import {ScreenshotError} from '../conductor/screenshot-error.js';
 import {assertElementScreenshotUnchanged} from '../shared/screenshots.js';
 
 const puppeteer = require('puppeteer-core');
@@ -35,7 +36,7 @@ interface BrowserWithArgs {
 }
 const CustomChrome = function(this: any, _baseBrowserDecorator: unknown, args: BrowserWithArgs, _config: unknown) {
   require('karma-chrome-launcher')['launcher:Chrome'][1].apply(this, arguments);
-  this._execCommand = async function(cmd: string, args: string[]) {
+  this._execCommand = async function(_cmd: string, args: string[]) {
     const url = args.pop();
     const browser = await puppeteer.launch({
       headless: !TestConfig.debug || TestConfig.headless,
@@ -61,8 +62,12 @@ const CustomChrome = function(this: any, _baseBrowserDecorator: unknown, args: B
         await assertElementScreenshotUnchanged(element, filename, {
           captureBeyondViewport: false,
         });
-      } catch (err) {
-        return err.message;
+        return undefined;
+      } catch (error) {
+        if (error instanceof ScreenshotError) {
+          ScreenshotError.errors.push(error);
+        }
+        return `ScreenshotError: ${error.message}`;
       }
     });
 
@@ -108,7 +113,7 @@ const ProgressWithDiffReporter = function(
     this: any, formatError: unknown, reportSlow: unknown, useColors: unknown, browserConsoleLogOptions: unknown) {
   BaseProgressReporter.call(this, formatError, reportSlow, useColors, browserConsoleLogOptions);
   const baseSpecFailure = this.specFailure;
-  this.specFailure = function(this: any, browser: unknown, result: any) {
+  this.specFailure = function(this: any, _browser: unknown, result: any) {
     baseSpecFailure.apply(this, arguments);
     const patch = formatAsPatch(resultAssertionsDiff(result));
     if (patch) {

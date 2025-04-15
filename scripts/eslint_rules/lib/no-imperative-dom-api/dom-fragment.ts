@@ -76,7 +76,10 @@ export class DomFragment {
 
   toTemplateLiteral(sourceCode: Readonly<SourceCode>, indent = 4): string[] {
     if (this.expression && !this.tagName) {
-      return [`\n${' '.repeat(indent)}`, '${', this.expression, '}'];
+      const value = this.initializer?.parent?.type === 'VariableDeclarator' ? this.initializer?.parent?.init : null;
+      const expression =
+          (this.references.every(r => r.processed) && value) ? sourceCode.getText(value) : this.expression;
+      return [`\n${' '.repeat(indent)}`, '${', expression, '}'];
     }
 
     function toOutputString(node: Node|string, quoteLiterals = false): string {
@@ -150,7 +153,8 @@ export class DomFragment {
     components.push('>');
     if (this.textContent) {
       components.push(toOutputString(this.textContent));
-    } else if (this.children?.length) {
+    }
+    if (this.children?.length) {
       for (const child of this.children || []) {
         components.push(...child.toTemplateLiteral(sourceCode, indent + 2));
       }
