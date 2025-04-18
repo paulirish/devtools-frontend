@@ -241,9 +241,9 @@ async function getEmptyStateSuggestions(
       ];
     case AiAssistanceModel.ConversationType.PERFORMANCE:
       return [
-        'Identify performance issues in this call tree',
-        'Where is most of the time being spent in this call tree?',
-        'How can I reduce the time of this call tree?',
+        'What\'s the purpose of this work?',
+        'Where is time being spent?',
+        'How can I optimize this?',
       ];
     case AiAssistanceModel.ConversationType.PERFORMANCE_INSIGHT:
       return ['Help me optimize my page load performance'];

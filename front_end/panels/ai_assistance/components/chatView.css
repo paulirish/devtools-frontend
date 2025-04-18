@@ -30,7 +30,7 @@
 .input-form {
   display: flex;
   flex-direction: column;
-  padding: var(--sys-size-5) var(--sys-size-5) 0 var(--sys-size-5);
+  padding: 0 var(--sys-size-5) 0 var(--sys-size-5);
   max-width: var(--sys-size-36);
   background-color: var(--sys-color-cdt-base-container);
   width: 100%;
@@ -611,7 +611,7 @@ main {
   align-items: center;
   justify-content: center;
   font: var(--sys-typescale-headline4);
-  gap: var(--sys-size-8);
+  gap: var(--sys-size-5);
   padding: var(--sys-size-3);
   max-width: var(--sys-size-33);
 
@@ -626,7 +626,7 @@ main {
 
   .header {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     width: 100%;
     align-items: center;
     justify-content: center;
@@ -637,8 +637,8 @@ main {
       display: flex;
       justify-content: center;
       align-items: center;
-      height: var(--sys-size-14);
-      width: var(--sys-size-14);
+      height: var(--sys-size-12);
+      width: var(--sys-size-12);
       border-radius: var(--sys-shape-corner-small);
       background: linear-gradient(
         135deg,
@@ -659,7 +659,7 @@ main {
 
   .empty-state-content {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     gap: var(--sys-size-5);
     align-items: center;
     justify-content: center;

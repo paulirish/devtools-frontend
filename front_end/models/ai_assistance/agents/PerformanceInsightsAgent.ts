@@ -153,8 +153,8 @@ export class InsightContext extends ConversationContext<TimelineUtils.InsightAIC
         return ['What should I do to improve and optimize the time taken to fetch and display images on the page?'];
       case 'InteractionToNextPaint':
         return [
-          'Help me optimize my INP score', 'Help me understand why a large INP score is problematic',
-          'What was the biggest contributor to my longest interaction duration time?'
+          'Suggest fixes for my longest interaction', 'Why is a large INP score is problematic?',
+          'What\'s the biggest contributor to my longest interaction?'
         ];
       case 'LCPDiscovery':
         return [
