@@ -228,10 +228,19 @@ export class TimelineTreeView extends
       parsedTrace: Trace.Handlers.Types.ParsedTrace|null = null,
       entityMappings: Utils.EntityMapper.EntityMapper|null = null,
       ): void {
+    // Add check: If the trace data and selected events haven't changed, do nothing.
+    // Note: This uses strict equality (===) for selectedEvents. If the array
+    // instance changes but contains the same events, this check will not prevent
+    // the refresh. A deeper comparison could be added if needed.
+    if (this.#parsedTrace === parsedTrace && this.#selectedEvents === selectedEvents) {
+      // Update entityMappings if needed, but don't refresh the whole tree.
+      this.#entityMapper = entityMappings;
+      return;
+    }
     this.#parsedTrace = parsedTrace;
     this.#selectedEvents = selectedEvents;
     this.#entityMapper = entityMappings;
-    this.refreshTree();
+    // refreshTree() will be called via updateDetailsForSelection() or updateSelectedRangeStats()
   }
 
   entityMapper(): Utils.EntityMapper.EntityMapper|null {
@@ -298,6 +307,10 @@ export class TimelineTreeView extends
   }
 
   setRange(startTime: Trace.Types.Timing.Milli, endTime: Trace.Types.Timing.Milli): void {
+    // Add check: If the time range hasn't changed, do nothing.
+    if (this.startTime === startTime && this.endTime === endTime) {
+      return;
+    }
     this.startTime = startTime;
     this.endTime = endTime;
     this.refreshTree();
@@ -392,6 +405,8 @@ export class TimelineTreeView extends
   }
 
   refreshTree(): void {
+    const start = performance.now();
+
     if (!this.element.parentElement) {
       // This function can be called in different views (Bottom-Up and
       // Call Tree) by the same single event whenever the group-by
@@ -432,6 +447,7 @@ export class TimelineTreeView extends
     if (this.autoSelectFirstChildOnRefresh && rootNode.children.length > 0) {
       rootNode.children[0].select(/* supressSelectedEvent */ true);
     }
+    performance.measure('refreshTree' + this.constructor.name, {start, end: performance.now()});
   }
 
   buildTree(): Trace.Extras.TraceTree.Node {

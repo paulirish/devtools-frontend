@@ -1975,9 +1975,17 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
 
     // Order is important: the bounds must be set before we initiate any UI
     // rendering.
-    TraceBounds.TraceBounds.BoundsManager.instance().resetWithNewBounds(
-        parsedTrace.Meta.traceBounds,
-    );
+    TraceBounds.TraceBounds.BoundsManager.instance().resetWithNewBounds(parsedTrace.Meta.traceBounds);
+
+    // Zoom into main activity (of the top-most main-thread track). We want this window calcuated before doing the setModel()s
+    const topMostMainThreadAppender =
+        this.flameChart.getMainDataProvider().compatibilityTracksAppenderInstance().threadAppenders().at(0);
+    if (topMostMainThreadAppender) {
+      const zoomedInBounds = Trace.Extras.MainThreadActivity.calculateWindow(
+          parsedTrace.Meta.traceBounds, topMostMainThreadAppender.getEntries());
+
+      TraceBounds.TraceBounds.BoundsManager.instance().setTimelineVisibleWindow(zoomedInBounds);
+    }
 
     // Set up the modifications manager for the newly active trace.
     // The order is important: this needs to happen before we trigger a flame chart redraw by setting the model.
@@ -1994,8 +2002,6 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
 
     this.flameChart.setModel(parsedTrace, traceMetadata);
     this.flameChart.resizeToPreferredHeights();
-    // Reset the visual selection as we've just swapped to a new trace.
-    this.flameChart.setSelectionAndReveal(null);
     this.#sideBar.setParsedTrace(parsedTrace, traceMetadata);
 
     this.searchableViewInternal.showWidget();
@@ -2032,16 +2038,6 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       const annotationEntryToColorMap = this.buildColorsAnnotationsMap(annotations);
       this.#sideBar.setAnnotations(annotations, annotationEntryToColorMap);
     });
-
-    // To calculate the activity we might want to zoom in, we use the top-most main-thread track
-    const topMostMainThreadAppender =
-        this.flameChart.getMainDataProvider().compatibilityTracksAppenderInstance().threadAppenders().at(0);
-    if (topMostMainThreadAppender) {
-      const zoomedInBounds = Trace.Extras.MainThreadActivity.calculateWindow(
-          parsedTrace.Meta.traceBounds, topMostMainThreadAppender.getEntries());
-
-      TraceBounds.TraceBounds.BoundsManager.instance().setTimelineVisibleWindow(zoomedInBounds);
-    }
 
     // Add overlays for annotations loaded from the trace file
     const currModificationManager = ModificationsManager.activeManager();

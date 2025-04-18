@@ -1667,8 +1667,7 @@ export interface SyntheticJSSample extends Event {
 }
 
 export function isSyntheticInteraction(event: Event): event is SyntheticInteractionPair {
-  return Boolean(
-      'interactionId' in event && event.args?.data && 'beginEvent' in event.args.data && 'endEvent' in event.args.data);
+  return event.cat === 'devtools.synthetic' && 'interactionId' in event;
 }
 
 // Events relating to frames.

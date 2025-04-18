@@ -96,6 +96,7 @@ export class TimelineDetailsPane extends
   #relatedInsightChips = new TimelineComponents.RelatedInsightChips.RelatedInsightChips();
   #thirdPartyTree = new ThirdPartyTreeViewWidget();
   #entityMapper: Utils.EntityMapper.EntityMapper|null = null;
+  #isSettingModel = false;
 
   constructor(delegate: TimelineModeViewDelegate) {
     super();
@@ -290,32 +291,41 @@ export class TimelineDetailsPane extends
     eventToRelatedInsightsMap: TimelineComponents.RelatedInsightChips.EventToRelatedInsightsMap|null,
     entityMapper: Utils.EntityMapper.EntityMapper|null,
   }): Promise<void> {
-    if (this.#parsedTrace !== data.parsedTrace) {
-      // Clear the selector stats view, so the next time the user views it we
-      // reconstruct it with the new trace data.
-      this.lazySelectorStatsView = null;
+    this.#isSettingModel = true;
+    try {
+      if (this.#parsedTrace !== data.parsedTrace) {
+        // Clear the selector stats view, so the next time the user views it we
+        // reconstruct it with the new trace data.
+        this.lazySelectorStatsView = null;
 
-      this.#parsedTrace = data.parsedTrace;
+        this.#parsedTrace = data.parsedTrace;
+      }
+      if (data.parsedTrace) {
+        this.#filmStrip = Trace.Extras.FilmStrip.fromParsedTrace(data.parsedTrace);
+        this.#entityMapper = new Utils.EntityMapper.EntityMapper(data.parsedTrace);
+      }
+      this.#selectedEvents = data.selectedEvents;
+      this.#traceInsightsSets = data.traceInsightsSets;
+      this.#eventToRelatedInsightsMap = data.eventToRelatedInsightsMap;
+      if (data.eventToRelatedInsightsMap) {
+        this.#relatedInsightChips.eventToRelatedInsightsMap = data.eventToRelatedInsightsMap;
+      }
+      this.tabbedPane.closeTabs([Tab.PaintProfiler, Tab.LayerViewer], false);
+      for (const view of this.rangeDetailViews.values()) {
+        view.setModelWithEvents(data.selectedEvents, data.parsedTrace, data.entityMapper);
+      }
+      // Set the 3p tree model.
+      this.#thirdPartyTree.setModelWithEvents(data.selectedEvents, data.parsedTrace, data.entityMapper);
+      this.lazyPaintProfilerView = null;
+      this.lazyLayersView = null;
+      await this.setSelection(null);
+    } finally {
+      // Use rAF to ensure the flag is reset after the current execution stack,
+      // allowing synchronous operations triggered by setSelection to complete first.
+      requestAnimationFrame(() => {
+        this.#isSettingModel = false;
+      });
     }
-    if (data.parsedTrace) {
-      this.#filmStrip = Trace.Extras.FilmStrip.fromParsedTrace(data.parsedTrace);
-      this.#entityMapper = new Utils.EntityMapper.EntityMapper(data.parsedTrace);
-    }
-    this.#selectedEvents = data.selectedEvents;
-    this.#traceInsightsSets = data.traceInsightsSets;
-    this.#eventToRelatedInsightsMap = data.eventToRelatedInsightsMap;
-    if (data.eventToRelatedInsightsMap) {
-      this.#relatedInsightChips.eventToRelatedInsightsMap = data.eventToRelatedInsightsMap;
-    }
-    this.tabbedPane.closeTabs([Tab.PaintProfiler, Tab.LayerViewer], false);
-    for (const view of this.rangeDetailViews.values()) {
-      view.setModelWithEvents(data.selectedEvents, data.parsedTrace, data.entityMapper);
-    }
-    // Set the 3p tree model.
-    this.#thirdPartyTree.setModelWithEvents(data.selectedEvents, data.parsedTrace, data.entityMapper);
-    this.lazyPaintProfilerView = null;
-    this.lazyLayersView = null;
-    await this.setSelection(null);
   }
 
   private setSummaryContent(node: Node): void {
@@ -336,6 +346,12 @@ export class TimelineDetailsPane extends
   }
 
   private updateContents(): void {
+    // If we are currently in the process of setting the model, the initial
+    // refresh is handled by setModelWithEvents. Skip the update triggered
+    // by setSelection(null) within setModel to avoid redundant refreshes.
+    if (this.#isSettingModel) {
+      return;
+    }
     const traceBoundsState = TraceBounds.TraceBounds.BoundsManager.instance().state();
     if (!traceBoundsState) {
       return;
