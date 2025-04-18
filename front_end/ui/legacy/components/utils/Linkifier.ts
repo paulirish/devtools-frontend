@@ -330,12 +330,12 @@ export class Linkifier extends Common.ObjectWrapper.ObjectWrapper<EventTypes> im
   private setupPopover(link: HTMLElement): void {
     this.popoverHelper = new UI.PopoverHelper.PopoverHelper(
         link, (event: MouseEvent|KeyboardEvent) => this.getPopoverRequest(event, link));
-
-    link.addEventListener('mouseover', () => console.log('mouseover'));
-    link.addEventListener('mouseout', () => console.log('mouseout'));
+    this.popoverHelper.setTimeout(300);
+    // link.addEventListener('mouseover', () => console.log('mouseover'));
+    link.addEventListener('mouseout', () => this.popoverHelper?.hidePopover());
   }
 
-  private getPopoverRequest(event: MouseEvent|KeyboardEvent, link: HTMLElement): UI.PopoverHelper.PopoverRequest|null {
+  private getPopoverRequest(_event: MouseEvent|KeyboardEvent, link: HTMLElement): UI.PopoverHelper.PopoverRequest|null {
     return {
       box: link.boxInWindow(),
       show: (popover: UI.GlassPane.GlassPane) => {
@@ -344,13 +344,10 @@ export class Linkifier extends Common.ObjectWrapper.ObjectWrapper<EventTypes> im
           return Promise.resolve(false);
         }
 
-
         const resourceSourceFrame = ResourceSourceFrame.createSearchableView(
             linkInfo.uiLocation.uiSourceCode, linkInfo.uiLocation.uiSourceCode.mimeType());
-
-
-        // const resourceSourceFrame =
-        //     new ResourceSourceFrame(linkInfo.uiLocation.uiSourceCode, linkInfo.uiLocation.uiSourceCode.mimeType());
+        resourceSourceFrame.contentElement.querySelector('devtools-toolbar')?.setAttribute('hidden', 'true');
+        popover.contentElement.classList.add('has-inner-scroll-container');
 
         const position = {
           lineNumber: linkInfo.uiLocation.lineNumber,
@@ -365,7 +362,7 @@ export class Linkifier extends Common.ObjectWrapper.ObjectWrapper<EventTypes> im
 
         popover.setAnchorBehavior(UI.GlassPane.AnchorBehavior.PREFER_TOP);
         popover.setSizeBehavior(UI.GlassPane.SizeBehavior.SET_EXACT_SIZE);
-        popover.setMaxContentSize(new UI.Geometry.Size(600, 400));
+        popover.setMaxContentSize(new UI.Geometry.Size(700, 400));
         return Promise.resolve(true);
       },
       hide: undefined,

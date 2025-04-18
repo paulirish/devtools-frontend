@@ -210,7 +210,7 @@ export class TextEditor extends HTMLElement {
     if (!selection.main.empty) {
       // If the caller provided an actual range, we use the default 'nearest' on both axis.
       // Otherwise we 'center' on an axis to provide more context around the single point.
-      effects.push(CodeMirror.EditorView.scrollIntoView(selection.main));
+      effects.push(CodeMirror.EditorView.scrollIntoView(selection.main, {y: 'center'}));
     } else if (!targetPos || targetPos.top < editorRect.top || targetPos.bottom > editorRect.bottom) {
       effects.push(CodeMirror.EditorView.scrollIntoView(selection.main, {y: 'center'}));
     } else if (targetPos.left < editorRect.left || targetPos.right > editorRect.right) {

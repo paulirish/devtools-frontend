@@ -641,7 +641,9 @@ export class SourceFrameImpl extends Common.ObjectWrapper.eventMixin<EventTypes,
     const fromLocation = from ? this.uiLocationToEditorLocation(from.lineNumber, from.columnNumber) : undefined;
 
     const {textEditor} = this;
-    textEditor.revealPosition(textEditor.createSelection(toLocation, fromLocation), shouldHighlight);
+    const selection = textEditor.createSelection(toLocation, fromLocation);
+    textEditor.revealPosition(selection, shouldHighlight);
+    // this.textEditor.dispatch({effects: CodeMirror.EditorView.scrollIntoView(selection, {y: 'center', yMargin: 0})});
     this.positionToReveal = null;
   }
 
