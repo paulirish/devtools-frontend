@@ -157,11 +157,16 @@ function userTimingComparator(
 }
 
 export function handleEvent(event: Types.Events.Event): void {
+  // Early return to avoid expensive includes() check.
+  if (event.cat !== 'devtools.timeline' && event.cat !== 'blink.user_timing' && event.cat !== 'blink.console') {
+    return;
+  }
   if (ignoredNames.includes(event.name)) {
     return;
   }
   if (Types.Events.isUserTimingMeasure(event)) {
     measureTraceByTraceId.set(event.args.traceId, event);
+    return;
   }
   if (Types.Events.isPerformanceMeasure(event)) {
     performanceMeasureEvents.push(event);
@@ -169,12 +174,15 @@ export function handleEvent(event: Types.Events.Event): void {
   }
   if (Types.Events.isPerformanceMark(event)) {
     performanceMarkEvents.push(event);
+    return;
   }
   if (Types.Events.isConsoleTime(event)) {
     consoleTimings.push(event);
+    return;
   }
   if (Types.Events.isConsoleTimeStamp(event)) {
     timestampEvents.push(event);
+    return;
   }
 }
 
