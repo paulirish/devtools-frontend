@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 /* eslint-disable rulesdir/no-lit-render-outside-of-view */
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import '../../../ui/components/menus/menus.js';
 
@@ -15,11 +16,7 @@ import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as UI from '../../../ui/legacy/legacy.js';
 import * as Lit from '../../../ui/lit/lit.js';
 
-import ignoreListSettingStylesRaw from './ignoreListSetting.css.js';
-
-// TODO(crbug.com/391381439): Fully migrate off of constructed style sheets.
-const ignoreListSettingStyles = new CSSStyleSheet();
-ignoreListSettingStyles.replaceSync(ignoreListSettingStylesRaw.cssText);
+import ignoreListSettingStyles from './ignoreListSetting.css.js';
 
 const {html} = Lit;
 
@@ -63,7 +60,6 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class IgnoreListSetting extends HTMLElement {
   readonly #shadow = this.attachShadow({mode: 'open'});
-  readonly #renderBound = this.#render.bind(this);
   readonly #ignoreListEnabled: Common.Settings.Setting<boolean> =
       Common.Settings.Settings.instance().moduleSetting('enable-ignore-listing');
   readonly #regexPatterns = this.#getSkipStackFramesPatternSetting().getAsArray();
@@ -90,7 +86,6 @@ export class IgnoreListSetting extends HTMLElement {
   }
 
   connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [ignoreListSettingStyles];
     this.#scheduleRender();
 
     // Prevent the event making its way to the TimelinePanel element which will
@@ -101,7 +96,7 @@ export class IgnoreListSetting extends HTMLElement {
   }
 
   #scheduleRender(): void {
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#renderBound);
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
   #getSkipStackFramesPatternSetting(): Common.Settings.RegExpSetting {
@@ -275,6 +270,7 @@ export class IgnoreListSetting extends HTMLElement {
     }
     // clang-format off
     const output = html`
+      <style>${ignoreListSettingStyles.cssText}</style>
       <devtools-button-dialog .data=${{
           openOnRender: false,
           jslogContext: 'timeline.ignore-list',

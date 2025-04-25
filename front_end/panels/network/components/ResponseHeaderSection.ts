@@ -32,11 +32,7 @@ import {
   type HeaderSectionRowData,
   isValidHeaderName,
 } from './HeaderSectionRow.js';
-import responseHeaderSectionStylesRaw from './ResponseHeaderSection.css.js';
-
-// TODO(crbug.com/391381439): Fully migrate off of constructed style sheets.
-const responseHeaderSectionStyles = new CSSStyleSheet();
-responseHeaderSectionStyles.replaceSync(responseHeaderSectionStylesRaw.cssText);
+import responseHeaderSectionStyles from './ResponseHeaderSection.css.js';
 
 const UIStrings = {
   /**
@@ -95,10 +91,6 @@ class ResponseHeaderSectionBase extends HTMLElement {
   protected readonly shadow = this.attachShadow({mode: 'open'});
   protected headerDetails: HeaderDetailsDescriptor[] = [];
 
-  connectedCallback(): void {
-    this.shadow.adoptedStyleSheets = [responseHeaderSectionStyles];
-  }
-
   protected setHeaders(headers: NameValue[]): void {
     headers.sort(function(a, b) {
       return Platform.StringUtilities.compare(a.name.toLowerCase(), b.name.toLowerCase());
@@ -140,6 +132,7 @@ export class EarlyHintsHeaderSection extends ResponseHeaderSectionBase {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     render(html`
+      <style>${responseHeaderSectionStyles.cssText}</style>
       ${this.headerDetails.map(header => html`
         <devtools-header-section-row .data=${{
         header,
@@ -538,6 +531,7 @@ export class ResponseHeaderSection extends ResponseHeaderSectionBase {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     render(html`
+      <style>${responseHeaderSectionStyles.cssText}</style>
       ${headerDescriptors.map((header, index) => html`
         <devtools-header-section-row
             .data=${{header} as HeaderSectionRowData}

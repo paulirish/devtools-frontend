@@ -13,13 +13,9 @@ import * as RenderCoordinator from '../../../ui/components/render_coordinator/re
 import * as Lit from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
-import elementsBreadcrumbsStylesRaw from './elementsBreadcrumbs.css.js';
+import elementsBreadcrumbsStyles from './elementsBreadcrumbs.css.js';
 import {crumbsToRender, type UserScrollPosition} from './ElementsBreadcrumbsUtils.js';
 import type {DOMNode} from './Helper.js';
-
-// TODO(crbug.com/391381439): Fully migrate off of constructed style sheets.
-const elementsBreadcrumbsStyles = new CSSStyleSheet();
-elementsBreadcrumbsStyles.replaceSync(elementsBreadcrumbsStylesRaw.cssText);
 
 const {html} = Lit;
 
@@ -59,7 +55,6 @@ export interface ElementsBreadcrumbsData {
 export class ElementsBreadcrumbs extends HTMLElement {
   readonly #shadow = this.attachShadow({mode: 'open'});
   readonly #resizeObserver = new ResizeObserver(() => this.#checkForOverflowOnResize());
-  readonly #renderBound = this.#render.bind(this);
 
   #crumbsData: readonly DOMNode[] = [];
   #selectedDOMNode: Readonly<DOMNode>|null = null;
@@ -68,15 +63,11 @@ export class ElementsBreadcrumbs extends HTMLElement {
   #isObservingResize = false;
   #userHasManuallyScrolled = false;
 
-  connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [elementsBreadcrumbsStyles];
-  }
-
   set data(data: ElementsBreadcrumbsData) {
     this.#selectedDOMNode = data.selectedNode;
     this.#crumbsData = data.crumbs;
     this.#userHasManuallyScrolled = false;
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#renderBound);
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
   disconnectedCallback(): void {
@@ -299,6 +290,7 @@ export class ElementsBreadcrumbs extends HTMLElement {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     Lit.render(html`
+      <style>${elementsBreadcrumbsStyles.cssText}</style>
       <nav class="crumbs" aria-label=${i18nString(UIStrings.breadcrumbs)} jslog=${VisualLogging.elementsBreadcrumbs()}>
         ${this.#renderOverflowButton('left', this.#userScrollPosition === 'start')}
 

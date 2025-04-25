@@ -18,12 +18,8 @@ import type {BaseInsightComponent} from './insights/BaseInsightComponent.js';
 import {shouldRenderForCategory} from './insights/Helpers.js';
 import * as Insights from './insights/insights.js';
 import type {ActiveInsight} from './Sidebar.js';
-import stylesRaw from './sidebarSingleInsightSet.css.js';
+import sidebarSingleInsightSetStyles from './sidebarSingleInsightSet.css.js';
 import {determineCompareRating, NumberWithUnit} from './Utils.js';
-
-// TODO(crbug.com/391381439): Fully migrate off of constructed style sheets.
-const styles = new CSSStyleSheet();
-styles.replaceSync(stylesRaw.cssText);
 
 const {html} = Lit.StaticHtml;
 
@@ -124,7 +120,6 @@ const INSIGHT_NAME_TO_COMPONENT: InsightNameToComponentMapping = {
 
 export class SidebarSingleInsightSet extends HTMLElement {
   readonly #shadow = this.attachShadow({mode: 'open'});
-  #renderBound = this.#render.bind(this);
 
   #activeInsightElement: BaseInsightComponent<Trace.Insights.Types.InsightModel>|null = null;
 
@@ -142,10 +137,9 @@ export class SidebarSingleInsightSet extends HTMLElement {
 
   set data(data: SidebarSingleInsightSetData) {
     this.#data = data;
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#renderBound);
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
   connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [styles];
     this.#render();
   }
 
@@ -460,6 +454,7 @@ export class SidebarSingleInsightSet extends HTMLElement {
 
     // clang-format off
     Lit.render(html`
+      <style>${sidebarSingleInsightSetStyles.cssText}</style>
       <div class="navigation">
         ${this.#renderMetrics(insightSetKey)}
         ${this.#renderInsights(insights, insightSetKey)}

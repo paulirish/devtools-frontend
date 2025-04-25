@@ -20,12 +20,14 @@ const domFragments = new Map<Node|ClassMember|Variable, DomFragment>();
 
 export class DomFragment {
   tagName?: string;
-  classList: Node[] = [];
+  classList: Array<Node|string> = [];
   attributes: Array<{key: string, value: Node|string}> = [];
+  booleanAttributes: Array<{key: string, value: Node|string}> = [];
   style: Array<{key: string, value: Node}> = [];
   eventListeners: Array<{key: string, value: Node}> = [];
   bindings: Array<{key: string, value: Node|string}> = [];
-  textContent?: Node;
+  directives: Array<{name: string, arguments: Node[]}> = [];
+  textContent?: Node|string;
   children: DomFragment[] = [];
   parent?: DomFragment;
   expression?: string;
@@ -89,6 +91,9 @@ export class DomFragment {
       if (node.type === 'Literal' && !quoteLiterals) {
         return node.value?.toString() ?? '';
       }
+      if (node.type === 'UnaryExpression' && node.operator === '-' && node.argument.type === 'Literal') {
+        return '-' + node.argument.value;
+      }
       const text = sourceCode.getText(node);
       if (node.type === 'TemplateLiteral') {
         return text.substr(1, text.length - 2);
@@ -122,8 +127,17 @@ export class DomFragment {
       );
     }
     for (const attribute of this.attributes || []) {
+      const value = attribute.value;
+      const valueEmpty = typeof value === 'string' ? value === '' : value.type === 'Literal' && value.value === '';
+      if (valueEmpty) {
+        appendExpression(attribute.key);
+      } else {
+        appendExpression(`${attribute.key}=${attributeValue(toOutputString(value))}`);
+      }
+    }
+    for (const attribute of this.booleanAttributes || []) {
       appendExpression(
-          `${attribute.key}=${attributeValue(toOutputString(attribute.value))}`,
+          `?${attribute.key}=${attributeValue(toOutputString(attribute.value, /* quoteLiterals=*/ true))}`,
       );
     }
     for (const eventListener of this.eventListeners || []) {
@@ -143,6 +157,9 @@ export class DomFragment {
                   )}`,
       );
     }
+    for (const directive of this.directives || []) {
+      appendExpression(`\${${directive.name}(${directive.arguments.map(a => sourceCode.getText(a)).join(', ')})}`);
+    }
     if (this.style.length) {
       const style = this.style.map(s => `${s.key}:${toOutputString(s.value)}`).join('; ');
       appendExpression(`style="${style}"`);
@@ -160,31 +177,25 @@ export class DomFragment {
       }
       components.push(`\n${' '.repeat(indent)}`);
     }
-    if (this.tagName) {
+    if (this.tagName && this.tagName !== 'input') {
       components.push('</', this.tagName, '>');
     }
     return components;
   }
 
-  appendChild(node: Node, sourceCode: SourceCode): DomFragment {
-    const child = DomFragment.getOrCreate(node, sourceCode);
-    this.children.push(child);
-    child.parent = this;
-    for (const reference of child.references) {
-      if (reference.node === node) {
-        reference.processed = true;
-      }
-    }
-    return child;
+  appendChild(node: Node, sourceCode: SourceCode, processed = true): DomFragment {
+    return this.insertChildAt(node, this.children.length, sourceCode, processed);
   }
 
-  insertChildAt(node: Node, index: number, sourceCode: SourceCode): DomFragment {
+  insertChildAt(node: Node, index: number, sourceCode: SourceCode, processed = true): DomFragment {
     const child = DomFragment.getOrCreate(node, sourceCode);
     this.children.splice(index, 0, child);
     child.parent = this;
-    for (const reference of child.references) {
-      if (reference.node === node) {
-        reference.processed = true;
+    if (processed) {
+      for (const reference of child.references) {
+        if (reference.node === node) {
+          reference.processed = true;
+        }
       }
     }
     return child;

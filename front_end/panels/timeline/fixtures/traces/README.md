@@ -291,3 +291,11 @@ Contains several image requests from the same 3P origin that use HTTP/1.1
 ### dupe-js
 
 A bunch of bundles with the exact same content: https://dupe-modules-lh-2.surge.sh/
+
+### react-console-timestamp
+
+A React app that contains with a version of React that uses console.timeStamp to extend the Performance panel. Calls to the API are part of async tasks tagged with console.createTask.
+
+### layout-shifts-root-causes
+
+A trace generated from the internal layout shifts example page (ask jacktfranklin@ for info). It also was run after crrev.com/c/6491448 landed, which means all the `PaintImage` events have `nodeName` in `args.data`.

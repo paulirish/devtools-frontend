@@ -211,6 +211,8 @@ export class PatchWidget extends UI.Widget.Widget {
       Persistence.AutomaticFileSystemManager.AutomaticFileSystemManager.instance().automaticFileSystem;
   #applyToDisconnectedAutomaticWorkspace = false;
   #popoverHelper: UI.PopoverHelper.PopoverHelper|null = null;
+  // `rpcId` from the `applyPatch` request
+  #rpcId: Host.AidaClient.RpcGlobalId|null = null;
 
   constructor(element?: HTMLElement, view?: View, opts?: {
     aidaClient: Host.AidaClient.AidaClient,
@@ -345,7 +347,7 @@ export class PatchWidget extends UI.Widget.Widget {
         return html`
         <div class="footer">
           ${input.projectName ? html`
-            <div class="change-workspace">
+            <div class="change-workspace" jslog=${VisualLogging.section('patch-widget.workspace')}>
                 <devtools-icon .name=${iconName}></devtools-icon>
                 <span class="folder-name" title=${input.projectPath}>${input.projectName}</span>
               ${input.onChangeWorkspaceClick ? html`
@@ -362,7 +364,7 @@ export class PatchWidget extends UI.Widget.Widget {
           ` : nothing}
           <div class="apply-to-workspace-container" aria-live="polite">
             ${input.patchSuggestionState === PatchSuggestionState.LOADING ? html`
-              <div class="loading-text-container">
+              <div class="loading-text-container" jslog=${VisualLogging.section('patch-widget.apply-to-workspace-loading')}>
                 <devtools-spinner></devtools-spinner>
                 <span>
                   ${lockedString(UIStringsNotTranslate.applyingToWorkspace)}
@@ -371,7 +373,7 @@ export class PatchWidget extends UI.Widget.Widget {
             ` : html`
                 <devtools-button
                 @click=${input.onApplyToWorkspace}
-                .jslogContext=${'stage-to-workspace'}
+                .jslogContext=${'patch-widget.apply-to-workspace'}
                 .variant=${Buttons.Button.Variant.OUTLINED}>
                 ${lockedString(UIStringsNotTranslate.applyToWorkspace)}
               </devtools-button>
@@ -384,6 +386,7 @@ export class PatchWidget extends UI.Widget.Widget {
             </devtools-button>` : nothing}
             <devtools-button
               aria-details="info-tooltip"
+              .jslogContext=${'patch-widget.info-tooltip-trigger'}
               .iconName=${'info'}
               .variant=${Buttons.Button.Variant.ICON}
               .title=${input.applyToWorkspaceTooltipText}
@@ -402,7 +405,7 @@ export class PatchWidget extends UI.Widget.Widget {
              </div>
           </div>`
         : html`
-          <details class="change-summary">
+          <details class="change-summary" jslog=${VisualLogging.section('patch-widget')}>
             <summary class="header-container" ${Directives.ref(output.summaryRef)}>
               ${renderHeader()}
             </summary>
@@ -605,9 +608,9 @@ export class PatchWidget extends UI.Widget.Widget {
   }
 
   #selectDefaultProject(): void {
-    const automaticFileSystemProject =
-        this.#automaticFileSystem ? this.#workspace.projectForFileSystemRoot(this.#automaticFileSystem.root) : null;
-    const project = automaticFileSystemProject || this.#workspace.project(this.#projectIdSetting.get());
+    const project = this.#automaticFileSystem ?
+        this.#workspace.projectForFileSystemRoot(this.#automaticFileSystem.root) :
+        this.#workspace.project(this.#projectIdSetting.get());
     if (project) {
       this.#project = project;
     } else {
@@ -645,6 +648,11 @@ export class PatchWidget extends UI.Widget.Widget {
         void this.#applyPatchAndUpdateUI();
       } else {
         this.requestUpdate();
+        void this.updateComplete.then(() => {
+          this.contentElement?.querySelector('.apply-to-workspace-container devtools-button')
+              ?.shadowRoot?.querySelector('button')
+              ?.focus();
+        });
       }
     };
 
@@ -681,8 +689,12 @@ export class PatchWidget extends UI.Widget.Widget {
     }
 
     this.#patchSuggestionState = PatchSuggestionState.LOADING;
+    this.#rpcId = null;
     this.requestUpdate();
     const {response, processedFiles} = await this.#applyPatch(changeSummary);
+    if (response && 'rpcId' in response && response.rpcId) {
+      this.#rpcId = response.rpcId;
+    }
     if (response?.type === AiAssistanceModel.ResponseType.ANSWER) {
       this.#patchSuggestionState = PatchSuggestionState.SUCCESS;
     } else if (
@@ -713,6 +725,7 @@ ${processedFiles.map(filename => `* ${filename}`).join('\n')}`;
     this.#patchSuggestionState = PatchSuggestionState.INITIAL;
     this.#patchSources = undefined;
     void this.changeManager?.popStashedChanges();
+    this.#submitRating(Host.AidaClient.Rating.NEGATIVE);
     this.requestUpdate();
     void this.updateComplete.then(() => {
       this.#viewOutput.changeRef?.value?.focus();
@@ -730,7 +743,24 @@ ${processedFiles.map(filename => `* ${filename}`).join('\n')}`;
     });
 
     this.#savedToDisk = true;
+    this.#submitRating(Host.AidaClient.Rating.POSITIVE);
     this.requestUpdate();
+  }
+
+  #submitRating(rating: Host.AidaClient.Rating): void {
+    if (!this.#rpcId) {
+      return;
+    }
+
+    void this.#aidaClient.registerClientEvent({
+      corresponding_aida_rpc_global_id: this.#rpcId,
+      disable_user_content_logging: true,
+      do_conversation_client_event: {
+        user_feedback: {
+          sentiment: rating,
+        },
+      },
+    });
   }
 
   async #applyPatch(changeSummary: string): Promise<{
@@ -789,13 +819,22 @@ window.aiAssistanceTestPatchPrompt =
     serverSideLoggingEnabled: false,
     project,
   });
-  const results = [];
   try {
-    const {processedFiles} = await agent.applyChanges(changeSummary);
+    const assertionFailures = [];
+    const {processedFiles, responses} = await agent.applyChanges(changeSummary);
+    if (responses.at(-1)?.type === AiAssistanceModel.ResponseType.ERROR) {
+      return {
+        error: 'failed to patch',
+        debugInfo: {
+          responses,
+          processedFiles,
+        },
+      };
+    }
     for (const file of processedFiles) {
       const change = expectedChanges.find(change => change.path === file);
       if (!change) {
-        results.push(`Patched ${file} that was not expected`);
+        assertionFailures.push(`Patched ${file} that was not expected`);
         break;
       }
       const agentProject = agent.agentProject;
@@ -804,20 +843,34 @@ window.aiAssistanceTestPatchPrompt =
         throw new Error(`${file} has no content`);
       }
       for (const m of change.matches) {
-        if (!content.includes(m)) {
-          results.push(`Did not match ${m} in ${file}`);
+        if (!content.match(new RegExp(m, 'gm'))) {
+          assertionFailures.push({
+            message: `Did not match ${m} in ${file}`,
+            file,
+            content,
+          });
         }
       }
       for (const m of change.doesNotMatch || []) {
-        if (content.includes(m)) {
-          results.push(`Unexpectedly matched ${m} in ${file}`);
+        if (content.match(new RegExp(m, 'gm'))) {
+          assertionFailures.push({
+            message: `Unexpectedly matched ${m} in ${file}`,
+            file,
+            content,
+          });
         }
       }
     }
+    return {
+      assertionFailures,
+      debugInfo: {
+        responses,
+        processedFiles,
+      },
+    };
   } finally {
     workspaceDiff.modifiedUISourceCodes().forEach(modifiedUISourceCode => {
       modifiedUISourceCode.resetWorkingCopy();
     });
   }
-  return results;
 };

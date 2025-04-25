@@ -64,7 +64,7 @@ import type {XWidget} from './XWidget.js';
 
 declare global {
   interface HTMLElementTagNameMap {
-    'dt-checkbox': CheckboxLabel;
+    'devtools-checkbox': CheckboxLabel;
     'dt-close-button': DevToolsCloseButton;
     'dt-icon-label': DevToolsIconLabel;
     'dt-small-bubble': DevToolsSmallBubble;
@@ -1305,6 +1305,8 @@ export function setTitle(element: HTMLElement, title: string): void {
 }
 
 export class CheckboxLabel extends HTMLElement {
+  static readonly observedAttributes = ['checked', 'disabled', 'indeterminate', 'name', 'title'];
+
   readonly #shadowRoot!: DocumentFragment;
   #checkboxElement!: HTMLInputElement;
   #textElement!: HTMLElement;
@@ -1319,19 +1321,19 @@ export class CheckboxLabel extends HTMLElement {
     this.#checkboxElement.setAttribute('id', id);
     // Change event is not composable, so it doesn't bubble up through the shadow root.
     this.#checkboxElement.addEventListener('change', () => this.dispatchEvent(new Event('change')));
-    this.#textElement = this.#shadowRoot.createChild('label', 'dt-checkbox-text');
+    this.#textElement = this.#shadowRoot.createChild('label', 'devtools-checkbox-text');
     this.#textElement.setAttribute('for', id);
     // Click events are composable, so both label and checkbox bubble up through the shadow root.
     // However, clicking the label, also triggers the checkbox click, so we stop the label event
     // propagation here to avoid duplicate events.
     this.#textElement.addEventListener('click', e => e.stopPropagation());
-    this.#shadowRoot.createChild('slot');
+    this.#textElement.createChild('slot');
   }
 
   static create(
       title?: Platform.UIString.LocalizedString, checked?: boolean, subtitle?: Platform.UIString.LocalizedString,
       jslogContext?: string, small?: boolean): CheckboxLabel {
-    const element = document.createElement('dt-checkbox');
+    const element = document.createElement('devtools-checkbox');
     element.#checkboxElement.checked = Boolean(checked);
     if (jslogContext) {
       element.#checkboxElement.setAttribute(
@@ -1341,11 +1343,26 @@ export class CheckboxLabel extends HTMLElement {
       element.#textElement.textContent = title;
       element.#checkboxElement.title = title;
       if (subtitle !== undefined) {
-        element.#textElement.createChild('div', 'dt-checkbox-subtitle').textContent = subtitle;
+        element.#textElement.createChild('div', 'devtools-checkbox-subtitle').textContent = subtitle;
       }
     }
     element.#checkboxElement.classList.toggle('small', small);
     return element;
+  }
+
+  attributeChangedCallback(name: string, _oldValue: string|null, newValue: string|null): void {
+    if (name === 'checked') {
+      this.#checkboxElement.checked = newValue !== null;
+    } else if (name === 'disabled') {
+      this.#checkboxElement.disabled = newValue !== null;
+    } else if (name === 'indeterminate') {
+      this.#checkboxElement.indeterminate = newValue !== null;
+    } else if (name === 'name') {
+      this.#checkboxElement.name = newValue ?? '';
+    } else if (name === 'title') {
+      this.#checkboxElement.title = newValue ?? '';
+      this.#textElement.title = newValue ?? '';
+    }
   }
 
   get checked(): boolean {
@@ -1353,11 +1370,11 @@ export class CheckboxLabel extends HTMLElement {
   }
 
   set checked(checked: boolean) {
-    this.#checkboxElement.checked = checked;
+    this.toggleAttribute('checked', checked);
   }
 
   set disabled(disabled: boolean) {
-    this.#checkboxElement.disabled = disabled;
+    this.toggleAttribute('disabled', disabled);
   }
 
   get disabled(): boolean {
@@ -1365,7 +1382,7 @@ export class CheckboxLabel extends HTMLElement {
   }
 
   set indeterminate(indeterminate: boolean) {
-    this.#checkboxElement.indeterminate = indeterminate;
+    this.toggleAttribute('indeterminate', indeterminate);
   }
 
   get indeterminate(): boolean {
@@ -1373,20 +1390,11 @@ export class CheckboxLabel extends HTMLElement {
   }
 
   set name(name: string) {
-    this.#checkboxElement.name = name;
+    this.setAttribute('name', name);
   }
 
   get name(): string {
     return this.#checkboxElement.name;
-  }
-
-  override set title(title: string) {
-    this.#textElement.title = title;
-    this.#checkboxElement.title = title;
-  }
-
-  override get title(): string {
-    return this.#checkboxElement.title;
   }
 
   override click(): void {
@@ -1403,7 +1411,7 @@ export class CheckboxLabel extends HTMLElement {
   private static lastId = 0;
 }
 
-customElements.define('dt-checkbox', CheckboxLabel);
+customElements.define('devtools-checkbox', CheckboxLabel);
 
 export class DevToolsIconLabel extends HTMLElement {
   readonly #icon: IconButton.Icon.Icon;

@@ -6813,6 +6813,14 @@ export namespace Emulation {
      */
     enabled: boolean;
   }
+
+  export interface SetSmallViewportHeightDifferenceOverrideRequest {
+    /**
+     * This will cause an element of size 100svh to be `difference` pixels smaller than an element
+     * of size 100lvh.
+     */
+    difference: integer;
+  }
 }
 
 /**
@@ -10930,6 +10938,38 @@ export namespace Network {
   }
 
   /**
+   * Fired when data is sent to tcp direct socket stream.
+   */
+  export interface DirectTCPSocketChunkSentEvent {
+    identifier: RequestId;
+    data: binary;
+    timestamp: MonotonicTime;
+  }
+
+  /**
+   * Fired when data is received from tcp direct socket stream.
+   */
+  export interface DirectTCPSocketChunkReceivedEvent {
+    identifier: RequestId;
+    data: binary;
+    timestamp: MonotonicTime;
+  }
+
+  /**
+   * Fired when there is an error
+   * when writing to tcp direct socket stream.
+   * For example, if user writes illegal type like string
+   * instead of ArrayBuffer or ArrayBufferView.
+   * There's no reporting for reading, because
+   * we cannot know errors on the other side.
+   */
+  export interface DirectTCPSocketChunkErrorEvent {
+    identifier: RequestId;
+    errorMessage: string;
+    timestamp: MonotonicTime;
+  }
+
+  /**
    * Fired when additional information about a requestWillBeSent event is available from the
    * network stack. Not every requestWillBeSent event will have an additional
    * requestWillBeSentExtraInfo fired for it, and there is no guarantee whether requestWillBeSent
@@ -12978,7 +13018,8 @@ export namespace Page {
     RequestedByWebViewClient = 'RequestedByWebViewClient',
     PostMessageByWebViewClient = 'PostMessageByWebViewClient',
     CacheControlNoStoreDeviceBoundSessionTerminated = 'CacheControlNoStoreDeviceBoundSessionTerminated',
-    CacheLimitPruned = 'CacheLimitPruned',
+    CacheLimitPrunedOnModerateMemoryPressure = 'CacheLimitPrunedOnModerateMemoryPressure',
+    CacheLimitPrunedOnCriticalMemoryPressure = 'CacheLimitPrunedOnCriticalMemoryPressure',
   }
 
   /**
@@ -13220,16 +13261,18 @@ export namespace Page {
     recommendedId?: string;
   }
 
-  export interface GetAdScriptIdRequest {
+  export interface GetAdScriptAncestryIdsRequest {
     frameId: FrameId;
   }
 
-  export interface GetAdScriptIdResponse extends ProtocolResponseWithError {
+  export interface GetAdScriptAncestryIdsResponse extends ProtocolResponseWithError {
     /**
-     * Identifies the bottom-most script which caused the frame to be labelled
-     * as an ad. Only sent if frame is labelled as an ad and id is available.
+     * The ancestry chain of ad script identifiers leading to this frame's
+     * creation, ordered from the most immediate script (in the frame creation
+     * stack) to more distant ancestors (that created the immediately preceding
+     * script). Only sent if frame is labelled as an ad and ids are available.
      */
-    adScriptId?: AdScriptId;
+    adScriptAncestryIds: AdScriptId[];
   }
 
   export interface GetFrameTreeResponse extends ProtocolResponseWithError {
@@ -14063,6 +14106,10 @@ export namespace Page {
    */
   export interface JavascriptDialogClosedEvent {
     /**
+     * Frame id.
+     */
+    frameId: FrameId;
+    /**
      * Whether dialog was confirmed.
      */
     result: boolean;
@@ -14081,6 +14128,10 @@ export namespace Page {
      * Frame url.
      */
     url: string;
+    /**
+     * Frame id.
+     */
+    frameId: FrameId;
     /**
      * Message that will be displayed by the dialog.
      */
@@ -14971,6 +15022,29 @@ export namespace Storage {
   }
 
   /**
+   * Represents a dictionary object passed in as privateAggregationConfig to
+   * run or selectURL.
+   */
+  export interface SharedStoragePrivateAggregationConfig {
+    /**
+     * The chosen aggregation service deployment.
+     */
+    aggregationCoordinatorOrigin?: string;
+    /**
+     * The context ID provided.
+     */
+    contextId?: string;
+    /**
+     * Configures the maximum size allowed for filtering IDs.
+     */
+    filteringIdMaxBytes: integer;
+    /**
+     * The limit on the number of contributions in the final report.
+     */
+    maxContributions?: integer;
+  }
+
+  /**
    * Pair of reporting metadata details for a candidate URL for `selectURL()`.
    */
   export interface SharedStorageReportingMetadata {
@@ -14999,57 +15073,90 @@ export namespace Storage {
   export interface SharedStorageAccessParams {
     /**
      * Spec of the module script URL.
-     * Present only for SharedStorageAccessType.documentAddModule.
+     * Present only for SharedStorageAccessMethods: addModule and
+     * createWorklet.
      */
     scriptSourceUrl?: string;
     /**
+     * String denoting "context-origin", "script-origin", or a custom
+     * origin to be used as the worklet's data origin.
+     * Present only for SharedStorageAccessMethod: createWorklet.
+     */
+    dataOrigin?: string;
+    /**
      * Name of the registered operation to be run.
-     * Present only for SharedStorageAccessType.documentRun and
-     * SharedStorageAccessType.documentSelectURL.
+     * Present only for SharedStorageAccessMethods: run and selectURL.
      */
     operationName?: string;
     /**
+     * Whether or not to keep the worket alive for future run or selectURL
+     * calls.
+     * Present only for SharedStorageAccessMethods: run and selectURL.
+     */
+    keepAlive?: boolean;
+    /**
+     * Configures the private aggregation options.
+     * Present only for SharedStorageAccessMethods: run and selectURL.
+     */
+    privateAggregationConfig?: SharedStoragePrivateAggregationConfig;
+    /**
      * The operation's serialized data in bytes (converted to a string).
-     * Present only for SharedStorageAccessType.documentRun and
-     * SharedStorageAccessType.documentSelectURL.
+     * Present only for SharedStorageAccessMethods: run and selectURL.
+     * TODO(crbug.com/401011862): Consider updating this parameter to binary.
      */
     serializedData?: string;
     /**
      * Array of candidate URLs' specs, along with any associated metadata.
-     * Present only for SharedStorageAccessType.documentSelectURL.
+     * Present only for SharedStorageAccessMethod: selectURL.
      */
     urlsWithMetadata?: SharedStorageUrlWithMetadata[];
     /**
+     * Spec of the URN:UUID generated for a selectURL call.
+     * Present only for SharedStorageAccessMethod: selectURL.
+     */
+    urnUuid?: string;
+    /**
      * Key for a specific entry in an origin's shared storage.
-     * Present only for SharedStorageAccessType.documentSet,
-     * SharedStorageAccessType.documentAppend,
-     * SharedStorageAccessType.documentDelete,
-     * SharedStorageAccessType.workletSet,
-     * SharedStorageAccessType.workletAppend,
-     * SharedStorageAccessType.workletDelete,
-     * SharedStorageAccessType.workletGet,
-     * SharedStorageAccessType.headerSet,
-     * SharedStorageAccessType.headerAppend, and
-     * SharedStorageAccessType.headerDelete.
+     * Present only for SharedStorageAccessMethods: set, append, delete, and
+     * get.
      */
     key?: string;
     /**
      * Value for a specific entry in an origin's shared storage.
-     * Present only for SharedStorageAccessType.documentSet,
-     * SharedStorageAccessType.documentAppend,
-     * SharedStorageAccessType.workletSet,
-     * SharedStorageAccessType.workletAppend,
-     * SharedStorageAccessType.headerSet, and
-     * SharedStorageAccessType.headerAppend.
+     * Present only for SharedStorageAccessMethods: set and append.
      */
     value?: string;
     /**
      * Whether or not to set an entry for a key if that key is already present.
-     * Present only for SharedStorageAccessType.documentSet,
-     * SharedStorageAccessType.workletSet, and
-     * SharedStorageAccessType.headerSet.
+     * Present only for SharedStorageAccessMethod: set.
      */
     ignoreIfPresent?: boolean;
+    /**
+     * If the method is called on a worklet, or as part of
+     * a worklet script, it will have an ID for the associated worklet.
+     * Present only for SharedStorageAccessMethods: addModule, createWorklet,
+     * run, selectURL, and any other SharedStorageAccessMethod when the
+     * SharedStorageAccessScope is worklet.
+     */
+    workletId?: string;
+    /**
+     * Name of the lock to be acquired, if present.
+     * Optionally present only for SharedStorageAccessMethods: batchUpdate,
+     * set, append, delete, and clear.
+     */
+    withLock?: string;
+    /**
+     * If the method has been called as part of a batchUpdate, then this
+     * number identifies the batch to which it belongs.
+     * Optionally present only for SharedStorageAccessMethods:
+     * batchUpdate (required), set, append, delete, and clear.
+     */
+    batchUpdateId?: string;
+    /**
+     * Number of modifier methods sent in batch.
+     * Present only for SharedStorageAccessMethod: batchUpdate.
+     */
+    batchSize?: integer;
   }
 
   export const enum StorageBucketsDurability {
@@ -15167,6 +15274,11 @@ export namespace Storage {
     maxEventStates: number;
   }
 
+  export interface AttributionReportingNamedBudgetDef {
+    name: string;
+    budget: integer;
+  }
+
   export interface AttributionReportingSourceRegistration {
     time: Network.TimeSinceEpoch;
     /**
@@ -15192,6 +15304,9 @@ export namespace Storage {
     aggregatableDebugReportingConfig: AttributionReportingAggregatableDebugReportingConfig;
     scopesData?: AttributionScopesData;
     maxEventLevelReports: integer;
+    namedBudgets: AttributionReportingNamedBudgetDef[];
+    debugReporting: boolean;
+    eventLevelEpsilon: number;
   }
 
   export const enum AttributionReportingSourceRegistrationResult {
@@ -15251,6 +15366,11 @@ export namespace Storage {
     filters: AttributionReportingFilterPair;
   }
 
+  export interface AttributionReportingNamedBudgetCandidate {
+    name?: string;
+    filters: AttributionReportingFilterPair;
+  }
+
   export interface AttributionReportingTriggerRegistration {
     filters: AttributionReportingFilterPair;
     debugKey?: UnsignedInt64AsBase10;
@@ -15265,6 +15385,7 @@ export namespace Storage {
     triggerContextId?: string;
     aggregatableDebugReportingConfig: AttributionReportingAggregatableDebugReportingConfig;
     scopes: string[];
+    namedBudgets: AttributionReportingNamedBudgetCandidate[];
   }
 
   export const enum AttributionReportingEventLevelResult {
@@ -15620,6 +15741,12 @@ export namespace Storage {
      * party URL, only the first-party URL is returned in the array.
      */
     matchedUrls: string[];
+  }
+
+  export interface SetProtectedAudienceKAnonymityRequest {
+    owner: string;
+    name: string;
+    hashes: binary[];
   }
 
   /**

@@ -12,7 +12,7 @@ import type * as Overlays from '../../overlays/overlays.js';
 
 import type * as BaseInsightComponent from './BaseInsightComponent.js';
 import {EventReferenceClick} from './EventRef.js';
-import tableStylesRaw from './table.css.js';
+import tableStyles from './table.css.js';
 
 const UIStrings = {
   /**
@@ -24,10 +24,6 @@ const UIStrings = {
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/insights/Table.ts', UIStrings);
 export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
-
-// TODO(crbug.com/391381439): Fully migrate off of constructed style sheets.
-const tableStyles = new CSSStyleSheet();
-tableStyles.replaceSync(tableStylesRaw.cssText);
 
 const {html} = Lit;
 
@@ -102,7 +98,6 @@ export function createLimitedRows<T>(arr: T[], aggregator: RowLimitAggregator<T>
 
 export class Table extends HTMLElement {
   readonly #shadow = this.attachShadow({mode: 'open'});
-  readonly #boundRender = this.#render.bind(this);
   #insight?: BaseInsightComponent;
   #state?: TableState;
   #headers?: string[];
@@ -120,14 +115,13 @@ export class Table extends HTMLElement {
     this.#rows = data.rows;
     // If this table isn't interactive, don't attach mouse listeners or use CSS :hover.
     this.#interactive = this.#rows.some(row => row.overlays);
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
   connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets.push(tableStyles);
     UI.UIUtils.injectCoreStyles(this.#shadow);
 
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
   #onHoverRow(e: MouseEvent): void {
@@ -254,7 +248,8 @@ export class Table extends HTMLElement {
     this.#flattenedRows = flattenedRows;
 
     Lit.render(
-        html`<table
+        html`<style>${tableStyles.cssText}</style>
+      <table
           class=${Lit.Directives.classMap({
           interactive: this.#interactive,
         })}

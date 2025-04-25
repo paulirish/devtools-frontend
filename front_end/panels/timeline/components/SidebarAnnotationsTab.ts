@@ -15,11 +15,7 @@ import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 import * as Utils from '../utils/utils.js';
 
 import {RemoveAnnotation, RevealAnnotation} from './Sidebar.js';
-import sidebarAnnotationsTabStylesRaw from './sidebarAnnotationsTab.css.js';
-
-// TODO(crbug.com/391381439): Fully migrate off of constructed style sheets.
-const sidebarAnnotationsTabStyles = new CSSStyleSheet();
-sidebarAnnotationsTabStyles.replaceSync(sidebarAnnotationsTabStylesRaw.cssText);
+import sidebarAnnotationsTabStyles from './sidebarAnnotationsTab.css.js';
 
 const {html} = Lit;
 
@@ -98,7 +94,6 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class SidebarAnnotationsTab extends HTMLElement {
   readonly #shadow = this.attachShadow({mode: 'open'});
-  readonly #boundRender = this.#render.bind(this);
   #annotations: Trace.Types.File.Annotation[] = [];
   // A map with annotated entries and the colours that are used to display them in the FlameChart.
   // We need this map to display the entries in the sidebar with the same colours.
@@ -117,7 +112,7 @@ export class SidebarAnnotationsTab extends HTMLElement {
 
   set annotations(annotations: Trace.Types.File.Annotation[]) {
     this.#annotations = this.#processAnnotationsList(annotations);
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
   set annotationEntryToColorMap(annotationEntryToColorMap: Map<Trace.Types.Events.Event, string>) {
@@ -196,8 +191,7 @@ export class SidebarAnnotationsTab extends HTMLElement {
   }
 
   connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [sidebarAnnotationsTabStyles];
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
   #renderEntryToIdentifier(annotation: Trace.Types.File.EntriesLinkAnnotation): Lit.LitTemplate {
@@ -340,6 +334,7 @@ export class SidebarAnnotationsTab extends HTMLElement {
     // clang-format off
     Lit.render(
       html`
+        <style>${sidebarAnnotationsTabStyles.cssText}</style>
         <span class="annotations">
           ${this.#annotations.length === 0 ?
             this.#renderTutorialCard() :

@@ -29,9 +29,13 @@ export interface ExecutedExample {
  * The result of making a single request to Aida.
  */
 export interface IndividualPromptRequestResponse {
-  request: AidaRequest;
-  response: string;
+  request: AidaRequest|string;
+  response: string|object;
   exampleId: string;
+  /** Automatically computed score [0-1]. */
+  score?: number;
+  error?: string;
+  assertionFailures?: string[];
 }
 
 export interface ExampleMetadata {
@@ -39,18 +43,7 @@ export interface ExampleMetadata {
   explanation: string;
 }
 
-/**
- * The CLI arguments people can use to configure the run.
- */
-export interface YargsInput {
-  exampleUrls: string[];
-  label: string;
-  parallel: boolean;
-  includeFollowUp: boolean;
-  times: number;
-  testTarget: TestTarget;
-}
-export type TestTarget = 'elements'|'performance-main-thread'|'performance-insights'|'elements-multimodal';
+export type TestTarget = 'elements'|'performance-main-thread'|'performance-insights'|'elements-multimodal'|'patching';
 
 // Clang cannot handle the Record<> syntax over multiple lines, it seems.
 /* clang-format off */
@@ -59,3 +52,10 @@ export type Logs = Record<string, {
   text: string,
 }> ;
 /* clang-format on */
+
+export interface PatchTest {
+  repository: string;
+  folderName: string;
+  query: string;
+  changedFiles: Array<{path: string, matches: string[], doesNotMatch?: string[]}>;
+}

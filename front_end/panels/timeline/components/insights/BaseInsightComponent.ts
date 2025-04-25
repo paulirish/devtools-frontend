@@ -20,13 +20,9 @@ import type * as Overlays from '../../overlays/overlays.js';
 import {md} from '../../utils/Helpers.js';
 import * as Utils from '../../utils/utils.js';
 
-import baseInsightComponentStylesRaw from './baseInsightComponent.css.js';
+import baseInsightComponentStyles from './baseInsightComponent.css.js';
 import * as SidebarInsight from './SidebarInsight.js';
 import type {TableState} from './Table.js';
-
-// TODO(crbug.com/391381439): Fully migrate off of constructed style sheets.
-const baseInsightComponentStyles = new CSSStyleSheet();
-baseInsightComponentStyles.replaceSync(baseInsightComponentStylesRaw.cssText);
 
 const {html} = Lit;
 
@@ -44,17 +40,23 @@ const UIStrings = {
    */
   estimatedSavingsTimingAndBytes: 'Est savings: {PH1} & {PH2}',
   /**
-   * @description Text to tell the user the estimated time or size savings for this insight that is used for screen readers.
+   * @description Text to tell the user the estimated time savings for this insight that is used for screen readers.
    * @example {401 ms} PH1
    * @example {112 kB} PH1
    */
-  estimatedSavingsAria: 'Estimated savings for this insight: {PH1}',
+  estimatedSavingsAriaTiming: 'Estimated savings for this insight: {PH1}',
+  /**
+   * @description Text to tell the user the estimated size savings for this insight that is used for screen readers. Value is in terms of "transfer size", aka encoded/compressed data length.
+   * @example {401 ms} PH1
+   * @example {112 kB} PH1
+   */
+  estimatedSavingsAriaBytes: 'Estimated savings for this insight: {PH1} transfer size',
   /**
    * @description Text to tell the user the estimated time and size savings for this insight that is used for screen readers.
    * @example {401 ms} PH1
    * @example {112 kB} PH2
    */
-  estimatedSavingsTimingAndBytesAria: 'Estimated savings for this insight: {PH1} and {PH2}',
+  estimatedSavingsTimingAndBytesAria: 'Estimated savings for this insight: {PH1} and {PH2} transfer size',
   /**
    * @description Used for screen-readers as a label on the button to expand an insight to view details
    * @example {LCP by phase} PH1
@@ -96,7 +98,6 @@ export abstract class BaseInsightComponent<T extends InsightModel> extends HTMLE
     insightSetKey: null,
   };
 
-  readonly #boundRender = this.#render.bind(this);
   readonly sharedTableState: TableState = {
     selectedRowEl: null,
     selectionIsSticky: false,
@@ -104,7 +105,7 @@ export abstract class BaseInsightComponent<T extends InsightModel> extends HTMLE
   #initialOverlays: Overlays.Overlays.TimelineOverlay[]|null = null;
 
   protected scheduleRender(): void {
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
   // Insights that do support the AI feature can override this to return true.
@@ -116,7 +117,6 @@ export abstract class BaseInsightComponent<T extends InsightModel> extends HTMLE
   }
 
   connectedCallback(): void {
-    this.shadow.adoptedStyleSheets.push(baseInsightComponentStyles);
     this.setAttribute('jslog', `${VisualLogging.section(`timeline.insights.${this.internalName}`)}`);
     // Used for unit test purposes when querying the DOM.
     this.dataset.insightName = this.internalName;
@@ -133,7 +133,7 @@ export abstract class BaseInsightComponent<T extends InsightModel> extends HTMLE
     }
 
     this.#selected = selected;
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
   get selected(): boolean {
@@ -142,12 +142,12 @@ export abstract class BaseInsightComponent<T extends InsightModel> extends HTMLE
 
   set model(model: T) {
     this.#model = model;
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
   set insightSetKey(insightSetKey: string|null) {
     this.data.insightSetKey = insightSetKey;
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
   get bounds(): Trace.Types.Timing.TraceWindowMicro|null {
@@ -156,7 +156,7 @@ export abstract class BaseInsightComponent<T extends InsightModel> extends HTMLE
 
   set bounds(bounds: Trace.Types.Timing.TraceWindowMicro|null) {
     this.data.bounds = bounds;
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
   set parsedTrace(parsedTrace: Trace.Handlers.Types.ParsedTrace) {
@@ -276,7 +276,7 @@ export abstract class BaseInsightComponent<T extends InsightModel> extends HTMLE
   }
 
   getEstimatedSavingsBytes(): number|null {
-    return null;
+    return this.model?.wastedBytes ?? null;
   }
 
   #getEstimatedSavingsTextParts(): {bytesString?: string, timeString?: string} {
@@ -306,12 +306,12 @@ export abstract class BaseInsightComponent<T extends InsightModel> extends HTMLE
       });
     }
     if (timeString) {
-      return i18nString(UIStrings.estimatedSavingsAria, {
+      return i18nString(UIStrings.estimatedSavingsAriaTiming, {
         PH1: timeString,
       });
     }
     if (bytesString) {
-      return i18nString(UIStrings.estimatedSavingsAria, {
+      return i18nString(UIStrings.estimatedSavingsAriaBytes, {
         PH1: bytesString,
       });
     }
@@ -436,10 +436,12 @@ export abstract class BaseInsightComponent<T extends InsightModel> extends HTMLE
 
     // clang-format off
     const output = html`
+      <style>${baseInsightComponentStyles.cssText}</style>
       <div class=${containerClasses}>
         <header @click=${this.#dispatchInsightToggle}
           @keydown=${this.#handleHeaderKeyDown}
           jslog=${VisualLogging.action(`timeline.toggle-insight.${this.internalName}`).track({click: true})}
+          data-insight-header-title=${this.#model?.title}
           tabIndex="0"
           role="button"
           aria-expanded=${this.#selected}
@@ -450,7 +452,7 @@ export abstract class BaseInsightComponent<T extends InsightModel> extends HTMLE
           ${estimatedSavingsString ?
             html`
             <slot name="insight-savings" class="insight-savings">
-              ${estimatedSavingsString}
+              <span title=${estimatedSavingsAriaLabel ?? ''}>${estimatedSavingsString}</span>
             </slot>
           </div>`
           : Lit.nothing}

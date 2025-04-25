@@ -15,8 +15,9 @@ import * as ProjectSettings from '../models/project_settings/project_settings.js
 import * as Workspace from '../models/workspace/workspace.js';
 import * as WorkspaceDiff from '../models/workspace_diff/workspace_diff.js';
 import * as AiAssistancePanel from '../panels/ai_assistance/ai_assistance.js';
+import * as UI from '../ui/legacy/legacy.js';
 
-import {findMenuItemWithLabel, getMenu} from './ContextMenuHelpers.js';
+import {findMenuItemWithLabel} from './ContextMenuHelpers.js';
 import {
   createTarget,
 } from './EnvironmentHelpers.js';
@@ -264,9 +265,11 @@ export async function createPatchWidget(options?: {
   };
 }
 
-export async function createPatchWidgetWithDiffView() {
-  const {view, widget, aidaClient} =
-      await createPatchWidget({aidaClient: mockAidaClient([[{explanation: 'patch applied'}]])});
+export async function createPatchWidgetWithDiffView(options?: {
+  aidaClient?: Host.AidaClient.AidaClient,
+}) {
+  const aidaClient = options?.aidaClient ?? mockAidaClient([[{explanation: 'patch applied'}]]);
+  const {view, widget} = await createPatchWidget({aidaClient});
   widget.changeSummary = 'body { background-color: red; }';
   view.input.onApplyToWorkspace();
   assert.strictEqual(
@@ -308,9 +311,9 @@ export function openHistoryContextMenu(
     lastUpdate: AiAssistancePanel.ViewInput,
     item: string,
 ) {
-  const contextMenu = getMenu(() => {
-    lastUpdate.onHistoryClick(new MouseEvent('click'));
-  });
+  const contextMenu = new UI.ContextMenu.ContextMenu(new MouseEvent('click'));
+  lastUpdate.populateHistoryMenu(contextMenu);
+
   const freestylerEntry = findMenuItemWithLabel(contextMenu.defaultSection(), item);
   return {
     contextMenu,

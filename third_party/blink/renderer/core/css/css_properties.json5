@@ -5940,6 +5940,7 @@
       valid_for_marker: true,
       valid_for_page_context: true,
       invalidate: ["reshape"],
+      valid_for_permission_element: true,
     },
     {
       name: "text-underline-offset",
@@ -8652,6 +8653,18 @@
     {
       name: "rule-color",
       longhands: ["column-rule-color", "row-rule-color"],
+      property_methods: ["ParseShorthand", "CSSValueFromComputedStyleInternal"],
+      runtime_flag: "CSSGapDecoration",
+    },
+    {
+      name: "rule-width",
+      longhands: ["column-rule-width", "row-rule-width"],
+      property_methods: ["ParseShorthand", "CSSValueFromComputedStyleInternal"],
+      runtime_flag: "CSSGapDecoration",
+    },
+    {
+      name: "rule-style",
+      longhands: ["column-rule-style", "row-rule-style"],
       property_methods: ["ParseShorthand", "CSSValueFromComputedStyleInternal"],
       runtime_flag: "CSSGapDecoration",
     },

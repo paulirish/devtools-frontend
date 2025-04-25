@@ -40,7 +40,8 @@ import {
   selectionFromRangeMilliSeconds,
   selectionIsEvent,
   selectionIsRange,
-  type TimelineSelection,
+  selectionsEqual,
+  type TimelineSelection
 } from './TimelineSelection.js';
 import {AggregatedTimelineTreeView, TimelineTreeView} from './TimelineTreeView.js';
 import type {TimelineMarkerStyle} from './TimelineUIUtils.js';
@@ -179,6 +180,14 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
   #treeRowClickDimmer = this.#registerFlameChartDimmer({inclusive: false, outline: false});
   #activeInsightDimmer = this.#registerFlameChartDimmer({inclusive: false, outline: true});
   #thirdPartyCheckboxDimmer = this.#registerFlameChartDimmer({inclusive: true, outline: false});
+  /**
+   * Determines if we respect the user's prefers-reduced-motion setting. We
+   * absolutely should care about this; the only time we don't is in unit tests
+   * when we need to force animations on and don't want the environment to
+   * determine if they are on or not.
+   * It is not expected that this flag is ever disabled in non-test environments.
+   */
+  #checkReducedMotion = true;
 
   constructor(delegate: TimelineModeViewDelegate) {
     super();
@@ -1043,6 +1052,9 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
     this.runBrickBreakerGame();
   }
 
+  forceAnimationsForTest(): void {
+    this.#checkReducedMotion = false;
+  }
   runBrickBreakerGame(): void {
     if (!SHOULD_SHOW_EASTER_EGG) {
       return;
@@ -1066,7 +1078,8 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
 
     // If the user has set a preference for reduced motion, we disable any animations.
     const userHasReducedMotionSet = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const shouldAnimate = Boolean(event.options.shouldAnimate) && !userHasReducedMotionSet;
+    const shouldAnimate =
+        Boolean(event.options.shouldAnimate) && (this.#checkReducedMotion ? !userHasReducedMotionSet : true);
 
     this.mainFlameChart.setWindowTimes(visibleWindow.min, visibleWindow.max, shouldAnimate);
     this.networkDataProvider.setWindowTimes(visibleWindow.min, visibleWindow.max);
@@ -1398,6 +1411,10 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
   }
 
   setSelectionAndReveal(selection: TimelineSelection|null): void {
+    if (selection && this.#currentSelection && selectionsEqual(selection, this.#currentSelection)) {
+      return;
+    }
+
     this.#currentSelection = selection;
 
     // Clear any existing entry selection.

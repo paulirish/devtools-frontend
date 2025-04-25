@@ -5,13 +5,14 @@
 import childProcess from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { performance } from 'node:perf_hooks';
+import {performance} from 'node:perf_hooks';
 import util from 'node:util';
 
 import {
-  autoninjaExecutablePath,
-  gnExecutablePath,
+  autoninjaPyPath,
+  gnPyPath,
   rootPath,
+  vpython3ExecutablePath,
 } from './devtools_paths.js';
 
 const execFile = util.promisify(childProcess.execFile);
@@ -78,7 +79,7 @@ export class FeatureSet {
    * Yields the command line parameters to pass to the invocation of
    * a Chrome binary for achieving the state of the feature set.
    */
-  *[Symbol.iterator]() {
+  * [Symbol.iterator]() {
     const disabledFeatures = [...this.#disabled];
     if (disabledFeatures.length) {
       yield `--disable-features=${disabledFeatures.sort().join(',')}`;
@@ -97,6 +98,9 @@ export class FeatureSet {
   }
 
   static parse(text) {
+    if (!text) {
+      return [];
+    }
     const features = [];
     for (const str of text.split(',')) {
       const parts = str.split(':');
@@ -109,7 +113,7 @@ export class FeatureSet {
         const args = parts[1].split('/');
         if (args.length % 2 !== 0) {
           throw new Error(
-            `Invalid parameters '${parts[1]}' for feature ${feature}`,
+              `Invalid parameters '${parts[1]}' for feature ${feature}`,
           );
         }
         for (let i = 0; i < args.length; i += 2) {
@@ -118,14 +122,62 @@ export class FeatureSet {
           parameters[key] = value;
         }
       }
-      features.push({ feature, parameters });
+      features.push({feature, parameters});
     }
     return features;
   }
 }
 
+/**
+ * Constructs a human readable error message for the given build `error`.
+ *
+ * @param {Error} error the `Error` from the failed `autoninja` invocation.
+ * @param {string} outDir the absolute path to the `target` out directory.
+ * @param {string} target the targe relative to `//out`.
+ * @return {string} the human readable error message.
+ */
+function buildErrorMessageForNinja(error, outDir, target) {
+  const {message, stderr, stdout} = error;
+  if (stderr) {
+    // Anything that went to stderr has precedence.
+    return `Failed to build \`${target}' in \`${outDir}'
+
+${stderr}
+`;
+  }
+  if (stdout) {
+    // Check for `tsc` or `esbuild` errors in the stdout.
+    const tscErrors = [...stdout.matchAll(/^[^\s].*\(\d+,\d+\): error TS\d+:\s+.*$/gm)].map(([tscError]) => tscError);
+    if (!tscErrors.length) {
+      // We didn't find any `tsc` errors, but maybe there are `esbuild` errors.
+      // Transform these into the `tsc` format (with a made up error code), so
+      // we can report all TypeScript errors consistently in `tsc` format (which
+      // is well-known and understood by tools).
+      const esbuildErrors = stdout.matchAll(/^✘ \[ERROR\] ([^\n]+)\n\n\s+\.\.\/\.\.\/(.+):(\d+):(\d+):/gm);
+      for (const [, message, filename, line, column] of esbuildErrors) {
+        tscErrors.push(`${filename}(${line},${column}): error TS0000: ${message}`);
+      }
+    }
+    if (tscErrors.length) {
+      return `TypeScript compilation failed for \`${target}'
+
+${tscErrors.join('\n')}
+`;
+    }
+
+    // At the very least we strip `ninja: Something, something` lines from the
+    // standard output, since that's not particularly helpful.
+    const output = stdout.replaceAll(/^ninja: [^\n]+\n+/mg, '').trim();
+    return `Failed to build \`${target}' in \`${outDir}'
+
+${output}
+`;
+  }
+  return `Failed to build \`${target}' in \`${outDir}' (${message.substring(0, message.indexOf('\n'))})`;
+}
+
 export const BuildStep = {
-  GN: 'gn-gen',
+  GN: 'gn',
   AUTONINJA: 'autoninja',
 };
 
@@ -140,17 +192,14 @@ export class BuildError extends Error {
    * @param {string} options.target the target relative to `//out`.
    */
   constructor(step, options) {
-    const { cause, outDir, target } = options;
-    super(`Failed to build target ${target} in ${outDir}`, { cause });
-    this.name = 'BuildError';
+    const {cause, outDir, target} = options;
+    const message = step === BuildStep.GN ? `\`gn' failed to initialize out directory ${outDir}` :
+                                            buildErrorMessageForNinja(cause, outDir, target);
+    super(message, {cause});
     this.step = step;
+    this.name = 'BuildError';
     this.target = target;
     this.outDir = outDir;
-  }
-
-  toString() {
-    const { stdout } = this.cause;
-    return stdout;
   }
 }
 
@@ -172,11 +221,11 @@ export async function prepareBuild(target) {
   if (!outDirStat?.isDirectory()) {
     // Use GN to (optionally create and) initialize the |outDir|.
     try {
-      const gnExe = gnExecutablePath();
-      const gnArgs = ['-q', 'gen', outDir];
+      const gnExe = vpython3ExecutablePath();
+      const gnArgs = [gnPyPath(), '-q', 'gen', outDir];
       await execFile(gnExe, gnArgs);
     } catch (cause) {
-      throw new BuildError(BuildStep.GN, { cause, outDir, target });
+      throw new BuildError(BuildStep.GN, {cause, outDir, target});
     }
   }
 }
@@ -194,17 +243,17 @@ export async function build(target, signal) {
   // since we might be running in a full Chromium checkout and certainly don't
   // want to build all of Chromium first.
   try {
-    const autoninjaExe = autoninjaExecutablePath();
-    const autoninjaArgs = ['-C', outDir, '--quiet', 'devtools_all_files'];
-    await execFile(autoninjaExe, autoninjaArgs, { signal });
+    const autoninjaExe = vpython3ExecutablePath();
+    const autoninjaArgs = [autoninjaPyPath(), '-C', outDir, 'devtools_all_files'];
+    await execFile(autoninjaExe, autoninjaArgs, {signal});
   } catch (cause) {
     if (cause.name === 'AbortError') {
       throw cause;
     }
-    throw new BuildError(BuildStep.AUTONINJA, { cause, outDir, target });
+    throw new BuildError(BuildStep.AUTONINJA, {cause, outDir, target});
   }
 
   // Report the build result.
   const time = (performance.now() - startTime) / 1000;
-  return { time };
+  return {time};
 }

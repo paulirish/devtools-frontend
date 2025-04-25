@@ -27,6 +27,17 @@ export const enum ErrorType {
   BLOCK = 'block',
 }
 
+export const enum MultimodalInputType {
+  SCREENSHOT = 'screenshot',
+  UPLOADED_IMAGE = 'uploaded-image',
+}
+
+export interface MultimodalInput {
+  input: Host.AidaClient.Part;
+  type: MultimodalInputType;
+  id: string;
+}
+
 export interface AnswerResponse {
   type: ResponseType.ANSWER;
   text: string;
@@ -132,11 +143,16 @@ export type ParsedResponse = ParsedAnswer|ParsedStep;
 
 export const MAX_STEPS = 10;
 
+export interface ConversationSuggestion {
+  title: string;
+  jslogContext?: string;
+}
+
 export abstract class ConversationContext<T> {
   abstract getOrigin(): string;
   abstract getItem(): T;
-  abstract getIcon(): HTMLElement;
-  abstract getTitle(): string|ReturnType<typeof Lit.Directives.until>;
+  abstract getIcon(): HTMLElement|undefined;
+  abstract getTitle(opts?: {disabled: boolean}): string|ReturnType<typeof Lit.Directives.until>;
 
   isOriginAllowed(agentOrigin: string|undefined): boolean {
     if (!agentOrigin) {
@@ -157,7 +173,7 @@ export abstract class ConversationContext<T> {
     return;
   }
 
-  async getSuggestions(): Promise<[string, ...string[]]|undefined> {
+  async getSuggestions(): Promise<[ConversationSuggestion, ...ConversationSuggestion[]]|undefined> {
     return;
   }
 }
@@ -264,7 +280,8 @@ export abstract class AiAgent<T> {
     this.confirmSideEffect = opts.confirmSideEffectForTest ?? (() => Promise.withResolvers());
   }
 
-  async enhanceQuery(query: string, selected: ConversationContext<T>|null, hasImageInput?: boolean): Promise<string>;
+  async enhanceQuery(query: string, selected: ConversationContext<T>|null, multimodalInputType?: MultimodalInputType):
+      Promise<string>;
   async enhanceQuery(query: string): Promise<string> {
     return query;
   }
@@ -397,7 +414,7 @@ export abstract class AiAgent<T> {
       run(initialQuery: string, options: {
         signal?: AbortSignal, selected: ConversationContext<T>|null,
       },
-          imageInput?: Host.AidaClient.Part, imageId?: string): AsyncGenerator<ResponseData, void, void> {
+          multimodalInput?: MultimodalInput): AsyncGenerator<ResponseData, void, void> {
     await options.selected?.refresh();
 
     // First context set on the agent determines its origin from now on.
@@ -409,19 +426,19 @@ export abstract class AiAgent<T> {
       this.#context = options.selected;
     }
 
-    const enhancedQuery = await this.enhanceQuery(initialQuery, options.selected, Boolean(imageInput));
+    const enhancedQuery = await this.enhanceQuery(initialQuery, options.selected, multimodalInput?.type);
     Host.userMetrics.freestylerQueryLength(enhancedQuery.length);
 
     let query: Host.AidaClient.Part|Host.AidaClient.Part[];
-    query = imageInput ? [{text: enhancedQuery}, imageInput] : [{text: enhancedQuery}];
+    query = multimodalInput ? [{text: enhancedQuery}, multimodalInput.input] : [{text: enhancedQuery}];
     // Request is built here to capture history up to this point.
     let request = this.buildRequest(query, Host.AidaClient.Role.USER);
 
     yield {
       type: ResponseType.USER_QUERY,
       query: initialQuery,
-      imageInput,
-      imageId,
+      imageInput: multimodalInput?.input,
+      imageId: multimodalInput?.id,
     };
 
     yield* this.handleContextDetails(options.selected);

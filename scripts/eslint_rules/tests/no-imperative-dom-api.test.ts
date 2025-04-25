@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 import rule from '../lib/no-imperative-dom-api.ts';
 
-import {RuleTester} from './utils/tsUtils.ts';
+import {RuleTester} from './utils/RuleTester.ts';
 
 new RuleTester().run('no-imperative-dom-api', rule, {
   valid: [
@@ -504,7 +504,7 @@ export const DEFAULT_VIEW = (input, _output, target) => {
           hidden="hidden" href="https://www.google.com" id="some-id" name="some-name" rel="some-rel"
           scope="some-scope"></img>
       <input type="text" placeholder="some-placeholder" value="some-value"
-          ?disabled=\${!this.enabled} ?checked=\${true}></input>
+          ?disabled=\${!this.enabled} ?checked=\${true}>
     </div>\`,
     target, {host: input});
 };
@@ -581,6 +581,177 @@ export const DEFAULT_VIEW = (input, _output, target) => {
       </label>
       <devtools-button class="some-class" title=\${i18nString(UIStrings.someTitle)} @click=\${onClick}
           .jslogContext=\${'some-button'} .variant=\${Buttons.Button.Variant.PRIMARY}>Some button</devtools-button>
+    </div>\`,
+    target, {host: input});
+};
+
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+  }
+}`,
+      errors: [{messageId: 'preferTemplateLiterals'}],
+    },
+    {
+      filename: 'front_end/ui/components/component/file.ts',
+      code: `
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+    UI.UIUtils.createTextChild(this.contentElement.createChild('div', 'some-class'), 'some-text');
+  }
+}`,
+      output: `
+
+export const DEFAULT_VIEW = (input, _output, target) => {
+  render(html\`
+    <div>
+      <div class="some-class">some-text</div>
+    </div>\`,
+    target, {host: input});
+};
+
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+  }
+}`,
+      errors: [{messageId: 'preferTemplateLiterals'}],
+    },
+    {
+      filename: 'front_end/ui/components/component/file.ts',
+      code: `
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+    const button = new Buttons.Button.Button();
+    button.data = {
+      jslogContext: 'some-button',
+      variant: Buttons.Button.Variant.PRIMARY,
+      title: i18nString(UIStrings.someTitle),
+    };
+    UI.ARIAUtils.markAsPresentation(button);
+    UI.Tooltip.Tooltip.install(button, i18nString(UIStrings.someTooltip));
+    this.contentElement.appendChild(button);
+  }
+}`,
+      output: `
+
+export const DEFAULT_VIEW = (input, _output, target) => {
+  render(html\`
+    <div>
+      <devtools-button role="presentation" title=\${i18nString(UIStrings.someTooltip)}
+          .data=\${{
+      jslogContext: 'some-button',
+      variant: Buttons.Button.Variant.PRIMARY,
+      title: i18nString(UIStrings.someTitle),
+    }}
+      ></devtools-button>
+    </div>\`,
+    target, {host: input});
+};
+
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+  }
+}`,
+      errors: [{messageId: 'preferTemplateLiterals'}],
+    },
+    {
+      filename: 'front_end/ui/components/component/file.ts',
+      code: `
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+    this.contentElement.appendChild(UI.UIUtils.CheckboxLabel.create(
+          i18nString(UIStrings.someTitle), true, i18nString(UIStrings.someTooltip),
+          undefined, 'some-checkbox', true));
+    this.contentElement.appendChild(UI.UIUtils.CheckboxLabel.create());
+    this.contentElement.appendChild(UI.UIUtils.CheckboxLabel.createWithStringLiteral(
+        ':hover', undefined, undefined, 'some-other-checkbox'));
+
+    const toolbar = this.contentElement.createChild('devtools-toolbar');
+    toolbar.appendToolbarItem(new UI.Toolbar.ToolbarCheckbox(
+        i18nString(UIStrings.someToolbarTitle), i18nString(UIStrings.someToolbarTooltip),
+        this.someToolbarCheckboxClicked.bind(this), 'some-toolbar-checkbox'));
+    toolbar.appendToolbarItem(new UI.Toolbar.ToolbarSettingCheckbox(
+        this.someSetting, i18nString(UIStrings.someToolbarTooltip), i18nString(UIStrings.alternateToolbarTitle)));
+    toolbar.appendToolbarItem(new UI.Toolbar.ToolbarSettingCheckbox(this.someOtherSetting));
+  }
+}`,
+      output: `
+
+export const DEFAULT_VIEW = (input, _output, target) => {
+  render(html\`
+    <div>
+      <devtools-checkbox class="small" ?checked=\${true}>\${i18nString(UIStrings.someTitle)}</devtools-checkbox>
+      <devtools-checkbox></devtools-checkbox>
+      <devtools-checkbox class="small">:hover</devtools-checkbox>
+      <devtools-toolbar>
+        <devtools-checkbox title=\${i18nString(UIStrings.someToolbarTooltip)}
+            @click=\${this.someToolbarCheckboxClicked.bind(this)}
+            .jslogContext=\${'some-toolbar-checkbox'}>\${i18nString(UIStrings.someToolbarTitle)}</devtools-checkbox>
+        <devtools-checkbox title=\${i18nString(UIStrings.someToolbarTooltip)}
+            \${bindToSetting(this.someSetting)}>\${i18nString(UIStrings.alternateToolbarTitle)}</devtools-checkbox>
+        <devtools-checkbox \${bindToSetting(this.someOtherSetting)}>\${this.someOtherSetting.title()}</devtools-checkbox>
+      </devtools-toolbar>
+    </div>\`,
+    target, {host: input});
+};
+
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+  }
+}`,
+      errors: [{messageId: 'preferTemplateLiterals'}],
+    },
+    {
+      filename: 'front_end/ui/components/component/file.ts',
+      code: `
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('sandbox', '');
+    iframe.tabIndex = -1;
+    this.contentElement.appendChild(iframe);
+  }
+}`,
+      output: `
+
+export const DEFAULT_VIEW = (input, _output, target) => {
+  render(html\`
+    <div>
+      <iframe sandbox tabindex="-1"></iframe>
+    </div>\`,
+    target, {host: input});
+};
+
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+  }
+}`,
+      errors: [{messageId: 'preferTemplateLiterals'}],
+    },
+    {
+      filename: 'front_end/ui/components/component/file.ts',
+      code: `
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+    this.contentElement.appendChild(UI.UIUtils.createInput('add-source-map', 'text', 'url'));
+  }
+}`,
+      output: `
+
+export const DEFAULT_VIEW = (input, _output, target) => {
+  render(html\`
+    <div>
+      <input class="harmony-input add-source-map" spellcheck="false" type="text"
+          jslog=\${VisualLogging.textField('url').track({keydown: 'Enter', change: true})}>
     </div>\`,
     target, {host: input});
 };

@@ -8,7 +8,9 @@
 import type {TSESTree} from '@typescript-eslint/utils';
 
 import {adorner} from './no-imperative-dom-api/adorner.ts';
+import {ariaUtils} from './no-imperative-dom-api/aria-utils.ts';
 import {getEnclosingExpression, isIdentifier} from './no-imperative-dom-api/ast.ts';
+import {button} from './no-imperative-dom-api/button.ts';
 import {ClassMember} from './no-imperative-dom-api/class-member.ts';
 import {domApiDevtoolsExtensions} from './no-imperative-dom-api/dom-api-devtools-extensions.ts';
 import {domApi} from './no-imperative-dom-api/dom-api.ts';
@@ -16,11 +18,12 @@ import {DomFragment} from './no-imperative-dom-api/dom-fragment.ts';
 import {toolbar} from './no-imperative-dom-api/toolbar.ts';
 import {uiUtils} from './no-imperative-dom-api/ui-utils.ts';
 import {widget} from './no-imperative-dom-api/widget.ts';
-import {createRule} from './tsUtils.ts';
+import {createRule} from './utils/ruleCreator.ts';
 type CallExpression = TSESTree.CallExpression;
 type Identifier = TSESTree.Identifier;
 type MemberExpression = TSESTree.MemberExpression;
 type NewExpression = TSESTree.NewExpression;
+type CallExpressionArgument = TSESTree.CallExpressionArgument;
 type Node = TSESTree.Node;
 type Range = TSESTree.Range;
 
@@ -32,6 +35,7 @@ type Subrule = Partial<{
   propertyMethodCall(property: Identifier, method: Node, firstArg: Node, domFragment: DomFragment): boolean,
   subpropertyAssignment(
       property: Identifier, subproperty: Identifier, subpropertyValue: Node, domFragment: DomFragment): boolean,
+  functionCall(call: CallExpression, firstArg: Node, secondArg: Node, domFragment: DomFragment): boolean,
   // eslint-disable-next-line @typescript-eslint/naming-convention
   MemberExpression: (node: MemberExpression) => void,
   // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -60,6 +64,8 @@ export default createRule({
 
     const subrules: Subrule[] = [
       adorner.create(context),
+      ariaUtils.create(context),
+      button.create(context),
       domApi.create(context),
       domApiDevtoolsExtensions.create(context),
       toolbar.create(context),
@@ -85,35 +91,33 @@ export default createRule({
       if (!parent) {
         return false;
       }
-      const isAccessed = parent.type === 'MemberExpression' && parent.object === reference;
-      if (!isAccessed) {
-        return false;
-      }
-      const property = parent.property;
-      if (property.type !== 'Identifier') {
-        return false;
-      }
+      const isPropertyAccess =
+          parent.type === 'MemberExpression' && parent.object === reference && parent.property.type === 'Identifier';
+      const property = isPropertyAccess ? parent.property as Identifier : null;
       const grandParent = parent.parent;
-      const isPropertyAssignment = grandParent.type === 'AssignmentExpression' && grandParent.left === parent;
+      const isPropertyAssignment =
+          isPropertyAccess && grandParent?.type === 'AssignmentExpression' && grandParent.left === parent;
       const propertyValue = isPropertyAssignment ? grandParent.right : null;
-      const isMethodCall = grandParent.type === 'CallExpression' && grandParent.callee === parent;
-      const grandGrandParent = grandParent.parent;
-      const isPropertyMethodCall = grandParent.type === 'MemberExpression' && grandParent.object === parent &&
-          grandGrandParent?.type === 'CallExpression' && grandGrandParent?.callee === grandParent &&
-          grandParent.property.type === 'Identifier';
+      const isMethodCall = isPropertyAccess && grandParent?.type === 'CallExpression' && grandParent.callee === parent;
+      const grandGrandParent = grandParent?.parent;
+      const isPropertyMethodCall = isPropertyAccess && grandParent?.type === 'MemberExpression' &&
+          grandParent.object === parent && grandGrandParent?.type === 'CallExpression' &&
+          grandGrandParent?.callee === grandParent && grandParent.property.type === 'Identifier';
       const propertyMethodArgument = isPropertyMethodCall ? grandGrandParent.arguments[0] : null;
-      const isSubpropertyAssignment = grandParent.type === 'MemberExpression' && grandParent.object === parent &&
-          grandParent.property.type === 'Identifier' && grandGrandParent?.type === 'AssignmentExpression' &&
-          grandGrandParent?.left === grandParent;
+      const isSubpropertyAssignment = isPropertyAccess && grandParent?.type === 'MemberExpression' &&
+          grandParent.object === parent && grandParent.property.type === 'Identifier' &&
+          grandGrandParent?.type === 'AssignmentExpression' && grandGrandParent?.left === grandParent;
       const subproperty =
-          isSubpropertyAssignment && grandParent.property.type === 'Identifier' ? grandParent.property : null;
+          isSubpropertyAssignment && grandParent?.property?.type === 'Identifier' ? grandParent.property : null;
       const subpropertyValue = isSubpropertyAssignment ? grandGrandParent.right : null;
+      const isCallArgument =
+          parent.type === 'CallExpression' && parent.arguments.includes(reference as CallExpressionArgument);
       for (const rule of subrules) {
-        if (isPropertyAssignment && propertyValue) {
+        if (isPropertyAssignment && property && propertyValue) {
           if ('propertyAssignment' in rule && rule.propertyAssignment?.(property, propertyValue, domFragment)) {
             return true;
           }
-        } else if (isMethodCall) {
+        } else if (isMethodCall && property) {
           const firstArg = grandParent.arguments[0];
           const secondArg = grandParent.arguments[1];
           if (isIdentifier(property, 'addEventListener')) {
@@ -127,14 +131,20 @@ export default createRule({
           if ('methodCall' in rule && rule.methodCall?.(property, firstArg, secondArg, domFragment, grandParent)) {
             return true;
           }
-        } else if (isPropertyMethodCall && propertyMethodArgument) {
+        } else if (isPropertyMethodCall && property && propertyMethodArgument) {
           if ('propertyMethodCall' in rule &&
               rule.propertyMethodCall?.(property, grandParent.property, propertyMethodArgument, domFragment)) {
             return true;
           }
-        } else if (isSubpropertyAssignment && subproperty && subpropertyValue) {
+        } else if (isSubpropertyAssignment && property && subproperty && subpropertyValue) {
           if ('subpropertyAssignment' in rule &&
               rule.subpropertyAssignment?.(property, subproperty, subpropertyValue, domFragment)) {
+            return true;
+          }
+        } else if (isCallArgument) {
+          const firstArg = parent.arguments[0];
+          const secondArg = parent.arguments[1];
+          if ('functionCall' in rule && rule.functionCall?.(parent, firstArg, secondArg, domFragment)) {
             return true;
           }
         }

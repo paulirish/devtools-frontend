@@ -21,8 +21,7 @@ import * as Dialogs from '../../../ui/components/dialogs/dialogs.js';
 import * as Input from '../../../ui/components/input/input.js';
 import type * as Menus from '../../../ui/components/menus/menus.js';
 import * as TextEditor from '../../../ui/components/text_editor/text_editor.js';
-// eslint-disable-next-line rulesdir/es-modules-import
-import inspectorCommonStylesRaw from '../../../ui/legacy/inspectorCommon.css.js';
+import * as UI from '../../../ui/legacy/legacy.js';
 import * as Lit from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 import type * as Converters from '../converters/converters.js';
@@ -31,7 +30,7 @@ import * as Models from '../models/models.js';
 import {PlayRecordingSpeed} from '../models/RecordingPlayer.js';
 import * as Actions from '../recorder-actions/recorder-actions.js';
 
-import recordingViewStylesRaw from './recordingView.css.js';
+import recordingViewStyles from './recordingView.css.js';
 import type {ReplaySectionData, StartReplayEvent} from './ReplaySection.js';
 import {
   type CopyStepEvent,
@@ -39,14 +38,6 @@ import {
   type StepView,
   type StepViewData,
 } from './StepView.js';
-
-// TODO(crbug.com/391381439): Fully migrate off of constructed style sheets.
-const inspectorCommonStyles = new CSSStyleSheet();
-inspectorCommonStyles.replaceSync(inspectorCommonStylesRaw.cssText);
-
-// TODO(crbug.com/391381439): Fully migrate off of constructed style sheets.
-const recordingViewStyles = new CSSStyleSheet();
-recordingViewStyles.replaceSync(recordingViewStylesRaw.cssText);
 
 const {html} = Lit;
 
@@ -380,11 +371,6 @@ export class RecordingView extends HTMLElement {
   }
 
   connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [
-      inspectorCommonStyles,
-      recordingViewStyles,
-      Input.textInputStyles,
-    ];
     document.addEventListener('copy', this.#onCopyBound);
     this.#render();
   }
@@ -1298,6 +1284,9 @@ export class RecordingView extends HTMLElement {
     // clang-format off
     Lit.render(
       html`
+      <style>${UI.inspectorCommonStyles.cssText}</style>
+      <style>${recordingViewStyles.cssText}</style>
+      <style>${Input.textInputStyles.cssText}</style>
       <div @click=${this.#onWrapperClick} class=${Lit.Directives.classMap(
         classNames,
       )}>

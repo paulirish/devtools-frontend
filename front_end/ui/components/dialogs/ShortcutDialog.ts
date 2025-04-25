@@ -13,7 +13,9 @@ import {html, nothing, render, type TemplateResult} from '../../../ui/lit/lit.js
 import type {ButtonDialogData} from './ButtonDialog.js';
 import shortcutDialogStylesRaw from './shortcutDialog.css.js';
 
-// TODO(crbug.com/391381439): Fully migrate off of constructed style sheets.
+/* eslint-disable rulesdir/no-adopted-style-sheets --
+ * TODO(crbug.com/391381439): Fully migrate off of Constructable Stylesheets.
+ **/
 const shortcutDialogStyles = new CSSStyleSheet();
 shortcutDialogStyles.replaceSync(shortcutDialogStylesRaw.cssText);
 
@@ -56,7 +58,6 @@ export interface ShortcutDialogData {
 
 export class ShortcutDialog extends HTMLElement {
   readonly #shadow = this.attachShadow({mode: 'open'});
-  readonly #renderBound = this.#render.bind(this);
 
   #shortcuts: Shortcut[] = [];
   #openOnRender = false;
@@ -84,7 +85,7 @@ export class ShortcutDialog extends HTMLElement {
       this.#customTitle = data.customTitle;
     }
 
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#renderBound);
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
   prependElement(element: HTMLElement): void {

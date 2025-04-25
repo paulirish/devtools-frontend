@@ -16,12 +16,8 @@ import * as Utils from '../utils/utils.js';
 
 import * as Insights from './insights/insights.js';
 import type {ActiveInsight} from './Sidebar.js';
-import stylesRaw from './sidebarInsightsTab.css.js';
+import sidebarInsightsTabStyles from './sidebarInsightsTab.css.js';
 import type {SidebarSingleInsightSet, SidebarSingleInsightSetData} from './SidebarSingleInsightSet.js';
-
-// TODO(crbug.com/391381439): Fully migrate off of constructed style sheets.
-const styles = new CSSStyleSheet();
-styles.replaceSync(stylesRaw.cssText);
 
 const {html} = Lit;
 
@@ -42,9 +38,7 @@ const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/SidebarInsi
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class SidebarInsightsTab extends HTMLElement {
-  readonly #boundRender = this.#render.bind(this);
   readonly #shadow = this.attachShadow({mode: 'open'});
-
   #parsedTrace: Trace.Handlers.Types.ParsedTrace|null = null;
   #traceMetadata: Trace.Types.File.MetaData|null = null;
   #insights: Trace.Insights.Types.TraceInsightSets|null = null;
@@ -58,10 +52,6 @@ export class SidebarInsightsTab extends HTMLElement {
    */
   #insightSetKey: string|null = null;
 
-  connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [styles];
-  }
-
   // TODO(paulirish): add back a disconnectedCallback() to avoid memory leaks that doesn't cause b/372943062
 
   set parsedTrace(data: Trace.Handlers.Types.ParsedTrace|null) {
@@ -71,7 +61,7 @@ export class SidebarInsightsTab extends HTMLElement {
     this.#parsedTrace = data;
     this.#insightSetKey = null;
 
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
   set traceMetadata(data: Trace.Types.File.MetaData|null) {
@@ -81,7 +71,7 @@ export class SidebarInsightsTab extends HTMLElement {
     this.#traceMetadata = data;
     this.#insightSetKey = null;
 
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
   set insights(data: Trace.Insights.Types.TraceInsightSets|null) {
@@ -106,7 +96,7 @@ export class SidebarInsightsTab extends HTMLElement {
         // If everything is "trivial", just select the first one.
         ?? insightSets[0]?.id ?? null;
 
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
   set activeInsight(active: ActiveInsight|null) {
@@ -123,7 +113,7 @@ export class SidebarInsightsTab extends HTMLElement {
     if (this.#activeInsight) {
       this.#insightSetKey = this.#activeInsight.insightSetKey;
     }
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
   #insightSetToggled(id: string): void {
@@ -132,7 +122,7 @@ export class SidebarInsightsTab extends HTMLElement {
     if (this.#insightSetKey !== this.#activeInsight?.insightSetKey) {
       this.dispatchEvent(new Insights.SidebarInsight.InsightDeactivated());
     }
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
   #insightSetHovered(id: string): void {
@@ -219,6 +209,7 @@ export class SidebarInsightsTab extends HTMLElement {
     const contents =
         // clang-format off
      html`
+      <style>${sidebarInsightsTabStyles.cssText}</style>
       <div class="insight-sets-wrapper">
         ${[...this.#insights.values()].map(({id, url}, index) => {
           const data: SidebarSingleInsightSetData = {

@@ -7,8 +7,9 @@
 
 import type {TSESTree} from '@typescript-eslint/utils';
 
-import {isIdentifier, isMemberExpression} from './ast.ts';
+import {isIdentifier, isIdentifierChain, isMemberExpression} from './ast.ts';
 import {DomFragment} from './dom-fragment.ts';
+
 type Node = TSESTree.Node;
 
 export const toolbar = {
@@ -34,12 +35,15 @@ export const toolbar = {
         return false;
       },
       NewExpression(node) {
-        if (isMemberExpression(
-                node.callee, n => isMemberExpression(n, n => isIdentifier(n, 'UI'), n => isIdentifier(n, 'Toolbar')),
-                n => isIdentifier(n, ['ToolbarFilter', 'ToolbarInput']))) {
+        const toolbarItem =
+            isMemberExpression(node.callee, n => isIdentifierChain(n, ['UI', 'Toolbar']), n => n.type === 'Identifier');
+        if (!toolbarItem) {
+          return;
+        }
+        if (isIdentifier(toolbarItem, ['ToolbarFilter', 'ToolbarInput'])) {
           const domFragment = DomFragment.getOrCreate(node, sourceCode);
           domFragment.tagName = 'devtools-toolbar-input';
-          const type = isIdentifier(node.callee.property, 'ToolbarFilter') ? 'filter' : 'text';
+          const type = isIdentifier(toolbarItem, 'ToolbarFilter') ? 'filter' : 'text';
           domFragment.attributes.push({
             key: 'type',
             value: type,
@@ -105,9 +109,7 @@ export const toolbar = {
             });
           }
         }
-        if (isMemberExpression(
-                node.callee, n => isMemberExpression(n, n => isIdentifier(n, 'UI'), n => isIdentifier(n, 'Toolbar')),
-                n => isIdentifier(n, 'ToolbarButton'))) {
+        if (isIdentifier(toolbarItem, 'ToolbarButton')) {
           const domFragment = DomFragment.getOrCreate(node, sourceCode);
           domFragment.tagName = 'devtools-button';
           const title = node.arguments[0];
@@ -138,6 +140,50 @@ export const toolbar = {
               key: 'jslogContext',
               value: jslogContext,
             });
+          }
+        }
+        if (isIdentifier(toolbarItem, ['ToolbarCheckbox', 'ToolbarSettingCheckbox'])) {
+          const domFragment = DomFragment.getOrCreate(node, sourceCode);
+          domFragment.tagName = 'devtools-checkbox';
+          const title = node.arguments[0];
+          if (title && !isIdentifier(title, 'undefined')) {
+            let text: Node|string = title;
+            if (isIdentifier(toolbarItem, 'ToolbarSettingCheckbox')) {
+              domFragment.directives.push({
+                name: 'bindToSetting',
+                arguments: [title],
+              });
+              const alternateTitle = node.arguments[2];
+              if (alternateTitle && !isIdentifier(alternateTitle, 'undefined')) {
+                text = alternateTitle;
+              } else {
+                text = '${' + sourceCode.getText(title) + '.title()}';
+              }
+            }
+            domFragment.textContent = text;
+          }
+          const tooltip = node.arguments[1];
+          if (tooltip && !isIdentifier(tooltip, 'undefined')) {
+            domFragment.attributes.push({
+              key: 'title',
+              value: tooltip,
+            });
+          }
+          if (isIdentifier(toolbarItem, 'ToolbarCheckbox')) {
+            const listener = node.arguments[2];
+            if (listener && !isIdentifier(listener, 'undefined')) {
+              domFragment.eventListeners.push({
+                key: 'click',
+                value: listener,
+              });
+            }
+            const jslogContext = node.arguments[3];
+            if (jslogContext && !isIdentifier(jslogContext, 'undefined')) {
+              domFragment.bindings.push({
+                key: 'jslogContext',
+                value: jslogContext,
+              });
+            }
           }
         }
       }

@@ -15,7 +15,7 @@ import {
   mockAidaClient,
   openHistoryContextMenu
 } from '../../testing/AiAssistanceHelpers.js';
-import {findMenuItemWithLabel, getMenu} from '../../testing/ContextMenuHelpers.js';
+import {findMenuItemWithLabel} from '../../testing/ContextMenuHelpers.js';
 import {createTarget, registerNoopActions, updateHostConfig} from '../../testing/EnvironmentHelpers.js';
 import {expectCall} from '../../testing/ExpectStubCall.js';
 import {describeWithMockConnection} from '../../testing/MockConnection.js';
@@ -218,7 +218,7 @@ describeWithMockConnection('AI Assistance Panel', () => {
             nodeType: Node.ELEMENT_NODE,
           });
           sinon.stub(AiAssistanceModel.NodeContext.prototype, 'getSuggestions')
-              .returns(Promise.resolve(['test suggestion']));
+              .returns(Promise.resolve([{title: 'test suggestion'}]));
           return new AiAssistanceModel.NodeContext(node);
         },
         action: 'freestyler.elements-floating-button',
@@ -243,7 +243,7 @@ describeWithMockConnection('AI Assistance Panel', () => {
           const context = new AiAssistanceModel.InsightContext(
               sinon.createStubInstance(TimelineUtils.InsightAIContext.ActiveInsight));
           sinon.stub(AiAssistanceModel.InsightContext.prototype, 'getSuggestions')
-              .returns(Promise.resolve(['test suggestion']));
+              .returns(Promise.resolve([{title: 'test suggestion'}]));
           return context;
         },
         action: 'drjones.performance-insight-context'
@@ -570,7 +570,8 @@ describeWithMockConnection('AI Assistance Panel', () => {
           {aidaClient: mockAidaClient([[{explanation: 'test'}], [{explanation: 'test2'}]])});
       panel.handleAction('freestyler.elements-floating-button');
       const imageInput = {inlineData: {data: 'imageinputbytes', mimeType: 'image/jpeg'}};
-      (await view.nextInput).onTextSubmit('User question to Freestyler?', imageInput);
+      (await view.nextInput)
+          .onTextSubmit('User question to Freestyler?', imageInput, AiAssistanceModel.MultimodalInputType.SCREENSHOT);
       assert.deepEqual((await view.nextInput).messages, [
         {
           entity: AiAssistancePanel.ChatMessageEntity.USER,
@@ -603,12 +604,9 @@ describeWithMockConnection('AI Assistance Panel', () => {
         },
       ]);
 
-      const contextMenu = getMenu(() => {
-        view.input.onHistoryClick(new MouseEvent('click'));
-      });
-      const freestylerEntry = findMenuItemWithLabel(contextMenu.defaultSection(), 'User question to Freestyler?')!;
-      assert.isDefined(freestylerEntry);
-      contextMenu.invokeHandler(freestylerEntry.id());
+      const {contextMenu, id} = openHistoryContextMenu(view.input, 'User question to Freestyler?');
+      assert.isDefined(id);
+      contextMenu.invokeHandler(id);
       assert.isTrue((await view.nextInput).isReadOnly);
       assert.deepEqual(view.input.messages, [
         {
@@ -786,9 +784,7 @@ describeWithMockConnection('AI Assistance Panel', () => {
         },
       ]);
 
-      let contextMenu = getMenu(() => {
-        view.input.onHistoryClick(new MouseEvent('click'));
-      });
+      let {contextMenu} = openHistoryContextMenu(view.input, 'User question to Freestyler?');
       const clearAll = findMenuItemWithLabel(contextMenu.footerSection(), 'Clear local chats')!;
       assert.isDefined(clearAll);
       contextMenu.invokeHandler(clearAll.id());
@@ -796,9 +792,7 @@ describeWithMockConnection('AI Assistance Panel', () => {
       assert.isUndefined(view.input.conversationType);
       contextMenu.discard();
 
-      contextMenu = getMenu(() => {
-        view.input.onHistoryClick(new MouseEvent('click'));
-      });
+      contextMenu = openHistoryContextMenu(view.input, 'User question to Freestyler?').contextMenu;
       const menuItem = findMenuItemWithLabel(contextMenu.defaultSection(), 'No past conversations');
       assert(menuItem);
     });
@@ -1254,12 +1248,33 @@ describeWithMockConnection('AI Assistance Panel', () => {
       const {view} = await createAiAssistancePanel();
 
       assert.isFalse(view.input.multimodalInputEnabled);
+      assert.isFalse(view.input.uploadImageInputEnabled);
       assert.notExists(view.input.onTakeScreenshot);
       assert.notExists(view.input.onRemoveImageInput);
+      assert.notExists(view.input.onLoadImage);
       assert.notExists(view.input.imageInput);
     });
 
-    it('adds an image input and then removes it', async () => {
+    it('upload input function unavailable when multimodalUploadInput is disabled', async () => {
+      updateHostConfig({
+        devToolsFreestyler: {
+          enabled: true,
+          multimodal: true,
+          multimodalUploadInput: false,
+        },
+      });
+      UI.Context.Context.instance().setFlavor(
+          Elements.ElementsPanel.ElementsPanel, sinon.createStubInstance(Elements.ElementsPanel.ElementsPanel));
+      const {view} = await createAiAssistancePanel();
+
+      assert.isTrue(view.input.multimodalInputEnabled);
+      assert.isFalse(view.input.uploadImageInputEnabled);
+      assert.exists(view.input.onTakeScreenshot);
+      assert.exists(view.input.onRemoveImageInput);
+      assert.notExists(view.input.onLoadImage);
+    });
+
+    it('adds screenshot as an image input and then removes it', async () => {
       const {captureScreenshotStub} = mockScreenshotModel();
       updateHostConfig({
         devToolsFreestyler: {
@@ -1275,8 +1290,42 @@ describeWithMockConnection('AI Assistance Panel', () => {
 
       view.input.onTakeScreenshot?.();
 
-      assert.deepEqual((await view.nextInput).imageInput, {isLoading: false, data: 'imageInput'});
+      assert.deepEqual((await view.nextInput).imageInput, {
+        isLoading: false,
+        data: 'imageInput',
+        mimeType: 'image/jpeg',
+        inputType: AiAssistanceModel.MultimodalInputType.SCREENSHOT
+      });
       expect(captureScreenshotStub.calledOnce);
+
+      view.input.onRemoveImageInput?.();
+      assert.notExists((await view.nextInput).imageInput);
+    });
+
+    it('uploads an image as an input and then removes it', async () => {
+      updateHostConfig({
+        devToolsFreestyler: {
+          enabled: true,
+          multimodal: true,
+          multimodalUploadInput: true,
+        },
+      });
+      UI.Context.Context.instance().setFlavor(
+          Elements.ElementsPanel.ElementsPanel, sinon.createStubInstance(Elements.ElementsPanel.ElementsPanel));
+      const {view} = await createAiAssistancePanel();
+      const blob = new Blob(['imageInput'], {type: 'image/jpeg'});
+
+      assert.isTrue(view.input.multimodalInputEnabled);
+      assert.isTrue(view.input.uploadImageInputEnabled);
+
+      await view.input.onLoadImage?.(new File([blob], 'image.jpeg', {type: 'image/jpeg'}));
+
+      assert.deepEqual((await view.nextInput).imageInput, {
+        isLoading: false,
+        data: btoa('imageInput'),
+        mimeType: 'image/jpeg',
+        inputType: AiAssistanceModel.MultimodalInputType.UPLOADED_IMAGE
+      });
 
       view.input.onRemoveImageInput?.();
       assert.notExists((await view.nextInput).imageInput);
@@ -1295,7 +1344,9 @@ describeWithMockConnection('AI Assistance Panel', () => {
 
       assert.isTrue(view.input.multimodalInputEnabled);
 
-      view.input.onTextSubmit('test', {inlineData: {data: 'imageInput', mimeType: 'image/jpeg'}});
+      view.input.onTextSubmit(
+          'test', {inlineData: {data: 'imageInput', mimeType: 'image/jpeg'}},
+          AiAssistanceModel.MultimodalInputType.SCREENSHOT);
 
       assert.deepEqual((await view.nextInput).messages, [
         {
