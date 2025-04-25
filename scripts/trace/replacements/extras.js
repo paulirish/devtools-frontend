@@ -20,6 +20,7 @@ export * as StackTraceForEvent from './StackTraceForEvent.js';
 //    import 'es-iterator-helpers/Iterator.prototype.find/auto';
 //    import 'es-iterator-helpers/Iterator.prototype.flatMap/auto';
 //    import 'es-iterator-helpers/Iterator.prototype.map/auto';
+//    import 'es-iterator-helpers/Iterator.prototype.reduce/auto';
 //    import 'es-iterator-helpers/Iterator.prototype.toArray/auto';
 
 "use strict";
@@ -3821,8 +3822,96 @@ export * as StackTraceForEvent from './StackTraceForEvent.js';
     }
   });
 
-  // node_modules/es-iterator-helpers/Iterator.prototype.toArray/implementation.js
+  // node_modules/es-iterator-helpers/Iterator.prototype.reduce/implementation.js
   var require_implementation7 = __commonJS({
+    "node_modules/es-iterator-helpers/Iterator.prototype.reduce/implementation.js"(exports, module) {
+      "use strict";
+      var $TypeError = require_type();
+      var Call = require_Call();
+      var GetIteratorDirect = require_GetIteratorDirect();
+      var IsCallable = require_IsCallable();
+      var IteratorClose = require_IteratorClose();
+      var IteratorStepValue = require_IteratorStepValue();
+      var ThrowCompletion = require_ThrowCompletion();
+      var Type = require_Type2();
+      module.exports = function reduce(reducer) {
+        if (this instanceof reduce) {
+          throw new $TypeError("`reduce` is not a constructor");
+        }
+        var O = this;
+        if (Type(O) !== "Object") {
+          throw new $TypeError("`this` value must be an Object");
+        }
+        if (!IsCallable(reducer)) {
+          throw new $TypeError("`reducer` must be a function");
+        }
+        var iterated = GetIteratorDirect(O);
+        var accumulator;
+        var counter;
+        if (arguments.length < 2) {
+          accumulator = IteratorStepValue(iterated);
+          if (iterated["[[Done]]"]) {
+            throw new $TypeError("Reduce of empty iterator with no initial value");
+          }
+          counter = 1;
+        } else {
+          accumulator = arguments[1];
+          counter = 0;
+        }
+        while (true) {
+          var value = IteratorStepValue(iterated);
+          if (iterated["[[Done]]"]) {
+            return accumulator;
+          }
+          try {
+            var result = Call(reducer, void 0, [accumulator, value, counter]);
+            accumulator = result;
+          } catch (e) {
+            IteratorClose(
+              iterated,
+              ThrowCompletion(e)
+            );
+          }
+          counter += 1;
+        }
+      };
+    }
+  });
+
+  // node_modules/es-iterator-helpers/Iterator.prototype.reduce/polyfill.js
+  var require_polyfill4 = __commonJS({
+    "node_modules/es-iterator-helpers/Iterator.prototype.reduce/polyfill.js"(exports, module) {
+      "use strict";
+      var implementation = require_implementation7();
+      module.exports = function getPolyfill() {
+        return typeof Iterator === "function" && typeof Iterator.prototype.reduce === "function" ? Iterator.prototype.reduce : implementation;
+      };
+    }
+  });
+
+  // node_modules/es-iterator-helpers/Iterator.prototype.reduce/shim.js
+  var require_shim4 = __commonJS({
+    "node_modules/es-iterator-helpers/Iterator.prototype.reduce/shim.js"(exports, module) {
+      "use strict";
+      var define = require_define_properties();
+      var getPolyfill = require_polyfill4();
+      var $IteratorPrototype = require_implementation4();
+      module.exports = function shimIteratorPrototypeReduce() {
+        var polyfill = getPolyfill();
+        define(
+          $IteratorPrototype,
+          { reduce: polyfill },
+          { reduce: function() {
+            return $IteratorPrototype.reduce !== polyfill;
+          } }
+        );
+        return polyfill;
+      };
+    }
+  });
+
+  // node_modules/es-iterator-helpers/Iterator.prototype.toArray/implementation.js
+  var require_implementation8 = __commonJS({
     "node_modules/es-iterator-helpers/Iterator.prototype.toArray/implementation.js"(exports, module) {
       "use strict";
       var $TypeError = require_type();
@@ -3851,10 +3940,10 @@ export * as StackTraceForEvent from './StackTraceForEvent.js';
   });
 
   // node_modules/es-iterator-helpers/Iterator.prototype.toArray/polyfill.js
-  var require_polyfill4 = __commonJS({
+  var require_polyfill5 = __commonJS({
     "node_modules/es-iterator-helpers/Iterator.prototype.toArray/polyfill.js"(exports, module) {
       "use strict";
-      var implementation = require_implementation7();
+      var implementation = require_implementation8();
       module.exports = function getPolyfill() {
         return typeof Iterator === "function" && typeof Iterator.prototype.toArray === "function" ? Iterator.prototype.toArray : implementation;
       };
@@ -3862,11 +3951,11 @@ export * as StackTraceForEvent from './StackTraceForEvent.js';
   });
 
   // node_modules/es-iterator-helpers/Iterator.prototype.toArray/shim.js
-  var require_shim4 = __commonJS({
+  var require_shim5 = __commonJS({
     "node_modules/es-iterator-helpers/Iterator.prototype.toArray/shim.js"(exports, module) {
       "use strict";
       var define = require_define_properties();
-      var getPolyfill = require_polyfill4();
+      var getPolyfill = require_polyfill5();
       var $IteratorPrototype = require_implementation4();
       module.exports = function shimIteratorPrototypeToArray() {
         var polyfill = getPolyfill();
@@ -3891,6 +3980,9 @@ export * as StackTraceForEvent from './StackTraceForEvent.js';
   // node_modules/es-iterator-helpers/Iterator.prototype.map/auto.js
   require_shim3()();
 
-  // node_modules/es-iterator-helpers/Iterator.prototype.toArray/auto.js
+  // node_modules/es-iterator-helpers/Iterator.prototype.reduce/auto.js
   require_shim4()();
+
+  // node_modules/es-iterator-helpers/Iterator.prototype.toArray/auto.js
+  require_shim5()();
 })();

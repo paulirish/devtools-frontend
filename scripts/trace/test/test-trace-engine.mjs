@@ -93,8 +93,8 @@ test('insights look ok', t => {
     assert.ok(typeof insightItem === 'object', `insightName ${insightName} is not an object`);
   }
 
-  const entityNames = insightSet.model.ThirdParties.summaries.map(s => s.entity.name);
-  const values = insightSet.model.ThirdParties.summaries.values();
+  const entityNames = insightSet.model.ThirdParties.entitySummaries.map(s => s.entity.name);
+  const values = insightSet.model.ThirdParties.entitySummaries.values();
   const simplified = Object.fromEntries(values.map((v, i) => [entityNames[i], {transferSize: v.transferSize, mainThreadTime: v.mainThreadTime}]));
 
   const expected = {
