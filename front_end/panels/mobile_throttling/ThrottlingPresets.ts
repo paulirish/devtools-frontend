@@ -183,8 +183,8 @@ export class ThrottlingPresets {
     SDK.CPUThrottlingManager.MidTierThrottlingOption,
     SDK.CPUThrottlingManager.LowTierThrottlingOption,
     SDK.CPUThrottlingManager.ExtraSlowThrottlingOption,
-    SDK.CPUThrottlingManager.CalibratedLowTierMobileThrottlingOption,
     SDK.CPUThrottlingManager.CalibratedMidTierMobileThrottlingOption,
+    SDK.CPUThrottlingManager.CalibratedLowTierMobileThrottlingOption,
   ];
 }
 
