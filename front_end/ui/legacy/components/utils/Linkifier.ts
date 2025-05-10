@@ -823,24 +823,24 @@ export class Linkifier extends Common.ObjectWrapper.ObjectWrapper<EventTypes> im
         handler: () => Common.Revealer.reveal(revealable),
       });
     }
-    if (contentProvider) {
-      const lineNumber = uiLocation ? uiLocation.lineNumber : info.lineNumber || 0;
-      for (const title of linkHandlers.keys()) {
-        const handler = linkHandlers.get(title);
-        if (!handler) {
-          continue;
-        }
-        const action = {
-          section: 'reveal',
-          title: i18nString(UIStrings.openUsingS, {PH1: title}),
-          jslogContext: 'open-using',
-          handler: handler.bind(null, contentProvider, lineNumber),
-        };
-        if (title === Linkifier.linkHandlerSetting().get()) {
-          result.unshift(action);
-        } else {
-          result.push(action);
-        }
+    // Consider handling link with extension Link Handling aka `setOpenResourceHandler`
+    const contentProviderOrUrl = contentProvider || url;
+    const lineNumber = uiLocation ? uiLocation.lineNumber : info.lineNumber || 0;
+    for (const title of linkHandlers.keys()) {
+      const handler = linkHandlers.get(title);
+      if (!handler) {
+        continue;
+      }
+      const action = {
+        section: 'reveal',
+        title: i18nString(UIStrings.openUsingS, {PH1: title}),
+        jslogContext: 'open-using',
+        handler: handler.bind(null, contentProviderOrUrl, lineNumber),
+      };
+      if (title === Linkifier.linkHandlerSetting().get()) {
+        result.unshift(action);
+      } else {
+        result.push(action);
       }
     }
     if (resource || info.url) {
@@ -1097,7 +1097,9 @@ interface LinkDisplayOptions {
   revealBreakpoint?: boolean;
 }
 
-export type LinkHandler = (arg0: TextUtils.ContentProvider.ContentProvider, arg1: number) => void;
+export type LinkHandler =
+    (arg0: TextUtils.ContentProvider.ContentProvider|Platform.DevToolsPath.UrlString, lineNumber: number,
+     columnNumber?: number) => void;
 
 export const enum Events {
   LIVE_LOCATION_UPDATED = 'liveLocationUpdated',

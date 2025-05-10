@@ -106,6 +106,7 @@ export class HostsPolicy {
 }
 
 class RegisteredExtension {
+  openResourceScheme: null|string = null;
   constructor(readonly name: string, readonly hostsPolicy: HostsPolicy, readonly allowFileAccess: boolean) {
   }
 
@@ -116,6 +117,10 @@ class RegisteredExtension {
 
     if (!inspectedURL) {
       return false;
+    }
+
+    if (this.openResourceScheme && inspectedURL.startsWith(`${this.openResourceScheme}://`)) {
+      return true;
     }
 
     if (!ExtensionServer.canInspectURL(inspectedURL)) {
@@ -671,6 +676,7 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     if (panelView && panelView instanceof ExtensionServerPanelView) {
       panelViewId = panelView.viewId();
     }
+    // return UI.InspectorView.InspectorView.instance().showPanel(panelViewId);
     void UI.InspectorView.InspectorView.instance().showPanel(panelViewId);
     return undefined;
   }
@@ -817,6 +823,9 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     if (!extension) {
       throw new Error('Received a message from an unregistered extension');
     }
+    if (message.urlScheme) {
+      extension.openResourceScheme = message.urlScheme;
+    }
     const {name} = extension;
     if (message.handlerPresent) {
       Components.Linkifier.Linkifier.registerLinkHandler(name, this.handleOpenURL.bind(this, port));
@@ -846,10 +855,20 @@ export class ExtensionServer extends Common.ObjectWrapper.ObjectWrapper<EventTyp
   }
 
   private handleOpenURL(
-      port: MessagePort, contentProvider: TextUtils.ContentProvider.ContentProvider, lineNumber: number): void {
-    if (this.extensionAllowedOnURL(contentProvider.contentURL(), port)) {
-      port.postMessage(
-          {command: 'open-resource', resource: this.makeResource(contentProvider), lineNumber: lineNumber + 1});
+      port: MessagePort, contentProviderOrUrl: TextUtils.ContentProvider.ContentProvider|string, lineNumber: number,
+      columnNumber?: number): void {
+    const url = contentProviderOrUrl.contentURL?.() ?? contentProviderOrUrl;
+    const resource = typeof url === 'string' ? {url, type: Common.ResourceType.resourceTypes.Other.name()} :
+                                               this.makeResource(contentProviderOrUrl);
+    // Typically this method is used to see if extension can run on this inspected page url.
+    // But now we're seeing if this extension can be trusted to open this url
+    if (this.extensionAllowedOnURL(url, port)) {
+      port.postMessage({
+        command: 'open-resource',
+        resource,
+        lineNumber: lineNumber + 1,
+        columnNumber: columnNumber ?? 0,  // do i need +1 ?
+      });
     }
   }
 

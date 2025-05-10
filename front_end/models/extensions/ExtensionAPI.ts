@@ -230,6 +230,7 @@ export namespace PrivateAPI {
   interface SetOpenResourceHandlerRequest {
     command: Commands.SetOpenResourceHandler;
     handlerPresent: boolean;
+    urlScheme?: string;
   }
   interface SetThemeChangeHandlerRequest {
     command: Commands.SetThemeChangeHandler;
@@ -693,32 +694,33 @@ self.injectedExtensionAPI = function(
     },
 
     setOpenResourceHandler: function(
-        callback: (resource: PublicAPI.Chrome.DevTools.Resource, lineNumber: number) => unknown): void {
-      const hadHandler = extensionServer.hasHandler(PrivateAPI.Events.OpenResource);
+        callback: (resource: PublicAPI.Chrome.DevTools.Resource, lineNumber: number) => unknown, urlScheme?: string):
+        void {
+          const hadHandler = extensionServer.hasHandler(PrivateAPI.Events.OpenResource);
 
-      function callbackWrapper(message: unknown): void {
-        // Allow the panel to show itself when handling the event.
-        userAction = true;
-        try {
-          const {resource, lineNumber} = message as {resource: APIImpl.ResourceData, lineNumber: number};
-          callback.call(null, new (Constructor(Resource))(resource), lineNumber);
-        } finally {
-          userAction = false;
-        }
-      }
+          function callbackWrapper(message: unknown): void {
+            // Allow the panel to show itself when handling the event.
+            userAction = true;
+            try {
+              const {resource, lineNumber} = message as {resource: APIImpl.ResourceData, lineNumber: number};
+              callback.call(null, new (Constructor(Resource))(resource), lineNumber);
+            } finally {
+              userAction = false;
+            }
+          }
 
-      if (!callback) {
-        extensionServer.unregisterHandler(PrivateAPI.Events.OpenResource);
-      } else {
-        extensionServer.registerHandler(PrivateAPI.Events.OpenResource, callbackWrapper);
-      }
+          if (!callback) {
+            extensionServer.unregisterHandler(PrivateAPI.Events.OpenResource);
+          } else {
+            extensionServer.registerHandler(PrivateAPI.Events.OpenResource, callbackWrapper);
+          }
 
-      // Only send command if we either removed an existing handler or added handler and had none before.
-      if (hadHandler === !callback) {
-        extensionServer.sendRequest(
-            {command: PrivateAPI.Commands.SetOpenResourceHandler, handlerPresent: Boolean(callback)});
-      }
-    },
+          // Only send command if we either removed an existing handler or added handler and had none before.
+          if (hadHandler === !callback) {
+            extensionServer.sendRequest(
+                {command: PrivateAPI.Commands.SetOpenResourceHandler, handlerPresent: Boolean(callback), urlScheme});
+          }
+        },
 
     setThemeChangeHandler: function(callback: (themeName: string) => unknown): void {
       const hadHandler = extensionServer.hasHandler(PrivateAPI.Events.ThemeChange);

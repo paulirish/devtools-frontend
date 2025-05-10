@@ -36,6 +36,7 @@
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
+import type {UrlString} from '../../core/platform/DevToolsPath.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
@@ -1191,6 +1192,18 @@ export class TimelineUIUtils {
 
     if (Trace.Types.Extensions.isSyntheticExtensionEntry(event)) {
       for (const [key, value] of event.args.properties || []) {
+        // starts with a scheme. scheme can include a hyphen.
+        if (/^[\w-]+:\/\//.test(value)) {
+          const url = value as UrlString;
+          const splitResult = Common.ParsedURL.ParsedURL.splitLineAndColumn(url);
+          if (splitResult) {
+            const {lineNumber, columnNumber} = splitResult;
+            const options = {text: value, lineNumber, columnNumber} as LegacyComponents.Linkifier.LinkifyURLOptions;
+            const linkElement = LegacyComponents.Linkifier.Linkifier.linkifyURL(url, (options));
+            contentHelper.appendElementRow(key, linkElement);
+            continue;
+          }
+        }
         contentHelper.appendTextRow(key, value);
       }
     }
