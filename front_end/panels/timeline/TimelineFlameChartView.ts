@@ -399,10 +399,12 @@ export class TimelineFlameChartView extends Common.ObjectWrapper.eventMixin<Even
     });
 
     this.detailsView.addEventListener(TimelineTreeView.Events.TREE_ROW_HOVERED, e => {
+      // Sometimes the trace events come in on on the hovered event
       if (e.data.events) {
         this.#updateFlameChartDimmerWithEvents(this.#treeRowHoverDimmer, e.data.events);
         return;
       }
+      // But if not, we grab it from the tree node directly.
       const events = e?.data?.node?.events ?? null;
       this.#updateFlameChartDimmerWithEvents(this.#treeRowHoverDimmer, events);
     });

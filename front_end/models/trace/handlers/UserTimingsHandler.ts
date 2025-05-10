@@ -68,50 +68,6 @@ export function reset(): void {
   measureTraceByTraceId.clear();
 }
 
-const resourceTimingNames = [
-  'workerStart',
-  'redirectStart',
-  'redirectEnd',
-  'fetchStart',
-  'domainLookupStart',
-  'domainLookupEnd',
-  'connectStart',
-  'connectEnd',
-  'secureConnectionStart',
-  'requestStart',
-  'responseStart',
-  'responseEnd',
-];
-const navTimingNames = [
-  'navigationStart',
-  'unloadEventStart',
-  'unloadEventEnd',
-  'redirectStart',
-  'redirectEnd',
-  'fetchStart',
-  'commitNavigationEnd',
-  'domainLookupStart',
-  'domainLookupEnd',
-  'connectStart',
-  'connectEnd',
-  'secureConnectionStart',
-  'requestStart',
-  'responseStart',
-  'responseEnd',
-  'domLoading',
-  'domInteractive',
-  'domContentLoadedEventStart',
-  'domContentLoadedEventEnd',
-  'domComplete',
-  'loadEventStart',
-  'loadEventEnd',
-];
-// These are events dispatched under the blink.user_timing category
-// but that the user didn't add. Filter them out so that they do not
-// Appear in the timings track (they still appear in the main thread
-// flame chart).
-const ignoredNames = [...resourceTimingNames, ...navTimingNames];
-
 /**
  * Similar to the default {@see Helpers.Trace.eventTimeComparator}
  * but with a twist:
@@ -157,24 +113,30 @@ function userTimingComparator(
 }
 
 export function handleEvent(event: Types.Events.Event): void {
-  if (ignoredNames.includes(event.name)) {
-    return;
-  }
   if (Types.Events.isUserTimingMeasure(event)) {
+    // This provides a JS Sample and nothing else. We get measure data (name, detail) from `PerformanceMeasure` event pair. See measureTraceByTraceId comment
     measureTraceByTraceId.set(event.args.traceId, event);
-  }
-  if (Types.Events.isPerformanceMeasure(event)) {
-    performanceMeasureEvents.push(event);
     return;
   }
-  if (Types.Events.isPerformanceMark(event)) {
-    performanceMarkEvents.push(event);
+
+  if (Types.Events.isUserTiming(event)) {
+    if (Types.Events.isPerformanceMeasure(event)) {
+      performanceMeasureEvents.push(event);
+      return;
+    }
+
+    if (Types.Events.isPerformanceMark(event)) {
+      performanceMarkEvents.push(event);
+      return;
+    }
   }
   if (Types.Events.isConsoleTime(event)) {
     consoleTimings.push(event);
+    return;
   }
   if (Types.Events.isConsoleTimeStamp(event)) {
     timestampEvents.push(event);
+    return;
   }
 }
 

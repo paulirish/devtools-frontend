@@ -1468,6 +1468,7 @@ export interface SyntheticConsoleTimeStamp extends Event, SyntheticBased {
   ph: Phase.COMPLETE;
 }
 
+// Added in Feb 2025. https://crrev.com/c/6252783
 export interface UserTimingMeasure extends Event {
   cat: 'devtools.timeline';
   ph: Phase.COMPLETE;
@@ -2312,8 +2313,11 @@ export function isPerformanceMeasureBegin(event: Event): event is PerformanceMea
   return isPerformanceMeasure(event) && event.ph === Phase.ASYNC_NESTABLE_START;
 }
 
+// Many trace events for resourceTiming and navTiming are emitted under the blink.user_timing category, despite not being User Timing
+// Luckily we can easily identify them (to exclude them from our User Timing data) as they are MARK phase.
+// As of June 2023, true User Timing marks are emitted as INSTANT: https://crrev.com/c/3656547)
 export function isPerformanceMark(event: Event): event is PerformanceMark {
-  return isUserTiming(event) && (event.ph === Phase.MARK || event.ph === Phase.INSTANT);
+  return isUserTiming(event) && event.ph === Phase.INSTANT;
 }
 
 export function isConsoleTime(event: Event): event is ConsoleTime {
@@ -2321,7 +2325,7 @@ export function isConsoleTime(event: Event): event is ConsoleTime {
 }
 
 export function isConsoleTimeStamp(event: Event): event is ConsoleTimeStamp {
-  return event.ph === Phase.INSTANT && event.name === Name.TIME_STAMP;
+  return event.name === Name.TIME_STAMP && event.ph === Phase.INSTANT;
 }
 
 export function isUserTimingMeasure(event: Event): event is UserTimingMeasure {

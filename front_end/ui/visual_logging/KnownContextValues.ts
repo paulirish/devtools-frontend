@@ -23,6 +23,8 @@ export const knownContextValues = new Set([
   '-moz-text-decoration',
   '-moz-text-size-adjust',
   '-ms-flex-direction',
+  'chrome-extension://fmkadmapgofadopljbjfkapdkoienihiComponents⚛',
+  'chrome-extension://fmkadmapgofadopljbjfkapdkoienihiProfiler⚛',
   '-ms-text-size-adjust',
   '-ms-touch-action',
   '-webkit-FONT-smoothing',
