@@ -113,7 +113,8 @@ describeWithEnvironment('UserTimingsHandler', function() {
         ]);
       });
     });
-    describe('performance.mark events parsing', function() {
+    describe.only('performance.mark events parsing', function() {
+      // this fails because the trace is 2+ yrs old and the marks are not instant phase.
       it('parses performance mark events correctly', function() {
         assert.lengthOf(timingsData.performanceMarks, 2);
         assert.strictEqual(timingsData.performanceMarks[0].name, 'mark1');

@@ -158,13 +158,13 @@ export async function finalize(): Promise<void> {
 
 export function data(): UserTimingsData {
   return {
+    allTimings: allResolvedTimings,
     performanceMeasures: allResolvedTimings.filter(Types.Events.isSyntheticUserTiming) as
         Types.Events.SyntheticUserTimingPair[],
     consoleTimings: allResolvedTimings.filter(Types.Events.isSyntheticConsoleTiming) as
         Types.Events.SyntheticConsoleTimingPair[],
     performanceMarks: allResolvedTimings.filter(Types.Events.isPerformanceMark),
     timestampEvents: allResolvedTimings.filter(Types.Events.isConsoleTimeStamp),
-    allTimings: allResolvedTimings,
     measureTraceByTraceId: new Map(measureTraceByTraceId),
   };
 }
