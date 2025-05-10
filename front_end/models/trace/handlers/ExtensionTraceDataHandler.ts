@@ -6,14 +6,14 @@ import * as Helpers from '../helpers/helpers.js';
 import * as Types from '../types/types.js';
 
 import type {HandlerName} from './types.js';
-import {data as userTimingsData} from './UserTimingsHandler.js';
+import {data as userTimingsData, type Timing} from './UserTimingsHandler.js';
 
 const extensionTrackEntries: Types.Extensions.SyntheticExtensionTrackEntry[] = [];
 const extensionTrackData: Types.Extensions.ExtensionTrackData[] = [];
 const extensionMarkers: Types.Extensions.SyntheticExtensionMarker[] = [];
 const entryToNode = new Map<Types.Events.Event, Helpers.TreeHelpers.TraceEntryNode>();
 const timeStampByName = new Map<string, Types.Events.ConsoleTimeStamp>();
-
+const extensionEvents: Timing[] = [];
 const syntheticConsoleEntriesForTimingsTrack: Types.Events.SyntheticConsoleTimeStamp[] = [];
 
 export interface ExtensionTraceData {
@@ -22,6 +22,8 @@ export interface ExtensionTraceData {
   // TODO(andoli): Can we augment Renderer's entryToNode instead? To avoid the split of TimelineUIUtils's getEventSelfTime()?
   entryToNode: Map<Types.Events.Event, Helpers.TreeHelpers.TraceEntryNode>;
   syntheticConsoleEntriesForTimingsTrack: Types.Events.SyntheticConsoleTimeStamp[];
+  /** User Timing events that have extension data attached */
+  extensionEvents: Timing[];
 }
 
 export function handleEvent(_event: Types.Events.Event): void {
@@ -33,6 +35,7 @@ export function reset(): void {
   syntheticConsoleEntriesForTimingsTrack.length = 0;
   extensionTrackData.length = 0;
   extensionMarkers.length = 0;
+  extensionEvents.length = 0;
   entryToNode.clear();
   timeStampByName.clear();
 }
@@ -107,6 +110,7 @@ export function extractConsoleAPIExtensionEntries(): void {
     const entryStartTime = startTimeStamp ?? currentTimeStamp.ts;
     const entryEndTime = endTimeStamp ?? currentTimeStamp.ts;
     if (extensionData) {
+      extensionEvents.push(currentTimeStamp);
       const unregisteredExtensionEntry: Omit<Types.Extensions.SyntheticExtensionTrackEntry, '_tag'> = {
         ...currentTimeStamp,
         name: timeStampName,
@@ -180,6 +184,7 @@ export function extractPerformanceAPIExtensionEntries(
       // Not an extension user timing.
       continue;
     }
+    extensionEvents.push(timing);
 
     const extensionSyntheticEntry = {
       name: timing.name,
@@ -289,6 +294,7 @@ export function data(): ExtensionTraceData {
     extensionTrackData,
     extensionMarkers,
     syntheticConsoleEntriesForTimingsTrack,
+    extensionEvents,
   };
 }
 

@@ -71,23 +71,17 @@ export class TimingsTrackAppender implements TrackAppender {
    */
   appendTrackAtLevel(trackStartLevel: number, expanded?: boolean): number {
     const extensionMarkersAreEmpty = this.#extensionMarkers.length === 0;
-    const performanceMarks = this.#parsedTrace.UserTimings.performanceMarks.filter(
-        m => !Trace.Handlers.ModelHandlers.ExtensionTraceData.extensionDataInPerformanceTiming(m));
-    const performanceMeasures = this.#parsedTrace.UserTimings.performanceMeasures.filter(
-        m => !Trace.Handlers.ModelHandlers.ExtensionTraceData.extensionDataInPerformanceTiming(m));
-    const timestampEvents = this.#parsedTrace.UserTimings.timestampEvents.filter(
-        timeStamp => !Trace.Handlers.ModelHandlers.ExtensionTraceData.extensionDataInConsoleTimeStamp(timeStamp));
-    const consoleTimings = this.#parsedTrace.UserTimings.consoleTimings;
-    if (extensionMarkersAreEmpty && performanceMarks.length === 0 && performanceMeasures.length === 0 &&
-        timestampEvents.length === 0 && consoleTimings.length === 0) {
+    const allTimings = this.#parsedTrace.UserTimings.allTimings.filter(
+        // Exclude if it's being displayed in extension tracks
+        event =>
+            !(TimelinePanel.extensionDataVisibilitySetting().get() &&
+              this.#parsedTrace.ExtensionTraceData.extensionEvents.includes(event)));
+    if (extensionMarkersAreEmpty && allTimings.length === 0) {
       return trackStartLevel;
     }
     this.#appendTrackHeaderAtLevel(trackStartLevel, expanded);
-    let newLevel = this.#appendExtensionsAtLevel(trackStartLevel);
-    newLevel = this.#compatibilityBuilder.appendEventsAtLevel(performanceMarks, newLevel, this);
-    newLevel = this.#compatibilityBuilder.appendEventsAtLevel(performanceMeasures, newLevel, this);
-    newLevel = this.#compatibilityBuilder.appendEventsAtLevel(timestampEvents, newLevel, this);
-    return this.#compatibilityBuilder.appendEventsAtLevel(consoleTimings, newLevel, this);
+    const newLevel = this.#appendExtensionsAtLevel(trackStartLevel);
+    return this.#compatibilityBuilder.appendEventsAtLevel(allTimings, newLevel, this);
   }
 
   /**

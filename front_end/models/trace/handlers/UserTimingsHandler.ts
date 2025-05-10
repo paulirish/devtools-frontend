@@ -10,7 +10,9 @@ import * as Types from '../types/types.js';
  * See UserTimings.md in this directory for some handy documentation on
  * UserTimings and the trace events we parse currently.
  **/
-let syntheticEvents: Array<Types.Events.SyntheticEventPair<Types.Events.PairableAsync>> = [];
+export type Timing = Types.Events.SyntheticEventPair<Types.Events.PairableAsync>|Types.Events.PerformanceMark|
+                     Types.Events.ConsoleTimeStamp;
+let allResolvedTimings: Timing[] = [];
 
 // There are two events dispatched for performance.measure calls: one to
 // represent the measured timing in the tracing clock (which we type as
@@ -57,10 +59,14 @@ export interface UserTimingsData {
    * cached by trace_id.
    */
   measureTraceByTraceId: Map<number, Types.Events.UserTimingMeasure>;
+  /**
+   * All of the UserTiming data, together in a sorted array.
+   */
+  allTimings: typeof allResolvedTimings;
 }
 
 export function reset(): void {
-  syntheticEvents.length = 0;
+  allResolvedTimings.length = 0;
   performanceMeasureEvents.length = 0;
   performanceMarkEvents.length = 0;
   consoleTimings.length = 0;
@@ -141,19 +147,24 @@ export function handleEvent(event: Types.Events.Event): void {
 }
 
 export async function finalize(): Promise<void> {
-  const asyncEvents = [...performanceMeasureEvents, ...consoleTimings];
-  syntheticEvents = Helpers.Trace.createMatchedSortedSyntheticEvents(asyncEvents);
-  syntheticEvents = syntheticEvents.sort((a, b) => userTimingComparator(a, b, [...syntheticEvents]));
+  const pairedAsyncEvents = [...performanceMeasureEvents, ...consoleTimings];
+  const pairedSyntheticEvents = Helpers.Trace.createMatchedSortedSyntheticEvents(pairedAsyncEvents);
+
+  // Combine the paired synthetic events (measures and console timings) with performance marks and timestamps
+  allResolvedTimings = [...pairedSyntheticEvents, ...performanceMarkEvents, ...timestampEvents];
+  // Sort all of them together using the custom comparator.
+  allResolvedTimings.sort((a, b) => userTimingComparator(a, b, allResolvedTimings));
 }
 
 export function data(): UserTimingsData {
   return {
-    performanceMeasures: syntheticEvents.filter(e => e.cat === 'blink.user_timing') as
+    performanceMeasures: allResolvedTimings.filter(Types.Events.isSyntheticUserTiming) as
         Types.Events.SyntheticUserTimingPair[],
-    consoleTimings: syntheticEvents.filter(e => e.cat === 'blink.console') as Types.Events.SyntheticConsoleTimingPair[],
-    // TODO(crbug/41484172): UserTimingsHandler.test.ts fails if this is not copied.
-    performanceMarks: [...performanceMarkEvents],
-    timestampEvents: [...timestampEvents],
+    consoleTimings: allResolvedTimings.filter(Types.Events.isSyntheticConsoleTiming) as
+        Types.Events.SyntheticConsoleTimingPair[],
+    performanceMarks: allResolvedTimings.filter(Types.Events.isPerformanceMark),
+    timestampEvents: allResolvedTimings.filter(Types.Events.isConsoleTimeStamp),
+    allTimings: allResolvedTimings,
     measureTraceByTraceId: new Map(measureTraceByTraceId),
   };
 }
