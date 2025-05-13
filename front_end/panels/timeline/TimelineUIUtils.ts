@@ -42,6 +42,7 @@ import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
 import * as Bindings from '../../models/bindings/bindings.js';
+import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as Trace from '../../models/trace/trace.js';
 import * as TraceBounds from '../../services/trace_bounds/trace_bounds.js';
 import * as CodeHighlighter from '../../ui/components/code_highlighter/code_highlighter.js';
@@ -1192,19 +1193,26 @@ export class TimelineUIUtils {
 
     if (Trace.Types.Extensions.isSyntheticExtensionEntry(event)) {
       for (const [key, value] of event.args.properties || []) {
-        // starts with a scheme. scheme can include a hyphen.
-        if (/^[\w-]+:\/\//.test(value)) {
-          const url = value as UrlString;
-          const splitResult = Common.ParsedURL.ParsedURL.splitLineAndColumn(url);
-          if (splitResult) {
-            const {lineNumber, columnNumber} = splitResult;
-            const options = {text: value, lineNumber, columnNumber} as LegacyComponents.Linkifier.LinkifyURLOptions;
-            const linkElement = LegacyComponents.Linkifier.Linkifier.linkifyURL(url, (options));
-            contentHelper.appendElementRow(key, linkElement);
-            continue;
+        const {tokenizerRegexes, tokenizerTypes} = getOrCreateTokenizers();
+        const results = TextUtils.TextUtils.Utils.splitStringByRegexes(value, tokenizerRegexes);
+        const tokens = results.map(result => ({text: result.value, type: tokenizerTypes[result.regexIndex]}));
+        const linkifiedTokens = tokens.map(token => {
+          // starts with a scheme. scheme can include a hyphen.
+          if (token.type === 'url' && /^[\w-]+:\/\//.test(token.text)) {
+            const url = token.text as UrlString;
+            const splitResult = Common.ParsedURL.ParsedURL.splitLineAndColumn(url);
+            if (splitResult) {
+              const {lineNumber, columnNumber} = splitResult;
+              const options = {text: url, lineNumber, columnNumber} as LegacyComponents.Linkifier.LinkifyURLOptions;
+              const linkElement = LegacyComponents.Linkifier.Linkifier.linkifyURL(url, (options));
+              return linkElement;
+            }
           }
-        }
-        contentHelper.appendTextRow(key, value);
+          return token.text;
+        });
+        const frag = document.createDocumentFragment();
+        frag.append(...linkifiedTokens);
+        contentHelper.appendElementRow(key, frag);
       }
     }
 
@@ -2688,4 +2696,37 @@ function getEventSelfTime(
       parsedTrace.Renderer.entryToNode;
   const selfTime = mapToUse.get(event)?.selfTime;
   return selfTime ? selfTime : Trace.Types.Timing.Micro(0);
+}
+
+// lifted from ConsoleViewMessage
+let tokenizerRegexes: RegExp[]|null = null;
+let tokenizerTypes: string[]|null = null;
+
+function getOrCreateTokenizers(): {
+  tokenizerRegexes: RegExp[],
+  tokenizerTypes: string[],
+} {
+  if (!tokenizerRegexes || !tokenizerTypes) {
+    const controlCodes = '\\u0000-\\u0020\\u007f-\\u009f';
+    const linkStringRegex = new RegExp(
+        '(?:[a-zA-Z][a-zA-Z0-9+.-]{2,}:\\/\\/|data:|www\\.)[^\\s' + controlCodes + '"]{2,}[^\\s' + controlCodes +
+            '"\')}\\],:;.!?]',
+        'u');
+    const pathLineRegex = /(?:\/[\w\.-]*)+\:[\d]+/;
+    const timeRegex = /took [\d]+ms/;
+    const eventRegex = /'\w+' event/;
+    const milestoneRegex = /\sM[6-7]\d/;
+    const autofillRegex = /\(suggested: \"[\w-]+\"\)/;
+    const handlers = new Map<RegExp, string>();
+    handlers.set(linkStringRegex, 'url');
+    handlers.set(pathLineRegex, 'url');
+    handlers.set(timeRegex, 'time');
+    handlers.set(eventRegex, 'event');
+    handlers.set(milestoneRegex, 'milestone');
+    handlers.set(autofillRegex, 'autofill');
+    tokenizerRegexes = Array.from(handlers.keys());
+    tokenizerTypes = Array.from(handlers.values());
+    return {tokenizerRegexes, tokenizerTypes};
+  }
+  return {tokenizerRegexes, tokenizerTypes};
 }
