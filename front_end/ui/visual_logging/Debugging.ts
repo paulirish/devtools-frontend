@@ -390,9 +390,9 @@ const veDebugEventsLog: Array<IntuitiveLogEntry|AdHocAnalysisLogEntry|TestLogEnt
 
 function maybeLogDebugEvent(entry: IntuitiveLogEntry|AdHocAnalysisLogEntry|TestLogEntry): void {
   const format = localStorage.getItem('veDebugLoggingEnabled');
-  if (!format) {
-    return;
-  }
+  // if (!format) {
+  //   return;
+  // }
   veDebugEventsLog.push(entry);
   if (format === DebugLoggingFormat.INTUITIVE) {
     const obj = entry as EventData;
@@ -429,7 +429,7 @@ function logEventTree(eventData: EventData, indent = '', isLast = true): void {
   const marker = isLast ? '└─' : '├─';
   const mainText = [context, ve, event.replace('Impression', '')].map(x => x || '').filter(Boolean).join(' | ')
   const line = `${indent}${marker} ${mainText}`;
-  console.debug(line, {obj: eventData});
+  console.log(line, {obj: eventData});
 
   if (eventData.children) {
     const childrenCount = eventData.children.length;
