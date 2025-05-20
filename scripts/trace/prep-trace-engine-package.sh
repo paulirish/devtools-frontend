@@ -48,9 +48,12 @@ for p in Path('$dist/models/trace/insights').rglob('*.js'):
     needle = 'i18n.ByteUtilities.bytesToString'
     content = content.replace(needle, '(bytes => ({__i18nBytes: bytes}))')
 
+    needle = 'i18n.TimeUtilities.millisToString'
+    content = content.replace(needle, '(bytes => ({__i18nMillis: bytes}))')
+
     p.write_text(content)
 
-for p in Path('$dist/models').rglob('*.d.ts'):
+for p in Path('$dist').rglob('*.d.ts'):
     content = p.read_text()
 
     needle = 'import type * as Common'
@@ -88,6 +91,9 @@ for p in Path('$dist/models').rglob('*.d.ts'):
 
     needle = 'anyV3'
     content = content.replace(needle, 'any')
+
+    needle = 'CSSInJS'
+    content = content.replace(needle, 'string')
 
     p.write_text(content)
 "

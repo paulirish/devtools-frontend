@@ -12,13 +12,13 @@ import {data as metaHandlerData, type MetaHandlerData} from './MetaHandler.js';
 import {data as networkRequestsHandlerData} from './NetworkRequestsHandler.js';
 import type {HandlerName} from './types.js';
 
-function completeURL(base: string, url: string): string|null {
+function completeURL(base: string, url: string): Platform.DevToolsPath.UrlString|null {
   if (url.startsWith('data:') || url.startsWith('blob:') || url.startsWith('javascript:') || url.startsWith('mailto:')) {
-    return url;
+    return url as Platform.DevToolsPath.UrlString;
   }
 
   try {
-    return new URL(url, base).href;
+    return new URL(url, base).href as Platform.DevToolsPath.UrlString;
   } catch {}
 
   return null;
