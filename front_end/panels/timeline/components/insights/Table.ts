@@ -6,7 +6,6 @@
 import * as i18n from '../../../../core/i18n/i18n.js';
 import type * as Trace from '../../../../models/trace/trace.js';
 import * as ComponentHelpers from '../../../../ui/components/helpers/helpers.js';
-import * as UI from '../../../../ui/legacy/legacy.js';
 import * as Lit from '../../../../ui/lit/lit.js';
 import type * as Overlays from '../../overlays/overlays.js';
 
@@ -105,6 +104,7 @@ export class Table extends HTMLElement {
   #rows?: TableDataRow[];
   /** All rows/subRows, in the order that they appear visually. This is the result of traversing `#rows` and any subRows found. */
   #flattenedRows?: TableDataRow[];
+  #rowToParentRow = new Map<TableDataRow, TableDataRow>();
   #interactive = false;
   #currentHoverIndex: number|null = null;
 
@@ -114,17 +114,19 @@ export class Table extends HTMLElement {
     this.#headers = data.headers;
     this.#rows = data.rows;
     // If this table isn't interactive, don't attach mouse listeners or use CSS :hover.
-    this.#interactive = this.#rows.some(row => row.overlays);
+    this.#interactive = this.#rows.some(row => row.overlays || row.subRows?.length);
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
   connectedCallback(): void {
-    UI.UIUtils.injectCoreStyles(this.#shadow);
-
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
   #onHoverRow(e: MouseEvent): void {
+    if (!this.#flattenedRows) {
+      return;
+    }
+
     if (!(e.target instanceof HTMLElement)) {
       return;
     }
@@ -134,9 +136,23 @@ export class Table extends HTMLElement {
       return;
     }
 
-    const index = [...rowEl.parentElement.children].indexOf(rowEl);
-    if (index === -1 || index === this.#currentHoverIndex) {
+    const rowEls = [...rowEl.parentElement.children];
+    const index = rowEl.sectionRowIndex;
+    if (index === this.#currentHoverIndex) {
       return;
+    }
+
+    for (const el of rowEl.parentElement.querySelectorAll('.hover')) {
+      el.classList.remove('hover');
+    }
+
+    // Add 'hover' class to all parent rows.
+    let row: TableDataRow|undefined = this.#rowToParentRow.get(this.#flattenedRows[index]);
+    while (row) {
+      const index = this.#flattenedRows.indexOf(row);
+      const rowEl = rowEls[index];
+      rowEl.classList.add('hover');
+      row = this.#rowToParentRow.get(row);
     }
 
     this.#currentHoverIndex = index;
@@ -172,6 +188,10 @@ export class Table extends HTMLElement {
   }
 
   #onMouseLeave(): void {
+    for (const el of this.shadowRoot?.querySelectorAll('.hover') ?? []) {
+      el.classList.remove('hover');
+    }
+
     this.#currentHoverIndex = null;
     // Unselect the row, unless it's sticky.
     this.#onSelectedRowChanged(null, null);
@@ -215,13 +235,27 @@ export class Table extends HTMLElement {
       return;
     }
 
+    const rowToParentRow = this.#rowToParentRow;
+    rowToParentRow.clear();
+
     const numColumns = this.#headers.length;
     const flattenedRows: TableDataRow[] = [];
     const rowEls: Lit.TemplateResult[] = [];
-    function traverse(row: TableDataRow, depth = 0): void {
+    function traverse(parent: TableDataRow|null, row: TableDataRow, depth = 0): void {
+      if (parent) {
+        rowToParentRow.set(row, parent);
+      }
+
       const thStyles = Lit.Directives.styleMap({
         paddingLeft: `calc(${depth} * var(--sys-size-5))`,
-        borderLeft: depth ? 'var(--sys-size-1) solid var(--sys-color-divider)' : '',
+        backgroundImage: `repeating-linear-gradient(
+              to right,
+              var(--sys-color-tonal-outline) 0 var(--sys-size-1),
+              transparent var(--sys-size-1) var(--sys-size-5)
+            )`,
+        backgroundPosition: '0 0',
+        backgroundRepeat: 'no-repeat',
+        backgroundSize: `calc(${depth} * var(--sys-size-5))`,
       });
       const trStyles = Lit.Directives.styleMap({
         color: depth ? 'var(--sys-color-on-surface-subtle)' : '',
@@ -238,17 +272,18 @@ export class Table extends HTMLElement {
       flattenedRows.push(row);
 
       for (const subRow of row.subRows ?? []) {
-        traverse(subRow, depth + 1);
+        traverse(row, subRow, depth + 1);
       }
     }
+
     for (const row of this.#rows) {
-      traverse(row);
+      traverse(null, row);
     }
 
     this.#flattenedRows = flattenedRows;
 
     Lit.render(
-        html`<style>${tableStyles.cssText}</style>
+        html`<style>${tableStyles}</style>
       <table
           class=${Lit.Directives.classMap({
           interactive: this.#interactive,

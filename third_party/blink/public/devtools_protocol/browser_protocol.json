@@ -2060,6 +2060,31 @@
                     ]
                 },
                 {
+                    "id": "UserReidentificationIssueType",
+                    "type": "string",
+                    "enum": [
+                        "BlockedFrameNavigation",
+                        "BlockedSubresource"
+                    ]
+                },
+                {
+                    "id": "UserReidentificationIssueDetails",
+                    "description": "This issue warns about uses of APIs that may be considered misuse to\nre-identify users.",
+                    "type": "object",
+                    "properties": [
+                        {
+                            "name": "type",
+                            "$ref": "UserReidentificationIssueType"
+                        },
+                        {
+                            "name": "request",
+                            "description": "Applies to BlockedFrameNavigation and BlockedSubresource issue types.",
+                            "optional": true,
+                            "$ref": "AffectedRequest"
+                        }
+                    ]
+                },
+                {
                     "id": "InspectorIssueCode",
                     "description": "A unique identifier for the type of issue. Each type may use one of the\noptional fields in InspectorIssueDetails to convey more specific\ninformation about the kind of issue.",
                     "type": "string",
@@ -2087,7 +2112,8 @@
                         "PropertyRuleIssue",
                         "SharedDictionaryIssue",
                         "SelectElementAccessibilityIssue",
-                        "SRIMessageSignatureIssue"
+                        "SRIMessageSignatureIssue",
+                        "UserReidentificationIssue"
                     ]
                 },
                 {
@@ -2215,6 +2241,11 @@
                             "name": "sriMessageSignatureIssueDetails",
                             "optional": true,
                             "$ref": "SRIMessageSignatureIssueDetails"
+                        },
+                        {
+                            "name": "userReidentificationIssueDetails",
+                            "optional": true,
+                            "$ref": "UserReidentificationIssueDetails"
                         }
                     ]
                 },
@@ -10231,7 +10262,7 @@
                 },
                 {
                     "name": "setPressureStateOverride",
-                    "description": "Provides a given pressure state that will be processed and eventually be\ndelivered to PressureObserver users. |source| must have been previously\noverridden by setPressureSourceOverrideEnabled.",
+                    "description": "TODO: OBSOLETE: To remove when setPressureDataOverride is merged.\nProvides a given pressure state that will be processed and eventually be\ndelivered to PressureObserver users. |source| must have been previously\noverridden by setPressureSourceOverrideEnabled.",
                     "experimental": true,
                     "parameters": [
                         {
@@ -10241,6 +10272,26 @@
                         {
                             "name": "state",
                             "$ref": "PressureState"
+                        }
+                    ]
+                },
+                {
+                    "name": "setPressureDataOverride",
+                    "description": "Provides a given pressure data set that will be processed and eventually be\ndelivered to PressureObserver users. |source| must have been previously\noverridden by setPressureSourceOverrideEnabled.",
+                    "experimental": true,
+                    "parameters": [
+                        {
+                            "name": "source",
+                            "$ref": "PressureSource"
+                        },
+                        {
+                            "name": "state",
+                            "$ref": "PressureState"
+                        },
+                        {
+                            "name": "ownContributionEstimate",
+                            "optional": true,
+                            "type": "number"
                         }
                     ]
                 },
@@ -12909,6 +12960,7 @@
                         "Ping",
                         "CSPViolationReport",
                         "Preflight",
+                        "FedCM",
                         "Other"
                     ]
                 },
@@ -13413,6 +13465,7 @@
                         "mixed-content",
                         "origin",
                         "inspector",
+                        "integrity",
                         "subresource-filter",
                         "content-type",
                         "coep-frame-resource-needs-coep-header",
@@ -14586,6 +14639,75 @@
                     ]
                 },
                 {
+                    "id": "DirectUDPSocketOptions",
+                    "experimental": true,
+                    "type": "object",
+                    "properties": [
+                        {
+                            "name": "remoteAddr",
+                            "optional": true,
+                            "type": "string"
+                        },
+                        {
+                            "name": "remotePort",
+                            "description": "Unsigned int 16.",
+                            "optional": true,
+                            "type": "integer"
+                        },
+                        {
+                            "name": "localAddr",
+                            "optional": true,
+                            "type": "string"
+                        },
+                        {
+                            "name": "localPort",
+                            "description": "Unsigned int 16.",
+                            "optional": true,
+                            "type": "integer"
+                        },
+                        {
+                            "name": "dnsQueryType",
+                            "optional": true,
+                            "$ref": "DirectSocketDnsQueryType"
+                        },
+                        {
+                            "name": "sendBufferSize",
+                            "description": "Expected to be unsigned integer.",
+                            "optional": true,
+                            "type": "number"
+                        },
+                        {
+                            "name": "receiveBufferSize",
+                            "description": "Expected to be unsigned integer.",
+                            "optional": true,
+                            "type": "number"
+                        }
+                    ]
+                },
+                {
+                    "id": "DirectUDPMessage",
+                    "experimental": true,
+                    "type": "object",
+                    "properties": [
+                        {
+                            "name": "data",
+                            "type": "binary"
+                        },
+                        {
+                            "name": "remoteAddr",
+                            "description": "Null for connected mode.",
+                            "optional": true,
+                            "type": "string"
+                        },
+                        {
+                            "name": "remotePort",
+                            "description": "Null for connected mode.\nExpected to be unsigned integer.",
+                            "optional": true,
+                            "type": "integer"
+                        }
+                    ]
+                },
+                {
                     "id": "PrivateNetworkRequestPolicy",
                     "experimental": true,
                     "type": "string",
@@ -15144,6 +15266,13 @@
                             "description": "Longest post body size (in bytes) that would be included in requestWillBeSent notification",
                             "optional": true,
                             "type": "integer"
+                        },
+                        {
+                            "name": "reportDirectSocketTraffic",
+                            "description": "Whether DirectSocket chunk send/receive events should be reported.",
+                            "experimental": true,
+                            "optional": true,
+                            "type": "boolean"
                         }
                     ]
                 },
@@ -15644,7 +15773,7 @@
                 },
                 {
                     "name": "setCookieControls",
-                    "description": "Sets Controls for third-party cookie access\nPage reload is required before the new cookie bahavior will be observed",
+                    "description": "Sets Controls for third-party cookie access\nPage reload is required before the new cookie behavior will be observed",
                     "experimental": true,
                     "parameters": [
                         {
@@ -16381,8 +16510,67 @@
                     ]
                 },
                 {
-                    "name": "directTCPSocketChunkError",
-                    "description": "Fired when there is an error\nwhen writing to tcp direct socket stream.\nFor example, if user writes illegal type like string\ninstead of ArrayBuffer or ArrayBufferView.\nThere's no reporting for reading, because\nwe cannot know errors on the other side.",
+                    "name": "directUDPSocketCreated",
+                    "description": "Fired upon direct_socket.UDPSocket creation.",
+                    "experimental": true,
+                    "parameters": [
+                        {
+                            "name": "identifier",
+                            "$ref": "RequestId"
+                        },
+                        {
+                            "name": "options",
+                            "$ref": "DirectUDPSocketOptions"
+                        },
+                        {
+                            "name": "timestamp",
+                            "$ref": "MonotonicTime"
+                        },
+                        {
+                            "name": "initiator",
+                            "optional": true,
+                            "$ref": "Initiator"
+                        }
+                    ]
+                },
+                {
+                    "name": "directUDPSocketOpened",
+                    "description": "Fired when direct_socket.UDPSocket connection is opened.",
+                    "experimental": true,
+                    "parameters": [
+                        {
+                            "name": "identifier",
+                            "$ref": "RequestId"
+                        },
+                        {
+                            "name": "localAddr",
+                            "type": "string"
+                        },
+                        {
+                            "name": "localPort",
+                            "description": "Expected to be unsigned integer.",
+                            "type": "integer"
+                        },
+                        {
+                            "name": "timestamp",
+                            "$ref": "MonotonicTime"
+                        },
+                        {
+                            "name": "remoteAddr",
+                            "optional": true,
+                            "type": "string"
+                        },
+                        {
+                            "name": "remotePort",
+                            "description": "Expected to be unsigned integer.",
+                            "optional": true,
+                            "type": "integer"
+                        }
+                    ]
+                },
+                {
+                    "name": "directUDPSocketAborted",
+                    "description": "Fired when direct_socket.UDPSocket is aborted.",
                     "experimental": true,
                     "parameters": [
                         {
@@ -16392,6 +16580,59 @@
                         {
                             "name": "errorMessage",
                             "type": "string"
+                        },
+                        {
+                            "name": "timestamp",
+                            "$ref": "MonotonicTime"
+                        }
+                    ]
+                },
+                {
+                    "name": "directUDPSocketClosed",
+                    "description": "Fired when direct_socket.UDPSocket is closed.",
+                    "experimental": true,
+                    "parameters": [
+                        {
+                            "name": "identifier",
+                            "$ref": "RequestId"
+                        },
+                        {
+                            "name": "timestamp",
+                            "$ref": "MonotonicTime"
+                        }
+                    ]
+                },
+                {
+                    "name": "directUDPSocketChunkSent",
+                    "description": "Fired when message is sent to udp direct socket stream.",
+                    "experimental": true,
+                    "parameters": [
+                        {
+                            "name": "identifier",
+                            "$ref": "RequestId"
+                        },
+                        {
+                            "name": "message",
+                            "$ref": "DirectUDPMessage"
+                        },
+                        {
+                            "name": "timestamp",
+                            "$ref": "MonotonicTime"
+                        }
+                    ]
+                },
+                {
+                    "name": "directUDPSocketChunkReceived",
+                    "description": "Fired when message is received from udp direct socket stream.",
+                    "experimental": true,
+                    "parameters": [
+                        {
+                            "name": "identifier",
+                            "$ref": "RequestId"
+                        },
+                        {
+                            "name": "message",
+                            "$ref": "DirectUDPMessage"
                         },
                         {
                             "name": "timestamp",
@@ -17951,7 +18192,7 @@
                 },
                 {
                     "id": "PermissionsPolicyFeature",
-                    "description": "All Permissions Policy features. This enum should match the one defined\nin services/network/public/cpp/permissions_policy/permissions_policy_features.json5.",
+                    "description": "All Permissions Policy features. This enum should match the one defined\nin services/network/public/cpp/permissions_policy/permissions_policy_features.json5.\nLINT_SKIP.IfChange(PermissionsPolicyFeature)",
                     "experimental": true,
                     "type": "string",
                     "enum": [
@@ -18019,10 +18260,12 @@
                         "keyboard-map",
                         "language-detector",
                         "local-fonts",
+                        "local-network-access",
                         "magnetometer",
                         "media-playback-while-not-visible",
                         "microphone",
                         "midi",
+                        "on-device-speech-recognition",
                         "otp-credentials",
                         "payment",
                         "picture-in-picture",
@@ -18032,6 +18275,7 @@
                         "private-state-token-redemption",
                         "publickey-credentials-create",
                         "publickey-credentials-get",
+                        "record-ad-auction-events",
                         "rewriter",
                         "run-ad-auction",
                         "screen-wake-lock",
@@ -22832,25 +23076,6 @@
                     ]
                 },
                 {
-                    "id": "AttributionReportingTriggerSpec",
-                    "experimental": true,
-                    "type": "object",
-                    "properties": [
-                        {
-                            "name": "triggerData",
-                            "description": "number instead of integer because not all uint32 can be represented by\nint",
-                            "type": "array",
-                            "items": {
-                                "type": "number"
-                            }
-                        },
-                        {
-                            "name": "eventReportWindows",
-                            "$ref": "AttributionReportingEventReportWindows"
-                        }
-                    ]
-                },
-                {
                     "id": "AttributionReportingTriggerDataMatching",
                     "experimental": true,
                     "type": "string",
@@ -22964,11 +23189,16 @@
                             "type": "integer"
                         },
                         {
-                            "name": "triggerSpecs",
+                            "name": "triggerData",
+                            "description": "number instead of integer because not all uint32 can be represented by\nint",
                             "type": "array",
                             "items": {
-                                "$ref": "AttributionReportingTriggerSpec"
+                                "type": "number"
                             }
+                        },
+                        {
+                            "name": "eventReportWindows",
+                            "$ref": "AttributionReportingEventReportWindows"
                         },
                         {
                             "name": "aggregatableReportWindow",
@@ -23337,6 +23567,17 @@
                         "deduplicated",
                         "reportWindowPassed",
                         "excessiveReports"
+                    ]
+                },
+                {
+                    "id": "AttributionReportingReportResult",
+                    "experimental": true,
+                    "type": "string",
+                    "enum": [
+                        "sent",
+                        "prohibited",
+                        "failedToAssemble",
+                        "expired"
                     ]
                 },
                 {
@@ -24228,6 +24469,40 @@
                         {
                             "name": "aggregatable",
                             "$ref": "AttributionReportingAggregatableResult"
+                        }
+                    ]
+                },
+                {
+                    "name": "attributionReportingReportSent",
+                    "experimental": true,
+                    "parameters": [
+                        {
+                            "name": "url",
+                            "type": "string"
+                        },
+                        {
+                            "name": "body",
+                            "type": "object"
+                        },
+                        {
+                            "name": "result",
+                            "$ref": "AttributionReportingReportResult"
+                        },
+                        {
+                            "name": "netError",
+                            "description": "If result is `sent`, populated with net/HTTP status.",
+                            "optional": true,
+                            "type": "integer"
+                        },
+                        {
+                            "name": "netErrorName",
+                            "optional": true,
+                            "type": "string"
+                        },
+                        {
+                            "name": "httpStatusCode",
+                            "optional": true,
+                            "type": "integer"
                         }
                     ]
                 }
@@ -27397,7 +27672,6 @@
                         "InvalidSchemeRedirect",
                         "InvalidSchemeNavigation",
                         "NavigationRequestBlockedByCsp",
-                        "MainFrameNavigation",
                         "MojoBinderPolicy",
                         "RendererProcessCrashed",
                         "RendererProcessKilled",
@@ -28116,6 +28390,36 @@
                     ]
                 },
                 {
+                    "id": "CharacteristicWriteType",
+                    "description": "Indicates the various types of characteristic write.",
+                    "type": "string",
+                    "enum": [
+                        "write-default-deprecated",
+                        "write-with-response",
+                        "write-without-response"
+                    ]
+                },
+                {
+                    "id": "CharacteristicOperationType",
+                    "description": "Indicates the various types of characteristic operation.",
+                    "type": "string",
+                    "enum": [
+                        "read",
+                        "write",
+                        "subscribe-to-notifications",
+                        "unsubscribe-from-notifications"
+                    ]
+                },
+                {
+                    "id": "DescriptorOperationType",
+                    "description": "Indicates the various types of descriptor operation.",
+                    "type": "string",
+                    "enum": [
+                        "read",
+                        "write"
+                    ]
+                },
+                {
                     "id": "ManufacturerData",
                     "description": "Stores the manufacturer data",
                     "type": "object",
@@ -28329,6 +28633,52 @@
                     ]
                 },
                 {
+                    "name": "simulateCharacteristicOperationResponse",
+                    "description": "Simulates the response from the characteristic with |characteristicId| for a\ncharacteristic operation of |type|. The |code| value follows the Error\nCodes from Bluetooth Core Specification Vol 3 Part F 3.4.1.1 Error Response.\nThe |data| is expected to exist when simulating a successful read operation\nresponse.",
+                    "parameters": [
+                        {
+                            "name": "characteristicId",
+                            "type": "string"
+                        },
+                        {
+                            "name": "type",
+                            "$ref": "CharacteristicOperationType"
+                        },
+                        {
+                            "name": "code",
+                            "type": "integer"
+                        },
+                        {
+                            "name": "data",
+                            "optional": true,
+                            "type": "binary"
+                        }
+                    ]
+                },
+                {
+                    "name": "simulateDescriptorOperationResponse",
+                    "description": "Simulates the response from the descriptor with |descriptorId| for a\ndescriptor operation of |type|. The |code| value follows the Error\nCodes from Bluetooth Core Specification Vol 3 Part F 3.4.1.1 Error Response.\nThe |data| is expected to exist when simulating a successful read operation\nresponse.",
+                    "parameters": [
+                        {
+                            "name": "descriptorId",
+                            "type": "string"
+                        },
+                        {
+                            "name": "type",
+                            "$ref": "DescriptorOperationType"
+                        },
+                        {
+                            "name": "code",
+                            "type": "integer"
+                        },
+                        {
+                            "name": "data",
+                            "optional": true,
+                            "type": "binary"
+                        }
+                    ]
+                },
+                {
                     "name": "addService",
                     "description": "Adds a service with |serviceUuid| to the peripheral with |address|.",
                     "parameters": [
@@ -28424,6 +28774,16 @@
                             "type": "string"
                         }
                     ]
+                },
+                {
+                    "name": "simulateGATTDisconnection",
+                    "description": "Simulates a GATT disconnection from the peripheral with |address|.",
+                    "parameters": [
+                        {
+                            "name": "address",
+                            "type": "string"
+                        }
+                    ]
                 }
             ],
             "events": [
@@ -28438,6 +28798,49 @@
                         {
                             "name": "type",
                             "$ref": "GATTOperationType"
+                        }
+                    ]
+                },
+                {
+                    "name": "characteristicOperationReceived",
+                    "description": "Event for when a characteristic operation of |type| to the characteristic\nrespresented by |characteristicId| happened. |data| and |writeType| is\nexpected to exist when |type| is write.",
+                    "parameters": [
+                        {
+                            "name": "characteristicId",
+                            "type": "string"
+                        },
+                        {
+                            "name": "type",
+                            "$ref": "CharacteristicOperationType"
+                        },
+                        {
+                            "name": "data",
+                            "optional": true,
+                            "type": "binary"
+                        },
+                        {
+                            "name": "writeType",
+                            "optional": true,
+                            "$ref": "CharacteristicWriteType"
+                        }
+                    ]
+                },
+                {
+                    "name": "descriptorOperationReceived",
+                    "description": "Event for when a descriptor operation of |type| to the descriptor\nrespresented by |descriptorId| happened. |data| is expected to exist when\n|type| is write.",
+                    "parameters": [
+                        {
+                            "name": "descriptorId",
+                            "type": "string"
+                        },
+                        {
+                            "name": "type",
+                            "$ref": "DescriptorOperationType"
+                        },
+                        {
+                            "name": "data",
+                            "optional": true,
+                            "type": "binary"
                         }
                     ]
                 }
@@ -29770,7 +30173,7 @@
                         },
                         {
                             "name": "buildId",
-                            "description": "For Wasm modules, the content of the `build_id` custom section.",
+                            "description": "For Wasm modules, the content of the `build_id` custom section. For JavaScript the `debugId` magic comment.",
                             "type": "string"
                         },
                         {
@@ -29879,7 +30282,7 @@
                         },
                         {
                             "name": "buildId",
-                            "description": "For Wasm modules, the content of the `build_id` custom section.",
+                            "description": "For Wasm modules, the content of the `build_id` custom section. For JavaScript the `debugId` magic comment.",
                             "type": "string"
                         },
                         {

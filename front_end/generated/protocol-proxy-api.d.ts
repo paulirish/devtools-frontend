@@ -1609,11 +1609,19 @@ declare namespace ProtocolProxyApi {
     invoke_setPressureSourceOverrideEnabled(params: Protocol.Emulation.SetPressureSourceOverrideEnabledRequest): Promise<Protocol.ProtocolResponseWithError>;
 
     /**
+     * TODO: OBSOLETE: To remove when setPressureDataOverride is merged.
      * Provides a given pressure state that will be processed and eventually be
      * delivered to PressureObserver users. |source| must have been previously
      * overridden by setPressureSourceOverrideEnabled.
      */
     invoke_setPressureStateOverride(params: Protocol.Emulation.SetPressureStateOverrideRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Provides a given pressure data set that will be processed and eventually be
+     * delivered to PressureObserver users. |source| must have been previously
+     * overridden by setPressureSourceOverrideEnabled.
+     */
+    invoke_setPressureDataOverride(params: Protocol.Emulation.SetPressureDataOverrideRequest): Promise<Protocol.ProtocolResponseWithError>;
 
     /**
      * Overrides the Idle state.
@@ -2255,7 +2263,7 @@ declare namespace ProtocolProxyApi {
 
     /**
      * Sets Controls for third-party cookie access
-     * Page reload is required before the new cookie bahavior will be observed
+     * Page reload is required before the new cookie behavior will be observed
      */
     invoke_setCookieControls(params: Protocol.Network.SetCookieControlsRequest): Promise<Protocol.ProtocolResponseWithError>;
 
@@ -2394,14 +2402,34 @@ declare namespace ProtocolProxyApi {
     directTCPSocketChunkReceived(params: Protocol.Network.DirectTCPSocketChunkReceivedEvent): void;
 
     /**
-     * Fired when there is an error
-     * when writing to tcp direct socket stream.
-     * For example, if user writes illegal type like string
-     * instead of ArrayBuffer or ArrayBufferView.
-     * There's no reporting for reading, because
-     * we cannot know errors on the other side.
+     * Fired upon direct_socket.UDPSocket creation.
      */
-    directTCPSocketChunkError(params: Protocol.Network.DirectTCPSocketChunkErrorEvent): void;
+    directUDPSocketCreated(params: Protocol.Network.DirectUDPSocketCreatedEvent): void;
+
+    /**
+     * Fired when direct_socket.UDPSocket connection is opened.
+     */
+    directUDPSocketOpened(params: Protocol.Network.DirectUDPSocketOpenedEvent): void;
+
+    /**
+     * Fired when direct_socket.UDPSocket is aborted.
+     */
+    directUDPSocketAborted(params: Protocol.Network.DirectUDPSocketAbortedEvent): void;
+
+    /**
+     * Fired when direct_socket.UDPSocket is closed.
+     */
+    directUDPSocketClosed(params: Protocol.Network.DirectUDPSocketClosedEvent): void;
+
+    /**
+     * Fired when message is sent to udp direct socket stream.
+     */
+    directUDPSocketChunkSent(params: Protocol.Network.DirectUDPSocketChunkSentEvent): void;
+
+    /**
+     * Fired when message is received from udp direct socket stream.
+     */
+    directUDPSocketChunkReceived(params: Protocol.Network.DirectUDPSocketChunkReceivedEvent): void;
 
     /**
      * Fired when additional information about a requestWillBeSent event is available from the
@@ -3492,6 +3520,8 @@ declare namespace ProtocolProxyApi {
 
     attributionReportingTriggerRegistered(params: Protocol.Storage.AttributionReportingTriggerRegisteredEvent): void;
 
+    attributionReportingReportSent(params: Protocol.Storage.AttributionReportingReportSentEvent): void;
+
   }
 
   export interface SystemInfoApi {
@@ -4255,6 +4285,24 @@ declare namespace ProtocolProxyApi {
     invoke_simulateGATTOperationResponse(params: Protocol.BluetoothEmulation.SimulateGATTOperationResponseRequest): Promise<Protocol.ProtocolResponseWithError>;
 
     /**
+     * Simulates the response from the characteristic with |characteristicId| for a
+     * characteristic operation of |type|. The |code| value follows the Error
+     * Codes from Bluetooth Core Specification Vol 3 Part F 3.4.1.1 Error Response.
+     * The |data| is expected to exist when simulating a successful read operation
+     * response.
+     */
+    invoke_simulateCharacteristicOperationResponse(params: Protocol.BluetoothEmulation.SimulateCharacteristicOperationResponseRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
+     * Simulates the response from the descriptor with |descriptorId| for a
+     * descriptor operation of |type|. The |code| value follows the Error
+     * Codes from Bluetooth Core Specification Vol 3 Part F 3.4.1.1 Error Response.
+     * The |data| is expected to exist when simulating a successful read operation
+     * response.
+     */
+    invoke_simulateDescriptorOperationResponse(params: Protocol.BluetoothEmulation.SimulateDescriptorOperationResponseRequest): Promise<Protocol.ProtocolResponseWithError>;
+
+    /**
      * Adds a service with |serviceUuid| to the peripheral with |address|.
      */
     invoke_addService(params: Protocol.BluetoothEmulation.AddServiceRequest): Promise<Protocol.BluetoothEmulation.AddServiceResponse>;
@@ -4287,6 +4335,11 @@ declare namespace ProtocolProxyApi {
      */
     invoke_removeDescriptor(params: Protocol.BluetoothEmulation.RemoveDescriptorRequest): Promise<Protocol.ProtocolResponseWithError>;
 
+    /**
+     * Simulates a GATT disconnection from the peripheral with |address|.
+     */
+    invoke_simulateGATTDisconnection(params: Protocol.BluetoothEmulation.SimulateGATTDisconnectionRequest): Promise<Protocol.ProtocolResponseWithError>;
+
   }
   export interface BluetoothEmulationDispatcher {
     /**
@@ -4294,6 +4347,20 @@ declare namespace ProtocolProxyApi {
      * happened.
      */
     gattOperationReceived(params: Protocol.BluetoothEmulation.GattOperationReceivedEvent): void;
+
+    /**
+     * Event for when a characteristic operation of |type| to the characteristic
+     * respresented by |characteristicId| happened. |data| and |writeType| is
+     * expected to exist when |type| is write.
+     */
+    characteristicOperationReceived(params: Protocol.BluetoothEmulation.CharacteristicOperationReceivedEvent): void;
+
+    /**
+     * Event for when a descriptor operation of |type| to the descriptor
+     * respresented by |descriptorId| happened. |data| is expected to exist when
+     * |type| is write.
+     */
+    descriptorOperationReceived(params: Protocol.BluetoothEmulation.DescriptorOperationReceivedEvent): void;
 
   }
 

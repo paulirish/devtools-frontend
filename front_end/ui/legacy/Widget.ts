@@ -35,7 +35,6 @@ import * as Platform from '../../core/platform/platform.js';
 import * as Lit from '../../ui/lit/lit.js';
 
 import {Constraints, Size} from './Geometry.js';
-import * as ThemeSupport from './theme_support/theme_support.js';
 import {createShadowRootWithCoreStyles} from './UIUtils.js';
 import {XWidget} from './XWidget.js';
 
@@ -52,32 +51,30 @@ function assert(condition: unknown, message: string): void {
   }
 }
 
-interface WidgetConstructor<WidgetT extends Widget&WidgetParams, WidgetParams> {
-  new(element: WidgetElement<WidgetT, WidgetParams>): WidgetT;
-}
+type WidgetConstructor<WidgetT extends Widget> = new (element: WidgetElement<WidgetT>) => WidgetT;
+type WidgetProducer<WidgetT extends Widget> = (element: WidgetElement<WidgetT>) => WidgetT;
+type WidgetFactory<WidgetT extends Widget> = WidgetConstructor<WidgetT>|WidgetProducer<WidgetT>;
+type InferWidgetTFromFactory<F> = F extends WidgetFactory<infer WidgetT>? WidgetT : never;
 
-export class WidgetConfig<WidgetT extends Widget&WidgetParams, WidgetParams> {
-  constructor(readonly widgetClass: WidgetConstructor<WidgetT, WidgetParams>, readonly widgetParams?: WidgetParams) {
+export class WidgetConfig<WidgetT extends Widget> {
+  constructor(readonly widgetClass: WidgetFactory<WidgetT>, readonly widgetParams?: Partial<WidgetT>) {
   }
 }
 
-export function widgetConfig<WidgetT extends Widget&WidgetParams, WidgetParams>(
-    widgetClass: WidgetConstructor<WidgetT, WidgetParams>, widgetParams?: WidgetParams):
+export function widgetConfig<F extends WidgetFactory<Widget>, ParamKeys extends keyof InferWidgetTFromFactory<F>>(
+    widgetClass: F, widgetParams?: Pick<InferWidgetTFromFactory<F>, ParamKeys>&Partial<InferWidgetTFromFactory<F>>):
     // This is a workaround for https://github.com/runem/lit-analyzer/issues/163
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    WidgetConfig<any, any> {
+    WidgetConfig<any> {
   return new WidgetConfig(widgetClass, widgetParams);
 }
 
-export class WidgetElement<WidgetT extends Widget&WidgetParams, WidgetParams = object> extends HTMLElement {
-  #widgetClass?: WidgetConstructor<WidgetT, WidgetParams>;
-  #widgetParams?: WidgetParams;
-  createWidget(): WidgetT {
-    if (!this.#widgetClass) {
-      throw new Error('No widgetClass defined');
-    }
+export class WidgetElement<WidgetT extends Widget> extends HTMLElement {
+  #widgetClass?: WidgetFactory<WidgetT>;
+  #widgetParams?: Partial<WidgetT>;
 
-    const widget = new this.#widgetClass(this);
+  createWidget(): WidgetT {
+    const widget = this.#instantiateWidget();
     if (this.#widgetParams) {
       Object.assign(widget, this.#widgetParams);
     }
@@ -85,7 +82,21 @@ export class WidgetElement<WidgetT extends Widget&WidgetParams, WidgetParams = o
     return widget;
   }
 
-  set widgetConfig(config: WidgetConfig<WidgetT, WidgetParams>) {
+  #instantiateWidget(): WidgetT {
+    if (!this.#widgetClass) {
+      throw new Error('No widgetClass defined');
+    }
+
+    if (Widget.isPrototypeOf(this.#widgetClass)) {
+      const ctor = this.#widgetClass as WidgetConstructor<WidgetT>;
+      return new ctor(this);
+    }
+
+    const factory = this.#widgetClass as WidgetProducer<WidgetT>;
+    return factory(this);
+  }
+
+  set widgetConfig(config: WidgetConfig<WidgetT>) {
     const widget = Widget.get(this);
     if (widget) {
       let needsUpdate = false;
@@ -125,7 +136,7 @@ export class WidgetElement<WidgetT extends Widget&WidgetParams, WidgetParams = o
 
   override insertBefore<T extends Node>(child: T, referenceChild: Node): T {
     if (child instanceof HTMLElement && child.tagName !== 'STYLE') {
-      Widget.getOrCreateWidget(child).show(this, referenceChild);
+      Widget.getOrCreateWidget(child).show(this, referenceChild, true);
       return child;
     }
     return super.insertBefore(child, referenceChild);
@@ -148,6 +159,16 @@ export class WidgetElement<WidgetT extends Widget&WidgetParams, WidgetParams = o
       }
     }
     super.removeChildren();
+  }
+
+  override cloneNode(deep: boolean): Node {
+    const clone = super.cloneNode(deep) as WidgetElement<WidgetT>;
+    if (!this.#widgetClass) {
+      throw new Error('No widgetClass defined');
+    }
+    clone.#widgetClass = this.#widgetClass;
+    clone.#widgetParams = this.#widgetParams;
+    return clone;
   }
 }
 
@@ -602,9 +623,9 @@ export class Widget {
     this.doResize();
   }
 
-  registerRequiredCSS(...cssFiles: Array<{cssText: string}>): void {
+  registerRequiredCSS(...cssFiles: Array<string&{_tag: 'CSS-in-JS'}>): void {
     for (const cssFile of cssFiles) {
-      ThemeSupport.ThemeSupport.instance().appendStyle(this.#shadowRoot ?? this.element, cssFile);
+      Platform.DOMUtilities.appendStyle(this.#shadowRoot ?? this.element, cssFile);
     }
   }
 

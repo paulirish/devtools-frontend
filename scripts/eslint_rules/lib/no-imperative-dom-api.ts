@@ -12,10 +12,13 @@ import {ariaUtils} from './no-imperative-dom-api/aria-utils.ts';
 import {getEnclosingExpression, isIdentifier} from './no-imperative-dom-api/ast.ts';
 import {button} from './no-imperative-dom-api/button.ts';
 import {ClassMember} from './no-imperative-dom-api/class-member.ts';
+import {dataGrid} from './no-imperative-dom-api/data-grid.ts';
 import {domApiDevtoolsExtensions} from './no-imperative-dom-api/dom-api-devtools-extensions.ts';
 import {domApi} from './no-imperative-dom-api/dom-api.ts';
 import {DomFragment} from './no-imperative-dom-api/dom-fragment.ts';
+import {splitWidget} from './no-imperative-dom-api/split-widget.ts';
 import {toolbar} from './no-imperative-dom-api/toolbar.ts';
+import {uiFragment} from './no-imperative-dom-api/ui-fragment.ts';
 import {uiUtils} from './no-imperative-dom-api/ui-utils.ts';
 import {widget} from './no-imperative-dom-api/widget.ts';
 import {createRule} from './utils/ruleCreator.ts';
@@ -66,9 +69,12 @@ export default createRule({
       adorner.create(context),
       ariaUtils.create(context),
       button.create(context),
+      dataGrid.create(context),
       domApi.create(context),
       domApiDevtoolsExtensions.create(context),
+      splitWidget.create(context),
       toolbar.create(context),
+      uiFragment.create(context),
       uiUtils.create(context),
       widget.create(context),
     ];
@@ -99,6 +105,9 @@ export default createRule({
           isPropertyAccess && grandParent?.type === 'AssignmentExpression' && grandParent.left === parent;
       const propertyValue = isPropertyAssignment ? grandParent.right : null;
       const isMethodCall = isPropertyAccess && grandParent?.type === 'CallExpression' && grandParent.callee === parent;
+      if (isPropertyAccess && !isMethodCall && property && isIdentifier(property, 'element')) {
+        return processReference(parent, domFragment);
+      }
       const grandGrandParent = grandParent?.parent;
       const isPropertyMethodCall = isPropertyAccess && grandParent?.type === 'MemberExpression' &&
           grandParent.object === parent && grandGrandParent?.type === 'CallExpression' &&
@@ -152,8 +161,14 @@ export default createRule({
       return false;
     }
 
-    function getRangesToRemove(domFragment: DomFragment): Range[] {
+    function getRangesToRemove(domFragment: DomFragment, keepInitializer = false): Range[] {
       const ranges: Range[] = [];
+      const initializerRange = domFragment.initializer ? getEnclosingExpression(domFragment.initializer)?.range : null;
+
+      if (initializerRange && domFragment.references.every(r => r.processed) && !keepInitializer) {
+        ranges.push(initializerRange);
+      }
+
       for (const reference of domFragment.references) {
         if (!reference.processed) {
           continue;
@@ -163,20 +178,23 @@ export default createRule({
           continue;
         }
         ranges.push(range);
-        for (const child of domFragment.children) {
-          ranges.push(...getRangesToRemove(child));
-        }
       }
-
-      if (domFragment.initializer && domFragment.references.every(r => r.processed)) {
-        const range = getEnclosingExpression(domFragment.initializer)?.range;
-        if (range) {
-          ranges.push(range);
-        }
+      for (const child of domFragment.children) {
+        ranges.push(...getRangesToRemove(child));
       }
       for (const range of ranges) {
         while ([' ', '\n'].includes(sourceCode.text[range[0] - 1])) {
           range[0]--;
+        }
+      }
+      if (keepInitializer && initializerRange) {
+        for (const range of ranges) {
+          if (range[0] < initializerRange[1] && range[1] > initializerRange[0]) {
+            range[0] = initializerRange[1];
+          }
+          if (range[1] > initializerRange[0] && range[0] < initializerRange[1]) {
+            range[1] = initializerRange[0];
+          }
         }
       }
       ranges.sort((a, b) => a[0] - b[0]);
@@ -190,38 +208,28 @@ export default createRule({
     }
 
     function maybeReportDomFragment(domFragment: DomFragment): void {
-      const replacementLocation = domFragment.replacementLocation?.parent?.type === 'ExportNamedDeclaration' ?
-          domFragment.replacementLocation.parent :
-          domFragment.replacementLocation;
-      if (!replacementLocation || domFragment.parent || !domFragment.tagName ||
+      if ((!domFragment.initializer && !domFragment.replacer) || domFragment.parent || !domFragment.tagName ||
           domFragment.references.every(r => !r.processed)) {
         return;
       }
       context.report({
-        node: replacementLocation,
+        node: domFragment.initializer ?? domFragment.references[0].node as Node,
         messageId: 'preferTemplateLiterals',
         fix(fixer) {
           const template = 'html`' + domFragment.toTemplateLiteral(sourceCode).join('') + '`';
 
-          if (replacementLocation.type === 'VariableDeclarator' && replacementLocation.init) {
-            domFragment.initializer = undefined;
-            return [
-              fixer.replaceText(replacementLocation.init, template),
+          if (domFragment.replacer) {
+            const result = [
+              domFragment.replacer(fixer, template),
               ...getRangesToRemove(domFragment).map(range => fixer.removeRange(range)),
             ];
+            return result;
           }
-
-          const text = `
-export const DEFAULT_VIEW = (input, _output, target) => {
-  render(${template},
-    target, {host: input});
-};
-
-`;
-          return [
-            fixer.insertTextBefore(replacementLocation, text),
-            ...getRangesToRemove(domFragment).map(range => fixer.removeRange(range)),
+          const result = [
+            fixer.replaceText(domFragment.initializer as Node, template),
+            ...getRangesToRemove(domFragment, true).map(range => fixer.removeRange(range)),
           ];
+          return result;
         }
       });
     }

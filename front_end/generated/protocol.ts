@@ -1402,6 +1402,23 @@ export namespace Audits {
     propertyValue?: string;
   }
 
+  export const enum UserReidentificationIssueType {
+    BlockedFrameNavigation = 'BlockedFrameNavigation',
+    BlockedSubresource = 'BlockedSubresource',
+  }
+
+  /**
+   * This issue warns about uses of APIs that may be considered misuse to
+   * re-identify users.
+   */
+  export interface UserReidentificationIssueDetails {
+    type: UserReidentificationIssueType;
+    /**
+     * Applies to BlockedFrameNavigation and BlockedSubresource issue types.
+     */
+    request?: AffectedRequest;
+  }
+
   /**
    * A unique identifier for the type of issue. Each type may use one of the
    * optional fields in InspectorIssueDetails to convey more specific
@@ -1432,6 +1449,7 @@ export namespace Audits {
     SharedDictionaryIssue = 'SharedDictionaryIssue',
     SelectElementAccessibilityIssue = 'SelectElementAccessibilityIssue',
     SRIMessageSignatureIssue = 'SRIMessageSignatureIssue',
+    UserReidentificationIssue = 'UserReidentificationIssue',
   }
 
   /**
@@ -1464,6 +1482,7 @@ export namespace Audits {
     sharedDictionaryIssueDetails?: SharedDictionaryIssueDetails;
     selectElementAccessibilityIssueDetails?: SelectElementAccessibilityIssueDetails;
     sriMessageSignatureIssueDetails?: SRIMessageSignatureIssueDetails;
+    userReidentificationIssueDetails?: UserReidentificationIssueDetails;
   }
 
   /**
@@ -6678,6 +6697,12 @@ export namespace Emulation {
     state: PressureState;
   }
 
+  export interface SetPressureDataOverrideRequest {
+    source: PressureSource;
+    state: PressureState;
+    ownContributionEstimate?: number;
+  }
+
   export interface SetIdleOverrideRequest {
     /**
      * Mock isUserActive
@@ -8464,6 +8489,7 @@ export namespace Network {
     Ping = 'Ping',
     CSPViolationReport = 'CSPViolationReport',
     Preflight = 'Preflight',
+    FedCM = 'FedCM',
     Other = 'Other',
   }
 
@@ -8873,6 +8899,7 @@ export namespace Network {
     MixedContent = 'mixed-content',
     Origin = 'origin',
     Inspector = 'inspector',
+    Integrity = 'integrity',
     SubresourceFilter = 'subresource-filter',
     ContentType = 'content-type',
     CoepFrameResourceNeedsCoepHeader = 'coep-frame-resource-needs-coep-header',
@@ -9777,6 +9804,41 @@ export namespace Network {
     dnsQueryType?: DirectSocketDnsQueryType;
   }
 
+  export interface DirectUDPSocketOptions {
+    remoteAddr?: string;
+    /**
+     * Unsigned int 16.
+     */
+    remotePort?: integer;
+    localAddr?: string;
+    /**
+     * Unsigned int 16.
+     */
+    localPort?: integer;
+    dnsQueryType?: DirectSocketDnsQueryType;
+    /**
+     * Expected to be unsigned integer.
+     */
+    sendBufferSize?: number;
+    /**
+     * Expected to be unsigned integer.
+     */
+    receiveBufferSize?: number;
+  }
+
+  export interface DirectUDPMessage {
+    data: binary;
+    /**
+     * Null for connected mode.
+     */
+    remoteAddr?: string;
+    /**
+     * Null for connected mode.
+     * Expected to be unsigned integer.
+     */
+    remotePort?: integer;
+  }
+
   export const enum PrivateNetworkRequestPolicy {
     Allow = 'Allow',
     BlockFromInsecureToMorePrivate = 'BlockFromInsecureToMorePrivate',
@@ -10081,6 +10143,10 @@ export namespace Network {
      * Longest post body size (in bytes) that would be included in requestWillBeSent notification
      */
     maxPostDataSize?: integer;
+    /**
+     * Whether DirectSocket chunk send/receive events should be reported.
+     */
+    reportDirectSocketTraffic?: boolean;
   }
 
   export interface GetAllCookiesResponse extends ProtocolResponseWithError {
@@ -10956,16 +11022,65 @@ export namespace Network {
   }
 
   /**
-   * Fired when there is an error
-   * when writing to tcp direct socket stream.
-   * For example, if user writes illegal type like string
-   * instead of ArrayBuffer or ArrayBufferView.
-   * There's no reporting for reading, because
-   * we cannot know errors on the other side.
+   * Fired upon direct_socket.UDPSocket creation.
    */
-  export interface DirectTCPSocketChunkErrorEvent {
+  export interface DirectUDPSocketCreatedEvent {
+    identifier: RequestId;
+    options: DirectUDPSocketOptions;
+    timestamp: MonotonicTime;
+    initiator?: Initiator;
+  }
+
+  /**
+   * Fired when direct_socket.UDPSocket connection is opened.
+   */
+  export interface DirectUDPSocketOpenedEvent {
+    identifier: RequestId;
+    localAddr: string;
+    /**
+     * Expected to be unsigned integer.
+     */
+    localPort: integer;
+    timestamp: MonotonicTime;
+    remoteAddr?: string;
+    /**
+     * Expected to be unsigned integer.
+     */
+    remotePort?: integer;
+  }
+
+  /**
+   * Fired when direct_socket.UDPSocket is aborted.
+   */
+  export interface DirectUDPSocketAbortedEvent {
     identifier: RequestId;
     errorMessage: string;
+    timestamp: MonotonicTime;
+  }
+
+  /**
+   * Fired when direct_socket.UDPSocket is closed.
+   */
+  export interface DirectUDPSocketClosedEvent {
+    identifier: RequestId;
+    timestamp: MonotonicTime;
+  }
+
+  /**
+   * Fired when message is sent to udp direct socket stream.
+   */
+  export interface DirectUDPSocketChunkSentEvent {
+    identifier: RequestId;
+    message: DirectUDPMessage;
+    timestamp: MonotonicTime;
+  }
+
+  /**
+   * Fired when message is received from udp direct socket stream.
+   */
+  export interface DirectUDPSocketChunkReceivedEvent {
+    identifier: RequestId;
+    message: DirectUDPMessage;
     timestamp: MonotonicTime;
   }
 
@@ -12046,6 +12161,7 @@ export namespace Page {
   /**
    * All Permissions Policy features. This enum should match the one defined
    * in services/network/public/cpp/permissions_policy/permissions_policy_features.json5.
+   * LINT_SKIP.IfChange(PermissionsPolicyFeature)
    */
   export const enum PermissionsPolicyFeature {
     Accelerometer = 'accelerometer',
@@ -12112,10 +12228,12 @@ export namespace Page {
     KeyboardMap = 'keyboard-map',
     LanguageDetector = 'language-detector',
     LocalFonts = 'local-fonts',
+    LocalNetworkAccess = 'local-network-access',
     Magnetometer = 'magnetometer',
     MediaPlaybackWhileNotVisible = 'media-playback-while-not-visible',
     Microphone = 'microphone',
     Midi = 'midi',
+    OnDeviceSpeechRecognition = 'on-device-speech-recognition',
     OtpCredentials = 'otp-credentials',
     Payment = 'payment',
     PictureInPicture = 'picture-in-picture',
@@ -12125,6 +12243,7 @@ export namespace Page {
     PrivateStateTokenRedemption = 'private-state-token-redemption',
     PublickeyCredentialsCreate = 'publickey-credentials-create',
     PublickeyCredentialsGet = 'publickey-credentials-get',
+    RecordAdAuctionEvents = 'record-ad-auction-events',
     Rewriter = 'rewriter',
     RunAdAuction = 'run-ad-auction',
     ScreenWakeLock = 'screen-wake-lock',
@@ -15229,15 +15348,6 @@ export namespace Storage {
     ends: integer[];
   }
 
-  export interface AttributionReportingTriggerSpec {
-    /**
-     * number instead of integer because not all uint32 can be represented by
-     * int
-     */
-    triggerData: number[];
-    eventReportWindows: AttributionReportingEventReportWindows;
-  }
-
   export const enum AttributionReportingTriggerDataMatching {
     Exact = 'exact',
     Modulus = 'modulus',
@@ -15285,7 +15395,12 @@ export namespace Storage {
      * duration in seconds
      */
     expiry: integer;
-    triggerSpecs: AttributionReportingTriggerSpec[];
+    /**
+     * number instead of integer because not all uint32 can be represented by
+     * int
+     */
+    triggerData: number[];
+    eventReportWindows: AttributionReportingEventReportWindows;
     /**
      * duration in seconds
      */
@@ -15426,6 +15541,13 @@ export namespace Storage {
     Deduplicated = 'deduplicated',
     ReportWindowPassed = 'reportWindowPassed',
     ExcessiveReports = 'excessiveReports',
+  }
+
+  export const enum AttributionReportingReportResult {
+    Sent = 'sent',
+    Prohibited = 'prohibited',
+    FailedToAssemble = 'failedToAssemble',
+    Expired = 'expired',
   }
 
   /**
@@ -15946,6 +16068,18 @@ export namespace Storage {
     registration: AttributionReportingTriggerRegistration;
     eventLevel: AttributionReportingEventLevelResult;
     aggregatable: AttributionReportingAggregatableResult;
+  }
+
+  export interface AttributionReportingReportSentEvent {
+    url: string;
+    body: any;
+    result: AttributionReportingReportResult;
+    /**
+     * If result is `sent`, populated with net/HTTP status.
+     */
+    netError?: integer;
+    netErrorName?: string;
+    httpStatusCode?: integer;
   }
 }
 
@@ -18030,7 +18164,6 @@ export namespace Preload {
     InvalidSchemeRedirect = 'InvalidSchemeRedirect',
     InvalidSchemeNavigation = 'InvalidSchemeNavigation',
     NavigationRequestBlockedByCsp = 'NavigationRequestBlockedByCsp',
-    MainFrameNavigation = 'MainFrameNavigation',
     MojoBinderPolicy = 'MojoBinderPolicy',
     RendererProcessCrashed = 'RendererProcessCrashed',
     RendererProcessKilled = 'RendererProcessKilled',
@@ -18468,6 +18601,33 @@ export namespace BluetoothEmulation {
   }
 
   /**
+   * Indicates the various types of characteristic write.
+   */
+  export const enum CharacteristicWriteType {
+    WriteDefaultDeprecated = 'write-default-deprecated',
+    WriteWithResponse = 'write-with-response',
+    WriteWithoutResponse = 'write-without-response',
+  }
+
+  /**
+   * Indicates the various types of characteristic operation.
+   */
+  export const enum CharacteristicOperationType {
+    Read = 'read',
+    Write = 'write',
+    SubscribeToNotifications = 'subscribe-to-notifications',
+    UnsubscribeFromNotifications = 'unsubscribe-from-notifications',
+  }
+
+  /**
+   * Indicates the various types of descriptor operation.
+   */
+  export const enum DescriptorOperationType {
+    Read = 'read',
+    Write = 'write',
+  }
+
+  /**
    * Stores the manufacturer data
    */
   export interface ManufacturerData {
@@ -18563,6 +18723,20 @@ export namespace BluetoothEmulation {
     code: integer;
   }
 
+  export interface SimulateCharacteristicOperationResponseRequest {
+    characteristicId: string;
+    type: CharacteristicOperationType;
+    code: integer;
+    data?: binary;
+  }
+
+  export interface SimulateDescriptorOperationResponseRequest {
+    descriptorId: string;
+    type: DescriptorOperationType;
+    code: integer;
+    data?: binary;
+  }
+
   export interface AddServiceRequest {
     address: string;
     serviceUuid: string;
@@ -18612,6 +18786,10 @@ export namespace BluetoothEmulation {
     descriptorId: string;
   }
 
+  export interface SimulateGATTDisconnectionRequest {
+    address: string;
+  }
+
   /**
    * Event for when a GATT operation of |type| to the peripheral with |address|
    * happened.
@@ -18619,6 +18797,29 @@ export namespace BluetoothEmulation {
   export interface GattOperationReceivedEvent {
     address: string;
     type: GATTOperationType;
+  }
+
+  /**
+   * Event for when a characteristic operation of |type| to the characteristic
+   * respresented by |characteristicId| happened. |data| and |writeType| is
+   * expected to exist when |type| is write.
+   */
+  export interface CharacteristicOperationReceivedEvent {
+    characteristicId: string;
+    type: CharacteristicOperationType;
+    data?: binary;
+    writeType?: CharacteristicWriteType;
+  }
+
+  /**
+   * Event for when a descriptor operation of |type| to the descriptor
+   * respresented by |descriptorId| happened. |data| is expected to exist when
+   * |type| is write.
+   */
+  export interface DescriptorOperationReceivedEvent {
+    descriptorId: string;
+    type: DescriptorOperationType;
+    data?: binary;
   }
 }
 
@@ -19475,7 +19676,7 @@ export namespace Debugger {
      */
     hash: string;
     /**
-     * For Wasm modules, the content of the `build_id` custom section.
+     * For Wasm modules, the content of the `build_id` custom section. For JavaScript the `debugId` magic comment.
      */
     buildId: string;
     /**
@@ -19554,7 +19755,7 @@ export namespace Debugger {
      */
     hash: string;
     /**
-     * For Wasm modules, the content of the `build_id` custom section.
+     * For Wasm modules, the content of the `build_id` custom section. For JavaScript the `debugId` magic comment.
      */
     buildId: string;
     /**

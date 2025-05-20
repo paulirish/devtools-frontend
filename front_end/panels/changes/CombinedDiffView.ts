@@ -5,7 +5,6 @@
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
-import * as Platform from '../../core/platform/platform.js';
 import * as Persistence from '../../models/persistence/persistence.js';
 import type * as Workspace from '../../models/workspace/workspace.js';
 import * as WorkspaceDiff from '../../models/workspace_diff/workspace_diff.js';
@@ -40,11 +39,13 @@ const str_ = i18n.i18n.registerUIStrings('panels/changes/CombinedDiffView.ts', U
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 interface SingleDiffViewInput {
+  // `DiffArray` can be empty for the modified files that
+  // do not have any diff. (e.g. the file content transition was A -> B -> A)
+  diff: Diff.Diff.DiffArray;
   fileName: string;
   fileUrl: string;
   mimeType: string;
-  icon: HTMLElement;
-  diff: Diff.Diff.DiffArray;
+  icon: Lit.TemplateResult;
   copied: boolean;
   selectedFileUrl?: string;
   onCopy: (fileUrl: string) => void;
@@ -227,19 +228,15 @@ export class CombinedDiffView extends UI.Widget.Widget {
                                    // `requestDiff` caches the response from the previous `requestDiff` calls if the file did not change
                                    // so we can safely call it here without concerns for performance.
                                    const diffResponse = await this.#workspaceDiff?.requestDiff(modifiedUISourceCode);
-                                   if (!diffResponse || diffResponse.diff.length === 0) {
-                                     return;
-                                   }
-
                                    return {
-                                     diff: diffResponse.diff,
+                                     diff: diffResponse?.diff ?? [],
                                      uiSourceCode: modifiedUISourceCode,
                                    };
                                  }))).filter(uiSourceCodeAndDiff => !!uiSourceCodeAndDiff);
 
     const singleDiffViewInputs =
-        uiSourceCodeAndDiffs
-            .map(({uiSourceCode, diff}) => {
+        uiSourceCodeAndDiffs.map(
+            ({uiSourceCode, diff}) => {
               let displayText = uiSourceCode.fullDisplayName();
               // If the UISourceCode is backed by a workspace, we show the path as "{workspace-name}/path/relative/to/workspace"
               const fileSystemUiSourceCode =
@@ -256,14 +253,13 @@ export class CombinedDiffView extends UI.Widget.Widget {
                 fileName: `${uiSourceCode.isDirty() ? '*' : ''}${displayText}`,
                 fileUrl: uiSourceCode.url(),
                 mimeType: uiSourceCode.mimeType(),
-                icon: PanelUtils.PanelUtils.getIconForSourceFile(uiSourceCode, {width: 18, height: 18}),
+                icon: PanelUtils.PanelUtils.getIconForSourceFile(uiSourceCode),
                 copied: this.#copiedFiles[uiSourceCode.url()],
                 selectedFileUrl: this.#selectedFileUrl,
                 onCopy: this.#onCopyFileContent.bind(this),
                 onFileNameClick: this.#onFileNameClick.bind(this),
               };
-            })
-            .sort((a, b) => Platform.StringUtilities.compare(a.fileName, b.fileName));
+            });
 
     this.#view({singleDiffViewInputs}, this.#viewOutput, this.contentElement);
   }

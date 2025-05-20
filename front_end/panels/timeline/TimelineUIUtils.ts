@@ -527,10 +527,7 @@ interface LinkifyLocationOptions {
   omitOrigin?: boolean;
 }
 
-interface TimeRangeCategoryStats {
-  // The number values are Microseconds, but proper type safety isn't possible due to all the math.
-  [categoryName: string]: number;
-}
+type TimeRangeCategoryStats = Record<string, number>;
 
 const {SamplesIntegrator} = Trace.Helpers.SamplesIntegrator;
 
@@ -1715,14 +1712,12 @@ export class TimelineUIUtils {
         return;
       }
 
-      // aggeregatedStats is a map by categories. For each category there's an array
+      // aggregatedStats is a map by categories. For each category there's an array
       // containing sorted time points which records accumulated value of the category.
-      const aggregatedStats: {
-        [categoryName: string]: {
-          time: number[],
-          value: number[],
-        },
-      } = {};
+      const aggregatedStats: Record<string, {
+        time: number[],
+        value: number[],
+      }> = {};
       const categoryStack: string[] = [];
       let lastTime = 0;
       Trace.Helpers.Trace.forEachEvent(events, {
@@ -2114,7 +2109,7 @@ export class TimelineUIUtils {
     }
     const stylesContainer = document.createElement('div');
     const shadowRoot = stylesContainer.attachShadow({mode: 'open'});
-    shadowRoot.createChild('style').textContent = imagePreviewStyles.cssText;
+    shadowRoot.createChild('style').textContent = imagePreviewStyles;
     const container = shadowRoot.createChild('div');
     container.classList.add('image-preview-container', 'vbox', 'link');
     const img = container.createChild('img');

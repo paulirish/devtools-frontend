@@ -239,7 +239,7 @@ export class PatchWidget extends UI.Widget.Widget {
         return html`<x-link
           class="link"
           title="${UIStringsNotTranslate.viewUploadedFiles} ${UIStringsNotTranslate.opensInNewTab}"
-          href="data:text/plain,${encodeURIComponent(input.sources)}"
+          href="data:text/plain;charset=utf-8,${encodeURIComponent(input.sources)}"
           jslog=${VisualLogging.link('files-used-in-patching').track({click: true})}>
           ${UIStringsNotTranslate.viewUploadedFiles}
         </x-link>`;
@@ -682,6 +682,15 @@ export class PatchWidget extends UI.Widget.Widget {
     }
   }
 
+  /**
+   * The modified files excluding inspector stylesheets
+   */
+  get #modifiedFiles(): Workspace.UISourceCode.UISourceCode[] {
+    return this.#workspaceDiff.modifiedUISourceCodes().filter(modifiedUISourceCode => {
+      return !modifiedUISourceCode.url().startsWith('inspector://');
+    });
+  }
+
   async #applyPatchAndUpdateUI(): Promise<void> {
     const changeSummary = this.changeSummary;
     if (!changeSummary) {
@@ -695,7 +704,21 @@ export class PatchWidget extends UI.Widget.Widget {
     if (response && 'rpcId' in response && response.rpcId) {
       this.#rpcId = response.rpcId;
     }
-    if (response?.type === AiAssistanceModel.ResponseType.ANSWER) {
+
+    // Determines if applying the patch resulted in any actual file changes in the workspace.
+    // This is crucial because the agent might return an answer (e.g., an explanation)
+    // without making any code modifications (i.e., no `writeFile` calls).
+    // If no files were modified, we avoid transitioning to a success state,
+    // which would otherwise lead to an empty and potentially confusing diff view.
+    //
+    // Note: The `hasChanges` check below is based on `modifiedUISourceCodes()`, which reflects
+    // *all* current modifications in the workspace. It does not differentiate between
+    // changes made by this specific AI patch operation versus pre-existing changes
+    // made by the user. Consequently, if the AI patch itself makes no changes but the
+    // user already had other modified files, the widget will still transition to the
+    // success state (displaying all current workspace modifications).
+    const hasChanges = this.#modifiedFiles.length > 0;
+    if (response?.type === AiAssistanceModel.ResponseType.ANSWER && hasChanges) {
       this.#patchSuggestionState = PatchSuggestionState.SUCCESS;
     } else if (
         response?.type === AiAssistanceModel.ResponseType.ERROR &&
@@ -718,9 +741,9 @@ ${processedFiles.map(filename => `* ${filename}`).join('\n')}`;
   }
 
   #onDiscard(): void {
-    this.#workspaceDiff.modifiedUISourceCodes().forEach(modifiedUISourceCode => {
+    for (const modifiedUISourceCode of this.#modifiedFiles) {
       modifiedUISourceCode.resetWorkingCopy();
-    });
+    }
 
     this.#patchSuggestionState = PatchSuggestionState.INITIAL;
     this.#patchSources = undefined;
@@ -733,11 +756,9 @@ ${processedFiles.map(filename => `* ${filename}`).join('\n')}`;
   }
 
   #onSaveAll(): void {
-    this.#workspaceDiff.modifiedUISourceCodes().forEach(modifiedUISourceCode => {
-      if (!modifiedUISourceCode.url().startsWith('inspector://')) {
-        modifiedUISourceCode.commitWorkingCopy();
-      }
-    });
+    for (const modifiedUISourceCode of this.#modifiedFiles) {
+      modifiedUISourceCode.commitWorkingCopy();
+    }
     void this.changeManager?.stashChanges().then(() => {
       this.changeManager?.dropStashedChanges();
     });

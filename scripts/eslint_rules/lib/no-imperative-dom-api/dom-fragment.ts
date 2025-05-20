@@ -31,9 +31,14 @@ export class DomFragment {
   children: DomFragment[] = [];
   parent?: DomFragment;
   expression?: string;
-  replacementLocation?: Node;
+  widgetClass?: Node;
+  replacer?: (fixer: TSESLint.RuleFixer, template: string) => TSESLint.RuleFix;
   initializer?: Node;
   references: Array<{node: Node, processed?: boolean}> = [];
+
+  static get(node: Node, sourceCode: SourceCode): DomFragment|undefined {
+    return domFragments.get(getKey(node, sourceCode));
+  }
 
   static getOrCreate(node: Node, sourceCode: SourceCode): DomFragment {
     const key = getKey(node, sourceCode);
@@ -46,26 +51,42 @@ export class DomFragment {
         result.expression = sourceCode.getText(node);
         result.references.push({node});
       } else if (key instanceof ClassMember) {
-        result.replacementLocation = key.classDeclaration;
         result.expression = sourceCode.getText(node);
+        const references: Array<{node: Node, processed?: boolean}> = [];
+        Object.defineProperty(result, 'references', {
+          get: () => {
+            if (key.references.size === references.length) {
+              return references;
+            }
+            for (const reference of key.references) {
+              if (!references.some(r => r.node === reference)) {
+                references.push({node: reference});
+              }
+            }
+            return references;
+          },
+          set: () => {},
+        });
+        Object.defineProperty(result, 'initializer', {
+          get: () => key.initializer,
+          set: () => {},
+        });
       } else if ('references' in key) {
         result.references = key.references.filter(r => !key.identifiers.includes(r.identifier as Identifier))
                                 .map(r => ({node: r.identifier}));
         const initializer = key.identifiers[0];
         if (initializer?.parent?.type === 'VariableDeclarator') {
-          result.initializer = initializer;
+          result.initializer = initializer.parent?.init ?? undefined;
         }
-        result.replacementLocation = result.initializer?.parent;
         result.expression = key.name;
       }
     }
-    if (key instanceof ClassMember) {
-      result.references = [...key.references].map(r => ({
-                                                    node: r,
-                                                  }));
-      result.initializer = key.initializer;
-    }
     return result;
+  }
+
+  static set(node: Node, sourceCode: SourceCode, domFragment: DomFragment) {
+    const key = getKey(node, sourceCode);
+    domFragments.set(key, domFragment);
   }
 
   static clear() {
@@ -77,11 +98,21 @@ export class DomFragment {
   }
 
   toTemplateLiteral(sourceCode: Readonly<SourceCode>, indent = 4): string[] {
+    const components: string[] = [];
+    const MAX_LINE_LENGTH = 100;
+    components.push(`\n${' '.repeat(indent)}`);
+    let lineLength = indent;
     if (this.expression && !this.tagName) {
-      const value = this.initializer?.parent?.type === 'VariableDeclarator' ? this.initializer?.parent?.init : null;
-      const expression =
-          (this.references.every(r => r.processed) && value) ? sourceCode.getText(value) : this.expression;
-      return [`\n${' '.repeat(indent)}`, '${', expression, '}'];
+      if (this.expression.startsWith('`') && this.expression.endsWith('`')) {
+        components.push(this.expression.slice(1, -1).trim());
+      } else {
+        const expression = (this.references.every(r => r.processed) && this.initializer) ?
+            sourceCode.getText(this.initializer) :
+            this.expression;
+        components.push('${', expression, '}');
+      }
+
+      return components;
     }
 
     function toOutputString(node: Node|string, quoteLiterals = false): string {
@@ -101,18 +132,16 @@ export class DomFragment {
       return '${' + text + '}';
     }
 
-    const components: string[] = [];
-    const MAX_LINE_LENGTH = 100;
-    components.push(`\n${' '.repeat(indent)}`);
-    let lineLength = indent;
-
     function appendExpression(expression) {
       if (lineLength + expression.length + 1 > MAX_LINE_LENGTH) {
         components.push(`\n${' '.repeat(indent + 4)}`);
         lineLength = expression.length + indent + 4;
       } else {
-        components.push(' ');
-        lineLength += expression.length + 1;
+        if (expression.match(/^[a-zA-Z0-9?.$@]/)) {
+          components.push(' ');
+          ++lineLength;
+        }
+        lineLength += expression.length;
       }
       components.push(expression);
     }
@@ -136,9 +165,17 @@ export class DomFragment {
       }
     }
     for (const attribute of this.booleanAttributes || []) {
-      appendExpression(
-          `?${attribute.key}=${attributeValue(toOutputString(attribute.value, /* quoteLiterals=*/ true))}`,
-      );
+      const value = attribute.value;
+      const isFalse = typeof value === 'string' ? value === 'false' : value.type === 'Literal' && value.value === false;
+      if (isFalse) {
+        continue;
+      }
+      const isTrue = typeof value === 'string' ? value === 'true' : value.type === 'Literal' && value.value === true;
+      if (isTrue) {
+        appendExpression(attribute.key);
+      } else {
+        appendExpression(`?${attribute.key}=${attributeValue(toOutputString(value))}`);
+      }
     }
     for (const eventListener of this.eventListeners || []) {
       appendExpression(
@@ -148,14 +185,32 @@ export class DomFragment {
                   )}`,
       );
     }
-    for (const binding of this.bindings || []) {
-      appendExpression(
-          `.${binding.key}=${
-              toOutputString(
-                  binding.value,
-                  /* quoteLiterals=*/ true,
-                  )}`,
-      );
+    if (this.widgetClass) {
+      appendExpression(`.widgetConfig=\${widgetConfig(${sourceCode.getText(this.widgetClass)}`);
+      if (this.bindings.length) {
+        appendExpression(',');
+        if (this.bindings.length === 1) {
+          appendExpression(
+              `{${this.bindings[0].key}: ${toOutputString(this.bindings[0].value, /* quoteLiterals=*/ true)}}`);
+        } else {
+          appendExpression('{');
+          for (const binding of this.bindings) {
+            appendExpression(`${binding.key}: ${toOutputString(binding.value, /* quoteLiterals=*/ true)},`);
+          }
+          appendExpression('}');
+        }
+      }
+      appendExpression(')}');
+    } else {
+      for (const binding of this.bindings || []) {
+        appendExpression(
+            `.${binding.key}=${
+                toOutputString(
+                    binding.value,
+                    /* quoteLiterals=*/ true,
+                    )}`,
+        );
+      }
     }
     for (const directive of this.directives || []) {
       appendExpression(`\${${directive.name}(${directive.arguments.map(a => sourceCode.getText(a)).join(', ')})}`);

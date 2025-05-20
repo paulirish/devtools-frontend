@@ -115,8 +115,8 @@ export interface UserActionRowWidgetParams {
 export const DEFAULT_VIEW = (input: UserActionRowViewInput, output: ViewOutput, target: HTMLElement): void => {
   // clang-format off
   Lit.render(html`
-    <style>${Input.textInputStyles.cssText}</style>
-    <style>${userActionRowStyles.cssText}</style>
+    <style>${Input.textInputStyles}</style>
+    <style>${userActionRowStyles}</style>
     <div class="ai-assistance-feedback-row">
       <div class="rate-buttons">
         ${input.showRateButtons ? html`
@@ -278,12 +278,12 @@ export class UserActionRow extends UI.Widget.Widget implements UserActionRowWidg
   #isShowingFeedbackForm = false;
   #isSubmitButtonDisabled = true;
 
-  view: View;
+  #view: View;
   #viewOutput: ViewOutput = {};
 
   constructor(element?: HTMLElement, view?: View) {
     super(false, false, element);
-    this.view = view ?? DEFAULT_VIEW;
+    this.#view = view ?? DEFAULT_VIEW;
   }
 
   override wasShown(): void {
@@ -297,7 +297,7 @@ export class UserActionRow extends UI.Widget.Widget implements UserActionRowWidg
   }
 
   override performUpdate(): Promise<void>|void {
-    this.view(
+    this.#view(
         {
           onSuggestionClick: this.onSuggestionClick,
           onRatingClick: this.#handleRateClick.bind(this),
@@ -341,7 +341,7 @@ export class UserActionRow extends UI.Widget.Widget implements UserActionRowWidg
     rightScrollButtonContainer.classList.toggle('hidden', !shouldShowRightButton);
   };
 
-  disconnectedCallback(): void {
+  override willHide(): void {
     this.#suggestionsResizeObserver.disconnect();
   }
 

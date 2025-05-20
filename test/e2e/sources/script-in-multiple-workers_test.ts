@@ -46,11 +46,6 @@ async function validateSourceTabs() {
 }
 
 describe('Multi-Workers', function() {
-  // The tests in this suite are particularly slow, as they perform a lot of actions
-  if (this.timeout() !== 0) {
-    this.timeout(10000);
-  }
-
   [false, true].forEach(sourceMaps => {
     const withOrWithout = sourceMaps ? 'with source maps' : 'without source maps';
     const targetPage = sourceMaps ? 'sources/multi-workers-sourcemap.html' : 'sources/multi-workers.html';
@@ -192,7 +187,7 @@ describe('Multi-Workers', function() {
     });
 
     // Regularly failing on Windows CQ
-    describe.skip(`[crbug.com/1425122] copies breakpoints between workers ${withOrWithout}`, () => {
+    describe.skip(`[crbug.com/40260732] copies breakpoints between workers ${withOrWithout}`, () => {
       beforeEach(async () => {
         await waitForSourceFiles(
             SourceFileEvents.SOURCE_FILE_LOADED, files => files.some(f => f.endsWith('multi-workers.js')), async () => {
@@ -265,7 +260,7 @@ describe('Multi-Workers', function() {
     });
 
     // Flaky tests in beforeEach.
-    describe.skip(`[crbug.com/1425122] hits breakpoints added to workers ${withOrWithout}`, () => {
+    describe.skip(`[crbug.com/40260732] hits breakpoints added to workers ${withOrWithout}`, () => {
       beforeEach(async () => {
         await enableExperiment('instrumentation-breakpoints');
         await waitForSourceFiles(

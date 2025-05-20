@@ -17,7 +17,7 @@ import {
 } from './PropertyRenderer.js';
 import stylePropertiesTreeOutlineStyles from './stylePropertiesTreeOutline.css.js';
 
-const {html, render, Directives: {ref, classMap, ifDefined}} = Lit;
+const {html, render, Directives: {classMap, ifDefined}} = Lit;
 
 export interface ViewInput {
   substitutions: Node[][];
@@ -25,17 +25,13 @@ export interface ViewInput {
   onToggle: () => void;
 }
 
-export interface ViewOutput {
-  defaultFocusedElement?: Element;
-}
-
 export type View = (
     input: ViewInput,
-    output: ViewOutput,
+    output: object,
     target: HTMLElement,
     ) => void;
 
-function defaultView(input: ViewInput, output: ViewOutput, target: HTMLElement): void {
+function defaultView(input: ViewInput, output: object, target: HTMLElement): void {
   const substitutions = [...input.substitutions];
   const evaluations = [...input.evaluations];
   const finalResult = evaluations.pop() ?? substitutions.pop();
@@ -49,9 +45,6 @@ function defaultView(input: ViewInput, output: ViewOutput, target: HTMLElement):
     html`
       <div
        role=dialog
-       ${ref(e => {
-         output.defaultFocusedElement = (e as HTMLDivElement)?.querySelector('[tabindex]') ?? undefined;
-       })}
        class="css-value-trace monospace"
        @keydown=${onKeyDown}
        >
@@ -129,6 +122,7 @@ export class CSSValueTraceView extends UI.Widget.VBox {
   readonly #view: View;
   #evaluations: Node[][] = [];
   #substitutions: Node[][] = [];
+  #pendingFocus = false;
 
   constructor(element?: HTMLElement, view: View = defaultView) {
     super(true, false, element);
@@ -146,6 +140,9 @@ export class CSSValueTraceView extends UI.Widget.VBox {
       matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles,
       computedStyles: Map<string, string>|null,
       renderers: Array<MatchRenderer<SDK.CSSPropertyParser.Match>>,
+      expandPercentagesInShorthands: boolean,
+      shorthandPositionOffset: number,
+      focus: boolean,
       ): Promise<void> {
     const matchedResult = subexpression === null ?
         property.parseValue(matchedStyles, computedStyles) :
@@ -153,13 +150,17 @@ export class CSSValueTraceView extends UI.Widget.VBox {
     if (!matchedResult) {
       return undefined;
     }
-    return await this.#showTrace(property, matchedResult, renderers);
+    return await this.#showTrace(
+        property, matchedResult, renderers, expandPercentagesInShorthands, shorthandPositionOffset, focus);
   }
 
   async #showTrace(
       property: SDK.CSSProperty.CSSProperty,
       matchedResult: SDK.CSSPropertyParser.BottomUpTreeMatching,
       renderers: Array<MatchRenderer<SDK.CSSPropertyParser.Match>>,
+      expandPercentagesInShorthands: boolean,
+      shorthandPositionOffset: number,
+      focus: boolean,
       ): Promise<void> {
     this.#highlighting = new Highlighting();
     const rendererMap = new Map(renderers.map(r => [r.matchType, r]));
@@ -168,7 +169,8 @@ export class CSSValueTraceView extends UI.Widget.VBox {
     // 1st: Apply substitutions for var() functions
     const substitutions = [];
     const evaluations = [];
-    const tracing = new TracingContext(this.#highlighting, matchedResult);
+    const tracing =
+        new TracingContext(this.#highlighting, expandPercentagesInShorthands, shorthandPositionOffset, matchedResult);
     while (tracing.nextSubstitution()) {
       const context = new RenderingContext(
           matchedResult.ast,
@@ -216,6 +218,7 @@ export class CSSValueTraceView extends UI.Widget.VBox {
       this.#evaluations.push(Renderer.render(matchedResult.ast.tree, context).nodes);
     }
 
+    this.#pendingFocus = focus;
     this.requestUpdate();
   }
 
@@ -225,8 +228,16 @@ export class CSSValueTraceView extends UI.Widget.VBox {
       evaluations: this.#evaluations,
       onToggle: () => this.onResize(),
     };
-    const viewOutput: ViewOutput = {};
-    this.#view(viewInput, viewOutput, this.contentElement);
-    this.setDefaultFocusedElement(viewOutput.defaultFocusedElement ?? null);
+    this.#view(viewInput, {}, this.contentElement);
+    const tabStop = this.contentElement.querySelector('[tabindex]');
+    this.setDefaultFocusedElement(tabStop);
+    if (tabStop && this.#pendingFocus) {
+      this.focus();
+      this.resetPendingFocus();
+    }
+  }
+
+  resetPendingFocus(): void {
+    this.#pendingFocus = false;
   }
 }

@@ -28,6 +28,7 @@ export interface InsightSetContextWithNavigation {
 }
 
 export interface LanternContext {
+  requests: Array<Lantern.Types.NetworkRequest<Types.Events.SyntheticNetworkRequest>>;
   graph: Lantern.Graph.Node<Types.Events.SyntheticNetworkRequest>;
   simulator: Lantern.Simulation.Simulator<Types.Events.SyntheticNetworkRequest>;
   metrics: Record<string, Lantern.Metrics.MetricResult>;
@@ -75,6 +76,7 @@ export type InsightModel<UIStrings extends Record<string, string> = Record<strin
       description: Common.UIString.LocalizedString,
       category: InsightCategory,
       state: 'pass' | 'fail' | 'informative',
+      /** Used by RelatedInsightChips.ts */
       relatedEvents?: RelatedEventsMap | Types.Events.Event[],
       warnings?: InsightWarning[],
       metricSavings?: MetricSavings,

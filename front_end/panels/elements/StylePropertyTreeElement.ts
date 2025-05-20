@@ -39,6 +39,7 @@ import {
   rendererBase,
   RenderingContext,
   StringRenderer,
+  type TracingContext,
   URLRenderer
 } from './PropertyRenderer.js';
 import {StyleEditorWidget} from './StyleEditorWidget.js';
@@ -250,13 +251,17 @@ export class VariableRenderer extends rendererBase(SDK.CSSPropertyParserMatchers
   }
 
   override render(match: SDK.CSSPropertyParserMatchers.VariableMatch, context: RenderingContext): Node[] {
+    if (this.#treeElement?.property.ownerStyle.parentRule instanceof SDK.CSSRule.CSSFunctionRule) {
+      return Renderer.render(ASTUtils.children(match.node), context).nodes;
+    }
+
     const {declaration, value: variableValue} = match.resolveVariable() ?? {};
     const fromFallback = variableValue === undefined;
     const computedValue = variableValue ?? match.fallbackValue();
     const onLinkActivate = (name: string): void => this.#handleVarDefinitionActivate(declaration ?? name);
     const varSwatch = document.createElement('span');
 
-    const substitution = context.tracing?.substitution({match, ...context});
+    const substitution = context.tracing?.substitution({match, context});
     if (substitution) {
       if (declaration?.declaration) {
         const {nodes, cssControls} = Renderer.renderValueNodes(
@@ -276,7 +281,7 @@ export class VariableRenderer extends rendererBase(SDK.CSSPropertyParserMatchers
     const renderedFallback = match.fallback.length > 0 ? Renderer.render(match.fallback, context) : undefined;
 
     const varCall =
-        this.#treeElement?.getTracingTooltip('var', match.text, this.#matchedStyles, this.#computedStyles, context);
+        this.#treeElement?.getTracingTooltip('var', match.node, this.#matchedStyles, this.#computedStyles, context);
     const tooltipContents =
         this.#stylesPane.getVariablePopoverContents(this.#matchedStyles, match.name, variableValue ?? null);
     const tooltipId = this.#treeElement?.getTooltipId('custom-property-var');
@@ -357,11 +362,56 @@ export class LinearGradientRenderer extends rendererBase(SDK.CSSPropertyParserMa
       if (angleMatch) {
         angle.addEventListener(InlineEditor.InlineEditorUtils.ValueChangedEvent.eventName, ev => {
           angle.updateProperty(
-              context.matchedResult.getComputedText(match.node, new Map([[angleMatch, ev.data.value]])));
+              context.matchedResult.getComputedText(match.node, match => match === angleMatch ? ev.data.value : null));
         });
       }
     }
     return nodes;
+  }
+}
+
+// clang-format off
+export class RelativeColorChannelRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.RelativeColorChannelMatch) {
+  // clang-format on
+  readonly #treeElement: StylePropertyTreeElement|null;
+  constructor(treeElement: StylePropertyTreeElement|null) {
+    super();
+    this.#treeElement = treeElement;
+  }
+  override render(match: SDK.CSSPropertyParserMatchers.RelativeColorChannelMatch, context: RenderingContext): Node[] {
+    const color = context.findParent(match.node, SDK.CSSPropertyParserMatchers.ColorMatch);
+    if (!color?.relativeColor) {
+      return [document.createTextNode(match.text)];
+    }
+
+    const value = match.getColorChannelValue(color.relativeColor);
+
+    if (value === null) {
+      return [document.createTextNode(match.text)];
+    }
+
+    const evaluation =
+        context.tracing?.applyEvaluation([], () => ({placeholder: [document.createTextNode(value.toFixed(3))]}));
+    if (evaluation) {
+      return evaluation;
+    }
+
+    const span = document.createElement('span');
+    span.append(match.text);
+    const tooltipId = this.#treeElement?.getTooltipId('relative-color-channel');
+    if (!tooltipId) {
+      return [span];
+    }
+    span.setAttribute('aria-details', tooltipId);
+    const tooltip = new Tooltips.Tooltip.Tooltip({
+      id: tooltipId,
+      variant: 'rich',
+      anchor: span,
+      jslogContext: 'elements.relative-color-channel',
+    });
+    tooltip.append(value.toFixed(3));
+
+    return [span, tooltip];
   }
 }
 
@@ -376,23 +426,39 @@ export class ColorRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.Co
     this.#stylesPane = stylesPane;
   }
 
-  #getValueChild(match: SDK.CSSPropertyParserMatchers.ColorMatch, context: RenderingContext):
-      {valueChild: HTMLSpanElement, cssControls?: SDK.CSSPropertyParser.CSSControlMap} {
+  #getValueChild(match: SDK.CSSPropertyParserMatchers.ColorMatch, context: RenderingContext): {
+    valueChild: HTMLSpanElement,
+    cssControls?: SDK.CSSPropertyParser.CSSControlMap,
+    childTracingContexts?: TracingContext[],
+  } {
     const valueChild = document.createElement('span');
-    if (match.node.name === 'ColorLiteral' || match.node.name === 'ValueName') {
+    if (match.node.name !== 'CallExpression') {
       valueChild.appendChild(document.createTextNode(match.text));
       return {valueChild};
     }
-    const {cssControls} = Renderer.renderInto(ASTUtils.children(match.node), context, valueChild);
-    return {valueChild, cssControls};
+
+    const func = context.matchedResult.ast.text(match.node.getChild('Callee'));
+    const args = ASTUtils.siblings(match.node.getChild('ArgList'));
+
+    const childTracingContexts = context.tracing?.evaluation([args], {match, context}) ?? undefined;
+    const renderingContext = childTracingContexts?.at(0)?.renderingContext(context) ?? context;
+    const {nodes, cssControls} = Renderer.renderInto(args, renderingContext, valueChild);
+    render(
+        html`${
+            this.#treeElement?.getTracingTooltip(
+                func, match.node, this.#treeElement.matchedStyles(), this.#treeElement.getComputedStyles() ?? new Map(),
+                renderingContext) ??
+            func}${nodes}`,
+        valueChild);
+
+    return {valueChild, cssControls, childTracingContexts};
   }
 
   override render(match: SDK.CSSPropertyParserMatchers.ColorMatch, context: RenderingContext): Node[] {
-    const {valueChild, cssControls} = this.#getValueChild(match, context);
+    const {valueChild, cssControls, childTracingContexts} = this.#getValueChild(match, context);
     let colorText = context.matchedResult.getComputedText(match.node);
-    // Evaluate relative color values
-    if (match.node.name === 'CallExpression' && colorText.match(/^[^)]*\(\W*from\W+/) &&
-        !context.matchedResult.hasUnresolvedVars(match.node) && CSS.supports('color', colorText)) {
+
+    if (match.relativeColor) {
       const fakeSpan = document.body.appendChild(document.createElement('span'));
       fakeSpan.style.backgroundColor = colorText;
       colorText = window.getComputedStyle(fakeSpan).backgroundColor?.toString() || colorText;
@@ -407,6 +473,21 @@ export class ColorRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.Co
       }
       return [document.createTextNode(colorText)];
     }
+
+    if (match.node.name === 'CallExpression' && childTracingContexts) {
+      const evaluation = context.tracing?.applyEvaluation(childTracingContexts, () => {
+        const displayColor = color.as(((color.alpha ?? 1) !== 1) ? Common.Color.Format.HEXA : Common.Color.Format.HEX);
+        const swatch =
+            new ColorRenderer(this.#stylesPane, null)
+                .renderColorSwatch(displayColor.isGamutClipped() ? color : (displayColor.nickname() ?? displayColor));
+        context.addControl('color', swatch);
+        return {placeholder: [swatch]};
+      });
+      if (evaluation) {
+        return evaluation;
+      }
+    }
+
     const swatch = this.renderColorSwatch(color, valueChild);
     context.addControl('color', swatch);
 
@@ -628,7 +709,8 @@ export class ColorMixRenderer extends rendererBase(SDK.CSSPropertyParserMatchers
       return false;
     };
 
-    const childTracingContexts = context.tracing?.evaluation([match.space, match.color1, match.color2]);
+    const childTracingContexts =
+        context.tracing?.evaluation([match.space, match.color1, match.color2], {match, context});
     const childRenderingContexts =
         childTracingContexts?.map(ctx => ctx.renderingContext(context)) ?? [context, context, context];
 
@@ -638,7 +720,7 @@ export class ColorMixRenderer extends rendererBase(SDK.CSSPropertyParserMatchers
     render(
         html`${
             this.#treeElement?.getTracingTooltip(
-                'color-mix', match.text, this.#matchedStyles, this.#computedStyles, context) ??
+                'color-mix', match.node, this.#matchedStyles, this.#computedStyles, context) ??
             'color-mix'}(${Renderer.render(match.space, childRenderingContexts[0]).nodes}, ${color1.nodes}, ${
             color2.nodes})`,
         contentChild);
@@ -687,6 +769,7 @@ export class ColorMixRenderer extends rendererBase(SDK.CSSPropertyParserMatchers
     }
     swatch.tabIndex = -1;
     swatch.setColorMixText(colorMixText);
+    UI.ARIAUtils.setLabel(swatch, colorMixText);
     context.addControl('color', swatch);
 
     if (context.tracing) {
@@ -817,6 +900,13 @@ export class LinkableNameRenderer extends rendererBase(SDK.CSSPropertyParserMatc
           ruleBlock: '@position-try',
           isDefined: Boolean(this.#matchedStyles.positionTryRules().find(pt => pt.name().text === match.text)),
         };
+      case SDK.CSSPropertyParserMatchers.LinkableNameProperties.FUNCTION:
+        return {
+          jslogContext: 'css-function',
+          metric: null,
+          ruleBlock: '@function',
+          isDefined: Boolean(this.#matchedStyles.getRegisteredFunction(match.text)),
+        };
     }
   }
 
@@ -829,7 +919,15 @@ export class LinkableNameRenderer extends rendererBase(SDK.CSSPropertyParserMatc
       isDefined,
       onLinkActivate: (): void => {
         metric && Host.userMetrics.swatchActivated(metric);
-        this.#stylesPane.jumpToSectionBlock(`${ruleBlock} ${match.text}`);
+        if (match.propertyName === SDK.CSSPropertyParserMatchers.LinkableNameProperties.FUNCTION) {
+          const functionName = this.#matchedStyles.getRegisteredFunction(match.text);
+          if (!functionName) {
+            return;
+          }
+          this.#stylesPane.jumpToFunctionDefinition(functionName);
+        } else {
+          this.#stylesPane.jumpToSectionBlock(`${ruleBlock} ${match.text}`);
+        }
       },
       jslogContext,
     };
@@ -1282,11 +1380,8 @@ async function resolveValues(
   // so try to look up the original name.
   propertyName = context.tracing?.propertyName ?? context.matchedResult.ast.propertyName ?? propertyName;
 
-  if (
-      SHORTHANDS_FOR_PERCENTAGES.has(propertyName) &&
-      context.matchedResult.getLonghandValuesCount() >
-          1  // If the shorthand only has a single value we can't tell width and height apart
-  ) {
+  if (SHORTHANDS_FOR_PERCENTAGES.has(propertyName) &&
+      (context.tracing?.expandPercentagesInShorthands ?? context.matchedResult.getLonghandValuesCount() > 1)) {
     propertyName = context.getComputedLonghandName(match.node) ?? propertyName;
   }
   const nodeId = stylesPane.node()?.id;
@@ -1383,7 +1478,7 @@ export class MathFunctionRenderer extends rendererBase(SDK.CSSPropertyParserMatc
   }
 
   override render(match: SDK.CSSPropertyParserMatchers.MathFunctionMatch, context: RenderingContext): Node[] {
-    const childTracingContexts = context.tracing?.evaluation(match.args);
+    const childTracingContexts = context.tracing?.evaluation(match.args, {match, context});
     const renderedArgs = match.args.map((arg, idx) => {
       const span = document.createElement('span');
       Renderer.renderInto(
@@ -1395,7 +1490,7 @@ export class MathFunctionRenderer extends rendererBase(SDK.CSSPropertyParserMatc
     render(
         html`${
             this.#treeElement?.getTracingTooltip(
-                match.func, match.text, this.#matchedStyles, this.#computedStyles, context) ??
+                match.func, match.node, this.#matchedStyles, this.#computedStyles, context) ??
             match.func}(${renderedArgs.map((arg, idx) => idx === 0 ? [arg] : [html`, `, arg]).flat()})`,
         span);
 
@@ -1416,7 +1511,14 @@ export class MathFunctionRenderer extends rendererBase(SDK.CSSPropertyParserMatc
   async applyEvaluation(
       span: HTMLSpanElement, match: SDK.CSSPropertyParserMatchers.MathFunctionMatch,
       context: RenderingContext): Promise<boolean> {
-    const value = context.matchedResult.getComputedText(match.node);
+    const value = context.matchedResult.getComputedText(match.node, match => {
+      if (match instanceof SDK.CSSPropertyParserMatchers.RelativeColorChannelMatch) {
+        const relativeColor =
+            context.findParent(match.node, SDK.CSSPropertyParserMatchers.ColorMatch)?.relativeColor ?? null;
+        return (relativeColor && match.getColorChannelValue(relativeColor)?.toFixed(3)) ?? null;
+      }
+      return null;
+    });
     const evaled = await resolveValues(this.#stylesPane, this.#propertyName, match, context, value);
     if (!evaled?.[0] || evaled[0] === value) {
       return false;
@@ -1450,7 +1552,8 @@ export class MathFunctionRenderer extends rendererBase(SDK.CSSPropertyParserMatc
 }
 
 async function decorateAnchorForAnchorLink(container: HTMLElement, stylesSidebarPane: StylesSidebarPane, options: {
-  identifier?: string, needsSpace: boolean,
+  needsSpace: boolean,
+  identifier?: string,
 }): Promise<void> {
   const anchorNode = await stylesSidebarPane.node()?.getAnchorBySpecifier(options.identifier) ?? undefined;
   const link = new ElementsComponents.AnchorFunctionLinkSwatch.AnchorFunctionLinkSwatch({
@@ -1600,6 +1703,7 @@ export function getPropertyRenderers(
     new MathFunctionRenderer(stylesPane, matchedStyles, computedStyles, propertyName, treeElement),
     new AutoBaseRenderer(computedStyles),
     new BinOpRenderer(),
+    new RelativeColorChannelRenderer(treeElement),
   ];
 }
 
@@ -2025,7 +2129,8 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
         indent.repeat(this.section().nestingLevel + 1) + (this.property.disabled ? '/* ' : ''));
     this.listItemElement.appendChild(this.nameElement);
 
-    if (this.property.name.startsWith('--')) {
+    if (this.property.name.startsWith('--') &&
+        !(this.property.ownerStyle.parentRule instanceof SDK.CSSRule.CSSFunctionRule)) {
       const contents = this.parentPaneInternal.getVariablePopoverContents(
           this.matchedStyles(), this.property.name,
           this.matchedStylesInternal.computeCSSVariable(this.style, this.property.name)?.value ?? null);
@@ -2122,10 +2227,29 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
         event.consume();
       }, false);
       if (this.nameElement && this.valueElement) {
-        UI.ARIAUtils.setLabel(
-            enabledCheckboxElement, `${this.nameElement.textContent} ${this.valueElement.textContent}`);
+        UI.ARIAUtils.setLabel(enabledCheckboxElement, `${this.name} ${this.value}`);
       }
       this.listItemElement.insertBefore(enabledCheckboxElement, this.listItemElement.firstChild);
+    }
+
+    const that = this;
+    this.valueElement.addEventListener('keydown', nonEditingNameValueKeyDown);
+    this.nameElement.addEventListener('keydown', nonEditingNameValueKeyDown);
+
+    function nonEditingNameValueKeyDown(this: HTMLElement, event: KeyboardEvent): void {
+      if (UI.UIUtils.isBeingEdited(this)) {
+        return;
+      }
+      if (event.key !== Platform.KeyboardUtilities.ENTER_KEY && event.key !== ' ') {
+        return;
+      }
+      if (this === that.valueElement) {
+        that.startEditingValue();
+        event.consume(true);
+      } else if (this === that.nameElement) {
+        that.startEditingName();
+        event.consume(true);
+      }
     }
   }
 
@@ -2160,11 +2284,14 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
   }
 
   getTracingTooltip(
-      functionName: string, text: string, matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles,
+      functionName: string, node: CodeMirror.SyntaxNode, matchedStyles: SDK.CSSMatchedStyles.CSSMatchedStyles,
       computedStyles: Map<string, string>, context: RenderingContext): Lit.TemplateResult {
     if (!Root.Runtime.hostConfig.devToolsCssValueTracing?.enabled || context.tracing || !context.property) {
       return html`${functionName}`;
     }
+    const text = context.ast.text(node);
+    const expandPercentagesInShorthands = context.matchedResult.getLonghandValuesCount() > 1;
+    const shorthandPositionOffset = context.matchedResult.getComputedLonghandName(node);
     const {property} = context;
     const stylesPane = this.parentPane();
     const tooltipId = this.getTooltipId(`${functionName}-trace`);
@@ -2181,7 +2308,15 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
               ?.showTrace(
                 property, text, matchedStyles, computedStyles,
                 getPropertyRenderers(property.name,
-                  property.ownerStyle, stylesPane, matchedStyles, null, computedStyles));
+                  property.ownerStyle, stylesPane, matchedStyles, null, computedStyles),
+                expandPercentagesInShorthands, shorthandPositionOffset, this.openedViaHotkey);
+          }
+        }}
+        @toggle=${function(this: Tooltips.Tooltip.Tooltip, e: ToggleEvent) {
+          if (e.newState !== 'open') {
+            (this.querySelector('devtools-widget') as UI.Widget.WidgetElement<CSSValueTraceView>| null)
+              ?.getWidget()
+              ?.resetPendingFocus();
           }
         }}
         ><devtools-widget
@@ -2196,7 +2331,7 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
               e.consume(true);
             }
           }}
-          .widgetConfig=${UI.Widget.widgetConfig(CSSValueTraceView, {})}
+          .widgetConfig=${UI.Widget.widgetConfig(CSSValueTraceView)}
           ></devtools-widget></devtools-tooltip>`;
     // clang-format on
   }
@@ -2606,6 +2741,11 @@ export class StylePropertyTreeElement extends UI.TreeOutline.TreeElement {
       switch (result) {
         case 'cancel':
           this.editingCancelled(context);
+          if (context.isEditingName) {
+            this.nameElement?.focus();
+          } else {
+            this.valueElement?.focus();
+          }
           break;
         case 'forward':
         case 'backward':

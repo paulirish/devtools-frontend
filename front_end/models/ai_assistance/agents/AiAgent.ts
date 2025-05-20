@@ -151,7 +151,7 @@ export interface ConversationSuggestion {
 export abstract class ConversationContext<T> {
   abstract getOrigin(): string;
   abstract getItem(): T;
-  abstract getIcon(): HTMLElement|undefined;
+  abstract getIcon(): Lit.TemplateResult|undefined;
   abstract getTitle(opts?: {disabled: boolean}): string|ReturnType<typeof Lit.Directives.until>;
 
   isOriginAllowed(agentOrigin: string|undefined): boolean {
@@ -412,7 +412,8 @@ export abstract class AiAgent<T> {
 
   async *
       run(initialQuery: string, options: {
-        signal?: AbortSignal, selected: ConversationContext<T>|null,
+        selected: ConversationContext<T>|null,
+        signal?: AbortSignal,
       },
           multimodalInput?: MultimodalInput): AsyncGenerator<ResponseData, void, void> {
     await options.selected?.refresh();

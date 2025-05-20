@@ -363,9 +363,7 @@ export class ApplicationPanelSidebar extends UI.Widget.VBox implements SDK.Targe
   private extensionStorageModels: ExtensionStorageModel[];
   private extensionStorageTreeElements: Map<string, ExtensionStorageTreeElement>;
   private sharedStorageTreeElements: Map<string, SharedStorageTreeElement>;
-  private domains: {
-    [x: string]: boolean,
-  };
+  private domains: Record<string, boolean>;
   // Holds main frame target.
   private target?: SDK.Target.Target;
   private previousHoveredElement?: FrameTreeElement;
@@ -407,8 +405,7 @@ export class ApplicationPanelSidebar extends UI.Widget.VBox implements SDK.Targe
         panel, i18nString(UIStrings.localStorage), i18nString(UIStrings.noLocalStorage),
         i18nString(UIStrings.localStorageDescription), 'local-storage');
     this.localStorageListTreeElement.setLink(
-        'https://developer.chrome.com/docs/devtools/storage/localstorage/?utm_source=devtools' as
-        Platform.DevToolsPath.UrlString);
+        'https://developer.chrome.com/docs/devtools/storage/localstorage/' as Platform.DevToolsPath.UrlString);
     const localStorageIcon = IconButton.Icon.create('table');
     this.localStorageListTreeElement.setLeadingIcons([localStorageIcon]);
 
@@ -417,8 +414,7 @@ export class ApplicationPanelSidebar extends UI.Widget.VBox implements SDK.Targe
         panel, i18nString(UIStrings.sessionStorage), i18nString(UIStrings.noSessionStorage),
         i18nString(UIStrings.sessionStorageDescription), 'session-storage');
     this.sessionStorageListTreeElement.setLink(
-        'https://developer.chrome.com/docs/devtools/storage/sessionstorage/?utm_source=devtools' as
-        Platform.DevToolsPath.UrlString);
+        'https://developer.chrome.com/docs/devtools/storage/sessionstorage/' as Platform.DevToolsPath.UrlString);
     const sessionStorageIcon = IconButton.Icon.create('table');
     this.sessionStorageListTreeElement.setLeadingIcons([sessionStorageIcon]);
 
@@ -428,8 +424,7 @@ export class ApplicationPanelSidebar extends UI.Widget.VBox implements SDK.Targe
         panel, i18nString(UIStrings.extensionStorage), i18nString(UIStrings.noExtensionStorage),
         i18nString(UIStrings.extensionStorageDescription), 'extension-storage');
     this.extensionStorageListTreeElement.setLink(
-        'https://developer.chrome.com/docs/extensions/reference/api/storage/?utm_source=devtools' as
-        Platform.DevToolsPath.UrlString);
+        'https://developer.chrome.com/docs/extensions/reference/api/storage/' as Platform.DevToolsPath.UrlString);
     const extensionStorageIcon = IconButton.Icon.create('table');
     this.extensionStorageListTreeElement.setLeadingIcons([extensionStorageIcon]);
 
@@ -437,16 +432,14 @@ export class ApplicationPanelSidebar extends UI.Widget.VBox implements SDK.Targe
 
     this.indexedDBListTreeElement = new IndexedDBTreeElement(panel);
     this.indexedDBListTreeElement.setLink(
-        'https://developer.chrome.com/docs/devtools/storage/indexeddb/?utm_source=devtools' as
-        Platform.DevToolsPath.UrlString);
+        'https://developer.chrome.com/docs/devtools/storage/indexeddb/' as Platform.DevToolsPath.UrlString);
     storageTreeElement.appendChild(this.indexedDBListTreeElement);
 
     this.cookieListTreeElement = new ExpandableApplicationPanelTreeElement(
         panel, i18nString(UIStrings.cookies), i18nString(UIStrings.noCookies), i18nString(UIStrings.cookiesDescription),
         'cookies');
     this.cookieListTreeElement.setLink(
-        'https://developer.chrome.com/docs/devtools/storage/cookies/?utm_source=devtools' as
-        Platform.DevToolsPath.UrlString);
+        'https://developer.chrome.com/docs/devtools/storage/cookies/' as Platform.DevToolsPath.UrlString);
     const cookieIcon = IconButton.Icon.create('cookie');
     this.cookieListTreeElement.setLeadingIcons([cookieIcon]);
     storageTreeElement.appendChild(this.cookieListTreeElement);

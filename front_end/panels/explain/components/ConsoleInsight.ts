@@ -557,12 +557,36 @@ export class ConsoleInsight extends HTMLElement {
     return {explanationWithCitations, directCitationUrls};
   }
 
+  #modifyTokensToHandleCitationsInCode(tokens: Marked.Marked.TokensList): void {
+    for (const token of tokens) {
+      if (token.type === 'code') {
+        // Find and remove '[^number]' from within code block
+        const matches: String[]|null = token.text.match(/\[\^\d+\]/g);
+        token.text = token.text.replace(/\[\^\d+\]/g, '');
+        // And add as a citation for the whole code block
+        if (matches?.length) {
+          const citations = matches.map(match => {
+            const index = parseInt(match.slice(2, -1), 10);
+            return {
+              index,
+              clickHandler: this.#citationClickHandler.bind(this, index),
+            };
+          });
+          (token as MarkdownView.MarkdownView.CodeTokenWithCitation).citations = citations;
+        }
+      }
+    }
+  }
+
   async #generateInsight(): Promise<void> {
     try {
       for await (const {sources, isPageReloadRecommended, explanation, metadata, completed} of this.#getInsight()) {
         const {explanationWithCitations, directCitationUrls} = this.#insertCitations(explanation, metadata);
         const tokens = this.#validateMarkdown(explanationWithCitations);
         const valid = tokens !== false;
+        if (valid) {
+          this.#modifyTokensToHandleCitationsInCode(tokens);
+        }
         this.#transitionTo({
           type: State.INSIGHT,
           tokens: valid ? tokens : [],
@@ -914,7 +938,6 @@ export class ConsoleInsight extends HTMLElement {
   }
 
   #renderFooter(): Lit.LitTemplate {
-    const showThumbsUpDownButtons = !(Root.Runtime.hostConfig.aidaAvailability?.disallowLogging ?? true);
     const disclaimer = this.#renderDisclaimer();
     // clang-format off
     switch (this.#state.type) {
@@ -990,44 +1013,42 @@ export class ConsoleInsight extends HTMLElement {
         </div>
         <div class="filler"></div>
         <div class="rating">
-          ${showThumbsUpDownButtons ? html`
-            <devtools-button
-              data-rating=${'true'}
-              .data=${
-                {
-                  variant: Buttons.Button.Variant.ICON_TOGGLE,
-                  size: Buttons.Button.Size.SMALL,
-                  iconName: 'thumb-up',
-                  toggledIconName: 'thumb-up',
-                  toggleOnClick: false,
-                  toggleType: Buttons.Button.ToggleType.PRIMARY,
-                  disabled: this.#selectedRating !== undefined,
-                  toggled: this.#selectedRating === true,
-                  title: i18nString(UIStrings.goodResponse),
-                  jslogContext: 'thumbs-up',
-                } as Buttons.Button.ButtonData
-              }
-              @click=${this.#onRating}
-            ></devtools-button>
-            <devtools-button
-              data-rating=${'false'}
-              .data=${
-                {
-                  variant: Buttons.Button.Variant.ICON_TOGGLE,
-                  size: Buttons.Button.Size.SMALL,
-                  iconName: 'thumb-down',
-                  toggledIconName: 'thumb-down',
-                  toggleOnClick: false,
-                  toggleType: Buttons.Button.ToggleType.PRIMARY,
-                  disabled: this.#selectedRating !== undefined,
-                  toggled: this.#selectedRating === false,
-                  title: i18nString(UIStrings.badResponse),
-                  jslogContext: 'thumbs-down',
-                } as Buttons.Button.ButtonData
-              }
-              @click=${this.#onRating}
-            ></devtools-button>
-          ` : Lit.nothing}
+          <devtools-button
+            data-rating=${'true'}
+            .data=${
+              {
+                variant: Buttons.Button.Variant.ICON_TOGGLE,
+                size: Buttons.Button.Size.SMALL,
+                iconName: 'thumb-up',
+                toggledIconName: 'thumb-up',
+                toggleOnClick: false,
+                toggleType: Buttons.Button.ToggleType.PRIMARY,
+                disabled: this.#selectedRating !== undefined,
+                toggled: this.#selectedRating === true,
+                title: i18nString(UIStrings.goodResponse),
+                jslogContext: 'thumbs-up',
+              } as Buttons.Button.ButtonData
+            }
+            @click=${this.#onRating}
+          ></devtools-button>
+          <devtools-button
+            data-rating=${'false'}
+            .data=${
+              {
+                variant: Buttons.Button.Variant.ICON_TOGGLE,
+                size: Buttons.Button.Size.SMALL,
+                iconName: 'thumb-down',
+                toggledIconName: 'thumb-down',
+                toggleOnClick: false,
+                toggleType: Buttons.Button.ToggleType.PRIMARY,
+                disabled: this.#selectedRating !== undefined,
+                toggled: this.#selectedRating === false,
+                title: i18nString(UIStrings.badResponse),
+                jslogContext: 'thumbs-down',
+              } as Buttons.Button.ButtonData
+            }
+            @click=${this.#onRating}
+          ></devtools-button>
           <devtools-button
             .data=${
               {
@@ -1122,8 +1143,8 @@ export class ConsoleInsight extends HTMLElement {
   #render(): void {
     // clang-format off
     render(html`
-      <style>${styles.cssText}</style>
-      <style>${Input.checkboxStyles.cssText}</style>
+      <style>${styles}</style>
+      <style>${Input.checkboxStyles}</style>
       <div class="wrapper" jslog=${VisualLogging.pane('console-insights').track({resize: true})}>
         <div class="animation-wrapper">
           ${this.#renderHeader()}
@@ -1154,11 +1175,11 @@ class ConsoleInsightSourcesList extends HTMLElement {
   #render(): void {
     // clang-format off
      render(html`
-      <style>${listStyles.cssText}</style>
-      <style>${Input.checkboxStyles.cssText}</style>
+      <style>${listStyles}</style>
+      <style>${Input.checkboxStyles}</style>
       <ul>
         ${Directives.repeat(this.#sources, item => item.value, item => {
-          return html`<li><x-link class="link" title="${localizeType(item.type)} ${i18nString(UIStrings.opensInNewTab)}" href="data:text/plain,${encodeURIComponent(item.value)}" jslog=${VisualLogging.link('source-' + item.type).track({click: true})}>
+          return html`<li><x-link class="link" title="${localizeType(item.type)} ${i18nString(UIStrings.opensInNewTab)}" href="data:text/plain;charset=utf-8,${encodeURIComponent(item.value)}" jslog=${VisualLogging.link('source-' + item.type).track({click: true})}>
             <devtools-icon name="open-externally"></devtools-icon>
             ${localizeType(item.type)}
           </x-link></li>`;

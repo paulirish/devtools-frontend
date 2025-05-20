@@ -182,12 +182,8 @@ export interface FlameChartDelegate {
   containingElement?: () => HTMLElement;
 }
 
-interface GroupExpansionState {
-  [groupName: string]: boolean;
-}
-interface GroupHiddenState {
-  [groupName: string]: boolean;
-}
+type GroupExpansionState = Record<string, boolean>;
+type GroupHiddenState = Record<string, boolean>;
 
 interface PopoverState {
   // Index of the last entry the popover was shown over.
@@ -342,6 +338,8 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     super(true);
     this.#font = `${DEFAULT_FONT_SIZE} ${getFontFamilyForCanvas()}`;
     this.registerRequiredCSS(flameChartStyles);
+    this.registerRequiredCSS(UI.inspectorCommonStyles);
+
     this.contentElement.classList.add('flame-chart-main-pane');
     if (typeof optionalConfig.selectedElementOutline === 'boolean') {
       this.#selectedElementOutlineEnabled = optionalConfig.selectedElementOutline;
@@ -678,11 +676,12 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.updateHighlight();
   }
 
-  timelineData(rebuid?: boolean): FlameChartTimelineData|null {
+  timelineData(rebuild?: boolean): FlameChartTimelineData|null {
     if (!this.dataProvider) {
       return null;
     }
-    const timelineData = this.dataProvider.timelineData(rebuid);
+
+    const timelineData = this.dataProvider.timelineData(rebuild);
     if (timelineData !== this.rawTimelineData ||
         (timelineData && timelineData.entryStartTimes.length !== this.rawTimelineDataLength)) {
       this.processTimelineData(timelineData);

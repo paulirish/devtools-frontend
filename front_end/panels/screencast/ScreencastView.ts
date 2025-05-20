@@ -95,7 +95,7 @@ export class ScreencastView extends UI.Widget.VBox implements SDK.OverlayModel.H
   private resourceTreeModel: SDK.ResourceTreeModel.ResourceTreeModel|null;
   private networkManager: SDK.NetworkManager.NetworkManager|null;
   private readonly inputModel: InputModel|null;
-  private shortcuts: {[x: number]: (arg0?: Event|undefined) => boolean};
+  private shortcuts: Record<number, (arg0?: Event|undefined) => boolean>;
   private scrollOffsetX: number;
   private scrollOffsetY: number;
   private screenZoom: number;
@@ -127,7 +127,6 @@ export class ScreencastView extends UI.Widget.VBox implements SDK.OverlayModel.H
   private inspectModeConfig?: Protocol.Overlay.HighlightConfig|null;
   private navigationBar?: HTMLElement;
   private navigationReload?: HTMLElement;
-  // @ts-expect-error keep local reference
   private navigationProgressBar?: ProgressTracker;
   private touchInputToggle?: HTMLButtonElement;
   private mouseInputToggle?: HTMLButtonElement;
@@ -149,9 +148,7 @@ export class ScreencastView extends UI.Widget.VBox implements SDK.OverlayModel.H
 
     this.setMinimumSize(150, 150);
 
-    this.shortcuts = {} as {
-      [x: number]: (arg0?: Event|undefined) => boolean,
-    };
+    this.shortcuts = {};
     this.scrollOffsetX = 0;
     this.scrollOffsetY = 0;
     this.screenZoom = 1;

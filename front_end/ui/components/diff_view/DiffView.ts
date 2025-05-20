@@ -9,15 +9,7 @@ import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 import * as Lit from '../../lit/lit.js';
 import * as CodeHighlighter from '../code_highlighter/code_highlighter.js';
 
-import diffViewStylesRaw from './diffView.css.js';
-
-/* eslint-disable rulesdir/no-adopted-style-sheets --
- * TODO(crbug.com/391381439): Fully migrate off of Constructable Stylesheets.
- **/
-const diffViewStyles = new CSSStyleSheet();
-diffViewStyles.replaceSync(diffViewStylesRaw.cssText);
-const CodeHighlighterStyles = new CSSStyleSheet();
-CodeHighlighterStyles.replaceSync(CodeHighlighter.codeHighlighterStyles.cssText);
+import diffViewStyles from './diffView.css.js';
 
 const {html} = Lit;
 
@@ -39,6 +31,11 @@ const UIStrings = {
    *@example {2} PH1
    */
   SkippingDMatchingLines: '( … Skipping {PH1} matching lines … )',
+  /**
+   *@description Text in Changes View for the case where the modified file contents are the same with its unmodified state
+   * e.g. the file contents changed from A -> B then B -> A and not saved yet.
+   */
+  noDiff: 'File is identical to its unmodified state',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('ui/components/diff_view/DiffView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -202,6 +199,8 @@ class DiffRenderer {
 
   #render(rows: readonly Row[]): Lit.TemplateResult {
     return html`
+      <style>${diffViewStyles}</style>
+      <style>${CodeHighlighter.codeHighlighterStyles}</style>
       <div class="diff-listing" aria-label=${i18nString(UIStrings.changesDiffViewer)}>
         ${rows.map(row => this.#renderRow(row))}
       </div>`;
@@ -275,23 +274,36 @@ export interface DiffViewData {
   mimeType: string;
 }
 
-export class DiffView extends HTMLElement {
+function renderNoDiffState(container: HTMLElement|DocumentFragment): void {
+  // clang-format off
+  Lit.render(html`
+    <style>${diffViewStyles}</style>
+    <p class="diff-listing-no-diff" data-testid="no-diff">${i18nString(UIStrings.noDiff)}</p>`,
+  container, {host: container});
+  // clang-format on
+}
 
+export class DiffView extends HTMLElement {
   readonly #shadow = this.attachShadow({mode: 'open'});
   loaded: Promise<void>;
 
   constructor(data?: DiffViewData) {
     super();
-    this.#shadow.adoptedStyleSheets = [diffViewStyles, CodeHighlighterStyles];
-    if (data) {
-      this.loaded = DiffRenderer.render(data.diff, data.mimeType, this.#shadow);
-    } else {
-      this.loaded = Promise.resolve();
-    }
+
+    this.loaded = this.#render(data);
   }
 
   set data(data: DiffViewData) {
-    this.loaded = DiffRenderer.render(data.diff, data.mimeType, this.#shadow);
+    this.loaded = this.#render(data);
+  }
+
+  async #render(data?: DiffViewData): Promise<void> {
+    if (!data || data.diff.length === 0) {
+      renderNoDiffState(this.#shadow);
+      return;
+    }
+
+    await DiffRenderer.render(data.diff, data.mimeType, this.#shadow);
   }
 }
 

@@ -11,13 +11,8 @@ import type * as Marked from '../../../third_party/marked/marked.js';
 import * as Lit from '../../lit/lit.js';
 import * as VisualLogging from '../../visual_logging/visual_logging.js';
 
-import markdownViewStylesRaw from './markdownView.css.js';
-
-/* eslint-disable rulesdir/no-adopted-style-sheets --
- * TODO(crbug.com/391381439): Fully migrate off of Constructable Stylesheets.
- **/
-const markdownViewStyles = new CSSStyleSheet();
-markdownViewStyles.replaceSync(markdownViewStylesRaw.cssText);
+import type * as Codeblock from './CodeBlock.js';
+import markdownViewStyles from './markdownView.css.js';
 
 const html = Lit.html;
 const render = Lit.render;
@@ -28,6 +23,10 @@ export interface MarkdownViewData {
   animationEnabled?: boolean;
 }
 
+export type CodeTokenWithCitation = Marked.Marked.Tokens.Generic&{
+  citations: Codeblock.Citation[],
+};
+
 export class MarkdownView extends HTMLElement {
   readonly #shadow = this.attachShadow({mode: 'open'});
 
@@ -35,10 +34,6 @@ export class MarkdownView extends HTMLElement {
   #renderer = new MarkdownLitRenderer();
   #animationEnabled = false;
   #isAnimating = false;
-
-  connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [markdownViewStyles];
-  }
 
   set data(data: MarkdownViewData) {
     this.#tokenData = data.tokens;
@@ -118,6 +113,7 @@ export class MarkdownView extends HTMLElement {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     render(html`
+      <style>${markdownViewStyles}</style>
       <div class='message'>
         ${this.#tokenData.map(token => this.#renderer.renderToken(token))}
       </div>
@@ -317,7 +313,7 @@ export class MarkdownInsightRenderer extends MarkdownLitRenderer {
       return token.lang;
     }
 
-    if (/^(\.|#)?[\w:\[\]="'-\.]* ?{/m.test(token.text) || /^@import/.test(token.text)) {
+    if (/^(\.|#)?[\w:\[\]="'-\.]+ ?{/m.test(token.text) || /^@import/.test(token.text)) {
       return 'css';
     }
     if (/^(var|const|let|function|async|import)\s/.test(token.text)) {
@@ -345,6 +341,7 @@ export class MarkdownInsightRenderer extends MarkdownLitRenderer {
           class=${this.customClassMapForToken('code')}
           .code=${this.unescape(token.text)}
           .codeLang=${this.detectCodeLanguage(token as Marked.Marked.Tokens.Code)}
+          .citations=${(token as CodeTokenWithCitation).citations || []}
           .displayNotice=${true}>
         </devtools-code-block>`;
       case 'citation':

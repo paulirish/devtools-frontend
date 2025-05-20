@@ -120,14 +120,11 @@ const REGISTERED_EXPERIMENTS = [
   Root.Runtime.ExperimentName.HIGHLIGHT_ERRORS_ELEMENTS_PANEL,
   Root.Runtime.ExperimentName.USE_SOURCE_MAP_SCOPES,
   'font-editor',
-  Root.Runtime.ExperimentName.NETWORK_PANEL_FILTER_BAR_REDESIGN,
   Root.Runtime.ExperimentName.TIMELINE_DEBUG_MODE,
   Root.Runtime.ExperimentName.FULL_ACCESSIBILITY_TREE,
   Root.Runtime.ExperimentName.TIMELINE_SHOW_POST_MESSAGE_EVENTS,
   Root.Runtime.ExperimentName.TIMELINE_ENHANCED_TRACES,
   Root.Runtime.ExperimentName.TIMELINE_EXPERIMENTAL_INSIGHTS,
-  Root.Runtime.ExperimentName.TIMELINE_DIM_UNRELATED_EVENTS,
-  Root.Runtime.ExperimentName.TIMELINE_ALTERNATIVE_NAVIGATION,
 ];
 
 export async function initializeGlobalVars({reset = true} = {}) {
@@ -156,6 +153,7 @@ export async function initializeGlobalVars({reset = true} = {}) {
         Common.Settings.SettingCategory.DEBUGGER, 'skip-stack-frames-pattern',
         '/node_modules/|^node:', Common.Settings.SettingType.REGEX),
     createSettingValue(Common.Settings.SettingCategory.DEBUGGER, 'navigator-group-by-folder', true),
+    createSettingValue(Common.Settings.SettingCategory.ELEMENTS, 'dom-word-wrap', true),
     createSettingValue(Common.Settings.SettingCategory.ELEMENTS, 'show-detailed-inspect-tooltip', true),
     createSettingValue(Common.Settings.SettingCategory.ELEMENTS, 'show-html-comments', true),
     createSettingValue(Common.Settings.SettingCategory.ELEMENTS, 'show-ua-shadow-dom', false),
@@ -203,6 +201,7 @@ export async function initializeGlobalVars({reset = true} = {}) {
     createSettingValue(Common.Settings.SettingCategory.SOURCES, 'auto-pretty-print-minified', true),
     createSettingValue(Common.Settings.SettingCategory.SOURCES, 'js-source-maps-enabled', true),
     createSettingValue(Common.Settings.SettingCategory.SOURCES, 'show-whitespaces-in-editor', 'none'),
+    createSettingValue(Common.Settings.SettingCategory.SOURCES, 'sources.word-wrap', true),
     createSettingValue(Common.Settings.SettingCategory.SOURCES, 'text-editor-autocompletion', true),
     createSettingValue(Common.Settings.SettingCategory.SOURCES, 'text-editor-auto-detect-indent', false),
     createSettingValue(Common.Settings.SettingCategory.SOURCES, 'text-editor-bracket-closing', true),
@@ -210,7 +209,6 @@ export async function initializeGlobalVars({reset = true} = {}) {
     createSettingValue(Common.Settings.SettingCategory.SOURCES, 'text-editor-code-folding', true),
     createSettingValue(Common.Settings.SettingCategory.SOURCES, 'text-editor-indent', '    '),
     createSettingValue(Common.Settings.SettingCategory.SOURCES, 'text-editor-tab-moves-focus', false),
-    createSettingValue(Common.Settings.SettingCategory.SOURCES, 'dom-word-wrap', true),
     createSettingValue(
         Common.Settings.SettingCategory.EMULATION, 'emulation.touch', '', Common.Settings.SettingType.ENUM),
     createSettingValue(
@@ -301,6 +299,9 @@ export async function initializeGlobalVars({reset = true} = {}) {
         Common.Settings.SettingType.BOOLEAN),
     createSettingValue(
         Common.Settings.SettingCategory.APPEARANCE, 'chrome-theme-colors', true, Common.Settings.SettingType.BOOLEAN),
+    createSettingValue(
+        Common.Settings.SettingCategory.PERFORMANCE, 'timeline.user-had-shortcuts-dialog-opened-once', false,
+        Common.Settings.SettingType.BOOLEAN),
   ];
 
   Common.Settings.registerSettingsForTest(settings, reset);

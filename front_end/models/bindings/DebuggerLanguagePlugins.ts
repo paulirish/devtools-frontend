@@ -29,13 +29,13 @@ const UIStrings = {
    *@example {http://web.dev/file.wasm} PH2
    *@example {http://web.dev/file.wasm.debug.wasm} PH3
    */
-  loadingDebugSymbolsForVia: '[{PH1}] Loading debug symbols for {PH2} (via {PH3})...',
+  loadingDebugSymbolsForVia: '[{PH1}] Loading debug symbols for {PH2} (via {PH3})…',
   /**
    *@description Status message that is shown in the Console when debugging information is being loaded
    *@example {C/C++ DevTools Support (DWARF)} PH1
    *@example {http://web.dev/file.wasm} PH2
    */
-  loadingDebugSymbolsFor: '[{PH1}] Loading debug symbols for {PH2}...',
+  loadingDebugSymbolsFor: '[{PH1}] Loading debug symbols for {PH2}…',
   /**
    *@description Warning message that is displayed in the Console when debugging information was loaded, but no source files were found
    *@example {C/C++ DevTools Support (DWARF)} PH1
@@ -178,9 +178,7 @@ class SourceScopeRemoteObject extends SDK.RemoteObject.RemoteObjectImpl {
     }
 
     const properties = [];
-    const namespaces: {
-      [x: string]: SDK.RemoteObject.RemoteObject,
-    } = {};
+    const namespaces: Record<string, SDK.RemoteObject.RemoteObject> = {};
 
     function makeProperty(name: string, obj: SDK.RemoteObject.RemoteObject): SDK.RemoteObject.RemoteObjectProperty {
       return new SDK.RemoteObject.RemoteObjectProperty(
@@ -199,9 +197,7 @@ class SourceScopeRemoteObject extends SDK.RemoteObject.RemoteObjectImpl {
         sourceVar = new SDK.RemoteObject.LocalJSONObject(undefined);
       }
       if (variable.nestedName && variable.nestedName.length > 1) {
-        let parent: {
-          [x: string]: SDK.RemoteObject.RemoteObject,
-        } = namespaces;
+        let parent: Record<string, SDK.RemoteObject.RemoteObject> = namespaces;
         for (let index = 0; index < variable.nestedName.length - 1; index++) {
           const nestedName = variable.nestedName[index];
           let child: NamespaceObject|SDK.RemoteObject.RemoteObject = parent[nestedName];

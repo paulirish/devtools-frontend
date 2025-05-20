@@ -295,14 +295,29 @@ export namespace ProtocolMapping {
      */
     'Network.directTCPSocketChunkReceived': [Protocol.Network.DirectTCPSocketChunkReceivedEvent];
     /**
-     * Fired when there is an error
-     * when writing to tcp direct socket stream.
-     * For example, if user writes illegal type like string
-     * instead of ArrayBuffer or ArrayBufferView.
-     * There's no reporting for reading, because
-     * we cannot know errors on the other side.
+     * Fired upon direct_socket.UDPSocket creation.
      */
-    'Network.directTCPSocketChunkError': [Protocol.Network.DirectTCPSocketChunkErrorEvent];
+    'Network.directUDPSocketCreated': [Protocol.Network.DirectUDPSocketCreatedEvent];
+    /**
+     * Fired when direct_socket.UDPSocket connection is opened.
+     */
+    'Network.directUDPSocketOpened': [Protocol.Network.DirectUDPSocketOpenedEvent];
+    /**
+     * Fired when direct_socket.UDPSocket is aborted.
+     */
+    'Network.directUDPSocketAborted': [Protocol.Network.DirectUDPSocketAbortedEvent];
+    /**
+     * Fired when direct_socket.UDPSocket is closed.
+     */
+    'Network.directUDPSocketClosed': [Protocol.Network.DirectUDPSocketClosedEvent];
+    /**
+     * Fired when message is sent to udp direct socket stream.
+     */
+    'Network.directUDPSocketChunkSent': [Protocol.Network.DirectUDPSocketChunkSentEvent];
+    /**
+     * Fired when message is received from udp direct socket stream.
+     */
+    'Network.directUDPSocketChunkReceived': [Protocol.Network.DirectUDPSocketChunkReceivedEvent];
     /**
      * Fired when additional information about a requestWillBeSent event is available from the
      * network stack. Not every requestWillBeSent event will have an additional
@@ -564,6 +579,7 @@ export namespace ProtocolMapping {
     'Storage.storageBucketDeleted': [Protocol.Storage.StorageBucketDeletedEvent];
     'Storage.attributionReportingSourceRegistered': [Protocol.Storage.AttributionReportingSourceRegisteredEvent];
     'Storage.attributionReportingTriggerRegistered': [Protocol.Storage.AttributionReportingTriggerRegisteredEvent];
+    'Storage.attributionReportingReportSent': [Protocol.Storage.AttributionReportingReportSentEvent];
     /**
      * Issued when attached to target because of auto-attach or `attachToTarget` command.
      */
@@ -760,6 +776,18 @@ export namespace ProtocolMapping {
      * happened.
      */
     'BluetoothEmulation.gattOperationReceived': [Protocol.BluetoothEmulation.GattOperationReceivedEvent];
+    /**
+     * Event for when a characteristic operation of |type| to the characteristic
+     * respresented by |characteristicId| happened. |data| and |writeType| is
+     * expected to exist when |type| is write.
+     */
+    'BluetoothEmulation.characteristicOperationReceived': [Protocol.BluetoothEmulation.CharacteristicOperationReceivedEvent];
+    /**
+     * Event for when a descriptor operation of |type| to the descriptor
+     * respresented by |descriptorId| happened. |data| is expected to exist when
+     * |type| is write.
+     */
+    'BluetoothEmulation.descriptorOperationReceived': [Protocol.BluetoothEmulation.DescriptorOperationReceivedEvent];
     /**
      * Fired when breakpoint is resolved to an actual script and location.
      * Deprecated in favor of `resolvedBreakpoints` in the `scriptParsed` event.
@@ -2358,12 +2386,22 @@ export namespace ProtocolMapping {
       returnType: void;
     };
     /**
+     * TODO: OBSOLETE: To remove when setPressureDataOverride is merged.
      * Provides a given pressure state that will be processed and eventually be
      * delivered to PressureObserver users. |source| must have been previously
      * overridden by setPressureSourceOverrideEnabled.
      */
     'Emulation.setPressureStateOverride': {
       paramsType: [Protocol.Emulation.SetPressureStateOverrideRequest];
+      returnType: void;
+    };
+    /**
+     * Provides a given pressure data set that will be processed and eventually be
+     * delivered to PressureObserver users. |source| must have been previously
+     * overridden by setPressureSourceOverrideEnabled.
+     */
+    'Emulation.setPressureDataOverride': {
+      paramsType: [Protocol.Emulation.SetPressureDataOverrideRequest];
       returnType: void;
     };
     /**
@@ -3123,7 +3161,7 @@ export namespace ProtocolMapping {
     };
     /**
      * Sets Controls for third-party cookie access
-     * Page reload is required before the new cookie bahavior will be observed
+     * Page reload is required before the new cookie behavior will be observed
      */
     'Network.setCookieControls': {
       paramsType: [Protocol.Network.SetCookieControlsRequest];
@@ -4781,6 +4819,28 @@ export namespace ProtocolMapping {
       returnType: void;
     };
     /**
+     * Simulates the response from the characteristic with |characteristicId| for a
+     * characteristic operation of |type|. The |code| value follows the Error
+     * Codes from Bluetooth Core Specification Vol 3 Part F 3.4.1.1 Error Response.
+     * The |data| is expected to exist when simulating a successful read operation
+     * response.
+     */
+    'BluetoothEmulation.simulateCharacteristicOperationResponse': {
+      paramsType: [Protocol.BluetoothEmulation.SimulateCharacteristicOperationResponseRequest];
+      returnType: void;
+    };
+    /**
+     * Simulates the response from the descriptor with |descriptorId| for a
+     * descriptor operation of |type|. The |code| value follows the Error
+     * Codes from Bluetooth Core Specification Vol 3 Part F 3.4.1.1 Error Response.
+     * The |data| is expected to exist when simulating a successful read operation
+     * response.
+     */
+    'BluetoothEmulation.simulateDescriptorOperationResponse': {
+      paramsType: [Protocol.BluetoothEmulation.SimulateDescriptorOperationResponseRequest];
+      returnType: void;
+    };
+    /**
      * Adds a service with |serviceUuid| to the peripheral with |address|.
      */
     'BluetoothEmulation.addService': {
@@ -4823,6 +4883,13 @@ export namespace ProtocolMapping {
      */
     'BluetoothEmulation.removeDescriptor': {
       paramsType: [Protocol.BluetoothEmulation.RemoveDescriptorRequest];
+      returnType: void;
+    };
+    /**
+     * Simulates a GATT disconnection from the peripheral with |address|.
+     */
+    'BluetoothEmulation.simulateGATTDisconnection': {
+      paramsType: [Protocol.BluetoothEmulation.SimulateGATTDisconnectionRequest];
       returnType: void;
     };
     /**

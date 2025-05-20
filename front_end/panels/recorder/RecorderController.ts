@@ -13,7 +13,6 @@ import * as PublicExtensions from '../../models/extensions/extensions.js';
 import type * as Trace from '../../models/trace/trace.js';
 import * as PanelCommon from '../../panels/common/common.js';
 import * as Emulation from '../../panels/emulation/emulation.js';
-import * as Timeline from '../../panels/timeline/timeline.js';
 import * as Tracing from '../../services/tracing/tracing.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
 import type * as Dialogs from '../../ui/components/dialogs/dialogs.js';
@@ -30,13 +29,10 @@ import * as Converters from './converters/converters.js';
 import * as Extensions from './extensions/extensions.js';
 import * as Models from './models/models.js';
 import * as Actions from './recorder-actions/recorder-actions.js';
-import recorderControllerStylesRaw from './recorderController.css.js';
+import recorderControllerStyles from './recorderController.css.js';
 import * as Events from './RecorderEvents.js';
 
 // TODO(crbug.com/391381439): Fully migrate off of Constructable Stylesheets.
-const recorderControllerStyles = new CSSStyleSheet();
-recorderControllerStyles.replaceSync(recorderControllerStylesRaw.cssText);
-
 const {html, Decorators, LitElement} = Lit;
 const {customElement, state} = Decorators;
 
@@ -203,8 +199,6 @@ const CONVERTER_ID_TO_METRIC: Record<string, Host.UserMetrics.RecordingExported|
 
 @customElement('devtools-recorder-controller')
 export class RecorderController extends LitElement {
-  static override readonly styles = [recorderControllerStyles];
-
   @state() declare private currentRecordingSession?: Models.RecordingSession.RecordingSession;
   @state() declare private currentRecording: StoredRecording|undefined;
   @state() declare private currentStep?: Models.Schema.Step;
@@ -595,10 +589,10 @@ export class RecorderController extends LitElement {
       this.#replayState.isPlaying = false;
       this.recordingPlayer = undefined;
       await UI.InspectorView.InspectorView.instance().showPanel(event.data?.targetPanel as string);
-      switch (event.data?.targetPanel) {
-        case Components.RecordingView.TargetPanel.PERFORMANCE_PANEL:
-          Timeline.TimelinePanel.TimelinePanel.instance().loadFromEvents(events as Trace.Types.Events.Event[]);
-          break;
+      if (event.data?.targetPanel === Components.RecordingView.TargetPanel.PERFORMANCE_PANEL) {
+        // Note: this is not passing any metadata to the Performance panel.
+        const trace = new SDK.TraceObject.TraceObject(events as Trace.Types.Events.Event[]);
+        void Common.Revealer.reveal(trace);
       }
     }
   }
@@ -1297,6 +1291,7 @@ export class RecorderController extends LitElement {
     ];
 
     return html`
+        <style>${recorderControllerStyles}</style>
         <div class="wrapper">
           <div class="header" jslog=${VisualLogging.toolbar()}>
             <devtools-button

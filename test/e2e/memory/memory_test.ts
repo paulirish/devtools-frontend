@@ -194,7 +194,7 @@ describe('The Memory Panel', function() {
   });
 
   // Flaky on win and linux
-  it.skip('[crbug.com/1363150] Correctly shows multiple retainer paths for an object', async () => {
+  it.skip('[crbug.com/40238574] Correctly shows multiple retainer paths for an object', async () => {
     await goToResource('memory/multiple-retainers.html');
     await navigateToMemoryTab();
     await takeHeapSnapshot();
@@ -262,7 +262,7 @@ describe('The Memory Panel', function() {
   });
 
   // Flaky test causing build failures
-  it.skip('[crbug.com/1239550] Shows the correct output for a detached iframe', async () => {
+  it.skip('[crbug.com/40193901] Shows the correct output for a detached iframe', async () => {
     await goToResource('memory/detached-iframe.html');
     await navigateToMemoryTab();
     await takeHeapSnapshot();
@@ -513,9 +513,9 @@ describe('The Memory Panel', function() {
     await waitForRetainerChain([
       '{y}',
       '{d}',
-      `{${'#'.repeat(130)}, ...}`,
+      `{${'#'.repeat(130)}, …}`,
       '{b, irrelevantProperty, <symbol also irrelevant>, "}"}',
-      '{a, extraProp0, extraProp1, extraProp2, extraProp3, ..., extraProp6, extraProp7, extraProp8, extraProp9}',
+      '{a, extraProp0, extraProp1, extraProp2, extraProp3, …, extraProp6, extraProp7, extraProp8, extraProp9}',
       'Window',
     ]);
     await clickOnContextMenuForRetainer('b', 'Ignore this retainer');

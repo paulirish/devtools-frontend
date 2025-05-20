@@ -32,6 +32,7 @@ import {SharedDictionaryIssue} from './SharedDictionaryIssue.js';
 import {SourceFrameIssuesManager} from './SourceFrameIssuesManager.js';
 import {SRIMessageSignatureIssue} from './SRIMessageSignatureIssue.js';
 import {StylesheetLoadingIssue} from './StylesheetLoadingIssue.js';
+import {UserReidentificationIssue} from './UserReidentificationIssue.js';
 
 export {Events} from './IssuesManagerEvents.js';
 
@@ -139,6 +140,10 @@ const issueCodeHandlers = new Map<
     Protocol.Audits.InspectorIssueCode.SRIMessageSignatureIssue,
     SRIMessageSignatureIssue.fromInspectorIssue,
   ],
+  [
+    Protocol.Audits.InspectorIssueCode.UserReidentificationIssue,
+    UserReidentificationIssue.fromInspectorIssue,
+  ],
 ]);
 
 /**
@@ -163,9 +168,7 @@ export interface IssuesManagerCreationOptions {
   hideIssueSetting?: Common.Settings.Setting<HideIssueMenuSetting>;
 }
 
-export interface HideIssueMenuSetting {
-  [x: string]: IssueStatus;
-}
+export type HideIssueMenuSetting = Record<string, IssueStatus>;
 
 export const enum IssueStatus {
   HIDDEN = 'Hidden',

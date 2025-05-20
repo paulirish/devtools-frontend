@@ -5,9 +5,9 @@
 import * as Host from '../../../core/host/host.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Platform from '../../../core/platform/platform.js';
+import * as Root from '../../../core/root/root.js';
 import * as TimelineUtils from '../../../panels/timeline/utils/utils.js';
-import * as PanelUtils from '../../../panels/utils/utils.js';
-import type * as Lit from '../../../ui/lit/lit.js';
+import {html, type TemplateResult} from '../../../ui/lit/lit.js';
 import {PerformanceInsightFormatter, TraceEventFormatter} from '../data_formatters/PerformanceInsightFormatter.js';
 import {debugLog} from '../debug.js';
 
@@ -121,17 +121,12 @@ export class InsightContext extends ConversationContext<TimelineUtils.InsightAIC
     return this.#insight;
   }
 
-  override getIcon(): HTMLElement {
-    const iconData = {
-      iconName: 'performance',
-      color: 'var(--sys-color-on-surface-subtle)',
-    };
-    const icon = PanelUtils.PanelUtils.createIconElement(iconData, 'Performance');
-    icon.classList.add('icon');
-    return icon;
+  override getIcon(): TemplateResult {
+    return html`<devtools-icon name="performance" title="Performance"
+        style="color: var(--sys-color-on-surface-subtle);"></devtools-icon>`;
   }
 
-  override getTitle(): string|ReturnType<typeof Lit.Directives.until> {
+  override getTitle(): string {
     return `Insight: ${this.#insight.title()}`;
   }
 
@@ -170,12 +165,12 @@ export class InsightContext extends ConversationContext<TimelineUtils.InsightAIC
         ];
       case 'InteractionToNextPaint':
         return [
-          {title: 'Help me optimize my INP score'}, {title: 'Help me understand why a large INP score is problematic'},
-          {title: 'What was the biggest contributor to my INP score?'}
+          {title: 'Suggest fixes for my longest interaction'}, {title: 'Why is a large INP score problematic?'},
+          {title: 'What\'s the biggest contributor to my longest interaction?'}
         ];
       case 'LCPDiscovery':
         return [
-          {title: 'Help me optimize my LCP score'}, {title: 'What can I do to reduce my LCP discovery time?'},
+          {title: 'Suggest fixes to reduce my LCP'}, {title: 'What can I do to reduce my LCP discovery time?'},
           {title: 'Why is LCP discovery time important?'}
         ];
       case 'LCPPhases':
@@ -207,6 +202,9 @@ export class InsightContext extends ConversationContext<TimelineUtils.InsightAIC
     }
   }
 }
+
+// 16k Tokens * ~4 char per token.
+const MAX_FUNCTION_RESULT_BYTE_LENGTH = 16384 * 4;
 
 export class PerformanceInsightsAgent extends AiAgent<TimelineUtils.InsightAIContext.ActiveInsight> {
   #insight: ConversationContext<TimelineUtils.InsightAIContext.ActiveInsight>|undefined;
@@ -254,14 +252,21 @@ export class PerformanceInsightsAgent extends AiAgent<TimelineUtils.InsightAICon
   readonly preamble = preamble;
   readonly clientFeature = Host.AidaClient.ClientFeature.CHROME_PERFORMANCE_INSIGHTS_AGENT;
 
+  // Note: for both userTier and options we purposefully reuse the flags from
+  // the Performance Agent, rather than define new ones as we didn't think that
+  // was necessary.
+
   get userTier(): string|undefined {
-    return 'TESTERS';
+    return Root.Runtime.hostConfig.devToolsAiAssistancePerformanceAgent?.userTier;
   }
 
   get options(): RequestOptions {
+    const temperature = Root.Runtime.hostConfig.devToolsAiAssistancePerformanceAgent?.temperature;
+    const modelId = Root.Runtime.hostConfig.devToolsAiAssistancePerformanceAgent?.modelId;
+
     return {
-      temperature: undefined,
-      modelId: undefined,
+      temperature,
+      modelId,
     };
   }
 
@@ -297,6 +302,12 @@ export class PerformanceInsightsAgent extends AiAgent<TimelineUtils.InsightAICon
         );
         const formatted =
             requests.map(r => TraceEventFormatter.networkRequest(r, activeInsight.parsedTrace, {verbose: false}));
+
+        if (this.#isFunctionResponseTooLarge(formatted.join('\n'))) {
+          return {
+            error: 'getNetworkActivitySummary response is too large. Try investigating using other functions',
+          };
+        }
         const summaryFact: Host.AidaClient.RequestFact = {
           text:
               `This is the network summary for this insight. You can use this and not call getNetworkActivitySummary again:\n${
@@ -344,6 +355,11 @@ export class PerformanceInsightsAgent extends AiAgent<TimelineUtils.InsightAICon
           return {error: 'Request not found'};
         }
         const formatted = TraceEventFormatter.networkRequest(request, activeInsight.parsedTrace, {verbose: true});
+        if (this.#isFunctionResponseTooLarge(formatted)) {
+          return {
+            error: 'getNetworkRequestDetail response is too large. Try investigating using other functions',
+          };
+        }
         return {result: {request: formatted}};
       },
     });
@@ -394,6 +410,11 @@ The fields are:
           return {error: 'No main thread activity found'};
         }
         const activity = tree.serialize();
+        if (this.#isFunctionResponseTooLarge(activity)) {
+          return {
+            error: 'getMainThreadActivity response is too large. Try investigating using other functions',
+          };
+        }
         const activityFact: Host.AidaClient.RequestFact = {
           text:
               `This is the main thread activity for this insight. You can use this and not call getMainThreadActivity again:\n${
@@ -408,6 +429,10 @@ The fields are:
       },
 
     });
+  }
+
+  #isFunctionResponseTooLarge(response: string): boolean {
+    return response.length > MAX_FUNCTION_RESULT_BYTE_LENGTH;
   }
 
   override parseTextResponse(response: string): ParsedResponse {
@@ -450,7 +475,8 @@ The fields are:
   }
 
   override async * run(initialQuery: string, options: {
-    signal?: AbortSignal, selected: ConversationContext<TimelineUtils.InsightAIContext.ActiveInsight>|null,
+    selected: ConversationContext<TimelineUtils.InsightAIContext.ActiveInsight>|null,
+    signal?: AbortSignal,
   }): AsyncGenerator<ResponseData, void, void> {
     this.#insight = options.selected ?? undefined;
 

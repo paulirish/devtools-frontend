@@ -962,14 +962,11 @@ export enum DevtoolsExperiments {
   'just-my-code' = 65,
   'highlight-errors-elements-panel' = 73,
   'use-source-map-scopes' = 76,
-  'network-panel-filter-bar-redesign' = 79,
   'timeline-show-postmessage-events' = 86,
   'timeline-enhanced-traces' = 90,
   'timeline-compiled-sources' = 91,
   'timeline-debug-mode' = 93,
   'timeline-experimental-insights' = 102,
-  'timeline-dim-unrelated-events' = 103,
-  'timeline-alternative-navigation' = 104,
   // 106 was historically used [https://chromium-review.googlesource.com/c/devtools/devtools-frontend/+/6230097]
   // next experiment should be 107
   /* eslint-enable @typescript-eslint/naming-convention */

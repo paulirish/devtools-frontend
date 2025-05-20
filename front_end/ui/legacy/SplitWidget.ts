@@ -76,8 +76,8 @@ export class SplitWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typ
   private shouldSaveShowMode: boolean;
   private savedVerticalMainSize: number|null;
   private savedHorizontalMainSize: number|null;
-  private showModeInternal: string;
-  private savedShowMode: string;
+  private showModeInternal: ShowMode;
+  private savedShowMode: ShowMode;
   private autoAdjustOrientation: boolean;
 
   constructor(
@@ -454,6 +454,11 @@ export class SplitWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typ
     return ZoomManager.instance().dipToCSS(sizeDIP);
   }
 
+  totalSize(): number {
+    const sizeDIP = Math.max(0, this.totalSizeDIP());
+    return ZoomManager.instance().dipToCSS(sizeDIP);
+  }
+
   /**
    * Returns total size in DIP.
    */
@@ -466,7 +471,7 @@ export class SplitWidget extends Common.ObjectWrapper.eventMixin<EventTypes, typ
     return ZoomManager.instance().cssToDIP(this.totalSizeCSS);
   }
 
-  private updateShowMode(showMode: string): void {
+  private updateShowMode(showMode: ShowMode): void {
     this.showModeInternal = showMode;
     this.saveShowModeToSettings();
     this.updateShowHideSidebarButton();
@@ -982,7 +987,7 @@ export interface EventTypes {
 
 const MinPadding = 20;
 export interface SettingForOrientation {
-  showMode: string;
+  showMode: ShowMode;
   size: number;
 }
 

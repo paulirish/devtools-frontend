@@ -1,6 +1,7 @@
 // Copyright 2018 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import '../../ui/legacy/legacy.js';
 import '../../ui/legacy/components/data_grid/data_grid.js';
@@ -142,9 +143,9 @@ const enumsByName = ProtocolClient.InspectorBackend.inspectorBackend.enumMap as 
 export interface Message {
   id?: number;
   method: string;
-  error?: Object;
-  result?: Object;
-  params?: Object;
+  error?: Record<string, unknown>;
+  result?: Record<string, unknown>;
+  params?: Record<string, unknown>;
   requestTime: number;
   elapsedTime?: number;
   sessionId?: string;
@@ -160,9 +161,7 @@ export interface LogMessage {
 
 export interface ProtocolDomain {
   readonly domain: string;
-  readonly metadata: {
-    [commandName: string]: {parameters: Parameter[], description: string, replyArgs: string[]},
-  };
+  readonly metadata: Record<string, {parameters: Parameter[], description: string, replyArgs: string[]}>;
 }
 
 export interface ViewInput {
@@ -198,8 +197,8 @@ export type View = (input: ViewInput, output: ViewOutput, target: HTMLElement) =
 export const DEFAULT_VIEW: View = (input, output, target) => {
   // clang-format off
     render(html`
-        <style>${UI.inspectorCommonStyles.cssText}</style>
-        <style>${protocolMonitorStyles.cssText}</style>
+        <style>${UI.inspectorCommonStyles}</style>
+        <style>${protocolMonitorStyles}</style>
         <devtools-split-view name="protocol-monitor-split-container"
                              direction="column"
                              sidebar-initial-size="400"
@@ -476,7 +475,7 @@ export class ProtocolMonitorImpl extends UI.Panel.Panel {
       if (!this.#selectedMessage) {
         return;
       }
-      const parameters = this.#selectedMessage.params as {[x: string]: unknown};
+      const parameters = this.#selectedMessage.params as Record<string, unknown>;
       const targetId = this.#selectedMessage.target?.id() || '';
       const command = message.method;
       this.#command = JSON.stringify({command, parameters});
@@ -534,6 +533,7 @@ export class ProtocolMonitorImpl extends UI.Panel.Panel {
   private setRecording(recording: boolean): void {
     const test = ProtocolClient.InspectorBackend.test;
     if (recording) {
+      // @ts-expect-error
       test.onMessageSent = this.messageSent.bind(this);
       // @ts-expect-error
       test.onMessageReceived = this.messageReceived.bind(this);
@@ -564,14 +564,14 @@ export class ProtocolMonitorImpl extends UI.Panel.Panel {
       sessionId: message.sessionId,
       target: (target ?? undefined) as SDK.Target.Target | undefined,
       requestTime: Date.now() - this.startTime,
-      result: message.params as Object,
+      result: message.params,
     });
 
     this.requestUpdate();
   }
 
   private messageSent(
-      message: {domain: string, method: string, params: Object, id: number, sessionId?: string},
+      message: {domain: string, method: string, params: Record<string, unknown>, id: number, sessionId?: string},
       target: ProtocolClient.InspectorBackend.TargetBase|null): void {
     const messageRecord = {
       method: message.method,
@@ -646,8 +646,8 @@ export class CommandAutocompleteSuggestionProvider {
 
 export class InfoWidget extends UI.Widget.VBox {
   private readonly tabbedPane: UI.TabbedPane.TabbedPane;
-  request: {[x: string]: unknown}|undefined;
-  response: {[x: string]: unknown}|undefined;
+  request: Record<string, unknown>|undefined;
+  response: Record<string, unknown>|undefined;
   type: 'sent'|'received'|undefined;
   selectedTab: 'request'|'response'|undefined;
   constructor(element: HTMLElement) {
@@ -687,7 +687,7 @@ export class InfoWidget extends UI.Widget.VBox {
   }
 }
 
-export function parseCommandInput(input: string): {command: string, parameters: {[paramName: string]: unknown}} {
+export function parseCommandInput(input: string): {command: string, parameters: Record<string, unknown>} {
   // If input cannot be parsed as json, we assume it's the command name
   // for a command without parameters. Otherwise, we expect an object
   // with "command"/"method"/"cmd" and "parameters"/"params"/"args"/"arguments" attributes.

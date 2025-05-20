@@ -290,7 +290,7 @@ export const showWhitespace = new DynamicSetting<string>('show-whitespaces-in-ed
 
 export const allowScrollPastEof = DynamicSetting.bool('allow-scroll-past-eof', CM.scrollPastEnd());
 
-const cachedIndentUnit: {[indent: string]: CM.Extension} = Object.create(null);
+const cachedIndentUnit: Record<string, CM.Extension> = Object.create(null);
 
 function getIndentUnit(indent: string): CM.Extension {
   let value = cachedIndentUnit[indent];
@@ -303,6 +303,8 @@ function getIndentUnit(indent: string): CM.Extension {
 export const indentUnit = new DynamicSetting<string>('text-editor-indent', getIndentUnit);
 
 export const domWordWrap = DynamicSetting.bool('dom-word-wrap', CM.EditorView.lineWrapping);
+
+export const sourcesWordWrap = DynamicSetting.bool('sources.word-wrap', CM.EditorView.lineWrapping);
 
 function detectLineSeparator(text: string): CM.Extension {
   if (/\r\n/.test(text) && !/(^|[^\r])\n/.test(text)) {

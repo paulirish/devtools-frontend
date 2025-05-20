@@ -59,7 +59,7 @@ const UIStrings = {
    */
   showEventsFromOtherDomains: 'Show events from other domains',
   /**
-   *@description Text of a checkbox to show events for other dtorage keys
+   *@description Text of a checkbox to show events for other storage keys
    */
   showEventsForOtherStorageKeys: 'Show events from other storage partitions',
   /**
@@ -111,7 +111,7 @@ const UIStrings = {
    *@description Text in Background Service View of the Application panel
    *@example {Background Fetch} PH1
    */
-  recordingSActivity: 'Recording {PH1} activity...',
+  recordingSActivity: 'Recording {PH1} activity…',
   /**
    *@description Text in Background Service View of the Application panel
    */
@@ -128,7 +128,7 @@ const UIStrings = {
    *@example {Start recording events} PH1
    *@example {Ctrl + E} PH2
    */
-  startRecordingToDebug: 'Start to debug background services by using the "{PH1}" button or by hitting {PH2}.',
+  startRecordingToDebug: 'Start to debug background services by using the "{PH1}" button or by pressing {PH2}.',
   /**
    *@description Text to show an item is empty
    */
@@ -444,7 +444,7 @@ export class BackgroundServiceView extends UI.Widget.VBox {
   }
 
   private createLearnMoreLink(): Platform.DevToolsPath.UrlString {
-    let url = 'https://developer.chrome.com/docs/devtools/javascript/background-services/?utm_source=devtools';
+    let url = 'https://developer.chrome.com/docs/devtools/javascript/background-services/';
 
     switch (this.serviceName) {
       case Protocol.BackgroundService.ServiceName.BackgroundFetch:

@@ -55,7 +55,6 @@ import inlineButtonStyles from './inlineButton.css.js';
 import inspectorCommonStyles from './inspectorCommon.css.js';
 import {KeyboardShortcut, Keys} from './KeyboardShortcut.js';
 import smallBubbleStyles from './smallBubble.css.js';
-import * as ThemeSupport from './theme_support/theme_support.js';
 import type {ToolbarButton} from './Toolbar.js';
 import {Tooltip} from './Tooltip.js';
 import type {TreeOutline} from './Treeoutline.js';
@@ -641,7 +640,8 @@ export function addPlatformClass(element: HTMLElement): void {
 }
 
 export function installComponentRootStyles(element: HTMLElement): void {
-  injectCoreStyles(element);
+  Platform.DOMUtilities.appendStyle(element, inspectorCommonStyles);
+  Platform.DOMUtilities.appendStyle(element, Buttons.textButtonStyles);
 
   // Detect overlay scrollbar enable by checking for nonzero scrollbar width.
   if (!Host.Platform.isMac() && measuredScrollbarWidth(element.ownerDocument) === 0) {
@@ -1224,7 +1224,7 @@ export function createLabel(title: string, className?: string, associatedControl
 }
 
 export function createIconLabel(
-    options: {title?: string, iconName: string, color?: string, width?: '14px'|'20px', height?: '14px'|'20px'}):
+    options: {iconName: string, title?: string, color?: string, width?: '14px'|'20px', height?: '14px'|'20px'}):
     DevToolsIconLabel {
   const element = document.createElement('dt-icon-label');
   if (options.title) {
@@ -1493,11 +1493,8 @@ export class DevToolsCloseButton extends HTMLElement {
 customElements.define('dt-close-button', DevToolsCloseButton);
 
 export function bindInput(
-    input: HTMLInputElement, apply: (arg0: string) => void, validate: (arg0: string) => {
-      valid: boolean,
-      errorMessage: (string | undefined),
-    },
-    numeric: boolean, modifierMultiplier?: number): (arg0: string) => void {
+    input: HTMLInputElement, apply: (arg0: string) => void, validate: (arg0: string) => boolean, numeric: boolean,
+    modifierMultiplier?: number): (arg0: string) => void {
   input.addEventListener('change', onChange, false);
   input.addEventListener('input', onInput, false);
   input.addEventListener('keydown', onKeyDown, false);
@@ -1508,7 +1505,7 @@ export function bindInput(
   }
 
   function onChange(): void {
-    const {valid} = validate(input.value);
+    const valid = validate(input.value);
     input.classList.toggle('error-input', !valid);
     if (valid) {
       apply(input.value);
@@ -1517,7 +1514,7 @@ export function bindInput(
 
   function onKeyDown(event: KeyboardEvent): void {
     if (event.key === 'Enter') {
-      const {valid} = validate(input.value);
+      const valid = validate(input.value);
       if (valid) {
         apply(input.value);
       }
@@ -1534,7 +1531,7 @@ export function bindInput(
       return;
     }
     const stringValue = String(value);
-    const {valid} = validate(stringValue);
+    const valid = validate(stringValue);
     if (valid) {
       setValue(stringValue);
     }
@@ -1545,7 +1542,7 @@ export function bindInput(
     if (value === input.value) {
       return;
     }
-    const {valid} = validate(value);
+    const valid = validate(value);
     input.classList.toggle('error-input', !valid);
     input.value = value;
   }
@@ -1910,11 +1907,6 @@ function focusChanged(event: Event): void {
   updateXWidgetfocusWidgetForNode(element);
 }
 
-export function injectCoreStyles(elementOrShadowRoot: Element|ShadowRoot): void {
-  ThemeSupport.ThemeSupport.instance().appendStyle(elementOrShadowRoot, inspectorCommonStyles);
-  ThemeSupport.ThemeSupport.instance().appendStyle(elementOrShadowRoot, Buttons.textButtonStyles);
-}
-
 /**
  * Creates a new shadow DOM tree with the core styles and an optional list of
  * additional styles, and attaches it to the specified `element`.
@@ -1924,24 +1916,21 @@ export function injectCoreStyles(elementOrShadowRoot: Element|ShadowRoot): void 
  * @returns the newly created `ShadowRoot`.
  * @see https://developer.mozilla.org/en-US/docs/Web/API/Element/attachShadow
  */
-export function createShadowRootWithCoreStyles(
-    element: Element, options: {cssFile?: Array<{cssText: string}>|{cssText: string}, delegatesFocus?: boolean} = {
-      delegatesFocus: undefined,
-      cssFile: undefined,
-    }): ShadowRoot {
-  const {
-    cssFile,
-    delegatesFocus,
-  } = options;
+export function createShadowRootWithCoreStyles(element: Element, options: {
+  cssFile?: CSSInJS[]|CSSInJS,
+  delegatesFocus?: boolean,
+} = {
+  delegatesFocus: undefined,
+  cssFile: undefined,
+}): ShadowRoot {
+  const {cssFile, delegatesFocus} = options;
 
   const shadowRoot = element.attachShadow({mode: 'open', delegatesFocus});
-  injectCoreStyles(shadowRoot);
+  Platform.DOMUtilities.appendStyle(shadowRoot, inspectorCommonStyles, Buttons.textButtonStyles);
   if (Array.isArray(cssFile)) {
-    for (const cf of cssFile) {
-      ThemeSupport.ThemeSupport.instance().appendStyle(shadowRoot, cf);
-    }
+    Platform.DOMUtilities.appendStyle(shadowRoot, ...cssFile);
   } else if (cssFile) {
-    ThemeSupport.ThemeSupport.instance().appendStyle(shadowRoot, cssFile);
+    Platform.DOMUtilities.appendStyle(shadowRoot, cssFile);
   }
   shadowRoot.addEventListener('focus', focusChanged, true);
   return shadowRoot;

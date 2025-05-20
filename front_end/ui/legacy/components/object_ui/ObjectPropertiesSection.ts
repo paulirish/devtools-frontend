@@ -1376,7 +1376,6 @@ export class ArrayGroupingTreeElement extends UI.TreeOutline.TreeElement {
       if (consecutiveRange) {
         count = toIndex - fromIndex + 1;
       } else {
-        // @ts-expect-error we need the for to loop over the generator
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         for (const ignored of arrayIndexes(this)) {
           ++count;
@@ -1480,10 +1479,11 @@ export class ArrayGroupingTreeElement extends UI.TreeOutline.TreeElement {
     }
 
     function buildArrayFragment(
-        this: {
-          [x: number]: Object,
-        },
-        fromIndex?: number, toIndex?: number, sparseIterationThreshold?: number): unknown {
+        this: Record<number, Object>,
+        fromIndex?: number,
+        toIndex?: number,
+        sparseIterationThreshold?: number,
+        ): unknown {
       const result = Object.create(null);
 
       if (fromIndex === undefined || toIndex === undefined || sparseIterationThreshold === undefined) {

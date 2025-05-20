@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import './Table.js';
+import './NodeLink.js';
 import '../../../../ui/components/icon_button/icon_button.js';
 
 import * as i18n from '../../../../core/i18n/i18n.js';
@@ -11,10 +13,13 @@ import type {
 import * as Trace from '../../../../models/trace/trace.js';
 import * as Lit from '../../../../ui/lit/lit.js';
 import type * as Overlays from '../../overlays/overlays.js';
+import {md} from '../../utils/Helpers.js';
 
 import {BaseInsightComponent} from './BaseInsightComponent.js';
 import {eventRef} from './EventRef.js';
 import networkDependencyTreeInsightStyles from './networkDependencyTreeInsight.css.js';
+import type {NodeLinkData} from './NodeLink.js';
+import type {TableData, TableDataRow} from './Table.js';
 
 const {UIStrings, i18nString} = Trace.Insights.Models.NetworkDependencyTree;
 
@@ -47,59 +52,62 @@ export class NetworkDependencyTree extends BaseInsightComponent<NetworkDependenc
     return overlays;
   }
 
-  #onMouseOver(relatedRequests: Set<Trace.Types.Events.SyntheticNetworkRequest>): void {
-    this.#relatedRequests = relatedRequests;
-    const overlays = this.#createOverlayForChain(this.#relatedRequests);
-    this.toggleTemporaryOverlays(overlays, {
-      // The trace window doesn't need to be updated because the request is being hovered.
-      updateTraceWindow: false,
+  #renderNetworkTreeRow(node: CriticalRequestNode): Lit.LitTemplate {
+    const requestStyles = Lit.Directives.styleMap({
+      display: 'flex',
+      '--override-timeline-link-text-color': node.isLongest ? 'var(--sys-color-error)' : '',
+      color: node.isLongest ? 'var(--sys-color-error)' : '',
+      backgroundColor: this.#relatedRequests?.has(node.request) ? 'var(--sys-color-state-hover-on-subtle)' : '',
     });
-    this.scheduleRender();
-  }
-
-  #onMouseOut(): void {
-    this.#relatedRequests = null;
-    this.toggleTemporaryOverlays(null, {
-      updateTraceWindow: false,
+    const urlStyles = Lit.Directives.styleMap({
+      flex: 'auto',
     });
-    this.scheduleRender();
-  }
 
-  renderTree(nodes: CriticalRequestNode[]): Lit.LitTemplate|null {
-    if (nodes.length === 0) {
-      return null;
-    }
     // clang-format off
     return html`
-      <ul>
-        ${nodes.map(({request, timeFromInitialRequest, children, isLongest, relatedRequests}) => {
-          const hasChildren = children.length > 0;
-
-          const requestClasses = Lit.Directives.classMap({
-            request: true,
-            longest: Boolean(isLongest),
-            highlighted: this.#relatedRequests?.has(request) ?? false,
-          });
-
-          return html`
-            <li>
-              <div class=${requestClasses}
-                   @mouseover=${this.#onMouseOver.bind(this, relatedRequests)}
-                   @mouseout=${this.#onMouseOut.bind(this)}>
-                <span class="url">${eventRef(request)}</span>
-                <span class="chain-time">
-                  ${i18n.TimeUtilities.formatMicroSecondsTime(Trace.Types.Timing.Micro(timeFromInitialRequest))}
-                </span>
-              </div>
-            </li>
-            ${hasChildren ? html`${this.renderTree(children)}` : Lit.nothing}
-          `;
-        })}
-      </ul>`;
+      <div style=${requestStyles}>
+        <span style=${urlStyles}>${eventRef(node.request)}</span>
+        <span>
+          ${i18n.TimeUtilities.formatMicroSecondsTime(Trace.Types.Timing.Micro(node.timeFromInitialRequest))}
+        </span>
+      </div>
+    `;
     // clang-format on
   }
 
-  override renderContent(): Lit.LitTemplate {
+  #mapNetworkDependencyToRow(node: CriticalRequestNode): TableDataRow {
+    return {
+      values: [this.#renderNetworkTreeRow(node)],
+      overlays: this.#createOverlayForChain(node.relatedRequests),
+      subRows: node.children.map(child => this.#mapNetworkDependencyToRow(child)),
+    };
+  }
+
+  #renderNetworkDependencyTree(nodes: CriticalRequestNode[]): Lit.LitTemplate|null {
+    if (nodes.length === 0) {
+      return null;
+    }
+
+    const rows: TableDataRow[] = [{
+      // Add one empty row so the main document request can also has a left border
+      values: [],
+      subRows: nodes.map(node => this.#mapNetworkDependencyToRow(node))
+    }];
+
+    // clang-format off
+    return html`
+      <devtools-performance-table
+          .data=${{
+            insight: this,
+            headers: [i18nString(UIStrings.columnRequest), i18nString(UIStrings.columnTime)],
+            rows,
+          } as TableData}>
+      </devtools-performance-table>
+    `;
+    // clang-format on
+  }
+
+  #renderNetworkTreeSection(): Lit.LitTemplate {
     if (!this.model) {
       return Lit.nothing;
     }
@@ -107,7 +115,7 @@ export class NetworkDependencyTree extends BaseInsightComponent<NetworkDependenc
     if (!this.model.rootNodes.length) {
       // clang-format off
       return html`
-        <style>${networkDependencyTreeInsightStyles.cssText}</style>
+        <style>${networkDependencyTreeInsightStyles}</style>
         <div class="insight-section">${i18nString(UIStrings.noNetworkDependencyTree)}</div>
       `;
       // clang-format on
@@ -115,19 +123,154 @@ export class NetworkDependencyTree extends BaseInsightComponent<NetworkDependenc
 
     // clang-format off
     return html`
-      <style>${networkDependencyTreeInsightStyles.cssText}</style>
+      <style>${networkDependencyTreeInsightStyles}</style>
       <div class="insight-section">
         <div class="max-time">
           ${i18nString(UIStrings.maxCriticalPathLatency)}
           <br>
           <span class='longest'> ${i18n.TimeUtilities.formatMicroSecondsTime((this.model.maxTime))}</span>
         </div>
-
-        <!-- a divider is added here, through |tree-view| element's border-top -->
-        <div class="tree-view">${this.renderTree(this.model.rootNodes)} </div>
+      </div>
+      <div class="insight-section">
+        ${this.#renderNetworkDependencyTree(this.model.rootNodes)}
       </div>
     `;
     // clang-format on
+  }
+
+  #renderTooManyPreconnectsWarning(): Lit.LitTemplate {
+    if (!this.model) {
+      return Lit.nothing;
+    }
+    if (this.model.preconnectOrigins.length <=
+        Trace.Insights.Models.NetworkDependencyTree.TOO_MANY_PRECONNECTS_THRESHOLD) {
+      return Lit.nothing;
+    }
+
+    const warningStyles = Lit.Directives.styleMap({
+      backgroundColor: 'var(--sys-color-surface-yellow)',
+      padding: ' var(--sys-size-5) var(--sys-size-8);',
+      display: 'flex',
+    });
+
+    // clang-format off
+    return html`
+      <div style=${warningStyles}>
+        ${md(i18nString(UIStrings.tooManyPreconnectLinksWarning))}
+      </div>
+    `;
+    // clang-format on
+  }
+
+  #renderPreconnectOriginsTable(): Lit.LitTemplate {
+    if (!this.model) {
+      return Lit.nothing;
+    }
+
+    const preconnectOriginsTableTitle = html`
+      <style>${networkDependencyTreeInsightStyles}</style>
+      <div class='section-title'>${i18nString(UIStrings.preconnectOriginsTableTitle)}</div>
+      <div class="insight-description">${md(i18nString(UIStrings.preconnectOriginsTableDescription))}</div>
+    `;
+
+    if (!this.model.preconnectOrigins.length) {
+      // clang-format off
+      return html`
+        <div class="insight-section">
+          ${preconnectOriginsTableTitle}
+          ${i18nString(UIStrings.noPreconnectOrigins)}
+        </div>
+      `;
+      // clang-format on
+    }
+
+    const rows: TableDataRow[] = this.model.preconnectOrigins.map(preconnectOrigin => {
+      // clang-format off
+      const nodeEl = html`
+        <devtools-performance-node-link
+          .data=${{
+            backendNodeId: preconnectOrigin.node_id,
+            frame: preconnectOrigin.frame,
+            fallbackHtmlSnippet: `<link rel="preconnect" href="${preconnectOrigin.url}">`,
+          } as NodeLinkData}>
+        </devtools-performance-node-link>`;
+      // clang-format on
+
+      return {
+        values: [preconnectOrigin.url, nodeEl],
+        subRows: preconnectOrigin.unused ? [{
+          values: [md(i18nString(UIStrings.unusedWarning))],
+        }] :
+                                           undefined,
+      };
+    });
+
+    // clang-format off
+    return html`
+      <div class="insight-section">
+        ${preconnectOriginsTableTitle}
+        ${this.#renderTooManyPreconnectsWarning()}
+        <devtools-performance-table
+          .data=${{
+            insight: this,
+            headers: [i18nString(UIStrings.columnOrigin), i18nString(UIStrings.columnSource)],
+            rows,
+          } as TableData}>
+        </devtools-performance-table>
+      </div>
+    `;
+    // clang-format on
+  }
+
+  #renderEstSavingTable(): Lit.LitTemplate {
+    if (!this.model) {
+      return Lit.nothing;
+    }
+
+    const estSavingTableTitle = html`
+      <style>${networkDependencyTreeInsightStyles}</style>
+      <div class='section-title'>${i18nString(UIStrings.estSavingTableTitle)}</div>
+      <div class="insight-description">${md(i18nString(UIStrings.estSavingTableDescription))}</div>
+    `;
+
+    if (!this.model.preconnectCandidates.length) {
+      // clang-format off
+      return html`
+        <div class="insight-section">
+          ${estSavingTableTitle}
+          ${i18nString(UIStrings.noPreconnectCandidates)}
+        </div>
+      `;
+      // clang-format on
+    }
+
+    const rows: TableDataRow[] = this.model.preconnectCandidates.map(
+        candidate => ({
+          values: [candidate.origin, i18n.TimeUtilities.millisToString(candidate.wastedMs)],
+        }));
+
+    // clang-format off
+    return html`
+      <div class="insight-section">
+        ${estSavingTableTitle}
+        <devtools-performance-table
+          .data=${{
+            insight: this,
+            headers: [i18nString(UIStrings.columnOrigin), i18nString(UIStrings.columnWastedMs)],
+            rows,
+          } as TableData}>
+        </devtools-performance-table>
+      </div>
+    `;
+    // clang-format on
+  }
+
+  override renderContent(): Lit.LitTemplate {
+    return html`
+      ${this.#renderNetworkTreeSection()}
+      ${this.#renderPreconnectOriginsTable()}
+      ${this.#renderEstSavingTable()}
+    `;
   }
 }
 

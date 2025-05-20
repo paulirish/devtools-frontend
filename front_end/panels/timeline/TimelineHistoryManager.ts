@@ -58,6 +58,10 @@ const UIStrings = {
    * @example {2} PH1
    */
   dSlowdown: '{PH1}× slowdown',
+  /**
+   * @description Tooltip text that appears when hovering over the Back arrow inside the 'Select Timeline Session' dropdown in the Performance pane.
+   */
+  backButtonTooltip: 'View live metrics page',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/TimelineHistoryManager.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -455,6 +459,7 @@ export class DropDown implements UI.ListControl.ListDelegate<number> {
   private readonly focusRestorer: UI.UIUtils.ElementFocusRestorer;
   private selectionDone: ((arg0: number|null) => void)|null;
   #landingPageTitle: Common.UIString.LocalizedString;
+  contentElement: HTMLElement;
 
   constructor(availableparsedTraceIndexes: number[], landingPageTitle: Common.UIString.LocalizedString) {
     this.#landingPageTitle = landingPageTitle;
@@ -468,7 +473,7 @@ export class DropDown implements UI.ListControl.ListDelegate<number> {
 
     const shadowRoot = UI.UIUtils.createShadowRootWithCoreStyles(
         this.glassPane.contentElement, {cssFile: timelineHistoryManagerStyles});
-    const contentElement = shadowRoot.createChild('div', 'drop-down');
+    this.contentElement = shadowRoot.createChild('div', 'drop-down');
 
     const listModel = new UI.ListModel.ListModel<number>();
     this.listControl = new UI.ListControl.ListControl<number>(listModel, this, UI.ListControl.ListMode.NonViewport);
@@ -477,9 +482,9 @@ export class DropDown implements UI.ListControl.ListDelegate<number> {
 
     UI.ARIAUtils.markAsMenu(this.listControl.element);
     UI.ARIAUtils.setLabel(this.listControl.element, i18nString(UIStrings.selectTimelineSession));
-    contentElement.appendChild(this.listControl.element);
-    contentElement.addEventListener('keydown', this.onKeyDown.bind(this), false);
-    contentElement.addEventListener('click', this.onClick.bind(this), false);
+    this.contentElement.appendChild(this.listControl.element);
+    this.contentElement.addEventListener('keydown', this.onKeyDown.bind(this), false);
+    this.contentElement.addEventListener('click', this.onClick.bind(this), false);
 
     this.focusRestorer = new UI.UIUtils.ElementFocusRestorer(this.listControl.element);
     this.selectionDone = null;
@@ -579,6 +584,8 @@ export class DropDown implements UI.ListControl.ListDelegate<number> {
     div.style.width = `${previewWidth}px`;
 
     const icon = IconButton.Icon.create('arrow-back');
+    icon.title = i18nString(UIStrings.backButtonTooltip);
+    icon.classList.add('back-arrow');
     div.appendChild(icon);
 
     const text = document.createElement('span');
@@ -609,7 +616,7 @@ export class DropDown implements UI.ListControl.ListDelegate<number> {
     return false;
   }
 
-  private static instance: DropDown|null = null;
+  static instance: DropDown|null = null;
 }
 
 export class ToolbarButton extends UI.Toolbar.ToolbarItem {
