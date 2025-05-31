@@ -1423,11 +1423,29 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
     } else {
       fileName = `Trace-${traceStart}.json` as Platform.DevToolsPath.RawPathString;
     }
-
     try {
-      // TODO(crbug.com/1456818): Extract this logic and add more tests.
-      let traceAsString;
-      if (metadata?.dataOrigin === Trace.Types.File.DataOrigin.CPU_PROFILE) {
+      await this.innerSaveToFile(traceEvents, metadata, fileName, config);
+    } catch (error) {
+      console.error(error.stack);
+      if (error.name === 'AbortError') {
+        // The user cancelled the action, so this is not an error we need to report.
+        return;
+      }
+      Common.Console.Console.instance().error(
+          i18nString(UIStrings.failedToSaveTimelineSS, {PH1: error.message, PH2: error.name}));
+    }
+  }
+
+
+  async innerSaveToFile(
+      traceEvents: readonly Trace.Types.Events.Event[], metadata: Trace.Types.File.MetaData|null,
+      fileName: Platform.DevToolsPath.RawPathString, config: {
+        savingEnhancedTrace: boolean,
+        addModifications: boolean,
+      }): Promise<void> {
+    let blobParts: string[] = [];
+
+    if (metadata?.dataOrigin === Trace.Types.File.DataOrigin.CPU_PROFILE) {
         const profileEvent = traceEvents.find(e => Trace.Types.Events.isSyntheticCpuProfile(e));
 
         const profile = profileEvent?.args.data.cpuProfile;
@@ -1438,34 +1456,25 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
           // And there is where the old saving logic saves the cpuprofile.
           // This will be solved when the CPUProfileHandler is done. Then we can directly get it
           // from the new traceEngine
-          traceAsString = cpuprofileJsonGenerator(profile);
+          blobParts = [cpuprofileJsonGenerator(profile)];
         }
-      } else {
-        const formattedTraceIter = traceJsonGenerator(traceEvents, {
-          ...metadata,
-          sourceMaps: config.savingEnhancedTrace ? metadata?.sourceMaps : undefined,
-        });
-        traceAsString = Array.from(formattedTraceIter).join('');
-      }
-      if (!traceAsString) {
-        throw new Error('Trace content empty');
-      }
-      await Workspace.FileManager.FileManager.instance().save(
-          fileName, new TextUtils.ContentData.ContentData(traceAsString, /* isBase64=*/ false, 'application/json'),
-          /* forceSaveAs=*/ true);
-      Workspace.FileManager.FileManager.instance().close(fileName);
-    } catch (e) {
-      // We expect the error to be an Error class, but this deals with any weird case where it's not.
-      const error = e instanceof Error ? e : new Error(e);
 
-      console.error(error.stack);
-      if (error.name === 'AbortError') {
-        // The user cancelled the action, so this is not an error we need to report.
-        return;
-      }
-
-      this.#showExportTraceErrorDialog(error);
+    } else {
+      const formattedTraceIter = traceJsonGenerator(traceEvents, {
+        ...metadata,
+        sourceMaps: config.savingEnhancedTrace ? metadata?.sourceMaps : undefined,
+      });
+      blobParts = Array.from(formattedTraceIter);
     }
+
+    const blob = new Blob(blobParts, {type: 'application/json'});
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   #showExportTraceErrorDialog(error: Error): void {
