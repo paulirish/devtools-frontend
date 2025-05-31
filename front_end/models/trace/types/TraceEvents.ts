@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import type * as Platform from '../../../core/platform/platform.js';
+import type * as DOMModel from '../../../core/sdk/DOMModel.js';
 import type * as Protocol from '../../../generated/protocol.js';
 
 import type {Micro, Milli, Seconds, TraceWindowMicro} from './Timing.js';
@@ -1200,6 +1201,7 @@ export function isScheduleStyleInvalidationTracking(event: Event): event is Sche
 
 export const enum StyleRecalcInvalidationReason {
   ANIMATION = 'Animation',
+  RELATED_STYLE_RULE = 'Related style rule',
 }
 
 export interface StyleRecalcInvalidationTracking extends Instant {
@@ -1230,6 +1232,8 @@ export interface StyleInvalidatorInvalidationTracking extends Instant {
       subtree: boolean,
       nodeName?: string,
       extraData?: string,
+      // eslint-disable-next-line @typescript-eslint/naming-convention
+      selectors?: Array<{selector: string, style_sheet_id: string}>,
     },
   };
 }
@@ -1284,6 +1288,9 @@ export interface ScheduleStyleRecalculation extends Instant {
   args: Args&{
     data: {
       frame: string,
+      reason?: string,
+      subtree?: boolean,
+      nodeId?: Protocol.DOM.BackendNodeId,
     },
   };
 }
@@ -1866,17 +1873,31 @@ export function isDecodeImage(event: Event): event is DecodeImage {
   return event.name === Name.DECODE_IMAGE;
 }
 
+export enum InvalidationEventType {
+  StyleInvalidatorInvalidationTracking = 'StyleInvalidatorInvalidationTracking',
+  StyleRecalcInvalidationTracking = 'StyleRecalcInvalidationTracking',
+}
+
+export interface InvalidationNode {
+  frame: string;
+  backendNodeId: Protocol.DOM.BackendNodeId;
+  node: DOMModel.DOMNode|null;
+  type: InvalidationEventType;
+  selectorList: Array<{selector: string, styleSheetId: string}>;
+  ts: Micro;
+  tts?: Micro;
+  subtree: boolean;
+  lastUpdateLayoutTreeEventTs: Micro;
+}
+
 export interface SelectorTiming {
   'elapsed (us)': number;
-
   fast_reject_count: number;
-
   match_attempts: number;
   selector: string;
-
   style_sheet_id: string;
-
   match_count: number;
+  number_of_invalidation_nodes: number;
 }
 
 export enum SelectorTimingsKey {
@@ -1887,6 +1908,7 @@ export enum SelectorTimingsKey {
   MatchCount = 'match_count',
   Selector = 'selector',
   StyleSheetId = 'style_sheet_id',
+  NumberOfInvalidationNodes = 'number_of_invalidation_nodes',
 }
 
 export interface SelectorStats {

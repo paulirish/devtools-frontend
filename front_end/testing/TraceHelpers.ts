@@ -848,6 +848,7 @@ export function getBaseTraceParseModelData(overrides: Partial<ParsedTrace> = {})
     },
     SelectorStats: {
       dataForUpdateLayoutEvent: new Map(),
+      dataForInvalidationEvent: [],
     },
     Warnings: {
       perEvent: new Map(),

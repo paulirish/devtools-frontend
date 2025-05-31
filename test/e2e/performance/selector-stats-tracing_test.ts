@@ -6,7 +6,7 @@ import {assert} from 'chai';
 
 import {getBrowserAndPages, step} from '../../shared/helper.js';
 import {reloadDevTools} from '../helpers/cross-tool-helper.js';
-import {getDataGridRows} from '../helpers/datagrid-helpers.js';
+import {getDataGrid, getDataGridRows, getInnerTextOfDataGridCells} from '../helpers/datagrid-helpers.js';
 import {
   disableCSSSelectorStats,
   enableCSSSelectorStats,
@@ -73,5 +73,30 @@ describe.skip('[crbug.com/414579835] The Performance panel', function() {
     const timeDiffPercentage = (recordingTimeWithSelectorStatsEnabled - recordingTimeWithSelectorStatsDisabled) /
         recordingTimeWithSelectorStatsDisabled;
     assert.isAtMost(timeDiffPercentage, timeDiffPercentageMax);
+  });
+
+  it('CSS style invalidation results verification', async () => {
+    await navigateToPerformanceTab('selectorStats/css-style-invalidation');
+    await enableCSSSelectorStats();
+
+    await startRecording();
+
+    // click the 'add/remove article' button and 'toggle emphasis' button to trigger CSS style invalidation
+    const {target, frontend} = await getBrowserAndPages();
+
+    target.bringToFront();
+    await target.click('#addRemoveArticle');
+    await target.click('#toggleEmphasis');
+
+    frontend.bringToFront();
+    await stopRecording();
+
+    await navigateToSelectorStatsTab();
+    const dataGrid = await getDataGrid(undefined /* root*/);
+    const dataGridText =
+        await getInnerTextOfDataGridCells(dataGrid, 1 /* expectedNumberOfRows */, false /* matchExactNumberOfRows */);
+
+    // the total number of CSS style invalidations
+    assert.strictEqual(dataGridText[0][1], '75');
   });
 });

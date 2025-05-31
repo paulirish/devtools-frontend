@@ -74,13 +74,16 @@ const UIStrings = {
    *@description Text shown as the "Selectelector" cell value for one row of the Selector Stats table, however this particular row is the totals. While normally the Selector cell is values like "div.container", the parenthesis can denote this description is not an actual selector, but a general row description.
    */
   totalForAllSelectors: '(Totals for all selectors)',
-
   /**
    *@description Text for showing the location of a selector in the style sheet
    *@example {256} PH1
    *@example {14} PH2
    */
   lineNumber: 'Line {PH1}:{PH2}',
+  /**
+   *@description Number of invalidation nodes for a specific selector
+   */
+  numberOfInvalidationNodes: '# of Invalidation Nodes',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/TimelineSelectorStatsView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -121,6 +124,9 @@ export class TimelineSelectorStatsView extends UI.Widget.VBox {
             <th id=${SelectorTimingsKey.Elapsed} weight="1" sortable hideable align="right">
               ${i18nString(UIStrings.elapsed)}
             </th>
+            <th id=${SelectorTimingsKey.NumberOfInvalidationNodes} weight="1.5" sortable hideable>
+              ${i18nString(UIStrings.numberOfInvalidationNodes)}
+            </th>
             <th id=${SelectorTimingsKey.MatchAttempts} weight="1" sortable hideable align="right">
               ${i18nString(UIStrings.matchAttempts)}
             </th>
@@ -149,6 +155,9 @@ export class TimelineSelectorStatsView extends UI.Widget.VBox {
           return html`<tr>
             <td data-value=${timing[SelectorTimingsKey.Elapsed]}>
               ${(timing[SelectorTimingsKey.Elapsed] / 1000.0).toFixed(3)}
+            </td>
+            <td title=${timing[SelectorTimingsKey.NumberOfInvalidationNodes]}>
+              ${timing[SelectorTimingsKey.NumberOfInvalidationNodes]}
             </td>
             <td>${timing[SelectorTimingsKey.MatchAttempts]}</td>
             <td>${timing[SelectorTimingsKey.MatchCount]}</td>
@@ -231,46 +240,73 @@ export class TimelineSelectorStatsView extends UI.Widget.VBox {
     this.#view(viewInput, viewOutput, this.contentElement);
   }
 
-  setEvent(event: Trace.Types.Events.UpdateLayoutTree): boolean {
-    if (!this.#parsedTrace) {
-      return false;
-    }
-
-    if (this.#lastStatsSourceEventOrEvents === event) {
-      // The event that is populating the selector stats table has not changed,
-      // so no need to do any work because the data will be the same.
-      return false;
-    }
-
-    this.#lastStatsSourceEventOrEvents = event;
-
-    const selectorStats = this.#parsedTrace.SelectorStats.dataForUpdateLayoutEvent.get(event);
-    if (!selectorStats) {
-      this.#timings = [];
-      this.requestUpdate();
-      return false;
-    }
-
-    void this.processSelectorTimings(selectorStats.timings).then(timings => {
-      this.#timings = timings;
-      this.requestUpdate();
-    });
-    return true;
-  }
-
-  setAggregatedEvents(events: Trace.Types.Events.UpdateLayoutTree[]): void {
-    const timings: Trace.Types.Events.SelectorTiming[] = [];
-    const selectorMap = new Map<String, Trace.Types.Events.SelectorTiming>();
-
+  private async updateNumberOfInvalidationNodes(events: Trace.Types.Events.UpdateLayoutTree[]): Promise<void> {
     if (!this.#parsedTrace) {
       return;
     }
+
+    const invalidationNodes = this.#parsedTrace.SelectorStats.dataForInvalidationEvent;
+    const invalidationNodeMap = new Map<string, {subtree: boolean, nodeList: Array<SDK.DOMModel.DOMNode|null>}>();
+    for (const invalidationNode of invalidationNodes) {
+      if (!invalidationNode.node) {
+        invalidationNode.node = await Trace.Extras.FetchNodes.domNodeForBackendNodeID(
+            invalidationNodes as unknown as Trace.Handlers.Types.ParsedTrace, invalidationNode.backendNodeId);
+      }
+
+      for (const selector of invalidationNode.selectorList) {
+        const key = [
+          selector.selector, selector.styleSheetId, invalidationNode.frame, invalidationNode.lastUpdateLayoutTreeEventTs
+        ].join('-');
+        if (invalidationNodeMap.has(key)) {
+          const nodes = invalidationNodeMap.get(key);
+          nodes?.nodeList.push(invalidationNode.node);
+        } else {
+          invalidationNodeMap.set(key, {subtree: invalidationNode.subtree, nodeList: [invalidationNode.node]});
+        }
+      }
+    }
+
+    for (const event of events) {
+      const selectorStats = event ? this.#parsedTrace.SelectorStats.dataForUpdateLayoutEvent.get(event) : undefined;
+      if (!selectorStats) {
+        continue;
+      }
+
+      const frameId = event.args.beginData?.frame;
+      for (const timing of selectorStats.timings) {
+        timing.number_of_invalidation_nodes = 0;
+
+        const key = [timing.selector, timing.style_sheet_id, frameId, event.ts].join('-');
+        const nodes = invalidationNodeMap.get(key);
+        if (nodes === undefined) {
+          continue;
+        }
+
+        for (const node of nodes.nodeList) {
+          if (nodes.subtree) {
+            timing.number_of_invalidation_nodes += node ? node.childNodeCount() + 1 : 1;
+          } else {
+            timing.number_of_invalidation_nodes += 1;
+          }
+        }
+      }
+    }
+  }
+
+  private async aggregateEvents(events: Trace.Types.Events.UpdateLayoutTree[]): Promise<void> {
+    if (!this.#parsedTrace) {
+      return;
+    }
+
+    const timings: Trace.Types.Events.SelectorTiming[] = [];
+    const selectorMap = new Map<String, Trace.Types.Events.SelectorTiming>();
 
     const sums = {
       [SelectorTimingsKey.Elapsed]: 0,
       [SelectorTimingsKey.MatchAttempts]: 0,
       [SelectorTimingsKey.MatchCount]: 0,
       [SelectorTimingsKey.FastRejectCount]: 0,
+      [SelectorTimingsKey.NumberOfInvalidationNodes]: 0,
     };
 
     // Now we want to check if the set of events we have been given matches the
@@ -292,33 +328,38 @@ export class TimelineSelectorStatsView extends UI.Widget.VBox {
     }
 
     this.#lastStatsSourceEventOrEvents = events;
-
+    await this.updateNumberOfInvalidationNodes(events);
     for (let i = 0; i < events.length; i++) {
       const event = events[i];
       const selectorStats = event ? this.#parsedTrace.SelectorStats.dataForUpdateLayoutEvent.get(event) : undefined;
       if (!selectorStats) {
         continue;
-      } else {
-        const data: Trace.Types.Events.SelectorTiming[] = selectorStats.timings;
-        for (const timing of data) {
-          const key = timing[SelectorTimingsKey.Selector] + '_' + timing[SelectorTimingsKey.StyleSheetId];
-          const findTiming = selectorMap.get(key);
-          if (findTiming !== undefined) {
-            findTiming[SelectorTimingsKey.Elapsed] += timing[SelectorTimingsKey.Elapsed];
-            findTiming[SelectorTimingsKey.FastRejectCount] += timing[SelectorTimingsKey.FastRejectCount];
-            findTiming[SelectorTimingsKey.MatchAttempts] += timing[SelectorTimingsKey.MatchAttempts];
-            findTiming[SelectorTimingsKey.MatchCount] += timing[SelectorTimingsKey.MatchCount];
-          } else {
-            selectorMap.set(key, structuredClone(timing));
-          }
-          // Keep track of the total times for a sum row.
-          sums[SelectorTimingsKey.Elapsed] += timing[SelectorTimingsKey.Elapsed];
-          sums[SelectorTimingsKey.MatchAttempts] += timing[SelectorTimingsKey.MatchAttempts];
-          sums[SelectorTimingsKey.MatchCount] += timing[SelectorTimingsKey.MatchCount];
-          sums[SelectorTimingsKey.FastRejectCount] += timing[SelectorTimingsKey.FastRejectCount];
+      }
+
+      const data: Trace.Types.Events.SelectorTiming[] = selectorStats.timings;
+
+      for (const timing of data) {
+        const key = timing[SelectorTimingsKey.Selector] + '_' + timing[SelectorTimingsKey.StyleSheetId];
+        const findTiming = selectorMap.get(key);
+        if (findTiming !== undefined) {
+          findTiming[SelectorTimingsKey.Elapsed] += timing[SelectorTimingsKey.Elapsed];
+          findTiming[SelectorTimingsKey.FastRejectCount] += timing[SelectorTimingsKey.FastRejectCount];
+          findTiming[SelectorTimingsKey.MatchAttempts] += timing[SelectorTimingsKey.MatchAttempts];
+          findTiming[SelectorTimingsKey.MatchCount] += timing[SelectorTimingsKey.MatchCount];
+          findTiming[SelectorTimingsKey.NumberOfInvalidationNodes] +=
+              timing[SelectorTimingsKey.NumberOfInvalidationNodes];
+        } else {
+          selectorMap.set(key, structuredClone(timing));
         }
+        // Keep track of the total times for a sum row.
+        sums[SelectorTimingsKey.Elapsed] += timing[SelectorTimingsKey.Elapsed];
+        sums[SelectorTimingsKey.MatchAttempts] += timing[SelectorTimingsKey.MatchAttempts];
+        sums[SelectorTimingsKey.MatchCount] += timing[SelectorTimingsKey.MatchCount];
+        sums[SelectorTimingsKey.FastRejectCount] += timing[SelectorTimingsKey.FastRejectCount];
+        sums[SelectorTimingsKey.NumberOfInvalidationNodes] += timing[SelectorTimingsKey.NumberOfInvalidationNodes];
       }
     }
+
     if (selectorMap.size > 0) {
       selectorMap.forEach(timing => {
         timings.push(timing);
@@ -326,7 +367,6 @@ export class TimelineSelectorStatsView extends UI.Widget.VBox {
       selectorMap.clear();
     } else {
       this.#timings = [];
-      this.requestUpdate();
       return;
     }
 
@@ -338,10 +378,18 @@ export class TimelineSelectorStatsView extends UI.Widget.VBox {
       [SelectorTimingsKey.MatchCount]: sums[SelectorTimingsKey.MatchCount],
       [SelectorTimingsKey.Selector]: i18nString(UIStrings.totalForAllSelectors),
       [SelectorTimingsKey.StyleSheetId]: 'n/a',
+      [SelectorTimingsKey.NumberOfInvalidationNodes]: sums[SelectorTimingsKey.NumberOfInvalidationNodes],
     });
 
-    void this.processSelectorTimings(timings).then(timings => {
-      this.#timings = timings;
+    this.#timings = await this.processSelectorTimings(timings);
+  }
+
+  setAggregatedEvents(events: Trace.Types.Events.UpdateLayoutTree[]): void {
+    if (!this.#parsedTrace) {
+      return;
+    }
+
+    void this.aggregateEvents(events).then(() => {
       this.requestUpdate();
     });
   }

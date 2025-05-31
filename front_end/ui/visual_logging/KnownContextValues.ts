@@ -2534,6 +2534,7 @@ export const knownContextValues = new Set([
   'notification.request-permission',
   'notifications',
   'number',
+  'number-of-invalidation-nodes',
   'numeric-column',
   'object',
   'object-column',
