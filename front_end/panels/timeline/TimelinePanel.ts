@@ -1363,51 +1363,67 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     } else {
       fileName = `Trace-${traceStart}.json` as Platform.DevToolsPath.RawPathString;
     }
-
     try {
-      // TODO(crbug.com/1456818): Extract this logic and add more tests.
-      let traceAsString;
-      if (metadata?.dataOrigin === Trace.Types.File.DataOrigin.CPU_PROFILE) {
-        const profileEvent = traceEvents.find(e => e.name === 'CpuProfile');
-        if (!profileEvent?.args?.data) {
-          return;
-        }
-        const profileEventData = profileEvent.args?.data;
-        if (profileEventData.hasOwnProperty('cpuProfile')) {
-          // TODO(crbug.com/1456799): Currently use a hack way because we can't differentiate
-          // cpuprofile from trace events when loading a file.
-          // The loader will directly add the fake trace created from CpuProfile to the tracingModel.
-          // And there is where the old saving logic saves the cpuprofile.
-          // This will be solved when the CPUProfileHandler is done. Then we can directly get it
-          // from the new traceEngine
-          const profile = (profileEventData as {cpuProfile: Protocol.Profiler.Profile}).cpuProfile;
-          traceAsString = cpuprofileJsonGenerator(profile);
-        }
-      } else {
-        const formattedTraceIter = traceJsonGenerator(traceEvents, {
-          ...metadata,
-          sourceMaps: savingEnhancedTrace ? metadata?.sourceMaps : undefined,
-        });
-        traceAsString = Array.from(formattedTraceIter).join('');
-      }
-      if (!traceAsString) {
-        throw new Error('Trace content empty');
-      }
-      await Workspace.FileManager.FileManager.instance().save(
-          fileName, traceAsString, true /* forceSaveAs */, false /* isBase64 */);
-      Workspace.FileManager.FileManager.instance().close(fileName);
-    } catch (e) {
-      // We expect the error to be an Error class, but this deals with any weird case where it's not.
-      const error = e instanceof Error ? e : new Error(e);
-
+      await this.innerSaveToFile(traceEvents, metadata, fileName, savingEnhancedTrace);
+    } catch (error) {
       console.error(error.stack);
       if (error.name === 'AbortError') {
         // The user cancelled the action, so this is not an error we need to report.
         return;
       }
-
-      this.#showExportTraceErrorDialog(error);
+      Common.Console.Console.instance().error(
+          i18nString(UIStrings.failedToSaveTimelineSS, {PH1: error.message, PH2: error.name}));
     }
+  }
+
+
+  async innerSaveToFile(
+      traceEvents: readonly Trace.Types.Events.Event[], metadata: Trace.Types.File.MetaData|null,
+      fileName?: Platform.DevToolsPath.RawPathString, savingEnhancedTrace?: boolean): Promise<void> {
+    let blobParts = [];
+
+    if (metadata?.dataOrigin === Trace.Types.File.DataOrigin.CPU_PROFILE) {
+      const profileEvent = traceEvents.find(e => e.name === 'CpuProfile');
+      if (!profileEvent?.args?.data) {
+        return;
+      }
+      const profileEventData = profileEvent.args?.data;
+      if (profileEventData.hasOwnProperty('cpuProfile')) {
+        // TODO(crbug.com/1456799): Currently use a hack way because we can't differentiate
+        // cpuprofile from trace events when loading a file.
+        // The loader will directly add the fake trace created from CpuProfile to the tracingModel.
+        // And there is where the old saving logic saves the cpuprofile.
+        // This will be solved when the CPUProfileHandler is done. Then we can directly get it
+        // from the new traceEngine
+        const profile = (profileEventData as {cpuProfile: Protocol.Profiler.Profile}).cpuProfile;
+        blobParts = [cpuprofileJsonGenerator(profile)];
+      }
+    } else {
+      const formattedTraceIter = traceJsonGenerator(traceEvents, {
+        ...metadata,
+        sourceMaps: savingEnhancedTrace ? metadata?.sourceMaps : undefined,
+      });
+      blobParts = Array.from(formattedTraceIter);
+    }
+
+    // Create a Blob from the array of strings
+    const blob = new Blob(blobParts, {type: 'application/json'});
+
+    // Create a URL for the Blob
+    const url = URL.createObjectURL(blob);
+
+    // Create a temporary anchor element and trigger download
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'performance_trace.json';  // Or a more dynamic name
+    a.click();
+    URL.revokeObjectURL(url);
+
+
+
+    // await Workspace.FileManager.FileManager.instance().save(
+    //     fileName, traceAsString, true /* forceSaveAs */, false /* isBase64 */);
+    // Workspace.FileManager.FileManager.instance().close(fileName);
   }
 
   #showExportTraceErrorDialog(error: Error): void {
@@ -2128,7 +2144,9 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
    * 2. The user had it open, and we hid it (for example, during recording), so now we need to bring it back.
    */
   #showSidebarIfRequired(): void {
-    if (Root.Runtime.Runtime.queryParam('disable-auto-performance-sidebar-reveal') !== null) {
+    const disabledByLocalStorage = window.localStorage.getItem('disable-auto-show-rpp-sidebar-for-test') === 'true';
+
+    if (Root.Runtime.Runtime.queryParam('disable-auto-performance-sidebar-reveal') !== null || disabledByLocalStorage) {
       // Used in interaction tests & screenshot tests.
       return;
     }
