@@ -33,7 +33,7 @@ function addInvalidationToEvent(event: Types.Events.Event, invalidation: Types.E
   existingInvalidations.push(invalidation);
 
   if (maxInvalidationsPerEvent !== null && existingInvalidations.length > maxInvalidationsPerEvent) {
-    existingInvalidations.shift();
+    console.log('dropped an invalidation', existingInvalidations.shift());
   }
   invalidationsForEvent.set(event, existingInvalidations);
 
@@ -85,11 +85,10 @@ export function handleEvent(event: Types.Events.Event): void {
     // timings overlap and if so associate them.
     if (lastRecalcStyleEvent &&
         (Types.Events.isScheduleStyleInvalidationTracking(event) ||
-         Types.Events.isStyleRecalcInvalidationTracking(event) ||
+         Types.Events.isStyleRecalcInvalidationTracking(event) || Types.Events.isResolveStyle(event) ||
          Types.Events.isStyleInvalidatorInvalidationTracking(event))) {
       const recalcEndTime = lastRecalcStyleEvent.ts + (lastRecalcStyleEvent.dur || 0);
-      if (event.ts >= lastRecalcStyleEvent.ts && event.ts <= recalcEndTime &&
-          lastRecalcStyleEvent.args.beginData?.frame === event.args.data.frame) {
+      if (event.ts >= lastRecalcStyleEvent.ts && event.ts <= recalcEndTime) {
         addInvalidationToEvent(lastRecalcStyleEvent, event);
       }
     }

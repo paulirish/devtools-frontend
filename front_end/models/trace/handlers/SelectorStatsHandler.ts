@@ -12,12 +12,12 @@ const selectorDataForUpdateLayoutTree = new Map<Types.Events.UpdateLayoutTree, {
   timings: Types.Events.SelectorTiming[],
 }>();
 
-const dataForInvalidationEvent = new Array<Types.Events.InvalidationNode>();
+const styleInvalidatorData = new Array<Types.Events.InvalidationNode>();
 
 export function reset(): void {
   lastUpdateLayoutTreeEvent = null;
   selectorDataForUpdateLayoutTree.clear();
-  dataForInvalidationEvent.length = 0;
+  styleInvalidatorData.length = 0;
 }
 
 export function handleEvent(event: Types.Events.Event): void {
@@ -59,7 +59,7 @@ export function handleEvent(event: Types.Events.Event): void {
         subtree: false,
         lastUpdateLayoutTreeEventTs: lastUpdateLayoutTreeEvent ? lastUpdateLayoutTreeEvent.ts : Micro(0),
       };
-      dataForInvalidationEvent.push(lastInvalidationNode);
+      styleInvalidatorData.push(lastInvalidationNode);
     }
   }
 
@@ -76,12 +76,12 @@ export interface SelectorStatsData {
   dataForUpdateLayoutEvent: Map<Types.Events.UpdateLayoutTree, {
     timings: Types.Events.SelectorTiming[],
   }>;
-  dataForInvalidationEvent: Types.Events.InvalidationNode[];
+  styleInvalidatorData: Types.Events.InvalidationNode[];
 }
 
 export function data(): SelectorStatsData {
   return {
     dataForUpdateLayoutEvent: selectorDataForUpdateLayoutTree,
-    dataForInvalidationEvent,
+    styleInvalidatorData: styleInvalidatorData,
   };
 }

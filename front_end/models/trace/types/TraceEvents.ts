@@ -1241,6 +1241,23 @@ export function isStyleInvalidatorInvalidationTracking(event: Event): event is S
   return event.name === Name.STYLE_INVALIDATOR_INVALIDATION_TRACKING;
 }
 
+export interface ResolveStyle extends Instant {
+  name: Name.RESOLVE_STYLE;
+  cat: 'disabled-by-default-devtools.timeline.invalidationTracking'
+  args: Args&{
+    data: ArgsData & {
+      nodeId: Protocol.DOM.BackendNodeId,
+      parentNodeId: Protocol.DOM.BackendNodeId,
+      pseudoId: Protocol.DOM.BackendNodeId,  // is this really a node id?
+    },
+  };
+}
+export function isResolveStyle(event: Event): event is ResolveStyle {
+  return event.name === Name.RESOLVE_STYLE;
+}
+
+
+
 export interface BeginCommitCompositorFrame extends Instant {
   name: Name.BEGIN_COMMIT_COMPOSITOR_FRAME;
   args: Args&{
@@ -1838,7 +1855,7 @@ export type InvalidationTrackingEvent = ScheduleStyleInvalidationTracking|StyleR
 
 export function isInvalidationTracking(event: Event): event is InvalidationTrackingEvent {
   return isScheduleStyleInvalidationTracking(event) || isStyleRecalcInvalidationTracking(event) ||
-      isStyleInvalidatorInvalidationTracking(event) || isLayoutInvalidationTracking(event);
+      isStyleInvalidatorInvalidationTracking(event) || isLayoutInvalidationTracking(event) || isResolveStyle(event)
 }
 
 export interface DrawLazyPixelRef extends Instant {
@@ -2983,6 +3000,7 @@ export const enum Name {
   SCHEDULE_STYLE_INVALIDATION_TRACKING = 'ScheduleStyleInvalidationTracking',
   STYLE_RECALC_INVALIDATION_TRACKING = 'StyleRecalcInvalidationTracking',
   STYLE_INVALIDATOR_INVALIDATION_TRACKING = 'StyleInvalidatorInvalidationTracking',
+  RESOLVE_STYLE = 'StyleResolver::ResolveStyle',
   SELECTOR_STATS = 'SelectorStats',
   BEGIN_COMMIT_COMPOSITOR_FRAME = 'BeginCommitCompositorFrame',
   PARSE_META_VIEWPORT = 'ParseMetaViewport',

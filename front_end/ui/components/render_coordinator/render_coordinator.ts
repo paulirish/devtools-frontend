@@ -238,10 +238,10 @@ function scheduleWork(): void {
     try {
       await Promise.race([
         Promise.all(readers.map(r => r.promise)),
-        new Promise((_, reject) => {
-          window.setTimeout(
-              () => reject(new Error(`Readers took over ${DEADLOCK_TIMEOUT}ms. Possible deadlock?`)), DEADLOCK_TIMEOUT);
-        }),
+        // new Promise((_, reject) => {
+        //   window.setTimeout(
+        //       () => reject(new Error(`Readers took over ${DEADLOCK_TIMEOUT}ms. Possible deadlock?`)), DEADLOCK_TIMEOUT);
+        // }),
       ]);
     } catch (err) {
       rejectAll(readers, err);
@@ -257,10 +257,10 @@ function scheduleWork(): void {
     try {
       await Promise.race([
         Promise.all(writers.map(w => w.promise)),
-        new Promise((_, reject) => {
-          window.setTimeout(
-              () => reject(new Error(`Writers took over ${DEADLOCK_TIMEOUT}ms. Possible deadlock?`)), DEADLOCK_TIMEOUT);
-        }),
+        // new Promise((_, reject) => {
+        //   window.setTimeout(
+        //       () => reject(new Error(`Writers took over ${DEADLOCK_TIMEOUT}ms. Possible deadlock?`)), DEADLOCK_TIMEOUT);
+        // }),
       ]);
     } catch (err) {
       rejectAll(writers, err);

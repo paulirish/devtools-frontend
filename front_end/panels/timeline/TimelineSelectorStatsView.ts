@@ -245,7 +245,8 @@ export class TimelineSelectorStatsView extends UI.Widget.VBox {
       return;
     }
 
-    const invalidationNodes = this.#parsedTrace.SelectorStats.dataForInvalidationEvent;
+    const invalidationNodes = this.#parsedTrace.SelectorStats.styleInvalidatorData;
+    // Aggregate invalidated nodes per (Selector + Recalc timestamp + Frame)
     const invalidationNodeMap = new Map<string, {subtree: boolean, nodeList: Array<SDK.DOMModel.DOMNode|null>}>();
     for (const invalidationNode of invalidationNodes) {
       if (!invalidationNode.node) {

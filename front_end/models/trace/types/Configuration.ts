@@ -44,7 +44,7 @@ export const defaults = (): Configuration => ({
   includeRuntimeCallStats: false,
   showAllEvents: false,
   debugMode: false,
-  maxInvalidationEventsPerEvent: 20,
+  maxInvalidationEventsPerEvent: 100,
 });
 
 /**

@@ -117,6 +117,7 @@ export class TimelineController implements Trace.TracingManager.TracingManagerCl
     }
     if (Root.Runtime.experiments.isEnabled('timeline-invalidation-tracking')) {
       categoriesArray.push(disabledByDefault('devtools.timeline.invalidationTracking'));
+      categoriesArray.push(disabledByDefault('blink.debug.invalidationTracking'));
     }
     if (options.capturePictures) {
       categoriesArray.push(

@@ -225,7 +225,7 @@ export function generateInvalidationsList(
       // so we do not include these in the UI.
       continue;
     }
-
+    reason = `${invalidation.name.replace('InvalidationTracking', '_InvTr').padEnd(25)} ${reason}`;
     const existing = groupedByReason[reason] || [];
     existing.push(invalidation);
     groupedByReason[reason] = existing;
