@@ -21,6 +21,11 @@ const REMOTE_DEBUGGING_PORT = 7722;
 const tests = loadTests(path.join(GEN_DIR, 'front_end'));
 
 function* reporters() {
+  const isVerbose = ['info', 'debug'].includes(process.argv.at(process.argv.indexOf('--log-level') + 1) ?? '');
+
+  // if (isVerbose) {
+  //   yield 'spec';  // Show individual test names
+  // }
   if (ResultsDb.available()) {
     yield 'resultsdb';
   } else {
@@ -39,10 +44,27 @@ const CustomChrome = function(this: any, _baseBrowserDecorator: unknown, args: B
   require('karma-chrome-launcher')['launcher:Chrome'][1].apply(this, arguments);
   this._execCommand = async function(_cmd: string, args: string[]) {
     const url = args.pop()!;
+    const headless = !TestConfig.debug || TestConfig.headless;
+
+    const viewportWidth = 800;
+    const viewportHeight = 600;
+    // Adding some offset to the window size used in the headful mode so to account for the size of the browser UI. Values
+    // are chosen by trial and error to make sure that the window size is not much bigger than the viewport but so that the
+    // entire viewport is visible.
+    const windowWidth = viewportWidth + 50;
+    const windowHeight = viewportHeight + 200;
+
+    const defaultViewport = {width: viewportWidth, height: viewportHeight, deviceScaleFactor: 1};
+    if (!headless) {
+      args.push(`--window-size=${windowWidth},${windowHeight}`);
+    }
+
     const browser = await puppeteer.launch({
-      headless: !TestConfig.debug || TestConfig.headless,
+      headless,
       executablePath: TestConfig.chromeBinary,
-      defaultViewport: null,
+      // Always set the default viewport because setting only the window size for
+      // headful mode would result in much smaller actual viewport.
+      defaultViewport,
       dumpio: true,
       args,
       ignoreDefaultArgs: ['--hide-scrollbars'],
@@ -136,12 +158,53 @@ TestConfig.configureChrome(executablePath);
 
 CustomChrome.$inject = ['baseBrowserDecorator', 'args', 'config'];
 
+const baseSpecReporter = require(path.join(SOURCE_ROOT, 'node_modules', 'karma-spec-reporter', 'index.js'));
+const SpecWithDiffReporter = function(
+    this: any, formatError: unknown, reportSlow: unknown, useColors: unknown, browserConsoleLogOptions: unknown) {
+  console.log({that: this, args: arguments, formatError, reportSlow, useColors, browserConsoleLogOptions});
+  baseSpecReporter['reporter:spec'][1].apply(this, arguments);
+  // const baseSpecFailure = this.specFailure;
+  // this.specFailure = function(this: any, _browser: unknown, result: any) {
+  //   console.log('z', this, _browser, result);
+  //   baseSpecFailure.call(this, _browser, result);
+  //   const patch = formatAsPatch(resultAssertionsDiff(result));
+  //   if (patch) {
+  //     this.write(`\n${patch}\n\n`);
+  //   }
+  // };
+};
+
+
 const BaseProgressReporter =
     require(path.join(SOURCE_ROOT, 'node_modules', 'karma', 'lib', 'reporters', 'progress_color.js'));
 const ProgressWithDiffReporter = function(
     this: any, formatError: unknown, reportSlow: unknown, useColors: unknown, browserConsoleLogOptions: unknown) {
   BaseProgressReporter.call(this, formatError, reportSlow, useColors, browserConsoleLogOptions);
   const baseSpecFailure = this.specFailure;
+  // // success like spec reporter
+  // this.specSuccess = function(this: any, _browser: unknown, result: any) {
+  //   var suite = result.suite;
+  //   var indent = '  ';
+  //   this.write(JSON.stringify(suite));
+  //   suite.forEach(function(value, index) {
+  //     if (index >= suite.length || suite[index] != value) {
+  //       if (index === 0) {
+  //         this.writeCommonMsg('\n');
+  //       }
+
+  //       this.writeCommonMsg(indent + value + '\n');
+  //       suite = [];
+  //     }
+
+  //     indent += '  ';
+  //   }, this);
+
+  //   var specName = result.description;
+  //   var msg = indent + '✓ ' + specName;
+
+  //   this.writeCommonMsg(msg + '\n');
+  // };
+
   this.specFailure = function(this: any, _browser: unknown, result: any) {
     baseSpecFailure.apply(this, arguments);
     const patch = formatAsPatch(resultAssertionsDiff(result));
@@ -150,7 +213,7 @@ const ProgressWithDiffReporter = function(
     }
   };
 };
-ProgressWithDiffReporter.$inject =
+SpecWithDiffReporter.$inject = ProgressWithDiffReporter.$inject =
     ['formatError', 'config.reportSlowerThan', 'config.colors', 'config.browserConsoleLogOptions'];
 
 const coveragePreprocessors = TestConfig.coverage ? {
@@ -188,7 +251,7 @@ module.exports = function(config: any) {
       {pattern: path.join(GEN_DIR, 'front_end/ui/components/docs/**/*'), served: true, included: false},
     ],
 
-    reporters: [...reporters()],
+    reporters: ['spec-diff'],  //  [...reporters()],
 
     browsers: ['BrowserWithArgs'],
     customLaunchers: {
@@ -220,6 +283,7 @@ module.exports = function(config: any) {
       require('karma-coverage'),
       {'reporter:resultsdb': ['type', ResultsDBReporter]},
       {'reporter:progress-diff': ['type', ProgressWithDiffReporter]},
+      {'reporter:spec-diff': ['type', SpecWithDiffReporter]},
     ],
 
     preprocessors: {

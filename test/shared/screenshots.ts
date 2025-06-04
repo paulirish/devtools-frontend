@@ -174,6 +174,7 @@ const assertScreenshotUnchanged = async (options: ScreenshotAssertionOptions) =>
   const throwAfterGoldensUpdate = TestConfig.onDiff.throw;
 
   let onBotAndImageNotFound = false;
+  console.log({goldenScreenshotPath});
 
   // In the event that a golden does not exist, assume the generated screenshot is the new golden.
   if (!fs.existsSync(goldenScreenshotPath)) {

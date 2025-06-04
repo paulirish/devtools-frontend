@@ -5,7 +5,7 @@
 import * as Platform from '../../../core/platform/platform.js';
 import * as SDK from '../../../core/sdk/sdk.js';
 import type * as Protocol from '../../../generated/protocol.js';
-import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
+import {describeWithEnvironment, expectConsoleLogs} from '../../../testing/EnvironmentHelpers.js';
 import {fetchFixture} from '../../../testing/TraceLoader.js';
 import * as Trace from '../trace.js';
 
@@ -152,16 +152,20 @@ describeWithEnvironment('ScriptDuplication', function() {
         unmappedBytes: 36,
       });
     });
-
-    it('fault tolerance (bogus mappings)', async function() {
-      const script = await loadScriptFixture('foo.min', fixture => {
-        fixture.sourceMapJson.mappings = 'blahblah blah';
+    describe('invalid sourcemap', () => {
+      expectConsoleLogs({
+        error: [`Failed to parse source map Error: Unexpected char ' ' encountered while decoding`],
       });
-      const sizes = Trace.Handlers.ModelHandlers.Scripts.getScriptGeneratedSizes(script);
-      assert.deepEqual(sizes, {
-        files: {},
-        totalBytes: 718,
-        unmappedBytes: 718,
+      it('fault tolerance (bogus mappings)', async function() {
+        const script = await loadScriptFixture('foo.min', fixture => {
+          fixture.sourceMapJson.mappings = 'blahblah blah';
+        });
+        const sizes = Trace.Handlers.ModelHandlers.Scripts.getScriptGeneratedSizes(script);
+        assert.deepEqual(sizes, {
+          files: {},
+          totalBytes: 718,
+          unmappedBytes: 718,
+        });
       });
     });
 

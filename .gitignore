@@ -54,3 +54,4 @@ test/perf/.generated
 .eslintcache
 .stylelintcache
 **/tsconfig.tsbuildinfo
+.aider*

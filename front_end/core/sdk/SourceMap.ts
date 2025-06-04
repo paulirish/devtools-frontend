@@ -530,6 +530,7 @@ export class SourceMap {
           break;
         }
       }
+      // console.log('peek', tokenIter.peekVLQ()); // -13
 
       columnNumber += tokenIter.nextVLQ();
       if (!tokenIter.hasNext() || this.isSeparator(tokenIter.peek())) {
