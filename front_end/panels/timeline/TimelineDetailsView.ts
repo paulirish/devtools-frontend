@@ -15,6 +15,7 @@ import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import * as TimelineComponents from './components/components.js';
 import {EventsTimelineTreeView} from './EventsTimelineTreeView.js';
+import {FlameGraphView} from './FlameGraphView.js';
 import {Tracker} from './FreshRecording.js';
 import {targetForEvent} from './TargetForEvent.js';
 import {ThirdPartyTreeViewWidget} from './ThirdPartyTreeView.js';
@@ -56,6 +57,10 @@ const UIStrings = {
    *@description Text in Timeline Details View of the Performance panel
    */
   eventLog: 'Event log',
+  /**
+   *@description Text in Timeline Details View of the Performance panel
+   */
+  flameGraph: 'Flame graph',
   /**
    *@description Title of the paint profiler, old name of the performance pane
    */
@@ -127,6 +132,10 @@ export class TimelineDetailsPane extends
     this.appendTab(Tab.CallTree, i18nString(UIStrings.callTree), callTreeView);
     this.rangeDetailViews.set(Tab.CallTree, callTreeView);
 
+    const flameGraphView = new FlameGraphView();
+    this.appendTab(Tab.FlameGraph, i18nString(UIStrings.flameGraph), flameGraphView);
+    this.rangeDetailViews.set(Tab.FlameGraph, flameGraphView);
+
     const eventsView = new EventsTimelineTreeView(delegate);
     this.appendTab(Tab.EventLog, i18nString(UIStrings.eventLog), eventsView);
     this.rangeDetailViews.set(Tab.EventLog, eventsView);
@@ -194,6 +203,7 @@ export class TimelineDetailsPane extends
       case Tab.CallTree:
       case Tab.EventLog:
       case Tab.PaintProfiler:
+      case Tab.FlameGraph:
       case Tab.LayerViewer:
       case Tab.SelectorStats: {
         break;
@@ -631,6 +641,7 @@ export enum Tab {
   EventLog = 'event-log',
   CallTree = 'call-tree',
   BottomUp = 'bottom-up',
+  FlameGraph = 'flame-graph',
   PaintProfiler = 'paint-profiler',
   LayerViewer = 'layer-viewer',
   SelectorStats = 'selector-stats',

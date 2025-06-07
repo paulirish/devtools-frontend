@@ -63,6 +63,7 @@ devtools_module("timeline") {
     "CountersGraph.ts",
     "EntriesFilter.ts",
     "EventsSerializer.ts",
+    "FlameGraphView.ts",
     "EventsTimelineTreeView.ts",
     "ExtensionTrackAppender.ts",
     "FreshRecording.ts",
