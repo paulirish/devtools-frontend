@@ -185,13 +185,18 @@ export class ThreadAppender implements TrackAppender {
 
     // redefine tree
 
-    tree = new Trace.Extras.TraceTree.TopDownRootNode(
-        entries ?? [], [visibleEventsFilter], Trace.Types.Timing.MilliSeconds(0),
-        Trace.Types.Timing.MilliSeconds(Infinity), false, null, false);
+  tree = new Trace.Extras.TraceTree.TopDownRootNode(entries ?? [], {
+    filters: [visibleEventsFilter],
+    startTime: Trace.Types.Timing.Milli(0),
+    endTime: Trace.Types.Timing.Milli(Infinity),
+    doNotAggregate: false,
+    eventGroupIdCallback: null,
+    includeInstantEvents: false
+  });
 
-    if (!entries || !tree) {
-      throw new Error(`Could not find data for thread with id ${threadId} in process with id ${processId}`);
-    }
+  if (!entries || !tree) {
+    throw new Error(`Could not find data for thread with id ${threadId} in process with id ${processId}`);
+  }
     this.#entries = entries;
     this.#tree = tree;
     this.#threadDefaultName = threadName || i18nString(UIStrings.threadS, {PH1: threadId});
