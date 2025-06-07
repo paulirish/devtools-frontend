@@ -102,7 +102,7 @@ export class FlameGraphView extends Common.ObjectWrapper.eventMixin<TimelineTree
     const timingMilli = Trace.Helpers.Timing.traceWindowMicroSecondsToMilliSeconds(timings);
     this.startTime = timingMilli.min;
     this.endTime = timingMilli.max;
-    this.#flameChart.setWindowTimes(this.startTime, this.endTime - this.startTime);
+    this.#flameChart.setWindowTimes(0, 99 + Math.random());
     this.#dataProvider.setRange(timingMilli);
 
 
@@ -147,8 +147,9 @@ class DataProvider implements PerfUI.FlameChart.FlameChartDataProvider {
   #timelineData: PerfUI.FlameChart.FlameChartTimelineData;
   #parsedTrace: Trace.Handlers.Types.ParsedTrace|null = null;
   #maxDepth: number = 0;
-  private timeSpan: number = 0;
-  #minimumBoundary: Trace.Types.Timing.Milli = Trace.Types.Timing.Milli(0);
+  private timeSpan: number = 100;
+  #minimumBoundary: number = 0;
+
 
   constructor() {
     this.#timelineData = PerfUI.FlameChart.FlameChartTimelineData.createEmpty();
@@ -172,9 +173,9 @@ class DataProvider implements PerfUI.FlameChart.FlameChartDataProvider {
   }
 
   setRange(timingMilli: Trace.Types.Timing.TraceWindowMilli): void {
-    const {min, max} = timingMilli;
-    this.#minimumBoundary = min;
-    this.timeSpan = min === max ? 1000 : max - this.#minimumBoundary;
+    // const {min, max} = timingMilli;
+    // this.#minimumBoundary = min;
+    // this.timeSpan = min === max ? 1000 : max - this.#minimumBoundary;
   }
 
   setTree(tree: Trace.Extras.TraceTree.TopDownRootNode, parsedTrace: Trace.Handlers.Types.ParsedTrace): void {
@@ -186,6 +187,7 @@ class DataProvider implements PerfUI.FlameChart.FlameChartDataProvider {
     }
     let maxDepth = 0;
     const {entryLevels, entryStartTimes, entryTotalTimes} = this.#timelineData;
+    const xOffsets: number[] = [];
 
     function processNode(
         node: Trace.Extras.TraceTree.Node, level: number): void {
@@ -193,9 +195,12 @@ class DataProvider implements PerfUI.FlameChart.FlameChartDataProvider {
         maxDepth = level;
       }
       if (node.event) {
+        const x = xOffsets[level] || 0;
         entryLevels.push(level);
-        entryStartTimes.push(/*  ??????? */);
-        entryTotalTimes.push(node.totalTime / tree.totalTime * 100);  // percentage of tree time
+        entryStartTimes.push(x);
+        const nodeTotalTime = node.totalTime / tree.totalTime * 100;
+        entryTotalTimes.push(nodeTotalTime);
+        xOffsets[level] = x + nodeTotalTime;
       }
       for (const child of node.children().values()) {
         processNode(child, level + 1);
@@ -209,11 +214,11 @@ class DataProvider implements PerfUI.FlameChart.FlameChartDataProvider {
   }
 
   minimumBoundary(): number {
-    return this.#minimumBoundary;
+    return 0;
   }
 
   totalTime(): number {
-    return this.timeSpan;
+    return 100;
   }
 
   maxStackDepth(): number {
