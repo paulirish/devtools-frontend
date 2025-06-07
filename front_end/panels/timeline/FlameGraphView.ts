@@ -53,7 +53,7 @@ export class FlameGraphView extends Common.ObjectWrapper.eventMixin<TimelineTree
 
     this.#dataProvider = new DataProvider();
     this.#flameChart = new PerfUI.FlameChart.FlameChart(this.#dataProvider, this);
-    this.contentElement.appendChild(this.#flameChart.element);
+    this.#flameChart.show(this.contentElement);
   }
 
   windowChanged(startTime: number, endTime: number, animate: boolean): void {
@@ -103,6 +103,9 @@ export class FlameGraphView extends Common.ObjectWrapper.eventMixin<TimelineTree
     this.startTime = timingMilli.min;
     this.endTime = timingMilli.max;
     this.#flameChart.setWindowTimes(this.startTime, this.endTime - this.startTime);
+    this.#dataProvider.setRange(timingMilli);
+
+
     this.refreshTree();
   }
 
@@ -143,31 +146,56 @@ class DataProvider implements PerfUI.FlameChart.FlameChartDataProvider {
   #tree: Trace.Extras.TraceTree.TopDownRootNode|null = null;
   #timelineData: PerfUI.FlameChart.FlameChartTimelineData;
   #parsedTrace: Trace.Handlers.Types.ParsedTrace|null = null;
+  #maxDepth: number = 0;
+  private timeSpan: number = 0;
+  #minimumBoundary: Trace.Types.Timing.Milli = Trace.Types.Timing.Milli(0);
 
   constructor() {
     this.#timelineData = PerfUI.FlameChart.FlameChartTimelineData.createEmpty();
+  }
+
+  // TODO(crbug.com/40256158): Implement formatValue
+  formatValue(value: number, entryIndex: number): string {
+    return value.toFixed(2);
+  }
+
+  // TODO(crbug.com/40256158): Implement preparePopoverElement
+  async preparePopoverElement(entryIndex: number): Promise<Element|null> {
+    const element = document.createElement('div');
+    element.textContent = `Entry Index: ${entryIndex}`;
+    return element;
+  }
+
+  // TODO(crbug.com/40256158): Implement hasTrackConfigurationMode
+  hasTrackConfigurationMode(): boolean {
+    return false;
+  }
+
+  setRange(timingMilli: Trace.Types.Timing.TraceWindowMilli): void {
+    const {min, max} = timingMilli;
+    this.#minimumBoundary = min;
+    this.timeSpan = min === max ? 1000 : max - this.#minimumBoundary;
   }
 
   setTree(tree: Trace.Extras.TraceTree.TopDownRootNode, parsedTrace: Trace.Handlers.Types.ParsedTrace): void {
     this.#tree = tree;
     this.#parsedTrace = parsedTrace;
     this.#timelineData = PerfUI.FlameChart.FlameChartTimelineData.createEmpty();
-
     if (!this.#tree) {
       return;
     }
-
-    const {maxDepth, entryLevels, entryStartTimes, entryTotalTimes} = this.#timelineData;
+    let maxDepth = 0;
+    const {entryLevels, entryStartTimes, entryTotalTimes} = this.#timelineData;
 
     function processNode(
         node: Trace.Extras.TraceTree.Node, level: number): void {
-      if (level > maxDepth[0]) {
-        maxDepth[0] = level;
+      if (level > maxDepth) {
+        maxDepth = level;
       }
       if (node.event) {
         entryLevels.push(level);
-        entryStartTimes.push(Trace.Helpers.Timing.microSecondsToMilliSeconds(node.event.ts));
-        entryTotalTimes.push(Trace.Helpers.Timing.microSecondsToMilliSeconds(node.event.dur || 0));
+        entryStartTimes.push(/*  ??????? */);
+        entryTotalTimes.push(node.totalTime / tree.totalTime * 100);  // percentage of tree time
       }
       for (const child of node.children().values()) {
         processNode(child, level + 1);
@@ -177,24 +205,19 @@ class DataProvider implements PerfUI.FlameChart.FlameChartDataProvider {
     for (const child of this.#tree.children().values()) {
       processNode(child, 0);
     }
+    this.#maxDepth = maxDepth;
   }
 
   minimumBoundary(): number {
-    if (!this.#tree) {
-      return 0;
-    }
-    return Trace.Helpers.Timing.microSecondsToMilliSeconds(this.#tree.startTime);
+    return this.#minimumBoundary;
   }
 
   totalTime(): number {
-    if (!this.#tree) {
-      return 0;
-    }
-    return Trace.Helpers.Timing.microSecondsToMilliSeconds(this.#tree.duration);
+    return this.timeSpan;
   }
 
   maxStackDepth(): number {
-    return this.#timelineData.maxDepth[0];
+    return this.#maxDepth;
   }
 
   timelineData(): PerfUI.FlameChart.FlameChartTimelineData {
