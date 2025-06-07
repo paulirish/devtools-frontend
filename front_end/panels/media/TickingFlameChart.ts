@@ -488,10 +488,10 @@ class TickingFlameChartDataProvider implements PerfUI.FlameChart.FlameChartDataP
     return false;
   }
 
-  preparePopoverElement(index: number): Element|null {
+  async preparePopoverElement(index: number): Promise<Element|null> {
     const element = document.createElement('div');
     (this.eventMap.get(index) as Event).decorate(element);
-    return element;
+    return Promise.resolve(element);
   }
 
   formatValue(value: number, _precision?: number): string {

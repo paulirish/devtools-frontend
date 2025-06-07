@@ -873,7 +873,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.#updatePopoverForEntry(selectedSearchResult);
   }
 
-  #updatePopoverForEntry(entryIndex: number|null): void {
+  async #updatePopoverForEntry(entryIndex: number|null): Promise<void> {
     // Just update position if cursor is hovering the same entry.
     const isMouseOverRevealChildrenArrow =
         entryIndex !== null && this.isMouseOverRevealChildrenArrow(this.lastMouseOffsetX, entryIndex);
@@ -889,7 +889,7 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     // If the mouse is hovering over the hidden descendants arrow, get an element that shows how many children are hidden, otherwise an element with the event name and length
     const popoverElement = (isMouseOverRevealChildrenArrow && group) ?
         this.dataProvider.preparePopoverForCollapsedArrow?.(entryIndex) :
-        entryIndex !== null && this.dataProvider.preparePopoverElement(entryIndex);
+        entryIndex !== null && await this.dataProvider.preparePopoverElement(entryIndex);
     if (popoverElement) {
       this.updatePopoverContents(popoverElement);
     }
@@ -4179,7 +4179,7 @@ export interface FlameChartDataProvider {
 
   timelineData(rebuild?: boolean): FlameChartTimelineData|null;
 
-  preparePopoverElement(entryIndex: number): Element|null;
+  preparePopoverElement(entryIndex: number): Promise<Element|null>|Element|null;
 
   preparePopoverForCollapsedArrow?(entryIndex: number): Element|null;
 

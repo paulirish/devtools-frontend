@@ -6,13 +6,14 @@
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Trace from '../../models/trace/trace.js';
-import * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
+import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
+import * as LegacyComponents from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {Category, IsLong} from './TimelineFilters.js';
 import type {TimelineModeViewDelegate} from './TimelinePanel.js';
-import {rangeForSelection, selectionIsEvent, type TimelineSelection} from './TimelineSelection.js';
+import {rangeForSelection, type TimelineSelection} from './TimelineSelection.js';
 import {TimelineTreeView} from './TimelineTreeView.js';
 import {TimelineUIUtils} from './TimelineUIUtils.js';
 import * as Utils from './utils/utils.js';
@@ -24,14 +25,16 @@ const UIStrings = {
   startTime: 'Start time',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/FlameGraphView.ts', UIStrings);
-const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class FlameGraphView extends Common.ObjectWrapper.eventMixin<TimelineTreeView.EventTypes, typeof UI.Widget.VBox>(
-    UI.Widget.VBox) implements UI.SearchableView.Searchable {
+    UI.Widget.VBox) implements UI.SearchableView.Searchable, PerfUI.FlameChart.FlameChartDelegate {
   private searchResults: Trace.Extras.TraceTree.Node[] = [];
   #parsedTrace: Trace.Handlers.Types.ParsedTrace|null = null;
   #entityMapper: Utils.EntityMapper.EntityMapper|null = null;
   #selectedEvents: Trace.Types.Events.Event[]|null = null;
+  #dataProvider: DataProvider;
+  #flameChart: PerfUI.FlameChart.FlameChart;
 
   currentResult?: number;
   startTime: Trace.Types.Timing.Milli = Trace.Types.Timing.Milli(0);
@@ -43,13 +46,26 @@ export class FlameGraphView extends Common.ObjectWrapper.eventMixin<TimelineTree
       private readonly isLong: IsLong,
   ) {
     super(true);
-    // this.registerRequiredCSS('panels/timeline/flameGraphView.css');
     this.element.classList.add('timeline-flame-graph-view');
     this.element.tabIndex = -1;
     this.setDefaultFocusedElement(this.element);
     this.element.setAttribute('jslog', `${VisualLogging.pane('flamegraph').track({resize: true})}`);
-    this.contentElement.textContent = 'hi mom';
+
+    this.#dataProvider = new DataProvider();
+    this.#flameChart = new PerfUI.FlameChart.FlameChart(this.#dataProvider, this);
+    this.contentElement.appendChild(this.#flameChart.element);
   }
+
+  windowChanged(startTime: number, endTime: number, animate: boolean): void {
+    this.delegate.windowChanged(startTime, endTime, animate);
+  }
+  updateRangeSelection(startTime: number, endTime: number): void {
+    this.delegate.updateRangeSelection(startTime, endTime);
+  }
+  updateSelectedGroup(flameChart: PerfUI.FlameChart.FlameChart, group: PerfUI.FlameChart.Group|null): void {
+    // TODO(crbug.com/1428148): Implement group selection.
+  }
+
   setModelWithEvents(
       selectedEvents: Trace.Types.Events.Event[]|null,
       parsedTrace: Trace.Handlers.Types.ParsedTrace|null = null,
@@ -58,15 +74,13 @@ export class FlameGraphView extends Common.ObjectWrapper.eventMixin<TimelineTree
     this.#parsedTrace = parsedTrace;
     this.#selectedEvents = selectedEvents;
     this.#entityMapper = entityMappings;
-    console.log('FlameGraphView.setModelWithEvents', selectedEvents);
     this.refreshTree();
   }
 
   refreshTree(): void {
-    if (!this.isShowing() || !this.#selectedEvents || !this.#selectedEvents.length) {
+    if (!this.isShowing() || !this.#selectedEvents || !this.#selectedEvents.length || !this.#parsedTrace) {
       return;
     }
-
 
     const visibleEventsFilter = new Trace.Extras.TraceFilter.VisibleEventsFilter(Utils.EntryStyles.visibleTypes());
 
@@ -76,30 +90,21 @@ export class FlameGraphView extends Common.ObjectWrapper.eventMixin<TimelineTree
       endTime: this.endTime,
       doNotAggregate: false,
       eventGroupIdCallback: null,
-      includeInstantEvents: false
+      includeInstantEvents: false,
     });
 
-    console.log('FlameGraphView.refreshTree', this.#selectedEvents.length, tree);
-
-    const x = tree.children();
-    console.log(x);
+    this.#dataProvider.setTree(tree, this.#parsedTrace);
+    this.#flameChart.scheduleUpdate();
   }
-
 
   updateContents(selection: TimelineSelection): void {
     const timings = rangeForSelection(selection);
     const timingMilli = Trace.Helpers.Timing.traceWindowMicroSecondsToMilliSeconds(timings);
-    // this.setRange(timingMilli.min, timingMilli.max);
-    console.log('FlameGraphView.updateContents', selection, timingMilli);
     this.startTime = timingMilli.min;
     this.endTime = timingMilli.max;
+    this.#flameChart.setWindowTimes(this.startTime, this.endTime - this.startTime);
     this.refreshTree();
-    // if (selectionIsEvent(selection)) {
-    //   this.selectEvent(selection.event, true);
-    // }
   }
-
-
 
   // UI.SearchableView.Searchable implementation
 
@@ -111,29 +116,18 @@ export class FlameGraphView extends Common.ObjectWrapper.eventMixin<TimelineTree
   performSearch(searchConfig: UI.SearchableView.SearchConfig, _shouldJump: boolean, _jumpBackwards?: boolean): void {
     this.searchResults = [];
     this.currentResult = 0;
-    // if (!this.root) {
-    //   return;
-    // }
-    // const searchRegex = searchConfig.toSearchRegex();
-    // this.searchResults = this.root.searchTree(
-    //     event => TimelineUIUtils.testContentMatching(event, searchRegex.regex, this.#parsedTrace || undefined));
-    // this.searchableView.updateSearchMatchesCount(this.searchResults.length);
   }
 
   jumpToNextSearchResult(): void {
     if (!this.searchResults.length || this.currentResult === undefined) {
       return;
     }
-    // this.selectProfileNode(this.searchResults[this.currentResult], false);
-    // this.currentResult = Platform.NumberUtilities.mod(this.currentResult + 1, this.searchResults.length);
   }
 
   jumpToPreviousSearchResult(): void {
     if (!this.searchResults.length || this.currentResult === undefined) {
       return;
     }
-    // this.selectProfileNode(this.searchResults[this.currentResult], false);
-    // this.currentResult = Platform.NumberUtilities.mod(this.currentResult - 1, this.searchResults.length);
   }
 
   supportsCaseSensitiveSearch(): boolean {
@@ -142,5 +136,153 @@ export class FlameGraphView extends Common.ObjectWrapper.eventMixin<TimelineTree
 
   supportsRegexSearch(): boolean {
     return true;
+  }
+}
+
+class DataProvider implements PerfUI.FlameChart.FlameChartDataProvider {
+  #tree: Trace.Extras.TraceTree.TopDownRootNode|null = null;
+  #timelineData: PerfUI.FlameChart.FlameChartTimelineData;
+  #parsedTrace: Trace.Handlers.Types.ParsedTrace|null = null;
+
+  constructor() {
+    this.#timelineData = PerfUI.FlameChart.FlameChartTimelineData.createEmpty();
+  }
+
+  setTree(tree: Trace.Extras.TraceTree.TopDownRootNode, parsedTrace: Trace.Handlers.Types.ParsedTrace): void {
+    this.#tree = tree;
+    this.#parsedTrace = parsedTrace;
+    this.#timelineData = PerfUI.FlameChart.FlameChartTimelineData.createEmpty();
+
+    if (!this.#tree) {
+      return;
+    }
+
+    const {maxDepth, entryLevels, entryStartTimes, entryTotalTimes} = this.#timelineData;
+
+    function processNode(
+        node: Trace.Extras.TraceTree.Node, level: number): void {
+      if (level > maxDepth[0]) {
+        maxDepth[0] = level;
+      }
+      if (node.event) {
+        entryLevels.push(level);
+        entryStartTimes.push(Trace.Helpers.Timing.microSecondsToMilliSeconds(node.event.ts));
+        entryTotalTimes.push(Trace.Helpers.Timing.microSecondsToMilliSeconds(node.event.dur || 0));
+      }
+      for (const child of node.children().values()) {
+        processNode(child, level + 1);
+      }
+    }
+
+    for (const child of this.#tree.children().values()) {
+      processNode(child, 0);
+    }
+  }
+
+  minimumBoundary(): number {
+    if (!this.#tree) {
+      return 0;
+    }
+    return Trace.Helpers.Timing.microSecondsToMilliSeconds(this.#tree.startTime);
+  }
+
+  totalTime(): number {
+    if (!this.#tree) {
+      return 0;
+    }
+    return Trace.Helpers.Timing.microSecondsToMilliSeconds(this.#tree.duration);
+  }
+
+  maxStackDepth(): number {
+    return this.#timelineData.maxDepth[0];
+  }
+
+  timelineData(): PerfUI.FlameChart.FlameChartTimelineData {
+    return this.#timelineData;
+  }
+
+  async preparePopover(entryIndex: number): Promise<Element|null> {
+    if (!this.#tree || !this.#parsedTrace) {
+      return null;
+    }
+    const event = this.#getEvent(entryIndex);
+    if (!event) {
+      return null;
+    }
+    const linkifier = new LegacyComponents.Linkifier.Linkifier();
+    const fragment = await TimelineUIUtils.buildTraceEventDetails(
+        this.#parsedTrace, event, linkifier, false, null);
+    const popoverElement = document.createElement('div');
+    popoverElement.appendChild(fragment);
+    return popoverElement;
+  }
+
+  canJumpToEntry(entryIndex: number): boolean {
+    return false;
+  }
+
+  entryTitle(entryIndex: number): string|null {
+    const event = this.#getEvent(entryIndex);
+    if (!event) {
+      return '';
+    }
+    return TimelineUIUtils.eventStyle(event).title;
+  }
+
+  entryFont(entryIndex: number): string|null {
+    return null;
+  }
+
+  entryColor(entryIndex: number): string {
+    const event = this.#getEvent(entryIndex);
+    if (!event) {
+      return '';
+    }
+    return TimelineUIUtils.eventStyle(event).category.color;
+  }
+
+  decorateEntry(
+      entryIndex: number, context: CanvasRenderingContext2D, text: string|null, barX: number, barY: number,
+      barWidth: number, barHeight: number, unclippedBarX: number, timeToPixelRatio: number): boolean {
+    return false;
+  }
+
+  forceDecoration(entryIndex: number): boolean {
+    return false;
+  }
+
+  textColor(entryIndex: number): string {
+    return '#333';
+  }
+
+  #getEvent(entryIndex: number): Trace.Types.Events.Event|null {
+    if (!this.#tree) {
+      return null;
+    }
+    // This is a bit of a hack to get the event from the tree.
+    // We should probably store the events in the data provider.
+    let i = 0;
+    function findEvent(node: Trace.Extras.TraceTree.Node): Trace.Types.Events.Event|null {
+      if (node.event) {
+        if (i === entryIndex) {
+          return node.event;
+        }
+        i++;
+      }
+      for (const child of node.children().values()) {
+        const event = findEvent(child);
+        if (event) {
+          return event;
+        }
+      }
+      return null;
+    }
+    for (const child of this.#tree.children().values()) {
+      const event = findEvent(child);
+      if (event) {
+        return event;
+      }
+    }
+    return null;
   }
 }
