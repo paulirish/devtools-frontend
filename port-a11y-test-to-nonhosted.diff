@@ -1,0 +1,375 @@
+From a0db23a14b316e530d342424cdf85edec9a464f5 Mon Sep 17 00:00:00 2001
+From: Liviu Rau <liviurau@chromium.org>
+Date: Mon, 12 May 2025 17:39:20 +0200
+Subject: [PATCH] Port accessibility-tree test
+
+Bug: 414332532
+Change-Id: Iecb9a34dccfb62a6c9a619acbc50f5a185e6d0ba
+Reviewed-on: https://chromium-review.googlesource.com/c/devtools/devtools-frontend/+/6501202
+Reviewed-by: Philip Pfaffe <pfaffe@chromium.org>
+Commit-Queue: Liviu Rau <liviurau@chromium.org>
+---
+
+diff --git a/test/e2e/elements/BUILD.gn b/test/e2e/elements/BUILD.gn
+index 9a09f90..ccc0468 100644
+--- a/test/e2e/elements/BUILD.gn
++++ b/test/e2e/elements/BUILD.gn
+@@ -7,7 +7,6 @@
+ node_ts_library("elements") {
+   sources = [
+     "accessibility-pane_test.ts",
+-    "accessibility-tree_test.ts",
+     "add-view-transition-pseudo-styles_test.ts",
+     "adornment_test.ts",
+     "at-function-sections_test.ts",
+diff --git a/test/e2e/elements/accessibility-tree_test.ts b/test/e2e/elements/accessibility-tree_test.ts
+deleted file mode 100644
+index e9615ff..0000000
+--- a/test/e2e/elements/accessibility-tree_test.ts
++++ /dev/null
+@@ -1,110 +0,0 @@
+-// Copyright 2021 The Chromium Authors. All rights reserved.
+-// Use of this source code is governed by a BSD-style license that can be
+-// found in the LICENSE file.
+-
+-import type * as puppeteer from 'puppeteer-core';
+-
+-import {
+-  assertNotNullOrUndefined,
+-  click,
+-  enableExperiment,
+-  getBrowserAndPages,
+-  getResourcesPath,
+-  goToResource,
+-  raf,
+-  waitForElementWithTextContent,
+-  waitForNoElementsWithTextContent,
+-} from '../../shared/helper.js';
+-import {toggleAccessibilityTree} from '../helpers/elements-helpers.js';
+-
+-describe('Accessibility Tree in the Elements Tab', function() {
+-  it('displays the fuller accessibility tree', async () => {
+-    await enableExperiment('full-accessibility-tree');
+-    await enableExperiment('protocol-monitor');
+-    await goToResource('elements/accessibility-simple-page.html');
+-    await toggleAccessibilityTree();
+-    await waitForElementWithTextContent('heading\xa0"Title"');
+-    await waitForElementWithTextContent(`link\xa0"cats" focusable:\xa0true url:\xa0${getResourcesPath()}/elements/x`);
+-  });
+-
+-  it('allows navigating iframes', async () => {
+-    await enableExperiment('full-accessibility-tree');
+-    await goToResource('elements/accessibility-iframe-page.html');
+-    await toggleAccessibilityTree();
+-    const iframeDoc = await waitForElementWithTextContent(
+-        `RootWebArea\xa0"Simple page with aria labeled element" focusable:\xa0true url:\xa0${
+-            getResourcesPath()}/elements/accessibility-simple-page.html`);
+-    const arrowIconContainer =
+-        (await iframeDoc.evaluateHandle(
+-            // eslint-disable-next-line  @typescript-eslint/no-explicit-any
+-            node => (node as any).parentElementOrShadowHost().parentElement.parentElement)) as puppeteer.ElementHandle;
+-    assertNotNullOrUndefined(arrowIconContainer);
+-    await click('.arrow-icon', {root: arrowIconContainer});
+-    await waitForElementWithTextContent(`link\xa0"cats" focusable:\xa0true url:\xa0${getResourcesPath()}/elements/x`);
+-  });
+-
+-  it('listens for text changes to DOM and redraws the tree', async () => {
+-    const {target, frontend} = getBrowserAndPages();
+-    await enableExperiment('full-accessibility-tree');
+-    await target.bringToFront();
+-    await goToResource('elements/accessibility-simple-page.html');
+-    await frontend.bringToFront();
+-    await toggleAccessibilityTree();
+-    await waitForElementWithTextContent(`link\xa0"cats" focusable:\xa0true url:\xa0${getResourcesPath()}/elements/x`);
+-    await target.bringToFront();
+-    const link = await target.waitForSelector('aria/cats[role="link"]');
+-    await link!.evaluate(node => {
+-      (node as HTMLElement).innerText = 'dogs';
+-    });
+-    // For some reason a11y tree takes a while to propagate.
+-    for (let i = 0; i < 30; i++) {
+-      await raf(target);
+-    }
+-    await frontend.bringToFront();
+-    await waitForElementWithTextContent(`link\xa0"dogs" focusable:\xa0true url:\xa0${getResourcesPath()}/elements/x`);
+-  });
+-
+-  it('listens for changes to properties and redraws tree', async () => {
+-    const {target, frontend} = getBrowserAndPages();
+-    await enableExperiment('full-accessibility-tree');
+-    await target.bringToFront();
+-    await goToResource('elements/accessibility-simple-page.html');
+-    await frontend.bringToFront();
+-    await toggleAccessibilityTree();
+-    await target.bringToFront();
+-    const link = await target.waitForSelector('aria/cats[role="link"]');
+-    assertNotNullOrUndefined(link);
+-    await frontend.bringToFront();
+-    await waitForElementWithTextContent(`link\xa0"cats" focusable:\xa0true url:\xa0${getResourcesPath()}/elements/x`);
+-    await target.bringToFront();
+-    await link.evaluate(node => node.setAttribute('aria-label', 'birds'));
+-    // For some reason a11y tree takes a while to propagate.
+-    for (let i = 0; i < 30; i++) {
+-      await raf(target);
+-    }
+-    await frontend.bringToFront();
+-    await waitForElementWithTextContent(`link\xa0"birds" focusable:\xa0true url:\xa0${getResourcesPath()}/elements/x`);
+-  });
+-
+-  it('listen for removed nodes and redraw tree', async () => {
+-    const {target, frontend} = getBrowserAndPages();
+-    await enableExperiment('full-accessibility-tree');
+-    await target.bringToFront();
+-    await goToResource('elements/accessibility-simple-page.html');
+-    await frontend.bringToFront();
+-    await toggleAccessibilityTree();
+-    await target.bringToFront();
+-    const link = await target.waitForSelector('aria/cats[role="link"]');
+-    await frontend.bringToFront();
+-    await waitForElementWithTextContent(`link\xa0"cats" focusable:\xa0true url:\xa0${getResourcesPath()}/elements/x`);
+-    await target.bringToFront();
+-    await link!.evaluate(node => node.remove());
+-    // For some reason a11y tree takes a while to propagate.
+-    for (let i = 0; i < 30; i++) {
+-      await raf(target);
+-    }
+-    await frontend.bringToFront();
+-    await waitForNoElementsWithTextContent(
+-        `link\xa0"cats" focusable:\xa0true url:\xa0${getResourcesPath()}/elements/x`);
+-  });
+-});
+diff --git a/test/e2e/helpers/elements-helpers.ts b/test/e2e/helpers/elements-helpers.ts
+index ada2881..1c51004 100644
+--- a/test/e2e/helpers/elements-helpers.ts
++++ b/test/e2e/helpers/elements-helpers.ts
+@@ -1040,9 +1040,10 @@
+       ])]);
+ }
+ 
+-export const toggleAccessibilityTree = async () => {
+-  await click('aria/Switch to Accessibility Tree view');
+-  await expectVeEvents([veClick('Panel: elements > Action: toggle-accessibility-tree')]);
++export const toggleAccessibilityTree =
++    async (devToolsPage: DevToolsPage = getBrowserAndPagesWrappers().devToolsPage) => {
++  await devToolsPage.click('aria/Switch to Accessibility Tree view');
++  await expectVeEvents([veClick('Panel: elements > Action: toggle-accessibility-tree')], undefined, devToolsPage);
+ };
+ 
+ export const getPropertiesWithHints = async () => {
+diff --git a/test/e2e_non_hosted/elements/BUILD.gn b/test/e2e_non_hosted/elements/BUILD.gn
+index b060daf..f6d3889 100644
+--- a/test/e2e_non_hosted/elements/BUILD.gn
++++ b/test/e2e_non_hosted/elements/BUILD.gn
+@@ -5,7 +5,10 @@
+ import("../../../scripts/build/typescript/typescript.gni")
+ 
+ ts_e2e_library("elements") {
+-  sources = [ "style-pane-properties_test.ts" ]
++  sources = [
++    "accessibility-tree_test.ts",
++    "style-pane-properties_test.ts",
++  ]
+   deps = [
+     "../../e2e/helpers",
+     "../shared",
+diff --git a/test/e2e_non_hosted/elements/accessibility-tree_test.ts b/test/e2e_non_hosted/elements/accessibility-tree_test.ts
+new file mode 100644
+index 0000000..42aa757
+--- /dev/null
++++ b/test/e2e_non_hosted/elements/accessibility-tree_test.ts
+@@ -0,0 +1,107 @@
++// Copyright 2021 The Chromium Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++import type * as puppeteer from 'puppeteer-core';
++
++import {toggleAccessibilityTree} from '../../e2e/helpers/elements-helpers.js';
++import {
++  assertNotNullOrUndefined,
++  raf,
++} from '../../shared/helper.js';
++
++describe('Accessibility Tree in the Elements Tab', function() {
++  setup({enabledDevToolsExperiments: ['full-accessibility-tree', 'protocol-monitor']});
++
++  it('displays the fuller accessibility tree', async ({devToolsPage, inspectedPage}) => {
++    await inspectedPage.goToResource('elements/accessibility-simple-page.html');
++    await toggleAccessibilityTree(devToolsPage);
++    await devToolsPage.waitForElementWithTextContent('heading\xa0"Title"');
++    await devToolsPage.waitForElementWithTextContent(
++        `link\xa0"cats" focusable:\xa0true url:\xa0${inspectedPage.getResourcesPath()}/elements/x`);
++  });
++});
++
++describe('Accessibility Tree in the Elements Tab', function() {
++  setup({enabledDevToolsExperiments: ['full-accessibility-tree']});
++
++  it('allows navigating iframes', async ({devToolsPage, inspectedPage}) => {
++    await inspectedPage.goToResource('elements/accessibility-iframe-page.html');
++    await toggleAccessibilityTree(devToolsPage);
++    const iframeDoc = await devToolsPage.waitForElementWithTextContent(
++        `RootWebArea\xa0"Simple page with aria labeled element" focusable:\xa0true url:\xa0${
++            inspectedPage.getResourcesPath()}/elements/accessibility-simple-page.html`);
++    const arrowIconContainer =
++        (await iframeDoc.evaluateHandle(
++            // eslint-disable-next-line  @typescript-eslint/no-explicit-any
++            node => (node as any).parentElementOrShadowHost().parentElement.parentElement)) as puppeteer.ElementHandle;
++    assertNotNullOrUndefined(arrowIconContainer);
++    await devToolsPage.click('.arrow-icon', {root: arrowIconContainer});
++    await devToolsPage.waitForElementWithTextContent(
++        `link\xa0"cats" focusable:\xa0true url:\xa0${inspectedPage.getResourcesPath()}/elements/x`);
++  });
++
++  it('listens for text changes to DOM and redraws the tree', async ({devToolsPage, inspectedPage}) => {
++    await inspectedPage.bringToFront();
++    await inspectedPage.goToResource('elements/accessibility-simple-page.html');
++    await devToolsPage.bringToFront();
++    await toggleAccessibilityTree(devToolsPage);
++    await devToolsPage.waitForElementWithTextContent(
++        `link\xa0"cats" focusable:\xa0true url:\xa0${inspectedPage.getResourcesPath()}/elements/x`);
++    await inspectedPage.bringToFront();
++    const link = await inspectedPage.waitForSelector('aria/cats[role="link"]');
++    await link!.evaluate(node => {
++      (node as HTMLElement).innerText = 'dogs';
++    });
++    // For some reason a11y tree takes a while to propagate.
++    for (let i = 0; i < 30; i++) {
++      await raf(inspectedPage.page);
++    }
++    await devToolsPage.bringToFront();
++    await devToolsPage.waitForElementWithTextContent(
++        `link\xa0"dogs" focusable:\xa0true url:\xa0${inspectedPage.getResourcesPath()}/elements/x`);
++  });
++
++  it('listens for changes to properties and redraws tree', async ({devToolsPage, inspectedPage}) => {
++    await inspectedPage.bringToFront();
++    await inspectedPage.goToResource('elements/accessibility-simple-page.html');
++    await devToolsPage.bringToFront();
++    await toggleAccessibilityTree(devToolsPage);
++    await inspectedPage.bringToFront();
++    const link = await inspectedPage.waitForSelector('aria/cats[role="link"]');
++    assertNotNullOrUndefined(link);
++    await devToolsPage.bringToFront();
++    await devToolsPage.waitForElementWithTextContent(
++        `link\xa0"cats" focusable:\xa0true url:\xa0${inspectedPage.getResourcesPath()}/elements/x`);
++    await inspectedPage.bringToFront();
++    await link.evaluate(node => node.setAttribute('aria-label', 'birds'));
++    // For some reason a11y tree takes a while to propagate.
++    for (let i = 0; i < 30; i++) {
++      await raf(inspectedPage.page);
++    }
++    await devToolsPage.bringToFront();
++    await devToolsPage.waitForElementWithTextContent(
++        `link\xa0"birds" focusable:\xa0true url:\xa0${inspectedPage.getResourcesPath()}/elements/x`);
++  });
++
++  it('listen for removed nodes and redraw tree', async ({devToolsPage, inspectedPage}) => {
++    await inspectedPage.bringToFront();
++    await inspectedPage.goToResource('elements/accessibility-simple-page.html');
++    await devToolsPage.bringToFront();
++    await toggleAccessibilityTree(devToolsPage);
++    await inspectedPage.bringToFront();
++    const link = await inspectedPage.waitForSelector('aria/cats[role="link"]');
++    await devToolsPage.bringToFront();
++    await devToolsPage.waitForElementWithTextContent(
++        `link\xa0"cats" focusable:\xa0true url:\xa0${inspectedPage.getResourcesPath()}/elements/x`);
++    await inspectedPage.bringToFront();
++    await link!.evaluate(node => node.remove());
++    // For some reason a11y tree takes a while to propagate.
++    for (let i = 0; i < 30; i++) {
++      await raf(inspectedPage.page);
++    }
++    await devToolsPage.bringToFront();
++    await devToolsPage.waitForNoElementsWithTextContent(
++        `link\xa0"cats" focusable:\xa0true url:\xa0${inspectedPage.getResourcesPath()}/elements/x`);
++  });
++});
+diff --git a/test/e2e_non_hosted/shared/frontend-helper.ts b/test/e2e_non_hosted/shared/frontend-helper.ts
+index 33502ee..c00d1c3 100644
+--- a/test/e2e_non_hosted/shared/frontend-helper.ts
++++ b/test/e2e_non_hosted/shared/frontend-helper.ts
+@@ -317,6 +317,27 @@
+       el.scrollIntoView();
+     });
+   }
++
++  /**
++   * Search for all elements based on their textContent
++   *
++   * @param textContent The text content to search for.
++   * @param root The root of the search.
++   */
++  async $$textContent(textContent: string, root?: puppeteer.ElementHandle) {
++    return await this.$$(textContent, root, 'pierceShadowText');
++  }
++
++  waitForNoElementsWithTextContent(textContent: string, root?: puppeteer.ElementHandle, asyncScope = new AsyncScope()) {
++    return asyncScope.exec(() => this.waitForFunction(async () => {
++      const elems = await this.$$textContent(textContent, root);
++      if (elems && elems.length === 0) {
++        return true;
++      }
++
++      return false;
++    }, asyncScope), `Waiting for no elements with textContent '${textContent}'`);
++  }
+ }
+ 
+ export interface DevtoolsSettings {
+diff --git a/test/e2e_non_hosted/shared/target-helper.ts b/test/e2e_non_hosted/shared/target-helper.ts
+index a3737a6..d46f691 100644
+--- a/test/e2e_non_hosted/shared/target-helper.ts
++++ b/test/e2e_non_hosted/shared/target-helper.ts
+@@ -11,10 +11,15 @@
+     super(page);
+     this.serverPort = serverPort;
+   }
++
+   async goTo(url: string, options: puppeteer.WaitForOptions = {}) {
+     await this.page.goto(url, options);
+   }
+ 
++  waitForSelector<Selector extends string>(selector: Selector, options?: puppeteer.WaitForSelectorOptions) {
++    return this.page.waitForSelector(selector, options);
++  }
++
+   async goToResource(path: string, options: puppeteer.WaitForOptions = {}) {
+     await this.goTo(`${this.getResourcesPath()}/${path}`, options);
+   }
+diff --git a/test/shared/helper.ts b/test/shared/helper.ts
+index 4c79fda..72e665e 100644
+--- a/test/shared/helper.ts
++++ b/test/shared/helper.ts
+@@ -156,8 +156,10 @@
+  * @param textContent The text content to search for.
+  * @param root The root of the search.
+  */
+-export const $$textContent = async (textContent: string, root?: puppeteer.ElementHandle) => {
+-  return await $$(textContent, root, 'pierceShadowText');
++export const $$textContent = async (
++    textContent: string, root?: puppeteer.ElementHandle,
++    devToolsPage: DevToolsPage = getBrowserAndPagesWrappers().devToolsPage) => {
++  return await devToolsPage.$$textContent(textContent, root);
+ };
+ 
+ export const timeout = (duration: number) => {
+@@ -250,15 +252,9 @@
+     };
+ 
+ export const waitForNoElementsWithTextContent =
+-    (textContent: string, root?: puppeteer.ElementHandle, asyncScope = new AsyncScope()) => {
+-      return asyncScope.exec(() => waitForFunction(async () => {
+-                               const elems = await $$textContent(textContent, root);
+-                               if (elems && elems.length === 0) {
+-                                 return true;
+-                               }
+-
+-                               return false;
+-                             }, asyncScope), `Waiting for no elements with textContent '${textContent}'`);
++    (textContent: string, root?: puppeteer.ElementHandle, asyncScope = new AsyncScope(),
++     devToolsPage: DevToolsPage = getBrowserAndPagesWrappers().devToolsPage) => {
++      return devToolsPage.waitForNoElementsWithTextContent(textContent, root, asyncScope);
+     };
+ 
+ export const waitForFunction =

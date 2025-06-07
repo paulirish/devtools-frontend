@@ -1,0 +1,28 @@
+PID: 18805 START: 1743104113445448960 :+++++++++++++++NEW COMMAND+++++++++++++++++++ starting new command: init [sid=repo-20250327T193510Z-P00004975/repo-20250327T193513Z-P00004975]
+
+PID: 18805 START: 1743104113533613056 :git command None ['git', 'config', '--get', 'trace2.eventtarget'] with debug: : git config --get trace2.eventtarget 1>| 2>|
+
+PID: 18805 END: 1743104113540712960 :git command None ['git', 'config', '--get', 'trace2.eventtarget'] with debug: : git config --get trace2.eventtarget 1>| 2>|
+
+PID: 18805 END: 1743104113540999936 :+++++++++++++++NEW COMMAND+++++++++++++++++++ starting new command: init [sid=repo-20250327T193510Z-P00004975/repo-20250327T193513Z-P00004975]
+
+PID: 18903 START: 1743104144595162112 :+++++++++++++++NEW COMMAND+++++++++++++++++++ starting new command: download, devtools/devtools-frontend, 6398204 [sid=repo-20250327T193544Z-P000049d7/repo-20250327T193544Z-P000049d7]
+
+PID: 18903 START: 1743104144602138112 :git command None ['git', 'config', '--file', '/Users/paulirish/.gitconfig', '--includes', '--null', '--list'] with debug: : git config --file /Users/paulirish/.gitconfig --includes --null --list 1>| 2>|
+
+PID: 18903 END: 1743104144608666880 :git command None ['git', 'config', '--file', '/Users/paulirish/.gitconfig', '--includes', '--null', '--list'] with debug: : git config --file /Users/paulirish/.gitconfig --includes --null --list 1>| 2>|
+
+PID: 18903 START: 1743104144629696000 :git command None ['git', 'config', '--get', 'trace2.eventtarget'] with debug: : git config --get trace2.eventtarget 1>| 2>|
+
+PID: 18903 END: 1743104144636113920 :git command None ['git', 'config', '--get', 'trace2.eventtarget'] with debug: : git config --get trace2.eventtarget 1>| 2>|
+
+PID: 18903 END: 1743104144636386048 :+++++++++++++++NEW COMMAND+++++++++++++++++++ starting new command: download, devtools/devtools-frontend, 6398204 [sid=repo-20250327T193544Z-P000049d7/repo-20250327T193544Z-P000049d7]
+
+PID: 19016 START: 1743104172079980032 :+++++++++++++++NEW COMMAND+++++++++++++++++++ starting new command: init [sid=repo-20250327T193611Z-P00004a48/repo-20250327T193612Z-P00004a48]
+
+PID: 19016 START: 1743104172103279104 :git command None ['git', 'config', '--get', 'trace2.eventtarget'] with debug: : git config --get trace2.eventtarget 1>| 2>|
+
+PID: 19016 END: 1743104172109009920 :git command None ['git', 'config', '--get', 'trace2.eventtarget'] with debug: : git config --get trace2.eventtarget 1>| 2>|
+
+PID: 19016 END: 1743104172109210880 :+++++++++++++++NEW COMMAND+++++++++++++++++++ starting new command: init [sid=repo-20250327T193611Z-P00004a48/repo-20250327T193612Z-P00004a48]
+
