@@ -189,26 +189,42 @@ class DataProvider implements PerfUI.FlameChart.FlameChartDataProvider {
     const {entryLevels, entryStartTimes, entryTotalTimes} = this.#timelineData;
     const xOffsets: number[] = [];
 
-    function processNode(
-        node: Trace.Extras.TraceTree.Node, level: number): void {
+    function processNode(node: Trace.Extras.TraceTree.Node, level: number, parentAbsoluteStartTime: number): void {
       if (level > maxDepth) {
         maxDepth = level;
       }
       if (node.event) {
-        const x = xOffsets[level] || 0;
-        entryLevels.push(level);
-        entryStartTimes.push(x);
+        // The start time of the current node.
+        // This is the parent's absolute start time PLUS the x-offset accumulated at this level.
+        const nodeAbsoluteStartTime = Math.max(parentAbsoluteStartTime, xOffsets[level] || 0);
+
+        // The total time of the node, converted to a percentage of the overall trace.
+        // This seems correct for width calculation.
         const nodeTotalTime = node.totalTime / tree.totalTime * 100;
+
+        entryLevels.push(level);
+        entryStartTimes.push(nodeAbsoluteStartTime);  // Use the calculated absolute start time
         entryTotalTimes.push(nodeTotalTime);
-        xOffsets[level] = x + nodeTotalTime;
+
+        // Update the xOffset for the current level.
+        // This ensures subsequent siblings at the same level start after this node.
+        xOffsets[level] = nodeAbsoluteStartTime + nodeTotalTime;
       }
+
+
       for (const child of node.children().values()) {
-        processNode(child, level + 1);
+        // When processing a child, its parent's absolute start time is the current node's absolute start time.
+        // If the current node doesn't have an event (e.g., it's a root node without a direct event),
+        // then we'd use the current `parentAbsoluteStartTime` passed into `processNode`.
+        const childParentAbsoluteStartTime =
+            node.event ? entryStartTimes[entryStartTimes.length - 1] : parentAbsoluteStartTime;
+        processNode(child, level + 1, childParentAbsoluteStartTime);
       }
     }
 
+    // Initial call for the root's children. The initial parentAbsoluteStartTime is 0.
     for (const child of this.#tree.children().values()) {
-      processNode(child, 0);
+      processNode(child, 0, 0);
     }
     this.#maxDepth = maxDepth;
   }
@@ -243,6 +259,7 @@ class DataProvider implements PerfUI.FlameChart.FlameChartDataProvider {
     const fragment = await TimelineUIUtils.buildTraceEventDetails(
         this.#parsedTrace, event, linkifier, false, null);
     const popoverElement = document.createElement('div');
+    popoverElement.textContent = this.entryTitle(entryIndex)
     popoverElement.appendChild(fragment);
     return popoverElement;
   }
@@ -255,15 +272,11 @@ class DataProvider implements PerfUI.FlameChart.FlameChartDataProvider {
     const timelineData = this.#timelineData;
     const eventLevel = timelineData.entryLevels[entryIndex];
     const event = this.#getEvent(entryIndex);
-    if (!event) {
+    if (!event || !this.#parsedTrace) {
       return '';
     }
-    try {
-      // this doesnt work because its a diff flamechart and the entryIndexes are not the same.
-      return this.#parsedTrace.compatibilityTracksAppender?.titleForEvent(event, eventLevel);
-    } catch (e) {
-      return TimelineUIUtils.eventStyle(event).title;
-    }
+
+    return Utils.EntryName.nameForEntry(event, this.#parsedTrace);
   }
 
 
