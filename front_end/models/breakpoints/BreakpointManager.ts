@@ -59,7 +59,7 @@ export class BreakpointManager extends Common.ObjectWrapper.ObjectWrapper<EventT
   readonly #breakpointsForUISourceCode =
       new Map<Workspace.UISourceCode.UISourceCode, Map<string, BreakpointLocation>>();
   readonly #breakpointByStorageId = new Map<string, Breakpoint>();
-  #updateBindingsCallbacks: ((uiSourceCode: Workspace.UISourceCode.UISourceCode) => Promise<void>)[] = [];
+  #updateBindingsCallbacks: Array<(uiSourceCode: Workspace.UISourceCode.UISourceCode) => Promise<void>> = [];
 
   private constructor(
       targetManager: SDK.TargetManager.TargetManager, workspace: Workspace.Workspace.WorkspaceImpl,
@@ -472,7 +472,7 @@ export class BreakpointManager extends Common.ObjectWrapper.ObjectWrapper<EventT
     this.dispatchEventToListeners(Events.BreakpointAdded, breakpointLocation);
   }
 
-  uiLocationRemoved(breakpoint: Breakpoint, uiLocation: Workspace.UISourceCode.UILocation): void {
+  uiLocationRemoved(uiLocation: Workspace.UISourceCode.UILocation): void {
     const breakpoints = this.#breakpointsForUISourceCode.get(uiLocation.uiSourceCode);
     if (!breakpoints) {
       return;
@@ -612,7 +612,7 @@ export class Breakpoint implements SDK.TargetManager.SDKModelObserver<SDK.Debugg
       const modelBreakpoints = Array.from(this.#modelBreakpoints.values());
       await Promise.all(modelBreakpoints.map(async modelBreakpoint => {
         await modelBreakpoint.resetBreakpoint();
-        return this.#updateModel(modelBreakpoint);
+        return await this.#updateModel(modelBreakpoint);
       }));
     }
   }
@@ -707,7 +707,7 @@ export class Breakpoint implements SDK.TargetManager.SDKModelObserver<SDK.Debugg
       this.uiSourceCodes.delete(uiSourceCode);
       this.breakpointManager.removeHomeUISourceCode(uiSourceCode, this);
       if (!this.bound()) {
-        this.breakpointManager.uiLocationRemoved(this, this.defaultUILocation(uiSourceCode));
+        this.breakpointManager.uiLocationRemoved(this.defaultUILocation(uiSourceCode));
       }
     }
 
@@ -716,7 +716,7 @@ export class Breakpoint implements SDK.TargetManager.SDKModelObserver<SDK.Debugg
       for (const uiLocation of this.#uiLocations) {
         if (uiLocation.uiSourceCode === uiSourceCode) {
           this.#uiLocations.delete(uiLocation);
-          this.breakpointManager.uiLocationRemoved(this, uiLocation);
+          this.breakpointManager.uiLocationRemoved(uiLocation);
         }
       }
 
@@ -754,7 +754,7 @@ export class Breakpoint implements SDK.TargetManager.SDKModelObserver<SDK.Debugg
   uiLocationRemoved(uiLocation: Workspace.UISourceCode.UILocation): void {
     if (this.#uiLocations.has(uiLocation)) {
       this.#uiLocations.delete(uiLocation);
-      this.breakpointManager.uiLocationRemoved(this, uiLocation);
+      this.breakpointManager.uiLocationRemoved(uiLocation);
       if (!this.bound() && !this.isRemoved) {
         this.addAllUnboundLocations();
       }
@@ -767,15 +767,6 @@ export class Breakpoint implements SDK.TargetManager.SDKModelObserver<SDK.Debugg
 
   bound(): boolean {
     return this.#uiLocations.size !== 0;
-  }
-
-  hasBoundScript(): boolean {
-    for (const uiSourceCode of this.uiSourceCodes) {
-      if (uiSourceCode.project().type() === Workspace.Workspace.projectTypes.Network) {
-        return true;
-      }
-    }
-    return false;
   }
 
   setEnabled(enabled: boolean): void {
@@ -812,10 +803,8 @@ export class Breakpoint implements SDK.TargetManager.SDKModelObserver<SDK.Debugg
 
     if (location) {
       return SourceMapScopes.NamesResolver.allVariablesAtPosition(location)
-          .then(
-              nameMap => nameMap.size > 0 ?
-                  Formatter.FormatterWorkerPool.formatterWorkerPool().javaScriptSubstitute(condition, nameMap) :
-                  condition)
+          .then(nameMap => Formatter.FormatterWorkerPool.formatterWorkerPool().javaScriptSubstitute(condition, nameMap))
+          .catch(() => condition)
           .then(subsitutedCondition => addSourceUrl(subsitutedCondition), () => addSourceUrl(condition));
     }
     return addSourceUrl(condition);
@@ -856,7 +845,7 @@ export class Breakpoint implements SDK.TargetManager.SDKModelObserver<SDK.Debugg
         this.addAllUnboundLocations();
       }
     }
-    return this.#updateModels();
+    return await this.#updateModels();
   }
 
   async remove(keepInStorage: boolean): Promise<void> {
@@ -887,7 +876,7 @@ export class Breakpoint implements SDK.TargetManager.SDKModelObserver<SDK.Debugg
 
   private removeAllUnboundLocations(): void {
     for (const uiSourceCode of this.uiSourceCodes) {
-      this.breakpointManager.uiLocationRemoved(this, this.defaultUILocation(uiSourceCode));
+      this.breakpointManager.uiLocationRemoved(this.defaultUILocation(uiSourceCode));
     }
   }
 
@@ -978,6 +967,19 @@ export class ModelBreakpoint {
     let result = DebuggerUpdateResult.PENDING;
     while (result === DebuggerUpdateResult.PENDING) {
       result = await this.#updateInDebugger();
+
+      // TODO(crbug.com/1229541): This is a mirror to the quickfix
+      // in #updateInDebugger. If the model didn't enable yet, instead of
+      // spamming the "setBreakpoint" call to the backend, we'll wait for
+      // it to finish enabling.
+      if (this.#debuggerModel.debuggerEnabled() && !this.#debuggerModel.isReadyToPause()) {
+        await this.#debuggerModel.once(SDK.DebuggerModel.Events.DebuggerIsReadyToPause);
+        if (!this.#debuggerModel.debuggerEnabled()) {
+          // If the model failed to enable, we won't try to set the breakpoint.
+          result = DebuggerUpdateResult.OK;
+          break;
+        }
+      }
     }
     release();
     return result;
@@ -986,7 +988,7 @@ export class ModelBreakpoint {
   private scriptDiverged(): boolean {
     for (const uiSourceCode of this.#breakpoint.getUiSourceCodes()) {
       const scriptFile = this.#debuggerWorkspaceBinding.scriptFile(uiSourceCode, this.#debuggerModel);
-      if (scriptFile && scriptFile.hasDivergedFromVM()) {
+      if (scriptFile?.hasDivergedFromVM()) {
         return true;
       }
     }
@@ -1126,7 +1128,7 @@ export class ModelBreakpoint {
         return this.#debuggerModel.setBreakpointByURL(pos.url, pos.lineNumber, pos.columnNumber, pos.condition);
       }
       return this.#debuggerModel.setBreakpointInAnonymousScript(
-          pos.scriptHash as string, pos.lineNumber, pos.columnNumber, pos.condition);
+          pos.scriptHash, pos.lineNumber, pos.columnNumber, pos.condition);
     }));
     const breakpointIds: Protocol.Debugger.BreakpointId[] = [];
     let locations: SDK.DebuggerModel.Location[] = [];

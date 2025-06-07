@@ -6,7 +6,6 @@ import * as Common from '../../../core/common/common.js';
 import * as SDK from '../../../core/sdk/sdk.js';
 import {getCleanTextContentFromElements, renderElementIntoDOM} from '../../../testing/DOMHelpers.js';
 import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
-import type * as Menus from '../../../ui/components/menus/menus.js';
 import * as RenderCoordinator from '../../../ui/components/render_coordinator/render_coordinator.js';
 import * as MobileThrottling from '../../mobile_throttling/mobile_throttling.js';
 
@@ -34,18 +33,18 @@ describeWithEnvironment('NetworkThrottlingSelector', () => {
 
     await RenderCoordinator.done();
 
-    const groups = view.shadowRoot!.querySelectorAll('devtools-menu-group') as NodeListOf<Menus.Menu.MenuGroup>;
+    const groups = view.shadowRoot!.querySelectorAll('devtools-menu-group');
 
     assert.lengthOf(groups, 3);
 
     assert.strictEqual(groups[0].name, 'Disabled');
-    const group1Items = groups[0].querySelectorAll('devtools-menu-item') as NodeListOf<Menus.Menu.MenuItem>;
+    const group1Items = groups[0].querySelectorAll('devtools-menu-item');
     assert.lengthOf(group1Items, 1);
     assert.match(group1Items[0].innerText, /No throttling/);
     assert.isTrue(group1Items[0].selected);
 
     assert.strictEqual(groups[1].name, 'Presets');
-    const group2Items = groups[1].querySelectorAll('devtools-menu-item') as NodeListOf<Menus.Menu.MenuItem>;
+    const group2Items = groups[1].querySelectorAll('devtools-menu-item');
     assert.lengthOf(group2Items, 4);
     assert.match(group2Items[0].innerText, /Fast 4G/);
     assert.isFalse(group2Items[0].selected);
@@ -57,7 +56,7 @@ describeWithEnvironment('NetworkThrottlingSelector', () => {
     assert.isFalse(group2Items[3].selected);
 
     assert.strictEqual(groups[2].name, 'Custom');
-    const group3Items = groups[2].querySelectorAll('devtools-menu-item') as NodeListOf<Menus.Menu.MenuItem>;
+    const group3Items = groups[2].querySelectorAll('devtools-menu-item');
     assert.lengthOf(group3Items, 1);
     assert.match(group3Items[0].innerText, /Add…/);
     assert.isFalse(group3Items[0].selected);
@@ -69,7 +68,7 @@ describeWithEnvironment('NetworkThrottlingSelector', () => {
 
     await RenderCoordinator.done();
 
-    const items = view.shadowRoot!.querySelectorAll('devtools-menu-item') as NodeListOf<Menus.Menu.MenuItem>;
+    const items = view.shadowRoot!.querySelectorAll('devtools-menu-item');
     assert.isTrue(items[0].selected);
     assert.strictEqual(networkManager.networkConditions().i18nTitleKey, 'No throttling');
 
@@ -122,7 +121,7 @@ describeWithEnvironment('NetworkThrottlingSelector', () => {
 
     renderElementIntoDOM(view);
     await RenderCoordinator.done();
-    // Ensure that the component picks up the new changes and has selected the right thorttling setting
+    // Ensure that the component picks up the new changes and has selected the right throttling setting
     const items = view.shadowRoot!.querySelectorAll('devtools-menu-item');
     assert.isTrue(items[2].innerText.includes('Slow 4G'));
     assert.isTrue(items[2].selected);
@@ -134,7 +133,7 @@ describeWithEnvironment('NetworkThrottlingSelector', () => {
 
     await RenderCoordinator.done();
 
-    const items = view.shadowRoot!.querySelectorAll('devtools-menu-item') as NodeListOf<Menus.Menu.MenuItem>;
+    const items = view.shadowRoot!.querySelectorAll('devtools-menu-item');
     assert.isTrue(items[0].selected);
 
     networkManager.setNetworkConditions(MobileThrottling.ThrottlingPresets.ThrottlingPresets.networkPresets[1]);
@@ -172,7 +171,7 @@ describeWithEnvironment('NetworkThrottlingSelector', () => {
 
     await RenderCoordinator.done();
 
-    const items = view.shadowRoot!.querySelectorAll('devtools-menu-item') as NodeListOf<Menus.Menu.MenuItem>;
+    const items = view.shadowRoot!.querySelectorAll('devtools-menu-item');
     const addItem = items[items.length - 1];
     addItem.click();
 
@@ -180,7 +179,7 @@ describeWithEnvironment('NetworkThrottlingSelector', () => {
 
     await RenderCoordinator.done();
 
-    assert(mockReveal.calledOnce);
+    sinon.assert.calledOnce(mockReveal);
     assert.isFalse(addItem.selected);
   });
 });

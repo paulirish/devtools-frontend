@@ -1,13 +1,15 @@
 // Copyright 2020 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
+
+import '../../ui/components/cards/cards.js';
 
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
-import * as Cards from '../../ui/components/cards/cards.js';
 import * as IconButton from '../../ui/components/icon_button/icon_button.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
@@ -95,7 +97,7 @@ const UIStrings = {
    *@description Screen reader announcment for discarded short cut changes
    */
   shortcutChangesDiscared: 'Changes to shortcut discarded',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/settings/KeybindsSettingsTab.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -107,6 +109,7 @@ export class KeybindsSettingsTab extends UI.Widget.VBox implements UI.ListContro
 
   constructor() {
     super(true);
+    this.registerRequiredCSS(keybindsSettingsTabStyles, settingsScreenStyles);
 
     this.element.setAttribute('jslog', `${VisualLogging.pane('keybinds')}`);
 
@@ -120,8 +123,8 @@ export class KeybindsSettingsTab extends UI.Widget.VBox implements UI.ListContro
     const keybindsSetSelect =
         UI.SettingsUI.createControlForSetting(keybindsSetSetting, i18nString(UIStrings.matchShortcutsFromPreset));
 
-    const card = new Cards.Card.Card();
-    settingsContent.appendChild(card);
+    const card = settingsContent.createChild('devtools-card');
+    card.heading = i18nString(UIStrings.shortcuts);
 
     if (keybindsSetSelect) {
       keybindsSetSelect.classList.add('keybinds-set-select');
@@ -150,10 +153,10 @@ export class KeybindsSettingsTab extends UI.Widget.VBox implements UI.ListContro
     this.editingItem = null;
     this.editingRow = null;
 
-    card.data = {
-      heading: i18nString(UIStrings.shortcuts),
-      content: keybindsSetSelect ? [keybindsSetSelect, this.list.element, footer] : [this.list.element, footer],
-    };
+    if (keybindsSetSelect) {
+      card.append(keybindsSetSelect);
+    }
+    card.append(this.list.element, footer);
 
     this.update();
   }
@@ -196,8 +199,7 @@ export class KeybindsSettingsTab extends UI.Widget.VBox implements UI.ListContro
       }
       if (newDescriptors) {
         UI.ShortcutRegistry.ShortcutRegistry.instance().registerUserShortcut(
-            originalShortcut.changeKeys(newDescriptors as UI.KeyboardShortcut.Descriptor[])
-                .changeType(UI.KeyboardShortcut.Type.USER_SHORTCUT));
+            originalShortcut.changeKeys(newDescriptors).changeType(UI.KeyboardShortcut.Type.USER_SHORTCUT));
         if (originalShortcut.type === UI.KeyboardShortcut.Type.UNSET_SHORTCUT) {
           Host.userMetrics.actionTaken(Host.UserMetrics.Action.UserShortcutAdded);
         } else {
@@ -220,7 +222,7 @@ export class KeybindsSettingsTab extends UI.Widget.VBox implements UI.ListContro
   }
 
   selectedItemChanged(
-      from: KeybindsItem|null, to: KeybindsItem|null, fromElement: HTMLElement|null,
+      _from: KeybindsItem|null, to: KeybindsItem|null, fromElement: HTMLElement|null,
       toElement: HTMLElement|null): void {
     if (fromElement) {
       fromElement.tabIndex = -1;
@@ -313,13 +315,10 @@ export class KeybindsSettingsTab extends UI.Widget.VBox implements UI.ListContro
   }
 
   override willHide(): void {
+    super.willHide();
     if (this.editingItem) {
       this.stopEditing(this.editingItem);
     }
-  }
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([keybindsSettingsTabStyles, settingsScreenStyles]);
   }
 }
 
@@ -540,7 +539,7 @@ export class ShortcutListItem {
   }
 
   private descriptorForEvent(event: KeyboardEvent): UI.KeyboardShortcut.Descriptor {
-    const userKey = UI.KeyboardShortcut.KeyboardShortcut.makeKeyFromEvent(event as KeyboardEvent);
+    const userKey = UI.KeyboardShortcut.KeyboardShortcut.makeKeyFromEvent(event);
     const codeAndModifiers = UI.KeyboardShortcut.KeyboardShortcut.keyCodeAndModifiersFromKey(userKey);
     let key: UI.KeyboardShortcut.Key|string =
         UI.KeyboardShortcut.Keys[event.key] || UI.KeyboardShortcut.KeyBindings[event.key];
@@ -591,9 +590,7 @@ export class ShortcutListItem {
     const activeElement = Platform.DOMUtilities.deepActiveElement(document);
     for (const [shortcut, shortcutInput] of this.shortcutInputs.entries()) {
       if (activeElement === shortcutInput) {
-        this.onShortcutInputKeyDown(
-            shortcut as UI.KeyboardShortcut.KeyboardShortcut, shortcutInput as HTMLInputElement,
-            event as KeyboardEvent);
+        this.onShortcutInputKeyDown(shortcut, shortcutInput as HTMLInputElement, event as KeyboardEvent);
       }
     }
   }

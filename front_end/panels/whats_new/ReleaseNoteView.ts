@@ -2,19 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as Host from '../../core/host/host.js';
+import '../../ui/components/markdown_view/markdown_view.js';
+
 import * as i18n from '../../core/i18n/i18n.js';
 import type * as Platform from '../../core/platform/platform.js';
 import * as Marked from '../../third_party/marked/marked.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
-import type * as MarkdownView from '../../ui/components/markdown_view/markdown_view.js';
 import * as UI from '../../ui/legacy/legacy.js';
-import * as LitHtml from '../../ui/lit-html/lit-html.js';
+import {html, render} from '../../ui/lit/lit.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {getReleaseNote, type ReleaseNote, VideoType} from './ReleaseNoteText.js';
-
-const {render, html} = LitHtml;
 import releaseNoteViewStyles from './releaseNoteView.css.js';
 
 const UIStrings = {
@@ -22,7 +20,7 @@ const UIStrings = {
    *@description Text that is usually a hyperlink to more documentation
    */
   seeFeatures: 'See all new features',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/whats_new/ReleaseNoteView.ts', UIStrings);
 
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -62,14 +60,15 @@ export async function getMarkdownContent(): Promise<Marked.Marked.Token[][]> {
   return splitMarkdownAst;
 }
 
-export class ReleaseNoteView extends UI.Widget.VBox {
+export class ReleaseNoteView extends UI.Panel.Panel {
   #view: View;
 
-  constructor(element?: HTMLElement, view: View = (input, _output, target) => {
+  constructor(view: View = (input, _output, target) => {
     const releaseNote = input.getReleaseNote();
     const markdownContent = input.markdownContent;
     // clang-format off
     render(html`
+      <style>${releaseNoteViewStyles}</style>
       <div class="whatsnew" jslog=${VisualLogging.section().context('release-notes')}>
         <div class="whatsnew-content">
           <div class="header">
@@ -99,15 +98,19 @@ export class ReleaseNoteView extends UI.Widget.VBox {
               })}
             </div>
             ${markdownContent.map((markdown: Marked.Marked.Token[]) => {
-              return html`<div class="feature"><devtools-markdown-view slot="content" .data=${{tokens: markdown} as MarkdownView.MarkdownView.MarkdownViewData}></devtools-markdown-view></div>`;
+              return html`
+                  <div class="feature">
+                    <devtools-markdown-view slot="content" .data=${{tokens: markdown}}>
+                    </devtools-markdown-view>
+                  </div>`;
             })}
           </div>
         </div>
       </div>
-    `, target, {host: this});
+    `, target, {host: input});
     // clang-format on
   }) {
-    super(true, undefined, element);
+    super('whats-new', true);
     this.#view = view;
     this.requestUpdate();
   }
@@ -116,7 +119,7 @@ export class ReleaseNoteView extends UI.Widget.VBox {
     const url = new URL('./resources/WNDT.md', import.meta.url);
     try {
       const response = await fetch(url.toString());
-      return response.text();
+      return await response.text();
     } catch {
       throw new Error(`Markdown file ${
           url.toString()} not found. Make sure it is correctly listed in the relevant BUILD.gn files.`);
@@ -128,7 +131,7 @@ export class ReleaseNoteView extends UI.Widget.VBox {
     this.#view(
         {
           getReleaseNote,
-          openNewTab: this.#openNewTab,
+          openNewTab: UI.UIUtils.openInNewTab,
           markdownContent,
           getThumbnailPath: this.#getThumbnailPath,
         },
@@ -149,14 +152,5 @@ export class ReleaseNoteView extends UI.Widget.VBox {
         break;
     }
     return new URL(img, import.meta.url).toString() as Platform.DevToolsPath.UrlString;
-  }
-
-  #openNewTab(link: string): void {
-    Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(link as Platform.DevToolsPath.UrlString);
-  }
-
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([releaseNoteViewStyles]);
   }
 }

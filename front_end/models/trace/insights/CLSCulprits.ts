@@ -5,12 +5,19 @@
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Platform from '../../../core/platform/platform.js';
 import type * as Protocol from '../../../generated/protocol.js';
+import * as Handlers from '../handlers/handlers.js';
 import * as Helpers from '../helpers/helpers.js';
 import * as Types from '../types/types.js';
 
-import {InsightCategory, type InsightModel, type InsightSetContext, type RequiredData} from './types.js';
+import {
+  InsightCategory,
+  InsightKeys,
+  type InsightModel,
+  type InsightSetContext,
+  type PartialInsightModel,
+} from './types.js';
 
-const UIStrings = {
+export const UIStrings = {
   /** Title of an insight that provides details about why elements shift/move on the page. The causes for these shifts are referred to as culprits ("reasons"). */
   title: 'Layout shift culprits',
   /**
@@ -19,20 +26,60 @@ const UIStrings = {
    */
   description:
       'Layout shifts occur when elements move absent any user interaction. [Investigate the causes of layout shifts](https://web.dev/articles/optimize-cls), such as elements being added, removed, or their fonts changing as the page loads.',
-};
-const str_ = i18n.i18n.registerUIStrings('models/trace/insights/CLSCulprits.ts', UIStrings);
-const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+  /**
+   *@description Text indicating the worst layout shift cluster.
+   */
+  worstLayoutShiftCluster: 'Worst layout shift cluster',
+  /**
+   * @description Text indicating the worst layout shift cluster.
+   */
+  worstCluster: 'Worst cluster',
+  /**
+   * @description Text indicating a layout shift cluster and its start time.
+   * @example {32 ms} PH1
+   */
+  layoutShiftCluster: 'Layout shift cluster @ {PH1}',
+  /**
+   *@description Text indicating the biggest reasons for the layout shifts.
+   */
+  topCulprits: 'Top layout shift culprits',
+  /**
+   * @description Text for a culprit type of Injected iframe.
+   */
+  injectedIframe: 'Injected iframe',
+  /**
+   * @description Text for a culprit type of Font request.
+   */
+  fontRequest: 'Font request',
+  /**
+   * @description Text for a culprit type of Animation.
+   */
+  animation: 'Animation',
+  /**
+   * @description Text for a culprit type of Unsized images.
+   */
+  unsizedImages: 'Unsized Images',
+  /**
+   * @description Text status when there were no layout shifts detected.
+   */
+  noLayoutShifts: 'No layout shifts',
+  /**
+   * @description Text status when there no layout shifts culprits/root causes were found.
+   */
+  noCulprits: 'Could not detect any layout shift culprits',
+} as const;
 
-export type CLSCulpritsInsightModel = InsightModel<{
+const str_ = i18n.i18n.registerUIStrings('models/trace/insights/CLSCulprits.ts', UIStrings);
+export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+
+export type CLSCulpritsInsightModel = InsightModel<typeof UIStrings, {
   animationFailures: readonly NoncompositedAnimationFailure[],
   shifts: Map<Types.Events.SyntheticLayoutShift, LayoutShiftRootCausesData>,
   clusters: Types.Events.SyntheticLayoutShiftCluster[],
   worstCluster: Types.Events.SyntheticLayoutShiftCluster | undefined,
+  /** The top 3 shift root causes for each cluster. */
+  topCulpritsByCluster: Map<Types.Events.SyntheticLayoutShiftCluster, Platform.UIString.LocalizedString[]>,
 }>;
-
-export function deps(): ['Meta', 'Animations', 'LayoutShifts', 'NetworkRequests'] {
-  return ['Meta', 'Animations', 'LayoutShifts', 'NetworkRequests'];
-}
 
 export const enum AnimationFailureReasons {
   ACCELERATED_ANIMATIONS_DISABLED = 'ACCELERATED_ANIMATIONS_DISABLED',
@@ -80,94 +127,102 @@ export interface NoncompositedAnimationFailure {
  * Each failure reason is represented by a bit flag. The bit shift operator '<<' is used to define
  * which bit corresponds to each failure reason.
  * https://source.chromium.org/search?q=f:compositor_animations.h%20%22enum%20FailureReason%22
- * @type {{flag: number, failure: AnimationFailureReasons}[]}
  */
-const ACTIONABLE_FAILURE_REASONS = [
-  {
-    flag: 1 << 0,
-    failure: AnimationFailureReasons.ACCELERATED_ANIMATIONS_DISABLED,
-  },
-  {
-    flag: 1 << 1,
-    failure: AnimationFailureReasons.EFFECT_SUPPRESSED_BY_DEVTOOLS,
-  },
-  {
-    flag: 1 << 2,
-    failure: AnimationFailureReasons.INVALID_ANIMATION_OR_EFFECT,
-  },
-  {
-    flag: 1 << 3,
-    failure: AnimationFailureReasons.EFFECT_HAS_UNSUPPORTED_TIMING_PARAMS,
-  },
-  {
-    flag: 1 << 4,
-    failure: AnimationFailureReasons.EFFECT_HAS_NON_REPLACE_COMPOSITE_MODE,
-  },
-  {
-    flag: 1 << 5,
-    failure: AnimationFailureReasons.TARGET_HAS_INVALID_COMPOSITING_STATE,
-  },
-  {
-    flag: 1 << 6,
-    failure: AnimationFailureReasons.TARGET_HAS_INCOMPATIBLE_ANIMATIONS,
-  },
-  {
-    flag: 1 << 7,
-    failure: AnimationFailureReasons.TARGET_HAS_CSS_OFFSET,
-  },
-  // The failure 1 << 8 is marked as obsolete in Blink
-  {
-    flag: 1 << 9,
-    failure: AnimationFailureReasons.ANIMATION_AFFECTS_NON_CSS_PROPERTIES,
-  },
-  {
-    flag: 1 << 10,
-    failure: AnimationFailureReasons.TRANSFORM_RELATED_PROPERTY_CANNOT_BE_ACCELERATED_ON_TARGET,
-  },
-  {
-    flag: 1 << 11,
-    failure: AnimationFailureReasons.TRANSFROM_BOX_SIZE_DEPENDENT,
-  },
-  {
-    flag: 1 << 12,
-    failure: AnimationFailureReasons.FILTER_RELATED_PROPERTY_MAY_MOVE_PIXELS,
-  },
-  {
-    flag: 1 << 13,
-    failure: AnimationFailureReasons.UNSUPPORTED_CSS_PROPERTY,
-  },
-  // The failure 1 << 14 is marked as obsolete in Blink
-  {
-    flag: 1 << 15,
-    failure: AnimationFailureReasons.MIXED_KEYFRAME_VALUE_TYPES,
-  },
-  {
-    flag: 1 << 16,
-    failure: AnimationFailureReasons.TIMELINE_SOURCE_HAS_INVALID_COMPOSITING_STATE,
-  },
-  {
-    flag: 1 << 17,
-    failure: AnimationFailureReasons.ANIMATION_HAS_NO_VISIBLE_CHANGE,
-  },
-  {
-    flag: 1 << 18,
-    failure: AnimationFailureReasons.AFFECTS_IMPORTANT_PROPERTY,
-  },
-  {
-    flag: 1 << 19,
-    failure: AnimationFailureReasons.SVG_TARGET_HAS_INDEPENDENT_TRANSFORM_PROPERTY,
-  },
-];
+const ACTIONABLE_FAILURE_REASONS: Array<{
+  flag: number,
+  failure: AnimationFailureReasons,
+}> =
+    [
+      {
+        flag: 1 << 0,
+        failure: AnimationFailureReasons.ACCELERATED_ANIMATIONS_DISABLED,
+      },
+      {
+        flag: 1 << 1,
+        failure: AnimationFailureReasons.EFFECT_SUPPRESSED_BY_DEVTOOLS,
+      },
+      {
+        flag: 1 << 2,
+        failure: AnimationFailureReasons.INVALID_ANIMATION_OR_EFFECT,
+      },
+      {
+        flag: 1 << 3,
+        failure: AnimationFailureReasons.EFFECT_HAS_UNSUPPORTED_TIMING_PARAMS,
+      },
+      {
+        flag: 1 << 4,
+        failure: AnimationFailureReasons.EFFECT_HAS_NON_REPLACE_COMPOSITE_MODE,
+      },
+      {
+        flag: 1 << 5,
+        failure: AnimationFailureReasons.TARGET_HAS_INVALID_COMPOSITING_STATE,
+      },
+      {
+        flag: 1 << 6,
+        failure: AnimationFailureReasons.TARGET_HAS_INCOMPATIBLE_ANIMATIONS,
+      },
+      {
+        flag: 1 << 7,
+        failure: AnimationFailureReasons.TARGET_HAS_CSS_OFFSET,
+      },
+      // The failure 1 << 8 is marked as obsolete in Blink
+      {
+        flag: 1 << 9,
+        failure: AnimationFailureReasons.ANIMATION_AFFECTS_NON_CSS_PROPERTIES,
+      },
+      {
+        flag: 1 << 10,
+        failure: AnimationFailureReasons.TRANSFORM_RELATED_PROPERTY_CANNOT_BE_ACCELERATED_ON_TARGET,
+      },
+      {
+        flag: 1 << 11,
+        failure: AnimationFailureReasons.TRANSFROM_BOX_SIZE_DEPENDENT,
+      },
+      {
+        flag: 1 << 12,
+        failure: AnimationFailureReasons.FILTER_RELATED_PROPERTY_MAY_MOVE_PIXELS,
+      },
+      {
+        flag: 1 << 13,
+        failure: AnimationFailureReasons.UNSUPPORTED_CSS_PROPERTY,
+      },
+      // The failure 1 << 14 is marked as obsolete in Blink
+      {
+        flag: 1 << 15,
+        failure: AnimationFailureReasons.MIXED_KEYFRAME_VALUE_TYPES,
+      },
+      {
+        flag: 1 << 16,
+        failure: AnimationFailureReasons.TIMELINE_SOURCE_HAS_INVALID_COMPOSITING_STATE,
+      },
+      {
+        flag: 1 << 17,
+        failure: AnimationFailureReasons.ANIMATION_HAS_NO_VISIBLE_CHANGE,
+      },
+      {
+        flag: 1 << 18,
+        failure: AnimationFailureReasons.AFFECTS_IMPORTANT_PROPERTY,
+      },
+      {
+        flag: 1 << 19,
+        failure: AnimationFailureReasons.SVG_TARGET_HAS_INDEPENDENT_TRANSFORM_PROPERTY,
+      },
+    ] as const;
 
 // 500ms window.
 // Use this window to consider events and requests that may have caused a layout shift.
-const ROOT_CAUSE_WINDOW = Helpers.Timing.secondsToMicroseconds(Types.Timing.Seconds(0.5));
+const ROOT_CAUSE_WINDOW = Helpers.Timing.secondsToMicro(Types.Timing.Seconds(0.5));
+
+export interface UnsizedImage {
+  backendNodeId: Protocol.DOM.BackendNodeId;
+  paintImageEvent: Types.Events.PaintImage;
+}
 
 export interface LayoutShiftRootCausesData {
   iframeIds: string[];
   fontRequests: Types.Events.SyntheticNetworkRequest[];
   nonCompositedAnimations: NoncompositedAnimationFailure[];
-  unsizedImages: Protocol.DOM.BackendNodeId[];
+  unsizedImages: UnsizedImage[];
 }
 
 /**
@@ -211,8 +266,8 @@ export function getNonCompositedFailure(animationEvent: Types.Events.SyntheticAn
 function getNonCompositedFailureRootCauses(
     animationEvents: Types.Events.SyntheticAnimationPair[],
     prePaintEvents: Types.Events.PrePaint[],
-    shiftsByPrePaint: Map<Types.Events.PrePaint, Types.Events.LayoutShift[]>,
-    rootCausesByShift: Map<Types.Events.LayoutShift, LayoutShiftRootCausesData>,
+    shiftsByPrePaint: Map<Types.Events.PrePaint, Types.Events.SyntheticLayoutShift[]>,
+    rootCausesByShift: Map<Types.Events.SyntheticLayoutShift, LayoutShiftRootCausesData>,
     ): NoncompositedAnimationFailure[] {
   const allAnimationFailures: NoncompositedAnimationFailure[] = [];
   for (const animation of animationEvents) {
@@ -260,11 +315,11 @@ function getNonCompositedFailureRootCauses(
  * PrePaint events to layout shifts dispatched within it.
  */
 function getShiftsByPrePaintEvents(
-    layoutShifts: Types.Events.LayoutShift[],
+    layoutShifts: Types.Events.SyntheticLayoutShift[],
     prePaintEvents: Types.Events.PrePaint[],
-    ): Map<Types.Events.PrePaint, Types.Events.LayoutShift[]> {
-  // Maps from PrePaint events to LayoutShifts that occured in each one.
-  const shiftsByPrePaint = new Map<Types.Events.PrePaint, Types.Events.LayoutShift[]>();
+    ): Map<Types.Events.PrePaint, Types.Events.SyntheticLayoutShift[]> {
+  // Maps from PrePaint events to LayoutShifts that occurred in each one.
+  const shiftsByPrePaint = new Map<Types.Events.PrePaint, Types.Events.SyntheticLayoutShift[]>();
 
   // Associate all shifts to their corresponding PrePaint.
   for (const prePaintEvent of prePaintEvents) {
@@ -310,9 +365,11 @@ function getNextEvent(sourceEvents: Types.Events.Event[], targetEvent: Types.Eve
  */
 function getIframeRootCauses(
     iframeCreatedEvents: readonly Types.Events.RenderFrameImplCreateChildFrame[],
-    prePaintEvents: Types.Events.PrePaint[], shiftsByPrePaint: Map<Types.Events.PrePaint, Types.Events.LayoutShift[]>,
-    rootCausesByShift: Map<Types.Events.LayoutShift, LayoutShiftRootCausesData>,
-    domLoadingEvents: readonly Types.Events.DomLoading[]): Map<Types.Events.LayoutShift, LayoutShiftRootCausesData> {
+    prePaintEvents: Types.Events.PrePaint[],
+    shiftsByPrePaint: Map<Types.Events.PrePaint, Types.Events.SyntheticLayoutShift[]>,
+    rootCausesByShift: Map<Types.Events.SyntheticLayoutShift, LayoutShiftRootCausesData>,
+    domLoadingEvents: readonly Types.Events.DomLoading[]):
+    Map<Types.Events.SyntheticLayoutShift, LayoutShiftRootCausesData> {
   for (const iframeEvent of iframeCreatedEvents) {
     const nextPrePaint = getNextEvent(prePaintEvents, iframeEvent) as Types.Events.PrePaint | null;
     // If no following prePaint, this is not a root cause.
@@ -333,10 +390,10 @@ function getIframeRootCauses(
       // Look for the first dom event that occurs within the bounds of the iframe event.
       // This contains the frame id.
       const domEvent = domLoadingEvents.find(e => {
-        const maxIframe = Types.Timing.MicroSeconds(iframeEvent.ts + (iframeEvent.dur ?? 0));
+        const maxIframe = Types.Timing.Micro(iframeEvent.ts + (iframeEvent.dur ?? 0));
         return e.ts >= iframeEvent.ts && e.ts <= maxIframe;
       });
-      if (domEvent && domEvent.args.frame) {
+      if (domEvent?.args.frame) {
         rootCausesForShift.iframeIds.push(domEvent.args.frame);
       }
     }
@@ -354,14 +411,17 @@ function getIframeRootCauses(
  */
 function getUnsizedImageRootCauses(
     unsizedImageEvents: readonly Types.Events.LayoutImageUnsized[], paintImageEvents: Types.Events.PaintImage[],
-    shiftsByPrePaint: Map<Types.Events.PrePaint, Types.Events.LayoutShift[]>,
-    rootCausesByShift: Map<Types.Events.LayoutShift, LayoutShiftRootCausesData>):
-    Map<Types.Events.LayoutShift, LayoutShiftRootCausesData> {
+    shiftsByPrePaint: Map<Types.Events.PrePaint, Types.Events.SyntheticLayoutShift[]>,
+    rootCausesByShift: Map<Types.Events.SyntheticLayoutShift, LayoutShiftRootCausesData>):
+    Map<Types.Events.SyntheticLayoutShift, LayoutShiftRootCausesData> {
   shiftsByPrePaint.forEach((shifts, prePaint) => {
     const paintImage = getNextEvent(paintImageEvents, prePaint) as Types.Events.PaintImage | null;
+    if (!paintImage) {
+      return;
+    }
     // The unsized image corresponds to this PaintImage.
     const matchingNode =
-        unsizedImageEvents.find(unsizedImage => unsizedImage.args.data.nodeId === paintImage?.args.data.nodeId);
+        unsizedImageEvents.find(unsizedImage => unsizedImage.args.data.nodeId === paintImage.args.data.nodeId);
     if (!matchingNode) {
       return;
     }
@@ -371,10 +431,17 @@ function getUnsizedImageRootCauses(
       if (!rootCausesForShift) {
         throw new Error('Unaccounted shift');
       }
-      rootCausesForShift.unsizedImages.push(matchingNode.args.data.nodeId);
+      rootCausesForShift.unsizedImages.push({
+        backendNodeId: matchingNode.args.data.nodeId,
+        paintImageEvent: paintImage,
+      });
     }
   });
   return rootCausesByShift;
+}
+
+export function isCLSCulprits(insight: InsightModel): insight is CLSCulpritsInsightModel {
+  return insight.insightKey === InsightKeys.CLS_CULPRITS;
 }
 
 /**
@@ -384,9 +451,9 @@ function getUnsizedImageRootCauses(
  */
 function getFontRootCauses(
     networkRequests: Types.Events.SyntheticNetworkRequest[], prePaintEvents: Types.Events.PrePaint[],
-    shiftsByPrePaint: Map<Types.Events.PrePaint, Types.Events.LayoutShift[]>,
-    rootCausesByShift: Map<Types.Events.LayoutShift, LayoutShiftRootCausesData>):
-    Map<Types.Events.LayoutShift, LayoutShiftRootCausesData> {
+    shiftsByPrePaint: Map<Types.Events.PrePaint, Types.Events.SyntheticLayoutShift[]>,
+    rootCausesByShift: Map<Types.Events.SyntheticLayoutShift, LayoutShiftRootCausesData>):
+    Map<Types.Events.SyntheticLayoutShift, LayoutShiftRootCausesData> {
   const fontRequests =
       networkRequests.filter(req => req.args.data.resourceType === 'Font' && req.args.data.mimeType.startsWith('font'));
 
@@ -420,27 +487,74 @@ function getFontRootCauses(
   return rootCausesByShift;
 }
 
-function finalize(partialModel: Omit<CLSCulpritsInsightModel, 'title'|'description'|'category'|'shouldShow'>):
-    CLSCulpritsInsightModel {
-  let maxScore = 0;
-  for (const cluster of partialModel.clusters) {
-    if (cluster.clusterCumulativeScore > maxScore) {
-      maxScore = cluster.clusterCumulativeScore;
+/**
+ * Returns the top 3 shift root causes based on the given cluster.
+ */
+function getTopCulprits(
+    cluster: Types.Events.SyntheticLayoutShiftCluster,
+    culpritsByShift: Map<Types.Events.SyntheticLayoutShift, LayoutShiftRootCausesData>):
+    Platform.UIString.LocalizedString[] {
+  const MAX_TOP_CULPRITS = 3;
+  const causes: Platform.UIString.LocalizedString[] = [];
+
+  const shifts = cluster.events;
+  for (const shift of shifts) {
+    const culprits = culpritsByShift.get(shift);
+    if (!culprits) {
+      continue;
+    }
+
+    const fontReq = culprits.fontRequests;
+    const iframes = culprits.iframeIds;
+    const animations = culprits.nonCompositedAnimations;
+    const unsizedImages = culprits.unsizedImages;
+
+    for (let i = 0; i < fontReq.length && causes.length < MAX_TOP_CULPRITS; i++) {
+      causes.push(i18nString(UIStrings.fontRequest));
+    }
+    for (let i = 0; i < iframes.length && causes.length < MAX_TOP_CULPRITS; i++) {
+      causes.push(i18nString(UIStrings.injectedIframe));
+    }
+    for (let i = 0; i < animations.length && causes.length < MAX_TOP_CULPRITS; i++) {
+      causes.push(i18nString(UIStrings.animation));
+    }
+    for (let i = 0; i < unsizedImages.length && causes.length < MAX_TOP_CULPRITS; i++) {
+      causes.push(i18nString(UIStrings.unsizedImages));
+    }
+
+    if (causes.length >= MAX_TOP_CULPRITS) {
+      break;
+    }
+  }
+
+  return causes.slice(0, MAX_TOP_CULPRITS);
+}
+
+function finalize(partialModel: PartialInsightModel<CLSCulpritsInsightModel>): CLSCulpritsInsightModel {
+  let state: CLSCulpritsInsightModel['state'] = 'pass';
+  if (partialModel.worstCluster) {
+    const classification = Handlers.ModelHandlers.LayoutShifts.scoreClassificationForLayoutShift(
+        partialModel.worstCluster.clusterCumulativeScore);
+    if (classification === Handlers.ModelHandlers.PageLoadMetrics.ScoreClassification.GOOD) {
+      state = 'informative';
+    } else {
+      state = 'fail';
     }
   }
 
   return {
+    insightKey: InsightKeys.CLS_CULPRITS,
+    strings: UIStrings,
     title: i18nString(UIStrings.title),
     description: i18nString(UIStrings.description),
     category: InsightCategory.CLS,
-    // TODO: getTopCulprits in component needs to move to model so this can be set properly here.
-    shouldShow: maxScore > 0,
+    state,
     ...partialModel,
   };
 }
 
 export function generateInsight(
-    parsedTrace: RequiredData<typeof deps>, context: InsightSetContext): CLSCulpritsInsightModel {
+    parsedTrace: Handlers.Types.ParsedTrace, context: InsightSetContext): CLSCulpritsInsightModel {
   const isWithinContext = (event: Types.Events.Event): boolean => Helpers.Timing.eventIsInBounds(event, context.bounds);
 
   const compositeAnimationEvents = parsedTrace.Animations.animations.filter(isWithinContext);
@@ -477,11 +591,17 @@ export function generateInsight(
     relatedEvents.push(worstCluster);
   }
 
+  const topCulpritsByCluster = new Map<Types.Events.SyntheticLayoutShiftCluster, Platform.UIString.LocalizedString[]>();
+  for (const cluster of clusters) {
+    topCulpritsByCluster.set(cluster, getTopCulprits(cluster, rootCausesByShift));
+  }
+
   return finalize({
     relatedEvents,
     animationFailures,
     shifts: rootCausesByShift,
     clusters,
     worstCluster,
+    topCulpritsByCluster,
   });
 }

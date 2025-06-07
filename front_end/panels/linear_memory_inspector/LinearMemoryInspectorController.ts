@@ -21,7 +21,7 @@ const UIStrings = {
    *@description A context menu item in the Scope View of the Sources Panel
    */
   openInMemoryInspectorPanel: 'Open in Memory inspector panel',
-};
+} as const;
 const str_ =
     i18n.i18n.registerUIStrings('panels/linear_memory_inspector/LinearMemoryInspectorController.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -31,7 +31,7 @@ const MEMORY_TRANSFER_MIN_CHUNK_SIZE = 1000;
 let controllerInstance: LinearMemoryInspectorController;
 
 export interface LazyUint8Array {
-  getRange(start: number, end: number): Promise<Uint8Array>;
+  getRange(start: number, end: number): Promise<Uint8Array<ArrayBuffer>>;
   length(): number;
 }
 
@@ -46,14 +46,15 @@ export class RemoteArrayBufferWrapper implements LazyUint8Array {
     return this.#remoteArrayBuffer.byteLength();
   }
 
-  async getRange(start: number, end: number): Promise<Uint8Array> {
+  async getRange(start: number, end: number): Promise<Uint8Array<ArrayBuffer>> {
     const newEnd = Math.min(end, this.length());
     if (start < 0 || start > newEnd) {
       console.error(`Requesting invalid range of memory: (${start}, ${end})`);
       return new Uint8Array(0);
     }
     const array = await this.#remoteArrayBuffer.bytes(start, newEnd);
-    return new Uint8Array(array);
+
+    return new Uint8Array(array ?? []);
   }
 }
 
@@ -75,19 +76,12 @@ async function getBufferFromObject(obj: SDK.RemoteObject.RemoteObject): Promise<
   return new SDK.RemoteObject.RemoteArrayBuffer(obj);
 }
 
-export function isDWARFMemoryObject(obj: SDK.RemoteObject.RemoteObject): boolean {
-  if (obj instanceof Bindings.DebuggerLanguagePlugins.ExtensionRemoteObject) {
-    return obj.linearMemoryAddress !== undefined;
-  }
-  return false;
-}
-
 interface SerializableSettings {
   valueTypes: LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType[];
-  valueTypeModes: [
+  valueTypeModes: Array<[
     LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueType,
     LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.ValueTypeMode,
-  ][];
+  ]>;
   endianness: LinearMemoryInspectorComponents.ValueInterpreterDisplayUtils.Endianness;
 }
 
@@ -95,9 +89,8 @@ export class LinearMemoryInspectorController extends SDK.TargetManager.SDKModelO
     implements Common.Revealer.Revealer<SDK.RemoteObject.LinearMemoryInspectable>,
                UI.ContextMenu.Provider<ObjectUI.ObjectPropertiesSection.ObjectPropertyTreeElement> {
   #paneInstance = LinearMemoryInspectorPane.instance();
-  #bufferIdToRemoteObject: Map<string, SDK.RemoteObject.RemoteObject> = new Map();
-  #bufferIdToHighlightInfo: Map<string, LinearMemoryInspectorComponents.LinearMemoryViewerUtils.HighlightInfo> =
-      new Map();
+  #bufferIdToRemoteObject = new Map<string, SDK.RemoteObject.RemoteObject>();
+  #bufferIdToHighlightInfo = new Map<string, LinearMemoryInspectorComponents.LinearMemoryViewerUtils.HighlightInfo>();
   #settings: Common.Settings.Setting<SerializableSettings>;
 
   private constructor() {
@@ -129,7 +122,7 @@ export class LinearMemoryInspectorController extends SDK.TargetManager.SDKModelO
   }
 
   static async getMemoryForAddress(memoryWrapper: LazyUint8Array, address: number):
-      Promise<{memory: Uint8Array, offset: number}> {
+      Promise<{memory: Uint8Array<ArrayBuffer>, offset: number}> {
     // Provide a chunk of memory that covers the address to show and some before and after
     // as 1. the address shown is not necessarily at the beginning of a page and
     // 2. to allow for fewer memory requests.
@@ -139,7 +132,8 @@ export class LinearMemoryInspectorController extends SDK.TargetManager.SDKModelO
     return {memory, offset: memoryChunkStart};
   }
 
-  static async getMemoryRange(memoryWrapper: LazyUint8Array, start: number, end: number): Promise<Uint8Array> {
+  static async getMemoryRange(memoryWrapper: LazyUint8Array, start: number, end: number):
+      Promise<Uint8Array<ArrayBuffer>> {
     // Check that the requested start is within bounds.
     // If the requested end is larger than the actual
     // memory, it will be automatically capped when

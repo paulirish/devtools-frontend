@@ -1,6 +1,7 @@
 // Copyright 2020 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as I18n from '../../third_party/i18n/i18n.js';
 import type * as Platform from '../platform/platform.js';
@@ -48,7 +49,7 @@ export function getAllSupportedDevToolsLocales(): string[] {
  */
 function getLocaleFetchUrl(locale: Intl.UnicodeBCP47LocaleIdentifier, location: string): string {
   const remoteBase = Root.Runtime.getRemoteBase(location);
-  if (remoteBase && remoteBase.version && !BUNDLED_LOCALES.has(locale)) {
+  if (remoteBase?.version && !BUNDLED_LOCALES.has(locale)) {
     return REMOTE_FETCH_PATTERN.replace('@HOST@', 'devtools://devtools')
         .replace('@VERSION@', remoteBase.version)
         .replace('@LOCALE@', locale);
@@ -59,7 +60,7 @@ function getLocaleFetchUrl(locale: Intl.UnicodeBCP47LocaleIdentifier, location: 
 
 /**
  * Fetches the locale data of the specified locale.
- * Callers have to ensure that `locale` is an officilly supported locale.
+ * Callers have to ensure that `locale` is an officially supported locale.
  * Depending whether a locale is present in `bundledLocales`, the data will be
  * fetched locally or remotely.
  */
@@ -67,7 +68,7 @@ export async function fetchAndRegisterLocaleData(
     locale: Intl.UnicodeBCP47LocaleIdentifier, location = self.location.toString()): Promise<void> {
   const localeDataTextPromise = fetch(getLocaleFetchUrl(locale, location)).then(result => result.json());
   const timeoutPromise =
-      new Promise((resolve, reject) => window.setTimeout(() => reject(new Error('timed out fetching locale')), 5000));
+      new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error('timed out fetching locale')), 5000));
   const localeData = await Promise.race([timeoutPromise, localeDataTextPromise]);
   i18nInstance.registerLocaleData(locale, localeData);
 }
@@ -107,7 +108,7 @@ export function getLocalizedString(
  * Register a file's UIStrings with i18n, return function to generate the string ids.
  */
 export function registerUIStrings(
-    path: string, stringStructure: {[key: string]: string}): I18n.LocalizedStringSet.RegisteredFileStrings {
+    path: string, stringStructure: Record<string, string>): I18n.LocalizedStringSet.RegisteredFileStrings {
   return i18nInstance.registerFileStrings(path, stringStructure);
 }
 

@@ -1,15 +1,18 @@
 // Copyright 2024 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
-import * as LitHtml from '../../lit-html/lit-html.js';
+import './IconButton.js';
 
-import styles from './fileSourceIcon.css.js';
-import {create} from './Icon.js';
+import {Directives, html, render} from '../../lit/lit.js';
 
-const {html} = LitHtml;
+import fileSourceIconStyles from './fileSourceIcon.css.js';
+
+const {classMap} = Directives;
 
 export interface FileSourceIconData {
+  iconType?: string;
   contentType?: string;
   hasDotBadge?: boolean;
   isDotPurple?: boolean;
@@ -18,25 +21,22 @@ export interface FileSourceIconData {
 export class FileSourceIcon extends HTMLElement {
   readonly #shadow = this.attachShadow({mode: 'open'});
 
-  #iconType: string;
+  #iconType?: string;
   #contentType?: string;
   #hasDotBadge?: boolean;
   #isDotPurple?: boolean;
-
-  constructor(iconType: string) {
-    super();
-    this.#iconType = iconType;
-  }
 
   set data(data: FileSourceIconData) {
     this.#contentType = data.contentType;
     this.#hasDotBadge = data.hasDotBadge;
     this.#isDotPurple = data.isDotPurple;
+    this.#iconType = data.iconType;
     this.#render();
   }
 
   get data(): FileSourceIconData {
     return {
+      iconType: this.#iconType,
       contentType: this.#contentType,
       hasDotBadge: this.#hasDotBadge,
       isDotPurple: this.#isDotPurple,
@@ -44,24 +44,22 @@ export class FileSourceIcon extends HTMLElement {
   }
 
   connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [styles];
     this.#render();
   }
 
   #render(): void {
-    let iconStyles: string[] = [];
-    if (this.#hasDotBadge) {
-      iconStyles = this.#isDotPurple ? ['dot', 'purple'] : ['dot', 'green'];
-    }
-    if (this.#contentType) {
-      iconStyles.push(this.#contentType);
-    }
-    const icon = create(this.#iconType, iconStyles.join(' '));
+    const iconClasses = classMap({
+      dot: Boolean(this.#hasDotBadge),
+      purple: Boolean(this.#hasDotBadge && this.#isDotPurple),
+      green: Boolean(this.#hasDotBadge && !this.#isDotPurple),
+      ...(this.#contentType ? {[this.#contentType]: this.#contentType} : null)
+    });
 
     // clang-format off
-    LitHtml.render(html`${icon}`, this.#shadow, {
-      host: this,
-    });
+    render(html`
+      <style>${fileSourceIconStyles}</style>
+      <devtools-icon .name=${this.#iconType ?? null} class=${iconClasses}></devtools-icon>`,
+      this.#shadow, {host: this});
     // clang-format on
   }
 }

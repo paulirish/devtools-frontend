@@ -27,6 +27,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as Platform from '../../core/platform/platform.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
@@ -65,7 +66,7 @@ export class ConsoleViewport {
   private stickToBottomInternal: boolean;
   private selectionIsBackward: boolean;
   private lastSelectedElement?: HTMLElement|null;
-  private cachedProviderElements?: (ConsoleViewportElement|null)[];
+  private cachedProviderElements?: Array<ConsoleViewportElement|null>;
 
   constructor(provider: ConsoleViewportProvider) {
     this.element = document.createElement('div');
@@ -334,7 +335,7 @@ export class ConsoleViewport {
   }
 
   private isSelectionBackwards(selection: Selection|null): boolean {
-    if (!selection || !selection.rangeCount || !selection.anchorNode || !selection.focusNode) {
+    if (!selection?.rangeCount || !selection.anchorNode || !selection.focusNode) {
       return false;
     }
     const range = document.createRange();
@@ -352,7 +353,7 @@ export class ConsoleViewport {
   }
 
   private updateSelectionModel(selection: Selection|null): boolean {
-    const range = selection && selection.rangeCount ? selection.getRangeAt(0) : null;
+    const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
     if (!range || (!selection || selection.isCollapsed) || !this.element.hasSelection()) {
       this.headSelection = null;
       this.anchorSelection = null;
@@ -391,8 +392,8 @@ export class ConsoleViewport {
     let firstSelected: SelectionModel|null = null;
     let lastSelected: SelectionModel|null = null;
     if (hasVisibleSelection) {
-      firstSelected = this.createSelectionModel(firstSelectedIndex, (range.startContainer as Node), range.startOffset);
-      lastSelected = this.createSelectionModel(lastSelectedIndex, (range.endContainer as Node), range.endOffset);
+      firstSelected = this.createSelectionModel(firstSelectedIndex, (range.startContainer), range.startOffset);
+      lastSelected = this.createSelectionModel(lastSelectedIndex, (range.endContainer), range.endOffset);
     }
     if (topOverlap && bottomOverlap && hasVisibleSelection) {
       firstSelected = (firstSelected && firstSelected.item < startSelection.item) ? firstSelected : startSelection;
@@ -607,8 +608,8 @@ export class ConsoleViewport {
     }
 
     const endProviderElement = this.providerElement(endSelection.item);
-    const endSelectionElement = endProviderElement && endProviderElement.element();
-    if (endSelectionElement && endSelection.node && endSelection.node.isSelfOrDescendant(endSelectionElement)) {
+    const endSelectionElement = endProviderElement?.element();
+    if (endSelectionElement && endSelection.node?.isSelfOrDescendant(endSelectionElement)) {
       const itemTextOffset = this.textOffsetInNode(endSelectionElement, endSelection.node, endSelection.offset);
       if (textLines.length > 0) {
         textLines[textLines.length - 1] = textLines[textLines.length - 1].substring(0, itemTextOffset);
@@ -616,8 +617,8 @@ export class ConsoleViewport {
     }
 
     const startProviderElement = this.providerElement(startSelection.item);
-    const startSelectionElement = startProviderElement && startProviderElement.element();
-    if (startSelectionElement && startSelection.node && startSelection.node.isSelfOrDescendant(startSelectionElement)) {
+    const startSelectionElement = startProviderElement?.element();
+    if (startSelectionElement && startSelection.node?.isSelfOrDescendant(startSelectionElement)) {
       const itemTextOffset = this.textOffsetInNode(startSelectionElement, startSelection.node, startSelection.offset);
       textLines[0] = textLines[0].substring(itemTextOffset);
     }

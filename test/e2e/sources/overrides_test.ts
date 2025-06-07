@@ -18,7 +18,6 @@ import {
   waitForFunction,
   waitForNone,
 } from '../../shared/helper.js';
-
 import {openSoftContextMenuAndClickOnItem} from '../helpers/context-menu-helpers.js';
 import {
   openNetworkTab,
@@ -151,7 +150,9 @@ describe('Overrides panel', function() {
       await click('aria/Override content');
 
       // File permission pop up
-      const infoBar = await waitForAria('Select a folder to store override files in.');
+      const infoBar = await waitForAria('Select a folder to store override files in');
+      // Allow time for infobar to animate in before clicking the button
+      await new Promise<void>(resolve => setTimeout(resolve, 550));
       await click('.infobar-main-row .infobar-button', {root: infoBar});
 
       // Open & close the file in the Sources panel
@@ -167,7 +168,7 @@ describe('Overrides panel', function() {
       await click('aria/Override content');
 
       // No file permission pop up
-      const popups = await $$('aria/Select a folder to store override files in.', undefined, 'aria');
+      const popups = await $$('aria/Select a folder to store override files in', undefined, 'aria');
       assert.lengthOf(popups, 0);
 
       // Open & close the file in the Sources panel
@@ -187,7 +188,7 @@ describe('Overrides panel', function() {
       await click('aria/Override content');
 
       // No file permission pop up
-      const popups = await $$('aria/Select a folder to store override files in.', undefined, 'aria');
+      const popups = await $$('aria/Select a folder to store override files in', undefined, 'aria');
       assert.lengthOf(popups, 0);
 
       // Open & close the file in the Sources panel
@@ -204,7 +205,7 @@ describe('Overrides panel', function() {
 
       await openNetworkTab();
       const networkPanel = await waitFor('.tabbed-pane-header-tab.selected');
-      const icons = await networkPanel.$$('.tabbed-pane-header-tab-icon');
+      const icons = await networkPanel.$$('devtools-icon.warning');
 
       assert.lengthOf(icons, 0);
     });
@@ -215,18 +216,21 @@ describe('Overrides panel', function() {
       await click('aria/Override content');
 
       // File permission pop up
-      const infoBar = await waitForAria('Select a folder to store override files in.');
+      const infoBar = await waitForAria('Select a folder to store override files in');
+      // Allow time for infobar to animate in before clicking the button
+      await new Promise<void>(resolve => setTimeout(resolve, 550));
       await click('.infobar-main-row .infobar-button', {root: infoBar});
       await waitFor('[aria-label="coffees.json, file"]');
 
       await openNetworkTab();
       await setCacheDisabled(false);
       const networkPanel = await waitFor('.tabbed-pane-header-tab.selected');
-      const icons = await networkPanel.$$('.tabbed-pane-header-tab-icon');
-      const iconTitleElement = await icons[0].$('[title="Requests may be overridden locally, see the Sources panel"]');
+      const icons = await networkPanel.$$('devtools-icon.warning');
 
       assert.lengthOf(icons, 1);
-      assert.isNotNull(iconTitleElement);
+      assert.strictEqual(
+          'Requests may be overridden locally, see the Sources panel',
+          await icons[0].evaluate(icon => (icon as HTMLElement).title));
     });
 
     await step('no indicator after clearing overrides configuration', async () => {
@@ -237,7 +241,7 @@ describe('Overrides panel', function() {
       await openNetworkTab();
       await setCacheDisabled(false);
       const networkPanel = await waitFor('.tabbed-pane-header-tab.selected');
-      const icons = await networkPanel.$$('.tabbed-pane-header-tab-icon');
+      const icons = await networkPanel.$$('devtools-icon.warning');
 
       assert.lengthOf(icons, 0);
     });
@@ -251,11 +255,12 @@ describe('Overrides panel', function() {
       await openNetworkTab();
       await setCacheDisabled(false);
       const networkPanel = await waitFor('.tabbed-pane-header-tab.selected');
-      const icons = await networkPanel.$$('.tabbed-pane-header-tab-icon');
-      const iconTitleElement = await icons[0].$('[title="Requests may be overridden locally, see the Sources panel"]');
+      const icons = await networkPanel.$$('devtools-icon.warning');
 
       assert.lengthOf(icons, 1);
-      assert.isNotNull(iconTitleElement);
+      assert.strictEqual(
+          'Requests may be overridden locally, see the Sources panel',
+          await icons[0].evaluate(icon => (icon as HTMLElement).title));
     });
   });
 
@@ -298,7 +303,8 @@ describe('Overrides panel', function() {
     await click('aria/Override content');
 
     // File permission pop up
-    const infoBar = await waitForAria('Select a folder to store override files in.');
+    const infoBar = await waitForAria('Select a folder to store override files in');
+    await new Promise<void>(resolve => setTimeout(resolve, 550));
     await click('.infobar-main-row .infobar-button', {root: infoBar});
 
     // Open the file in the Sources panel
@@ -323,7 +329,9 @@ describe('Overrides panel', function() {
     await click('aria/Override content');
 
     // File permission pop up
-    const infoBar = await waitForAria('Select a folder to store override files in.');
+    const infoBar = await waitForAria('Select a folder to store override files in');
+    // Allow time for infobar to animate in before clicking the button
+    await new Promise<void>(resolve => setTimeout(resolve, 550));
     await click('.infobar-main-row .infobar-button', {root: infoBar});
 
     // Open the main folder in the Sources panel
@@ -347,7 +355,9 @@ describe('Overrides panel', function() {
     await click('aria/Override content');
 
     // File permission pop up
-    const infoBar = await waitForAria('Select a folder to store override files in.');
+    const infoBar = await waitForAria('Select a folder to store override files in');
+    // Allow time for infobar to animate in before clicking the button
+    await new Promise<void>(resolve => setTimeout(resolve, 550));
     await click('.infobar-main-row .infobar-button', {root: infoBar});
 
     // Open the sub folder in the Sources panel
@@ -392,36 +402,33 @@ describe('Overrides panel', function() {
     await waitFor('[aria-label="Close sourcemap-origin.min.js"]');
   });
 
-  // crbug.com/350617272
-  it.skipOnPlatforms(
-      ['mac'], '[crbug.com/350617272]: show redirect dialog when override content of source mapped css file',
-      async () => {
-        await goToResource('sources/sourcemap-origin.html');
-        await openSourcesPanel();
-        await enableLocalOverrides();
+  it('show redirect dialog when override content of source mapped css file', async () => {
+    await goToResource('sources/sourcemap-origin.html');
+    await openSourcesPanel();
+    await enableLocalOverrides();
 
-        await openNetworkTab();
-        await waitForSomeRequestsToAppear(4);
-        await waitForOverrideContentMenuItemIsEnabled('sourcemap-origin.css');
-        await click('aria/Open in Sources panel');
+    await openNetworkTab();
+    await waitForSomeRequestsToAppear(4);
+    await waitForOverrideContentMenuItemIsEnabled('sourcemap-origin.css');
+    await click('aria/Open in Sources panel');
 
-        // Actual file > Has override content
-        const file = await waitFor('[aria-label="sourcemap-origin.css"]');
-        await file.click({button: 'right'});
-        await click('aria/Close');
+    // Actual file > Has override content
+    const file = await waitFor('[aria-label="sourcemap-origin.css"]');
+    await file.click({button: 'right'});
+    await click('aria/Close');
 
-        // Source mapped file > Show redirect confirmation dialog
-        const mappedfile = await waitFor('[aria-label="sourcemap-origin.scss, file"]');
-        await mappedfile.click({button: 'right'});
-        await click('aria/Override content');
-        const p = await waitFor('.dimmed-pane');
-        const dialog = await p.waitForSelector('>>>> [role="dialog"]');
-        const okButton = await dialog?.waitForSelector('>>> devtools-button');
-        const okButtonTextContent = await okButton?.evaluate(e => e.textContent);
-        assert.deepEqual(okButtonTextContent, 'OK');
-        await okButton?.click();
-        await waitFor('[aria-label="Close sourcemap-origin.css"]');
-      });
+    // Source mapped file > Show redirect confirmation dialog
+    const mappedfile = await waitFor('[aria-label="sourcemap-origin.scss, file"]');
+    await mappedfile.click({button: 'right'});
+    await click('aria/Override content');
+    const p = await waitFor('.dimmed-pane');
+    const dialog = await p.waitForSelector('>>>> [role="dialog"]');
+    const okButton = await dialog?.waitForSelector('>>> devtools-button');
+    const okButtonTextContent = await okButton?.evaluate(e => e.textContent);
+    assert.deepEqual(okButtonTextContent, 'OK');
+    await okButton?.click();
+    await waitFor('[aria-label="Close sourcemap-origin.css"]');
+  });
 });
 
 describe('Overrides panel', () => {

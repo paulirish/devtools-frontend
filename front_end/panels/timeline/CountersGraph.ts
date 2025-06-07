@@ -28,6 +28,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* eslint-disable rulesdir/no-imperative-dom-api */
+
 import '../../ui/legacy/legacy.js';
 
 import * as Common from '../../core/common/common.js';
@@ -71,7 +73,7 @@ const UIStrings = {
    * @description text shown when no counter events are found and the graph is empty
    */
   noEventsFound: 'No memory usage data found within selected events.',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/CountersGraph.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -94,7 +96,7 @@ export class CountersGraph extends UI.Widget.VBox {
   #onTraceBoundsChangeBound = this.#onTraceBoundsChange.bind(this);
 
   #noEventsFoundMessage = document.createElement('div');
-  #showNoEventsMessage: boolean = false;
+  #showNoEventsMessage = false;
 
   constructor(delegate: TimelineModeViewDelegate) {
     super();
@@ -254,7 +256,7 @@ export class CountersGraph extends UI.Widget.VBox {
 
   private onClick(event: Event): void {
     const x = (event as MouseEvent).x - this.canvasContainer.getBoundingClientRect().left;
-    let minDistance: number = Infinity;
+    let minDistance = Infinity;
     let bestTime;
     for (const counterUI of this.counterUI) {
       if (!counterUI.counter.times.length) {
@@ -434,17 +436,16 @@ export class CounterUI {
     this.setting = Common.Settings.Settings.instance().createSetting('timeline-counters-graph-' + settingsKey, true);
     this.setting.setTitle(title);
     this.filter = new UI.Toolbar.ToolbarSettingCheckbox(this.setting, title);
-    this.filter.inputElement.classList.add('-theme-preserve-input');
     const parsedColor = Common.Color.parse(graphColor);
     if (parsedColor) {
       const colorWithAlpha = parsedColor.setAlpha(0.5).asString(Common.Color.Format.RGBA);
-      const htmlElement = (this.filter.element as HTMLElement);
+      const htmlElement = (this.filter.element);
       if (colorWithAlpha) {
         htmlElement.style.backgroundColor = colorWithAlpha;
       }
       htmlElement.style.borderColor = 'transparent';
     }
-    this.filter.inputElement.addEventListener('click', this.toggleCounterGraph.bind(this));
+    this.filter.element.addEventListener('click', this.toggleCounterGraph.bind(this));
     countersPane.toolbar.appendToolbarItem(this.filter);
     this.range = this.filter.element.createChild('span', 'range');
 

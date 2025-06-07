@@ -32,7 +32,7 @@ interface SetBreakpointByUrlResponse {
 export class MockProtocolBackend {
   #scriptSources = new Map<string, string>();
   #sourceMapContents = new Map<string, string>();
-  #objectProperties = new Map<string, {name: string, value?: number}[]>();
+  #objectProperties = new Map<string, Array<{name: string, value?: number}>>();
   #setBreakpointByUrlResponses = new Map<string, SetBreakpointByUrlResponse>();
   #removeBreakpointCallbacks = new Map<Protocol.Debugger.BreakpointId, () => void>();
   #nextObjectIndex = 0;
@@ -47,6 +47,7 @@ export class MockProtocolBackend {
     setMockConnectionResponseHandler('Debugger.removeBreakpoint', this.#removeBreakpointHandler.bind(this));
     setMockConnectionResponseHandler('Debugger.resume', () => ({}));
     setMockConnectionResponseHandler('Debugger.enable', () => ({debuggerId: 'DEBUGGER_ID'}));
+    setMockConnectionResponseHandler('Debugger.setInstrumentationBreakpoint', () => ({}));
 
     SDK.PageResourceLoader.PageResourceLoader.instance({
       forceNew: true,
@@ -56,7 +57,7 @@ export class MockProtocolBackend {
   }
 
   dispatchDebuggerPause(
-      script: SDK.Script.Script, reason: Protocol.Debugger.PausedEventReason, functionName: string = '',
+      script: SDK.Script.Script, reason: Protocol.Debugger.PausedEventReason, functionName = '',
       scopeChain: Protocol.Debugger.Scope[] = []): void {
     const target = script.debuggerModel.target();
     if (reason === Protocol.Debugger.PausedEventReason.Instrumentation) {
@@ -168,7 +169,7 @@ export class MockProtocolBackend {
     };
   }
 
-  createSimpleRemoteObject(properties: {name: string, value?: number}[]): Protocol.Runtime.RemoteObject {
+  createSimpleRemoteObject(properties: Array<{name: string, value?: number}>): Protocol.Runtime.RemoteObject {
     const objectId = 'OBJECTID.' + this.#nextObjectIndex++;
     this.#objectProperties.set(objectId, properties);
 
@@ -293,7 +294,7 @@ export class MockProtocolBackend {
     return Promise.resolve(response);
   }
 
-  #removeBreakpointHandler(request: Protocol.Debugger.RemoveBreakpointRequest): {} {
+  #removeBreakpointHandler(request: Protocol.Debugger.RemoveBreakpointRequest): Record<string, never> {
     const callback = this.#removeBreakpointCallbacks.get(request.breakpointId);
     if (callback) {
       callback();

@@ -29,8 +29,8 @@
  */
 
 import * as SDK from '../../core/sdk/sdk.js';
-import type * as Protocol from '../../generated/protocol.js';
 import type * as ProtocolProxyApi from '../../generated/protocol-proxy-api.js';
+import type * as Protocol from '../../generated/protocol.js';
 
 export class InterestGroupStorageModel extends SDK.SDKModel.SDKModel<EventTypes> implements
     ProtocolProxyApi.StorageDispatcher {
@@ -87,6 +87,10 @@ export class InterestGroupStorageModel extends SDK.SDKModel.SDKModel<EventTypes>
   sharedStorageAccessed(_event: Protocol.Storage.SharedStorageAccessedEvent): void {
   }
 
+  sharedStorageWorkletOperationExecutionFinished(
+      _event: Protocol.Storage.SharedStorageWorkletOperationExecutionFinishedEvent): void {
+  }
+
   storageBucketCreatedOrUpdated(_event: Protocol.Storage.StorageBucketCreatedOrUpdatedEvent): void {
   }
 
@@ -94,6 +98,8 @@ export class InterestGroupStorageModel extends SDK.SDKModel.SDKModel<EventTypes>
   }
 
   attributionReportingSourceRegistered(_event: Protocol.Storage.AttributionReportingSourceRegisteredEvent): void {
+  }
+  attributionReportingReportSent(_event: Protocol.Storage.AttributionReportingReportSentEvent): void {
   }
 }
 

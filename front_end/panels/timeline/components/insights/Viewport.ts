@@ -6,34 +6,34 @@ import './NodeLink.js';
 
 import type {ViewportInsightModel} from '../../../../models/trace/insights/Viewport.js';
 import type * as Trace from '../../../../models/trace/trace.js';
-import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
+import * as Lit from '../../../../ui/lit/lit.js';
 import type * as Overlays from '../../overlays/overlays.js';
 
 import {BaseInsightComponent} from './BaseInsightComponent.js';
 
-const {html} = LitHtml;
+const {html} = Lit;
 
 export class Viewport extends BaseInsightComponent<ViewportInsightModel> {
-  static override readonly litTagName = LitHtml.StaticHtml.literal`devtools-performance-viewport`;
-  override internalName: string = 'viewport';
+  static override readonly litTagName = Lit.StaticHtml.literal`devtools-performance-viewport`;
+  override internalName = 'viewport';
 
   override createOverlays(): Overlays.Overlays.TimelineOverlay[] {
     // TODO(b/351757418): create overlay for synthetic input delay events
     return [];
   }
 
-  override getEstimatedSavingsTime(): Trace.Types.Timing.MilliSeconds|null {
+  override getEstimatedSavingsTime(): Trace.Types.Timing.Milli|null {
     return this.model?.metricSavings?.INP ?? null;
   }
 
-  renderContent(): LitHtml.LitTemplate {
+  renderContent(): Lit.LitTemplate {
     if (!this.model || !this.model.viewportEvent) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
 
     const backendNodeId = this.model.viewportEvent.args.data.node_id;
     if (backendNodeId === undefined) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
 
     // clang-format off

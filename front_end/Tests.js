@@ -1028,7 +1028,7 @@
       let blueCount = 0;
 
       const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext('2d', {willReadFrequently: true});
       for (const image of images) {
         test.assertTrue(image.naturalWidth > 10);
         test.assertTrue(image.naturalHeight > 10);
@@ -1131,13 +1131,7 @@
     SDK.TargetManager.TargetManager.instance().addModelListener(
         SDK.NetworkManager.NetworkManager, SDK.NetworkManager.Events.ResponseReceived, onResponseReceived);
 
-    this.evaluateInConsole_(
-        `
-      let img = document.createElement('img');
-      img.src = "${url}";
-      document.body.appendChild(img);
-    `,
-        () => {});
+    this.evaluateInConsole_(`location.href= "${url}";`, () => {});
 
     let count = 0;
     function onResponseReceived(event) {
@@ -1169,13 +1163,6 @@
           test.releaseControl();
       }
     }
-  };
-
-  TestSuite.prototype.testDOMWarnings = function() {
-    const messages = SDK.ConsoleModel.ConsoleModel.allMessagesUnordered();
-    this.assertEquals(1, messages.length);
-    const expectedPrefix = '[DOM] Found 2 elements with non-unique id #dup:';
-    this.assertTrue(messages[0].messageText.startsWith(expectedPrefix));
   };
 
   TestSuite.prototype.waitForTestResultsInConsole = function() {

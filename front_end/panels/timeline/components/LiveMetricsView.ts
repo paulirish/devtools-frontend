@@ -1,6 +1,8 @@
 // Copyright 2024 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import '../../../ui/components/icon_button/icon_button.js';
 import './CPUThrottlingSelector.js';
@@ -15,6 +17,7 @@ import type * as Platform from '../../../core/platform/platform.js';
 import * as CrUXManager from '../../../models/crux-manager/crux-manager.js';
 import * as EmulationModel from '../../../models/emulation/emulation.js';
 import * as LiveMetrics from '../../../models/live-metrics/live-metrics.js';
+import * as Trace from '../../../models/trace/trace.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as LegacyWrapper from '../../../ui/components/legacy_wrapper/legacy_wrapper.js';
@@ -22,7 +25,7 @@ import type * as Menus from '../../../ui/components/menus/menus.js';
 import * as RenderCoordinator from '../../../ui/components/render_coordinator/render_coordinator.js';
 import type * as Settings from '../../../ui/components/settings/settings.js';
 import * as UI from '../../../ui/legacy/legacy.js';
-import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import * as Lit from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 import * as MobileThrottling from '../../mobile_throttling/mobile_throttling.js';
 import {getThrottlingRecommendations, md} from '../utils/Helpers.js';
@@ -32,7 +35,7 @@ import type {MetricCardData} from './MetricCard.js';
 import metricValueStyles from './metricValueStyles.css.js';
 import {CLS_THRESHOLDS, INP_THRESHOLDS, renderMetricValue} from './Utils.js';
 
-const {html, nothing} = LitHtml;
+const {html, nothing} = Lit;
 
 type DeviceOption = CrUXManager.DeviceScope|'AUTO';
 
@@ -284,7 +287,7 @@ const UIStrings = {
    * @description Description of a view that can be used to analyze the performance of a Node process as a timeline. "Node" is a product name and should not be translated.
    */
   nodeClickToRecord: 'Record a performance timeline of the connected Node process.',
-};
+} as const;
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/LiveMetricsView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -292,7 +295,7 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableComponent {
   readonly #shadow = this.attachShadow({mode: 'open'});
 
-  #isNode: boolean = false;
+  #isNode = false;
 
   #lcpValue?: LiveMetrics.LcpValue;
   #clsValue?: LiveMetrics.ClsValue;
@@ -386,8 +389,6 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
   }
 
   connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [liveMetricsViewStyles, metricValueStyles];
-
     const liveMetrics = LiveMetrics.LiveMetrics.instance();
     liveMetrics.addEventListener(LiveMetrics.Events.STATUS, this.#onMetricStatus, this);
 
@@ -419,10 +420,38 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
         EmulationModel.DeviceModeModel.Events.UPDATED, this.#onEmulationChanged, this);
   }
 
-  #renderLcpCard(): LitHtml.LitTemplate {
+  #getLcpFieldPhases(): LiveMetrics.LcpValue['phases']|null {
+    const ttfb = this.#cruxManager.getSelectedFieldMetricData('largest_contentful_paint_image_time_to_first_byte')
+                     ?.percentiles?.p75;
+    const loadDelay =
+        this.#cruxManager.getSelectedFieldMetricData('largest_contentful_paint_image_resource_load_delay')
+            ?.percentiles?.p75;
+    const loadDuration =
+        this.#cruxManager.getSelectedFieldMetricData('largest_contentful_paint_image_resource_load_duration')
+            ?.percentiles?.p75;
+    const renderDelay =
+        this.#cruxManager.getSelectedFieldMetricData('largest_contentful_paint_image_element_render_delay')
+            ?.percentiles?.p75;
+
+    if (typeof ttfb !== 'number' || typeof loadDelay !== 'number' || typeof loadDuration !== 'number' ||
+        typeof renderDelay !== 'number') {
+      return null;
+    }
+
+    return {
+      timeToFirstByte: Trace.Types.Timing.Milli(ttfb),
+      resourceLoadDelay: Trace.Types.Timing.Milli(loadDelay),
+      resourceLoadTime: Trace.Types.Timing.Milli(loadDuration),
+      elementRenderDelay: Trace.Types.Timing.Milli(renderDelay),
+    };
+  }
+
+  #renderLcpCard(): Lit.LitTemplate {
     const fieldData = this.#cruxManager.getSelectedFieldMetricData('largest_contentful_paint');
     const nodeLink = this.#lcpValue?.nodeRef?.link;
     const phases = this.#lcpValue?.phases;
+
+    const fieldPhases = this.#getLcpFieldPhases();
 
     // clang-format off
     return html`
@@ -434,10 +463,10 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
         tooltipContainer: this.#tooltipContainerEl,
         warnings: this.#lcpValue?.warnings,
         phases: phases && [
-          [i18nString(UIStrings.timeToFirstByte), phases.timeToFirstByte],
-          [i18nString(UIStrings.resourceLoadDelay), phases.resourceLoadDelay],
-          [i18nString(UIStrings.resourceLoadDuration), phases.resourceLoadTime],
-          [i18nString(UIStrings.elementRenderDelay), phases.elementRenderDelay],
+          [i18nString(UIStrings.timeToFirstByte), phases.timeToFirstByte, fieldPhases?.timeToFirstByte],
+          [i18nString(UIStrings.resourceLoadDelay), phases.resourceLoadDelay, fieldPhases?.resourceLoadDelay],
+          [i18nString(UIStrings.resourceLoadDuration), phases.resourceLoadTime, fieldPhases?.resourceLoadTime],
+          [i18nString(UIStrings.elementRenderDelay), phases.elementRenderDelay, fieldPhases?.elementRenderDelay],
         ],
       } as MetricCardData}>
         ${nodeLink ? html`
@@ -452,7 +481,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
     // clang-format on
   }
 
-  #renderClsCard(): LitHtml.LitTemplate {
+  #renderClsCard(): Lit.LitTemplate {
     const fieldData = this.#cruxManager.getSelectedFieldMetricData('cumulative_layout_shift');
 
     const clusterIds = new Set(this.#clsValue?.clusterShiftIds || []);
@@ -485,7 +514,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
     // clang-format on
   }
 
-  #renderInpCard(): LitHtml.LitTemplate {
+  #renderInpCard(): Lit.LitTemplate {
     const fieldData = this.#cruxManager.getSelectedFieldMetricData('interaction_to_next_paint');
     const phases = this.#inpValue?.phases;
     const interaction = this.#inpValue && this.#interactions.get(this.#inpValue.interactionId);
@@ -521,7 +550,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
     // clang-format on
   }
 
-  #renderRecordAction(action: UI.ActionRegistration.Action): LitHtml.LitTemplate {
+  #renderRecordAction(action: UI.ActionRegistration.Action): Lit.LitTemplate {
     function onClick(): void {
       void action.execute();
     }
@@ -582,7 +611,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
     });
   }
 
-  #renderRecordingSettings(): LitHtml.LitTemplate {
+  #renderRecordingSettings(): Lit.LitTemplate {
     const fieldEnabled = this.#cruxManager.getConfigSetting().get().enabled;
 
     const deviceRecEl = document.createElement('span');
@@ -644,9 +673,9 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
-  #renderPageScopeSetting(): LitHtml.LitTemplate {
+  #renderPageScopeSetting(): Lit.LitTemplate {
     if (!this.#cruxManager.getConfigSetting().get().enabled) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
 
     const urlLabel = this.#getPageScopeLabel('url');
@@ -658,6 +687,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
     // If there is no data at all we should force users to switch pages or reconfigure CrUX.
     const shouldDisable = !this.#cruxManager.pageResult?.['url-ALL'] && !this.#cruxManager.pageResult?.['origin-ALL'];
 
+    /* eslint-disable rulesdir/no-deprecated-component-usages */
     return html`
       <devtools-select-menu
         id="page-scope-select"
@@ -685,6 +715,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
         </devtools-menu-item>
       </devtools-select-menu>
     `;
+    /* eslint-enable rulesdir/no-deprecated-component-usages */
   }
 
   #getDeviceScopeDisplayName(deviceScope: CrUXManager.DeviceScope): string {
@@ -703,7 +734,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
   #getLabelForDeviceOption(deviceOption: DeviceOption): string {
     let baseLabel;
     if (deviceOption === 'AUTO') {
-      const deviceScope = this.#cruxManager.getSelectedDeviceScope();
+      const deviceScope = this.#cruxManager.resolveDeviceOptionToScope(deviceOption);
       const deviceScopeLabel = this.#getDeviceScopeDisplayName(deviceScope);
       baseLabel = i18nString(UIStrings.auto, {PH1: deviceScopeLabel});
     } else {
@@ -727,9 +758,9 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
-  #renderDeviceScopeSetting(): LitHtml.LitTemplate {
+  #renderDeviceScopeSetting(): Lit.LitTemplate {
     if (!this.#cruxManager.getConfigSetting().get().enabled) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
 
     // If there is no data at all we should force users to try adjusting the page scope
@@ -739,6 +770,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
     const currentDeviceLabel = this.#getLabelForDeviceOption(this.#cruxManager.fieldDeviceOption);
 
     // clang-format off
+    /* eslint-disable rulesdir/no-deprecated-component-usages */
     return html`
       <devtools-select-menu
         id="device-scope-select"
@@ -764,6 +796,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
         })}
       </devtools-select-menu>
     `;
+    /* eslint-enable rulesdir/no-deprecated-component-usages */
     // clang-format on
   }
 
@@ -800,7 +833,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
     });
   }
 
-  #renderCollectionPeriod(): LitHtml.LitTemplate {
+  #renderCollectionPeriod(): Lit.LitTemplate {
     const range = this.#getCollectionPeriodRange();
 
     const dateEl = document.createElement('span');
@@ -823,7 +856,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
     `;
   }
 
-  #renderFieldDataMessage(): LitHtml.LitTemplate {
+  #renderFieldDataMessage(): Lit.LitTemplate {
     if (this.#cruxManager.getConfigSetting().get().enabled) {
       return this.#renderCollectionPeriod();
     }
@@ -837,7 +870,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
     `;
   }
 
-  #renderLogSection(): LitHtml.LitTemplate {
+  #renderLogSection(): Lit.LitTemplate {
     // clang-format off
     return html`
       <section class="logs-section" aria-label=${i18nString(UIStrings.eventLogs)}>
@@ -881,9 +914,9 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
     }
   }
 
-  #renderInteractionsLog(): LitHtml.LitTemplate {
+  #renderInteractionsLog(): Lit.LitTemplate {
     if (!this.#interactions.size) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
 
     // clang-format off
@@ -911,8 +944,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
               <details>
                 <summary>
                   <span class="interaction-type">
-                    ${interaction.interactionType}
-                    ${isInp ?
+                    ${interaction.interactionType} ${isInp ?
                       html`<span class="interaction-inp-chip" title=${i18nString(UIStrings.inpInteraction)}>INP</span>`
                     : nothing}
                   </span>
@@ -992,9 +1024,9 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
     });
   }
 
-  #renderLayoutShiftsLog(): LitHtml.LitTemplate {
+  #renderLayoutShiftsLog(): Lit.LitTemplate {
     if (!this.#layoutShifts.length) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
 
     // clang-format off
@@ -1032,8 +1064,10 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
     // clang-format on
   }
 
-  #renderNodeView(): LitHtml.LitTemplate {
+  #renderNodeView(): Lit.LitTemplate {
     return html`
+      <style>${liveMetricsViewStyles}</style>
+      <style>${metricValueStyles}</style>
       <div class="node-view">
         <main>
           <h2 class="section-title">${i18nString(UIStrings.nodePerformanceTimeline)}</h2>
@@ -1046,7 +1080,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
 
   #render = (): void => {
     if (this.#isNode) {
-      LitHtml.render(this.#renderNodeView(), this.#shadow, {host: this});
+      Lit.render(this.#renderNodeView(), this.#shadow, {host: this});
       return;
     }
 
@@ -1059,6 +1093,8 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
 
     // clang-format off
     const output = html`
+      <style>${liveMetricsViewStyles}</style>
+      <style>${metricValueStyles}</style>
       <div class="container">
         <div class="live-metrics-view">
           <main class="live-metrics">
@@ -1109,7 +1145,7 @@ export class LiveMetricsView extends LegacyWrapper.LegacyWrapper.WrappableCompon
         </div>
       </div>
     `;
-    LitHtml.render(output, this.#shadow, {host: this});
+    Lit.render(output, this.#shadow, {host: this});
   };
   // clang-format on
 }

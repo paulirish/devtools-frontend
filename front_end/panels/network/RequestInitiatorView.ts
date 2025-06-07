@@ -1,6 +1,7 @@
 // Copyright 2019 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as i18n from '../../core/i18n/i18n.js';
 import * as SDK from '../../core/sdk/sdk.js';
@@ -14,9 +15,9 @@ import requestInitiatorViewTreeStyles from './requestInitiatorViewTree.css.js';
 
 const UIStrings = {
   /**
-   *@description Text in Request Initiator View of the Network panel
+   *@description Text in Request Initiator View of the Network panel if the request has no initiator data
    */
-  thisRequestHasNoInitiatorData: 'This request has no initiator data.',
+  noInitiator: 'No initiator data',
   /**
    *@description Title of a section in Request Initiator view of the Network Panel
    */
@@ -25,7 +26,7 @@ const UIStrings = {
    *@description Title of a section in Request Initiator view of the Network Panel
    */
   requestInitiatorChain: 'Request initiator chain',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/network/RequestInitiatorView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export class RequestInitiatorView extends UI.Widget.VBox {
@@ -41,7 +42,7 @@ export class RequestInitiatorView extends UI.Widget.VBox {
     this.element.setAttribute('jslog', `${VisualLogging.pane('initiator').track({resize: true})}`);
     this.linkifier = new Components.Linkifier.Linkifier();
     this.request = request;
-    this.emptyWidget = new UI.EmptyWidget.EmptyWidget(i18nString(UIStrings.thisRequestHasNoInitiatorData), '');
+    this.emptyWidget = new UI.EmptyWidget.EmptyWidget(i18nString(UIStrings.noInitiator), '');
     this.emptyWidget.show(this.element);
     this.hasShown = false;
   }
@@ -49,10 +50,10 @@ export class RequestInitiatorView extends UI.Widget.VBox {
   static createStackTracePreview(
       request: SDK.NetworkRequest.NetworkRequest, linkifier: Components.Linkifier.Linkifier, focusableLink?: boolean): {
     element: Element,
-    links: Array<Element>,
+    links: Element[],
   }|null {
     const initiator = request.initiator();
-    if (!initiator || !initiator.stack) {
+    if (!initiator?.stack) {
       return null;
     }
     const networkManager = SDK.NetworkManager.NetworkManager.forRequest(request);
@@ -64,7 +65,7 @@ export class RequestInitiatorView extends UI.Widget.VBox {
 
   private createTree(): UI.TreeOutline.TreeOutlineInShadow {
     const treeOutline = new UI.TreeOutline.TreeOutlineInShadow();
-    treeOutline.registerCSSFiles([requestInitiatorViewTreeStyles]);
+    treeOutline.registerRequiredCSS(requestInitiatorViewTreeStyles);
     treeOutline.contentElement.classList.add('request-initiator-view-tree');
     treeOutline.contentElement.setAttribute('jslog', `${VisualLogging.tree('initiator-tree')}`);
 
@@ -99,7 +100,7 @@ export class RequestInitiatorView extends UI.Widget.VBox {
     }
 
     const initiated = initiatorGraph.initiated;
-    this.depthFirstSearchTreeBuilder(initiated, (parent as UI.TreeOutline.TreeElement), this.request);
+    this.depthFirstSearchTreeBuilder(initiated, parent, this.request);
     return root;
   }
 
@@ -142,7 +143,7 @@ export class RequestInitiatorView extends UI.Widget.VBox {
     if (this.hasShown) {
       return;
     }
-    this.registerCSSFiles([requestInitiatorViewStyles]);
+    this.registerRequiredCSS(requestInitiatorViewStyles);
     let initiatorDataPresent = false;
     const containerTree = this.createTree();
 

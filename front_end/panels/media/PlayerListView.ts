@@ -1,6 +1,7 @@
 // Copyright 2019 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as i18n from '../../core/i18n/i18n.js';
 import type * as Protocol from '../../generated/protocol.js';
@@ -30,7 +31,7 @@ const UIStrings = {
    *@description Side-panel entry title text for the players section.
    */
   players: 'Players',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/media/PlayerListView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export interface PlayerStatus {
@@ -53,6 +54,7 @@ export class PlayerListView extends UI.Widget.VBox implements TriggerDispatcher 
 
   constructor(mainContainer: MainView) {
     super(true);
+    this.registerRequiredCSS(playerListViewStyles);
 
     this.playerEntryFragments = new Map();
     this.playerEntriesWithHostnameFrameTitle = new Set();
@@ -126,7 +128,7 @@ export class PlayerListView extends UI.Widget.VBox implements TriggerDispatcher 
       return;
     }
     const fragment = this.playerEntryFragments.get(playerID);
-    if (fragment === undefined || fragment.element() === undefined) {
+    if (fragment?.element() === undefined) {
       return;
     }
     fragment.$('frame-title').textContent = frameTitle;
@@ -159,7 +161,8 @@ export class PlayerListView extends UI.Widget.VBox implements TriggerDispatcher 
     icon.appendChild(IconButton.Icon.create(iconName, 'media-player'));
   }
 
-  private formatAndEvaluate(playerID: string, func: Function, candidate: string, min: number, max: number): void {
+  private formatAndEvaluate(
+      playerID: string, func: (...args: any[]) => unknown, candidate: string, min: number, max: number): void {
     if (candidate.length <= min) {
       return;
     }
@@ -181,7 +184,7 @@ export class PlayerListView extends UI.Widget.VBox implements TriggerDispatcher 
       return;
     }
     const fragment = this.playerEntryFragments.get(playerID);
-    if (fragment === undefined || fragment.element() === undefined) {
+    if (fragment?.element() === undefined) {
       return;
     }
     this.contentElement.removeChild(fragment.element());
@@ -249,10 +252,5 @@ export class PlayerListView extends UI.Widget.VBox implements TriggerDispatcher 
 
   onMessage(_playerID: string, _message: Protocol.Media.PlayerMessage): void {
     // TODO(tmathmeyer) show a message count number next to the player name.
-  }
-
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([playerListViewStyles]);
   }
 }

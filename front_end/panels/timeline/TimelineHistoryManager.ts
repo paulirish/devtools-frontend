@@ -1,11 +1,12 @@
 // Copyright 2017 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
-import type * as Trace from '../../models/trace/trace.js';
+import * as Trace from '../../models/trace/trace.js';
 import * as IconButton from '../../ui/components/icon_button/icon_button.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
@@ -57,7 +58,11 @@ const UIStrings = {
    * @example {2} PH1
    */
   dSlowdown: '{PH1}× slowdown',
-};
+  /**
+   * @description Tooltip text that appears when hovering over the Back arrow inside the 'Select Timeline Session' dropdown in the Performance pane.
+   */
+  backButtonTooltip: 'View live metrics page',
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/TimelineHistoryManager.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -107,10 +112,10 @@ export class TimelineHistoryManager {
   private readonly action: UI.ActionRegistration.Action;
   private readonly nextNumberByDomain: Map<string, number>;
   private readonly buttonInternal: ToolbarButton;
-  private readonly allOverviews: {
+  private readonly allOverviews: Array<{
     constructor: (parsedTrace: Trace.Handlers.Types.ParsedTrace) => TimelineEventOverview,
     height: number,
-  }[];
+  }>;
   private totalHeight: number;
   private enabled: boolean;
   private lastActiveTrace: RecordingData|null = null;
@@ -398,7 +403,8 @@ export class TimelineHistoryManager {
       return container;
     }
     // TODO(paulirish): Adopt Util.ImageCache
-    void UI.UIUtils.loadImage(lastFrame.screenshotEvent.args.dataUri).then(img => {
+    const uri = Trace.Handlers.ModelHandlers.Screenshots.screenshotImageDataUri(lastFrame.screenshotEvent);
+    void UI.UIUtils.loadImage(uri).then(img => {
       if (img) {
         container.appendChild(img);
       }
@@ -453,6 +459,7 @@ export class DropDown implements UI.ListControl.ListDelegate<number> {
   private readonly focusRestorer: UI.UIUtils.ElementFocusRestorer;
   private selectionDone: ((arg0: number|null) => void)|null;
   #landingPageTitle: Common.UIString.LocalizedString;
+  contentElement: HTMLElement;
 
   constructor(availableparsedTraceIndexes: number[], landingPageTitle: Common.UIString.LocalizedString) {
     this.#landingPageTitle = landingPageTitle;
@@ -465,8 +472,8 @@ export class DropDown implements UI.ListControl.ListDelegate<number> {
     this.glassPane.element.addEventListener('blur', () => this.close(null));
 
     const shadowRoot = UI.UIUtils.createShadowRootWithCoreStyles(
-        this.glassPane.contentElement, {cssFile: [timelineHistoryManagerStyles]});
-    const contentElement = shadowRoot.createChild('div', 'drop-down');
+        this.glassPane.contentElement, {cssFile: timelineHistoryManagerStyles});
+    this.contentElement = shadowRoot.createChild('div', 'drop-down');
 
     const listModel = new UI.ListModel.ListModel<number>();
     this.listControl = new UI.ListControl.ListControl<number>(listModel, this, UI.ListControl.ListMode.NonViewport);
@@ -475,9 +482,9 @@ export class DropDown implements UI.ListControl.ListDelegate<number> {
 
     UI.ARIAUtils.markAsMenu(this.listControl.element);
     UI.ARIAUtils.setLabel(this.listControl.element, i18nString(UIStrings.selectTimelineSession));
-    contentElement.appendChild(this.listControl.element);
-    contentElement.addEventListener('keydown', this.onKeyDown.bind(this), false);
-    contentElement.addEventListener('click', this.onClick.bind(this), false);
+    this.contentElement.appendChild(this.listControl.element);
+    this.contentElement.addEventListener('keydown', this.onKeyDown.bind(this), false);
+    this.contentElement.addEventListener('click', this.onClick.bind(this), false);
 
     this.focusRestorer = new UI.UIUtils.ElementFocusRestorer(this.listControl.element);
     this.selectionDone = null;
@@ -577,6 +584,8 @@ export class DropDown implements UI.ListControl.ListDelegate<number> {
     div.style.width = `${previewWidth}px`;
 
     const icon = IconButton.Icon.create('arrow-back');
+    icon.title = i18nString(UIStrings.backButtonTooltip);
+    icon.classList.add('back-arrow');
     div.appendChild(icon);
 
     const text = document.createElement('span');
@@ -607,7 +616,7 @@ export class DropDown implements UI.ListControl.ListDelegate<number> {
     return false;
   }
 
-  private static instance: DropDown|null = null;
+  static instance: DropDown|null = null;
 }
 
 export class ToolbarButton extends UI.Toolbar.ToolbarItem {

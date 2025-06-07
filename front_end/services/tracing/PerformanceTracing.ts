@@ -45,7 +45,7 @@ export class PerformanceTracing implements Trace.TracingManager.TracingManagerCl
       'v8',
     ].join(',');
 
-    const started = await this.#tracingManager.start(this, categories, '');
+    const started = await this.#tracingManager.start(this, categories);
 
     if (!started) {
       throw new Error('Unable to start tracing.');
@@ -57,10 +57,6 @@ export class PerformanceTracing implements Trace.TracingManager.TracingManagerCl
   }
 
   // Start of implementation of SDK.TracingManager.TracingManagerClient
-  getTraceEvents(): Object[] {
-    return this.#traceEvents;
-  }
-
   traceEventsCollected(events: Object[]): void {
     this.#traceEvents.push(...events);
   }

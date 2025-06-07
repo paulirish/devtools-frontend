@@ -3,16 +3,23 @@
 // found in the LICENSE file.
 
 import * as BaseInsightComponent from './BaseInsightComponent.js';
+import * as Cache from './Cache.js';
+import * as Checklist from './Checklist.js';
 import * as CLSCulprits from './CLSCulprits.js';
 import * as DocumentLatency from './DocumentLatency.js';
 import * as DOMSize from './DOMSize.js';
+import * as DuplicatedJavaScript from './DuplicatedJavaScript.js';
 import * as EventRef from './EventRef.js';
 import * as FontDisplay from './FontDisplay.js';
+import * as ForcedReflow from './ForcedReflow.js';
 import * as Helpers from './Helpers.js';
 import * as ImageDelivery from './ImageDelivery.js';
 import * as InteractionToNextPaint from './InteractionToNextPaint.js';
 import * as LCPDiscovery from './LCPDiscovery.js';
 import * as LCPPhases from './LCPPhases.js';
+import * as LegacyJavaScript from './LegacyJavaScript.js';
+import * as ModernHTTP from './ModernHTTP.js';
+import * as NetworkDependencyTree from './NetworkDependencyTree.js';
 import * as NodeLink from './NodeLink.js';
 import * as RenderBlocking from './RenderBlocking.js';
 import * as SidebarInsight from './SidebarInsight.js';
@@ -24,16 +31,23 @@ import * as Viewport from './Viewport.js';
 
 export {
   BaseInsightComponent,
+  Cache,
+  Checklist,
   CLSCulprits,
   DocumentLatency,
   DOMSize,
+  DuplicatedJavaScript,
   EventRef,
   FontDisplay,
+  ForcedReflow,
   Helpers,
   ImageDelivery,
   InteractionToNextPaint,
   LCPDiscovery,
   LCPPhases,
+  LegacyJavaScript,
+  ModernHTTP,
+  NetworkDependencyTree,
   NodeLink,
   RenderBlocking,
   SidebarInsight,

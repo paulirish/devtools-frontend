@@ -9,13 +9,9 @@ import type {WasmValue} from './WasmTypes.js';
 import {type AsyncHostInterface, type WorkerInterface, WorkerRPC} from './WorkerRPC.js';
 
 export class WorkerPlugin implements Chrome.DevTools.LanguageExtensionPlugin, AsyncHostInterface {
-  private readonly worker: Worker;
-  private readonly rpc: WorkerRPC<AsyncHostInterface, WorkerInterface>;
+  private readonly worker = new Worker('DevToolsPluginWorkerMain.bundle.js', {type: 'module'});
+  private readonly rpc = new WorkerRPC<AsyncHostInterface, WorkerInterface>(this.worker, this);
 
-  constructor() {
-    this.worker = new Worker('DevToolsPluginWorkerMain.bundle.js', {type: 'module'});
-    this.rpc = new WorkerRPC<AsyncHostInterface, WorkerInterface>(this.worker, this);
-  }
   getWasmLinearMemory(offset: number, length: number, stopId: unknown): Promise<ArrayBuffer> {
     return chrome.devtools.languageServices.getWasmLinearMemory(offset, length, stopId);
   }
@@ -35,7 +31,7 @@ export class WorkerPlugin implements Chrome.DevTools.LanguageExtensionPlugin, As
 
   static async create(
       moduleConfigurations: ModuleConfigurations = DEFAULT_MODULE_CONFIGURATIONS,
-      logPluginApiCalls: boolean = false): Promise<WorkerPlugin> {
+      logPluginApiCalls = false): Promise<WorkerPlugin> {
     const plugin = new WorkerPlugin();
     await plugin.rpc.sendMessage('hello', moduleConfigurations, logPluginApiCalls);
     return plugin;
@@ -102,14 +98,14 @@ export class WorkerPlugin implements Chrome.DevTools.LanguageExtensionPlugin, As
 
 export interface Storage {
   onChanged: Chrome.DevTools
-      .EventSink<(changes: {[key: string]: {oldValue: unknown, newValue: unknown}}, namespace: string) => unknown>;
+      .EventSink<(changes: Record<string, {oldValue: unknown, newValue: unknown}>, namespace: string) => unknown>;
   local:
       {set<ResultT>(value: ResultT): void, get<ResultT>(keys: ResultT, callback: (result: ResultT) => unknown): void};
 }
 
 export declare const chrome: Chrome.DevTools.Chrome&{storage?: Storage};
 
-if (typeof chrome !== 'undefined' && typeof chrome.storage !== 'undefined') {
+if (typeof chrome?.storage !== 'undefined') {
   const {storage} = chrome;
   const {languageServices} = chrome.devtools;
 

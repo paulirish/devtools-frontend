@@ -141,8 +141,6 @@ export class Aggregate {
   maxRet!: number;
   name!: string;
   idxs!: number[];
-  constructor() {
-  }
 }
 
 export class AggregateForDiff {
@@ -189,8 +187,6 @@ export class DiffForClass {
   addedIndexes!: number[];
   countDelta!: number;
   sizeDelta!: number;
-  constructor() {
-  }
 }
 
 export class ComparatorConfig {
@@ -216,16 +212,14 @@ export class WorkerCommand {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   methodArguments!: any[];
   source!: string;
-  constructor() {
-  }
 }
 
 export class ItemsRange {
   startPosition: number;
   endPosition: number;
   totalLength: number;
-  items: (Node|Edge)[];
-  constructor(startPosition: number, endPosition: number, totalLength: number, items: (Node|Edge)[]) {
+  items: Array<Node|Edge>;
+  constructor(startPosition: number, endPosition: number, totalLength: number, items: Array<Node|Edge>) {
     this.startPosition = startPosition;
     this.endPosition = endPosition;
     this.totalLength = totalLength;

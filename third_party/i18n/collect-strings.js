@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* eslint-disable no-console, max-len, rulesdir/check-license-header */
+/* eslint-disable no-console, rulesdir/check-license-header */
 
 /**
  * @license Copyright 2018 The Lighthouse Authors. All Rights Reserved.
@@ -17,7 +17,7 @@ const {collectAndBakeCtcStrings} = require('./bake-ctc-to-lhl.js');
 const {writeIfChanged} = require('../../scripts/build/ninja/write-if-changed.js');
 
 const OUTPUT_ROOT = path.join(process.cwd(), 'front_end');
-const UISTRINGS_REGEX = /UIStrings = .*?\};\n/s;
+const UISTRINGS_REGEX = /(UIStrings = .*?\}) as const;\n/s;
 
 /** @typedef {import('./bake-ctc-to-lhl.js').CtcMessage} CtcMessage */
 /** @typedef {Required<Pick<CtcMessage, 'message'|'placeholders'>>} IncrementalCtc */
@@ -604,12 +604,6 @@ function parseUIStrings(sourceStr) {
 /** @type {Map<string, string>} */
 const seenStrings = new Map();
 
-/** @type {number} */
-let collisions = 0;
-
-/** @type {Array<string>} */
-const collisionStrings = [];
-
 /** @type {Record<string, CtcMessage>} */
 const strings = {};
 
@@ -623,7 +617,7 @@ function collectAllStringsInDir(directory) {
   // If CWD is contains "third_party" (e.g. in a full Chromium checkout) then
   // *all* paths will be ignored. To avoid this, make the directory relative to
   // CWD.
-  directory = path.relative(process.cwd(), directory)
+  directory = path.relative(process.cwd(), directory);
   const files = glob.sync('**/*.{js,ts}', {
     cwd: directory,
     ignore: IGNORED_PATH_COMPONENTS,
@@ -639,7 +633,7 @@ function collectAllStringsInDir(directory) {
     }
 
     // just parse the UIStrings substring to avoid ES version issues, save time, etc
-    const justUIStrings = 'const ' + regexMatch[0];
+    const justUIStrings = `const ${regexMatch[1]};`;
 
     const parsedMessages = parseUIStrings(justUIStrings);
     for (const [key, parsed] of Object.entries(parsedMessages)) {
@@ -685,10 +679,7 @@ function collectAllStringsInDir(directory) {
         if (seenId) {
           if (!strings[seenId].meaning) {
             strings[seenId].meaning = strings[seenId].meaning ?? strings[seenId].description;
-            collisions++;
           }
-          collisionStrings.push(ctc.message);
-          collisions++;
         }
       }
       seenStrings.set(ctc.message, messageKey);
@@ -721,6 +712,7 @@ if (require.main === module) {
     throw new Error('Provide at least one directory from which to collect strings!');
   }
   const directories = process.argv.slice(2);
+  /** @type {Record<string, CtcMessage>} */
   let collectedStrings = {};
   for (const directory of directories) {
     collectedStrings = {

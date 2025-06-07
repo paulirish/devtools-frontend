@@ -10,8 +10,8 @@
  * here. Please add any paths you need that are missing.
  */
 
-const path = require('path');
 const os = require('os');
+const path = require('path');
 
 /**
  * You would think we can use __filename here but we cannot because __filename
@@ -47,7 +47,7 @@ function isInChromiumDirectory() {
   }
 
   const normalizedPath = PATH_TO_EXECUTED_FILE.split(path.sep).join('/');
-  const devtoolsPath = 'src/third_party/devtools-frontend';
+  const devtoolsPath = 'third_party/devtools-frontend/src';
   const isInChromium = normalizedPath.includes(devtoolsPath);
   const potentialChromiumDir = PATH_TO_EXECUTED_FILE.substring(
       0,
@@ -78,7 +78,7 @@ function devtoolsRootPath() {
 function rootPath() {
   const {isInChromium, chromiumDirectory} = isInChromiumDirectory();
   if (isInChromium) {
-    return path.join(chromiumDirectory, 'src');
+    return chromiumDirectory;
   }
   return devtoolsRootPath();
 }
@@ -127,6 +127,18 @@ function nodeModulesPath() {
   return path.join(devtoolsRootPath(), 'node_modules');
 }
 
+function autoninjaPyPath() {
+  return path.join(thirdPartyPath(), 'depot_tools', 'autoninja.py');
+}
+
+function vpython3ExecutablePath() {
+  return path.join(thirdPartyPath(), 'depot_tools', os.platform() === 'win32' ? 'vpython3.bat' : 'vpython3');
+}
+
+function gnPyPath() {
+  return path.join(thirdPartyPath(), 'depot_tools', 'gn.py');
+}
+
 function stylelintExecutablePath() {
   return path.join(nodeModulesPath(), 'stylelint', 'bin', 'stylelint.js');
 }
@@ -145,7 +157,7 @@ function litAnalyzerExecutablePath() {
  * @returns the path to the toplevel `tsconfig.json`.
  */
 function tsconfigJsonPath() {
-  return path.join(devtoolsRootPath(), 'tsconfig.json');
+  return path.join(devtoolsRootPath(), 'front_end', 'tsconfig.json');
 }
 
 function downloadedChromeBinaryPath() {
@@ -164,13 +176,18 @@ function downloadedChromeBinaryPath() {
 }
 
 module.exports = {
-  thirdPartyPath,
-  nodePath,
+  autoninjaPyPath,
   devtoolsRootPath,
-  nodeModulesPath,
-  mochaExecutablePath,
-  stylelintExecutablePath,
   downloadedChromeBinaryPath,
+  isInChromiumDirectory,
+  gnPyPath,
   litAnalyzerExecutablePath,
+  mochaExecutablePath,
+  nodeModulesPath,
+  nodePath,
+  rootPath,
+  stylelintExecutablePath,
+  thirdPartyPath,
   tsconfigJsonPath,
+  vpython3ExecutablePath,
 };

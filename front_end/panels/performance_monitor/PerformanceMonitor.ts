@@ -1,6 +1,7 @@
 // Copyright 2017 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
@@ -54,13 +55,13 @@ const UIStrings = {
    *@description Text in Performance Monitor of the Performance monitor tab
    */
   styleRecalcsSec: 'Style recalcs / sec',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/performance_monitor/PerformanceMonitor.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class PerformanceMonitorImpl extends UI.Widget.HBox implements
     SDK.TargetManager.SDKModelObserver<SDK.PerformanceMetricsModel.PerformanceMetricsModel> {
-  private metricsBuffer: {timestamp: number, metrics: Map<string, number>}[];
+  private metricsBuffer: Array<{timestamp: number, metrics: Map<string, number>}>;
   private readonly pixelsPerMs: number;
   private pollIntervalMs: number;
   private readonly scaleHeight: number;
@@ -72,11 +73,11 @@ export class PerformanceMonitorImpl extends UI.Widget.HBox implements
   private width!: number;
   private height!: number;
   private model?: SDK.PerformanceMetricsModel.PerformanceMetricsModel|null;
-  private startTimestamp?: number;
   private pollTimer?: number;
 
-  constructor(pollIntervalMs: number = 500) {
+  constructor(pollIntervalMs = 500) {
     super(true);
+    this.registerRequiredCSS(performanceMonitorStyles);
 
     this.element.setAttribute('jslog', `${VisualLogging.panel('performance.monitor').track({resize: true})}`);
 
@@ -106,7 +107,6 @@ export class PerformanceMonitorImpl extends UI.Widget.HBox implements
     if (!this.model) {
       return;
     }
-    this.registerCSSFiles([performanceMonitorStyles]);
     this.controlPane.instantiateMetricData();
     const themeSupport = ThemeSupport.ThemeSupport.instance();
     themeSupport.addEventListener(ThemeSupport.ThemeChangeEvent.eventName, () => {
@@ -162,7 +162,6 @@ export class PerformanceMonitorImpl extends UI.Widget.HBox implements
   }
 
   private startPolling(): void {
-    this.startTimestamp = 0;
     this.pollTimer = window.setInterval(() => this.poll(), this.pollIntervalMs);
     this.onResize();
     const animate = (): void => {
@@ -289,7 +288,7 @@ export class PerformanceMonitorImpl extends UI.Widget.HBox implements
     }
     const width = this.width;
     const startTime = performance.now() - this.pollIntervalMs - width / this.pixelsPerMs;
-    let max: number = -Infinity;
+    let max = -Infinity;
     for (const metricInfo of chartInfo.metrics) {
       for (let i = this.metricsBuffer.length - 1; i >= 0; --i) {
         const metrics = this.metricsBuffer[i];
@@ -441,7 +440,7 @@ export class ControlPane extends Common.ObjectWrapper.ObjectWrapper<EventTypes> 
   private readonly enabledCharts: Set<string>;
 
   private chartsInfo: ChartInfo[] = [];
-  private indicators: Map<string, MetricIndicator> = new Map();
+  private indicators = new Map<string, MetricIndicator>();
 
   constructor(parent: Element) {
     super();
@@ -640,8 +639,8 @@ export class MetricIndicator {
     const chartName = info.metrics[0].name;
     this.swatchElement = UI.UIUtils.CheckboxLabel.create(info.title, active, undefined, chartName);
     this.element.appendChild(this.swatchElement);
-    this.swatchElement.checkboxElement.addEventListener('change', () => {
-      onToggle(this.swatchElement.checkboxElement.checked);
+    this.swatchElement.addEventListener('change', () => {
+      onToggle(this.swatchElement.checked);
       this.element.classList.toggle('active');
     });
     this.valueElement = this.element.createChild('div', 'perfmon-indicator-value');
@@ -676,7 +675,7 @@ export interface MetricInfo {
 }
 export interface ChartInfo {
   title: Common.UIString.LocalizedString;
-  metrics: {name: string, color: string}[];
+  metrics: Array<{name: string, color: string}>;
   max?: number;
   currentMax?: number;
   format?: Format;

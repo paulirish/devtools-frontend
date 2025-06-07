@@ -4,22 +4,32 @@
 
 import type * as Protocol from '../../../generated/protocol.js';
 import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
+import {
+  getBaseTraceParseModelData,
+  makeCompleteEvent,
+  makeInstantEvent,
+  makeMockRendererHandlerData,
+  makeProfileCall
+} from '../../../testing/TraceHelpers.js';
 import {TraceLoader} from '../../../testing/TraceLoader.js';
 import * as Trace from '../trace.js';
 
 function shapeStackTraceAsArray(stackTrace: Protocol.Runtime.StackTrace):
-    {callFrames: Protocol.Runtime.CallFrame[], description?: string}[] {
-  const stackTraceAsArray: {callFrames: Protocol.Runtime.CallFrame[], description?: string}[] = [];
+    Array<{callFrames: Protocol.Runtime.CallFrame[], description?: string}> {
+  const stackTraceAsArray: Array<{callFrames: Protocol.Runtime.CallFrame[], description?: string}> = [];
   let currentStackTrace: Protocol.Runtime.StackTrace|undefined = stackTrace;
   while (currentStackTrace) {
-    // @ts-ignore `codeType` is not included in the protocol types but
+    // @ts-expect-error `codeType` is not included in the protocol types but
     // occasionally present
     currentStackTrace.callFrames.forEach(callFrame => delete callFrame.codeType);
     stackTraceAsArray.push({callFrames: currentStackTrace.callFrames, description: currentStackTrace.description});
     currentStackTrace = currentStackTrace.parent;
   }
-
   return stackTraceAsArray;
+}
+
+function parsedTraceFromEvents(events: Trace.Types.Events.Event[]): Trace.Handlers.Types.ParsedTrace {
+  return getBaseTraceParseModelData({Renderer: makeMockRendererHandlerData(events)});
 }
 describeWithEnvironment('StackTraceForTraceEvent', function() {
   let parsedTrace: Trace.Handlers.Types.ParsedTrace;
@@ -165,95 +175,154 @@ describeWithEnvironment('StackTraceForTraceEvent', function() {
     ]);
     bottomFrame.functionName = originalName;
   });
-  it('correctly builds the stack trace of an extension entry', async function() {
-    const jsCall = parsedTrace.Renderer.allTraceEntries.find(
-                       e => Trace.Types.Events.isProfileCall(e) && e.callFrame.functionName === 'baz') as
-            Trace.Types.Events.SyntheticProfileCall |
-        undefined;
-    assert.exists(jsCall);
-    const stackTraceForExtensionProfileCall = Trace.Extras.StackTraceForEvent.get(jsCall, parsedTrace);
-    assert.exists(stackTraceForExtensionProfileCall);
-
-    // Create an extension entry right next to our profile call (based
-    // on its callTime property).
-    // Test the profile call's stack strace is returned as the
-    // extension entry's stack trace.
-    const mockExtensionEntry = {
-      cat: 'devtools.extension',
-      ts: jsCall.ts,
-      pid: jsCall.pid,
-      tid: jsCall.tid,
-      rawSourceEvent: {
-        cat: 'blink.user_timing',
-        args: {stackTrace: [{functionName: jsCall.callFrame.functionName}], callTime: jsCall.ts - 1},
-        ph: Trace.Types.Events.Phase.ASYNC_NESTABLE_START,
-      },
-    } as Trace.Types.Extensions.SyntheticExtensionEntry;
-    const stackTraceForExtensionEntry = Trace.Extras.StackTraceForEvent.get(mockExtensionEntry, parsedTrace);
-    assert.exists(stackTraceForExtensionEntry);
-
-    assert.strictEqual(stackTraceForExtensionEntry, stackTraceForExtensionProfileCall);
-  });
-  it('uses the stack trace of the profile call that contains an extension entry call time', async function() {
-    const bar = parsedTrace.Renderer.allTraceEntries.find(
-                    e => Trace.Types.Events.isProfileCall(e) && e.callFrame.functionName === 'bar') as
-            Trace.Types.Events.SyntheticProfileCall |
-        undefined;
-    assert.exists(bar);
-    const stackTraceForExtensionProfileCall = Trace.Extras.StackTraceForEvent.get(bar, parsedTrace);
-    assert.exists(stackTraceForExtensionProfileCall);
-
-    // Create an extension entry contained by the profile call (based on
-    // its callTime property).
-    // Test the profile call's stack strace is returned as
-    // the extension entry's stack trace.
-    const mockExtensionEntry = {
-      cat: 'devtools.extension',
-      ts: bar.ts,
-      pid: bar.pid,
-      tid: bar.tid,
-      rawSourceEvent: {
-        cat: 'blink.user_timing',
-        args: {stackTrace: [{functionName: bar.callFrame.functionName}], callTime: bar.ts + 1},
-        ph: Trace.Types.Events.Phase.ASYNC_NESTABLE_START,
-      },
-    } as Trace.Types.Extensions.SyntheticExtensionEntry;
-    const stackTraceForExtensionEntry = Trace.Extras.StackTraceForEvent.get(mockExtensionEntry, parsedTrace);
-    assert.exists(stackTraceForExtensionEntry);
-
-    assert.strictEqual(stackTraceForExtensionEntry, stackTraceForExtensionProfileCall);
-  });
-
-  it('picks the stack trace of the closest profile call when no profile call contains the extension entry call time',
+  it('uses the stack trace of the profile call that contains the raw trace event of the extension entry call',
      async function() {
-       const bazCalls = parsedTrace.Renderer.allTraceEntries.filter(
-           e => Trace.Types.Events.isProfileCall(e) && e.callFrame.functionName === 'baz');
-       const firstBaz = bazCalls.at(0);
-       assert.exists(firstBaz);
-       const secondBaz = bazCalls.at(1) as Trace.Types.Events.SyntheticProfileCall;
-       assert.exists(secondBaz);
-       const middlePoint = (secondBaz.ts + firstBaz.ts) / 2;
+       const jsCall = parsedTrace.Renderer.allTraceEntries.find(
+                          e => Trace.Types.Events.isProfileCall(e) && e.callFrame.functionName === 'baz') as
+               Trace.Types.Events.SyntheticProfileCall |
+           undefined;
+       assert.exists(jsCall);
+       const stackTraceForExtensionProfileCall = Trace.Extras.StackTraceForEvent.get(jsCall, parsedTrace);
+       const measureTraceId = [...parsedTrace.UserTimings.measureTraceByTraceId.keys()].at(0);
+       if (!measureTraceId) {
+         throw new Error('Performance measure trace was not found');
+       }
 
-       const stackTraceForSecondBaz = Trace.Extras.StackTraceForEvent.get(secondBaz, parsedTrace);
-       assert.exists(stackTraceForSecondBaz);
+       assert.exists(stackTraceForExtensionProfileCall);
 
-       // Create an extension entry contained closer to the second
-       // baz call (based on its callTime property).
-       // Test the stack trace of baz is used for it.
+       // Create an extension entry right next to our profile call (based
+       // on its callTime property).
+       // Test the profile call's stack strace is returned as the
+       // extension entry's stack trace.
        const mockExtensionEntry = {
          cat: 'devtools.extension',
-         ts: middlePoint,
-         pid: secondBaz.pid,
-         tid: secondBaz.tid,
+         ts: jsCall.ts,
+         pid: jsCall.pid,
+         tid: jsCall.tid,
          rawSourceEvent: {
            cat: 'blink.user_timing',
-           args: {stackTrace: [{functionName: secondBaz.callFrame.functionName}], callTime: middlePoint + 1},
+           args: {stackTrace: [{functionName: jsCall.callFrame.functionName}], traceId: measureTraceId},
            ph: Trace.Types.Events.Phase.ASYNC_NESTABLE_START,
          },
        } as Trace.Types.Extensions.SyntheticExtensionEntry;
        const stackTraceForExtensionEntry = Trace.Extras.StackTraceForEvent.get(mockExtensionEntry, parsedTrace);
        assert.exists(stackTraceForExtensionEntry);
-
-       assert.strictEqual(stackTraceForExtensionEntry, stackTraceForSecondBaz);
+       assert.deepEqual(
+           shapeStackTraceAsArray(stackTraceForExtensionEntry),
+           shapeStackTraceAsArray(stackTraceForExtensionProfileCall));
      });
+  it('extracts the correct stack trace for a console timestamp extension entry', () => {
+    const pid = 0;
+    const tid = 0;
+    const profileCall = makeProfileCall('myFunction', 0, 200, pid, tid);
+    // Override the default -1 values to ensure the callframe is not
+    // discarded as a native frame (which we ignore).
+    profileCall.callFrame.columnNumber = 0;
+    profileCall.callFrame.lineNumber = 0;
+    const extensionEntryStart = 0;
+    const extensionEntryEnd = 100;
+    const entryName = 'Entry';
+    const timestamp = makeInstantEvent(Trace.Types.Events.Name.TIME_STAMP, extensionEntryEnd, '', pid, tid);
+    const extensionData = {
+      color: 'tertiary-dark',
+      frame: 'frame',
+      message: entryName,
+      name: entryName,
+      sampleTraceId: 0,
+      start: extensionEntryStart,
+      track: 'track',
+    };
+    timestamp.args = {data: extensionData};
+    const trace = parsedTraceFromEvents([profileCall, timestamp]);
+
+    const mockExtensionEntry = {
+      ts: timestamp.ts,
+      name: 'Entry',
+      cat: 'devtools.extension',
+      args: extensionData,
+      rawSourceEvent: timestamp,
+      dur: Trace.Types.Timing.Micro(extensionEntryEnd - extensionEntryStart),
+      ph: Trace.Types.Events.Phase.COMPLETE,
+      pid,
+      tid,
+    } as unknown as Trace.Types.Extensions.SyntheticExtensionTrackEntry;
+    const stackTraceForExtensionEntry = Trace.Extras.StackTraceForEvent.get(mockExtensionEntry, trace);
+    assert.exists(stackTraceForExtensionEntry);
+    assert.deepEqual(shapeStackTraceAsArray(stackTraceForExtensionEntry), [
+      {callFrames: [profileCall.callFrame], description: undefined},
+    ]);
+  });
+
+  it('returns the right stack for a trace event that contains a stack trace in its payload', () => {
+    const pid = 0;
+    const tid = 0;
+    const payloadLineNumber = 10;
+    const payloadColumnNumber = 3;
+    const profileCall1 = makeProfileCall('foo', 0, 200, pid, tid);
+    const profileCall2 = makeProfileCall('bar', 0, 200, pid, tid);
+    // Override the default -1 values to ensure the callframe is not
+    // discarded as a native frame (which we ignore).
+    profileCall1.callFrame.columnNumber = 0;
+    profileCall1.callFrame.lineNumber = 0;
+    profileCall2.callFrame.columnNumber = 0;
+    profileCall2.callFrame.lineNumber = 0;
+    const traceEvent = makeCompleteEvent(Trace.Types.Events.Name.UPDATE_LAYOUT_TREE, 100, 10, '', pid, tid) as
+        Trace.Types.Events.UpdateLayoutTree;
+    const payloadCallStack = [
+      {columnNumber: payloadColumnNumber, functionName: 'bar', lineNumber: payloadLineNumber, scriptId: '115', url: ''},
+      {columnNumber: payloadColumnNumber, functionName: 'foo', lineNumber: payloadLineNumber, scriptId: '115', url: ''},
+    ];
+    traceEvent.args = {elementCount: 1, beginData: {frame: '', stackTrace: payloadCallStack}};
+    const trace = parsedTraceFromEvents([profileCall1, profileCall2, traceEvent]);
+
+    const stackTraceForExtensionEntry = Trace.Extras.StackTraceForEvent.get(traceEvent, trace);
+    assert.exists(stackTraceForExtensionEntry);
+    assert.deepEqual(shapeStackTraceAsArray(stackTraceForExtensionEntry) as unknown[], [
+      {
+        callFrames: [
+          {...payloadCallStack[0], lineNumber: payloadLineNumber - 1, columnNumber: payloadColumnNumber - 1},
+          {...payloadCallStack[1], lineNumber: payloadLineNumber - 1, columnNumber: payloadColumnNumber - 1},
+        ],
+        description: undefined
+      },
+    ]);
+  });
+  it('obtains the stack trace for a trace event triggered by an async JS call', async function() {
+    const {parsedTrace} = await TraceLoader.traceEngine(this, 'react-console-timestamp.json.gz');
+    const containerExtensionEntry = parsedTrace.ExtensionTraceData.extensionTrackData[0].entriesByTrack['Primary'].find(
+        e => e.name === 'Container');
+    assert.exists(containerExtensionEntry);
+    const stackTraceForExtensionEntry = Trace.Extras.StackTraceForEvent.get(containerExtensionEntry, parsedTrace);
+    assert.exists(stackTraceForExtensionEntry);
+    const prettyStack =
+        shapeStackTraceAsArray(stackTraceForExtensionEntry)
+            .map(stack => ({...stack, callFrames: stack.callFrames.map(frame => ({...frame, url: ''}))}));
+    assert.deepEqual(prettyStack as unknown[], [
+      {callFrames: [], description: undefined}, {
+        callFrames: [{columnNumber: 8, functionName: 'App', lineNumber: 45, scriptId: '31', url: ''}],
+        description: '<Container>'
+      },
+      {
+        callFrames: [
+          {columnNumber: 14, functionName: 'renderApp', lineNumber: 98, scriptId: '25', url: ''},
+          {columnNumber: 16, functionName: '<anonymous>', lineNumber: 165, scriptId: '26', url: ''}
+        ],
+        description: '<App>'
+      },
+      {
+        callFrames: [
+          {columnNumber: 27, functionName: 'ResponseInstance', lineNumber: 26161, scriptId: '11', url: ''},
+          {columnNumber: 36, functionName: 'createResponseFromOptions', lineNumber: 26879, scriptId: '11', url: ''},
+          {columnNumber: 37, functionName: 'exports.createFromFetch', lineNumber: 27107, scriptId: '11', url: ''},
+          {columnNumber: 25, functionName: 'hydrateApp', lineNumber: 31283, scriptId: '11', url: ''},
+          {columnNumber: 7, functionName: './src/index.js', lineNumber: 31213, scriptId: '11', url: ''},
+          {columnNumber: 39, functionName: 'options.factory', lineNumber: 31995, scriptId: '11', url: ''},
+          {columnNumber: 38, functionName: '__webpack_require__', lineNumber: 31365, scriptId: '11', url: ''},
+          {columnNumber: 10, functionName: '', lineNumber: 0, scriptId: '11', url: ''},
+          {columnNumber: 0, functionName: '', lineNumber: 0, scriptId: '11', url: ''}
+        ],
+        description: '"use server"'
+      }
+    ]);
+  });
 });

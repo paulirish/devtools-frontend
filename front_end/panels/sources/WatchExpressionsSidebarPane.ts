@@ -1,6 +1,7 @@
 // Copyright 2021 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 /*
  * Copyright (C) IBM Corp. 2009  All rights reserved.
@@ -84,7 +85,7 @@ const UIStrings = {
    *@description A context menu item in the Watch Expressions Sidebar Pane of the Sources panel and Network pane request.
    */
   copyValue: 'Copy value',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/sources/WatchExpressionsSidebarPane.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 let watchExpressionsSidebarPaneInstance: WatchExpressionsSidebarPane;
@@ -102,6 +103,7 @@ export class WatchExpressionsSidebarPane extends UI.ThrottledWidget.ThrottledWid
   private readonly linkifier: Components.Linkifier.Linkifier;
   private constructor() {
     super(true);
+    this.registerRequiredCSS(watchExpressionsSidebarPaneStyles, objectValueStyles);
 
     // TODO(szuend): Replace with a Set once the web test
     // panels/sources/debugger-ui/watch-expressions-preserve-expansion.js is either converted
@@ -125,6 +127,7 @@ export class WatchExpressionsSidebarPane extends UI.ThrottledWidget.ThrottledWid
     this.contentElement.setAttribute('jslog', `${VisualLogging.section('sources.watch')}`);
     this.contentElement.addEventListener('contextmenu', this.contextMenu.bind(this), false);
     this.treeOutline = new ObjectUI.ObjectPropertiesSection.ObjectPropertiesSectionsTreeOutline();
+    this.treeOutline.registerRequiredCSS(watchExpressionsSidebarPaneStyles);
     this.treeOutline.hideOverflow();
 
     this.treeOutline.setShowSelectionOnKeyboardFocus(/* show */ true);
@@ -155,10 +158,6 @@ export class WatchExpressionsSidebarPane extends UI.ThrottledWidget.ThrottledWid
     if (this.watchExpressions.length > 0) {
       this.treeOutline.forceSelect();
     }
-  }
-
-  hasExpressions(): boolean {
-    return Boolean(this.watchExpressionsSetting.get().length);
   }
 
   private saveExpressions(): void {
@@ -301,12 +300,6 @@ export class WatchExpressionsSidebarPane extends UI.ThrottledWidget.ThrottledWid
 
     contextMenu.debugSection().appendAction('sources.add-to-watch');
   }
-
-  override wasShown(): void {
-    super.wasShown();
-    this.treeOutline.registerCSSFiles([watchExpressionsSidebarPaneStyles]);
-    this.registerCSSFiles([watchExpressionsSidebarPaneStyles, objectValueStyles]);
-  }
 }
 
 export class WatchExpression extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
@@ -350,7 +343,7 @@ export class WatchExpression extends Common.ObjectWrapper.ObjectWrapper<EventTyp
   async #evaluateExpression(executionContext: SDK.RuntimeModel.ExecutionContext, expression: string):
       Promise<SDK.RuntimeModel.EvaluationResult> {
     const callFrame = executionContext.debuggerModel.selectedCallFrame();
-    if (callFrame && callFrame.script.isJavaScript()) {
+    if (callFrame?.script.isJavaScript()) {
       const nameMap = await SourceMapScopes.NamesResolver.allVariablesInCallFrame(callFrame);
       try {
         expression =
@@ -359,7 +352,7 @@ export class WatchExpression extends Common.ObjectWrapper.ObjectWrapper<EventTyp
       }
     }
 
-    return executionContext.evaluate(
+    return await executionContext.evaluate(
         {
           expression,
           objectGroup: WatchExpression.watchObjectGroupId,
@@ -455,7 +448,7 @@ export class WatchExpression extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     this.element.removeChildren();
     const oldTreeElement = this.treeElementInternal;
     this.createWatchExpressionTreeElement(result, exceptionDetails);
-    if (oldTreeElement && oldTreeElement.parent) {
+    if (oldTreeElement?.parent) {
       const root = oldTreeElement.parent;
       const index = root.indexOfChild(oldTreeElement);
       root.removeChild(oldTreeElement);
@@ -494,14 +487,13 @@ export class WatchExpression extends Common.ObjectWrapper.ObjectWrapper<EventTyp
       this.valueElement.classList.add('value');
       titleElement.classList.add('dimmed');
       this.valueElement.textContent = i18nString(UIStrings.notAvailable);
-      if (exceptionDetails !== undefined && exceptionDetails.exception !== undefined &&
-          exceptionDetails.exception.description !== undefined) {
+      if (exceptionDetails?.exception?.description !== undefined) {
         UI.Tooltip.Tooltip.install(this.valueElement as HTMLElement, exceptionDetails.exception.description);
       }
     } else {
       const propertyValue =
           ObjectUI.ObjectPropertiesSection.ObjectPropertiesSection.createPropertyValueWithCustomSupport(
-              expressionValue, Boolean(exceptionDetails), false /* showPreview */, titleElement, this.linkifier);
+              expressionValue, Boolean(exceptionDetails), false /* showPreview */, this.linkifier);
       this.valueElement = propertyValue.element;
     }
     const separatorElement = document.createElement('span');

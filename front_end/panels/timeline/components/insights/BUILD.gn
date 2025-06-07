@@ -10,6 +10,8 @@ import("../../../../../scripts/build/typescript/typescript.gni")
 generate_css("css_files") {
   sources = [
     "baseInsightComponent.css",
+    "checklist.css",
+    "networkDependencyTreeInsight.css",
     "table.css",
   ]
 }
@@ -18,17 +20,25 @@ devtools_module("insights") {
   sources = [
     "BaseInsightComponent.ts",
     "CLSCulprits.ts",
+    "Cache.ts",
+    "Checklist.ts",
     "DOMSize.ts",
     "DocumentLatency.ts",
+    "DuplicatedJavaScript.ts",
     "EventRef.ts",
     "FontDisplay.ts",
+    "ForcedReflow.ts",
     "Helpers.ts",
     "ImageDelivery.ts",
     "InteractionToNextPaint.ts",
     "LCPDiscovery.ts",
     "LCPPhases.ts",
+    "LegacyJavaScript.ts",
+    "ModernHTTP.ts",
+    "NetworkDependencyTree.ts",
     "NodeLink.ts",
     "RenderBlocking.ts",
+    "ScriptRef.ts",
     "SidebarInsight.ts",
     "SlowCSSSelector.ts",
     "Table.ts",
@@ -47,7 +57,7 @@ devtools_module("insights") {
     "../../../../ui/components/helpers:bundle",
     "../../../../ui/components/icon_button:bundle",
     "../../../../ui/components/linkifier:bundle",
-    "../../../../ui/lit-html:bundle",
+    "../../../../ui/lit:bundle",
     "../../overlays:bundle",
     "../../utils:bundle",
   ]
@@ -73,6 +83,8 @@ ts_library("unittests") {
   sources = [
     "BaseInsightComponent.test.ts",
     "CLSCulprits.test.ts",
+    "InteractionToNextPaint.test.ts",
+    "Table.test.ts",
   ]
 
   deps = [

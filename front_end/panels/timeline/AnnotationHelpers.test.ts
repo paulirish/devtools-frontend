@@ -31,8 +31,8 @@ describe('AnnotationHelpers', () => {
     it('returns an empty array for a range', async () => {
       const annotation: Trace.Types.File.TimeRangeAnnotation = {
         bounds: Trace.Helpers.Timing.traceWindowFromMicroSeconds(
-            Trace.Types.Timing.MicroSeconds(0),
-            Trace.Types.Timing.MicroSeconds(10),
+            Trace.Types.Timing.Micro(0),
+            Trace.Types.Timing.Micro(10),
             ),
         type: 'TIME_RANGE',
         label: 'Hello world',
@@ -77,8 +77,8 @@ describe('AnnotationHelpers', () => {
     it('returns the bounds for a TIME_RANGE', async () => {
       const annotation: Trace.Types.File.TimeRangeAnnotation = {
         bounds: Trace.Helpers.Timing.traceWindowFromMicroSeconds(
-            Trace.Types.Timing.MicroSeconds(0),
-            Trace.Types.Timing.MicroSeconds(10),
+            Trace.Types.Timing.Micro(0),
+            Trace.Types.Timing.Micro(10),
             ),
         type: 'TIME_RANGE',
         label: 'Hello world',
@@ -137,6 +137,13 @@ describe('AnnotationHelpers', () => {
       const event = new Timeline.ModificationsManager.AnnotationModifiedEvent(overlay, 'Add');
       const text = ariaAnnouncementForModifiedEvent(event);
       assert.strictEqual(text, 'The entry label annotation has been added');
+    });
+
+    it('does not return an announcement for new empty labels', async () => {
+      const overlay: Overlays.Overlays.EntryLabel = {type: 'ENTRY_LABEL', entry: FAKE_ENTRY_1, label: ''};
+      const event = new Timeline.ModificationsManager.AnnotationModifiedEvent(overlay, 'Add');
+      const text = ariaAnnouncementForModifiedEvent(event);
+      assert.isNull(text);
     });
 
     it('returns text for an annotation having its label updated', async () => {

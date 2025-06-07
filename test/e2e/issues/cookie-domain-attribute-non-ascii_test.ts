@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 import {assertNotNullOrUndefined, getBrowserAndPages, goToResource} from '../../shared/helper.js';
-
 import {
   ensureResourceSectionIsExpanded,
   expandIssue,
@@ -31,6 +30,8 @@ describe('Cookie domain attribute should not contain non-ASCII characters issue'
         img.onerror = c;
       });
       img.src = './issues/cookie-domain-non-ascii.rawresponse';
+      // This rule is only relevant for unit tests.
+      // eslint-disable-next-line rulesdir/no-document-body-mutation
       document.body.appendChild(img);
       await done;
     });

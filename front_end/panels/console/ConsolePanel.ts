@@ -1,6 +1,7 @@
 // Copyright 2020 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 /*
  * Copyright (C) 2009 Joseph Pecoraro
@@ -64,7 +65,7 @@ export class ConsolePanel extends UI.Panel.Panel {
   override wasShown(): void {
     super.wasShown();
     const wrapper = wrapperViewInstance;
-    if (wrapper && wrapper.isShowing()) {
+    if (wrapper?.isShowing()) {
       UI.InspectorView.InspectorView.instance().setDrawerMinimized(true);
     }
     this.view.show(this.element);

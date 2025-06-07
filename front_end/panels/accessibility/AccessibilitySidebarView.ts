@@ -1,6 +1,7 @@
 // Copyright 2015 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import type * as Common from '../../core/common/common.js';
 import * as Root from '../../core/root/root.js';
@@ -150,7 +151,7 @@ export class AccessibilitySidebarView extends UI.ThrottledWidget.ThrottledWidget
       return;
     }
     const data = event.data;
-    const node = (data instanceof SDK.DOMModel.DOMNode ? data : data.node as SDK.DOMModel.DOMNode);
+    const node = (data instanceof SDK.DOMModel.DOMNode ? data : data.node);
     if (this.node() !== node) {
       return;
     }

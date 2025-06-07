@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {renderElementIntoDOM} from '../../../testing/DOMHelpers.js';
+
 import * as RenderCoordinator from './render_coordinator.js';
 
 describe('RenderCoordinator', () => {
@@ -109,7 +111,7 @@ describe('RenderCoordinator', () => {
   it('returns values', async () => {
     const element = document.createElement('div');
     element.style.height = '800px';
-    document.body.appendChild(element);
+    renderElementIntoDOM(element);
 
     const height = await RenderCoordinator.read(() => element.clientHeight);
     await RenderCoordinator.done();
@@ -128,7 +130,7 @@ describe('RenderCoordinator', () => {
                          }, timeout));
     };
 
-    void RenderCoordinator.write(async () => delayedSet(expected, 100));
+    void RenderCoordinator.write(async () => await delayedSet(expected, 100));
     await RenderCoordinator.done();
 
     assert.strictEqual(targetValue, expected);

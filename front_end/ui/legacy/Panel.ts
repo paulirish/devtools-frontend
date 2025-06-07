@@ -1,6 +1,7 @@
 // Copyright 2021 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 /*
  * Copyright (C) 2007, 2008 Apple Inc.  All rights reserved.
@@ -48,12 +49,12 @@ export class Panel extends VBox {
     this.element.classList.add(name);
     this.panelName = name;
 
-    // @ts-ignore: Legacy global. Requires rewriting tests to get rid of.
+    // @ts-expect-error: Legacy global. Requires rewriting tests to get rid of.
     // For testing.
     self.UI = self.UI || {};
-    // @ts-ignore
+    // @ts-expect-error
     self.UI.panels = self.UI.panels || {};
-    // @ts-ignore
+    // @ts-expect-error
     UI.panels[name] = this;
   }
 

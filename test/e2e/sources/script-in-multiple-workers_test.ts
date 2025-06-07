@@ -17,7 +17,6 @@ import {
   waitFor,
   waitForFunction,
 } from '../../shared/helper.js';
-
 import {
   addBreakpointForLine,
   BREAKPOINT_ITEM_SELECTOR,
@@ -47,11 +46,6 @@ async function validateSourceTabs() {
 }
 
 describe('Multi-Workers', function() {
-  // The tests in this suite are particularly slow, as they perform a lot of actions
-  if (this.timeout() !== 0) {
-    this.timeout(10000);
-  }
-
   [false, true].forEach(sourceMaps => {
     const withOrWithout = sourceMaps ? 'with source maps' : 'without source maps';
     const targetPage = sourceMaps ? 'sources/multi-workers-sourcemap.html' : 'sources/multi-workers.html';
@@ -86,7 +80,7 @@ describe('Multi-Workers', function() {
         await validateNavigationTree();
 
         const {target, frontend} = getBrowserAndPages();
-        installEventListener(frontend, DEBUGGER_PAUSED_EVENT);
+        await installEventListener(frontend, DEBUGGER_PAUSED_EVENT);
 
         await step('Send message to a worker to trigger break', async () => {
           await target.evaluate('workers[3].postMessage({command:"break"});');
@@ -173,7 +167,6 @@ describe('Multi-Workers', function() {
     });
 
     it(`shows exactly one breakpoint ${withOrWithout}`, async () => {
-      const {frontend} = getBrowserAndPages();
       await waitForSourceFiles(
           SourceFileEvents.SOURCE_FILE_LOADED, files => files.some(f => f.endsWith('multi-workers.js')), async () => {
             // Have the target load the page.
@@ -186,94 +179,91 @@ describe('Multi-Workers', function() {
             await openNestedWorkerFile(workerFileSelectors(2));
           });
       // Set a breakpoint
-      await addBreakpointForLine(frontend, 6);
+      await addBreakpointForLine(6);
 
       await waitFor(BREAKPOINT_ITEM_SELECTOR);
       const breakpoints = (await $$(BREAKPOINT_ITEM_SELECTOR)).length;
       assert.strictEqual(breakpoints, 1);
     });
 
-    // Regularly failing on Windows CQ
-    describe.skip(
-        `[crbug.com/1425122] copies breakpoints between workers ${withOrWithout}`, () => {
-          beforeEach(async () => {
-            const {frontend} = getBrowserAndPages();
-            await waitForSourceFiles(
-                SourceFileEvents.SOURCE_FILE_LOADED, files => files.some(f => f.endsWith('multi-workers.js')),
-                async () => {
-                  // Have the target load the page.
-                  await goToResource(targetPage);
+    describe(`copies breakpoints between workers ${withOrWithout}`, () => {
+      async function setupBreakpoints() {
+        await waitForSourceFiles(
+            SourceFileEvents.SOURCE_FILE_LOADED, files => files.some(f => f.endsWith('multi-workers.js')), async () => {
+              // Have the target load the page.
+              await goToResource(targetPage);
 
-                  await click('#tab-sources');
-                  // Wait for all workers to load
-                  await validateNavigationTree();
+              await click('#tab-sources');
+              // Wait for all workers to load
+              await validateNavigationTree();
 
-                  await step('Open file from second worker', async () => {
-                    await openNestedWorkerFile(workerFileSelectors(2));
-                  });
-                });
-
-            await step('Set two breakpoints', async () => {
-              await addBreakpointForLine(frontend, 6);
+              await step('Open file from second worker', async () => {
+                await openNestedWorkerFile(workerFileSelectors(2));
+              });
             });
 
-            await step('Disable first breakpoint', async () => {
-              const bpEntry = await waitFor(BREAKPOINT_ITEM_SELECTOR);
-              const bpCheckbox = await waitFor('input', bpEntry);
-              await bpCheckbox.evaluate(n => (n as HTMLElement).click());
-              await waitFor('.cm-breakpoint-disabled');
-            });
-
-            await step('Add another breakpoint', async () => {
-              await addBreakpointForLine(frontend, 12);
-            });
-
-            await step('Check breakpoints', async () => {
-              await validateBreakpoints();
-            });
-
-            await step('Close tab', async () => {
-              await click('[aria-label="Close multi-workers.js"]');
-            });
-          });
-
-          it('when opening different file in editor', async () => {
-            // Open different worker
-            await step('Open different worker', async () => {
-              await openNestedWorkerFile(workerFileSelectors(3));
-            });
-
-            await step('Check breakpoints', async () => {
-              await validateBreakpoints();
-            });
-          });
-
-          it('after reloading', async () => {
-            const {target} = getBrowserAndPages();
-
-            await step('Reload page', async () => {
-              await target.reload();
-            });
-
-            // FIXME(crbug/1112692): Refactor test to remove the timeout.
-            await timeout(100);
-
-            await step('Open different worker', async () => {
-              await openNestedWorkerFile(workerFileSelectors(4));
-            });
-
-            await step('Check breakpoints', async () => {
-              await waitFor('.cm-breakpoint');
-              await validateBreakpoints();
-            });
-          });
+        await step('Set two breakpoints', async () => {
+          await addBreakpointForLine(6);
         });
 
-    // Flaky tests in beforeEach.
-    describe.skip(`[crbug.com/1425122] hits breakpoints added to workers ${withOrWithout}`, () => {
-      beforeEach(async () => {
+        await step('Disable first breakpoint', async () => {
+          const bpEntry = await waitFor(BREAKPOINT_ITEM_SELECTOR);
+          const bpCheckbox = await waitFor('input', bpEntry);
+          await bpCheckbox.evaluate(n => (n as HTMLElement).click());
+          await waitFor('.cm-breakpoint-disabled');
+        });
+
+        await step('Add another breakpoint', async () => {
+          await addBreakpointForLine(12);
+        });
+
+        await step('Check breakpoints', async () => {
+          await validateBreakpoints();
+        });
+
+        await step('Close tab', async () => {
+          await click('[aria-label="Close multi-workers.js"]');
+        });
+      }
+
+      it('when opening different file in editor', async () => {
+        await setupBreakpoints();
+        // Open different worker
+        await step('Open different worker', async () => {
+          await openNestedWorkerFile(workerFileSelectors(3));
+        });
+
+        await step('Check breakpoints', async () => {
+          await validateBreakpoints();
+        });
+      });
+
+      it('after reloading', async () => {
+        await setupBreakpoints();
+
+        const {target} = getBrowserAndPages();
+
+        await step('Reload page', async () => {
+          await target.reload();
+        });
+
+        // FIXME(crbug/1112692): Refactor test to remove the timeout.
+        await timeout(100);
+
+        await step('Open different worker', async () => {
+          await openNestedWorkerFile(workerFileSelectors(4));
+        });
+
+        await step('Check breakpoints', async () => {
+          await waitFor('.cm-breakpoint');
+          await validateBreakpoints();
+        });
+      });
+    });
+
+    describe(`hits breakpoints added to workers ${withOrWithout}`, () => {
+      async function setupInstrumentationBreakpoints() {
         await enableExperiment('instrumentation-breakpoints');
-        const {frontend} = getBrowserAndPages();
         await waitForSourceFiles(
             SourceFileEvents.SOURCE_FILE_LOADED, files => files.some(f => f.endsWith('multi-workers.js')), async () => {
               // Have the target load the page.
@@ -291,11 +281,13 @@ describe('Multi-Workers', function() {
             });
 
         await step('Set breakpoint', async () => {
-          await addBreakpointForLine(frontend, 6);
+          await addBreakpointForLine(6);
         });
-      });
+      }
 
       it('for pre-loaded workers', async () => {
+        await setupInstrumentationBreakpoints();
+
         const {target} = getBrowserAndPages();
         // Send message to a worker to trigger break
         await target.evaluate('workers[5].postMessage({});');
@@ -311,6 +303,8 @@ describe('Multi-Workers', function() {
       });
 
       it('for newly created workers', async () => {
+        await setupInstrumentationBreakpoints();
+
         const {target} = getBrowserAndPages();
         // Launch new worker to hit breakpoint
         await target.evaluate(`new Worker('${scriptFile}').postMessage({});`);

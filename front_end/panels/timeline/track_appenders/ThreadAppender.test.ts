@@ -30,8 +30,9 @@ function initTrackAppender(
   compatibilityTracksAppender: Timeline.CompatibilityTracksAppender.CompatibilityTracksAppender,
 } {
   setupIgnoreListManagerEnvironment();
+  const entityMapper = new Timeline.Utils.EntityMapper.EntityMapper(parsedTrace);
   const compatibilityTracksAppender = new Timeline.CompatibilityTracksAppender.CompatibilityTracksAppender(
-      flameChartData, parsedTrace, entryData, entryTypeByLevel);
+      flameChartData, parsedTrace, entryData, entryTypeByLevel, entityMapper);
   return {threadAppenders: compatibilityTracksAppender.threadAppenders(), compatibilityTracksAppender};
 }
 
@@ -286,7 +287,7 @@ describeWithEnvironment('ThreadAppender', function() {
     }
     const infoForLongEvent = getDefaultInfo();
     threadAppenders[0].setPopoverInfo(longTask, infoForLongEvent);
-    assert.strictEqual(infoForLongEvent.formattedTime, '1.30\u00A0s (self 47\u00A0μs)');
+    assert.strictEqual(infoForLongEvent.formattedTime, '1.30\u00A0s (self 47\xA0μs)');
   });
 
   it('shows the correct title for a ParseHTML event', async function() {
@@ -305,7 +306,7 @@ describeWithEnvironment('ThreadAppender', function() {
     }
     const infoForLongEvent = getDefaultInfo();
     threadAppenders[0].setPopoverInfo(longTask, infoForLongEvent);
-    assert.strictEqual(infoForLongEvent.formattedTime, '1.30\u00A0s (self 47\u00A0μs)');
+    assert.strictEqual(infoForLongEvent.formattedTime, '1.30\u00A0s (self 47\xA0μs)');
   });
 
   it('shows the right time for a profile call when hovered', async function() {
@@ -343,7 +344,7 @@ describeWithEnvironment('ThreadAppender', function() {
       {type: PerfUI.FlameChart.FlameChartDecorationType.WARNING_TRIANGLE},
       {
         type: PerfUI.FlameChart.FlameChartDecorationType.CANDY,
-        startAtTime: Trace.Types.Timing.MicroSeconds(50_000),
+        startAtTime: Trace.Types.Timing.Micro(50_000),
       },
     ]);
   });
@@ -464,7 +465,10 @@ describeWithEnvironment('ThreadAppender', function() {
         AuctionWorklets: {worklets: new Map()},
         Meta: {
           traceIsGeneric: false,
+          navigationsByNavigationId: new Map(),
         },
+        NetworkRequests:
+            {entityMappings: {entityByEvent: new Map(), eventsByEntity: new Map(), createdEntityCache: new Map()}},
         ExtensionTraceData: {entryToNode: new Map(), extensionMarkers: [], extensionTrackData: []},
       } as unknown as Trace.Handlers.Types.ParsedTrace;
 
@@ -514,8 +518,7 @@ describeWithEnvironment('ThreadAppender', function() {
       // appended to the timeline data.
       const initialTimelineData = await renderThreadAppendersFromTrace(this, fileName);
       let unknownEventIndex = initialTimelineData.entryData.findIndex(entry => {
-        const event = entry as Trace.Types.Events.Event;
-        return event.name === bizarreName;
+        return entry.name === bizarreName;
       });
       assert.strictEqual(unknownEventIndex, -1);
 
@@ -524,8 +527,7 @@ describeWithEnvironment('ThreadAppender', function() {
       const finalTimelineData = await renderThreadAppendersFromTrace(this, fileName);
       const finalFlamechartData = finalTimelineData.flameChartData;
       unknownEventIndex = finalTimelineData.entryData.findIndex(entry => {
-        const event = entry as Trace.Types.Events.Event;
-        return event.name === bizarreName;
+        return entry.name === bizarreName;
       });
       assert.isAbove(unknownEventIndex, -1);
       assert.exists(finalFlamechartData.entryStartTimes);

@@ -1,6 +1,12 @@
-### [Persistent AI chat history](persistent-chat-history)
-The AI assistance panel now persists your chat history across sessions, so you can view your previous conversations with Gemini.
-### [Classic and modern keyboard navigation in Performance](perf-nav)
-The Performance panel now lets you choose your preferred style of keyboard navigation and shows the corresponding list of shortcuts.
-### [Image delivery insight in Performance](perf-image-delivery)
-The Insights tab in the Performance panel now highlights images whose file size you can optimize.
+### Preconnected origins in 'Network dependency tree' insight
+The 'Network dependency tree' insight now shows you a list of used or unused preconnected origins and preconnect candidates, if any.
+
+[Send feedback](crbug1)
+### Server response and redirection times in 'Document request latency' insight
+The 'Document request latency' insight now shows you server response time and, if any, redirection time.
+
+[Send feedback](crbug2)
+### Geolocation accuracy parameter in Sensors
+The Sensors panel now lets you set accuracy in geolocation emulation, so you can test the handling of different levels of GPS accuracy.
+
+[Send feedback](crbug3)

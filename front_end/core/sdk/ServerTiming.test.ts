@@ -3,9 +3,17 @@
 // found in the LICENSE file.
 
 import {describeWithLocale} from '../../testing/EnvironmentHelpers.js';
-import * as Platform from '../platform/platform.js';
 
 import * as SDK from './sdk.js';
+
+describe('ServerTiming', () => {
+  it('can be instantiated correctly', () => {
+    const serverTiming = new SDK.ServerTiming.ServerTiming('example metric', 1, 'example description');
+    assert.strictEqual(serverTiming.metric, 'example metric', 'metric was not set correctly');
+    assert.strictEqual(serverTiming.value, 1, 'value was not set correctly');
+    assert.strictEqual(serverTiming.description, 'example description', 'description was not set correctly');
+  });
+});
 
 describeWithLocale('SDK.ServerTiming.ServerTiming.createFromHeaderValue', () => {
   it('parses headers correctly', () => {
@@ -55,6 +63,206 @@ describeWithLocale('SDK.ServerTiming.ServerTiming.createFromHeaderValue', () => 
       },
     ];
     assert.deepEqual(actual, expected);
+  });
+
+  it('parses the custom non-standard cfL4 headers correctly', () => {
+    const actual = SDK.ServerTiming.ServerTiming.createFromHeaderValue(
+        'cfL4;desc="?proto=TCP&rtt=6699&sent=35&recv=35&lost=0&retrans=0&sent_bytes=29507&recv_bytes=3329&delivery_rate=2064884&cwnd=228&unsent_bytes=0&cid=2c16ce0a54b8174d&ts=215&x=0"');
+    const expected: SDK.ServerTiming.ServerTimingMetric[] = [
+      {
+        name: 'cfL4',
+        desc:
+            '?proto=TCP&rtt=6699&sent=35&recv=35&lost=0&retrans=0&sent_bytes=29507&recv_bytes=3329&delivery_rate=2064884&cwnd=228&unsent_bytes=0&cid=2c16ce0a54b8174d&ts=215&x=0',
+      },
+      {name: '(cf) proto', desc: 'TCP'},
+      {name: '(cf) rtt', desc: '6699'},
+      {name: '(cf) sent', desc: '35'},
+      {name: '(cf) recv', desc: '35'},
+      {name: '(cf) lost', desc: '0'},
+      {name: '(cf) retrans', desc: '0'},
+      {name: '(cf) sent_bytes', desc: '29507'},
+      {name: '(cf) recv_bytes', desc: '3329'},
+      {name: '(cf) delivery_rate', desc: '2064884'},
+      {name: '(cf) cwnd', desc: '228'},
+      {name: '(cf) unsent_bytes', desc: '0'},
+      {name: '(cf) cid', desc: '2c16ce0a54b8174d'},
+      {name: '(cf) ts', desc: '215'},
+      {name: '(cf) x', desc: '0'},
+    ];
+    assert.deepEqual(actual, expected);
+  });
+
+  it('parses the custom non-standard cloudinary headers correctly', () => {
+    const actual = SDK.ServerTiming.ServerTiming.createFromHeaderValue(
+        'cld-fastly;dur=2;cpu=0;start=2025-03-31T21:29:17.654Z;desc=hit,rtt;dur=13,content-info;desc="width=1440,height=328,bytes=6066,format=\\"svg\\",o=1,crt=1736894672,ef=(17)"');
+    const expected: SDK.ServerTiming.ServerTimingMetric[] = [
+      {name: 'cld-fastly', dur: 2, desc: 'hit'},
+      {name: 'rtt', dur: 13},
+      {name: 'content-info', desc: 'width=1440,height=328,bytes=6066,format=\"svg\",o=1,crt=1736894672,ef=(17)'},
+      {name: '(cld) width', desc: '1440'},
+      {name: '(cld) height', desc: '328'},
+      {name: '(cld) bytes', desc: '6066'},
+      {name: '(cld) format', desc: '"svg"'},
+      {name: '(cld) o', desc: '1'},
+      {name: '(cld) crt', desc: '1736894672'},
+      {name: '(cld) ef', desc: '(17)'},
+    ];
+    assert.deepEqual(actual, expected);
+  });
+
+  it('parses Server Timing metric names correctly', () => {
+    assert.deepEqual(SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric'), [{name: 'metric'}]);
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('aB3!#$%&\'*+-.^_`|~'), [{name: 'aB3!#$%&\'*+-.^_`|~'}]);
+  });
+
+  it('parses Server Timing metric durations correctly', () => {
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;dur=123.4'), [{name: 'metric', dur: 123.4}]);
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;dur="123.4"'), [{name: 'metric', dur: 123.4}]);
+  });
+
+  it('parses Server Timing metric descriptions correctly', () => {
+    assert.deepEqual(SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc=description'), [
+      {name: 'metric', desc: 'description'},
+    ]);
+    assert.deepEqual(SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc="description"'), [
+      {name: 'metric', desc: 'description'},
+    ]);
+    assert.deepEqual(SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;dur=123.4;desc=description'), [
+      {name: 'metric', dur: 123.4, desc: 'description'},
+    ]);
+    assert.deepEqual(SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc=description;dur=123.4'), [
+      {name: 'metric', desc: 'description', dur: 123.4},
+    ]);
+  });
+
+  it('handles spaces in Server Timing headers correctly', () => {
+    assert.deepEqual(SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric ; '), [{name: 'metric'}]);
+    assert.deepEqual(SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric , '), [{name: 'metric'}]);
+    assert.deepEqual(SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric ; dur = 123.4 ; desc = description'), [
+      {name: 'metric', dur: 123.4, desc: 'description'},
+    ]);
+    assert.deepEqual(SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric ; desc = description ; dur = 123.4'), [
+      {name: 'metric', desc: 'description', dur: 123.4},
+    ]);
+    assert.deepEqual(SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc = "description"'), [
+      {name: 'metric', desc: 'description'},
+    ]);
+  });
+
+  it('handles tabs in Server Timing headers correctly', () => {
+    assert.deepEqual(SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric\t;\t'), [{name: 'metric'}]);
+    assert.deepEqual(SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric\t,\t'), [{name: 'metric'}]);
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric\t;\tdur\t=\t123.4\t;\tdesc\t=\tdescription'), [
+          {name: 'metric', dur: 123.4, desc: 'description'},
+        ]);
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric\t;\tdesc\t=\tdescription\t;\tdur\t=\t123.4'), [
+          {name: 'metric', desc: 'description', dur: 123.4},
+        ]);
+    assert.deepEqual(SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc\t=\t"description"'), [
+      {name: 'metric', desc: 'description'},
+    ]);
+  });
+
+  it('handles Server Timing headers with multiple entries correctly', () => {
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue(
+            'metric1;dur=12.3;desc=description1,metric2;dur=45.6;desc=description2,metric3;dur=78.9;desc=description3'),
+        [
+          {name: 'metric1', dur: 12.3, desc: 'description1'},
+          {name: 'metric2', dur: 45.6, desc: 'description2'},
+          {name: 'metric3', dur: 78.9, desc: 'description3'},
+        ]);
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric1,metric2 ,metric3, metric4 , metric5'), [
+          {name: 'metric1'},
+          {name: 'metric2'},
+          {name: 'metric3'},
+          {name: 'metric4'},
+          {name: 'metric5'},
+        ]);
+  });
+
+  it('handles RFC7230 quoted-string Server Timing values correctly', () => {
+    assert.deepEqual(SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc="description"'), [
+      {name: 'metric', desc: 'description'},
+    ]);
+    assert.deepEqual(SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc="\t description \t"'), [
+      {name: 'metric', desc: '\t description \t'},
+    ]);
+    assert.deepEqual(SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc="descr\\"iption"'), [
+      {name: 'metric', desc: 'descr"iption'},
+    ]);
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc=\\'), [{name: 'metric', desc: ''}]);
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc="'), [{name: 'metric', desc: ''}]);
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc=\\\\'), [{name: 'metric', desc: ''}]);
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc=\\"'), [{name: 'metric', desc: ''}]);
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc="\\'), [{name: 'metric', desc: ''}]);
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc=""'), [{name: 'metric', desc: ''}]);
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc=\\\\\\'), [{name: 'metric', desc: ''}]);
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc=\\\\"'), [{name: 'metric', desc: ''}]);
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc=\\"\\'), [{name: 'metric', desc: ''}]);
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc=\\""'), [{name: 'metric', desc: ''}]);
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc="\\\\'), [{name: 'metric', desc: ''}]);
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc="\\"'), [{name: 'metric', desc: ''}]);
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc=""\\'), [{name: 'metric', desc: ''}]);
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc="""'), [{name: 'metric', desc: ''}]);
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc=\\\\\\\\'), [{name: 'metric', desc: ''}]);
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc=\\\\\\"'), [{name: 'metric', desc: ''}]);
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc=\\\\"\\'), [{name: 'metric', desc: ''}]);
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc=\\\\""'), [{name: 'metric', desc: ''}]);
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc=\\"\\\\'), [{name: 'metric', desc: ''}]);
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc=\\"\\"'), [{name: 'metric', desc: ''}]);
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc=\\""\\'), [{name: 'metric', desc: ''}]);
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc=\\"""'), [{name: 'metric', desc: ''}]);
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc="\\\\\\'), [{name: 'metric', desc: ''}]);
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc="\\\\"'), [{name: 'metric', desc: '\\'}]);
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc="\\"\\'), [{name: 'metric', desc: ''}]);
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc="\\""'), [{name: 'metric', desc: '"'}]);
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc=""\\\\'), [{name: 'metric', desc: ''}]);
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc=""\\"'), [{name: 'metric', desc: ''}]);
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc="""\\'), [{name: 'metric', desc: ''}]);
+    assert.deepEqual(
+        SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;desc=""""'), [{name: 'metric', desc: ''}]);
+  });
+
+  it('handles case-sensitivity correctly', () => {
+    assert.deepEqual(SDK.ServerTiming.ServerTiming.createFromHeaderValue('metric;DuR=123.4;DeSc=description'), [
+      {name: 'metric', dur: 123.4, desc: 'description'},
+    ]);
   });
 
   it('handles duplicate entry names correctly', () => {
@@ -146,7 +354,7 @@ describeWithLocale('SDK.ServerTiming.ServerTiming.createFromHeaderValue', () => 
     // TODO: These tests require mocking `Common.console.warn`.
     // For now, we override `SDK.ServerTiming.ServerTiming.showWarning` to throw an
     // exception instead of logging it.
-    Platform.ServerTiming.ServerTiming.showWarning = message => {
+    SDK.ServerTiming.ServerTiming.showWarning = message => {
       throw new Error(message);
     };
 

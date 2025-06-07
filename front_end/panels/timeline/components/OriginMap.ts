@@ -1,6 +1,8 @@
 // Copyright 2024 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import '../../../ui/components/icon_button/icon_button.js';
 
@@ -9,11 +11,11 @@ import * as SDK from '../../../core/sdk/sdk.js';
 import * as CrUXManager from '../../../models/crux-manager/crux-manager.js';
 import * as RenderCoordinator from '../../../ui/components/render_coordinator/render_coordinator.js';
 import * as UI from '../../../ui/legacy/legacy.js';
-import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import * as Lit from '../../../ui/lit/lit.js';
 
 import originMapStyles from './originMap.css.js';
 
-const {html} = LitHtml;
+const {html} = Lit;
 
 const UIStrings = {
   /**
@@ -38,7 +40,7 @@ const UIStrings = {
    * @description Warning message explaining that a page doesn't have enough real user data to show any information for. "Chrome UX Report" is a product name and should not be translated.
    */
   pageHasNoData: 'The Chrome UX Report does not have sufficient real user data for this page.',
-};
+} as const;
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/OriginMap.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -66,7 +68,7 @@ export class OriginMap extends UI.Widget.WidgetElement<UI.Widget.Widget> impleme
   override createWidget(): UI.Widget.Widget {
     const containerWidget = new UI.Widget.Widget(false, false, this);
 
-    this.#list.registerCSSFiles([originMapStyles]);
+    this.#list.registerRequiredCSS(originMapStyles);
     this.#list.show(containerWidget.contentElement);
 
     return containerWidget;
@@ -106,10 +108,10 @@ export class OriginMap extends UI.Widget.WidgetElement<UI.Widget.Widget> impleme
     }
   }
 
-  #renderOriginWarning(url: string): Promise<LitHtml.LitTemplate> {
+  #renderOriginWarning(url: string): Promise<Lit.LitTemplate> {
     return RenderCoordinator.write(async () => {
       if (!CrUXManager.CrUXManager.instance().isEnabled()) {
-        return LitHtml.nothing;
+        return Lit.nothing;
       }
 
       const cruxManager = CrUXManager.CrUXManager.instance();
@@ -122,7 +124,7 @@ export class OriginMap extends UI.Widget.WidgetElement<UI.Widget.Widget> impleme
         return Boolean(value);
       });
       if (hasFieldData) {
-        return LitHtml.nothing;
+        return Lit.nothing;
       }
 
       return html`
@@ -156,14 +158,14 @@ export class OriginMap extends UI.Widget.WidgetElement<UI.Widget.Widget> impleme
     if (originMapping.isTitleRow) {
       element.classList.add('header');
       cellRole = 'columnheader';
-      warningIcon = LitHtml.nothing;
+      warningIcon = Lit.nothing;
     } else {
       cellRole = 'cell';
-      warningIcon = LitHtml.Directives.until(this.#renderOriginWarning(originMapping.productionOrigin));
+      warningIcon = Lit.Directives.until(this.#renderOriginWarning(originMapping.productionOrigin));
     }
 
     // clang-format off
-    LitHtml.render(html`
+    Lit.render(html`
       <div class="origin-mapping-cell development-origin" role=${cellRole}>
         <div class="origin" title=${originMapping.developmentOrigin}>${originMapping.developmentOrigin}</div>
       </div>
@@ -253,7 +255,7 @@ export class OriginMap extends UI.Widget.WidgetElement<UI.Widget.Widget> impleme
         PROD_ORIGIN_CONTROL, 'text', i18nString(UIStrings.productionOrigin), this.#productionValidator.bind(this));
 
     // clang-format off
-    LitHtml.render(html`
+    Lit.render(html`
       <label class="development-origin-input">
         ${i18nString(UIStrings.developmentOrigin)}
         ${devInput}

@@ -1,6 +1,7 @@
 // Copyright (c) 2020 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view, rulesdir/inject-checkbox-styles */
 
 import '../../../ui/components/node_text/node_text.js';
 
@@ -12,10 +13,8 @@ import * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as Input from '../../../ui/components/input/input.js';
 import * as LegacyWrapper from '../../../ui/components/legacy_wrapper/legacy_wrapper.js';
 import * as RenderCoordinator from '../../../ui/components/render_coordinator/render_coordinator.js';
-// eslint-disable-next-line rulesdir/es-modules-import
-import inspectorCommonStyles from '../../../ui/legacy/inspectorCommon.css.js';
 import * as UI from '../../../ui/legacy/legacy.js';
-import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import * as Lit from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import layoutPaneStyles from './layoutPane.css.js';
@@ -62,12 +61,12 @@ const UIStrings = {
    *@description Screen reader announcement when opening color picker tool.
    */
   colorPickerOpened: 'Color picker opened.',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/elements/components/LayoutPane.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export {LayoutElement};
 
-const {render, html} = LitHtml;
+const {render, html} = Lit;
 
 const nodeToLayoutElement = (node: SDK.DOMModel.DOMNode): LayoutElement => {
   const className = node.getAttribute('class');
@@ -77,7 +76,7 @@ const nodeToLayoutElement = (node: SDK.DOMModel.DOMNode): LayoutElement => {
     color: 'var(--sys-color-inverse-surface)',
     name: node.localName(),
     domId: node.getAttribute('id'),
-    domClasses: className ? className.split(/\s+/).filter(s => Boolean(s)) : undefined,
+    domClasses: className ? className.split(/\s+/).filter(s => !!s) : undefined,
     enabled: false,
     reveal: () => {
       void Common.Revealer.reveal(node);
@@ -168,7 +167,7 @@ let layoutPaneWrapperInstance: LegacyWrapper.LegacyWrapper.LegacyWrapper<UI.Widg
 
 export class LayoutPane extends LegacyWrapper.LegacyWrapper.WrappableComponent {
   readonly #shadow = this.attachShadow({mode: 'open'});
-  #settings: Readonly<Setting[]> = [];
+  #settings: readonly Setting[] = [];
   readonly #uaShadowDOMSetting: Common.Settings.Setting<boolean>;
   #domModels: SDK.DOMModel.DOMModel[];
 
@@ -177,11 +176,6 @@ export class LayoutPane extends LegacyWrapper.LegacyWrapper.WrappableComponent {
     this.#settings = this.#makeSettings();
     this.#uaShadowDOMSetting = Common.Settings.Settings.instance().moduleSetting('show-ua-shadow-dom');
     this.#domModels = [];
-    this.#shadow.adoptedStyleSheets = [
-      Input.checkboxStyles,
-      layoutPaneStyles,
-      inspectorCommonStyles,
-    ];
   }
 
   static instance(): LayoutPane {
@@ -209,10 +203,10 @@ export class LayoutPane extends LegacyWrapper.LegacyWrapper.WrappableComponent {
     this.#domModels = this.#domModels.filter(model => model !== domModel);
   }
 
-  async #fetchNodesByStyle(style: {
+  async #fetchNodesByStyle(style: Array<{
     name: string,
     value: string,
-  }[]): Promise<SDK.DOMModel.DOMNode[]> {
+  }>): Promise<SDK.DOMModel.DOMNode[]> {
     const showUAShadowDOM = this.#uaShadowDOMSetting.get();
 
     const nodes = [];
@@ -338,6 +332,9 @@ export class LayoutPane extends LegacyWrapper.LegacyWrapper.WrappableComponent {
       // Disabled until https://crbug.com/1079231 is fixed.
       // clang-format off
       render(html`
+        <style>${Input.checkboxStyles}</style>
+        <style>${layoutPaneStyles}</style>
+        <style>${UI.inspectorCommonStyles}</style>
         <details open>
           <summary class="header" @keydown=${this.#onSummaryKeyDown} jslog=${VisualLogging.sectionHeader('grid-settings').track({click: true})}>
             ${i18nString(UIStrings.grid)}
@@ -432,7 +429,7 @@ export class LayoutPane extends LegacyWrapper.LegacyWrapper.WrappableComponent {
     element.hideHighlight();
   }
 
-  #renderElement(element: LayoutElement): LitHtml.TemplateResult {
+  #renderElement(element: LayoutElement): Lit.TemplateResult {
     const onElementToggle = this.#onElementToggle.bind(this, element);
     const onElementClick = this.#onElementClick.bind(this, element);
     const onColorChange = this.#onColorChange.bind(this, element);
@@ -480,10 +477,10 @@ export class LayoutPane extends LegacyWrapper.LegacyWrapper.WrappableComponent {
                                            .variant=${Buttons.Button.Variant.ICON}
                                            @click=${onElementClick}></devtools-button>
     </div>`;
-            // clang-format on
+          // clang-format on
   }
 
-  #renderBooleanSetting(setting: BooleanSetting): LitHtml.TemplateResult {
+  #renderBooleanSetting(setting: BooleanSetting): Lit.TemplateResult {
     const onBooleanSettingChange = this.#onBooleanSettingChange.bind(this, setting);
     return html`<label data-boolean-setting="true" class="checkbox-label" title=${setting.title} jslog=${
         VisualLogging.toggle().track({click: true}).context(setting.name)}>
@@ -492,7 +489,7 @@ export class LayoutPane extends LegacyWrapper.LegacyWrapper.WrappableComponent {
     </label>`;
   }
 
-  #renderEnumSetting(setting: EnumSetting): LitHtml.TemplateResult {
+  #renderEnumSetting(setting: EnumSetting): Lit.TemplateResult {
     const onEnumSettingChange = this.#onEnumSettingChange.bind(this, setting);
     return html`<label data-enum-setting="true" class="select-label" title=${setting.title}>
       <select

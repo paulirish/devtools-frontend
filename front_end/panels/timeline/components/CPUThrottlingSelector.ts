@@ -1,6 +1,7 @@
 // Copyright 2024 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import '../../../ui/components/menus/menus.js';
 
@@ -10,13 +11,13 @@ import * as SDK from '../../../core/sdk/sdk.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import type * as Menus from '../../../ui/components/menus/menus.js';
-import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import * as Lit from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 import * as MobileThrottling from '../../mobile_throttling/mobile_throttling.js';
 
 import cpuThrottlingSelectorStyles from './cpuThrottlingSelector.css.js';
 
-const {html} = LitHtml;
+const {html} = Lit;
 
 const UIStrings = {
   /**
@@ -50,7 +51,7 @@ const UIStrings = {
    * @description Label shown above a list of CPU calibration preset options.
    */
   labelCalibratedPresets: 'Calibrated presets',
-};
+} as const;
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/CPUThrottlingSelector.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -85,7 +86,6 @@ export class CPUThrottlingSelector extends HTMLElement {
   }
 
   connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [cpuThrottlingSelectorStyles];
     SDK.CPUThrottlingManager.CPUThrottlingManager.instance().addEventListener(
         SDK.CPUThrottlingManager.Events.RATE_CHANGED, this.#onOptionChange, this);
     this.#calibratedThrottlingSetting.addChangeListener(this.#onCalibratedSettingChanged, this);
@@ -163,7 +163,9 @@ export class CPUThrottlingSelector extends HTMLElement {
     const calibrationLabel = hasCalibratedOnce ? i18nString(UIStrings.recalibrate) : i18nString(UIStrings.calibrate);
 
     // clang-format off
+    /* eslint-disable rulesdir/no-deprecated-component-usages */
     const output = html`
+      <style>${cpuThrottlingSelectorStyles}</style>
       <devtools-select-menu
             @selectmenuselected=${this.#onMenuItemSelected}
             .showDivider=${true}
@@ -193,20 +195,21 @@ export class CPUThrottlingSelector extends HTMLElement {
                   `;
                 })}
                 ${group.name === 'Calibrated presets' ? html`<devtools-menu-item
-                  .value=${1 /* This won't be displayed unless it has some value. */}
+                  .value=${-1 /* This won't be displayed unless it has some value. */}
                   .title=${calibrationLabel}
                   jslog=${VisualLogging.action('cpu-throttling-selector-calibrate').track({click: true})}
                   @click=${this.#onCalibrateClick}
                 >
                   ${calibrationLabel}
-                </devtools-menu-item>` : LitHtml.nothing}
+                </devtools-menu-item>` : Lit.nothing}
               </devtools-menu-group>`;
           })}
       </devtools-select-menu>
       ${recommendedInfoEl}
     `;
+    /* eslint-enable rulesdir/no-deprecated-component-usages */
     // clang-format on
-    LitHtml.render(output, this.#shadow, {host: this});
+    Lit.render(output, this.#shadow, {host: this});
   };
 }
 

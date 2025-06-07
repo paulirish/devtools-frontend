@@ -5,7 +5,6 @@
 import {assert} from 'chai';
 
 import {click, goToResource, waitFor} from '../../shared/helper.js';
-
 import {createSelectorsForWorkerFile, expandFileTree, type NestedFileSelector} from '../helpers/sources-helpers.js';
 
 function createSelectorsForFile(fileName: string) {
@@ -15,15 +14,12 @@ function createSelectorsForFile(fileName: string) {
 async function openNestedWorkerFile(selectors: NestedFileSelector) {
   const workerFile = await expandFileTree(selectors);
 
-  return workerFile.evaluate(node => node.textContent);
+  return await workerFile.evaluate(node => node.textContent);
 }
 
 describe('The Sources Tab', function() {
   let worker1Selectors: NestedFileSelector;
   let worker2Selectors: NestedFileSelector;
-
-  // The tests in this suite are particularly slow, as they perform a lot of actions
-  this.timeout(10000);
 
   before(() => {
     worker1Selectors = createSelectorsForFile('worker1.js');

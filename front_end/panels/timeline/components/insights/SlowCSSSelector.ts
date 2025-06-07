@@ -12,49 +12,20 @@ import type * as Protocol from '../../../../generated/protocol.js';
 import type {SlowCSSSelectorInsightModel} from '../../../../models/trace/insights/SlowCSSSelector.js';
 import * as Trace from '../../../../models/trace/trace.js';
 import type * as Linkifier from '../../../../ui/components/linkifier/linkifier.js';
-import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
+import * as Lit from '../../../../ui/lit/lit.js';
 import type * as Overlays from '../../overlays/overlays.js';
 
 import {BaseInsightComponent} from './BaseInsightComponent.js';
 import type {TableData} from './Table.js';
 
-const {html} = LitHtml;
+const {UIStrings, i18nString} = Trace.Insights.Models.SlowCSSSelector;
 
-const UIStrings = {
-  /**
-   *@description Column name for count of elements that the engine attempted to match against a style rule
-   */
-  matchAttempts: 'Match attempts',
-  /**
-   *@description Column name for count of elements that matched a style rule
-   */
-  matchCount: 'Match count',
-  /**
-   *@description Column name for elapsed time spent computing a style rule
-   */
-  elapsed: 'Elapsed time',
-  /**
-   *@description Column name for the selectors that took the longest amount of time/effort.
-   */
-  topSelectors: 'Top selectors',
-  /**
-   *@description Column name for a total sum.
-   */
-  total: 'Total',
-  /**
-   * @description Text status indicating that no CSS selector data was found.
-   */
-  enableSelectorData:
-      'No CSS selector data was found. CSS selector stats need to be enabled in the performance panel settings.',
-};
-
-const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/insights/SlowCSSSelector.ts', UIStrings);
-const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+const {html} = Lit;
 
 export class SlowCSSSelector extends BaseInsightComponent<SlowCSSSelectorInsightModel> {
-  static override readonly litTagName = LitHtml.StaticHtml.literal`devtools-performance-slow-css-selector`;
-  override internalName: string = 'slow-css-selector';
-  #selectorLocations: Map<string, Protocol.CSS.SourceRange[]> = new Map();
+  static override readonly litTagName = Lit.StaticHtml.literal`devtools-performance-slow-css-selector`;
+  override internalName = 'slow-css-selector';
+  #selectorLocations = new Map<string, Protocol.CSS.SourceRange[]>();
 
   override createOverlays(): Overlays.Overlays.TimelineOverlay[] {
     return [];
@@ -85,7 +56,7 @@ export class SlowCSSSelector extends BaseInsightComponent<SlowCSSSelectorInsight
 
     const locations = ranges.map((range, itemIndex) => {
       return {
-        url: styleSheetHeader.resourceURL() as Platform.DevToolsPath.UrlString,
+        url: styleSheetHeader.resourceURL(),
         lineNumber: range.startLine,
         columnNumber: range.startColumn,
         linkText: `[${itemIndex + 1}]`,
@@ -97,38 +68,37 @@ export class SlowCSSSelector extends BaseInsightComponent<SlowCSSSelectorInsight
 
   private async getSelectorLinks(
       cssModel: SDK.CSSModel.CSSModel|null|undefined,
-      selector: Trace.Types.Events.SelectorTiming): Promise<LitHtml.LitTemplate> {
+      selector: Trace.Types.Events.SelectorTiming): Promise<Lit.LitTemplate> {
     if (!cssModel) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
 
     if (!selector.style_sheet_id) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
 
     const locations = await this.toSourceFileLocation(cssModel, selector);
     if (!locations) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
 
     const links = html`
     ${locations.map((location, itemIndex) => {
       const divider = itemIndex !== locations.length - 1 ? ', ' : '';
-      return html`<devtools-linkifier .data=${location as Linkifier.Linkifier.LinkifierData}></devtools-linkifier>${
-          divider}`;
+      return html`<devtools-linkifier .data=${location}></devtools-linkifier>${divider}`;
     })}`;
 
     return links;
   }
 
-  override renderContent(): LitHtml.LitTemplate {
+  override renderContent(): Lit.LitTemplate {
     if (!this.model) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
 
     const target = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
     const cssModel = target?.model(SDK.CSSModel.CSSModel);
-    const time = (us: Trace.Types.Timing.MicroSeconds): string =>
+    const time = (us: Trace.Types.Timing.Micro): string =>
         i18n.TimeUtilities.millisToString(Platform.Timing.microSecondsToMilliSeconds(us));
 
     if (!this.model.topMatchAttempts.length && !this.model.topElapsedMs.length) {
@@ -164,8 +134,8 @@ export class SlowCSSSelector extends BaseInsightComponent<SlowCSSSelectorInsight
               rows: this.model.topElapsedMs.map(selector => {
                 return {
                   values: [
-                  html`${selector.selector} ${LitHtml.Directives.until(this.getSelectorLinks(cssModel, selector))}`,
-                  time(Trace.Types.Timing.MicroSeconds(selector['elapsed (us)']))],
+                  html`${selector.selector} ${Lit.Directives.until(this.getSelectorLinks(cssModel, selector))}`,
+                  time(Trace.Types.Timing.Micro(selector['elapsed (us)']))],
                 };
               }),
             } as TableData}>
@@ -186,7 +156,7 @@ export class SlowCSSSelector extends BaseInsightComponent<SlowCSSSelectorInsight
               rows: this.model.topMatchAttempts.map(selector => {
                 return {
                   values: [
-                  html`${selector.selector} ${LitHtml.Directives.until(this.getSelectorLinks(cssModel, selector))}` as unknown as string,
+                  html`${selector.selector} ${Lit.Directives.until(this.getSelectorLinks(cssModel, selector))}` as unknown as string,
                   selector['match_attempts']],
                 };
               }),

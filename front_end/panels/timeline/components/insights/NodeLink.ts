@@ -1,6 +1,7 @@
 // Copyright 2024 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 // TODO: move to ui/components/node_link?
 
@@ -8,9 +9,9 @@ import * as Common from '../../../../core/common/common.js';
 import type * as Protocol from '../../../../generated/protocol.js';
 import * as Trace from '../../../../models/trace/trace.js';
 import * as ComponentHelpers from '../../../../ui/components/helpers/helpers.js';
-import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
+import * as Lit from '../../../../ui/lit/lit.js';
 
-const {html} = LitHtml;
+const {html} = Lit;
 
 export interface NodeLinkData {
   backendNodeId: Protocol.DOM.BackendNodeId;
@@ -30,7 +31,6 @@ export interface NodeLinkData {
 
 export class NodeLink extends HTMLElement {
   readonly #shadow = this.attachShadow({mode: 'open'});
-  readonly #boundRender = this.#render.bind(this);
   #backendNodeId?: Protocol.DOM.BackendNodeId;
   #frame?: string;
   #options?: Common.Linkifier.Options;
@@ -43,7 +43,7 @@ export class NodeLink extends HTMLElement {
     this.#options = data.options;
     this.#fallbackHtmlSnippet = data.fallbackHtmlSnippet;
     this.#fallbackText = data.fallbackText;
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
   async #linkify(): Promise<Node|undefined> {
@@ -67,7 +67,7 @@ export class NodeLink extends HTMLElement {
 
     // TODO: it'd be nice if we could specify what attributes to render,
     // ex for the Viewport insight: <meta content="..."> (instead of just <meta>)
-    return Common.Linkifier.Linkifier.linkify(node, this.#options);
+    return await Common.Linkifier.Linkifier.linkify(node, this.#options);
   }
 
   async #render(): Promise<void> {
@@ -82,10 +82,10 @@ export class NodeLink extends HTMLElement {
     } else if (this.#fallbackText) {
       template = html`<span>${this.#fallbackText}</span>`;
     } else {
-      template = LitHtml.nothing;
+      template = Lit.nothing;
     }
 
-    LitHtml.render(template, this.#shadow, {host: this});
+    Lit.render(template, this.#shadow, {host: this});
   }
 }
 

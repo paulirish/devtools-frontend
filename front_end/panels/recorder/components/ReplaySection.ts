@@ -1,11 +1,12 @@
 // Copyright 2023 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import * as Host from '../../../core/host/host.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
-import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import * as Lit from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 import type * as Extensions from '../extensions/extensions.js';
 import type * as Models from '../models/models.js';
@@ -19,7 +20,7 @@ import {
   Variant as SelectButtonVariant,
 } from './SelectButton.js';
 
-const {html} = LitHtml;
+const {html} = Lit;
 
 const UIStrings = {
   /**
@@ -66,7 +67,7 @@ const UIStrings = {
    * @description Label for a group of items in the replay menu that indicate various extensions that can be used for replay.
    */
   extensionGroup: 'Extensions',
-};
+} as const;
 
 const items: SelectButtonItem[] = [
   {
@@ -132,7 +133,6 @@ const REPLAY_EXTENSION_PREFIX = 'extension';
 
 export class ReplaySection extends HTMLElement {
   readonly #shadow = this.attachShadow({mode: 'open'});
-  readonly #boundRender = this.#render.bind(this);
   readonly #props: ReplaySectionProps = {disabled: false};
   #settings?: Models.RecorderSettings.RecorderSettings;
   #replayExtensions: Extensions.ExtensionManager.Extension[] = [];
@@ -150,14 +150,14 @@ export class ReplaySection extends HTMLElement {
     this.#props.disabled = disabled;
     void ComponentHelpers.ScheduledRender.scheduleRender(
         this,
-        this.#boundRender,
+        this.#render,
     );
   }
 
   connectedCallback(): void {
     void ComponentHelpers.ScheduledRender.scheduleRender(
         this,
-        this.#boundRender,
+        this.#render,
     );
   }
 
@@ -171,14 +171,14 @@ export class ReplaySection extends HTMLElement {
     Host.userMetrics.recordingReplaySpeed(replaySpeedToMetricSpeedMap[speed]);
     void ComponentHelpers.ScheduledRender.scheduleRender(
         this,
-        this.#boundRender,
+        this.#render,
     );
   }
 
   #handleSelectButtonClick(event: SelectButtonClickEvent): void {
     event.stopPropagation();
 
-    if (event.value && event.value.startsWith(REPLAY_EXTENSION_PREFIX)) {
+    if (event.value?.startsWith(REPLAY_EXTENSION_PREFIX)) {
       if (this.#settings) {
         this.#settings.replayExtension = event.value;
       }
@@ -193,7 +193,7 @@ export class ReplaySection extends HTMLElement {
       );
       void ComponentHelpers.ScheduledRender.scheduleRender(
           this,
-          this.#boundRender,
+          this.#render,
       );
       return;
     }
@@ -201,7 +201,7 @@ export class ReplaySection extends HTMLElement {
     this.dispatchEvent(new StartReplayEvent(this.#settings ? this.#settings.speed : PlayRecordingSpeed.NORMAL));
     void ComponentHelpers.ScheduledRender.scheduleRender(
         this,
-        this.#boundRender,
+        this.#render,
     );
   }
 
@@ -223,7 +223,7 @@ export class ReplaySection extends HTMLElement {
     }
 
     // clang-format off
-    LitHtml.render(
+    Lit.render(
       html`
     <devtools-select-button
       @selectmenuselected=${this.#handleSelectMenuSelected}
@@ -235,8 +235,8 @@ export class ReplaySection extends HTMLElement {
       .value=${this.#settings?.replayExtension || this.#settings?.speed || ''}
       .buttonLabel=${i18nString(UIStrings.Replay)}
       .groups=${groups}
-      jslog=${VisualLogging.action(Actions.RecorderActions.REPLAY_RECORDING).track({click: true})}>
-    </devtools-select-button>`,
+      jslog=${VisualLogging.action(Actions.RecorderActions.REPLAY_RECORDING).track({click: true})}
+    ></devtools-select-button>`,
       this.#shadow,
       { host: this },
     );

@@ -16,7 +16,6 @@ import {
   waitForFunction,
   waitForNone,
 } from '../../shared/helper.js';
-
 import {setIgnoreListPattern, toggleIgnoreListing} from '../helpers/settings-helpers.js';
 import {
   addBreakpointForLine,
@@ -36,10 +35,10 @@ import {
 describe('Ignore list', function() {
   it('can be toggled on and off in call stack', async function() {
     await setIgnoreListPattern('thirdparty');
-    const {target, frontend} = getBrowserAndPages();
+    const {target} = getBrowserAndPages();
 
     await openSourceCodeEditorForFile('multi-files-mycode.js', 'multi-files.html');
-    await addBreakpointForLine(frontend, 4);
+    await addBreakpointForLine(4);
 
     const scriptEvaluation = target.evaluate('f();');
     await waitFor(RESUME_BUTTON);
@@ -62,10 +61,10 @@ describe('Ignore list', function() {
 
   it('shows no toggle when everything is ignore-listed', async function() {
     await setIgnoreListPattern('multi|pptr');
-    const {target, frontend} = getBrowserAndPages();
+    const {target} = getBrowserAndPages();
 
     await openSourceCodeEditorForFile('multi-files-mycode.js', 'multi-files.html');
-    await addBreakpointForLine(frontend, 4);
+    await addBreakpointForLine(4);
 
     const scriptEvaluation = target.evaluate('f();');
     await waitFor(RESUME_BUTTON);
@@ -84,10 +83,10 @@ describe('Ignore list', function() {
   it('skips frames when stepping in and out', async function() {
     await setIgnoreListPattern('thirdparty');
     const {target, frontend} = getBrowserAndPages();
-    installEventListener(frontend, DEBUGGER_PAUSED_EVENT);
+    await installEventListener(frontend, DEBUGGER_PAUSED_EVENT);
 
     await openSourceCodeEditorForFile('multi-files-mycode.js', 'multi-files.html');
-    await addBreakpointForLine(frontend, 8);
+    await addBreakpointForLine(8);
 
     const scriptEvaluation = target.evaluate('f();');
     await waitFor(RESUME_BUTTON);
@@ -111,7 +110,7 @@ describe('Ignore list', function() {
   it('skips instrumentation breakpoints', async function() {
     await setIgnoreListPattern('thirdparty');
     const {target, frontend} = getBrowserAndPages();
-    installEventListener(frontend, DEBUGGER_PAUSED_EVENT);
+    await installEventListener(frontend, DEBUGGER_PAUSED_EVENT);
 
     await openSourceCodeEditorForFile('multi-files-mycode.js', 'multi-files.html');
     await setEventListenerBreakpoint('Timer', 'setTimeout');

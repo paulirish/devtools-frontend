@@ -1,6 +1,7 @@
 // Copyright 2014 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import type * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -16,7 +17,7 @@ const UIStrings = {
    *@description Text in Threads Sidebar Pane of the Sources panel
    */
   paused: 'paused',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/sources/ThreadsSidebarPane.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -29,6 +30,7 @@ export class ThreadsSidebarPane extends UI.Widget.VBox implements
 
   constructor() {
     super(true);
+    this.registerRequiredCSS(threadsSidebarPaneStyles);
 
     this.contentElement.setAttribute('jslog', `${VisualLogging.section('sources.threads')}`);
     this.items = new UI.ListModel.ListModel();
@@ -70,8 +72,7 @@ export class ThreadsSidebarPane extends UI.Widget.VBox implements
 
     function updateTitle(): void {
       const executionContext = debuggerModel.runtimeModel().defaultExecutionContext();
-      title.textContent =
-          executionContext && executionContext.label() ? executionContext.label() : debuggerModel.target().name();
+      title.textContent = executionContext?.label() ? executionContext.label() : debuggerModel.target().name();
     }
 
     function updatePausedState(): void {
@@ -152,9 +153,5 @@ export class ThreadsSidebarPane extends UI.Widget.VBox implements
     if (hadFocus) {
       this.focus();
     }
-  }
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([threadsSidebarPaneStyles]);
   }
 }

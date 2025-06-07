@@ -5,14 +5,12 @@
 import {assert} from 'chai';
 
 import {goToResource, step} from '../../shared/helper.js';
-
 import {
   expandSelectedNodeRecursively,
   getGridsInLayoutPane,
   openLayoutPane,
   toggleElementCheckboxInLayoutPane,
   waitForAdorners,
-  waitForContentOfSelectedElementsNode,
   waitForElementsStyleSection,
   waitForSomeGridsInLayoutPane,
 } from '../helpers/elements-helpers.js';
@@ -23,7 +21,6 @@ describe('Layout Pane in the Elements Tab', function() {
     await goToResource('elements/css-grid.html');
     await step('Prepare elements tab', async () => {
       await waitForElementsStyleSection();
-      await waitForContentOfSelectedElementsNode('<body>\u200B');
       await expandSelectedNodeRecursively();
     });
     await waitForAdorners([

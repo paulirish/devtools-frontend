@@ -1,6 +1,7 @@
 // Copyright 2020 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
@@ -18,12 +19,14 @@ import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {AffectedBlockedByResponseView} from './AffectedBlockedByResponseView.js';
 import {AffectedCookiesView, AffectedRawCookieLinesView} from './AffectedCookiesView.js';
+import {AffectedDescendantsWithinSelectElementView} from './AffectedDescendantsWithinSelectElementView.js';
 import {AffectedDirectivesView} from './AffectedDirectivesView.js';
 import {AffectedDocumentsInQuirksModeView} from './AffectedDocumentsInQuirksModeView.js';
 import {AffectedElementsView} from './AffectedElementsView.js';
 import {AffectedElementsWithLowContrastView} from './AffectedElementsWithLowContrastView.js';
 import {AffectedHeavyAdView} from './AffectedHeavyAdView.js';
 import {AffectedMetadataAllowedSitesView} from './AffectedMetadataAllowedSitesView.js';
+import {AffectedPartitioningBlobURLView} from './AffectedPartitioningBlobURLView.js';
 import {AffectedItem, AffectedResourcesView, extractShortPath} from './AffectedResourcesView.js';
 import {AffectedSharedArrayBufferIssueDetailsView} from './AffectedSharedArrayBufferIssueDetailsView.js';
 import {AffectedSourcesView} from './AffectedSourcesView.js';
@@ -82,7 +85,7 @@ const UIStrings = {
    *@description Menu entry for unhiding a particular issue, in the Hide Issues context menu.
    */
   unhideIssuesLikeThis: 'Unhide issues like this',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/issues/IssueView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -223,7 +226,7 @@ export class IssueView extends UI.TreeOutline.TreeElement {
   #throttle: Common.Throttler.Throttler;
   #needsUpdateOnExpand = true;
   #hiddenIssuesMenu?: Components.HideIssuesMenu.HideIssuesMenu;
-  #contentCreated: boolean = false;
+  #contentCreated = false;
 
   constructor(issue: AggregatedIssue, description: IssuesManager.MarkdownIssueDescription.IssueDescription) {
     super();
@@ -255,6 +258,8 @@ export class IssueView extends UI.TreeOutline.TreeElement {
       new AffectedRawCookieLinesView(this, this.#issue, 'affected-raw-cookies'),
       new AffectedTrackingSitesView(this, this.#issue, 'tracking-sites-details'),
       new AffectedMetadataAllowedSitesView(this, this.#issue, 'metadata-allowed-sites-details'),
+      new AffectedDescendantsWithinSelectElementView(this, this.#issue, 'disallowed-select-descendants-details'),
+      new AffectedPartitioningBlobURLView(this, this.#issue, 'partitioning-blob-url-details'),
     ];
     this.#hiddenIssuesMenu = new Components.HideIssuesMenu.HideIssuesMenu();
     this.#aggregatedIssuesCount = null;
@@ -359,8 +364,8 @@ export class IssueView extends UI.TreeOutline.TreeElement {
 
     // Handle sub type for cookie issues.
     if (category === IssuesManager.Issue.IssueCategory.COOKIE) {
-      const cookieIssueSubCatagory = IssuesManager.CookieIssue.CookieIssue.getSubCategory(this.#issue.code());
-      Host.userMetrics.issuesPanelIssueExpanded(cookieIssueSubCatagory);
+      const cookieIssueSubCategory = IssuesManager.CookieIssue.CookieIssue.getSubCategory(this.#issue.code());
+      Host.userMetrics.issuesPanelIssueExpanded(cookieIssueSubCategory);
     } else {
       Host.userMetrics.issuesPanelIssueExpanded(category);
     }

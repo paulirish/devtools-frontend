@@ -1,6 +1,7 @@
 // Copyright 2020 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 /*
  * Copyright (C) 2011 Brian Grinstead All rights reserved.
@@ -125,7 +126,7 @@ const UIStrings = {
    */
   pressArrowKeysMessage:
       'Press arrow keys with or without modifiers to move swatch position. Arrow key with Shift key moves position largely, with Ctrl key it is less and with Alt key it is even less',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/components/color_picker/Spectrum.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 const colorElementToMutable = new WeakMap<HTMLElement, boolean>();
@@ -228,7 +229,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
   private srgbOverlay: SrgbOverlay.SrgbOverlay.SrgbOverlay;
   private contrastOverlay: ContrastOverlay|undefined;
   private contrastDetails: ContrastDetails|undefined;
-  private readonly contrastDetailsBackgroundColorPickedToggledBound:
+  private readonly contrastDetailsBackgroundColorPickerToggledBound:
       ((event: Common.EventTarget.EventTargetEvent<boolean>) => void)|undefined;
   private readonly palettes: Map<string, Palette>;
   private readonly palettePanel: HTMLElement;
@@ -270,6 +271,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
   private colorStringInternal?: string;
   constructor(contrastInfo?: ContrastInfo|null) {
     super(true);
+    this.registerRequiredCSS(spectrumStyles);
 
     this.contentElement.tabIndex = 0;
     this.contentElement.setAttribute(
@@ -397,8 +399,8 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
           this.contrastInfo, this.contentElement, this.toggleColorPicker.bind(this),
           this.contrastPanelExpandedChanged.bind(this), this.colorSelected.bind(this));
 
-      this.contrastDetailsBackgroundColorPickedToggledBound =
-          this.contrastDetailsBackgroundColorPickedToggled.bind(this);
+      this.contrastDetailsBackgroundColorPickerToggledBound =
+          this.contrastDetailsBackgroundColorPickerToggled.bind(this);
     }
 
     this.element.classList.add('flex-none');
@@ -570,7 +572,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
     return true;
   }
 
-  private contrastDetailsBackgroundColorPickedToggled(event: {
+  private contrastDetailsBackgroundColorPickerToggled(event: {
     data: unknown,
   }): void {
     if (event.data) {
@@ -867,7 +869,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
         colors.push(color);
       }
     }
-    const palette = this.customPaletteSetting.get() as Palette;
+    const palette = this.customPaletteSetting.get();
     palette.colors = colors;
     this.customPaletteSetting.set(palette);
     this.showPalette(palette, false);
@@ -882,14 +884,14 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
         Palette = {title: 'Custom', colors: [], colorNames: [], mutable: true, matchUserFormat: undefined};
     this.customPaletteSetting =
         Common.Settings.Settings.instance().createSetting('custom-color-palette', defaultCustomPalette);
-    const customPalette = this.customPaletteSetting.get() as Palette;
+    const customPalette = this.customPaletteSetting.get();
     // Fallback case for custom palettes created pre-m67
     customPalette.colorNames = customPalette.colorNames || [];
     this.palettes.set(customPalette.title, customPalette);
 
     this.selectedColorPalette =
         Common.Settings.Settings.instance().createSetting('selected-color-palette', GeneratedPaletteTitle);
-    const palette = this.palettes.get(this.selectedColorPalette.get() as string);
+    const palette = this.palettes.get(this.selectedColorPalette.get());
     if (palette) {
       this.showPalette(palette, true);
     }
@@ -930,7 +932,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
   }
 
   private resizeForSelectedPalette(force?: boolean): void {
-    const palette = this.palettes.get(this.selectedColorPalette.get() as string);
+    const palette = this.palettes.get(this.selectedColorPalette.get());
     if (!palette) {
       return;
     }
@@ -1018,7 +1020,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
   }
 
   private addColorToCustomPalette(): void {
-    const palette = this.customPaletteSetting.get() as Palette;
+    const palette = this.customPaletteSetting.get();
     palette.colors.push(this.colorString());
     this.customPaletteSetting.set(palette);
     this.showPalette(palette, false);
@@ -1046,7 +1048,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
   }
 
   private deletePaletteColors(colorIndex: number, toRight: boolean): void {
-    const palette = this.customPaletteSetting.get() as Palette;
+    const palette = this.customPaletteSetting.get();
     if (toRight) {
       palette.colors.splice(colorIndex + 1, palette.colors.length - colorIndex - 1);
     } else {
@@ -1240,7 +1242,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
   }
 
   private showSrgbOverlay(): void {
-    if ((this.contrastDetails && this.contrastDetails.expanded()) || this.gamut !== SpectrumGamut.DISPLAY_P3) {
+    if ((this.contrastDetails?.expanded()) || this.gamut !== SpectrumGamut.DISPLAY_P3) {
       return;
     }
 
@@ -1264,14 +1266,14 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
   }
 
   private updateUI(): void {
-    this.colorElement.style.backgroundColor = getColorFromHsva(this.gamut, [this.hsv[0], 1, 1, 1]).asString() as string;
+    this.colorElement.style.backgroundColor = getColorFromHsva(this.gamut, [this.hsv[0], 1, 1, 1]).asString();
     if (this.contrastOverlay) {
       this.contrastOverlay.setDimensions(this.dragWidth, this.dragHeight);
     }
     this.updateSrgbOverlay();
 
     this.swatch.setColor(this.color, this.colorString());
-    this.colorDragElement.style.backgroundColor = this.color.asString(Common.Color.Format.LCH) as string;
+    this.colorDragElement.style.backgroundColor = this.color.asString(Common.Color.Format.LCH);
     const noAlpha = Common.Color.Legacy.fromHSVA(this.hsv.slice(0, 3).concat(1) as Common.ColorUtils.Color4D);
     this.alphaElementBackground.style.backgroundImage = Platform.StringUtilities.sprintf(
         'linear-gradient(to right, rgba(0,0,0,0), %s)', noAlpha.asString(Common.Color.Format.LCH));
@@ -1339,7 +1341,6 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
   }
 
   override wasShown(): void {
-    this.registerCSSFiles([spectrumStyles]);
     this.hueAlphaWidth = this.hueElement.offsetWidth;
     this.slideHelperWidth = this.hueSlider.offsetWidth / 2;
     this.dragWidth = this.colorElement.offsetWidth;
@@ -1354,19 +1355,19 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
       this.colorPickerButton.setToggled(false);
     }
 
-    if (this.contrastDetails && this.contrastDetailsBackgroundColorPickedToggledBound) {
+    if (this.contrastDetails && this.contrastDetailsBackgroundColorPickerToggledBound) {
       this.contrastDetails.addEventListener(
           ContrastDetailsEvents.BACKGROUND_COLOR_PICKER_WILL_BE_TOGGLED,
-          this.contrastDetailsBackgroundColorPickedToggledBound);
+          this.contrastDetailsBackgroundColorPickerToggledBound);
     }
   }
 
   override willHide(): void {
     void this.toggleColorPicker(false);
-    if (this.contrastDetails && this.contrastDetailsBackgroundColorPickedToggledBound) {
+    if (this.contrastDetails && this.contrastDetailsBackgroundColorPickerToggledBound) {
       this.contrastDetails.removeEventListener(
           ContrastDetailsEvents.BACKGROUND_COLOR_PICKER_WILL_BE_TOGGLED,
-          this.contrastDetailsBackgroundColorPickedToggledBound);
+          this.contrastDetailsBackgroundColorPickerToggledBound);
     }
   }
 
@@ -1375,9 +1376,10 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
       enabled = this.colorPickerButton.isToggled();
     }
 
-    // This is to make sure that only one picker is open at a time
-    // Also have a look at this.contrastDetailsBackgroundColorPickedToggled
-    if (this.contrastDetails && enabled && this.contrastDetails.backgroundColorPickerEnabled()) {
+    // This is to make sure that only one picker is open at a time (enabled is true) and
+    // the background color picker gets dismissed whenever the popup is closed by an Esc (enabled is false).
+    // Also have a look at this.contrastDetailsBackgroundColorPickedToggled.
+    if (this.contrastDetails?.backgroundColorPickerEnabled()) {
       this.contrastDetails.toggleBackgroundColorPicker(false);
     }
 
@@ -1397,7 +1399,7 @@ export class Spectrum extends Common.ObjectWrapper.eventMixin<EventTypes, typeof
       // Wait for TypeScript to support the definition of EyeDropper API:
       // https://github.com/microsoft/TypeScript/issues/48638
       /* eslint-disable  @typescript-eslint/no-explicit-any */
-      const eyeDropper = new (<any>window).EyeDropper();
+      const eyeDropper = new (window as any).EyeDropper();
       this.eyeDropperAbortController = new AbortController();
 
       try {
@@ -1450,10 +1452,9 @@ const GeneratedPaletteTitle = 'Page colors';
 
 export class PaletteGenerator {
   private readonly callback: (arg0: Palette) => void;
-  private readonly frequencyMap: Map<string, number>;
+  private readonly frequencyMap = new Map<string, number>();
   constructor(callback: (arg0: Palette) => void) {
     this.callback = callback;
-    this.frequencyMap = new Map();
     const stylesheetPromises = [];
     for (const cssModel of SDK.TargetManager.TargetManager.instance().models(SDK.CSSModel.CSSModel)) {
       for (const stylesheet of cssModel.allStyleSheets()) {
@@ -1645,7 +1646,7 @@ export class Swatch {
 
   setColor(color: Common.Color.Color, colorString?: string): void {
     const lchColor = color.as(Common.Color.Format.LCH);
-    this.swatchInnerElement.style.backgroundColor = lchColor.asString() as string;
+    this.swatchInnerElement.style.backgroundColor = lchColor.asString();
     // Show border if the swatch is white.
     this.swatchInnerElement.classList.toggle('swatch-inner-white', lchColor.l > 90);
     this.colorString = colorString || null;

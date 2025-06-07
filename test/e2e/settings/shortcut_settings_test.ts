@@ -5,13 +5,13 @@
 import {assert} from 'chai';
 
 import {
+  drainFrontendTaskQueue,
   getBrowserAndPages,
   timeout,
   waitFor,
   waitForFunction,
   waitForNoElementsWithTextContent,
 } from '../../shared/helper.js';
-
 import {getSelectedItemText, QUICK_OPEN_SELECTOR} from '../helpers/quick_open-helpers.js';
 import {openSettingsTab} from '../helpers/settings-helpers.js';
 import {
@@ -74,6 +74,7 @@ describe('Shortcuts Settings tab', () => {
 
     // make sure the command menu reflects the new shortcuts
     await frontend.keyboard.type('Show Shortcuts');
+    await drainFrontendTaskQueue();
     const shortcutsItemText = await getSelectedItemText();
 
     assert.strictEqual(shortcutsItemText, VS_CODE_SHORTCUTS_QUICK_OPEN_TEXT);
@@ -247,30 +248,26 @@ describe('Shortcuts Settings tab', () => {
     assert.deepEqual(shortcutInputsText, CONTROL_ALT_C_SHORTCUT_INPUT_TEXT);
   });
 
-  describe('[slow test]', function() {
-    this.timeout(10000);
+  it('should allow users to set a new shortcut after the chord timeout', async function() {
+    const {frontend} = getBrowserAndPages();
 
-    it('should allow users to set a new shortcut after the chord timeout', async function() {
-      const {frontend} = getBrowserAndPages();
+    await openSettingsTab('Shortcuts');
+    await editShortcutListItem('Toggle Console');
 
-      await openSettingsTab('Shortcuts');
-      await editShortcutListItem('Toggle Console');
+    await frontend.keyboard.down('Control');
+    await frontend.keyboard.press('1');
+    await frontend.keyboard.up('Control');
+    await timeout(SHORTCUT_CHORD_TIMEOUT * 1.2);
+    await frontend.keyboard.down('Control');
+    await frontend.keyboard.press('2');
+    await frontend.keyboard.up('Control');
 
-      await frontend.keyboard.down('Control');
-      await frontend.keyboard.press('1');
-      await frontend.keyboard.up('Control');
-      await timeout(SHORTCUT_CHORD_TIMEOUT * 1.2);
-      await frontend.keyboard.down('Control');
-      await frontend.keyboard.press('2');
-      await frontend.keyboard.up('Control');
+    const shortcutInputsText = await shortcutInputValues();
+    assert.deepEqual(shortcutInputsText, CONTROL_2_SHORTCUT_INPUT_TEXT);
+    await clickShortcutConfirmButton();
+    await waitForNoElementsWithTextContent(ADD_SHORTCUT_LINK_TEXT);
 
-      const shortcutInputsText = await shortcutInputValues();
-      assert.deepEqual(shortcutInputsText, CONTROL_2_SHORTCUT_INPUT_TEXT);
-      await clickShortcutConfirmButton();
-      await waitForNoElementsWithTextContent(ADD_SHORTCUT_LINK_TEXT);
-
-      const shortcuts = await shortcutsForAction('Toggle Console');
-      assert.deepEqual(shortcuts, CONTROL_2_SHORTCUT_DISPLAY_TEXT);
-    });
+    const shortcuts = await shortcutsForAction('Toggle Console');
+    assert.deepEqual(shortcuts, CONTROL_2_SHORTCUT_DISPLAY_TEXT);
   });
 });

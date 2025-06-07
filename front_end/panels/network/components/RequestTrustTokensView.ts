@@ -1,6 +1,7 @@
 // Copyright 2020 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import '../../../ui/components/report_view/report_view.js';
 import '../../../ui/components/icon_button/icon_button.js';
@@ -10,12 +11,12 @@ import * as SDK from '../../../core/sdk/sdk.js';
 import * as Protocol from '../../../generated/protocol.js';
 import type * as IconButton from '../../../ui/components/icon_button/icon_button.js';
 import * as LegacyWrapper from '../../../ui/components/legacy_wrapper/legacy_wrapper.js';
-import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import * as Lit from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import requestTrustTokensViewStyles from './RequestTrustTokensView.css.js';
 
-const {html} = LitHtml;
+const {html} = Lit;
 
 const UIStrings = {
   /**
@@ -97,7 +98,7 @@ const UIStrings = {
    *@description Text for an error status in the Network panel
    */
   perSiteLimit: 'Per-site issuer limit reached.',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/network/components/RequestTrustTokensView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -119,10 +120,6 @@ export class RequestTrustTokensView extends LegacyWrapper.LegacyWrapper.Wrappabl
     this.#request.removeEventListener(SDK.NetworkRequest.Events.TRUST_TOKEN_RESULT_ADDED, this.render, this);
   }
 
-  connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [requestTrustTokensViewStyles];
-  }
-
   override async render(): Promise<void> {
     if (!this.#request) {
       throw new Error('Trying to render a Trust Token report without providing data');
@@ -130,7 +127,9 @@ export class RequestTrustTokensView extends LegacyWrapper.LegacyWrapper.Wrappabl
 
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
-    LitHtml.render(html`<devtools-report>
+    Lit.render(html`
+      <style>${requestTrustTokensViewStyles}</style>
+      <devtools-report>
         ${this.#renderParameterSection()}
         ${this.#renderResultSection()}
       </devtools-report>
@@ -138,10 +137,10 @@ export class RequestTrustTokensView extends LegacyWrapper.LegacyWrapper.Wrappabl
     // clang-format on
   }
 
-  #renderParameterSection(): LitHtml.LitTemplate {
+  #renderParameterSection(): Lit.LitTemplate {
     const trustTokenParams = this.#request.trustTokenParams();
     if (!trustTokenParams) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
 
     return html`
@@ -156,16 +155,16 @@ export class RequestTrustTokensView extends LegacyWrapper.LegacyWrapper.Wrappabl
     `;
   }
 
-  #renderRefreshPolicy(params: Protocol.Network.TrustTokenParams): LitHtml.LitTemplate {
+  #renderRefreshPolicy(params: Protocol.Network.TrustTokenParams): Lit.LitTemplate {
     if (params.operation !== Protocol.Network.TrustTokenOperationType.Redemption) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
     return renderRowWithCodeValue(i18nString(UIStrings.refreshPolicy), params.refreshPolicy.toString());
   }
 
-  #renderIssuers(params: Protocol.Network.TrustTokenParams): LitHtml.LitTemplate {
+  #renderIssuers(params: Protocol.Network.TrustTokenParams): Lit.LitTemplate {
     if (!params.issuers || params.issuers.length === 0) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
 
     return html`
@@ -181,10 +180,10 @@ export class RequestTrustTokensView extends LegacyWrapper.LegacyWrapper.Wrappabl
   // The issuer and top level origin are technically parameters but reported in the
   // result structure due to the timing when they are calculated in the backend.
   // Nonetheless, we show them as part of the parameter section.
-  #renderIssuerAndTopLevelOriginFromResult(): LitHtml.LitTemplate {
+  #renderIssuerAndTopLevelOriginFromResult(): Lit.LitTemplate {
     const trustTokenResult = this.#request.trustTokenOperationDoneEvent();
     if (!trustTokenResult) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
 
     return html`
@@ -192,10 +191,10 @@ export class RequestTrustTokensView extends LegacyWrapper.LegacyWrapper.Wrappabl
       ${renderSimpleRowIfValuePresent(i18nString(UIStrings.issuer), trustTokenResult.issuerOrigin)}`;
   }
 
-  #renderResultSection(): LitHtml.LitTemplate {
+  #renderResultSection(): Lit.LitTemplate {
     const trustTokenResult = this.#request.trustTokenOperationDoneEvent();
     if (!trustTokenResult) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
     return html`
       <devtools-report-section-header>${i18nString(UIStrings.result)}</devtools-report-section-header>
@@ -214,9 +213,9 @@ export class RequestTrustTokensView extends LegacyWrapper.LegacyWrapper.Wrappabl
       `;
   }
 
-  #renderIssuedTokenCount(result: Protocol.Network.TrustTokenOperationDoneEvent): LitHtml.LitTemplate {
+  #renderIssuedTokenCount(result: Protocol.Network.TrustTokenOperationDoneEvent): Lit.LitTemplate {
     if (result.type !== Protocol.Network.TrustTokenOperationType.Issuance) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
     return renderSimpleRowIfValuePresent(i18nString(UIStrings.numberOfIssuedTokens), result.issuedTokenCount);
   }
@@ -278,9 +277,9 @@ function getDetailedTextForStatusCode(status: Protocol.Network.TrustTokenOperati
   }
 }
 
-function renderSimpleRowIfValuePresent<T>(key: string, value: T|undefined): LitHtml.LitTemplate {
+function renderSimpleRowIfValuePresent<T>(key: string, value: T|undefined): Lit.LitTemplate {
   if (value === undefined) {
-    return LitHtml.nothing;
+    return Lit.nothing;
   }
 
   return html`
@@ -289,7 +288,7 @@ function renderSimpleRowIfValuePresent<T>(key: string, value: T|undefined): LitH
   `;
 }
 
-function renderRowWithCodeValue(key: string, value: string): LitHtml.TemplateResult {
+function renderRowWithCodeValue(key: string, value: string): Lit.TemplateResult {
   return html`
     <devtools-report-key>${key}</devtools-report-key>
     <devtools-report-value class="code">${value}</devtools-report-value>

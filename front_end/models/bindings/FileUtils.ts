@@ -55,7 +55,7 @@ export class ChunkedFileReader implements ChunkedReader {
   #file: File|null;
   readonly #fileSizeInternal: number;
   #loadedSizeInternal: number;
-  #streamReader: ReadableStreamDefaultReader<Uint8Array>|null;
+  #streamReader: ReadableStreamDefaultReader<Uint8Array<ArrayBuffer>>|null;
   readonly #chunkSize: number;
   readonly #chunkTransferredCallback: ((arg0: ChunkedReader) => void)|undefined;
   readonly #decoder: TextDecoder;
@@ -98,7 +98,7 @@ export class ChunkedFileReader implements ChunkedReader {
     this.#output = output;
     void this.loadChunk();
 
-    return new Promise(resolve => {
+    return await new Promise(resolve => {
       this.#transferFinished = resolve;
     });
   }
@@ -192,7 +192,7 @@ export class ChunkedFileReader implements ChunkedReader {
       if (done || !value) {
         // Write empty string to inform of file end
         await this.#output.write('', true);
-        return this.finishRead();
+        return await this.finishRead();
       }
       void this.decodeChunkBuffer(value.buffer, false);
     }
@@ -212,7 +212,7 @@ export class ChunkedFileReader implements ChunkedReader {
 }
 
 export class FileOutputStream implements Common.StringOutputStream.OutputStream {
-  #writeCallbacks: (() => void)[];
+  #writeCallbacks: Array<() => void>;
   #fileName!: Platform.DevToolsPath.RawPathString|Platform.DevToolsPath.UrlString;
   #closed?: boolean;
   constructor() {

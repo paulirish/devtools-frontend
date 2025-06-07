@@ -6,7 +6,7 @@ import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 import * as AutofillManager from '../../models/autofill_manager/autofill_manager.js';
-import {assertGridContents, getBodyRowByAriaIndex, getDataGrid} from '../../testing/DataGridHelpers.js';
+import {assertGridContents} from '../../testing/DataGridHelpers.js';
 import {renderElementIntoDOM} from '../../testing/DOMHelpers.js';
 import {createTarget, stubNoopSettings} from '../../testing/EnvironmentHelpers.js';
 import {describeWithMockConnection} from '../../testing/MockConnection.js';
@@ -99,7 +99,6 @@ describeWithMockConnection('AutofillView', () => {
     const maybeAutofillModel = target.model(SDK.AutofillModel.AutofillModel);
     assert.exists(maybeAutofillModel);
     autofillModel = maybeAutofillModel;
-    Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.AUTOFILL_VIEW);
     showViewStub = sinon.stub(UI.ViewManager.ViewManager.instance(), 'showView').resolves();
     AutofillManager.AutofillManager.AutofillManager.instance({forceNew: true});
   });
@@ -110,9 +109,12 @@ describeWithMockConnection('AutofillView', () => {
 
   const renderAutofillView = async () => {
     const view = new Autofill.AutofillView.AutofillView();
+    view.style.display = 'block';
+    view.style.width = '640px';
+    view.style.height = '480px';
     renderElementIntoDOM(view);
     await view.render();
-    await RenderCoordinator.done();
+    await RenderCoordinator.done({waitForWork: true});
     return view;
   };
 
@@ -121,20 +123,24 @@ describeWithMockConnection('AutofillView', () => {
     const addressText = [...addressSpans].map(div => div.textContent);
     assert.deepEqual(
         addressText, ['Crocodile', ' Middle ', 'Dundee', 'Uluru ToursOutback Road 1Bundaberg Queensland ', '12345']);
-    const expectedHeaders = ['Form field', 'Predicted autofill value', 'Value', 'filledFieldIndex'];
+    const expectedHeaders = ['Form field', 'Predicted autofill value', 'Value'];
     const expectedRows = [
-      ['#input1 (text)', 'First name \nheur', '"Crocodile"', ''],
-      ['input2 (text)', 'Last name \nheur', '"Dundee"', ''],
-      ['#input3 (text)', 'Country \nheur', '"Australia"', ''],
-      ['#input4 (text)', 'Zip code \nattr', '"12345"', ''],
+      ['#input1 (text)', 'First name\nheur', '"Crocodile"'],
+      ['input2 (text)', 'Last name\nheur', '"Dundee"'],
+      ['#input3 (text)', 'Country\nheur', '"Australia"'],
+      ['#input4 (text)', 'Zip code\nattr', '"12345"'],
     ];
     assertGridContents(view, expectedHeaders, expectedRows);
   };
 
   it('renders autofilled address and filled fields and clears content on navigation', async () => {
+    const expectedPlaceholderHeader = 'No autofill detected';
     const expectedPlaceholder = 'To start debugging autofill, use Chrome\'s autofill menu to fill an address form.';
     const view = await renderAutofillView();
-    let placeholderText = view.shadowRoot!.querySelector('.placeholder div')!.textContent!.trim();
+    let placeholderHeader = view.shadowRoot!.querySelector('.empty-state-header')!.textContent!.trim();
+    assert.strictEqual(placeholderHeader, expectedPlaceholderHeader);
+
+    let placeholderText = view.shadowRoot!.querySelector('.empty-state-description > span')!.textContent!.trim();
     assert.strictEqual(placeholderText, expectedPlaceholder);
 
     autofillModel.addressFormFilled(addressFormFilledEvent);
@@ -144,13 +150,16 @@ describeWithMockConnection('AutofillView', () => {
     navigate(getMainFrame(target));
 
     await RenderCoordinator.done();
-    placeholderText = view.shadowRoot!.querySelector('.placeholder div')!.textContent!.trim();
+    placeholderHeader = view.shadowRoot!.querySelector('.empty-state-header')!.textContent!.trim();
+    assert.strictEqual(placeholderHeader, expectedPlaceholderHeader);
+
+    placeholderText = view.shadowRoot!.querySelector('.empty-state-description > span')!.textContent!.trim();
     assert.strictEqual(placeholderText, expectedPlaceholder);
   });
 
   it('shows content if the view is created after the event was received', async () => {
     autofillModel.addressFormFilled(addressFormFilledEvent);
-    assert.isTrue(showViewStub.calledOnceWithExactly('autofill-view'));
+    sinon.assert.calledOnceWithExactly(showViewStub, 'autofill-view');
     const view = await renderAutofillView();
     assert.isNotNull(view.shadowRoot);
     assertViewShowsEventData(view);
@@ -161,11 +170,11 @@ describeWithMockConnection('AutofillView', () => {
     const view = await renderAutofillView();
 
     autofillModel.addressFormFilled(addressFormFilledEvent);
-    assert.isTrue(showViewStub.calledOnceWithExactly('autofill-view'));
+    sinon.assert.calledOnceWithExactly(showViewStub, 'autofill-view');
     showViewStub.reset();
 
     // The auto-opening checkbox is the second one.
-    const checkbox = view.shadowRoot!.querySelectorAll('input')[1];
+    const checkbox = view.shadowRoot!.querySelectorAll('devtools-checkbox')[1];
     assert.isNotNull(checkbox);
     assert.isTrue(checkbox.checked);
     checkbox.checked = false;
@@ -173,14 +182,14 @@ describeWithMockConnection('AutofillView', () => {
     checkbox.dispatchEvent(event);
 
     autofillModel.addressFormFilled(addressFormFilledEvent);
-    assert.isTrue(showViewStub.notCalled);
+    sinon.assert.notCalled(showViewStub);
 
     checkbox.checked = true;
     event = new Event('change');
     checkbox.dispatchEvent(event);
 
     autofillModel.addressFormFilled(addressFormFilledEvent);
-    assert.isTrue(showViewStub.calledOnceWithExactly('autofill-view'));
+    sinon.assert.calledOnceWithExactly(showViewStub, 'autofill-view');
     await RenderCoordinator.done();
   });
 
@@ -188,21 +197,21 @@ describeWithMockConnection('AutofillView', () => {
     const view = await renderAutofillView();
 
     autofillModel.addressFormFilled(addressFormFilledEvent);
-    assert.isTrue(showViewStub.calledOnceWithExactly('autofill-view'));
+    sinon.assert.calledOnceWithExactly(showViewStub, 'autofill-view');
     showViewStub.reset();
 
     // The show test addresses checkbox is the first one.
-    const checkbox = view.shadowRoot!.querySelectorAll('input')[0];
+    const checkbox = view.shadowRoot!.querySelectorAll('devtools-checkbox')[0];
     assert.isNotNull(checkbox);
     assert.isFalse(checkbox.checked);
 
     const setAddressSpy = sinon.spy(autofillModel!.agent, 'invoke_setAddresses');
-    assert.isTrue(setAddressSpy.notCalled);
+    sinon.assert.notCalled(setAddressSpy);
 
     checkbox.checked = true;
     const event = new Event('change');
     checkbox.dispatchEvent(event);
-    assert.isTrue(setAddressSpy.calledOnce);
+    sinon.assert.calledOnce(setAddressSpy);
 
     await RenderCoordinator.done();
   });
@@ -211,7 +220,7 @@ describeWithMockConnection('AutofillView', () => {
     const monospaceStyles = 'font-family:var(--monospace-font-family);font-size:var(--monospace-font-size);';
 
     autofillModel.addressFormFilled(addressFormFilledEvent);
-    assert.isTrue(showViewStub.calledOnceWithExactly('autofill-view'));
+    sinon.assert.calledOnceWithExactly(showViewStub, 'autofill-view');
     const view = await renderAutofillView();
     assertViewShowsEventData(view);
 
@@ -219,9 +228,9 @@ describeWithMockConnection('AutofillView', () => {
     const crocodileSpan = addressSpans[0];
     assert.strictEqual(crocodileSpan.textContent, 'Crocodile');
     assert.isFalse(crocodileSpan.classList.contains('highlighted'));
-    const grid = getDataGrid(view);
+    const grid = view.shadowRoot!.querySelector('devtools-data-grid')!;
     assert.isNotNull(grid.shadowRoot);
-    const firstGridRow = getBodyRowByAriaIndex(grid.shadowRoot, 1);
+    const firstGridRow = grid.shadowRoot.querySelector('tbody tr[jslog]')!;
     let styles = firstGridRow.getAttribute('style') || '';
     assert.strictEqual(styles.replace(/\s/g, ''), monospaceStyles);
 
@@ -251,7 +260,7 @@ describeWithMockConnection('AutofillView', () => {
     });
 
     autofillModel.addressFormFilled(addressFormFilledEvent);
-    assert.isTrue(showViewStub.calledOnceWithExactly('autofill-view'));
+    sinon.assert.calledOnceWithExactly(showViewStub, 'autofill-view');
     const view = await renderAutofillView();
     assertViewShowsEventData(view);
 
@@ -265,22 +274,22 @@ describeWithMockConnection('AutofillView', () => {
     const zipCodeSpan = addressSpans[4];
     assert.strictEqual(zipCodeSpan.textContent, '12345');
     assert.isFalse(zipCodeSpan.classList.contains('highlighted'));
-    const grid = getDataGrid(view);
+    const grid = view.shadowRoot!.querySelector('devtools-data-grid')!;
     assert.isNotNull(grid.shadowRoot);
-    const fourthGridRow = getBodyRowByAriaIndex(grid.shadowRoot, 4);
+    const fourthGridRow = grid.shadowRoot.querySelector('tbody tr[jslog]:nth-child(5)')!;
     fourthGridRow.dispatchEvent(new MouseEvent('mouseenter'));
     await RenderCoordinator.done({waitForWork: true});
     assert.isTrue(zipCodeSpan.classList.contains('highlighted'));
-    assert.isTrue(overlaySpy.calledOnce);
+    sinon.assert.calledOnce(overlaySpy);
     const deferredNode =
         (overlaySpy.getCall(0).args[0] as unknown as SDK.OverlayModel.HighlightDeferredNode).deferredNode;
     assert.strictEqual(deferredNode.backendNodeId(), 4);
-    assert.isTrue(hideOverlaySpy.notCalled);
+    sinon.assert.notCalled(hideOverlaySpy);
 
     fourthGridRow.dispatchEvent(new MouseEvent('mouseleave'));
     await RenderCoordinator.done({waitForWork: true});
     assert.isFalse(zipCodeSpan.classList.contains('highlighted'));
-    assert.isTrue(hideOverlaySpy.calledOnce);
+    sinon.assert.calledOnce(hideOverlaySpy);
     getFrameStub.restore();
   });
 });

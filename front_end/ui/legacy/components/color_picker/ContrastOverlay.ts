@@ -73,7 +73,7 @@ export class ContrastOverlay {
 
   private async drawContrastRatioLines(): Promise<void> {
     for (const [level, element] of this.contrastRatioLines) {
-      const path = this.contrastRatioLineBuilder.drawContrastRatioLine(this.width, this.height, level as string);
+      const path = this.contrastRatioLineBuilder.drawContrastRatioLine(this.width, this.height, level);
       if (path) {
         element.setAttribute('d', path);
       } else {
@@ -158,7 +158,7 @@ export class ContrastRatioLineBuilder {
       // gradient of the curve.
       candidateHSVA[V] = lastV + currentSlope * dS;
 
-      const v = Common.Color.approachColorValue(candidateHSVA, bgRGBA, V, desiredLuminance, candidateLuminance);
+      const v = Common.Color.approachColorValue(candidateHSVA, V, desiredLuminance, candidateLuminance);
       if (v === null) {
         break;
       }
@@ -177,7 +177,7 @@ export class ContrastRatioLineBuilder {
     if (s < 1 + dS) {
       s -= dS;
       candidateHSVA[V] = 1;
-      s = Common.Color.approachColorValue(candidateHSVA, bgRGBA, S, desiredLuminance, candidateLuminance);
+      s = Common.Color.approachColorValue(candidateHSVA, S, desiredLuminance, candidateLuminance);
       if (s !== null) {
         pathBuilder = pathBuilder.concat(['L', (s * width).toFixed(2), '-0.1']);
       }

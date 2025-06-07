@@ -6,6 +6,7 @@ import * as i18n from '../../core/i18n/i18n.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
+import {html, render} from '../../ui/lit/lit.js';
 
 import nodeStackTraceWidgetStyles from './nodeStackTraceWidget.css.js';
 
@@ -14,29 +15,39 @@ const UIStrings = {
    *@description Message displayed when no JavaScript stack trace is available for the DOM node in the Stack Trace widget of the Elements panel
    */
   noStackTraceAvailable: 'No stack trace available',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/elements/NodeStackTraceWidget.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
+interface ViewInput {
+  stackTracePreview: HTMLElement|null;
+}
+
+type View = (input: ViewInput, output: object, target: HTMLElement) => void;
+
+export const DEFAULT_VIEW: View = (input, _output, target) => {
+  // clang-format off
+  render(html`
+    <style>${nodeStackTraceWidgetStyles}</style>
+    ${input.stackTracePreview ?
+         html`<div class="stack-trace">${input.stackTracePreview}</div>` :
+         html`<div class="gray-info-message">${i18nString(UIStrings.noStackTraceAvailable)}</div>`}`,
+    target, {host: input});
+  // clang-format on
+};
+
 export class NodeStackTraceWidget extends UI.ThrottledWidget.ThrottledWidget {
-  private readonly noStackTraceElement: HTMLElement;
-  private readonly creationStackTraceElement: HTMLElement;
-  private readonly linkifier: Components.Linkifier.Linkifier;
+  readonly #linkifier = new Components.Linkifier.Linkifier(MaxLengthForLinks);
+  readonly #view: View;
 
-  constructor() {
+  constructor(view = DEFAULT_VIEW) {
     super(true /* isWebComponent */);
-
-    this.noStackTraceElement = this.contentElement.createChild('div', 'gray-info-message');
-    this.noStackTraceElement.textContent = i18nString(UIStrings.noStackTraceAvailable);
-    this.creationStackTraceElement = this.contentElement.createChild('div', 'stack-trace');
-
-    this.linkifier = new Components.Linkifier.Linkifier(MaxLengthForLinks);
+    this.#view = view;
   }
 
   override wasShown(): void {
     super.wasShown();
     UI.Context.Context.instance().addFlavorChangeListener(SDK.DOMModel.DOMNode, this.update, this);
-    this.registerCSSFiles([nodeStackTraceWidgetStyles]);
     this.update();
   }
 
@@ -47,25 +58,17 @@ export class NodeStackTraceWidget extends UI.ThrottledWidget.ThrottledWidget {
   override async doUpdate(): Promise<void> {
     const node = UI.Context.Context.instance().flavor(SDK.DOMModel.DOMNode);
 
-    if (!node) {
-      this.noStackTraceElement.classList.remove('hidden');
-      this.creationStackTraceElement.classList.add('hidden');
-      return;
-    }
-
-    const creationStackTrace = await node.creationStackTrace();
-    if (creationStackTrace) {
-      this.noStackTraceElement.classList.add('hidden');
-      this.creationStackTraceElement.classList.remove('hidden');
-
-      const stackTracePreview = Components.JSPresentationUtils.buildStackTracePreviewContents(
-          node.domModel().target(), this.linkifier, {stackTrace: creationStackTrace, tabStops: undefined});
-      this.creationStackTraceElement.removeChildren();
-      this.creationStackTraceElement.appendChild(stackTracePreview.element);
-    } else {
-      this.noStackTraceElement.classList.remove('hidden');
-      this.creationStackTraceElement.classList.add('hidden');
-    }
+    const creationStackTrace = node ? await node.creationStackTrace() : null;
+    const stackTracePreview = node && creationStackTrace ?
+        Components.JSPresentationUtils
+            .buildStackTracePreviewContents(
+                node.domModel().target(), this.#linkifier, {stackTrace: creationStackTrace, tabStops: undefined})
+            .element :
+        null;
+    const input = {
+      stackTracePreview,
+    };
+    this.#view(input, {}, this.contentElement);
   }
 }
 

@@ -3,16 +3,16 @@
 // found in the LICENSE file.
 import './ButtonDialog.js';
 
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
+
 import * as i18n from '../../../core/i18n/i18n.js';
 import type * as Platform from '../../../core/platform/platform.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
-import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import {html, nothing, render, type TemplateResult} from '../../../ui/lit/lit.js';
 
 import type {ButtonDialogData} from './ButtonDialog.js';
 import shortcutDialogStyles from './shortcutDialog.css.js';
-
-const {html} = LitHtml;
 
 const UIStrings = {
 
@@ -24,7 +24,7 @@ const UIStrings = {
    * @description Title of the keyboard shortcuts help menu.
    */
   dialogTitle: 'Keyboard shortcuts',
-};
+} as const;
 
 const str_ = i18n.i18n.registerUIStrings('ui/components/dialogs/ShortcutDialog.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -35,25 +35,36 @@ declare global {
   }
 }
 
+export type ShortcutPart = {
+  key: string,
+}|{joinText: string};
+
+export type ShortcutRow = ShortcutPart[]|{footnote: string};
+
 export interface Shortcut {
   title: string|Platform.UIString.LocalizedString;
-  bindings: string[][];
+  rows: readonly ShortcutRow[];
 }
 export interface ShortcutDialogData {
   shortcuts: Shortcut[];
   open?: boolean;
+  customTitle?: Platform.UIString.LocalizedString;
 }
 
 export class ShortcutDialog extends HTMLElement {
   readonly #shadow = this.attachShadow({mode: 'open'});
-  readonly #renderBound = this.#render.bind(this);
 
   #shortcuts: Shortcut[] = [];
   #openOnRender = false;
+  #customTitle?: Platform.UIString.LocalizedString;
   #prependedElement: HTMLElement|null = null;
 
-  connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [shortcutDialogStyles];
+  get data(): ShortcutDialogData {
+    return {
+      shortcuts: this.#shortcuts,
+      open: this.#openOnRender,
+      customTitle: this.#customTitle,
+    };
   }
 
   set data(data: ShortcutDialogData) {
@@ -61,12 +72,31 @@ export class ShortcutDialog extends HTMLElement {
     if (data.open) {
       this.#openOnRender = data.open;
     }
+    if (data.customTitle) {
+      this.#customTitle = data.customTitle;
+    }
 
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#renderBound);
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
   prependElement(element: HTMLElement): void {
     this.#prependedElement = element;
+  }
+
+  #renderRow(row: ShortcutRow): TemplateResult {
+    if (!Array.isArray(row)) {
+      // If it's not an array it's a footnote, which is the easier case, so
+      // render that and return.
+      return html`<span class="footnote">${row.footnote}</span>`;
+    }
+
+    return html`${row.map(part => {
+      if ('key' in part) {
+        return html`<span class="keybinds-key">${part.key}</span>`;
+      }
+      return html`<span class="keybinds-join-text">${part.joinText}</span>`;
+    })}
+    `;
   }
 
   #render(): void {
@@ -75,33 +105,29 @@ export class ShortcutDialog extends HTMLElement {
     }
 
     // clang-format off
-    LitHtml.render(
+    render(
       html`
+      <style>${shortcutDialogStyles}</style>
       <devtools-button-dialog .data=${{
           openOnRender: this.#openOnRender,
           closeButton: true,
-          dialogTitle: i18nString(UIStrings.dialogTitle),
+          dialogTitle: this.#customTitle ?? i18nString(UIStrings.dialogTitle),
           variant: Buttons.Button.Variant.TOOLBAR,
           iconName: 'help',
           iconTitle: i18nString(UIStrings.showShortcutTitle),
         } as ButtonDialogData}>
         <ul class="keybinds-list">
-          ${(this.#prependedElement) ? html`${this.#prependedElement}` : LitHtml.nothing}
+          ${(this.#prependedElement) ? html`${this.#prependedElement}` : nothing}
           ${this.#shortcuts.map(shortcut =>
             html`
               <li class="keybinds-list-item">
                 <div class="keybinds-list-title">${shortcut.title}</div>
                 <div class="shortcuts-for-actions">
-                  ${shortcut.bindings.map(binding => {
-                    return html`
-                    <div class="keys-container">
-                      ${binding.map(key => html`
-                          <span class="keybinds-key">${key}</span>
-                      `)}
-                    </div>
+                  ${shortcut.rows.map(row => {
+                    return html`<div class="row-container">${this.#renderRow(row)}</div>
                   `;
-                    })}
-                  </div>
+                  })}
+                </div>
               </li>`,
           )}
         </ul>

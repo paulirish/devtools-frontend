@@ -1,31 +1,29 @@
 // Copyright 2024 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
+
 import * as i18n from '../../../../core/i18n/i18n.js';
 import type * as Trace from '../../../../models/trace/trace.js';
-import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
+import * as Lit from '../../../../ui/lit/lit.js';
 
-import styles from './timespanBreakdownOverlay.css.js';
+import timespanBreakdownOverlayStyles from './timespanBreakdownOverlay.css.js';
 
-const {html} = LitHtml;
+const {html} = Lit;
 
 /**
  * An EntryBreakdown, or section, that makes up a TimespanBreakdown.
  */
 export interface EntryBreakdown {
-  bounds: Trace.Types.Timing.TraceWindowMicroSeconds;
-  label: string|LitHtml.LitTemplate;
+  bounds: Trace.Types.Timing.TraceWindowMicro;
+  label: string|Lit.LitTemplate;
   showDuration: boolean;
 }
 
 export class TimespanBreakdownOverlay extends HTMLElement {
   readonly #shadow = this.attachShadow({mode: 'open'});
   #canvasRect: DOMRect|null = null;
-  #sections: Array<EntryBreakdown>|null = null;
-
-  connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [styles];
-  }
+  #sections: EntryBreakdown[]|null = null;
 
   set isBelowEntry(isBelow: boolean) {
     this.classList.toggle('is-below', isBelow);
@@ -39,7 +37,7 @@ export class TimespanBreakdownOverlay extends HTMLElement {
     this.#render();
   }
 
-  set sections(sections: Array<EntryBreakdown>|null) {
+  set sections(sections: EntryBreakdown[]|null) {
     if (sections === this.#sections) {
       return;
     }
@@ -154,18 +152,14 @@ export class TimespanBreakdownOverlay extends HTMLElement {
     return Array.from(this.#shadow.querySelectorAll('.timespan-breakdown-overlay-section'));
   }
 
-  #renderSection(section: EntryBreakdown): LitHtml.TemplateResult {
+  #renderSection(section: EntryBreakdown): Lit.TemplateResult {
     // clang-format off
     return html`
       <div class="timespan-breakdown-overlay-section">
         <div class="timespan-breakdown-overlay-label">
         ${section.showDuration ?
-          html`
-            <span class="duration-text">${i18n.TimeUtilities.formatMicroSecondsAsMillisFixed(section.bounds.range)}</span>
-          ` : LitHtml.nothing}
-          <span class="section-label-text">
-            ${section.label}
-          </span>
+          html`<span class="duration-text">${i18n.TimeUtilities.formatMicroSecondsAsMillisFixed(section.bounds.range)}</span> ` : Lit.nothing}
+          <span class="section-label-text">${section.label}</span>
         </div>
       </div>`;
     // clang-format on
@@ -176,7 +170,10 @@ export class TimespanBreakdownOverlay extends HTMLElement {
       this.classList.toggle('odd-number-of-sections', this.#sections.length % 2 === 1);
       this.classList.toggle('even-number-of-sections', this.#sections.length % 2 === 0);
     }
-    LitHtml.render(html`${this.#sections?.map(this.#renderSection)}`, this.#shadow, {host: this});
+    Lit.render(
+        html`<style>${timespanBreakdownOverlayStyles}</style>
+             ${this.#sections?.map(this.#renderSection)}`,
+        this.#shadow, {host: this});
     this.checkSectionLabelPositioning();
   }
 }

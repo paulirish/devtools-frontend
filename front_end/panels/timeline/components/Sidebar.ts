@@ -1,17 +1,18 @@
 // Copyright 2024 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as Common from '../../../core/common/common.js';
 import type * as Trace from '../../../models/trace/trace.js';
-import * as Adorners from '../../../ui/components/adorners/adorners.js';
+import * as RenderCoordinator from '../../../ui/components/render_coordinator/render_coordinator.js';
 import * as UI from '../../../ui/legacy/legacy.js';
 
 import {SidebarAnnotationsTab} from './SidebarAnnotationsTab.js';
 import {SidebarInsightsTab} from './SidebarInsightsTab.js';
 
 export interface ActiveInsight {
-  model: Trace.Insights.Types.InsightModel<{}>;
+  model: Trace.Insights.Types.InsightModel;
   insightSetKey: string;
 }
 
@@ -52,8 +53,6 @@ export class SidebarWidget extends UI.Widget.VBox {
   #insightsView = new InsightsView();
   #annotationsView = new AnnotationsView();
 
-  #annotationCount = 0;
-
   /**
    * Track if the user has opened the sidebar before. We do this so that the
    * very first time they record/import a trace after the sidebar ships, we can
@@ -91,10 +90,8 @@ export class SidebarWidget extends UI.Widget.VBox {
     // Swap to the Annotations tab if:
     // 1. Insights is currently selected.
     // 2. The Insights tab is disabled (which means we have no insights for this trace)
-    // 3. The annotations tab exists (we can remove this check once annotations
-    //    are non-experimental)
     if (this.#tabbedPane.selectedTabId === SidebarTabs.INSIGHTS &&
-        this.#tabbedPane.tabIsDisabled(SidebarTabs.INSIGHTS) && this.#tabbedPane.hasTab(SidebarTabs.ANNOTATIONS)) {
+        this.#tabbedPane.tabIsDisabled(SidebarTabs.INSIGHTS)) {
       this.#tabbedPane.selectTab(SidebarTabs.ANNOTATIONS);
     }
   }
@@ -103,27 +100,16 @@ export class SidebarWidget extends UI.Widget.VBox {
       updatedAnnotations: Trace.Types.File.Annotation[],
       annotationEntryToColorMap: Map<Trace.Types.Events.Event, string>): void {
     this.#annotationsView.setAnnotations(updatedAnnotations, annotationEntryToColorMap);
-    this.#annotationCount = updatedAnnotations.length;
     this.#updateAnnotationsCountBadge();
   }
 
   #updateAnnotationsCountBadge(): void {
-    let countAdorner: Adorners.Adorner.Adorner|null = null;
-    if (this.#annotationCount > 0) {
-      countAdorner = new Adorners.Adorner.Adorner();
-      const countSpan = document.createElement('span');
-      countSpan.textContent = this.#annotationCount.toString();
-      countAdorner.data = {
-        name: 'countWrapper',
-        content: countSpan,
-      };
-      countAdorner.classList.add('annotations-count');
-    }
-    this.#tabbedPane.setSuffixElement('annotations', countAdorner);
+    const annotations = this.#annotationsView.deduplicatedAnnotations();
+    this.#tabbedPane.setBadge('annotations', annotations.length > 0 ? annotations.length.toString() : null);
   }
 
-  setParsedTrace(parsedTrace: Trace.Handlers.Types.ParsedTrace|null): void {
-    this.#insightsView.setParsedTrace(parsedTrace);
+  setParsedTrace(parsedTrace: Trace.Handlers.Types.ParsedTrace|null, metadata: Trace.Types.File.MetaData|null): void {
+    this.#insightsView.setParsedTrace(parsedTrace, metadata);
   }
 
   setInsights(insights: Trace.Insights.Types.TraceInsightSets|null): void {
@@ -135,8 +121,10 @@ export class SidebarWidget extends UI.Widget.VBox {
     );
   }
 
-  setActiveInsight(activeInsight: ActiveInsight|null): void {
-    this.#insightsView.setActiveInsight(activeInsight);
+  setActiveInsight(activeInsight: ActiveInsight|null, opts: {
+    highlight: boolean,
+  }): void {
+    this.#insightsView.setActiveInsight(activeInsight, opts);
 
     if (activeInsight) {
       this.#tabbedPane.selectTab(SidebarTabs.INSIGHTS);
@@ -153,16 +141,25 @@ class InsightsView extends UI.Widget.VBox {
     this.element.appendChild(this.#component);
   }
 
-  setParsedTrace(data: Trace.Handlers.Types.ParsedTrace|null): void {
-    this.#component.parsedTrace = data;
+  setParsedTrace(parsedTrace: Trace.Handlers.Types.ParsedTrace|null, metadata: Trace.Types.File.MetaData|null): void {
+    this.#component.parsedTrace = parsedTrace;
+    this.#component.traceMetadata = metadata;
   }
 
   setInsights(data: Trace.Insights.Types.TraceInsightSets|null): void {
     this.#component.insights = data;
   }
 
-  setActiveInsight(active: ActiveInsight|null): void {
+  setActiveInsight(active: ActiveInsight|null, opts: {highlight: boolean}): void {
     this.#component.activeInsight = active;
+    if (opts.highlight && active) {
+      // Wait for the rendering of the component to be done, otherwise we
+      // might highlight the wrong insight. The UI needs to be fully
+      // re-rendered before we can highlight the newly-expanded insight.
+      void RenderCoordinator.done().then(() => {
+        this.#component.highlightActiveInsight();
+      });
+    }
   }
 }
 
@@ -182,5 +179,15 @@ class AnnotationsView extends UI.Widget.VBox {
     // set the `annotationEntryToColorMap` first.
     this.#component.annotationEntryToColorMap = annotationEntryToColorMap;
     this.#component.annotations = annotations;
+  }
+
+  /**
+   * The component "de-duplicates" annotations to ensure implementation details
+   * about how we create pending annotations don't leak into the UI. We expose
+   * these here because we use this count to show the number of annotations in
+   * the small adorner in the sidebar tab.
+   */
+  deduplicatedAnnotations(): readonly Trace.Types.File.Annotation[] {
+    return this.#component.deduplicatedAnnotations();
   }
 }

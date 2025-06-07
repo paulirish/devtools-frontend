@@ -11,7 +11,7 @@ import type {GeneratedRange, OriginalPosition, OriginalScope, Position,} from '.
 
 export class SourceMapScopesInfo {
   readonly #sourceMap: SourceMap;
-  readonly #originalScopes: OriginalScope[];
+  readonly #originalScopes: Array<OriginalScope|undefined>;
   readonly #generatedRanges: GeneratedRange[];
 
   #cachedVariablesAndBindingsPresent: boolean|null = null;
@@ -22,7 +22,7 @@ export class SourceMapScopesInfo {
     this.#generatedRanges = generatedRanges;
   }
 
-  addOriginalScopes(scopes: OriginalScope[]): void {
+  addOriginalScopes(scopes: Array<OriginalScope|undefined>): void {
     for (const scope of scopes) {
       this.#originalScopes.push(scope);
     }
@@ -31,6 +31,18 @@ export class SourceMapScopesInfo {
   addGeneratedRanges(ranges: GeneratedRange[]): void {
     for (const range of ranges) {
       this.#generatedRanges.push(range);
+    }
+  }
+
+  hasOriginalScopes(sourceIdx: number): boolean {
+    return Boolean(this.#originalScopes[sourceIdx]);
+  }
+
+  addOriginalScopesAtIndex(sourceIdx: number, scope: OriginalScope): void {
+    if (!this.#originalScopes[sourceIdx]) {
+      this.#originalScopes[sourceIdx] = scope;
+    } else {
+      throw new Error(`Trying to re-augment existing scopes for source at index: ${sourceIdx}`);
     }
   }
 
@@ -130,8 +142,12 @@ export class SourceMapScopesInfo {
     // We check whether any original scope has a non-empty list of variables, and
     // generated ranges with a non-empty binding list.
 
-    function walkTree(nodes: OriginalScope[]|GeneratedRange[]): boolean {
+    function walkTree(nodes: Array<OriginalScope|undefined>|GeneratedRange[]): boolean {
       for (const node of nodes) {
+        if (!node) {
+          continue;
+        }
+
         if ('variables' in node && node.variables.length > 0) {
           return true;
         }
@@ -251,7 +267,7 @@ export class SourceMapScopesInfo {
     } else {
       // No GeneratedRanges. Try to use mappings.
       const entry = this.#sourceMap.findEntry(line, column);
-      if (entry === null || entry.sourceIndex === undefined) {
+      if (entry?.sourceIndex === undefined) {
         return null;
       }
       originalInnerMostScope =
@@ -274,8 +290,12 @@ export class SourceMapScopesInfo {
    * to inner.
    */
   #findOriginalScopeChain({sourceIndex, line, column}: OriginalPosition): OriginalScope[] {
-    const result: OriginalScope[] = [];
+    const scope = this.#originalScopes[sourceIndex];
+    if (!scope) {
+      return [];
+    }
 
+    const result: OriginalScope[] = [];
     (function walkScopes(scopes: OriginalScope[]) {
       for (const scope of scopes) {
         if (!contains(scope, line, column)) {
@@ -284,7 +304,7 @@ export class SourceMapScopesInfo {
         result.push(scope);
         walkScopes(scope.children);
       }
-    })([this.#originalScopes[sourceIndex]]);
+    })([scope]);
 
     return result;
   }
@@ -300,7 +320,7 @@ export class SourceMapScopesInfo {
  * The inlined functions are sorted from inner to outer (or top to bottom on the stack).
  */
 export interface InlineInfo {
-  inlinedFunctions: {name: string, callsite: OriginalPosition}[];
+  inlinedFunctions: Array<{name: string, callsite: OriginalPosition}>;
   originalFunctionName: string;
 }
 

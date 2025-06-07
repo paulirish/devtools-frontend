@@ -19,11 +19,11 @@ declare global {
 
     skip: (title: string, fn: Mocha.AsyncFunc) => void,
 
-    skipOnPlatforms: (platforms: Array<Platform>, title: string, fn: Mocha.AsyncFunc) => void,
+    skipOnPlatforms: (platforms: Platform[], title: string, fn: Mocha.AsyncFunc) => void,
   };
   namespace Mocha {
     export interface TestFunction {
-      skipOnPlatforms: (platforms: Array<Platform>, title: string, fn: Mocha.AsyncFunc) => void;
+      skipOnPlatforms: (platforms: Platform[], title: string, fn: Mocha.AsyncFunc) => void;
     }
   }
 }
@@ -88,21 +88,23 @@ async function createScreenshotError(error: Error): Promise<Error> {
   return error;
 }
 
+/**
+ * We track the initial timeouts for each functions because mocha
+ * does not reset test timeout for retries.
+ */
+const timeoutByTestFunction = new WeakMap<Mocha.AsyncFunc, number>();
+
 export function makeInstrumentedTestFunction(fn: Mocha.AsyncFunc, label: string) {
   return async function testFunction(this: Mocha.Context) {
     const abortController = new AbortController();
-    let resolver;
-    let rejecter: (reason?: unknown) => void;
-    const testPromise = new Promise((resolve, reject) => {
-      resolver = resolve;
-      rejecter = reject;
-    });
+    const {resolve, reject, promise: testPromise} = Promise.withResolvers();
     // AbortSignal for the current test function.
     AsyncScope.abortSignal = abortController.signal;
     // Promisify the function in case it is sync.
-    const promise = (async () => fn.call(this))();
-    const actualTimeout = this.timeout();
-    // Disable test timeout.
+    const promise = (async () => await fn.call(this))();
+    const actualTimeout = timeoutByTestFunction.get(fn) ?? this.timeout();
+    timeoutByTestFunction.set(fn, actualTimeout);
+    // Disable mocha test timeout.
     this.timeout(0);
     const t = actualTimeout !== 0 ? setTimeout(async () => {
       abortController.abort();
@@ -115,27 +117,30 @@ export function makeInstrumentedTestFunction(fn: Mocha.AsyncFunc, label: string)
           stacks.push(`${stepDescription}${stack.join('\n')}\n`);
         }
       }
-      const err = new Error(`A test function (${label}) for "${this.test?.title}" timed out`);
+      const err = new Error(`A test function (${label}) for "${this.test?.title}" timed out (${actualTimeout} ms)`);
       if (stacks.length > 0) {
         const msg = `Pending async operations during timeout:\n${stacks.join('\n\n')}`;
         err.cause = new Error(msg);
       }
-      rejecter(await createScreenshotError(err));
+      reject(await createScreenshotError(err));
     }, actualTimeout) : 0;
     promise
         .then(
-            resolver,
+            resolve,
             async err => {
               // Suppress errors after the test was aborted.
               if (abortController.signal.aborted) {
                 return;
               }
-              rejecter(await createScreenshotError(err));
+              if (err instanceof ScreenshotError) {
+                reject(err);
+                return;
+              }
+              reject(await createScreenshotError(err));
             })
         .finally(() => {
           clearTimeout(t);
-          this.timeout(actualTimeout);
         });
-    return testPromise;
+    return await testPromise;
   };
 }

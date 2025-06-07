@@ -1,18 +1,18 @@
 // Copyright 2018 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
-
-import signedExchangeInfoTreeStyles from './signedExchangeInfoTree.css.js';
-import signedExchangeInfoViewStyles from './signedExchangeInfoView.css.js';
-
 import type * as SDK from '../../core/sdk/sdk.js';
+import * as Protocol from '../../generated/protocol.js';
 import * as IconButton from '../../ui/components/icon_button/icon_button.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
-import * as Protocol from '../../generated/protocol.js';
+
+import signedExchangeInfoTreeStyles from './signedExchangeInfoTree.css.js';
+import signedExchangeInfoViewStyles from './signedExchangeInfoView.css.js';
 
 const UIStrings = {
   /**
@@ -99,7 +99,7 @@ const UIStrings = {
    *@description Text for the issuer of an item
    */
   issuer: 'Issuer',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/network/SignedExchangeInfoView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export class SignedExchangeInfoView extends UI.Widget.VBox {
@@ -107,13 +107,14 @@ export class SignedExchangeInfoView extends UI.Widget.VBox {
 
   constructor(request: SDK.NetworkRequest.NetworkRequest) {
     super();
+    this.registerRequiredCSS(signedExchangeInfoViewStyles);
     console.assert(request.signedExchangeInfo() !== null);
     const signedExchangeInfo = (request.signedExchangeInfo() as Protocol.Network.SignedExchangeInfo);
 
     this.element.classList.add('signed-exchange-info-view');
 
     const root = new UI.TreeOutline.TreeOutlineInShadow();
-    root.registerCSSFiles([signedExchangeInfoTreeStyles]);
+    root.registerRequiredCSS(signedExchangeInfoTreeStyles);
     root.element.classList.add('signed-exchange-info-tree');
     root.setFocusable(false);
     root.makeDense();
@@ -122,7 +123,7 @@ export class SignedExchangeInfoView extends UI.Widget.VBox {
 
     const errorFieldSetMap = new Map<number|undefined, Set<string>>();
 
-    if (signedExchangeInfo.errors && signedExchangeInfo.errors.length) {
+    if (signedExchangeInfo.errors?.length) {
       const errorMessagesCategory = new Category(root, i18nString(UIStrings.errors));
       for (const error of signedExchangeInfo.errors) {
         const fragment = document.createDocumentFragment();
@@ -255,10 +256,6 @@ export class SignedExchangeInfoView extends UI.Widget.VBox {
       valueElement.classList.add('error-field');
     }
     return fragment;
-  }
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([signedExchangeInfoViewStyles]);
   }
 }
 

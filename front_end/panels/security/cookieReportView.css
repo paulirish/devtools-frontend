@@ -18,13 +18,14 @@
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-  gap: var(--sys-size-5);
+  gap: var(--sys-size-2);
   padding-left: var(--sys-size-6);
   padding-right: var(--sys-size-6);
   min-width: var(--sys-size-31);
 
-  .title {
+  h1 {
     font: var(--sys-typescale-headline4);
+    margin: 0;
   }
 }
 
@@ -39,12 +40,16 @@
 }
 
 .filter {
-  padding-left: var(--sys-size-5);
   padding-right: var(--sys-size-6);
   flex-shrink: 0;
 }
 
-.data-grid {
+.filters-container {
+  display: flex;
+  padding-left: var(--sys-size-5);
+}
+
+devtools-data-grid {
   flex: auto;
   margin-left: -1px;
 }

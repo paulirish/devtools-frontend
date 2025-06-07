@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import * as Root from '../../core/root/root.js';
 import * as Protocol from '../../generated/protocol.js';
 import {createTarget} from '../../testing/EnvironmentHelpers.js';
 import {describeWithMockConnection} from '../../testing/MockConnection.js';
@@ -12,7 +11,6 @@ import * as SDK from './sdk.js';
 
 describeWithMockConnection('AutofillModel', () => {
   beforeEach(() => {
-    Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.AUTOFILL_VIEW);
     Common.Settings.Settings.instance().createLocalSetting('show-test-addresses-in-autofill-menu-on-event', true);
   });
 
@@ -21,37 +19,37 @@ describeWithMockConnection('AutofillModel', () => {
     const autofillModel = target.model(SDK.AutofillModel.AutofillModel);
     const enableSpy = sinon.spy(autofillModel!.agent, 'invoke_enable');
     const disableSpy = sinon.spy(autofillModel!.agent, 'invoke_disable');
-    assert.isTrue(enableSpy.notCalled);
-    assert.isTrue(disableSpy.notCalled);
+    sinon.assert.notCalled(enableSpy);
+    sinon.assert.notCalled(disableSpy);
 
     autofillModel!.disable();
-    assert.isTrue(enableSpy.notCalled);
-    assert.isTrue(disableSpy.calledOnce);
+    sinon.assert.notCalled(enableSpy);
+    sinon.assert.calledOnce(disableSpy);
     disableSpy.resetHistory();
 
     autofillModel!.enable();
-    assert.isTrue(enableSpy.calledOnce);
-    assert.isTrue(disableSpy.notCalled);
+    sinon.assert.calledOnce(enableSpy);
+    sinon.assert.notCalled(disableSpy);
   });
 
   it('sets test addresses by calling the Autofill backend', () => {
     const target = createTarget();
     const autofillModel = target.model(SDK.AutofillModel.AutofillModel);
     const setAddressSpy = sinon.spy(autofillModel!.agent, 'invoke_setAddresses');
-    assert.isTrue(setAddressSpy.notCalled);
+    sinon.assert.notCalled(setAddressSpy);
 
     autofillModel!.disable();
-    assert.isTrue(setAddressSpy.notCalled);
+    sinon.assert.notCalled(setAddressSpy);
 
     autofillModel!.enable();
-    assert.isTrue(setAddressSpy.calledOnce);
+    sinon.assert.calledOnce(setAddressSpy);
   });
 
   it('dispatches addressFormFilledEvent on autofill event', () => {
     const target = createTarget();
     const autofillModel = target.model(SDK.AutofillModel.AutofillModel);
 
-    const dispatchedEvents: Array<SDK.AutofillModel.AddressFormFilledEvent> = [];
+    const dispatchedEvents: SDK.AutofillModel.AddressFormFilledEvent[] = [];
     autofillModel!.addEventListener(SDK.AutofillModel.Events.ADDRESS_FORM_FILLED, e => dispatchedEvents.push(e.data));
 
     const addressFormFilledEvent: Protocol.Autofill.AddressFormFilledEvent = {

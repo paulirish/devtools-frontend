@@ -4,8 +4,8 @@
 
 import * as CodeHighlighter from './code_highlighter.js';
 
-function parseTokens(code: string): [string, string][] {
-  const token = /\[(\S+) ([^\]]+)\]/g, tokens: [string, string][] = [];
+function parseTokens(code: string): Array<[string, string]> {
+  const token = /\[(\S+) ([^\]]+)\]/g, tokens: Array<[string, string]> = [];
   for (let pos = 0;;) {
     const match = token.exec(code);
     const next = match ? match.index : code.length;
@@ -70,6 +70,10 @@ it('can highlight JavaScript with `new.target` syntax', testHighlight(`
 [keyword type] [type X] = {
   [property x]: [type boolean]
 }`, 'text/typescript'));
+
+it('can highlight TypeScript with the new `satisfies` keyword', testHighlight(`
+[keyword const] [definition bar] = {} [keyword satisfies] [type X];
+`, 'text/typescript'));
 
 it('can highlight TypeScript with the new `using` keyword', testHighlight(`
 [keyword using] [definition resource] = [variable getResource]()

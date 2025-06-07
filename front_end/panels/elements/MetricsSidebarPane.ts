@@ -1,6 +1,7 @@
 // Copyright 2021 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 /*
  * Copyright (C) 2007 Apple Inc.  All rights reserved.
@@ -45,15 +46,16 @@ export class MetricsSidebarPane extends ElementsSidebarPane {
   previousPropertyDataCandidate: SDK.CSSProperty.CSSProperty|null;
   private inlineStyle: SDK.CSSStyleDeclaration.CSSStyleDeclaration|null;
   private highlightMode: string;
-  private boxElements: {
+  private boxElements: Array<{
     element: HTMLElement,
     name: string,
     backgroundColor: string,
-  }[];
+  }>;
   private isEditingMetrics?: boolean;
 
   constructor(computedStyleModel: ComputedStyleModel) {
     super(computedStyleModel);
+    this.registerRequiredCSS(metricsSidebarPaneStyles);
 
     this.originalPropertyData = null;
     this.previousPropertyDataCandidate = null;
@@ -533,9 +535,5 @@ export class MetricsSidebarPane extends ElementsSidebarPane {
       ): void {
     this.editingEnded(element, context);
     this.applyUserInput(element, userInput, previousContent, context, true);
-  }
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([metricsSidebarPaneStyles]);
   }
 }

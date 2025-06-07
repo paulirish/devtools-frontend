@@ -56,7 +56,7 @@ const UIStrings = {
    */
   srEntriesLinked: 'The connected entries annotation now links from {PH1} to {PH2}',
 
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/AnnotationHelpers.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -89,18 +89,17 @@ export function getAnnotationEntries(
  */
 export function getAnnotationWindow(
     annotation: Trace.Types.File.Annotation,
-    ): Trace.Types.Timing.TraceWindowMicroSeconds|null {
-  let annotationWindow: Trace.Types.Timing.TraceWindowMicroSeconds|null = null;
-  const minVisibleEntryDuration = Trace.Types.Timing.MilliSeconds(1);
+    ): Trace.Types.Timing.TraceWindowMicro|null {
+  let annotationWindow: Trace.Types.Timing.TraceWindowMicro|null = null;
+  const minVisibleEntryDuration = Trace.Types.Timing.Milli(1);
 
   switch (annotation.type) {
     case 'ENTRY_LABEL': {
-      const eventDuration =
-          annotation.entry.dur ?? Trace.Helpers.Timing.millisecondsToMicroseconds(minVisibleEntryDuration);
+      const eventDuration = annotation.entry.dur ?? Trace.Helpers.Timing.milliToMicro(minVisibleEntryDuration);
 
       annotationWindow = Trace.Helpers.Timing.traceWindowFromMicroSeconds(
           annotation.entry.ts,
-          Trace.Types.Timing.MicroSeconds(annotation.entry.ts + eventDuration),
+          Trace.Types.Timing.Micro(annotation.entry.ts + eventDuration),
       );
 
       break;
@@ -126,7 +125,7 @@ export function getAnnotationWindow(
 
       annotationWindow = Trace.Helpers.Timing.traceWindowFromMicroSeconds(
           annotation.entryFrom.ts,
-          Trace.Types.Timing.MicroSeconds(maxTimestamp),
+          Trace.Types.Timing.Micro(maxTimestamp),
       );
       break;
     }
@@ -165,7 +164,8 @@ export function ariaDescriptionForOverlay(overlay: Overlays.Overlays.TimelineOve
     return i18nString(UIStrings.entriesLink);
   }
   if (isEntryLabel(overlay)) {
-    return i18nString(UIStrings.entryLabel);
+    // Don't announce an empty label
+    return overlay.label.length > 0 ? i18nString(UIStrings.entryLabel) : null;
   }
 
   // Not an annotation overlay: ignore.
@@ -207,10 +207,10 @@ export function ariaAnnouncementForModifiedEvent(event: AnnotationModifiedEvent)
 
       const {min, max} = overlay.bounds;
       const minText = i18n.TimeUtilities.formatMicroSecondsAsMillisFixed(
-          Trace.Types.Timing.MicroSeconds(min - traceBounds.min),
+          Trace.Types.Timing.Micro(min - traceBounds.min),
       );
       const maxText =
-          i18n.TimeUtilities.formatMicroSecondsAsMillisFixed(Trace.Types.Timing.MicroSeconds(max - traceBounds.min));
+          i18n.TimeUtilities.formatMicroSecondsAsMillisFixed(Trace.Types.Timing.Micro(max - traceBounds.min));
 
       return i18nString(UIStrings.srTimeRangeBoundsUpdated, {
         PH1: minText,

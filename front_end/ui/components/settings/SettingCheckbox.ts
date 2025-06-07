@@ -1,27 +1,28 @@
 // Copyright 2021 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view, rulesdir/inject-checkbox-styles */
 
 import './SettingDeprecationWarning.js';
 
 import type * as Common from '../../../core/common/common.js';
 import * as Host from '../../../core/host/host.js';
 import * as i18n from '../../../core/i18n/i18n.js';
-import * as LitHtml from '../../lit-html/lit-html.js';
+import * as Lit from '../../lit/lit.js';
 import * as VisualLogging from '../../visual_logging/visual_logging.js';
 import * as Buttons from '../buttons/buttons.js';
 import * as Input from '../input/input.js';
 
 import settingCheckboxStyles from './settingCheckbox.css.js';
 
-const {html, Directives: {ifDefined}} = LitHtml;
+const {html, Directives: {ifDefined}} = Lit;
 
 const UIStrings = {
   /**
    *@description Text that is usually a hyperlink to more documentation
    */
   learnMore: 'Learn more',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('ui/components/settings/SettingCheckbox.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -40,10 +41,6 @@ export class SettingCheckbox extends HTMLElement {
   #changeListenerDescriptor?: Common.EventTarget.EventDescriptor;
   #textOverride?: string;
 
-  connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [Input.checkboxStyles, settingCheckboxStyles];
-  }
-
   set data(data: SettingCheckboxData) {
     if (this.#changeListenerDescriptor && this.#setting) {
       this.#setting.removeChangeListener(this.#changeListenerDescriptor.listener);
@@ -58,7 +55,7 @@ export class SettingCheckbox extends HTMLElement {
     this.#render();
   }
 
-  icon(): LitHtml.TemplateResult|undefined {
+  icon(): Lit.TemplateResult|undefined {
     if (!this.#setting) {
       return undefined;
     }
@@ -105,9 +102,11 @@ export class SettingCheckbox extends HTMLElement {
             Buttons.Button.Size.SMALL} title=${ifDefined(disabledReasons.join('\n'))} @click=${
             onclick}></devtools-button>
     ` :
-        LitHtml.nothing;
-    LitHtml.render(
+        Lit.nothing;
+    Lit.render(
         html`
+      <style>${Input.checkboxStyles}</style>
+      <style>${settingCheckboxStyles}</style>
       <p>
         <label title=${title}>
           <input

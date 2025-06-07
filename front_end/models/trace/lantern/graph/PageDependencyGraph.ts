@@ -5,7 +5,7 @@
 import * as Core from '../core/core.js';
 import type * as Lantern from '../types/types.js';
 
-import type {Node} from './BaseNode.js';
+import type {BaseNode, Node} from './BaseNode.js';
 import {CPUNode} from './CPUNode.js';
 import {NetworkNode} from './NetworkNode.js';
 
@@ -19,9 +19,9 @@ const SCHEDULABLE_TASK_TITLE_ALT2 = 'ThreadControllerImpl::DoWork';
 const SCHEDULABLE_TASK_TITLE_ALT3 = 'TaskQueueManager::ProcessTaskFromWorkQueue';
 
 interface NetworkNodeOutput {
-  nodes: Array<NetworkNode>;
+  nodes: NetworkNode[];
   idToNodeMap: Map<string, NetworkNode>;
-  urlToNodeMap: Map<string, Array<NetworkNode>>;
+  urlToNodeMap: Map<string, NetworkNode[]>;
   frameIdToNodeMap: Map<string, NetworkNode|null>;
 }
 
@@ -64,9 +64,9 @@ class PageDependencyGraph {
   }
 
   static getNetworkNodeOutput(networkRequests: Lantern.NetworkRequest[]): NetworkNodeOutput {
-    const nodes: Array<NetworkNode> = [];
+    const nodes: NetworkNode[] = [];
     const idToNodeMap = new Map<string, NetworkNode>();
-    const urlToNodeMap = new Map<string, Array<NetworkNode>>();
+    const urlToNodeMap = new Map<string, NetworkNode[]>();
     const frameIdToNodeMap = new Map<string, NetworkNode|null>();
 
     networkRequests.forEach(request => {
@@ -549,14 +549,17 @@ class PageDependencyGraph {
     PageDependencyGraph.linkCPUNodes(rootNode, networkNodeOutput, cpuNodes);
     mainDocumentNode.setIsMainDocument(true);
 
-    if (NetworkNode.hasCycle(rootNode)) {
+    if (NetworkNode.findCycle(rootNode)) {
+      // Uncomment the following if you are debugging cycles.
+      // this.printGraph(rootNode);
       throw new Core.LanternError('Invalid dependency graph created, cycle detected');
     }
 
     return rootNode;
   }
 
-  static printGraph(rootNode: Node, widthInCharacters = 100): void {
+  // Unused, but useful for debugging.
+  static printGraph(rootNode: Node, widthInCharacters = 80): void {
     function padRight(str: string, target: number, padChar = ' '): string {
       return str + padChar.repeat(Math.max(target - str.length, 0));
     }
@@ -564,6 +567,19 @@ class PageDependencyGraph {
     const nodes: Node[] = [];
     rootNode.traverse(node => nodes.push(node));
     nodes.sort((a, b) => a.startTime - b.startTime);
+
+    // Assign labels (A, B, C, ..., Z, Z1, Z2, ...) for each node.
+    const nodeToLabel = new Map<BaseNode, string>();
+    rootNode.traverse(node => {
+      const ascii = 65 + nodeToLabel.size;
+      let label;
+      if (ascii > 90) {
+        label = `Z${ascii - 90}`;
+      } else {
+        label = String.fromCharCode(ascii);
+      }
+      nodeToLabel.set(node, label);
+    });
 
     const min = nodes[0].startTime;
     const max = nodes.reduce((max, node) => Math.max(max, node.endTime), 0);
@@ -578,8 +594,42 @@ class PageDependencyGraph {
       // @ts-expect-error -- disambiguate displayName from across possible Node types.
       const displayName = node.request ? node.request.url : node.type;
       // eslint-disable-next-line
-      console.log(padRight(bar, widthInCharacters), `| ${displayName.slice(0, 30)}`);
+      console.log(padRight(bar, widthInCharacters), `| ${displayName.slice(0, 50)}`);
     });
+
+    // Print labels for each node.
+
+    // eslint-disable-next-line
+    console.log();
+
+    // Print dependencies.
+    nodes.forEach(node => {
+      // @ts-expect-error -- disambiguate displayName from across possible Node types.
+      const displayName = node.request ? node.request.url : node.type;
+      // eslint-disable-next-line
+      console.log(nodeToLabel.get(node), displayName.slice(0, widthInCharacters - 5));
+
+      for (const child of node.dependents) {
+        // @ts-expect-error -- disambiguate displayName from across possible Node types.
+        const displayName = child.request ? child.request.url : child.type;
+        // eslint-disable-next-line
+        console.log('  ->', nodeToLabel.get(child), displayName.slice(0, widthInCharacters - 10));
+      }
+
+      // eslint-disable-next-line
+      console.log();
+    });
+
+    // Show cycle.
+    const cyclePath = NetworkNode.findCycle(rootNode);
+    // eslint-disable-next-line
+    console.log('Cycle?', cyclePath ? 'yes' : 'no');
+    if (cyclePath) {
+      const path = [...cyclePath];
+      path.push(path[0]);
+      // eslint-disable-next-line
+      console.log(path.map(node => nodeToLabel.get(node)).join(' -> '));
+    }
   }
 }
 

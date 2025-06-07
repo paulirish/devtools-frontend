@@ -17,7 +17,7 @@ const UIStrings = {
    *@description New report item label in Lighthouse Report Selector
    */
   newReport: '(new report)',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/lighthouse/LighthouseReportSelector.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export class ReportSelector {
@@ -61,10 +61,6 @@ export class ReportSelector {
     return this.itemByOptionElement.get(option as Element) as Item;
   }
 
-  hasCurrentSelection(): boolean {
-    return Boolean(this.selectedItem());
-  }
-
   hasItems(): boolean {
     return this.itemByOptionElement.size > 0;
   }
@@ -103,13 +99,11 @@ export class ReportSelector {
 }
 
 export class Item {
-  private readonly lighthouseResult: ReportRenderer.ReportJSON;
   private readonly renderReport: () => void;
   private readonly showLandingCallback: () => void;
   private readonly element: HTMLOptionElement;
 
   constructor(lighthouseResult: ReportRenderer.ReportJSON, renderReport: () => void, showLandingCallback: () => void) {
-    this.lighthouseResult = lighthouseResult;
     this.renderReport = renderReport;
     this.showLandingCallback = showLandingCallback;
 

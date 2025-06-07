@@ -10,7 +10,7 @@ import {getEventStyle} from './EntryStyles.js';
 
 const UIStrings = {
   /**
-   *@description Text shown for an entry in the flame chart that has no explict name.
+   *@description Text shown for an entry in the flame chart that has no explicit name.
    */
   anonymous: '(anonymous)',
   /**
@@ -39,7 +39,7 @@ const UIStrings = {
    *@description Text in Timeline Flame Chart Data Provider of the Performance panel
    */
   layoutShift: 'Layout shift',
-};
+} as const;
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/utils/EntryName.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -49,7 +49,7 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
  * @param parsedTrace - If the trace data is provided
  * as the second argument it can be used to find source map resolved names for
  * profile calls.
- * Use this function to customise the user visible name for an entry. If no
+ * Use this function to customize the user visible name for an entry. If no
  * custom name is found, we will fallback to the `name` property in the trace
  * entry.
  */
@@ -103,7 +103,7 @@ export function nameForEntry(
     return nameForInteractionEvent(entry);
   }
 
-  if (Trace.Types.Events.isLayoutShift(entry)) {
+  if (Trace.Types.Events.isSyntheticLayoutShift(entry)) {
     return i18nString(UIStrings.layoutShift);
   }
 

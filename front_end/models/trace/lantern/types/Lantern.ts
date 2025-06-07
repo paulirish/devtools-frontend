@@ -23,6 +23,7 @@ export const NetworkRequestTypes = {
   Preflight: 'Preflight',
   CSPViolationReport: 'CSPViolationReport',
   Prefetch: 'Prefetch',
+  FedCM: 'FedCM',
 } as const;
 
 export interface TraceEvent {
@@ -32,9 +33,9 @@ export interface TraceEvent {
     data?: {
       frame?: string,
       readyState?: number,
-      stackTrace?: {
-        url: string,
-      }[],
+      stackTrace?: Array<{
+                  url: string,
+                }>,
       url?: string,
     },
   };
@@ -99,7 +100,7 @@ export interface NetworkRequest<T = AnyNetworkObject> {
   networkRequestTime: number;
   /**
    * When the last byte of the response headers is received, in milliseconds.
-   * Equal to networkRequestTime if no data is recieved over the
+   * Equal to networkRequestTime if no data is received over the
    * network (ex: cached requests or data urls).
    */
   responseHeadersEndTime: number;
@@ -133,12 +134,12 @@ export interface NetworkRequest<T = AnyNetworkObject> {
   frameId: string|undefined;
   fromWorker: boolean;
   /**
-   * Optional value for how long the server took to respond to this request.
+   * Optional value for how long the server took to respond to this request, in ms.
    * When not provided, the server response time is derived from the timing object.
    */
   serverResponseTime?: number;
   /**
-   * Implementation-specific canoncial data structure that this Lantern NetworkRequest
+   * Implementation-specific canonical data structure that this Lantern NetworkRequest
    * was derived from.
    * Users of Lantern create a NetworkRequest matching this interface,
    * but can store the source-of-truth for their network model in this property.
@@ -174,8 +175,8 @@ export namespace Simulation {
   }
 
   export interface PrecomputedLanternData {
-    additionalRttByOrigin: {[origin: string]: number};
-    serverResponseTimeByOrigin: {[origin: string]: number};
+    additionalRttByOrigin: Record<string, number>;
+    serverResponseTimeByOrigin: Record<string, number>;
   }
 
   export interface Settings {

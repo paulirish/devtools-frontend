@@ -13,10 +13,19 @@
   to { width: 100%; }
 }
 
+@keyframes expand {
+  from { height: 0; }
+  to { height: auto; }
+}
+
 .animating {
   overflow: hidden;
   white-space: nowrap;
   animation: typing 0.4s steps(40, end);
+}
+
+devtools-code-block.animating {
+  animation: expand 0.1s linear;
 }
 
 .pending {
@@ -59,6 +68,7 @@
 
 .message code {
   color: var(--sys-color-on-surface);
+  font-family: var(--monospace-font-family);
   font-size: 11px;
   user-select: text;
   cursor: text;
@@ -73,11 +83,16 @@ devtools-code-block {
   margin-bottom: var(--sys-size-5);
 }
 
-.devtools-link {
-  color: var(--sys-color-primary);
-  outline-offset: 2px;
+.citation {
   text-decoration: underline;
+  color: var(--sys-color-primary);
+  background-color: transparent;
   cursor: pointer;
+  outline-offset: var(--sys-size-2);
+  border: none;
+  padding: 0;
+  font-size: 10px;
+  font-family: var(--default-font-family);
 }
 
 h1.insight, h2.insight, h3.insight, h4.insight, h5.insight, h6.insight {

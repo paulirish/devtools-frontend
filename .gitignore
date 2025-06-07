@@ -24,10 +24,11 @@ config.gypi
 /interactions-coverage
 /perf-data
 npm-debug.log
-/scripts/javascript_natives/node_modules
 /scripts/protocol_typescript/*.js
 /scripts/ai_assistance/data
+/scripts/ai_assistance/auto-run/data
 /scripts/ai_assistance/performance-trace-downloads
+/scripts/ai_assistance/auto-run/performance-trace-downloads
 
 /build
 /buildtools
@@ -48,3 +49,8 @@ test/perf/.generated
 /.vscode/settings.json
 /.vscode/tasks.json
 /.vscode/launch.json
+
+# Linters caches
+.eslintcache
+.stylelintcache
+**/tsconfig.tsbuildinfo

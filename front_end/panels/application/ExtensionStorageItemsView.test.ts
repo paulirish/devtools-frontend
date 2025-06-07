@@ -5,14 +5,12 @@
 import type * as Common from '../../core/common/common.js';
 import type * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
-import {dispatchKeyDownEvent, raf} from '../../testing/DOMHelpers.js';
 import {createTarget} from '../../testing/EnvironmentHelpers.js';
 import {
   describeWithMockConnection,
 } from '../../testing/MockConnection.js';
-import {getCellElementFromNodeAndColumnId, selectNodeByKey} from '../../testing/StorageItemsViewHelpers.js';
+import {createViewFunctionStub, type ViewFunctionStub} from '../../testing/ViewFunctionHelpers.js';
 import * as RenderCoordinator from '../../ui/components/render_coordinator/render_coordinator.js';
-import type * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
 
 import * as Resources from './application.js';
 
@@ -20,8 +18,8 @@ import View = Resources.ExtensionStorageItemsView;
 
 class ExtensionStorageItemsListener {
   #dispatcher: Common.ObjectWrapper.ObjectWrapper<View.ExtensionStorageItemsDispatcher.EventTypes>;
-  #edited: boolean = false;
-  #refreshed: boolean = false;
+  #edited = false;
+  #refreshed = false;
 
   constructor(dispatcher: Common.ObjectWrapper.ObjectWrapper<View.ExtensionStorageItemsDispatcher.EventTypes>) {
     this.#dispatcher = dispatcher;
@@ -35,10 +33,6 @@ class ExtensionStorageItemsListener {
         View.ExtensionStorageItemsDispatcher.Events.ITEM_EDITED, this.#itemsEdited, this);
     this.#dispatcher.removeEventListener(
         View.ExtensionStorageItemsDispatcher.Events.ITEMS_REFRESHED, this.#itemsRefreshed, this);
-  }
-
-  resetEdited(): void {
-    this.#edited = false;
   }
 
   #itemsEdited(): void {
@@ -76,7 +70,7 @@ describeWithMockConnection('ExtensionStorageItemsView', function() {
   const TEST_EXTENSION_ID = 'abc';
   const TEST_EXTENSION_NAME = 'Hello World';
 
-  const EXAMPLE_DATA: {[key: string]: string} = {a: 'foo', b: 'bar'};
+  const EXAMPLE_DATA: Record<string, string> = {a: 'foo', b: 'bar'};
 
   beforeEach(() => {
     target = createTarget();
@@ -85,6 +79,17 @@ describeWithMockConnection('ExtensionStorageItemsView', function() {
     extensionStorage = new Resources.ExtensionStorageModel.ExtensionStorage(
         extensionStorageModel, TEST_EXTENSION_ID, TEST_EXTENSION_NAME, Protocol.Extensions.StorageArea.Local);
   });
+
+  function createView(): {
+    view: View.ExtensionStorageItemsView,
+    viewFunction: ViewFunctionStub<typeof View.ExtensionStorageItemsView>,
+    toolbar: Resources.StorageItemsToolbar.StorageItemsToolbar,
+  } {
+    const toolbar = new Resources.StorageItemsToolbar.StorageItemsToolbar();
+    const viewFunction = createViewFunctionStub(View.ExtensionStorageItemsView, {toolbar});
+    const view = new View.ExtensionStorageItemsView(extensionStorage, viewFunction);
+    return {view, viewFunction, toolbar};
+  }
 
   it('displays items', async () => {
     assert.exists(extensionStorageModel);
@@ -95,16 +100,12 @@ describeWithMockConnection('ExtensionStorageItemsView', function() {
           getError: () => undefined,
         });
 
-    const view = new View.ExtensionStorageItemsView(extensionStorage);
+    const {view, viewFunction} = createView();
 
     const itemsListener = new ExtensionStorageItemsListener(view.extensionStorageItemsDispatcher);
     await itemsListener.waitForItemsRefreshed();
 
-    assert.deepEqual(
-        view.getEntriesForTesting(), Object.keys(EXAMPLE_DATA).map(key => ({key, value: EXAMPLE_DATA[key]})));
-
-    await RenderCoordinator.done();
-    view.detach();
+    assert.deepEqual(viewFunction.input.items, Object.keys(EXAMPLE_DATA).map(key => ({key, value: EXAMPLE_DATA[key]})));
   });
 
   it('correctly parses set values as JSON, with string fallback', async () => {
@@ -118,14 +119,9 @@ describeWithMockConnection('ExtensionStorageItemsView', function() {
     const setStorageItems =
         sinon.stub(extensionStorageModel.agent, 'invoke_setStorageItems').resolves({getError: () => undefined});
 
-    const view = new View.ExtensionStorageItemsView(extensionStorage);
-    const dataGrid = view.dataGridForTesting;
+    const {view, viewFunction} = createView();
     const itemsListener = new ExtensionStorageItemsListener(view.extensionStorageItemsDispatcher);
     await itemsListener.waitForItemsRefreshed();
-
-    view.markAsRoot();
-    view.show(document.body);
-    await raf();
 
     const expectedResults = [
       {input: '{foo: "bar"}', parsedValue: {foo: 'bar'}},
@@ -134,18 +130,15 @@ describeWithMockConnection('ExtensionStorageItemsView', function() {
 
     for (const {input, parsedValue} of expectedResults) {
       const key = Object.keys(EXAMPLE_DATA)[0];
-      const node = selectNodeByKey(dataGrid, key);
-      assert.exists(node);
-      await raf();
+      viewFunction.input.onEdit(new CustomEvent('edit', {
+        detail: {
+          node: {dataset: {key}} as unknown as HTMLElement,
+          columnId: 'value',
+          valueBeforeEditing: EXAMPLE_DATA[key],
+          newText: input
+        }
+      }));
 
-      const selectedNode = node as DataGrid.DataGrid.DataGridNode<Protocol.Storage.SharedStorageEntry>;
-      dataGrid.startEditingNextEditableColumnOfDataGridNode(selectedNode, 'value', true);
-
-      const cellElement = getCellElementFromNodeAndColumnId(dataGrid, selectedNode, 'value');
-      assert.exists(cellElement);
-
-      cellElement.textContent = input;
-      dispatchKeyDownEvent(cellElement, {key: 'Enter'});
       await itemsListener.waitForItemsEdited();
       setStorageItems.calledOnceWithExactly(
           {id: TEST_EXTENSION_ID, storageArea: Protocol.Extensions.StorageArea.Local, values: {[key]: parsedValue}});

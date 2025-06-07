@@ -34,7 +34,7 @@ export function setVeDebuggingEnabled(enabled: boolean, inspect?: (query: string
   }
 }
 
-// @ts-ignore
+// @ts-expect-error
 globalThis.setVeDebuggingEnabled = setVeDebuggingEnabled;
 
 export function processForDebugging(loggable: Loggable): void {
@@ -126,7 +126,7 @@ function processElementForDebugging(element: HTMLElement, loggingState: LoggingS
   }
 }
 
-type EventType = 'Click'|'Drag'|'Hover'|'Change'|'KeyDown'|'Resize';
+type EventType = 'Click'|'Drag'|'Hover'|'Change'|'KeyDown'|'Resize'|'SettingAccess'|'FunctionCall';
 export function processEventForDebugging(
     event: EventType, state: LoggingState|null, extraInfo?: EventAttributes): void {
   const format = localStorage.getItem('veDebugLoggingEnabled');
@@ -163,7 +163,9 @@ export function processEventForIntuitiveDebugging(
 
 export function processEventForTestDebugging(
     event: EventType, state: LoggingState|null, _extraInfo?: EventAttributes): void {
-  lastImpressionLogEntry = null;
+  if (event !== 'SettingAccess' && event !== 'FunctionCall') {
+    lastImpressionLogEntry = null;
+  }
   maybeLogDebugEvent(
       {interaction: `${event}: ${veTestKeys.get(state?.veid || 0) || (state?.veid ? '<UNKNOWN>' : '')}`});
   checkPendingEventExpectation();
@@ -194,6 +196,9 @@ export interface EventAttributes {
   height?: number;
   mouseButton?: number;
   doubleClick?: boolean;
+  name?: string;
+  numericValue?: number;
+  stringValue?: string;
 }
 
 interface VisualElementAttributes {
@@ -376,7 +381,7 @@ export function debugString(config: LoggingConfig): string {
   return components.join('; ');
 }
 
-const veDebugEventsLog: (IntuitiveLogEntry|AdHocAnalysisLogEntry|TestLogEntry)[] = [];
+const veDebugEventsLog: Array<IntuitiveLogEntry|AdHocAnalysisLogEntry|TestLogEntry> = [];
 
 function maybeLogDebugEvent(entry: IntuitiveLogEntry|AdHocAnalysisLogEntry|TestLogEntry): void {
   const format = localStorage.getItem('veDebugLoggingEnabled');
@@ -429,7 +434,8 @@ function findVeDebugImpression(veid: number, includeAncestorChain?: boolean): In
 
 function fieldValuesForSql<T>(
     obj: T,
-    fields: {strings: readonly(keyof T)[], numerics: readonly(keyof T)[], booleans: readonly(keyof T)[]}): string {
+    fields: {strings: ReadonlyArray<keyof T>, numerics: ReadonlyArray<keyof T>, booleans: ReadonlyArray<keyof T>}):
+    string {
   return [
     ...fields.strings.map(f => obj[f] ? `"${obj[f]}"` : '$NullString'),
     ...fields.numerics.map(f => obj[f] ?? 'null'),
@@ -643,9 +649,15 @@ function compareVeEvents(actual: TestLogEntry, expected: TestLogEntry): boolean 
   return false;
 }
 
-let pendingEventExpectation:
-    {expectedEvents: TestLogEntry[], missingEvents?: TestLogEntry[], success: () => void, fail: (arg0: Error) => void}|
-    null = null;
+interface PendingEventExpectation {
+  expectedEvents: TestLogEntry[];
+  missingEvents?: TestLogEntry[];
+  unmatchingEvents: TestLogEntry[];
+  success: () => void;
+  fail: (arg0: Error) => void;
+}
+
+let pendingEventExpectation: PendingEventExpectation|null = null;
 
 function formatImpressions(impressions: string[]): string {
   const result: string[] = [];
@@ -665,6 +677,10 @@ function formatImpressions(impressions: string[]): string {
 
 const EVENT_EXPECTATION_TIMEOUT = 5000;
 
+function formatVeEvents(events: TestLogEntry[]): string {
+  return events.map(e => 'interaction' in e ? e.interaction : formatImpressions(e.impressions)).join('\n');
+}
+
 // Verifies that VE events contains all the expected events in given order.
 // Unexpected VE events are ignored.
 export async function expectVeEvents(expectedEvents: TestLogEntry[]): Promise<void> {
@@ -672,18 +688,20 @@ export async function expectVeEvents(expectedEvents: TestLogEntry[]): Promise<vo
     throw new Error('VE events expectation already set. Cannot set another one until the previous is resolved');
   }
   const {promise, resolve: success, reject: fail} = Promise.withResolvers<void>();
-  pendingEventExpectation = {expectedEvents, success, fail};
+  pendingEventExpectation = {expectedEvents, success, fail, unmatchingEvents: []};
   checkPendingEventExpectation();
-  setTimeout(() => {
+
+  const timeout = setTimeout(() => {
     if (pendingEventExpectation?.missingEvents) {
       pendingEventExpectation.fail(new Error(
-          'Missing VE Events: ' +
-          pendingEventExpectation.missingEvents
-              .map(e => 'interaction' in e ? e.interaction : formatImpressions(e.impressions))
-              .join('\n')));
+          '\nMissing VE Events:\n' + formatVeEvents(pendingEventExpectation.missingEvents) +
+          '\nUnmatched VE Events:\n' + formatVeEvents(pendingEventExpectation.unmatchingEvents)));
     }
   }, EVENT_EXPECTATION_TIMEOUT);
-  return promise;
+
+  return await promise.finally(() => {
+    clearTimeout(timeout);
+  });
 }
 
 let numMatchedEvents = 0;
@@ -693,16 +711,38 @@ function checkPendingEventExpectation(): void {
     return;
   }
   const actualEvents = [...veDebugEventsLog] as TestLogEntry[];
+  let partialMatch = false;
+  const matchedImpressions = new Set<string>();
+  pendingEventExpectation.unmatchingEvents = [];
   for (let i = 0; i < pendingEventExpectation.expectedEvents.length; ++i) {
     const expectedEvent = pendingEventExpectation.expectedEvents[i];
     while (true) {
       if (actualEvents.length <= i) {
         pendingEventExpectation.missingEvents = pendingEventExpectation.expectedEvents.slice(i);
+        for (const event of pendingEventExpectation.missingEvents) {
+          if ('impressions' in event) {
+            event.impressions = event.impressions.filter(impression => !matchedImpressions.has(impression));
+          }
+        }
         return;
       }
       if (!compareVeEvents(actualEvents[i], expectedEvent)) {
+        if (partialMatch) {
+          const unmatching = {...actualEvents[i]};
+          if ('impressions' in unmatching && 'impressions' in expectedEvent) {
+            unmatching.impressions = unmatching.impressions.filter(impression => {
+              const matched = expectedEvent.impressions.includes(impression);
+              if (matched) {
+                matchedImpressions.add(impression);
+              }
+              return !matched;
+            });
+          }
+          pendingEventExpectation.unmatchingEvents.push(unmatching);
+        }
         actualEvents.splice(i, 1);
       } else {
+        partialMatch = true;
         break;
       }
     }
@@ -719,17 +759,17 @@ function getUnmatchedVeEvents(): string {
       .join('\n');
 }
 
-// @ts-ignore
+// @ts-expect-error
 globalThis.setVeDebugLoggingEnabled = setVeDebugLoggingEnabled;
-// @ts-ignore
+// @ts-expect-error
 globalThis.getUnmatchedVeEvents = getUnmatchedVeEvents;
-// @ts-ignore
+// @ts-expect-error
 globalThis.veDebugEventsLog = veDebugEventsLog;
-// @ts-ignore
+// @ts-expect-error
 globalThis.findVeDebugImpression = findVeDebugImpression;
-// @ts-ignore
+// @ts-expect-error
 globalThis.exportAdHocAnalysisLogForSql = exportAdHocAnalysisLogForSql;
-// @ts-ignore
+// @ts-expect-error
 globalThis.buildStateFlow = buildStateFlow;
-// @ts-ignore
+// @ts-expect-error
 globalThis.expectVeEvents = expectVeEvents;

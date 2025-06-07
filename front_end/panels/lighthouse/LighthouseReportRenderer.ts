@@ -29,9 +29,8 @@ export class LighthouseReportRenderer {
     let onViewTrace: (() => Promise<void>)|undefined = undefined;
     if (artifacts) {
       onViewTrace = async () => {
-        const defaultPassTrace = artifacts.traces.defaultPass;
         Host.userMetrics.actionTaken(Host.UserMetrics.Action.LighthouseViewTrace);
-        const trace = new SDK.TraceObject.TraceObject(defaultPassTrace.traceEvents);
+        const trace = new SDK.TraceObject.TraceObject(artifacts.Trace.traceEvents);
         void Common.Revealer.reveal(trace);
       };
     }
@@ -88,9 +87,9 @@ export class LighthouseReportRenderer {
         ThemeSupport.ThemeChangeEvent.eventName, updateDarkModeIfNecessary);
     updateDarkModeIfNecessary();
 
-    // @ts-ignore Expose LHR on DOM for e2e tests
+    // @ts-expect-error Expose LHR on DOM for e2e tests
     reportEl._lighthouseResultForTesting = lhr;
-    // @ts-ignore Expose Artifacts on DOM for e2e tests
+    // @ts-expect-error Expose Artifacts on DOM for e2e tests
     reportEl._lighthouseArtifactsForTesting = artifacts;
 
     // This should block the report rendering as we need visual logging ready

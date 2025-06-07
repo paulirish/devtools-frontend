@@ -15,7 +15,7 @@ import {
   addDecorationToEvent,
   buildGroupStyle,
   buildTrackHeader,
-  getFormattedTime,
+  getDurationString,
 } from './AppenderUtils.js';
 import {
   type CompatibilityTracksAppender,
@@ -130,7 +130,7 @@ const UIStrings = {
    * @example {https://google.com} PH1
    */
   workletServiceS: 'Auction Worklet service — {PH1}',
-};
+} as const;
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/ThreadAppender.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -147,22 +147,23 @@ export class ThreadAppender implements TrackAppender {
   #compatibilityBuilder: CompatibilityTracksAppender;
   #parsedTrace: Trace.Handlers.Types.ParsedTrace;
 
-  #entries: Trace.Types.Events.Event[] = [];
+  #entries: readonly Trace.Types.Events.Event[] = [];
   #tree: Trace.Extras.TraceTree.TopDownRootNode;
   #processId: Trace.Types.Events.ProcessID;
   #threadId: Trace.Types.Events.ThreadID;
   #threadDefaultName: string;
   #expanded = false;
-  #headerAppended: boolean = false;
+  #headerAppended = false;
   readonly threadType: Trace.Handlers.Threads.ThreadType = Trace.Handlers.Threads.ThreadType.MAIN_THREAD;
   readonly isOnMainFrame: boolean;
   #showAllEventsEnabled = Root.Runtime.experiments.isEnabled('timeline-show-all-events');
-  #url: string = '';
+  #url = '';
   #headerNestingLevel: number|null = null;
   constructor(
       compatibilityBuilder: CompatibilityTracksAppender, parsedTrace: Trace.Handlers.Types.ParsedTrace,
       processId: Trace.Types.Events.ProcessID, threadId: Trace.Types.Events.ThreadID, threadName: string|null,
-      type: Trace.Handlers.Threads.ThreadType) {
+      type: Trace.Handlers.Threads.ThreadType, entries: readonly Trace.Types.Events.Event[],
+      tree: Trace.Helpers.TreeHelpers.TraceEntryTree) {
     this.#compatibilityBuilder = compatibilityBuilder;
     // TODO(crbug.com/1456706):
     // The values for this color generator have been taken from the old
@@ -178,22 +179,15 @@ export class ThreadAppender implements TrackAppender {
     this.#processId = processId;
     this.#threadId = threadId;
 
-    // When loading a CPU profile, only CPU data will be available, thus
-    // we get the data from the SamplesHandler.
-    const entries = type === Trace.Handlers.Threads.ThreadType.CPU_PROFILE ?
-        this.#parsedTrace.Samples?.profilesInProcess.get(processId)?.get(threadId)?.profileCalls :
-        this.#parsedTrace.Renderer?.processes.get(processId)?.threads?.get(threadId)?.entries;
-    // const tree = type === Trace.Handlers.Threads.ThreadType.CPU_PROFILE ?
-    //     this.#parsedTrace.Samples?.profilesInProcess.get(processId)?.get(threadId)?.profileTree :
-    //     this.#parsedTrace.Renderer?.processes.get(processId)?.threads?.get(threadId)?.tree;
 
 
-    const visibleEventsFilter = new Trace.Extras.TraceFilter.VisibleEventsFilter(Utils.EntryStyles.visibleTypes());
+  const visibleEventsFilter = new Trace.Extras.TraceFilter.VisibleEventsFilter(Utils.EntryStyles.visibleTypes());
 
-    const tree = new Trace.Extras.TraceTree.TopDownRootNode(
+    // redefine tree
+
+    tree = new Trace.Extras.TraceTree.TopDownRootNode(
         entries ?? [], [visibleEventsFilter], Trace.Types.Timing.MilliSeconds(0),
         Trace.Types.Timing.MilliSeconds(Infinity), false, null, false);
-
 
     if (!entries || !tree) {
       throw new Error(`Could not find data for thread with id ${threadId} in process with id ${processId}`);
@@ -229,7 +223,7 @@ export class ThreadAppender implements TrackAppender {
    * @returns the first available level to append more data after having
    * appended the track's events.
    */
-  appendTrackAtLevel(trackStartLevel: number, expanded: boolean = false): number {
+  appendTrackAtLevel(trackStartLevel: number, expanded = false): number {
     if (this.#entries.length === 0) {
       return trackStartLevel;
     }
@@ -380,7 +374,7 @@ export class ThreadAppender implements TrackAppender {
     return this.#url;
   }
 
-  getEntries(): Trace.Types.Events.Event[] {
+  getEntries(): readonly Trace.Types.Events.Event[] {
     return this.#entries;
   }
 
@@ -476,8 +470,8 @@ export class ThreadAppender implements TrackAppender {
    * listed is done before appending.
    */
   #appendNodesAtLevel(
-      nodes: Iterable<Trace.Extras.TraceTree.Node>, startingLevel: number,
-      parentIsIgnoredListed: boolean = false): number {
+      nodes: Iterable<Trace.Helpers.TreeHelpers.TraceEntryNode>, startingLevel: number,
+      parentIsIgnoredListed = false): number {
     const invisibleEntries =
         ModificationsManager.ModificationsManager.activeManager()?.getEntriesFilter().invisibleEntries() ?? [];
     let maxDepthInTree = startingLevel;
@@ -564,6 +558,9 @@ export class ThreadAppender implements TrackAppender {
       if (event.callFrame.functionName === '(idle)') {
         return Utils.EntryStyles.getCategoryStyles().idle.getComputedColorValue();
       }
+      if (event.callFrame.functionName === '(program)') {
+        return Utils.EntryStyles.getCategoryStyles().other.getComputedColorValue();
+      }
       if (event.callFrame.scriptId === '0') {
         // If we can not match this frame to a script, return the
         // generic "scripting" color.
@@ -591,13 +588,13 @@ export class ThreadAppender implements TrackAppender {
   setPopoverInfo(event: Trace.Types.Events.Event, info: PopoverInfo): void {
     if (Trace.Types.Events.isParseHTML(event)) {
       const startLine = event.args['beginData']['startLine'];
-      const endLine = event.args['endData'] && event.args['endData']['endLine'];
+      const endLine = event.args['endData']?.['endLine'];
       const eventURL = event.args['beginData']['url'] as Platform.DevToolsPath.UrlString;
       const url = Bindings.ResourceUtils.displayNameForURL(eventURL);
       const range = (endLine !== -1 || endLine === startLine) ? `${startLine}...${endLine}` : startLine;
       info.title += ` - ${url} [${range}]`;
     }
     const selfTime = this.#parsedTrace.Renderer.entryToNode.get(event)?.selfTime;
-    info.formattedTime = getFormattedTime(event.dur, selfTime);
+    info.formattedTime = getDurationString(event.dur, selfTime);
   }
 }

@@ -2,14 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {assert, AssertionError} from 'chai';
+import {AssertionError} from 'chai';
 import type * as puppeteer from 'puppeteer-core';
 
 import {AsyncScope} from '../conductor/async-scope.js';
 import type {DevToolsFrontendReloadOptions} from '../conductor/frontend_tab.js';
 import {getDevToolsFrontendHostname, reloadDevTools} from '../conductor/hooks.js';
-import {platform} from '../conductor/mocha-interface-helpers.js';
-import {getBrowserAndPages, getTestServerPort} from '../conductor/puppeteer-state.js';
+import {getBrowserAndPages} from '../conductor/puppeteer-state.js';
+import {getTestServerPort} from '../conductor/server_port.js';
+import type {DevToolsPage} from '../e2e_non_hosted/shared/frontend-helper.js';
+import type {InspectedPage} from '../e2e_non_hosted/shared/target-helper.js';
+
+import {getBrowserAndPagesWrappers} from './non_hosted_wrappers.js';
 
 export {platform} from '../conductor/mocha-interface-helpers.js';
 
@@ -31,175 +35,85 @@ declare global {
 const globalThis: any = global;
 
 export interface ClickOptions {
-  root?: puppeteer.JSHandle;
+  root?: puppeteer.ElementHandle;
   clickOptions?: puppeteer.ClickOptions;
   maxPixelsFromLeft?: number;
 }
 
-const CONTROL_OR_META = platform === 'mac' ? 'Meta' : 'Control';
 export const withControlOrMetaKey = async (action: () => Promise<void>, root = getBrowserAndPages().frontend) => {
-  await waitForFunction(async () => {
-    await root.keyboard.down(CONTROL_OR_META);
-    try {
-      await action();
-      return true;
-    } finally {
-      await root.keyboard.up(CONTROL_OR_META);
-    }
-  });
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  await devToolsPage.withControlOrMetaKey(action, root);
 };
 
 export const click = async (selector: string, options?: ClickOptions) => {
-  return await performActionOnSelector(
-      selector, {root: options?.root}, element => element.click(options?.clickOptions));
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  return await devToolsPage.click(selector, options);
 };
 
-export const hover = async (selector: string, options?: {root?: puppeteer.JSHandle}) => {
-  return await performActionOnSelector(selector, {root: options?.root}, element => element.hover());
+export const hover = async (selector: string, options?: {root?: puppeteer.ElementHandle}) => {
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  return await devToolsPage.hover(selector, options);
 };
 
-type Action = (element: puppeteer.ElementHandle) => Promise<void>;
-
-async function performActionOnSelector(
-    selector: string, options: {root?: puppeteer.JSHandle}, action: Action): Promise<puppeteer.ElementHandle> {
-  // TODO(crbug.com/1410168): we should refactor waitFor to be compatible with
-  // Puppeteer's syntax for selectors.
-  const queryHandlers = new Set([
-    'pierceShadowText',
-    'pierce',
-    'aria',
-    'xpath',
-    'text',
-  ]);
-  let queryHandler = 'pierce';
-  for (const handler of queryHandlers) {
-    const prefix = handler + '/';
-    if (selector.startsWith(prefix)) {
-      queryHandler = handler;
-      selector = selector.substring(prefix.length);
-      break;
-    }
-  }
-  return waitForFunction(async () => {
-    const element = await waitFor(selector, options?.root, undefined, queryHandler);
-    try {
-      await action(element);
-      return element;
-    } catch {
-      // A bit of delay to not retry too often.
-      await new Promise(resolve => setTimeout(resolve, 50));
-    }
-    return undefined;
-  });
+/**
+ * Schedules a task in the frontend page that ensures that previously
+ * handled tasks have been handled.
+ */
+export async function drainFrontendTaskQueue(): Promise<void> {
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  await devToolsPage.drainTaskQueue();
 }
 
 /**
  * @deprecated This method is not able to recover from unstable DOM. Use click(selector) instead.
  */
 export async function clickElement(element: puppeteer.ElementHandle, options?: ClickOptions): Promise<void> {
-  // Retries here just in case the element gets connected to DOM / becomes visible.
-  await waitForFunction(async () => {
-    try {
-      await element.click(options?.clickOptions);
-      return true;
-    } catch {
-      return false;
-    }
-  });
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  await devToolsPage.clickElement(element, options);
 }
 
 /**
  * @deprecated This method is not able to recover from unstable DOM. Use hover(selector) instead.
  */
 export async function hoverElement(element: puppeteer.ElementHandle): Promise<void> {
+  const {devToolsPage} = getBrowserAndPagesWrappers();
   // Retries here just in case the element gets connected to DOM / becomes visible.
-  await waitForFunction(async () => {
-    try {
-      await element.hover();
-      return true;
-    } catch {
-      return false;
-    }
-  });
+  await devToolsPage.hoverElement(element);
 }
 
 export const doubleClick =
-    async (selector: string, options?: {root?: puppeteer.JSHandle, clickOptions?: puppeteer.ClickOptions}) => {
-  const passedClickOptions = (options && options.clickOptions) || {};
-  const clickOptionsWithDoubleClick: puppeteer.ClickOptions = {
-    ...passedClickOptions,
-    clickCount: 2,
-  };
-  return click(selector, {
-    ...options,
-    clickOptions: clickOptionsWithDoubleClick,
-  });
+    async (selector: string, options?: {root?: puppeteer.ElementHandle, clickOptions?: puppeteer.ClickOptions}) => {
+  const devToolsPage = getBrowserAndPagesWrappers().devToolsPage;
+  return await devToolsPage.doubleClick(selector, options);
 };
 
 export const typeText = async (text: string) => {
-  const {frontend} = getBrowserAndPages();
-  await frontend.keyboard.type(text);
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  await devToolsPage.typeText(text);
 };
 
-export const pressKey =
-    async (key: puppeteer.KeyInput, modifiers?: {control?: boolean, alt?: boolean, shift?: boolean}) => {
-  const {frontend} = getBrowserAndPages();
-  if (modifiers) {
-    if (modifiers.control) {
-      if (platform === 'mac') {
-        // Use command key on mac
-        await frontend.keyboard.down('Meta');
-      } else {
-        await frontend.keyboard.down('Control');
-      }
-    }
-    if (modifiers.alt) {
-      await frontend.keyboard.down('Alt');
-    }
-    if (modifiers.shift) {
-      await frontend.keyboard.down('Shift');
-    }
-  }
-  await frontend.keyboard.press(key);
-  if (modifiers) {
-    if (modifiers.shift) {
-      await frontend.keyboard.up('Shift');
-    }
-    if (modifiers.alt) {
-      await frontend.keyboard.up('Alt');
-    }
-    if (modifiers.control) {
-      if (platform === 'mac') {
-        // Use command key on mac
-        await frontend.keyboard.up('Meta');
-      } else {
-        await frontend.keyboard.up('Control');
-      }
-    }
-  }
+export const pressKey = async (
+    key: puppeteer.KeyInput, modifiers?: {control?: boolean, alt?: boolean, shift?: boolean},
+    devToolsPage: DevToolsPage = getBrowserAndPagesWrappers().devToolsPage) => {
+  await devToolsPage.pressKey(key, modifiers);
 };
 
 export const pasteText = async (text: string) => {
-  const {frontend} = getBrowserAndPages();
-  await frontend.keyboard.sendCharacter(text);
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  await devToolsPage.pasteText(text);
 };
 
-// Get a single element handle. Uses `pierce` handler per default for piercing Shadow DOM.
-export const $ =
-    async<ElementType extends Element = Element>(selector: string, root?: puppeteer.JSHandle, handler = 'pierce') => {
-  const {frontend} = getBrowserAndPages();
-  const rootElement = root ? root as puppeteer.ElementHandle : frontend;
-  const element = await rootElement.$(`${handler}/${selector}`) as puppeteer.ElementHandle<ElementType>;
-  return element;
+export const $ = async<ElementType extends Element|null = null, Selector extends string = string>(
+    selector: Selector, root?: puppeteer.ElementHandle, handler = 'pierce') => {
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  return await devToolsPage.$<ElementType, Selector>(selector, root, handler);
 };
 
 // Get multiple element handles. Uses `pierce` handler per default for piercing Shadow DOM.
-export const $$ =
-    async<ElementType extends Element = Element>(selector: string, root?: puppeteer.JSHandle, handler = 'pierce') => {
-  const {frontend} = getBrowserAndPages();
-  const rootElement = root ? root.asElement() || frontend : frontend;
-  const elements = await rootElement.$$(`${handler}/${selector}`) as puppeteer.ElementHandle<ElementType>[];
-  return elements;
+export const $$ = async<ElementType extends Element|null = null, Selector extends string = string>(
+    selector: Selector, root?: puppeteer.JSHandle, handler = 'pierce', devToolsPage?: DevToolsPage) => {
+  devToolsPage = devToolsPage || getBrowserAndPagesWrappers().devToolsPage;
+  return await devToolsPage.$$<ElementType, Selector>(selector, root, handler);
 };
 
 /**
@@ -208,8 +122,9 @@ export const $$ =
  * @param textContent The text content to search for.
  * @param root The root of the search.
  */
-export const $textContent = async (textContent: string, root?: puppeteer.JSHandle) => {
-  return $(textContent, root, 'pierceShadowText');
+export const $textContent = async (textContent: string, root?: puppeteer.ElementHandle) => {
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  return await devToolsPage.$textContent(textContent, root);
 };
 
 /**
@@ -218,22 +133,26 @@ export const $textContent = async (textContent: string, root?: puppeteer.JSHandl
  * @param textContent The text content to search for.
  * @param root The root of the search.
  */
-export const $$textContent = async (textContent: string, root?: puppeteer.JSHandle) => {
-  return $$(textContent, root, 'pierceShadowText');
+export const $$textContent = async (textContent: string, root?: puppeteer.ElementHandle) => {
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  return await devToolsPage.$$textContent(textContent, root);
 };
 
-export const timeout = (duration: number) => new Promise(resolve => setTimeout(resolve, duration));
+export const timeout = (duration: number) => {
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  return devToolsPage.timeout(duration);
+};
 
 export const getTextContent =
-    async<ElementType extends Element = Element>(selector: string, root?: puppeteer.JSHandle) => {
-  const text = await (await $<ElementType>(selector, root))?.evaluate(node => node.textContent);
-  return text ?? undefined;
+    async<ElementType extends Element = Element>(selector: string, root?: puppeteer.ElementHandle) => {
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  return await devToolsPage.getTextContent<ElementType>(selector, root);
 };
 
 export const getAllTextContents =
     async(selector: string, root?: puppeteer.JSHandle, handler = 'pierce'): Promise<Array<string|null>> => {
-  const allElements = await $$(selector, root, handler);
-  return Promise.all(allElements.map(e => e.evaluate(e => e.textContent)));
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  return await devToolsPage.getAllTextContents(selector, root, handler);
 };
 
 /**
@@ -244,100 +163,68 @@ export const getAllTextContents =
  * @returns array containing text contents from visible elements
  */
 export const getVisibleTextContents = async (selector: string) => {
-  const allElements = await $$(selector);
-  const texts = await Promise.all(
-      allElements.map(el => el.evaluate(node => node.checkVisibility() ? node.textContent?.trim() : undefined)));
-  return texts.filter(content => typeof (content) === 'string');
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  return await devToolsPage.getVisibleTextContents(selector);
 };
 
-export const waitFor = async<ElementType extends Element = Element>(
-    selector: string, root?: puppeteer.JSHandle, asyncScope = new AsyncScope(), handler?: string) => {
-  return await asyncScope.exec(() => waitForFunction(async () => {
-                                 const element = await $<ElementType>(selector, root, handler);
-                                 return (element || undefined);
-                               }, asyncScope), `Waiting for element matching selector '${selector}'`);
+export const waitFor = async<ElementType extends Element|null = null, Selector extends string = string>(
+    selector: Selector, root?: puppeteer.ElementHandle, asyncScope = new AsyncScope(), handler?: string) => {
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  return await devToolsPage.waitFor<ElementType, Selector>(selector, root, asyncScope, handler);
 };
 
-export const waitForVisible = async<ElementType extends Element = Element>(
-    selector: string, root?: puppeteer.JSHandle, asyncScope = new AsyncScope(), handler?: string) => {
-  return await asyncScope.exec(() => waitForFunction(async () => {
-                                 const element = await $<ElementType>(selector, root, handler);
-                                 const visible = await element.evaluate(node => node.checkVisibility());
-                                 return visible ? element : undefined;
-                               }, asyncScope), `Waiting for element matching selector '${selector}' to be visible`);
+export const waitForVisible = async<ElementType extends Element|null = null, Selector extends string = string>(
+    selector: Selector, root?: puppeteer.ElementHandle, asyncScope = new AsyncScope(), handler?: string) => {
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  return await devToolsPage.waitForVisible<ElementType, Selector>(selector, root, asyncScope, handler);
 };
 
-export const waitForMany = async (
-    selector: string, count: number, root?: puppeteer.JSHandle, asyncScope = new AsyncScope(), handler?: string) => {
-  return await asyncScope.exec(() => waitForFunction(async () => {
-                                 const elements = await $$(selector, root, handler);
-                                 return elements.length >= count ? elements : undefined;
-                               }, asyncScope), `Waiting for ${count} elements to match selector '${selector}'`);
+export const waitForMany = async<ElementType extends Element|null = null, Selector extends string = string>(
+    selector: Selector, count: number, root?: puppeteer.ElementHandle, asyncScope = new AsyncScope(),
+    handler?: string) => {
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  return await devToolsPage.waitForMany<ElementType, Selector>(selector, count, root, asyncScope, handler);
 };
 
 export const waitForNone =
-    async (selector: string, root?: puppeteer.JSHandle, asyncScope = new AsyncScope(), handler?: string) => {
-  return await asyncScope.exec(() => waitForFunction(async () => {
-                                 const elements = await $$(selector, root, handler);
-                                 if (elements.length === 0) {
-                                   return true;
-                                 }
-                                 return false;
-                               }, asyncScope), `Waiting for no elements to match selector '${selector}'`);
+    async (selector: string, root?: puppeteer.ElementHandle, asyncScope = new AsyncScope(), handler?: string) => {
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  return await devToolsPage.waitForNone(selector, root, asyncScope, handler);
 };
 
 export const waitForAria = <ElementType extends Element = Element>(
-    selector: string, root?: puppeteer.JSHandle, asyncScope = new AsyncScope()) => {
-  return waitFor<ElementType>(selector, root, asyncScope, 'aria');
+    selector: string, root?: puppeteer.ElementHandle, asyncScope = new AsyncScope()) => {
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  return devToolsPage.waitForAria<ElementType>(selector, root, asyncScope);
 };
 
-export const waitForAriaNone = (selector: string, root?: puppeteer.JSHandle, asyncScope = new AsyncScope()) => {
-  return waitForNone(selector, root, asyncScope, 'aria');
+export const waitForAriaNone = (selector: string, root?: puppeteer.ElementHandle, asyncScope = new AsyncScope()) => {
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  return devToolsPage.waitForAriaNone(selector, root, asyncScope);
 };
 
 export const waitForElementWithTextContent =
-    (textContent: string, root?: puppeteer.JSHandle, asyncScope = new AsyncScope()) => {
-      return waitFor(textContent, root, asyncScope, 'pierceShadowText');
+    (textContent: string, root?: puppeteer.ElementHandle, asyncScope = new AsyncScope()) => {
+      const {devToolsPage} = getBrowserAndPagesWrappers();
+      return devToolsPage.waitForElementWithTextContent(textContent, root, asyncScope);
     };
 
 export const waitForElementsWithTextContent =
-    (textContent: string, root?: puppeteer.JSHandle, asyncScope = new AsyncScope()) => {
-      return asyncScope.exec(() => waitForFunction(async () => {
-                               const elems = await $$textContent(textContent, root);
-                               if (elems && elems.length) {
-                                 return elems;
-                               }
-
-                               return undefined;
-                             }, asyncScope), `Waiting for elements with textContent '${textContent}'`);
+    (textContent: string, root?: puppeteer.ElementHandle, asyncScope = new AsyncScope()) => {
+      const {devToolsPage} = getBrowserAndPagesWrappers();
+      return devToolsPage.waitForElementsWithTextContent(textContent, root, asyncScope);
     };
 
 export const waitForNoElementsWithTextContent =
-    (textContent: string, root?: puppeteer.JSHandle, asyncScope = new AsyncScope()) => {
-      return asyncScope.exec(() => waitForFunction(async () => {
-                               const elems = await $$textContent(textContent, root);
-                               if (elems && elems.length === 0) {
-                                 return true;
-                               }
-
-                               return false;
-                             }, asyncScope), `Waiting for no elements with textContent '${textContent}'`);
+    (textContent: string, root?: puppeteer.ElementHandle, asyncScope = new AsyncScope()) => {
+      const {devToolsPage} = getBrowserAndPagesWrappers();
+      return devToolsPage.waitForNoElementsWithTextContent(textContent, root, asyncScope);
     };
 
 export const waitForFunction =
     async<T>(fn: () => Promise<T|undefined>, asyncScope = new AsyncScope(), description?: string) => {
-  const innerFunction = async () => {
-    while (true) {
-      AsyncScope.abortSignal?.throwIfAborted();
-      const result = await fn();
-      AsyncScope.abortSignal?.throwIfAborted();
-      if (result) {
-        return result;
-      }
-      await timeout(100);
-    }
-  };
-  return await asyncScope.exec(innerFunction, description);
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  return await devToolsPage.waitForFunction(fn, asyncScope, description);
 };
 
 export const waitForFunctionWithTries = async<T>(
@@ -345,35 +232,22 @@ export const waitForFunctionWithTries = async<T>(
       tries: Number.MAX_SAFE_INTEGER,
     },
     asyncScope = new AsyncScope()) => {
-  return await asyncScope.exec(async () => {
-    let tries = 0;
-    while (tries++ < options.tries) {
-      const result = await fn();
-      if (result) {
-        return result;
-      }
-      await timeout(100);
-    }
-    return undefined;
-  });
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  return await devToolsPage.waitForFunctionWithTries(fn, options, asyncScope);
 };
 
 export const waitForWithTries = async (
-    selector: string, root?: puppeteer.JSHandle, options: {tries: number} = {
+    selector: string, root?: puppeteer.ElementHandle, options: {tries: number} = {
       tries: Number.MAX_SAFE_INTEGER,
     },
     asyncScope = new AsyncScope(), handler?: string) => {
-  return await asyncScope.exec(() => waitForFunctionWithTries(async () => {
-                                 const element = await $(selector, root, handler);
-                                 return (element || undefined);
-                               }, options, asyncScope));
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  return await devToolsPage.waitForWithTries(selector, root, options, asyncScope, handler);
 };
 
-export const debuggerStatement = (frontend: puppeteer.Page) => {
-  return frontend.evaluate(() => {
-    // eslint-disable-next-line no-debugger
-    debugger;
-  });
+export const debuggerStatement = (_frontend: puppeteer.Page) => {
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  return devToolsPage.debuggerStatement();
 };
 
 export const logToStdOut = (msg: string) => {
@@ -423,39 +297,43 @@ export const setDevToolsSettings = async (settings: Record<string, string>) => {
   await reloadDevTools();
 };
 
-export function goToHtml(html: string): Promise<void> {
-  return goTo(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+export async function goToHtml(html: string) {
+  const {inspectedPage} = getBrowserAndPagesWrappers();
+  return await inspectedPage.goTo(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
 }
 
 export const goTo = async (url: string, options: puppeteer.WaitForOptions = {}) => {
-  const {target} = getBrowserAndPages();
-  await target.goto(url, options);
+  const {inspectedPage} = getBrowserAndPagesWrappers();
+  await inspectedPage.goTo(url, options);
 };
 
-export const overridePermissions = async (permissions: puppeteer.Permission[]) => {
-  const {browser} = getBrowserAndPages();
-  await browser.defaultBrowserContext().overridePermissions(`https://localhost:${getTestServerPort()}`, permissions);
+export const overridePermissions =
+    async (permissions: puppeteer.Permission[], inspectedPage = getBrowserAndPagesWrappers().inspectedPage) => {
+  await inspectedPage.page.browserContext().overridePermissions(
+      `https://localhost:${inspectedPage.serverPort}`, permissions);
 };
 
-export const clearPermissionsOverride = async () => {
-  const {browser} = getBrowserAndPages();
-  await browser.defaultBrowserContext().clearPermissionOverrides();
+export const clearPermissionsOverride = async (inspectedPage = getBrowserAndPagesWrappers().inspectedPage) => {
+  await inspectedPage.page.browserContext().clearPermissionOverrides();
 };
 
-export const goToResource = async (path: string, options: puppeteer.WaitForOptions = {}) => {
-  await goTo(`${getResourcesPath()}/${path}`, options);
+export const goToResource =
+    async (path: string, options: puppeteer.WaitForOptions&{inspectedPage?: InspectedPage} = {}) => {
+  const inspectedPage = options.inspectedPage ?? getBrowserAndPagesWrappers().inspectedPage;
+  await inspectedPage.goToResource(path, options);
 };
 
 export const goToResourceWithCustomHost = async (host: string, path: string) => {
-  assert.isTrue(host.endsWith('.test'), 'Only custom hosts with a .test domain are allowed.');
-  await goTo(`${getResourcesPath(host)}/${path}`);
+  const {inspectedPage} = getBrowserAndPagesWrappers();
+  await inspectedPage.goToResourceWithCustomHost(host, path);
 };
 
-export const getResourcesPath = (host: string = 'localhost') => {
-  return `https://${host}:${getTestServerPort()}/test/e2e/resources`;
+export const getResourcesPath = (host = 'localhost') => {
+  const {inspectedPage} = getBrowserAndPagesWrappers();
+  return inspectedPage.getResourcesPath(host);
 };
 
-export const step = async (description: string, step: Function) => {
+export const step = async<T = unknown>(description: string, step: () => Promise<T>| T): Promise<Awaited<T>> => {
   try {
     return await step();
   } catch (error) {
@@ -472,161 +350,66 @@ export const step = async (description: string, step: Function) => {
 };
 
 export const waitForAnimationFrame = async () => {
-  const {frontend} = getBrowserAndPages();
-
-  await frontend.waitForFunction(() => {
-    return new Promise(resolve => {
-      requestAnimationFrame(resolve);
-    });
-  });
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  await devToolsPage.waitForAnimationFrame();
 };
 
 export const activeElement = async () => {
-  const {frontend} = getBrowserAndPages();
-
-  await waitForAnimationFrame();
-
-  return frontend.evaluateHandle(() => {
-    let activeElement = document.activeElement;
-
-    while (activeElement && activeElement.shadowRoot) {
-      activeElement = activeElement.shadowRoot.activeElement;
-    }
-
-    if (!activeElement) {
-      throw new Error('No active element found');
-    }
-
-    return activeElement;
-  });
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  return await devToolsPage.activeElement();
 };
 
 export const activeElementTextContent = async () => {
-  const element = await activeElement();
-  return element.evaluate(node => node.textContent);
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  return await devToolsPage.activeElementTextContent();
 };
 
 export const activeElementAccessibleName = async () => {
-  const element = await activeElement();
-  return element.evaluate(node => node.getAttribute('aria-label') || node.getAttribute('title'));
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  return await devToolsPage.activeElementAccessibleName();
 };
 
 export const tabForward = async (page?: puppeteer.Page) => {
-  let targetPage: puppeteer.Page;
-  if (page) {
-    targetPage = page;
-  } else {
-    const {frontend} = getBrowserAndPages();
-    targetPage = frontend;
-  }
-
-  await targetPage.keyboard.press('Tab');
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  await devToolsPage.tabForward(page);
 };
 
 export const tabBackward = async (page?: puppeteer.Page) => {
-  let targetPage: puppeteer.Page;
-  if (page) {
-    targetPage = page;
-  } else {
-    const {frontend} = getBrowserAndPages();
-    targetPage = frontend;
-  }
-
-  await targetPage.keyboard.down('Shift');
-  await targetPage.keyboard.press('Tab');
-  await targetPage.keyboard.up('Shift');
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  await devToolsPage.tabBackward(page);
 };
 
-type Awaitable<T> = T|PromiseLike<T>;
-
-export const selectTextFromNodeToNode = async (
-    from: Awaitable<puppeteer.ElementHandle>, to: Awaitable<puppeteer.ElementHandle>, direction: 'up'|'down') => {
-  const {target} = getBrowserAndPages();
-
-  // The clipboard api does not allow you to copy, unless the tab is focused.
-  await target.bringToFront();
-
-  return target.evaluate(async (from, to, direction) => {
-    const selection = (from.getRootNode() as Document).getSelection();
-    const range = document.createRange();
-    if (direction === 'down') {
-      range.setStartBefore(from);
-      range.setEndAfter(to);
-    } else {
-      range.setStartBefore(to);
-      range.setEndAfter(from);
-    }
-
-    if (selection) {
-      selection.removeAllRanges();
-      selection.addRange(range);
-    }
-
-    document.execCommand('copy');
-
-    return navigator.clipboard.readText();
-  }, await from, await to, direction);
+export const clickMoreTabsButton = async (
+    root?: puppeteer.ElementHandle<Element>,
+    devToolsPage: DevToolsPage = getBrowserAndPagesWrappers().devToolsPage) => {
+  return await devToolsPage.clickMoreTabsButton(root);
 };
 
-export const clickMoreTabsButton = async (root?: puppeteer.ElementHandle<Element>) => {
-  await click('aria/More tabs', {root});
-};
-
-export const closePanelTab = async (panelTabSelector: string) => {
-  // Get close button from tab element
-  const selector = `${panelTabSelector} > .tabbed-pane-close-button`;
-  await click(selector);
-  await waitForNone(selector);
+export const closePanelTab =
+    async (panelTabSelector: string, devToolsPage: DevToolsPage = getBrowserAndPagesWrappers().devToolsPage) => {
+  return await devToolsPage.closePanelTab(panelTabSelector);
 };
 
 export const closeAllCloseableTabs = async () => {
-  // get all closeable tools by looking for the available x buttons on tabs
-  const selector = '.tabbed-pane-close-button';
-  const allCloseButtons = await $$(selector);
-
-  // Get all panel ids
-  const panelTabIds = await Promise.all(allCloseButtons.map(button => {
-    return button.evaluate(button => button.parentElement ? button.parentElement.id : '');
-  }));
-
-  // Close each tab
-  for (const tabId of panelTabIds) {
-    const selector = `#${tabId}`;
-    await closePanelTab(selector);
-  }
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  return await devToolsPage.closeAllCloseableTabs();
 };
 
 // Noisy! Do not leave this in your test but it may be helpful
 // when debugging.
 export const enableCDPLogging = async () => {
-  const {frontend} = getBrowserAndPages();
-  await frontend.evaluate(() => {
-    globalThis.ProtocolClient.test.dumpProtocol = console.log;  // eslint-disable-line no-console
-  });
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  return await devToolsPage.enableCDPLogging();
 };
 
 export const enableCDPTracking = async () => {
-  const {frontend} = getBrowserAndPages();
-  await frontend.evaluate(() => {
-    globalThis.__messageMapForTest = new Map();
-    globalThis.ProtocolClient.test.onMessageSent = (message: {method: string, id: number}) => {
-      globalThis.__messageMapForTest.set(message.id, message.method);
-    };
-    globalThis.ProtocolClient.test.onMessageReceived = (message: {id?: number}) => {
-      if (message.id) {
-        globalThis.__messageMapForTest.delete(message.id);
-      }
-    };
-  });
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  return await devToolsPage.enableCDPTracking();
 };
 
 export const logOutstandingCDP = async () => {
-  const {frontend} = getBrowserAndPages();
-  await frontend.evaluate(() => {
-    for (const entry of globalThis.__messageMapForTest) {
-      console.error(entry);
-    }
-  });
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  return await devToolsPage.logOutstandingCDP();
 };
 
 export const selectOption = async (select: puppeteer.ElementHandle<HTMLSelectElement>, value: string) => {
@@ -638,41 +421,20 @@ export const selectOption = async (select: puppeteer.ElementHandle<HTMLSelectEle
   }, value);
 };
 
-export const scrollElementIntoView = async (selector: string, root?: puppeteer.JSHandle) => {
-  const element = await $(selector, root);
-
-  if (!element) {
-    throw new Error(`Unable to find element with selector "${selector}"`);
-  }
-
-  await element.evaluate(el => {
-    el.scrollIntoView();
-  });
+export const scrollElementIntoView = async (
+    selector: string, root?: puppeteer.ElementHandle,
+    devToolsPage: DevToolsPage = getBrowserAndPagesWrappers().devToolsPage) => {
+  await devToolsPage.scrollElementIntoView(selector, root);
 };
 
-export const installEventListener = function(frontend: puppeteer.Page, eventType: string) {
-  return frontend.evaluate(eventType => {
-    window.__pendingEvents = window.__pendingEvents || new Map();
-    window.addEventListener(eventType, (e: Event) => {
-      let events = window.__pendingEvents.get(eventType);
-      if (!events) {
-        events = [];
-        window.__pendingEvents.set(eventType, events);
-      }
-      events.push(e);
-    });
-  }, eventType);
+export const installEventListener = function(_frontend: puppeteer.Page, eventType: string) {
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  return devToolsPage.installEventListener(eventType);
 };
 
-export const getPendingEvents = function(frontend: puppeteer.Page, eventType: string): Promise<Event[]|undefined> {
-  return frontend.evaluate(eventType => {
-    if (!('__pendingEvents' in window)) {
-      return undefined;
-    }
-    const pendingEvents = window.__pendingEvents.get(eventType);
-    window.__pendingEvents.set(eventType, []);
-    return pendingEvents;
-  }, eventType);
+export const getPendingEvents = function(_frontend: puppeteer.Page, eventType: string): Promise<Event[]|undefined> {
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  return devToolsPage.getPendingEvents(eventType);
 };
 
 export function prepareWaitForEvent(element: puppeteer.ElementHandle, eventType: string): Promise<void> {
@@ -716,13 +478,13 @@ export function waitForEvent(element: puppeteer.ElementHandle, eventType: string
 }
 
 export const hasClass = async (element: puppeteer.ElementHandle<Element>, classname: string) => {
-  return await element.evaluate((el, classname) => el.classList.contains(classname), classname);
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  return await devToolsPage.hasClass(element, classname);
 };
 
 export const waitForClass = async (element: puppeteer.ElementHandle<Element>, classname: string) => {
-  await waitForFunction(async () => {
-    return hasClass(element, classname);
-  });
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  return await devToolsPage.waitForClass(element, classname);
 };
 
 /**
@@ -778,39 +540,27 @@ export function matchTable<A, E>(
   return matchArray(actual, expected, (actual, expected) => matchArray<A, E>(actual, expected, comparator));
 }
 
-export const matchStringArray = (actual: string[], expected: (string|RegExp)[]) =>
+export const matchStringArray = (actual: string[], expected: Array<string|RegExp>) =>
     matchArray(actual, expected, matchString);
 
 export const assertMatchArray = assertOk(matchStringArray);
 
-export const matchStringTable = (actual: string[][], expected: (string|RegExp)[][]) =>
+export const matchStringTable = (actual: string[][], expected: Array<Array<string|RegExp>>) =>
     matchTable(actual, expected, matchString);
 
 export async function renderCoordinatorQueueEmpty(): Promise<void> {
-  const {frontend} = getBrowserAndPages();
-  await frontend.evaluate(() => {
-    return new Promise<void>(resolve => {
-      const pendingFrames = globalThis.__getRenderCoordinatorPendingFrames();
-      if (pendingFrames < 1) {
-        resolve();
-        return;
-      }
-      globalThis.addEventListener('renderqueueempty', resolve, {once: true});
-    });
-  });
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  await devToolsPage.renderCoordinatorQueueEmpty();
 }
 
 export async function setCheckBox(selector: string, wantChecked: boolean): Promise<void> {
-  const checkbox = await waitFor(selector);
-  const checked = await checkbox.evaluate(box => (box as HTMLInputElement).checked);
-  if (checked !== wantChecked) {
-    await click(`${selector} + label`);
-  }
-  assert.strictEqual(await checkbox.evaluate(box => (box as HTMLInputElement).checked), wantChecked);
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  await devToolsPage.setCheckBox(selector, wantChecked);
 }
 
 export const summonSearchBox = async () => {
-  await pressKey('f', {control: true});
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  await devToolsPage.summonSearchBox();
 };
 
 export const replacePuppeteerUrl = (value: string) => {
@@ -819,6 +569,9 @@ export const replacePuppeteerUrl = (value: string) => {
   });
 };
 
+/**
+ * @deprecated Use devToolsPage.raf or inspectedPage.raf instead
+ */
 export async function raf(page: puppeteer.Page): Promise<void> {
   await page.evaluate(() => {
     return new Promise(resolve => window.requestAnimationFrame(resolve));
@@ -826,9 +579,6 @@ export async function raf(page: puppeteer.Page): Promise<void> {
 }
 
 export async function readClipboard() {
-  const {frontend, browser} = getBrowserAndPages();
-  await browser.defaultBrowserContext().overridePermissions(frontend.url(), ['clipboard-read']);
-  const clipboard = await frontend.evaluate(async () => navigator.clipboard.readText());
-  await browser.defaultBrowserContext().clearPermissionOverrides();
-  return clipboard;
+  const {devToolsPage, browserWrapper} = getBrowserAndPagesWrappers();
+  return await devToolsPage.readClipboard(browserWrapper);
 }

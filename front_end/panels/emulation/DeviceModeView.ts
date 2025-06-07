@@ -1,6 +1,7 @@
 // Copyright 2015 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
@@ -12,7 +13,7 @@ import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {DeviceModeToolbar} from './DeviceModeToolbar.js';
-import deviceModeViewStyles from './deviceModeView.css.legacy.js';
+import deviceModeViewStyles from './deviceModeView.css.js';
 import {MediaQueryInspector} from './MediaQueryInspector.js';
 
 const UIStrings = {
@@ -50,7 +51,7 @@ const UIStrings = {
    * Translation of this phrase should be limited to 10 characters.
    */
   laptopL: 'Laptop L',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/emulation/DeviceModeView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -473,7 +474,7 @@ export class DeviceModeView extends UI.Widget.VBox {
       // Cap the height to not hit the GPU limit.
       // https://crbug.com/1260828
       canvas.height = Math.min((1 << 14), Math.floor(outlineRect.height));
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext('2d', {willReadFrequently: true});
       if (!ctx) {
         throw new Error('Could not get 2d context from canvas.');
       }
@@ -486,7 +487,7 @@ export class DeviceModeView extends UI.Widget.VBox {
         await this.paintImage(ctx, this.model.screenImage(), screenRect.relativeTo(outlineRect));
       }
       ctx.drawImage(pageImage, Math.floor(contentLeft), Math.floor(contentTop));
-      this.saveScreenshot((canvas as HTMLCanvasElement));
+      this.saveScreenshot((canvas));
     };
   }
 
@@ -515,13 +516,13 @@ export class DeviceModeView extends UI.Widget.VBox {
       // Cap the height to not hit the GPU limit.
       // https://crbug.com/1260828
       canvas.height = Math.min((1 << 14), Math.floor(pageImage.naturalHeight));
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext('2d', {willReadFrequently: true});
       if (!ctx) {
         throw new Error('Could not get 2d context for base64 screenshot.');
       }
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(pageImage, 0, 0);
-      this.saveScreenshot((canvas as HTMLCanvasElement));
+      this.saveScreenshot((canvas));
     };
   }
 
@@ -577,8 +578,7 @@ export class Ruler extends UI.Widget.VBox {
     this.element.classList.add('device-mode-ruler');
     this.element.setAttribute('jslog', `${VisualLogging.deviceModeRuler().track({click: true})}`);
     this.contentElementInternal =
-        this.element.createChild('div', 'device-mode-ruler-content').createChild('div', 'device-mode-ruler-inner') as
-        HTMLDivElement;
+        this.element.createChild('div', 'device-mode-ruler-content').createChild('div', 'device-mode-ruler-inner');
     this.horizontal = horizontal;
     this.scale = 1;
     this.count = 0;

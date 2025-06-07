@@ -12,6 +12,7 @@ devtools_module("theme_support") {
   deps = [
     "../../../core/common:bundle",
     "../../../core/host:bundle",
+    "../../../core/root:bundle",
   ]
 }
 
@@ -20,7 +21,7 @@ devtools_entrypoint("bundle") {
 
   deps = [
     ":theme_support",
-    "../:legacy_css_files",
+    "../:css_files",
   ]
 
   visibility = [

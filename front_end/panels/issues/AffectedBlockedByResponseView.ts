@@ -1,14 +1,15 @@
 // Copyright 2021 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
+import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import type * as Platform from '../../core/platform/platform.js';
-import * as IssuesManager from '../../models/issues_manager/issues_manager.js';
 import type * as Protocol from '../../generated/protocol.js';
-import * as Host from '../../core/host/host.js';
+import * as IssuesManager from '../../models/issues_manager/issues_manager.js';
 
-import {AffectedResourcesView, AffectedItem} from './AffectedResourcesView.js';
+import {AffectedItem, AffectedResourcesView} from './AffectedResourcesView.js';
 
 const UIStrings = {
   /**
@@ -27,7 +28,7 @@ const UIStrings = {
    *@description Noun for a singular resource that was blocked (an example for a blocked resource would be a frame). Label for a column in the affected resources table in the issue view.
    */
   blockedResource: 'Blocked Resource',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/issues/AffectedBlockedByResponseView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 

@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import stylelint from 'stylelint';
-import { parse, comment } from 'postcss';
-import { join } from 'path';
 import { readFileSync } from 'fs';
+import { join } from 'path';
+import { comment, parse } from 'postcss';
+import stylelint from 'stylelint';
 
 const {
   createPlugin,
@@ -15,27 +15,27 @@ const {
 const RULE_NAME = 'plugin/use_theme_colors';
 
 const CSS_PROPS_TO_CHECK_FOR_COLOR_USAGE = new Set([
-  'color',
-  'box-shadow',
-  'text-shadow',
-  'outline-color',
-  'background-image',
-  'background-color',
-  'border-left-color',
-  'border-right-color',
-  'border-top-color',
-  'border-bottom-color',
   '-webkit-border-image',
-  'fill',
-  'stroke',
-  'border-left',
-  'border-right',
-  'border-top',
-  'border-bottom',
+  'background-color',
+  'background-image',
   'background',
-  'border',
+  'border-bottom-color',
+  'border-bottom',
   'border-color',
+  'border-left-color',
+  'border-left',
+  'border-right-color',
+  'border-right',
+  'border-top-color',
+  'border-top',
+  'border',
+  'box-shadow',
+  'color',
+  'fill',
+  'outline-color',
   'outline',
+  'stroke',
+  'text-shadow',
 ]);
 
 const borderCombinedDeclarations = new Set([
@@ -55,35 +55,21 @@ const COLOR_INDICATOR_REGEXES = new Set([
 
 const CUSTOM_VARIABLE_OVERRIDE_PREFIX = '--override-';
 
-const applicationColorsPath = join(
+const applicationTokensPath = join(
   import.meta.dirname,
   '..',
   '..',
   '..',
   'front_end',
-  'ui',
-  'legacy',
-  'applicationColorTokens.css',
+  'application_tokens.css',
 );
-const themeColorsPath = join(
+const designSystemTokensPath = join(
   import.meta.dirname,
   '..',
   '..',
   '..',
   'front_end',
-  'ui',
-  'legacy',
-  'themeColors.css',
-);
-const tokensPath = join(
-  import.meta.dirname,
-  '..',
-  '..',
-  '..',
-  'front_end',
-  'ui',
-  'legacy',
-  'tokens.css',
+  'design_system_tokens.css',
 );
 const inspectorCommonPath = join(
   import.meta.dirname,
@@ -112,17 +98,15 @@ function getRootVariableDeclarationsFromCSSFile(filePath) {
 }
 
 const DEFINED_APPLICATION_COLOR_VARIABLES =
-  getRootVariableDeclarationsFromCSSFile(applicationColorsPath);
-const DEFINED_THEME_COLOR_VARIABLES =
-  getRootVariableDeclarationsFromCSSFile(themeColorsPath);
-const DEFINED_COLOR_TOKEN_VARIABLES =
-  getRootVariableDeclarationsFromCSSFile(tokensPath);
+  getRootVariableDeclarationsFromCSSFile(applicationTokensPath);
+const DEFINED_THEME_COLOR_VARIABLES = getRootVariableDeclarationsFromCSSFile(
+  designSystemTokensPath,
+);
 const DEFINED_INSPECTOR_STYLE_VARIABLES =
   getRootVariableDeclarationsFromCSSFile(inspectorCommonPath);
 const ALL_DEFINED_VARIABLES = new Set([
   ...DEFINED_APPLICATION_COLOR_VARIABLES,
   ...DEFINED_THEME_COLOR_VARIABLES,
-  ...DEFINED_COLOR_TOKEN_VARIABLES,
   ...DEFINED_INSPECTOR_STYLE_VARIABLES,
 ]);
 
@@ -256,18 +240,6 @@ const ruleFunction = (primary, secondary, context) => {
     }
 
     postcssRoot.walkRules(rule => {
-      // If you are providing a selector specifically for dark mode, you can use
-      // any colors you want, as it means you are purposefully deviating. This
-      // is not encouraged but we do need to allow it.
-      if (
-        rule.selector.startsWith(
-          ':host-context(.theme-with-dark-background)',
-        ) ||
-        rule.selector.startsWith('.theme-with-dark-background')
-      ) {
-        return;
-      }
-
       rule.walkDecls(declaration => {
         if (!CSS_PROPS_TO_CHECK_FOR_COLOR_USAGE.has(declaration.prop)) {
           return;
@@ -319,8 +291,7 @@ const ruleFunction = (primary, secondary, context) => {
           const partsOfValue = /(.+)\s(\w+)\s(.+)/.exec(declaration.value);
 
           if (partsOfValue) {
-            // eslint-disable-next-line no-unused-vars
-            const [, lineSize, lineStyle, lineColor] = partsOfValue;
+            const [, , , lineColor] = partsOfValue;
             // Line color is the only part we want to check as it's the only bit
             // that could contain color.
             checkColorValueIsValidOrError({
@@ -348,5 +319,4 @@ const ruleFunction = (primary, secondary, context) => {
 ruleFunction.ruleName = RULE_NAME;
 ruleFunction.messages = ruleMessages(RULE_NAME, {});
 
-// eslint-disable-next-line import/no-default-export
 export default createPlugin(RULE_NAME, ruleFunction);

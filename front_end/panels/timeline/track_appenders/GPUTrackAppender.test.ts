@@ -15,8 +15,9 @@ function initTrackAppender(
     entryData: Trace.Types.Events.Event[],
     entryTypeByLevel: Timeline.TimelineFlameChartDataProvider.EntryType[],
     ): Timeline.GPUTrackAppender.GPUTrackAppender {
+  const entityMapper = new Timeline.Utils.EntityMapper.EntityMapper(parsedTrace);
   const compatibilityTracksAppender = new Timeline.CompatibilityTracksAppender.CompatibilityTracksAppender(
-      flameChartData, parsedTrace, entryData, entryTypeByLevel);
+      flameChartData, parsedTrace, entryData, entryTypeByLevel, entityMapper);
   return compatibilityTracksAppender.gpuTrackAppender();
 }
 
@@ -59,8 +60,7 @@ describeWithEnvironment('GPUTrackAppender', function() {
       for (const event of gpuEvents) {
         const index = entryData.indexOf(event);
         assert.exists(index);
-        assert.strictEqual(
-            flameChartData.entryStartTimes[index], Trace.Helpers.Timing.microSecondsToMilliseconds(event.ts));
+        assert.strictEqual(flameChartData.entryStartTimes[index], Trace.Helpers.Timing.microToMilli(event.ts));
       }
     });
 
@@ -74,7 +74,7 @@ describeWithEnvironment('GPUTrackAppender', function() {
           continue;
         }
         const expectedTotalTimeForEvent = event.dur ?
-            Trace.Helpers.Timing.microSecondsToMilliseconds(event.dur) :
+            Trace.Helpers.Timing.microToMilli(event.dur) :
             Timeline.TimelineFlameChartDataProvider.InstantEventVisibleDurationMs;
         assert.strictEqual(flameChartData.entryTotalTimes[index], expectedTotalTimeForEvent);
       }

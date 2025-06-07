@@ -1,6 +1,7 @@
 // Copyright 2014 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import '../../ui/legacy/legacy.js';
 
@@ -79,12 +80,12 @@ const UIStrings = {
    *@description Text for previewing items
    */
   preview: 'Preview',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/application/ServiceWorkerCacheViews.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export class ServiceWorkerCacheView extends UI.View.SimpleView {
   private model: SDK.ServiceWorkerCacheModel.ServiceWorkerCacheModel;
-  private entriesForTest: Protocol.CacheStorage.DataEntry[]|null;
+  protected entriesForTest: Protocol.CacheStorage.DataEntry[]|null;
   private readonly splitWidget: UI.SplitWidget.SplitWidget;
   private readonly previewPanel: UI.Widget.VBox;
   private preview: UI.Widget.Widget|null;
@@ -97,13 +98,14 @@ export class ServiceWorkerCacheView extends UI.View.SimpleView {
   private returnCount: number|null;
   private summaryBarElement: Element|null;
   private loadingPromise: Promise<{
-    entries: Array<Protocol.CacheStorage.DataEntry>,
+    entries: Protocol.CacheStorage.DataEntry[],
     returnCount: number,
   }>|null;
   private readonly metadataView = new ApplicationComponents.StorageMetadataView.StorageMetadataView();
 
   constructor(model: SDK.ServiceWorkerCacheModel.ServiceWorkerCacheModel, cache: SDK.ServiceWorkerCacheModel.Cache) {
     super(i18nString(UIStrings.cache));
+    this.registerRequiredCSS(serviceWorkerCacheViewsStyles);
 
     this.model = model;
     this.entriesForTest = null;
@@ -178,7 +180,6 @@ export class ServiceWorkerCacheView extends UI.View.SimpleView {
   override wasShown(): void {
     this.model.addEventListener(
         SDK.ServiceWorkerCacheModel.Events.CACHE_STORAGE_CONTENT_UPDATED, this.cacheContentUpdated, this);
-    this.registerCSSFiles([serviceWorkerCacheViewsStyles]);
     void this.updateData(true);
   }
 
@@ -236,7 +237,6 @@ export class ServiceWorkerCacheView extends UI.View.SimpleView {
       columns,
       deleteCallback: this.deleteButtonClicked.bind(this),
       refreshCallback: this.updateData.bind(this, true),
-      editCallback: undefined,
     });
 
     dataGrid.addEventListener(DataGrid.DataGrid.Events.SORTING_CHANGED, this.sortingChanged, this);
@@ -283,7 +283,7 @@ export class ServiceWorkerCacheView extends UI.View.SimpleView {
 
   private async deleteButtonClicked(node: DataGrid.DataGrid.DataGridNode<DataGridNode>|null): Promise<void> {
     if (!node) {
-      node = this.dataGrid && this.dataGrid.selectedNode;
+      node = this.dataGrid?.selectedNode ?? null;
       if (!node) {
         return;
       }
@@ -315,13 +315,11 @@ export class ServiceWorkerCacheView extends UI.View.SimpleView {
     }
   }
 
-  private updateDataCallback(
-      this: ServiceWorkerCacheView, skipCount: number, entries: Protocol.CacheStorage.DataEntry[],
-      returnCount: number): void {
+  private updateDataCallback(entries: Protocol.CacheStorage.DataEntry[], returnCount: number): void {
     if (!this.dataGrid) {
       return;
     }
-    const selected = this.dataGrid.selectedNode && this.dataGrid.selectedNode.data.url();
+    const selected = this.dataGrid.selectedNode?.data.url();
     this.refreshButton.setEnabled(true);
     this.entriesForTest = entries;
     this.returnCount = returnCount;
@@ -361,12 +359,12 @@ export class ServiceWorkerCacheView extends UI.View.SimpleView {
     returnCount: number,
   }|undefined> {
     if (!force && this.loadingPromise) {
-      return this.loadingPromise;
+      return await this.loadingPromise;
     }
     this.refreshButton.setEnabled(false);
 
     if (this.loadingPromise) {
-      return this.loadingPromise;
+      return await this.loadingPromise;
     }
 
     this.loadingPromise = new Promise(resolve => {
@@ -377,7 +375,7 @@ export class ServiceWorkerCacheView extends UI.View.SimpleView {
     });
 
     const {entries, returnCount} = await this.loadingPromise;
-    this.updateDataCallback(0, entries, returnCount);
+    this.updateDataCallback(entries, returnCount);
     this.loadingPromise = null;
     return;
   }
@@ -404,7 +402,7 @@ export class ServiceWorkerCacheView extends UI.View.SimpleView {
     }
 
     // It is possible that table selection changes before the preview opens.
-    if (this.dataGrid && this.dataGrid.selectedNode && request === this.dataGrid.selectedNode.data) {
+    if (this.dataGrid?.selectedNode && request === this.dataGrid.selectedNode.data) {
       this.showPreview(preview);
     }
   }

@@ -1,6 +1,7 @@
 // Copyright 2023 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as Common from '../../core/common/common.js';
 import * as Trace from '../../models/trace/trace.js';
@@ -51,6 +52,7 @@ export class TimelineMiniMap extends
 
   constructor() {
     super();
+    this.registerRequiredCSS(miniMapStyles);
     this.element.classList.add('timeline-minimap');
     this.#breadcrumbsUI = new TimelineComponents.BreadcrumbsUI.BreadcrumbsUI();
     this.element.prepend(this.#breadcrumbsUI);
@@ -84,6 +86,14 @@ export class TimelineMiniMap extends
     this.#overviewComponent.enableCreateBreadcrumbsButton();
 
     TraceBounds.TraceBounds.onChange(this.#onTraceBoundsChangeBound);
+    // Set the initial bounds for the overview. Otherwise if we mount & there
+    // is not an immediate RESET event, then we don't render correctly.
+    const state = TraceBounds.TraceBounds.BoundsManager.instance().state();
+    if (state) {
+      const {timelineTraceWindow, minimapTraceBounds} = state.milli;
+      this.#overviewComponent.setWindowTimes(timelineTraceWindow.min, timelineTraceWindow.max);
+      this.#overviewComponent.setBounds(minimapTraceBounds.min, minimapTraceBounds.max);
+    }
   }
 
   #onOverviewPanelWindowChanged(
@@ -104,8 +114,8 @@ export class TimelineMiniMap extends
 
     TraceBounds.TraceBounds.BoundsManager.instance().setTimelineVisibleWindow(
         Trace.Helpers.Timing.traceWindowFromMilliSeconds(
-            Trace.Types.Timing.MilliSeconds(left),
-            Trace.Types.Timing.MilliSeconds(right),
+            Trace.Types.Timing.Milli(left),
+            Trace.Types.Timing.Milli(right),
             ),
         {
           shouldAnimate: true,
@@ -140,7 +150,7 @@ export class TimelineMiniMap extends
     }
   }
 
-  #updateMiniMapBoundsToFitNewWindow(newWindow: Trace.Types.Timing.TraceWindowMicroSeconds): void {
+  #updateMiniMapBoundsToFitNewWindow(newWindow: Trace.Types.Timing.TraceWindowMicro): void {
     if (!this.breadcrumbs) {
       return;
     }
@@ -187,8 +197,8 @@ export class TimelineMiniMap extends
     // this case we change them to be the min and max values of the minimap
     // bounds.
     const breadcrumbTimes = {
-      startTime: Trace.Types.Timing.MilliSeconds(Math.max(startTime, bounds.min)),
-      endTime: Trace.Types.Timing.MilliSeconds(Math.min(endTime, bounds.max)),
+      startTime: Trace.Types.Timing.Milli(Math.max(startTime, bounds.min)),
+      endTime: Trace.Types.Timing.Milli(Math.min(endTime, bounds.max)),
     };
 
     const newVisibleTraceWindow =
@@ -202,7 +212,7 @@ export class TimelineMiniMap extends
     };
   }
 
-  highlightBounds(bounds: Trace.Types.Timing.TraceWindowMicroSeconds, withBracket: boolean = false): void {
+  highlightBounds(bounds: Trace.Types.Timing.TraceWindowMicro, withBracket = false): void {
     this.#overviewComponent.highlightBounds(bounds, withBracket);
   }
   clearBoundsHighlight(): void {
@@ -229,11 +239,6 @@ export class TimelineMiniMap extends
     };
   }
 
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([miniMapStyles]);
-  }
-
   reset(): void {
     this.#data = null;
     this.#overviewComponent.reset();
@@ -246,7 +251,7 @@ export class TimelineMiniMap extends
 
     // Only add markers for navigation start times.
     const navStartEvents = Meta.mainFrameNavigations;
-    const minTimeInMilliseconds = Trace.Helpers.Timing.microSecondsToMilliseconds(Meta.traceBounds.min);
+    const minTimeInMilliseconds = Trace.Helpers.Timing.microToMilli(Meta.traceBounds.min);
 
     for (const event of navStartEvents) {
       const {startTime} = Trace.Helpers.Timing.eventTimingsMilliSeconds(event);

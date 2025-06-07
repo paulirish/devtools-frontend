@@ -8,15 +8,15 @@ import {
 import * as Trace from '../trace.js';
 
 const DEVTOOLS_CATEGORY = 'disabled-by-default-devtools.timeline';
-function milliToMicro(x: number): Trace.Types.Timing.MicroSeconds {
-  return Trace.Helpers.Timing.millisecondsToMicroseconds(Trace.Types.Timing.MilliSeconds(x));
+function milliToMicro(x: number): Trace.Types.Timing.Micro {
+  return Trace.Helpers.Timing.milliToMicro(Trace.Types.Timing.Milli(x));
 }
 
-function makeFakeBounds(min: number, max: number): Trace.Types.Timing.TraceWindowMicroSeconds {
+function makeFakeBounds(min: number, max: number): Trace.Types.Timing.TraceWindowMicro {
   return {
-    min: Trace.Types.Timing.MicroSeconds(min),
-    max: Trace.Types.Timing.MicroSeconds(max),
-    range: Trace.Types.Timing.MicroSeconds(max - min),
+    min: Trace.Types.Timing.Micro(min),
+    max: Trace.Types.Timing.Micro(max),
+    range: Trace.Types.Timing.Micro(max - min),
   };
 }
 
@@ -52,7 +52,7 @@ describe('MainThreadActivity', function() {
     // Therefore, the window focuses on the time period of 1 to 280ms (280 is
     // the end time of the event that starts at 230ms).
     // The right number looks odd because when we zoom the window we adjust it
-    // postively by 5% for the upper bound to give it some breathing room.
+    // positively by 5% for the upper bound to give it some breathing room.
     assert.strictEqual(win.min, milliToMicro(1));
     assert.strictEqual(win.max, milliToMicro(293.95));
   });

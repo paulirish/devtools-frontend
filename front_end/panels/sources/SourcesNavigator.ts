@@ -28,6 +28,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* eslint-disable rulesdir/no-imperative-dom-api */
+
 import '../../ui/legacy/legacy.js';
 
 import * as Common from '../../core/common/common.js';
@@ -108,8 +110,18 @@ const UIStrings = {
   /**
    *@description Text to save content as a specific file type
    */
-  saveAs: 'Save as...',
-};
+  saveAs: 'Save as…',
+  /**
+   * @description Message shown in the Workspace tab of the Sources panel to nudge
+   *              developers into utilizing the Automatic Workspace Folders feature
+   *              in Chrome DevTools by setting up a `com.chrome.devtools.json`
+   *              file / endpoint in their project. This nudge is only shown when
+   *              the feature is enabled and there's no automatic workspace folder
+   *              detected.
+   * @example {com.chrome.devtools.json} PH1
+   */
+  automaticWorkspaceNudge: 'Use {PH1} to automatically connect your project folder',
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/sources/SourcesNavigator.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 let networkNavigatorViewInstance: NetworkNavigatorView;
@@ -117,17 +129,13 @@ let networkNavigatorViewInstance: NetworkNavigatorView;
 export class NetworkNavigatorView extends NavigatorView {
   private constructor() {
     super('navigator-network', true);
+    this.registerRequiredCSS(sourcesNavigatorStyles);
     SDK.TargetManager.TargetManager.instance().addEventListener(
         SDK.TargetManager.Events.INSPECTED_URL_CHANGED, this.inspectedURLChanged, this);
 
     // Record the sources tool load time after the file navigator has loaded.
     Host.userMetrics.panelLoaded('sources', 'DevTools.Launch.Sources');
     SDK.TargetManager.TargetManager.instance().addScopeChangeListener(this.onScopeChange.bind(this));
-  }
-
-  override wasShown(): void {
-    this.registerCSSFiles([sourcesNavigatorStyles]);
-    super.wasShown();
   }
 
   static instance(opts: {
@@ -186,12 +194,24 @@ export class NetworkNavigatorView extends NavigatorView {
 }
 
 export class FilesNavigatorView extends NavigatorView {
+  #automaticFileSystemManager = Persistence.AutomaticFileSystemManager.AutomaticFileSystemManager.instance();
+  #eventListeners: Common.EventTarget.EventDescriptor[] = [];
+  #automaticFileSystemNudge: HTMLSpanElement;
+
   constructor() {
     super('navigator-files');
+    this.registerRequiredCSS(sourcesNavigatorStyles);
     const placeholder =
         new UI.EmptyWidget.EmptyWidget(i18nString(UIStrings.noWorkspace), i18nString(UIStrings.explainWorkspace));
     this.setPlaceholder(placeholder);
-    placeholder.appendLink('https://goo.gle/devtools-workspace' as Platform.DevToolsPath.UrlString);
+    placeholder.link = 'https://developer.chrome.com/docs/devtools/workspaces/' as Platform.DevToolsPath.UrlString;
+
+    const link =
+        UI.XLink.XLink.create('https://goo.gle/devtools-automatic-workspace-folders', 'com.chrome.devtools.json');
+    this.#automaticFileSystemNudge =
+        i18n.i18n.getFormatLocalizedString(str_, UIStrings.automaticWorkspaceNudge, {PH1: link});
+    this.#automaticFileSystemNudge.classList.add('automatic-file-system-nudge');
+    this.contentElement.insertBefore(this.#automaticFileSystemNudge, this.contentElement.firstChild);
 
     const toolbar = document.createElement('devtools-toolbar');
     toolbar.classList.add('navigator-toolbar');
@@ -202,12 +222,33 @@ export class FilesNavigatorView extends NavigatorView {
     });
   }
 
+  override wasShown(): void {
+    super.wasShown();
+    this.#eventListeners = [
+      this.#automaticFileSystemManager.addEventListener(
+          Persistence.AutomaticFileSystemManager.Events.AUTOMATIC_FILE_SYSTEM_CHANGED, this.#automaticFileSystemChanged,
+          this),
+      this.#automaticFileSystemManager.addEventListener(
+          Persistence.AutomaticFileSystemManager.Events.AVAILABILITY_CHANGED, this.#availabilityChanged, this),
+    ];
+    this.#automaticFileSystemChanged({data: this.#automaticFileSystemManager.automaticFileSystem});
+  }
+
+  override willHide(): void {
+    Common.EventTarget.removeEventListeners(this.#eventListeners);
+    this.#automaticFileSystemChanged({data: null});
+    super.willHide();
+  }
+
   override sourceSelected(uiSourceCode: Workspace.UISourceCode.UISourceCode, focusSource: boolean): void {
     Host.userMetrics.actionTaken(Host.UserMetrics.Action.WorkspaceSourceSelected);
     super.sourceSelected(uiSourceCode, focusSource);
   }
 
   override acceptProject(project: Workspace.Workspace.Project): boolean {
+    if (project.type() === Workspace.Workspace.projectTypes.ConnectableFileSystem) {
+      return true;
+    }
     return project.type() === Workspace.Workspace.projectTypes.FileSystem &&
         Persistence.FileSystemWorkspaceBinding.FileSystemWorkspaceBinding.fileSystemType(project) !== 'overrides' &&
         !Snippets.ScriptSnippetFileSystem.isSnippetsProject(project);
@@ -217,6 +258,21 @@ export class FilesNavigatorView extends NavigatorView {
     const contextMenu = new UI.ContextMenu.ContextMenu(event);
     contextMenu.defaultSection().appendAction('sources.add-folder-to-workspace', undefined, true);
     void contextMenu.show();
+  }
+
+  #automaticFileSystemChanged(
+      _event: Common.EventTarget.EventTargetEvent<Persistence.AutomaticFileSystemManager.AutomaticFileSystem|null>):
+      void {
+    this.#availabilityChanged({data: this.#automaticFileSystemManager.availability});
+  }
+
+  #availabilityChanged(
+      event:
+          Common.EventTarget.EventTargetEvent<Persistence.AutomaticFileSystemManager.AutomaticFileSystemAvailability>):
+      void {
+    const availability = event.data;
+    const {automaticFileSystem} = this.#automaticFileSystemManager;
+    this.#automaticFileSystemNudge.hidden = automaticFileSystem !== null || availability !== 'available';
   }
 }
 
@@ -229,7 +285,7 @@ export class OverridesNavigatorView extends NavigatorView {
     const placeholder = new UI.EmptyWidget.EmptyWidget(
         i18nString(UIStrings.noLocalOverrides), i18nString(UIStrings.explainLocalOverrides));
     this.setPlaceholder(placeholder);
-    placeholder.appendLink('https://goo.gle/devtools-overrides' as Platform.DevToolsPath.UrlString);
+    placeholder.link = 'https://developer.chrome.com/docs/devtools/overrides/' as Platform.DevToolsPath.UrlString;
 
     this.toolbar = document.createElement('devtools-toolbar');
     this.toolbar.classList.add('navigator-toolbar');
@@ -322,8 +378,7 @@ export class ContentScriptsNavigatorView extends NavigatorView {
     const placeholder = new UI.EmptyWidget.EmptyWidget(
         i18nString(UIStrings.noContentScripts), i18nString(UIStrings.explainContentScripts));
     this.setPlaceholder(placeholder);
-    placeholder.appendLink(
-        'https://developer.chrome.com/extensions/content_scripts' as Platform.DevToolsPath.UrlString);
+    placeholder.link = 'https://developer.chrome.com/extensions/content_scripts' as Platform.DevToolsPath.UrlString;
   }
 
   override acceptProject(project: Workspace.Workspace.Project): boolean {
@@ -334,9 +389,11 @@ export class ContentScriptsNavigatorView extends NavigatorView {
 export class SnippetsNavigatorView extends NavigatorView {
   constructor() {
     super('navigator-snippets');
-    const placeholder = new UI.EmptyWidget.EmptyWidget(UIStrings.noSnippets, UIStrings.explainSnippets);
+    const placeholder =
+        new UI.EmptyWidget.EmptyWidget(i18nString(UIStrings.noSnippets), i18nString(UIStrings.explainSnippets));
     this.setPlaceholder(placeholder);
-    placeholder.appendLink('https://goo.gle/devtools-snippets' as Platform.DevToolsPath.UrlString);
+    placeholder.link =
+        'https://developer.chrome.com/docs/devtools/javascript/snippets/' as Platform.DevToolsPath.UrlString;
 
     const toolbar = document.createElement('devtools-toolbar');
     toolbar.classList.add('navigator-toolbar');
@@ -393,7 +450,7 @@ export class SnippetsNavigatorView extends NavigatorView {
 }
 
 export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
-  handleAction(context: UI.Context.Context, actionId: string): boolean {
+  handleAction(_context: UI.Context.Context, actionId: string): boolean {
     switch (actionId) {
       case 'sources.create-snippet':
         void Snippets.ScriptSnippetFileSystem.findSnippetsProject()

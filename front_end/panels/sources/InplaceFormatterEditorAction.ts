@@ -1,6 +1,7 @@
 // Copyright 2014 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -28,7 +29,7 @@ const UIStrings = {
    *@description Tooltip text that appears when hovering over the largeicon pretty print button in the Inplace Formatter Editor Action of the Sources panel
    */
   format: 'Format',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/sources/InplaceFormatterEditorAction.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -38,8 +39,6 @@ export class InplaceFormatterEditorAction implements EditorAction {
   private button!: UI.Toolbar.ToolbarButton;
   private sourcesView!: SourcesView;
   private uiSourceCodeTitleChangedEvent: Common.EventTarget.EventDescriptor|null = null;
-  constructor() {
-  }
   static instance(opts: {
     forceNew: boolean|null,
   } = {forceNew: null}): InplaceFormatterEditorAction {

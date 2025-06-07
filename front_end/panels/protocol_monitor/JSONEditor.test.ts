@@ -12,16 +12,13 @@ import {
 } from '../../testing/DOMHelpers.js';
 import {describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
 import {expectCall} from '../../testing/ExpectStubCall.js';
-import * as Menus from '../../ui/components/menus/menus.js';
-import * as RenderCoordinator from '../../ui/components/render_coordinator/render_coordinator.js';
 import type * as SuggestionInput from '../../ui/components/suggestion_input/suggestion_input.js';
-import * as UI from '../../ui/legacy/legacy.js';
 
 import * as ProtocolMonitor from './protocol_monitor.js';
 
 describeWithEnvironment('JSONEditor', () => {
   const renderJSONEditor = () => {
-    const jsonEditor = new ProtocolMonitor.JSONEditor.JSONEditor(new Map(), new Map(), new Map());
+    const jsonEditor = new ProtocolMonitor.JSONEditor.JSONEditor(document.createElement('div'));
     jsonEditor.markAsRoot();
     jsonEditor.show(renderElementIntoDOM(document.createElement('main')));
     return jsonEditor;
@@ -261,10 +258,10 @@ describeWithEnvironment('JSONEditor', () => {
   const serializePopupContent = () => {
     const container = document.body.querySelector<HTMLDivElement>('[data-devtools-glass-pane]');
     const hintDetailView = container?.shadowRoot?.querySelector('devtools-css-hint-details-view');
-    return hintDetailView?.shadowRoot?.textContent?.replaceAll(/\s/g, '');
+    return hintDetailView?.shadowRoot?.querySelector('.hint-popup-wrapper')?.textContent?.replaceAll(/\s/g, '');
   };
 
-  const renderEditorForCommand = async(command: string, parameters: {[paramName: string]: unknown}): Promise<{
+  const renderEditorForCommand = async(command: string, parameters: Record<string, unknown>): Promise<{
     inputs: NodeListOf<SuggestionInput.SuggestionInput.SuggestionInput>,
     displayedCommand: string,
     jsonEditor: ProtocolMonitor.JSONEditor.JSONEditor,
@@ -333,7 +330,7 @@ describeWithEnvironment('JSONEditor', () => {
     // inputs[0] corresponds to the devtools-suggestion-input of the command
     const input = jsonEditor.contentElement.querySelectorAll('devtools-suggestion-input')[1];
     if (!input) {
-      throw Error('No editable content displayed');
+      throw new Error('No editable content displayed');
     }
     input.value = 'Not an accepted value';
     await jsonEditor.updateComplete;
@@ -342,7 +339,7 @@ describeWithEnvironment('JSONEditor', () => {
     await jsonEditor.updateComplete;
     const warningIcon = jsonEditor.contentElement.querySelector('devtools-icon');
     if (!warningIcon) {
-      throw Error('No icon displayed');
+      throw new Error('No icon displayed');
     }
     return warningIcon;
   };
@@ -360,7 +357,7 @@ describeWithEnvironment('JSONEditor', () => {
          const {command, parameters} = ProtocolMonitor.ProtocolMonitor.parseCommandInput(JSON.stringify(cdpCommand));
          const {inputs} = await renderEditorForCommand(command, parameters);
          const parameterRecorderInput = inputs[1];
-         const value = parameterRecorderInput.renderRoot.textContent?.replaceAll(/\s/g, '');
+         const value = parameterRecorderInput.value;
          const expectedValue = 'test';
          assert.deepEqual(value, expectedValue);
        });
@@ -376,7 +373,7 @@ describeWithEnvironment('JSONEditor', () => {
          const {command, parameters} = ProtocolMonitor.ProtocolMonitor.parseCommandInput(JSON.stringify(cdpCommand));
          const {inputs} = await renderEditorForCommand(command, parameters);
          const parameterRecorderInput = inputs[1];
-         const value = parameterRecorderInput.renderRoot.textContent?.replaceAll(/\s/g, '');
+         const value = parameterRecorderInput.value;
          const expectedValue = 'test';
          assert.deepEqual(value, expectedValue);
        });
@@ -396,7 +393,7 @@ describeWithEnvironment('JSONEditor', () => {
          const {command, parameters} = ProtocolMonitor.ProtocolMonitor.parseCommandInput(JSON.stringify(cdpCommand));
          const {inputs} = await renderEditorForCommand(command, parameters);
          const parameterRecorderInput = inputs[1];
-         const value = parameterRecorderInput.renderRoot.textContent?.replaceAll(/\s/g, '');
+         const value = parameterRecorderInput.value;
          const expectedValue = 'test1';
          assert.deepEqual(value, expectedValue);
        });
@@ -476,78 +473,6 @@ describeWithEnvironment('JSONEditor', () => {
     });
   });
 
-  describe('Display command written in editor inside input bar', () => {
-    it('should display the command edited inside the CDP editor into the input bar', async () => {
-      const split = new UI.SplitWidget.SplitWidget(true, false, 'protocol-monitor-split-container', 400);
-      const editorWidget = new ProtocolMonitor.ProtocolMonitor.EditorWidget();
-      const jsonEditor = editorWidget.jsonEditor;
-      jsonEditor.command = 'Test.test';
-      jsonEditor.parameters = [
-        {
-          name: 'test',
-          type: ProtocolMonitor.JSONEditor.ParameterType.STRING,
-          description: 'test',
-          optional: false,
-          value: 'test',
-        },
-      ];
-      const dataGrid = new ProtocolMonitor.ProtocolMonitor.ProtocolMonitorDataGrid(split);
-      split.setMainWidget(dataGrid);
-      split.setSidebarWidget(editorWidget);
-      split.toggleSidebar();
-      split.markAsRoot();
-      split.show(renderElementIntoDOM(document.createElement('main')));
-      await RenderCoordinator.done();
-
-      const toolbarInput =
-          dataGrid.element.shadowRoot!.querySelector('.protocol-monitor-bottom-toolbar')!.querySelector(
-              '.toolbar-input-prompt');
-      assert.deepEqual(toolbarInput!.innerHTML, '{"command":"Test.test","parameters":{"test":"test"}}');
-    });
-
-    it('should update the selected target inside the input bar', async () => {
-      const split = new UI.SplitWidget.SplitWidget(true, false, 'protocol-monitor-split-container', 400);
-      const editorWidget = new ProtocolMonitor.ProtocolMonitor.EditorWidget();
-      const jsonEditor = editorWidget.jsonEditor;
-      jsonEditor.targetId = 'value2';
-      const dataGrid = new ProtocolMonitor.ProtocolMonitor.ProtocolMonitorDataGrid(split);
-      const selector = dataGrid.selector;
-
-      selector.createOption('Option 1', 'value1');
-      selector.createOption('Option 2', 'value2');
-      selector.createOption('Option 3', 'value3');
-
-      split.setMainWidget(dataGrid);
-      split.setSidebarWidget(editorWidget);
-
-      split.toggleSidebar();
-      await RenderCoordinator.done();
-
-      // Should be index 1 because the targetId equals "value2" which corresponds to the index number 1
-      assert.deepEqual(selector.selectedIndex(), 1);
-    });
-
-    // Flaky test.
-    it.skip(
-        '[crbug.com/1484534]: should not display the command into the input bar if the command is empty string',
-        async () => {
-          const split = new UI.SplitWidget.SplitWidget(true, false, 'protocol-monitor-split-container', 400);
-          const editorWidget = new ProtocolMonitor.ProtocolMonitor.EditorWidget();
-          const jsonEditor = editorWidget.jsonEditor;
-          jsonEditor.command = '';
-          const dataGrid = new ProtocolMonitor.ProtocolMonitor.ProtocolMonitorDataGrid(split);
-          split.setMainWidget(dataGrid);
-          split.setSidebarWidget(editorWidget);
-          split.toggleSidebar();
-
-          await RenderCoordinator.done();
-
-          // The first input bar corresponds to the filter bar, so we query the second one which corresponds to the CDP one.
-          const toolbarInput = dataGrid.element.shadowRoot?.querySelectorAll('.toolbar')[1].shadowRoot?.querySelector(
-              '.toolbar-input-prompt');
-          assert.deepEqual(toolbarInput?.innerHTML, '');
-        });
-  });
   describe('Descriptions', () => {
     it('should show the popup with the correct description for the description of parameters', async () => {
       const inputParameters = [
@@ -1072,10 +997,12 @@ describeWithEnvironment('JSONEditor', () => {
          };
 
          jsonEditor.parameters = inputParameters as ProtocolMonitor.JSONEditor.Parameter[];
+         await jsonEditor.updateComplete;
 
          const promise = jsonEditor.once(ProtocolMonitor.JSONEditor.Events.SUBMIT_EDITOR);
 
-         dispatchKeyDownEvent(jsonEditor.contentElement, {key: 'Enter', ctrlKey: true, metaKey: true});
+         dispatchKeyDownEvent(
+             jsonEditor.contentElement.querySelector('.wrapper')!, {key: 'Enter', ctrlKey: true, metaKey: true});
 
          const response = await promise;
 
@@ -1099,7 +1026,7 @@ describeWithEnvironment('JSONEditor', () => {
 
          const toolbar = jsonEditor.contentElement.querySelector('devtools-toolbar');
          if (!toolbar) {
-           throw Error('No toolbar found !');
+           throw new Error('No toolbar found !');
          }
 
          const promise = jsonEditor.once(ProtocolMonitor.JSONEditor.Events.SUBMIT_EDITOR);
@@ -1159,14 +1086,19 @@ describeWithEnvironment('JSONEditor', () => {
     const jsonEditor = renderJSONEditor();
     await jsonEditor.updateComplete;
     const targetId = 'target1';
-    const event = new Menus.SelectMenu.SelectMenuItemSelectedEvent('target1');
 
     const shadowRoot = jsonEditor.contentElement;
-    const selectMenu = shadowRoot.querySelector('devtools-select-menu');
-    selectMenu?.dispatchEvent(event);
-    const expectedId = jsonEditor.targetId;
+    const selectElement = shadowRoot.querySelector<HTMLSelectElement>('select');
 
-    assert.deepEqual(targetId, expectedId);
+    const option = document.createElement('option');
+    option.value = targetId;
+    selectElement?.appendChild(option);
+
+    selectElement!.selectedIndex = 0;
+    selectElement!.dispatchEvent(new Event('change'));
+
+    const actualId = jsonEditor.targetId;
+    assert.deepEqual(actualId, targetId);
   });
 
   it('should copy the CDP command to clipboard via copy event', async () => {
@@ -1188,7 +1120,7 @@ describeWithEnvironment('JSONEditor', () => {
         ));
     const toolbar = jsonEditor.contentElement.querySelector('devtools-toolbar');
     if (!toolbar) {
-      throw Error('No toolbar found !');
+      throw new Error('No toolbar found !');
     }
     dispatchClickEvent(toolbar.querySelector('devtools-button[title="Copy command"]')!);
     const [text] = await copyText;
@@ -1329,7 +1261,8 @@ describeWithEnvironment('JSONEditor', () => {
        const promise = jsonEditor.once(ProtocolMonitor.JSONEditor.Events.SUBMIT_EDITOR);
 
        // We send the command
-       dispatchKeyDownEvent(jsonEditor.contentElement, {key: 'Enter', ctrlKey: true, metaKey: true});
+       dispatchKeyDownEvent(
+           jsonEditor.contentElement.querySelector('.wrapper')!, {key: 'Enter', ctrlKey: true, metaKey: true});
 
        const response = await promise;
 
@@ -1382,7 +1315,7 @@ describeWithEnvironment('JSONEditor', () => {
     it('filters the commands by substring match', async () => {
       assert(ProtocolMonitor.JSONEditor.suggestionFilter('Test', 'Tes'));
       assert(ProtocolMonitor.JSONEditor.suggestionFilter('Test', 'est'));
-      assert(!ProtocolMonitor.JSONEditor.suggestionFilter('Test', 'dest'));
+      assert.isNotOk(ProtocolMonitor.JSONEditor.suggestionFilter('Test', 'dest'));
     });
   });
 });

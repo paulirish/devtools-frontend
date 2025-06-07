@@ -1,14 +1,15 @@
 // Copyright (c) 2020 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
-import * as LitHtml from '../../../lit-html/lit-html.js';
+import * as Lit from '../../../lit/lit.js';
 
 import cssAngleSwatchStyles from './cssAngleSwatch.css.js';
 import {type Angle, AngleUnit, get2DTranslationsForAngle} from './CSSAngleUtils.js';
 
-const {render, html} = LitHtml;
-const styleMap = LitHtml.Directives.styleMap;
+const {render, html} = Lit;
+const styleMap = Lit.Directives.styleMap;
 
 const swatchWidth = 11;
 
@@ -24,10 +25,6 @@ export class CSSAngleSwatch extends HTMLElement {
     unit: AngleUnit.RAD,
   };
 
-  connectedCallback(): void {
-    this.shadow.adoptedStyleSheets = [cssAngleSwatchStyles];
-  }
-
   set data(data: CSSAngleSwatchData) {
     this.angle = data.angle;
     this.render();
@@ -42,6 +39,7 @@ export class CSSAngleSwatch extends HTMLElement {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     render(html`
+      <style>${cssAngleSwatchStyles}</style>
       <div class="swatch">
         <span class="mini-hand" style=${styleMap(miniHandStyle)}></span>
       </div>

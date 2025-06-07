@@ -1,6 +1,7 @@
 // Copyright 2018 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -50,7 +51,7 @@ const UIStrings = {
    *@description Text of a DOM element in Console Pin Pane of the Console panel
    */
   notAvailable: 'not available',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/console/ConsolePinPane.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -61,6 +62,7 @@ export class ConsolePinPane extends UI.ThrottledWidget.ThrottledWidget {
   private readonly pinsSetting: Common.Settings.Setting<string[]>;
   constructor(private readonly liveExpressionButton: UI.Toolbar.ToolbarButton, private readonly focusOut: () => void) {
     super(true, 250);
+    this.registerRequiredCSS(consolePinPaneStyles, objectValueStyles);
     this.contentElement.classList.add('console-pins', 'monospace');
     this.contentElement.addEventListener('contextmenu', this.contextMenuEventFired.bind(this), false);
     this.contentElement.setAttribute('jslog', `${VisualLogging.pane('console-pins')}`);
@@ -72,12 +74,8 @@ export class ConsolePinPane extends UI.ThrottledWidget.ThrottledWidget {
     }
   }
 
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([consolePinPaneStyles, objectValueStyles]);
-  }
-
   override willHide(): void {
+    super.willHide();
     for (const pin of this.pins) {
       pin.setHovered(false);
     }

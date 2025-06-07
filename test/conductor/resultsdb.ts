@@ -4,11 +4,6 @@
 
 import * as fs from 'fs';
 import * as http from 'http';
-import * as path from 'path';
-
-import {GEN_DIR} from './paths.js';
-
-export const REPO = 'https://chromium.googlesource.com/devtools/devtools-frontend';
 
 // This type mirrors test_result.proto.
 // https://source.chromium.org/chromium/infra/infra/+/main:recipes-py/recipe_proto/go.chromium.org/luci/resultdb/proto/sink/v1/test_result.proto
@@ -18,25 +13,15 @@ export interface TestResult {
   status?: 'PASS'|'FAIL'|'SKIP';
   summaryHtml?: string;
   duration?: string;
-  tags?: {key: string, value: string}[];
-  artifacts?: {
-    [key: string]: {
-      filePath: string,
-    },
-  };
-  testMetadata?: {
-    name: string,
-    location: {
-      repo: string,
-      fileName?: string,
-    },
-  };
+  tags?: Array<{key: string, value: string}>;
+  artifacts?: Record<string, {
+    filePath: string,
+  }>;
 }
 
-class SanitizedTestIdTag {
-  private sanitizedTag: (string|undefined);
-}
-export type SanitizedTestId = string&SanitizedTestIdTag;
+export type SanitizedTestId = string&{
+  _sanitizedTag?: string,
+};
 
 // ResultSink checks the testId against the regex /^[[print]]{1,512}$/:
 // https://source.chromium.org/chromium/infra/infra/+/main:go/src/go.chromium.org/luci/resultdb/pbutil/test_result.go;l=43;drc=7ba090da753a71be5a0f37785558e9102e57fa10
@@ -105,8 +90,4 @@ export function sendTestResult(results: TestResult): void {
   const data = JSON.stringify({testResults: [results]});
   request.write(data);
   request.end();
-}
-
-export function testLocation(file?: string): string|undefined {
-  return file ? `//${path.relative(GEN_DIR, file).replace('.js', '.ts')}` : undefined;
 }

@@ -1,6 +1,7 @@
 // Copyright 2014 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -11,7 +12,7 @@ import type * as Workspace from '../../models/workspace/workspace.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
-import mediaQueryInspectorStyles from './mediaQueryInspector.css.legacy.js';
+import mediaQueryInspectorStyles from './mediaQueryInspector.css.js';
 
 const UIStrings = {
   /**
@@ -19,7 +20,7 @@ const UIStrings = {
    * Takes the user to the source code where this media query actually came from.
    */
   revealInSourceCode: 'Reveal in source code',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/emulation/MediaQueryInspector.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export class MediaQueryInspector extends UI.Widget.Widget implements
@@ -118,7 +119,7 @@ export class MediaQueryInspector extends UI.Widget.Widget implements
   }
 
   private onContextMenu(event: Event): void {
-    if (!this.cssModel || !this.cssModel.isEnabled()) {
+    if (!this.cssModel?.isEnabled()) {
       return;
     }
 
@@ -178,7 +179,7 @@ export class MediaQueryInspector extends UI.Widget.Widget implements
     const filtered = [];
     for (let i = 0; i < models.length; ++i) {
       const last = filtered[filtered.length - 1];
-      if (!last || !last.equals(models[i])) {
+      if (!last?.equals(models[i])) {
         filtered.push(models[i]);
       }
     }
@@ -205,7 +206,7 @@ export class MediaQueryInspector extends UI.Widget.Widget implements
 
     let allEqual: (boolean|undefined) = this.cachedQueryModels && this.cachedQueryModels.length === queryModels.length;
     for (let i = 0; allEqual && i < queryModels.length; ++i) {
-      allEqual = allEqual && this.cachedQueryModels && this.cachedQueryModels[i].equals(queryModels[i]);
+      allEqual = allEqual && this.cachedQueryModels?.[i].equals(queryModels[i]);
     }
     if (allEqual) {
       return;
@@ -230,7 +231,7 @@ export class MediaQueryInspector extends UI.Widget.Widget implements
       locations: SDK.CSSModel.CSSLocation[],
     }|null = null;
     for (const model of this.cachedQueryModels) {
-      if (lastMarker && lastMarker.model.dimensionsEqual(model)) {
+      if (lastMarker?.model.dimensionsEqual(model)) {
         lastMarker.active = lastMarker.active || model.active();
       } else {
         lastMarker = {

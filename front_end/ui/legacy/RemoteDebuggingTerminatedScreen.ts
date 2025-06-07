@@ -3,20 +3,26 @@
 // found in the LICENSE file.
 
 import * as i18n from '../../core/i18n/i18n.js';
+import * as Buttons from '../../ui/components/buttons/buttons.js';
+import {html, render} from '../../ui/lit/lit.js';
 
 import {Dialog} from './Dialog.js';
 import {SizeBehavior} from './GlassPane.js';
-import remoteDebuggingTerminatedScreenStyles from './remoteDebuggingTerminatedScreen.css.legacy.js';
-import {createTextButton} from './UIUtils.js';
+import remoteDebuggingTerminatedScreenStyles from './remoteDebuggingTerminatedScreen.css.js';
 import {VBox} from './Widget.js';
 
 const UIStrings = {
   /**
-   * @description Text in a dialog box in DevTools stating why remote debugging has been terminated.
+   * @description Text in a dialog box in DevTools stating that remote debugging has been terminated.
    * "Remote debugging" here means that DevTools on a PC is inspecting a website running on an actual mobile device
    * (see https://developer.chrome.com/docs/devtools/remote-debugging/).
    */
-  debuggingConnectionWasClosed: 'Debugging connection was closed. Reason: ',
+  debuggingConnectionWasClosed: 'Debugging connection was closed',
+  /**
+   *@description Text in a dialog box in DevTools stating the reason for remote debugging being terminated.
+   *@example {target_closed} PH1
+   */
+  connectionClosedReason: 'Reason: {PH1}.',
   /**
    * @description Text in a dialog box showing how to reconnect to DevTools when remote debugging has been terminated.
    * "Remote debugging" here means that DevTools on a PC is inspecting a website running on an actual mobile device
@@ -31,22 +37,46 @@ const UIStrings = {
    * (see https://developer.chrome.com/docs/devtools/remote-debugging/).
    */
   reconnectDevtools: 'Reconnect `DevTools`',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/RemoteDebuggingTerminatedScreen.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+
+interface ViewInput {
+  reason: string;
+  onReconnect: () => void;
+}
+
+type View = (input: ViewInput, output: object, target: HTMLElement) => void;
+
+export const DEFAULT_VIEW: View = (input, _output, target) => {
+  // clang-format off
+  render(html`
+    <style>${remoteDebuggingTerminatedScreenStyles}</style>
+    <div class="header">${i18nString(UIStrings.debuggingConnectionWasClosed)}</div>
+    <div class="content">
+      <div class="reason">${i18nString(UIStrings.connectionClosedReason, {PH1: input.reason})}</div>
+      <div class="message">${i18nString(UIStrings.reconnectWhenReadyByReopening)}</div>
+    </div>
+    <div class="button-container">
+      <div class="button">
+        <devtools-button @click=${input.onReconnect} .jslogContext=${'reconnect'}
+            .variant=${Buttons.Button.Variant.OUTLINED}>${i18nString(UIStrings.reconnectDevtools)}</devtools-button>
+      </div>
+    </div>`,
+    target, {host: input});
+  // clang-format on
+};
+
 export class RemoteDebuggingTerminatedScreen extends VBox {
-  constructor(reason: string) {
+  constructor(reason: string, view: View = DEFAULT_VIEW) {
     super(true);
-    this.registerRequiredCSS(remoteDebuggingTerminatedScreenStyles);
-    const message = this.contentElement.createChild('div', 'message');
-    const span = message.createChild('span');
-    span.append(i18nString(UIStrings.debuggingConnectionWasClosed));
-    const reasonElement = span.createChild('span', 'reason');
-    reasonElement.textContent = reason;
-    this.contentElement.createChild('div', 'message').textContent = i18nString(UIStrings.reconnectWhenReadyByReopening);
-    const button = createTextButton(
-        i18nString(UIStrings.reconnectDevtools), () => window.location.reload(), {jslogContext: 'reconnect'});
-    this.contentElement.createChild('div', 'button').appendChild(button);
+    const input = {
+      reason,
+      onReconnect: () => {
+        window.location.reload();
+      },
+    };
+    view(input, {}, this.contentElement);
   }
 
   static show(reason: string): void {

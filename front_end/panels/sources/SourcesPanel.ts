@@ -1,6 +1,7 @@
 // Copyright 2021 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 /*
  * Copyright (C) 2008 Apple Inc. All Rights Reserved.
@@ -41,7 +42,6 @@ import * as Bindings from '../../models/bindings/bindings.js';
 import * as Breakpoints from '../../models/breakpoints/breakpoints.js';
 import * as Extensions from '../../models/extensions/extensions.js';
 import * as Workspace from '../../models/workspace/workspace.js';
-import * as IconButton from '../../ui/components/icon_button/icon_button.js';
 import * as ObjectUI from '../../ui/legacy/components/object_ui/object_ui.js';
 import type * as SourceFrame from '../../ui/legacy/components/source_frame/source_frame.js';
 import * as UI from '../../ui/legacy/legacy.js';
@@ -167,7 +167,7 @@ const UIStrings = {
    *@description Text in Sources Panel of the Sources panel
    */
   openInSourcesPanel: 'Open in Sources panel',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/sources/SourcesPanel.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 const primitiveRemoteObjectTypes = new Set(['number', 'boolean', 'bigint', 'undefined']);
@@ -187,7 +187,7 @@ export class SourcesPanel extends UI.Panel.Panel implements
   private readonly debugToolbar: UI.Toolbar.Toolbar;
   private readonly debugToolbarDrawer: HTMLDivElement;
   private readonly debuggerPausedMessage: DebuggerPausedMessage;
-  private overlayLoggables?: {debuggerPausedMessage: {}, resumeButton: {}, stepOverButton: {}};
+  private overlayLoggables?: {debuggerPausedMessage: object, resumeButton: object, stepOverButton: object};
   private splitWidget: UI.SplitWidget.SplitWidget;
   editorView: UI.SplitWidget.SplitWidget;
   private navigatorTabbedLocation: UI.View.TabbedViewLocation;
@@ -201,9 +201,7 @@ export class SourcesPanel extends UI.Panel.Panel implements
   private lastModificationTime: number;
   private pausedInternal?: boolean;
   private switchToPausedTargetTimeout?: number;
-  private ignoreExecutionLineEvents?: boolean;
   private executionLineLocation?: Bindings.DebuggerWorkspaceBinding.Location|null;
-  private pauseOnExceptionButton?: UI.Toolbar.ToolbarToggle;
   private sidebarPaneStack?: UI.View.ViewLocation;
   private tabbedLocationHeader?: Element|null;
   private extensionSidebarPanesContainer?: UI.View.ViewLocation;
@@ -213,6 +211,7 @@ export class SourcesPanel extends UI.Panel.Panel implements
 
   constructor() {
     super('sources');
+    this.registerRequiredCSS(sourcesPanelStyles);
 
     new UI.DropTarget.DropTarget(
         this.element, [UI.DropTarget.Type.Folder], i18nString(UIStrings.dropWorkspaceFolderHere),
@@ -253,11 +252,12 @@ export class SourcesPanel extends UI.Panel.Panel implements
     tabbedPane.headerElement().setAttribute(
         'jslog',
         `${VisualLogging.toolbar('navigator').track({keydown: 'ArrowUp|ArrowLeft|ArrowDown|ArrowRight|Enter|Space'})}`);
-    const navigatorMenuButton = new UI.Toolbar.ToolbarMenuButton(
-        this.populateNavigatorMenu.bind(this), /* isIconDropdown */ true, /* useSoftMenu */ true, 'more-options',
-        'dots-vertical');
-    navigatorMenuButton.setTitle(i18nString(UIStrings.moreOptions));
-    tabbedPane.rightToolbar().appendToolbarItem(navigatorMenuButton);
+    const navigatorMenuButton = new UI.ContextMenu.MenuButton();
+    navigatorMenuButton.populateMenuCall = this.populateNavigatorMenu.bind(this);
+    navigatorMenuButton.jslogContext = 'more-options';
+    navigatorMenuButton.iconName = 'dots-vertical';
+    navigatorMenuButton.title = i18nString(UIStrings.moreOptions);
+    tabbedPane.rightToolbar().appendToolbarItem(new UI.Toolbar.ToolbarItem(navigatorMenuButton));
 
     if (UI.ViewManager.ViewManager.instance().hasViewsForLocation('run-view-sidebar')) {
       const navigatorSplitWidget =
@@ -339,9 +339,9 @@ export class SourcesPanel extends UI.Panel.Panel implements
     const isInWrapper = UI.Context.Context.instance().flavor(QuickSourceView) &&
         !UI.InspectorView.InspectorView.instance().isDrawerMinimized();
     if (panel.splitWidget.isVertical() || isInWrapper) {
-      panel.splitWidget.uninstallResizer(panel.sourcesViewInternal.toolbarContainerElement());
+      panel.splitWidget.uninstallResizer(panel.sourcesViewInternal.scriptViewToolbar());
     } else {
-      panel.splitWidget.installResizer(panel.sourcesViewInternal.toolbarContainerElement());
+      panel.splitWidget.installResizer(panel.sourcesViewInternal.scriptViewToolbar());
     }
     if (!isInWrapper) {
       panel.sourcesViewInternal.leftToolbar().appendToolbarItem(panel.toggleNavigatorSidebarButton);
@@ -398,7 +398,6 @@ export class SourcesPanel extends UI.Panel.Panel implements
 
   override wasShown(): void {
     UI.Context.Context.instance().setFlavor(SourcesPanel, this);
-    this.registerCSSFiles([sourcesPanelStyles]);
     super.wasShown();
     if (UI.Context.Context.instance().flavor(QuickSourceView)) {
       UI.InspectorView.InspectorView.instance().setDrawerMinimized(true);
@@ -505,13 +504,14 @@ export class SourcesPanel extends UI.Panel.Panel implements
     if (withOverlay && !this.overlayLoggables) {
       this.overlayLoggables = {debuggerPausedMessage: {}, resumeButton: {}, stepOverButton: {}};
       VisualLogging.registerLoggable(
-          this.overlayLoggables.debuggerPausedMessage, `${VisualLogging.dialog('debugger-paused')}`, null);
+          this.overlayLoggables.debuggerPausedMessage, `${VisualLogging.dialog('debugger-paused')}`, null,
+          new DOMRect(0, 0, 200, 20));
       VisualLogging.registerLoggable(
           this.overlayLoggables.resumeButton, `${VisualLogging.action('debugger.toggle-pause')}`,
-          this.overlayLoggables.debuggerPausedMessage);
+          this.overlayLoggables.debuggerPausedMessage, new DOMRect(0, 0, 20, 20));
       VisualLogging.registerLoggable(
           this.overlayLoggables.stepOverButton, `${VisualLogging.action('debugger.step-over')}`,
-          this.overlayLoggables.debuggerPausedMessage);
+          this.overlayLoggables.debuggerPausedMessage, new DOMRect(0, 0, 20, 20));
     }
     this.#lastPausedTarget = new WeakRef(details.debuggerModel.target());
   }
@@ -628,7 +628,7 @@ export class SourcesPanel extends UI.Panel.Panel implements
 
     menuSection.appendCheckboxItem(menuItem, toggleExperiment, {
       checked: Root.Runtime.experiments.isEnabled(experiment),
-      additionalElement: IconButton.Icon.create('experiment'),
+      experimental: true,
       jslogContext: Platform.StringUtilities.toKebabCase(experiment),
     });
   }
@@ -647,10 +647,6 @@ export class SourcesPanel extends UI.Panel.Panel implements
         contextMenu.viewSection(), Root.Runtime.ExperimentName.JUST_MY_CODE, i18nString(UIStrings.hideIgnoreListed));
   }
 
-  setIgnoreExecutionLineEvents(ignoreExecutionLineEvents: boolean): void {
-    this.ignoreExecutionLineEvents = ignoreExecutionLineEvents;
-  }
-
   updateLastModificationTime(): void {
     this.lastModificationTime = window.performance.now();
   }
@@ -667,14 +663,6 @@ export class SourcesPanel extends UI.Panel.Panel implements
       return;
     }
     this.sourcesViewInternal.showSourceLocation(uiLocation.uiSourceCode, uiLocation, undefined, true);
-  }
-
-  private lastModificationTimeoutPassedForTest(): void {
-    lastModificationTimeout = Number.MIN_VALUE;
-  }
-
-  private updateLastModificationTimeForTest(): void {
-    lastModificationTimeout = Number.MAX_VALUE;
   }
 
   private async callFrameChanged(): Promise<void> {
@@ -961,7 +949,7 @@ export class SourcesPanel extends UI.Panel.Panel implements
       const editorElement = this.element.querySelector('devtools-text-editor');
       if (!eventTarget.isSelfOrDescendant(editorElement) && uiSourceCode.contentType().isTextType()) {
         UI.Context.Context.instance().setFlavor(Workspace.UISourceCode.UISourceCode, uiSourceCode);
-        contextMenu.headerSection().appendAction(
+        contextMenu.footerSection().appendAction(
             'drjones.sources-panel-context',
         );
       }
@@ -996,7 +984,7 @@ export class SourcesPanel extends UI.Panel.Panel implements
     if (contentType.hasScripts()) {
       const target = UI.Context.Context.instance().flavor(SDK.Target.Target);
       const debuggerModel = target ? target.model(SDK.DebuggerModel.DebuggerModel) : null;
-      if (debuggerModel && debuggerModel.isPaused()) {
+      if (debuggerModel?.isPaused()) {
         contextMenu.debugSection().appendItem(
             i18nString(UIStrings.continueToHere), this.continueToLocation.bind(this, uiLocation),
             {jslogContext: 'continue-to-here'});
@@ -1129,7 +1117,7 @@ export class SourcesPanel extends UI.Panel.Panel implements
   private async didGetFunctionDetails(response: {
     location: SDK.DebuggerModel.Location|null,
   }|null): Promise<void> {
-    if (!response || !response.location) {
+    if (!response?.location) {
       return;
     }
 
@@ -1169,7 +1157,7 @@ export class SourcesPanel extends UI.Panel.Panel implements
       return;
     }
 
-    if (this.sidebarPaneView && this.sidebarPaneView.shouldHideOnDetach()) {
+    if (this.sidebarPaneView?.shouldHideOnDetach()) {
       return;
     }  // We can't reparent extension iframes.
 
@@ -1190,7 +1178,7 @@ export class SourcesPanel extends UI.Panel.Panel implements
     vbox.setMinimumAndPreferredSizes(minToolbarWidth, 25, minToolbarWidth, 100);
     this.sidebarPaneStack = UI.ViewManager.ViewManager.instance().createStackLocation(
         this.revealDebuggerSidebar.bind(this), undefined, 'debug');
-    this.sidebarPaneStack.widget().element.classList.add('overflow-auto');
+    this.sidebarPaneStack.widget().element.classList.add('y-overflow-only');
     this.sidebarPaneStack.widget().show(vbox.element);
     this.sidebarPaneStack.widget().element.appendChild(this.debuggerPausedMessage.element());
     this.sidebarPaneStack.appendApplicableItems('sources.sidebar-top');
@@ -1272,7 +1260,7 @@ export class SourcesPanel extends UI.Panel.Panel implements
       return;
     }
     const entry = items[0].webkitGetAsEntry();
-    if (entry && entry.isDirectory) {
+    if (entry?.isDirectory) {
       Host.InspectorFrontendHost.InspectorFrontendHostInstance.upgradeDraggedFileSystemPermissions(entry.filesystem);
       Host.userMetrics.actionTaken(Host.UserMetrics.Action.WorkspaceDropFolder);
       void UI.ViewManager.ViewManager.instance().showView('navigator-files');
@@ -1280,7 +1268,7 @@ export class SourcesPanel extends UI.Panel.Panel implements
   }
 }
 
-export let lastModificationTimeout = 200;
+export const lastModificationTimeout = 200;
 export const minToolbarWidth = 215;
 
 export class UILocationRevealer implements Common.Revealer.Revealer<Workspace.UISourceCode.UILocation> {
@@ -1325,7 +1313,7 @@ export class DebuggerPausedDetailsRevealer implements
     Common.Revealer.Revealer<SDK.DebuggerModel.DebuggerPausedDetails> {
   async reveal(_object: SDK.DebuggerModel.DebuggerPausedDetails): Promise<void> {
     if (Common.Settings.Settings.instance().moduleSetting('auto-focus-on-debugger-paused-enabled').get()) {
-      return SourcesPanel.instance().setAsCurrentPanel();
+      return await SourcesPanel.instance().setAsCurrentPanel();
     }
   }
 }
@@ -1429,6 +1417,11 @@ export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
       }
       case 'sources.toggle-debugger-sidebar': {
         panel.toggleDebuggerSidebar();
+        return true;
+      }
+      case 'sources.toggle-word-wrap': {
+        const setting = Common.Settings.Settings.instance().moduleSetting<boolean>('sources.word-wrap');
+        setting.set(!setting.get());
         return true;
       }
     }

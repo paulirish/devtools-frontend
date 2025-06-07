@@ -40,13 +40,8 @@ To do so, the styles defined for the items should be part of the styles adopted 
 ```ts
 // In Example.ts
 import exampleStyles from './example.css.js';
-export class Example extends HTMLElement{
 
-…
-
-  connectedCallback(): void {
-    this.shadow.adoptedStyleSheets = [exampleStyles];
-  }
+export class Example extends HTMLElement {
 
 …
 
@@ -55,6 +50,7 @@ export class Example extends HTMLElement{
         LitHtml.html`
 ```
 ```html
+          <style>${exampleStyles}</style>
           <span id="hello-world">Hello world!!1</span>
           <devtools-select-menu>
             <devtools-menu-item>
@@ -84,6 +80,7 @@ So that the owner of a SelectMenu instance is notified about item selections in 
 ```ts
 // In Example.ts
 import exampleStyles from './example.css.js';
+
 export class Example extends HTMLElement{
   private currentValue = 0;
 
@@ -99,6 +96,7 @@ export class Example extends HTMLElement{
         LitHtml.html`
 ```
 ```html
+          <style>${exampleStyles}</style>
           <devtools-select-menu
             @selectmenuselected=${this.onItemSelected}
           >

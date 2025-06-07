@@ -1,6 +1,7 @@
 // Copyright 2023 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Platform from '../../../core/platform/platform.js';
@@ -11,7 +12,7 @@ import * as UI from '../../../ui/legacy/legacy.js';
 // *********************************************************************
 // At the moment this file consists of helpers to aid in the rendering
 // of events details in the bottom drawer. In the future, we should use
-// LitHtml for this section, and update this helpers accordingly.
+// Lit for this section, and update this helpers accordingly.
 // *********************************************************************
 
 const UIStrings = {
@@ -65,7 +66,7 @@ const UIStrings = {
    * @description Details text indicating how many bytes were sent in a WebSocket message
    */
   webSocketDataLength: 'Data length',
-};
+} as const;
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/DetailsView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -78,7 +79,7 @@ export function buildWarningElementsForEvent(
     return warningElements;
   }
   for (const warning of warnings) {
-    const duration = Trace.Helpers.Timing.microSecondsToMilliseconds(Trace.Types.Timing.MicroSeconds(event.dur || 0));
+    const duration = Trace.Helpers.Timing.microToMilli(Trace.Types.Timing.Micro(event.dur || 0));
     const span = document.createElement('span');
     switch (warning) {
       case 'FORCED_REFLOW': {
@@ -173,7 +174,7 @@ export function generateInvalidationsList(
 } {
   const groupedByReason: Record<string, Trace.Types.Events.InvalidationTrackingEvent[]> = {};
 
-  const backendNodeIds: Set<Protocol.DOM.BackendNodeId> = new Set();
+  const backendNodeIds = new Set<Protocol.DOM.BackendNodeId>();
   for (const invalidation of invalidations) {
     backendNodeIds.add(invalidation.args.data.nodeId);
 

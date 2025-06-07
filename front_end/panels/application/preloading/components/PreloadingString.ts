@@ -122,6 +122,10 @@ const UIStrings = {
    *@description  Description text for Prefetch status PrefetchNotEligiblePreloadingDisabled.
    */
   PrefetchNotEligiblePreloadingDisabled: 'The prefetch was not performed because speculative loading was disabled.',
+  /**
+   *@description  Description text for Prefetch status PrefetchEvictedAfterBrowsingDataRemoved.
+   */
+  PrefetchEvictedAfterBrowsingDataRemoved: 'The prefetch was discarded because browsing data was removed.',
 
   /**
    *  Description text for PrerenderFinalStatus::kLowEndDevice.
@@ -143,11 +147,6 @@ const UIStrings = {
    */
   prerenderFinalStatusNavigationRequestBlockedByCsp:
       'The prerendering navigation was blocked by a Content Security Policy.',
-  /**
-   *  Description text for PrerenderFinalStatus::kMainFrameNavigation.
-   */
-  prerenderFinalStatusMainFrameNavigation:
-      'The prerendered page navigated itself to another URL, which is currently not supported.',
   /**
    *@description Description text for PrerenderFinalStatus::kMojoBinderPolicy.
    *@example {device.mojom.GamepadMonitor} PH1
@@ -377,6 +376,10 @@ const UIStrings = {
    * Description text for PrenderFinalStatus::kWindowClosed.
    */
   prerenderFinalStatusWindowClosed: 'The prerendered page was unloaded because it called window.close().',
+  /**
+   * Description text for PrenderFinalStatus::kBrowsingDataRemoved.
+   */
+  prerenderFinalStatusBrowsingDataRemoved: 'The prerendered page was unloaded because browsing data was removed.',
 
   /**
    *@description Text in grid and details: Preloading attempt is not yet triggered.
@@ -402,13 +405,13 @@ const UIStrings = {
    *@description Text in grid and details: Preloading failed.
    */
   statusFailure: 'Failure',
-};
+} as const;
 
 const str_ = i18n.i18n.registerUIStrings('panels/application/preloading/components/PreloadingString.ts', UIStrings);
 const i18nLazyString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined, str_);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-export const PrefetchReasonDescription: {[key: string]: {name: () => Platform.UIString.LocalizedString}} = {
+export const PrefetchReasonDescription: Record<string, {name: () => Platform.UIString.LocalizedString}> = {
   PrefetchFailedIneligibleRedirect: {name: i18nLazyString(UIStrings.PrefetchFailedIneligibleRedirect)},
   PrefetchFailedInvalidRedirect: {name: i18nLazyString(UIStrings.PrefetchFailedInvalidRedirect)},
   PrefetchFailedMIMENotSupported: {name: i18nLazyString(UIStrings.PrefetchFailedMIMENotSupported)},
@@ -436,6 +439,10 @@ export const PrefetchReasonDescription: {[key: string]: {name: () => Platform.UI
   PrefetchEvictedAfterCandidateRemoved: {name: i18nLazyString(UIStrings.PrefetchEvictedAfterCandidateRemoved)},
   PrefetchNotEligibleBatterySaverEnabled: {name: i18nLazyString(UIStrings.PrefetchNotEligibleBatterySaverEnabled)},
   PrefetchNotEligiblePreloadingDisabled: {name: i18nLazyString(UIStrings.PrefetchNotEligiblePreloadingDisabled)},
+  PrefetchNotEligibleUserHasServiceWorkerNoFetchHandler: {name: () => i18n.i18n.lockedString('Unknown')},
+  PrefetchNotEligibleRedirectFromServiceWorker: {name: () => i18n.i18n.lockedString('Unknown')},
+  PrefetchNotEligibleRedirectToServiceWorker: {name: () => i18n.i18n.lockedString('Unknown')},
+  PrefetchEvictedAfterBrowsingDataRemoved: {name: i18nLazyString(UIStrings.PrefetchEvictedAfterBrowsingDataRemoved)},
 };
 
 // Decoding PrefetchFinalStatus prefetchAttempt to failure description.
@@ -510,6 +517,14 @@ export function prefetchFailureReason({prefetchStatus}: SDK.PreloadingModel.Pref
       return PrefetchReasonDescription['PrefetchNotEligibleBatterySaverEnabled'].name();
     case Protocol.Preload.PrefetchStatus.PrefetchNotEligiblePreloadingDisabled:
       return PrefetchReasonDescription['PrefetchNotEligiblePreloadingDisabled'].name();
+    case Protocol.Preload.PrefetchStatus.PrefetchNotEligibleUserHasServiceWorkerNoFetchHandler:
+      return PrefetchReasonDescription['PrefetchNotEligibleUserHasServiceWorkerNoFetchHandler'].name();
+    case Protocol.Preload.PrefetchStatus.PrefetchNotEligibleRedirectFromServiceWorker:
+      return PrefetchReasonDescription['PrefetchNotEligibleRedirectFromServiceWorker'].name();
+    case Protocol.Preload.PrefetchStatus.PrefetchNotEligibleRedirectToServiceWorker:
+      return PrefetchReasonDescription['PrefetchNotEligibleRedirectToServiceWorker'].name();
+    case Protocol.Preload.PrefetchStatus.PrefetchEvictedAfterBrowsingDataRemoved:
+      return PrefetchReasonDescription['PrefetchEvictedAfterBrowsingDataRemoved'].name();
     default:
       // Note that we use switch and exhaustiveness check to prevent to
       // forget updating these strings, but allow to handle unknown
@@ -538,8 +553,6 @@ export function prerenderFailureReason(attempt: SDK.PreloadingModel.PrerenderAtt
       return i18nString(UIStrings.prerenderFinalStatusInvalidSchemeNavigation);
     case Protocol.Preload.PrerenderFinalStatus.NavigationRequestBlockedByCsp:
       return i18nString(UIStrings.prerenderFinalStatusNavigationRequestBlockedByCsp);
-    case Protocol.Preload.PrerenderFinalStatus.MainFrameNavigation:
-      return i18nString(UIStrings.prerenderFinalStatusMainFrameNavigation);
     case Protocol.Preload.PrerenderFinalStatus.MojoBinderPolicy:
       assertNotNullOrUndefined(attempt.disallowedMojoInterface);
       return i18nString(UIStrings.prerenderFinalStatusMojoBinderPolicy, {PH1: attempt.disallowedMojoInterface});
@@ -685,6 +698,8 @@ export function prerenderFailureReason(attempt: SDK.PreloadingModel.PrerenderAtt
       return i18nString(UIStrings.prerenderFinalStatusAllPrerenderingCanceled);
     case Protocol.Preload.PrerenderFinalStatus.WindowClosed:
       return i18nString(UIStrings.prerenderFinalStatusWindowClosed);
+    case Protocol.Preload.PrerenderFinalStatus.BrowsingDataRemoved:
+      return i18nString(UIStrings.prerenderFinalStatusBrowsingDataRemoved);
     case Protocol.Preload.PrerenderFinalStatus.SlowNetwork:
     case Protocol.Preload.PrerenderFinalStatus.OtherPrerenderedPageActivated:
     case Protocol.Preload.PrerenderFinalStatus.V8OptimizerDisabled:
@@ -695,9 +710,8 @@ export function prerenderFailureReason(attempt: SDK.PreloadingModel.PrerenderAtt
       // Note that we use switch and exhaustiveness check to prevent to
       // forget updating these strings, but allow to handle unknown
       // PrerenderFinalStatus at runtime.
-      return i18n.i18n.lockedString(`Unknown failure reason: ${
-          attempt.prerenderStatus as
-          'See https://docs.google.com/document/d/1PnrfowsZMt62PX1EvvTp2Nqs3ji1zrklrAEe1JYbkTk'}`);
+      // See https://docs.google.com/document/d/1PnrfowsZMt62PX1EvvTp2Nqs3ji1zrklrAEe1JYbkTk'
+      return i18n.i18n.lockedString(`Unknown failure reason: ${attempt.prerenderStatus as string}`);
   }
 }
 
@@ -705,6 +719,17 @@ export function ruleSetLocationShort(
     ruleSet: Protocol.Preload.RuleSet, pageURL: Platform.DevToolsPath.UrlString): string {
   const url = ruleSet.url === undefined ? pageURL : ruleSet.url as Platform.DevToolsPath.UrlString;
   return Bindings.ResourceUtils.displayNameForURL(url);
+}
+
+export function ruleSetTagOrLocationShort(
+    ruleSet: Protocol.Preload.RuleSet, pageURL: Platform.DevToolsPath.UrlString): string {
+  if (!ruleSet.errorMessage) {
+    const parsedRuleset = JSON.parse(ruleSet['sourceText']);
+    if ('tag' in parsedRuleset) {
+      return '"' + parsedRuleset['tag'] + '"';
+    }
+  }
+  return ruleSetLocationShort(ruleSet, pageURL);
 }
 
 export function capitalizedAction(action: Protocol.Preload.SpeculationAction): Common.UIString.LocalizedString {

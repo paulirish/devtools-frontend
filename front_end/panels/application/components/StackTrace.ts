@@ -1,6 +1,7 @@
 // Copyright 2021 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import '../../../ui/components/expandable_list/expandable_list.js';
 
@@ -9,13 +10,13 @@ import type * as SDK from '../../../core/sdk/sdk.js';
 import type * as Protocol from '../../../generated/protocol.js';
 import * as Bindings from '../../../models/bindings/bindings.js';
 import * as Components from '../../../ui/legacy/components/utils/utils.js';
-import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import * as Lit from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import stackTraceLinkButtonStyles from './stackTraceLinkButton.css.js';
 import stackTraceRowStyles from './stackTraceRow.css.js';
 
-const {html} = LitHtml;
+const {html} = Lit;
 
 const UIStrings = {
   /**
@@ -35,7 +36,7 @@ const UIStrings = {
    * stack trace for the line of code which caused the creation of the iframe. This is the stack trace we are showing here.
    */
   creationStackTrace: 'Frame Creation `Stack Trace`',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/application/components/StackTrace.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -46,9 +47,9 @@ export interface StackTraceData {
       target: SDK.Target.Target|null,
       linkifier: Components.Linkifier.Linkifier,
       tabStops: boolean|undefined,
-      updateCallback?: (arg0: (Components.JSPresentationUtils.StackTraceRegularRow|
-                               Components.JSPresentationUtils.StackTraceAsyncRow)[]) => void,
-      ) => (Components.JSPresentationUtils.StackTraceRegularRow | Components.JSPresentationUtils.StackTraceAsyncRow)[];
+      updateCallback?: (arg0: Array<Components.JSPresentationUtils.StackTraceRegularRow|
+                                    Components.JSPresentationUtils.StackTraceAsyncRow>) => void,
+      ) => Array<Components.JSPresentationUtils.StackTraceRegularRow|Components.JSPresentationUtils.StackTraceAsyncRow>;
 }
 
 interface StackTraceRowData {
@@ -65,16 +66,13 @@ export class StackTraceRow extends HTMLElement {
     this.#render();
   }
 
-  connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [stackTraceRowStyles];
-  }
-
   #render(): void {
     if (!this.#stackTraceRowItem) {
       return;
     }
-    LitHtml.render(
+    Lit.render(
         html`
+      <style>${stackTraceRowStyles}</style>
       <div class="stack-trace-row">
               <div class="stack-trace-function-name text-ellipsis" title=${this.#stackTraceRowItem.functionName}>
                 ${this.#stackTraceRowItem.functionName}
@@ -83,7 +81,7 @@ export class StackTraceRow extends HTMLElement {
                 ${
             this.#stackTraceRowItem.link ?
                 html`<div class="text-ellipsis">\xA0@\xA0${this.#stackTraceRowItem.link}</div>` :
-                LitHtml.nothing}
+                Lit.nothing}
               </div>
             </div>
     `,
@@ -102,7 +100,7 @@ export class StackTraceLinkButton extends HTMLElement {
 
   #onShowAllClick: () => void = () => {};
   #hiddenCallFramesCount: number|null = null;
-  #expandedView: boolean = false;
+  #expandedView = false;
 
   set data(data: StackTraceLinkButtonData) {
     this.#onShowAllClick = data.onShowAllClick;
@@ -111,18 +109,15 @@ export class StackTraceLinkButton extends HTMLElement {
     this.#render();
   }
 
-  connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [stackTraceLinkButtonStyles];
-  }
-
   #render(): void {
     if (!this.#hiddenCallFramesCount) {
       return;
     }
     const linkText = this.#expandedView ? i18nString(UIStrings.showLess) :
                                           i18nString(UIStrings.showSMoreFrames, {n: this.#hiddenCallFramesCount});
-    LitHtml.render(
+    Lit.render(
         html`
+      <style>${stackTraceLinkButtonStyles}</style>
       <div class="stack-trace-row">
           <button class="link" @click=${() => this.#onShowAllClick()}>
             ${linkText}
@@ -136,8 +131,8 @@ export class StackTraceLinkButton extends HTMLElement {
 export class StackTrace extends HTMLElement {
   readonly #shadow = this.attachShadow({mode: 'open'});
   readonly #linkifier = new Components.Linkifier.Linkifier();
-  #stackTraceRows: (Components.JSPresentationUtils.StackTraceRegularRow|
-                    Components.JSPresentationUtils.StackTraceAsyncRow)[] = [];
+  #stackTraceRows:
+      Array<Components.JSPresentationUtils.StackTraceRegularRow|Components.JSPresentationUtils.StackTraceAsyncRow> = [];
   #showHidden = false;
 
   set data(data: StackTraceData) {
@@ -151,8 +146,10 @@ export class StackTrace extends HTMLElement {
     this.#render();
   }
 
-  #onStackTraceRowsUpdated(stackTraceRows: (Components.JSPresentationUtils.StackTraceRegularRow|
-                                            Components.JSPresentationUtils.StackTraceAsyncRow)[]): void {
+  #onStackTraceRowsUpdated(
+      stackTraceRows:
+          Array<Components.JSPresentationUtils.StackTraceRegularRow|Components.JSPresentationUtils.StackTraceAsyncRow>):
+      void {
     this.#stackTraceRows = stackTraceRows;
     this.#render();
   }
@@ -162,7 +159,7 @@ export class StackTrace extends HTMLElement {
     this.#render();
   }
 
-  createRowTemplates(): LitHtml.TemplateResult[] {
+  createRowTemplates(): Lit.TemplateResult[] {
     const expandableRows = [];
     let hiddenCallFramesCount = 0;
     for (const item of this.#stackTraceRows) {
@@ -213,7 +210,7 @@ export class StackTrace extends HTMLElement {
     if (!this.#stackTraceRows.length) {
       // Disabled until https://crbug.com/1079231 is fixed.
       // clang-format off
-      LitHtml.render(
+      Lit.render(
         html`
           <span>${i18nString(UIStrings.cannotRenderStackTrace)}</span>
         `,
@@ -222,7 +219,7 @@ export class StackTrace extends HTMLElement {
     }
 
     const expandableRows = this.createRowTemplates();
-    LitHtml.render(
+    Lit.render(
       html`
         <devtools-expandable-list .data=${{rows: expandableRows, title: i18nString(UIStrings.creationStackTrace)}}
                                   jslog=${VisualLogging.tree()}>

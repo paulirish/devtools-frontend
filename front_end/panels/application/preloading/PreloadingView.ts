@@ -1,8 +1,9 @@
 // Copyright 2022 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
-import '../../../ui/components/split_view/split_view.js';
 import '../../../ui/legacy/legacy.js';
 
 import * as Common from '../../../core/common/common.js';
@@ -11,22 +12,18 @@ import * as Platform from '../../../core/platform/platform.js';
 import {assertNotNullOrUndefined} from '../../../core/platform/platform.js';
 import * as SDK from '../../../core/sdk/sdk.js';
 import * as Protocol from '../../../generated/protocol.js';
-import * as Bindings from '../../../models/bindings/bindings.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
-import type * as DataGrid from '../../../ui/components/data_grid/data_grid.js';
-import type * as SplitView from '../../../ui/components/split_view/split_view.js';
 // eslint-disable-next-line rulesdir/es-modules-import
 import emptyWidgetStyles from '../../../ui/legacy/emptyWidget.css.js';
 import * as UI from '../../../ui/legacy/legacy.js';
-import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import {html, render} from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import * as PreloadingComponents from './components/components.js';
+import {ruleSetTagOrLocationShort} from './components/PreloadingString.js';
 import type * as PreloadingHelper from './helper/helper.js';
 import preloadingViewStyles from './preloadingView.css.js';
 import preloadingViewDropDownStyles from './preloadingViewDropDown.css.js';
-
-const {html} = LitHtml;
 
 const UIStrings = {
   /**
@@ -82,12 +79,36 @@ const UIStrings = {
    *@description Text to pretty print a file
    */
   prettyPrint: 'Pretty print',
-};
+  /**
+   *@description Placeholder text if there are no rules to show. https://developer.chrome.com/docs/devtools/application/debugging-speculation-rules
+   */
+  noRulesDetected: 'No rules detected',
+  /**
+   *@description Placeholder text if there are no rules to show. https://developer.chrome.com/docs/devtools/application/debugging-speculation-rules
+   */
+  rulesDescription: 'On this page you will see the speculation rules used to prefetch and prerender page navigations.',
+  /**
+   *@description Placeholder text if there are no speculation attempts for prefetching or prerendering urls. https://developer.chrome.com/docs/devtools/application/debugging-speculation-rules
+   */
+  noPrefetchAttempts: 'No speculation detected',
+  /**
+   *@description Placeholder text if there are no speculation attempts for prefetching or prerendering urls. https://developer.chrome.com/docs/devtools/application/debugging-speculation-rules
+   */
+  prefetchDescription: 'On this page you will see details on speculative loads.',
+  /**
+   *@description Text for a learn more link
+   */
+  learnMore: 'Learn more',
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/application/preloading/PreloadingView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
+const SPECULATION_EXPLANATION_URL =
+    'https://developer.chrome.com/docs/devtools/application/debugging-speculation-rules' as
+    Platform.DevToolsPath.UrlString;
+
 // Used for selector, indicating no filter is specified.
-const AllRuleSetRootId: symbol = Symbol('AllRuleSetRootId');
+const AllRuleSetRootId = Symbol('AllRuleSetRootId');
 
 class PreloadingUIUtils {
   static status(status: SDK.PreloadingModel.PreloadingStatus): string {
@@ -153,23 +174,13 @@ class PreloadingUIUtils {
       return ruleSet.url;
     }
 
-    throw Error('unreachable');
+    throw new Error('unreachable');
   }
 
   static processLocalId(id: Protocol.Preload.RuleSetId): string {
     // RuleSetId is form of '<processId>.<processLocalId>'
     const index = id.indexOf('.');
     return index === -1 ? id : id.slice(index + 1);
-  }
-
-  // TODO(https://crbug.com/1410709): Move
-  // front_end/panels/application/preloading/components/PreloadingString.ts
-  // to
-  // front_end/panels/application/preloading/helper/PreloadingString.ts
-  // and use PreloadingString.ruleSetLocationShort.
-  static ruleSetLocationShort(ruleSet: Protocol.Preload.RuleSet, pageURL: Platform.DevToolsPath.UrlString): string {
-    const url = ruleSet.url === undefined ? pageURL : ruleSet.url as Platform.DevToolsPath.UrlString;
-    return Bindings.ResourceUtils.displayNameForURL(url);
   }
 }
 
@@ -181,11 +192,10 @@ function pageURL(): Platform.DevToolsPath.UrlString {
 export class PreloadingRuleSetView extends UI.Widget.VBox {
   private model: SDK.PreloadingModel.PreloadingModel;
   private focusedRuleSetId: Protocol.Preload.RuleSetId|null = null;
-  private focusedPreloadingAttemptId: SDK.PreloadingModel.PreloadingAttemptId|null = null;
 
   private readonly warningsContainer: HTMLDivElement;
   private readonly warningsView = new PreloadingWarningsView();
-  private readonly hsplit: SplitView.SplitView.SplitView;
+  private readonly hsplit: HTMLElement;
   private readonly ruleSetGrid = new PreloadingComponents.RuleSetGrid.RuleSetGrid();
   private readonly ruleSetDetails = new PreloadingComponents.RuleSetDetailsView.RuleSetDetailsView();
 
@@ -193,6 +203,7 @@ export class PreloadingRuleSetView extends UI.Widget.VBox {
 
   constructor(model: SDK.PreloadingModel.PreloadingModel) {
     super(/* isWebComponent */ true, /* delegatesFocus */ false);
+    this.registerRequiredCSS(emptyWidgetStyles, preloadingViewStyles);
 
     this.model = model;
     SDK.TargetManager.TargetManager.instance().addScopeChangeListener(this.onScopeChange.bind(this));
@@ -220,22 +231,27 @@ export class PreloadingRuleSetView extends UI.Widget.VBox {
     this.contentElement.insertBefore(this.warningsContainer, this.contentElement.firstChild);
     this.warningsView.show(this.warningsContainer);
 
-    this.ruleSetGrid.addEventListener('cellfocused', this.onRuleSetsGridCellFocused.bind(this));
-
+    this.ruleSetGrid.addEventListener('select', this.onRuleSetsGridCellFocused.bind(this));
     const onPrettyPrintToggle = (): void => {
       this.shouldPrettyPrint = !this.shouldPrettyPrint;
       this.updateRuleSetDetails();
     };
 
     // clang-format off
-    LitHtml.render(
+    render(
         html`
-        <devtools-split-view .horizontal=${true} style="--min-sidebar-size: max(100vh-200px, 0px)">
-          <div slot="main" class="overflow-auto" style="height: 100%">
+        <div class="empty-state">
+          <span class="empty-state-header">${i18nString(UIStrings.noRulesDetected)}</span>
+          <div class="empty-state-description">
+            <span>${i18nString(UIStrings.rulesDescription)}</span>
+            ${UI.XLink.XLink.create(SPECULATION_EXPLANATION_URL, i18nString(UIStrings.learnMore), 'x-link', undefined, 'learn-more')}
+          </div>
+        </div>
+        <devtools-split-view sidebar-position="second">
+          <div slot="main">
             ${this.ruleSetGrid}
           </div>
-          <div slot="sidebar" class="overflow-auto" style="height: 100%"
-          jslog=${VisualLogging.section('rule-set-details')}>
+          <div slot="sidebar" jslog=${VisualLogging.section('rule-set-details')}>
             ${this.ruleSetDetails}
           </div>
         </devtools-split-view>
@@ -253,13 +269,11 @@ export class PreloadingRuleSetView extends UI.Widget.VBox {
         </div>`,
         this.contentElement, {host: this});
     // clang-format on
-    this.hsplit = this.contentElement.querySelector('devtools-split-view') as SplitView.SplitView.SplitView;
+    this.hsplit = this.contentElement.querySelector('devtools-split-view') as HTMLElement;
   }
 
   override wasShown(): void {
     super.wasShown();
-
-    this.registerCSSFiles([emptyWidgetStyles, preloadingViewStyles]);
 
     this.warningsView.wasShown();
 
@@ -285,9 +299,9 @@ export class PreloadingRuleSetView extends UI.Widget.VBox {
     this.ruleSetDetails.data = ruleSet;
 
     if (ruleSet === null) {
-      this.hsplit.style.setProperty('--current-main-area-size', '100%');
+      this.hsplit.setAttribute('sidebar-visibility', 'hidden');
     } else {
-      this.hsplit.style.setProperty('--current-main-area-size', '60%');
+      this.hsplit.removeAttribute('sidebar-visibility');
     }
   }
 
@@ -302,14 +316,13 @@ export class PreloadingRuleSetView extends UI.Widget.VBox {
       };
     });
     this.ruleSetGrid.update({rows: ruleSetRows, pageURL: pageURL()});
-
+    this.contentElement.classList.toggle('empty', ruleSetRows.length === 0);
     this.updateRuleSetDetails();
   }
 
   private onRuleSetsGridCellFocused(event: Event): void {
-    const focusedEvent = event as DataGrid.DataGridEvents.BodyCellFocusedEvent;
-    this.focusedRuleSetId =
-        focusedEvent.data.row.cells.find(cell => cell.columnId === 'id')?.value as Protocol.Preload.RuleSetId;
+    const focusedEvent = event as CustomEvent<Protocol.Preload.RuleSetId>;
+    this.focusedRuleSetId = focusedEvent.detail;
     this.render();
   }
 
@@ -341,6 +354,7 @@ export class PreloadingAttemptView extends UI.Widget.VBox {
 
   constructor(model: SDK.PreloadingModel.PreloadingModel) {
     super(/* isWebComponent */ true, /* delegatesFocus */ false);
+    this.registerRequiredCSS(emptyWidgetStyles, preloadingViewStyles);
 
     this.element.setAttribute('jslog', `${VisualLogging.pane('preloading-speculations')}`);
     this.model = model;
@@ -378,10 +392,19 @@ export class PreloadingAttemptView extends UI.Widget.VBox {
     this.ruleSetSelector = new PreloadingRuleSetSelector(() => this.render());
     toolbar.appendToolbarItem(this.ruleSetSelector.item());
 
-    this.preloadingGrid.addEventListener('cellfocused', this.onPreloadingGridCellFocused.bind(this));
-    LitHtml.render(
+    this.preloadingGrid.addEventListener('select', this.onPreloadingGridCellFocused.bind(this));
+    render(
         html`
-        <devtools-split-view .horizontal=${true} style="--min-sidebar-size: 0px">
+        <div class="empty-state">
+          <span class="empty-state-header">${i18nString(UIStrings.noPrefetchAttempts)}</span>
+          <div class="empty-state-description">
+            <span>${i18nString(UIStrings.prefetchDescription)}</span>
+            ${
+            UI.XLink.XLink.create(
+                SPECULATION_EXPLANATION_URL, i18nString(UIStrings.learnMore), 'x-link', undefined, 'learn-more')}
+          </div>
+        </div>
+        <devtools-split-view sidebar-position="second">
           <div slot="main" class="overflow-auto" style="height: 100%">
             ${this.preloadingGrid}
           </div>
@@ -396,8 +419,6 @@ export class PreloadingAttemptView extends UI.Widget.VBox {
 
   override wasShown(): void {
     super.wasShown();
-
-    this.registerCSSFiles([emptyWidgetStyles, preloadingViewStyles]);
 
     this.warningsView.wasShown();
 
@@ -427,8 +448,7 @@ export class PreloadingAttemptView extends UI.Widget.VBox {
       this.preloadingDetails.data = null;
     } else {
       const pipeline = this.model.getPipeline(preloadingAttempt);
-      const ruleSets = preloadingAttempt.ruleSetIds.map(id => this.model.getRuleSetById(id)).filter(x => x !== null) as
-          Protocol.Preload.RuleSet[];
+      const ruleSets = preloadingAttempt.ruleSetIds.map(id => this.model.getRuleSetById(id)).filter(x => x !== null);
       this.preloadingDetails.data = {
         pipeline,
         ruleSets,
@@ -454,14 +474,14 @@ export class PreloadingAttemptView extends UI.Widget.VBox {
       };
     });
     this.preloadingGrid.update({rows, pageURL: pageURL()});
+    this.contentElement.classList.toggle('empty', rows.length === 0);
 
     this.updatePreloadingDetails();
   }
 
   private onPreloadingGridCellFocused(event: Event): void {
-    const focusedEvent = event as DataGrid.DataGridEvents.BodyCellFocusedEvent;
-    this.focusedPreloadingAttemptId = focusedEvent.data.row.cells.find(cell => cell.columnId === 'id')?.value as
-        SDK.PreloadingModel.PreloadingAttemptId;
+    const focusedEvent = event as CustomEvent<SDK.PreloadingModel.PreloadingAttemptId>;
+    this.focusedPreloadingAttemptId = focusedEvent.detail;
     this.render();
   }
 
@@ -491,6 +511,7 @@ export class PreloadingSummaryView extends UI.Widget.VBox {
 
   constructor(model: SDK.PreloadingModel.PreloadingModel) {
     super(/* isWebComponent */ true, /* delegatesFocus */ false);
+    this.registerRequiredCSS(emptyWidgetStyles, preloadingViewStyles);
 
     this.element.setAttribute('jslog', `${VisualLogging.pane('speculative-loads')}`);
     this.model = model;
@@ -514,8 +535,6 @@ export class PreloadingSummaryView extends UI.Widget.VBox {
 
   override wasShown(): void {
     super.wasShown();
-
-    this.registerCSSFiles([emptyWidgetStyles, preloadingViewStyles]);
 
     this.warningsView.wasShown();
 
@@ -590,19 +609,17 @@ class PreloadingRuleSetSelector implements
 
   private onModelUpdated(): void {
     const ids = this.model.getAllRuleSets().map(({id}) => id);
-    const items = [AllRuleSetRootId, ...ids];
+    const items = [AllRuleSetRootId, ...ids] as [typeof AllRuleSetRootId, ...Protocol.Preload.RuleSetId[]];
     const selected = this.dropDown.getSelectedItem();
+    // Use `AllRuleSetRootId` by default. For example, `selected` is null or has gone.
+    const newSelected = (selected === null || !items.includes(selected)) ? AllRuleSetRootId : selected;
     this.listModel.replaceAll(items);
-    if (selected === null) {
-      this.dropDown.selectItem(AllRuleSetRootId);
-    } else {
-      this.dropDown.selectItem(selected);
-    }
+    this.dropDown.selectItem(newSelected);
     this.updateWidth(items);
   }
 
   // Updates the width for the DropDown element.
-  private updateWidth(items: (Protocol.Preload.RuleSetId|typeof AllRuleSetRootId)[]): void {
+  private updateWidth(items: Array<Protocol.Preload.RuleSetId|typeof AllRuleSetRootId>): void {
     // Width set by `UI.SoftDropDown`.
     const DEFAULT_WIDTH = 315;
     const urlLengths = items.map(x => this.titleFor(x).length);
@@ -648,7 +665,8 @@ class PreloadingRuleSetSelector implements
     if (ruleSet === null) {
       return i18n.i18n.lockedString('Internal error');
     }
-    return PreloadingUIUtils.ruleSetLocationShort(ruleSet, pageURL());
+
+    return ruleSetTagOrLocationShort(ruleSet, pageURL());
   }
 
   subtitleFor(id: Protocol.Preload.RuleSetId|typeof AllRuleSetRootId): string {
@@ -661,7 +679,7 @@ class PreloadingRuleSetSelector implements
   // Method for UI.SoftDropDown.Delegate<Protocol.Preload.RuleSetId|typeof AllRuleSetRootId>
   createElementForItem(id: Protocol.Preload.RuleSetId|typeof AllRuleSetRootId): Element {
     const element = document.createElement('div');
-    const shadowRoot = UI.UIUtils.createShadowRootWithCoreStyles(element, {cssFile: [preloadingViewDropDownStyles]});
+    const shadowRoot = UI.UIUtils.createShadowRootWithCoreStyles(element, {cssFile: preloadingViewDropDownStyles});
     const title = shadowRoot.createChild('div', 'title');
     UI.UIUtils.createTextChild(title, Platform.StringUtilities.trimEndWithMaxLength(this.titleFor(id), 100));
     const subTitle = shadowRoot.createChild('div', 'subtitle');
@@ -692,13 +710,11 @@ export class PreloadingWarningsView extends UI.Widget.VBox {
 
   constructor() {
     super(/* isWebComponent */ false, /* delegatesFocus */ false);
+    this.registerRequiredCSS(emptyWidgetStyles);
   }
 
   override wasShown(): void {
     super.wasShown();
-
-    this.registerCSSFiles([emptyWidgetStyles]);
-
     this.contentElement.append(this.infobar);
   }
 

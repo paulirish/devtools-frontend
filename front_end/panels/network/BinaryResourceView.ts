@@ -1,6 +1,7 @@
 // Copyright 2019 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import '../../ui/legacy/legacy.js';
 
@@ -59,7 +60,7 @@ const UIStrings = {
    *to the clipboard. UTF-8 is a format for encoding data.
    */
   copyAsUtf: 'Copy as `UTF-8`',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/network/BinaryResourceView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export class BinaryResourceView extends UI.Widget.VBox {
@@ -74,8 +75,9 @@ export class BinaryResourceView extends UI.Widget.VBox {
 
   constructor(
       content: TextUtils.StreamingContentData.StreamingContentData, contentUrl: Platform.DevToolsPath.UrlString,
-      resourceType: Common.ResourceType.ResourceType) {
-    super();
+      resourceType: Common.ResourceType.ResourceType, element?: HTMLElement) {
+    super(undefined, undefined, element);
+    this.registerRequiredCSS(binaryResourceViewStyles);
 
     this.binaryResourceViewFactory =
         new SourceFrame.BinaryResourceViewFactory.BinaryResourceViewFactory(content, contentUrl, resourceType);
@@ -149,11 +151,6 @@ export class BinaryResourceView extends UI.Widget.VBox {
     this.addFadeoutSettimeoutId = window.setTimeout(addFadeoutClass.bind(this), 2000);
   }
 
-  override wasShown(): void {
-    this.updateView();
-    this.registerCSSFiles([binaryResourceViewStyles]);
-  }
-
   private updateView(): void {
     const newViewObject = this.getCurrentViewObject();
     if (!newViewObject) {
@@ -175,7 +172,7 @@ export class BinaryResourceView extends UI.Widget.VBox {
   }
 
   private binaryViewTypeChanged(): void {
-    const selectedOption = (this.binaryViewTypeCombobox.selectedOption() as HTMLOptionElement | null);
+    const selectedOption = (this.binaryViewTypeCombobox.selectedOption());
     if (!selectedOption) {
       return;
     }

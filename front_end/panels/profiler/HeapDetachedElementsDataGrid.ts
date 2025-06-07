@@ -1,6 +1,7 @@
 // Copyright 2024 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as i18n from '../../core/i18n/i18n.js';
 import * as SDK from '../../core/sdk/sdk.js';
@@ -23,7 +24,7 @@ const UIStrings = {
    *@description Label for the detached elements table
    */
   detachedElementsList: 'Detached elements list',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/profiler/HeapDetachedElementsDataGrid.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -45,7 +46,6 @@ export class HeapDetachedElementsDataGrid extends DataGrid.DataGrid.DataGridImpl
     super({
       displayName: i18nString(UIStrings.detachedElementsList),
       columns,
-      editCallback: undefined,
       deleteCallback: undefined,
       refreshCallback: undefined,
     });
@@ -87,7 +87,7 @@ export class HeapDetachedElementsDataGridNode extends DataGrid.DataGrid.DataGrid
   }
 
   #getNodeSize(detachedElementInfo: Protocol.DOM.DetachedElementInfo): number {
-    let count: number = 1;
+    let count = 1;
     const queue: Protocol.DOM.Node[] = [];
     let node: Protocol.DOM.Node|undefined;
     queue.push(detachedElementInfo.treeNode);
@@ -118,7 +118,7 @@ export class HeapDetachedElementsDataGridNode extends DataGrid.DataGrid.DataGrid
       treeOutline.element.classList.add('single-node');
     }
     treeOutline.setVisible(true);
-    // @ts-ignore used in console_test_runner
+    // @ts-expect-error used in console_test_runner
     treeOutline.element.treeElementForTest = firstChild;
     treeOutline.setShowSelectionOnKeyboardFocus(/* show: */ true, /* preventTabOrder: */ true);
 
@@ -152,7 +152,7 @@ export class HeapDetachedElementsDataGridNode extends DataGrid.DataGrid.DataGrid
       }
     }
 
-    treeOutline.findTreeElement(node as SDK.DOMModel.DOMNode)?.listItemNode.setAttribute('title', 'Detached Tree Node');
+    treeOutline.findTreeElement(node)?.listItemNode.setAttribute('title', 'Detached Tree Node');
 
     return treeOutline.element;
   }

@@ -1,7 +1,9 @@
 // Copyright 2023 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
+import type * as Platform from '../../../core/platform/platform.js';
 import type * as UI from '../../legacy/legacy.js';
 import * as VisualLogging from '../../visual_logging/visual_logging.js';
 
@@ -15,14 +17,12 @@ export abstract class WrappableComponent<T extends UI.Widget.Widget = UI.Widget.
   }
 }
 
-type Constructor<T extends UI.Widget.Widget> = new (...args: any[]) => T;
-
 export type LegacyWrapper<T extends UI.Widget.Widget, Component extends WrappableComponent<T>> = {
   getComponent(): Component,
 }&T;
 
-export function
-legacyWrapper<T extends Constructor<UI.Widget.Widget>, Component extends WrappableComponent<InstanceType<T>>>(
+export function legacyWrapper<T extends Platform.Constructor.Constructor<UI.Widget.Widget>,
+                                        Component extends WrappableComponent<InstanceType<T>>>(
     base: T, component: Component, jsLogContext?: string): LegacyWrapper<InstanceType<T>, Component> {
   return new class extends base {
     #component: Component;

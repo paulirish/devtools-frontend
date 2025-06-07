@@ -1,6 +1,7 @@
 // Copyright 2020 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
@@ -53,7 +54,6 @@ export interface EventProperties {
   duration?: number;
   name: string;
   color?: string;
-  hoverData?: Object|null;
 }
 
 /**
@@ -69,12 +69,11 @@ export class Event {
   title: string;
   private colorInternal: string;
   private fontColorInternal: string;
-  private readonly hoverData: Object;
 
   constructor(
       timelineData: PerfUI.FlameChart.FlameChartTimelineData, eventHandlers: EventHandlers,
       eventProperties: EventProperties|
-      undefined = {color: undefined, duration: undefined, hoverData: {}, level: 0, name: '', startTime: 0}) {
+      undefined = {color: undefined, duration: undefined, level: 0, name: '', startTime: 0}) {
     // These allow the event to privately change it's own data in the timeline.
     this.timelineData = timelineData;
     this.setLive = eventHandlers.setLive;
@@ -100,7 +99,6 @@ export class Event {
     this.title = eventProperties['name'] || '';
     this.colorInternal = eventProperties['color'] || HotColorScheme[0];
     this.fontColorInternal = calculateFontColor(this.colorInternal);
-    this.hoverData = eventProperties['hoverData'] || {};
   }
 
   /**
@@ -318,7 +316,7 @@ export class TickingFlameChart extends UI.Widget.VBox {
     this.ticking = true;
   }
 
-  private stop(permanently: boolean = false): void {
+  private stop(permanently = false): void {
     window.clearInterval(this.intervalTimer);
     this.intervalTimer = 0;
     if (permanently) {
@@ -344,9 +342,6 @@ export class TickingFlameChart extends UI.Widget.VBox {
  * Doesn't do much right now, but can be used in the future for selecting events.
  */
 class TickingFlameChartDelegate implements PerfUI.FlameChart.FlameChartDelegate {
-  constructor() {
-  }
-
   windowChanged(_windowStartTime: number, _windowEndTime: number, _animate: boolean): void {
   }
 
@@ -417,7 +412,7 @@ class TickingFlameChartDataProvider implements PerfUI.FlameChart.FlameChartDataP
   startEvent(properties: EventProperties): Event {
     properties['level'] = properties['level'] || 0;
     if (properties['level'] > this.maxLevel) {
-      throw `level ${properties['level']} is above the maximum allowed of ${this.maxLevel}`;
+      throw new Error(`level ${properties['level']} is above the maximum allowed of ${this.maxLevel}`);
     }
 
     const event = new Event(

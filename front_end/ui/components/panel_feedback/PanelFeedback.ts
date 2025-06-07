@@ -1,18 +1,17 @@
 // Copyright 2021 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import '../../legacy/legacy.js';
 
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Platform from '../../../core/platform/platform.js';
 import * as ComponentHelpers from '../../components/helpers/helpers.js';
-import * as LitHtml from '../../lit-html/lit-html.js';
+import {html, render} from '../../lit/lit.js';
 import * as VisualLogging from '../../visual_logging/visual_logging.js';
 
 import panelFeedbackStyles from './panelFeedback.css.js';
-
-const {html} = LitHtml;
 
 const UIStrings = {
   /**
@@ -31,7 +30,7 @@ const UIStrings = {
    *@description Title of the section to the quick start video and documentation on experimental panels.
    */
   videoAndDocumentation: 'Video and documentation',
-};
+} as const;
 
 const str_ = i18n.i18n.registerUIStrings('ui/components/panel_feedback/PanelFeedback.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -46,7 +45,6 @@ export interface PanelFeedbackData {
 }
 export class PanelFeedback extends HTMLElement {
   readonly #shadow = this.attachShadow({mode: 'open'});
-  readonly #boundRender = this.#render.bind(this);
 
   #props: PanelFeedbackData = {
     feedbackUrl: Platform.DevToolsPath.EmptyUrlString,
@@ -54,13 +52,9 @@ export class PanelFeedback extends HTMLElement {
     quickStartLinkText: '',
   };
 
-  connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [panelFeedbackStyles];
-  }
-
   set data(data: PanelFeedbackData) {
     this.#props = data;
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
   #render(): void {
@@ -69,7 +63,8 @@ export class PanelFeedback extends HTMLElement {
     }
 
     // clang-format off
-    LitHtml.render(html`
+    render(html`
+      <style>${panelFeedbackStyles}</style>
       <div class="preview">
         <h2 class="flex">
           <devtools-icon .data=${{

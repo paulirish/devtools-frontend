@@ -6,29 +6,39 @@ import './Table.js';
 
 import * as i18n from '../../../../core/i18n/i18n.js';
 import type {FontDisplayInsightModel} from '../../../../models/trace/insights/FontDisplay.js';
-import type * as Trace from '../../../../models/trace/trace.js';
-import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
+import * as Trace from '../../../../models/trace/trace.js';
+import * as Lit from '../../../../ui/lit/lit.js';
 import type * as Overlays from '../../overlays/overlays.js';
 
 import {BaseInsightComponent} from './BaseInsightComponent.js';
 import {eventRef} from './EventRef.js';
-import type {TableData} from './Table.js';
+import {createLimitedRows, renderOthersLabel, type TableData, type TableDataRow} from './Table.js';
 
-const {html} = LitHtml;
+const {UIStrings, i18nString} = Trace.Insights.Models.FontDisplay;
 
-const UIStrings = {
-  /** Column for a font loaded by the page to render text. */
-  fontColumn: 'Font',
-  /** Column for the amount of time wasted. */
-  wastedTimeColumn: 'Wasted time',
-};
-
-const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/insights/FontDisplay.ts', UIStrings);
-const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+const {html} = Lit;
 
 export class FontDisplay extends BaseInsightComponent<FontDisplayInsightModel> {
-  static override readonly litTagName = LitHtml.StaticHtml.literal`devtools-performance-font-display`;
-  override internalName: string = 'font-display';
+  static override readonly litTagName = Lit.StaticHtml.literal`devtools-performance-font-display`;
+  override internalName = 'font-display';
+
+  mapToRow(font: Trace.Insights.Models.FontDisplay.RemoteFont): TableDataRow {
+    const overlay = this.#overlayForRequest.get(font.request);
+    return {
+      values: [
+        eventRef(font.request, {text: font.name}),
+        i18n.TimeUtilities.millisToString(font.wastedTime),
+      ],
+      overlays: overlay ? [overlay] : [],
+    };
+  }
+
+  createAggregatedTableRow(remaining: Trace.Insights.Models.FontDisplay.RemoteFont[]): TableDataRow {
+    return {
+      values: [renderOthersLabel(remaining.length), ''],
+      overlays: remaining.map(r => this.#overlayForRequest.get(r.request)).filter(o => !!o),
+    };
+  }
 
   #overlayForRequest = new Map<Trace.Types.Events.SyntheticNetworkRequest, Overlays.Overlays.TimelineOverlay>();
 
@@ -50,14 +60,16 @@ export class FontDisplay extends BaseInsightComponent<FontDisplayInsightModel> {
     return [...this.#overlayForRequest.values()];
   }
 
-  override getEstimatedSavingsTime(): Trace.Types.Timing.MilliSeconds|null {
+  override getEstimatedSavingsTime(): Trace.Types.Timing.Milli|null {
     return this.model?.metricSavings?.FCP ?? null;
   }
 
-  override renderContent(): LitHtml.LitTemplate {
+  override renderContent(): Lit.LitTemplate {
     if (!this.model) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
+
+    const rows = createLimitedRows(this.model.fonts, this);
 
     // clang-format off
     return html`
@@ -65,16 +77,8 @@ export class FontDisplay extends BaseInsightComponent<FontDisplayInsightModel> {
         ${html`<devtools-performance-table
           .data=${{
             insight: this,
-            headers: [i18nString(UIStrings.fontColumn), 'font-display', i18nString(UIStrings.wastedTimeColumn)],
-            rows: this.model.fonts.map(font => ({
-              values: [
-                // TODO(crbug.com/369422196): the font name would be nicer here.
-                eventRef(font.request),
-                font.display,
-                i18n.TimeUtilities.millisToString(font.wastedTime),
-              ],
-              overlays: [this.#overlayForRequest.get(font.request)],
-            })),
+            headers: [i18nString(UIStrings.fontColumn), i18nString(UIStrings.wastedTimeColumn)],
+            rows,
           } as TableData}>
         </devtools-performance-table>`}
       </div>`;

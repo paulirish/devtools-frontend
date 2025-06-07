@@ -1,0 +1,11 @@
+{
+  "extends": "../tsconfig.json",
+  "references": [
+    {
+      "path": "../shared/tsconfig.json"
+    },
+    {
+      "path": "../e2e/tsconfig.json"
+    }
+  ]
+}

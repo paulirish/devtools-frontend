@@ -1,6 +1,7 @@
 // Copyright (c) 2015 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import '../../ui/legacy/legacy.js';
 
@@ -20,9 +21,17 @@ import {AnimationUI} from './AnimationUI.js';
 
 const UIStrings = {
   /**
-   *@description Timeline hint text content in Animation Timeline of the Animation Inspector
+   *@description Timeline hint text content in Animation Timeline of the Animation Inspector if no effect
+   * is shown.
+   * Animation effects are the visual effects of an animation on the page.
    */
-  selectAnEffectAboveToInspectAnd: 'Select an effect above to inspect and modify.',
+  noEffectSelected: 'No animation effect selected',
+  /**
+   *@description Timeline hint text content in Animation Timeline of the Animation Inspector that instructs
+   * users to select an effect.
+   * Animation effects are the visual effects of an animation on the page.
+   */
+  selectAnEffectAboveToInspectAnd: 'Select an effect above to inspect and modify',
   /**
    *@description Text to clear everything
    */
@@ -54,9 +63,13 @@ const UIStrings = {
    */
   animationPreviews: 'Animation previews',
   /**
-   *@description Empty buffer hint text content in Animation Timeline of the Animation Inspector
+   *@description Empty buffer hint text content in Animation Timeline of the Animation Inspector.
    */
-  waitingForAnimations: 'Waiting for animations...',
+  waitingForAnimations: 'Currently waiting for animations',
+  /**
+   *@description Empty buffer hint text content in Animation Timeline of the Animation Inspector that explains the panel.
+   */
+  animationDescription: 'On this page you can inspect and modify animations.',
   /**
    *@description Tooltip text that appears when hovering over largeicon replay animation button in Animation Timeline of the Animation Inspector
    */
@@ -78,7 +91,7 @@ const UIStrings = {
    *@example {1} PH1
    */
   animationPreviewS: 'Animation Preview {PH1}',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/animation/AnimationTimeline.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 const nodeUIsByNode = new WeakMap<SDK.DOMModel.DOMNode, NodeUI>();
@@ -88,6 +101,9 @@ const playbackRates = new WeakMap<HTMLElement, number>();
 const MIN_TIMELINE_CONTROLS_WIDTH = 120;
 const DEFAULT_TIMELINE_CONTROLS_WIDTH = 150;
 const MAX_TIMELINE_CONTROLS_WIDTH = 720;
+
+const ANIMATION_EXPLANATION_URL =
+    'https://developer.chrome.com/docs/devtools/css/animations' as Platform.DevToolsPath.UrlString;
 
 let animationTimelineInstance: AnimationTimeline;
 
@@ -129,11 +145,12 @@ export class AnimationTimeline extends UI.Widget.VBox implements
   #gridHeader!: HTMLElement;
   #scrollListenerId?: number|null;
   #collectedGroups: SDK.AnimationModel.AnimationGroup[];
-  #createPreviewForCollectedGroupsThrottler: Common.Throttler.Throttler = new Common.Throttler.Throttler(10);
-  #animationGroupUpdatedThrottler: Common.Throttler.Throttler = new Common.Throttler.Throttler(10);
+  #createPreviewForCollectedGroupsThrottler = new Common.Throttler.Throttler(10);
+  #animationGroupUpdatedThrottler = new Common.Throttler.Throttler(10);
 
   private constructor() {
     super(true);
+    this.registerRequiredCSS(animationTimelineStyles);
 
     this.element.classList.add('animations-timeline');
     this.element.setAttribute('jslog', `${VisualLogging.panel('animations').track({resize: true})}`);
@@ -149,8 +166,16 @@ export class AnimationTimeline extends UI.Widget.VBox implements
     this.createHeader();
     this.#animationsContainer = this.contentElement.createChild('div', 'animation-timeline-rows');
     this.#animationsContainer.setAttribute('jslog', `${VisualLogging.section('animations')}`);
+    const emptyBufferHint = this.contentElement.createChild('div', 'animation-timeline-buffer-hint');
+    const noAnimationsPlaceholder = new UI.EmptyWidget.EmptyWidget(
+        i18nString(UIStrings.waitingForAnimations), i18nString(UIStrings.animationDescription));
+    noAnimationsPlaceholder.link = ANIMATION_EXPLANATION_URL;
+    noAnimationsPlaceholder.show(emptyBufferHint);
+
     const timelineHint = this.contentElement.createChild('div', 'animation-timeline-rows-hint');
-    timelineHint.textContent = i18nString(UIStrings.selectAnEffectAboveToInspectAnd);
+    const noEffectSelectedPlaceholder = new UI.EmptyWidget.EmptyWidget(
+        i18nString(UIStrings.noEffectSelected), i18nString(UIStrings.selectAnEffectAboveToInspectAnd));
+    noEffectSelectedPlaceholder.show(timelineHint);
 
     /** @const */ this.#defaultDuration = 100;
     this.#durationInternal = this.#defaultDuration;
@@ -219,12 +244,12 @@ export class AnimationTimeline extends UI.Widget.VBox implements
   }
 
   override wasShown(): void {
+    super.wasShown();
     for (const animationModel of SDK.TargetManager.TargetManager.instance().models(
              SDK.AnimationModel.AnimationModel, {scoped: true})) {
       this.#addExistingAnimationGroups(animationModel);
       this.addEventListeners(animationModel);
     }
-    this.registerCSSFiles([animationTimelineStyles]);
   }
 
   override willHide(): void {
@@ -258,7 +283,7 @@ export class AnimationTimeline extends UI.Widget.VBox implements
     }
 
     this.#showPanelInDrawer();
-    return this.selectAnimationGroup(animationGroup);
+    return await this.selectAnimationGroup(animationGroup);
   }
 
   modelAdded(animationModel: SDK.AnimationModel.AnimationModel): void {
@@ -350,8 +375,6 @@ export class AnimationTimeline extends UI.Widget.VBox implements
     this.#previewContainer.setAttribute('jslog', `${VisualLogging.section('film-strip')}`);
     UI.ARIAUtils.markAsListBox(this.#previewContainer);
     UI.ARIAUtils.setLabel(this.#previewContainer, i18nString(UIStrings.animationPreviews));
-    const emptyBufferHint = this.contentElement.createChild('div', 'animation-timeline-buffer-hint');
-    emptyBufferHint.textContent = i18nString(UIStrings.waitingForAnimations);
     const container = this.contentElement.createChild('div', 'animation-timeline-header');
     const controls = container.createChild('div', 'animation-controls');
     this.#currentTime = controls.createChild('div', 'animation-timeline-current-time monospace');
@@ -494,7 +517,7 @@ export class AnimationTimeline extends UI.Widget.VBox implements
       this.#selectedGroup.togglePause(pause);
       const preview = this.#previewMap.get(this.#selectedGroup);
       if (preview) {
-        preview.element.classList.toggle('paused', pause);
+        preview.setPaused(pause);
       }
     }
     if (this.#scrubberPlayer) {
@@ -616,12 +639,6 @@ export class AnimationTimeline extends UI.Widget.VBox implements
   }
 
   private createPreview(group: SDK.AnimationModel.AnimationGroup): void {
-    const preview = new AnimationGroupPreviewUI(group);
-
-    const previewUiContainer = document.createElement('div');
-    previewUiContainer.classList.add('preview-ui-container');
-    previewUiContainer.appendChild(preview.element);
-
     const screenshotsContainer = document.createElement('div');
     screenshotsContainer.classList.add('screenshots-container', 'no-screenshots');
     screenshotsContainer.createChild('span', 'screenshot-arrow');
@@ -633,47 +650,71 @@ export class AnimationTimeline extends UI.Widget.VBox implements
         screenshotsContainer.classList.add('to-the-left');
       }
     });
+
+    const preview = new AnimationGroupPreviewUI({
+      animationGroup: group,
+      label: i18nString(UIStrings.animationPreviewS, {PH1: this.#groupBuffer.length + 1}),
+      onRemoveAnimationGroup: () => {
+        this.removeAnimationGroup(group);
+      },
+      onSelectAnimationGroup: () => {
+        void this.selectAnimationGroup(group);
+      },
+      // Screenshot popover is created only once.
+      // Then, its visibility is controlled via CSS `:hover`.
+      onCreateScreenshotPopover: () => {
+        const screenshots = group.screenshots();
+        if (!screenshots.length) {
+          return;
+        }
+
+        screenshotsContainer.classList.remove('no-screenshots');
+        const createAndShowScreenshotPopover = (): void => {
+          const screenshotPopover = new AnimationScreenshotPopover(screenshots);
+          // This is needed for clearing out the widgets
+          this.#screenshotPopovers.push(screenshotPopover);
+          screenshotPopover.show(screenshotsContainer);
+        };
+
+        if (!screenshots[0].complete) {
+          screenshots[0].onload = createAndShowScreenshotPopover;
+        } else {
+          createAndShowScreenshotPopover();
+        }
+      },
+      onFocusNextGroup: () => {
+        this.focusNextGroup(group);
+      },
+      onFocusPreviousGroup: () => {
+        this.focusNextGroup(group, /* focusPrevious */ true);
+      }
+    });
+
+    const previewUiContainer = document.createElement('div');
+    previewUiContainer.classList.add('preview-ui-container');
+    preview.markAsRoot();
+    preview.show(previewUiContainer);
     previewUiContainer.appendChild(screenshotsContainer);
 
     this.#groupBuffer.push(group);
     this.#previewMap.set(group, preview);
     this.#previewContainer.appendChild(previewUiContainer);
-    preview.removeButton().addEventListener('click', this.removeAnimationGroup.bind(this, group));
-    preview.element.addEventListener('click', this.selectAnimationGroup.bind(this, group));
-    preview.element.addEventListener('keydown', this.handleAnimationGroupKeyDown.bind(this, group));
-    preview.element.addEventListener('mouseover', () => {
-      const screenshots = group.screenshots();
-      if (!screenshots.length) {
-        return;
-      }
 
-      screenshotsContainer.classList.remove('no-screenshots');
-      const createAndShowScreenshotPopover = (): void => {
-        const screenshotPopover = new AnimationScreenshotPopover(screenshots);
-        // This is needed for clearing out the widgets
-        this.#screenshotPopovers.push(screenshotPopover);
-        screenshotPopover.show(screenshotsContainer);
-      };
-
-      if (!screenshots[0].complete) {
-        screenshots[0].onload = createAndShowScreenshotPopover;
-      } else {
-        createAndShowScreenshotPopover();
-      }
-    }, {once: true});
-    UI.ARIAUtils.setLabel(
-        preview.element, i18nString(UIStrings.animationPreviewS, {PH1: this.#groupBuffer.indexOf(group) + 1}));
-    UI.ARIAUtils.markAsOption(preview.element);
-
+    // If this is the first preview attached, we want it to be focusable directly.
+    // Otherwise, we don't want the previews to be focusable via Tabbing and manage
+    // their focus via arrow keys.
     if (this.#previewMap.size === 1) {
       const preview = this.#previewMap.get(this.#groupBuffer[0]);
       if (preview) {
-        preview.element.tabIndex = 0;
+        preview.setFocusable(true);
       }
     }
   }
 
   previewsCreatedForTest(): void {
+  }
+
+  scrubberOnFinishForTest(): void {
   }
 
   private createPreviewForCollectedGroups(): void {
@@ -728,7 +769,7 @@ export class AnimationTimeline extends UI.Widget.VBox implements
       if (!discardGroup) {
         continue;
       }
-      discardGroup.element.remove();
+      discardGroup.detach();
       this.#previewMap.delete(g);
       g.release();
     }
@@ -740,24 +781,7 @@ export class AnimationTimeline extends UI.Widget.VBox implements
         () => Promise.resolve(this.createPreviewForCollectedGroups()));
   }
 
-  private handleAnimationGroupKeyDown(group: SDK.AnimationModel.AnimationGroup, event: KeyboardEvent): void {
-    switch (event.key) {
-      case 'Backspace':
-      case 'Delete':
-        this.removeAnimationGroup(group, event);
-        break;
-      case 'ArrowLeft':
-      case 'ArrowUp':
-        this.focusNextGroup(group, /* target */ event.target, /* focusPrevious */ true);
-        break;
-      case 'ArrowRight':
-      case 'ArrowDown':
-        this.focusNextGroup(group, /* target */ event.target);
-    }
-  }
-
-  private focusNextGroup(group: SDK.AnimationModel.AnimationGroup, target: EventTarget|null, focusPrevious?: boolean):
-      void {
+  private focusNextGroup(group: SDK.AnimationModel.AnimationGroup, focusPrevious?: boolean): void {
     const currentGroupIndex = this.#groupBuffer.indexOf(group);
     const nextIndex = focusPrevious ? currentGroupIndex - 1 : currentGroupIndex + 1;
     if (nextIndex < 0 || nextIndex >= this.#groupBuffer.length) {
@@ -765,27 +789,26 @@ export class AnimationTimeline extends UI.Widget.VBox implements
     }
     const preview = this.#previewMap.get(this.#groupBuffer[nextIndex]);
     if (preview) {
-      preview.element.tabIndex = 0;
-      preview.element.focus();
+      preview.setFocusable(true);
+      preview.focus();
     }
 
-    if (target) {
-      (target as HTMLElement).tabIndex = -1;
+    const previousPreview = this.#previewMap.get(group);
+    if (previousPreview) {
+      previousPreview.setFocusable(false);
     }
   }
 
-  private removeAnimationGroup(group: SDK.AnimationModel.AnimationGroup, event: Event): void {
+  private removeAnimationGroup(group: SDK.AnimationModel.AnimationGroup): void {
     const currentGroupIndex = this.#groupBuffer.indexOf(group);
 
     Platform.ArrayUtilities.removeElement(this.#groupBuffer, group);
     const previewGroup = this.#previewMap.get(group);
     if (previewGroup) {
-      previewGroup.element.remove();
+      previewGroup.detach();
     }
     this.#previewMap.delete(group);
     group.release();
-    event.consume(true);
-
     if (this.#selectedGroup === group) {
       this.clearTimeline();
       this.renderGrid();
@@ -801,8 +824,8 @@ export class AnimationTimeline extends UI.Widget.VBox implements
         this.#previewMap.get(this.#groupBuffer[currentGroupIndex]);
 
     if (nextGroup) {
-      nextGroup.element.tabIndex = 0;
-      nextGroup.element.focus();
+      nextGroup.setFocusable(true);
+      nextGroup.focus();
     }
   }
 
@@ -828,7 +851,7 @@ export class AnimationTimeline extends UI.Widget.VBox implements
     this.clearTimeline();
     this.#selectedGroup = group;
     this.#previewMap.forEach((previewUI: AnimationGroupPreviewUI, group: SDK.AnimationModel.AnimationGroup) => {
-      previewUI.element.classList.toggle('selected', this.#selectedGroup === group);
+      previewUI.setSelected(this.#selectedGroup === group);
     });
 
     if (group.isScrollDriven()) {
@@ -1004,7 +1027,7 @@ export class AnimationTimeline extends UI.Widget.VBox implements
   }
 
   override onResize(): void {
-    this.#cachedTimelineWidth = Math.max(0, this.#animationsContainer.offsetWidth - this.#timelineControlsWidth) || 0;
+    this.#cachedTimelineWidth = Math.max(0, this.contentElement.offsetWidth - this.#timelineControlsWidth) || 0;
     this.scheduleRedraw();
     if (this.#scrubberPlayer) {
       this.syncScrubber();
@@ -1040,7 +1063,10 @@ export class AnimationTimeline extends UI.Widget.VBox implements
         [{transform: 'translateX(0px)'}, {transform: 'translateX(' + this.width() + 'px)'}],
         {duration: this.duration(), fill: 'forwards'});
     this.#scrubberPlayer.playbackRate = this.effectivePlaybackRate();
-    this.#scrubberPlayer.onfinish = this.updateControlButton.bind(this);
+    this.#scrubberPlayer.onfinish = () => {
+      this.updateControlButton();
+      this.scrubberOnFinishForTest();
+    };
     this.#scrubberPlayer.currentTime = currentTime;
     this.element.window().requestAnimationFrame(this.updateScrubber.bind(this));
   }
@@ -1100,9 +1126,9 @@ export class AnimationTimeline extends UI.Widget.VBox implements
     }
 
     if (this.#selectedGroup?.scrollOrientation() === Protocol.DOM.ScrollOrientation.Vertical) {
-      return node.setScrollTop(offset);
+      return await node.setScrollTop(offset);
     }
-    return node.setScrollLeft(offset);
+    return await node.setScrollLeft(offset);
   }
 
   private setTimelineScrubberPosition(time: number): void {

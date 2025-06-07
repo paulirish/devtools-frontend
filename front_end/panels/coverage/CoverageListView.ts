@@ -1,6 +1,7 @@
 // Copyright (c) 2017 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -109,7 +110,7 @@ const UIStrings = {
    *@example {12.3} PH2
    */
   sOfFileUnusedSOfFileUsed: '{PH1} % of file unused, {PH2} % of file used',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/coverage/CoverageListView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -134,6 +135,7 @@ export class CoverageListView extends UI.Widget.VBox {
 
   constructor(isVisibleFilter: (arg0: URLCoverageInfo) => boolean) {
     super(true);
+    this.registerRequiredCSS(coverageListViewStyles);
     this.nodeForCoverageInfo = new Map();
     this.isVisibleFilter = isVisibleFilter;
     this.highlightRegExp = null;
@@ -180,7 +182,6 @@ export class CoverageListView extends UI.Widget.VBox {
     this.dataGrid = new DataGrid.SortableDataGrid.SortableDataGrid<GridNode>({
       displayName: i18nString(UIStrings.codeCoverage),
       columns,
-      editCallback: undefined,
       refreshCallback: undefined,
       deleteCallback: undefined,
     });
@@ -335,10 +336,6 @@ export class CoverageListView extends UI.Widget.VBox {
     }
     this.dataGrid.sortNodes(sortFunction, !this.dataGrid.isSortOrderAscending());
   }
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([coverageListViewStyles]);
-  }
 }
 
 let percentageFormatter: Intl.NumberFormat|null = null;
@@ -491,7 +488,7 @@ export class GridNode extends DataGrid.SortableDataGrid.SortableDataGridNode<Gri
       return;
     }
     const matches = this.highlightRegExp.exec(textContent);
-    if (!matches || !matches.length) {
+    if (!matches?.length) {
       return;
     }
     const range = new TextUtils.TextRange.SourceRange(matches.index, matches[0].length);

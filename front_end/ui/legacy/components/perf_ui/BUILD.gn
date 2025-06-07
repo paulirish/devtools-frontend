@@ -10,21 +10,14 @@ import("../../visibility.gni")
 
 generate_css("css_files") {
   sources = [
-    "pieChart.css",
-    "timelineOverviewInfo.css",
-  ]
-}
-
-generate_css("legacy_css_files") {
-  sources = [
     "chartViewport.css",
     "filmStripView.css",
     "flameChart.css",
     "overviewGrid.css",
+    "pieChart.css",
     "timelineGrid.css",
+    "timelineOverviewInfo.css",
   ]
-
-  legacy = true
 }
 
 devtools_module("perf_ui") {
@@ -54,12 +47,11 @@ devtools_module("perf_ui") {
     "../../../../core/sdk:bundle",
     "../../../../models/bindings:bundle",
     "../../../../models/cpu_profile:bundle",
-    "../../../../models/timeline_model:bundle",
     "../../../../models/workspace:bundle",
     "../../../../ui/legacy:bundle",
     "../../../../ui/legacy/components/source_frame:bundle",
     "../../../../ui/legacy/theme_support:bundle",
-    "../../../../ui/lit-html:bundle",
+    "../../../../ui/lit:bundle",
   ]
 
   visibility = [ "../../../../component_docs/perf_piechart" ]
@@ -70,7 +62,6 @@ devtools_entrypoint("bundle") {
 
   deps = [
     ":css_files",
-    ":legacy_css_files",
     ":perf_ui",
   ]
 
@@ -107,6 +98,7 @@ ts_library("unittests") {
   testonly = true
 
   sources = [
+    "ChartViewport.test.ts",
     "FilmStripView.test.ts",
     "FlameChart.test.ts",
     "PieChart.test.ts",

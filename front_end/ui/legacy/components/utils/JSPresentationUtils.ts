@@ -1,6 +1,7 @@
 // Copyright 2021 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 /*
  * Copyright (C) 2011 Google Inc.  All rights reserved.
@@ -65,7 +66,7 @@ const UIStrings = {
    *@description Text indicating that source url of a link is currently unknown
    */
   unknownSource: 'unknown',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/components/utils/JSPresentationUtils.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -97,10 +98,10 @@ export function buildStackTraceRows(
     target: SDK.Target.Target|null,
     linkifier: Linkifier,
     tabStops: boolean|undefined,
-    updateCallback?: (arg0: (StackTraceRegularRow|StackTraceAsyncRow)[]) => void,
+    updateCallback?: (arg0: Array<StackTraceRegularRow|StackTraceAsyncRow>) => void,
     showColumnNumber?: boolean,
-    ): (StackTraceRegularRow|StackTraceAsyncRow)[] {
-  const stackTraceRows: (StackTraceRegularRow|StackTraceAsyncRow)[] = [];
+    ): Array<StackTraceRegularRow|StackTraceAsyncRow> {
+  const stackTraceRows: Array<StackTraceRegularRow|StackTraceAsyncRow> = [];
 
   if (updateCallback) {
     const throttler = new Common.Throttler.Throttler(100);
@@ -167,7 +168,7 @@ export function buildStackTracePreviewContents(
   element.classList.add('stack-preview-container');
   element.classList.toggle('width-constrained', options.widthConstrained);
   element.style.display = 'inline-block';
-  const shadowRoot = UI.UIUtils.createShadowRootWithCoreStyles(element, {cssFile: [jsUtilsStyles]});
+  const shadowRoot = UI.UIUtils.createShadowRootWithCoreStyles(element, {cssFile: jsUtilsStyles});
   const contentElement = shadowRoot.createChild('table', 'stack-preview-container');
   contentElement.classList.toggle('width-constrained', options.widthConstrained);
 
@@ -179,7 +180,8 @@ export function buildStackTracePreviewContents(
 }
 
 function renderStackTraceTable(
-    container: Element, parent: Element, stackTraceRows: (StackTraceRegularRow|StackTraceAsyncRow)[]): HTMLElement[] {
+    container: Element, parent: Element,
+    stackTraceRows: Array<StackTraceRegularRow|StackTraceAsyncRow>): HTMLElement[] {
   container.removeChildren();
   const links: HTMLElement[] = [];
 

@@ -1,14 +1,16 @@
 // Copyright 2025 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Trace from '../../models/trace/trace.js';
-import type * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
+import * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import * as TimelineTreeView from './TimelineTreeView.js';
+import * as Utils from './utils/utils.js';
 
 const UIStrings = {
   /**
@@ -18,29 +20,36 @@ const UIStrings = {
   /**
    *@description Title for the name of either 1st or 3rd Party entities.
    */
-  firstOrThirdPartyName: '1st / 3rd Party',
+  firstOrThirdPartyName: '1st / 3rd party',
   /**
    *@description Title referencing transfer size.
    */
   transferSize: 'Transfer size',
   /**
-   *@description Title referencing self time.
+   *@description Title referencing main thread time.
    */
-  selfTime: 'Self time',
-};
+  mainThreadTime: 'Main thread time',
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/ThirdPartyTreeView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView {
-  #thirdPartySummaries: {
-    summaries: Trace.Extras.ThirdParties.SummaryMaps,
-    entityByEvent: Map<Trace.Types.Events.Event, Trace.Extras.ThirdParties.Entity>,
-  }|null = null;
+  // By default the TimelineTreeView will auto-select the first row
+  // when the grid is refreshed but for the ThirdParty view we only
+  // want to do this when the user hovers.
+  protected override autoSelectFirstChildOnRefresh = false;
 
   constructor() {
     super();
     this.element.setAttribute('jslog', `${VisualLogging.pane('third-party-tree').track({hover: true})}`);
     this.init();
+    this.dataGrid.markColumnAsSortedBy('self', DataGrid.DataGrid.Order.Descending);
+    this.dataGrid.setResizeMethod(DataGrid.DataGrid.ResizeMethod.NEAREST);
+    /**
+     * By default data grids always expand when arrowing.
+     * For 3P table, we don't use this feature.
+     */
+    this.dataGrid.expandNodesWhenArrowing = false;
   }
 
   override buildTree(): Trace.Extras.TraceTree.Node {
@@ -48,43 +57,47 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
     const entityMapper = this.entityMapper();
 
     if (!parsedTrace || !entityMapper) {
-      return new Trace.Extras.TraceTree.BottomUpRootNode(
-          [], this.textFilter(), this.filtersWithoutTextFilter(), this.startTime, this.endTime,
-          this.groupingFunction());
+      return new Trace.Extras.TraceTree.BottomUpRootNode([], {
+        textFilter: this.textFilter(),
+        filters: this.filtersWithoutTextFilter(),
+        startTime: this.startTime,
+        endTime: this.endTime,
+        eventGroupIdCallback: this.groupingFunction.bind(this),
+      });
     }
 
-    // Update summaries.
-    const min = Trace.Helpers.Timing.millisecondsToMicroseconds(this.startTime);
-    const max = Trace.Helpers.Timing.millisecondsToMicroseconds(this.endTime);
-    const bounds:
-        Trace.Types.Timing.TraceWindowMicroSeconds = {max, min, range: Trace.Types.Timing.MicroSeconds(max - min)};
-    this.#thirdPartySummaries =
-        Trace.Extras.ThirdParties.getSummariesAndEntitiesWithMapping(parsedTrace, bounds, entityMapper.mappings());
+    // const events = this.#thirdPartySummaries.entityByEvent.keys();
+    const relatedEvents = this.selectedEvents().sort(Trace.Helpers.Trace.eventTimeComparator);
 
-    const events = this.#thirdPartySummaries?.entityByEvent.keys();
-    const relatedEvents = Array.from(events ?? []);
+    // The filters for this view are slightly different; we want to use the set
+    // of visible event types, but also include network events, which by
+    // default are not in the set of visible entries (as they are not shown on
+    // the main flame chart).
+    const filter = new Trace.Extras.TraceFilter.VisibleEventsFilter(
+        Utils.EntryStyles.visibleTypes().concat([Trace.Types.Events.Name.SYNTHETIC_NETWORK_REQUEST]));
 
-    return new Trace.Extras.TraceTree.BottomUpRootNode(
-        relatedEvents, this.textFilter(), this.filtersWithoutTextFilter(), this.startTime, this.endTime,
-        this.groupingFunction());
+    const node = new Trace.Extras.TraceTree.BottomUpRootNode(relatedEvents, {
+      textFilter: this.textFilter(),
+      filters: [filter],
+      startTime: this.startTime,
+      endTime: this.endTime,
+      eventGroupIdCallback: this.groupingFunction.bind(this),
+      calculateTransferSize: true,
+      // Ensure we group by 3P alongside eventID for correct 3P grouping.
+      forceGroupIdCallback: true,
+    });
+    return node;
   }
 
-  protected groupingFunction(): ((arg0: Trace.Types.Events.Event) => string)|null {
-    return this.domainByEvent.bind(this);
+  /**
+   * Third party tree view doesn't require the select feature, as this expands the node.
+   */
+  override selectProfileNode(): void {
+    return;
   }
 
-  private domainByEvent(event: Trace.Types.Events.Event): string {
-    const parsedTrace = this.parsedTrace();
-    if (!parsedTrace) {
-      return '';
-    }
-
-    const entityMappings = this.entityMapper();
-    if (!entityMappings) {
-      return '';
-    }
-
-    const entity = entityMappings.entityForEvent(event);
+  private groupingFunction(event: Trace.Types.Events.Event): string {
+    const entity = this.entityMapper()?.entityForEvent(event);
     if (!entity) {
       return '';
     }
@@ -97,21 +110,23 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
         {
           id: 'site',
           title: i18nString(UIStrings.firstOrThirdPartyName),
-          width: '100px',
-          fixedWidth: true,
+          // It's important that this width is the `.widget.vbox.timeline-tree-view` max-width (550)
+          // minus the two fixed sizes below. (550-100-105) == 345
+          width: '345px',
+          // And with this column not-fixed-width and resizingMethod NEAREST, the name-column will appropriately flex.
           sortable: true,
         },
         {
           id: 'transfer-size',
           title: i18nString(UIStrings.transferSize),
-          width: '80px',
+          width: '100px',  // Mostly so there's room for the header plus sorting triangle
           fixedWidth: true,
           sortable: true,
         },
         {
           id: 'self',
-          title: i18nString(UIStrings.selfTime),
-          width: '80px',
+          title: i18nString(UIStrings.mainThreadTime),
+          width: '120px',  // Mostly to fit large self-time/main thread time plus devtools-button
           fixedWidth: true,
           sortable: true,
         });
@@ -126,8 +141,8 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
       b: DataGrid.SortableDataGrid.SortableDataGridNode<TimelineTreeView.GridNode>): number {
     const nodeA = a as TimelineTreeView.TreeGridNode;
     const nodeB = b as TimelineTreeView.TreeGridNode;
-    const transferA = this.extractThirdPartySummary(nodeA.profileNode).transferSize ?? 0;
-    const transferB = this.extractThirdPartySummary(nodeB.profileNode).transferSize ?? 0;
+    const transferA = nodeA.profileNode.transferSize ?? 0;
+    const transferB = nodeB.profileNode.transferSize ?? 0;
     return transferA - transferB;
   }
 
@@ -155,16 +170,37 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
   }
 
   override onHover(node: Trace.Extras.TraceTree.Node|null): void {
-    const entityMappings = this.entityMapper();
-    if (!entityMappings || !node?.event) {
+    if (!node) {
+      this.dispatchEventToListeners(TimelineTreeView.TimelineTreeView.Events.TREE_ROW_HOVERED, {node: null});
       return;
     }
-    const nodeEntity = entityMappings.entityForEvent(node.event);
-    if (!nodeEntity) {
+    this.#getEventsForEventDispatch(node);
+    const events = this.#getEventsForEventDispatch(node);
+    this.dispatchEventToListeners(
+        TimelineTreeView.TimelineTreeView.Events.TREE_ROW_HOVERED,
+        {node, events: events && events.length > 0 ? events : undefined});
+  }
+
+  override onClick(node: Trace.Extras.TraceTree.Node|null): void {
+    if (!node) {
+      this.dispatchEventToListeners(TimelineTreeView.TimelineTreeView.Events.TREE_ROW_CLICKED, {node: null});
       return;
     }
-    const eventsForEntity = entityMappings.eventsForEntity(nodeEntity);
-    this.dispatchEventToListeners(TimelineTreeView.TimelineTreeView.Events.THIRD_PARTY_ROW_HOVERED, eventsForEntity);
+    const events = this.#getEventsForEventDispatch(node);
+    this.dispatchEventToListeners(
+        TimelineTreeView.TimelineTreeView.Events.TREE_ROW_CLICKED,
+        {node, events: events && events.length > 0 ? events : undefined});
+  }
+
+  // For ThirdPartyTree, we should include everything in our entity mapper for full coverage.
+  #getEventsForEventDispatch(node: Trace.Extras.TraceTree.Node): Trace.Types.Events.Event[]|null {
+    const mapper = this.entityMapper();
+    if (!mapper) {
+      return null;
+    }
+
+    const entity = mapper.entityForEvent(node.event);
+    return entity ? mapper.eventsForEntity(entity) ?? [] : [];
   }
 
   displayInfoForGroupNode(node: Trace.Extras.TraceTree.Node): {
@@ -175,27 +211,10 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
     const color = 'gray';
     const unattributed = i18nString(UIStrings.unattributed);
     const id = typeof node.id === 'symbol' ? undefined : node.id;
-    const domainName = id ? this.domainByEvent(node.event) : undefined;
+    // This `undefined` is [unattributed]
+    // TODO(paulirish,aixba): Improve attribution to reduce amount of items in [unattributed].
+    const domainName = id ? this.entityMapper()?.entityForEvent(node.event)?.name || id : undefined;
     return {name: domainName || unattributed, color, icon: undefined};
-  }
-
-  extractThirdPartySummary(node: Trace.Extras.TraceTree.Node): {
-    transferSize: number,
-    mainThreadTime: Trace.Types.Timing.MicroSeconds,
-  } {
-    if (!this.#thirdPartySummaries) {
-      return {transferSize: 0, mainThreadTime: Trace.Types.Timing.MicroSeconds(0)};
-    }
-
-    const entity = this.#thirdPartySummaries.entityByEvent.get(node.event);
-    if (!entity) {
-      return {transferSize: 0, mainThreadTime: Trace.Types.Timing.MicroSeconds(0)};
-    }
-    const summary = this.#thirdPartySummaries.summaries.byEntity.get(entity);
-    if (!summary) {
-      return {transferSize: 0, mainThreadTime: Trace.Types.Timing.MicroSeconds(0)};
-    }
-    return {transferSize: summary.transferSize, mainThreadTime: summary.mainThreadTime};
   }
 
   nodeIsFirstParty(node: Trace.Extras.TraceTree.Node): boolean {
@@ -217,7 +236,7 @@ export class ThirdPartyTreeViewWidget extends TimelineTreeView.TimelineTreeView 
   }
 }
 
-export class ThirdPartyTreeView extends UI.Widget.WidgetElement<UI.Widget.Widget> {
+export class ThirdPartyTreeElement extends UI.Widget.WidgetElement<UI.Widget.Widget> {
   #treeView?: ThirdPartyTreeViewWidget;
 
   set treeView(treeView: ThirdPartyTreeViewWidget) {
@@ -239,10 +258,10 @@ export class ThirdPartyTreeView extends UI.Widget.WidgetElement<UI.Widget.Widget
   }
 }
 
-customElements.define('devtools-performance-third-party-tree-view', ThirdPartyTreeView);
+customElements.define('devtools-performance-third-party-tree-view', ThirdPartyTreeElement);
 
 declare global {
   interface HTMLElementTagNameMap {
-    'devtools-performance-third-party-tree-view': ThirdPartyTreeView;
+    'devtools-performance-third-party-tree-view': ThirdPartyTreeElement;
   }
 }

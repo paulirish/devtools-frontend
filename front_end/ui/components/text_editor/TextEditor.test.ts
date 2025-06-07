@@ -36,6 +36,15 @@ function makeState(doc: string, extensions: CodeMirror.Extension = []) {
 }
 
 describeWithEnvironment('TextEditor', () => {
+  afterEach(() => {
+    // These do not get removed when the text editor is disconnected and calls
+    // the CodeMirror destroy() method.
+    const cmTooltips = document.body.querySelectorAll('.editor-tooltip-host');
+    for (const tooltip of cmTooltips) {
+      document.body.removeChild(tooltip);
+    }
+  });
+
   describe('component', () => {
     it('has a state property', () => {
       const editor = new TextEditor.TextEditor.TextEditor(makeState('one'));
@@ -142,7 +151,7 @@ describeWithEnvironment('TextEditor', () => {
         code: string,
         pos: number,
         type?: TextEditor.JavaScript.QueryType,
-        range: string = '',
+        range = '',
         related?: string,
         ): Promise<void> {
       const state = makeState(code, CodeMirror.javascript.javascriptLanguage);
@@ -217,6 +226,7 @@ describeWithEnvironment('TextEditor', () => {
     // directly dispatching from Editor A now calls `textEditor.editor.update`
     // which references to EditorView B that has a different state.
     assert.doesNotThrow(() => editorViewA.dispatch({changes: {from: 3, insert: '!'}}));
+    editorViewA.destroy();
   });
 });
 
@@ -233,7 +243,7 @@ describeWithMockConnection('TextEditor autocompletion', () => {
         {forceNew: true, targetManager, resourceMapping});
     const testScript = debuggerModel.parsedScriptSource(
         '1' as Protocol.Runtime.ScriptId, urlString`script://1`, 0, 0, 0, 0, executionContext.id, '', undefined, false,
-        undefined, false, false, 0, null, null, null, null, null, null);
+        undefined, false, false, 0, null, null, null, null, null, null, null);
     const payload: Protocol.Debugger.CallFrame = {
       callFrameId: '0' as Protocol.Debugger.CallFrameId,
       functionName: 'test',

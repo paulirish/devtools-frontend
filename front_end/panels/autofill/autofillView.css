@@ -21,11 +21,6 @@ main {
   align-items: center;
 }
 
-.placeholder {
-  font-size: 15px;
-  text-align: center;
-}
-
 .address {
   padding: 10px;
   margin-right: auto;
@@ -44,6 +39,11 @@ main {
 
 .grid-wrapper {
   flex-grow: 1;
+}
+
+devtools-data-grid {
+  border: none;
+  height: 100%;
 }
 
 .checkbox-label {

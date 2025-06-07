@@ -5,7 +5,7 @@ import type * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Trace from '../../models/trace/trace.js';
 
-import {buildGroupStyle, buildTrackHeader, getFormattedTime} from './AppenderUtils.js';
+import {buildGroupStyle, buildTrackHeader, getDurationString} from './AppenderUtils.js';
 import {
   type CompatibilityTracksAppender,
   type PopoverInfo,
@@ -23,7 +23,7 @@ const UIStrings = {
    *@description Text in Timeline Flame Chart Data Provider of the Performance panel
    */
   timings: 'Timings',
-};
+} as const;
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/TimingsTrackAppender.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -72,12 +72,12 @@ export class TimingsTrackAppender implements TrackAppender {
   appendTrackAtLevel(trackStartLevel: number, expanded?: boolean): number {
     const extensionMarkersAreEmpty = this.#extensionMarkers.length === 0;
     const performanceMarks = this.#parsedTrace.UserTimings.performanceMarks.filter(
-        m => !Trace.Handlers.ModelHandlers.ExtensionTraceData.extensionDataInTiming(m));
+        m => !Trace.Handlers.ModelHandlers.ExtensionTraceData.extensionDataInPerformanceTiming(m));
     const performanceMeasures = this.#parsedTrace.UserTimings.performanceMeasures.filter(
-        m => !Trace.Handlers.ModelHandlers.ExtensionTraceData.extensionDataInTiming(m));
-    const timestampEvents = this.#parsedTrace.UserTimings.timestampEvents;
+        m => !Trace.Handlers.ModelHandlers.ExtensionTraceData.extensionDataInPerformanceTiming(m));
+    const timestampEvents = this.#parsedTrace.UserTimings.timestampEvents.filter(
+        timeStamp => !Trace.Handlers.ModelHandlers.ExtensionTraceData.extensionDataInConsoleTimeStamp(timeStamp));
     const consoleTimings = this.#parsedTrace.UserTimings.consoleTimings;
-
     if (extensionMarkersAreEmpty && performanceMarks.length === 0 && performanceMeasures.length === 0 &&
         timestampEvents.length === 0 && consoleTimings.length === 0) {
       return trackStartLevel;
@@ -127,14 +127,14 @@ export class TimingsTrackAppender implements TrackAppender {
       this.#compatibilityBuilder.getFlameChartTimelineData().entryTotalTimes[index] = Number.NaN;
     }
 
-    const minTimeMs = Trace.Helpers.Timing.microSecondsToMilliseconds(this.#parsedTrace.Meta.traceBounds.min);
+    const minTimeMs = Trace.Helpers.Timing.microToMilli(this.#parsedTrace.Meta.traceBounds.min);
     const flameChartMarkers = markers.map(marker => {
       // The timestamp for user timing trace events is set to the
       // start time passed by the user at the call site of the timing
       // (based on the UserTiming spec), meaning we can use event.ts
       // directly.
       // https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/renderer/core/timing/performance_user_timing.cc;l=236;drc=494419358caf690316f160a1f27d9e771a14c033
-      const startTimeMs = Trace.Helpers.Timing.microSecondsToMilliseconds(marker.ts);
+      const startTimeMs = Trace.Helpers.Timing.microToMilli(marker.ts);
       const style = this.markerStyleForExtensionMarker(marker);
       return new TimelineFlameChartMarker(startTimeMs, startTimeMs - minTimeMs, style);
     });
@@ -244,7 +244,7 @@ export class TimingsTrackAppender implements TrackAppender {
       }
     }
     if (Trace.Types.Events.isConsoleTimeStamp(event)) {
-      return `TimeStamp: ${event.args.data.name}`;
+      return `TimeStamp: ${event.args.data?.message ?? '(name unknown)'}`;
     }
     if (Trace.Types.Events.isPerformanceMark(event)) {
       return `[mark]: ${event.name}`;
@@ -268,7 +268,7 @@ export class TimingsTrackAppender implements TrackAppender {
           this.#parsedTrace.Meta.navigationsByNavigationId,
           this.#parsedTrace.Meta.navigationsByFrameId,
       );
-      info.formattedTime = getFormattedTime(timeOfEvent);
+      info.formattedTime = getDurationString(timeOfEvent);
     }
   }
 }

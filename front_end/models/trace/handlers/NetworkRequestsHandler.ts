@@ -22,7 +22,7 @@ const SECONDS_TO_MICROSECONDS = 1000000;
 // keep for each request in the trace. In the finalize we will convert
 // these 5 types of trace records to a synthetic complete event that
 // represents a composite of these trace records.
-interface TraceEventsForNetworkRequest {
+export interface TraceEventsForNetworkRequest {
   changePriority?: Types.Events.ResourceChangePriority;
   willSendRequests?: Types.Events.ResourceWillSendRequest[];
   sendRequests?: Types.Events.ResourceSendRequest[];
@@ -46,7 +46,9 @@ export interface WebSocketTraceDataForWorker {
 }
 export type WebSocketTraceData = WebSocketTraceDataForFrame|WebSocketTraceDataForWorker;
 
-const webSocketData: Map<number, WebSocketTraceData> = new Map();
+const webSocketData = new Map<number, WebSocketTraceData>();
+const linkPreconnectEvents: Types.Events.LinkPreconnect[] = [];
+
 interface NetworkRequestData {
   byId: Map<string, Types.Events.SyntheticNetworkRequest>;
   byOrigin: Map<string, {
@@ -58,6 +60,7 @@ interface NetworkRequestData {
   eventToInitiator: Map<Types.Events.SyntheticNetworkRequest, Types.Events.SyntheticNetworkRequest>;
   webSocket: WebSocketTraceData[];
   entityMappings: HandlerHelpers.EntityMappings;
+  linkPreconnectEvents: Types.Events.LinkPreconnect[];
 }
 
 const requestMap = new Map<string, TraceEventsForNetworkRequest>();
@@ -103,9 +106,9 @@ function storeTraceEventWithRequestId<K extends keyof TraceEventsForNetworkReque
   }
 }
 
-function firstPositiveValueInList(entries: number[]): number {
+function firstPositiveValueInList(entries: Array<number|null>): number {
   for (const entry of entries) {
-    if (entry > 0) {
+    if (entry && entry > 0) {
       return entry;
     }
   }
@@ -127,6 +130,7 @@ export function reset(): void {
   entityMappings.eventsByEntity.clear();
   entityMappings.entityByEvent.clear();
   entityMappings.createdEntityCache.clear();
+  linkPreconnectEvents.length = 0;
 }
 
 export function handleEvent(event: Types.Events.Event): void {
@@ -188,6 +192,11 @@ export function handleEvent(event: Types.Events.Event): void {
 
     webSocketData.get(identifier)?.events.push(event);
   }
+
+  if (Types.Events.isLinkPreconnect(event)) {
+    linkPreconnectEvents.push(event);
+    return;
+  }
 }
 
 export async function finalize(): Promise<void> {
@@ -195,7 +204,7 @@ export async function finalize(): Promise<void> {
   for (const [requestId, request] of requestMap.entries()) {
     // If we have an incomplete set of events here, we choose to drop the network
     // request rather than attempt to synthesize the missing data.
-    if (!request.sendRequests || !request.receiveResponse) {
+    if (!request.sendRequests) {
       continue;
     }
 
@@ -218,12 +227,12 @@ export async function finalize(): Promise<void> {
       // We default to those of the sendRequests, however, since willSendRequest
       // is not guaranteed to be present in the data for every request.
       let ts = sendRequest.ts;
-      let dur = Types.Timing.MicroSeconds(nextSendRequest.ts - sendRequest.ts);
-      if (request.willSendRequests && request.willSendRequests[i] && request.willSendRequests[i + 1]) {
+      let dur = Types.Timing.Micro(nextSendRequest.ts - sendRequest.ts);
+      if (request.willSendRequests?.[i] && request.willSendRequests[i + 1]) {
         const willSendRequest = request.willSendRequests[i];
         const nextWillSendRequest = request.willSendRequests[i + 1];
         ts = willSendRequest.ts;
-        dur = Types.Timing.MicroSeconds(nextWillSendRequest.ts - willSendRequest.ts);
+        dur = Types.Timing.Micro(nextWillSendRequest.ts - willSendRequest.ts);
       }
 
       redirects.push({
@@ -235,12 +244,20 @@ export async function finalize(): Promise<void> {
       });
     }
 
+    const firstSendRequest = request.sendRequests[0];
+    const finalSendRequest = request.sendRequests[request.sendRequests.length - 1];
+
+    // We currently do not want to include data URI requests. We may revisit this in the future.
+    if (finalSendRequest.args.data.url.startsWith('data:')) {
+      continue;
+    }
+
     // If a ResourceFinish event with an encoded data length is received,
     // then the resource was not cached; it was fetched before it was
     // requested, e.g. because it was pushed in this navigation.
     const isPushedResource = request.resourceFinish?.args.data.encodedDataLength !== 0;
     // This works around crbug.com/998397, which reports pushed resources, and resources served by a service worker as disk cached.
-    const isDiskCached = request.receiveResponse.args.data.fromCache &&
+    const isDiskCached = !!request.receiveResponse && request.receiveResponse.args.data.fromCache &&
         !request.receiveResponse.args.data.fromServiceWorker && !isPushedResource;
     // If the request contains a resourceMarkAsCached event, it was served from memory cache.
     // The timing data returned is from the original (uncached) request, which
@@ -256,14 +273,11 @@ export async function finalize(): Promise<void> {
     const isMemoryCached = request.resourceMarkAsCached !== undefined;
     // If a request has `resourceMarkAsCached` field, the `timing` field is not correct.
     // So let's discard it and override to 0 (which will be handled in later logic if timing field is undefined).
-    const timing = isMemoryCached ? undefined : request.receiveResponse.args.data.timing;
-    // If a non-cached request has no |timing| indicates data URLs, we ignore it.
-    if (!timing && !isMemoryCached) {
+    const timing = isMemoryCached ? undefined : request.receiveResponse?.args.data.timing;
+    // If a non-cached response has no |timing|, we ignore it. An example of this is chrome://new-page / about:blank.
+    if (request.receiveResponse && !timing && !isMemoryCached) {
       continue;
     }
-
-    const firstSendRequest = request.sendRequests[0];
-    const finalSendRequest = request.sendRequests[request.sendRequests.length - 1];
 
     const initialPriority = finalSendRequest.args.data.priority;
     let finalPriority = initialPriority;
@@ -278,18 +292,17 @@ export async function finalize(): Promise<void> {
     // =======================
     // The time where the request started, which is either the first willSendRequest
     // event if there is one, or, if there is not, the sendRequest.
-    const startTime = (request.willSendRequests && request.willSendRequests.length) ?
-        Types.Timing.MicroSeconds(request.willSendRequests[0].ts) :
-        Types.Timing.MicroSeconds(firstSendRequest.ts);
+    const startTime = (request.willSendRequests?.length) ? Types.Timing.Micro(request.willSendRequests[0].ts) :
+                                                           Types.Timing.Micro(firstSendRequest.ts);
 
     // End redirect time
     // =======================
     // It's possible that when we start requesting data we will receive redirections.
     // Here we note the time of the *last* willSendRequest / sendRequest event,
     // which is used later on in the calculations for time queueing etc.
-    const endRedirectTime = (request.willSendRequests && request.willSendRequests.length) ?
-        Types.Timing.MicroSeconds(request.willSendRequests[request.willSendRequests.length - 1].ts) :
-        Types.Timing.MicroSeconds(finalSendRequest.ts);
+    const endRedirectTime = (request.willSendRequests?.length) ?
+        Types.Timing.Micro(request.willSendRequests[request.willSendRequests.length - 1].ts) :
+        Types.Timing.Micro(finalSendRequest.ts);
 
     // Finish time and end time
     // =======================
@@ -300,25 +313,25 @@ export async function finalize(): Promise<void> {
     // The end time, then, will be slightly after the finish time.
     const endTime = request.resourceFinish ? request.resourceFinish.ts : endRedirectTime;
     const finishTime = request.resourceFinish?.args.data.finishTime ?
-        Types.Timing.MicroSeconds(request.resourceFinish.args.data.finishTime * SECONDS_TO_MICROSECONDS) :
-        Types.Timing.MicroSeconds(endTime);
+        Types.Timing.Micro(request.resourceFinish.args.data.finishTime * SECONDS_TO_MICROSECONDS) :
+        Types.Timing.Micro(endTime);
 
     // Network duration
     // =======================
     // Time spent on the network.
-    const networkDuration = Types.Timing.MicroSeconds(timing ? (finishTime || endRedirectTime) - endRedirectTime : 0);
+    const networkDuration = Types.Timing.Micro(timing ? (finishTime || endRedirectTime) - endRedirectTime : 0);
 
     // Processing duration
     // =======================
     // Time spent from start to end.
-    const processingDuration = Types.Timing.MicroSeconds(endTime - (finishTime || endTime));
+    const processingDuration = Types.Timing.Micro(endTime - (finishTime || endTime));
 
     // Redirection duration
     // =======================
     // Time between the first willSendRequest / sendRequest and last. This we place in *front* of the
     // queueing, since the queueing time that we know about from the trace data is only the last request,
     // i.e., the one that occurs after all the redirects.
-    const redirectionDuration = Types.Timing.MicroSeconds(endRedirectTime - startTime);
+    const redirectionDuration = Types.Timing.Micro(endRedirectTime - startTime);
 
     // Queueing
     // =======================
@@ -326,8 +339,7 @@ export async function finalize(): Promise<void> {
     // arg recorded in the receiveResponse event. In the cases where the recorded start time is larger
     // that the requestTime we set queueing time to zero.
     const queueingFromTraceData = timing ? timing.requestTime * SECONDS_TO_MICROSECONDS - endRedirectTime : 0;
-    const queueing =
-        Types.Timing.MicroSeconds(Platform.NumberUtilities.clamp(queueingFromTraceData, 0, Number.MAX_VALUE));
+    const queueing = Types.Timing.Micro(Platform.NumberUtilities.clamp(queueingFromTraceData, 0, Number.MAX_VALUE));
 
     // Stalled
     // =======================
@@ -336,19 +348,20 @@ export async function finalize(): Promise<void> {
     // Otherwise it is whichever positive number comes first from the following timing info:
     // DNS start, Connection start, Send Start, or the time duration between our start time and
     // receiving a response.
-    const stalled = timing ? Types.Timing.MicroSeconds(firstPositiveValueInList([
-      timing.dnsStart * MILLISECONDS_TO_MICROSECONDS,
-      timing.connectStart * MILLISECONDS_TO_MICROSECONDS,
-      timing.sendStart * MILLISECONDS_TO_MICROSECONDS,
-      (request.receiveResponse.ts - endRedirectTime),
-    ])) :
-                             Types.Timing.MicroSeconds(request.receiveResponse.ts - startTime);
+    const stalled = timing ?
+        Types.Timing.Micro(firstPositiveValueInList([
+          timing.dnsStart * MILLISECONDS_TO_MICROSECONDS,
+          timing.connectStart * MILLISECONDS_TO_MICROSECONDS,
+          timing.sendStart * MILLISECONDS_TO_MICROSECONDS,
+          request.receiveResponse ? (request.receiveResponse.ts - endRedirectTime) : null,
+        ])) :
+        (request.receiveResponse ? Types.Timing.Micro(request.receiveResponse.ts - startTime) : Types.Timing.Micro(0));
 
     // Sending HTTP request
     // =======================
     // Time when the HTTP request is sent.
     const sendStartTime = timing ?
-        Types.Timing.MicroSeconds(
+        Types.Timing.Micro(
             timing.requestTime * SECONDS_TO_MICROSECONDS + timing.sendStart * MILLISECONDS_TO_MICROSECONDS) :
         startTime;
 
@@ -356,37 +369,37 @@ export async function finalize(): Promise<void> {
     // =======================
     // Time from when the send finished going to when the headers were received.
     const waiting = timing ?
-        Types.Timing.MicroSeconds((timing.receiveHeadersEnd - timing.sendEnd) * MILLISECONDS_TO_MICROSECONDS) :
-        Types.Timing.MicroSeconds(0);
+        Types.Timing.Micro((timing.receiveHeadersEnd - timing.sendEnd) * MILLISECONDS_TO_MICROSECONDS) :
+        Types.Timing.Micro(0);
 
     // Download
     // =======================
     // Time from receipt of headers to the finish time.
     const downloadStart = timing ?
-        Types.Timing.MicroSeconds(
+        Types.Timing.Micro(
             timing.requestTime * SECONDS_TO_MICROSECONDS + timing.receiveHeadersEnd * MILLISECONDS_TO_MICROSECONDS) :
         startTime;
-    const download = timing ? Types.Timing.MicroSeconds(((finishTime || downloadStart) - downloadStart)) :
-                              Types.Timing.MicroSeconds(endTime - request.receiveResponse.ts);
+    const download = timing     ? Types.Timing.Micro(((finishTime || downloadStart) - downloadStart)) :
+        request.receiveResponse ? Types.Timing.Micro(endTime - request.receiveResponse.ts) :
+                                  Types.Timing.Micro(0);
 
-    const totalTime = Types.Timing.MicroSeconds(networkDuration + processingDuration);
+    const totalTime = Types.Timing.Micro(networkDuration + processingDuration);
 
     // Collect a few values from the timing info.
     // If the Network request is cached, these fields will be zero, so the minus will zero out them.
-    const dnsLookup = timing ?
-        Types.Timing.MicroSeconds((timing.dnsEnd - timing.dnsStart) * MILLISECONDS_TO_MICROSECONDS) :
-        Types.Timing.MicroSeconds(0);
-    const ssl = timing ? Types.Timing.MicroSeconds((timing.sslEnd - timing.sslStart) * MILLISECONDS_TO_MICROSECONDS) :
-                         Types.Timing.MicroSeconds(0);
+    const dnsLookup = timing ? Types.Timing.Micro((timing.dnsEnd - timing.dnsStart) * MILLISECONDS_TO_MICROSECONDS) :
+                               Types.Timing.Micro(0);
+    const ssl = timing ? Types.Timing.Micro((timing.sslEnd - timing.sslStart) * MILLISECONDS_TO_MICROSECONDS) :
+                         Types.Timing.Micro(0);
     const proxyNegotiation = timing ?
-        Types.Timing.MicroSeconds((timing.proxyEnd - timing.proxyStart) * MILLISECONDS_TO_MICROSECONDS) :
-        Types.Timing.MicroSeconds(0);
+        Types.Timing.Micro((timing.proxyEnd - timing.proxyStart) * MILLISECONDS_TO_MICROSECONDS) :
+        Types.Timing.Micro(0);
     const requestSent = timing ?
-        Types.Timing.MicroSeconds((timing.sendEnd - timing.sendStart) * MILLISECONDS_TO_MICROSECONDS) :
-        Types.Timing.MicroSeconds(0);
+        Types.Timing.Micro((timing.sendEnd - timing.sendStart) * MILLISECONDS_TO_MICROSECONDS) :
+        Types.Timing.Micro(0);
     const initialConnection = timing ?
-        Types.Timing.MicroSeconds((timing.connectEnd - timing.connectStart) * MILLISECONDS_TO_MICROSECONDS) :
-        Types.Timing.MicroSeconds(0);
+        Types.Timing.Micro((timing.connectEnd - timing.connectStart) * MILLISECONDS_TO_MICROSECONDS) :
+        Types.Timing.Micro(0);
 
     // Finally get some of the general data from the trace events.
     const {frame, url, renderBlocking} = finalSendRequest.args.data;
@@ -429,12 +442,12 @@ export async function finalize(): Promise<void> {
               decodedBodyLength,
               encodedDataLength,
               frame,
-              fromServiceWorker: request.receiveResponse.args.data.fromServiceWorker,
+              fromServiceWorker: request.receiveResponse?.args.data.fromServiceWorker,
               isLinkPreload: finalSendRequest.args.data.isLinkPreload || false,
-              mimeType: request.receiveResponse.args.data.mimeType,
+              mimeType: request.receiveResponse?.args.data.mimeType ?? '',
               priority: finalPriority,
               initialPriority,
-              protocol: request.receiveResponse.args.data.protocol ?? 'unknown',
+              protocol: request.receiveResponse?.args.data.protocol ?? 'unknown',
               redirects,
               // In the event the property isn't set, assume non-blocking.
               renderBlocking: renderBlocking ?? 'non_blocking',
@@ -442,8 +455,8 @@ export async function finalize(): Promise<void> {
               requestingFrameUrl,
               requestMethod: finalSendRequest.args.data.requestMethod,
               resourceType: finalSendRequest.args.data.resourceType ?? Protocol.Network.ResourceType.Other,
-              statusCode: request.receiveResponse.args.data.statusCode,
-              responseHeaders: request.receiveResponse.args.data.headers || [],
+              statusCode: request.receiveResponse?.args.data.statusCode ?? 0,
+              responseHeaders: request.receiveResponse?.args.data.headers ?? null,
               fetchPriorityHint: finalSendRequest.args.data.fetchPriorityHint ?? 'auto',
               initiator: finalSendRequest.args.data.initiator,
               stackTrace: finalSendRequest.args.data.stackTrace,
@@ -451,17 +464,18 @@ export async function finalize(): Promise<void> {
               url,
               failed: request.resourceFinish?.args.data.didFail ?? false,
               finished: Boolean(request.resourceFinish),
-              connectionId: request.receiveResponse.args.data.connectionId,
-              connectionReused: request.receiveResponse.args.data.connectionReused,
+              hasResponse: Boolean(request.receiveResponse),
+              connectionId: request.receiveResponse?.args.data.connectionId,
+              connectionReused: request.receiveResponse?.args.data.connectionReused,
             },
           },
           cat: 'loading',
-          name: 'SyntheticNetworkRequest',
+          name: Types.Events.Name.SYNTHETIC_NETWORK_REQUEST,
           ph: Types.Events.Phase.COMPLETE,
-          dur: Types.Timing.MicroSeconds(endTime - startTime),
-          tdur: Types.Timing.MicroSeconds(endTime - startTime),
-          ts: Types.Timing.MicroSeconds(startTime),
-          tts: Types.Timing.MicroSeconds(startTime),
+          dur: Types.Timing.Micro(endTime - startTime),
+          tdur: Types.Timing.Micro(endTime - startTime),
+          ts: Types.Timing.Micro(startTime),
+          tts: Types.Timing.Micro(startTime),
           pid: finalSendRequest.pid,
           tid: finalSendRequest.tid,
         });
@@ -487,10 +501,13 @@ export async function finalize(): Promise<void> {
     requests.all.push(networkEvent);
     requestsByTime.push(networkEvent);
     requestsById.set(networkEvent.args.data.requestId, networkEvent);
-    // Update entity relationships for network events.
-    HandlerHelpers.updateEventForEntities(networkEvent, entityMappings);
+
+    // Update entity relationships for network events
+    HandlerHelpers.addNetworkRequestToEntityMapping(networkEvent, entityMappings, request);
+
+    // Establish initiator relationships
     const initiatorUrl = networkEvent.args.data.initiator?.url ||
-        Helpers.Trace.getZeroIndexedStackTraceForEvent(networkEvent)?.at(0)?.url;
+        Helpers.Trace.getZeroIndexedStackTraceInEventPayload(networkEvent)?.at(0)?.url;
     if (initiatorUrl) {
       const events = networkRequestEventByInitiatorUrl.get(initiatorUrl) ?? [];
       events.push(networkEvent);
@@ -522,6 +539,7 @@ export function data(): NetworkRequestData {
       eventsByEntity: new Map(entityMappings.eventsByEntity),
       createdEntityCache: new Map(entityMappings.createdEntityCache),
     },
+    linkPreconnectEvents,
   };
 }
 
@@ -566,7 +584,7 @@ function createSyntheticWebSocketConnection(
     cat: mainEvent.cat,
     ph: Types.Events.Phase.COMPLETE,
     ts: startTs,
-    dur: duration as Types.Timing.MicroSeconds,
+    dur: duration as Types.Timing.Micro,
     pid: mainEvent.pid,
     tid: mainEvent.tid,
     s: mainEvent.s,

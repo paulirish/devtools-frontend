@@ -28,18 +28,18 @@ devtools_module("markdown_view") {
   ]
   deps = [
     "../../../core/common:bundle",
-    "../../../core/host:bundle",
     "../../../core/platform:bundle",
     "../../../models/text_utils:bundle",
     "../../../third_party/codemirror.next:bundle",
     "../../../third_party/marked:bundle",
     "../../../ui/components/buttons:bundle",
+    "../../../ui/components/copy_to_clipboard:bundle",
     "../../../ui/components/helpers:bundle",
     "../../../ui/components/icon_button:bundle",
     "../../../ui/components/render_coordinator:bundle",
     "../../../ui/components/text_editor:bundle",
     "../../../ui/legacy:bundle",
-    "../../../ui/lit-html:bundle",
+    "../../../ui/lit:bundle",
     "../../../ui/visual_logging:bundle",
   ]
 }
@@ -72,7 +72,7 @@ ts_library("unittests") {
     "../../../testing",
     "../../../third_party/marked:bundle",
     "../../legacy:bundle",
-    "../../lit-html:bundle",
+    "../../lit:bundle",
     "../icon_button:bundle",
     "../render_coordinator:bundle",
   ]

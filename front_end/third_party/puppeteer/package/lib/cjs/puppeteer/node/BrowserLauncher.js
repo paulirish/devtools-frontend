@@ -39,9 +39,9 @@ exports.BrowserLauncher = void 0;
  * Copyright 2017 Google Inc.
  * SPDX-License-Identifier: Apache-2.0
  */
-const fs_1 = require("fs");
-const os_1 = require("os");
-const path_1 = require("path");
+const node_fs_1 = require("node:fs");
+const node_os_1 = require("node:os");
+const node_path_1 = require("node:path");
 const browsers_1 = require("@puppeteer/browsers");
 const rxjs_js_1 = require("../../third_party/rxjs/rxjs.js");
 const Browser_js_1 = require("../cdp/Browser.js");
@@ -72,7 +72,7 @@ class BrowserLauncher {
         return this.#browser;
     }
     async launch(options = {}) {
-        const { dumpio = false, env = process.env, handleSIGINT = true, handleSIGTERM = true, handleSIGHUP = true, acceptInsecureCerts = false, defaultViewport = util_js_1.DEFAULT_VIEWPORT, downloadBehavior, slowMo = 0, timeout = 30000, waitForInitialPage = true, protocolTimeout, } = options;
+        const { dumpio = false, enableExtensions = false, env = process.env, handleSIGINT = true, handleSIGTERM = true, handleSIGHUP = true, acceptInsecureCerts = false, defaultViewport = util_js_1.DEFAULT_VIEWPORT, downloadBehavior, slowMo = 0, timeout = 30000, waitForInitialPage = true, protocolTimeout, } = options;
         let { protocol } = options;
         // Default to 'webDriverBiDi' for Firefox.
         if (this.#browser === 'firefox' && protocol === undefined) {
@@ -85,7 +85,7 @@ class BrowserLauncher {
             ...options,
             protocol,
         });
-        if (!(0, fs_1.existsSync)(launchArgs.executablePath)) {
+        if (!(0, node_fs_1.existsSync)(launchArgs.executablePath)) {
             throw new Error(`Browser was not found at the configured executablePath (${launchArgs.executablePath})`);
         }
         const usePipe = launchArgs.args.includes('--remote-debugging-pipe');
@@ -97,7 +97,7 @@ class BrowserLauncher {
         if (this.#browser === 'firefox' &&
             protocol === 'webDriverBiDi' &&
             usePipe) {
-            throw new Error('Pipe connections are not supported wtih Firefox and WebDriver BiDi');
+            throw new Error('Pipe connections are not supported with Firefox and WebDriver BiDi');
         }
         const browserProcess = (0, browsers_1.launch)({
             executablePath: launchArgs.executablePath,
@@ -162,6 +162,16 @@ class BrowserLauncher {
                 throw new Errors_js_1.TimeoutError(error.message);
             }
             throw error;
+        }
+        if (Array.isArray(enableExtensions)) {
+            if (this.#browser === 'chrome' && !usePipe) {
+                throw new Error('To use `enableExtensions` with a list of paths in Chrome, you must be connected with `--remote-debugging-pipe` (`pipe: true`).');
+            }
+            await Promise.all([
+                enableExtensions.map(path => {
+                    return browser.installExtension(path);
+                }),
+            ]);
         }
         if (waitForInitialPage) {
             await this.waitForPageTarget(browser, timeout);
@@ -257,7 +267,7 @@ class BrowserLauncher {
      * @internal
      */
     getProfilePath() {
-        return (0, path_1.join)(this.puppeteer.configuration.temporaryDirectory ?? (0, os_1.tmpdir)(), `puppeteer_dev_${this.browser}_profile-`);
+        return (0, node_path_1.join)(this.puppeteer.configuration.temporaryDirectory ?? (0, node_os_1.tmpdir)(), `puppeteer_dev_${this.browser}_profile-`);
     }
     /**
      * @internal
@@ -265,7 +275,7 @@ class BrowserLauncher {
     resolveExecutablePath(headless, validatePath = true) {
         let executablePath = this.puppeteer.configuration.executablePath;
         if (executablePath) {
-            if (validatePath && !(0, fs_1.existsSync)(executablePath)) {
+            if (validatePath && !(0, node_fs_1.existsSync)(executablePath)) {
                 throw new Error(`Tried to find the browser at the configured path (${executablePath}), but no executable was found.`);
             }
             return executablePath;
@@ -288,7 +298,7 @@ class BrowserLauncher {
             browser: browserType,
             buildId: this.puppeteer.browserVersion,
         });
-        if (validatePath && !(0, fs_1.existsSync)(executablePath)) {
+        if (validatePath && !(0, node_fs_1.existsSync)(executablePath)) {
             const configVersion = this.puppeteer.configuration?.[this.browser]?.version;
             if (configVersion) {
                 throw new Error(`Tried to find the browser at the configured path (${executablePath}) for version ${configVersion}, but no executable was found.`);

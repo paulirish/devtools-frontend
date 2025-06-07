@@ -28,6 +28,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* eslint-disable rulesdir/no-imperative-dom-api */
+
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -177,7 +179,7 @@ const UIStrings = {
    * @description Explanation text for the 'Forces CSS forced-colors' setting in the Rendering tool.
    */
   forcesCssForcedColors: 'Forces CSS forced-colors media feature',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('entrypoints/inspector_main/RenderingOptions.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -206,6 +208,7 @@ const supportsPrefersContrast = (): boolean => {
 export class RenderingOptionsView extends UI.Widget.VBox {
   constructor() {
     super(true);
+    this.registerRequiredCSS(renderingOptionsStyles);
 
     this.element.setAttribute('jslog', `${VisualLogging.panel('rendering').track({resize: true})}`);
 
@@ -293,7 +296,7 @@ export class RenderingOptionsView extends UI.Widget.VBox {
       label: Common.UIString.LocalizedString, subtitle: Common.UIString.LocalizedString,
       setting: Common.Settings.Setting<boolean>, metric?: UI.SettingsUI.UserMetricOptions): UI.UIUtils.CheckboxLabel {
     const checkbox = UI.UIUtils.CheckboxLabel.create(label, false, subtitle, setting.name);
-    UI.SettingsUI.bindCheckbox(checkbox.checkboxElement, setting, metric);
+    UI.SettingsUI.bindCheckbox(checkbox, setting, metric);
     this.contentElement.appendChild(checkbox);
     return checkbox;
   }
@@ -303,10 +306,6 @@ export class RenderingOptionsView extends UI.Widget.VBox {
     if (control) {
       this.contentElement.appendChild(control);
     }
-  }
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([renderingOptionsStyles]);
   }
 }
 

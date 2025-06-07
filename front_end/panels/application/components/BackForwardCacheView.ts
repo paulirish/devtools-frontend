@@ -1,6 +1,7 @@
 // Copyright (c) 2021 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import '../../../ui/components/chrome_link/chrome_link.js';
 import '../../../ui/components/expandable_list/expandable_list.js';
@@ -20,13 +21,13 @@ import * as RenderCoordinator from '../../../ui/components/render_coordinator/re
 import type * as ReportView from '../../../ui/components/report_view/report_view.js';
 import type * as TreeOutline from '../../../ui/components/tree_outline/tree_outline.js';
 import * as Components from '../../../ui/legacy/components/utils/utils.js';
-import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import * as Lit from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import {NotRestoredReasonDescription} from './BackForwardCacheStrings.js';
 import backForwardCacheViewStyles from './backForwardCacheView.css.js';
 
-const {html} = LitHtml;
+const {html} = Lit;
 
 const UIStrings = {
   /**
@@ -44,7 +45,7 @@ const UIStrings = {
   /**
    * @description Entry name text in the back/forward cache view of the Application panel
    */
-  url: 'URL:',
+  url: 'URL',
   /**
    * @description Status text for the status of the back/forward cache status
    */
@@ -144,7 +145,7 @@ const UIStrings = {
    * @description Shows the number of files with a particular issue.
    */
   filesPerIssue: '{n, plural, =1 {# file} other {# files}}',
-};
+} as const;
 
 const str_ = i18n.i18n.registerUIStrings('panels/application/components/BackForwardCacheView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -178,14 +179,14 @@ export class BackForwardCacheView extends LegacyWrapper.LegacyWrapper.WrappableC
   }
   connectedCallback(): void {
     this.parentElement?.classList.add('overflow-auto');
-    this.#shadow.adoptedStyleSheets = [backForwardCacheViewStyles];
   }
 
   override async render(): Promise<void> {
     await RenderCoordinator.write('BackForwardCacheView render', () => {
       // Disabled until https://crbug.com/1079231 is fixed.
       // clang-format off
-      LitHtml.render(html`
+      Lit.render(html`
+        <style>${backForwardCacheViewStyles}</style>
         <devtools-report .data=${
             {reportTitle: i18nString(UIStrings.backForwardCacheTitle)} as ReportView.ReportView.ReportData
         } jslog=${VisualLogging.pane('back-forward-cache')}>
@@ -258,7 +259,7 @@ export class BackForwardCacheView extends LegacyWrapper.LegacyWrapper.WrappableC
     void resourceTreeModel.navigate('chrome://terms' as Platform.DevToolsPath.UrlString);
   }
 
-  #renderMainFrameInformation(): LitHtml.TemplateResult {
+  #renderMainFrameInformation(): Lit.TemplateResult {
     const frame = this.#getMainFrame();
     if (!frame) {
       // clang-format off
@@ -278,14 +279,8 @@ export class BackForwardCacheView extends LegacyWrapper.LegacyWrapper.WrappableC
     // clang-format off
     return html`
       ${this.#renderBackForwardCacheStatus(frame.backForwardCacheDetails.restoredFromCache)}
-      <div class="report-line">
-        <div class="report-key">
-          ${i18nString(UIStrings.url)}
-        </div>
-        <div class="report-value" title=${frame.url}>
-          ${frame.url}
-        </div>
-      </div>
+      <devtools-report-key>${i18nString(UIStrings.url)}</devtools-report-key>
+      <devtools-report-value>${frame.url}</devtools-report-value>
       ${this.#maybeRenderFrameTree(frame.backForwardCacheDetails.explanationsTree)}
       <devtools-report-section>
         <devtools-button
@@ -316,12 +311,12 @@ export class BackForwardCacheView extends LegacyWrapper.LegacyWrapper.WrappableC
   }
 
   #maybeRenderFrameTree(explanationTree: Protocol.Page.BackForwardCacheNotRestoredExplanationTree|
-                        undefined): LitHtml.LitTemplate {
+                        undefined): Lit.LitTemplate {
     if (!explanationTree || (explanationTree.explanations.length === 0 && explanationTree.children.length === 0)) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
 
-    function treeNodeRenderer(node: TreeOutline.TreeOutlineUtils.TreeNode<FrameTreeNodeData>): LitHtml.TemplateResult {
+    function treeNodeRenderer(node: TreeOutline.TreeOutlineUtils.TreeNode<FrameTreeNodeData>): Lit.TemplateResult {
       // clang-format off
       return html`
         <div class="text-ellipsis">
@@ -333,7 +328,7 @@ export class BackForwardCacheView extends LegacyWrapper.LegacyWrapper.WrappableC
               height: '20px',
             } as IconButton.Icon.IconData}>
             </devtools-icon>
-          ` : LitHtml.nothing}
+          ` : Lit.nothing}
           ${node.treeNodeData.text}
         </div>
       `;
@@ -361,20 +356,15 @@ export class BackForwardCacheView extends LegacyWrapper.LegacyWrapper.WrappableC
 
     // clang-format off
     return html`
-      <div class="report-line"
-      jslog=${VisualLogging.section('frames')}>
-        <div class="report-key">
-          ${i18nString(UIStrings.framesTitle)}
-        </div>
-        <div class="report-value">
-          <devtools-tree-outline .data=${{
-            tree: [root],
-            defaultRenderer: treeNodeRenderer,
-            compact: true,
-          } as TreeOutline.TreeOutline.TreeOutlineData<FrameTreeNodeData>}>
-          </devtools-tree-outline>
-        </div>
-      </div>
+      <devtools-report-key jslog=${VisualLogging.section('frames')}>${i18nString(UIStrings.framesTitle)}</devtools-report-key>
+      <devtools-report-value>
+        <devtools-tree-outline .data=${{
+          tree: [root],
+          defaultRenderer: treeNodeRenderer,
+          compact: true,
+        } as TreeOutline.TreeOutline.TreeOutlineData<FrameTreeNodeData>}>
+        </devtools-tree-outline>
+      </devtools-report-value>
     `;
     // clang-format on
   }
@@ -387,7 +377,7 @@ export class BackForwardCacheView extends LegacyWrapper.LegacyWrapper.WrappableC
       {node: TreeOutline.TreeOutlineUtils.TreeNode<FrameTreeNodeData>, frameCount: number, issueCount: number} {
     let frameCount = 1;
     let issueCount = 0;
-    const children: TreeOutline.TreeOutlineUtils.TreeNode<FrameTreeNodeData>[] = [];
+    const children: Array<TreeOutline.TreeOutlineUtils.TreeNode<FrameTreeNodeData>> = [];
 
     let nodeUrlText = '';
     if (explanationTree.url.length) {
@@ -431,7 +421,7 @@ export class BackForwardCacheView extends LegacyWrapper.LegacyWrapper.WrappableC
     return {node, frameCount, issueCount};
   }
 
-  #renderBackForwardCacheStatus(status: boolean|undefined): LitHtml.TemplateResult {
+  #renderBackForwardCacheStatus(status: boolean|undefined): Lit.TemplateResult {
     switch (status) {
       case true:
         // clang-format off
@@ -502,9 +492,9 @@ export class BackForwardCacheView extends LegacyWrapper.LegacyWrapper.WrappableC
 
   #maybeRenderExplanations(
       explanations: Protocol.Page.BackForwardCacheNotRestoredExplanation[],
-      explanationTree: Protocol.Page.BackForwardCacheNotRestoredExplanationTree|undefined): LitHtml.LitTemplate {
+      explanationTree: Protocol.Page.BackForwardCacheNotRestoredExplanationTree|undefined): Lit.LitTemplate {
     if (explanations.length === 0) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
 
     const pageSupportNeeded = explanations.filter(
@@ -514,7 +504,7 @@ export class BackForwardCacheView extends LegacyWrapper.LegacyWrapper.WrappableC
     const circumstantial = explanations.filter(
         explanation => explanation.type === Protocol.Page.BackForwardCacheNotRestoredReasonType.Circumstantial);
 
-    const reasonToFramesMap: Map<Protocol.Page.BackForwardCacheNotRestoredReason, string[]> = new Map();
+    const reasonToFramesMap = new Map<Protocol.Page.BackForwardCacheNotRestoredReason, string[]>();
     if (explanationTree) {
       this.#buildReasonToFramesMap(explanationTree, {blankCount: 1}, reasonToFramesMap);
     }
@@ -531,7 +521,7 @@ export class BackForwardCacheView extends LegacyWrapper.LegacyWrapper.WrappableC
   #renderExplanations(
       category: Platform.UIString.LocalizedString, explainerText: Platform.UIString.LocalizedString,
       explanations: Protocol.Page.BackForwardCacheNotRestoredExplanation[],
-      reasonToFramesMap: Map<Protocol.Page.BackForwardCacheNotRestoredReason, string[]>): LitHtml.TemplateResult {
+      reasonToFramesMap: Map<Protocol.Page.BackForwardCacheNotRestoredReason, string[]>): Lit.TemplateResult {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     return html`
@@ -549,12 +539,12 @@ export class BackForwardCacheView extends LegacyWrapper.LegacyWrapper.WrappableC
           </div>
         </devtools-report-section-header>
         ${explanations.map(explanation => this.#renderReason(explanation, reasonToFramesMap.get(explanation.reason)))}
-      ` : LitHtml.nothing}
+      ` : Lit.nothing}
     `;
     // clang-format on
   }
 
-  #maybeRenderReasonContext(explanation: Protocol.Page.BackForwardCacheNotRestoredExplanation): LitHtml.LitTemplate {
+  #maybeRenderReasonContext(explanation: Protocol.Page.BackForwardCacheNotRestoredExplanation): Lit.LitTemplate {
     if (explanation.reason ===
             Protocol.Page.BackForwardCacheNotRestoredReason.EmbedderExtensionSentMessageToCachedFrame &&
         explanation.context) {
@@ -564,12 +554,12 @@ export class BackForwardCacheView extends LegacyWrapper.LegacyWrapper.WrappableC
       <devtools-chrome-link .href=${link}>${explanation.context}</devtools-chrome-link>`;
       // clang-format on
     }
-    return LitHtml.nothing;
+    return Lit.nothing;
   }
 
-  #renderFramesPerReason(frames: string[]|undefined): LitHtml.LitTemplate {
+  #renderFramesPerReason(frames: string[]|undefined): Lit.LitTemplate {
     if (frames === undefined || frames.length === 0) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
     const rows = [html`<div>${i18nString(UIStrings.framesPerIssue, {n: frames.length})}</div>`];
     rows.push(...frames.map(url => html`<div class="text-ellipsis" title=${url}
@@ -586,7 +576,7 @@ export class BackForwardCacheView extends LegacyWrapper.LegacyWrapper.WrappableC
     `;
   }
 
-  #maybeRenderDeepLinkToUnload(explanation: Protocol.Page.BackForwardCacheNotRestoredExplanation): LitHtml.LitTemplate {
+  #maybeRenderDeepLinkToUnload(explanation: Protocol.Page.BackForwardCacheNotRestoredExplanation): Lit.LitTemplate {
     if (explanation.reason === Protocol.Page.BackForwardCacheNotRestoredReason.UnloadHandlerExistsInMainFrame ||
         explanation.reason === Protocol.Page.BackForwardCacheNotRestoredReason.UnloadHandlerExistsInSubFrame) {
       return html`
@@ -597,13 +587,12 @@ export class BackForwardCacheView extends LegacyWrapper.LegacyWrapper.WrappableC
           ${i18nString(UIStrings.neverUseUnload)}
         </x-link>`;
     }
-    return LitHtml.nothing;
+    return Lit.nothing;
   }
 
-  #maybeRenderJavaScriptDetails(details: Protocol.Page.BackForwardCacheBlockingDetails[]|
-                                undefined): LitHtml.LitTemplate {
+  #maybeRenderJavaScriptDetails(details: Protocol.Page.BackForwardCacheBlockingDetails[]|undefined): Lit.LitTemplate {
     if (details === undefined || details.length === 0) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
     const maxLengthForDisplayedURLs = 50;
     const linkifier = new Components.Linkifier.Linkifier(maxLengthForDisplayedURLs);
@@ -625,7 +614,7 @@ export class BackForwardCacheView extends LegacyWrapper.LegacyWrapper.WrappableC
   }
 
   #renderReason(explanation: Protocol.Page.BackForwardCacheNotRestoredExplanation, frames: string[]|undefined):
-      LitHtml.TemplateResult {
+      Lit.TemplateResult {
     // clang-format off
     return html`
       <devtools-report-section>
@@ -645,7 +634,7 @@ export class BackForwardCacheView extends LegacyWrapper.LegacyWrapper.WrappableC
               ${this.#maybeRenderDeepLinkToUnload(explanation)}
               ${this.#maybeRenderReasonContext(explanation)}
            </div>` :
-            LitHtml.nothing}
+            Lit.nothing}
       </devtools-report-section>
       <div class="gray-text">
         ${explanation.reason}

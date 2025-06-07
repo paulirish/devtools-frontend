@@ -30,7 +30,7 @@ devtools_module("text_editor") {
     "../../../models/source_map_scopes:bundle",
     "../../../services/window_bounds:bundle",
     "../../legacy:bundle",
-    "../../lit-html:bundle",
+    "../../lit:bundle",
     "../code_highlighter:bundle",
     "../helpers:bundle",
   ]
@@ -45,7 +45,7 @@ devtools_entrypoint("bundle") {
   ]
 
   visibility = [
-    "../../../../test/interactions/text_editor/*",
+    "../../../../test/e2e_non_hosted/*",
     "../../legacy/components/*",
   ]
   visibility += default_components_visibility

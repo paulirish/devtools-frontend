@@ -10,6 +10,7 @@ import {
   $$,
   assertNotNullOrUndefined,
   clickElement,
+  drainFrontendTaskQueue,
   enableExperiment,
   getBrowserAndPages,
   goToResource,
@@ -68,13 +69,12 @@ describe('The Memory Panel', function() {
     await navigateToMemoryTab();
   });
 
-  // This test logs assertions to the console.
-  it.skip('[crbug.com/347709947] Can take several heap snapshots ', async () => {
+  it('Can take several heap snapshots ', async () => {
     await goToResource('memory/default.html');
     await navigateToMemoryTab();
     await takeHeapSnapshot();
     await waitForNonEmptyHeapSnapshotData();
-    await takeHeapSnapshot();
+    await takeHeapSnapshot('Snapshot 2');
     await waitForNonEmptyHeapSnapshotData();
     const heapSnapShots = await $$('.heap-snapshot-sidebar-tree-item');
     assert.lengthOf(heapSnapShots, 2);
@@ -194,7 +194,7 @@ describe('The Memory Panel', function() {
   });
 
   // Flaky on win and linux
-  it.skip('[crbug.com/1363150] Correctly shows multiple retainer paths for an object', async () => {
+  it.skip('[crbug.com/40238574] Correctly shows multiple retainer paths for an object', async () => {
     await goToResource('memory/multiple-retainers.html');
     await navigateToMemoryTab();
     await takeHeapSnapshot();
@@ -214,7 +214,7 @@ describe('The Memory Panel', function() {
       const findPromises = await Promise.all(results.map(async e => {
         const textContent = await e.evaluate(el => el.textContent);
         // Can't search for "shared in leaking()" because the different parts are spaced with CSS.
-        return textContent && textContent.startsWith('sharedinleaking()') ? e : null;
+        return textContent?.startsWith('sharedinleaking()') ? e : null;
       }));
       return findPromises.find(result => result !== null);
     });
@@ -262,7 +262,7 @@ describe('The Memory Panel', function() {
   });
 
   // Flaky test causing build failures
-  it.skip('[crbug.com/1239550] Shows the correct output for a detached iframe', async () => {
+  it.skip('[crbug.com/40193901] Shows the correct output for a detached iframe', async () => {
     await goToResource('memory/detached-iframe.html');
     await navigateToMemoryTab();
     await takeHeapSnapshot();
@@ -285,14 +285,14 @@ describe('The Memory Panel', function() {
     });
     const rows = await getDataGridRows('.retaining-paths-view table.data');
     const propertyNameElement = await rows[0].$('span.property-name');
-    propertyNameElement!.hover();
+    await propertyNameElement!.hover();
     const el = await waitFor('div.vbox.flex-auto.no-pointer-events');
     await waitFor('.source-code', el);
 
     await setSearchFilter('system / descriptorarray');
     await findSearchResult('system / DescriptorArray');
     const searchResultElement = await waitFor('.selected.data-grid-data-grid-node span.object-value-null');
-    searchResultElement!.hover();
+    await searchResultElement!.hover();
     await waitFor('.widget .object-popover-footer');
   });
 
@@ -319,7 +319,7 @@ describe('The Memory Panel', function() {
 
     const header = await waitForElementWithTextContent('Live Count');
     const table = await header.evaluateHandle(node => {
-      return node.closest('.data-grid');
+      return node.closest('.data-grid')!;
     });
     await waitFor('.data-grid-data-grid-node', table);
   });
@@ -421,8 +421,8 @@ describe('The Memory Panel', function() {
       }
 
       // Verify the link to the source code.
-      const linkText =
-          await waitForFunction(async () => element?.evaluate(e => e.querySelector('.devtools-link')?.textContent));
+      const linkText = await waitForFunction(
+          async () => await element?.evaluate(e => e.querySelector('.devtools-link')?.textContent));
       assert.strictEqual(linkText, entry.link);
     }
   });
@@ -513,9 +513,9 @@ describe('The Memory Panel', function() {
     await waitForRetainerChain([
       '{y}',
       '{d}',
-      `{${'#'.repeat(130)}, ...}`,
+      `{${'#'.repeat(130)}, …}`,
       '{b, irrelevantProperty, <symbol also irrelevant>, "}"}',
-      '{a, extraProp0, extraProp1, extraProp2, extraProp3, ..., extraProp6, extraProp7, extraProp8, extraProp9}',
+      '{a, extraProp0, extraProp1, extraProp2, extraProp3, …, extraProp6, extraProp7, extraProp8, extraProp9}',
       'Window',
     ]);
     await clickOnContextMenuForRetainer('b', 'Ignore this retainer');
@@ -534,10 +534,10 @@ describe('The Memory Panel', function() {
     await waitForSearchResultNumber(2);
     await setFilterDropdown('Objects retained by detached DOM nodes');
     await getCategoryRow('ObjectRetainedByDetachedDom');
-    assert.isTrue(!(await getCategoryRow('ObjectRetainedByBothDetachedDomAndConsole', false)));
+    assert.isNotOk(await getCategoryRow('ObjectRetainedByBothDetachedDomAndConsole', false));
     await setFilterDropdown('Objects retained by DevTools Console');
     await getCategoryRow('ObjectRetainedByConsole');
-    assert.isTrue(!(await getCategoryRow('ObjectRetainedByBothDetachedDomAndConsole', false)));
+    assert.isNotOk(await getCategoryRow('ObjectRetainedByBothDetachedDomAndConsole', false));
   });
 
   it('Groups HTML elements by tag name', async () => {
@@ -560,8 +560,8 @@ describe('The Memory Panel', function() {
     await setClassFilter('{a, b, c, d, ');
     // Objects should be grouped by interface if there are at least two matching instances.
     assert.strictEqual(2, await getCountFromCategoryRowWithName('{a, b, c, d, p, q, r}'));
-    assert.isTrue(!(await getCategoryRow('{a, b, c, d, e}', /* wait:*/ false)));
-    const {frontend, target} = await getBrowserAndPages();
+    assert.isNotOk(await getCategoryRow('{a, b, c, d, e}', /* wait:*/ false));
+    const {frontend, target} = getBrowserAndPages();
     await target.bringToFront();
     await target.click('button#update');
     await frontend.bringToFront();
@@ -573,7 +573,7 @@ describe('The Memory Panel', function() {
     // so the comparison should report only one new object of the following type, not two.
     assert.strictEqual(1, await getAddedCountFromComparisonRowWithName('{a, b, c, d, e}'));
     // Only one of these objects remains, so it's no longer a category.
-    assert.isTrue(!(await getCategoryRow('{a, b, c, d, p, q, r}', /* wait:*/ false)));
+    assert.isNotOk(await getCategoryRow('{a, b, c, d, p, q, r}', /* wait:*/ false));
   });
 
   it('Groups objects by constructor location', async () => {
@@ -581,6 +581,8 @@ describe('The Memory Panel', function() {
     await navigateToMemoryTab();
     await takeHeapSnapshot();
     await waitForNonEmptyHeapSnapshotData();
+    // TODO: filtering does not work while UI is rendering snapshot.
+    await drainFrontendTaskQueue();
     await setClassFilter('DuplicatedClassName');
     let rows = await waitForMany('tr.data-grid-data-grid-node', 3);
     assert.strictEqual(30, await getCountFromCategoryRow(rows[0]));
@@ -588,12 +590,13 @@ describe('The Memory Panel', function() {
     assert.strictEqual(2, await getCountFromCategoryRow(rows[2]));
     await focusTableRow(rows[0]);
     await expandFocusedRow();
-    const {frontend, target} = await getBrowserAndPages();
+    // TODO: pressing arrowDown does not work while UI is rendering.
+    await drainFrontendTaskQueue();
+    const {frontend, target} = getBrowserAndPages();
     await frontend.keyboard.press('ArrowDown');
     await clickOnContextMenuForRetainer('x', 'Reveal in Summary view');
     await waitUntilRetainerChainSatisfies(
         retainerChain => retainerChain.length > 0 && retainerChain[0].propertyName === 'a');
-
     await target.bringToFront();
     await target.click('button#update');
     await frontend.bringToFront();

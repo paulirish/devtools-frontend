@@ -5,15 +5,13 @@
 import {assert} from 'chai';
 import type * as puppeteer from 'puppeteer-core';
 
-import {$, getBrowserAndPages, step} from '../../shared/helper.js';
-
+import {getBrowserAndPages, step} from '../../shared/helper.js';
 import {
   CONSOLE_MESSAGE_WRAPPER_SELECTOR,
   deleteConsoleMessagesFilter,
   filterConsoleMessages,
   getConsoleMessages,
   getCurrentConsoleMessages,
-  showVerboseMessages,
   toggleShowCorsErrors,
   waitForConsoleMessagesToBeNonEmpty,
 } from '../helpers/console-helpers.js';
@@ -39,7 +37,6 @@ function getExpectedMessages(unfilteredMessages: string[], filter: MessageCheck)
 }
 
 async function testMessageFilter(filter: string, expectedMessageFilter: MessageCheck) {
-  const {frontend} = getBrowserAndPages();
   let unfilteredMessages: string[];
   const showMessagesWithAnchor = true;
 
@@ -48,7 +45,7 @@ async function testMessageFilter(filter: string, expectedMessageFilter: MessageC
   });
 
   await step(`filter to only show messages containing '${filter}'`, async () => {
-    await filterConsoleMessages(frontend, filter);
+    await filterConsoleMessages(filter);
   });
 
   await step('check that messages are correctly filtered', async () => {
@@ -90,46 +87,10 @@ describe('The Console Tab', () => {
     });
   });
 
-  it('shows messages from all levels', async () => {
-    let messages: string[];
-    const withAnchor = true;
-    await step('navigate to console-filter.html and get console messages', async () => {
-      messages = await getConsoleMessages('console-filter', withAnchor, showVerboseMessages);
-    });
-
-    await step('ensure that all levels are logged', async () => {
-      const allLevelsDropdown = await $('[aria-label^="Log level: All levels"]');
-      assert.isNotNull(allLevelsDropdown);
-    });
-
-    await step('check that all console messages appear', async () => {
-      assert.deepEqual(messages, [
-        'console-filter.html:10 1topGroup: log1()',
-        'log-source.js:6 2topGroup: log2()',
-        'console-filter.html:10 3topGroup: log1()',
-        'console-filter.html:17 enter outerGroup',
-        'console-filter.html:10 1outerGroup: log1()',
-        'log-source.js:6 2outerGroup: log2()',
-        'console-filter.html:21 enter innerGroup1',
-        'console-filter.html:10 1innerGroup1: log1()',
-        'log-source.js:6 2innerGroup1: log2()',
-        'console-filter.html:26 enter innerGroup2',
-        'console-filter.html:10 1innerGroup2: log1()',
-        'log-source.js:6 2innerGroup2: log2()',
-        'console-filter.html:10 4topGroup: log1()',
-        'log-source.js:6 5topGroup: log2()',
-        'console-filter.html:38 Hello 1',
-        'console-filter.html:39 Hello 2',
-        'console-filter.html:41 verbose debug message',
-        'console-filter.html:42 end',
-      ]);
-    });
-  });
-
   it('can exclude messages from a source url', async () => {
     const {frontend} = getBrowserAndPages();
     let sourceUrls: string[];
-    let uniqueUrls: Set<string> = new Set();
+    let uniqueUrls = new Set<string>();
 
     await step('navigate to console-filter.html and wait for console messages', async () => {
       await getConsoleMessages('console-filter');
@@ -161,7 +122,7 @@ describe('The Console Tab', () => {
       await testMessageFilter(filter, expectedMessageFilter);
 
       await step(`remove filter '${filter}'`, async () => {
-        await deleteConsoleMessagesFilter(frontend);
+        await deleteConsoleMessagesFilter();
       });
     }
   });
@@ -169,7 +130,7 @@ describe('The Console Tab', () => {
   it('can include messages from a given source url', async () => {
     const {frontend} = getBrowserAndPages();
     let sourceUrls: string[];
-    let uniqueUrls: Set<string> = new Set();
+    let uniqueUrls = new Set<string>();
 
     await step('navigate to console-filter.html and wait for console messages', async () => {
       await getConsoleMessages('console-filter');
@@ -200,7 +161,7 @@ describe('The Console Tab', () => {
       await testMessageFilter(filter, expectedMessageFilter);
 
       await step(`remove filter '${filter}'`, async () => {
-        await deleteConsoleMessagesFilter(frontend);
+        await deleteConsoleMessagesFilter();
       });
     }
   });
@@ -310,28 +271,6 @@ describe('The Console Tab', () => {
       return /[2-3]top/.test(msg);
     };
     await testMessageFilter(filter, expectedMessageFilter);
-  });
-
-  it('can reset filter', async () => {
-    const {frontend} = getBrowserAndPages();
-    let unfilteredMessages: string[];
-
-    await step('get unfiltered messages', async () => {
-      unfilteredMessages = await getConsoleMessages('console-filter');
-    });
-
-    await step('apply message filter', async () => {
-      await filterConsoleMessages(frontend, 'outer');
-    });
-
-    await step('delete message filter', async () => {
-      void deleteConsoleMessagesFilter(frontend);
-    });
-
-    await step('check if messages are unfiltered', async () => {
-      const messages = await getCurrentConsoleMessages();
-      assert.deepEqual(messages, unfilteredMessages);
-    });
   });
 
   it('can exclude CORS error messages', async () => {

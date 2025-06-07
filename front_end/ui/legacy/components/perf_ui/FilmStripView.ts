@@ -1,6 +1,7 @@
 // Copyright 2015 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as Common from '../../../../core/common/common.js';
 import * as Host from '../../../../core/host/host.js';
@@ -9,7 +10,7 @@ import * as Trace from '../../../../models/trace/trace.js';
 import * as VisualLogging from '../../../visual_logging/visual_logging.js';
 import * as UI from '../../legacy.js';
 
-import filmStripViewStyles from './filmStripView.css.legacy.js';
+import filmStripViewStyles from './filmStripView.css.js';
 
 const UIStrings = {
   /**
@@ -33,19 +34,19 @@ const UIStrings = {
    *@description Next button title in Film Strip View of the Performance panel
    */
   nextFrame: 'Next frame',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/components/perf_ui/FilmStripView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export class FilmStripView extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.HBox>(UI.Widget.HBox) {
   private statusLabel: HTMLElement;
-  private zeroTime: Trace.Types.Timing.MilliSeconds = Trace.Types.Timing.MilliSeconds(0);
+  private zeroTime: Trace.Types.Timing.Milli = Trace.Types.Timing.Milli(0);
   #filmStrip: Trace.Extras.FilmStrip.Data|null = null;
 
   constructor() {
     super(true);
     this.registerRequiredCSS(filmStripViewStyles);
     this.contentElement.classList.add('film-strip-view');
-    this.statusLabel = this.contentElement.createChild('div', 'label');
+    this.statusLabel = this.contentElement.createChild('div', 'gray-info-message');
     this.reset();
   }
 
@@ -57,7 +58,7 @@ export class FilmStripView extends Common.ObjectWrapper.eventMixin<EventTypes, t
 
   setModel(filmStrip: Trace.Extras.FilmStrip.Data): void {
     this.#filmStrip = filmStrip;
-    this.zeroTime = Trace.Helpers.Timing.microSecondsToMilliseconds(filmStrip.zeroTime);
+    this.zeroTime = Trace.Helpers.Timing.microToMilli(filmStrip.zeroTime);
 
     if (!this.#filmStrip.frames.length) {
       this.reset();
@@ -67,7 +68,7 @@ export class FilmStripView extends Common.ObjectWrapper.eventMixin<EventTypes, t
   }
 
   createFrameElement(frame: Trace.Extras.FilmStrip.Frame): HTMLButtonElement {
-    const time = Trace.Helpers.Timing.microSecondsToMilliseconds(frame.screenshotEvent.ts);
+    const time = Trace.Helpers.Timing.microToMilli(frame.screenshotEvent.ts);
     const frameTime = i18n.TimeUtilities.millisToString(time - this.zeroTime);
     const element = document.createElement('button');
     element.classList.add('frame');
@@ -86,7 +87,8 @@ export class FilmStripView extends Common.ObjectWrapper.eventMixin<EventTypes, t
     element.addEventListener('focusin', this.onMouseEvent.bind(this, Events.FRAME_ENTER, time), false);
     element.addEventListener('focusout', this.onMouseEvent.bind(this, Events.FRAME_EXIT, time), false);
 
-    FilmStripView.setImageData(imageElement, frame.screenshotEvent.args.dataUri);
+    const imgData = Trace.Handlers.ModelHandlers.Screenshots.screenshotImageDataUri(frame.screenshotEvent);
+    FilmStripView.setImageData(imageElement, imgData);
     return element;
   }
 
@@ -117,7 +119,7 @@ export class FilmStripView extends Common.ObjectWrapper.eventMixin<EventTypes, t
   }
 
   reset(): void {
-    this.zeroTime = Trace.Types.Timing.MilliSeconds(0);
+    this.zeroTime = Trace.Types.Timing.Milli(0);
     this.contentElement.removeChildren();
     this.contentElement.appendChild(this.statusLabel);
   }
@@ -142,7 +144,7 @@ export interface EventTypes {
 interface DialogParsedTrace {
   source: 'Trace';
   index: number;
-  zeroTime: Trace.Types.Timing.MilliSeconds;
+  zeroTime: Trace.Types.Timing.Milli;
   frames: readonly Trace.Extras.FilmStrip.Frame[];
 }
 
@@ -159,7 +161,7 @@ export class Dialog {
       source: 'Trace',
       frames: filmStrip.frames,
       index: selectedFrameIndex,
-      zeroTime: Trace.Helpers.Timing.microSecondsToMilliseconds(filmStrip.zeroTime),
+      zeroTime: Trace.Helpers.Timing.microToMilli(filmStrip.zeroTime),
     };
     return new Dialog(data);
   }
@@ -172,13 +174,13 @@ export class Dialog {
     const nextButton = UI.UIUtils.createTextButton('\u25B6', this.onNextFrame.bind(this));
     UI.Tooltip.Tooltip.install(nextButton, i18nString(UIStrings.nextFrame));
     this.fragment = UI.Fragment.Fragment.build`
-      <x-widget flex=none margin=12px>
-        <x-hbox overflow=auto border='1px solid #ddd'>
+      <x-widget flex=none margin='var(--sys-size-7) var(--sys-size-8) var(--sys-size-8) var(--sys-size-8)'>
+        <x-hbox overflow=auto border='var(--sys-size-1) solid var(--sys-color-divider)'>
           <img $='image' data-film-strip-dialog-img style="max-height: 80vh; max-width: 80vw;"></img>
         </x-hbox>
-        <x-hbox x-center justify-content=center margin-top=10px>
+        <x-hbox x-center justify-content=center margin-top='var(--sys-size-6)'>
           ${prevButton}
-          <x-hbox $='time' margin=8px></x-hbox>
+          <x-hbox $='time' margin='var(--sys-size-5)'></x-hbox>
           ${nextButton}
         </x-hbox>
       </x-widget>
@@ -201,7 +203,7 @@ export class Dialog {
     return this.#data.frames.length;
   }
 
-  #zeroTime(): Trace.Types.Timing.MilliSeconds {
+  #zeroTime(): Trace.Types.Timing.Milli {
     return this.#data.zeroTime;
   }
 
@@ -270,11 +272,12 @@ export class Dialog {
 
   private render(): void {
     const frame = this.#data.frames[this.index];
-    const timestamp = Trace.Helpers.Timing.microSecondsToMilliseconds(frame.screenshotEvent.ts);
+    const timestamp = Trace.Helpers.Timing.microToMilli(frame.screenshotEvent.ts);
     this.fragment.$('time').textContent = i18n.TimeUtilities.millisToString(timestamp - this.#zeroTime());
     const image = (this.fragment.$('image') as HTMLImageElement);
     image.setAttribute('data-frame-index', this.index.toString());
-    FilmStripView.setImageData(image, frame.screenshotEvent.args.dataUri);
+    const imgData = Trace.Handlers.ModelHandlers.Screenshots.screenshotImageDataUri(frame.screenshotEvent);
+    FilmStripView.setImageData(image, imgData);
     this.resize();
   }
 }

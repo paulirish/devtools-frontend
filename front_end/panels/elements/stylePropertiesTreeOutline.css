@@ -8,6 +8,10 @@
   color: inherit;
 }
 
+.inactive-value:not(:hover,:focus,:focus-within) {
+  text-decoration: line-through;
+}
+
 .tree-outline {
   padding: 0;
 }
@@ -101,8 +105,15 @@
 ol:not(.tree-outline) {
   display: none;
   margin: 0;
-  padding-inline-start: 12px;
   list-style: none;
+}
+
+.tree-outline > ol {
+  padding-inline-start: 16px;
+
+  ol {
+    padding-left: 0;
+  }
 }
 
 ol.expanded {
@@ -130,6 +141,16 @@ input.enabled-button.small {
   }
 }
 
+devtools-icon.icon-link {
+  color: var(--text-link);
+  width: 13px;
+  height: 13px;
+
+  &:hover {
+    cursor: pointer;
+  }
+}
+
 .overloaded:not(.has-ignorable-error, .invalid-property-value),
 .inactive:not(.invalid-property-value),
 .disabled,
@@ -142,35 +163,6 @@ input.enabled-button.small {
 .inherited,
 .inactive-property {
   opacity: 50%;
-}
-
-.changed {
-  background-color: var(--sys-color-tertiary-container);
-
-  &::after {
-    content: "";
-    position: absolute;
-    left: -4px;
-    top: 0;
-    width: 2px;
-    height: 100%;
-    background-color: var(--sys-color-tertiary);
-  }
-}
-
-.copy {
-  display: none;
-
-  .changed:hover & {
-    position: absolute;
-    right: -4px;
-    top: 0;
-    bottom: 0;
-    margin: auto;
-    display: inline-block;
-    cursor: pointer;
-    transform: scale(0.9);
-  }
 }
 
 .hint-wrapper {
@@ -258,8 +250,15 @@ input.enabled-button.small {
   visibility: visible;
 }
 
-:host-context(.matched-styles) ol.expanded {
-  margin-left: 16px;
+:host-context(.matched-styles) {
+  ol.expanded {
+    margin-left: 16px;
+  }
+
+  :focus {
+    border-radius: var(--sys-size-2);
+    outline: var(--sys-size-2) solid var(--sys-color-state-focus-ring);
+  }
 }
 
 .devtools-link-styled-trim {
@@ -291,4 +290,15 @@ devtools-icon.open-in-animations-panel {
   &:hover {
     color: var(--icon-css-hover);
   }
+}
+
+.css-function-inline-block {
+  display: inline-block;
+  padding-left: 18px;  /* should match enabled-button width */
+  margin-left: -38px;  /* should match .webkit-css-property margin-left */
+  color: var(--app-color-element-sidebar-subtitle);
+}
+
+.tracing-anchor {
+  text-decoration: underline dotted var(--sys-color-token-meta);
 }

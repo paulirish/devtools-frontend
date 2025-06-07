@@ -19,7 +19,7 @@ import {ExtensionStorageItemsView} from './ExtensionStorageItemsView.js';
 import type {ExtensionStorage} from './ExtensionStorageModel.js';
 import type * as PreloadingHelper from './preloading/helper/helper.js';
 import resourcesPanelStyles from './resourcesPanel.css.js';
-import {StorageItemsView} from './StorageItemsView.js';
+import {StorageItemsToolbar} from './StorageItemsToolbar.js';
 
 let resourcesPanelInstance: ResourcesPanel;
 
@@ -33,11 +33,11 @@ export class ResourcesPanel extends UI.Panel.PanelWithSidebar {
   private domStorageView: DOMStorageItemsView|null;
   private extensionStorageView: ExtensionStorageItemsView|null;
   private cookieView: CookieItemsView|null;
-  private readonly emptyWidget: UI.EmptyWidget.EmptyWidget|null;
   private readonly sidebar: ApplicationPanelSidebar;
 
   private constructor() {
     super('resources');
+    this.registerRequiredCSS(resourcesPanelStyles);
 
     this.resourcesLastSelectedItemSetting =
         Common.Settings.Settings.instance().createSetting('resources-last-selected-element-path', []);
@@ -59,8 +59,6 @@ export class ResourcesPanel extends UI.Panel.PanelWithSidebar {
 
     this.cookieView = null;
 
-    this.emptyWidget = null;
-
     this.sidebar = new ApplicationPanelSidebar(this);
     this.sidebar.show(this.panelSidebarElement());
   }
@@ -81,7 +79,7 @@ export class ResourcesPanel extends UI.Panel.PanelWithSidebar {
       SourceFrame.ResourceSourceFrame.ResourceSourceFrame,
       SourceFrame.ImageView.ImageView,
       SourceFrame.FontView.FontView,
-      StorageItemsView,
+      StorageItemsToolbar,
     ];
     return viewClassesToClose.some(type => view instanceof type);
   }
@@ -144,13 +142,16 @@ export class ResourcesPanel extends UI.Panel.PanelWithSidebar {
     return view;
   }
 
-  showCategoryView(categoryName: string, categoryLink: Platform.DevToolsPath.UrlString|null): void {
+  showCategoryView(
+      categoryName: string, categoryHeadline: string, categoryDescription: string,
+      categoryLink: Platform.DevToolsPath.UrlString|null): void {
     if (!this.categoryView) {
       this.categoryView = new StorageCategoryView();
     }
     this.categoryView.element.setAttribute(
         'jslog', `${VisualLogging.pane().context(Platform.StringUtilities.toKebabCase(categoryName))}`);
-    this.categoryView.setHeader(categoryName);
+    this.categoryView.setHeadline(categoryHeadline);
+    this.categoryView.setText(categoryDescription);
     this.categoryView.setLink(categoryLink);
     this.showView(this.categoryView);
   }
@@ -195,7 +196,7 @@ export class ResourcesPanel extends UI.Panel.PanelWithSidebar {
   }
 
   clearCookies(target: SDK.Target.Target, cookieDomain: string): void {
-    const model = (target.model(SDK.CookieModel.CookieModel) as SDK.CookieModel.CookieModel | null);
+    const model = (target.model(SDK.CookieModel.CookieModel));
     if (!model) {
       return;
     }
@@ -204,10 +205,6 @@ export class ResourcesPanel extends UI.Panel.PanelWithSidebar {
         this.cookieView.refreshItems();
       }
     });
-  }
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([resourcesPanelStyles]);
   }
 }
 

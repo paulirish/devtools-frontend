@@ -1,6 +1,7 @@
 // Copyright (c) 2015 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
@@ -179,7 +180,7 @@ const UIStrings = {
    *@description Link to view all the Service Workers that have been registered.
    */
   seeAllRegistrations: 'See all registrations',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/application/ServiceWorkersView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 let throttleDisabledForDebugging = false;
@@ -201,6 +202,7 @@ export class ServiceWorkersView extends UI.Widget.VBox implements
 
   constructor() {
     super(true);
+    this.registerRequiredCSS(serviceWorkersViewStyles);
 
     // TODO(crbug.com/1156978): Replace UI.ReportView.ReportView with ReportView.ts web component.
     this.currentWorkersView = new UI.ReportView.ReportView(i18n.i18n.lockedString('Service workers'));
@@ -261,8 +263,8 @@ export class ServiceWorkersView extends UI.Widget.VBox implements
     this.updateListVisibility();
 
     const drawerChangeHandler = (event: Event): void => {
-      // @ts-ignore: No support for custom event listener
-      const isDrawerOpen = event.detail && event.detail.isDrawerOpen;
+      // @ts-expect-error: No support for custom event listener
+      const isDrawerOpen = event.detail?.isDrawerOpen;
       if (this.manager && !isDrawerOpen) {
         const {serviceWorkerNetworkRequestsPanelStatus: {isOpen, openedAt}} = this.manager;
         if (isOpen) {
@@ -472,12 +474,6 @@ export class ServiceWorkersView extends UI.Widget.VBox implements
   private updateListVisibility(): void {
     this.contentElement.classList.toggle('service-worker-list-empty', this.sections.size === 0);
   }
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([
-      serviceWorkersViewStyles,
-    ]);
-  }
 }
 
 export class Section {
@@ -496,7 +492,6 @@ export class Section {
   private sourceField: Element;
   private readonly statusField: Element;
   private readonly clientsField: Element;
-  private readonly linkifier: Components.Linkifier.Linkifier;
   private readonly clientInfoCache: Map<string, Protocol.Target.TargetInfo>;
   private readonly throttler: Common.Throttler.Throttler;
   private updateCycleField?: Element;
@@ -556,7 +551,6 @@ export class Section {
     this.createUpdateCycleField();
     this.maybeCreateRouterField();
 
-    this.linkifier = new Components.Linkifier.Linkifier();
     this.clientInfoCache = new Map();
     this.throttler = new Common.Throttler.Throttler(500);
   }
@@ -593,7 +587,7 @@ export class Section {
 
   private targetForVersionId(versionId: string): SDK.Target.Target|null {
     const version = this.manager.findVersion(versionId);
-    if (!version || !version.targetId) {
+    if (!version?.targetId) {
       return null;
     }
     return SDK.TargetManager.TargetManager.instance().targetById(version.targetId);
@@ -767,7 +761,7 @@ export class Section {
     const versions = this.registration.versionsByMode();
     const active = versions.get(SDK.ServiceWorkerManager.ServiceWorkerVersion.Modes.ACTIVE);
     const title = i18nString(UIStrings.routers);
-    if (active && active.routerRules && active.routerRules.length > 0) {
+    if (active?.routerRules && active.routerRules.length > 0) {
       // If there is at least one registered rule in the active version, append the router filed.
       if (!this.routerField) {
         this.routerField = this.wrapWidget(this.section.appendField(title));

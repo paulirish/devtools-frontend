@@ -13,8 +13,7 @@ const storedScrollPositions = new WeakMap<Element, {
 
 export class XWidget extends XElement {
   private visible: boolean;
-  private readonly shadowRootInternal!: DocumentFragment|null;
-  private defaultFocusedElement: Element|null;
+  defaultFocusedElement: Element|null;
   private elementsToRestoreScrollPositionsFor: Element[];
   private onShownCallback!: (() => void)|null;
   private onHiddenCallback!: (() => void)|null;
@@ -50,18 +49,6 @@ export class XWidget extends XElement {
 
   isShowing(): boolean {
     return this.visible;
-  }
-
-  setOnShown(callback: (() => void)|null): void {
-    this.onShownCallback = callback;
-  }
-
-  setOnHidden(callback: (() => void)|null): void {
-    this.onHiddenCallback = callback;
-  }
-
-  setOnResized(callback: (() => void)|null): void {
-    this.onResizedCallback = callback;
   }
 
   setElementsToRestoreScrollPositionsFor(elements: Element[]): void {

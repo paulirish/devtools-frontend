@@ -2,38 +2,32 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import type {ElementHandle, Page} from 'puppeteer-core';
+import {assert} from 'chai';
+import type {Page} from 'puppeteer-core';
 
 import type {UserFlow} from '../../../front_end/panels/recorder/models/Schema.js';
 import type * as Recorder from '../../../front_end/panels/recorder/recorder.js';
-import {openPanelViaMoreTools} from '../../../test/e2e/helpers/settings-helpers.js';
+import {openCommandMenu} from '../../../test/e2e/helpers/quick_open-helpers.js';
 import {
-  $,
-  click,
-  clickElement,
-  getBrowserAndPages,
-  getTestServerPort,
-  goToResource,
   platform,
-  timeout,
-  waitFor,
-  waitForAria,
+  selectOption,
 } from '../../../test/shared/helper.js';
-import {assertMatchesJSONSnapshot} from '../../../test/shared/snapshots.js';
+import {getBrowserAndPagesWrappers} from '../../shared/non_hosted_wrappers.js';
 
-const RECORDER_CONTROLLER_TAG_NAME = 'devtools-recorder-controller';
+const RECORDER_CONTROLLER_TAG_NAME = 'devtools-recorder-controller' as const;
 const TEST_RECORDING_NAME = 'New Recording';
 const ControlOrMeta = platform === 'mac' ? 'Meta' : 'Control';
 
-export async function getRecordingController() {
-  return (await waitFor(
-             RECORDER_CONTROLLER_TAG_NAME,
-             )) as unknown as ElementHandle<Recorder.RecorderController.RecorderController>;
+export async function getRecordingController(devToolsPage = getBrowserAndPagesWrappers().devToolsPage) {
+  return await devToolsPage.waitFor(
+      RECORDER_CONTROLLER_TAG_NAME,
+  );
 }
 
-export async function onRecordingStateChanged(): Promise<unknown> {
-  const view = await getRecordingController();
-  return view.evaluate(el => {
+export async function onRecordingStateChanged(devToolsPage = getBrowserAndPagesWrappers().devToolsPage):
+    Promise<unknown> {
+  const view = await getRecordingController(devToolsPage);
+  return await view.evaluate(el => {
     return new Promise(resolve => {
       el.addEventListener(
           'recordingstatechanged',
@@ -46,9 +40,9 @@ export async function onRecordingStateChanged(): Promise<unknown> {
   });
 }
 
-export async function onRecorderAttachedToTarget(): Promise<unknown> {
-  const {frontend} = getBrowserAndPages();
-  return frontend.evaluate(() => {
+export async function onRecorderAttachedToTarget(devToolsPage = getBrowserAndPagesWrappers().devToolsPage):
+    Promise<unknown> {
+  return await devToolsPage.evaluate(() => {
     return new Promise(resolve => {
       window.addEventListener('recorderAttachedToTarget', resolve, {
         once: true,
@@ -57,18 +51,17 @@ export async function onRecorderAttachedToTarget(): Promise<unknown> {
   });
 }
 
-export async function onReplayFinished(): Promise<unknown> {
-  const view = await getRecordingController();
-  return view.evaluate(el => {
+export async function onReplayFinished(devToolsPage = getBrowserAndPagesWrappers().devToolsPage): Promise<unknown> {
+  const view = await getRecordingController(devToolsPage);
+  return await view.evaluate(el => {
     return new Promise(resolve => {
       el.addEventListener('replayfinished', resolve, {once: true});
     });
   });
 }
 
-export async function enableUntrustedEventMode() {
-  const {frontend} = getBrowserAndPages();
-  await frontend.evaluate(`(async () => {
+export async function enableUntrustedEventMode(devToolsPage = getBrowserAndPagesWrappers().devToolsPage) {
+  await devToolsPage.evaluate(`(async () => {
     // TODO: have an explicit UI setting or perhaps a special event to configure this
     // instead of having a global setting.
     const Common = await import('./core/common/common.js');
@@ -76,19 +69,26 @@ export async function enableUntrustedEventMode() {
   })()`);
 }
 
-export async function enableAndOpenRecorderPanel(path: string) {
-  await goToResource(path);
-  await openPanelViaMoreTools('Recorder');
-  await waitFor(RECORDER_CONTROLLER_TAG_NAME);
+export async function enableAndOpenRecorderPanel(
+    path: string, devToolsPage = getBrowserAndPagesWrappers().devToolsPage,
+    inspectedPage = getBrowserAndPagesWrappers().inspectedPage
+
+) {
+  await inspectedPage.goToResource(path);
+  await openCommandMenu(devToolsPage);
+  await devToolsPage.typeText('Show Recorder');
+  await devToolsPage.page.keyboard.press('Enter');
+  await devToolsPage.waitFor(RECORDER_CONTROLLER_TAG_NAME);
 }
 
-async function createRecording(name: string, selectorAttribute?: string) {
-  const newRecordingButton = await waitForAria('Create a new recording');
+async function createRecording(
+    name: string, selectorAttribute?: string, devToolsPage = getBrowserAndPagesWrappers().devToolsPage) {
+  const newRecordingButton = await devToolsPage.waitForAria('Create recording');
   await newRecordingButton.click();
-  const input = await waitForAria('RECORDING NAME');
+  const input = await devToolsPage.waitForAria('RECORDING NAME');
   await input.type(name);
   if (selectorAttribute) {
-    const input = await waitForAria(
+    const input = await devToolsPage.waitForAria(
         'SELECTOR ATTRIBUTE Learn more',
     );
     await input.type(selectorAttribute);
@@ -96,27 +96,25 @@ async function createRecording(name: string, selectorAttribute?: string) {
 }
 
 export async function createAndStartRecording(
-    name: string,
-    selectorAttribute?: string,
-) {
-  await createRecording(name, selectorAttribute);
-  const onRecordingStarted = onRecordingStateChanged();
-  await click('devtools-control-button');
-  await waitFor('devtools-recording-view');
+    name?: string, selectorAttribute?: string, devToolsPage = getBrowserAndPagesWrappers().devToolsPage) {
+  await createRecording(name ?? TEST_RECORDING_NAME, selectorAttribute, devToolsPage);
+  const onRecordingStarted = onRecordingStateChanged(devToolsPage);
+  await devToolsPage.click('devtools-control-button');
+  await devToolsPage.waitFor('devtools-recording-view');
   await onRecordingStarted;
 }
 
-export async function changeNetworkConditions(condition: string) {
-  const {frontend} = getBrowserAndPages();
-  await frontend.waitForSelector('pierce/#tab-network');
-  await frontend.click('pierce/#tab-network');
-  await frontend.waitForSelector('pierce/[aria-label="Throttling"]');
-  await frontend.select('pierce/[aria-label="Throttling"] select', condition);
+export async function changeNetworkConditions(
+    condition: string, devToolsPage = getBrowserAndPagesWrappers().devToolsPage) {
+  await devToolsPage.page.waitForSelector('pierce/#tab-network');
+  await devToolsPage.click('pierce/#tab-network');
+  await devToolsPage.page.waitForSelector('pierce/select[aria-label="Throttling"]');
+  await devToolsPage.page.select('pierce/select[aria-label="Throttling"]', condition);
 }
 
-export async function openRecorderPanel() {
-  await click('[aria-label="Recorder"]');
-  await waitFor('devtools-recording-view');
+export async function openRecorderPanel(devToolsPage = getBrowserAndPagesWrappers().devToolsPage) {
+  await devToolsPage.click('[aria-label="Recorder"]');
+  await devToolsPage.waitFor('devtools-recording-view');
 }
 
 interface StartRecordingOptions {
@@ -131,9 +129,9 @@ export async function startRecording(
       networkCondition: '',
       untrustedEvents: false,
     },
+    devToolsPage = getBrowserAndPagesWrappers().devToolsPage,
 ) {
-  const {frontend} = getBrowserAndPages();
-  await frontend.bringToFront();
+  await devToolsPage.bringToFront();
   if (options.networkCondition) {
     await changeNetworkConditions(options.networkCondition);
   }
@@ -144,12 +142,11 @@ export async function startRecording(
   await createAndStartRecording(TEST_RECORDING_NAME, options.selectorAttribute);
 }
 
-export async function stopRecording(): Promise<unknown> {
-  const {frontend} = getBrowserAndPages();
-  await frontend.bringToFront();
-  await raf(frontend);
-  const onRecordingStopped = onRecordingStateChanged();
-  await click('aria/End recording');
+export async function stopRecording(devToolsPage = getBrowserAndPagesWrappers().devToolsPage): Promise<unknown> {
+  await devToolsPage.bringToFront();
+  await raf(devToolsPage.page);
+  const onRecordingStopped = onRecordingStateChanged(devToolsPage);
+  await devToolsPage.click('aria/End recording');
   return await onRecordingStopped;
 }
 
@@ -160,88 +157,101 @@ interface RecordingSnapshotOptions {
    * @defaultValue `false`
    */
   offsets?: boolean;
+  /**
+   * @defaultValue `true`
+   */
+  expectCommon?: boolean;
+  resource?: string;
 }
 
-const preprocessRecording = (
+export const processAndVerifyBaseRecording = (
     recording: unknown,
     options: RecordingSnapshotOptions = {},
     ) => {
-  let value = JSON.stringify(recording).replaceAll(
-      `:${getTestServerPort()}`,
-      ':<test-port>',
-  );
+  const {
+    offsets = false,
+    expectCommon = true,
+    resource = 'recorder/recorder.html',
+  } = options;
+
+  let value = JSON.stringify(recording)
+                  .replaceAll(
+                      /https:\/\/localhost:\d+/g,
+                      'https://localhost:<test-port>',
+                      )
+                  .replaceAll(
+                      /https:\/\/devtools.oopif.test:\d+/g,
+                      'https://devtools.oopif.test:<test-port>',
+                  );
   value = value.replaceAll('\u200b', '');
-  if (!options.offsets) {
+  if (!offsets) {
     value = value.replaceAll(
         /,?"(?:offsetY|offsetX)":[0-9]+(?:\.[0-9]+)?/g,
         '',
     );
   }
-  return JSON.parse(value.trim());
+
+  const parsed = JSON.parse(value.trim());
+  if (expectCommon) {
+    assert.strictEqual(
+        parsed.title,
+        'New Recording',
+    );
+    delete parsed.title;
+    assert.deepEqual(
+        parsed.steps[0],
+        {
+          type: 'setViewport',
+          width: 1280,
+          height: 720,
+          deviceScaleFactor: 1,
+          isMobile: false,
+          hasTouch: false,
+          isLandscape: false
+        },
+    );
+    assert.deepEqual(
+        parsed.steps[1],
+        {
+          type: 'navigate',
+          url: `https://localhost:<test-port>/test/e2e/resources/${resource}`,
+          assertedEvents: [{
+            type: 'navigation',
+            url: `https://localhost:<test-port>/test/e2e/resources/${resource}`,
+            title: '',
+          }]
+        },
+    );
+
+    parsed.steps = parsed.steps.slice(2);
+  }
+
+  return parsed;
 };
 
-export const assertRecordingMatchesSnapshot = (
-    recording: unknown,
-    options: RecordingSnapshotOptions = {},
-    ) => {
-  assertMatchesJSONSnapshot(preprocessRecording(recording, options));
-};
-
-async function setCode(flow: string) {
-  const view = await getRecordingController();
+async function setCode(flow: string, devToolsPage = getBrowserAndPagesWrappers().devToolsPage) {
+  const view = await getRecordingController(devToolsPage);
   await view.evaluate((el, flow) => {
     el.dispatchEvent(new CustomEvent('setrecording', {detail: flow}));
   }, flow);
 }
 
-async function waitForDialogAnimationEnd(root?: ElementHandle) {
-  const ANIMATION_TIMEOUT = 2000;
-  const dialog = await waitFor('dialog[open]', root);
-  const animationPromise = dialog.evaluate((dialog: Element) => {
-    return new Promise<void>(resolve => {
-      dialog.addEventListener('animationend', () => resolve(), {once: true});
-    });
-  });
-  await Promise.race([animationPromise, timeout(ANIMATION_TIMEOUT)]);
-}
-
-export async function clickSelectButtonItem(itemLabel: string, root: string) {
-  const selectMenu = await waitFor(root);
-  const selectMenuButton = await waitFor(
-      'devtools-select-menu-button',
+export async function clickSelectButtonItem(
+    itemLabel: string, root: string, devToolsPage = getBrowserAndPagesWrappers().devToolsPage) {
+  const selectMenu = await devToolsPage.waitFor(root);
+  const selectMenuButton = await devToolsPage.waitFor(
+      'select',
       selectMenu,
   );
-  const selectMenuButtonArrow = await waitFor('#arrow', selectMenuButton);
-  const animationEndPromise = waitForDialogAnimationEnd();
-  await clickElement(selectMenuButtonArrow);
-  await animationEndPromise;
 
-  const selectMenuItems = await selectMenu.$$('pierce/devtools-menu-item');
-  const selectMenuItemIndex =
-      await Promise
-          .all(
-              selectMenuItems.map(
-                  selectMenuItem => selectMenuItem.evaluate(element => element.textContent?.trim()),
-                  ),
-              )
-          .then(
-              elements => elements.findIndex(elementText => elementText === itemLabel),
-          );
+  void selectOption(await selectMenuButton.toElement('select'), itemLabel);
 
-  if (selectMenuItemIndex === -1) {
-    throw new Error(
-        `Select menu item for label "${itemLabel}" is not found in "${root}"`,
-    );
-  }
-
-  await clickElement(selectMenuItems[selectMenuItemIndex]);
-  const button = await waitFor('devtools-button', selectMenu);
-  await clickElement(button);
+  await devToolsPage.click('devtools-button', {root: selectMenu});
 }
 
 export async function setupRecorderWithScript(
     script: UserFlow,
-    path: string = 'recorder/recorder.html',
+    path = 'recorder/recorder.html',
     ): Promise<void> {
   await enableAndOpenRecorderPanel(path);
   await createAndStartRecording(script.title);
@@ -251,7 +261,7 @@ export async function setupRecorderWithScript(
 
 export async function setupRecorderWithScriptAndReplay(
     script: UserFlow,
-    path: string = 'recorder/recorder.html',
+    path = 'recorder/recorder.html',
     ): Promise<void> {
   await setupRecorderWithScript(script, path);
   const onceFinished = onReplayFinished();
@@ -259,21 +269,23 @@ export async function setupRecorderWithScriptAndReplay(
   await onceFinished;
 }
 
-export async function getCurrentRecording(): Promise<unknown> {
-  const {frontend} = getBrowserAndPages();
-  await frontend.bringToFront();
-  const controller = await $(RECORDER_CONTROLLER_TAG_NAME);
+export async function getCurrentRecording(
+    devToolsPage = getBrowserAndPagesWrappers().devToolsPage,
+    ): Promise<UserFlow> {
+  await devToolsPage.bringToFront();
+  const controller = await devToolsPage.$(RECORDER_CONTROLLER_TAG_NAME);
   const recording = (await controller?.evaluate(
-                        el => JSON.stringify((el as unknown as {getUserFlow(): unknown}).getUserFlow()),
-                        )) as string;
+      el => JSON.stringify(el.getUserFlow()),
+      ));
   return JSON.parse(recording);
 }
 
 export async function startOrStopRecordingShortcut(
-    execute: 'page'|'frontend' = 'frontend',
+    execute: 'inspectedPage'|'devToolsPage' = 'devToolsPage',
+    devToolsPage = getBrowserAndPagesWrappers().devToolsPage,
+    inspectedPage = getBrowserAndPagesWrappers().inspectedPage,
 ) {
-  const {target, frontend} = getBrowserAndPages();
-  const executeOn = execute === 'frontend' ? frontend : target;
+  const executeOn = execute === 'devToolsPage' ? devToolsPage.page : inspectedPage.page;
   const onRecordingStarted = onRecordingStateChanged();
   await executeOn.bringToFront();
   await executeOn.keyboard.down(ControlOrMeta);
@@ -281,7 +293,7 @@ export async function startOrStopRecordingShortcut(
   await executeOn.keyboard.up(ControlOrMeta);
   await executeOn.keyboard.up('e');
 
-  await waitFor('devtools-recording-view');
+  await devToolsPage.waitFor('devtools-recording-view');
   return await onRecordingStarted;
 }
 
@@ -295,22 +307,24 @@ export async function startRecordingViaShortcut(path: string) {
   await startOrStopRecordingShortcut();
 }
 
-export async function replayShortcut() {
-  const {frontend} = getBrowserAndPages();
-  await frontend.bringToFront();
-  await frontend.keyboard.down(ControlOrMeta);
-  await frontend.keyboard.down('Enter');
-  await frontend.keyboard.up(ControlOrMeta);
-  await frontend.keyboard.up('Enter');
+export async function replayShortcut(
+    devToolsPage = getBrowserAndPagesWrappers().devToolsPage,
+) {
+  await devToolsPage.bringToFront();
+  await devToolsPage.page.keyboard.down(ControlOrMeta);
+  await devToolsPage.page.keyboard.down('Enter');
+  await devToolsPage.page.keyboard.up(ControlOrMeta);
+  await devToolsPage.page.keyboard.up('Enter');
 }
 
-export async function toggleCodeView() {
-  const {frontend} = getBrowserAndPages();
-  await frontend.bringToFront();
-  await frontend.keyboard.down(ControlOrMeta);
-  await frontend.keyboard.down('b');
-  await frontend.keyboard.up(ControlOrMeta);
-  await frontend.keyboard.up('b');
+export async function toggleCodeView(
+    devToolsPage = getBrowserAndPagesWrappers().devToolsPage,
+) {
+  await devToolsPage.bringToFront();
+  await devToolsPage.page.keyboard.down(ControlOrMeta);
+  await devToolsPage.page.keyboard.down('b');
+  await devToolsPage.page.keyboard.up(ControlOrMeta);
+  await devToolsPage.page.keyboard.up('b');
 }
 
 export async function raf(page: Page): Promise<void> {

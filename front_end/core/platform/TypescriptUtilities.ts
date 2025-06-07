@@ -13,7 +13,7 @@ export function assertNotNullOrUndefined<T>(val: T, message?: string): asserts v
   }
 }
 
-export function assertNever(type: never, message: string): never {
+export function assertNever(_type: never, message: string): never {
   throw new Error(message);
 }
 
@@ -75,4 +75,12 @@ export type NoUnion<T> = [T] extends [IntersectionFromUnion<T>] ? T : never;
 
 export type RecursivePartial<T> = {
   [P in keyof T]?: RecursivePartial<T[P]>;
+};
+
+/**
+ * Note this does not recursively
+ * make Array items readonly at the moment
+ */
+export type RecursiveReadonly<T> = {
+  [P in keyof T]: Readonly<RecursiveReadonly<T[P]>>;
 };

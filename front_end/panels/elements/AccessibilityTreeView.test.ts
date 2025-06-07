@@ -4,6 +4,7 @@
 
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
+import {renderElementIntoDOM} from '../../testing/DOMHelpers.js';
 import {createTarget, stubNoopSettings} from '../../testing/EnvironmentHelpers.js';
 import {describeWithMockConnection} from '../../testing/MockConnection.js';
 import * as TreeOutline from '../../ui/components/tree_outline/tree_outline.js';
@@ -26,7 +27,8 @@ describeWithMockConnection('AccessibilityTreeView', () => {
 
   const updatesUiOnEvent = (inScope: boolean) => async () => {
     SDK.TargetManager.TargetManager.instance().setScopeTarget(inScope ? target : null);
-    new Elements.AccessibilityTreeView.AccessibilityTreeView(toggleButoon, treeComponent);
+    const view = new Elements.AccessibilityTreeView.AccessibilityTreeView(toggleButoon, treeComponent);
+    renderElementIntoDOM(view);
 
     const model = target.model(SDK.AccessibilityModel.AccessibilityModel);
     const treeComponentDataSet = sinon.spy(treeComponent, 'data', ['set']);
@@ -40,6 +42,7 @@ describeWithMockConnection('AccessibilityTreeView', () => {
     });
     await new Promise<void>(resolve => queueMicrotask(resolve));
     assert.strictEqual(treeComponentDataSet.set.called, inScope);
+    view.detach();
   };
 
   it('updates UI on in scope update event', updatesUiOnEvent(true));

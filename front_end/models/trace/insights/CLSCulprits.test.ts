@@ -10,7 +10,7 @@ import * as Types from '../types/types.js';
 import {Models} from './insights.js';
 
 // Root cause invalidation window.
-const INVALIDATION_WINDOW = Helpers.Timing.secondsToMicroseconds(Types.Timing.Seconds(0.5));
+const INVALIDATION_WINDOW = Helpers.Timing.secondsToMicro(Types.Timing.Seconds(0.5));
 
 describeWithEnvironment('CLSCulprits', function() {
   describe('non composited animations', function() {
@@ -46,8 +46,8 @@ describeWithEnvironment('CLSCulprits', function() {
       ];
       assert.deepEqual(animationFailures, expected);
     });
-    // Flaky test.
-    it.skip('[crbug.com/370382177]: gets the correct non composited animations for shift', async function() {
+
+    it('gets the correct non composited animations for shift', async function() {
       const {data, insights} = await processTrace(this, 'non-composited-animation-shift.json.gz');
       const firstNav = getFirstOrError(data.Meta.navigationsByNavigationId.values());
       const insight = getInsightOrError('CLSCulprits', insights, firstNav);
@@ -67,7 +67,10 @@ describeWithEnvironment('CLSCulprits', function() {
       const expectedWithShift: Models.CLSCulprits.NoncompositedAnimationFailure[] = [
         {
           name: 'simple-animation',
-          failureReasons: [Models.CLSCulprits.AnimationFailureReasons.UNSUPPORTED_CSS_PROPERTY],
+          failureReasons: [
+            Models.CLSCulprits.AnimationFailureReasons.TARGET_HAS_INVALID_COMPOSITING_STATE,
+            Models.CLSCulprits.AnimationFailureReasons.UNSUPPORTED_CSS_PROPERTY,
+          ],
           unsupportedProperties: ['height', 'color', 'top'],
           animation: simpleAnimation,
         },
@@ -77,13 +80,19 @@ describeWithEnvironment('CLSCulprits', function() {
       const expectedAll: Models.CLSCulprits.NoncompositedAnimationFailure[] = [
         {
           name: 'simple-animation',
-          failureReasons: [Models.CLSCulprits.AnimationFailureReasons.UNSUPPORTED_CSS_PROPERTY],
+          failureReasons: [
+            Models.CLSCulprits.AnimationFailureReasons.TARGET_HAS_INVALID_COMPOSITING_STATE,
+            Models.CLSCulprits.AnimationFailureReasons.UNSUPPORTED_CSS_PROPERTY
+          ],
           unsupportedProperties: ['height', 'color', 'top'],
           animation: simpleAnimation,
         },
         {
           name: 'top',
-          failureReasons: [Models.CLSCulprits.AnimationFailureReasons.UNSUPPORTED_CSS_PROPERTY],
+          failureReasons: [
+            Models.CLSCulprits.AnimationFailureReasons.TARGET_HAS_INVALID_COMPOSITING_STATE,
+            Models.CLSCulprits.AnimationFailureReasons.UNSUPPORTED_CSS_PROPERTY
+          ],
           unsupportedProperties: ['top'],
           animation: top,
         },
@@ -195,11 +204,13 @@ describeWithEnvironment('CLSCulprits', function() {
         const shift1 = layoutShiftEvents.at(0);
         assert.isOk(shift1);
         // Root cause should match the nodeId of the unsized images events.
-        assert.strictEqual(shift1[1].unsizedImages[0], unsizedImages[0].args.data.nodeId);
+        assert.strictEqual(shift1[1].unsizedImages[0].backendNodeId, unsizedImages[0].args.data.nodeId);
+        assert.isDefined(shift1[1].unsizedImages[0].paintImageEvent);
 
         const shift2 = layoutShiftEvents.at(1);
         assert.isOk(shift2);
-        assert.strictEqual(shift2[1].unsizedImages[0], unsizedImages[1].args.data.nodeId);
+        assert.strictEqual(shift2[1].unsizedImages[0].backendNodeId, unsizedImages[1].args.data.nodeId);
+        assert.isDefined(shift2[1].unsizedImages[0].paintImageEvent);
       });
     });
   });

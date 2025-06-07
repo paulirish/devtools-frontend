@@ -6,19 +6,20 @@ import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
+import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as PublicExtensions from '../../models/extensions/extensions.js';
 import type * as Trace from '../../models/trace/trace.js';
+import * as PanelCommon from '../../panels/common/common.js';
 import * as Emulation from '../../panels/emulation/emulation.js';
-import * as Timeline from '../../panels/timeline/timeline.js';
 import * as Tracing from '../../services/tracing/tracing.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
 import type * as Dialogs from '../../ui/components/dialogs/dialogs.js';
 import * as ComponentHelpers from '../../ui/components/helpers/helpers.js';
 import type * as Menus from '../../ui/components/menus/menus.js';
 import * as UI from '../../ui/legacy/legacy.js';
-import * as LitHtml from '../../ui/lit-html/lit-html.js';
+import * as Lit from '../../ui/lit/lit.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import * as Components from './components/components.js';
@@ -31,14 +32,15 @@ import * as Actions from './recorder-actions/recorder-actions.js';
 import recorderControllerStyles from './recorderController.css.js';
 import * as Events from './RecorderEvents.js';
 
-const {html, Decorators, LitElement} = LitHtml;
+// TODO(crbug.com/391381439): Fully migrate off of Constructable Stylesheets.
+const {html, Decorators, LitElement} = Lit;
 const {customElement, state} = Decorators;
 
 const UIStrings = {
   /**
    * @description The title of the button that leads to a page for creating a new recording.
    */
-  createRecording: 'Create a new recording',
+  createRecording: 'Create recording',
   /**
    * @description The title of the button that allows importing a recording.
    */
@@ -67,7 +69,7 @@ const UIStrings = {
   /**
    * @description The title of the button that opens a menu with various options of exporting a recording to file.
    */
-  exportRecording: 'Export',
+  exportRecording: 'Export recording',
   /**
    * @description The title of shortcut for starting and stopping recording.
    */
@@ -104,12 +106,46 @@ const UIStrings = {
    * @description The button label that leads to the feedback form for Recorder.
    */
   sendFeedback: 'Send feedback',
-};
+  /**
+   * @description The header of the start page in the Recorder panel.
+   */
+  header: 'Nothing recorded yet',
+  /**
+   * @description Text to explain the usage of the recorder panel.
+   */
+  recordingDescription: 'Use recordings to create automated end-to-end tests or performance traces.',
+  /**
+   * @description Link text to forward to a documentation page on the recorder.
+   */
+  learnMore: 'Learn more',
+  /**
+   *@description Headline of warning shown to users when users import a recording into DevTools Recorder.
+   */
+  doYouTrustThisCode: 'Do you trust this recording?',
+  /**
+   *@description Warning shown to users when imports code into DevTools Recorder.
+   *@example {allow importing} PH1
+   */
+  doNotImport:
+      'Don\'t import recordings you do not understand or have not reviewed yourself into DevTools. This could allow attackers to steal your identity or take control of your computer. Please type \'\'{PH1}\'\' below to allow importing.',
+  /**
+   *@description Text a user needs to type in order to confirm that they
+   *are aware of the danger of import code into the DevTools Recorder.
+   */
+  allowImporting: 'allow importing',
+  /**
+   *@description Input box placeholder which instructs the user to type 'allow importing' into the input box.
+   *@example {allow importing} PH1
+   */
+  typeAllowImporting: 'Type \'\'{PH1}\'\'',
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/recorder/RecorderController.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 const GET_EXTENSIONS_MENU_ITEM = 'get-extensions-link';
 const GET_EXTENSIONS_URL = 'https://goo.gle/recorder-extension-list' as Platform.DevToolsPath.UrlString;
+const RECORDER_EXPLANATION_URL = 'https://developer.chrome.com/docs/devtools/recorder';
+const FEEDBACK_URL = 'https://goo.gle/recorder-feedback' as Platform.DevToolsPath.UrlString;
 
 declare global {
   interface HTMLElementTagNameMap {
@@ -163,8 +199,6 @@ const CONVERTER_ID_TO_METRIC: Record<string, Host.UserMetrics.RecordingExported|
 
 @customElement('devtools-recorder-controller')
 export class RecorderController extends LitElement {
-  static override readonly styles = [recorderControllerStyles];
-
   @state() declare private currentRecordingSession?: Models.RecordingSession.RecordingSession;
   @state() declare private currentRecording: StoredRecording|undefined;
   @state() declare private currentStep?: Models.Schema.Step;
@@ -195,9 +229,9 @@ export class RecorderController extends LitElement {
   @state() declare private exportMenuExpanded: boolean;
   #exportMenuButton: Buttons.Button.Button|undefined;
 
-  #stepBreakpointIndexes: Set<number> = new Set();
+  #stepBreakpointIndexes = new Set<number>();
 
-  #builtInConverters: Readonly<Converters.Converter.Converter[]>;
+  #builtInConverters: readonly Converters.Converter.Converter[];
   @state() declare private extensionConverters: Converters.Converter.Converter[];
   @state() declare private replayExtensions: Extensions.ExtensionManager.Extension[];
 
@@ -205,6 +239,11 @@ export class RecorderController extends LitElement {
 
   #recorderSettings = new Models.RecorderSettings.RecorderSettings();
   #shortcutHelper = new Models.RecorderShortcutHelper.RecorderShortcutHelper();
+
+  #disableRecorderImportWarningSetting = Common.Settings.Settings.instance().createSetting(
+      'disable-recorder-import-warning', false, Common.Settings.SettingStorageType.SYNCED);
+  #selfXssWarningDisabledSetting = Common.Settings.Settings.instance().createSetting(
+      'disable-self-xss-warning', false, Common.Settings.SettingStorageType.SYNCED);
 
   constructor() {
     super();
@@ -294,7 +333,7 @@ export class RecorderController extends LitElement {
         /* chunkSize */ 10000000);
     const success = await reader.read(outputStream);
     if (!success) {
-      throw reader.error();
+      throw reader.error() ?? new Error('Unknown');
     }
 
     let flow: Models.Schema.UserFlow|undefined;
@@ -313,7 +352,7 @@ export class RecorderController extends LitElement {
     this.#setCurrentRecording(recording);
   }
 
-  getSectionsForTesting(): Array<Models.Section.Section>|undefined {
+  getSectionsForTesting(): Models.Section.Section[]|undefined {
     return this.sections;
   }
 
@@ -437,7 +476,7 @@ export class RecorderController extends LitElement {
       this.viewDescriptor = undefined;
     }
     if (event.data.extension) {
-      return this.#onPlayViaExtension(event.data.extension);
+      return await this.#onPlayViaExtension(event.data.extension);
     }
     Host.userMetrics.recordingReplayStarted(
         event.data.targetPanel !== Components.RecordingView.TargetPanel.DEFAULT ?
@@ -496,6 +535,8 @@ export class RecorderController extends LitElement {
       } else {
         Host.userMetrics.recordingReplayFinished(Host.UserMetrics.RecordingReplayFinished.OTHER_ERROR);
       }
+      // Dispatch an event for e2e testing.
+      this.dispatchEvent(new Events.ReplayFinishedEvent());
     });
 
     this.recordingPlayer.addEventListener(Models.RecordingPlayer.Events.DONE, () => {
@@ -548,10 +589,10 @@ export class RecorderController extends LitElement {
       this.#replayState.isPlaying = false;
       this.recordingPlayer = undefined;
       await UI.InspectorView.InspectorView.instance().showPanel(event.data?.targetPanel as string);
-      switch (event.data?.targetPanel) {
-        case Components.RecordingView.TargetPanel.PERFORMANCE_PANEL:
-          Timeline.TimelinePanel.TimelinePanel.instance().loadFromEvents(events as Trace.Types.Events.Event[]);
-          break;
+      if (event.data?.targetPanel === Components.RecordingView.TargetPanel.PERFORMANCE_PANEL) {
+        // Note: this is not passing any metadata to the Performance panel.
+        const trace = new SDK.TraceObject.TraceObject(events as Trace.Types.Events.Event[]);
+        void Common.Revealer.reveal(trace);
       }
     }
   }
@@ -949,11 +990,43 @@ export class RecorderController extends LitElement {
         ?.click();
   }
 
-  #onImportRecording(event: Event): void {
+  async #acknowledgeImportNotice(): Promise<boolean> {
+    if (this.#disableRecorderImportWarningSetting.get()) {
+      return true;
+    }
+
+    if (Root.Runtime.Runtime.queryParam('isChromeForTesting') ||
+        Root.Runtime.Runtime.queryParam('disableSelfXssWarnings') || this.#selfXssWarningDisabledSetting.get()) {
+      return true;
+    }
+
+    const result = await PanelCommon.TypeToAllowDialog.show({
+      jslogContext: {
+        input: 'confirm-import-recording-input',
+        dialog: 'confirm-import-recording-dialog',
+      },
+      message: i18nString(UIStrings.doNotImport, {PH1: i18nString(UIStrings.allowImporting)}),
+      header: i18nString(UIStrings.doYouTrustThisCode),
+      typePhrase: i18nString(UIStrings.allowImporting),
+      inputPlaceholder: i18nString(UIStrings.typeAllowImporting, {PH1: i18nString(UIStrings.allowImporting)}),
+    });
+
+    if (result) {
+      this.#disableRecorderImportWarningSetting.set(true);
+    }
+
+    return result;
+  }
+
+  async #onImportRecording(event: Event): Promise<void> {
     event.stopPropagation();
+
     this.#clearError();
-    this.#fileSelector = UI.UIUtils.createFileSelectorElement(this.#importFile.bind(this));
-    this.#fileSelector.click();
+
+    if (await this.#acknowledgeImportNotice()) {
+      this.#fileSelector = UI.UIUtils.createFileSelectorElement(this.#importFile.bind(this));
+      this.#fileSelector.click();
+    }
   }
 
   async #onPlayRecordingByName(event: Components.RecordingListView.PlayRecordingEvent): Promise<void> {
@@ -1038,31 +1111,35 @@ export class RecorderController extends LitElement {
   }
 
   #getShortcutsInfo(): Dialogs.ShortcutDialog.Shortcut[] {
-    const getBindingForAction = (action: Actions.RecorderActions): string[][] => {
+    const getBindingForAction = (action: Actions.RecorderActions): Dialogs.ShortcutDialog.ShortcutPart[][] => {
       const shortcuts = UI.ShortcutRegistry.ShortcutRegistry.instance().shortcutsForAction(action);
-      const shortcutsWithSplitBindings =
-          shortcuts.map(shortcut => shortcut.title().split(/[\s+]+/).map(word => word.trim()));
+      const shortcutsWithSplitBindings = shortcuts.map(shortcut => shortcut.title().split(/[\s+]+/).map(word => {
+        return {key: word.trim()};
+      }));
       return shortcutsWithSplitBindings;
     };
 
     return [
       {
         title: i18nString(UIStrings.startStopRecording),
-        bindings: getBindingForAction(Actions.RecorderActions.START_RECORDING),
+        rows: getBindingForAction(Actions.RecorderActions.START_RECORDING),
       },
       {
         title: i18nString(UIStrings.replayRecording),
-        bindings: getBindingForAction(Actions.RecorderActions.REPLAY_RECORDING),
+        rows: getBindingForAction(Actions.RecorderActions.REPLAY_RECORDING),
       },
-      {title: i18nString(UIStrings.copyShortcut), bindings: Host.Platform.isMac() ? [['⌘', 'C']] : [['Ctrl', 'C']]},
+      {
+        title: i18nString(UIStrings.copyShortcut),
+        rows: Host.Platform.isMac() ? [[{key: '⌘'}, {key: 'C'}]] : [[{key: 'Ctrl'}, {key: 'C'}]]
+      },
       {
         title: i18nString(UIStrings.toggleCode),
-        bindings: getBindingForAction(Actions.RecorderActions.TOGGLE_CODE_VIEW),
+        rows: getBindingForAction(Actions.RecorderActions.TOGGLE_CODE_VIEW),
       },
     ];
   }
 
-  #renderCurrentPage(): LitHtml.TemplateResult {
+  #renderCurrentPage(): Lit.TemplateResult {
     switch (this.currentPage) {
       case Pages.START_PAGE:
         return this.#renderStartPage();
@@ -1075,7 +1152,7 @@ export class RecorderController extends LitElement {
     }
   }
 
-  #renderAllRecordingsPage(): LitHtml.TemplateResult {
+  #renderAllRecordingsPage(): Lit.TemplateResult {
     const recordings = this.#storage.getRecordings();
     // clang-format off
     return html`
@@ -1095,17 +1172,22 @@ export class RecorderController extends LitElement {
     // clang-format on
   }
 
-  #renderStartPage(): LitHtml.TemplateResult {
+  #renderStartPage(): Lit.TemplateResult {
     // clang-format off
     return html`
-      <devtools-start-view
-        @createrecording=${this.#onCreateNewRecording}
-      ></devtools-start-view>
+      <div class="empty-state" jslog=${VisualLogging.section().context('start-view')}>
+        <div class="empty-state-header">${i18nString(UIStrings.header)}</div>
+        <div class="empty-state-description">
+          <span>${i18nString(UIStrings.recordingDescription)}</span>
+          ${UI.XLink.XLink.create(RECORDER_EXPLANATION_URL, i18nString(UIStrings.learnMore), 'x-link', undefined, 'learn-more')}
+        </div>
+        <devtools-button .variant=${Buttons.Button.Variant.TONAL} jslogContext=${Actions.RecorderActions.CREATE_RECORDING} @click=${this.#onCreateNewRecording}>${i18nString(UIStrings.createRecording)}</devtools-button>
+      </div>
     `;
     // clang-format on
   }
 
-  #renderRecordingPage(): LitHtml.TemplateResult {
+  #renderRecordingPage(): Lit.TemplateResult {
     // clang-format off
     return html`
       <devtools-recording-view
@@ -1152,7 +1234,7 @@ export class RecorderController extends LitElement {
     // clang-format on
   }
 
-  #renderCreateRecordingPage(): LitHtml.TemplateResult {
+  #renderCreateRecordingPage(): Lit.TemplateResult {
     // clang-format off
     return html`
       <devtools-create-recording-view
@@ -1185,7 +1267,7 @@ export class RecorderController extends LitElement {
     this.exportMenuExpanded = false;
   }
 
-  protected override render(): LitHtml.TemplateResult {
+  protected override render(): Lit.TemplateResult {
     const recordings = this.#storage.getRecordings();
     const selectValue: string = this.currentRecording ? this.currentRecording.storageName : this.currentPage;
     // clang-format off
@@ -1209,6 +1291,7 @@ export class RecorderController extends LitElement {
     ];
 
     return html`
+        <style>${recorderControllerStyles}</style>
         <div class="wrapper">
           <div class="header" jslog=${VisualLogging.toolbar()}>
             <devtools-button
@@ -1241,7 +1324,7 @@ export class RecorderController extends LitElement {
               @change=${this.#onRecordingSelected}
               jslog=${VisualLogging.dropDown('recordings').track({change: true})}
             >
-              ${LitHtml.Directives.repeat(
+              ${Lit.Directives.repeat(
                 values,
                 item => item.value,
                 item => {
@@ -1287,10 +1370,8 @@ export class RecorderController extends LitElement {
               .showSelectedItem=${false}
               .open=${this.exportMenuExpanded}
             >
-              <devtools-menu-group .name=${i18nString(
-      UIStrings.export,
-    )}>
-                ${LitHtml.Directives.repeat(
+              <devtools-menu-group .name=${i18nString(UIStrings.export)}>
+                ${Lit.Directives.repeat(
                   this.#builtInConverters,
                   converter => {
                     return html`
@@ -1303,10 +1384,8 @@ export class RecorderController extends LitElement {
                   },
                 )}
               </devtools-menu-group>
-              <devtools-menu-group .name=${i18nString(
-      UIStrings.exportViaExtensions,
-    )}>
-                ${LitHtml.Directives.repeat(
+              <devtools-menu-group .name=${i18nString(UIStrings.exportViaExtensions)}>
+                ${Lit.Directives.repeat(
                   this.extensionConverters,
                   converter => {
                     return html`
@@ -1370,7 +1449,7 @@ export class RecorderController extends LitElement {
             ></devtools-button>
             <div class="feedback">
               <x-link class="x-link" href=${
-                Components.StartView.FEEDBACK_URL
+                FEEDBACK_URL
               } jslog=${VisualLogging.link('feedback').track({click: true})}>${i18nString(UIStrings.sendFeedback)}</x-link>
             </div>
             <div class="separator"></div>

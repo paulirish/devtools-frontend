@@ -1,11 +1,12 @@
 // Copyright 2017 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
+import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
-import * as TimelineModel from '../../models/timeline_model/timeline_model.js';
 import * as Trace from '../../models/trace/trace.js';
 import * as TraceBounds from '../../services/trace_bounds/trace_bounds.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
@@ -27,8 +28,15 @@ import {
   type TimelineSelection,
 } from './TimelineSelection.js';
 import {TimelineSelectorStatsView} from './TimelineSelectorStatsView.js';
-import {BottomUpTimelineTreeView, CallTreeTimelineTreeView, TimelineTreeView} from './TimelineTreeView.js';
+import {
+  AggregatedTimelineTreeView,
+  BottomUpTimelineTreeView,
+  CallTreeTimelineTreeView,
+  TimelineStackView,
+  TimelineTreeView
+} from './TimelineTreeView.js';
 import {TimelineUIUtils} from './TimelineUIUtils.js';
+import {TracingFrameLayerTree} from './TracingLayerTree.js';
 import * as Utils from './utils/utils.js';
 
 const UIStrings = {
@@ -60,10 +68,10 @@ const UIStrings = {
    *@description Title of the selector stats tab
    */
   selectorStats: 'Selector stats',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/TimelineDetailsView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
-export class TimelineDetailsView extends
+export class TimelineDetailsPane extends
     Common.ObjectWrapper.eventMixin<TimelineTreeView.EventTypes, typeof UI.Widget.VBox>(UI.Widget.VBox) {
   private readonly detailsLinkifier: Components.Linkifier.Linkifier;
   private tabbedPane: UI.TabbedPane.TabbedPane;
@@ -123,13 +131,37 @@ export class TimelineDetailsView extends
     this.appendTab(Tab.EventLog, i18nString(UIStrings.eventLog), eventsView);
     this.rangeDetailViews.set(Tab.EventLog, eventsView);
 
+    // Listeners for hover dimming
     this.rangeDetailViews.values().forEach(view => {
       view.addEventListener(
           TimelineTreeView.Events.TREE_ROW_HOVERED,
           node => this.dispatchEventToListeners(TimelineTreeView.Events.TREE_ROW_HOVERED, node.data));
+
+      view.addEventListener(TimelineTreeView.Events.TREE_ROW_CLICKED, node => {
+        // Re-dispatch to reach the tree row dimmer.
+        this.dispatchEventToListeners(TimelineTreeView.Events.TREE_ROW_CLICKED, node.data);
+      });
+
+      // If there's a heaviest stack sidebar view, also listen to hover within it.
+      if (view instanceof AggregatedTimelineTreeView) {
+        view.stackView.addEventListener(
+            TimelineStackView.Events.TREE_ROW_HOVERED,
+            node => this.dispatchEventToListeners(TimelineTreeView.Events.TREE_ROW_HOVERED, {node: node.data}));
+      }
     });
-    this.#thirdPartyTree.addEventListener(TimelineTreeView.Events.THIRD_PARTY_ROW_HOVERED, node => {
-      this.dispatchEventToListeners(TimelineTreeView.Events.THIRD_PARTY_ROW_HOVERED, node.data);
+    this.#thirdPartyTree.addEventListener(TimelineTreeView.Events.TREE_ROW_HOVERED, node => {
+      // Re-dispatch through 3P event to get 3P dimmer.
+      this.dispatchEventToListeners(
+          TimelineTreeView.Events.TREE_ROW_HOVERED, {node: node.data.node, events: node.data.events ?? undefined});
+    });
+
+    this.#thirdPartyTree.addEventListener(TimelineTreeView.Events.BOTTOM_UP_BUTTON_CLICKED, node => {
+      this.selectTab(Tab.BottomUp, node.data, AggregatedTimelineTreeView.GroupBy.ThirdParties);
+    });
+    this.#thirdPartyTree.addEventListener(TimelineTreeView.Events.TREE_ROW_CLICKED, node => {
+      // Re-dispatch through 3P event to get 3P dimmer.
+      this.dispatchEventToListeners(
+          TimelineTreeView.Events.TREE_ROW_CLICKED, {node: node.data.node, events: node.data.events ?? undefined});
     });
 
     this.#networkRequestDetails =
@@ -142,6 +174,67 @@ export class TimelineDetailsView extends
     TraceBounds.TraceBounds.onChange(this.#onTraceBoundsChangeBound);
 
     this.lazySelectorStatsView = null;
+  }
+
+  /**
+   * This selects a given tabbedPane tab.
+   * Additionally, if provided a node, we open that node and
+   * if a groupBySetting is included, we groupBy.
+   */
+  selectTab(tabName: Tab, node: Trace.Extras.TraceTree.Node|null, groupBySetting?: AggregatedTimelineTreeView.GroupBy):
+      void {
+    this.tabbedPane.selectTab(tabName, true, true);
+    /**
+     * For a11y, ensure that the header is focused.
+     */
+    this.tabbedPane.focusSelectedTabHeader();
+
+    // We currently only support selecting Details and BottomUp via the 3P insight.
+    switch (tabName) {
+      case Tab.CallTree:
+      case Tab.EventLog:
+      case Tab.PaintProfiler:
+      case Tab.LayerViewer:
+      case Tab.SelectorStats: {
+        break;
+      }
+      case Tab.Details: {
+        this.updateContentsFromWindow();
+        break;
+      }
+      case Tab.BottomUp: {
+        if (!(this.tabbedPane.visibleView instanceof BottomUpTimelineTreeView)) {
+          return;
+        }
+        // Set grouping if necessary.
+        const bottomUp = this.tabbedPane.visibleView;
+        if (groupBySetting) {
+          bottomUp.setGroupBySetting(groupBySetting);
+          bottomUp.refreshTree();
+        }
+
+        if (!node) {
+          return;
+        }
+
+        // Look for the equivalent GroupNode in the bottomUp tree using the node's reference `event`.
+        // Conceivably, we could match using the group ID instead.
+        const treeNode = bottomUp.eventToTreeNode.get(node.event);
+        if (!treeNode) {
+          return;
+        }
+        bottomUp.selectProfileNode(treeNode, true);
+        // Reveal/expand the bottom up tree grid node.
+        const gridNode = bottomUp.dataGridNodeForTreeNode(treeNode);
+        if (gridNode) {
+          gridNode.expand();
+        }
+        break;
+      }
+      default: {
+        Platform.assertNever(tabName, `Unknown Tab: ${tabName}. Add new case to switch.`);
+      }
+    }
   }
 
   #createContentWidget(): UI.Widget.VBox {
@@ -216,7 +309,7 @@ export class TimelineDetailsView extends
     }
     this.tabbedPane.closeTabs([Tab.PaintProfiler, Tab.LayerViewer], false);
     for (const view of this.rangeDetailViews.values()) {
-      view.setModelWithEvents(data.selectedEvents, data.parsedTrace);
+      view.setModelWithEvents(data.selectedEvents, data.parsedTrace, data.entityMapper);
     }
     // Set the 3p tree model.
     this.#thirdPartyTree.setModelWithEvents(data.selectedEvents, data.parsedTrace, data.entityMapper);
@@ -225,19 +318,21 @@ export class TimelineDetailsView extends
     await this.setSelection(null);
   }
 
-  private setContent(node: Node): void {
+  private setSummaryContent(node: Node): void {
     const allTabs = this.tabbedPane.otherTabs(Tab.Details);
     for (let i = 0; i < allTabs.length; ++i) {
       if (!this.rangeDetailViews.has(allTabs[i])) {
         this.tabbedPane.closeTab(allTabs[i]);
       }
     }
+
+    // Append relatedChips inside of the node being shown.
+    const chipParent = (node instanceof Element && node.shadowRoot || node);
+    chipParent.appendChild(this.#relatedInsightChips);
+
     this.defaultDetailsContentWidget.detach();
     this.defaultDetailsContentWidget = this.#createContentWidget();
-    this.defaultDetailsContentWidget.contentElement.appendChild(node);
-    if (this.#relatedInsightChips) {
-      this.defaultDetailsContentWidget.contentElement.appendChild(this.#relatedInsightChips);
-    }
+    this.defaultDetailsContentWidget.contentElement.append(node);
   }
 
   private updateContents(): void {
@@ -250,10 +345,6 @@ export class TimelineDetailsView extends
     const view = this.rangeDetailViews.get(this.tabbedPane.selectedTabId || '');
     if (view) {
       view.updateContents(this.selection || selectionFromRangeMilliSeconds(visibleWindow.min, visibleWindow.max));
-    } else {
-      // If no view, we must be in the summary tab, update the 3p tree.
-      this.#thirdPartyTree.updateContents(
-          this.selection || selectionFromRangeMilliSeconds(visibleWindow.min, visibleWindow.max));
     }
   }
 
@@ -281,9 +372,9 @@ export class TimelineDetailsView extends
    * debounced. The forceImmediateUpdate param configures the debouncing
    * behaviour.
    */
-  private scheduleUpdateContentsFromWindow(forceImmediateUpdate: boolean = false): void {
+  private scheduleUpdateContentsFromWindow(forceImmediateUpdate = false): void {
     if (!this.#parsedTrace) {
-      this.setContent(UI.Fragment.html`<div/>`);
+      this.setSummaryContent(UI.Fragment.html`<div/>`);
       return;
     }
     if (forceImmediateUpdate) {
@@ -295,6 +386,9 @@ export class TimelineDetailsView extends
     if (!this.updateContentsScheduled) {
       this.updateContentsScheduled = true;
       setTimeout(() => {
+        if (!this.updateContentsScheduled) {
+          return;
+        }
         this.updateContentsScheduled = false;
         this.updateContentsFromWindow();
       }, 100);
@@ -315,21 +409,25 @@ export class TimelineDetailsView extends
     if (!this.#filmStrip) {
       return null;
     }
+
     const screenshotTime = (frame.idle ? frame.startTime : frame.endTime);
     const filmStripFrame = Trace.Extras.FilmStrip.frameClosestToTimestamp(this.#filmStrip, screenshotTime);
     if (!filmStripFrame) {
       return null;
     }
-    const frameTimeMilliSeconds = Trace.Helpers.Timing.microSecondsToMilliseconds(filmStripFrame.screenshotEvent.ts);
-    return frameTimeMilliSeconds - frame.endTime < 10 ? filmStripFrame : null;
+
+    const frameTimeMilliSeconds = Trace.Helpers.Timing.microToMilli(filmStripFrame.screenshotEvent.ts);
+    const frameEndTimeMilliSeconds = Trace.Helpers.Timing.microToMilli(frame.endTime);
+    return frameTimeMilliSeconds - frameEndTimeMilliSeconds < 10 ? filmStripFrame : null;
   }
 
   #setSelectionForTimelineFrame(frame: Trace.Types.Events.LegacyTimelineFrame): void {
     const matchedFilmStripFrame = this.#getFilmStripFrame(frame);
-    this.setContent(TimelineUIUtils.generateDetailsContentForFrame(frame, this.#filmStrip, matchedFilmStripFrame));
+    this.setSummaryContent(
+        TimelineUIUtils.generateDetailsContentForFrame(frame, this.#filmStrip, matchedFilmStripFrame));
     const target = SDK.TargetManager.TargetManager.instance().rootTarget();
     if (frame.layerTree && target) {
-      const layerTreeForFrame = new TimelineModel.TracingLayerTree.TracingFrameLayerTree(target, frame.layerTree);
+      const layerTreeForFrame = new TracingFrameLayerTree(target, frame.layerTree);
       const layersView = this.layersView();
       layersView.showLayerTree(layerTreeForFrame);
       if (!this.tabbedPane.hasTab(Tab.LayerViewer)) {
@@ -349,7 +447,7 @@ export class TimelineDetailsView extends
       this.#relatedInsightChips.eventToRelatedInsightsMap = this.#eventToRelatedInsightsMap;
     }
 
-    this.setContent(this.#networkRequestDetails);
+    this.setSummaryContent(this.#networkRequestDetails);
   }
 
   async #setSelectionForTraceEvent(event: Trace.Types.Events.Event): Promise<void> {
@@ -367,7 +465,7 @@ export class TimelineDetailsView extends
     if (Trace.Types.Events.isSyntheticLayoutShift(event) || Trace.Types.Events.isSyntheticLayoutShiftCluster(event)) {
       const isFreshRecording = Boolean(this.#parsedTrace && Tracker.instance().recordingIsFresh(this.#parsedTrace));
       this.#layoutShiftDetails.setData(event, this.#traceInsightsSets, this.#parsedTrace, isFreshRecording);
-      this.setContent(this.#layoutShiftDetails);
+      this.setSummaryContent(this.#layoutShiftDetails);
       return;
     }
 
@@ -393,6 +491,9 @@ export class TimelineDetailsView extends
     }
 
     if (selectionIsEvent(selection)) {
+      // Cancel any pending debounced range stats update
+      this.updateContentsScheduled = false;
+
       if (Trace.Types.Events.isSyntheticNetworkRequest(selection.event)) {
         await this.#setSelectionForNetworkEvent(selection.event);
       } else if (Trace.Types.Events.isLegacyTimelineFrame(selection.event)) {
@@ -462,7 +563,7 @@ export class TimelineDetailsView extends
   }
 
   private appendDetailsTabsForTraceEventAndShowDetails(event: Trace.Types.Events.Event, content: Node): void {
-    this.setContent(content);
+    this.setSummaryContent(content);
     if (Trace.Types.Events.isPaint(event) || Trace.Types.Events.isRasterTask(event)) {
       this.showEventInPaintProfiler(event);
     }
@@ -492,8 +593,7 @@ export class TimelineDetailsView extends
     this.appendTab(Tab.PaintProfiler, i18nString(UIStrings.paintProfiler), paintProfilerView);
   }
 
-  private updateSelectedRangeStats(
-      startTime: Trace.Types.Timing.MilliSeconds, endTime: Trace.Types.Timing.MilliSeconds): void {
+  private updateSelectedRangeStats(startTime: Trace.Types.Timing.Milli, endTime: Trace.Types.Timing.Milli): void {
     if (!this.#selectedEvents || !this.#parsedTrace || !this.#entityMapper) {
       return;
     }
@@ -502,9 +602,12 @@ export class TimelineDetailsView extends
     const aggregatedStats = TimelineUIUtils.statsForTimeRange(this.#selectedEvents, startTime, endTime);
     const startOffset = startTime - minBoundsMilli;
     const endOffset = endTime - minBoundsMilli;
-    const summaryDetails = TimelineUIUtils.generateSummaryDetails(
+    const summaryDetailElem = TimelineUIUtils.generateSummaryDetails(
         aggregatedStats, startOffset, endOffset, this.#selectedEvents, this.#thirdPartyTree);
-    this.setContent(summaryDetails);
+
+    this.#thirdPartyTree.updateContents(this.selection || selectionFromRangeMilliSeconds(startTime, endTime));
+
+    this.setSummaryContent(summaryDetailElem);
 
     // Find all recalculate style events data from range
     const isSelectorStatsEnabled =
@@ -512,8 +615,8 @@ export class TimelineDetailsView extends
     if (this.#selectedEvents && isSelectorStatsEnabled) {
       const eventsInRange = Trace.Helpers.Trace.findUpdateLayoutTreeEvents(
           this.#selectedEvents,
-          Trace.Helpers.Timing.millisecondsToMicroseconds(startTime),
-          Trace.Helpers.Timing.millisecondsToMicroseconds(endTime),
+          Trace.Helpers.Timing.milliToMicro(startTime),
+          Trace.Helpers.Timing.milliToMicro(endTime),
       );
       if (eventsInRange.length > 0) {
         this.showAggregatedSelectorStats(eventsInRange);

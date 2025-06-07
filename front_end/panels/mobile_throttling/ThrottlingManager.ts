@@ -1,6 +1,7 @@
 // Copyright 2017 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
@@ -89,7 +90,15 @@ const UIStrings = {
    * @example {4x slowdown} PH1
    */
   recommendedThrottling: '{PH1} – recommended',
-};
+  /**
+   * @description Text to prompt the user to run the CPU calibration process.
+   */
+  calibrate: 'Calibrate…',
+  /**
+   * @description Text to prompt the user to re-run the CPU calibration process.
+   */
+  recalibrate: 'Recalibrate…',
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/mobile_throttling/ThrottlingManager.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 let throttlingManagerInstance: ThrottlingManager;
@@ -99,6 +108,8 @@ export class ThrottlingManager {
   private readonly cpuThrottlingOptions: SDK.CPUThrottlingManager.CPUThrottlingOption[];
   private readonly customNetworkConditionsSetting: Common.Settings.Setting<SDK.NetworkManager.Conditions[]>;
   private readonly currentNetworkThrottlingConditionsSetting: Common.Settings.Setting<SDK.NetworkManager.Conditions>;
+  private readonly calibratedCpuThrottlingSetting:
+      Common.Settings.Setting<SDK.CPUThrottlingManager.CalibratedCPUThrottling>;
   private lastNetworkThrottlingConditions!: SDK.NetworkManager.Conditions;
   private readonly cpuThrottlingManager: SDK.CPUThrottlingManager.CPUThrottlingManager;
   #hardwareConcurrencyOverrideEnabled = false;
@@ -117,6 +128,9 @@ export class ThrottlingManager {
         Common.Settings.Settings.instance().moduleSetting('custom-network-conditions');
     this.currentNetworkThrottlingConditionsSetting = Common.Settings.Settings.instance().createSetting(
         'preferred-network-condition', SDK.NetworkManager.NoThrottlingConditions);
+    this.calibratedCpuThrottlingSetting =
+        Common.Settings.Settings.instance().createSetting<SDK.CPUThrottlingManager.CalibratedCPUThrottling>(
+            'calibrated-cpu-throttling', {}, Common.Settings.SettingStorageType.GLOBAL);
 
     this.currentNetworkThrottlingConditionsSetting.setSerializer(new SDK.NetworkManager.ConditionsSerializer());
 
@@ -243,7 +257,7 @@ export class ThrottlingManager {
   }
 
   createNetworkThrottlingSelector(selectElement: HTMLSelectElement): NetworkThrottlingSelectorWrapper {
-    let options: (SDK.NetworkManager.Conditions|null)[] = [];
+    let options: Array<SDK.NetworkManager.Conditions|null> = [];
     let titles: string[] = [];
     let optionEls: HTMLOptionElement[] = [];
     const selector = new NetworkThrottlingSelector(populate, select, this.customNetworkConditionsSetting);
@@ -255,7 +269,7 @@ export class ThrottlingManager {
                 .context(this.currentNetworkThrottlingConditionsSetting.name)}`);
     selectElement.addEventListener('change', optionSelected, false);
 
-    function populate(groups: NetworkThrottlingConditionsGroup[]): (SDK.NetworkManager.Conditions|null)[] {
+    function populate(groups: NetworkThrottlingConditionsGroup[]): Array<SDK.NetworkManager.Conditions|null> {
       selectElement.removeChildren();
       options = [];
       titles = [];
@@ -324,10 +338,24 @@ export class ThrottlingManager {
   }
 
   createCPUThrottlingSelector(): CPUThrottlingSelectorWrapper {
-    const control = new UI.Toolbar.ToolbarComboBox(
-        event =>
-            this.setCPUThrottlingOption(this.cpuThrottlingOptions[(event.target as HTMLSelectElement).selectedIndex]),
-        i18nString(UIStrings.cpuThrottling), '', 'cpu-throttling');
+    const getCalibrationString = (): Common.UIString.LocalizedString => {
+      const value = this.calibratedCpuThrottlingSetting.get();
+      const hasCalibrated = value.low || value.mid;
+      return hasCalibrated ? i18nString(UIStrings.recalibrate) : i18nString(UIStrings.calibrate);
+    };
+
+    const optionSelected = (): void => {
+      if (control.selectedIndex() === control.options().length - 1) {
+        const index = this.cpuThrottlingOptions.indexOf(this.cpuThrottlingManager.cpuThrottlingOption());
+        control.setSelectedIndex(index);
+        void Common.Revealer.reveal(this.calibratedCpuThrottlingSetting);
+      } else {
+        this.setCPUThrottlingOption(this.cpuThrottlingOptions[control.selectedIndex()]);
+      }
+    };
+
+    const control =
+        new UI.Toolbar.ToolbarComboBox(optionSelected, i18nString(UIStrings.cpuThrottling), '', 'cpu-throttling');
     this.cpuThrottlingControls.add(control);
     const currentOption = this.cpuThrottlingManager.cpuThrottlingOption();
 
@@ -347,15 +375,22 @@ export class ThrottlingManager {
       optionEls.push(optionEl);
     }
 
+    const optionEl = control.createOption(getCalibrationString(), '');
+    control.addOption(optionEl);
+    optionEls.push(optionEl);
+
     return {
       control,
       updateRecommendedOption(recommendedOption: SDK.CPUThrottlingManager.CPUThrottlingOption|null) {
-        for (let i = 0; i < optionEls.length; i++) {
+        for (let i = 0; i < optionEls.length - 1; i++) {
           const option = options[i];
           optionEls[i].text = option === recommendedOption ?
               i18nString(UIStrings.recommendedThrottling, {PH1: option.title()}) :
               option.title();
+          optionEls[i].disabled = option.rate() === 0;
         }
+
+        optionEls[optionEls.length - 1].textContent = getCalibrationString();
       },
     };
   }
@@ -370,7 +405,7 @@ export class ThrottlingManager {
     const numericInput =
         new UI.Toolbar.ToolbarItem(UI.UIUtils.createInput('devtools-text-input', 'number', 'hardware-concurrency'));
     numericInput.setTitle(i18nString(UIStrings.hardwareConcurrencySettingLabel));
-    const inputElement = numericInput.element as HTMLInputElement;
+    const inputElement = numericInput.element;
     inputElement.min = '1';
     numericInput.setEnabled(false);
 
@@ -385,7 +420,7 @@ export class ThrottlingManager {
     const warning = new UI.Toolbar.ToolbarItem(icon);
     warning.setTitle(i18nString(UIStrings.excessConcurrency));
 
-    checkbox.checkboxElement.disabled = true;  // Prevent modification while still wiring things up asynchronously below
+    checkbox.disabled = true;  // Prevent modification while still wiring things up asynchronously below
     reset.element.classList.add('concurrency-hidden');
     warning.element.classList.add('concurrency-hidden');
 
@@ -412,9 +447,9 @@ export class ThrottlingManager {
 
       inputElement.value = `${defaultValue}`;
       inputElement.oninput = () => setHardwareConcurrency(Number(inputElement.value));
-      checkbox.checkboxElement.disabled = false;
-      checkbox.checkboxElement.addEventListener('change', () => {
-        this.#hardwareConcurrencyOverrideEnabled = checkbox.checkboxElement.checked;
+      checkbox.disabled = false;
+      checkbox.addEventListener('change', () => {
+        this.#hardwareConcurrencyOverrideEnabled = checkbox.checked;
 
         numericInput.setEnabled(this.hardwareConcurrencyOverrideEnabled);
         setHardwareConcurrency(this.hardwareConcurrencyOverrideEnabled ? Number(inputElement.value) : defaultValue);

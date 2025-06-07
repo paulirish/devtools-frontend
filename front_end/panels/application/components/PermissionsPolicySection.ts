@@ -1,6 +1,7 @@
 // Copyright 2021 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import '../../../ui/components/icon_button/icon_button.js';
 import '../../../ui/components/report_view/report_view.js';
@@ -13,12 +14,12 @@ import * as Protocol from '../../../generated/protocol.js';
 import * as NetworkForward from '../../../panels/network/forward/forward.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as RenderCoordinator from '../../../ui/components/render_coordinator/render_coordinator.js';
-import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import * as Lit from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import permissionsPolicySectionStyles from './permissionsPolicySection.css.js';
 
-const {html} = LitHtml;
+const {html} = Lit;
 
 const UIStrings = {
   /**
@@ -60,7 +61,7 @@ const UIStrings = {
    *@description Text describing that a specific feature is blocked by virtue of being inside a fenced frame tree.
    */
   disabledByFencedFrame: 'disabled inside a `fencedframe`',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/application/components/PermissionsPolicySection.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -71,7 +72,7 @@ export interface PermissionsPolicySectionData {
 
 export function renderIconLink(
     iconName: string, title: Platform.UIString.LocalizedString, clickHandler: (() => void)|(() => Promise<void>),
-    jsLogContext: string): LitHtml.TemplateResult {
+    jsLogContext: string): Lit.TemplateResult {
   // Disabled until https://crbug.com/1079231 is fixed.
   // clang-format off
   return html`
@@ -95,19 +96,15 @@ export class PermissionsPolicySection extends HTMLElement {
     void this.#render();
   }
 
-  connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [permissionsPolicySectionStyles];
-  }
-
   #toggleShowPermissionsDisallowedDetails(): void {
     this.#permissionsPolicySectionData.showDetails = !this.#permissionsPolicySectionData.showDetails;
     void this.#render();
   }
 
-  #renderAllowed(): LitHtml.LitTemplate {
+  #renderAllowed(): Lit.LitTemplate {
     const allowed = this.#permissionsPolicySectionData.policies.filter(p => p.allowed).map(p => p.feature).sort();
     if (!allowed.length) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
     return html`
       <devtools-report-key>${i18nString(UIStrings.allowedFeatures)}</devtools-report-key>
@@ -117,11 +114,11 @@ export class PermissionsPolicySection extends HTMLElement {
     `;
   }
 
-  async #renderDisallowed(): Promise<LitHtml.LitTemplate> {
+  async #renderDisallowed(): Promise<Lit.LitTemplate> {
     const disallowed = this.#permissionsPolicySectionData.policies.filter(p => !p.allowed)
                            .sort((a, b) => a.feature.localeCompare(b.feature));
     if (!disallowed.length) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
     if (!this.#permissionsPolicySectionData.showDetails) {
       return html`
@@ -129,6 +126,7 @@ export class PermissionsPolicySection extends HTMLElement {
         <devtools-report-value>
           ${disallowed.map(p => p.feature).join(', ')}
           <devtools-button
+          class="disabled-features-button"
           .variant=${Buttons.Button.Variant.OUTLINED}
           @click=${() => this.#toggleShowPermissionsDisallowedDetails()}
           jslog=${VisualLogging.action('show-disabled-features-details').track({
@@ -143,12 +141,10 @@ export class PermissionsPolicySection extends HTMLElement {
     const featureRows = await Promise.all(disallowed.map(async policy => {
       const frame = policy.locator ? frameManager.getFrame(policy.locator.frameId) : null;
       const blockReason = policy.locator?.blockReason;
-      const linkTargetDOMNode = await (
-          blockReason === Protocol.Page.PermissionsPolicyBlockReason.IframeAttribute && frame &&
-          frame.getOwnerDOMNodeOrDocument());
-      const resource = frame && frame.resourceForURL(frame.url);
-      const linkTargetRequest =
-          blockReason === Protocol.Page.PermissionsPolicyBlockReason.Header && resource && resource.request;
+      const linkTargetDOMNode = await (blockReason === Protocol.Page.PermissionsPolicyBlockReason.IframeAttribute &&
+                                       frame?.getOwnerDOMNodeOrDocument());
+      const resource = frame?.resourceForURL(frame.url);
+      const linkTargetRequest = blockReason === Protocol.Page.PermissionsPolicyBlockReason.Header && resource?.request;
       const blockReasonText = (() => {
         switch (blockReason) {
           case Protocol.Page.PermissionsPolicyBlockReason.IframeAttribute:
@@ -196,18 +192,18 @@ export class PermissionsPolicySection extends HTMLElement {
           linkTargetDOMNode ? renderIconLink(
                                   'code-circle', i18nString(UIStrings.clickToShowIframe),
                                   () => Common.Revealer.reveal(linkTargetDOMNode), 'reveal-in-elements') :
-                              LitHtml.nothing}
+                              Lit.nothing}
             ${
           linkTargetRequest ? renderIconLink(
                                   'arrow-up-down-circle',
                                   i18nString(UIStrings.clickToShowHeader),
                                   revealHeader,
                                   'reveal-in-network') :
-                              LitHtml.nothing}
+                              Lit.nothing}
           </div>
         </div>
       `;
-                // clang-format on
+              // clang-format on
     }));
 
     return html`
@@ -231,11 +227,15 @@ export class PermissionsPolicySection extends HTMLElement {
     await RenderCoordinator.write('PermissionsPolicySection render', () => {
       // Disabled until https://crbug.com/1079231 is fixed.
       // clang-format off
-      LitHtml.render(
+      Lit.render(
         html`
+          <style>${permissionsPolicySectionStyles}</style>
           <devtools-report-section-header>${i18n.i18n.lockedString('Permissions Policy')}</devtools-report-section-header>
           ${this.#renderAllowed()}
-          ${LitHtml.Directives.until(this.#renderDisallowed(), LitHtml.nothing)}
+          ${(this.#permissionsPolicySectionData.policies.findIndex(p => p.allowed) > 0 ||
+            this.#permissionsPolicySectionData.policies.findIndex(p => !p.allowed) > 0) ?
+            html`<devtools-report-divider class="subsection-divider"></devtools-report-divider>` : Lit.nothing}
+          ${Lit.Directives.until(this.#renderDisallowed(), Lit.nothing)}
           <devtools-report-divider></devtools-report-divider>
         `,
         this.#shadow, {host: this},

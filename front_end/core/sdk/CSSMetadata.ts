@@ -39,24 +39,18 @@ import * as SupportedCSSProperties from '../../generated/SupportedCSSProperties.
 import * as Common from '../common/common.js';
 
 export class CSSMetadata {
-  readonly #values: string[];
-  readonly #longhands: Map<string, string[]>;
-  readonly #shorthands: Map<string, string[]>;
-  readonly #inherited: Set<string>;
-  readonly #svgProperties: Set<string>;
-  readonly #propertyValues: Map<string, string[]>;
-  readonly #aliasesFor: Map<string, string>;
+  readonly #values: string[] = [];
+  readonly #longhands = new Map<string, string[]>();
+  readonly #shorthands = new Map<string, string[]>();
+  readonly #inherited = new Set<string>();
+  readonly #svgProperties = new Set<string>();
+  readonly #propertyValues = new Map<string, string[]>();
+  readonly #aliasesFor = new Map<string, string>();
+  readonly #nameValuePresets: string[] = [];
+  readonly #nameValuePresetsIncludingSVG: string[] = [];
   #valuesSet: Set<string>;
-  readonly #nameValuePresetsInternal: string[];
-  readonly #nameValuePresetsIncludingSVG: string[];
 
   constructor(properties: CSSPropertyDefinition[], aliasesFor: Map<string, string>) {
-    this.#values = [];
-    this.#longhands = new Map();
-    this.#shorthands = new Map();
-    this.#inherited = new Set();
-    this.#svgProperties = new Set();
-    this.#propertyValues = new Map();
     this.#aliasesFor = aliasesFor;
     for (let i = 0; i < properties.length; ++i) {
       const property = properties[i];
@@ -117,15 +111,13 @@ export class CSSMetadata {
       this.#propertyValues.set(propertyName, [...values]);
     }
 
-    this.#nameValuePresetsInternal = [];
-    this.#nameValuePresetsIncludingSVG = [];
     for (const name of this.#valuesSet) {
       const values = this.specificPropertyValues(name)
                          .filter(value => CSS.supports(name, value))
                          .sort(CSSMetadata.sortPrefixesAndCSSWideKeywordsToEnd);
       const presets = values.map(value => `${name}: ${value}`);
       if (!this.isSVGProperty(name)) {
-        this.#nameValuePresetsInternal.push(...presets);
+        this.#nameValuePresets.push(...presets);
       }
       this.#nameValuePresetsIncludingSVG.push(...presets);
     }
@@ -170,7 +162,7 @@ export class CSSMetadata {
   }
 
   nameValuePresets(includeSVG?: boolean): string[] {
-    return includeSVG ? this.#nameValuePresetsIncludingSVG : this.#nameValuePresetsInternal;
+    return includeSVG ? this.#nameValuePresetsIncludingSVG : this.#nameValuePresets;
   }
 
   isSVGProperty(name: string): boolean {
@@ -362,6 +354,14 @@ export class CSSMetadata {
   }
 }
 
+export const CubicBezierKeywordValues = new Map([
+  ['linear', 'cubic-bezier(0, 0, 1, 1)'],
+  ['ease', 'cubic-bezier(0.25, 0.1, 0.25, 1)'],
+  ['ease-in', 'cubic-bezier(0.42, 0, 1, 1)'],
+  ['ease-in-out', 'cubic-bezier(0.42, 0, 0.58, 1)'],
+  ['ease-out', 'cubic-bezier(0, 0, 0.58, 1)'],
+]);
+
 // CSS-wide keywords.
 export const enum CSSWideKeyword {
   INHERIT = 'inherit',
@@ -447,6 +447,11 @@ const filterValuePresetMap = new Map([
   ['url', 'url(||)'],
 ]);
 
+const cornerShapeValuePresetMap = new Map([
+  ['superellipse(0.5)', 'superellipse(|0.5|)'],
+  ['superellipse(infinity)', 'superellipse(|infinity|)'],
+]);
+
 const valuePresets = new Map([
   ['filter', filterValuePresetMap],
   ['backdrop-filter', filterValuePresetMap],
@@ -478,6 +483,7 @@ const valuePresets = new Map([
       ['perspective', 'perspective(|10px|)'],
     ]),
   ],
+  ['corner-shape', cornerShapeValuePresetMap],
 ]);
 
 const distanceProperties = new Set<string>([
@@ -533,10 +539,14 @@ const colorAwareProperties = new Set<string>([
   'border-right-color',
   'border-top',
   'border-top-color',
+  'border-block',
+  'border-block-color',
   'border-block-end',
   'border-block-end-color',
   'border-block-start',
   'border-block-start-color',
+  'border-inline',
+  'border-inline-color',
   'border-inline-end',
   'border-inline-end-color',
   'border-inline-start',
@@ -583,6 +593,10 @@ const colorAwareProperties = new Set<string>([
   '-webkit-text-fill-color',
   '-webkit-text-stroke',
   '-webkit-text-stroke-color',
+  // For SVG
+  'flood-color',
+  'lighting-color',
+  'stop-color',
 ]);
 
 // In addition to `_colorAwareProperties`, the following properties contain CSS <angle> units.
@@ -632,7 +646,7 @@ const extraPropertyValues = new Map<string, Set<string>>([
   ['border-width', new Set(['medium', 'thick', 'thin'])],
   ['border-style', new Set(['hidden', 'inset', 'groove', 'ridge', 'outset', 'dotted', 'dashed', 'solid', 'double'])],
   ['size', new Set(['a3', 'a4', 'a5', 'b4', 'b5', 'landscape', 'ledger', 'legal', 'letter', 'portrait'])],
-  ['overflow', new Set(['hidden', 'visible', 'overlay', 'scroll'])],
+  ['overflow', new Set(['hidden', 'visible', 'overlay', 'scroll', 'clip'])],
   ['overscroll-behavior', new Set(['contain'])],
   ['text-rendering', new Set(['optimizeSpeed', 'optimizeLegibility', 'geometricPrecision'])],
   ['text-align', new Set(['-webkit-auto', '-webkit-match-parent'])],
@@ -1348,6 +1362,19 @@ const extraPropertyValues = new Map<string, Set<string>>([
       'text alphabetic',
       'cap alphabetic',
       'ex alphabetic',
+    ]),
+  ],
+  [
+    'corner-shape',
+    new Set([
+      'round',
+      'scoop',
+      'bevel',
+      'notch',
+      'square',
+      'squircle',
+      'superellipse(0.5)',
+      'superellipse(infinity)',
     ]),
   ],
 ]);

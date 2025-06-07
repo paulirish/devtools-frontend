@@ -38,7 +38,8 @@ import * as Platform from '../platform/platform.js';
 import * as Root from '../root/root.js';
 
 import type {CallFrame, ScopeChainEntry} from './DebuggerModel.js';
-import {decodeScopes, type Position as GeneratedPosition} from './SourceMapScopes.js';
+import {buildOriginalScopes, decodePastaRanges, type NamedFunctionRange} from './SourceMapFunctionRanges.js';
+import {decodeScopes, type OriginalScope, type Position as GeneratedPosition} from './SourceMapScopes.js';
 import {SourceMapScopesInfo} from './SourceMapScopesInfo.js';
 
 /**
@@ -56,7 +57,7 @@ export interface SourceMapV3Object {
 
   file?: string;
   sourceRoot?: string;
-  sourcesContent?: (string|null)[];
+  sourcesContent?: Array<string|null>;
 
   names?: string[];
   ignoreList?: number[];
@@ -81,14 +82,14 @@ export interface SourceMapV3Object {
 export type SourceMapV3 = SourceMapV3Object|{
   // clang-format off
   version: number,
-  file?: string,
-  sections: ({
+  sections: Array<{
     offset: {line: number, column: number},
     map: SourceMapV3Object,
   } | {
     offset: {line: number, column: number},
     url: string,
-  })[],
+  }>,
+  file?: string,
   // clang-format on
 };
 
@@ -139,51 +140,16 @@ export class SourceMapEntry {
   }
 }
 
-interface Position {
-  lineNumber: number;
-  columnNumber: number;
-}
-
-function comparePositions(a: Position, b: Position): number {
-  return a.lineNumber - b.lineNumber || a.columnNumber - b.columnNumber;
-}
-
-export interface ScopeEntry {
-  scopeName(): string;
-  start(): Position;
-  end(): Position;
-}
-
-class ScopeTreeEntry implements ScopeEntry {
-  children: ScopeTreeEntry[] = [];
-
-  constructor(
-      readonly startLineNumber: number, readonly startColumnNumber: number, readonly endLineNumber: number,
-      readonly endColumnNumber: number, readonly name: string) {
-  }
-
-  scopeName(): string {
-    return this.name;
-  }
-
-  start(): Position {
-    return {lineNumber: this.startLineNumber, columnNumber: this.startColumnNumber};
-  }
-
-  end(): Position {
-    return {lineNumber: this.endLineNumber, columnNumber: this.endColumnNumber};
-  }
-}
-
 interface SourceInfo {
   sourceURL: Platform.DevToolsPath.UrlString;
   content: string|null;
   ignoreListHint: boolean;
   reverseMappings: number[]|null;
-  scopeTree: ScopeTreeEntry[]|null;
 }
 
 export class SourceMap {
+  static retainRawSourceMaps = false;
+
   #json: SourceMapV3|null;
   readonly #compiledURLInternal: Platform.DevToolsPath.UrlString;
   readonly #sourceMappingURL: Platform.DevToolsPath.UrlString;
@@ -215,6 +181,35 @@ export class SourceMap {
       }
     }
     this.eachSection(this.parseSources.bind(this));
+  }
+
+  json(): SourceMapV3|null {
+    return this.#json;
+  }
+
+  augmentWithScopes(scriptUrl: Platform.DevToolsPath.UrlString, ranges: NamedFunctionRange[]): void {
+    this.#ensureMappingsProcessed();
+    if (this.#json && this.#json.version > 3) {
+      throw new Error('Only support augmenting source maps up to version 3.');
+    }
+    // Ensure scriptUrl is associated with sourceMap sources
+    const sourceIdx = this.#sourceIndex(scriptUrl);
+    if (sourceIdx >= 0) {
+      if (!this.#scopesInfo) {
+        // First time seeing this sourcemap, create an new empty scopesInfo object
+        this.#scopesInfo = new SourceMapScopesInfo(this, [], []);
+      }
+      if (!this.#scopesInfo.hasOriginalScopes(sourceIdx)) {
+        const originalScopes = buildOriginalScopes(ranges);
+        this.#scopesInfo.addOriginalScopesAtIndex(sourceIdx, originalScopes);
+      }
+    } else {
+      throw new Error(`Could not find sourceURL ${scriptUrl} in sourceMap`);
+    }
+  }
+
+  #sourceIndex(sourceURL: Platform.DevToolsPath.UrlString): number {
+    return this.#sourceInfos.findIndex(info => info.sourceURL === sourceURL);
   }
 
   compiledURL(): Platform.DevToolsPath.UrlString {
@@ -265,7 +260,7 @@ export class SourceMap {
     }
     const mappings = this.mappings();
     const index = Platform.ArrayUtilities.upperBound(
-        mappings, undefined, (unused, entry) => lineNumber - entry.lineNumber || columnNumber - entry.columnNumber);
+        mappings, undefined, (_, entry) => lineNumber - entry.lineNumber || columnNumber - entry.columnNumber);
     return index ? mappings[index - 1] : null;
   }
 
@@ -276,7 +271,7 @@ export class SourceMap {
   }|null {
     const mappings = this.mappings();
     const endIndex = Platform.ArrayUtilities.upperBound(
-        mappings, undefined, (unused, entry) => lineNumber - entry.lineNumber || columnNumber - entry.columnNumber);
+        mappings, undefined, (_, entry) => lineNumber - entry.lineNumber || columnNumber - entry.columnNumber);
     if (!endIndex) {
       // If the line and column are preceding all the entries, then there is nothing to map.
       return null;
@@ -300,8 +295,7 @@ export class SourceMap {
     const startSourceColumn = mappings[startIndex].sourceColumnNumber;
     const endReverseIndex = Platform.ArrayUtilities.upperBound(
         reverseMappings, undefined,
-        (unused, i) =>
-            startSourceLine - mappings[i].sourceLineNumber || startSourceColumn - mappings[i].sourceColumnNumber);
+        (_, i) => startSourceLine - mappings[i].sourceLineNumber || startSourceColumn - mappings[i].sourceColumnNumber);
     if (!endReverseIndex) {
       return null;
     }
@@ -346,7 +340,7 @@ export class SourceMap {
     const reverseMappings = this.reversedMappings(sourceURL);
     const endIndex = Platform.ArrayUtilities.upperBound(
         reverseMappings, undefined,
-        (unused, i) => lineNumber - mappings[i].sourceLineNumber || columnNumber - mappings[i].sourceColumnNumber);
+        (_, i) => lineNumber - mappings[i].sourceLineNumber || columnNumber - mappings[i].sourceColumnNumber);
     let startIndex = endIndex;
     while (startIndex > 0 &&
            mappings[reverseMappings[startIndex - 1]].sourceLineNumber ===
@@ -422,6 +416,9 @@ export class SourceMap {
       this.mappings().sort(SourceMapEntry.compare);
 
       this.#computeReverseMappings(this.#mappingsInternal);
+    }
+
+    if (!SourceMap.retainRawSourceMaps) {
       this.#json = null;
     }
   }
@@ -494,13 +491,12 @@ export class SourceMap {
       }
       const url =
           Common.ParsedURL.ParsedURL.completeURL(this.#baseURL, href) || (href as Platform.DevToolsPath.UrlString);
-      const source = sourceMap.sourcesContent && sourceMap.sourcesContent[i];
+      const source = sourceMap.sourcesContent?.[i];
       const sourceInfo: SourceInfo = {
         sourceURL: url,
         content: source ?? null,
         ignoreListHint: ignoreList.has(i),
         reverseMappings: null,
-        scopeTree: null,
       };
       this.#sourceInfos.push(sourceInfo);
       if (!this.#sourceInfoByURL.has(url)) {
@@ -519,7 +515,7 @@ export class SourceMap {
     let nameIndex = 0;
     const names = map.names ?? [];
     const tokenIter = new TokenIterator(map.mappings);
-    let sourceURL: Platform.DevToolsPath.UrlString = this.#sourceInfos[sourceIndex].sourceURL;
+    let sourceURL: Platform.DevToolsPath.UrlString|undefined = this.#sourceInfos[sourceIndex]?.sourceURL;
 
     while (true) {
       if (tokenIter.peek() === ',') {
@@ -544,7 +540,7 @@ export class SourceMap {
       const sourceIndexDelta = tokenIter.nextVLQ();
       if (sourceIndexDelta) {
         sourceIndex += sourceIndexDelta;
-        sourceURL = this.#sourceInfos[sourceIndex].sourceURL;
+        sourceURL = this.#sourceInfos[sourceIndex]?.sourceURL;
       }
       sourceLineNumber += tokenIter.nextVLQ();
       sourceColumnNumber += tokenIter.nextVLQ();
@@ -568,101 +564,32 @@ export class SourceMap {
         const {originalScopes, generatedRanges} = decodeScopes(map, {line: baseLineNumber, column: baseColumnNumber});
         this.#scopesInfo.addOriginalScopes(originalScopes);
         this.#scopesInfo.addGeneratedRanges(generatedRanges);
+      } else if (map.x_com_bloomberg_sourcesFunctionMappings) {
+        const originalScopes = this.parseBloombergScopes(map);
+        this.#scopesInfo.addOriginalScopes(originalScopes);
+      } else {
+        // Keep the OriginalScope[] tree array consistent with sources.
+        this.#scopesInfo.addOriginalScopes(new Array(map.sources.length));
       }
-      this.parseBloombergScopes(map, baseSourceIndex);
     }
   }
 
-  private parseBloombergScopes(map: SourceMapV3Object, baseSourceIndex: number): void {
-    if (!map.x_com_bloomberg_sourcesFunctionMappings) {
-      return;
+  private parseBloombergScopes(map: SourceMapV3Object): Array<OriginalScope|undefined> {
+    const scopeList = map.x_com_bloomberg_sourcesFunctionMappings;
+    if (!scopeList) {
+      throw new Error('Cant decode pasta scopes without x_com_bloomberg_sourcesFunctionMappings field');
+    } else if (scopeList.length !== map.sources.length) {
+      throw new Error(`x_com_bloomberg_sourcesFunctionMappings must have ${map.sources.length} scope trees`);
     }
     const names = map.names ?? [];
-    const scopeList = map.x_com_bloomberg_sourcesFunctionMappings;
 
-    for (let i = 0; i < scopeList.length; i++) {
-      if (!scopeList[i]) {
-        continue;
+    return scopeList.map(rawScopes => {
+      if (!rawScopes) {
+        return undefined;
       }
-      const sourceInfo = this.#sourceInfos[baseSourceIndex + i];
-      const scopes = scopeList[i];
-
-      let nameIndex = 0;
-      let startLineNumber = 0;
-      let startColumnNumber = 0;
-      let endLineNumber = 0;
-      let endColumnNumber = 0;
-
-      const tokenIter = new TokenIterator(scopes);
-      const entries: ScopeTreeEntry[] = [];
-      let atStart = true;
-      while (tokenIter.hasNext()) {
-        if (atStart) {
-          atStart = false;
-        } else if (tokenIter.peek() === ',') {
-          tokenIter.next();
-        } else {
-          // Unexpected character.
-          return;
-        }
-        nameIndex += tokenIter.nextVLQ();
-        startLineNumber += tokenIter.nextVLQ();
-        startColumnNumber += tokenIter.nextVLQ();
-        endLineNumber += tokenIter.nextVLQ();
-        endColumnNumber += tokenIter.nextVLQ();
-        entries.push(new ScopeTreeEntry(
-            startLineNumber, startColumnNumber, endLineNumber, endColumnNumber, names[nameIndex] ?? '<invalid>'));
-      }
-      sourceInfo.scopeTree = this.buildScopeTree(entries);
-    }
-  }
-
-  private buildScopeTree(entries: ScopeTreeEntry[]): ScopeTreeEntry[] {
-    const toplevel: ScopeTreeEntry[] = [];
-    entries.sort((l, r) => comparePositions(l.start(), r.start()));
-
-    const stack: ScopeTreeEntry[] = [];
-
-    for (const entry of entries) {
-      const start = entry.start();
-      // Pop all the scopes that precede the current entry.
-      while (stack.length > 0) {
-        const top = stack[stack.length - 1];
-        if (comparePositions(top.end(), start) < 0) {
-          stack.pop();
-        } else {
-          break;
-        }
-      }
-
-      if (stack.length > 0) {
-        stack[stack.length - 1].children.push(entry);
-      } else {
-        toplevel.push(entry);
-      }
-      stack.push(entry);
-    }
-    return toplevel;
-  }
-
-  findScopeEntry(sourceURL: Platform.DevToolsPath.UrlString, sourceLineNumber: number, sourceColumnNumber: number):
-      ScopeEntry|null {
-    const sourceInfo = this.#sourceInfoByURL.get(sourceURL);
-    if (!sourceInfo || !sourceInfo.scopeTree) {
-      return null;
-    }
-    const position: Position = {lineNumber: sourceLineNumber, columnNumber: sourceColumnNumber};
-
-    let current: ScopeTreeEntry|null = null;
-    while (true) {
-      const children: ScopeTreeEntry[] = current?.children ?? sourceInfo.scopeTree;
-      const match = children.find(
-          child => comparePositions(child.start(), position) <= 0 && comparePositions(position, child.end()) <= 0);
-      if (!match) {
-        return current;
-      }
-      current = match;
-    }
+      const ranges = decodePastaRanges(rawScopes, names);
+      return buildOriginalScopes(ranges);
+    });
   }
 
   private isSeparator(char: string): boolean {

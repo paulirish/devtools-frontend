@@ -2,59 +2,118 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {renderElementIntoDOM} from '../../../testing/DOMHelpers.js';
+import * as Host from '../../../core/host/host.js';
+import {assertScreenshot, renderElementIntoDOM} from '../../../testing/DOMHelpers.js';
 import {
   describeWithEnvironment,
 } from '../../../testing/EnvironmentHelpers.js';
-import * as Freestyler from '../ai_assistance.js';
+import {createViewFunctionStub, type ViewFunctionStub} from '../../../testing/ViewFunctionHelpers.js';
+import * as AiAssistance from '../ai_assistance.js';
 
 describeWithEnvironment('UserActionRow', () => {
-  it('should show the feedback form when canShowFeedbackForm is true', async () => {
-    const component = new Freestyler.UserActionRow({
-      showRateButtons: true,
-      onFeedbackSubmit: sinon.stub(),
-      canShowFeedbackForm: true,
-      handleSuggestionClick: sinon.stub(),
-    });
-    renderElementIntoDOM(component);
-    const button = component.shadowRoot!.querySelector('.rate-buttons devtools-button')! as HTMLElement;
-    button.click();
+  function createComponent(props: AiAssistance.UserActionRow.UserActionRowWidgetParams):
+      [ViewFunctionStub<typeof AiAssistance.UserActionRow.UserActionRow>, AiAssistance.UserActionRow.UserActionRow] {
+    const view = createViewFunctionStub(AiAssistance.UserActionRow.UserActionRow);
+    const component = new AiAssistance.UserActionRow.UserActionRow(undefined, view);
+    Object.assign(component, props);
+    component.wasShown();
+    return [view, component];
+  }
 
-    assert(component.shadowRoot!.querySelector('.feedback-form'));
+  it('should show the feedback form when canShowFeedbackForm is true', async () => {
+    const [view] = createComponent({
+      showRateButtons: true,
+      canShowFeedbackForm: true,
+      onSuggestionClick: sinon.stub(),
+      onFeedbackSubmit: sinon.stub(),
+    });
+
+    sinon.assert.callCount(view, 1);
+
+    {
+      expect(view.input.isShowingFeedbackForm).equals(false);
+      view.input.onRatingClick(Host.AidaClient.Rating.POSITIVE);
+    }
+
+    sinon.assert.callCount(view, 2);
+    {
+      expect(view.input.isShowingFeedbackForm).equals(true);
+    }
   });
 
   it('should not show the feedback form when canShowFeedbackForm is false', async () => {
-    const component = new Freestyler.UserActionRow({
+    const [view] = createComponent({
       showRateButtons: true,
-      onFeedbackSubmit: sinon.stub(),
       canShowFeedbackForm: false,
-      handleSuggestionClick: sinon.stub(),
+      onSuggestionClick: sinon.stub(),
+      onFeedbackSubmit: sinon.stub(),
     });
-    renderElementIntoDOM(component);
 
-    const button = component.shadowRoot!.querySelector('.rate-buttons devtools-button')! as HTMLElement;
-    button.click();
+    sinon.assert.callCount(view, 1);
 
-    assert.notExists(component.shadowRoot!.querySelector('.feedback-form'));
+    {
+      expect(view.input.isShowingFeedbackForm).equals(false);
+      view.input.onRatingClick(Host.AidaClient.Rating.POSITIVE);
+    }
+
+    sinon.assert.callCount(view, 2);
+    {
+      expect(view.input.isShowingFeedbackForm).equals(false);
+    }
   });
 
   it('should disable the submit button when the input is empty', async () => {
-    const component = new Freestyler.UserActionRow({
+    const [view] = createComponent({
       showRateButtons: true,
-      onFeedbackSubmit: sinon.stub(),
       canShowFeedbackForm: true,
-      handleSuggestionClick: sinon.stub(),
+      onSuggestionClick: sinon.stub(),
+      onFeedbackSubmit: sinon.stub(),
     });
-    renderElementIntoDOM(component);
-    const button = component.shadowRoot!.querySelector('.rate-buttons devtools-button')! as HTMLElement;
-    button.click();
 
-    assert(component.shadowRoot!.querySelector('.feedback-form'));
-    const submitButton = component.shadowRoot!.querySelector('[aria-label="Submit"]') as HTMLButtonElement;
-    assert.isTrue(submitButton?.disabled);
-    const inputField = component.shadowRoot!.querySelector('.feedback-form input')! as HTMLInputElement;
-    inputField.value = 'test';
-    inputField.dispatchEvent(new Event('input'));
-    assert.isFalse(submitButton?.disabled);
+    sinon.assert.callCount(view, 1);
+
+    {
+      expect(view.input.isSubmitButtonDisabled).equals(true);
+      view.input.onRatingClick(Host.AidaClient.Rating.POSITIVE);
+    }
+
+    sinon.assert.callCount(view, 2);
+
+    {
+      expect(view.input.isShowingFeedbackForm).equals(true);
+      view.input.onInputChange('test');
+    }
+
+    {
+      expect(view.input.isSubmitButtonDisabled).equals(false);
+      view.input.onSubmit(new SubmitEvent('submit'));
+    }
+
+    {
+      expect(view.input.isSubmitButtonDisabled).equals(true);
+    }
+  });
+
+  describe('view', () => {
+    it('looks fine', async () => {
+      const target = document.createElement('div');
+      renderElementIntoDOM(target);
+      AiAssistance.UserActionRow.DEFAULT_VIEW(
+          {
+            onRatingClick: () => {},
+            onReportClick: () => {},
+            scrollSuggestionsScrollContainer: () => {},
+            onSuggestionsScrollOrResize: () => {},
+            onSuggestionClick: () => {},
+            onSubmit: () => {},
+            onClose: () => {},
+            onInputChange: () => {},
+            showRateButtons: true,
+            isSubmitButtonDisabled: false,
+            isShowingFeedbackForm: true,
+          },
+          {}, target);
+      await assertScreenshot('ai_assistance/user_action_row.png');
+    });
   });
 });

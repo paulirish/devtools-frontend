@@ -1,6 +1,7 @@
 // Copyright 2022 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import * as Common from '../../../core/common/common.js';
 import * as Host from '../../../core/host/host.js';
@@ -16,7 +17,7 @@ import * as NetworkForward from '../../../panels/network/forward/forward.js';
 import * as Sources from '../../../panels/sources/sources.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as UI from '../../../ui/legacy/legacy.js';
-import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import {html, nothing, render} from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import {
@@ -32,8 +33,6 @@ import {
   isValidHeaderName,
 } from './HeaderSectionRow.js';
 import responseHeaderSectionStyles from './ResponseHeaderSection.css.js';
-
-const {render, html} = LitHtml;
 
 const UIStrings = {
   /**
@@ -75,13 +74,11 @@ const UIStrings = {
    */
   toUseThisResourceFromADifferentSite:
       'To use this resource from a different site, the server may relax the cross-origin resource policy response header:',
-};
+} as const;
 
 const str_ = i18n.i18n.registerUIStrings('panels/network/components/ResponseHeaderSection.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 const i18nLazyString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined, str_);
-
-const plusIconUrl = new URL('../../../Images/plus.svg', import.meta.url).toString();
 
 export const RESPONSE_HEADER_SECTION_DATA_KEY = 'ResponseHeaderSection';
 
@@ -93,10 +90,6 @@ export interface ResponseHeaderSectionData {
 class ResponseHeaderSectionBase extends HTMLElement {
   protected readonly shadow = this.attachShadow({mode: 'open'});
   protected headerDetails: HeaderDetailsDescriptor[] = [];
-
-  connectedCallback(): void {
-    this.shadow.adoptedStyleSheets = [responseHeaderSectionStyles];
-  }
 
   protected setHeaders(headers: NameValue[]): void {
     headers.sort(function(a, b) {
@@ -139,6 +132,7 @@ export class EarlyHintsHeaderSection extends ResponseHeaderSectionBase {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     render(html`
+      <style>${responseHeaderSectionStyles}</style>
       ${this.headerDetails.map(header => html`
         <devtools-header-section-row .data=${{
         header,
@@ -283,7 +277,7 @@ export class ResponseHeaderSection extends ResponseHeaderSectionBase {
       this.#overrides =
           JSON.parse(deferredContent.content || '[]') as Persistence.NetworkPersistenceManager.HeaderOverride[];
       if (!this.#overrides.every(Persistence.NetworkPersistenceManager.isHeaderOverride)) {
-        throw 'Type mismatch after parsing';
+        throw new Error('Type mismatch after parsing');
       }
       if (Common.Settings.Settings.instance().moduleSetting('persistence-network-overrides-enabled').get() &&
           this.#isEditingAllowed === EditingAllowedStatus.DISABLED) {
@@ -537,6 +531,7 @@ export class ResponseHeaderSection extends ResponseHeaderSectionBase {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     render(html`
+      <style>${responseHeaderSectionStyles}</style>
       ${headerDescriptors.map((header, index) => html`
         <devtools-header-section-row
             .data=${{header} as HeaderSectionRowData}
@@ -551,12 +546,12 @@ export class ResponseHeaderSection extends ResponseHeaderSectionBase {
         <devtools-button
           class="add-header-button"
           .variant=${Buttons.Button.Variant.OUTLINED}
-          .iconUrl=${plusIconUrl}
+          .iconName=${'plus'}
           @click=${this.#onAddHeaderClick}
           jslog=${VisualLogging.action('add-header').track({click: true})}>
           ${i18nString(UIStrings.addHeader)}
         </devtools-button>
-      ` : LitHtml.nothing}
+      ` : nothing}
     `, this.shadow, {host: this});
     // clang-format on
   }

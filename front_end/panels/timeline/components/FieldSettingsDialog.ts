@@ -1,8 +1,8 @@
 // Copyright 2024 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view, rulesdir/inject-checkbox-styles */
 
-import '../../../ui/components/data_grid/data_grid.js';
 import './OriginMap.js';
 
 import * as i18n from '../../../core/i18n/i18n.js';
@@ -12,7 +12,7 @@ import * as Dialogs from '../../../ui/components/dialogs/dialogs.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as Input from '../../../ui/components/input/input.js';
 import * as UI from '../../../ui/legacy/legacy.js';
-import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import * as Lit from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import fieldSettingsDialogStyles from './fieldSettingsDialog.css.js';
@@ -87,12 +87,12 @@ const UIStrings = {
    * @example {http//malformed.com} PH1
    */
   invalidOrigin: '"{PH1}" is not a valid origin or URL.',
-};
+} as const;
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/FieldSettingsDialog.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-const {html, nothing, Directives: {ifDefined}} = LitHtml;
+const {html, nothing, Directives: {ifDefined}} = Lit;
 
 export class ShowDialog extends Event {
   static readonly eventName = 'showdialog';
@@ -109,8 +109,8 @@ export class FieldSettingsDialog extends HTMLElement {
 
   #configSetting = CrUXManager.CrUXManager.instance().getConfigSetting();
 
-  #urlOverride: string = '';
-  #urlOverrideEnabled: boolean = false;
+  #urlOverride = '';
+  #urlOverrideEnabled = false;
   #urlOverrideWarning = '';
   #originMap?: OriginMap;
 
@@ -200,8 +200,6 @@ export class FieldSettingsDialog extends HTMLElement {
   }
 
   connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [fieldSettingsDialogStyles, Input.textInputStyles, Input.checkboxStyles];
-
     this.#configSetting.addChangeListener(this.#onSettingsChanged, this);
 
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
@@ -211,7 +209,7 @@ export class FieldSettingsDialog extends HTMLElement {
     this.#configSetting.removeChangeListener(this.#onSettingsChanged, this);
   }
 
-  #renderOpenButton(): LitHtml.LitTemplate {
+  #renderOpenButton(): Lit.LitTemplate {
     if (this.#configSetting.get().enabled) {
       // clang-format off
       return html`
@@ -243,7 +241,7 @@ export class FieldSettingsDialog extends HTMLElement {
     // clang-format on
   }
 
-  #renderEnableButton(): LitHtml.LitTemplate {
+  #renderEnableButton(): Lit.LitTemplate {
     // clang-format off
     return html`
       <devtools-button
@@ -254,6 +252,7 @@ export class FieldSettingsDialog extends HTMLElement {
           variant: Buttons.Button.Variant.PRIMARY,
           title: i18nString(UIStrings.ok),
         } as Buttons.Button.ButtonData}
+        class="enable"
         jslog=${VisualLogging.action('timeline.field-data.enable').track({click: true})}
         data-field-data-enable
       >${i18nString(UIStrings.ok)}</devtools-button>
@@ -261,7 +260,7 @@ export class FieldSettingsDialog extends HTMLElement {
     // clang-format on
   }
 
-  #renderDisableButton(): LitHtml.LitTemplate {
+  #renderDisableButton(): Lit.LitTemplate {
     const label = this.#configSetting.get().enabled ? i18nString(UIStrings.optOut) : i18nString(UIStrings.cancel);
     // clang-format off
     return html`
@@ -304,7 +303,7 @@ export class FieldSettingsDialog extends HTMLElement {
     }
   }
 
-  #renderOriginMapGrid(): LitHtml.LitTemplate {
+  #renderOriginMapGrid(): Lit.LitTemplate {
     // clang-format off
     return html`
       <div class="origin-mapping-description">${i18nString(UIStrings.mapDevelopmentOrigins)}</div>
@@ -335,6 +334,9 @@ export class FieldSettingsDialog extends HTMLElement {
 
     // clang-format off
     const output = html`
+      <style>${fieldSettingsDialogStyles}</style>
+      <style>${Input.textInputStyles}</style>
+      <style>${Input.checkboxStyles}</style>
       <div class="open-button-section">${this.#renderOpenButton()}</div>
       <devtools-dialog
         @clickoutsidedialog=${this.#closeDialog}
@@ -391,7 +393,7 @@ export class FieldSettingsDialog extends HTMLElement {
       </devtools-dialog>
     `;
     // clang-format on
-    LitHtml.render(output, this.#shadow, {host: this});
+    Lit.render(output, this.#shadow, {host: this});
   };
 }
 

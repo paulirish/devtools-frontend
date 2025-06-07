@@ -27,6 +27,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import '../../ui/components/report_view/report_view.js';
 import '../../ui/legacy/legacy.js';
@@ -37,7 +38,7 @@ import * as Buttons from '../../ui/components/buttons/buttons.js';
 import * as DataGrid from '../../ui/legacy/components/data_grid/data_grid.js';
 import * as ObjectUI from '../../ui/legacy/components/object_ui/object_ui.js';
 import * as UI from '../../ui/legacy/legacy.js';
-import * as LitHtml from '../../ui/lit-html/lit-html.js';
+import * as Lit from '../../ui/lit/lit.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import * as ApplicationComponents from './components/components.js';
@@ -45,7 +46,7 @@ import type {
   Database, DatabaseId, Entry, Index, IndexedDBModel, ObjectStore, ObjectStoreMetadata} from './IndexedDBModel.js';
 import indexedDBViewsStyles from './indexedDBViews.css.js';
 
-const {html} = LitHtml;
+const {html} = Lit;
 
 const UIStrings = {
   /**
@@ -65,10 +66,14 @@ const UIStrings = {
    */
   refreshDatabase: 'Refresh database',
   /**
-   *@description Text in Indexed DBViews of the Application panel
+   *@description Text in Application panel IndexedDB delete confirmation dialog
    *@example {msb} PH1
    */
-  pleaseConfirmDeleteOfSDatabase: 'Please confirm delete of "{PH1}" database.',
+  confirmDeleteDatabase: 'Delete "{PH1}" database?',
+  /**
+   *@description Explanation text in Application panel IndexedDB delete confirmation dialog
+   */
+  databaseWillBeRemoved: 'The selected database and contained data will be removed.',
   /**
    *@description Text in Indexed DBViews of the Application panel
    */
@@ -143,7 +148,7 @@ const UIStrings = {
    *@example {2} PH1
    */
   keyGeneratorValueS: 'Key generator value: {PH1}',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/application/IndexedDBViews.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -163,9 +168,9 @@ export class IDBDatabaseView extends ApplicationComponents.StorageMetadataView.S
     return this.database?.databaseId.name;
   }
 
-  override async renderReportContent(): Promise<LitHtml.LitTemplate> {
+  override async renderReportContent(): Promise<Lit.LitTemplate> {
     if (!this.database) {
-      return LitHtml.nothing;
+      return Lit.nothing;
     }
     return html`
       ${await super.renderReportContent()}
@@ -222,7 +227,8 @@ export class IDBDatabaseView extends ApplicationComponents.StorageMetadataView.S
 
   private async deleteDatabase(): Promise<void> {
     const ok = await UI.UIUtils.ConfirmDialog.show(
-        i18nString(UIStrings.pleaseConfirmDeleteOfSDatabase, {PH1: this.database.databaseId.name}), this,
+        i18nString(UIStrings.databaseWillBeRemoved),
+        i18nString(UIStrings.confirmDeleteDatabase, {PH1: this.database.databaseId.name}), this,
         {jslogContext: 'delete-database-confirmation'});
     if (ok) {
       void this.model.deleteDatabase(this.database.databaseId);
@@ -252,12 +258,12 @@ export class IDBDataView extends UI.View.SimpleView {
   private clearingObjectStore: boolean;
   private pageSize: number;
   private skipCount: number;
-  private entries: Entry[];
+  // Used in Web Tests
+  protected entries: Entry[];
   private objectStore!: ObjectStore;
   private index!: Index|null;
   private keyInput!: UI.Toolbar.ToolbarInput;
   private dataGrid!: DataGrid.DataGrid.DataGridImpl<unknown>;
-  private previouslySelectedNode?: DataGrid.DataGrid.DataGridNode<unknown>;
   private lastPageSize!: number;
   private lastSkipCount!: number;
   private pageBackButton!: UI.Toolbar.ToolbarButton;
@@ -271,6 +277,7 @@ export class IDBDataView extends UI.View.SimpleView {
       model: IndexedDBModel, databaseId: DatabaseId, objectStore: ObjectStore, index: Index|null,
       refreshObjectStoreCallback: () => void) {
     super(i18nString(UIStrings.idb));
+    this.registerRequiredCSS(indexedDBViewsStyles);
 
     this.model = model;
     this.databaseId = databaseId;
@@ -366,12 +373,10 @@ export class IDBDataView extends UI.View.SimpleView {
       columns,
       deleteCallback: this.deleteButtonClicked.bind(this),
       refreshCallback: this.updateData.bind(this, true),
-      editCallback: undefined,
     });
     dataGrid.setStriped(true);
     dataGrid.addEventListener(DataGrid.DataGrid.Events.SELECTED_NODE, () => {
       this.updateToolbarEnablement();
-      this.updateSelectionColor();
     }, this);
     return dataGrid;
   }
@@ -551,7 +556,6 @@ export class IDBDataView extends UI.View.SimpleView {
       this.pageForwardButton.setEnabled(hasMore);
       this.needsRefresh.setVisible(false);
       this.updateToolbarEnablement();
-      this.updateSelectionColor();
       this.updatedDataForTests();
     }
 
@@ -636,37 +640,13 @@ export class IDBDataView extends UI.View.SimpleView {
     const empty = !this.dataGrid || this.dataGrid.rootNode().children.length === 0;
     this.deleteSelectedButton.setEnabled(!empty && this.dataGrid.selectedNode !== null);
   }
-
-  private updateSelectionColor(): void {
-    if (this.previouslySelectedNode) {
-      this.previouslySelectedNode.element().querySelectorAll('.source-code').forEach(element => {
-        const shadowRoot = element.shadowRoot;
-        shadowRoot?.adoptedStyleSheets.pop();
-      });
-    }
-    this.previouslySelectedNode = this.dataGrid.selectedNode ?? undefined;
-    this.dataGrid.selectedNode?.element().querySelectorAll('.source-code').forEach(element => {
-      const shadowRoot = element.shadowRoot;
-      const sheet = new CSSStyleSheet();
-      sheet.replaceSync('::selection {background-color: var(--sys-color-state-focus-select);}');
-      shadowRoot?.adoptedStyleSheets.push(sheet);
-    });
-  }
-
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([indexedDBViewsStyles]);
-  }
 }
 
 export class IDBDataGridNode extends DataGrid.DataGrid.DataGridNode<unknown> {
   override selectable: boolean;
   valueObjectPresentation: ObjectUI.ObjectPropertiesSection.ObjectPropertiesSection|null;
-  constructor(data: {
-    // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    [x: string]: any,
-  }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  constructor(data: Record<string, any>) {
     super(data, false);
     this.selectable = true;
     this.valueObjectPresentation = null;
@@ -693,8 +673,6 @@ export class IDBDataGridNode extends DataGrid.DataGrid.DataGridNode<unknown> {
             value, undefined /* linkifier */, true /* skipProto */, true /* readOnly */);
         cell.appendChild(objectElement);
         break;
-      }
-      default: {
       }
     }
 

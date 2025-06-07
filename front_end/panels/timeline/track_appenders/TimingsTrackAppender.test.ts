@@ -15,8 +15,9 @@ function initTrackAppender(
     entryData: Trace.Types.Events.Event[],
     entryTypeByLevel: Timeline.TimelineFlameChartDataProvider.EntryType[],
     ): Timeline.TimingsTrackAppender.TimingsTrackAppender {
+  const entityMapper = new Timeline.Utils.EntityMapper.EntityMapper(parsedTrace);
   const compatibilityTracksAppender = new Timeline.CompatibilityTracksAppender.CompatibilityTracksAppender(
-      flameChartData, parsedTrace, entryData, entryTypeByLevel);
+      flameChartData, parsedTrace, entryData, entryTypeByLevel, entityMapper);
   return compatibilityTracksAppender.timingsTrackAppender();
 }
 
@@ -40,7 +41,7 @@ describeWithEnvironment('TimingTrackAppender', function() {
   function getMockInfo(event?: Trace.Types.Events.Event) {
     const defaultInfo: Timeline.CompatibilityTracksAppender.PopoverInfo = {
       title: event ? timingsTrackAppender.titleForEvent(event) : 'title',
-      formattedTime: event ? Timeline.AppenderUtils.getFormattedTime(event.dur) : 'time',
+      formattedTime: event ? Timeline.AppenderUtils.getDurationString(event.dur) : 'time',
       warningElements: [],
       additionalElements: [],
       url: null,
@@ -69,8 +70,7 @@ describeWithEnvironment('TimingTrackAppender', function() {
       for (const event of [...performanceMarks, ...performanceMeasures, ...consoleTimings, ...consoleTimestamps]) {
         const markerIndex = entryData.indexOf(event);
         assert.exists(markerIndex);
-        assert.strictEqual(
-            flameChartData.entryStartTimes[markerIndex], Trace.Helpers.Timing.microSecondsToMilliseconds(event.ts));
+        assert.strictEqual(flameChartData.entryStartTimes[markerIndex], Trace.Helpers.Timing.microToMilli(event.ts));
       }
     });
     it('adds total times correctly', () => {
@@ -86,7 +86,7 @@ describeWithEnvironment('TimingTrackAppender', function() {
           continue;
         }
         const expectedTotalTimeForEvent = event.dur ?
-            Trace.Helpers.Timing.microSecondsToMilliseconds(event.dur) :
+            Trace.Helpers.Timing.microToMilli(event.dur) :
             Timeline.TimelineFlameChartDataProvider.InstantEventVisibleDurationMs;
         assert.strictEqual(flameChartData.entryTotalTimes[markerIndex], expectedTotalTimeForEvent);
       }
@@ -155,7 +155,7 @@ describeWithEnvironment('TimingTrackAppender', function() {
     it('returns the correct title for console timestamps', () => {
       const traceMarkers = parsedTrace.UserTimings.timestampEvents;
       for (const mark of traceMarkers) {
-        assert.strictEqual(timingsTrackAppender.titleForEvent(mark), `TimeStamp: ${mark.args.data.name}`);
+        assert.strictEqual(timingsTrackAppender.titleForEvent(mark), `TimeStamp: ${mark.args.data?.message}`);
       }
     });
   });
@@ -212,7 +212,7 @@ describeWithEnvironment('TimingTrackAppender', function() {
 
       assert.deepInclude(popoverInfo, {
         title: 'TimeStamp: a timestamp',
-        formattedTime: '615.88\u00A0ms',
+        formattedTime: '615.25\u00A0ms',
       });
     });
 
@@ -271,7 +271,7 @@ describeWithEnvironment('TimingTrackAppender', function() {
     it('creates a TimelineFlameChartMarker for each extension marker event in a trace', () => {
       const extensionMarkers = parsedTrace.ExtensionTraceData.extensionMarkers;
       for (const traceMarker of extensionMarkers) {
-        const markerTimeMs = Trace.Helpers.Timing.microSecondsToMilliseconds(traceMarker.ts);
+        const markerTimeMs = Trace.Helpers.Timing.microToMilli(traceMarker.ts);
         const flameChartMarker =
             flameChartData.markers.find(flameChartMarker => flameChartMarker.startTime() === markerTimeMs);
         assert.exists(flameChartMarker);
@@ -336,7 +336,7 @@ describeWithEnvironment('TimingTrackAppender', function() {
 
         const extensionMarkers = parsedTrace.ExtensionTraceData.extensionMarkers;
         for (const traceMarker of extensionMarkers) {
-          const markerTimeMs = Trace.Helpers.Timing.microSecondsToMilliseconds(traceMarker.ts);
+          const markerTimeMs = Trace.Helpers.Timing.microToMilli(traceMarker.ts);
           const flameChartMarker =
               flameChartData.markers.find(flameChartMarker => flameChartMarker.startTime() === markerTimeMs);
           assert.isUndefined(flameChartMarker);

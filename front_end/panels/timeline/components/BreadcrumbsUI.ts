@@ -1,18 +1,19 @@
 // Copyright 2023 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Trace from '../../../models/trace/trace.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as UI from '../../../ui/legacy/legacy.js';
-import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import * as Lit from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import {flattenBreadcrumbs} from './Breadcrumbs.js';
 import breadcrumbsUIStyles from './breadcrumbsUI.css.js';
 
-const {render, html} = LitHtml;
+const {render, html} = Lit;
 
 const UIStrings = {
   /**
@@ -27,7 +28,7 @@ const UIStrings = {
    */
   removeChildBreadcrumbs: 'Remove child breadcrumbs',
 
-};
+} as const;
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/BreadcrumbsUI.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -51,18 +52,13 @@ export class BreadcrumbActivatedEvent extends Event {
 
 export class BreadcrumbsUI extends HTMLElement {
   readonly #shadow = this.attachShadow({mode: 'open'});
-  readonly #boundRender = this.#render.bind(this);
   #initialBreadcrumb: Trace.Types.File.Breadcrumb|null = null;
   #activeBreadcrumb: Trace.Types.File.Breadcrumb|null = null;
-
-  connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [breadcrumbsUIStyles];
-  }
 
   set data(data: BreadcrumbsUIData) {
     this.#initialBreadcrumb = data.initialBreadcrumb;
     this.#activeBreadcrumb = data.activeBreadcrumb;
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
   #activateBreadcrumb(breadcrumb: Trace.Types.File.Breadcrumb): void {
@@ -108,8 +104,8 @@ export class BreadcrumbsUI extends HTMLElement {
     void menu.show();
   }
 
-  #renderElement(breadcrumb: Trace.Types.File.Breadcrumb, index: number): LitHtml.LitTemplate {
-    const breadcrumbRange = Trace.Helpers.Timing.microSecondsToMilliseconds(breadcrumb.window.range);
+  #renderElement(breadcrumb: Trace.Types.File.Breadcrumb, index: number): Lit.LitTemplate {
+    const breadcrumbRange = Trace.Helpers.Timing.microToMilli(breadcrumb.window.range);
     // clang-format off
     return html`
           <div class="breadcrumb" @contextmenu=${(event: Event) => this.#onContextMenu(event, breadcrumb)} @click=${() => this.#activateBreadcrumb(breadcrumb)}
@@ -136,7 +132,8 @@ export class BreadcrumbsUI extends HTMLElement {
   #render(): void {
     // clang-format off
     const output = html`
-      ${this.#initialBreadcrumb === null ? LitHtml.nothing : html`<div class="breadcrumbs" jslog=${VisualLogging.section('breadcrumbs')}>
+      <style>${breadcrumbsUIStyles}</style>
+      ${this.#initialBreadcrumb === null ? Lit.nothing : html`<div class="breadcrumbs" jslog=${VisualLogging.section('breadcrumbs')}>
         ${flattenBreadcrumbs(this.#initialBreadcrumb).map((breadcrumb, index) => this.#renderElement(breadcrumb, index))}
       </div>`}
     `;

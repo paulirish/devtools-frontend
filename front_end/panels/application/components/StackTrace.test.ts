@@ -37,9 +37,9 @@ function mockBuildStackTraceRows(
     _target: SDK.Target.Target|null,
     _linkifier: Components.Linkifier.Linkifier,
     _tabStops: boolean|undefined,
-    _updateCallback?: (arg0: (Components.JSPresentationUtils.StackTraceRegularRow|
-                              Components.JSPresentationUtils.StackTraceAsyncRow)[]) => void,
-    ): (Components.JSPresentationUtils.StackTraceRegularRow|Components.JSPresentationUtils.StackTraceAsyncRow)[] {
+    _updateCallback?: (arg0: Array<Components.JSPresentationUtils.StackTraceRegularRow|
+                                   Components.JSPresentationUtils.StackTraceAsyncRow>) => void,
+    ): Array<Components.JSPresentationUtils.StackTraceRegularRow|Components.JSPresentationUtils.StackTraceAsyncRow> {
   const fakeProject = {id: () => 'http://www.example.com', type: () => Workspace.Workspace.projectTypes.Network} as
       Workspace.Workspace.Project;
   return stackTrace.callFrames.map(callFrame => {
@@ -115,8 +115,8 @@ describeWithEnvironment('StackTrace', () => {
     });
 
     assert.deepEqual(stackTraceText, [
-      'function1 \xA0@\xA0www.example.com/script1.js',
-      'function2 \xA0@\xA0www.example.com/script2.js',
+      'function1\n\xA0@\xA0www.example.com/script1.js',
+      'function2\n\xA0@\xA0www.example.com/script2.js',
     ]);
   });
 
@@ -175,7 +175,7 @@ describeWithEnvironment('StackTrace', () => {
     });
 
     assert.deepEqual(stackTraceText, [
-      'function1 \xA0@\xA0www.example.com/script.js',
+      'function1\n\xA0@\xA0www.example.com/script.js',
       'Show 1 more frame',
     ]);
 
@@ -195,8 +195,8 @@ describeWithEnvironment('StackTrace', () => {
     });
 
     assert.deepEqual(openedStackTraceText, [
-      'function1 \xA0@\xA0www.example.com/script.js',
-      'function2 \xA0@\xA0www.example.com/hidden.js',
+      'function1\n\xA0@\xA0www.example.com/script.js',
+      'function2\n\xA0@\xA0www.example.com/hidden.js',
       'Show less',
     ]);
 
@@ -215,7 +215,7 @@ describeWithEnvironment('StackTrace', () => {
     });
 
     assert.deepEqual(stackTraceText, [
-      'function1 \xA0@\xA0www.example.com/script.js',
+      'function1\n\xA0@\xA0www.example.com/script.js',
       'Show 1 more frame',
     ]);
   });

@@ -8,7 +8,6 @@ import {
   goTo,
   waitForFunction,
 } from '../../shared/helper.js';
-
 import {
   clearTimeWindow,
   getAllRequestNames,
@@ -27,9 +26,6 @@ const SIMPLE_PAGE_REQUEST_NUMBER = 10;
 const SIMPLE_PAGE_URL = `requests.html?num=${SIMPLE_PAGE_REQUEST_NUMBER}`;
 
 describe('The Network Tab', function() {
-  // The tests here tend to take time because they wait for requests to appear in the request panel.
-  this.timeout(5000);
-
   beforeEach(async () => {
     await navigateToNetworkTab('empty.html');
     await setCacheDisabled(true);
@@ -84,7 +80,7 @@ describe('The Network Tab', function() {
     // Navigate to a new page, and wait for the same requests to still be there.
     await goTo('about:blank');
     await waitForSomeRequestsToAppear(SIMPLE_PAGE_REQUEST_NUMBER + 1);
-    let secondPageRequestNames: (string|null)[] = [];
+    let secondPageRequestNames: Array<string|null> = [];
     await waitForFunction(async () => {
       secondPageRequestNames = await getAllRequestNames();
       return secondPageRequestNames.length === SIMPLE_PAGE_REQUEST_NUMBER + 1;

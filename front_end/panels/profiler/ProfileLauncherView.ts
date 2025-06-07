@@ -27,6 +27,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -63,7 +64,7 @@ const UIStrings = {
    *@description Profile type header element text content in Profile Launcher View of a profiler tool
    */
   selectProfilingType: 'Select profiling type',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/profiler/ProfileLauncherView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export class ProfileLauncherView extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.VBox>(
@@ -86,6 +87,7 @@ export class ProfileLauncherView extends Common.ObjectWrapper.eventMixin<EventTy
 
   constructor(profilesPanel: ProfilesPanel) {
     super();
+    this.registerRequiredCSS(profileLauncherViewStyles);
 
     this.panel = profilesPanel;
     this.element.classList.add('profile-launcher-view');
@@ -226,10 +228,6 @@ export class ProfileLauncherView extends Common.ObjectWrapper.eventMixin<EventTy
     this.isEnabled = profileType.isEnabled();
     this.updateControls();
     this.selectedProfileTypeSetting.set(profileType.id);
-  }
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([profileLauncherViewStyles]);
   }
 }
 

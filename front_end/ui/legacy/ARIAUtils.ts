@@ -164,10 +164,6 @@ export function markAsPoliteLiveRegion(element: Element, isAtomic: boolean): voi
   }
 }
 
-export function markAsLog(element: Element): void {
-  element.setAttribute('role', 'log');
-}
-
 export function hasRole(element: Element): boolean {
   return element.hasAttribute('role');
 }
@@ -376,56 +372,54 @@ function hideFromLayout(element: HTMLElement): void {
   element.style.overflow = 'hidden';
 }
 
-interface AlertState {
-  one: HTMLDivElement;
-  two: HTMLDivElement;
-  alertToggle: boolean;
-}
-const alertElements = new WeakMap<HTMLElement, AlertState>();
-
+const alertElements = new WeakMap<HTMLElement, HTMLElement>();
 function createAlertElement(container: HTMLElement): HTMLDivElement {
   const element = container.createChild('div');
   hideFromLayout(element);
   element.setAttribute('role', 'alert');
   element.setAttribute('aria-atomic', 'true');
-  return element as HTMLDivElement;
+  return element;
 }
 
-export function getOrCreateAlertElements(container: HTMLElement = document.body): AlertState {
-  let state = alertElements.get(container);
-  if (!state) {
-    state = {
-      one: createAlertElement(container),
-      two: createAlertElement(container),
-      alertToggle: false,
-    };
-    alertElements.set(container, state);
+export function getOrCreateAlertElement(container: HTMLElement = document.body, opts?: {force: boolean}): HTMLElement {
+  const existingAlertElement = alertElements.get(container);
+  if (existingAlertElement && existingAlertElement.isConnected && !opts?.force) {
+    return existingAlertElement;
   }
-  return state;
+
+  const newAlertElement = createAlertElement(container);
+  alertElements.set(container, newAlertElement);
+  return newAlertElement;
 }
 
 /**
- * This function instantiates and switches off returning one of two offscreen alert elements.
- * We utilize two alert elements to ensure that alerts with the same string are still registered
- * as changes and trigger screen reader announcement.
+ * Used only in tests to clear any left over alerts between test runs.
  */
-export function alertElementInstance(container = document.body): HTMLElement {
-  const state = getOrCreateAlertElements(container);
-  state.alertToggle = !state.alertToggle;
-  if (state.alertToggle) {
-    state.two.textContent = '';
-    return state.one;
+export function removeAlertElement(container: HTMLElement): void {
+  const alertElement = alertElements.get(container);
+  if (alertElement) {
+    alertElement.remove();
+    alertElements.delete(container);
   }
-  state.one.textContent = '';
-  return state.two;
 }
 
 /**
- * This function is used to announce a message with the screen reader.
- * Setting the textContent would allow the SR to access the offscreen element via browse mode
+ * Announces the provided message using a dedicated ARIA alert element (`role="alert"`).
+ * Ensures messages are announced even if identical to the previous message by appending
+ * a non-breaking space ('\u00A0') when necessary. This works around screen reader
+ * optimizations that might otherwise silence repeated identical alerts. The element's
+ * `aria-atomic="true"` attribute ensures the entire message is announced upon change.
+ *
+ * The alert element is associated with the currently active dialog's content element
+ * if a dialog is showing, otherwise defaults to an element associated with the document body.
+ * Messages longer than 10000 characters will be trimmed.
+ *
+ * @param message The message to be announced.
  */
 export function alert(message: string): void {
   const dialog = Dialog.getInstance();
-  const element = alertElementInstance(dialog && dialog.isShowing() ? dialog.contentElement : undefined);
-  element.textContent = Platform.StringUtilities.trimEndWithMaxLength(message, 10000);
+  const element = getOrCreateAlertElement(dialog?.isShowing() ? dialog.contentElement : undefined);
+
+  const announcedMessage = element.textContent === message ? `${message}\u00A0` : message;
+  element.textContent = Platform.StringUtilities.trimEndWithMaxLength(announcedMessage, 10000);
 }

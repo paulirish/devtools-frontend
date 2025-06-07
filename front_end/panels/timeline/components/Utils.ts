@@ -1,6 +1,7 @@
 // Copyright 2024 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Platform from '../../../core/platform/platform.js';
@@ -8,6 +9,8 @@ import * as Protocol from '../../../generated/protocol.js';
 import type * as Trace from '../../../models/trace/trace.js';
 import * as ThemeSupport from '../../../ui/legacy/theme_support/theme_support.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
+
+import type {CompareRating} from './MetricCompareStrings.js';
 
 const UIStrings = {
   /**
@@ -24,7 +27,7 @@ const UIStrings = {
    *@example {2.14} PH1
    */
   fs: '{PH1}[s]()',
-};
+} as const;
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/Utils.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -62,7 +65,8 @@ export function networkResourceCategory(request: Trace.Types.Events.SyntheticNet
 
       // Traces before Feb 2024 don't have `resourceType`.
       // We'll keep mimeType logic for a couple years to avoid grey network requests for last year's traces.
-      return mimeType.endsWith('/css')                                   ? NetworkCategory.CSS :
+      return mimeType === undefined                                      ? NetworkCategory.OTHER :
+          mimeType.endsWith('/css')                                      ? NetworkCategory.CSS :
           mimeType.endsWith('javascript')                                ? NetworkCategory.JS :
           mimeType.startsWith('image/')                                  ? NetworkCategory.IMG :
           mimeType.startsWith('audio/') || mimeType.startsWith('video/') ? NetworkCategory.MEDIA :
@@ -251,4 +255,48 @@ export namespace NumberWithUnit {
 
     return {text: element.textContent ?? '', element};
   }
+}
+
+/**
+ * Returns if the local value is better/worse/similar compared to field.
+ */
+export function determineCompareRating(
+    metric: 'LCP'|'CLS'|'INP', localValue: Trace.Types.Timing.Milli|number,
+    fieldValue: Trace.Types.Timing.Milli|number): CompareRating|undefined {
+  let thresholds: MetricThresholds;
+  let compareThreshold: number;
+  switch (metric) {
+    case 'LCP':
+      thresholds = LCP_THRESHOLDS;
+      compareThreshold = 1000;
+      break;
+    case 'CLS':
+      thresholds = CLS_THRESHOLDS;
+      compareThreshold = 0.1;
+      break;
+    case 'INP':
+      thresholds = INP_THRESHOLDS;
+      compareThreshold = 200;
+      break;
+    default:
+      Platform.assertNever(metric, `Unknown metric: ${metric}`);
+  }
+
+  const localRating = rateMetric(localValue, thresholds);
+  const fieldRating = rateMetric(fieldValue, thresholds);
+
+  // It's not worth highlighting a significant difference when both #s
+  // are rated "good"
+  if (localRating === 'good' && fieldRating === 'good') {
+    return 'similar';
+  }
+
+  if (localValue - fieldValue > compareThreshold) {
+    return 'worse';
+  }
+  if (fieldValue - localValue > compareThreshold) {
+    return 'better';
+  }
+
+  return 'similar';
 }

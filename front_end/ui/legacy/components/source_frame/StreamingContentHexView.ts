@@ -1,6 +1,7 @@
 // Copyright 2024 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as TextUtils from '../../../../models/text_utils/text_utils.js';
 import * as LinearMemoryInspectorComponents from '../../../../panels/linear_memory_inspector/components/components.js';
@@ -35,7 +36,7 @@ class LinearMemoryInspectorView extends UI.Widget.VBox {
     this.refreshData();
   }
 
-  setMemory(memory: Uint8Array): void {
+  setMemory(memory: Uint8Array<ArrayBuffer>): void {
     this.#memory = memory;
     this.refreshData();
   }

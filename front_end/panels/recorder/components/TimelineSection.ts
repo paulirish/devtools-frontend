@@ -1,12 +1,13 @@
 // Copyright 2023 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
-import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import * as Lit from '../../../ui/lit/lit.js';
 
 import timelineSectionStyles from './timelineSection.css.js';
 
-const {html} = LitHtml;
+const {html} = Lit;
 
 declare global {
   interface HTMLElementTagNameMap {
@@ -23,19 +24,12 @@ export interface TimelineSectionData {
 }
 
 export class TimelineSection extends HTMLElement {
-
   #isEndOfGroup = false;
   #isStartOfGroup = false;
   #isFirstSection = false;
   #isLastSection = false;
   #isSelected = false;
-
-  constructor() {
-    super();
-
-    const shadowRoot = this.attachShadow({mode: 'open'});
-    shadowRoot.adoptedStyleSheets = [timelineSectionStyles];
-  }
+  readonly #shadowRoot = this.attachShadow({mode: 'open'});
 
   set data(data: TimelineSectionData) {
     this.#isFirstSection = data.isFirstSection;
@@ -62,10 +56,10 @@ export class TimelineSection extends HTMLElement {
     };
 
     // clang-format off
-    LitHtml.render(
+    Lit.render(
       html`
-      <div class=${LitHtml.Directives.classMap(classes)}>
-        <div class="overlay"></div>
+      <style>${timelineSectionStyles}</style>
+      <div class=${Lit.Directives.classMap(classes)}>
         <div class="icon"><slot name="icon"></slot></div>
         <svg width="24" height="100%" class="bar">
           <rect class="line" x="7" y="0" width="2" height="100%" />
@@ -73,7 +67,7 @@ export class TimelineSection extends HTMLElement {
         <slot></slot>
       </div>
     `,
-      this.shadowRoot as ShadowRoot,
+      this.#shadowRoot,
       { host: this },
     );
     // clang-format on

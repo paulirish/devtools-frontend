@@ -4,7 +4,7 @@
 
 import * as Host from '../../core/host/host.js';
 import * as Platform from '../../core/platform/platform.js';
-import * as LitHtml from '../lit-html/lit-html.js';
+import {html} from '../lit/lit.js';
 import * as VisualLogging from '../visual_logging/visual_logging.js';
 
 import * as ARIAUtils from './ARIAUtils.js';
@@ -12,14 +12,12 @@ import type {ContextMenu, Provider} from './ContextMenu.js';
 import {html as xhtml} from './Fragment.js';
 import {Tooltip} from './Tooltip.js';
 import {
-  addReferrerToURLIfNecessary,
   copyLinkAddressLabel,
   MaxLengthForDisplayedURLs,
+  openInNewTab,
   openLinkExternallyLabel,
 } from './UIUtils.js';
 import {XElement} from './XElement.js';
-
-const {html} = LitHtml;
 
 export class XLink extends XElement {
   hrefInternal: Platform.DevToolsPath.UrlString|null;
@@ -57,7 +55,7 @@ export class XLink extends XElement {
     this.onClick = (event: Event) => {
       event.consume(true);
       if (this.hrefInternal) {
-        Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(this.hrefInternal);
+        openInNewTab(this.hrefInternal);
       }
       this.dispatchEvent(new Event('x-link-invoke'));
     };
@@ -65,7 +63,7 @@ export class XLink extends XElement {
       if (Platform.KeyboardUtilities.isEnterOrSpaceKey(event)) {
         event.consume(true);
         if (this.hrefInternal) {
-          Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(this.hrefInternal);
+          openInNewTab(this.hrefInternal);
         }
       }
       this.dispatchEvent(new Event('x-link-invoke'));
@@ -94,14 +92,12 @@ export class XLink extends XElement {
         newValue = '';
       }
       let href: Platform.DevToolsPath.UrlString|null = null;
-      let url: URL|null = null;
       try {
-        url = new URL(addReferrerToURLIfNecessary(newValue as Platform.DevToolsPath.UrlString));
-        href = url.toString() as Platform.DevToolsPath.UrlString;
+        const url = new URL(newValue);
+        if (url.protocol !== 'javascript:') {
+          href = Platform.DevToolsPath.urlString`${url}`;
+        }
       } catch {
-      }
-      if (url && url.protocol === 'javascript:') {
-        href = null;
       }
 
       this.hrefInternal = href;
@@ -147,7 +143,7 @@ export class ContextMenuProvider implements Provider<Node> {
     const node: XLink = targetNode;
     contextMenu.revealSection().appendItem(openLinkExternallyLabel(), () => {
       if (node.href) {
-        Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(node.href);
+        openInNewTab(node.href);
       }
     }, {jslogContext: 'open-in-new-tab'});
     contextMenu.revealSection().appendItem(copyLinkAddressLabel(), () => {

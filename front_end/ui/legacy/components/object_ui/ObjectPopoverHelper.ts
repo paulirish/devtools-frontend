@@ -28,6 +28,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* eslint-disable rulesdir/no-imperative-dom-api */
+
 import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
 import * as SDK from '../../../../core/sdk/sdk.js';
@@ -44,7 +46,7 @@ const UIStrings = {
    *@description Text that is usually a hyperlink to more documentation
    */
   learnMore: 'Learn more',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/components/object_ui/ObjectPopoverHelper.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -84,7 +86,7 @@ export class ObjectPopoverHelper {
       } else {
         popoverContentElement = document.createElement('div');
         popoverContentElement.classList.add('object-popover-content');
-        popover.registerCSSFiles([objectValueStyles, objectPopoverStyles]);
+        popover.registerRequiredCSS(objectValueStyles, objectPopoverStyles);
         const titleElement = popoverContentElement.createChild('div', 'object-popover-title');
         if (result.type === 'function') {
           titleElement.classList.add('source-code');
@@ -108,7 +110,7 @@ export class ObjectPopoverHelper {
 
     popoverContentElement = document.createElement('span');
     popoverContentElement.dataset.stableNameForTest = 'object-popover-content';
-    popover.registerCSSFiles([objectValueStyles, objectPopoverStyles]);
+    popover.registerRequiredCSS(objectValueStyles, objectPopoverStyles);
     const valueElement = popoverContentElement.createChild('span', 'monospace object-value-' + result.type);
     valueElement.style.whiteSpace = 'pre';
 
@@ -128,7 +130,7 @@ export class ObjectPopoverHelper {
     popoverContentElement.classList.add('object-popover-description-box');
     const descriptionDiv = document.createElement('div');
     descriptionDiv.dataset.stableNameForTest = 'object-popover-content';
-    popover.registerCSSFiles([objectPopoverStyles]);
+    popover.registerRequiredCSS(objectPopoverStyles);
     descriptionDiv.textContent = description;
     const learnMoreLink =
         UI.XLink.XLink.create(link, i18nString(UIStrings.learnMore), undefined, undefined, 'learn-more');

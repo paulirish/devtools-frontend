@@ -36,12 +36,14 @@ devtools_module("security") {
     "../../core/common:bundle",
     "../../core/host:bundle",
     "../../core/i18n:bundle",
+    "../../core/root:bundle",
     "../../core/sdk:bundle",
     "../../generated:protocol",
     "../../models/issues_manager:bundle",
     "../../panels/network/forward:bundle",
     "../../ui/components/buttons:bundle",
     "../../ui/components/cards:bundle",
+    "../../ui/components/chrome_link:bundle",
     "../../ui/components/switch:bundle",
     "../../ui/legacy:bundle",
     "../../ui/legacy/components/data_grid:bundle",
@@ -59,6 +61,7 @@ devtools_entrypoint("bundle") {
   visibility = [
     ":*",
     "../../entrypoints/*",
+    "../console/*",
   ]
 
   visibility += devtools_panels_visibility
@@ -69,7 +72,9 @@ devtools_entrypoint("meta") {
 
   deps = [
     ":bundle",
+    "../../core/common:bundle",
     "../../core/i18n:bundle",
+    "../../core/root:bundle",
     "../../ui/legacy:bundle",
   ]
 
@@ -89,6 +94,7 @@ ts_library("unittests") {
   deps = [
     ":bundle",
     "../../core/platform:bundle",
+    "../../core/root:bundle",
     "../../core/sdk:bundle",
     "../../generated:protocol",
     "../../testing",

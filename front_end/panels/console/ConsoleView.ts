@@ -1,6 +1,7 @@
 // Copyright 2020 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 /*
  * Copyright (C) 2007, 2008 Apple Inc.  All rights reserved.
@@ -177,7 +178,7 @@ const UIStrings = {
   /**
    *@description Text to save content as a specific file type
    */
-  saveAs: 'Save as...',
+  saveAs: 'Save as…',
   /**
    *@description Text to copy Console log to clipboard
    */
@@ -258,7 +259,7 @@ const UIStrings = {
    */
   filteredMessagesInConsole: '{PH1} messages in console',
 
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/console/ConsoleView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 let consoleViewInstance: ConsoleView;
@@ -323,12 +324,13 @@ export class ConsoleView extends UI.Widget.VBox implements
   private issueToolbarThrottle: Common.Throttler.Throttler;
   private requestResolver = new Logs.RequestResolver.RequestResolver();
   private issueResolver = new IssuesManager.IssueResolver.IssueResolver();
-  #isDetached: boolean = false;
+  #isDetached = false;
   #onIssuesCountUpdateBound = this.#onIssuesCountUpdate.bind(this);
 
   constructor(viewportThrottlerTimeout: number) {
     super();
     this.setMinimumSize(0, 35);
+    this.registerRequiredCSS(consoleViewStyles, objectValueStyles, CodeHighlighter.codeHighlighterStyles);
 
     this.searchableViewInternal = new UI.SearchableView.SearchableView(this, null);
     this.searchableViewInternal.element.classList.add('console-searchable-view');
@@ -634,7 +636,7 @@ export class ConsoleView extends UI.Widget.VBox implements
     this.buildHiddenCache(0, this.consoleMessages.slice());
   }
 
-  private setImmediatelyFilterMessagesForTest(): void {
+  protected setImmediatelyFilterMessagesForTest(): void {
     this.immediatelyFilterMessagesForTest = true;
   }
 
@@ -718,7 +720,6 @@ export class ConsoleView extends UI.Widget.VBox implements
     this.#isDetached = false;
     this.updateIssuesToolbarItem();
     this.viewport.refresh();
-    this.registerCSSFiles([consoleViewStyles, objectValueStyles, CodeHighlighter.Style.default]);
   }
 
   override focus(): void {
@@ -998,7 +999,7 @@ export class ConsoleView extends UI.Widget.VBox implements
 
     const currentGroup = viewMessage.consoleGroup();
 
-    if (!currentGroup || !currentGroup.messagesHidden()) {
+    if (!currentGroup?.messagesHidden()) {
       const originatingMessage = viewMessage.consoleMessage().originatingMessage();
       const adjacent = Boolean(originatingMessage && lastMessage?.consoleMessage() === originatingMessage);
       viewMessage.setAdjacentUserCommandResult(adjacent);
@@ -1184,7 +1185,7 @@ export class ConsoleView extends UI.Widget.VBox implements
   }
 
   private async copyConsole(): Promise<void> {
-    const messageContents: Array<string> = [];
+    const messageContents: string[] = [];
     for (let i = 0; i < this.itemCount(); i++) {
       const message = (this.itemElement(i) as ConsoleViewMessage);
       messageContents.push(message.toExportString());
@@ -1259,6 +1260,7 @@ export class ConsoleView extends UI.Widget.VBox implements
     }
     this.updateFilterStatus();
     this.searchableViewInternal.updateSearchMatchesCount(this.regexMatchRanges.length);
+    this.jumpToMatch(this.currentMatchRangeIndex);  // Re-highlight current match.
     this.viewport.invalidate();
     this.messagesCountElement.setAttribute(
         'aria-label', i18nString(UIStrings.filteredMessagesInConsole, {PH1: this.visibleViewMessages.length}));
@@ -1470,7 +1472,7 @@ export class ConsoleView extends UI.Widget.VBox implements
 
   private innerSearch(index: number): void {
     delete this.innerSearchTimeoutId;
-    if (this.searchProgressIndicator && this.searchProgressIndicator.isCanceled()) {
+    if (this.searchProgressIndicator?.isCanceled()) {
       this.cleanupAfterSearch();
       return;
     }
@@ -1609,9 +1611,9 @@ export class ConsoleView extends UI.Widget.VBox implements
   }
 }
 
-// @ts-ignore exported for Tests.js
+// @ts-expect-error exported for Tests.js
 globalThis.Console = globalThis.Console || {};
-// @ts-ignore exported for Tests.js
+// @ts-expect-error exported for Tests.js
 globalThis.Console.ConsoleView = ConsoleView;
 
 export class ConsoleViewFilter {

@@ -4,6 +4,7 @@
 
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
+import {renderElementIntoDOM} from '../../testing/DOMHelpers.js';
 import {
   createTarget,
   stubNoopSettings,
@@ -110,13 +111,13 @@ describeWithMockConnection('StorageBucketsTreeElement', function() {
 
     const panel = Application.ResourcesPanel.ResourcesPanel.instance({forceNew: true});
     panel.markAsRoot();
-    panel.show(document.body);
+    renderElementIntoDOM(panel);
 
     const parentTreeElement = new Application.StorageBucketsTreeElement.StorageBucketsTreeParentElement(panel);
     const appendChildSpy = sinon.spy(parentTreeElement, 'appendChild');
     parentTreeElement.initialize();
 
-    assert.strictEqual(appendChildSpy.callCount, getNonDefaultBuckets().length);
+    sinon.assert.callCount(appendChildSpy, getNonDefaultBuckets().length);
 
     panel.detach();
   });
@@ -124,21 +125,23 @@ describeWithMockConnection('StorageBucketsTreeElement', function() {
   it('shows view on select', async () => {
     assert.exists(storageBucketsModel);
 
+    const container = document.createElement('div');
+    renderElementIntoDOM(container);
     const panel = Application.ResourcesPanel.ResourcesPanel.instance({forceNew: true});
     panel.markAsRoot();
-    panel.show(document.body);
+    panel.show(container);
 
     const treeElement = new Application.StorageBucketsTreeElement.StorageBucketsTreeElement(
         panel, storageBucketsModel, STORAGE_BUCKET_INFOS[0]);
 
     const showViewSpy = sinon.spy(treeElement, 'showView');
 
-    document.body.appendChild(treeElement.listItemNode);
+    container.appendChild(treeElement.listItemNode);
     treeElement.treeOutline = new UI.TreeOutline.TreeOutlineInShadow();
     treeElement.selectable = true;
     treeElement.select();
 
-    assert.isTrue(showViewSpy.calledOnce);
+    sinon.assert.calledOnce(showViewSpy);
 
     panel.detach();
   });

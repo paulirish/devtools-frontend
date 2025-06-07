@@ -91,9 +91,7 @@ export interface ElementInfo {
   nodeHeight: number;
   isLocked: boolean;
   isLockedAncestor: boolean;
-  style: {
-    [key: string]: string|undefined,
-  }&{
+  style: Record<string, string|undefined>&{
     'color-unclamped-rgba'?: ColorRgba,
     'background-color-unclamped-rgba'?: ColorRgba,
   };
@@ -222,8 +220,7 @@ export class HighlightOverlay extends Overlay {
 
     if (highlight.flexInfo) {
       for (const flex of highlight.flexInfo) {
-        drawLayoutFlexContainerHighlight(
-            flex, this.context, this.deviceScaleFactor, this.canvasWidth, this.canvasHeight, this.emulationScaleFactor);
+        drawLayoutFlexContainerHighlight(flex, this.context, this.emulationScaleFactor);
       }
     }
 
@@ -245,9 +242,7 @@ export class HighlightOverlay extends Overlay {
         if (!path) {
           continue;
         }
-        drawLayoutFlexItemHighlight(
-            flexItem, path, this.context, this.deviceScaleFactor, this.canvasWidth, this.canvasHeight,
-            this.emulationScaleFactor);
+        drawLayoutFlexItemHighlight(flexItem, path, this.context, this.emulationScaleFactor);
       }
     }
     this.context.restore();
@@ -424,11 +419,11 @@ const gridBackgroundColor = 'rgba(255, 255, 255, 0.8)';
  * @return {String|null} The layout type of the object, or null if none was found
  */
 function getElementLayoutType(elementInfo: ElementInfo): string|null {
-  if (elementInfo.layoutObjectName && elementInfo.layoutObjectName.endsWith('Grid')) {
+  if (elementInfo.layoutObjectName?.endsWith('Grid')) {
     return 'grid';
   }
 
-  if (elementInfo.layoutObjectName && elementInfo.layoutObjectName.endsWith('FlexibleBox')) {
+  if (elementInfo.layoutObjectName?.endsWith('FlexibleBox')) {
     return 'flex';
   }
 

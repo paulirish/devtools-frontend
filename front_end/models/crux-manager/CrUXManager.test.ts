@@ -4,10 +4,9 @@
 
 import * as Common from '../../core/common/common.js';
 import * as Platform from '../../core/platform/platform.js';
-import type * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as EmulationModel from '../../models/emulation/emulation.js';
-import {createTarget} from '../../testing/EnvironmentHelpers.js';
+import {createTarget, updateHostConfig} from '../../testing/EnvironmentHelpers.js';
 import {describeWithMockConnection} from '../../testing/MockConnection.js';
 
 import * as CrUXManager from './crux-manager.js';
@@ -79,6 +78,7 @@ describeWithMockConnection('CrUXManager', () => {
 
   describe('storing the user consent', () => {
     it('uses global storage if the user is not in an OffTheRecord profile', async () => {
+      updateHostConfig({isOffTheRecord: false});
       const dummyStorage = new Common.Settings.SettingsStorage({});
       const globalStorage = new Common.Settings.SettingsStorage({});
 
@@ -87,9 +87,6 @@ describeWithMockConnection('CrUXManager', () => {
         syncedStorage: dummyStorage,
         globalStorage,
         localStorage: dummyStorage,
-        config: {
-          isOffTheRecord: false,
-        } as Root.Runtime.HostConfig,
       });
       const manager = CrUXManager.CrUXManager.instance({forceNew: true});
       manager.getConfigSetting().set({enabled: true});
@@ -97,6 +94,7 @@ describeWithMockConnection('CrUXManager', () => {
     });
 
     it('uses session storage if the user is in an OffTheRecord profile', async () => {
+      updateHostConfig({isOffTheRecord: true});
       const dummyStorage = new Common.Settings.SettingsStorage({});
 
       Common.Settings.Settings.instance({
@@ -104,9 +102,6 @@ describeWithMockConnection('CrUXManager', () => {
         syncedStorage: dummyStorage,
         globalStorage: dummyStorage,
         localStorage: dummyStorage,
-        config: {
-          isOffTheRecord: true,
-        } as Root.Runtime.HostConfig,
       });
       const manager = CrUXManager.CrUXManager.instance({forceNew: true});
       manager.getConfigSetting().set({enabled: true});
@@ -161,6 +156,10 @@ describeWithMockConnection('CrUXManager', () => {
             'interaction_to_next_paint',
             'round_trip_time',
             'form_factors',
+            'largest_contentful_paint_image_time_to_first_byte',
+            'largest_contentful_paint_image_resource_load_delay',
+            'largest_contentful_paint_image_resource_load_duration',
+            'largest_contentful_paint_image_element_render_delay',
           ],
           origin: 'https://example.com',
         },
@@ -173,6 +172,10 @@ describeWithMockConnection('CrUXManager', () => {
             'interaction_to_next_paint',
             'round_trip_time',
             'form_factors',
+            'largest_contentful_paint_image_time_to_first_byte',
+            'largest_contentful_paint_image_resource_load_delay',
+            'largest_contentful_paint_image_resource_load_duration',
+            'largest_contentful_paint_image_element_render_delay',
           ],
           origin: 'https://example.com',
         },
@@ -184,6 +187,10 @@ describeWithMockConnection('CrUXManager', () => {
             'interaction_to_next_paint',
             'round_trip_time',
             'form_factors',
+            'largest_contentful_paint_image_time_to_first_byte',
+            'largest_contentful_paint_image_resource_load_delay',
+            'largest_contentful_paint_image_resource_load_duration',
+            'largest_contentful_paint_image_element_render_delay',
           ],
           origin: 'https://example.com',
         },
@@ -196,6 +203,10 @@ describeWithMockConnection('CrUXManager', () => {
             'interaction_to_next_paint',
             'round_trip_time',
             'form_factors',
+            'largest_contentful_paint_image_time_to_first_byte',
+            'largest_contentful_paint_image_resource_load_delay',
+            'largest_contentful_paint_image_resource_load_duration',
+            'largest_contentful_paint_image_element_render_delay',
           ],
           url: 'https://example.com/',
         },
@@ -208,6 +219,10 @@ describeWithMockConnection('CrUXManager', () => {
             'interaction_to_next_paint',
             'round_trip_time',
             'form_factors',
+            'largest_contentful_paint_image_time_to_first_byte',
+            'largest_contentful_paint_image_resource_load_delay',
+            'largest_contentful_paint_image_resource_load_duration',
+            'largest_contentful_paint_image_element_render_delay',
           ],
           url: 'https://example.com/',
         },
@@ -219,6 +234,10 @@ describeWithMockConnection('CrUXManager', () => {
             'interaction_to_next_paint',
             'round_trip_time',
             'form_factors',
+            'largest_contentful_paint_image_time_to_first_byte',
+            'largest_contentful_paint_image_resource_load_delay',
+            'largest_contentful_paint_image_resource_load_duration',
+            'largest_contentful_paint_image_element_render_delay',
           ],
           url: 'https://example.com/',
         },
@@ -250,11 +269,11 @@ describeWithMockConnection('CrUXManager', () => {
 
       await cruxManager.getFieldDataForPage('https://example.com');
 
-      assert.strictEqual(mockFetch.callCount, 6);
+      sinon.assert.callCount(mockFetch, 6);
 
       await cruxManager.getFieldDataForPage('https://example.com');
 
-      assert.strictEqual(mockFetch.callCount, 6);
+      sinon.assert.callCount(mockFetch, 6);
     });
 
     it('should cache "NOT_FOUND" responses', async () => {
@@ -264,11 +283,11 @@ describeWithMockConnection('CrUXManager', () => {
 
       await cruxManager.getFieldDataForPage('https://example.com');
 
-      assert.strictEqual(mockFetch.callCount, 6);
+      sinon.assert.callCount(mockFetch, 6);
 
       await cruxManager.getFieldDataForPage('https://example.com');
 
-      assert.strictEqual(mockFetch.callCount, 6);
+      sinon.assert.callCount(mockFetch, 6);
     });
 
     it('should not cache error responses', async () => {
@@ -278,13 +297,13 @@ describeWithMockConnection('CrUXManager', () => {
 
       await cruxManager.getFieldDataForPage('https://example.com');
 
-      assert.strictEqual(mockFetch.callCount, 6);
-      assert.strictEqual(mockConsoleError.callCount, 6);
+      sinon.assert.callCount(mockFetch, 6);
+      sinon.assert.callCount(mockConsoleError, 6);
 
       await cruxManager.getFieldDataForPage('https://example.com');
 
-      assert.strictEqual(mockFetch.callCount, 12);
-      assert.strictEqual(mockConsoleError.callCount, 12);
+      sinon.assert.callCount(mockFetch, 12);
+      sinon.assert.callCount(mockConsoleError, 12);
     });
 
     it('should ignore hash and search params for caching', async () => {
@@ -294,11 +313,11 @@ describeWithMockConnection('CrUXManager', () => {
 
       await cruxManager.getFieldDataForPage('https://example.com#hash');
 
-      assert.strictEqual(mockFetch.callCount, 6);
+      sinon.assert.callCount(mockFetch, 6);
 
       await cruxManager.getFieldDataForPage('https://example.com?search');
 
-      assert.strictEqual(mockFetch.callCount, 6);
+      sinon.assert.callCount(mockFetch, 6);
     });
 
     it('should exit early for localhost and non-public URLs', async () => {
@@ -312,7 +331,7 @@ describeWithMockConnection('CrUXManager', () => {
       await cruxManager.getFieldDataForPage('chrome://tracing');
       await cruxManager.getFieldDataForPage('chrome-extension://sdkfsddsdsisdof/dashboard.html');
 
-      assert.strictEqual(mockFetch.callCount, 0);
+      sinon.assert.callCount(mockFetch, 0);
     });
   });
 
@@ -348,10 +367,10 @@ describeWithMockConnection('CrUXManager', () => {
         isPrimaryFrame: () => false,
       } as SDK.ResourceTreeModel.ResourceTreeFrame);
 
-      const result = await cruxManager.getFieldDataForCurrentPage();
+      const result = await cruxManager.getFieldDataForCurrentPageForTesting();
 
       assert.deepEqual(result.warnings, []);
-      assert.strictEqual(getFieldDataMock.callCount, 1);
+      sinon.assert.callCount(getFieldDataMock, 1);
       assert.strictEqual(getFieldDataMock.firstCall.args[0], 'https://example.com/main/');
     });
 
@@ -360,10 +379,10 @@ describeWithMockConnection('CrUXManager', () => {
       cruxManager.getConfigSetting().set(
           {enabled: false, override: 'https://example.com/override', overrideEnabled: true});
 
-      const result = await cruxManager.getFieldDataForCurrentPage();
+      const result = await cruxManager.getFieldDataForCurrentPageForTesting();
 
       assert.deepEqual(result.warnings, ['Field data is configured for a different URL than the current page.']);
-      assert.strictEqual(getFieldDataMock.callCount, 1);
+      sinon.assert.callCount(getFieldDataMock, 1);
       assert.strictEqual(getFieldDataMock.firstCall.args[0], 'https://example.com/override');
     });
 
@@ -377,10 +396,10 @@ describeWithMockConnection('CrUXManager', () => {
         }],
       });
 
-      const result = await cruxManager.getFieldDataForCurrentPage();
+      const result = await cruxManager.getFieldDataForCurrentPageForTesting();
 
       assert.deepEqual(result.warnings, ['Field data is configured for a different URL than the current page.']);
-      assert.strictEqual(getFieldDataMock.callCount, 1);
+      sinon.assert.callCount(getFieldDataMock, 1);
       assert.strictEqual(getFieldDataMock.firstCall.args[0], 'https://example.com/inspected');
     });
 
@@ -396,27 +415,27 @@ describeWithMockConnection('CrUXManager', () => {
         }],
       });
 
-      const result = await cruxManager.getFieldDataForCurrentPage();
+      const result = await cruxManager.getFieldDataForCurrentPageForTesting();
 
       assert.deepEqual(result.warnings, ['Field data is configured for a different URL than the current page.']);
-      assert.strictEqual(getFieldDataMock.callCount, 1);
+      sinon.assert.callCount(getFieldDataMock, 1);
       assert.strictEqual(getFieldDataMock.firstCall.args[0], 'https://google.com');
     });
 
     it('should use inspected URL if main document is unavailable', async () => {
       target.setInspectedURL(urlString`https://example.com/inspected`);
 
-      const result = await cruxManager.getFieldDataForCurrentPage();
+      const result = await cruxManager.getFieldDataForCurrentPageForTesting();
 
       assert.deepEqual(result.warnings, []);
-      assert.strictEqual(getFieldDataMock.callCount, 1);
+      sinon.assert.callCount(getFieldDataMock, 1);
       assert.strictEqual(getFieldDataMock.firstCall.args[0], 'https://example.com/inspected');
     });
 
     it('should wait for inspected URL if main document and inspected URL are unavailable', async () => {
       target.setInspectedURL(Platform.DevToolsPath.EmptyUrlString);
 
-      const finishPromise = cruxManager.getFieldDataForCurrentPage();
+      const finishPromise = cruxManager.getFieldDataForCurrentPageForTesting();
 
       await triggerMicroTaskQueue();
 
@@ -425,12 +444,13 @@ describeWithMockConnection('CrUXManager', () => {
       const result = await finishPromise;
 
       assert.deepEqual(result.warnings, []);
-      assert.strictEqual(getFieldDataMock.callCount, 1);
+      sinon.assert.callCount(getFieldDataMock, 1);
       assert.strictEqual(getFieldDataMock.firstCall.args[0], 'https://example.com/awaitInspected');
     });
 
     it('getSelectedFieldMetricData - should take from selected page scope', async () => {
-      await cruxManager.getFieldDataForCurrentPage();
+      cruxManager.getConfigSetting().set({enabled: true});
+      await cruxManager.refresh();
 
       let data: CrUXManager.MetricResponse|undefined;
 
@@ -448,7 +468,8 @@ describeWithMockConnection('CrUXManager', () => {
     });
 
     it('should take from selected device scope', async () => {
-      await cruxManager.getFieldDataForCurrentPage();
+      cruxManager.getConfigSetting().set({enabled: true});
+      await cruxManager.refresh();
       cruxManager.fieldPageScope = 'url';
 
       let data: CrUXManager.MetricResponse|undefined;
@@ -470,7 +491,8 @@ describeWithMockConnection('CrUXManager', () => {
       cruxManager.fieldDeviceOption = 'AUTO';
       assert.strictEqual(cruxManager.getSelectedDeviceScope(), 'ALL');
 
-      await cruxManager.getFieldDataForCurrentPage();
+      cruxManager.getConfigSetting().set({enabled: true});
+      await cruxManager.refresh();
       assert.strictEqual(cruxManager.getSelectedDeviceScope(), 'DESKTOP');
 
       for (const device of EmulationModel.EmulatedDevices.EmulatedDevicesList.instance().standard()) {
@@ -493,7 +515,7 @@ describeWithMockConnection('CrUXManager', () => {
       cruxManager.addEventListener(CrUXManager.Events.FIELD_DATA_CHANGED, event => {
         eventBodies.push(event.data);
       });
-      getFieldDataMock = sinon.stub(cruxManager, 'getFieldDataForCurrentPage');
+      getFieldDataMock = sinon.stub(cruxManager, 'getFieldDataForPage');
       getFieldDataMock.resolves({
         'origin-ALL': null,
         'origin-DESKTOP': null,
@@ -503,6 +525,7 @@ describeWithMockConnection('CrUXManager', () => {
         'url-DESKTOP': null,
         'url-PHONE': null,
         'url-TABLET': null,
+        warnings: [],
       });
     });
 
@@ -516,7 +539,7 @@ describeWithMockConnection('CrUXManager', () => {
       setting.set({enabled: true});
       await triggerMicroTaskQueue();
 
-      assert.strictEqual(getFieldDataMock.callCount, 1);
+      sinon.assert.callCount(getFieldDataMock, 1);
       assert.lengthOf(eventBodies, 2);
       assert.isUndefined(eventBodies[0]);
       assert.isObject(eventBodies[1]);
@@ -524,7 +547,7 @@ describeWithMockConnection('CrUXManager', () => {
       setting.set({enabled: false});
       await triggerMicroTaskQueue();
 
-      assert.strictEqual(getFieldDataMock.callCount, 1);
+      sinon.assert.callCount(getFieldDataMock, 1);
       assert.lengthOf(eventBodies, 3);
       assert.isUndefined(eventBodies[0]);
       assert.isObject(eventBodies[1]);
@@ -544,7 +567,7 @@ describeWithMockConnection('CrUXManager', () => {
 
       await triggerMicroTaskQueue();
 
-      assert.strictEqual(getFieldDataMock.callCount, 2);
+      sinon.assert.callCount(getFieldDataMock, 2);
       assert.lengthOf(eventBodies, 4);
       assert.isUndefined(eventBodies[0]);
       assert.isObject(eventBodies[1]);
@@ -562,7 +585,7 @@ describeWithMockConnection('CrUXManager', () => {
 
       await triggerMicroTaskQueue();
 
-      assert.strictEqual(getFieldDataMock.callCount, 2);
+      sinon.assert.callCount(getFieldDataMock, 2);
       assert.lengthOf(eventBodies, 4);
       assert.isUndefined(eventBodies[0]);
       assert.isObject(eventBodies[1]);
@@ -581,7 +604,7 @@ describeWithMockConnection('CrUXManager', () => {
 
       await triggerMicroTaskQueue();
 
-      assert.strictEqual(getFieldDataMock.callCount, 0);
+      sinon.assert.callCount(getFieldDataMock, 0);
       assert.lengthOf(eventBodies, 2);
       assert.isUndefined(eventBodies[0]);
       assert.isUndefined(eventBodies[1]);

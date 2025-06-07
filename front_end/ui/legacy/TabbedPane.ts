@@ -28,6 +28,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* eslint-disable rulesdir/no-imperative-dom-api */
+
 import './Toolbar.js';
 
 import * as Common from '../../core/common/common.js';
@@ -40,7 +42,7 @@ import * as IconButton from '../components/icon_button/icon_button.js';
 import * as ARIAUtils from './ARIAUtils.js';
 import {ContextMenu} from './ContextMenu.js';
 import {Constraints, Size} from './Geometry.js';
-import tabbedPaneStyles from './tabbedPane.css.legacy.js';
+import tabbedPaneStyles from './tabbedPane.css.js';
 import type {Toolbar} from './Toolbar.js';
 import {Tooltip} from './Tooltip.js';
 import {installDragHandle, invokeOnceAfterBatchUpdate} from './UIUtils.js';
@@ -85,7 +87,7 @@ const UIStrings = {
    * @description Text to move a tab backward.
    */
   moveTabLeft: 'Move left',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/TabbedPane.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, typeof VBox>(VBox) {
@@ -119,8 +121,8 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
   allowTabReorder?: boolean;
   private automaticReorder?: boolean;
 
-  constructor() {
-    super(true);
+  constructor(element?: HTMLElement) {
+    super(true, undefined, element);
     this.registerRequiredCSS(tabbedPaneStyles);
     this.element.classList.add('tabbed-pane');
     this.contentElement.classList.add('tabbed-pane-shadow');
@@ -222,11 +224,6 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
 
   tabbedPaneContentElement(): Element {
     return this.contentElementInternal;
-  }
-
-  isTabCloseable(id: string): boolean {
-    const tab = this.tabsById.get(id);
-    return tab ? tab.isCloseable() : false;
   }
 
   setTabDelegate(delegate: TabbedPaneTabDelegate): void {
@@ -339,7 +336,7 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
   }
 
   private viewHasFocus(): boolean {
-    if (this.visibleView && this.visibleView.hasFocus()) {
+    if (this.visibleView?.hasFocus()) {
       return true;
     }
     const root = this.contentElement.getComponentRoot();
@@ -429,6 +426,14 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.updateTabElements();
   }
 
+  setTrailingTabIcon(id: string, icon: IconButton.Icon.Icon|null): void {
+    const tab = this.tabsById.get(id);
+    if (!tab) {
+      return;
+    }
+    tab.setSuffixElement(icon);
+  }
+
   setSuffixElement(id: string, suffixElement: HTMLElement|null): void {
     const tab = this.tabsById.get(id);
     if (!tab) {
@@ -436,6 +441,13 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
     }
     tab.setSuffixElement(suffixElement);
     this.updateTabElements();
+  }
+
+  setBadge(id: string, content: string|null): void {
+    const badge = document.createElement('span');
+    badge.textContent = content;
+    badge.classList.add('badge');
+    this.setSuffixElement(id, content ? badge : null);
   }
 
   setTabEnabled(id: string, enabled: boolean): void {
@@ -453,13 +465,6 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
     const tab = this.tabsById.get(id);
     const disabled = tab?.tabElement.classList.contains('disabled') ?? false;
     return !disabled;
-  }
-
-  toggleTabClass(id: string, className: string, force?: boolean): void {
-    const tab = this.tabsById.get(id);
-    if (tab && tab.toggleClass(className, force)) {
-      this.updateTabElements();
-    }
   }
 
   private zoomChanged(): void {
@@ -659,8 +664,7 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
     return dropDownContainer;
   }
 
-  private dropDownClicked(ev: Event): void {
-    const event = (ev as MouseEvent);
+  private dropDownClicked(event: MouseEvent): void {
     if (event.button !== 0) {
       return;
     }
@@ -670,7 +674,6 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
     }
     const rect = this.dropDownButton.getBoundingClientRect();
     const menu = new ContextMenu(event, {
-      useSoftMenu: false,
       x: rect.left,
       y: rect.bottom,
       onSoftMenuClosed: () => {
@@ -967,11 +970,10 @@ export class TabbedPane extends Common.ObjectWrapper.eventMixin<EventTypes, type
     this.automaticReorder = automatic;
   }
 
-  private keyDown(ev: Event): void {
+  private keyDown(event: KeyboardEvent): void {
     if (!this.currentTab) {
       return;
     }
-    const event = (ev as KeyboardEvent);
     let nextTabElement: (Element|null)|null = null;
     switch (event.key) {
       case 'ArrowUp':
@@ -1260,7 +1262,7 @@ export class TabbedPaneTab {
     const closeButton = new Buttons.Button.Button();
     closeButton.data = {
       variant: Buttons.Button.Variant.ICON,
-      size: Buttons.Button.Size.SMALL,
+      size: Buttons.Button.Size.MICRO,
       iconName: 'cross',
       title: i18nString(UIStrings.closeS, {PH1: this.title}),
     };
@@ -1278,7 +1280,8 @@ export class TabbedPaneTab {
     closeIcon.data = {
       iconName: 'experiment',
       color: 'var(--override-tabbed-pane-preview-icon-color)',
-      width: '16px',
+      height: '14px',
+      width: '14px',
     };
     previewIcon.appendChild(closeIcon);
     previewIcon.setAttribute('title', i18nString(UIStrings.previewFeature));
@@ -1291,8 +1294,7 @@ export class TabbedPaneTab {
         element?.parentElement?.classList.contains('tabbed-pane-close-button') || false;
   }
 
-  private tabClicked(ev: Event): void {
-    const event = (ev as MouseEvent);
+  private tabClicked(event: MouseEvent): void {
     const middleButton = event.button === 1;
     const shouldClose = this.closeable && (middleButton || this.isCloseIconClicked(event.target as HTMLElement));
     if (!shouldClose) {
@@ -1303,16 +1305,14 @@ export class TabbedPaneTab {
     event.consume(true);
   }
 
-  private tabMouseDown(ev: Event): void {
-    const event = ev as MouseEvent;
+  private tabMouseDown(event: MouseEvent): void {
     if (this.isCloseIconClicked(event.target as HTMLElement) || event.button !== 0) {
       return;
     }
     this.tabbedPane.selectTab(this.id, true);
   }
 
-  private tabMouseUp(ev: Event): void {
-    const event = (ev as MouseEvent);
+  private tabMouseUp(event: MouseEvent): void {
     // This is needed to prevent middle-click pasting on linux when tabs are clicked.
     if (event.button === 1) {
       event.consume(true);
@@ -1378,8 +1378,7 @@ export class TabbedPaneTab {
     void contextMenu.show();
   }
 
-  private startTabDragging(ev: Event): boolean {
-    const event = (ev as MouseEvent);
+  private startTabDragging(event: MouseEvent): boolean {
     if (this.isCloseIconClicked(event.target as HTMLElement)) {
       return false;
     }
@@ -1391,8 +1390,7 @@ export class TabbedPaneTab {
     return true;
   }
 
-  private tabDragging(ev: Event): void {
-    const event = (ev as MouseEvent);
+  private tabDragging(event: MouseEvent): void {
     const tabElements = this.tabbedPane.tabsElement.childNodes;
     for (let i = 0; i < tabElements.length; ++i) {
       let tabElement: HTMLElement = (tabElements[i] as HTMLElement);

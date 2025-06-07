@@ -28,6 +28,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* eslint-disable rulesdir/no-imperative-dom-api */
+
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as SDK from '../../core/sdk/sdk.js';
@@ -160,7 +162,7 @@ const UIStrings = {
    *@description Text in Layer Details View of the Layers panel
    */
   mainThreadScrollingReason: 'Main thread scrolling reason',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/layer_viewer/LayerDetailsView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 const i18nLazyString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined, str_);
@@ -182,6 +184,7 @@ export class LayerDetailsView extends Common.ObjectWrapper.eventMixin<EventTypes
 
   constructor(layerViewHost: LayerViewHost) {
     super(true);
+    this.registerRequiredCSS(layerDetailsViewStyles);
     this.element.setAttribute('jslog', `${VisualLogging.pane('layers-details')}`);
     this.contentElement.classList.add('layer-details-container');
 
@@ -210,7 +213,6 @@ export class LayerDetailsView extends Common.ObjectWrapper.eventMixin<EventTypes
 
   override wasShown(): void {
     super.wasShown();
-    this.registerCSSFiles([layerDetailsViewStyles]);
     this.update();
   }
 
@@ -304,7 +306,7 @@ export class LayerDetailsView extends Common.ObjectWrapper.eventMixin<EventTypes
   }
 
   update(): void {
-    const layer = this.selection && this.selection.layer();
+    const layer = this.selection?.layer();
     if (!layer) {
       this.tableElement.remove();
       this.paintProfilerLink.remove();
@@ -363,7 +365,7 @@ export class LayerDetailsView extends Common.ObjectWrapper.eventMixin<EventTypes
   }
 
   private updateCompositingReasons(compositingReasons: string[]): void {
-    if (!compositingReasons || !compositingReasons.length) {
+    if (!compositingReasons?.length) {
       this.compositingReasonsCell.textContent = 'n/a';
       return;
     }

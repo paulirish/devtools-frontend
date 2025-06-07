@@ -10,6 +10,7 @@ import * as Bindings from '../../models/bindings/bindings.js';
 import * as Breakpoints from '../../models/breakpoints/breakpoints.js';
 import * as Persistence from '../../models/persistence/persistence.js';
 import * as Workspace from '../../models/workspace/workspace.js';
+import {renderElementIntoDOM} from '../../testing/DOMHelpers.js';
 import {
   createTarget,
   describeWithEnvironment,
@@ -47,8 +48,7 @@ describeWithEnvironment('SourcesView', () => {
 
   it('creates new source view of updated type when renamed file requires a different viewer', async () => {
     const sourcesView = new Sources.SourcesView.SourcesView();
-    sourcesView.markAsRoot();
-    sourcesView.show(document.body);
+    renderElementIntoDOM(sourcesView);
     const workspace = Workspace.Workspace.WorkspaceImpl.instance();
     const {uiSourceCode, project} = createFileSystemUISourceCode({
       url: urlString`file:///path/to/overrides/example.html`,
@@ -56,7 +56,7 @@ describeWithEnvironment('SourcesView', () => {
     });
     project.canSetFileContent = () => true;
     project.rename =
-        (uiSourceCode: Workspace.UISourceCode.UISourceCode, newName: string,
+        (_uiSourceCode: Workspace.UISourceCode.UISourceCode, newName: string,
          callback: (
              arg0: boolean, arg1?: string, arg2?: Platform.DevToolsPath.UrlString,
              arg3?: Common.ResourceType.ResourceType) => void) => {
@@ -99,6 +99,41 @@ describeWithEnvironment('SourcesView', () => {
     assert.instanceOf(sourcesView.getSourceView(uiSourceCode), SourcesComponents.HeadersView.HeadersView);
   });
 
+  it('shows and hides an infobar which warns about AI-generated changes', async () => {
+    const attachSpy = sinon.spy(Sources.AiWarningInfobarPlugin.AiWarningInfobarPlugin.prototype, 'attachInfobar');
+    const removeSpy = sinon.spy(Sources.AiWarningInfobarPlugin.AiWarningInfobarPlugin.prototype, 'removeInfobar');
+
+    const sourcesView = new Sources.SourcesView.SourcesView();
+    const {uiSourceCode} = createFileSystemUISourceCode({
+      url: urlString`file:///path/to/project/example.ts`,
+      mimeType: 'text/typescript',
+      content: 'export class Foo {}',
+    });
+
+    // Mock an AI-generated edit
+    uiSourceCode.setWorkingCopy('export class Bar {}');
+    uiSourceCode.setContainsAiChanges(true);
+
+    const contentLoadedPromise = new Promise(res => window.addEventListener('source-file-loaded', res));
+    const widget = sourcesView.viewForFile(uiSourceCode);
+    assert.instanceOf(widget, Sources.UISourceCodeFrame.UISourceCodeFrame);
+    const uiSourceCodeFrame = widget;
+
+    // Only load the AiWarningInfobarPlugin
+    sinon.stub(Sources.UISourceCodeFrame.UISourceCodeFrame, 'sourceFramePlugins').returns([
+      Sources.AiWarningInfobarPlugin.AiWarningInfobarPlugin
+    ]);
+    uiSourceCodeFrame.wasShown();
+
+    await contentLoadedPromise;
+
+    sinon.assert.called(attachSpy);
+    sinon.assert.notCalled(removeSpy);
+
+    uiSourceCode.commitWorkingCopy();
+    sinon.assert.called(removeSpy);
+  });
+
   describe('viewForFile', () => {
     it('records the correct media type in the DevTools.SourcesPanelFileOpened metric', async () => {
       const sourcesView = new Sources.SourcesView.SourcesView();
@@ -111,7 +146,7 @@ describeWithEnvironment('SourcesView', () => {
       const contentLoadedPromise = new Promise(res => window.addEventListener('source-file-loaded', res));
       const widget = sourcesView.viewForFile(uiSourceCode);
       assert.instanceOf(widget, Sources.UISourceCodeFrame.UISourceCodeFrame);
-      const uiSourceCodeFrame = widget as Sources.UISourceCodeFrame.UISourceCodeFrame;
+      const uiSourceCodeFrame = widget;
 
       // Skip creating the DebuggerPlugin, which times out and simulate DOM attach/showing.
       sinon.stub(uiSourceCodeFrame, 'loadPlugins' as keyof typeof uiSourceCodeFrame).callsFake(() => {});
@@ -119,7 +154,7 @@ describeWithEnvironment('SourcesView', () => {
 
       await contentLoadedPromise;
 
-      assert.isTrue(sourcesPanelFileOpenedSpy.calledWithExactly('text/typescript'));
+      sinon.assert.calledWithExactly(sourcesPanelFileOpenedSpy, 'text/typescript');
     });
   });
 });
@@ -179,7 +214,7 @@ describeWithMockConnection('SourcesView', () => {
     new Sources.SourcesView.SourcesView();
     let addedURLs = addUISourceCodeSpy.args.map(args => args[0].url());
     assert.deepEqual(addedURLs, ['http://example.com/a.js', 'http://example.com/b.js']);
-    assert.isTrue(removeUISourceCodesSpy.notCalled);
+    sinon.assert.notCalled(removeUISourceCodesSpy);
 
     addUISourceCodeSpy.resetHistory();
     target2.targetManager().setScopeTarget(target2);
@@ -193,12 +228,12 @@ describeWithMockConnection('SourcesView', () => {
     createFileSystemUISourceCode({
       url: urlString`snippet:///foo.js`,
       mimeType: 'application/javascript',
-      type: 'snippets',
+      type: Persistence.PlatformFileSystem.PlatformFileSystemType.SNIPPETS,
     });
 
     const sourcesView = new Sources.SourcesView.SourcesView();
     const removeUISourceCodesSpy = sinon.spy(sourcesView.editorContainer, 'removeUISourceCodes');
     target2.targetManager().setScopeTarget(target2);
-    assert.isTrue(removeUISourceCodesSpy.notCalled);
+    sinon.assert.notCalled(removeUISourceCodesSpy);
   });
 });

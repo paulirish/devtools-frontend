@@ -9,7 +9,7 @@ import type {
   RehydratingExecutionContext, RehydratingScript, RehydratingTarget, ServerMessage} from './RehydratingObject.js';
 
 const mockTarget1: RehydratingTarget = {
-  targetId: 'ABCDE' as Protocol.Page.FrameId,
+  targetId: 'ABCDE' as Protocol.Target.TargetID,
   type: 'page',
   isolate: '12345',
   url: 'example.com',
@@ -51,8 +51,8 @@ const mockScript1: RehydratingScript = {
   hash: '',
   isModule: false,
   url: 'example.com',
-  hasSourceUrl: false,
-  sourceMapUrl: undefined,
+  hasSourceURL: false,
+  sourceMapURL: undefined,
   length: 10,
   sourceText: 'source text 1',
   auxData: {
@@ -73,8 +73,8 @@ const mockScript2: RehydratingScript = {
   hash: '',
   isModule: false,
   url: 'example.com',
-  hasSourceUrl: false,
-  sourceMapUrl: undefined,
+  hasSourceURL: false,
+  sourceMapURL: undefined,
   length: 10,
   sourceText: 'source text 2',
   auxData: {

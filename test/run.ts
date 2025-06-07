@@ -7,6 +7,8 @@ import * as fs from 'fs';
 import * as glob from 'glob';
 import * as os from 'os';
 import * as path from 'path';
+import yargs from 'yargs';
+import unparse from 'yargs-unparser';
 
 import {commandLineArgs} from './conductor/commandline.js';
 import {
@@ -18,26 +20,43 @@ import {
   SOURCE_ROOT,
 } from './conductor/paths.js';
 
-const yargs = require('yargs');
-const unparse = require('yargs-unparser');
 const options = commandLineArgs(yargs(process.argv.slice(2)))
-                    .options('skip-ninja', {type: 'boolean', desc: 'Skip rebuilding'})
-                    .options('debug-driver', {type: 'boolean', hidden: true, desc: 'Debug the driver part of tests'})
-                    .options('verbose', {alias: 'v', type: 'count', desc: 'Increases the log level'})
-                    .options('bail', {alias: 'b', desc: ' bail after first test failure'})
+                    .options('skip-ninja', {
+                      type: 'boolean',
+                      default: false,
+                      desc: 'Skip rebuilding',
+                    })
+                    .options('debug-driver', {
+                      type: 'boolean',
+                      hidden: true,
+                      desc: 'Debug the driver part of tests',
+                    })
+                    .options('verbose', {
+                      alias: 'v',
+                      type: 'count',
+                      desc: 'Increases the log level',
+                    })
+                    .options('bail', {
+                      type: 'boolean',
+                      alias: 'b',
+                      desc: 'Bail after first test failure',
+                    })
                     .options('auto-watch', {
+                      type: 'boolean',
+                      default: false,
                       desc: 'watch changes to files and run tests automatically on file change (only for unit tests)'
                     })
                     .positional('tests', {
                       type: 'string',
                       desc: 'Path to the test suite, starting from out/Target/gen directory.',
                       normalize: true,
-                      default: ['front_end', 'test/e2e', 'test/interactions'].map(
+                      default: ['front_end', 'test/e2e', 'test/interactions', 'test/e2e_non_hosted'].map(
                           f => path.relative(process.cwd(), path.join(SOURCE_ROOT, f))),
                     })
                     .strict()
-                    .argv;
-const CONSUMED_OPTIONS = ['tests', 'skip-ninja', 'debug-driver', 'bail', 'b', 'verbose', 'v', 'watch'];
+                    .parseSync();
+
+const CONSUMED_OPTIONS = ['tests', 'skip-ninja', 'debug-driver', 'verbose', 'v', 'watch'];
 
 let logLevel = 'error';
 if (options['verbose'] === 1) {
@@ -46,12 +65,26 @@ if (options['verbose'] === 1) {
   logLevel = 'debug';
 }
 
-function forwardOptions() {
+function forwardOptions(): string[] {
   const forwardedOptions = {...options};
   for (const consume of CONSUMED_OPTIONS) {
     forwardedOptions[consume] = undefined;
   }
-  return unparse(forwardedOptions);
+
+  // @ts-expect-error yargs and unparse have slightly different types
+  const unparsed = unparse(forwardedOptions);
+  const args: string[] = [];
+  for (let i = 0; i < unparsed.length - 1; i++) {
+    if (unparsed[i].startsWith('--') && !Number.isNaN(Number(unparsed[i + 1]))) {
+      // Mocha errors on --repeat 1 as it expects --repeat=1. We assume
+      // that this is the same for all args followed by a number.
+      args.push(`${unparsed[i]}=${unparsed[i + 1]}`);
+      i++;
+    } else {
+      args.push(unparsed[i]);
+    }
+  }
+  return args;
 }
 
 function runProcess(exe: string, args: string[], options: childProcess.SpawnSyncOptionsWithStringEncoding) {
@@ -82,9 +115,12 @@ function ninja(stdio: 'inherit'|'pipe', ...args: string[]) {
   return {status, output};
 }
 
+const MOCHA_BIN_PATH = path.join(SOURCE_ROOT, 'node_modules', 'mocha', 'bin', 'mocha.js');
+
 class Tests {
   readonly suite: PathPair;
   readonly extraPaths: PathPair[];
+  protected readonly cwd = path.dirname(GEN_DIR);
   constructor(suite: string, ...extraSuites: string[]) {
     const suitePath = PathPair.get(suite);
     if (!suitePath) {
@@ -114,11 +150,15 @@ class Tests {
     ];
     if (options['debug-driver']) {
       argumentsForNode.unshift('--inspect-brk');
-    } else if (options['debug']) {
+    } else if (options['debug'] && !argumentsForNode.includes('--inspect-brk')) {
       argumentsForNode.unshift('--inspect');
     }
-    const result = runProcess(
-        process.argv[0], argumentsForNode, {encoding: 'utf-8', stdio: 'inherit', cwd: path.dirname(GEN_DIR)});
+
+    const result = runProcess(process.argv[0], argumentsForNode, {
+      encoding: 'utf-8',
+      stdio: 'inherit',
+      cwd: this.cwd,
+    });
     return !result.error && (result.status ?? 1) === 0;
   }
 }
@@ -128,7 +168,7 @@ class MochaTests extends Tests {
     return super.run(
         tests,
         [
-          path.join(SOURCE_ROOT, 'node_modules', 'mocha', 'bin', 'mocha'),
+          MOCHA_BIN_PATH,
           '--config',
           path.join(this.suite.buildPath, 'mocharc.js'),
           '-u',
@@ -137,6 +177,56 @@ class MochaTests extends Tests {
         /* positionalTestArgs= */ false,  // Mocha interprets positional arguments as test files itself. Work around
                                           // that by passing the tests as dashed args instead.
     );
+  }
+}
+
+class NonHostedMochaTests extends Tests {
+  override run(tests: PathPair[]) {
+    const args = [
+      MOCHA_BIN_PATH,
+      '--config',
+      path.join(this.suite.buildPath, 'mocharc.js'),
+      '-u',
+      path.join(this.suite.buildPath, 'conductor', 'mocha-interface.js'),
+    ];
+
+    if (options['debug']) {
+      args.unshift('--inspect-brk');
+      console.warn(
+          '\x1b[33mYou need to attach a debugger from chrome://inspect for tests to continue the run in debug mode.\x1b[0m');
+    }
+    return super.run(
+        tests,
+        args,
+        /* positionalTestArgs= */ false,  // Mocha interprets positional arguments as test files itself. Work around
+                                          // that by passing the tests as dashed args instead.
+    );
+  }
+}
+
+/**
+ * Workaround the fact that these test don't have
+ * build output in out/Default like dir.
+ */
+class ScriptPathPair extends PathPair {
+  static getFromPair(pair: PathPair) {
+    return new ScriptPathPair(pair.sourcePath, pair.sourcePath);
+  }
+}
+
+class ScriptsMochaTests extends Tests {
+  override readonly cwd = SOURCE_ROOT;
+
+  override run(tests: PathPair[]) {
+    return super.run(
+        tests.map(test => ScriptPathPair.getFromPair(test)),
+        ['--experimental-strip-types', '--no-warnings=ExperimentalWarning', MOCHA_BIN_PATH, '--extension=ts,js'],
+    );
+  }
+
+  override match(path: PathPair): boolean {
+    return [this.suite, ...this.extraPaths].some(
+        pathToCheck => isContainedInDirectory(path.sourcePath, pathToCheck.sourcePath));
   }
 }
 
@@ -155,13 +245,16 @@ class KarmaTests extends Tests {
 // TODO(333423685)
 // - watch
 function main() {
-  const tests: string[] = options['tests'];
-
+  const tests: string[] = typeof options['tests'] === 'string' ? [options['tests']] : options['tests'];
   const testKinds = [
     new KarmaTests(path.join(GEN_DIR, 'front_end'), path.join(GEN_DIR, 'inspector_overlay')),
     new MochaTests(path.join(GEN_DIR, 'test/interactions')),
     new MochaTests(path.join(GEN_DIR, 'test/e2e')),
+    new NonHostedMochaTests(path.join(GEN_DIR, 'test/e2e_non_hosted')),
     new MochaTests(path.join(GEN_DIR, 'test/perf')),
+    new ScriptsMochaTests(path.join(SOURCE_ROOT, 'scripts/eslint_rules/tests')),
+    new ScriptsMochaTests(path.join(SOURCE_ROOT, 'scripts/stylelint_rules/tests')),
+    new ScriptsMochaTests(path.join(SOURCE_ROOT, 'scripts/build/tests')),
   ];
 
   if (!options['skip-ninja']) {

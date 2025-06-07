@@ -5,8 +5,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import * as ResultsDb from './resultsdb.js';
-const diff = require('diff');
+import {ScreenshotError} from './screenshot-error.js';
+
 const chalk = require('chalk');
+const diff = require('diff');
 
 type DiffCallback = (line: string) => string;
 function*
@@ -54,19 +56,19 @@ export const ResultsDBReporter = function(
 
   this.USE_COLORS = true;
 
-  const capturedLog: {log: string, type: string}[] = [];
-  this.onBrowserLog = (browser: any, log: string, type: string) => {
+  const capturedLog: Array<{log: string, type: string}> = [];
+  this.onBrowserLog = (_browser: any, log: string, type: string) => {
     capturedLog.push({log, type});
   };
 
-  const specComplete = (browser: any, result: any) => {
+  const specComplete = (_browser: any, result: any) => {
     const {suite, description, log, startTime, endTime, success, skipped} = result;
     const testId = ResultsDb.sanitizedTestId([...suite, description].join('/'));
     const expected = success || skipped;
     const status = skipped ? 'SKIP' : success ? 'PASS' : 'FAIL';
-    let duration = '1ms';
+    let duration = '.001s';
     if (startTime < endTime) {
-      duration = (endTime - startTime).toString() + 'ms';
+      duration = ((endTime - startTime) * .001).toFixed(3) + 's';
     }
 
     const consoleLog = capturedLog.map(({type, log}) => `${type.toUpperCase()}: ${log}`);
@@ -112,6 +114,19 @@ export const ResultsDBReporter = function(
     }
 
     const testResult: ResultsDb.TestResult = {testId, duration, status, expected, summaryHtml};
+
+    if (result.log?.[0]?.startsWith('Error: ScreenshotError')) {
+      const screenshotError = ScreenshotError.errors.shift();
+      if (screenshotError) {
+        // Assert that the screenshot error matches the log.
+        // If it does not, it means something is wrong
+        // with the order of assertions and tests.«
+        if (!result.log?.[0]?.includes(screenshotError.message)) {
+          throw new Error('Unexpected screenshot assertion error');
+        }
+        [testResult.artifacts, testResult.summaryHtml] = screenshotError.toMiloArtifacts();
+      }
+    }
     ResultsDb.sendTestResult(testResult);
   };
   this.specSuccess = specComplete;

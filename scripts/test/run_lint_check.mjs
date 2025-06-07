@@ -2,20 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import { loadESLint } from 'eslint';
-import stylelint from 'stylelint';
-
-import { extname, join } from 'path';
+import { spawn } from 'child_process';
+import { ESLint } from 'eslint';
+import { readFileSync } from 'fs';
 import { sync } from 'globby';
+import { extname, join, resolve, relative } from 'path';
+import stylelint from 'stylelint';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
-import { spawn } from 'child_process';
-import { readFileSync } from 'fs';
 
 import {
   devtoolsRootPath,
   litAnalyzerExecutablePath,
   nodePath,
+  nodeModulesPath,
   tsconfigJsonPath,
 } from '../devtools_paths.js';
 
@@ -25,44 +25,75 @@ const flags = yargs(hideBin(process.argv))
     default: true,
     describe: 'Automatically fix, where possible, problems reported by rules.',
   })
+  .option('debug', {
+    type: 'boolean',
+    default: false,
+    describe:
+      'Disable cache validations during debugging, useful for custom rule creation/debugging.',
+  })
   .usage('$0 [<files...>]', 'Run the linter on the provided files', yargs => {
-    yargs.positional('files', {
+    return yargs.positional('files', {
       describe: 'File(s), glob(s), or directories',
-      type: 'array',
+      type: 'string',
+      array: true,
       default: [
         'front_end',
         'inspector_overlay',
         'scripts',
         'test',
         'extensions',
+        'extension-api',
       ],
     });
   })
-  .parse();
+  .parseSync();
 
 if (!flags.fix) {
   console.log('[lint]: fix is disabled; no errors will be autofixed.');
 }
+if (flags.debug) {
+  console.log('[lint]: Cache disabled, linting may take longer.');
+}
+const cacheLinters = !flags.debug;
 
-async function runESLint(files) {
-  const EsLintFlat = await loadESLint({ useFlatConfig: true });
-  const cli = new EsLintFlat({
+function debugLogging(...args) {
+  if (!flags.debug) {
+    return;
+  }
+
+  console.log(...args);
+}
+
+async function runESLint(scriptFiles) {
+  debugLogging('[lint]: Running EsLint...');
+  const cli = new ESLint({
     cwd: join(import.meta.dirname, '..', '..'),
     fix: flags.fix,
+    cache: cacheLinters,
   });
 
-  // We filter out certain files in the `.eslintignore`. However, ESLint produces warnings
+  // We filter out certain files in the `eslint.config.mjs` `Ignore list` entry.
+  // However, ESLint produces warnings
   // when you include a particular file that is ignored. This means that if you edit a file
-  // that is directly ignored in the `.eslintignore`, ESLint would report a failure.
+  // that is directly ignored. ESLint would report a failure.
   // This was originally reported in https://github.com/eslint/eslint/issues/9977
   // The suggested workaround is to use the CLIEngine to preemptively filter out these
   // problematic paths.
-  files = await Promise.all(
-    files.map(async file => {
-      return (await cli.isPathIgnored(file)) ? null : file;
-    }),
-  );
-  files = files.filter(file => file !== null);
+  const files = (
+    await Promise.all(
+      scriptFiles.map(async file => {
+        return (await cli.isPathIgnored(file)) ? null : file;
+      }),
+    )
+  ).filter(file => file !== null);
+
+  if (files.length === 0) {
+    // When an empty array is pass lint CWD
+    // This can happen only if we pass things that will
+    // be ignored by the above filter
+    // https://github.com/eslint/eslint/pull/17644
+    return true;
+  }
 
   const results = await cli.lintFiles(files);
 
@@ -71,15 +102,17 @@ async function runESLint(files) {
   );
   if (usedDeprecatedRules.length) {
     console.log('Used deprecated rules:');
-    for (const { ruleId, replaceBy } of usedDeprecatedRules) {
+    for (const { ruleId, replacedBy } of usedDeprecatedRules) {
       console.log(
-        ` Rule ${ruleId} can be replaced with ${replaceBy ?? 'none'}`,
+        ` Rule ${ruleId} can be replaced with ${
+          replacedBy.join(',') ?? 'none'
+        }`,
       );
     }
   }
 
   if (flags.fix) {
-    await EsLintFlat.outputFixes(results);
+    await ESLint.outputFixes(results);
   }
 
   const formatter = await cli.loadFormatter('stylish');
@@ -92,12 +125,15 @@ async function runESLint(files) {
 }
 
 async function runStylelint(files) {
+  debugLogging('[lint]: Running StyleLint...');
   const { report, errored } = await stylelint.lint({
     configFile: join(import.meta.dirname, '..', '..', '.stylelintrc.json'),
     ignorePath: join(import.meta.dirname, '..', '..', '.stylelintignore'),
     fix: flags.fix,
     files,
     formatter: 'string',
+    cache: cacheLinters,
+    allowEmptyInput: true,
   });
 
   if (report) {
@@ -116,6 +152,8 @@ async function runStylelint(files) {
  * @param {string[]} files the input files to analyze.
  */
 async function runLitAnalyzer(files) {
+  debugLogging('[lint]: Running LitAnalyzer...');
+
   const readLitAnalyzerConfigFromCompilerOptions = () => {
     const { compilerOptions } = JSON.parse(
       readFileSync(tsconfigJsonPath(), 'utf-8'),
@@ -133,6 +171,11 @@ async function runLitAnalyzer(files) {
   };
 
   const { rules } = readLitAnalyzerConfigFromCompilerOptions();
+  /**
+   *
+   * @param {string[]} subsetFiles
+   * @returns {Promise<{output: string, error: string, status:boolean}>}
+   */
   const getLitAnalyzerResult = async subsetFiles => {
     const args = [
       litAnalyzerExecutablePath(),
@@ -148,7 +191,6 @@ async function runLitAnalyzer(files) {
 
     return await new Promise(resolve => {
       const litAnalyzerProcess = spawn(nodePath(), args, {
-        encoding: 'utf-8',
         cwd: devtoolsRootPath(),
       });
 
@@ -176,6 +218,9 @@ async function runLitAnalyzer(files) {
       return [filesToSplit];
     }
 
+    /**
+     * @type {string[][]}
+     */
     const splitFiles = [[]];
     let index = 0;
     for (const file of filesToSplit) {
@@ -196,7 +241,9 @@ async function runLitAnalyzer(files) {
     }),
   );
   for (const result of results) {
-    if (result.output) {
+    // Don't print if no problems are found
+    // Mimics the other tools
+    if (result.output && !result.output.includes('Found 0 problems')) {
       console.log(result.output);
     }
     if (result.error) {
@@ -207,12 +254,93 @@ async function runLitAnalyzer(files) {
   return results.every(r => r.status);
 }
 
+const DEVTOOLS_ROOT_DIR = resolve(import.meta.dirname, '..', '..');
+/**
+ *
+ * @param {string} path
+ * @returns {boolean}
+ */
+function shouldIgnoreFile(path) {
+  const resolvedPath = resolve(path);
+  const relativePath = relative(DEVTOOLS_ROOT_DIR, resolvedPath);
+
+  if (
+    relativePath.includes('third_party') ||
+    relativePath.includes('node_modules')
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+async function runEslintRulesTypeCheck(_files) {
+  debugLogging('[lint]: Running EsLint custom rules typechecking...');
+  const tscPath = join(nodeModulesPath(), 'typescript', 'bin', 'tsc');
+  const tsConfigEslintRules = join(
+    devtoolsRootPath(),
+    'scripts',
+    'eslint_rules',
+    'tsconfig.json',
+  );
+  const args = [tscPath, '-b', tsConfigEslintRules];
+  /**
+   * @returns {Promise<{output: string, error: string, status:boolean}>}
+   */
+  async function runTypeCheck() {
+    const result = {
+      output: '',
+      error: '',
+      status: false,
+    };
+
+    return await new Promise(resolve => {
+      const tscProcess = spawn(nodePath(), args, {
+        cwd: devtoolsRootPath(),
+      });
+
+      tscProcess.stdout.on('data', data => {
+        result.output += `\n${data.toString()}`;
+      });
+      tscProcess.stderr.on('data', data => {
+        result.error += `\n${data.toString()}`;
+      });
+
+      tscProcess.on('error', message => {
+        result.error += `\n${message}`;
+        resolve(result);
+      });
+
+      tscProcess.on('exit', code => {
+        result.status = code === 0;
+        resolve(result);
+      });
+    });
+  }
+
+  const result = await runTypeCheck();
+
+  if (result.output) {
+    console.log(result.output);
+  }
+  if (result.error) {
+    console.log(result.error);
+  }
+  return result.status;
+}
+
 async function run() {
+  const files = Array.isArray(flags.files) ? flags.files : [flags.files];
   const scripts = [];
   const styles = [];
-  for (const path of sync(flags.files, {
+  for (const path of sync(files, {
     expandDirectories: { extensions: ['css', 'mjs', 'js', 'ts'] },
+    gitignore: true,
   })) {
+    if (shouldIgnoreFile(path)) {
+      continue;
+    }
+
     if (extname(path) === '.css') {
       styles.push(path);
     } else {
@@ -221,6 +349,9 @@ async function run() {
   }
 
   const frontEndFiles = scripts.filter(script => script.includes('front_end'));
+  const esLintRules = scripts.filter(script =>
+    script.includes('scripts/eslint_rules'),
+  );
 
   let succeed = true;
   if (scripts.length !== 0) {
@@ -232,6 +363,10 @@ async function run() {
   if (styles.length !== 0) {
     succeed &&= await runStylelint(styles);
   }
+  if (esLintRules.length !== 0) {
+    succeed &&= await runEslintRulesTypeCheck();
+  }
+
   return succeed;
 }
 

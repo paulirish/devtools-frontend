@@ -1,8 +1,8 @@
 /// <reference types="node" />
 
-import type { ChildProcess } from 'child_process';
+import type { ChildProcess } from 'node:child_process';
 type ParseSelector<T extends string> = any;
-import { PassThrough } from 'stream';
+import { PassThrough } from 'node:stream';
 import { Protocol } from 'devtools-protocol';
 import type { ProtocolMapping } from 'devtools-protocol/types/protocol-mapping.js';
 type Session = any;
@@ -95,6 +95,9 @@ export declare type ActionResult = 'continue' | 'abort' | 'respond';
  * @public
  */
 export declare interface AutofillData {
+    /**
+     * See {@link https://chromedevtools.github.io/devtools-protocol/tot/Autofill/#type-CreditCard | Autofill.CreditCard}.
+     */
     creditCard: {
         number: string;
         name: string;
@@ -339,7 +342,7 @@ export declare abstract class Browser extends EventEmitter<BrowserEvents> {
      * Shortcut for
      * {@link BrowserContext.setCookie | browser.defaultBrowserContext().setCookie()}.
      */
-    setCookie(...cookies: Cookie[]): Promise<void>;
+    setCookie(...cookies: CookieData[]): Promise<void>;
     /**
      * Removes cookies from the default {@link BrowserContext}.
      *
@@ -349,6 +352,18 @@ export declare abstract class Browser extends EventEmitter<BrowserEvents> {
      * {@link BrowserContext.deleteCookie | browser.defaultBrowserContext().deleteCookie()}.
      */
     deleteCookie(...cookies: Cookie[]): Promise<void>;
+    /**
+     * Installs an extension and returns the ID. In Chrome, this is only
+     * available if the browser was created using `pipe: true` and the
+     * `--enable-unsafe-extension-debugging` flag is set.
+     */
+    abstract installExtension(path: string): Promise<string>;
+    /**
+     * Uninstalls an extension. In Chrome, this is only available if the browser
+     * was created using `pipe: true` and the
+     * `--enable-unsafe-extension-debugging` flag is set.
+     */
+    abstract uninstallExtension(id: string): Promise<void>;
     /**
      * Whether Puppeteer is connected to this {@link Browser | browser}.
      *
@@ -699,7 +714,18 @@ export declare type CDPEvents = {
  */
 export declare abstract class CDPSession extends EventEmitter<CDPSessionEvents> {
 
+    /**
+     * The underlying connection for this session, if any.
+     *
+     * @public
+     */
     abstract connection(): Connection | undefined;
+    /**
+     * True if the session has been detached, false otherwise.
+     *
+     * @public
+     */
+    abstract get detached(): boolean;
 
     abstract send<T extends keyof ProtocolMapping.Commands>(method: T, params?: ProtocolMapping.Commands[T]['paramsType'][0], options?: CommandOptions): Promise<ProtocolMapping.Commands[T]['returnType']>;
     /**
@@ -937,6 +963,7 @@ export declare class Connection extends EventEmitter<CDPSessionEvents> {
     get timeout(): number;
 
 
+
     /**
      * @param sessionId - The session id
      * @returns The current CDP session if it exists
@@ -1113,7 +1140,7 @@ export declare function convertCookiesPartitionKeyFromPuppeteerToCdp(partitionKe
  *
  * @public
  */
-export declare interface Cookie {
+export declare interface Cookie extends CookieData {
     /**
      * Cookie name.
      */
@@ -1170,8 +1197,8 @@ export declare interface Cookie {
     /**
      * Cookie partition key. In Chrome, it is the top-level site the
      * partitioned cookie is available in. In Firefox, it matches the
-     * source origin
-     * (https://w3c.github.io/webdriver-bidi/#type-storage-PartitionKey).
+     * source origin in the
+     * {@link https://w3c.github.io/webdriver-bidi/#type-storage-PartitionKey | PartitionKey }.
      */
     partitionKey?: CookiePartitionKey | string;
     /**
@@ -1234,8 +1261,8 @@ export declare interface CookieData {
     /**
      * Cookie partition key. In Chrome, it matches the top-level site the
      * partitioned cookie is available in. In Firefox, it matches the
-     * source origin
-     * (https://w3c.github.io/webdriver-bidi/#type-storage-PartitionKey).
+     * source origin in the
+     * {@link https://w3c.github.io/webdriver-bidi/#type-storage-PartitionKey | PartitionKey }.
      */
     partitionKey?: CookiePartitionKey | string;
 }
@@ -1299,8 +1326,8 @@ export declare interface CookieParam {
     /**
      * Cookie partition key. In Chrome, it matches the top-level site the
      * partitioned cookie is available in. In Firefox, it matches the
-     * source origin
-     * (https://w3c.github.io/webdriver-bidi/#type-storage-PartitionKey).
+     * source origin in the
+     * {@link https://w3c.github.io/webdriver-bidi/#type-storage-PartitionKey | PartitionKey }.
      */
     partitionKey?: CookiePartitionKey | string;
 }
@@ -1582,8 +1609,9 @@ export declare interface DeleteCookiesRequest {
     /**
      * If specified, deletes cookies in the given partition key. In
      * Chrome, partitionKey matches the top-level site the partitioned
-     * cookie is available in. In Firefox, it matches the source origin
-     * (https://w3c.github.io/webdriver-bidi/#type-storage-PartitionKey).
+     * cookie is available in.
+     * In Firefox, it matches the source origin in the
+     * {@link https://w3c.github.io/webdriver-bidi/#type-storage-PartitionKey | PartitionKey }.
      */
     partitionKey?: CookiePartitionKey | string;
 }
@@ -1811,7 +1839,7 @@ export declare abstract class ElementHandle<ElementType extends Node = Element> 
      * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
      * can be passed as-is and a
      * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-     * allows quering by
+     * allows querying by
      * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
      * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
      * and
@@ -1833,7 +1861,7 @@ export declare abstract class ElementHandle<ElementType extends Node = Element> 
      * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
      * can be passed as-is and a
      * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-     * allows quering by
+     * allows querying by
      * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
      * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
      * and
@@ -1871,7 +1899,7 @@ export declare abstract class ElementHandle<ElementType extends Node = Element> 
      * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
      * can be passed as-is and a
      * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-     * allows quering by
+     * allows querying by
      * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
      * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
      * and
@@ -1919,7 +1947,7 @@ export declare abstract class ElementHandle<ElementType extends Node = Element> 
      * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
      * can be passed as-is and a
      * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-     * allows quering by
+     * allows querying by
      * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
      * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
      * and
@@ -2481,7 +2509,7 @@ export declare type FlattenHandle<T> = T extends HandleOr<infer U> ? U : never;
  *
  * To understand frames, you can think of frames as `<iframe>` elements. Just
  * like iframes, frames can be nested, and when JavaScript is executed in a
- * frame, the JavaScript does not effect frames inside the ambient frame the
+ * frame, the JavaScript does not affect frames inside the ambient frame the
  * JavaScript executes in.
  *
  * @example
@@ -2514,9 +2542,25 @@ export declare type FlattenHandle<T> = T extends HandleOr<infer U> ? U : never;
  * An example of getting text from an iframe element:
  *
  * ```ts
- * const frame = page.frames().find(frame => frame.name() === 'myframe');
- * const text = await frame.$eval('.selector', element => element.textContent);
- * console.log(text);
+ * const frames = page.frames();
+ * let frame = null;
+ * for (const currentFrame of frames) {
+ *   const frameElement = await currentFrame.frameElement();
+ *   const name = await frameElement.evaluate(el => el.getAttribute('name'));
+ *   if (name === 'myframe') {
+ *     frame = currentFrame;
+ *     break;
+ *   }
+ * }
+ * if (frame) {
+ *   const text = await frame.$eval(
+ *     '.selector',
+ *     element => element.textContent,
+ *   );
+ *   console.log(text);
+ * } else {
+ *   console.error('Frame with name "myframe" not found.');
+ * }
  * ```
  *
  * @remarks
@@ -2634,7 +2678,7 @@ export declare abstract class Frame extends EventEmitter<FrameEvents> {
      * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
      * can be passed as-is and a
      * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-     * allows quering by
+     * allows querying by
      * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
      * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
      * and
@@ -2659,7 +2703,7 @@ export declare abstract class Frame extends EventEmitter<FrameEvents> {
      * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
      * can be passed as-is and a
      * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-     * allows quering by
+     * allows querying by
      * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
      * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
      * and
@@ -2682,7 +2726,7 @@ export declare abstract class Frame extends EventEmitter<FrameEvents> {
      * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
      * can be passed as-is and a
      * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-     * allows quering by
+     * allows querying by
      * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
      * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
      * and
@@ -2715,7 +2759,7 @@ export declare abstract class Frame extends EventEmitter<FrameEvents> {
      * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
      * can be passed as-is and a
      * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-     * allows quering by
+     * allows querying by
      * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
      * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
      * and
@@ -2750,7 +2794,7 @@ export declare abstract class Frame extends EventEmitter<FrameEvents> {
      * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
      * can be passed as-is and a
      * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-     * allows quering by
+     * allows querying by
      * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
      * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
      * and
@@ -3514,6 +3558,11 @@ export declare abstract class HTTPResponse {
 /**
  * @public
  */
+export declare type ImageFormat = 'png' | 'jpeg' | 'webp';
+
+/**
+ * @public
+ */
 export declare type InnerParams<T extends unknown[]> = {
     [K in keyof T]: FlattenHandle<T[K]>;
 };
@@ -3937,6 +3986,12 @@ export declare interface LaunchOptions extends ConnectOptions {
      * @defaultValue `false`
      */
     ignoreDefaultArgs?: boolean | string[];
+    /**
+     * If `true`, avoids passing default arguments to the browser that would
+     * prevent extensions from being enabled. Passing a list of strings will
+     * load the provided paths as unpacked extensions.
+     */
+    enableExtensions?: boolean | string[];
     /**
      * Close the browser process on `Ctrl+C`.
      * @defaultValue `true`
@@ -4829,7 +4884,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
      * can be passed as-is and a
      * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-     * allows quering by
+     * allows querying by
      * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
      * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
      * and
@@ -4850,7 +4905,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
      * can be passed as-is and a
      * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-     * allows quering by
+     * allows querying by
      * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
      * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
      * and
@@ -4872,7 +4927,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
      * can be passed as-is and a
      * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-     * allows quering by
+     * allows querying by
      * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
      * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
      * and
@@ -4897,7 +4952,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
      * can be passed as-is and a
      * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-     * allows quering by
+     * allows querying by
      * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
      * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
      * and
@@ -5050,7 +5105,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
      * can be passed as-is and a
      * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-     * allows quering by
+     * allows querying by
      * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
      * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
      * and
@@ -5120,7 +5175,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
      * can be passed as-is and a
      * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-     * allows quering by
+     * allows querying by
      * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
      * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
      * and
@@ -5232,7 +5287,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      *
      * ```ts
      * import puppeteer from 'puppeteer';
-     * import fs from 'fs';
+     * import fs from 'node:fs';
      *
      * (async () => {
      *   const browser = await puppeteer.launch();
@@ -5474,7 +5529,12 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      *
      * ```ts
      * const frame = await page.waitForFrame(async frame => {
-     *   return frame.name() === 'Test';
+     *   const frameElement = await frame.frameElement();
+     *   if (!frameElement) {
+     *     return false;
+     *   }
+     *   const name = await frameElement.evaluate(el => el.getAttribute('name'));
+     *   return name === 'test';
      * });
      * ```
      */
@@ -5867,8 +5927,8 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      *
      * @remarks
      *
-     * All recordings will be {@link https://www.webmproject.org/ | WebM} format using
-     * the {@link https://www.webmproject.org/vp9/ | VP9} video codec. The FPS is 30.
+     * By default, all recordings will be {@link https://www.webmproject.org/ | WebM} format using
+     * the {@link https://www.webmproject.org/vp9/ | VP9} video codec, with a frame rate of 30 FPS.
      *
      * You must have {@link https://ffmpeg.org/ | ffmpeg} installed on your system.
      */
@@ -5965,7 +6025,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
      * can be passed as-is and a
      * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-     * allows quering by
+     * allows querying by
      * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
      * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
      * and
@@ -5990,7 +6050,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
      * can be passed as-is and a
      * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-     * allows quering by
+     * allows querying by
      * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
      * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
      * and
@@ -6022,7 +6082,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
      * can be passed as-is and a
      * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-     * allows quering by
+     * allows querying by
      * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
      * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
      * and
@@ -6059,7 +6119,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
      * can be passed as-is and a
      * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-     * allows quering by
+     * allows querying by
      * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
      * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
      * and
@@ -6089,7 +6149,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
      * can be passed as-is and a
      * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-     * allows quering by
+     * allows querying by
      * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
      * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
      * and
@@ -6125,7 +6185,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
      * can be passed as-is and a
      * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-     * allows quering by
+     * allows querying by
      * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
      * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
      * and
@@ -6175,7 +6235,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
      * can be passed as-is and a
      * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-     * allows quering by
+     * allows querying by
      * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
      * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
      * and
@@ -6484,27 +6544,27 @@ export declare interface PageEvents extends Record<EventType, unknown> {
  *
  * The sizes of each format are as follows:
  *
- * - `Letter`: 8.5in x 11in
+ * - `Letter`: 8.5in x 11in / 21.59cm x 27.94cm
  *
- * - `Legal`: 8.5in x 14in
+ * - `Legal`: 8.5in x 14in / 21.59cm x 35.56cm
  *
- * - `Tabloid`: 11in x 17in
+ * - `Tabloid`: 11in x 17in / 27.94cm x 43.18cm
  *
- * - `Ledger`: 17in x 11in
+ * - `Ledger`: 17in x 11in / 43.18cm x 27.94cm
  *
- * - `A0`: 33.1102in x 46.811in
+ * - `A0`: 33.1102in x 46.811in / 84.1cm x 118.9cm
  *
- * - `A1`: 23.3858in x 33.1102in
+ * - `A1`: 23.3858in x 33.1102in / 59.4cm x 84.1cm
  *
- * - `A2`: 16.5354in x 23.3858in
+ * - `A2`: 16.5354in x 23.3858in / 42cm x 59.4cm
  *
- * - `A3`: 11.6929in x 16.5354in
+ * - `A3`: 11.6929in x 16.5354in / 29.7cm x 42cm
  *
- * - `A4`: 8.2677in x 11.6929in
+ * - `A4`: 8.2677in x 11.6929in / 21cm x 29.7cm
  *
- * - `A5`: 5.8268in x 8.2677in
+ * - `A5`: 5.8268in x 8.2677in / 14.8cm x 21cm
  *
- * - `A6`: 4.1339in x 5.8268in
+ * - `A6`: 4.1339in x 5.8268in / 10.5cm x 14.8cm
  *
  * @public
  */
@@ -6650,7 +6710,7 @@ export declare interface PDFOptions {
 /**
  * @public
  */
-export declare type Permission = 'geolocation' | 'midi' | 'notifications' | 'camera' | 'microphone' | 'background-sync' | 'ambient-light-sensor' | 'accelerometer' | 'gyroscope' | 'magnetometer' | 'accessibility-events' | 'clipboard-read' | 'clipboard-write' | 'clipboard-sanitized-write' | 'payment-handler' | 'persistent-storage' | 'idle-detection' | 'midi-sysex';
+export declare type Permission = 'accelerometer' | 'ambient-light-sensor' | 'background-sync' | 'camera' | 'clipboard-read' | 'clipboard-sanitized-write' | 'clipboard-write' | 'geolocation' | 'gyroscope' | 'idle-detection' | 'keyboard-lock' | 'magnetometer' | 'microphone' | 'midi-sysex' | 'midi' | 'notifications' | 'payment-handler' | 'persistent-storage' | 'pointer-lock';
 
 /**
  * @public
@@ -6883,6 +6943,8 @@ declare namespace Puppeteer_2 {
         GeolocationOptions,
         MediaFeature,
         ScreenshotClip,
+        ImageFormat,
+        VideoFormat,
         ScreenshotOptions,
         ScreencastOptions,
         QueryOptions,
@@ -7232,7 +7294,20 @@ export declare interface ScreencastOptions {
     /**
      * File path to save the screencast to.
      */
-    path?: `${string}.webm`;
+    path?: `${string}.${VideoFormat}`;
+    /**
+     * Specifies whether to overwrite output file,
+     * or exit immediately if it already exists.
+     *
+     * @defaultValue `true`
+     */
+    overwrite?: boolean;
+    /**
+     * Specifies the output file format.
+     *
+     * @defaultValue `'webm'`
+     */
+    format?: VideoFormat;
     /**
      * Specifies the region of the viewport to crop.
      */
@@ -7256,9 +7331,48 @@ export declare interface ScreencastOptions {
      */
     speed?: number;
     /**
+     * Specifies the frame rate in frames per second.
+     *
+     * @defaultValue `30` (`20` for GIF)
+     */
+    fps?: number;
+    /**
+     * Specifies the number of times to loop playback, from `0` to `Infinity`.
+     * A value of `0` or `undefined` will disable looping.
+     *
+     * @defaultValue `undefined`
+     */
+    loop?: number;
+    /**
+     * Specifies the delay between iterations of a loop, in ms.
+     * `-1` is a special value to re-use the previous delay.
+     *
+     * @defaultValue `-1`
+     */
+    delay?: number;
+    /**
+     * Specifies the recording
+     * {@link https://trac.ffmpeg.org/wiki/Encode/VP9#constantq | quality}
+     * Constant Rate Factor between `0`–`63`. Lower values mean better quality.
+     *
+     * @defaultValue `30`
+     */
+    quality?: number;
+    /**
+     * Specifies the maximum number of
+     * {@link https://ffmpeg.org/ffmpeg-filters.html#palettegen | palette}
+     * colors to quantize, with GIF limited to `256`.
+     * Restrict the palette to only necessary colors to reduce output file size.
+     *
+     * @defaultValue `256`
+     */
+    colors?: number;
+    /**
      * Path to the {@link https://ffmpeg.org/ | ffmpeg}.
      *
      * Required if `ffmpeg` is not in your PATH.
+     *
+     * @defaultValue `'ffmpeg'`
      */
     ffmpegPath?: string;
 }
@@ -7299,7 +7413,7 @@ export declare interface ScreenshotOptions {
     /**
      * @defaultValue `'png'`
      */
-    type?: 'png' | 'jpeg' | 'webp';
+    type?: ImageFormat;
     /**
      * Quality of the image, between 0-100. Not applicable to `png` images.
      */
@@ -7328,7 +7442,7 @@ export declare interface ScreenshotOptions {
      * relative to current working directory. If no path is provided, the image
      * won't be saved to the disk.
      */
-    path?: string;
+    path?: `${string}.${ImageFormat}`;
     /**
      * Specifies the region of the page/element to clip.
      */
@@ -7717,6 +7831,11 @@ export declare interface TracingOptions {
  */
 export declare class UnsupportedOperation extends PuppeteerError {
 }
+
+/**
+ * @public
+ */
+export declare type VideoFormat = 'webm' | 'gif' | 'mp4';
 
 /**
  * @license

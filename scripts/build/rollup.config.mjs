@@ -4,13 +4,13 @@
 
 // @ts-check
 
-import sourcemaps from 'rollup-plugin-sourcemaps2';
 import terser from '@rollup/plugin-terser';
+import sourcemaps from 'rollup-plugin-sourcemaps2';
 
 import { devtoolsPlugin } from './devtools_plugin.js';
 
 /** @type {function({configSourcemaps: boolean}): import("rollup").MergedRollupOptions} */
-// eslint-disable-next-line import/no-default-export
+
 export default commandLineArgs => ({
   treeshake: false,
   context: 'self',

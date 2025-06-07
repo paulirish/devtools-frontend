@@ -1,6 +1,7 @@
 // Copyright 2014 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import type * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
@@ -19,7 +20,6 @@ export class AdvancedApp implements Common.App.App {
   private toolboxWindow?: Window|null;
   private toolboxRootView?: UI.RootView.RootView;
   private changingDockSide?: boolean;
-  private toolboxDocument?: Document;
 
   constructor() {
     UI.DockController.DockController.instance().addEventListener(
@@ -87,8 +87,6 @@ export class AdvancedApp implements Common.App.App {
 
     this.toolboxRootView = new UI.RootView.RootView();
     this.toolboxRootView.attachToDocument(toolboxDocument);
-
-    this.toolboxDocument = toolboxDocument;
 
     this.updateDeviceModeView();
   }
@@ -183,9 +181,9 @@ export class AdvancedApp implements Common.App.App {
 }
 
 // Export required for usage in toolbox.ts
-// @ts-ignore Exported for Tests.js
+// @ts-expect-error Exported for Tests.js
 globalThis.Emulation = globalThis.Emulation || {};
-// @ts-ignore Exported for Tests.js
+// @ts-expect-error Exported for Tests.js
 globalThis.Emulation.AdvancedApp = AdvancedApp;
 
 let advancedAppProviderInstance: AdvancedAppProvider;

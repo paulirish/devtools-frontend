@@ -1,6 +1,7 @@
 // Copyright 2014 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import '../../ui/legacy/legacy.js';
 
@@ -12,6 +13,7 @@ import * as SDK from '../../core/sdk/sdk.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as Persistence from '../../models/persistence/persistence.js';
 import * as Workspace from '../../models/workspace/workspace.js';
+import * as IconButton from '../../ui/components/icon_button/icon_button.js';
 import * as QuickOpen from '../../ui/legacy/components/quick_open/quick_open.js';
 import * as SourceFrame from '../../ui/legacy/components/source_frame/source_frame.js';
 import * as UI from '../../ui/legacy/legacy.js';
@@ -50,19 +52,17 @@ const UIStrings = {
    */
   sourceViewActions: 'Source View Actions',
 
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/sources/SourcesView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Widget.VBox>(UI.Widget.VBox)
     implements TabbedEditorContainerDelegate, UI.SearchableView.Searchable, UI.SearchableView.Replaceable {
-  private selectedIndex: number;
   private readonly searchableViewInternal: UI.SearchableView.SearchableView;
   private readonly sourceViewByUISourceCode: Map<Workspace.UISourceCode.UISourceCode, UI.Widget.Widget>;
   editorContainer: TabbedEditorContainer;
   private readonly historyManager: EditingLocationHistoryManager;
-  private readonly toolbarContainerElementInternal: HTMLElement;
-  private readonly scriptViewToolbar: UI.Toolbar.Toolbar;
+  readonly #scriptViewToolbar: UI.Toolbar.Toolbar;
   private readonly bottomToolbarInternal: UI.Toolbar.Toolbar;
   private toolbarChangedListener: Common.EventTarget.EventDescriptor|null;
   private readonly focusedPlaceholderElement?: HTMLElement;
@@ -71,12 +71,11 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
 
   constructor() {
     super();
+    this.registerRequiredCSS(sourcesViewStyles);
 
     this.element.id = 'sources-panel-sources-view';
     this.element.setAttribute('jslog', `${VisualLogging.pane('editor').track({keydown: 'Escape'})}`);
     this.setMinimumAndPreferredSizes(88, 52, 150, 100);
-
-    this.selectedIndex = 0;
 
     const workspace = Workspace.Workspace.WorkspaceImpl.instance();
 
@@ -95,11 +94,11 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
 
     this.historyManager = new EditingLocationHistoryManager(this);
 
-    this.toolbarContainerElementInternal = this.element.createChild('div', 'sources-toolbar');
-    this.toolbarContainerElementInternal.setAttribute('jslog', `${VisualLogging.toolbar('bottom')}`);
-    this.scriptViewToolbar = this.toolbarContainerElementInternal.createChild('devtools-toolbar');
-    this.scriptViewToolbar.style.flex = 'auto';
-    this.bottomToolbarInternal = this.toolbarContainerElementInternal.createChild('devtools-toolbar');
+    const toolbarContainerElementInternal = this.element.createChild('div', 'sources-toolbar');
+    toolbarContainerElementInternal.setAttribute('jslog', `${VisualLogging.toolbar('bottom')}`);
+    this.#scriptViewToolbar = toolbarContainerElementInternal.createChild('devtools-toolbar');
+    this.#scriptViewToolbar.style.flex = 'auto';
+    this.bottomToolbarInternal = toolbarContainerElementInternal.createChild('devtools-toolbar');
 
     this.toolbarChangedListener = null;
 
@@ -145,45 +144,54 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
   }
 
   private placeholderElement(): Element {
+    const placeholder = document.createElement('div');
+    placeholder.classList.add('sources-placeholder');
+
+    const workspaceElement = placeholder.createChild('div', 'tabbed-pane-placeholder-row');
+    workspaceElement.classList.add('workspace');
+
+    const icon = IconButton.Icon.create('sync', 'sync-icon');
+    workspaceElement.createChild('span', 'icon-container').appendChild(icon);
+    const text = workspaceElement.createChild('span');
+    text.textContent = UIStrings.workspaceDropInAFolderToSyncSources;
+    const browseButton = text.createChild('button');
+    browseButton.textContent = i18nString(UIStrings.selectFolder);
+    browseButton.addEventListener('click', this.addFileSystemClicked.bind(this));
+
     const shortcuts = [
       {actionId: 'quick-open.show', description: i18nString(UIStrings.openFile)},
       {actionId: 'quick-open.show-command-menu', description: i18nString(UIStrings.runCommand)},
-      {
-        actionId: 'sources.add-folder-to-workspace',
-        description: i18nString(UIStrings.workspaceDropInAFolderToSyncSources),
-        isWorkspace: true,
-      },
     ];
 
-    const list = document.createElement('div');
+    const list = placeholder.createChild('div', 'shortcuts-list');
+    list.classList.add('tabbed-pane-placeholder-row');
     UI.ARIAUtils.markAsList(list);
     UI.ARIAUtils.setLabel(list, i18nString(UIStrings.sourceViewActions));
 
     for (const shortcut of shortcuts) {
-      const shortcutKeyText = UI.ShortcutRegistry.ShortcutRegistry.instance().shortcutTitleForAction(shortcut.actionId);
-      const listItemElement = list.createChild('div', 'tabbed-pane-placeholder-row');
-      UI.ARIAUtils.markAsListitem(listItemElement);
-      if (shortcutKeyText) {
-        const title = listItemElement.createChild('span');
-        title.textContent = shortcutKeyText;
+      const shortcutKeys = UI.ShortcutRegistry.ShortcutRegistry.instance().shortcutsForAction(shortcut.actionId);
+      const listItemElement = list.createChild('div');
+      listItemElement.classList.add('shortcut-line');
 
+      UI.ARIAUtils.markAsListitem(listItemElement);
+
+      // Take the first shortcut for display.
+      if (shortcutKeys?.[0]) {
         const button = listItemElement.createChild('button');
         button.textContent = shortcut.description;
         const action = UI.ActionRegistry.ActionRegistry.instance().getAction(shortcut.actionId);
         button.addEventListener('click', () => action.execute());
-      }
 
-      if (shortcut.isWorkspace) {
-        const workspace = listItemElement.createChild('span', 'workspace');
-        workspace.textContent = shortcut.description;
-
-        const browseButton = workspace.createChild('button');
-        browseButton.textContent = i18nString(UIStrings.selectFolder);
-        browseButton.addEventListener('click', this.addFileSystemClicked.bind(this));
+        const shortcutElement = listItemElement.createChild('span', 'shortcuts');
+        const separator = Host.Platform.isMac() ? '\u2004' : ' + ';
+        const keys = shortcutKeys[0].descriptors.flatMap(descriptor => descriptor.name.split(separator));
+        keys.forEach(key => {
+          shortcutElement.createChild('span', 'keybinds-key').createChild('span').textContent = key;
+        });
       }
     }
 
-    return list;
+    return placeholder;
   }
 
   private async addFileSystemClicked(): Promise<void> {
@@ -220,19 +228,18 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
     return this.bottomToolbarInternal;
   }
 
+  scriptViewToolbar(): UI.Toolbar.Toolbar {
+    return this.#scriptViewToolbar;
+  }
+
   override wasShown(): void {
     super.wasShown();
-    this.registerCSSFiles([sourcesViewStyles]);
     UI.Context.Context.instance().setFlavor(SourcesView, this);
   }
 
   override willHide(): void {
     UI.Context.Context.instance().setFlavor(SourcesView, null);
     super.willHide();
-  }
-
-  toolbarContainerElement(): Element {
-    return this.toolbarContainerElementInternal;
   }
 
   searchableView(): UI.SearchableView.SearchableView {
@@ -248,7 +255,7 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
     if (!(view instanceof UISourceCodeFrame)) {
       return null;
     }
-    return (view as UISourceCodeFrame);
+    return (view);
   }
 
   currentUISourceCode(): Workspace.UISourceCode.UISourceCode|null {
@@ -337,11 +344,11 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
     const view = this.visibleView();
     if (view instanceof UI.View.SimpleView) {
       void view.toolbarItems().then(items => {
-        this.scriptViewToolbar.removeToolbarItems();
+        this.#scriptViewToolbar.removeToolbarItems();
         for (const action of getRegisteredEditorActions()) {
-          this.scriptViewToolbar.appendToolbarItem(action.getOrCreateButton(this));
+          this.#scriptViewToolbar.appendToolbarItem(action.getOrCreateButton(this));
         }
-        items.map(item => this.scriptViewToolbar.appendToolbarItem(item));
+        items.map(item => this.#scriptViewToolbar.appendToolbarItem(item));
       });
     }
   }
@@ -451,7 +458,7 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
     const sourceView = this.sourceViewByUISourceCode.get(uiSourceCode);
     this.sourceViewByUISourceCode.delete(uiSourceCode);
     if (sourceView && sourceView instanceof UISourceCodeFrame) {
-      (sourceView as UISourceCodeFrame).dispose();
+      (sourceView).dispose();
     }
     uiSourceCode.removeEventListener(Workspace.UISourceCode.Events.TitleChanged, this.#uiSourceCodeTitleChanged, this);
   }
@@ -614,7 +621,7 @@ export class SourcesView extends Common.ObjectWrapper.eventMixin<EventTypes, typ
     if (!(sourceFrame instanceof UISourceCodeFrame)) {
       return;
     }
-    const uiSourceCodeFrame = (sourceFrame as UISourceCodeFrame);
+    const uiSourceCodeFrame = sourceFrame;
     uiSourceCodeFrame.commitEditing();
   }
 
@@ -642,7 +649,7 @@ export interface EditorAction {
   getOrCreateButton(sourcesView: SourcesView): UI.Toolbar.ToolbarButton;
 }
 
-const registeredEditorActions: (() => EditorAction)[] = [];
+const registeredEditorActions: Array<() => EditorAction> = [];
 
 export function registerEditorAction(editorAction: () => EditorAction): void {
   registeredEditorActions.push(editorAction);

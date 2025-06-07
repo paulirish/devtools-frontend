@@ -6,15 +6,17 @@ import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as Workspace from '../../models/workspace/workspace.js';
+import {dispatchClickEvent, renderElementIntoDOM} from '../../testing/DOMHelpers.js';
 import {createTarget, registerNoopActions} from '../../testing/EnvironmentHelpers.js';
 import {describeWithMockConnection} from '../../testing/MockConnection.js';
 import {activate, getMainFrame, navigate} from '../../testing/ResourceTreeHelpers.js';
 import * as RenderCoordinator from '../../ui/components/render_coordinator/render_coordinator.js';
+import * as UI from '../../ui/legacy/legacy.js';
 
 import * as Coverage from './coverage.js';
 
 const isShowingLandingPage = (view: Coverage.CoverageView.CoverageView) => {
-  return Boolean(view.contentElement.querySelector('.landing-page'));
+  return Boolean(view.contentElement.querySelector('.empty-state'));
 };
 
 const isShowingResults = (view: Coverage.CoverageView.CoverageView) => {
@@ -91,16 +93,31 @@ describeWithMockConnection('CoverageView', () => {
     ]);
   });
 
+  it('dispatches a record/reload action when the button is clicked', () => {
+    const view = Coverage.CoverageView.CoverageView.instance();
+    assert.isTrue(isShowingLandingPage(view));
+
+    const button = view.contentElement.querySelector('.empty-state devtools-button');
+    assert.exists(button);
+
+    const toggleSpy =
+        sinon.spy(UI.ActionRegistry.ActionRegistry.instance().getAction('coverage.toggle-recording'), 'execute');
+    const reloadSpy =
+        sinon.spy(UI.ActionRegistry.ActionRegistry.instance().getAction('coverage.start-with-reload'), 'execute');
+
+    dispatchClickEvent(button);
+    assert.isTrue(toggleSpy.calledOnce || reloadSpy.calledOnce);
+  });
+
   it('can handle back/forward cache navigations', async () => {
     const {startSpy, stopSpy, target} = setupTargetAndModels();
     const view = Coverage.CoverageView.CoverageView.instance();
-    view.markAsRoot();
-    view.show(document.body);
+    renderElementIntoDOM(view);
     assert.isTrue(isShowingLandingPage(view));
     assert.isFalse(isShowingResults(view));
     assert.isFalse(isShowingPrerenderPage(view));
     assert.isFalse(isShowingBfcachePage(view));
-    assert.isTrue(startSpy.notCalled);
+    sinon.assert.notCalled(startSpy);
 
     await view.startRecording({reload: false, jsCoveragePerBlock: false});
     await RenderCoordinator.done();
@@ -108,7 +125,7 @@ describeWithMockConnection('CoverageView', () => {
     assert.isTrue(isShowingResults(view));
     assert.isFalse(isShowingPrerenderPage(view));
     assert.isFalse(isShowingBfcachePage(view));
-    assert.isTrue(startSpy.calledOnce);
+    sinon.assert.calledOnce(startSpy);
 
     navigate(getMainFrame(target), {}, Protocol.Page.NavigationType.BackForwardCacheRestore);
 
@@ -116,16 +133,16 @@ describeWithMockConnection('CoverageView', () => {
     assert.isFalse(isShowingResults(view));
     assert.isFalse(isShowingPrerenderPage(view));
     assert.isTrue(isShowingBfcachePage(view));
-    assert.isTrue(startSpy.calledOnce);
-    assert.isTrue(stopSpy.notCalled);
+    sinon.assert.calledOnce(startSpy);
+    sinon.assert.notCalled(stopSpy);
 
     navigate(getMainFrame(target));
     assert.isFalse(isShowingLandingPage(view));
     assert.isTrue(isShowingResults(view));
     assert.isFalse(isShowingPrerenderPage(view));
     assert.isFalse(isShowingBfcachePage(view));
-    assert.isTrue(startSpy.calledOnce);
-    assert.isTrue(stopSpy.notCalled);
+    sinon.assert.calledOnce(startSpy);
+    sinon.assert.notCalled(stopSpy);
 
     await view.stopRecording();
     view.willHide();
@@ -137,13 +154,12 @@ describeWithMockConnection('CoverageView', () => {
   it('can handle prerender activations', async () => {
     const {startSpy, stopSpy} = setupTargetAndModels();
     const view = Coverage.CoverageView.CoverageView.instance();
-    view.markAsRoot();
-    view.show(document.body);
+    renderElementIntoDOM(view);
     assert.isTrue(isShowingLandingPage(view));
     assert.isFalse(isShowingResults(view));
     assert.isFalse(isShowingPrerenderPage(view));
     assert.isFalse(isShowingBfcachePage(view));
-    assert.isTrue(startSpy.notCalled);
+    sinon.assert.notCalled(startSpy);
 
     await view.startRecording({reload: false, jsCoveragePerBlock: false});
     await RenderCoordinator.done({waitForWork: true});
@@ -151,7 +167,7 @@ describeWithMockConnection('CoverageView', () => {
     assert.isTrue(isShowingResults(view));
     assert.isFalse(isShowingPrerenderPage(view));
     assert.isFalse(isShowingBfcachePage(view));
-    assert.isTrue(startSpy.calledOnce);
+    sinon.assert.calledOnce(startSpy);
 
     // Create 2nd target for the prerendered frame.
     const {startSpy: startSpy2, stopSpy: stopSpy2, target: target2} = setupTargetAndModels();
@@ -161,20 +177,20 @@ describeWithMockConnection('CoverageView', () => {
     assert.isFalse(isShowingResults(view));
     assert.isTrue(isShowingPrerenderPage(view));
     assert.isFalse(isShowingBfcachePage(view));
-    assert.isTrue(startSpy.calledOnce);
-    assert.isTrue(stopSpy.calledOnce);
-    assert.isTrue(startSpy2.calledOnce);
-    assert.isTrue(stopSpy2.notCalled);
+    sinon.assert.calledOnce(startSpy);
+    sinon.assert.calledOnce(stopSpy);
+    sinon.assert.calledOnce(startSpy2);
+    sinon.assert.notCalled(stopSpy2);
 
     navigate(getMainFrame(target2), {url: 'http://www.example.com/page'});
     assert.isFalse(isShowingLandingPage(view));
     assert.isTrue(isShowingResults(view));
     assert.isFalse(isShowingPrerenderPage(view));
     assert.isFalse(isShowingBfcachePage(view));
-    assert.isTrue(startSpy.calledOnce);
-    assert.isTrue(stopSpy.calledOnce);
-    assert.isTrue(startSpy2.calledOnce);
-    assert.isTrue(stopSpy2.notCalled);
+    sinon.assert.calledOnce(startSpy);
+    sinon.assert.calledOnce(stopSpy);
+    sinon.assert.calledOnce(startSpy2);
+    sinon.assert.notCalled(stopSpy2);
 
     await view.stopRecording();
     view.willHide();

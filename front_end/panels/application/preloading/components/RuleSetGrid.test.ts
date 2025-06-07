@@ -7,7 +7,6 @@ import * as Protocol from '../../../../generated/protocol.js';
 import {assertGridContents} from '../../../../testing/DataGridHelpers.js';
 import {renderElementIntoDOM} from '../../../../testing/DOMHelpers.js';
 import {describeWithEnvironment} from '../../../../testing/EnvironmentHelpers.js';
-import type * as DataGrid from '../../../../ui/components/data_grid/data_grid.js';
 import * as RenderCoordinator from '../../../../ui/components/render_coordinator/render_coordinator.js';
 
 import * as PreloadingComponents from './components.js';
@@ -16,8 +15,11 @@ const {urlString} = Platform.DevToolsPath;
 
 async function assertRenderResult(
     rowsInput: PreloadingComponents.RuleSetGrid.RuleSetGridData, headerExpected: string[],
-    rowsExpected: string[][]): Promise<DataGrid.DataGrid.DataGrid> {
+    rowsExpected: string[][]): Promise<Element> {
   const component = new PreloadingComponents.RuleSetGrid.RuleSetGrid();
+  component.style.display = 'block';
+  component.style.width = '640px';
+  component.style.height = '480px';
   component.update(rowsInput);
   renderElementIntoDOM(component);
   await RenderCoordinator.done();
@@ -55,6 +57,36 @@ describeWithEnvironment('RuleSetGrid', () => {
         ['Rule set', 'Status'],
         [
           ['example.com/', '1 Not triggered, 2 Ready, 3 Failure'],
+        ],
+    );
+  });
+
+  it('renders tag instead of url correctly', async () => {
+    await assertRenderResult(
+        {
+          rows: [{
+            ruleSet: {
+              id: 'ruleSetId:0.1' as Protocol.Preload.RuleSetId,
+              loaderId: 'loaderId:1' as Protocol.Network.LoaderId,
+              sourceText: `
+{
+  "tag": "tag1",
+  "prefetch":[
+    {
+      "source": "list",
+      "urls": ["/prefetched.html"]
+    }
+  ]
+}
+`,
+            },
+            preloadsStatusSummary: '1 Not triggered, 2 Ready, 3 Failure',
+          }],
+          pageURL: urlString`https://example.com/`,
+        },
+        ['Rule set', 'Status'],
+        [
+          ['\"tag1\"', '1 Not triggered, 2 Ready, 3 Failure'],
         ],
     );
   });

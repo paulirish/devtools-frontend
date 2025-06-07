@@ -1,6 +1,8 @@
 // Copyright 2022 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
+
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as SDK from '../../core/sdk/sdk.js';
@@ -16,7 +18,7 @@ const UIStrings = {
    *@description Link text content in Elements Tree Outline of the Elements panel. When clicked, it "reveals" the true location of an element.
    */
   reveal: 'reveal',
-};
+} as const;
 
 const str_ = i18n.i18n.registerUIStrings('panels/elements/TopLayerContainer.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -24,7 +26,7 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export class TopLayerContainer extends UI.TreeOutline.TreeElement {
   tree: ElementsTreeOutline.ElementsTreeOutline;
   document: SDK.DOMModel.DOMDocument;
-  currentTopLayerDOMNodes: Set<SDK.DOMModel.DOMNode> = new Set();
+  currentTopLayerDOMNodes = new Set<SDK.DOMModel.DOMNode>();
   topLayerUpdateThrottler: Common.Throttler.Throttler;
 
   constructor(tree: ElementsTreeOutline.ElementsTreeOutline, document: SDK.DOMModel.DOMDocument) {
@@ -83,8 +85,7 @@ export class TopLayerContainer extends UI.TreeOutline.TreeElement {
   private removeCurrentTopLayerElementsAdorners(): void {
     for (const node of this.currentTopLayerDOMNodes) {
       const topLayerTreeElement = this.tree.treeElementByNode.get(node);
-      // TODO(changhaohan): remove only top layer adorner.
-      topLayerTreeElement?.removeAllAdorners();
+      topLayerTreeElement?.removeAdornersByType(ElementsComponents.AdornerManager.RegisteredAdorners.TOP_LAYER);
     }
   }
 

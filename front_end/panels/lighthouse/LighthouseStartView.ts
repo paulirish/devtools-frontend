@@ -1,6 +1,7 @@
 // Copyright 2022 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import '../../ui/legacy/legacy.js';
 
@@ -48,7 +49,7 @@ const UIStrings = {
    * @description Text that refers to device such as a phone
    */
   device: 'Device',
-};
+} as const;
 
 const str_ = i18n.i18n.registerUIStrings('panels/lighthouse/LighthouseStartView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -66,6 +67,7 @@ export class StartView extends UI.Widget.Widget {
 
   constructor(controller: LighthouseController, panel: LighthousePanel) {
     super(true /* useShadowDom */);
+    this.registerRequiredCSS(lighthouseStartViewStyles);
 
     this.controller = controller;
     this.panel = panel;
@@ -76,7 +78,7 @@ export class StartView extends UI.Widget.Widget {
 
   private populateRuntimeSettingAsRadio(settingName: string, label: string, parentElement: Element): void {
     const runtimeSetting = RuntimeSettings.find(item => item.setting.name === settingName);
-    if (!runtimeSetting || !runtimeSetting.options) {
+    if (!runtimeSetting?.options) {
       throw new Error(`${settingName} is not a setting with options`);
     }
 
@@ -100,7 +102,7 @@ export class StartView extends UI.Widget.Widget {
 
   private populateRuntimeSettingAsToolbarCheckbox(settingName: string, toolbar: UI.Toolbar.Toolbar): void {
     const runtimeSetting = RuntimeSettings.find(item => item.setting.name === settingName);
-    if (!runtimeSetting || !runtimeSetting.title) {
+    if (!runtimeSetting?.title) {
       throw new Error(`${settingName} is not a setting with a title`);
     }
 
@@ -118,7 +120,7 @@ export class StartView extends UI.Widget.Widget {
 
   private populateRuntimeSettingAsToolbarDropdown(settingName: string, toolbar: UI.Toolbar.Toolbar): void {
     const runtimeSetting = RuntimeSettings.find(item => item.setting.name === settingName);
-    if (!runtimeSetting || !runtimeSetting.title) {
+    if (!runtimeSetting?.title) {
       throw new Error(`${settingName} is not a setting with a title`);
     }
 
@@ -306,7 +308,6 @@ export class StartView extends UI.Widget.Widget {
   override wasShown(): void {
     super.wasShown();
     this.controller.recomputePageAuditability();
-    this.registerCSSFiles([lighthouseStartViewStyles]);
   }
 
   settingsToolbar(): UI.Toolbar.Toolbar {

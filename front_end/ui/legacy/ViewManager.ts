@@ -1,6 +1,7 @@
 // Copyright 2019 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import './Toolbar.js';
 
@@ -18,7 +19,7 @@ import {type EventData, Events as TabbedPaneEvents, TabbedPane} from './TabbedPa
 import {type ItemsProvider, type ToolbarItem, ToolbarMenuButton} from './Toolbar.js';
 import {createTextChild} from './UIUtils.js';
 import type {TabbedViewLocation, View, ViewLocation} from './View.js';
-import viewContainersStyles from './viewContainers.css.legacy.js';
+import viewContainersStyles from './viewContainers.css.js';
 import {
   getLocalizedViewLocationCategory,
   getRegisteredLocationResolvers,
@@ -40,7 +41,7 @@ const UIStrings = {
    *@example {Sensors} PH1
    */
   sPanel: '{PH1} panel',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/ViewManager.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -147,7 +148,7 @@ let viewManagerInstance: ViewManager|undefined;
 export class ViewManager {
   readonly views: Map<string, View>;
   private readonly locationNameByViewId: Map<string, string>;
-  private readonly locationOverrideSetting: Common.Settings.Setting<{[key: string]: string}>;
+  private readonly locationOverrideSetting: Common.Settings.Setting<Record<string, string>>;
 
   private constructor() {
     this.views = new Map();
@@ -161,7 +162,7 @@ export class ViewManager {
     // default ordering as defined by the views themselves.
 
     const viewsByLocation = new Map<ViewLocationValues|'none', PreRegisteredView[]>();
-    for (const view of getRegisteredViewExtensions(Common.Settings.Settings.instance().getHostConfig())) {
+    for (const view of getRegisteredViewExtensions()) {
       const location = view.location() || 'none';
       const views = viewsByLocation.get(location) || [];
       views.push(view);
@@ -453,6 +454,7 @@ class ExpandableContainerWidget extends VBox {
   }
 
   override wasShown(): void {
+    super.wasShown();
     if (this.widget && this.materializePromise) {
       void this.materializePromise.then(() => {
         if (this.titleElement.classList.contains('expanded') && this.widget) {
@@ -575,13 +577,9 @@ class Location {
 
 const locationForView = new WeakMap<View, Location>();
 
-interface CloseableTabSetting {
-  [tabName: string]: boolean;
-}
+type CloseableTabSetting = Record<string, boolean>;
 
-interface TabOrderSetting {
-  [tabName: string]: number;
-}
+type TabOrderSetting = Record<string, number>;
 
 class TabbedLocation extends Location implements TabbedViewLocation {
   private tabbedPaneInternal: TabbedPane;
@@ -590,7 +588,7 @@ class TabbedLocation extends Location implements TabbedViewLocation {
   private readonly tabOrderSetting: Common.Settings.Setting<TabOrderSetting>;
   private readonly lastSelectedTabSetting?: Common.Settings.Setting<string>;
   private readonly defaultTab: string|null|undefined;
-  private readonly views: Map<string, View>;
+  private readonly views = new Map<string, View>();
 
   constructor(
       manager: ViewManager, revealCallback?: (() => void), location?: string, restoreSelection?: boolean,
@@ -618,8 +616,6 @@ class TabbedLocation extends Location implements TabbedViewLocation {
       this.lastSelectedTabSetting = Common.Settings.Settings.instance().createSetting(location + '-selected-tab', '');
     }
     this.defaultTab = defaultTab;
-
-    this.views = new Map();
 
     if (location) {
       this.appendApplicableItems(location);
@@ -819,9 +815,7 @@ class TabbedLocation extends Location implements TabbedViewLocation {
 
   private persistTabOrder(): void {
     const tabIds = this.tabbedPaneInternal.tabIds();
-    const tabOrders: {
-      [x: string]: number,
-    } = {};
+    const tabOrders: Record<string, number> = {};
     for (let i = 0; i < tabIds.length; i++) {
       tabOrders[tabIds[i]] = (i + 1) * TabbedLocation.orderStep;
     }
@@ -914,15 +908,15 @@ class StackLocation extends Location implements ViewLocation {
 }
 
 export {
-  ViewRegistration,
-  ViewPersistence,
+  getLocalizedViewLocationCategory,
+  getRegisteredLocationResolvers,
   getRegisteredViewExtensions,
   maybeRemoveViewExtension,
-  registerViewExtension,
-  ViewLocationValues,
-  getRegisteredLocationResolvers,
   registerLocationResolver,
-  ViewLocationCategory,
-  getLocalizedViewLocationCategory,
+  registerViewExtension,
   resetViewRegistration,
+  ViewLocationCategory,
+  ViewLocationValues,
+  ViewPersistence,
+  ViewRegistration,
 };

@@ -28,6 +28,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* eslint-disable rulesdir/no-imperative-dom-api */
+
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import type * as TextUtils from '../../models/text_utils/text_utils.js';
@@ -38,7 +40,7 @@ import {Size} from './Geometry.js';
 import {AnchorBehavior, GlassPane} from './GlassPane.js';
 import {ListControl, type ListDelegate, ListMode} from './ListControl.js';
 import {ListModel} from './ListModel.js';
-import suggestBoxStyles from './suggestBox.css.legacy.js';
+import suggestBoxStyles from './suggestBox.css.js';
 import {createShadowRootWithCoreStyles, measuredScrollbarWidth, measurePreferredSize} from './UIUtils.js';
 
 const UIStrings = {
@@ -54,7 +56,7 @@ const UIStrings = {
    *@example {name} PH1
    */
   sSuggestionSSelected: '{PH1}, suggestion selected',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/SuggestBox.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export interface SuggestBoxDelegate {
@@ -76,7 +78,6 @@ export class SuggestBox implements ListDelegate<Suggestion> {
   private readonly maxItemsHeight: number|undefined;
   private rowHeight: number;
   private userEnteredText: string;
-  private readonly defaultSelectionIsDimmed: boolean;
   private onlyCompletion: Suggestion|null;
   private readonly items: ListModel<Suggestion>;
   private readonly list: ListControl<Suggestion>;
@@ -88,7 +89,6 @@ export class SuggestBox implements ListDelegate<Suggestion> {
     this.maxItemsHeight = maxItemsHeight;
     this.rowHeight = 17;
     this.userEnteredText = '';
-    this.defaultSelectionIsDimmed = false;
 
     this.onlyCompletion = null;
 
@@ -134,7 +134,7 @@ export class SuggestBox implements ListDelegate<Suggestion> {
       return kMaxWidth;
     }
     let maxItem;
-    let maxLength: number = -Infinity;
+    let maxLength = -Infinity;
     for (let i = 0; i < items.length; i++) {
       const length = (items[i].title || items[i].text).length + (items[i].subtitle || '').length;
       if (length > maxLength) {
@@ -155,7 +155,7 @@ export class SuggestBox implements ListDelegate<Suggestion> {
     VisualLogging.setMappedParent(this.element, this.suggestBoxDelegate.ownerElement());
     // TODO(dgozman): take document as a parameter.
     this.glassPane.show(document);
-    const suggestion = ({text: '1', subtitle: '12'} as Suggestion);
+    const suggestion: Suggestion = {text: '1', subtitle: '12'};
     this.rowHeight = measurePreferredSize(this.createElementForItem(suggestion), this.element).height;
     ARIAUtils.setControls(this.suggestBoxDelegate.ownerElement(), this.element);
     ARIAUtils.setExpanded(this.suggestBoxDelegate.ownerElement(), true);
@@ -181,7 +181,7 @@ export class SuggestBox implements ListDelegate<Suggestion> {
       return true;
     }
     const suggestion = this.list.selectedItem();
-    if (suggestion && suggestion.text) {
+    if (suggestion?.text) {
       isIntermediateSuggestion ?
           ARIAUtils.alert(i18nString(UIStrings.sSuggestionSOfS, {
             PH1: suggestion.title || suggestion.text,
@@ -253,7 +253,7 @@ export class SuggestBox implements ListDelegate<Suggestion> {
     return true;
   }
 
-  selectedItemChanged(from: Suggestion|null, to: Suggestion|null, fromElement: Element|null, toElement: Element|null):
+  selectedItemChanged(_from: Suggestion|null, _to: Suggestion|null, fromElement: Element|null, toElement: Element|null):
       void {
     if (fromElement) {
       fromElement.classList.remove('selected', 'force-white-icons');
@@ -283,7 +283,7 @@ export class SuggestBox implements ListDelegate<Suggestion> {
   private canShowBox(
       completions: Suggestion[], highestPriorityItem: Suggestion|null, canShowForSingleItem: boolean,
       userEnteredText: string): boolean {
-    if (!completions || !completions.length) {
+    if (!completions?.length) {
       return false;
     }
 

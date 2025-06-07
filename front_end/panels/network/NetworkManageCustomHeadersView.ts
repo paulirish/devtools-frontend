@@ -1,6 +1,7 @@
 // Copyright 2016 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as i18n from '../../core/i18n/i18n.js';
 import * as UI from '../../ui/legacy/legacy.js';
@@ -24,7 +25,7 @@ const UIStrings = {
    *@description Text in Network Manage Custom Headers View of the Network panel
    */
   headerName: 'Header Name',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/network/NetworkManageCustomHeadersView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -44,19 +45,20 @@ export class NetworkManageCustomHeadersView extends UI.Widget.VBox implements UI
   private editor?: UI.ListWidget.Editor<CustomHeader>;
 
   constructor(
-      columnData: {
+      columnData: Array<{
         title: string,
         editable: boolean,
-      }[],
+      }>,
       addHeaderColumnCallback: (arg0: string) => boolean,
       changeHeaderColumnCallback: (arg0: string, arg1: string) => boolean,
       removeHeaderColumnCallback: (arg0: string) => boolean) {
     super(true);
+    this.registerRequiredCSS(networkManageCustomHeadersViewStyles);
 
-    this.contentElement.classList.add('custom-headers-wrapper');
     this.contentElement.createChild('div', 'header').textContent = i18nString(UIStrings.manageHeaderColumns);
 
     this.list = new UI.ListWidget.ListWidget(this);
+    this.list.registerRequiredCSS(networkManageCustomHeadersViewStyles);
     this.list.element.classList.add('custom-headers-list');
 
     const placeholder = document.createElement('div');
@@ -81,9 +83,8 @@ export class NetworkManageCustomHeadersView extends UI.Widget.VBox implements UI
   }
 
   override wasShown(): void {
+    super.wasShown();
     this.headersUpdated();
-    this.list.registerCSSFiles([networkManageCustomHeadersViewStyles]);
-    this.registerCSSFiles([networkManageCustomHeadersViewStyles]);
   }
 
   private headersUpdated(): void {

@@ -39,6 +39,7 @@ devtools_module("console") {
     "../../core/host:bundle",
     "../../core/i18n:bundle",
     "../../core/platform:bundle",
+    "../../core/root:bundle",
     "../../core/sdk:bundle",
     "../../models/bindings:bundle",
     "../../models/issues_manager:bundle",
@@ -56,6 +57,7 @@ devtools_module("console") {
     "../../ui/legacy/components/utils:bundle",
     "../../ui/legacy/theme_support:bundle",
     "../console_counters:bundle",
+    "../security:bundle",
   ]
 }
 
@@ -100,6 +102,7 @@ ts_library("unittests") {
     "ConsolePrompt.test.ts",
     "ConsoleView.test.ts",
     "ConsoleViewMessage.test.ts",
+    "ConsoleViewport.test.ts",
     "ErrorStackParser.test.ts",
   ]
 

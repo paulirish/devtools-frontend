@@ -9,13 +9,14 @@ import * as Types from '../types/types.js';
 
 import {
   InsightCategory,
+  InsightKeys,
   type InsightModel,
   type InsightSetContext,
   InsightWarning,
-  type RequiredData,
+  type PartialInsightModel,
 } from './types.js';
 
-const UIStrings = {
+export const UIStrings = {
   /**
    *@description Title of an insight that provides details about the LCP metric, broken down by phases / parts.
    */
@@ -26,39 +27,70 @@ const UIStrings = {
    */
   description:
       'Each [phase has specific improvement strategies](https://web.dev/articles/optimize-lcp#lcp-breakdown). Ideally, most of the LCP time should be spent on loading the resources, not within delays.',
-};
+  /**
+   *@description Time to first byte title for the Largest Contentful Paint's phases timespan breakdown.
+   */
+  timeToFirstByte: 'Time to first byte',
+  /**
+   *@description Resource load delay title for the Largest Contentful Paint phases timespan breakdown.
+   */
+  resourceLoadDelay: 'Resource load delay',
+  /**
+   *@description Resource load duration title for the Largest Contentful Paint phases timespan breakdown.
+   */
+  resourceLoadDuration: 'Resource load duration',
+  /**
+   *@description Element render delay title for the Largest Contentful Paint phases timespan breakdown.
+   */
+  elementRenderDelay: 'Element render delay',
+  /**
+   *@description Label used for the phase/component/stage/section of a larger duration.
+   */
+  phase: 'Phase',
+  /**
+   * @description Label used for the duration a single phase/component/stage/section takes up of a larger duration.
+   */
+  duration: 'Duration',
+  /**
+   * @description Label used for the duration a single phase/component/stage/section takes up of a larger duration. The value will be the 75th percentile of aggregate data. "Field" means that the data was collected from real users in the field as opposed to the developers local environment. "Field" is synonymous with "Real user data".
+   */
+  fieldDuration: 'Field p75',
+  /**
+   * @description Text status indicating that the the Largest Contentful Paint (LCP) metric timing was not found. "LCP" is an acronym and should not be translated.
+   */
+  noLcp: 'No LCP detected',
+} as const;
 const str_ = i18n.i18n.registerUIStrings('models/trace/insights/LCPPhases.ts', UIStrings);
-const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
-
-export function deps(): ['NetworkRequests', 'PageLoadMetrics', 'LargestImagePaint', 'Meta'] {
-  return ['NetworkRequests', 'PageLoadMetrics', 'LargestImagePaint', 'Meta'];
-}
+export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 interface LCPPhases {
   /**
    * The time between when the user initiates loading the page until when
    * the browser receives the first byte of the html response.
    */
-  ttfb: Types.Timing.MilliSeconds;
+  ttfb: Types.Timing.Milli;
   /**
    * The time between ttfb and the LCP request request being started.
    * For a text LCP, this is undefined given no request is loaded.
    */
-  loadDelay?: Types.Timing.MilliSeconds;
+  loadDelay?: Types.Timing.Milli;
   /**
    * The time it takes to load the LCP request.
    */
-  loadTime?: Types.Timing.MilliSeconds;
+  loadTime?: Types.Timing.Milli;
   /**
    * The time between when the LCP request finishes loading and when
    * the LCP element is rendered.
    */
-  renderDelay: Types.Timing.MilliSeconds;
+  renderDelay: Types.Timing.Milli;
 }
 
-export type LCPPhasesInsightModel = InsightModel<{
-  lcpMs?: Types.Timing.MilliSeconds,
-  lcpTs?: Types.Timing.MilliSeconds,
+export function isLCPPhases(model: InsightModel): model is LCPPhasesInsightModel {
+  return model.insightKey === 'LCPPhases';
+}
+export type LCPPhasesInsightModel = InsightModel<typeof UIStrings, {
+  lcpMs?: Types.Timing.Milli,
+  lcpTs?: Types.Timing.Milli,
   lcpEvent?: Types.Events.LargestContentfulPaintCandidate,
   /** The network request for the LCP image, if there was one. */
   lcpRequest?: Types.Events.SyntheticNetworkRequest,
@@ -75,18 +107,18 @@ function anyValuesNaN(...values: number[]): boolean {
  * data we rely on, so we want to handle that case.
  */
 function breakdownPhases(
-    nav: Types.Events.NavigationStart, docRequest: Types.Events.SyntheticNetworkRequest,
-    lcpMs: Types.Timing.MilliSeconds, lcpRequest: Types.Events.SyntheticNetworkRequest|undefined): LCPPhases|null {
+    nav: Types.Events.NavigationStart, docRequest: Types.Events.SyntheticNetworkRequest, lcpMs: Types.Timing.Milli,
+    lcpRequest: Types.Events.SyntheticNetworkRequest|undefined): LCPPhases|null {
   const docReqTiming = docRequest.args.data.timing;
   if (!docReqTiming) {
     throw new Error('no timing for document request');
   }
-  const firstDocByteTs = Helpers.Timing.secondsToMicroseconds(docReqTiming.requestTime) +
-      Helpers.Timing.millisecondsToMicroseconds(docReqTiming.receiveHeadersStart);
+  const firstDocByteTs = Helpers.Timing.secondsToMicro(docReqTiming.requestTime) +
+      Helpers.Timing.milliToMicro(docReqTiming.receiveHeadersStart);
 
-  const firstDocByteTiming = Types.Timing.MicroSeconds(firstDocByteTs - nav.ts);
-  const ttfb = Helpers.Timing.microSecondsToMilliseconds(firstDocByteTiming);
-  let renderDelay = Types.Timing.MilliSeconds(lcpMs - ttfb);
+  const firstDocByteTiming = Types.Timing.Micro(firstDocByteTs - nav.ts);
+  const ttfb = Helpers.Timing.microToMilli(firstDocByteTiming);
+  let renderDelay = Types.Timing.Milli(lcpMs - ttfb);
 
   if (!lcpRequest) {
     if (anyValuesNaN(ttfb, renderDelay)) {
@@ -95,15 +127,15 @@ function breakdownPhases(
     return {ttfb, renderDelay};
   }
 
-  const lcpStartTs = Types.Timing.MicroSeconds(lcpRequest.ts - nav.ts);
-  const requestStart = Helpers.Timing.microSecondsToMilliseconds(lcpStartTs);
+  const lcpStartTs = Types.Timing.Micro(lcpRequest.ts - nav.ts);
+  const requestStart = Helpers.Timing.microToMilli(lcpStartTs);
 
-  const lcpReqEndTs = Types.Timing.MicroSeconds(lcpRequest.args.data.syntheticData.finishTime - nav.ts);
-  const requestEnd = Helpers.Timing.microSecondsToMilliseconds(lcpReqEndTs);
+  const lcpReqEndTs = Types.Timing.Micro(lcpRequest.args.data.syntheticData.finishTime - nav.ts);
+  const requestEnd = Helpers.Timing.microToMilli(lcpReqEndTs);
 
-  const loadDelay = Types.Timing.MilliSeconds(requestStart - ttfb);
-  const loadTime = Types.Timing.MilliSeconds(requestEnd - requestStart);
-  renderDelay = Types.Timing.MilliSeconds(lcpMs - requestEnd);
+  const loadDelay = Types.Timing.Milli(requestStart - ttfb);
+  const loadTime = Types.Timing.Milli(requestEnd - requestStart);
+  renderDelay = Types.Timing.Milli(lcpMs - requestEnd);
   if (anyValuesNaN(ttfb, loadDelay, loadTime, renderDelay)) {
     return null;
   }
@@ -116,8 +148,7 @@ function breakdownPhases(
   };
 }
 
-function finalize(partialModel: Omit<LCPPhasesInsightModel, 'title'|'description'|'category'|'shouldShow'>):
-    LCPPhasesInsightModel {
+function finalize(partialModel: PartialInsightModel<LCPPhasesInsightModel>): LCPPhasesInsightModel {
   const relatedEvents = [];
   if (partialModel.lcpEvent) {
     relatedEvents.push(partialModel.lcpEvent);
@@ -126,18 +157,19 @@ function finalize(partialModel: Omit<LCPPhasesInsightModel, 'title'|'description
     relatedEvents.push(partialModel.lcpRequest);
   }
   return {
+    insightKey: InsightKeys.LCP_PHASES,
+    strings: UIStrings,
     title: i18nString(UIStrings.title),
     description: i18nString(UIStrings.description),
     category: InsightCategory.LCP,
-    // TODO: should move the component's "getPhaseData" to model.
-    shouldShow: Boolean(partialModel.phases) && (partialModel.lcpMs ?? 0) > 0,
+    state: partialModel.lcpEvent || partialModel.lcpRequest ? 'informative' : 'pass',
     ...partialModel,
     relatedEvents,
   };
 }
 
 export function generateInsight(
-    parsedTrace: RequiredData<typeof deps>, context: InsightSetContext): LCPPhasesInsightModel {
+    parsedTrace: Handlers.Types.ParsedTrace, context: InsightSetContext): LCPPhasesInsightModel {
   if (!context.navigation) {
     return finalize({});
   }
@@ -160,10 +192,10 @@ export function generateInsight(
   }
 
   // This helps calculate the phases.
-  const lcpMs = Helpers.Timing.microSecondsToMilliseconds(metricScore.timing);
+  const lcpMs = Helpers.Timing.microToMilli(metricScore.timing);
   // This helps position things on the timeline's UI accurately for a trace.
-  const lcpTs = metricScore.event?.ts ? Helpers.Timing.microSecondsToMilliseconds(metricScore.event?.ts) : undefined;
-  const lcpRequest = parsedTrace.LargestImagePaint.lcpRequestByNavigation.get(context.navigation);
+  const lcpTs = metricScore.event?.ts ? Helpers.Timing.microToMilli(metricScore.event?.ts) : undefined;
+  const lcpRequest = parsedTrace.LargestImagePaint.lcpRequestByNavigationId.get(context.navigationId);
 
   const docRequest = networkRequests.byTime.find(req => req.args.data.requestId === context.navigationId);
   if (!docRequest) {

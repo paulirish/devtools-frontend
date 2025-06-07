@@ -11,7 +11,7 @@ function _checkPrivateRedeclaration(e, t) { if (t.has(e)) throw new TypeError("C
 function _classPrivateFieldSet(s, a, r) { return s.set(_assertClassBrand(s, a), r), r; }
 function _classPrivateFieldGet(s, a) { return s.get(_assertClassBrand(s, a)); }
 function _assertClassBrand(e, t, n) { if ("function" == typeof e ? e === t : e.has(t)) return arguments.length < 3 ? t : n; throw new TypeError("Private element is not present on this object"); }
-var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _mutex2, _onRelease) {
+var Puppeteer = function (exports, _error, _suppressed, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _mutex2, _onRelease) {
   'use strict';
 
   /**
@@ -186,7 +186,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
    limitations under the License.
    
    */
-  // node_modules/tslib/tslib.es6.mjs
+  // ../../node_modules/rxjs/node_modules/tslib/tslib.es6.mjs
   var extendStatics = function (d, b) {
     extendStatics = Object.setPrototypeOf || {
       
@@ -245,12 +245,8 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       f,
       y,
       t,
-      g;
-    return g = {
-      next: verb(0),
-      "throw": verb(1),
-      "return": verb(2)
-    }, typeof Symbol === "function" && (g[Symbol.iterator] = function () {
+      g = Object.create((typeof Iterator === "function" ? Iterator : Object).prototype);
+    return g.next = verb(0), g["throw"] = verb(1), g["return"] = verb(2), typeof Symbol === "function" && (g[Symbol.iterator] = function () {
       return this;
     }), g;
     function verb(n) {
@@ -315,7 +311,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       }
       if (op[0] & 5) throw op[1];
       return {
-        value: op[0] ? op[1] : undefined,
+        value: op[0] ? op[1] : void 0,
         done: true
       };
     }
@@ -327,7 +323,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     if (m) return m.call(o);
     if (o && typeof o.length === "number") return {
       next: function () {
-        if (o && i >= o.length) o = undefined;
+        if (o && i >= o.length) o = void 0;
         return {
           value: o && o[i++],
           done: !o
@@ -375,15 +371,23 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     var g = generator.apply(thisArg, _arguments || []),
       i,
       q = [];
-    return i = {}, verb("next"), verb("throw"), verb("return"), i[Symbol.asyncIterator] = function () {
+    return i = Object.create((typeof AsyncIterator === "function" ? AsyncIterator : Object).prototype), verb("next"), verb("throw"), verb("return", awaitReturn), i[Symbol.asyncIterator] = function () {
       return this;
     }, i;
-    function verb(n) {
-      if (g[n]) i[n] = function (v) {
-        return new Promise(function (a, b) {
-          q.push([n, v, a, b]) > 1 || resume(n, v);
-        });
+    function awaitReturn(f) {
+      return function (v) {
+        return Promise.resolve(v).then(f, reject);
       };
+    }
+    function verb(n, f) {
+      if (g[n]) {
+        i[n] = function (v) {
+          return new Promise(function (a, b) {
+            q.push([n, v, a, b]) > 1 || resume(n, v);
+          });
+        };
+        if (f) i[n] = f(i[n]);
+      }
     }
     function resume(n, v) {
       try {
@@ -429,12 +433,12 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     }
   }
 
-  // node_modules/rxjs/dist/esm5/internal/util/isFunction.js
+  // ../../node_modules/rxjs/dist/esm5/internal/util/isFunction.js
   function isFunction(value) {
     return typeof value === "function";
   }
 
-  // node_modules/rxjs/dist/esm5/internal/util/createErrorClass.js
+  // ../../node_modules/rxjs/dist/esm5/internal/util/createErrorClass.js
   function createErrorClass(createImpl) {
     var _super = function (instance) {
       Error.call(instance);
@@ -446,7 +450,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     return ctorFunc;
   }
 
-  // node_modules/rxjs/dist/esm5/internal/util/UnsubscriptionError.js
+  // ../../node_modules/rxjs/dist/esm5/internal/util/UnsubscriptionError.js
   var UnsubscriptionError = createErrorClass(function (_super) {
     return function UnsubscriptionErrorImpl(errors) {
       _super(this);
@@ -458,7 +462,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     };
   });
 
-  // node_modules/rxjs/dist/esm5/internal/util/arrRemove.js
+  // ../../node_modules/rxjs/dist/esm5/internal/util/arrRemove.js
   function arrRemove(arr, item) {
     if (arr) {
       var index = arr.indexOf(item);
@@ -466,7 +470,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     }
   }
 
-  // node_modules/rxjs/dist/esm5/internal/Subscription.js
+  // ../../node_modules/rxjs/dist/esm5/internal/Subscription.js
   var Subscription = function () {
     function Subscription2(initialTeardown) {
       this.initialTeardown = initialTeardown;
@@ -557,7 +561,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
             }
             teardown._addParent(this);
           }
-          (this._finalizers = (_a = this._finalizers) !== null && _a !== undefined ? _a : []).push(teardown);
+          (this._finalizers = (_a = this._finalizers) !== null && _a !== void 0 ? _a : []).push(teardown);
         }
       }
     };
@@ -603,31 +607,27 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     }
   }
 
-  // node_modules/rxjs/dist/esm5/internal/config.js
+  // ../../node_modules/rxjs/dist/esm5/internal/config.js
   var config = {
-    onUnhandledError: null,
-    onStoppedNotification: null,
-    Promise: undefined,
-    useDeprecatedSynchronousErrorHandling: false,
-    useDeprecatedNextContext: false
+    Promise: void 0
   };
 
-  // node_modules/rxjs/dist/esm5/internal/scheduler/timeoutProvider.js
+  // ../../node_modules/rxjs/dist/esm5/internal/scheduler/timeoutProvider.js
   var timeoutProvider = {
     setTimeout: function (handler, timeout) {
       var args = [];
       for (var _i = 2; _i < arguments.length; _i++) {
         args[_i - 2] = arguments[_i];
       }
-      return setTimeout.apply(undefined, __spreadArray([handler, timeout], __read(args)));
+      return setTimeout.apply(void 0, __spreadArray([handler, timeout], __read(args)));
     },
     clearTimeout: function (handle) {
       return clearTimeout(handle);
     },
-    delegate: undefined
+    delegate: void 0
   };
 
-  // node_modules/rxjs/dist/esm5/internal/util/reportUnhandledError.js
+  // ../../node_modules/rxjs/dist/esm5/internal/util/reportUnhandledError.js
   function reportUnhandledError(err) {
     timeoutProvider.setTimeout(function () {
       {
@@ -636,7 +636,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     });
   }
 
-  // node_modules/rxjs/dist/esm5/internal/util/noop.js
+  // ../../node_modules/rxjs/dist/esm5/internal/util/noop.js
   function noop() {}
   function errorContext(cb) {
     {
@@ -644,7 +644,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     }
   }
 
-  // node_modules/rxjs/dist/esm5/internal/Subscriber.js
+  // ../../node_modules/rxjs/dist/esm5/internal/Subscriber.js
   var Subscriber = function (_super) {
     __extends(Subscriber2, _super);
     function Subscriber2(destination) {
@@ -751,9 +751,9 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       var partialObserver;
       if (isFunction(observerOrNext) || !observerOrNext) {
         partialObserver = {
-          next: observerOrNext !== null && observerOrNext !== undefined ? observerOrNext : undefined,
-          error: error !== null && error !== undefined ? error : undefined,
-          complete: complete !== null && complete !== undefined ? complete : undefined
+          next: observerOrNext !== null && observerOrNext !== void 0 ? observerOrNext : void 0,
+          error: error !== null && error !== void 0 ? error : void 0,
+          complete: complete !== null && complete !== void 0 ? complete : void 0
         };
       } else {
         {
@@ -780,17 +780,17 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     complete: noop
   };
 
-  // node_modules/rxjs/dist/esm5/internal/symbol/observable.js
+  // ../../node_modules/rxjs/dist/esm5/internal/symbol/observable.js
   var observable = function () {
     return typeof Symbol === "function" && Symbol.observable || "@@observable";
   }();
 
-  // node_modules/rxjs/dist/esm5/internal/util/identity.js
+  // ../../node_modules/rxjs/dist/esm5/internal/util/identity.js
   function identity(x) {
     return x;
   }
 
-  // node_modules/rxjs/dist/esm5/internal/util/pipe.js
+  // ../../node_modules/rxjs/dist/esm5/internal/util/pipe.js
   function pipe() {
     var fns = [];
     for (var _i = 0; _i < arguments.length; _i++) {
@@ -812,7 +812,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     };
   }
 
-  // node_modules/rxjs/dist/esm5/internal/Observable.js
+  // ../../node_modules/rxjs/dist/esm5/internal/Observable.js
   var Observable = function () {
     function Observable2(subscribe) {
       if (subscribe) {
@@ -864,7 +864,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     };
     Observable2.prototype._subscribe = function (subscriber) {
       var _a;
-      return (_a = this.source) === null || _a === undefined ? undefined : _a.subscribe(subscriber);
+      return (_a = this.source) === null || _a === void 0 ? void 0 : _a.subscribe(subscriber);
     };
     Observable2.prototype[observable] = function () {
       return this;
@@ -897,7 +897,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
   }();
   function getPromiseCtor(promiseCtor) {
     var _a;
-    return (_a = promiseCtor !== null && promiseCtor !== undefined ? promiseCtor : config.Promise) !== null && _a !== undefined ? _a : Promise;
+    return (_a = promiseCtor !== null && promiseCtor !== void 0 ? promiseCtor : config.Promise) !== null && _a !== void 0 ? _a : Promise;
   }
   function isObserver(value) {
     return value && isFunction(value.next) && isFunction(value.error) && isFunction(value.complete);
@@ -906,9 +906,9 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     return value && value instanceof Subscriber || isObserver(value) && isSubscription(value);
   }
 
-  // node_modules/rxjs/dist/esm5/internal/util/lift.js
+  // ../../node_modules/rxjs/dist/esm5/internal/util/lift.js
   function hasLift(source) {
-    return isFunction(source === null || source === undefined ? undefined : source.lift);
+    return isFunction(source === null || source === void 0 ? void 0 : source.lift);
   }
   function operate(init) {
     return function (source) {
@@ -925,7 +925,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     };
   }
 
-  // node_modules/rxjs/dist/esm5/internal/operators/OperatorSubscriber.js
+  // ../../node_modules/rxjs/dist/esm5/internal/operators/OperatorSubscriber.js
   function createOperatorSubscriber(destination, onNext, onComplete, onError, onFinalize) {
     return new OperatorSubscriber(destination, onNext, onComplete, onError, onFinalize);
   }
@@ -967,13 +967,13 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       if (!this.shouldUnsubscribe || this.shouldUnsubscribe()) {
         var closed_1 = this.closed;
         _super.prototype.unsubscribe.call(this);
-        !closed_1 && ((_a = this.onFinalize) === null || _a === undefined ? undefined : _a.call(this));
+        !closed_1 && ((_a = this.onFinalize) === null || _a === void 0 ? void 0 : _a.call(this));
       }
     };
     return OperatorSubscriber2;
   }(Subscriber);
 
-  // node_modules/rxjs/dist/esm5/internal/util/ObjectUnsubscribedError.js
+  // ../../node_modules/rxjs/dist/esm5/internal/util/ObjectUnsubscribedError.js
   var ObjectUnsubscribedError = createErrorClass(function (_super) {
     return function ObjectUnsubscribedErrorImpl() {
       _super(this);
@@ -982,7 +982,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     };
   });
 
-  // node_modules/rxjs/dist/esm5/internal/Subject.js
+  // ../../node_modules/rxjs/dist/esm5/internal/Subject.js
   var Subject = function (_super) {
     __extends(Subject2, _super);
     function Subject2() {
@@ -1067,7 +1067,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     Object.defineProperty(Subject2.prototype, "observed", {
       get: function () {
         var _a;
-        return ((_a = this.observers) === null || _a === undefined ? undefined : _a.length) > 0;
+        return ((_a = this.observers) === null || _a === void 0 ? void 0 : _a.length) > 0;
       },
       enumerable: false,
       configurable: true
@@ -1128,42 +1128,42 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     }
     AnonymousSubject2.prototype.next = function (value) {
       var _a, _b;
-      (_b = (_a = this.destination) === null || _a === undefined ? undefined : _a.next) === null || _b === undefined ? undefined : _b.call(_a, value);
+      (_b = (_a = this.destination) === null || _a === void 0 ? void 0 : _a.next) === null || _b === void 0 ? void 0 : _b.call(_a, value);
     };
     AnonymousSubject2.prototype.error = function (err) {
       var _a, _b;
-      (_b = (_a = this.destination) === null || _a === undefined ? undefined : _a.error) === null || _b === undefined ? undefined : _b.call(_a, err);
+      (_b = (_a = this.destination) === null || _a === void 0 ? void 0 : _a.error) === null || _b === void 0 ? void 0 : _b.call(_a, err);
     };
     AnonymousSubject2.prototype.complete = function () {
       var _a, _b;
-      (_b = (_a = this.destination) === null || _a === undefined ? undefined : _a.complete) === null || _b === undefined ? undefined : _b.call(_a);
+      (_b = (_a = this.destination) === null || _a === void 0 ? void 0 : _a.complete) === null || _b === void 0 ? void 0 : _b.call(_a);
     };
     AnonymousSubject2.prototype._subscribe = function (subscriber) {
       var _a, _b;
-      return (_b = (_a = this.source) === null || _a === undefined ? undefined : _a.subscribe(subscriber)) !== null && _b !== undefined ? _b : EMPTY_SUBSCRIPTION;
+      return (_b = (_a = this.source) === null || _a === void 0 ? void 0 : _a.subscribe(subscriber)) !== null && _b !== void 0 ? _b : EMPTY_SUBSCRIPTION;
     };
     return AnonymousSubject2;
   }(Subject);
 
-  // node_modules/rxjs/dist/esm5/internal/scheduler/dateTimestampProvider.js
+  // ../../node_modules/rxjs/dist/esm5/internal/scheduler/dateTimestampProvider.js
   var dateTimestampProvider = {
     now: function () {
       return (dateTimestampProvider.delegate || Date).now();
     },
-    delegate: undefined
+    delegate: void 0
   };
 
-  // node_modules/rxjs/dist/esm5/internal/ReplaySubject.js
+  // ../../node_modules/rxjs/dist/esm5/internal/ReplaySubject.js
   var ReplaySubject = function (_super) {
     __extends(ReplaySubject2, _super);
     function ReplaySubject2(_bufferSize, _windowTime, _timestampProvider) {
-      if (_bufferSize === undefined) {
+      if (_bufferSize === void 0) {
         _bufferSize = Infinity;
       }
-      if (_windowTime === undefined) {
+      if (_windowTime === void 0) {
         _windowTime = Infinity;
       }
-      if (_timestampProvider === undefined) {
+      if (_timestampProvider === void 0) {
         _timestampProvider = dateTimestampProvider;
       }
       var _this = _super.call(this) || this;
@@ -1225,7 +1225,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     return ReplaySubject2;
   }(Subject);
 
-  // node_modules/rxjs/dist/esm5/internal/scheduler/Action.js
+  // ../../node_modules/rxjs/dist/esm5/internal/scheduler/Action.js
   var Action = function (_super) {
     __extends(Action2, _super);
     function Action2(scheduler, work) {
@@ -1237,22 +1237,22 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     return Action2;
   }(Subscription);
 
-  // node_modules/rxjs/dist/esm5/internal/scheduler/intervalProvider.js
+  // ../../node_modules/rxjs/dist/esm5/internal/scheduler/intervalProvider.js
   var intervalProvider = {
     setInterval: function (handler, timeout) {
       var args = [];
       for (var _i = 2; _i < arguments.length; _i++) {
         args[_i - 2] = arguments[_i];
       }
-      return setInterval.apply(undefined, __spreadArray([handler, timeout], __read(args)));
+      return setInterval.apply(void 0, __spreadArray([handler, timeout], __read(args)));
     },
     clearInterval: function (handle) {
       return clearInterval(handle);
     },
-    delegate: undefined
+    delegate: void 0
   };
 
-  // node_modules/rxjs/dist/esm5/internal/scheduler/AsyncAction.js
+  // ../../node_modules/rxjs/dist/esm5/internal/scheduler/AsyncAction.js
   var AsyncAction = function (_super) {
     __extends(AsyncAction2, _super);
     function AsyncAction2(scheduler, work) {
@@ -1264,7 +1264,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     }
     AsyncAction2.prototype.schedule = function (state, delay2) {
       var _a;
-      if (delay2 === undefined) {
+      if (delay2 === void 0) {
         delay2 = 0;
       }
       if (this.closed) {
@@ -1278,17 +1278,17 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       }
       this.pending = true;
       this.delay = delay2;
-      this.id = (_a = this.id) !== null && _a !== undefined ? _a : this.requestAsyncId(scheduler, this.id, delay2);
+      this.id = (_a = this.id) !== null && _a !== void 0 ? _a : this.requestAsyncId(scheduler, this.id, delay2);
       return this;
     };
     AsyncAction2.prototype.requestAsyncId = function (scheduler, _id, delay2) {
-      if (delay2 === undefined) {
+      if (delay2 === void 0) {
         delay2 = 0;
       }
       return intervalProvider.setInterval(scheduler.flush.bind(scheduler, this), delay2);
     };
     AsyncAction2.prototype.recycleAsyncId = function (_scheduler, id, delay2) {
-      if (delay2 === undefined) {
+      if (delay2 === void 0) {
         delay2 = 0;
       }
       if (delay2 != null && this.delay === delay2 && this.pending === false) {
@@ -1297,7 +1297,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       if (id != null) {
         intervalProvider.clearInterval(id);
       }
-      return undefined;
+      return void 0;
     };
     AsyncAction2.prototype.execute = function (state, delay2) {
       if (this.closed) {
@@ -1344,17 +1344,17 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     return AsyncAction2;
   }(Action);
 
-  // node_modules/rxjs/dist/esm5/internal/Scheduler.js
+  // ../../node_modules/rxjs/dist/esm5/internal/Scheduler.js
   var Scheduler = function () {
     function Scheduler2(schedulerActionCtor, now) {
-      if (now === undefined) {
+      if (now === void 0) {
         now = Scheduler2.now;
       }
       this.schedulerActionCtor = schedulerActionCtor;
       this.now = now;
     }
     Scheduler2.prototype.schedule = function (work, delay2, state) {
-      if (delay2 === undefined) {
+      if (delay2 === void 0) {
         delay2 = 0;
       }
       return new this.schedulerActionCtor(this, work).schedule(state, delay2);
@@ -1363,11 +1363,11 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     return Scheduler2;
   }();
 
-  // node_modules/rxjs/dist/esm5/internal/scheduler/AsyncScheduler.js
+  // ../../node_modules/rxjs/dist/esm5/internal/scheduler/AsyncScheduler.js
   var AsyncScheduler = function (_super) {
     __extends(AsyncScheduler2, _super);
     function AsyncScheduler2(SchedulerAction, now) {
-      if (now === undefined) {
+      if (now === void 0) {
         now = Scheduler.now;
       }
       var _this = _super.call(this, SchedulerAction, now) || this;
@@ -1399,57 +1399,57 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     return AsyncScheduler2;
   }(Scheduler);
 
-  // node_modules/rxjs/dist/esm5/internal/scheduler/async.js
+  // ../../node_modules/rxjs/dist/esm5/internal/scheduler/async.js
   var asyncScheduler = new AsyncScheduler(AsyncAction);
   var async = asyncScheduler;
 
-  // node_modules/rxjs/dist/esm5/internal/observable/empty.js
+  // ../../node_modules/rxjs/dist/esm5/internal/observable/empty.js
   var EMPTY = new Observable(function (subscriber) {
     return subscriber.complete();
   });
 
-  // node_modules/rxjs/dist/esm5/internal/util/isScheduler.js
+  // ../../node_modules/rxjs/dist/esm5/internal/util/isScheduler.js
   function isScheduler(value) {
     return value && isFunction(value.schedule);
   }
 
-  // node_modules/rxjs/dist/esm5/internal/util/args.js
+  // ../../node_modules/rxjs/dist/esm5/internal/util/args.js
   function last(arr) {
     return arr[arr.length - 1];
   }
   function popScheduler(args) {
-    return isScheduler(last(args)) ? args.pop() : undefined;
+    return isScheduler(last(args)) ? args.pop() : void 0;
   }
   function popNumber(args, defaultValue) {
     return typeof last(args) === "number" ? args.pop() : defaultValue;
   }
 
-  // node_modules/rxjs/dist/esm5/internal/util/isArrayLike.js
+  // ../../node_modules/rxjs/dist/esm5/internal/util/isArrayLike.js
   var isArrayLike = function (x) {
     return x && typeof x.length === "number" && typeof x !== "function";
   };
 
-  // node_modules/rxjs/dist/esm5/internal/util/isPromise.js
+  // ../../node_modules/rxjs/dist/esm5/internal/util/isPromise.js
   function isPromise(value) {
-    return isFunction(value === null || value === undefined ? undefined : value.then);
+    return isFunction(value === null || value === void 0 ? void 0 : value.then);
   }
 
-  // node_modules/rxjs/dist/esm5/internal/util/isInteropObservable.js
+  // ../../node_modules/rxjs/dist/esm5/internal/util/isInteropObservable.js
   function isInteropObservable(input) {
     return isFunction(input[observable]);
   }
 
-  // node_modules/rxjs/dist/esm5/internal/util/isAsyncIterable.js
+  // ../../node_modules/rxjs/dist/esm5/internal/util/isAsyncIterable.js
   function isAsyncIterable(obj) {
-    return Symbol.asyncIterator && isFunction(obj === null || obj === undefined ? undefined : obj[Symbol.asyncIterator]);
+    return Symbol.asyncIterator && isFunction(obj === null || obj === void 0 ? void 0 : obj[Symbol.asyncIterator]);
   }
 
-  // node_modules/rxjs/dist/esm5/internal/util/throwUnobservableError.js
+  // ../../node_modules/rxjs/dist/esm5/internal/util/throwUnobservableError.js
   function createInvalidObservableTypeError(input) {
     return new TypeError("You provided " + (input !== null && typeof input === "object" ? "an invalid object" : "'" + input + "'") + " where a stream was expected. You can provide an Observable, Promise, ReadableStream, Array, AsyncIterable, or Iterable.");
   }
 
-  // node_modules/rxjs/dist/esm5/internal/symbol/iterator.js
+  // ../../node_modules/rxjs/dist/esm5/internal/symbol/iterator.js
   function getSymbolIterator() {
     if (typeof Symbol !== "function" || !Symbol.iterator) {
       return "@@iterator";
@@ -1458,12 +1458,12 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
   }
   var iterator = getSymbolIterator();
 
-  // node_modules/rxjs/dist/esm5/internal/util/isIterable.js
+  // ../../node_modules/rxjs/dist/esm5/internal/util/isIterable.js
   function isIterable(input) {
-    return isFunction(input === null || input === undefined ? undefined : input[iterator]);
+    return isFunction(input === null || input === void 0 ? void 0 : input[iterator]);
   }
 
-  // node_modules/rxjs/dist/esm5/internal/util/isReadableStreamLike.js
+  // ../../node_modules/rxjs/dist/esm5/internal/util/isReadableStreamLike.js
   function readableStreamLikeToAsyncGenerator(readableStream) {
     return __asyncGenerator(this, arguments, function readableStreamLikeToAsyncGenerator_1() {
       var reader, _a, value, done;
@@ -1480,7 +1480,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
           case 3:
             _a = _b.sent(), value = _a.value, done = _a.done;
             if (!done) return [3, 5];
-            return [4, __await(undefined)];
+            return [4, __await(void 0)];
           case 4:
             return [2, _b.sent()];
           case 5:
@@ -1502,10 +1502,10 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     });
   }
   function isReadableStreamLike(obj) {
-    return isFunction(obj === null || obj === undefined ? undefined : obj.getReader);
+    return isFunction(obj === null || obj === void 0 ? void 0 : obj.getReader);
   }
 
-  // node_modules/rxjs/dist/esm5/internal/observable/innerFrom.js
+  // ../../node_modules/rxjs/dist/esm5/internal/observable/innerFrom.js
   function innerFrom(input) {
     if (input instanceof Observable) {
       return input;
@@ -1599,7 +1599,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
   function process$1(asyncIterable, subscriber) {
     var asyncIterable_1, asyncIterable_1_1;
     var e_2, _a;
-    return __awaiter(this, undefined, undefined, function () {
+    return __awaiter(this, void 0, void 0, function () {
       var value, e_2_1;
       return __generator(this, function (_b) {
         switch (_b.label) {
@@ -1649,12 +1649,12 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     });
   }
 
-  // node_modules/rxjs/dist/esm5/internal/util/executeSchedule.js
+  // ../../node_modules/rxjs/dist/esm5/internal/util/executeSchedule.js
   function executeSchedule(parentSubscription, scheduler, work, delay2, repeat) {
-    if (delay2 === undefined) {
+    if (delay2 === void 0) {
       delay2 = 0;
     }
-    if (repeat === undefined) {
+    if (repeat === void 0) {
       repeat = false;
     }
     var scheduleSubscription = scheduler.schedule(function () {
@@ -1671,9 +1671,9 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     }
   }
 
-  // node_modules/rxjs/dist/esm5/internal/operators/observeOn.js
+  // ../../node_modules/rxjs/dist/esm5/internal/operators/observeOn.js
   function observeOn(scheduler, delay2) {
-    if (delay2 === undefined) {
+    if (delay2 === void 0) {
       delay2 = 0;
     }
     return operate(function (source, subscriber) {
@@ -1693,9 +1693,9 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     });
   }
 
-  // node_modules/rxjs/dist/esm5/internal/operators/subscribeOn.js
+  // ../../node_modules/rxjs/dist/esm5/internal/operators/subscribeOn.js
   function subscribeOn(scheduler, delay2) {
-    if (delay2 === undefined) {
+    if (delay2 === void 0) {
       delay2 = 0;
     }
     return operate(function (source, subscriber) {
@@ -1705,17 +1705,17 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     });
   }
 
-  // node_modules/rxjs/dist/esm5/internal/scheduled/scheduleObservable.js
+  // ../../node_modules/rxjs/dist/esm5/internal/scheduled/scheduleObservable.js
   function scheduleObservable(input, scheduler) {
     return innerFrom(input).pipe(subscribeOn(scheduler), observeOn(scheduler));
   }
 
-  // node_modules/rxjs/dist/esm5/internal/scheduled/schedulePromise.js
+  // ../../node_modules/rxjs/dist/esm5/internal/scheduled/schedulePromise.js
   function schedulePromise(input, scheduler) {
     return innerFrom(input).pipe(subscribeOn(scheduler), observeOn(scheduler));
   }
 
-  // node_modules/rxjs/dist/esm5/internal/scheduled/scheduleArray.js
+  // ../../node_modules/rxjs/dist/esm5/internal/scheduled/scheduleArray.js
   function scheduleArray(input, scheduler) {
     return new Observable(function (subscriber) {
       var i = 0;
@@ -1732,7 +1732,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     });
   }
 
-  // node_modules/rxjs/dist/esm5/internal/scheduled/scheduleIterable.js
+  // ../../node_modules/rxjs/dist/esm5/internal/scheduled/scheduleIterable.js
   function scheduleIterable(input, scheduler) {
     return new Observable(function (subscriber) {
       var iterator2;
@@ -1756,12 +1756,12 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
         }, 0, true);
       });
       return function () {
-        return isFunction(iterator2 === null || iterator2 === undefined ? undefined : iterator2.return) && iterator2.return();
+        return isFunction(iterator2 === null || iterator2 === void 0 ? void 0 : iterator2.return) && iterator2.return();
       };
     });
   }
 
-  // node_modules/rxjs/dist/esm5/internal/scheduled/scheduleAsyncIterable.js
+  // ../../node_modules/rxjs/dist/esm5/internal/scheduled/scheduleAsyncIterable.js
   function scheduleAsyncIterable(input, scheduler) {
     if (!input) {
       throw new Error("Iterable cannot be null");
@@ -1782,12 +1782,12 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     });
   }
 
-  // node_modules/rxjs/dist/esm5/internal/scheduled/scheduleReadableStreamLike.js
+  // ../../node_modules/rxjs/dist/esm5/internal/scheduled/scheduleReadableStreamLike.js
   function scheduleReadableStreamLike(input, scheduler) {
     return scheduleAsyncIterable(readableStreamLikeToAsyncGenerator(input), scheduler);
   }
 
-  // node_modules/rxjs/dist/esm5/internal/scheduled/scheduled.js
+  // ../../node_modules/rxjs/dist/esm5/internal/scheduled/scheduled.js
   function scheduled(input, scheduler) {
     if (input != null) {
       if (isInteropObservable(input)) {
@@ -1812,12 +1812,12 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     throw createInvalidObservableTypeError(input);
   }
 
-  // node_modules/rxjs/dist/esm5/internal/observable/from.js
+  // ../../node_modules/rxjs/dist/esm5/internal/observable/from.js
   function from(input, scheduler) {
     return scheduler ? scheduled(input, scheduler) : innerFrom(input);
   }
 
-  // node_modules/rxjs/dist/esm5/internal/observable/of.js
+  // ../../node_modules/rxjs/dist/esm5/internal/observable/of.js
   function of() {
     var args = [];
     for (var _i = 0; _i < arguments.length; _i++) {
@@ -1827,7 +1827,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     return from(args, scheduler);
   }
 
-  // node_modules/rxjs/dist/esm5/internal/util/EmptyError.js
+  // ../../node_modules/rxjs/dist/esm5/internal/util/EmptyError.js
   var EmptyError = createErrorClass(function (_super) {
     return function EmptyErrorImpl() {
       _super(this);
@@ -1836,7 +1836,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     };
   });
 
-  // node_modules/rxjs/dist/esm5/internal/firstValueFrom.js
+  // ../../node_modules/rxjs/dist/esm5/internal/firstValueFrom.js
   function firstValueFrom(source, config2) {
     return new Promise(function (resolve, reject) {
       var subscriber = new SafeSubscriber({
@@ -1855,12 +1855,12 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     });
   }
 
-  // node_modules/rxjs/dist/esm5/internal/util/isDate.js
+  // ../../node_modules/rxjs/dist/esm5/internal/util/isDate.js
   function isValidDate(value) {
     return value instanceof Date && !isNaN(value);
   }
 
-  // node_modules/rxjs/dist/esm5/internal/operators/map.js
+  // ../../node_modules/rxjs/dist/esm5/internal/operators/map.js
   function map(project, thisArg) {
     return operate(function (source, subscriber) {
       var index = 0;
@@ -1870,10 +1870,10 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     });
   }
 
-  // node_modules/rxjs/dist/esm5/internal/util/mapOneOrManyArgs.js
+  // ../../node_modules/rxjs/dist/esm5/internal/util/mapOneOrManyArgs.js
   var isArray = Array.isArray;
   function callOrApply(fn, args) {
-    return isArray(args) ? fn.apply(undefined, __spreadArray([], __read(args))) : fn(args);
+    return isArray(args) ? fn.apply(void 0, __spreadArray([], __read(args))) : fn(args);
   }
   function mapOneOrManyArgs(fn) {
     return map(function (args) {
@@ -1881,7 +1881,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     });
   }
 
-  // node_modules/rxjs/dist/esm5/internal/operators/mergeInternals.js
+  // ../../node_modules/rxjs/dist/esm5/internal/operators/mergeInternals.js
   function mergeInternals(source, subscriber, project, concurrent, onBeforeNext, expand, innerSubScheduler, additionalFinalizer) {
     var buffer = [];
     var active = 0;
@@ -1900,7 +1900,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       active++;
       var innerComplete = false;
       innerFrom(project(value, index++)).subscribe(createOperatorSubscriber(subscriber, function (innerValue) {
-        onBeforeNext === null || onBeforeNext === undefined ? undefined : onBeforeNext(innerValue);
+        onBeforeNext === null || onBeforeNext === void 0 ? void 0 : onBeforeNext(innerValue);
         if (expand) {
           outerNext(innerValue);
         } else {
@@ -1908,7 +1908,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
         }
       }, function () {
         innerComplete = true;
-      }, undefined, function () {
+      }, void 0, function () {
         if (innerComplete) {
           try {
             active--;
@@ -1933,13 +1933,13 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       checkComplete();
     }));
     return function () {
-      additionalFinalizer === null || additionalFinalizer === undefined ? undefined : additionalFinalizer();
+      additionalFinalizer === null || additionalFinalizer === void 0 ? void 0 : additionalFinalizer();
     };
   }
 
-  // node_modules/rxjs/dist/esm5/internal/operators/mergeMap.js
+  // ../../node_modules/rxjs/dist/esm5/internal/operators/mergeMap.js
   function mergeMap(project, resultSelector, concurrent) {
-    if (concurrent === undefined) {
+    if (concurrent === void 0) {
       concurrent = Infinity;
     }
     if (isFunction(resultSelector)) {
@@ -1956,20 +1956,20 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     });
   }
 
-  // node_modules/rxjs/dist/esm5/internal/operators/mergeAll.js
+  // ../../node_modules/rxjs/dist/esm5/internal/operators/mergeAll.js
   function mergeAll(concurrent) {
-    if (concurrent === undefined) {
+    if (concurrent === void 0) {
       concurrent = Infinity;
     }
     return mergeMap(identity, concurrent);
   }
 
-  // node_modules/rxjs/dist/esm5/internal/operators/concatAll.js
+  // ../../node_modules/rxjs/dist/esm5/internal/operators/concatAll.js
   function concatAll() {
     return mergeAll(1);
   }
 
-  // node_modules/rxjs/dist/esm5/internal/observable/concat.js
+  // ../../node_modules/rxjs/dist/esm5/internal/observable/concat.js
   function concat() {
     var args = [];
     for (var _i = 0; _i < arguments.length; _i++) {
@@ -1978,21 +1978,21 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     return concatAll()(from(args, popScheduler(args)));
   }
 
-  // node_modules/rxjs/dist/esm5/internal/observable/defer.js
+  // ../../node_modules/rxjs/dist/esm5/internal/observable/defer.js
   function defer(observableFactory) {
     return new Observable(function (subscriber) {
       innerFrom(observableFactory()).subscribe(subscriber);
     });
   }
 
-  // node_modules/rxjs/dist/esm5/internal/observable/fromEvent.js
+  // ../../node_modules/rxjs/dist/esm5/internal/observable/fromEvent.js
   var nodeEventEmitterMethods = ["addListener", "removeListener"];
   var eventTargetMethods = ["addEventListener", "removeEventListener"];
   var jqueryMethods = ["on", "off"];
   function fromEvent(target, eventName, options, resultSelector) {
     if (isFunction(options)) {
       resultSelector = options;
-      options = undefined;
+      options = void 0;
     }
     if (resultSelector) {
       return fromEvent(target, eventName, options).pipe(mapOneOrManyArgs(resultSelector));
@@ -2045,12 +2045,12 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     return isFunction(target.addEventListener) && isFunction(target.removeEventListener);
   }
 
-  // node_modules/rxjs/dist/esm5/internal/observable/timer.js
+  // ../../node_modules/rxjs/dist/esm5/internal/observable/timer.js
   function timer(dueTime, intervalOrScheduler, scheduler) {
-    if (dueTime === undefined) {
+    if (dueTime === void 0) {
       dueTime = 0;
     }
-    if (scheduler === undefined) {
+    if (scheduler === void 0) {
       scheduler = async;
     }
     return new Observable(function (subscriber) {
@@ -2070,7 +2070,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     });
   }
 
-  // node_modules/rxjs/dist/esm5/internal/observable/merge.js
+  // ../../node_modules/rxjs/dist/esm5/internal/observable/merge.js
   function merge() {
     var args = [];
     for (var _i = 0; _i < arguments.length; _i++) {
@@ -2082,16 +2082,16 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     return !sources.length ? EMPTY : sources.length === 1 ? innerFrom(sources[0]) : mergeAll(concurrent)(from(sources, scheduler));
   }
 
-  // node_modules/rxjs/dist/esm5/internal/observable/never.js
+  // ../../node_modules/rxjs/dist/esm5/internal/observable/never.js
   var NEVER = new Observable(noop);
 
-  // node_modules/rxjs/dist/esm5/internal/util/argsOrArgArray.js
+  // ../../node_modules/rxjs/dist/esm5/internal/util/argsOrArgArray.js
   var isArray3 = Array.isArray;
   function argsOrArgArray(args) {
     return args.length === 1 && isArray3(args[0]) ? args[0] : args;
   }
 
-  // node_modules/rxjs/dist/esm5/internal/operators/filter.js
+  // ../../node_modules/rxjs/dist/esm5/internal/operators/filter.js
   function filter(predicate, thisArg) {
     return operate(function (source, subscriber) {
       var index = 0;
@@ -2101,7 +2101,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     });
   }
 
-  // node_modules/rxjs/dist/esm5/internal/observable/race.js
+  // ../../node_modules/rxjs/dist/esm5/internal/observable/race.js
   function race() {
     var sources = [];
     for (var _i = 0; _i < arguments.length; _i++) {
@@ -2130,7 +2130,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     };
   }
 
-  // node_modules/rxjs/dist/esm5/internal/operators/catchError.js
+  // ../../node_modules/rxjs/dist/esm5/internal/operators/catchError.js
   function catchError(selector) {
     return operate(function (source, subscriber) {
       var innerSub = null;
@@ -2154,7 +2154,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     });
   }
 
-  // node_modules/rxjs/dist/esm5/internal/operators/defaultIfEmpty.js
+  // ../../node_modules/rxjs/dist/esm5/internal/operators/defaultIfEmpty.js
   function defaultIfEmpty(defaultValue) {
     return operate(function (source, subscriber) {
       var hasValue = false;
@@ -2170,7 +2170,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     });
   }
 
-  // node_modules/rxjs/dist/esm5/internal/operators/take.js
+  // ../../node_modules/rxjs/dist/esm5/internal/operators/take.js
   function take(count) {
     return count <= 0 ? function () {
       return EMPTY;
@@ -2187,16 +2187,16 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     });
   }
 
-  // node_modules/rxjs/dist/esm5/internal/operators/ignoreElements.js
+  // ../../node_modules/rxjs/dist/esm5/internal/operators/ignoreElements.js
   function ignoreElements() {
     return operate(function (source, subscriber) {
       source.subscribe(createOperatorSubscriber(subscriber, noop));
     });
   }
 
-  // node_modules/rxjs/dist/esm5/internal/operators/throwIfEmpty.js
+  // ../../node_modules/rxjs/dist/esm5/internal/operators/throwIfEmpty.js
   function throwIfEmpty(errorFactory) {
-    if (errorFactory === undefined) {
+    if (errorFactory === void 0) {
       errorFactory = defaultErrorFactory;
     }
     return operate(function (source, subscriber) {
@@ -2213,7 +2213,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     return new EmptyError();
   }
 
-  // node_modules/rxjs/dist/esm5/internal/operators/first.js
+  // ../../node_modules/rxjs/dist/esm5/internal/operators/first.js
   function first(predicate, defaultValue) {
     var hasDefaultValue = arguments.length >= 2;
     return function (source) {
@@ -2225,9 +2225,9 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     };
   }
 
-  // node_modules/rxjs/dist/esm5/internal/operators/mergeScan.js
+  // ../../node_modules/rxjs/dist/esm5/internal/operators/mergeScan.js
   function mergeScan(accumulator, seed, concurrent) {
-    if (concurrent === undefined) {
+    if (concurrent === void 0) {
       concurrent = Infinity;
     }
     return operate(function (source, subscriber) {
@@ -2242,7 +2242,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     });
   }
 
-  // node_modules/rxjs/dist/esm5/internal/operators/raceWith.js
+  // ../../node_modules/rxjs/dist/esm5/internal/operators/raceWith.js
   function raceWith() {
     var otherSources = [];
     for (var _i = 0; _i < arguments.length; _i++) {
@@ -2253,9 +2253,9 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     });
   }
 
-  // node_modules/rxjs/dist/esm5/internal/operators/retry.js
+  // ../../node_modules/rxjs/dist/esm5/internal/operators/retry.js
   function retry(configOrCount) {
-    if (configOrCount === undefined) {
+    if (configOrCount === void 0) {
       configOrCount = Infinity;
     }
     var config2;
@@ -2267,10 +2267,10 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       };
     }
     var _a = config2.count,
-      count = _a === undefined ? Infinity : _a,
+      count = _a === void 0 ? Infinity : _a,
       delay2 = config2.delay,
       _b = config2.resetOnSuccess,
-      resetOnSuccess = _b === undefined ? false : _b;
+      resetOnSuccess = _b === void 0 ? false : _b;
     return count <= 0 ? identity : operate(function (source, subscriber) {
       var soFar = 0;
       var innerSub;
@@ -2318,7 +2318,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     });
   }
 
-  // node_modules/rxjs/dist/esm5/internal/operators/startWith.js
+  // ../../node_modules/rxjs/dist/esm5/internal/operators/startWith.js
   function startWith() {
     var values = [];
     for (var _i = 0; _i < arguments.length; _i++) {
@@ -2330,7 +2330,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     });
   }
 
-  // node_modules/rxjs/dist/esm5/internal/operators/switchMap.js
+  // ../../node_modules/rxjs/dist/esm5/internal/operators/switchMap.js
   function switchMap(project, resultSelector) {
     return operate(function (source, subscriber) {
       var innerSubscriber = null;
@@ -2356,7 +2356,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     });
   }
 
-  // node_modules/rxjs/dist/esm5/internal/operators/takeUntil.js
+  // ../../node_modules/rxjs/dist/esm5/internal/operators/takeUntil.js
   function takeUntil(notifier) {
     return operate(function (source, subscriber) {
       innerFrom(notifier).subscribe(createOperatorSubscriber(subscriber, function () {
@@ -2366,7 +2366,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     });
   }
 
-  // node_modules/rxjs/dist/esm5/internal/operators/tap.js
+  // ../../node_modules/rxjs/dist/esm5/internal/operators/tap.js
   function tap(observerOrNext, error, complete) {
     var tapObserver = isFunction(observerOrNext) || error || complete ? {
       next: observerOrNext,
@@ -2467,46 +2467,40 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     constructor() {
       _classPrivateFieldInitSpec(this, _disposed, false);
       _classPrivateFieldInitSpec(this, _stack, []);
-      _defineProperty(this, disposeSymbol, this.dispose);
       _defineProperty(this, Symbol.toStringTag, 'DisposableStack');
     }
     /**
-     * Returns a value indicating whether this stack has been disposed.
+     * Returns a value indicating whether the stack has been disposed.
      */
     get disposed() {
       return _classPrivateFieldGet(_disposed, this);
     }
     /**
-     * Disposes each resource in the stack in the reverse order that they were added.
+     * Alias for `[Symbol.dispose]()`.
      */
     dispose() {
-      if (_classPrivateFieldGet(_disposed, this)) {
-        return;
-      }
-      _classPrivateFieldSet(_disposed, this, true);
-      for (const resource of _classPrivateFieldGet(_stack, this).reverse()) {
-        resource[disposeSymbol]();
-      }
+      this[disposeSymbol]();
     }
     /**
-     * Adds a disposable resource to the stack, returning the resource.
+     * Adds a disposable resource to the top of stack, returning the resource.
+     * Has no effect if provided `null` or `undefined`.
      *
-     * @param value - The resource to add. `null` and `undefined` will not be added,
-     * but will be returned.
+     * @param value - A `Disposable` object, `null`, or `undefined`.
+     * `null` and `undefined` will not be added, but will be returned.
      * @returns The provided `value`.
      */
     use(value) {
-      if (value) {
+      if (value && typeof value[disposeSymbol] === 'function') {
         _classPrivateFieldGet(_stack, this).push(value);
       }
       return value;
     }
     /**
-     * Adds a value and associated disposal callback as a resource to the stack.
+     * Adds a non-disposable resource and a disposal callback to the top of the stack.
      *
-     * @param value - The value to add.
-     * @param onDispose - The callback to use in place of a `[disposeSymbol]()`
-     * method. Will be invoked with `value` as the first parameter.
+     * @param value - A resource to be disposed.
+     * @param onDispose - A callback invoked to dispose the provided value.
+     * Will be invoked with `value` as the first parameter.
      * @returns The provided `value`.
      */
     adopt(value, onDispose) {
@@ -2518,7 +2512,8 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       return value;
     }
     /**
-     * Adds a callback to be invoked when the stack is disposed.
+     * Add a disposal callback to the top of the stack to be invoked when stack is disposed.
+     * @param onDispose - A callback to invoke when this object is disposed.
      */
     defer(onDispose) {
       _classPrivateFieldGet(_stack, this).push({
@@ -2530,6 +2525,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     /**
      * Move all resources out of this stack and into a new `DisposableStack`, and
      * marks this stack as disposed.
+     * @returns The new `DisposableStack`.
      *
      * @example
      *
@@ -2561,12 +2557,43 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
      */
     move() {
       if (_classPrivateFieldGet(_disposed, this)) {
-        throw new ReferenceError('a disposed stack can not use anything new'); // step 3
+        throw new ReferenceError('A disposed stack can not use anything new');
       }
-      const stack = new DisposableStack(); // step 4-5
+      const stack = new DisposableStack();
       _classPrivateFieldSet(_stack, stack, _classPrivateFieldGet(_stack, this));
+      _classPrivateFieldSet(_stack, this, []);
       _classPrivateFieldSet(_disposed, this, true);
       return stack;
+    }
+    /**
+     * Disposes each resource in the stack in last-in-first-out (LIFO) manner.
+     */
+    [disposeSymbol]() {
+      if (_classPrivateFieldGet(_disposed, this)) {
+        return;
+      }
+      _classPrivateFieldSet(_disposed, this, true);
+      const errors = [];
+      for (const resource of _classPrivateFieldGet(_stack, this).reverse()) {
+        try {
+          resource[disposeSymbol]();
+        } catch (e) {
+          errors.push(e);
+        }
+      }
+      if (errors.length === 1) {
+        throw errors[0];
+      } else if (errors.length > 1) {
+        let suppressed = null;
+        for (const error of errors.reverse()) {
+          if (suppressed === null) {
+            suppressed = error;
+          } else {
+            suppressed = new SuppressedError$1(error, suppressed);
+          }
+        }
+        throw suppressed;
+      }
     }
   }
   /**
@@ -2578,46 +2605,50 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     constructor() {
       _classPrivateFieldInitSpec(this, _disposed2, false);
       _classPrivateFieldInitSpec(this, _stack2, []);
-      _defineProperty(this, asyncDisposeSymbol, this.dispose);
       _defineProperty(this, Symbol.toStringTag, 'AsyncDisposableStack');
     }
     /**
-     * Returns a value indicating whether this stack has been disposed.
+     * Returns a value indicating whether the stack has been disposed.
      */
     get disposed() {
       return _classPrivateFieldGet(_disposed2, this);
     }
     /**
-     * Disposes each resource in the stack in the reverse order that they were added.
+     * Alias for `[Symbol.asyncDispose]()`.
      */
     async dispose() {
-      if (_classPrivateFieldGet(_disposed2, this)) {
-        return;
-      }
-      _classPrivateFieldSet(_disposed2, this, true);
-      for (const resource of _classPrivateFieldGet(_stack2, this).reverse()) {
-        await resource[asyncDisposeSymbol]();
-      }
+      await this[asyncDisposeSymbol]();
     }
     /**
-     * Adds a disposable resource to the stack, returning the resource.
+     * Adds a AsyncDisposable resource to the top of stack, returning the resource.
+     * Has no effect if provided `null` or `undefined`.
      *
-     * @param value - The resource to add. `null` and `undefined` will not be added,
-     * but will be returned.
+     * @param value - A `AsyncDisposable` object, `null`, or `undefined`.
+     * `null` and `undefined` will not be added, but will be returned.
      * @returns The provided `value`.
      */
     use(value) {
       if (value) {
-        _classPrivateFieldGet(_stack2, this).push(value);
+        const asyncDispose = value[asyncDisposeSymbol];
+        const dispose = value[disposeSymbol];
+        if (typeof asyncDispose === 'function') {
+          _classPrivateFieldGet(_stack2, this).push(value);
+        } else if (typeof dispose === 'function') {
+          _classPrivateFieldGet(_stack2, this).push({
+            [asyncDisposeSymbol]: async () => {
+              value[disposeSymbol]();
+            }
+          });
+        }
       }
       return value;
     }
     /**
-     * Adds a value and associated disposal callback as a resource to the stack.
+     * Adds a non-disposable resource and a disposal callback to the top of the stack.
      *
-     * @param value - The value to add.
-     * @param onDispose - The callback to use in place of a `[disposeSymbol]()`
-     * method. Will be invoked with `value` as the first parameter.
+     * @param value - A resource to be disposed.
+     * @param onDispose - A callback invoked to dispose the provided value.
+     * Will be invoked with `value` as the first parameter.
      * @returns The provided `value`.
      */
     adopt(value, onDispose) {
@@ -2629,7 +2660,8 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       return value;
     }
     /**
-     * Adds a callback to be invoked when the stack is disposed.
+     * Add a disposal callback to the top of the stack to be invoked when stack is disposed.
+     * @param onDispose - A callback to invoke when this object is disposed.
      */
     defer(onDispose) {
       _classPrivateFieldGet(_stack2, this).push({
@@ -2641,6 +2673,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     /**
      * Move all resources out of this stack and into a new `DisposableStack`, and
      * marks this stack as disposed.
+     * @returns The new `AsyncDisposableStack`.
      *
      * @example
      *
@@ -2672,14 +2705,74 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
      */
     move() {
       if (_classPrivateFieldGet(_disposed2, this)) {
-        throw new ReferenceError('a disposed stack can not use anything new'); // step 3
+        throw new ReferenceError('A disposed stack can not use anything new');
       }
-      const stack = new AsyncDisposableStack(); // step 4-5
+      const stack = new AsyncDisposableStack();
       _classPrivateFieldSet(_stack2, stack, _classPrivateFieldGet(_stack2, this));
+      _classPrivateFieldSet(_stack2, this, []);
       _classPrivateFieldSet(_disposed2, this, true);
       return stack;
     }
+    /**
+     * Disposes each resource in the stack in last-in-first-out (LIFO) manner.
+     */
+    async [asyncDisposeSymbol]() {
+      if (_classPrivateFieldGet(_disposed2, this)) {
+        return;
+      }
+      _classPrivateFieldSet(_disposed2, this, true);
+      const errors = [];
+      for (const resource of _classPrivateFieldGet(_stack2, this).reverse()) {
+        try {
+          await resource[asyncDisposeSymbol]();
+        } catch (e) {
+          errors.push(e);
+        }
+      }
+      if (errors.length === 1) {
+        throw errors[0];
+      } else if (errors.length > 1) {
+        let suppressed = null;
+        for (const error of errors.reverse()) {
+          if (suppressed === null) {
+            suppressed = error;
+          } else {
+            suppressed = new SuppressedError$1(error, suppressed);
+          }
+        }
+        throw suppressed;
+      }
+    }
   }
+  /**
+   * @internal
+   * Represents an error that occurs when multiple errors are thrown during
+   * the disposal of resources. This class encapsulates the primary error and
+   * any suppressed errors that occurred subsequently.
+   */
+  let SuppressedError$1 = (_error = /*#__PURE__*/new WeakMap(), _suppressed = /*#__PURE__*/new WeakMap(), class SuppressedError extends Error {
+    constructor(error, suppressed, message = 'An error was suppressed during disposal') {
+      super(message);
+      _classPrivateFieldInitSpec(this, _error, void 0);
+      _classPrivateFieldInitSpec(this, _suppressed, void 0);
+      this.name = 'SuppressedError';
+      _classPrivateFieldSet(_error, this, error);
+      _classPrivateFieldSet(_suppressed, this, suppressed);
+    }
+    /**
+     * The primary error that occurred during disposal.
+     */
+    get error() {
+      return _classPrivateFieldGet(_error, this);
+    }
+    /**
+     * The suppressed error i.e. the error that was suppressed
+     * because it occurred later in the flow after the original error.
+     */
+    get suppressed() {
+      return _classPrivateFieldGet(_suppressed, this);
+    }
+  });
 
   /**
    * @license
@@ -2835,7 +2928,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
   /**
    * @internal
    */
-  const packageVersion = '24.1.0';
+  const packageVersion = '24.10.0';
 
   /**
    * @license
@@ -2865,9 +2958,13 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
    */
   function stringToTypedArray(string, base64Encoded = false) {
     if (base64Encoded) {
-      const binaryString = atob(string);
-      // @ts-expect-error There are non-proper overloads
-      return Uint8Array.from(binaryString, m => {
+      // TODO: use
+      // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Uint8Array/fromBase64
+      // once available.
+      if (typeof Buffer === 'function') {
+        return Buffer.from(string, 'base64');
+      }
+      return Uint8Array.from(atob(string), m => {
         return m.codePointAt(0);
       });
     }
@@ -3113,51 +3210,120 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
    */
   /**
    * @internal
+   *
+   * @remarks All A series paper format sizes in inches are calculated from centimeters
+   * rounded mathematically to four decimal places.
    */
   const paperFormats = {
     letter: {
-      width: 8.5,
-      height: 11
+      cm: {
+        width: 21.59,
+        height: 27.94
+      },
+      in: {
+        width: 8.5,
+        height: 11
+      }
     },
     legal: {
-      width: 8.5,
-      height: 14
+      cm: {
+        width: 21.59,
+        height: 35.56
+      },
+      in: {
+        width: 8.5,
+        height: 14
+      }
     },
     tabloid: {
-      width: 11,
-      height: 17
+      cm: {
+        width: 27.94,
+        height: 43.18
+      },
+      in: {
+        width: 11,
+        height: 17
+      }
     },
     ledger: {
-      width: 17,
-      height: 11
+      cm: {
+        width: 43.18,
+        height: 27.94
+      },
+      in: {
+        width: 17,
+        height: 11
+      }
     },
     a0: {
-      width: 33.1102,
-      height: 46.811
+      cm: {
+        width: 84.1,
+        height: 118.9
+      },
+      in: {
+        width: 33.1102,
+        height: 46.811
+      }
     },
     a1: {
-      width: 23.3858,
-      height: 33.1102
+      cm: {
+        width: 59.4,
+        height: 84.1
+      },
+      in: {
+        width: 23.3858,
+        height: 33.1102
+      }
     },
     a2: {
-      width: 16.5354,
-      height: 23.3858
+      cm: {
+        width: 42,
+        height: 59.4
+      },
+      in: {
+        width: 16.5354,
+        height: 23.3858
+      }
     },
     a3: {
-      width: 11.6929,
-      height: 16.5354
+      cm: {
+        width: 29.7,
+        height: 42
+      },
+      in: {
+        width: 11.6929,
+        height: 16.5354
+      }
     },
     a4: {
-      width: 8.2677,
-      height: 11.6929
+      cm: {
+        width: 21,
+        height: 29.7
+      },
+      in: {
+        width: 8.2677,
+        height: 11.6929
+      }
     },
     a5: {
-      width: 5.8268,
-      height: 8.2677
+      cm: {
+        width: 14.8,
+        height: 21
+      },
+      in: {
+        width: 5.8268,
+        height: 8.2677
+      }
     },
     a6: {
-      width: 4.1339,
-      height: 5.8268
+      cm: {
+        width: 10.5,
+        height: 14.8
+      },
+      in: {
+        width: 4.1339,
+        height: 5.8268
+      }
     }
   };
 
@@ -3353,15 +3519,6 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
   async function getReadableFromProtocolStream(client, handle) {
     return new ReadableStream({
       async pull(controller) {
-        function getUnit8Array(data, isBase64) {
-          if (isBase64) {
-            return Uint8Array.from(atob(data), m => {
-              return m.codePointAt(0);
-            });
-          }
-          const encoder = new TextEncoder();
-          return encoder.encode(data);
-        }
         const {
           data,
           base64Encoded,
@@ -3369,7 +3526,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
         } = await client.send('IO.read', {
           handle
         });
-        controller.enqueue(getUnit8Array(data, base64Encoded ?? false));
+        controller.enqueue(stringToTypedArray(data, base64Encoded ?? false));
         if (eof) {
           await client.send('IO.close', {
             handle
@@ -3440,7 +3597,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     let width = 8.5;
     let height = 11;
     if (options.format) {
-      const format = paperFormats[options.format.toLowerCase()];
+      const format = paperFormats[options.format.toLowerCase()][lengthUnit];
       assert(format, 'Unknown paper format: ' + options.format);
       width = format.width;
       height = format.height;
@@ -3547,10 +3704,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
   /**
    * @internal
    */
-  const WEB_PERMISSION_TO_PROTOCOL_PERMISSION = new Map([['geolocation', 'geolocation'], ['midi', 'midi'], ['notifications', 'notifications'],
-  // TODO: push isn't a valid type?
-  // ['push', 'push'],
-  ['camera', 'videoCapture'], ['microphone', 'audioCapture'], ['background-sync', 'backgroundSync'], ['ambient-light-sensor', 'sensors'], ['accelerometer', 'sensors'], ['gyroscope', 'sensors'], ['magnetometer', 'sensors'], ['accessibility-events', 'accessibilityEvents'], ['clipboard-read', 'clipboardReadWrite'], ['clipboard-write', 'clipboardReadWrite'], ['clipboard-sanitized-write', 'clipboardSanitizedWrite'], ['payment-handler', 'paymentHandler'], ['persistent-storage', 'durableStorage'], ['idle-detection', 'idleDetection'],
+  const WEB_PERMISSION_TO_PROTOCOL_PERMISSION = new Map([['accelerometer', 'sensors'], ['ambient-light-sensor', 'sensors'], ['background-sync', 'backgroundSync'], ['camera', 'videoCapture'], ['clipboard-read', 'clipboardReadWrite'], ['clipboard-sanitized-write', 'clipboardSanitizedWrite'], ['clipboard-write', 'clipboardReadWrite'], ['geolocation', 'geolocation'], ['gyroscope', 'sensors'], ['idle-detection', 'idleDetection'], ['keyboard-lock', 'keyboardLock'], ['magnetometer', 'sensors'], ['microphone', 'audioCapture'], ['midi', 'midi'], ['notifications', 'notifications'], ['payment-handler', 'paymentHandler'], ['persistent-storage', 'durableStorage'], ['pointer-lock', 'pointerLock'],
   // chrome-specific permissions we have.
   ['midi-sysex', 'midiSysex']]);
   /**
@@ -4284,14 +4438,14 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
    * SPDX-License-Identifier: Apache-2.0
    */
   var __addDisposableResource$c = undefined && undefined.__addDisposableResource || function (env, value, async) {
-    if (value !== null && value !== undefined) {
+    if (value !== null && value !== void 0) {
       if (typeof value !== "object" && typeof value !== "function") throw new TypeError("Object expected.");
       var dispose, inner;
       if (async) {
         if (!Symbol.asyncDispose) throw new TypeError("Symbol.asyncDispose is not defined.");
         dispose = value[Symbol.asyncDispose];
       }
-      if (dispose === undefined) {
+      if (dispose === void 0) {
         if (!Symbol.dispose) throw new TypeError("Symbol.dispose is not defined.");
         dispose = value[Symbol.dispose];
         if (async) inner = dispose;
@@ -4359,7 +4513,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
   async function* fastTransposeIteratorHandle(iterator, size) {
     const env_1 = {
       stack: [],
-      error: undefined,
+      error: void 0,
       hasError: false
     };
     try {
@@ -4420,7 +4574,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
   async function* transposeIterableHandle(handle) {
     const env_3 = {
       stack: [],
-      error: undefined,
+      error: void 0,
       hasError: false
     };
     try {
@@ -4469,14 +4623,14 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     return new _LazyArg(get);
   });
   var __addDisposableResource$b = undefined && undefined.__addDisposableResource || function (env, value, async) {
-    if (value !== null && value !== undefined) {
+    if (value !== null && value !== void 0) {
       if (typeof value !== "object" && typeof value !== "function") throw new TypeError("Object expected.");
       var dispose, inner;
       if (async) {
         if (!Symbol.asyncDispose) throw new TypeError("Symbol.asyncDispose is not defined.");
         dispose = value[Symbol.asyncDispose];
       }
-      if (dispose === undefined) {
+      if (dispose === void 0) {
         if (!Symbol.dispose) throw new TypeError("Symbol.dispose is not defined.");
         dispose = value[Symbol.dispose];
         if (async) inner = dispose;
@@ -4580,7 +4734,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     static async *queryAll(element, selector) {
       const env_1 = {
         stack: [],
-        error: undefined,
+        error: void 0,
         hasError: false
       };
       try {
@@ -4603,7 +4757,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     static async queryOne(element, selector) {
       const env_2 = {
         stack: [],
-        error: undefined,
+        error: void 0,
         hasError: false
       };
       try {
@@ -4631,7 +4785,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     static async waitFor(elementOrFrame, selector, options) {
       const env_3 = {
         stack: [],
-        error: undefined,
+        error: void 0,
         hasError: false
       };
       try {
@@ -5422,14 +5576,14 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
    * SPDX-License-Identifier: Apache-2.0
    */
   var __addDisposableResource$a = undefined && undefined.__addDisposableResource || function (env, value, async) {
-    if (value !== null && value !== undefined) {
+    if (value !== null && value !== void 0) {
       if (typeof value !== "object" && typeof value !== "function") throw new TypeError("Object expected.");
       var dispose, inner;
       if (async) {
         if (!Symbol.asyncDispose) throw new TypeError("Symbol.asyncDispose is not defined.");
         dispose = value[Symbol.asyncDispose];
       }
-      if (dispose === undefined) {
+      if (dispose === void 0) {
         if (!Symbol.dispose) throw new TypeError("Symbol.dispose is not defined.");
         dispose = value[Symbol.dispose];
         if (async) inner = dispose;
@@ -5574,7 +5728,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       return async function (...args) {
         const env_1 = {
           stack: [],
-          error: undefined,
+          error: void 0,
           hasError: false
         };
         try {
@@ -5607,11 +5761,11 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     for (var i = 0; i < initializers.length; i++) {
       value = useValue ? initializers[i].call(thisArg, value) : initializers[i].call(thisArg);
     }
-    return useValue ? value : undefined;
+    return useValue ? value : void 0;
   };
   var __esDecorate$6 = undefined && undefined.__esDecorate || function (ctor, descriptorIn, decorators, contextIn, initializers, extraInitializers) {
     function accept(f) {
-      if (f !== undefined && typeof f !== "function") throw new TypeError("Function expected");
+      if (f !== void 0 && typeof f !== "function") throw new TypeError("Function expected");
       return f;
     }
     var kind = contextIn.kind,
@@ -5633,7 +5787,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
         set: descriptor.set
       } : descriptor[key], context);
       if (kind === "accessor") {
-        if (result === undefined) continue;
+        if (result === void 0) continue;
         if (result === null || typeof result !== "object") throw new TypeError("Object expected");
         if (_ = accept(result.get)) descriptor.get = _;
         if (_ = accept(result.set)) descriptor.set = _;
@@ -5646,14 +5800,14 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     done = true;
   };
   var __addDisposableResource$9 = undefined && undefined.__addDisposableResource || function (env, value, async) {
-    if (value !== null && value !== undefined) {
+    if (value !== null && value !== void 0) {
       if (typeof value !== "object" && typeof value !== "function") throw new TypeError("Object expected.");
       var dispose, inner;
       if (async) {
         if (!Symbol.asyncDispose) throw new TypeError("Symbol.asyncDispose is not defined.");
         dispose = value[Symbol.asyncDispose];
       }
-      if (dispose === undefined) {
+      if (dispose === void 0) {
         if (!Symbol.dispose) throw new TypeError("Symbol.dispose is not defined.");
         dispose = value[Symbol.dispose];
         if (async) inner = dispose;
@@ -5806,7 +5960,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
         for (const [key, value] of Object.entries(propertyNames)) {
           const env_1 = {
             stack: [],
-            error: undefined,
+            error: void 0,
             hasError: false
           };
           try {
@@ -5834,7 +5988,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     };
     _classThis = _Class2;
     (() => {
-      const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(null) : undefined;
+      const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(null) : void 0;
       __esDecorate$6(_Class2, null, _getProperty_decorators, {
         kind: "method",
         name: "getProperty",
@@ -5886,11 +6040,11 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     for (var i = 0; i < initializers.length; i++) {
       value = useValue ? initializers[i].call(thisArg, value) : initializers[i].call(thisArg);
     }
-    return useValue ? value : undefined;
+    return useValue ? value : void 0;
   };
   var __esDecorate$5 = undefined && undefined.__esDecorate || function (ctor, descriptorIn, decorators, contextIn, initializers, extraInitializers) {
     function accept(f) {
-      if (f !== undefined && typeof f !== "function") throw new TypeError("Function expected");
+      if (f !== void 0 && typeof f !== "function") throw new TypeError("Function expected");
       return f;
     }
     var kind = contextIn.kind,
@@ -5912,7 +6066,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
         set: descriptor.set
       } : descriptor[key], context);
       if (kind === "accessor") {
-        if (result === undefined) continue;
+        if (result === void 0) continue;
         if (result === null || typeof result !== "object") throw new TypeError("Object expected");
         if (_ = accept(result.get)) descriptor.get = _;
         if (_ = accept(result.set)) descriptor.set = _;
@@ -5925,14 +6079,14 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     done = true;
   };
   var __addDisposableResource$8 = undefined && undefined.__addDisposableResource || function (env, value, async) {
-    if (value !== null && value !== undefined) {
+    if (value !== null && value !== void 0) {
       if (typeof value !== "object" && typeof value !== "function") throw new TypeError("Object expected.");
       var dispose, inner;
       if (async) {
         if (!Symbol.asyncDispose) throw new TypeError("Symbol.asyncDispose is not defined.");
         dispose = value[Symbol.asyncDispose];
       }
-      if (dispose === undefined) {
+      if (dispose === void 0) {
         if (!Symbol.dispose) throw new TypeError("Symbol.dispose is not defined.");
         dispose = value[Symbol.dispose];
         if (async) inner = dispose;
@@ -6197,8 +6351,8 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       /**
        * @internal
        */
-      dispose() {
-        return this.handle.dispose();
+      async dispose() {
+        await Promise.all([this.handle.dispose(), this.isolatedHandle?.dispose()]);
       }
       /**
        * @internal
@@ -6215,7 +6369,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
        * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
        * can be passed as-is and a
        * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-       * allows quering by
+       * allows querying by
        * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
        * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
        * and
@@ -6243,7 +6397,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
        * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
        * can be passed as-is and a
        * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-       * allows quering by
+       * allows querying by
        * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
        * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
        * and
@@ -6286,7 +6440,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
        * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
        * can be passed as-is and a
        * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-       * allows quering by
+       * allows querying by
        * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
        * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
        * and
@@ -6304,7 +6458,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       async $eval(selector, pageFunction, ...args) {
         const env_1 = {
           stack: [],
-          error: undefined,
+          error: void 0,
           hasError: false
         };
         try {
@@ -6353,7 +6507,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
        * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
        * can be passed as-is and a
        * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-       * allows quering by
+       * allows querying by
        * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
        * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
        * and
@@ -6371,7 +6525,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       async $$eval(selector, pageFunction, ...args) {
         const env_2 = {
           stack: [],
-          error: undefined,
+          error: void 0,
           hasError: false
         };
         try {
@@ -6989,7 +7143,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       async isIntersectingViewport(options = {}) {
         const env_5 = {
           stack: [],
-          error: undefined,
+          error: void 0,
           hasError: false
         };
         try {
@@ -7033,7 +7187,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
        * etc.).
        */
     }, (() => {
-      const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : undefined;
+      const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
       _getProperty_decorators = [throwIfDisposed(), bindIsolatedHandle];
       _getProperties_decorators = [throwIfDisposed(), bindIsolatedHandle];
       _jsonValue_decorators = [throwIfDisposed(), bindIsolatedHandle];
@@ -7462,7 +7616,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       while (parentFrame = frame?.parentFrame()) {
         const env_3 = {
           stack: [],
-          error: undefined,
+          error: void 0,
           hasError: false
         };
         try {
@@ -7535,7 +7689,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       while (parentFrame = frame?.parentFrame()) {
         const env_4 = {
           stack: [],
-          error: undefined,
+          error: void 0,
           hasError: false
         };
         try {
@@ -7601,14 +7755,14 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     box.height = Math.max(box.y >= 0 ? Math.min(height - box.y, box.height) : Math.min(height, box.height + box.y), 0);
   }
   var __addDisposableResource$7 = undefined && undefined.__addDisposableResource || function (env, value, async) {
-    if (value !== null && value !== undefined) {
+    if (value !== null && value !== void 0) {
       if (typeof value !== "object" && typeof value !== "function") throw new TypeError("Object expected.");
       var dispose, inner;
       if (async) {
         if (!Symbol.asyncDispose) throw new TypeError("Symbol.asyncDispose is not defined.");
         dispose = value[Symbol.asyncDispose];
       }
-      if (dispose === undefined) {
+      if (dispose === void 0) {
         if (!Symbol.dispose) throw new TypeError("Symbol.dispose is not defined.");
         dispose = value[Symbol.dispose];
         if (async) inner = dispose;
@@ -7918,7 +8072,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     async wait(options) {
       const env_1 = {
         stack: [],
-        error: undefined,
+        error: void 0,
         hasError: false
       };
       try {
@@ -8348,11 +8502,11 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     for (var i = 0; i < initializers.length; i++) {
       value = useValue ? initializers[i].call(thisArg, value) : initializers[i].call(thisArg);
     }
-    return useValue ? value : undefined;
+    return useValue ? value : void 0;
   };
   var __esDecorate$4 = undefined && undefined.__esDecorate || function (ctor, descriptorIn, decorators, contextIn, initializers, extraInitializers) {
     function accept(f) {
-      if (f !== undefined && typeof f !== "function") throw new TypeError("Function expected");
+      if (f !== void 0 && typeof f !== "function") throw new TypeError("Function expected");
       return f;
     }
     var kind = contextIn.kind,
@@ -8374,7 +8528,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
         set: descriptor.set
       } : descriptor[key], context);
       if (kind === "accessor") {
-        if (result === undefined) continue;
+        if (result === void 0) continue;
         if (result === null || typeof result !== "object") throw new TypeError("Object expected");
         if (_ = accept(result.get)) descriptor.get = _;
         if (_ = accept(result.set)) descriptor.set = _;
@@ -8387,14 +8541,14 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     done = true;
   };
   var __addDisposableResource$6 = undefined && undefined.__addDisposableResource || function (env, value, async) {
-    if (value !== null && value !== undefined) {
+    if (value !== null && value !== void 0) {
       if (typeof value !== "object" && typeof value !== "function") throw new TypeError("Object expected.");
       var dispose, inner;
       if (async) {
         if (!Symbol.asyncDispose) throw new TypeError("Symbol.asyncDispose is not defined.");
         dispose = value[Symbol.asyncDispose];
       }
-      if (dispose === undefined) {
+      if (dispose === void 0) {
         if (!Symbol.dispose) throw new TypeError("Symbol.dispose is not defined.");
         dispose = value[Symbol.dispose];
         if (async) inner = dispose;
@@ -8478,7 +8632,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
    *
    * To understand frames, you can think of frames as `<iframe>` elements. Just
    * like iframes, frames can be nested, and when JavaScript is executed in a
-   * frame, the JavaScript does not effect frames inside the ambient frame the
+   * frame, the JavaScript does not affect frames inside the ambient frame the
    * JavaScript executes in.
    *
    * @example
@@ -8511,9 +8665,25 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
    * An example of getting text from an iframe element:
    *
    * ```ts
-   * const frame = page.frames().find(frame => frame.name() === 'myframe');
-   * const text = await frame.$eval('.selector', element => element.textContent);
-   * console.log(text);
+   * const frames = page.frames();
+   * let frame = null;
+   * for (const currentFrame of frames) {
+   *   const frameElement = await currentFrame.frameElement();
+   *   const name = await frameElement.evaluate(el => el.getAttribute('name'));
+   *   if (name === 'myframe') {
+   *     frame = currentFrame;
+   *     break;
+   *   }
+   * }
+   * if (frame) {
+   *   const text = await frame.$eval(
+   *     '.selector',
+   *     element => element.textContent,
+   *   );
+   *   console.log(text);
+   * } else {
+   *   console.error('Frame with name "myframe" not found.');
+   * }
    * ```
    *
    * @remarks
@@ -8591,7 +8761,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       async frameElement() {
         const env_1 = {
           stack: [],
-          error: undefined,
+          error: void 0,
           hasError: false
         };
         try {
@@ -8668,7 +8838,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
        * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
        * can be passed as-is and a
        * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-       * allows quering by
+       * allows querying by
        * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
        * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
        * and
@@ -8695,7 +8865,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
        * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
        * can be passed as-is and a
        * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-       * allows quering by
+       * allows querying by
        * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
        * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
        * and
@@ -8732,7 +8902,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
        * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
        * can be passed as-is and a
        * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-       * allows quering by
+       * allows querying by
        * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
        * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
        * and
@@ -8772,7 +8942,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
        * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
        * can be passed as-is and a
        * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-       * allows quering by
+       * allows querying by
        * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
        * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
        * and
@@ -9063,7 +9233,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       async click(selector, options = {}) {
         const env_3 = {
           stack: [],
-          error: undefined,
+          error: void 0,
           hasError: false
         };
         try {
@@ -9087,7 +9257,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       async focus(selector) {
         const env_4 = {
           stack: [],
-          error: undefined,
+          error: void 0,
           hasError: false
         };
         try {
@@ -9111,7 +9281,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       async hover(selector) {
         const env_5 = {
           stack: [],
-          error: undefined,
+          error: void 0,
           hasError: false
         };
         try {
@@ -9146,7 +9316,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       async select(selector, ...values) {
         const env_6 = {
           stack: [],
-          error: undefined,
+          error: void 0,
           hasError: false
         };
         try {
@@ -9169,7 +9339,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       async tap(selector) {
         const env_7 = {
           stack: [],
-          error: undefined,
+          error: void 0,
           hasError: false
         };
         try {
@@ -9207,7 +9377,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       async type(selector, text, options) {
         const env_8 = {
           stack: [],
-          error: undefined,
+          error: void 0,
           hasError: false
         };
         try {
@@ -9230,7 +9400,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
         });
       }
     }, (() => {
-      const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : undefined;
+      const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
       _frameElement_decorators = [throwIfDetached];
       _evaluateHandle_decorators = [throwIfDetached];
       _evaluate_decorators = [throwIfDetached];
@@ -9941,7 +10111,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
   function handleError(error) {
     // Firefox throws an invalid argument error with a message starting with
     // 'Expected "header" [...]'.
-    if (error.originalMessage.includes('Invalid header') || error.originalMessage.includes('Expected "header"') ||
+    if (error.originalMessage.includes('Invalid header') || error.originalMessage.includes('Unsafe header') || error.originalMessage.includes('Expected "header"') ||
     // WebDriver BiDi error for invalid values, for example, headers.
     error.originalMessage.includes('invalid argument')) {
       throw error;
@@ -10015,6 +10185,9 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
   function createIncrementalIdGenerator() {
     let id = 0;
     return () => {
+      if (id === Number.MAX_SAFE_INTEGER) {
+        id = 0;
+      }
       return ++id;
     };
   }
@@ -10280,11 +10453,11 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     for (var i = 0; i < initializers.length; i++) {
       value = useValue ? initializers[i].call(thisArg, value) : initializers[i].call(thisArg);
     }
-    return useValue ? value : undefined;
+    return useValue ? value : void 0;
   };
   var __esDecorate$3 = undefined && undefined.__esDecorate || function (ctor, descriptorIn, decorators, contextIn, initializers, extraInitializers) {
     function accept(f) {
-      if (f !== undefined && typeof f !== "function") throw new TypeError("Function expected");
+      if (f !== void 0 && typeof f !== "function") throw new TypeError("Function expected");
       return f;
     }
     var kind = contextIn.kind,
@@ -10306,7 +10479,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
         set: descriptor.set
       } : descriptor[key], context);
       if (kind === "accessor") {
-        if (result === undefined) continue;
+        if (result === void 0) continue;
         if (result === null || typeof result !== "object") throw new TypeError("Object expected");
         if (_ = accept(result.get)) descriptor.get = _;
         if (_ = accept(result.set)) descriptor.set = _;
@@ -10319,14 +10492,14 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     done = true;
   };
   var __addDisposableResource$5 = undefined && undefined.__addDisposableResource || function (env, value, async) {
-    if (value !== null && value !== undefined) {
+    if (value !== null && value !== void 0) {
       if (typeof value !== "object" && typeof value !== "function") throw new TypeError("Object expected.");
       var dispose, inner;
       if (async) {
         if (!Symbol.asyncDispose) throw new TypeError("Symbol.asyncDispose is not defined.");
         dispose = value[Symbol.asyncDispose];
       }
-      if (dispose === undefined) {
+      if (dispose === void 0) {
         if (!Symbol.dispose) throw new TypeError("Symbol.dispose is not defined.");
         dispose = value[Symbol.dispose];
         if (async) inner = dispose;
@@ -10549,7 +10722,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
        * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
        * can be passed as-is and a
        * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-       * allows quering by
+       * allows querying by
        * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
        * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
        * and
@@ -10576,7 +10749,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
        * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
        * can be passed as-is and a
        * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-       * allows quering by
+       * allows querying by
        * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
        * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
        * and
@@ -10710,7 +10883,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
        * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
        * can be passed as-is and a
        * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-       * allows quering by
+       * allows querying by
        * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
        * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
        * and
@@ -10783,7 +10956,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
        * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
        * can be passed as-is and a
        * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-       * allows quering by
+       * allows querying by
        * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
        * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
        * and
@@ -11000,7 +11173,12 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
        *
        * ```ts
        * const frame = await page.waitForFrame(async frame => {
-       *   return frame.name() === 'Test';
+       *   const frameElement = await frame.frameElement();
+       *   if (!frameElement) {
+       *     return false;
+       *   }
+       *   const name = await frameElement.evaluate(el => el.getAttribute('name'));
+       *   return name === 'test';
        * });
        * ```
        */
@@ -11143,8 +11321,8 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
        *
        * @remarks
        *
-       * All recordings will be {@link https://www.webmproject.org/ | WebM} format using
-       * the {@link https://www.webmproject.org/vp9/ | VP9} video codec. The FPS is 30.
+       * By default, all recordings will be {@link https://www.webmproject.org/ | WebM} format using
+       * the {@link https://www.webmproject.org/vp9/ | VP9} video codec, with a frame rate of 30 FPS.
        *
        * You must have {@link https://ffmpeg.org/ | ffmpeg} installed on your system.
        */
@@ -11188,7 +11366,6 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
         }
         const recorder = new ScreenRecorder(this, width, height, {
           ...options,
-          path: options.ffmpegPath,
           crop
         });
         try {
@@ -11243,7 +11420,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       async screenshot(userOptions = {}) {
         const env_2 = {
           stack: [],
-          error: undefined,
+          error: void 0,
           hasError: false
         };
         try {
@@ -11372,7 +11549,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
        * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
        * can be passed as-is and a
        * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-       * allows quering by
+       * allows querying by
        * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
        * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
        * and
@@ -11399,7 +11576,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
        * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
        * can be passed as-is and a
        * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-       * allows quering by
+       * allows querying by
        * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
        * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
        * and
@@ -11433,7 +11610,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
        * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
        * can be passed as-is and a
        * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-       * allows quering by
+       * allows querying by
        * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
        * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
        * and
@@ -11472,7 +11649,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
        * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
        * can be passed as-is and a
        * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-       * allows quering by
+       * allows querying by
        * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
        * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
        * and
@@ -11504,7 +11681,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
        * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
        * can be passed as-is and a
        * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-       * allows quering by
+       * allows querying by
        * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
        * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
        * and
@@ -11542,7 +11719,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
        * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
        * can be passed as-is and a
        * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-       * allows quering by
+       * allows querying by
        * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
        * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
        * and
@@ -11594,7 +11771,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
        * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
        * can be passed as-is and a
        * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-       * allows quering by
+       * allows querying by
        * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
        * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
        * and
@@ -11696,7 +11873,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
         return this.close();
       }
     }, (() => {
-      const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : undefined;
+      const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
       __esDecorate$3(_Page, null, _screenshot_decorators, {
         kind: "method",
         name: "screenshot",
@@ -11718,7 +11895,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     async function _getNativePixelDimensions() {
       const env_1 = {
         stack: [],
-        error: undefined,
+        error: void 0,
         hasError: false
       };
       try {
@@ -11922,7 +12099,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       }
       if (_classPrivateFieldGet(_poller, this)) {
         try {
-          await _classPrivateFieldGet(_poller, this).evaluateHandle(async poller => {
+          await _classPrivateFieldGet(_poller, this).evaluate(async poller => {
             await poller.stop();
           });
           if (_classPrivateFieldGet(_poller, this)) {
@@ -12200,14 +12377,14 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
    * SPDX-License-Identifier: Apache-2.0
    */
   var __addDisposableResource$4 = undefined && undefined.__addDisposableResource || function (env, value, async) {
-    if (value !== null && value !== undefined) {
+    if (value !== null && value !== void 0) {
       if (typeof value !== "object" && typeof value !== "function") throw new TypeError("Object expected.");
       var dispose, inner;
       if (async) {
         if (!Symbol.asyncDispose) throw new TypeError("Symbol.asyncDispose is not defined.");
         dispose = value[Symbol.asyncDispose];
       }
-      if (dispose === undefined) {
+      if (dispose === void 0) {
         if (!Symbol.dispose) throw new TypeError("Symbol.dispose is not defined.");
         dispose = value[Symbol.dispose];
         if (async) inner = dispose;
@@ -12362,7 +12539,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
         if (root.payload.role?.value === 'Iframe') {
           const env_1 = {
             stack: [],
-            error: undefined,
+            error: void 0,
             hasError: false
           };
           try {
@@ -12711,14 +12888,14 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     return _classPrivateFieldGet(_cachedHasFocusableChild, this);
   }
   var __addDisposableResource$3 = undefined && undefined.__addDisposableResource || function (env, value, async) {
-    if (value !== null && value !== undefined) {
+    if (value !== null && value !== void 0) {
       if (typeof value !== "object" && typeof value !== "function") throw new TypeError("Object expected.");
       var dispose, inner;
       if (async) {
         if (!Symbol.asyncDispose) throw new TypeError("Symbol.asyncDispose is not defined.");
         dispose = value[Symbol.asyncDispose];
       }
-      if (dispose === undefined) {
+      if (dispose === void 0) {
         if (!Symbol.dispose) throw new TypeError("Symbol.dispose is not defined.");
         dispose = value[Symbol.dispose];
         if (async) inner = dispose;
@@ -12972,12 +13149,12 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     /**
      * @internal
      */
-    constructor(element, event) {
+    constructor(element, multiple) {
       _classPrivateFieldInitSpec(this, _element, void 0);
       _classPrivateFieldInitSpec(this, _multiple, void 0);
       _classPrivateFieldInitSpec(this, _handled, false);
       _classPrivateFieldSet(_element, this, element);
-      _classPrivateFieldSet(_multiple, this, event.mode !== 'selectSingle');
+      _classPrivateFieldSet(_multiple, this, multiple);
     }
     /**
      * Whether file chooser allow for
@@ -13043,6 +13220,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
    * Copyright 2023 Google Inc.
    * SPDX-License-Identifier: Apache-2.0
    */
+  const idGenerator = createIncrementalIdGenerator();
   /**
    * Manages callbacks and their IDs for the protocol request/response communication.
    *
@@ -13053,7 +13231,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
   class CallbackRegistry {
     constructor() {
       _classPrivateFieldInitSpec(this, _callbacks, new Map());
-      _classPrivateFieldInitSpec(this, _idGenerator, createIncrementalIdGenerator());
+      _classPrivateFieldInitSpec(this, _idGenerator, idGenerator);
     }
     create(label, timeout, request) {
       const callback = new Callback(_classPrivateFieldGet(_idGenerator, this).call(this), label, timeout);
@@ -13130,14 +13308,14 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
    * @internal
    */
   var _id2 = /*#__PURE__*/new WeakMap();
-  var _error = /*#__PURE__*/new WeakMap();
+  var _error2 = /*#__PURE__*/new WeakMap();
   var _deferred = /*#__PURE__*/new WeakMap();
   var _timer = /*#__PURE__*/new WeakMap();
   var _label = /*#__PURE__*/new WeakMap();
   class Callback {
     constructor(id, label, timeout) {
       _classPrivateFieldInitSpec(this, _id2, void 0);
-      _classPrivateFieldInitSpec(this, _error, new ProtocolError());
+      _classPrivateFieldInitSpec(this, _error2, new ProtocolError());
       _classPrivateFieldInitSpec(this, _deferred, Deferred.create());
       _classPrivateFieldInitSpec(this, _timer, void 0);
       _classPrivateFieldInitSpec(this, _label, void 0);
@@ -13145,7 +13323,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       _classPrivateFieldSet(_label, this, label);
       if (timeout) {
         _classPrivateFieldSet(_timer, this, setTimeout(() => {
-          _classPrivateFieldGet(_deferred, this).reject(rewriteError$1(_classPrivateFieldGet(_error, this), `${label} timed out. Increase the 'protocolTimeout' setting in launch/connect calls for a higher timeout if needed.`));
+          _classPrivateFieldGet(_deferred, this).reject(rewriteError$1(_classPrivateFieldGet(_error2, this), `${label} timed out. Increase the 'protocolTimeout' setting in launch/connect calls for a higher timeout if needed.`));
         }, timeout));
       }
     }
@@ -13164,7 +13342,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       return _classPrivateFieldGet(_deferred, this).valueOrThrow();
     }
     get error() {
-      return _classPrivateFieldGet(_error, this);
+      return _classPrivateFieldGet(_error2, this);
     }
     get label() {
       return _classPrivateFieldGet(_label, this);
@@ -13186,6 +13364,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
   var _parentSessionId = /*#__PURE__*/new WeakMap();
   var _target = /*#__PURE__*/new WeakMap();
   var _rawErrors = /*#__PURE__*/new WeakMap();
+  var _detached = /*#__PURE__*/new WeakMap();
   class CdpCDPSession extends CDPSession {
     /**
      * @internal
@@ -13199,6 +13378,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       _classPrivateFieldInitSpec(this, _parentSessionId, void 0);
       _classPrivateFieldInitSpec(this, _target, void 0);
       _classPrivateFieldInitSpec(this, _rawErrors, false);
+      _classPrivateFieldInitSpec(this, _detached, false);
       _classPrivateFieldSet(_connection, this, connection);
       _classPrivateFieldSet(_targetType, this, targetType);
       _classPrivateFieldSet(_sessionId, this, sessionId);
@@ -13210,7 +13390,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
      *
      * @internal
      */
-    _setTarget(target) {
+    setTarget(target) {
       _classPrivateFieldSet(_target, this, target);
     }
     /**
@@ -13218,12 +13398,15 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
      *
      * @internal
      */
-    _target() {
+    target() {
       assert(_classPrivateFieldGet(_target, this), 'Target must exist');
       return _classPrivateFieldGet(_target, this);
     }
     connection() {
       return _classPrivateFieldGet(_connection, this);
+    }
+    get detached() {
+      return _classPrivateFieldGet(_connection, this)._closed || _classPrivateFieldGet(_detached, this);
     }
     parentSession() {
       if (!_classPrivateFieldGet(_parentSessionId, this)) {
@@ -13235,7 +13418,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       return parent ?? undefined;
     }
     send(method, params, options) {
-      if (!_classPrivateFieldGet(_connection, this)) {
+      if (this.detached) {
         return Promise.reject(new TargetCloseError(`Protocol error (${method}): Session closed. Most likely the ${_classPrivateFieldGet(_targetType, this)} has been closed.`));
       }
       return _classPrivateFieldGet(_connection, this)._rawSend(_classPrivateFieldGet(_callbacks2, this), method, params, _classPrivateFieldGet(_sessionId, this), options);
@@ -13243,7 +13426,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     /**
      * @internal
      */
-    _onMessage(object) {
+    onMessage(object) {
       if (object.id) {
         if (object.error) {
           if (_classPrivateFieldGet(_rawErrors, this)) {
@@ -13264,19 +13447,20 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
      * won't emit any events and can't be used to send messages.
      */
     async detach() {
-      if (!_classPrivateFieldGet(_connection, this)) {
+      if (this.detached) {
         throw new Error(`Session already detached. Most likely the ${_classPrivateFieldGet(_targetType, this)} has been closed.`);
       }
       await _classPrivateFieldGet(_connection, this).send('Target.detachFromTarget', {
         sessionId: _classPrivateFieldGet(_sessionId, this)
       });
+      _classPrivateFieldSet(_detached, this, true);
     }
     /**
      * @internal
      */
-    _onClosed() {
+    onClosed() {
       _classPrivateFieldGet(_callbacks2, this).clear();
-      _classPrivateFieldSet(_connection, this, undefined);
+      _classPrivateFieldSet(_detached, this, true);
       this.emit(exports.CDPSessionEvent.Disconnected, undefined);
     }
     /**
@@ -13360,11 +13544,17 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       return _classPrivateFieldGet(_sessions, this);
     }
     /**
+     * @internal
+     */
+    _session(sessionId) {
+      return _classPrivateFieldGet(_sessions, this).get(sessionId) || null;
+    }
+    /**
      * @param sessionId - The session id
      * @returns The current CDP session if it exists
      */
     session(sessionId) {
-      return _classPrivateFieldGet(_sessions, this).get(sessionId) || null;
+      return this._session(sessionId);
     }
     url() {
       return _classPrivateFieldGet(_url2, this);
@@ -13425,7 +13615,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       } else if (object.method === 'Target.detachedFromTarget') {
         const session = _classPrivateFieldGet(_sessions, this).get(object.params.sessionId);
         if (session) {
-          session._onClosed();
+          session.onClosed();
           _classPrivateFieldGet(_sessions, this).delete(object.params.sessionId);
           this.emit(exports.CDPSessionEvent.SessionDetached, session);
           const parentSession = _classPrivateFieldGet(_sessions, this).get(object.sessionId);
@@ -13437,7 +13627,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       if (object.sessionId) {
         const session = _classPrivateFieldGet(_sessions, this).get(object.sessionId);
         if (session) {
-          session._onMessage(object);
+          session.onMessage(object);
         }
       } else if (object.id) {
         if (object.error) {
@@ -13514,7 +13704,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     _classPrivateFieldGet(_transport, this).onclose = undefined;
     _classPrivateFieldGet(_callbacks3, this).clear();
     for (const session of _classPrivateFieldGet(_sessions, this).values()) {
-      session._onClosed();
+      session.onClosed();
     }
     _classPrivateFieldGet(_sessions, this).clear();
     this.emit(exports.CDPSessionEvent.Disconnected, undefined);
@@ -13947,11 +14137,11 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     for (var i = 0; i < initializers.length; i++) {
       value = useValue ? initializers[i].call(thisArg, value) : initializers[i].call(thisArg);
     }
-    return useValue ? value : undefined;
+    return useValue ? value : void 0;
   };
   var __esDecorate$2 = undefined && undefined.__esDecorate || function (ctor, descriptorIn, decorators, contextIn, initializers, extraInitializers) {
     function accept(f) {
-      if (f !== undefined && typeof f !== "function") throw new TypeError("Function expected");
+      if (f !== void 0 && typeof f !== "function") throw new TypeError("Function expected");
       return f;
     }
     var kind = contextIn.kind,
@@ -13973,7 +14163,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
         set: descriptor.set
       } : descriptor[key], context);
       if (kind === "accessor") {
-        if (result === undefined) continue;
+        if (result === void 0) continue;
         if (result === null || typeof result !== "object") throw new TypeError("Object expected");
         if (_ = accept(result.get)) descriptor.get = _;
         if (_ = accept(result.set)) descriptor.set = _;
@@ -14229,7 +14419,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
         });
       }
     }, (() => {
-      const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(null) : undefined;
+      const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(null) : void 0;
       _private_applyViewport_decorators = [invokeAtMostOnceForArguments];
       _private_emulateIdleState_decorators = [invokeAtMostOnceForArguments];
       _private_emulateTimezone_decorators = [invokeAtMostOnceForArguments];
@@ -14731,7 +14921,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
   }
   var _client7 = /*#__PURE__*/new WeakMap();
   var _timeoutSettings2 = /*#__PURE__*/new WeakMap();
-  var _deviceRequestPrompDeferreds = /*#__PURE__*/new WeakMap();
+  var _deviceRequestPromptDeferreds = /*#__PURE__*/new WeakMap();
   var _DeviceRequestPromptManager_brand = /*#__PURE__*/new WeakSet();
   class DeviceRequestPromptManager {
     /**
@@ -14744,7 +14934,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       _classPrivateMethodInitSpec(this, _DeviceRequestPromptManager_brand);
       _classPrivateFieldInitSpec(this, _client7, void 0);
       _classPrivateFieldInitSpec(this, _timeoutSettings2, void 0);
-      _classPrivateFieldInitSpec(this, _deviceRequestPrompDeferreds, new Set());
+      _classPrivateFieldInitSpec(this, _deviceRequestPromptDeferreds, new Set());
       _classPrivateFieldSet(_client7, this, client);
       _classPrivateFieldSet(_timeoutSettings2, this, timeoutSettings);
       _classPrivateFieldGet(_client7, this).on('DeviceAccess.deviceRequestPrompted', event => {
@@ -14760,7 +14950,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
      */
     async waitForDevicePrompt(options = {}) {
       assert(_classPrivateFieldGet(_client7, this) !== null, 'Cannot wait for device prompt through detached session!');
-      const needsEnable = _classPrivateFieldGet(_deviceRequestPrompDeferreds, this).size === 0;
+      const needsEnable = _classPrivateFieldGet(_deviceRequestPromptDeferreds, this).size === 0;
       let enablePromise;
       if (needsEnable) {
         enablePromise = _classPrivateFieldGet(_client7, this).send('DeviceAccess.enable');
@@ -14779,12 +14969,12 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
           once: true
         });
       }
-      _classPrivateFieldGet(_deviceRequestPrompDeferreds, this).add(deferred);
+      _classPrivateFieldGet(_deviceRequestPromptDeferreds, this).add(deferred);
       try {
         const [result] = await Promise.all([deferred.valueOrThrow(), enablePromise]);
         return result;
       } finally {
-        _classPrivateFieldGet(_deviceRequestPrompDeferreds, this).delete(deferred);
+        _classPrivateFieldGet(_deviceRequestPromptDeferreds, this).delete(deferred);
       }
     }
   }
@@ -14798,15 +14988,15 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
    * @internal
    */
   function _onDeviceRequestPrompted(event) {
-    if (!_classPrivateFieldGet(_deviceRequestPrompDeferreds, this).size) {
+    if (!_classPrivateFieldGet(_deviceRequestPromptDeferreds, this).size) {
       return;
     }
     assert(_classPrivateFieldGet(_client7, this) !== null);
     const devicePrompt = new DeviceRequestPrompt(_classPrivateFieldGet(_client7, this), _classPrivateFieldGet(_timeoutSettings2, this), event);
-    for (const promise of _classPrivateFieldGet(_deviceRequestPrompDeferreds, this)) {
+    for (const promise of _classPrivateFieldGet(_deviceRequestPromptDeferreds, this)) {
       promise.resolve(devicePrompt);
     }
-    _classPrivateFieldGet(_deviceRequestPrompDeferreds, this).clear();
+    _classPrivateFieldGet(_deviceRequestPromptDeferreds, this).clear();
   }
   function createEvaluationError(details) {
     let name;
@@ -15089,11 +15279,11 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     for (var i = 0; i < initializers.length; i++) {
       value = useValue ? initializers[i].call(thisArg, value) : initializers[i].call(thisArg);
     }
-    return useValue ? value : undefined;
+    return useValue ? value : void 0;
   };
   var __esDecorate$1 = undefined && undefined.__esDecorate || function (ctor, descriptorIn, decorators, contextIn, initializers, extraInitializers) {
     function accept(f) {
-      if (f !== undefined && typeof f !== "function") throw new TypeError("Function expected");
+      if (f !== void 0 && typeof f !== "function") throw new TypeError("Function expected");
       return f;
     }
     var kind = contextIn.kind,
@@ -15115,7 +15305,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
         set: descriptor.set
       } : descriptor[key], context);
       if (kind === "accessor") {
-        if (result === undefined) continue;
+        if (result === void 0) continue;
         if (result === null || typeof result !== "object") throw new TypeError("Object expected");
         if (_ = accept(result.get)) descriptor.get = _;
         if (_ = accept(result.set)) descriptor.set = _;
@@ -15280,7 +15470,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
         return _classPrivateFieldGet(_backendNodeId, this);
       }
     }, (() => {
-      const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : undefined;
+      const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
       _contentFrame_decorators = [throwIfDisposed()];
       _scrollIntoView_decorators = [throwIfDisposed(), bindIsolatedHandle];
       _uploadFile_decorators = [throwIfDisposed(), bindIsolatedHandle];
@@ -15347,14 +15537,14 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
    * SPDX-License-Identifier: Apache-2.0
    */
   var __addDisposableResource$2 = undefined && undefined.__addDisposableResource || function (env, value, async) {
-    if (value !== null && value !== undefined) {
+    if (value !== null && value !== void 0) {
       if (typeof value !== "object" && typeof value !== "function") throw new TypeError("Object expected.");
       var dispose, inner;
       if (async) {
         if (!Symbol.asyncDispose) throw new TypeError("Symbol.asyncDispose is not defined.");
         dispose = value[Symbol.asyncDispose];
       }
-      if (dispose === undefined) {
+      if (dispose === void 0) {
         if (!Symbol.dispose) throw new TypeError("Symbol.dispose is not defined.");
         dispose = value[Symbol.dispose];
         if (async) inner = dispose;
@@ -15592,7 +15782,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
   async function _addBinding(binding) {
     const env_1 = {
       stack: [],
-      error: undefined,
+      error: void 0,
       hasError: false
     };
     try {
@@ -15701,7 +15891,10 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       if (exceptionDetails) {
         throw createEvaluationError(exceptionDetails);
       }
-      return returnByValue ? valueFromRemoteObject(remoteObject) : _classPrivateFieldGet(_world3, this).createCdpHandle(remoteObject);
+      if (returnByValue) {
+        return valueFromRemoteObject(remoteObject);
+      }
+      return _classPrivateFieldGet(_world3, this).createCdpHandle(remoteObject);
     }
     const functionDeclaration = stringifyFunction(pageFunction);
     const functionDeclarationWithSourceUrl = SOURCE_URL_REGEX.test(functionDeclaration) ? functionDeclaration : `${functionDeclaration}\n${sourceUrlComment}\n`;
@@ -15736,7 +15929,10 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     if (exceptionDetails) {
       throw createEvaluationError(exceptionDetails);
     }
-    return returnByValue ? valueFromRemoteObject(remoteObject) : _classPrivateFieldGet(_world3, this).createCdpHandle(remoteObject);
+    if (returnByValue) {
+      return valueFromRemoteObject(remoteObject);
+    }
+    return _classPrivateFieldGet(_world3, this).createCdpHandle(remoteObject);
     async function convertArgumentAsync(context, arg) {
       if (arg instanceof LazyArg) {
         arg = await arg.get(context);
@@ -15888,7 +16084,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     }
     async evaluateHandle(pageFunction, ...args) {
       pageFunction = withSourcePuppeteerURLIfNone(this.evaluateHandle.name, pageFunction);
-      // This code needs to schedule evaluateHandle call synchroniously (at
+      // This code needs to schedule evaluateHandle call synchronously (at
       // least when the context is there) so we cannot unconditionally
       // await.
       let context = _assertClassBrand(_IsolatedWorld_brand, this, _executionContext).call(this);
@@ -15899,7 +16095,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     }
     async evaluate(pageFunction, ...args) {
       pageFunction = withSourcePuppeteerURLIfNone(this.evaluate.name, pageFunction);
-      // This code needs to schedule evaluate call synchroniously (at
+      // This code needs to schedule evaluate call synchronously (at
       // least when the context is there) so we cannot unconditionally
       // await.
       let context = _assertClassBrand(_IsolatedWorld_brand, this, _executionContext).call(this);
@@ -15909,7 +16105,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       return await context.evaluate(pageFunction, ...args);
     }
     async adoptBackendNode(backendNodeId) {
-      // This code needs to schedule resolveNode call synchroniously (at
+      // This code needs to schedule resolveNode call synchronously (at
       // least when the context is there) so we cannot unconditionally
       // await.
       let context = _assertClassBrand(_IsolatedWorld_brand, this, _executionContext).call(this);
@@ -16197,11 +16393,11 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     for (var i = 0; i < initializers.length; i++) {
       value = useValue ? initializers[i].call(thisArg, value) : initializers[i].call(thisArg);
     }
-    return useValue ? value : undefined;
+    return useValue ? value : void 0;
   };
   var __esDecorate = undefined && undefined.__esDecorate || function (ctor, descriptorIn, decorators, contextIn, initializers, extraInitializers) {
     function accept(f) {
-      if (f !== undefined && typeof f !== "function") throw new TypeError("Function expected");
+      if (f !== void 0 && typeof f !== "function") throw new TypeError("Function expected");
       return f;
     }
     var kind = contextIn.kind,
@@ -16223,7 +16419,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
         set: descriptor.set
       } : descriptor[key], context);
       if (kind === "accessor") {
-        if (result === undefined) continue;
+        if (result === void 0) continue;
         if (result === null || typeof result !== "object") throw new TypeError("Object expected");
         if (_ = accept(result.get)) descriptor.get = _;
         if (_ = accept(result.set)) descriptor.set = _;
@@ -16238,7 +16434,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
   /**
    * @internal
    */
-  let CdpFrame = ((_ref3, _CdpFrame, _url3, _detached, _client9, _CdpFrame_brand) => {
+  let CdpFrame = ((_ref3, _CdpFrame, _url3, _detached2, _client9, _CdpFrame_brand) => {
     let _classSuper = Frame;
     let _instanceExtraInitializers = [];
     let _goto_decorators;
@@ -16248,12 +16444,12 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     let _addExposedFunctionBinding_decorators;
     let _removeExposedFunctionBinding_decorators;
     let _waitForDevicePrompt_decorators;
-    return _url3 = /*#__PURE__*/new WeakMap(), _detached = /*#__PURE__*/new WeakMap(), _client9 = /*#__PURE__*/new WeakMap(), _CdpFrame_brand = /*#__PURE__*/new WeakSet(), _ref3 = (_goto_decorators = [throwIfDetached], _waitForNavigation_decorators = [throwIfDetached], _setContent_decorators = [throwIfDetached], _addPreloadScript_decorators = [throwIfDetached], _addExposedFunctionBinding_decorators = [throwIfDetached], _removeExposedFunctionBinding_decorators = [throwIfDetached], _waitForDevicePrompt_decorators = [throwIfDetached], disposeSymbol), _CdpFrame = class CdpFrame extends _classSuper {
+    return _url3 = /*#__PURE__*/new WeakMap(), _detached2 = /*#__PURE__*/new WeakMap(), _client9 = /*#__PURE__*/new WeakMap(), _CdpFrame_brand = /*#__PURE__*/new WeakSet(), _ref3 = (_goto_decorators = [throwIfDetached], _waitForNavigation_decorators = [throwIfDetached], _setContent_decorators = [throwIfDetached], _addPreloadScript_decorators = [throwIfDetached], _addExposedFunctionBinding_decorators = [throwIfDetached], _removeExposedFunctionBinding_decorators = [throwIfDetached], _waitForDevicePrompt_decorators = [throwIfDetached], disposeSymbol), _CdpFrame = class CdpFrame extends _classSuper {
       constructor(frameManager, frameId, parentFrameId, client) {
         super();
         _classPrivateMethodInitSpec(this, _CdpFrame_brand);
         _classPrivateFieldInitSpec(this, _url3, (__runInitializers(this, _instanceExtraInitializers), ''));
-        _classPrivateFieldInitSpec(this, _detached, false);
+        _classPrivateFieldInitSpec(this, _detached2, false);
         _classPrivateFieldInitSpec(this, _client9, void 0);
         _defineProperty(this, "_frameManager", void 0);
         _defineProperty(this, "_loaderId", '');
@@ -16266,7 +16462,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
         _classPrivateFieldSet(_url3, this, '');
         this._id = frameId;
         this._parentId = parentFrameId;
-        _classPrivateFieldSet(_detached, this, false);
+        _classPrivateFieldSet(_detached2, this, false);
         _classPrivateFieldSet(_client9, this, client);
         this._loaderId = '';
         this.worlds = {
@@ -16463,13 +16659,13 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
         this._hasStartedLoading = true;
       }
       get detached() {
-        return _classPrivateFieldGet(_detached, this);
+        return _classPrivateFieldGet(_detached2, this);
       }
       [_ref3]() {
-        if (_classPrivateFieldGet(_detached, this)) {
+        if (_classPrivateFieldGet(_detached2, this)) {
           return;
         }
-        _classPrivateFieldSet(_detached, this, true);
+        _classPrivateFieldSet(_detached2, this, true);
         this.worlds[MAIN_WORLD][disposeSymbol]();
         this.worlds[PUPPETEER_WORLD][disposeSymbol]();
       }
@@ -16489,7 +16685,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
         return await parent.mainRealm().adoptBackendNode(backendNodeId);
       }
     }, (() => {
-      const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : undefined;
+      const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
       __esDecorate(_CdpFrame, null, _goto_decorators, {
         kind: "method",
         name: "goto",
@@ -17658,7 +17854,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     if (!request) {
       return;
     }
-    _assertClassBrand(_NetworkManager_brand, this, _maybeReassignOOPIFRequestClient).call(this, client, request);
+    _assertClassBrand(_NetworkManager_brand, this, _adoptCdpSessionIfNeeded).call(this, client, request);
     // Under certain conditions we never get the Network.responseReceived
     // event from protocol. @see https://crbug.com/883475
     if (request.response()) {
@@ -17684,7 +17880,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     if (!request) {
       return;
     }
-    _assertClassBrand(_NetworkManager_brand, this, _maybeReassignOOPIFRequestClient).call(this, client, request);
+    _assertClassBrand(_NetworkManager_brand, this, _adoptCdpSessionIfNeeded).call(this, client, request);
     request._failureText = event.errorText;
     const response = request.response();
     if (response) {
@@ -17693,13 +17889,14 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     _assertClassBrand(_NetworkManager_brand, this, _forgetRequest).call(this, request, true);
     this.emit(exports.NetworkManagerEvent.RequestFailed, request);
   }
-  function _maybeReassignOOPIFRequestClient(client, request) {
-    // Document requests for OOPIFs start in the parent frame but are adopted by their
-    // child frame, meaning their loadingFinished and loadingFailed events are fired on
-    // the child session. In this case we reassign the request CDPSession to ensure all
-    // subsequent actions use the correct session (e.g. retrieving response body in
-    // HTTPResponse).
-    if (client !== request.client && request.isNavigationRequest()) {
+  function _adoptCdpSessionIfNeeded(client, request) {
+    // Document requests for OOPIFs start in the parent frame but are
+    // adopted by their child frame, meaning their loadingFinished and
+    // loadingFailed events are fired on the child session. In this case
+    // we reassign the request CDPSession to ensure all subsequent
+    // actions use the correct session (e.g. retrieving response body in
+    // HTTPResponse). The same applies to main worker script requests.
+    if (client !== request.client) {
       request.client = client;
     }
   }
@@ -17770,12 +17967,11 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
      */
     async swapFrameTree(client) {
       _classPrivateFieldSet(_client11, this, client);
-      assert(_classPrivateFieldGet(_client11, this) instanceof CdpCDPSession, 'CDPSession is not an instance of CDPSessionImpl.');
       const frame = this._frameTree.getMainFrame();
       if (frame) {
-        _classPrivateFieldGet(_frameNavigatedReceived, this).add(_classPrivateFieldGet(_client11, this)._target()._targetId);
+        _classPrivateFieldGet(_frameNavigatedReceived, this).add(_classPrivateFieldGet(_client11, this).target()._targetId);
         this._frameTree.removeFrame(frame);
-        frame.updateId(_classPrivateFieldGet(_client11, this)._target()._targetId);
+        frame.updateId(_classPrivateFieldGet(_client11, this).target()._targetId);
         this._frameTree.addFrame(frame);
         frame.updateClient(client);
       }
@@ -17832,7 +18028,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
         _classPrivateFieldGet(_frameTreeHandled, this)?.resolve();
         _classPrivateFieldSet(_frameTreeHandled, this, Deferred.create());
         // We need to schedule all these commands while the target is paused,
-        // therefore, it needs to happen synchroniously. At the same time we
+        // therefore, it needs to happen synchronously. At the same time we
         // should not start processing execution context and frame events before
         // we received the initial information about the frame tree.
         await Promise.all([_classPrivateFieldGet(_networkManager, this).addClient(client), client.send('Page.enable'), client.send('Page.getFrameTree').then(({
@@ -17947,6 +18143,12 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
   async function _onClientDisconnect() {
     const mainFrame = this._frameTree.getMainFrame();
     if (!mainFrame) {
+      return;
+    }
+    if (!_classPrivateFieldGet(_page, this).browser().connected) {
+      // If the browser is not connected we know
+      // that activation will not happen
+      _assertClassBrand(_FrameManager_brand, this, _removeFramesRecursively).call(this, mainFrame);
       return;
     }
     for (const child of mainFrame.childFrames()) {
@@ -20184,7 +20386,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
   var _id6 = /*#__PURE__*/new WeakMap();
   var _targetType2 = /*#__PURE__*/new WeakMap();
   class CdpWebWorker extends WebWorker {
-    constructor(client, url, targetId, targetType, consoleAPICalled, exceptionThrown) {
+    constructor(client, url, targetId, targetType, consoleAPICalled, exceptionThrown, networkManager) {
       super(url);
       _classPrivateFieldInitSpec(this, _world4, void 0);
       _classPrivateFieldInitSpec(this, _client17, void 0);
@@ -20211,6 +20413,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
         _classPrivateFieldGet(_world4, this).dispose();
       });
       // This might fail if the target is closed before we receive all execution contexts.
+      networkManager?.addClient(_classPrivateFieldGet(_client17, this)).catch(debugError);
       _classPrivateFieldGet(_client17, this).send('Runtime.enable').catch(debugError);
     }
     mainRealm() {
@@ -20248,14 +20451,14 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
    * SPDX-License-Identifier: Apache-2.0
    */
   var __addDisposableResource$1 = undefined && undefined.__addDisposableResource || function (env, value, async) {
-    if (value !== null && value !== undefined) {
+    if (value !== null && value !== void 0) {
       if (typeof value !== "object" && typeof value !== "function") throw new TypeError("Object expected.");
       var dispose, inner;
       if (async) {
         if (!Symbol.asyncDispose) throw new TypeError("Symbol.asyncDispose is not defined.");
         dispose = value[Symbol.asyncDispose];
       }
-      if (dispose === undefined) {
+      if (dispose === void 0) {
         if (!Symbol.dispose) throw new TypeError("Symbol.dispose is not defined.");
         dispose = value[Symbol.dispose];
         if (async) inner = dispose;
@@ -20399,9 +20602,9 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       });
       _classPrivateFieldInitSpec(this, _onAttachedToTarget, session => {
         assert(session instanceof CdpCDPSession);
-        _classPrivateFieldGet(_frameManager2, this).onAttachedToTarget(session._target());
-        if (session._target()._getTargetInfo().type === 'worker') {
-          const worker = new CdpWebWorker(session, session._target().url(), session._target()._targetId, session._target().type(), _assertClassBrand(_CdpPage_brand, this, _addConsoleMessage).bind(this), _assertClassBrand(_CdpPage_brand, this, _handleException).bind(this));
+        _classPrivateFieldGet(_frameManager2, this).onAttachedToTarget(session.target());
+        if (session.target()._getTargetInfo().type === 'worker') {
+          const worker = new CdpWebWorker(session, session.target().url(), session.target()._targetId, session.target().type(), _assertClassBrand(_CdpPage_brand, this, _addConsoleMessage).bind(this), _assertClassBrand(_CdpPage_brand, this, _handleException).bind(this), _classPrivateFieldGet(_frameManager2, this).networkManager);
           _classPrivateFieldGet(_workers, this).set(session.id(), worker);
           this.emit("workercreated" /* PageEvent.WorkerCreated */, worker);
         }
@@ -20410,7 +20613,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       _classPrivateFieldSet(_primaryTargetClient, this, client);
       _classPrivateFieldSet(_tabTargetClient, this, client.parentSession());
       assert(_classPrivateFieldGet(_tabTargetClient, this), 'Tab target session is not defined.');
-      _classPrivateFieldSet(_tabTarget, this, _classPrivateFieldGet(_tabTargetClient, this)._target());
+      _classPrivateFieldSet(_tabTarget, this, _classPrivateFieldGet(_tabTargetClient, this).target());
       assert(_classPrivateFieldGet(_tabTarget, this), 'Tab target is not defined.');
       _classPrivateFieldSet(_primaryTarget, this, _target2);
       _classPrivateFieldSet(_targetManager, this, _target2._targetManager());
@@ -20764,7 +20967,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     async _screenshot(options) {
       const env_2 = {
         stack: [],
-        error: undefined,
+        error: void 0,
         hasError: false
       };
       try {
@@ -20897,7 +21100,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     }) {
       const env_3 = {
         stack: [],
-        error: undefined,
+        error: void 0,
         hasError: false
       };
       try {
@@ -20972,9 +21175,10 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     }
   }
   async function _onActivation(newSession) {
+    // TODO: Remove assert once we have separate Event type for CdpCDPSession.
+    assert(newSession instanceof CdpCDPSession, 'CDPSession is not instance of CdpCDPSession');
     _classPrivateFieldSet(_primaryTargetClient, this, newSession);
-    assert(_classPrivateFieldGet(_primaryTargetClient, this) instanceof CdpCDPSession, 'CDPSession is not instance of CDPSessionImpl');
-    _classPrivateFieldSet(_primaryTarget, this, _classPrivateFieldGet(_primaryTargetClient, this)._target());
+    _classPrivateFieldSet(_primaryTarget, this, newSession.target());
     assert(_classPrivateFieldGet(_primaryTarget, this), 'Missing target on swap');
     _classPrivateFieldGet(_keyboard4, this).updateClient(newSession);
     _classPrivateFieldGet(_mouse, this).updateClient(newSession);
@@ -20987,7 +21191,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
   }
   async function _onSecondaryTarget(session) {
     assert(session instanceof CdpCDPSession);
-    if (session._target()._subtype() !== 'prerender') {
+    if (session.target()._subtype() !== 'prerender') {
       return;
     }
     _classPrivateFieldGet(_frameManager2, this).registerSpeculativeSession(session).catch(debugError);
@@ -21030,7 +21234,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
   async function _onFileChooser(event) {
     const env_1 = {
       stack: [],
-      error: undefined,
+      error: void 0,
       hasError: false
     };
     try {
@@ -21041,7 +21245,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       assert(frame, 'This should never happen.');
       // This is guaranteed to be an HTMLInputElement handle by the event.
       const handle = __addDisposableResource$1(env_1, await frame.worlds[MAIN_WORLD].adoptBackendNode(event.backendNodeId), false);
-      const fileChooser = new FileChooser(handle.move(), event);
+      const fileChooser = new FileChooser(handle.move(), event.mode !== 'selectSingle');
       for (const promise of _classPrivateFieldGet(_fileChooserDeferreds, this)) {
         promise.resolve(fileChooser);
       }
@@ -21209,14 +21413,14 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
    * SPDX-License-Identifier: Apache-2.0
    */
   var __addDisposableResource = undefined && undefined.__addDisposableResource || function (env, value, async) {
-    if (value !== null && value !== undefined) {
+    if (value !== null && value !== void 0) {
       if (typeof value !== "object" && typeof value !== "function") throw new TypeError("Object expected.");
       var dispose, inner;
       if (async) {
         if (!Symbol.asyncDispose) throw new TypeError("Symbol.asyncDispose is not defined.");
         dispose = value[Symbol.asyncDispose];
       }
-      if (dispose === undefined) {
+      if (dispose === void 0) {
         if (!Symbol.dispose) throw new TypeError("Symbol.dispose is not defined.");
         dispose = value[Symbol.dispose];
         if (async) inner = dispose;
@@ -21329,7 +21533,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
     async newPage() {
       const env_1 = {
         stack: [],
-        error: undefined,
+        error: void 0,
         hasError: false
       };
       try {
@@ -21430,8 +21634,8 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       _classPrivateFieldSet(_browserContext, this, browserContext);
       this._targetId = targetInfo.targetId;
       _classPrivateFieldSet(_sessionFactory, this, sessionFactory);
-      if (_classPrivateFieldGet(_session, this) && _classPrivateFieldGet(_session, this) instanceof CdpCDPSession) {
-        _classPrivateFieldGet(_session, this)._setTarget(this);
+      if (_classPrivateFieldGet(_session, this)) {
+        _classPrivateFieldGet(_session, this).setTarget(this);
       }
     }
     async asPage() {
@@ -21469,7 +21673,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
         throw new Error('sessionFactory is not initialized');
       }
       return _classPrivateFieldGet(_sessionFactory, this).call(this, false).then(session => {
-        session._setTarget(this);
+        session.setTarget(this);
         return session;
       });
     }
@@ -21614,7 +21818,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
         const session = this._session();
         // TODO(einbinder): Make workers send their console logs.
         _classPrivateFieldSet(_workerPromise, this, (session ? Promise.resolve(session) : this._sessionFactory()(/* isAutoAttachEmulated=*/false)).then(client => {
-          return new CdpWebWorker(client, this._getTargetInfo().url, this._targetId, this.type(), () => {} /* consoleAPICalled */, () => {} /* exceptionThrown */);
+          return new CdpWebWorker(client, this._getTargetInfo().url, this._targetId, this.type(), () => {} /* consoleAPICalled */, () => {} /* exceptionThrown */, undefined /* networkManager */);
         }));
       }
       return await _classPrivateFieldGet(_workerPromise, this);
@@ -21778,7 +21982,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       });
       _classPrivateFieldInitSpec(this, _onAttachedToTarget2, async (parentSession, event) => {
         const targetInfo = event.targetInfo;
-        const session = _classPrivateFieldGet(_connection3, this).session(event.sessionId);
+        const session = _classPrivateFieldGet(_connection3, this)._session(event.sessionId);
         if (!session) {
           throw new Error(`Session ${event.sessionId} was not created.`);
         }
@@ -21813,7 +22017,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
           return;
         }
         const isExistingTarget = _classPrivateFieldGet(_attachedTargetsByTargetId, this).has(targetInfo.targetId);
-        const target = isExistingTarget ? _classPrivateFieldGet(_attachedTargetsByTargetId, this).get(targetInfo.targetId) : _classPrivateFieldGet(_targetFactory, this).call(this, targetInfo, session, parentSession instanceof CDPSession ? parentSession : undefined);
+        const target = isExistingTarget ? _classPrivateFieldGet(_attachedTargetsByTargetId, this).get(targetInfo.targetId) : _classPrivateFieldGet(_targetFactory, this).call(this, targetInfo, session, parentSession instanceof CdpCDPSession ? parentSession : undefined);
         if (_classPrivateFieldGet(_targetFilterCallback, this) && !_classPrivateFieldGet(_targetFilterCallback, this).call(this, target)) {
           _classPrivateFieldGet(_ignoredTargets, this).add(targetInfo.targetId);
           _assertClassBrand(_TargetManager_brand, this, _finishInitializationIfReady).call(this, targetInfo.targetId);
@@ -21822,14 +22026,14 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
         }
         _assertClassBrand(_TargetManager_brand, this, _setupAttachmentListeners).call(this, session);
         if (isExistingTarget) {
-          session._setTarget(target);
+          session.setTarget(target);
           _classPrivateFieldGet(_attachedTargetsBySessionId, this).set(session.id(), _classPrivateFieldGet(_attachedTargetsByTargetId, this).get(targetInfo.targetId));
         } else {
           target._initialize();
           _classPrivateFieldGet(_attachedTargetsByTargetId, this).set(targetInfo.targetId, target);
           _classPrivateFieldGet(_attachedTargetsBySessionId, this).set(session.id(), target);
         }
-        const parentTarget = parentSession instanceof CDPSession ? parentSession._target() : null;
+        const parentTarget = parentSession instanceof CDPSession ? parentSession.target() : null;
         parentTarget?._addChildTarget(target);
         parentSession.emit(exports.CDPSessionEvent.Ready, session);
         _classPrivateFieldGet(_targetsIdsForInit, this).delete(target._targetId);
@@ -21853,7 +22057,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
           return;
         }
         if (parentSession instanceof CDPSession) {
-          parentSession._target()._removeChildTarget(target);
+          parentSession.target()._removeChildTarget(target);
         }
         _classPrivateFieldGet(_attachedTargetsByTargetId, this).delete(target._targetId);
         this.emit("targetGone" /* TargetManagerEvent.TargetGone */, target);
@@ -22135,6 +22339,19 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       }
       return page;
     }
+    async installExtension(path) {
+      const {
+        id
+      } = await _classPrivateFieldGet(_connection4, this).send('Extensions.loadUnpacked', {
+        path
+      });
+      return id;
+    }
+    uninstallExtension(id) {
+      return _classPrivateFieldGet(_connection4, this).send('Extensions.uninstall', {
+        id
+      });
+    }
     targets() {
       return Array.from(_classPrivateFieldGet(_targetManager3, this).getAvailableTargets().values()).filter(target => {
         return target._isTargetExposed() && target._initializedDeferred.value() === exports.InitializationStatus.SUCCESS;
@@ -22363,9 +22580,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
       if (parsed.sessionId === 'pageTargetSessionId') {
         delete parsed.sessionId;
       }
-      chrome.debugger.sendCommand(
-      // @ts-expect-error sessionId is not in stable yet.
-      {
+      chrome.debugger.sendCommand({
         tabId: _classPrivateFieldGet(_tabId, this),
         sessionId: parsed.sessionId
       }, parsed.method, parsed.params).then(response => {
@@ -24295,9 +24510,9 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
    * @internal
    */
   const PUPPETEER_REVISIONS = Object.freeze({
-    chrome: '132.0.6834.83',
-    'chrome-headless-shell': '132.0.6834.83',
-    firefox: 'stable_134.0.1'
+    chrome: '137.0.7151.55',
+    'chrome-headless-shell': '137.0.7151.55',
+    firefox: 'stable_139.0.1'
   });
 
   /**
@@ -24411,6 +24626,7 @@ var Puppeteer = function (exports, _PuppeteerURL, _LazyArg, _ARIAQueryHandler, _
   exports.STATUS_TEXTS = STATUS_TEXTS;
   exports.ScriptInjector = ScriptInjector;
   exports.SecurityDetails = SecurityDetails;
+  exports.SuppressedError = SuppressedError$1;
   exports.Target = Target;
   exports.TargetCloseError = TargetCloseError;
   exports.TargetManager = TargetManager;

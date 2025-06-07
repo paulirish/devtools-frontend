@@ -28,6 +28,7 @@
   display: inline-flex;
   flex-direction: row;
   align-items: center;
+  width: fit-content;
 }
 
 button {
@@ -43,6 +44,7 @@ button {
   cursor: inherit;
   display: inline-flex;
   position: relative;
+  font-family: var(--default-font-family);
   font-size: var(--sys-typescale-body4-size);
   font-weight: var(--ref-typeface-weight-medium);
   line-height: var(--sys-typescale-body4-line-height);
@@ -58,6 +60,11 @@ button {
 
   &.red-toggle {
     --toggle-color: var(--sys-color-error-bright);
+  }
+
+  &.inverse {
+    --hover-layer-color: var(--sys-color-state-hover-on-prominent);
+    --active-layer-color: var(--sys-color-state-ripple-neutral-on-prominent);
   }
 
   devtools-icon {
@@ -80,6 +87,18 @@ button {
       --button-height: var(--sys-size-9);
       --button-width: var(--sys-size-9);
       --icon-size: var(--sys-size-8);
+    }
+
+    &.micro {
+      --button-height: var(--sys-size-8);
+      --button-width: var(--sys-size-8);
+      --icon-size: var(--sys-size-8);
+
+      border-radius: var(--sys-shape-corner-extra-small);
+    }
+
+    &.inverse devtools-icon {
+      color:  var(--sys-color-inverse-on-surface);
     }
 
     &.toggled devtools-icon {
@@ -145,6 +164,10 @@ button {
     border: none;
     color: var(--sys-color-primary);
 
+    &.inverse {
+      color:  var(--sys-color-inverse-primary);
+    }
+
     devtools-icon {
       color: var(--icon-primary);
     }
@@ -165,26 +188,12 @@ button {
     background: transparent;
     color: var(--sys-color-primary);
 
-    devtools-icon {
-      color: var(--icon-primary);
+    &.micro {
+      --button-height: var(--sys-size-8);
     }
 
-    &.micro {
-      --button-height: var(--sys-size-7);
-
-      padding: 0 var(--sys-size-5);
-      font-size: var(--sys-typescale-body4-size);
-      font-weight: var(--ref-typeface-weight-medium);
-      line-height: var(--sys-typescale-body4-line-height);
-
-      &:not(.icon):has(devtools-icon) {
-        padding-left: var(--sys-size-3);
-      }
-
-      &:not(.icon) devtools-icon {
-        height: var(--sys-size-6);
-        width: var(--sys-size-6);
-      }
+    devtools-icon {
+      color: var(--icon-primary);
     }
   }
 

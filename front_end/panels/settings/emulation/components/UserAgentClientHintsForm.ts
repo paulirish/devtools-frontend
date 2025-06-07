@@ -1,6 +1,7 @@
 // Copyright 2021 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view, rulesdir/inject-checkbox-styles */
 
 import '../../../../ui/legacy/legacy.js';
 
@@ -10,13 +11,13 @@ import type * as Protocol from '../../../../generated/protocol.js';
 import * as Buttons from '../../../../ui/components/buttons/buttons.js';
 import * as Input from '../../../../ui/components/input/input.js';
 import type * as UI from '../../../../ui/legacy/legacy.js';
-import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
+import * as Lit from '../../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../../ui/visual_logging/visual_logging.js';
 import * as EmulationUtils from '../utils/utils.js';
 
 import userAgentClientHintsFormStyles from './userAgentClientHintsForm.css.js';
 
-const {html} = LitHtml;
+const {html} = Lit;
 
 const UIStrings = {
   /**
@@ -151,7 +152,7 @@ const UIStrings = {
    *@description Text that is usually a hyperlink to more documentation
    */
   learnMore: 'Learn more',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/settings/emulation/components/UserAgentClientHintsForm.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -206,16 +207,12 @@ const DEFAULT_METADATA = {
 export class UserAgentClientHintsForm extends HTMLElement {
   readonly #shadow = this.attachShadow({mode: 'open'});
 
-  #isFormOpened: boolean = false;
-  #isFormDisabled: boolean = false;
+  #isFormOpened = false;
+  #isFormDisabled = false;
   #metaData: Protocol.Emulation.UserAgentMetadata = DEFAULT_METADATA;
-  #showMobileCheckbox: boolean = false;
-  #showSubmitButton: boolean = false;
-  #useragentModifiedAriaMessage: string = '';
-
-  connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [Input.checkboxStyles, userAgentClientHintsFormStyles];
-  }
+  #showMobileCheckbox = false;
+  #showSubmitButton = false;
+  #useragentModifiedAriaMessage = '';
 
   set value(data: UserAgentClientHintsFormData) {
     const {metaData = DEFAULT_METADATA, showMobileCheckbox = false, showSubmitButton = false} = data;
@@ -443,7 +440,7 @@ export class UserAgentClientHintsForm extends HTMLElement {
 
   #renderInputWithLabel(
       label: string, placeholder: string, value: string,
-      stateKey: keyof Protocol.Emulation.UserAgentMetadata): LitHtml.TemplateResult {
+      stateKey: keyof Protocol.Emulation.UserAgentMetadata): Lit.TemplateResult {
     const handleInputChange = (event: KeyboardEvent): void => {
       const value = (event.target as HTMLInputElement).value;
       this.#handleInputChange(stateKey, value);
@@ -464,7 +461,7 @@ export class UserAgentClientHintsForm extends HTMLElement {
     `;
   }
 
-  #renderPlatformSection(): LitHtml.TemplateResult {
+  #renderPlatformSection(): Lit.TemplateResult {
     const {platform, platformVersion} = this.#metaData;
     const handlePlatformNameChange = (event: KeyboardEvent): void => {
       const value = (event.target as HTMLInputElement).value;
@@ -503,7 +500,7 @@ export class UserAgentClientHintsForm extends HTMLElement {
     `;
   }
 
-  #renderDeviceModelSection(): LitHtml.TemplateResult {
+  #renderDeviceModelSection(): Lit.TemplateResult {
     const {model, mobile} = this.#metaData;
     const handleDeviceModelChange = (event: KeyboardEvent): void => {
       const value = (event.target as HTMLInputElement).value;
@@ -542,7 +539,7 @@ export class UserAgentClientHintsForm extends HTMLElement {
     `;
   }
 
-  #renderUseragent(): LitHtml.TemplateResult {
+  #renderUseragent(): Lit.TemplateResult {
     const {
       brands =
           [
@@ -602,8 +599,7 @@ export class UserAgentClientHintsForm extends HTMLElement {
           />
           <devtools-icon
             .data=${{
-      color:
-        'var(--icon-default)', iconName: 'bin', width: '16px', height: '16px',
+        color: 'var(--icon-default)', iconName: 'bin', width: '16px', height: '16px',
       }
       }
             title=${i18nString(UIStrings.brandUserAgentDelete)}
@@ -633,8 +629,7 @@ export class UserAgentClientHintsForm extends HTMLElement {
         <devtools-icon
           aria-hidden="true"
           .data=${{
-    color:
-      'var(--icon-default)', iconName: 'plus', width: '16px',
+      color: 'var(--icon-default)', iconName: 'plus', width: '16px',
     }
     }
         >
@@ -644,7 +639,7 @@ export class UserAgentClientHintsForm extends HTMLElement {
     `;
   }
 
-  #renderFullVersionList(): LitHtml.TemplateResult {
+  #renderFullVersionList(): Lit.TemplateResult {
     const {
       fullVersionList =
           [
@@ -708,8 +703,7 @@ export class UserAgentClientHintsForm extends HTMLElement {
           />
           <devtools-icon
             .data=${{
-      color:
-        'var(--icon-default)', iconName: 'bin', width: '16px', height: '16px',
+        color: 'var(--icon-default)', iconName: 'bin', width: '16px', height: '16px',
       }
       }
             title=${i18nString(UIStrings.brandFullVersionListDelete)}
@@ -739,8 +733,7 @@ export class UserAgentClientHintsForm extends HTMLElement {
         <devtools-icon
           aria-hidden="true"
           .data=${{
-    color:
-      'var(--icon-default)', iconName: 'plus', width: '16px',
+      color: 'var(--icon-default)', iconName: 'plus', width: '16px',
     }
     }
         >
@@ -770,11 +763,13 @@ export class UserAgentClientHintsForm extends HTMLElement {
       >
         ${i18nString(UIStrings.update)}
       </devtools-button>
-    ` : LitHtml.nothing;
+    ` : Lit.nothing;
     // clang-format on
 
     // clang-format off
     const output = html`
+      <style>${Input.checkboxStyles}</style>
+      <style>${userAgentClientHintsFormStyles}</style>
       <section class="root">
         <div
           class="tree-title"
@@ -834,8 +829,8 @@ export class UserAgentClientHintsForm extends HTMLElement {
         <div aria-live="polite" aria-label=${this.#useragentModifiedAriaMessage}></div>
       </section>
     `;
-              // clang-format on
-              LitHtml.render(output, this.#shadow, {host: this});
+    // clang-format on
+    Lit.render(output, this.#shadow, {host: this});
   }
 
   validate = (): UI.ListWidget.ValidatorResult => {

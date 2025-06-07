@@ -1,6 +1,7 @@
 // Copyright 2024 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as i18n from '../../core/i18n/i18n.js';
 import * as SDK from '../../core/sdk/sdk.js';
@@ -10,7 +11,7 @@ const UIStrings = {
    *@description Text to display to user while a calibration process is running.
    */
   runningCalibration: 'Running CPU calibration, please do not leave this tab or close DevTools.',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/mobile_throttling/CalibrationController.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -90,6 +91,7 @@ export class CalibrationController {
         margin: 0;
         background-color: antiquewhite;
         font-size: 18px;
+        text-align: center;
 
         display: flex;
         flex-direction: column;
@@ -103,19 +105,17 @@ export class CalibrationController {
       moonEl.textContent = '🌑';
       moonEl.style.cssText = 'font-size: 5em';
     }
-    await runtimeModel.agent.invoke_evaluate({
-      expression: 'window.location.href = "about:blank"',
-    });
-    await runtimeModel.agent.invoke_evaluate({
-      expression: `(${setupTestPage})(${JSON.stringify(i18nString(UIStrings.runningCalibration))})`,
-    });
+
+    await primaryPageTarget.pageAgent().invoke_navigate({url: 'about:blank'});
+
     await runtimeModel.agent.invoke_evaluate({
       expression: `
-          ${computeBenchmarkIndex}
+          (${setupTestPage})(${JSON.stringify(i18nString(UIStrings.runningCalibration))});
+
           window.runBenchmark = () => {
             window.runs = window.runs ?? 0;
-            moon.textContent = ['🌑', '🌒','🌓', '🌔', '🌕', '🌖', '🌗', '🌘'][window.runs++ % 8];
-            return computeBenchmarkIndex(${benchmarkDurationMs});
+            moon.textContent = ['🌑', '🌒', '🌓', '🌔', '🌕', '🌖', '🌗', '🌘'][window.runs++ % 8];
+            return (${computeBenchmarkIndex})(${benchmarkDurationMs});
           }`,
     });
 
@@ -144,7 +144,11 @@ export class CalibrationController {
       expression: 'runBenchmark()',
     });
     if (!Number.isFinite(result.value)) {
-      throw new Error(`unexpected score from benchmark: ${result.value}`);
+      let err = `unexpected score from benchmark: ${result.value}`;
+      if (result.description) {
+        err += `\n${result.description}`;
+      }
+      throw new Error(err);
     }
     return result.value;
   }

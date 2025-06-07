@@ -5,13 +5,9 @@
 import {assert} from 'chai';
 
 import {click, getBrowserAndPages, typeText, waitFor, waitForNone} from '../../shared/helper.js';
-
 import {CONSOLE_TAB_SELECTOR, CONSOLE_TOOLTIP_SELECTOR, focusConsolePrompt} from '../helpers/console-helpers.js';
 
 describe('The Console Tab', function() {
-  // The tests in this suite are particularly slow, as they perform a lot of actions
-  this.timeout(10000);
-
   it('allows re-declaration of let variables', async () => {
     const {frontend} = getBrowserAndPages();
     await click(CONSOLE_TAB_SELECTOR);

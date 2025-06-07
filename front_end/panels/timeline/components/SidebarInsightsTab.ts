@@ -1,6 +1,7 @@
 // Copyright 2024 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import './SidebarSingleInsightSet.js';
 
@@ -10,15 +11,15 @@ import type * as Platform from '../../../core/platform/platform.js';
 import * as Trace from '../../../models/trace/trace.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
-import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import * as Lit from '../../../ui/lit/lit.js';
 import * as Utils from '../utils/utils.js';
 
 import * as Insights from './insights/insights.js';
 import type {ActiveInsight} from './Sidebar.js';
-import styles from './sidebarInsightsTab.css.js';
-import type {SidebarSingleInsightSetData} from './SidebarSingleInsightSet.js';
+import sidebarInsightsTabStyles from './sidebarInsightsTab.css.js';
+import type {SidebarSingleInsightSet, SidebarSingleInsightSetData} from './SidebarSingleInsightSet.js';
 
-const {html} = LitHtml;
+const {html} = Lit;
 
 const FEEDBACK_URL = 'https://crbug.com/371170842' as Platform.DevToolsPath.UrlString;
 
@@ -31,16 +32,15 @@ const UIStrings = {
    *@description text show in feedback tooltip
    */
   feedbackTooltip: 'Insights is an experimental feature. Your feedback will help us improve it.',
-};
+} as const;
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/SidebarInsightsTab.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 export class SidebarInsightsTab extends HTMLElement {
-  readonly #boundRender = this.#render.bind(this);
   readonly #shadow = this.attachShadow({mode: 'open'});
-
   #parsedTrace: Trace.Handlers.Types.ParsedTrace|null = null;
+  #traceMetadata: Trace.Types.File.MetaData|null = null;
   #insights: Trace.Insights.Types.TraceInsightSets|null = null;
   #activeInsight: ActiveInsight|null = null;
   #selectedCategory = Trace.Insights.Types.InsightCategory.ALL;
@@ -52,10 +52,6 @@ export class SidebarInsightsTab extends HTMLElement {
    */
   #insightSetKey: string|null = null;
 
-  connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [styles];
-  }
-
   // TODO(paulirish): add back a disconnectedCallback() to avoid memory leaks that doesn't cause b/372943062
 
   set parsedTrace(data: Trace.Handlers.Types.ParsedTrace|null) {
@@ -65,7 +61,17 @@ export class SidebarInsightsTab extends HTMLElement {
     this.#parsedTrace = data;
     this.#insightSetKey = null;
 
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
+  }
+
+  set traceMetadata(data: Trace.Types.File.MetaData|null) {
+    if (data === this.#traceMetadata) {
+      return;
+    }
+    this.#traceMetadata = data;
+    this.#insightSetKey = null;
+
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
   set insights(data: Trace.Insights.Types.TraceInsightSets|null) {
@@ -83,14 +89,14 @@ export class SidebarInsightsTab extends HTMLElement {
     // - greater than 5s in duration
     // - or, has a navigation
     // In practice this means selecting either the first or the second insight set.
-    const trivialThreshold = Trace.Helpers.Timing.millisecondsToMicroseconds(Trace.Types.Timing.MilliSeconds(5000));
+    const trivialThreshold = Trace.Helpers.Timing.milliToMicro(Trace.Types.Timing.Milli(5000));
     const insightSets = [...this.#insights.values()];
     this.#insightSetKey =
         insightSets.find(insightSet => insightSet.navigation || insightSet.bounds.range > trivialThreshold)?.id
         // If everything is "trivial", just select the first one.
         ?? insightSets[0]?.id ?? null;
 
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
   set activeInsight(active: ActiveInsight|null) {
@@ -107,7 +113,7 @@ export class SidebarInsightsTab extends HTMLElement {
     if (this.#activeInsight) {
       this.#insightSetKey = this.#activeInsight.insightSetKey;
     }
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
   #insightSetToggled(id: string): void {
@@ -116,7 +122,7 @@ export class SidebarInsightsTab extends HTMLElement {
     if (this.#insightSetKey !== this.#activeInsight?.insightSetKey) {
       this.dispatchEvent(new Insights.SidebarInsight.InsightDeactivated());
     }
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#boundRender);
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
   #insightSetHovered(id: string): void {
@@ -141,8 +147,8 @@ export class SidebarInsightsTab extends HTMLElement {
     this.dispatchEvent(new Insights.SidebarInsight.InsightSetZoom(data.bounds));
   }
 
-  #renderZoomButton(insightSetToggled: boolean): LitHtml.TemplateResult {
-    const classes = LitHtml.Directives.classMap({
+  #renderZoomButton(insightSetToggled: boolean): Lit.TemplateResult {
+    const classes = Lit.Directives.classMap({
       'zoom-icon': true,
       active: insightSetToggled,
     });
@@ -159,8 +165,8 @@ export class SidebarInsightsTab extends HTMLElement {
     // clang-format on
   }
 
-  #renderDropdownIcon(insightSetToggled: boolean): LitHtml.TemplateResult {
-    const containerClasses = LitHtml.Directives.classMap({
+  #renderDropdownIcon(insightSetToggled: boolean): Lit.TemplateResult {
+    const containerClasses = Lit.Directives.classMap({
       'dropdown-icon': true,
       active: insightSetToggled,
     });
@@ -178,9 +184,22 @@ export class SidebarInsightsTab extends HTMLElement {
     // clang-format on
   }
 
+  highlightActiveInsight(): void {
+    if (!this.#activeInsight) {
+      return;
+    }
+    // Find the right set for this insight via the set key.
+    const set = this.#shadow?.querySelector<SidebarSingleInsightSet>(
+        `devtools-performance-sidebar-single-navigation[data-insight-set-key="${this.#activeInsight.insightSetKey}"]`);
+    if (!set) {
+      return;
+    }
+    set.highlightActiveInsight();
+  }
+
   #render(): void {
     if (!this.#parsedTrace || !this.#insights) {
-      LitHtml.render(LitHtml.nothing, this.#shadow, {host: this});
+      Lit.render(Lit.nothing, this.#shadow, {host: this});
       return;
     }
 
@@ -190,19 +209,22 @@ export class SidebarInsightsTab extends HTMLElement {
     const contents =
         // clang-format off
      html`
+      <style>${sidebarInsightsTabStyles}</style>
       <div class="insight-sets-wrapper">
         ${[...this.#insights.values()].map(({id, url}, index) => {
-          const data = {
+          const data: SidebarSingleInsightSetData = {
             insights: this.#insights,
             insightSetKey: id,
             activeCategory: this.#selectedCategory,
             activeInsight: this.#activeInsight,
             parsedTrace: this.#parsedTrace,
+            traceMetadata: this.#traceMetadata,
           };
 
           const contents = html`
             <devtools-performance-sidebar-single-navigation
-              .data=${data as SidebarSingleInsightSetData}>
+              data-insight-set-key=${id}
+              .data=${data}>
             </devtools-performance-sidebar-single-navigation>
           `;
 
@@ -240,8 +262,8 @@ export class SidebarInsightsTab extends HTMLElement {
     // Insight components contain state, so to prevent insights from previous trace loads breaking things we use the parsedTrace
     // as a render key.
     // Note: newer Lit has `keyed`, but we don't have that, so we do it manually. https://lit.dev/docs/templates/directives/#keyed
-    const result = LitHtml.Directives.repeat([contents], () => this.#parsedTrace, template => template);
-    LitHtml.render(result, this.#shadow, {host: this});
+    const result = Lit.Directives.repeat([contents], () => this.#parsedTrace, template => template);
+    Lit.render(result, this.#shadow, {host: this});
   }
 }
 

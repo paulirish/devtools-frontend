@@ -1,14 +1,15 @@
 // Copyright 2024 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
+
 import * as Common from '../../../core/common/common.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Platform from '../../../core/platform/platform.js';
-import type * as CrUXManager from '../../../models/crux-manager/crux-manager.js';
 import * as Trace from '../../../models/trace/trace.js';
 import type * as PerfUI from '../../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
-import {EntryStyles} from '../../timeline/utils/utils.js';
+import * as Utils from '../utils/utils.js';
 
 import * as Components from './components/components.js';
 
@@ -25,7 +26,15 @@ const UIStrings = {
    * @example {URL} PH2
    */
   fieldMetricMarkerField: '{PH1} - Field ({PH2})',
-};
+  /**
+   * @description Label for an option that selects the page's specific URL as opposed to it's entire origin/domain.
+   */
+  urlOption: 'URL',
+  /**
+   * @description Label for an option that selects the page's entire origin/domain as opposed to it's specific URL.
+   */
+  originOption: 'Origin',
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/overlays/OverlaysImpl.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -91,7 +100,7 @@ export interface EntriesLink {
  */
 export interface TimeRangeLabel {
   type: 'TIME_RANGE';
-  bounds: Trace.Types.Timing.TraceWindowMicroSeconds;
+  bounds: Trace.Types.Timing.TraceWindowMicro;
   label: string;
   showDuration: boolean;
 }
@@ -101,10 +110,9 @@ export interface TimeRangeLabel {
  * trace window that will contain all of the overlays.
  * `overlays` is expected to be non-empty, and this will return `null` if it is empty.
  */
-export function traceWindowContainingOverlays(overlays: TimelineOverlay[]): Trace.Types.Timing.TraceWindowMicroSeconds|
-    null {
-  let minTime = Trace.Types.Timing.MicroSeconds(Number.POSITIVE_INFINITY);
-  let maxTime = Trace.Types.Timing.MicroSeconds(Number.NEGATIVE_INFINITY);
+export function traceWindowContainingOverlays(overlays: TimelineOverlay[]): Trace.Types.Timing.TraceWindowMicro|null {
+  let minTime = Trace.Types.Timing.Micro(Number.POSITIVE_INFINITY);
+  let maxTime = Trace.Types.Timing.Micro(Number.NEGATIVE_INFINITY);
 
   if (overlays.length === 0) {
     return null;
@@ -123,9 +131,9 @@ export function traceWindowContainingOverlays(overlays: TimelineOverlay[]): Trac
   return Trace.Helpers.Timing.traceWindowFromMicroSeconds(minTime, maxTime);
 }
 
-function traceWindowForOverlay(overlay: TimelineOverlay): Trace.Types.Timing.TraceWindowMicroSeconds {
-  const overlayMinBounds: Trace.Types.Timing.MicroSeconds[] = [];
-  const overlayMaxBounds: Trace.Types.Timing.MicroSeconds[] = [];
+function traceWindowForOverlay(overlay: TimelineOverlay): Trace.Types.Timing.TraceWindowMicro {
+  const overlayMinBounds: Trace.Types.Timing.Micro[] = [];
+  const overlayMaxBounds: Trace.Types.Timing.Micro[] = [];
 
   switch (overlay.type) {
     case 'ENTRY_SELECTED': {
@@ -201,8 +209,8 @@ function traceWindowForOverlay(overlay: TimelineOverlay): Trace.Types.Timing.Tra
       Platform.TypeScriptUtilities.assertNever(overlay, `Unexpected overlay ${overlay}`);
   }
 
-  const min = Trace.Types.Timing.MicroSeconds(Math.min(...overlayMinBounds));
-  const max = Trace.Types.Timing.MicroSeconds(Math.max(...overlayMaxBounds));
+  const min = Trace.Types.Timing.Micro(Math.min(...overlayMinBounds));
+  const max = Trace.Types.Timing.Micro(Math.max(...overlayMaxBounds));
   return Trace.Helpers.Timing.traceWindowFromMicroSeconds(min, max);
 }
 
@@ -275,7 +283,7 @@ export function chartForEntry(entry: OverlayEntry): EntryChartLocation {
  */
 export interface CandyStripedTimeRange {
   type: 'CANDY_STRIPED_TIME_RANGE';
-  bounds: Trace.Types.Timing.TraceWindowMicroSeconds;
+  bounds: Trace.Types.Timing.TraceWindowMicro;
   entry: Trace.Types.Events.Event;
 }
 
@@ -285,14 +293,14 @@ export interface CandyStripedTimeRange {
  */
 export interface TimespanBreakdown {
   type: 'TIMESPAN_BREAKDOWN';
-  sections: Array<Components.TimespanBreakdownOverlay.EntryBreakdown>;
+  sections: Components.TimespanBreakdownOverlay.EntryBreakdown[];
   entry?: Trace.Types.Events.Event;
   renderLocation?: 'BOTTOM_OF_TIMELINE'|'BELOW_EVENT'|'ABOVE_EVENT';
 }
 
 export interface TimestampMarker {
   type: 'TIMESTAMP_MARKER';
-  timestamp: Trace.Types.Timing.MicroSeconds;
+  timestamp: Trace.Types.Timing.Micro;
 }
 
 /**
@@ -304,13 +312,10 @@ export interface TimingsMarker {
   type: 'TIMINGS_MARKER';
   entries: Trace.Types.Events.PageLoadEvent[];
   entryToFieldResult: Map<Trace.Types.Events.PageLoadEvent, TimingsMarkerFieldResult>;
-  adjustedTimestamp: Trace.Types.Timing.MicroSeconds;
+  adjustedTimestamp: Trace.Types.Timing.Micro;
 }
 
-export interface TimingsMarkerFieldResult {
-  ts: Trace.Types.Timing.MicroSeconds;
-  pageScope: CrUXManager.PageScope;
-}
+export type TimingsMarkerFieldResult = Trace.Insights.Common.CrUXFieldMetricTimingResult;
 
 /**
  * All supported overlay types.
@@ -319,7 +324,20 @@ export type TimelineOverlay = EntrySelected|EntryOutline|TimeRangeLabel|EntryLab
     TimestampMarker|CandyStripedTimeRange|TimingsMarker;
 
 export interface TimelineOverlaySetOptions {
-  updateTraceWindow: boolean;
+  /** Whether to update the trace window. Defaults to false. */
+  updateTraceWindow?: boolean;
+  /**
+   * If updateTraceWindow is true, this is the total amount of space added as margins to the
+   * side of the bounds represented by the overlays, represented as a percentage relative to
+   * the width of the overlay bounds. The space is split evenly on either side of the overlay
+   * bounds. The intention is to neatly center the overlays in the middle of the viewport, with
+   * some additional context on either side.
+   *
+   * If 0, no margins will be added, and the precise bounds defined by the overlays will be used.
+   *
+   * If not provided, 100 is used (25% margin, 50% overlays, 25% margin).
+   */
+  updateTraceWindowPercentage?: number;
 }
 
 /**
@@ -329,7 +347,11 @@ export interface TimelineOverlaySetOptions {
  */
 type SingletonOverlay = EntrySelected|TimestampMarker;
 export function overlayIsSingleton(overlay: TimelineOverlay): overlay is SingletonOverlay {
-  return overlay.type === 'TIMESTAMP_MARKER' || overlay.type === 'ENTRY_SELECTED';
+  return overlayTypeIsSingleton(overlay.type);
+}
+
+export function overlayTypeIsSingleton(type: TimelineOverlay['type']): type is SingletonOverlay['type'] {
+  return type === 'TIMESTAMP_MARKER' || type === 'ENTRY_SELECTED';
 }
 
 /**
@@ -346,7 +368,7 @@ export function overlayIsSingleton(overlay: TimelineOverlay): overlay is Singlet
  */
 interface ActiveDimensions {
   trace: {
-    visibleWindow: Trace.Types.Timing.TraceWindowMicroSeconds|null,
+    visibleWindow: Trace.Types.Timing.TraceWindowMicro|null,
   };
   charts: {
     main: FlameChartDimensions|null,
@@ -379,6 +401,7 @@ export interface TimelineCharts {
 }
 
 export interface OverlayEntryQueries {
+  parsedTrace: () => Trace.Handlers.Types.ParsedTrace | null;
   isEntryCollapsedByUser: (entry: Trace.Types.Events.Event) => boolean;
   firstVisibleParentForEntry: (entry: Trace.Types.Events.Event) => Trace.Types.Events.Event | null;
 }
@@ -392,6 +415,12 @@ export class AnnotationOverlayActionEvent extends Event {
 
   constructor(public overlay: TimelineOverlay, public action: UpdateAction) {
     super(AnnotationOverlayActionEvent.eventName);
+  }
+}
+export class ConsentDialogVisibilityChange extends Event {
+  static readonly eventName = 'consentdialogvisibilitychange';
+  constructor(public isVisible: boolean) {
+    super(ConsentDialogVisibilityChange.eventName, {bubbles: true, composed: true});
   }
 }
 
@@ -449,7 +478,9 @@ export class Overlays extends EventTarget {
    * subsequent renders we do not destroy and recreate it, instead we update it
    * based on the new position of the timeline.
    */
-  #overlaysToElements: Map<TimelineOverlay, HTMLElement|null> = new Map();
+  #overlaysToElements = new Map<TimelineOverlay, HTMLElement|null>();
+
+  #singletonOverlays = new Map<SingletonOverlay['type'], TimelineOverlay>();
 
   // When the Entries Link Annotation is created, the arrow needs to follow the mouse.
   // Update the mouse coordinates while it is being created.
@@ -487,7 +518,7 @@ export class Overlays extends EventTarget {
    */
   #overlaysContainer: HTMLElement;
 
-  // Setting that specififed if the annotations overlays need to be visible.
+  // Setting that specified if the annotations overlays need to be visible.
   // It is switched on/off from the annotations tab in the sidebar.
   readonly #annotationsHiddenSetting: Common.Settings.Setting<boolean>;
 
@@ -540,13 +571,12 @@ export class Overlays extends EventTarget {
   // because `overlaysContainer` doesn't have events to enable the interaction with the
   // Flamecharts beneath it.
   #updateMouseCoordinatesProgressEntriesLink(event: Event, chart: EntryChartLocation): void {
-    const mouseEvent = (event as MouseEvent);
-    this.#lastMouseOffsetX = mouseEvent.offsetX;
-    this.#lastMouseOffsetY = mouseEvent.offsetY;
-
     if (this.#entriesLinkInProgress?.state !== Trace.Types.File.EntriesLinkState.PENDING_TO_EVENT) {
       return;
     }
+    const mouseEvent = (event as MouseEvent);
+    this.#lastMouseOffsetX = mouseEvent.offsetX;
+    this.#lastMouseOffsetY = mouseEvent.offsetY;
 
     // The Overlays layer coordinates cover both Network and Main Charts, while the mousemove
     // coordinates are received from the charts individually and start from 0 for each chart.
@@ -578,10 +608,14 @@ export class Overlays extends EventTarget {
      * the existing one, rather than create a new one. This ensures you can only
      * ever have one instance of the overlay type.
      */
-    const existing = this.overlaysOfType<T>(newOverlay.type);
-    if (overlayIsSingleton(newOverlay) && existing[0]) {
-      this.updateExisting(existing[0], newOverlay);
-      return existing[0];
+    if (overlayIsSingleton(newOverlay)) {
+      const existing = this.#singletonOverlays.get(newOverlay.type);
+      if (existing) {
+        this.updateExisting(existing, newOverlay);
+        return existing as T;  // The is a safe cast, thanks to `type` above.
+      }
+
+      this.#singletonOverlays.set(newOverlay.type, newOverlay);
     }
 
     // By setting the value to null, we ensure that on the next render that the
@@ -637,10 +671,28 @@ export class Overlays extends EventTarget {
   }
 
   /**
+   * Used for debugging and testing. Do not mutate the element directly using
+   * this method.
+   */
+  elementForOverlay(overlay: TimelineOverlay): HTMLElement|null {
+    return this.#overlaysToElements.get(overlay) ?? null;
+  }
+
+  /**
    * Removes any active overlays that match the provided type.
    * @returns the number of overlays that were removed.
    */
   removeOverlaysOfType(type: TimelineOverlay['type']): number {
+    if (overlayTypeIsSingleton(type)) {
+      const singleton = this.#singletonOverlays.get(type);
+      if (singleton) {
+        this.remove(singleton);
+        return 1;
+      }
+
+      return 0;
+    }
+
     const overlaysToRemove = Array.from(this.#overlaysToElements.keys()).filter(overlay => {
       return overlay.type === type;
     });
@@ -653,7 +705,16 @@ export class Overlays extends EventTarget {
   /**
    * @returns all overlays that match the provided type.
    */
-  overlaysOfType<T extends TimelineOverlay>(type: T['type']): NoInfer<T>[] {
+  overlaysOfType<T extends TimelineOverlay>(type: T['type']): Array<NoInfer<T>> {
+    if (overlayTypeIsSingleton(type)) {
+      const singleton = this.#singletonOverlays.get(type);
+      if (singleton) {
+        return [singleton as T];
+      }
+
+      return [];
+    }
+
     const matches: T[] = [];
 
     function overlayIsOfType(overlay: TimelineOverlay): overlay is T {
@@ -669,6 +730,13 @@ export class Overlays extends EventTarget {
   }
 
   /**
+   * @returns all overlays.
+   */
+  allOverlays(): TimelineOverlay[] {
+    return [...this.#overlaysToElements.keys()];
+  }
+
+  /**
    * Removes the provided overlay from the list of overlays and destroys any
    * DOM associated with it.
    */
@@ -678,10 +746,13 @@ export class Overlays extends EventTarget {
       this.#overlaysContainer.removeChild(htmlElement);
     }
     this.#overlaysToElements.delete(overlay);
+    if (overlayIsSingleton(overlay)) {
+      this.#singletonOverlays.delete(overlay.type);
+    }
   }
 
   /**
-   * Update the dimenions of a chart.
+   * Update the dimensions of a chart.
    * IMPORTANT: this does not trigger a re-draw. You must call the render() method manually.
    */
   updateChartDimensions(chart: EntryChartLocation, dimensions: FlameChartDimensions): void {
@@ -692,14 +763,14 @@ export class Overlays extends EventTarget {
    * Update the visible window of the UI.
    * IMPORTANT: this does not trigger a re-draw. You must call the render() method manually.
    */
-  updateVisibleWindow(visibleWindow: Trace.Types.Timing.TraceWindowMicroSeconds): void {
+  updateVisibleWindow(visibleWindow: Trace.Types.Timing.TraceWindowMicro): void {
     this.#dimensions.trace.visibleWindow = visibleWindow;
   }
 
   /**
    * Clears all overlays and all data. Call this when the trace is changing
    * (e.g. the user has imported/recorded a new trace) and we need to start from
-   * scratch and remove all overlays relating to the preivous trace.
+   * scratch and remove all overlays relating to the previous trace.
    */
   reset(): void {
     if (this.#overlaysContainer) {
@@ -771,7 +842,7 @@ export class Overlays extends EventTarget {
     // This isn't bi-directional: if we find that O2 overlaps O1, we will
     // store O1 => [O2]. We will not then also store O2 => [O1], because we
     // only need to deal with the overlap once.
-    const overlapsByOverlay: Map<TimeRangeLabel, TimeRangeLabel[]> = new Map();
+    const overlapsByOverlay = new Map<TimeRangeLabel, TimeRangeLabel[]>();
 
     for (let i = 0; i < overlaysSorted.length; i++) {
       const current = overlaysSorted[i];
@@ -1017,7 +1088,7 @@ export class Overlays extends EventTarget {
 
         // Available space between the bottom of the overlay and top of the chart.
         const minSpace = Math.max(bottom, 0);
-        // Contrain height to available space.
+        // Constrain height to available space.
         const height = Math.min(MAX_BOX_HEIGHT, minSpace);
 
         const top = bottom - height;
@@ -1098,33 +1169,36 @@ export class Overlays extends EventTarget {
       const entryToWrapper = component.entryToWrapper();
 
       if (entryTo && entryToWrapper) {
-        let toEntryX = 0;
+        let toEntryX = this.xPixelForEventStartOnChart(entryTo) ?? 0;
         // If the 'to' entry is visible, set the entry Y as an arrow coordinate to point to. If not, get the canvas edge coordate to point the arrow to.
         let toEntryY = this.#yCoordinateForNotVisibleEntry(entryTo);
+        const toEntryParams = this.#positionEntryBorderOutlineType(entryTo, entryToWrapper);
 
-        if (entryToVisibility) {
-          const toEntryParams = this.#positionEntryBorderOutlineType(entryTo, entryToWrapper);
+        if (toEntryParams) {
+          const toEntryHeight = toEntryParams?.entryHeight;
+          const toEntryWidth = toEntryParams?.entryWidth;
+          const toCutOffHeight = toEntryParams?.cutOffHeight;
+          toEntryX = toEntryParams?.x;
+          toEntryY = toEntryParams?.y;
 
-          if (toEntryParams) {
-            const toEntryHeight = toEntryParams?.entryHeight;
-            const toEntryWidth = toEntryParams?.entryWidth;
-            const toCutOffHeight = toEntryParams?.cutOffHeight;
-            toEntryX = toEntryParams?.x;
-            toEntryY = toEntryParams?.y;
-
-            component.toEntryCoordinateAndDimensions = {
-              x: toEntryX,
-              y: toEntryY,
-              length: toEntryWidth,
-              height: toEntryHeight - toCutOffHeight,
-            };
-          } else {
-            // Something went if the entry is visible and we cannot get its' parameters.
-            return;
-          }
+          component.toEntryCoordinateAndDimensions = {
+            x: toEntryX,
+            y: toEntryY,
+            length: toEntryWidth,
+            height: toEntryHeight - toCutOffHeight,
+          };
+        } else {
+          // if the entry exists and we cannot get its' parameters, it is probably loaded and is off screen.
+          // In this case, assign the coordinates so we can draw the arrow in the right direction.
+          component.toEntryCoordinateAndDimensions = {
+            x: toEntryX,
+            y: toEntryY,
+          };
+          return;
         }
 
-      } else if (this.#lastMouseOffsetX && this.#lastMouseOffsetY) {
+      } else {
+        // If the 'to' entry does not exist, the link is being created.
         // The second coordinate for in progress link gets updated on mousemove
         this.#entriesLinkInProgress = overlay;
       }
@@ -1231,7 +1305,7 @@ export class Overlays extends EventTarget {
       return null;
     }
 
-    // Position the start of label overlay at the start of the entry + length of connector + legth of the label element
+    // Position the start of label overlay at the start of the entry + length of connector + length of the label element
     element.style.top = `${y - Components.EntryLabelOverlay.EntryLabelOverlay.LABEL_AND_CONNECTOR_HEIGHT}px`;
     element.style.left = `${x}px`;
     element.style.width = `${entryWidth}px`;
@@ -1362,7 +1436,7 @@ export class Overlays extends EventTarget {
       widthPixels = customPos.width;
     }
 
-    // Calculate the visible overlay width by substracting the entry width that is outside of the flamechart width
+    // Calculate the visible overlay width by subtracting the entry width that is outside of the flamechart width
     const cutOffRight = (x + widthPixels > chartWidth) ? (x + widthPixels) - chartWidth : null;
     const cutOffLeft = (x < 0) ? Math.abs(x) : null;
     element.classList.toggle('cut-off-right', cutOffRight !== null);
@@ -1486,6 +1560,16 @@ export class Overlays extends EventTarget {
       case 'ENTRY_LABEL': {
         const shouldDrawLabelBelowEntry = Trace.Types.Events.isLegacyTimelineFrame(overlay.entry);
         const component = new Components.EntryLabelOverlay.EntryLabelOverlay(overlay.label, shouldDrawLabelBelowEntry);
+        // Generate the AI Call Tree for the AI Auto-Annotation feature.
+        const parsedTrace = this.#queries.parsedTrace();
+        const callTree = parsedTrace ? Utils.AICallTree.AICallTree.fromEvent(overlay.entry, parsedTrace) : null;
+        component.callTree = callTree;
+
+        component.addEventListener(
+            Components.EntryLabelOverlay.LabelAnnotationsConsentDialogVisibilityChange.eventName, e => {
+              const event = e as Components.EntryLabelOverlay.LabelAnnotationsConsentDialogVisibilityChange;
+              this.dispatchEvent(new ConsentDialogVisibilityChange(event.isVisible));
+            });
         component.addEventListener(Components.EntryLabelOverlay.EmptyEntryLabelRemoveEvent.eventName, () => {
           this.dispatchEvent(new AnnotationOverlayActionEvent(overlay, 'Remove'));
         });
@@ -1560,7 +1644,7 @@ export class Overlays extends EventTarget {
         return overlayElement;
       }
       case 'TIMINGS_MARKER': {
-        const {color} = EntryStyles.markerDetailsForEvent(overlay.entries[0]);
+        const {color} = Utils.EntryStyles.markerDetailsForEvent(overlay.entries[0]);
         const markersComponent = this.#createTimingsMarkerElement(overlay);
         overlayElement.appendChild(markersComponent);
         overlayElement.style.backgroundColor = color;
@@ -1577,7 +1661,7 @@ export class Overlays extends EventTarget {
   }
 
   #createOverlayPopover(
-      adjustedTimestamp: Trace.Types.Timing.MicroSeconds, name: string,
+      adjustedTimestamp: Trace.Types.Timing.Micro, name: string,
       fieldResult: TimingsMarkerFieldResult|undefined): HTMLElement {
     const popoverElement = document.createElement('div');
     const popoverContents = popoverElement.createChild('div', 'overlay-popover');
@@ -1590,12 +1674,12 @@ export class Overlays extends EventTarget {
     if (fieldResult) {
       const popoverContents = popoverElement.createChild('div', 'overlay-popover');
       popoverContents.createChild('span', 'overlay-popover-time').textContent =
-          i18n.TimeUtilities.formatMicroSecondsTime(fieldResult.ts);
+          i18n.TimeUtilities.formatMicroSecondsTime(fieldResult.value);
       let scope: string = fieldResult.pageScope;
       if (fieldResult.pageScope === 'url') {
-        scope = 'URL';
+        scope = i18nString(UIStrings.urlOption);
       } else if (fieldResult.pageScope === 'origin') {
-        scope = 'Origin';
+        scope = i18nString(UIStrings.originOption);
       }
       popoverContents.createChild('span', 'overlay-popover-title').textContent =
           i18nString(UIStrings.fieldMetricMarkerField, {
@@ -1629,7 +1713,7 @@ export class Overlays extends EventTarget {
     const markers = document.createElement('div');
     markers.classList.add('markers');
     for (const entry of overlay.entries) {
-      const {color, title} = EntryStyles.markerDetailsForEvent(entry);
+      const {color, title} = Utils.EntryStyles.markerDetailsForEvent(entry);
       const marker = document.createElement('div');
       marker.classList.add('marker-title');
       marker.textContent = title;
@@ -1776,7 +1860,7 @@ export class Overlays extends EventTarget {
   /**
    * Calculate if an entry is visible vertically on the chart. A bit fiddly as
    * we have to figure out its pixel offset and go on that. Unlike horizontal
-   * visibility, we can't work soley from its microsecond values.
+   * visibility, we can't work solely from its microsecond values.
    */
   #entryIsVerticallyVisibleOnChart(entry: OverlayEntry): boolean {
     const chartName = chartForEntry(entry);
@@ -1873,7 +1957,7 @@ export class Overlays extends EventTarget {
    * how far along the timeline the event is. We can then multiply that by the
    * width of the canvas to get its pixel position.
    */
-  #xPixelForMicroSeconds(chart: EntryChartLocation, timestamp: Trace.Types.Timing.MicroSeconds): number|null {
+  #xPixelForMicroSeconds(chart: EntryChartLocation, timestamp: Trace.Types.Timing.Micro): number|null {
     if (this.#dimensions.trace.visibleWindow === null) {
       console.error('Cannot calculate xPixel without visible trace window.');
       return null;
@@ -2002,7 +2086,7 @@ export class Overlays extends EventTarget {
  * of entry.
  */
 export function timingsForOverlayEntry(entry: OverlayEntry):
-    Trace.Helpers.Timing.EventTimingsData<Trace.Types.Timing.MicroSeconds> {
+    Trace.Helpers.Timing.EventTimingsData<Trace.Types.Timing.Micro> {
   if (Trace.Types.Events.isLegacyTimelineFrame(entry)) {
     return {
       startTime: entry.startTime,

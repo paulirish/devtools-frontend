@@ -6,12 +6,15 @@ import * as childProcess from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import yargs from 'yargs';
+import {hideBin} from 'yargs/helpers';
 
 import {asArray, commandLineArgs, DiffBehaviors} from './commandline.js';
 import {defaultChromePath, SOURCE_ROOT} from './paths.js';
 
-const yargs = require('yargs');
-const options = commandLineArgs(yargs(yargs.argv['_'])).argv;
+const argv = yargs(hideBin(process.argv)).parseSync()['_'] as string[];
+
+const options = commandLineArgs(yargs(argv)).parseSync();
 
 export const enum ServerType {
   HOSTED_MODE = 'hosted-mode',
@@ -31,6 +34,7 @@ interface Config {
   shuffle: boolean;
   mochaGrep: {invert?: boolean, grep?: string}|{invert?: boolean, fgrep?: string};
   copyScreenshotGoldens: boolean;
+  retries: number;
   configureChrome: (executablePath: string) => void;
 }
 
@@ -40,7 +44,7 @@ function sliceArrayFromElement(array: string[], element: string) {
 }
 
 const diffBehaviors = asArray(options['on-diff']);
-// --diff=throw is the default, so set the option to true if there is either no --diff=no-throw or if it is overriden
+// --diff=throw is the default, so set the option to true if there is either no --diff=no-throw or if it is overridden
 // by a later --diff=throw
 const onDiffThrow = !diffBehaviors.includes(DiffBehaviors.NO_THROW) ||
     sliceArrayFromElement(diffBehaviors, DiffBehaviors.NO_THROW).includes(DiffBehaviors.THROW);
@@ -114,6 +118,7 @@ export const TestConfig: Config = {
   shuffle: options['shuffle'],
   mochaGrep: mochaGrep(),
   copyScreenshotGoldens: false,
+  retries: options['retries'],
   configureChrome,
 };
 

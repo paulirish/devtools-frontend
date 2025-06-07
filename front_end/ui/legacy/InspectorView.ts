@@ -27,11 +27,13 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Root from '../../core/root/root.js';
+import * as SDK from '../../core/sdk/sdk.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
 import * as IconButton from '../components/icon_button/icon_button.js';
 import * as VisualLogging from '../visual_logging/visual_logging.js';
@@ -45,7 +47,7 @@ import {Dialog} from './Dialog.js';
 import {DockController, DockState} from './DockController.js';
 import {GlassPane} from './GlassPane.js';
 import {Infobar, Type as InfobarType} from './Infobar.js';
-import inspectorViewTabbedPaneStyles from './inspectorViewTabbedPane.css.legacy.js';
+import inspectorViewTabbedPaneStyles from './inspectorViewTabbedPane.css.js';
 import {KeyboardShortcut} from './KeyboardShortcut.js';
 import type {Panel} from './Panel.js';
 import {ShowMode, SplitWidget} from './SplitWidget.js';
@@ -72,7 +74,7 @@ const UIStrings = {
   /**
    *@description Title of an action that reloads the tab currently being debugged by DevTools
    */
-  reloadDebuggedTab: 'Reload',
+  reloadDebuggedTab: 'Reload page',
   /**
    *@description Title of an action that reloads the DevTools
    */
@@ -91,7 +93,7 @@ const UIStrings = {
    * The placeholder is the current Chrome language.
    * @example {German} PH1
    */
-  devToolsLanguageMissmatch: 'DevTools is now available in {PH1}!',
+  devToolsLanguageMissmatch: 'DevTools is now available in {PH1}',
   /**
    * @description An option the user can select when we notice that DevTools
    * is configured with a different locale than Chrome. This option means DevTools will
@@ -125,12 +127,12 @@ const UIStrings = {
    * @description Request for the user to select a local file system folder for DevTools
    * to store local overrides in.
    */
-  selectOverrideFolder: 'Select a folder to store override files in.',
+  selectOverrideFolder: 'Select a folder to store override files in',
   /**
    *@description Label for a button which opens a file picker.
    */
   selectFolder: 'Select folder',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/InspectorView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 let inspectorViewInstance: InspectorView|null = null;
@@ -149,6 +151,7 @@ export class InspectorView extends VBox implements ViewLocationResolver {
   private ownerSplitWidget?: SplitWidget;
   private reloadRequiredInfobar?: Infobar;
   #selectOverrideFolderInfobar?: Infobar;
+  #resizeObserver: ResizeObserver;
 
   constructor() {
     super();
@@ -181,11 +184,10 @@ export class InspectorView extends VBox implements ViewLocationResolver {
     closeDrawerButton.addEventListener(ToolbarButton.Events.CLICK, this.closeDrawer, this);
     this.drawerTabbedPane.addEventListener(
         TabbedPaneEvents.TabSelected,
-        (event: Common.EventTarget.EventTargetEvent<EventData>) => this.tabSelected(event.data.tabId, 'drawer'), this);
+        (event: Common.EventTarget.EventTargetEvent<EventData>) => this.tabSelected(event.data.tabId), this);
     const selectedDrawerTab = this.drawerTabbedPane.selectedTabId;
     if (this.drawerSplitWidget.showMode() !== ShowMode.ONLY_MAIN && selectedDrawerTab) {
       Host.userMetrics.panelShown(selectedDrawerTab, true);
-      Host.userMetrics.panelShownInLocation(selectedDrawerTab, 'drawer');
     }
     this.drawerTabbedPane.setTabDelegate(this.tabDelegate);
 
@@ -218,11 +220,10 @@ export class InspectorView extends VBox implements ViewLocationResolver {
     this.tabbedPane.registerRequiredCSS(inspectorViewTabbedPaneStyles);
     this.tabbedPane.addEventListener(
         TabbedPaneEvents.TabSelected,
-        (event: Common.EventTarget.EventTargetEvent<EventData>) => this.tabSelected(event.data.tabId, 'main'), this);
+        (event: Common.EventTarget.EventTargetEvent<EventData>) => this.tabSelected(event.data.tabId), this);
     const selectedTab = this.tabbedPane.selectedTabId;
     if (selectedTab) {
       Host.userMetrics.panelShown(selectedTab, true);
-      Host.userMetrics.panelShownInLocation(selectedTab, 'main');
     }
     this.tabbedPane.setAccessibleName(i18nString(UIStrings.panels));
     this.tabbedPane.setTabDelegate(this.tabDelegate);
@@ -256,6 +257,7 @@ export class InspectorView extends VBox implements ViewLocationResolver {
       infobar.setParentView(this);
       this.attachInfobar(infobar);
     }
+    this.#resizeObserver = new ResizeObserver(this.#observedResize.bind(this));
   }
 
   static instance(opts: {
@@ -277,11 +279,24 @@ export class InspectorView extends VBox implements ViewLocationResolver {
     inspectorViewInstance = null;
   }
 
+  #observedResize(): void {
+    const rect = this.element.getBoundingClientRect();
+    this.element.style.setProperty('--devtools-window-left', `${rect.left}px`);
+    this.element.style.setProperty('--devtools-window-right', `${window.innerWidth - rect.right}px`);
+    this.element.style.setProperty('--devtools-window-width', `${rect.width}px`);
+    this.element.style.setProperty('--devtools-window-top', `${rect.top}px`);
+    this.element.style.setProperty('--devtools-window-bottom', `${window.innerHeight - rect.bottom}px`);
+    this.element.style.setProperty('--devtools-window-height', `${rect.height}px`);
+  }
+
   override wasShown(): void {
+    this.#resizeObserver.observe(this.element);
+    this.#observedResize();
     this.element.ownerDocument.addEventListener('keydown', this.keyDownBound, false);
   }
 
   override willHide(): void {
+    this.#resizeObserver.unobserve(this.element);
     this.element.ownerDocument.removeEventListener('keydown', this.keyDownBound, false);
   }
 
@@ -313,7 +328,7 @@ export class InspectorView extends VBox implements ViewLocationResolver {
     if (!view) {
       throw new Error(`Expected view for panel '${panelName}'`);
     }
-    return view.widget() as Promise<Panel>;
+    return await (view.widget() as Promise<Panel>);
   }
 
   onSuspendStateChanged(allTargetsSuspended: boolean): void {
@@ -338,10 +353,10 @@ export class InspectorView extends VBox implements ViewLocationResolver {
       let icon: IconButton.Icon.Icon|null = null;
       if (warnings.length !== 0) {
         const warning = warnings.length === 1 ? warnings[0] : '· ' + warnings.join('\n· ');
-        icon = IconButton.Icon.create('warning-filled');
+        icon = IconButton.Icon.create('warning-filled', 'warning');
         Tooltip.install(icon, warning);
       }
-      tabbedPane.setTabIcon(tabId, icon);
+      tabbedPane.setTrailingTabIcon(tabId, icon);
     }
   }
 
@@ -366,7 +381,7 @@ export class InspectorView extends VBox implements ViewLocationResolver {
   }
 
   currentPanelDeprecated(): Widget|null {
-    return (ViewManager.instance().materializedWidget(this.tabbedPane.selectedTabId || '') as Widget | null);
+    return (ViewManager.instance().materializedWidget(this.tabbedPane.selectedTabId || ''));
   }
 
   showDrawer({focus, hasTargetDrawer}: {focus: boolean, hasTargetDrawer: boolean}): void {
@@ -407,12 +422,20 @@ export class InspectorView extends VBox implements ViewLocationResolver {
     this.drawerSplitWidget.setResizable(!minimized);
   }
 
-  isDrawerMinimized(): boolean {
-    return this.drawerSplitWidget.isSidebarMinimized();
+  drawerSize(): number {
+    return this.drawerSplitWidget.sidebarSize();
   }
 
-  closeDrawerTab(id: string, userGesture?: boolean): void {
-    this.drawerTabbedPane.closeTab(id, userGesture);
+  setDrawerSize(size: number): void {
+    this.drawerSplitWidget.setSidebarSize(size);
+  }
+
+  totalSize(): number {
+    return this.drawerSplitWidget.totalSize();
+  }
+
+  isDrawerMinimized(): boolean {
+    return this.drawerSplitWidget.isSidebarMinimized();
   }
 
   private keyDown(event: Event): void {
@@ -457,9 +480,8 @@ export class InspectorView extends VBox implements ViewLocationResolver {
     this.tabbedPane.headerResized();
   }
 
-  private tabSelected(tabId: string, location: 'main'|'drawer'): void {
+  private tabSelected(tabId: string): void {
     Host.userMetrics.panelShown(tabId);
-    Host.userMetrics.panelShownInLocation(tabId, location);
   }
 
   setOwnerSplit(splitWidget: SplitWidget): void {
@@ -489,30 +511,35 @@ export class InspectorView extends VBox implements ViewLocationResolver {
           [
             {
               text: i18nString(UIStrings.reloadDebuggedTab),
-              highlight: true,
               delegate: () => {
                 reloadDebuggedTab();
                 this.removeDebuggedTabReloadRequiredWarning();
               },
               dismiss: false,
               buttonVariant: Buttons.Button.Variant.PRIMARY,
-              icon: 'refresh',
               jslogContext: 'main.debug-reload',
             },
           ],
-          undefined, undefined, 'reload-required');
+          undefined, 'reload-required');
       infobar.setParentView(this);
       this.attachInfobar(infobar);
       this.reloadRequiredInfobar = infobar;
       infobar.setCloseCallback(() => {
         delete this.reloadRequiredInfobar;
       });
+
+      SDK.TargetManager.TargetManager.instance().addModelListener(
+          SDK.ResourceTreeModel.ResourceTreeModel, SDK.ResourceTreeModel.Events.PrimaryPageChanged,
+          this.removeDebuggedTabReloadRequiredWarning, this);
     }
   }
 
   removeDebuggedTabReloadRequiredWarning(): void {
     if (this.reloadRequiredInfobar) {
       this.reloadRequiredInfobar.dispose();
+      SDK.TargetManager.TargetManager.instance().removeModelListener(
+          SDK.ResourceTreeModel.ResourceTreeModel, SDK.ResourceTreeModel.Events.PrimaryPageChanged,
+          this.removeDebuggedTabReloadRequiredWarning, this);
     }
   }
 
@@ -523,13 +550,13 @@ export class InspectorView extends VBox implements ViewLocationResolver {
           [
             {
               text: i18nString(UIStrings.reloadDevtools),
-              highlight: true,
               delegate: () => reloadDevTools(),
               dismiss: false,
+              buttonVariant: Buttons.Button.Variant.PRIMARY,
               jslogContext: 'main.debug-reload',
             },
           ],
-          undefined, undefined, 'reload-required');
+          undefined, 'reload-required');
       infobar.setParentView(this);
       this.attachInfobar(infobar);
       this.reloadRequiredInfobar = infobar;
@@ -546,13 +573,13 @@ export class InspectorView extends VBox implements ViewLocationResolver {
           [
             {
               text: i18nString(UIStrings.selectFolder),
-              highlight: true,
               delegate: () => callback(),
               dismiss: true,
+              buttonVariant: Buttons.Button.Variant.TONAL,
               jslogContext: 'select-folder',
             },
           ],
-          undefined, undefined, 'select-override-folder');
+          undefined, 'select-override-folder');
       infobar.setParentView(this);
       this.attachInfobar(infobar);
       this.#selectOverrideFolderInfobar = infobar;
@@ -611,7 +638,6 @@ function createLocaleInfobar(): Infobar {
       [
         {
           text: i18nString(UIStrings.setToBrowserLanguage),
-          highlight: true,
           delegate: () => {
             languageSetting.set('browserLanguage');
             getDisableLocaleInfoBarSetting().set(true);
@@ -622,7 +648,6 @@ function createLocaleInfobar(): Infobar {
         },
         {
           text: i18nString(UIStrings.setToSpecificLanguage, {PH1: closestSupportedLanguageInCurrentLocale}),
-          highlight: true,
           delegate: () => {
             languageSetting.set(closestSupportedLocale);
             getDisableLocaleInfoBarSetting().set(true);
@@ -632,7 +657,7 @@ function createLocaleInfobar(): Infobar {
           jslogContext: 'set-to-specific-language',
         },
       ],
-      getDisableLocaleInfoBarSetting(), undefined, 'language-mismatch');
+      getDisableLocaleInfoBarSetting(), 'language-mismatch');
 }
 
 function reloadDevTools(): void {
@@ -647,7 +672,7 @@ function reloadDebuggedTab(): void {
 }
 
 export class ActionDelegate implements ActionDelegateInterface {
-  handleAction(context: Context, actionId: string): boolean {
+  handleAction(_context: Context, actionId: string): boolean {
     switch (actionId) {
       case 'main.toggle-drawer':
         if (InspectorView.instance().drawerVisible()) {

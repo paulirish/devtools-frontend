@@ -6,8 +6,10 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 const parseURL = require('url').parse;
-const {argv} = require('yargs');
+const yargs = require('yargs');
+const {hideBin} = require('yargs/helpers');
 
+const argv = yargs(hideBin(process.argv)).argv;
 const tracesMode = argv.traces || false;
 const serverPort = parseInt(process.env.PORT, 10) || (tracesMode ? 11010 : 8090);
 
@@ -143,13 +145,10 @@ server.once('error', error => {
 // All paths that are injected globally into real DevTools, so we do the same
 // to avoid styles being broken in the component server.
 const styleSheetPaths = [
-  'front_end/ui/legacy/themeColors.css',
-  'front_end/ui/legacy/tokens.css',
-  'front_end/ui/legacy/applicationColorTokens.css',
-  'front_end/ui/legacy/designTokens.css',
+  'front_end/design_system_tokens.css',
+  'front_end/application_tokens.css',
+  'front_end/ui/components/buttons/textButton.css',
   'front_end/ui/legacy/inspectorCommon.css',
-  'front_end/ui/legacy/inspectorSyntaxHighlight.css',
-  'front_end/ui/legacy/textButton.css',
   'front_end/ui/components/docs/component_docs_styles.css',
 ];
 

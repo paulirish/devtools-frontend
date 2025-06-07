@@ -1,6 +1,7 @@
 // Copyright 2016 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import '../../ui/legacy/legacy.js';
 
@@ -14,7 +15,6 @@ import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 import * as MobileThrottling from '../mobile_throttling/mobile_throttling.js';
 
 import * as EmulationComponents from './components/components.js';
-import deviceModeToolbarStyles from './deviceModeToolbar.css.legacy.js';
 
 const UIStrings = {
   /**
@@ -182,7 +182,7 @@ const UIStrings = {
    * posture e.g. Continuous, Folded.
    */
   devicePosture: 'Device posture',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/emulation/DeviceModeToolbar.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -254,13 +254,9 @@ export class DeviceModeToolbar {
     this.elementInternal.classList.add('device-mode-toolbar');
     this.elementInternal.setAttribute('jslog', `${VisualLogging.toolbar('device-mode').track({resize: true})}`);
 
-    const leftContainer = this.elementInternal.createChild('div', 'device-mode-toolbar-spacer');
-    leftContainer.createChild('div', 'device-mode-toolbar-spacer');
-    const leftToolbar = leftContainer.createChild('devtools-toolbar');
-    this.fillLeftToolbar(leftToolbar);
+    const mainToolbar = this.elementInternal.createChild('devtools-toolbar', 'main-toolbar');
+    this.appendDeviceSelectMenu(mainToolbar);
 
-    const mainToolbar = this.elementInternal.createChild('devtools-toolbar');
-    mainToolbar.wrappable = true;
     this.widthInput = new EmulationComponents.DeviceSizeInputElement.SizeInputElement(
         i18nString(UIStrings.width), {jslogContext: 'width'});
     this.widthInput.addEventListener('sizechanged', ({size: width}) => {
@@ -279,17 +275,11 @@ export class DeviceModeToolbar {
         this.model.setHeight(height);
       }
     });
-    this.fillMainToolbar(mainToolbar);
+    this.appendDimensionInputs(mainToolbar);
 
-    const rightContainer = this.elementInternal.createChild('div', 'device-mode-toolbar-spacer');
-    const rightToolbar = rightContainer.createChild('devtools-toolbar', 'device-mode-toolbar-fixed-size');
-    rightToolbar.wrappable = true;
-    this.fillRightToolbar(rightToolbar);
-    const modeToolbar = rightContainer.createChild('devtools-toolbar', 'device-mode-toolbar-fixed-size');
-    modeToolbar.wrappable = true;
-    this.fillModeToolbar(modeToolbar);
-    rightContainer.createChild('div', 'device-mode-toolbar-spacer');
-    const optionsToolbar = rightContainer.createChild('devtools-toolbar', 'device-mode-toolbar-options');
+    this.appendDisplaySettings(mainToolbar);
+    this.appendDevicePositionItems(mainToolbar);
+    const optionsToolbar = this.elementInternal.createChild('devtools-toolbar', 'device-mode-toolbar-options');
     optionsToolbar.wrappable = true;
     this.fillOptionsToolbar(optionsToolbar);
 
@@ -307,22 +297,19 @@ export class DeviceModeToolbar {
 
     function updateToolbarsEnabled(): void {
       const enabled = model.toolbarControlsEnabledSetting().get();
-      leftToolbar.setEnabled(enabled);
       mainToolbar.setEnabled(enabled);
-      rightToolbar.setEnabled(enabled);
-      modeToolbar.setEnabled(enabled);
       optionsToolbar.setEnabled(enabled);
     }
   }
 
-  private createEmptyToolbarElement(): Element {
+  private createEmptyToolbarElement(): HTMLDivElement {
     const element = document.createElement('div');
     element.classList.add('device-mode-empty-toolbar-element');
     return element;
   }
 
-  private fillLeftToolbar(toolbar: UI.Toolbar.Toolbar): void {
-    toolbar.appendToolbarItem(this.wrapToolbarItem(this.createEmptyToolbarElement()));
+  private appendDeviceSelectMenu(toolbar: UI.Toolbar.Toolbar): void {
+    toolbar.appendToolbarItem(new UI.Toolbar.ToolbarItem(this.createEmptyToolbarElement()));
     this.deviceSelectItem =
         new UI.Toolbar.ToolbarMenuButton(this.appendDeviceMenuItems.bind(this), undefined, undefined, 'device');
     this.deviceSelectItem.turnShrinkable();
@@ -330,38 +317,41 @@ export class DeviceModeToolbar {
     toolbar.appendToolbarItem(this.deviceSelectItem);
   }
 
-  private fillMainToolbar(toolbar: UI.Toolbar.Toolbar): void {
+  private appendDimensionInputs(toolbar: UI.Toolbar.Toolbar): void {
     toolbar.appendToolbarItem(new UI.Toolbar.ToolbarItem(this.widthInput));
 
     const xElement = document.createElement('div');
     xElement.classList.add('device-mode-x');
     xElement.textContent = '×';
-    this.xItem = this.wrapToolbarItem(xElement);
+    this.xItem = new UI.Toolbar.ToolbarItem(xElement);
     toolbar.appendToolbarItem(this.xItem);
 
     toolbar.appendToolbarItem(new UI.Toolbar.ToolbarItem(this.heightInput));
   }
 
-  private fillRightToolbar(toolbar: UI.Toolbar.Toolbar): void {
-    toolbar.appendToolbarItem(this.wrapToolbarItem(this.createEmptyToolbarElement()));
+  private appendDisplaySettings(toolbar: UI.Toolbar.Toolbar): void {
+    toolbar.appendToolbarItem(new UI.Toolbar.ToolbarItem(this.createEmptyToolbarElement()));
     this.scaleItem =
         new UI.Toolbar.ToolbarMenuButton(this.appendScaleMenuItems.bind(this), undefined, undefined, 'scale');
     setTitleForButton(this.scaleItem, i18nString(UIStrings.zoom));
+    this.scaleItem.turnShrinkable();
     this.scaleItem.setDarkText();
     toolbar.appendToolbarItem(this.scaleItem);
 
-    toolbar.appendToolbarItem(this.wrapToolbarItem(this.createEmptyToolbarElement()));
+    toolbar.appendToolbarItem(new UI.Toolbar.ToolbarItem(this.createEmptyToolbarElement()));
 
     this.deviceScaleItem = new UI.Toolbar.ToolbarMenuButton(
         this.appendDeviceScaleMenuItems.bind(this), undefined, undefined, 'device-pixel-ratio');
+    this.deviceScaleItem.turnShrinkable();
     this.deviceScaleItem.setVisible(this.showDeviceScaleFactorSetting.get());
     setTitleForButton(this.deviceScaleItem, i18nString(UIStrings.devicePixelRatio));
     this.deviceScaleItem.setDarkText();
     toolbar.appendToolbarItem(this.deviceScaleItem);
 
-    toolbar.appendToolbarItem(this.wrapToolbarItem(this.createEmptyToolbarElement()));
+    toolbar.appendToolbarItem(new UI.Toolbar.ToolbarItem(this.createEmptyToolbarElement()));
     this.uaItem =
         new UI.Toolbar.ToolbarMenuButton(this.appendUserAgentMenuItems.bind(this), undefined, undefined, 'device-type');
+    this.uaItem.turnShrinkable();
     this.uaItem.setVisible(this.showUserAgentTypeSetting.get());
     setTitleForButton(this.uaItem, i18nString(UIStrings.deviceType));
     this.uaItem.setDarkText();
@@ -369,11 +359,12 @@ export class DeviceModeToolbar {
 
     this.throttlingConditionsItem =
         MobileThrottling.ThrottlingManager.throttlingManager().createMobileThrottlingButton();
+    this.throttlingConditionsItem.turnShrinkable();
     toolbar.appendToolbarItem(this.throttlingConditionsItem);
   }
 
-  private fillModeToolbar(toolbar: UI.Toolbar.Toolbar): void {
-    toolbar.appendToolbarItem(this.wrapToolbarItem(this.createEmptyToolbarElement()));
+  private appendDevicePositionItems(toolbar: UI.Toolbar.Toolbar): void {
+    toolbar.appendToolbarItem(new UI.Toolbar.ToolbarItem(this.createEmptyToolbarElement()));
     this.modeButton = new UI.Toolbar.ToolbarButton('', 'screen-rotation', undefined, 'screen-rotation');
     this.modeButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, this.modeMenuClicked, this);
     toolbar.appendToolbarItem(this.modeButton);
@@ -384,9 +375,10 @@ export class DeviceModeToolbar {
     toolbar.appendToolbarItem(this.spanButton);
 
     // Show posture toolbar menu for foldable devices.
-    toolbar.appendToolbarItem(this.wrapToolbarItem(this.createEmptyToolbarElement()));
+    toolbar.appendToolbarItem(new UI.Toolbar.ToolbarItem(this.createEmptyToolbarElement()));
     this.postureItem = new UI.Toolbar.ToolbarMenuButton(
         this.appendDevicePostureItems.bind(this), undefined, undefined, 'device-posture');
+    this.postureItem.turnShrinkable();
     this.postureItem.setDarkText();
     setTitleForButton(this.postureItem, i18nString(UIStrings.devicePosture));
     toolbar.appendToolbarItem(this.postureItem);
@@ -414,7 +406,7 @@ export class DeviceModeToolbar {
   }
 
   private fillOptionsToolbar(toolbar: UI.Toolbar.Toolbar): void {
-    toolbar.appendToolbarItem(this.wrapToolbarItem(this.createEmptyToolbarElement()));
+    toolbar.appendToolbarItem(new UI.Toolbar.ToolbarItem(this.createEmptyToolbarElement()));
     const moreOptionsButton = new UI.Toolbar.ToolbarMenuButton(
         this.appendOptionsMenuItems.bind(this), true, undefined, 'more-options', 'dots-vertical');
     moreOptionsButton.setTitle(i18nString(UIStrings.moreOptions));
@@ -553,13 +545,6 @@ export class DeviceModeToolbar {
     this.showMediaInspectorSetting.set(false);
     this.showRulersSetting.set(false);
     this.model.reset();
-  }
-
-  private wrapToolbarItem(element: Element): UI.Toolbar.ToolbarItem {
-    const container = document.createElement('div');
-    const shadowRoot = UI.UIUtils.createShadowRootWithCoreStyles(container, {cssFile: deviceModeToolbarStyles});
-    shadowRoot.appendChild(element);
-    return new UI.Toolbar.ToolbarItem(container);
   }
 
   private emulateDevice(device: EmulationModel.EmulatedDevices.EmulatedDevice): void {
@@ -711,7 +696,6 @@ export class DeviceModeToolbar {
     }
 
     const contextMenu = new UI.ContextMenu.ContextMenu(event.data, {
-      useSoftMenu: false,
       x: this.modeButton.element.getBoundingClientRect().left,
       y: this.modeButton.element.getBoundingClientRect().top + (this.modeButton.element as HTMLElement).offsetHeight,
     });

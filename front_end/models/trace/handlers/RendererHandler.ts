@@ -27,7 +27,7 @@ import type {HandlerName} from './types.js';
 
 const processes = new Map<Types.Events.ProcessID, RendererProcess>();
 
-const entityMappings: HandlerHelpers.EntityMappings = {
+let entityMappings: HandlerHelpers.EntityMappings = {
   eventsByEntity: new Map<HandlerHelpers.Entity, Types.Events.Event[]>(),
   entityByEvent: new Map<Types.Events.Event, HandlerHelpers.Entity>(),
   createdEntityCache: new Map<string, HandlerHelpers.Entity>(),
@@ -40,7 +40,7 @@ const compositorTileWorkers = Array<{
   pid: Types.Events.ProcessID,
   tid: Types.Events.ThreadID,
 }>();
-const entryToNode: Map<Types.Events.Event, Helpers.TreeHelpers.TraceEntryNode> = new Map();
+const entryToNode = new Map<Types.Events.Event, Helpers.TreeHelpers.TraceEntryNode>();
 let allTraceEntries: Types.Events.Event[] = [];
 
 const completeEventStack: (Types.Events.SyntheticComplete)[] = [];
@@ -127,9 +127,7 @@ export function handleEvent(event: Types.Events.Event): void {
 
 export async function finalize(): Promise<void> {
   const {mainFrameId, rendererProcessesByFrame, threadsInProcess} = metaHandlerData();
-  const {entityMappings: networkEntityMappings} = networkRequestHandlerData();
-  // Build on top of the created entity cache to avoid de-dupes of entities that are made up.
-  entityMappings.createdEntityCache = new Map(networkEntityMappings.createdEntityCache);
+  entityMappings = networkRequestHandlerData().entityMappings;
 
   assignMeta(processes, mainFrameId, rendererProcessesByFrame, threadsInProcess);
   sanitizeProcesses(processes);
@@ -174,7 +172,7 @@ export function assignMeta(
     threadsInProcess: Map<Types.Events.ProcessID, Map<Types.Events.ThreadID, Types.Events.ThreadName>>): void {
   assignOrigin(processes, rendererProcessesByFrame);
   assignIsMainFrame(processes, mainFrameId, rendererProcessesByFrame);
-  assignThreadName(processes, rendererProcessesByFrame, threadsInProcess);
+  assignThreadName(processes, threadsInProcess);
 }
 
 /**
@@ -235,7 +233,7 @@ export function assignIsMainFrame(
  * @see assignMeta
  */
 export function assignThreadName(
-    processes: Map<Types.Events.ProcessID, RendererProcess>, rendererProcessesByFrame: FrameProcessData,
+    processes: Map<Types.Events.ProcessID, RendererProcess>,
     threadsInProcess: Map<Types.Events.ProcessID, Map<Types.Events.ThreadID, Types.Events.ThreadName>>): void {
   for (const [pid, process] of processes) {
     for (const [tid, threadInfo] of threadsInProcess.get(pid) ?? []) {
@@ -248,7 +246,7 @@ export function assignThreadName(
 /**
  * Removes unneeded trace data opportunistically stored while handling events.
  * This currently does the following:
- *  - Deletes processes with an unkonwn origin.
+ *  - Deletes processes with an unknown origin.
  */
 export function sanitizeProcesses(processes: Map<Types.Events.ProcessID, RendererProcess>): void {
   const auctionWorklets = auctionWorkletsData().worklets;
@@ -356,7 +354,8 @@ export function buildHierarchy(
       // Update the entryToNode map with the entries from this thread
       for (const [entry, node] of treeData.entryToNode) {
         entryToNode.set(entry, node);
-        HandlerHelpers.updateEventForEntities(entry, entityMappings);
+        // Entity mapping is unrelated to the tree, but calling here as we need to call on every node anyway.
+        HandlerHelpers.addEventToEntityMapping(entry, entityMappings);
       }
     }
   }
@@ -378,7 +377,7 @@ export function makeCompleteEvent(event: Types.Events.Begin|Types.Events.End): T
     }
     // Update the begin event's duration using the timestamp of the end
     // event.
-    beginEvent.dur = Types.Timing.MicroSeconds(event.ts - beginEvent.ts);
+    beginEvent.dur = Types.Timing.Micro(event.ts - beginEvent.ts);
     return null;
   }
 
@@ -387,7 +386,7 @@ export function makeCompleteEvent(event: Types.Events.Begin|Types.Events.End): T
   const syntheticComplete: Types.Events.SyntheticComplete = {
     ...event,
     ph: Types.Events.Phase.COMPLETE,
-    dur: Types.Timing.MicroSeconds(0),
+    dur: Types.Timing.Micro(0),
   };
 
   completeEventStack.push(syntheticComplete);

@@ -7,9 +7,11 @@ import type * as puppeteer from 'puppeteer-core';
 
 import {
   $$,
+  click,
   getBrowserAndPages,
   getResourcesPath,
   goTo,
+  goToHtml,
   goToResource,
   goToResourceWithCustomHost,
   waitFor,
@@ -19,6 +21,13 @@ import {
 } from '../../shared/helper.js';
 import {getCurrentConsoleMessages} from '../helpers/console-helpers.js';
 import {reloadDevTools, tabExistsInDrawer} from '../helpers/cross-tool-helper.js';
+import {
+  getCategoryRow,
+  navigateToMemoryTab,
+  setClassFilter,
+  takeHeapSnapshot,
+  waitForNonEmptyHeapSnapshotData,
+} from '../helpers/memory-helpers.js';
 
 const READY_LOCAL_METRIC_SELECTOR = '#local-value .metric-value:not(.waiting)';
 const READY_FIELD_METRIC_SELECTOR = '#field-value .metric-value:not(.waiting)';
@@ -62,7 +71,8 @@ describe('The Performance panel landing page', () => {
     await reloadDevTools({selectedPanel: {name: 'timeline'}});
   });
 
-  it('displays live metrics', async () => {
+  // Flaky, skipped while we deflake it
+  it.skip('[crbug.com/415271011]displays live metrics', async () => {
     const {target, frontend} = await getBrowserAndPages();
 
     await target.bringToFront();
@@ -108,7 +118,8 @@ describe('The Performance panel landing page', () => {
     }
   });
 
-  it('displays live metrics after the page already loaded', async () => {
+  // Flaky, skipped while we deflake it
+  it.skip('[crbug.com/415271011] displays live metrics after the page already loaded', async () => {
     const {target, frontend} = await getBrowserAndPages();
 
     await target.bringToFront();
@@ -153,8 +164,8 @@ describe('The Performance panel landing page', () => {
       await targetSession.detach();
     }
   });
-
-  it('treats bfcache restoration like a regular navigation', async () => {
+  // Flaky, skipped while we deflake it
+  it.skip('[crbug.com/415271011] treats bfcache restoration like a regular navigation', async () => {
     const {target, frontend} = await getBrowserAndPages();
 
     await target.bringToFront();
@@ -221,7 +232,8 @@ describe('The Performance panel landing page', () => {
     }
   });
 
-  it('ignores metrics from iframes', async () => {
+  // Flaky, skipped while we deflake it
+  it.skip('[crbug.com/415271011]ignores metrics from iframes', async () => {
     const {target, frontend} = await getBrowserAndPages();
 
     await target.bringToFront();
@@ -416,8 +428,8 @@ describe('The Performance panel landing page', () => {
       await targetSession.detach();
     }
   });
-
-  it('logs extra interaction details to console', async () => {
+  // flaky test
+  it.skip('[crbug.com/415210718] logs extra interaction details to console', async () => {
     const {target, frontend} = await getBrowserAndPages();
 
     await target.bringToFront();
@@ -434,22 +446,107 @@ describe('The Performance panel landing page', () => {
       await frontend.bringToFront();
 
       const interaction = await waitFor(INTERACTION_SELECTOR);
-      const interactionSummary = await interaction.$('summary');
-      await interactionSummary!.click();
+      await click('summary', {root: interaction});
 
-      const logToConsole = await interaction.$('.log-extra-details-button');
-      await logToConsole!.click();
+      await click('.log-extra-details-button', {root: interaction});
 
       await tabExistsInDrawer('#tab-console-view');
       const messages = await getCurrentConsoleMessages();
-      assert.deepEqual(messages, [
-        '[DevTools] Long animation frames for 504ms pointer interaction',
-        'Scripts:',
-        'Array(3)',
-        'Intersecting long animation frame events: [{…}]',
-      ]);
+      assert.lengthOf(messages, 4);
+      assert.match(messages[0], /^\[DevTools\] Long animation frames for \d+ms pointer interaction$/);
+      assert.strictEqual(messages[1], 'Scripts:');
+      assert.strictEqual(messages[2], 'Array(3)');
+      assert.strictEqual(messages[3], 'Intersecting long animation frame events: [{…}]');
+    } finally {
+      await targetSession.detach();
+    }
+  });
+
+  // Flaking.
+  it.skip('[crbug.com/405356930]: does not retain interaction nodes in memory', async () => {
+    const {target, frontend} = getBrowserAndPages();
+
+    await target.bringToFront();
+
+    const targetSession = await target.createCDPSession();
+    try {
+      await goToHtml('<button>Click me!</button>');
+
+      const button = await target.waitForSelector('button');
+      await button!.click();
+
+      // This ensures that the interaction has time to make it's way through web-vitals.js and
+      // be detected by the live metrics model in DevTools.
+      //
+      // If any unnecessary JS references to the node get created they will be created in this time period.
+      await target.evaluate(() => new Promise(requestAnimationFrame));
+      await target.evaluate(() => new Promise(requestAnimationFrame));
+      await frontend.bringToFront();
+      await waitFor(INTERACTION_SELECTOR);
+      await target.bringToFront();
+
+      // Attempt to remove the node from memory
+      await button!.evaluate(async el => {
+        el.remove();
+        await new Promise(requestAnimationFrame);
+      });
+      await button!.dispose();
+
+      // Ensure the node is not preserved in a detached state
+      const hasNoDetachedNodes = await retryUntilExpected(async () => {
+        const {detachedNodes} = await targetSession.send('DOM.getDetachedDomNodes');
+        return detachedNodes.length === 0;
+      });
+      assert.isTrue(hasNoDetachedNodes, 'detached nodes were found after retries');
+
+      await frontend.bringToFront();
+
+      // For redundancy, ensure the button node is removed from the memory heap
+      await navigateToMemoryTab();
+      await takeHeapSnapshot();
+      await waitForNonEmptyHeapSnapshotData();
+      await setClassFilter('Detached <button>');
+      const row = await getCategoryRow('Detached <button>', false);
+      assert.isNull(row);
     } finally {
       await targetSession.detach();
     }
   });
 });
+
+/**
+ * Retries the function a number of times until it returns true, or hits the max retries.
+ * Note that this is different to our waitForFunction helpers which run the
+ * function in the context of the target page. This runs in the execution of the
+ * test file itself.
+ */
+async function retryUntilExpected(asyncFunction: () => Promise<boolean>, maxRetries = 5): Promise<boolean> {
+  let retries = 0;
+
+  async function attempt(): Promise<boolean> {
+    try {
+      const result = await asyncFunction();
+      if (result === true) {
+        return true;
+      }
+      // Silently retry
+      if (retries < maxRetries) {
+        retries++;
+        await new Promise(resolve => setTimeout(resolve, 100));
+        return await attempt();
+      }
+      return false;  // Max retries exceeded
+
+    } catch {
+      // Silently retry even if there is an error
+      if (retries < maxRetries) {
+        retries++;
+        await new Promise(resolve => setTimeout(resolve, 100));
+        return await attempt();
+      }
+      return false;  // Max retries exceeded
+    }
+  }
+
+  return await attempt();
+}

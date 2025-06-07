@@ -1,9 +1,10 @@
-declare var Y: {
+declare var Q: {
     new (e: any, t: any): {
         _document: any;
         _lighthouseChannel: string;
         _componentCache: Map<any, any>;
         rootEl: any;
+        _swappableSections: WeakMap<object, any>;
         createElement(e: any, t: any): any;
         createElementNS(e: any, t: any, n: any): any;
         createSVGElement(e: any, t: any): any;
@@ -20,13 +21,15 @@ declare var Y: {
         document(): any;
         isDevTools(): boolean;
         find(e: any, t?: any): any;
-        maybeFind(e: any, t: any): any;
+        maybeFind(e: any, t?: any): any;
         findAll(e: any, t: any): any[];
         fireEventOn(e: any, t: any, n: any): void;
         saveFile(e: any, t: any): void;
+        registerSwappableSections(e: any, t: any): void;
+        swapSectionIfPossible(e: any): void;
     };
 };
-declare var ne: {
+declare var te: {
     new (e: any): {
         _dom: any;
         _opts: {};
@@ -40,7 +43,7 @@ declare var ne: {
         _renderReport(e: any): any;
     };
 };
-declare var re: {
+declare var ne: {
     new (e: any, t?: {}): {
         _dom: any;
         _opts: {};
@@ -100,15 +103,15 @@ declare var re: {
         _saveFile(e: any): void;
     };
 };
-declare namespace Lt {
+declare namespace zt {
     export { At as registerLocaleData };
-    export { Ct as hasLocale };
+    export { Lt as hasLocale };
 }
-declare function kt(r: any, e?: {}): HTMLElement;
-declare function St(r: any, e: any): {
+declare function St(o: any, e?: {}): HTMLElement;
+declare function Ct(o: any, e: any): {
     lhr: any;
     missingIcuMessageIds: any[];
 };
-declare function At(r: any, e: any): void;
-declare function Ct(r: any): boolean;
-export { Y as DOM, ne as ReportRenderer, re as ReportUIFeatures, Lt as format, kt as renderReport, St as swapLocale };
+declare function At(o: any, e: any): void;
+declare function Lt(o: any): boolean;
+export { Q as DOM, te as ReportRenderer, ne as ReportUIFeatures, zt as format, St as renderReport, Ct as swapLocale };

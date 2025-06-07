@@ -23,7 +23,7 @@ const UIStrings = {
    * targets at the same time in some scenarios.
    */
   main: 'Main',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('core/sdk/ChildTargetManager.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -31,10 +31,10 @@ export class ChildTargetManager extends SDKModel<EventTypes> implements Protocol
   readonly #targetManager: TargetManager;
   #parentTarget: Target;
   readonly #targetAgent: ProtocolProxyApi.TargetApi;
-  readonly #targetInfosInternal: Map<Protocol.Target.TargetID, Protocol.Target.TargetInfo> = new Map();
-  readonly #childTargetsBySessionId: Map<Protocol.Target.SessionID, Target> = new Map();
-  readonly #childTargetsById: Map<Protocol.Target.TargetID|'main', Target> = new Map();
-  readonly #parallelConnections: Map<string, ProtocolClient.InspectorBackend.Connection> = new Map();
+  readonly #targetInfosInternal = new Map<Protocol.Target.TargetID, Protocol.Target.TargetInfo>();
+  readonly #childTargetsBySessionId = new Map<Protocol.Target.SessionID, Target>();
+  readonly #childTargetsById = new Map<Protocol.Target.TargetID|'main', Target>();
+  readonly #parallelConnections = new Map<string, ProtocolClient.InspectorBackend.Connection>();
   #parentTargetId: Protocol.Target.TargetID|null = null;
 
   constructor(parentTarget: Target) {
@@ -49,6 +49,8 @@ export class ChildTargetManager extends SDKModel<EventTypes> implements Protocol
         void browserTarget.targetAgent().invoke_autoAttachRelated(
             {targetId: parentTarget.id() as Protocol.Target.TargetID, waitForDebuggerOnStart: true});
       }
+    } else if (parentTarget.type() === Type.NODE) {
+      void this.#targetAgent.invoke_setAutoAttach({autoAttach: true, waitForDebuggerOnStart: true, flatten: false});
     } else {
       void this.#targetAgent.invoke_setAutoAttach({autoAttach: true, waitForDebuggerOnStart: true, flatten: true});
     }
@@ -99,7 +101,7 @@ export class ChildTargetManager extends SDKModel<EventTypes> implements Protocol
       if (target.targetInfo()?.subtype === 'prerender' && !targetInfo.subtype) {
         const resourceTreeModel = target.model(ResourceTreeModel);
         target.updateTargetInfo(targetInfo);
-        if (resourceTreeModel && resourceTreeModel.mainFrame) {
+        if (resourceTreeModel?.mainFrame) {
           resourceTreeModel.primaryPageChanged(resourceTreeModel.mainFrame, PrimaryPageChangeType.ACTIVATION);
         }
         target.setName(i18nString(UIStrings.main));
@@ -185,6 +187,8 @@ export class ChildTargetManager extends SDKModel<EventTypes> implements Protocol
       type = Type.ServiceWorker;
     } else if (targetInfo.type === 'auction_worklet') {
       type = Type.AUCTION_WORKLET;
+    } else if (targetInfo.type === 'node_worker') {
+      type = Type.NODE_WORKER;
     }
     const target = this.#targetManager.createTarget(
         targetInfo.targetId, targetName, type, this.#parentTarget, sessionId, undefined, undefined, targetInfo);

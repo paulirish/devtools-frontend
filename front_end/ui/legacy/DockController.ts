@@ -31,7 +31,6 @@
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
-import * as Platform from '../../core/platform/platform.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import type {ActionDelegate} from './ActionRegistration.js';
@@ -45,22 +44,6 @@ const UIStrings = {
    */
   close: 'Close',
   /**
-   *@description Text to dock the DevTools to the right of the browser tab
-   */
-  dockToRight: 'Dock to right',
-  /**
-   *@description Text to dock the DevTools to the bottom of the browser tab
-   */
-  dockToBottom: 'Dock to bottom',
-  /**
-   *@description Text to dock the DevTools to the left of the browser tab
-   */
-  dockToLeft: 'Dock to left',
-  /**
-   *@description Text to undock the DevTools
-   */
-  undockIntoSeparateWindow: 'Undock into separate window',
-  /**
    *@description Text announced when the DevTools are undocked
    */
   devtoolsUndocked: 'DevTools is undocked',
@@ -69,7 +52,7 @@ const UIStrings = {
    *@example {bottom} PH1
    */
   devToolsDockedTo: 'DevTools is docked to {PH1}',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/DockController.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 let dockControllerInstance: DockController;
@@ -80,8 +63,6 @@ export class DockController extends Common.ObjectWrapper.ObjectWrapper<EventType
   private readonly currentDockStateSetting: Common.Settings.Setting<DockState>;
   private readonly lastDockStateSetting: Common.Settings.Setting<DockState>;
   private dockSideInternal: DockState|undefined = undefined;
-  private titles?: Common.UIString.LocalizedString[];
-  private savedFocus?: Element|null;
 
   constructor(canDock: boolean) {
     super();
@@ -130,12 +111,6 @@ export class DockController extends Common.ObjectWrapper.ObjectWrapper<EventType
       return;
     }
 
-    this.titles = [
-      i18nString(UIStrings.dockToRight),
-      i18nString(UIStrings.dockToBottom),
-      i18nString(UIStrings.dockToLeft),
-      i18nString(UIStrings.undockIntoSeparateWindow),
-    ];
     this.dockSideChanged();
   }
 
@@ -175,7 +150,6 @@ export class DockController extends Common.ObjectWrapper.ObjectWrapper<EventType
       this.lastDockStateSetting.set(this.dockSideInternal);
     }
 
-    this.savedFocus = Platform.DOMUtilities.deepActiveElement(document);
     const eventData = {from: this.dockSideInternal, to: dockSide};
     this.dispatchEventToListeners(Events.BEFORE_DOCK_SIDE_CHANGED, eventData);
     console.timeStamp('DockController.setIsDocked');
@@ -189,10 +163,6 @@ export class DockController extends Common.ObjectWrapper.ObjectWrapper<EventType
 
   private setIsDockedResponse(eventData: ChangeEvent): void {
     this.dispatchEventToListeners(Events.AFTER_DOCK_SIDE_CHANGED, eventData);
-    if (this.savedFocus) {
-      (this.savedFocus as HTMLElement).focus();
-      this.savedFocus = null;
-    }
   }
 
   toggleDockSide(): void {

@@ -7,7 +7,6 @@ export const enum FormatterActions {
   PARSE_CSS = 'parseCSS',
   JAVASCRIPT_SUBSTITUTE = 'javaScriptSubstitute',
   JAVASCRIPT_SCOPE_TREE = 'javaScriptScopeTree',
-  EVALUATE_JAVASCRIPT_SUBSTRING = 'evaluatableJavaScriptSubstring',
 }
 
 export const enum FormattableMediaTypes {
@@ -46,7 +45,7 @@ export const enum DefinitionKind {
 }
 
 export interface ScopeTreeNode {
-  variables: {name: string, kind: DefinitionKind, offsets: number[]}[];
+  variables: Array<{name: string, kind: DefinitionKind, offsets: number[]}>;
   start: number;
   end: number;
   children: ScopeTreeNode[];

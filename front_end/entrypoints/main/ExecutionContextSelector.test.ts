@@ -30,7 +30,7 @@ describeWithMockConnection('ExecutionContextSelector', () => {
 
     const contextSetFlavor = sinon.spy(UI.Context.Context.instance(), 'setFlavor');
 
-    const sentExecutionContextCreated = (target: SDK.Target.Target, includeFrameId: boolean = true) => {
+    const sentExecutionContextCreated = (target: SDK.Target.Target, includeFrameId = true) => {
       const frameId = includeFrameId ? getMainFrame(target).id : undefined;
 
       const runtimeModel = target.model(SDK.RuntimeModel.RuntimeModel);
@@ -40,25 +40,25 @@ describeWithMockConnection('ExecutionContextSelector', () => {
     };
 
     sentExecutionContextCreated(subframeTarget);
-    assert.isTrue(contextSetFlavor.called);
+    sinon.assert.called(contextSetFlavor);
 
     contextSetFlavor.resetHistory();
     sentExecutionContextCreated(subframeTarget);
-    assert.isTrue(contextSetFlavor.notCalled);
+    sinon.assert.notCalled(contextSetFlavor);
 
     sentExecutionContextCreated(mainFrameTarget);
-    assert.isTrue(contextSetFlavor.called);
+    sinon.assert.called(contextSetFlavor);
 
     contextSetFlavor.resetHistory();
     sentExecutionContextCreated(prerenderTarget);
-    assert.isFalse(contextSetFlavor.called);
+    sinon.assert.notCalled(contextSetFlavor);
 
     contextSetFlavor.resetHistory();
     sentExecutionContextCreated(serviceWorkerTarget, /* includeFrameId */ false);
-    assert.isFalse(contextSetFlavor.called);
+    sinon.assert.notCalled(contextSetFlavor);
 
     contextSetFlavor.resetHistory();
     sentExecutionContextCreated(workerTarget, /* includeFrameId */ false);
-    assert.isFalse(contextSetFlavor.called);
+    sinon.assert.notCalled(contextSetFlavor);
   });
 });

@@ -1,16 +1,17 @@
 // Copyright (c) 2020 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import '../../components/icon_button/icon_button.js';
 
 import type * as IconButton from '../../components/icon_button/icon_button.js';
-import * as LitHtml from '../../lit-html/lit-html.js';
+import * as Lit from '../../lit/lit.js';
 
 import markdownImageStyles from './markdownImage.css.js';
 import {getMarkdownImage, type ImageData} from './MarkdownImagesMap.js';
 
-const {html, Directives: {ifDefined}} = LitHtml;
+const {html, Directives: {ifDefined}} = Lit;
 
 export interface MarkdownImageData {
   key: string;
@@ -28,10 +29,6 @@ export class MarkdownImage extends HTMLElement {
   #imageData?: ImageData;
   #imageTitle?: string;
 
-  connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [markdownImageStyles];
-  }
-
   set data(data: MarkdownImageData) {
     const {key, title} = data;
     const markdownImage = getMarkdownImage(key);
@@ -40,7 +37,7 @@ export class MarkdownImage extends HTMLElement {
     this.#render();
   }
 
-  #getIconComponent(): LitHtml.TemplateResult {
+  #getIconComponent(): Lit.TemplateResult {
     if (!this.#imageData) {
       return html``;
     }
@@ -50,7 +47,7 @@ export class MarkdownImage extends HTMLElement {
     `;
   }
 
-  #getImageComponent(): LitHtml.TemplateResult {
+  #getImageComponent(): Lit.TemplateResult {
     if (!this.#imageData) {
       return html``;
     }
@@ -66,7 +63,12 @@ export class MarkdownImage extends HTMLElement {
     }
     const {isIcon} = this.#imageData;
     const imageComponent = isIcon ? this.#getIconComponent() : this.#getImageComponent();
-    LitHtml.render(imageComponent, this.#shadow, {host: this});
+    Lit.render(
+        html`
+      <style>${markdownImageStyles}</style>
+      ${imageComponent}
+    `,
+        this.#shadow, {host: this});
   }
 }
 

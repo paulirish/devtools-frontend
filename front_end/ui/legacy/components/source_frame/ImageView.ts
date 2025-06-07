@@ -1,6 +1,7 @@
 // Copyright 2021 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 /*
  * Copyright (C) 2007, 2008 Apple Inc.  All rights reserved.
@@ -39,7 +40,22 @@ import * as Workspace from '../../../../models/workspace/workspace.js';
 import * as VisualLogging from '../../../visual_logging/visual_logging.js';
 import * as UI from '../../legacy.js';
 
-import imageViewStyles from './imageView.css.legacy.js';
+import imageViewStyles from './imageView.css.js';
+
+declare global {
+  interface FileSystemWritableFileStream extends WritableStream {
+    write(data: unknown): Promise<void>;
+    close(): Promise<void>;
+  }
+
+  interface FileSystemHandle {
+    createWritable(): Promise<FileSystemWritableFileStream>;
+  }
+
+  interface Window {
+    showSaveFilePicker(opts: unknown): Promise<FileSystemHandle>;
+  }
+}
 
 const UIStrings = {
   /**
@@ -76,18 +92,18 @@ const UIStrings = {
   /**
    *@description A context menu item in the Image Preview
    */
-  saveImageAs: 'Save image as...',
+  saveImageAs: 'Save image as…',
   /**
    *@description The default file name when downloading a file
    */
   download: 'download',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/components/source_frame/ImageView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export class ImageView extends UI.View.SimpleView {
   private url: Platform.DevToolsPath.UrlString;
   private parsedURL: Common.ParsedURL.ParsedURL;
-  private readonly mimeType: string;
+
   private readonly contentProvider: TextUtils.ContentProvider.ContentProvider;
   private uiSourceCode: Workspace.UISourceCode.UISourceCode|null;
   private readonly sizeLabel: UI.Toolbar.ToolbarText;
@@ -105,11 +121,8 @@ export class ImageView extends UI.View.SimpleView {
     this.element.setAttribute('jslog', `${VisualLogging.pane('image-view')}`);
     this.url = contentProvider.contentURL();
     this.parsedURL = new Common.ParsedURL.ParsedURL(this.url);
-    this.mimeType = mimeType;
     this.contentProvider = contentProvider;
-    this.uiSourceCode = contentProvider instanceof Workspace.UISourceCode.UISourceCode ?
-        contentProvider as Workspace.UISourceCode.UISourceCode :
-        null;
+    this.uiSourceCode = contentProvider instanceof Workspace.UISourceCode.UISourceCode ? contentProvider : null;
     if (this.uiSourceCode) {
       this.uiSourceCode.addEventListener(
           Workspace.UISourceCode.Events.WorkingCopyCommitted, this.workingCopyCommitted, this);
@@ -215,17 +228,30 @@ export class ImageView extends UI.View.SimpleView {
       return;
     }
 
-    const link = document.createElement('a');
-    link.href = imageDataURL;
+    let suggestedName = '';
+    if (this.parsedURL.isDataURL()) {
+      suggestedName = i18nString(UIStrings.download);
+      const {type, subtype} = this.parsedURL.extractDataUrlMimeType();
+      if (type === 'image' && subtype) {
+        suggestedName += '.' + subtype;
+      }
+    } else {
+      suggestedName = decodeURIComponent(this.parsedURL.displayName);
+    }
 
-    // If it is a Base64 image, set a default file name.
-    // When chrome saves a file, the file name characters that are not supported
-    // by the OS will be replaced automatically. For example, in the Mac,
-    // `:` it will be replaced with `_`.
-    link.download =
-        this.parsedURL.isDataURL() ? i18nString(UIStrings.download) : decodeURIComponent(this.parsedURL.displayName);
-    link.click();
-    link.remove();
+    const blob = await fetch(imageDataURL).then(r => r.blob());
+    try {
+      const handle = await window.showSaveFilePicker({suggestedName});
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+    } catch (error) {
+      // If the user aborts the action no need to report it, otherwise do.
+      if (error.name === 'AbortError') {
+        return;
+      }
+      throw error;
+    }
   }
 
   private openInNewTab(): void {

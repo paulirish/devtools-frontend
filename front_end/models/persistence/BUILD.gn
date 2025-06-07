@@ -18,6 +18,8 @@ generate_css("css_files") {
 devtools_module("persistence") {
   sources = [
     "Automapping.ts",
+    "AutomaticFileSystemManager.ts",
+    "AutomaticFileSystemWorkspaceBinding.ts",
     "EditFileSystemView.ts",
     "FileSystemWorkspaceBinding.ts",
     "IsolatedFileSystem.ts",
@@ -39,11 +41,14 @@ devtools_module("persistence") {
     "../../generated:protocol",
     "../../models/bindings:bundle",
     "../../models/breakpoints:bundle",
+    "../../models/project_settings:bundle",
     "../../models/text_utils:bundle",
     "../../models/workspace:bundle",
     "../../ui/components/cards:bundle",
     "../../ui/legacy:bundle",
+    "../../ui/legacy/components/data_grid:bundle",
     "../../ui/legacy/components/utils:bundle",
+    "../../ui/lit:bundle",
   ]
 }
 
@@ -59,6 +64,8 @@ devtools_entrypoint("bundle") {
     ":*",
     "../../core/sdk:unittests",
     "../../entrypoints/main/*",
+    "../../panels/ai_assistance/*",
+    "../../panels/changes/*",
     "../../panels/network/*",
     "../../panels/recorder/*",
     "../../panels/snippets/*",
@@ -92,10 +99,14 @@ ts_library("unittests") {
   testonly = true
 
   sources = [
+    "AutomaticFileSystemManager.test.ts",
+    "AutomaticFileSystemWorkspaceBinding.test.ts",
+    "EditFileSystemView.test.ts",
     "NetworkPersistenceManager.test.ts",
     "PersistenceAction.test.ts",
     "PersistenceImpl.test.ts",
     "PlatformFileSystem.test.ts",
+    "WorkspaceSettingsTab.test.ts",
   ]
 
   deps = [

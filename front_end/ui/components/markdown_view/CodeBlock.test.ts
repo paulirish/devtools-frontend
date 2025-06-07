@@ -6,7 +6,6 @@ import * as Host from '../../../core/host/host.js';
 import {
   dispatchClickEvent,
   renderElementIntoDOM,
-  resetTestDOM,
 } from '../../../testing/DOMHelpers.js';
 import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
 
@@ -32,7 +31,7 @@ describeWithEnvironment('CodeBlock', () => {
         bubbles: true,
         composed: true,
       });
-      assert.isTrue(copyText.calledWith('test'));
+      sinon.assert.calledWith(copyText, 'test');
 
       clock.tick(100);
       let buttonContainer = component.shadowRoot!.querySelector('.copy-button-container');
@@ -44,33 +43,50 @@ describeWithEnvironment('CodeBlock', () => {
       assert.strictEqual(buttonContainer.textContent?.trim(), '');
     } finally {
       clock.restore();
-      resetTestDOM();
     }
   });
 
   it('renders no legal notice by default', () => {
-    try {
-      const component = new MarkdownView.CodeBlock.CodeBlock();
-      component.code = 'test';
-      renderElementIntoDOM(component);
-      const notice = component.shadowRoot!.querySelector('.notice') as HTMLElement;
-      assert(notice === null, '.notice was found');
-    } finally {
-      resetTestDOM();
-    }
+    const component = new MarkdownView.CodeBlock.CodeBlock();
+    component.code = 'test';
+    renderElementIntoDOM(component);
+    const notice = component.shadowRoot!.querySelector('.notice') as HTMLElement;
+    assert.isNull(notice, '.notice was found');
   });
 
   it('renders legal notice if configured', () => {
-    try {
-      const component = new MarkdownView.CodeBlock.CodeBlock();
-      component.code = 'test';
-      component.displayNotice = true;
-      renderElementIntoDOM(component);
-      const notice = component.shadowRoot!.querySelector('.notice') as HTMLElement;
-      assert.exists(notice);
-      assert.strictEqual(notice!.innerText, 'Use code snippets with caution');
-    } finally {
-      resetTestDOM();
-    }
+    const component = new MarkdownView.CodeBlock.CodeBlock();
+    component.code = 'test';
+    component.displayNotice = true;
+    renderElementIntoDOM(component);
+    const notice = component.shadowRoot!.querySelector('.notice') as HTMLElement;
+    assert.exists(notice);
+    assert.strictEqual(notice.innerText, 'Use code snippets with caution');
+  });
+
+  it('renders citations', () => {
+    const handler1 = sinon.spy();
+    const handler2 = sinon.spy();
+    const component = new MarkdownView.CodeBlock.CodeBlock();
+    component.code = 'test';
+    component.citations = [
+      {
+        index: 1,
+        clickHandler: handler1,
+      },
+      {
+        index: 2,
+        clickHandler: handler2,
+      },
+    ];
+    renderElementIntoDOM(component);
+    const citations = component.shadowRoot!.querySelectorAll('button.citation');
+    assert.lengthOf(citations, 2);
+    assert.strictEqual(citations[0].textContent, '[1]');
+    assert.strictEqual(citations[1].textContent, '[2]');
+    (citations[0] as HTMLElement).click();
+    sinon.assert.calledOnce(handler1);
+    (citations[1] as HTMLElement).click();
+    sinon.assert.calledOnce(handler2);
   });
 });

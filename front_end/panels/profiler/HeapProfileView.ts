@@ -1,6 +1,7 @@
 // Copyright 2016 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -102,7 +103,7 @@ const UIStrings = {
    *@description Text for web URLs
    */
   url: 'URL',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/profiler/HeapProfileView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 function convertToSamplingHeapProfile(profileHeader: SamplingHeapProfileHeader):
@@ -169,7 +170,7 @@ export class HeapProfileView extends ProfileView implements UI.SearchableView.Se
   }
 
   setSelectionRange(minId: number, maxId: number): void {
-    const profileData = convertToSamplingHeapProfile((this.profileHeader as SamplingHeapProfileHeader));
+    const profileData = convertToSamplingHeapProfile((this.profileHeader));
     const profile = new SamplingHeapProfileModel(profileData, minId, maxId);
     this.adjustedTotal = profile.total;
     this.setProfile(profile);
@@ -263,12 +264,12 @@ export class SamplingHeapProfileTypeBase extends
     if (this.recording) {
       void this.stopRecordingProfile();
     } else {
-      this.startRecordingProfile();
+      void this.startRecordingProfile();
     }
     return this.recording;
   }
 
-  startRecordingProfile(): void {
+  async startRecordingProfile(): Promise<void> {
     const heapProfilerModel = UI.Context.Context.instance().flavor(SDK.HeapProfilerModel.HeapProfilerModel);
     if (this.profileBeingRecorded() || !heapProfilerModel) {
       return;
@@ -282,13 +283,19 @@ export class SamplingHeapProfileTypeBase extends
     UI.InspectorView.InspectorView.instance().setPanelWarnings('heap-profiler', warnings);
 
     this.recording = true;
+    const target = heapProfilerModel.target();
+    const animationModel = target.model(SDK.AnimationModel.AnimationModel);
+    if (animationModel) {
+      // TODO(b/406904348): Remove this once we correctly release animations on the backend.
+      await animationModel.releaseAllAnimations();
+    }
     this.startSampling();
   }
 
   async stopRecordingProfile(): Promise<void> {
     this.recording = false;
     const recordedProfile = this.profileBeingRecorded();
-    if (!recordedProfile || !recordedProfile.heapProfilerModel()) {
+    if (!recordedProfile?.heapProfilerModel()) {
       return;
     }
 
@@ -325,11 +332,11 @@ export class SamplingHeapProfileTypeBase extends
   }
 
   startSampling(): void {
-    throw 'Not implemented';
+    throw new Error('Not implemented');
   }
 
   stopSampling(): Promise<Protocol.HeapProfiler.SamplingHeapProfile> {
-    throw 'Not implemented';
+    throw new Error('Not implemented');
   }
 }
 
@@ -461,7 +468,7 @@ export class SamplingHeapProfileHeader extends WritableProfileHeader {
       heapProfilerModel: SDK.HeapProfilerModel.HeapProfilerModel|null, type: SamplingHeapProfileTypeBase,
       title?: string) {
     super(
-        heapProfilerModel && heapProfilerModel.debuggerModel(), type,
+        heapProfilerModel?.debuggerModel() ?? null, type,
         title || i18nString(UIStrings.profileD, {PH1: type.nextProfileUid()}));
     this.heapProfilerModelInternal = heapProfilerModel;
     this.protocolProfileInternal = {
@@ -680,10 +687,10 @@ export class HeapFlameChartDataProvider extends ProfileFlameChartDataProvider {
     if (!node) {
       return null;
     }
-    const popoverInfo: {
+    const popoverInfo: Array<{
       title: string,
       value: string,
-    }[] = [];
+    }> = [];
     function pushRow(title: string, value: string): void {
       popoverInfo.push({title, value});
     }

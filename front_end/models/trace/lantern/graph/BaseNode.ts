@@ -132,6 +132,7 @@ class BaseNode<T = Lantern.AnyNetworkObject> {
     this.dependencies.splice(this.dependencies.indexOf(node), 1);
   }
 
+  // Unused in devtools, but used in LH.
   removeAllDependencies(): void {
     for (const node of this.dependencies.slice()) {
       this.removeDependency(node);
@@ -179,7 +180,7 @@ class BaseNode<T = Lantern.AnyNetworkObject> {
    * node this was called on is not included in the resulting filtered graph, the method will throw.
    *
    * This does not clone NetworkNode's `record` or `rawRecord` fields. It may be reasonable to clone the former,
-   * to assist in graph construction, but the latter should never be cloned as one contraint of Lantern is that
+   * to assist in graph construction, but the latter should never be cloned as one constraint of Lantern is that
    * the underlying data records are accessible for plain object reference equality checks.
    */
   cloneWithRelationships(predicate?: (arg0: Node) => boolean): Node {
@@ -240,8 +241,9 @@ class BaseNode<T = Lantern.AnyNetworkObject> {
    * The `getNextNodes` function takes a visited node and returns which nodes to
    * visit next. It defaults to returning the node's dependents.
    */
-  traverse(callback: (node: Node<T>, traversalPath: Node<T>[]) => void, getNextNodes?: (arg0: Node<T>) => Node<T>[]):
-      void {
+  traverse(
+      callback: (node: Node<T>, traversalPath: Array<Node<T>>) => void,
+      getNextNodes?: (arg0: Node<T>) => Array<Node<T>>): void {
     for (const {node, traversalPath} of this.traverseGenerator(getNextNodes)) {
       callback(node, traversalPath);
     }
@@ -280,12 +282,15 @@ class BaseNode<T = Lantern.AnyNetworkObject> {
   }
 
   /**
-   * Returns whether the given node has a cycle in its dependent graph by performing a DFS.
+   * If the given node has a cycle, returns a path representing that cycle.
+   * Else returns null.
+   *
+   * Does a DFS on in its dependent graph.
    */
-  static hasCycle(node: Node, direction: 'dependents'|'dependencies'|'both' = 'both'): boolean {
+  static findCycle(node: Node, direction: 'dependents'|'dependencies'|'both' = 'both'): BaseNode[]|null {
     // Checking 'both' is the default entrypoint to recursively check both directions
     if (direction === 'both') {
-      return BaseNode.hasCycle(node, 'dependents') || BaseNode.hasCycle(node, 'dependencies');
+      return BaseNode.findCycle(node, 'dependents') || BaseNode.findCycle(node, 'dependencies');
     }
 
     const visited = new Set();
@@ -301,7 +306,7 @@ class BaseNode<T = Lantern.AnyNetworkObject> {
 
       // We've hit a cycle if the node we're visiting is in our current dependency path
       if (currentPath.includes(currentNode)) {
-        return true;
+        return currentPath;
       }
       // If we've already visited the node, no need to revisit it
       if (visited.has(currentNode)) {
@@ -329,7 +334,7 @@ class BaseNode<T = Lantern.AnyNetworkObject> {
       }
     }
 
-    return false;
+    return null;
   }
 
   canDependOn(node: Node): boolean {

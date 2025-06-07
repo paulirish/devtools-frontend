@@ -10,9 +10,10 @@ import("../scripts/build/typescript/typescript.gni")
 
 group("front_end") {
   public_deps = [
+    ":color_tokens",
+    ":devtools_json",
     ":embedder-scripts",
     ":html_entrypoints",
-    ":integration_test_runner",
     "Images",
     "core/i18n/locales",
     "entrypoints/device_mode_emulation_frame",
@@ -28,21 +29,40 @@ group("front_end") {
     "entrypoints/shell",
     "entrypoints/wasmparser_worker:worker_entrypoint",
     "entrypoints/worker_app:entrypoint",
-    "legacy_test_runner",
     "third_party/vscode.web-custom-data:web_custom_data",
   ]
 }
 
-copy_to_gen("integration_test_runner-gen") {
+copy_to_gen_with_grd("color_tokens") {
+  sources = [
+    "application_tokens.css",
+    "design_system_tokens.css",
+  ]
+}
+
+copy_to_gen("integration_test_runner") {
   sources = [ "integration_test_runner.html" ]
 }
 
-group("integration_test_runner") {
-  public_deps = [ ":integration_test_runner-gen" ]
+group("web_test_resources") {
+  public_deps = [
+    ":integration_test_runner",
+    "legacy_test_runner",
+  ]
   data_deps = public_deps
-  metadata = {
-    grd_files = get_target_outputs(":integration_test_runner-gen")
-  }
+}
+
+node_action("devtools_json") {
+  inputs = []
+
+  script = "scripts/build/generate_devtools_json.js"
+
+  args = [ rebase_path(
+          "$target_gen_dir/.well-known/appspecific/com.chrome.devtools.json",
+          root_build_dir) ]
+
+  outputs =
+      [ "$target_gen_dir/.well-known/appspecific/com.chrome.devtools.json" ]
 }
 
 node_action("html_entrypoints") {
@@ -81,19 +101,11 @@ node_action("html_entrypoints") {
   }
 }
 
-copy_to_gen("embedder-scripts-gen") {
+copy_to_gen_with_grd("embedder-scripts") {
   sources = [
     "Tests.js",
     "devtools_compatibility.js",
   ]
-}
-
-group("embedder-scripts") {
-  public_deps = [ ":embedder-scripts-gen" ]
-  data_deps = public_deps
-  metadata = {
-    grd_files = get_target_outputs(":embedder-scripts-gen")
-  }
 }
 
 group("unittests") {
@@ -113,6 +125,7 @@ group("unittests") {
     "entrypoints/inspector_main:unittests",
     "entrypoints/main:unittests",
     "entrypoints/wasmparser_worker:unittests",
+    "models/ai_assistance:unittests",
     "models/autofill_manager:unittests",
     "models/bindings:unittests",
     "models/breakpoints:unittests",
@@ -127,6 +140,7 @@ group("unittests") {
     "models/javascript_metadata:unittests",
     "models/logs:unittests",
     "models/persistence:unittests",
+    "models/project_settings:unittests",
     "models/source_map_scopes:unittests",
     "models/text_utils:unittests",
     "models/trace:unittests",
@@ -138,7 +152,6 @@ group("unittests") {
     "models/trace/lantern/graph:unittests",
     "models/trace/lantern/metrics:unittests",
     "models/trace/lantern/simulation:unittests",
-    "models/trace/root-causes:unittests",
     "models/trace/types:unittests",
     "models/workspace:unittests",
     "models/workspace_diff:unittests",
@@ -159,6 +172,7 @@ group("unittests") {
     "panels/developer_resources:unittests",
     "panels/elements:unittests",
     "panels/emulation:unittests",
+    "panels/event_listeners:unittests",
     "panels/explain:unittests",
     "panels/issues:unittests",
     "panels/layer_viewer:unittests",
@@ -171,6 +185,7 @@ group("unittests") {
     "panels/network:unittests",
     "panels/network/components:unittests",
     "panels/performance_monitor:unittests",
+    "panels/profiler:unittests",
     "panels/protocol_monitor:unittests",
     "panels/recorder:unittests",
     "panels/recorder/components:unittests",
@@ -210,7 +225,6 @@ group("unittests") {
     "ui/components/cards:unittests",
     "ui/components/chrome_link:unittests",
     "ui/components/code_highlighter:unittests",
-    "ui/components/data_grid:unittests",
     "ui/components/dialogs:unittests",
     "ui/components/diff_view:unittests",
     "ui/components/expandable_list:unittests",
@@ -227,11 +241,12 @@ group("unittests") {
     "ui/components/report_view:unittests",
     "ui/components/request_link_icon:unittests",
     "ui/components/settings:unittests",
-    "ui/components/split_view:unittests",
+    "ui/components/snackbars:unittests",
     "ui/components/survey_link:unittests",
     "ui/components/switch:unittests",
     "ui/components/text_editor:unittests",
     "ui/components/text_prompt:unittests",
+    "ui/components/tooltips:unittests",
     "ui/components/tree_outline:unittests",
     "ui/legacy:copy_stylesheets_for_server",
     "ui/legacy:unittests",
@@ -244,7 +259,7 @@ group("unittests") {
     "ui/legacy/components/source_frame:unittests",
     "ui/legacy/components/utils:unittests",
     "ui/legacy/theme_support:unittests",
-    "ui/lit-html:unittests",
+    "ui/lit:unittests",
     "ui/visual_logging:unittests",
   ]
 }

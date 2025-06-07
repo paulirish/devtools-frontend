@@ -52,7 +52,7 @@ const UIStrings = {
    *@description Title of a setting under the Persistence category that can be invoked through the Command Menu
    */
   disableOverrideNetworkRequests: 'Disable override network requests',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('models/persistence/persistence-meta.ts', UIStrings);
 const i18nLazyString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined, str_);
 

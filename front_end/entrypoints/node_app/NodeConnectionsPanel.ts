@@ -1,6 +1,7 @@
 // Copyright 2015 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import type * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
@@ -33,7 +34,7 @@ const UIStrings = {
    *@description Text in Node Connections Panel of the Sources panel when debugging a Node.js app
    */
   networkAddressEgLocalhost: 'Network address (e.g. localhost:9229)',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('entrypoints/node_app/NodeConnectionsPanel.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -75,7 +76,7 @@ export class NodeConnectionsPanel extends UI.Panel.Panel {
   }
   override wasShown(): void {
     super.wasShown();
-    this.registerCSSFiles([nodeConnectionsPanelStyles]);
+    this.registerRequiredCSS(nodeConnectionsPanelStyles);
   }
 }
 
@@ -83,9 +84,9 @@ export class NodeConnectionsView extends UI.Widget.VBox implements UI.ListWidget
   readonly #callback: (arg0: Adb.NetworkDiscoveryConfig) => void;
   readonly #list: UI.ListWidget.ListWidget<Adb.PortForwardingRule>;
   #editor: UI.ListWidget.Editor<Adb.PortForwardingRule>|null;
-  #networkDiscoveryConfig: {
+  #networkDiscoveryConfig: Array<{
     address: string,
-  }[];
+  }>;
   constructor(callback: (arg0: Adb.NetworkDiscoveryConfig) => void) {
     super();
     this.#callback = callback;
@@ -99,7 +100,7 @@ export class NodeConnectionsView extends UI.Widget.VBox implements UI.ListWidget
         i18n.i18n.getFormatLocalizedString(str_, UIStrings.specifyNetworkEndpointAnd, {PH1: documentationLink}));
 
     this.#list = new UI.ListWidget.ListWidget(this);
-
+    this.#list.registerRequiredCSS(nodeConnectionsPanelStyles);
     this.#list.element.classList.add('network-discovery-list');
     const placeholder = document.createElement('div');
     placeholder.classList.add('network-discovery-list-empty');
@@ -144,7 +145,7 @@ export class NodeConnectionsView extends UI.Widget.VBox implements UI.ListWidget
     return element;
   }
 
-  removeItemRequested(rule: Adb.PortForwardingRule, index: number): void {
+  removeItemRequested(_rule: Adb.PortForwardingRule, index: number): void {
     this.#networkDiscoveryConfig.splice(index, 1);
     this.#list.removeItem(index);
     this.#update();
@@ -193,9 +194,5 @@ export class NodeConnectionsView extends UI.Widget.VBox implements UI.ListWidget
         errorMessage: undefined,
       };
     }
-  }
-  override wasShown(): void {
-    super.wasShown();
-    this.#list.registerCSSFiles([nodeConnectionsPanelStyles]);
   }
 }

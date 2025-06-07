@@ -1,19 +1,20 @@
 // Copyright 2023 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Platform from '../../../core/platform/platform.js';
 import * as WindowBoundsService from '../../../services/window_bounds/window_bounds.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
 import * as RenderCoordinator from '../../../ui/components/render_coordinator/render_coordinator.js';
-import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import * as Lit from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 import * as Buttons from '../buttons/buttons.js';
 
 import dialogStyles from './dialog.css.js';
 
-const {html} = LitHtml;
+const {html} = Lit;
 
 const UIStrings = {
 
@@ -21,7 +22,7 @@ const UIStrings = {
    * @description Title of close button for the shortcuts dialog.
    */
   close: 'Close',
-};
+} as const;
 
 const str_ = i18n.i18n.registerUIStrings('ui/components/dialogs/Dialog.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -107,7 +108,6 @@ export const MODAL = 'MODAL';
 export type DialogOrigin = DialogAnchor|null|(() => DialogAnchor)|typeof MODAL;
 export class Dialog extends HTMLElement {
   readonly #shadow = this.attachShadow({mode: 'open'});
-  readonly #renderBound = this.#render.bind(this);
   readonly #forceDialogCloseInDevToolsBound = this.#forceDialogCloseInDevToolsMutation.bind(this);
   readonly #handleScrollAttemptBound = this.#handleScrollAttempt.bind(this);
   readonly #props: DialogData = {
@@ -237,12 +237,10 @@ export class Dialog extends HTMLElement {
   }
 
   #onStateChange(): void {
-    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#renderBound);
+    void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
   connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [dialogStyles];
-
     window.addEventListener('resize', this.#forceDialogCloseInDevToolsBound);
     this.#devtoolsMutationObserver.observe(this.#devToolsBoundingElement, {childList: true, subtree: true});
     this.#devToolsBoundingElement.addEventListener('wheel', this.#handleScrollAttemptBound);
@@ -311,6 +309,10 @@ export class Dialog extends HTMLElement {
       return;
     }
     this.dispatchEvent(new ClickOutsideDialogEvent());
+  }
+
+  #animationEndedEvent(): void {
+    this.dispatchEvent(new AnimationEndedEvent());
   }
 
   #mouseEventWasInDialogContent(evt: MouseEvent): boolean {
@@ -611,7 +613,7 @@ export class Dialog extends HTMLElement {
     return this.#dialogClientRect;
   }
 
-  #renderHeaderRow(): LitHtml.TemplateResult|null {
+  #renderHeaderRow(): Lit.TemplateResult|null {
     // If the title is empty and close button is false, let's skip the header row.
     if (!this.#props.dialogTitle && !this.#props.closeButton) {
       return null;
@@ -627,10 +629,11 @@ export class Dialog extends HTMLElement {
               variant: Buttons.Button.Variant.TOOLBAR,
               iconName: 'cross',
               title: i18nString(UIStrings.close),
+              size: Buttons.Button.Size.SMALL,
             } as Buttons.Button.ButtonData}
             jslog=${VisualLogging.close().track({click: true})}
           ></devtools-button>
-        ` : LitHtml.nothing}
+        ` : Lit.nothing}
     `;
     // clang-format on
   }
@@ -643,7 +646,7 @@ export class Dialog extends HTMLElement {
     if (!IS_DIALOG_SUPPORTED) {
       // To make sure that light dom content passed into this component doesn't show up,
       // we have to explicitly render a slot and hide it with CSS.
-      LitHtml.render(
+      Lit.render(
           // clang-format off
       html`
         <slot></slot>
@@ -653,8 +656,9 @@ export class Dialog extends HTMLElement {
     }
 
     // clang-format off
-    LitHtml.render(html`
-      <dialog @click=${this.#handlePointerEvent} @pointermove=${this.#handlePointerEvent} @cancel=${this.#onCancel}
+    Lit.render(html`
+      <style>${dialogStyles}</style>
+      <dialog @click=${this.#handlePointerEvent} @pointermove=${this.#handlePointerEvent} @cancel=${this.#onCancel} @animationend=${this.#animationEndedEvent}
               jslog=${VisualLogging.dialog(this.#props.jslogContext).track({resize: true, keydown: 'Escape'}).parent('mapped')}>
         <div id="content">
           <div class="dialog-header">${this.#renderHeaderRow()}</div>
@@ -690,6 +694,14 @@ export class ClickOutsideDialogEvent extends Event {
 
   constructor() {
     super(ClickOutsideDialogEvent.eventName, {bubbles: true, composed: true});
+  }
+}
+
+export class AnimationEndedEvent extends Event {
+  static readonly eventName = 'animationended';
+
+  constructor() {
+    super(AnimationEndedEvent.eventName, {bubbles: true, composed: true});
   }
 }
 

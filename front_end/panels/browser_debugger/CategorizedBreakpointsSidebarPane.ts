@@ -1,6 +1,7 @@
 // Copyright (c) 2015 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
@@ -120,7 +121,7 @@ const UIStrings = {
    *@description Text that appears on a button for the xhr resource type filter.
    */
   xhr: 'XHR',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/browser_debugger/CategorizedBreakpointsSidebarPane.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 const i18nLazyString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined, str_);
@@ -137,6 +138,7 @@ export abstract class CategorizedBreakpointsSidebarPane extends UI.Widget.VBox {
       detailsPausedReason: Protocol.Debugger.PausedEventReason) {
     super(true);
     this.#categoriesTreeOutline = new UI.TreeOutline.TreeOutlineInShadow();
+    this.#categoriesTreeOutline.registerRequiredCSS(categorizedBreakpointsSidebarPaneStyles);
 
     this.#categoriesTreeOutline.setShowSelectionOnKeyboardFocus(/* show */ true);
     this.contentElement.appendChild(this.#categoriesTreeOutline.element);
@@ -196,15 +198,15 @@ export abstract class CategorizedBreakpointsSidebarPane extends UI.Widget.VBox {
   private createCategory(name: SDK.CategorizedBreakpoint.Category): void {
     const labelNode =
         UI.UIUtils.CheckboxLabel.create(getLocalizedCategory(name), undefined, undefined, name, /* small */ true);
-    labelNode.checkboxElement.addEventListener('click', this.categoryCheckboxClicked.bind(this, name), true);
-    labelNode.checkboxElement.tabIndex = -1;
+    labelNode.addEventListener('click', this.categoryCheckboxClicked.bind(this, name), true);
+    labelNode.tabIndex = -1;
 
     const treeElement = new UI.TreeOutline.TreeElement(labelNode, undefined, name);
     treeElement.listItemElement.addEventListener('keydown', event => {
       this.handleSpaceKeyEventOnBreakpoint(event, this.#categories.get(name));
     });
 
-    labelNode.checkboxElement.addEventListener('keydown', event => {
+    labelNode.addEventListener('keydown', event => {
       treeElement.listItemElement.focus();
       this.handleSpaceKeyEventOnBreakpoint(event, this.#categories.get(name));
     });
@@ -212,16 +214,16 @@ export abstract class CategorizedBreakpointsSidebarPane extends UI.Widget.VBox {
     UI.ARIAUtils.setChecked(treeElement.listItemElement, false);
     this.#categoriesTreeOutline.appendChild(treeElement);
 
-    this.#categories.set(name, {element: treeElement, checkbox: labelNode.checkboxElement});
+    this.#categories.set(name, {element: treeElement, checkbox: labelNode});
   }
 
   protected createBreakpoint(breakpoint: SDK.CategorizedBreakpoint.CategorizedBreakpoint): void {
     const labelNode = UI.UIUtils.CheckboxLabel.create(
         Sources.CategorizedBreakpointL10n.getLocalizedBreakpointName(breakpoint.name), undefined, undefined,
         Platform.StringUtilities.toKebabCase(breakpoint.name), /* small */ true);
-    labelNode.classList.add('source-code');
-    labelNode.checkboxElement.addEventListener('click', this.breakpointCheckboxClicked.bind(this, breakpoint), true);
-    labelNode.checkboxElement.tabIndex = -1;
+    labelNode.classList.add('source-code', 'breakpoint');
+    labelNode.addEventListener('click', this.breakpointCheckboxClicked.bind(this, breakpoint), true);
+    labelNode.tabIndex = -1;
 
     const treeElement =
         new UI.TreeOutline.TreeElement(labelNode, undefined, Platform.StringUtilities.toKebabCase(breakpoint.name));
@@ -229,7 +231,7 @@ export abstract class CategorizedBreakpointsSidebarPane extends UI.Widget.VBox {
       this.handleSpaceKeyEventOnBreakpoint(event, this.#breakpoints.get(breakpoint));
     });
 
-    labelNode.checkboxElement.addEventListener('keydown', event => {
+    labelNode.addEventListener('keydown', event => {
       treeElement.listItemElement.focus();
       this.handleSpaceKeyEventOnBreakpoint(event, this.#breakpoints.get(breakpoint));
     });
@@ -241,7 +243,7 @@ export abstract class CategorizedBreakpointsSidebarPane extends UI.Widget.VBox {
       category.element.appendChild(treeElement);
     }
     // Better to return that to produce a side-effect
-    this.#breakpoints.set(breakpoint, {element: treeElement, checkbox: labelNode.checkboxElement});
+    this.#breakpoints.set(breakpoint, {element: treeElement, checkbox: labelNode});
   }
 
   protected getBreakpointFromPausedDetails(_details: SDK.DebuggerModel.DebuggerPausedDetails):
@@ -340,14 +342,10 @@ export abstract class CategorizedBreakpointsSidebarPane extends UI.Widget.VBox {
       UI.ARIAUtils.setChecked(category.element.listItemElement, hasEnabled);
     }
   }
-  override wasShown(): void {
-    super.wasShown();
-    this.#categoriesTreeOutline.registerCSSFiles([categorizedBreakpointsSidebarPaneStyles]);
-  }
 }
 export interface Item {
   element: UI.TreeOutline.TreeElement;
-  checkbox: HTMLInputElement;
+  checkbox: UI.UIUtils.CheckboxLabel;
 }
 
 const LOCALIZED_CATEGORIES: Record<SDK.CategorizedBreakpoint.Category, () => Platform.UIString.LocalizedString> = {

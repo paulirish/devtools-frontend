@@ -36,7 +36,6 @@
 import type * as ProtocolProxyApi from '../../generated/protocol-proxy-api.js';
 import * as Protocol from '../../generated/protocol.js';
 import * as Common from '../common/common.js';
-import * as Host from '../host/host.js';
 import * as Platform from '../platform/platform.js';
 import * as Root from '../root/root.js';
 
@@ -56,7 +55,7 @@ export class DOMNode {
   ownerDocument!: DOMDocument|null;
   #isInShadowTreeInternal!: boolean;
   id!: Protocol.DOM.NodeId;
-  index: number|undefined;
+  index: number|undefined = undefined;
   #backendNodeIdInternal!: Protocol.DOM.BackendNodeId;
   #nodeTypeInternal!: number;
   #nodeNameInternal!: string;
@@ -69,21 +68,21 @@ export class DOMNode {
   #xmlVersion!: string|undefined;
   #isSVGNodeInternal!: boolean;
   #isScrollableInternal!: boolean;
-  #creationStackTraceInternal: Promise<Protocol.Runtime.StackTrace|null>|null;
-  #pseudoElements: Map<string, DOMNode[]>;
-  #distributedNodesInternal: DOMNodeShortcut[];
-  assignedSlot: DOMNodeShortcut|null;
-  readonly shadowRootsInternal: DOMNode[];
-  #attributesInternal: Map<string, Attribute>;
-  #markers: Map<string, unknown>;
-  #subtreeMarkerCount: number;
+  #creationStackTraceInternal: Promise<Protocol.Runtime.StackTrace|null>|null = null;
+  #pseudoElements = new Map<string, DOMNode[]>();
+  #distributedNodesInternal: DOMNodeShortcut[] = [];
+  assignedSlot: DOMNodeShortcut|null = null;
+  readonly shadowRootsInternal: DOMNode[] = [];
+  #attributesInternal = new Map<string, Attribute>();
+  #markers = new Map<string, unknown>();
+  #subtreeMarkerCount = 0;
   childNodeCountInternal!: number;
-  childrenInternal: DOMNode[]|null;
-  nextSibling: DOMNode|null;
-  previousSibling: DOMNode|null;
-  firstChild: DOMNode|null;
-  lastChild: DOMNode|null;
-  parentNode: DOMNode|null;
+  childrenInternal: DOMNode[]|null = null;
+  nextSibling: DOMNode|null = null;
+  previousSibling: DOMNode|null = null;
+  firstChild: DOMNode|null = null;
+  lastChild: DOMNode|null = null;
+  parentNode: DOMNode|null = null;
   templateContentInternal?: DOMNode;
   contentDocumentInternal?: DOMDocument;
   childDocumentPromiseForTesting?: Promise<DOMDocument|null>;
@@ -97,21 +96,6 @@ export class DOMNode {
   constructor(domModel: DOMModel) {
     this.#domModelInternal = domModel;
     this.#agent = this.#domModelInternal.getAgent();
-    this.index = undefined;
-    this.#creationStackTraceInternal = null;
-    this.#pseudoElements = new Map();
-    this.#distributedNodesInternal = [];
-    this.assignedSlot = null;
-    this.shadowRootsInternal = [];
-    this.#attributesInternal = new Map();
-    this.#markers = new Map();
-    this.#subtreeMarkerCount = 0;
-    this.childrenInternal = null;
-    this.nextSibling = null;
-    this.previousSibling = null;
-    this.firstChild = null;
-    this.lastChild = null;
-    this.parentNode = null;
   }
 
   static create(domModel: DOMModel, doc: DOMDocument|null, isInShadowTree: boolean, payload: Protocol.DOM.Node):
@@ -215,7 +199,7 @@ export class DOMNode {
   private async requestChildDocument(frameId: Protocol.Page.FrameId, notInTarget: Target): Promise<DOMDocument|null> {
     const frame = await FrameManager.instance().getOrWaitForFrame(frameId, notInTarget);
     const childModel = frame.resourceTreeModel()?.target().model(DOMModel);
-    return childModel?.requestDocument() || null;
+    return await (childModel?.requestDocument() || null);
   }
 
   isAdFrameNode(): boolean {
@@ -301,10 +285,6 @@ export class DOMNode {
     this.childNodeCountInternal = childNodeCount;
   }
 
-  hasShadowRoots(): boolean {
-    return Boolean(this.shadowRootsInternal.length);
-  }
-
   shadowRoots(): DOMNode[] {
     return this.shadowRootsInternal.slice();
   }
@@ -353,12 +333,20 @@ export class DOMNode {
     return this.#pseudoElements;
   }
 
+  checkmarkPseudoElement(): DOMNode|undefined {
+    return this.#pseudoElements.get(Protocol.DOM.PseudoType.Checkmark)?.at(-1);
+  }
+
   beforePseudoElement(): DOMNode|undefined {
     return this.#pseudoElements.get(Protocol.DOM.PseudoType.Before)?.at(-1);
   }
 
   afterPseudoElement(): DOMNode|undefined {
     return this.#pseudoElements.get(Protocol.DOM.PseudoType.After)?.at(-1);
+  }
+
+  pickerIconPseudoElement(): DOMNode|undefined {
+    return this.#pseudoElements.get(Protocol.DOM.PseudoType.PickerIcon)?.at(-1);
   }
 
   markerPseudoElement(): DOMNode|undefined {
@@ -376,6 +364,15 @@ export class DOMNode {
       ...this.#pseudoElements.get(Protocol.DOM.PseudoType.ViewTransitionImagePair) || [],
       ...this.#pseudoElements.get(Protocol.DOM.PseudoType.ViewTransitionOld) || [],
       ...this.#pseudoElements.get(Protocol.DOM.PseudoType.ViewTransitionNew) || [],
+    ];
+  }
+
+  carouselPseudoElements(): DOMNode[] {
+    return [
+      ...this.#pseudoElements.get(Protocol.DOM.PseudoType.ScrollButton) || [],
+      ...this.#pseudoElements.get(Protocol.DOM.PseudoType.Column) || [],
+      ...this.#pseudoElements.get(Protocol.DOM.PseudoType.ScrollMarker) || [],
+      ...this.#pseudoElements.get(Protocol.DOM.PseudoType.ScrollMarkerGroup) || [],
     ];
   }
 
@@ -407,7 +404,7 @@ export class DOMNode {
       return null;
     }
 
-    let current: (DOMNode|null) = (this as DOMNode | null);
+    let current: DOMNode|null = this;
     while (current && !current.isShadowRoot()) {
       current = current.parentNode;
     }
@@ -534,7 +531,7 @@ export class DOMNode {
     });
   }
 
-  getChildNodes(callback: (arg0: Array<DOMNode>|null) => void): void {
+  getChildNodes(callback: (arg0: DOMNode[]|null) => void): void {
     if (this.childrenInternal) {
       callback(this.children());
       return;
@@ -576,14 +573,6 @@ export class DOMNode {
     });
   }
 
-  async copyNode(): Promise<string|null> {
-    const {outerHTML} = await this.#agent.invoke_getOuterHTML({nodeId: this.id});
-    if (outerHTML !== null) {
-      Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(outerHTML);
-    }
-    return outerHTML;
-  }
-
   path(): string {
     function getNodeKey(node: DOMNode): number|'u'|'a'|'d'|null {
       if (!node.#nodeNameInternal.length) {
@@ -605,7 +594,7 @@ export class DOMNode {
     }
 
     const path = [];
-    let node: (DOMNode|null) = (this as DOMNode | null);
+    let node: (DOMNode|null) = this;
     while (node) {
       const key = getNodeKey(node);
       if (key === null) {
@@ -635,7 +624,7 @@ export class DOMNode {
   }
 
   isDescendant(descendant: DOMNode): boolean {
-    return descendant !== null && descendant.isAncestor(this);
+    return descendant.isAncestor(this);
   }
 
   frameOwnerFrameId(): Protocol.Page.FrameId|null {
@@ -840,22 +829,22 @@ export class DOMNode {
       }
 
       this.#markers.delete(name);
-      for (let node: (DOMNode|null) = (this as DOMNode | null); node; node = node.parentNode) {
+      for (let node: (DOMNode|null) = this; node; node = node.parentNode) {
         --node.#subtreeMarkerCount;
       }
-      for (let node: (DOMNode|null) = (this as DOMNode | null); node; node = node.parentNode) {
+      for (let node: (DOMNode|null) = this; node; node = node.parentNode) {
         this.#domModelInternal.dispatchEventToListeners(Events.MarkersChanged, node);
       }
       return;
     }
 
     if (this.parentNode && !this.#markers.has(name)) {
-      for (let node: (DOMNode|null) = (this as DOMNode | null); node; node = node.parentNode) {
+      for (let node: (DOMNode|null) = this; node; node = node.parentNode) {
         ++node.#subtreeMarkerCount;
       }
     }
     this.#markers.set(name, value);
-    for (let node: (DOMNode|null) = (this as DOMNode | null); node; node = node.parentNode) {
+    for (let node: (DOMNode|null) = this; node; node = node.parentNode) {
       this.#domModelInternal.dispatchEventToListeners(Events.MarkersChanged, node);
     }
   }
@@ -890,7 +879,7 @@ export class DOMNode {
     if (!url) {
       return url as Platform.DevToolsPath.UrlString;
     }
-    for (let frameOwnerCandidate: (DOMNode|null) = (this as DOMNode | null); frameOwnerCandidate;
+    for (let frameOwnerCandidate: (DOMNode|null) = this; frameOwnerCandidate;
          frameOwnerCandidate = frameOwnerCandidate.parentNode) {
       if (frameOwnerCandidate instanceof DOMDocument && frameOwnerCandidate.baseURL) {
         return Common.ParsedURL.ParsedURL.completeURL(frameOwnerCandidate.baseURL, url);
@@ -920,8 +909,8 @@ export class DOMNode {
   }
 
   async setAsInspectedNode(): Promise<void> {
-    let node: (DOMNode|null)|DOMNode = (this as DOMNode | null);
-    if (node && node.pseudoType()) {
+    let node: DOMNode|null = this;
+    if (node?.pseudoType()) {
       node = node.parentNode;
     }
     while (node) {
@@ -943,7 +932,7 @@ export class DOMNode {
   }
 
   enclosingElementOrSelf(): DOMNode|null {
-    let node: DOMNode|null|(DOMNode | null) = (this as DOMNode | null);
+    let node: DOMNode|null = this;
     if (node && node.nodeType() === Node.TEXT_NODE && node.parentNode) {
       node = node.parentNode;
     }
@@ -1077,7 +1066,7 @@ export class DeferredDOMNode {
   async resolvePromise(): Promise<DOMNode|null> {
     const nodeIds =
         await this.#domModelInternal.pushNodesByBackendIdsToFrontend(new Set([this.#backendNodeIdInternal]));
-    return nodeIds && nodeIds.get(this.#backendNodeIdInternal) || null;
+    return nodeIds?.get(this.#backendNodeIdInternal) || null;
   }
 
   backendNodeId(): Protocol.DOM.BackendNodeId {
@@ -1121,12 +1110,12 @@ export class DOMDocument extends DOMNode {
 
 export class DOMModel extends SDKModel<EventTypes> {
   agent: ProtocolProxyApi.DOMApi;
-  idToDOMNode: Map<Protocol.DOM.NodeId, DOMNode> = new Map();
-  #document: DOMDocument|null;
-  readonly #attributeLoadNodeIds: Set<Protocol.DOM.NodeId>;
+  idToDOMNode = new Map<Protocol.DOM.NodeId, DOMNode>();
+  #document: DOMDocument|null = null;
+  readonly #attributeLoadNodeIds = new Set<Protocol.DOM.NodeId>();
   readonly runtimeModelInternal: RuntimeModel;
   #lastMutationId!: number;
-  #pendingDocumentRequestPromise: Promise<DOMDocument|null>|null;
+  #pendingDocumentRequestPromise: Promise<DOMDocument|null>|null = null;
   #frameOwnerNode?: DOMNode|null;
   #loadNodeAttributesTimeout?: number;
   #searchId?: string;
@@ -1135,12 +1124,8 @@ export class DOMModel extends SDKModel<EventTypes> {
 
     this.agent = target.domAgent();
 
-    this.#document = null;
-    this.#attributeLoadNodeIds = new Set();
     target.registerDOMDispatcher(new DOMDispatcher(this));
     this.runtimeModelInternal = (target.model(RuntimeModel) as RuntimeModel);
-
-    this.#pendingDocumentRequestPromise = null;
 
     if (!target.suspended()) {
       void this.agent.invoke_enable({});
@@ -1255,7 +1240,7 @@ export class DOMModel extends SDKModel<EventTypes> {
   async pushNodeToFrontend(objectId: Protocol.Runtime.RemoteObjectId): Promise<DOMNode|null> {
     await this.requestDocument();
     const {nodeId} = await this.agent.invoke_requestNode({objectId});
-    return nodeId ? this.nodeForId(nodeId) : null;
+    return this.nodeForId(nodeId);
   }
 
   pushNodeByPathToFrontend(path: string): Promise<Protocol.DOM.NodeId|null> {
@@ -1474,10 +1459,11 @@ export class DOMModel extends SDKModel<EventTypes> {
       throw new Error('DOMModel._pseudoElementAdded expects pseudoType to be defined.');
     }
     const currentPseudoElements = parent.pseudoElements().get(pseudoType);
-    if (currentPseudoElements) {
-      if (!pseudoType.startsWith('view-transition')) {
+    if (currentPseudoElements && currentPseudoElements.length > 0) {
+      if (!(pseudoType.startsWith('view-transition') || pseudoType.startsWith('scroll-') || pseudoType === 'column')) {
         throw new Error(
-            'DOMModel.pseudoElementAdded expects parent to not already have this pseudo type added; only view-transition* pseudo elements can coexist under the same parent.');
+            'DOMModel.pseudoElementAdded expects parent to not already have this pseudo type added; only view-transition* and scrolling pseudo elements can coexist under the same parent.' +
+            ` ${currentPseudoElements.length} elements of type ${pseudoType} already exist on parent.`);
       }
       currentPseudoElements.push(node);
     } else {
@@ -1547,11 +1533,11 @@ export class DOMModel extends SDKModel<EventTypes> {
   }
 
   async getNodesByStyle(
-      computedStyles: {
+      computedStyles: Array<{
         name: string,
         value: string,
-      }[],
-      pierce: boolean = false): Promise<Protocol.DOM.NodeId[]> {
+      }>,
+      pierce = false): Promise<Protocol.DOM.NodeId[]> {
     await this.requestDocument();
     if (!this.#document) {
       throw new Error('DOMModel.getNodesByStyle expects to have a document.');
@@ -1559,7 +1545,7 @@ export class DOMModel extends SDKModel<EventTypes> {
     const response =
         await this.agent.invoke_getNodesForSubtreeByStyle({nodeId: this.#document.id, computedStyles, pierce});
     if (response.getError()) {
-      throw response.getError();
+      throw new Error(response.getError());
     }
     return response.nodeIds;
   }
@@ -1822,7 +1808,7 @@ export class DOMModelUndoStack {
 
   async undo(): Promise<void> {
     if (this.#index === 0) {
-      return Promise.resolve();
+      return await Promise.resolve();
     }
     --this.#index;
     this.#lastModelWithMinorChange = null;
@@ -1831,7 +1817,7 @@ export class DOMModelUndoStack {
 
   async redo(): Promise<void> {
     if (this.#index >= this.#stack.length) {
-      return Promise.resolve();
+      return await Promise.resolve();
     }
     ++this.#index;
     this.#lastModelWithMinorChange = null;

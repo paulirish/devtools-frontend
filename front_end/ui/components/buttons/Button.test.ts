@@ -7,7 +7,7 @@ import {dispatchKeyDownEvent, renderElementIntoDOM} from '../../../testing/DOMHe
 import * as Buttons from './buttons.js';
 
 describe('Button', () => {
-  const iconUrl = new URL('../../../Images/file-image.svg', import.meta.url).toString();
+  const iconName = 'file-image';
 
   function renderButton(
       data: Buttons.Button.ButtonData = {
@@ -107,7 +107,7 @@ describe('Button', () => {
   it('toolbar button can be clicked', () => {
     testClick({
       variant: Buttons.Button.Variant.TOOLBAR,
-      iconUrl,
+      iconName,
     });
   });
 
@@ -115,7 +115,7 @@ describe('Button', () => {
     testClick(
         {
           variant: Buttons.Button.Variant.TOOLBAR,
-          iconUrl,
+          iconName,
           disabled: true,
         },
         0);
@@ -124,8 +124,8 @@ describe('Button', () => {
   it('gets the no additional classes set for the inner button if only text is provided', () => {
     const button = renderButton();
     const innerButton = button.shadowRoot?.querySelector('button') as HTMLButtonElement;
-    assert.isTrue(!innerButton.classList.contains('text-with-icon'));
-    assert.isTrue(!innerButton.classList.contains('only-icon'));
+    assert.isNotOk(innerButton.classList.contains('text-with-icon'));
+    assert.isNotOk(innerButton.classList.contains('only-icon'));
   });
 
   it('gets title set', () => {
@@ -144,23 +144,23 @@ describe('Button', () => {
     const button = renderButton(
         {
           variant: Buttons.Button.Variant.PRIMARY,
-          iconUrl,
+          iconName,
         },
         'text');
     const innerButton = button.shadowRoot?.querySelector('button') as HTMLButtonElement;
     assert.isTrue(innerButton.classList.contains('text-with-icon'));
-    assert.isTrue(!innerButton.classList.contains('only-icon'));
+    assert.isNotOk(innerButton.classList.contains('only-icon'));
   });
 
   it('gets the only-icon class set for the inner button if only icon is provided', () => {
     const button = renderButton(
         {
           variant: Buttons.Button.Variant.PRIMARY,
-          iconUrl,
+          iconName,
         },
         '');
     const innerButton = button.shadowRoot?.querySelector('button') as HTMLButtonElement;
-    assert.isTrue(!innerButton.classList.contains('text-with-icon'));
+    assert.isNotOk(innerButton.classList.contains('text-with-icon'));
     assert.isTrue(innerButton.classList.contains('only-icon'));
   });
 
@@ -179,7 +179,7 @@ describe('Button', () => {
     const button = renderButton(
         {
           variant: Buttons.Button.Variant.PRIMARY,
-          iconUrl,
+          iconName,
         },
         '');
     const innerButton = button.shadowRoot?.querySelector('button') as HTMLButtonElement;
@@ -196,8 +196,32 @@ describe('Button', () => {
     dispatchKeyDownEvent(innerButton, {bubbles: true, composed: true, key: ' '});
     dispatchKeyDownEvent(innerButton, {bubbles: true, composed: true, key: 'x'});
 
-    assert.isTrue(onKeydown.calledOnce);
+    sinon.assert.calledOnce(onKeydown);
     assert.strictEqual(onKeydown.getCall(0).args[0].key, 'x');
+  });
+
+  it('devtools-button width should not expand its content\'s width', () => {
+    const button = new Buttons.Button.Button();
+    button.data = {variant: Buttons.Button.Variant.PRIMARY};
+    button.textContent = 'test';
+
+    const fullWidthContainer = document.createElement('div');
+    fullWidthContainer.style.width = '400px';
+    fullWidthContainer.style.height = '400px';
+    fullWidthContainer.style.display = 'flex';
+    fullWidthContainer.style.flexDirection = 'column';
+    fullWidthContainer.appendChild(button);
+
+    renderElementIntoDOM(fullWidthContainer);
+    const buttonWidth = button.getBoundingClientRect().width;
+    const fullWidthContainerWidth = fullWidthContainer.getBoundingClientRect().width;
+    assert.isBelow(buttonWidth, fullWidthContainerWidth);
+    assert.isAbove(buttonWidth, 0);
+
+    const buttonHeight = button.getBoundingClientRect().height;
+    const bigContainerHeight = fullWidthContainer.getBoundingClientRect().height;
+    assert.isBelow(buttonHeight, bigContainerHeight);
+    assert.isAbove(buttonHeight, 0);
   });
 
   describe('in forms', () => {

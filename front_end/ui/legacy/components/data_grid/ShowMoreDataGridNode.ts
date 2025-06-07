@@ -27,6 +27,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as i18n from '../../../../core/i18n/i18n.js';
 import type * as Buttons from '../../../components/buttons/buttons.js';
@@ -54,7 +55,7 @@ const UIStrings = {
    *@example {50} PH1
    */
   showAllD: 'Show all {PH1}',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/components/data_grid/ShowMoreDataGridNode.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 

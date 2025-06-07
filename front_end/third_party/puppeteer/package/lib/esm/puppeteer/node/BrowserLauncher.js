@@ -3,9 +3,9 @@
  * Copyright 2017 Google Inc.
  * SPDX-License-Identifier: Apache-2.0
  */
-import { existsSync } from 'fs';
-import { tmpdir } from 'os';
-import { join } from 'path';
+import { existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { Browser as InstalledBrowser, CDP_WEBSOCKET_ENDPOINT_REGEX, launch, TimeoutError as BrowsersTimeoutError, WEBDRIVER_BIDI_WEBSOCKET_ENDPOINT_REGEX, computeExecutablePath, } from '@puppeteer/browsers';
 import { firstValueFrom, from, map, race, timer, } from '../../third_party/rxjs/rxjs.js';
 import { CdpBrowser } from '../cdp/Browser.js';
@@ -36,7 +36,7 @@ export class BrowserLauncher {
         return this.#browser;
     }
     async launch(options = {}) {
-        const { dumpio = false, env = process.env, handleSIGINT = true, handleSIGTERM = true, handleSIGHUP = true, acceptInsecureCerts = false, defaultViewport = DEFAULT_VIEWPORT, downloadBehavior, slowMo = 0, timeout = 30000, waitForInitialPage = true, protocolTimeout, } = options;
+        const { dumpio = false, enableExtensions = false, env = process.env, handleSIGINT = true, handleSIGTERM = true, handleSIGHUP = true, acceptInsecureCerts = false, defaultViewport = DEFAULT_VIEWPORT, downloadBehavior, slowMo = 0, timeout = 30000, waitForInitialPage = true, protocolTimeout, } = options;
         let { protocol } = options;
         // Default to 'webDriverBiDi' for Firefox.
         if (this.#browser === 'firefox' && protocol === undefined) {
@@ -61,7 +61,7 @@ export class BrowserLauncher {
         if (this.#browser === 'firefox' &&
             protocol === 'webDriverBiDi' &&
             usePipe) {
-            throw new Error('Pipe connections are not supported wtih Firefox and WebDriver BiDi');
+            throw new Error('Pipe connections are not supported with Firefox and WebDriver BiDi');
         }
         const browserProcess = launch({
             executablePath: launchArgs.executablePath,
@@ -126,6 +126,16 @@ export class BrowserLauncher {
                 throw new TimeoutError(error.message);
             }
             throw error;
+        }
+        if (Array.isArray(enableExtensions)) {
+            if (this.#browser === 'chrome' && !usePipe) {
+                throw new Error('To use `enableExtensions` with a list of paths in Chrome, you must be connected with `--remote-debugging-pipe` (`pipe: true`).');
+            }
+            await Promise.all([
+                enableExtensions.map(path => {
+                    return browser.installExtension(path);
+                }),
+            ]);
         }
         if (waitForInitialPage) {
             await this.waitForPageTarget(browser, timeout);

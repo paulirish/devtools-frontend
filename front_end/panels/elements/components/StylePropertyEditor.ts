@@ -1,11 +1,12 @@
 // Copyright (c) 2021 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import '../../../ui/components/icon_button/icon_button.js';
 
 import * as i18n from '../../../core/i18n/i18n.js';
-import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import * as Lit from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
 import {findFlexContainerIcon, findGridContainerIcon, type IconInfo} from './CSSPropertyIconResolver.js';
@@ -24,11 +25,11 @@ const UIStrings = {
    * @example {row} propertyValue
    */
   deselectButton: 'Remove {propertyName}: {propertyValue}',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/elements/components/StylePropertyEditor.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-const {render, html, Directives} = LitHtml;
+const {render, html, Directives} = Lit;
 
 declare global {
   interface HTMLElementEventMap {
@@ -69,17 +70,9 @@ export class PropertyDeselectedEvent extends Event {
 
 export class StylePropertyEditor extends HTMLElement {
   readonly #shadow = this.attachShadow({mode: 'open'});
-  #authoredProperties: Map<string, string> = new Map();
-  #computedProperties: Map<string, string> = new Map();
+  #authoredProperties = new Map<string, string>();
+  #computedProperties = new Map<string, string>();
   protected readonly editableProperties: EditableProperty[] = [];
-
-  constructor() {
-    super();
-  }
-
-  connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [stylePropertyEditorStyles];
-  }
 
   getEditableProperties(): EditableProperty[] {
     return this.editableProperties;
@@ -95,6 +88,7 @@ export class StylePropertyEditor extends HTMLElement {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     render(html`
+      <style>${stylePropertyEditorStyles}</style>
       <div class="container">
         ${this.editableProperties.map(prop => this.#renderProperty(prop))}
       </div>
@@ -104,7 +98,7 @@ export class StylePropertyEditor extends HTMLElement {
     // clang-format on
   }
 
-  #renderProperty(prop: EditableProperty): LitHtml.TemplateResult {
+  #renderProperty(prop: EditableProperty): Lit.TemplateResult {
     const authoredValue = this.#authoredProperties.get(prop.propertyName);
     const notAuthored = !authoredValue;
     const shownValue = authoredValue || this.#computedProperties.get(prop.propertyName);
@@ -122,7 +116,7 @@ export class StylePropertyEditor extends HTMLElement {
     </div>`;
   }
 
-  #renderButton(propertyValue: string, propertyName: string, selected: boolean = false): LitHtml.TemplateResult {
+  #renderButton(propertyValue: string, propertyName: string, selected = false): Lit.TemplateResult {
     const query = `${propertyName}: ${propertyValue}`;
     const iconInfo = this.findIcon(query, this.#computedProperties);
     if (!iconInfo) {

@@ -158,14 +158,14 @@ async function fetchLocaleData(locales: string[]): Promise<string|void> {
   try {
     const remoteBase = Root.Runtime.getRemoteBase();
     let localeUrl: string;
-    if (remoteBase && remoteBase.base) {
+    if (remoteBase?.base) {
       localeUrl = `${remoteBase.base}third_party/lighthouse/locales/${locale}.json`;
     } else {
       localeUrl = new URL(`../../third_party/lighthouse/locales/${locale}.json`, import.meta.url).toString();
     }
 
-    const timeoutPromise = new Promise<string>(
-        (resolve, reject) => setTimeout(() => reject(new Error('timed out fetching locale')), 5000));
+    const timeoutPromise =
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timed out fetching locale')), 5000));
     const localeData = await Promise.race([timeoutPromise, fetch(localeUrl).then(result => result.json())]);
     // @ts-expect-error https://github.com/GoogleChrome/lighthouse/issues/11628
     self.registerLocaleData(locale, localeData);
@@ -224,7 +224,6 @@ async function onFrontendMessage(event: MessageEvent): Promise<void> {
 self.onmessage = onFrontendMessage;
 
 // Make lighthouse and traceviewer happy.
-// @ts-ignore https://github.com/GoogleChrome/lighthouse/issues/11628
 globalThis.global = self;
 // @ts-expect-error https://github.com/GoogleChrome/lighthouse/issues/11628
 globalThis.global.isVinn = true;

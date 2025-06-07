@@ -170,14 +170,14 @@ const UIStrings = {
    */
   poorPoorDetailedCompare:
       'Your local {PH1} value of {PH2} is poor and is rated the same as {PH4} of real-user {PH1} experiences. Additionally, the field data 75th percentile {PH1} value of {PH3} is poor.',
-};
+} as const;
 
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/components/MetricCompareStrings.ts', UIStrings);
 
 export type CompareRating = 'better'|'worse'|'similar';
 
 export function renderCompareText(
-    options: {metric: string, rating: MetricRating, compare?: CompareRating, localValue: Element}): Element {
+    options: {metric: string, rating: MetricRating, localValue: Element, compare?: CompareRating}): Element {
   const {rating, compare} = options;
   const values = {
     PH1: options.metric,
@@ -227,7 +227,10 @@ export function renderCompareText(
 export function renderDetailedCompareText(options: {
   metric: string,
   localRating: MetricRating,
-  fieldRating?: MetricRating, localValue: Element, fieldValue: Element, percent: string,
+  localValue: Element,
+  percent: string,
+  fieldValue: Element,
+  fieldRating?: MetricRating,
 }): Element {
   const {localRating, fieldRating} = options;
   const values = {

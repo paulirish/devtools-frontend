@@ -27,23 +27,23 @@ const {urlString} = Platform.DevToolsPath;
 describeWithLocale('PromptBuilder', () => {
   describe('allowHeader', () => {
     it('disallows cookie headers', () => {
-      assert(!Explain.allowHeader({name: 'Cookie', value: ''}));
-      assert(!Explain.allowHeader({name: 'cookiE', value: ''}));
-      assert(!Explain.allowHeader({name: 'cookie', value: ''}));
-      assert(!Explain.allowHeader({name: 'set-cookie', value: ''}));
-      assert(!Explain.allowHeader({name: 'Set-cOokie', value: ''}));
+      assert.isNotOk(Explain.allowHeader({name: 'Cookie', value: ''}));
+      assert.isNotOk(Explain.allowHeader({name: 'cookiE', value: ''}));
+      assert.isNotOk(Explain.allowHeader({name: 'cookie', value: ''}));
+      assert.isNotOk(Explain.allowHeader({name: 'set-cookie', value: ''}));
+      assert.isNotOk(Explain.allowHeader({name: 'Set-cOokie', value: ''}));
     });
 
     it('disallows authorization headers', () => {
-      assert(!Explain.allowHeader({name: 'AuthoRization', value: ''}));
-      assert(!Explain.allowHeader({name: 'authorization', value: ''}));
+      assert.isNotOk(Explain.allowHeader({name: 'AuthoRization', value: ''}));
+      assert.isNotOk(Explain.allowHeader({name: 'authorization', value: ''}));
     });
 
     it('disallows custom headers', () => {
-      assert(!Explain.allowHeader({name: 'X-smth', value: ''}));
-      assert(!Explain.allowHeader({name: 'X-', value: ''}));
-      assert(!Explain.allowHeader({name: 'x-smth', value: ''}));
-      assert(!Explain.allowHeader({name: 'x-', value: ''}));
+      assert.isNotOk(Explain.allowHeader({name: 'X-smth', value: ''}));
+      assert.isNotOk(Explain.allowHeader({name: 'X-', value: ''}));
+      assert.isNotOk(Explain.allowHeader({name: 'x-smth', value: ''}));
+      assert.isNotOk(Explain.allowHeader({name: 'x-', value: ''}));
     });
   });
 
@@ -222,9 +222,9 @@ export const y = "";
           {forceNew: true, resourceMapping, targetManager});
     });
 
-    const PREAMBLE = 'Why does browser show an error';
-    const RELATED_CODE_PREFIX = 'For the following code in my web app';
-    const RELATED_NETWORK_REQUEST_PREFIX = 'For the following network request in my web app';
+    const PROMPT_PREFIX = 'Please explain the following console error or warning:';
+    const RELATED_CODE_PREFIX = 'For the following code:';
+    const RELATED_NETWORK_REQUEST_PREFIX = 'For the following network request:';
 
     it('builds a simple prompt', async () => {
       const runtimeModel = target.model(SDK.RuntimeModel.RuntimeModel);
@@ -239,8 +239,11 @@ export const y = "";
       const promptBuilder = new Explain.PromptBuilder(message);
       const {prompt, sources} = await promptBuilder.buildPrompt();
       assert.strictEqual(prompt, [
-        PREAMBLE,
+        PROMPT_PREFIX,
+        '',
+        '```',
         ERROR_MESSAGE,
+        '```',
       ].join('\n'));
       assert.deepEqual(sources, [{type: 'message', value: ERROR_MESSAGE}]);
     });
@@ -274,8 +277,11 @@ export const y = "";
       const promptBuilder = new Explain.PromptBuilder(message);
       const {prompt, sources} = await promptBuilder.buildPrompt();
       assert.strictEqual(prompt, [
-        PREAMBLE,
+        PROMPT_PREFIX,
+        '',
+        '```',
         ERROR_MESSAGE,
+        '```',
         RELATED_CODE_PREFIX,
         '',
         '```',
@@ -321,9 +327,12 @@ export const y = "";
       const promptBuilder = new Explain.PromptBuilder(message);
       const {prompt, sources} = await promptBuilder.buildPrompt();
       assert.strictEqual(prompt, [
-        PREAMBLE,
+        PROMPT_PREFIX,
+        '',
+        '```',
         ERROR_MESSAGE,
         STACK_TRACE,
+        '```',
         RELATED_CODE_PREFIX,
         '',
         '```',
@@ -387,8 +396,11 @@ export const y = "";
       const promptBuilder = new Explain.PromptBuilder(message);
       const {prompt, sources} = await promptBuilder.buildPrompt();
       assert.strictEqual(prompt, [
-        PREAMBLE,
+        PROMPT_PREFIX,
+        '',
+        '```',
         ERROR_MESSAGE,
+        '```',
         RELATED_NETWORK_REQUEST_PREFIX,
         '',
         '```',
@@ -414,8 +426,11 @@ export const y = "";
       const promptBuilder = new Explain.PromptBuilder(message);
       const {prompt, sources} = await promptBuilder.buildPrompt();
       assert.strictEqual(prompt, [
-        PREAMBLE,
+        PROMPT_PREFIX,
+        '',
+        '```',
         TRIMMED_ERROR_MESSAGE,
+        '```',
       ].join('\n'));
       assert.deepEqual(sources, [{type: 'message', value: TRIMMED_ERROR_MESSAGE}]);
     });
@@ -447,9 +462,12 @@ export const y = "";
       const promptBuilder = new Explain.PromptBuilder(message);
       const {prompt, sources} = await promptBuilder.buildPrompt();
       assert.strictEqual(prompt, [
-        PREAMBLE,
+        PROMPT_PREFIX,
+        '',
+        '```',
         ERROR_MESSAGE,
         STACK_TRACE,
+        '```',
         RELATED_CODE_PREFIX,
         '',
         '```',
@@ -498,8 +516,11 @@ export const y = "";
       const promptBuilder = new Explain.PromptBuilder(message);
       const {prompt, sources, isPageReloadRecommended} = await promptBuilder.buildPrompt();
       assert.strictEqual(prompt, [
-        PREAMBLE,
+        PROMPT_PREFIX,
+        '',
+        '```',
         ERROR_MESSAGE,
+        '```',
         RELATED_NETWORK_REQUEST_PREFIX,
         '',
         '```',

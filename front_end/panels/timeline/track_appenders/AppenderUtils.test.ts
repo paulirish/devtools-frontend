@@ -56,47 +56,45 @@ describeWithEnvironment('AppenderUtils', () => {
     });
   });
 
-  describe('getFormattedTime', () => {
+  describe('getDurationWithSelf', () => {
     // Helper method. Treat input as milliseconds
-    const getFormattedTime = (tot: number, self: number): string => {
-      const totalTime = Trace.Helpers.Timing.millisecondsToMicroseconds(Trace.Types.Timing.MilliSeconds(tot));
-      const selfTime = Trace.Helpers.Timing.millisecondsToMicroseconds(Trace.Types.Timing.MilliSeconds(self));
-      return Timeline.AppenderUtils.getFormattedTime(totalTime, selfTime);
+    const getDurationWithSelf = (tot: number, self: number): string => {
+      const totalTime = Trace.Helpers.Timing.milliToMicro(Trace.Types.Timing.Milli(tot));
+      const selfTime = Trace.Helpers.Timing.milliToMicro(Trace.Types.Timing.Milli(self));
+      return Timeline.AppenderUtils.getDurationString(totalTime, selfTime);
     };
 
     it('returns the time info for a entry with no duration correctly', async () => {
-      const totalTime = Trace.Types.Timing.MicroSeconds(0);
-      const formattedTime = Timeline.AppenderUtils.getFormattedTime(totalTime);
+      const totalTime = Trace.Types.Timing.Micro(0);
+      const formattedTime = Timeline.AppenderUtils.getDurationString(totalTime);
       assert.strictEqual(formattedTime, '');
-
-      const formattedTime2 = Timeline.AppenderUtils.getFormattedTime(undefined);
-      assert.strictEqual(formattedTime2, '');
     });
 
     it('returns the time info for given total time correctly', async () => {
-      const totalTime = Trace.Types.Timing.MicroSeconds(10000);
-      const formattedTime = Timeline.AppenderUtils.getFormattedTime(totalTime);
+      const totalTime = Trace.Types.Timing.Micro(10000);
+      const formattedTime = Timeline.AppenderUtils.getDurationString(totalTime);
       // The i18n encodes spaces using the u00A0 unicode character.
       assert.strictEqual(formattedTime, '10.00\u00A0ms');
     });
 
     it('returns the time info for given total time and self time correctly', async () => {
-      const totalTime = Trace.Types.Timing.MicroSeconds(10000);
-      const selfTime = Trace.Types.Timing.MicroSeconds(1000);
-      const formattedTime = Timeline.AppenderUtils.getFormattedTime(totalTime, selfTime);
-      // The i18n encodes spaces using the u00A0 unicode character.
+      const totalTime = Trace.Types.Timing.Micro(10000);
+      const selfTime = Trace.Types.Timing.Micro(1000);
+      const formattedTime = Timeline.AppenderUtils.getDurationString(totalTime, selfTime);
+      // The i18n encodes spaces using the \u00A0 unicode character, aka \xA0
       assert.strictEqual(formattedTime, '10.00\u00A0ms (self 1.00\u00A0ms)');
     });
 
     it('returns the time info for same total time and self time correctly', async () => {
-      const totalTime = Trace.Types.Timing.MicroSeconds(10000);
-      const selfTime = Trace.Types.Timing.MicroSeconds(10000);
-      const formattedTime = Timeline.AppenderUtils.getFormattedTime(totalTime, selfTime);
-      // The i18n encodes spaces using the u00A0 unicode character.
+      const totalTime = Trace.Types.Timing.Micro(10000);
+      const selfTime = Trace.Types.Timing.Micro(10000);
+      const formattedTime = Timeline.AppenderUtils.getDurationString(totalTime, selfTime);
       assert.strictEqual(formattedTime, '10.00\u00A0ms');
     });
 
     it('has appropriate rounding', () => {
+      const getFormattedTime = getDurationWithSelf;  // For clearer diff
+
       assert.strictEqual(getFormattedTime(10, 9), '10.00\u00A0ms (self 9.00\u00A0ms)');
       assert.strictEqual(getFormattedTime(10, 9.99), '10.00\u00A0ms (self 9.99\u00A0ms)');
       assert.strictEqual(getFormattedTime(10, 9.999), '10.00\u00A0ms (self 10.00\u00A0ms)');
@@ -108,7 +106,8 @@ describeWithEnvironment('AppenderUtils', () => {
     });
 
     it('selfTime is omitted if we hit minSignificance', async () => {
-      // Total and self are really close
+      const getFormattedTime = getDurationWithSelf;  // For clearer diff
+      // Total and self are really close (we always show)
       assert.strictEqual(getFormattedTime(5, 5.00001), '5.00\u00A0ms (self 5.00\u00A0ms)');
       assert.strictEqual(getFormattedTime(5, 5.000001), '5.00\u00A0ms (self 5.00\u00A0ms)');
       assert.strictEqual(getFormattedTime(5, 5.0000001), '5.00\u00A0ms');  // minSignificance hit!
@@ -128,18 +127,18 @@ describeWithEnvironment('AppenderUtils', () => {
       const lastTimestampByLevel: Timeline.AppenderUtils.LastTimestampByLevel = [];
       const eventOne = {
         ...defaultTraceEvent,
-        ts: Trace.Types.Timing.MicroSeconds(0),
-        dur: Trace.Types.Timing.MicroSeconds(10),
+        ts: Trace.Types.Timing.Micro(0),
+        dur: Trace.Types.Timing.Micro(10),
       };
       const eventTwo = {
         ...defaultTraceEvent,
-        ts: Trace.Types.Timing.MicroSeconds(5),
-        dur: Trace.Types.Timing.MicroSeconds(10),
+        ts: Trace.Types.Timing.Micro(5),
+        dur: Trace.Types.Timing.Micro(10),
       };
       const eventThree = {
         ...defaultTraceEvent,
-        ts: Trace.Types.Timing.MicroSeconds(20),
-        dur: Trace.Types.Timing.MicroSeconds(10),
+        ts: Trace.Types.Timing.Micro(20),
+        dur: Trace.Types.Timing.Micro(10),
       };
 
       let level = Timeline.AppenderUtils.getEventLevel(eventOne, lastTimestampByLevel);
@@ -159,23 +158,23 @@ describeWithEnvironment('AppenderUtils', () => {
       const lastTimestampByLevel: Timeline.AppenderUtils.LastTimestampByLevel = [];
       const eventOne = {
         ...defaultTraceEvent,
-        ts: Trace.Types.Timing.MicroSeconds(0),
-        dur: Trace.Types.Timing.MicroSeconds(30),
+        ts: Trace.Types.Timing.Micro(0),
+        dur: Trace.Types.Timing.Micro(30),
       };
       const eventTwo = {
         ...defaultTraceEvent,
-        ts: Trace.Types.Timing.MicroSeconds(5),
-        dur: Trace.Types.Timing.MicroSeconds(10),
+        ts: Trace.Types.Timing.Micro(5),
+        dur: Trace.Types.Timing.Micro(10),
       };
       const eventThree = {
         ...defaultTraceEvent,
-        ts: Trace.Types.Timing.MicroSeconds(10),
-        dur: Trace.Types.Timing.MicroSeconds(2),
+        ts: Trace.Types.Timing.Micro(10),
+        dur: Trace.Types.Timing.Micro(2),
       };
       const eventFour = {
         ...defaultTraceEvent,
-        ts: Trace.Types.Timing.MicroSeconds(20),
-        dur: Trace.Types.Timing.MicroSeconds(10),
+        ts: Trace.Types.Timing.Micro(20),
+        dur: Trace.Types.Timing.Micro(10),
       };
 
       let level = Timeline.AppenderUtils.getEventLevel(eventOne, lastTimestampByLevel);

@@ -41,7 +41,7 @@ describeWithEnvironment('Trace helpers', function() {
         name: 'process_name',
         tid,
         pid,
-        ts: Trace.Types.Timing.MicroSeconds(0),
+        ts: Trace.Types.Timing.Micro(0),
         cat: 'test',
         ph: Trace.Types.Events.Phase.METADATA,
       };
@@ -81,8 +81,8 @@ describeWithEnvironment('Trace helpers', function() {
   describe('sortTraceEventsInPlace', () => {
     function makeFakeEvent(ts: number, dur: number): Trace.Types.Events.Event {
       return {
-        ts: Trace.Types.Timing.MicroSeconds(ts),
-        dur: Trace.Types.Timing.MicroSeconds(dur),
+        ts: Trace.Types.Timing.Micro(ts),
+        dur: Trace.Types.Timing.Micro(dur),
       } as unknown as Trace.Types.Events.Event;
     }
 
@@ -117,7 +117,7 @@ describeWithEnvironment('Trace helpers', function() {
       const request2 = NetworkRequests.byTime[1];
       const navigationForSecondRequest =
           Trace.Helpers.Trace.getNavigationForTraceEvent(request2, request2.args.data.frame, Meta.navigationsByFrameId);
-      assert.strictEqual(navigationForSecondRequest?.ts, Trace.Types.Timing.MicroSeconds(636471400029));
+      assert.strictEqual(navigationForSecondRequest?.ts, Trace.Types.Timing.Micro(636471400029));
     });
 
     it('returns the correct navigation for a page load event', async function() {
@@ -128,7 +128,7 @@ describeWithEnvironment('Trace helpers', function() {
       const fcp = PageLoadMetrics.metricScoresByFrameId.get(Meta.mainFrameId)
                       ?.get(firstNavigationId)
                       ?.get(Trace.Handlers.ModelHandlers.PageLoadMetrics.MetricName.FCP);
-      if (!fcp || !fcp.event) {
+      if (!fcp?.event) {
         assert.fail('FCP not found');
       }
       const navigationForFirstRequest =
@@ -375,10 +375,10 @@ describeWithEnvironment('Trace helpers', function() {
       const {parsedTrace} = await TraceLoader.traceEngine(this, 'simple-js-program.json.gz');
       const frameId = '1F729458403A23CF1D8D246095129AC4';
       const firstURL = Trace.Helpers.Trace.activeURLForFrameAtTime(
-          frameId, Trace.Types.Timing.MicroSeconds(251126654355), parsedTrace.Meta.rendererProcessesByFrame);
+          frameId, Trace.Types.Timing.Micro(251126654355), parsedTrace.Meta.rendererProcessesByFrame);
       assert.strictEqual(firstURL, 'about:blank');
       const secondURL = Trace.Helpers.Trace.activeURLForFrameAtTime(
-          frameId, Trace.Types.Timing.MicroSeconds(251126663398), parsedTrace.Meta.rendererProcessesByFrame);
+          frameId, Trace.Types.Timing.Micro(251126663398), parsedTrace.Meta.rendererProcessesByFrame);
       assert.strictEqual(secondURL, 'https://www.google.com');
     });
   });
@@ -426,10 +426,9 @@ describeWithEnvironment('Trace helpers', function() {
     describe('createSortedSyntheticEvents()', () => {
       it('correctly creates synthetic events when instant animation events are present', async function() {
         const events = await TraceLoader.rawEvents(this, 'instant-animation-events.json.gz');
-        const animationEvents =
-            events.filter(event => Trace.Types.Events.isAnimation(event)) as Trace.Types.Events.Animation[];
+        const animationEvents = events.filter(event => Trace.Types.Events.isAnimation(event));
         const animationSynthEvents = Trace.Helpers.Trace.createMatchedSortedSyntheticEvents(animationEvents);
-        const wantPairs = new Map<string, {compositeFailed: number, unsupportedProperties?: Array<string>}>([
+        const wantPairs = new Map<string, {compositeFailed: number, unsupportedProperties?: string[]}>([
           [
             'blink.animations,devtools.timeline,benchmark,rail:0x11d00230380:Animation',
             {compositeFailed: 8224, unsupportedProperties: ['width']},
@@ -444,7 +443,7 @@ describeWithEnvironment('Trace helpers', function() {
             {compositeFailed: 8224, unsupportedProperties: ['font-size']},
           ],
         ]);
-        // Ensure we have the correct numner of synthetic events created.
+        // Ensure we have the correct number of synthetic events created.
         assert.deepEqual(wantPairs.size, animationSynthEvents.length);
 
         animationSynthEvents.forEach(event => {
@@ -484,8 +483,8 @@ describeWithEnvironment('Trace helpers', function() {
         name: Trace.Types.Events.Name.FUNCTION_CALL,
         ph: Trace.Types.Events.Phase.COMPLETE,
         cat: 'devtools-timeline',
-        dur: Trace.Types.Timing.MicroSeconds(100),
-        ts: Trace.Types.Timing.MicroSeconds(100),
+        dur: Trace.Types.Timing.Micro(100),
+        ts: Trace.Types.Timing.Micro(100),
         pid: Trace.Types.Events.ProcessID(1),
         tid: Trace.Types.Events.ThreadID(1),
         args: {
@@ -551,7 +550,7 @@ describeWithEnvironment('Trace helpers', function() {
       const filteredByEndTimeEvents = Trace.Helpers.Trace.findUpdateLayoutTreeEvents(
           mainThread.entries,
           parsedTrace.Meta.traceBounds.min,
-          Trace.Types.Timing.MicroSeconds(lastEvent.ts - 1_000),
+          Trace.Types.Timing.Micro(lastEvent.ts - 1_000),
       );
       assert.lengthOf(filteredByEndTimeEvents, 10);
     });
@@ -607,8 +606,8 @@ describeWithEnvironment('Trace helpers', function() {
       Trace.Helpers.Trace.forEachEvent(traceEvents, {
         onEndEvent,
         onStartEvent,
-        startTime: Trace.Types.Timing.MicroSeconds(5),
-        endTime: Trace.Types.Timing.MicroSeconds(9),
+        startTime: Trace.Types.Timing.Micro(5),
+        endTime: Trace.Types.Timing.Micro(9),
       });
       const eventsFromStartEventCalls = onStartEvent.getCalls().map(a => a.args[0]);
       const eventsFromEndEventCalls = onEndEvent.getCalls().map(a => a.args[0]);
@@ -672,9 +671,9 @@ describeWithEnvironment('Trace helpers', function() {
         onInstantEvent,
       });
 
-      assert.strictEqual(onStartEvent.callCount, 0);
-      assert.strictEqual(onEndEvent.callCount, 0);
-      assert.strictEqual(onInstantEvent.callCount, 1);
+      sinon.assert.callCount(onStartEvent, 0);
+      sinon.assert.callCount(onEndEvent, 0);
+      sinon.assert.callCount(onInstantEvent, 1);
     });
 
     it('skips async events by default', async () => {
@@ -692,9 +691,9 @@ describeWithEnvironment('Trace helpers', function() {
         onInstantEvent,
       });
 
-      assert.strictEqual(onStartEvent.callCount, 0);
-      assert.strictEqual(onEndEvent.callCount, 0);
-      assert.strictEqual(onInstantEvent.callCount, 0);
+      sinon.assert.callCount(onStartEvent, 0);
+      sinon.assert.callCount(onEndEvent, 0);
+      sinon.assert.callCount(onInstantEvent, 0);
     });
 
     it('can be configured to include async events', async () => {
@@ -713,9 +712,9 @@ describeWithEnvironment('Trace helpers', function() {
         ignoreAsyncEvents: false,
       });
 
-      assert.strictEqual(onStartEvent.callCount, 0);
-      assert.strictEqual(onEndEvent.callCount, 0);
-      assert.strictEqual(onInstantEvent.callCount, 2);
+      sinon.assert.callCount(onStartEvent, 0);
+      sinon.assert.callCount(onEndEvent, 0);
+      sinon.assert.callCount(onInstantEvent, 2);
     });
   });
 
@@ -732,7 +731,7 @@ describeWithEnvironment('Trace helpers', function() {
   describe('findNextEventAfterTimestamp', () => {
     it('gets the first screenshot after a trace', async function() {
       const {parsedTrace} = await TraceLoader.traceEngine(this, 'cls-multiple-frames.json.gz');
-      const screenshots = parsedTrace.Screenshots.all;
+      const screenshots = parsedTrace.Screenshots.legacySyntheticScreenshots ?? [];
       const {clusters} = parsedTrace.LayoutShifts;
       const shifts = clusters.flatMap(cluster => cluster.events);
       assert.isAtLeast(shifts.length, 10);
@@ -748,7 +747,7 @@ describeWithEnvironment('Trace helpers', function() {
         assert.isNotNull(nextScreenshot);
         assert.isNotNull(prevScreenshot);
         // Make sure the screenshot came after the shift.
-        assert.isAbove(nextScreenshot!.ts, shift.ts);
+        assert.isAbove(nextScreenshot.ts, shift.ts);
         // Make sure the previous screenshot came before the shift
         assert.isBelow(prevScreenshot.ts, shift.ts);
 

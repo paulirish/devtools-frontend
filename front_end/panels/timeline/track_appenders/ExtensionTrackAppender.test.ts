@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 import { // eslint-disable-line rulesdir/es-modules-import
-  createTraceExtensionDataFromTestInput,
-  type ExtensionTestData,
+  createTraceExtensionDataFromPerformanceAPITestInput,
+  type PerformanceAPIExtensionTestData,
 } from '../../../models/trace/handlers/ExtensionTraceDataHandler.test.js';
 import * as Trace from '../../../models/trace/trace.js';
 import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
@@ -18,8 +18,9 @@ function initTrackAppender(
     flameChartData: PerfUI.FlameChart.FlameChartTimelineData, parsedTrace: Trace.Handlers.Types.ParsedTrace,
     entryData: Trace.Types.Events.Event[], entryTypeByLevel: Timeline.TimelineFlameChartDataProvider.EntryType[]):
     Timeline.ExtensionTrackAppender.ExtensionTrackAppender[] {
+  const entityMapper = new Timeline.Utils.EntityMapper.EntityMapper(parsedTrace);
   const compatibilityTracksAppender = new Timeline.CompatibilityTracksAppender.CompatibilityTracksAppender(
-      flameChartData, parsedTrace, entryData, entryTypeByLevel);
+      flameChartData, parsedTrace, entryData, entryTypeByLevel, entityMapper);
 
   return compatibilityTracksAppender.allVisibleTrackAppenders().filter(track => track.appenderName === 'Extension') as
       Timeline.ExtensionTrackAppender.ExtensionTrackAppender[];
@@ -49,7 +50,7 @@ describeWithEnvironment('ExtensionTrackAppender', function() {
 
   describe('appendTrackAtLevel', function() {
     it('creates flamechart groups for the Extension tracks properly', function() {
-      assert.lengthOf(flameChartData.groups, 3);
+      assert.lengthOf(flameChartData.groups, 4);
       assert.strictEqual(flameChartData.groups[0].name, 'A track group — Custom track');
       assert.strictEqual(flameChartData.groups[0].startLevel, 0);
       assert.strictEqual(flameChartData.groups[0].style.nestingLevel, 0);
@@ -66,8 +67,7 @@ describeWithEnvironment('ExtensionTrackAppender', function() {
           parsedTrace.ExtensionTraceData.extensionTrackData.map(track => Object.values(track.entriesByTrack)).flat(2);
       for (let i = 0; i < allExtensionTrackEntries.length; ++i) {
         const event = allExtensionTrackEntries[i];
-        assert.strictEqual(
-            flameChartData.entryStartTimes[i], Trace.Helpers.Timing.microSecondsToMilliseconds(event.ts));
+        assert.strictEqual(flameChartData.entryStartTimes[i], Trace.Helpers.Timing.microToMilli(event.ts));
       }
     });
 
@@ -81,7 +81,7 @@ describeWithEnvironment('ExtensionTrackAppender', function() {
           continue;
         }
         const expectedTotalTimeForEvent = event.dur ?
-            Trace.Helpers.Timing.microSecondsToMilliseconds(event.dur) :
+            Trace.Helpers.Timing.microToMilli(event.dur) :
             Timeline.TimelineFlameChartDataProvider.InstantEventVisibleDurationMs;
         assert.strictEqual(flameChartData.entryTotalTimes[i], expectedTotalTimeForEvent);
       }
@@ -112,8 +112,8 @@ describeWithEnvironment('ExtensionTrackAppender', function() {
              ts: 100,
              dur: 100,
            },
-         ] as ExtensionTestData[];
-         const traceExtensionData = await createTraceExtensionDataFromTestInput(extensionData);
+         ] as PerformanceAPIExtensionTestData[];
+         const traceExtensionData = await createTraceExtensionDataFromPerformanceAPITestInput(extensionData);
          const testParsedTrace = getBaseTraceParseModelData({ExtensionTraceData: traceExtensionData});
          entryData = [];
          flameChartData = PerfUI.FlameChart.FlameChartTimelineData.createEmpty();

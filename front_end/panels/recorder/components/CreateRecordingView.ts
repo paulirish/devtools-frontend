@@ -1,6 +1,7 @@
 // Copyright 2023 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view, rulesdir/inject-checkbox-styles */
 
 import '../../../ui/legacy/legacy.js';
 import '../../../ui/components/icon_button/icon_button.js';
@@ -9,14 +10,14 @@ import './ControlButton.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as Input from '../../../ui/components/input/input.js';
-import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import * as Lit from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 import * as Models from '../models/models.js';
 import * as Actions from '../recorder-actions/recorder-actions.js';
 
 import createRecordingViewStyles from './createRecordingView.css.js';
 
-const {html, Directives: {ifDefined}} = LitHtml;
+const {html, Directives: {ifDefined}} = Lit;
 
 const UIStrings = {
   /**
@@ -94,7 +95,7 @@ const UIStrings = {
    * @description Title of a link to the developer documentation.
    */
   learnMore: 'Learn more',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings(
     'panels/recorder/components/CreateRecordingView.ts',
     UIStrings,
@@ -142,7 +143,7 @@ export interface CreateRecordingViewData {
 
 export class CreateRecordingView extends HTMLElement {
   readonly #shadow = this.attachShadow({mode: 'open'});
-  #defaultRecordingName: string = '';
+  #defaultRecordingName = '';
   #error?: Error;
   #recorderSettings?: Models.RecorderSettings.RecorderSettings;
 
@@ -152,11 +153,6 @@ export class CreateRecordingView extends HTMLElement {
   }
 
   connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [
-      createRecordingViewStyles,
-      Input.textInputStyles,
-      Input.checkboxStyles,
-    ];
     this.#render();
     this.#shadow.querySelector('input')?.focus();
   }
@@ -181,9 +177,7 @@ export class CreateRecordingView extends HTMLElement {
   }
 
   startRecording(): void {
-    const nameInput = this.#shadow.querySelector(
-                          '#user-flow-name',
-                          ) as HTMLInputElement;
+    const nameInput = this.#shadow.querySelector<HTMLInputElement>('#user-flow-name');
     if (!nameInput) {
       throw new Error('input#user-flow-name not found');
     }
@@ -262,8 +256,11 @@ export class CreateRecordingView extends HTMLElement {
       ],
     ]);
     // clang-format off
-    LitHtml.render(
+    Lit.render(
       html`
+        <style>${createRecordingViewStyles}</style>
+        <style>${Input.textInputStyles}</style>
+        <style>${Input.checkboxStyles}</style>
         <div class="wrapper">
           <div class="header-wrapper">
             <h1>${i18nString(UIStrings.createRecording)}</h1>

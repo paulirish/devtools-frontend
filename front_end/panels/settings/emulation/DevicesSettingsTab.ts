@@ -1,11 +1,13 @@
 // Copyright 2015 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
+
+import '../../../ui/components/cards/cards.js';
 
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as EmulationModel from '../../../models/emulation/emulation.js';
 import type * as Buttons from '../../../ui/components/buttons/buttons.js';
-import * as Cards from '../../../ui/components/cards/cards.js';
 import * as UI from '../../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 
@@ -68,7 +70,7 @@ const UIStrings = {
    *@example {TestDevice} PH1
    */
   deviceAddedOrUpdated: 'Device {PH1} successfully added/updated.',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/settings/emulation/DevicesSettingsTab.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -85,6 +87,7 @@ export class DevicesSettingsTab extends UI.Widget.VBox implements
 
   constructor() {
     super();
+    this.registerRequiredCSS(devicesSettingsTabStyles);
 
     this.element.setAttribute('jslog', `${VisualLogging.pane('devices')}`);
 
@@ -93,6 +96,7 @@ export class DevicesSettingsTab extends UI.Widget.VBox implements
     this.containerElement.classList.add('settings-card-container', 'ignore-list-settings');
 
     this.#defaultDeviceList = new UI.ListWidget.ListWidget(this, false /* delegatesFocus */);
+    this.#defaultDeviceList.registerRequiredCSS(devicesSettingsTabStyles);
     this.#defaultDeviceList.element.classList.add('devices-list', 'device-card-content');
 
     this.muteUpdate = false;
@@ -115,31 +119,23 @@ export class DevicesSettingsTab extends UI.Widget.VBox implements
     const deviceList = customSettings.createChild('div');
     customSettings.appendChild(this.addCustomButton);
 
-    const customDevicesCard = new Cards.Card.Card();
-    customDevicesCard.data = {
-      heading: i18nString(UIStrings.customDevices),
-      content: [customSettings],
-    };
-    this.containerElement.appendChild(customDevicesCard);
+    const customDevicesCard = this.containerElement.createChild('devtools-card');
+    customDevicesCard.heading = i18nString(UIStrings.customDevices);
+    customDevicesCard.append(customSettings);
 
     this.#customDeviceList = new UI.ListWidget.ListWidget(this, false /* delegatesFocus */);
+    this.#customDeviceList.registerRequiredCSS(devicesSettingsTabStyles);
     this.#customDeviceList.element.classList.add('devices-list');
     this.#customDeviceList.show(deviceList);
 
-    const defaultDevicesCard = new Cards.Card.Card();
-    defaultDevicesCard.data = {
-      heading: i18nString(UIStrings.defaultDevices),
-      content: [this.#defaultDeviceList.element],
-    };
-    this.containerElement.appendChild(defaultDevicesCard);
+    const defaultDevicesCard = this.containerElement.createChild('devtools-card');
+    defaultDevicesCard.heading = i18nString(UIStrings.defaultDevices);
+    defaultDevicesCard.append(this.#defaultDeviceList.element);
   }
 
   override wasShown(): void {
     super.wasShown();
     this.devicesUpdated();
-    this.registerCSSFiles([devicesSettingsTabStyles]);
-    this.#defaultDeviceList.registerCSSFiles([devicesSettingsTabStyles]);
-    this.#customDeviceList.registerCSSFiles([devicesSettingsTabStyles]);
   }
 
   private devicesUpdated(): void {
@@ -345,7 +341,7 @@ export class DevicesSettingsTab extends UI.Widget.VBox implements
     }
 
     function titleValidator(
-        item: EmulationModel.EmulatedDevices.EmulatedDevice, index: number,
+        _item: EmulationModel.EmulatedDevices.EmulatedDevice, _index: number,
         input: UI.ListWidget.EditorControl): UI.ListWidget.ValidatorResult {
       let valid = false;
       let errorMessage;
@@ -364,19 +360,19 @@ export class DevicesSettingsTab extends UI.Widget.VBox implements
     }
 
     function widthValidator(
-        item: EmulationModel.EmulatedDevices.EmulatedDevice, index: number,
+        _item: EmulationModel.EmulatedDevices.EmulatedDevice, _index: number,
         input: UI.ListWidget.EditorControl): UI.ListWidget.ValidatorResult {
       return EmulationModel.DeviceModeModel.DeviceModeModel.widthValidator(input.value);
     }
 
     function heightValidator(
-        item: EmulationModel.EmulatedDevices.EmulatedDevice, index: number,
+        _item: EmulationModel.EmulatedDevices.EmulatedDevice, _index: number,
         input: UI.ListWidget.EditorControl): UI.ListWidget.ValidatorResult {
       return EmulationModel.DeviceModeModel.DeviceModeModel.heightValidator(input.value);
     }
 
     function scaleValidator(
-        item: EmulationModel.EmulatedDevices.EmulatedDevice, index: number,
+        _item: EmulationModel.EmulatedDevices.EmulatedDevice, _index: number,
         input: UI.ListWidget.EditorControl): UI.ListWidget.ValidatorResult {
       return EmulationModel.DeviceModeModel.DeviceModeModel.scaleValidator(input.value);
     }

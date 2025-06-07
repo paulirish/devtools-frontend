@@ -49,6 +49,7 @@ describeWithMockConnection('PersistenceImpl', () => {
   };
 
   beforeEach(() => {
+    backend = new MockProtocolBackend();
     target = createTarget();
 
     const workspace = Workspace.Workspace.WorkspaceImpl.instance();
@@ -63,7 +64,6 @@ describeWithMockConnection('PersistenceImpl', () => {
     breakpointManager = Breakpoints.BreakpointManager.BreakpointManager.instance(
         {forceNew: true, targetManager, workspace, debuggerWorkspaceBinding});
 
-    backend = new MockProtocolBackend();
     Persistence.Persistence.PersistenceImpl.instance({forceNew: true, workspace, breakpointManager});
   });
 
@@ -115,7 +115,12 @@ describeWithMockConnection('PersistenceImpl', () => {
     const fileSystemPath = urlString`file://path/to/filesystem`;
     const fileSystemFileUrl = urlString`${fileSystemPath + '/script.js'}`;
     const {uiSourceCode: fileSystemUiSourceCode, project} = createFileSystemFileForPersistenceTests(
-        {fileSystemPath, fileSystemFileUrl, type: ''}, SCRIPT_DESCRIPTION.url, SCRIPT_DESCRIPTION.content, target);
+        {
+          fileSystemPath,
+          fileSystemFileUrl,
+          type: Persistence.PlatformFileSystem.PlatformFileSystemType.WORKSPACE_PROJECT
+        },
+        SCRIPT_DESCRIPTION.url, SCRIPT_DESCRIPTION.content, target);
     const breakpointLine = 0;
 
     // Set the breakpoint response for our upcoming request.
@@ -140,7 +145,12 @@ describeWithMockConnection('PersistenceImpl', () => {
        const fileSystemPath = urlString`file://path/to/filesystem`;
        const fileSystemFileUrl = urlString`${fileSystemPath + '/script.js'}`;
        const {uiSourceCode: fileSystemUiSourceCode, project} = createFileSystemFileForPersistenceTests(
-           {fileSystemPath, fileSystemFileUrl, type: ''}, SCRIPT_DESCRIPTION.url, SCRIPT_DESCRIPTION.content, target);
+           {
+             fileSystemPath,
+             fileSystemFileUrl,
+             type: Persistence.PlatformFileSystem.PlatformFileSystemType.WORKSPACE_PROJECT
+           },
+           SCRIPT_DESCRIPTION.url, SCRIPT_DESCRIPTION.content, target);
        const breakpointLine = 0;
 
        // Set the breakpoint response for our upcoming request.

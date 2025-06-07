@@ -1,6 +1,7 @@
 // Copyright 2020 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 /*
  * Copyright (C) 2008 Apple Inc. All Rights Reserved.
@@ -128,7 +129,7 @@ const UIStrings = {
    * Clicking on the button will display that object in the Memory inspector panel.
    */
   openInMemoryInpector: 'Open in Memory inspector panel',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/components/object_ui/ObjectPropertiesSection.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 const EXPANDABLE_MAX_LENGTH = 50;
@@ -172,7 +173,7 @@ export class ObjectPropertiesSection extends UI.TreeOutline.TreeOutlineInShadow 
     }
 
     objectPropertiesSectionMap.set(this.element, this);
-    this.registerCSSFiles([objectValueStyles, objectPropertiesSectionStyles]);
+    this.registerRequiredCSS(objectValueStyles, objectPropertiesSectionStyles);
     this.rootElement().childrenListElement.classList.add('source-code', 'object-properties-section');
   }
 
@@ -192,7 +193,7 @@ export class ObjectPropertiesSection extends UI.TreeOutline.TreeOutlineInShadow 
       readOnly?: boolean): ObjectPropertiesSection {
     const titleElement = document.createElement('span');
     titleElement.classList.add('source-code');
-    const shadowRoot = UI.UIUtils.createShadowRootWithCoreStyles(titleElement, {cssFile: [objectValueStyles]});
+    const shadowRoot = UI.UIUtils.createShadowRootWithCoreStyles(titleElement, {cssFile: objectValueStyles});
     const propertyValue =
         ObjectPropertiesSection.createPropertyValue(object, /* wasThrown */ false, /* showPreview */ true);
     shadowRoot.appendChild(propertyValue.element);
@@ -206,15 +207,6 @@ export class ObjectPropertiesSection extends UI.TreeOutline.TreeOutlineInShadow 
     }
 
     return objectPropertiesSection;
-  }
-
-  static getPropertyValuesByNames(properties: SDK.RemoteObject.RemoteObjectProperty[]):
-      Map<string, SDK.RemoteObject.RemoteObject|undefined> {
-    const map = new Map();
-    for (const property of properties) {
-      map.set(property.name, property.value);
-    }
-    return map;
   }
 
   static compareProperties(
@@ -334,7 +326,7 @@ export class ObjectPropertiesSection extends UI.TreeOutline.TreeOutlineInShadow 
     function nameAndArguments(contents: string): string {
       const startOfArgumentsIndex = contents.indexOf('(');
       const endOfArgumentsMatch = contents.match(/\)\s*{/);
-      if (startOfArgumentsIndex !== -1 && endOfArgumentsMatch && endOfArgumentsMatch.index !== undefined &&
+      if (startOfArgumentsIndex !== -1 && endOfArgumentsMatch?.index !== undefined &&
           endOfArgumentsMatch.index > startOfArgumentsIndex) {
         const name = contents.substring(0, startOfArgumentsIndex).trim() || defaultName;
         const args = contents.substring(startOfArgumentsIndex, endOfArgumentsMatch.index + 1);
@@ -358,7 +350,7 @@ export class ObjectPropertiesSection extends UI.TreeOutline.TreeOutlineInShadow 
   }
 
   static createPropertyValueWithCustomSupport(
-      value: SDK.RemoteObject.RemoteObject, wasThrown: boolean, showPreview: boolean, parentElement?: Element,
+      value: SDK.RemoteObject.RemoteObject, wasThrown: boolean, showPreview: boolean,
       linkifier?: Components.Linkifier.Linkifier, isSyntheticProperty?: boolean,
       variableName?: string): ObjectPropertyValue {
     if (value.customPreview()) {
@@ -367,7 +359,7 @@ export class ObjectPropertiesSection extends UI.TreeOutline.TreeOutlineInShadow 
       return new ObjectPropertyValue(result);
     }
     return ObjectPropertiesSection.createPropertyValue(
-        value, wasThrown, showPreview, parentElement, linkifier, isSyntheticProperty, variableName);
+        value, wasThrown, showPreview, linkifier, isSyntheticProperty, variableName);
   }
 
   static appendMemoryIcon(element: Element, object: SDK.RemoteObject.RemoteObject, expression?: string): void {
@@ -401,7 +393,7 @@ export class ObjectPropertiesSection extends UI.TreeOutline.TreeOutlineInShadow 
   }
 
   static createPropertyValue(
-      value: SDK.RemoteObject.RemoteObject, wasThrown: boolean, showPreview: boolean, parentElement?: Element,
+      value: SDK.RemoteObject.RemoteObject, wasThrown: boolean, showPreview: boolean,
       linkifier?: Components.Linkifier.Linkifier, isSyntheticProperty = false,
       variableName?: string): ObjectPropertyValue {
     let propertyValue;
@@ -498,7 +490,7 @@ export class ObjectPropertiesSection extends UI.TreeOutline.TreeOutlineInShadow 
     function createNodeElement(): Element {
       const valueElement = document.createElement('span');
       valueElement.classList.add('object-value-node');
-      createSpansForNodeTitle(valueElement, (description as string));
+      createSpansForNodeTitle(valueElement, (description));
       valueElement.addEventListener('click', event => {
         void Common.Revealer.reveal(value);
         event.consume(true);
@@ -516,7 +508,7 @@ export class ObjectPropertiesSection extends UI.TreeOutline.TreeOutlineInShadow 
     return func.debuggerModel().functionDetailsPromise(func).then(didGetDetails);
 
     function didGetDetails(response: SDK.DebuggerModel.FunctionDetails|null): void {
-      if (linkify && response && response.location) {
+      if (linkify && response?.location) {
         element.classList.add('linkified');
         element.addEventListener('click', () => {
           void Common.Revealer.reveal(response.location);
@@ -526,7 +518,7 @@ export class ObjectPropertiesSection extends UI.TreeOutline.TreeOutlineInShadow 
 
       // The includePreview flag is false for formats such as console.dir().
       let defaultName: string|('' | 'anonymous') = includePreview ? '' : 'anonymous';
-      if (response && response.functionName) {
+      if (response?.functionName) {
         defaultName = response.functionName;
       }
       const valueElement =
@@ -538,7 +530,7 @@ export class ObjectPropertiesSection extends UI.TreeOutline.TreeOutlineInShadow 
   static isDisplayableProperty(
       property: SDK.RemoteObject.RemoteObjectProperty,
       parentProperty?: SDK.RemoteObject.RemoteObjectProperty): boolean {
-    if (!parentProperty || !parentProperty.synthetic) {
+    if (!parentProperty?.synthetic) {
       return true;
     }
     const name = property.name;
@@ -592,21 +584,12 @@ export class ObjectPropertiesSection extends UI.TreeOutline.TreeOutlineInShadow 
 /** @const */
 const ARRAY_LOAD_THRESHOLD = 100;
 
-let maxRenderableStringLength = 10000;
-
-export function setMaxRenderableStringLength(value: number): void {
-  maxRenderableStringLength = value;
-}
-export function getMaxRenderableStringLength(): number {
-  return maxRenderableStringLength;
-}
+const maxRenderableStringLength = 10000;
 
 export class ObjectPropertiesSectionsTreeOutline extends UI.TreeOutline.TreeOutlineInShadow {
-  private readonly editable: boolean;
-  constructor(options?: TreeOutlineOptions|null) {
+  constructor() {
     super();
-    this.registerCSSFiles([objectValueStyles, objectPropertiesSectionStyles]);
-    this.editable = !(options && options.readOnly);
+    this.registerRequiredCSS(objectValueStyles, objectPropertiesSectionStyles);
     this.contentElement.classList.add('source-code');
     this.contentElement.classList.add('object-properties-section');
   }
@@ -689,7 +672,7 @@ export class RootElement extends UI.TreeOutline.TreeElement {
   override async onpopulate(): Promise<void> {
     const treeOutline = (this.treeOutline as ObjectPropertiesSection | null);
     const skipProto = treeOutline ? Boolean(treeOutline.skipProtoInternal) : false;
-    return ObjectPropertyTreeElement.populate(
+    return await ObjectPropertyTreeElement.populate(
         this, this.object, skipProto, false, this.linkifier, this.emptyPlaceholder, this.propertiesMode,
         this.extraProperties, this.targetObject);
   }
@@ -864,9 +847,6 @@ export class ObjectPropertyTreeElement extends UI.TreeOutline.TreeElement {
     function onInvokeGetterClick(event: Event): void {
       event.consume();
       if (object) {
-        // The definition of callFunction expects an unknown, and setting to `any` causes Closure to fail.
-        // However, leaving this as unknown also causes TypeScript to fail, so for now we leave this as unchecked.
-        // @ts-ignore  TODO(crbug.com/1011811): Fix after Closure is removed.
         void object.callFunction(invokeGetter, [{value: JSON.stringify(propertyPath)}]).then(callback);
       }
     }
@@ -875,7 +855,7 @@ export class ObjectPropertyTreeElement extends UI.TreeOutline.TreeElement {
       let result: Object = this;
       const properties = JSON.parse(arrayStr);
       for (let i = 0, n = properties.length; i < n; ++i) {
-        // @ts-ignore callFunction expects this to be a generic Object, so while this works we can't be more specific on types.
+        // @ts-expect-error callFunction expects this to be a generic Object, so while this works we can't be more specific on types.
         result = result[properties[i]];
       }
       return result;
@@ -1046,8 +1026,8 @@ export class ObjectPropertyTreeElement extends UI.TreeOutline.TreeElement {
     } else if (this.property.value) {
       const showPreview = this.property.name !== '[[Prototype]]';
       this.propertyValue = ObjectPropertiesSection.createPropertyValueWithCustomSupport(
-          this.property.value, this.property.wasThrown, showPreview, this.listItemElement, this.linkifier,
-          this.property.synthetic, this.path() /* variableName */);
+          this.property.value, this.property.wasThrown, showPreview, this.linkifier, this.property.synthetic,
+          this.path() /* variableName */);
       this.valueElement = (this.propertyValue.element as HTMLElement);
     } else if (this.property.getter) {
       this.valueElement = document.createElement('span');
@@ -1063,7 +1043,7 @@ export class ObjectPropertyTreeElement extends UI.TreeOutline.TreeElement {
           function invokeGetter(getter) {
             return Reflect.apply(getter, this, []);
           }`;
-        // @ts-ignore No way to teach TypeScript to preserve the Function-ness of `getter`.
+        // @ts-expect-error No way to teach TypeScript to preserve the Function-ness of `getter`.
         // Also passing a string instead of a Function to avoid coverage implementation messing with it.
         void object.callFunction(invokeGetter, [SDK.RemoteObject.RemoteObject.toCallArgument(getter)])
             .then(this.onInvokeGetterClick.bind(this));
@@ -1148,7 +1128,7 @@ export class ObjectPropertyTreeElement extends UI.TreeOutline.TreeElement {
             i18nString(UIStrings.copyValue), copyValueHandler, {jslogContext: 'copy-value'});
       }
     }
-    if (!this.property.synthetic && this.nameElement && this.nameElement.title) {
+    if (!this.property.synthetic && this.nameElement?.title) {
       const copyPathHandler = Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText.bind(
           Host.InspectorFrontendHost.InspectorFrontendHostInstance, this.nameElement.title);
       contextMenu.clipboardSection().appendItem(
@@ -1442,14 +1422,14 @@ export class ArrayGroupingTreeElement extends UI.TreeOutline.TreeElement {
       return {ranges};
     }
 
-    async function callback(result: {ranges: Array<Array<number>>}|undefined): Promise<void> {
+    async function callback(result: {ranges: number[][]}|undefined|null): Promise<void> {
       if (!result) {
         return;
       }
-      const ranges = (result.ranges as number[][]);
+      const ranges = (result.ranges);
       if (ranges.length === 1) {
         // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-        // @ts-ignore
+        // @ts-expect-error
         await ArrayGroupingTreeElement.populateAsFragment(treeNode, object, ranges[0][0], ranges[0][1], linkifier);
       } else {
         for (let i = 0; i < ranges.length; ++i) {
@@ -1458,7 +1438,7 @@ export class ArrayGroupingTreeElement extends UI.TreeOutline.TreeElement {
           const count = ranges[i][2];
           if (fromIndex === toIndex) {
             // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-            // @ts-ignore
+            // @ts-expect-error
             await ArrayGroupingTreeElement.populateAsFragment(treeNode, object, fromIndex, toIndex, linkifier);
           } else {
             treeNode.appendChild(new ArrayGroupingTreeElement(object, fromIndex, toIndex, count, linkifier));
@@ -1467,7 +1447,7 @@ export class ArrayGroupingTreeElement extends UI.TreeOutline.TreeElement {
       }
       if (topLevel) {
         // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-        // @ts-ignore
+        // @ts-expect-error
         await ArrayGroupingTreeElement.populateNonIndexProperties(treeNode, object, linkifier);
       }
     }
@@ -1499,10 +1479,11 @@ export class ArrayGroupingTreeElement extends UI.TreeOutline.TreeElement {
     }
 
     function buildArrayFragment(
-        this: {
-          [x: number]: Object,
-        },
-        fromIndex?: number, toIndex?: number, sparseIterationThreshold?: number): unknown {
+        this: Record<number, Object>,
+        fromIndex?: number,
+        toIndex?: number,
+        sparseIterationThreshold?: number,
+        ): unknown {
       const result = Object.create(null);
 
       if (fromIndex === undefined || toIndex === undefined || sparseIterationThreshold === undefined) {
@@ -1548,7 +1529,7 @@ export class ArrayGroupingTreeElement extends UI.TreeOutline.TreeElement {
       return;
     }
     // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-    // @ts-ignore
+    // @ts-expect-error
     await ArrayGroupingTreeElement.populateAsFragment(this, this.object, this.fromIndex, this.toIndex, this.linkifier);
   }
 
@@ -1755,7 +1736,4 @@ export class ExpandableTextPropertyValue extends ObjectPropertyValue {
   private copyText(): void {
     Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(this.text);
   }
-}
-export interface TreeOutlineOptions {
-  readOnly?: boolean;
 }

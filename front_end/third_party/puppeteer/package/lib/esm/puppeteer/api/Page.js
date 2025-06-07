@@ -266,7 +266,7 @@ let Page = (() => {
          * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
          * can be passed as-is and a
          * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-         * allows quering by
+         * allows querying by
          * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
          * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
          * and
@@ -293,7 +293,7 @@ let Page = (() => {
          * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
          * can be passed as-is and a
          * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-         * allows quering by
+         * allows querying by
          * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
          * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
          * and
@@ -427,7 +427,7 @@ let Page = (() => {
          * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
          * can be passed as-is and a
          * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-         * allows quering by
+         * allows querying by
          * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
          * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
          * and
@@ -500,7 +500,7 @@ let Page = (() => {
          * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
          * can be passed as-is and a
          * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-         * allows quering by
+         * allows querying by
          * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
          * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
          * and
@@ -706,7 +706,12 @@ let Page = (() => {
          *
          * ```ts
          * const frame = await page.waitForFrame(async frame => {
-         *   return frame.name() === 'Test';
+         *   const frameElement = await frame.frameElement();
+         *   if (!frameElement) {
+         *     return false;
+         *   }
+         *   const name = await frameElement.evaluate(el => el.getAttribute('name'));
+         *   return name === 'test';
          * });
          * ```
          */
@@ -851,8 +856,8 @@ let Page = (() => {
          *
          * @remarks
          *
-         * All recordings will be {@link https://www.webmproject.org/ | WebM} format using
-         * the {@link https://www.webmproject.org/vp9/ | VP9} video codec. The FPS is 30.
+         * By default, all recordings will be {@link https://www.webmproject.org/ | WebM} format using
+         * the {@link https://www.webmproject.org/vp9/ | VP9} video codec, with a frame rate of 30 FPS.
          *
          * You must have {@link https://ffmpeg.org/ | ffmpeg} installed on your system.
          */
@@ -891,7 +896,6 @@ let Page = (() => {
             }
             const recorder = new ScreenRecorder(this, width, height, {
                 ...options,
-                path: options.ffmpegPath,
                 crop,
             });
             try {
@@ -1114,7 +1118,7 @@ let Page = (() => {
          * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
          * can be passed as-is and a
          * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-         * allows quering by
+         * allows querying by
          * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
          * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
          * and
@@ -1141,7 +1145,7 @@ let Page = (() => {
          * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
          * can be passed as-is and a
          * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-         * allows quering by
+         * allows querying by
          * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
          * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
          * and
@@ -1175,7 +1179,7 @@ let Page = (() => {
          * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
          * can be passed as-is and a
          * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-         * allows quering by
+         * allows querying by
          * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
          * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
          * and
@@ -1214,7 +1218,7 @@ let Page = (() => {
          * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
          * can be passed as-is and a
          * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-         * allows quering by
+         * allows querying by
          * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
          * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
          * and
@@ -1246,7 +1250,7 @@ let Page = (() => {
          * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
          * can be passed as-is and a
          * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-         * allows quering by
+         * allows querying by
          * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
          * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
          * and
@@ -1284,7 +1288,7 @@ let Page = (() => {
          * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
          * can be passed as-is and a
          * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-         * allows quering by
+         * allows querying by
          * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
          * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
          * and
@@ -1336,7 +1340,7 @@ let Page = (() => {
          * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
          * can be passed as-is and a
          * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
-         * allows quering by
+         * allows querying by
          * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
          * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
          * and

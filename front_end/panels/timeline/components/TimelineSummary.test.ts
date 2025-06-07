@@ -16,7 +16,7 @@ describeWithMockConnection('TimelineSummary', () => {
       {title: 'Rendering', value: 0, color: 'black'},
     ];
 
-    const summary = new TimelineComponents.TimelineSummary.TimelineSummary();
+    const summary = new TimelineComponents.TimelineSummary.CategorySummary();
     summary.data = {
       rangeStart: 0,
       rangeEnd: 110,
@@ -45,7 +45,7 @@ describeWithMockConnection('TimelineSummary', () => {
   it('no categories should just render Total', async function() {
     const categories: TimelineComponents.TimelineSummary.CategoryData[] = [];
 
-    const summary = new TimelineComponents.TimelineSummary.TimelineSummary();
+    const summary = new TimelineComponents.TimelineSummary.CategorySummary();
     summary.data = {
       rangeStart: 0,
       rangeEnd: 110,
@@ -63,7 +63,7 @@ describeWithMockConnection('TimelineSummary', () => {
     const categorySummaries = summary.shadowRoot.querySelector('.category-summary');
     // Should just have the "Total" row.
     const rows = categorySummaries?.querySelectorAll('.category-row') || [];
-    assert.isTrue(rows.length === 1);
+    assert.lengthOf(rows, 1);
 
     const swatch = rows[0].querySelector('.category-swatch');
     assert.isNotNull(swatch);

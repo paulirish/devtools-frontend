@@ -56,7 +56,7 @@ const UIStrings = {
    *@description Error message when failing to load a script source text
    */
   unableToFetchScriptSource: 'Unable to fetch script source.',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('core/sdk/Script.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -87,13 +87,14 @@ export class Script implements TextUtils.ContentProvider.ContentProvider, FrameA
   #contentPromise: Promise<TextUtils.ContentData.ContentDataOrError>|null;
   readonly #embedderNameInternal: Platform.DevToolsPath.UrlString|null;
   readonly isModule: boolean|null;
+  readonly buildId: string|null;
   constructor(
       debuggerModel: DebuggerModel, scriptId: Protocol.Runtime.ScriptId, sourceURL: Platform.DevToolsPath.UrlString,
       startLine: number, startColumn: number, endLine: number, endColumn: number, executionContextId: number,
       hash: string, isContentScript: boolean, isLiveEdit: boolean, sourceMapURL: string|undefined,
       hasSourceURL: boolean, length: number, isModule: boolean|null, originStackTrace: Protocol.Runtime.StackTrace|null,
       codeOffset: number|null, scriptLanguage: string|null, debugSymbols: Protocol.Debugger.DebugSymbols|null,
-      embedderName: Platform.DevToolsPath.UrlString|null) {
+      embedderName: Platform.DevToolsPath.UrlString|null, buildId: string|null) {
     this.debuggerModel = debuggerModel;
     this.scriptId = scriptId;
     this.sourceURL = sourceURL;
@@ -102,6 +103,7 @@ export class Script implements TextUtils.ContentProvider.ContentProvider, FrameA
     this.endLine = endLine;
     this.endColumn = endColumn;
     this.isModule = isModule;
+    this.buildId = buildId;
 
     this.executionContextId = executionContextId;
     this.hash = hash;
@@ -311,7 +313,7 @@ export class Script implements TextUtils.ContentProvider.ContentProvider, FrameA
   async getWasmBytecode(): Promise<ArrayBuffer> {
     const base64 = await this.debuggerModel.target().debuggerAgent().invoke_getWasmBytecode({scriptId: this.scriptId});
     const response = await fetch(`data:application/wasm;base64,${base64.bytecode}`);
-    return response.arrayBuffer();
+    return await response.arrayBuffer();
   }
 
   originalContentProvider(): TextUtils.ContentProvider.ContentProvider {
@@ -490,7 +492,7 @@ function frameIdForScript(script: Script): Protocol.Page.FrameId|null {
   }
   // This is to overcome compilation cache which doesn't get reset.
   const resourceTreeModel = script.debuggerModel.target().model(ResourceTreeModel);
-  if (!resourceTreeModel || !resourceTreeModel.mainFrame) {
+  if (!resourceTreeModel?.mainFrame) {
     return null;
   }
   return resourceTreeModel.mainFrame.id;

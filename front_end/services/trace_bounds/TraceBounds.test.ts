@@ -6,12 +6,12 @@ import * as Trace from '../../models/trace/trace.js';
 
 import * as TraceBounds from './trace_bounds.js';
 
-const baseTraceWindow: Trace.Types.Timing.TraceWindowMicroSeconds = {
-  min: Trace.Types.Timing.MicroSeconds(0),
-  max: Trace.Types.Timing.MicroSeconds(10_000),
-  range: Trace.Types.Timing.MicroSeconds(10_000),
+const baseTraceWindow: Trace.Types.Timing.TraceWindowMicro = {
+  min: Trace.Types.Timing.Micro(0),
+  max: Trace.Types.Timing.Micro(10_000),
+  range: Trace.Types.Timing.Micro(10_000),
 };
-const baseTraceWindowMilli: Trace.Types.Timing.TraceWindowMilliSeconds =
+const baseTraceWindowMilli: Trace.Types.Timing.TraceWindowMilli =
     Trace.Helpers.Timing.traceWindowMilliSeconds(baseTraceWindow);
 
 describe('TraceBounds', () => {
@@ -39,13 +39,13 @@ describe('TraceBounds', () => {
     manager.addEventListener(TraceBounds.TraceBounds.StateChangedEvent.eventName, onStateChange);
 
     const newMiniMapBounds = {
-      min: Trace.Types.Timing.MicroSeconds(10_000),
-      max: Trace.Types.Timing.MicroSeconds(20_000),
-      range: Trace.Types.Timing.MicroSeconds(10_000),
+      min: Trace.Types.Timing.Micro(10_000),
+      max: Trace.Types.Timing.Micro(20_000),
+      range: Trace.Types.Timing.Micro(10_000),
     };
 
     manager.setMiniMapBounds(newMiniMapBounds);
-    assert.strictEqual(onStateChange.callCount, 1);
+    sinon.assert.callCount(onStateChange, 1);
     const dataFromEvent = onStateChange.firstCall.args[0] as TraceBounds.TraceBounds.StateChangedEvent;
     assert.strictEqual(dataFromEvent.updateType, 'MINIMAP_BOUNDS');
     assert.deepEqual(dataFromEvent.state.micro, {
@@ -63,14 +63,14 @@ describe('TraceBounds', () => {
     manager.addEventListener(TraceBounds.TraceBounds.StateChangedEvent.eventName, onStateChange);
 
     const newBounds = {
-      min: Trace.Types.Timing.MicroSeconds(1_000),
-      max: Trace.Types.Timing.MicroSeconds(5_000),
-      range: Trace.Types.Timing.MicroSeconds(4_000),
+      min: Trace.Types.Timing.Micro(1_000),
+      max: Trace.Types.Timing.Micro(5_000),
+      range: Trace.Types.Timing.Micro(4_000),
     };
     const newBoundsMilli = Trace.Helpers.Timing.traceWindowMilliSeconds(newBounds);
     manager.resetWithNewBounds(newBounds);
 
-    assert.strictEqual(onStateChange.callCount, 1);
+    sinon.assert.callCount(onStateChange, 1);
     const dataFromEvent = onStateChange.firstCall.args[0] as TraceBounds.TraceBounds.StateChangedEvent;
     assert.strictEqual(dataFromEvent.updateType, 'RESET');
     assert.deepEqual(dataFromEvent.state, {
@@ -94,14 +94,14 @@ describe('TraceBounds', () => {
     manager.addEventListener(TraceBounds.TraceBounds.StateChangedEvent.eventName, onStateChange);
 
     const newVisibleWindow = {
-      min: Trace.Types.Timing.MicroSeconds(10_000),
-      max: Trace.Types.Timing.MicroSeconds(20_000),
-      range: Trace.Types.Timing.MicroSeconds(10_000),
+      min: Trace.Types.Timing.Micro(10_000),
+      max: Trace.Types.Timing.Micro(20_000),
+      range: Trace.Types.Timing.Micro(10_000),
     };
 
     manager.setTimelineVisibleWindow(newVisibleWindow);
 
-    assert.strictEqual(onStateChange.callCount, 1);
+    sinon.assert.callCount(onStateChange, 1);
     const dataFromEvent = onStateChange.firstCall.args[0] as TraceBounds.TraceBounds.StateChangedEvent;
     assert.strictEqual(dataFromEvent.updateType, 'VISIBLE_WINDOW');
     assert.deepEqual(dataFromEvent.state.micro, {
@@ -118,13 +118,13 @@ describe('TraceBounds', () => {
     manager.addEventListener(TraceBounds.TraceBounds.StateChangedEvent.eventName, onStateChange);
 
     const newVisibleWindow = {
-      min: Trace.Types.Timing.MicroSeconds(10_000),
-      max: Trace.Types.Timing.MicroSeconds(10_500),
-      range: Trace.Types.Timing.MicroSeconds(500),
+      min: Trace.Types.Timing.Micro(10_000),
+      max: Trace.Types.Timing.Micro(10_500),
+      range: Trace.Types.Timing.Micro(500),
     };
 
     manager.setTimelineVisibleWindow(newVisibleWindow);
-    assert.strictEqual(onStateChange.callCount, 0);
+    sinon.assert.callCount(onStateChange, 0);
     assert.deepEqual(manager.state()?.micro, {
       entireTraceBounds: baseTraceWindow,
       minimapTraceBounds: baseTraceWindow,
@@ -139,13 +139,13 @@ describe('TraceBounds', () => {
     manager.addEventListener(TraceBounds.TraceBounds.StateChangedEvent.eventName, onStateChange);
 
     const newMiniMapBounds = {
-      min: Trace.Types.Timing.MicroSeconds(10_000),
-      max: Trace.Types.Timing.MicroSeconds(10_500),
-      range: Trace.Types.Timing.MicroSeconds(500),
+      min: Trace.Types.Timing.Micro(10_000),
+      max: Trace.Types.Timing.Micro(10_500),
+      range: Trace.Types.Timing.Micro(500),
     };
 
     manager.setMiniMapBounds(newMiniMapBounds);
-    assert.strictEqual(onStateChange.callCount, 0);
+    sinon.assert.callCount(onStateChange, 0);
     assert.deepEqual(manager.state()?.micro, {
       entireTraceBounds: baseTraceWindow,
       minimapTraceBounds: baseTraceWindow,

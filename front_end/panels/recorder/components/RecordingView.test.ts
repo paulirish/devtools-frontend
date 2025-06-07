@@ -108,12 +108,12 @@ describeWithEnvironment('RecordingView', () => {
     dispatchClickEvent(button);
   }
 
-  async function waitForSplitViewToDissappear(
+  async function waitForSplitViewSidebarToBeHidden(
       view: Components.RecordingView.RecordingView,
       ): Promise<void> {
     await getEventPromise(view, 'code-generated');
     const splitView = view.shadowRoot?.querySelector('devtools-split-view');
-    assert.isNull(splitView);
+    assert.strictEqual(splitView?.getAttribute('sidebar-visibility'), 'hidden');
   }
 
   async function changeCodeView(view: Components.RecordingView.RecordingView): Promise<void> {
@@ -156,7 +156,7 @@ describeWithEnvironment('RecordingView', () => {
     clickHideCode(view);
 
     // Click is handled async, therefore, waiting for split view to be removed.
-    await waitForSplitViewToDissappear(view);
+    await waitForSplitViewSidebarToBeHidden(view);
   });
 
   it('should copy the recording to clipboard via copy event', async () => {
@@ -196,7 +196,7 @@ describeWithEnvironment('RecordingView', () => {
 
     await isCalled;
 
-    assert.isTrue(copyText.calledWith(JSON.stringify(step, null, 2) + '\n'));
+    sinon.assert.calledWith(copyText, JSON.stringify(step, null, 2) + '\n');
   });
 
   it('should copy a step to clipboard via custom event', async () => {
@@ -216,7 +216,7 @@ describeWithEnvironment('RecordingView', () => {
 
     await isCalled;
 
-    assert.isTrue(copyText.calledWith(JSON.stringify(step, null, 2) + '\n'));
+    sinon.assert.calledWith(copyText, JSON.stringify(step, null, 2) + '\n');
   });
 
   it('should show code and change preferred copy method', async () => {

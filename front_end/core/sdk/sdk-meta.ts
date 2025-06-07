@@ -320,7 +320,7 @@ const UIStrings = {
    */
   networkCacheExplanation:
       'Disabling the network cache will simulate a network experience similar to a first time visitor.',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('core/sdk/sdk-meta.ts', UIStrings);
 const i18nLazyString = i18n.i18n.getLazilyComputedLocalizedString.bind(undefined, str_);
 
@@ -1013,7 +1013,7 @@ Common.Settings.registerSettingExtension({
   title: i18nLazyString(UIStrings.networkRequestBlocking),
   settingName: 'request-blocking-enabled',
   settingType: Common.Settings.SettingType.BOOLEAN,
-  storageType: Common.Settings.SettingStorageType.SESSION,
+  storageType: Common.Settings.SettingStorageType.LOCAL,
   defaultValue: false,
   options: [
     {

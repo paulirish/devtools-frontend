@@ -1,6 +1,7 @@
 // Copyright 2016 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
@@ -114,7 +115,7 @@ const UIStrings = {
    * element doesn't have any special accessibility considerations
    */
   elementNotInteresting: 'Element not interesting for accessibility.',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/accessibility/AccessibilityNodeView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export class AXNodeSubPane extends AccessibilitySubPane {
@@ -125,6 +126,7 @@ export class AXNodeSubPane extends AccessibilitySubPane {
   private readonly ignoredReasonsTree: UI.TreeOutline.TreeOutline;
   constructor() {
     super(i18nString(UIStrings.computedProperties));
+    this.registerRequiredCSS(accessibilityNodeStyles);
 
     this.axNode = null;
 
@@ -223,10 +225,6 @@ export class AXNodeSubPane extends AccessibilitySubPane {
     super.setNode(node);
     this.axNode = null;
   }
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([accessibilityNodeStyles]);
-  }
 }
 
 export class AXNodePropertyTreeElement extends UI.TreeOutline.TreeElement {
@@ -275,7 +273,7 @@ export class AXNodePropertyTreeElement extends UI.TreeOutline.TreeElement {
   appendNameElement(name: string): void {
     const nameElement = document.createElement('span');
     if (name in AXAttributes) {
-      // @ts-ignore TS can't cast name here but we checked it's valid.
+      // @ts-expect-error TS can't cast name here but we checked it's valid.
       const attribute = AXAttributes[name];
       nameElement.textContent = attribute.name();
       UI.Tooltip.Tooltip.install(nameElement, attribute.description());
@@ -319,7 +317,7 @@ export class AXNodePropertyTreeElement extends UI.TreeOutline.TreeElement {
   appendRelatedNodeInline(relatedNode: Protocol.Accessibility.AXRelatedNode): void {
     const deferredNode =
         new SDK.DOMModel.DeferredDOMNode(this.axNode.accessibilityModel().target(), relatedNode.backendDOMNodeId);
-    const linkedNode = new AXRelatedNodeElement({deferredNode, idref: undefined}, relatedNode);
+    const linkedNode = new AXRelatedNodeElement({deferredNode, idref: undefined});
     this.listItemElement.appendChild(linkedNode.render());
   }
 
@@ -340,9 +338,7 @@ export class AXNodePropertyTreeElement extends UI.TreeOutline.TreeElement {
   }
 }
 
-export const TypeStyles: {
-  [x: string]: string,
-} = {
+export const TypeStyles: Record<string, string> = {
   attribute: 'ax-value-string',
   boolean: 'object-value-boolean',
   booleanOrUndefined: 'object-value-boolean',
@@ -547,7 +543,7 @@ export class AXRelatedNodeSourceTreeElement extends UI.TreeOutline.TreeElement {
     super('');
 
     this.value = value;
-    this.axRelatedNodeElement = new AXRelatedNodeElement(node, value);
+    this.axRelatedNodeElement = new AXRelatedNodeElement(node);
     this.selectable = true;
   }
 
@@ -572,16 +568,12 @@ export class AXRelatedNodeSourceTreeElement extends UI.TreeOutline.TreeElement {
 export class AXRelatedNodeElement {
   private readonly deferredNode: SDK.DOMModel.DeferredDOMNode|undefined;
   private readonly idref: string|undefined;
-  private readonly value: Protocol.Accessibility.AXRelatedNode|undefined;
-  constructor(
-      node: {
-        deferredNode?: SDK.DOMModel.DeferredDOMNode,
-        idref?: string,
-      },
-      value?: Protocol.Accessibility.AXRelatedNode) {
+  constructor(node: {
+    deferredNode?: SDK.DOMModel.DeferredDOMNode,
+    idref?: string,
+  }) {
     this.deferredNode = node.deferredNode;
     this.idref = node.idref;
-    this.value = value;
   }
 
   render(): Element {
@@ -679,7 +671,7 @@ export class AXNodeIgnoredReasonTreeElement extends AXNodePropertyTreeElement {
         reasonElement = i18n.i18n.getFormatLocalizedString(str_, UIStrings.elementIsNotVisible, {});
         break;
       case 'presentationalRole': {
-        const role = axNode && axNode.role()?.value || '';
+        const role = axNode?.role()?.value || '';
         const rolePresentationSpan = document.createElement('span', {is: 'source-code'}).textContent = 'role=' + role;
         reasonElement =
             i18n.i18n.getFormatLocalizedString(str_, UIStrings.elementHasPlaceholder, {PH1: rolePresentationSpan});

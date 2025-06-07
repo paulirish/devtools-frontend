@@ -9,7 +9,7 @@
  */
 export function deepActiveElement(doc: Document): Element|null {
   let activeElement: Element|null = doc.activeElement;
-  while (activeElement && activeElement.shadowRoot && activeElement.shadowRoot.activeElement) {
+  while (activeElement?.shadowRoot?.activeElement) {
     activeElement = activeElement.shadowRoot.activeElement;
   }
   return activeElement;
@@ -120,4 +120,19 @@ export function rangeOfWord(
   result.setEnd(endNode, endOffset);
 
   return result;
+}
+
+/**
+ * Appends the list of `styles` as individual `<style>` elements to the
+ * given `node`.
+ *
+ * @param node the `Node` to append the `<style>` elements to.
+ * @param styles an optional list of styles to append to the `node`.
+ */
+export function appendStyle(node: Node, ...styles: CSSInJS[]): void {
+  for (const cssText of styles) {
+    const style = (node.ownerDocument ?? document).createElement('style');
+    style.textContent = cssText;
+    node.appendChild(style);
+  }
 }

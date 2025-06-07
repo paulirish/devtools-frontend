@@ -197,7 +197,7 @@ describeWithMockConnection('BreakpointManager', () => {
 
       // Breakpoint was removed and is kept in storage.
       assert.isTrue(breakpoint.getIsRemoved());
-      assert.isTrue(removedSpy.calledWith(true));
+      sinon.assert.calledWith(removedSpy, true);
     });
 
     it('are only set if the uiSourceCode is still valid (not removed)', async () => {
@@ -465,7 +465,7 @@ describeWithMockConnection('BreakpointManager', () => {
     assert.isNull(breakpoint.getLastResolvedState());
     const result = await update;
     // Make sure that no error occurred.
-    assert.isTrue(result === Breakpoints.BreakpointManager.DebuggerUpdateResult.OK);
+    assert.strictEqual(result, Breakpoints.BreakpointManager.DebuggerUpdateResult.OK);
     assert.strictEqual(breakpoint.getLastResolvedState()?.[0].lineNumber, 13);
     await breakpoint.remove(false);
     Workspace.Workspace.WorkspaceImpl.instance().removeProject(project);
@@ -883,7 +883,7 @@ describeWithMockConnection('BreakpointManager', () => {
 
     async function testBreakpointMovedOnInstrumentationBreak(
         fileSystemPath: Platform.DevToolsPath.UrlString, fileSystemFileUrl: Platform.DevToolsPath.UrlString,
-        content: string, type?: string) {
+        content: string, type?: Persistence.PlatformFileSystem.PlatformFileSystemType) {
       const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel);
       assert.exists(debuggerModel);
 
@@ -1480,10 +1480,10 @@ describeWithMockConnection('BreakpointManager', () => {
 
       const fileSystemPath = urlString`file://path/to/overrides`;
       const fielSystemFileUrl = urlString`${fileSystemPath + '/site/script.js'}`;
-      const type = 'overrides';
       const content = '';
 
-      await testBreakpointMovedOnInstrumentationBreak(fileSystemPath, fielSystemFileUrl, content, type);
+      await testBreakpointMovedOnInstrumentationBreak(
+          fileSystemPath, fielSystemFileUrl, content, Persistence.PlatformFileSystem.PlatformFileSystemType.OVERRIDES);
     });
   });
 

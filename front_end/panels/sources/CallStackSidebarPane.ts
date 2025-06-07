@@ -1,6 +1,7 @@
 // Copyright 2021 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 /*
  * Copyright (C) 2008 Apple Inc. All Rights Reserved.
@@ -78,12 +79,12 @@ const UIStrings = {
    */
   debugFileNotFound: 'Failed to load debug file "{PH1}".',
   /**
-   * @description A contex menu item in the Call Stack Sidebar Pane. "Restart" is a verb and
+   * @description A context menu item in the Call Stack Sidebar Pane. "Restart" is a verb and
    * "frame" is a noun. "Frame" refers to an individual item in the call stack, i.e. a call frame.
    * The user opens this context menu by selecting a specific call frame in the call stack sidebar pane.
    */
   restartFrame: 'Restart frame',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/sources/CallStackSidebarPane.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -109,6 +110,7 @@ export class CallStackSidebarPane extends UI.View.SimpleView implements UI.Conte
 
   private constructor() {
     super(i18nString(UIStrings.callStack), true, 'sources.callstack');
+    this.registerRequiredCSS(callStackSidebarPaneStyles);
 
     this.contentElement.setAttribute('jslog', `${VisualLogging.section('sources.callstack')}`);
     ({element: this.ignoreListMessageElement, checkbox: this.ignoreListCheckboxElement} =
@@ -225,7 +227,7 @@ export class CallStackSidebarPane extends UI.View.SimpleView implements UI.Conte
     this.notPausedMessageElement.classList.add('hidden');
 
     const itemPromises = [];
-    const uniqueWarnings: Set<string> = new Set();
+    const uniqueWarnings = new Set<string>();
     for (const frame of details.callFrames) {
       const itemPromise = Item.createForDebuggerCallFrame(frame, this.locationPool, this.refreshItem.bind(this));
       itemPromises.push(itemPromise);
@@ -353,7 +355,7 @@ export class CallStackSidebarPane extends UI.View.SimpleView implements UI.Conte
     element.appendChild(icon);
     element.tabIndex = item === this.list.selectedItem() ? 0 : -1;
 
-    if (callframe && callframe.missingDebugInfoDetails) {
+    if (callframe?.missingDebugInfoDetails) {
       const icon = new IconButton.Icon.Icon();
       icon.data = {
         iconName: 'warning-filled',
@@ -451,13 +453,6 @@ export class CallStackSidebarPane extends UI.View.SimpleView implements UI.Conte
     void contextMenu.show();
   }
 
-  private onClick(event: Event): void {
-    const item = this.list.itemForNode((event.target as Node | null));
-    if (item) {
-      this.activateItem(item);
-    }
-  }
-
   private activateItem(item: Item): void {
     const uiLocation = item.uiLocation;
     if (this.muteActivateItem || !uiLocation) {
@@ -540,17 +535,13 @@ export class CallStackSidebarPane extends UI.View.SimpleView implements UI.Conte
     }
     Host.InspectorFrontendHost.InspectorFrontendHostInstance.copyText(text.join('\n'));
   }
-  override wasShown(): void {
-    super.wasShown();
-    this.registerCSSFiles([callStackSidebarPaneStyles]);
-  }
 }
 
 export const elementSymbol = Symbol('element');
 export const defaultMaxAsyncStackChainDepth = 32;
 
 export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
-  handleAction(context: UI.Context.Context, actionId: string): boolean {
+  handleAction(_context: UI.Context.Context, actionId: string): boolean {
     switch (actionId) {
       case 'debugger.next-call-frame':
         CallStackSidebarPane.instance().selectNextCallFrameOnStack();
@@ -609,6 +600,13 @@ export class Item {
       liveLocationPromises.push(
           Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance().createCallFrameLiveLocation(
               rawLocation, item.update.bind(item), locationPool));
+      void SourceMapScopes.NamesResolver.resolveProfileFrameFunctionName(frame, debuggerModel.target())
+          .then(functionName => {
+            if (functionName && functionName !== frame.functionName) {
+              item.title = functionName;
+              item.updateDelegate(item);
+            }
+          });
       asyncFrameItems.push(item);
     }
 

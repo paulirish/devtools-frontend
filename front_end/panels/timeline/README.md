@@ -4,6 +4,36 @@ This folder contains the majority of the source code for the Performance panel i
 
 Some of the UI components are reused across other panels; those live in `front_end/ui/legacy/components/perf_ui`.
 
+## Working on the performance panel locally
+
+There are a few different ways to run the Performance Panel locally:
+
+#### Option 1: run real DevTools
+
+The first method is to run DevTools! Load up the Chrome for Testing version that comes within DevTools ([see the DevTools documentation here[(https://chromium.googlesource.com/devtools/devtools-frontend/+/main/docs/get_the_code.md#running-from-file-system)]).
+
+DevTools, navigate to the Performance Panel and record or import a trace. There are a number of trace files saved in `devtools-frontend/test/unittests/fixtures/traces` that you can use.
+
+#### Option 2: the components server
+
+You can also use the DevTools component server. This server runs standalone parts of DevTools in the browser. To do this, run `npm run components-server` in the terminal, which will run a server on `localhost:8090`.
+
+You can then navigate to the Performance Panel examples using the link on the index page. This runs the real Performance Panel code in isolation, and you can additionally preload a trace by appending `?trace=name-of-trace-file-from-fixtures`. This is a nicer development cycle because you do not have to manually import a trace after each change. Note though that some parts of the experience are stubbed, so you always should test your work in proper DevTools too.
+
+These examples can also be used to create screenshot tests, which are an important tool for the Performance Panel because it is the only way to test `<canvas>` output. We define these as interaction tests (`devtools-frontend/tests/interactions/panels/performance`).
+
+#### Option 3: bundled DevTools in the browser
+
+This option loads the DevTools frontend in a browser tab in Chrome, but requires a little more setup to easily load traces.
+
+1.  Head to `devtools-frontend/test/unittests/fixtures/traces` and run `npx statikk --cors`. [This is a tool built by @paulirish to serve local files on a server](https://github.com/paulirish/statikk).
+2.  Build and run the Chrome for Testing binary from devtools-frontend.
+3.  Visit `devtools://devtools/bundled/devtools_app.html` and let it load (you only need to do this the first time you load up the Chrome for Testing binary).
+4.  Update the URL by appending `?loadTimelineFromURL=http://localhost:1234/name-of-trace-file.json`. **Swap the port to the one `statikk` is using on your machine**.
+5.  When you make changes and rebuild DevTools, simply refresh the URL! **Make sure you disable network caching in your DevTools on DevTools instance.**
+
+Each one has its pros and cons, but typically **this option is preferred** for quick iteration because you don't have to manually record or import a trace every time you reload.
+
 ## Trace bounds and visible windows
 
 One slightly confusing aspect of the panel is how the zooming, panning and minimap interactions impact what time-range is shown in the timeline, and how these are tracked in code.
@@ -37,10 +67,11 @@ Because this component is used across multiple panels, it does not know about th
 The timeline minimap (which is only used in the Performance Panel) listens to the two OverviewPane events emitted.
 
 When an `OverviewPaneBreadcrumbAdded` event is emitted it will:
+
 1. Create a new breadcrumb and update the Breadcrumbs component.
 2. Update the `TraceBounds` service, updating it with:
-    1. `minimapBounds` which are set to the bounds of the breadcrumb
-    2. `timelineVisibleWindow` which are set to the bounds of the breadcrumb
+   1. `minimapBounds` which are set to the bounds of the breadcrumb
+   2. `timelineVisibleWindow` which are set to the bounds of the breadcrumb
 
 If a breadcrumb is removed (which is handled via a `RemoveBreadcrumb` event dispatched by the Breadcrumbs UI component), the minimap does the exact same as above.
 
@@ -69,7 +100,7 @@ This is used in:
 Serializing/Deserializing events allows for the creation of data (such as annotations) associated with events and enabling to save them to/load them from the trace file. Several classes handle the serialization and application of these serialized annotations:
 
 1. `SyntheticEventsManager` - stores all synthetic events based on a raw event. They are stored in an array indexed by the position the corresponding raw events have in the `Model::rawEvents` array. The `SyntheticEventsManager` needs to be called by handlers as synthetic events are created. To enforce this we make use of a branded type called `SyntheticEntry`, which the `SyntheticEventsManager` adds to trace-event-like objects.
-Having a single place where all synthetic events are stored allows us to easily map from a synthetic event key back to the event object.
+   Having a single place where all synthetic events are stored allows us to easily map from a synthetic event key back to the event object.
 
 2. `EventsSerializer` - is responsible for event serialization. It generates the string key saved into the trace file and maps the key back to the corresponding Event (after reading keys from the trace file). To perform this mapping, it retrieves the raw event array registered by `SyntheticEventsManager` at the id extracted from the key. For profile calls, a binary search is conducted on the complete profile call list to efficiently find a match based on the sample index and node id retrieved from the string key.
 
@@ -146,3 +177,89 @@ If you ever need to know how high the network canvas is, use `networkChartOffset
 |                                           |
 +-------------------------------------------+
 ```
+
+## Timeline tree views
+
+The `TimelineTreeView` base class provides the foundation for creating various tree-based views within the Performance panel (e.g., Summary, Bottom-Up, Call Tree, Event Log). It handles core functionality like:
+
+- Data grid creation
+- Filtering
+- Hover actions
+- Toolbar management
+- Event handling
+
+The data grid is the core UI element, with each `GridNode` representing a row containing a name and associated values.
+
+### Tree Data Sources
+
+The Summary (ThirdParty), Bottom-Up, Call Tree, and Event Log views primarily use `this.selectedEvents()` as their data source. This method returns the events currently selected and in view by the user in the main timeline view. For example, if a user clicks on a track other than the Main track, `this.selectedEvents()` will represent that.
+
+**Important Considerations:**
+
+- **Lazily built:** trees are lazily built - child nodes are not created until
+  they are needed. In most cases, trees are fully built when `.children()` is called from `refreshTree()`
+- **Single Track Focus:** `this.selectedEvents()` only captures events from a _single_ track at a time. Selecting the main track will not include what one would consider
+  "relevant events" from other tracks (e.g. a Frame's track).
+- **No Synthetic Network Events:** Tree views do not consume `SyntheticNetworkEvents` due to their unique "overlapping" behavior, which differs from standard trace events.
+- **Filters:** Filters can be applied to determine which events are included when building the tree.
+
+### Event aggregation
+
+`AggregatedTimelineTreeView` allows grouping similar events into single nodes. The `TraceTree.ts` module handles this aggregation.
+
+**Aggregation Logic for BottomUp tree views:**
+
+1.  **Default Aggregation:** By default, aggregation is determined by the `generateEventID()` function, and optionally by `eventGroupIdCallback`.
+2.  **Pre-Grouping (`ungroupedTopNodes`)**: Before explicit grouping, `ungroupedTopNodes()` organizes events into a `ChildrenCache` map (`<string, Node>`). Even without explicit `GroupBy` grouping, `ungroupedTopNodes()` aggregates nodes by event name using `generateEventID()`.
+3.  **Third Party Grouping (`forceGroupIdCallback`)**: In `ThirdPartyTreeView`, `forceGroupIdCallback` is used to ensure that `eventGroupIdCallback` is used to generate the node ID. This is crucial because events with the same name can belong to different third parties. Without this, the initial aggregation by event name would lead to incorrect third-party grouping.
+
+## Call stacks
+
+### Source
+Call stacks in the Performance panel are taken from two sources:
+
+1. Samples in CPU profiles. These are taken in two ways:
+
+    1. With automatic periodic samples: when the V8 sampler is enabled during a trace, a separate thread (profiler thread) is started which interrupts the main thread and samples the JS stack every fixed amount of microseconds (see [where the sampling interval is set when tracing]). The sampled stack, which is not symbolized (memory addresses are not yet resolved into source locations) at this point, is added to a buffer. The symbolization of the stack happens asynchronously between samples, where the profiler thread symbolizes samples in the buffer until it needs to take the next sample. When the samples are symbolized they are added to a cache containing the CPU profile to be exported when the profiling is over. [See the V8 CPU profiler implementation] for more details.
+
+    2. With "manual" collections of samples: V8 offers [an API to collect a stack sample "on demand"], called V8::CollectSample. It calls the profiler method that samples the JS stack (without symbolization) and adds it to the buffer to be asynchronously symbolized and cached in the CPU profile to be exported. This API also offers the possibility to pass a `trace_id` which is included in the exported CPU profile as an identifier for the manually collected sample. This is particularly useful in cases where a stack trace wants to be obtained for a trace event, as an id can be created and passed to the sample API and to the trace event payload ([see an example of how to do this]), allowing the frontend to easily match the stack trace with the corresponding trace event. This is considered fast because the stack is symbolized asynchronously in a different thread, not when the sample is taken. Note that at the time of writing, this change is relatively new and thus not widely adopted.
+
+    Stacks in CPU profiles contain frames that point to function declarations, not to function call sites. When sampling is enabled, the frontend receives a CPU profile per thread in the target.
+
+2. Stack traces in trace events: Blink's V8 bindings offer an API to synchronously take and symbolize a stack trace: [CaptureSourceLocation]. For many trace events, this API is called and the resulting stack trace is included in the event's payload. This is slow because the stack trace is symbolized and thus a manual collection of samples (see 1.2) is preferred unless sampling is not an option.
+
+    Stack traces taken with [CaptureSourceLocation] have frames pointing to the call site, not function declarations.
+
+
+### JS flamechart
+
+The JS calls displayed in the flamechart are built from CPU samples in the [SamplesIntegrator.ts](../../models/trace/helpers/SamplesIntegrator.ts). Its output is an array of `SyntheticProfileCall`, each represents the time in which a function was called according to the thread's CPU profile (hence the name) and its duration. This output is then merged with the trace events in the same thread and a single call hierarchy is created in the [RendererHandler.ts]. This hierarchy ends up being drawn as a flamechart in the timeline.
+
+Because the stack trace data in the CPU profile are samples, the output of the SamplesIntegrator is not guaranteed to be correct, as there is no way to know the status of the stack in the time window between samples. For this reason, we leverage different mechanisms to improve the accuracy of the resulting calls. In particular:
+
+1. Incorporating the fact that the stack cannot change within the duration of an event dispatched by the running script. For example, if the script contains a `elem.offsetLeft = val;`, we know the stack from that point cannot change before the end of the `Layout` trace event dispatched by it, so we "lock" the stack at the beginning of the trace event.
+
+2. We collect a stack sample with a trace id using the "manual" collection mechanism described above for some trace events (and include the id in the trace event). In the SamplesIntegrator, when we encounter an event with a matching sample (via an equal trace id) we use the stack in the sample as the event's parent.
+
+### Asynchronous stack traces
+
+Async stacks are tracked using the pair of trace events composed of [v8::Debugger::AsyncTaskScheduled] and [v8::Debugger::AsyncTaskRun]. These events are dispatched for async tasks in Blink and JS, including tasks run with `console.createTask`. They are also dispatched using perfetto's flow API, using the task memory address as flow id. This means that in the frontend we get events tracking the handling of a single async task grouped together (see [FlowsHandler.ts](../../models/trace/handlers/FlowsHandler.ts)).
+
+The main implementation of async call stack parsing is in the [AsyncJSCallsHandler], where the async task flows are used to connect `SyntheticProfileCall`s representing the scheduler and the task being run. These connections are stored as mappings: [async js task scheduler -> async js task run] and its inverse.
+
+There is a caveat to this: Because of the incompleteness of CPU profile data (since it's composed of samples), we don't always find the corresponding `SyntheticProfileCall` at either end of the async task. In these cases we default to using the corresponding trace event representing the JS execution, AKA the JS entrypoint (like `FunctionCall`, `RunMicrotasks`, `EvaluateScript`, etc.) at that end of the task, which is always present.
+
+### Stack traces in entry details (bottom drawer)
+
+Stack traces for individual events are computed by the [StackTraceForEvents.ts](../../models/trace/extras/StackTraceForEvent.ts). Given a trace event it moves up from its corresponding node in the call hierarchy built by the [RendererHandler.ts] (composed of trace events and `SyntheticProfileCall`s) and appends call frames as they are found. In order to track async call stacks, before moving to a node's parent, an asynchronous parent is looked up for the node in the output of the [AsyncJSCallsHandler]. If an async parent is present, it moves there instead, and continues the call frame appending from there.
+
+Note: because this approach uses `SyntheticProfileCalls`, which are built from CPU profile samples, the frames in the resulting stack trace point to the source location of the function declaration, not the call site (see the explanation in the [source](#source) section).
+
+[where the sampling interval is set when tracing]: https://source.chromium.org/chromium/chromium/src/+/1fab167b80daecb09e388ac021861eecd60340f8:v8/src/profiler/tracing-cpu-profiler.cc;l=90;bpv=1;bpt=0
+[See the V8 CPU profiler implementation]: https://source.chromium.org/chromium/chromium/src/+/main:v8/src/profiler/cpu-profiler.cc;l=276;drc=c0883e36f0f65273f002c2ca8b7e9474256e00e4;bpv=0;bpt=1
+[an API to collect a stack sample "on demand"]: https://source.chromium.org/chromium/chromium/src/+/main:v8/src/profiler/cpu-profiler.h;l=356;drc=86fc160bf60f45bddce6a7e37c1f900a8b6fe5a6
+[see an example of how to do this]: https://chromium-review.googlesource.com/c/v8/v8/+/6383360/7/src/inspector/v8-debugger.cc
+[CaptureSourceLocation]: https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/renderer/bindings/core/v8/capture_source_location.h;l=35;drc=8bf7a2a5fe85a01019ab5777e5b55a6c50ce72b3
+[v8::Debugger::AsyncTaskScheduled]: https://source.chromium.org/chromium/chromium/src/+/main:v8/src/inspector/v8-debugger.cc;l=1214;drc=ed6ca45bf1ee83042ee0d325fed822302e331e09)
+[v8::Debugger::AsyncTaskRun]: https://source.chromium.org/chromium/chromium/src/+/main:v8/src/inspector/v8-debugger.cc;l=1252;drc=ed6ca45bf1ee83042ee0d325fed822302e331e09)[AsyncJSCallsHandler](../../models/trace/handlers/AsyncJSCallsHandler.ts
+[AsyncJSCallsHandler]: ../../models/trace/handlers/AsyncJSCallsHandler.ts

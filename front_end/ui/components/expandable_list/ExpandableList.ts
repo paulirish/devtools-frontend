@@ -1,16 +1,17 @@
 // Copyright 2021 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
-import * as LitHtml from '../../lit-html/lit-html.js';
+import * as Lit from '../../lit/lit.js';
 import * as VisualLogging from '../../visual_logging/visual_logging.js';
 
 import expandableListStyles from './expandableList.css.js';
 
-const {html, Directives: {ifDefined}} = LitHtml;
+const {html, Directives: {ifDefined}} = Lit;
 
 export interface ExpandableListData {
-  rows: LitHtml.TemplateResult[];
+  rows: Lit.TemplateResult[];
   title?: string;
 }
 
@@ -18,7 +19,7 @@ export class ExpandableList extends HTMLElement {
 
   readonly #shadow = this.attachShadow({mode: 'open'});
   #expanded = false;
-  #rows: LitHtml.TemplateResult[] = [];
+  #rows: Lit.TemplateResult[] = [];
   #title?: string;
 
   set data(data: ExpandableListData) {
@@ -32,10 +33,6 @@ export class ExpandableList extends HTMLElement {
     this.#render();
   }
 
-  connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [expandableListStyles];
-  }
-
   #render(): void {
     if (this.#rows.length < 1) {
       return;
@@ -43,8 +40,9 @@ export class ExpandableList extends HTMLElement {
 
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
-    LitHtml.render(
+    Lit.render(
         html`
+      <style>${expandableListStyles}</style>
       <div class="expandable-list-container">
         <div>
           ${this.#rows.length > 1 ?
@@ -54,7 +52,7 @@ export class ExpandableList extends HTMLElement {
                 jslog=${VisualLogging.expand().track({click: true})}></span>
               </button>
             `
-          : LitHtml.nothing}
+          : Lit.nothing}
         </div>
         <div class="expandable-list-items">
           ${this.#rows.filter((_, index) => (this.#expanded || index === 0)).map(row => html`

@@ -11,12 +11,10 @@ import {
   renderElementIntoDOM,
   stripLitHtmlCommentNodes,
 } from '../../../testing/DOMHelpers.js';
-import * as LitHtml from '../../lit-html/lit-html.js';
+import {html} from '../../lit/lit.js';
 import * as RenderCoordinator from '../render_coordinator/render_coordinator.js';
 
 import * as TreeOutline from './tree_outline.js';
-
-const {html} = LitHtml;
 
 async function renderTreeOutline<TreeNodeDataType>({
   tree,
@@ -50,7 +48,7 @@ async function renderTreeOutline<TreeNodeDataType>({
 
 /**
  * Wait for a certain number of children are rendered. We need this as the
- * component uses LitHtml's until directive, which is async and not within the
+ * component uses Lit's until directive, which is async and not within the
  * render coordinator's control.
  */
 async function waitForRenderedTreeNodeCount(shadowRoot: ShadowRoot, expectedNodeCount: number): Promise<void> {
@@ -129,7 +127,7 @@ const nodeOffices = {
   children: async () => [nodeEurope],
 };
 
-const basicTreeData: TreeOutline.TreeOutlineUtils.TreeNode<string>[] = [
+const basicTreeData: Array<TreeOutline.TreeOutlineUtils.TreeNode<string>> = [
   nodeOffices,
   {
     treeNodeData: 'Products',
@@ -377,7 +375,7 @@ describe('TreeOutline', () => {
     const customRenderer = (node: TreeOutline.TreeOutlineUtils.TreeNode<CustomTreeKeyType>) => {
       return html`<h2 class="item">${node.treeNodeData.property.toUpperCase()}:</h2>${node.treeNodeData.value}`;
     };
-    const tinyTree: TreeOutline.TreeOutlineUtils.TreeNode<CustomTreeKeyType>[] = [{
+    const tinyTree: Array<TreeOutline.TreeOutlineUtils.TreeNode<CustomTreeKeyType>> = [{
       treeNodeData: {property: 'name', value: 'jack'},
       id: '0',
       renderer: customRenderer,
@@ -566,7 +564,8 @@ describe('TreeOutline', () => {
   });
 
   it('caches async child nodes and only fetches them once', async () => {
-    const fetchChildrenSpy = sinon.spy<() => Promise<TreeOutline.TreeOutlineUtils.TreeNode<string>[]>>(async () => {
+    const fetchChildrenSpy = sinon.spy<
+        () => Promise<Array<TreeOutline.TreeOutlineUtils.TreeNode<string>>>>(async () => {
       return [
         {
           treeNodeData: 'EMEA',
@@ -582,7 +581,7 @@ describe('TreeOutline', () => {
         },
       ];
     });
-    const tinyTree: TreeOutline.TreeOutlineUtils.TreeNode<string>[] = [
+    const tinyTree: Array<TreeOutline.TreeOutlineUtils.TreeNode<string>> = [
       {
         treeNodeData: 'Offices',
         id: '0',
@@ -597,7 +596,7 @@ describe('TreeOutline', () => {
     // Expand it, then collapse it, then expand it again
     await component.expandRecursively(Number.POSITIVE_INFINITY);
     await waitForRenderedTreeNodeCount(shadowRoot, 4);
-    assert.strictEqual(fetchChildrenSpy.callCount, 1);
+    sinon.assert.callCount(fetchChildrenSpy, 1);
     const officesNode = getVisibleTreeNodeByText(shadowRoot, 'Offices');
     await component.collapseChildrenOfNode(officesNode);
     await waitForRenderedTreeNodeCount(shadowRoot, 1);
@@ -605,7 +604,7 @@ describe('TreeOutline', () => {
     await waitForRenderedTreeNodeCount(shadowRoot, 4);
     // Make sure that we only fetched the children once despite expanding the
     // Tree twice.
-    assert.strictEqual(fetchChildrenSpy.callCount, 1);
+    sinon.assert.callCount(fetchChildrenSpy, 1);
     const visibleTree = visibleNodesToTree(shadowRoot);
     assert.deepEqual(visibleTree, [
       {
@@ -622,7 +621,7 @@ describe('TreeOutline', () => {
   });
 
   it('allows a node to have a custom renderer', async () => {
-    const tinyTree: TreeOutline.TreeOutlineUtils.TreeNode<string>[] = [{
+    const tinyTree: Array<TreeOutline.TreeOutlineUtils.TreeNode<string>> = [{
       treeNodeData: 'Offices',
       id: 'Offices',
       renderer: node => html`<h2 class="top-node">${node.treeNodeData.toUpperCase()}</h2>`,
@@ -655,7 +654,7 @@ describe('TreeOutline', () => {
   });
 
   it('passes the custom renderer the expanded state', async () => {
-    const tinyTree: TreeOutline.TreeOutlineUtils.TreeNode<string>[] = [{
+    const tinyTree: Array<TreeOutline.TreeOutlineUtils.TreeNode<string>> = [{
       treeNodeData: 'Offices',
       id: 'Offices',
       renderer: (node, {isExpanded}) => {

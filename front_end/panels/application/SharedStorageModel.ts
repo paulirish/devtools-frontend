@@ -4,8 +4,8 @@
 
 import * as Common from '../../core/common/common.js';
 import * as SDK from '../../core/sdk/sdk.js';
-import * as Protocol from '../../generated/protocol.js';
 import type * as ProtocolProxyApi from '../../generated/protocol-proxy-api.js';
+import * as Protocol from '../../generated/protocol.js';
 
 export class SharedStorageForOrigin extends Common.ObjectWrapper.ObjectWrapper<SharedStorageForOrigin.EventTypes> {
   readonly #model: SharedStorageModel;
@@ -22,12 +22,12 @@ export class SharedStorageForOrigin extends Common.ObjectWrapper.ObjectWrapper<S
   }
 
   async getMetadata(): Promise<Protocol.Storage.SharedStorageMetadata|null> {
-    return this.#model.storageAgent.invoke_getSharedStorageMetadata({ownerOrigin: this.securityOrigin})
+    return await this.#model.storageAgent.invoke_getSharedStorageMetadata({ownerOrigin: this.securityOrigin})
         .then(({metadata}) => metadata);
   }
 
   async getEntries(): Promise<Protocol.Storage.SharedStorageEntry[]|null> {
-    return this.#model.storageAgent.invoke_getSharedStorageEntries({ownerOrigin: this.securityOrigin})
+    return await this.#model.storageAgent.invoke_getSharedStorageEntries({ownerOrigin: this.securityOrigin})
         .then(({entries}) => entries);
   }
 
@@ -56,8 +56,10 @@ export namespace SharedStorageForOrigin {
 
   export interface SharedStorageChangedEvent {
     accessTime: Protocol.Network.TimeSinceEpoch;
-    type: Protocol.Storage.SharedStorageAccessType;
+    scope: Protocol.Storage.SharedStorageAccessScope;
+    method: Protocol.Storage.SharedStorageAccessMethod;
     mainFrameId: Protocol.Page.FrameId;
+    ownerSite: string;
     params: Protocol.Storage.SharedStorageAccessParams;
   }
 
@@ -178,15 +180,11 @@ export class SharedStorageModel extends SDK.SDKModel.SDKModel<EventTypes> implem
 
   isChangeEvent(event: Protocol.Storage.SharedStorageAccessedEvent): boolean {
     return [
-      Protocol.Storage.SharedStorageAccessType.DocumentSet,
-      Protocol.Storage.SharedStorageAccessType.DocumentAppend,
-      Protocol.Storage.SharedStorageAccessType.DocumentDelete,
-      Protocol.Storage.SharedStorageAccessType.DocumentClear,
-      Protocol.Storage.SharedStorageAccessType.WorkletSet,
-      Protocol.Storage.SharedStorageAccessType.WorkletAppend,
-      Protocol.Storage.SharedStorageAccessType.WorkletDelete,
-      Protocol.Storage.SharedStorageAccessType.WorkletClear,
-    ].includes(event.type);
+      Protocol.Storage.SharedStorageAccessMethod.Set,
+      Protocol.Storage.SharedStorageAccessMethod.Append,
+      Protocol.Storage.SharedStorageAccessMethod.Delete,
+      Protocol.Storage.SharedStorageAccessMethod.Clear,
+    ].includes(event.method);
   }
 
   sharedStorageAccessed(event: Protocol.Storage.SharedStorageAccessedEvent): void {
@@ -194,8 +192,14 @@ export class SharedStorageModel extends SDK.SDKModel.SDKModel<EventTypes> implem
       const sharedStorage = this.storageForOrigin(event.ownerOrigin);
 
       if (sharedStorage) {
-        const eventData =
-            {accessTime: event.accessTime, type: event.type, mainFrameId: event.mainFrameId, params: event.params};
+        const eventData = {
+          accessTime: event.accessTime,
+          method: event.method,
+          mainFrameId: event.mainFrameId,
+          ownerSite: event.ownerSite,
+          params: event.params,
+          scope: event.scope,
+        };
 
         // Forward events that may have changed `sharedStorage` to listeners for `sharedStorage`.
         sharedStorage.dispatchEventToListeners(SharedStorageForOrigin.Events.SHARED_STORAGE_CHANGED, eventData);
@@ -205,6 +209,10 @@ export class SharedStorageModel extends SDK.SDKModel.SDKModel<EventTypes> implem
     }
 
     this.dispatchEventToListeners(Events.SHARED_STORAGE_ACCESS, event);
+  }
+
+  sharedStorageWorkletOperationExecutionFinished(
+      _event: Protocol.Storage.SharedStorageWorkletOperationExecutionFinishedEvent): void {
   }
 
   attributionReportingTriggerRegistered(_event: Protocol.Storage.AttributionReportingTriggerRegisteredEvent): void {
@@ -239,6 +247,8 @@ export class SharedStorageModel extends SDK.SDKModel.SDKModel<EventTypes> implem
   }
 
   attributionReportingSourceRegistered(_event: Protocol.Storage.AttributionReportingSourceRegisteredEvent): void {
+  }
+  attributionReportingReportSent(_event: Protocol.Storage.AttributionReportingReportSentEvent): void {
   }
 }
 

@@ -228,7 +228,7 @@ const UIStrings = {
     *@description Tooltip to explain why the cookie should have been blocked by third-party cookie phaseout but is exempted.
     */
     exemptionReasonScheme: 'This cookie is allowed by the top-level url scheme',
-};
+} as const;
 // clang-format on
 
 const str_ = i18n.i18n.registerUIStrings('core/sdk/NetworkRequest.ts', UIStrings);
@@ -269,9 +269,7 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
   #contentDataInternal: Promise<TextUtils.ContentData.ContentDataOrError>|null;
   #streamingContentData: Promise<TextUtils.StreamingContentData.StreamingContentDataOrError>|null;
   readonly #framesInternal: WebSocketFrame[];
-  #responseHeaderValues: {
-    [x: string]: string|undefined,
-  };
+  #responseHeaderValues: Record<string, string|undefined>;
   #responseHeadersTextInternal: string;
   #originalResponseHeaders: Protocol.Fetch.HeaderEntry[];
   #sortedOriginalResponseHeaders?: NameValue[];
@@ -281,9 +279,7 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
   #setCookieHeaders: Protocol.Fetch.HeaderEntry[];
 
   #requestHeadersInternal: NameValue[];
-  #requestHeaderValues: {
-    [x: string]: string|undefined,
-  };
+  #requestHeaderValues: Record<string, string|undefined>;
   #remoteAddressInternal: string;
   #remoteAddressSpaceInternal: Protocol.Network.IPAddressSpace;
   #referrerPolicyInternal: Protocol.Network.RequestReferrerPolicy|null;
@@ -348,6 +344,8 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
   #serverSentEvents?: ServerSentEvents;
   responseReceivedPromise?: Promise<void>;
   responseReceivedPromiseResolve?: () => void;
+  directSocketInfo?: DirectSocketInfo;
+  readonly #directSocketChunksInternal: DirectSocketChunk[];
 
   constructor(
       requestId: string, backendRequestId: Protocol.Network.RequestId|undefined, url: Platform.DevToolsPath.UrlString,
@@ -433,6 +431,7 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
     this.#wasIntercepted = false;
     this.#hasOverriddenContent = false;
     this.#hasThirdPartyCookiePhaseoutIssue = false;
+    this.#directSocketChunksInternal = [];
   }
 
   static create(
@@ -444,7 +443,7 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
         backendRequestId, backendRequestId, url, documentURL, frameId, loaderId, initiator, hasUserGesture);
   }
 
-  static createForWebSocket(
+  static createForSocket(
       backendRequestId: Protocol.Network.RequestId, requestURL: Platform.DevToolsPath.UrlString,
       initiator?: Protocol.Network.Initiator): NetworkRequest {
     return new NetworkRequest(
@@ -619,7 +618,7 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
   }
 
   set endTime(x: number) {
-    if (this.timing && this.timing.requestTime) {
+    if (this.timing?.requestTime) {
       // Check against accurate responseReceivedTime.
       this.#endTimeInternal = Math.max(x, this.responseReceivedTime);
     } else {
@@ -781,6 +780,16 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
 
   set serviceWorkerRouterInfo(x: Protocol.Network.ServiceWorkerRouterInfo) {
     this.#serviceWorkerRouterInfoInternal = x;
+  }
+
+  /**
+   * Returns true if the request was matched to a route when using the
+   * ServiceWorker static routing API.
+   */
+  hasMatchingServiceWorkerRouter(): boolean {
+    // See definitions in `browser_protocol.pdl` for justification.
+    return this.#serviceWorkerRouterInfoInternal !== undefined &&
+        this.serviceWorkerRouterInfo?.matchedSourceType !== undefined;
   }
 
   /**
@@ -1196,7 +1205,7 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
       ...this.responseCookies,
       ...this.blockedRequestCookies().map(blockedRequestCookie => blockedRequestCookie.cookie),
       ...this.blockedResponseCookies().map(blockedResponseCookie => blockedResponseCookie.cookie),
-    ].filter(v => Boolean(v)) as Cookie[];
+    ].filter(v => !!v);
   }
 
   get serverTimings(): ServerTiming[]|null {
@@ -1422,7 +1431,7 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
   async searchInContent(query: string, caseSensitive: boolean, isRegex: boolean):
       Promise<TextUtils.ContentProvider.SearchMatch[]> {
     if (!this.#contentDataProvider) {
-      return NetworkManager.searchInRequest(this, query, caseSensitive, isRegex);
+      return await NetworkManager.searchInRequest(this, query, caseSensitive, isRegex);
     }
 
     const contentData = await this.requestContentData();
@@ -1430,10 +1439,6 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
       return [];
     }
     return TextUtils.TextUtils.performSearchInContentData(contentData, query, caseSensitive, isRegex);
-  }
-
-  isHttpFamily(): boolean {
-    return Boolean(this.url().match(/^https?:/i));
   }
 
   requestContentType(): string|undefined {
@@ -1532,6 +1537,15 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
   addFrame(frame: WebSocketFrame): void {
     this.#framesInternal.push(frame);
     this.dispatchEventToListeners(Events.WEBSOCKET_FRAME_ADDED, frame);
+  }
+
+  directSocketChunks(): DirectSocketChunk[] {
+    return this.#directSocketChunksInternal;
+  }
+
+  addDirectSocketChunk(chunk: DirectSocketChunk): void {
+    this.#directSocketChunksInternal.push(chunk);
+    this.dispatchEventToListeners(Events.DIRECTSOCKET_CHUNK_ADDED, chunk);
   }
 
   eventSourceMessages(): readonly EventSourceMessage[] {
@@ -1695,7 +1709,7 @@ export class NetworkRequest extends Common.ObjectWrapper.ObjectWrapper<EventType
   }
 
   nonBlockedResponseCookies(): Cookie[] {
-    const blockedCookieLines: (string|null)[] =
+    const blockedCookieLines: Array<string|null> =
         this.blockedResponseCookies().map(blockedCookie => blockedCookie.cookieLine);
     // Use array and remove 1 by 1 to handle the (potential) case of multiple
     // identical cookies, only some of which are blocked.
@@ -1802,6 +1816,7 @@ export enum Events {
   REQUEST_HEADERS_CHANGED = 'RequestHeadersChanged',
   RESPONSE_HEADERS_CHANGED = 'ResponseHeadersChanged',
   WEBSOCKET_FRAME_ADDED = 'WebsocketFrameAdded',
+  DIRECTSOCKET_CHUNK_ADDED = 'DirectsocketChunkAdded',
   EVENT_SOURCE_MESSAGE_ADDED = 'EventSourceMessageAdded',
   TRUST_TOKEN_RESULT_ADDED = 'TrustTokenResultAdded',
 }
@@ -1813,6 +1828,8 @@ export interface EventTypes {
   [Events.REQUEST_HEADERS_CHANGED]: void;
   [Events.RESPONSE_HEADERS_CHANGED]: void;
   [Events.WEBSOCKET_FRAME_ADDED]: WebSocketFrame;
+  [Events.DIRECTSOCKET_CHUNK_ADDED]: DirectSocketChunk;
+  [Events.DIRECTSOCKET_CHUNK_ADDED]: DirectSocketChunk;
   [Events.EVENT_SOURCE_MESSAGE_ADDED]: EventSourceMessage;
   [Events.TRUST_TOKEN_RESULT_ADDED]: void;
 }
@@ -2045,10 +2062,10 @@ export interface EventSourceMessage {
 }
 
 export interface ExtraRequestInfo {
-  blockedRequestCookies: {
+  blockedRequestCookies: Array<{
     blockedReasons: Protocol.Network.CookieBlockedReason[],
     cookie: Cookie,
-  }[];
+  }>;
   requestHeaders: NameValue[];
   includedRequestCookies: IncludedCookieWithReason[];
   clientSecurityState?: Protocol.Network.ClientSecurityState;
@@ -2057,22 +2074,22 @@ export interface ExtraRequestInfo {
 }
 
 export interface ExtraResponseInfo {
-  blockedResponseCookies: {
+  blockedResponseCookies: Array<{
     blockedReasons: Protocol.Network.SetCookieBlockedReason[],
     cookieLine: string,
     cookie: Cookie|null,
-  }[];
+  }>;
   responseHeaders: NameValue[];
   responseHeadersText?: string;
   resourceIPAddressSpace: Protocol.Network.IPAddressSpace;
   statusCode: number|undefined;
   cookiePartitionKey?: Protocol.Network.CookiePartitionKey;
   cookiePartitionKeyOpaque: boolean|undefined;
-  exemptedResponseCookies: {
+  exemptedResponseCookies: Array<{
     cookie: Cookie,
     cookieLine: string,
     exemptionReason: Protocol.Network.CookieExemptionReason,
-  }[]|undefined;
+  }>|undefined;
 }
 
 export interface EarlyHintsInfo {
@@ -2090,3 +2107,57 @@ export interface WebBundleInnerRequestInfo {
 }
 
 export type OverrideType = 'content'|'headers';
+
+export enum DirectSocketType {
+  TCP = 1,
+  UDP_BOUND = 2,
+  UDP_CONNECTED = 3,
+}
+
+export enum DirectSocketStatus {
+  OPENING = 1,
+  OPEN = 2,
+  CLOSED = 3,
+  ABORTED = 4,
+}
+
+export interface DirectSocketCreateOptions {
+  remoteAddr?: string;
+  remotePort?: number;
+  localAddr?: string;
+  localPort?: number;
+  noDelay?: boolean;
+  keepAliveDelay?: number;
+  sendBufferSize?: number;
+  receiveBufferSize?: number;
+  dnsQueryType?: Protocol.Network.DirectSocketDnsQueryType;
+}
+
+export interface DirectSocketOpenInfo {
+  remoteAddr?: string;
+  remotePort?: number;
+  localAddr?: string;
+  localPort?: number;
+}
+
+export interface DirectSocketInfo {
+  type: DirectSocketType;
+  status: DirectSocketStatus;
+  errorMessage?: string;
+  createOptions: DirectSocketCreateOptions;
+  openInfo?: DirectSocketOpenInfo;
+}
+
+export interface DirectSocketChunk {
+  data: string;
+  type: DirectSocketChunkType;
+  timestamp: number;
+  // Only for bound udp socket.
+  remoteAddress?: string;
+  remotePort?: number;
+}
+
+export enum DirectSocketChunkType {
+  SEND = 'send',
+  RECEIVE = 'receive'
+}

@@ -15,11 +15,11 @@ const {urlString} = Platform.DevToolsPath;
 
 class ExtensionStorageListener {
   #model: Resources.ExtensionStorageModel.ExtensionStorageModel;
-  #storagesWatched: Array<Resources.ExtensionStorageModel.ExtensionStorage>;
+  #storagesWatched: Resources.ExtensionStorageModel.ExtensionStorage[];
 
   constructor(model: Resources.ExtensionStorageModel.ExtensionStorageModel) {
     this.#model = model;
-    this.#storagesWatched = new Array<Resources.ExtensionStorageModel.ExtensionStorage>();
+    this.#storagesWatched = [];
 
     this.#model.addEventListener(
         Resources.ExtensionStorageModel.Events.EXTENSION_STORAGE_ADDED, this.#extensionStorageAdded, this);
@@ -116,17 +116,17 @@ describeWithMockConnection('ExtensionStorageModel', () => {
     });
 
     const data = await extensionStorage.getItems();
-    assert.isTrue(getSpy.calledOnceWithExactly({id: initId, storageArea: initStorageArea}));
+    sinon.assert.calledOnceWithExactly(getSpy, {id: initId, storageArea: initStorageArea});
     assert.deepEqual(data, ENTRIES);
 
     await extensionStorage.setItem('foo', 'baz');
-    assert.isTrue(setSpy.calledOnceWithExactly({id: initId, storageArea: initStorageArea, values: {foo: 'baz'}}));
+    sinon.assert.calledOnceWithExactly(setSpy, {id: initId, storageArea: initStorageArea, values: {foo: 'baz'}});
 
     await extensionStorage.removeItem('foo');
-    assert.isTrue(removeSpy.calledOnceWithExactly({id: initId, storageArea: initStorageArea, keys: ['foo']}));
+    sinon.assert.calledOnceWithExactly(removeSpy, {id: initId, storageArea: initStorageArea, keys: ['foo']});
 
     await extensionStorage.clear();
-    assert.isTrue(clearSpy.calledOnceWithExactly({id: initId, storageArea: initStorageArea}));
+    sinon.assert.calledOnceWithExactly(clearSpy, {id: initId, storageArea: initStorageArea});
   });
 
   it('adds/removes ExtensionStorage on Runtime events', async () => {

@@ -15,7 +15,6 @@ devtools_module("data_grid") {
   sources = [
     "DataGrid.ts",
     "DataGridElement.ts",
-    "DataGridWithPreview.ts",
     "ShowMoreDataGridNode.ts",
     "SortableDataGrid.ts",
     "ViewportDataGrid.ts",
@@ -39,17 +38,8 @@ devtools_entrypoint("bundle") {
 
   visibility = [
     ":*",
-    "../../../../panels/application/*",
-    "../../../../panels/console/*",
-    "../../../../panels/coverage/*",
-    "../../../../panels/css_overview/*",
-    "../../../../panels/developer_resources/*",
-    "../../../../panels/media/*",
-    "../../../../panels/network/*",
-    "../../../../panels/profiler/*",
-    "../../../../panels/security/*",
-    "../../../../panels/timeline/*",
-    "../../../../panels/webauthn/*",
+    "../../../../models/persistence/*",
+    "../../../../panels/*",
     "../cookie_table/*",
   ]
 
@@ -59,11 +49,7 @@ devtools_entrypoint("bundle") {
 ts_library("unittests") {
   testonly = true
 
-  sources = [
-    "DataGrid.test.ts",
-    "DataGridElement.test.ts",
-    "DataGridWithPreview.test.ts",
-  ]
+  sources = [ "DataGridElement.test.ts" ]
 
   deps = [
     ":bundle",

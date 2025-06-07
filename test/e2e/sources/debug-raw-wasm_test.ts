@@ -15,7 +15,6 @@ import {
   waitFor,
   waitForFunction,
 } from '../../shared/helper.js';
-
 import {
   addBreakpointForLine,
   captureAddedSourceFiles,
@@ -42,11 +41,6 @@ import {
 } from '../helpers/sources-helpers.js';
 
 describe('Sources Tab', function() {
-  // The tests in this suite are particularly slow, as they perform a lot of actions
-  if (this.timeout() > 0) {
-    this.timeout(10000);
-  }
-
   beforeEach(async () => {
     const {frontend} = getBrowserAndPages();
     await installEventListener(frontend, DEBUGGER_PAUSED_EVENT);
@@ -77,17 +71,17 @@ describe('Sources Tab', function() {
   });
 
   it('can add a breakpoint in raw wasm', async () => {
-    const {target, frontend} = getBrowserAndPages();
+    const {target} = getBrowserAndPages();
 
     await openSourceCodeEditorForFile('add.wasm', 'wasm/call-to-add-wasm.html');
-    await addBreakpointForLine(frontend, '0x023');
+    await addBreakpointForLine('0x023');
 
     const scriptLocation = await retrieveTopCallFrameScriptLocation('main();', target);
     assert.deepEqual(scriptLocation, 'add.wasm:0x23');
   });
 
   it('hits two breakpoints that are set and activated separately', async function() {
-    const {target, frontend} = getBrowserAndPages();
+    const {frontend} = getBrowserAndPages();
     const fileName = 'add.wasm';
 
     await step('navigate to a page and open the Sources tab', async () => {
@@ -95,11 +89,11 @@ describe('Sources Tab', function() {
     });
 
     await step('add a breakpoint to line No.0x027', async () => {
-      await addBreakpointForLine(frontend, '0x027');
+      await addBreakpointForLine('0x027');
     });
 
     await step('reload the page', async () => {
-      await reloadPageAndWaitForSourceFile(target, fileName);
+      await reloadPageAndWaitForSourceFile(fileName);
     });
 
     await waitForFunction(async () => await isBreakpointSet('0x027'));
@@ -110,7 +104,7 @@ describe('Sources Tab', function() {
     });
 
     await step('remove the breakpoint from the line 0x027', async () => {
-      await removeBreakpointForLine(frontend, '0x027');
+      await removeBreakpointForLine('0x027');
     });
 
     await step('resume script execution', async () => {
@@ -119,18 +113,18 @@ describe('Sources Tab', function() {
     });
 
     await step('reload the page', async () => {
-      await reloadPageAndWaitForSourceFile(target, fileName);
+      await reloadPageAndWaitForSourceFile(fileName);
     });
 
     await waitForFunction(async () => !(await isBreakpointSet('0x027')));
     await checkBreakpointDidNotActivate();
 
     await step('add a breakpoint to line No.0x028', async () => {
-      await addBreakpointForLine(frontend, '0x028');
+      await addBreakpointForLine('0x028');
     });
 
     await step('reload the page', async () => {
-      await reloadPageAndWaitForSourceFile(target, fileName);
+      await reloadPageAndWaitForSourceFile(fileName);
     });
 
     await waitForFunction(async () => await isBreakpointSet('0x028'));
@@ -142,7 +136,6 @@ describe('Sources Tab', function() {
   });
 
   it('shows variable value in popover', async function() {
-    const {target, frontend} = getBrowserAndPages();
     const fileName = 'add.wasm';
 
     await step('navigate to a page and open the Sources tab', async () => {
@@ -150,11 +143,11 @@ describe('Sources Tab', function() {
     });
 
     await step('add a breakpoint to line No.0x023', async () => {
-      await addBreakpointForLine(frontend, '0x023');
+      await addBreakpointForLine('0x023');
     });
 
     await step('reload the page', async () => {
-      await reloadPageAndWaitForSourceFile(target, fileName);
+      await reloadPageAndWaitForSourceFile(fileName);
     });
 
     await step('hover over the $var0 in line No.0x023', async () => {
@@ -176,8 +169,6 @@ describe('Sources Tab', function() {
   });
 
   it('cannot set a breakpoint on non-breakable line in raw wasm', async () => {
-    const {frontend} = getBrowserAndPages();
-
     await openSourceCodeEditorForFile('add.wasm', 'wasm/call-to-add-wasm.html');
     assert.deepEqual(await getNonBreakableLines(), [
       0x000,
@@ -186,12 +177,12 @@ describe('Sources Tab', function() {
     ]);
     assert.deepEqual(await getBreakpointDecorators(), []);
     // Line 3 is breakable.
-    await addBreakpointForLine(frontend, '0x023');
+    await addBreakpointForLine('0x023');
     assert.deepEqual(await getBreakpointDecorators(), [0x023]);
   });
 
   it('is able to step with state', async () => {
-    const {target, frontend} = getBrowserAndPages();
+    const {frontend} = getBrowserAndPages();
     const fileName = 'stepping-with-state.wasm';
 
     await step('navigate to a page and open the Sources tab', async () => {
@@ -199,11 +190,11 @@ describe('Sources Tab', function() {
     });
 
     await step('add a breakpoint to line No.0x060', async () => {
-      await addBreakpointForLine(frontend, '0x060');
+      await addBreakpointForLine('0x060');
     });
 
     await step('reload the page', async () => {
-      await reloadPageAndWaitForSourceFile(target, fileName);
+      await reloadPageAndWaitForSourceFile(fileName);
     });
 
     await waitForFunction(async () => await isBreakpointSet('0x060'));
@@ -233,15 +224,15 @@ describe('Sources Tab', function() {
     });
 
     await step('remove the breakpoint from the line 0x060', async () => {
-      await removeBreakpointForLine(frontend, '0x060');
+      await removeBreakpointForLine('0x060');
     });
 
     await step('add a breakpoint to line No.0x048', async () => {
-      await addBreakpointForLine(frontend, '0x048');
+      await addBreakpointForLine('0x048');
     });
 
     await step('reload the page', async () => {
-      await reloadPageAndWaitForSourceFile(target, fileName);
+      await reloadPageAndWaitForSourceFile(fileName);
     });
 
     await waitForFunction(async () => await isBreakpointSet('0x048'));
@@ -274,7 +265,7 @@ describe('Sources Tab', function() {
 
   it('is able to step with state in multi-threaded code in main thread', async () => {
     await enableExperiment('instrumentation-breakpoints');
-    const {target, frontend} = getBrowserAndPages();
+    const {frontend} = getBrowserAndPages();
     // enableExperiment() reloads the devtools page, so we need to reinstall the listener on the new window.
     await installEventListener(frontend, DEBUGGER_PAUSED_EVENT);
     const fileName = 'stepping-with-state.wasm';
@@ -308,11 +299,11 @@ describe('Sources Tab', function() {
         0x06c,
         0x0c1,
       ]);
-      await addBreakpointForLine(frontend, '0x060');
+      await addBreakpointForLine('0x060');
     });
 
     await step('reload the page', async () => {
-      await reloadPageAndWaitForSourceFile(target, fileName);
+      await reloadPageAndWaitForSourceFile(fileName);
     });
 
     await waitForFunction(async () => await isBreakpointSet('0x060'));
@@ -342,15 +333,15 @@ describe('Sources Tab', function() {
     });
 
     await step('remove the breakpoint from the line 0x060', async () => {
-      await removeBreakpointForLine(frontend, '0x060');
+      await removeBreakpointForLine('0x060');
     });
 
     await step('add a breakpoint to line No.0x048', async () => {
-      await addBreakpointForLine(frontend, '0x048');
+      await addBreakpointForLine('0x048');
     });
 
     await step('reload the page', async () => {
-      await reloadPageAndWaitForSourceFile(target, fileName);
+      await reloadPageAndWaitForSourceFile(fileName);
     });
 
     await waitForFunction(async () => await isBreakpointSet('0x048'));
@@ -382,7 +373,7 @@ describe('Sources Tab', function() {
     });
 
     await step('remove the breakpoint from the 8th line', async () => {
-      await removeBreakpointForLine(frontend, '0x048');
+      await removeBreakpointForLine('0x048');
     });
 
     await step('resume script execution', async () => {
@@ -395,7 +386,7 @@ describe('Sources Tab', function() {
 
   it('is able to step with state in multi-threaded code in worker thread', async () => {
     await enableExperiment('instrumentation-breakpoints');
-    const {target, frontend} = getBrowserAndPages();
+    const {frontend} = getBrowserAndPages();
     // enableExperiment() reloads the devtools page, so we need to reinstall the listener on the new window.
     await installEventListener(frontend, DEBUGGER_PAUSED_EVENT);
     const fileName = 'stepping-with-state.wasm';
@@ -420,11 +411,11 @@ describe('Sources Tab', function() {
     });
 
     await step('add a breakpoint to line No.0x06d', async () => {
-      await addBreakpointForLine(frontend, '0x06d');
+      await addBreakpointForLine('0x06d');
     });
 
     await step('reload the page', async () => {
-      await reloadPageAndWaitForSourceFile(target, fileName);
+      await reloadPageAndWaitForSourceFile(fileName);
     });
 
     await waitForFunction(async () => await isBreakpointSet('0x06d'));
@@ -458,15 +449,15 @@ describe('Sources Tab', function() {
     });
 
     await step('remove the breakpoint from line 0x06d', async () => {
-      await removeBreakpointForLine(frontend, '0x06d');
+      await removeBreakpointForLine('0x06d');
     });
 
     await step('add a breakpoint to line No.0x050', async () => {
-      await addBreakpointForLine(frontend, '0x050');
+      await addBreakpointForLine('0x050');
     });
 
     await step('reload the page', async () => {
-      await reloadPageAndWaitForSourceFile(target, fileName);
+      await reloadPageAndWaitForSourceFile(fileName);
     });
 
     await waitForFunction(async () => await isBreakpointSet('0x050'));

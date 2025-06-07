@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import type {Args, Event, PerformanceMark, PerformanceMeasureBegin, Phase, SyntheticBased} from './TraceEvents.js';
+import type {
+  Args, ConsoleTimeStamp, Event, PerformanceMark, PerformanceMeasureBegin, Phase, SyntheticBased} from
+  './TraceEvents.js';
 
 export type ExtensionEntryType = 'track-entry'|'marker';
 
@@ -22,13 +24,9 @@ export const extensionPalette = [
 
 export type ExtensionColorFromPalette = typeof extensionPalette[number];
 
-export function colorIsValid(color: string): boolean {
-  return (extensionPalette as readonly string[]).includes(color);
-}
-
 export interface ExtensionDataPayloadBase {
   color?: ExtensionColorFromPalette;
-  properties?: [string, string][];
+  properties?: Array<[string, string]>;
   tooltipText?: string;
 }
 
@@ -58,7 +56,7 @@ export interface ExtensionMarkerPayload extends ExtensionDataPayloadBase {
  * Synthetic events created for extension tracks.
  */
 export interface SyntheticExtensionTrackEntry extends
-    SyntheticBased<Phase.COMPLETE, PerformanceMeasureBegin|PerformanceMark> {
+    SyntheticBased<Phase.COMPLETE, PerformanceMeasureBegin|PerformanceMark|ConsoleTimeStamp> {
   args: Args&ExtensionTrackEntryPayload;
 }
 
@@ -98,7 +96,5 @@ export interface ExtensionTrackData {
   // If this contains the data of a track group, this property contains
   // the entries of each of the tracks in the the group. If this is a
   // standalone track, then this contains that track's entries only.
-  entriesByTrack: {
-    [x: string]: SyntheticExtensionTrackEntry[],
-  };
+  entriesByTrack: Record<string, SyntheticExtensionTrackEntry[]>;
 }

@@ -1,6 +1,7 @@
 // Copyright (c) 2015 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as UI from '../../ui/legacy/legacy.js';
 
@@ -15,6 +16,7 @@ export class AnimationScreenshotPopover extends UI.Widget.VBox {
   #endDelay?: number;
   constructor(images: HTMLImageElement[]) {
     super(true);
+    this.registerRequiredCSS(animationScreenshotPopoverStyles);
     console.assert(images.length > 0);
 
     this.contentElement.classList.add('animation-screenshot-popover');
@@ -30,8 +32,8 @@ export class AnimationScreenshotPopover extends UI.Widget.VBox {
   }
 
   override wasShown(): void {
+    super.wasShown();
     this.#rafId = this.contentElement.window().requestAnimationFrame(this.changeFrame.bind(this));
-    this.registerCSSFiles([animationScreenshotPopoverStyles]);
   }
 
   override willHide(): void {

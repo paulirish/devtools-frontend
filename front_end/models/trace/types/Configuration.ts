@@ -2,6 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import type * as Platform from '../../../core/platform/platform.js';
+import type * as SDK from '../../../core/sdk/sdk.js';
+import type * as Protocol from '../../../generated/protocol.js';
+import type * as Lantern from '../lantern/lantern.js';
+
+import type * as File from './File.js';
+
 export interface Configuration {
   /**
    * Include V8 RCS functions in the JS stacks
@@ -47,4 +54,36 @@ export const defaults = (): Configuration => ({
  */
 export function configToCacheKey(config: Configuration): string {
   return JSON.stringify(config);
+}
+
+export interface ParseOptions {
+  /**
+   * If the trace was just recorded on the current page, rather than an imported file.
+   * TODO(paulirish): Maybe remove. This is currently unused by the Processor and Handlers
+   * @default false
+   */
+  isFreshRecording?: boolean;
+  /**
+   * If the trace is a CPU Profile rather than a Chrome tracing trace.
+   * @default false
+   */
+  isCPUProfile?: boolean;
+  metadata?: File.MetaData;
+  resolveSourceMap?: (params: ResolveSourceMapParams) => Promise<SDK.SourceMap.SourceMap|null>;
+  logger?: {
+    start: (id: string) => void,
+    end: (id: string) => void,
+  };
+  lanternSettings?: Omit<Lantern.Types.Simulation.Settings, 'networkAnalysis'>;
+}
+
+export interface ResolveSourceMapParams {
+  scriptId: string;
+  scriptUrl: Platform.DevToolsPath.UrlString;
+  /** The url as resolved by any sourceUrl comment. */
+  sourceUrl: Platform.DevToolsPath.UrlString;
+  sourceMapUrl: Platform.DevToolsPath.UrlString;
+  frame: Protocol.Page.FrameId;
+  /** Set only if the raw source map was found on the provided metadata. Never set for source maps from data urls. */
+  cachedRawSourceMap?: SDK.SourceMap.SourceMapV3;
 }

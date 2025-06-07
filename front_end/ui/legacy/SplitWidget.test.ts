@@ -4,11 +4,10 @@
 
 import {renderElementIntoDOM} from '../../testing/DOMHelpers.js';
 import {describeWithEnvironment} from '../../testing/EnvironmentHelpers.js';
-import * as LitHtml from '../../ui/lit-html/lit-html.js';
+import {html, render} from '../../ui/lit/lit.js';
 
 import * as UI from './legacy.js';
 
-const {render, html} = LitHtml;
 const widgetRef = UI.Widget.widgetRef;
 const SplitWidget = UI.SplitWidget.SplitWidget;
 
@@ -37,13 +36,11 @@ describeWithEnvironment('SplitWidget', () => {
     // clang-format off
     render(
         html`
-      <devtools-split-widget .options=${{vertical: true,
-                                         defaultSidebarWidth: 100,
-                                         markAsRoot: true}}
+      <devtools-split-view direction="column" sidebar-initial-size="100"
                              ${widgetRef(SplitWidget, e => {widget = e;})}>
         <div slot="main">Main content</div>
         <div slot="sidebar">Sidebar content</div>
-      </devtools-split-widget>`,
+      </devtools-split-view>`,
         container, {host: this});
     // clang-format on
 

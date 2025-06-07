@@ -1,22 +1,22 @@
 // Copyright 2024 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
+
 import * as i18n from '../../../../core/i18n/i18n.js';
 import * as Platform from '../../../../core/platform/platform.js';
 import type * as Trace from '../../../../models/trace/trace.js';
-import * as LitHtml from '../../../../ui/lit-html/lit-html.js';
+import {html, render} from '../../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../../ui/visual_logging/visual_logging.js';
 
-import styles from './timeRangeOverlay.css.js';
-
-const {html} = LitHtml;
+import timeRangeOverlayStyles from './timeRangeOverlay.css.js';
 
 const UIStrings = {
   /**
    *@description Accessible label used to explain to a user that they are viewing an entry label.
    */
   timeRange: 'Time range',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/timeline/overlays/components/TimeRangeOverlay.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -38,20 +38,16 @@ export class TimeRangeRemoveEvent extends Event {
 
 export class TimeRangeOverlay extends HTMLElement {
   readonly #shadow = this.attachShadow({mode: 'open'});
-  #duration: Trace.Types.Timing.MicroSeconds|null = null;
+  #duration: Trace.Types.Timing.Micro|null = null;
   #canvasRect: DOMRect|null = null;
   #label: string;
 
   // The label is set to editable and in focus anytime the label is empty and when the label it is double clicked.
-  // If the user clicks away from the selected range element and the label is not empty, the lable is set to not editable until it is double clicked.
-  #isLabelEditable: boolean = true;
+  // If the user clicks away from the selected range element and the label is not empty, the label is set to not editable until it is double clicked.
+  #isLabelEditable = true;
 
   #rangeContainer: HTMLElement|null = null;
   #labelBox: HTMLElement|null = null;
-
-  connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [styles];
-  }
 
   constructor(initialLabel: string) {
     super();
@@ -84,7 +80,7 @@ export class TimeRangeOverlay extends HTMLElement {
     this.#render();
   }
 
-  set duration(duration: Trace.Types.Timing.MicroSeconds|null) {
+  set duration(duration: Trace.Types.Timing.Micro|null) {
     if (duration === this.#duration) {
       return;
     }
@@ -255,8 +251,9 @@ export class TimeRangeOverlay extends HTMLElement {
   #render(): void {
     const durationText = this.#duration ? i18n.TimeUtilities.formatMicroSecondsTime(this.#duration) : '';
     // clang-format off
-    LitHtml.render(
+    render(
         html`
+          <style>${timeRangeOverlayStyles}</style>
           <span class="range-container" role="region" aria-label=${i18nString(UIStrings.timeRange)}>
             <span
              class="label-text"

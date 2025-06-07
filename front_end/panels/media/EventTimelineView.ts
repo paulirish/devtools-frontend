@@ -1,6 +1,7 @@
 // Copyright 2019 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as i18n from '../../core/i18n/i18n.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
@@ -26,13 +27,11 @@ const UIStrings = {
    *@description Title of the 'Buffering Status' button
    */
   bufferingStatus: 'Buffering Status',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/media/EventTimelineView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-interface State {
-  [key: string]: string;
-}
+type State = Record<string, string>;
 
 export class PlayerEventsTimeline extends TickingFlameChart {
   private normalizedTimestamp: number;
@@ -143,7 +142,7 @@ export class PlayerEventsTimeline extends TickingFlameChart {
         break;
 
       default:
-        throw `_onPlaybackEvent cant handle ${event.event}`;
+        throw new Error(`_onPlaybackEvent cant handle ${event.event}`);
     }
   }
 
@@ -162,9 +161,9 @@ export class PlayerEventsTimeline extends TickingFlameChart {
         // We only want the buffering for audio and video to be displayed.
         // One event may have changes for a single type, or for both audio/video
         // simultaneously.
-        // @ts-ignore
+        // @ts-expect-error
         audioState = event.value['audio_buffering_state'];
-        // @ts-ignore
+        // @ts-expect-error
         videoState = event.value['video_buffering_state'];
 
         if (audioState) {
@@ -199,7 +198,7 @@ export class PlayerEventsTimeline extends TickingFlameChart {
         break;
 
       default:
-        throw `_onPlaybackEvent cant handle ${event.event}`;
+        throw new Error(`_onPlaybackEvent cant handle ${event.event}`);
     }
   }
 

@@ -5,7 +5,6 @@
 import {assert} from 'chai';
 
 import {$, $$, click, getBrowserAndPages, goToResource, step, waitFor, waitForFunction} from '../../shared/helper.js';
-
 import {checkIfTabExistsInDrawer, DRAWER_PANEL_SELECTOR} from '../helpers/cross-tool-helper.js';
 import {
   addBreakpointForLine,
@@ -24,7 +23,7 @@ const LINEAR_MEMORY_INSPECTOR_TAB_TITLE_SELECTOR = '.tabbed-pane-header-tab-titl
 
 describe('Scope View', () => {
   it('opens linear memory inspector', async () => {
-    const {frontend, target} = getBrowserAndPages();
+    const {frontend} = getBrowserAndPages();
     const breakpointLine = '0x039';
     const fileName = 'memory.wasm';
 
@@ -33,11 +32,11 @@ describe('Scope View', () => {
     });
 
     await step(`add a breakpoint to line No.${breakpointLine}`, async () => {
-      await addBreakpointForLine(frontend, breakpointLine);
+      await addBreakpointForLine(breakpointLine);
     });
 
     await step('reload the page', async () => {
-      await reloadPageAndWaitForSourceFile(target, fileName);
+      await reloadPageAndWaitForSourceFile(fileName);
     });
 
     await step('expand the module scope', async () => {

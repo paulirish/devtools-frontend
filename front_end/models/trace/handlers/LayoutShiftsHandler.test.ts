@@ -171,7 +171,7 @@ describe('LayoutShiftsHandler', function() {
           assert.strictEqual(cluster.scoreWindows.needsImprovement.min, event.ts);
         }
 
-        // Here we have transitioned from eiter Good or NI to Bad, so
+        // Here we have transitioned from either Good or NI to Bad, so
         // again we assert that the Bad window starts when expected,
         // and that either the NI or Good window finishes just prior.
         if (scoreBeforeEvent < Trace.Handlers.ModelHandlers.LayoutShifts.LayoutShiftsThreshold.BAD &&
@@ -257,7 +257,7 @@ describe('LayoutShiftsHandler', function() {
 
       const lastShiftTimings = Trace.Helpers.Timing.eventTimingsMicroSeconds(cluster.events[cluster.events.length - 1]);
       const wantEndTime = lastShiftTimings.endTime + Trace.Handlers.ModelHandlers.LayoutShifts.MAX_SHIFT_TIME_DELTA;
-      const dur = Trace.Types.Timing.MicroSeconds(wantEndTime - earliestLayoutShiftTs);
+      const dur = Trace.Types.Timing.Micro(wantEndTime - earliestLayoutShiftTs);
       assert.strictEqual(cluster.dur || 0, dur);
     }
   });

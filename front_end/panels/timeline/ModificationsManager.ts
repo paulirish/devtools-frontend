@@ -30,7 +30,7 @@ export class AnnotationModifiedEvent extends Event {
 
 interface ModificationsManagerData {
   parsedTrace: Trace.Handlers.Types.ParsedTrace;
-  traceBounds: Trace.Types.Timing.TraceWindowMicroSeconds;
+  traceBounds: Trace.Types.Timing.TraceWindowMicro;
   rawTraceEvents: readonly Trace.Types.Events.Event[];
   syntheticEvents: Trace.Types.Events.SyntheticBased[];
   modifications?: Trace.Types.File.Modifications;
@@ -133,13 +133,18 @@ export class ModificationsManager extends EventTarget {
     }
   }
 
-  createAnnotation(newAnnotation: Trace.Types.File.Annotation, loadedFromFile: boolean = false): void {
+  /**
+   * Stores the annotation and creates its overlay.
+   * @returns the Overlay that gets created and associated with this annotation.
+   */
+  createAnnotation(newAnnotation: Trace.Types.File.Annotation, loadedFromFile = false):
+      Overlays.Overlays.TimelineOverlay {
     // If a label already exists on an entry and a user is trying to create a new one, start editing an existing label instead.
     if (newAnnotation.type === 'ENTRY_LABEL') {
       const overlay = this.#findLabelOverlayForEntry(newAnnotation.entry);
       if (overlay) {
         this.dispatchEvent(new AnnotationModifiedEvent(overlay, 'EnterLabelEditState'));
-        return;
+        return overlay;
       }
     }
 
@@ -155,6 +160,7 @@ export class ModificationsManager extends EventTarget {
     const newOverlay = this.#createOverlayFromAnnotation(newAnnotation);
     this.#overlayForAnnotation.set(newAnnotation, newOverlay);
     this.dispatchEvent(new AnnotationModifiedEvent(newOverlay, 'Add'));
+    return newOverlay;
   }
 
   annotationsForEntry(entry: Trace.Types.Events.Event): Trace.Types.File.Annotation[] {
@@ -307,6 +313,14 @@ export class ModificationsManager extends EventTarget {
     return [...this.#overlayForAnnotation.values()];
   }
 
+  applyAnnotationsFromCache(): void {
+    this.#modifications = this.toJSON();
+    // The cache is filled by applyModificationsIfPresent, so we clear
+    // it beforehand to prevent duplicate entries.
+    this.#overlayForAnnotation.clear();
+    this.#applyStoredAnnotations(this.#modifications.annotations);
+  }
+
   /**
    * Builds all modifications into a serializable object written into
    * the 'modifications' trace file metadata field.
@@ -314,10 +328,10 @@ export class ModificationsManager extends EventTarget {
   toJSON(): Trace.Types.File.Modifications {
     const hiddenEntries = this.#entriesFilter.invisibleEntries()
                               .map(entry => this.#eventsSerializer.keyForEvent(entry))
-                              .filter(entry => entry !== null) as Trace.Types.File.SerializableKey[];
+                              .filter(entry => entry !== null);
     const expandableEntries = this.#entriesFilter.expandableEntries()
                                   .map(entry => this.#eventsSerializer.keyForEvent(entry))
-                                  .filter(entry => entry !== null) as Trace.Types.File.SerializableKey[];
+                                  .filter(entry => entry !== null);
     this.#modifications = {
       entriesModifications: {
         hiddenEntries,

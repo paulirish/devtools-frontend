@@ -1,6 +1,7 @@
 // Copyright 2023 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import '../../../ui/legacy/legacy.js';
 import '../../../ui/components/icon_button/icon_button.js';
@@ -8,13 +9,13 @@ import '../../../ui/components/icon_button/icon_button.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import type * as PublicExtensions from '../../../models/extensions/extensions.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
-import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import * as Lit from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 import * as Extensions from '../extensions/extensions.js';
 
 import extensionViewStyles from './extensionView.css.js';
 
-const {html} = LitHtml;
+const {html} = Lit;
 
 const UIStrings = {
   /**
@@ -25,7 +26,7 @@ const UIStrings = {
    * @description The label that indicates that the content shown is provided by a browser extension.
    */
   extension: 'Content provided by a browser extension',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings(
     'panels/recorder/components/ExtensionView.ts',
     UIStrings,
@@ -59,7 +60,6 @@ export class ExtensionView extends HTMLElement {
   }
 
   connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [extensionViewStyles];
     this.#render();
   }
 
@@ -88,8 +88,9 @@ export class ExtensionView extends HTMLElement {
     }
     const iframe = Extensions.ExtensionManager.ExtensionManager.instance().getView(this.#descriptor.id).frame();
     // clang-format off
-    LitHtml.render(
+    Lit.render(
       html`
+        <style>${extensionViewStyles}</style>
         <div class="extension-view">
           <header>
             <div class="title">

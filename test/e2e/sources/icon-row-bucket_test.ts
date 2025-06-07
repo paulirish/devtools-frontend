@@ -16,7 +16,6 @@ import {
   waitForNone,
   waitForWithTries,
 } from '../../shared/helper.js';
-
 import {navigateToIssuesTab} from '../helpers/issues-helpers.js';
 import {openSourcesPanel} from '../helpers/sources-helpers.js';
 
@@ -38,13 +37,6 @@ async function getRowsText(root: puppeteer.ElementHandle<Element>): Promise<stri
     messages.push(messageText);
   }
   return messages;
-}
-
-async function getIconFile(iconComponent: puppeteer.ElementHandle<Element>): Promise<string> {
-  const issueIcon = await waitFor('.icon-basic', iconComponent);
-  const imageSrc = await issueIcon.evaluate(x => window.getComputedStyle(x).webkitMaskImage);
-  const splitImageSrc = imageSrc.substring(5, imageSrc.length - 2).split('/');
-  return splitImageSrc[splitImageSrc.length - 1];
 }
 
 async function openFileInSourceTab(fileName: string) {
@@ -80,10 +72,6 @@ async function waitForExpandedIssueTitle(issueIconComponent: puppeteer.ElementHa
 }
 
 describe('The row\'s icon bucket', function() {
-  if (this.timeout()) {
-    this.timeout(10000);
-  }
-
   // This test and the tests below require the use of unsafe hoverElement/clickElement helpers
   // because they return a list of elements and check each one of them. Perhaps, the tests
   // can be changed to check the elements one by one using the safer hover/click helpers.
@@ -104,21 +92,6 @@ describe('The row\'s icon bucket', function() {
       messages.push(...rowMessages);
     }
     assert.deepEqual(messages, expectedMessages);
-  });
-
-  // Flakily fails with finding an empty icon.
-  it.skip('[crbug.com/1508270] should use the correct error icon', async () => {
-    await openFileInSourceTab('trusted-type-violations-report-only.rawresponse');
-    const bucketIconComponents = await getIconComponents('cm-messageIcon-error');
-    for (const bucketIconComponent of bucketIconComponents) {
-      await hoverElement(bucketIconComponent);
-      const vbox = await waitFor('div.vbox.flex-auto.no-pointer-events');
-      const iconComponents = await getIconComponents('text-editor-row-message-icon', vbox);
-      for (const iconComponent of iconComponents) {
-        assert.strictEqual(await getIconFile(iconComponent), 'cross-circle-filled.svg');
-      }
-      assert.strictEqual(await getIconFile(bucketIconComponent), 'cross-circle-filled.svg');
-    }
   });
 
   it('should display issue messages', async () => {

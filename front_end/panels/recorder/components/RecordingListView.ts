@@ -1,20 +1,21 @@
 // Copyright 2023 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import '../../../ui/components/icon_button/icon_button.js';
 
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as ComponentHelpers from '../../../ui/components/helpers/helpers.js';
-import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import * as Lit from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 import * as Models from '../models/models.js';
 import * as Actions from '../recorder-actions/recorder-actions.js';
 
 import recordingListViewStyles from './recordingListView.css.js';
 
-const {html} = LitHtml;
+const {html} = Lit;
 
 const UIStrings = {
   /**
@@ -37,7 +38,7 @@ const UIStrings = {
    * @description The title of the row corresponding to a recording. By clicking on the row, the user open the recording for editing.
    */
   openRecording: 'Open recording',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings(
     'panels/recorder/components/RecordingListView.ts',
     UIStrings,
@@ -95,12 +96,7 @@ export class RecordingListView extends HTMLElement {
     replayAllowed: true,
   };
 
-  constructor() {
-    super();
-  }
-
   connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [recordingListViewStyles];
     void ComponentHelpers.ScheduledRender.scheduleRender(this, this.#render);
   }
 
@@ -146,8 +142,9 @@ export class RecordingListView extends HTMLElement {
 
   #render = (): void => {
     // clang-format off
-    LitHtml.render(
+    Lit.render(
       html`
+        <style>${recordingListViewStyles}</style>
         <div class="wrapper">
           <div class="header">
             <h1>${i18nString(UIStrings.savedRecordings)}</h1>

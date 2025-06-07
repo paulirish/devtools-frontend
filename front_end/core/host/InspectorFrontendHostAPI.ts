@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import type * as Platform from '../../core/platform/platform.js';
+import type * as Common from '../common/common.js';
 import type * as Root from '../root/root.js';
 
 export enum Events {
@@ -67,7 +68,7 @@ export const EventDescriptors = [
   [Events.SetInspectedTabId, 'setInspectedTabId', ['tabId']],
   [Events.SetUseSoftMenu, 'setUseSoftMenu', ['useSoftMenu']],
   [Events.ShowPanel, 'showPanel', ['panelName']],
-];
+] as const;
 
 export interface DispatchMessageChunkEvent {
   messageChunk: string;
@@ -82,7 +83,7 @@ export interface EyeDropperPickedColorEvent {
 }
 
 export interface DevToolsFileSystem {
-  type: string;
+  type: ''|'automatic'|'snippets'|'overrides';
   fileSystemName: string;
   rootURL: string;
   fileSystemPath: Platform.DevToolsPath.RawPathString;
@@ -137,9 +138,7 @@ export interface SearchCompletedEvent {
 
 export interface DoAidaConversationResult {
   statusCode?: number;
-  headers?: {
-    [x: string]: string,
-  };
+  headers?: Record<string, string>;
   netError?: number;
   netErrorName?: string;
   error?: string;
@@ -199,6 +198,19 @@ export interface KeyDownEvent {
   context?: number;
 }
 
+export interface SettingAccessEvent {
+  name: number;
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  numeric_value?: number;
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  string_value?: number;
+}
+
+export interface FunctionCallEvent {
+  name: number;
+  context?: number;
+}
+
 // While `EventDescriptors` are used to dynamically dispatch host binding events,
 // the `EventTypes` "type map" is used for type-checking said events by TypeScript.
 // `EventTypes` is not used at runtime.
@@ -236,6 +248,17 @@ export interface EventTypes {
 }
 
 export interface InspectorFrontendHostAPI {
+  events: Common.EventTarget.EventTarget<EventTypes>;
+
+  connectAutomaticFileSystem(
+      fileSystemPath: Platform.DevToolsPath.RawPathString,
+      fileSystemUUID: string,
+      addIfMissing: boolean,
+      callback: (result: {success: boolean}) => void,
+      ): void;
+
+  disconnectAutomaticFileSystem(fileSystemPath: Platform.DevToolsPath.RawPathString): void;
+
   addFileSystem(type?: string): void;
 
   loadCompleted(): void;
@@ -284,6 +307,10 @@ export interface InspectorFrontendHostAPI {
 
   closeWindow(): void;
 
+  /**
+   * Don't use directly - use {@link CopyToClipboard.copyTextToClipboard} instead.
+   * @deprecated Marked to restrict usage.
+   */
   copyText(text: string|null|undefined): void;
 
   inspectedURLChanged(url: Platform.DevToolsPath.UrlString): void;
@@ -295,9 +322,7 @@ export interface InspectorFrontendHostAPI {
 
   registerPreference(name: string, options: {synced?: boolean}): void;
 
-  getPreferences(callback: (arg0: {
-                   [x: string]: string,
-                 }) => void): void;
+  getPreferences(callback: (arg0: Record<string, string>) => void): void;
 
   getPreference(name: string, callback: (arg0: string) => void): void;
 
@@ -329,8 +354,6 @@ export interface InspectorFrontendHostAPI {
   setDevicesDiscoveryConfig(config: Adb.Config): void;
 
   setDevicesUpdatesEnabled(enabled: boolean): void;
-
-  performActionOnRemotePage(pageId: string, action: string): void;
 
   openRemotePage(browserId: string, url: string): void;
 
@@ -377,6 +400,8 @@ export interface InspectorFrontendHostAPI {
   recordDrag(event: DragEvent): void;
   recordChange(event: ChangeEvent): void;
   recordKeyDown(event: KeyDownEvent): void;
+  recordSettingAccess(event: SettingAccessEvent): void;
+  recordFunctionCall(event: FunctionCallEvent): void;
 }
 
 export interface AcceleratorDescriptor {
@@ -399,9 +424,7 @@ export interface ContextMenuDescriptor {
 }
 export interface LoadNetworkResourceResult {
   statusCode: number;
-  headers?: {
-    [x: string]: string,
-  };
+  headers?: Record<string, string>;
   netError?: number;
   netErrorName?: string;
   urlValid?: boolean;
@@ -444,14 +467,12 @@ export interface SyncInformation {
  * Warning: There is another definition of this enum in the DevTools code
  * base, keep them in sync:
  * front_end/devtools_compatibility.js
- * @readonly
  */
 export const enum EnumeratedHistogram {
   /* eslint-disable @typescript-eslint/naming-convention -- Shadows a legacy enum */
+  // LINT.IfChange(EnumeratedHistogram)
   ActionTaken = 'DevTools.ActionTaken',
   PanelShown = 'DevTools.PanelShown',
-  PanelShownInLocation = 'DevTools.PanelShownInLocation',
-  SidebarPaneShown = 'DevTools.SidebarPaneShown',
   KeyboardShortcutFired = 'DevTools.KeyboardShortcutFired',
   IssueCreated = 'DevTools.IssueCreated',
   IssuesPanelIssueExpanded = 'DevTools.IssuesPanelIssueExpanded',
@@ -479,13 +500,11 @@ export const enum EnumeratedHistogram {
   SourcesPanelFileOpened = 'DevTools.SourcesPanelFileOpened',
   NetworkPanelResponsePreviewOpened = 'DevTools.NetworkPanelResponsePreviewOpened',
   TimelineNavigationSettingState = 'DevTools.TimelineNavigationSettingState',
-  StyleTextCopied = 'DevTools.StyleTextCopied',
   CSSHintShown = 'DevTools.CSSHintShown',
   LighthouseModeRun = 'DevTools.LighthouseModeRun',
   LighthouseCategoryUsed = 'DevTools.LighthouseCategoryUsed',
-  CSSPropertyDocumentation = 'DevTools.CSSPropertyDocumentation',
   SwatchActivated = 'DevTools.SwatchActivated',
   AnimationPlaybackRateChanged = 'DevTools.AnimationPlaybackRateChanged',
   AnimationPointDragged = 'DevTools.AnimationPointDragged',
-
+  // LINT.ThenChange(/front_end/devtools_compatibility.js:EnumeratedHistogram)
 }

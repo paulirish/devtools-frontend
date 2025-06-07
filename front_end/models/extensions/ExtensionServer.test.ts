@@ -12,7 +12,9 @@ import {
   describeWithDevtoolsExtension,
   getExtensionOrigin,
 } from '../../testing/ExtensionHelpers.js';
+import {MockProtocolBackend} from '../../testing/MockScopeChain.js';
 import {addChildFrame, FRAME_URL, getMainFrame} from '../../testing/ResourceTreeHelpers.js';
+import {encodeSourceMap} from '../../testing/SourceMapEncoder.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as Bindings from '../bindings/bindings.js';
 import * as Extensions from '../extensions/extensions.js';
@@ -31,7 +33,7 @@ describeWithDevtoolsExtension('Extensions', {}, context => {
 
     const addExtensionStub = sinon.stub(Extensions.ExtensionServer.ExtensionServer.instance(), 'addExtension');
     createTarget().setInspectedURL(urlString`http://example.com`);
-    assert.isTrue(addExtensionStub.calledOnceWithExactly(context.extensionDescriptor));
+    sinon.assert.calledOnceWithExactly(addExtensionStub, context.extensionDescriptor);
   });
 
   it('are not initialized before the target is initialized and navigated to a non-privileged URL', async () => {
@@ -41,7 +43,7 @@ describeWithDevtoolsExtension('Extensions', {}, context => {
 
     const addExtensionStub = sinon.stub(Extensions.ExtensionServer.ExtensionServer.instance(), 'addExtension');
     createTarget().setInspectedURL(urlString`chrome://version`);
-    assert.isTrue(addExtensionStub.notCalled);
+    sinon.assert.notCalled(addExtensionStub);
   });
 
   it('defers loading extensions until after navigation from a privileged to a non-privileged host', async () => {
@@ -75,6 +77,95 @@ describeWithDevtoolsExtension('Extensions', {}, context => {
         await new Promise<Chrome.DevTools.Resource[]>(r => context.chrome.devtools!.inspectedWindow.getResources(r));
 
     assert.deepEqual(resources.map(r => r.url), ['https://example.com/', 'http://example.com']);
+  });
+
+  describe('Resource', () => {
+    let target: SDK.Target.Target;
+    let project: Bindings.ContentProviderBasedProject.ContentProviderBasedProject;
+
+    beforeEach(() => {
+      target = createTarget();
+      const inspectedUrl = urlString`https://www.example.com/`;
+      target.setInspectedURL(inspectedUrl);
+
+      project = new Bindings.ContentProviderBasedProject.ContentProviderBasedProject(
+          Workspace.Workspace.WorkspaceImpl.instance(), target.id(), Workspace.Workspace.projectTypes.Network, '',
+          false /* isServiceProject */);
+
+      const targetManager = target.targetManager();
+      const resourceMapping =
+          new Bindings.ResourceMapping.ResourceMapping(targetManager, Workspace.Workspace.WorkspaceImpl.instance());
+      Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance(
+          {forceNew: true, resourceMapping, targetManager});
+    });
+
+    describe('setFunctionRangesForScript', () => {
+      const validFunctionRanges = [{start: {line: 0, column: 0}, end: {line: 10, column: 1}, name: 'foo'}];
+      it('correctly calls DebuggerWorkspaceBindings.setFunctionRanges via Resource.setFunctionRangesForScript API',
+         async () => {
+           // create a mock uiSourceCode for the sourceMap script
+           const scriptUrl = urlString`https://example.com/foo.js.map/foo.js`;
+           project.addUISourceCode(
+               new Workspace.UISourceCode.UISourceCode(
+                   project, scriptUrl, Common.ResourceType.resourceTypes.SourceMapScript),
+           );
+           const uiSourceCode = project.uiSourceCodeForURL(scriptUrl);
+           assert.exists(uiSourceCode);
+           assert.exists(context.chrome.devtools);
+
+           const resources = await new Promise<Chrome.DevTools.Resource[]>(
+               r => context.chrome.devtools?.inspectedWindow.getResources(r));
+
+           const nonSourceMapScripts = resources.filter(r => r.type !== 'sm-script');
+           const sourceMapScripts = resources.filter(r => r.type === 'sm-script');
+
+           const workspaceBindingSetFunctionRangesStub =
+               sinon.stub(Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance(), 'setFunctionRanges');
+
+           // The assert.throws() helper does not work with async/await, hence the manual try catch
+           let didThrow = false;
+           try {
+             // Should throw if called with a non-sourceMap script
+             await nonSourceMapScripts[0].setFunctionRangesForScript(validFunctionRanges);
+           } catch (e) {
+             didThrow = true;
+             assertIsStatus(e);
+             assert.strictEqual(e.code, 'E_BADARG');
+           }
+           assert.isTrue(didThrow, 'SetFunctionRangesForScript did not throw an error as expected.');
+
+           try {
+             // Should throw if called with invalid/empty ranges
+             await sourceMapScripts[0].setFunctionRangesForScript([/** empty ranges */]);
+           } catch (e) {
+             didThrow = true;
+             assertIsStatus(e);
+             assert.strictEqual(e.code, 'E_BADARG');
+           }
+           assert.isTrue(didThrow, 'SetFunctionRangesForScript did not throw an error as expected.');
+           sinon.assert.notCalled(workspaceBindingSetFunctionRangesStub);
+           await sourceMapScripts[0].setFunctionRangesForScript(validFunctionRanges);
+           sinon.assert.calledOnceWithExactly(workspaceBindingSetFunctionRangesStub, uiSourceCode, validFunctionRanges);
+         });
+    });
+
+    it('returns the buildId', async () => {
+      const stubScript = sinon.createStubInstance(SDK.Script.Script);
+      // @ts-expect-error
+      stubScript.buildId = 'my-build-id';
+      sinon.stub(Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance(), 'scriptsForUISourceCode')
+          .returns([stubScript]);
+      project.addUISourceCode(
+          new Workspace.UISourceCode.UISourceCode(
+              project, urlString`http://example.com/index.js`, Common.ResourceType.resourceTypes.Script),
+      );
+
+      const resources =
+          await new Promise<Chrome.DevTools.Resource[]>(r => context.chrome.devtools?.inspectedWindow.getResources(r));
+
+      assert.strictEqual(resources[0].url, 'http://example.com/index.js');
+      assert.strictEqual(resources[0].buildId, 'my-build-id');
+    });
   });
 });
 
@@ -169,7 +260,7 @@ describeWithDevtoolsExtension('Extensions', {}, context => {
       steps: [],
     });
 
-    assert.isTrue(stub.called);
+    sinon.assert.called(stub);
 
     await context.chrome.devtools?.recorder.unregisterRecorderExtensionPlugin(extensionPlugin);
   });
@@ -284,8 +375,8 @@ describeWithDevtoolsExtension('Extensions', {}, context => {
     const reloadPromise = new Promise(resolve => reloadStub.callsFake(resolve));
     context.chrome.devtools!.inspectedWindow.reload();
     await reloadPromise;
-    assert.isTrue(reloadStub.calledOnce);
-    assert.isTrue(secondReloadStub.notCalled);
+    sinon.assert.calledOnce(reloadStub);
+    sinon.assert.notCalled(secondReloadStub);
   });
 
   it('correcly installs blocked extensions after navigation', async () => {
@@ -350,7 +441,7 @@ describeWithDevtoolsExtension('Runtime hosts policy', {hostsPolicy}, context => 
       const addExtensionStub = sinon.stub(Extensions.ExtensionServer.ExtensionServer.instance(), 'addExtension');
 
       target.setInspectedURL(urlString`${`${protocol}://foo`}`);
-      assert.isTrue(addExtensionStub.notCalled);
+      sinon.assert.notCalled(addExtensionStub);
       assert.isUndefined(context.chrome.devtools);
     });
   }
@@ -544,6 +635,9 @@ describeWithDevtoolsExtension('Runtime hosts policy', {hostsPolicy}, context => 
     const target = createTarget({id: 'target' as Protocol.Target.TargetID});
     target.setInspectedURL(allowedUrl);
 
+    sinon.stub(Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding, 'instance')
+        .returns(sinon.createStubInstance(
+            Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding, {scriptsForUISourceCode: []}));
     const project = new Bindings.ContentProviderBasedProject.ContentProviderBasedProject(
         Workspace.Workspace.WorkspaceImpl.instance(), target.id(), Workspace.Workspace.projectTypes.Network, '',
         false /* isServiceProject */);
@@ -553,14 +647,13 @@ describeWithDevtoolsExtension('Runtime hosts policy', {hostsPolicy}, context => 
     assert.exists(context.chrome.devtools);
     const resources =
         await new Promise<Chrome.DevTools.Resource[]>(r => context.chrome.devtools?.inspectedWindow.getResources(r));
-    assert.deepEqual(resources.map(r => r.url), [blockedUrl, allowedUrl]);
+    assert.deepEqual(resources.map(r => r.url), [allowedUrl]);
 
     const resourceContents = await Promise.all(resources.map(
         resource => new Promise<{url: string, content?: string, encoding?: string}>(
             r => resource.getContent((content, encoding) => r({url: resource.url, content, encoding})))));
 
     assert.deepEqual(resourceContents, [
-      {url: blockedUrl, content: undefined, encoding: undefined},
       {url: allowedUrl, content: 'content', encoding: ''},
     ]);
   });
@@ -609,6 +702,9 @@ describeWithDevtoolsExtension('Runtime hosts policy', {hostsPolicy}, context => 
     const target = createTarget({id: 'target' as Protocol.Target.TargetID});
     target.setInspectedURL(allowedUrl);
 
+    sinon.stub(Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding, 'instance')
+        .returns(sinon.createStubInstance(
+            Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding, {scriptsForUISourceCode: []}));
     const project = new Bindings.ContentProviderBasedProject.ContentProviderBasedProject(
         Workspace.Workspace.WorkspaceImpl.instance(), target.id(), Workspace.Workspace.projectTypes.Network, '',
         false /* isServiceProject */);
@@ -618,7 +714,7 @@ describeWithDevtoolsExtension('Runtime hosts policy', {hostsPolicy}, context => 
     assert.exists(context.chrome.devtools);
     const resources =
         await new Promise<Chrome.DevTools.Resource[]>(r => context.chrome.devtools?.inspectedWindow.getResources(r));
-    assert.deepEqual(resources.map(r => r.url), [blockedUrl, allowedUrl]);
+    assert.deepEqual(resources.map(r => r.url), [allowedUrl]);
 
     assert.deepEqual(project.uiSourceCodeForURL(allowedUrl)?.content(), 'content');
     assert.deepEqual(project.uiSourceCodeForURL(blockedUrl)?.content(), 'content');
@@ -626,8 +722,8 @@ describeWithDevtoolsExtension('Runtime hosts policy', {hostsPolicy}, context => 
                           resource => new Promise<Object|undefined>(r => resource.setContent('modified', true, r)))) as
         Array<undefined|{code: string, details: string[]}>;
 
-    assert.deepEqual(responses.map(response => response?.code), ['E_FAILED', 'OK']);
-    assert.deepEqual(responses.map(response => response?.details), [['Permission denied'], []]);
+    assert.deepEqual(responses.map(response => response?.code), ['OK']);
+    assert.deepEqual(responses.map(response => response?.details), [[]]);
 
     assert.deepEqual(project.uiSourceCodeForURL(allowedUrl)?.content(), 'modified');
     assert.deepEqual(project.uiSourceCodeForURL(blockedUrl)?.content(), 'content');
@@ -718,8 +814,8 @@ describe('ExtensionServer', () => {
   });
 });
 
-function assertIsStatus<T>(value: T|
-                           Extensions.ExtensionServer.Record): asserts value is Extensions.ExtensionServer.Record {
+function assertIsStatus<T>(value: T|Extensions.ExtensionServer.Record):
+    asserts value is Extensions.ExtensionServer.Record {
   if (value && typeof value === 'object' && 'code' in value) {
     assert.isTrue(value.code === 'OK' || Boolean(value.isError), `Value ${value} is not a status code`);
   } else {
@@ -761,7 +857,7 @@ describeWithDevtoolsExtension('Wasm extension API', {}, context => {
     const log = captureError('Extension server error: Invalid argument global: No global with index 0');
     const result = await context.chrome.devtools?.languageServices.getWasmGlobal(0, stopId);
     assertIsStatus(result);
-    assert.isTrue(log.calledOnce);
+    sinon.assert.calledOnce(log);
     assert.strictEqual(result.code, 'E_BADARG');
     assert.strictEqual(result.details[0], 'global');
   });
@@ -770,7 +866,7 @@ describeWithDevtoolsExtension('Wasm extension API', {}, context => {
     const log = captureError('Extension server error: Invalid argument local: No local with index 0');
     const result = await context.chrome.devtools?.languageServices.getWasmLocal(0, stopId);
     assertIsStatus(result);
-    assert.isTrue(log.calledOnce);
+    sinon.assert.calledOnce(log);
     assert.strictEqual(result.code, 'E_BADARG');
     assert.strictEqual(result.details[0], 'local');
   });
@@ -779,7 +875,7 @@ describeWithDevtoolsExtension('Wasm extension API', {}, context => {
     const log = captureError('Extension server error: Invalid argument op: No operand with index 0');
     const result = await context.chrome.devtools?.languageServices.getWasmOp(0, stopId);
     assertIsStatus(result);
-    assert.isTrue(log.calledOnce);
+    sinon.assert.calledOnce(log);
     assert.strictEqual(result.code, 'E_BADARG');
     assert.strictEqual(result.details[0], 'op');
   });
@@ -803,8 +899,8 @@ class StubLanguageExtension implements Chrome.DevTools.LanguageExtensionPlugin {
   }
   async removeRawModule(): Promise<void> {
   }
-  async getFunctionInfo(): Promise<{frames: Array<Chrome.DevTools.FunctionInfo>, missingSymbolFiles: Array<string>}|
-                                   {missingSymbolFiles: Array<string>}|{frames: Array<Chrome.DevTools.FunctionInfo>}> {
+  async getFunctionInfo(): Promise<{frames: Chrome.DevTools.FunctionInfo[], missingSymbolFiles: string[]}|
+                                   {missingSymbolFiles: string[]}|{frames: Chrome.DevTools.FunctionInfo[]}> {
     return {frames: []};
   }
   async getInlinedFunctionRanges(): Promise<Chrome.DevTools.RawLocationRange[]> {
@@ -836,7 +932,7 @@ describeWithDevtoolsExtension('Language Extension API', {}, context => {
     const spy = sinon.spy(pageResourceLoader, 'resourceLoadedThroughExtension');
     await context.chrome.devtools?.languageServices.reportResourceLoad('test.dwo', {success: true, size: 10});
 
-    assert.isTrue(spy.calledOnce);
+    sinon.assert.calledOnce(spy);
     assert.strictEqual(pageResourceLoader.getNumberOfResources().resources, 1);
 
     const resource = spy.args[0][0];
@@ -847,6 +943,7 @@ describeWithDevtoolsExtension('Language Extension API', {}, context => {
       initiator: expectedInitiator,
       success: true,
       size: 10,
+      duration: null,
       errorMessage: undefined,
     };
     assert.deepEqual(resource, expectedResource);
@@ -886,9 +983,9 @@ for (const allowFileAccess of [true, false]) {
                 type: Protocol.Debugger.DebugSymbolsType.SourceMap,
                 externalURL: 'file:///source/url.map',
               }],
-              null);
+              null, null);
 
-          assert.isTrue(endpointSpy.calledOnce);
+          sinon.assert.calledOnce(endpointSpy);
           assert.strictEqual(
               (endpointSpy.thisValues[0] as Extensions.LanguageExtensionEndpoint.LanguageExtensionEndpoint)
                   .allowFileAccess,
@@ -896,3 +993,72 @@ for (const allowFileAccess of [true, false]) {
         });
       });
 }
+
+describeWithDevtoolsExtension('validate attachSourceMapURL ', {}, context => {
+  it('correctly attaches a source map to a registered script', async () => {
+    const sourceRoot = 'http://example.com';
+    const scriptName = 'script.ts';
+    const scriptInfo = {
+      url: urlString`${sourceRoot}/script.js`,
+      content: 'function f(x) { console.log(x); } function ignore(y){ console.log(y); }',
+    };
+    const sourceMap = encodeSourceMap(
+        [
+          `0:9 => ${scriptName}:0:1`,
+          `1:0 => ${scriptName}:4:0`,
+          `1:2 => ${scriptName}:4:2`,
+          `2:0 => ${scriptName}:2:0`,
+        ],
+        sourceRoot);
+
+    const sourceMapString = {
+      version: 3,
+      names: ['f', 'console', 'log', 'ignore'],
+      sources: [scriptInfo.url],
+      mappings: sourceMap.mappings,
+      file: `${scriptInfo.url}.map`,
+    };
+
+    const target = createTarget({type: SDK.Target.Type.FRAME});
+    const targetManager = target.targetManager();
+    const workspace = Workspace.Workspace.WorkspaceImpl.instance();
+    const resourceMapping = new Bindings.ResourceMapping.ResourceMapping(targetManager, workspace);
+    const debuggerWorkspaceBinding = Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance(
+        {forceNew: false, resourceMapping, targetManager});
+    const backend = new MockProtocolBackend();
+    Bindings.IgnoreListManager.IgnoreListManager.instance({forceNew: false, debuggerWorkspaceBinding});
+
+    // Before any script is registered, there shouldn't be any uiSourceCodes.
+    assert.isNull(Workspace.Workspace.WorkspaceImpl.instance().uiSourceCodeForURL(scriptInfo.url));
+
+    // Create promise to await the uiSourceCode given the url and its target.
+    const uiSourceCodePromise = debuggerWorkspaceBinding.waitForUISourceCodeAdded(scriptInfo.url, target);
+
+    // Register the script.
+    const currentScript = await backend.addScript(target, scriptInfo, null);
+
+    // Await the promise for sourceCode to be added.
+    await uiSourceCodePromise;
+
+    assert.exists(context.chrome.devtools);
+
+    const resources = await new Promise<Chrome.DevTools.Resource[]>(r => {
+      context.chrome.devtools?.inspectedWindow.getResources(r);
+    });
+
+    // Validate that resource is registered.
+    assert.isTrue(resources && resources.length > 0);
+
+    // Script should not have a source map url attached yet.
+    assert.notExists(currentScript.sourceMapURL);
+
+    // Call attachSourceMapURL with encoded source map as a dataURL
+    const scriptResource = resources.find(item => item.url === scriptInfo.url.toString());
+    const encodedSourceMap = `data:text/plain;base64,${btoa(JSON.stringify(sourceMapString))}`;
+
+    await scriptResource?.attachSourceMapURL(encodedSourceMap);
+
+    // Validate that the script has the sourcemap dataURL attached.
+    assert.deepEqual(currentScript.sourceMapURL, encodedSourceMap);
+  });
+});

@@ -8,17 +8,15 @@ import type {Suggestion} from './SuggestBox.js';
 
 export class FilterSuggestionBuilder {
   private readonly keys: string[];
-  private readonly valueSorter: ((arg0: string, arg1: Array<string>) => void)|
-      ((key: string, result: string[]) => string[]);
-  private readonly valuesMap: Map<string, Set<string>>;
+  private readonly valueSorter: ((arg0: string, arg1: string[]) => void)|((key: string, result: string[]) => string[]);
+  private readonly valuesMap = new Map<string, Set<string>>();
 
-  constructor(keys: string[], valueSorter?: ((arg0: string, arg1: Array<string>) => void)) {
+  constructor(keys: string[], valueSorter?: ((arg0: string, arg1: string[]) => void)) {
     this.keys = keys;
-    this.valueSorter = valueSorter || ((key: string, result: string[]) => result.sort());
-    this.valuesMap = new Map();
+    this.valueSorter = valueSorter || ((_: string, result: string[]) => result.sort());
   }
 
-  completions(expression: string, prefix: string, force?: boolean): Promise<Suggestion[]> {
+  completions(_expression: string, prefix: string, force?: boolean): Promise<Suggestion[]> {
     if (!prefix && !force) {
       return Promise.resolve([]);
     }
@@ -35,7 +33,7 @@ export class FilterSuggestionBuilder {
       const matcher = new RegExp('^' + Platform.StringUtilities.escapeForRegExp(prefix), 'i');
       for (const key of this.keys) {
         if (matcher.test(key)) {
-          suggestions.push(({text: modifier + key + ':'} as Suggestion));
+          suggestions.push(({text: modifier + key + ':'}));
         }
       }
     } else {
@@ -46,7 +44,7 @@ export class FilterSuggestionBuilder {
       this.valueSorter(key, values);
       for (const item of values) {
         if (matcher.test(item) && (item !== value)) {
-          suggestions.push(({text: modifier + key + ':' + item} as Suggestion));
+          suggestions.push(({text: modifier + key + ':' + item}));
         }
       }
     }
@@ -60,7 +58,7 @@ export class FilterSuggestionBuilder {
 
     let set = this.valuesMap.get(key);
     if (!set) {
-      set = (new Set() as Set<string>);
+      set = (new Set());
       this.valuesMap.set(key, set);
     }
     set.add(value);

@@ -8,7 +8,7 @@ import * as Platform from '../../../core/platform/platform.js';
 import type * as Puppeteer from '../../../third_party/puppeteer/puppeteer.js';
 import * as Buttons from '../../../ui/components/buttons/buttons.js';
 import * as SuggestionInput from '../../../ui/components/suggestion_input/suggestion_input.js';
-import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import * as Lit from '../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
 import * as Controllers from '../controllers/controllers.js';
 import * as Models from '../models/models.js';
@@ -29,7 +29,7 @@ import {
   type RequiredKeys,
 } from './util.js';
 
-const {html, Decorators, Directives, LitElement} = LitHtml;
+const {html, Decorators, Directives, LitElement} = Lit;
 const {customElement, property, state} = Decorators;
 const {live} = Directives;
 
@@ -131,7 +131,7 @@ const defaultValuesByAttribute = deepFreeze({
 
 const attributesByType = deepFreeze<{
   [Type in Models.Schema.StepType]:
-      {required: Exclude<RequiredKeys<StepFor<Type>>, 'type'>[], optional: OptionalKeys<StepFor<Type>>[]};
+      {required: Array<Exclude<RequiredKeys<StepFor<Type>>, 'type'>>, optional: Array<OptionalKeys<StepFor<Type>>>};
 }>({
   [Models.Schema.StepType.Click]: {
     required: ['selectors', 'offsetX', 'offsetY'],
@@ -270,7 +270,7 @@ const UIStrings = {
    *@description The error message display when a user enters a type in the input not associates with any existing types.
    */
   unknownActionType: 'Unknown action type.',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/recorder/components/StepEditor.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -364,7 +364,7 @@ export class EditorState {
       attribute: Attribute): Promise<DeepImmutable<typeof defaultValuesByAttribute[Attribute]>>;
   static async defaultByAttribute(_state: DeepImmutable<EditorState>, attribute: keyof typeof defaultValuesByAttribute):
       Promise<unknown> {
-    return this.#puppeteer.run(puppeteer => {
+    return await this.#puppeteer.run(puppeteer => {
       switch (attribute) {
         case 'assertedEvents': {
           return immutableDeepAssign(defaultValuesByAttribute.assertedEvents, new ArrayAssignments({
@@ -397,7 +397,7 @@ export class EditorState {
     const state = structuredClone(step) as EditorState;
     for (const key of ['parameters', 'properties'] as Array<'properties'>) {
       if (key in step && step[key] !== undefined) {
-        // @ts-ignore Potential infinite type instantiation.
+        // @ts-expect-error Potential infinite type instantiation.
         state[key] = JSON.stringify(step[key]);
       }
     }
@@ -415,7 +415,7 @@ export class EditorState {
         return [...selector];
       });
     }
-    return deepFreeze(state as EditorState);
+    return deepFreeze(state);
   }
 
   static toStep(state: DeepImmutable<EditorState>): Models.Schema.Step {
@@ -464,8 +464,6 @@ export class EditorState {
  */
 @customElement('devtools-recorder-selector-picker-button')
 class RecorderSelectorPickerButton extends LitElement {
-  static override styles = [stepEditorStyles];
-
   @property({type: Boolean}) declare disabled: boolean;
 
   #picker = new Controllers.SelectorPicker.SelectorPicker(this);
@@ -486,11 +484,12 @@ class RecorderSelectorPickerButton extends LitElement {
     void this.#picker.stop();
   }
 
-  protected override render(): LitHtml.TemplateResult|undefined {
+  protected override render(): Lit.TemplateResult|undefined {
     if (this.disabled) {
       return;
     }
-    return html`<devtools-button
+    // clang-format off
+    return html`<style>${stepEditorStyles}</style><devtools-button
       @click=${this.#handleClickEvent}
       .title=${i18nString(UIStrings.selectorPicker)}
       class="selector-picker"
@@ -502,6 +501,7 @@ class RecorderSelectorPickerButton extends LitElement {
       click: true,
     })}
     ></devtools-button>`;
+    // clang-format on
   }
 }
 
@@ -511,15 +511,13 @@ class RecorderSelectorPickerButton extends LitElement {
  */
 @customElement('devtools-recorder-step-editor')
 export class StepEditor extends LitElement {
-  static override styles = [stepEditorStyles];
-
   @state() private declare state: DeepImmutable<EditorState>;
   @state() private declare error: string|undefined;
 
   @property({type: Boolean}) declare isTypeEditable: boolean;
   @property({type: Boolean}) declare disabled: boolean;
 
-  #renderedAttributes: Set<Attribute> = new Set();
+  #renderedAttributes = new Set<Attribute>();
 
   constructor() {
     super();
@@ -654,7 +652,7 @@ export class StepEditor extends LitElement {
   };
 
   #renderInlineButton(opts: {class: string, title: string, iconName: string, onClick: (event: MouseEvent) => void}):
-      LitHtml.TemplateResult|undefined {
+      Lit.TemplateResult|undefined {
     if (this.disabled) {
       return;
     }
@@ -673,7 +671,7 @@ export class StepEditor extends LitElement {
     `;
   }
 
-  #renderDeleteButton(attribute: Attribute): LitHtml.TemplateResult|undefined {
+  #renderDeleteButton(attribute: Attribute): Lit.TemplateResult|undefined {
     if (this.disabled) {
       return;
     }
@@ -705,7 +703,7 @@ export class StepEditor extends LitElement {
     // clang-format on
   }
 
-  #renderTypeRow(editable: boolean): LitHtml.TemplateResult {
+  #renderTypeRow(editable: boolean): Lit.TemplateResult {
     this.#renderedAttributes.add('type');
     // clang-format off
     return html`<div class="row attribute" data-attribute="type" jslog=${VisualLogging.treeItem('type')}>
@@ -721,7 +719,7 @@ export class StepEditor extends LitElement {
     // clang-format on
   }
 
-  #renderRow(attribute: Attribute): LitHtml.TemplateResult|undefined {
+  #renderRow(attribute: Attribute): Lit.TemplateResult|undefined {
     this.#renderedAttributes.add(attribute);
     const attributeValue = this.state[attribute]?.toString();
     if (attributeValue === undefined) {
@@ -765,7 +763,7 @@ export class StepEditor extends LitElement {
     // clang-format on
   }
 
-  #renderFrameRow(): LitHtml.TemplateResult|undefined {
+  #renderFrameRow(): Lit.TemplateResult|undefined {
     this.#renderedAttributes.add('frame');
     if (this.state.frame === undefined) {
       return;
@@ -837,7 +835,7 @@ export class StepEditor extends LitElement {
     // clang-format on
   }
 
-  #renderSelectorsRow(): LitHtml.TemplateResult|undefined {
+  #renderSelectorsRow(): Lit.TemplateResult|undefined {
     this.#renderedAttributes.add('selectors');
     if (this.state.selectors === undefined) {
       return;
@@ -960,7 +958,7 @@ export class StepEditor extends LitElement {
     // clang-format on
   }
 
-  #renderAssertedEvents(): LitHtml.TemplateResult|undefined {
+  #renderAssertedEvents(): Lit.TemplateResult|undefined {
     this.#renderedAttributes.add('assertedEvents');
     if (this.state.assertedEvents === undefined) {
       return;
@@ -1025,7 +1023,7 @@ export class StepEditor extends LitElement {
     // clang-format on
   }
 
-  #renderAttributesRow(): LitHtml.TemplateResult|undefined {
+  #renderAttributesRow(): Lit.TemplateResult|undefined {
     this.#renderedAttributes.add('attributes');
     if (this.state.attributes === undefined) {
       return;
@@ -1134,7 +1132,7 @@ export class StepEditor extends LitElement {
     // clang-format on
   }
 
-  #renderAddRowButtons(): Array<LitHtml.TemplateResult|undefined> {
+  #renderAddRowButtons(): Array<Lit.TemplateResult|undefined> {
     const attributes = attributesByType[this.state.type];
     return [...attributes.optional].filter(attr => this.state[attr] === undefined).map(attr => {
       // clang-format off
@@ -1160,12 +1158,13 @@ export class StepEditor extends LitElement {
     });
   };
 
-  protected override render(): LitHtml.TemplateResult {
+  protected override render(): Lit.TemplateResult {
     this.#renderedAttributes = new Set();
 
     // clang-format off
     const result = html`
-      <div class="wrapper" jslog=${VisualLogging.tree('step-editor')}>
+      <style>${stepEditorStyles}</style>
+      <div class="wrapper" jslog=${VisualLogging.tree('step-editor')} >
         ${this.#renderTypeRow(this.isTypeEditable)} ${this.#renderRow('target')}
         ${this.#renderFrameRow()} ${this.#renderSelectorsRow()}
         ${this.#renderRow('deviceType')} ${this.#renderRow('button')}

@@ -1,8 +1,9 @@
 // Copyright (c) 2020 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
-import * as LitHtml from '../../lit-html/lit-html.js';
+import {html, nothing, render} from '../../lit/lit.js';
 
 import reportStyles from './report.css.js';
 import reportKeyStyles from './reportKey.css.js';
@@ -10,8 +11,6 @@ import reportSectionStyles from './reportSection.css.js';
 import reportSectionDividerStyles from './reportSectionDivider.css.js';
 import reportSectionHeaderStyles from './reportSectionHeader.css.js';
 import reportValueStyles from './reportValue.css.js';
-
-const {html} = LitHtml;
 
 /**
  * The `Report` component can be used to display static information. A report
@@ -36,9 +35,8 @@ export interface ReportData {
   reportTitle: string;
 }
 export class Report extends HTMLElement {
-
   readonly #shadow = this.attachShadow({mode: 'open'});
-  #reportTitle: string = '';
+  #reportTitle = '';
 
   set data({reportTitle}: ReportData) {
     this.#reportTitle = reportTitle;
@@ -46,16 +44,16 @@ export class Report extends HTMLElement {
   }
 
   connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [reportStyles];
     this.#render();
   }
 
   #render(): void {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
-    LitHtml.render(html`
+    render(html`
+      <style>${reportStyles}</style>
+      ${this.#reportTitle ? html`<div class="report-title">${this.#reportTitle}</div>` : nothing}
       <div class="content">
-        ${this.#reportTitle ? html`<div class="report-title">${this.#reportTitle}</div>` : LitHtml.nothing}
         <slot></slot>
       </div>
     `, this.#shadow, {host: this});
@@ -70,13 +68,13 @@ export interface ReportSectionData {
 export class ReportSection extends HTMLElement {
   readonly #shadow = this.attachShadow({mode: 'open'});
   connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [reportSectionStyles];
     this.#render();
   }
   #render(): void {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
-    LitHtml.render(html`
+    render(html`
+      <style>${reportSectionStyles}</style>
       <div class="section">
         <slot></slot>
       </div>
@@ -86,17 +84,16 @@ export class ReportSection extends HTMLElement {
 }
 
 export class ReportSectionHeader extends HTMLElement {
-
   readonly #shadow = this.attachShadow({mode: 'open'});
   connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [reportSectionHeaderStyles];
     this.#render();
   }
 
   #render(): void {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
-    LitHtml.render(html`
+    render(html`
+      <style>${reportSectionHeaderStyles}</style>
       <div class="section-header">
         <slot></slot>
       </div>
@@ -106,17 +103,16 @@ export class ReportSectionHeader extends HTMLElement {
 }
 
 export class ReportSectionDivider extends HTMLElement {
-
   readonly #shadow = this.attachShadow({mode: 'open'});
   connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [reportSectionDividerStyles];
     this.#render();
   }
 
   #render(): void {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
-    LitHtml.render(html`
+    render(html`
+      <style>${reportSectionDividerStyles}</style>
       <div class="section-divider">
       </div>
     `, this.#shadow, {host: this});
@@ -125,17 +121,16 @@ export class ReportSectionDivider extends HTMLElement {
 }
 
 export class ReportKey extends HTMLElement {
-
   readonly #shadow = this.attachShadow({mode: 'open'});
   connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [reportKeyStyles];
     this.#render();
   }
 
   #render(): void {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
-    LitHtml.render(html`
+    render(html`
+      <style>${reportKeyStyles}</style>
       <div class="key"><slot></slot></div>
     `, this.#shadow, {host: this});
     // clang-format on
@@ -143,17 +138,16 @@ export class ReportKey extends HTMLElement {
 }
 
 export class ReportValue extends HTMLElement {
-
   readonly #shadow = this.attachShadow({mode: 'open'});
   connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [reportValueStyles];
     this.#render();
   }
 
   #render(): void {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
-    LitHtml.render(html`
+    render(html`
+      <style>${reportValueStyles}</style>
       <div class="value"><slot></slot></div>
     `, this.#shadow, {host: this});
     // clang-format on

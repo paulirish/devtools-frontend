@@ -1,6 +1,7 @@
 // Copyright (c) 2015 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as Common from '../../../../core/common/common.js';
 import * as VisualLogging from '../../../visual_logging/visual_logging.js';
@@ -29,6 +30,7 @@ export class BezierEditor extends Common.ObjectWrapper.eventMixin<EventTypes, ty
 
   constructor(model: AnimationTimingModel) {
     super(true);
+    this.registerRequiredCSS(bezierEditorStyles);
 
     this.model = model;
     this.contentElement.tabIndex = 0;
@@ -97,7 +99,6 @@ export class BezierEditor extends Common.ObjectWrapper.eventMixin<EventTypes, ty
   }
 
   override wasShown(): void {
-    this.registerCSSFiles([bezierEditorStyles]);
     this.unselectPresets();
     // Check if bezier matches a preset
     for (const category of this.presetCategories) {
@@ -125,10 +126,10 @@ export class BezierEditor extends Common.ObjectWrapper.eventMixin<EventTypes, ty
     this.animationTimingUI?.draw();
   }
 
-  private createCategory(presetGroup: {
+  private createCategory(presetGroup: Array<{
     name: string,
     value: string,
-  }[]): PresetCategory|null {
+  }>): PresetCategory|null {
     const pivot = AnimationTimingModel.parse(presetGroup[0].value);
     if (!pivot) {
       return null;
@@ -280,10 +281,10 @@ export const Presets = [
   ],
 ];
 export interface PresetCategory {
-  presets: {
+  presets: Array<{
     name: string,
     value: string,
-  }[];
+  }>;
   icon: Element;
   presetIndex: number;
 }

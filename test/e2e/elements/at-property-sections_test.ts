@@ -15,7 +15,6 @@ import {
   waitForMany,
   waitForNone,
 } from '../../shared/helper.js';
-
 import {
   ELEMENTS_PANEL_SELECTOR,
   getStyleRule,
@@ -44,16 +43,11 @@ describe('The styles pane', () => {
     await goToResourceAndWaitForStyleSection('elements/at-property.html');
     await hover('.invalid-property-value:has(> [aria-label="CSS property name: --my-color"]) .exclamation-mark');
 
-    const popover = await waitFor('.variable-value-popup-wrapper');
-    const popoverContents = (await popover.evaluate(e => e.textContent))?.trim()?.replaceAll(/\s\s+/g, ', ');
+    const popover = await waitFor(':popover-open devtools-css-variable-parser-error');
+    const firstSection = await waitFor('.variable-value-popup-wrapper', popover);
+    const popoverContents = await firstSection.evaluate(e => e.deepInnerText());
 
-    assert.deepEqual(popoverContents, 'Invalid property value, expected type "<color>", View registered property');
-  });
-
-  it('correctly determines the computed value for non-overriden properties', async () => {
-    await goToResourceAndWaitForStyleSection('elements/at-property.html');
-    const myColorProp = await waitForAria('CSS property value: var(--my-cssom-color)');
-    await waitFor('.link-swatch-link[data-title="orange"]', myColorProp);
+    assert.deepEqual(popoverContents, 'Invalid property value, expected type "<color>"\nView registered property');
   });
 
   it('shows registered properties', async () => {
@@ -117,7 +111,7 @@ describe('The styles pane', () => {
       const section = await click('pierceShadowText/@property', {root: stylesPane});
       await waitForFunction(async () => 'true' === await section.evaluate(e => e.ariaExpanded));
       const rule = await getStyleRule('--custom-prop-4');
-      return rule.evaluate(e => !e.classList.contains('hidden'));
+      return await rule.evaluate(e => !e.classList.contains('hidden'));
     });
   });
 
@@ -131,19 +125,13 @@ describe('The styles pane', () => {
         await hover(`aria/CSS property name: ${label}`);
       }
 
-      const firstSection = await waitFor('.variable-value-popup-wrapper');
-      const textContent = await firstSection.evaluate((e: Element|null) => {
-        const results = [];
-        while (e) {
-          results.push(e.textContent);
-          e = e.nextElementSibling;
-        }
-        return results;
+      const popover = await waitFor(':popover-open devtools-css-variable-value-view');
+      const popoverContents = await popover.evaluate((e: Element|null) => {
+        return e?.deepInnerText();
       });
-      const popoverContents = textContent.join(' ').trim().replaceAll(/\s\s+/g, ', ');
 
       await hover(ELEMENTS_PANEL_SELECTOR);
-      await waitForNone('.variable-value-popup-wrapper');
+      await waitForNone(':popover-open devtools-css-variable-value-view');
 
       return popoverContents;
     }
@@ -151,21 +139,21 @@ describe('The styles pane', () => {
 
     assert.strictEqual(
         await hoverVariable('var(--my-cssom-color)'),
-        'orange, syntax: "<color>", inherits: false, initial-value: orange, View registered property');
+        'orange\nsyntax: "<color>"\ninherits: false\ninitial-value: orange\nView registered property');
 
     assert.strictEqual(
         await hoverVariable('--my-color'),
-        'red, syntax: "<color>", inherits: false, initial-value: red, View registered property');
+        'red\nsyntax: "<color>"\ninherits: false\ninitial-value: red\nView registered property');
     assert.strictEqual(
         await hoverVariable('var(--my-color)'),
-        'red, syntax: "<color>", inherits: false, initial-value: red, View registered property');
+        'red\nsyntax: "<color>"\ninherits: false\ninitial-value: red\nView registered property');
 
     assert.strictEqual(
         await hoverVariable('--my-color2'),
-        'gray, syntax: "<color>", inherits: false, initial-value: #c0ffee, View registered property');
+        'gray\nsyntax: "<color>"\ninherits: false\ninitial-value: #c0ffee\nView registered property');
     assert.strictEqual(
         await hoverVariable('var(--my-color2)'),
-        'gray, syntax: "<color>", inherits: false, initial-value: #c0ffee, View registered property');
+        'gray\nsyntax: "<color>"\ninherits: false\ninitial-value: #c0ffee\nView registered property');
 
     assert.strictEqual(await hoverVariable('--my-other-color'), 'green');
     assert.strictEqual(await hoverVariable('var(--my-other-color)'), 'green');

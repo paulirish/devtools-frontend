@@ -1,37 +1,34 @@
 // Copyright (c) 2020 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
+
+import './LinearMemoryValueInterpreter.js';
+import './LinearMemoryHighlightChipList.js';
+import './LinearMemoryViewer.js';
 
 import * as Common from '../../../core/common/common.js';
 import * as i18n from '../../../core/i18n/i18n.js';
-import * as LitHtml from '../../../ui/lit-html/lit-html.js';
+import {html, nothing, render} from '../../../ui/lit/lit.js';
 
+import type {DeleteMemoryHighlightEvent, JumpToHighlightedMemoryEvent} from './LinearMemoryHighlightChipList.js';
 import linearMemoryInspectorStyles from './linearMemoryInspector.css.js';
-
-const {render, html} = LitHtml;
-
+import {formatAddress, parseAddress} from './LinearMemoryInspectorUtils.js';
 import {
-  Mode,
-  Navigation,
   type AddressInputChangedEvent,
   type HistoryNavigationEvent,
+  Mode,
+  Navigation,
   type PageNavigationEvent,
 } from './LinearMemoryNavigator.js';
-
-import './LinearMemoryValueInterpreter.js';
 import type {EndiannessChangedEvent, ValueTypeToggledEvent} from './LinearMemoryValueInterpreter.js';
-
-import './LinearMemoryHighlightChipList.js';
-import type {DeleteMemoryHighlightEvent, JumpToHighlightedMemoryEvent} from './LinearMemoryHighlightChipList.js';
-import {formatAddress, parseAddress} from './LinearMemoryInspectorUtils.js';
-import './LinearMemoryViewer.js';
 import type {ByteSelectedEvent, ResizeEvent} from './LinearMemoryViewer.js';
 import type {HighlightInfo} from './LinearMemoryViewerUtils.js';
 import type {JumpToPointerAddressEvent, ValueTypeModeChangedEvent} from './ValueInterpreterDisplay.js';
 import {
   Endianness,
-  VALUE_INTEPRETER_MAX_NUM_BYTES,
   getDefaultValueTypeMapping,
+  VALUE_INTEPRETER_MAX_NUM_BYTES,
   type ValueType,
   type ValueTypeMode,
 } from './ValueInterpreterDisplayUtils.js';
@@ -43,7 +40,7 @@ const UIStrings = {
    *@example {0x00400000} PH2
    */
   addressHasToBeANumberBetweenSAnd: 'Address has to be a number between {PH1} and {PH2}',
-};
+} as const;
 const str_ =
     i18n.i18n.registerUIStrings('panels/linear_memory_inspector/components/LinearMemoryInspector.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -52,7 +49,7 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 // on the 1. memoryOffset (at which index this portion starts),
 // and on the 2. outerMemoryLength (length of the original Uint8Array).
 export interface LinearMemoryInspectorData {
-  memory: Uint8Array;
+  memory: Uint8Array<ArrayBuffer>;
   address: number;
   memoryOffset: number;
   outerMemoryLength: number;
@@ -142,10 +139,6 @@ export class LinearMemoryInspector extends HTMLElement {
 
   #hideValueInspector = false;
 
-  connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [linearMemoryInspectorStyles];
-  }
-
   set data(data: LinearMemoryInspectorData) {
     if (data.address < data.memoryOffset || data.address > data.memoryOffset + data.memory.length || data.address < 0) {
       throw new Error('Address is out of bounds.');
@@ -197,6 +190,7 @@ export class LinearMemoryInspector extends HTMLElement {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     render(html`
+      <style>${linearMemoryInspectorStyles}</style>
       <div class="view">
         <devtools-linear-memory-inspector-navigator
           .data=${{address: navigatorAddressToShow, valid: navigatorAddressIsValid, mode: this.#currentNavigatorMode, error: errorMsg, canGoBackInHistory, canGoForwardInHistory}}
@@ -220,7 +214,7 @@ export class LinearMemoryInspector extends HTMLElement {
           @resize=${this.#resize}>
         </devtools-linear-memory-inspector-viewer>
       </div>
-      ${this.#hideValueInspector ? LitHtml.nothing : html`
+      ${this.#hideValueInspector ? nothing : html`
       <div class="value-interpreter">
         <devtools-linear-memory-inspector-interpreter
           .data=${{

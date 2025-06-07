@@ -4,12 +4,19 @@
 
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Platform from '../../../core/platform/platform.js';
+import type * as Handlers from '../handlers/handlers.js';
 import * as Helpers from '../helpers/helpers.js';
 import * as Types from '../types/types.js';
 
-import {InsightCategory, type InsightModel, type InsightSetContext, type RequiredData} from './types.js';
+import {
+  InsightCategory,
+  InsightKeys,
+  type InsightModel,
+  type InsightSetContext,
+  type PartialInsightModel,
+} from './types.js';
 
-const UIStrings = {
+export const UIStrings = {
   /** Title of an insight that provides details about the fonts used on the page, and the value of their `font-display` properties. */
   title: 'Font display',
   /**
@@ -17,38 +24,43 @@ const UIStrings = {
    */
   description:
       'Consider setting [`font-display`](https://developer.chrome.com/blog/font-display) to `swap` or `optional` to ensure text is consistently visible. `swap` can be further optimized to mitigate layout shifts with [font metric overrides](https://developer.chrome.com/blog/font-fallbacks).',
-};
+  /** Column for a font loaded by the page to render text. */
+  fontColumn: 'Font',
+  /** Column for the amount of time wasted. */
+  wastedTimeColumn: 'Wasted time',
+} as const;
 
 const str_ = i18n.i18n.registerUIStrings('models/trace/insights/FontDisplay.ts', UIStrings);
-const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
+export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-export function deps(): ['Meta', 'NetworkRequests', 'LayoutShifts'] {
-  return ['Meta', 'NetworkRequests', 'LayoutShifts'];
+export interface RemoteFont {
+  name?: string;
+  request: Types.Events.SyntheticNetworkRequest;
+  display: string;
+  wastedTime: Types.Timing.Milli;
 }
 
-export type FontDisplayInsightModel = InsightModel<{
-  fonts: Array<{
-    request: Types.Events.SyntheticNetworkRequest,
-    display: string,
-    wastedTime: Types.Timing.MilliSeconds,
-  }>,
+export type FontDisplayInsightModel = InsightModel<typeof UIStrings, {
+  fonts: RemoteFont[],
 }>;
 
-function finalize(partialModel: Omit<FontDisplayInsightModel, 'title'|'description'|'category'|'shouldShow'>):
-    FontDisplayInsightModel {
+function finalize(partialModel: PartialInsightModel<FontDisplayInsightModel>): FontDisplayInsightModel {
   return {
+    insightKey: InsightKeys.FONT_DISPLAY,
+    strings: UIStrings,
     title: i18nString(UIStrings.title),
     description: i18nString(UIStrings.description),
     category: InsightCategory.INP,
-    shouldShow: Boolean(partialModel.fonts.find(font => font.wastedTime > 0)),
+    state: partialModel.fonts.find(font => font.wastedTime > 0) ? 'fail' : 'pass',
     ...partialModel,
   };
 }
 
 export function generateInsight(
-    parsedTrace: RequiredData<typeof deps>, context: InsightSetContext): FontDisplayInsightModel {
-  const fonts = [];
-  for (const event of parsedTrace.LayoutShifts.beginRemoteFontLoadEvents) {
+    parsedTrace: Handlers.Types.ParsedTrace, context: InsightSetContext): FontDisplayInsightModel {
+  const fonts: RemoteFont[] = [];
+  for (const remoteFont of parsedTrace.LayoutShifts.remoteFonts) {
+    const event = remoteFont.beginRemoteFontLoadEvent;
     if (!Helpers.Timing.eventIsInBounds(event, context.bounds)) {
       continue;
     }
@@ -59,29 +71,33 @@ export function generateInsight(
       continue;
     }
 
-    const display = event.args.display;
-    let wastedTime = Types.Timing.MilliSeconds(0);
-
-    if (/^(block|fallback|auto)$/.test(display)) {
-      const wastedTimeMicro = Types.Timing.MicroSeconds(
-          request.args.data.syntheticData.finishTime - request.args.data.syntheticData.sendStartTime);
-      // TODO(crbug.com/352244504): should really end at the time of the next Commit trace event.
-      wastedTime = Platform.NumberUtilities.floor(Helpers.Timing.microSecondsToMilliseconds(wastedTimeMicro), 1 / 5) as
-          Types.Timing.MilliSeconds;
-      // All browsers wait for no more than 3s.
-      wastedTime = Math.min(wastedTime, 3000) as Types.Timing.MilliSeconds;
+    if (!/^(block|fallback|auto)$/.test(remoteFont.display)) {
+      continue;
     }
 
+    const wastedTimeMicro =
+        Types.Timing.Micro(request.args.data.syntheticData.finishTime - request.args.data.syntheticData.sendStartTime);
+    // TODO(crbug.com/352244504): should really end at the time of the next Commit trace event.
+    let wastedTime =
+        Platform.NumberUtilities.floor(Helpers.Timing.microToMilli(wastedTimeMicro), 1 / 5) as Types.Timing.Milli;
+    if (wastedTime === 0) {
+      continue;
+    }
+
+    // All browsers wait for no more than 3s.
+    wastedTime = Math.min(wastedTime, 3000) as Types.Timing.Milli;
+
     fonts.push({
+      name: remoteFont.name,
       request,
-      display,
+      display: remoteFont.display,
       wastedTime,
     });
   }
 
   fonts.sort((a, b) => b.wastedTime - a.wastedTime);
 
-  const savings = Math.max(...fonts.map(f => f.wastedTime)) as Types.Timing.MilliSeconds;
+  const savings = Math.max(...fonts.map(f => f.wastedTime)) as Types.Timing.Milli;
 
   return finalize({
     relatedEvents: fonts.map(f => f.request),

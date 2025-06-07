@@ -1,6 +1,7 @@
 // Copyright 2017 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import '../../legacy.js';
 
@@ -61,7 +62,7 @@ const UIStrings = {
    *@description Text to show less content
    */
   showLess: 'Show less',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/components/color_picker/ContrastDetails.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 export class ContrastDetails extends Common.ObjectWrapper.ObjectWrapper<EventTypes> {
@@ -369,8 +370,7 @@ export class ContrastDetails extends Common.ObjectWrapper.ObjectWrapper<EventTyp
   }
 
   private static showHelp(): void {
-    Host.InspectorFrontendHost.InspectorFrontendHostInstance.openInNewTab(UI.UIUtils.addReferrerToURL(
-        'https://web.dev/color-and-contrast-accessibility/' as Platform.DevToolsPath.UrlString));
+    UI.UIUtils.openInNewTab('https://web.dev/color-and-contrast-accessibility/');
   }
 
   setVisible(visible: boolean): void {
@@ -466,6 +466,7 @@ export class ContrastDetails extends Common.ObjectWrapper.ObjectWrapper<EventTyp
     const color = Common.Color.Legacy.fromRGBA(rgba);
     this.contrastInfo.setBgColor(color);
     this.toggleBackgroundColorPickerInternal(false);
+    this.bgColorPickerButton.toggled(false);
     Host.InspectorFrontendHost.InspectorFrontendHostInstance.bringToFront();
   }
 }
@@ -479,12 +480,10 @@ export interface EventTypes {
 }
 
 export class Swatch {
-  private readonly parentElement: Element;
   private readonly swatchElement: Element;
   private swatchInnerElement: HTMLElement;
   private textPreview: HTMLElement;
   constructor(parentElement: Element) {
-    this.parentElement = parentElement;
     this.swatchElement = parentElement.createChild('span', 'swatch contrast swatch-inner-white');
     this.swatchInnerElement = this.swatchElement.createChild('span', 'swatch-inner');
     this.textPreview = this.swatchElement.createChild('div', 'text-preview');
@@ -492,8 +491,8 @@ export class Swatch {
   }
 
   setColors(fgColor: Common.Color.Legacy, bgColor: Common.Color.Legacy): void {
-    this.textPreview.style.color = fgColor.asString(Common.Color.Format.RGBA) as string;
-    this.swatchInnerElement.style.backgroundColor = bgColor.asString(Common.Color.Format.RGBA) as string;
+    this.textPreview.style.color = fgColor.asString(Common.Color.Format.RGBA);
+    this.swatchInnerElement.style.backgroundColor = bgColor.asString(Common.Color.Format.RGBA);
     // Show border if the swatch is white.
     this.swatchElement.classList.toggle('swatch-inner-white', bgColor.as(Common.Color.Format.HSL).l > 0.9);
   }

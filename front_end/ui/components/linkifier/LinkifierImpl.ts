@@ -1,15 +1,16 @@
 // Copyright 2020 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import * as Platform from '../../../core/platform/platform.js';
-import * as LitHtml from '../../lit-html/lit-html.js';
+import * as Lit from '../../lit/lit.js';
 import * as RenderCoordinator from '../render_coordinator/render_coordinator.js';
 
 import linkifierImplStyles from './linkifierImpl.css.js';
 import * as LinkifierUtils from './LinkifierUtils.js';
 
-const {html} = LitHtml;
+const {html} = Lit;
 
 export interface LinkifierData {
   url: Platform.DevToolsPath.UrlString;
@@ -31,7 +32,6 @@ export class LinkifierClick extends Event {
 }
 
 export class Linkifier extends HTMLElement {
-
   readonly #shadow = this.attachShadow({mode: 'open'});
   #url: Platform.DevToolsPath.UrlString = Platform.DevToolsPath.EmptyUrlString;
   #lineNumber?: number;
@@ -53,8 +53,16 @@ export class Linkifier extends HTMLElement {
     void this.#render();
   }
 
-  connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [linkifierImplStyles];
+  override cloneNode(deep?: boolean): Node {
+    const node = super.cloneNode(deep) as Linkifier;
+    node.data = {
+      url: this.#url,
+      lineNumber: this.#lineNumber,
+      columnNumber: this.#columnNumber,
+      linkText: this.#linkText,
+      title: this.#title
+    };
+    return node;
   }
 
   #onLinkActivation(event: Event): void {
@@ -72,8 +80,13 @@ export class Linkifier extends HTMLElement {
     // Disabled until https://crbug.com/1079231 is fixed.
     await RenderCoordinator.write(() => {
       // clang-format off
-      // eslint-disable-next-line rulesdir/no-a-tags-in-lit-html
-      LitHtml.render(html`<a class="link" href=${this.#url} @click=${this.#onLinkActivation} title=${LitHtml.Directives.ifDefined(this.#title) as string}><slot>${linkText}</slot></a>`, this.#shadow, { host: this});
+      // eslint-disable-next-line rulesdir/no-a-tags-in-lit
+      Lit.render(html`
+        <style>${linkifierImplStyles}</style>
+        <a class="link" href=${this.#url} @click=${this.#onLinkActivation} title=${Lit.Directives.ifDefined(this.#title) as string}>
+          <slot>${linkText}</slot>
+        </a>`,
+        this.#shadow, { host: this});
       // clang-format on
     });
   }

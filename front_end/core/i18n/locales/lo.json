@@ -5,6 +5,9 @@
   "core/common/ResourceType.ts | css": {
     "message": "CSS"
   },
+  "core/common/ResourceType.ts | directsocket": {
+    "message": "DirectSocket"
+  },
   "core/common/ResourceType.ts | doc": {
     "message": "ເອກະສານ"
   },
@@ -13,6 +16,9 @@
   },
   "core/common/ResourceType.ts | eventsource": {
     "message": "EventSource"
+  },
+  "core/common/ResourceType.ts | fedcm": {
+    "message": "FedCM"
   },
   "core/common/ResourceType.ts | fetch": {
     "message": "ດຶງຂໍ້ມູນ"
@@ -56,6 +62,9 @@
   "core/common/ResourceType.ts | signedexchange": {
     "message": "SignedExchange"
   },
+  "core/common/ResourceType.ts | socketShort": {
+    "message": "ຊັອກເກັດ"
+  },
   "core/common/ResourceType.ts | stylesheet": {
     "message": "ຊີດຮູບແບບ"
   },
@@ -76,9 +85,6 @@
   },
   "core/common/ResourceType.ts | webtransport": {
     "message": "WebTransport"
-  },
-  "core/common/ResourceType.ts | ws": {
-    "message": "WS"
   },
   "core/common/Revealer.ts | animationsPanel": {
     "message": "ແຜງອະນິເມຊັນ"
@@ -104,6 +110,9 @@
   "core/common/Revealer.ts | networkPanel": {
     "message": "ແຜງເຄືອຂ່າຍ"
   },
+  "core/common/Revealer.ts | securityPanel": {
+    "message": "ແຜງຄວາມປອດໄພ"
+  },
   "core/common/Revealer.ts | sourcesPanel": {
     "message": "ແຜງແຫຼ່ງຂໍ້ມູນ"
   },
@@ -115,6 +124,9 @@
   },
   "core/common/SettingRegistration.ts | adorner": {
     "message": "Adorner"
+  },
+  "core/common/SettingRegistration.ts | ai": {
+    "message": "AI"
   },
   "core/common/SettingRegistration.ts | appearance": {
     "message": "ຮູບແບບໜ້າຕາ"
@@ -209,6 +221,21 @@
   "core/sdk/CPUProfilerModel.ts | profileD": {
     "message": "ໂປຣໄຟລ໌ {PH1}"
   },
+  "core/sdk/CPUThrottlingManager.ts | calibratedLowTierMobile": {
+    "message": "ໂທລະສັບມືຖືລະດັບຕ່ຳ"
+  },
+  "core/sdk/CPUThrottlingManager.ts | calibratedMidTierMobile": {
+    "message": "ໂທລະສັບມືຖືລະດັບກາງ"
+  },
+  "core/sdk/CPUThrottlingManager.ts | calibrationErrorDeviceTooWeak": {
+    "message": "ອຸປະກອນບໍ່ມີປະສິດທິພາບພຽງພໍ"
+  },
+  "core/sdk/CPUThrottlingManager.ts | dSlowdown": {
+    "message": "ເຮັດວຽກຊ້າລົງ {PH1} ເທົ່າ"
+  },
+  "core/sdk/CPUThrottlingManager.ts | noThrottling": {
+    "message": "ບໍ່ມີການຄວບຄຸມ"
+  },
   "core/sdk/CSSStyleSheetHeader.ts | couldNotFindTheOriginalStyle": {
     "message": "ບໍ່ພົບຊີດຮູບແບບຕົ້ນສະບັບ."
   },
@@ -220,6 +247,9 @@
   },
   "core/sdk/CompilerSourceMappingContentProvider.ts | couldNotLoadContentForSS": {
     "message": "ບໍ່ສາມາດໂຫຼດເນື້ອຫາສຳລັບ {PH1} ({PH2}) ໄດ້"
+  },
+  "core/sdk/Connections.ts | websocketDisconnected": {
+    "message": "ຍົກເລີກການເຊື່ອມຕໍ່ WebSocket ແລ້ວ"
   },
   "core/sdk/ConsoleModel.ts | bfcacheNavigation": {
     "message": "ການນຳທາງຫາ {PH1} ຖືກກູ້ຄືນຈາກແຄສຍ້ອນຫຼັງ (ໃຫ້ເບິ່ງ https://web.dev/bfcache/)"
@@ -268,6 +298,18 @@
   },
   "core/sdk/DebuggerModel.ts | withBlock": {
     "message": "ບລັອກ With"
+  },
+  "core/sdk/NetworkManager.ts | directSocketStatusAborted": {
+    "message": "ຍົກເລີກແລ້ວ"
+  },
+  "core/sdk/NetworkManager.ts | directSocketStatusClosed": {
+    "message": "ປິດ"
+  },
+  "core/sdk/NetworkManager.ts | directSocketStatusOpen": {
+    "message": "ເປີດ"
+  },
+  "core/sdk/NetworkManager.ts | directSocketStatusOpening": {
+    "message": "ກຳລັງເປີດ"
   },
   "core/sdk/NetworkManager.ts | fast4G": {
     "message": "4G ແບບໄວ"
@@ -456,7 +498,7 @@
     "message": "ບໍ່ສາມາດໂຫຼດແຫຼ່ງທີ່ມາສະຄຣິບໄດ້."
   },
   "core/sdk/ServerTiming.ts | deprecatedSyntaxFoundPleaseUse": {
-    "message": "ພົບ syntax ທີ່ເຊົາໃຊ້ໄປແລ້ວ ກະລຸນາໃຊ້: <name>;dur=<duration>;desc=<description>"
+    "message": "ພົບ syntax ທີ່ຖືກເຊົາສະໜັບສະໜຸນສຳລັບການວັດແທກ \"{PH1}\". ກະລຸນາໃຊ້: <name>;dur=<duration>;desc=<description>"
   },
   "core/sdk/ServerTiming.ts | duplicateParameterSIgnored": {
     "message": "ບໍ່ສົນໃຈພາຣາມິເຕີ \"{PH1}\" ທີ່ຊ້ຳກັນແລ້ວ."
@@ -932,7 +974,7 @@
   "entrypoints/main/MainImpl.ts | dockSide": {
     "message": "ດ້ານທີ່ຕ້ອງຈອດໄວ້"
   },
-  "entrypoints/main/MainImpl.ts | dockSideNaviation": {
+  "entrypoints/main/MainImpl.ts | dockSideNavigation": {
     "message": "ໃຊ້ລູກສອນຊ້າຍ ແລະ ຂວາເພື່ອນຳທາງຕົວເລືອກ"
   },
   "entrypoints/main/MainImpl.ts | dockToBottom": {
@@ -1169,6 +1211,9 @@
   "generated/Deprecation.ts | CanRequestURLHTTPContainingNewline": {
     "message": "ບລັອກຄຳຮ້ອງຂໍແຫຼ່ງຊັບພະຍາກອນທີ່ URL ມີຕົວອັກສອນຍະຫວ່າງທີ່ຖືກລຶບອອກໄປແລ້ວ \\(n|r|t) ແລະ ທີ່ໜ້ອຍກວ່າຕົວອັກສອນ (<) ໄວ້ແລ້ວ. ກະລຸນາລຶບແຖວໃໝ່ອອກ ແລະ ປ່ຽນສ່ວນທີ່ໜ້ອຍກວ່າຕົວອັກສອນໃຫ້ເປັນລະຫັດຈາກບ່ອນຕ່າງໆ ເຊັ່ນ: ຄ່າຄຸນສົມບັດອົງປະກອບເພື່ອໂຫຼດແຫຼ່ງຊັບພະຍາກອນເຫຼົ່ານີ້."
   },
+  "generated/Deprecation.ts | CharsetAutoDetectionISO2022JP": {
+    "message": "ການກວດສອບອັດຕະໂນມັດຂອງຊຸດໂຕອັກສອນ ISO-2022-JP ຖືກເຊົາສະໜັບສະໜຸນ ແລະ ມັນຈະຖືກປິດການນຳໃຊ້ໃນອະນາຄົດອັນໃກ້ນີ້. ກະລຸນາລະບຸຊຸດໂຕອັກສອນໃນສ່ວນຫົວປະເພດເນື້ອຫາ ຫຼື ໂດຍໃຊ້ເມຕາແທັກ (https://developer.mozilla.org/lo-LA/docs/Glossary/Character_encoding)."
+  },
   "generated/Deprecation.ts | ChromeLoadTimesConnectionInfo": {
     "message": "ສິ້ນສຸດການສະໜັບສະໜຸນ chrome.loadTimes() ແລ້ວ, ໃຫ້ໃຊ້ API ແບບມາດຕະຖານແທນ: ໃນເວລາການນຳທາງ 2."
   },
@@ -1190,9 +1235,6 @@
   "generated/Deprecation.ts | CrossOriginWindowConfirm": {
     "message": "ການເອີ້ນໃຊ້ window.confirm ຈາກ iframe ແບບຂ້າມຕົ້ນທາງເຊົານຳໃຊ້ແລ້ວ ແລະ ຈະຖືກລຶບອອກໃນອະນາຄົດ."
   },
-  "generated/Deprecation.ts | DOMMutationEvents": {
-    "message": "ເຫດການການປ່ຽນແປງ DOM, ເຊິ່ງຮວມທັງ DOMSubtreeModified, DOMNodeInserted, DOMNodeRemoved, DOMNodeRemovedFromDocument, DOMNodeInsertedIntoDocument ແລະ DOMCharacterDataModified ແມ່ນເຊົາຖືກນຳໃຊ້ແລ້ວ (https://w3c.github.io/uievents/#legacy-event-types) ແລະ ຈະຖືກລຶບອອກ. ກະລຸນາໃຊ້ MutationObserver ແທນ."
-  },
   "generated/Deprecation.ts | DataUrlInSvgUse": {
     "message": "ການສະໜັບສະໜູນຂໍ້ມູນ: URL ໃນ SVGUseElement ແມ່ນຈະເຊົາຖືກນຳໃຊ້ ແລະ ຈະຖືກລຶບອອກໃນອະນາຄົດ."
   },
@@ -1205,8 +1247,14 @@
   "generated/Deprecation.ts | GetUserMediaInsecureOrigin": {
     "message": "ບໍ່ສາມາດໃຊ້ getUserMedia() ຢູ່ຕົ້ນທາງທີ່ບໍ່ປອດໄພໄດ້ອີກຕໍ່ໄປ. ເພື່ອໃຊ້ຄຸນສົມບັດນີ້, ທ່ານຄວນພິຈາລະນາການສະຫຼັບແອັບພລິເຄຊັນຂອງທ່ານໄປເປັນຕົ້ນທາງທີ່ປອດໄພ, ເຊັ່ນ: HTTPS. ກະລຸນາອ່ານລາຍລະອຽດເພີ່ມເຕີມໃນ https://goo.gle/chrome-insecure-origins."
   },
+  "generated/Deprecation.ts | H1UserAgentFontSizeInSection": {
+    "message": "ພົບແທັກ <h1> ພາຍໃນ <article>, <aside>, <nav> ຫຼື <section> ເຊິ່ງບໍ່ມີຂະໜາດຟອນທີ່ລະບຸ. ຂະໜາດຂອງຂໍ້ຄວາມສ່ວນຫົວນີ້ຈະປ່ຽນແປງໃນໂປຣແກຣມທ່ອງເວັບນີ້ໃນໄວໆນີ້. ເບິ່ງ https://developer.mozilla.org/en-US/docs/Web/HTML/Element/Heading_Elements#specifying_a_uniform_font_size_for_h1 ສຳລັບຂໍ້ມູນເພີ່ມເຕີມ."
+  },
   "generated/Deprecation.ts | HostCandidateAttributeGetter": {
     "message": "ເຊົາສະໜັບສະໜຸນ RTCPeerConnectionIceErrorEvent.hostCandidate ແລ້ວ. ກະລຸນາໃຊ້ RTCPeerConnectionIceErrorEvent.address ຫຼື RTCPeerConnectionIceErrorEvent.port ແທນ."
+  },
+  "generated/Deprecation.ts | IdentityDigitalCredentials": {
+    "message": "ຮູບແບບນີ້ສຳລັບຄຳຮ້ອງຂໍ navigator.credentials.get() ຂອງຂໍ້ມູນການເຂົ້າສູ່ລະບົບດິຈິຕອນເຊົານຳໃຊ້ແລ້ວ, ກະລຸນາອັບເດດການເອີ້ນໃຊ້ຂອງທ່ານເພື່ອໃຊ້ຮູບແບບໃໝ່."
   },
   "generated/Deprecation.ts | IdentityInCanMakePaymentEvent": {
     "message": "ຕົ້ນທາງຜູ້ຂ້າຍ ແລະ ຂໍ້ມູນທີ່ກໍານົດເອງຈາກເຫດການພະນັກງານບໍລິການ canmakepayment ຖືກເຊົາໃຊ້ ແລະ ຖືກລຶບອອກ: topOrigin, paymentRequestOrigin, methodData, modifiers."
@@ -1216,6 +1264,9 @@
   },
   "generated/Deprecation.ts | InterestGroupDailyUpdateUrl": {
     "message": "ຊ່ອງ dailyUpdateUrl ຂອງ InterestGroups ທີ່ໄດ້ສົ່ງຜ່ານຫາ joinAdInterestGroup() ໄດ້ຖືກປ່ຽນຊື່ເປັນ updateUrl, ເພື່ອສະທ້ອນພຶດຕິກຳໃຫ້ຖືກຕ້ອງຍິ່ງຂຶ້ນ."
+  },
+  "generated/Deprecation.ts | IntlV8BreakIterator": {
+    "message": "ເຊົາສະໜັບສະໜຸນ Intl.v8BreakIterator ແລ້ວ. ກະລຸນາໃຊ້ Intl.Segmenter ແທນ."
   },
   "generated/Deprecation.ts | LocalCSSFileExtensionRejected": {
     "message": "ບໍ່ສາມາດໂຫຼດ CSS ໄດ້ຈາກ URL file: ເວັ້ນແຕ່ພວກມັນຈະລົງທ້າຍດ້ວຍນາມສະກຸນໄຟລ໌ .css."
@@ -1236,7 +1287,7 @@
     "message": "ການອະນຸຍາດສຳລັບ API ການແຈ້ງເຕືອນອາດບໍ່ມີການຮ້ອງຂໍຈາກ iframe ຂ້າມຕົ້ນທາງອີກຕໍ່ໄປ. ທ່ານຄວນພິຈາລະນາການຮ້ອງຂໍການອະນຸຍາດຈາກເຟຣມທີ່ຢູ່ລະດັບເທິງສຸດ ຫຼື ເປີດໜ້າຈໍໃໝ່ແທນ."
   },
   "generated/Deprecation.ts | ObsoleteCreateImageBitmapImageOrientationNone": {
-    "message": "ຕົວເລືອກ imageOrientation: 'none' ໃນ createImageBitmap ເຊົານຳໃຊ້ແລ້ວ. ກະລຸນາໃຊ້ createImageBitmap ກັບຕົວເລືອກ {imageOrientation: 'from-image'} ແທນ."
+    "message": "ຕົວເລືອກ imageOrientation: 'none' ໃນ createImageBitmap ເຊົາສະໜັບສະໜຸນແລ້ວ. ກະລຸນາໃຊ້ createImageBitmap ກັບຕົວເລືອກ '{imageOrientation: 'from-image'}' ແທນ."
   },
   "generated/Deprecation.ts | ObsoleteWebRtcCipherSuite": {
     "message": "ຮຸ້ນສ່ວນຂອງທ່ານກຳລັງເຈລະຈາເວີຊັນ (D)TLS ທີ່ເຊົາໃຊ້ແລ້ວ. ກະລຸນາກວດສອບກັບຮຸ້ນສ່ວນຂອງທ່ານເພື່ອແກ້ໄຂບັນຫານີ້."
@@ -1313,11 +1364,8 @@
   "generated/Deprecation.ts | V8SharedArrayBufferConstructedInExtensionWithoutIsolation": {
     "message": "ສ່ວນຂະຫຍາຍຄວນເຂົ້າຮ່ວມການແຍກຕົວຂ້າມຕົ້ນທາງເພື່ອສືບຕໍ່ການໃຊ້ SharedArrayBuffer. ກະລຸນາອ່ານ https://developer.chrome.com/docs/extensions/mv3/cross-origin-isolation/."
   },
-  "generated/Deprecation.ts | WebGPULimitMaxInterStageShaderComponents": {
-    "message": "ເຊົາໃຊ້ຂີດຈຳກັດ WebGPU maxInterStageShaderComponents ແລ້ວ, ກະລຸນາໃຊ້ຂີດຈຳກັດ WebGPU maxInterStageShaderVariables ແທນ."
-  },
-  "generated/Deprecation.ts | WebSQL": {
-    "message": "SQL ໃນເວັບແມ່ນເຊົາຖືກນຳໃຊ້ແລ້ວ. ກະລຸນາໃຊ້ SQLite WebAssembly ຫຼື ຖານຂໍ້ມູນທີ່ເກັບຂໍ້ມູນແລ້ວ"
+  "generated/Deprecation.ts | WebGPUAdapterIsFallbackAdapter": {
+    "message": "ພວກເຮົາເຊົາໃຊ້ຄຸນສົມບັດ isFallbackAdapter ຂອງ GPUAdapter ແລ້ວ, ກະລຸນາໃຊ້ຄຸນສົມບັດ isFallbackAdapter ຂອງ GPUAdapterInfo ແທນ."
   },
   "generated/Deprecation.ts | XHRJSONEncodingDetection": {
     "message": "ບໍ່ຮອງຮັບ UTF-16 ໂດຍ json ການຕອບກັບໃນ XMLHttpRequest"
@@ -1325,8 +1373,17 @@
   "generated/Deprecation.ts | XMLHttpRequestSynchronousInNonWorkerOutsideBeforeUnload": {
     "message": "XMLHttpRequest ແບບພ້ອມກັນໃນຊຸດຂໍ້ຄວາມຫຼັກເຊົານຳໃຊ້ແລ້ວເນື່ອງຈາກມີຜົນກະທົບທີ່ເປັນອັນຕະລາຍຕໍ່ປະສົບການຂອງຜູ້ໃຊ້ປາຍທາງ. ກວດເບິ່ງຄວາມຊ່ວຍເຫຼືອເພີ່ມເຕີມໄດ້ຢູ່ https://xhr.spec.whatwg.org/."
   },
-  "generated/Deprecation.ts | XRSupportsSession": {
-    "message": "ສິ້ນສຸດການສະໜັບສະໜຸນ supportsSession() ແລ້ວ. ກະລຸນາໃຊ້ isSessionSupported() ແລະ ເລືອກຄ່າ boolean ທີ່ແກ້ໄຂແລ້ວແທນ."
+  "models/ai_assistance/AiUtils.ts | ageRestricted": {
+    "message": "ຄຸນສົມບັດນີ້ມີໃຫ້ບໍລິການກັບຜູ້ໃຊ້ທີ່ມີອາຍຸ 18 ປີຂຶ້ນໄປເທົ່ານັ້ນ."
+  },
+  "models/ai_assistance/AiUtils.ts | notAvailableInIncognitoMode": {
+    "message": "ຄວາມຊ່ວຍເຫຼືອຈາກ AI ບໍ່ພ້ອມໃຫ້ນຳໃຊ້ໃນໂໝດບໍ່ເປີດເຜີຍຕົວຕົນ ຫຼື ໂໝດແຂກ."
+  },
+  "models/ai_assistance/AiUtils.ts | notLoggedIn": {
+    "message": "ຄຸນສົມບັດນີ້ຈະພ້ອມໃຫ້ໃຊ້ເມື່ອທ່ານເຂົ້າສູ່ລະບົບ Chrome ດ້ວຍບັນຊີ Google ຂອງທ່ານເທົ່ານັ້ນ."
+  },
+  "models/ai_assistance/AiUtils.ts | offline": {
+    "message": "ຄຸນສົມບັດນີ້ໃຊ້ໄດ້ເມື່ອເຊື່ອມຕໍ່ອິນເຕີເນັດຢູ່ເທົ່ານັ້ນ."
   },
   "models/bindings/ContentProviderBasedProject.ts | unknownErrorLoadingFile": {
     "message": "ເກີດຄວາມຜິດພາດທີ່ບໍ່ຮູ້ຈັກໃນການໂຫຼດໄຟລ໌"
@@ -1350,10 +1407,10 @@
     "message": "[{PH1}] ໂຫຼດສັນຍາລັກດີບັກສຳລັບ {PH2} ແລ້ວ, ພົບໄຟລ໌ແຫຼ່ງທີ່ມາ {PH3} ໄຟລ໌"
   },
   "models/bindings/DebuggerLanguagePlugins.ts | loadingDebugSymbolsFor": {
-    "message": "[{PH1}] ກຳລັງໂຫຼດສັນຍາລັກດີບັກສຳລັບ {PH2}..."
+    "message": "[{PH1}] ກຳລັງໂຫຼດສັນຍາລັກດີບັກສຳລັບ {PH2}…"
   },
   "models/bindings/DebuggerLanguagePlugins.ts | loadingDebugSymbolsForVia": {
-    "message": "[{PH1}] ກຳລັງໂຫຼດສັນຍາລັກດີບັກສຳລັບ {PH2} (ຜ່ານ {PH3})..."
+    "message": "[{PH1}] ກຳລັງໂຫຼດສັນຍາລັກດີບັກສຳລັບ {PH2} (ຜ່ານ {PH3})…"
   },
   "models/bindings/IgnoreListManager.ts | addAllAnonymousScriptsToIgnoreList": {
     "message": "ເພີ່ມສະຄຣິບແບບບໍ່ລະບຸຕົວຕົນທັງໝົດໃສ່ໃນລາຍຊື່ຍົກເວັ້ນ"
@@ -1454,17 +1511,8 @@
   "models/issues_manager/CookieDeprecationMetadataIssue.ts | thirdPartyPhaseoutExplained": {
     "message": "ການປ່ຽນແປງໃນການຈັດການຄຸກກີ້ພາກສ່ວນທີສາມຂອງ Chrome"
   },
-  "models/issues_manager/CookieIssue.ts | aSecure": {
-    "message": "ຄວາມປອດໄພ"
-  },
-  "models/issues_manager/CookieIssue.ts | anInsecure": {
-    "message": "an insecure"
-  },
   "models/issues_manager/CookieIssue.ts | consoleTpcdErrorMessage": {
     "message": "ຄຸກກີ້ພາກສ່ວນທີສາມຖືກບລັອກໃນ Chrome ເນື່ອງຈາກມີການປັງທຸງ Chrome ຫຼື ການຕັ້ງຄ່າໂປຣແກຣມທ່ອງເວັບ."
-  },
-  "models/issues_manager/CookieIssue.ts | consoleTpcdWarningMessage": {
-    "message": "Chrome ກຳລັງມຸ່ງໄປສູ່ປະສົບການໃນການນຳໃຊ້ຮູບແບບໃໝ່ທີ່ອະນຸຍາດໃຫ້ຜູ້ໃຊ້ເລືອກທ່ອງເວັບໂດຍບໍ່ມີຄຸກກີ້ພາກສ່ວນທີສາມ."
   },
   "models/issues_manager/CookieIssue.ts | fileCrosSiteRedirectBug": {
     "message": "ລາຍງານຂໍ້ຜິດພາດ"
@@ -1478,11 +1526,11 @@
   "models/issues_manager/CookieIssue.ts | samesiteCookiesExplained": {
     "message": "ອະທິບາຍຄຸກກີ້ SameSite ແລ້ວ"
   },
-  "models/issues_manager/CookieIssue.ts | thirdPartyPhaseoutExplained": {
-    "message": "ການປ່ຽນແປງໃນການຈັດການຄຸກກີ້ພາກສ່ວນທີສາມຂອງ Chrome"
-  },
   "models/issues_manager/CorsIssue.ts | CORS": {
     "message": "ກົນໄກການແບ່ງປັນຊັບພະຍາກອນຂ້າມໂດເມນ (CORS)"
+  },
+  "models/issues_manager/CorsIssue.ts | corsLocalNetworkAccess": {
+    "message": "ການເຂົ້າເຖິງເຄືອຂ່າຍທ້ອງຖິ່ນ"
   },
   "models/issues_manager/CorsIssue.ts | corsPrivateNetworkAccess": {
     "message": "ການເຂົ້າເຖິງເຄືອຂ່າຍສ່ວນຕົວ"
@@ -1550,8 +1598,20 @@
   "models/issues_manager/MixedContentIssue.ts | preventingMixedContent": {
     "message": "ການປ້ອງກັນເນື້ອຫາປະສົມ"
   },
+  "models/issues_manager/PartitioningBlobURLIssue.ts | chromeStatusEntry": {
+    "message": "ລາຍການສະຖານະ Chrome"
+  },
+  "models/issues_manager/PartitioningBlobURLIssue.ts | partitioningBlobURL": {
+    "message": "ການແບ່ງພາທິຊັນ URL ຂອງ Blob"
+  },
   "models/issues_manager/QuirksModeIssue.ts | documentCompatibilityMode": {
     "message": "ໂໝດຄວາມເຂົ້າກັນໄດ້ຂອງເອກະສານ"
+  },
+  "models/issues_manager/SRIMessageSignatureIssue.ts | httpMessageSignatures": {
+    "message": "ລາຍເຊັນຂໍ້ຄວາມ HTTP (RFC9421)"
+  },
+  "models/issues_manager/SRIMessageSignatureIssue.ts | signatureBasedIntegrity": {
+    "message": "ຄວາມສົມບູນແບບຕາມລາຍເຊັນ"
   },
   "models/issues_manager/SharedArrayBufferIssue.ts | enablingSharedArrayBuffer": {
     "message": "ກຳລັງເປີດການນຳໃຊ້ SharedArrayBuffer"
@@ -1561,6 +1621,9 @@
   },
   "models/live-metrics/LiveMetrics.ts | lcpEmulationWarning": {
     "message": "ການຈຳລອງອຸປະກອນໃໝ່ຫຼັງຈາກໂຫຼດໜ້າເວັບອາດສົ່ງຜົນຕໍ່ LCP. ໂຫຼດໜ້າເວັບໃໝ່ຫຼັງຈາກຈຳລອງອຸປະກອນໃໝ່ເພື່ອຮັບຂໍ້ມູນ LCP ທີ່ຖືກຕ້ອງ."
+  },
+  "models/live-metrics/LiveMetrics.ts | lcpVisibilityWarning": {
+    "message": "ຄ່າ LCP ອາດສູງຂຶ້ນເນື່ອງຈາກໜ້າເວັບເລີ່ມໂຫຼດໃນພື້ນຫຼັງ."
   },
   "models/logs/NetworkLog.ts | anonymous": {
     "message": "<ບໍ່ລະບຸຕົວຕົນ>"
@@ -1586,9 +1649,6 @@
   "models/logs/logs-meta.ts | reset": {
     "message": "ຣີເຊັດ"
   },
-  "models/persistence/EditFileSystemView.ts | add": {
-    "message": "ເພີ່ມໂຟນເດີ"
-  },
   "models/persistence/EditFileSystemView.ts | enterAPath": {
     "message": "ປ້ອນເສັ້ນທາງ"
   },
@@ -1597,15 +1657,6 @@
   },
   "models/persistence/EditFileSystemView.ts | excludedFolders": {
     "message": "ບໍ່ຮວມໂຟນເດີຍ່ອຍ"
-  },
-  "models/persistence/EditFileSystemView.ts | folderPath": {
-    "message": "ເສັ້ນທາງໂຟນເດີ"
-  },
-  "models/persistence/EditFileSystemView.ts | none": {
-    "message": "ບໍ່ມີ"
-  },
-  "models/persistence/EditFileSystemView.ts | sViaDevtools": {
-    "message": "{PH1} (ຜ່ານເຄື່ອງມືນັກພັດທະນາ)"
   },
   "models/persistence/EditFileSystemView.ts | url": {
     "message": "URL"
@@ -1638,7 +1689,7 @@
     "message": "ຍົກເລີກ ‘{PH1}’ ແທນບໍ?"
   },
   "models/persistence/PersistenceActions.ts | saveAs": {
-    "message": "ບັນທຶກເປັນ..."
+    "message": "ບັນທຶກເປັນ…"
   },
   "models/persistence/PersistenceActions.ts | saveImage": {
     "message": "ບັນທຶກຮູບພາບ"
@@ -1703,50 +1754,212 @@
   "models/persistence/persistence-meta.ts | workspace": {
     "message": "ບ່ອນເຮັດວຽກ"
   },
+  "models/trace/insights/CLSCulprits.ts | animation": {
+    "message": "ພາບເຄື່ອນໄຫວ"
+  },
   "models/trace/insights/CLSCulprits.ts | description": {
     "message": "ການປ່ຽນແປງໂຄງຮ່າງເກີດຂຶ້ນເມື່ອອົງປະກອບຕ່າງໆເຄື່ອນທີ່ໂດຍບໍ່ມີການໂຕ້ຕອບຂອງຜູ້ໃຊ້. [ກວດສອບສາເຫດຂອງການປ່ຽນແປງໂຄງຮ່າງ](https://web.dev/articles/optimize-cls) ເຊັ່ນ: ການເພີ່ມ, ການລຶບ ຫຼື ການປ່ຽນຟອນຂອງອົງປະກອບຕ່າງໆເມື່ອໂຫຼດໜ້າເວັບ."
+  },
+  "models/trace/insights/CLSCulprits.ts | fontRequest": {
+    "message": "ຄຳຮ້ອງຂໍຟອນ"
+  },
+  "models/trace/insights/CLSCulprits.ts | injectedIframe": {
+    "message": "ມີການແຊກ iframe"
+  },
+  "models/trace/insights/CLSCulprits.ts | layoutShiftCluster": {
+    "message": "ຄລັສເຕີການປ່ຽນແປງໂຄງຮ່າງ @ {PH1}"
+  },
+  "models/trace/insights/CLSCulprits.ts | noCulprits": {
+    "message": "ກວດບໍ່ພົບສາເຫດຂອງການປ່ຽນແປງໂຄງຮ່າງ"
+  },
+  "models/trace/insights/CLSCulprits.ts | noLayoutShifts": {
+    "message": "ບໍ່ມີການປ່ຽນແປງໂຄງຮ່າງ"
   },
   "models/trace/insights/CLSCulprits.ts | title": {
     "message": "ສາເຫດຂອງການປ່ຽນແປງໂຄງຮ່າງ"
   },
+  "models/trace/insights/CLSCulprits.ts | topCulprits": {
+    "message": "ສາເຫດຫຼັກຂອງການປ່ຽນແປງໂຄງຮ່າງ"
+  },
+  "models/trace/insights/CLSCulprits.ts | unsizedImages": {
+    "message": "ຮູບບໍ່ມີຂະໜາດ"
+  },
+  "models/trace/insights/CLSCulprits.ts | worstCluster": {
+    "message": "ຄລັສເຕີທີ່ບໍ່ດີທີ່ສຸດ"
+  },
+  "models/trace/insights/CLSCulprits.ts | worstLayoutShiftCluster": {
+    "message": "ຄລັສເຕີການປ່ຽນແປງໂຄງຮ່າງທີ່ບໍ່ດີທີ່ສຸດ"
+  },
+  "models/trace/insights/Cache.ts | cacheTTL": {
+    "message": "TTL ຂອງແຄສ"
+  },
+  "models/trace/insights/Cache.ts | description": {
+    "message": "ອາຍຸການນຳໃຊ້ແຄສທີ່ດົນຊ່ວຍເພີ່ມການເຂົ້າເບິ່ງໜ້າເວັບຂອງທ່ານຊ້ຳໄດ້. [ສຶກສາເພີ່ມເຕີມ](https://web.dev/uses-long-cache-ttl/)."
+  },
+  "models/trace/insights/Cache.ts | noRequestsToCache": {
+    "message": "ບໍ່ມີຄຳຮ້ອງຂໍທີ່ມີນະໂຍບາຍແຄສທີ່ບໍ່ມີປະສິດທິພາບ"
+  },
+  "models/trace/insights/Cache.ts | others": {
+    "message": "ອີກ {PH1} ລາຍການ"
+  },
+  "models/trace/insights/Cache.ts | requestColumn": {
+    "message": "ຄຳຮ້ອງຂໍ"
+  },
+  "models/trace/insights/Cache.ts | title": {
+    "message": "ໃຊ້ອາຍຸການນຳໃຊ້ແຄສທີ່ມີປະສິດທິພາບ"
+  },
   "models/trace/insights/DOMSize.ts | description": {
-    "message": "DOM ທີ່ມີຂະໜາດໃຫຍ່ຈະໃຊ້ໜ່ວຍຄວາມຈຳເພີ່ມຂຶ້ນ, ເຮັດໃຫ້ການຄິດໄລ່ຮູບແບບໃຊ້ເວລາດົນຂຶ້ນ ແລະ ສົ່ງຜົນໃຫ້ເກີດການຈັດຮຽງໂຄງຮ່າງໃໝ່ທີ່ມີຄ່າໃຊ້ຈ່າຍສູງ ເຊິ່ງສົ່ງຜົນກະທົບຕໍ່ການຕອບສະໜອງຂອງໜ້າເວັບ. [ສຶກສາວິທີຫຼີກເວັ້ນ DOM ທີ່ມີຂະໜາດໃຫຍ່ເກີນໄປ](https://developer.chrome.com/docs/lighthouse/performance/dom-size/)."
+    "message": "DOM ທີ່ມີຂະໜາດໃຫຍ່ຈະໃຊ້ເວລາດົນຂຶ້ນໃນການຄິດໄລ່ຮູບແບບ ແລະ ຄຳນວນຕຳແໜ່ງໂຄງຮ່າງໃໝ່, ເຊິ່ງສົ່ງຜົນຕໍ່ການຕອບສະໜອງຂອງໜ້າເວັບ. ນອກຈາກນີ້, DOM ທີ່ມີຂະໜາດໃຫຍ່ຈະໃຊ້ໜ່ວຍຄວາມຈຳເພີ່ມຂຶ້ນນຳ. [ສຶກສາວິທີຫຼີກເວັ້ນ DOM ທີ່ມີຂະໜາດໃຫຍ່ເກີນໄປ](https://developer.chrome.com/docs/lighthouse/performance/dom-size/)."
+  },
+  "models/trace/insights/DOMSize.ts | element": {
+    "message": "ອົງປະກອບ"
+  },
+  "models/trace/insights/DOMSize.ts | maxChildren": {
+    "message": "ອົງປະກອບຍ່ອຍສ່ວນໃຫຍ່"
+  },
+  "models/trace/insights/DOMSize.ts | maxDOMDepth": {
+    "message": "ຄວາມເລິກຂອງ DOM"
+  },
+  "models/trace/insights/DOMSize.ts | statistic": {
+    "message": "ສະຖິຕິ"
   },
   "models/trace/insights/DOMSize.ts | title": {
     "message": "ເພີ່ມປະສິດທິພາບຂະໜາດ DOM"
   },
+  "models/trace/insights/DOMSize.ts | totalElements": {
+    "message": "ອົງປະກອບທັງໝົດ"
+  },
+  "models/trace/insights/DOMSize.ts | value": {
+    "message": "ຄ່າ"
+  },
   "models/trace/insights/DocumentLatency.ts | description": {
     "message": "ຄຳຮ້ອງຂໍເຄືອຂ່າຍເທື່ອທຳອິດຂອງທ່ານເປັນສິ່ງສຳຄັນທີ່ສຸດ.  ຫຼຸດເວລາໃນການຕອບສະໜອງໂດຍຫຼີກເວັ້ນການປ່ຽນເສັ້ນທາງ, ກວດສອບການຕອບກັບຂອງເຊີບເວີທີ່ວ່ອງໄວ ແລະ ເປີດການນຳໃຊ້ການບີບອັດຂໍ້ຄວາມ."
+  },
+  "models/trace/insights/DocumentLatency.ts | failedRedirects": {
+    "message": "ມີການປ່ຽນເສັ້ນທາງ (ປ່ຽນເສັ້ນທາງ {PH1}, +{PH2})"
+  },
+  "models/trace/insights/DocumentLatency.ts | failedServerResponseTime": {
+    "message": "ເຊີບເວີຕອບສະໜອງຊ້າ (ສັງເກດ {PH1}) "
+  },
+  "models/trace/insights/DocumentLatency.ts | failedTextCompression": {
+    "message": "ບໍ່ໄດ້ນຳໃຊ້ການບີບອັດຂໍ້ມູນ"
+  },
+  "models/trace/insights/DocumentLatency.ts | passingRedirects": {
+    "message": "ຫຼີກເວັ້ນການປ່ຽນເສັ້ນທາງ"
+  },
+  "models/trace/insights/DocumentLatency.ts | passingServerResponseTime": {
+    "message": "ເຊີບເວີຕອບສະໜອງໄວ (ສັງເກດ {PH1}) "
+  },
+  "models/trace/insights/DocumentLatency.ts | passingTextCompression": {
+    "message": "ນຳໃຊ້ການບີບອັດຂໍ້ຄວາມ"
+  },
+  "models/trace/insights/DocumentLatency.ts | redirectsLabel": {
+    "message": "ປ່ຽນເສັ້ນທາງ"
+  },
+  "models/trace/insights/DocumentLatency.ts | serverResponseTimeLabel": {
+    "message": "ເວລາໃນການຕອບກັບຂອງເຊີບເວີ"
   },
   "models/trace/insights/DocumentLatency.ts | title": {
     "message": "ເວລາໃນການຕອບສະໜອງຕໍ່ຄຳຮ້ອງຂໍເອກະສານ"
   },
+  "models/trace/insights/DocumentLatency.ts | uncompressedDownload": {
+    "message": "ການດາວໂຫຼດທີ່ບໍ່ມີການບີບອັດ"
+  },
+  "models/trace/insights/DuplicatedJavaScript.ts | columnDuplicatedBytes": {
+    "message": "ໄບຕ໌ທີ່ຊ້ຳກັນ"
+  },
+  "models/trace/insights/DuplicatedJavaScript.ts | columnSource": {
+    "message": "ແຫຼ່ງທີ່ມາ"
+  },
+  "models/trace/insights/DuplicatedJavaScript.ts | description": {
+    "message": "ລຶບໂມດູນ JavaScript ຂະໜາດໃຫຍ່ທີ່ຊ້ຳກັນອອກຈາກແພັກເກດເພື່ອຫຼຸດຈຳນວນໄບຕ໌ທີ່ບໍ່ຈຳເປັນທີ່ການເຄື່ອນໄຫວເຄືອຂ່າຍໃຊ້."
+  },
+  "models/trace/insights/DuplicatedJavaScript.ts | title": {
+    "message": "JavaScript ທີ່ຊ້ຳກັນ"
+  },
   "models/trace/insights/FontDisplay.ts | description": {
     "message": "ພິຈາລະນາການຕັ້ງຄ່າ [font-display](https://developer.chrome.com/blog/font-display) ເປັນ swap ຫຼື optional ເພື່ອໃຫ້ແນ່ໃຈວ່າຂໍ້ຄວາມສາມາດເບິ່ງເຫັນຢ່າງສະໝ່ຳສະເໝີ. swap ສາມາດເພີ່ມປະສິດທິພາບເພີ່ມເຕີມເພື່ອຫຼຸດການປ່ຽນແປງໂຄງຮ່າງດ້ວຍ [ການຍົກເລີກການວັດແທກແບບຟອນ](https://developer.chrome.com/blog/font-fallbacks)."
+  },
+  "models/trace/insights/FontDisplay.ts | fontColumn": {
+    "message": "ຟອນ"
   },
   "models/trace/insights/FontDisplay.ts | title": {
     "message": "ການສະແດງຟອນ"
   },
+  "models/trace/insights/FontDisplay.ts | wastedTimeColumn": {
+    "message": "ເວລາທີ່ເສຍໄປ"
+  },
+  "models/trace/insights/ForcedReflow.ts | anonymous": {
+    "message": "(ບໍ່ລະບຸຕົວຕົນ)"
+  },
+  "models/trace/insights/ForcedReflow.ts | description": {
+    "message": "API ຫຼາຍລາຍການ, ເຊິ່ງໂດຍປົກກະຕິຈະອ່ານຮູບຊົງເລຂາຄະນິດຂອງໂຄງຮ່າງ, ບັງຄັບໃຫ້ເຄື່ອງມືສະແດງຜົນຢຸດການເຮັດວຽກຂອງສະຄຣິບຊົ່ວຄາວເພື່ອຄິດໄລ່ຮູບແບບ ແລະ ໂຄງຮ່າງ. ສຶກສາເພີ່ມເຕີມກ່ຽວກັບ [ການບັງຄັບໃຫ້ຄຳນວນຕຳແໜ່ງໃໝ່](https://developers.google.com/web/fundamentals/performance/rendering/avoid-large-complex-layouts-and-layout-thrashing#avoid-forced-synchronous-layouts) ແລະ ການຫຼຸດຜົນກະທົບ."
+  },
+  "models/trace/insights/ForcedReflow.ts | relatedStackTrace": {
+    "message": "ການຕິດຕາມແບບຊ້ອນກັນ"
+  },
+  "models/trace/insights/ForcedReflow.ts | title": {
+    "message": "ການບັງຄັບໃຫ້ຄຳນວນຕຳແໜ່ງໃໝ່"
+  },
+  "models/trace/insights/ForcedReflow.ts | topTimeConsumingFunctionCall": {
+    "message": "ການເອີ້ນໃຊ້ຟັງຊັນຍອດນິຍົມ"
+  },
+  "models/trace/insights/ForcedReflow.ts | totalReflowTime": {
+    "message": "ເວລາໃນການຄຳນວນຕຳແໜ່ງໃໝ່ທັງໝົດ"
+  },
+  "models/trace/insights/ForcedReflow.ts | unattributed": {
+    "message": "[ບໍ່ມີຄຸນສົມບັດ]"
+  },
   "models/trace/insights/ImageDelivery.ts | description": {
     "message": "ການຫຼຸດເວລາດາວໂຫຼດຮູບຈະຊ່ວຍປັບປຸງເວລາທີ່ໃຊ້ໃນການໂຫຼດທີ່ຮັບຮູ້ຂອງໜ້າເວັບ ແລະ LCP. [ສຶກສາເພີ່ມເຕີມກ່ຽວກັບການເພີ່ມປະສິດທິພາບຂະໜາດຮູບ](https://developer.chrome.com/docs/lighthouse/performance/uses-optimized-images/)"
+  },
+  "models/trace/insights/ImageDelivery.ts | estimatedSavings": {
+    "message": "{PH1} (ປະມານ {PH2})"
+  },
+  "models/trace/insights/ImageDelivery.ts | noOptimizableImages": {
+    "message": "ບໍ່ມີຮູບທີ່ເພີ່ມປະສິດທິພາບໄດ້"
+  },
+  "models/trace/insights/ImageDelivery.ts | optimizeFile": {
+    "message": "ເພີ່ມປະສິດທິພາບຂະໜາດໄຟລ໌"
+  },
+  "models/trace/insights/ImageDelivery.ts | others": {
+    "message": "ອີກ {PH1} ລາຍການ"
   },
   "models/trace/insights/ImageDelivery.ts | title": {
     "message": "ປັບປຸງການຈັດສົ່ງຮູບ"
   },
   "models/trace/insights/ImageDelivery.ts | useCompression": {
-    "message": "ການເພີ່ມຄ່າການອັດບີບຮູບສາມາດປັບປຸງຂະໜາດການດາວໂຫຼດຂອງຮູບນີ້ໄດ້. (ປະມານ {PH1})"
+    "message": "ການເພີ່ມຄ່າການບີບອັດຮູບສາມາດປັບປຸງຂະໜາດການດາວໂຫຼດຂອງຮູບນີ້ໄດ້."
   },
   "models/trace/insights/ImageDelivery.ts | useModernFormat": {
-    "message": "ການໃຊ້ນາມສະກຸນໄຟລ໌ຮູບສະໄໝໃໝ່ (WebP, AVIF) ຫຼື ການເພີ່ມການບີບອັດຮູບອາດຊ່ວຍປັບປຸງຂະໜາດການດາວໂຫຼດຂອງຮູບນີ້ໄດ້. (ປະມານ {PH1})"
+    "message": "ການໃຊ້ນາມສະກຸນໄຟລ໌ຮູບສະໄໝໃໝ່ (WebP, AVIF) ຫຼື ການເພີ່ມການບີບອັດຮູບອາດຊ່ວຍປັບປຸງຂະໜາດການດາວໂຫຼດຂອງຮູບນີ້ໄດ້."
   },
   "models/trace/insights/ImageDelivery.ts | useResponsiveSize": {
-    "message": "ໄຟລ໌ຮູບມີຂະໜາດໃຫຍ່ເກີນຄວາມຈຳເປັນ ({PH2}) ສຳລັບມິຕິຂໍ້ມູນທີ່ສະແດງ ({PH3}). ກະລຸນາໃຊ້ຮູບທີ່ປັບປ່ຽນຕາມອຸປະກອນເພື່ອຫຼຸດຂະໜາດການດາວໂຫຼດຮູບ. (ປະມານ {PH1})"
+    "message": "ໄຟລ໌ຮູບມີຂະໜາດໃຫຍ່ເກີນຄວາມຈຳເປັນ ({PH1}) ສຳລັບມິຕິຂໍ້ມູນທີ່ສະແດງ ({PH2}). ກະລຸນາໃຊ້ຮູບທີ່ປັບປ່ຽນຕາມອຸປະກອນເພື່ອຫຼຸດຂະໜາດການດາວໂຫຼດຮູບ."
   },
   "models/trace/insights/ImageDelivery.ts | useVideoFormat": {
-    "message": "ການໃຊ້ຮູບແບບວິດີໂອແທນ GIF ຈະຊ່ວຍປັບປຸງຂະໜາດການດາວໂຫຼດເນື້ອຫາທີ່ເປັນພາບເຄື່ອນໄຫວໄດ້. (ປະມານ {PH1})"
+    "message": "ການໃຊ້ຮູບແບບວິດີໂອແທນ GIF ຈະຊ່ວຍປັບປຸງຂະໜາດການດາວໂຫຼດເນື້ອຫາທີ່ເປັນພາບເຄື່ອນໄຫວໄດ້."
   },
   "models/trace/insights/InteractionToNextPaint.ts | description": {
     "message": "ເລີ່ມຕົ້ນກວດສອບໄລຍະທີ່ຍາວທີ່ສຸດ. [ຫຼຸດຄວາມຫຼ້າຊ້າໃຫ້ໜ້ອຍທີ່ສຸດ](https://web.dev/articles/optimize-inp#optimize_interactions). ເພື່ອຫຼຸດໄລຍະເວລາໃນການປະມວນຜົນ, ໃຫ້ [ເພີ່ມປະສິດທິພາບຕົ້ນທຶນຂອງຫົວຂໍ້ຫຼັກ](https://web.dev/articles/optimize-long-tasks), ເຊິ່ງມັກຈະເປັນ JS."
+  },
+  "models/trace/insights/InteractionToNextPaint.ts | duration": {
+    "message": "ໄລຍະເວລາ"
+  },
+  "models/trace/insights/InteractionToNextPaint.ts | inputDelay": {
+    "message": "ຄວາມຫຼ້າຊ້າຂອງອິນພຸດ"
+  },
+  "models/trace/insights/InteractionToNextPaint.ts | noInteractions": {
+    "message": "ບໍ່ພົບການໂຕ້ຕອບ"
+  },
+  "models/trace/insights/InteractionToNextPaint.ts | phase": {
+    "message": "ໄລຍະ"
+  },
+  "models/trace/insights/InteractionToNextPaint.ts | presentationDelay": {
+    "message": "ການນຳສະເໜີຫຼ້າຊ້າ"
+  },
+  "models/trace/insights/InteractionToNextPaint.ts | processingDuration": {
+    "message": "ໄລຍະເວລາໃນການປະມວນຜົນ"
   },
   "models/trace/insights/InteractionToNextPaint.ts | title": {
     "message": "INP ຕາມໄລຍະ"
@@ -1754,17 +1967,155 @@
   "models/trace/insights/LCPDiscovery.ts | description": {
     "message": "ເພີ່ມປະສິດທິພາບ LCP ໂດຍເຮັດໃຫ້ຮູບ LCP [ຄົ້ນພົບໄດ້](https://web.dev/articles/optimize-lcp#1_eliminate_resource_load_delay) ຈາກ HTML ທັນທີ ແລະ [ຫຼີກເວັ້ນ lazy loading](https://web.dev/articles/lcp-lazy-loading)"
   },
+  "models/trace/insights/LCPDiscovery.ts | fetchPriorityApplied": {
+    "message": "ໃຊ້ລຳດັບຄວາມສຳຄັນໃນການດຶງຂໍ້ມູນ=ສູງຢູ່"
+  },
+  "models/trace/insights/LCPDiscovery.ts | fetchPriorityShouldBeApplied": {
+    "message": "ຄວນໃຊ້ fetchpriority=high"
+  },
+  "models/trace/insights/LCPDiscovery.ts | lazyLoadNotApplied": {
+    "message": "ບໍ່ໄດ້ໃຊ້ການໂຫຼດແບບ lazy loading"
+  },
+  "models/trace/insights/LCPDiscovery.ts | lcpLoadDelay": {
+    "message": "ຮູບ LCP ໃຊ້ເວລາໂຫຼດ {PH1} ຫຼັງຈາກຈຸດເລີ່ມຕົ້ນທຳອິດສຸດ."
+  },
+  "models/trace/insights/LCPDiscovery.ts | noLcp": {
+    "message": "ບໍ່ພົບ LCP"
+  },
+  "models/trace/insights/LCPDiscovery.ts | noLcpResource": {
+    "message": "ບໍ່ພົບຊັບພະຍາກອນ LCP ເນື່ອງຈາກ LCP ບໍ່ແມ່ນຮູບ"
+  },
+  "models/trace/insights/LCPDiscovery.ts | requestDiscoverable": {
+    "message": "ຄຳຮ້ອງຂໍສາມາດຄົ້ນພົບໄດ້ໃນເອກະສານເລີ່ມຕົ້ນ"
+  },
   "models/trace/insights/LCPDiscovery.ts | title": {
     "message": "ການຄົ້ນພົບຄຳຮ້ອງຂໍ LCP"
   },
   "models/trace/insights/LCPPhases.ts | description": {
     "message": "ແຕ່ລະ [ໄລຍະມີກົນລະຍຸດການປັບປຸງສະເພາະ](https://web.dev/articles/optimize-lcp#lcp-breakdown). ໂດຍປົກກະຕິແລ້ວ, ເວລາສ່ວນໃຫຍ່ຂອງ LCP ຄວນໃຊ້ໄປກັບການໂຫຼດຊັບພະຍາກອນ, ບໍ່ແມ່ນຄວາມຫຼ້າຊ້າ."
   },
+  "models/trace/insights/LCPPhases.ts | duration": {
+    "message": "ໄລຍະເວລາ"
+  },
+  "models/trace/insights/LCPPhases.ts | elementRenderDelay": {
+    "message": "ຄວາມຫຼ້າຊ້າໃນການສະແດງຜົນອົງປະກອບ"
+  },
+  "models/trace/insights/LCPPhases.ts | fieldDuration": {
+    "message": "ຊ່ອງ p75"
+  },
+  "models/trace/insights/LCPPhases.ts | noLcp": {
+    "message": "ບໍ່ພົບ LCP"
+  },
+  "models/trace/insights/LCPPhases.ts | phase": {
+    "message": "ໄລຍະ"
+  },
+  "models/trace/insights/LCPPhases.ts | resourceLoadDelay": {
+    "message": "ຄວາມຫຼ້າຊ້າຂອງການໂຫຼດຊັບພະຍາກອນ"
+  },
+  "models/trace/insights/LCPPhases.ts | resourceLoadDuration": {
+    "message": "ໄລຍະເວລາໃນການໂຫຼດຊັບພະຍາກອນ"
+  },
+  "models/trace/insights/LCPPhases.ts | timeToFirstByte": {
+    "message": "ເວລາທີ່ໄດ້ຮັບຂໍ້ມູນໄບຕ໌ທຳອິດ"
+  },
   "models/trace/insights/LCPPhases.ts | title": {
     "message": "LCP ຕາມໄລຍະ"
   },
+  "models/trace/insights/LegacyJavaScript.ts | columnScript": {
+    "message": "ສະຄຣິບ"
+  },
+  "models/trace/insights/LegacyJavaScript.ts | columnWastedBytes": {
+    "message": "ໄບຕ໌ທີ່ເສຍໄປ"
+  },
+  "models/trace/insights/LegacyJavaScript.ts | description": {
+    "message": "Polyfills ແລະ ການປ່ຽນຮູບແບບຊ່ວຍໃຫ້ໂປຣແກຣມທ່ອງເວັບເກົ່າໃຊ້ຄຸນສົມບັດ JavaScript ໃໝ່ໄດ້. ແນວໃດກໍຕາມ, ສ່ວນຫຼາຍຈະບໍ່ຈຳເປັນສຳລັບໂປຣແກຣມທ່ອງເວັບສະໄໝໃໝ່. ລອງແກ້ໄຂຂະບວນການ build JavaScript ເພື່ອບໍ່ໃຫ້ເຮັດການ Transpile ຄຸນສົມບັດ [Baseline](https://web.dev/articles/baseline-and-polyfills), ເວັ້ນແຕ່ທ່ານຈະຮູ້ວ່າທ່ານຕ້ອງຮອງຮັບໂປຣແກຣມທ່ອງເວັບເກົ່າ. [ສຶກສາສາເຫດທີ່ເວັບໄຊສ່ວນໃຫຍ່ສາມາດຕິດຕັ້ງການນຳໃຊ້ໂຄດ ES6+ ໄດ້ໂດຍບໍ່ຕ້ອງເຮັດການ Transpile](https://philipwalton.com/articles/the-state-of-es5-on-the-web/)"
+  },
+  "models/trace/insights/LegacyJavaScript.ts | title": {
+    "message": "JavaScript ແບບເກົ່າ"
+  },
+  "models/trace/insights/ModernHTTP.ts | description": {
+    "message": "HTTP/2 ແລະ HTTP/3 ມີປະໂຫຍດຫຼາຍກວ່າ HTTP/1.1 ຫຼາຍຂໍ້ ເຊັ່ນ: multiplexing. [ສຶກສາເພີ່ມເຕີມກ່ຽວກັບການໃຊ້ HTTP ສະໄໝໃໝ່](https://developer.chrome.com/docs/lighthouse/best-practices/uses-http2/)."
+  },
+  "models/trace/insights/ModernHTTP.ts | noOldProtocolRequests": {
+    "message": "ບໍ່ມີຄຳຮ້ອງຂໍທີ່ໃຊ້ HTTP/1.1"
+  },
+  "models/trace/insights/ModernHTTP.ts | protocol": {
+    "message": "ໂປຣໂຕຄໍ"
+  },
+  "models/trace/insights/ModernHTTP.ts | request": {
+    "message": "ຄຳຮ້ອງຂໍ"
+  },
+  "models/trace/insights/ModernHTTP.ts | title": {
+    "message": "HTTP ສະໄໝໃໝ່"
+  },
+  "models/trace/insights/NetworkDependencyTree.ts | columnOrigin": {
+    "message": "ຕົ້ນທາງ"
+  },
+  "models/trace/insights/NetworkDependencyTree.ts | columnRequest": {
+    "message": "ຄຳຮ້ອງຂໍ"
+  },
+  "models/trace/insights/NetworkDependencyTree.ts | columnSource": {
+    "message": "ແຫຼ່ງທີ່ມາ"
+  },
+  "models/trace/insights/NetworkDependencyTree.ts | columnTime": {
+    "message": "ເວລາ"
+  },
+  "models/trace/insights/NetworkDependencyTree.ts | columnWastedMs": {
+    "message": "ການປະຢັດ LCP ໂດຍປະມານ"
+  },
+  "models/trace/insights/NetworkDependencyTree.ts | crossoriginWarning": {
+    "message": "ການເຊື່ອມຕໍ່ລ່ວງໜ້າທີ່ບໍ່ໄດ້ໃຊ້. ກວດເບິ່ງວ່າຄຸນສົມບັດ crossorigin ຖືກໃຊ້ຢ່າງຖືກຕ້ອງ."
+  },
+  "models/trace/insights/NetworkDependencyTree.ts | description": {
+    "message": "[ຫຼີກເວັ້ນການເຊນຄຳຮ້ອງຂໍທີ່ສຳຄັນ](https://developer.chrome.com/docs/lighthouse/performance/critical-request-chains) ໂດຍການຫຼຸດຄວາມຍາວຂອງເຊນ, ຫຼຸດຂະໜາດການດາວໂຫຼດຂອງຊັບພະຍາກອນ ຫຼື ເລື່ອນເວລາການດາວໂຫຼດຊັບພະຍາກອນທີ່ບໍ່ຈຳເປັນເພື່ອປັບປຸງການໂຫຼດໜ້າເວັບ."
+  },
+  "models/trace/insights/NetworkDependencyTree.ts | estSavingTableDescription": {
+    "message": "ເພີ່ມຄຳແນະນຳ [ການເຊື່ອມຕໍ່ລ່ວງໜ້າ](https://developer.chrome.com/docs/lighthouse/performance/uses-rel-preconnect/) ໄປຫາຕົ້ນທາງທີ່ສຳຄັນທີ່ສຸດ, ແຕ່ພະຍາຍາມໃຊ້ໃຫ້ໜ້ອຍກວ່າ 4."
+  },
+  "models/trace/insights/NetworkDependencyTree.ts | estSavingTableTitle": {
+    "message": "ຕົວເລືອກການເຊື່ອມຕໍ່ລ່ວງໜ້າ"
+  },
+  "models/trace/insights/NetworkDependencyTree.ts | maxCriticalPathLatency": {
+    "message": "ເວລາໃນການຕອບສະໜອງສູງສຸດຂອງເສັ້ນທາງທີ່ສຳຄັນ:"
+  },
+  "models/trace/insights/NetworkDependencyTree.ts | noNetworkDependencyTree": {
+    "message": "ບໍ່ມີໜ້າວຽກການສະແດງຜົນທີ່ໄດ້ຮັບຜົນກະທົບຈາກການເພິ່ງພາອາໄສຂອງເຄືອຂ່າຍ"
+  },
+  "models/trace/insights/NetworkDependencyTree.ts | noPreconnectCandidates": {
+    "message": "ບໍ່ມີຕົວເລືອກຕົ້ນທາງເພີ່ມເຕີມທີ່ເໝາະສຳລັບການເຊື່ອມຕໍ່ລ່ວງໜ້າ"
+  },
+  "models/trace/insights/NetworkDependencyTree.ts | noPreconnectOrigins": {
+    "message": "ບໍ່ໄດ້ເຊື່ອມຕໍ່ກັບຕົ້ນທາງໄວ້ລ່ວງໜ້າ"
+  },
+  "models/trace/insights/NetworkDependencyTree.ts | preconnectOriginsTableDescription": {
+    "message": "ຄຳແນະນຳ [ການເຊື່ອມຕໍ່ລ່ວງໜ້າ](https://developer.chrome.com/docs/lighthouse/performance/uses-rel-preconnect/) ຊ່ວຍໃຫ້ໂປຣແກຣມທ່ອງເວັບສ້າງການເຊື່ອມຕໍ່ໄດ້ໄວຂຶ້ນເມື່ອໂຫຼດໜ້າເວັບ, ເຊິ່ງຈະຊ່ວຍປະຢັດເວລາເມື່ອມີການຂໍຂໍ້ມູນຕົ້ນທາງເທື່ອທຳອິດ. ຕົ້ນທາງທີ່ໜ້າເວັບເຊື່ອມຕໍ່ໄວ້ລ່ວງໜ້າມີດັ່ງນີ້."
+  },
+  "models/trace/insights/NetworkDependencyTree.ts | preconnectOriginsTableTitle": {
+    "message": "ຕົ້ນທາງທີ່ເຊື່ອມຕໍ່ໄວ້ລ່ວງໜ້າ"
+  },
+  "models/trace/insights/NetworkDependencyTree.ts | title": {
+    "message": "ການເຊນຄຳຮ້ອງຂໍແບບເພິ່ງພາອາໄສຂອງເຄືອຂ່າຍ"
+  },
+  "models/trace/insights/NetworkDependencyTree.ts | tooManyPreconnectLinksWarning": {
+    "message": "ພົບການເຊື່ອມຕໍ່ preconnect ຫຼາຍກວ່າ 4 ລາຍການ. ຄວນໃຊ້ການເຊື່ອມຕໍ່ເຫຼົ່ານີ້ເທົ່າທີ່ຈຳເປັນ ແລະ ໃຊ້ກັບຕົ້ນທາງທີ່ສຳຄັນທີ່ສຸດເທົ່ານັ້ນ."
+  },
+  "models/trace/insights/NetworkDependencyTree.ts | unusedWarning": {
+    "message": "ການເຊື່ອມຕໍ່ລ່ວງໜ້າທີ່ບໍ່ໄດ້ໃຊ້. ໃຊ້ preconnect ກັບຕົ້ນທາງທີ່ໜ້າເວັບມີແນວໂນ້ມຈະຮ້ອງຂໍເທົ່ານັ້ນ."
+  },
+  "models/trace/insights/NetworkDependencyTree.ts | warningDescription": {
+    "message": "ຫຼີກເວັ້ນການເຊື່ອມຕໍ່ການຮ້ອງຂໍທີ່ສຳຄັນໂດຍການຫຼຸດຄວາມຍາວຂອງການເຊື່ອມຕໍ່, ຫຼຸດຂະໜາດການດາວໂຫຼດຂອງຊັບພະຍາກອນ ຫຼື ເລື່ອນການດາວໂຫຼດຊັບພະຍາກອນທີ່ບໍ່ຈຳເປັນອອກໄປເພື່ອປັບປຸງການໂຫຼດໜ້າ."
+  },
   "models/trace/insights/RenderBlocking.ts | description": {
-    "message": "ຄຳຮ້ອງຂໍກຳລັງບລັອກການສະແດງພາບເລີ່ມຕົ້ນຂອງໜ້າເວັບ, ເຊິ່ງອາດເຮັດໃຫ້ LCP ຫຼ້າຊ້າ. [ການເລື່ອນເວລາ ຫຼື ແຊກໃນແຖວ](https://web.dev/learn/performance/understanding-the-critical-path#render-blocking_resources/) ສາມາດຍ້າຍຄຳຮ້ອງຂໍເຄືອຂ່າຍເຫຼົ່ານີ້ອອກຈາກເສັ້ນທາງທີ່ສຳຄັນໄດ້."
+    "message": "ຄຳຮ້ອງຂໍກຳລັງບລັອກການສະແດງພາບເລີ່ມຕົ້ນຂອງໜ້າເວັບ, ເຊິ່ງອາດເຮັດໃຫ້ LCP ຫຼ້າຊ້າ. [ການເລື່ອນເວລາ ຫຼື ແຊກໃນແຖວ](https://web.dev/learn/performance/understanding-the-critical-path#render-blocking_resources) ສາມາດຍ້າຍຄຳຮ້ອງຂໍເຄືອຂ່າຍເຫຼົ່ານີ້ອອກຈາກເສັ້ນທາງທີ່ສຳຄັນໄດ້."
+  },
+  "models/trace/insights/RenderBlocking.ts | duration": {
+    "message": "ໄລຍະເວລາ"
+  },
+  "models/trace/insights/RenderBlocking.ts | noRenderBlocking": {
+    "message": "ບໍ່ມີຄຳຮ້ອງຂໍບລັອກການສະແດງຜົນສຳລັບການນຳທາງນີ້"
+  },
+  "models/trace/insights/RenderBlocking.ts | renderBlockingRequest": {
+    "message": "ຄຳຮ້ອງຂໍ"
   },
   "models/trace/insights/RenderBlocking.ts | title": {
     "message": "ສະແດງຜົນຄຳຮ້ອງຂໍການບລັອກ"
@@ -1772,11 +2123,41 @@
   "models/trace/insights/SlowCSSSelector.ts | description": {
     "message": "ຫາກຕົ້ນທຶນໃນການຄິດໄລ່ຮູບແບບອີກຄັ້ງຍັງຄົງສູງຢູ່, ການເພີ່ມປະສິດທິພາບຕົວເລືອກຈະສາມາດຫຼຸດຕົ້ນທຶນໄດ້. [ເພີ່ມປະສິດທິພາບຕົວເລືອກ](https://developer.chrome.com/docs/devtools/performance/selector-stats) ດ້ວຍເວລາທີ່ຜ່ານໄປດົນ ແລະ % ຂອງເສັ້ນທາງທີ່ຊ້າທີ່ສຸດ. ຕົວເລືອກທີ່ຮຽບງ່າຍຂຶ້ນ, ຕົວເລືອກທີ່ໜ້ອຍລົງ, DOM ທີ່ນ້ອຍລົງ ແລະ DOM ທີ່ຕື້ນຂຶ້ນຈະຊ່ວຍຫຼຸດຕົ້ນທຶນການຈັບຄູ່ໄດ້ໝົດ."
   },
+  "models/trace/insights/SlowCSSSelector.ts | elapsed": {
+    "message": "ເວລາທີ່ຜ່ານໄປ"
+  },
+  "models/trace/insights/SlowCSSSelector.ts | enableSelectorData": {
+    "message": "ບໍ່ພົບຂໍ້ມູນຕົວເລືອກ CSS. ຕ້ອງເປີດການນຳໃຊ້ສະຖິຕິຕົວເລືອກ CSS ໃນການຕັ້ງຄ່າແຜງປະສິດທິພາບ."
+  },
+  "models/trace/insights/SlowCSSSelector.ts | matchAttempts": {
+    "message": "ຄວາມພະຍາຍາມຈັບຄູ່ທີ່ກົງກັນ"
+  },
+  "models/trace/insights/SlowCSSSelector.ts | matchCount": {
+    "message": "ຈຳນວນການຈັບຄູ່ທີ່ກົງກັນ"
+  },
   "models/trace/insights/SlowCSSSelector.ts | title": {
     "message": "ຕົ້ນທຶນຂອງຕົວເລືອກ CSS"
   },
+  "models/trace/insights/SlowCSSSelector.ts | topSelectors": {
+    "message": "ຕົວເລືອກຍອດນິຍົມ"
+  },
+  "models/trace/insights/SlowCSSSelector.ts | total": {
+    "message": "ຮວມ"
+  },
+  "models/trace/insights/ThirdParties.ts | columnMainThreadTime": {
+    "message": "ເວລາຂອງຫົວຂໍ້ຫຼັກ"
+  },
+  "models/trace/insights/ThirdParties.ts | columnThirdParty": {
+    "message": "ພາກສ່ວນທີສາມ"
+  },
+  "models/trace/insights/ThirdParties.ts | columnTransferSize": {
+    "message": "ຂະໜາດການໂອນຍ້າຍ"
+  },
   "models/trace/insights/ThirdParties.ts | description": {
-    "message": "ລະຫັດຂອງພາກສ່ວນທີສາມອາດສົ່ງຜົນກະທົບທີ່ສຳຄັນຕໍ່ປະສິດທິພາບການໂຫຼດ. [ຫຼຸດ ແລະ ເລື່ອນການໂຫຼດລະຫັດຂອງພາກສ່ວນທີສາມອອກໄປ](https://developers.google.com/web/fundamentals/performance/optimizing-content-efficiency/loading-third-party-javascript/) ເພື່ອຈັດລຳດັບຄວາມສຳຄັນຂອງເນື້ອຫາໃນໜ້າເວັບຂອງທ່ານ."
+    "message": "ລະຫັດຂອງພາກສ່ວນທີສາມອາດສົ່ງຜົນກະທົບທີ່ສຳຄັນຕໍ່ປະສິດທິພາບການໂຫຼດ. [ຫຼຸດ ແລະ ເລື່ອນການໂຫຼດລະຫັດຂອງພາກສ່ວນທີສາມອອກໄປ](https://web.dev/articles/optimizing-content-efficiency-loading-third-party-javascript/) ເພື່ອຈັດລຳດັບຄວາມສຳຄັນຂອງເນື້ອຫາໃນໜ້າເວັບຂອງທ່ານ."
+  },
+  "models/trace/insights/ThirdParties.ts | noThirdParties": {
+    "message": "ບໍ່ພົບພາກສ່ວນທີສາມ"
   },
   "models/trace/insights/ThirdParties.ts | title": {
     "message": "ພາກສ່ວນທີສາມ"
@@ -1812,7 +2193,7 @@
     "message": "ລະເວັ້ນແລ້ວ"
   },
   "panels/accessibility/AXBreadcrumbsPane.ts | reloadRequired": {
-    "message": "ຕ້ອງໂຫຼດໃໝ່ກ່ອນທີ່ການປ່ຽນແປງຈະມີຜົນ."
+    "message": "ຕ້ອງໂຫຼດໃໝ່ ການປ່ຽນແປງຈຶ່ງຈະມີຜົນ"
   },
   "panels/accessibility/AXBreadcrumbsPane.ts | scrollIntoView": {
     "message": "ເລື່ອນເຂົ້າໄປຫາມຸມມອງ"
@@ -2219,11 +2600,20 @@
   "panels/ai_assistance/AiAssistancePanel.ts | deleteChat": {
     "message": "ລຶບການສົນທະນາໃນເຄື່ອງ"
   },
+  "panels/ai_assistance/AiAssistancePanel.ts | externalRequestReceived": {
+    "message": "DevTools ໄດ້ຮັບຄຳຮ້ອງຂໍພາຍນອກແລ້ວ"
+  },
+  "panels/ai_assistance/AiAssistancePanel.ts | followTheSteps": {
+    "message": "ປະຕິບັດຕາມຂັ້ນຕອນຂ້າງເທິງເພື່ອຖາມຄຳຖາມ"
+  },
   "panels/ai_assistance/AiAssistancePanel.ts | help": {
     "message": "ຄວາມຊ່ວຍເຫຼືອ"
   },
   "panels/ai_assistance/AiAssistancePanel.ts | history": {
     "message": "ປະຫວັດ"
+  },
+  "panels/ai_assistance/AiAssistancePanel.ts | inputDisclaimerForEmptyState": {
+    "message": "ນີ້ແມ່ນຄຸນສົມບັດ AI ເວີຊັນທົດລອງ ແລະ ອາດເຮັດວຽກໄດ້ບໍ່ຖືກຕ້ອງສະເໝີໄປ."
   },
   "panels/ai_assistance/AiAssistancePanel.ts | newChat": {
     "message": "ການສົນທະນາໃໝ່"
@@ -2261,20 +2651,20 @@
   "panels/ai_assistance/ai_assistance-meta.ts | wrongLocale": {
     "message": "ເພື່ອໃຊ້ຄຸນສົມບັດນີ້, ໃຫ້ກຳນົດການຕັ້ງຄ່າພາສາຂອງທ່ານເປັນພາສາອັງກິດໃນການຕັ້ງຄ່າ DevTools."
   },
-  "panels/ai_assistance/components/ChatView.ts | followTheSteps": {
-    "message": "ປະຕິບັດຕາມຂັ້ນຕອນຂ້າງເທິງເພື່ອຖາມຄຳຖາມ"
-  },
-  "panels/ai_assistance/components/ChatView.ts | inputDisclaimerForEmptyState": {
-    "message": "ນີ້ແມ່ນຄຸນສົມບັດ AI ເວີຊັນທົດລອງ ແລະ ອາດເຮັດວຽກໄດ້ບໍ່ຖືກຕ້ອງສະເໝີໄປ."
-  },
   "panels/ai_assistance/components/ChatView.ts | learnAbout": {
     "message": "ສຶກສາກ່ຽວກັບ AI ໃນ DevTools"
+  },
+  "panels/ai_assistance/components/ChatView.ts | notAvailableInIncognitoMode": {
+    "message": "ຄວາມຊ່ວຍເຫຼືອຈາກ AI ບໍ່ພ້ອມໃຫ້ນຳໃຊ້ໃນໂໝດບໍ່ເປີດເຜີຍຕົວຕົນ ຫຼື ໂໝດແຂກ"
   },
   "panels/ai_assistance/components/ChatView.ts | notLoggedIn": {
     "message": "ຄຸນສົມບັດນີ້ສາມາດໃຊ້ໄດ້ສະເພາະເມື່ອທ່ານເຂົ້າສູ່ລະບົບ Chrome ດ້ວຍບັນຊີ Google ຂອງທ່ານເທົ່ານັ້ນ"
   },
   "panels/ai_assistance/components/ChatView.ts | offline": {
     "message": "ກະລຸນາກວດສອບການເຊື່ອມຕໍ່ອິນເຕີເນັດຂອງທ່ານແລ້ວລອງໃໝ່"
+  },
+  "panels/ai_assistance/components/ChatView.ts | revealContextDescription": {
+    "message": "ເປີດເຜີຍລາຍການບໍລິບົດທີ່ເລືອກໃນ DevTools"
   },
   "panels/ai_assistance/components/ChatView.ts | settingsLink": {
     "message": "ຄວາມຊ່ວຍເຫຼືອຈາກ AI ໃນການຕັ້ງຄ່າ"
@@ -2291,6 +2681,9 @@
   "panels/ai_assistance/components/ChatView.ts | turnOnForStylesRequestsPerformanceAndFiles": {
     "message": "ເປີດ {PH1} ເພື່ອຮັບຄວາມຊ່ວຍເຫຼືອຕໍ່ກັບຮູບແບບ, ຄຳຮ້ອງຂໍເຄືອຂ່າຍ, ປະສິດທິພາບ ແລະ ໄຟລ໌"
   },
+  "panels/animation/AnimationTimeline.ts | animationDescription": {
+    "message": "ໃນໜ້ານີ້, ທ່ານສາມາດກວດສອບ ແລະ ແກ້ໄຂພາບເຄື່ອນໄຫວໄດ້."
+  },
   "panels/animation/AnimationTimeline.ts | animationPreviewS": {
     "message": "ສະແດງຕົວຢ່າງອະນິເມຊັນ {PH1}"
   },
@@ -2299,6 +2692,9 @@
   },
   "panels/animation/AnimationTimeline.ts | clearAll": {
     "message": "ລຶບລ້າງທັງໝົດ"
+  },
+  "panels/animation/AnimationTimeline.ts | noEffectSelected": {
+    "message": "ບໍ່ໄດ້ເລືອກເອັບເຟັກພາບເຄື່ອນໄຫວ"
   },
   "panels/animation/AnimationTimeline.ts | pause": {
     "message": "ຢຸດຊົ່ວຄາວ"
@@ -2325,13 +2721,13 @@
     "message": "ດຳເນີນຕໍ່ທັງໝົດ"
   },
   "panels/animation/AnimationTimeline.ts | selectAnEffectAboveToInspectAnd": {
-    "message": "ເລືອກເອັບເຟັກຢູ່ຂ້າງເທິງເພື່ອກວດກາ ແລະ ແກ້ໄຂ."
+    "message": "ເລືອກເອັບເຟັກຂ້າງເທິງເພື່ອກວດສອບ ແລະ ແກ້ໄຂ"
   },
   "panels/animation/AnimationTimeline.ts | setSpeedToS": {
     "message": "ຕັ້ງຄ່າຄວາມໄວເປັນ {PH1}"
   },
   "panels/animation/AnimationTimeline.ts | waitingForAnimations": {
-    "message": "ກຳລັງລໍຖ້າອະນິເມຊັນ..."
+    "message": "ກຳລັງລໍຖ້າພາບເຄື່ອນໄຫວ"
   },
   "panels/animation/AnimationUI.ts | animationEndpointSlider": {
     "message": "ແຖບເລື່ອນຈຸດສິ້ນສຸດອະນິເມຊັນ"
@@ -2364,7 +2760,7 @@
     "message": "ນີ້ແມ່ນຖືກໃຊ້ໂດຍໂປຣແກຣມທ່ອງເວັບເພື່ອຮູ້ວ່າ manifest ຄວນຖືກອັບເດດແອັບພລິເຄຊັນທີ່ມີຢູ່ກ່ອນແລ້ວ ຫຼື ມັນອ້າງອີງຫາເວັບແອັບໃໝ່ທີ່ສາມາດຖືກຕິດຕັ້ງໄດ້."
   },
   "panels/application/AppManifestView.ts | appIdNote": {
-    "message": "ບໍ່ໄດ້ລະບຸ {PH1} {PH2} ໃນ manifest, ໃຊ້ {PH3} ແທນ. ເພື່ອລະບຸ ID ແອັບໃດໜຶ່ງທີ່ກົງກັບຕົວລະບຸປັດຈຸບັນ, ໃຫ້ຕັ້ງຊ່ອງຂໍ້ມູນ {PH4} ເປັນ {PH5} {PH6}."
+    "message": "ໝາຍເຫດ: ບໍ່ໄດ້ກຳນົດ id ໃນ manifest, ລະບົບຈະໃຊ້ start_url ແທນ. ເພື່ອກຳນົດ ID ແອັບທີ່ກົງກັບຂໍ້ມູນຢັ້ງຢືນຕົວຕົນໃນປັດຈຸບັນ, ໃຫ້ຕັ້ງຄ່າຊ່ອງ id ເປັນ {PH1} {PH2}."
   },
   "panels/application/AppManifestView.ts | avoidPurposeAnyAndMaskable": {
     "message": "ບໍ່ແນະນຳໃຫ້ປະກາດໄອຄອນທີ່ມີ 'purpose' ເປັນ 'any maskable'. ມັນອາດສະແດງຜົນບໍ່ຖືກຕ້ອງໃນບາງແພລດຟອມເນື່ອງຈາກມີໄລຍະຫ່າງຈາກຂອບຫຼາຍ ຫຼື ໜ້ອຍເກີນໄປ."
@@ -2473,9 +2869,6 @@
   },
   "panels/application/AppManifestView.ts | noSuppliedIconIsAtLeastSpxSquare": {
     "message": "ບໍ່ໄດ້ສົ່ງໄອຄອນທີ່ມີຢ່າງໜ້ອຍ {PH1} ພິກເຊວສີ່ຫຼ່ຽມໃນຮູບແບບ PNG, SVG ຫຼື ຮູບແບບ WebP, ພ້ອມຄຸນສົມບັດຈຸດປະສົງບໍ່ໄດ້ຕັ້ງ ຫຼື ຕັ້ງເປັນ 'any'."
-  },
-  "panels/application/AppManifestView.ts | note": {
-    "message": "ໝາຍເຫດ:"
   },
   "panels/application/AppManifestView.ts | orientation": {
     "message": "ທິດທາງ"
@@ -2607,7 +3000,7 @@
     "message": "ການວາງທັບການຄວບຄຸມໜ້າຈໍ"
   },
   "panels/application/ApplicationPanelSidebar.ts | appManifest": {
-    "message": "ໄຟລ໌ Manifest ຂອງແອັບ"
+    "message": "Manifest"
   },
   "panels/application/ApplicationPanelSidebar.ts | application": {
     "message": "ແອັບພລິເຄຊັນ"
@@ -2627,11 +3020,14 @@
   "panels/application/ApplicationPanelSidebar.ts | cookies": {
     "message": "ຄຸກກີ້"
   },
+  "panels/application/ApplicationPanelSidebar.ts | cookiesDescription": {
+    "message": "ທ່ານສາມາດເບິ່ງ, ເພີ່ມ, ແກ້ໄຂ ແລະ ລຶບຄຸກກີ້ໄດ້ໃນໜ້ານີ້."
+  },
   "panels/application/ApplicationPanelSidebar.ts | cookiesUsedByFramesFromS": {
     "message": "ຄຸກກີ້ທີ່ໃຊ້ໂດຍເຟຣມຈາກ {PH1}"
   },
   "panels/application/ApplicationPanelSidebar.ts | documentNotAvailable": {
-    "message": "ເອກະສານບໍ່ສາມາດໃຊ້ໄດ້"
+    "message": "ບໍ່ພົບເອກະສານ"
   },
   "panels/application/ApplicationPanelSidebar.ts | extensionLocalStorage": {
     "message": "ໃນເຄື່ອງ"
@@ -2645,6 +3041,9 @@
   "panels/application/ApplicationPanelSidebar.ts | extensionStorage": {
     "message": "ບ່ອນຈັດເກັບຂໍ້ມູນສຳລັບສ່ວນຂະຫຍາຍ"
   },
+  "panels/application/ApplicationPanelSidebar.ts | extensionStorageDescription": {
+    "message": "ທ່ານສາມາດເບິ່ງ, ເພີ່ມ, ແກ້ໄຂ ແລະ ລຶບຄູ່ກະແຈ-ຄ່າຂອງບ່ອນຈັດເກັບຂໍ້ມູນສຳລັບສ່ວນຂະຫຍາຍໄດ້ໃນໜ້ານີ້."
+  },
   "panels/application/ApplicationPanelSidebar.ts | extensionSyncStorage": {
     "message": "ຊິ້ງ"
   },
@@ -2653,6 +3052,9 @@
   },
   "panels/application/ApplicationPanelSidebar.ts | indexeddb": {
     "message": "IndexedDB"
+  },
+  "panels/application/ApplicationPanelSidebar.ts | indexeddbDescription": {
+    "message": "ທ່ານສາມາດເບິ່ງ ແລະ ລຶບຄູ່ກະແຈ-ຄ່າ ແລະ ຖານຂໍ້ມູນຂອງ indexedDB ໄດ້ໃນໜ້ານີ້."
   },
   "panels/application/ApplicationPanelSidebar.ts | keyPathS": {
     "message": "ເສັ້ນທາງຫຼັກ: {PH1}"
@@ -2663,11 +3065,32 @@
   "panels/application/ApplicationPanelSidebar.ts | localStorage": {
     "message": "ບ່ອນຈັດເກັບຂໍ້ມູນໃນເຄື່ອງ"
   },
+  "panels/application/ApplicationPanelSidebar.ts | localStorageDescription": {
+    "message": "ທ່ານສາມາດເບິ່ງ, ເພີ່ມ, ແກ້ໄຂ ແລະ ລຶບຄູ່ກະແຈ-ຄ່າຂອງບ່ອນຈັດເກັບຂໍ້ມູນໃນເຄື່ອງໄດ້ໃນໜ້ານີ້."
+  },
   "panels/application/ApplicationPanelSidebar.ts | manifest": {
     "message": "ໄຟລ໌ Manifest"
   },
+  "panels/application/ApplicationPanelSidebar.ts | manifestDescription": {
+    "message": "manifest ຈະກຳນົດລັກສະນະທີ່ແອັບຂອງທ່ານປາກົດຢູ່ໂຮມສະກຣີນຂອງໂທລະສັບ ແລະ ລັກສະນະຂອງແອັບເມື່ອເປີດໃຊ້."
+  },
+  "panels/application/ApplicationPanelSidebar.ts | noCookies": {
+    "message": "ບໍ່ໄດ້ຕັ້ງຄ່າຄຸກກີ້"
+  },
+  "panels/application/ApplicationPanelSidebar.ts | noExtensionStorage": {
+    "message": "ບໍ່ພົບບ່ອນຈັດເກັບຂໍ້ມູນສຳລັບສ່ວນຂະຫຍາຍ"
+  },
+  "panels/application/ApplicationPanelSidebar.ts | noIndexeddb": {
+    "message": "ບໍ່ພົບ indexedDB"
+  },
+  "panels/application/ApplicationPanelSidebar.ts | noLocalStorage": {
+    "message": "ບໍ່ພົບບ່ອນຈັດເກັບຂໍ້ມູນໃນເຄື່ອງ"
+  },
   "panels/application/ApplicationPanelSidebar.ts | noManifestDetected": {
     "message": "ກວດບໍ່ພົບໄຟລ໌ manifest"
+  },
+  "panels/application/ApplicationPanelSidebar.ts | noSessionStorage": {
+    "message": "ບໍ່ພົບບ່ອນຈັດເກັບຂໍ້ມູນຂອງເຊດຊັນ"
   },
   "panels/application/ApplicationPanelSidebar.ts | onInvokeAlert": {
     "message": "ເລື່ອນໄປຫາ {PH1} ແລ້ວ"
@@ -2678,11 +3101,20 @@
   "panels/application/ApplicationPanelSidebar.ts | openedWindows": {
     "message": "ໜ້າຈໍທີ່ເປີດຢູ່"
   },
+  "panels/application/ApplicationPanelSidebar.ts | openedWindowsDescription": {
+    "message": "ທ່ານສາມາດເບິ່ງໜ້າຈໍທີ່ເປີດຜ່ານ window.open() ໄດ້ໃນໜ້ານີ້."
+  },
   "panels/application/ApplicationPanelSidebar.ts | refreshIndexeddb": {
     "message": "ໂຫຼດຂໍ້ມູນ IndexedDB ຄືນໃໝ່"
   },
+  "panels/application/ApplicationPanelSidebar.ts | resourceDescription": {
+    "message": "ທ່ານສາມາດເບິ່ງຊັບພະຍາກອນຂອງເຟຣມໄດ້ໃນໜ້ານີ້."
+  },
   "panels/application/ApplicationPanelSidebar.ts | sessionStorage": {
     "message": "ບ່ອນຈັດເກັບຂໍ້ມູນເຊດຊັນ"
+  },
+  "panels/application/ApplicationPanelSidebar.ts | sessionStorageDescription": {
+    "message": "ທ່ານສາມາດເບິ່ງ, ເພີ່ມ, ແກ້ໄຂ ແລະ ລຶບຄູ່ກະແຈ-ຄ່າຂອງບ່ອນຈັດເກັບຂໍ້ມູນສຳລັບເຊດຊັນໄດ້ໃນໜ້ານີ້."
   },
   "panels/application/ApplicationPanelSidebar.ts | storage": {
     "message": "ບ່ອນຈັດເກັບຂໍ້ມູນ"
@@ -2708,6 +3140,9 @@
   "panels/application/ApplicationPanelSidebar.ts | worker": {
     "message": "ຜູ້ເຮັດວຽກ"
   },
+  "panels/application/ApplicationPanelSidebar.ts | workerDescription": {
+    "message": "ທ່ານສາມາເບິ່ງຜູ້ເຮັດວຽກສະເພາະທີ່ເຟຣມຫຼັກສ້າງຂຶ້ນໄດ້ໃນໜ້ານີ້."
+  },
   "panels/application/BackForwardCacheTreeElement.ts | backForwardCache": {
     "message": "ແຄສຍ້ອນຫຼັງ"
   },
@@ -2723,9 +3158,6 @@
   "panels/application/BackgroundServiceView.ts | clear": {
     "message": "ລຶບ"
   },
-  "panels/application/BackgroundServiceView.ts | clickTheRecordButtonSOrHitSTo": {
-    "message": "ຄລິກປຸ່ມບັນທຶກ {PH1} ຫຼື ແຕະ {PH2} ເພື່ອເລີ່ມການບັນທຶກ."
-  },
   "panels/application/BackgroundServiceView.ts | devtoolsWillRecordAllSActivity": {
     "message": "ເຄື່ອງມືສຳລັບນັກພັດທະນາຈະບັນທຶກການເຄື່ອນໄຫວ {PH1} ທັງໝົດສູງສຸດ 3 ມື້, ເຖິງແມ່ນວ່າຈະປິດຢູ່ກໍຕາມ."
   },
@@ -2738,11 +3170,14 @@
   "panels/application/BackgroundServiceView.ts | instanceId": {
     "message": "ID ອິນສະແຕນ"
   },
-  "panels/application/BackgroundServiceView.ts | learnMore": {
-    "message": "ສຶກສາເພີ່ມເຕີມ"
+  "panels/application/BackgroundServiceView.ts | noEventSelected": {
+    "message": "ບໍ່ໄດ້ເລືອກເຫດການ"
   },
   "panels/application/BackgroundServiceView.ts | noMetadataForThisEvent": {
     "message": "ບໍ່ມີເມຕາເດຕາສຳລັບເຫດການນີ້"
+  },
+  "panels/application/BackgroundServiceView.ts | noRecording": {
+    "message": "ຍັງບໍ່ມີການບັນທຶກ"
   },
   "panels/application/BackgroundServiceView.ts | notifications": {
     "message": "ການແຈ້ງເຕືອນ"
@@ -2760,13 +3195,13 @@
     "message": "ການຮັບສົ່ງຂໍ້ຄວາມ Push"
   },
   "panels/application/BackgroundServiceView.ts | recordingSActivity": {
-    "message": "ກຳລັງບັນທຶກກິດຈະກຳ {PH1}..."
+    "message": "ກຳລັງບັນທຶກກິດຈະກຳ {PH1}…"
   },
   "panels/application/BackgroundServiceView.ts | saveEvents": {
     "message": "ບັນທຶກເຫດການ"
   },
-  "panels/application/BackgroundServiceView.ts | selectAnEntryToViewMetadata": {
-    "message": "ເລືອກລາຍການເພື່ອເບິ່ງເມຕາເດຕາ"
+  "panels/application/BackgroundServiceView.ts | selectAnEventToViewMetadata": {
+    "message": "ເລືອກເຫດການເພື່ອເບິ່ງເມຕາເດຕາ"
   },
   "panels/application/BackgroundServiceView.ts | showEventsForOtherStorageKeys": {
     "message": "ສະແດງເຫດການຈາກການແບ່ງສ່ວນຂອງບ່ອນຈັດເກັບຂໍ້ມູນອື່ນໆ"
@@ -2776,6 +3211,9 @@
   },
   "panels/application/BackgroundServiceView.ts | startRecordingEvents": {
     "message": "ເລີ່ມບັນທຶກເຫດການ"
+  },
+  "panels/application/BackgroundServiceView.ts | startRecordingToDebug": {
+    "message": "ເລີ່ມດີບັກບໍລິການໃນພື້ນຫຼັງໂດຍໃຊ້ປຸ່ມ \"{PH1}\" ຫຼື ໂດຍການກົດ {PH2}."
   },
   "panels/application/BackgroundServiceView.ts | stopRecordingEvents": {
     "message": "ຢຸດເຫດການບັນທຶກ"
@@ -2798,8 +3236,8 @@
   "panels/application/CookieItemsView.ts | clearFilteredCookies": {
     "message": "ລ້າງຄຸກກີ້ທີ່ກັ່ນຕອງ"
   },
-  "panels/application/CookieItemsView.ts | cookies": {
-    "message": "ຄຸກກີ້"
+  "panels/application/CookieItemsView.ts | noCookieSelected": {
+    "message": "ບໍ່ໄດ້ເລືອກຄຸກກີ້"
   },
   "panels/application/CookieItemsView.ts | numberOfCookiesShownInTableS": {
     "message": "ຈຳນວນຄຸກກີ້ທີ່ສະແດງໃນຕາຕະລາງ: {PH1}"
@@ -2816,9 +3254,6 @@
   "panels/application/CookieItemsView.ts | showUrlDecoded": {
     "message": "ສະແດງ URL ທີ່ຖອດລະຫັດແລ້ວ"
   },
-  "panels/application/DOMStorageItemsView.ts | domStorage": {
-    "message": "ບ່ອນຈັດເກັບຂໍ້ມູນ DOM"
-  },
   "panels/application/DOMStorageItemsView.ts | domStorageItemDeleted": {
     "message": "ລຶບລາຍການບ່ອນຈັດເກັບຂໍ້ມູນແລ້ວ."
   },
@@ -2828,29 +3263,11 @@
   "panels/application/DOMStorageItemsView.ts | domStorageItemsCleared": {
     "message": "ລົບລ້າງລາຍການບ່ອນຈັດເກັບຂໍ້ມູນ DOM ແລ້ວ"
   },
-  "panels/application/DOMStorageItemsView.ts | key": {
-    "message": "ກະແຈ"
-  },
-  "panels/application/DOMStorageItemsView.ts | value": {
-    "message": "ຄ່າ"
-  },
-  "panels/application/ExtensionStorageItemsView.ts | extensionStorage": {
-    "message": "ບ່ອນຈັດເກັບຂໍ້ມູນສຳລັບສ່ວນຂະຫຍາຍ"
-  },
-  "panels/application/ExtensionStorageItemsView.ts | extensionStorageItemDeleted": {
-    "message": "ລຶບລາຍການບ່ອນຈັດເກັບຂໍ້ມູນແລ້ວ."
-  },
   "panels/application/ExtensionStorageItemsView.ts | extensionStorageItems": {
     "message": "ລາຍການບ່ອນຈັດເກັບຂໍ້ມູນສຳລັບສ່ວນຂະຫຍາຍ"
   },
   "panels/application/ExtensionStorageItemsView.ts | extensionStorageItemsCleared": {
     "message": "ລຶບລ້າງລາຍການບ່ອນຈັດເກັບຂໍ້ມູນສຳລັບສ່ວນຂະຫຍາຍແລ້ວ"
-  },
-  "panels/application/ExtensionStorageItemsView.ts | key": {
-    "message": "ກະແຈ"
-  },
-  "panels/application/ExtensionStorageItemsView.ts | value": {
-    "message": "ຄ່າ"
   },
   "panels/application/IndexedDBViews.ts | clearObjectStore": {
     "message": "ລຶບລ້າງການຈັດເກັບວັດຖຸ"
@@ -2858,8 +3275,14 @@
   "panels/application/IndexedDBViews.ts | collapse": {
     "message": "ຫຍໍ້ລົງ"
   },
+  "panels/application/IndexedDBViews.ts | confirmDeleteDatabase": {
+    "message": "ລຶບຖານຂໍ້ມູນ \"{PH1}\" ບໍ?"
+  },
   "panels/application/IndexedDBViews.ts | dataMayBeStale": {
     "message": "ຂໍ້ມູນອາດຈະບໍ່ອັບເດດ"
+  },
+  "panels/application/IndexedDBViews.ts | databaseWillBeRemoved": {
+    "message": "ລະບົບຈະລຶບຖານຂໍ້ມູນທີ່ເລືອກ ແລະ ຂໍ້ມູນທີ່ມີຢູ່ອອກ."
   },
   "panels/application/IndexedDBViews.ts | deleteDatabase": {
     "message": "ລຶບຖານຂໍ້ມູນ"
@@ -2891,9 +3314,6 @@
   "panels/application/IndexedDBViews.ts | objectStores": {
     "message": "ການເກັບວັດຖຸ"
   },
-  "panels/application/IndexedDBViews.ts | pleaseConfirmDeleteOfSDatabase": {
-    "message": "ກະລຸນາຢືນຢັນການລຶບຖານຂໍ້ມູນ \"{PH1}\"."
-  },
   "panels/application/IndexedDBViews.ts | primaryKey": {
     "message": "ກະແຈຫຼັກ"
   },
@@ -2922,13 +3342,34 @@
     "message": "ເວີຊັນ"
   },
   "panels/application/InterestGroupStorageView.ts | clickToDisplayBody": {
-    "message": "ຄລິກໃສ່ເຫດການກຸ່ມຄວາມສົນໃຈໃດກໍໄດ້ເພື່ອສະແດງສະຖານະປັດຈຸບັນຂອງກຸ່ມ"
+    "message": "ເລືອກເຫດການກຸ່ມຄວາມສົນໃຈເພື່ອສະແດງສະຖານະປັດຈຸບັນຂອງກຸ່ມດັ່ງກ່າວ"
   },
   "panels/application/InterestGroupStorageView.ts | noDataAvailable": {
-    "message": "ບໍ່ມີລາຍລະອຽດທີ່ສາມາດໃຊ້ໄດ້ສຳລັບກຸ່ມຄວາມສົນໃຈທີ່ເລືອກ. ໂປຣແກຣມທ່ອງເວັບອາດອອກຈາກກຸ່ມໄປແລ້ວ."
+    "message": "ບໍ່ມີລາຍລະອຽດ"
+  },
+  "panels/application/InterestGroupStorageView.ts | noDataDescription": {
+    "message": "ໂປຣແກຣມທ່ອງເວັບອາດອອກຈາກກຸ່ມແລ້ວ."
+  },
+  "panels/application/InterestGroupStorageView.ts | noValueSelected": {
+    "message": "ບໍ່ໄດ້ເລືອກກຸ່ມຄວາມສົນໃຈ"
   },
   "panels/application/InterestGroupTreeElement.ts | interestGroups": {
     "message": "ກຸ່ມຄວາມສົນໃຈ"
+  },
+  "panels/application/KeyValueStorageItemsView.ts | key": {
+    "message": "ກະແຈ"
+  },
+  "panels/application/KeyValueStorageItemsView.ts | noPreviewSelected": {
+    "message": "ບໍ່ໄດ້ເລືອກຄ່າ"
+  },
+  "panels/application/KeyValueStorageItemsView.ts | numberEntries": {
+    "message": "ຈຳນວນຂໍ້ມູນທີ່ສະແດງໃນຕາຕະລາງ: {PH1}"
+  },
+  "panels/application/KeyValueStorageItemsView.ts | selectAValueToPreview": {
+    "message": "ເລືອກຄ່າເພື່ອສະແດງຕົວຢ່າງ"
+  },
+  "panels/application/KeyValueStorageItemsView.ts | value": {
+    "message": "ຄ່າ"
   },
   "panels/application/OpenedWindowDetailsView.ts | accessToOpener": {
     "message": "ການເຂົ້າເຖິງໂປຣແກຣມເປີດ"
@@ -2996,14 +3437,29 @@
   "panels/application/ReportingApiReportsView.ts | clickToDisplayBody": {
     "message": "ຄລິກໃສ່ລາຍງານໃດກໍໄດ້ເພື່ອສະແດງເນື້ອຫາຂອງມັນ"
   },
+  "panels/application/ReportingApiReportsView.ts | noReportSelected": {
+    "message": "ບໍ່ໄດ້ເລືອກລາຍງານ"
+  },
   "panels/application/ReportingApiTreeElement.ts | reportingApi": {
     "message": "API ການລາຍງານ"
+  },
+  "panels/application/ReportingApiView.ts | noReportOrEndpoint": {
+    "message": "ບໍ່ມີລາຍງານ ຫຼື ປາຍທາງ"
+  },
+  "panels/application/ReportingApiView.ts | reportingApiDescription": {
+    "message": "ໃນໜ້ານີ້ທ່ານຈະສາມາດກວດສອບລາຍງານ ແລະ ປາຍທາງ Reporting API ໄດ້."
   },
   "panels/application/ServiceWorkerCacheTreeElement.ts | cacheStorage": {
     "message": "ບ່ອນຈັດເກັບຂໍ້ມູນແຄສ"
   },
+  "panels/application/ServiceWorkerCacheTreeElement.ts | cacheStorageDescription": {
+    "message": "ທ່ານສາມາດເບິ່ງ ແລະ ລຶບຂໍ້ມູນແຄສໄດ້ໃນໜ້ານີ້."
+  },
   "panels/application/ServiceWorkerCacheTreeElement.ts | delete": {
     "message": "ລຶບ"
+  },
+  "panels/application/ServiceWorkerCacheTreeElement.ts | noCacheStorage": {
+    "message": "ບໍ່ພົບບ່ອນຈັດເກັບຂໍ້ມູນແຄສ"
   },
   "panels/application/ServiceWorkerCacheTreeElement.ts | refreshCaches": {
     "message": "ໂຫຼດຂໍ້ມູນແຄສຄືນໃໝ່"
@@ -3025,6 +3481,9 @@
   },
   "panels/application/ServiceWorkerCacheViews.ts | name": {
     "message": "ຊື່"
+  },
+  "panels/application/ServiceWorkerCacheViews.ts | noCacheEntrySelected": {
+    "message": "ບໍ່ໄດ້ເລືອກລາຍການແຄສ"
   },
   "panels/application/ServiceWorkerCacheViews.ts | preview": {
     "message": "ຕົວຢ່າງ"
@@ -3168,13 +3627,10 @@
     "message": "ຜູ້ເຮັດວຽກ: {PH1}"
   },
   "panels/application/SharedStorageEventsView.ts | clickToDisplayBody": {
-    "message": "ຄລິກໃສ່ເຫດການບ່ອນຈັດເກັບຂໍ້ມູນທີ່ແບ່ງປັນເພື່ອສະແດງພາຣາມີເຕີຂອງເຫດການ."
+    "message": "ຄລິກເຫດການບ່ອນຈັດເກັບຂໍ້ມູນທີ່ແບ່ງປັນເພື່ອສະແດງພາຣາມີເຕີຂອງເຫດການ"
   },
-  "panels/application/SharedStorageItemsView.ts | key": {
-    "message": "ກະແຈ"
-  },
-  "panels/application/SharedStorageItemsView.ts | selectAValueToPreview": {
-    "message": "ເລືອກຄ່າເພື່ອສະແດງຕົວຢ່າງ"
+  "panels/application/SharedStorageEventsView.ts | noEventSelected": {
+    "message": "ບໍ່ໄດ້ເລືອກເຫດການບ່ອນຈັດເກັບຂໍ້ມູນທີ່ແບ່ງປັນ"
   },
   "panels/application/SharedStorageItemsView.ts | sharedStorage": {
     "message": "ບ່ອນຈັດເກັບຂໍ້ມູນທີ່ແບ່ງປັນ"
@@ -3191,34 +3647,31 @@
   "panels/application/SharedStorageItemsView.ts | sharedStorageItemEdited": {
     "message": "ແກ້ໄຂລາຍການບ່ອນຈັດເກັບຂໍ້ມູນແລ້ວ."
   },
-  "panels/application/SharedStorageItemsView.ts | sharedStorageItems": {
-    "message": "ລາຍການບ່ອນຈັດເກັບຂໍ້ມູນທີ່ແບ່ງປັນ"
-  },
   "panels/application/SharedStorageItemsView.ts | sharedStorageItemsCleared": {
     "message": "ລຶບລ້າງລາຍການບ່ອນຈັດເກັບຂໍ້ມູນທີ່ແບ່ງປັນແລ້ວ"
-  },
-  "panels/application/SharedStorageItemsView.ts | sharedStorageNumberEntries": {
-    "message": "ຈຳນວນລາຍການທີ່ສະແດງໃນຕາຕະລາງ: {PH1}"
-  },
-  "panels/application/SharedStorageItemsView.ts | value": {
-    "message": "ຄ່າ"
   },
   "panels/application/SharedStorageListTreeElement.ts | sharedStorage": {
     "message": "ບ່ອນຈັດເກັບຂໍ້ມູນທີ່ແບ່ງປັນ"
   },
+  "panels/application/StorageBucketsTreeElement.ts | noStorageBuckets": {
+    "message": "ບໍ່ພົບບ່ອນເກັບຂໍ້ມູນຂອງພື້ນທີ່ຈັດເກັບຂໍ້ມູນ"
+  },
   "panels/application/StorageBucketsTreeElement.ts | storageBuckets": {
     "message": "ບ່ອນຈັດເກັບຂໍ້ມູນຂອງພື້ນທີ່ເກັບຂໍ້ມູນ"
   },
-  "panels/application/StorageItemsView.ts | clearAll": {
+  "panels/application/StorageBucketsTreeElement.ts | storageBucketsDescription": {
+    "message": "ທ່ານສາມາດເບິ່ງ ແລະ ລຶບບ່ອນເກັບຂໍ້ມູນຂອງພື້ນທີ່ຈັດເກັບຂໍ້ມູນ, ຮວມທັງ Storage APIs ທີ່ກ່ຽວຂ້ອງໄດ້ໃນໜ້ານີ້."
+  },
+  "panels/application/StorageItemsToolbar.ts | clearAll": {
     "message": "ລຶບລ້າງທັງໝົດ"
   },
-  "panels/application/StorageItemsView.ts | deleteSelected": {
+  "panels/application/StorageItemsToolbar.ts | deleteSelected": {
     "message": "ລຶບລາຍການທີ່ເລືອກ"
   },
-  "panels/application/StorageItemsView.ts | refresh": {
+  "panels/application/StorageItemsToolbar.ts | refresh": {
     "message": "ໂຫຼດຂໍ້ມູນຄືນໃໝ່"
   },
-  "panels/application/StorageItemsView.ts | refreshedStatus": {
+  "panels/application/StorageItemsToolbar.ts | refreshedStatus": {
     "message": "ໂຫຼດຂໍ້ມູນຕາຕະລາງຄືນໃໝ່ແລ້ວ"
   },
   "panels/application/StorageView.ts | SiteDataCleared": {
@@ -3234,7 +3687,7 @@
     "message": "ລຶບລ້າງຂໍ້ມູນເວັບໄຊ"
   },
   "panels/application/StorageView.ts | clearing": {
-    "message": "ກໍາລັງລຶບ…"
+    "message": "ກຳລັງລຶບລ້າງ…"
   },
   "panels/application/StorageView.ts | cookies": {
     "message": "ຄຸກກີ້"
@@ -3304,9 +3757,6 @@
   },
   "panels/application/StorageView.ts | usage": {
     "message": "ການນໍາໃຊ້"
-  },
-  "panels/application/StorageView.ts | webSql": {
-    "message": "SQL ຂອງເວັບ"
   },
   "panels/application/TrustTokensTreeElement.ts | trustTokens": {
     "message": "ໂທເຄນສະຖານະສ່ວນຕົວ"
@@ -3762,7 +4212,7 @@
     "message": "ສະຖານະທີ່ບໍ່ຮູ້ຈັກ"
   },
   "panels/application/components/BackForwardCacheView.ts | url": {
-    "message": "URL:"
+    "message": "URL"
   },
   "panels/application/components/BounceTrackingMitigationsView.ts | bounceTrackingMitigationsTitle": {
     "message": "ການຫຼຸດການຕິດຕາມການເຂົ້າອອກ"
@@ -3771,10 +4221,7 @@
     "message": "ກຳລັງກວດຫາເວັບໄຊທີ່ອາດຕິດຕາມການເຂົ້າອອກ."
   },
   "panels/application/components/BounceTrackingMitigationsView.ts | featureDisabled": {
-    "message": "ການຫຼຸດການຕິດຕາມການເຂົ້າອອກຖືກປິດການນຳໃຊ້. ເພື່ອເປີດການນຳໃຊ້, ໃຫ້ຕັ້ງຄ່າທຸງເປັນ {PH1} ເພື່ອ \"ເປີດການນຳໃຊ້ດ້ວຍການລຶບ\"."
-  },
-  "panels/application/components/BounceTrackingMitigationsView.ts | featureFlag": {
-    "message": "ທຸງຄຸນສົມບັດການຫຼຸດການຕິດຕາມການເຂົ້າອອກ"
+    "message": "ການບັນເທົາ bounce tracking ຖືກປິດການນຳໃຊ້."
   },
   "panels/application/components/BounceTrackingMitigationsView.ts | forceRun": {
     "message": "ບັງຄັບເອີ້ນໃຊ້"
@@ -3790,6 +4237,9 @@
   },
   "panels/application/components/BounceTrackingMitigationsView.ts | stateDeletedFor": {
     "message": "ສະຖານະຖືກລຶບແລ້ວສຳລັບເວັບໄຊຕໍ່ໄປນີ້:"
+  },
+  "panels/application/components/EndpointsGrid.ts | endpointsDescription": {
+    "message": "ຢູ່ບ່ອນນີ້ທ່ານຈະພົບລາຍຊື່ອຸປະກອນປາຍທາງທີ່ໄດ້ຮັບລາຍງານ"
   },
   "panels/application/components/EndpointsGrid.ts | noEndpointsToDisplay": {
     "message": "ບໍ່ມີຈຸດສິ້ນສຸດໃຫ້ສະແດງຜົນ"
@@ -3848,8 +4298,8 @@
   "panels/application/components/FrameDetailsView.ts | creationStackTraceExplanation": {
     "message": "ເຟຣມນີ້ຖືກສ້າງຂຶ້ນແບບເປັນໂປຣແກຣມ. stack trace ຈະສະແດງຈຸດທີ່ເກີດການດຳເນີນການນີ້."
   },
-  "panels/application/components/FrameDetailsView.ts | creatorAdScript": {
-    "message": "ສະຄຣິບໂຄສະນາຂອງຜູ້ສ້າງ"
+  "panels/application/components/FrameDetailsView.ts | creatorAdScriptAncestry": {
+    "message": "ລຳດັບສະຄຣິບໂຄສະນາຂອງຜູ້ສ້າງ"
   },
   "panels/application/components/FrameDetailsView.ts | crossoriginIsolated": {
     "message": "ແຍກດ່ຽວແບບຂ້າມຕົ້ນທາງ"
@@ -3959,8 +4409,11 @@
   "panels/application/components/InterestGroupAccessGrid.ts | groupOwner": {
     "message": "ເຈົ້າຂອງ"
   },
+  "panels/application/components/InterestGroupAccessGrid.ts | interestGroupDescription": {
+    "message": "ໃນໜ້ານີ້, ທ່ານສາມາດກວດສອບ ແລະ ວິເຄາະກຸ່ມຄວາມສົນໃຈໄດ້"
+  },
   "panels/application/components/InterestGroupAccessGrid.ts | noEvents": {
-    "message": "ບໍ່ມີບັນທຶກເຫດການຂອງກຸ່ມຄວາມສົນໃຈ"
+    "message": "ບໍ່ພົບເຫດການກຸ່ມຄວາມສົນໃຈ"
   },
   "panels/application/components/OriginTrialTreeView.ts | expiryTime": {
     "message": "ເວລາໝົດອາຍຸ"
@@ -4055,8 +4508,14 @@
   "panels/application/components/ReportsGrid.ts | generatedAt": {
     "message": "ສ້າງເມື່ອ"
   },
+  "panels/application/components/ReportsGrid.ts | learnMore": {
+    "message": "ສຶກສາເພີ່ມເຕີມ"
+  },
   "panels/application/components/ReportsGrid.ts | noReportsToDisplay": {
     "message": "ບໍ່ມີລາຍງານໃຫ້ສະແດງຜົນ"
+  },
+  "panels/application/components/ReportsGrid.ts | reportingApiDescription": {
+    "message": "ຢູ່ບ່ອນນີ້ທ່ານຈະພົບລາຍງານ Reporting API ທີ່ໜ້ານີ້ສ້າງຂຶ້ນ."
   },
   "panels/application/components/ReportsGrid.ts | status": {
     "message": "ສະຖານະ"
@@ -4064,26 +4523,35 @@
   "panels/application/components/SharedStorageAccessGrid.ts | allSharedStorageEvents": {
     "message": "ກິດຈະກຳບ່ອນຈັດເກັບຂໍ້ມູນທີ່ແບ່ງປັນທັງໝົດສຳລັບໜ້ານີ້."
   },
+  "panels/application/components/SharedStorageAccessGrid.ts | eventMethod": {
+    "message": "ວິທີການເຂົ້າເຖິງ"
+  },
   "panels/application/components/SharedStorageAccessGrid.ts | eventParams": {
     "message": "ຄ່າຂອງເຫດການແບບບໍ່ບັງຄັບ"
+  },
+  "panels/application/components/SharedStorageAccessGrid.ts | eventScope": {
+    "message": "ຂອບເຂດການເຂົ້າເຖິງ"
   },
   "panels/application/components/SharedStorageAccessGrid.ts | eventTime": {
     "message": "ເວລາຂອງເຫດການ"
   },
-  "panels/application/components/SharedStorageAccessGrid.ts | eventType": {
-    "message": "ປະເພດສິດເຂົ້າເຖິງ"
-  },
-  "panels/application/components/SharedStorageAccessGrid.ts | mainFrameId": {
-    "message": "ID ເຟຣມຫຼັກ"
+  "panels/application/components/SharedStorageAccessGrid.ts | learnMore": {
+    "message": "ສຶກສາເພີ່ມເຕີມ"
   },
   "panels/application/components/SharedStorageAccessGrid.ts | noEvents": {
-    "message": "ບໍ່ໄດ້ບັນທຶກກິດຈະກຳບ່ອນຈັດເກັບຂໍ້ມູນທີ່ແບ່ງປັນໄວ້."
+    "message": "ບໍ່ພົບເຫດການບ່ອນຈັດເກັບຂໍ້ມູນທີ່ແບ່ງປັນ"
   },
   "panels/application/components/SharedStorageAccessGrid.ts | ownerOrigin": {
     "message": "ຕົ້ນທາງເຈົ້າຂອງ"
   },
+  "panels/application/components/SharedStorageAccessGrid.ts | ownerSite": {
+    "message": "ເວັບໄຊຂອງເຈົ້າຂອງ"
+  },
   "panels/application/components/SharedStorageAccessGrid.ts | sharedStorage": {
     "message": "ບ່ອນຈັດເກັບຂໍ້ມູນທີ່ແບ່ງປັນ"
+  },
+  "panels/application/components/SharedStorageAccessGrid.ts | sharedStorageDescription": {
+    "message": "ໃນໜ້ານີ້, ທ່ານສາມາດເບິ່ງ, ເພີ່ມ, ແກ້ໄຂ ແລະ ລຶບຄູ່ກະແຈ-ຄ່າຂອງບ່ອນຈັດເກັບຂໍ້ມູນທີ່ແບ່ງປັນ ພ້ອມທັງເບິ່ງເຫດການບ່ອນຈັດເກັບຂໍ້ມູນທີ່ແບ່ງປັນໄດ້."
   },
   "panels/application/components/SharedStorageMetadataView.ts | budgetExplanation": {
     "message": "ການຮົ່ວໄຫຼຂອງຂໍ້ມູນທີ່ເຫຼືອຢູ່ເຊິ່ງໄດ້ຮັບອະນຸຍາດພາຍໃນ 24 ຊົ່ວໂມງສຳລັບຕົ້ນທາງນີ້ໂດຍມີໜ່ວຍວັດແທກເປັນ Bits of Entropy"
@@ -4123,6 +4591,9 @@
   },
   "panels/application/components/StorageMetadataView.ts | bucketName": {
     "message": "ຊື່ບ່ອນເກັບຂໍ້ມູນ"
+  },
+  "panels/application/components/StorageMetadataView.ts | bucketWillBeRemoved": {
+    "message": "ລະບົບຈະລຶບບ່ອນເກັບຂໍ້ມູນຂອງພື້ນທີ່ຈັດເກັບຂໍ້ມູນ ແລະ ຂໍ້ມູນທີ່ມີຢູ່ອອກ."
   },
   "panels/application/components/StorageMetadataView.ts | confirmBucketDeletion": {
     "message": "ລຶບບ່ອນເກັບຂໍ້ມູນ \"{PH1}\" ບໍ?"
@@ -4193,8 +4664,11 @@
   "panels/application/components/TrustTokensView.ts | issuer": {
     "message": "ຜູ້ອອກ"
   },
-  "panels/application/components/TrustTokensView.ts | noTrustTokensStored": {
-    "message": "ບໍ່ມີໂທເຄນສະຖານະສ່ວນຕົວທີ່ຖືກຈັດເກັບໄວ້ໃນປັດຈຸບັນ."
+  "panels/application/components/TrustTokensView.ts | learnMore": {
+    "message": "ສຶກສາເພີ່ມເຕີມ"
+  },
+  "panels/application/components/TrustTokensView.ts | noTrustTokens": {
+    "message": "ບໍ່ພົບໂທເຄນສະຖານະສ່ວນຕົວ"
   },
   "panels/application/components/TrustTokensView.ts | storedTokenCount": {
     "message": "ຈຳນວນໂທເຄັນທີ່ຈັດເກັບໄວ້"
@@ -4202,17 +4676,35 @@
   "panels/application/components/TrustTokensView.ts | trustTokens": {
     "message": "ໂທເຄນສະຖານະສ່ວນຕົວ"
   },
+  "panels/application/components/TrustTokensView.ts | trustTokensDescription": {
+    "message": "ໃນໜ້ານີ້, ທ່ານສາມາດເບິ່ງໂທເຄນສະຖານະສ່ວນຕົວທັງໝົດທີ່ພ້ອມໃຫ້ນຳໃຊ້ໃນບໍລິບົດການທ່ອງເວັບປັດຈຸບັນໄດ້."
+  },
   "panels/application/preloading/PreloadingView.ts | filterAllPreloads": {
     "message": "ການໂຫຼດແບບຄາດເດົາທັງໝົດ"
   },
   "panels/application/preloading/PreloadingView.ts | filterFilterByRuleSet": {
     "message": "ກັ່ນຕອງຕາມຊຸດກົດລະບຽບ"
   },
+  "panels/application/preloading/PreloadingView.ts | learnMore": {
+    "message": "ສຶກສາເພີ່ມເຕີມ"
+  },
+  "panels/application/preloading/PreloadingView.ts | noPrefetchAttempts": {
+    "message": "ບໍ່ພົບການຄາດເດົາ"
+  },
   "panels/application/preloading/PreloadingView.ts | noRuleSets": {
     "message": "ບໍ່ມີຊຸດກົດລະບຽບ"
   },
+  "panels/application/preloading/PreloadingView.ts | noRulesDetected": {
+    "message": "ບໍ່ພົບກົດລະບຽບ"
+  },
+  "panels/application/preloading/PreloadingView.ts | prefetchDescription": {
+    "message": "ໃນໜ້ານີ້, ທ່ານຈະເຫັນລາຍລະອຽດທີ່ກ່ຽວກັບການໂຫຼດຂໍ້ມູນລ່ວງໜ້າ."
+  },
   "panels/application/preloading/PreloadingView.ts | prettyPrint": {
     "message": "Pretty print"
+  },
+  "panels/application/preloading/PreloadingView.ts | rulesDescription": {
+    "message": "ໃນໜ້ານີ້, ທ່ານຈະເຫັນການຄາດເດົາທີ່ໃຊ້ໃນການດຶງຂໍ້ມູນ ແລະ ສະແດງຜົນການນຳທາງໜ້າເວັບລ່ວງໜ້າ."
   },
   "panels/application/preloading/PreloadingView.ts | statusFailure": {
     "message": "ບໍ່ສຳເລັດ"
@@ -4316,6 +4808,12 @@
   "panels/application/preloading/components/PreloadingDetailsReportView.ts | detailsStatus": {
     "message": "ສະຖານະ"
   },
+  "panels/application/preloading/components/PreloadingDetailsReportView.ts | detailsTargetHint": {
+    "message": "hints ເປົ້າໝາຍ"
+  },
+  "panels/application/preloading/components/PreloadingDetailsReportView.ts | noElementSelected": {
+    "message": "ບໍ່ໄດ້ເລືອກອົງປະກອບ"
+  },
   "panels/application/preloading/components/PreloadingDetailsReportView.ts | selectAnElementForMoreDetails": {
     "message": "ເລືອກອົງປະກອບເພື່ອເບິ່ງລາຍລະອຽດເພີ່ມເຕີມ"
   },
@@ -4390,6 +4888,9 @@
   },
   "panels/application/preloading/components/PreloadingMismatchedHeadersGrid.ts | missing": {
     "message": "(ບໍ່ມີ)"
+  },
+  "panels/application/preloading/components/PreloadingString.ts | PrefetchEvictedAfterBrowsingDataRemoved": {
+    "message": "ການດຶງຂໍ້ມູນລ່ວງໜ້າໄດ້ຖືກຍົກເລີກເນື່ອງຈາກຂໍ້ມູນການທ່ອງເວັບຖືກລຶບອອກ."
   },
   "panels/application/preloading/components/PreloadingString.ts | PrefetchEvictedAfterCandidateRemoved": {
     "message": "ລະບົບຖິ້ມການດຶງຂໍ້ມູນລ່ວງໜ້າໄປແລ້ວເນື່ອງຈາກບໍ່ມີກົດລະບຽບການຄາດເດົາໃນໜ້າເລີ່ມຕົ້ນທີ່ຈະເອີ້ນໃຊ້ການດຶງຂໍ້ມູນລ່ວງໜ້າສຳລັບ URL ນີ້ອີກຕໍ່ໄປ."
@@ -4490,6 +4991,9 @@
   "panels/application/preloading/components/PreloadingString.ts | prerenderFinalStatusBlockedByClient": {
     "message": "ການໂຫຼດຊັບພະຍາກອນບາງລາຍການຖືກບລັອກແລ້ວ."
   },
+  "panels/application/preloading/components/PreloadingString.ts | prerenderFinalStatusBrowsingDataRemoved": {
+    "message": "ໜ້າທີ່ສະແດງພາບລ່ວງໜ້າໄດ້ຖືກຍົກເລີກການໂຫຼດເນື່ອງຈາກຂໍ້ມູນການທ່ອງເວັບຖືກລຶບອອກ."
+  },
   "panels/application/preloading/components/PreloadingString.ts | prerenderFinalStatusClientCertRequested": {
     "message": "ການນຳທາງໂດຍມີການສະແດງພາບລ່ວງໜ້າຈຳເປັນຕ້ອງມີໃບຮັບຮອງລູກຂ່າຍ HTTP."
   },
@@ -4531,9 +5035,6 @@
   },
   "panels/application/preloading/components/PreloadingString.ts | prerenderFinalStatusLowEndDevice": {
     "message": "ບໍ່ໄດ້ສະແດງພາບລ່ວງໜ້າ ເນື່ອງຈາກອຸປະກອນນີ້ບໍ່ມີໜ່ວຍຄວາມຈຳລະບົບທັງໝົດທີ່ພຽງພໍໃນການຮອງຮັບການສະແດງພາບລ່ວງໜ້າ."
-  },
-  "panels/application/preloading/components/PreloadingString.ts | prerenderFinalStatusMainFrameNavigation": {
-    "message": "ໜ້າທີ່ສະແດງພາບລ່ວງໜ້ານຳທາງຕົນເອງໄປຫາ URL ອື່ນ, ເຊິ່ງຍັງບໍ່ຮອງຮັບໃນປັດຈຸບັນ."
   },
   "panels/application/preloading/components/PreloadingString.ts | prerenderFinalStatusMaxNumOfRunningEagerPrerendersExceeded": {
     "message": "ບໍ່ໄດ້ສະແດງພາບລ່ວງໜ້າທີ່ຄວາມໄວຂອງການຕອບສະໜອງເປັນ \"ຕອບສະໜອງໄວ\" ເນື່ອງຈາກໜ້າເລີ່ມຕົ້ນມີການສະແດງພາບລ່ວງໜ້າທີ່ກຳລັງດຳເນີນການຢູ່ຫຼາຍເກີນໄປ. ລຶບກົດລະບຽບການຄາດເດົາອື່ນໆທີ່ມີ \"ຕອບສະໜອງໄວ\" ອອກເພື່ອເປີດການນຳໃຊ້ການສະແດງພາບລ່ວງໜ້າເພີ່ມເຕີມ."
@@ -4639,6 +5140,12 @@
   },
   "panels/application/preloading/components/PreloadingString.ts | statusSuccess": {
     "message": "ສໍາເລັດແລ້ວ"
+  },
+  "panels/application/preloading/components/RuleSetDetailsView.ts | noElementSelected": {
+    "message": "ບໍ່ໄດ້ເລືອກອົງປະກອບ"
+  },
+  "panels/application/preloading/components/RuleSetDetailsView.ts | selectAnElementForMoreDetails": {
+    "message": "ເລືອກອົງປະກອບເພື່ອເບິ່ງລາຍລະອຽດເພີ່ມເຕີມ"
   },
   "panels/application/preloading/components/RuleSetGrid.ts | buttonRevealPreloadsAssociatedWithRuleSet": {
     "message": "ສະແດງການໂຫຼດແບບຄາດເດົາທີ່ກ່ຽວຂ້ອງກັບຊຸດກົດລະບຽບນີ້"
@@ -4753,6 +5260,9 @@
   },
   "panels/autofill/AutofillView.ts | learnMore": {
     "message": "ສຶກສາເພີ່ມເຕີມ"
+  },
+  "panels/autofill/AutofillView.ts | noAutofill": {
+    "message": "ບໍ່ພົບການຕື່ມຂໍ້ມູນອັດຕະໂນມັດ"
   },
   "panels/autofill/AutofillView.ts | predictedAutofillValue": {
     "message": "ຄ່າການຕື່ມຂໍ້ມູນອັດຕະໂນມັດທີ່ຄາດເດົາໄວ້"
@@ -4874,11 +5384,14 @@
   "panels/browser_debugger/DOMBreakpointsSidebarPane.ts | checked": {
     "message": "ເລືອກໄວ້"
   },
+  "panels/browser_debugger/DOMBreakpointsSidebarPane.ts | domBreakpointsDescription": {
+    "message": "ເບຣກພອຍ DOM ຈະຢຸດຊົ່ວຄາວໃນ code ທີ່ປ່ຽນໂໜດ DOM ຫຼື ໂໜດຍ່ອຍຂອງ DOM."
+  },
   "panels/browser_debugger/DOMBreakpointsSidebarPane.ts | domBreakpointsList": {
     "message": "ລາຍການເບຣກພອຍຂອງ DOM"
   },
   "panels/browser_debugger/DOMBreakpointsSidebarPane.ts | noBreakpoints": {
-    "message": "ບໍ່ມີຈຸດເບຣກພອຍ"
+    "message": "ບໍ່ມີເບຣກພອຍ DOM"
   },
   "panels/browser_debugger/DOMBreakpointsSidebarPane.ts | nodeRemoved": {
     "message": "ລຶບໂນດອອກແລ້ວ"
@@ -4994,20 +5507,32 @@
   "panels/changes/ChangesSidebar.ts | sFromSourceMap": {
     "message": "{PH1} (ຈາກແຜນທີ່ແຫຼ່ງທີ່ມາ)"
   },
-  "panels/changes/ChangesView.ts | binaryData": {
-    "message": "ຂໍ້ມູນໄບນາຣີ"
+  "panels/changes/ChangesView.ts | binaryDataDescription": {
+    "message": "ແຖບການປ່ຽນແປງບໍ່ສະແດງການປ່ຽນແປງຂໍ້ມູນໄບນາຣີ"
+  },
+  "panels/changes/ChangesView.ts | changesViewDescription": {
+    "message": "ໃນໜ້ານີ້ທ່ານສາມາດຕິດຕາມການປ່ຽນແປງລະຫັດທີ່ເຮັດພາຍໃນ DevTools ໄດ້."
   },
   "panels/changes/ChangesView.ts | copy": {
     "message": "ສຳເນົາ"
   },
   "panels/changes/ChangesView.ts | noChanges": {
-    "message": "ບໍ່ມີການປ່ຽນແປງ"
+    "message": "ບໍ່ມີການປ່ຽນແປງເທື່ອ"
+  },
+  "panels/changes/ChangesView.ts | noTextualDiff": {
+    "message": "ບໍ່ມີຂໍ້ຄວາມທີ່ແຕກຕ່າງກັນ"
   },
   "panels/changes/ChangesView.ts | sDeletions": {
     "message": "{n,plural, =1{# ການລຶບ (-)}other{# ການລຶບ (-)}}"
   },
   "panels/changes/ChangesView.ts | sInsertions": {
     "message": "{n,plural, =1{# ການແຊກໃສ່ (+)}other{# ການແຊກໃສ່ (+)}}"
+  },
+  "panels/changes/CombinedDiffView.ts | copied": {
+    "message": "ສຳເນົາໃສ່ຄລິບບອດແລ້ວ"
+  },
+  "panels/changes/CombinedDiffView.ts | copyFile": {
+    "message": "ສຳເນົາໄຟລ໌ {PH1} ໃສ່ຄລິບບອດ"
   },
   "panels/changes/changes-meta.ts | changes": {
     "message": "ການປ່ຽນແປງ"
@@ -5020,6 +5545,21 @@
   },
   "panels/changes/changes-meta.ts | showChanges": {
     "message": "ສະແດງການປ່ຽນແປງ"
+  },
+  "panels/common/common.ts | allow": {
+    "message": "ອະນຸຍາດ"
+  },
+  "panels/common/common.ts | cancel": {
+    "message": "ຍົກເລີກ"
+  },
+  "panels/common/common.ts | gotIt": {
+    "message": "ເຂົ້າໃຈແລ້ວ"
+  },
+  "panels/common/common.ts | learnMore": {
+    "message": "ສຶກສາເພີ່ມເຕີມ"
+  },
+  "panels/common/common.ts | thingsToConsider": {
+    "message": "ສິ່ງທີ່ຕ້ອງພິຈາລະນາ"
   },
   "panels/console/ConsoleContextSelector.ts | extension": {
     "message": "ສ່ວນຂະຫຍາຍ"
@@ -5101,6 +5641,9 @@
   },
   "panels/console/ConsoleView.ts | consoleSidebarShown": {
     "message": "ສະແດງແຖບດ້ານຂ້າງຄອນໂຊແລ້ວ"
+  },
+  "panels/console/ConsoleView.ts | copyConsole": {
+    "message": "ສຳເນົາຄອນໂຊ"
   },
   "panels/console/ConsoleView.ts | copyVisibleStyledSelection": {
     "message": "ສຳເນົາການເລືອກທີ່ມີຮູບແບບທີ່ເບິ່ງເຫັນໄດ້"
@@ -5187,7 +5730,7 @@
     "message": "{PH1} ເທົ່ານັ້ນ"
   },
   "panels/console/ConsoleView.ts | saveAs": {
-    "message": "ບັນທຶກເປັນ..."
+    "message": "ບັນທຶກເປັນ…"
   },
   "panels/console/ConsoleView.ts | searching": {
     "message": "ກຳລັງຊອກຫາ…"
@@ -5215,6 +5758,9 @@
   },
   "panels/console/ConsoleViewMessage.ts | Mxx": {
     "message": " M<XX>"
+  },
+  "panels/console/ConsoleViewMessage.ts | SeeIssueInCookieReport": {
+    "message": "ຄລິກເພື່ອເປີດແຜງຄວາມເປັນສ່ວນຕົວ ແລະ ຄວາມປອດໄພ ພ້ອມທັງສະແດງລາຍງານຄຸກກີ້ພາກສ່ວນທີສາມ"
   },
   "panels/console/ConsoleViewMessage.ts | assertionFailed": {
     "message": "ຢືນຢັນບໍ່ສຳເລັດ: "
@@ -5487,10 +6033,10 @@
     "message": "ເລືອກລາຍລະອຽດການກວມເອົາ: ຕໍ່ຟັງຊັນມີໂອເວີເຮດຕໍ່າ, ຕໍ່ບລັອກມີໂອເວີເຮດທີ່ຈຳເປັນ."
   },
   "panels/coverage/CoverageView.ts | clickTheRecordButtonSToStart": {
-    "message": "ຄລິກປຸ່ມບັນທຶກ {PH1} ເພື່ອເລີ່ມຖ່າຍຮູບການກວມເອົາ."
+    "message": "ຄລິກປຸ່ມ \"{PH1}\" ເພື່ອເລີ່ມຖ່າຍຮູບການຄອບຄຸມ."
   },
   "panels/coverage/CoverageView.ts | clickTheReloadButtonSToReloadAnd": {
-    "message": "ຄລິກປຸ່ມໂຫຼດຄືນໃໝ່ {PH1} ເພື່ອໂຫຼດ ແລະ ເລີ່ມການຖ່າຍຮູບການກວມເອົາ."
+    "message": "ຄລິກປຸ່ມ \"{PH1}\" ເພື່ອໂຫຼດໃໝ່ ແລະ ເລີ່ມຖ່າຍຮູບການຄອບຄຸມ."
   },
   "panels/coverage/CoverageView.ts | contentScripts": {
     "message": "ສະຄຣິບເນື້ອຫາ"
@@ -5513,17 +6059,26 @@
   "panels/coverage/CoverageView.ts | javascript": {
     "message": "JavaScript"
   },
+  "panels/coverage/CoverageView.ts | noCoverageData": {
+    "message": "ບໍ່ມີຂໍ້ມູນການຄອບຄຸມ"
+  },
   "panels/coverage/CoverageView.ts | perBlock": {
     "message": "ຕໍ່ບລັອກ"
   },
   "panels/coverage/CoverageView.ts | perFunction": {
     "message": "ຕໍ່ຟັງຊັນ"
   },
+  "panels/coverage/CoverageView.ts | reloadPage": {
+    "message": "ໂຫຼດໜ້າເວັບໃໝ່"
+  },
   "panels/coverage/CoverageView.ts | reloadPrompt": {
     "message": "ຄລິກປຸ່ມໂຫຼດໃໝ່ {PH1} ເພື່ອໂຫຼດໃໝ່ ແລະ ເບິ່ງການຄອບຄຸມ."
   },
   "panels/coverage/CoverageView.ts | sOfSSUsedSoFarSUnused": {
     "message": "ຕອນນີ້ໃຊ້ໄປແລ້ວ {PH1} ຈາກ {PH2} ({PH3}%), ເຫຼືອ {PH4}."
+  },
+  "panels/coverage/CoverageView.ts | startRecording": {
+    "message": "ເລີ່ມການບັນທຶກ"
   },
   "panels/coverage/coverage-meta.ts | clearCoverage": {
     "message": "ລຶບລ້າງການຄອບຄຸມ"
@@ -5645,6 +6200,12 @@
   "panels/css_overview/CSSOverviewCompletedView.ts | typeSelectors": {
     "message": "ຕົວເລືອກປະເພດ"
   },
+  "panels/css_overview/CSSOverviewCompletedView.ts | unableToLink": {
+    "message": "(ບໍ່ສາມາດລິ້ງໄດ້)"
+  },
+  "panels/css_overview/CSSOverviewCompletedView.ts | unableToLinkToInlineStyle": {
+    "message": "(ບໍ່ສາມາດລິ້ງກັບຮູບແບບໃນແຖວໄດ້)"
+  },
   "panels/css_overview/CSSOverviewCompletedView.ts | universalSelectors": {
     "message": "ຕົວເລືອກສ່ວນກາງ"
   },
@@ -5659,6 +6220,24 @@
   },
   "panels/css_overview/CSSOverviewSidebarPanel.ts | cssOverviewPanelSidebar": {
     "message": "ແຖບດ້ານຂ້າງຂອງແຜງພາບຮວມ CSS"
+  },
+  "panels/css_overview/CSSOverviewStartView.ts | captureOverview": {
+    "message": "ບັນທຶກພາບຮວມ"
+  },
+  "panels/css_overview/CSSOverviewStartView.ts | capturePageCSSOverview": {
+    "message": "ບັນທຶກສະຫຼຸບຂອງ CSS ຂອງໜ້າທ່ານ"
+  },
+  "panels/css_overview/CSSOverviewStartView.ts | identifyCSSImprovements": {
+    "message": "ລະບຸການປັບປຸງ CSS ທີ່ເປັນໄປໄດ້"
+  },
+  "panels/css_overview/CSSOverviewStartView.ts | identifyCSSImprovementsWithExampleIssues": {
+    "message": "ລະບຸການປັບປຸງ CSS ທີ່ເປັນໄປໄດ້ (ເຊັ່ນ: ບັນຫາຄອນທຣາສຕ່ຳ, ການປະກາດທີ່ບໍ່ໄດ້ໃຊ້, ສີ ຫຼື ຟອນບໍ່ກົງກັນ)"
+  },
+  "panels/css_overview/CSSOverviewStartView.ts | locateAffectedElements": {
+    "message": "ຊອກຫາອົງປະກອບທີ່ໄດ້ຮັບຜົນກະທົບໃນແຜງອົງປະກອບ"
+  },
+  "panels/css_overview/CSSOverviewStartView.ts | quickStartWithCSSOverview": {
+    "message": "ຄູ່ມືເລີ່ມຕົ້ນສະບັບຫຍໍ້: ເລີ່ມຕົ້ນໃຊ້ແຜງພາບຮວມ CSS ໃໝ່"
   },
   "panels/css_overview/CSSOverviewUnusedDeclarations.ts | bottomAppliedToAStatically": {
     "message": "ນຳໃຊ້ Bottom ກັບອົງປະກອບທີ່ຢູ່ໃນຕຳແໜ່ງຄົງທີ່ແລ້ວ"
@@ -5681,24 +6260,6 @@
   "panels/css_overview/CSSOverviewUnusedDeclarations.ts | widthAppliedToAnInlineElement": {
     "message": "ນຳໃຊ້ Width ໃສ່ອົງປະກອບໃນແຖວແລ້ວ"
   },
-  "panels/css_overview/components/CSSOverviewStartView.ts | captureOverview": {
-    "message": "ບັນທຶກພາບຮວມ"
-  },
-  "panels/css_overview/components/CSSOverviewStartView.ts | capturePageCSSOverview": {
-    "message": "ບັນທຶກສະຫຼຸບຂອງ CSS ຂອງໜ້າທ່ານ"
-  },
-  "panels/css_overview/components/CSSOverviewStartView.ts | identifyCSSImprovements": {
-    "message": "ລະບຸການປັບປຸງ CSS ທີ່ເປັນໄປໄດ້"
-  },
-  "panels/css_overview/components/CSSOverviewStartView.ts | identifyCSSImprovementsWithExampleIssues": {
-    "message": "ລະບຸການປັບປຸງ CSS ທີ່ເປັນໄປໄດ້ (ເຊັ່ນ: ບັນຫາຄອນທຣາສຕ່ຳ, ການປະກາດທີ່ບໍ່ໄດ້ໃຊ້, ສີ ຫຼື ຟອນບໍ່ກົງກັນ)"
-  },
-  "panels/css_overview/components/CSSOverviewStartView.ts | locateAffectedElements": {
-    "message": "ຊອກຫາອົງປະກອບທີ່ໄດ້ຮັບຜົນກະທົບໃນແຜງອົງປະກອບ"
-  },
-  "panels/css_overview/components/CSSOverviewStartView.ts | quickStartWithCSSOverview": {
-    "message": "ຄູ່ມືເລີ່ມຕົ້ນສະບັບຫຍໍ້: ເລີ່ມຕົ້ນໃຊ້ແຜງພາບຮວມ CSS ໃໝ່"
-  },
   "panels/css_overview/css_overview-meta.ts | cssOverview": {
     "message": "ພາບຮວມ CSS"
   },
@@ -5714,6 +6275,9 @@
   "panels/developer_resources/DeveloperResourcesListView.ts | developerResources": {
     "message": "ແຫຼ່ງຂໍ້ມູນຂອງນັກພັດທະນາ"
   },
+  "panels/developer_resources/DeveloperResourcesListView.ts | duration": {
+    "message": "ໄລຍະເວລາ"
+  },
   "panels/developer_resources/DeveloperResourcesListView.ts | error": {
     "message": "ຜິດພາດ"
   },
@@ -5722,6 +6286,12 @@
   },
   "panels/developer_resources/DeveloperResourcesListView.ts | initiator": {
     "message": "ຜູ້ເລີ່ມ"
+  },
+  "panels/developer_resources/DeveloperResourcesListView.ts | noResourceMatches": {
+    "message": "ບໍ່ມີຊັບພະຍາກອນທີ່ກົງກັນ"
+  },
+  "panels/developer_resources/DeveloperResourcesListView.ts | numberOfResourceMatch": {
+    "message": "{n,plural, =1{ກົງກັບຊັບພະຍາກອນ # ລາຍການ}other{ກົງກັບຊັບພະຍາກອນ # ລາຍການ}}"
   },
   "panels/developer_resources/DeveloperResourcesListView.ts | pending": {
     "message": "ຄ້າງຢູ່"
@@ -5749,12 +6319,6 @@
   },
   "panels/developer_resources/DeveloperResourcesView.ts | loadHttpsDeveloperResources": {
     "message": "ໂຫຼດຊັບພະຍາກອນ HTTP(S) ສຳລັບນັກພັດທະນາຜ່ານເວັບໄຊທີ່ທ່ານກວດສອບ, ເຊິ່ງບໍ່ແມ່ນຜ່ານ DevTools"
-  },
-  "panels/developer_resources/DeveloperResourcesView.ts | noResourceMatches": {
-    "message": "ບໍ່ມີຊັບພະຍາກອນທີ່ກົງກັນ"
-  },
-  "panels/developer_resources/DeveloperResourcesView.ts | numberOfResourceMatch": {
-    "message": "{n,plural, =1{ກົງກັບຊັບພະຍາກອນ # ລາຍການ}other{ກົງກັບຊັບພະຍາກອນ # ລາຍການ}}"
   },
   "panels/developer_resources/DeveloperResourcesView.ts | resources": {
     "message": "{n,plural, =1{# ຊັບພະຍາກອນ}other{# ຊັບພະຍາກອນ}}"
@@ -5830,6 +6394,54 @@
   },
   "panels/elements/DOMLinkifier.ts | node": {
     "message": "<ໂນດ>"
+  },
+  "panels/elements/ElementIssueUtils.ts | disallowedOptGroupChild": {
+    "message": "ອົງປະກອບ ຫຼື ໂໜດຂໍ້ຄວາມບໍ່ຖືກຕ້ອງພາຍໃນ <optgroup>"
+  },
+  "panels/elements/ElementIssueUtils.ts | disallowedSelectChild": {
+    "message": "ອົງປະກອບ ຫຼື ໂໜດຂໍ້ຄວາມບໍ່ຖືກຕ້ອງພາຍໃນ <select>"
+  },
+  "panels/elements/ElementIssueUtils.ts | formAriaLabelledByToNonExistingId": {
+    "message": "ຄຸນສົມບັດ aria-labelledby ບໍ່ກົງກັບ ID ອົງປະກອບໃດໆ"
+  },
+  "panels/elements/ElementIssueUtils.ts | formAutocompleteAttributeEmptyError": {
+    "message": "ການໃຊ້ຄຸນສົມບັດຕື່ມຂໍ້ມູນອັດຕະໂນມັດບໍ່ຖືກຕ້ອງ"
+  },
+  "panels/elements/ElementIssueUtils.ts | formDuplicateIdForInputError": {
+    "message": "ID ຊ່ອງຂໍ້ມູນແບບຟອມຊ້ຳກັນໃນແບບຟອມດຽວກັບ"
+  },
+  "panels/elements/ElementIssueUtils.ts | formEmptyIdAndNameAttributesForInputError": {
+    "message": "ອົງປະກອບຊ່ອງຂໍ້ມູນແບບຟອມຄວນມີ ID ຫຼື ຊື່ຄຸນສົມບັດ"
+  },
+  "panels/elements/ElementIssueUtils.ts | formInputAssignedAutocompleteValueToIdOrNameAttributeError": {
+    "message": "ອົງປະກອບບໍ່ມີຄຸນສົມບັດຕື່ມຂໍ້ມູນອັດຕະໂນມັດ"
+  },
+  "panels/elements/ElementIssueUtils.ts | formInputHasWrongButWellIntendedAutocompleteValueError": {
+    "message": "ຄ່າຄຸນສົມບັດຕື່ມຂໍ້ມູນອັດຕະໂນມັດທີ່ບໍ່ເປັນມາດຕະຖານ"
+  },
+  "panels/elements/ElementIssueUtils.ts | formInputWithNoLabelError": {
+    "message": "ຊ່ອງຂໍ້ມູນແບບຟອມທີ່ບໍ່ມີຄຸນສົມບັດ aria-labelledby ທີ່ຖືກຕ້ອງ ຫຼື ປ້າຍກຳກັບທີ່ກ່ຽວຂ້ອງ"
+  },
+  "panels/elements/ElementIssueUtils.ts | formLabelForMatchesNonExistingIdError": {
+    "message": "ການນຳ <label for=FORM_ELEMENT> ບໍ່ຖືກຕ້ອງ"
+  },
+  "panels/elements/ElementIssueUtils.ts | formLabelForNameError": {
+    "message": "ການນຳ <label for=FORM_ELEMENT> ບໍ່ຖືກຕ້ອງ"
+  },
+  "panels/elements/ElementIssueUtils.ts | formLabelHasNeitherForNorNestedInput": {
+    "message": "ບໍ່ມີປ້າຍກຳກັບທີ່ເຊື່ອມໂຍງກັບຊ່ອງຂໍ້ມູນແບບຟອມ"
+  },
+  "panels/elements/ElementIssueUtils.ts | interactiveContentAttributesSelectDescendant": {
+    "message": "ອົງປະກອບທີ່ມີຄຸນສົມບັດບໍ່ຖືກຕ້ອງພາຍໃນອົງປະກອບ <select>"
+  },
+  "panels/elements/ElementIssueUtils.ts | interactiveContentLegendChild": {
+    "message": "ອົງປະກອບແບບໂຕ້ຕອບພາຍໃນອົງປະກອບ <legend>"
+  },
+  "panels/elements/ElementIssueUtils.ts | interactiveContentOptionChild": {
+    "message": "ອົງປະກອບແບບໂຕ້ຕອບພາຍໃນອົງປະກອບ <option>"
+  },
+  "panels/elements/ElementIssueUtils.ts | nonPhrasingContentOptionChild": {
+    "message": "ເນື້ອຫາທີ່ບໍ່ແມ່ນປະໂຫຍກທີ່ໃຊ້ພາຍໃນອົງປະກອບ <option>"
   },
   "panels/elements/ElementStatePaneWidget.ts | emulateFocusedPage": {
     "message": "ຈຳລອງໜ້າທີ່ໂຟກັສໄວ້"
@@ -5999,8 +6611,14 @@
   "panels/elements/ElementsTreeElement.ts | scrollIntoView": {
     "message": "ເລື່ອນເຂົ້າໄປຫາມຸມມອງ"
   },
+  "panels/elements/ElementsTreeElement.ts | showCommandForTarget": {
+    "message": "ສະແດງຄຳສັ່ງສຳລັບເປົ້າໝາຍ"
+  },
   "panels/elements/ElementsTreeElement.ts | showFrameDetails": {
     "message": "ສະແດງລາຍລະອຽດ iframe"
+  },
+  "panels/elements/ElementsTreeElement.ts | showInterestTarget": {
+    "message": "ສະແດງເປົ້າໝາຍຄວາມສົນໃຈ"
   },
   "panels/elements/ElementsTreeElement.ts | showPopoverTarget": {
     "message": "ສະແດງເປົ້າໝາຍປັອບອັບ"
@@ -6025,6 +6643,9 @@
   },
   "panels/elements/ElementsTreeOutline.ts | storeAsGlobalVariable": {
     "message": "ຈັດເກັບເປັນຕົວແປທົ່ວໄປ"
+  },
+  "panels/elements/ElementsTreeOutline.ts | viewIssue": {
+    "message": "ເບິ່ງບັນຫາ:"
   },
   "panels/elements/EventListenersWidget.ts | all": {
     "message": "ທັງໝົດ"
@@ -6131,6 +6752,9 @@
   "panels/elements/StylePropertiesSection.ts | showAllPropertiesSMore": {
     "message": "ສະແດງຄຸນສົມບັດທັງໝົດ (ມີອີກ {PH1} ລາຍການ)"
   },
+  "panels/elements/StylePropertiesSection.ts | specificity": {
+    "message": "ລັກສະນະສະເພາະ: {PH1}"
+  },
   "panels/elements/StylePropertiesSection.ts | styleAttribute": {
     "message": "ຄຸນສົມບັດ style"
   },
@@ -6170,6 +6794,15 @@
   "panels/elements/StylePropertyTreeElement.ts | gridEditorButton": {
     "message": "ເປີດຕົວແກ້ໄຂ grid"
   },
+  "panels/elements/StylePropertyTreeElement.ts | invalidPropertyValue": {
+    "message": "ຄ່າຄຸນສົມບັດບໍ່ຖືກຕ້ອງ"
+  },
+  "panels/elements/StylePropertyTreeElement.ts | invalidString": {
+    "message": "{PH1}, ຊື່ຄຸນສົມບັດ: {PH2}, ຄ່າຄຸນສົມບັດ: {PH3}"
+  },
+  "panels/elements/StylePropertyTreeElement.ts | jumpToAnchorNode": {
+    "message": "ຂ້າມໄປຫາໂໝດຂອງແທັກ Anchor"
+  },
   "panels/elements/StylePropertyTreeElement.ts | jumpToAnimationsPanel": {
     "message": "ຂ້າມໄປຫາແຜງອະນິເມຊັນ"
   },
@@ -6179,11 +6812,17 @@
   "panels/elements/StylePropertyTreeElement.ts | openInSourcesPanel": {
     "message": "ເປີດໃນແຜງແຫຼ່ງຂໍ້ມູນ"
   },
+  "panels/elements/StylePropertyTreeElement.ts | sIsNotDefined": {
+    "message": "ບໍ່ໄດ້ກຳນົດ {PH1}"
+  },
   "panels/elements/StylePropertyTreeElement.ts | shiftClickToChangeColorFormat": {
     "message": "Shift + ຄລິກ ເພື່ອປ່ຽນຮູບແບບສີ."
   },
   "panels/elements/StylePropertyTreeElement.ts | togglePropertyAndContinueEditing": {
     "message": "ສະຫຼັບຄຸນສົມບັດ ແລະ ດຳເນີນການແກ້ໄຂຕໍ່"
+  },
+  "panels/elements/StylePropertyTreeElement.ts | unknownPropertyName": {
+    "message": "ບໍ່ຮູ້ຈັກຊື່ຄຸນສົມບັດ"
   },
   "panels/elements/StylePropertyTreeElement.ts | viewComputedValue": {
     "message": "ເບິ່ງຄ່າທີ່ຄຳນວນແລ້ວ"
@@ -6193,12 +6832,6 @@
   },
   "panels/elements/StylesSidebarPane.ts | clickToRevealLayer": {
     "message": "ຄລິກເພື່ອເປີດເຜີຍຊັ້ນຂໍ້ມູນໃນຜັງຊັ້ນຂໍ້ມູນ"
-  },
-  "panels/elements/StylesSidebarPane.ts | copiedToClipboard": {
-    "message": "ສຳເນົາໃສ່ຄລິບບອດແລ້ວ"
-  },
-  "panels/elements/StylesSidebarPane.ts | copyAllCSSChanges": {
-    "message": "ສຳເນົາການປ່ຽນແປງ CSS"
   },
   "panels/elements/StylesSidebarPane.ts | incrementdecrementWithMousewheelHundred": {
     "message": "ການເພີ່ມ/ການຫຼຸດດ້ວຍລູກກິ້ງເມົ້າ ຫຼື ປຸ່ມຂຶ້ນ/ລົງ. {PH1}: ±100, Shift: ±10, {PH2}: ±0.1"
@@ -6212,12 +6845,6 @@
   "panels/elements/StylesSidebarPane.ts | inheritedFroms": {
     "message": "ສືບທອດມາຈາກ "
   },
-  "panels/elements/StylesSidebarPane.ts | invalidPropertyValue": {
-    "message": "ຄ່າຄຸນສົມບັດບໍ່ຖືກຕ້ອງ"
-  },
-  "panels/elements/StylesSidebarPane.ts | invalidString": {
-    "message": "{PH1}, ຊື່ຄຸນສົມບັດ: {PH2}, ຄ່າຄຸນສົມບັດ: {PH3}"
-  },
   "panels/elements/StylesSidebarPane.ts | layer": {
     "message": "ຊັ້ນຂໍ້ມູນ"
   },
@@ -6227,14 +6854,8 @@
   "panels/elements/StylesSidebarPane.ts | pseudoSElement": {
     "message": "ອົງປະກອບຈຳລອງ ::{PH1}"
   },
-  "panels/elements/StylesSidebarPane.ts | specificity": {
-    "message": "ລັກສະນະສະເພາະ: {PH1}"
-  },
   "panels/elements/StylesSidebarPane.ts | toggleRenderingEmulations": {
     "message": "ສະ​ຫຼັບການຈຳລອງການສະແດງພາບທົ່ວໄປ"
-  },
-  "panels/elements/StylesSidebarPane.ts | unknownPropertyName": {
-    "message": "ບໍ່ຮູ້ຈັກຊື່ຄຸນສົມບັດ"
   },
   "panels/elements/StylesSidebarPane.ts | visibleSelectors": {
     "message": "{n,plural, =1{ຕົວເລືອກທີ່ປາກົດໃຫ້ເຫັນ # ລາຍການສະແດງຢູ່ທາງລຸ່ມ}other{ຕົວເລືອກທີ່ປາກົດໃຫ້ເຫັນ # ລາຍການສະແດງຢູ່ທາງລຸ່ມ}}"
@@ -6244,9 +6865,6 @@
   },
   "panels/elements/components/AccessibilityTreeNode.ts | ignored": {
     "message": "ລະເວັ້ນແລ້ວ"
-  },
-  "panels/elements/components/AnchorFunctionLinkSwatch.ts | jumpToAnchorNode": {
-    "message": "ຂ້າມໄປຫາໂໝດຂອງແທັກ Anchor"
   },
   "panels/elements/components/CSSHintDetailsView.ts | learnMore": {
     "message": "ສຶກສາເພີ່ມເຕີມ"
@@ -6323,9 +6941,6 @@
   "panels/elements/elements-meta.ts | copyStyles": {
     "message": "ສຳເນົາຮູບແບບ"
   },
-  "panels/elements/elements-meta.ts | disableDomWordWrap": {
-    "message": "ປິດການນຳໃຊ້ການຕັດຄຳ DOM"
-  },
   "panels/elements/elements-meta.ts | duplicateElement": {
     "message": "ອົງປະກອບຊ້ຳ"
   },
@@ -6334,9 +6949,6 @@
   },
   "panels/elements/elements-meta.ts | elements": {
     "message": "ອົງປະກອບ"
-  },
-  "panels/elements/elements-meta.ts | enableDomWordWrap": {
-    "message": "ເປີດການນຳໃຊ້ການຕັດຄຳ DOM"
   },
   "panels/elements/elements-meta.ts | eventListeners": {
     "message": "ຕົວຟັງເຫດການ"
@@ -6404,8 +7016,14 @@
   "panels/elements/elements-meta.ts | stackTrace": {
     "message": "ການຕິດຕາມແບບຊ້ອນກັນ"
   },
+  "panels/elements/elements-meta.ts | toggleA11yTree": {
+    "message": "ສະຫຼັບແຜນຜັງການຊ່ວຍເຂົ້າເຖິງ"
+  },
   "panels/elements/elements-meta.ts | toggleEyeDropper": {
     "message": "ເປີດ/ປິດຫຼອດດູດສີ"
+  },
+  "panels/elements/elements-meta.ts | toggleWordWrap": {
+    "message": "ເປີດ/ປິດການຕັດຄຳ"
   },
   "panels/elements/elements-meta.ts | undo": {
     "message": "ຍົກເລີກ"
@@ -6572,6 +7190,9 @@
   "panels/event_listeners/EventListenersView.ts | deleteEventListener": {
     "message": "ລຶບຜູ້ຟັງເຫດການ"
   },
+  "panels/event_listeners/EventListenersView.ts | eventListenersExplanation": {
+    "message": "ໃນໜ້ານີ້, ທ່ານຈະພົບ Listener ເຫດການທີ່ລົງທະບຽນໄວ້"
+  },
   "panels/event_listeners/EventListenersView.ts | noEventListeners": {
     "message": "ບໍ່ມີຜູ້ຟັງເຫດການ"
   },
@@ -6620,6 +7241,9 @@
   "panels/explain/components/ConsoleInsight.ts | networkRequest": {
     "message": "ຄຳຮ້ອງຂໍເຄືອຂ່າຍ"
   },
+  "panels/explain/components/ConsoleInsight.ts | notAvailableInIncognitoMode": {
+    "message": "ຄວາມຊ່ວຍເຫຼືອຈາກ AI ບໍ່ພ້ອມໃຫ້ນຳໃຊ້ໃນໂໝດບໍ່ເປີດເຜີຍຕົວຕົນ ຫຼື ໂໝດແຂກ"
+  },
   "panels/explain/components/ConsoleInsight.ts | notLoggedIn": {
     "message": "ຄຸນສົມບັດນີ້ຈະພ້ອມໃຫ້ໃຊ້ເມື່ອທ່ານເຂົ້າສູ່ລະບົບ Chrome ດ້ວຍບັນຊີ Google ຂອງທ່ານເທົ່ານັ້ນ."
   },
@@ -6637,6 +7261,9 @@
   },
   "panels/explain/components/ConsoleInsight.ts | relatedCode": {
     "message": "ລະຫັດທີ່ກ່ຽວຂ້ອງ"
+  },
+  "panels/explain/components/ConsoleInsight.ts | relatedContent": {
+    "message": "ເນື້ອຫາທີ່ກ່ຽວຂ້ອງ"
   },
   "panels/explain/components/ConsoleInsight.ts | reloadRecommendation": {
     "message": "ໂຫຼດໜ້າໃໝ່ເພື່ອບັນທຶກຂໍ້ມູນຄຳຮ້ອງຂໍເຄືອຂ່າຍທີ່ກ່ຽວຂ້ອງສຳລັບຂໍ້ຄວາມນີ້ເພື່ອສ້າງຂໍ້ມູນເຈາະເລິກທີ່ດີຂຶ້ນ."
@@ -6658,6 +7285,9 @@
   },
   "panels/explain/components/ConsoleInsight.ts | stackTrace": {
     "message": "ສະແຕັກເທຣຊ"
+  },
+  "panels/explain/components/ConsoleInsight.ts | timedOut": {
+    "message": "ການສ້າງຄຳຕອບດົນເກີນໄປ. ກະລຸນາລອງໃໝ່."
   },
   "panels/explain/components/ConsoleInsight.ts | turnOnInSettings": {
     "message": "ເປີດ {PH1} ເພື່ອໃຊ້ AI ໃນການສ້າງຄວາມເຂົ້າໃຈ ແລະ ແກ້ໄຂຄຳເຕືອນ ແລະ ຂໍ້ຜິດພາດຂອງຄອນໂຊນ."
@@ -6712,6 +7342,12 @@
   },
   "panels/issues/AffectedCookiesView.ts | path": {
     "message": "ເສັ້ນທາງ"
+  },
+  "panels/issues/AffectedDescendantsWithinSelectElementView.ts | disallowedNode": {
+    "message": "ອົງປະກອບສືບທອດທີ່ບໍ່ໄດ້ຮັບອະນຸຍາດ"
+  },
+  "panels/issues/AffectedDescendantsWithinSelectElementView.ts | nDescendants": {
+    "message": "{n,plural, =1{ ອົງປະກອບສືບທອດ}other{ ອົງປະກອບສືບທອດ}}"
   },
   "panels/issues/AffectedDirectivesView.ts | blocked": {
     "message": "ບລັອກໄວ້ແລ້ວ"
@@ -6802,6 +7438,18 @@
   },
   "panels/issues/AffectedMetadataAllowedSitesView.ts | nAllowedSites": {
     "message": "{n,plural, =1{1 ເວັບໄຊໄດ້ຮັບອະນຸຍາດໃຫ້ເຂົ້າເຖິງຄຸກກີ້}other{# ເວັບໄຊໄດ້ຮັບອະນຸຍາດໃຫ້ເຂົ້າເຖິງຄຸກກີ້}}"
+  },
+  "panels/issues/AffectedPartitioningBlobURLView.ts | blobURLCount": {
+    "message": "ຈຳນວນບັນຫາ URL ຂອງ Blob: {count}"
+  },
+  "panels/issues/AffectedPartitioningBlobURLView.ts | blockedCrossPartitionFetching": {
+    "message": "ການເຂົ້າເຖິງ URL ຂອງ Blob {url} ຖືກບລັອກເນື່ອງຈາກດຳເນີນການຈາກບໍລິບົດຂ້າມພາທິຊັນ."
+  },
+  "panels/issues/AffectedPartitioningBlobURLView.ts | enforceNoopenerForNavigation": {
+    "message": "ການນຳທາງລະດັບເທິງສຸດຂອງ URL ຂອງ Blob {url} ມີການຕັ້ງຄ່າ 'noopener' ເນື່ອງຈາກຕົ້ນທາງ URL ຂອງ Blob ຂ້າມເວັບໄຊດ້ວຍເວັບໄຊລະດັບເທິງສຸດຂອງບໍລິບົດທີ່ເລີ່ມການນຳທາງ."
+  },
+  "panels/issues/AffectedPartitioningBlobURLView.ts | noBlobURLAvailable": {
+    "message": "ບໍ່ມີ URL ຂອງ Blob ທີ່ໃຊ້ໄດ້ກັບບັນຫານີ້."
   },
   "panels/issues/AffectedResourcesView.ts | clickToRevealTheFramesDomNodeIn": {
     "message": "ຄລິກເພື່ອສະແດງໂນດ DOM ຂອງເຟຣມໃນແຜງອົງປະກອບ"
@@ -7037,17 +7685,20 @@
   "panels/issues/IssuesPane.ts | includeThirdpartyCookieIssues": {
     "message": "ຮວມເອົາບັນຫາຄຸກກີ້ພາກສ່ວນທີສາມ"
   },
+  "panels/issues/IssuesPane.ts | issuesPanelDescription": {
+    "message": "ໃນໜ້ານີ້, ທ່ານຈະສາມາດເບິ່ງຄຳເຕືອນຈາກໂປຣແກຣມທ່ອງເວັບໄດ້."
+  },
   "panels/issues/IssuesPane.ts | lowTextContrast": {
     "message": "ຄອນທຣາສຂໍ້ຄວາມຕ່ຳ"
   },
   "panels/issues/IssuesPane.ts | mixedContent": {
     "message": "ເນື້ອຫາປະສົມ"
   },
-  "panels/issues/IssuesPane.ts | noIssuesDetectedSoFar": {
-    "message": "ບໍ່ພົບບັນຫາໃດໆເທື່ອ"
+  "panels/issues/IssuesPane.ts | noIssues": {
+    "message": "ບໍ່ພົບບັນຫາ"
   },
   "panels/issues/IssuesPane.ts | onlyThirdpartyCookieIssues": {
-    "message": "ຕອນນີ້ກວດພົບສະເພາະບັນຫາຄຸກກີ້ພາກສ່ວນທີສາມເທົ່ານັ້ນ"
+    "message": "ກວດພົບສະເພາະບັນຫາຄຸກກີ້ພາກສ່ວນທີສາມ"
   },
   "panels/issues/IssuesPane.ts | other": {
     "message": "ອື່ນໆ"
@@ -7103,6 +7754,9 @@
   "panels/layer_viewer/LayerDetailsView.ts | nearestLayerShiftingStickyBox": {
     "message": "ກ່ອງຍຶດຕິດທີ່ເລື່ອນຊັ້ນທີ່ຢູ່ໃກ້ສຸດ"
   },
+  "panels/layer_viewer/LayerDetailsView.ts | noLayerSelected": {
+    "message": "ບໍ່ໄດ້ເລືອກຊັ້ນ"
+  },
   "panels/layer_viewer/LayerDetailsView.ts | nonFastScrollable": {
     "message": "ເລື່ອນໄດ້ແບບບໍ່ໄວ"
   },
@@ -7148,6 +7802,9 @@
   "panels/layer_viewer/LayerDetailsView.ts | wheelEventHandler": {
     "message": "ເຄື່ອງຈັດການເຫດການລໍ້ໝຸນ"
   },
+  "panels/layer_viewer/LayerTreeOutline.ts | layerCount": {
+    "message": "{PH1} ຊັ້ນຂໍ້ມູນ"
+  },
   "panels/layer_viewer/LayerTreeOutline.ts | layersTreePane": {
     "message": "ແຜງແຜນຜັງຊັ້ນຂໍ້ມູນ"
   },
@@ -7161,7 +7818,7 @@
     "message": "ສະແດງຊັ້ນພາຍໃນ"
   },
   "panels/layer_viewer/Layers3DView.ts | cantDisplayLayers": {
-    "message": "ບໍ່ສາມາດສະແດງຊັ້ນຂໍ້ມູນໄດ້,"
+    "message": "ບໍ່ສາມາດສະແດງຊັ້ນໄດ້"
   },
   "panels/layer_viewer/Layers3DView.ts | checkSForPossibleReasons": {
     "message": "ກວດເບິ່ງ {PH1} ສຳລັບເຫດຜົນທີ່ເປັນໄປໄດ້."
@@ -7169,8 +7826,11 @@
   "panels/layer_viewer/Layers3DView.ts | dLayersView": {
     "message": "ມຸມມອງຊັ້ນຂໍ້ມູນ 3D"
   },
-  "panels/layer_viewer/Layers3DView.ts | layerInformationIsNotYet": {
-    "message": "ຍັງບໍ່ມີຂໍ້ມູນຊັ້ນເທື່ອ."
+  "panels/layer_viewer/Layers3DView.ts | layerExplanation": {
+    "message": "ໃນໜ້ານີ້, ທ່ານຈະສາມາດເບິ່ງ ແລະ ກວດສອບຊັ້ນເອກະສານໄດ້."
+  },
+  "panels/layer_viewer/Layers3DView.ts | noLayerInformation": {
+    "message": "ຍັງບໍ່ພົບຊັ້ນ"
   },
   "panels/layer_viewer/Layers3DView.ts | paints": {
     "message": "ສະແດງຜົນ"
@@ -7511,8 +8171,11 @@
   "panels/lighthouse/LighthouseTimespanView.ts | endTimespan": {
     "message": "ສິ້ນສຸດຊ່ວງເວລາ"
   },
+  "panels/lighthouse/LighthouseTimespanView.ts | interactWithPage": {
+    "message": "ໂຕ້ຕອບກັບໜ້າເວັບ."
+  },
   "panels/lighthouse/LighthouseTimespanView.ts | timespanStarted": {
-    "message": "ເລີ່ມຊ່ວງເວລາແລ້ວ, ໂຕ້ຕອບກັບໜ້າ"
+    "message": "ຊ່ວງເວລາເລີ່ມແລ້ວ"
   },
   "panels/lighthouse/LighthouseTimespanView.ts | timespanStarting": {
     "message": "ກຳລັງເລີ່ມຊ່ວງເວລາ…"
@@ -7525,6 +8188,12 @@
   },
   "panels/linear_memory_inspector/LinearMemoryInspectorController.ts | openInMemoryInspectorPanel": {
     "message": "ເປີດໃນແຜງຕົວກວດສອບໜ່ວຍຄວາມຈຳ"
+  },
+  "panels/linear_memory_inspector/LinearMemoryInspectorPane.ts | learnMore": {
+    "message": "ສຶກສາເພີ່ມເຕີມ"
+  },
+  "panels/linear_memory_inspector/LinearMemoryInspectorPane.ts | memoryInspectorExplanation": {
+    "message": "ໃນໜ້ານີ້, ທ່ານສາມາດກວດສອບຂໍ້ມູນໄບນາຣີໄດ້."
   },
   "panels/linear_memory_inspector/LinearMemoryInspectorPane.ts | noOpenInspections": {
     "message": "ບໍ່ມີການກວດກາທີ່ເປີດຢູ່"
@@ -7606,6 +8275,18 @@
   },
   "panels/media/EventTimelineView.ts | playbackStatus": {
     "message": "ສະຖານະການຫຼິ້ນ"
+  },
+  "panels/media/MainView.ts | mediaPlayerDescription": {
+    "message": "ໃນໜ້ານີ້, ທ່ານຈະສາມາດເບິ່ງ ແລະ ສົ່ງອອກລາຍລະອຽດກ່ຽວກັບເຄື່ອງຫຼິ້ນມີເດຍໄດ້."
+  },
+  "panels/media/MainView.ts | noMediaPlayer": {
+    "message": "ບໍ່ມີເຄື່ອງຫຼິ້ນມີເດຍ"
+  },
+  "panels/media/MainView.ts | noPlayerDetailsSelected": {
+    "message": "ບໍ່ໄດ້ເລືອກເຄື່ອງຫຼິ້ນມີເດຍ"
+  },
+  "panels/media/MainView.ts | selectToViewDetails": {
+    "message": "ເລືອກເຄື່ອງຫຼິ້ນມີເດຍເພື່ອກວດສອບລາຍລະອຽດ."
   },
   "panels/media/PlayerDetailView.ts | events": {
     "message": "ເຫດການ"
@@ -7778,6 +8459,9 @@
   "panels/media/media-meta.ts | video": {
     "message": "ວິດີໂອ"
   },
+  "panels/mobile_throttling/CalibrationController.ts | runningCalibration": {
+    "message": "ກຳລັງປັບທຽບ CPU, ກະລຸນາຢ່າອອກຈາກແຖບນີ້ ຫຼື ປິດ DevTools."
+  },
   "panels/mobile_throttling/MobileThrottlingSelector.ts | advanced": {
     "message": "ຂັ້ນສູງ"
   },
@@ -7814,6 +8498,9 @@
   "panels/mobile_throttling/ThrottlingManager.ts | addS": {
     "message": "ເພີ່ມ {PH1}"
   },
+  "panels/mobile_throttling/ThrottlingManager.ts | calibrate": {
+    "message": "ປັບທຽບ…"
+  },
   "panels/mobile_throttling/ThrottlingManager.ts | cpuThrottling": {
     "message": "ການຄວບຄຸມ CPU"
   },
@@ -7835,8 +8522,11 @@
   "panels/mobile_throttling/ThrottlingManager.ts | offline": {
     "message": "ອອບລາຍ"
   },
+  "panels/mobile_throttling/ThrottlingManager.ts | recalibrate": {
+    "message": "ປັບທຽບໃໝ່…"
+  },
   "panels/mobile_throttling/ThrottlingManager.ts | recommendedThrottling": {
-    "message": "{PH1} - ແນະນຳ"
+    "message": "{PH1} – ແນະນຳ"
   },
   "panels/mobile_throttling/ThrottlingManager.ts | resetConcurrency": {
     "message": "ຣີເຊັດເປັນຄ່າເລີ່ມຕົ້ນ"
@@ -7856,8 +8546,14 @@
   "panels/mobile_throttling/ThrottlingPresets.ts | fastGXCpuSlowdown": {
     "message": "3G ທີ່ໄວ ແລະ CPU ທີ່ຊ້າລົງ 4 ເທົ່າ"
   },
+  "panels/mobile_throttling/ThrottlingPresets.ts | fastGXCpuSlowdownCalibrated": {
+    "message": "3G ທີ່ໄວ ແລະ CPU ທີ່ຊ້າລົງ {PH1} ເທົ່າ"
+  },
+  "panels/mobile_throttling/ThrottlingPresets.ts | lowTierMobile": {
+    "message": "ໂທລະສັບມືຖືລະດັບຕ່ຳ"
+  },
   "panels/mobile_throttling/ThrottlingPresets.ts | midtierMobile": {
-    "message": "ອຸປະກອນເຄື່ອນທີ່ລະດັບກາງ"
+    "message": "ໂທລະສັບມືຖືລະດັບກາງ"
   },
   "panels/mobile_throttling/ThrottlingPresets.ts | noInternetConnectivity": {
     "message": "ບໍ່ມີການເຊື່ອມຕໍ່ອິນເຕີເນັດ"
@@ -7868,8 +8564,44 @@
   "panels/mobile_throttling/ThrottlingPresets.ts | slowGXCpuSlowdown": {
     "message": "3G ທີ່ຊ້າ ແລະ CPU ທີ່ມີການຊ້າລົງ 6 ເທົ່າ"
   },
+  "panels/mobile_throttling/ThrottlingPresets.ts | slowGXCpuSlowdownCalibrated": {
+    "message": "3G ທີ່ຊ້າ ແລະ CPU ທີ່ຊ້າລົງ {PH1} ເທົ່າ"
+  },
   "panels/mobile_throttling/ThrottlingSettingsTab.ts | addCustomProfile": {
     "message": "ເພີ່ມໂປຣໄຟລ໌"
+  },
+  "panels/mobile_throttling/ThrottlingSettingsTab.ts | calibrate": {
+    "message": "ປັບທຽບ"
+  },
+  "panels/mobile_throttling/ThrottlingSettingsTab.ts | calibrationCTA": {
+    "message": "ເພື່ອໃຊ້ຄ່າທີ່ກຳນົດການຄວບຄຸມ CPU ລ່ວງໜ້າ, ໃຫ້ເອີ້ນໃຊ້ຂະບວນການປັບທຽບເພື່ອກຳນົດອັດຕາການຄວບຄຸມທີ່ເໝາະສົມສຳລັບອຸປະກອນຂອງທ່ານ."
+  },
+  "panels/mobile_throttling/ThrottlingSettingsTab.ts | calibrationConfirmationPrompt": {
+    "message": "ການປັບທຽບຈະໃຊ້ເວລາປະມານ 5 ວິນາທີ ແລະ ຈະນຳທາງທ່ານອອກຈາກໜ້າປັດຈຸບັນຂອງທ່ານຊົ່ວຄາວ. ທ່ານຕ້ອງການສືບຕໍ່ບໍ?"
+  },
+  "panels/mobile_throttling/ThrottlingSettingsTab.ts | calibrationWarningHighCPU": {
+    "message": "ການນຳໃຊ້ CPU ສູງເກີນໄປ"
+  },
+  "panels/mobile_throttling/ThrottlingSettingsTab.ts | calibrationWarningLowBattery": {
+    "message": "ແບັດເຕີຣີຂອງອຸປະກອນເຫຼືອໜ້ອຍ (<20%), ຜົນຮັບຈຶ່ງອາດໄດ້ຮັບຜົນກະທົບຈາກການຄວບຄຸມ CPU"
+  },
+  "panels/mobile_throttling/ThrottlingSettingsTab.ts | calibrationWarningRunningOnBattery": {
+    "message": "ອຸປະກອນເຮັດວຽກໂດຍໃຊ້ພະລັງງານຈາກແບັດເຕີຣີ, ກະລຸນາສຽບສາຍສາກເພື່ອຮັບຜົນໄດ້ຮັບທີ່ດີທີ່ສຸດ"
+  },
+  "panels/mobile_throttling/ThrottlingSettingsTab.ts | cancel": {
+    "message": "ຍົກເລີກ"
+  },
+  "panels/mobile_throttling/ThrottlingSettingsTab.ts | continue": {
+    "message": "ສືບຕໍ່"
+  },
+  "panels/mobile_throttling/ThrottlingSettingsTab.ts | cpuCalibrationDescription": {
+    "message": "ຄ່າທີ່ກຳນົດລ່ວງໜ້າເຫຼົ່ານີ້ຈະຄວບຄຸມ CPU ຂອງທ່ານໃຫ້ມີປະສິດທິພາບໃກ້ຄຽງກັບອຸປະກອນມືຖືລະດັບຕ່ຳ ຫຼື ລະດັບກາງທົ່ວໄປ."
+  },
+  "panels/mobile_throttling/ThrottlingSettingsTab.ts | cpuThrottlingPresets": {
+    "message": "ຄ່າທີ່ກຳນົດການຄວບຄຸມ CPU ລ່ວງໜ້າ"
+  },
+  "panels/mobile_throttling/ThrottlingSettingsTab.ts | dSlowdown": {
+    "message": "ເຮັດວຽກຊ້າລົງ {PH1} ເທົ່າ"
   },
   "panels/mobile_throttling/ThrottlingSettingsTab.ts | dms": {
     "message": "{PH1} ms"
@@ -7888,6 +8620,9 @@
   },
   "panels/mobile_throttling/ThrottlingSettingsTab.ts | latencyMustBeAnIntegerBetweenSms": {
     "message": "ການຕອບສະໜອງຈະຕ້ອງເປັນຈຳນວນເຕັມລະຫວ່າງ {PH1} ms ຫາ {PH2} ms ຮວມກັນ"
+  },
+  "panels/mobile_throttling/ThrottlingSettingsTab.ts | needsCalibration": {
+    "message": "ຕ້ອງປັບທຽບ"
   },
   "panels/mobile_throttling/ThrottlingSettingsTab.ts | networkThrottlingProfiles": {
     "message": "ໂປຣໄຟລ໌ການຄວບຄຸມເຄືອຂ່າຍ"
@@ -7927,6 +8662,9 @@
   },
   "panels/mobile_throttling/ThrottlingSettingsTab.ts | profileNameCharactersLengthMust": {
     "message": "ຊື່ໂປຣໄຟລ໌ຕ້ອງມີຄວາມຍາວລະຫວ່າງ 1 ຫາ {PH1} ຕົວອັກສອນ"
+  },
+  "panels/mobile_throttling/ThrottlingSettingsTab.ts | recalibrate": {
+    "message": "ປັບທຽບໃໝ່"
   },
   "panels/mobile_throttling/ThrottlingSettingsTab.ts | sMustBeANumberBetweenSkbsToSkbs": {
     "message": "{PH1} ຈະຕ້ອງເປັນຕົວເລກລະຫວ່າງ {PH2} kbit/s ຫາ {PH3} kbit/s ຮວມກັນ"
@@ -7991,6 +8729,9 @@
   "panels/network/BlockedURLsPane.ts | addPattern": {
     "message": "ເພີ່ມຮູບແບບ"
   },
+  "panels/network/BlockedURLsPane.ts | addPatternToBlock": {
+    "message": "ເພີ່ມຮູບແບບເພື່ອບລັອກຄຳຮ້ອງຂໍຈາກເຄືອຂ່າຍໂດຍຄລິກປຸ່ມ \"{PH1}\"."
+  },
   "panels/network/BlockedURLsPane.ts | dBlocked": {
     "message": "ບລັອກ {PH1} ໄວ້ແລ້ວ"
   },
@@ -8000,8 +8741,11 @@
   "panels/network/BlockedURLsPane.ts | itemDeleted": {
     "message": "ລຶບລາຍການສຳເລັດແລ້ວ"
   },
-  "panels/network/BlockedURLsPane.ts | networkRequestsAreNotBlockedS": {
-    "message": "ຄຳຂໍຂອງເຄືອຂ່າຍບໍ່ໄດ້ຖືກບລັອກ. {PH1}"
+  "panels/network/BlockedURLsPane.ts | learnMore": {
+    "message": "ສຶກສາເພີ່ມເຕີມ"
+  },
+  "panels/network/BlockedURLsPane.ts | noNetworkRequestsBlocked": {
+    "message": "ບໍ່ມີຄຳຮ້ອງຂໍຈາກເຄືອຂ່າຍທີ່ຖືກບລັອກ"
   },
   "panels/network/BlockedURLsPane.ts | patternAlreadyExists": {
     "message": "ມີຮູບແບບຢູ່ແລ້ວ."
@@ -8046,7 +8790,7 @@
     "message": "ອັບເດດໂປຣແກຣມຜູ້ໃຊ້ແລ້ວ."
   },
   "panels/network/NetworkConfigView.ts | custom": {
-    "message": "ກຳນົດເອງ..."
+    "message": "ກຳນົດເອງ…"
   },
   "panels/network/NetworkConfigView.ts | customUserAgentFieldIsRequired": {
     "message": "ຈຳເປັນຕ້ອງລະບຸຊ່ອງຂໍ້ມູນໂປຣແກຣມຜູ້ໃຊ້ແບບກຳນົດເອງ"
@@ -8123,6 +8867,9 @@
   "panels/network/NetworkDataGridNode.ts | initialPriorityToolTip": {
     "message": "{PH1}, ລະດັບຄວາມສຳຄັນເລີ່ມຕົ້ນ: {PH2}"
   },
+  "panels/network/NetworkDataGridNode.ts | integrity": {
+    "message": "ຄວາມສົມບູນ"
+  },
   "panels/network/NetworkDataGridNode.ts | level": {
     "message": "ລະດັບ 1"
   },
@@ -8192,6 +8939,12 @@
   "panels/network/NetworkDataGridNode.ts | servedFromMemoryCacheResource": {
     "message": "ໃຫ້ບໍລິການຈາກແຄສໜ່ວຍຄວາມຈຳ, ຂະໜາດຊັບພະຍາກອນ: {PH1}"
   },
+  "panels/network/NetworkDataGridNode.ts | servedFromNetwork": {
+    "message": "{PH1} ຖືກໂອນຍ້າຍຜ່ານເຄືອຂ່າຍ, ຂະໜາດຊັບພະຍາກອນ: {PH2}"
+  },
+  "panels/network/NetworkDataGridNode.ts | servedFromNetworkMissingServiceWorkerRoute": {
+    "message": "{PH1} ຖືກໂອນຜ່ານເຄືອຂ່າຍ, ຂະໜາດຊັບພະຍາກອນ: {PH2}, ບໍ່ມີເສັ້ນທາງ ServiceWorkers ທີ່ກົງກັນ"
+  },
   "panels/network/NetworkDataGridNode.ts | servedFromPrefetchCacheResource": {
     "message": "ສະແດງຈາກແຄສທີ່ດຶງຂໍ້ມູນລ່ວງໜ້າ, ຂະໜາດຊັບພະຍາກອນ {PH1}"
   },
@@ -8228,11 +8981,17 @@
   "panels/network/NetworkDataGridNode.ts | webBundleInnerRequest": {
     "message": "ສະແດງຜົນຈາກ Web Bundle"
   },
+  "panels/network/NetworkItemView.ts | connectionInfo": {
+    "message": "ການເຊື່ອມຕໍ່ຂໍ້ມູນ"
+  },
   "panels/network/NetworkItemView.ts | containsOverriddenHeaders": {
     "message": "ຄຳຕອບນີ້ມີສ່ວນຫົວທີ່ຖືກຍົກເລີກໂດຍ DevTools"
   },
   "panels/network/NetworkItemView.ts | cookies": {
     "message": "ຄຸກກີ້"
+  },
+  "panels/network/NetworkItemView.ts | directsocketMessages": {
+    "message": "ຂໍ້ຄວາມ DirectSocket"
   },
   "panels/network/NetworkItemView.ts | eventstream": {
     "message": "EventStream"
@@ -8432,9 +9191,6 @@
   "panels/network/NetworkLogView.ts | invertsFilter": {
     "message": "ປີ້ນກັບຕົວກັ່ນຕອງການຊອກຫາ"
   },
-  "panels/network/NetworkLogView.ts | learnMore": {
-    "message": "ສຶກສາເພີ່ມເຕີມ"
-  },
   "panels/network/NetworkLogView.ts | loadS": {
     "message": "ໂຫລດ: {PH1}"
   },
@@ -8443,6 +9199,9 @@
   },
   "panels/network/NetworkLogView.ts | networkDataAvailable": {
     "message": "ມີຂໍ້ມູນເຄືອຂ່າຍ"
+  },
+  "panels/network/NetworkLogView.ts | noNetworkActivityRecorded": {
+    "message": "ບໍ່ໄດ້ບັນທຶກການເຄື່ອນໄຫວເຄືອຂ່າຍ"
   },
   "panels/network/NetworkLogView.ts | onlyShowBlockedRequests": {
     "message": "ສະແດງຄຳຮ້ອງຂໍທີ່ຖືກບລັອກເທົ່ານັ້ນ"
@@ -8457,13 +9216,16 @@
     "message": "ຍົກເລີກສ່ວນຫົວ"
   },
   "panels/network/NetworkLogView.ts | performARequestOrHitSToRecordThe": {
-    "message": "ເຮັດຄຳຂໍ ຫຼື ແຕະ {PH1} ເພື່ອບັນທຶກການໂຫຼດຄືນໃໝ່."
+    "message": "ສົ່ງຄຳຮ້ອງຂໍ ຫຼື ໂຫຼດໜ້າເວັບໃໝ່ໂດຍໃຊ້ປຸ່ມ \"{PH1}\" ຫຼື ໂດຍການກົດ {PH2}."
   },
   "panels/network/NetworkLogView.ts | recordToDisplayNetworkActivity": {
-    "message": "ຈັດເກັບບັນທຶກເຄືອຂ່າຍ ({PH1}) ເພື່ອສະແດງການເຄື່ອນໄຫວ Display Network."
+    "message": "ຈັດເກັບບັນທຶກເຄືອຂ່າຍເພື່ອສະແດງການເຄື່ອນໄຫວເຄືອຂ່າຍໂດຍໃຊ້ປຸ່ມ \"{PH1}\" ຫຼື ໂດຍການກົດ {PH2}."
   },
   "panels/network/NetworkLogView.ts | recordingNetworkActivity": {
-    "message": "ກຳລັງບັນທຶກການເຄື່ອນໄຫວຂອງເຄືອຂ່າຍຢູ່…"
+    "message": "ກຳລັງບັນທຶກການເຄື່ອນໄຫວເຄືອຂ່າຍ"
+  },
+  "panels/network/NetworkLogView.ts | reloadPage": {
+    "message": "ໂຫຼດໜ້າເວັບໃໝ່"
   },
   "panels/network/NetworkLogView.ts | replayXhr": {
     "message": "ຫຼິ້ນ XHR ຊໍ້າ"
@@ -8503,6 +9265,9 @@
   },
   "panels/network/NetworkLogView.ts | showOnlyHideRequests": {
     "message": "ສະແດງສະເພາະ/ເຊື່ອງຄຳຮ້ອງຂໍ"
+  },
+  "panels/network/NetworkLogView.ts | startRecording": {
+    "message": "ເລີ່ມການບັນທຶກ"
   },
   "panels/network/NetworkLogView.ts | thirdParty": {
     "message": "ຄຳຮ້ອງຂໍພາກສ່ວນທີສາມ"
@@ -8637,13 +9402,13 @@
     "message": "ສົ່ງອອກ HAR (ແບບກວດສອບຄວາມຖືກຕ້ອງແລ້ວ ຫຼື ພ້ອມຂໍ້ມູນທີ່ລະອຽດອ່ອນ)"
   },
   "panels/network/NetworkPanel.ts | exportHarSanitized": {
-    "message": "ສົ່ງອອກ HAR (ກວດສອບຄວາມຖືກຕ້ອງແລ້ວ)..."
+    "message": "ສົ່ງອອກ HAR (ກວດສອບຄວາມຖືກຕ້ອງແລ້ວ)…"
   },
   "panels/network/NetworkPanel.ts | exportHarWithSensitiveData": {
-    "message": "ສົ່ງອອກ HAR (ພ້ອມຂໍ້ມູນລະອຽດອ່ອນ)..."
+    "message": "ສົ່ງອອກ HAR (ພ້ອມຂໍ້ມູນລະອຽດອ່ອນ)…"
   },
   "panels/network/NetworkPanel.ts | fetchingFrames": {
-    "message": "ກໍາລັງດຶງຂໍ້ມູນເຟຣມ..."
+    "message": "ກຳລັງດຶງຂໍ້ມູນເຟຣມ…"
   },
   "panels/network/NetworkPanel.ts | groupByFrame": {
     "message": "ຈັດກຸ່ມຕາມເຟຣມ"
@@ -8652,10 +9417,10 @@
     "message": "ຈັດກຸ່ມຄຳຂໍຕາມເຟຣມຄຳຂໍລະດັບເທິງສຸດ"
   },
   "panels/network/NetworkPanel.ts | hitSToReloadAndCaptureFilmstrip": {
-    "message": "ແຕະ {PH1} ເພື່ອໂຫຼດຊໍ້າ ແລະ ຖ່າຍຮູບແຖບຟີມ."
+    "message": "ກົດ {PH1} ເພື່ອໂຫຼດໃໝ່ ແລະ ຖ່າຍຮູບຂອງຮູບນ້ອຍ."
   },
   "panels/network/NetworkPanel.ts | importHarFile": {
-    "message": "ນຳເຂົ້າໄຟລ໌ HAR..."
+    "message": "ນຳເຂົ້າໄຟລ໌ HAR…"
   },
   "panels/network/NetworkPanel.ts | moreNetworkConditions": {
     "message": "ສະພາບເຄືອຂ່າຍເພີ່ມເຕີມ…"
@@ -8673,7 +9438,7 @@
     "message": "ເກັບບັນທຶກ"
   },
   "panels/network/NetworkPanel.ts | recordingFrames": {
-    "message": "ກຳລັງບັນທຶກເຟຣມ..."
+    "message": "ກຳລັງບັນທຶກເຟຣມ…"
   },
   "panels/network/NetworkPanel.ts | search": {
     "message": "ຊອກຫາ"
@@ -8744,14 +9509,17 @@
   "panels/network/RequestCookiesView.ts | thisRequestHasNoCookies": {
     "message": "ຄຳຂໍນີ້ບໍ່ມີຄຸກກີ້"
   },
+  "panels/network/RequestInitiatorView.ts | noInitiator": {
+    "message": "ບໍ່ມີຂໍ້ມູນຜູ້ລິເລີ່ມ"
+  },
   "panels/network/RequestInitiatorView.ts | requestCallStack": {
     "message": "ສົ່ງຄຳຂໍສະແຕັກການເອີ້ນໃຊ້"
   },
   "panels/network/RequestInitiatorView.ts | requestInitiatorChain": {
     "message": "ເຊນຜູ້ເລີ່ມຄຳຂໍ"
   },
-  "panels/network/RequestInitiatorView.ts | thisRequestHasNoInitiatorData": {
-    "message": "ຄຳຂໍນີ້ບໍ່ມີຂໍ້ມູນຜູ້ເລີ່ມ."
+  "panels/network/RequestPayloadView.ts | copyPayload": {
+    "message": "ສຳເນົາ"
   },
   "panels/network/RequestPayloadView.ts | copyValue": {
     "message": "ສຳເນົາຄ່າ"
@@ -8777,26 +9545,14 @@
   "panels/network/RequestPayloadView.ts | viewDecoded": {
     "message": "ເບິ່ງລາຍການທີ່ຖອດລະຫັດ"
   },
-  "panels/network/RequestPayloadView.ts | viewDecodedL": {
-    "message": "ເບິ່ງລາຍການທີ່ຖອດລະຫັດ"
-  },
   "panels/network/RequestPayloadView.ts | viewParsed": {
     "message": "ແຍກວິເຄາະມຸມມອງແລ້ວ"
-  },
-  "panels/network/RequestPayloadView.ts | viewParsedL": {
-    "message": "ເບິ່ງຜົນການແຍກວິເຄາະ"
   },
   "panels/network/RequestPayloadView.ts | viewSource": {
     "message": "ເບິ່ງແຫຼ່ງຂໍ້ມູນ"
   },
-  "panels/network/RequestPayloadView.ts | viewSourceL": {
-    "message": "ເບິ່ງແຫຼ່ງທີ່ມາ"
-  },
   "panels/network/RequestPayloadView.ts | viewUrlEncoded": {
     "message": "ເບິ່ງ URL ທີ່ເຂົ້າລະຫັດໄວ້"
-  },
-  "panels/network/RequestPayloadView.ts | viewUrlEncodedL": {
-    "message": "ເບິ່ງ URL ທີ່ເຂົ້າລະຫັດ"
   },
   "panels/network/RequestPreviewView.ts | failedToLoadResponseData": {
     "message": "ໂຫຼດຂໍ້ມູນການຕອບສະໜອງບໍ່ສຳເລັດ"
@@ -8807,8 +9563,11 @@
   "panels/network/RequestResponseView.ts | failedToLoadResponseData": {
     "message": "ໂຫຼດຂໍ້ມູນການຕອບສະໜອງບໍ່ສຳເລັດ"
   },
+  "panels/network/RequestResponseView.ts | noPreview": {
+    "message": "ບໍ່ມີຫຍັງໃຫ້ສະແດງຕົວຢ່າງ"
+  },
   "panels/network/RequestResponseView.ts | thisRequestHasNoResponseData": {
-    "message": "ຄຳຂໍນີ້ບໍ່ມີຂໍ້ມູນການຕອບກັບ."
+    "message": "ຄຳຂໍນີ້ບໍ່ມີຂໍ້ມູນການຕອບກັບ"
   },
   "panels/network/RequestTimingView.ts | cacheStorageCacheNameS": {
     "message": "ຊື່ແຄສໃນບ່ອນຈັດເກັບຂໍ້ມູນແຄສ: {PH1}"
@@ -8948,17 +9707,68 @@
   "panels/network/RequestTimingView.ts | waterfall": {
     "message": "ນໍ້າຕົກຕາດ"
   },
-  "panels/network/ResourceWebSocketFrameView.ts | all": {
+  "panels/network/ResourceChunkView.ts | all": {
     "message": "ທັງໝົດ"
+  },
+  "panels/network/ResourceChunkView.ts | clearAll": {
+    "message": "ລຶບລ້າງທັງໝົດ"
+  },
+  "panels/network/ResourceChunkView.ts | clearAllL": {
+    "message": "ລຶບລ້າງທັງໝົດ"
+  },
+  "panels/network/ResourceChunkView.ts | copyMessage": {
+    "message": "ສຳເນົາຂໍ້ຄວາມ"
+  },
+  "panels/network/ResourceChunkView.ts | copyMessageD": {
+    "message": "ສຳເນົາຂໍ້ຄວາມ…"
+  },
+  "panels/network/ResourceChunkView.ts | data": {
+    "message": "ຂໍ້ມູນ"
+  },
+  "panels/network/ResourceChunkView.ts | filter": {
+    "message": "ກັ່ນຕອງ"
+  },
+  "panels/network/ResourceChunkView.ts | length": {
+    "message": "ຄວາມຍາວ"
+  },
+  "panels/network/ResourceChunkView.ts | noMessageSelected": {
+    "message": "ບໍ່ໄດ້ເລືອກຂໍ້ຄວາມ"
+  },
+  "panels/network/ResourceChunkView.ts | receive": {
+    "message": "ຮັບ"
+  },
+  "panels/network/ResourceChunkView.ts | selectMessageToBrowseItsContent": {
+    "message": "ເລືອກຂໍ້ຄວາມເພື່ອເເລືອກເບິ່ງເນື້ອຫາຂອງມັນ."
+  },
+  "panels/network/ResourceChunkView.ts | send": {
+    "message": "ສົ່ງ"
+  },
+  "panels/network/ResourceChunkView.ts | time": {
+    "message": "ເວລາ"
+  },
+  "panels/network/ResourceDirectSocketChunkView.ts | address": {
+    "message": "ທີ່ຢູ່"
+  },
+  "panels/network/ResourceDirectSocketChunkView.ts | data": {
+    "message": "ຂໍ້ມູນ"
+  },
+  "panels/network/ResourceDirectSocketChunkView.ts | directSocketChunk": {
+    "message": "Chunk ຂອງ Direct Socket"
+  },
+  "panels/network/ResourceDirectSocketChunkView.ts | filterUsingRegex": {
+    "message": "ການກັ່ນຕອງໂດຍໃຊ້ regex (ຕົວຢ່າງ: (direct)?socket)"
+  },
+  "panels/network/ResourceDirectSocketChunkView.ts | length": {
+    "message": "ຄວາມຍາວ"
+  },
+  "panels/network/ResourceDirectSocketChunkView.ts | port": {
+    "message": "ຜອດ"
+  },
+  "panels/network/ResourceDirectSocketChunkView.ts | time": {
+    "message": "ເວລາ"
   },
   "panels/network/ResourceWebSocketFrameView.ts | binaryMessage": {
     "message": "ຂໍ້ຄວາມໄບນາຣີ"
-  },
-  "panels/network/ResourceWebSocketFrameView.ts | clearAll": {
-    "message": "ລຶບລ້າງທັງໝົດ"
-  },
-  "panels/network/ResourceWebSocketFrameView.ts | clearAllL": {
-    "message": "ລຶບລ້າງທັງໝົດ"
   },
   "panels/network/ResourceWebSocketFrameView.ts | connectionCloseMessage": {
     "message": "ຂໍ້ຄວາມປິດການເຊື່ອມຕໍ່"
@@ -8966,23 +9776,8 @@
   "panels/network/ResourceWebSocketFrameView.ts | continuationFrame": {
     "message": "ເຟຣມຄວາມຕໍ່ເນື່ອງ"
   },
-  "panels/network/ResourceWebSocketFrameView.ts | copyMessage": {
-    "message": "ສໍາເນົາຂໍ້ຄວາມ"
-  },
-  "panels/network/ResourceWebSocketFrameView.ts | copyMessageD": {
-    "message": "ສໍາເນົາຂໍ້ຄວາມ..."
-  },
-  "panels/network/ResourceWebSocketFrameView.ts | data": {
-    "message": "ຂໍ້ມູນ"
-  },
-  "panels/network/ResourceWebSocketFrameView.ts | filter": {
-    "message": "ກັ່ນຕອງ"
-  },
   "panels/network/ResourceWebSocketFrameView.ts | filterUsingRegex": {
     "message": "ກັ່ນຕອງໂດຍໃຊ້ regex (ຕົວຢ່າງ: (web)?socket)"
-  },
-  "panels/network/ResourceWebSocketFrameView.ts | length": {
-    "message": "ຄວາມຍາວ"
   },
   "panels/network/ResourceWebSocketFrameView.ts | na": {
     "message": "ບໍ່ມີ"
@@ -8993,26 +9788,14 @@
   "panels/network/ResourceWebSocketFrameView.ts | pongMessage": {
     "message": "ຂໍ້ຄວາມ Pong"
   },
-  "panels/network/ResourceWebSocketFrameView.ts | receive": {
-    "message": "ຮັບ"
-  },
   "panels/network/ResourceWebSocketFrameView.ts | sOpcodeS": {
     "message": "{PH1} (ລະຫັດດຳເນີນການ {PH2})"
   },
   "panels/network/ResourceWebSocketFrameView.ts | sOpcodeSMask": {
     "message": "{PH1} (ລະຫັດດຳເນີນການ {PH2}, ໜ້າກາກ)"
   },
-  "panels/network/ResourceWebSocketFrameView.ts | selectMessageToBrowseItsContent": {
-    "message": "ເລືອກຂໍ້ຄວາມເພື່ອເເລືອກເບິ່ງເນື້ອຫາຂອງມັນ."
-  },
-  "panels/network/ResourceWebSocketFrameView.ts | send": {
-    "message": "ສົ່ງ"
-  },
   "panels/network/ResourceWebSocketFrameView.ts | textMessage": {
     "message": "ຂໍ້ຄວາມສັ້ນ"
-  },
-  "panels/network/ResourceWebSocketFrameView.ts | time": {
-    "message": "ເວລາ"
   },
   "panels/network/ResourceWebSocketFrameView.ts | webSocketFrame": {
     "message": "Web Socket Frame"
@@ -9079,6 +9862,45 @@
   },
   "panels/network/SignedExchangeInfoView.ts | viewCertificate": {
     "message": "ເບິ່ງໃບຮັບຮອງ"
+  },
+  "panels/network/components/DirectSocketConnectionView.ts | directSocketStatusAborted": {
+    "message": "ຍົກເລີກແລ້ວ"
+  },
+  "panels/network/components/DirectSocketConnectionView.ts | directSocketStatusClosed": {
+    "message": "ປິດ"
+  },
+  "panels/network/components/DirectSocketConnectionView.ts | directSocketStatusOpen": {
+    "message": "ເປີດ"
+  },
+  "panels/network/components/DirectSocketConnectionView.ts | directSocketStatusOpening": {
+    "message": "ກຳລັງເປີດ"
+  },
+  "panels/network/components/DirectSocketConnectionView.ts | directSocketTypeTcp": {
+    "message": "TCP"
+  },
+  "panels/network/components/DirectSocketConnectionView.ts | directSocketTypeUdpBound": {
+    "message": "UDP (ຜູກມັດ)"
+  },
+  "panels/network/components/DirectSocketConnectionView.ts | directSocketTypeUdpConnected": {
+    "message": "UDP (ເຊື່ອມຕໍ່ແລ້ວ)"
+  },
+  "panels/network/components/DirectSocketConnectionView.ts | errorMessage": {
+    "message": "ຂໍ້ຄວາມສະແດງຂໍ້ຜິດພາດ"
+  },
+  "panels/network/components/DirectSocketConnectionView.ts | general": {
+    "message": "ທົ່ວໄປ"
+  },
+  "panels/network/components/DirectSocketConnectionView.ts | openInfo": {
+    "message": "ເປີດຂໍ້ມູນ"
+  },
+  "panels/network/components/DirectSocketConnectionView.ts | options": {
+    "message": "ຕົວເລືອກ"
+  },
+  "panels/network/components/DirectSocketConnectionView.ts | status": {
+    "message": "ສະຖານະ"
+  },
+  "panels/network/components/DirectSocketConnectionView.ts | type": {
+    "message": "ປະເພດ DirectSocket"
   },
   "panels/network/components/HeaderSectionRow.ts | activeClientExperimentVariation": {
     "message": "client experiment variation IDs ທີ່ນຳໃຊ້ຢູ່."
@@ -9196,6 +10018,9 @@
   },
   "panels/network/components/RequestTrustTokensView.ts | parameters": {
     "message": "ພາຣາມິເຕີ"
+  },
+  "panels/network/components/RequestTrustTokensView.ts | perSiteLimit": {
+    "message": "ດຳເນີນການຮອດຈຳນວນຈຳກັດທີ່ສາມາດອອກໃຫ້ກັບເວັບໄຊໄດ້ແລ້ວ."
   },
   "panels/network/components/RequestTrustTokensView.ts | refreshPolicy": {
     "message": "ໂຫຼດຂໍ້ມູນນະໂຍບາຍຄືນໃໝ່"
@@ -9450,10 +10275,10 @@
     "message": "ຂະໜາດທີ່ເລືອກ: {PH1}"
   },
   "panels/profiler/HeapProfileView.ts | selfSize": {
-    "message": "ຂະໜາດຂອງຕົນເອງ"
+    "message": "ຂະໜາດຮີບສຳລັບໂໜດດຽວ"
   },
   "panels/profiler/HeapProfileView.ts | selfSizeBytes": {
-    "message": "ຂະໜາດຂອງຕົນເອງ (ໄບຕ໌)"
+    "message": "ຂະໜາດຮີບສຳລັບໂໜດດຽວ"
   },
   "panels/profiler/HeapProfileView.ts | skb": {
     "message": "{PH1} kB"
@@ -9471,7 +10296,7 @@
     "message": "ຂະໜາດຮວມ"
   },
   "panels/profiler/HeapProfileView.ts | totalSizeBytes": {
-    "message": "ຂະໜາດທັງໝົດ (ໄບຕ໌)"
+    "message": "ຂະໜາດຮວມ"
   },
   "panels/profiler/HeapProfileView.ts | url": {
     "message": "URL"
@@ -9697,6 +10522,12 @@
   },
   "panels/profiler/HeapSnapshotView.ts | objectsRetainedByDetachedDomNodes": {
     "message": "ອອບເຈັກທີ່ໂໜດ DOM ແບບຖອດອອກເກັບຮັກສາໄວ້"
+  },
+  "panels/profiler/HeapSnapshotView.ts | otherJSObjects": {
+    "message": "ອອບເຈັກ JS ອື່ນໆ"
+  },
+  "panels/profiler/HeapSnapshotView.ts | otherNonJSObjects": {
+    "message": "ອອບເຈັກອື່ນໆທີ່ບໍ່ແມ່ນ JS (ເຊັ່ນ: HTML ແລະ CSS)"
   },
   "panels/profiler/HeapSnapshotView.ts | percentagePlaceholder": {
     "message": "{PH1}%"
@@ -9971,8 +10802,11 @@
   "panels/profiler/ProfilesPanel.ts | cantLoadProfileWhileAnother": {
     "message": "ບໍ່ສາມາດໂຫຼດໂປຣໄຟລ໌ໄດ້ໃນຂະນະທີ່ກຳລັງບັນທຶກໂປຣໄຟລ໌ອື່ນຢູ່."
   },
-  "panels/profiler/ProfilesPanel.ts | profileLoadingFailedS": {
-    "message": "ໂຫຼດໂປຣໄຟລ໌ບໍ່ສຳເລັດ: {PH1}."
+  "panels/profiler/ProfilesPanel.ts | failReason": {
+    "message": "ເຫດຜົນ: {PH1}."
+  },
+  "panels/profiler/ProfilesPanel.ts | profileLoadingFailed": {
+    "message": "ໂຫຼດໂປຣໄຟລ໌ບໍ່ສຳເລັດ"
   },
   "panels/profiler/ProfilesPanel.ts | profiles": {
     "message": "ໂປຣໄຟລ໌"
@@ -10016,11 +10850,29 @@
   "panels/profiler/profiler-meta.ts | stopRecordingHeapAllocations": {
     "message": "ຢຸດການບັນທຶກການຈັດສັນຮີບ"
   },
-  "panels/protocol_monitor/ProtocolMonitor.ts | CDPCommandEditorHidden": {
-    "message": "ຕົວແກ້ໄຂຄຳສັ່ງ CDP ເຊື່ອງຢູ່"
+  "panels/protocol_monitor/JSONEditor.ts | addCustomProperty": {
+    "message": "ເພີ່ມຄຸນສົມບັດກຳນົດເອງ"
   },
-  "panels/protocol_monitor/ProtocolMonitor.ts | CDPCommandEditorShown": {
-    "message": "ຕົວແກ້ໄຂຄຳສັ່ງ CDP ສະແດງຢູ່"
+  "panels/protocol_monitor/JSONEditor.ts | addParameter": {
+    "message": "ເພີ່ມພາຣາມິເຕີ"
+  },
+  "panels/protocol_monitor/JSONEditor.ts | copyCommand": {
+    "message": "ຄຳສັ່ງສຳເນົາ"
+  },
+  "panels/protocol_monitor/JSONEditor.ts | deleteParameter": {
+    "message": "ລຶບພາຣາມິເຕີ"
+  },
+  "panels/protocol_monitor/JSONEditor.ts | resetDefaultValue": {
+    "message": "ຣີເຊັດເປັນຄ່າເລີ່ມຕົ້ນ"
+  },
+  "panels/protocol_monitor/JSONEditor.ts | selectTarget": {
+    "message": "ເລືອກເປົ້າໝາຍ"
+  },
+  "panels/protocol_monitor/JSONEditor.ts | sendCommandCmdEnter": {
+    "message": "ສົ່ງຄຳສັ່ງ - ⌘+Enter"
+  },
+  "panels/protocol_monitor/JSONEditor.ts | sendCommandCtrlEnter": {
+    "message": "ສົ່ງຄຳສັ່ງ - Ctrl+Enter"
   },
   "panels/protocol_monitor/ProtocolMonitor.ts | clearAll": {
     "message": "ລຶບລ້າງທັງໝົດ"
@@ -10061,6 +10913,9 @@
   "panels/protocol_monitor/ProtocolMonitor.ts | save": {
     "message": "ບັນທຶກ"
   },
+  "panels/protocol_monitor/ProtocolMonitor.ts | selectAMessageToView": {
+    "message": "ເລືອກຂໍ້ຄວາມເພື່ອເບິ່ງລາຍລະອຽດຂອງມັນ"
+  },
   "panels/protocol_monitor/ProtocolMonitor.ts | selectTarget": {
     "message": "ເລືອກເປົ້າໝາຍ"
   },
@@ -10085,32 +10940,14 @@
   "panels/protocol_monitor/ProtocolMonitor.ts | type": {
     "message": "ປະເພດ"
   },
-  "panels/protocol_monitor/components/JSONEditor.ts | addCustomProperty": {
-    "message": "ເພີ່ມຄຸນສົມບັດກຳນົດເອງ"
-  },
-  "panels/protocol_monitor/components/JSONEditor.ts | addParameter": {
-    "message": "ເພີ່ມພາຣາມິເຕີ"
-  },
-  "panels/protocol_monitor/components/JSONEditor.ts | deleteParameter": {
-    "message": "ລຶບພາຣາມິເຕີ"
-  },
-  "panels/protocol_monitor/components/JSONEditor.ts | resetDefaultValue": {
-    "message": "ຣີເຊັດເປັນຄ່າເລີ່ມຕົ້ນ"
-  },
-  "panels/protocol_monitor/components/Toolbar.ts | copyCommand": {
-    "message": "ຄຳສັ່ງສຳເນົາ"
-  },
-  "panels/protocol_monitor/components/Toolbar.ts | sendCommandCmdEnter": {
-    "message": "ສົ່ງຄຳສັ່ງ - ⌘+Enter"
-  },
-  "panels/protocol_monitor/components/Toolbar.ts | sendCommandCtrlEnter": {
-    "message": "ສົ່ງຄຳສັ່ງ - Ctrl+Enter"
-  },
   "panels/protocol_monitor/protocol_monitor-meta.ts | protocolMonitor": {
     "message": "ການກວດສອບໂປຣໂຕຄໍ"
   },
   "panels/protocol_monitor/protocol_monitor-meta.ts | showProtocolMonitor": {
     "message": "ສະແດງເຄື່ອງມືຕິດຕາມໂປຣໂຕຄໍ"
+  },
+  "panels/recorder/RecorderController.ts | allowImporting": {
+    "message": "ອະນຸຍາດການນຳເຂົ້າ"
   },
   "panels/recorder/RecorderController.ts | continueReplay": {
     "message": "ສືບຕໍ່"
@@ -10119,16 +10956,22 @@
     "message": "ສຳເນົາການບັນທຶກ ຫຼື ຂັ້ນຕອນທີ່ເລືອກໄວ້"
   },
   "panels/recorder/RecorderController.ts | createRecording": {
-    "message": "ສ້າງການບັນທຶກໃໝ່"
+    "message": "ສ້າງການບັນທຶກ"
   },
   "panels/recorder/RecorderController.ts | deleteRecording": {
     "message": "ລຶບການບັນທຶກ"
+  },
+  "panels/recorder/RecorderController.ts | doNotImport": {
+    "message": "ຢ່ານຳເຂົ້າໄຟລ໌ບັນທຶກທີ່ທ່ານບໍ່ຮູ້ຈັກດີ ຫຼື ຍັງບໍ່ໄດ້ກວດສອບດ້ວຍຕົນເອງມາໃນ DevTools. ເຊິ່ງອາດເຮັດໃຫ້ຜູ້ໂຈມຕີສາມາດລັກຂໍ້ມູນຢັ້ງຢືນຕົວຕົນຂອງທ່ານ ຫຼື ຄວບຄຸມຄອມພິວເຕີຂອງທ່ານໄດ້. ກະລຸນາພິມ ''{PH1}'' ລຸ່ມນີ້ເພື່ອອະນຸຍາດການນຳເຂົ້າ."
+  },
+  "panels/recorder/RecorderController.ts | doYouTrustThisCode": {
+    "message": "ທ່ານເຊື່ອຖືໄຟລ໌ບັນທຶກນີ້ຫຼືບໍ່?"
   },
   "panels/recorder/RecorderController.ts | export": {
     "message": "ສົ່ງອອກ"
   },
   "panels/recorder/RecorderController.ts | exportRecording": {
-    "message": "ສົ່ງອອກ"
+    "message": "ສົ່ງອອກການບັນທຶກ"
   },
   "panels/recorder/RecorderController.ts | exportViaExtensions": {
     "message": "ສົ່ງອອກຜ່ານສ່ວນຂະຫຍາຍ"
@@ -10136,14 +10979,23 @@
   "panels/recorder/RecorderController.ts | getExtensions": {
     "message": "ດາວໂຫຼດສ່ວນຂະຫຍາຍ…"
   },
+  "panels/recorder/RecorderController.ts | header": {
+    "message": "ບໍ່ທັນໄດ້ບັນທຶກຫຍັງເທື່ອ"
+  },
   "panels/recorder/RecorderController.ts | importRecording": {
     "message": "ນຳເຂົ້າການບັນທຶກ"
+  },
+  "panels/recorder/RecorderController.ts | learnMore": {
+    "message": "ສຶກສາເພີ່ມເຕີມ"
   },
   "panels/recorder/RecorderController.ts | noRecordings": {
     "message": "ບໍ່ມີການບັນທຶກ"
   },
   "panels/recorder/RecorderController.ts | numberOfRecordings": {
     "message": "ການບັນທຶກ"
+  },
+  "panels/recorder/RecorderController.ts | recordingDescription": {
+    "message": "ໃຊ້ການບັນທຶກເພື່ອສ້າງການທົດສອບ ຫຼື ການຕິດຕາມປະສິດທິພາບແບບອັດຕະໂນມັດແບບຕົ້ນທາງຮອດປາຍທາງ."
   },
   "panels/recorder/RecorderController.ts | replayRecording": {
     "message": "ຫຼິ້ນການບັນທຶກຄືນໃໝ່"
@@ -10159,6 +11011,9 @@
   },
   "panels/recorder/RecorderController.ts | toggleCode": {
     "message": "ສະຫຼັບໄປເປັນມຸມມອງລະຫັດ"
+  },
+  "panels/recorder/RecorderController.ts | typeAllowImporting": {
+    "message": "ພິມ ''{PH1}''"
   },
   "panels/recorder/components/CreateRecordingView.ts | cancelRecording": {
     "message": "ຍົກເລີກການບັນທຶກ"
@@ -10327,24 +11182,6 @@
   },
   "panels/recorder/components/ReplaySection.ts | speedGroup": {
     "message": "ຄວາມໄວ"
-  },
-  "panels/recorder/components/StartView.ts | createRecording": {
-    "message": "ສ້າງການບັນທຶກໃໝ່"
-  },
-  "panels/recorder/components/StartView.ts | header": {
-    "message": "ວັດແທກປະສິດທິພາບຈາກປະສົບການຜູ້ໃຊ້ທັງໝົດ"
-  },
-  "panels/recorder/components/StartView.ts | quickStart": {
-    "message": "ຄູ່ມືເລີ່ມຕົ້ນສະບັບຫຍໍ້: ສຶກສາກ່ຽວກັບແຜງຕົວບັນທຶກໃໝ່ໃນ DevTools"
-  },
-  "panels/recorder/components/StartView.ts | step1": {
-    "message": "ບັນທຶກປະສົບການຜູ້ໃຊ້ທົ່ວໄປຢູ່ເວັບໄຊ ຫຼື ແອັບຂອງທ່ານ"
-  },
-  "panels/recorder/components/StartView.ts | step2": {
-    "message": "ຫຼິ້ນການບັນທຶກຄືນໃໝ່ເພື່ອກວດສອບວ່າຂັ້ນຕອນໃຊ້ໄດ້"
-  },
-  "panels/recorder/components/StartView.ts | step3": {
-    "message": "ສ້າງການຕິດຕາມປະສິດທິພາບຢ່າງລະອຽດ ຫຼື ສົ່ງອອກສະຄຣິບ Puppeteer ສຳລັບການທົດສອບ"
   },
   "panels/recorder/components/StepEditor.ts | addAttribute": {
     "message": "ເພີ່ມ {attributeName}"
@@ -10554,7 +11391,13 @@
     "message": "ການຈັດດັດຊະນີຖືກຂັດຈັງຫວະ."
   },
   "panels/search/SearchView.ts | noMatchesFound": {
-    "message": "ບໍ່ພົບຜົນການຊອກຫາທີ່ກົງກັນ."
+    "message": "ບໍ່ພົບຜົນຮັບທີ່ກົງກັນ"
+  },
+  "panels/search/SearchView.ts | noSearchResult": {
+    "message": "ບໍ່ພົບຜົນການຊອກຫາ"
+  },
+  "panels/search/SearchView.ts | nothingMatchedTheQuery": {
+    "message": "ບໍ່ມີຜົນຮັບທີ່ກົງກັບຄຳຊອກຫາຂອງທ່ານ"
   },
   "panels/search/SearchView.ts | refresh": {
     "message": "ໂຫຼດຂໍ້ມູນຄືນໃໝ່"
@@ -10568,11 +11411,20 @@
   "panels/search/SearchView.ts | searching": {
     "message": "ກຳລັງຊອກຫາ…"
   },
+  "panels/search/SearchView.ts | typeAndPressSToSearch": {
+    "message": "ພິມ ແລະ ກົດ {PH1} ເພື່ອຊອກຫາ"
+  },
   "panels/security/CookieControlsView.ts | cardDisclaimer": {
     "message": "ສະເພາະເມື່ອ DevTools ເປີດຢູ່"
   },
   "panels/security/CookieControlsView.ts | cardTitle": {
     "message": "ຈຳກັດຄຸກກີ້ພາກສ່ວນທີສາມຊົ່ວຄາວ"
+  },
+  "panels/security/CookieControlsView.ts | enableFlag": {
+    "message": "ເພື່ອໃຊ້, ໃຫ້ຕັ້ງຄ່າ {PH1} ເປັນຄ່າເລີ່ມຕົ້ນ"
+  },
+  "panels/security/CookieControlsView.ts | enrollGracePeriod": {
+    "message": "ເພື່ອໃຊ້, ໃຫ້ລົງທະບຽນເວັບໄຊນີ້ ຫຼື ເວັບໄຊທີ່ຝັງຢູ່ໃນເວັບໄຊນີ້ໃນ {PH1}"
   },
   "panels/security/CookieControlsView.ts | enterpriseDisclaimer": {
     "message": "ອົງກອນຂອງທ່ານຈັດການສິດເຂົ້າເຖິງຄຸກກີ້ພາກສ່ວນທີສາມສຳລັບເວັບໄຊນີ້"
@@ -10607,11 +11459,17 @@
   "panels/security/CookieControlsView.ts | siteReloadMessage": {
     "message": "ໂຫຼດໜ້າເວັບໃໝ່ເພື່ອໃຊ້ການຄວບຄຸມທີ່ອັບເດດແລ້ວຂອງທ່ານ"
   },
+  "panels/security/CookieControlsView.ts | tpcdHeuristicsGrants": {
+    "message": "#tpcd-heuristics-grants"
+  },
+  "panels/security/CookieControlsView.ts | tpcdMetadataGrants": {
+    "message": "#tpcd-metadata-grants"
+  },
   "panels/security/CookieControlsView.ts | viewDetails": {
     "message": "ເບິ່ງລາຍລະອຽດ"
   },
   "panels/security/CookieControlsView.ts | viewExplanation": {
-    "message": "ທົດສອບວ່າເວັບໄຊນີ້ຈະເຮັດວຽກແນວໃດຫາກຜູ້ໃຊ້ເລືອກທີ່ຈະຈຳກັດຄຸກກີ້ພາກສ່ວນທີສາມໃນ Chrome"
+    "message": "ທົດສອບວ່າເວັບໄຊນີ້ຈະເຮັດວຽກແນວໃດຫາກມີການຈຳກັດຄຸກກີ້ພາກສ່ວນທີສາມໃນ Chrome"
   },
   "panels/security/CookieControlsView.ts | viewTitle": {
     "message": "ການຄວບຄຸມ"
@@ -10623,7 +11481,7 @@
     "message": "ອະນຸຍາດແລ້ວ"
   },
   "panels/security/CookieReportView.ts | allowedByException": {
-    "message": "ອະນຸຍາດໂດຍຂໍ້ຍົກເວັ້ນ"
+    "message": "ອະນຸຍາດຕາມຂໍ້ຍົກເວັ້ນ"
   },
   "panels/security/CookieReportView.ts | analyticsCookieTypeString": {
     "message": "ການວິເຄາະ"
@@ -10632,7 +11490,7 @@
     "message": "ບລັອກແລ້ວ"
   },
   "panels/security/CookieReportView.ts | body": {
-    "message": "ຄຸກກີ້ພາກສ່ວນທີສາມທີ່ອາດຖືກຈຳກັດໂດຍຜູ້ໃຊ້, ຂຶ້ນກັບການຕັ້ງຄ່າຂອງເຂົາເຈົ້າ. ຫາກຜູ້ໃຊ້ເລືອກທີ່ຈະຈຳກັດຄຸກກີ້, ສະນັ້ນແລ້ວເວັບໄຊນີ້ອາດຈະບໍ່ເຮັດວຽກສຳລັບເຂົາເຈົ້າ."
+    "message": "ເວັບໄຊນີ້ອາດບໍ່ເຮັດວຽກຫາກມີການຈຳກັດຄຸກກີ້ພາກສ່ວນທີສາມ ແລະ ຄຸກກີ້ອື່ນໆໃນ Chrome."
   },
   "panels/security/CookieReportView.ts | cdnCookieTypeString": {
     "message": "CDN"
@@ -10656,7 +11514,7 @@
     "message": "ບໍ່ພົບບັນຫາກ່ຽວກັບຄຸກກີ້ພາກສ່ວນທີສາມ"
   },
   "panels/security/CookieReportView.ts | gitHubResource": {
-    "message": "ອ່ານ {PH1} ຈາກເວັບໄຊຂອງພາກສ່ວນທີສາມ."
+    "message": "ອ່ານ {PH1} ຈາກເວັບໄຊຂອງພາກສ່ວນທີສາມ"
   },
   "panels/security/CookieReportView.ts | gitHubResourceInsightTypeString": {
     "message": "GitHub"
@@ -10671,7 +11529,7 @@
     "message": "ຄຳແນະນຳ"
   },
   "panels/security/CookieReportView.ts | heuristics": {
-    "message": "ຂໍໃຫ້ດຳເນີນການໃນພາຍຫຼັງ. ຂໍ້ຍົກເວັ້ນຕາມການຄາດຄະເນເປີດໃຊ້ຢູ່"
+    "message": "ຂໍໃຫ້ດຳເນີນການໃນພາຍຫຼັງ. ຂໍ້ຍົກເວັ້ນຕາມການຄາດຄະເນເປີດໃຊ້ຢູ່."
   },
   "panels/security/CookieReportView.ts | heuristicsInisightTypeString": {
     "message": "ການຄາດຄະເນ"
@@ -10708,6 +11566,9 @@
   },
   "panels/security/CookieReportView.ts | reportedIssues": {
     "message": "ບັນຫາທີ່ລາຍງານ"
+  },
+  "panels/security/CookieReportView.ts | showRequestsWithThisCookie": {
+    "message": "ສະແດງຄຳຮ້ອງຂໍທີ່ມີຄຸກກີ້ນີ້"
   },
   "panels/security/CookieReportView.ts | socialCookieTypeString": {
     "message": "ໂຊຊຽວ"
@@ -11042,12 +11903,6 @@
   "panels/security/SecurityPanelSidebar.ts | mainOrigin": {
     "message": "ຕົ້ນທາງຫຼັກ"
   },
-  "panels/security/SecurityPanelSidebar.ts | mainOriginNonsecure": {
-    "message": "ຕົ້ນທາງຫຼັກ (ບໍ່ປອດໄພ)"
-  },
-  "panels/security/SecurityPanelSidebar.ts | mainOriginSecure": {
-    "message": "ຕົ້ນທາງຫຼັກ (ປອດໄພ)"
-  },
   "panels/security/SecurityPanelSidebar.ts | nonsecureOrigins": {
     "message": "ຕົ້ນທາງບໍ່ປອດໄພ"
   },
@@ -11069,17 +11924,26 @@
   "panels/security/SecurityPanelSidebar.ts | unknownCanceled": {
     "message": "ບໍ່ຮູ້ຈັກ / ຍົກເລີກແລ້ວ"
   },
+  "panels/security/security-meta.ts | PrivacyAndSecurity": {
+    "message": "ຄວາມເປັນສ່ວນຕົວ ແລະ ຄວາມປອດໄພ"
+  },
   "panels/security/security-meta.ts | security": {
     "message": "ຄວາມປອດໄພ"
   },
-  "panels/security/security-meta.ts | securityAndPrivacy": {
-    "message": "ຄວາມປອດໄພ ແລະ ຄວາມເປັນສ່ວນຕົວ"
+  "panels/security/security-meta.ts | showPrivacyAndSecurity": {
+    "message": "ສະແດງຄວາມເປັນສ່ວນຕົວ ແລະ ຄວາມປອດໄພ"
   },
   "panels/security/security-meta.ts | showSecurity": {
     "message": "ສະແດງການຮັກສາຄວາມປອດໄພ"
   },
-  "panels/security/security-meta.ts | showSecurityAndPrivacy": {
-    "message": "ສະແດງແຜງຄວາມປອດໄພ ແລະ ຄວາມເປັນສ່ວນຕົວ"
+  "panels/sensors/LocationsSettingsTab.ts | accuracy": {
+    "message": "ຄວາມຖືກຕ້ອງ"
+  },
+  "panels/sensors/LocationsSettingsTab.ts | accuracyMustBeANumber": {
+    "message": "ຄວາມຖືກຕ້ອງຕ້ອງເປັນຕົວເລກ"
+  },
+  "panels/sensors/LocationsSettingsTab.ts | accuracyMustBeGreaterThanOrEqual": {
+    "message": "ຄວາມຖືກຕ້ອງຕ້ອງໃຫຍ່ກວ່າ ຫຼື ເທົ່າກັບ {PH1}"
   },
   "panels/sensors/LocationsSettingsTab.ts | addLocation": {
     "message": "ເພີ່ມສະຖານທີ່"
@@ -11137,6 +12001,9 @@
   },
   "panels/sensors/LocationsSettingsTab.ts | timezoneIdMustContainAlphabetic": {
     "message": "ID ເຂດເວລາຕ້ອງມີຕົວອັກສອນ"
+  },
+  "panels/sensors/SensorsView.ts | accuracy": {
+    "message": "ຄວາມຖືກຕ້ອງ"
   },
   "panels/sensors/SensorsView.ts | adjustWithMousewheelOrUpdownKeys": {
     "message": "ປັບແກ້ດ້ວຍລູກກິ້ງເມົ້າ ຫຼື ປຸ່ມຂຶ້ນ/ລົງ. {PH1}: ±10, Shift: ±1, Alt: ±0.01"
@@ -11315,29 +12182,32 @@
   "panels/sensors/sensors-meta.ts | userIdleScreenUnlocked": {
     "message": "ຜູ້ໃຊ້ບໍ່ເຄື່ອນໄຫວ, ປົດລັອກໜ້າຈໍແລ້ວ"
   },
-  "panels/settings/AISettingsTab.ts | ageRestricted": {
-    "message": "ຄຸນສົມບັດນີ້ມີໃຫ້ບໍລິການກັບຜູ້ໃຊ້ທີ່ມີອາຍຸ 18 ປີຂຶ້ນໄປເທົ່ານັ້ນ."
-  },
   "panels/settings/AISettingsTab.ts | boostYourProductivity": {
     "message": "ເພີ່ມຜະລິດຕະພາບຂອງທ່ານດ້ວຍ AI"
   },
   "panels/settings/AISettingsTab.ts | consoleInsightsSendsData": {
     "message": "ລະບົບຈະສົ່ງຂໍ້ຄວາມໃນຄອນໂຊ, ການຕິດຕາມແບບຊ້ອນກັນທີ່ກ່ຽວຂ້ອງ, ຊອດໂຄດທີ່ກ່ຽວຂ້ອງ ແລະ ສ່ວນຫົວຂອງເຄືອຂ່າຍທີ່ກ່ຽວຂ້ອງໄປຫາ Google ເພື່ອສ້າງຄຳອະທິບາຍ. ທີມງານກວດສອບອາດເຫັນຂໍ້ມູນນີ້ເພື່ອນຳໃຊ້ໃນການປັບປຸງຄຸນສົມບັດນີ້."
   },
+  "panels/settings/AISettingsTab.ts | consoleInsightsSendsDataNoLogging": {
+    "message": "ລະບົບຈະສົ່ງຂໍ້ຄວາມໃນຄອນໂຊ, ການຕິດຕາມແບບຊ້ອນກັນທີ່ກ່ຽວຂ້ອງ, ຊອດໂຄດທີ່ກ່ຽວຂ້ອງ ແລະ ສ່ວນຫົວຂອງເຄືອຂ່າຍທີ່ກ່ຽວຂ້ອງໄປຫາ Google ເພື່ອສ້າງຄຳອະທິບາຍ. ຂໍ້ມູນນີ້ຈະບໍ່ຖືກໃຊ້ເພື່ອປັບປຸງໂມເດວ AI ຂອງ Google."
+  },
   "panels/settings/AISettingsTab.ts | dataCollection": {
-    "message": "ໂດຍຂຶ້ນກັບພາກພື້ນຂອງທ່ານ, Google ອາດບໍ່ເກັບຮວບຮວມຂໍ້ມູນ."
+    "message": "ໂດຍຂຶ້ນກັບພາກພື້ນຂອງທ່ານ, Google ອາດບໍ່ເກັບຮວບຮວມຂໍ້ມູນ"
   },
   "panels/settings/AISettingsTab.ts | dataCollectionNoLogging": {
-    "message": "ທີມງານກວດສອບຈະບໍ່ໃຊ້ເນື້ອຫາຂອງທ່ານເພື່ອປັບປຸງ AI. ອົງກອນຂອງທ່ານອາດປ່ຽນການຕັ້ງຄ່າເຫຼົ່ານີ້ໄດ້ທຸກເວລາ. Google ອາດບໍ່ເກັບຮວບຮວມຂໍ້ມູນ, ໂດຍຂຶ້ນຢູ່ກັບການຈັດການບັນຊີ Google ແລະ/ຫຼື ພາກພື້ນຂອງທ່ານ."
+    "message": "Google ອາດບໍ່ເກັບຮວບຮວມຂໍ້ມູນ, ໂດຍຂຶ້ນຢູ່ກັບການຈັດການບັນຊີ Google ແລະ/ຫຼື ພາກພື້ນຂອງທ່ານ"
   },
   "panels/settings/AISettingsTab.ts | enableAiAssistance": {
     "message": "ເປີດການນຳໃຊ້ຄວາມຊ່ວຍເຫຼືອຈາກ AI"
+  },
+  "panels/settings/AISettingsTab.ts | enableAiSuggestedAnnotations": {
+    "message": "ເປີດການນຳໃຊ້ຄຳແນະນຳຈາກ AI ສຳລັບຄຳອະທິບາຍປະກອບແຜງປະສິດທິພາບ"
   },
   "panels/settings/AISettingsTab.ts | enableConsoleInsights": {
     "message": "ເປີດການນຳໃຊ້ Console insights"
   },
   "panels/settings/AISettingsTab.ts | experimentalFeatures": {
-    "message": "ຄຸນສົມບັດເຫຼົ່ານີ້ເປັນເວີຊັນທົດລອງ. ເຊິ່ງໃຊ້ AI ສ້າງເນື້ອຫາ ແລະ ອາດໃຫ້ຂໍ້ມູນທີ່ບໍ່ຖືກຕ້ອງ ຫຼື ບໍ່ເໝາະສົມເຊິ່ງບໍ່ໄດ້ສະທ້ອນມຸມມອງຂອງ Google."
+    "message": "ຄຸນສົມບັດເຫຼົ່ານີ້ໃຊ້ AI ສ້າງເນື້ອຫາ ແລະ ອາດໃຫ້ຂໍ້ມູນທີ່ບໍ່ຖືກຕ້ອງ ຫຼື ບໍ່ເໝາະສົມເຊິ່ງບໍ່ໄດ້ສະທ້ອນມຸມມອງຂອງ Google"
   },
   "panels/settings/AISettingsTab.ts | explainConsole": {
     "message": "ຮັບຄຳອະທິບາຍກ່ຽວກັບຄຳເຕືອນ ແລະ ຂໍ້ຜິດພາດຂອງຄອນໂຊ"
@@ -11355,7 +12225,19 @@
     "message": "ເຂົ້າໃຈຮູບແບບ CSS, ການເຄື່ອນໄຫວເຄືອຂ່າຍ, ຄໍຂວດປະສິດທິພາບ ແລະ ໄຟລ໌ຕົ້ນທາງດ້ວຍຂໍ້ມູນເຈາະເລິກທີ່ຂັບເຄື່ອນໂດຍ AI"
   },
   "panels/settings/AISettingsTab.ts | freestylerSendsData": {
-    "message": "ລະບົບຈະສົ່ງຂໍ້ມູນໃດກໍຕາມເຊິ່ງໜ້າເວັບທີ່ກວດສອບສາມາດເຂົ້າເຖິງໄດ້ຜ່ານ Web API, ຄຳຮ້ອງຂໍເຄືອຂ່າຍ, ໄຟລ໌ ແລະ ການຕິດຕາມປະສິດທິພາບໄປຫາ Google ເພື່ອສ້າງຄຳອະທິບາຍ. ທີມງານກວດສອບອາດເຫັນຂໍ້ມູນນີ້ເພື່ອນຳໃຊ້ໃນການປັບປຸງຄຸນສົມບັດນີ້. ຢ່າໃຊ້ກັບໜ້າທີ່ມີຂໍ້ມູນສ່ວນຕົວ ຫຼື ຂໍ້ມູນລະອຽດອ່ອນ."
+    "message": "ລະບົບຈະສົ່ງຄຳຊອກຫາຂອງຜູ້ໃຊ້ ແລະ ຂໍ້ມູນໃດກໍຕາມເຊິ່ງໜ້າເວັບທີ່ກວດສອບສາມາດເຂົ້າເຖິງໄດ້ຜ່ານ Web API, ຄຳຮ້ອງຂໍເຄືອຂ່າຍ, ໄຟລ໌ ແລະ ການຕິດຕາມປະສິດທິພາບໄປຫາ Google ເພື່ອສ້າງຄຳອະທິບາຍ. ທີມງານກວດສອບອາດເຫັນຂໍ້ມູນນີ້ເພື່ອນຳໃຊ້ໃນການປັບປຸງຄຸນສົມບັດນີ້. ຢ່າໃຊ້ກັບໜ້າທີ່ມີຂໍ້ມູນສ່ວນຕົວ ຫຼື ຂໍ້ມູນລະອຽດອ່ອນ."
+  },
+  "panels/settings/AISettingsTab.ts | freestylerSendsDataNoLogging": {
+    "message": "ລະບົບຈະສົ່ງຄຳຊອກຫາຂອງຜູ້ໃຊ້ ແລະ ຂໍ້ມູນໃດກໍຕາມເຊິ່ງໜ້າເວັບທີ່ກວດສອບສາມາດເຂົ້າເຖິງໄດ້ຜ່ານ Web API, ຄຳຮ້ອງຂໍເຄືອຂ່າຍ, ໄຟລ໌ ແລະ ການຕິດຕາມປະສິດທິພາບໄປຫາ Google ເພື່ອສ້າງຄຳອະທິບາຍ. ຂໍ້ມູນນີ້ຈະບໍ່ຖືກໃຊ້ເພື່ອປັບປຸງໂມເດວ AI ຂອງ Google."
+  },
+  "panels/settings/AISettingsTab.ts | generatedAiAnnotationsSendData": {
+    "message": "ລະບົບຈະສົ່ງການຕິດຕາມປະສິດທິພາບຂອງທ່ານໄປຫາ Google ເພື່ອສ້າງຄຳອະທິບາຍ. ຂໍ້ມູນນີ້ຈະຖືກໃຊ້ເພື່ອປັບປຸງໂມເດວ AI ຂອງ Google."
+  },
+  "panels/settings/AISettingsTab.ts | generatedAiAnnotationsSendDataNoLogging": {
+    "message": "ລະບົບຈະສົ່ງການຕິດຕາມປະສິດທິພາບຂອງທ່ານໄປຫາ Google ເພື່ອສ້າງຄຳອະທິບາຍ. ຂໍ້ມູນນີ້ຈະບໍ່ຖືກໃຊ້ເພື່ອປັບປຸງໂມເດວ AI ຂອງ Google."
+  },
+  "panels/settings/AISettingsTab.ts | getAIAnnotationsSuggestions": {
+    "message": "ຮັບຄຳແນະນຳຈາກ AI ສຳລັບຄຳອະທິບາຍປະກອບແຜງປະສິດທິພາບ"
   },
   "panels/settings/AISettingsTab.ts | helpUnderstandConsole": {
     "message": "ຊ່ວຍໃຫ້ທ່ານເຂົ້າໃຈ ແລະ ແກ້ໄຂຄຳເຕືອນ ແລະ ຂໍ້ຜິດພາດຂອງຄອນໂຊ"
@@ -11375,12 +12257,6 @@
   "panels/settings/AISettingsTab.ts | learnMore": {
     "message": "ສຶກສາເພີ່ມເຕີມ"
   },
-  "panels/settings/AISettingsTab.ts | notLoggedIn": {
-    "message": "ຄຸນສົມບັດນີ້ຈະພ້ອມໃຫ້ໃຊ້ເມື່ອທ່ານເຂົ້າສູ່ລະບົບ Chrome ດ້ວຍບັນຊີ Google ຂອງທ່ານເທົ່ານັ້ນ."
-  },
-  "panels/settings/AISettingsTab.ts | offline": {
-    "message": "ຄຸນສົມບັດນີ້ໃຊ້ໄດ້ເມື່ອເຊື່ອມຕໍ່ອິນເຕີເນັດຢູ່ເທົ່ານັ້ນ."
-  },
   "panels/settings/AISettingsTab.ts | privacyNotice": {
     "message": "ນະໂຍບາຍຄວາມເປັນສ່ວນຕົວ Google"
   },
@@ -11392,6 +12268,9 @@
   },
   "panels/settings/AISettingsTab.ts | sendsDataToGoogle": {
     "message": "ຄຸນສົມບັດເຫຼົ່ານີ້ຈະສົ່ງຂໍ້ມູນທີ່ກ່ຽວຂ້ອງໄປຫາ Google. Google ຮວບຮວມຂໍ້ມູນ ແລະ ຄຳຕິຊົມນີ້ເພື່ອປັບປຸງຜະລິດຕະພັນ ແລະ ບໍລິການຂອງຕົນເອງໂດຍອາໄສຄວາມຊ່ວຍເຫຼືອຈາກທີມງານກວດສອບ. ຫຼີກເວັ້ນການແບ່ງປັນຂໍ້ມູນລະອຽດອ່ອນ ຫຼື ຂໍ້ມູນສ່ວນຕົວ."
+  },
+  "panels/settings/AISettingsTab.ts | sendsDataToGoogleNoLogging": {
+    "message": "ທີມງານກວດສອບຈະບໍ່ໃຊ້ເນື້ອຫາຂອງທ່ານເພື່ອປັບປຸງ AI. ອົງກອນຂອງທ່ານອາດປ່ຽນການຕັ້ງຄ່າເຫຼົ່ານີ້ໄດ້ທຸກເວລາ."
   },
   "panels/settings/AISettingsTab.ts | showLess": {
     "message": "ສະແດງໜ້ອຍລົງ"
@@ -11522,9 +12401,6 @@
   "panels/settings/SettingsScreen.ts | experiments": {
     "message": "ການທົດລອງ"
   },
-  "panels/settings/SettingsScreen.ts | filterExperimentsLabel": {
-    "message": "ກັ່ນຕອງ"
-  },
   "panels/settings/SettingsScreen.ts | learnMore": {
     "message": "ສຶກສາເພີ່ມເຕີມ"
   },
@@ -11532,10 +12408,13 @@
     "message": "ບໍ່ມີການທົດລອງທີ່ກົງກັບຕົວກັ່ນຕອງ"
   },
   "panels/settings/SettingsScreen.ts | oneOrMoreSettingsHaveChanged": {
-    "message": "ການຕັ້ງຄ່າໜຶ່ງ ຫຼື ຫຼາຍລາຍການໄດ້ປ່ຽນແປງເຊິ່ງຈຳເປັນຕ້ອງໂຫຼດຄືນໃໝ່ເພື່ອໃຫ້ມີຜົນນຳໃຊ້."
+    "message": "ມີການປ່ຽນແປງການຕັ້ງຄ່າຢ່າງໜ້ອຍ 1 ລາຍການເຊິ່ງຈະຕ້ອງໂຫຼດໃໝ່ຈຶ່ງຈະມີຜົນ"
   },
   "panels/settings/SettingsScreen.ts | restoreDefaultsAndReload": {
     "message": "ກູ້ຄືນຄ່າເລີ່ມຕົ້ນ ແລະ ໂຫຼດຄືນໃໝ່"
+  },
+  "panels/settings/SettingsScreen.ts | searchExperiments": {
+    "message": "ການທົດລອງສຳລັບການຊອກຫາ"
   },
   "panels/settings/SettingsScreen.ts | sendFeedback": {
     "message": "ສົ່ງຄຳຕິຊົມ"
@@ -11747,6 +12626,9 @@
   "panels/snippets/SnippetsQuickOpen.ts | run": {
     "message": "ເອີ້ນໃຊ້"
   },
+  "panels/snippets/SnippetsQuickOpen.ts | runSnippet": {
+    "message": "ເອີ້ນໃຊ້ສະນິບເພັດ"
+  },
   "panels/snippets/SnippetsQuickOpen.ts | snippet": {
     "message": "ສະນິບເພັດ"
   },
@@ -11758,6 +12640,9 @@
   },
   "panels/sources/AddSourceMapURLDialog.ts | sourceMapUrl": {
     "message": "URL ແຜນທີ່ແຫຼ່ງທີ່ມາ: "
+  },
+  "panels/sources/AiWarningInfobarPlugin.ts | aiContentWarning": {
+    "message": "ໄຟລ໌ນີ້ມີເນື້ອຫາທີ່ສ້າງຂຶ້ນໂດຍ AI"
   },
   "panels/sources/BreakpointEditDialog.ts | breakpoint": {
     "message": "ເບຣກພອຍ"
@@ -11988,7 +12873,7 @@
     "message": "ໂຫຼດໄຟລ໌ດີບັກ \"{PH1}\" ບໍ່ສຳເລັດ."
   },
   "panels/sources/DebuggerPlugin.ts | debugInfoNotFound": {
-    "message": "ໂຫຼດຂໍ້ມູນດີບັກໃດກໍຕາມສຳລັບ {PH1} ບໍ່ສຳເລັດ."
+    "message": "ໂຫຼດຂໍ້ມູນດີບັກຂອງ {PH1} ບໍ່ສຳເລັດ"
   },
   "panels/sources/DebuggerPlugin.ts | debuggingPowerReduced": {
     "message": "DevTools ບໍ່ສາມາດສະແດງແຫຼ່ງທີ່ມາທີ່ຖືກຂຽນຂຶ້ນ, ແຕ່ທ່ານສາມາດດີບັກ code ທີ່ມີການເຮັດໃຫ້ນຳໃຊ້ໄດ້."
@@ -12024,13 +12909,13 @@
     "message": "ສະແດງຄຳຮ້ອງຂໍ"
   },
   "panels/sources/DebuggerPlugin.ts | sourceMapFailed": {
-    "message": "ໂຫຼດແຜນທີ່ແຫຼ່ງທີ່ມາບໍ່ສຳເລັດ."
+    "message": "ໂຫຼດແຜນທີ່ແຫຼ່ງທີ່ມາບໍ່ສຳເລັດ"
   },
   "panels/sources/DebuggerPlugin.ts | sourceMapLoaded": {
-    "message": "ໂຫຼດແຜນທີ່ແຫຼ່ງທີ່ມາແລ້ວ."
+    "message": "ໂຫຼດແຜນທີ່ແຫຼ່ງທີ່ມາແລ້ວ"
   },
   "panels/sources/DebuggerPlugin.ts | sourceMapSkipped": {
-    "message": "ຂ້າມແຜນທີ່ແຫຼ່ງທີ່ມາສຳລັບໄຟລ໌ນີ້ແລ້ວ."
+    "message": "ຂ້າມແຜນທີ່ແຫຼ່ງທີ່ມາສຳລັບໄຟລ໌ນີ້ແລ້ວ"
   },
   "panels/sources/DebuggerPlugin.ts | theDebuggerWillSkipStepping": {
     "message": "ຕົວດີບັກຈະຂ້າມສະຄຣິບນີ້ ແລະ ຈະບໍ່ຢຸດເມື່ອພົບຂໍ້ຍົກເວັ້ນ."
@@ -12045,28 +12930,28 @@
     "message": "{PH1} (ລາຍຊື່ຍົກເວັ້ນ)"
   },
   "panels/sources/GoToLineQuickOpen.ts | currentLineSTypeALineNumber": {
-    "message": "ແຖວປັດຈຸບັນ: {PH1}. ພິມຕົວເລກແຖວລະຫວ່າງ 1 ຫາ {PH2} ເພື່ອນຳທາງໄປຫາ."
+    "message": "ພິມຕົວເລກແຖວລະຫວ່າງ 1 ຫາ {PH1} ເພື່ອນຳທາງໄປຫາແຖວດັ່ງກ່າວ"
   },
   "panels/sources/GoToLineQuickOpen.ts | currentPositionXsTypeAnOffset": {
-    "message": "ຕຳແໜ່ງປັດຈຸບັນ: 0x{PH1}. ພິມອອບເຊັດລະຫວ່າງ 0x{PH2} ຫາ 0x{PH3} ເພື່ອນຳທາງໄປຫາ."
+    "message": "ພິມອອບເຊັດລະຫວ່າງ 0x{PH1} ຫາ 0x{PH2} ເພື່ອນຳທາງໄປຫາຕຳແໜ່ງດັ່ງກ່າວ"
   },
   "panels/sources/GoToLineQuickOpen.ts | goToLineS": {
-    "message": "ໄປຫາແຖວ {PH1}."
+    "message": "ໄປຫາແຖວທີ {PH1}"
   },
   "panels/sources/GoToLineQuickOpen.ts | goToLineSAndColumnS": {
-    "message": "ໄປຫາແຖວ {PH1} ແລະ ຖັນ {PH2}."
+    "message": "ໄປຫາແຖວທີ {PH1} ແລະ ຖັນທີ {PH2}"
   },
   "panels/sources/GoToLineQuickOpen.ts | goToOffsetXs": {
-    "message": "ໄປຫາອອບເຊັດ 0x{PH1}."
+    "message": "ໄປຫາອອບເຊັດ 0x{PH1}"
   },
   "panels/sources/GoToLineQuickOpen.ts | noFileSelected": {
-    "message": "ບໍ່ໄດ້ເລືອກໄຟລ໌."
+    "message": "ບໍ່ໄດ້ເລືອກໄຟລ໌"
   },
   "panels/sources/GoToLineQuickOpen.ts | noResultsFound": {
     "message": "ບໍ່ພົບຜົນການຊອກຫາ"
   },
   "panels/sources/GoToLineQuickOpen.ts | typeANumberToGoToThatLine": {
-    "message": "ພິມຕົວເລກເພື່ອໄປຫາແຖວນັ້ນ."
+    "message": "ພິມຕົວເລກເພື່ອໄປຫາແຖວນັ້ນ"
   },
   "panels/sources/InplaceFormatterEditorAction.ts | format": {
     "message": "ຮູບແບບ"
@@ -12077,15 +12962,6 @@
   "panels/sources/NavigatorView.ts | actionCannotBeUndone": {
     "message": "ຄຳສັ່ງນີ້ບໍ່ສາມາດຍົກເລີກໄດ້."
   },
-  "panels/sources/NavigatorView.ts | areYouSureYouWantToDeleteFolder": {
-    "message": "ທ່ານແນ່ໃຈບໍວ່າທ່ານຕ້ອງການລຶບໂຟນເດີນີ້ ແລະ ເນື້ອຫາຂອງມັນ?"
-  },
-  "panels/sources/NavigatorView.ts | areYouSureYouWantToDeleteThis": {
-    "message": "ທ່ານແນ່ໃຈບໍ່ວ່າຕ້ອງການລຶບໄຟລ໌ນີ້ອອກ?"
-  },
-  "panels/sources/NavigatorView.ts | areYouSureYouWantToExcludeThis": {
-    "message": "ທ່ານແນ່ໃຈບໍ່ວ່າບໍ່ຕ້ອງການຮວມໂຟນເດີນີ້?"
-  },
   "panels/sources/NavigatorView.ts | areYouSureYouWantToRemoveThis": {
     "message": "ລຶບ ‘{PH1}’ ອອກຈາກພື້ນທີ່ເຮັດວຽກບໍ?"
   },
@@ -12095,8 +12971,20 @@
   "panels/sources/NavigatorView.ts | authoredTooltip": {
     "message": "ປະກອບມີແຫຼ່ງຂໍ້ມູນຕົ້ນສະບັບ"
   },
+  "panels/sources/NavigatorView.ts | connect": {
+    "message": "ເຊື່ອມຕໍ່"
+  },
+  "panels/sources/NavigatorView.ts | connectFolderToWorkspace": {
+    "message": "ເຊື່ອມຕໍ່ຫາບ່ອນເຮັດວຽກ"
+  },
   "panels/sources/NavigatorView.ts | delete": {
     "message": "ລຶບ"
+  },
+  "panels/sources/NavigatorView.ts | deleteFolder": {
+    "message": "ລຶບໂຟນເດີນີ້ ແລະ ເນື້ອຫາໃນໂຟນເດີບໍ?"
+  },
+  "panels/sources/NavigatorView.ts | deleteThisFile": {
+    "message": "ລຶບໄຟລ໌ນີ້ບໍ?"
   },
   "panels/sources/NavigatorView.ts | deployed": {
     "message": "ປັບໃຊ້ແລ້ວ"
@@ -12106,6 +12994,12 @@
   },
   "panels/sources/NavigatorView.ts | excludeFolder": {
     "message": "ຍົກເວັ້ນຈາກບ່ອນເຮັດວຽກ"
+  },
+  "panels/sources/NavigatorView.ts | excludeThisFolder": {
+    "message": "ຍົກເວັ້ນໂຟນເດີນີ້ບໍ?"
+  },
+  "panels/sources/NavigatorView.ts | folderWillNotBeShown": {
+    "message": "ໂຟນເດີນີ້ ແລະ ເນື້ອຫາຈະບໍ່ສະແດງໃນພື້ນທີ່ເຮັດວຽກ."
   },
   "panels/sources/NavigatorView.ts | makeACopy": {
     "message": "ສ້າງສຳເນົາ…"
@@ -12174,7 +13068,7 @@
     "message": "ການປິດ ({PH1})"
   },
   "panels/sources/ScopeChainSidebarPane.ts | loading": {
-    "message": "ກຳລັງໂຫລດ..."
+    "message": "ກຳລັງໂຫຼດ…"
   },
   "panels/sources/ScopeChainSidebarPane.ts | noVariables": {
     "message": "ບໍ່ມີຕົວແປ"
@@ -12188,6 +13082,9 @@
   "panels/sources/SnippetsPlugin.ts | enter": {
     "message": "⌘+Enter"
   },
+  "panels/sources/SourcesNavigator.ts | automaticWorkspaceNudge": {
+    "message": "ໃຊ້ {PH1} ເພື່ອເຊື່ອມຕໍ່ໂຟນເດີໂຄງການຂອງທ່ານໂດຍອັດຕະໂນມັດ"
+  },
   "panels/sources/SourcesNavigator.ts | clearConfiguration": {
     "message": "ລຶບລ້າງການຕັ້ງຄ່າ"
   },
@@ -12195,22 +13092,31 @@
     "message": "ສ້າງສະນິບເພັດໃໝ່"
   },
   "panels/sources/SourcesNavigator.ts | explainContentScripts": {
-    "message": "ເບິ່ງສະຄຣິບເນື້ອຫາທີ່ໃຫ້ບໍລິການໂດຍສ່ວນຂະຫຍາຍ"
+    "message": "ເບິ່ງສະຄຣິບເນື້ອຫາທີ່ສ່ວນຂະຫຍາຍສະແດງ."
   },
   "panels/sources/SourcesNavigator.ts | explainLocalOverrides": {
-    "message": "ຍົກເລີກຄຳຮ້ອງຂໍເຄືອຂ່າຍ ແລະ ເນື້ອຫາເວັບໃນເຄື່ອງເພື່ອຈຳລອງຊັບພະຍາກອນໄລຍະໄກ"
+    "message": "ຍົກເລີກຄຳຮ້ອງຂໍເຄືອຂ່າຍ ແລະ ເນື້ອຫາເວັບໃນເຄື່ອງເພື່ອຈຳລອງຊັບພະຍາກອນໄລຍະໄກ."
   },
   "panels/sources/SourcesNavigator.ts | explainSnippets": {
-    "message": "ບັນທຶກ code ຂອງ JavaScript ທີ່ທ່ານເອີ້ນໃຊ້ເລື້ອຍໆເພື່ອໃຫ້ສາມາດເອີ້ນໃຊ້ອີກຄັ້ງໄດ້ທຸກເວລາ"
+    "message": "ບັນທຶກ code ຂອງ JavaScript ທີ່ທ່ານເອີ້ນໃຊ້ເລື້ອຍໆໄວ້ໃນສະນິບເພັດເພື່ອໃຫ້ສາມາດເອີ້ນໃຊ້ອີກຄັ້ງໄດ້ທຸກເວລາ."
   },
   "panels/sources/SourcesNavigator.ts | explainWorkspace": {
-    "message": "ຕັ້ງຄ່າບ່ອນເຮັດວຽກເພື່ອຊິ້ງການແກ້ໄຂກັບແຫຼ່ງທີ່ມາທີ່ທ່ານພັດທະນາໂດຍກົງ"
-  },
-  "panels/sources/SourcesNavigator.ts | learnMore": {
-    "message": "ສຶກສາເພີ່ມເຕີມ"
+    "message": "ຕັ້ງຄ່າພື້ນທີ່ເຮັດວຽກເພື່ອຊິ້ງການແກ້ໄຂກັບແຫຼ່ງທີ່ມາທີ່ທ່ານພັດທະນາໂດຍກົງ."
   },
   "panels/sources/SourcesNavigator.ts | newSnippet": {
     "message": "ສະນິບເພັດໃໝ່"
+  },
+  "panels/sources/SourcesNavigator.ts | noContentScripts": {
+    "message": "ບໍ່ພົບສະຄຣິບເນື້ອຫາ"
+  },
+  "panels/sources/SourcesNavigator.ts | noLocalOverrides": {
+    "message": "ບໍ່ໄດ້ຕັ້ງຄ່າການຍົກເລີກໃນເຄື່ອງ"
+  },
+  "panels/sources/SourcesNavigator.ts | noSnippets": {
+    "message": "ບໍ່ມີສະນິບເພັດທີ່ບັນທຶກໄວ້"
+  },
+  "panels/sources/SourcesNavigator.ts | noWorkspace": {
+    "message": "ບໍ່ໄດ້ຕັ້ງຄ່າພື້ນທີ່ເຮັດວຽກ"
   },
   "panels/sources/SourcesNavigator.ts | remove": {
     "message": "ລຶບອອກ"
@@ -12222,7 +13128,7 @@
     "message": "ເອີ້ນໃຊ້"
   },
   "panels/sources/SourcesNavigator.ts | saveAs": {
-    "message": "ບັນທຶກເປັນ..."
+    "message": "ບັນທຶກເປັນ…"
   },
   "panels/sources/SourcesNavigator.ts | selectFolderForOverrides": {
     "message": "ເລືອກໂຟນເດີເພື່ອຍົກເລີກ"
@@ -12320,8 +13226,11 @@
   "panels/sources/TabbedEditorContainer.ts | areYouSureYouWantToCloseUnsaved": {
     "message": "ທ່ານແນ່ໃຈບໍ່ວ່າຕ້ອງການປິດໄຟລ໌ທີ່ບໍ່ໄດ້ບັນທຶກໄວ້: {PH1}?"
   },
-  "panels/sources/TabbedEditorContainer.ts | changesToThisFileWereNotSavedTo": {
-    "message": "ການປ່ຽນແປງຕໍ່ໄຟລ໌ນີ້ບໍ່ໄດ້ຖືກບັນທຶກໄປໃສ່ລະບົບໄຟລ໌."
+  "panels/sources/TabbedEditorContainer.ts | changesWereNotSavedToFileSystemToSaveAddFolderToWorkspace": {
+    "message": "ການປ່ຽນແປງບໍ່ໄດ້ຖືກບັນທຶກໄວ້ໃນລະບົບໄຟລ໌. ເພື່ອບັນທຶກ, ໃຫ້ເພີ່ມ {PH1} ໃສ່ Workspace ຂອງທ່ານ."
+  },
+  "panels/sources/TabbedEditorContainer.ts | changesWereNotSavedToFileSystemToSaveSetUpYourWorkspace": {
+    "message": "ການປ່ຽນແປງບໍ່ໄດ້ຖືກບັນທຶກໄວ້ໃນລະບົບໄຟລ໌. ເພື່ອບັນທຶກ, ໃຫ້ຕັ້ງຄ່າ {PH1} ຂອງທ່ານ."
   },
   "panels/sources/TabbedEditorContainer.ts | unableToLoadThisContent": {
     "message": "ບໍ່ສາມາດໂຫຼດເນື້ອຫານີ້ໄດ້."
@@ -12434,8 +13343,8 @@
   "panels/sources/sources-meta.ts | activateBreakpoints": {
     "message": "ເປີດການນຳໃຊ້ເບຣກພອຍ"
   },
-  "panels/sources/sources-meta.ts | addFolder": {
-    "message": "ເພີ່ມໂຟນເດີ"
+  "panels/sources/sources-meta.ts | addFolderManually": {
+    "message": "ເພີ່ມໂຟນເດີດ້ວຍຕົນເອງ"
   },
   "panels/sources/sources-meta.ts | addFolderToWorkspace": {
     "message": "ເພີ່ມໂຟນເດີໃສ່ພື້ນທີ່ວຽກ"
@@ -12584,6 +13493,9 @@
   "panels/sources/sources-meta.ts | goToLine": {
     "message": "ໄປຫາແຖວ"
   },
+  "panels/sources/sources-meta.ts | goToSymbol": {
+    "message": "ໄປຫາສັນຍາລັກ"
+  },
   "panels/sources/sources-meta.ts | incrementCssUnitBy": {
     "message": "ເພີ່ມຫົວໜ່ວຍ CSS ເທື່ອລະ {PH1}"
   },
@@ -12611,6 +13523,9 @@
   "panels/sources/sources-meta.ts | open": {
     "message": "ເປີດ"
   },
+  "panels/sources/sources-meta.ts | openFile": {
+    "message": "ເປີດໄຟລ໌"
+  },
   "panels/sources/sources-meta.ts | pauseScriptExecution": {
     "message": "ຢຸດການດຳເນີນການສະຄຣິບຊົ່ວຄາວ"
   },
@@ -12633,7 +13548,7 @@
     "message": "ສະແດງໄຟລ໌ທີ່ໃຊ້ຢູ່ໃນແຖບດ້ານຂ້າງຂອງຕົວນຳທາງ"
   },
   "panels/sources/sources-meta.ts | runSnippet": {
-    "message": "ເອີ້ນໃຊ້ຂໍ້ມູນສະນິບເພັດ"
+    "message": "ໃຊ້ສະນິບເພັດ"
   },
   "panels/sources/sources-meta.ts | save": {
     "message": "ບັນທຶກ"
@@ -12731,6 +13646,9 @@
   "panels/sources/sources-meta.ts | toggleNavigatorSidebar": {
     "message": "ສະຫຼັບແຖບດ້ານຂ້າງຕົວນຳທາງ"
   },
+  "panels/sources/sources-meta.ts | toggleWordWrap": {
+    "message": "ເປີດ/ປິດການຕັດຄຳ"
+  },
   "panels/sources/sources-meta.ts | trailing": {
     "message": "ຕໍ່ທ້າຍ"
   },
@@ -12739,6 +13657,9 @@
   },
   "panels/sources/sources-meta.ts | watch": {
     "message": "ເບິ່ງ"
+  },
+  "panels/sources/sources-meta.ts | wordWrap": {
+    "message": "ການຕັດຄຳ"
   },
   "panels/sources/sources-meta.ts | workspace": {
     "message": "ພື້ນທີ່ເຮັດວຽກ"
@@ -12836,11 +13757,32 @@
   "panels/timeline/NetworkTrackAppender.ts | network": {
     "message": "ເຄືອຂ່າຍ"
   },
-  "panels/timeline/ServerTimingsTrackAppender.ts | serverSideTrack": {
-    "message": "ເວລາຂອງເຊີບເວີ — {PH1}"
+  "panels/timeline/StatusDialog.ts | description": {
+    "message": "ລາຍລະອຽດ"
   },
-  "panels/timeline/ServerTimingsTrackAppender.ts | serverTimingTrack": {
-    "message": "ແທຣັກນີ້ມີການຈັບເວລາເຊິ່ງມາຈາກສ່ວນຫົວການຕອບກັບຂອງເຄືອຂ່າຍເວລາຂອງເຊີບເວີ. ເວລາເລີ່ມຕົ້ນເປັນພຽງຄ່າປະເມີນ ແລະ ອາດບໍ່ຖືກຕ້ອງ."
+  "panels/timeline/StatusDialog.ts | downloadAfterError": {
+    "message": "ດາວໂຫຼດການຕິດຕາມ"
+  },
+  "panels/timeline/StatusDialog.ts | status": {
+    "message": "ສະຖານະ"
+  },
+  "panels/timeline/StatusDialog.ts | stop": {
+    "message": "ຢຸດ"
+  },
+  "panels/timeline/StatusDialog.ts | time": {
+    "message": "ເວລາ"
+  },
+  "panels/timeline/ThirdPartyTreeView.ts | firstOrThirdPartyName": {
+    "message": "ພາກສ່ວນທີໜຶ່ງ / ພາກສ່ວນທີສາມ"
+  },
+  "panels/timeline/ThirdPartyTreeView.ts | mainThreadTime": {
+    "message": "ເວລາຂອງຫົວຂໍ້ຫຼັກ"
+  },
+  "panels/timeline/ThirdPartyTreeView.ts | transferSize": {
+    "message": "ຂະໜາດການໂອນຍ້າຍ"
+  },
+  "panels/timeline/ThirdPartyTreeView.ts | unattributed": {
+    "message": "[ບໍ່ມີການລະບຸແຫຼ່ງທີ່ມາ]"
   },
   "panels/timeline/ThreadAppender.ts | bidderWorklet": {
     "message": "ງານຜູ້ປະມູນ"
@@ -12977,6 +13919,9 @@
   "panels/timeline/TimelineFlameChartView.ts | sAtS": {
     "message": "{PH1} ເວລາ {PH2}"
   },
+  "panels/timeline/TimelineHistoryManager.ts | backButtonTooltip": {
+    "message": "ເບິ່ງໜ້າການວັດແທກແບບສົດໆ"
+  },
   "panels/timeline/TimelineHistoryManager.ts | currentSessionSS": {
     "message": "ເຊດຊັນປັດຈຸບັນ: {PH1}. {PH2}"
   },
@@ -13000,9 +13945,6 @@
   },
   "panels/timeline/TimelinePanel.ts | CpuThrottlingIsEnabled": {
     "message": "- ການຄວບຄຸມ CPU ເປີດໃຊ້ຢູ່"
-  },
-  "panels/timeline/TimelinePanel.ts | JavascriptSamplingIsDisabled": {
-    "message": "- ປິດການນຳໃຊ້ການສ້າງຕົວຢ່າງ JavaScript ແລ້ວ"
   },
   "panels/timeline/TimelinePanel.ts | NetworkThrottlingIsEnabled": {
     "message": "- ເປີດການນຳໃຊ້ການຄວບຄຸມເຄືອຂ່າຍແລ້ວ"
@@ -13040,20 +13982,8 @@
   "panels/timeline/TimelinePanel.ts | cpu": {
     "message": "CPU:"
   },
-  "panels/timeline/TimelinePanel.ts | description": {
-    "message": "ລາຍລະອຽດ"
-  },
   "panels/timeline/TimelinePanel.ts | dimThirdParties": {
     "message": "ຫຼຸດຄວາມໂດດເດັ່ນຂອງພາກສ່ວນທີສາມ"
-  },
-  "panels/timeline/TimelinePanel.ts | disableJavascriptSamples": {
-    "message": "ປິດການນຳໃຊ້ຕົວຢ່າງ JavaScript"
-  },
-  "panels/timeline/TimelinePanel.ts | disablesJavascriptSampling": {
-    "message": "ປິດການນຳໃຊ້ການສ້າງຕົວຢ່າງ JavaScript, ຫຼຸດໂອເວີເຮດເມື່ອໃຊ້ກັບອຸປະກອນມືຖື"
-  },
-  "panels/timeline/TimelinePanel.ts | downloadAfterError": {
-    "message": "ດາວໂຫຼດເຫດການການຕິດຕາມໄຟລ໌ຂໍ້ມູນດິບ"
   },
   "panels/timeline/TimelinePanel.ts | dropTimelineFileOrUrlHere": {
     "message": "ວາງໄຟລ໌ທາມລາຍ ຫຼື URL ໃສ່ບ່ອນນີ້"
@@ -13073,8 +14003,8 @@
   "panels/timeline/TimelinePanel.ts | exportNormalTraces": {
     "message": "ການຕິດຕາມປະສິດທິພາບພື້ນຖານ"
   },
-  "panels/timeline/TimelinePanel.ts | failedToSaveTimelineSS": {
-    "message": "ບັນທຶກທາມລາຍບໍ່ສຳເລັດ: {PH1} ({PH2})"
+  "panels/timeline/TimelinePanel.ts | exportingFailed": {
+    "message": "ການສົ່ງອອກການຕິດຕາມບໍ່ສຳເລັດ"
   },
   "panels/timeline/TimelinePanel.ts | fixMe": {
     "message": "ແກ້ໄຂຂ້ອຍ"
@@ -13136,6 +14066,9 @@
   "panels/timeline/TimelinePanel.ts | selectionCleared": {
     "message": "ລຶບລ້າງຕົວເລືອກແລ້ວ"
   },
+  "panels/timeline/TimelinePanel.ts | shortcutsDialogTitle": {
+    "message": "ຄີລັດສໍາລັບແຜນຜັງໄຟ"
+  },
   "panels/timeline/TimelinePanel.ts | showCustomtracks": {
     "message": "ສະແດງການຕິດຕາມທີ່ກຳນົດເອງ"
   },
@@ -13154,29 +14087,17 @@
   "panels/timeline/TimelinePanel.ts | sidebarShown": {
     "message": "ແຖບດ້ານຂ້າງໃນແຜງປະສິດທິພາບສະແດງຢູ່"
   },
-  "panels/timeline/TimelinePanel.ts | status": {
-    "message": "ສະຖານະ"
-  },
-  "panels/timeline/TimelinePanel.ts | stop": {
-    "message": "ຢຸດ"
-  },
   "panels/timeline/TimelinePanel.ts | stoppingTimeline": {
     "message": "ກຳລັງຢຸດທາມລາຍ…"
   },
-  "panels/timeline/TimelinePanel.ts | time": {
-    "message": "ເວລາ"
+  "panels/timeline/TimelinePanel.ts | thirdPartiesByThirdPartyWeb": {
+    "message": "ພາກສ່ວນທີສາມທີ່ຈຳແນກໂດຍເວັບພາກສ່ວນທີສາມ"
   },
-  "panels/timeline/TimelinePanel.ts | timelineFastZoomInOut": {
-    "message": "ຊູມເຂົ້າ/ອອກຢ່າງວ່ອງໄວໃນທາມລາຍ"
+  "panels/timeline/TimelinePanel.ts | timelineScrollPan": {
+    "message": "ເລື່ອນ ແລະ ແພນ"
   },
-  "panels/timeline/TimelinePanel.ts | timelinePanLeftRight": {
-    "message": "ເລື່ອນທາມລາຍໄປທາງຂວາ/ຊ້າຍ"
-  },
-  "panels/timeline/TimelinePanel.ts | timelineScrollUpDown": {
-    "message": "ທາມລາຍຂຶ້ນ/ລົງ"
-  },
-  "panels/timeline/TimelinePanel.ts | timelineZoomInOut": {
-    "message": "ຊູມເຂົ້າ/ອອກທາມລາຍ"
+  "panels/timeline/TimelinePanel.ts | timelineZoom": {
+    "message": "ຊູມ"
   },
   "panels/timeline/TimelineSelectorStatsView.ts | copyTable": {
     "message": "ສຳເນົາຕາຕະລາງ"
@@ -13223,8 +14144,17 @@
   "panels/timeline/TimelineTreeView.ts | activity": {
     "message": "ການເຄື່ອນໄຫວ"
   },
+  "panels/timeline/TimelineTreeView.ts | bottomUp": {
+    "message": "ລຸ່ມຂຶ້ນເທິງ"
+  },
   "panels/timeline/TimelineTreeView.ts | chromeExtensionsOverhead": {
     "message": "[ໂອເວີເຮດສ່ວນຂະຫຍາຍ Chrome]"
+  },
+  "panels/timeline/TimelineTreeView.ts | extension": {
+    "message": "ສ່ວນຂະຫຍາຍ"
+  },
+  "panels/timeline/TimelineTreeView.ts | firstParty": {
+    "message": "ພາກສ່ວນທີໜຶ່ງ"
   },
   "panels/timeline/TimelineTreeView.ts | groupBy": {
     "message": "ຈັດກຸ່ມຕາມ"
@@ -13296,13 +14226,16 @@
     "message": "ເວລາທັງໝົດ"
   },
   "panels/timeline/TimelineTreeView.ts | unattributed": {
-    "message": "[ບໍ່ມີຄຸນສົມບັດ]"
+    "message": "[ບໍ່ມີການລະບຸແຫຼ່ງທີ່ມາ]"
   },
   "panels/timeline/TimelineTreeView.ts | useRegularExpression": {
     "message": "ໃຊ້ regular expression"
   },
   "panels/timeline/TimelineTreeView.ts | vRuntime": {
     "message": "[ເວລາໃຊ້ແລ່ນ V8]"
+  },
+  "panels/timeline/TimelineTreeView.ts | viewBottomUp": {
+    "message": "ເບິ່ງຈາກລຸ່ມຂຶ້ນເທິງ"
   },
   "panels/timeline/TimelineUIUtils.ts | UnknownNode": {
     "message": "[ ບໍ່ຮູ້ໂນດ ]"
@@ -13403,23 +14336,8 @@
   "panels/timeline/TimelineUIUtils.ts | consumedCacheSize": {
     "message": "ຂະໜາດແຄສທີ່ໃຊ້ໄປແລ້ວ"
   },
-  "panels/timeline/TimelineUIUtils.ts | cumulativeLayoutShifts": {
-    "message": "Cumulative Layout Shifts"
-  },
-  "panels/timeline/TimelineUIUtils.ts | cumulativeScore": {
-    "message": "ຄະແນນສະສົມ"
-  },
-  "panels/timeline/TimelineUIUtils.ts | currentClusterId": {
-    "message": "ID ຄລັສເຕີປັດຈຸບັນ"
-  },
-  "panels/timeline/TimelineUIUtils.ts | currentClusterScore": {
-    "message": "ຄະແນນຄລັສເຕີປັດຈຸບັນ"
-  },
   "panels/timeline/TimelineUIUtils.ts | delay": {
     "message": "ຄວາມ​ຫຼ້າຊ້າ"
-  },
-  "panels/timeline/TimelineUIUtils.ts | description": {
-    "message": "ຄຳອະທິບາຍ"
   },
   "panels/timeline/TimelineUIUtils.ts | details": {
     "message": "ລາຍລະອຽດ"
@@ -13442,9 +14360,6 @@
   "panels/timeline/TimelineUIUtils.ts | entryIsHidden": {
     "message": "(ລາຍການຖືກເຊື່ອງໄວ້)"
   },
-  "panels/timeline/TimelineUIUtils.ts | evolvedClsLink": {
-    "message": "ພັດທະນາແລ້ວ"
-  },
   "panels/timeline/TimelineUIUtils.ts | failedToLoadScriptFromCache": {
     "message": "ໂຫຼດສະຄຣິບຈາດແຄສບໍ່ສຳເລັດ"
   },
@@ -13459,9 +14374,6 @@
   },
   "panels/timeline/TimelineUIUtils.ts | function": {
     "message": "ຟັງຊັນ"
-  },
-  "panels/timeline/TimelineUIUtils.ts | hadRecentInput": {
-    "message": "ມີອິນພຸດຫຼ້າສຸດ"
   },
   "panels/timeline/TimelineUIUtils.ts | idleCallbackRequested": {
     "message": "ຮ້ອງຂໍ Callback ທີ່ບໍ່ມີການນຳໃຊ້ແລ້ວ"
@@ -13514,17 +14426,11 @@
   "panels/timeline/TimelineUIUtils.ts | module": {
     "message": "ໂມດູນ"
   },
-  "panels/timeline/TimelineUIUtils.ts | movedFrom": {
-    "message": "ຍ້າຍແລ້ວຈາກ"
-  },
-  "panels/timeline/TimelineUIUtils.ts | movedTo": {
-    "message": "ຍ້າຍ​ໄປໃສ່​"
-  },
-  "panels/timeline/TimelineUIUtils.ts | no": {
-    "message": "ບໍ່"
-  },
   "panels/timeline/TimelineUIUtils.ts | nodesThatNeedLayout": {
     "message": "ໂໜດທີ່ຕ້ອງມີໂຄງຮ່າງ"
+  },
+  "panels/timeline/TimelineUIUtils.ts | origin": {
+    "message": "ຕົ້ນທາງ"
   },
   "panels/timeline/TimelineUIUtils.ts | outsideBreadcrumbRange": {
     "message": "(ນອກໄລຍະລຳດັບຂັ້ນ)"
@@ -13574,9 +14480,6 @@
   "panels/timeline/TimelineUIUtils.ts | sAtSParentheses": {
     "message": "{PH1} (ເວລາ {PH2})"
   },
-  "panels/timeline/TimelineUIUtils.ts | sCLSInformation": {
-    "message": "{PH1} ອາດສົ່ງຜົນໃຫ້ປະສົບການຜູ້ໃຊ້ຕ່ຳ. ມັນໄດ້ {PH2} ເມື່ອບໍ່ດົນມານີ້."
-  },
   "panels/timeline/TimelineUIUtils.ts | sChildren": {
     "message": "{PH1} (ເດັກນ້ອຍ)"
   },
@@ -13607,9 +14510,6 @@
   "panels/timeline/TimelineUIUtils.ts | sSs": {
     "message": "{PH1} [{PH2}…{PH3}]"
   },
-  "panels/timeline/TimelineUIUtils.ts | score": {
-    "message": "ຄະແນນ"
-  },
   "panels/timeline/TimelineUIUtils.ts | script": {
     "message": "ສະຄຣິບ"
   },
@@ -13622,11 +14522,11 @@
   "panels/timeline/TimelineUIUtils.ts | selectorStatsTitle": {
     "message": "ສະຖິຕິຕົວເລືອກ"
   },
-  "panels/timeline/TimelineUIUtils.ts | selfTime": {
-    "message": "ເວລາຂອງການເຄື່ອນໄຫວດ່ຽວ"
-  },
   "panels/timeline/TimelineUIUtils.ts | size": {
     "message": "ຂະໜາດ"
+  },
+  "panels/timeline/TimelineUIUtils.ts | source": {
+    "message": "ແຫຼ່ງທີ່ມາ"
   },
   "panels/timeline/TimelineUIUtils.ts | stackTrace": {
     "message": "ການຕິດຕາມແບບຊ້ອນກັນ"
@@ -13636,6 +14536,9 @@
   },
   "panels/timeline/TimelineUIUtils.ts | stylesheetUrl": {
     "message": "URL ຊີດຮູບແບບ"
+  },
+  "panels/timeline/TimelineUIUtils.ts | thirdPartyTable": {
+    "message": "ຕາຕະລາງພາກສ່ວນທີໜຶ່ງ / ພາກສ່ວນທີສາມ"
   },
   "panels/timeline/TimelineUIUtils.ts | timeSpentInRendering": {
     "message": "ເວລາທີ່ໃຊ້ໄປໃນການສະແດງພາບ"
@@ -13652,9 +14555,6 @@
   "panels/timeline/TimelineUIUtils.ts | timestamp": {
     "message": "ເວລາ"
   },
-  "panels/timeline/TimelineUIUtils.ts | totalTime": {
-    "message": "ເວລາທັງໝົດ"
-  },
   "panels/timeline/TimelineUIUtils.ts | traceEvent": {
     "message": "ເຫດການການຕິດຕາມ"
   },
@@ -13666,9 +14566,6 @@
   },
   "panels/timeline/TimelineUIUtils.ts | warning": {
     "message": "ຄຳເຕືອນ"
-  },
-  "panels/timeline/TimelineUIUtils.ts | yes": {
-    "message": "ແມ່ນ"
   },
   "panels/timeline/TimingsTrackAppender.ts | timings": {
     "message": "ໄລຍະເວລາ"
@@ -13724,14 +14621,23 @@
   "panels/timeline/components/BreadcrumbsUI.ts | removeChildBreadcrumbs": {
     "message": "ລຶບລຳດັບຂັ້ນຍ່ອຍອອກ"
   },
+  "panels/timeline/components/CPUThrottlingSelector.ts | calibrate": {
+    "message": "ປັບທຽບ…"
+  },
   "panels/timeline/components/CPUThrottlingSelector.ts | cpu": {
     "message": "CPU: {PH1}"
   },
   "panels/timeline/components/CPUThrottlingSelector.ts | cpuThrottling": {
     "message": "ການຄວບຄຸມ CPU: {PH1}"
   },
+  "panels/timeline/components/CPUThrottlingSelector.ts | labelCalibratedPresets": {
+    "message": "ຄ່າທີ່ກຳນົດລ່ວງໜ້າເຊິ່ງປັບທຽບແລ້ວ"
+  },
+  "panels/timeline/components/CPUThrottlingSelector.ts | recalibrate": {
+    "message": "ປັບທຽບໃໝ່…"
+  },
   "panels/timeline/components/CPUThrottlingSelector.ts | recommendedThrottling": {
-    "message": "{PH1} - ແນະນຳ"
+    "message": "{PH1} – ແນະນຳ"
   },
   "panels/timeline/components/CPUThrottlingSelector.ts | recommendedThrottlingReason": {
     "message": "ພິຈາລະນາປ່ຽນການຕັ້ງຄ່າເພື່ອຈຳລອງສະພາບແວດລ້ອມຂອງຜູ້ໃຊ້ແທ້"
@@ -13828,18 +14734,6 @@
   },
   "panels/timeline/components/IgnoreListSetting.ts | ignoreScriptsWhoseNamesMatchS": {
     "message": "ບໍ່ຕ້ອງສົນໃຈສະຄຣິບທີ່ມີ \"{regex}\" ຢູ່ໃນຊື່"
-  },
-  "panels/timeline/components/IgnoreListSetting.ts | patternAlreadyExists": {
-    "message": "ມີກົດລະບຽບນີ້ຢູ່ແລ້ວ"
-  },
-  "panels/timeline/components/IgnoreListSetting.ts | patternAlreadyExistsWillBeEnables": {
-    "message": "ມີກົດລະບຽບນີ້ຢູ່ແລ້ວ ແຕ່ປິດການນຳໃຊ້ຢູ່. ການບັນທຶກຄ່ານີ້ຈະເປີດການນຳໃຊ້ກົດລະບຽບຄືນໃໝ່"
-  },
-  "panels/timeline/components/IgnoreListSetting.ts | patternCannotBeEmpty": {
-    "message": "ຕ້ອງລະບຸກົດລະບຽບ"
-  },
-  "panels/timeline/components/IgnoreListSetting.ts | patternMustBeAValidRegular": {
-    "message": "ກົດລະບຽບຕ້ອງເປັນ regular expression ທີ່ຖືກຕ້ອງ"
   },
   "panels/timeline/components/IgnoreListSetting.ts | removeRegex": {
     "message": "ລຶບ regex ອອກ: ''{regex}''"
@@ -14069,11 +14963,11 @@
   "panels/timeline/components/MetricCard.ts | considerTesting": {
     "message": "ພິຈາລະນາເງື່ອນໄຂການທົດສອບໃນເຄື່ອງຂອງທ່ານ"
   },
-  "panels/timeline/components/MetricCard.ts | duration": {
-    "message": "ໄລຍະເວລາໃນເຄື່ອງ (ມິລິວິນາທີ)"
-  },
   "panels/timeline/components/MetricCard.ts | field75thPercentile": {
     "message": "ຂໍ້ມູນພາກສະໜາມ 75%"
+  },
+  "panels/timeline/components/MetricCard.ts | fieldP75": {
+    "message": "ຊ່ອງ p75"
   },
   "panels/timeline/components/MetricCard.ts | good": {
     "message": "ດີ"
@@ -14216,8 +15110,14 @@
   "panels/timeline/components/NetworkRequestDetails.ts | decodedBody": {
     "message": "ຖອດລະຫັດເນື້ອຫາແລ້ວ"
   },
+  "panels/timeline/components/NetworkRequestDetails.ts | description": {
+    "message": "ຄຳອະທິບາຍ"
+  },
   "panels/timeline/components/NetworkRequestDetails.ts | encodedData": {
     "message": "ຂໍ້ມູນທີ່ເຂົ້າລະຫັດ"
+  },
+  "panels/timeline/components/NetworkRequestDetails.ts | entity": {
+    "message": "ພາກສ່ວນທີສາມ"
   },
   "panels/timeline/components/NetworkRequestDetails.ts | fromCache": {
     "message": "ຈາກແຄສ"
@@ -14240,11 +15140,20 @@
   "panels/timeline/components/NetworkRequestDetails.ts | priority": {
     "message": "ຄວາມສຳຄັນ"
   },
+  "panels/timeline/components/NetworkRequestDetails.ts | protocol": {
+    "message": "ໂປຣໂຕຄໍ"
+  },
   "panels/timeline/components/NetworkRequestDetails.ts | renderBlocking": {
     "message": "ການບລັອກການສະແດງພາບ"
   },
   "panels/timeline/components/NetworkRequestDetails.ts | requestMethod": {
     "message": "ວິທີຮ້ອງຂໍ"
+  },
+  "panels/timeline/components/NetworkRequestDetails.ts | serverTiming": {
+    "message": "ເວລາຂອງເຊີບເວີ"
+  },
+  "panels/timeline/components/NetworkRequestDetails.ts | time": {
+    "message": "ເວລາ"
   },
   "panels/timeline/components/NetworkRequestDetails.ts | yes": {
     "message": "ແມ່ນ"
@@ -14260,6 +15169,9 @@
   },
   "panels/timeline/components/NetworkRequestTooltip.ts | queuingAndConnecting": {
     "message": "ກຳລັງເຂົ້າຄິວ ແລະ ເຊື່ອມຕໍ່"
+  },
+  "panels/timeline/components/NetworkRequestTooltip.ts | redirects": {
+    "message": "ປ່ຽນເສັ້ນທາງ"
   },
   "panels/timeline/components/NetworkRequestTooltip.ts | renderBlocking": {
     "message": "ການບລັອກການສະແດງພາບ"
@@ -14289,7 +15201,7 @@
     "message": "ຄ່າທີ່ຕັ້ງລ່ວງໜ້າ"
   },
   "panels/timeline/components/NetworkThrottlingSelector.ts | recommendedThrottling": {
-    "message": "{PH1} - ແນະນຳ"
+    "message": "{PH1} – ແນະນຳ"
   },
   "panels/timeline/components/NetworkThrottlingSelector.ts | recommendedThrottlingReason": {
     "message": "ພິຈາລະນາປ່ຽນການຕັ້ງຄ່າເພື່ອຈຳລອງສະພາບແວດລ້ອມຂອງຜູ້ໃຊ້ແທ້"
@@ -14331,7 +15243,7 @@
     "message": "ເຫດການ \"{PH1}\" ທີ່ມີຄຳອະທິບາຍປະກອບດ້ວຍຂໍ້ຄວາມ \"{PH2}\""
   },
   "panels/timeline/components/SidebarAnnotationsTab.ts | entryLabelTutorialDescription": {
-    "message": "ຄລິກລາຍການສອງເທື່ອ ແລ້ວພິມເພື່ອສ້າງປ້າຍກຳກັບລາຍການ."
+    "message": "ຄລິກສອງເທື່ອ ຫຼື ກົດ Enter ຢູ່ລາຍການແລ້ວພິມເພື່ອສ້າງປ້າຍກຳກັບລາຍການ."
   },
   "panels/timeline/components/SidebarAnnotationsTab.ts | entryLabelTutorialTitle": {
     "message": "ຕິດປ້າຍກຳກັບລາຍການ"
@@ -14360,11 +15272,32 @@
   "panels/timeline/components/SidebarInsightsTab.ts | feedbackTooltip": {
     "message": "ຄຸນສົມບັດ Insights ເປັນເວີຊັນທົດລອງ. ຄຳຕິຊົມຂອງທ່ານຈະຊ່ວຍພວກເຮົາປັບປຸງຄຸນສົມບັດນີ້ໄດ້."
   },
+  "panels/timeline/components/SidebarSingleInsightSet.ts | dismissTitle": {
+    "message": "ປິດໄວ້"
+  },
+  "panels/timeline/components/SidebarSingleInsightSet.ts | fieldMismatchNotice": {
+    "message": "ມີຫຼາຍເຫດຜົນວ່າເປັນຫຍັງການວັດແທກທ້ອງຖິ່ນ ແລະ ພາກສະໜາມຈຶ່ງ [ອາດບໍ່ກົງກັນ](https://web.dev/articles/lab-and-field-data-differences). ປັບແກ້ [ການຕັ້ງຄ່າການຄວບຄຸມປະລິມານ ແລະ ການຈຳລອງອຸປະກອນ](https://developer.chrome.com/docs/devtools/device-mode) ເພື່ອວິເຄາະການຕິດຕາມທີ່ຄ້າຍຄືກັບສະພາບແວດລ້ອມຂອງຜູ້ໃຊ້ໂດຍສະເລ່ຍ."
+  },
+  "panels/timeline/components/SidebarSingleInsightSet.ts | fieldMismatchTitle": {
+    "message": "ການວັດແທກພາກສະໜາມ ແລະ ທ້ອງຖິ່ນບໍ່ກົງກັນ"
+  },
+  "panels/timeline/components/SidebarSingleInsightSet.ts | fieldScoreLabel": {
+    "message": "ສະໜາມ ({PH1})"
+  },
   "panels/timeline/components/SidebarSingleInsightSet.ts | metricScore": {
     "message": "{PH1}: {PH2} {PH3} ຄະແນນ"
   },
+  "panels/timeline/components/SidebarSingleInsightSet.ts | metricScoreUnavailable": {
+    "message": "{PH1}: ບໍ່ມີຂໍ້ມູນ"
+  },
+  "panels/timeline/components/SidebarSingleInsightSet.ts | originOption": {
+    "message": "ຕົ້ນສະບັບ"
+  },
   "panels/timeline/components/SidebarSingleInsightSet.ts | passedInsights": {
     "message": "ຂໍ້ມູນເຈາະເລິກທີ່ຜ່ານ ({PH1})"
+  },
+  "panels/timeline/components/SidebarSingleInsightSet.ts | urlOption": {
+    "message": "URL"
   },
   "panels/timeline/components/TimelineSummary.ts | rangeSS": {
     "message": "ໄລຍະ:  {PH1} – {PH2}"
@@ -14381,203 +15314,62 @@
   "panels/timeline/components/insights/BaseInsightComponent.ts | estimatedSavings": {
     "message": "ເວລາທີ່ປະຢັດໄດ້ໂດຍປະມານ: {PH1}"
   },
+  "panels/timeline/components/insights/BaseInsightComponent.ts | estimatedSavingsAriaBytes": {
+    "message": "ການປະຢັດໂດຍປະມານສໍາລັບຂໍ້ມູນເຈາະເລິກນີ້: {PH1} ຂະໜາດການໂອນ"
+  },
+  "panels/timeline/components/insights/BaseInsightComponent.ts | estimatedSavingsAriaTiming": {
+    "message": "ການປະຢັດໂດຍປະມານສໍາລັບຂໍ້ມູນເຈາະເລິກນີ້: {PH1}"
+  },
   "panels/timeline/components/insights/BaseInsightComponent.ts | estimatedSavingsTimingAndBytes": {
     "message": "ການປະຢັດໂດຍປະມານ: {PH1} ແລະ {PH2}"
   },
+  "panels/timeline/components/insights/BaseInsightComponent.ts | estimatedSavingsTimingAndBytesAria": {
+    "message": "ການປະຢັດໂດຍປະມານສໍາລັບຂໍ້ມູນເຈາະເລິກນີ້: {PH1} ແລະ {PH2} ຂະໜາດການໂອນ"
+  },
   "panels/timeline/components/insights/BaseInsightComponent.ts | viewDetails": {
-    "message": "ເບິ່ງລາຍລະອຽດສຳລັບ {PH1}"
+    "message": "ເບິ່ງລາຍລະອຽດສຳລັບຂໍ້ມູນເຈາະເລິກ {PH1}."
   },
-  "panels/timeline/components/insights/CLSCulprits.ts | animation": {
-    "message": "ພາບເຄື່ອນໄຫວ"
-  },
-  "panels/timeline/components/insights/CLSCulprits.ts | fontRequest": {
-    "message": "ຄຳຮ້ອງຂໍຟອນ"
-  },
-  "panels/timeline/components/insights/CLSCulprits.ts | injectedIframe": {
-    "message": "ມີການແຊກ iframe"
-  },
-  "panels/timeline/components/insights/CLSCulprits.ts | layoutShiftCluster": {
-    "message": "ຄລັສເຕີການປ່ຽນແປງໂຄງຮ່າງ @ {PH1}"
-  },
-  "panels/timeline/components/insights/CLSCulprits.ts | noCulprits": {
-    "message": "ກວດບໍ່ພົບສາເຫດຂອງການປ່ຽນແປງໂຄງຮ່າງ"
-  },
-  "panels/timeline/components/insights/CLSCulprits.ts | noLayoutShifts": {
-    "message": "ບໍ່ມີການປ່ຽນແປງໂຄງຮ່າງ"
-  },
-  "panels/timeline/components/insights/CLSCulprits.ts | topCulprits": {
-    "message": "ສາເຫດຫຼັກຂອງການປ່ຽນແປງໂຄງຮ່າງ"
-  },
-  "panels/timeline/components/insights/CLSCulprits.ts | unsizedImages": {
-    "message": "ຮູບບໍ່ມີຂະໜາດ"
-  },
-  "panels/timeline/components/insights/CLSCulprits.ts | worstCluster": {
-    "message": "ຄລັສເຕີທີ່ບໍ່ດີທີ່ສຸດ"
-  },
-  "panels/timeline/components/insights/CLSCulprits.ts | worstLayoutShiftCluster": {
-    "message": "ຄລັສເຕີການປ່ຽນແປງໂຄງຮ່າງທີ່ບໍ່ດີທີ່ສຸດ"
-  },
-  "panels/timeline/components/insights/DOMSize.ts | noLargeRenderTasks": {
-    "message": "ບໍ່ມີການສະແດງຜົນທີ່ໄດ້ຮັບຜົນກະທົບຈາກຂະໜາດ DOM"
-  },
-  "panels/timeline/components/insights/DocumentLatency.ts | failedAriaLabel": {
+  "panels/timeline/components/insights/Checklist.ts | failedAriaLabel": {
     "message": "ກວດສອບຂໍ້ມູນເຈາະເລິກບໍ່ສຳເລັດ: {PH1}"
   },
-  "panels/timeline/components/insights/DocumentLatency.ts | failedRedirects": {
-    "message": "ມີການປ່ຽນເສັ້ນທາງ"
-  },
-  "panels/timeline/components/insights/DocumentLatency.ts | failedServerResponseTime": {
-    "message": "ເຊີບເວີຕອບສະໜອງຊ້າ"
-  },
-  "panels/timeline/components/insights/DocumentLatency.ts | failedTextCompression": {
-    "message": "ບໍ່ໄດ້ນຳໃຊ້ການບີບອັດຂໍ້ມູນ"
-  },
-  "panels/timeline/components/insights/DocumentLatency.ts | passingRedirects": {
-    "message": "ຫຼີກເວັ້ນການປ່ຽນເສັ້ນທາງ"
-  },
-  "panels/timeline/components/insights/DocumentLatency.ts | passingServerResponseTime": {
-    "message": "ເຊີບເວີຕອບສະໜອງຢ່າງວ່ອງໄວ"
-  },
-  "panels/timeline/components/insights/DocumentLatency.ts | passingTextCompression": {
-    "message": "ນຳໃຊ້ການບີບອັດຂໍ້ຄວາມ"
-  },
-  "panels/timeline/components/insights/DocumentLatency.ts | redirectsLabel": {
-    "message": "ປ່ຽນເສັ້ນທາງ"
-  },
-  "panels/timeline/components/insights/DocumentLatency.ts | serverResponseTimeLabel": {
-    "message": "ເວລາໃນການຕອບກັບຂອງເຊີບເວີ"
-  },
-  "panels/timeline/components/insights/DocumentLatency.ts | successAriaLabel": {
+  "panels/timeline/components/insights/Checklist.ts | successAriaLabel": {
     "message": "ການກວດສອບຂໍ້ມູນເຈາະເລິກຜ່ານແລ້ວ: {PH1}"
   },
-  "panels/timeline/components/insights/DocumentLatency.ts | uncompressedDownload": {
-    "message": "ການດາວໂຫຼດທີ່ບໍ່ມີການບີບອັດ"
-  },
-  "panels/timeline/components/insights/FontDisplay.ts | fontColumn": {
-    "message": "ຟອນ"
-  },
-  "panels/timeline/components/insights/FontDisplay.ts | wastedTimeColumn": {
-    "message": "ເວລາທີ່ເສຍໄປ"
-  },
-  "panels/timeline/components/insights/ImageDelivery.ts | noOptimizableImages": {
-    "message": "ບໍ່ມີຮູບທີ່ເພີ່ມປະສິດທິພາບໄດ້"
-  },
-  "panels/timeline/components/insights/ImageDelivery.ts | optimizeFile": {
-    "message": "ເພີ່ມປະສິດທິພາບຂະໜາດໄຟລ໌"
-  },
-  "panels/timeline/components/insights/ImageDelivery.ts | others": {
+  "panels/timeline/components/insights/Table.ts | others": {
     "message": "ອີກ {PH1} ລາຍການ"
   },
-  "panels/timeline/components/insights/InteractionToNextPaint.ts | duration": {
-    "message": "ໄລຍະເວລາ"
+  "panels/timeline/overlays/OverlaysImpl.ts | fieldMetricMarkerField": {
+    "message": "{PH1} - ຊ່ອງຂໍ້ມູນ ({PH2})"
   },
-  "panels/timeline/components/insights/InteractionToNextPaint.ts | inputDelay": {
-    "message": "ຄວາມຫຼ້າຊ້າຂອງອິນພຸດ"
+  "panels/timeline/overlays/OverlaysImpl.ts | fieldMetricMarkerLocal": {
+    "message": "{PH1} - ໃນເຄື່ອງ"
   },
-  "panels/timeline/components/insights/InteractionToNextPaint.ts | noInteractions": {
-    "message": "ບໍ່ພົບການໂຕ້ຕອບ"
+  "panels/timeline/overlays/OverlaysImpl.ts | originOption": {
+    "message": "ຕົ້ນສະບັບ"
   },
-  "panels/timeline/components/insights/InteractionToNextPaint.ts | phase": {
-    "message": "ໄລຍະ"
-  },
-  "panels/timeline/components/insights/InteractionToNextPaint.ts | presentationDelay": {
-    "message": "ການນຳສະເໜີຫຼ້າຊ້າ"
-  },
-  "panels/timeline/components/insights/InteractionToNextPaint.ts | processingDuration": {
-    "message": "ໄລຍະເວລາໃນການປະມວນຜົນ"
-  },
-  "panels/timeline/components/insights/LCPDiscovery.ts | failedAriaLabel": {
-    "message": "ກວດສອບຂໍ້ມູນເຈາະເລິກບໍ່ສຳເລັດ: {PH1}"
-  },
-  "panels/timeline/components/insights/LCPDiscovery.ts | fetchPriorityApplied": {
-    "message": "ໃຊ້ລຳດັບຄວາມສຳຄັນໃນການດຶງຂໍ້ມູນ=ສູງຢູ່"
-  },
-  "panels/timeline/components/insights/LCPDiscovery.ts | lazyLoadNotApplied": {
-    "message": "ບໍ່ໄດ້ໃຊ້ການໂຫຼດແບບ lazy loading"
-  },
-  "panels/timeline/components/insights/LCPDiscovery.ts | lcpLoadDelay": {
-    "message": "ຮູບ LCP ໃຊ້ເວລາໂຫຼດ {PH1} ຫຼັງຈາກຈຸດເລີ່ມຕົ້ນທຳອິດສຸດ."
-  },
-  "panels/timeline/components/insights/LCPDiscovery.ts | noLcp": {
-    "message": "ບໍ່ພົບ LCP"
-  },
-  "panels/timeline/components/insights/LCPDiscovery.ts | noLcpResource": {
-    "message": "ບໍ່ພົບຊັບພະຍາກອນ LCP ເນື່ອງຈາກ LCP ບໍ່ແມ່ນຮູບ"
-  },
-  "panels/timeline/components/insights/LCPDiscovery.ts | requestDiscoverable": {
-    "message": "ຄຳຮ້ອງຂໍສາມາດຄົ້ນພົບໄດ້ໃນເອກະສານເລີ່ມຕົ້ນ"
-  },
-  "panels/timeline/components/insights/LCPDiscovery.ts | successAriaLabel": {
-    "message": "ການກວດສອບຂໍ້ມູນເຈາະເລິກຜ່ານແລ້ວ: {PH1}"
-  },
-  "panels/timeline/components/insights/LCPPhases.ts | elementRenderDelay": {
-    "message": "ຄວາມຫຼ້າຊ້າໃນການສະແດງຜົນອົງປະກອບ"
-  },
-  "panels/timeline/components/insights/LCPPhases.ts | noLcp": {
-    "message": "ບໍ່ພົບ LCP"
-  },
-  "panels/timeline/components/insights/LCPPhases.ts | percentLCP": {
-    "message": "% ຂອງ LCP"
-  },
-  "panels/timeline/components/insights/LCPPhases.ts | phase": {
-    "message": "ໄລຍະ"
-  },
-  "panels/timeline/components/insights/LCPPhases.ts | resourceLoadDelay": {
-    "message": "ຄວາມຫຼ້າຊ້າຂອງການໂຫຼດຊັບພະຍາກອນ"
-  },
-  "panels/timeline/components/insights/LCPPhases.ts | resourceLoadDuration": {
-    "message": "ໄລຍະເວລາໃນການໂຫຼດຊັບພະຍາກອນ"
-  },
-  "panels/timeline/components/insights/LCPPhases.ts | timeToFirstByte": {
-    "message": "ເວລາທີ່ໄດ້ຮັບຂໍ້ມູນໄບຕ໌ທຳອິດ"
-  },
-  "panels/timeline/components/insights/RenderBlocking.ts | duration": {
-    "message": "ໄລຍະເວລາ"
-  },
-  "panels/timeline/components/insights/RenderBlocking.ts | noRenderBlocking": {
-    "message": "ບໍ່ມີຄຳຮ້ອງຂໍບລັອກການສະແດງຜົນສຳລັບການນຳທາງນີ້"
-  },
-  "panels/timeline/components/insights/RenderBlocking.ts | renderBlockingRequest": {
-    "message": "ຄຳຮ້ອງຂໍ"
-  },
-  "panels/timeline/components/insights/SlowCSSSelector.ts | elapsed": {
-    "message": "ເວລາທີ່ຜ່ານໄປ"
-  },
-  "panels/timeline/components/insights/SlowCSSSelector.ts | enableSelectorData": {
-    "message": "ບໍ່ພົບຂໍ້ມູນຕົວເລືອກ CSS. ຕ້ອງເປີດການນຳໃຊ້ສະຖິຕິຕົວເລືອກ CSS ໃນການຕັ້ງຄ່າແຜງປະສິດທິພາບ."
-  },
-  "panels/timeline/components/insights/SlowCSSSelector.ts | matchAttempts": {
-    "message": "ຄວາມພະຍາຍາມຈັບຄູ່ທີ່ກົງກັນ"
-  },
-  "panels/timeline/components/insights/SlowCSSSelector.ts | matchCount": {
-    "message": "ຈຳນວນການຈັບຄູ່ທີ່ກົງກັນ"
-  },
-  "panels/timeline/components/insights/SlowCSSSelector.ts | topSelectors": {
-    "message": "ຕົວເລືອກຍອດນິຍົມ"
-  },
-  "panels/timeline/components/insights/SlowCSSSelector.ts | total": {
-    "message": "ຮວມ"
-  },
-  "panels/timeline/components/insights/ThirdParties.ts | columnBlockingTime": {
-    "message": "ເວລາໃນການບລັອກ"
-  },
-  "panels/timeline/components/insights/ThirdParties.ts | columnThirdParty": {
-    "message": "ພາກສ່ວນທີສາມ"
-  },
-  "panels/timeline/components/insights/ThirdParties.ts | columnTransferSize": {
-    "message": "ຂະໜາດການໂອນຍ້າຍ"
-  },
-  "panels/timeline/components/insights/ThirdParties.ts | noThirdParties": {
-    "message": "ບໍ່ພົບພາກສ່ວນທີສາມ"
+  "panels/timeline/overlays/OverlaysImpl.ts | urlOption": {
+    "message": "URL"
   },
   "panels/timeline/overlays/components/EntriesLinkOverlay.ts | diagram": {
-    "message": "ລິ້ງລະຫວ່າງລາຍການ"
+    "message": "ການລິ້ງລະຫວ່າງລາຍການ"
   },
   "panels/timeline/overlays/components/EntryLabelOverlay.ts | entryLabel": {
     "message": "ປ້າຍກຳກັບລາຍການ"
   },
+  "panels/timeline/overlays/components/EntryLabelOverlay.ts | freDialog": {
+    "message": "ກ່ອງໂຕ້ຕອບຮັບຄຳແນະນຳກ່ຽວກັບຄຳອະທິບາຍປະກອບທີ່ຂັບເຄື່ອນໂດຍ AI"
+  },
+  "panels/timeline/overlays/components/EntryLabelOverlay.ts | generateLabelButton": {
+    "message": "ສ້າງປ້າຍກຳກັບ"
+  },
   "panels/timeline/overlays/components/EntryLabelOverlay.ts | inputTextPrompt": {
     "message": "ລະບຸປ້າຍກຳກັບຄຳອະທິບາຍປະກອບ"
+  },
+  "panels/timeline/overlays/components/EntryLabelOverlay.ts | learnMoreAriaLabel": {
+    "message": "ສຶກສາເພີ່ມເຕີມກ່ຽວກັບຄຳອະທິບາຍປະກອບອັດຕະໂນມັດໃນການຕັ້ງຄ່າ"
+  },
+  "panels/timeline/overlays/components/EntryLabelOverlay.ts | moreInfoAriaLabel": {
+    "message": "ຂໍ້ມູນເພີ່ມເຕີມກ່ຽວກັບຄຸນສົມບັດນີ້"
   },
   "panels/timeline/overlays/components/TimeRangeOverlay.ts | timeRange": {
     "message": "ຊ່ວງເວລາ"
@@ -14629,6 +15421,9 @@
   },
   "panels/timeline/utils/EntryName.ts | frame": {
     "message": "ເຟຣມ"
+  },
+  "panels/timeline/utils/EntryName.ts | layoutShift": {
+    "message": "ການປ່ຽນແປງໂຄງຮ່າງ"
   },
   "panels/timeline/utils/EntryName.ts | wsConnectionClosed": {
     "message": "ປິດ WebSocket ແລ້ວ"
@@ -15044,6 +15839,9 @@
   "panels/web_audio/AudioContextSelector.ts | noRecordings": {
     "message": "(ບໍ່ມີການບັນທຶກ)"
   },
+  "panels/web_audio/WebAudioView.ts | noWebAudio": {
+    "message": "ບໍ່ພົບການນຳໃຊ້ Web Audio API"
+  },
   "panels/web_audio/WebAudioView.ts | openAPageThatUsesWebAudioApiTo": {
     "message": "ເປີດໜ້າທີ່ໃຊ້ Web Audio API ເພື່ອເລີ່ມການຕິດຕາມ."
   },
@@ -15092,14 +15890,14 @@
   "panels/webauthn/WebauthnPane.ts | isResident": {
     "message": "ໃຊ້ປະຈຳ"
   },
-  "panels/webauthn/WebauthnPane.ts | learnMore": {
-    "message": "ສຶກສາເພີ່ມເຕີມ"
-  },
   "panels/webauthn/WebauthnPane.ts | newAuthenticator": {
     "message": "ຕົວພິສູດຢືນຢັນໃໝ່"
   },
   "panels/webauthn/WebauthnPane.ts | no": {
     "message": "ບໍ່"
+  },
+  "panels/webauthn/WebauthnPane.ts | noAuthenticator": {
+    "message": "ບໍ່ໄດ້ຕັ້ງຄ່າ Authenticator"
   },
   "panels/webauthn/WebauthnPane.ts | noCredentialsTryCallingSFromYour": {
     "message": "ບໍ່ມີຂໍ້ມູນປະຈຳຕົວ. ລອງໂທຫາ {PH1} ຈາກເວັບໄຊຂອງທ່ານ."
@@ -15138,7 +15936,7 @@
     "message": "ການໂດຍສານ"
   },
   "panels/webauthn/WebauthnPane.ts | useWebauthnForPhishingresistant": {
-    "message": "ໃຊ້ WebAuthn ສຳລັບການກວດສອບສິດແບບປ້ອງກັນການຫຼອກເອົາຂໍ້ມູນ"
+    "message": "ໃຊ້ WebAuthn ສຳລັບການກວດສອບສິດແບບປ້ອງກັນການຫຼອກເອົາຂໍ້ມູນ."
   },
   "panels/webauthn/WebauthnPane.ts | userHandle": {
     "message": "ດ້າມຈັບຜູ້ໃຊ້"
@@ -15179,36 +15977,6 @@
   "panels/whats_new/whats_new-meta.ts | whatsNew": {
     "message": "ມີຫຍັງໃໝ່"
   },
-  "ui/components/data_grid/DataGrid.ts | enterToSort": {
-    "message": "ສະຖານະການຈັດຮຽງຖັນ: {PH1}. ກົດ Enter ເພື່ອໃຊ້ຕົວກັ່ນຕອງການຈັດຮຽງ"
-  },
-  "ui/components/data_grid/DataGrid.ts | headerOptions": {
-    "message": "ຕົວເລືອກສ່ວນຫົວ"
-  },
-  "ui/components/data_grid/DataGrid.ts | resetColumns": {
-    "message": "ຣີເຊັດຖັນ"
-  },
-  "ui/components/data_grid/DataGrid.ts | sortAsc": {
-    "message": "ໜ້ອຍຫາຫຼາຍ"
-  },
-  "ui/components/data_grid/DataGrid.ts | sortBy": {
-    "message": "ຈັດຮຽງຕາມ"
-  },
-  "ui/components/data_grid/DataGrid.ts | sortDesc": {
-    "message": "ຫຼາຍຫາໜ້ອຍ"
-  },
-  "ui/components/data_grid/DataGrid.ts | sortNone": {
-    "message": "ບໍ່ມີ"
-  },
-  "ui/components/data_grid/DataGridController.ts | sortInAscendingOrder": {
-    "message": "{PH1} ຖືກຈັດຮຽງແຕ່ນ້ອຍຫາໃຫຍ່"
-  },
-  "ui/components/data_grid/DataGridController.ts | sortInDescendingOrder": {
-    "message": "{PH1} ຖືກຈັດຮຽງແຕ່ໃຫຍ່ຫານ້ອຍ"
-  },
-  "ui/components/data_grid/DataGridController.ts | sortingCanceled": {
-    "message": "ຍົກເລີກການຈັດຮຽງ {PH1} ແລ້ວ"
-  },
   "ui/components/dialogs/Dialog.ts | close": {
     "message": "ປິດ"
   },
@@ -15229,6 +15997,9 @@
   },
   "ui/components/diff_view/DiffView.ts | deletions": {
     "message": "ການລຶບ:"
+  },
+  "ui/components/diff_view/DiffView.ts | noDiff": {
+    "message": "ໄຟລ໌ຄືກັບສະຖານະທີ່ບໍ່ໄດ້ແກ້ໄຂ"
   },
   "ui/components/issue_counter/IssueCounter.ts | breakingChanges": {
     "message": "{issueCount,plural, =1{ການປ່ຽນແປງທີ່ສົ່ງຜົນກັບສ່ວນອື່ນໃນລະບົບ # ລາຍການ}other{ການປ່ຽນແປງທີ່ສົ່ງຜົນກັບສ່ວນອື່ນໃນລະບົບ # ລາຍການ}}"
@@ -15295,6 +16066,9 @@
   },
   "ui/components/settings/SettingCheckbox.ts | learnMore": {
     "message": "ສຶກສາເພີ່ມເຕີມ"
+  },
+  "ui/components/snackbars/Snackbar.ts | dismiss": {
+    "message": "ປິດໄວ້"
   },
   "ui/components/survey_link/SurveyLink.ts | anErrorOccurredWithTheSurvey": {
     "message": "ເກີດຄວາມຜິດພາດຂຶ້ນກັບການສຳຫຼວດ"
@@ -15383,18 +16157,6 @@
   "ui/legacy/DockController.ts | devtoolsUndocked": {
     "message": "ຢຸດຈອດ DevTools ແລ້ວ"
   },
-  "ui/legacy/DockController.ts | dockToBottom": {
-    "message": "ຈອດໄວ້ລຸ່ມສຸດ"
-  },
-  "ui/legacy/DockController.ts | dockToLeft": {
-    "message": "ຈອດໄວ້ຊ້າຍ"
-  },
-  "ui/legacy/DockController.ts | dockToRight": {
-    "message": "ຈອດໄວ້ຂວາ"
-  },
-  "ui/legacy/DockController.ts | undockIntoSeparateWindow": {
-    "message": "ຢຸດຈອດໄປໃສ່ໜ້າຈໍແຍກຕ່າງຫາກ"
-  },
   "ui/legacy/EmptyWidget.ts | learnMore": {
     "message": "ສຶກສາເພີ່ມເຕີມ"
   },
@@ -15416,14 +16178,11 @@
   "ui/legacy/Infobar.ts | dontShowAgain": {
     "message": "ບໍ່ຕ້ອງສະແດງອີກ"
   },
-  "ui/legacy/Infobar.ts | showMore": {
-    "message": "ສະແດງເພີ່ມເຕີມ"
-  },
   "ui/legacy/InspectorView.ts | closeDrawer": {
     "message": "ປິດ​ລິ້ນ​ຊັກ"
   },
   "ui/legacy/InspectorView.ts | devToolsLanguageMissmatch": {
-    "message": "ຕອນນີ້ສາມາດໃຊ້ DevTools ໃນ {PH1} ໄດ້ແລ້ວ!"
+    "message": "ຕອນນີ້ DevTools ພ້ອມໃຫ້ນຳໃຊ້ແລ້ວໃນພາສາ {PH1}"
   },
   "ui/legacy/InspectorView.ts | drawer": {
     "message": "ລິ້ນຊັກເຄື່ອງມື"
@@ -15450,7 +16209,7 @@
     "message": "ແຜງ"
   },
   "ui/legacy/InspectorView.ts | reloadDebuggedTab": {
-    "message": "ໂຫຼດໃໝ່"
+    "message": "ໂຫຼດໜ້າເວັບໃໝ່"
   },
   "ui/legacy/InspectorView.ts | reloadDevtools": {
     "message": "ໂຫຼດ DevTools ໃໝ່"
@@ -15459,7 +16218,7 @@
     "message": "ເລືອກໂຟນເດີ"
   },
   "ui/legacy/InspectorView.ts | selectOverrideFolder": {
-    "message": "ເລືອກໂຟນເດີທີ່ຈະໃຊ້ຈັດເກັບໄຟລ໌ທີ່ລຶບລ້າງ."
+    "message": "ເລືອກໂຟນເດີທີ່ຈະໃຊ້ຈັດເກັບໄຟລ໌ທີ່ລຶບລ້າງ"
   },
   "ui/legacy/InspectorView.ts | setToBrowserLanguage": {
     "message": "ຈັບຄູ່ພາສາ Chrome ທຸກເທື່ອ"
@@ -15488,8 +16247,11 @@
   "ui/legacy/ListWidget.ts | saveString": {
     "message": "ບັນທຶກ"
   },
+  "ui/legacy/RemoteDebuggingTerminatedScreen.ts | connectionClosedReason": {
+    "message": "ເຫດຜົນ: {PH1}."
+  },
   "ui/legacy/RemoteDebuggingTerminatedScreen.ts | debuggingConnectionWasClosed": {
-    "message": "ປິດການເຊື່ອມຕໍ່ການດີບັກ​ແລ້ວ. ເຫດ​ຜົນ​: "
+    "message": "ການເຊື່ອມຕໍ່ການດີບັກຖືກປິດ"
   },
   "ui/legacy/RemoteDebuggingTerminatedScreen.ts | reconnectDevtools": {
     "message": "ເຊື່ອມຕໍ່ຫາ DevTools ຄືນໃໝ່"
@@ -15549,7 +16311,7 @@
     "message": "ສະແດງຜົນການຊອກຫາກ່ອນໜ້າ"
   },
   "ui/legacy/SettingsUI.ts | oneOrMoreSettingsHaveChanged": {
-    "message": "ການຕັ້ງຄ່າໜຶ່ງ ຫຼື ຫຼາຍລາຍການໄດ້ປ່ຽນແປງເຊິ່ງຈຳເປັນຕ້ອງໂຫຼດຄືນໃໝ່ເພື່ອໃຫ້ມີຜົນນຳໃຊ້."
+    "message": "ມີການປ່ຽນແປງການຕັ້ງຄ່າຢ່າງໜ້ອຍ 1 ລາຍການເຊິ່ງຈະຕ້ອງໂຫຼດໃໝ່ຈຶ່ງຈະມີຜົນ"
   },
   "ui/legacy/SettingsUI.ts | srequiresReload": {
     "message": "*ຕ້ອງໂຫຼດໃໝ່"
@@ -15786,7 +16548,7 @@
     "message": "ສະແດງບັນຫາທີ່ເຊື່ອມໂຍງກັບຄຸກກີ້ນີ້"
   },
   "ui/legacy/components/cookie_table/CookiesTable.ts | showRequestsWithThisCookie": {
-    "message": "ສະແດງຄຳຂໍທີ່ມີຄຸກກີ້"
+    "message": "ສະແດງຄຳຮ້ອງຂໍທີ່ມີຄຸກກີ້ນີ້"
   },
   "ui/legacy/components/cookie_table/CookiesTable.ts | size": {
     "message": "ຂະໜາດ"
@@ -15824,6 +16586,9 @@
   "ui/legacy/components/data_grid/DataGrid.ts | emptyRowCreated": {
     "message": "ສ້າງແຖວຕາຕະລາງຫວ່າງເປົ່າແລ້ວ. ທ່ານສາມາດຄລິກສອງເທື່ອ ຫຼື ໃຊ້ເມນູບໍລິບົດເພື່ອແກ້ໄຂໄດ້."
   },
+  "ui/legacy/components/data_grid/DataGrid.ts | enterToSort": {
+    "message": "ສະຖານະການຈັດຮຽງຖັນ: {PH1}. ກົດ Enter ເພື່ອໃຊ້ຕົວກັ່ນຕອງການຈັດຮຽງ"
+  },
   "ui/legacy/components/data_grid/DataGrid.ts | expanded": {
     "message": "ຂະຫຍາຍແລ້ວ"
   },
@@ -15849,13 +16614,10 @@
     "message": "{PH1} {PH2}, ໃຊ້ປຸ່ມລູກສອນຂຶ້ນ ແລະ ລົງເພື່ອໄປຍັງສ່ວນຕ່າງໆ ແລະ ໂຕ້ຕອບກັບແຖວຕາຕະລາງ, ໃຊ້ໂໝດເລືອກເບິ່ງເພື່ອອ່ານແຕ່ລະຫ້ອງ."
   },
   "ui/legacy/components/data_grid/DataGrid.ts | sortByString": {
-    "message": "ຈັດຮຽງຕາມ"
+    "message": "ຮຽງຕາມ"
   },
-  "ui/legacy/components/data_grid/DataGridWithPreview.ts | numberEntries": {
-    "message": "ຈຳນວນລາຍການທີ່ສະແດງໃນຕາຕະລາງ: {PH1}"
-  },
-  "ui/legacy/components/data_grid/DataGridWithPreview.ts | selectAValueToPreview": {
-    "message": "ເລືອກຄ່າເພື່ອສະແດງຕົວຢ່າງ"
+  "ui/legacy/components/data_grid/DataGrid.ts | sortableColumn": {
+    "message": "ຖັນທີ່ຈັດຮຽງໄດ້. ກົດ Enter ເພື່ອໃຊ້ຕົວກັ່ນຕອງການຈັດຮຽງ"
   },
   "ui/legacy/components/data_grid/ShowMoreDataGridNode.ts | showAllD": {
     "message": "ສະແດງທັງໝົດ {PH1} ລາຍການ"
@@ -15943,9 +16705,6 @@
   },
   "ui/legacy/components/inline_editor/FontEditor.ts | units": {
     "message": "ຫົວໜ່ວຍ"
-  },
-  "ui/legacy/components/inline_editor/LinkSwatch.ts | sIsNotDefined": {
-    "message": "ບໍ່ໄດ້ກຳນົດ {PH1}"
   },
   "ui/legacy/components/object_ui/CustomPreviewComponent.ts | showAsJavascriptObject": {
     "message": "ສະແດງເປັນວັດຖຸ JavaScript"
@@ -16125,10 +16884,13 @@
     "message": "ບໍ່ພົບຄຳສັ່ງ"
   },
   "ui/legacy/components/quick_open/CommandMenu.ts | oneOrMoreSettingsHaveChanged": {
-    "message": "ການຕັ້ງຄ່າໜຶ່ງ ຫຼື ຫຼາຍລາຍການໄດ້ປ່ຽນແປງເຊິ່ງຈຳເປັນຕ້ອງໂຫຼດຄືນໃໝ່ເພື່ອໃຫ້ມີຜົນນຳໃຊ້."
+    "message": "ມີການປ່ຽນແປງການຕັ້ງຄ່າຢ່າງໜ້ອຍ 1 ລາຍການເຊິ່ງຈະຕ້ອງໂຫຼດໃໝ່ຈຶ່ງຈະມີຜົນ"
   },
   "ui/legacy/components/quick_open/CommandMenu.ts | run": {
     "message": "ເອີ້ນໃຊ້"
+  },
+  "ui/legacy/components/quick_open/CommandMenu.ts | runCommand": {
+    "message": "ເອີ້ນໃຊ້ຄຳສັ່ງ"
   },
   "ui/legacy/components/quick_open/FilteredListWidget.ts | noResultsFound": {
     "message": "ບໍ່ພົບຜົນການຊອກຫາ"
@@ -16182,19 +16944,19 @@
     "message": "ເປີດຮູບຢູ່ໃນແຖບໃໝ່"
   },
   "ui/legacy/components/source_frame/ImageView.ts | saveImageAs": {
-    "message": "ບັນທຶກຮູບເປັນ..."
+    "message": "ບັນທຶກຮູບເປັນ…"
   },
   "ui/legacy/components/source_frame/JSONView.ts | find": {
     "message": "ຊອກຫາ"
+  },
+  "ui/legacy/components/source_frame/PreviewFactory.ts | failedToLoadData": {
+    "message": "ໂຫຼດຂໍ້ມູນບໍ່ສຳເລັດ"
   },
   "ui/legacy/components/source_frame/PreviewFactory.ts | nothingToPreview": {
     "message": "ບໍ່ມີຫຍັງໃຫ້ສະແດງຕົວຢ່າງ"
   },
   "ui/legacy/components/source_frame/ResourceSourceFrame.ts | find": {
     "message": "ຊອກຫາ"
-  },
-  "ui/legacy/components/source_frame/SourceFrame.ts | allow": {
-    "message": "ອະນຸຍາດ"
   },
   "ui/legacy/components/source_frame/SourceFrame.ts | allowPasting": {
     "message": "ອະນຸຍາດໃຫ້ວາງ"
@@ -16204,9 +16966,6 @@
   },
   "ui/legacy/components/source_frame/SourceFrame.ts | bytecodePositionXs": {
     "message": "ຕຳແໜ່ງ Bytecode 0x{PH1}"
-  },
-  "ui/legacy/components/source_frame/SourceFrame.ts | cancel": {
-    "message": "ຍົກເລີກ"
   },
   "ui/legacy/components/source_frame/SourceFrame.ts | dCharactersSelected": {
     "message": "ເລືອກ {PH1} ຕົວອັກສອນແລ້ວ"
@@ -16236,7 +16995,7 @@
     "message": "ແຫຼ່ງທີ່ມາ"
   },
   "ui/legacy/components/source_frame/SourceFrame.ts | typeAllowPasting": {
-    "message": "ປະເພດ ''{PH1}''"
+    "message": "ພິມ ''{PH1}''"
   },
   "ui/legacy/components/source_frame/XMLView.ts | find": {
     "message": "ຊອກຫາ"
@@ -16324,8 +17083,5 @@
   },
   "ui/legacy/components/utils/Linkifier.ts | unknown": {
     "message": "(ບໍ່ຮູ້ຈັກ)"
-  },
-  "ui/legacy/components/utils/TargetDetachedDialog.ts | websocketDisconnected": {
-    "message": "ຍົກເລີກການເຊື່ອມຕໍ່ WebSocket ແລ້ວ"
   }
 }

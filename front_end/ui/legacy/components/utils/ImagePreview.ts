@@ -1,6 +1,7 @@
 // Copyright 2018 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as Common from '../../../../core/common/common.js';
 import * as Host from '../../../../core/host/host.js';
@@ -45,7 +46,7 @@ const UIStrings = {
    * @description The intrinsic aspect ratio of an image.
    */
   intrinsicAspectRatio: 'Intrinsic aspect ratio:',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('ui/legacy/components/utils/ImagePreview.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -72,23 +73,22 @@ function isImageResource(resource: SDK.Resource.Resource|null): boolean {
 
 export class ImagePreview {
   static async build(
-      target: SDK.Target.Target, originalImageURL: Platform.DevToolsPath.UrlString, showDimensions: boolean, options: {
+      originalImageURL: Platform.DevToolsPath.UrlString,
+      showDimensions: boolean,
+      options: {
         precomputedFeatures: (PrecomputedFeatures|undefined),
         imageAltText: (string|undefined),
         align: Align,
         hideFileData?: boolean,
-      }|undefined = {precomputedFeatures: undefined, imageAltText: undefined, align: Align.CENTER}):
-      Promise<Element|null> {
+      }|undefined = {precomputedFeatures: undefined, imageAltText: undefined, align: Align.CENTER},
+      ): Promise<HTMLDivElement|null> {
     const {precomputedFeatures, imageAltText, align} = options;
-    const resourceTreeModel = target.model(SDK.ResourceTreeModel.ResourceTreeModel);
-    if (!resourceTreeModel) {
-      return null;
-    }
-    let resource = resourceTreeModel.resourceForURL(originalImageURL);
+
+    let resource = SDK.ResourceTreeModel.ResourceTreeModel.resourceForURL(originalImageURL);
     let imageURL = originalImageURL;
     if (!isImageResource(resource) && precomputedFeatures && precomputedFeatures.currentSrc) {
       imageURL = precomputedFeatures.currentSrc;
-      resource = resourceTreeModel.resourceForURL(imageURL);
+      resource = SDK.ResourceTreeModel.ResourceTreeModel.resourceForURL(imageURL);
     }
     if (!resource || !isImageResource(resource)) {
       return null;
@@ -103,7 +103,7 @@ export class ImagePreview {
     const resourceSize = contentSize ? contentSize : Platform.StringUtilities.base64ToSize(content);
     const resourceSizeText = resourceSize > 0 ? i18n.ByteUtilities.bytesToString(resourceSize) : '';
 
-    return new Promise(resolve => {
+    return await new Promise(resolve => {
       const imageElement = document.createElement('img');
       imageElement.addEventListener('load', buildContent, false);
       imageElement.addEventListener('error', () => resolve(null), false);
@@ -115,7 +115,7 @@ export class ImagePreview {
       function buildContent(): void {
         const shadowBoundary = document.createElement('div');
         const shadowRoot = shadowBoundary.attachShadow({mode: 'open'});
-        shadowRoot.adoptedStyleSheets = [imagePreviewStyles];
+        shadowRoot.createChild('style').textContent = imagePreviewStyles;
         const container = shadowRoot.createChild('table');
         container.className = 'image-preview-container';
 
@@ -196,7 +196,7 @@ export class ImagePreview {
 
     const featuresObject = await object.callFunctionJSON(features, undefined);
     object.release();
-    return featuresObject;
+    return featuresObject ?? undefined;
 
     function features(this: HTMLImageElement): PrecomputedFeatures {
       return {

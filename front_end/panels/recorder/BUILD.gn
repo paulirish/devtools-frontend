@@ -21,10 +21,11 @@ devtools_module("recorder") {
   deps = [
     "../../core/common:bundle",
     "../../core/platform:bundle",
+    "../../core/root:bundle",
     "../../models/extensions:bundle",
     "../../models/trace:bundle",
+    "../../panels/common:bundle",
     "../../panels/emulation:bundle",
-    "../../panels/timeline:bundle",
     "../../services/tracing:bundle",
     "../../third_party/puppeteer-replay:bundle",
     "../../ui/components/dialogs:bundle",
@@ -51,6 +52,7 @@ devtools_entrypoint("bundle") {
   visibility = [
     ":*",
     "../../../test/e2e/recorder:*",
+    "../../../test/e2e_non_hosted/recorder:*",
     "../../entrypoints/main/*",
     "../../panels/sources/*",
   ]
@@ -76,7 +78,10 @@ devtools_entrypoint("meta") {
 ts_library("unittests") {
   testonly = true
 
-  sources = [ "RecorderController.test.ts" ]
+  sources = [
+    "RecorderController.test.ts",
+    "injected.test.ts",
+  ]
 
   deps = [
     ":bundle",

@@ -1,6 +1,7 @@
 // Copyright 2021 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 import * as SDK from '../../../core/sdk/sdk.js';
 import * as Bindings from '../../../models/bindings/bindings.js';
@@ -18,7 +19,7 @@ export function completion(): CodeMirror.Extension {
 }
 
 export async function completeInContext(
-    textBefore: string, query: string, force: boolean = false): Promise<UI.SuggestBox.Suggestions> {
+    textBefore: string, query: string, force = false): Promise<UI.SuggestBox.Suggestions> {
   const state = CodeMirror.EditorState.create({
     doc: textBefore + query,
     selection: {anchor: textBefore.length},
@@ -270,7 +271,7 @@ let cacheInstance: PropertyCache|null = null;
 // Store recent collections of property completions. The empty string
 // is used to store the set of global bindings.
 class PropertyCache {
-  readonly #cache: Map<string, Promise<CompletionSet>> = new Map();
+  readonly #cache = new Map<string, Promise<CompletionSet>>();
 
   constructor() {
     const clear = (): void => this.#cache.clear();
@@ -330,13 +331,13 @@ async function maybeCompleteKeysFromMap(objectVariable: string): Promise<Complet
 async function completeProperties(
     expression: string,
     quoted?: string,
-    hasBracket: boolean = false,
+    hasBracket = false,
     ): Promise<CompletionSet> {
   const cache = PropertyCache.instance();
   if (!quoted) {
     const cached = cache.get(expression);
     if (cached) {
-      return cached;
+      return await cached;
     }
   }
   const context = getExecutionContext();
@@ -347,14 +348,14 @@ async function completeProperties(
   if (!quoted) {
     cache.set(expression, result);
   }
-  return result;
+  return await result;
 }
 
 async function completePropertiesInner(
     expression: string,
     context: SDK.RuntimeModel.ExecutionContext,
     quoted?: string,
-    hasBracket: boolean = false,
+    hasBracket = false,
     ): Promise<CompletionSet> {
   const result = new CompletionSet();
   if (!context) {
@@ -425,7 +426,7 @@ async function completeExpressionGlobal(): Promise<CompletionSet> {
   const cache = PropertyCache.instance();
   const cached = cache.get('');
   if (cached) {
-    return cached;
+    return await cached;
   }
 
   const context = getExecutionContext();
@@ -446,7 +447,7 @@ async function completeExpressionGlobal(): Promise<CompletionSet> {
     });
   });
   cache.set('', fetchNames);
-  return fetchNames;
+  return await fetchNames;
 }
 
 export async function isExpressionComplete(expression: string): Promise<boolean> {
@@ -456,7 +457,7 @@ export async function isExpressionComplete(expression: string): Promise<boolean>
   }
   const result =
       await currentExecutionContext.runtimeModel.compileScript(expression, '', false, currentExecutionContext.id);
-  if (!result || !result.exceptionDetails || !result.exceptionDetails.exception) {
+  if (!result?.exceptionDetails?.exception) {
     return true;
   }
   const description = result.exceptionDetails.exception.description;
@@ -528,15 +529,16 @@ async function getArgumentsForExpression(
     if (!first || callee.name !== 'MemberExpression') {
       return null;
     }
-    return evaluateExpression(context, doc.sliceString(first.from, first.to), 'argumentsHint');
+    return await evaluateExpression(context, doc.sliceString(first.from, first.to), 'argumentsHint');
   };
-  return getArgumentsForFunctionValue(result, objGetter, expression)
+  return await getArgumentsForFunctionValue(result, objGetter, expression)
       .finally(() => context.runtimeModel.releaseObjectGroup('argumentsHint'));
 }
 
 export function argumentsList(input: string): string[] {
   function parseParamList(cursor: CodeMirror.TreeCursor): string[] {
-    while (cursor.name !== 'ParamList' && cursor.nextSibling()) {
+    while (cursor.name !== 'ParamList') {
+      cursor.nextSibling();
     }
     const parameters = [];
     if (cursor.name === 'ParamList' && cursor.firstChild()) {
@@ -591,8 +593,9 @@ export function argumentsList(input: string): string[] {
           if (!cursor.firstChild()) {
             throw new Error(`${cursor.name} rule is expected to have children`);
           }
-          while (cursor.nextSibling() && cursor.name as string !== 'ClassBody') {
-          }
+          do {
+            cursor.nextSibling();
+          } while (cursor.name as string !== 'ClassBody');
           if (cursor.name as string === 'ClassBody' && cursor.firstChild()) {
             do {
               if (cursor.name as string === 'MethodDeclaration' && cursor.firstChild()) {
@@ -638,7 +641,7 @@ async function getArgumentsForFunctionValue(
   const javaScriptMetadata = JavaScriptMetaData.JavaScriptMetadata.JavaScriptMetadataImpl.instance();
 
   const descriptionRegexResult = /^function ([^(]*)\(/.exec(description);
-  const name = descriptionRegexResult && descriptionRegexResult[1] || functionName;
+  const name = descriptionRegexResult?.[1] || functionName;
   if (!name) {
     return null;
   }
@@ -702,12 +705,12 @@ async function prototypesFromObject(object: SDK.RemoteObject.RemoteObject): Prom
   return await object.callFunctionJSON(function(this: Object) {
     const result = [];
     for (let object = this; object; object = Object.getPrototypeOf(object)) {
-      if (typeof object === 'object' && object.constructor && object.constructor.name) {
+      if (typeof object === 'object' && object.constructor?.name) {
         result[result.length] = object.constructor.name;
       }
     }
     return result;
-  }, []);
+  }, []) ?? [];
 }
 
 // Given a function object that is probably a bound function, try to

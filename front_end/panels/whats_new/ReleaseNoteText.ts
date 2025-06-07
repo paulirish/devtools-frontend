@@ -14,8 +14,8 @@ let registeredLinks = false;
 export interface ReleaseNote {
   version: number;
   header: string;
-  markdownLinks: {key: string, link: string}[];
-  videoLinks: {description: string, link: Platform.DevToolsPath.UrlString, type?: VideoType}[];
+  markdownLinks: Array<{key: string, link: string}>;
+  videoLinks: Array<{description: string, link: Platform.DevToolsPath.UrlString, type?: VideoType}>;
   link: string;
 }
 
@@ -40,28 +40,28 @@ export function getReleaseNote(): ReleaseNote {
 }
 
 let releaseNote: ReleaseNote = {
-  version: 74,
-  header: 'What\'s new in DevTools 133',
+  version: 79,
+  header: 'What\'s new in DevTools 138 Beta',
   markdownLinks: [
     {
-      key: 'persistent-chat-history',
-      link: 'https://developer.chrome.com/blog/new-in-devtools-133/#persistent-chat-history',
+      key: 'crbug1',
+      link: 'https://issues.chromium.org/issues/420862341',
     },
     {
-      key: 'perf-nav',
-      link: 'https://developer.chrome.com/blog/new-in-devtools-133/#perf-nav',
+      key: 'crbug2',
+      link: 'https://issues.chromium.org/issues/420862838',
     },
     {
-      key: 'perf-image-delivery',
-      link: 'https://developer.chrome.com/blog/new-in-devtools-133/#perf-image-delivery',
+      key: 'crbug3',
+      link: 'https://issues.chromium.org/issues/420870269',
     },
   ],
   videoLinks: [
     {
-      description: 'Highlights of updates from Chrome 130-132',
-      link: 'https://www.youtube.com/watch?v=kzDUe-f4gac' as Platform.DevToolsPath.UrlString,
+      description: 'See past highlights from Chrome 137',
+      link: 'https://developer.chrome.com/blog/new-in-devtools-137' as Platform.DevToolsPath.UrlString,
       type: VideoType.WHATS_NEW,
     },
   ],
-  link: 'https://developer.chrome.com/blog/new-in-devtools-133/',
+  link: 'https://issues.chromium.org/hotlists/7004254',
 };

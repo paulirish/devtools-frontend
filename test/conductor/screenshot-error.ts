@@ -7,16 +7,15 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
-interface ArtifactGroup {
-  [key: string]: {
-    filePath: string,
-  };
-}
+type ArtifactGroup = Record<string, {
+  filePath: string,
+}>;
 
 export class ScreenshotError extends Error {
   // The max length of the summary is 4000, but we need to leave some room for
   // the rest of the HTML formatting (e.g. <pre> and </pre>).
   static readonly SUMMARY_LENGTH_CUTOFF = 3900;
+  static errors: ScreenshotError[] = [];
   readonly screenshots: ArtifactGroup;
 
   private constructor(screenshots: ArtifactGroup, message?: string, cause?: Error) {
@@ -28,13 +27,13 @@ export class ScreenshotError extends Error {
 
     // To show Diffs mocha Spec reporter expects some properties.
     // See node_modules/mocha/lib/reporters/base.js.
-    // @ts-ignore forwarding error properties for Mocha.
+    // @ts-expect-error forwarding error properties for Mocha.
     this.showDiff = cause?.showDiff;
-    // @ts-ignore forwarding error properties for Mocha.
+    // @ts-expect-error forwarding error properties for Mocha.
     this.actual = cause?.actual;
-    // @ts-ignore forwarding error properties for Mocha.
+    // @ts-expect-error forwarding error properties for Mocha.
     this.expected = cause?.expected;
-    // @ts-ignore forwarding error properties for Mocha.
+    // @ts-expect-error forwarding error properties for Mocha.
     this.operator = cause?.operator;
   }
 
@@ -74,7 +73,7 @@ export class ScreenshotError extends Error {
       target: {filePath: this.saveArtifact(targetScreenshot)},
       frontend: {filePath: this.saveArtifact(frontendScreenshot)},
     };
-    return new ScreenshotError(screenshots, undefined, error as Error);
+    return new ScreenshotError(screenshots, undefined, error);
   }
 
   /**

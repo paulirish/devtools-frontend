@@ -1,6 +1,7 @@
 // Copyright 2021 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-imperative-dom-api */
 
 /*
  * Copyright (C) 2007, 2008 Apple Inc.  All rights reserved.
@@ -39,7 +40,6 @@ import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
-import * as Bindings from '../../models/bindings/bindings.js';
 import type * as Extensions from '../../models/extensions/extensions.js';
 import * as Logs from '../../models/logs/logs.js';
 import * as Trace from '../../models/trace/trace.js';
@@ -124,7 +124,7 @@ const UIStrings = {
    * @description Tooltip text that appears when hovering over the largeicon load button in the
    * Network Panel. This action prompts the user to select a HAR file to upload to DevTools.
    */
-  importHarFile: 'Import `HAR` file...',
+  importHarFile: 'Import `HAR` file…',
   /**
    * @description Tooltip text that appears when hovering over the download button in the Network
    * panel, when the setting to allow generating HAR files with sensitive data is enabled. HAR is
@@ -143,14 +143,14 @@ const UIStrings = {
    * the Network panel, when the setting to allow generating HAR files with sensitive data is
    * enabled.
    */
-  exportHarSanitized: 'Export `HAR` (sanitized)...',
+  exportHarSanitized: 'Export `HAR` (sanitized)…',
   /**
    * @description Context menu item in the context menu for the download button of the Network panel,
    * which is only available when the Network setting to allow generating HAR with sensitive data
    * is active. HAR is a file format (HTTP Archive) and should not be translated. This action
    * triggers the download of a HAR file with sensitive data included.
    */
-  exportHarWithSensitiveData: 'Export `HAR` (with sensitive data)...',
+  exportHarWithSensitiveData: 'Export `HAR` (with sensitive data)…',
   /**
    *@description Text for throttling the network
    */
@@ -159,7 +159,7 @@ const UIStrings = {
    *@description Text in Network Panel to tell the user to reload the page to capture screenshots.
    *@example {Ctrl + R} PH1
    */
-  hitSToReloadAndCaptureFilmstrip: 'Hit {PH1} to reload and capture filmstrip.',
+  hitSToReloadAndCaptureFilmstrip: 'Press {PH1} to reload and capture filmstrip.',
   /**
    * @description A context menu item that is shown for resources in other panels
    * to open them in the Network panel.
@@ -176,16 +176,16 @@ const UIStrings = {
   /**
    *@description Text in Network Panel that is displayed whilst the recording is in progress.
    */
-  recordingFrames: 'Recording frames...',
+  recordingFrames: 'Recording frames…',
   /**
    *@description Text in Network Panel that is displayed when frames are being fetched.
    */
-  fetchingFrames: 'Fetching frames...',
+  fetchingFrames: 'Fetching frames…',
   /**
    * @description Text of a button in the Network panel's toolbar that open Network Conditions panel in the drawer.
    */
   moreNetworkConditions: 'More network conditions…',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('panels/network/NetworkPanel.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 let networkPanelInstance: NetworkPanel;
@@ -226,6 +226,7 @@ export class NetworkPanel extends UI.Panel.Panel implements
 
   constructor(displayScreenshotDelay: number) {
     super('network');
+    this.registerRequiredCSS(networkPanelStyles);
 
     this.displayScreenshotDelay = displayScreenshotDelay;
     this.networkLogShowOverviewSetting =
@@ -389,10 +390,10 @@ export class NetworkPanel extends UI.Panel.Panel implements
     return networkPanelInstance;
   }
 
-  static revealAndFilter(filters: {
-    filterType: NetworkForward.UIFilter.FilterType|null,
+  static revealAndFilter(filters: Array<{
+    filterType: NetworkForward.UIFilter.FilterType | null,
     filterValue: string,
-  }[]): Promise<void> {
+  }>): Promise<void> {
     const panel = NetworkPanel.instance();
     let filterString = '';
     for (const filter of filters) {
@@ -404,13 +405,6 @@ export class NetworkPanel extends UI.Panel.Panel implements
     }
     panel.networkLogView.setTextFilterValue(filterString);
     return UI.ViewManager.ViewManager.instance().showView('network');
-  }
-
-  static async selectAndShowRequest(
-      request: SDK.NetworkRequest.NetworkRequest, tab: NetworkForward.UIRequestLocation.UIRequestTabs,
-      options?: NetworkForward.UIRequestLocation.FilterOptions): Promise<void> {
-    const panel = NetworkPanel.instance();
-    await panel.selectAndActivateRequest(request, tab, options);
   }
 
   throttlingSelectForTest(): UI.Toolbar.ToolbarComboBox {
@@ -549,7 +543,7 @@ export class NetworkPanel extends UI.Panel.Panel implements
     }
     const timestamps = filmStrip.frames.map(frame => {
       // The network view works in seconds.
-      return Trace.Helpers.Timing.microSecondsToSeconds(frame.screenshotEvent.ts);
+      return Trace.Helpers.Timing.microToSeconds(frame.screenshotEvent.ts);
     });
 
     this.networkLogView.addFilmStripFrames(timestamps);
@@ -577,7 +571,7 @@ export class NetworkPanel extends UI.Panel.Panel implements
   }
 
   private load(): void {
-    if (this.filmStripRecorder && this.filmStripRecorder.isRecording()) {
+    if (this.filmStripRecorder?.isRecording()) {
       if (this.pendingStopTimer) {
         window.clearTimeout(this.pendingStopTimer);
       }
@@ -647,8 +641,8 @@ export class NetworkPanel extends UI.Panel.Panel implements
   }
 
   override wasShown(): void {
+    super.wasShown();
     UI.Context.Context.instance().setFlavor(NetworkPanel, this);
-    this.registerCSSFiles([networkPanelStyles]);
 
     // Record the network tool load time after the panel has loaded.
     Host.userMetrics.panelLoaded('network', 'DevTools.Launch.Network');
@@ -656,6 +650,7 @@ export class NetworkPanel extends UI.Panel.Panel implements
 
   override willHide(): void {
     UI.Context.Context.instance().setFlavor(NetworkPanel, null);
+    super.willHide();
   }
 
   revealAndHighlightRequest(request: SDK.NetworkRequest.NetworkRequest): void {
@@ -686,9 +681,6 @@ export class NetworkPanel extends UI.Panel.Panel implements
     this.hideRequestPanel();
   }
 
-  private onRowSizeChanged(): void {
-    this.updateUI();
-  }
   private onRequestSelected(event: Common.EventTarget.EventTargetEvent<SDK.NetworkRequest.NetworkRequest|null>): void {
     const request = event.data;
     this.currentRequest = request;
@@ -807,8 +799,8 @@ export class NetworkPanel extends UI.Panel.Panel implements
       return;
     }
     if (target instanceof Workspace.UISourceCode.UISourceCode) {
-      const resource = Bindings.ResourceUtils.resourceForURL(target.url());
-      if (resource && resource.request) {
+      const resource = SDK.ResourceTreeModel.ResourceTreeModel.resourceForURL(target.url());
+      if (resource?.request) {
         appendRevealItem(resource.request);
       } else {
         appendRevealItemMissingData();
@@ -829,7 +821,7 @@ export class NetworkPanel extends UI.Panel.Panel implements
 
   private onFilmFrameSelected(event: Common.EventTarget.EventTargetEvent<number>): void {
     const timestamp = event.data;
-    this.overviewPane.setWindowTimes(0, timestamp);
+    this.overviewPane.setWindowTimes(Trace.Types.Timing.Milli(0), Trace.Types.Timing.Milli(timestamp));
   }
 
   private onFilmFrameEnter(event: Common.EventTarget.EventTargetEvent<number>): void {
@@ -849,8 +841,8 @@ export class NetworkPanel extends UI.Panel.Panel implements
     this.calculator.updateBoundaries(request);
     // FIXME: Unify all time units across the frontend!
     this.overviewPane.setBounds(
-        Trace.Types.Timing.MilliSeconds(this.calculator.minimumBoundary() * 1000),
-        Trace.Types.Timing.MilliSeconds(this.calculator.maximumBoundary() * 1000));
+        Trace.Types.Timing.Milli(this.calculator.minimumBoundary() * 1000),
+        Trace.Types.Timing.Milli(this.calculator.maximumBoundary() * 1000));
     this.networkOverview.updateRequest(request);
   }
 
@@ -881,8 +873,8 @@ export class RequestIdRevealer implements Common.Revealer.Revealer<NetworkForwar
 export class NetworkLogWithFilterRevealer implements
     Common.Revealer
         .Revealer<Extensions.ExtensionServer.RevealableNetworkRequestFilter|NetworkForward.UIFilter.UIRequestFilter> {
-  reveal(request: Extensions.ExtensionServer.RevealableNetworkRequestFilter|
-         NetworkForward.UIFilter.UIRequestFilter): Promise<void> {
+  reveal(request: Extensions.ExtensionServer.RevealableNetworkRequestFilter|NetworkForward.UIFilter.UIRequestFilter):
+      Promise<void> {
     if ('filters' in request) {
       return NetworkPanel.revealAndFilter(request.filters);
     }
@@ -930,7 +922,7 @@ export class FilmStripRecorder implements Trace.TracingManager.TracingManagerCli
     }
     const zeroTimeInSeconds = Trace.Types.Timing.Seconds(this.timeCalculator.minimumBoundary());
     const filmStrip =
-        Trace.Extras.FilmStrip.fromParsedTrace(data, Trace.Helpers.Timing.secondsToMicroseconds(zeroTimeInSeconds));
+        Trace.Extras.FilmStrip.fromParsedTrace(data, Trace.Helpers.Timing.secondsToMicro(zeroTimeInSeconds));
 
     if (this.callback) {
       this.callback(filmStrip);
@@ -965,7 +957,7 @@ export class FilmStripRecorder implements Trace.TracingManager.TracingManagerCli
 
     this.tracingManager = tracingManager;
     this.resourceTreeModel = this.tracingManager.target().model(SDK.ResourceTreeModel.ResourceTreeModel);
-    void this.tracingManager.start(this, '-*,disabled-by-default-devtools.screenshot', '');
+    void this.tracingManager.start(this, '-*,disabled-by-default-devtools.screenshot');
 
     Host.userMetrics.actionTaken(Host.UserMetrics.Action.FilmStripStartedRecording);
   }

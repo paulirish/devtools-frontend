@@ -1,18 +1,17 @@
 // Copyright 2021 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+/* eslint-disable rulesdir/no-lit-render-outside-of-view */
 
 import '../icon_button/icon_button.js';
 
 import * as Common from '../../../core/common/common.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as IssuesManager from '../../../models/issues_manager/issues_manager.js';
-import * as LitHtml from '../../lit-html/lit-html.js';
+import {html, render} from '../../lit/lit.js';
 import type * as IconButton from '../icon_button/icon_button.js';
 
 import issueCounterStyles from './issueCounter.css.js';
-
-const {html} = LitHtml;
 
 const UIStrings = {
   /**
@@ -27,7 +26,7 @@ const UIStrings = {
    *@description Label for link to Issues tab, specifying how many issues there are.
    */
   possibleImprovements: '{issueCount, plural, =1 {# possible improvement} other {# possible improvements}}',
-};
+} as const;
 const str_ = i18n.i18n.registerUIStrings('ui/components/issue_counter/IssueCounter.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
@@ -83,7 +82,7 @@ const listFormatter = (function defineFormatter() {
 })();
 
 export function getIssueCountsEnumeration(
-    issuesManager: IssuesManager.IssuesManager.IssuesManager, omitEmpty: boolean = true): string {
+    issuesManager: IssuesManager.IssuesManager.IssuesManager, omitEmpty = true): string {
   const counts: [number, number, number] = [
     issuesManager.numberOfIssues(IssuesManager.Issue.IssueKind.PAGE_ERROR),
     issuesManager.numberOfIssues(IssuesManager.Issue.IssueKind.BREAKING_CHANGE),
@@ -101,7 +100,7 @@ export class IssueCounter extends HTMLElement {
   readonly #shadow = this.attachShadow({mode: 'open'});
   #clickHandler: undefined|(() => void) = undefined;
   #tooltipCallback: undefined|(() => void) = undefined;
-  #leadingText: string = '';
+  #leadingText = '';
   #throttler: undefined|Common.Throttler.Throttler;
   #counts: [number, number, number] = [0, 0, 0];
   #displayMode: DisplayMode = DisplayMode.OMIT_EMPTY;
@@ -116,10 +115,6 @@ export class IssueCounter extends HTMLElement {
     } else {
       this.#render();
     }
-  }
-
-  connectedCallback(): void {
-    this.#shadow.adoptedStyleSheets = [issueCounterStyles];
   }
 
   set data(data: IssueCounterData) {
@@ -205,8 +200,9 @@ export class IssueCounter extends HTMLElement {
       accessibleName: this.#accessibleName,
       compact: this.#compact,
     };
-    LitHtml.render(
+    render(
         html`
+        <style>${issueCounterStyles}</style>
         <icon-button .data=${data} .accessibleName=${this.#accessibleName}></icon-button>
         `,
         this.#shadow, {host: this});

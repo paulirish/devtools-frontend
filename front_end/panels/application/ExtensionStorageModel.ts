@@ -7,7 +7,7 @@ import * as SDK from '../../core/sdk/sdk.js';
 import type * as ProtocolProxyApi from '../../generated/protocol-proxy-api.js';
 import * as Protocol from '../../generated/protocol.js';
 
-export class ExtensionStorage extends Common.ObjectWrapper.ObjectWrapper<{}> {
+export class ExtensionStorage extends Common.ObjectWrapper.ObjectWrapper<Record<string, never>> {
   readonly #model: ExtensionStorageModel;
   readonly #extensionIdInternal: string;
   readonly #nameInternal: string;
@@ -45,7 +45,7 @@ export class ExtensionStorage extends Common.ObjectWrapper.ObjectWrapper<{}> {
     return this.#storageAreaInternal;
   }
 
-  async getItems(keys?: string[]): Promise<{[key: string]: unknown}> {
+  async getItems(keys?: string[]): Promise<Record<string, unknown>> {
     const params: Protocol.Extensions.GetStorageItemsRequest = {
       id: this.#extensionIdInternal,
       storageArea: this.#storageAreaInternal,
