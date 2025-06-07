@@ -229,6 +229,8 @@ class DataProvider implements PerfUI.FlameChart.FlameChartDataProvider {
     return this.#timelineData;
   }
 
+
+
   async preparePopover(entryIndex: number): Promise<Element|null> {
     if (!this.#tree || !this.#parsedTrace) {
       return null;
@@ -250,12 +252,20 @@ class DataProvider implements PerfUI.FlameChart.FlameChartDataProvider {
   }
 
   entryTitle(entryIndex: number): string|null {
+    const timelineData = this.#timelineData;
+    const eventLevel = timelineData.entryLevels[entryIndex];
     const event = this.#getEvent(entryIndex);
     if (!event) {
       return '';
     }
-    return TimelineUIUtils.eventStyle(event).title;
+    try {
+      // this doesnt work because its a diff flamechart and the entryIndexes are not the same.
+      return this.#parsedTrace.compatibilityTracksAppender?.titleForEvent(event, eventLevel);
+    } catch (e) {
+      return TimelineUIUtils.eventStyle(event).title;
+    }
   }
+
 
   entryFont(entryIndex: number): string|null {
     return null;
@@ -263,10 +273,18 @@ class DataProvider implements PerfUI.FlameChart.FlameChartDataProvider {
 
   entryColor(entryIndex: number): string {
     const event = this.#getEvent(entryIndex);
+    const timelineData = this.#timelineData;
+    const eventLevel = timelineData.entryLevels[entryIndex];
+
     if (!event) {
       return '';
     }
-    return TimelineUIUtils.eventStyle(event).category.color;
+
+    try {
+      return this.#parsedTrace.compatibilityTracksAppender?.colorForEvent(event, eventLevel);
+    } catch (e) {
+      return TimelineUIUtils.eventStyle(event).category.color;
+    }
   }
 
   decorateEntry(

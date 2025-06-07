@@ -432,6 +432,7 @@ export class TimelineFlameChartDataProvider extends Common.ObjectWrapper.ObjectW
       this.timelineDataInternal = this.#instantiateTimelineData();
       this.compatibilityTracksAppender = new CompatibilityTracksAppender(
           this.timelineDataInternal, this.parsedTrace, this.entryData, this.entryTypeByLevel, this.#entityMapper);
+      this.parsedTrace.compatibilityTracksAppender = this.compatibilityTracksAppender;
     }
     return this.compatibilityTracksAppender;
   }
