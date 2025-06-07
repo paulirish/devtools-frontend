@@ -148,7 +148,7 @@ export class ThreadAppender implements TrackAppender {
   #parsedTrace: Trace.Handlers.Types.ParsedTrace;
 
   #entries: readonly Trace.Types.Events.Event[] = [];
-  #tree: Trace.Extras.TraceTree.TopDownRootNode;
+  #tree: Trace.Helpers.TreeHelpers.TraceEntryTree;
   #processId: Trace.Types.Events.ProcessID;
   #threadId: Trace.Types.Events.ThreadID;
   #threadDefaultName: string;
@@ -179,24 +179,22 @@ export class ThreadAppender implements TrackAppender {
     this.#processId = processId;
     this.#threadId = threadId;
 
+    // const visibleEventsFilter = new Trace.Extras.TraceFilter.VisibleEventsFilter(Utils.EntryStyles.visibleTypes());
 
+    //   // redefine tree
 
-  const visibleEventsFilter = new Trace.Extras.TraceFilter.VisibleEventsFilter(Utils.EntryStyles.visibleTypes());
+    // tree = new Trace.Extras.TraceTree.TopDownRootNode(entries ?? [], {
+    //   filters: [visibleEventsFilter],
+    //   startTime: Trace.Types.Timing.Milli(0),
+    //   endTime: Trace.Types.Timing.Milli(Infinity),
+    //   doNotAggregate: false,
+    //   eventGroupIdCallback: null,
+    //   includeInstantEvents: false
+    // });
 
-    // redefine tree
-
-  tree = new Trace.Extras.TraceTree.TopDownRootNode(entries ?? [], {
-    filters: [visibleEventsFilter],
-    startTime: Trace.Types.Timing.Milli(0),
-    endTime: Trace.Types.Timing.Milli(Infinity),
-    doNotAggregate: false,
-    eventGroupIdCallback: null,
-    includeInstantEvents: false
-  });
-
-  if (!entries || !tree) {
-    throw new Error(`Could not find data for thread with id ${threadId} in process with id ${processId}`);
-  }
+    if (!entries || !tree) {
+      throw new Error(`Could not find data for thread with id ${threadId} in process with id ${processId}`);
+    }
     this.#entries = entries;
     this.#tree = tree;
     this.#threadDefaultName = threadName || i18nString(UIStrings.threadS, {PH1: threadId});
@@ -465,7 +463,8 @@ export class ThreadAppender implements TrackAppender {
     // We can not used the tree maxDepth in the tree from the
     // RendererHandler because ignore listing and visibility of events
     // alter the final depth of the flame chart.
-    return this.#appendNodesAtLevel(this.#tree.children().values(), trackStartLevel);
+    // return this.#appendNodesAtLevel(this.#tree.children().values(), trackStartLevel);
+    return this.#appendNodesAtLevel(this.#tree.roots, trackStartLevel);
   }
 
   /**
@@ -482,7 +481,8 @@ export class ThreadAppender implements TrackAppender {
     let maxDepthInTree = startingLevel;
     for (const node of nodes) {
       let nextLevel = startingLevel;
-      const entry = node.event;
+      const entry = node.entry;
+      // const entry = node.event;
       const entryIsIgnoreListed = Utils.IgnoreList.isIgnoreListedEntry(entry);
       // Events' visibility is determined from their predefined styles,
       // which is something that's not available in the engine data.
@@ -512,7 +512,8 @@ export class ThreadAppender implements TrackAppender {
         nextLevel++;
       }
 
-      const depthInChildTree = this.#appendNodesAtLevel(node.children().values(), nextLevel, entryIsIgnoreListed);
+      const depthInChildTree = this.#appendNodesAtLevel(node.children, nextLevel, entryIsIgnoreListed);
+      // const depthInChildTree = this.#appendNodesAtLevel(node.children().values(), nextLevel, entryIsIgnoreListed);
       maxDepthInTree = Math.max(depthInChildTree, maxDepthInTree);
     }
     return maxDepthInTree;
