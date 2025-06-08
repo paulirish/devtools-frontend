@@ -11,6 +11,8 @@ import * as Trace from '../../models/trace/trace.js';
 import {entities} from '../../third_party/third-party-web/package/lib/index.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 
+export type DrawOverride = PerfUI.FlameChart.DrawOverride;
+
 import {
   addDecorationToEvent,
   buildGroupStyle,
@@ -590,6 +592,25 @@ export class ThreadAppender implements TrackAppender {
     }
     return Utils.EntryName.nameForEntry(entry, this.#parsedTrace);
   }
+
+  getDrawOverride(event: Trace.Types.Events.Event): DrawOverride|undefined {
+    if (event.badnest) {
+      return (context, x, y, width, levelHeight, _, transformColor) => {
+        // normal box
+        context.fillStyle = transformColor(this.colorForEvent(event));
+        context.fillRect(x, y, width - 0.5, levelHeight - 1);
+        // now add red stroke around it
+        context.strokeStyle = 'red';
+        context.lineWidth = 3;
+        context.strokeRect(x, y, width - 0.5, levelHeight - 1);
+        // add text of event.badnest
+        context.fillStyle = 'black';
+        context.fillText(String(event.badnest), x + 2, y + levelHeight);
+        return {x, width, z: -1};
+      };
+    }
+  }
+
 
   setPopoverInfo(event: Trace.Types.Events.Event, info: PopoverInfo): void {
     if (Trace.Types.Events.isParseHTML(event)) {

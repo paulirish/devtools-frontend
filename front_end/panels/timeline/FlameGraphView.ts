@@ -37,8 +37,8 @@ export class FlameGraphView extends Common.ObjectWrapper.eventMixin<TimelineTree
   #flameChart: PerfUI.FlameChart.FlameChart;
 
   currentResult?: number;
-  startTime: Trace.Types.Timing.Milli = Trace.Types.Timing.Milli(0);
-  endTime: Trace.Types.Timing.Milli = Trace.Types.Timing.Milli(Infinity);
+  startTime: Trace.Types.Timing.Micro = Trace.Types.Timing.Micro(0);
+  endTime: Trace.Types.Timing.Micro = Trace.Types.Timing.Micro(Infinity);
 
   constructor(
       private readonly delegate: TimelineModeViewDelegate,
@@ -57,10 +57,12 @@ export class FlameGraphView extends Common.ObjectWrapper.eventMixin<TimelineTree
   }
 
   windowChanged(startTime: number, endTime: number, animate: boolean): void {
-    this.delegate.windowChanged(startTime, endTime, animate);
+    // this.delegate.windowChanged(startTime, endTime, animate);
+    console.log('windowChanged called with:', startTime, endTime, animate);
   }
   updateRangeSelection(startTime: number, endTime: number): void {
-    this.delegate.updateRangeSelection(startTime, endTime);
+    // this.delegate.updateRangeSelection(startTime, endTime);
+    console.log('updateRangeSelection called with:', startTime, endTime);
   }
   updateSelectedGroup(flameChart: PerfUI.FlameChart.FlameChart, group: PerfUI.FlameChart.Group|null): void {
     // TODO(crbug.com/1428148): Implement group selection.
@@ -77,6 +79,104 @@ export class FlameGraphView extends Common.ObjectWrapper.eventMixin<TimelineTree
     this.refreshTree();
   }
 
+  buildAggregatedTree(events: Trace.Types.Events.Event[]) {
+    // 1. Decompose events into start and end points
+    const points = [];
+    for (const event of events) {
+      if (event.ph === 'I' || event.dur === 0)
+        continue;
+      // Basic data validation
+      if (typeof event.ts !== 'number' || typeof event.dur !== 'number' || isNaN(event.ts) || isNaN(event.dur)) {
+        console.warn('Skipping invalid event:', event);
+        continue;
+      }
+      event.badnest = '';
+      points.push({ts: event.ts, type: 'start', event});
+      points.push({ts: event.ts + event.dur, type: 'end', event});
+    }
+
+    // 2. Sort points: primary by timestamp, secondary by type ('end' before 'start')
+    points.sort((a, b) => {
+      if (a.ts !== b.ts) {
+        return a.ts - b.ts;
+      }
+      // If timestamps are equal, 'end' events should come first.
+      return a.type === 'end' ? -1 : 1;
+    });
+
+    const root = {name: 'root', value: 0, children: new Map()};
+    const stack = [root];
+
+
+    for (const point of points) {
+      const parentNode = stack[stack.length - 1];
+
+      if (point.type === 'start') {
+        const event = point.event;
+        let childNode = parentNode.children.get(event.name);
+
+        if (!childNode) {
+          childNode = {
+            name: event.name,
+            event: event,
+            value: 0,
+            children: new Map(),
+            // Store a reference to the event that created this node instance on the stack
+            // This helps in validating the 'end' event.
+            _originatingEventName: event.name
+          };
+          parentNode.children.set(event.name, childNode);
+        }
+
+        childNode.value += event.dur;
+        stack.push(childNode);
+
+      } else {  // 'end'
+        // --- ROBUSTNESS FIX ---
+        // If the stack is empty or only has the root, we can't pop.
+        // This indicates a mismatched 'end' event (e.g., from a truncated trace).
+        if (stack.length <= 1) {
+          console.warn('Mismatched "end" event (stack empty or at root):', point.event.name);
+          continue;
+        }
+
+        // Check if the event at the top of the stack matches the 'end' event we're processing.
+        // This handles interleaved events.
+        if (parentNode._originatingEventName === point.event.name) {
+          // This is the normal, correct case.
+          stack.pop();
+        } else {
+          // The data is improperly nested. An event is ending, but it's not the
+          // one at the top of the stack.
+          console.warn(
+              `Interleaved event detected. Trying to end "${point.event.name}" but "${
+                  parentNode._originatingEventName}" is at the top of the stack. Attempting to self-heal.`,
+              parentNode.event, point.event);
+          point.event.badnest = (point.event.badnest || '') + ' TL ending.';
+          parentNode.event.badnest = (parentNode.event.badnest || '') + ' TL @top.';
+
+          // Search down the stack to find the correct event to pop.
+          let found = false;
+          for (let i = stack.length - 1; i > 0; i--) {  // i > 0 to protect the root
+            if (stack[i]._originatingEventName === point.event.name) {
+              // We found it. Pop everything above it.
+              stack.length = i;  // Effectively pops everything from i upwards
+              found = true;
+              break;
+            }
+          }
+          if (!found) {
+            console.warn(`Could not find matching start for event "${point.event.name}" in the current stack.`);
+          }
+        }
+      }
+    }
+
+    root.value = Array.from(root.children.values()).reduce((sum, child) => sum + child.value, 0);
+
+    return root;
+  }
+
   refreshTree(): void {
     if (!this.isShowing() || !this.#selectedEvents || !this.#selectedEvents.length || !this.#parsedTrace) {
       return;
@@ -86,24 +186,41 @@ export class FlameGraphView extends Common.ObjectWrapper.eventMixin<TimelineTree
 
     const tree = new Trace.Extras.TraceTree.TopDownRootNode(this.#selectedEvents, {
       filters: [visibleEventsFilter],
-      startTime: this.startTime,
-      endTime: this.endTime,
+      startTime: Trace.Helpers.Timing.microToMilli(this.startTime),
+      endTime: Trace.Helpers.Timing.microToMilli(this.endTime),
       doNotAggregate: false,
       eventGroupIdCallback: null,
       includeInstantEvents: false,
     });
 
+    let now = performance.now();
+    // filter selectedEvents down to only those that are visible in the current time range
+    const selectedEventsInRange = this.#selectedEvents.filter(event => {
+      if (event.ph === 'I' || event.dur === 0) {
+        return false;  // Ignore instant events
+      }
+      if (event.ts < this.startTime || (event.ts + (event.dur ?? 0)) > this.endTime) {
+        return false;  // Ignore events outside the current time range
+      }
+      return true;
+    });
+    const aggTree = this.buildAggregatedTree(selectedEventsInRange);
+
+
+    console.log(aggTree, performance.measure('buildAggregatedTree', {start: now, end: performance.now()}));
+    now = performance.now();
     this.#dataProvider.setTree(tree, this.#parsedTrace);
+    console.log(performance.measure('setTree', {start: now, end: performance.now()}));
     this.#flameChart.scheduleUpdate();
   }
 
   updateContents(selection: TimelineSelection): void {
     const timings = rangeForSelection(selection);
-    const timingMilli = Trace.Helpers.Timing.traceWindowMicroSecondsToMilliSeconds(timings);
-    this.startTime = timingMilli.min;
-    this.endTime = timingMilli.max;
+    // const timingMilli = Trace.Helpers.Timing.traceWindowMicroSecondsToMilliSeconds(timings);
+    this.startTime = timings.min;
+    this.endTime = timings.max;
     this.#flameChart.setWindowTimes(0, 99 + Math.random());
-    this.#dataProvider.setRange(timingMilli);
+    // this.#dataProvider.setRange(timings);
 
 
     this.refreshTree();
@@ -172,11 +289,11 @@ class DataProvider implements PerfUI.FlameChart.FlameChartDataProvider {
     return false;
   }
 
-  setRange(timingMilli: Trace.Types.Timing.TraceWindowMilli): void {
-    // const {min, max} = timingMilli;
-    // this.#minimumBoundary = min;
-    // this.timeSpan = min === max ? 1000 : max - this.#minimumBoundary;
-  }
+  // setRange(timingMilli: Trace.Types.Timing.TraceWindowMilli): void {
+  //   // const {min, max} = timingMilli;
+  //   // this.#minimumBoundary = min;
+  //   // this.timeSpan = min === max ? 1000 : max - this.#minimumBoundary;
+  // }
 
   setTree(tree: Trace.Extras.TraceTree.TopDownRootNode, parsedTrace: Trace.Handlers.Types.ParsedTrace): void {
     this.#tree = tree;

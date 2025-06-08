@@ -463,39 +463,39 @@
    */
   --default-font-family: ".SFNSDisplay-Regular", "Helvetica Neue", "Lucida Grande", sans-serif;
   --monospace-font-size: 10px;
-  --monospace-font-family: monospace;
+  --monospace-font-family: "Roboto Mono DG", monospace;
   --source-code-font-size: 11px;
-  --source-code-font-family: monospace;
+  --source-code-font-family: "Roboto Mono DG", monospace;
 
   /* Default fonts */
   &.platform-linux {
     --default-font-family: "Google Sans Text", "Google Sans", system-ui, sans-serif;
     --monospace-font-size: 11px;
-    --monospace-font-family: "Noto Sans Mono", "DejaVu Sans Mono", monospace;
+    --monospace-font-family: "Roboto Mono DG", "Noto Sans Mono", "DejaVu Sans Mono", monospace;
     --source-code-font-size: 11px;
-    --source-code-font-family: "Noto Sans Mono", "DejaVu Sans Mono", monospace;
+    --source-code-font-family: "Roboto Mono DG", "Noto Sans Mono", "DejaVu Sans Mono", monospace;
   }
 
   &.platform-mac {
     --default-font-family: system-ui, sans-serif;
     --monospace-font-size: 11px;
-    --monospace-font-family: monospace;
+    --monospace-font-family: "Roboto Mono DG", monospace;
     --source-code-font-size: 11px;
-    --source-code-font-family: monospace;
+    --source-code-font-family: "Roboto Mono DG", monospace;
   }
 
   &.platform-windows {
     --default-font-family: system-ui, sans-serif;
     --monospace-font-size: var(--sys-size-6);
-    --monospace-font-family: monospace;
+    --monospace-font-family: "Roboto Mono DG", monospace;
     --source-code-font-size: var(--sys-size-6);
-    --source-code-font-family: monospace;
+    --source-code-font-family: "Roboto Mono DG", monospace;
   }
 
   &.platform-screenshot-test {
     --default-font-family: roboto;
-    --monospace-font-family: roboto;
-    --source-code-font-family: roboto;
+    --monospace-font-family: "Roboto Mono DG", roboto;
+    --source-code-font-family: "Roboto Mono DG", roboto;
   }
 
   --ref-typeface-weight-regular: 400;

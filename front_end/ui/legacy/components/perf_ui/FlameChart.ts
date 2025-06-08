@@ -3964,6 +3964,16 @@ export class FlameChart extends Common.ObjectWrapper.eventMixin<EventTypes, type
     }
     this.updateHeight();
     this.updateBoundaries();
+
+
+    // HACK for debugging.
+    for (let i = 0; i < this.rawTimelineDataLength; ++i) {
+      const drawOverride = this.dataProvider.getDrawOverride?.(i);
+      if (drawOverride) {
+        this.#indexToDrawOverride.set(i, drawOverride);
+      }
+    }
+
     this.draw();
     if (!this.chartViewport.isDragging()) {
       this.updateHighlight();
