@@ -79,10 +79,185 @@ export class FlameGraphView extends Common.ObjectWrapper.eventMixin<TimelineTree
     this.refreshTree();
   }
 
-  buildAggregatedTree(events: Trace.Types.Events.Event[]) {
+  refreshTree(): void {
+    if (!this.isShowing() || !this.#selectedEvents || !this.#selectedEvents.length || !this.#parsedTrace) {
+      return;
+    }
+
+    const visibleEventsFilter = new Trace.Extras.TraceFilter.VisibleEventsFilter(Utils.EntryStyles.visibleTypes());
+
+    const tree = new Trace.Extras.TraceTree.TopDownRootNode(this.#selectedEvents, {
+      filters: [visibleEventsFilter],
+      startTime: Trace.Helpers.Timing.microToMilli(this.startTime),
+      endTime: Trace.Helpers.Timing.microToMilli(this.endTime),
+      doNotAggregate: false,
+      eventGroupIdCallback: null,
+      includeInstantEvents: false,
+    });
+
+    let now = performance.now();
+
+
+    this.#dataProvider.buildAggregatedTree(this.#selectedEvents, this.startTime, this.endTime);
+    console.log(performance.measure('buildAggregatedTree', {start: now, end: performance.now()}));
+
+    now = performance.now();
+    this.#dataProvider.setTree(tree, this.#parsedTrace);
+    console.log(performance.measure('setTree', {start: now, end: performance.now()}));
+    this.#flameChart.scheduleUpdate();
+  }
+
+  updateContents(selection: TimelineSelection): void {
+    const timings = rangeForSelection(selection);
+    // const timingMilli = Trace.Helpers.Timing.traceWindowMicroSecondsToMilliSeconds(timings);
+    this.startTime = timings.min;
+    this.endTime = timings.max;
+    this.#flameChart.setWindowTimes(0, 99 + Math.random());
+    // this.#dataProvider.setRange(timings);
+
+
+    this.refreshTree();
+  }
+
+  // UI.SearchableView.Searchable implementation
+
+  onSearchCanceled(): void {
+    this.searchResults = [];
+    this.currentResult = 0;
+  }
+
+  performSearch(searchConfig: UI.SearchableView.SearchConfig, _shouldJump: boolean, _jumpBackwards?: boolean): void {
+    this.searchResults = [];
+    this.currentResult = 0;
+  }
+
+  jumpToNextSearchResult(): void {
+    if (!this.searchResults.length || this.currentResult === undefined) {
+      return;
+    }
+  }
+
+  jumpToPreviousSearchResult(): void {
+    if (!this.searchResults.length || this.currentResult === undefined) {
+      return;
+    }
+  }
+
+  supportsCaseSensitiveSearch(): boolean {
+    return true;
+  }
+
+  supportsRegexSearch(): boolean {
+    return true;
+  }
+}
+
+class DataProvider implements PerfUI.FlameChart.FlameChartDataProvider {
+  #tree: Trace.Extras.TraceTree.TopDownRootNode|null = null;
+  #timelineData: PerfUI.FlameChart.FlameChartTimelineData;
+  #parsedTrace: Trace.Handlers.Types.ParsedTrace|null = null;
+  #maxDepth: number = 0;
+  private timeSpan: number = 100;
+  #minimumBoundary: number = 0;
+  treeRoot: {name: string; value: number; children: Map<any, any>;};
+
+
+  constructor() {
+    this.#timelineData = PerfUI.FlameChart.FlameChartTimelineData.createEmpty();
+  }
+
+  // TODO(crbug.com/40256158): Implement formatValue
+  formatValue(value: number, entryIndex: number): string {
+    return value.toFixed(2);
+  }
+
+  // TODO(crbug.com/40256158): Implement preparePopoverElement
+  async preparePopoverElement(entryIndex: number): Promise<Element|null> {
+    const element = document.createElement('div');
+    element.textContent = `Entry Index: ${entryIndex}`;
+    return element;
+  }
+
+  // TODO(crbug.com/40256158): Implement hasTrackConfigurationMode
+  hasTrackConfigurationMode(): boolean {
+    return false;
+  }
+
+  // setRange(timingMilli: Trace.Types.Timing.TraceWindowMilli): void {
+  //   // const {min, max} = timingMilli;
+  //   // this.#minimumBoundary = min;
+  //   // this.timeSpan = min === max ? 1000 : max - this.#minimumBoundary;
+  // }
+
+  setTree(tree: Trace.Extras.TraceTree.TopDownRootNode, parsedTrace: Trace.Handlers.Types.ParsedTrace): void {
+    this.#tree = tree;
+    this.#parsedTrace = parsedTrace;
+    this.#timelineData = PerfUI.FlameChart.FlameChartTimelineData.createEmpty();
+    if (!this.#tree) {
+      return;
+    }
+    let maxDepth = 0;
+    const {entryLevels, entryStartTimes, entryTotalTimes} = this.#timelineData;
+    const xOffsets: number[] = [];
+
+    function processNode(node: Trace.Extras.TraceTree.Node, level: number, parentAbsoluteStartTime: number): void {
+      if (level > maxDepth) {
+        maxDepth = level;
+      }
+      if (node.event) {
+        // The start time of the current node.
+        // This is the parent's absolute start time PLUS the x-offset accumulated at this level.
+        const nodeAbsoluteStartTime = Math.max(parentAbsoluteStartTime, xOffsets[level] || 0);
+
+        // The total time of the node, converted to a percentage of the overall trace.
+        // This seems correct for width calculation.
+        const nodeTotalTime = node.totalTime / tree.totalTime * 100;
+
+        entryLevels.push(level);
+        entryStartTimes.push(nodeAbsoluteStartTime);  // Use the calculated absolute start time
+        entryTotalTimes.push(nodeTotalTime);
+
+        // Update the xOffset for the current level.
+        // This ensures subsequent siblings at the same level start after this node.
+        xOffsets[level] = nodeAbsoluteStartTime + nodeTotalTime;
+      }
+
+
+      for (const child of node.children().values()) {
+        // When processing a child, its parent's absolute start time is the current node's absolute start time.
+        // If the current node doesn't have an event (e.g., it's a root node without a direct event),
+        // then we'd use the current `parentAbsoluteStartTime` passed into `processNode`.
+        const childParentAbsoluteStartTime =
+            node.event ? entryStartTimes[entryStartTimes.length - 1] : parentAbsoluteStartTime;
+        processNode(child, level + 1, childParentAbsoluteStartTime);
+      }
+    }
+
+    // Initial call for the root's children. The initial parentAbsoluteStartTime is 0.
+    for (const child of this.#tree.children().values()) {
+      processNode(child, 0, 0);
+    }
+    this.#maxDepth = maxDepth;
+  }
+
+
+  buildAggregatedTree(
+      events: Trace.Types.Events.Event[], startTime: Trace.Types.Timing.Micro = Trace.Types.Timing.Micro(0),
+      endTime: Trace.Types.Timing.Micro = Trace.Types.Timing.Micro(Infinity)): Trace.Extras.TraceTree.Node {
+    // filter selectedEvents down to only those that are visible in the current time range
+    const eventsInRange = events.filter(event => {
+      if (event.ph === 'I' || event.dur === 0) {
+        return false;  // Ignore instant events
+      }
+      if (event.ts < startTime || (event.ts + (event.dur ?? 0)) > endTime) {
+        return false;  // Ignore events outside the current time range
+      }
+      return true;
+    });
+
     // 1. Decompose events into start and end points
     const points = [];
-    for (const event of events) {
+    for (const event of eventsInRange) {
       if (event.ph === 'I' || event.dur === 0)
         continue;
       // Basic data validation
@@ -174,177 +349,11 @@ export class FlameGraphView extends Common.ObjectWrapper.eventMixin<TimelineTree
 
     root.value = Array.from(root.children.values()).reduce((sum, child) => sum + child.value, 0);
 
+    this.treeRoot = root;
     return root;
   }
 
-  refreshTree(): void {
-    if (!this.isShowing() || !this.#selectedEvents || !this.#selectedEvents.length || !this.#parsedTrace) {
-      return;
-    }
 
-    const visibleEventsFilter = new Trace.Extras.TraceFilter.VisibleEventsFilter(Utils.EntryStyles.visibleTypes());
-
-    const tree = new Trace.Extras.TraceTree.TopDownRootNode(this.#selectedEvents, {
-      filters: [visibleEventsFilter],
-      startTime: Trace.Helpers.Timing.microToMilli(this.startTime),
-      endTime: Trace.Helpers.Timing.microToMilli(this.endTime),
-      doNotAggregate: false,
-      eventGroupIdCallback: null,
-      includeInstantEvents: false,
-    });
-
-    let now = performance.now();
-    // filter selectedEvents down to only those that are visible in the current time range
-    const selectedEventsInRange = this.#selectedEvents.filter(event => {
-      if (event.ph === 'I' || event.dur === 0) {
-        return false;  // Ignore instant events
-      }
-      if (event.ts < this.startTime || (event.ts + (event.dur ?? 0)) > this.endTime) {
-        return false;  // Ignore events outside the current time range
-      }
-      return true;
-    });
-    const aggTree = this.buildAggregatedTree(selectedEventsInRange);
-
-
-    console.log(aggTree, performance.measure('buildAggregatedTree', {start: now, end: performance.now()}));
-    now = performance.now();
-    this.#dataProvider.setTree(tree, this.#parsedTrace);
-    console.log(performance.measure('setTree', {start: now, end: performance.now()}));
-    this.#flameChart.scheduleUpdate();
-  }
-
-  updateContents(selection: TimelineSelection): void {
-    const timings = rangeForSelection(selection);
-    // const timingMilli = Trace.Helpers.Timing.traceWindowMicroSecondsToMilliSeconds(timings);
-    this.startTime = timings.min;
-    this.endTime = timings.max;
-    this.#flameChart.setWindowTimes(0, 99 + Math.random());
-    // this.#dataProvider.setRange(timings);
-
-
-    this.refreshTree();
-  }
-
-  // UI.SearchableView.Searchable implementation
-
-  onSearchCanceled(): void {
-    this.searchResults = [];
-    this.currentResult = 0;
-  }
-
-  performSearch(searchConfig: UI.SearchableView.SearchConfig, _shouldJump: boolean, _jumpBackwards?: boolean): void {
-    this.searchResults = [];
-    this.currentResult = 0;
-  }
-
-  jumpToNextSearchResult(): void {
-    if (!this.searchResults.length || this.currentResult === undefined) {
-      return;
-    }
-  }
-
-  jumpToPreviousSearchResult(): void {
-    if (!this.searchResults.length || this.currentResult === undefined) {
-      return;
-    }
-  }
-
-  supportsCaseSensitiveSearch(): boolean {
-    return true;
-  }
-
-  supportsRegexSearch(): boolean {
-    return true;
-  }
-}
-
-class DataProvider implements PerfUI.FlameChart.FlameChartDataProvider {
-  #tree: Trace.Extras.TraceTree.TopDownRootNode|null = null;
-  #timelineData: PerfUI.FlameChart.FlameChartTimelineData;
-  #parsedTrace: Trace.Handlers.Types.ParsedTrace|null = null;
-  #maxDepth: number = 0;
-  private timeSpan: number = 100;
-  #minimumBoundary: number = 0;
-
-
-  constructor() {
-    this.#timelineData = PerfUI.FlameChart.FlameChartTimelineData.createEmpty();
-  }
-
-  // TODO(crbug.com/40256158): Implement formatValue
-  formatValue(value: number, entryIndex: number): string {
-    return value.toFixed(2);
-  }
-
-  // TODO(crbug.com/40256158): Implement preparePopoverElement
-  async preparePopoverElement(entryIndex: number): Promise<Element|null> {
-    const element = document.createElement('div');
-    element.textContent = `Entry Index: ${entryIndex}`;
-    return element;
-  }
-
-  // TODO(crbug.com/40256158): Implement hasTrackConfigurationMode
-  hasTrackConfigurationMode(): boolean {
-    return false;
-  }
-
-  // setRange(timingMilli: Trace.Types.Timing.TraceWindowMilli): void {
-  //   // const {min, max} = timingMilli;
-  //   // this.#minimumBoundary = min;
-  //   // this.timeSpan = min === max ? 1000 : max - this.#minimumBoundary;
-  // }
-
-  setTree(tree: Trace.Extras.TraceTree.TopDownRootNode, parsedTrace: Trace.Handlers.Types.ParsedTrace): void {
-    this.#tree = tree;
-    this.#parsedTrace = parsedTrace;
-    this.#timelineData = PerfUI.FlameChart.FlameChartTimelineData.createEmpty();
-    if (!this.#tree) {
-      return;
-    }
-    let maxDepth = 0;
-    const {entryLevels, entryStartTimes, entryTotalTimes} = this.#timelineData;
-    const xOffsets: number[] = [];
-
-    function processNode(node: Trace.Extras.TraceTree.Node, level: number, parentAbsoluteStartTime: number): void {
-      if (level > maxDepth) {
-        maxDepth = level;
-      }
-      if (node.event) {
-        // The start time of the current node.
-        // This is the parent's absolute start time PLUS the x-offset accumulated at this level.
-        const nodeAbsoluteStartTime = Math.max(parentAbsoluteStartTime, xOffsets[level] || 0);
-
-        // The total time of the node, converted to a percentage of the overall trace.
-        // This seems correct for width calculation.
-        const nodeTotalTime = node.totalTime / tree.totalTime * 100;
-
-        entryLevels.push(level);
-        entryStartTimes.push(nodeAbsoluteStartTime);  // Use the calculated absolute start time
-        entryTotalTimes.push(nodeTotalTime);
-
-        // Update the xOffset for the current level.
-        // This ensures subsequent siblings at the same level start after this node.
-        xOffsets[level] = nodeAbsoluteStartTime + nodeTotalTime;
-      }
-
-
-      for (const child of node.children().values()) {
-        // When processing a child, its parent's absolute start time is the current node's absolute start time.
-        // If the current node doesn't have an event (e.g., it's a root node without a direct event),
-        // then we'd use the current `parentAbsoluteStartTime` passed into `processNode`.
-        const childParentAbsoluteStartTime =
-            node.event ? entryStartTimes[entryStartTimes.length - 1] : parentAbsoluteStartTime;
-        processNode(child, level + 1, childParentAbsoluteStartTime);
-      }
-    }
-
-    // Initial call for the root's children. The initial parentAbsoluteStartTime is 0.
-    for (const child of this.#tree.children().values()) {
-      processNode(child, 0, 0);
-    }
-    this.#maxDepth = maxDepth;
-  }
 
   minimumBoundary(): number {
     return 0;
