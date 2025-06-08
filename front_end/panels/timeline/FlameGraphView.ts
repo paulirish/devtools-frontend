@@ -98,11 +98,11 @@ export class FlameGraphView extends Common.ObjectWrapper.eventMixin<TimelineTree
     let now = performance.now();
 
 
-    this.#dataProvider.buildAggregatedTree(this.#selectedEvents, this.startTime, this.endTime);
+    this.#dataProvider.buildAggregatedTree(this.#selectedEvents, this.startTime, this.endTime, this.#parsedTrace);
     console.log(performance.measure('buildAggregatedTree', {start: now, end: performance.now()}));
 
     now = performance.now();
-    this.#dataProvider.setTree(tree, this.#parsedTrace);
+    // this.#dataProvider.setTree(tree, this.#parsedTrace);
     console.log(performance.measure('setTree', {start: now, end: performance.now()}));
     this.#flameChart.scheduleUpdate();
   }
@@ -160,6 +160,7 @@ class DataProvider implements PerfUI.FlameChart.FlameChartDataProvider {
   private timeSpan: number = 100;
   #minimumBoundary: number = 0;
   treeRoot: {name: string; value: number; children: Map<any, any>;};
+  indexedEvents: any;
 
 
   constructor() {
@@ -243,8 +244,14 @@ class DataProvider implements PerfUI.FlameChart.FlameChartDataProvider {
 
   buildAggregatedTree(
       events: Trace.Types.Events.Event[], startTime: Trace.Types.Timing.Micro = Trace.Types.Timing.Micro(0),
-      endTime: Trace.Types.Timing.Micro = Trace.Types.Timing.Micro(Infinity)): Trace.Extras.TraceTree.Node {
+      endTime: Trace.Types.Timing.Micro = Trace.Types.Timing.Micro(Infinity),
+      parsedTrace: Trace.Handlers.Types.ParsedTrace): Trace.Extras.TraceTree.Node {
     // filter selectedEvents down to only those that are visible in the current time range
+
+
+    this.#parsedTrace = parsedTrace;
+
+
     const eventsInRange = events.filter(event => {
       if (event.ph === 'I' || event.dur === 0) {
         return false;  // Ignore instant events
@@ -269,6 +276,9 @@ class DataProvider implements PerfUI.FlameChart.FlameChartDataProvider {
       points.push({ts: event.ts, type: 'start', event});
       points.push({ts: event.ts + event.dur, type: 'end', event});
     }
+
+
+    const nodeToEvent = new Map<any, Trace.Types.Events.Event>();
 
     // 2. Sort points: primary by timestamp, secondary by type ('end' before 'start')
     points.sort((a, b) => {
@@ -300,6 +310,7 @@ class DataProvider implements PerfUI.FlameChart.FlameChartDataProvider {
             // This helps in validating the 'end' event.
             _originatingEventName: event.name
           };
+          nodeToEvent.set(childNode, event);
           parentNode.children.set(event.name, childNode);
         }
 
@@ -350,6 +361,68 @@ class DataProvider implements PerfUI.FlameChart.FlameChartDataProvider {
     root.value = Array.from(root.children.values()).reduce((sum, child) => sum + child.value, 0);
 
     this.treeRoot = root;
+
+
+
+    // 3. Populate timeline data for the flame chart.
+    // This logic is adapted from your original `setTree` method. It traverses the
+    // aggregated tree to generate the necessary arrays for rendering.
+    this.#timelineData = PerfUI.FlameChart.FlameChartTimelineData.createEmpty();
+
+    const totalTime = root.value;
+    if (totalTime === 0) {
+      this.#maxDepth = 0;
+      return root;
+    }
+
+    let maxDepth = 0;
+    const {entryLevels, entryStartTimes, entryTotalTimes} = this.#timelineData;
+    this.indexedEvents = [];
+    const xOffsets: number[] = [];
+
+    // Define a recursive function to traverse the aggregated tree.
+    const processAggregatedNode = (node: any, level: number, parentAbsoluteStartTime: number): void => {
+      if (level > maxDepth) {
+        maxDepth = level;
+      }
+
+      // The start time for a node is the greater of its parent's start time or the
+      // current offset at its level. This creates the flame chart's horizontal layout.
+      const nodeAbsoluteStartTime = Math.max(parentAbsoluteStartTime, xOffsets[level] || 0);
+
+      // The width of the node is its aggregated duration as a percentage of the total.
+      const nodeTotalTime = (node.value / totalTime) * 100;
+
+      entryLevels.push(level);
+      this.indexedEvents.push(nodeToEvent.get(node));
+
+      entryStartTimes.push(nodeAbsoluteStartTime);
+      entryTotalTimes.push(nodeTotalTime);
+
+      // Update the offset for the current level to position the next sibling correctly.
+      xOffsets[level] = nodeAbsoluteStartTime + nodeTotalTime;
+
+      // The parent start time for any children is this node's calculated start time.
+      const children = Array.from(node.children.values());
+      // Sort children for a stable and predictable flame chart layout.
+      // children.sort((a, b) => b.value - a.value);
+
+      for (const child of children) {
+        processAggregatedNode(child, level + 1, nodeAbsoluteStartTime);
+      }
+    };
+
+    // Begin processing with the top-level children of the root node.
+    const topLevelNodes = Array.from(root.children.values());
+    // Sort top-level nodes by aggregated time (value) for a more readable chart.
+    // topLevelNodes.sort((a, b) => b.value - a.value);
+
+    for (const child of topLevelNodes) {
+      processAggregatedNode(child, 0, 0);
+    }
+
+    this.#maxDepth = maxDepth;
+
     return root;
   }
 
@@ -398,11 +471,11 @@ class DataProvider implements PerfUI.FlameChart.FlameChartDataProvider {
     const timelineData = this.#timelineData;
     const eventLevel = timelineData.entryLevels[entryIndex];
     const event = this.#getEvent(entryIndex);
-    if (!event || !this.#parsedTrace) {
+    if (!event) {
       return '';
     }
 
-    return Utils.EntryName.nameForEntry(event, this.#parsedTrace);
+    return Utils.EntryName.nameForEntry(event, this.#parsedTrace ?? undefined);
   }
 
 
@@ -441,6 +514,8 @@ class DataProvider implements PerfUI.FlameChart.FlameChartDataProvider {
   }
 
   #getEvent(entryIndex: number): Trace.Types.Events.Event|null {
+    return this.indexedEvents[entryIndex];
+
     if (!this.#tree) {
       return null;
     }
