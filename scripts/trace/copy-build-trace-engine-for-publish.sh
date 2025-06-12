@@ -27,10 +27,15 @@ cp -rp "$dtfe/front_end/panels/timeline/fixtures/traces/invalid-animation-events
 # tweak paths for the new location
 cp -rp "$dtfe/front_end/analyze-trace.mjs" "$standalone/analyze-trace.mjs.orig"
 cat "$standalone/analyze-trace.mjs.orig" | sed 's|../out/TraceEngine/dist/|./|' > "$standalone/analyze-trace.mjs"
+
+cp -rp "$dtfe/front_end/analyze-inspector-issues.mjs" "$standalone/analyze-inspector-issues.mjs.orig"
+cat "$standalone/analyze-inspector-issues.mjs.orig" | sed 's|../out/TraceEngine/dist/|./|' > "$standalone/analyze-inspector-issues.mjs"
+
 cp -rp "$dtfe/scripts/trace/test/test-trace-engine.mjs" "$standalone/test/test-trace-engine.mjs"
 
 # cleanup
 command rm "$standalone/analyze-trace.mjs.orig"
+command rm "$standalone/analyze-inspector-issues.mjs.orig"
 
 echo "➕ Files copied. Testing…"
 npm -C "$standalone" install

@@ -3,9 +3,11 @@
 // found in the LICENSE file.
 
 import {strict as assert} from 'assert';
+import fs from 'fs';
 import test from 'node:test';
 
 import {analyzeTrace} from '../analyze-trace.mjs';
+import {analyzeInspectorIssues} from '../analyze-inspector-issues.mjs';
 
 const filename = './test/invalid-animation-events.json.gz';
 const {parsedTrace: data, insights} = await analyzeTrace(filename);
@@ -113,4 +115,16 @@ test('insights look ok', t => {
     obadmbiiipafnncogfkdfionggeckfia: { transferSize: 0, mainThreadTime: 1.696999967098236 },
   };
   assert.deepStrictEqual(simplified, expected);
+});
+
+test('inspector issues ok', t => {
+  const artifactsPath = [
+    '../lighthouse/core/test/results/artifacts/artifacts.json',
+    '../../src/lighthouse/core/test/results/artifacts/artifacts.json',
+  ].find(f => fs.existsSync(f));
+  assert(artifactsPath);
+  const issues = analyzeInspectorIssues(artifactsPath);
+  assert.equal(issues.length, 4);
+  // TODO: almost working ...
+  // console.log(issues[0].getDescription());
 });

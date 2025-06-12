@@ -11,7 +11,8 @@ out_dir="./out/TraceEngine"
 dist="$out_dir/dist"  # This doesn't match up with typical obj,gen,resources layout but that's fine!
 
 # Prevent old files from being copied to the dist folder. Yes, this forces a rebuild every time. Got a better idea?
-rm -rf "$out_dir/gen"
+# rm -rf "$out_dir/gen"
+# TODO ! restore above
 
 # build devtools first!
 gn --args="is_debug=true" gen -C $out_dir
@@ -25,15 +26,19 @@ mkdir -p "$dist/generated"
 cp -r "$out_dir/gen/front_end/models/trace" "$dist/models/trace"
 cp -r "$out_dir/gen/front_end/models/cpu_profile" "$dist/models/cpu_profile"
 cp -r "$out_dir/gen/front_end/core/platform" "$dist/core/platform"
+# cp -r "$out_dir/gen/front_end/core/common" "$dist/core/common"
 cp "$out_dir/gen/front_end/generated/protocol.js" "$dist/generated/protocol.js"
 cp "$out_dir/gen/front_end/generated/protocol.d.ts" "$dist/generated/protocol.d.ts"
 cp ./front_end/models/trace/package-template.json "$dist/package.json"
+
+# Smuggling issues in this package...
+cp -r "$out_dir/gen/front_end/models/issues_manager" "$dist/models/issues_manager"
 
 # Strip out the i18n modules and some type-only stuff.
 python3 -c "
 from pathlib import Path
 
-for p in Path('$dist/models/trace/insights').rglob('*.js'):
+for p in Path('$dist').rglob('*.js'):
     content = p.read_text()
 
     needle = 'import * as i18n'
@@ -42,8 +47,20 @@ for p in Path('$dist/models/trace/insights').rglob('*.js'):
     needle = 'const str_ ='
     content = content.replace(needle, f'// {needle}')
 
+    needle = 'Host.userMetrics.'
+    content = content.replace(needle, f'// {needle}')
+
+    needle = 'extends Common.ObjectWrapper.ObjectWrapper'
+    content = content.replace(needle, 'extends class {}')
+
     needle = 'const i18nString ='
     content = content.replace(needle, 'const i18nString = (i18nId, values) => ({i18nId, values}); //')
+
+    needle = 'const i18nLazyString ='
+    content = content.replace(needle, 'const i18nLazyString = (i18nId, values) => ({i18nId, values}); //')
+
+    needle = 'i18n.i18n.lockedLazyString'
+    content = content.replace(needle, '')
 
     needle = 'i18n.ByteUtilities.bytesToString'
     content = content.replace(needle, '(bytes => ({__i18nBytes: bytes}))')
@@ -56,8 +73,34 @@ for p in Path('$dist/models/trace/insights').rglob('*.js'):
 for p in Path('$dist').rglob('*.d.ts'):
     content = p.read_text()
 
-    needle = 'import type * as Common'
-    content = content.replace(needle, f'// {needle}')
+    make_any = [
+        'Common.Settings.Setting<boolean>',
+        'Common.Settings.Setting<HideIssueMenuSetting>',
+        'CrUXManager.PageResult',
+        'CrUXManager.PageScope',
+        'CrUXManager.Scope',
+        'Marked.Marked.Token',
+        'SDK.ConsoleModel.ConsoleMessage',
+        'SDK.IssuesModel.IssuesModel',
+        'SDK.NetworkManager.Conditions',
+        'SDK.NetworkManager.Conditions',
+        'SDK.ResourceTreeModel.ResourceTreeFrame',
+        'SDK.Target.Target',
+
+        # Order is important here.
+        'SDK.SourceMap.SourceMapV3',
+        'SDK.SourceMap.SourceMap',
+    ]
+    for needle in make_any:
+        content = content.replace(needle, 'any')
+
+    comment_out = [
+        'import type * as Common',
+        'import type * as CrUXManager',
+        'import type * as SDK',
+    ]
+    for needle in comment_out:
+        content = content.replace(needle, f'// {needle}')
 
     for needle in ['Common.UIString.LocalizedString', 'Platform.UIString.LocalizedString']:
         content = content.replace(needle, '{i18nId: string, values: Record<string, string|number>, formattedDefault: string}')
@@ -68,29 +111,11 @@ for p in Path('$dist').rglob('*.d.ts'):
     needle = 'import(\"../../../core/platform/UIString.js\").LocalizedString'
     content = content.replace(needle, 'Record<string, string>')
 
-    needle = 'import type * as SDK'
-    content = content.replace(needle, f'// {needle}')
+    needle = 'extends Common.ObjectWrapper.ObjectWrapper<EventTypes>'
+    content = content.replace(needle, 'extends class {}')
 
-    needle = 'SDK.NetworkManager.Conditions'
-    content = content.replace(needle, 'any')
-
-    needle = 'SDK.SourceMap.SourceMap'
-    content = content.replace(needle, 'any')
-
-    needle = 'import type * as CrUXManager'
-    content = content.replace(needle, f'// {needle}')
-
-    needle = 'CrUXManager.PageResult'
-    content = content.replace(needle, 'any')
-
-    needle = 'CrUXManager.PageScope'
-    content = content.replace(needle, 'any')
-
-    needle = 'CrUXManager.Scope'
-    content = content.replace(needle, 'any')
-
-    needle = 'anyV3'
-    content = content.replace(needle, 'any')
+    needle = 'implements SDK.TargetManager.SDKModelObserver<any>'
+    content = content.replace(needle, '')
 
     needle = 'CSSInJS'
     content = content.replace(needle, 'string')
@@ -113,6 +138,33 @@ echo 'export {};' > $dist/models/trace/TracingManager.js
 echo 'export {};' > $dist/models/trace/TracingManager.d.ts
 echo 'export {};' > $dist/models/trace/LegacyTracingModel.js
 echo 'export {};' > $dist/models/trace/LegacyTracingModel.d.ts
+
+# Issues stuff
+echo 'export {};' > $dist/models/issues_manager/CheckFormsIssuesTrigger.js
+echo 'export {};' > $dist/models/issues_manager/CheckFormsIssuesTrigger.d.ts
+echo 'export {};' > $dist/models/issues_manager/ContrastCheckTrigger.js
+echo 'export {};' > $dist/models/issues_manager/ContrastCheckTrigger.d.ts
+echo 'export {};' > $dist/models/issues_manager/IssueResolver.js
+echo 'export {};' > $dist/models/issues_manager/IssueResolver.d.ts
+echo 'export {};' > $dist/models/issues_manager/RelatedIssue.js
+echo 'export {};' > $dist/models/issues_manager/RelatedIssue.d.ts
+echo 'export const SourceFrameIssuesManager = null;' > $dist/models/issues_manager/SourceFrameIssuesManager.js
+echo 'export {};' > $dist/models/issues_manager/SourceFrameIssuesManager.d.ts
+# Lighthouse currently does deprecations separate from issues.
+echo 'export const DeprecationIssue = {fromInspectorIssue: () => []};' > $dist/models/issues_manager/DeprecationIssue.js
+echo 'export {};' > $dist/models/issues_manager/DeprecationIssue.d.ts
+
+mkdir -p $dist/core/sdk/ $dist/core/host/ $dist/core/root/ $dist/core/common/ $dist/third_party/marked/
+echo 'export {};' > $dist/core/sdk/sdk.js
+echo 'export {};' > $dist/core/sdk/sdk.d.ts
+echo 'export {};' > $dist/core/host/host.js
+echo 'export {};' > $dist/core/host/host.d.ts
+echo 'export {};' > $dist/core/common/common.js
+echo 'export {};' > $dist/core/common/common.d.ts
+echo 'export {};' > $dist/core/root/root.js
+echo 'export {};' > $dist/core/root/root.d.ts
+echo 'export {};' > $dist/third_party/marked/marked.js
+echo 'export {};' > $dist/third_party/marked/marked.d.ts
 
 # Copy i18n strings.
 # Also copies generated/Deprecation.ts strings, since Lighthouse benefits from that too.
