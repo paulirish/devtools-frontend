@@ -26,13 +26,13 @@ mkdir -p "$dist/generated"
 cp -r "$out_dir/gen/front_end/models/trace" "$dist/models/trace"
 cp -r "$out_dir/gen/front_end/models/cpu_profile" "$dist/models/cpu_profile"
 cp -r "$out_dir/gen/front_end/core/platform" "$dist/core/platform"
-# cp -r "$out_dir/gen/front_end/core/common" "$dist/core/common"
 cp "$out_dir/gen/front_end/generated/protocol.js" "$dist/generated/protocol.js"
 cp "$out_dir/gen/front_end/generated/protocol.d.ts" "$dist/generated/protocol.d.ts"
 cp ./front_end/models/trace/package-template.json "$dist/package.json"
 
 # Smuggling issues in this package...
-cp -r "$out_dir/gen/front_end/models/issues_manager" "$dist/models/issues_manager"
+# TODO: uncommented for now, since it's not done.
+# cp -r "$out_dir/gen/front_end/models/issues_manager" "$dist/models/issues_manager"
 
 # Strip out the i18n modules and some type-only stuff.
 python3 -c "
@@ -140,6 +140,7 @@ echo 'export {};' > $dist/models/trace/LegacyTracingModel.js
 echo 'export {};' > $dist/models/trace/LegacyTracingModel.d.ts
 
 # Issues stuff
+mkdir -p $dist/models/issues_manager/
 echo 'export {};' > $dist/models/issues_manager/CheckFormsIssuesTrigger.js
 echo 'export {};' > $dist/models/issues_manager/CheckFormsIssuesTrigger.d.ts
 echo 'export {};' > $dist/models/issues_manager/ContrastCheckTrigger.js
