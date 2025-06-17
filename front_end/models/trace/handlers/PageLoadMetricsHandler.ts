@@ -411,7 +411,7 @@ export function deps(): HandlerName[] {
   return ['Meta'];
 }
 
-export const enum ScoreClassification {
+export enum ScoreClassification {
   GOOD = 'good',
   OK = 'ok',
   BAD = 'bad',
@@ -419,7 +419,7 @@ export const enum ScoreClassification {
   UNCLASSIFIED = 'unclassified',
 }
 
-export const enum MetricName {
+export enum MetricName {
   // First Contentful Paint
   FCP = 'FCP',
   // First Paint

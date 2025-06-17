@@ -130,7 +130,7 @@ export type InsightModels = {
  */
 export type TraceInsightSets = Map<Types.Events.NavigationId, InsightSet>;
 
-export const enum InsightKeys {
+export enum InsightKeys {
   LCP_PHASES = 'LCPPhases',
   INTERACTION_TO_NEXT_PAINT = 'InteractionToNextPaint',
   CLS_CULPRITS = 'CLSCulprits',

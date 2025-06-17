@@ -14,7 +14,8 @@ dist="$out_dir/dist"  # This doesn't match up with typical obj,gen,resources lay
 # rm -rf "$out_dir/gen"
 # TODO ! restore above
 
-sed -i 's/export const enum/export enum/g' "$dtfe"/front_end/models/trace/*
+# export all const enums so they can be used by clients.
+sed -i '' -e 's/export const enum/export enum/g' "$dtfe"/front_end/models/trace/**/*.ts
 
 # build devtools first!
 gn --args="is_debug=true" gen -C $out_dir

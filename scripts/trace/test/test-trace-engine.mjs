@@ -6,8 +6,9 @@ import {strict as assert} from 'assert';
 import fs from 'fs';
 import test from 'node:test';
 
-// import {analyzeInspectorIssues} from '../analyze-inspector-issues.mjs';
 import {analyzeTrace} from '../analyze-trace.mjs';
+// import {analyzeInspectorIssues} from '../analyze-inspector-issues.mjs';
+import * as Trace from '../models/trace/trace.js';
 
 const filename = './test/invalid-animation-events.json.gz';
 const {parsedTrace: data, insights} = await analyzeTrace(filename);
@@ -116,6 +117,68 @@ test('insights look ok', t => {
   };
   assert.deepStrictEqual(simplified, expected);
 });
+
+test('bottom-up summary is good', t => {
+  const parsedTrace = data;
+  const visibleEvents = Trace.Helpers.Trace.VISIBLE_TRACE_EVENT_TYPES.values().toArray();
+  const filter = new Trace.Extras.TraceFilter.VisibleEventsFilter(
+      visibleEvents.concat([Trace.Types.Events.Name.SYNTHETIC_NETWORK_REQUEST]));
+  const milliBounds = Trace.Helpers.Timing.traceWindowMilliSeconds(parsedTrace.Meta.traceBounds);
+
+
+  const mainThreadProbably =
+      Trace.Handlers.Threads.threadsInTrace(parsedTrace)
+          .filter(t => t.type === Trace.Handlers.Threads.ThreadType.MAIN_THREAD && t.processIsOnMainFrame)
+          .sort((a, b) => b.entries.length - a.entries.length)
+          .at(0);
+  if (!mainThreadProbably)
+    assert.fail('No main thread found in trace');
+
+  /** @param {Trace.Types.Events.Event} event  */
+  const groupingFunction = event => event.name;
+
+  const node = new Trace.Extras.TraceTree.BottomUpRootNode([...mainThreadProbably.entries], {
+    textFilter: new Trace.Extras.TraceFilter.ExclusiveNameFilter([]),
+    filters: [filter],
+    startTime: milliBounds.min,
+    endTime: milliBounds.max,
+    eventGroupIdCallback: groupingFunction,
+  });
+
+  const bottomUpByName =
+      Array.from(node.children().values())
+          .map(c => [c.id.toString().padEnd(30), c.selfTime.toLocaleString().padStart(10) + 'ms'].join('\t'));
+
+  assert.deepStrictEqual(bottomUpByName.join('\n'), `
+RunTask                       	   105.929ms
+V8.CompileCode                	     28.32ms
+CpuProfiler::StartProfiling   	    20.116ms
+FunctionCall                  	     4.239ms
+ProfileCall                   	    25.086ms
+EventDispatch                 	     1.235ms
+MinorGC                       	     1.907ms
+v8.compile                    	     1.729ms
+v8.produceCache               	     0.165ms
+EvaluateScript                	     3.073ms
+ParseHTML                     	     9.719ms
+UpdateLayoutTree              	    12.108ms
+Layout                        	    36.788ms
+PrePaint                      	    10.425ms
+Paint                         	     8.374ms
+Layerize                      	     2.419ms
+Commit                        	     4.394ms
+RunMicrotasks                 	     0.854ms
+FireIdleCallback              	     0.129ms
+HitTest                       	     0.087ms
+ParseAuthorStyleSheet         	      0.23ms
+FireAnimationFrame            	      0.14ms
+TimerFire                     	     0.107ms
+v8.evaluateModule             	     0.062ms
+v8.produceModuleCache         	     0.005ms
+Decode Image                  	     0.043ms
+`.trim());
+});
+
 
 // TODO: needs more work...
 // test('inspector issues ok', t => {

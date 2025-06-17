@@ -8,7 +8,7 @@ import type * as Protocol from '../../../generated/protocol.js';
 import type {Micro, Milli, Seconds, TraceWindowMicro} from './Timing.js';
 
 // Trace Events.
-export const enum Phase {
+export enum Phase {
   // Standard
   BEGIN = 'B',
   END = 'E',
@@ -66,7 +66,7 @@ export function isFlowPhase(phase: Phase): boolean {
   return phase === Phase.FLOW_START || phase === Phase.FLOW_STEP || phase === Phase.FLOW_END;
 }
 
-export const enum Scope {
+export enum Scope {
   THREAD = 't',
   PROCESS = 'p',
   GLOBAL = 'g',
@@ -442,7 +442,7 @@ export interface SyntheticWebSocketConnection extends Complete, SyntheticBased<P
   s: Scope;
 }
 
-export const enum AuctionWorkletType {
+export enum AuctionWorkletType {
   BIDDER = 'bidder',
   SELLER = 'seller',
   // Not expected to be used, but here as a fallback in case new types get
@@ -1154,7 +1154,7 @@ export interface ResourceMarkAsCached extends Instant {
   };
 }
 
-export const enum LayoutInvalidationReason {
+export enum LayoutInvalidationReason {
   SIZE_CHANGED = 'Size changed',
   ATTRIBUTE = 'Attribute',
   ADDED_TO_LAYOUT = 'Added to layout',
@@ -1198,7 +1198,7 @@ export function isScheduleStyleInvalidationTracking(event: Event): event is Sche
   return event.name === Name.SCHEDULE_STYLE_INVALIDATION_TRACKING;
 }
 
-export const enum StyleRecalcInvalidationReason {
+export enum StyleRecalcInvalidationReason {
   ANIMATION = 'Animation',
 }
 

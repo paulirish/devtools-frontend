@@ -81,7 +81,7 @@ export type CLSCulpritsInsightModel = InsightModel<typeof UIStrings, {
   topCulpritsByCluster: Map<Types.Events.SyntheticLayoutShiftCluster, Platform.UIString.LocalizedString[]>,
 }>;
 
-export const enum AnimationFailureReasons {
+export enum AnimationFailureReasons {
   ACCELERATED_ANIMATIONS_DISABLED = 'ACCELERATED_ANIMATIONS_DISABLED',
   EFFECT_SUPPRESSED_BY_DEVTOOLS = 'EFFECT_SUPPRESSED_BY_DEVTOOLS',
   INVALID_ANIMATION_OR_EFFECT = 'INVALID_ANIMATION_OR_EFFECT',
