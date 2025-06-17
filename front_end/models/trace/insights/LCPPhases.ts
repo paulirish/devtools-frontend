@@ -116,7 +116,6 @@ function breakdownPhases(
   const firstDocByteTs = Helpers.Timing.secondsToMicro(docReqTiming.requestTime) +
       Helpers.Timing.milliToMicro(docReqTiming.receiveHeadersStart);
 
-
   // The TTFB includes the small gap of time between navStart and when the docRequest starts.
   // the doc rquest is 5.3ms after navstart.
   const ttfb = Helpers.Timing.microToMilli(Types.Timing.Micro(firstDocByteTs - nav.ts));
@@ -197,14 +196,10 @@ export function generateInsight(
   // This helps calculate the phases. Relative to navigation.
   const lcpMs = Helpers.Timing.microToMilli(metricScore.timing);
   // This helps position things on the timeline's UI accurately for a trace.  Monotonic clock.
-  const lcpTs = metricScore.event?.ts ? Helpers.Timing.microToMilli(metricScore.event?.ts) : undefined;
+  const lcpTs = lcpEvent.ts;
   const lcpRequest = parsedTrace.LargestImagePaint.lcpRequestByNavigationId.get(context.navigationId);
 
-  // i have no idea what the conflict diff state of this is.....
-
   // This helps position things on the timeline's UI accurately for a trace. Monotonic clock.
-  const lcpTs = lcpEvent.ts;
-  const lcpRequest = parsedTrace.LargestImagePaint.lcpRequestByNavigation.get(context.navigation);
   const docRequest = networkRequests.byTime.find(req => req.args.data.requestId === context.navigationId);
   if (!docRequest) {
     return finalize({lcpMs, lcpTs, lcpEvent, lcpRequest, warnings: [InsightWarning.NO_DOCUMENT_REQUEST]});

@@ -93,8 +93,6 @@ export class LCPPhases extends BaseInsightComponent<LCPPhasesInsightModel> {
       overlays.push({type: 'ENTRY_OUTLINE', entry: this.model.lcpRequest, outlineReason: 'INFO'});
     }
 
-    // smal possibility i messed up a merge conflict here.
-
     /** Image LCP. 4 phases means 5 timestamps
      *
      *       |  ttfb   |    loadDelay     |     loadTime    |    renderDelay    |
