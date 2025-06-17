@@ -14,6 +14,8 @@ dist="$out_dir/dist"  # This doesn't match up with typical obj,gen,resources lay
 # rm -rf "$out_dir/gen"
 # TODO ! restore above
 
+sed -i 's/export const enum/export enum/g' "$dtfe"/front_end/models/trace/*
+
 # build devtools first!
 gn --args="is_debug=true" gen -C $out_dir
 autoninja -C $out_dir front_end

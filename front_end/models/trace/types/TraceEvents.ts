@@ -2864,7 +2864,7 @@ export function isParseAuthorStyleSheetEvent(event: Event): event is ParseAuthor
  * chart, some of them we only use for parsing.
  * TODO(crbug.com/1428024): Complete this enum.
  */
-export const enum Name {
+export enum Name {
   /* Metadata */
   THREAD_NAME = 'thread_name',
 
