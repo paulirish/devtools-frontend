@@ -217,6 +217,7 @@ describeWithEnvironment('TextEditor', () => {
     // directly dispatching from Editor A now calls `textEditor.editor.update`
     // which references to EditorView B that has a different state.
     assert.doesNotThrow(() => editorViewA.dispatch({changes: {from: 3, insert: '!'}}));
+    editorViewA.destroy();
   });
 });
 

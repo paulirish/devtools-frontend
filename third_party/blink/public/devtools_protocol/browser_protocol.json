@@ -3543,6 +3543,13 @@
                                 "completed",
                                 "canceled"
                             ]
+                        },
+                        {
+                            "name": "filePath",
+                            "description": "If download is \"completed\", provides the path of the downloaded file.\nDepending on the platform, it is not guaranteed to be set, nor the file\nis guaranteed to exist.",
+                            "experimental": true,
+                            "optional": true,
+                            "type": "string"
                         }
                     ]
                 }
@@ -6283,12 +6290,14 @@
                         "view-transition",
                         "view-transition-group",
                         "view-transition-image-pair",
+                        "view-transition-group-children",
                         "view-transition-old",
                         "view-transition-new",
                         "placeholder",
                         "file-selector-button",
                         "details-content",
-                        "picker"
+                        "picker",
+                        "permission-icon"
                     ]
                 },
                 {
@@ -7407,7 +7416,8 @@
                             "type": "string",
                             "enum": [
                                 "PopoverTarget",
-                                "InterestTarget"
+                                "InterestTarget",
+                                "CommandFor"
                             ]
                         }
                     ],
@@ -9682,6 +9692,15 @@
                             "name": "wow64",
                             "optional": true,
                             "type": "boolean"
+                        },
+                        {
+                            "name": "formFactors",
+                            "description": "Used to specify User Agent form-factor values.\nSee https://wicg.github.io/ua-client-hints/#sec-ch-ua-form-factors",
+                            "optional": true,
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
                         }
                     ]
                 },
@@ -10138,6 +10157,17 @@
                                 "protanopia",
                                 "tritanopia"
                             ]
+                        }
+                    ]
+                },
+                {
+                    "name": "setEmulatedOSTextScale",
+                    "description": "Emulates the given OS text scale.",
+                    "parameters": [
+                        {
+                            "name": "scale",
+                            "optional": true,
+                            "type": "number"
                         }
                     ]
                 },
@@ -14560,6 +14590,11 @@
                             "$ref": "Response"
                         },
                         {
+                            "name": "hasExtraInfo",
+                            "description": "Whether network response for the signed exchange was accompanied by\nextra headers.",
+                            "type": "boolean"
+                        },
+                        {
                             "name": "header",
                             "description": "Information about the signed exchange header.",
                             "optional": true,
@@ -18140,19 +18175,41 @@
                 },
                 {
                     "id": "AdScriptId",
-                    "description": "Identifies the bottom-most script which caused the frame to be labelled\nas an ad.",
+                    "description": "Identifies the script which caused a script or frame to be labelled as an\nad.",
                     "experimental": true,
                     "type": "object",
                     "properties": [
                         {
                             "name": "scriptId",
-                            "description": "Script Id of the bottom-most script which caused the frame to be labelled\nas an ad.",
+                            "description": "Script Id of the script which caused a script or frame to be labelled as\nan ad.",
                             "$ref": "Runtime.ScriptId"
                         },
                         {
                             "name": "debuggerId",
-                            "description": "Id of adScriptId's debugger.",
+                            "description": "Id of scriptId's debugger.",
                             "$ref": "Runtime.UniqueDebuggerId"
+                        }
+                    ]
+                },
+                {
+                    "id": "AdScriptAncestry",
+                    "description": "Encapsulates the script ancestry and the root script filterlist rule that\ncaused the frame to be labelled as an ad. Only created when `ancestryChain`\nis not empty.",
+                    "experimental": true,
+                    "type": "object",
+                    "properties": [
+                        {
+                            "name": "ancestryChain",
+                            "description": "A chain of `AdScriptId`s representing the ancestry of an ad script that\nled to the creation of a frame. The chain is ordered from the script\nitself (lower level) up to its root ancestor that was flagged by\nfilterlist.",
+                            "type": "array",
+                            "items": {
+                                "$ref": "AdScriptId"
+                            }
+                        },
+                        {
+                            "name": "rootScriptFilterlistRule",
+                            "description": "The filterlist rule that caused the root (last) script in\n`ancestryChain` to be ad-tagged. Only populated if the rule is\navailable.",
+                            "optional": true,
+                            "type": "string"
                         }
                     ]
                 },
@@ -18259,6 +18316,7 @@
                         "join-ad-interest-group",
                         "keyboard-map",
                         "language-detector",
+                        "language-model",
                         "local-fonts",
                         "local-network-access",
                         "magnetometer",
@@ -20081,7 +20139,7 @@
                     ]
                 },
                 {
-                    "name": "getAdScriptAncestryIds",
+                    "name": "getAdScriptAncestry",
                     "experimental": true,
                     "parameters": [
                         {
@@ -20091,12 +20149,10 @@
                     ],
                     "returns": [
                         {
-                            "name": "adScriptAncestryIds",
-                            "description": "The ancestry chain of ad script identifiers leading to this frame's\ncreation, ordered from the most immediate script (in the frame creation\nstack) to more distant ancestors (that created the immediately preceding\nscript). Only sent if frame is labelled as an ad and ids are available.",
-                            "type": "array",
-                            "items": {
-                                "$ref": "AdScriptId"
-                            }
+                            "name": "adScriptAncestry",
+                            "description": "The ancestry chain of ad script identifiers leading to this frame's\ncreation, along with the root script's filterlist rule. The ancestry\nchain is ordered from the most immediate script (in the frame creation\nstack) to more distant ancestors (that created the immediately preceding\nscript). Only sent if frame is labelled as an ad and ids are available.",
+                            "optional": true,
+                            "$ref": "AdScriptAncestry"
                         }
                     ]
                 },
@@ -22826,6 +22882,12 @@
                             "type": "string"
                         },
                         {
+                            "name": "operationId",
+                            "description": "ID of the operation call.\nPresent only for SharedStorageAccessMethods: run and selectURL.",
+                            "optional": true,
+                            "type": "string"
+                        },
+                        {
                             "name": "keepAlive",
                             "description": "Whether or not to keep the worket alive for future run or selectURL\ncalls.\nPresent only for SharedStorageAccessMethods: run and selectURL.",
                             "optional": true,
@@ -22877,10 +22939,16 @@
                             "type": "boolean"
                         },
                         {
-                            "name": "workletId",
-                            "description": "If the method is called on a worklet, or as part of\na worklet script, it will have an ID for the associated worklet.\nPresent only for SharedStorageAccessMethods: addModule, createWorklet,\nrun, selectURL, and any other SharedStorageAccessMethod when the\nSharedStorageAccessScope is worklet.",
+                            "name": "workletOrdinal",
+                            "description": "A number denoting the (0-based) order of the worklet's\ncreation relative to all other shared storage worklets created by\ndocuments using the current storage partition.\nPresent only for SharedStorageAccessMethods: addModule, createWorklet.",
                             "optional": true,
-                            "type": "string"
+                            "type": "integer"
+                        },
+                        {
+                            "name": "workletTargetId",
+                            "description": "Hex representation of the DevTools token used as the TargetID for the\nassociated shared storage worklet.\nPresent only for SharedStorageAccessMethods: addModule, createWorklet,\nrun, selectURL, and any other SharedStorageAccessMethod when the\nSharedStorageAccessScope is sharedStorageWorklet.",
+                            "optional": true,
+                            "$ref": "Target.TargetID"
                         },
                         {
                             "name": "withLock",
@@ -24423,6 +24491,47 @@
                     ]
                 },
                 {
+                    "name": "sharedStorageWorkletOperationExecutionFinished",
+                    "description": "A shared storage run or selectURL operation finished its execution.\nThe following parameters are included in all events.",
+                    "parameters": [
+                        {
+                            "name": "finishedTime",
+                            "description": "Time that the operation finished.",
+                            "$ref": "Network.TimeSinceEpoch"
+                        },
+                        {
+                            "name": "executionTime",
+                            "description": "Time, in microseconds, from start of shared storage JS API call until\nend of operation execution in the worklet.",
+                            "type": "integer"
+                        },
+                        {
+                            "name": "method",
+                            "description": "Enum value indicating the Shared Storage API method invoked.",
+                            "$ref": "SharedStorageAccessMethod"
+                        },
+                        {
+                            "name": "operationId",
+                            "description": "ID of the operation call.",
+                            "type": "string"
+                        },
+                        {
+                            "name": "workletTargetId",
+                            "description": "Hex representation of the DevTools token used as the TargetID for the\nassociated shared storage worklet.",
+                            "$ref": "Target.TargetID"
+                        },
+                        {
+                            "name": "mainFrameId",
+                            "description": "DevTools Frame Token for the primary frame tree's root.",
+                            "$ref": "Page.FrameId"
+                        },
+                        {
+                            "name": "ownerOrigin",
+                            "description": "Serialization of the origin owning the Shared Storage data.",
+                            "type": "string"
+                        }
+                    ]
+                },
+                {
                     "name": "storageBucketCreatedOrUpdated",
                     "parameters": [
                         {
@@ -24491,6 +24600,39 @@
                         {
                             "name": "netError",
                             "description": "If result is `sent`, populated with net/HTTP status.",
+                            "optional": true,
+                            "type": "integer"
+                        },
+                        {
+                            "name": "netErrorName",
+                            "optional": true,
+                            "type": "string"
+                        },
+                        {
+                            "name": "httpStatusCode",
+                            "optional": true,
+                            "type": "integer"
+                        }
+                    ]
+                },
+                {
+                    "name": "attributionReportingVerboseDebugReportSent",
+                    "experimental": true,
+                    "parameters": [
+                        {
+                            "name": "url",
+                            "type": "string"
+                        },
+                        {
+                            "name": "body",
+                            "optional": true,
+                            "type": "array",
+                            "items": {
+                                "type": "object"
+                            }
+                        },
+                        {
+                            "name": "netError",
                             "optional": true,
                             "type": "integer"
                         },
@@ -25543,7 +25685,7 @@
                     "properties": [
                         {
                             "name": "recordMode",
-                            "description": "Controls how the trace buffer stores data.",
+                            "description": "Controls how the trace buffer stores data. The default is `recordUntilFull`.",
                             "experimental": true,
                             "optional": true,
                             "type": "string",
@@ -28259,7 +28401,7 @@
                 },
                 {
                     "name": "install",
-                    "description": "Installs the given manifest identity, optionally using the given install_url\nor IWA bundle location.\n\nTODO(crbug.com/337872319) Support IWA to meet the following specific\nrequirement.\nIWA-specific install description: If the manifest_id is isolated-app://,\ninstall_url_or_bundle_url is required, and can be either an http(s) URL or\nfile:// URL pointing to a signed web bundle (.swbn). The .swbn file's\nsigning key must correspond to manifest_id. If Chrome is not in IWA dev\nmode, the installation will fail, regardless of the state of the allowlist.",
+                    "description": "Installs the given manifest identity, optionally using the given installUrlOrBundleUrl\n\nIWA-specific install description:\nmanifestId corresponds to isolated-app:// + web_package::SignedWebBundleId\n\nFile installation mode:\nThe installUrlOrBundleUrl can be either file:// or http(s):// pointing\nto a signed web bundle (.swbn). In this case SignedWebBundleId must correspond to\nThe .swbn file's signing key.\n\nDev proxy installation mode:\ninstallUrlOrBundleUrl must be http(s):// that serves dev mode IWA.\nweb_package::SignedWebBundleId must be of type dev proxy.\n\nThe advantage of dev proxy mode is that all changes to IWA\nautomatically will be reflected in the running app without\nreinstallation.\n\nTo generate bundle id for proxy mode:\n1. Generate 32 random bytes.\n2. Add a specific suffix 0x00 at the end.\n3. Encode the entire sequence using Base32 without padding.\n\nIf Chrome is not in IWA dev\nmode, the installation will fail, regardless of the state of the allowlist.",
                     "parameters": [
                         {
                             "name": "manifestId",

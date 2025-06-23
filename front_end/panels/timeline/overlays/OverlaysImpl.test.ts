@@ -6,7 +6,7 @@ import * as Common from '../../../core/common/common.js';
 import * as AiAssistanceModels from '../../../models/ai_assistance/ai_assistance.js';
 import * as Trace from '../../../models/trace/trace.js';
 import {mockAidaClient} from '../../../testing/AiAssistanceHelpers.js';
-import {cleanTextContent, dispatchClickEvent, doubleRaf} from '../../../testing/DOMHelpers.js';
+import {cleanTextContent, dispatchClickEvent, doubleRaf, renderElementIntoDOM} from '../../../testing/DOMHelpers.js';
 import {describeWithEnvironment, updateHostConfig} from '../../../testing/EnvironmentHelpers.js';
 import {
   makeInstantEvent,
@@ -52,8 +52,9 @@ function createCharts(parsedTrace?: Trace.Handlers.Types.ParsedTrace): Overlays.
   const delegate = new MockFlameChartDelegate();
   const mainChart = new PerfUI.FlameChart.FlameChart(mainProvider, delegate);
   const networkChart = new PerfUI.FlameChart.FlameChart(networkProvider, delegate);
-  // Add to DOM for offsetWidth, etc working
-  document.body.append(mainChart.element, networkChart.element);
+
+  renderElementIntoDOM(mainChart, {allowMultipleChildren: true});
+  renderElementIntoDOM(networkChart, {allowMultipleChildren: true});
 
   if (parsedTrace) {
     // Force the charts to render. Normally the TimelineFlameChartView would do
@@ -75,11 +76,6 @@ describeWithEnvironment('Overlays', () => {
   beforeEach(() => {
     showFreDialogStub = sinon.stub(PanelCommon.FreDialog, 'show');
     setupIgnoreListManagerEnvironment();
-  });
-
-  afterEach(() => {
-    // Remove any FlameChart elements from the DOM
-    document.body.querySelectorAll('widget').forEach(e => e.remove());
   });
 
   it('can calculate the x position of an event based on the dimensions and its timestamp', async () => {
@@ -335,12 +331,6 @@ describeWithEnvironment('Overlays', () => {
       event: Trace.Types.Events.Event,
       component: Components.EntryLabelOverlay.EntryLabelOverlay,
     }> {
-      updateHostConfig({
-        devToolsAiGeneratedTimelineLabels: {
-          enabled: true,
-        }
-      });
-
       const {parsedTrace} = await TraceLoader.traceEngine(context, file);
       const {overlays, container, charts} = setupChartWithDimensionsAndAnnotationOverlayListeners(parsedTrace);
       let event;
@@ -495,6 +485,14 @@ describeWithEnvironment('Overlays', () => {
 
     it('should show FRE dialog on the ai suggestion button click if the `ai-annotations-enabled` setting is off',
        async function() {
+         updateHostConfig({
+           devToolsAiGeneratedTimelineLabels: {
+             enabled: true,
+           },
+           aidaAvailability: {
+             enabled: true,
+           },
+         });
          Common.Settings.moduleSetting('ai-annotations-enabled').set(false);
          const {elementsWrapper, inputField} = await createAnnotationsLabelElement(this, 'web-dev.json.gz', 50);
 
@@ -524,6 +522,14 @@ describeWithEnvironment('Overlays', () => {
 
     it('should not show FRE dialog on the ai suggestion button click if the `ai-annotations-enabled` setting is on',
        async function() {
+         updateHostConfig({
+           devToolsAiGeneratedTimelineLabels: {
+             enabled: true,
+           },
+           aidaAvailability: {
+             enabled: true,
+           },
+         });
          Common.Settings.moduleSetting('ai-annotations-enabled').set(true);
          const {elementsWrapper, inputField} = await createAnnotationsLabelElement(this, 'web-dev.json.gz', 50);
 
@@ -583,6 +589,15 @@ describeWithEnvironment('Overlays', () => {
     });
 
     it('generates a label when the user clicks "Generate" if the setting is enabled', async function() {
+      updateHostConfig({
+        devToolsAiGeneratedTimelineLabels: {
+          enabled: true,
+        },
+        aidaAvailability: {
+          enabled: true,
+        },
+      });
+
       const {elementsWrapper, inputField, component} = await createAnnotationsLabelElement(this, 'web-dev.json.gz', 50);
       Common.Settings.moduleSetting('ai-annotations-enabled').set(true);
 
@@ -620,6 +635,14 @@ describeWithEnvironment('Overlays', () => {
     });
 
     it('shows correct tooltip on the `generate ai label` hover for the users with logging enabled', async function() {
+      updateHostConfig({
+        devToolsAiGeneratedTimelineLabels: {
+          enabled: true,
+        },
+        aidaAvailability: {
+          enabled: true,
+        },
+      });
       const {elementsWrapper} = await createAnnotationsLabelElement(this, 'web-dev.json.gz', 50);
 
       const aiLabelButtonWrapper =
@@ -644,6 +667,9 @@ describeWithEnvironment('Overlays', () => {
 
     it('shows correct tooltip text on `generate ai label` hover for the users with logging disabled', async function() {
       updateHostConfig({
+        devToolsAiGeneratedTimelineLabels: {
+          enabled: true,
+        },
         aidaAvailability: {
           enabled: true,
           blockedByAge: false,
@@ -655,7 +681,6 @@ describeWithEnvironment('Overlays', () => {
       });
 
       const {elementsWrapper} = await createAnnotationsLabelElement(this, 'web-dev.json.gz', 50);
-
       const aiLabelButtonWrapper =
           elementsWrapper.querySelector<HTMLElement>('.ai-label-button-wrapper') as HTMLSpanElement;
       assert.isOk(aiLabelButtonWrapper);
@@ -691,6 +716,9 @@ describeWithEnvironment('Overlays', () => {
 
     it('Shows the `generate ai label` button if the label is empty', async function() {
       updateHostConfig({
+        devToolsAiGeneratedTimelineLabels: {
+          enabled: true,
+        },
         aidaAvailability: {
           enabled: false,
           blockedByAge: true,
@@ -712,6 +740,9 @@ describeWithEnvironment('Overlays', () => {
     it('Shows disabled `generate ai label` button if the user is not logged into their google account or is under 18',
        async function() {
          updateHostConfig({
+           devToolsAiGeneratedTimelineLabels: {
+             enabled: true,
+           },
            aidaAvailability: {
              enabled: false,
              blockedByAge: true,
@@ -739,6 +770,9 @@ describeWithEnvironment('Overlays', () => {
 
     it('Shows disabled `generate ai label` button if the user is in an unsupported location', async function() {
       updateHostConfig({
+        devToolsAiGeneratedTimelineLabels: {
+          enabled: true,
+        },
         aidaAvailability: {
           enabled: false,
           blockedByAge: false,
@@ -1140,6 +1174,74 @@ describeWithEnvironment('Overlays', () => {
       // Double click on the label to make it editable again
       inputField.dispatchEvent(new FocusEvent('dblclick', {bubbles: true}));
       assert.isTrue(inputField.isContentEditable);
+    });
+
+    it('brings the correct label forward when multiple labels exist', async function() {
+      const {parsedTrace} = await TraceLoader.traceEngine(this, 'web-dev.json.gz');
+      const {overlays, charts} = setupChartWithDimensionsAndAnnotationOverlayListeners(parsedTrace);
+
+      const event1 = charts.mainProvider.eventByIndex?.(50);
+      assert.isOk(event1);
+      const labelOverlay1 = overlays.add({
+        type: 'ENTRY_LABEL',
+        entry: event1,
+        label: 'label 1',
+      });
+
+      const event2 = charts.mainProvider.eventByIndex?.(51);
+      assert.isOk(event2);
+      const labelOverlay2 = overlays.add({
+        type: 'ENTRY_LABEL',
+        entry: event2,
+        label: 'label 2',
+      });
+
+      await overlays.update();
+
+      const element1 = overlays.elementForOverlay(labelOverlay1);
+      const element2 = overlays.elementForOverlay(labelOverlay2);
+
+      overlays.bringLabelForward(labelOverlay1);
+      assert.isTrue(element1?.classList.contains('bring-forward'));
+      assert.isFalse(element2?.classList.contains('bring-forward'));
+
+      overlays.bringLabelForward(labelOverlay2);
+      assert.isFalse(element1?.classList.contains('bring-forward'));
+      assert.isTrue(element2?.classList.contains('bring-forward'));
+    });
+
+    it('shows and hides the delete button on the entry label overlay correctly', async function() {
+      let {elementsWrapper, inputField, component} =
+          await createAnnotationsLabelElement(this, 'web-dev.json.gz', 50, '');
+
+      // Double click on the label box to make it editable and focus on it
+      inputField.dispatchEvent(new FocusEvent('dblclick', {bubbles: true}));
+
+      // Ensure the label content is editable and empty
+      assert.isTrue(inputField.isContentEditable);
+      assert.isTrue(component.hasAttribute('data-user-editing-label'));
+      assert.isEmpty(inputField.innerText);
+
+      // Even though the label is editable. Delete button should not be visible the th elabel is empty.
+      let deleteButton = elementsWrapper.querySelector<HTMLElement>('.delete-button');
+      assert.isNull(deleteButton);
+
+      // Make the label non-empty. Delete button should be visible.
+      ({elementsWrapper, inputField, component} =
+           await createAnnotationsLabelElement(this, 'web-dev.json.gz', 50, 'label'));
+      inputField.dispatchEvent(new FocusEvent('dblclick', {bubbles: true}));
+
+      assert.isTrue(component.hasAttribute('data-user-editing-label'));
+      assert.isTrue(inputField.isContentEditable);
+      deleteButton = elementsWrapper.querySelector<HTMLElement>('.delete-button');
+      assert.isNotNull(deleteButton);
+
+      // Set to not editable. Delete button should not be visible.
+      component.setLabelEditabilityAndRemoveEmptyLabel(false);
+      assert.isFalse(component.hasAttribute('data-user-editing-label'));
+
+      deleteButton = elementsWrapper.querySelector<HTMLElement>('.delete-button');
+      assert.isNull(deleteButton);
     });
   });
 

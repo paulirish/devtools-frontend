@@ -11,6 +11,7 @@ import {
   BOTTOM_UP_SELECTOR,
   CALL_TREE_SELECTOR,
   getTotalTimeFromPie,
+  increaseTimeoutForPerfPanel,
   navigateToBottomUpTab,
   navigateToCallTreeTab,
   navigateToPerformanceTab,
@@ -61,6 +62,8 @@ async function expandAndCheckActivityTree(expectedActivities: string[], devtools
 
 describe('The Performance panel', function() {
   setup({dockingMode: 'undocked'});
+  increaseTimeoutForPerfPanel(this);
+
   async function setupPerformancePanel(devToolsPage: DevToolsPage, inspectedPage: InspectedPage) {
     await navigateToPerformanceTab('wasm/profiling', devToolsPage, inspectedPage);
 
@@ -104,7 +107,7 @@ describe('The Performance panel', function() {
         await setupPerformancePanel(devToolsPage, inspectedPage);
         const expectedActivities = ['mainWasm', 'js-to-wasm::i', '(anonymous)', 'Run microtasks'];
 
-        await navigateToBottomUpTab(devToolsPage);
+        await navigateToBottomUpTab(devToolsPage, 'url');
 
         const timelineTree = await devToolsPage.$('.timeline-tree-view') as puppeteer.ElementHandle<HTMLSelectElement>;
         const rootActivity = await devToolsPage.waitForElementWithTextContent(expectedActivities[0], timelineTree);

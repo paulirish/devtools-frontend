@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 import * as Platform from '../../../core/platform/platform.js';
-// eslint-disable-next-line rulesdir/no-imports-in-directory
 import type * as SDK from '../../../core/sdk/sdk.js';
 import type * as Protocol from '../../../generated/protocol.js';
 import * as Types from '../types/types.js';

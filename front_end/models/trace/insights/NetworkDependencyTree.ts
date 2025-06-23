@@ -51,7 +51,7 @@ export const UIStrings = {
   /**
    * @description Title of the table of the detected preconnect origins.
    */
-  preconnectOriginsTableTitle: 'Preconnect origins',
+  preconnectOriginsTableTitle: 'Preconnected origins',
   /**
    * @description Description of the table of the detected preconnect origins.
    */
@@ -71,6 +71,10 @@ export const UIStrings = {
    */
   unusedWarning: 'Unused preconnect. Only use `preconnect` for origins that the page is likely to request.',
   /**
+   * @description A warning message that is shown when the user forget to set the `crossorigin` HTML attribute, or setting it to an incorrect value, on the link is a common mistake when adding preconnect links.
+   * */
+  crossoriginWarning: 'Unused preconnect. Check that the `crossorigin` attribute is used properly.',
+  /**
    * @description Label for a column in a data table; entries will be the source of the origin.
    */
   columnSource: 'Source',
@@ -86,7 +90,7 @@ export const UIStrings = {
    * @description Description of the table that recommends preconnecting to the origins to save time.
    */
   estSavingTableDescription:
-      'Add [preconnect](https://developer.chrome.com/docs/lighthouse/performance/uses-rel-preconnect/) hints to your most important origins, but try to use fewer than 4.',
+      'Add [preconnect](https://developer.chrome.com/docs/lighthouse/performance/uses-rel-preconnect/) hints to your most important origins, but try to use no more than 4.',
   /**
    * @description Label for a column in a data table; entries will be the origin of a web resource
    */
@@ -129,13 +133,27 @@ export interface CriticalRequestNode {
   relatedRequests: Set<Types.Events.SyntheticNetworkRequest>;
 }
 
-export interface PreconnectOrigin {
+export type PreconnectedOrigin = PreconnectedOriginFromDom|PreconnectedOriginFromResponseHeader;
+
+export interface PreconnectedOriginFromDom {
   // eslint-disable-next-line @typescript-eslint/naming-convention
   node_id: Protocol.DOM.BackendNodeId;
   frame?: string;
   url: string;
   unused: boolean;
+  crossorigin: boolean;
+  source: 'DOM';
 }
+
+export interface PreconnectedOriginFromResponseHeader {
+  url: string;
+  headerText: string;
+  request: Types.Events.SyntheticNetworkRequest;
+  unused: boolean;
+  crossorigin: boolean;
+  source: 'ResponseHeader';
+}
+
 export interface PreconnectCandidate {
   origin: Platform.DevToolsPath.UrlString;
   wastedMs: Types.Timing.Milli;
@@ -145,7 +163,7 @@ export type NetworkDependencyTreeInsightModel = InsightModel<typeof UIStrings, {
   rootNodes: CriticalRequestNode[],
   maxTime: Types.Timing.Micro,
   fail: boolean,
-  preconnectOrigins: PreconnectOrigin[],
+  preconnectedOrigins: PreconnectedOrigin[],
   preconnectCandidates: PreconnectCandidate[],
 }>;
 
@@ -194,6 +212,33 @@ function isCritical(request: Types.Events.SyntheticNetworkRequest, context: Insi
   const isBlocking = Helpers.Network.isSyntheticNetworkRequestEventRenderBlocking(request);
   const isHighPriority = Helpers.Network.isSyntheticNetworkRequestHighPriority(request);
   return isHighPriority || isBlocking;
+}
+
+function findMaxLeafNode(node: CriticalRequestNode): CriticalRequestNode {
+  if (node.children.length === 0) {
+    return node;
+  }
+  let maxLeaf = node.children[0];
+  for (const child of node.children) {
+    const leaf = findMaxLeafNode(child);
+    if (leaf.timeFromInitialRequest > maxLeaf.timeFromInitialRequest) {
+      maxLeaf = leaf;
+    }
+  }
+  return maxLeaf;
+}
+
+function sortRecursively(nodes: CriticalRequestNode[]): void {
+  for (const node of nodes) {
+    if (node.children.length > 0) {
+      node.children.sort((nodeA, nodeB) => {
+        const leafA = findMaxLeafNode(nodeA);
+        const leafB = findMaxLeafNode(nodeB);
+        return leafB.timeFromInitialRequest - leafA.timeFromInitialRequest;
+      });
+      sortRecursively(node.children);
+    }
+  }
 }
 
 function generateNetworkDependencyTree(context: InsightSetContextWithNavigation): {
@@ -299,6 +344,8 @@ function generateNetworkDependencyTree(context: InsightSetContextWithNavigation)
     }
   }
 
+  sortRecursively(rootNodes);
+
   return {
     rootNodes,
     maxTime,
@@ -312,21 +359,138 @@ function getSecurityOrigin(url: string): Platform.DevToolsPath.UrlString {
   return parsedURL.securityOrigin();
 }
 
+function handleLinkResponseHeaderPart(trimmedPart: string): {url: string, headerText: string}|null {
+  if (!trimmedPart) {
+    // Skip empty string
+    return null;
+  }
+
+  // Extract URL
+  const urlStart = trimmedPart.indexOf('<');
+  const urlEnd = trimmedPart.indexOf('>');
+
+  if (urlStart !== 0 || urlEnd === -1 || urlEnd <= urlStart) {
+    // Skip parts without a valid URI (must start with '<' and have a closing '>')
+    return null;
+  }
+
+  const url = trimmedPart.substring(urlStart + 1, urlEnd).trim();
+  if (!url) {
+    // Skip empty url
+    return null;
+  }
+
+  // Extract parameters string (everything after '>')
+  const paramsString = trimmedPart.substring(urlEnd + 1).trim();
+
+  if (paramsString) {
+    const params = paramsString.split(';');
+
+    for (const param of params) {
+      const trimmedParam = param.trim();
+      if (!trimmedParam) {
+        continue;
+      }
+
+      const eqIndex = trimmedParam.indexOf('=');
+      if (eqIndex === -1) {
+        // Skip malformed parameters without an '='
+        continue;
+      }
+
+      const paramName = trimmedParam.substring(0, eqIndex).trim().toLowerCase();
+      let paramValue = trimmedParam.substring(eqIndex + 1).trim();
+
+      // Remove quotes from value if present
+      if (paramValue.startsWith('"') && paramValue.endsWith('"')) {
+        paramValue = paramValue.substring(1, paramValue.length - 1);
+      }
+
+      if (paramName === 'rel' && paramValue === 'preconnect') {
+        // Found 'rel=preconnect', no need to process other parameters for this link
+        return {url, headerText: trimmedPart};
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Parses an HTTP Link header string into an array of url and related header text.
+ *
+ * Export the function for test purpose.
+ * @param linkHeaderValue The value of the HTTP Link header (e.g., '</style.css>; rel=preload; as=style, <https://example.com>; rel="preconnect"').
+ * @returns An array of url and header text objects if it contains `rel=preconnect`.
+ */
+export function handleLinkResponseHeader(linkHeaderValue: string): Array<{url: string, headerText: string}> {
+  if (!linkHeaderValue) {
+    return [];
+  }
+  const preconnectedOrigins: Array<{url: string, headerText: string}> = [];
+
+  // const headerTextParts = linkHeaderValue.split(',');
+
+  for (let i = 0; i < linkHeaderValue.length;) {
+    const firstUrlEnd = linkHeaderValue.indexOf('>', i);
+    const commaIndex = linkHeaderValue.indexOf(',', firstUrlEnd);
+    const partEnd = commaIndex !== -1 ? commaIndex : linkHeaderValue.length;
+    const part = linkHeaderValue.substring(i, partEnd);
+
+    i = partEnd + 1;
+
+    const preconnectedOrigin = handleLinkResponseHeaderPart(part.trim());
+    if (preconnectedOrigin) {
+      preconnectedOrigins.push(preconnectedOrigin);
+    }
+  }
+
+  return preconnectedOrigins;
+}
+
 // Export the function for test purpose.
 export function generatePreconnectedOrigins(
-    linkPreconnectEvents: Types.Events.LinkPreconnect[],
-    contextRequests: Types.Events.SyntheticNetworkRequest[]): PreconnectOrigin[] {
-  const preconnectOrigins: PreconnectOrigin[] = [];
-  for (const event of linkPreconnectEvents) {
-    preconnectOrigins.push({
+    parsedTrace: Handlers.Types.ParsedTrace, context: InsightSetContextWithNavigation,
+    contextRequests: Types.Events.SyntheticNetworkRequest[],
+    preconnectCandidates: PreconnectCandidate[]): PreconnectedOrigin[] {
+  const preconnectedOrigins: PreconnectedOrigin[] = [];
+  for (const event of parsedTrace.NetworkRequests.linkPreconnectEvents) {
+    preconnectedOrigins.push({
       node_id: event.args.data.node_id,
       frame: event.args.data.frame,
       url: event.args.data.url,
+      // For each origin the page wanted to preconnect to:
+      // - if we found no network requests to that origin at all then we issue a unused warning
       unused: !contextRequests.some(
           request => getSecurityOrigin(event.args.data.url) === getSecurityOrigin(request.args.data.url)),
+      // - else (we found network requests to the same origin) and if some of those network requests is too slow (if
+      //   they are preconnect candidates), then we issue a unused warning with crossorigin hint
+      crossorigin: preconnectCandidates.some(candidate => candidate.origin === getSecurityOrigin(event.args.data.url)),
+      source: 'DOM',
     });
   }
-  return preconnectOrigins;
+
+  const documentRequest =
+      parsedTrace.NetworkRequests.byTime.find(req => req.args.data.requestId === context.navigationId);
+  documentRequest?.args.data.responseHeaders?.forEach(header => {
+    if (header.name.toLowerCase() === 'link') {
+      const preconnectedOriginsFromResponseHeader = handleLinkResponseHeader(header.value);  // , documentRequest);
+      preconnectedOriginsFromResponseHeader?.forEach(origin => preconnectedOrigins.push({
+        url: origin.url,
+        headerText: origin.headerText,
+        request: documentRequest,
+        // For each origin the page wanted to preconnect to:
+        // - if we found no network requests to that origin at all then we issue a unused warning
+        unused: !contextRequests.some(
+            request => getSecurityOrigin(origin.url) === getSecurityOrigin(request.args.data.url)),
+        // - else (we found network requests to the same origin) and if some of those network requests is too slow (if
+        //   they are preconnect candidates), then we issue a unused warning with crossorigin hint
+        crossorigin: preconnectCandidates.some(candidate => candidate.origin === getSecurityOrigin(origin.url)),
+        source: 'ResponseHeader',
+      }));
+    }
+  });
+
+  return preconnectedOrigins;
 }
 
 function hasValidTiming(request: Types.Events.SyntheticNetworkRequest): boolean {
@@ -498,7 +662,7 @@ export function generateInsight(
       rootNodes: [],
       maxTime: 0 as Types.Timing.Micro,
       fail: false,
-      preconnectOrigins: [],
+      preconnectedOrigins: [],
       preconnectCandidates: [],
     });
   }
@@ -513,17 +677,16 @@ export function generateInsight(
   const isWithinContext = (event: Types.Events.Event): boolean => Helpers.Timing.eventIsInBounds(event, context.bounds);
   const contextRequests = parsedTrace.NetworkRequests.byTime.filter(isWithinContext);
 
-  const preconnectOrigins =
-      generatePreconnectedOrigins(parsedTrace.NetworkRequests.linkPreconnectEvents, contextRequests);
-
   const preconnectCandidates = generatePreconnectCandidates(parsedTrace, context, contextRequests);
+
+  const preconnectedOrigins = generatePreconnectedOrigins(parsedTrace, context, contextRequests, preconnectCandidates);
 
   return finalize({
     rootNodes,
     maxTime,
     fail,
     relatedEvents,
-    preconnectOrigins,
+    preconnectedOrigins,
     preconnectCandidates,
   });
 }

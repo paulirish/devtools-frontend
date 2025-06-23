@@ -44,11 +44,11 @@ import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
 import * as CrUXManager from '../../models/crux-manager/crux-manager.js';
+import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as Trace from '../../models/trace/trace.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as TraceBounds from '../../services/trace_bounds/trace_bounds.js';
 import * as Adorners from '../../ui/components/adorners/adorners.js';
-import type * as Buttons from '../../ui/components/buttons/buttons.js';
 import * as Dialogs from '../../ui/components/dialogs/dialogs.js';
 import * as LegacyWrapper from '../../ui/components/legacy_wrapper/legacy_wrapper.js';
 import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
@@ -67,6 +67,7 @@ import {IsolateSelector} from './IsolateSelector.js';
 import {AnnotationModifiedEvent, ModificationsManager} from './ModificationsManager.js';
 import * as Overlays from './overlays/overlays.js';
 import {cpuprofileJsonGenerator, traceJsonGenerator} from './SaveFileFormatter.js';
+import {StatusDialog} from './StatusDialog.js';
 import {type Client, TimelineController} from './TimelineController.js';
 import {Tab} from './TimelineDetailsView.js';
 import type {TimelineFlameChartDataProvider} from './TimelineFlameChartDataProvider.js';
@@ -82,7 +83,6 @@ import {
   selectionsEqual,
   type TimelineSelection,
 } from './TimelineSelection.js';
-import timelineStatusDialogStyles from './timelineStatusDialog.css.js';
 import {TimelineUIUtils} from './TimelineUIUtils.js';
 import {UIDevtoolsController} from './UIDevtoolsController.js';
 import {UIDevtoolsUtils} from './UIDevtoolsUtils.js';
@@ -167,12 +167,6 @@ const UIStrings = {
   networkConditions: 'Network conditions',
   /**
    *@description Text in Timeline Panel of the Performance panel
-   *@example {wrong format} PH1
-   *@example {ERROR_FILE_NOT_FOUND} PH2
-   */
-  failedToSaveTimelineSS: 'Failed to save timeline: {PH1} ({PH2})',
-  /**
-   *@description Text in Timeline Panel of the Performance panel
    */
   CpuThrottlingIsEnabled: '- CPU throttling is enabled',
   /**
@@ -204,13 +198,13 @@ const UIStrings = {
    */
   close: 'Close',
   /**
-   *@description Text to download the trace file after an error
-   */
-  downloadAfterError: 'Download trace',
-  /**
    *@description Status text to indicate the recording has failed in the Performance panel
    */
   recordingFailed: 'Recording failed',
+  /**
+   *@description Status text to indicate that exporting the trace has failed
+   */
+  exportingFailed: 'Exporting the trace failed',
   /**
    * @description Text to indicate the progress of a profile. Informs the user that we are currently
    * creating a peformance profile.
@@ -232,22 +226,6 @@ const UIStrings = {
    *@description Text in Timeline Panel of the Performance panel
    */
   initializingProfiler: 'Initializing profiler…',
-  /**
-   *@description Text for the status of something
-   */
-  status: 'Status',
-  /**
-   *@description Text that refers to the time
-   */
-  time: 'Time',
-  /**
-   *@description Text for the description of something
-   */
-  description: 'Description',
-  /**
-   *@description Text of an item that stops the running task
-   */
-  stop: 'Stop',
   /**
    *
    * @description Text for exporting basic traces
@@ -345,11 +323,13 @@ type ViewMode = {
 }|{
   mode: 'VIEWING_TRACE',
   traceIndex: number,
+  forceOpenSidebar: boolean,
 }|{
   mode: 'STATUS_PANE_OVERLAY',
 };
 
-export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineModeViewDelegate {
+export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, typeof UI.Panel.Panel>(UI.Panel.Panel)
+    implements Client, TimelineModeViewDelegate {
   private readonly dropTarget: UI.DropTarget.DropTarget;
   private readonly recordingOptionUIControls: UI.Toolbar.ToolbarItem[];
   private state: State;
@@ -400,7 +380,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   private loadButton!: UI.Toolbar.ToolbarButton;
   private saveButton!: UI.Toolbar.ToolbarButton|UI.Toolbar.ToolbarMenuButton;
   private homeButton?: UI.Toolbar.ToolbarButton;
-  private statusPane!: StatusPane|null;
+  private statusDialog: StatusDialog|null = null;
   private landingPage!: UI.Widget.Widget;
   private loader?: TimelineLoader;
   private showScreenshotsToolbarCheckbox?: UI.Toolbar.ToolbarItem;
@@ -425,19 +405,6 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   );
 
   #sideBar = new TimelineComponents.Sidebar.SidebarWidget();
-  /**
-   * Rather than auto-pop the sidebar every time the user records a trace,
-   * which could get annoying, we instead persist the state of the sidebar
-   * visibility to a setting so it's restored across sessions.
-   * However, sometimes we have to automatically hide the sidebar, like when a
-   * trace recording is happening, or the user is on the landing page. In those
-   * times, we toggle this flag to true. Then, when we enter the VIEWING_TRACE
-   * mode, we check this flag and pop the sidebar open if it's set to true.
-   * Longer term a better fix here would be to divide the 3 UI screens
-   * (status pane, landing page, trace view) into distinct components /
-   * widgets, to avoid this complexity.
-   */
-  #restoreSidebarVisibilityOnTraceLoad = false;
 
   /**
    * Used to track an aria announcement that we need to alert for
@@ -844,10 +811,14 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   }
 
   #removeStatusPane(): void {
-    if (this.statusPane) {
-      this.statusPane.remove();
+    if (this.statusDialog) {
+      this.statusDialog.remove();
     }
-    this.statusPane = null;
+    this.statusDialog = null;
+  }
+
+  hasActiveTrace(): boolean {
+    return this.#viewMode.mode === 'VIEWING_TRACE';
   }
 
   #changeView(newMode: ViewMode): void {
@@ -894,6 +865,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       case 'LANDING_PAGE': {
         this.#removeStatusPane();
         this.#showLandingPage();
+        this.dispatchEventToListeners(Events.IS_VIEWING_TRACE, false);
 
         // Whilst we don't reset this, we hide it, mainly so the user cannot
         // hit Ctrl/Cmd-F and try to search when it isn't visible.
@@ -905,8 +877,11 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         this.#hideLandingPage();
         this.#setModelForActiveTrace();
         this.#removeStatusPane();
-        this.#showSidebarIfRequired();
+        if (newMode.forceOpenSidebar) {
+          this.#showSidebar();
+        }
         this.flameChart.dimThirdPartiesIfRequired();
+        this.dispatchEventToListeners(Events.IS_VIEWING_TRACE, true);
         return;
       }
 
@@ -915,6 +890,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         // recordingStarted/recordingProgress callbacks, but we do make sure we
         // hide the landing page.
         this.#hideLandingPage();
+        this.dispatchEventToListeners(Events.IS_VIEWING_TRACE, false);
 
         // We also hide the sidebar - else if the user is viewing a trace and
         // then load/record another, the sidebar remains visible.
@@ -1029,18 +1005,29 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   }
 
   #populateDownloadMenu(contextMenu: UI.ContextMenu.ContextMenu): void {
+    // If the current trace is annotated, add an option to save it without annotations.
+    const currModificationManager = ModificationsManager.activeManager();
+    const annotationsExist = currModificationManager && currModificationManager.getAnnotations()?.length > 0;
+
     contextMenu.viewSection().appendItem(i18nString(UIStrings.saveTraceWithAnnotationsMenuOption), () => {
       Host.userMetrics.actionTaken(Host.UserMetrics.Action.PerfPanelTraceExported);
-      void this.saveToFile(/* isEnhancedTrace */ false, /* addModifications */ true);
+      void this.saveToFile({savingEnhancedTrace: false, addModifications: true});
     }, {
-      jslogContext: 'timeline.save-to-file-with-annotations',
+      jslogContext: annotationsExist ? 'timeline.save-to-file-with-annotations' :
+                                       'timeline.save-to-file-without-annotations',
     });
-    contextMenu.viewSection().appendItem(i18nString(UIStrings.saveTraceWithoutAnnotationsMenuOption), () => {
-      Host.userMetrics.actionTaken(Host.UserMetrics.Action.PerfPanelTraceExported);
-      void this.saveToFile();
-    }, {
-      jslogContext: 'timeline.save-to-file-without-annotations',
-    });
+
+    if (annotationsExist) {
+      contextMenu.viewSection().appendItem(i18nString(UIStrings.saveTraceWithoutAnnotationsMenuOption), () => {
+        Host.userMetrics.actionTaken(Host.UserMetrics.Action.PerfPanelTraceExported);
+        void this.saveToFile({
+          savingEnhancedTrace: false,
+          addModifications: false,
+        });
+      }, {
+        jslogContext: 'timeline.save-to-file-without-annotations',
+      });
+    }
   }
 
   private populateToolbar(): void {
@@ -1071,15 +1058,15 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         if (event.ctrlKey || event.button === 2) {
           const contextMenu = new UI.ContextMenu.ContextMenu(event);
           contextMenu.saveSection().appendItem(i18nString(UIStrings.exportNormalTraces), () => {
-            void this.saveToFile();
+            void this.saveToFile({savingEnhancedTrace: false, addModifications: false});
           });
           contextMenu.saveSection().appendItem(i18nString(UIStrings.exportEnhancedTraces), () => {
-            void this.saveToFile(/* isEnhancedTrace */ true);
+            void this.saveToFile({savingEnhancedTrace: true, addModifications: false});
           });
 
           void contextMenu.show();
         } else {
-          void this.saveToFile();
+          void this.saveToFile({savingEnhancedTrace: false, addModifications: false});
         }
       });
     }
@@ -1326,6 +1313,13 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   }
 
   private contextMenu(event: Event): void {
+    // If we are recording (or transitioning to/from recording, don't let the user use the context menu)
+    if (this.state === State.START_PENDING || this.state === State.RECORDING || this.state === State.STOP_PENDING) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+
     // Do not show this Context menu on FlameChart entries because we have a different context menu for FlameChart entries
     const mouseEvent = (event as MouseEvent);
     if (this.flameChart.getMainFlameChart().coordinatesToEntryIndex(mouseEvent.offsetX, mouseEvent.offsetY) !== -1) {
@@ -1336,20 +1330,36 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     void contextMenu.show();
   }
 
-  async saveToFile(savingEnhancedTrace = false, addModifications = false): Promise<void> {
+  /**
+   * Saves a trace file to disk.
+   * Pass `config.savingEnhancedTrace === true` to include source maps in the resulting metadata.
+   * Pass `config.addModifications === true` to include user modifications to the trace file, which includes:
+   *      1. Annotations
+   *      2. Filtering / collapsing of the flame chart.
+   *      3. Visual track configuration (re-ordering or hiding tracks).
+   */
+  async saveToFile(config: {
+    savingEnhancedTrace: boolean,
+    addModifications: boolean,
+  }): Promise<void> {
     if (this.state !== State.IDLE) {
       return;
     }
     if (this.#viewMode.mode !== 'VIEWING_TRACE') {
       return;
     }
+    const trace = this.#traceEngineModel.parsedTrace(this.#viewMode.traceIndex);
+    if (!trace) {
+      return;
+    }
     let traceEvents = this.#traceEngineModel.rawTraceEvents(this.#viewMode.traceIndex);
-    const metadata = this.#traceEngineModel.metadata(this.#viewMode.traceIndex);
     if (!traceEvents) {
       return;
     }
 
-    const shouldRetainScriptSources = savingEnhancedTrace &&
+    const metadata = this.#traceEngineModel.metadata(this.#viewMode.traceIndex) ?? {};
+
+    const shouldRetainScriptSources = config.savingEnhancedTrace &&
         Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_COMPILED_SOURCES);
     if (!shouldRetainScriptSources) {
       traceEvents = traceEvents.map(event => {
@@ -1371,11 +1381,18 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       });
     }
 
-    if (metadata) {
-      metadata.modifications = addModifications ? ModificationsManager.activeManager()?.toJSON() : undefined;
-      metadata.enhancedTraceVersion =
-          savingEnhancedTrace ? SDK.EnhancedTracesParser.EnhancedTracesParser.enhancedTraceVersion : undefined;
+    metadata.modifications = config.addModifications ? ModificationsManager.activeManager()?.toJSON() : undefined;
+    if (config.addModifications) {
+      // Get any visual track config
+      const visualConfig = this.flameChart.getPersistedConfigMetadata(trace);
+      // If both these values are null then the user has not made any visual
+      // changes, so we don't need to store it into the saved file.
+      if (visualConfig.main !== null || visualConfig.network !== null) {
+        metadata.visualTrackConfig = visualConfig;
+      }
     }
+    metadata.enhancedTraceVersion =
+        config.savingEnhancedTrace ? SDK.EnhancedTracesParser.EnhancedTracesParser.enhancedTraceVersion : undefined;
 
     const traceStart = Platform.DateUtilities.toISO8601Compact(new Date());
     let fileName: Platform.DevToolsPath.RawPathString;
@@ -1391,25 +1408,22 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       // TODO(crbug.com/1456818): Extract this logic and add more tests.
       let traceAsString;
       if (metadata?.dataOrigin === Trace.Types.File.DataOrigin.CPU_PROFILE) {
-        const profileEvent = traceEvents.find(e => e.name === 'CpuProfile');
-        if (!profileEvent?.args?.data) {
-          return;
-        }
-        const profileEventData = profileEvent.args?.data;
-        if (profileEventData.hasOwnProperty('cpuProfile')) {
+        const profileEvent = traceEvents.find(e => Trace.Types.Events.isSyntheticCpuProfile(e));
+
+        const profile = profileEvent?.args.data.cpuProfile;
+        if (profile) {
           // TODO(crbug.com/1456799): Currently use a hack way because we can't differentiate
           // cpuprofile from trace events when loading a file.
           // The loader will directly add the fake trace created from CpuProfile to the tracingModel.
           // And there is where the old saving logic saves the cpuprofile.
           // This will be solved when the CPUProfileHandler is done. Then we can directly get it
           // from the new traceEngine
-          const profile = (profileEventData as {cpuProfile: Protocol.Profiler.Profile}).cpuProfile;
           traceAsString = cpuprofileJsonGenerator(profile);
         }
       } else {
         const formattedTraceIter = traceJsonGenerator(traceEvents, {
           ...metadata,
-          sourceMaps: savingEnhancedTrace ? metadata?.sourceMaps : undefined,
+          sourceMaps: config.savingEnhancedTrace ? metadata?.sourceMaps : undefined,
         });
         traceAsString = Array.from(formattedTraceIter).join('');
       }
@@ -1417,17 +1431,42 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         throw new Error('Trace content empty');
       }
       await Workspace.FileManager.FileManager.instance().save(
-          fileName, traceAsString, true /* forceSaveAs */, false /* isBase64 */);
+          fileName, new TextUtils.ContentData.ContentData(traceAsString, /* isBase64=*/ false, 'application/json'),
+          /* forceSaveAs=*/ true);
       Workspace.FileManager.FileManager.instance().close(fileName);
-    } catch (error) {
+    } catch (e) {
+      // We expect the error to be an Error class, but this deals with any weird case where it's not.
+      const error = e instanceof Error ? e : new Error(e);
+
       console.error(error.stack);
       if (error.name === 'AbortError') {
         // The user cancelled the action, so this is not an error we need to report.
         return;
       }
-      Common.Console.Console.instance().error(
-          i18nString(UIStrings.failedToSaveTimelineSS, {PH1: error.message, PH2: error.name}));
+
+      this.#showExportTraceErrorDialog(error);
     }
+  }
+
+  #showExportTraceErrorDialog(error: Error): void {
+    if (this.statusDialog) {
+      this.statusDialog.remove();
+    }
+
+    this.statusDialog = new StatusDialog(
+        {
+          description: error.message ?? error.toString(),
+          buttonText: i18nString(UIStrings.close),
+          hideStopButton: false,
+          showProgress: false,
+          showTimer: false,
+        },
+        async () => {
+          this.statusDialog?.remove();
+          this.statusDialog = null;
+        });
+    this.statusDialog.showPane(this.statusPaneContainer);
+    this.statusDialog.updateStatus(i18nString(UIStrings.exportingFailed));
   }
 
   async showHistoryDropdown(): Promise<void> {
@@ -1439,6 +1478,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         this.#changeView({
           mode: 'VIEWING_TRACE',
           traceIndex: recordingData.parsedTraceIndex,
+          forceOpenSidebar: false,
         });
       }
     }
@@ -1452,6 +1492,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       this.#changeView({
         mode: 'VIEWING_TRACE',
         traceIndex: recordingData.parsedTraceIndex,
+        forceOpenSidebar: false,
       });
     }
     return true;
@@ -1753,7 +1794,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   }
 
   private async startRecording(): Promise<void> {
-    console.assert(!this.statusPane, 'Status pane is already opened.');
+    console.assert(!this.statusDialog, 'Status pane is already opened.');
     this.setState(State.START_PENDING);
     this.showRecordingStarted();
 
@@ -1765,10 +1806,10 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   }
 
   private async stopRecording(): Promise<void> {
-    if (this.statusPane) {
-      this.statusPane.finish();
-      this.statusPane.updateStatus(i18nString(UIStrings.stoppingTimeline));
-      this.statusPane.updateProgressBar(i18nString(UIStrings.received), 0);
+    if (this.statusDialog) {
+      this.statusDialog.finish();
+      this.statusDialog.updateStatus(i18nString(UIStrings.stoppingTimeline));
+      this.statusDialog.updateProgressBar(i18nString(UIStrings.received), 0);
     }
     this.setState(State.STOP_PENDING);
     if (this.controller) {
@@ -1791,10 +1832,10 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   }
 
   private async recordingFailed(error: string, rawEvents?: Trace.Types.Events.Event[]): Promise<void> {
-    if (this.statusPane) {
-      this.statusPane.remove();
+    if (this.statusDialog) {
+      this.statusDialog.remove();
     }
-    this.statusPane = new StatusPane(
+    this.statusDialog = new StatusDialog(
         {
           description: error,
           buttonText: i18nString(UIStrings.close),
@@ -1804,17 +1845,17 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         },
         // When recording failed, we should load null to go back to the landing page.
         async () => {
-          this.statusPane?.remove();
+          this.statusDialog?.remove();
           await this.loadingComplete(
               /* no collectedEvents */[],
               /* exclusiveFilter= */ null,
               /* metadata= */ null);
         });
-    this.statusPane.showPane(this.statusPaneContainer);
-    this.statusPane.updateStatus(i18nString(UIStrings.recordingFailed));
+    this.statusDialog.showPane(this.statusPaneContainer);
+    this.statusDialog.updateStatus(i18nString(UIStrings.recordingFailed));
 
     if (rawEvents) {
-      this.statusPane.enableDownloadOfEvents(rawEvents);
+      this.statusDialog.enableDownloadOfEvents(rawEvents);
     }
 
     this.setState(State.RECORDING_FAILED);
@@ -1882,6 +1923,8 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.flameChart.getNetworkDataProvider().reset();
     this.flameChart.reset();
     this.#changeView({mode: 'LANDING_PAGE'});
+    UI.Context.Context.instance().setFlavor(Utils.AICallTree.AICallTree, null);
+    UI.Context.Context.instance().setFlavor(Utils.InsightAIContext.ActiveInsight, null);
   }
 
   #hasActiveTrace(): boolean {
@@ -1976,7 +2019,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     if (!currentManager) {
       console.error('ModificationsManager could not be created or activated.');
     }
-    this.statusPane?.updateProgressBar(i18nString(UIStrings.processed), 70);
+    this.statusDialog?.updateProgressBar(i18nString(UIStrings.processed), 70);
 
     const traceInsightsSets = this.#traceEngineModel.traceInsights(traceIndex);
     this.flameChart.setInsights(traceInsightsSets, this.#eventToRelatedInsights);
@@ -2015,6 +2058,8 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         });
       } else if (action === 'EnterLabelEditState' && AnnotationHelpers.isEntryLabel(overlay)) {
         this.flameChart.enterLabelEditMode(overlay);
+      } else if (action === 'LabelBringForward' && AnnotationHelpers.isEntryLabel(overlay)) {
+        this.flameChart.bringLabelForward(overlay);
       }
 
       const annotations = currentManager.getAnnotations();
@@ -2070,9 +2115,9 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     // Initialize EntityMapper
     this.#entityMapper = new Utils.EntityMapper.EntityMapper(parsedTrace);
 
-    this.statusPane?.updateProgressBar(i18nString(UIStrings.processed), 80);
+    this.statusDialog?.updateProgressBar(i18nString(UIStrings.processed), 80);
     this.updateMiniMap();
-    this.statusPane?.updateProgressBar(i18nString(UIStrings.processed), 90);
+    this.statusDialog?.updateProgressBar(i18nString(UIStrings.processed), 90);
     this.updateTimelineControls();
 
     this.#setActiveInsight(null);
@@ -2105,8 +2150,6 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       }
     }
 
-    this.#showSidebarIfRequired();
-
     // When the timeline is loaded for the first time, setup the shortcuts dialog and log what navigation setting is selected.
     // Logging the setting on the first timeline load will allow us to get an estimate number of people using each option.
     if (this.#traceEngineModel.size() === 1) {
@@ -2122,22 +2165,18 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   }
 
   /**
-   * We automatically show the sidebar in only 2 scenarios:
-   * 1. The user has never seen it before, so we show it once to aid discovery
-   * 2. The user had it open, and we hid it (for example, during recording), so now we need to bring it back.
+   * After the user imports / records a trace, we auto-show the sidebar.
    */
-  #showSidebarIfRequired(): void {
-    if (Root.Runtime.Runtime.queryParam('disable-auto-performance-sidebar-reveal') !== null) {
-      // Used in interaction tests & screenshot tests.
+  #showSidebar(): void {
+    const disabledByLocalStorageForTests =
+        window.localStorage.getItem('disable-auto-show-rpp-sidebar-for-test') === 'true';
+    if (disabledByLocalStorageForTests) {
       return;
     }
-    const needToRestore = this.#restoreSidebarVisibilityOnTraceLoad;
-    const userHasSeenSidebar = this.#sideBar.userHasOpenedSidebarOnce();
 
-    if (!userHasSeenSidebar || needToRestore) {
+    if (!this.#splitWidget.sidebarIsShowing()) {
       this.#splitWidget.showBoth();
     }
-    this.#restoreSidebarVisibilityOnTraceLoad = false;
   }
 
   // Build a map mapping annotated entries to the colours that are used to display them in the FlameChart.
@@ -2200,17 +2239,17 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
     this.#changeView({mode: 'STATUS_PANE_OVERLAY'});
     this.setState(State.RECORDING);
     this.showRecordingStarted();
-    if (this.statusPane) {
-      this.statusPane.enableAndFocusButton();
-      this.statusPane.updateStatus(i18nString(UIStrings.profiling));
-      this.statusPane.updateProgressBar(i18nString(UIStrings.bufferUsage), 0);
-      this.statusPane.startTimer();
+    if (this.statusDialog) {
+      this.statusDialog.enableAndFocusButton();
+      this.statusDialog.updateStatus(i18nString(UIStrings.profiling));
+      this.statusDialog.updateProgressBar(i18nString(UIStrings.bufferUsage), 0);
+      this.statusDialog.startTimer();
     }
   }
 
   recordingProgress(usage: number): void {
-    if (this.statusPane) {
-      this.statusPane.updateProgressBar(i18nString(UIStrings.bufferUsage), usage * 100);
+    if (this.statusDialog) {
+      this.statusDialog.updateProgressBar(i18nString(UIStrings.bufferUsage), usage * 100);
     }
   }
 
@@ -2220,7 +2259,6 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
    */
   #hideSidebar(): void {
     if (this.#splitWidget.sidebarIsShowing()) {
-      this.#restoreSidebarVisibilityOnTraceLoad = true;
       this.#splitWidget.hideSidebar();
     }
   }
@@ -2254,10 +2292,10 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
   async loadingStarted(): Promise<void> {
     this.#changeView({mode: 'STATUS_PANE_OVERLAY'});
 
-    if (this.statusPane) {
-      this.statusPane.remove();
+    if (this.statusDialog) {
+      this.statusDialog.remove();
     }
-    this.statusPane = new StatusPane(
+    this.statusDialog = new StatusDialog(
         {
           showProgress: true,
           showTimer: undefined,
@@ -2266,24 +2304,24 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
           description: undefined,
         },
         () => this.cancelLoading());
-    this.statusPane.showPane(this.statusPaneContainer);
-    this.statusPane.updateStatus(i18nString(UIStrings.loadingProfile));
+    this.statusDialog.showPane(this.statusPaneContainer);
+    this.statusDialog.updateStatus(i18nString(UIStrings.loadingProfile));
     // FIXME: make loading from backend cancelable as well.
     if (!this.loader) {
-      this.statusPane.finish();
+      this.statusDialog.finish();
     }
     this.traceLoadStart = Trace.Types.Timing.Milli(performance.now());
     await this.loadingProgress(0);
   }
 
   async loadingProgress(progress?: number): Promise<void> {
-    if (typeof progress === 'number' && this.statusPane) {
-      this.statusPane.updateProgressBar(i18nString(UIStrings.received), progress * 100);
+    if (typeof progress === 'number' && this.statusDialog) {
+      this.statusDialog.updateProgressBar(i18nString(UIStrings.received), progress * 100);
     }
   }
 
   async processingStarted(): Promise<void> {
-    this.statusPane?.updateStatus(i18nString(UIStrings.processingProfile));
+    this.statusDialog?.updateStatus(i18nString(UIStrings.processingProfile));
   }
 
   #listenForProcessingProgress(): void {
@@ -2295,10 +2333,10 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       const traceParseMaxProgress = 0.7;
 
       if (updateEvent.data.type === Trace.TraceModel.ModelUpdateType.COMPLETE) {
-        this.statusPane?.updateProgressBar(str, 100 * traceParseMaxProgress);
+        this.statusDialog?.updateProgressBar(str, 100 * traceParseMaxProgress);
       } else if (updateEvent.data.type === Trace.TraceModel.ModelUpdateType.PROGRESS_UPDATE) {
         const data = updateEvent.data.data;
-        this.statusPane?.updateProgressBar(str, data.percent * 100 * traceParseMaxProgress);
+        this.statusDialog?.updateProgressBar(str, data.percent * 100 * traceParseMaxProgress);
       }
     });
   }
@@ -2345,6 +2383,7 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
         this.#changeView({
           mode: 'VIEWING_TRACE',
           traceIndex: this.#traceEngineModel.lastTraceIndex(),
+          forceOpenSidebar: false,
         });
       } else {
         this.#changeView({mode: 'LANDING_PAGE'});
@@ -2361,6 +2400,8 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
       this.#changeView({
         mode: 'VIEWING_TRACE',
         traceIndex,
+        // This is a new trace, so we want to open the insights sidebar automatically.
+        forceOpenSidebar: true,
       });
 
       const parsedTrace = this.#traceEngineModel.parsedTrace(traceIndex);
@@ -2595,10 +2636,10 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
 
   private showRecordingStarted(): void {
     this.#changeView({mode: 'STATUS_PANE_OVERLAY'});
-    if (this.statusPane) {
-      this.statusPane.remove();
+    if (this.statusDialog) {
+      this.statusDialog.remove();
     }
-    this.statusPane = new StatusPane(
+    this.statusDialog = new StatusDialog(
         {
           showTimer: true,
           showProgress: true,
@@ -2607,9 +2648,9 @@ export class TimelinePanel extends UI.Panel.Panel implements Client, TimelineMod
           buttonText: undefined,
         },
         () => this.stopRecording());
-    this.statusPane.showPane(this.statusPaneContainer);
-    this.statusPane.updateStatus(i18nString(UIStrings.initializingProfiler));
-    this.statusPane.updateProgressBar(i18nString(UIStrings.bufferUsage), 0);
+    this.statusDialog.showPane(this.statusPaneContainer);
+    this.statusDialog.updateStatus(i18nString(UIStrings.initializingProfiler));
+    this.statusDialog.updateProgressBar(i18nString(UIStrings.bufferUsage), 0);
   }
 
   private cancelLoading(): void {
@@ -2838,162 +2879,7 @@ export interface TimelineModeViewDelegate {
   highlightEvent(event: Trace.Types.Events.Event|null): void;
 }
 
-export class StatusPane extends UI.Widget.VBox {
-  private status: HTMLElement;
-  private time: Element|undefined;
-  private progressLabel?: HTMLElement;
-  private progressBar?: HTMLElement;
-  private readonly description: HTMLElement|undefined;
-  private button: Buttons.Button.Button;
-  private downloadTraceButton: Buttons.Button.Button;
-  private startTime!: number;
-  private timeUpdateTimer?: number;
-  #rawEvents?: Trace.Types.Events.Event[];
-
-  constructor(
-      options: {
-        hideStopButton: boolean,
-        showTimer?: boolean,
-        showProgress?: boolean,
-        description?: string,
-        buttonText?: string,
-      },
-      buttonCallback: () => (Promise<void>| void)) {
-    super(true);
-
-    this.contentElement.classList.add('timeline-status-dialog');
-    this.contentElement.setAttribute('jslog', `${VisualLogging.dialog('timeline-status').track({resize: true})}`);
-
-    const statusLine = this.contentElement.createChild('div', 'status-dialog-line status');
-    statusLine.createChild('div', 'label').textContent = i18nString(UIStrings.status);
-    this.status = statusLine.createChild('div', 'content');
-    UI.ARIAUtils.markAsStatus(this.status);
-
-    if (options.showTimer) {
-      const timeLine = this.contentElement.createChild('div', 'status-dialog-line time');
-      timeLine.createChild('div', 'label').textContent = i18nString(UIStrings.time);
-      this.time = timeLine.createChild('div', 'content');
-    }
-
-    if (options.showProgress) {
-      const progressBarContainer = this.contentElement.createChild('div', 'status-dialog-line progress');
-      this.progressLabel = progressBarContainer.createChild('div', 'label');
-      this.progressBar = progressBarContainer.createChild('div', 'indicator-container').createChild('div', 'indicator');
-      UI.ARIAUtils.markAsProgressBar(this.progressBar);
-    }
-
-    if (typeof options.description === 'string') {
-      const descriptionLine = this.contentElement.createChild('div', 'status-dialog-line description');
-      descriptionLine.createChild('div', 'label').textContent = i18nString(UIStrings.description);
-      this.description = descriptionLine.createChild('div', 'content');
-      this.description.innerText = options.description;
-    }
-
-    const buttonContainer = this.contentElement.createChild('div', 'stop-button');
-    this.downloadTraceButton = UI.UIUtils.createTextButton(i18nString(UIStrings.downloadAfterError), () => {
-      void this.#downloadRawTraceAfterError();
-    }, {jslogContext: 'timeline.download-after-error'});
-
-    this.downloadTraceButton.disabled = true;
-    this.downloadTraceButton.classList.add('hidden');
-
-    const buttonText = options.buttonText || i18nString(UIStrings.stop);
-    this.button = UI.UIUtils.createTextButton(buttonText, buttonCallback, {
-      jslogContext: 'timeline.stop-recording',
-    });
-    // Profiling can't be stopped during initialization.
-    this.button.classList.toggle('hidden', options.hideStopButton);
-
-    buttonContainer.append(this.downloadTraceButton);
-    buttonContainer.append(this.button);
-  }
-
-  finish(): void {
-    this.stopTimer();
-    this.button.classList.add('hidden');
-  }
-
-  async #downloadRawTraceAfterError(): Promise<void> {
-    if (!this.#rawEvents || this.#rawEvents.length === 0) {
-      return;
-    }
-    const traceStart = Platform.DateUtilities.toISO8601Compact(new Date());
-    const fileName = `Trace-Load-Error-${traceStart}.json` as Platform.DevToolsPath.RawPathString;
-    const formattedTraceIter = traceJsonGenerator(this.#rawEvents, {});
-    const traceAsString = Array.from(formattedTraceIter).join('');
-    await Workspace.FileManager.FileManager.instance().save(
-        fileName, traceAsString, true /* forceSaveAs */, false /* isBase64 */);
-    Workspace.FileManager.FileManager.instance().close(fileName);
-  }
-
-  enableDownloadOfEvents(rawEvents: Trace.Types.Events.Event[]): void {
-    this.#rawEvents = rawEvents;
-    this.downloadTraceButton.disabled = false;
-    this.downloadTraceButton.classList.remove('hidden');
-  }
-
-  remove(): void {
-    (this.element.parentNode as HTMLElement)?.classList.remove('tinted');
-    this.stopTimer();
-    this.element.remove();
-  }
-
-  showPane(parent: Element): void {
-    this.show(parent);
-    parent.classList.add('tinted');
-  }
-
-  enableAndFocusButton(): void {
-    this.button.classList.remove('hidden');
-    this.button.focus();
-  }
-
-  updateStatus(text: string): void {
-    this.status.textContent = text;
-  }
-
-  updateProgressBar(activity: string, percent: number): void {
-    if (this.progressLabel) {
-      this.progressLabel.textContent = activity;
-    }
-    if (this.progressBar) {
-      this.progressBar.style.width = percent.toFixed(1) + '%';
-      UI.ARIAUtils.setValueNow(this.progressBar, percent);
-    }
-    this.updateTimer();
-  }
-
-  startTimer(): void {
-    this.startTime = Date.now();
-    this.timeUpdateTimer = window.setInterval(this.updateTimer.bind(this), 100);
-    this.updateTimer();
-  }
-
-  private stopTimer(): void {
-    if (!this.timeUpdateTimer) {
-      return;
-    }
-    clearInterval(this.timeUpdateTimer);
-    this.updateTimer();
-    delete this.timeUpdateTimer;
-  }
-
-  private updateTimer(): void {
-    if (!this.timeUpdateTimer || !this.time) {
-      return;
-    }
-
-    const seconds = (Date.now() - this.startTime) / 1000;
-    this.time.textContent = i18n.TimeUtilities.preciseSecondsToString(seconds, 1);
-  }
-
-  override wasShown(): void {
-    super.wasShown();
-    this.registerRequiredCSS(timelineStatusDialogStyles);
-  }
-}
-
-let loadTimelineHandlerInstance: LoadTimelineHandler;
+export let loadTimelineHandlerInstance: LoadTimelineHandler;
 
 export class LoadTimelineHandler implements Common.QueryParamHandler.QueryParamHandler {
   static instance(opts: {
@@ -3049,7 +2935,7 @@ export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
         panel.recordReload();
         return true;
       case 'timeline.save-to-file':
-        void panel.saveToFile();
+        void panel.saveToFile({savingEnhancedTrace: false, addModifications: false});
         return true;
       case 'timeline.load-from-file':
         panel.selectFileToLoad();
@@ -3082,4 +2968,10 @@ export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
 export class SelectedInsight {
   constructor(public insight: TimelineComponents.Sidebar.ActiveInsight) {
   }
+}
+export const enum Events {
+  IS_VIEWING_TRACE = 'IsViewingTrace',
+}
+export interface EventTypes {
+  [Events.IS_VIEWING_TRACE]: boolean;
 }

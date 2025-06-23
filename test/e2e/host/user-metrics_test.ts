@@ -138,6 +138,20 @@ describe('User Metrics', () => {
     ]);
   });
 
+  it('dispatches a metric event during drawer orientation toggle', async () => {
+    await enableExperiment('vertical-drawer');
+    const {frontend} = getBrowserAndPages();
+    await frontend.keyboard.down('Shift');
+    await frontend.keyboard.press('Escape');
+
+    await assertHistogramEventsInclude([{
+      actionName: 'DevTools.KeyboardShortcutFired',
+      actionCode: 119,  // main.toggle-drawer-orientation
+    }]);
+
+    await frontend.keyboard.up('Shift');
+  });
+
   it('dispatches events for views', async () => {
     const {frontend} = getBrowserAndPages();
 
@@ -453,8 +467,7 @@ describe('User Metrics for Issue Panel', () => {
     ]);
   });
 
-  // Flaky
-  it.skip('[crbug.com/380037466]: dispatch events when a link to an element is clicked', async () => {
+  it('dispatch events when a link to an element is clicked', async () => {
     await goToResource('elements/element-reveal-inline-issue.html');
     await click('.issue');
 

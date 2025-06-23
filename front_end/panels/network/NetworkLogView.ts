@@ -484,7 +484,6 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
   private readonly networkOnlyThirdPartySetting: Common.Settings.Setting<boolean>;
   private readonly networkResourceTypeFiltersSetting: Common.Settings.Setting<Record<string, boolean>>;
   private readonly networkShowOptionsToGenerateHarWithSensitiveData: Common.Settings.Setting<boolean>;
-  private rawRowHeight: number;
   private readonly progressBarContainer: Element;
   private readonly networkLogLargeRowsSetting: Common.Settings.Setting<boolean>;
   private rowHeightInternal: number;
@@ -508,12 +507,7 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
   private activeGroupLookup: GroupLookupInterface|null;
   private readonly textFilterUI: UI.FilterBar.TextFilterUI;
   private readonly invertFilterUI: UI.FilterBar.CheckboxFilterUI;
-  private readonly dataURLFilterUI: UI.FilterBar.CheckboxFilterUI|undefined;
   private readonly moreFiltersDropDownUI: MoreFiltersDropDownUI|undefined;
-  private readonly onlyBlockedResponseCookiesFilterUI: UI.FilterBar.CheckboxFilterUI|undefined;
-  private readonly onlyBlockedRequestsUI: UI.FilterBar.CheckboxFilterUI|undefined;
-  private readonly onlyThirdPartyFilterUI: UI.FilterBar.CheckboxFilterUI|undefined;
-  private readonly hideChromeExtensionsUI: UI.FilterBar.CheckboxFilterUI|undefined;
   private readonly resourceCategoryFilterUI: UI.FilterBar.NamedBitSetFilterUI;
   private readonly filterParser: TextUtils.TextUtils.FilterParser;
   private readonly suggestionBuilder: UI.FilterSuggestionBuilder.FilterSuggestionBuilder;
@@ -547,16 +541,13 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
     this.networkShowOptionsToGenerateHarWithSensitiveData = Common.Settings.Settings.instance().createSetting(
         'network.show-options-to-generate-har-with-sensitive-data', false);
 
-    this.rawRowHeight = 0;
     this.progressBarContainer = progressBarContainer;
     this.networkLogLargeRowsSetting = networkLogLargeRowsSetting;
     this.networkLogLargeRowsSetting.addChangeListener(updateRowHeight.bind(this), this);
 
     function updateRowHeight(this: NetworkLogView): void {
-      this.rawRowHeight = Boolean(this.networkLogLargeRowsSetting.get()) ? 41 : 21;
-      this.rowHeightInternal = this.computeRowHeight();
+      this.rowHeightInternal = Boolean(this.networkLogLargeRowsSetting.get()) ? 41 : 21;
     }
-    this.rawRowHeight = 0;
     this.rowHeightInternal = 0;
     updateRowHeight.call(this);
 
@@ -933,10 +924,6 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
     this.invalidateAllItems();
   }
 
-  private computeRowHeight(): number {
-    return this.rawRowHeight;
-  }
-
   nodeForRequest(request: SDK.NetworkRequest.NetworkRequest): NetworkRequestNode|null {
     return networkRequestToNode.get(request) || null;
   }
@@ -1067,8 +1054,7 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
 
     this.recordingHint = new UI.EmptyWidget.EmptyWidget(header, shortcutTitle ? description : '');
     this.recordingHint.element.classList.add('network-status-pane');
-    this.recordingHint.appendLink(
-        'https://developer.chrome.com/docs/devtools/network/' as Platform.DevToolsPath.UrlString);
+    this.recordingHint.link = 'https://developer.chrome.com/docs/devtools/network/' as Platform.DevToolsPath.UrlString;
     if (shortcutTitle && action) {
       const button = UI.UIUtils.createTextButton(buttonText, () => action.execute(), {
         jslogContext: actionName,
@@ -1385,10 +1371,6 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
 
   override willHide(): void {
     this.columnsInternal.willHide();
-  }
-
-  override onResize(): void {
-    this.rowHeightInternal = this.computeRowHeight();
   }
 
   flatNodesList(): NetworkNode[] {
@@ -2354,7 +2336,7 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
               .replace(/"/g, '\\"')
               .replace(/[^a-zA-Z0-9\s_\-:=+~'\/.',?;()*`]/g, '^$&')
               .replace(/%(?=[a-zA-Z0-9_])/g, '%^')
-              .replace(/\r?\n/g, '^\n\n') +
+              .replace(/\r?\n|\r/g, '^\n\n') +
           encapsChars;
     }
 

@@ -12,9 +12,10 @@ import * as Host from '../core/host/host.js';
 import * as Root from '../core/root/root.js';
 import * as Trace from '../models/trace/trace.js';
 import * as Timeline from '../panels/timeline/timeline.js';
+import * as UI from '../ui/legacy/legacy.js';
 import * as ThemeSupport from '../ui/legacy/theme_support/theme_support.js';
 
-import {cleanTestDOM, setupTestDOM} from './DOMHelpers.js';
+import {cleanTestDOM, raf, setupTestDOM} from './DOMHelpers.js';
 import {createFakeSetting, resetHostConfig} from './EnvironmentHelpers.js';
 import {
   checkForPendingActivity,
@@ -28,9 +29,15 @@ style.innerText =
 document.head.append(style);
 document.documentElement.classList.add('platform-screenshot-test');
 
+const documentBodyElements = new Set<Element>();
+
 beforeEach(async () => {
   resetHostConfig();
+  for (const child of document.body.children) {
+    documentBodyElements.add(child);
+  }
   await setupTestDOM();
+
   // Ensure that no trace data leaks between tests when testing the trace engine.
   for (const handler of Object.values(Trace.Handlers.ModelHandlers)) {
     handler.reset();
@@ -50,7 +57,42 @@ beforeEach(async () => {
   startTrackingAsyncActivity();
 });
 
-afterEach(async () => {
+/**
+ * If a widget creates a glass pane, it can get orphaned and not cleaned up correctly.
+ */
+async function removeGlassPanes() {
+  for (const pane of document.body.querySelectorAll('[data-devtools-glass-pane]')) {
+    document.body.removeChild(pane);
+  }
+  await raf();
+}
+/**
+ * If a text editor is created we create a special parent for the tooltip
+ * This does not get cleared after render, but it's internals do.
+ * So we need to manually remove it
+ */
+async function removeTextEditorTooltip() {
+  // Found in front_end/ui/components/text_editor/config.ts
+  for (const pane of document.body.querySelectorAll('.editor-tooltip-host')) {
+    document.body.removeChild(pane);
+  }
+  await raf();
+}
+
+afterEach(async function() {
+  await cleanTestDOM();
+
+  await removeGlassPanes();
+  await removeTextEditorTooltip();
+
+  UI.ARIAUtils.removeAlertElement(document.body);
+
+  for (const child of document.body.children) {
+    if (!documentBodyElements.has(child)) {
+      console.error(`Test "${this.currentTest?.fullTitle()}" left DOM in document.body:`);
+      console.error(child);
+    }
+  }
   for (const key of Object.keys(Root.Runtime.hostConfig)) {
     // @ts-expect-error
     delete Root.Runtime.hostConfig[key];

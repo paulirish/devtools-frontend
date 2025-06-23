@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 import stylisticPlugin from '@stylistic/eslint-plugin';
-import { defineConfig, globalIgnores } from 'eslint/config';
 import eslintPlugin from 'eslint-plugin-eslint-plugin';
 import importPlugin from 'eslint-plugin-import';
 import jsdocPlugin from 'eslint-plugin-jsdoc';
 import mochaPlugin from 'eslint-plugin-mocha';
+import {defineConfig, globalIgnores} from 'eslint/config';
 import globals from 'globals';
-import { join } from 'path';
+import {join} from 'path';
 import typescriptEslint from 'typescript-eslint';
 
 import rulesdirPlugin from './scripts/eslint_rules/rules-dir.mjs';
@@ -193,7 +193,7 @@ export default defineConfig([
       radix: 'error',
       'valid-typeof': 'error',
       'no-return-assign': ['error', 'always'],
-      'no-implicit-coercion': ['error', { allow: ['!!'] }],
+      'no-implicit-coercion': ['error', {allow: ['!!']}],
 
       'no-array-constructor': 'error',
 
@@ -251,6 +251,7 @@ export default defineConfig([
       // no-implicit-globals will prevent accidental globals
       'no-implicit-globals': 'off',
       'no-unused-private-class-members': 'error',
+      'no-useless-constructor': 'error',
 
       // Sort imports first
       'import/first': 'error',
@@ -304,11 +305,11 @@ export default defineConfig([
       parserOptions: {
         allowAutomaticSingleRunInference: true,
         project: join(
-          import.meta.dirname,
-          'config',
-          'typescript',
-          'tsconfig.eslint.json',
-        ),
+            import.meta.dirname,
+            'config',
+            'typescript',
+            'tsconfig.eslint.json',
+            ),
       },
     },
 
@@ -542,6 +543,9 @@ export default defineConfig([
 
       '@typescript-eslint/consistent-indexed-object-style': 'error',
 
+      'no-useless-constructor': 'off',
+      '@typescript-eslint/no-useless-constructor': 'error',
+
       'rulesdir/no-underscored-properties': 'error',
       'rulesdir/inline-type-imports': 'error',
 
@@ -550,15 +554,17 @@ export default defineConfig([
         {
           // Enforce that any import of models/trace/trace.js names the import Trace.
           modulePath: join(
-            import.meta.dirname,
-            'front_end',
-            'models',
-            'trace',
-            'trace.js',
-          ),
+              import.meta.dirname,
+              'front_end',
+              'models',
+              'trace',
+              'trace.js',
+              ),
           importName: 'Trace',
         },
       ],
+
+      'rulesdir/validate-timing-types': 'error',
     },
   },
   {
@@ -608,6 +614,7 @@ export default defineConfig([
       'rulesdir/no-bound-component-methods': 'error',
       'rulesdir/no-adopted-style-sheets': 'error',
       'rulesdir/no-customized-builtin-elements': 'error',
+      'rulesdir/no-deprecated-component-usages': 'error',
       'rulesdir/no-self-closing-custom-element-tagnames': 'error',
       'rulesdir/no-a-tags-in-lit': 'error',
       'rulesdir/check-css-import': 'error',
@@ -699,6 +706,7 @@ export default defineConfig([
       'rulesdir/prefer-sinon-assert': 'error',
       'rulesdir/prefer-url-string': 'error',
       'rulesdir/trace-engine-test-timeouts': 'error',
+      'rulesdir/no-document-body-mutation': 'error',
       'rulesdir/enforce-custom-element-definitions-location': 'off',
     },
 
@@ -721,11 +729,6 @@ export default defineConfig([
         },
         {
           name: 'describeWithMockConnection',
-          type: 'suite',
-          interfaces: ['BDD', 'TDD'],
-        },
-        {
-          name: 'describeWithRealConnection',
           type: 'suite',
           interfaces: ['BDD', 'TDD'],
         },
@@ -797,15 +800,17 @@ export default defineConfig([
     },
   },
   {
-    name: 'Traces import rule',
-    files: ['front_end/models/trace/handlers/**/*.ts'],
+    name: 'No SDK in models/trace',
+    files: ['front_end/models/trace/**/*.ts'],
+    ignores: ['front_end/models/trace/**/*.test.ts'],
     rules: {
       'rulesdir/no-imports-in-directory': [
         'error',
         {
-          bannedImportPaths: [
-            join(import.meta.dirname, 'front_end', 'core', 'sdk', 'sdk.js'),
-          ],
+          bannedImportPaths: [{
+            bannedPath: join(import.meta.dirname, 'front_end', 'core', 'sdk', 'sdk.js'),
+            allowTypeImports: true,
+          }],
         },
       ],
     },

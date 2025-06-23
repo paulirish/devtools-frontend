@@ -550,12 +550,8 @@ export const generatedProperties = [
    "mask-repeat",
    "mask-size",
    "mask-type",
-   "masonry-auto-tracks",
    "masonry-direction",
    "masonry-fill",
-   "masonry-template-tracks",
-   "masonry-track-end",
-   "masonry-track-start",
    "math-depth",
    "math-shift",
    "math-style",
@@ -652,7 +648,6 @@ export const generatedProperties = [
    "scroll-margin-left",
    "scroll-margin-right",
    "scroll-margin-top",
-   "scroll-marker-contain",
    "scroll-marker-group",
    "scroll-padding-block-end",
    "scroll-padding-block-start",
@@ -669,6 +664,7 @@ export const generatedProperties = [
    "scroll-start-inline",
    "scroll-start-x",
    "scroll-start-y",
+   "scroll-target-group",
    "scroll-timeline-axis",
    "scroll-timeline-name",
    "scrollbar-color",
@@ -714,11 +710,13 @@ export const generatedProperties = [
    "text-emphasis-color",
    "text-emphasis-position",
    "text-emphasis-style",
+   "text-grow",
    "text-indent",
    "text-orientation",
    "text-overflow",
    "text-rendering",
    "text-shadow",
+   "text-shrink",
    "text-size-adjust",
    "text-spacing-trim",
    "text-transform",
@@ -1803,7 +1801,8 @@ export const generatedProperties = [
    "style",
    "paint",
    "inline-size",
-   "block-size"
+   "block-size",
+   "view-transition"
   ],
   "name": "contain"
  },
@@ -1867,6 +1866,20 @@ export const generatedProperties = [
   "name": "content-visibility"
  },
  {
+  "longhands": [
+   "corner-end-start-shape",
+   "corner-end-end-shape"
+  ],
+  "name": "corner-block-end-shape"
+ },
+ {
+  "longhands": [
+   "corner-start-start-shape",
+   "corner-start-end-shape"
+  ],
+  "name": "corner-block-start-shape"
+ },
+ {
   "keywords": [
    "notch",
    "scoop",
@@ -1889,10 +1902,45 @@ export const generatedProperties = [
   "name": "corner-bottom-right-shape"
  },
  {
+  "longhands": [
+   "corner-bottom-left-shape",
+   "corner-bottom-right-shape"
+  ],
+  "name": "corner-bottom-shape"
+ },
+ {
   "name": "corner-end-end-shape"
  },
  {
   "name": "corner-end-start-shape"
+ },
+ {
+  "longhands": [
+   "corner-start-end-shape",
+   "corner-end-end-shape"
+  ],
+  "name": "corner-inline-end-shape"
+ },
+ {
+  "longhands": [
+   "corner-start-start-shape",
+   "corner-end-start-shape"
+  ],
+  "name": "corner-inline-start-shape"
+ },
+ {
+  "longhands": [
+   "corner-top-left-shape",
+   "corner-bottom-left-shape"
+  ],
+  "name": "corner-left-shape"
+ },
+ {
+  "longhands": [
+   "corner-top-right-shape",
+   "corner-bottom-right-shape"
+  ],
+  "name": "corner-right-shape"
  },
  {
   "longhands": [
@@ -1930,6 +1978,29 @@ export const generatedProperties = [
    "square"
   ],
   "name": "corner-top-right-shape"
+ },
+ {
+  "longhands": [
+   "corner-top-left-shape",
+   "corner-top-right-shape"
+  ],
+  "name": "corner-top-shape"
+ },
+ {
+  "keywords": [
+   "normal"
+  ],
+  "longhands": [
+   "border-top-left-radius",
+   "corner-top-left-shape",
+   "border-top-right-radius",
+   "corner-top-right-shape",
+   "border-bottom-right-radius",
+   "corner-bottom-right-shape",
+   "border-bottom-left-radius",
+   "corner-bottom-left-shape"
+  ],
+  "name": "corners"
  },
  {
   "keywords": [
@@ -2935,12 +3006,23 @@ export const generatedProperties = [
   "name": "mask-clip"
  },
  {
+  "keywords": [
+   "add",
+   "subtract",
+   "intersect",
+   "exclude"
+  ],
   "name": "mask-composite"
  },
  {
   "name": "mask-image"
  },
  {
+  "keywords": [
+   "alpha",
+   "luminance",
+   "match-source"
+  ],
   "name": "mask-mode"
  },
  {
@@ -2968,14 +3050,6 @@ export const generatedProperties = [
  },
  {
   "keywords": [
-   "auto",
-   "min-content",
-   "max-content"
-  ],
-  "name": "masonry-auto-tracks"
- },
- {
-  "keywords": [
    "row",
    "row-reverse",
    "column",
@@ -2996,28 +3070,6 @@ export const generatedProperties = [
    "masonry-fill"
   ],
   "name": "masonry-flow"
- },
- {
-  "name": "masonry-template-tracks"
- },
- {
-  "longhands": [
-   "masonry-track-start",
-   "masonry-track-end"
-  ],
-  "name": "masonry-track"
- },
- {
-  "keywords": [
-   "auto"
-  ],
-  "name": "masonry-track-end"
- },
- {
-  "keywords": [
-   "auto"
-  ],
-  "name": "masonry-track-start"
  },
  {
   "inherited": true,
@@ -3661,6 +3713,17 @@ export const generatedProperties = [
  },
  {
   "longhands": [
+   "column-rule-width",
+   "column-rule-style",
+   "column-rule-color",
+   "row-rule-width",
+   "row-rule-style",
+   "row-rule-color"
+  ],
+  "name": "rule"
+ },
+ {
+  "longhands": [
    "column-rule-color",
    "row-rule-color"
   ],
@@ -3755,13 +3818,6 @@ export const generatedProperties = [
  },
  {
   "name": "scroll-margin-top"
- },
- {
-  "keywords": [
-   "none",
-   "auto"
-  ],
-  "name": "scroll-marker-contain"
  },
  {
   "keywords": [
@@ -3889,6 +3945,13 @@ export const generatedProperties = [
  },
  {
   "name": "scroll-start-y"
+ },
+ {
+  "keywords": [
+   "none",
+   "auto"
+  ],
+  "name": "scroll-target-group"
  },
  {
   "longhands": [
@@ -4204,6 +4267,9 @@ export const generatedProperties = [
   "name": "text-emphasis-style"
  },
  {
+  "name": "text-grow"
+ },
+ {
   "inherited": true,
   "name": "text-indent"
  },
@@ -4239,6 +4305,9 @@ export const generatedProperties = [
    "none"
   ],
   "name": "text-shadow"
+ },
+ {
+  "name": "text-shrink"
  },
  {
   "inherited": true,
@@ -5247,7 +5316,8 @@ export const generatedPropertyValues = {
    "style",
    "paint",
    "inline-size",
-   "block-size"
+   "block-size",
+   "view-transition"
   ]
  },
  "contain-intrinsic-height": {
@@ -5319,6 +5389,11 @@ export const generatedPropertyValues = {
    "round",
    "squircle",
    "square"
+  ]
+ },
+ "corners": {
+  "values": [
+   "normal"
   ]
  },
  "counter-increment": {
@@ -5923,17 +5998,25 @@ export const generatedPropertyValues = {
    "none"
   ]
  },
+ "mask-composite": {
+  "values": [
+   "add",
+   "subtract",
+   "intersect",
+   "exclude"
+  ]
+ },
+ "mask-mode": {
+  "values": [
+   "alpha",
+   "luminance",
+   "match-source"
+  ]
+ },
  "mask-type": {
   "values": [
    "luminance",
    "alpha"
-  ]
- },
- "masonry-auto-tracks": {
-  "values": [
-   "auto",
-   "min-content",
-   "max-content"
   ]
  },
  "masonry-direction": {
@@ -5948,16 +6031,6 @@ export const generatedPropertyValues = {
   "values": [
    "normal",
    "reverse"
-  ]
- },
- "masonry-track-end": {
-  "values": [
-   "auto"
-  ]
- },
- "masonry-track-start": {
-  "values": [
-   "auto"
   ]
  },
  "math-shift": {
@@ -6344,12 +6417,6 @@ export const generatedPropertyValues = {
    "nearest"
   ]
  },
- "scroll-marker-contain": {
-  "values": [
-   "none",
-   "auto"
-  ]
- },
  "scroll-marker-group": {
   "values": [
    "none",
@@ -6421,6 +6488,12 @@ export const generatedPropertyValues = {
    "both",
    "mandatory",
    "proximity"
+  ]
+ },
+ "scroll-target-group": {
+  "values": [
+   "none",
+   "auto"
   ]
  },
  "scrollbar-color": {

@@ -102,6 +102,7 @@ ts_library("unittests") {
     "ConsolePrompt.test.ts",
     "ConsoleView.test.ts",
     "ConsoleViewMessage.test.ts",
+    "ConsoleViewport.test.ts",
     "ErrorStackParser.test.ts",
   ]
 
@@ -113,6 +114,7 @@ ts_library("unittests") {
     "../../models/bindings:bundle",
     "../../models/issues_manager:bundle",
     "../../models/logs:bundle",
+    "../../models/text_utils:bundle",
     "../../testing",
     "../../ui/legacy/components/utils:bundle",
   ]

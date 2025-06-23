@@ -125,11 +125,11 @@ export const highlightedCurrentSearchResultClassName = 'current-search-result';
 export function installDragHandle(
     element: Element, elementDragStart: ((arg0: MouseEvent) => boolean)|null, elementDrag: (arg0: MouseEvent) => void,
     elementDragEnd: ((arg0: MouseEvent) => void)|null, cursor: string|null, hoverCursor?: string|null,
-    startDelay?: number): void {
+    startDelay?: number, mouseDownPreventDefault = true): void {
   function onMouseDown(event: Event): void {
     const dragHandler = new DragHandler();
-    const dragStart = (): void =>
-        dragHandler.elementDragStart(element, elementDragStart, elementDrag, elementDragEnd, cursor, event);
+    const dragStart = (): void => dragHandler.elementDragStart(
+        element, elementDragStart, elementDrag, elementDragEnd, cursor, event, mouseDownPreventDefault);
     if (startDelay) {
       startTimer = window.setTimeout(dragStart, startDelay);
     } else {
@@ -206,7 +206,7 @@ class DragHandler {
   elementDragStart(
       targetElement: Element, elementDragStart: ((arg0: MouseEvent) => boolean)|null,
       elementDrag: (arg0: MouseEvent) => void|boolean, elementDragEnd: ((arg0: MouseEvent) => void)|null,
-      cursor: string|null, ev: Event): void {
+      cursor: string|null, ev: Event, preventDefault = true): void {
     const event = (ev as MouseEvent);
     // Only drag upon left button. Right will likely cause a context menu. So will ctrl-click on mac.
     if (event.button || (Host.Platform.isMac() && event.ctrlKey)) {
@@ -256,7 +256,10 @@ class DragHandler {
       targetHtmlElement.style.cursor = oldCursor;
       this.restoreCursorAfterDrag = undefined;
     }
-    event.preventDefault();
+
+    if (preventDefault) {
+      event.preventDefault();
+    }
   }
 
   private mouseOutWhileDragging(): void {
@@ -1111,6 +1114,13 @@ export function createTextButton(text: string, clickHandler?: ((arg0: Event) => 
   button.variant = opts?.variant ? opts.variant : Buttons.Button.Variant.OUTLINED;
   if (clickHandler) {
     button.addEventListener('click', clickHandler);
+    button.addEventListener('keydown', (event: KeyboardEvent): void => {
+      if (event.key === 'Enter' || event.key === 'Space') {
+        // Make sure we don't propagate 'Enter' or 'Space' key events to parents,
+        // so that these get turned into 'click' events properly.
+        event.stopImmediatePropagation();
+      }
+    });
   }
   if (opts?.jslogContext) {
     button.setAttribute('jslog', `${VisualLogging.action().track({click: true}).context(opts.jslogContext)}`);
@@ -1305,7 +1315,7 @@ export function setTitle(element: HTMLElement, title: string): void {
 }
 
 export class CheckboxLabel extends HTMLElement {
-  static readonly observedAttributes = ['checked', 'disabled', 'indeterminate', 'name', 'title'];
+  static readonly observedAttributes = ['checked', 'disabled', 'indeterminate', 'name', 'title', 'aria-label'];
 
   readonly #shadowRoot!: DocumentFragment;
   #checkboxElement!: HTMLInputElement;
@@ -1362,7 +1372,17 @@ export class CheckboxLabel extends HTMLElement {
     } else if (name === 'title') {
       this.#checkboxElement.title = newValue ?? '';
       this.#textElement.title = newValue ?? '';
+    } else if (name === 'aria-label') {
+      this.#checkboxElement.ariaLabel = newValue;
     }
+  }
+
+  override get ariaLabel(): string|null {
+    return this.#checkboxElement.ariaLabel;
+  }
+
+  override set ariaLabel(ariaLabel: string) {
+    this.setAttribute('aria-label', ariaLabel);
   }
 
   get checked(): boolean {
@@ -1387,6 +1407,14 @@ export class CheckboxLabel extends HTMLElement {
 
   get indeterminate(): boolean {
     return this.#checkboxElement.indeterminate;
+  }
+
+  override set title(title: string) {
+    this.setAttribute('title', title);
+  }
+
+  override get title(): string {
+    return this.#checkboxElement.title;
   }
 
   set name(name: string) {
@@ -1487,6 +1515,10 @@ export class DevToolsCloseButton extends HTMLElement {
     } else {
       this.#button.tabIndex = -1;
     }
+  }
+
+  override focus(): void {
+    this.#button.focus();
   }
 }
 

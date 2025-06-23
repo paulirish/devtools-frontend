@@ -39,6 +39,7 @@ import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as Persistence from '../../models/persistence/persistence.js';
+import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as Snippets from '../snippets/snippets.js';
@@ -111,6 +112,12 @@ const UIStrings = {
    *@description Text to save content as a specific file type
    */
   saveAs: 'Save as…',
+  /**
+   * @description An error message logged to the Console panel when the user uses
+   *              the "Save as…" context menu in the Sources panel and the operation
+   *              failes.
+   */
+  saveAsFailed: 'Failed to save file to disk.',
   /**
    * @description Message shown in the Workspace tab of the Sources panel to nudge
    *              developers into utilizing the Automatic Workspace Folders feature
@@ -204,7 +211,7 @@ export class FilesNavigatorView extends NavigatorView {
     const placeholder =
         new UI.EmptyWidget.EmptyWidget(i18nString(UIStrings.noWorkspace), i18nString(UIStrings.explainWorkspace));
     this.setPlaceholder(placeholder);
-    placeholder.appendLink('https://developer.chrome.com/docs/devtools/workspaces/' as Platform.DevToolsPath.UrlString);
+    placeholder.link = 'https://developer.chrome.com/docs/devtools/workspaces/' as Platform.DevToolsPath.UrlString;
 
     const link =
         UI.XLink.XLink.create('https://goo.gle/devtools-automatic-workspace-folders', 'com.chrome.devtools.json');
@@ -285,7 +292,7 @@ export class OverridesNavigatorView extends NavigatorView {
     const placeholder = new UI.EmptyWidget.EmptyWidget(
         i18nString(UIStrings.noLocalOverrides), i18nString(UIStrings.explainLocalOverrides));
     this.setPlaceholder(placeholder);
-    placeholder.appendLink('https://developer.chrome.com/docs/devtools/overrides/' as Platform.DevToolsPath.UrlString);
+    placeholder.link = 'https://developer.chrome.com/docs/devtools/overrides/' as Platform.DevToolsPath.UrlString;
 
     this.toolbar = document.createElement('devtools-toolbar');
     this.toolbar.classList.add('navigator-toolbar');
@@ -378,8 +385,7 @@ export class ContentScriptsNavigatorView extends NavigatorView {
     const placeholder = new UI.EmptyWidget.EmptyWidget(
         i18nString(UIStrings.noContentScripts), i18nString(UIStrings.explainContentScripts));
     this.setPlaceholder(placeholder);
-    placeholder.appendLink(
-        'https://developer.chrome.com/extensions/content_scripts' as Platform.DevToolsPath.UrlString);
+    placeholder.link = 'https://developer.chrome.com/extensions/content_scripts' as Platform.DevToolsPath.UrlString;
   }
 
   override acceptProject(project: Workspace.Workspace.Project): boolean {
@@ -393,8 +399,8 @@ export class SnippetsNavigatorView extends NavigatorView {
     const placeholder =
         new UI.EmptyWidget.EmptyWidget(i18nString(UIStrings.noSnippets), i18nString(UIStrings.explainSnippets));
     this.setPlaceholder(placeholder);
-    placeholder.appendLink(
-        'https://developer.chrome.com/docs/devtools/javascript/snippets/' as Platform.DevToolsPath.UrlString);
+    placeholder.link =
+        'https://developer.chrome.com/docs/devtools/javascript/snippets/' as Platform.DevToolsPath.UrlString;
 
     const toolbar = document.createElement('devtools-toolbar');
     toolbar.classList.add('navigator-toolbar');
@@ -439,9 +445,14 @@ export class SnippetsNavigatorView extends NavigatorView {
 
   private async handleSaveAs(uiSourceCode: Workspace.UISourceCode.UISourceCode): Promise<void> {
     uiSourceCode.commitWorkingCopy();
-    const {content} = await uiSourceCode.requestContent();
+    const contentData = await uiSourceCode.requestContentData();
+    if (TextUtils.ContentData.ContentData.isError(contentData)) {
+      console.error(`Failed to retrieve content for ${uiSourceCode.url()}: ${contentData}`);
+      Common.Console.Console.instance().error(i18nString(UIStrings.saveAsFailed), /* show=*/ false);
+      return;
+    }
     await Workspace.FileManager.FileManager.instance().save(
-        this.addJSExtension(uiSourceCode.url()), content || '', true, false /* isBase64 */);
+        this.addJSExtension(uiSourceCode.url()), contentData, /* forceSaveAs=*/ true);
     Workspace.FileManager.FileManager.instance().close(uiSourceCode.url());
   }
 

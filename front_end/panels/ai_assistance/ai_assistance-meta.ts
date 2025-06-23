@@ -4,8 +4,8 @@
 
 import * as Common from '../../core/common/common.js';
 import * as i18n from '../../core/i18n/i18n.js';
+import type * as Platform from '../../core/platform/platform.js';
 import type * as Root from '../../core/root/root.js';
-import type * as AiAssistanceModel from '../../models/ai_assistance/ai_assistance.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
 import type * as AiAssistance from './ai_assistance.js';
@@ -128,7 +128,7 @@ Common.Settings.registerSettingExtension({
   reloadRequired: false,
   condition: isAnyFeatureAvailable,
   disabledCondition: config => {
-    const reasons = [];
+    const reasons: Platform.UIString.LocalizedString[] = [];
     if (isGeoRestricted(config)) {
       reasons.push(i18nString(UIStrings.geoRestricted));
     }
@@ -264,12 +264,3 @@ UI.ActionRegistration.registerActionExtension({
   },
   condition: config => isFileAgentFeatureAvailable(config) && !isPolicyRestricted(config) && !isGeoRestricted(config),
 });
-
-// Called by MCP server via Puppeteer
-// @ts-expect-error
-globalThis.handleMcpRequest =
-    async(prompt: string, conversationType: AiAssistanceModel.ConversationType, selector?: string): Promise<string> => {
-  const AiAssistance = await loadAiAssistanceModule();
-  const panelInstance = await AiAssistance.AiAssistancePanel.instance();
-  return await panelInstance.handleMcpRequest(prompt, conversationType, selector);
-};

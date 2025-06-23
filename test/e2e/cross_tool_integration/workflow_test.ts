@@ -47,8 +47,7 @@ describe('A user can navigate across', function() {
     await waitFor('.panel[aria-label="sources"]');
   });
 
-  // Flaky test.
-  it.skip('[crbug.com/327072692] Performance -> Sources', async () => {
+  it('Performance -> Sources', async () => {
     await navigateToPerformanceTab();
 
     await startRecording();
@@ -69,7 +68,7 @@ describe('A user can navigate across', function() {
 
     await stopRecording();
 
-    await navigateToBottomUpTab();
+    await navigateToBottomUpTab(undefined, 'script-location');
 
     await click('.devtools-link[title*="default.html"]');
     await waitFor('.panel[aria-label="sources"]');
@@ -94,8 +93,7 @@ describe('A user can move tabs', function() {
 });
 
 describe('A user can open panels via the "panel" query param', function() {
-  // Flaky on windows
-  it.skipOnPlatforms(['win32'], '[crbug.com/377280477] Layers is shown', async () => {
+  it('Layers is shown', async () => {
     await reloadDevTools({queryParams: {panel: 'layers'}});
     await tabExistsInMainPanel(LAYERS_TAB_SELECTOR);
   });

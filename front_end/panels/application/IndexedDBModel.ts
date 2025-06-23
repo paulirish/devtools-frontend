@@ -463,6 +463,10 @@ export class IndexedDBModel extends SDK.SDKModel.SDKModel<EventTypes> implements
   sharedStorageAccessed(_event: Protocol.Storage.SharedStorageAccessedEvent): void {
   }
 
+  sharedStorageWorkletOperationExecutionFinished(
+      _event: Protocol.Storage.SharedStorageWorkletOperationExecutionFinishedEvent): void {
+  }
+
   storageBucketCreatedOrUpdated(_event: Protocol.Storage.StorageBucketCreatedOrUpdatedEvent): void {
   }
 
@@ -472,6 +476,9 @@ export class IndexedDBModel extends SDK.SDKModel.SDKModel<EventTypes> implements
   attributionReportingSourceRegistered(_event: Protocol.Storage.AttributionReportingSourceRegisteredEvent): void {
   }
   attributionReportingReportSent(_event: Protocol.Storage.AttributionReportingReportSentEvent): void {
+  }
+  attributionReportingVerboseDebugReportSent(_event: Protocol.Storage.AttributionReportingVerboseDebugReportSentEvent):
+      void {
   }
 }
 

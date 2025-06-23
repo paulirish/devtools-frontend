@@ -2345,6 +2345,12 @@ export namespace Browser {
      * Download status.
      */
     state: DownloadProgressEventState;
+    /**
+     * If download is "completed", provides the path of the downloaded file.
+     * Depending on the platform, it is not guaranteed to be set, nor the file
+     * is guaranteed to exist.
+     */
+    filePath?: string;
   }
 }
 
@@ -4176,12 +4182,14 @@ export namespace DOM {
     ViewTransition = 'view-transition',
     ViewTransitionGroup = 'view-transition-group',
     ViewTransitionImagePair = 'view-transition-image-pair',
+    ViewTransitionGroupChildren = 'view-transition-group-children',
     ViewTransitionOld = 'view-transition-old',
     ViewTransitionNew = 'view-transition-new',
     Placeholder = 'placeholder',
     FileSelectorButton = 'file-selector-button',
     DetailsContent = 'details-content',
     Picker = 'picker',
+    PermissionIcon = 'permission-icon',
   }
 
   /**
@@ -4935,6 +4943,7 @@ export namespace DOM {
   export const enum GetElementByRelationRequestRelation {
     PopoverTarget = 'PopoverTarget',
     InterestTarget = 'InterestTarget',
+    CommandFor = 'CommandFor',
   }
 
   export interface GetElementByRelationRequest {
@@ -6394,6 +6403,11 @@ export namespace Emulation {
     mobile: boolean;
     bitness?: string;
     wow64?: boolean;
+    /**
+     * Used to specify User Agent form-factor values.
+     * See https://wicg.github.io/ua-client-hints/#sec-ch-ua-form-factors
+     */
+    formFactors?: string[];
   }
 
   /**
@@ -6634,6 +6648,10 @@ export namespace Emulation {
      * physiologically accurate emulations for medically recognized color vision deficiencies.
      */
     type: SetEmulatedVisionDeficiencyRequestType;
+  }
+
+  export interface SetEmulatedOSTextScaleRequest {
+    scale?: number;
   }
 
   export interface SetGeolocationOverrideRequest {
@@ -9756,6 +9774,11 @@ export namespace Network {
      */
     outerResponse: Response;
     /**
+     * Whether network response for the signed exchange was accompanied by
+     * extra headers.
+     */
+    hasExtraInfo: boolean;
+    /**
      * Information about the signed exchange header.
      */
     header?: SignedExchangeHeader;
@@ -12117,19 +12140,40 @@ export namespace Page {
   }
 
   /**
-   * Identifies the bottom-most script which caused the frame to be labelled
-   * as an ad.
+   * Identifies the script which caused a script or frame to be labelled as an
+   * ad.
    */
   export interface AdScriptId {
     /**
-     * Script Id of the bottom-most script which caused the frame to be labelled
-     * as an ad.
+     * Script Id of the script which caused a script or frame to be labelled as
+     * an ad.
      */
     scriptId: Runtime.ScriptId;
     /**
-     * Id of adScriptId's debugger.
+     * Id of scriptId's debugger.
      */
     debuggerId: Runtime.UniqueDebuggerId;
+  }
+
+  /**
+   * Encapsulates the script ancestry and the root script filterlist rule that
+   * caused the frame to be labelled as an ad. Only created when `ancestryChain`
+   * is not empty.
+   */
+  export interface AdScriptAncestry {
+    /**
+     * A chain of `AdScriptId`s representing the ancestry of an ad script that
+     * led to the creation of a frame. The chain is ordered from the script
+     * itself (lower level) up to its root ancestor that was flagged by
+     * filterlist.
+     */
+    ancestryChain: AdScriptId[];
+    /**
+     * The filterlist rule that caused the root (last) script in
+     * `ancestryChain` to be ad-tagged. Only populated if the rule is
+     * available.
+     */
+    rootScriptFilterlistRule?: string;
   }
 
   /**
@@ -12227,6 +12271,7 @@ export namespace Page {
     JoinAdInterestGroup = 'join-ad-interest-group',
     KeyboardMap = 'keyboard-map',
     LanguageDetector = 'language-detector',
+    LanguageModel = 'language-model',
     LocalFonts = 'local-fonts',
     LocalNetworkAccess = 'local-network-access',
     Magnetometer = 'magnetometer',
@@ -13380,18 +13425,19 @@ export namespace Page {
     recommendedId?: string;
   }
 
-  export interface GetAdScriptAncestryIdsRequest {
+  export interface GetAdScriptAncestryRequest {
     frameId: FrameId;
   }
 
-  export interface GetAdScriptAncestryIdsResponse extends ProtocolResponseWithError {
+  export interface GetAdScriptAncestryResponse extends ProtocolResponseWithError {
     /**
      * The ancestry chain of ad script identifiers leading to this frame's
-     * creation, ordered from the most immediate script (in the frame creation
+     * creation, along with the root script's filterlist rule. The ancestry
+     * chain is ordered from the most immediate script (in the frame creation
      * stack) to more distant ancestors (that created the immediately preceding
      * script). Only sent if frame is labelled as an ad and ids are available.
      */
-    adScriptAncestryIds: AdScriptId[];
+    adScriptAncestry?: AdScriptAncestry;
   }
 
   export interface GetFrameTreeResponse extends ProtocolResponseWithError {
@@ -15208,6 +15254,11 @@ export namespace Storage {
      */
     operationName?: string;
     /**
+     * ID of the operation call.
+     * Present only for SharedStorageAccessMethods: run and selectURL.
+     */
+    operationId?: string;
+    /**
      * Whether or not to keep the worket alive for future run or selectURL
      * calls.
      * Present only for SharedStorageAccessMethods: run and selectURL.
@@ -15251,13 +15302,20 @@ export namespace Storage {
      */
     ignoreIfPresent?: boolean;
     /**
-     * If the method is called on a worklet, or as part of
-     * a worklet script, it will have an ID for the associated worklet.
+     * A number denoting the (0-based) order of the worklet's
+     * creation relative to all other shared storage worklets created by
+     * documents using the current storage partition.
+     * Present only for SharedStorageAccessMethods: addModule, createWorklet.
+     */
+    workletOrdinal?: integer;
+    /**
+     * Hex representation of the DevTools token used as the TargetID for the
+     * associated shared storage worklet.
      * Present only for SharedStorageAccessMethods: addModule, createWorklet,
      * run, selectURL, and any other SharedStorageAccessMethod when the
-     * SharedStorageAccessScope is worklet.
+     * SharedStorageAccessScope is sharedStorageWorklet.
      */
-    workletId?: string;
+    workletTargetId?: Target.TargetID;
     /**
      * Name of the lock to be acquired, if present.
      * Optionally present only for SharedStorageAccessMethods: batchUpdate,
@@ -16051,6 +16109,43 @@ export namespace Storage {
     params: SharedStorageAccessParams;
   }
 
+  /**
+   * A shared storage run or selectURL operation finished its execution.
+   * The following parameters are included in all events.
+   */
+  export interface SharedStorageWorkletOperationExecutionFinishedEvent {
+    /**
+     * Time that the operation finished.
+     */
+    finishedTime: Network.TimeSinceEpoch;
+    /**
+     * Time, in microseconds, from start of shared storage JS API call until
+     * end of operation execution in the worklet.
+     */
+    executionTime: integer;
+    /**
+     * Enum value indicating the Shared Storage API method invoked.
+     */
+    method: SharedStorageAccessMethod;
+    /**
+     * ID of the operation call.
+     */
+    operationId: string;
+    /**
+     * Hex representation of the DevTools token used as the TargetID for the
+     * associated shared storage worklet.
+     */
+    workletTargetId: Target.TargetID;
+    /**
+     * DevTools Frame Token for the primary frame tree's root.
+     */
+    mainFrameId: Page.FrameId;
+    /**
+     * Serialization of the origin owning the Shared Storage data.
+     */
+    ownerOrigin: string;
+  }
+
   export interface StorageBucketCreatedOrUpdatedEvent {
     bucketInfo: StorageBucketInfo;
   }
@@ -16077,6 +16172,14 @@ export namespace Storage {
     /**
      * If result is `sent`, populated with net/HTTP status.
      */
+    netError?: integer;
+    netErrorName?: string;
+    httpStatusCode?: integer;
+  }
+
+  export interface AttributionReportingVerboseDebugReportSentEvent {
+    url: string;
+    body?: any[];
     netError?: integer;
     netErrorName?: string;
     httpStatusCode?: integer;
@@ -16782,7 +16885,7 @@ export namespace Tracing {
 
   export interface TraceConfig {
     /**
-     * Controls how the trace buffer stores data.
+     * Controls how the trace buffer stores data. The default is `recordUntilFull`.
      */
     recordMode?: TraceConfigRecordMode;
     /**

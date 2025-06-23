@@ -15,7 +15,6 @@ import * as UI from '../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import {AnimationGroupPreviewUI} from './AnimationGroupPreviewUI.js';
-import {AnimationScreenshotPopover} from './AnimationScreenshotPopover.js';
 import animationTimelineStyles from './animationTimeline.css.js';
 import {AnimationUI} from './AnimationUI.js';
 
@@ -113,7 +112,6 @@ export class AnimationTimeline extends UI.Widget.VBox implements
   #grid: Element;
   #playbackRate: number;
   #allPaused: boolean;
-  #screenshotPopovers: AnimationScreenshotPopover[] = [];
   #animationsContainer: HTMLElement;
   #playbackRateButtons!: HTMLElement[];
   #previewContainer!: HTMLElement;
@@ -169,7 +167,7 @@ export class AnimationTimeline extends UI.Widget.VBox implements
     const emptyBufferHint = this.contentElement.createChild('div', 'animation-timeline-buffer-hint');
     const noAnimationsPlaceholder = new UI.EmptyWidget.EmptyWidget(
         i18nString(UIStrings.waitingForAnimations), i18nString(UIStrings.animationDescription));
-    noAnimationsPlaceholder.appendLink(ANIMATION_EXPLANATION_URL);
+    noAnimationsPlaceholder.link = ANIMATION_EXPLANATION_URL;
     noAnimationsPlaceholder.show(emptyBufferHint);
 
     const timelineHint = this.contentElement.createChild('div', 'animation-timeline-rows-hint');
@@ -631,26 +629,10 @@ export class AnimationTimeline extends UI.Widget.VBox implements
 
   private clearPreviews(): void {
     this.#previewMap.clear();
-    this.#screenshotPopovers.forEach(popover => {
-      popover.detach();
-    });
     this.#previewContainer.removeChildren();
-    this.#screenshotPopovers = [];
   }
 
   private createPreview(group: SDK.AnimationModel.AnimationGroup): void {
-    const screenshotsContainer = document.createElement('div');
-    screenshotsContainer.classList.add('screenshots-container', 'no-screenshots');
-    screenshotsContainer.createChild('span', 'screenshot-arrow');
-    // After the view is shown on hover, position it if it is out of bounds.
-    screenshotsContainer.addEventListener('animationend', () => {
-      const {right, left, width} = screenshotsContainer.getBoundingClientRect();
-      // Render to the left if it is not getting out of bounds when rendered on the left.
-      if (right > window.innerWidth && (left - width) >= 0) {
-        screenshotsContainer.classList.add('to-the-left');
-      }
-    });
-
     const preview = new AnimationGroupPreviewUI({
       animationGroup: group,
       label: i18nString(UIStrings.animationPreviewS, {PH1: this.#groupBuffer.length + 1}),
@@ -659,28 +641,6 @@ export class AnimationTimeline extends UI.Widget.VBox implements
       },
       onSelectAnimationGroup: () => {
         void this.selectAnimationGroup(group);
-      },
-      // Screenshot popover is created only once.
-      // Then, its visibility is controlled via CSS `:hover`.
-      onCreateScreenshotPopover: () => {
-        const screenshots = group.screenshots();
-        if (!screenshots.length) {
-          return;
-        }
-
-        screenshotsContainer.classList.remove('no-screenshots');
-        const createAndShowScreenshotPopover = (): void => {
-          const screenshotPopover = new AnimationScreenshotPopover(screenshots);
-          // This is needed for clearing out the widgets
-          this.#screenshotPopovers.push(screenshotPopover);
-          screenshotPopover.show(screenshotsContainer);
-        };
-
-        if (!screenshots[0].complete) {
-          screenshots[0].onload = createAndShowScreenshotPopover;
-        } else {
-          createAndShowScreenshotPopover();
-        }
       },
       onFocusNextGroup: () => {
         this.focusNextGroup(group);
@@ -694,7 +654,6 @@ export class AnimationTimeline extends UI.Widget.VBox implements
     previewUiContainer.classList.add('preview-ui-container');
     preview.markAsRoot();
     preview.show(previewUiContainer);
-    previewUiContainer.appendChild(screenshotsContainer);
 
     this.#groupBuffer.push(group);
     this.#previewMap.set(group, preview);
@@ -712,6 +671,9 @@ export class AnimationTimeline extends UI.Widget.VBox implements
   }
 
   previewsCreatedForTest(): void {
+  }
+
+  scrubberOnFinishForTest(): void {
   }
 
   private createPreviewForCollectedGroups(): void {
@@ -1060,7 +1022,10 @@ export class AnimationTimeline extends UI.Widget.VBox implements
         [{transform: 'translateX(0px)'}, {transform: 'translateX(' + this.width() + 'px)'}],
         {duration: this.duration(), fill: 'forwards'});
     this.#scrubberPlayer.playbackRate = this.effectivePlaybackRate();
-    this.#scrubberPlayer.onfinish = this.updateControlButton.bind(this);
+    this.#scrubberPlayer.onfinish = () => {
+      this.updateControlButton();
+      this.scrubberOnFinishForTest();
+    };
     this.#scrubberPlayer.currentTime = currentTime;
     this.element.window().requestAnimationFrame(this.updateScrubber.bind(this));
   }

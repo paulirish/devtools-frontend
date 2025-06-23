@@ -41,6 +41,7 @@ import * as Platform from '../../core/platform/platform.js';
 import * as ProtocolClient from '../../core/protocol_client/protocol_client.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
+import type * as AiAssistanceModel from '../../models/ai_assistance/ai_assistance.js';
 import * as AutofillManager from '../../models/autofill_manager/autofill_manager.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as Breakpoints from '../../models/breakpoints/breakpoints.js';
@@ -116,7 +117,7 @@ const UIStrings = {
   /**
    *@description Text describing how to navigate the dock side menu
    */
-  dockSideNaviation: 'Use left and right arrow keys to navigate the options',
+  dockSideNavigation: 'Use left and right arrow keys to navigate the options',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('entrypoints/main/MainImpl.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -288,6 +289,7 @@ export class MainImpl {
     Root.Runtime.experiments.register('sampling-heap-profiler-timeline', 'Sampling heap profiler timeline', true);
     Root.Runtime.experiments.register(
         'show-option-tp-expose-internals-in-heap-snapshot', 'Show option to expose internals in heap snapshots');
+    Root.Runtime.experiments.register('vertical-drawer', 'Enable vertical drawer configuration');
 
     // Timeline
     Root.Runtime.experiments.register(
@@ -547,7 +549,7 @@ export class MainImpl {
 
     const value = Root.Runtime.Runtime.queryParam('loadTimelineFromURL');
     if (value !== null) {
-      // Only import Timeline if neeeded. If this was a static import, every load of devtools
+      // Only import Timeline if needed. If this was a static import, every load of devtools
       // would request and evaluate the Timeline panel dep tree, slowing down the UI's load.
       const Timeline = await import('../../panels/timeline/timeline.js');
       Timeline.TimelinePanel.LoadTimelineHandler.instance().handleQueryParam(value);
@@ -805,14 +807,14 @@ export class MainMenuItem implements UI.Toolbar.Provider {
       dockItemElement.setAttribute(
           'jslog', `${VisualLogging.item('dock-side').track({keydown: 'ArrowDown|ArrowLeft|ArrowRight'})}`);
       dockItemElement.tabIndex = -1;
-      UI.ARIAUtils.setLabel(dockItemElement, UIStrings.dockSide + UIStrings.dockSideNaviation);
-      const [toggleDockSideShorcut] =
+      UI.ARIAUtils.setLabel(dockItemElement, UIStrings.dockSide + UIStrings.dockSideNavigation);
+      const [toggleDockSideShortcut] =
           UI.ShortcutRegistry.ShortcutRegistry.instance().shortcutsForAction('main.toggle-dock');
 
       // clang-format off
       render(html`
         <span class="dockside-title"
-              title=${i18nString(UIStrings.placementOfDevtoolsRelativeToThe, {PH1: toggleDockSideShorcut.title()})}>
+              title=${i18nString(UIStrings.placementOfDevtoolsRelativeToThe, {PH1: toggleDockSideShortcut.title()})}>
           ${i18nString(UIStrings.dockSide)}
         </span>
         <devtools-toolbar @mousedown=${(event: Event) => event.consume()}>
@@ -1019,3 +1021,12 @@ export class ReloadActionDelegate implements UI.ActionRegistration.ActionDelegat
     return false;
   }
 }
+
+// @ts-expect-error
+globalThis.handleExternalRequest =
+    async(prompt: string, conversationType: AiAssistanceModel.ConversationType, selector?: string):
+        Promise<{response: string, devToolsLogs: object[]}> => {
+          const AiAssistance = await import('../../panels/ai_assistance/ai_assistance.js');
+          const panelInstance = await AiAssistance.AiAssistancePanel.instance();
+          return await panelInstance.handleExternalRequest(prompt, conversationType, selector);
+        };

@@ -432,7 +432,6 @@ const EnumeratedHistogram = {
   RecordingReplaySpeed: 'DevTools.RecordingReplaySpeed',
   RecordingReplayStarted: 'DevTools.RecordingReplayStarted',
   RecordingToggled: 'DevTools.RecordingToggled',
-  SidebarPaneShown: 'DevTools.SidebarPaneShown',
   SourcesPanelFileDebugged: 'DevTools.SourcesPanelFileDebugged',
   SourcesPanelFileOpened: 'DevTools.SourcesPanelFileOpened',
   NetworkPanelResponsePreviewOpened: 'DevTools.NetworkPanelResponsePreviewOpened',
@@ -440,7 +439,6 @@ const EnumeratedHistogram = {
   SyncSetting: 'DevTools.SyncSetting',
   SwatchActivated: 'DevTools.SwatchActivated',
   AnimationPlaybackRateChanged: 'DevTools.AnimationPlaybackRateChanged',
-  AnimationPointDragged: 'DevTools.AnimationPointDragged',
   // LINT.ThenChange(/front_end/core/host/InspectorFrontendHostAPI.ts:EnumeratedHistogram)
 };
 
@@ -1104,6 +1102,14 @@ const InspectorFrontendHostImpl = class {
    */
   recordSettingAccess(settingAccessEvent) {
     DevToolsAPI.sendMessageToEmbedder('recordSettingAccess', [settingAccessEvent], null);
+  }
+
+  /**
+   * @override
+   * @param {InspectorFrontendHostAPI.FunctionCallEvent} functionCallEvent
+   */
+  recordFunctionCall(functionCallEvent) {
+    DevToolsAPI.sendMessageToEmbedder('recordFunctionCall', [functionCallEvent], null);
   }
 
   // Backward-compatible methods below this line --------------------------------------------

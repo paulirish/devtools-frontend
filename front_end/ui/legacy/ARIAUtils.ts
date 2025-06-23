@@ -383,13 +383,24 @@ function createAlertElement(container: HTMLElement): HTMLDivElement {
 
 export function getOrCreateAlertElement(container: HTMLElement = document.body, opts?: {force: boolean}): HTMLElement {
   const existingAlertElement = alertElements.get(container);
-  if (existingAlertElement && !opts?.force) {
+  if (existingAlertElement && existingAlertElement.isConnected && !opts?.force) {
     return existingAlertElement;
   }
 
   const newAlertElement = createAlertElement(container);
   alertElements.set(container, newAlertElement);
   return newAlertElement;
+}
+
+/**
+ * Used only in tests to clear any left over alerts between test runs.
+ */
+export function removeAlertElement(container: HTMLElement): void {
+  const alertElement = alertElements.get(container);
+  if (alertElement) {
+    alertElement.remove();
+    alertElements.delete(container);
+  }
 }
 
 /**

@@ -2,12 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import * as Platform from '../../../core/platform/platform.js';
 import type * as Protocol from '../../../generated/protocol.js';
 import {describeWithEnvironment} from '../../../testing/EnvironmentHelpers.js';
 import {getFirstOrError, getInsightOrError, processTrace} from '../../../testing/InsightHelpers.js';
+import {TraceLoader} from '../../../testing/TraceLoader.js';
 import * as Trace from '../trace.js';
 
+import type {PreconnectedOrigin} from './NetworkDependencyTree.js';
 import type {InsightSetContextWithNavigation, RelatedEventsMap} from './types.js';
+
+const {urlString} = Platform.DevToolsPath;
 
 describeWithEnvironment('NetworkDependencyTree', function() {
   let insight: Trace.Insights.Types.InsightModels['NetworkDependencyTree'];
@@ -19,11 +24,11 @@ describeWithEnvironment('NetworkDependencyTree', function() {
   });
 
   it('calculates network dependency tree', () => {
-    // The network dependency tree in this trace is
+    // The network dependency tree in this trace is, |app.js| took longer than |app.css|, so |app.js| will be first.
     // | .../index.html (ts:566777570990, dur:5005590)
     // |
-    // | | .../app.css (ts:566782573909, dur:7205)
     // | | .../app.js (ts:566782574106, dur:11790)
+    // | | .../app.css (ts:566782573909, dur:7205)
     assert.lengthOf(insight.rootNodes, 1);
 
     const root = insight.rootNodes[0];
@@ -32,12 +37,12 @@ describeWithEnvironment('NetworkDependencyTree', function() {
     assert.lengthOf(root.children, 2);
 
     const [child0, child1] = insight.rootNodes[0].children;
-    assert.strictEqual(child0.request.args.data.url, 'http://localhost:8787/lcp-iframes/app.css');
+    assert.strictEqual(child0.request.args.data.url, 'http://localhost:8787/lcp-iframes/app.js');
     assert.strictEqual(
         child0.timeFromInitialRequest,
         Trace.Types.Timing.Micro(child0.request.ts + child0.request.dur - root.request.ts));
     assert.lengthOf(child0.children, 0);
-    assert.strictEqual(child1.request.args.data.url, 'http://localhost:8787/lcp-iframes/app.js');
+    assert.strictEqual(child1.request.args.data.url, 'http://localhost:8787/lcp-iframes/app.css');
     assert.strictEqual(
         child1.timeFromInitialRequest,
         Trace.Types.Timing.Micro(child1.request.ts + child1.request.dur - root.request.ts));
@@ -45,22 +50,22 @@ describeWithEnvironment('NetworkDependencyTree', function() {
   });
 
   it('Calculate the max critical path latency', () => {
-    // The chain |index.html(root) -> app.js(child1)| is the longest
+    // The chain |index.html(root) -> app.js(child0)| is the longest
     const root = insight.rootNodes[0];
-    const child1 = root.children[1];
+    const child0 = root.children[0];
     assert.strictEqual(
-        insight.maxTime, Trace.Types.Timing.Micro(child1.request.ts + child1.request.dur - root.request.ts));
+        insight.maxTime, Trace.Types.Timing.Micro(child0.request.ts + child0.request.dur - root.request.ts));
   });
 
   it('Marks the longest network dependency chain', () => {
     const root = insight.rootNodes[0];
     const [child0, child1] = root.children;
 
-    // The chain |index.html(root) -> app.js(child1)| is the longest
+    // The chain |index.html(root) -> app.js(child0)| is the longest
     assert.isTrue(root.isLongest);
-    assert.isTrue(child1.isLongest);
+    assert.isTrue(child0.isLongest);
     // The |app.css| is not in the longest chain
-    assert.isNotTrue(child0.isLongest);
+    assert.isNotTrue(child1.isLongest);
   });
 
   it('Store the all parents and children events for all requests', () => {
@@ -69,14 +74,14 @@ describeWithEnvironment('NetworkDependencyTree', function() {
 
     // There are three chains from Lantern:
     //   |index.html(root)|
-    //   |index.html(root) -> app.css(child0)|
-    //   |index.html(root) -> app.js(child1)|
+    //   |index.html(root) -> app.js(child0)|
+    //   |index.html(root) -> app.css(child1)|
     // Both child0 and child1 are related to the root
-    assert.deepEqual([...root.relatedRequests], [root.request, child0.request, child1.request]);
+    assert.sameDeepMembers([...root.relatedRequests], [root.request, child0.request, child1.request]);
     // Only root and child0 are related to the child0
-    assert.deepEqual([...child0.relatedRequests], [root.request, child0.request]);
+    assert.sameDeepMembers([...child0.relatedRequests], [root.request, child0.request]);
     // Only root and child1 are related to the child1
-    assert.deepEqual([...child1.relatedRequests], [root.request, child1.request]);
+    assert.sameDeepMembers([...child1.relatedRequests], [root.request, child1.request]);
   });
 
   it('Fail the audit when there at least one chain with at least two requests', () => {
@@ -92,8 +97,8 @@ describeWithEnvironment('NetworkDependencyTree', function() {
     assert.isFalse(insight.fail);
   });
 
-  // TODO(crbug.com/403507404) Times out
-  it.skip('[crbug.com/403507404] Calculates the relatedEvents map (event to warning map)', async () => {
+  it('Calculates the relatedEvents map (event to warning map)', async function() {
+    TraceLoader.setTestTimeout(this);
     // Need to load a file with longer dependency chain for this test.
     // Only those requests whose depth >= 2 will be added to the related events.
     const {data, insights} = await processTrace(this, 'web-dev-screenshot-source-ids.json.gz');
@@ -105,7 +110,7 @@ describeWithEnvironment('NetworkDependencyTree', function() {
     const relatedEvents = insight.relatedEvents as RelatedEventsMap;
 
     // There are a few chains, let test the first chain
-    // |web.dev -> /css -> 4UasrENHsx...UvQ.woff2|
+    // |web.dev -> /css -> KFO7CnqEu9…UBA.woff2|
     const root = insight.rootNodes[0];
     const child0 = root.children[0];
     const child00 = child0.children[0];
@@ -121,68 +126,256 @@ describeWithEnvironment('NetworkDependencyTree', function() {
 });
 
 describe('generatePreconnectedOrigins', () => {
-  const mockParsedTrace = {
-    NetworkRequests: {
-      linkPreconnectEvents: [] as Trace.Types.Events.LinkPreconnect[],
-    },
-  } as Trace.Handlers.Types.ParsedTrace;
+  describe('generatePreconnectedOriginsFromDom', () => {
+    const mockParsedTrace = {
+      NetworkRequests: {
+        linkPreconnectEvents: [] as Trace.Types.Events.LinkPreconnect[],
+        byTime: [] as Trace.Types.Events.SyntheticNetworkRequest[],
+      },
+    } as Trace.Handlers.Types.ParsedTrace;
 
-  beforeEach(() => {
-    mockParsedTrace.NetworkRequests.linkPreconnectEvents.length = 0;
+    const mockContext = {} as InsightSetContextWithNavigation;
+
+    beforeEach(() => {
+      mockParsedTrace.NetworkRequests.linkPreconnectEvents.length = 0;
+    });
+
+    it('should mark preconnect origins as not unused when they match context requests', () => {
+      mockParsedTrace.NetworkRequests.linkPreconnectEvents.push({
+        args: {
+          data: {
+            url: 'https://example.com',
+            node_id: 1,
+            frame: 'frame-id',
+          },
+        },
+      } as Trace.Types.Events.LinkPreconnect);
+      const mockContextRequests: Trace.Types.Events.SyntheticNetworkRequest[] = [{
+        args: {
+          data: {
+            url: 'https://example.com/script.js',
+          },
+        },
+      } as Trace.Types.Events.SyntheticNetworkRequest];
+      const preconnectOrigins = Trace.Insights.Models.NetworkDependencyTree.generatePreconnectedOrigins(
+          mockParsedTrace, mockContext, mockContextRequests, /* preconnectCandidates */[]);
+      assert.deepEqual(preconnectOrigins, [{
+                         node_id: 1 as Protocol.DOM.BackendNodeId,
+                         frame: 'frame-id',
+                         url: 'https://example.com',
+                         unused: false,
+                         crossorigin: false,
+                         source: 'DOM'
+                       }]);
+    });
+
+    it('should mark preconnect origins as unused when they do not match context requests', () => {
+      mockParsedTrace.NetworkRequests.linkPreconnectEvents.push({
+        args: {
+          data: {
+            url: 'https://example.com',
+            node_id: 1,
+            frame: 'frame-id',
+          },
+        },
+      } as Trace.Types.Events.LinkPreconnect);
+      const mockContextRequests: Trace.Types.Events.SyntheticNetworkRequest[] = [{
+        args: {
+          data: {
+            url: 'https://other.com/image.png',
+          },
+        },
+      } as Trace.Types.Events.SyntheticNetworkRequest];
+      const preconnectOrigins = Trace.Insights.Models.NetworkDependencyTree.generatePreconnectedOrigins(
+          mockParsedTrace, mockContext, mockContextRequests, /* preconnectCandidates */[]);
+      assert.deepEqual(preconnectOrigins, [{
+                         node_id: 1 as Protocol.DOM.BackendNodeId,
+                         frame: 'frame-id',
+                         url: 'https://example.com',
+                         unused: true,
+                         crossorigin: false,
+                         source: 'DOM'
+                       }]);
+    });
+
+    it('sets crossorigin to true when a matching preconnect candidate exists', () => {
+      mockParsedTrace.NetworkRequests.linkPreconnectEvents.push({
+        args: {
+          data: {
+            url: 'https://example.com',
+            node_id: 1,
+            frame: 'frame-id',
+          },
+        },
+      } as Trace.Types.Events.LinkPreconnect);
+      const mockPreconnectCandidates: Trace.Insights.Models.NetworkDependencyTree.PreconnectCandidate[] =
+          [{origin: urlString`https://example.com`, wastedMs: 100 as Trace.Types.Timing.Milli}];
+      const preconnectOrigins = Trace.Insights.Models.NetworkDependencyTree.generatePreconnectedOrigins(
+          mockParsedTrace, mockContext, /* mockContextRequests */[],
+          /* preconnectCandidates */ mockPreconnectCandidates);
+      assert.deepEqual(preconnectOrigins, [{
+                         node_id: 1 as Protocol.DOM.BackendNodeId,
+                         frame: 'frame-id',
+                         url: 'https://example.com',
+                         unused: true,
+                         crossorigin: true,
+                         source: 'DOM'
+                       }]);
+    });
+
+    it('sets crossorigin to false when no matching preconnect candidate exists', () => {
+      mockParsedTrace.NetworkRequests.linkPreconnectEvents.push({
+        args: {
+          data: {
+            url: 'https://example.com',
+            node_id: 1,
+            frame: 'frame-id',
+          },
+        },
+      } as Trace.Types.Events.LinkPreconnect);
+      const mockPreconnectCandidates: Trace.Insights.Models.NetworkDependencyTree.PreconnectCandidate[] =
+          [{origin: urlString`https://other.com`, wastedMs: 100 as Trace.Types.Timing.Milli}];
+      const preconnectOrigins = Trace.Insights.Models.NetworkDependencyTree.generatePreconnectedOrigins(
+          mockParsedTrace, mockContext, /* mockContextRequests */[],
+          /* preconnectCandidates */ mockPreconnectCandidates);
+      assert.deepEqual(preconnectOrigins, [{
+                         node_id: 1 as Protocol.DOM.BackendNodeId,
+                         frame: 'frame-id',
+                         url: 'https://example.com',
+                         unused: true,
+                         crossorigin: false,
+                         source: 'DOM'
+                       }]);
+    });
   });
 
-  it('should mark preconnect origins as not unused when they match context requests', () => {
-    const mockLinkPreconnectEvents = [{
-                                       args: {
-                                         data: {
-                                           url: 'https://example.com',
-                                           node_id: 1,
-                                           frame: 'frame-id',
-                                         },
-                                       },
-                                     }] as Trace.Types.Events.LinkPreconnect[];
-    const mockContextRequests: Trace.Types.Events.SyntheticNetworkRequest[] = [{
-      args: {
-        data: {
-          url: 'https://example.com/script.js',
+  describeWithEnvironment('PreconnectedOriginFromResponseHeader', function() {
+    let insight: Trace.Insights.Types.InsightModels['NetworkDependencyTree'];
+    let documentRequest: Trace.Types.Events.SyntheticNetworkRequest|undefined;
+
+    before(async function() {
+      const {data, insights} = await processTrace(this, 'preconnect-advice.json.gz');
+      const firstNav = getFirstOrError(data.Meta.navigationsByNavigationId.values());
+      insight = getInsightOrError('NetworkDependencyTree', insights, firstNav);
+      documentRequest =
+          data.NetworkRequests.byTime.find(req => req.args.data.requestId === firstNav.args.data?.navigationId);
+    });
+
+    it('correctly generate the preconnected origins', () => {
+      // There are 4 preconnected origins, 3 from DOM, and 1 from response header.
+      assert.lengthOf(insight.preconnectedOrigins, 4);
+
+      // A sanity check to avoid TS error.
+      assert.isDefined(documentRequest);
+      const expected: PreconnectedOrigin[] = [
+        {
+          node_id: 57 as Protocol.DOM.BackendNodeId,
+          frame: '3773BAB92FB5A26C6B03EAD6CF821791',
+          url: 'https://www.youtube.com/',
+          unused: true,
+          crossorigin: false,
+          source: 'DOM',
         },
-      },
-    } as Trace.Types.Events.SyntheticNetworkRequest];
-    const preconnectOrigins = Trace.Insights.Models.NetworkDependencyTree.generatePreconnectedOrigins(
-        mockLinkPreconnectEvents, mockContextRequests);
-    assert.deepEqual(preconnectOrigins, [{
-                       node_id: 1 as Protocol.DOM.BackendNodeId,
-                       frame: 'frame-id',
-                       url: 'https://example.com',
-                       unused: false,
-                     }]);
+        {
+          node_id: 58 as Protocol.DOM.BackendNodeId,
+          frame: '3773BAB92FB5A26C6B03EAD6CF821791',
+          url: 'https://www.google.com/',
+          unused: true,
+          crossorigin: false,
+          source: 'DOM',
+        },
+        {
+          node_id: 59 as Protocol.DOM.BackendNodeId,
+          frame: '3773BAB92FB5A26C6B03EAD6CF821791',
+          url: 'http://example.com/',
+          unused: true,
+          crossorigin: false,
+          source: 'DOM',
+        },
+        {
+          url: 'https://example.com/',
+          headerText: '<https://example.com/>; rel=preconnect',
+          request: documentRequest,
+          unused: true,
+          crossorigin: false,
+          source: 'ResponseHeader',
+        },
+      ];
+
+      assert.deepEqual(insight.preconnectedOrigins, expected);
+    });
   });
 
-  it('should mark preconnect origins as unused when they do not match context requests', () => {
-    const mockLinkPreconnectEvents = [{
-                                       args: {
-                                         data: {
-                                           url: 'https://example.com',
-                                           node_id: 1,
-                                           frame: 'frame-id',
-                                         },
-                                       },
-                                     }] as Trace.Types.Events.LinkPreconnect[];
-    const mockContextRequests: Trace.Types.Events.SyntheticNetworkRequest[] = [{
-      args: {
-        data: {
-          url: 'https://other.com/image.png',
-        },
-      },
-    } as Trace.Types.Events.SyntheticNetworkRequest];
-    const preconnectOrigins = Trace.Insights.Models.NetworkDependencyTree.generatePreconnectedOrigins(
-        mockLinkPreconnectEvents, mockContextRequests);
-    assert.deepEqual(preconnectOrigins, [{
-                       node_id: 1 as Protocol.DOM.BackendNodeId,
-                       frame: 'frame-id',
-                       url: 'https://example.com',
-                       unused: true,
-                     }]);
+  describe('handleLinkResponseHeader', () => {
+    it('should return an empty array for null or empty input', () => {
+      assert.deepEqual(Trace.Insights.Models.NetworkDependencyTree.handleLinkResponseHeader(''), []);
+      assert.deepEqual(
+          Trace.Insights.Models.NetworkDependencyTree.handleLinkResponseHeader(null as unknown as string), []);
+    });
+
+    it('should parse a valid preconnect link with quotes', () => {
+      const linkHeader = '<https://example.com>; rel="preconnect"';
+      const result = Trace.Insights.Models.NetworkDependencyTree.handleLinkResponseHeader(linkHeader);
+      assert.deepEqual(result, [{url: 'https://example.com', headerText: '<https://example.com>; rel="preconnect"'}]);
+    });
+
+    it('should parse a valid preconnect link without quotes', () => {
+      const linkHeader = '<https://example.com>; rel=preconnect';
+      const result = Trace.Insights.Models.NetworkDependencyTree.handleLinkResponseHeader(linkHeader);
+      assert.deepEqual(result, [{url: 'https://example.com', headerText: '<https://example.com>; rel=preconnect'}]);
+    });
+
+    it('should parse multiple preconnect links', () => {
+      const linkHeader = '<https://example.com>; rel="preconnect", <https://other.com>; rel=preconnect';
+      const result = Trace.Insights.Models.NetworkDependencyTree.handleLinkResponseHeader(linkHeader);
+      assert.deepEqual(result, [
+        {url: 'https://example.com', headerText: '<https://example.com>; rel="preconnect"'},
+        {url: 'https://other.com', headerText: '<https://other.com>; rel=preconnect'},
+      ]);
+    });
+
+    it('should parse a preconnect link with other parameters', () => {
+      const linkHeader = '<https://example.com>; rel="preconnect"; crossorigin';
+      const result = Trace.Insights.Models.NetworkDependencyTree.handleLinkResponseHeader(linkHeader);
+      assert.deepEqual(
+          result, [{url: 'https://example.com', headerText: '<https://example.com>; rel="preconnect"; crossorigin'}]);
+    });
+
+    it('should parse a preconnect link with comma in urls', () => {
+      const linkHeader =
+          '<https://imaginary.url.notreal/segment;foo=bar;baz/item?name=What,+me+worry>; rel="preconnect"';
+      const result = Trace.Insights.Models.NetworkDependencyTree.handleLinkResponseHeader(linkHeader);
+      assert.deepEqual(
+          result, [{
+            url: 'https://imaginary.url.notreal/segment;foo=bar;baz/item?name=What,+me+worry',
+            headerText: '<https://imaginary.url.notreal/segment;foo=bar;baz/item?name=What,+me+worry>; rel="preconnect"'
+          }]);
+    });
+
+    it('should ignore links with other rel values', () => {
+      const linkHeader = '<https://example.com>; rel="preload"';
+      const result = Trace.Insights.Models.NetworkDependencyTree.handleLinkResponseHeader(linkHeader);
+      assert.deepEqual(result, []);
+    });
+
+    it('should ignore invalid links (missing <>)', () => {
+      const linkHeader = 'https://example.com; rel="preconnect"';
+      const result = Trace.Insights.Models.NetworkDependencyTree.handleLinkResponseHeader(linkHeader);
+      assert.deepEqual(result, []);
+    });
+
+    it('should ignore invalid links (missing rel)', () => {
+      const linkHeader = '<https://example.com>; crossorigin';
+      const result = Trace.Insights.Models.NetworkDependencyTree.handleLinkResponseHeader(linkHeader);
+      assert.deepEqual(result, []);
+    });
+
+    it('should handle mixed valid and invalid links', () => {
+      const linkHeader =
+          '<https://example.com>; rel="preconnect", https://other.com; rel=preconnect, <https://another.com>; rel="preload"';
+      const result = Trace.Insights.Models.NetworkDependencyTree.handleLinkResponseHeader(linkHeader);
+      assert.deepEqual(result, [{url: 'https://example.com', headerText: '<https://example.com>; rel="preconnect"'}]);
+    });
   });
 });
 
@@ -191,6 +384,7 @@ describeWithEnvironment('generatePreconnectCandidates', () => {
     NetworkRequests: {
       eventToInitiator: new Map<Trace.Types.Events.SyntheticNetworkRequest, Trace.Types.Events.Event>(),
       byTime: [] as Trace.Types.Events.SyntheticNetworkRequest[],
+      linkPreconnectEvents: [] as Trace.Types.Events.LinkPreconnect[],
     },
   } as Trace.Handlers.Types.ParsedTrace;
 
@@ -251,6 +445,7 @@ describeWithEnvironment('generatePreconnectCandidates', () => {
   beforeEach(() => {
     mockParsedTrace.NetworkRequests.eventToInitiator.clear();
     mockParsedTrace.NetworkRequests.byTime.length = 0;
+    mockParsedTrace.NetworkRequests.linkPreconnectEvents.length = 0;
     mockParsedTrace.NetworkRequests.byTime.push(mainRequest);
   });
 
