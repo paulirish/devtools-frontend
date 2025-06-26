@@ -103,7 +103,7 @@ export enum AnimationFailureReasons {
   SVG_TARGET_HAS_INDEPENDENT_TRANSFORM_PROPERTY = 'SVG_TARGET_HAS_INDEPENDENT_TRANSFORM_PROPERTY',
 }
 
-export const enum LayoutShiftType {
+export enum LayoutShiftType {
   WEB_FONT = 0,
   IFRAMES = 1,
   ANIMATIONS = 2,
