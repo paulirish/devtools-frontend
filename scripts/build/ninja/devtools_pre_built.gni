@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("./node.gni")
-import("./vars.gni")
 
 template("devtools_pre_built") {
   node_action(target_name) {
@@ -40,7 +39,7 @@ template("devtools_pre_built") {
 
     data = _javascript_implementation_files + _javascript_map_files
 
-    if (invoker.sources_are_release || !devtools_bundle) {
+    if (invoker.sources_are_release || is_debug) {
       metadata = {
         grd_files = _javascript_implementation_files
       }

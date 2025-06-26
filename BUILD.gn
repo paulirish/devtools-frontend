@@ -90,7 +90,7 @@ action("assert_third_party_readmes") {
 
 _expected_grd_files = []
 _expected_grd_files += grd_files_release_sources
-if (!devtools_bundle) {
+if (is_debug) {
   _expected_grd_files += grd_files_debug_sources
 }
 
