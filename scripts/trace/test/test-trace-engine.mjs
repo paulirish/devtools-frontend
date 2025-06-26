@@ -69,8 +69,8 @@ test('insights look ok', t => {
   }
   const keys = Object.keys(insightSet.model);
   assert.deepStrictEqual(keys, [
-    'InteractionToNextPaint',
-    'LCPPhases',
+    'INPBreakdown',
+    'LCPBreakdown',
     'LCPDiscovery',
     'CLSCulprits',
     'RenderBlocking',
