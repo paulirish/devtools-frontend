@@ -354,8 +354,8 @@ export class TraceProcessor extends EventTarget {
     // The initial order of the insights is alphabetical, based on `front_end/models/trace/insights/Models.ts`.
     // The order here provides a baseline that groups insights in a more logical way.
     const baselineOrder: Record<keyof Insights.Types.InsightModels, null> = {
-      InteractionToNextPaint: null,
-      LCPPhases: null,
+      INPBreakdown: null,
+      LCPBreakdown: null,
       LCPDiscovery: null,
       CLSCulprits: null,
       RenderBlocking: null,
@@ -492,8 +492,8 @@ export class TraceProcessor extends EventTarget {
     const everyInsightPasses =
         Object.values(model).filter(model => !(model instanceof Error)).every(model => model.state === 'pass');
 
-    const noLcp = !model.LCPPhases.lcpEvent;
-    const noInp = !model.InteractionToNextPaint.longestInteractionEvent;
+    const noLcp = !model.LCPBreakdown.lcpEvent;
+    const noInp = !model.INPBreakdown.longestInteractionEvent;
     const noLayoutShifts = model.CLSCulprits.shifts?.size === 0;
     const shouldExclude = isNavigation && context.bounds.range < trivialThreshold && everyInsightPasses && noLcp &&
         noInp && noLayoutShifts;
