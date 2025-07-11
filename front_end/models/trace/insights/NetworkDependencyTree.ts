@@ -428,13 +428,23 @@ export function handleLinkResponseHeader(linkHeaderValue: string): Array<{url: s
   }
   const preconnectedOrigins: Array<{url: string, headerText: string}> = [];
 
-  // const headerTextParts = linkHeaderValue.split(',');
-
   for (let i = 0; i < linkHeaderValue.length;) {
     const firstUrlEnd = linkHeaderValue.indexOf('>', i);
+    if (firstUrlEnd === -1) {
+      break;
+    }
+
     const commaIndex = linkHeaderValue.indexOf(',', firstUrlEnd);
     const partEnd = commaIndex !== -1 ? commaIndex : linkHeaderValue.length;
     const part = linkHeaderValue.substring(i, partEnd);
+
+    // This shouldn't be necessary, but we had a bug that created an infinite loop so
+    // let's guard against that.
+    // See crbug.com/431239629
+    if (partEnd + 1 <= i) {
+      console.warn('unexpected infinite loop, bailing');
+      break;
+    }
 
     i = partEnd + 1;
 
@@ -689,6 +699,24 @@ export function generateInsight(
     preconnectedOrigins,
     preconnectCandidates,
   });
+}
+
+export function createOverlays(model: NetworkDependencyTreeInsightModel): Types.Overlays.Overlay[] {
+  function walk(nodes: CriticalRequestNode[], overlays: Types.Overlays.Overlay[]): void {
+    nodes.forEach(node => {
+      overlays.push({
+        type: 'ENTRY_OUTLINE',
+        entry: node.request,
+        outlineReason: 'ERROR',
+      });
+      walk(node.children, overlays);
+    });
+  }
+
+  const overlays: Types.Overlays.Overlay[] = [];
+  walk(model.rootNodes, overlays);
+
+  return overlays;
 }
 
 // the rest of this file is copied from core/common/common.js, which can't be bundled right now.

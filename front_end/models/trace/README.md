@@ -25,8 +25,8 @@ See the included `analyze-trace.mjs` a runnable invocation.
 
 You'll probably use something like…
 
-    @type {import('@paulirish/trace_engine').Types.TraceEvents.TraceEventData[]
-    @type {import('@paulirish/trace_engine').Handlers.Types.TraceParseData
+    @type {import('@paulirish/trace_engine').Types.TraceEvents.TraceEventData[]}
+    @type {import('@paulirish/trace_engine').Handlers.Types.TraceParseData}
 
 ## Maintainer cheatsheet
 

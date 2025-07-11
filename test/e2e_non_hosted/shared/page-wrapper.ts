@@ -26,7 +26,13 @@ export class PageWrapper {
     this.locator = page.locator.bind(page);
   }
 
-  async waitForFunction<T>(fn: () => Promise<T|undefined>, asyncScope = new AsyncScope(), description?: string) {
+  /**
+   * `waitForFunction` runs in the test context and not in the page
+   * context. If you want to evaluate code on the page, use
+   * {@link PageWrapper.evaluate} within the `waitForFunction` callback.
+   */
+  async waitForFunction<T>(
+      fn: () => T | undefined | Promise<T|undefined>, asyncScope = new AsyncScope(), description?: string) {
     const innerFunction = async () => {
       while (true) {
         AsyncScope.abortSignal?.throwIfAborted();

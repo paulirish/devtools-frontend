@@ -82,6 +82,7 @@ for p in Path('$dist').rglob('*.d.ts'):
         'CrUXManager.PageResult',
         'CrUXManager.PageScope',
         'CrUXManager.Scope',
+        'Lit.LitTemplate',
         'Marked.Marked.Token',
         'SDK.ConsoleModel.ConsoleMessage',
         'SDK.IssuesModel.IssuesModel',
@@ -100,6 +101,7 @@ for p in Path('$dist').rglob('*.d.ts'):
     comment_out = [
         'import type * as Common',
         'import type * as CrUXManager',
+        'import type * as Lit',
         'import type * as SDK',
     ]
     for needle in comment_out:

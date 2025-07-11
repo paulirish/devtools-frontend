@@ -1336,20 +1336,21 @@ export namespace Audits {
     partitioningBlobURLInfo: PartitioningBlobURLInfo;
   }
 
-  export const enum SelectElementAccessibilityIssueReason {
+  export const enum ElementAccessibilityIssueReason {
     DisallowedSelectChild = 'DisallowedSelectChild',
     DisallowedOptGroupChild = 'DisallowedOptGroupChild',
     NonPhrasingContentOptionChild = 'NonPhrasingContentOptionChild',
     InteractiveContentOptionChild = 'InteractiveContentOptionChild',
     InteractiveContentLegendChild = 'InteractiveContentLegendChild',
+    InteractiveContentSummaryDescendant = 'InteractiveContentSummaryDescendant',
   }
 
   /**
-   * This issue warns about errors in the select element content model.
+   * This issue warns about errors in the select or summary element content model.
    */
-  export interface SelectElementAccessibilityIssueDetails {
+  export interface ElementAccessibilityIssueDetails {
     nodeId: DOM.BackendNodeId;
-    selectElementAccessibilityIssueReason: SelectElementAccessibilityIssueReason;
+    elementAccessibilityIssueReason: ElementAccessibilityIssueReason;
     hasDisallowedAttributes: boolean;
   }
 
@@ -1447,7 +1448,7 @@ export namespace Audits {
     FederatedAuthUserInfoRequestIssue = 'FederatedAuthUserInfoRequestIssue',
     PropertyRuleIssue = 'PropertyRuleIssue',
     SharedDictionaryIssue = 'SharedDictionaryIssue',
-    SelectElementAccessibilityIssue = 'SelectElementAccessibilityIssue',
+    ElementAccessibilityIssue = 'ElementAccessibilityIssue',
     SRIMessageSignatureIssue = 'SRIMessageSignatureIssue',
     UserReidentificationIssue = 'UserReidentificationIssue',
   }
@@ -1480,7 +1481,7 @@ export namespace Audits {
     propertyRuleIssueDetails?: PropertyRuleIssueDetails;
     federatedAuthUserInfoRequestIssueDetails?: FederatedAuthUserInfoRequestIssueDetails;
     sharedDictionaryIssueDetails?: SharedDictionaryIssueDetails;
-    selectElementAccessibilityIssueDetails?: SelectElementAccessibilityIssueDetails;
+    elementAccessibilityIssueDetails?: ElementAccessibilityIssueDetails;
     sriMessageSignatureIssueDetails?: SRIMessageSignatureIssueDetails;
     userReidentificationIssueDetails?: UserReidentificationIssueDetails;
   }
@@ -2268,6 +2269,23 @@ export namespace Browser {
      * with 'left', 'top', 'width' or 'height'. Leaves unspecified fields unchanged.
      */
     bounds: Bounds;
+  }
+
+  export interface SetContentsSizeRequest {
+    /**
+     * Browser window id.
+     */
+    windowId: WindowID;
+    /**
+     * The window contents width in DIP. Assumes current width if omitted.
+     * Must be specified if 'height' is omitted.
+     */
+    width?: integer;
+    /**
+     * The window contents height in DIP. Assumes current height if omitted.
+     * Must be specified if 'width' is omitted.
+     */
+    height?: integer;
   }
 
   export interface SetDockTileRequest {
@@ -4778,6 +4796,10 @@ export namespace DOM {
      * JavaScript object id of the node wrapper.
      */
     objectId?: Runtime.RemoteObjectId;
+    /**
+     * Include all shadow roots. Equals to false if not specified.
+     */
+    includeShadowDOM?: boolean;
   }
 
   export interface GetOuterHTMLResponse extends ProtocolResponseWithError {
@@ -6822,6 +6844,13 @@ export namespace Emulation {
      * Image types to disable.
      */
     imageTypes: DisabledImageType[];
+  }
+
+  export interface SetDataSaverOverrideRequest {
+    /**
+     * Override value. Omitting the parameter disables the override.
+     */
+    dataSaverEnabled?: boolean;
   }
 
   export interface SetHardwareConcurrencyOverrideRequest {
@@ -9873,7 +9902,7 @@ export namespace Network {
   }
 
   export const enum IPAddressSpace {
-    Local = 'Local',
+    Loopback = 'Loopback',
     Private = 'Private',
     Public = 'Public',
     Unknown = 'Unknown',
@@ -11788,7 +11817,6 @@ export namespace Overlay {
     SearchForNode = 'searchForNode',
     SearchForUAShadowDOM = 'searchForUAShadowDOM',
     CaptureAreaScreenshot = 'captureAreaScreenshot',
-    ShowDistances = 'showDistances',
     None = 'none',
   }
 
@@ -12211,6 +12239,7 @@ export namespace Page {
     Accelerometer = 'accelerometer',
     AllScreensCapture = 'all-screens-capture',
     AmbientLightSensor = 'ambient-light-sensor',
+    AriaNotify = 'aria-notify',
     AttributionReporting = 'attribution-reporting',
     Autoplay = 'autoplay',
     Bluetooth = 'bluetooth',
@@ -13021,16 +13050,6 @@ export namespace Page {
   }
 
   /**
-   * Enum of possible auto-response for permission / prompt dialogs.
-   */
-  export const enum AutoResponseMode {
-    None = 'none',
-    AutoAccept = 'autoAccept',
-    AutoReject = 'autoReject',
-    AutoOptOut = 'autoOptOut',
-  }
-
-  /**
    * The type of a frameNavigated event.
    */
   export const enum NavigationType {
@@ -13122,6 +13141,7 @@ export namespace Page {
     BroadcastChannel = 'BroadcastChannel',
     WebXR = 'WebXR',
     SharedWorker = 'SharedWorker',
+    SharedWorkerMessage = 'SharedWorkerMessage',
     WebLocks = 'WebLocks',
     WebHID = 'WebHID',
     WebShare = 'WebShare',
@@ -13972,12 +13992,26 @@ export namespace Page {
     data: binary;
   }
 
+  export const enum SetSPCTransactionModeRequestMode {
+    None = 'none',
+    AutoAccept = 'autoAccept',
+    AutoChooseToAuthAnotherWay = 'autoChooseToAuthAnotherWay',
+    AutoReject = 'autoReject',
+    AutoOptOut = 'autoOptOut',
+  }
+
   export interface SetSPCTransactionModeRequest {
-    mode: AutoResponseMode;
+    mode: SetSPCTransactionModeRequestMode;
+  }
+
+  export const enum SetRPHRegistrationModeRequestMode {
+    None = 'none',
+    AutoAccept = 'autoAccept',
+    AutoReject = 'autoReject',
   }
 
   export interface SetRPHRegistrationModeRequest {
-    mode: AutoResponseMode;
+    mode: SetRPHRegistrationModeRequestMode;
   }
 
   export interface GenerateTestReportRequest {
@@ -14994,10 +15028,6 @@ export namespace ServiceWorker {
     origin: string;
     registrationId: RegistrationID;
     tag: string;
-  }
-
-  export interface InspectWorkerRequest {
-    versionId: string;
   }
 
   export interface SetForceUpdateOnPageLoadRequest {

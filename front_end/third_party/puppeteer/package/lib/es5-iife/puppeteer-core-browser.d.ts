@@ -388,6 +388,7 @@ export declare abstract class Browser extends EventEmitter<BrowserEvents> {
      * @experimental
      */
     abstract get debugInfo(): DebugInfo;
+
 }
 
 /**
@@ -1011,6 +1012,15 @@ export declare interface ConnectOptions {
      * @defaultValue `false`
      */
     acceptInsecureCerts?: boolean;
+    /**
+     * Experimental setting to disable monitoring network events by default. When
+     * set to `false`, parts of Puppeteer that depend on network events would not
+     * work such as HTTPRequest and HTTPResponse.
+     *
+     * @experimental
+     * @defaultValue `true`
+     */
+    networkEnabled?: boolean;
     /**
      * Sets the viewport for each page.
      *
@@ -5516,6 +5526,9 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
     waitForResponse(urlOrPredicate: string | AwaitablePredicate<HTTPResponse>, options?: WaitTimeoutOptions): Promise<HTTPResponse>;
     /**
      * Waits for the network to be idle.
+     *
+     * @remarks The function will always wait at least the
+     * set {@link WaitForNetworkIdleOptions.idleTime | IdleTime}.
      *
      * @param options - Options to configure waiting behavior.
      * @returns A promise which resolves once the network is idle.

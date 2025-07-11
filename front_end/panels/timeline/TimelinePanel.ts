@@ -777,10 +777,6 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
     return this.flameChart;
   }
 
-  getMinimap(): TimelineMiniMap {
-    return this.#minimapComponent;
-  }
-
   /**
    * Determine if two view modes are equivalent. Useful because if {@see
    * #changeView} gets called and the new mode is identical to the current,
@@ -871,6 +867,7 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
       case 'LANDING_PAGE': {
         this.#removeStatusPane();
         this.#showLandingPage();
+        this.updateMiniMap();
         this.dispatchEventToListeners(Events.IS_VIEWING_TRACE, false);
 
         // Whilst we don't reset this, we hide it, mainly so the user cannot
@@ -984,14 +981,6 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
   private setState(state: State): void {
     this.state = state;
     this.updateTimelineControls();
-  }
-
-  /**
-   * This indicates that `this.#setModelForActiveTrace` has been called,
-   * and so the main flame chart should have been populated.
-   */
-  hasFinishedLoadingTraceForTest(): boolean {
-    return this.#viewMode.mode === 'VIEWING_TRACE';
   }
 
   private createSettingCheckbox(setting: Common.Settings.Setting<boolean>, tooltip: Platform.UIString.LocalizedString):
@@ -1579,6 +1568,7 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
 
   private updateMiniMap(): void {
     if (this.#viewMode.mode !== 'VIEWING_TRACE') {
+      this.#minimapComponent.setData(null);
       return;
     }
 
@@ -2876,6 +2866,7 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
   }
 
   static async handleExternalRecordRequest(): Promise<{response: string, devToolsLogs: object[]}> {
+    void VisualLogging.logFunctionCall('timeline.record-reload', 'external');
     Snackbars.Snackbar.Snackbar.show({message: i18nString(UIStrings.externalRequestReceived)});
 
     const panelInstance = TimelinePanel.instance();
@@ -2916,15 +2907,17 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
         };
       }
 
-      let responseText = '';
+      let responseTextForNonPassedInsights = '';
+      // We still return info on the passed insights, but we put it at the
+      // bottom of the response under a heading.
+      let responseTextForPassedInsights = '';
+
       for (const modelName in insightsForNav.model) {
         const model = modelName as keyof Trace.Insights.Types.InsightModelsType;
         const data = insightsForNav.model[model];
-        if (data.state === 'pass') {
-          continue;
-        }
         const activeInsight = new Utils.InsightAIContext.ActiveInsight(
             data,
+            insightsForNav.bounds,
             parsedTrace,
         );
         const formatter = new AiAssistanceModel.PerformanceInsightFormatter(activeInsight);
@@ -2935,10 +2928,30 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
           continue;
         }
 
-        responseText += `${formatter.formatInsight()}\n\n`;
+        const formatted = formatter.formatInsight({headingLevel: 3});
+
+        if (data.state === 'pass') {
+          responseTextForPassedInsights += `${formatted}\n\n`;
+          continue;
+        } else {
+          responseTextForNonPassedInsights += `${formatted}\n\n`;
+        }
       }
+
+      const finalText = `# Trace recording results
+
+## Non-passing insights:
+
+These insights highlight potential problems and opportunities to improve performance.
+${responseTextForNonPassedInsights}
+
+## Passing insights:
+
+These insights are passing, which means they are not considered to highlight considerable performance problems.
+${responseTextForPassedInsights}`;
+
       return {
-        response: `Insights from this recording:\n${responseText}`,
+        response: finalText,
         devToolsLogs: [],
       };
     }

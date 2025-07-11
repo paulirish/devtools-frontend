@@ -103,7 +103,7 @@ test('insights look ok', t => {
   const expected = {
     ahfhijdlegdabablpippeagghigmibma: { transferSize: 0, mainThreadTime: 3.953000009059906 },
     'paulirish.com': { transferSize: 142142, mainThreadTime: 17.631999850273132 },
-    cjpalhdlnbpafiamejdnhcphjbkeiagm: { transferSize: 0, mainThreadTime: 4.081999972462654 },
+    cjpalhdlnbpafiamejdnhcphjbkeiagm: { transferSize: 7390, mainThreadTime: 4.081999972462654 },
     jinjaccalgkegednnccohejagnlnfdag: { transferSize: 0, mainThreadTime: 1.2049999833106995 },
     noondiphcddnnabmjcihcjfbhfklnnep: { transferSize: 0, mainThreadTime: 2.2430000007152557 },
     'Google Tag Manager': { transferSize: 0, mainThreadTime: 0.2629999965429306 },

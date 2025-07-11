@@ -390,10 +390,14 @@ export interface HostConfigAiAssistanceFileAgent {
   userTier: string;
 }
 
-/**
- * @see http://go/chrome-devtools:automatic-workspace-folders-design
- */
-export interface HostConfigAutomaticFileSystems {
+export interface HostConfigAiCodeCompletion {
+  modelId: string;
+  temperature: number;
+  enabled: boolean;
+  userTier: string;
+}
+
+export interface HostConfigDeepLinksViaExtensibilityApi {
   enabled: boolean;
 }
 
@@ -429,10 +433,6 @@ export interface HostConfigThirdPartyCookieControls {
   managedBlockThirdPartyCookies: string|boolean;
 }
 
-interface CSSValueTracing {
-  enabled: boolean;
-}
-
 interface AiGeneratedTimelineLabels {
   enabled: boolean;
 }
@@ -454,11 +454,11 @@ export type HostConfig = Platform.TypeScriptUtilities.RecursivePartial<{
   aidaAvailability: AidaAvailability,
   channel: Channel,
   devToolsConsoleInsights: HostConfigConsoleInsights,
+  devToolsDeepLinksViaExtensibilityApi: HostConfigDeepLinksViaExtensibilityApi,
   devToolsFreestyler: HostConfigFreestyler,
   devToolsAiAssistanceNetworkAgent: HostConfigAiAssistanceNetworkAgent,
   devToolsAiAssistanceFileAgent: HostConfigAiAssistanceFileAgent,
   devToolsAiAssistancePerformanceAgent: HostConfigAiAssistancePerformanceAgent,
-  devToolsAutomaticFileSystems: HostConfigAutomaticFileSystems,
   devToolsVeLogging: HostConfigVeLogging,
   devToolsWellKnown: HostConfigWellKnown,
   devToolsPrivacyUI: HostConfigPrivacyUI,
@@ -470,7 +470,6 @@ export type HostConfig = Platform.TypeScriptUtilities.RecursivePartial<{
   devToolsEnableOriginBoundCookies: HostConfigEnableOriginBoundCookies,
   devToolsAnimationStylesInStylesTab: HostConfigAnimationStylesInStylesTab,
   thirdPartyCookieControls: HostConfigThirdPartyCookieControls,
-  devToolsCssValueTracing: CSSValueTracing,
   devToolsAiGeneratedTimelineLabels: AiGeneratedTimelineLabels,
 }>;
 

@@ -236,10 +236,6 @@ export class TracingContext {
     return true;
   }
 
-  didApplyEvaluations(): boolean {
-    return this.#appliedEvaluations > 0;
-  }
-
   #setHasMoreEvaluations(value: boolean): void {
     if (this.#parent) {
       this.#parent.#setHasMoreEvaluations(value);
@@ -430,7 +426,7 @@ export class Renderer extends SDK.CSSPropertyParser.TreeWalker {
         node => this.walkExcludingSuccessors(
             context.ast.subtree(node), context.property, context.renderers, context.matchedResult, cssControls,
             context.options, context.tracing));
-    const nodes = renderers.map(node => node.#output).reduce(mergeWithSpacing);
+    const nodes = renderers.map(node => node.#output).reduce(mergeWithSpacing, []);
     return {nodes, cssControls};
   }
 
