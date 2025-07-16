@@ -1469,6 +1469,8 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
       blobParts = Array.from(formattedTraceIter);
     }
 
+    // By saving a blob directly (instead of joining into a single string), we avoid the 536MB string limit in V8
+    // FYI maybe from https://crrev.com/c/4562037 we could recover the TracingModel and TempFile bits that seem to allow streamed json parsing.
     const blob = new Blob(blobParts, {type: 'application/json'});
     // Download with blob URL, as the alternatives are inferior…
     // - Workspace.FileManager.FileManager.instance().save() can only do strings and base64. TODO MAYBEEEEEEEEEEEEE via base64 tho.
