@@ -1425,17 +1425,19 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
     }
     try {
       await this.innerSaveToFile(traceEvents, metadata, fileName, config);
-    } catch (error) {
+    } catch (e) {
+      // We expect the error to be an Error class, but this deals with any weird case where it's not.
+      const error = e instanceof Error ? e : new Error(e);
+
       console.error(error.stack);
       if (error.name === 'AbortError') {
         // The user cancelled the action, so this is not an error we need to report.
         return;
       }
-      Common.Console.Console.instance().error(
-          i18nString(UIStrings.failedToSaveTimelineSS, {PH1: error.message, PH2: error.name}));
+
+      this.#showExportTraceErrorDialog(error);
     }
   }
-
 
   async innerSaveToFile(
       traceEvents: readonly Trace.Types.Events.Event[], metadata: Trace.Types.File.MetaData|null,
@@ -1468,7 +1470,9 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
     }
 
     const blob = new Blob(blobParts, {type: 'application/json'});
-
+    // Download with blob URL, as the alternatives are inferior…
+    // - Workspace.FileManager.FileManager.instance().save() can only do strings and base64. TODO MAYBEEEEEEEEEEEEE via base64 tho.
+    // - window.showOpenFilePicker() doesn't work within iframes (e.g. trace.cafe) and is not supported in Safari
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
