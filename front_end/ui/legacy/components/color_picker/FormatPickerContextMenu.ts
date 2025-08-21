@@ -9,8 +9,8 @@ import * as UI from '../../legacy.js';
 
 const UIStrings = {
   /**
-   *@description Tooltip text describing that a color was clipped after conversion to match the target gamut
-   *@example {rgb(255 255 255)} PH1
+   * @description Tooltip text describing that a color was clipped after conversion to match the target gamut
+   * @example {rgb(255 255 255)} PH1
    */
   colorClippedTooltipText: 'This color was clipped to match the format\'s gamut. The actual result was {PH1}',
 } as const;
@@ -109,11 +109,11 @@ export class FormatPickerContextMenu {
     let icon = undefined;
     if (newColor.isGamutClipped()) {
       icon = new IconButton.Icon.Icon();
+      icon.name = 'warning';
+      icon.classList.add('medium');
       icon.data = {
         iconName: 'warning',
         color: 'var(--icon-default)',
-        width: '16px',
-        height: '16px',
       };
       icon.style.marginLeft = '1px';
       icon.style.marginTop = '-1px';

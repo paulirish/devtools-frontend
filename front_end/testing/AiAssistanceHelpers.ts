@@ -29,9 +29,11 @@ function createMockAidaClient(doConversation: Host.AidaClient.AidaClient['doConv
     Host.AidaClient.AidaClient {
   const doConversationStub = sinon.stub();
   const registerClientEventStub = sinon.stub();
+  const completeCodeStub = sinon.stub();
   return {
     doConversation: doConversationStub.callsFake(doConversation),
     registerClientEvent: registerClientEventStub,
+    completeCode: completeCodeStub,
   };
 }
 
@@ -286,6 +288,7 @@ export function initializePersistenceImplForTests(): void {
     targetManager: SDK.TargetManager.TargetManager.instance(),
     resourceMapping:
         new Bindings.ResourceMapping.ResourceMapping(SDK.TargetManager.TargetManager.instance(), workspace),
+    ignoreListManager: Workspace.IgnoreListManager.IgnoreListManager.instance({forceNew: true}),
   });
   const breakpointManager = Breakpoints.BreakpointManager.BreakpointManager.instance({
     forceNew: true,

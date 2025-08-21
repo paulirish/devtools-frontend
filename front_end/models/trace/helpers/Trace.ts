@@ -262,7 +262,7 @@ export function makeProfileCall(
  * if provided, though currently only coming from Animations. Traces may contain multiple instant events so we need to
  * account for that.
  *
- * @returns {Map<string, MatchingPairableAsyncEvents>} Map of the animation's ID to it's matching events.
+ * @returns Map of the animation's ID to it's matching events.
  */
 export function matchEvents(unpairedEvents: Types.Events.PairableAsync[]): Map<string, MatchingPairableAsyncEvents> {
   // map to store begin and end of the event

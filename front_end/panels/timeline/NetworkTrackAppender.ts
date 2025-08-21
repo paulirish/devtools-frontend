@@ -23,7 +23,7 @@ import {InstantEventVisibleDurationMs} from './TimelineFlameChartDataProvider.js
 
 const UIStrings = {
   /**
-   *@description Text in Timeline Flame Chart Data Provider of the Performance panel
+   * @description Text in Timeline Flame Chart Data Provider of the Performance panel
    */
   network: 'Network',
 } as const;

@@ -438,7 +438,7 @@ export class StorageView extends UI.ThrottledWidget.ThrottledWidget {
       this.clearButton.focus();
     }, 500);
 
-    UI.ARIAUtils.alert(i18nString(UIStrings.SiteDataCleared));
+    UI.ARIAUtils.LiveAnnouncer.alert(i18nString(UIStrings.SiteDataCleared));
   }
 
   static clear(
@@ -519,7 +519,8 @@ export class StorageView extends UI.ThrottledWidget.ThrottledWidget {
 
     if (!response.overrideActive && response.quota < 125829120) {  // 120 MB
       const icon = new IconButton.Icon.Icon();
-      icon.data = {iconName: 'info', color: 'var(--icon-info)', width: '14px', height: '14px'};
+      icon.data = {iconName: 'info', color: 'var(--icon-info)'};
+      icon.classList.add('small');
       UI.Tooltip.Tooltip.install(this.quotaRow, i18nString(UIStrings.storageQuotaIsLimitedIn));
       this.quotaRow.appendChild(icon);
     }

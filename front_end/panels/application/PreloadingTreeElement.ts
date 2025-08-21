@@ -14,15 +14,15 @@ import type {ResourcesPanel} from './ResourcesPanel.js';
 
 const UIStrings = {
   /**
-   *@description Text in Application Panel Sidebar of the Application panel
+   * @description Text in Application Panel Sidebar of the Application panel
    */
   speculativeLoads: 'Speculative loads',
   /**
-   *@description Text in Application Panel Sidebar of the Application panel
+   * @description Text in Application Panel Sidebar of the Application panel
    */
   rules: 'Rules',
   /**
-   *@description Text in Application Panel Sidebar of the Application panel
+   * @description Text in Application Panel Sidebar of the Application panel
    */
   speculations: 'Speculations',
 } as const;
@@ -45,7 +45,7 @@ class PreloadingTreeElementBase<View extends PreloadingRuleSetView|PreloadingAtt
     this.#viewConstructor = viewConstructor;
     this.#path = path;
 
-    const icon = IconButton.Icon.create('arrow-up-down');
+    const icon = IconButton.Icon.create('speculative-loads');
     this.setLeadingIcons([icon]);
     this.#selectedInternal = false;
 
@@ -94,7 +94,7 @@ export class PreloadingSummaryTreeElement extends ExpandableApplicationPanelTree
   constructor(panel: ResourcesPanel) {
     super(panel, i18nString(UIStrings.speculativeLoads), '', '', 'preloading');
 
-    const icon = IconButton.Icon.create('arrow-up-down');
+    const icon = IconButton.Icon.create('speculative-loads');
     this.setLeadingIcons([icon]);
     this.#selectedInternal = false;
 

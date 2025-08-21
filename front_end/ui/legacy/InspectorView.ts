@@ -47,7 +47,6 @@ import {Dialog} from './Dialog.js';
 import {DockController, DockState} from './DockController.js';
 import {GlassPane} from './GlassPane.js';
 import {Infobar, Type as InfobarType} from './Infobar.js';
-import inspectorViewTabbedPaneStyles from './inspectorViewTabbedPane.css.js';
 import {KeyboardShortcut} from './KeyboardShortcut.js';
 import type {Panel} from './Panel.js';
 import {ShowMode, SplitWidget} from './SplitWidget.js';
@@ -60,31 +59,31 @@ import {VBox, type Widget, WidgetFocusRestorer} from './Widget.js';
 
 const UIStrings = {
   /**
-   *@description Title of more tabs button in inspector view
+   * @description Title of more tabs button in inspector view
    */
   moreTools: 'More Tools',
   /**
-   *@description Text that appears when hovor over the close button on the drawer view
+   * @description Text that appears when hovor over the close button on the drawer view
    */
   closeDrawer: 'Close drawer',
   /**
-   *@description The aria label for main tabbed pane that contains Panels
+   * @description The aria label for main tabbed pane that contains Panels
    */
   panels: 'Panels',
   /**
-   *@description Title of an action that reloads the tab currently being debugged by DevTools
+   * @description Title of an action that reloads the tab currently being debugged by DevTools
    */
   reloadDebuggedTab: 'Reload page',
   /**
-   *@description Title of an action that reloads the DevTools
+   * @description Title of an action that reloads the DevTools
    */
   reloadDevtools: 'Reload DevTools',
   /**
-   *@description Text for context menu action to move a tab to the main panel
+   * @description Text for context menu action to move a tab to the main panel
    */
   moveToTop: 'Move to top',
   /**
-   *@description Text for context menu action to move a tab to the drawer
+   * @description Text for context menu action to move a tab to the drawer
    */
   moveToBottom: 'Move to bottom',
   /**
@@ -108,19 +107,19 @@ const UIStrings = {
    */
   setToSpecificLanguage: 'Switch DevTools to {PH1}',
   /**
-   *@description The aria label for main toolbar
+   * @description The aria label for main toolbar
    */
   mainToolbar: 'Main toolbar',
   /**
-   *@description The aria label for the drawer.
+   * @description The aria label for the drawer.
    */
   drawer: 'Tool drawer',
   /**
-   *@description The aria label for the drawer shown.
+   * @description The aria label for the drawer shown.
    */
   drawerShown: 'Drawer shown',
   /**
-   *@description The aria label for the drawer hidden.
+   * @description The aria label for the drawer hidden.
    */
   drawerHidden: 'Drawer hidden',
   /**
@@ -129,11 +128,11 @@ const UIStrings = {
    */
   selectOverrideFolder: 'Select a folder to store override files in',
   /**
-   *@description Label for a button which opens a file picker.
+   * @description Label for a button which opens a file picker.
    */
   selectFolder: 'Select folder',
   /**
-   *@description Text that appears when hover the toggle orientation button
+   * @description Text that appears when hover the toggle orientation button
    */
   toggleDrawerOrientation: 'Toggle drawer orientation',
 } as const;
@@ -231,7 +230,6 @@ export class InspectorView extends VBox implements ViewLocationResolver {
     // the Device mode button is not added and so the allocated space is smaller.
     const allocatedSpace = Root.Runtime.conditions.canDock() ? '69px' : '41px';
     this.tabbedPane.leftToolbar().style.minWidth = allocatedSpace;
-    this.tabbedPane.registerRequiredCSS(inspectorViewTabbedPaneStyles);
     this.tabbedPane.addEventListener(
         TabbedPaneEvents.TabSelected,
         (event: Common.EventTarget.EventTargetEvent<EventData>) => this.tabSelected(event.data.tabId), this);
@@ -368,7 +366,8 @@ export class InspectorView extends VBox implements ViewLocationResolver {
       let icon: IconButton.Icon.Icon|null = null;
       if (warnings.length !== 0) {
         const warning = warnings.length === 1 ? warnings[0] : '· ' + warnings.join('\n· ');
-        icon = IconButton.Icon.create('warning-filled', 'warning');
+        icon = IconButton.Icon.create('warning-filled', 'small');
+        icon.classList.add('warning');
         Tooltip.install(icon, warning);
       }
       tabbedPane.setTrailingTabIcon(tabId, icon);
@@ -412,7 +411,7 @@ export class InspectorView extends VBox implements ViewLocationResolver {
       this.focusRestorer = null;
     }
     this.emitDrawerChangeEvent(true);
-    ARIAUtils.alert(i18nString(UIStrings.drawerShown));
+    ARIAUtils.LiveAnnouncer.alert(i18nString(UIStrings.drawerShown));
   }
 
   drawerVisible(): boolean {
@@ -429,7 +428,7 @@ export class InspectorView extends VBox implements ViewLocationResolver {
     this.drawerSplitWidget.hideSidebar(true);
 
     this.emitDrawerChangeEvent(false);
-    ARIAUtils.alert(i18nString(UIStrings.drawerHidden));
+    ARIAUtils.LiveAnnouncer.alert(i18nString(UIStrings.drawerHidden));
   }
 
   toggleDrawerOrientation(): void {

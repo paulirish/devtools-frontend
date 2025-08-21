@@ -143,9 +143,8 @@ export const timeout = (duration: number) => {
   return devToolsPage.timeout(duration);
 };
 
-export const getTextContent =
-    async<ElementType extends Element = Element>(selector: string, root?: puppeteer.ElementHandle) => {
-  const {devToolsPage} = getBrowserAndPagesWrappers();
+export const getTextContent = async<ElementType extends Element = Element>(
+    selector: string, root?: puppeteer.ElementHandle, devToolsPage = getBrowserAndPagesWrappers().devToolsPage) => {
   return await devToolsPage.getTextContent<ElementType>(selector, root);
 };
 
@@ -168,8 +167,8 @@ export const getVisibleTextContents =
 };
 
 export const waitFor = async<ElementType extends Element|null = null, Selector extends string = string>(
-    selector: Selector, root?: puppeteer.ElementHandle, asyncScope = new AsyncScope(), handler?: string) => {
-  const {devToolsPage} = getBrowserAndPagesWrappers();
+    selector: Selector, root?: puppeteer.ElementHandle, asyncScope = new AsyncScope(), handler?: string,
+    devToolsPage = getBrowserAndPagesWrappers().devToolsPage) => {
   return await devToolsPage.waitFor<ElementType, Selector>(selector, root, asyncScope, handler);
 };
 
@@ -221,9 +220,9 @@ export const waitForNoElementsWithTextContent =
       return devToolsPage.waitForNoElementsWithTextContent(textContent, root, asyncScope);
     };
 
-export const waitForFunction =
-    async<T>(fn: () => Promise<T|undefined>, asyncScope = new AsyncScope(), description?: string) => {
-  const {devToolsPage} = getBrowserAndPagesWrappers();
+export const waitForFunction = async<T>(
+    fn: () => Promise<T|undefined>, asyncScope = new AsyncScope(), description?: string,
+    devToolsPage = getBrowserAndPagesWrappers().devToolsPage) => {
   return await devToolsPage.waitForFunction(fn, asyncScope, description);
 };
 
@@ -390,8 +389,7 @@ export const closePanelTab =
   return await devToolsPage.closePanelTab(panelTabSelector);
 };
 
-export const closeAllCloseableTabs = async () => {
-  const {devToolsPage} = getBrowserAndPagesWrappers();
+export const closeAllCloseableTabs = async (devToolsPage: DevToolsPage = getBrowserAndPagesWrappers().devToolsPage) => {
   return await devToolsPage.closeAllCloseableTabs();
 };
 
@@ -413,7 +411,7 @@ export const logOutstandingCDP = async () => {
 };
 
 export const selectOption = async (select: puppeteer.ElementHandle<HTMLSelectElement>, value: string) => {
-  await select.evaluate(async (node: HTMLSelectElement, _value: string) => {
+  await select.evaluate(async (node, _value) => {
     node.value = _value;
     const event = document.createEvent('HTMLEvents');
     event.initEvent('change', false, true);
@@ -438,7 +436,7 @@ export const getPendingEvents = function(_frontend: puppeteer.Page, eventType: s
 };
 
 export function prepareWaitForEvent(element: puppeteer.ElementHandle, eventType: string): Promise<void> {
-  return element.evaluate((element: Element, eventType: string) => {
+  return element.evaluate((element, eventType) => {
     window.__eventHandlers = window.__eventHandlers || new WeakMap();
 
     const eventHandlers = (() => {
@@ -465,7 +463,7 @@ export function prepareWaitForEvent(element: puppeteer.ElementHandle, eventType:
 }
 
 export function waitForEvent(element: puppeteer.ElementHandle, eventType: string): Promise<void> {
-  return element.evaluate((element: Element, eventType: string) => {
+  return element.evaluate((element, eventType) => {
     if (!('__eventHandlers' in window)) {
       throw new Error(`Event listener for '${eventType}' has not been installed.`);
     }
@@ -486,17 +484,6 @@ export const waitForClass = async (element: puppeteer.ElementHandle<Element>, cl
   const {devToolsPage} = getBrowserAndPagesWrappers();
   return await devToolsPage.waitForClass(element, classname);
 };
-
-/**
- * This is useful to keep TypeScript happy in a test - if you have a value
- * that's potentially `null` you can use this function to assert that it isn't,
- * and satisfy TypeScript that the value is present.
- */
-export function assertNotNullOrUndefined<T>(val: T): asserts val is NonNullable<T> {
-  if (val === null || val === undefined) {
-    throw new Error(`Expected given value to not be null/undefined but it was: ${val}`);
-  }
-}
 
 export {getBrowserAndPages, getDevToolsFrontendHostname, getTestServerPort, reloadDevTools};
 
@@ -558,8 +545,7 @@ export async function setCheckBox(selector: string, wantChecked: boolean): Promi
   await devToolsPage.setCheckBox(selector, wantChecked);
 }
 
-export const summonSearchBox = async () => {
-  const {devToolsPage} = getBrowserAndPagesWrappers();
+export const summonSearchBox = async (devToolsPage = getBrowserAndPagesWrappers().devToolsPage) => {
   await devToolsPage.summonSearchBox();
 };
 
@@ -579,6 +565,6 @@ export async function raf(page: puppeteer.Page): Promise<void> {
 }
 
 export async function readClipboard() {
-  const {devToolsPage, browserWrapper} = getBrowserAndPagesWrappers();
-  return await devToolsPage.readClipboard(browserWrapper);
+  const {devToolsPage} = getBrowserAndPagesWrappers();
+  return await devToolsPage.readClipboard();
 }

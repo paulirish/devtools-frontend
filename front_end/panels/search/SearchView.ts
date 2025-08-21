@@ -20,87 +20,87 @@ import searchViewStyles from './searchView.css.js';
 
 const UIStrings = {
   /**
-   *@description Placeholder text of a search bar
+   * @description Placeholder text of a search bar
    */
   find: 'Find',
   /**
-   *@description Tooltip text on a toggle to enable search by matching case of the input
+   * @description Tooltip text on a toggle to enable search by matching case of the input
    */
   enableCaseSensitive: 'Enable case sensitive search',
   /**
-   *@description Tooltip text on a toggle to disable search by matching case of the input
+   * @description Tooltip text on a toggle to disable search by matching case of the input
    */
   disableCaseSensitive: 'Disable case sensitive search',
   /**
-   *@description Tooltip text on a toggle to enable searching with regular expression
+   * @description Tooltip text on a toggle to enable searching with regular expression
    */
   enableRegularExpression: 'Enable regular expressions',
   /**
-   *@description Tooltip text on a toggle to disable searching with regular expression
+   * @description Tooltip text on a toggle to disable searching with regular expression
    */
   disableRegularExpression: 'Disable regular expressions',
   /**
-   *@description Text to refresh the page
+   * @description Text to refresh the page
    */
   refresh: 'Refresh',
   /**
-   *@description Tooltip text to clear the search input field
+   * @description Tooltip text to clear the search input field
    */
   clearInput: 'Clear',
   /**
-   *@description Text to clear content
+   * @description Text to clear content
    */
   clear: 'Clear search',
   /**
-   *@description Search message element text content in Search View of the Search tab
+   * @description Search message element text content in Search View of the Search tab
    */
   indexing: 'Indexing…',
   /**
-   *@description Text to indicate the searching is in progress
+   * @description Text to indicate the searching is in progress
    */
   searching: 'Searching…',
   /**
-   *@description Text in Search View of the Search tab
+   * @description Text in Search View of the Search tab
    */
   indexingInterrupted: 'Indexing interrupted.',
   /**
-   *@description Search results message element text content in Search View of the Search tab
+   * @description Search results message element text content in Search View of the Search tab
    */
   foundMatchingLineInFile: 'Found 1 matching line in 1 file.',
   /**
-   *@description Search results message element text content in Search View of the Search tab
-   *@example {2} PH1
+   * @description Search results message element text content in Search View of the Search tab
+   * @example {2} PH1
    */
   foundDMatchingLinesInFile: 'Found {PH1} matching lines in 1 file.',
   /**
-   *@description Search results message element text content in Search View of the Search tab
-   *@example {2} PH1
-   *@example {2} PH2
+   * @description Search results message element text content in Search View of the Search tab
+   * @example {2} PH1
+   * @example {2} PH2
    */
   foundDMatchingLinesInDFiles: 'Found {PH1} matching lines in {PH2} files.',
   /**
-   *@description Search results message element text content in Search View of the Search tab
+   * @description Search results message element text content in Search View of the Search tab
    */
   noMatchesFound: 'No matches found',
   /**
-   *@description Search results message element text content in Search View of the Search tab
+   * @description Search results message element text content in Search View of the Search tab
    */
   nothingMatchedTheQuery: 'Nothing matched your search query',
   /**
-   *@description Text in Search View of the Search tab
+   * @description Text in Search View of the Search tab
    */
   searchFinished: 'Search finished.',
   /**
-   *@description Text in Search View of the Search tab
+   * @description Text in Search View of the Search tab
    */
   searchInterrupted: 'Search interrupted.',
   /**
-   *@description Text in Search View of the Search tab if user hasn't started the search
-   *@example {Enter} PH1
+   * @description Text in Search View of the Search tab if user hasn't started the search
+   * @example {Enter} PH1
    */
   typeAndPressSToSearch: 'Type and press {PH1} to search',
   /**
-   *@description Text in Search view of the Search tab if user hasn't started the search
+   * @description Text in Search view of the Search tab if user hasn't started the search
    */
   noSearchResult: 'No search results',
 } as const;
@@ -156,7 +156,10 @@ export class SearchView extends UI.Widget.VBox {
   #emptyStartView: UI.EmptyWidget.EmptyWidget;
 
   constructor(settingKey: string, throttler: Common.Throttler.Throttler) {
-    super(true);
+    super({
+      jslog: `${VisualLogging.panel('search').track({resize: true})}`,
+      useShadowDom: true,
+    });
     this.setMinimumSize(0, 40);
     this.registerRequiredCSS(searchViewStyles);
 
@@ -174,8 +177,6 @@ export class SearchView extends UI.Widget.VBox {
     this.progressIndicator = null;
     this.visiblePane = null;
     this.#throttler = throttler;
-
-    this.contentElement.setAttribute('jslog', `${VisualLogging.panel('search').track({resize: true})}`);
 
     this.contentElement.classList.add('search-view');
     this.contentElement.addEventListener('keydown', event => {
@@ -335,9 +336,9 @@ export class SearchView extends UI.Widget.VBox {
     if (this.progressIndicator) {
       this.progressIndicator.done();
     }
-    this.progressIndicator = new UI.ProgressIndicator.ProgressIndicator();
+    this.progressIndicator = document.createElement('devtools-progress');
     this.searchMessageElement.textContent = i18nString(UIStrings.indexing);
-    this.progressIndicator.show(this.searchProgressPlaceholderElement);
+    this.searchProgressPlaceholderElement.appendChild(this.progressIndicator);
     if (this.searchScope) {
       this.searchScope.performIndexing(
           new Common.Progress.ProgressProxy(this.progressIndicator, this.onIndexingFinished.bind(this)));
@@ -386,7 +387,8 @@ export class SearchView extends UI.Widget.VBox {
     }
     this.searchFinished(finished);
     this.searchConfig = null;
-    UI.ARIAUtils.alert(this.searchMessageElement.textContent + ' ' + this.searchResultsMessageElement.textContent);
+    UI.ARIAUtils.LiveAnnouncer.alert(
+        this.searchMessageElement.textContent + ' ' + this.searchResultsMessageElement.textContent);
   }
 
   private innerStartSearch(searchConfig: Workspace.SearchConfig.SearchConfig): void {
@@ -394,7 +396,7 @@ export class SearchView extends UI.Widget.VBox {
     if (this.progressIndicator) {
       this.progressIndicator.done();
     }
-    this.progressIndicator = new UI.ProgressIndicator.ProgressIndicator();
+    this.progressIndicator = document.createElement('devtools-progress');
     this.searchStarted(this.progressIndicator);
     if (this.searchScope) {
       void this.searchScope.performSearch(
@@ -430,7 +432,7 @@ export class SearchView extends UI.Widget.VBox {
     }
     this.showPane(this.searchingView);
     this.searchMessageElement.textContent = i18nString(UIStrings.searching);
-    progressIndicator.show(this.searchProgressPlaceholderElement);
+    this.searchProgressPlaceholderElement.appendChild(progressIndicator);
     this.updateSearchResultsMessage();
   }
 

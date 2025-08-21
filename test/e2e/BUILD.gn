@@ -21,17 +21,11 @@ node_ts_library("tests") {
     "elements",
     "emulation",
     "extensions",
-    "host",
     "issues",
     "lighthouse",
-    "memory",
     "network",
-    "panels",
     "performance",
-    "security",
-    "settings",
     "sources",
-    "throttling",
   ]
   sources = [ "mocharc.ts" ]
 }

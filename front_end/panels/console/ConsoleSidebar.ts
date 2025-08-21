@@ -26,27 +26,27 @@ const UIStrings = {
    */
   other: '<other>',
   /**
-   *@description Text in Console Sidebar of the Console panel to show how many user messages exist.
+   * @description Text in Console Sidebar of the Console panel to show how many user messages exist.
    */
   dUserMessages: '{n, plural, =0 {No user messages} =1 {# user message} other {# user messages}}',
   /**
-   *@description Text in Console Sidebar of the Console panel to show how many messages exist.
+   * @description Text in Console Sidebar of the Console panel to show how many messages exist.
    */
   dMessages: '{n, plural, =0 {No messages} =1 {# message} other {# messages}}',
   /**
-   *@description Text in Console Sidebar of the Console panel to show how many errors exist.
+   * @description Text in Console Sidebar of the Console panel to show how many errors exist.
    */
   dErrors: '{n, plural, =0 {No errors} =1 {# error} other {# errors}}',
   /**
-   *@description Text in Console Sidebar of the Console panel to show how many warnings exist.
+   * @description Text in Console Sidebar of the Console panel to show how many warnings exist.
    */
   dWarnings: '{n, plural, =0 {No warnings} =1 {# warning} other {# warnings}}',
   /**
-   *@description Text in Console Sidebar of the Console panel to show how many info messages exist.
+   * @description Text in Console Sidebar of the Console panel to show how many info messages exist.
    */
   dInfo: '{n, plural, =0 {No info} =1 {# info} other {# info}}',
   /**
-   *@description Text in Console Sidebar of the Console panel to show how many verbose messages exist.
+   * @description Text in Console Sidebar of the Console panel to show how many verbose messages exist.
    */
   dVerbose: '{n, plural, =0 {No verbose} =1 {# verbose} other {# verbose}}',
 } as const;
@@ -59,7 +59,10 @@ export class ConsoleSidebar extends Common.ObjectWrapper.eventMixin<EventTypes, 
   private readonly treeElements: FilterTreeElement[];
 
   constructor() {
-    super(true);
+    super({
+      jslog: `${VisualLogging.pane('sidebar').track({resize: true})}`,
+      useShadowDom: true,
+    });
     this.setMinimumSize(125, 0);
 
     this.tree = new UI.TreeOutline.TreeOutlineInShadow(UI.TreeOutline.TreeVariant.NAVIGATION_TREE);
@@ -67,7 +70,6 @@ export class ConsoleSidebar extends Common.ObjectWrapper.eventMixin<EventTypes, 
     this.tree.registerRequiredCSS(consoleSidebarStyles);
     this.tree.hideOverflow();
 
-    this.contentElement.setAttribute('jslog', `${VisualLogging.pane('sidebar').track({resize: true})}`);
     this.contentElement.appendChild(this.tree.element);
     this.selectedTreeElement = null;
     this.treeElements = [];
@@ -187,7 +189,7 @@ const enum GroupName {
 
 /**
  * Maps the GroupName for a filter to the UIString used to render messages.
- * Stored here so we only construct it once at runtime, rather than everytime we
+ * Stored here so we only construct it once at runtime, rather than every time we
  * construct a filter or get a new message.
  */
 const stringForFilterSidebarItemMap = new Map<GroupName, string>([

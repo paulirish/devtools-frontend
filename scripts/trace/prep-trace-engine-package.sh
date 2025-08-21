@@ -90,6 +90,7 @@ for p in Path('$dist').rglob('*.d.ts'):
         'SDK.NetworkManager.Conditions',
         'SDK.ResourceTreeModel.ResourceTreeFrame',
         'SDK.Target.Target',
+        'UI.Infobar.Infobar',
 
         # Order is important here.
         'SDK.SourceMap.SourceMapV3',
@@ -103,6 +104,7 @@ for p in Path('$dist').rglob('*.d.ts'):
         'import type * as CrUXManager',
         'import type * as Lit',
         'import type * as SDK',
+        'import type * as UI',
     ]
     for needle in comment_out:
         content = content.replace(needle, f'// {needle}')

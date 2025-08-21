@@ -52,7 +52,7 @@ const UIStrings = {
   unknown: 'Unknown Status',
   /**
    * @description Status text for the status of the back/forward cache status indicating that
-   * the back/forward cache was not used and a normal navigation occured instead.
+   * the back/forward cache was not used and a normal navigation occurred instead.
    */
   normalNavigation:
       'Not served from back/forward cache: to trigger back/forward cache, use Chrome\'s back/forward buttons, or use the test button below to automatically navigate away and back.',
@@ -137,8 +137,8 @@ const UIStrings = {
    */
   framesPerIssue: '{n, plural, =1 {# frame} other {# frames}}',
   /**
-   *@description Title for a frame in the frame tree that doesn't have a URL. Placeholder indicates which number frame with a blank URL it is.
-   *@example {3} PH1
+   * @description Title for a frame in the frame tree that doesn't have a URL. Placeholder indicates which number frame with a blank URL it is.
+   * @example {3} PH1
    */
   blankURLTitle: 'Blank URL [{PH1}]',
   /**
@@ -310,8 +310,8 @@ export class BackForwardCacheView extends LegacyWrapper.LegacyWrapper.WrappableC
     // clang-format on
   }
 
-  #maybeRenderFrameTree(explanationTree: Protocol.Page.BackForwardCacheNotRestoredExplanationTree|
-                        undefined): Lit.LitTemplate {
+  #maybeRenderFrameTree(explanationTree: Protocol.Page.BackForwardCacheNotRestoredExplanationTree|undefined):
+      Lit.LitTemplate {
     if (!explanationTree || (explanationTree.explanations.length === 0 && explanationTree.children.length === 0)) {
       return Lit.nothing;
     }

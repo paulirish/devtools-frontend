@@ -52,8 +52,8 @@ export function commandLineArgs<T = Record<string, unknown>>(yargs: Yargs.Argv<T
       })
       .option('headless', {
         type: 'boolean',
-        default: false,
-        desc: 'Run tests headless even when in debug mode',
+        default: undefined,
+        desc: 'Whether to run tests headless. If unspecified, the default depends on the `debug` option',
       })
       .option('coverage', {
         type: 'boolean',
@@ -103,5 +103,10 @@ export function commandLineArgs<T = Record<string, unknown>>(yargs: Yargs.Argv<T
         type: 'boolean',
         default: false,
         desc: 'Invert the grep/fgrep result',
+      })
+      .option('cpu-throttle', {
+        type: 'number',
+        default: 1,
+        desc: 'Throttle the CPU during tests. The number provided is the multiplier used.',
       });
 }

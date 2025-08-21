@@ -12,19 +12,19 @@ vars = {
   'build_with_chromium': False,
 
   'build_url': 'https://chromium.googlesource.com/chromium/src/build.git',
-  'build_revision': 'e13953ced04ed05f45aa3c961bd6d802aced74ec',
+  'build_revision': '598d39bd27454801c8b98f8a7840098db0c07a60',
 
   'buildtools_url': 'https://chromium.googlesource.com/chromium/src/buildtools.git',
-  'buildtools_revision': '17bdad4a57ed807c4bef2a1947248d5fefef4efe',
+  'buildtools_revision': '311f10f06a6261d6a453c30d56586c78d2f87f5d',
 
   'depot_tools_url': 'https://chromium.googlesource.com/chromium/tools/depot_tools.git',
-  'depot_tools_revision': 'c2a6159a0d39caa1686977317d6f1c8891d2c83e',
+  'depot_tools_revision': '778a576e20053a8d1edf8e7d7185bacc02bc1a7a',
 
   'inspector_protocol_url': 'https://chromium.googlesource.com/deps/inspector_protocol',
-  'inspector_protocol_revision': '6d1ae0f13aae6ad381ca31b17b88a0f5af29ca94',
+  'inspector_protocol_revision': '07272ab9a30fd555890fda0718f4c2c25931653a',
 
   # Keeping track of the last time we rolled the browser protocol files.
-  'chromium_browser_protocol_revision' : 'b5b53c1e399d6f13e84f19e13bbbbc68d2dc137c',
+  'chromium_browser_protocol_revision' : 'c3e5017b2e2396d8c18d68ccb6fccd5f1432e72a',
 
   'clang_format_url': 'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/clang/tools/clang-format.git',
   'clang_format_revision': '37f6e68a107df43b7d7e044fd36a13cbae3413f2',
@@ -32,7 +32,7 @@ vars = {
   'emscripten_tag': 'ade9d780ff17c88d81aa13860361743e3c1e1396',
 
   # GN CIPD package version.
-  'gn_version': 'git_revision:635a71e20e99db0b08520ca0746b501167a5c7e5',
+  'gn_version': 'git_revision:ee5b7e32b961a9da1933e9f46a018ba6cac8ef60',
 
   'cmake_version': 'version:2@3.21.3',
 
@@ -49,7 +49,7 @@ vars = {
   # Chrome version used for tests. It should be regularly updated to
   # match the Canary version listed here:
   # https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json
-  'chrome': '140.0.7289.0',
+  'chrome': '141.0.7366.0',
 
   # 'magic' text to tell depot_tools that git submodules should be accepted but
   # but parity with DEPS file is expected.
@@ -59,16 +59,16 @@ vars = {
   'non_git_source': 'True',
 
   # siso CIPD package version
-  'siso_version': 'git_revision:f96f46a8e4cf30c097110903d4b71516ef976fb6',
+  'siso_version': 'git_revision:7e3433bde6dcf9d760b0423c5f47c51e65c7c0fa',
 }
 
 # Only these hosts are allowed for dependencies in this DEPS file.
-# If you need to add a new host, contact chrome infrastracture team.
+# If you need to add a new host, contact chrome infrastructure team.
 allowed_hosts = [
   'chromium.googlesource.com',
   'chrome-infra-packages.appspot.com',
 
-  # TODO(b/337061377): Move into a separate alllowed gcs bucket list.
+  # TODO(b/337061377): Move into a separate allowed gcs bucket list.
   'chromium-nodejs',
 ]
 
@@ -215,6 +215,19 @@ deps = {
               'output_file': 'node-darwin-arm64.tar.gz',
           },
       ],
+  },
+  "scripts/ai_assistance/suite/outputs": {
+    "dep_type": "gcs",
+    'condition': 'checkout_ai_evals == True',
+    "bucket": "chrome-devtools-ai-evals",
+    "objects": [
+      {
+        "object_name": "f0e8e7b99dc61f7a943bfdf284552982c63bdf8d6217091f5260bc8ebd84ca9f",
+        "sha256sum": "af579f30f2384089e1bece67db9afb71b902aa6ff99cb9749d4694ce53783670",
+        "size_bytes": 3582,
+        "generation": 1755705853621054
+      }
+    ]
   },
   'third_party/node/win': {
       'dep_type': 'gcs',

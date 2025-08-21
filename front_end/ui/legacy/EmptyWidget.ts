@@ -35,12 +35,13 @@ import type * as Platform from '../../core/platform/platform.js';
 import * as VisualLogging from '../visual_logging/visual_logging.js';
 
 import emptyWidgetStyles from './emptyWidget.css.js';
+import inspectorCommonStyles from './inspectorCommon.css.js';
 import {VBox} from './Widget.js';
 import {XLink} from './XLink.js';
 
 const UIStrings = {
   /**
-   *@description Text that is usually a hyperlink to more documentation
+   * @description Text that is usually a hyperlink to more documentation
    */
   learnMore: 'Learn more',
 } as const;
@@ -57,7 +58,8 @@ export class EmptyWidget extends VBox {
     if (!element && headerOrElement instanceof HTMLElement) {
       element = headerOrElement;
     }
-    super(undefined, undefined, element);
+    super(element);
+    this.registerRequiredCSS(inspectorCommonStyles);
     this.registerRequiredCSS(emptyWidgetStyles);
     this.element.classList.add('empty-view-scroller');
     this.contentElement = this.element.createChild('div', 'empty-state');

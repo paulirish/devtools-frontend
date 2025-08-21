@@ -200,6 +200,71 @@ describeWithEnvironment('TextEditor', () => {
     });
   });
 
+  describe('AI auto completion', () => {
+    it('can dispatch an effect to set the AI auto complete suggestion', () => {
+      const editor = new TextEditor.TextEditor.TextEditor(makeState('', TextEditor.Config.aiAutoCompleteSuggestion));
+      renderElementIntoDOM(editor);
+
+      const text = 'hello';
+      editor.dispatch({
+        effects: TextEditor.Config.setAiAutoCompleteSuggestion.of({text, from: 0}),
+      });
+
+      const actualSuggestion = editor.editor.state.field(TextEditor.Config.aiAutoCompleteSuggestionState);
+      assert.isOk(actualSuggestion);
+      assert.strictEqual(actualSuggestion.text, text);
+      editor.remove();
+    });
+
+    it('keeps the AI suggestion if the typed text is a prefix of the suggestion', () => {
+      const editor = new TextEditor.TextEditor.TextEditor(makeState('', TextEditor.Config.aiAutoCompleteSuggestion));
+      renderElementIntoDOM(editor);
+
+      editor.dispatch({
+        effects: TextEditor.Config.setAiAutoCompleteSuggestion.of({text: 'hello', from: 0}),
+      });
+      assert.isOk(editor.editor.state.field(TextEditor.Config.aiAutoCompleteSuggestionState));
+
+      editor.dispatch({
+        changes: {from: 0, insert: 'he'},
+        selection: {anchor: 2},
+      });
+      assert.isOk(editor.editor.state.field(TextEditor.Config.aiAutoCompleteSuggestionState));
+      editor.remove();
+    });
+
+    it('clears the AI auto complete suggestion if the typed text is not a prefix of the suggestion', () => {
+      const editor = new TextEditor.TextEditor.TextEditor(makeState('', TextEditor.Config.aiAutoCompleteSuggestion));
+      renderElementIntoDOM(editor);
+
+      editor.dispatch({
+        effects: TextEditor.Config.setAiAutoCompleteSuggestion.of({text: 'hello', from: 0}),
+      });
+      assert.isOk(editor.editor.state.field(TextEditor.Config.aiAutoCompleteSuggestionState));
+
+      editor.dispatch({changes: {from: 0, insert: 'a'}, selection: {anchor: 1}});
+      assert.isNull(editor.editor.state.field(TextEditor.Config.aiAutoCompleteSuggestionState));
+      editor.remove();
+    });
+
+    it('can accept an AI auto complete suggestion', () => {
+      const editor = new TextEditor.TextEditor.TextEditor(makeState('', TextEditor.Config.aiAutoCompleteSuggestion));
+      renderElementIntoDOM(editor);
+      const text = 'hello';
+      editor.dispatch({
+        effects: TextEditor.Config.setAiAutoCompleteSuggestion.of({text, from: 0}),
+      });
+
+      const {accepted, suggestion} = TextEditor.Config.acceptAiAutoCompleteSuggestion(editor.editor);
+      assert.isTrue(accepted);
+      assert.strictEqual(suggestion?.text, text);
+
+      assert.strictEqual(editor.state.doc.toString(), text);
+      assert.isNull(editor.editor.state.field(TextEditor.Config.aiAutoCompleteSuggestionState));
+      editor.remove();
+    });
+  });
+
   it('dispatching a transaction from a saved editor reference should not throw an error', () => {
     const textEditor = new TextEditor.TextEditor.TextEditor(makeState('one'));
     const editorViewA = textEditor.editor;
@@ -229,9 +294,13 @@ describeWithMockConnection('TextEditor autocompletion', () => {
     const workspace = Workspace.Workspace.WorkspaceImpl.instance();
     const targetManager = SDK.TargetManager.TargetManager.instance();
     const resourceMapping = new Bindings.ResourceMapping.ResourceMapping(targetManager, workspace);
-
-    const {pluginManager} = Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance(
-        {forceNew: true, targetManager, resourceMapping});
+    const ignoreListManager = Workspace.IgnoreListManager.IgnoreListManager.instance({forceNew: true});
+    const {pluginManager} = Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance({
+      forceNew: true,
+      resourceMapping,
+      targetManager,
+      ignoreListManager,
+    });
     const testScript = debuggerModel.parsedScriptSource(
         '1' as Protocol.Runtime.ScriptId, urlString`script://1`, 0, 0, 0, 0, executionContext.id, '', undefined, false,
         undefined, false, false, 0, null, null, null, null, null, null, null);

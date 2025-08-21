@@ -19,7 +19,7 @@ import * as Utils from './utils/utils.js';
 
 const UIStrings = {
   /**
-   *@description Text in Timeline Flame Chart Data Provider of the Performance panel
+   * @description Text in Timeline Flame Chart Data Provider of the Performance panel
    */
   interactions: 'Interactions',
 } as const;

@@ -9,7 +9,7 @@ const parseURL = require('url').parse;
 const yargs = require('yargs');
 const {hideBin} = require('yargs/helpers');
 
-const argv = yargs(hideBin(process.argv)).argv;
+const argv = yargs(hideBin(process.argv)).parseSync();
 const tracesMode = argv.traces || false;
 const serverPort = parseInt(process.env.PORT, 10) || (tracesMode ? 11010 : 8090);
 
@@ -291,8 +291,8 @@ async function checkFileExists(filePath) {
 }
 
 /**
- * @param {http.IncomingMessage} request
- * @param {http.ServerResponse} response
+ * @param request
+ * @param response
  */
 async function requestHandler(request, response) {
   const filePath = parseURL(request.url).pathname;
@@ -339,7 +339,8 @@ async function requestHandler(request, response) {
   } else if (tracesMode) {
     return handleTracesModeRequest(request, response, filePath);
   } else if (/ui\/components\/docs\/(.+)\/(.+)\.html/.test(filePath)) {
-    /** This conditional checks if we are viewing an individual example's HTML
+    /**
+     * This conditional checks if we are viewing an individual example's HTML
      *  file. e.g. localhost:8090/front_end/ui/components/docs/data_grid/basic.html For each
      *  example we inject themeColors.css into the page so all CSS variables
      *  that components use are available.
@@ -549,9 +550,9 @@ function createTracesIndexFile(traceFilenames) {
 }
 
 /**
- * @param {http.IncomingMessage} request
- * @param {http.ServerResponse} response
- * @param {string|null} filePath
+ * @param request
+ * @param response
+ * @param filePath
  */
 async function handleTracesModeRequest(request, response, filePath) {
   const traceFolder = path.resolve(

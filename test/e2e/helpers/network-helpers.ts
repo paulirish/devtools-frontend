@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {assert} from 'chai';
 import type * as puppeteer from 'puppeteer-core';
 
 import type {DevToolsPage} from '../../e2e_non_hosted/shared/frontend-helper.js';
 import type {InspectedPage} from '../../e2e_non_hosted/shared/target-helper.js';
 import {
   $,
-  click,
   goToResource,
   setCheckBox,
   waitFor,
@@ -111,8 +111,9 @@ export async function waitForSelectedRequestChange(initialRequestName: string|nu
   });
 }
 
-export async function setPersistLog(persist: boolean) {
-  await setCheckBox('[title="Do not clear log on page reload / navigation"]', persist);
+export async function setPersistLog(
+    persist: boolean, devToolsPage: DevToolsPage = getBrowserAndPagesWrappers().devToolsPage) {
+  await devToolsPage.setCheckBox('[title="Do not clear log on page reload / navigation"]', persist);
 }
 
 export async function setCacheDisabled(
@@ -142,31 +143,38 @@ export async function setTextFilter(
   await devToolsPage.typeText(text);
 }
 
-export async function getTextFilterContent(): Promise<string> {
-  const toolbarHandle = await waitFor('.text-filter');
-  const textFilterContent = toolbarHandle.evaluate(toolbar => {
+export async function getTextFilterContent(devToolsPage: DevToolsPage = getBrowserAndPagesWrappers().devToolsPage):
+    Promise<string> {
+  const toolbarHandle = await devToolsPage.waitFor('.text-filter');
+  const textFilterContent = await toolbarHandle.evaluate(toolbar => {
     return toolbar.querySelector('[aria-label="Filter"]')?.textContent ?? '';
   });
-  return await textFilterContent;
+  return textFilterContent;
 }
 
-export async function clearTextFilter(): Promise<void> {
-  const textFilterContent = await getTextFilterContent();
+export async function clearTextFilter(devToolsPage: DevToolsPage = getBrowserAndPagesWrappers().devToolsPage):
+    Promise<void> {
+  const textFilterContent = await getTextFilterContent(devToolsPage);
   if (textFilterContent) {
-    const toolbarHandle = await waitFor('.text-filter');
-    await click('[aria-label="Clear"]', {root: toolbarHandle});
+    const toolbarHandle = await devToolsPage.waitFor('.text-filter');
+    await devToolsPage.click('[aria-label="Clear"]', {root: toolbarHandle});
   }
 }
 
-export async function getTextFromHeadersRow(row: puppeteer.ElementHandle<Element>) {
-  const headerNameElement = await waitFor('.header-name', row);
+export async function getTextFromHeadersRow(
+    row: puppeteer.ElementHandle<Element>, devToolsPage: DevToolsPage = getBrowserAndPagesWrappers().devToolsPage) {
+  const headerNameElement = await row.waitForSelector('.header-name');
+  assert.isOk(headerNameElement);
   const headerNameText = await headerNameElement.evaluate(el => el.textContent || '');
 
-  const headerValueElement = await waitFor('.header-value', row);
+  const headerValueElement = await row.waitForSelector('.header-value');
+  assert.isOk(headerValueElement);
   let headerValueText = (await headerValueElement.evaluate(el => el.textContent || '')).trim();
   if (headerValueText === '') {
-    const headerValueEditableSpanComponent = await waitFor('.header-value devtools-editable-span', row);
-    const editableSpan = await waitFor('.editable', headerValueEditableSpanComponent);
+    const headerValueEditableSpanComponent = await devToolsPage.waitFor('.header-value devtools-editable-span', row);
+    assert.isOk(headerValueEditableSpanComponent);
+    const editableSpan = await devToolsPage.waitFor('.editable', headerValueEditableSpanComponent);
+    assert.isOk(editableSpan);
     headerValueText = (await editableSpan.evaluate(el => el.textContent || '')).trim();
   }
 
@@ -241,4 +249,13 @@ export function veImpressionForNetworkPanel(options?: {newFilterBar?: boolean}) 
     veImpression('TableHeader', 'size'),
     veImpression('TableHeader', 'time'),
   ]);
+}
+
+export async function clickInfobarButton(devToolsPage: DevToolsPage = getBrowserAndPagesWrappers().devToolsPage) {
+  const infoBar = await devToolsPage.waitForAria('Select a folder to store override files in');
+  // Allow time for infobar to animate in before clicking the button
+  await devToolsPage.timeout(550);
+  await devToolsPage.click('.infobar-main-row .infobar-button', {
+    root: infoBar,
+  });
 }

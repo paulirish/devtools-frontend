@@ -151,6 +151,12 @@ export interface AidaClientResult {
   detail?: string;
 }
 
+export interface AidaCodeCompleteResult {
+  response?: string;
+  error?: string;
+  detail?: string;
+}
+
 export interface VisualElementImpression {
   id: number;
   type: number;
@@ -349,6 +355,8 @@ export interface InspectorFrontendHostAPI {
 
   recordUserMetricsAction(umaName: string): void;
 
+  recordNewBadgeUsage(featureName: string): void;
+
   sendMessageToBackend(message: string): void;
 
   setDevicesDiscoveryConfig(config: Adb.Config): void;
@@ -393,6 +401,7 @@ export interface InspectorFrontendHostAPI {
 
   doAidaConversation: (request: string, streamId: number, cb: (result: DoAidaConversationResult) => void) => void;
   registerAidaClientEvent: (request: string, cb: (result: AidaClientResult) => void) => void;
+  aidaCodeComplete: (request: string, cb: (result: AidaCodeCompleteResult) => void) => void;
 
   recordImpression(event: ImpressionEvent): void;
   recordClick(event: ClickEvent): void;
@@ -421,6 +430,8 @@ export interface ContextMenuDescriptor {
   subItems?: ContextMenuDescriptor[];
   shortcut?: string;
   jslogContext?: string;
+  /** Setting the featureName requests showing a new badge tied to that feature . */
+  featureName?: string;
 }
 export interface LoadNetworkResourceResult {
   statusCode: number;

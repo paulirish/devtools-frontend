@@ -2,12 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {
-  drainFrontendTaskQueue,
-  getBrowserAndPages,
-  platform,
-  waitFor
-} from '../../shared/helper.js';
+import {assert} from 'chai';
+
+import {platform} from '../../shared/helper.js';
 import {getBrowserAndPagesWrappers} from '../../shared/non_hosted_wrappers.js';
 
 import {SourceFileEvents, waitForSourceFiles} from './sources-helpers.js';
@@ -73,22 +70,22 @@ export const openFileWithQuickOpen =
       SourceFileEvents.SOURCE_FILE_LOADED,
       files => files.some(f => f.endsWith(sourceFile)),
       async () => {
-        await openFileQuickOpen();
-        await typeIntoQuickOpen(sourceFile);
-        const firstItem = await getMenuItemAtPosition(filePosition);
+        await openFileQuickOpen(devtoolsPage);
+        await typeIntoQuickOpen(sourceFile, undefined, devtoolsPage);
+        const firstItem = await getMenuItemAtPosition(filePosition, devtoolsPage);
         await firstItem.click();
       },
       devtoolsPage,
   );
 };
 
-export async function runCommandWithQuickOpen(command: string): Promise<void> {
-  const {frontend} = getBrowserAndPages();
-  await openCommandMenu();
-  await frontend.keyboard.type(command);
+export async function runCommandWithQuickOpen(
+    command: string, devtoolsPage = getBrowserAndPagesWrappers().devToolsPage): Promise<void> {
+  await openCommandMenu(devtoolsPage);
+  await devtoolsPage.page.keyboard.type(command);
   // TODO: it should actually wait for rendering to finish.
-  await drainFrontendTaskQueue();
-  await frontend.keyboard.press('Enter');
+  await devtoolsPage.drainTaskQueue();
+  await devtoolsPage.page.keyboard.press('Enter');
 }
 
 export const openGoToLineQuickOpen = async (devtoolsPage = getBrowserAndPagesWrappers().devToolsPage) => {
@@ -118,9 +115,7 @@ export async function getMenuItemAtPosition(
   await devtoolsPage.waitFor(QUICK_OPEN_ITEM_TITLE_SELECTOR);
   const itemsHandles = await devtoolsPage.$$(QUICK_OPEN_ITEMS_SELECTOR, quickOpenElement);
   const item = itemsHandles[position];
-  if (!item) {
-    assert.fail(`Quick open: could not find item at position: ${position}.`);
-  }
+  assert.isOk(item, `Quick open: could not find item at position: ${position}.`);
   return item;
 }
 
@@ -130,9 +125,7 @@ export async function getMenuItemTitleAtPosition(
   await devtoolsPage.waitFor(QUICK_OPEN_ITEM_TITLE_SELECTOR);
   const itemsHandles = await devtoolsPage.$$(QUICK_OPEN_ITEM_TITLE_SELECTOR, quickOpenElement);
   const item = itemsHandles[position];
-  if (!item) {
-    assert.fail(`Quick open: could not find item at position: ${position}.`);
-  }
+  assert.isOk(item, `Quick open: could not find item at position: ${position}.`);
   const title = await item.evaluate(elem => elem.textContent);
   return title;
 }
@@ -141,13 +134,11 @@ export const closeDrawer = async (devToolsPage = getBrowserAndPagesWrappers().de
   await devToolsPage.click('[aria-label="Close drawer"]');
 };
 
-export const getSelectedItemText = async () => {
-  const quickOpenElement = await waitFor(QUICK_OPEN_SELECTOR);
-  const selectedRow = await waitFor(QUICK_OPEN_SELECTED_ITEM_SELECTOR, quickOpenElement);
+export const getSelectedItemText = async (devToolsPage = getBrowserAndPagesWrappers().devToolsPage) => {
+  const quickOpenElement = await devToolsPage.waitFor(QUICK_OPEN_SELECTOR);
+  const selectedRow = await devToolsPage.waitFor(QUICK_OPEN_SELECTED_ITEM_SELECTOR, quickOpenElement);
   const textContent = await selectedRow.getProperty('textContent');
-  if (!textContent) {
-    assert.fail('Quick open: could not get selected item textContent');
-  }
+  assert.isOk(textContent, 'Quick open: could not get selected item textContent');
   return await textContent.jsonValue();
 };
 

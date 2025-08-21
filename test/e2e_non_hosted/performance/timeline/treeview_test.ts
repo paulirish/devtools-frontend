@@ -43,7 +43,7 @@ describe('The Performance tool, Bottom-up panel', function() {
   async function setupPerformancePanel(devToolsPage: DevToolsPage, inspectedPage: InspectedPage) {
     await navigateToPerformanceTab('empty', devToolsPage, inspectedPage);
 
-    const uploadProfileHandle = await devToolsPage.waitFor<HTMLInputElement>('input[type=file]');
+    const uploadProfileHandle = await devToolsPage.waitFor('input[type=file]');
     assert.isNotNull(uploadProfileHandle, 'unable to upload the performance profile');
     await uploadProfileHandle.uploadFile(
         path.join(GEN_DIR, 'test/e2e/resources/performance/timeline/treeView-test-trace.json'));
@@ -109,7 +109,7 @@ describe('The Performance tool, Bottom-up panel', function() {
     await navigateToBottomUpTab(devToolsPage, 'url');
 
     // use group-by drop down and validate activities
-    const timelineTree = await devToolsPage.$('.timeline-tree-view') as puppeteer.ElementHandle;
+    const timelineTree = await devToolsPage.$('.timeline-tree-view');
     await devToolsPage.waitForElementWithTextContent('h2_with_suffix', timelineTree);
     const dropdown = await devToolsPage.waitFor('select[aria-label="No grouping"]');
     await dropdown.evaluate(el => {
@@ -131,9 +131,7 @@ describe('The Performance tool, Bottom-up panel', function() {
     await toggleCaseSensitive(devToolsPage);
     await setFilter('h2_', devToolsPage);
     const rootActivity = await devToolsPage.waitForElementWithTextContent(expectedActivities[0], timelineTree);
-    if (!rootActivity) {
-      assert.fail(`Could not find ${expectedActivities[0]} in frontend.`);
-    }
+    assert.isOk(rootActivity, `Could not find ${expectedActivities[0]} in DevTools.`);
 
     const initialActivities = await enumerateTreeItems(devToolsPage);
     assert.deepEqual(initialActivities, [expectedActivities.at(0)]);
@@ -158,9 +156,7 @@ describe('The Performance tool, Bottom-up panel', function() {
 
     const timelineTree = await devToolsPage.$('.timeline-tree-view') as puppeteer.ElementHandle<HTMLSelectElement>;
     const rootActivity = await devToolsPage.waitForElementWithTextContent(expectedActivities[0], timelineTree);
-    if (!rootActivity) {
-      assert.fail(`Could not find ${expectedActivities[0]} in frontend.`);
-    }
+    assert.isOk(rootActivity, `Could not find ${expectedActivities[0]} in DevTools.`);
     await expandNodeRecursively(rootActivity, devToolsPage);
     // Wait for all nodes
     await devToolsPage.waitForMany('td.activity-column', 7);

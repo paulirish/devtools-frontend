@@ -6,7 +6,7 @@ import * as Common from '../common/common.js';
 import * as Root from '../root/root.js';
 
 import {InspectorFrontendHostInstance} from './InspectorFrontendHost.js';
-import type {AidaClientResult, SyncInformation} from './InspectorFrontendHostAPI.js';
+import type {AidaClientResult, AidaCodeCompleteResult, SyncInformation} from './InspectorFrontendHostAPI.js';
 import {bindOutputStream} from './ResourceLoader.js';
 
 export enum Role {
@@ -113,6 +113,7 @@ export enum FunctionalityType {
   AGENTIC_CHAT = 5,
 }
 
+// See: cs/aida.proto (google3).
 export enum ClientFeature {
   // Unspecified client feature.
   CLIENT_FEATURE_UNSPECIFIED = 0,
@@ -132,6 +133,8 @@ export enum ClientFeature {
   CHROME_PATCH_AGENT = 12,
   // Chrome AI Assistance Performance Insights Agent.
   CHROME_PERFORMANCE_INSIGHTS_AGENT = 13,
+  // Chrome AI Assistance Performance Agent.
+  CHROME_PERFORMANCE_FULL_AGENT = 24,
 }
 
 export enum UserTier {
@@ -199,18 +202,76 @@ export interface DoConversationRequest {
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 
+/* eslint-disable @typescript-eslint/naming-convention */
+export interface CompleteCodeOptions {
+  temperature?: number;
+  model_id?: string;
+  inference_language?: AidaInferenceLanguage;
+  stop_sequences?: string[];
+}
+/* eslint-enable @typescript-eslint/naming-convention */
+
+export enum EditType {
+  // Unknown edit type
+  EDIT_TYPE_UNSPECIFIED = 0,
+  // User typed code/text into file
+  ADD = 1,
+  // User deleted code/text from file
+  DELETE = 2,
+  // User pasted into file (this includes smart paste)
+  PASTE = 3,
+  // User performs an undo action
+  UNDO = 4,
+  // User performs a redo action
+  REDO = 5,
+  // User accepted a completion from AIDA
+  ACCEPT_COMPLETION = 6,
+}
+
+/* eslint-disable @typescript-eslint/naming-convention */
+export interface CompletionRequest {
+  client: string;
+  prefix: string;
+  suffix?: string;
+  options?: CompleteCodeOptions;
+  metadata: RequestMetadata;
+  last_user_action?: EditType;
+}
+/* eslint-enable @typescript-eslint/naming-convention */
+
 /* eslint-disable @typescript-eslint/naming-convention  */
-export interface AidaDoConversationClientEvent {
-  corresponding_aida_rpc_global_id: RpcGlobalId;
-  disable_user_content_logging: boolean;
-  do_conversation_client_event: {
-    user_feedback: {
-      sentiment?: Rating,
-      user_input?: {
-        comment?: string,
-      },
+export interface DoConversationClientEvent {
+  user_feedback: {
+    sentiment?: Rating,
+    user_input?: {
+      comment?: string,
     },
   };
+}
+
+export interface UserImpression {
+  sample: {
+    sample_id: number,
+  };
+  latency: {
+    duration: {
+      seconds: number,
+      nanos: number,
+    },
+  };
+}
+
+export interface UserAcceptance {
+  sample: {
+    sample_id: number,
+  };
+}
+
+export interface AidaRegisterClientEvent {
+  corresponding_aida_rpc_global_id: RpcGlobalId;
+  disable_user_content_logging: boolean;
+  do_conversation_client_event?: DoConversationClientEvent;
+  complete_code_client_event?: {user_acceptance: UserAcceptance}|{user_impression: UserImpression};
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 
@@ -269,6 +330,18 @@ export interface DoConversationResponse {
   completed: boolean;
 }
 
+export interface CompletionResponse {
+  generatedSamples: GenerationSample[];
+  metadata: ResponseMetadata;
+}
+
+export interface GenerationSample {
+  generationString: string;
+  score: number;
+  sampleId: number;
+  attributionMetadata?: AttributionMetadata;
+}
+
 export const enum AidaAccessPreconditions {
   AVAILABLE = 'available',
   NO_ACCOUNT_EMAIL = 'no-account-email',
@@ -278,7 +351,7 @@ export const enum AidaAccessPreconditions {
   SYNC_IS_PAUSED = 'sync-is-paused',
 }
 
-const enum AidaInferenceLanguage {
+export const enum AidaInferenceLanguage {
   CPP = 'CPP',
   PYTHON = 'PYTHON',
   KOTLIN = 'KOTLIN',
@@ -496,7 +569,7 @@ export class AidaClient {
     };
   }
 
-  registerClientEvent(clientEvent: AidaDoConversationClientEvent): Promise<AidaClientResult> {
+  registerClientEvent(clientEvent: AidaRegisterClientEvent): Promise<AidaClientResult> {
     const {promise, resolve} = Promise.withResolvers<AidaClientResult>();
     InspectorFrontendHostInstance.registerAidaClientEvent(
         JSON.stringify({
@@ -508,6 +581,53 @@ export class AidaClient {
     );
 
     return promise;
+  }
+
+  async completeCode(request: CompletionRequest): Promise<CompletionResponse|null> {
+    if (!InspectorFrontendHostInstance.aidaCodeComplete) {
+      throw new Error('aidaCodeComplete is not available');
+    }
+    const {promise, resolve} = Promise.withResolvers<AidaCodeCompleteResult>();
+    InspectorFrontendHostInstance.aidaCodeComplete(JSON.stringify(request), resolve);
+    const completeCodeResult = await promise;
+
+    if (completeCodeResult.error) {
+      throw new Error(`Cannot send request: ${completeCodeResult.error} ${completeCodeResult.detail || ''}`);
+    }
+    const response = completeCodeResult.response;
+    if (!response?.length) {
+      throw new Error('Empty response');
+    }
+    let parsedResponse;
+    try {
+      parsedResponse = JSON.parse(response);
+    } catch (error) {
+      throw new Error('Cannot parse response: ' + response, {cause: error});
+    }
+
+    const generatedSamples: GenerationSample[] = [];
+    let metadata: ResponseMetadata = {rpcGlobalId: 0};
+    if ('metadata' in parsedResponse) {
+      metadata = parsedResponse.metadata;
+    }
+
+    if ('generatedSamples' in parsedResponse) {
+      for (const generatedSample of parsedResponse.generatedSamples) {
+        const sample: GenerationSample = {
+          generationString: generatedSample.generationString,
+          score: generatedSample.score,
+          sampleId: generatedSample.sampleId,
+        };
+        if ('metadata' in generatedSample && 'attributionMetadata' in generatedSample.metadata) {
+          sample.attributionMetadata = generatedSample.metadata.attributionMetadata;
+        }
+        generatedSamples.push(sample);
+      }
+    } else {
+      return null;
+    }
+
+    return {generatedSamples, metadata};
   }
 }
 

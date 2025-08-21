@@ -42,16 +42,16 @@ import {KeyValueStorageItemsView} from './KeyValueStorageItemsView.js';
 
 const UIStrings = {
   /**
-   *@description Name for the "DOM Storage Items" table that shows the content of the DOM Storage.
+   * @description Name for the "DOM Storage Items" table that shows the content of the DOM Storage.
    */
   domStorageItems: 'DOM Storage Items',
   /**
-   *@description Text for announcing that the "DOM Storage Items" table was cleared, that is, all
+   * @description Text for announcing that the "DOM Storage Items" table was cleared, that is, all
    * entries were deleted.
    */
   domStorageItemsCleared: 'DOM Storage Items cleared',
   /**
-   *@description Text for announcing a DOM Storage key/value item has been deleted
+   * @description Text for announcing a DOM Storage key/value item has been deleted
    */
   domStorageItemDeleted: 'The storage item was deleted.',
 } as const;
@@ -118,7 +118,7 @@ export class DOMStorageItemsView extends KeyValueStorageItemsView {
 
   override itemsCleared(): void {
     super.itemsCleared();
-    UI.ARIAUtils.alert(i18nString(UIStrings.domStorageItemsCleared));
+    UI.ARIAUtils.LiveAnnouncer.alert(i18nString(UIStrings.domStorageItemsCleared));
   }
 
   private domStorageItemRemoved(event: Common.EventTarget.EventTargetEvent<DOMStorage.DOMStorageItemRemovedEvent>):
@@ -132,7 +132,7 @@ export class DOMStorageItemsView extends KeyValueStorageItemsView {
 
   override itemRemoved(key: string): void {
     super.itemRemoved(key);
-    UI.ARIAUtils.alert(i18nString(UIStrings.domStorageItemDeleted));
+    UI.ARIAUtils.LiveAnnouncer.alert(i18nString(UIStrings.domStorageItemDeleted));
   }
 
   private domStorageItemAdded(event: Common.EventTarget.EventTargetEvent<DOMStorage.DOMStorageItemAddedEvent>): void {

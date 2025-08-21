@@ -86,7 +86,7 @@ export class StateProvider {
 
     const browsingContext = await browser.createBrowserContext();
     const inspectedPage = await setupInspectedPage(browsingContext, StateProvider.serverPort);
-    const devToolsPage = await setupDevToolsPage(browsingContext, settings);
+    const devToolsPage = await setupDevToolsPage(browsingContext, settings, inspectedPage);
     const state = {
       devToolsPage,
       inspectedPage,
@@ -118,6 +118,7 @@ export class StateProvider {
   }
 
   async closeBrowsers() {
+    this.#settingToBrowser.values().next().value?.copyCrashDumps();
     await Promise.allSettled([...this.#settingToBrowser.values()].map(async browser => {
       await browser.browser.close();
     }));
@@ -133,6 +134,7 @@ export function mergeSettings(s1: E2E.SuiteSettings, s2: E2E.HarnessSettings): E
     enabledBlinkFeatures: mergeAsSet(s1.enabledBlinkFeatures, s2.enabledBlinkFeatures),
     disabledFeatures: mergeAsSet(s1.disabledFeatures, s2.disabledFeatures),
     enabledDevToolsExperiments: mergeAsSet(s1.enabledDevToolsExperiments, s2.enabledDevToolsExperiments),
+    disabledDevToolsExperiments: mergeAsSet(s1.disabledDevToolsExperiments, s2.disabledDevToolsExperiments),
     devToolsSettings: {...(s2.devToolsSettings ?? {}), ...(s1.devToolsSettings ?? {})},
     dockingMode: s1.dockingMode ?? s2.dockingMode,
   };

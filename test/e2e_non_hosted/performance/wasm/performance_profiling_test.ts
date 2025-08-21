@@ -67,7 +67,7 @@ describe('The Performance panel', function() {
   async function setupPerformancePanel(devToolsPage: DevToolsPage, inspectedPage: InspectedPage) {
     await navigateToPerformanceTab('wasm/profiling', devToolsPage, inspectedPage);
 
-    const uploadProfileHandle = await devToolsPage.waitFor<HTMLInputElement>('input[type=file]');
+    const uploadProfileHandle = await devToolsPage.waitFor('input[type=file]');
     assert.isNotNull(uploadProfileHandle, 'unable to upload the performance profile');
     await uploadProfileHandle.uploadFile(
         path.join(GEN_DIR, 'test/e2e/resources/performance/wasm/mainWasm_profile.json'));
@@ -111,9 +111,7 @@ describe('The Performance panel', function() {
 
         const timelineTree = await devToolsPage.$('.timeline-tree-view') as puppeteer.ElementHandle<HTMLSelectElement>;
         const rootActivity = await devToolsPage.waitForElementWithTextContent(expectedActivities[0], timelineTree);
-        if (!rootActivity) {
-          assert.fail(`Could not find ${expectedActivities[0]} in frontend.`);
-        }
+        assert.isOk(rootActivity, `Could not find ${expectedActivities[0]} in DevTools.`);
         await rootActivity.click();
         await expandAndCheckActivityTree(expectedActivities, devToolsPage);
       });
@@ -137,9 +135,7 @@ describe('The Performance panel', function() {
 
         const timelineTree = await devToolsPage.$('.timeline-tree-view') as puppeteer.ElementHandle<HTMLSelectElement>;
         const rootActivity = await devToolsPage.waitForElementWithTextContent(expectedActivities[0], timelineTree);
-        if (!rootActivity) {
-          assert.fail(`Could not find ${expectedActivities[0]} in frontend.`);
-        }
+        assert.isOk(rootActivity, `Could not find ${expectedActivities[0]} in DevTools.`);
         await rootActivity.click();
         await expandAndCheckActivityTree(expectedActivities, devToolsPage);
       });

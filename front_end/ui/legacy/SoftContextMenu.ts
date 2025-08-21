@@ -44,24 +44,24 @@ import {createTextChild, ElementFocusRestorer} from './UIUtils.js';
 
 const UIStrings = {
   /**
-   *@description Text exposed to screen readers on checked items.
+   * @description Text exposed to screen readers on checked items.
    */
   checked: 'checked',
   /**
-   *@description Accessible text exposed to screen readers when the screen reader encounters an unchecked checkbox.
+   * @description Accessible text exposed to screen readers when the screen reader encounters an unchecked checkbox.
    */
   unchecked: 'unchecked',
   /**
-   *@description Accessibility label for checkable SoftContextMenuItems with shortcuts
-   *@example {Open File} PH1
-   *@example {Ctrl + P} PH2
-   *@example {checked} PH3
+   * @description Accessibility label for checkable SoftContextMenuItems with shortcuts
+   * @example {Open File} PH1
+   * @example {Ctrl + P} PH2
+   * @example {checked} PH3
    */
   sSS: '{PH1}, {PH2}, {PH3}',
   /**
-   *@description Generic text with two placeholders separated by a comma
-   *@example {1 613 680} PH1
-   *@example {44 %} PH2
+   * @description Generic text with two placeholders separated by a comma
+   * @example {1 613 680} PH1
+   * @example {44 %} PH2
    */
   sS: '{PH1}, {PH2}',
 } as const;
@@ -307,6 +307,11 @@ export class SoftContextMenu {
       accessibleName = i18nString(UIStrings.sS, {PH1: String(item.label), PH2: item.shortcut});
     }
     ARIAUtils.setLabel(menuItemElement, accessibleName);
+
+    if (item.isExperimentalFeature) {
+      const experimentIcon = IconButton.Icon.create('experiment');
+      menuItemElement.appendChild(experimentIcon);
+    }
 
     this.detailsForElementMap.set(menuItemElement, detailsForElement);
 
@@ -650,6 +655,8 @@ export interface SoftContextMenuDescriptor {
   shortcut?: string;
   tooltip?: Platform.UIString.LocalizedString;
   jslogContext?: string;
+  /** A no-op. For native context menus, feature name will request showing a new badge. */
+  featureName?: string;
 }
 interface ElementMenuDetails {
   customElement?: HTMLElement;

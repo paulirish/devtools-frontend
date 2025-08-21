@@ -3,8 +3,9 @@
 // found in the LICENSE file.
 
 import * as i18n from '../../../core/i18n/i18n.js';
-import type * as TimelineUtils from '../../../panels/timeline/utils/utils.js';
+import * as Platform from '../../../core/platform/platform.js';
 import * as Trace from '../../trace/trace.js';
+import type {ConversationSuggestion} from '../agents/AiAgent.js';
 
 import {
   NetworkRequestFormatter,
@@ -56,9 +57,10 @@ function getLCPData(parsedTrace: Trace.Handlers.Types.ParsedTrace, frameId: stri
 export class PerformanceInsightFormatter {
   #insight: Trace.Insights.Types.InsightModel;
   #parsedTrace: Trace.Handlers.Types.ParsedTrace;
-  constructor(activeInsight: TimelineUtils.InsightAIContext.ActiveInsight) {
-    this.#insight = activeInsight.insight;
-    this.#parsedTrace = activeInsight.parsedTrace;
+
+  constructor(parsedTrace: Trace.Handlers.Types.ParsedTrace, insight: Trace.Insights.Types.InsightModel) {
+    this.#insight = insight;
+    this.#parsedTrace = parsedTrace;
   }
 
   /**
@@ -87,8 +89,8 @@ export class PerformanceInsightFormatter {
 
     if (lcpRequest) {
       parts.push(`${theLcpElement} is an image fetched from \`${lcpRequest.args.data.url}\`.`);
-      const request = TraceEventFormatter.networkRequest(
-          lcpRequest, this.#parsedTrace, {verbose: true, customTitle: 'LCP resource network request'});
+      const request = TraceEventFormatter.networkRequests(
+          [lcpRequest], this.#parsedTrace, {verbose: true, customTitle: 'LCP resource network request'});
       parts.push(request);
     } else {
       parts.push(`${theLcpElement} is text and was not fetched from the network.`);
@@ -99,6 +101,83 @@ export class PerformanceInsightFormatter {
 
   insightIsSupported(): boolean {
     return this.#description().length > 0;
+  }
+
+  getSuggestions(): [ConversationSuggestion, ...ConversationSuggestion[]] {
+    switch (this.#insight.insightKey) {
+      case 'CLSCulprits':
+        return [
+          {title: 'Help me optimize my CLS score'},
+          {title: 'How can I prevent layout shifts on this page?'},
+        ];
+      case 'DocumentLatency':
+        return [
+          {title: 'How do I decrease the initial loading time of my page?'},
+          {title: 'Did anything slow down the request for this document?'},
+        ];
+      case 'DOMSize':
+        return [{title: 'How can I reduce the size of my DOM?'}];
+      case 'DuplicatedJavaScript':
+        return [
+          {title: 'How do I deduplicate the identified scripts in my bundle?'},
+          {title: 'Which duplicated JavaScript modules are the most problematic?'}
+        ];
+      case 'FontDisplay':
+        return [
+          {title: 'How can I update my CSS to avoid layout shifts caused by incorrect `font-display` properties?'}
+        ];
+      case 'ForcedReflow':
+        return [
+          {title: 'How can I avoid layout thrashing?'}, {title: 'What is forced reflow and why is it problematic?'}
+        ];
+      case 'ImageDelivery':
+        return [
+          {title: 'What should I do to improve and optimize the time taken to fetch and display images on the page?'},
+          {title: 'Are all images on my site optimized?'},
+        ];
+      case 'INPBreakdown':
+        return [
+          {title: 'Suggest fixes for my longest interaction'}, {title: 'Why is a large INP score problematic?'},
+          {title: 'What\'s the biggest contributor to my longest interaction?'}
+        ];
+      case 'LCPDiscovery':
+        return [
+          {title: 'Suggest fixes to reduce my LCP'}, {title: 'What can I do to reduce my LCP discovery time?'},
+          {title: 'Why is LCP discovery time important?'}
+        ];
+      case 'LCPBreakdown':
+        return [
+          {title: 'Help me optimize my LCP score'}, {title: 'Which LCP phase was most problematic?'},
+          {title: 'What can I do to reduce the LCP time for this page load?'}
+        ];
+      case 'NetworkDependencyTree':
+        return [{title: 'How do I optimize my network dependency tree?'}];
+      case 'RenderBlocking':
+        return [
+          {title: 'Show me the most impactful render blocking requests that I should focus on'},
+          {title: 'How can I reduce the number of render blocking requests?'}
+        ];
+      case 'SlowCSSSelector':
+        return [{title: 'How can I optimize my CSS to increase the performance of CSS selectors?'}];
+      case 'ThirdParties':
+        return [{title: 'Which third parties are having the largest impact on my page performance?'}];
+      case 'Cache':
+        return [{title: 'What caching strategies can I apply to improve my page performance?'}];
+      case 'Viewport':
+        return [{title: 'How do I make sure my page is optimized for mobile viewing?'}];
+      case 'ModernHTTP':
+        return [
+          {title: 'Is my site using the best HTTP practices?'},
+          {title: 'Which resources are not using a modern HTTP protocol?'},
+        ];
+      case 'LegacyJavaScript':
+        return [
+          {title: 'Is my site polyfilling modern JavaScript features?'},
+          {title: 'How can I reduce the amount of legacy JavaScript on my page?'},
+        ];
+      default:
+        Platform.assertNever(this.#insight.insightKey, 'Unknown insight key');
+    }
   }
 
   /**
@@ -118,11 +197,43 @@ ${this.#description()}
 ${header} Detailed analysis:
 ${this.#details()}
 
+${header} Estimated savings: ${this.estimatedSavings() || 'none'}
+
 ${header} External resources:
 ${this.#links()}`;
   }
 
   #details(): string {
+    if (Trace.Insights.Models.ImageDelivery.isImageDelivery(this.#insight)) {
+      const optimizableImages = this.#insight.optimizableImages;
+      if (optimizableImages.length === 0) {
+        return 'There are no unoptimized images on this page.';
+      }
+
+      const imageDetails =
+          optimizableImages
+              .map(image => {
+                // List potential optimizations for the image
+                const optimizations =
+                    image.optimizations
+                        .map(optimization => {
+                          const message = Trace.Insights.Models.ImageDelivery.getOptimizationMessage(optimization);
+                          const byteSavings = i18n.ByteUtilities.bytesToString(optimization.byteSavings);
+                          return `${message} (Est ${byteSavings})`;
+                        })
+                        .join('\n');
+
+                return `### ${image.request.args.data.url}
+- Potential savings: ${i18n.ByteUtilities.bytesToString(image.byteSavings)}
+- Optimizations:\n${optimizations}`;
+              })
+              .join('\n\n');
+
+      return `Total potential savings: ${i18n.ByteUtilities.bytesToString(this.#insight.wastedBytes)}
+
+The following images could be optimized:\n\n${imageDetails}`;
+    }
+
     if (Trace.Insights.Models.LCPBreakdown.isLCPBreakdown(this.#insight)) {
       const {subparts, lcpMs} = this.#insight;
       if (!lcpMs || !subparts) {
@@ -178,8 +289,8 @@ ${checklistBulletPoints.map(point => `- ${point.name}: ${point.passed ? 'PASSED'
     }
 
     if (Trace.Insights.Models.RenderBlocking.isRenderBlocking(this.#insight)) {
-      const requestSummary = this.#insight.renderBlockingRequests.map(
-          r => TraceEventFormatter.networkRequest(r, this.#parsedTrace, {verbose: false}));
+      const requestSummary =
+          TraceEventFormatter.networkRequests(this.#insight.renderBlockingRequests, this.#parsedTrace);
 
       if (requestSummary.length === 0) {
         return 'There are no network requests that are render blocking.';
@@ -187,7 +298,7 @@ ${checklistBulletPoints.map(point => `- ${point.name}: ${point.passed ? 'PASSED'
 
       return `Here is a list of the network requests that were render blocking on this page and their duration:
 
-${requestSummary.join('\n\n')}`;
+${requestSummary}`;
     }
 
     if (Trace.Insights.Models.DocumentLatency.isDocumentLatency(this.#insight)) {
@@ -214,7 +325,7 @@ ${requestSummary.join('\n\n')}`;
 
       return `${this.#lcpMetricSharedContext()}
 
-${TraceEventFormatter.networkRequest(documentRequest, this.#parsedTrace, {
+${TraceEventFormatter.networkRequests([documentRequest], this.#parsedTrace, {
         verbose: true,
         customTitle: 'Document network request'
       })}
@@ -267,18 +378,70 @@ ${shiftsFormatted.join('\n')}`;
     }
 
     if (Trace.Insights.Models.ModernHTTP.isModernHTTP(this.#insight)) {
-      const requestSummary = this.#insight.http1Requests.map(
-          request => TraceEventFormatter.networkRequest(request, this.#parsedTrace, {verbose: true}));
+      const requestSummary = (this.#insight.http1Requests.length === 1) ?
+          TraceEventFormatter.networkRequests(this.#insight.http1Requests, this.#parsedTrace, {verbose: true}) :
+          TraceEventFormatter.networkRequests(this.#insight.http1Requests, this.#parsedTrace);
 
       if (requestSummary.length === 0) {
         return 'There are no requests that were served over a legacy HTTP protocol.';
       }
 
       return `Here is a list of the network requests that were served over a legacy HTTP protocol:
-${requestSummary.join('\n')}`;
+${requestSummary}`;
+    }
+
+    if (Trace.Insights.Models.DuplicatedJavaScript.isDuplicatedJavaScript(this.#insight)) {
+      const totalWastedBytes = this.#insight.wastedBytes;
+      const duplicatedScriptsByModule = this.#insight.duplicationGroupedByNodeModules;
+
+      if (duplicatedScriptsByModule.size === 0) {
+        return 'There is no duplicated JavaScript in the page modules';
+      }
+
+      const filesFormatted =
+          Array.from(duplicatedScriptsByModule)
+              .map(
+                  ([module, duplication]) =>
+                      `- Source: ${module} - Duplicated bytes: ${duplication.estimatedDuplicateBytes} bytes`)
+              .join('\n');
+
+      return `Total wasted bytes: ${totalWastedBytes} bytes.
+
+Duplication grouped by Node modules: ${filesFormatted}`;
+    }
+
+    if (Trace.Insights.Models.LegacyJavaScript.isLegacyJavaScript(this.#insight)) {
+      const legacyJavaScriptResults = this.#insight.legacyJavaScriptResults;
+
+      if (legacyJavaScriptResults.size === 0) {
+        return 'There is no significant amount of legacy JavaScript on the page.';
+      }
+
+      const filesFormatted =
+          Array.from(legacyJavaScriptResults)
+              .map(([script, result]) => `\n- Script: ${script.url} - Wasted bytes: ${result.estimatedByteSavings} bytes
+Matches:
+${result.matches.map(match => `Line: ${match.line}, Column: ${match.column}, Name: ${match.name}`).join('\n')}`)
+              .join('\n');
+
+      return `Total legacy JavaScript: ${legacyJavaScriptResults.size} files.
+
+Legacy JavaScript by file:
+${filesFormatted}`;
     }
 
     return '';
+  }
+
+  estimatedSavings(): string {
+    return Object.entries(this.#insight.metricSavings ?? {})
+        .map(([k, v]) => {
+          if (k === 'CLS') {
+            return `${k} ${v}`;
+          }
+          return `${k} ${v} ms`;
+        })
+        .join(', ');
   }
 
   #links(): string {
@@ -297,7 +460,7 @@ ${requestSummary.join('\n')}`;
       case 'ForcedReflow':
         return '';
       case 'ImageDelivery':
-        return '';
+        return '- https://developer.chrome.com/docs/lighthouse/performance/uses-optimized-images/';
       case 'INPBreakdown':
         return `- https://web.dev/articles/inp
 - https://web.dev/explore/how-to-optimize-inp
@@ -325,7 +488,8 @@ ${requestSummary.join('\n')}`;
       case 'ModernHTTP':
         return '- https://developer.chrome.com/docs/lighthouse/best-practices/uses-http2';
       case 'LegacyJavaScript':
-        return '';
+        return `- https://web.dev/articles/baseline-and-polyfills
+- https://philipwalton.com/articles/the-state-of-es5-on-the-web/`;
     }
   }
 
@@ -344,13 +508,14 @@ ${requestSummary.join('\n')}`;
       case 'DOMSize':
         return '';
       case 'DuplicatedJavaScript':
-        return '';
+        return `This insight identifies large, duplicated JavaScript modules that are present in your application and create redundant code.
+  This wastes network bandwidth and slows down your page, as the user's browser must download and process the same code multiple times.`;
       case 'FontDisplay':
         return '';
       case 'ForcedReflow':
         return '';
       case 'ImageDelivery':
-        return '';
+        return 'This insight identifies unoptimized images that are downloaded at a much higher resolution than they are displayed. Properly sizing and compressing these assets will decrease their download time, directly improving the perceived page load time and LCP';
       case 'INPBreakdown':
         return `Interaction to Next Paint (INP) is a metric that tracks the responsiveness of the page when the user interacts with it. INP is a Core Web Vital and the thresholds for how we categorize a score are:
 - Good: 200 milliseconds or less.
@@ -394,13 +559,15 @@ We apply a conservative approach when flagging HTTP/1.1 usage. This insight will
 
 To pass this insight, ensure your server supports and prioritizes a modern HTTP protocol (like HTTP/2) for static assets, especially when serving a substantial number of them.`;
       case 'LegacyJavaScript':
-        return '';
+        return `This insight identified legacy JavaScript in your application's modules that may be creating unnecessary code.
+
+Polyfills and transforms enable older browsers to use new JavaScript features. However, many are not necessary for modern browsers. Consider modifying your JavaScript build process to not transpile Baseline features, unless you know you must support older browsers.`;
     }
   }
 }
 
 export interface NetworkRequestFormatOptions {
-  verbose: boolean;
+  verbose?: boolean;
   customTitle?: string;
 }
 
@@ -443,6 +610,34 @@ export class TraceEventFormatter {
 - Score: ${shift.args.data?.weighted_score_delta.toFixed(4)}
 ${rootCauseText}`;
   }
+
+  // Stringify network requests for the LLM model.
+  static networkRequests(
+      requests: readonly Trace.Types.Events.SyntheticNetworkRequest[], parsedTrace: Trace.Handlers.Types.ParsedTrace,
+      options?: NetworkRequestFormatOptions): string {
+    if (requests.length === 0) {
+      return '';
+    }
+
+    let verbose;
+    if (options?.verbose !== undefined) {
+      verbose = options.verbose;
+    } else {
+      verbose = requests.length === 1;
+    }
+
+    // Use verbose format for a single network request. With the compressed format, a format description
+    // needs to be provided, which is not worth sending if only one network request is being stringified.
+    // For a single request, use `formatRequestVerbosely`, which formats with all fields specified and does not require a
+    // format description.
+    if (verbose) {
+      return requests.map(request => this.#networkRequestVerbosely(request, parsedTrace, options?.customTitle))
+          .join('\n');
+    }
+
+    return this.#networkRequestsArrayCompressed(requests, parsedTrace);
+  }
+
   /**
    * This is the data passed to a network request when the Performance Insights
    * agent is asking for information. It is a slimmed down version of the
@@ -451,9 +646,9 @@ ${rootCauseText}`;
    * Security; be careful about adding new data here. If you are in doubt please
    * talk to jacktfranklin@.
    */
-  static networkRequest(
+  static #networkRequestVerbosely(
       request: Trace.Types.Events.SyntheticNetworkRequest, parsedTrace: Trace.Handlers.Types.ParsedTrace,
-      options: NetworkRequestFormatOptions): string {
+      customTitle?: string): string {
     const {
       url,
       statusCode,
@@ -466,7 +661,7 @@ ${rootCauseText}`;
       protocol
     } = request.args.data;
 
-    const titlePrefix = `## ${options.customTitle ?? 'Network request'}`;
+    const titlePrefix = `## ${customTitle ?? 'Network request'}`;
 
     // Note: unlike other agents, we do have the ability to include
     // cross-origins, hence why we do not sanitize the URLs here.
@@ -509,12 +704,8 @@ ${rootCauseText}`;
 - Duration: ${formatMicroToMilli(redirect.dur)}`;
     });
 
-    if (!options.verbose) {
-      return `${titlePrefix}: ${url}
-- Start time: ${formatMicroToMilli(startTimesForLifecycle.queuedAt)}
-- Duration: ${formatMicroToMilli(request.dur)}
-- MIME type: ${mimeType}${renderBlocking ? '\n- This request was render blocking' : ''}`;
-    }
+    const initiators = this.#getInitiatorChain(parsedTrace, request);
+    const initiatorUrls = initiators.map(initiator => initiator.args.data.url);
 
     return `${titlePrefix}: ${url}
 Timings:
@@ -533,6 +724,7 @@ Protocol: ${protocol}
 ${priorityLines.join('\n')}
 Render blocking: ${renderBlocking ? 'Yes' : 'No'}
 From a service worker: ${fromServiceWorker ? 'Yes' : 'No'}
+Initiators (root request to the request that directly loaded this one): ${initiatorUrls.join(', ') || 'none'}
 ${NetworkRequestFormatter.formatHeaders('Response headers', responseHeaders ?? [], true)}`;
   }
 
@@ -546,15 +738,27 @@ ${NetworkRequestFormatter.formatHeaders('Response headers', responseHeaders ?? [
     return index;
   }
 
-  // This is the data passed to a network request when the Performance Insights agent is asking for information on multiple requests.
-  static getNetworkRequestsNewFormat(
-      requests: Trace.Types.Events.SyntheticNetworkRequest[], parsedTrace: Trace.Handlers.Types.ParsedTrace): string {
+  // A compact network requests format designed to save tokens when sending multiple network requests to the model.
+  // It creates a map that maps request URLs to IDs and references the IDs in the compressed format.
+  //
+  // Important: Do not use this method for stringifying a single network request. With this format, a format description
+  // needs to be provided, which is not worth sending if only one network request is being stringified.
+  // For a single request, use `formatRequestVerbosely`, which formats with all fields specified and does not require a
+  // format description.
+  static #networkRequestsArrayCompressed(
+      requests: readonly Trace.Types.Events.SyntheticNetworkRequest[],
+      parsedTrace: Trace.Handlers.Types.ParsedTrace): string {
+    const networkDataString = `
+Network requests data:
+
+`;
     const urlIdToIndex = new Map<string, number>();
     const allRequestsText = requests
                                 .map(request => {
                                   const urlIndex =
                                       TraceEventFormatter.#getOrAssignUrlIndex(urlIdToIndex, request.args.data.url);
-                                  return this.networkRequestNewFormat(urlIndex, request, parsedTrace, urlIdToIndex);
+                                  return this.#networkRequestCompressedFormat(
+                                      urlIndex, request, parsedTrace, urlIdToIndex);
                                 })
                                 .join('\n');
 
@@ -566,44 +770,50 @@ ${NetworkRequestFormatter.formatHeaders('Response headers', responseHeaders ?? [
                                   })
                                   .join(', ')}]`;
 
-    return urlsMapString + '\n\n' + allRequestsText;
+    return networkDataString + '\n\n' + urlsMapString + '\n\n' + allRequestsText;
   }
 
   /**
+   * Network requests format description that is sent to the model as a fact.
+   */
+  static networkDataFormatDescription = `Network requests are formatted like this:
+\`urlIndex;queuedTime;requestSentTime;downloadCompleteTime;processingCompleteTime;totalDuration;downloadDuration;mainThreadProcessingDuration;statusCode;mimeType;priority;initialPriority;finalPriority;renderBlocking;protocol;fromServiceWorker;initiators;redirects:[[redirectUrlIndex|startTime|duration]];responseHeaders:[header1Value|header2Value|...]\`
+
+- \`urlIndex\`: Numerical index for the request's URL, referencing the "All URLs" list.
+Timings (all in milliseconds, relative to navigation start):
+- \`queuedTime\`: When the request was queued.
+- \`requestSentTime\`: When the request was sent.
+- \`downloadCompleteTime\`: When the download completed.
+- \`processingCompleteTime\`: When main thread processing finished.
+Durations (all in milliseconds):
+- \`totalDuration\`: Total time from the request being queued until its main thread processing completed.
+- \`downloadDuration\`: Time spent actively downloading the resource.
+- \`mainThreadProcessingDuration\`: Time spent on the main thread after the download completed.
+- \`statusCode\`: The HTTP status code of the response (e.g., 200, 404).
+- \`mimeType\`: The MIME type of the resource (e.g., "text/html", "application/javascript").
+- \`priority\`: The final network request priority (e.g., "VeryHigh", "Low").
+- \`initialPriority\`: The initial network request priority.
+- \`finalPriority\`: The final network request priority (redundant if \`priority\` is always final, but kept for clarity if \`initialPriority\` and \`priority\` differ).
+- \`renderBlocking\`: 't' if the request was render-blocking, 'f' otherwise.
+- \`protocol\`: The network protocol used (e.g., "h2", "http/1.1").
+- \`fromServiceWorker\`: 't' if the request was served from a service worker, 'f' otherwise.
+- \`initiators\`: A list (separated by ,) of URL indices for the initiator chain of this request. Listed in order starting from the root request to the request that directly loaded this one. This represents the network dependencies necessary to load this request. If there is no initiator, this is empty.
+- \`redirects\`: A comma-separated list of redirects, enclosed in square brackets. Each redirect is formatted as
+\`[redirectUrlIndex|startTime|duration]\`, where: \`redirectUrlIndex\`: Numerical index for the redirect's URL. \`startTime\`: The start time of the redirect in milliseconds, relative to navigation start. \`duration\`: The duration of the redirect in milliseconds.
+- \`responseHeaders\`: A list (separated by '|') of values for specific, pre-defined response headers, enclosed in square brackets.
+The order of headers corresponds to an internal fixed list. If a header is not present, its value will be empty.
+`;
+
+  /**
    *
-   * This is the network request data passed to a the Performance Insights agent.
+   * This is the network request data passed to the Performance agent.
    *
    * The `urlIdToIndex` Map is used to map URLs to numerical indices in order to not need to pass whole url every time it's mentioned.
    * The map content is passed in the response together will all the requests data.
    *
-   * The format is as follows:
-   * `urlIndex;queuedTime;requestSentTime;downloadCompleteTime;processingCompleteTime;totalDuration;downloadDuration;mainThreadProcessingDuration;statusCode;mimeType;priority;initialPriority;finalPriority;renderBlocking;protocol;fromServiceWorker;initiatorUrlIndex;redirects:[[redirectUrlIndex|startTime|duration]];responseHeaders:[header1Value,header2Value,...]`
-   *
-   * - `urlIndex`: Numerical index for the request's URL, referencing the 'All URLs' list.
-   * Timings (all in milliseconds, relative to navigation start):
-   * - `queuedTime`: When the request was queued.
-   * - `requestSentTime`: When the request was sent.
-   * - `downloadCompleteTime`: When the download completed.
-   * - `processingCompleteTime`: When main thread processing finished.
-   * Durations (all in milliseconds):
-   * - `totalDuration`: Total time from the request being queued until its main thread processing completed.
-   * - `downloadDuration`: Time spent actively downloading the resource.
-   * - `mainThreadProcessingDuration`: Time spent on the main thread after the download completed.
-   * - `statusCode`: The HTTP status code of the response (e.g., 200, 404).
-   * - `mimeType`: The MIME type of the resource (e.g., "text/html", "application/javascript").
-   * - `priority`: The final network request priority (e.g., "VeryHigh", "Low").
-   * - `initialPriority`: The initial network request priority.
-   * - `finalPriority`: The final network request priority (redundant if `priority` is always final, but kept for clarity if `initialPriority` and `priority` differ).
-   * - `renderBlocking`: 't' if the request was render-blocking, 'f' otherwise.
-   * - `protocol`: The network protocol used (e.g., "h2", "http/1.1").
-   * - `fromServiceWorker`: 't' if the request was served from a service worker, 'f' otherwise.
-   * - `initiatorUrlIndex`: Numerical index for the URL of the resource that initiated this request, or empty string if no initiator.
-   * - `redirects`: A comma-separated list of redirects, enclosed in square brackets. Each redirect is formatted as
-   * `[redirectUrlIndex|startTime|duration]`, where: `redirectUrlIndex`: Numerical index for the redirect's URL. `startTime`: The start time of the redirect in milliseconds, relative to navigation start. `duration`: The duration of the redirect in milliseconds.
-   * - `responseHeaders`: A list separated by '|' of values for specific, pre-defined response headers, enclosed in square brackets.
-   * The order of headers corresponds to an internal fixed list. If a header is not present, its value will be empty.
+   * See `networkDataFormatDescription` above for specifics.
    */
-  static networkRequestNewFormat(
+  static #networkRequestCompressedFormat(
       urlIndex: number, request: Trace.Types.Events.SyntheticNetworkRequest,
       parsedTrace: Trace.Handlers.Types.ParsedTrace, urlIdToIndex: Map<string, number>): string {
     const {
@@ -648,9 +858,9 @@ ${NetworkRequestFormatter.formatHeaders('Response headers', responseHeaders ?? [
                           })
                           .join(',');
 
-    const initiator = parsedTrace.NetworkRequests.eventToInitiator.get(request);
-    const initiatorUrlIndex =
-        initiator ? TraceEventFormatter.#getOrAssignUrlIndex(urlIdToIndex, initiator.args.data.url) : '';
+    const initiators = this.#getInitiatorChain(parsedTrace, request);
+    const initiatorUrlIndices =
+        initiators.map(initiator => TraceEventFormatter.#getOrAssignUrlIndex(urlIdToIndex, initiator.args.data.url));
 
     const parts = [
       urlIndex,
@@ -669,10 +879,33 @@ ${NetworkRequestFormatter.formatHeaders('Response headers', responseHeaders ?? [
       renderBlocking,
       protocol,
       fromServiceWorker ? 't' : 'f',
-      initiatorUrlIndex,
+      initiatorUrlIndices.join(','),
       `[${redirects}]`,
       `[${headerValues ?? ''}]`,
     ];
     return parts.join(';');
+  }
+
+  static #getInitiatorChain(
+      parsedTrace: Trace.Handlers.Types.ParsedTrace,
+      request: Trace.Types.Events.SyntheticNetworkRequest): Trace.Types.Events.SyntheticNetworkRequest[] {
+    const initiators: Trace.Types.Events.SyntheticNetworkRequest[] = [];
+
+    let cur: Trace.Types.Events.SyntheticNetworkRequest|undefined = request;
+    while (cur) {
+      const initiator = parsedTrace.NetworkRequests.eventToInitiator.get(cur);
+      if (initiator) {
+        // Should never happen, but if it did that would be an infinite loop.
+        if (initiators.includes(initiator)) {
+          return [];
+        }
+
+        initiators.unshift(initiator);
+      }
+
+      cur = initiator;
+    }
+
+    return initiators;
   }
 }

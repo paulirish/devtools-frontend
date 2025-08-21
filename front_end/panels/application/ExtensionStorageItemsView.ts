@@ -44,11 +44,11 @@ import {KeyValueStorageItemsView, type View as KeyValueStorageItemsViewFunction}
 
 const UIStrings = {
   /**
-   *@description Name for the "Extension Storage Items" table that shows the content of the extension Storage.
+   * @description Name for the "Extension Storage Items" table that shows the content of the extension Storage.
    */
   extensionStorageItems: 'Extension Storage Items',
   /**
-   *@description Text for announcing that the "Extension Storage Items" table was cleared, that is, all
+   * @description Text for announcing that the "Extension Storage Items" table was cleared, that is, all
    * entries were deleted.
    */
   extensionStorageItemsCleared: 'Extension Storage Items cleared',
@@ -144,7 +144,7 @@ export class ExtensionStorageItemsView extends KeyValueStorageItemsView {
     }
 
     this.itemsCleared();
-    UI.ARIAUtils.alert(i18nString(UIStrings.extensionStorageItemsCleared));
+    UI.ARIAUtils.LiveAnnouncer.alert(i18nString(UIStrings.extensionStorageItemsCleared));
   }
 
   override deleteSelectedItem(): void {

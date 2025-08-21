@@ -80,14 +80,12 @@ export async function renderFlameChartIntoDOM(context: Mocha.Context|null, optio
   const targetManager = SDK.TargetManager.TargetManager.instance({forceNew: true});
   const workspace = Workspace.Workspace.WorkspaceImpl.instance({forceNew: true});
   const resourceMapping = new Bindings.ResourceMapping.ResourceMapping(targetManager, workspace);
-  const debuggerWorkspaceBinding = Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance({
+  const ignoreListManager = Workspace.IgnoreListManager.IgnoreListManager.instance({forceNew: true});
+  Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance({
     forceNew: true,
     resourceMapping,
     targetManager,
-  });
-  Bindings.IgnoreListManager.IgnoreListManager.instance({
-    forceNew: true,
-    debuggerWorkspaceBinding,
+    ignoreListManager,
   });
 
   let parsedTrace: Trace.Handlers.Types.ParsedTrace|null = null;
@@ -464,22 +462,15 @@ export function makeMockRendererHandlerData(
     threads: new Map([[tid as Trace.Types.Events.ThreadID, mockThread]]),
   };
 
-  const renderereEvents: Trace.Types.Events.RendererEvent[] = [];
-  for (const entry of entries) {
-    if (Trace.Types.Events.isRendererEvent(entry)) {
-      renderereEvents.push(entry);
-    }
-  }
-
   return {
     processes: new Map([[pid as Trace.Types.Events.ProcessID, mockProcess]]),
     compositorTileWorkers: new Map(),
     entryToNode,
-    allTraceEntries: renderereEvents,
     entityMappings: {
       entityByEvent: new Map(),
       eventsByEntity: new Map(),
       createdEntityCache: new Map(),
+      entityByUrlCache: new Map(),
     },
   };
 }
@@ -602,8 +593,8 @@ export interface FlameChartWithFakeProviderOptions {
 
 /**
  * Renders a flame chart using a fake provider and mock delegate.
- * @param provider - The fake flame chart provider.
- * @param options - Optional parameters.  Includes windowTimes, an array specifying the minimum and maximum window times. Defaults to [0, 100].
+ * @param provider The fake flame chart provider.
+ * @param options Optional parameters.  Includes windowTimes, an array specifying the minimum and maximum window times. Defaults to [0, 100].
  * @returns A promise that resolves when the flame chart is rendered.
  */
 export async function renderFlameChartWithFakeProvider(
@@ -724,11 +715,11 @@ export function getBaseTraceParseModelData(overrides: Partial<ParsedTrace> = {})
       processes: new Map(),
       compositorTileWorkers: new Map(),
       entryToNode: new Map(),
-      allTraceEntries: [],
       entityMappings: {
         entityByEvent: new Map(),
         eventsByEntity: new Map(),
         createdEntityCache: new Map(),
+        entityByUrlCache: new Map(),
       },
     },
     Screenshots: {
@@ -758,6 +749,7 @@ export function getBaseTraceParseModelData(overrides: Partial<ParsedTrace> = {})
         entityByEvent: new Map(),
         eventsByEntity: new Map(),
         createdEntityCache: new Map(),
+        entityByUrlCache: new Map(),
       },
       linkPreconnectEvents: [],
     },
@@ -862,21 +854,17 @@ export function getEventOfType<T extends Trace.Types.Events.Event>(
  * errors.
  */
 export function setupIgnoreListManagerEnvironment(): {
-  ignoreListManager: Bindings.IgnoreListManager.IgnoreListManager,
+  ignoreListManager: Workspace.IgnoreListManager.IgnoreListManager,
 } {
   const targetManager = SDK.TargetManager.TargetManager.instance({forceNew: true});
   const workspace = Workspace.Workspace.WorkspaceImpl.instance({forceNew: true});
   const resourceMapping = new Bindings.ResourceMapping.ResourceMapping(targetManager, workspace);
-
-  const debuggerWorkspaceBinding = Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance({
+  const ignoreListManager = Workspace.IgnoreListManager.IgnoreListManager.instance({forceNew: true});
+  Bindings.DebuggerWorkspaceBinding.DebuggerWorkspaceBinding.instance({
     forceNew: true,
     resourceMapping,
     targetManager,
-  });
-
-  const ignoreListManager = Bindings.IgnoreListManager.IgnoreListManager.instance({
-    forceNew: true,
-    debuggerWorkspaceBinding,
+    ignoreListManager,
   });
 
   return {ignoreListManager};
@@ -906,4 +894,32 @@ export function getAllNetworkRequestsByHost(
   });
 
   return reqs;
+}
+
+const allThreadEntriesForTraceCache = new WeakMap<Trace.Handlers.Types.ParsedTrace, Trace.Types.Events.Event[]>();
+
+/**
+ * A function to get a list of all thread entries that exist. This is
+ * reasonably expensive, so it's cached to avoid a huge impact on our test suite
+ * speed.
+ */
+export function allThreadEntriesInTrace(parsedTrace: Trace.Handlers.Types.ParsedTrace): Trace.Types.Events.Event[] {
+  const fromCache = allThreadEntriesForTraceCache.get(parsedTrace);
+  if (fromCache) {
+    return fromCache;
+  }
+
+  const allEvents: Trace.Types.Events.Event[] = [];
+
+  for (const process of parsedTrace.Renderer.processes.values()) {
+    for (const thread of process.threads.values()) {
+      for (const entry of thread.entries) {
+        allEvents.push(entry);
+      }
+    }
+  }
+
+  Trace.Helpers.Trace.sortTraceEventsInPlace(allEvents);
+  allThreadEntriesForTraceCache.set(parsedTrace, allEvents);
+  return allEvents;
 }

@@ -21,7 +21,7 @@ const FRONT_END_FOLDER = path.join(
 
 const CURRENT_YEAR = `${new Date().getFullYear()}`;
 const LINE_LICENSE_HEADER = [
-  `Copyright ${CURRENT_YEAR} The Chromium Authors. All rights reserved.`,
+  `Copyright ${CURRENT_YEAR} The Chromium Authors`,
   'Use of this source code is governed by a BSD-style license that can be',
   'found in the LICENSE file.',
 ];
@@ -149,8 +149,8 @@ export default createRule({
   },
   defaultOptions: [],
   create: function(context) {
-    const sourceCode = context.sourceCode ?? context.getSourceCode();
-    const filename = context.filename ?? context.getFilename();
+    const sourceCode = context.sourceCode;
+    const filename = context.filename;
     const fileName = filename;
     // Fix windows paths for exemptions
     const relativePath = path.relative(FRONT_END_FOLDER, fileName).replace(/\\/g, '/');

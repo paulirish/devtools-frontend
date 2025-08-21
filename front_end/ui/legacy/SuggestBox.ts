@@ -45,15 +45,15 @@ import {createShadowRootWithCoreStyles, measuredScrollbarWidth, measurePreferred
 
 const UIStrings = {
   /**
-   *@description Aria alert to read the suggestion for the suggestion box when typing in text editor
-   *@example {name} PH1
-   *@example {2} PH2
-   *@example {5} PH3
+   * @description Aria alert to read the suggestion for the suggestion box when typing in text editor
+   * @example {name} PH1
+   * @example {2} PH2
+   * @example {5} PH3
    */
   sSuggestionSOfS: '{PH1}, suggestion {PH2} of {PH3}',
   /**
-   *@description Aria alert to confirm the suggestion when it is selected from the suggestion box
-   *@example {name} PH1
+   * @description Aria alert to confirm the suggestion when it is selected from the suggestion box
+   * @example {name} PH1
    */
   sSuggestionSSelected: '{PH1}, suggestion selected',
 } as const;
@@ -173,22 +173,22 @@ export class SuggestBox implements ListDelegate<Suggestion> {
   private applySuggestion(isIntermediateSuggestion?: boolean): boolean {
     if (this.onlyCompletion) {
       isIntermediateSuggestion ?
-          ARIAUtils.alert(i18nString(
+          ARIAUtils.LiveAnnouncer.alert(i18nString(
               UIStrings.sSuggestionSOfS,
               {PH1: this.onlyCompletion.text, PH2: this.list.selectedIndex() + 1, PH3: this.items.length})) :
-          ARIAUtils.alert(i18nString(UIStrings.sSuggestionSSelected, {PH1: this.onlyCompletion.text}));
+          ARIAUtils.LiveAnnouncer.alert(i18nString(UIStrings.sSuggestionSSelected, {PH1: this.onlyCompletion.text}));
       this.suggestBoxDelegate.applySuggestion(this.onlyCompletion, isIntermediateSuggestion);
       return true;
     }
     const suggestion = this.list.selectedItem();
     if (suggestion?.text) {
-      isIntermediateSuggestion ?
-          ARIAUtils.alert(i18nString(UIStrings.sSuggestionSOfS, {
-            PH1: suggestion.title || suggestion.text,
-            PH2: this.list.selectedIndex() + 1,
-            PH3: this.items.length,
-          })) :
-          ARIAUtils.alert(i18nString(UIStrings.sSuggestionSSelected, {PH1: suggestion.title || suggestion.text}));
+      isIntermediateSuggestion ? ARIAUtils.LiveAnnouncer.alert(i18nString(UIStrings.sSuggestionSOfS, {
+        PH1: suggestion.title || suggestion.text,
+        PH2: this.list.selectedIndex() + 1,
+        PH3: this.items.length,
+      })) :
+                                 ARIAUtils.LiveAnnouncer.alert(i18nString(
+                                     UIStrings.sSuggestionSSelected, {PH1: suggestion.title || suggestion.text}));
     }
     this.suggestBoxDelegate.applySuggestion(suggestion, isIntermediateSuggestion);
 

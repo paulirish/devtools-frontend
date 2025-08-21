@@ -14,7 +14,6 @@ const filename = './test/invalid-animation-events.json.gz';
 const {parsedTrace: data, insights} = await analyzeTrace(filename);
 
 test('key values are populated', t => {
-  assert.equal(data.Renderer.allTraceEntries.length > 90_000, true);
   assert.equal((data.Screenshots.legacySyntheticScreenshots?.length ?? 0) > 2, true);
   assert.equal(data.Meta.threadsInProcess.size > 2, true);
   assert.equal(data.Meta.mainFrameNavigations.length > 0, true);

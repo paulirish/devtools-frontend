@@ -71,7 +71,7 @@ const DEFAULT_VIEW: View = (input, _output, target: HTMLElement) => {
           input.pseudo ? html`<span class="extra node-label-pseudo">${input.pseudo}</span>` : nothing,
         ]
       }</button>
-    </span>` : i18nString(UIStrings.node)}`, target, {host: input});
+    </span>` : i18nString(UIStrings.node)}`, target);
   // clang-format on
 };
 
@@ -81,7 +81,7 @@ export class DOMNodeLink extends UI.Widget.Widget {
   #view: View;
 
   constructor(element?: HTMLElement, node?: SDK.DOMModel.DOMNode, options?: Options, view = DEFAULT_VIEW) {
-    super(true, undefined, element);
+    super(element, {useShadowDom: true});
     this.element.classList.remove('vbox');
     this.#node = node;
     this.#options = options;
@@ -114,6 +114,7 @@ export class DOMNodeLink extends UI.Widget.Widget {
       classes: [],
       onClick: () => {
         void Common.Revealer.reveal(this.#node);
+        void this.#node?.scrollIntoView();
         return false;
       },
       onMouseOver: () => {
@@ -199,7 +200,7 @@ const DEFERRED_DEFAULT_VIEW: DeferredView = (input, _output, target: HTMLElement
           @click=${input.onClick}
           @mousedown=${(e: Event) => e.consume()}>
         <slot></slot>
-      </button>`, target, {host: input});
+      </button>`, target);
   // clang-format on
 };
 
@@ -211,7 +212,7 @@ export class DeferredDOMNodeLink extends UI.Widget.Widget {
   constructor(
       element?: HTMLElement, deferredNode?: SDK.DOMModel.DeferredDOMNode, options?: Options,
       view: DeferredView = DEFERRED_DEFAULT_VIEW) {
-    super(true, undefined, element);
+    super(element, {useShadowDom: true});
     this.element.classList.remove('vbox');
     this.#deferredNode = deferredNode;
     this.#options = options;
@@ -225,6 +226,7 @@ export class DeferredDOMNodeLink extends UI.Widget.Widget {
       onClick: () => {
         this.#deferredNode?.resolve?.(node => {
           void Common.Revealer.reveal(node);
+          void node?.scrollIntoView();
         });
       },
     };

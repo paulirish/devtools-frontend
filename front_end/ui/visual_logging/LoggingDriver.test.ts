@@ -43,12 +43,12 @@ describe('LoggingDriver', () => {
   });
 
   function addLoggableElements() {
-    const parent = document.createElement('div') as HTMLElement;
+    const parent = document.createElement('div');
     parent.id = 'parent';
     parent.setAttribute('jslog', 'TreeItem; track: hover');
     parent.style.width = '300px';
     parent.style.height = '300px';
-    const element = document.createElement('div') as HTMLElement;
+    const element = document.createElement('div');
     element.id = 'element';
     element.setAttribute('jslog', 'TreeItem; context:42; track: click, keydown, hover, drag, resize, change');
     element.style.width = '300px';
@@ -84,7 +84,7 @@ describe('LoggingDriver', () => {
 
   it('does not log impressions when parent hidden', async () => {
     addLoggableElements();
-    const parent = document.getElementById('parent') as HTMLElement;
+    const parent = document.getElementById('parent')!;
     parent.style.height = '0';
     await VisualLoggingTesting.LoggingDriver.startLogging({processingThrottler: throttler});
     sinon.assert.notCalled(recordImpression);
@@ -106,7 +106,7 @@ describe('LoggingDriver', () => {
 
   it('logs impressions on scroll', async () => {
     addLoggableElements();
-    const parent = document.getElementById('parent') as HTMLElement;
+    const parent = document.getElementById('parent')!;
     parent.style.marginTop = '2000px';
     await VisualLoggingTesting.LoggingDriver.startLogging({processingThrottler: throttler});
 
@@ -136,7 +136,7 @@ describe('LoggingDriver', () => {
   });
 
   it('logs impressions on mutation in shadow DOM', async () => {
-    const parent = document.createElement('div') as HTMLElement;
+    const parent = document.createElement('div');
     renderElementIntoDOM(parent);
     const shadow = parent.attachShadow({mode: 'open'});
     const shadowContent = document.createElement('div');
@@ -145,6 +145,36 @@ describe('LoggingDriver', () => {
     await VisualLoggingTesting.LoggingDriver.startLogging({processingThrottler: throttler});
     shadowContent.innerHTML = '<div jslog="TreeItem" style="width:300px;height:300px"></div>';
     await assertImpressionRecordedDeferred();
+  });
+
+  it('does not log impressions for content in closed details element but does when opened', async () => {
+    await VisualLoggingTesting.LoggingDriver.startLogging({processingThrottler: throttler});
+
+    const details = document.createElement('details');
+    details.style.width = '100px';
+    details.style.height = '100px';
+    details.innerHTML = '<div id="details-content" jslog="TreeItem" style="width: 100px; height: 100px;"></div>';
+    renderElementIntoDOM(details);
+
+    let [work] = await expectCalled(throttle);
+    await work();
+    // This will fail with the bug, as an impression will be recorded.
+    sinon.assert.notCalled(recordImpression);
+
+    throttle.resetHistory();
+    recordImpression.resetHistory();
+
+    details.open = true;
+    // Opening details will trigger mutation observer.
+    [work] = await expectCalled(throttle);
+    await work();
+    sinon.assert.calledOnce(recordImpression);
+    assert.sameDeepMembers(recordImpression.firstCall.firstArg.impressions, [{
+                             id: getVeId('#details-content'),
+                             type: 1,
+                             width: 100,
+                             height: 100,
+                           }]);
   });
 
   it('logs impressions on mutation in additional document', async () => {
@@ -178,7 +208,7 @@ describe('LoggingDriver', () => {
   });
 
   it('hashes a string context', async () => {
-    const element = document.createElement('div') as HTMLElement;
+    const element = document.createElement('div');
     element.setAttribute('jslog', 'TreeItem; track: hover; context: foobar');
     element.style.width = '300px';
     element.style.height = '300px';
@@ -197,7 +227,7 @@ describe('LoggingDriver', () => {
         'recordClick',
     );
 
-    const element = document.getElementById('element') as HTMLElement;
+    const element = document.getElementById('element')!;
     element.click();
 
     await expectCalled(recordClick);
@@ -211,7 +241,7 @@ describe('LoggingDriver', () => {
         'recordClick',
     );
 
-    const element = document.getElementById('element') as HTMLElement;
+    const element = document.getElementById('element')!;
     element.dispatchEvent(new MouseEvent('contextmenu'));
 
     await expectCalled(recordClick);
@@ -225,7 +255,7 @@ describe('LoggingDriver', () => {
         'recordClick',
     );
 
-    const element = document.getElementById('element') as HTMLElement;
+    const element = document.getElementById('element')!;
     element.dispatchEvent(new MouseEvent('auxclick'));
 
     await expectCalled(recordClick);
@@ -239,7 +269,7 @@ describe('LoggingDriver', () => {
         'recordClick',
     );
 
-    const parent = document.getElementById('parent') as HTMLElement;
+    const parent = document.getElementById('parent')!;
     parent.click();
 
     await new Promise(resolve => setTimeout(resolve, 0));
@@ -248,7 +278,7 @@ describe('LoggingDriver', () => {
 
   it('does not log click on double click', async () => {
     addLoggableElements();
-    const element = document.getElementById('element') as HTMLElement;
+    const element = document.getElementById('element')!;
     element.setAttribute('jslog', 'TreeItem; context:42; track: click, dblclick');
     await VisualLoggingTesting.LoggingDriver.startLogging({clickLogThrottler: throttler});
     const recordClick = sinon.stub(
@@ -269,7 +299,7 @@ describe('LoggingDriver', () => {
 
   it('does not log click on parent when clicked on child', async () => {
     addLoggableElements();
-    const parent = document.getElementById('parent') as HTMLElement;
+    const parent = document.getElementById('parent')!;
     parent.setAttribute('jslog', 'TreeItem; track: click');
     await VisualLoggingTesting.LoggingDriver.startLogging({clickLogThrottler: throttler});
     const recordClick = sinon.stub(
@@ -277,7 +307,7 @@ describe('LoggingDriver', () => {
         'recordClick',
     );
 
-    const element = document.getElementById('element') as HTMLElement;
+    const element = document.getElementById('element')!;
     element.click();
     const [logging] = await expectCalled(throttle);
     sinon.assert.notCalled(recordClick);
@@ -288,7 +318,7 @@ describe('LoggingDriver', () => {
   });
 
   const logsSelectOptions = (event: Event) => async () => {
-    const parent = document.createElement('div') as HTMLElement;
+    const parent = document.createElement('div');
     parent.innerHTML = `
       <select jslog="TreeItem; context: 0" id="select" style="width: 30px; height: 20px">
         <option jslog="TreeItem; context: 1">1</option>
@@ -332,7 +362,7 @@ describe('LoggingDriver', () => {
   it('logs impressions on select options on F4', logsSelectOptions(new KeyboardEvent('keydown', {code: 'F4'})));
 
   it('logs option click on select change', async () => {
-    const parent = document.createElement('div') as HTMLElement;
+    const parent = document.createElement('div');
     parent.innerHTML = `
       <select jslog="TreeItem; context: 0" id="select">
         <option jslog="TreeItem; context: 1; track: click">1</option>
@@ -364,7 +394,7 @@ describe('LoggingDriver', () => {
         'recordKeyDown',
     );
 
-    const element = document.getElementById('element') as HTMLElement;
+    const element = document.getElementById('element')!;
     element.dispatchEvent(new KeyboardEvent('keydown', {key: 'a'}));
     element.dispatchEvent(new KeyboardEvent('keydown', {key: 'b'}));
     const [logging] = await expectCalled(throttle);
@@ -378,7 +408,7 @@ describe('LoggingDriver', () => {
   it('logs keydown for specific codes', async () => {
     addLoggableElements();
 
-    const element = document.getElementById('element') as HTMLElement;
+    const element = document.getElementById('element')!;
     element.setAttribute('jslog', 'TreeItem; context:42; track: keydown: KeyA|KeyB');
     await VisualLoggingTesting.LoggingDriver.startLogging({keyboardLogThrottler: throttler});
     const recordKeyDown = sinon.stub(
@@ -413,7 +443,7 @@ describe('LoggingDriver', () => {
         'recordChange',
     );
 
-    const element = document.getElementById('element') as HTMLElement;
+    const element = document.getElementById('element')!;
     element.dispatchEvent(new Event('change'));
     sinon.assert.calledOnce(recordChange);
   });
@@ -426,7 +456,7 @@ describe('LoggingDriver', () => {
         'recordChange',
     );
 
-    const element = document.getElementById('element') as HTMLElement;
+    const element = document.getElementById('element')!;
     element.dispatchEvent(new InputEvent('input', {inputType: 'insertText'}));
     await new Promise(resolve => setTimeout(resolve, 0));
     sinon.assert.notCalled(recordChange);
@@ -454,7 +484,7 @@ describe('LoggingDriver', () => {
         'recordChange',
     );
 
-    const element = document.getElementById('element') as HTMLElement;
+    const element = document.getElementById('element')!;
     element.dispatchEvent(new InputEvent('input', {inputType: 'insertText'}));
     element.dispatchEvent(new Event('focusout'));
     await expectCalled(recordChange);
@@ -468,8 +498,8 @@ describe('LoggingDriver', () => {
         'recordChange',
     );
 
-    const element = document.getElementById('element') as HTMLElement;
-    const parent = document.getElementById('parent') as HTMLElement;
+    const element = document.getElementById('element')!;
+    const parent = document.getElementById('parent')!;
     element.dispatchEvent(new InputEvent('input', {inputType: 'insertText'}));
     throttle.callsArg(0);
     parent.appendChild(element.cloneNode());
@@ -484,7 +514,7 @@ describe('LoggingDriver', () => {
         'recordChange',
     );
 
-    const element = document.getElementById('element') as HTMLElement;
+    const element = document.getElementById('element')!;
     element.dispatchEvent(new InputEvent('input', {inputType: 'insertText'}));
     throttle.callsArg(0);
     element.style.width = '400px';
@@ -499,7 +529,7 @@ describe('LoggingDriver', () => {
         'recordChange',
     );
 
-    const element = document.getElementById('element') as HTMLElement;
+    const element = document.getElementById('element')!;
     element.dispatchEvent(new Event('focusout'));
     await new Promise(resolve => setTimeout(resolve, 0));
     assert.isFalse(recordChange.calledOnce);
@@ -588,7 +618,7 @@ describe('LoggingDriver', () => {
         'recordHover',
     );
 
-    const element = document.getElementById('element') as HTMLElement;
+    const element = document.getElementById('element')!;
     element.dispatchEvent(new MouseEvent('mouseover'));
     const [logging] = await expectCalled(throttle);
     sinon.assert.notCalled(recordHover);
@@ -604,7 +634,7 @@ describe('LoggingDriver', () => {
         'recordHover',
     );
 
-    const element = document.getElementById('element') as HTMLElement;
+    const element = document.getElementById('element')!;
     element.dispatchEvent(new MouseEvent('mouseover'));
     await expectCalled(throttle);
     sinon.assert.notCalled(recordHover);
@@ -621,8 +651,8 @@ describe('LoggingDriver', () => {
         'recordHover',
     );
 
-    const parent = document.getElementById('parent') as HTMLElement;
-    const element = document.getElementById('element') as HTMLElement;
+    const parent = document.getElementById('parent')!;
+    const element = document.getElementById('element')!;
     parent.dispatchEvent(new MouseEvent('mouseover'));
     await expectCalled(throttle);
 
@@ -642,7 +672,7 @@ describe('LoggingDriver', () => {
         'recordDrag',
     );
 
-    const element = document.getElementById('element') as HTMLElement;
+    const element = document.getElementById('element')!;
     element.dispatchEvent(new MouseEvent('pointerdown'));
     assert.exists(dragLogThrottler.process);
     sinon.assert.notCalled(recordDrag);
@@ -661,7 +691,7 @@ describe('LoggingDriver', () => {
         'recordDrag',
     );
 
-    const element = document.getElementById('element') as HTMLElement;
+    const element = document.getElementById('element')!;
     element.dispatchEvent(new MouseEvent('pointerdown'));
     assert.exists(dragLogThrottler.process);
     sinon.assert.notCalled(recordDrag);
@@ -680,7 +710,7 @@ describe('LoggingDriver', () => {
         'recordDrag',
     );
 
-    const element = document.getElementById('element') as HTMLElement;
+    const element = document.getElementById('element')!;
     element.dispatchEvent(new MouseEvent('pointerdown', {screenX: 0, screenY: 0}));
 
     await expectCalled(throttle);
@@ -700,7 +730,7 @@ describe('LoggingDriver', () => {
         'recordResize',
     );
 
-    const element = document.getElementById('element') as HTMLElement;
+    const element = document.getElementById('element')!;
 
     element.style.height = '400px';
     const [logging] = await expectCall(throttle, {callCount: 2});
@@ -717,7 +747,7 @@ describe('LoggingDriver', () => {
         'recordResize',
     );
 
-    const element = document.getElementById('element') as HTMLElement;
+    const element = document.getElementById('element')!;
     element.style.height = '301px';
     sinon.assert.notCalled(recordResize);
   });
@@ -730,7 +760,7 @@ describe('LoggingDriver', () => {
         'recordResize',
     );
 
-    const element = document.getElementById('element') as HTMLElement;
+    const element = document.getElementById('element')!;
 
     element.style.display = 'none';
     const [logging] = await expectCall(throttle, {callCount: 2});
@@ -754,7 +784,7 @@ describe('LoggingDriver', () => {
 
   it('throttles resize per element', async () => {
     addLoggableElements();
-    const element1 = document.getElementById('element') as HTMLElement;
+    const element1 = document.getElementById('element')!;
     const element2 = element1.cloneNode() as HTMLElement;
     document.getElementById('parent')?.appendChild(element2);
     await VisualLoggingTesting.LoggingDriver.startLogging({resizeLogThrottler: throttler});
@@ -782,7 +812,7 @@ describe('LoggingDriver', () => {
 
   it('only logs resize of the outer element', async () => {
     addLoggableElements();
-    const element = document.getElementById('element') as HTMLElement;
+    const element = document.getElementById('element')!;
     const child = document.createElement('div');
     child.setAttribute('jslog', 'TreeItem; track: resize');
     child.style.width = '100%';
@@ -807,7 +837,7 @@ describe('LoggingDriver', () => {
 
   it('does not log resize intial impressions due to visibility change', async () => {
     addLoggableElements();
-    const element = document.getElementById('element') as HTMLElement;
+    const element = document.getElementById('element')!;
     element.style.display = 'none';
 
     await VisualLoggingTesting.LoggingDriver.startLogging(
@@ -830,7 +860,7 @@ describe('LoggingDriver', () => {
 
   it('properly handles the switch between visible elements', async () => {
     addLoggableElements();
-    const element1 = document.getElementById('element') as HTMLElement;
+    const element1 = document.getElementById('element')!;
     const child = document.createElement('div');
     child.id = 'child';
     child.setAttribute('jslog', 'TreeItem; track: resize');
@@ -877,8 +907,8 @@ describe('LoggingDriver', () => {
         'recordResize',
     );
 
-    const element = document.getElementById('element') as HTMLElement;
-    const parent = document.getElementById('parent') as HTMLElement;
+    const element = document.getElementById('element')!;
+    const parent = document.getElementById('parent')!;
 
     parent.removeChild(element);
     const [logging] = await expectCall(throttle, {callCount: 2});
@@ -911,8 +941,8 @@ describe('LoggingDriver', () => {
     );
     recordImpression.resetHistory();
 
-    const element = document.getElementById('element') as HTMLElement;
-    const parent = document.getElementById('parent') as HTMLElement;
+    const element = document.getElementById('element')!;
+    const parent = document.getElementById('parent')!;
 
     parent.removeChild(element);
     parent.appendChild(element.cloneNode());
@@ -929,7 +959,7 @@ describe('LoggingDriver', () => {
 
   it('logs keydown, then resize, then impressions', async () => {
     addLoggableElements();
-    const element = document.getElementById('element') as HTMLElement;
+    const element = document.getElementById('element')!;
     element.setAttribute('jslog', 'TreeItem; context:42; track: keydown: KeyA, resize');
     const keyboardLogThrottler = new Common.Throttler.Throttler(100);
     const resizeLogThrottler = new Common.Throttler.Throttler(100);
@@ -949,7 +979,7 @@ describe('LoggingDriver', () => {
     recordImpression.resetHistory();
     throttle.callsArg(0);
 
-    const parent = document.getElementById('parent') as HTMLElement;
+    const parent = document.getElementById('parent')!;
 
     parent.removeChild(element);
     parent.appendChild(element.cloneNode());

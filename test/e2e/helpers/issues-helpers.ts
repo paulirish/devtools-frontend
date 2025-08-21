@@ -8,7 +8,6 @@ import type * as puppeteer from 'puppeteer-core';
 import type {DevToolsPage} from '../../e2e_non_hosted/shared/frontend-helper.js';
 import {
   matchStringTable,
-  waitFor,
 } from '../../shared/helper.js';
 import {getBrowserAndPagesWrappers} from '../../shared/non_hosted_wrappers.js';
 
@@ -117,14 +116,14 @@ export async function getAndExpandSpecificIssueByTitle(
   const issueMessageElement = await devToolsPage.waitForFunction(async () => {
     const issueElements = await devToolsPage.$$(ISSUE_TITLE);
     for (const issueElement of issueElements) {
-      const message = await issueElement.evaluate(issueElement => issueElement.textContent);
+      const message = await issueElement.evaluate((issueElement: Element) => issueElement.textContent);
       if (message === issueMessage) {
         return issueElement;
       }
     }
     return undefined;
   });
-  await devToolsPage.clickElement(issueMessageElement);
+  await issueMessageElement.click();
   await devToolsPage.waitFor('.message');
   return await getIssueByTitleElement(issueMessageElement);
 }
@@ -177,7 +176,7 @@ export async function expandIssue(devToolsPage: DevToolsPage = getBrowserAndPage
   }
 
   const issue = await devToolsPage.waitFor(ISSUE);
-  await devToolsPage.clickElement(issue);
+  await issue.click();
   await devToolsPage.waitFor('.message');
 }
 
@@ -269,8 +268,9 @@ export async function getGroupByKindChecked(devToolsPage: DevToolsPage = getBrow
   return await categoryCheckbox.evaluate(node => (node as HTMLInputElement).checked);
 }
 
-export async function revealNodeInElementsPanel() {
-  const revealIcon = await waitFor(ELEMENT_REVEAL_ICON);
+export async function revealNodeInElementsPanel(
+    devToolsPage: DevToolsPage = getBrowserAndPagesWrappers().devToolsPage) {
+  const revealIcon = await devToolsPage.waitFor(ELEMENT_REVEAL_ICON);
   await revealIcon.click();
 }
 

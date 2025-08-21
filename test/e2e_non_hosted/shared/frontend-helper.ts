@@ -10,8 +10,8 @@ import {installPageErrorHandlers} from '../../conductor/events.js';
 import {platform} from '../../conductor/platform.js';
 import {TestConfig} from '../../conductor/test_config.js';
 
-import type {BrowserWrapper} from './browser-helper.js';
 import {PageWrapper} from './page-wrapper.js';
+import type {InspectedPage} from './target-helper.js';
 
 export type Action = (element: puppeteer.ElementHandle) => Promise<void>;
 
@@ -21,7 +21,6 @@ export interface ClickOptions {
   maxPixelsFromLeft?: number;
 }
 
-const envThrottleRate = process.env['STRESS'] ? 3 : 1;
 const envLatePromises = process.env['LATE_PROMISES'] !== undefined ?
     ['true', ''].includes(process.env['LATE_PROMISES'].toLowerCase()) ? 10 : Number(process.env['LATE_PROMISES']) :
     0;
@@ -37,6 +36,11 @@ const globalThis: any = global;
 
 export class DevToolsPage extends PageWrapper {
   #currentHighlightedElement?: HighlightedElement;
+
+  constructor(page: puppeteer.Page) {
+    super(page);
+    this.#startHeartbeat();
+  }
 
   async delayPromisesIfRequired(): Promise<void> {
     if (envLatePromises === 0) {
@@ -57,25 +61,56 @@ export class DevToolsPage extends PageWrapper {
     }, envLatePromises);
   }
 
+  #heartbeatInterval: ReturnType<typeof setInterval> = -1 as unknown as ReturnType<typeof setInterval>;
+  /**
+   * Evaluates a script in the page every second
+   * to detect possible timeouts.
+   */
+  #startHeartbeat(): void {
+    const url = this.page.url();
+    this.#heartbeatInterval = setInterval(async () => {
+      // 1 - success, -1 - eval error, -2 - eval timeout.
+      const status = (await Promise.race([
+        this.page.evaluate(() => 1).catch(() => {
+          return -1;
+        }),
+        new Promise(resolve => setTimeout(() => resolve(-2), 1000))
+      ]) as number);
+      if (status <= 0) {
+        clearInterval(this.#heartbeatInterval);
+      }
+      if (status === -2) {
+        console.error(`heartbeat(${url}): failed with ${status}`);
+      }
+    }, 2000);
+  }
+
   async throttleCPUIfRequired(): Promise<void> {
-    if (envThrottleRate === 1) {
+    if (TestConfig.cpuThrottle === 1) {
       return;
     }
     /* eslint-disable-next-line no-console */
-    console.log(`Throttling CPU: ${envThrottleRate}x slowdown`);
+    console.log(`Throttling CPU: ${TestConfig.cpuThrottle}x slowdown`);
     const client = await this.page.createCDPSession();
     await client.send('Emulation.setCPUThrottlingRate', {
-      rate: envThrottleRate,
+      rate: TestConfig.cpuThrottle,
     });
   }
 
+  override async reload() {
+    await super.reload();
+    await this.ensureReadyForTesting();
+  }
+
   async ensureReadyForTesting() {
-    await this.page.waitForFunction(`
-      (async function() {
+    await this.waitForFunction(async () => {
+      const result = await this.page.evaluate(`(async function() {
         const Main = await import('./entrypoints/main/main.js');
         return Main.MainImpl.MainImpl.instanceForTest !== null;
-        })()
-        `);
+      })()`);
+      return result;
+    });
+
     await this.evaluate(`
       (async function() {
         const Main = await import('./entrypoints/main/main.js');
@@ -584,51 +619,120 @@ export class DevToolsPage extends PageWrapper {
     await this.pressKey('f', {control: true});
   }
 
-  async readClipboard(browserWrapper: BrowserWrapper) {
-    await browserWrapper.browser.defaultBrowserContext().overridePermissions(this.page.url(), ['clipboard-read']);
+  async readClipboard() {
+    await this.page.browserContext().overridePermissions(this.page.url(), ['clipboard-read', 'clipboard-write']);
     const clipboard = await this.page.evaluate(async () => await navigator.clipboard.readText());
-    await browserWrapper.browser.defaultBrowserContext().clearPermissionOverrides();
+    await this.page.browserContext().clearPermissionOverrides();
     return clipboard;
+  }
+
+  async setupOverridesFSMocks() {
+    await this.evaluateOnNewDocument(`
+      Object.defineProperty(window, 'InspectorFrontendHost', {
+        configurable: true,
+        enumerable: true,
+        get() {
+            return this._InspectorFrontendHost;
+        },
+        set(value) {
+            this._InspectorFrontendHost = value;
+            this._InspectorFrontendHost.fileSystem = null;
+            this._InspectorFrontendHost.addFileSystem = (type) => {
+              const onFileSystem = (fs) => {
+                this._InspectorFrontendHost.fileSystem = fs;
+                const fileSystem = {
+                  fileSystemName: 'sandboxedRequestedFileSystem',
+                  fileSystemPath: '/overrides',
+                  rootURL: 'filesystem:devtools://devtools/isolated/',
+                  type: 'overrides',
+                };
+                this._InspectorFrontendHost.events.dispatchEventToListeners('fileSystemAdded', {fileSystem});
+              };
+              window.webkitRequestFileSystem(window.TEMPORARY, 1024 * 1024, onFileSystem);
+            };
+            this._InspectorFrontendHost.removeFileSystem = (fileSystemPath) => {
+              const removalCallback = (entries) => {
+                entries.forEach(entry => {
+                  if (entry.isDirectory) {
+                    entry.removeRecursively(() => {});
+                  } else if (entry.isFile) {
+                    entry.remove(() => {});
+                  }
+                });
+              };
+
+              if (this._InspectorFrontendHost.fileSystem) {
+                this._InspectorFrontendHost.fileSystem.root.createReader().readEntries(removalCallback);
+              }
+
+              this._InspectorFrontendHost.fileSystem = null;
+              this._InspectorFrontendHost.events.dispatchEventToListeners('fileSystemRemoved', '/overrides');
+            }
+            this._InspectorFrontendHost.isolatedFileSystem = (_fileSystemId, _registeredName) => {
+              return this._InspectorFrontendHost.fileSystem;
+            };
+        }
+      });
+    `);
+    await this.reload();
   }
 }
 
 export interface DevtoolsSettings {
   enabledDevToolsExperiments: string[];
-  devToolsSettings: Record<string, string|boolean>;
+  disabledDevToolsExperiments: string[];
+  devToolsSettings: Record<string, unknown>;
   // front_end/ui/legacy/DockController.ts DockState
   dockingMode: 'bottom'|'right'|'left'|'undocked';
 }
 
 export const DEFAULT_DEVTOOLS_SETTINGS: DevtoolsSettings = {
   enabledDevToolsExperiments: [],
+  disabledDevToolsExperiments: [],
   devToolsSettings: {
-    isUnderTest: true,
+    veLogsTestMode: true,
   },
   dockingMode: 'right',
 };
 
 /**
- * @internal This should not be use outside setup
+ * @internal
  */
-async function setDevToolsSettings(devToolsPata: DevToolsPage, settings: Record<string, string|boolean>) {
+async function setDevToolsSettings(devToolsPata: DevToolsPage, settings: Record<string, unknown>) {
   if (!Object.keys(settings).length) {
     return;
   }
   const rawValues = Object.entries(settings).map(value => {
-    const rawValue = typeof value[1] === 'boolean' ? value[1].toString() : `'${value[1]}'`;
-    return [value[0], rawValue];
+    switch (typeof value[1]) {
+      case 'boolean':
+        return [value[0], value[1].toString()];
+      case 'string':
+      case 'number':
+      case 'bigint':
+        return [value[0], `'${value[1]}'`];
+      default:
+        return [value[0], JSON.stringify(value[1])];
+    }
   });
 
   return await devToolsPata.evaluate(`(async () => {
       const Common = await import('./core/common/common.js');
-      ${rawValues.map(([settingName, value]) => {
-    return `Common.Settings.Settings.instance().createSetting('${settingName}', ${value});`;
-  })}
+      ${
+      rawValues
+          .map(([settingName, value]) => {
+            // Creating the setting might not be enough if it already exists, so we
+            // create it and then forcibly set the value
+            return `{
+              const setting = Common.Settings.Settings.instance().createSetting('${settingName}', ${value});
+              setting.set(${value});
+            }`;
+          })
+          .join('')}
     })()`);
 }
 
 /**
- * @internal This should not be use outside setup
+ * @internal
  */
 async function setDevToolsExperiments(devToolsPage: DevToolsPage, experiments: string[]) {
   if (!experiments.length) {
@@ -650,7 +754,23 @@ async function disableAnimations(devToolsPage: DevToolsPage) {
 }
 
 /**
- * @internal This should not be use outside setup
+ * @internal
+ */
+async function setDisabledDevToolsExperiments(devToolsPage: DevToolsPage, experiments: string[]) {
+  if (!experiments.length) {
+    return;
+  }
+  return await devToolsPage.evaluate(async experiments => {
+    // @ts-expect-error evaluate in DevTools page
+    const Root = await import('./core/root/root.js');
+    for (const experiment of experiments) {
+      Root.Runtime.experiments.setEnabled(experiment, false);
+    }
+  }, experiments);
+}
+
+/**
+ * @internal
  */
 async function setDockingSide(devToolsPage: DevToolsPage, side: string) {
   await devToolsPage.evaluate(`
@@ -661,8 +781,18 @@ async function setDockingSide(devToolsPage: DevToolsPage, side: string) {
   `);
 }
 
-export async function setupDevToolsPage(context: puppeteer.BrowserContext, settings: DevtoolsSettings) {
-  const devToolsTarget = await context.waitForTarget(target => target.url().startsWith('devtools://'));
+export async function setupDevToolsPage(
+    context: puppeteer.BrowserContext, settings: DevtoolsSettings, inspectedPage: InspectedPage) {
+  const session = await context.browser().target().createCDPSession();
+  // FIXME: get rid of the reload below and configure
+  // the initial DevTools state via the openDevTools command.
+  // @ts-expect-error no types yet
+  const {targetId} = await session.send('Target.openDevTools', {
+    // @ts-expect-error need to expose this via Puppeteer.
+    targetId: inspectedPage.page.target()._getTargetInfo().targetId
+  });
+  // @ts-expect-error need to expose this via Puppeteer.
+  const devToolsTarget = await context.waitForTarget(target => target._getTargetInfo().targetId === targetId);
   const frontend = await devToolsTarget?.page();
   if (!frontend) {
     throw new Error('Unable to find frontend target!');
@@ -674,10 +804,9 @@ export async function setupDevToolsPage(context: puppeteer.BrowserContext, setti
     disableAnimations(devToolsPage),
     setDevToolsSettings(devToolsPage, settings.devToolsSettings),
     setDevToolsExperiments(devToolsPage, settings.enabledDevToolsExperiments),
+    setDisabledDevToolsExperiments(devToolsPage, settings.disabledDevToolsExperiments),
   ]);
-
   await devToolsPage.reload();
-  await devToolsPage.ensureReadyForTesting();
 
   await Promise.all([
     devToolsPage.throttleCPUIfRequired(),

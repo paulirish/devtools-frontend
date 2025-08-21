@@ -75,6 +75,7 @@ export async function openCaptureSettings(
             [
               veImpression('Toggle', 'timeline-capture-layers-and-pictures'),
               veImpression('Toggle', 'timeline-capture-selector-stats'),
+              veImpression('Toggle', 'timeline-disable-js-sampling'),
               veImpression('DropDown', 'cpu-throttling'),
               veImpression('DropDown', 'active-network-condition-key'),
               veImpression('Toggle', 'timeline-show-extension-data'),
@@ -358,7 +359,7 @@ export async function enableCSSSelectorStats(devToolsPage: DevToolsPage = getBro
   // Wait for the checkbox to load
   const toggle = await devToolsPage.waitForElementWithTextContent(CSS_SELECTOR_STATS_TITLE) as
       puppeteer.ElementHandle<HTMLInputElement>;
-  await devToolsPage.waitForFunction(() => toggle.evaluate((e: HTMLInputElement) => {
+  await devToolsPage.waitForFunction(() => toggle.evaluate(e => {
     if (e.disabled) {
       return false;
     }
@@ -381,7 +382,6 @@ export function veImpressionForPerformancePanel() {
           veImpression('Action', 'timeline.record-reload'),
           veImpression('Action', 'timeline.clear'),
           veImpression('Action', 'timeline.load-from-file'),
-          veImpression('DropDown', 'timeline.save-to-file-more-options'),
           veImpression('DropDown', 'history'),
           veImpression('Toggle', 'timeline-show-screenshots'),
           veImpression('Toggle', 'timeline-show-memory'),

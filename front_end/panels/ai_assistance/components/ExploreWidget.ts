@@ -17,17 +17,13 @@ import exploreWidgetStyles from './exploreWidget.css.js';
 */
 const UIStringsNotTranslate = {
   /**
-   *@description Text for the empty state of the AI assistance panel when there is no agent selected.
+   * @description Text for the empty state of the AI assistance panel when there is no agent selected.
    */
   Explore: 'Explore AI assistance',
   /**
-   *@description The footer disclaimer that links to more information about the AI feature.
+   * @description The footer disclaimer that links to more information about the AI feature.
    */
   learnAbout: 'Learn about AI in DevTools',
-  /**
-   *@description Disclaimer text right after the chat input.
-   */
-  inputDisclaimerForEmptyState: 'This is an experimental AI feature and won\'t always get it right.',
 } as const;
 
 const lockedString = i18n.i18n.lockedString;
@@ -82,6 +78,13 @@ export const DEFAULT_VIEW = (
           <p>
             To chat about an item, right-click and select${' '}
             <strong>Ask AI</strong>.
+            <button
+              class="link"
+              role="link"
+              jslog=${VisualLogging.link('open-ai-settings').track({click: true})}
+              @click=${() => { void UI.ViewManager.ViewManager.instance().showView('chrome-ai'); }}
+            >${lockedString(UIStringsNotTranslate.learnAbout)}
+            </button>
           </p>
         </div>
         <div class="content">
@@ -100,23 +103,6 @@ export const DEFAULT_VIEW = (
           )}
         </div>
       </div>
-      <footer class="ai-assistance-explore-footer" jslog=${VisualLogging.section('footer')}>
-        <p>
-          ${lockedString(UIStringsNotTranslate.inputDisclaimerForEmptyState)}
-          <button
-            class="link"
-            role="link"
-            jslog=${VisualLogging.link('open-ai-settings').track({
-              click: true,
-            })}
-            @click=${() => {
-              void UI.ViewManager.ViewManager.instance().showView('chrome-ai');
-            }}
-          >
-            ${lockedString(UIStringsNotTranslate.learnAbout)}
-          </button>
-        </p>
-      </footer>
     `,
     target,
     { host: target },
@@ -129,7 +115,7 @@ export type View = typeof DEFAULT_VIEW;
 export class ExploreWidget extends UI.Widget.Widget {
   view: View;
   constructor(element?: HTMLElement, view?: View) {
-    super(false, false, element);
+    super(element);
     this.view = view ?? DEFAULT_VIEW;
   }
 

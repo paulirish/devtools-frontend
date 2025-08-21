@@ -14,29 +14,29 @@ import {SharedStorageForOrigin} from './SharedStorageModel.js';
 
 const UIStrings = {
   /**
-   *@description Text in SharedStorage Items View of the Application panel
+   * @description Text in SharedStorage Items View of the Application panel
    */
   sharedStorage: 'Shared storage',
   /**
-   *@description Text for announcing that the "Shared Storage Items" table was cleared, that is, all
+   * @description Text for announcing that the "Shared Storage Items" table was cleared, that is, all
    * entries were deleted.
    */
   sharedStorageItemsCleared: 'Shared Storage items cleared',
   /**
-   *@description Text for announcing that the filtered "Shared Storage Items" table was cleared, that is,
+   * @description Text for announcing that the filtered "Shared Storage Items" table was cleared, that is,
    * all filtered entries were deleted.
    */
   sharedStorageFilteredItemsCleared: 'Shared Storage filtered items cleared',
   /**
-   *@description Text for announcing a Shared Storage key/value item has been deleted
+   * @description Text for announcing a Shared Storage key/value item has been deleted
    */
   sharedStorageItemDeleted: 'The storage item was deleted.',
   /**
-   *@description Text for announcing a Shared Storage key/value item has been edited
+   * @description Text for announcing a Shared Storage key/value item has been edited
    */
   sharedStorageItemEdited: 'The storage item was edited.',
   /**
-   *@description Text for announcing a Shared Storage key/value item edit request has been canceled
+   * @description Text for announcing a Shared Storage key/value item edit request has been canceled
    */
   sharedStorageItemEditCanceled: 'The storage item edit was canceled.',
 } as const;
@@ -126,7 +126,7 @@ export class SharedStorageItemsView extends KeyValueStorageItemsView {
       await this.#sharedStorage.clear();
       await this.refreshItems();
       this.sharedStorageItemsDispatcher.dispatchEventToListeners(SharedStorageItemsDispatcher.Events.ITEMS_CLEARED);
-      UI.ARIAUtils.alert(i18nString(UIStrings.sharedStorageItemsCleared));
+      UI.ARIAUtils.LiveAnnouncer.alert(i18nString(UIStrings.sharedStorageItemsCleared));
       return;
     }
 
@@ -135,14 +135,14 @@ export class SharedStorageItemsView extends KeyValueStorageItemsView {
     await this.refreshItems();
     this.sharedStorageItemsDispatcher.dispatchEventToListeners(
         SharedStorageItemsDispatcher.Events.FILTERED_ITEMS_CLEARED);
-    UI.ARIAUtils.alert(i18nString(UIStrings.sharedStorageFilteredItemsCleared));
+    UI.ARIAUtils.LiveAnnouncer.alert(i18nString(UIStrings.sharedStorageFilteredItemsCleared));
   }
 
   protected override isEditAllowed(columnIdentifier: string, _oldText: string, newText: string): boolean {
     if (columnIdentifier === 'key' && newText === '') {
       // The Shared Storage backend does not currently allow '' as a key, so we only set a new entry with a new key if its new key is nonempty.
       void this.refreshItems().then(() => {
-        UI.ARIAUtils.alert(i18nString(UIStrings.sharedStorageItemEditCanceled));
+        UI.ARIAUtils.LiveAnnouncer.alert(i18nString(UIStrings.sharedStorageItemEditCanceled));
       });
       return false;
     }
@@ -154,7 +154,7 @@ export class SharedStorageItemsView extends KeyValueStorageItemsView {
 
     await this.refreshItems();
     this.sharedStorageItemsDispatcher.dispatchEventToListeners(SharedStorageItemsDispatcher.Events.ITEM_EDITED);
-    UI.ARIAUtils.alert(i18nString(UIStrings.sharedStorageItemEdited));
+    UI.ARIAUtils.LiveAnnouncer.alert(i18nString(UIStrings.sharedStorageItemEdited));
   }
 
   #showSharedStorageItems(items: Protocol.Storage.SharedStorageEntry[]): void {
@@ -169,7 +169,7 @@ export class SharedStorageItemsView extends KeyValueStorageItemsView {
     await this.refreshItems();
     this.sharedStorageItemsDispatcher.dispatchEventToListeners(
         SharedStorageItemsDispatcher.Events.ITEM_DELETED, {key} as SharedStorageItemsDispatcher.ItemDeletedEvent);
-    UI.ARIAUtils.alert(i18nString(UIStrings.sharedStorageItemDeleted));
+    UI.ARIAUtils.LiveAnnouncer.alert(i18nString(UIStrings.sharedStorageItemDeleted));
   }
 
   protected async createPreview(key: string, value: string): Promise<UI.Widget.Widget|null> {

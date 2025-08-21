@@ -2951,7 +2951,7 @@ var Puppeteer = function (exports, _error, _suppressed, _PuppeteerURL, _LazyArg,
   /**
    * @internal
    */
-  const packageVersion = '24.12.1';
+  const packageVersion = '24.17.0';
 
   /**
    * @license
@@ -4868,8 +4868,9 @@ var Puppeteer = function (exports, _error, _suppressed, _PuppeteerURL, _LazyArg,
           if (error.name === 'AbortError') {
             throw error;
           }
-          error.message = `Waiting for selector \`${selector}\` failed: ${error.message}`;
-          throw error;
+          const waitForSelectorError = new (error instanceof TimeoutError ? TimeoutError : Error)(`Waiting for selector \`${selector}\` failed`);
+          waitForSelectorError.cause = error;
+          throw waitForSelectorError;
         }
       } catch (e_4) {
         env_3.error = e_4;
@@ -6717,7 +6718,44 @@ var Puppeteer = function (exports, _error, _suppressed, _PuppeteerURL, _LazyArg,
           x,
           y
         } = await this.clickablePoint(options.offset);
-        await this.frame.page().mouse.click(x, y, options);
+        try {
+          await this.frame.page().mouse.click(x, y, options);
+        } finally {
+          if (options.debugHighlight) {
+            await this.frame.page().evaluate((x, y) => {
+              const highlight = document.createElement('div');
+              highlight.innerHTML = `<style>
+        @scope {
+          :scope {
+              position: fixed;
+              left: ${x}px;
+              top: ${y}px;
+              width: 10px;
+              height: 10px;
+              border-radius: 50%;
+              animation: colorChange 10s 1 normal;
+              animation-fill-mode: forwards;
+          }
+
+          @keyframes colorChange {
+              from {
+                  background-color: red;
+              }
+              to {
+                  background-color: #FADADD00;
+              }
+          }
+        }
+      </style>`;
+              highlight.addEventListener('animationend', () => {
+                highlight.remove();
+              }, {
+                once: true
+              });
+              document.body.append(highlight);
+            }, x, y);
+          }
+        }
       }
       /**
        * Drags an element over the given element or point.
@@ -12003,6 +12041,7 @@ var Puppeteer = function (exports, _error, _suppressed, _PuppeteerURL, _LazyArg,
   var _fn = /*#__PURE__*/new WeakMap();
   var _args = /*#__PURE__*/new WeakMap();
   var _timeout = /*#__PURE__*/new WeakMap();
+  var _genericError = /*#__PURE__*/new WeakMap();
   var _timeoutError2 = /*#__PURE__*/new WeakMap();
   var _result = /*#__PURE__*/new WeakMap();
   var _poller = /*#__PURE__*/new WeakMap();
@@ -12017,6 +12056,7 @@ var Puppeteer = function (exports, _error, _suppressed, _PuppeteerURL, _LazyArg,
       _classPrivateFieldInitSpec(this, _fn, void 0);
       _classPrivateFieldInitSpec(this, _args, void 0);
       _classPrivateFieldInitSpec(this, _timeout, void 0);
+      _classPrivateFieldInitSpec(this, _genericError, new Error('Waiting failed'));
       _classPrivateFieldInitSpec(this, _timeoutError2, void 0);
       _classPrivateFieldInitSpec(this, _result, Deferred.create());
       _classPrivateFieldInitSpec(this, _poller, void 0);
@@ -12116,7 +12156,8 @@ var Puppeteer = function (exports, _error, _suppressed, _PuppeteerURL, _LazyArg,
         }
         const badError = this.getBadError(error);
         if (badError) {
-          await this.terminate(badError);
+          _classPrivateFieldGet(_genericError, this).cause = badError;
+          await this.terminate(_classPrivateFieldGet(_genericError, this));
         }
       }
     }
@@ -17511,7 +17552,7 @@ var Puppeteer = function (exports, _error, _suppressed, _PuppeteerURL, _LazyArg,
       try {
         await Promise.all([client.send('Network.enable'), _assertClassBrand(_NetworkManager_brand, this, _applyExtraHTTPHeaders).call(this, client), _assertClassBrand(_NetworkManager_brand, this, _applyNetworkConditions).call(this, client), _assertClassBrand(_NetworkManager_brand, this, _applyProtocolCacheDisabled).call(this, client), _assertClassBrand(_NetworkManager_brand, this, _applyProtocolRequestInterception).call(this, client), _assertClassBrand(_NetworkManager_brand, this, _applyUserAgent).call(this, client)]);
       } catch (error) {
-        if (isErrorLike(error) && isTargetClosedError(error)) {
+        if (_assertClassBrand(_NetworkManager_brand, this, _canIgnoreError).call(this, error)) {
           return;
         }
         throw error;
@@ -17592,6 +17633,9 @@ var Puppeteer = function (exports, _error, _suppressed, _PuppeteerURL, _LazyArg,
    * Copyright 2017 Google Inc.
    * SPDX-License-Identifier: Apache-2.0
    */
+  function _canIgnoreError(error) {
+    return isErrorLike(error) && (isTargetClosedError(error) || error.message.includes('Not supported'));
+  }
   async function _removeClient(client) {
     _classPrivateFieldGet(_clients, this).get(client)?.dispose();
     _classPrivateFieldGet(_clients, this).delete(client);
@@ -17605,7 +17649,7 @@ var Puppeteer = function (exports, _error, _suppressed, _PuppeteerURL, _LazyArg,
         headers: _classPrivateFieldGet(_extraHTTPHeaders, this)
       });
     } catch (error) {
-      if (isErrorLike(error) && isTargetClosedError(error)) {
+      if (_assertClassBrand(_NetworkManager_brand, this, _canIgnoreError).call(this, error)) {
         return;
       }
       throw error;
@@ -17628,7 +17672,7 @@ var Puppeteer = function (exports, _error, _suppressed, _PuppeteerURL, _LazyArg,
         downloadThroughput: _classPrivateFieldGet(_emulatedNetworkConditions, this).download
       });
     } catch (error) {
-      if (isErrorLike(error) && isTargetClosedError(error)) {
+      if (_assertClassBrand(_NetworkManager_brand, this, _canIgnoreError).call(this, error)) {
         return;
       }
       throw error;
@@ -17644,7 +17688,7 @@ var Puppeteer = function (exports, _error, _suppressed, _PuppeteerURL, _LazyArg,
         userAgentMetadata: _classPrivateFieldGet(_userAgentMetadata, this)
       });
     } catch (error) {
-      if (isErrorLike(error) && isTargetClosedError(error)) {
+      if (_assertClassBrand(_NetworkManager_brand, this, _canIgnoreError).call(this, error)) {
         return;
       }
       throw error;
@@ -17666,7 +17710,7 @@ var Puppeteer = function (exports, _error, _suppressed, _PuppeteerURL, _LazyArg,
         await Promise.all([_assertClassBrand(_NetworkManager_brand, this, _applyProtocolCacheDisabled).call(this, client), client.send('Fetch.disable')]);
       }
     } catch (error) {
-      if (isErrorLike(error) && isTargetClosedError(error)) {
+      if (_assertClassBrand(_NetworkManager_brand, this, _canIgnoreError).call(this, error)) {
         return;
       }
       throw error;
@@ -17681,7 +17725,7 @@ var Puppeteer = function (exports, _error, _suppressed, _PuppeteerURL, _LazyArg,
         cacheDisabled: _classPrivateFieldGet(_userCacheDisabled, this)
       });
     } catch (error) {
-      if (isErrorLike(error) && isTargetClosedError(error)) {
+      if (_assertClassBrand(_NetworkManager_brand, this, _canIgnoreError).call(this, error)) {
         return;
       }
       throw error;
@@ -24605,9 +24649,9 @@ var Puppeteer = function (exports, _error, _suppressed, _PuppeteerURL, _LazyArg,
    * @internal
    */
   const PUPPETEER_REVISIONS = Object.freeze({
-    chrome: '138.0.7204.94',
-    'chrome-headless-shell': '138.0.7204.94',
-    firefox: 'stable_140.0.4'
+    chrome: '139.0.7258.138',
+    'chrome-headless-shell': '139.0.7258.138',
+    firefox: 'stable_142.0'
   });
 
   /**

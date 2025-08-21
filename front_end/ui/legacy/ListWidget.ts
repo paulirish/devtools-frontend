@@ -20,23 +20,23 @@ import {VBox} from './Widget.js';
 
 const UIStrings = {
   /**
-   *@description Text on a button to start editing text
+   * @description Text on a button to start editing text
    */
   editString: 'Edit',
   /**
-   *@description Label for an item to remove something
+   * @description Label for an item to remove something
    */
   removeString: 'Remove',
   /**
-   *@description Text to save something
+   * @description Text to save something
    */
   saveString: 'Save',
   /**
-   *@description Text to add something
+   * @description Text to add something
    */
   addString: 'Add',
   /**
-   *@description Text to cancel something
+   * @description Text to cancel something
    */
   cancelString: 'Cancel',
   /**
@@ -64,8 +64,8 @@ export class ListWidget<T> extends VBox {
   private editElement: Element|null;
   private emptyPlaceholder: Element|null;
   private isTable: boolean;
-  constructor(delegate: Delegate<T>, delegatesFocus: boolean|undefined = true, isTable = false) {
-    super(true, delegatesFocus);
+  constructor(delegate: Delegate<T>, delegatesFocus = true, isTable = false) {
+    super({useShadowDom: true, delegatesFocus});
     this.registerRequiredCSS(listWidgetStyles);
     this.delegate = delegate;
 
@@ -210,7 +210,7 @@ export class ListWidget<T> extends VBox {
       const index = this.elements.indexOf(element);
       this.element.focus();
       this.delegate.removeItemRequested(this.items[index], index);
-      ARIAUtils.alert(i18nString(UIStrings.removedItem));
+      ARIAUtils.LiveAnnouncer.alert(i18nString(UIStrings.removedItem));
       if (this.elements.length >= 1) {
         // focus on the next item in the list, or the last item if we're removing the last item
         (this.elements[Math.min(index, this.elements.length - 1)] as HTMLElement).focus();
@@ -269,7 +269,7 @@ export class ListWidget<T> extends VBox {
     this.stopEditing();
     if (editItem !== null) {
       this.delegate.commitEdit(editItem, editor, isNew);
-      ARIAUtils.alert(i18nString(UIStrings.changesSaved));
+      ARIAUtils.LiveAnnouncer.alert(i18nString(UIStrings.changesSaved));
       if (this.elements[focusElementIndex]) {
         (this.elements[focusElementIndex] as HTMLElement).focus();
       }

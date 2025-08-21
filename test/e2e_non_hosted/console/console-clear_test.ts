@@ -37,7 +37,7 @@ describe('The Console Tab', function() {
     const clearResult = await devToolsPage.evaluate(() => {
       const result = document.querySelector('.console-user-command-result');
       if (!result) {
-        assert.fail('Could not find user command result in the DOM.');
+        throw new Error('Could not find user command result in the DOM.');
       }
       return result.textContent;
     });
@@ -47,7 +47,7 @@ describe('The Console Tab', function() {
     await devToolsPage.click('[aria-label="Show console sidebar"]');
     const sideBar = await devToolsPage.waitFor('div[slot="sidebar"]');
     const entries = await devToolsPage.$$('li', sideBar);
-    const entriesText = await Promise.all(entries.map(e => e.evaluate((e: HTMLLIElement) => e.textContent)));
+    const entriesText = await Promise.all(entries.map(e => e.evaluate(e => e.textContent)));
     assert.deepEqual(entriesText, [
       '1 message',
       '<other>1',

@@ -46,32 +46,34 @@ import type {
   Database, DatabaseId, Entry, Index, IndexedDBModel, ObjectStore, ObjectStoreMetadata} from './IndexedDBModel.js';
 import indexedDBViewsStyles from './indexedDBViews.css.js';
 
+type IDBKeyValue = number|string|Date|IDBKeyValue[];
+
 const {html} = Lit;
 
 const UIStrings = {
   /**
-   *@description Text in Indexed DBViews of the Application panel
+   * @description Text in Indexed DBViews of the Application panel
    */
   version: 'Version',
   /**
-   *@description Text in Indexed DBViews of the Application panel
+   * @description Text in Indexed DBViews of the Application panel
    */
   objectStores: 'Object stores',
   /**
-   *@description Text of button in Indexed DBViews of the Application panel
+   * @description Text of button in Indexed DBViews of the Application panel
    */
   deleteDatabase: 'Delete database',
   /**
-   *@description Text of button in Indexed DBViews of the Application panel
+   * @description Text of button in Indexed DBViews of the Application panel
    */
   refreshDatabase: 'Refresh database',
   /**
-   *@description Text in Application panel IndexedDB delete confirmation dialog
-   *@example {msb} PH1
+   * @description Text in Application panel IndexedDB delete confirmation dialog
+   * @example {msb} PH1
    */
   confirmDeleteDatabase: 'Delete "{PH1}" database?',
   /**
-   *@description Explanation text in Application panel IndexedDB delete confirmation dialog
+   * @description Explanation text in Application panel IndexedDB delete confirmation dialog
    */
   databaseWillBeRemoved: 'The selected database and contained data will be removed.',
   /**
@@ -86,77 +88,77 @@ const UIStrings = {
    */
   objectStoreWillBeCleared: 'The data contained in the selected object store will be removed.',
   /**
-   *@description Text in Indexed DBViews of the Application panel
+   * @description Text in Indexed DBViews of the Application panel
    */
   idb: 'IDB',
   /**
-   *@description Text to refresh the page
+   * @description Text to refresh the page
    */
   refresh: 'Refresh',
   /**
-   *@description Tooltip text that appears when hovering over the delete button in the Indexed DBViews of the Application panel
+   * @description Tooltip text that appears when hovering over the delete button in the Indexed DBViews of the Application panel
    */
   deleteSelected: 'Delete selected',
   /**
-   *@description Tooltip text that appears when hovering over the clear button in the Indexed DBViews of the Application panel
+   * @description Tooltip text that appears when hovering over the clear button in the Indexed DBViews of the Application panel
    */
   clearObjectStore: 'Clear object store',
   /**
-   *@description Text in Indexed DBViews of the Application panel
+   * @description Text in Indexed DBViews of the Application panel
    */
   dataMayBeStale: 'Data may be stale',
   /**
-   *@description Title of needs refresh in indexed dbviews of the application panel
+   * @description Title of needs refresh in indexed dbviews of the application panel
    */
   someEntriesMayHaveBeenModified: 'Some entries may have been modified',
   /**
-   *@description Text in DOMStorage Items View of the Application panel
+   * @description Text in DOMStorage Items View of the Application panel
    */
   keyString: 'Key',
   /**
-   *@description Text in Indexed DBViews of the Application panel
+   * @description Text in Indexed DBViews of the Application panel
    */
   primaryKey: 'Primary key',
   /**
-   *@description Text for the value of something
+   * @description Text for the value of something
    */
   valueString: 'Value',
   /**
-   *@description Data grid name for Indexed DB data grids
+   * @description Data grid name for Indexed DB data grids
    */
   indexedDb: 'Indexed DB',
   /**
-   *@description Text in Indexed DBViews of the Application panel
+   * @description Text in Indexed DBViews of the Application panel
    */
   keyPath: 'Key path: ',
   /**
-   *@description Tooltip text that appears when hovering over the triangle left button in the Indexed DBViews of the Application panel
+   * @description Tooltip text that appears when hovering over the triangle left button in the Indexed DBViews of the Application panel
    */
   showPreviousPage: 'Show previous page',
   /**
-   *@description Tooltip text that appears when hovering over the triangle right button in the Indexed DBViews of the Application panel
+   * @description Tooltip text that appears when hovering over the triangle right button in the Indexed DBViews of the Application panel
    */
   showNextPage: 'Show next page',
   /**
-   *@description Text in Indexed DBViews of the Application panel
+   * @description Text in Indexed DBViews of the Application panel
    */
   filterByKey: 'Filter by key (show keys greater or equal to)',
   /**
-   *@description Text in Context menu for expanding objects in IndexedDB tables
+   * @description Text in Context menu for expanding objects in IndexedDB tables
    */
   expandRecursively: 'Expand Recursively',
   /**
-   *@description Text in Context menu for collapsing objects in IndexedDB tables
+   * @description Text in Context menu for collapsing objects in IndexedDB tables
    */
   collapse: 'Collapse',
   /**
-   *@description Span text content in Indexed DBViews of the Application panel
-   *@example {2} PH1
+   * @description Span text content in Indexed DBViews of the Application panel
+   * @example {2} PH1
    */
   totalEntriesS: 'Total entries: {PH1}',
   /**
-   *@description Text in Indexed DBViews of the Application panel
-   *@example {2} PH1
+   * @description Text in Indexed DBViews of the Application panel
+   * @example {2} PH1
    */
   keyGeneratorValueS: 'Key generator value: {PH1}',
 } as const;
@@ -287,7 +289,11 @@ export class IDBDataView extends UI.View.SimpleView {
   constructor(
       model: IndexedDBModel, databaseId: DatabaseId, objectStore: ObjectStore, index: Index|null,
       refreshObjectStoreCallback: () => void) {
-    super(i18nString(UIStrings.idb));
+    super({
+      title: i18nString(UIStrings.idb),
+      viewId: 'idb',
+      jslog: `${VisualLogging.pane('indexed-db-data-view')}`,
+    });
     this.registerRequiredCSS(indexedDBViewsStyles);
 
     this.model = model;
@@ -296,7 +302,6 @@ export class IDBDataView extends UI.View.SimpleView {
     this.refreshObjectStoreCallback = refreshObjectStoreCallback;
 
     this.element.classList.add('indexed-db-data-view', 'storage-view');
-    this.element.setAttribute('jslog', `${VisualLogging.pane('indexed-db-data-view')}`);
 
     this.refreshButton = new UI.Toolbar.ToolbarButton(i18nString(UIStrings.refresh), 'refresh');
     this.refreshButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, this.refreshButtonClicked, this);
@@ -633,6 +638,29 @@ export class IDBDataView extends UI.View.SimpleView {
     this.needsRefresh.setVisible(true);
   }
 
+  private async resolveArrayKey(key: SDK.RemoteObject.RemoteObject): Promise<IDBKeyValue> {
+    const {properties} = await key.getOwnProperties(false /* generatePreview */);
+    if (!properties) {
+      return [];
+    }
+    const result: IDBKeyValue = [];
+    const propertyPromises = properties.filter(property => !isNaN(Number(property.name))).map(async property => {
+      const value = property.value;
+      if (!value) {
+        return;
+      }
+      let propertyValue;
+      if (value.subtype === 'array') {
+        propertyValue = await this.resolveArrayKey(value);
+      } else {
+        propertyValue = value.value;
+      }
+      result[Number(property.name)] = propertyValue;
+    });
+    await Promise.all(propertyPromises);
+    return result;
+  }
+
   private async deleteButtonClicked(node: DataGrid.DataGrid.DataGridNode<unknown>|null): Promise<void> {
     if (!node) {
       node = this.dataGrid.selectedNode;
@@ -641,9 +669,7 @@ export class IDBDataView extends UI.View.SimpleView {
       }
     }
     const key = (this.isIndex ? node.data['primary-key'] : node.data.key as SDK.RemoteObject.RemoteObject);
-    // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const keyValue = (key.value as string | number | any[] | Date);
+    const keyValue: IDBKeyValue = key.subtype === 'array' ? await this.resolveArrayKey(key) : key.value;
     await this.model.deleteEntries(this.databaseId, this.objectStore.name, window.IDBKeyRange.only(keyValue));
     this.refreshObjectStoreCallback();
   }

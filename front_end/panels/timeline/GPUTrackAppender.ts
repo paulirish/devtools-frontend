@@ -15,7 +15,7 @@ import {
 
 const UIStrings = {
   /**
-   *@description Text in Timeline Flame Chart Data Provider of the Performance panel
+   * @description Text in Timeline Flame Chart Data Provider of the Performance panel
    */
   gpu: 'GPU',
 } as const;

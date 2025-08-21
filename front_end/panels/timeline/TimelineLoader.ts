@@ -16,8 +16,8 @@ import type {Client} from './TimelineController.js';
 
 const UIStrings = {
   /**
-   *@description Text in Timeline Loader of the Performance panel
-   *@example {Unknown JSON format} PH1
+   * @description Text in Timeline Loader of the Performance panel
+   * @example {Unknown JSON format} PH1
    */
   malformedTimelineDataS: 'Malformed timeline data: {PH1}',
 } as const;
@@ -73,6 +73,24 @@ export class TimelineLoader implements Common.StringOutputStream.OutputStream {
         loader.reportErrorAndCancelLoading((fileReader.error() as any).message);
       }
     });
+    return loader;
+  }
+
+  static loadFromParsedJsonFile(contents: ParsedJSONFile, client: Client): TimelineLoader {
+    const loader = new TimelineLoader(client);
+
+    window.setTimeout(async () => {
+      client.loadingStarted();
+      try {
+        loader.#processParsedFile(contents);
+        await loader.close();
+      } catch (e: unknown) {
+        await loader.close();
+        const message = e instanceof Error ? e.message : '';
+        return loader.reportErrorAndCancelLoading(i18nString(UIStrings.malformedTimelineDataS, {PH1: message}));
+      }
+    });
+
     return loader;
   }
 

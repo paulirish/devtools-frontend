@@ -36,6 +36,7 @@ interface Config {
   copyScreenshotGoldens: boolean;
   retries: number;
   configureChrome: (executablePath: string) => void;
+  cpuThrottle: number;
 }
 
 function sliceArrayFromElement(array: string[], element: string) {
@@ -108,7 +109,7 @@ export const TestConfig: Config = {
   chromeBinary: options['chrome-binary'] ?? defaultChromePath(),
   serverType: ServerType.HOSTED_MODE,
   debug: options['debug'],
-  headless: options['headless'],
+  headless: options['headless'] === undefined ? !options['debug'] : options['headless'],
   coverage: options['coverage'],
   repetitions: options['repeat'],
   onDiff: {
@@ -120,6 +121,7 @@ export const TestConfig: Config = {
   copyScreenshotGoldens: false,
   retries: options['retries'],
   configureChrome,
+  cpuThrottle: options['cpu-throttle'],
 };
 
 export function loadTests(testDirectory: string) {

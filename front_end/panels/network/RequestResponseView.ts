@@ -43,15 +43,15 @@ const {html, render} = Lit;
 
 const UIStrings = {
   /**
-   *@description Text in Request Response View of the Network panel if no preview can be shown
+   * @description Text in Request Response View of the Network panel if no preview can be shown
    */
   noPreview: 'Nothing to preview',
   /**
-   *@description Text in Request Response View of the Network panel
+   * @description Text in Request Response View of the Network panel
    */
   thisRequestHasNoResponseData: 'This request has no response data available',
   /**
-   *@description Text in Request Preview View of the Network panel
+   * @description Text in Request Preview View of the Network panel
    */
   failedToLoadResponseData: 'Failed to load response data',
 } as const;
@@ -94,7 +94,7 @@ export const DEFAULT_VIEW: View = (input: ViewInput, output: ViewOutput, target:
     widget = html`<devtools-widget
                     .widgetConfig=${widgetConfig(element => new SourceFrame.ResourceSourceFrame.SearchableContainer(
                         input.request, input.mimeType, element))}
-                    ${widgetRef(SourceFrame.ResourceSourceFrame.SearchableContainer, widget => {output.revealPosition = widget.revealPosition.bind(this);})}></devtools-widget>`;
+                    ${widgetRef(SourceFrame.ResourceSourceFrame.SearchableContainer, widget => {output.revealPosition = widget.revealPosition.bind(widget);})}></devtools-widget>`;
     // clang-format on
   } else {
     // clang-format off
@@ -105,7 +105,7 @@ export const DEFAULT_VIEW: View = (input: ViewInput, output: ViewOutput, target:
     // clang-format on
   }
 
-  render(widget, target, {host: input});
+  render(widget, target);
 };
 
 export class RequestResponseView extends UI.Widget.VBox {
