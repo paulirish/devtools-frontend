@@ -47,6 +47,7 @@ describeWithEnvironment('TimelinePanel', function() {
       targetManager: SDK.TargetManager.TargetManager.instance(),
       ignoreListManager,
     });
+    Timeline.ModificationsManager.ModificationsManager.reset();
     traceModel = Trace.TraceModel.Model.createWithAllHandlers();
     timeline = Timeline.TimelinePanel.TimelinePanel.instance({forceNew: true, isNode: false, traceModel});
     renderElementIntoDOM(timeline);
@@ -106,6 +107,7 @@ describeWithEnvironment('TimelinePanel', function() {
     const tracksAfterEnablingSetting = timeline.getFlameChart().getMainDataProvider().timelineData().groups;
     assert.deepEqual(tracksBeforeDisablingSetting, tracksAfterEnablingSetting);
   });
+
   it('should keep marker overlays when the custom tracks setting is toggled', async function() {
     const events = await TraceLoader.rawEvents(this, 'web-dev.json.gz') as Trace.Types.Events.Event[];
     await timeline.loadingComplete(events, null, null);
@@ -147,34 +149,43 @@ describeWithEnvironment('TimelinePanel', function() {
     assert.isAbove(dimIndicesAfterToggle.length, 0);
   });
 
-  it('keeps annotations after toggling the custom tracks setting', async function() {
-    const events = await TraceLoader.rawEvents(this, 'web-dev.json.gz') as Trace.Types.Events.Event[];
-    await timeline.loadingComplete(events, null, null);
-    const parsedTrace = traceModel.parsedTrace();
-    assert.isOk(parsedTrace?.Meta.traceBounds.min);
-    const modificationsManager = Timeline.ModificationsManager.ModificationsManager.activeManager();
-    assert.isOk(modificationsManager);
+  it('keeps annotations after toggling the custom tracks setting and does not aria alert the user twice',
+     async function() {
+       const events = await TraceLoader.rawEvents(this, 'web-dev.json.gz') as Trace.Types.Events.Event[];
+       await timeline.loadingComplete(events, null, null);
+       const parsedTrace = traceModel.parsedTrace();
+       assert.isOk(parsedTrace?.Meta.traceBounds.min);
+       const modificationsManager = Timeline.ModificationsManager.ModificationsManager.activeManager();
+       assert.isOk(modificationsManager);
+       const ariaAlertStub = sinon.spy(UI.ARIAUtils.LiveAnnouncer, 'alert');
+       // Add an annotation
+       modificationsManager.createAnnotation(
+           {
+             bounds: Trace.Helpers.Timing.traceWindowFromMicroSeconds(
+                 parsedTrace.Meta.traceBounds.min, parsedTrace.Meta.traceBounds.max),
+             type: 'TIME_RANGE',
+             label: '',
+           },
+           {loadedFromFile: false, muteAriaNotifications: false});
 
-    // Add an annotation
-    modificationsManager.createAnnotation({
-      bounds: Trace.Helpers.Timing.traceWindowFromMicroSeconds(
-          parsedTrace.Meta.traceBounds.min, parsedTrace.Meta.traceBounds.max),
-      type: 'TIME_RANGE',
-      label: '',
-    });
+       sinon.assert.calledOnceWithExactly(ariaAlertStub, 'The time range annotation has been added');
 
-    const annotationsBeforeToggle =
-        timeline.getFlameChart().overlays().allOverlays().filter(e => e.type === 'TIME_RANGE');
-    assert.exists(annotationsBeforeToggle);
-    assert.isAbove(annotationsBeforeToggle.length, 0);
+       const annotationsBeforeToggle =
+           timeline.getFlameChart().overlays().allOverlays().filter(e => e.type === 'TIME_RANGE');
+       assert.exists(annotationsBeforeToggle);
+       assert.lengthOf(annotationsBeforeToggle, 1);
 
-    // Toggle the custom track setting and verify annotations remain.
-    Timeline.TimelinePanel.TimelinePanel.extensionDataVisibilitySetting().set(true);
-    const annotationsAfterToggle =
-        timeline.getFlameChart().overlays().allOverlays().filter(e => e.type === 'TIME_RANGE');
-    assert.exists(annotationsAfterToggle);
-    assert.isAbove(annotationsAfterToggle.length, 0);
-  });
+       // Toggle the custom track setting and verify annotations remain.
+       Timeline.TimelinePanel.TimelinePanel.extensionDataVisibilitySetting().set(true);
+       const annotationsAfterToggle =
+           timeline.getFlameChart().overlays().allOverlays().filter(e => e.type === 'TIME_RANGE');
+       assert.exists(annotationsAfterToggle);
+       assert.isAbove(annotationsAfterToggle.length, 0);
+
+       // Ensure the alert wasn't fired again after the custom tracks setting
+       // was toggled.
+       sinon.assert.calledOnce(ariaAlertStub);
+     });
 
   it('clears out AI related contexts when the user presses "Clear"', async () => {
     const context = UI.Context.Context.instance();
@@ -403,12 +414,14 @@ describeWithEnvironment('TimelinePanel', function() {
         const modificationsManager = Timeline.ModificationsManager.ModificationsManager.activeManager();
         assert.isOk(modificationsManager);
 
-        modificationsManager.createAnnotation({
-          bounds: Trace.Helpers.Timing.traceWindowFromMicroSeconds(
-              Trace.Types.Timing.Micro(1), Trace.Types.Timing.Micro(2)),
-          type: 'TIME_RANGE',
-          label: 'Test Annotation',
-        });
+        modificationsManager.createAnnotation(
+            {
+              bounds: Trace.Helpers.Timing.traceWindowFromMicroSeconds(
+                  Trace.Types.Timing.Micro(1), Trace.Types.Timing.Micro(2)),
+              type: 'TIME_RANGE',
+              label: 'Test Annotation',
+            },
+            {loadedFromFile: false, muteAriaNotifications: false});
 
         await timeline.saveToFile({
           includeScriptContent: false,
@@ -444,6 +457,93 @@ describeWithEnvironment('TimelinePanel', function() {
         const file = await contentDataToFile(contentData);
         assert.isUndefined(file.metadata.enhancedTraceVersion);
         assert.deepEqual(file.traceEvents, traceEvents);
+      });
+    });
+
+    describe('removes chrome-extensions content', function() {
+      it('from trace events when saving a trace with "Include script content" on', async function() {
+        const {traceEvents, metadata} =
+            await TraceLoader.traceFile(this, 'chrome-ext-sourcemap-script-content.json.gz');
+        await timeline.loadingComplete(traceEvents as Trace.Types.Events.Event[], null, metadata);
+
+        // 7192505913775043000.8 matches a chrome-extension script in the trace
+        let extensionTracesWithContent = traceEvents.filter(value => {
+          return value.cat === 'disabled-by-default-devtools.v8-source-rundown-sources' &&
+              `${(value as Trace.Types.Events.V8SourceRundownSourcesScriptCatchupEvent).args.data.isolate}.${
+                  (value as Trace.Types.Events.V8SourceRundownSourcesScriptCatchupEvent).args.data.scriptId}` ===
+              '7192505913775043000.8';
+        });
+
+        // loading the trace and verifying the chrome extension script has associated source text
+        let castedEvent =
+            (extensionTracesWithContent[0] as Trace.Types.Events.V8SourceRundownSourcesScriptCatchupEvent);
+        assert.lengthOf(extensionTracesWithContent, 1);
+        assert.isDefined(castedEvent.args.data.sourceText);
+
+        await timeline.saveToFile({
+          includeScriptContent: true,
+          includeSourceMaps: false,
+          addModifications: false,
+        });
+
+        sinon.assert.calledOnce(saveSpy);
+        sinon.assert.calledOnce(closeSpy);
+
+        const [fileName, contentData] = saveSpy.getCall(0).args;
+        assert.match(fileName, /EnhancedTrace-[\d|T]+\.json$/);
+
+        const file = await contentDataToFile(contentData);
+        assert.isDefined(file.metadata.enhancedTraceVersion);
+
+        // getting the same trace as before, but this time after saving has happened.
+        extensionTracesWithContent = file.traceEvents?.filter(value => {
+          return value.cat === 'disabled-by-default-devtools.v8-source-rundown-sources' &&
+              `${(value as Trace.Types.Events.V8SourceRundownSourcesScriptCatchupEvent).args.data.isolate}.${
+                  (value as Trace.Types.Events.V8SourceRundownSourcesScriptCatchupEvent).args.data.scriptId}` ===
+              '7192505913775043000.8';
+        });
+
+        // the associated source text is now undefined from the chrome-extension script
+        castedEvent = (extensionTracesWithContent[0] as Trace.Types.Events.V8SourceRundownSourcesScriptCatchupEvent);
+        assert.lengthOf(extensionTracesWithContent, 1);
+        assert.isUndefined(castedEvent.args.data.sourceText);
+
+        // non-extension script content is still present (7192505913775043000.10)
+        extensionTracesWithContent = file.traceEvents?.filter(value => {
+          return value.cat === 'disabled-by-default-devtools.v8-source-rundown-sources' &&
+              `${(value as Trace.Types.Events.V8SourceRundownSourcesScriptCatchupEvent).args.data.isolate}.${
+                  (value as Trace.Types.Events.V8SourceRundownSourcesScriptCatchupEvent).args.data.scriptId}` ===
+              '7192505913775043000.10';
+        });
+        castedEvent = (extensionTracesWithContent[0] as Trace.Types.Events.V8SourceRundownSourcesScriptCatchupEvent);
+        assert.lengthOf(extensionTracesWithContent, 1);
+        assert.isDefined(castedEvent.args.data.sourceText);
+      });
+
+      it('from trace sourcemaps when saving a trace with "Include source map" on', async function() {
+        const {traceEvents, metadata} =
+            await TraceLoader.traceFile(this, 'chrome-ext-sourcemap-script-content.json.gz');
+
+        await timeline.innerSaveToFile(traceEvents, metadata, {
+          includeScriptContent: true,
+          includeSourceMaps: true,
+          addModifications: false,
+        });
+
+        sinon.assert.calledOnce(saveSpy);
+        sinon.assert.calledOnce(closeSpy);
+
+        const [fileName, contentData] = saveSpy.getCall(0).args;
+        assert.match(fileName, /EnhancedTrace-[\d|T]+\.json$/);
+
+        const file = await contentDataToFile(contentData);
+        assert.isDefined(file.metadata.enhancedTraceVersion);
+
+        const totalSourceMapsWithChromExtensionProtocol = file.metadata.sourceMaps?.filter(value => {
+          value.url.startsWith('chrome-extension:');
+        });
+        assert.isNotNull(totalSourceMapsWithChromExtensionProtocol);
+        assert.strictEqual(totalSourceMapsWithChromExtensionProtocol?.length, 0);
       });
     });
   });

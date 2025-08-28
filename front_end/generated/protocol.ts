@@ -2937,6 +2937,15 @@ export namespace CSS {
     value: string;
   }
 
+  export interface ComputedStyleExtraFields {
+    /**
+     * Returns whether or not this node is being rendered with base appearance,
+     * which happens when it has its appearance property set to base/base-select
+     * or it is in the subtree of an element being rendered with base appearance.
+     */
+    isAppearanceBase: boolean;
+  }
+
   /**
    * CSS style representation.
    */
@@ -3670,6 +3679,11 @@ export namespace CSS {
      * Computed style for the specified DOM node.
      */
     computedStyle: CSSComputedStyleProperty[];
+    /**
+     * A list of non-standard "extra fields" which blink stores alongside each
+     * computed style.
+     */
+    extraFields: ComputedStyleExtraFields;
   }
 
   export interface ResolveValuesRequest {
@@ -10044,6 +10058,20 @@ export namespace Network {
   }
 
   /**
+   * Sets Controls for IP Proxy of requests.
+   * Page reload is required before the new behavior will be observed.
+   */
+  export const enum IpProxyStatus {
+    Available = 'Available',
+    FeatureNotEnabled = 'FeatureNotEnabled',
+    MaskedDomainListNotEnabled = 'MaskedDomainListNotEnabled',
+    MaskedDomainListNotPopulated = 'MaskedDomainListNotPopulated',
+    AuthTokensUnavailable = 'AuthTokensUnavailable',
+    Unavailable = 'Unavailable',
+    BypassedByDevTools = 'BypassedByDevTools',
+  }
+
+  /**
    * The reason why request was blocked.
    */
   export const enum CorsError {
@@ -11148,6 +11176,13 @@ export namespace Network {
     includeCredentials: boolean;
   }
 
+  export interface GetIPProtectionProxyStatusResponse extends ProtocolResponseWithError {
+    /**
+     * Whether IP proxy is available
+     */
+    status: IpProxyStatus;
+  }
+
   export interface SetAcceptedEncodingsRequest {
     /**
      * List of accepted content encodings.
@@ -11291,6 +11326,12 @@ export namespace Network {
      * Whether DirectSocket chunk send/receive events should be reported.
      */
     reportDirectSocketTraffic?: boolean;
+    /**
+     * Enable storing response bodies outside of renderer, so that these survive
+     * a cross-process navigation. Requires maxTotalBufferSize to be set.
+     * Currently defaults to false.
+     */
+    enableDurableMessages?: boolean;
   }
 
   export interface GetAllCookiesResponse extends ProtocolResponseWithError {

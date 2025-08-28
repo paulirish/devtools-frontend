@@ -188,13 +188,13 @@ export async function getSelectedSource(): Promise<string> {
   return await (sourceTabs.evaluate(node => node.getAttribute('aria-label')) as Promise<string>);
 }
 
-export async function getBreakpointHitLocation() {
-  const breakpointHitHandle = await waitFor('.breakpoint-item.hit');
-  const locationHandle = await waitFor('.location', breakpointHitHandle);
+export async function getBreakpointHitLocation(devToolsPage = getBrowserAndPagesWrappers().devToolsPage) {
+  const breakpointHitHandle = await devToolsPage.waitFor('.breakpoint-item.hit');
+  const locationHandle = await devToolsPage.waitFor('.location', breakpointHitHandle);
   const locationText = await locationHandle.evaluate(location => location.textContent);
 
   const groupHandle = await breakpointHitHandle.evaluateHandle(x => x.parentElement!);
-  const groupHeaderTitleHandle = await waitFor('.group-header-title', groupHandle);
+  const groupHeaderTitleHandle = await devToolsPage.waitFor('.group-header-title', groupHandle);
   const groupHeaderTitle = await groupHeaderTitleHandle?.evaluate(header => header.textContent);
 
   return `${groupHeaderTitle}:${locationText}`;
@@ -222,12 +222,12 @@ export async function waitForHighlightedLine(
   });
 }
 
-export async function getToolbarText() {
-  const toolbar = await waitFor('.sources-toolbar');
+export async function getToolbarText(devToolsPage = getBrowserAndPagesWrappers().devToolsPage) {
+  const toolbar = await devToolsPage.waitFor('.sources-toolbar');
   if (!toolbar) {
     return [];
   }
-  const textNodes = await $$('.toolbar-text', toolbar);
+  const textNodes = await devToolsPage.$$('.toolbar-text', toolbar);
   return await Promise.all(textNodes.map(node => node.evaluate(node => node.textContent, node)));
 }
 

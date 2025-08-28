@@ -6,8 +6,11 @@ import("../../../scripts/build/typescript/typescript.gni")
 
 ts_e2e_library("sources") {
   sources = [
+    "authored-deployed-grouping_test.ts",
     "breakpoint-csp-violations_test.ts",
+    "breakpoint-javascript_test.ts",
     "breakpoints-sidebarpane_test.ts",
+    "can-break-with-wasm-sourcemaps_test.ts",
     "can-handle-special-characters_test.ts",
     "can-open-linear-memory-inspector_test.ts",
     "can-pretty-print-sourcecode_test.ts",
@@ -26,6 +29,7 @@ ts_e2e_library("sources") {
     "link-to-correct-source-line_test.ts",
     "live-edit-moving-breakpoint_test.ts",
     "navigator-view_test.ts",
+    "overrides_test.ts",
     "pause-button_test.ts",
     "popover_test.ts",
     "restart-frame_test.ts",
@@ -36,6 +40,7 @@ ts_e2e_library("sources") {
     "sourcemap_test.ts",
     "sources-list_test.ts",
     "sourceurl_test.ts",
+    "syntax-highlighting_test.ts",
     "text-editor_test.ts",
     "watch-expressions_test.ts",
     "worker-relative-sourcemap_test.ts",

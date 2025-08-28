@@ -9,6 +9,7 @@ import * as Host from '../../../core/host/host.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Platform from '../../../core/platform/platform.js';
 import * as Root from '../../../core/root/root.js';
+import * as SDK from '../../../core/sdk/sdk.js';
 import * as TimelineUtils from '../../../panels/timeline/utils/utils.js';
 import {html, type TemplateResult} from '../../../ui/lit/lit.js';
 import * as Trace from '../../trace/trace.js';
@@ -356,8 +357,7 @@ export class PerformanceTraceContext extends ConversationContext<TimelineUtils.A
   }
 
   override getIcon(): TemplateResult {
-    return html`<devtools-icon name="performance" title="Performance"
-        style="color: var(--sys-color-on-surface-subtle);"></devtools-icon>`;
+    return html`<devtools-icon name="performance" title="Performance"></devtools-icon>`;
   }
 
   override getTitle(): string {
@@ -817,7 +817,7 @@ export class PerformanceAgent extends AiAgent<TimelineUtils.AIContext.AgentFocus
       return;
     }
 
-    const {parsedTrace, insightSet} = focus.data;
+    const {parsedTrace, insightSet, traceMetadata} = focus.data;
 
     this.declareFunction<{insightName: string}, {details: string}>('getInsightDetails', {
       description:
@@ -889,55 +889,196 @@ export class PerformanceAgent extends AiAgent<TimelineUtils.AIContext.AgentFocus
       },
     });
 
-    this.declareFunction<{min: Trace.Types.Timing.Micro, max: Trace.Types.Timing.Micro}, {activity: string}>(
-        'getMainThreadTrackSummary', {
-          description: 'Returns the main thread activity for the selected bounds. The result is a call tree.',
-          parameters: {
-            type: Host.AidaClient.ParametersTypes.OBJECT,
-            description: '',
+    const createBounds =
+        (min: Trace.Types.Timing.Micro, max: Trace.Types.Timing.Micro): Trace.Types.Timing.TraceWindowMicro => {
+          min = Math.max(min ?? 0, parsedTrace.Meta.traceBounds.min) as Trace.Types.Timing.Micro;
+          max = Math.min(max ?? Number.POSITIVE_INFINITY, parsedTrace.Meta.traceBounds.max) as Trace.Types.Timing.Micro;
+          return Trace.Helpers.Timing.traceWindowFromMicroSeconds(min, max);
+        };
+
+    this.declareFunction<{min: Trace.Types.Timing.Micro, max: Trace.Types.Timing.Micro}, {
+      activity: string,
+    }>('getMainThreadTrackSummary', {
+      description:
+          'Returns a summary of the main thread for the given bounds. The result includes a top-down summary, bottom-up summary, third-parties summary, and a list of related insights for the events within the given bounds.',
+      parameters: {
+        type: Host.AidaClient.ParametersTypes.OBJECT,
+        description: '',
+        nullable: false,
+        properties: {
+          min: {
+            type: Host.AidaClient.ParametersTypes.INTEGER,
+            description: 'The minimum time of the bounds, in microseconds',
             nullable: false,
-            properties: {
-              min: {
-                type: Host.AidaClient.ParametersTypes.INTEGER,
-                description: 'The minimum time of the bounds, in microseconds',
-                nullable: false,
-              },
-              max: {
-                type: Host.AidaClient.ParametersTypes.INTEGER,
-                description: 'The maximum time of the bounds, in microseconds',
-                nullable: false,
-              },
+          },
+          max: {
+            type: Host.AidaClient.ParametersTypes.INTEGER,
+            description: 'The maximum time of the bounds, in microseconds',
+            nullable: false,
+          },
+        },
+      },
+      displayInfoFromArgs: args => {
+        return {
+          title: lockedString(UIStringsNotTranslated.mainThreadActivity),
+          action: `getMainThreadTrackSummary({min: ${args.min}, max: ${args.max}})`
+        };
+      },
+      handler: async args => {
+        debugLog('Function call: getMainThreadTrackSummary');
+
+        if (!this.#formatter) {
+          throw new Error('missing formatter');
+        }
+
+        const bounds = createBounds(args.min, args.max);
+        const activity = this.#formatter.formatMainThreadTrackSummary(bounds);
+        if (this.#isFunctionResponseTooLarge(activity)) {
+          return {
+            error:
+                'getMainThreadTrackSummary response is too large. Try investigating using other functions, or a more narrow bounds',
+          };
+        }
+
+        const key = `getMainThreadTrackSummary({min: ${bounds.min}, max: ${bounds.max}})`;
+        this.#cacheFunctionResult(focus, key, activity);
+        return {result: {activity}};
+      },
+
+    });
+
+    this.declareFunction<
+        {min: Trace.Types.Timing.Micro, max: Trace.Types.Timing.Micro}, {activity: string}>('getNetworkTrackSummary', {
+      description: 'Returns a summary of the network for the given bounds.',
+      parameters: {
+        type: Host.AidaClient.ParametersTypes.OBJECT,
+        description: '',
+        nullable: false,
+        properties: {
+          min: {
+            type: Host.AidaClient.ParametersTypes.INTEGER,
+            description: 'The minimum time of the bounds, in microseconds',
+            nullable: false,
+          },
+          max: {
+            type: Host.AidaClient.ParametersTypes.INTEGER,
+            description: 'The maximum time of the bounds, in microseconds',
+            nullable: false,
+          },
+        },
+      },
+      displayInfoFromArgs: args => {
+        return {
+          title: lockedString(UIStringsNotTranslated.networkActivitySummary),
+          action: `getNetworkTrackSummary({min: ${args.min}, max: ${args.max}})`
+        };
+      },
+      handler: async args => {
+        debugLog('Function call: getNetworkTrackSummary');
+
+        if (!this.#formatter) {
+          throw new Error('missing formatter');
+        }
+
+        const bounds = createBounds(args.min, args.max);
+        const activity = this.#formatter.formatNetworkTrackSummary(bounds);
+        if (this.#isFunctionResponseTooLarge(activity)) {
+          return {
+            error:
+                'getNetworkTrackSummary response is too large. Try investigating using other functions, or a more narrow bounds',
+          };
+        }
+
+        const key = `getNetworkTrackSummary({min: ${bounds.min}, max: ${bounds.max}})`;
+        this.#cacheFunctionResult(focus, key, activity);
+        return {result: {activity}};
+      },
+
+    });
+
+    this.declareFunction<{eventKey: string}, {callTree: string}>('getDetailedCallTree', {
+      description: 'Returns a detailed call tree for the given main thread event.',
+      parameters: {
+        type: Host.AidaClient.ParametersTypes.OBJECT,
+        description: '',
+        nullable: false,
+        properties: {
+          eventKey: {
+            type: Host.AidaClient.ParametersTypes.STRING,
+            description: 'The key for the event.',
+            nullable: false,
+          },
+        },
+      },
+      displayInfoFromArgs: args => {
+        return {title: lockedString('Looking at call tree…'), action: `getDetailedCallTree(${args.eventKey})`};
+      },
+      handler: async args => {
+        debugLog('Function call: getDetailedCallTree');
+
+        if (!this.#formatter) {
+          throw new Error('missing formatter');
+        }
+
+        const event = this.#lookupEvent(args.eventKey as Trace.Types.File.SerializableKey);
+        if (!event) {
+          return {error: 'Invalid eventKey'};
+        }
+
+        const tree = TimelineUtils.AICallTree.AICallTree.fromEvent(event, parsedTrace);
+        const callTree = tree?.serialize() ?? 'No call tree found';
+
+        const key = `getDetailedCallTree(${args.eventKey})`;
+        this.#cacheFunctionResult(focus, key, callTree);
+        return {result: {callTree}};
+      },
+
+    });
+
+    const isFresh = TimelineUtils.FreshRecording.Tracker.instance().recordingIsFresh(parsedTrace);
+    const hasScriptContents = traceMetadata.enhancedTraceVersion && parsedTrace.Scripts.scripts.some(s => s.content);
+
+    if (isFresh || hasScriptContents) {
+      this.declareFunction<{url: string}, {content: string}>('getResourceContent', {
+        description: 'Returns the content of the resource with the given url. Only use this for text resource types.',
+        parameters: {
+          type: Host.AidaClient.ParametersTypes.OBJECT,
+          description: '',
+          nullable: false,
+          properties: {
+            url: {
+              type: Host.AidaClient.ParametersTypes.STRING,
+              description: 'The url for the resource.',
+              nullable: false,
             },
           },
-          displayInfoFromArgs: args => {
-            return {
-              title: lockedString(UIStringsNotTranslated.mainThreadActivity),
-              action: `getMainThreadTrackSummary({min: ${args.min}, max: ${args.max}})`
-            };
-          },
-          handler: async args => {
-            debugLog('Function call: getMainThreadTrackSummary');
+        },
+        displayInfoFromArgs: args => {
+          return {title: lockedString('Looking at resource content…'), action: `getResourceContent(${args.url})`};
+        },
+        handler: async args => {
+          debugLog('Function call: getResourceContent');
 
-            if (!this.#formatter) {
-              throw new Error('missing formatter');
+          const url = args.url as Platform.DevToolsPath.UrlString;
+          const resource = SDK.ResourceTreeModel.ResourceTreeModel.resourceForURL(url);
+          if (!resource) {
+            if (!resource) {
+              return {error: 'Resource not found'};
             }
+          }
 
-            const min = Math.max(args.min ?? 0, parsedTrace.Meta.traceBounds.min) as Trace.Types.Timing.Micro;
-            const max = Math.min(args.max ?? Number.POSITIVE_INFINITY, parsedTrace.Meta.traceBounds.max) as
-                Trace.Types.Timing.Micro;
-            const activity = this.#formatter.formatMainThreadTrackSummary(min, max);
-            if (this.#isFunctionResponseTooLarge(activity)) {
-              return {
-                error: 'getMainThreadTrackSummary response is too large. Try investigating using other functions',
-              };
-            }
+          const content = resource.content;
+          if (!content) {
+            return {error: 'Resource has no content'};
+          }
 
-            const key = `getMainThreadTrackSummary({min: ${min}, max: ${max}})`;
-            this.#cacheFunctionResult(focus, key, activity);
-            return {result: {activity}};
-          },
+          const key = `getResourceContent(${args.url})`;
+          this.#cacheFunctionResult(focus, key, content);
+          return {result: {content}};
+        },
 
-        });
+      });
+    }
   }
 
   #declareFunctions(context: ConversationContext<TimelineUtils.AIContext.AgentFocus>): void {

@@ -10,7 +10,6 @@ import type * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 import * as AiAssistanceModel from '../../models/ai_assistance/ai_assistance.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
-import type * as IconButton from '../../ui/components/icon_button/icon_button.js';
 import * as Input from '../../ui/components/input/input.js';
 import * as LegacyWrapper from '../../ui/components/legacy_wrapper/legacy_wrapper.js';
 import * as Switch from '../../ui/components/switch/switch.js';
@@ -201,9 +200,13 @@ const UIStrings = {
    */
   enableAiAssistance: 'Enable AI assistance',
   /**
-   * @description Label for a toggle to enable the AI assistance feature
+   * @description Label for a toggle to enable the AI annotation feature
    */
   enableAiSuggestedAnnotations: 'Enable AI suggestions for performance panel annotations',
+  /**
+   * @description Label for a toggle to enable the AI code suggestions feature
+   */
+  enableAiCodeSuggestions: 'Enable AI code suggestions',
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/settings/AISettingsTab.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -371,7 +374,7 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
         settingName: i18n.i18n.lockedString('Code suggestions'),
         iconName: 'text-analysis',
         settingDescription: i18nString(UIStrings.helpUnderstandCodeSuggestions),
-        enableSettingText: i18nString(UIStrings.enableAiSuggestedAnnotations),
+        enableSettingText: i18nString(UIStrings.enableAiCodeSuggestions),
         settingItems: [{iconName: 'code', text: i18nString(UIStrings.asYouTypeCodeSuggestions)}],
         toConsiderSettingItems: [{
           iconName: 'google',
@@ -480,12 +483,7 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
     // clang-format off
     return html`
       <div>
-        <devtools-icon .data=${{
-          iconName: icon,
-          color: 'var(--icon-default)',
-          width: 'var(--sys-size-8)',
-          height: 'var(--sys-size-8)',
-        } as IconButton.Icon.IconData}>
+        <devtools-icon .name=${icon} class="medium">
         </devtools-icon>
       </div>
       <div>${text}</div>
@@ -538,11 +536,7 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
     // clang-format off
     return html`
       <div>
-        <devtools-icon .data=${{
-          iconName: settingItem.iconName,
-          width: 'var(--sys-size-9)',
-          height: 'var(--sys-size-9)',
-        } as IconButton.Icon.IconData}>
+        <devtools-icon class="extra-large" .name=${settingItem.iconName}>
         </devtools-icon>
       </div>
       <div class="padded">${settingItem.text}</div>
@@ -631,12 +625,7 @@ export class AISettingsTab extends LegacyWrapper.LegacyWrapper.WrappableComponen
       <div class="disabled-explainer">
         ${disabledReasons.map(reason => html`
           <div class="disabled-explainer-row">
-            <devtools-icon .data=${{
-              iconName: 'warning',
-              color: 'var(--sys-color-orange)',
-              width: 'var(--sys-size-8)',
-              height: 'var(--sys-size-8)',
-            } as IconButton.Icon.IconData}>
+            <devtools-icon name="warning" class="medium" style="color: var(--icon-warning);">
             </devtools-icon>
             ${reason}
           </div>

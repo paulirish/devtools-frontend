@@ -163,11 +163,9 @@ export class RuleSetGrid extends LegacyWrapper.LegacyWrapper.WrappableComponent<
                                 .action(revealInElements ? 'reveal-in-elements' : 'reveal-in-network')
                                 .track({click: true})}
                           >
-                            <devtools-icon name=${revealInElements ? 'code-circle' : 'arrow-up-down-circle'}
+                            <devtools-icon name=${revealInElements ? 'code-circle' : 'arrow-up-down-circle'} class="medium"
                               style=${styleMap({
                                 color: 'var(--icon-link)',
-                                width: '16px',
-                                height: '16px',
                                 'vertical-align': 'sub',
                               })}
                             ></devtools-icon>
@@ -179,7 +177,9 @@ export class RuleSetGrid extends LegacyWrapper.LegacyWrapper.WrappableComponent<
                     ${ruleSet.errorType !== undefined ? html`
                       <span style=${styleMap({color: 'var(--sys-color-error)'})}>
                         ${i18nString(UIStrings.errors, {errorCount: 1})}
-                      </span>` : ''} ${ruleSet.errorType !== Protocol.Preload.RuleSetErrorType.SourceIsNotJsonObject ? html`
+                      </span>` : ''} ${ruleSet.errorType !== Protocol.Preload.RuleSetErrorType.SourceIsNotJsonObject &&
+                      ruleSet.errorType !== Protocol.Preload.RuleSetErrorType.InvalidRulesetLevelTag ?
+                      html`
                       <button class="link" role="link"
                         @click=${() => this.#revealAttemptViewWithFilter(ruleSet)}
                         title=${i18nString(UIStrings.buttonRevealPreloadsAssociatedWithRuleSet)}
