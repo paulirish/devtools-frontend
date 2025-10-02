@@ -11,7 +11,8 @@ import {analyzeTrace} from '../analyze-trace.mjs';
 import * as Trace from '../models/trace/trace.js';
 
 const filename = './test/invalid-animation-events.json.gz';
-const {parsedTrace: data, insights} = await analyzeTrace(filename);
+const {parsedTrace} = await analyzeTrace(filename);
+const {data, insights} = parsedTrace;
 
 test('key values are populated', t => {
   assert.equal((data.Screenshots.legacySyntheticScreenshots?.length ?? 0) > 2, true);
@@ -118,15 +119,14 @@ test('insights look ok', t => {
 });
 
 test('bottom-up summary is good', t => {
-  const parsedTrace = data;
   const visibleEvents = Trace.Helpers.Trace.VISIBLE_TRACE_EVENT_TYPES.values().toArray();
   const filter = new Trace.Extras.TraceFilter.VisibleEventsFilter(
       visibleEvents.concat([Trace.Types.Events.Name.SYNTHETIC_NETWORK_REQUEST]));
-  const milliBounds = Trace.Helpers.Timing.traceWindowMilliSeconds(parsedTrace.Meta.traceBounds);
+  const milliBounds = Trace.Helpers.Timing.traceWindowMilliSeconds(parsedTrace.data.Meta.traceBounds);
 
 
   const mainThreadProbably =
-      Trace.Handlers.Threads.threadsInTrace(parsedTrace)
+      Trace.Handlers.Threads.threadsInTrace(parsedTrace.data)
           .filter(t => t.type === Trace.Handlers.Threads.ThreadType.MAIN_THREAD && t.processIsOnMainFrame)
           .sort((a, b) => b.entries.length - a.entries.length)
           .at(0);

@@ -90,6 +90,11 @@ for p in Path('$dist').rglob('*.d.ts'):
         'SDK.NetworkManager.Conditions',
         'SDK.ResourceTreeModel.ResourceTreeFrame',
         'SDK.Target.Target',
+        'SDK.EnhancedTracesParser.RundownScript[\'args\'][\'data\']',
+        'SDK.EnhancedTracesParser.RundownScript[\'name\']',
+        'SDK.EnhancedTracesParser.RundownScriptCompiled[\'args\'][\'data\']',
+        'SDK.EnhancedTracesParser.RundownScriptCompiled[\'name\']',
+        'SDK.EnhancedTracesParser.RundownScriptSource[\'args\'][\'data\']',
 
         # Order is important here.
         'SDK.SourceMap.SourceMapV3',

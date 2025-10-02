@@ -19,21 +19,23 @@ polyfillDOMRect();
 
 /**
  * @param {Trace.Types.Events.Event[]} traceEvents
- * @return {Promise<{parsedTrace: Trace.Handlers.Types.ParsedTrace, insights: Trace.Insights.Types.TraceInsightSets, model: Trace.TraceModel.Model}>}
+ * @returns {Promise<{parsedTrace: Trace.TraceModel.ParsedTrace, model: Trace.TraceModel.Model}>}
  */
 export async function analyzeEvents(traceEvents) {
   const model = Trace.TraceModel.Model.createWithAllHandlers();
   await model.parse(traceEvents);
   const parsedTrace = model.parsedTrace();
-  const insights = model.traceInsights();
 
   if (!parsedTrace) {
     throw new Error('No data');
   }
+
+  const insights = parsedTrace.insights;
   if (!insights) {
     throw new Error('No insights');
   }
-  return {parsedTrace, insights, model};
+
+  return {parsedTrace, model};
 }
 
 /**
