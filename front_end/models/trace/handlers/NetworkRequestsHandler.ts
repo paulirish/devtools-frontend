@@ -1,4 +1,4 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -14,14 +14,16 @@ import type {HandlerName} from './types.js';
 const MILLISECONDS_TO_MICROSECONDS = 1000;
 const SECONDS_TO_MICROSECONDS = 1000000;
 
-// Network requests from traces are actually formed of 5 trace records.
-// This handler tracks all trace records based on the request ID, and
-// then creates a new synthetic trace event for those network requests.
-//
-// This interface, then, defines the shape of the object we intend to
-// keep for each request in the trace. In the finalize we will convert
-// these 5 types of trace records to a synthetic complete event that
-// represents a composite of these trace records.
+/**
+ * Network requests from traces are actually formed of 5 trace records.
+ * This handler tracks all trace records based on the request ID, and
+ * then creates a new synthetic trace event for those network requests.
+ *
+ * This interface, then, defines the shape of the object we intend to
+ * keep for each request in the trace. In the finalize we will convert
+ * these 5 types of trace records to a synthetic complete event that
+ * represents a composite of these trace records.
+ **/
 export interface TraceEventsForNetworkRequest {
   changePriority?: Types.Events.ResourceChangePriority;
   willSendRequests?: Types.Events.ResourceWillSendRequest[];
@@ -46,8 +48,8 @@ export interface WebSocketTraceDataForWorker {
 }
 export type WebSocketTraceData = WebSocketTraceDataForFrame|WebSocketTraceDataForWorker;
 
-const webSocketData = new Map<number, WebSocketTraceData>();
-const linkPreconnectEvents: Types.Events.LinkPreconnect[] = [];
+let webSocketData = new Map<number, WebSocketTraceData>();
+let linkPreconnectEvents: Types.Events.LinkPreconnect[] = [];
 
 interface NetworkRequestData {
   byId: Map<string, Types.Events.SyntheticNetworkRequest>;
@@ -58,19 +60,19 @@ interface NetworkRequestData {
   linkPreconnectEvents: Types.Events.LinkPreconnect[];
 }
 
-const requestMap = new Map<string, TraceEventsForNetworkRequest>();
-const requestsById = new Map<string, Types.Events.SyntheticNetworkRequest>();
-const requestsByTime: Types.Events.SyntheticNetworkRequest[] = [];
+let requestMap = new Map<string, TraceEventsForNetworkRequest>();
+let requestsById = new Map<string, Types.Events.SyntheticNetworkRequest>();
+let requestsByTime: Types.Events.SyntheticNetworkRequest[] = [];
 
-const networkRequestEventByInitiatorUrl = new Map<string, Types.Events.SyntheticNetworkRequest[]>();
-const eventToInitiatorMap = new Map<Types.Events.SyntheticNetworkRequest, Types.Events.SyntheticNetworkRequest>();
+let networkRequestEventByInitiatorUrl = new Map<string, Types.Events.SyntheticNetworkRequest[]>();
+let eventToInitiatorMap = new Map<Types.Events.SyntheticNetworkRequest, Types.Events.SyntheticNetworkRequest>();
 
 /**
  * These are to store ThirdParty data relationships between entities and events. To reduce iterating through data
  * more than we have to, here we start building the caches. After this, the RendererHandler will update
  * the relationships. When handling ThirdParty references, use the one in the RendererHandler instead.
  */
-const entityMappings: HandlerHelpers.EntityMappings = {
+let entityMappings: HandlerHelpers.EntityMappings = {
   eventsByEntity: new Map<HandlerHelpers.Entity, Types.Events.Event[]>(),
   entityByEvent: new Map<Types.Events.Event, HandlerHelpers.Entity>(),
   createdEntityCache: new Map<string, HandlerHelpers.Entity>(),
@@ -111,17 +113,19 @@ function firstPositiveValueInList(entries: Array<number|null>): number {
 }
 
 export function reset(): void {
-  requestsById.clear();
-  requestMap.clear();
-  requestsByTime.length = 0;
-  networkRequestEventByInitiatorUrl.clear();
-  eventToInitiatorMap.clear();
-  webSocketData.clear();
-  entityMappings.eventsByEntity.clear();
-  entityMappings.entityByEvent.clear();
-  entityMappings.createdEntityCache.clear();
-  entityMappings.entityByUrlCache.clear();
-  linkPreconnectEvents.length = 0;
+  requestsById = new Map();
+  requestMap = new Map();
+  requestsByTime = [];
+  networkRequestEventByInitiatorUrl = new Map();
+  eventToInitiatorMap = new Map();
+  webSocketData = new Map();
+  entityMappings = {
+    eventsByEntity: new Map<HandlerHelpers.Entity, Types.Events.Event[]>(),
+    entityByEvent: new Map<Types.Events.Event, HandlerHelpers.Entity>(),
+    createdEntityCache: new Map<string, HandlerHelpers.Entity>(),
+    entityByUrlCache: new Map<string, HandlerHelpers.Entity>(),
+  };
+  linkPreconnectEvents = [];
 }
 
 export function handleEvent(event: Types.Events.Event): void {
@@ -293,6 +297,7 @@ export async function finalize(): Promise<void> {
      *
      * See `_updateTimingsForLightrider` in Lighthouse for more detail.
      */
+    let lrServerResponseTime;
     if (isLightrider && request.receiveResponse?.args.data.headers) {
       timing = {
         requestTime: Helpers.Timing.microToSeconds(request.sendRequests.at(0)?.ts ?? 0 as Types.Timing.Micro),
@@ -327,6 +332,14 @@ export async function finalize(): Promise<void> {
         timing.sslStart = TCPMs / 2 as Types.Timing.Milli;
         timing.connectEnd = TCPMs as Types.Timing.Milli;
         timing.sslEnd = TCPMs as Types.Timing.Milli;
+      }
+
+      // Lightrider does not have any equivalent for `sendEnd` timing values. The
+      // closest we can get to the server response time is from a header that
+      // Lightrider sets.
+      const ResponseMsHeader = request.receiveResponse.args.data.headers.find(h => h.name === 'X-ResponseMs');
+      if (ResponseMsHeader) {
+        lrServerResponseTime = Math.max(0, parseInt(ResponseMsHeader.value, 10)) as Types.Timing.Milli;
       }
     }
 
@@ -524,6 +537,7 @@ export async function finalize(): Promise<void> {
               initiator: finalSendRequest.args.data.initiator,
               stackTrace: finalSendRequest.args.data.stackTrace,
               timing,
+              lrServerResponseTime,
               url,
               failed: request.resourceFinish?.args.data.didFail ?? false,
               finished: Boolean(request.resourceFinish),
@@ -553,7 +567,7 @@ export async function finalize(): Promise<void> {
 
     // Establish initiator relationships
     const initiatorUrl = networkEvent.args.data.initiator?.url ||
-        Helpers.Trace.getZeroIndexedStackTraceInEventPayload(networkEvent)?.at(0)?.url;
+        Helpers.Trace.getStackTraceTopCallFrameInEventPayload(networkEvent)?.url;
     if (initiatorUrl) {
       const events = networkRequestEventByInitiatorUrl.get(initiatorUrl) ?? [];
       events.push(networkEvent);
@@ -581,10 +595,10 @@ export function data(): NetworkRequestData {
     eventToInitiator: eventToInitiatorMap,
     webSocket: [...webSocketData.values()],
     entityMappings: {
-      entityByEvent: new Map(entityMappings.entityByEvent),
-      eventsByEntity: new Map(entityMappings.eventsByEntity),
-      createdEntityCache: new Map(entityMappings.createdEntityCache),
-      entityByUrlCache: new Map(entityMappings.entityByUrlCache),
+      entityByEvent: entityMappings.entityByEvent,
+      eventsByEntity: entityMappings.eventsByEntity,
+      createdEntityCache: entityMappings.createdEntityCache,
+      entityByUrlCache: entityMappings.entityByUrlCache,
     },
     linkPreconnectEvents,
   };

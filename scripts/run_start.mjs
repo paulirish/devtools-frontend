@@ -1,4 +1,4 @@
-// Copyright 2025 The Chromium Authors. All rights reserved.
+// Copyright 2025 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -18,7 +18,8 @@ import {
 // The default feature set.
 const DEFAULT_FEATURE_SET = new FeatureSet();
 process.platform === 'darwin' && DEFAULT_FEATURE_SET.disable('MediaRouter');
-DEFAULT_FEATURE_SET.enable('DevToolsGlobalAiButton', { promotion_enabled: true });
+DEFAULT_FEATURE_SET.enable('DevToolsGdpProfiles', { starter_badge_enabled: true });
+DEFAULT_FEATURE_SET.enable('DevToolsGlobalAiButton', { promotion_enabled: false });
 DEFAULT_FEATURE_SET.enable('DevToolsAiCodeCompletion');
 DEFAULT_FEATURE_SET.enable('DevToolsAiAssistancePerformanceAgent', {insights_enabled: true});
 DEFAULT_FEATURE_SET.enable('DevToolsAiGeneratedTimelineLabels');
@@ -28,6 +29,7 @@ DEFAULT_FEATURE_SET.enable('DevToolsFreestyler', {
   function_calling: true,
 });
 DEFAULT_FEATURE_SET.enable('DevToolsWellKnown');
+DEFAULT_FEATURE_SET.enable('DevToolsVerticalDrawer');
 
 // The unstable feature set (can be enabled via `--enable-unstable-features`).
 const UNSTABLE_FEATURE_SET = new FeatureSet();
@@ -157,7 +159,7 @@ if (status !== 0) {
   process.exit(1);
 }
 
-// Launch Chrome with our custom DevTools front-end.
+/** Launch Chrome with our custom DevTools front-end. **/
 function start() {
   const binary = findBrowserBinary();
   /**

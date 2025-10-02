@@ -1,4 +1,4 @@
-// Copyright 2021 The Chromium Authors. All rights reserved.
+// Copyright 2021 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 /* eslint-disable rulesdir/no-imperative-dom-api */
@@ -41,10 +41,11 @@ import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
+import * as Geometry from '../../models/geometry/geometry.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as Buttons from '../components/buttons/buttons.js';
 import * as IconButton from '../components/icon_button/icon_button.js';
-import {Directives, type LitTemplate, render} from '../lit/lit.js';
+import * as Lit from '../lit/lit.js';
 import * as VisualLogging from '../visual_logging/visual_logging.js';
 
 import * as ActionRegistration from './ActionRegistration.js';
@@ -53,7 +54,6 @@ import * as ARIAUtils from './ARIAUtils.js';
 import checkboxTextLabelStyles from './checkboxTextLabel.css.js';
 import confirmDialogStyles from './confirmDialog.css.js';
 import {Dialog} from './Dialog.js';
-import {Size} from './Geometry.js';
 import {GlassPane, PointerEventsBehavior, SizeBehavior} from './GlassPane.js';
 import inlineButtonStyles from './inlineButton.css.js';
 import inspectorCommonStyles from './inspectorCommon.css.js';
@@ -61,9 +61,7 @@ import {KeyboardShortcut, Keys} from './KeyboardShortcut.js';
 import smallBubbleStyles from './smallBubble.css.js';
 import type {ToolbarButton} from './Toolbar.js';
 import {Tooltip} from './Tooltip.js';
-import type {TreeOutline} from './Treeoutline.js';
 import {Widget} from './Widget.js';
-import type {XWidget} from './XWidget.js';
 
 declare global {
   interface HTMLElementTagNameMap {
@@ -73,6 +71,7 @@ declare global {
     'dt-small-bubble': DevToolsSmallBubble;
   }
 }
+const {Directives, render} = Lit;
 
 const UIStrings = {
   /**
@@ -858,7 +857,7 @@ export function highlightRangesWithStyleClass(
   return highlightNodes;
 }
 
-// Used in chromium/src/third_party/blink/web_tests/http/tests/devtools/components/utilities-highlight-results.js
+/** Used in chromium/src/third_party/blink/web_tests/http/tests/devtools/components/utilities-highlight-results.js **/
 export function applyDomChanges(domChanges: HighlightChange[]): void {
   for (let i = 0, size = domChanges.length; i < size; ++i) {
     const entry = domChanges[i];
@@ -887,7 +886,7 @@ export function revertDomChanges(domChanges: HighlightChange[]): void {
   }
 }
 
-export function measurePreferredSize(element: Element, containerElement?: Element|null): Size {
+export function measurePreferredSize(element: Element, containerElement?: Element|null): Geometry.Size {
   const oldParent = element.parentElement;
   const oldNextSibling = element.nextSibling;
   containerElement = containerElement || element.ownerDocument.body;
@@ -901,7 +900,7 @@ export function measurePreferredSize(element: Element, containerElement?: Elemen
   } else {
     element.remove();
   }
-  return new Size(result.width, result.height);
+  return new Geometry.Size(result.width, result.height);
 }
 
 class InvokeOnceHandlers {
@@ -963,13 +962,6 @@ export function endBatchUpdate(): void {
     postUpdateHandlers.scheduleInvoke();
     postUpdateHandlers = null;
   }
-}
-
-export function invokeOnceAfterBatchUpdate(object: Object, method: () => void): void {
-  if (!postUpdateHandlers) {
-    postUpdateHandlers = new InvokeOnceHandlers(true);
-  }
-  postUpdateHandlers.add(object, method);
 }
 
 export function animateFunction(
@@ -1774,16 +1766,15 @@ export function createInlineButton(toolbarButton: ToolbarButton): Element {
   return element;
 }
 
-export abstract class Renderer {
-  abstract render(object: Object, options?: Options): Promise<{
-    node: Node,
-    tree: TreeOutline|null,
-  }|null>;
+export interface RenderedObject {
+  element: HTMLElement;
+  forceSelect(): void;
+}
 
-  static async render(object: Object, options?: Options): Promise<{
-    node: Node,
-    tree: TreeOutline|null,
-  }|null> {
+export abstract class Renderer {
+  abstract render(object: Object, options?: Options): Promise<RenderedObject|null>;
+
+  static async render(object: Object, options?: Options): Promise<RenderedObject|null> {
     if (!object) {
       throw new Error('Can\'t render ' + object);
     }
@@ -1812,6 +1803,10 @@ export function formatTimestamp(timestamp: number, full: boolean): string {
 export interface Options {
   title?: string|Element;
   editable?: boolean;
+  /**
+   * Should the resulting object be expanded.
+   */
+  expand?: boolean;
 }
 
 export interface HighlightChange {
@@ -1939,27 +1934,11 @@ function updateWidgetfocusWidgetForNode(node: Node|null): void {
   }
 }
 
-function updateXWidgetfocusWidgetForNode(node: Node|null): void {
-  node = node?.parentNodeOrShadowHost() ?? null;
-  const XWidgetConstructor = customElements.get('x-widget') as Platform.Constructor.Constructor<XWidget>| undefined;
-  let widget = null;
-  while (node) {
-    if (XWidgetConstructor && node instanceof XWidgetConstructor) {
-      if (widget) {
-        node.defaultFocusedElement = widget;
-      }
-      widget = node;
-    }
-    node = node.parentNodeOrShadowHost();
-  }
-}
-
 function focusChanged(event: Event): void {
   const target = event.target as HTMLElement;
   const document = target ? target.ownerDocument : null;
   const element = document ? Platform.DOMUtilities.deepActiveElement(document) : null;
   updateWidgetfocusWidgetForNode(element);
-  updateXWidgetfocusWidgetForNode(element);
 }
 
 /**
@@ -2185,6 +2164,54 @@ export function bindToAction(actionName: string): ReturnType<typeof Directives.r
   });
 }
 
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+type BindingEventListener = (arg: any) => any;
+export class InterceptBindingDirective extends Lit.Directive.Directive {
+  static readonly #interceptedBindings = new WeakMap<Element, Map<string, BindingEventListener>>();
+
+  override update(part: Lit.Directive.Part, [listener]: [BindingEventListener]): unknown {
+    if (part.type !== Lit.Directive.PartType.EVENT) {
+      return listener;
+    }
+    let eventListeners = InterceptBindingDirective.#interceptedBindings.get(part.element);
+    if (!eventListeners) {
+      eventListeners = new Map();
+      InterceptBindingDirective.#interceptedBindings.set(part.element, eventListeners);
+    }
+    eventListeners.set(part.name, listener);
+
+    return this.render(listener);
+  }
+
+  /* eslint-disable-next-line @typescript-eslint/no-unsafe-function-type */
+  render(_listener: Function): undefined {
+    return undefined;
+  }
+
+  static attachEventListeners(templateElement: Element, renderedElement: Element): void {
+    const eventListeners = InterceptBindingDirective.#interceptedBindings.get(templateElement);
+    if (!eventListeners) {
+      return;
+    }
+    for (const [name, listener] of eventListeners) {
+      renderedElement.addEventListener(name, listener);
+    }
+  }
+}
+
+export const cloneCustomElement = <T extends HTMLElement>(element: T, deep?: boolean): T => {
+  const clone = document.createElement(element.localName) as T;
+  for (const attribute of element.attributes) {
+    clone.setAttribute(attribute.name, attribute.value);
+  }
+  if (deep) {
+    for (const child of element.childNodes) {
+      clone.appendChild(child.cloneNode(deep));
+    }
+  }
+  return clone;
+};
+
 export class HTMLElementWithLightDOMTemplate extends HTMLElement {
   readonly #mutationObserver = new MutationObserver(this.#onChange.bind(this));
   #contentTemplate: HTMLTemplateElement|null = null;
@@ -2194,7 +2221,55 @@ export class HTMLElementWithLightDOMTemplate extends HTMLElement {
     this.#mutationObserver.observe(this, {childList: true, attributes: true, subtree: true, characterData: true});
   }
 
-  set template(template: LitTemplate) {
+  static cloneNode(node: Node): Node {
+    const clone = node.cloneNode(false);
+    for (const child of node.childNodes) {
+      clone.appendChild(HTMLElementWithLightDOMTemplate.cloneNode(child));
+    }
+    if (node instanceof Element && clone instanceof Element) {
+      InterceptBindingDirective.attachEventListeners(node, clone);
+    }
+    return clone;
+  }
+
+  private static patchLitTemplate(template: Lit.LitTemplate): void {
+    const wrapper = Lit.Directive.directive(InterceptBindingDirective);
+    if (template === Lit.nothing) {
+      return;
+    }
+    template.values = template.values.map(patchValue);
+
+    function isLitTemplate(value: unknown): value is Lit.TemplateResult<1> {
+      return Boolean(
+          typeof value === 'object' && value && '_$litType$' in value && 'strings' in value && 'values' in value &&
+          value['_$litType$'] === 1);
+    }
+
+    function patchValue(value: unknown): unknown {
+      if (typeof value === 'function') {
+        try {
+          return wrapper(value);
+        } catch {
+          return value;
+        }
+      }
+      if (isLitTemplate(value)) {
+        HTMLElementWithLightDOMTemplate.patchLitTemplate(value);
+        return value;
+      }
+      if (Array.isArray(value)) {
+        return value.map(patchValue);
+      }
+
+      return value;
+    }
+  }
+
+  get templateRoot(): DocumentFragment|HTMLElement {
+    return this.#contentTemplate?.content ?? this;
+  }
+
+  set template(template: Lit.LitTemplate) {
     if (!this.#contentTemplate) {
       this.removeChildren();
       this.#contentTemplate = this.createChild('template');
@@ -2202,24 +2277,47 @@ export class HTMLElementWithLightDOMTemplate extends HTMLElement {
       this.#mutationObserver.observe(
           this.#contentTemplate.content, {childList: true, attributes: true, subtree: true, characterData: true});
     }
+    HTMLElementWithLightDOMTemplate.patchLitTemplate(template);
     // eslint-disable-next-line rulesdir/no-lit-render-outside-of-view
     render(template, this.#contentTemplate.content);
   }
 
   #onChange(mutationList: MutationRecord[]): void {
+    this.onChange(mutationList);
     for (const mutation of mutationList) {
       this.removeNodes(mutation.removedNodes);
-      this.addNodes(mutation.addedNodes);
-      this.updateNodes(mutation.target, mutation.attributeName);
+      this.addNodes(mutation.addedNodes, mutation.nextSibling);
+      this.updateNode(mutation.target, mutation.attributeName);
     }
   }
 
-  protected updateNodes(_node: Node, _attributeName: string|null): void {
+  protected onChange(_mutationList: MutationRecord[]): void {
   }
 
-  protected addNodes(_nodes: NodeList|Node[]): void {
+  protected updateNode(_node: Node, _attributeName: string|null): void {
+  }
+
+  protected addNodes(_nodes: NodeList|Node[], _nextSibling?: Node|null): void {
   }
 
   protected removeNodes(_nodes: NodeList): void {
+  }
+
+  static findCorrespondingElement(
+      sourceElement: HTMLElement, sourceRootElement: HTMLElement, targetRootElement: Element): Element|null {
+    let currentElement = sourceElement;
+    const childIndexesOnPathToRoot: number[] = [];
+    while (currentElement?.parentElement && currentElement !== sourceRootElement) {
+      childIndexesOnPathToRoot.push([...currentElement.parentElement.children].indexOf(currentElement));
+      currentElement = currentElement.parentElement;
+    }
+    if (!currentElement) {
+      return null;
+    }
+    let targetElement = targetRootElement;
+    for (const index of childIndexesOnPathToRoot.reverse()) {
+      targetElement = targetElement.children[index];
+    }
+    return targetElement;
   }
 }

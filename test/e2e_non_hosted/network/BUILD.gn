@@ -1,4 +1,4 @@
-# Copyright 2025 The Chromium Authors. All rights reserved.
+# Copyright 2025 The Chromium Authors
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
@@ -11,6 +11,7 @@ ts_e2e_library("network") {
     "network-datagrid_test.ts",
     "network-filter_test.ts",
     "network-request-view_test.ts",
+    "network-search_test.ts",
     "network-throttle-persist_test.ts",
     "network_test.ts",
     "request-blocking_test.ts",

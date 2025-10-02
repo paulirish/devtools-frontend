@@ -1,15 +1,10 @@
-// Copyright 2020 The Chromium Authors. All rights reserved.
+// Copyright 2020 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 import {assert} from 'chai';
 import type {ElementHandle} from 'puppeteer-core';
 
-import {
-  getBrowserAndPages,
-  waitFor,
-  waitForElementWithTextContent,
-} from '../../shared/helper.js';
 import {getBrowserAndPagesWrappers} from '../../shared/non_hosted_wrappers.js';
 
 import {getQuotaUsage, waitForQuotaUsage} from './application-helpers.js';
@@ -32,8 +27,10 @@ export async function navigateToLighthouseTab(
   return await devToolsPage.waitFor('.lighthouse-start-view');
 }
 
-// Instead of watching the worker or controller/panel internals, we wait for the Lighthouse renderer
-// to create the new report DOM. And we pull the LHR and artifacts off the lh-root node.
+/**
+ * Instead of watching the worker or controller/panel internals, we wait for the Lighthouse renderer
+ * to create the new report DOM. And we pull the LHR and artifacts off the lh-root node.
+ **/
 export async function waitForResult(
     devToolsPage = getBrowserAndPagesWrappers().devToolsPage,
     inspectedPage = getBrowserAndPagesWrappers().inspectedPage) {
@@ -107,9 +104,10 @@ export async function selectDevice(
   await selectRadioOption(device, 'lighthouse.device-type', devToolsPage);
 }
 
-export async function setToolbarCheckboxWithText(enabled: boolean, textContext: string) {
-  const toolbarHandle = await waitFor('.lighthouse-settings-pane .lighthouse-settings-toolbar');
-  const label = await waitForElementWithTextContent(textContext, toolbarHandle);
+export async function setToolbarCheckboxWithText(
+    enabled: boolean, textContext: string, devToolsPage = getBrowserAndPagesWrappers().devToolsPage) {
+  const toolbarHandle = await devToolsPage.waitFor('.lighthouse-settings-pane .lighthouse-settings-toolbar');
+  const label = await devToolsPage.waitForElementWithTextContent(textContext, toolbarHandle);
   await label.evaluate((label, enabled: boolean) => {
     const rootNode = label.getRootNode() as ShadowRoot;
     const checkboxId = label.getAttribute('for') as string;
@@ -228,9 +226,9 @@ export async function registerServiceWorker(inspectedPage = getBrowserAndPagesWr
   assert.strictEqual(await getServiceWorkerCount(inspectedPage), 1);
 }
 
-export async function interceptNextFileSave(): Promise<() => Promise<string>> {
-  const {frontend} = await getBrowserAndPages();
-  await frontend.evaluate(() => {
+export async function interceptNextFileSave(devToolsPage = getBrowserAndPagesWrappers().devToolsPage):
+    Promise<() => Promise<string>> {
+  await devToolsPage.evaluate(() => {
     // @ts-expect-error
     const original = InspectorFrontendHost.save;
     const nextFilePromise = new Promise(resolve => {
@@ -248,16 +246,15 @@ export async function interceptNextFileSave(): Promise<() => Promise<string>> {
   });
 
   // @ts-expect-error
-  return () => frontend.evaluate(() => window.__nextFile);
+  return () => devToolsPage.evaluate(() => window.__nextFile);
 }
 
-export async function renderHtmlInIframe(html: string) {
-  const {target} = getBrowserAndPages();
-  return (await target.evaluateHandle(async html => {
-    const iframe = document.createElement('iframe');
-    iframe.srcdoc = html;
-    document.documentElement.append(iframe);
-    await new Promise(resolve => iframe.addEventListener('load', resolve));
-    return iframe.contentDocument!;
-  }, html));
+export async function renderHtmlInIframe(html: string, inspectedPage = getBrowserAndPagesWrappers().inspectedPage) {
+  return (await inspectedPage.page.evaluateHandle(async html => {
+           const iframe = document.createElement('iframe');
+           iframe.srcdoc = html;
+           document.documentElement.append(iframe);
+           await new Promise(resolve => iframe.addEventListener('load', resolve));
+           return iframe.contentDocument;
+         }, html)).asElement() as ElementHandle<Document>;
 }

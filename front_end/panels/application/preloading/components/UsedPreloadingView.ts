@@ -1,4 +1,4 @@
-// Copyright 2023 The Chromium Authors. All rights reserved.
+// Copyright 2023 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 /* eslint-disable rulesdir/no-lit-render-outside-of-view */
@@ -138,8 +138,10 @@ export const enum UsedKind {
   NO_PRELOADS = 'NoPreloads',
 }
 
-// TODO(kenoss): Rename this class and file once https://crrev.com/c/4933567 landed.
-// This also shows summary of speculations initiated by this page.
+/**
+ * TODO(kenoss): Rename this class and file once https://crrev.com/c/4933567 landed.
+ * This also shows summary of speculations initiated by this page.
+ **/
 export class UsedPreloadingView extends LegacyWrapper.LegacyWrapper.WrappableComponent<UI.Widget.VBox> {
   readonly #shadow = this.attachShadow({mode: 'open'});
   #data: UsedPreloadingViewData = {
@@ -155,11 +157,11 @@ export class UsedPreloadingView extends LegacyWrapper.LegacyWrapper.WrappableCom
 
   async #render(): Promise<void> {
     await RenderCoordinator.write('UsedPreloadingView render', () => {
-      Lit.render(this.#renderInternal(), this.#shadow, {host: this});
+      Lit.render(this.#renderTemplate(), this.#shadow, {host: this});
     });
   }
 
-  #renderInternal(): Lit.LitTemplate {
+  #renderTemplate(): Lit.LitTemplate {
     // Disabled until https://crbug.com/1079231 is fixed.
     // clang-format off
     return html`

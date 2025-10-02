@@ -1,4 +1,4 @@
-// Copyright 2024 The Chromium Authors. All rights reserved.
+// Copyright 2024 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 /* eslint-disable rulesdir/no-lit-render-outside-of-view */
@@ -20,7 +20,6 @@ import * as ThemeSupport from '../../../../ui/legacy/theme_support/theme_support
 import * as Lit from '../../../../ui/lit/lit.js';
 import * as VisualLogging from '../../../../ui/visual_logging/visual_logging.js';
 import * as PanelCommon from '../../../common/common.js';
-import type * as Utils from '../../utils/utils.js';
 
 import entryLabelOverlayStyles from './entryLabelOverlay.css.js';
 
@@ -184,7 +183,7 @@ export class EntryLabelOverlay extends HTMLElement {
   /**
    * Required to generate a label with AI.
    */
-  #callTree: Utils.AICallTree.AICallTree|null = null;
+  #callTree: AiAssistanceModels.AICallTree|null = null;
   // Creates or gets the setting if it exists.
   #aiAnnotationsEnabledSetting = Common.Settings.Settings.instance().createSetting('ai-annotations-enabled', false);
   #agent = new AiAssistanceModels.PerformanceAnnotationsAgent({
@@ -498,7 +497,7 @@ export class EntryLabelOverlay extends HTMLElement {
     selection?.addRange(range);
   }
 
-  set callTree(callTree: Utils.AICallTree.AICallTree|null) {
+  set callTree(callTree: AiAssistanceModels.AICallTree|null) {
     this.#callTree = callTree;
     // If the entry has a calltree, we need to check if we need to show the 'generate label' button.
     this.#setAIButtonRenderState();
@@ -577,7 +576,7 @@ export class EntryLabelOverlay extends HTMLElement {
       onLearnMoreClick: () => {
         UI.UIUtils.openInNewTab('https://developer.chrome.com/docs/devtools/performance/annotations#auto-annotations');
       },
-      learnMoreButtonTitle: UIStringsNotTranslate.learnMoreButton,
+      learnMoreButtonText: UIStringsNotTranslate.learnMoreButton,
     });
     this.dispatchEvent(new LabelAnnotationsConsentDialogVisibilityChange(false));
 

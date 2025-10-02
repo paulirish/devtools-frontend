@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as Bidi from 'chromium-bidi/lib/cjs/protocol/protocol.js';
 import type Protocol from 'devtools-protocol';
+import * as Bidi from 'webdriver-bidi-protocol';
 
 import {firstValueFrom, from, raceWith} from '../../third_party/rxjs/rxjs.js';
 import type {CDPSession} from '../api/CDPSession.js';
@@ -55,7 +55,6 @@ import {assert} from '../util/assert.js';
 import {bubble} from '../util/decorators.js';
 import {Deferred} from '../util/Deferred.js';
 import {stringToTypedArray} from '../util/encoding.js';
-import {isErrorLike} from '../util/ErrorLike.js';
 
 import type {BidiBrowser} from './Browser.js';
 import type {BidiBrowserContext} from './BrowserContext.js';
@@ -142,20 +141,45 @@ export class BidiPage extends Page {
   #userAgentInterception?: string;
   #userAgentPreloadScript?: string;
   override async setUserAgent(
-    userAgent: string,
+    userAgentOrOptions:
+      | string
+      | {
+          userAgent?: string;
+          userAgentMetadata?: Protocol.Emulation.UserAgentMetadata;
+          platform?: string;
+        },
     userAgentMetadata?: Protocol.Emulation.UserAgentMetadata,
   ): Promise<void> {
-    if (!this.#browserContext.browser().cdpSupported && userAgentMetadata) {
+    let userAgent: string;
+    let metadata: Protocol.Emulation.UserAgentMetadata | undefined;
+    let platform: string | undefined;
+
+    if (typeof userAgentOrOptions === 'string') {
+      userAgent = userAgentOrOptions;
+      metadata = userAgentMetadata;
+    } else {
+      userAgent =
+        userAgentOrOptions.userAgent ??
+        (await this.#browserContext.browser().userAgent());
+      metadata = userAgentOrOptions.userAgentMetadata;
+      platform = userAgentOrOptions.platform;
+    }
+
+    if (
+      !this.#browserContext.browser().cdpSupported &&
+      (metadata || platform)
+    ) {
       throw new UnsupportedOperation(
-        'Current Browser does not support `userAgentMetadata`',
+        'Current Browser does not support `userAgentMetadata` or `platform`',
       );
     } else if (
       this.#browserContext.browser().cdpSupported &&
-      userAgentMetadata
+      (metadata || platform)
     ) {
       return await this._client().send('Network.setUserAgentOverride', {
         userAgent: userAgent,
-        userAgentMetadata: userAgentMetadata,
+        userAgentMetadata: metadata,
+        platform: platform,
       });
     }
     const enable = userAgent !== '';
@@ -173,11 +197,20 @@ export class BidiPage extends Page {
       enable,
     );
 
-    const changeUserAgent = (userAgent: string) => {
+    const overrideNavigatorProperties = (
+      userAgent: string,
+      platform: string | undefined,
+    ) => {
       Object.defineProperty(navigator, 'userAgent', {
         value: userAgent,
         configurable: true,
       });
+      if (platform) {
+        Object.defineProperty(navigator, 'platform', {
+          value: platform,
+          configurable: true,
+        });
+      }
     };
 
     const frames = [this.#frame];
@@ -192,19 +225,27 @@ export class BidiPage extends Page {
     }
     const [evaluateToken] = await Promise.all([
       enable
-        ? this.evaluateOnNewDocument(changeUserAgent, userAgent)
+        ? this.evaluateOnNewDocument(
+            overrideNavigatorProperties,
+            userAgent,
+            platform || undefined,
+          )
         : undefined,
       // When we disable the UserAgent we want to
       // evaluate the original value in all Browsing Contexts
       ...frames.map(frame => {
-        return frame.evaluate(changeUserAgent, userAgent);
+        return frame.evaluate(
+          overrideNavigatorProperties,
+          userAgent,
+          platform || undefined,
+        );
       }),
     ]);
     this.#userAgentPreloadScript = evaluateToken?.identifier;
   }
 
   override async setBypassCSP(enabled: boolean): Promise<void> {
-    // TODO: handle CDP-specific cases such as mprach.
+    // TODO: handle CDP-specific cases such as MPArch.
     await this._client().send('Page.setBypassCSP', {enabled});
   }
 
@@ -235,6 +276,13 @@ export class BidiPage extends Page {
 
   override mainFrame(): BidiFrame {
     return this.#frame;
+  }
+
+  override resize(_params: {
+    contentWidth: number;
+    contentHeight: number;
+  }): Promise<void> {
+    throw new Error('Method not implemented for WebDriver BiDi yet.');
   }
 
   async focusedFrame(): Promise<BidiFrame> {
@@ -578,7 +626,7 @@ export class BidiPage extends Page {
       );
       return;
     }
-    // TODO: handle CDP-specific cases such as mprach.
+    // TODO: handle CDP-specific cases such as MPArch.
     await this._client().send('Network.setCacheDisabled', {
       cacheDisabled: !enabled,
     });
@@ -663,11 +711,20 @@ export class BidiPage extends Page {
     return [...this.#workers];
   }
 
-  #userInterception?: string;
+  get isNetworkInterceptionEnabled(): boolean {
+    return (
+      Boolean(this.#requestInterception) ||
+      Boolean(this.#extraHeadersInterception) ||
+      Boolean(this.#authInterception) ||
+      Boolean(this.#userAgentInterception)
+    );
+  }
+
+  #requestInterception?: string;
   override async setRequestInterception(enable: boolean): Promise<void> {
-    this.#userInterception = await this.#toggleInterception(
+    this.#requestInterception = await this.#toggleInterception(
       [Bidi.Network.InterceptPhase.BeforeRequestSent],
-      this.#userInterception,
+      this.#requestInterception,
       enable,
     );
   }
@@ -763,7 +820,7 @@ export class BidiPage extends Page {
     }
     if (!this.#emulatedNetworkConditions) {
       this.#emulatedNetworkConditions = {
-        offline: false,
+        offline: networkConditions?.offline ?? false,
         upload: -1,
         download: -1,
         latency: 0,
@@ -778,6 +835,8 @@ export class BidiPage extends Page {
     this.#emulatedNetworkConditions.latency = networkConditions
       ? networkConditions.latency
       : 0;
+    this.#emulatedNetworkConditions.offline =
+      networkConditions?.offline ?? false;
     return await this.#applyNetworkConditions();
   }
 
@@ -926,11 +985,6 @@ export class BidiPage extends Page {
       return response;
     } catch (error) {
       controller.abort();
-      if (isErrorLike(error)) {
-        if (error.message.includes('no such history entry')) {
-          return null;
-        }
-      }
       throw error;
     }
   }
@@ -1009,7 +1063,7 @@ export function bidiToPuppeteerCookie(
 ): Cookie {
   const partitionKey = bidiCookie[CDP_SPECIFIC_PREFIX + 'partitionKey'];
 
-  function getParitionKey(): {partitionKey?: Cookie['partitionKey']} {
+  function getPartitionKey(): {partitionKey?: Cookie['partitionKey']} {
     if (typeof partitionKey === 'string') {
       return {partitionKey};
     }
@@ -1051,7 +1105,7 @@ export function bidiToPuppeteerCookie(
       'partitionKeyOpaque',
       'priority',
     ),
-    ...getParitionKey(),
+    ...getPartitionKey(),
   };
 }
 

@@ -1,4 +1,4 @@
-// Copyright 2021 The Chromium Authors. All rights reserved.
+// Copyright 2021 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 /* eslint-disable rulesdir/no-imperative-dom-api */
@@ -36,7 +36,10 @@
 
 import * as Common from '../../core/common/common.js';
 import * as Platform from '../../core/platform/platform.js';
+import * as SDK from '../../core/sdk/sdk.js';
+import type * as TextUtils from '../../models/text_utils/text_utils.js';
 import type * as Buttons from '../components/buttons/buttons.js';
+import * as Highlighting from '../components/highlighting/highlighting.js';
 import type * as IconButton from '../components/icon_button/icon_button.js';
 import * as Lit from '../lit/lit.js';
 import * as VisualLogging from '../visual_logging/visual_logging.js';
@@ -44,6 +47,7 @@ import * as VisualLogging from '../visual_logging/visual_logging.js';
 import * as ARIAUtils from './ARIAUtils.js';
 import {type Config, InplaceEditor} from './InplaceEditor.js';
 import {Keys} from './KeyboardShortcut.js';
+import type {SearchableView} from './SearchableView.js';
 import {Tooltip} from './Tooltip.js';
 import treeoutlineStyles from './treeoutline.css.js';
 import {
@@ -51,6 +55,7 @@ import {
   deepElementFromPoint,
   enclosingNodeOrSelfWithNodeNameInArray,
   HTMLElementWithLightDOMTemplate,
+  InterceptBindingDirective,
   isEditing,
 } from './UIUtils.js';
 
@@ -1405,12 +1410,138 @@ function hasBooleanAttribute(element: Element, name: string): boolean {
   return element.hasAttribute(name) && element.getAttribute(name) !== 'false';
 }
 
+interface TreeNode<NodeT> {
+  children(): NodeT[];
+}
+
+export interface TreeSearchResult<NodeT> {
+  node: NodeT;
+  isPostOrderMatch: boolean;
+  matchIndexInNode: number;
+}
+
+export class TreeSearch < NodeT extends TreeNode<NodeT>,
+                                        SearchResultT extends TreeSearchResult<NodeT >= TreeSearchResult<NodeT>> {
+  #matches: SearchResultT[] = [];
+  #currentMatchIndex = 0;
+  #nodeMatchMap: WeakMap<NodeT, SearchResultT[]>|undefined;
+
+  reset(): void {
+    this.#matches = [];
+    this.#nodeMatchMap = undefined;
+    this.#currentMatchIndex = 0;
+  }
+
+  currentMatch(): SearchResultT|undefined {
+    return this.#matches.at(this.#currentMatchIndex);
+  }
+
+  #getNodeMatchMap(): WeakMap<NodeT, SearchResultT[]> {
+    if (!this.#nodeMatchMap) {
+      this.#nodeMatchMap = new WeakMap();
+      for (const match of this.#matches) {
+        let entry = this.#nodeMatchMap.get(match.node);
+        if (!entry) {
+          entry = [];
+          this.#nodeMatchMap.set(match.node, entry);
+        }
+        entry.push(match);
+      }
+    }
+    return this.#nodeMatchMap;
+  }
+
+  getResults(node: NodeT): SearchResultT[] {
+    return this.#getNodeMatchMap().get(node) ?? [];
+  }
+
+  static highlight(ranges: TextUtils.TextRange.SourceRange[], selectedRange: TextUtils.TextRange.SourceRange|undefined):
+      ReturnType<typeof Lit.Directives.ref> {
+    return Lit.Directives.ref(element => {
+      if (!(element instanceof HTMLElement)) {
+        return;
+      }
+      const configListItem = element.closest<HTMLLIElement>('li[role="treeitem"]');
+      const titleElement = configListItem ? TreeViewTreeElement.get(configListItem)?.titleElement : undefined;
+      if (configListItem && titleElement) {
+        const targetElement = HTMLElementWithLightDOMTemplate.findCorrespondingElement(
+            element, configListItem, titleElement as HTMLElement);
+        if (targetElement) {
+          Highlighting.HighlightManager.HighlightManager.instance().set(targetElement, ranges, selectedRange);
+        }
+      }
+    });
+  }
+
+  updateSearchableView(view: SearchableView): void {
+    view.updateSearchMatchesCount(this.#matches.length);
+    view.updateCurrentMatchIndex(this.#currentMatchIndex);
+  }
+
+  next(): SearchResultT|undefined {
+    this.#currentMatchIndex = Platform.NumberUtilities.mod(this.#currentMatchIndex + 1, this.#matches.length);
+    return this.currentMatch();
+  }
+
+  prev(): SearchResultT|undefined {
+    this.#currentMatchIndex = Platform.NumberUtilities.mod(this.#currentMatchIndex - 1, this.#matches.length);
+    return this.currentMatch();
+  }
+
+  // This is a generator to sidestep stack overflow risks
+  *
+      #innerSearch(
+          node: NodeT, currentMatch: SearchResultT|undefined, jumpBackwards: boolean,
+          match: (node: NodeT, isPostOrder: boolean) => SearchResultT[]): Generator<SearchResultT> {
+    const updateCurrentMatchIndex = (isPostOrder: boolean): void => {
+      if (currentMatch?.node === node && currentMatch.isPostOrderMatch === isPostOrder) {
+        // We're current matching the node that contains the currently focused search result, the n-th result
+        // within that node. When updating the search hits, make sure we're still focusing the n-th result within
+        // that node. That may make the result jump within the node, but at least we're still focusing the same
+        // node. If there are fewer than n hits in the current node, we're going to move the focus to the next
+        // search hit in the next node by default, or the last one in this node if searching backwards.
+        if (currentMatch.matchIndexInNode >= preOrderMatches.length) {
+          this.#currentMatchIndex = jumpBackwards ? this.#matches.length - 1 : this.#matches.length;
+        } else {
+          this.#currentMatchIndex = this.#matches.length - preOrderMatches.length + currentMatch.matchIndexInNode;
+        }
+      }
+    };
+
+    const preOrderMatches = match(node, /* isPostOrder=*/ false);
+    this.#matches.push(...preOrderMatches);
+    updateCurrentMatchIndex(/* isPostOrder=*/ false);
+    yield* preOrderMatches.values();
+    for (const child of node.children()) {
+      yield* this.#innerSearch(child, currentMatch, jumpBackwards, match);
+    }
+    const postOrderMatches = match(node, /* isPostOrder=*/ true);
+    this.#matches.push(...postOrderMatches);
+    updateCurrentMatchIndex(/* isPostOrder=*/ true);
+    yield* postOrderMatches.values();
+  }
+
+  search(node: NodeT, jumpBackwards: boolean, match: (node: NodeT, isPostOrder: boolean) => SearchResultT[]): number {
+    const currentMatch = this.currentMatch();
+    this.reset();
+    // eslint-disable-next-line @typescript-eslint/naming-convention,@typescript-eslint/no-unused-vars
+    for (const _ of this.#innerSearch(node, currentMatch, jumpBackwards, match)) {
+      // run the generator
+    }
+    this.#currentMatchIndex = Platform.NumberUtilities.mod(this.#currentMatchIndex, this.#matches.length);
+    return this.#matches.length;
+  }
+}
+
 class TreeViewTreeElement extends TreeElement {
+  #clonedAttributes = new Set<string>();
+  #clonedClasses = new Set<string>();
+
   static #elementToTreeElement = new WeakMap<Node, TreeViewTreeElement>();
   readonly configElement: HTMLLIElement;
 
   constructor(treeOutline: TreeOutline, configElement: HTMLLIElement) {
-    super();
+    super(undefined, undefined, configElement.getAttribute('jslog-context') ?? undefined);
     this.configElement = configElement;
     TreeViewTreeElement.#elementToTreeElement.set(configElement, this);
     this.refresh();
@@ -1418,21 +1549,31 @@ class TreeViewTreeElement extends TreeElement {
 
   refresh(): void {
     this.titleElement.textContent = '';
-    if (hasBooleanAttribute(this.configElement, 'selected')) {
-      this.revealAndSelect(true);
+    this.#clonedAttributes.forEach(attr => this.listItemElement.attributes.removeNamedItem(attr));
+    this.#clonedClasses.forEach(className => this.listItemElement.classList.remove(className));
+    this.#clonedAttributes.clear();
+    this.#clonedClasses.clear();
+    for (let i = 0; i < this.configElement.attributes.length; ++i) {
+      const attribute = this.configElement.attributes.item(i);
+      if (attribute && attribute.name !== 'role' && SDK.DOMModel.ARIA_ATTRIBUTES.has(attribute.name)) {
+        this.listItemElement.setAttribute(attribute.name, attribute.value);
+        this.#clonedAttributes.add(attribute.name);
+      }
     }
+    for (const className of this.configElement.classList) {
+      this.listItemElement.classList.add(className);
+      this.#clonedClasses.add(className);
+    }
+    InterceptBindingDirective.attachEventListeners(this.configElement, this.listItemElement);
 
     for (const child of this.configElement.childNodes) {
       if (child instanceof HTMLUListElement && child.role === 'group') {
-        if (hasBooleanAttribute(child, 'hidden')) {
-          this.collapse();
-        } else {
-          this.expand();
-        }
         continue;
       }
-      this.titleElement.appendChild(child.cloneNode(true));
+      this.titleElement.appendChild(HTMLElementWithLightDOMTemplate.cloneNode(child));
     }
+
+    Highlighting.HighlightManager.HighlightManager.instance().apply(this.titleElement);
   }
 
   static get(configElement: Node|undefined): TreeViewTreeElement|undefined {
@@ -1453,7 +1594,7 @@ function getTreeNodes(nodeList: NodeList|Node[]): HTMLLIElement[] {
   return nodeList.values()
       .flatMap(node => {
         if (node instanceof HTMLLIElement && node.role === 'treeitem') {
-          return [node];
+          return [node, ...node.querySelectorAll<HTMLLIElement>('ul[role="group"] li[role="treeitem"]')];
         }
         if (node instanceof HTMLElement) {
           return node.querySelectorAll<HTMLLIElement>('li[role="treeitem"]');
@@ -1464,18 +1605,22 @@ function getTreeNodes(nodeList: NodeList|Node[]): HTMLLIElement[] {
 }
 
 /**
- * A tree element that can be used as progressive enhancement over a <ul> element.
+ * A tree element that can be used as progressive enhancement over a <ul> element. A `template` IDL attribute allows
+ * additionally to insert the <ul> into a <template>, avoiding rendering anything into light DOM, which is recommended.
+ * The <ul> itself will be cloned into shadow DOM and rendered there.
+ *
+ * ## Usage ##
  *
  * It can be used as
  * ```
  * <devtools-tree
  *   .template=${html`
  *     <ul role="tree">
- *        <li role="treeitem">
+ *        <li role="treeitem" @expand=${onExpand}>
  *          Tree Node Text
  *          <ul role="group">
  *            Node with subtree
- *            <li role="treeitem">
+ *            <li role="treeitem" jslog-context="context">
  *              <ul role="group" hidden>
  *                <li role="treeitem">Tree Node Text in collapsed subtree</li>
  *                <li role="treeitem">Tree Node Text in collapsed subtree</li>
@@ -1489,16 +1634,38 @@ function getTreeNodes(nodeList: NodeList|Node[]): HTMLLIElement[] {
  * ></devtools-tree>
  *
  * ```
- * where a <li role="treeitem"> element defines a tree node and its contents. The `selected` attribute on an <li>
- * declares that this tree node should be selected on render. If a tree node contains a <ul role="group">, that defines
- * a subtree under that tree node. The `hidden` attribute on the <ul> defines whether that subtree should render as
- * collapsed initially.
+ * where a <li role="treeitem"> element defines a tree node and its contents (the <li> is the `config element` for this
+ * tree node). If a tree node contains a <ul role="group">, that defines a subtree under that tree node. The `hidden`
+ * attribute on the <ul> defines whether that subtree should render as collapsed. Note that node expanding/collapsing do
+ * not reflect this state back to the attribute on the config element, those state changes are rather sent out as
+ * `expand` events on the config element.
  *
  * Under the hood this uses TreeOutline.
  *
+ * ## Config Element Attributes ##
+ *
+ * - `selected`: Whether the tree node should be rendered as selected.
+ * - `jslog-context`: The jslog context for the tree element.
+ * - `aria-*`: All aria attributes defined on the config element are cloned over.
+ * - `hidden`: On the <ul>, declares whether the subtree should be rendererd as expanded or collapsed.
+ *
+ * ## Event Handling ##
+ *
+ * This section is only relevant if NOT using the `template`.
+ *
+ * Since config elements are cloned into the shadow DOM, it's not possible to directly attach event listeners to the
+ * children of config elements. Instead, the `UI.UIUtils.InterceptBindingDirective` directive needs to be used as a
+ * wrapper:
+ * ```
+ * const on = Lit.Directive.directive(UI.UIUtils.InterceptBindingDirective);
+ *
+ * html`<li role="treeitem">
+ *   <button @click=${on(clickHandler)}>click me</button>
+ * </li>`
+ * ```
+ *
  * @property template Define the tree contents
  * @event selected A node was selected
- * @event expand A subtree was expanded or collapsed
  * @attribute navigation-variant Turn this tree into the navigation variant
  * @attribute hide-overflow
  */
@@ -1508,20 +1675,21 @@ export class TreeViewElement extends HTMLElementWithLightDOMTemplate {
 
   constructor() {
     super();
-    this.#treeOutline.addEventListener(
-        Events.ElementSelected,
-        event =>
-            this.dispatchEvent(new TreeViewElement.SelectEvent((event.data as TreeViewTreeElement).configElement)));
-    this.#treeOutline.addEventListener(
-        Events.ElementExpanded,
-        event => (event.data as TreeViewTreeElement)
-                     .configElement.dispatchEvent(new TreeViewElement.ExpandEvent(
-                         {expanded: true, target: (event.data as TreeViewTreeElement).configElement})));
-    this.#treeOutline.addEventListener(
-        Events.ElementCollapsed,
-        event => (event.data as TreeViewTreeElement)
-                     .configElement.dispatchEvent(new TreeViewElement.ExpandEvent(
-                         {expanded: false, target: (event.data as TreeViewTreeElement).configElement})));
+    this.#treeOutline.addEventListener(Events.ElementSelected, event => {
+      if (event.data instanceof TreeViewTreeElement) {
+        this.dispatchEvent(new TreeViewElement.SelectEvent(event.data.configElement));
+      }
+    });
+    this.#treeOutline.addEventListener(Events.ElementExpanded, event => {
+      if (event.data instanceof TreeViewTreeElement) {
+        event.data.listItemElement.dispatchEvent(new TreeViewElement.ExpandEvent({expanded: true}));
+      }
+    });
+    this.#treeOutline.addEventListener(Events.ElementCollapsed, event => {
+      if (event.data instanceof TreeViewTreeElement) {
+        event.data.listItemElement.dispatchEvent(new TreeViewElement.ExpandEvent({expanded: false}));
+      }
+    });
     this.addNodes(getTreeNodes([this]));
   }
 
@@ -1545,15 +1713,32 @@ export class TreeViewElement extends HTMLElementWithLightDOMTemplate {
     return treeElement ? {expanded, treeElement} : null;
   }
 
-  protected override updateNodes(node: Node, _attributeName: string|null): void {
+  protected override updateNode(node: Node, attributeName: string|null): void {
     while (node?.parentNode && !(node instanceof HTMLElement)) {
       node = node.parentNode;
     }
     const treeNode = node instanceof HTMLElement ? node.closest('li[role="treeitem"]') : null;
-    treeNode && TreeViewTreeElement.get(treeNode)?.refresh();
+    if (!treeNode) {
+      return;
+    }
+    const treeElement = TreeViewTreeElement.get(treeNode);
+    if (!treeElement) {
+      return;
+    }
+    treeElement.refresh();
+    if (node === treeNode && attributeName === 'selected' && hasBooleanAttribute(treeNode, 'selected')) {
+      treeElement.revealAndSelect(true);
+    }
+    if (attributeName === 'hidden' && node instanceof HTMLUListElement && node.role === 'group') {
+      if (hasBooleanAttribute(node, 'hidden')) {
+        treeElement.collapse();
+      } else {
+        treeElement.expand();
+      }
+    }
   }
 
-  protected override addNodes(nodes: NodeList|Node[]): void {
+  protected override addNodes(nodes: NodeList|Node[], nextSibling?: Node|null): void {
     for (const node of getTreeNodes(nodes)) {
       if (TreeViewTreeElement.get(node)) {
         continue;  // Not sure this can happen
@@ -1562,8 +1747,15 @@ export class TreeViewElement extends HTMLElementWithLightDOMTemplate {
       if (!parent) {
         continue;
       }
+      while (nextSibling && nextSibling.nodeType !== Node.ELEMENT_NODE) {
+        nextSibling = nextSibling.nextSibling;
+      }
+      const nextElement = nextSibling ? TreeViewTreeElement.get(nextSibling) : null;
+      const index = nextElement ? parent.treeElement.indexOfChild(nextElement) : parent.treeElement.children().length;
       const treeElement = new TreeViewTreeElement(this.#treeOutline, node);
-      parent.treeElement.appendChild(treeElement, /* FIXME comparator */);
+      const expandable = Boolean(node.querySelector('ul[role="group"]'));
+      treeElement.setExpandable(expandable);
+      parent.treeElement.insertChild(treeElement, index);
       if (hasBooleanAttribute(node, 'selected')) {
         treeElement.revealAndSelect(true);
       }
@@ -1616,8 +1808,8 @@ export namespace TreeViewElement {
     }
   }
 
-  export class ExpandEvent extends CustomEvent<{expanded: boolean, target: HTMLLIElement}> {
-    constructor(detail: {expanded: boolean, target: HTMLLIElement}) {
+  export class ExpandEvent extends CustomEvent<{expanded: boolean}> {
+    constructor(detail: {expanded: boolean}) {
       super('expand', {detail});
     }
   }

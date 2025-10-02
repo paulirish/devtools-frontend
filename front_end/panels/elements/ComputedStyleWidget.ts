@@ -1,4 +1,4 @@
-// Copyright 2021 The Chromium Authors. All rights reserved.
+// Copyright 2021 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 /* eslint-disable rulesdir/no-imperative-dom-api */
@@ -191,7 +191,7 @@ const createTraceElement =
       return trace;
     };
 
-// clang-format off
+/** clang-format off **/
 class ColorRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.ColorMatch) {
   // clang-format on
   override render(match: SDK.CSSPropertyParserMatchers.ColorMatch, context: RenderingContext): Node[] {
@@ -205,7 +205,6 @@ class ColorRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.ColorMatc
     swatch.renderColor(color);
     const valueElement = document.createElement('span');
     valueElement.textContent = match.text;
-    swatch.append(valueElement);
 
     swatch.addEventListener(
         InlineEditor.ColorSwatch.ColorChangedEvent.eventName, (event: InlineEditor.ColorSwatch.ColorChangedEvent) => {
@@ -214,7 +213,7 @@ class ColorRenderer extends rendererBase(SDK.CSSPropertyParserMatchers.ColorMatc
         });
 
     context.addControl('color', swatch);
-    return [swatch];
+    return [swatch, valueElement];
   }
 
   matcher(): SDK.CSSPropertyParserMatchers.ColorMatcher {

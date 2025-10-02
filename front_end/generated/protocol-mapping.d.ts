@@ -1,4 +1,4 @@
-// Copyright (c) 2020 The Chromium Authors. All rights reserved.
+// Copyright 2020 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -157,6 +157,10 @@ export namespace ProtocolMapping {
      * Fired when a node's scrollability state changes.
      */
     'DOM.scrollableFlagUpdated': [Protocol.DOM.ScrollableFlagUpdatedEvent];
+    /**
+     * Fired when a node's starting styles changes.
+     */
+    'DOM.affectedByStartingStylesFlagUpdated': [Protocol.DOM.AffectedByStartingStylesFlagUpdatedEvent];
     /**
      * Called when a pseudo element is removed from an element.
      */
@@ -1227,7 +1231,7 @@ export namespace ProtocolMapping {
       returnType: void;
     };
     /**
-     * Set permission settings for given origin.
+     * Set permission settings for given requesting and embedding origins.
      */
     'Browser.setPermission': {
       paramsType: [Protocol.Browser.SetPermissionRequest];
@@ -3255,6 +3259,13 @@ export namespace ProtocolMapping {
       returnType: Protocol.Network.GetIPProtectionProxyStatusResponse;
     };
     /**
+     * Sets bypass IP Protection Proxy boolean.
+     */
+    'Network.setIPProtectionProxyBypassEnabled': {
+      paramsType: [Protocol.Network.SetIPProtectionProxyBypassEnabledRequest];
+      returnType: void;
+    };
+    /**
      * Sets a list of content encodings that will be accepted. Empty list means no encoding is accepted.
      */
     'Network.setAcceptedEncodings': {
@@ -3329,10 +3340,25 @@ export namespace ProtocolMapping {
       returnType: void;
     };
     /**
-     * Activates emulation of network conditions.
+     * Activates emulation of network conditions. This command is deprecated in favor of the emulateNetworkConditionsByRule
+     * and overrideNetworkState commands, which can be used together to the same effect.
      */
     'Network.emulateNetworkConditions': {
       paramsType: [Protocol.Network.EmulateNetworkConditionsRequest];
+      returnType: void;
+    };
+    /**
+     * Activates emulation of network conditions for individual requests using URL match patterns.
+     */
+    'Network.emulateNetworkConditionsByRule': {
+      paramsType: [Protocol.Network.EmulateNetworkConditionsByRuleRequest];
+      returnType: Protocol.Network.EmulateNetworkConditionsByRuleResponse;
+    };
+    /**
+     * Override the state of navigator.onLine and navigator.connection.
+     */
+    'Network.overrideNetworkState': {
+      paramsType: [Protocol.Network.OverrideNetworkStateRequest];
       returnType: void;
     };
     /**
@@ -3417,7 +3443,7 @@ export namespace ProtocolMapping {
      * Blocks URLs from loading.
      */
     'Network.setBlockedURLs': {
-      paramsType: [Protocol.Network.SetBlockedURLsRequest];
+      paramsType: [Protocol.Network.SetBlockedURLsRequest?];
       returnType: void;
     };
     /**
@@ -3743,7 +3769,8 @@ export namespace ProtocolMapping {
      *
      * To generate bundle id for proxy mode:
      * 1. Generate 32 random bytes.
-     * 2. Add a specific suffix 0x00 at the end.
+     * 2. Add a specific suffix at the end following the documentation
+     *    https://github.com/WICG/isolated-web-apps/blob/main/Scheme.md#suffix
      * 3. Encode the entire sequence using Base32 without padding.
      *
      * If Chrome is not in IWA dev
@@ -4385,10 +4412,19 @@ export namespace ProtocolMapping {
     };
     /**
      * Returns a storage key given a frame id.
+     * Deprecated. Please use Storage.getStorageKey instead.
      */
     'Storage.getStorageKeyForFrame': {
       paramsType: [Protocol.Storage.GetStorageKeyForFrameRequest];
       returnType: Protocol.Storage.GetStorageKeyForFrameResponse;
+    };
+    /**
+     * Returns storage key for the given frame. If no frame ID is provided,
+     * the storage key of the target executing this command is returned.
+     */
+    'Storage.getStorageKey': {
+      paramsType: [Protocol.Storage.GetStorageKeyRequest?];
+      returnType: Protocol.Storage.GetStorageKeyResponse;
     };
     /**
      * Clears storage for origin.

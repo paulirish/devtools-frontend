@@ -1,4 +1,4 @@
-// Copyright 2025 The Chromium Authors. All rights reserved.
+// Copyright 2025 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -68,7 +68,7 @@ export class StateProvider {
     }
 
     if (!browser?.connected) {
-      browser = await Launcher.browserSetup(browserSettings);
+      browser = await Launcher.browserSetup(browserSettings, StateProvider.serverPort);
       this.#settingToBrowser.set(browserKey, browser);
     }
     this.#suiteToBrowser.set(suite, browser);
@@ -137,5 +137,6 @@ export function mergeSettings(s1: E2E.SuiteSettings, s2: E2E.HarnessSettings): E
     disabledDevToolsExperiments: mergeAsSet(s1.disabledDevToolsExperiments, s2.disabledDevToolsExperiments),
     devToolsSettings: {...(s2.devToolsSettings ?? {}), ...(s1.devToolsSettings ?? {})},
     dockingMode: s1.dockingMode ?? s2.dockingMode,
+    panel: s1.panel ?? s2.panel,
   };
 }

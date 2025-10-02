@@ -5,7 +5,7 @@ import type { ParseSelector } from 'typed-query-selector/parser.js';
 import { PassThrough } from 'node:stream';
 import { Protocol } from 'devtools-protocol';
 import type { ProtocolMapping } from 'devtools-protocol/types/protocol-mapping.js';
-import { Session } from 'chromium-bidi/lib/cjs/protocol/protocol.js';
+import { Session } from 'webdriver-bidi-protocol';
 
 /**
  * The Accessibility class provides methods for inspecting the browser's
@@ -311,7 +311,7 @@ export declare abstract class Browser extends EventEmitter<BrowserEvents> {
      * Gets this {@link Browser | browser's} original user agent.
      *
      * {@link Page | Pages} can override the user agent with
-     * {@link Page.setUserAgent}.
+     * {@link Page.(setUserAgent:2) }.
      *
      */
     abstract userAgent(): Promise<string>;
@@ -352,6 +352,17 @@ export declare abstract class Browser extends EventEmitter<BrowserEvents> {
      * {@link BrowserContext.deleteCookie | browser.defaultBrowserContext().deleteCookie()}.
      */
     deleteCookie(...cookies: Cookie[]): Promise<void>;
+    /**
+     * Deletes cookies matching the provided filters from the default
+     * {@link BrowserContext}.
+     *
+     * @remarks
+     *
+     * Shortcut for
+     * {@link BrowserContext.deleteMatchingCookies |
+     * browser.defaultBrowserContext().deleteMatchingCookies()}.
+     */
+    deleteMatchingCookies(...filters: DeleteCookiesRequest[]): Promise<void>;
     /**
      * Installs an extension and returns the ID. In Chrome, this is only
      * available if the browser was created using `pipe: true` and the
@@ -526,10 +537,17 @@ export declare abstract class BrowserContext extends EventEmitter<BrowserContext
      */
     abstract setCookie(...cookies: CookieData[]): Promise<void>;
     /**
-     * Removes cookie in the browser context
-     * @param cookies - {@link Cookie | cookie} to remove
+     * Removes cookie in this browser context.
+     *
+     * @param cookies - Complete {@link Cookie | cookie} object to be removed.
      */
     deleteCookie(...cookies: Cookie[]): Promise<void>;
+    /**
+     * Deletes cookies matching the provided filters in this browser context.
+     *
+     * @param filters - {@link DeleteCookiesRequest}
+     */
+    deleteMatchingCookies(...filters: DeleteCookiesRequest[]): Promise<void>;
     /**
      * Whether this {@link BrowserContext | browser context} is closed.
      */
@@ -995,6 +1013,14 @@ export declare class Connection extends EventEmitter<CDPSessionEvents> {
 }
 
 /**
+ * Thrown if underlying protocol connection has been closed.
+ *
+ * @public
+ */
+export declare class ConnectionClosedError extends ProtocolError {
+}
+
+/**
  * @license
  * Copyright 2020 Google Inc.
  * SPDX-License-Identifier: Apache-2.0
@@ -1151,26 +1177,12 @@ export declare interface ContinueRequestOverrides {
     headers?: Record<string, string>;
 }
 
-export declare function convertCookiesPartitionKeyFromPuppeteerToCdp(partitionKey: CookiePartitionKey | string | undefined): Protocol.Network.CookiePartitionKey | undefined;
-
 /**
  * Represents a cookie object.
  *
  * @public
  */
 export declare interface Cookie extends CookieData {
-    /**
-     * Cookie name.
-     */
-    name: string;
-    /**
-     * Cookie value.
-     */
-    value: string;
-    /**
-     * Cookie domain.
-     */
-    domain: string;
     /**
      * Cookie path.
      */
@@ -1185,10 +1197,6 @@ export declare interface Cookie extends CookieData {
      */
     size: number;
     /**
-     * True if cookie is http-only.
-     */
-    httpOnly: boolean;
-    /**
      * True if cookie is secure.
      */
     secure: boolean;
@@ -1196,29 +1204,6 @@ export declare interface Cookie extends CookieData {
      * True in case of session cookie.
      */
     session: boolean;
-    /**
-     * Cookie SameSite type.
-     */
-    sameSite?: CookieSameSite;
-    /**
-     * Cookie Priority. Supported only in Chrome.
-     */
-    priority?: CookiePriority;
-    /**
-     * True if cookie is SameParty. Supported only in Chrome.
-     */
-    sameParty?: boolean;
-    /**
-     * Cookie source scheme type. Supported only in Chrome.
-     */
-    sourceScheme?: CookieSourceScheme;
-    /**
-     * Cookie partition key. In Chrome, it is the top-level site the
-     * partitioned cookie is available in. In Firefox, it matches the
-     * source origin in the
-     * {@link https://w3c.github.io/webdriver-bidi/#type-storage-PartitionKey | PartitionKey }.
-     */
-    partitionKey?: CookiePartitionKey | string;
     /**
      * True if cookie partition key is opaque. Supported only in Chrome.
      */
@@ -1551,6 +1536,9 @@ export declare interface CustomQueryHandler {
     queryAll?: (node: Node, selector: string) => Iterable<Node>;
 }
 
+/**
+ * @public
+ */
 declare interface CustomQuerySelector {
     querySelector(root: Node, selector: string): Awaitable<Node | null>;
     querySelectorAll(root: Node, selector: string): AwaitableIterable<Node>;
@@ -1569,12 +1557,9 @@ declare class CustomQuerySelectorRegistry {
 
 declare namespace CustomQuerySelectors {
     export {
-        CustomQuerySelector,
-        customQuerySelectors
+        CustomQuerySelector
     }
 }
-
-declare const customQuerySelectors: CustomQuerySelectorRegistry;
 
 /**
  * @public
@@ -1712,16 +1697,14 @@ export declare class DeviceRequestPromptDevice {
  * ```ts
  * import puppeteer from 'puppeteer';
  *
- * (async () => {
- *   const browser = await puppeteer.launch();
- *   const page = await browser.newPage();
- *   page.on('dialog', async dialog => {
- *     console.log(dialog.message());
- *     await dialog.dismiss();
- *     await browser.close();
- *   });
- *   page.evaluate(() => alert('1'));
- * })();
+ * const browser = await puppeteer.launch();
+ * const page = await browser.newPage();
+ * page.on('dialog', async dialog => {
+ *   console.log(dialog.message());
+ *   await dialog.dismiss();
+ *   await browser.close();
+ * });
+ * await page.evaluate(() => alert('1'));
  * ```
  *
  * @public
@@ -1803,19 +1786,18 @@ export declare type ElementFor<TagName extends keyof HTMLElementTagNameMap | key
  * ```ts
  * import puppeteer from 'puppeteer';
  *
- * (async () => {
- *   const browser = await puppeteer.launch();
- *   const page = await browser.newPage();
- *   await page.goto('https://example.com');
- *   const hrefElement = await page.$('a');
- *   await hrefElement.click();
- *   // ...
- * })();
+ * const browser = await puppeteer.launch();
+ * const page = await browser.newPage();
+ * await page.goto('https://example.com');
+ * const hrefElement = await page.$('a');
+ * await hrefElement.click();
+ * // ...
  * ```
  *
  * ElementHandle prevents the DOM element from being garbage-collected unless the
  * handle is {@link JSHandle.dispose | disposed}. ElementHandles are auto-disposed
- * when their origin frame gets navigated.
+ * when their associated frame is navigated away or the parent
+ * context gets destroyed.
  *
  * ElementHandle instances can be used as arguments in {@link Page.$eval} and
  * {@link Page.evaluate} methods.
@@ -1954,9 +1936,10 @@ export declare abstract class ElementHandle<ElementType extends Node = Element> 
      *
      * ```ts
      * const feedHandle = await page.$('.feed');
-     * expect(
-     *   await feedHandle.$$eval('.tweet', nodes => nodes.map(n => n.innerText)),
-     * ).toEqual(['Hello!', 'Hi!']);
+     *
+     * const listOfTweets = await feedHandle.$$eval('.tweet', nodes =>
+     *   nodes.map(n => n.innerText),
+     * );
      * ```
      *
      * @param selector -
@@ -1993,24 +1976,22 @@ export declare abstract class ElementHandle<ElementType extends Node = Element> 
      * ```ts
      * import puppeteer from 'puppeteer';
      *
-     * (async () => {
-     *   const browser = await puppeteer.launch();
-     *   const page = await browser.newPage();
-     *   let currentURL;
-     *   page
-     *     .mainFrame()
-     *     .waitForSelector('img')
-     *     .then(() => console.log('First URL with image: ' + currentURL));
+     * const browser = await puppeteer.launch();
+     * const page = await browser.newPage();
+     * let currentURL;
+     * page
+     *   .mainFrame()
+     *   .waitForSelector('img')
+     *   .then(() => console.log('First URL with image: ' + currentURL));
      *
-     *   for (currentURL of [
-     *     'https://example.com',
-     *     'https://google.com',
-     *     'https://bbc.com',
-     *   ]) {
-     *     await page.goto(currentURL);
-     *   }
-     *   await browser.close();
-     * })();
+     * for (currentURL of [
+     *   'https://example.com',
+     *   'https://google.com',
+     *   'https://bbc.com',
+     * ]) {
+     *   await page.goto(currentURL);
+     * }
+     * await browser.close();
      * ```
      *
      * @param selector - The selector to query and wait for.
@@ -2255,6 +2236,12 @@ export declare abstract class ElementHandle<ElementType extends Node = Element> 
      * or by calling element.scrollIntoView.
      */
     scrollIntoView(this: ElementHandle<Element>): Promise<void>;
+    /**
+     * Creates a locator based on an ElementHandle. This would not allow
+     * refreshing the element handle if it is stale but it allows re-using other
+     * locator pre-conditions.
+     */
+    asLocator(this: ElementHandle<Element>): Locator<Element>;
     /**
      * If the element is a form input, you can use {@link ElementHandle.autofill}
      * to test if the form is compatible with the browser's autofill
@@ -2540,20 +2527,18 @@ export declare type FlattenHandle<T> = T extends HandleOr<infer U> ? U : never;
  * ```ts
  * import puppeteer from 'puppeteer';
  *
- * (async () => {
- *   const browser = await puppeteer.launch();
- *   const page = await browser.newPage();
- *   await page.goto('https://www.google.com/chrome/browser/canary.html');
- *   dumpFrameTree(page.mainFrame(), '');
- *   await browser.close();
+ * const browser = await puppeteer.launch();
+ * const page = await browser.newPage();
+ * await page.goto('https://www.google.com/chrome/browser/canary.html');
+ * dumpFrameTree(page.mainFrame(), '');
+ * await browser.close();
  *
- *   function dumpFrameTree(frame, indent) {
- *     console.log(indent + frame.url());
- *     for (const child of frame.childFrames()) {
- *       dumpFrameTree(child, indent + '  ');
- *     }
+ * function dumpFrameTree(frame, indent) {
+ *   console.log(indent + frame.url());
+ *   for (const child of frame.childFrames()) {
+ *     dumpFrameTree(child, indent + '  ');
  *   }
- * })();
+ * }
  * ```
  *
  * @example
@@ -2838,24 +2823,22 @@ export declare abstract class Frame extends EventEmitter<FrameEvents> {
      * ```ts
      * import puppeteer from 'puppeteer';
      *
-     * (async () => {
-     *   const browser = await puppeteer.launch();
-     *   const page = await browser.newPage();
-     *   let currentURL;
-     *   page
-     *     .mainFrame()
-     *     .waitForSelector('img')
-     *     .then(() => console.log('First URL with image: ' + currentURL));
+     * const browser = await puppeteer.launch();
+     * const page = await browser.newPage();
+     * let currentURL;
+     * page
+     *   .mainFrame()
+     *   .waitForSelector('img')
+     *   .then(() => console.log('First URL with image: ' + currentURL));
      *
-     *   for (currentURL of [
-     *     'https://example.com',
-     *     'https://google.com',
-     *     'https://bbc.com',
-     *   ]) {
-     *     await page.goto(currentURL);
-     *   }
-     *   await browser.close();
-     * })();
+     * for (currentURL of [
+     *   'https://example.com',
+     *   'https://google.com',
+     *   'https://bbc.com',
+     * ]) {
+     *   await page.goto(currentURL);
+     * }
+     * await browser.close();
      * ```
      *
      * @param selector - The selector to query and wait for.
@@ -2871,14 +2854,14 @@ export declare abstract class Frame extends EventEmitter<FrameEvents> {
      * ```ts
      * import puppeteer from 'puppeteer';
      *
-     * (async () => {
-     * .  const browser = await puppeteer.launch();
-     * .  const page = await browser.newPage();
-     * .  const watchDog = page.mainFrame().waitForFunction('window.innerWidth < 100');
-     * .  page.setViewport({width: 50, height: 50});
-     * .  await watchDog;
-     * .  await browser.close();
-     * })();
+     * const browser = await puppeteer.launch();
+     * const page = await browser.newPage();
+     * const watchDog = page
+     *   .mainFrame()
+     *   .waitForFunction('window.innerWidth < 100');
+     * page.setViewport({width: 50, height: 50});
+     * await watchDog;
+     * await browser.close();
      * ```
      *
      * To pass arguments from Node.js to the predicate of `page.waitForFunction` function:
@@ -3237,7 +3220,6 @@ export declare type Handler<T = unknown> = (event: T) => void;
  * @public
  */
 export declare abstract class HTTPRequest {
-    #private;
 
 
 
@@ -3401,6 +3383,8 @@ export declare abstract class HTTPRequest {
     abstract failure(): {
         errorText: string;
     } | null;
+
+
     /**
      * Continues request with optional request overrides.
      *
@@ -3951,14 +3935,12 @@ export declare type KeyPressOptions = KeyDownOptions & KeyboardTypeOptions;
  * import {KnownDevices} from 'puppeteer';
  * const iPhone = KnownDevices['iPhone 15 Pro'];
  *
- * (async () => {
- *   const browser = await puppeteer.launch();
- *   const page = await browser.newPage();
- *   await page.emulate(iPhone);
- *   await page.goto('https://www.google.com');
- *   // other actions...
- *   await browser.close();
- * })();
+ * const browser = await puppeteer.launch();
+ * const page = await browser.newPage();
+ * await page.emulate(iPhone);
+ * await page.goto('https://www.google.com');
+ * // other actions...
+ * await browser.close();
  * ```
  *
  * @public
@@ -4559,6 +4541,14 @@ export declare interface Moveable {
  */
 export declare interface NetworkConditions {
     /**
+     * Emulates the offline mode.
+     *
+     * @remarks
+     *
+     * Shortcut for {@link Page.setOfflineMode}.
+     */
+    offline?: boolean;
+    /**
      * Download speed (bytes/s)
      */
     download: number;
@@ -4615,13 +4605,11 @@ export declare interface Offset {
  * ```ts
  * import puppeteer from 'puppeteer';
  *
- * (async () => {
- *   const browser = await puppeteer.launch();
- *   const page = await browser.newPage();
- *   await page.goto('https://example.com');
- *   await page.screenshot({path: 'screenshot.png'});
- *   await browser.close();
- * })();
+ * const browser = await puppeteer.launch();
+ * const page = await browser.newPage();
+ * await page.goto('https://example.com');
+ * await page.screenshot({path: 'screenshot.png'});
+ * await browser.close();
  * ```
  *
  * The Page class extends from Puppeteer's {@link EventEmitter} class and will
@@ -4792,21 +4780,19 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      *
      * ```ts
      * import puppeteer from 'puppeteer';
-     * (async () => {
-     *   const browser = await puppeteer.launch();
-     *   const page = await browser.newPage();
-     *   await page.setRequestInterception(true);
-     *   page.on('request', interceptedRequest => {
-     *     if (
-     *       interceptedRequest.url().endsWith('.png') ||
-     *       interceptedRequest.url().endsWith('.jpg')
-     *     )
-     *       interceptedRequest.abort();
-     *     else interceptedRequest.continue();
-     *   });
-     *   await page.goto('https://example.com');
-     *   await browser.close();
-     * })();
+     * const browser = await puppeteer.launch();
+     * const page = await browser.newPage();
+     * await page.setRequestInterception(true);
+     * page.on('request', interceptedRequest => {
+     *   if (
+     *     interceptedRequest.url().endsWith('.png') ||
+     *     interceptedRequest.url().endsWith('.jpg')
+     *   )
+     *     interceptedRequest.abort();
+     *   else interceptedRequest.continue();
+     * });
+     * await page.goto('https://example.com');
+     * await browser.close();
      * ```
      *
      * @param value - Whether to enable request interception.
@@ -4827,9 +4813,10 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      */
     abstract setDragInterception(enabled: boolean): Promise<void>;
     /**
-     * Sets the network connection to offline.
+     * Emulates the offline mode.
      *
-     * It does not change the parameters used in {@link Page.emulateNetworkConditions}
+     * It does not change the download/upload/latency parameters set by
+     * {@link Page.emulateNetworkConditions}
      *
      * @param enabled - When `true`, enables offline mode for the page.
      */
@@ -4848,14 +4835,12 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * import {PredefinedNetworkConditions} from 'puppeteer';
      * const slow3G = PredefinedNetworkConditions['Slow 3G'];
      *
-     * (async () => {
-     *   const browser = await puppeteer.launch();
-     *   const page = await browser.newPage();
-     *   await page.emulateNetworkConditions(slow3G);
-     *   await page.goto('https://www.google.com');
-     *   // other actions...
-     *   await browser.close();
-     * })();
+     * const browser = await puppeteer.launch();
+     * const page = await browser.newPage();
+     * await page.emulateNetworkConditions(slow3G);
+     * await page.goto('https://www.google.com');
+     * // other actions...
+     * await browser.close();
      * ```
      *
      * @param networkConditions - Passing `null` disables network condition
@@ -5222,7 +5207,8 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
     abstract cookies(...urls: string[]): Promise<Cookie[]>;
     /**
      * @deprecated Page-level cookie API is deprecated. Use
-     * {@link Browser.deleteCookie} or {@link BrowserContext.deleteCookie}
+     * {@link Browser.deleteCookie}, {@link BrowserContext.deleteCookie},
+     * {@link Browser.deleteMatchingCookies} or {@link BrowserContext.deleteMatchingCookies}
      * instead.
      */
     abstract deleteCookie(...cookies: DeleteCookiesRequest[]): Promise<void>;
@@ -5283,21 +5269,19 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * import puppeteer from 'puppeteer';
      * import crypto from 'crypto';
      *
-     * (async () => {
-     *   const browser = await puppeteer.launch();
-     *   const page = await browser.newPage();
-     *   page.on('console', msg => console.log(msg.text()));
-     *   await page.exposeFunction('md5', text =>
-     *     crypto.createHash('md5').update(text).digest('hex'),
-     *   );
-     *   await page.evaluate(async () => {
-     *     // use window.md5 to compute hashes
-     *     const myString = 'PUPPETEER';
-     *     const myHash = await window.md5(myString);
-     *     console.log(`md5 of ${myString} is ${myHash}`);
-     *   });
-     *   await browser.close();
-     * })();
+     * const browser = await puppeteer.launch();
+     * const page = await browser.newPage();
+     * page.on('console', msg => console.log(msg.text()));
+     * await page.exposeFunction('md5', text =>
+     *   crypto.createHash('md5').update(text).digest('hex'),
+     * );
+     * await page.evaluate(async () => {
+     *   // use window.md5 to compute hashes
+     *   const myString = 'PUPPETEER';
+     *   const myHash = await window.md5(myString);
+     *   console.log(`md5 of ${myString} is ${myHash}`);
+     * });
+     * await browser.close();
      * ```
      *
      * @example
@@ -5307,25 +5291,23 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * import puppeteer from 'puppeteer';
      * import fs from 'node:fs';
      *
-     * (async () => {
-     *   const browser = await puppeteer.launch();
-     *   const page = await browser.newPage();
-     *   page.on('console', msg => console.log(msg.text()));
-     *   await page.exposeFunction('readfile', async filePath => {
-     *     return new Promise((resolve, reject) => {
-     *       fs.readFile(filePath, 'utf8', (err, text) => {
-     *         if (err) reject(err);
-     *         else resolve(text);
-     *       });
+     * const browser = await puppeteer.launch();
+     * const page = await browser.newPage();
+     * page.on('console', msg => console.log(msg.text()));
+     * await page.exposeFunction('readfile', async filePath => {
+     *   return new Promise((resolve, reject) => {
+     *     fs.readFile(filePath, 'utf8', (err, text) => {
+     *       if (err) reject(err);
+     *       else resolve(text);
      *     });
      *   });
-     *   await page.evaluate(async () => {
-     *     // use window.readfile to read contents of a file
-     *     const content = await window.readfile('/etc/hosts');
-     *     console.log(content);
-     *   });
-     *   await browser.close();
-     * })();
+     * });
+     * await page.evaluate(async () => {
+     *   // use window.readfile to read contents of a file
+     *   const content = await window.readfile('/etc/hosts');
+     *   console.log(content);
+     * });
+     * await browser.close();
      * ```
      *
      * @param name - Name of the function on the window object
@@ -5380,8 +5362,18 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * @param userAgentData - Specific user agent client hint data to use in this
      * page
      * @returns Promise which resolves when the user agent is set.
+     * @deprecated Use {@link Page.(setUserAgent:2) } instead.
      */
     abstract setUserAgent(userAgent: string, userAgentMetadata?: Protocol.Emulation.UserAgentMetadata): Promise<void>;
+    /**
+     * @param options - Object containing user agent and optional user agent metadata
+     * @returns Promise which resolves when the user agent is set.
+     */
+    abstract setUserAgent(options: {
+        userAgent?: string;
+        userAgentMetadata?: Protocol.Emulation.UserAgentMetadata;
+        platform?: string;
+    }): Promise<void>;
     /**
      * Object containing metrics as key/value pairs.
      *
@@ -5565,7 +5557,9 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * @param options - Navigation parameters
      * @returns Promise which resolves to the main resource response. In case of
      * multiple redirects, the navigation will resolve with the response of the
-     * last redirect. If can not go back, resolves to `null`.
+     * last redirect.
+     * If the navigation is same page, returns null.
+     * If no history entry is found throws.
      */
     abstract goBack(options?: WaitForOptions): Promise<HTTPResponse | null>;
     /**
@@ -5573,7 +5567,9 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * @param options - Navigation Parameter
      * @returns Promise which resolves to the main resource response. In case of
      * multiple redirects, the navigation will resolve with the response of the
-     * last redirect. If can not go forward, resolves to `null`.
+     * last redirect.
+     * If the navigation is same page, returns null.
+     * If no history entry is found throws.
      */
     abstract goForward(options?: WaitForOptions): Promise<HTTPResponse | null>;
     /**
@@ -5588,7 +5584,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      *
      * @remarks
      * This method is a shortcut for calling two methods:
-     * {@link Page.setUserAgent} and {@link Page.setViewport}.
+     * {@link Page.(setUserAgent:2) } and {@link Page.setViewport}.
      *
      * This method will resize the page. A lot of websites don't expect phones to
      * change size, so you should emulate before navigating to the page.
@@ -5599,14 +5595,12 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * import {KnownDevices} from 'puppeteer';
      * const iPhone = KnownDevices['iPhone 15 Pro'];
      *
-     * (async () => {
-     *   const browser = await puppeteer.launch();
-     *   const page = await browser.newPage();
-     *   await page.emulate(iPhone);
-     *   await page.goto('https://www.google.com');
-     *   // other actions...
-     *   await browser.close();
-     * })();
+     * const browser = await puppeteer.launch();
+     * const page = await browser.newPage();
+     * await page.emulate(iPhone);
+     * await page.goto('https://www.google.com');
+     * // other actions...
+     * await browser.close();
      * ```
      */
     emulate(device: Device): Promise<void>;
@@ -5757,25 +5751,23 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * ```ts
      * import puppeteer from 'puppeteer';
      *
-     * (async () => {
-     *   const browser = await puppeteer.launch();
-     *   const page = await browser.newPage();
-     *   await page.goto('https://v8.dev/blog/10-years');
+     * const browser = await puppeteer.launch();
+     * const page = await browser.newPage();
+     * await page.goto('https://v8.dev/blog/10-years');
      *
-     *   await page.emulateVisionDeficiency('achromatopsia');
-     *   await page.screenshot({path: 'achromatopsia.png'});
+     * await page.emulateVisionDeficiency('achromatopsia');
+     * await page.screenshot({path: 'achromatopsia.png'});
      *
-     *   await page.emulateVisionDeficiency('deuteranopia');
-     *   await page.screenshot({path: 'deuteranopia.png'});
+     * await page.emulateVisionDeficiency('deuteranopia');
+     * await page.screenshot({path: 'deuteranopia.png'});
      *
-     *   await page.emulateVisionDeficiency('blurredVision');
-     *   await page.screenshot({path: 'blurred-vision.png'});
+     * await page.emulateVisionDeficiency('blurredVision');
+     * await page.screenshot({path: 'blurred-vision.png'});
      *
-     *   await page.emulateVisionDeficiency('reducedContrast');
-     *   await page.screenshot({path: 'reduced-contrast.png'});
+     * await page.emulateVisionDeficiency('reducedContrast');
+     * await page.screenshot({path: 'reduced-contrast.png'});
      *
-     *   await browser.close();
-     * })();
+     * await browser.close();
      * ```
      *
      * @param type - the type of deficiency to simulate, or `'none'` to reset.
@@ -6232,22 +6224,21 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      *
      * ```ts
      * import puppeteer from 'puppeteer';
-     * (async () => {
-     *   const browser = await puppeteer.launch();
-     *   const page = await browser.newPage();
-     *   let currentURL;
-     *   page
-     *     .waitForSelector('img')
-     *     .then(() => console.log('First URL with image: ' + currentURL));
-     *   for (currentURL of [
-     *     'https://example.com',
-     *     'https://google.com',
-     *     'https://bbc.com',
-     *   ]) {
-     *     await page.goto(currentURL);
-     *   }
-     *   await browser.close();
-     * })();
+     *
+     * const browser = await puppeteer.launch();
+     * const page = await browser.newPage();
+     * let currentURL;
+     * page
+     *   .waitForSelector('img')
+     *   .then(() => console.log('First URL with image: ' + currentURL));
+     * for (currentURL of [
+     *   'https://example.com',
+     *   'https://google.com',
+     *   'https://bbc.com',
+     * ]) {
+     *   await page.goto(currentURL);
+     * }
+     * await browser.close();
      * ```
      *
      * @param selector -
@@ -6295,14 +6286,13 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      *
      * ```ts
      * import puppeteer from 'puppeteer';
-     * (async () => {
-     *   const browser = await puppeteer.launch();
-     *   const page = await browser.newPage();
-     *   const watchDog = page.waitForFunction('window.innerWidth < 100');
-     *   await page.setViewport({width: 50, height: 50});
-     *   await watchDog;
-     *   await browser.close();
-     * })();
+     *
+     * const browser = await puppeteer.launch();
+     * const page = await browser.newPage();
+     * const watchDog = page.waitForFunction('window.innerWidth < 100');
+     * await page.setViewport({width: 50, height: 50});
+     * await watchDog;
+     * await browser.close();
      * ```
      *
      * @example
@@ -6369,6 +6359,7 @@ export declare abstract class Page extends EventEmitter<PageEvents> {
      * ```
      */
     abstract waitForDevicePrompt(options?: WaitTimeoutOptions): Promise<DeviceRequestPrompt>;
+
 
 
 }
@@ -6755,28 +6746,19 @@ declare namespace PQuerySelector {
  *
  * ```ts
  * import {PredefinedNetworkConditions} from 'puppeteer';
- * (async () => {
- *   const browser = await puppeteer.launch();
- *   const page = await browser.newPage();
- *   await page.emulateNetworkConditions(
- *     PredefinedNetworkConditions['Slow 3G'],
- *   );
- *   await page.goto('https://www.google.com');
- *   await page.emulateNetworkConditions(
- *     PredefinedNetworkConditions['Fast 3G'],
- *   );
- *   await page.goto('https://www.google.com');
- *   await page.emulateNetworkConditions(
- *     PredefinedNetworkConditions['Slow 4G'],
- *   ); // alias to Fast 3G.
- *   await page.goto('https://www.google.com');
- *   await page.emulateNetworkConditions(
- *     PredefinedNetworkConditions['Fast 4G'],
- *   );
- *   await page.goto('https://www.google.com');
- *   // other actions...
- *   await browser.close();
- * })();
+ * const browser = await puppeteer.launch();
+ * const page = await browser.newPage();
+ * await page.emulateNetworkConditions(PredefinedNetworkConditions['Slow 3G']);
+ * await page.goto('https://www.google.com');
+ * await page.emulateNetworkConditions(PredefinedNetworkConditions['Fast 3G']);
+ * await page.goto('https://www.google.com');
+ * // alias to Fast 3G.
+ * await page.emulateNetworkConditions(PredefinedNetworkConditions['Slow 4G']);
+ * await page.goto('https://www.google.com');
+ * await page.emulateNetworkConditions(PredefinedNetworkConditions['Fast 4G']);
+ * await page.goto('https://www.google.com');
+ * // other actions...
+ * await browser.close();
  * ```
  *
  * @public
@@ -7004,7 +6986,6 @@ declare namespace Puppeteer_2 {
         ProtocolLifeCycleEvent,
         NetworkConditions,
         InternalNetworkConditions,
-        convertCookiesPartitionKeyFromPuppeteerToCdp,
         PredefinedNetworkConditions,
         TracingOptions,
         Tracing,
@@ -7037,6 +7018,7 @@ declare namespace Puppeteer_2 {
         TouchError,
         ProtocolError,
         UnsupportedOperation,
+        ConnectionClosedError,
         EventType,
         Handler,
         CommonEventEmitter,
@@ -7132,13 +7114,11 @@ export declare type PuppeteerLifeCycleEvent =
  * ```ts
  * import puppeteer from 'puppeteer';
  *
- * (async () => {
- *   const browser = await puppeteer.launch();
- *   const page = await browser.newPage();
- *   await page.goto('https://www.google.com');
- *   // other actions...
- *   await browser.close();
- * })();
+ * const browser = await puppeteer.launch();
+ * const page = await browser.newPage();
+ * await page.goto('https://www.google.com');
+ * // other actions...
+ * await browser.close();
  * ```
  *
  * Once you have created a `page` you have access to a large API to interact

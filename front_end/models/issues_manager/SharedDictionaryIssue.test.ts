@@ -1,4 +1,4 @@
-// Copyright 2024 The Chromium Authors. All rights reserved.
+// Copyright 2024 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -32,8 +32,10 @@ describeWithLocale('SharedDictionaryIssue', () => {
       Protocol.Audits.SharedDictionaryError.WriteErrorInsufficientResources,
       Protocol.Audits.SharedDictionaryError.WriteErrorInvalidMatchField,
       Protocol.Audits.SharedDictionaryError.WriteErrorInvalidStructuredHeader,
+      Protocol.Audits.SharedDictionaryError.WriteErrorInvalidTTLField,
       Protocol.Audits.SharedDictionaryError.WriteErrorNavigationRequest,
       Protocol.Audits.SharedDictionaryError.WriteErrorNoMatchField,
+      Protocol.Audits.SharedDictionaryError.WriteErrorNonIntegerTTLField,
       Protocol.Audits.SharedDictionaryError.WriteErrorNonListMatchDestField,
       Protocol.Audits.SharedDictionaryError.WriteErrorNonSecureContext,
       Protocol.Audits.SharedDictionaryError.WriteErrorNonStringIdField,

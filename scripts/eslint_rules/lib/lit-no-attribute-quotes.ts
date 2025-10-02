@@ -1,4 +1,4 @@
-// Copyright 2021 The Chromium Authors. All rights reserved.
+// Copyright 2021 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 import type {TSESLint, TSESTree} from '@typescript-eslint/utils';
@@ -27,7 +27,7 @@ interface RemoveQuotesParams {
   secondPart: TemplateElement;
 }
 
-// Return type is an array of fixes or potentially null/empty if ranges are invalid
+/** Return type is an array of fixes or potentially null/empty if ranges are invalid **/
 function removeQuotesFromAttribute({fixer, firstPart, secondPart}: RemoveQuotesParams): RuleFix[]|null {
   const [, rangeOfOpeningTemplatePartEnd] = firstPart.range;
   // From the first part, we need to remove the last character, which is the double quote.

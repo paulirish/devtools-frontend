@@ -1,4 +1,4 @@
-// Copyright 2021 The Chromium Authors. All rights reserved.
+// Copyright 2021 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 /* eslint-disable rulesdir/no-lit-render-outside-of-view */
@@ -79,6 +79,7 @@ export function renderIconLink(
   <devtools-button
     .iconName=${iconName}
     title=${title}
+    aria-label=${title}
     .variant=${Buttons.Button.Variant.ICON}
     .size=${Buttons.Button.Size.SMALL}
     @click=${clickHandler}

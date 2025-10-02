@@ -1,4 +1,4 @@
-// Copyright 2014 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 /* eslint-disable rulesdir/no-imperative-dom-api */
@@ -134,6 +134,9 @@ export class ServiceWorkerCacheView extends UI.View.SimpleView {
     const bucketInfo = this.model.target()
                            .model(SDK.StorageBucketsModel.StorageBucketsModel)
                            ?.getBucketByName(cache.storageBucket.storageKey, cache.storageBucket.name);
+
+    this.metadataView.setShowOnlyBucket(false);
+
     if (bucketInfo) {
       this.metadataView.setStorageBucket(bucketInfo);
     } else if (cache.storageKey) {

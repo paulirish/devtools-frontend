@@ -1,4 +1,4 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -26,7 +26,7 @@ const zip2 = <T, S>(xs: T[], ys: S[]) => {
   return Array.from(xs.map((_, i) => [xs[i], ys[i]]));
 };
 
-// Holds targets and ids, and emits events.
+/** Holds targets and ids, and emits events. **/
 class NavigationEmulator {
   private seq = 0;
   private tabTarget: SDK.Target.Target;

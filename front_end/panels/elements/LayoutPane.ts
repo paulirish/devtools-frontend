@@ -1,4 +1,4 @@
-// Copyright (c) 2020 The Chromium Authors. All rights reserved.
+// Copyright 2020 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -284,7 +284,7 @@ const DEFAULT_VIEW: View = (input, output, target) => {
   render(html`
       <div style="min-width: min-content;" jslog=${VisualLogging.pane('layout').track({resize: true})}>
         <style>${layoutPaneStyles}</style>
-        <style>${UI.inspectorCommonStyles}</style>
+        <style>@scope to (devtools-widget > *) { ${UI.inspectorCommonStyles} }</style>
         <details open>
           <summary class="header"
             @keydown=${input.onSummaryKeyDown}

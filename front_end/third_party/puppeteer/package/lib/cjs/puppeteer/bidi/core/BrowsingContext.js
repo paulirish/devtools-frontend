@@ -337,7 +337,6 @@ let BrowsingContext = (() => {
             });
         }
         async setCacheBehavior(cacheBehavior) {
-            // @ts-expect-error not in BiDi types yet.
             await this.#session.send('network.setCacheBehavior', {
                 contexts: [this.id],
                 cacheBehavior,

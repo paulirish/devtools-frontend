@@ -1,4 +1,4 @@
-// Copyright 2020 The Chromium Authors. All rights reserved.
+// Copyright 2020 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -99,7 +99,7 @@ async function getIssueByTitleElement(issueMessageElement: puppeteer.ElementHand
   return undefined;
 }
 
-// Only works if there is just a single issue.
+/** Only works if there is just a single issue. **/
 export async function getIssueByTitle(
     issueMessage: string, devToolsPage: DevToolsPage = getBrowserAndPagesWrappers().devToolsPage):
     Promise<puppeteer.ElementHandle<HTMLElement>|undefined> {
@@ -109,7 +109,7 @@ export async function getIssueByTitle(
   return await getIssueByTitleElement(issueMessageElement);
 }
 
-// Works also if there are multiple issues.
+/** Works also if there are multiple issues. **/
 export async function getAndExpandSpecificIssueByTitle(
     issueMessage: string, devToolsPage: DevToolsPage = getBrowserAndPagesWrappers().devToolsPage):
     Promise<puppeteer.ElementHandle<HTMLElement>|undefined> {

@@ -1,4 +1,4 @@
-// Copyright (c) 2020 The Chromium Authors. All rights reserved.
+// Copyright 2020 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -9,9 +9,11 @@
  * Find more information about web development at [Learn more](exampleLink)
  */
 
-// This is only exported for tests, and it should not be
-// imported in any component, instead add link in map and
-// use getMarkdownLink to get the appropriate link.
+/**
+ * This is only exported for tests, and it should not be
+ * imported in any component, instead add link in map and
+ * use getMarkdownLink to get the appropriate link.
+ **/
 export const markdownLinks = new Map<string, string>([
   ['issuesContrastWCAG21AA', 'https://www.w3.org/TR/WCAG21/#contrast-minimum'],
   ['issuesContrastWCAG21AAA', 'https://www.w3.org/TR/WCAG21/#contrast-enhanced'],

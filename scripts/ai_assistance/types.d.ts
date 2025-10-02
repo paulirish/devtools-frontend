@@ -1,4 +1,4 @@
-// Copyright 2025 The Chromium Authors. All rights reserved.
+// Copyright 2025 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -23,7 +23,7 @@ declare global {
     // eslint-disable-next-line @typescript-eslint/naming-convention
     __commentElements?: Array<{comment: string, commentElement: Comment, targetElement: Element|null}>;
   }
-  // Define the custom event if needed
+  /** Define the custom event if needed **/
   interface WindowEventMap {
     aiassistancedone: CustomEvent;
   }

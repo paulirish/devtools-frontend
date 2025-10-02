@@ -1,4 +1,4 @@
-// Copyright 2021 The Chromium Authors. All rights reserved.
+// Copyright 2021 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 /* eslint-disable rulesdir/no-imperative-dom-api */
@@ -44,11 +44,14 @@ import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
 import * as AiAssistanceModel from '../../models/ai_assistance/ai_assistance.js';
+import * as Badges from '../../models/badges/badges.js';
 import * as CrUXManager from '../../models/crux-manager/crux-manager.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as Trace from '../../models/trace/trace.js';
+import * as SourceMapsResolver from '../../models/trace_source_maps_resolver/trace_source_maps_resolver.js';
 import * as Workspace from '../../models/workspace/workspace.js';
 import * as TraceBounds from '../../services/trace_bounds/trace_bounds.js';
+import * as Tracing from '../../services/tracing/tracing.js';
 import * as Adorners from '../../ui/components/adorners/adorners.js';
 import * as Dialogs from '../../ui/components/dialogs/dialogs.js';
 import * as LegacyWrapper from '../../ui/components/legacy_wrapper/legacy_wrapper.js';
@@ -369,7 +372,7 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
   );
   private readonly statusPaneContainer: HTMLElement;
   private readonly flameChart: TimelineFlameChartView;
-  private readonly searchableViewInternal: UI.SearchableView.SearchableView;
+  readonly #searchableView: UI.SearchableView.SearchableView;
   private showSettingsPaneButton!: UI.Toolbar.ToolbarSettingToggle;
   private showSettingsPaneSetting!: Common.Settings.Setting<boolean>;
   private settingsPane?: HTMLElement;
@@ -392,8 +395,9 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
   private traceLoadStart!: Trace.Types.Timing.Milli|null;
 
   #traceEngineModel: Trace.TraceModel.Model;
-  #sourceMapsResolver: Utils.SourceMapsResolver.SourceMapsResolver|null = null;
-  #entityMapper: Utils.EntityMapper.EntityMapper|null = null;
+  #externalAIConversationData: AiAssistanceModel.ExternalPerformanceAIConversationData|null = null;
+  #sourceMapsResolver: SourceMapsResolver.SourceMapsResolver|null = null;
+  #entityMapper: Trace.EntityMapper.EntityMapper|null = null;
   #onSourceMapsNodeNamesResolvedBound = this.#onSourceMapsNodeNamesResolved.bind(this);
   #sidebarToggleButton = this.#splitWidget.createShowHideSidebarButton(
       i18nString(UIStrings.showSidebar),
@@ -424,7 +428,7 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
       'flamechart-selected-navigation', 'Classic - scroll to zoom', 'timeline.select-classic-navigation');
 
   #onMainEntryHovered: (event: Common.EventTarget.EventTargetEvent<number>) => void;
-  #hiddenTracksInfoBarPerTrace = new WeakMap<Trace.Handlers.Types.ParsedTrace, UI.Infobar.Infobar|'DISMISSED'>();
+  #hiddenTracksInfoBarByParsedTrace = new WeakMap<Trace.TraceModel.ParsedTrace, UI.Infobar.Infobar|'DISMISSED'>();
 
   constructor(traceModel?: Trace.TraceModel.Model) {
     super('timeline');
@@ -535,14 +539,14 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
       this.select(selection);
     });
 
-    this.searchableViewInternal = new UI.SearchableView.SearchableView(this.flameChart, null);
-    this.searchableViewInternal.setMinimumSize(0, 100);
-    this.searchableViewInternal.setMinimalSearchQuerySize(2);  // At 1 it can introduce a bit of jank.
-    this.searchableViewInternal.element.classList.add('searchable-view');
-    this.searchableViewInternal.show(this.timelinePane.element);
-    this.flameChart.show(this.searchableViewInternal.element);
-    this.flameChart.setSearchableView(this.searchableViewInternal);
-    this.searchableViewInternal.hideWidget();
+    this.#searchableView = new UI.SearchableView.SearchableView(this.flameChart, null);
+    this.#searchableView.setMinimumSize(0, 100);
+    this.#searchableView.setMinimalSearchQuerySize(2);  // At 1 it can introduce a bit of jank.
+    this.#searchableView.element.classList.add('searchable-view');
+    this.#searchableView.show(this.timelinePane.element);
+    this.flameChart.show(this.#searchableView.element);
+    this.flameChart.setSearchableView(this.#searchableView);
+    this.#searchableView.hideWidget();
 
     this.#splitWidget.setMainWidget(this.timelinePane);
     this.#splitWidget.setSidebarWidget(this.#sideBar);
@@ -656,6 +660,10 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
     );
   }
 
+  zoomEvent(event: Trace.Types.Events.Event): void {
+    this.flameChart.zoomEvent(event);
+  }
+
   /**
    * Activates an insight and ensures the sidebar is open too.
    * Pass `highlightInsight: true` to flash the insight with the background highlight colour.
@@ -705,7 +713,7 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
   static removeInstance(): void {
     // TODO(crbug.com/358583420): Simplify attached data management
     // so that we don't have to maintain all of these singletons.
-    Utils.SourceMapsResolver.SourceMapsResolver.clearResolvedNodeNames();
+    SourceMapsResolver.SourceMapsResolver.clearResolvedNodeNames();
     Trace.Helpers.SyntheticEvents.SyntheticEventsManager.reset();
     TraceBounds.TraceBounds.BoundsManager.removeInstance();
     ModificationsManager.reset();
@@ -728,7 +736,7 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
     return Common.Settings.Settings.instance().createSetting('timeline-show-extension-data', true);
   }
   override searchableView(): UI.SearchableView.SearchableView|null {
-    return this.searchableViewInternal;
+    return this.#searchableView;
   }
 
   override wasShown(): void {
@@ -804,10 +812,10 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
       // this set of NodeNames is cached by PIDs, so we clear it so we don't
       // use incorrect names from another trace that might happen to share
       // PID/TIDs.
-      Utils.SourceMapsResolver.SourceMapsResolver.clearResolvedNodeNames();
+      SourceMapsResolver.SourceMapsResolver.clearResolvedNodeNames();
 
       this.#sourceMapsResolver.removeEventListener(
-          Utils.SourceMapsResolver.SourceMappingsUpdated.eventName, this.#onSourceMapsNodeNamesResolvedBound);
+          SourceMapsResolver.SourceMappingsUpdated.eventName, this.#onSourceMapsNodeNamesResolvedBound);
       this.#sourceMapsResolver.uninstall();
       this.#sourceMapsResolver = null;
     }
@@ -881,7 +889,7 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
 
         // Whilst we don't reset this, we hide it, mainly so the user cannot
         // hit Ctrl/Cmd-F and try to search when it isn't visible.
-        this.searchableViewInternal.hideWidget();
+        this.#searchableView.hideWidget();
         return;
       }
 
@@ -929,19 +937,54 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
     return this.#traceEngineModel;
   }
 
+  getOrCreateExternalAIConversationData(): AiAssistanceModel.ExternalPerformanceAIConversationData {
+    if (!this.#externalAIConversationData) {
+      const conversationHandler = AiAssistanceModel.ConversationHandler.instance();
+      const focus = AiAssistanceModel.getPerformanceAgentFocusFromModel(this.model);
+      if (!focus) {
+        throw new Error('could not create performance agent focus');
+      }
+
+      const agent = conversationHandler.createAgent(AiAssistanceModel.ConversationType.PERFORMANCE);
+      const conversation = new AiAssistanceModel.Conversation(
+          AiAssistanceModel.ConversationType.PERFORMANCE,
+          [],
+          agent.id,
+          /* isReadOnly */ true,
+          /* isExternal */ true,
+      );
+
+      const selected = new AiAssistanceModel.PerformanceTraceContext(focus);
+      selected.external = true;
+
+      this.#externalAIConversationData = {
+        conversationHandler,
+        conversation,
+        agent,
+        selected,
+      };
+    }
+
+    return this.#externalAIConversationData;
+  }
+
+  invalidateExternalAIConversationData(): void {
+    this.#externalAIConversationData = null;
+  }
+
   /**
    * NOTE: this method only exists to enable some layout tests to be migrated to the new engine.
    * DO NOT use this method within DevTools. It is marked as deprecated so
    * within DevTools you are warned when using the method.
    * @deprecated
    **/
-  getParsedTraceForLayoutTests(): Trace.Handlers.Types.ParsedTrace {
+  getParsedTraceForLayoutTests(): Trace.Handlers.Types.HandlerData {
     const traceIndex = this.#activeTraceIndex();
     if (traceIndex === null) {
       throw new Error('No trace index active.');
     }
-    const data = this.#traceEngineModel.parsedTrace(traceIndex);
-    if (data === null) {
+    const data = this.#traceEngineModel.parsedTrace(traceIndex)?.data;
+    if (!data) {
       throw new Error('No trace engine data found.');
     }
     return data;
@@ -958,11 +1001,11 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
     if (traceIndex === null) {
       throw new Error('No trace index active.');
     }
-    const data = this.#traceEngineModel.rawTraceEvents(traceIndex);
-    if (data === null) {
+    const data = this.#traceEngineModel.parsedTrace(traceIndex);
+    if (!data) {
       throw new Error('No trace engine data found.');
     }
-    return data;
+    return data.traceEvents;
   }
 
   #onEntryHovered(dataProvider: TimelineFlameChartDataProvider, event: Common.EventTarget.EventTargetEvent<number>):
@@ -1017,26 +1060,26 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
   }
 
   /**
-   * Returns false if this was loaded in a standalone context such that recording is
-   * not possible, like an enhanced trace (which opens a new devtools window) or
-   * trace.cafe.
+   * Returns false if DevTools is in a standalone context where tracing/recording are NOT available.
+   *
+   * This includes scenarios like:
+   * - viewing an enhanced trace
+   * - viewing a trace in trace.cafe
+   * - other devtools_app.html scenarios without valid `ws=` param.
+   *   - See also the `isHostedMode` comment in `InspectorFrontendHost.ts`
+   *
+   * Possible signals to find a no-record (NR) context:
+   * - `primaryPageTarget()?.sessionId` is empty in NR, but populated when viewing an enhanced trace.
+   * - `primaryPageTarget.#capabilitiesMask` There's a tracing capability but the advertised capabilities are quite unreliable.
+   * - `primaryPageTarget.targets().length === 1` Mostly correct for NC but its 2 when viewing an enhanced trace.
+   * - `primaryPageTarget.router().connection()` Perhaps StubConnection or RehydratingConnection but MainConnection is incorrectly used sometimes. (eg devtools://devtools/bundled/devtools_app.html)
+   * - `resourceTreeModel?.mainFrame === null`. Correct for NR, HOWEVER  Node.js canRecord despite no main frame.
+   * - `rootTarget.type !== 'tab'` Has potential but it lies. (It's "browser" for Node despite a node type)
+   *
+   * The best signal, for now, is this combo (`isNode || hasMainFrame`), which is both well-maintained and correct in all known cases:
    */
   private canRecord(): boolean {
-    // TODO(paulirish) Determine a more robust method as checking `primaryPageTarget()?.sessionId` isn't accurate.
-    return true;
-  }
-
-  private shouldEnableFullAskAI(): boolean {
-    if (!Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_ASK_AI_FULL_BUTTON)) {
-      return false;
-    }
-
-    if (Root.Runtime.hostConfig.aidaAvailability?.enterprisePolicyValue ===
-        Root.Runtime.GenAiEnterprisePolicyValue.DISABLE) {
-      return false;
-    }
-
-    return true;
+    return SDK.TargetManager.TargetManager.instance().hasFakeConnection() === false;
   }
 
   private populateToolbar(): void {
@@ -1087,13 +1130,6 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
       }
     }
 
-    if (this.shouldEnableFullAskAI()) {
-      this.askAiButton = new UI.Toolbar.ToolbarButton('Ask AI', 'button-magic', undefined, 'timeline.ask-ai');
-      this.askAiButton.addEventListener(UI.Toolbar.ToolbarButton.Events.CLICK, this.#onClickAskAIButton.bind(this));
-      this.panelToolbar.appendToolbarItem(this.askAiButton);
-      this.panelToolbar.appendSeparator();
-    }
-
     // TODO(crbug.com/337909145): need to hide "Live metrics" option if !canRecord.
     this.panelToolbar.appendToolbarItem(this.#historyManager.button());
 
@@ -1138,43 +1174,6 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
       this.panelRightToolbar.appendSeparator();
       this.panelRightToolbar.appendToolbarItem(this.showSettingsPaneButton);
     }
-  }
-
-  // Currently for debugging purposes only.
-  #onClickAskAIButton(): void {
-    const traceIndex = this.#activeTraceIndex();
-    if (traceIndex === null) {
-      return;
-    }
-
-    const parsedTrace = this.#traceEngineModel.parsedTrace(traceIndex);
-    if (parsedTrace === null) {
-      return;
-    }
-
-    const insights = this.#traceEngineModel.traceInsights(traceIndex);
-    if (insights === null) {
-      return;
-    }
-
-    const traceMetadata = this.#traceEngineModel.metadata(traceIndex);
-    if (traceMetadata === null) {
-      return;
-    }
-
-    const actionId = 'drjones.performance-panel-full-context';
-    if (!UI.ActionRegistry.ActionRegistry.instance().hasAction(actionId)) {
-      return;
-    }
-
-    // Currently only support a single insight set.
-    const insightSet = [...insights.values()].at(0) ?? null;
-    const context = Utils.AIContext.AgentFocus.full(parsedTrace, insightSet, traceMetadata);
-    UI.Context.Context.instance().setFlavor(Utils.AIContext.AgentFocus, context);
-
-    // Trigger the AI Assistance panel to open.
-    const action = UI.ActionRegistry.ActionRegistry.instance().getAction(actionId);
-    void action.execute();
   }
 
   #setupNavigationSetting(): HTMLElement {
@@ -1380,18 +1379,17 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
     void contextMenu.show();
   }
 
-  /**
-   * Saves a trace file to disk.
-   * Pass `config.savingEnhancedTrace === true` to include source maps in the resulting metadata.
-   * Pass `config.addModifications === true` to include user modifications to the trace file, which includes:
-   *      1. Annotations
-   *      2. Filtering / collapsing of the flame chart.
-   *      3. Visual track configuration (re-ordering or hiding tracks).
-   */
   async saveToFile(config: {
     includeScriptContent: boolean,
     includeSourceMaps: boolean,
+    /**
+     * Includes many things:
+     * 1. annotations
+     * 2. filtering / collapsing of the flame chart
+     * 3. visual track configuration (re-ordering or hiding tracks)
+     **/
     addModifications: boolean,
+    shouldCompress: boolean,
   }): Promise<void> {
     if (this.state !== State.IDLE) {
       return;
@@ -1399,12 +1397,9 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
     if (this.#viewMode.mode !== 'VIEWING_TRACE') {
       return;
     }
-    const trace = this.#traceEngineModel.parsedTrace(this.#viewMode.traceIndex);
-    if (!trace) {
-      return;
-    }
-    let traceEvents = this.#traceEngineModel.rawTraceEvents(this.#viewMode.traceIndex);
-    if (!traceEvents) {
+
+    const parsedTrace = this.#traceEngineModel.parsedTrace(this.#viewMode.traceIndex);
+    if (!parsedTrace) {
       return;
     }
 
@@ -1416,10 +1411,8 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
       scriptByIdMap.set(`${mapScript.isolate}.${mapScript.scriptId}`, mapScript);
     }
 
-    const metadata = this.#traceEngineModel.metadata(this.#viewMode.traceIndex) ?? {};
-
-    traceEvents = traceEvents.map(event => {
-      if (Trace.Types.Events.isAnyScriptCatchupEvent(event) && event.name !== 'StubScriptCatchup') {
+    const traceEvents = parsedTrace.traceEvents.map(event => {
+      if (Trace.Types.Events.isAnyScriptSourceEvent(event) && event.name !== 'StubScriptCatchup') {
         const mappedScript = scriptByIdMap.get(`${event.args.data.isolate}.${event.args.data.scriptId}`);
 
         // If the checkbox to include script content is not checked or if it comes from and
@@ -1437,13 +1430,14 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
             args: {
               data: {isolate: event.args.data.isolate, scriptId: event.args.data.scriptId},
             },
-          } as Trace.Types.Events.V8SourceRundownSourcesStubScriptCatchupEvent;
+          } as Trace.Types.Events.RundownScriptStub;
         }
       }
 
       return event;
     });
 
+    const metadata = parsedTrace.metadata;
     metadata.modifications = config.addModifications ? ModificationsManager.activeManager()?.toJSON() : undefined;
 
     // NOTE: we used to export the track configuration changes into the trace
@@ -1458,7 +1452,8 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
       await this.innerSaveToFile(traceEvents, metadata, {
         includeScriptContent: config.includeScriptContent,
         includeSourceMaps: config.includeSourceMaps,
-        addModifications: config.addModifications
+        addModifications: config.addModifications,
+        shouldCompress: config.shouldCompress,
       });
     } catch (e) {
       // We expect the error to be an Error class, but this deals with any weird case where it's not.
@@ -1478,6 +1473,7 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
     includeScriptContent: boolean,
     includeSourceMaps: boolean,
     addModifications: boolean,
+    shouldCompress: boolean,
   }): Promise<void> {
     // Base the filename on the trace's time of recording
     const isoDate =
@@ -1512,8 +1508,7 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
 
     let blob = new Blob(blobParts, {type: 'application/json'});
 
-    // TODO: Enable by default and connect with upcoming SaveDialog
-    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_SAVE_AS_GZ)) {
+    if (config.shouldCompress) {
       fileName = `${fileName}.gz` as Platform.DevToolsPath.RawPathString;
       const gzStream = Common.Gzip.compressStream(blob.stream());
       blob = await new Response(gzStream, {
@@ -1548,6 +1543,18 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
     }
   }
 
+  async handleSaveToFileAction(): Promise<void> {
+    const exportTraceOptionsElement =
+        this.saveButton.element as TimelineComponents.ExportTraceOptions.ExportTraceOptions;
+    const state = exportTraceOptionsElement.state;
+    await this.saveToFile({
+      includeScriptContent: state.includeScriptContent,
+      includeSourceMaps: state.includeSourceMaps,
+      addModifications: state.includeAnnotations,
+      shouldCompress: state.shouldCompress,
+    });
+  }
+
   #filterMetadataSourceMaps(metadata: Trace.Types.File.MetaData): Trace.Types.File.MetadataSourceMap[]|undefined {
     if (!metadata.sourceMaps) {
       return undefined;
@@ -1556,7 +1563,7 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
     // extensions sourcemaps provide little to no-value for the exported trace
     // debugging, so they are filtered out.
     return metadata.sourceMaps.filter(value => {
-      return value.url && Trace.Helpers.Trace.isExtensionUrl(value.url);
+      return !Trace.Helpers.Trace.isExtensionUrl(value.url);
     });
   }
 
@@ -1633,9 +1640,7 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
 
     const content = await Common.Gzip.fileToString(file);
     if (content.includes('enhancedTraceVersion')) {
-      await window.scheduler.postTask(() => {
-        this.#launchRehydratedSession(content);
-      }, {priority: 'background'});
+      this.#launchRehydratedSession(content);
     } else {
       this.loader = TimelineLoader.loadFromParsedJsonFile(JSON.parse(content), this);
       this.prepareToLoadTimeline();
@@ -1649,6 +1654,8 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
     const url = new URL(window.location.href);
     const pathToEntrypoint = url.pathname.slice(0, url.pathname.lastIndexOf('/'));
     url.pathname = `${pathToEntrypoint}/rehydrated_devtools_app.html`;
+    // The standalone devtools shouldn't retain any existing query params.
+    url.search = '';
     pathToLaunch = url.toString();
 
     // Clarifying the window the code is referring to
@@ -1660,7 +1667,12 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
       hostWindow.removeEventListener('message', onMessageHandler);
     }
     hostWindow.addEventListener('message', onMessageHandler);
-    rehydratingWindow = hostWindow.open(pathToLaunch, /* target: */ undefined, 'noopener=false,popup=true');
+
+    if (this.isDocked()) {
+      rehydratingWindow = hostWindow.open(pathToLaunch, /* target: */ '_blank', 'noopener=false,popup=false');
+    } else {
+      rehydratingWindow = hostWindow.open(pathToLaunch, /* target: */ undefined, 'noopener=false,popup=true');
+    }
   }
 
   async loadFromURL(url: Platform.DevToolsPath.UrlString): Promise<void> {
@@ -1671,6 +1683,10 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
     this.loader = await TimelineLoader.loadFromURL(url, this);
   }
 
+  private isDocked(): boolean {
+    return UI.DockController.DockController.instance().dockSide() !== UI.DockController.DockState.UNDOCKED;
+  }
+
   private updateMiniMap(): void {
     if (this.#viewMode.mode !== 'VIEWING_TRACE') {
       this.#minimapComponent.setData(null);
@@ -1678,8 +1694,7 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
     }
 
     const parsedTrace = this.#traceEngineModel.parsedTrace(this.#viewMode.traceIndex);
-    const isCpuProfile = this.#traceEngineModel.metadata(this.#viewMode.traceIndex)?.dataOrigin ===
-        Trace.Types.File.DataOrigin.CPU_PROFILE;
+    const isCpuProfile = parsedTrace?.metadata.dataOrigin === Trace.Types.File.DataOrigin.CPU_PROFILE;
     if (!parsedTrace) {
       return;
     }
@@ -1795,11 +1810,13 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
         return;
       }
 
-      // To clear out the page and any state from prior test runs, we
-      // navigate to about:blank before initiating the trace recording.
-      // Once we have navigated to about:blank, we start recording and
-      // then navigate to the original page URL, to ensure we profile the
-      // page load.
+      /**
+       * To clear out the page and any state from prior test runs, we
+       * navigate to about:blank before initiating the trace recording.
+       * Once we have navigated to about:blank, we start recording and
+       * then navigate to the original page URL, to ensure we profile the
+       * page load.
+       **/
       function waitForAboutBlank(event: Common.EventTarget.EventTargetEvent<SDK.ResourceTreeModel.ResourceTreeFrame>):
           void {
         if (event.data.url === 'about:blank') {
@@ -1914,6 +1931,7 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
     } else {
       await this.#startTraceRecording();
     }
+    Badges.UserBadges.instance().recordAction(Badges.BadgeAction.PERFORMANCE_RECORDING_STARTED);
   }
 
   private async stopRecording(): Promise<void> {
@@ -2008,14 +2026,14 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
     this.toggleRecordAction.setToggled(this.state === State.RECORDING);
     this.toggleRecordAction.setEnabled(this.state === State.RECORDING || this.state === State.IDLE);
     this.askAiButton?.setEnabled(this.state === State.IDLE && this.#hasActiveTrace());
+    this.panelToolbar.setEnabled(this.state !== State.LOADING);
+    this.panelRightToolbar.setEnabled(this.state !== State.LOADING);
 
     if (!this.canRecord()) {
       return;
     }
 
     this.recordReloadAction.setEnabled(isNode ? false : this.state === State.IDLE);
-    this.panelToolbar.setEnabled(this.state !== State.LOADING);
-    this.panelRightToolbar.setEnabled(this.state !== State.LOADING);
     this.homeButton?.setEnabled(this.state === State.IDLE && this.#hasActiveTrace());
   }
 
@@ -2047,7 +2065,7 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
     this.flameChart.getNetworkDataProvider().reset();
     this.flameChart.reset();
     this.#changeView({mode: 'LANDING_PAGE'});
-    UI.Context.Context.instance().setFlavor(Utils.AIContext.AgentFocus, null);
+    UI.Context.Context.instance().setFlavor(AiAssistanceModel.AgentFocus, null);
   }
 
   #hasActiveTrace(): boolean {
@@ -2084,7 +2102,6 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
     }
     const {traceIndex} = this.#viewMode;
     const parsedTrace = this.#traceEngineModel.parsedTrace(traceIndex);
-    const traceMetadata = this.#traceEngineModel.metadata(traceIndex);
     const syntheticEventsManager = this.#traceEngineModel.syntheticTraceEventsManager(traceIndex);
 
     if (!parsedTrace || !syntheticEventsManager) {
@@ -2104,8 +2121,9 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
 
     // Order is important: the bounds must be set before we initiate any UI
     // rendering.
+    const data = parsedTrace.data;
     TraceBounds.TraceBounds.BoundsManager.instance().resetWithNewBounds(
-        parsedTrace.Meta.traceBounds,
+        data.Meta.traceBounds,
     );
 
     // Set up the modifications manager for the newly active trace.
@@ -2118,21 +2136,19 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
     }
     this.statusDialog?.updateProgressBar(i18nString(UIStrings.processed), 70);
 
-    const traceInsightsSets = this.#traceEngineModel.traceInsights(traceIndex);
-    this.flameChart.setInsights(traceInsightsSets, this.#eventToRelatedInsights);
-
-    this.flameChart.setModel(parsedTrace, traceMetadata);
+    this.flameChart.setModel(parsedTrace, this.#eventToRelatedInsights);
     this.flameChart.resizeToPreferredHeights();
     // Reset the visual selection as we've just swapped to a new trace.
     this.flameChart.setSelectionAndReveal(null);
-    this.#sideBar.setParsedTrace(parsedTrace, traceMetadata);
+    this.#sideBar.setParsedTrace(parsedTrace);
 
-    this.searchableViewInternal.showWidget();
+    this.#searchableView.showWidget();
 
     const exclusiveFilter = this.#exclusiveFilterPerTrace.get(traceIndex) ?? null;
-    this.#applyActiveFilters(parsedTrace.Meta.traceIsGeneric, exclusiveFilter);
-    (this.saveButton.element as TimelineComponents.ExportTraceOptions.ExportTraceOptions)
-        .updateContentVisibility(currentManager ? currentManager.getAnnotations()?.length > 0 : false);
+    this.#applyActiveFilters(parsedTrace.data.Meta.traceIsGeneric, exclusiveFilter);
+    (this.saveButton.element as TimelineComponents.ExportTraceOptions.ExportTraceOptions).updateContentVisibility({
+      annotationsExist: currentManager ? currentManager.getAnnotations()?.length > 0 : false
+    });
 
     // Add ModificationsManager listeners for annotations change to update the
     // Annotation Overlays.
@@ -2143,7 +2159,7 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
         this.flameChart.getMainDataProvider().compatibilityTracksAppenderInstance().threadAppenders().at(0);
     if (topMostMainThreadAppender) {
       const zoomedInBounds = Trace.Extras.MainThreadActivity.calculateWindow(
-          parsedTrace.Meta.traceBounds, topMostMainThreadAppender.getEntries());
+          parsedTrace.data.Meta.traceBounds, topMostMainThreadAppender.getEntries());
 
       TraceBounds.TraceBounds.BoundsManager.instance().setTimelineVisibleWindow(zoomedInBounds);
     }
@@ -2159,11 +2175,11 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
 
     // Set up line level profiling with CPU profiles, if we found any.
     PerfUI.LineLevelProfile.Performance.instance().reset();
-    if (parsedTrace?.Samples.profilesInProcess.size) {
+    if (parsedTrace.data.Samples.profilesInProcess.size) {
       const primaryPageTarget = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
       // Gather up all CPU Profiles we found when parsing this trace.
       const cpuProfiles =
-          Array.from(parsedTrace.Samples.profilesInProcess).flatMap(([_processId, threadsInProcess]) => {
+          Array.from(parsedTrace.data.Samples.profilesInProcess).flatMap(([_processId, threadsInProcess]) => {
             const profiles = Array.from(threadsInProcess.values()).map(profileData => profileData.parsedProfile);
             return profiles;
           });
@@ -2173,18 +2189,18 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
     }
 
     // Initialize EntityMapper
-    this.#entityMapper = new Utils.EntityMapper.EntityMapper(parsedTrace);
+    this.#entityMapper = new Trace.EntityMapper.EntityMapper(parsedTrace);
 
     // Set up SourceMapsResolver to ensure we resolve any function names in
     // profile calls.
     // Pass in the entity mapper.
-    this.#sourceMapsResolver = new Utils.SourceMapsResolver.SourceMapsResolver(parsedTrace, this.#entityMapper);
+    this.#sourceMapsResolver = new SourceMapsResolver.SourceMapsResolver(parsedTrace, this.#entityMapper);
     this.#sourceMapsResolver.addEventListener(
-        Utils.SourceMapsResolver.SourceMappingsUpdated.eventName, this.#onSourceMapsNodeNamesResolvedBound);
+        SourceMapsResolver.SourceMappingsUpdated.eventName, this.#onSourceMapsNodeNamesResolvedBound);
     void this.#sourceMapsResolver.install();
 
     // Initialize EntityMapper
-    this.#entityMapper = new Utils.EntityMapper.EntityMapper(parsedTrace);
+    this.#entityMapper = new Trace.EntityMapper.EntityMapper(parsedTrace);
 
     this.statusDialog?.updateProgressBar(i18nString(UIStrings.processed), 80);
     this.updateMiniMap();
@@ -2193,11 +2209,10 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
     this.#maybeCreateHiddenTracksBanner(parsedTrace);
 
     this.#setActiveInsight(null);
-    this.#sideBar.setInsights(traceInsightsSets);
 
     this.#eventToRelatedInsights.clear();
-    if (traceInsightsSets) {
-      for (const [insightSetKey, insightSet] of traceInsightsSets) {
+    if (parsedTrace.insights) {
+      for (const [insightSetKey, insightSet] of parsedTrace.insights) {
         for (const model of Object.values(insightSet.model)) {
           let relatedEvents = model.relatedEvents;
           if (!relatedEvents) {
@@ -2233,6 +2248,9 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
             Host.UserMetrics.TimelineNavigationSetting.MODERN_AT_SESSION_FIRST_TRACE);
       }
     }
+
+    UI.Context.Context.instance().setFlavor(
+        AiAssistanceModel.AgentFocus, AiAssistanceModel.AgentFocus.fromParsedTrace(parsedTrace));
   }
 
   #onAnnotationModifiedEvent(e: Event): void {
@@ -2265,8 +2283,9 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
     const annotations = currentManager?.getAnnotations() ?? [];
     const annotationEntryToColorMap = this.buildColorsAnnotationsMap(annotations);
     this.#sideBar.setAnnotations(annotations, annotationEntryToColorMap);
-    (this.saveButton.element as TimelineComponents.ExportTraceOptions.ExportTraceOptions)
-        .updateContentVisibility(currentManager ? currentManager.getAnnotations()?.length > 0 : false);
+    (this.saveButton.element as TimelineComponents.ExportTraceOptions.ExportTraceOptions).updateContentVisibility({
+      annotationsExist: currentManager ? currentManager.getAnnotations()?.length > 0 : false
+    });
   }
 
   /**
@@ -2308,16 +2327,16 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
    * show a warning banner at the bottom. This can be dismissed by the user and
    * if that happens we do not want to bring it back again.
    */
-  #maybeCreateHiddenTracksBanner(trace: Trace.Handlers.Types.ParsedTrace): void {
+  #maybeCreateHiddenTracksBanner(parsedTrace: Trace.TraceModel.ParsedTrace): void {
     const hasHiddenTracks = this.flameChart.hasHiddenTracks();
     if (!hasHiddenTracks) {
       return;
     }
 
-    const maybeOverlay = createHiddenTracksOverlay(trace, {
+    const maybeOverlay = createHiddenTracksOverlay(parsedTrace, {
       onClose: () => {
         this.flameChart.overlays().removeOverlaysOfType('BOTTOM_INFO_BAR');
-        this.#hiddenTracksInfoBarPerTrace.set(trace, 'DISMISSED');
+        this.#hiddenTracksInfoBarByParsedTrace.set(parsedTrace, 'DISMISSED');
       },
       onShowAllTracks: () => {
         this.flameChart.showAllMainChartTracks();
@@ -2543,7 +2562,7 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
       }
 
       if (recordingIsFresh) {
-        Utils.FreshRecording.Tracker.instance().registerFreshRecording(parsedTrace);
+        Tracing.FreshRecording.Tracker.instance().registerFreshRecording(parsedTrace);
       }
 
       // We store the index of the active trace so we can load it back easily
@@ -2555,9 +2574,8 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
           parsedTraceIndex: traceIndex,
           type: 'TRACE_INDEX',
         },
-        filmStripForPreview: Trace.Extras.FilmStrip.fromParsedTrace(parsedTrace),
+        filmStripForPreview: Trace.Extras.FilmStrip.fromHandlerData(parsedTrace.data),
         parsedTrace,
-        metadata,
       });
 
       this.dispatchEventToListeners(Events.RECORDING_COMPLETED, {
@@ -2606,7 +2624,7 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
    *    subsequent attempt will work).
    */
   async #retainSourceMapsForEnhancedTrace(
-      parsedTrace: Trace.Handlers.Types.ParsedTrace, metadata: Trace.Types.File.MetaData): Promise<void> {
+      parsedTrace: Trace.TraceModel.ParsedTrace, metadata: Trace.Types.File.MetaData): Promise<void> {
     const handleScript = async(script: Trace.Handlers.ModelHandlers.Scripts.Script): Promise<void> => {
       if (script.sourceMapUrlElided) {
         if (metadata.sourceMaps?.find(m => m.url === script.url)) {
@@ -2651,14 +2669,14 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
     metadata.sourceMaps = [];
 
     const promises = [];
-    for (const script of parsedTrace?.Scripts.scripts.values() ?? []) {
+    for (const script of parsedTrace?.data.Scripts.scripts.values() ?? []) {
       promises.push(handleScript(script));
     }
     await Promise.all(promises);
   }
 
   #createSourceMapResolver(isFreshRecording: boolean, metadata: Trace.Types.File.MetaData|null):
-      Trace.TraceModel.ParseConfig['resolveSourceMap'] {
+      Trace.Types.Configuration.ParseOptions['resolveSourceMap'] {
     const debuggerModelForFrameId = new Map<string, SDK.DebuggerModel.DebuggerModel>();
     for (const target of SDK.TargetManager.TargetManager.instance().targets()) {
       const debuggerModel = target.model(SDK.DebuggerModel.DebuggerModel);
@@ -2746,14 +2764,28 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
   async #executeNewTrace(
       collectedEvents: Trace.Types.Events.Event[], isFreshRecording: boolean,
       metadata: Trace.Types.File.MetaData|null): Promise<void> {
-    await this.#traceEngineModel.parse(
-        collectedEvents,
-        {
-          metadata: metadata ?? undefined,
-          isFreshRecording,
-          resolveSourceMap: this.#createSourceMapResolver(isFreshRecording, metadata),
+    const config: Trace.Types.Configuration.ParseOptions = {
+      metadata: metadata ?? undefined,
+      isFreshRecording,
+      resolveSourceMap: this.#createSourceMapResolver(isFreshRecording, metadata),
+      isCPUProfile: metadata?.dataOrigin === Trace.Types.File.DataOrigin.CPU_PROFILE,
+    };
+
+    if (window.location.href.includes('devtools/bundled') || window.location.search.includes('debugFrontend')) {
+      // Someone is debugging DevTools, enable the logger to give timings
+      // when tracing the performance panel itself.
+      const times: Record<string, number> = {};
+      config.logger = {
+        start(id) {
+          times[id] = performance.now();
         },
-    );
+        end(id) {
+          performance.measure(id, {start: times[id]});
+        },
+      };
+    }
+
+    await this.#traceEngineModel.parse(collectedEvents, config);
 
     // Store all source maps on the trace metadata.
     // If not fresh, we can't validate the maps are still accurate.
@@ -2833,10 +2865,11 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
     if (!parsedTrace) {
       return null;
     }
+
     const endTime = rangeForSelection(selection).max;
     const lastFrameInSelection = Trace.Handlers.ModelHandlers.Frames
                                      .framesWithinWindow(
-                                         parsedTrace.Frames.frames,
+                                         parsedTrace.data.Frames.frames,
                                          endTime,
                                          endTime,
                                          )
@@ -2856,10 +2889,11 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
     if (!parsedTrace) {
       return;
     }
-    let index = parsedTrace.Frames.frames.indexOf(currentFrame);
+
+    let index = parsedTrace.data.Frames.frames.indexOf(currentFrame);
     console.assert(index >= 0, 'Can\'t find current frame in the frame list');
-    index = Platform.NumberUtilities.clamp(index + offset, 0, parsedTrace.Frames.frames.length - 1);
-    const frame = parsedTrace.Frames.frames[index];
+    index = Platform.NumberUtilities.clamp(index + offset, 0, parsedTrace.data.Frames.frames.length - 1);
+    const frame = parsedTrace.data.Frames.frames[index];
     this.#revealTimeRange(
         Trace.Helpers.Timing.microToMilli(frame.startTime), Trace.Helpers.Timing.microToMilli(frame.endTime));
     this.select(selectionFromEvent(frame));
@@ -2891,7 +2925,7 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
       UI.ARIAUtils.LiveAnnouncer.alert(i18nString(UIStrings.frameSelected));
       return;
     }
-    const name = Utils.EntryName.nameForEntry(newSelection.event);
+    const name = Trace.Name.forEntry(newSelection.event);
     UI.ARIAUtils.LiveAnnouncer.alert(i18nString(UIStrings.eventSelected, {PH1: name}));
   }
 
@@ -3002,6 +3036,7 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
       type: AiAssistanceModel.ExternalRequestResponseType.NOTIFICATION,
       message: 'Recording performance trace',
     };
+    TimelinePanel.instance().invalidateExternalAIConversationData();
     void VisualLogging.logFunctionCall('timeline.record-reload', 'external');
     Snackbars.Snackbar.Snackbar.show({message: i18nString(UIStrings.externalRequestReceived)});
 
@@ -3018,16 +3053,16 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
           message: `Error running the trace: ${eventData.errorText}`,
         };
       }
+
       const parsedTrace = panelInstance.model.parsedTrace(eventData.traceIndex);
-      const insights = panelInstance.model.traceInsights(eventData.traceIndex);
-      if (!parsedTrace || !insights || insights.size === 0) {
+      if (!parsedTrace || !parsedTrace.insights || parsedTrace.insights.size === 0) {
         return {
           type: AiAssistanceModel.ExternalRequestResponseType.ERROR,
           message: 'The trace was loaded successfully but no Insights were detected.',
         };
       }
 
-      const navigationId = Array.from(insights.keys()).find(k => k !== 'NO_NAVIGATION');
+      const navigationId = Array.from(parsedTrace.insights.keys()).find(k => k !== 'NO_NAVIGATION');
       if (!navigationId) {
         return {
           type: AiAssistanceModel.ExternalRequestResponseType.ERROR,
@@ -3035,7 +3070,7 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
         };
       }
 
-      const insightsForNav = insights.get(navigationId);
+      const insightsForNav = parsedTrace.insights.get(navigationId);
       if (!insightsForNav) {
         return {
           type: AiAssistanceModel.ExternalRequestResponseType.ERROR,
@@ -3048,10 +3083,12 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
       // bottom of the response under a heading.
       let responseTextForPassedInsights = '';
 
+      // TODO(b/442392194): use PerformanceTraceFormatter summary instead.
       for (const modelName in insightsForNav.model) {
         const model = modelName as keyof Trace.Insights.Types.InsightModelsType;
         const insight = insightsForNav.model[model];
-        const formatter = new AiAssistanceModel.PerformanceInsightFormatter(parsedTrace, insight);
+        const focus = AiAssistanceModel.AgentFocus.fromParsedTrace(parsedTrace);
+        const formatter = new AiAssistanceModel.PerformanceInsightFormatter(focus, insight);
         if (!formatter.insightIsSupported()) {
           // Not all Insights are integrated with "Ask AI" yet, let's avoid
           // filling up the response with those ones because there will be no
@@ -3098,6 +3135,16 @@ ${responseTextForPassedInsights}`;
       panelInstance.recordReload();
     });
   }
+
+  static async handleExternalAnalyzeRequest(prompt: string):
+      Promise<AsyncGenerator<AiAssistanceModel.ExternalRequestResponse, AiAssistanceModel.ExternalRequestResponse>> {
+    const data = TimelinePanel.instance().getOrCreateExternalAIConversationData();
+    return await data.conversationHandler.handleExternalRequest({
+      conversationType: AiAssistanceModel.ConversationType.PERFORMANCE,
+      prompt,
+      data,
+    });
+  }
 }
 
 export const enum State {
@@ -3109,12 +3156,13 @@ export const enum State {
   RECORDING_FAILED = 'RecordingFailed',
 }
 
-// Define row and header height, should be in sync with styles for timeline graphs.
+/** Define row and header height, should be in sync with styles for timeline graphs. **/
 export const rowHeight = 18;
 
 export const headerHeight = 20;
 export interface TimelineModeViewDelegate {
   select(selection: TimelineSelection|null): void;
+  zoomEvent(event: Trace.Types.Events.Event): void;
   element: Element;
   set3PCheckboxDisabled(disabled: boolean): void;
   selectEntryAtTime(events: Trace.Types.Events.Event[]|null, time: number): void;
@@ -3177,7 +3225,7 @@ export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
         panel.recordReload();
         return true;
       case 'timeline.save-to-file':
-        void panel.saveToFile({includeScriptContent: false, includeSourceMaps: false, addModifications: false});
+        void panel.handleSaveToFileAction();
         return true;
       case 'timeline.load-from-file':
         panel.selectFileToLoad();

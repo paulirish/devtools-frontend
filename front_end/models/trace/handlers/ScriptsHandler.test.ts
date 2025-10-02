@@ -1,4 +1,4 @@
-// Copyright 2025 The Chromium Authors. All rights reserved.
+// Copyright 2025 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -43,7 +43,7 @@ describe('ScriptsHandler', () => {
         request: undefined,
         scriptId: '3',
         sourceMapUrl: 'http://localhost:8080/source.map.json',
-        ts: 0,
+        ts: 50442438976,
         url: 'http://localhost:8080/index.html',
       },
       {
@@ -53,7 +53,7 @@ describe('ScriptsHandler', () => {
         request: undefined,
         scriptId: '4',
         sourceMapUrl: 'http://localhost:8080/source.map.json',
-        ts: 0,
+        ts: 50442438976,
         url: 'http://localhost:8080/index.html',
       },
       {
@@ -63,7 +63,7 @@ describe('ScriptsHandler', () => {
         request: undefined,
         scriptId: '1',
         sourceMapUrl: 'http://localhost:8080/source.map.json',
-        ts: 0,
+        ts: 50442438976,
         url: 'http://localhost:8080/index.html',
       },
       {

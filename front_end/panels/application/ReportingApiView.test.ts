@@ -1,16 +1,14 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 import * as SDK from '../../core/sdk/sdk.js';
 import * as Protocol from '../../generated/protocol.js';
-import {renderElementIntoDOM} from '../../testing/DOMHelpers.js';
 import {createTarget} from '../../testing/EnvironmentHelpers.js';
 import {describeWithMockConnection} from '../../testing/MockConnection.js';
 import {createViewFunctionStub} from '../../testing/ViewFunctionHelpers.js';
 
 import * as Application from './application.js';
-import * as ApplicationComponents from './components/components.js';
 
 const endpoints = [{url: 'www.reporting-endpoint.com', groupName: 'endpointName'}];
 const reports = [
@@ -60,38 +58,28 @@ describeWithMockConnection('ReportingApiView', () => {
 
   async function createComponent() {
     const view = createViewFunctionStub(Application.ReportingApiView.ReportingApiView);
-    const endpointsGrid = new ApplicationComponents.EndpointsGrid.EndpointsGrid();
-    const widget = new Application.ReportingApiView.ReportingApiView(endpointsGrid, view);
-
-    const container = document.createElement('div');
-    renderElementIntoDOM(container);
-    widget.markAsRoot();
-    widget.show(container);
+    new Application.ReportingApiView.ReportingApiView(view);
     await view.nextInput;
-
     return {view};
   }
 
-  it('updates endpoints grid when they change', () => {
+  it('updates endpoints grid when they change', async () => {
     const tabTarget = createTarget({type: SDK.Target.Type.TAB});
     const frameTarget = createTarget({parentTarget: tabTarget});
     createTarget({parentTarget: tabTarget, subtype: 'prerender'});
     const networkManager = frameTarget.model(SDK.NetworkManager.NetworkManager);
     assert.exists(networkManager);
 
-    const endpointsGrid = new ApplicationComponents.EndpointsGrid.EndpointsGrid();
-    new Application.ReportingApiView.ReportingApiView(endpointsGrid);
-    const endpointsGridData = sinon.spy(endpointsGrid, 'data', ['set']);
+    const {view} = await createComponent();
     networkManager.dispatchEventToListeners(
         SDK.NetworkManager.Events.ReportingApiEndpointsChangedForOrigin, {origin: ORIGIN_1, endpoints: ENDPOINTS_1});
-    sinon.assert.calledOnce(endpointsGridData.set);
-    sinon.assert.calledWith(endpointsGridData.set, {endpoints: new Map([[ORIGIN_1, ENDPOINTS_1]])});
+    let input = await view.nextInput;
+    assert.deepEqual(input.endpoints, new Map([[ORIGIN_1, ENDPOINTS_1]]));
 
     networkManager.dispatchEventToListeners(
         SDK.NetworkManager.Events.ReportingApiEndpointsChangedForOrigin, {origin: ORIGIN_2, endpoints: ENDPOINTS_2});
-    sinon.assert.calledTwice(endpointsGridData.set);
-    sinon.assert.calledWith(
-        endpointsGridData.set, {endpoints: new Map([[ORIGIN_1, ENDPOINTS_1], [ORIGIN_2, ENDPOINTS_2]])});
+    input = await view.nextInput;
+    assert.deepEqual(input.endpoints, new Map([[ORIGIN_1, ENDPOINTS_1], [ORIGIN_2, ENDPOINTS_2]]));
   });
 
   it('shows placeholder if there is no report and no endpoint', async () => {
@@ -100,10 +88,10 @@ describeWithMockConnection('ReportingApiView', () => {
     assert.isFalse(view.input.hasReports);
     assert.isUndefined(view.input.focusedReport);
 
-    const viewEndpoints = view.input.endpointsGrid.data.endpoints;
+    const viewEndpoints = view.input.endpoints;
     assert.strictEqual(viewEndpoints.size, 0);
 
-    const viewReports = view.input.reportsGrid.data.reports;
+    const viewReports = view.input.reports;
     assert.lengthOf(viewReports, 0);
   });
 
@@ -121,12 +109,12 @@ describeWithMockConnection('ReportingApiView', () => {
     assert.isFalse(view.input.hasReports);
     assert.isUndefined(view.input.focusedReport);
 
-    const viewEndpoints = view.input.endpointsGrid.data.endpoints;
+    const viewEndpoints = view.input.endpoints;
     assert.strictEqual(viewEndpoints.size, 1);
     const dummyEndpoints = viewEndpoints.get('dummy');
     assert.deepEqual(dummyEndpoints, endpoints);
 
-    const reports = view.input.reportsGrid.data.reports;
+    const reports = view.input.reports;
     assert.lengthOf(reports, 0);
   });
 
@@ -144,10 +132,10 @@ describeWithMockConnection('ReportingApiView', () => {
     assert.isTrue(view.input.hasReports);
     assert.isUndefined(view.input.focusedReport);
 
-    const viewEndpoints = view.input.endpointsGrid.data.endpoints;
+    const viewEndpoints = view.input.endpoints;
     assert.strictEqual(viewEndpoints.size, 0);
 
-    const viewReports = view.input.reportsGrid.data.reports;
+    const viewReports = view.input.reports;
     assert.deepEqual(viewReports, reports);
   });
 
@@ -166,12 +154,12 @@ describeWithMockConnection('ReportingApiView', () => {
     assert.isTrue(view.input.hasReports);
     assert.isUndefined(view.input.focusedReport);
 
-    const viewEndpoints = view.input.endpointsGrid.data.endpoints;
+    const viewEndpoints = view.input.endpoints;
     assert.strictEqual(viewEndpoints.size, 1);
     const dummyEndpoints = viewEndpoints.get('dummy');
     assert.deepEqual(dummyEndpoints, endpoints);
 
-    const viewReports = view.input.reportsGrid.data.reports;
+    const viewReports = view.input.reports;
     assert.deepEqual(viewReports, [reports[0]]);
   });
 
@@ -207,10 +195,10 @@ describeWithMockConnection('ReportingApiView', () => {
     assert.isTrue(view.input.hasReports);
     assert.isUndefined(view.input.focusedReport);
 
-    const viewEndpoints = view.input.endpointsGrid.data.endpoints;
+    const viewEndpoints = view.input.endpoints;
     assert.strictEqual(viewEndpoints.size, 0);
 
-    const viewReports = view.input.reportsGrid.data.reports;
+    const viewReports = view.input.reports;
     assert.deepEqual(viewReports, [successReport]);
   });
 
@@ -224,9 +212,8 @@ describeWithMockConnection('ReportingApiView', () => {
     networkManager.dispatchEventToListeners(SDK.NetworkManager.Events.ReportingApiReportAdded, reports[1]);
     await view.nextInput;
 
-    const grid = view.input.reportsGrid;
     assert.isUndefined(view.input.focusedReport);
-    grid.dispatchEvent(new CustomEvent('select', {detail: 'some_id'}));
+    view.input.onReportSelected('some_id');
     await view.nextInput;
     assert.strictEqual(view.input.focusedReport, reports[0]);
   });

@@ -1,10 +1,9 @@
-// Copyright 2020 The Chromium Authors. All rights reserved.
+// Copyright 2020 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 import type {DevToolsFrontendReloadOptions} from '../../conductor/frontend_tab.js';
 import type {DevToolsPage} from '../../e2e_non_hosted/shared/frontend-helper.js';
-import {reloadDevTools as baseReloadDevTools} from '../../shared/helper.js';
 import {getBrowserAndPagesWrappers} from '../../shared/non_hosted_wrappers.js';
 
 import {veImpressionForAnimationsPanel} from './animations-helpers.js';
@@ -87,7 +86,7 @@ export async function reloadDevTools(
     // Navigate to a different site to make sure that back-end state will be removed.
     await inspectedPage.page.goto('about:blank');
   }
-  await baseReloadDevTools(options);
+  await devToolsPage.reloadWithParams(options?.queryParams || {});
   const selectedPanel = options?.selectedPanel?.name || options?.queryParams?.panel || 'elements';
   await devToolsPage.waitFor(`.panel.${selectedPanel}`);
   const expectClosedPanels = options?.expectClosedPanels;

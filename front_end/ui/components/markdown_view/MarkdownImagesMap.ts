@@ -1,4 +1,4 @@
-// Copyright (c) 2020 The Chromium Authors. All rights reserved.
+// Copyright 2020 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -32,9 +32,11 @@ export interface ImageData {
  *
  */
 
-// NOTE: This is only exported for tests, and it should not be
-// imported in any component, instead add image data in map and
-// use getMarkdownImage to get the appropriate image data.
+/**
+ * NOTE: This is only exported for tests, and it should not be
+ * imported in any component, instead add image data in map and
+ * use getMarkdownImage to get the appropriate image data.
+ **/
 export const markdownImages = new Map<string, ImageData>([]);
 
 export const getMarkdownImage = (key: string): ImageData => {

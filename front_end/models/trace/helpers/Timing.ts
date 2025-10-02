@@ -1,4 +1,4 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -39,8 +39,10 @@ export function timeStampForEventAdjustedByClosestNavigation(
   return Types.Timing.Micro(eventTimeStamp);
 }
 
-// Expands the trace window by a provided percentage or, if it the expanded window is smaller than 1 millisecond, expands it to 1 millisecond.
-// If the expanded window is outside of the max trace window, cut the overflowing bound to the max trace window bound.
+/**
+ * Expands the trace window by a provided percentage or, if it the expanded window is smaller than 1 millisecond, expands it to 1 millisecond.
+ * If the expanded window is outside of the max trace window, cut the overflowing bound to the max trace window bound.
+ **/
 export function expandWindowByPercentOrToOneMillisecond(
     annotationWindow: Types.Timing.TraceWindowMicro, maxTraceWindow: Types.Timing.TraceWindowMicro,
     percentage: number): Types.Timing.TraceWindowMicro {
@@ -221,7 +223,7 @@ export function boundsIncludeTimeRange(data: BoundsIncludeTimeRange): boolean {
 /** Checks to see if the event is within or overlaps the bounds */
 export function eventIsInBounds(event: Types.Events.Event, bounds: Types.Timing.TraceWindowMicro): boolean {
   const startTime = event.ts;
-  return startTime <= bounds.max && bounds.min <= (startTime + (event.dur ?? 0));
+  return startTime <= bounds.max && bounds.min < (startTime + (event.dur ?? 0));
 }
 
 export function timestampIsInBounds(bounds: Types.Timing.TraceWindowMicro, timestamp: Types.Timing.Micro): boolean {

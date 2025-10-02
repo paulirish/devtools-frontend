@@ -1,4 +1,4 @@
-// Copyright 2021 The Chromium Authors. All rights reserved.
+// Copyright 2021 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 /* eslint-disable rulesdir/no-imperative-dom-api */
@@ -86,9 +86,11 @@ export const tabMovesFocus = DynamicSetting.bool('text-editor-tab-moves-focus', 
 
 const disableConservativeCompletion = CM.StateEffect.define();
 
-// When enabled, this suppresses the behavior of showCompletionHint
-// and accepting of completions with Enter until the user selects a
-// completion beyond the initially selected one. Used in the console.
+/**
+ * When enabled, this suppresses the behavior of showCompletionHint
+ * and accepting of completions with Enter until the user selects a
+ * completion beyond the initially selected one. Used in the console.
+ **/
 export const conservativeCompletion = CM.StateField.define<boolean>({
   create() {
     return true;
@@ -123,16 +125,17 @@ function acceptCompletionIfAtEndOfLine(view: CM.EditorView): boolean {
   return false;
 }
 
-// This is a wrapper around CodeMirror's own moveCompletionSelection command, which
-// selects the first selection if the state of the selection is conservative, and
-// otherwise behaves as normal.
+/**
+ * This is a wrapper around CodeMirror's own moveCompletionSelection command, which
+ * selects the first selection if the state of the selection is conservative, and
+ * otherwise behaves as normal.
+ **/
 function moveCompletionSelectionIfNotConservative(
     forward: boolean, by: 'option'|'page' = 'option'): ((view: CM.EditorView) => boolean) {
   return view => {
     if (CM.completionStatus(view.state) !== 'active') {
       return false;
     }
-    view.dispatch({effects: setAiAutoCompleteSuggestion.of(null)});
     if (view.state.field(conservativeCompletion, false)) {
       view.dispatch({effects: disableConservativeCompletion.of(null)});
       announceSelectedCompletionInfo(view);
@@ -149,7 +152,6 @@ function moveCompletionSelectionBackwardWrapper(): ((view: CM.EditorView) => boo
     if (CM.completionStatus(view.state) !== 'active') {
       return false;
     }
-    view.dispatch({effects: setAiAutoCompleteSuggestion.of(null)});
     CM.moveCompletionSelection(false)(view);
     announceSelectedCompletionInfo(view);
     return true;
@@ -486,8 +488,11 @@ export const setAiAutoCompleteSuggestion = CM.StateEffect.define<ActiveSuggestio
 interface ActiveSuggestion {
   text: string;
   from: number;
-  sampleId?: number;
+  sampleId: number;
   rpcGlobalId?: Host.AidaClient.RpcGlobalId;
+  startTime: number;
+  onImpression: (rpcGlobalId: Host.AidaClient.RpcGlobalId, sampleId: number, latency: number) => void;
+  clearCachedRequest: () => void;
 }
 
 export const aiAutoCompleteSuggestionState = CM.StateField.define<ActiveSuggestion|null>({
@@ -498,6 +503,7 @@ export const aiAutoCompleteSuggestionState = CM.StateField.define<ActiveSuggesti
         if (effect.value) {
           return effect.value;
         }
+        value?.clearCachedRequest();
         return null;
       }
     }
@@ -509,13 +515,15 @@ export const aiAutoCompleteSuggestionState = CM.StateField.define<ActiveSuggesti
     // A suggestion from an effect can be stale if the document was changed
     // between when the request was sent and the response was received.
     // We check if the position is still valid before trying to map it.
-    if (value.from > tr.startState.doc.length) {
+    if (value.from > tr.state.doc.length) {
+      value.clearCachedRequest();
       return null;
     }
 
     // If deletion occurs, set to null. Otherwise, the mapping might fail if
     // the position is inside the deleted range.
     if (tr.docChanged && tr.state.doc.length < tr.startState.doc.length) {
+      value.clearCachedRequest();
       return null;
     }
 
@@ -523,11 +531,12 @@ export const aiAutoCompleteSuggestionState = CM.StateField.define<ActiveSuggesti
     const {head} = tr.state.selection.main;
 
     // If a change happened before the position from which suggestion was generated, set to null.
-    if (tr.changes.touchesRange(0, from - 1) || head < from) {
+    if (tr.docChanged && head < from) {
+      value.clearCachedRequest();
       return null;
     }
 
-    // Check if what's typed is a prefix of the suggestion.
+    // Check if what's typed after the AI suggestion is a prefix of the AI suggestion.
     const typedText = tr.state.doc.sliceString(from, head);
     return value.text.startsWith(typedText) ? value : null;
   },
@@ -539,6 +548,11 @@ export function hasActiveAiSuggestion(state: CM.EditorState): boolean {
 
 export function acceptAiAutoCompleteSuggestion(view: CM.EditorView):
     {accepted: boolean, suggestion?: ActiveSuggestion} {
+  const selectedCompletion = CM.selectedCompletion(view.state);
+  if (selectedCompletion) {
+    return {accepted: false};
+  }
+
   const suggestion = view.state.field(aiAutoCompleteSuggestionState);
   if (!suggestion) {
     return {accepted: false};
@@ -558,6 +572,8 @@ export function acceptAiAutoCompleteSuggestion(view: CM.EditorView):
     effects: setAiAutoCompleteSuggestion.of(null),
     userEvent: 'input.complete',
   });
+
+  suggestion.clearCachedRequest();
   return {accepted: true, suggestion};
 }
 
@@ -566,25 +582,105 @@ export const aiAutoCompleteSuggestion: CM.Extension = [
   CM.ViewPlugin.fromClass(
       class {
         decorations: CM.DecorationSet = CM.Decoration.none;
+        #lastLoggedSuggestion: ActiveSuggestion|null = null;
 
         update(update: CM.ViewUpdate): void {
+          // If there is no text on the document, we don't want to show the AI suggestion.
+          if (update.state.doc.length === 0) {
+            this.decorations = CM.Decoration.none;
+            return;
+          }
+
+          // Hide decorations if there is no active AI suggestion.
           const activeSuggestion = update.state.field(aiAutoCompleteSuggestionState);
-          const {head, empty} = update.state.selection.main;
-          let hint = '';
-          if (activeSuggestion && empty && head >= activeSuggestion.from) {
-            const {text, from} = activeSuggestion;
-            const typedText = update.state.doc.sliceString(from, head);
-            if (text.startsWith(typedText)) {
-              hint = text.slice(typedText.length);
+          if (!activeSuggestion) {
+            this.decorations = CM.Decoration.none;
+            return;
+          }
+
+          // Hide AI suggestion while the user is interacting with the traditional
+          // autocomplete menu to avoid conflicting suggestions.
+          if (CM.completionStatus(update.view.state) === 'pending') {
+            this.decorations = CM.Decoration.none;
+            return;
+          }
+
+          // Hide AI suggestion if the user has selected an item from the
+          // traditional autocomplete menu that is not the first one.
+          const selectedCompletionIndex = CM.selectedCompletionIndex(update.state);
+          if (selectedCompletionIndex && selectedCompletionIndex > 0) {
+            this.decorations = CM.Decoration.none;
+            return;
+          }
+
+          const {head} = update.state.selection.main;
+          // Hide AI suggestion if the user moves the cursor to a location
+          // before the position from which suggestion was generated.
+          if (head < activeSuggestion.from) {
+            this.decorations = CM.Decoration.none;
+            return;
+          }
+
+          const selectedCompletion = CM.selectedCompletion(update.state);
+          const additionallyTypedText = update.state.doc.sliceString(activeSuggestion.from, head);
+          // The user might have typed text after the suggestion is triggered.
+          // If the suggestion no longer starts with the typed text, hide it.
+          if (!activeSuggestion.text.startsWith(additionallyTypedText)) {
+            this.decorations = CM.Decoration.none;
+            return;
+          }
+
+          let ghostText = activeSuggestion.text.slice(additionallyTypedText.length);
+          if (selectedCompletion) {
+            // Do not show AI generated suggestion if top traditional suggestion is of type
+            // 'keyword' - `do`, `while` etc.
+            if (selectedCompletion.type?.includes('keyword')) {
+              this.decorations = CM.Decoration.none;
+              return;
+            }
+            // If a traditional autocomplete menu is shown, the AI suggestion is only
+            // shown if it builds upon the currently selected item. If there is no
+            // overlap, we hide the AI suggestion. For example, for the text `console`
+            // if the traditional autocomplete suggests `log` and the AI
+            // suggests `warn`, there is no overlap and the AI suggestion is hidden.
+            const overlappingText = TextUtils.TextUtils.getOverlap(selectedCompletion.label, ghostText) ?? '';
+            const lineAtAiSuggestion = update.state.doc.lineAt(activeSuggestion.from).text;
+            const overlapsWithSelectedCompletion =
+                (lineAtAiSuggestion + overlappingText).endsWith(selectedCompletion.label);
+            if (!overlapsWithSelectedCompletion) {
+              this.decorations = CM.Decoration.none;
+              return;
             }
           }
 
-          if (!hint) {
-            this.decorations = CM.Decoration.none;
-          } else {
-            this.decorations =
-                CM.Decoration.set([CM.Decoration.widget({widget: new CompletionHint(hint), side: 1}).range(head)]);
+          // When `conservativeCompletion` is disabled in Console, the editor shows a ghost
+          // text for the first item in the traditional autocomplete menu and this ghost text
+          // is reflected in `currentHint`. In this case, we need to remove
+          // the overlapping part from our AI suggestion's ghost text to avoid
+          // showing a double suggestion.
+          const currentMenuHint = update.view.plugin(showCompletionHint)?.currentHint;
+          const conservativeCompletionEnabled = update.state.field(conservativeCompletion, false);
+          if (!conservativeCompletionEnabled && currentMenuHint) {
+            ghostText = ghostText.slice(currentMenuHint.length);
           }
+
+          this.decorations =
+              CM.Decoration.set([CM.Decoration.widget({widget: new CompletionHint(ghostText), side: 1}).range(head)]);
+          this.#registerImpressionIfNeeded(activeSuggestion);
+        }
+
+        #registerImpressionIfNeeded(activeSuggestion: ActiveSuggestion): void {
+          if (!activeSuggestion.rpcGlobalId) {
+            return;
+          }
+          if (this.#lastLoggedSuggestion?.rpcGlobalId === activeSuggestion?.rpcGlobalId &&
+              this.#lastLoggedSuggestion?.sampleId === activeSuggestion?.sampleId) {
+            return;
+          }
+          const latency = performance.now() - activeSuggestion.startTime;
+          // only register impression for the first time AI generated suggestion is shown to the user.
+          activeSuggestion.onImpression(activeSuggestion.rpcGlobalId, activeSuggestion.sampleId, latency);
+          this.#lastLoggedSuggestion = activeSuggestion;
         }
       },
       {decorations: p => p.decorations}),

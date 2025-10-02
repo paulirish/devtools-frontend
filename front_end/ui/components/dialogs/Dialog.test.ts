@@ -1,4 +1,4 @@
-// Copyright 2023 The Chromium Authors. All rights reserved.
+// Copyright 2023 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -652,7 +652,7 @@ describe('closing the dialog with click', () => {
 });
 
 describeWithLocale('visual appearance', () => {
-  // FIXME: clean up and modularize these test helpers.
+  /** FIXME: clean up and modularize these test helpers. **/
   async function renderDialogs() {
     const verticalPositions = [Dialogs.Dialog.DialogVerticalPosition.TOP, Dialogs.Dialog.DialogVerticalPosition.BOTTOM];
     const horizontalAlignments = [

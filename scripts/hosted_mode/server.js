@@ -1,4 +1,4 @@
-// Copyright (c) 2016 The Chromium Authors. All rights reserved.
+// Copyright 2016 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 const fs = require('fs');
@@ -117,8 +117,7 @@ async function requestHandler(request, response) {
 
   let encoding = 'utf8';
   if (absoluteFilePath.endsWith('.wasm') || absoluteFilePath.endsWith('.png') || absoluteFilePath.endsWith('.jpg') ||
-      absoluteFilePath.endsWith('.avif') || absoluteFilePath.endsWith('.wbn') || absoluteFilePath.endsWith('.dwp') ||
-      absoluteFilePath.endsWith('.dwo')) {
+      absoluteFilePath.endsWith('.avif') || absoluteFilePath.endsWith('.dwp') || absoluteFilePath.endsWith('.dwo')) {
     encoding = 'binary';
   }
 
@@ -188,7 +187,8 @@ async function requestHandler(request, response) {
       // based on the origin that made the request. E.g. the target page loads a script first
       // but then DevTools also wants to load it. In the former, we disallow cross-origin requests by default,
       // while for the latter we allow it.
-      const requestedByDevTools = request.headers.origin?.includes('devtools-frontend.test');
+      const requestedByDevTools = request.headers.origin?.includes('devtools-frontend.test') ||
+          request.headers.origin?.includes('devtools://devtools');
       if (requestedByDevTools) {
         headers.set('Access-Control-Allow-Origin', request.headers.origin);
       }

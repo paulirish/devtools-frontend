@@ -1,4 +1,4 @@
-// Copyright 2020 The Chromium Authors. All rights reserved.
+// Copyright 2020 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -60,12 +60,14 @@ function launchChrome() {
     'FencedFrames',
     'PrivacySandboxAdsAPIsOverride',
     'AutofillEnableDevtoolsIssues',
+    'CADisplayLink',
   ];
   const disabledFeatures = [
     'PMProcessPriorityPolicy',                     // crbug.com/361252079
     'MojoChannelAssociatedSendUsesRunOrPostTask',  // crbug.com/376228320
     'RasterInducingScroll',                        // crbug.com/381055647
     'CompositeBackgroundColorAnimation',           // crbug.com/381055647
+    'ScriptSrcHashesV1',                           // crbug.com/443216445
   ];
   // LINT.ThenChange(/test/e2e_non_hosted/shared/browser-helper.ts:features)
   const launchArgs = [
@@ -211,14 +213,14 @@ export async function reloadDevTools(options?: DevToolsFrontendReloadOptions) {
   await frontendTab.reload(options);
 }
 
-// Can be run multiple times in the same process.
+/** Can be run multiple times in the same process. **/
 export async function preFileSetup(serverPort: number) {
   setTestServerPort(serverPort);
   registerHandlers();
   await loadTargetPageAndFrontend(serverPort);
 }
 
-// Can be run multiple times in the same process.
+/** Can be run multiple times in the same process. **/
 export async function postFileTeardown() {
   // We need to kill the browser before we stop the hosted mode server.
   // That's because the browser could continue to make network requests,
@@ -229,8 +231,4 @@ export async function postFileTeardown() {
 
   clearPuppeteerState();
   dumpCollectedErrors();
-}
-
-export function getDevToolsFrontendHostname(): string {
-  return frontendTab?.hostname() || 'localhost';
 }

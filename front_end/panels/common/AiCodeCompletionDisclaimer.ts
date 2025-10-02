@@ -1,10 +1,11 @@
-// Copyright 2025 The Chromium Authors. All rights reserved.
+// Copyright 2025 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 import '../../ui/components/spinners/spinners.js';
 import '../../ui/components/tooltips/tooltips.js';
 
+import * as Host from '../../core/host/host.js';
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Root from '../../core/root/root.js';
 import * as UI from '../../ui/legacy/legacy.js';
@@ -33,6 +34,10 @@ const UIStringsNotTranslate = {
   tooltipDisclaimerTextForAiCodeCompletionNoLogging:
       'To generate code suggestions, your console input and the history of your current console session are shared with Google. This data will not be used to improve Google’s AI models.',
   /**
+   * Text for tooltip shown on hovering over spinner.
+   */
+  tooltipTextForSpinner: 'Shows when data is being sent to Google to generate code suggestions',
+  /**
    * @description Text for tooltip button which redirects to AI settings
    */
   manageInSettings: 'Manage in settings',
@@ -46,7 +51,9 @@ const lockedString = i18n.i18n.lockedString;
 
 export interface ViewInput {
   disclaimerTooltipId?: string;
+  spinnerTooltipId?: string;
   noLogging: boolean;
+  aidaAvailability?: Host.AidaClient.AidaAccessPreconditions;
   onManageInSettingsTooltipClick: () => void;
 }
 
@@ -59,7 +66,8 @@ export type View = (input: ViewInput, output: ViewOutput, target: HTMLElement) =
 
 export const DEFAULT_SUMMARY_TOOLBAR_VIEW: View =
     (input, output, target) => {
-      if (!input.disclaimerTooltipId) {
+      if (input.aidaAvailability !== Host.AidaClient.AidaAccessPreconditions.AVAILABLE || !input.disclaimerTooltipId ||
+          !input.spinnerTooltipId) {
         render(nothing, target);
         return;
       }
@@ -75,7 +83,16 @@ export const DEFAULT_SUMMARY_TOOLBAR_VIEW: View =
                 el.toggleAttribute('active', isLoading);
               };
             }
-          })}></devtools-spinner>
+          })}
+          aria-details=${input.spinnerTooltipId}
+          aria-describedby=${input.spinnerTooltipId}></devtools-spinner>
+          <devtools-tooltip
+              id=${input.spinnerTooltipId}
+              variant=${'rich'}
+              jslogContext=${'ai-code-completion-spinner-tooltip'}>
+          <div class="disclaimer-tooltip-container"><div class="tooltip-text">
+            ${lockedString(UIStringsNotTranslate.tooltipTextForSpinner)}
+          </div></div></devtools-tooltip>
           <span
               tabIndex="0"
               class="link"
@@ -123,22 +140,32 @@ export class AiCodeCompletionDisclaimer extends UI.Widget.Widget {
   readonly #view: View;
   #viewOutput: ViewOutput = {};
 
+  #spinnerTooltipId?: string;
   #disclaimerTooltipId?: string;
   #noLogging: boolean;  // Whether the enterprise setting is `ALLOW_WITHOUT_LOGGING` or not.
   #loading = false;
   #loadingStartTime = 0;
   #spinnerLoadingTimeout: number|undefined;
 
+  #aidaAvailability?: Host.AidaClient.AidaAccessPreconditions;
+  #boundOnAidaAvailabilityChange: () => Promise<void>;
+
   constructor(element?: HTMLElement, view: View = DEFAULT_SUMMARY_TOOLBAR_VIEW) {
     super(element);
     this.markAsExternallyManaged();
     this.#noLogging = Root.Runtime.hostConfig.aidaAvailability?.enterprisePolicyValue ===
         Root.Runtime.GenAiEnterprisePolicyValue.ALLOW_WITHOUT_LOGGING;
+    this.#boundOnAidaAvailabilityChange = this.#onAidaAvailabilityChange.bind(this);
     this.#view = view;
   }
 
   set disclaimerTooltipId(disclaimerTooltipId: string) {
     this.#disclaimerTooltipId = disclaimerTooltipId;
+    this.requestUpdate();
+  }
+
+  set spinnerTooltipId(spinnerTooltipId: string) {
+    this.#spinnerTooltipId = spinnerTooltipId;
     this.requestUpdate();
   }
 
@@ -169,6 +196,14 @@ export class AiCodeCompletionDisclaimer extends UI.Widget.Widget {
     }
   }
 
+  async #onAidaAvailabilityChange(): Promise<void> {
+    const currentAidaAvailability = await Host.AidaClient.AidaClient.checkAccessPreconditions();
+    if (currentAidaAvailability !== this.#aidaAvailability) {
+      this.#aidaAvailability = currentAidaAvailability;
+      this.requestUpdate();
+    }
+  }
+
   #onManageInSettingsTooltipClick(): void {
     this.#viewOutput.hideTooltip?.();
     void UI.ViewManager.ViewManager.instance().showView('chrome-ai');
@@ -178,9 +213,24 @@ export class AiCodeCompletionDisclaimer extends UI.Widget.Widget {
     this.#view(
         {
           disclaimerTooltipId: this.#disclaimerTooltipId,
+          spinnerTooltipId: this.#spinnerTooltipId,
           noLogging: this.#noLogging,
+          aidaAvailability: this.#aidaAvailability,
           onManageInSettingsTooltipClick: this.#onManageInSettingsTooltipClick.bind(this),
         },
         this.#viewOutput, this.contentElement);
+  }
+
+  override wasShown(): void {
+    super.wasShown();
+    Host.AidaClient.HostConfigTracker.instance().addEventListener(
+        Host.AidaClient.Events.AIDA_AVAILABILITY_CHANGED, this.#boundOnAidaAvailabilityChange);
+    void this.#onAidaAvailabilityChange();
+  }
+
+  override willHide(): void {
+    super.willHide();
+    Host.AidaClient.HostConfigTracker.instance().removeEventListener(
+        Host.AidaClient.Events.AIDA_AVAILABILITY_CHANGED, this.#boundOnAidaAvailabilityChange);
   }
 }

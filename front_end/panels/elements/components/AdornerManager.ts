@@ -1,4 +1,4 @@
-// Copyright 2021 The Chromium Authors. All rights reserved.
+// Copyright 2021 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -28,6 +28,7 @@ export enum RegisteredAdorners {
   FLEX = 'flex',
   AD = 'ad',
   SCROLL_SNAP = 'scroll-snap',
+  STARTING_STYLE = 'starting-style',
   CONTAINER = 'container',
   SLOT = 'slot',
   TOP_LAYER = 'top-layer',
@@ -37,8 +38,10 @@ export enum RegisteredAdorners {
   POPOVER = 'popover',
 }
 
-// This enum-like const object serves as the authoritative registry for all the
-// adorners available.
+/**
+ * This enum-like const object serves as the authoritative registry for all the
+ * adorners available.
+ **/
 export function getRegisteredAdorner(which: RegisteredAdorners): RegisteredAdorner {
   switch (which) {
     case RegisteredAdorners.GRID:
@@ -74,6 +77,12 @@ export function getRegisteredAdorner(which: RegisteredAdorners): RegisteredAdorn
     case RegisteredAdorners.SCROLL_SNAP:
       return {
         name: 'scroll-snap',
+        category: AdornerCategories.LAYOUT,
+        enabledByDefault: true,
+      };
+    case RegisteredAdorners.STARTING_STYLE:
+      return {
+        name: 'starting-style',
         category: AdornerCategories.LAYOUT,
         enabledByDefault: true,
       };
@@ -208,7 +217,7 @@ const OrderedAdornerCategories = [
   AdornerCategories.DEFAULT,
 ];
 
-// Use idx + 1 for the order to avoid JavaScript's 0 == false issue
+/** Use idx + 1 for the order to avoid JavaScript's 0 == false issue **/
 export const AdornerCategoryOrder = new Map(OrderedAdornerCategories.map((category, idx) => [category, idx + 1]));
 
 export function compareAdornerNamesByCategory(nameA: string, nameB: string): number {

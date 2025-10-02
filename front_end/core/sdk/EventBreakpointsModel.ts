@@ -1,4 +1,4 @@
-// Copyright 2021 The Chromium Authors. All rights reserved.
+// Copyright 2021 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -51,8 +51,10 @@ export class EventBreakpointsModel extends SDKModel<void> {
   }
 }
 
-// This implementation (as opposed to similar class in DOMDebuggerModel) is for
-// instrumentation breakpoints in targets that run JS but do not have a DOM.
+/**
+ * This implementation (as opposed to similar class in DOMDebuggerModel) is for
+ * instrumentation breakpoints in targets that run JS but do not have a DOM.
+ **/
 class EventListenerBreakpoint extends CategorizedBreakpoint {
   override setEnabled(enabled: boolean): void {
     if (this.enabled() === enabled) {
@@ -78,7 +80,7 @@ class EventListenerBreakpoint extends CategorizedBreakpoint {
 let eventBreakpointManagerInstance: EventBreakpointsManager;
 
 export class EventBreakpointsManager implements SDKModelObserver<EventBreakpointsModel> {
-  readonly #eventListenerBreakpointsInternal: EventListenerBreakpoint[] = [];
+  readonly #eventListenerBreakpoints: EventListenerBreakpoint[] = [];
 
   constructor() {
     this.createInstrumentationBreakpoints(Category.AUCTION_WORKLET, [
@@ -149,12 +151,12 @@ export class EventBreakpointsManager implements SDKModelObserver<EventBreakpoint
 
   private createInstrumentationBreakpoints(category: Category, instrumentationNames: InstrumentationNames[]): void {
     for (const instrumentationName of instrumentationNames) {
-      this.#eventListenerBreakpointsInternal.push(new EventListenerBreakpoint(category, instrumentationName));
+      this.#eventListenerBreakpoints.push(new EventListenerBreakpoint(category, instrumentationName));
     }
   }
 
   eventListenerBreakpoints(): EventListenerBreakpoint[] {
-    return this.#eventListenerBreakpointsInternal.slice();
+    return this.#eventListenerBreakpoints.slice();
   }
 
   resolveEventListenerBreakpoint({eventName}: EventListenerPausedDetailsAuxData): EventListenerBreakpoint|null {
@@ -163,11 +165,11 @@ export class EventBreakpointsManager implements SDKModelObserver<EventBreakpoint
     }
 
     const instrumentationName = eventName.substring(EventListenerBreakpoint.instrumentationPrefix.length);
-    return this.#eventListenerBreakpointsInternal.find(b => b.name === instrumentationName) || null;
+    return this.#eventListenerBreakpoints.find(b => b.name === instrumentationName) || null;
   }
 
   modelAdded(eventBreakpointModel: EventBreakpointsModel): void {
-    for (const breakpoint of this.#eventListenerBreakpointsInternal) {
+    for (const breakpoint of this.#eventListenerBreakpoints) {
       if (breakpoint.enabled()) {
         breakpoint.updateOnModel(eventBreakpointModel);
       }

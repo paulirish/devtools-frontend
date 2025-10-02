@@ -1,4 +1,4 @@
-// Copyright 2021 The Chromium Authors. All rights reserved.
+// Copyright 2021 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -50,10 +50,7 @@ export class Renderer implements UI.UIUtils.Renderer {
     return rendererInstance;
   }
 
-  async render(object: Object): Promise<{
-    node: Node,
-    tree: UI.TreeOutline.TreeOutline|null,
-  }|null> {
+  async render(object: Object, options?: UI.UIUtils.Options): Promise<UI.UIUtils.RenderedObject|null> {
     let node: SDK.DOMModel.DOMNode|(SDK.DOMModel.DOMNode | null)|null = null;
 
     if (object instanceof SDK.DOMModel.DOMNode) {
@@ -75,6 +72,12 @@ export class Renderer implements UI.UIUtils.Renderer {
     // @ts-expect-error used in console_test_runner
     treeOutline.element.treeElementForTest = treeOutline.firstChild();
     treeOutline.setShowSelectionOnKeyboardFocus(/* show: */ true, /* preventTabOrder: */ true);
-    return {node: treeOutline.element, tree: treeOutline};
+    if (options?.expand) {
+      treeOutline.firstChild()?.expand();
+    }
+    return {
+      element: treeOutline.element,
+      forceSelect: treeOutline.forceSelect.bind(treeOutline),
+    };
   }
 }

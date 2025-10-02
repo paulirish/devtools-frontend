@@ -1,9 +1,9 @@
-// Copyright 2024 The Chromium Authors. All rights reserved.
+// Copyright 2024 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 import * as i18n from '../../../core/i18n/i18n.js';
-import type * as Handlers from '../handlers/handlers.js';
+import * as Handlers from '../handlers/handlers.js';
 import * as Helpers from '../helpers/helpers.js';
 import type {SyntheticInteractionPair} from '../types/TraceEvents.js';
 import type * as Types from '../types/types.js';
@@ -62,25 +62,36 @@ export type INPBreakdownInsightModel = InsightModel<typeof UIStrings, {
   highPercentileInteractionEvent?: SyntheticInteractionPair,
 }>;
 
-export function isINPBreakdown(insight: InsightModel): insight is INPBreakdownInsightModel {
+export function isINPBreakdownInsight(insight: InsightModel): insight is INPBreakdownInsightModel {
   return insight.insightKey === InsightKeys.INP_BREAKDOWN;
 }
 
 function finalize(partialModel: PartialInsightModel<INPBreakdownInsightModel>): INPBreakdownInsightModel {
+  let state: INPBreakdownInsightModel['state'] = 'pass';
+  if (partialModel.longestInteractionEvent) {
+    const classification = Handlers.ModelHandlers.UserInteractions.scoreClassificationForInteractionToNextPaint(
+        partialModel.longestInteractionEvent.dur);
+    if (classification === Handlers.ModelHandlers.PageLoadMetrics.ScoreClassification.GOOD) {
+      state = 'informative';
+    } else {
+      state = 'fail';
+    }
+  }
+
   return {
     insightKey: InsightKeys.INP_BREAKDOWN,
     strings: UIStrings,
     title: i18nString(UIStrings.title),
     description: i18nString(UIStrings.description),
     category: InsightCategory.INP,
-    state: partialModel.longestInteractionEvent ? 'informative' : 'pass',
+    state,
     ...partialModel,
   };
 }
 
 export function generateInsight(
-    parsedTrace: Handlers.Types.ParsedTrace, context: InsightSetContext): INPBreakdownInsightModel {
-  const interactionEvents = parsedTrace.UserInteractions.interactionEventsWithNoNesting.filter(event => {
+    data: Handlers.Types.HandlerData, context: InsightSetContext): INPBreakdownInsightModel {
+  const interactionEvents = data.UserInteractions.interactionEventsWithNoNesting.filter(event => {
     return Helpers.Timing.eventIsInBounds(event, context.bounds);
   });
 

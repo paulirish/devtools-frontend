@@ -1,4 +1,4 @@
-// Copyright 2021 The Chromium Authors. All rights reserved.
+// Copyright 2021 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -47,11 +47,13 @@ import {
   rgbToHwb,
 } from './ColorUtils.js';
 
-// <hue> is defined as a <number> or <angle>
-// and we hold this in degrees. However, after
-// the conversions, these degrees can result in
-// negative values. That's why we normalize the hue to be
-// between [0 - 360].
+/**
+ * <hue> is defined as a <number> or <angle>
+ * and we hold this in degrees. However, after
+ * the conversions, these degrees can result in
+ * negative values. That's why we normalize the hue to be
+ * between [0 - 360].
+ **/
 function normalizeHue(hue: number): number {
   // Even though it is highly unlikely, hue can be
   // very negative like -400. The initial modulo
@@ -60,9 +62,11 @@ function normalizeHue(hue: number): number {
   return ((hue % 360) + 360) % 360;
 }
 
-// Parses angle in the form of
-// `<angle>deg`, `<angle>turn`, `<angle>grad and `<angle>rad`
-// and returns the canonicalized `degree`.
+/**
+ * Parses angle in the form of
+ * `<angle>deg`, `<angle>turn`, `<angle>grad and `<angle>rad`
+ * and returns the canonicalized `degree`.
+ **/
 function parseAngle(angleText: string): number|null {
   const angle = angleText.replace(/(deg|g?rad|turn)$/, '');
   // @ts-expect-error: isNaN can accept strings
@@ -90,7 +94,7 @@ function parseAngle(angleText: string): number|null {
   return number;
 }
 
-// Returns the `Format` equivalent from the format text
+/** Returns the `Format` equivalent from the format text **/
 export function getFormat(formatText: string): Format|null {
   switch (formatText) {
     case Format.HEX:
@@ -1952,25 +1956,21 @@ export class Nickname extends ShortFormatColorBase {
 
 export class Legacy implements Color {
   readonly #rawParams: Color3D;
-  #rgbaInternal: Color4D;
+  #rgba: Color4D;
   readonly #authoredText: string|null;
-  #formatInternal: LegacyColor;
+  #format: LegacyColor;
   readonly channels: [ColorChannel, ColorChannel, ColorChannel, ColorChannel] =
       [ColorChannel.R, ColorChannel.G, ColorChannel.B, ColorChannel.ALPHA];
 
   static readonly #conversions: ColorConversions<Legacy> = {
-    [Format.HEX]: (self: Legacy) => new Legacy(self.#rgbaInternal, Format.HEX),
-    [Format.HEXA]: (self: Legacy) => new Legacy(self.#rgbaInternal, Format.HEXA),
-    [Format.RGB]: (self: Legacy) => new Legacy(self.#rgbaInternal, Format.RGB),
-    [Format.RGBA]: (self: Legacy) => new Legacy(self.#rgbaInternal, Format.RGBA),
-    [Format.HSL]: (self: Legacy) =>
-        new HSL(...rgbToHsl([self.#rgbaInternal[0], self.#rgbaInternal[1], self.#rgbaInternal[2]]), self.alpha),
-    [Format.HSLA]: (self: Legacy) =>
-        new HSL(...rgbToHsl([self.#rgbaInternal[0], self.#rgbaInternal[1], self.#rgbaInternal[2]]), self.alpha),
-    [Format.HWB]: (self: Legacy) =>
-        new HWB(...rgbToHwb([self.#rgbaInternal[0], self.#rgbaInternal[1], self.#rgbaInternal[2]]), self.alpha),
-    [Format.HWBA]: (self: Legacy) =>
-        new HWB(...rgbToHwb([self.#rgbaInternal[0], self.#rgbaInternal[1], self.#rgbaInternal[2]]), self.alpha),
+    [Format.HEX]: (self: Legacy) => new Legacy(self.#rgba, Format.HEX),
+    [Format.HEXA]: (self: Legacy) => new Legacy(self.#rgba, Format.HEXA),
+    [Format.RGB]: (self: Legacy) => new Legacy(self.#rgba, Format.RGB),
+    [Format.RGBA]: (self: Legacy) => new Legacy(self.#rgba, Format.RGBA),
+    [Format.HSL]: (self: Legacy) => new HSL(...rgbToHsl([self.#rgba[0], self.#rgba[1], self.#rgba[2]]), self.alpha),
+    [Format.HSLA]: (self: Legacy) => new HSL(...rgbToHsl([self.#rgba[0], self.#rgba[1], self.#rgba[2]]), self.alpha),
+    [Format.HWB]: (self: Legacy) => new HWB(...rgbToHwb([self.#rgba[0], self.#rgba[1], self.#rgba[2]]), self.alpha),
+    [Format.HWBA]: (self: Legacy) => new HWB(...rgbToHwb([self.#rgba[0], self.#rgba[1], self.#rgba[2]]), self.alpha),
     [Format.LCH]: (self: Legacy) =>
         new LCH(...ColorConverter.labToLch(...ColorConverter.xyzd50ToLab(...self.#toXyzd50())), self.alpha),
     [Format.OKLCH]: (self: Legacy) => new Oklch(...ColorConverter.xyzd50ToOklch(...self.#toXyzd50()), self.alpha),
@@ -1997,7 +1997,7 @@ export class Legacy implements Color {
   };
 
   #toXyzd50(): Color3D {
-    const [r, g, b] = this.#rgbaInternal;
+    const [r, g, b] = this.#rgba;
     return ColorConverter.srgbToXyzd50(r, g, b);
   }
 
@@ -2005,7 +2005,7 @@ export class Legacy implements Color {
     switch (this.format()) {
       case Format.HEXA:
       case Format.RGBA:
-        return this.#rgbaInternal[3];
+        return this.#rgba[3];
       default:
         return null;
     }
@@ -2022,7 +2022,7 @@ export class Legacy implements Color {
 
   shortHex(): ShortHex|null {
     for (let i = 0; i < 4; ++i) {
-      const c = Math.round(this.#rgbaInternal[i] * 255);
+      const c = Math.round(this.#rgba[i] * 255);
       // Check if the two digits of each are identical: #aabbcc => #abc
       if (c % 0x11) {
         return null;
@@ -2033,10 +2033,10 @@ export class Legacy implements Color {
 
   constructor(rgba: Color3D|Color4DOr3D, format: LegacyColor, authoredText?: string) {
     this.#authoredText = authoredText || null;
-    this.#formatInternal = format;
+    this.#format = format;
     this.#rawParams = [rgba[0], rgba[1], rgba[2]];
 
-    this.#rgbaInternal = [
+    this.#rgba = [
       clamp(rgba[0], {min: 0, max: 1}),
       clamp(rgba[1], {min: 0, max: 1}),
       clamp(rgba[2], {min: 0, max: 1}),
@@ -2099,11 +2099,11 @@ export class Legacy implements Color {
   }
 
   format(): LegacyColor {
-    return this.#formatInternal;
+    return this.#format;
   }
 
   hasAlpha(): boolean {
-    return this.#rgbaInternal[3] !== 1;
+    return this.#rgba[3] !== 1;
   }
 
   detectHEXFormat(): Format {
@@ -2115,11 +2115,11 @@ export class Legacy implements Color {
     if (format) {
       return this.as(format).asString();
     }
-    return this.#stringify(format, this.#rgbaInternal[0], this.#rgbaInternal[1], this.#rgbaInternal[2]);
+    return this.#stringify(format, this.#rgba[0], this.#rgba[1], this.#rgba[2]);
   }
   #stringify(format: LegacyColor|undefined, r: number, g: number, b: number): string {
     if (!format) {
-      format = this.#formatInternal;
+      format = this.#format;
     }
 
     function toHexValue(value: number): string {
@@ -2132,7 +2132,7 @@ export class Legacy implements Color {
       case Format.RGBA: {
         const start = Platform.StringUtilities.sprintf('rgb(%d %d %d', toRgbValue(r), toRgbValue(g), toRgbValue(b));
         if (this.hasAlpha()) {
-          return start + Platform.StringUtilities.sprintf(' / %d%)', Math.round(this.#rgbaInternal[3] * 100));
+          return start + Platform.StringUtilities.sprintf(' / %d%)', Math.round(this.#rgba[3] * 100));
         }
         return start + ')';
       }
@@ -2140,7 +2140,7 @@ export class Legacy implements Color {
       case Format.HEXA: {
         if (this.hasAlpha()) {
           return Platform.StringUtilities
-              .sprintf('#%s%s%s%s', toHexValue(r), toHexValue(g), toHexValue(b), toHexValue(this.#rgbaInternal[3]))
+              .sprintf('#%s%s%s%s', toHexValue(r), toHexValue(g), toHexValue(b), toHexValue(this.#rgba[3]))
               .toLowerCase();
         }
         return Platform.StringUtilities.sprintf('#%s%s%s', toHexValue(r), toHexValue(g), toHexValue(b)).toLowerCase();
@@ -2162,20 +2162,20 @@ export class Legacy implements Color {
   }
   isGamutClipped(): boolean {
     return !equals(
-        this.#rawParams.map(toRgbValue),
-        [this.#rgbaInternal[0], this.#rgbaInternal[1], this.#rgbaInternal[2]].map(toRgbValue), WIDE_RANGE_EPSILON);
+        this.#rawParams.map(toRgbValue), [this.#rgba[0], this.#rgba[1], this.#rgba[2]].map(toRgbValue),
+        WIDE_RANGE_EPSILON);
   }
 
   rgba(): Color4D {
-    return [...this.#rgbaInternal];
+    return [...this.#rgba];
   }
 
   canonicalRGBA(): Color4D {
     const rgba = new Array(4);
     for (let i = 0; i < 3; ++i) {
-      rgba[i] = Math.round(this.#rgbaInternal[i] * 255);
+      rgba[i] = Math.round(this.#rgba[i] * 255);
     }
-    rgba[3] = this.#rgbaInternal[3];
+    rgba[3] = this.#rgba[3];
     return rgba as Color4D;
   }
 
@@ -2200,10 +2200,10 @@ export class Legacy implements Color {
 
   invert(): Legacy {
     const rgba: Color4D = [0, 0, 0, 0];
-    rgba[0] = 1 - this.#rgbaInternal[0];
-    rgba[1] = 1 - this.#rgbaInternal[1];
-    rgba[2] = 1 - this.#rgbaInternal[2];
-    rgba[3] = this.#rgbaInternal[3];
+    rgba[0] = 1 - this.#rgba[0];
+    rgba[1] = 1 - this.#rgba[1];
+    rgba[2] = 1 - this.#rgba[2];
+    rgba[3] = this.#rgba[3];
     return new Legacy(rgba, Format.RGBA);
   }
 
@@ -2212,38 +2212,38 @@ export class Legacy implements Color {
    * Note: We override with an alpha of 50% to enhance the dimming effect.
    */
   grayscale(): Legacy {
-    const [r, g, b] = this.#rgbaInternal;
+    const [r, g, b] = this.#rgba;
     const gray = r * 0.299 + g * 0.587 + b * 0.114;
     return new Legacy([gray, gray, gray, 0.5], Format.RGBA);
   }
 
   setAlpha(alpha: number): Legacy {
-    const rgba: Color4D = [...this.#rgbaInternal];
+    const rgba: Color4D = [...this.#rgba];
     rgba[3] = alpha;
     return new Legacy(rgba, Format.RGBA);
   }
 
   blendWith(fgColor: Legacy): Legacy {
-    const rgba: Color4D = blendColors(fgColor.#rgbaInternal, this.#rgbaInternal);
+    const rgba: Color4D = blendColors(fgColor.#rgba, this.#rgba);
     return new Legacy(rgba, Format.RGBA);
   }
 
   blendWithAlpha(alpha: number): Legacy {
-    const rgba: Color4D = [...this.#rgbaInternal];
+    const rgba: Color4D = [...this.#rgba];
     rgba[3] *= alpha;
     return new Legacy(rgba, Format.RGBA);
   }
 
   setFormat(format: LegacyColor): void {
-    this.#formatInternal = format;
+    this.#format = format;
   }
 
   equal(other: Color): boolean {
-    const legacy = other.as(this.#formatInternal);
-    return equals(toRgbValue(this.#rgbaInternal[0]), toRgbValue(legacy.#rgbaInternal[0]), WIDE_RANGE_EPSILON) &&
-        equals(toRgbValue(this.#rgbaInternal[1]), toRgbValue(legacy.#rgbaInternal[1]), WIDE_RANGE_EPSILON) &&
-        equals(toRgbValue(this.#rgbaInternal[2]), toRgbValue(legacy.#rgbaInternal[2]), WIDE_RANGE_EPSILON) &&
-        equals(this.#rgbaInternal[3], legacy.#rgbaInternal[3]);
+    const legacy = other.as(this.#format);
+    return equals(toRgbValue(this.#rgba[0]), toRgbValue(legacy.#rgba[0]), WIDE_RANGE_EPSILON) &&
+        equals(toRgbValue(this.#rgba[1]), toRgbValue(legacy.#rgba[1]), WIDE_RANGE_EPSILON) &&
+        equals(toRgbValue(this.#rgba[2]), toRgbValue(legacy.#rgba[2]), WIDE_RANGE_EPSILON) &&
+        equals(this.#rgba[3], legacy.#rgba[3]);
   }
 }
 

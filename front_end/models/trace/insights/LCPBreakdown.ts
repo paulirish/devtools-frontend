@@ -1,4 +1,4 @@
-// Copyright 2024 The Chromium Authors. All rights reserved.
+// Copyright 2024 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -65,7 +65,7 @@ export const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('models/trace/insights/LCPBreakdown.ts', UIStrings);
 export const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
-// A TraceWindow plus its UIString.
+/** A TraceWindow plus its UIString. **/
 export type Subpart = Types.Timing.TraceWindowMicro&{label: Common.UIString.LocalizedString};
 interface LCPSubparts {
   /**
@@ -89,7 +89,7 @@ interface LCPSubparts {
   renderDelay: Subpart;
 }
 
-export function isLCPBreakdown(model: InsightModel): model is LCPBreakdownInsightModel {
+export function isLCPBreakdownInsight(model: InsightModel): model is LCPBreakdownInsightModel {
   return model.insightKey === 'LCPBreakdown';
 }
 export type LCPBreakdownInsightModel = InsightModel<typeof UIStrings, {
@@ -180,27 +180,39 @@ function finalize(partialModel: PartialInsightModel<LCPBreakdownInsightModel>): 
   if (partialModel.lcpRequest) {
     relatedEvents.push(partialModel.lcpRequest);
   }
+
+  let state: LCPBreakdownInsightModel['state'] = 'pass';
+  if (partialModel.lcpMs !== undefined) {
+    const classification = Handlers.ModelHandlers.PageLoadMetrics.scoreClassificationForLargestContentfulPaint(
+        Helpers.Timing.milliToMicro(partialModel.lcpMs));
+    if (classification === Handlers.ModelHandlers.PageLoadMetrics.ScoreClassification.GOOD) {
+      state = 'informative';
+    } else {
+      state = 'fail';
+    }
+  }
+
   return {
     insightKey: InsightKeys.LCP_BREAKDOWN,
     strings: UIStrings,
     title: i18nString(UIStrings.title),
     description: i18nString(UIStrings.description),
     category: InsightCategory.LCP,
-    state: partialModel.lcpEvent || partialModel.lcpRequest ? 'informative' : 'pass',
+    state,
     ...partialModel,
     relatedEvents,
   };
 }
 
 export function generateInsight(
-    parsedTrace: Handlers.Types.ParsedTrace, context: InsightSetContext): LCPBreakdownInsightModel {
+    data: Handlers.Types.HandlerData, context: InsightSetContext): LCPBreakdownInsightModel {
   if (!context.navigation) {
     return finalize({});
   }
 
-  const networkRequests = parsedTrace.NetworkRequests;
+  const networkRequests = data.NetworkRequests;
 
-  const frameMetrics = parsedTrace.PageLoadMetrics.metricScoresByFrameId.get(context.frameId);
+  const frameMetrics = data.PageLoadMetrics.metricScoresByFrameId.get(context.frameId);
   if (!frameMetrics) {
     throw new Error('no frame metrics');
   }
@@ -219,7 +231,7 @@ export function generateInsight(
   const lcpMs = Helpers.Timing.microToMilli(metricScore.timing);
   // This helps position things on the timeline's UI accurately for a trace.
   const lcpTs = metricScore.event?.ts ? Helpers.Timing.microToMilli(metricScore.event?.ts) : undefined;
-  const lcpRequest = parsedTrace.LargestImagePaint.lcpRequestByNavigationId.get(context.navigationId);
+  const lcpRequest = data.LargestImagePaint.lcpRequestByNavigationId.get(context.navigationId);
 
   const docRequest = networkRequests.byId.get(context.navigationId);
   if (!docRequest) {

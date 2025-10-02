@@ -1,4 +1,4 @@
-// Copyright 2021 The Chromium Authors. All rights reserved.
+// Copyright 2021 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 /* eslint-disable rulesdir/no-imperative-dom-api */
@@ -43,6 +43,7 @@ import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as AiAssistanceModel from '../../models/ai_assistance/ai_assistance.js';
 import * as AutofillManager from '../../models/autofill_manager/autofill_manager.js';
+import * as Badges from '../../models/badges/badges.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as Breakpoints from '../../models/breakpoints/breakpoints.js';
 import * as CrUXManager from '../../models/crux-manager/crux-manager.js';
@@ -53,6 +54,7 @@ import * as Logs from '../../models/logs/logs.js';
 import * as Persistence from '../../models/persistence/persistence.js';
 import * as ProjectSettings from '../../models/project_settings/project_settings.js';
 import * as Workspace from '../../models/workspace/workspace.js';
+import type * as PanelCommon from '../../panels/common/common.js';
 import * as Snippets from '../../panels/snippets/snippets.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
 import * as Snackbar from '../../ui/components/snackbars/snackbars.js';
@@ -122,8 +124,10 @@ const UIStrings = {
 const str_ = i18n.i18n.registerUIStrings('entrypoints/main/MainImpl.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
+let loadedPanelCommonModule: typeof PanelCommon|undefined;
 export class MainImpl {
   #readyForTestPromise = Promise.withResolvers<void>();
+  #veStartPromise!: Promise<void>;
 
   constructor() {
     MainImpl.instanceForTest = this;
@@ -181,11 +185,12 @@ export class MainImpl {
           clickLogThrottler: new Common.Throttler.Throttler(10),
           resizeLogThrottler: new Common.Throttler.Throttler(10),
         };
-        void VisualLogging.startLogging(options);
+        this.#veStartPromise = VisualLogging.startLogging(options);
       } else {
-        void VisualLogging.startLogging();
+        this.#veStartPromise = VisualLogging.startLogging();
       }
     }
+
     void this.#createAppUI();
   }
 
@@ -296,7 +301,6 @@ export class MainImpl {
     Root.Runtime.experiments.register('sampling-heap-profiler-timeline', 'Sampling heap profiler timeline', true);
     Root.Runtime.experiments.register(
         'show-option-tp-expose-internals-in-heap-snapshot', 'Show option to expose internals in heap snapshots');
-    Root.Runtime.experiments.register('vertical-drawer', 'Enable vertical drawer configuration');
 
     // Timeline
     Root.Runtime.experiments.register(
@@ -341,11 +345,6 @@ export class MainImpl {
     // New cookie features.
     Root.Runtime.experiments.register('experimental-cookie-features', 'Enable experimental cookie features');
 
-    // Highlights a violating node or attribute by rendering a squiggly line under it and adding a tooltip linking to the issues panel.
-    Root.Runtime.experiments.register(
-        Root.Runtime.ExperimentName.HIGHLIGHT_ERRORS_ELEMENTS_PANEL,
-        'Highlights a violating node or attribute in the Elements panel DOM tree');
-
     // Change grouping of sources panel to use Authored/Deployed trees
     Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.AUTHORED_DEPLOYED_GROUPING, 'Group sources into authored and deployed trees',
@@ -359,15 +358,9 @@ export class MainImpl {
         Root.Runtime.ExperimentName.TIMELINE_SHOW_POST_MESSAGE_EVENTS,
         'Performance panel: show postMessage dispatch and handling flows',
     );
-    Root.Runtime.experiments.register(
-        Root.Runtime.ExperimentName.TIMELINE_SAVE_AS_GZ, 'Performance panel: enable saving traces as .gz');
-    Root.Runtime.experiments.register(
-        Root.Runtime.ExperimentName.TIMELINE_ASK_AI_FULL_BUTTON,
-        'Performance panel: enable new, more powerful Ask AI in trace view');
 
     Root.Runtime.experiments.enableExperimentsByDefault([
       Root.Runtime.ExperimentName.FULL_ACCESSIBILITY_TREE,
-      Root.Runtime.ExperimentName.HIGHLIGHT_ERRORS_ELEMENTS_PANEL,
       ...(Root.Runtime.Runtime.queryParam('isChromeForTesting') ? ['protocol-monitor'] : []),
     ]);
 
@@ -524,6 +517,28 @@ export class MainImpl {
     UI.ShortcutRegistry.ShortcutRegistry.instance({forceNew: true, actionRegistry: actionRegistryInstance});
     this.#registerMessageSinkListener();
 
+    // Initialize `GDPClient` and `UserBadges` for Google Developer Program integration
+    if (Host.GdpClient.isGdpProfilesAvailable()) {
+      void Host.GdpClient.GdpClient.instance().getProfile().then(getProfileResponse => {
+        if (!getProfileResponse) {
+          return;
+        }
+
+        const {profile, isEligible} = getProfileResponse;
+        const hasProfile = Boolean(profile);
+        const contextString = hasProfile ? 'has-profile' :
+            isEligible                   ? 'no-profile-and-eligible' :
+                                           'no-profile-and-not-eligible';
+        void VisualLogging.logFunctionCall('gdp-client-initialize', contextString);
+      });
+      void Badges.UserBadges.instance().initialize();
+      Badges.UserBadges.instance().addEventListener(Badges.Events.BADGE_TRIGGERED, async ev => {
+        loadedPanelCommonModule ??= await import('../../panels/common/common.js') as typeof PanelCommon;
+        const badgeNotification = new loadedPanelCommonModule.BadgeNotification();
+        void badgeNotification.present(ev.data);
+      });
+    }
+
     MainImpl.timeEnd('Main._createAppUI');
 
     const appProvider = Common.AppProvider.getRegisteredAppProviders()[0];
@@ -582,6 +597,7 @@ export class MainImpl {
     for (const runnableInstanceFunction of Common.Runnable.earlyInitializationRunnables()) {
       await runnableInstanceFunction().run();
     }
+    await this.#veStartPromise;
     // Used for browser tests.
     Host.InspectorFrontendHost.InspectorFrontendHostInstance.readyForTest();
     this.#readyForTestPromise.resolve();
@@ -788,13 +804,13 @@ export class SearchActionDelegate implements UI.ActionRegistration.ActionDelegat
 let mainMenuItemInstance: MainMenuItem;
 
 export class MainMenuItem implements UI.Toolbar.Provider {
-  readonly #itemInternal: UI.Toolbar.ToolbarMenuButton;
+  readonly #item: UI.Toolbar.ToolbarMenuButton;
   constructor() {
-    this.#itemInternal = new UI.Toolbar.ToolbarMenuButton(
+    this.#item = new UI.Toolbar.ToolbarMenuButton(
         this.#handleContextMenu.bind(this), /* isIconDropdown */ true, /* useSoftMenu */ true, 'main-menu',
         'dots-vertical');
-    this.#itemInternal.element.classList.add('main-menu');
-    this.#itemInternal.setTitle(i18nString(UIStrings.customizeAndControlDevtools));
+    this.#item.element.classList.add('main-menu');
+    this.#item.setTitle(i18nString(UIStrings.customizeAndControlDevtools));
   }
 
   static instance(opts: {
@@ -809,7 +825,7 @@ export class MainMenuItem implements UI.Toolbar.Provider {
   }
 
   item(): UI.Toolbar.ToolbarItem|null {
-    return this.#itemInternal;
+    return this.#item;
   }
 
   #handleContextMenu(contextMenu: UI.ContextMenu.ContextMenu): void {
@@ -898,7 +914,7 @@ export class MainMenuItem implements UI.Toolbar.Provider {
       contextMenu.headerSection().appendCustomItem(dockItemElement, 'dock-side');
     }
 
-    const button = this.#itemInternal.element;
+    const button = this.#item.element;
 
     function setDockSide(side: UI.DockController.DockState): void {
       void dockController.once(UI.DockController.Events.AFTER_DOCK_SIDE_CHANGED).then(() => button.focus());
@@ -906,20 +922,7 @@ export class MainMenuItem implements UI.Toolbar.Provider {
       contextMenu.discard();
     }
 
-    const aiPreregisteredView = UI.ViewManager.getRegisteredViewExtensionForID('freestyler');
-    if (aiPreregisteredView) {
-      let additionalElement = undefined;
-      const promotionId = aiPreregisteredView.featurePromotionId();
-      if (promotionId) {
-        additionalElement = UI.UIUtils.maybeCreateNewBadge(promotionId);
-      }
-      contextMenu.defaultSection().appendItem(aiPreregisteredView.title(), () => {
-        void UI.ViewManager.ViewManager.instance().showView('freestyler', true, false);
-        if (promotionId) {
-          UI.UIUtils.PromotionManager.instance().recordFeatureInteraction(promotionId);
-        }
-      }, {additionalElement, jslogContext: 'freestyler'});
-    }
+    contextMenu.defaultSection().appendAction('freestyler.main-menu', undefined, /* optional */ true);
 
     if (dockController.dockSide() === UI.DockController.DockState.UNDOCKED) {
       const mainTarget = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
@@ -947,6 +950,7 @@ export class MainMenuItem implements UI.Toolbar.Provider {
       const persistence = viewExtension.persistence();
       const title = viewExtension.title();
       const id = viewExtension.viewId();
+      const promotionId = viewExtension.featurePromotionId();
 
       if (id === 'issues-pane') {
         moreTools.defaultSection().appendItem(title, () => {
@@ -962,14 +966,15 @@ export class MainMenuItem implements UI.Toolbar.Provider {
       if (location !== 'drawer-view' && location !== 'panel') {
         continue;
       }
-      // Skip AI Assistance because we already show it in the main menu
-      if (id === 'freestyler') {
-        continue;
+
+      let additionalElement = undefined;
+      if (promotionId) {
+        additionalElement = UI.UIUtils.maybeCreateNewBadge(promotionId);
       }
 
       moreTools.defaultSection().appendItem(title, () => {
         void UI.ViewManager.ViewManager.instance().showView(id, true, false);
-      }, {isPreviewFeature: viewExtension.isPreviewFeature(), jslogContext: id});
+      }, {additionalElement, isPreviewFeature: viewExtension.isPreviewFeature(), jslogContext: id});
     }
 
     const helpSubMenu = contextMenu.footerSection().appendSubMenuItem(i18nString(UIStrings.help), false, 'help');
@@ -1017,7 +1022,7 @@ export class PauseListener {
   }
 }
 
-// Unused but mentioned at https://chromedevtools.github.io/devtools-protocol/#:~:text=use%20Main.MainImpl.-,sendOverProtocol,-()%20in%20the
+/** Unused but mentioned at https://chromedevtools.github.io/devtools-protocol/#:~:text=use%20Main.MainImpl.-,sendOverProtocol,-()%20in%20the **/
 export function sendOverProtocol(
     method: ProtocolClient.InspectorBackend.QualifiedName, params: Object|null): Promise<unknown[]|null> {
   return new Promise((resolve, reject) => {
@@ -1052,10 +1057,6 @@ type ExternalRequestInput = {
 }|{
   kind: 'PERFORMANCE_RELOAD_GATHER_INSIGHTS',
 }|{
-  // TODO(b/425270067): remove once MCP removes insight tool.
-  kind: 'PERFORMANCE_ANALYZE_INSIGHT',
-  args: {insightTitle: string, prompt: string},
-}|{
   kind: 'PERFORMANCE_ANALYZE',
   args: {prompt: string},
 }|{
@@ -1063,9 +1064,11 @@ type ExternalRequestInput = {
   args: {requestUrl: string, prompt: string},
 };
 
-// For backwards-compatibility we iterate over the generator and drop the
-// intermediate results. The final response is transformed to its legacy type.
-// Instead of sending responses of type error, errors are throws.
+/**
+ * For backwards-compatibility we iterate over the generator and drop the
+ * intermediate results. The final response is transformed to its legacy type.
+ * Instead of sending responses of type error, errors are throws.
+ **/
 export async function handleExternalRequest(input: ExternalRequestInput):
     Promise<{response: string, devToolsLogs: object[]}> {
   const generator = await handleExternalRequestGenerator(input);
@@ -1096,28 +1099,9 @@ export async function handleExternalRequestGenerator(input: ExternalRequestInput
       const TimelinePanel = await import('../../panels/timeline/timeline.js');
       return TimelinePanel.TimelinePanel.TimelinePanel.handleExternalRecordRequest();
     }
-    case 'PERFORMANCE_ANALYZE_INSIGHT': {
-      const AiAssistanceModel = await import('../../models/ai_assistance/ai_assistance.js');
-      const TimelinePanel = await import('../../panels/timeline/timeline.js');
-      const traceModel = TimelinePanel.TimelinePanel.TimelinePanel.instance().model;
-      const conversationHandler = AiAssistanceModel.ConversationHandler.instance();
-      return await conversationHandler.handleExternalRequest({
-        conversationType: AiAssistanceModel.ConversationType.PERFORMANCE_INSIGHT,
-        prompt: input.args.prompt,
-        insightTitle: input.args.insightTitle,
-        traceModel,
-      });
-    }
     case 'PERFORMANCE_ANALYZE': {
-      const AiAssistanceModel = await import('../../models/ai_assistance/ai_assistance.js');
       const TimelinePanel = await import('../../panels/timeline/timeline.js');
-      const traceModel = TimelinePanel.TimelinePanel.TimelinePanel.instance().model;
-      const conversationHandler = AiAssistanceModel.ConversationHandler.instance();
-      return await conversationHandler.handleExternalRequest({
-        conversationType: AiAssistanceModel.ConversationType.PERFORMANCE_FULL,
-        prompt: input.args.prompt,
-        traceModel,
-      });
+      return await TimelinePanel.TimelinePanel.TimelinePanel.handleExternalAnalyzeRequest(input.args.prompt);
     }
     case 'NETWORK_DEBUGGER': {
       const AiAssistanceModel = await import('../../models/ai_assistance/ai_assistance.js');

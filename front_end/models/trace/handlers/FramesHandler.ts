@@ -1,4 +1,4 @@
-// Copyright 2023 The Chromium Authors. All rights reserved.
+// Copyright 2023 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -25,7 +25,7 @@ import type {HandlerName} from './types.js';
  */
 
 let model: TimelineFrameModel|null = null;
-const relevantFrameEvents: Types.Events.Event[] = [];
+let relevantFrameEvents: Types.Events.Event[] = [];
 
 type FrameEvent = Types.Events.BeginFrame|Types.Events.DroppedFrame|Types.Events.RequestMainThreadFrame|
                   Types.Events.BeginMainThreadFrame|Types.Events.Commit|Types.Events.CompositeLayers|
@@ -58,7 +58,7 @@ const MAIN_FRAME_MARKERS = new Set<Types.Events.Name>([
 
 export function reset(): void {
   model = null;
-  relevantFrameEvents.length = 0;
+  relevantFrameEvents = [];
 }
 export function handleEvent(event: Types.Events.Event): void {
   // This might seem like a wide set of events to filter for, but these are all
@@ -95,8 +95,8 @@ export interface FramesData {
 
 export function data(): FramesData {
   return {
-    frames: model ? Array.from(model.frames()) : [],
-    framesById: model ? {...model.framesById()} : {},
+    frames: model?.frames() ?? [],
+    framesById: model?.framesById() ?? {},
   };
 }
 
@@ -483,7 +483,7 @@ export class PendingFrame {
   }
 }
 
-// The parameters of an impl-side BeginFrame.
+/** The parameters of an impl-side BeginFrame. **/
 class BeginFrameInfo {
   seqId: number;
   startTime: Types.Timing.Micro;
@@ -497,10 +497,12 @@ class BeginFrameInfo {
   }
 }
 
-// A queue of BeginFrames pending visualization.
-// BeginFrames are added into this queue as they occur; later when their
-// corresponding DrawFrames occur (or lack thereof), the BeginFrames are removed
-// from the queue and their timestamps are used for visualization.
+/**
+ * A queue of BeginFrames pending visualization.
+ * BeginFrames are added into this queue as they occur; later when their
+ * corresponding DrawFrames occur (or lack thereof), the BeginFrames are removed
+ * from the queue and their timestamps are used for visualization.
+ **/
 export class TimelineFrameBeginFrameQueue {
   private queueFrames: number[] = [];
 

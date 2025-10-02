@@ -1,4 +1,4 @@
-// Copyright 2025 The Chromium Authors. All rights reserved.
+// Copyright 2025 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 import rule from '../lib/no-imperative-dom-api.ts';
@@ -546,6 +546,73 @@ export const DEFAULT_VIEW = (input, _output, target) => {
             .jslogContext=\${'edit-name'}></devtools-button>
       </devtools-toolbar>
       <div class="banner">some-text</div>
+    </div>\`,
+    target, {host: input});
+};
+
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+  }
+}`,
+      errors: [{messageId: 'preferTemplateLiterals'}],
+    },
+    {
+      filename: 'front_end/ui/components/component/file.ts',
+      code: `
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+    const toolbar = this.contentElement.createChild('devtools-toolbar');
+    this.action = UI.ActionRegistry.ActionRegistry.instance().getAction('some-action');
+    this.actionButton = UI.Toolbar.Toolbar.createActionButton(this.action);
+    toolbar.appendToolbarItem(this.actionButton);
+    toolbar.appendToolbarItem(UI.Toolbar.Toolbar.createActionButton('other-action'));
+  }
+}`,
+      output: `
+
+export const DEFAULT_VIEW = (input, _output, target) => {
+  render(html\`
+    <div>
+      <devtools-toolbar>
+        <devtools-button \${bindToAction('some-action')}></devtools-button>
+        <devtools-button \${bindToAction('other-action')}></devtools-button>
+      </devtools-toolbar>
+    </div>\`,
+    target, {host: input});
+};
+
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+    this.action = UI.ActionRegistry.ActionRegistry.instance().getAction('some-action');
+  }
+}`,
+      errors: [{messageId: 'preferTemplateLiterals'}],
+    },
+    {
+      filename: 'front_end/ui/components/component/file.ts',
+      code: `
+class SomeWidget extends UI.Widget.Widget {
+  constructor() {
+    super();
+    const toolbar = this.contentElement.createChild('devtools-toolbar');
+    toolbar.appendToolbarItem(new UI.Toolbar.ToolbarComboBox(
+       this.someToolbarComboBoxClicked.bind(this), 'Combox',
+       'the-toolbar-combox', 'some-toolbar-combox'));
+  }
+}`,
+      output: `
+
+export const DEFAULT_VIEW = (input, _output, target) => {
+  render(html\`
+    <div>
+      <devtools-toolbar>
+        <select class="the-toolbar-combox" title="Combox" aria-label="Combox"
+            jslog=\${VisualLogging.dropDown('some-toolbar-combox').track({change: true})}
+            @change=\${this.someToolbarComboBoxClicked.bind(this)}></select>
+      </devtools-toolbar>
     </div>\`,
     target, {host: input});
 };

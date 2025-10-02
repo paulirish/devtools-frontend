@@ -1,4 +1,4 @@
-// Copyright 2014 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -106,71 +106,72 @@ const UIStrings = {
 } as const;
 const str_ = i18n.i18n.registerUIStrings('panels/search/SearchView.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
-const {ref} = Directives;
+const {ref, live} = Directives;
+const {widgetConfig, widgetRef} = UI.Widget;
 
-export class SearchView extends UI.Widget.VBox {
-  private focusOnShow: boolean;
-  private isIndexing: boolean;
-  private searchId: number;
-  private searchMatchesCount: number;
-  private searchResultsCount: number;
-  private nonEmptySearchResultsCount: number;
-  private searchingView: UI.Widget.Widget|null;
-  private notFoundView: UI.Widget.Widget|null;
-  private searchConfig: Workspace.SearchConfig.SearchConfig|null;
-  private pendingSearchConfig: Workspace.SearchConfig.SearchConfig|null;
-  private searchResultsPane: SearchResultsPane|null;
-  private progressIndicator: UI.ProgressIndicator.ProgressIndicator|null;
-  private visiblePane: UI.Widget.Widget|null;
-  private searchPanelElement!: HTMLElement;
-  private searchResultsElement!: HTMLElement;
-  protected search!: HTMLInputElement;
-  protected matchCaseButton!: Buttons.Button.Button;
-  protected regexButton!: Buttons.Button.Button;
-  private searchMessageElement!: HTMLElement;
-  private searchProgressPlaceholderElement!: HTMLElement;
-  private searchResultsMessageElement!: HTMLElement;
-  private readonly advancedSearchConfig: Common.Settings.Setting<{
-    query: string,
-    ignoreCase: boolean,
-    isRegex: boolean,
-  }>;
-  private searchScope: SearchScope|null;
+export interface SearchViewInput {
+  query: string;
+  matchCase: boolean;
+  isRegex: boolean;
+  searchConfig: Workspace.SearchConfig.SearchConfig|null;
+  searchMessage: string;
+  searchResultsMessage: string;
+  searchResults: SearchResult[];
+  progress: Common.Progress.Progress|null;
+  onQueryChange: (query: string) => void;
+  onQueryKeyDown: (evt: KeyboardEvent) => void;
+  onPanelKeyDown: (evt: KeyboardEvent) => void;
+  onClearSearchInput: () => void;
+  onToggleRegex: () => void;
+  onToggleMatchCase: () => void;
+  onRefresh: () => void;
+  onClearSearch: () => void;
+}
 
-  // We throttle adding search results, otherwise we trigger DOM layout for each
-  // result added.
-  #throttler: Common.Throttler.Throttler;
-  #pendingSearchResults: SearchResult[] = [];
-  #emptyStartView: UI.EmptyWidget.EmptyWidget;
+export interface SearchViewOutput {
+  focusSearchInput: () => void;
+  showAllMatches: () => void;
+  collapseAllResults: () => void;
+}
 
-  constructor(settingKey: string, throttler: Common.Throttler.Throttler) {
-    super({
-      jslog: `${VisualLogging.panel('search').track({resize: true})}`,
-      useShadowDom: true,
-    });
-    this.setMinimumSize(0, 40);
+export type View = (input: SearchViewInput, output: SearchViewOutput, target: HTMLElement) => void;
 
-    this.focusOnShow = false;
-    this.isIndexing = false;
-    this.searchId = 1;
-    this.searchMatchesCount = 0;
-    this.searchResultsCount = 0;
-    this.nonEmptySearchResultsCount = 0;
-    this.searchingView = null;
-    this.notFoundView = null;
-    this.searchConfig = null;
-    this.pendingSearchConfig = null;
-    this.searchResultsPane = null;
-    this.progressIndicator = null;
-    this.visiblePane = null;
-    this.#throttler = throttler;
-
-    // clang-format off
-    /* eslint-disable-next-line rulesdir/no-lit-render-outside-of-view */
-    render(html`
+export const DEFAULT_VIEW: View = (input, output, target) => {
+  const {
+    query,
+    matchCase,
+    isRegex,
+    searchConfig,
+    searchMessage,
+    searchResults,
+    searchResultsMessage,
+    progress,
+    onQueryChange,
+    onQueryKeyDown,
+    onPanelKeyDown,
+    onClearSearchInput,
+    onToggleRegex,
+    onToggleMatchCase,
+    onRefresh,
+    onClearSearch,
+  } = input;
+  let header = '', text = '';
+  if (!query) {
+    header = i18nString(UIStrings.noSearchResult);
+    text = i18nString(
+        UIStrings.typeAndPressSToSearch,
+        {PH1: UI.KeyboardShortcut.KeyboardShortcut.shortcutToString(UI.KeyboardShortcut.Keys.Enter)});
+  } else if (progress) {
+    header = i18nString(UIStrings.searching);
+  } else if (!searchResults.length) {
+    header = i18nString(UIStrings.noMatchesFound);
+    text = i18nString(UIStrings.nothingMatchedTheQuery);
+  }
+  // clang-format off
+  render(html`
+      <style>${UI.inspectorCommonStyles}</style>
       <style>${searchViewStyles}</style>
-      <div class="search-drawer-header" @keydown=${this.onKeyDownOnPanel}
-           ${ref(e => {this.searchPanelElement = e as HTMLElement;})}>
+      <div class="search-drawer-header" @keydown=${onPanelKeyDown}>
         <div class="search-container">
           <div class="toolbar-item-search">
             <devtools-icon name="search"></devtools-icon>
@@ -181,10 +182,19 @@ export class SearchView extends UI.Widget.VBox {
                     change: true, keydown: 'ArrowUp|ArrowDown|Enter'})}
                 aria-label=${i18nString(UIStrings.find)}
                 size="100" results="0"
-                @keydown=${this.onKeyDown}
-                ${ref(e => {this.search = e as HTMLInputElement;})}>
+                .value=${live(query)}
+                @keydown=${onQueryKeyDown}
+                @input=${(e: Event) => onQueryChange((e.target as HTMLInputElement).value)}
+                ${ref(e => {
+                  output.focusSearchInput = () => {
+                    if (e instanceof HTMLInputElement) {
+                      e.focus();
+                      e.select();
+                    }
+                  };
+                })}>
             <devtools-button class="clear-button" tabindex="-1"
-                @click=${this.onSearchInputClear}
+                @click=${onClearSearchInput}
                 .data=${{
                   variant: Buttons.Button.Variant.ICON,
                   iconName: 'cross-circle-filled',
@@ -193,40 +203,40 @@ export class SearchView extends UI.Widget.VBox {
                   title: i18nString(UIStrings.clearInput),
                 } as Buttons.Button.ButtonData}
             ></devtools-button>
-            <devtools-button @click=${this.regexButtonToggled} .data=${{
+            <devtools-button @click=${onToggleRegex} .data=${{
                 variant: Buttons.Button.Variant.ICON_TOGGLE,
                 iconName: 'regular-expression',
                 toggledIconName: 'regular-expression',
                 toggleType: Buttons.Button.ToggleType.PRIMARY,
                 size: Buttons.Button.Size.SMALL,
-                toggled: false,
-                title: i18nString(UIStrings.enableRegularExpression),
+                toggled: isRegex,
+                title: isRegex ? i18nString(UIStrings.disableRegularExpression) : i18nString(UIStrings.enableRegularExpression),
                 jslogContext: 'regular-expression',
               } as Buttons.Button.ButtonData}
-              ${ref(e => {this.regexButton = e as Buttons.Button.Button;})}
+              class="regex-button"
             ></devtools-button>
-            <devtools-button @click=${this.matchCaseButtonToggled} .data=${{
+            <devtools-button @click=${onToggleMatchCase} .data=${{
                 variant: Buttons.Button.Variant.ICON_TOGGLE,
                 iconName: 'match-case',
                 toggledIconName: 'match-case',
                 toggleType: Buttons.Button.ToggleType.PRIMARY,
                 size: Buttons.Button.Size.SMALL,
-                toggled: false,
-                title: i18nString(UIStrings.enableCaseSensitive),
+                toggled: matchCase,
+                title: matchCase ? i18nString(UIStrings.disableCaseSensitive) : i18nString(UIStrings.enableCaseSensitive),
                 jslogContext: 'match-case',
               } as Buttons.Button.ButtonData}
-              ${ref(e => {this.matchCaseButton = e as Buttons.Button.Button;})}
+              class="match-case-button"
             ></devtools-button>
           </div>
         </div>
         <devtools-toolbar class="search-toolbar" jslog=${VisualLogging.toolbar()}>
-          <devtools-button title=${i18nString(UIStrings.refresh)} @click=${this.onAction}
+          <devtools-button title=${i18nString(UIStrings.refresh)} @click=${onRefresh}
               .data=${{
                 variant: Buttons.Button.Variant.TOOLBAR,
                 iconName: 'refresh',
                 jslogContext: 'search.refresh',
               } as Buttons.Button.ButtonData}></devtools-button>
-          <devtools-button title=${i18nString(UIStrings.clear)} @click=${this.onClearSearch}
+          <devtools-button title=${i18nString(UIStrings.clear)} @click=${onClearSearch}
               .data=${{
                 variant: Buttons.Button.Variant.TOOLBAR,
                 iconName: 'clear',
@@ -234,59 +244,147 @@ export class SearchView extends UI.Widget.VBox {
               } as Buttons.Button.ButtonData}></devtools-button>
         </devtools-toolbar>
       </div>
-      <div class="search-results" @keydown=${this.onKeyDownOnPanel}
-           ${ref(e => {this.searchResultsElement = e as HTMLElement;})}>
+      <div class="search-results" @keydown=${onPanelKeyDown}>
+        ${searchResults.length
+           ? html`<devtools-widget .widgetConfig=${widgetConfig(SearchResultsPane, {searchResults, searchConfig})}
+            ${widgetRef(SearchResultsPane, w => {
+              output.showAllMatches = () => void w.showAllMatches();
+              output.collapseAllResults = () => void w.collapseAllResults(); })}>
+            </devtools-widget>`
+           : html`<devtools-widget .widgetConfig=${widgetConfig(UI.EmptyWidget.EmptyWidget, {header, text})}>
+                  </devtools-widget>`}
       </div>
-      <div class="search-toolbar-summary" @keydown=${this.onKeyDownOnPanel}>
-        <div class="search-message" ${ref(e => {this.searchMessageElement = e as HTMLElement;})}></div>
-        <div class="flex-centered" ${ref(e => {this.searchProgressPlaceholderElement = e as HTMLElement;})}>
+      <div class="search-toolbar-summary" @keydown=${onPanelKeyDown}>
+        <div class="search-message">${searchMessage}</div>
+        <div class="flex-centered">
+          ${progress ? html`
+            <devtools-progress .title=${progress.title ?? ''}
+                               .worked=${progress.worked} .totalWork=${progress.totalWork}>
+            </devtools-progress>` : ''}
         </div>
-        <div class="search-message" ${ref(e => {this.searchResultsMessageElement = e as HTMLElement;})}>
-        </div>
-      </div>`, this.contentElement, {host: this});
-    // clang-format on
+        <div class="search-message">${searchResultsMessage}</div>
+      </div>`, target);
+  // clang-format on
+};
 
-    this.advancedSearchConfig = Common.Settings.Settings.instance().createLocalSetting(
+export class SearchView extends UI.Widget.VBox {
+  readonly #view: View;
+  #focusSearchInput = (): void => {};
+  #showAllMatches = (): void => {};
+  #collapseAllResults = (): void => {};
+  #isIndexing: boolean;
+  #searchId: number;
+  #searchMatchesCount: number;
+  #searchResultsCount: number;
+  #nonEmptySearchResultsCount: number;
+  #searchingView: UI.Widget.Widget|null;
+  #searchConfig: Workspace.SearchConfig.SearchConfig|null;
+  #pendingSearchConfig: Workspace.SearchConfig.SearchConfig|null;
+  #progress: Common.Progress.Progress|null;
+  #query: string;
+  #matchCase = false;
+  #isRegex = false;
+  #searchMessage = '';
+  #searchResultsMessage = '';
+  readonly #advancedSearchConfig: Common.Settings.Setting<{
+    query: string,
+    ignoreCase: boolean,
+    isRegex: boolean,
+  }>;
+  #searchScope: SearchScope|null;
+
+  #searchResults: SearchResult[] = [];
+
+  constructor(settingKey: string, view = DEFAULT_VIEW) {
+    super({
+      jslog: `${VisualLogging.panel('search').track({resize: true})}`,
+      useShadowDom: true,
+    });
+    this.#view = view;
+    this.setMinimumSize(0, 40);
+
+    this.#isIndexing = false;
+    this.#searchId = 1;
+    this.#query = '';
+    this.#searchMatchesCount = 0;
+    this.#searchResultsCount = 0;
+    this.#nonEmptySearchResultsCount = 0;
+    this.#searchingView = null;
+    this.#searchConfig = null;
+    this.#pendingSearchConfig = null;
+    this.#progress = null;
+
+    this.#advancedSearchConfig = Common.Settings.Settings.instance().createLocalSetting(
         settingKey + '-search-config', new Workspace.SearchConfig.SearchConfig('', true, false).toPlainObject());
 
-    this.load();
-    this.searchScope = null;
-
-    this.#emptyStartView = new UI.EmptyWidget.EmptyWidget(
-        i18nString(UIStrings.noSearchResult), i18nString(UIStrings.typeAndPressSToSearch, {
-          PH1: UI.KeyboardShortcut.KeyboardShortcut.shortcutToString(UI.KeyboardShortcut.Keys.Enter)
-        }));
-    this.showPane(this.#emptyStartView);
+    this.performUpdate();
+    this.#load();
+    this.performUpdate();
+    this.#searchScope = null;
   }
 
-  regexButtonToggled(): void {
-    this.regexButton.title = this.regexButton.toggled ? i18nString(UIStrings.disableRegularExpression) :
-                                                        i18nString(UIStrings.enableRegularExpression);
+  override performUpdate(): void {
+    const input: SearchViewInput = {
+      query: this.#query,
+      matchCase: this.#matchCase,
+      isRegex: this.#isRegex,
+      searchConfig: this.#searchConfig,
+      searchMessage: this.#searchMessage,
+      searchResults: this.#searchResults.filter(searchResult => searchResult.matchesCount()),
+      searchResultsMessage: this.#searchResultsMessage,
+      progress: this.#progress,
+      onQueryChange: (query: string) => {
+        this.#query = query;
+      },
+      onQueryKeyDown: this.#onQueryKeyDown.bind(this),
+      onPanelKeyDown: this.#onPanelKeyDown.bind(this),
+      onClearSearchInput: this.#onClearSearchInput.bind(this),
+      onToggleRegex: this.#onToggleRegex.bind(this),
+      onToggleMatchCase: this.#onToggleMatchCase.bind(this),
+      onRefresh: this.#onRefresh.bind(this),
+      onClearSearch: this.#onClearSearch.bind(this),
+    };
+    const that = this;
+    const output: SearchViewOutput = {
+      set focusSearchInput(value: () => void) {
+        that.#focusSearchInput = value;
+      },
+      set showAllMatches(value: () => void) {
+        that.#showAllMatches = value;
+      },
+      set collapseAllResults(value: () => void) {
+        that.#collapseAllResults = value;
+      }
+    };
+    this.#view(input, output, this.contentElement);
   }
 
-  matchCaseButtonToggled(): void {
-    this.matchCaseButton.title = this.matchCaseButton.toggled ? i18nString(UIStrings.disableCaseSensitive) :
-                                                                i18nString(UIStrings.enableCaseSensitive);
+  #onToggleRegex(): void {
+    this.#isRegex = !this.#isRegex;
+    this.performUpdate();
   }
 
-  private buildSearchConfig(): Workspace.SearchConfig.SearchConfig {
-    return new Workspace.SearchConfig.SearchConfig(
-        this.search.value, !this.matchCaseButton.toggled, this.regexButton.toggled);
+  #onToggleMatchCase(): void {
+    this.#matchCase = !this.#matchCase;
+    this.performUpdate();
+  }
+
+  #buildSearchConfig(): Workspace.SearchConfig.SearchConfig {
+    return new Workspace.SearchConfig.SearchConfig(this.#query, !this.#matchCase, this.#isRegex);
   }
 
   toggle(queryCandidate: string, searchImmediately?: boolean): void {
-    this.search.value = queryCandidate;
-    if (this.isShowing()) {
+    this.#query = queryCandidate;
+    this.requestUpdate();
+    void this.updateComplete.then(() => {
       this.focus();
-    } else {
-      this.focusOnShow = true;
-    }
+    });
 
-    this.initScope();
+    this.#initScope();
     if (searchImmediately) {
-      this.onAction();
+      this.#onRefresh();
     } else {
-      this.startIndexing();
+      this.#startIndexing();
     }
   }
 
@@ -294,208 +392,164 @@ export class SearchView extends UI.Widget.VBox {
     throw new Error('Not implemented');
   }
 
-  private initScope(): void {
-    this.searchScope = this.createScope();
+  #initScope(): void {
+    this.#searchScope = this.createScope();
   }
 
-  override wasShown(): void {
-    super.wasShown();
-    if (this.focusOnShow) {
-      this.focus();
-      this.focusOnShow = false;
-    }
-  }
-
-  private onIndexingFinished(): void {
-    if (!this.progressIndicator) {
+  #onIndexingFinished(): void {
+    if (!this.#progress) {
       return;
     }
 
-    const finished = !this.progressIndicator.isCanceled();
-    this.progressIndicator.done();
-    this.progressIndicator = null;
-    this.isIndexing = false;
-    this.searchMessageElement.textContent = finished ? '' : i18nString(UIStrings.indexingInterrupted);
+    const finished = !this.#progress.canceled;
+    this.#progress = null;
+    this.#isIndexing = false;
+    this.#searchMessage = finished ? '' : i18nString(UIStrings.indexingInterrupted);
     if (!finished) {
-      this.pendingSearchConfig = null;
+      this.#pendingSearchConfig = null;
     }
-    if (!this.pendingSearchConfig) {
+    this.performUpdate();
+    if (!this.#pendingSearchConfig) {
       return;
     }
-    const searchConfig = this.pendingSearchConfig;
-    this.pendingSearchConfig = null;
-    this.innerStartSearch(searchConfig);
+    const searchConfig = this.#pendingSearchConfig;
+    this.#pendingSearchConfig = null;
+    this.#startSearch(searchConfig);
   }
 
-  private startIndexing(): void {
-    this.isIndexing = true;
-    if (this.progressIndicator) {
-      this.progressIndicator.done();
+  #startIndexing(): void {
+    this.#isIndexing = true;
+    if (this.#progress) {
+      this.#progress.done = true;
     }
-    this.progressIndicator = document.createElement('devtools-progress');
-    this.searchMessageElement.textContent = i18nString(UIStrings.indexing);
-    this.searchProgressPlaceholderElement.appendChild(this.progressIndicator);
-    if (this.searchScope) {
-      this.searchScope.performIndexing(
-          new Common.Progress.ProgressProxy(this.progressIndicator, this.onIndexingFinished.bind(this)));
+    this.#progress = new Common.Progress.ProgressProxy(
+        new Common.Progress.Progress(), this.#onIndexingFinished.bind(this), this.requestUpdate.bind(this));
+    this.#searchMessage = i18nString(UIStrings.indexing);
+    this.performUpdate();
+    if (this.#searchScope) {
+      this.#searchScope.performIndexing(this.#progress);
     }
   }
 
-  private onSearchInputClear(): void {
-    this.search.value = '';
-    this.save();
+  #onClearSearchInput(): void {
+    this.#query = '';
+    this.requestUpdate();
+    this.#save();
     this.focus();
-    this.showPane(this.#emptyStartView);
   }
 
-  private onSearchResult(searchId: number, searchResult: SearchResult): void {
-    if (searchId !== this.searchId || !this.progressIndicator) {
+  #onSearchResult(searchId: number, searchResult: SearchResult): void {
+    if (searchId !== this.#searchId || !this.#progress) {
       return;
     }
-    if (this.progressIndicator?.isCanceled()) {
-      this.onIndexingFinished();
+    if (this.#progress?.canceled) {
+      this.#onIndexingFinished();
       return;
     }
-    if (!this.searchResultsPane) {
-      this.searchResultsPane = new SearchResultsPane((this.searchConfig as Workspace.SearchConfig.SearchConfig));
-      this.showPane(this.searchResultsPane);
-    }
-    this.#pendingSearchResults.push(searchResult);
-    void this.#throttler.schedule(async () => this.#addPendingSearchResults());
+    this.#searchResults.push(searchResult);
+    this.#addSearchResult(searchResult);
+    this.requestUpdate();
   }
 
-  #addPendingSearchResults(): void {
-    for (const searchResult of this.#pendingSearchResults) {
-      this.addSearchResult(searchResult);
-      if (searchResult.matchesCount()) {
-        this.searchResultsPane?.addSearchResult(searchResult);
-      }
-    }
-    this.#pendingSearchResults = [];
-  }
-
-  private onSearchFinished(searchId: number, finished: boolean): void {
-    if (searchId !== this.searchId || !this.progressIndicator) {
+  #onSearchFinished(searchId: number, finished: boolean): void {
+    if (searchId !== this.#searchId || !this.#progress) {
       return;
     }
-    if (!this.searchResultsPane) {
-      this.nothingFound();
-    }
-    this.searchFinished(finished);
-    this.searchConfig = null;
-    UI.ARIAUtils.LiveAnnouncer.alert(
-        this.searchMessageElement.textContent + ' ' + this.searchResultsMessageElement.textContent);
+    this.#progress = null;
+    this.#searchFinished(finished);
+    UI.ARIAUtils.LiveAnnouncer.alert(this.#searchMessage + ' ' + this.#searchResultsMessage);
   }
 
-  private innerStartSearch(searchConfig: Workspace.SearchConfig.SearchConfig): void {
-    this.searchConfig = searchConfig;
-    if (this.progressIndicator) {
-      this.progressIndicator.done();
+  #startSearch(searchConfig: Workspace.SearchConfig.SearchConfig): void {
+    this.#searchConfig = searchConfig;
+    if (this.#progress) {
+      this.#progress.done = true;
     }
-    this.progressIndicator = document.createElement('devtools-progress');
-    this.searchStarted(this.progressIndicator);
-    if (this.searchScope) {
-      void this.searchScope.performSearch(
-          searchConfig, this.progressIndicator, this.onSearchResult.bind(this, this.searchId),
-          this.onSearchFinished.bind(this, this.searchId));
+    this.#progress =
+        new Common.Progress.ProgressProxy(new Common.Progress.Progress(), undefined, this.requestUpdate.bind(this));
+    this.#searchStarted();
+    if (this.#searchScope) {
+      void this.#searchScope.performSearch(
+          searchConfig, this.#progress, this.#onSearchResult.bind(this, this.#searchId),
+          this.#onSearchFinished.bind(this, this.#searchId));
     }
   }
 
-  private resetSearch(): void {
-    this.stopSearch();
-    this.showPane(null);
-    this.searchResultsPane = null;
-    this.searchMessageElement.textContent = '';
-    this.searchResultsMessageElement.textContent = '';
+  #resetSearch(): void {
+    this.#stopSearch();
+    this.#searchResults = [];
+    this.#searchMessage = '';
+    this.#searchResultsMessage = '';
+    this.performUpdate();
   }
 
-  private stopSearch(): void {
-    if (this.progressIndicator && !this.isIndexing) {
-      this.progressIndicator.cancel();
+  #stopSearch(): void {
+    if (this.#progress && !this.#isIndexing) {
+      this.#progress.canceled = true;
     }
-    if (this.searchScope) {
-      this.searchScope.stopSearch();
+    if (this.#searchScope) {
+      this.#searchScope.stopSearch();
     }
-    this.searchConfig = null;
   }
 
-  private searchStarted(progressIndicator: UI.ProgressIndicator.ProgressIndicator): void {
-    this.searchMatchesCount = 0;
-    this.searchResultsCount = 0;
-    this.nonEmptySearchResultsCount = 0;
-    if (!this.searchingView) {
-      this.searchingView = new UI.EmptyWidget.EmptyWidget(i18nString(UIStrings.searching), '');
+  #searchStarted(): void {
+    this.#searchMatchesCount = 0;
+    this.#searchResultsCount = 0;
+    this.#searchResults = [];
+    this.#nonEmptySearchResultsCount = 0;
+    if (!this.#searchingView) {
+      this.#searchingView = new UI.EmptyWidget.EmptyWidget(i18nString(UIStrings.searching), '');
     }
-    this.showPane(this.searchingView);
-    this.searchMessageElement.textContent = i18nString(UIStrings.searching);
-    this.searchProgressPlaceholderElement.appendChild(progressIndicator);
-    this.updateSearchResultsMessage();
+    this.#searchMessage = i18nString(UIStrings.searching);
+    this.performUpdate();
+    this.#updateSearchResultsMessage();
   }
 
-  private updateSearchResultsMessage(): void {
-    if (this.searchMatchesCount && this.searchResultsCount) {
-      if (this.searchMatchesCount === 1 && this.nonEmptySearchResultsCount === 1) {
-        this.searchResultsMessageElement.textContent = i18nString(UIStrings.foundMatchingLineInFile);
-      } else if (this.searchMatchesCount > 1 && this.nonEmptySearchResultsCount === 1) {
-        this.searchResultsMessageElement.textContent =
-            i18nString(UIStrings.foundDMatchingLinesInFile, {PH1: this.searchMatchesCount});
+  #updateSearchResultsMessage(): void {
+    if (this.#searchMatchesCount && this.#searchResultsCount) {
+      if (this.#searchMatchesCount === 1 && this.#nonEmptySearchResultsCount === 1) {
+        this.#searchResultsMessage = i18nString(UIStrings.foundMatchingLineInFile);
+      } else if (this.#searchMatchesCount > 1 && this.#nonEmptySearchResultsCount === 1) {
+        this.#searchResultsMessage = i18nString(UIStrings.foundDMatchingLinesInFile, {PH1: this.#searchMatchesCount});
       } else {
-        this.searchResultsMessageElement.textContent = i18nString(
+        this.#searchResultsMessage = i18nString(
             UIStrings.foundDMatchingLinesInDFiles,
-            {PH1: this.searchMatchesCount, PH2: this.nonEmptySearchResultsCount});
+            {PH1: this.#searchMatchesCount, PH2: this.#nonEmptySearchResultsCount});
       }
     } else {
-      this.searchResultsMessageElement.textContent = '';
+      this.#searchResultsMessage = '';
     }
+    this.performUpdate();
   }
 
-  private showPane(panel: UI.Widget.Widget|null): void {
-    if (this.visiblePane) {
-      this.visiblePane.detach();
-    }
-    if (panel) {
-      panel.show(this.searchResultsElement);
-    }
-    this.visiblePane = panel;
-  }
-
-  private nothingFound(): void {
-    if (!this.notFoundView) {
-      this.notFoundView = new UI.EmptyWidget.EmptyWidget(
-          i18nString(UIStrings.noMatchesFound), i18nString(UIStrings.nothingMatchedTheQuery));
-    }
-    this.showPane(this.notFoundView);
-  }
-
-  private addSearchResult(searchResult: SearchResult): void {
+  #addSearchResult(searchResult: SearchResult): void {
     const matchesCount = searchResult.matchesCount();
-    this.searchMatchesCount += matchesCount;
-    this.searchResultsCount++;
+    this.#searchMatchesCount += matchesCount;
+    this.#searchResultsCount++;
     if (matchesCount) {
-      this.nonEmptySearchResultsCount++;
+      this.#nonEmptySearchResultsCount++;
     }
-    this.updateSearchResultsMessage();
+    this.#updateSearchResultsMessage();
   }
 
-  private searchFinished(finished: boolean): void {
-    this.searchMessageElement.textContent =
-        finished ? i18nString(UIStrings.searchFinished) : i18nString(UIStrings.searchInterrupted);
+  #searchFinished(finished: boolean): void {
+    this.#searchMessage = finished ? i18nString(UIStrings.searchFinished) : i18nString(UIStrings.searchInterrupted);
+    this.requestUpdate();
   }
 
   override focus(): void {
-    this.search.focus();
-    this.search.select();
+    this.#focusSearchInput();
   }
 
   override willHide(): void {
-    this.stopSearch();
+    this.#stopSearch();
   }
 
-  private onKeyDown(event: KeyboardEvent): void {
-    this.save();
+  #onQueryKeyDown(event: KeyboardEvent): void {
+    this.#save();
     switch (event.keyCode) {
       case UI.KeyboardShortcut.Keys.Enter.code:
-        this.onAction();
+        this.#onRefresh();
         break;
     }
   }
@@ -518,7 +572,7 @@ export class SearchView extends UI.Widget.VBox {
    *
    * @param event KeyboardEvent
    */
-  private onKeyDownOnPanel(event: KeyboardEvent): void {
+  #onPanelKeyDown(event: KeyboardEvent): void {
     const isMac = Host.Platform.isMac();
     // "Command + Alt + ]" for Mac
     const shouldShowAllForMac =
@@ -529,54 +583,48 @@ export class SearchView extends UI.Widget.VBox {
     // "Command + Alt + [" for Mac
     const shouldCollapseAllForMac =
         isMac && event.metaKey && !event.ctrlKey && event.altKey && event.code === 'BracketLeft';
-    // "Command + Alt + {" for other platforms
+    // "Ctrl + Alt + {" for other platforms
     const shouldCollapseAllForOtherPlatforms =
         !isMac && event.ctrlKey && !event.metaKey && event.shiftKey && event.code === 'BracketLeft';
 
     if (shouldShowAllForMac || shouldShowAllForOtherPlatforms) {
-      this.searchResultsPane?.showAllMatches();
+      this.#showAllMatches();
       void VisualLogging.logKeyDown(event.currentTarget, event, 'show-all-matches');
     } else if (shouldCollapseAllForMac || shouldCollapseAllForOtherPlatforms) {
-      this.searchResultsPane?.collapseAllResults();
+      this.#collapseAllResults();
       void VisualLogging.logKeyDown(event.currentTarget, event, 'collapse-all-results');
     }
   }
 
-  private save(): void {
-    this.advancedSearchConfig.set(this.buildSearchConfig().toPlainObject());
+  #save(): void {
+    this.#advancedSearchConfig.set(this.#buildSearchConfig().toPlainObject());
   }
 
-  private load(): void {
-    const searchConfig = Workspace.SearchConfig.SearchConfig.fromPlainObject(this.advancedSearchConfig.get());
-    this.search.value = searchConfig.query();
+  #load(): void {
+    const searchConfig = Workspace.SearchConfig.SearchConfig.fromPlainObject(this.#advancedSearchConfig.get());
+    this.#query = searchConfig.query();
 
-    this.matchCaseButton.toggled = !searchConfig.ignoreCase();
-    this.matchCaseButtonToggled();
-
-    this.regexButton.toggled = searchConfig.isRegex();
-    this.regexButtonToggled();
+    this.#matchCase = !searchConfig.ignoreCase();
+    this.#isRegex = searchConfig.isRegex();
+    this.requestUpdate();
   }
 
-  private onAction(): void {
-    const searchConfig = this.buildSearchConfig();
+  #onRefresh(): void {
+    const searchConfig = this.#buildSearchConfig();
     if (!searchConfig.query()?.length) {
       return;
     }
-    this.resetSearch();
-    ++this.searchId;
-    this.initScope();
-    if (!this.isIndexing) {
-      this.startIndexing();
+    this.#resetSearch();
+    ++this.#searchId;
+    this.#initScope();
+    if (!this.#isIndexing) {
+      this.#startIndexing();
     }
-    this.pendingSearchConfig = searchConfig;
+    this.#pendingSearchConfig = searchConfig;
   }
 
-  private onClearSearch(): void {
-    this.resetSearch();
-    this.onSearchInputClear();
-  }
-
-  get throttlerForTest(): Common.Throttler.Throttler {
-    return this.#throttler;
+  #onClearSearch(): void {
+    this.#resetSearch();
+    this.#onClearSearchInput();
   }
 }

@@ -1,4 +1,4 @@
-// Copyright 2025 The Chromium Authors. All rights reserved.
+// Copyright 2025 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -64,7 +64,8 @@ export async function executePromptCycle(
 
   await devtoolsPage.locator(inputSelector).click();
   // Add randomness to bust cache
-  const suffix = randomize ? `${(Math.random() * 1000)}`.split('.')[0] : '';
+  const id = randomize ? `${(Math.random() * 1000)}`.split('.')[0] : '';
+  const suffix = id ? ` [qid=${id}]` : '';
   await devtoolsPage.locator(inputSelector).fill(`${query}${suffix}`);
 
   const abort = new AbortController();

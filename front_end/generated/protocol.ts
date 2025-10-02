@@ -1,4 +1,4 @@
-// Copyright (c) 2020 The Chromium Authors. All rights reserved.
+// Copyright 2020 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -172,7 +172,8 @@ export namespace Accessibility {
    * - from 'live' to 'root': attributes which apply to nodes in live regions
    * - from 'autocomplete' to 'valuetext': attributes which apply to widgets
    * - from 'checked' to 'selected': states which apply to widgets
-   * - from 'activedescendant' to 'owns' - relationships between elements other than parent/child/sibling.
+   * - from 'activedescendant' to 'owns': relationships between elements other than parent/child/sibling
+   * - from 'activeFullscreenElement' to 'uninteresting': reasons why this noode is hidden
    */
   export const enum AXPropertyName {
     Actions = 'actions',
@@ -216,6 +217,23 @@ export namespace Accessibility {
     Labelledby = 'labelledby',
     Owns = 'owns',
     Url = 'url',
+    ActiveFullscreenElement = 'activeFullscreenElement',
+    ActiveModalDialog = 'activeModalDialog',
+    ActiveAriaModalDialog = 'activeAriaModalDialog',
+    AriaHiddenElement = 'ariaHiddenElement',
+    AriaHiddenSubtree = 'ariaHiddenSubtree',
+    EmptyAlt = 'emptyAlt',
+    EmptyText = 'emptyText',
+    InertElement = 'inertElement',
+    InertSubtree = 'inertSubtree',
+    LabelContainer = 'labelContainer',
+    LabelFor = 'labelFor',
+    NotRendered = 'notRendered',
+    NotVisible = 'notVisible',
+    PresentationalRole = 'presentationalRole',
+    ProbablyPresentational = 'probablyPresentational',
+    InactiveCarouselTabContent = 'inactiveCarouselTabContent',
+    Uninteresting = 'uninteresting',
   }
 
   /**
@@ -1064,8 +1082,10 @@ export namespace Audits {
     WriteErrorInsufficientResources = 'WriteErrorInsufficientResources',
     WriteErrorInvalidMatchField = 'WriteErrorInvalidMatchField',
     WriteErrorInvalidStructuredHeader = 'WriteErrorInvalidStructuredHeader',
+    WriteErrorInvalidTTLField = 'WriteErrorInvalidTTLField',
     WriteErrorNavigationRequest = 'WriteErrorNavigationRequest',
     WriteErrorNoMatchField = 'WriteErrorNoMatchField',
+    WriteErrorNonIntegerTTLField = 'WriteErrorNonIntegerTTLField',
     WriteErrorNonListMatchDestField = 'WriteErrorNonListMatchDestField',
     WriteErrorNonSecureContext = 'WriteErrorNonSecureContext',
     WriteErrorNonStringIdField = 'WriteErrorNonStringIdField',
@@ -1617,6 +1637,8 @@ export namespace Autofill {
   export interface AddressField {
     /**
      * address field name, for example GIVEN_NAME.
+     * The full list of supported field names:
+     * https://source.chromium.org/chromium/chromium/src/+/main:components/autofill/core/browser/field_types.cc;l=38
      */
     name: string;
     /**
@@ -1708,9 +1730,13 @@ export namespace Autofill {
      */
     frameId?: Page.FrameId;
     /**
-     * Credit card information to fill out the form. Credit card data is not saved.
+     * Credit card information to fill out the form. Credit card data is not saved.  Mutually exclusive with `address`.
      */
-    card: CreditCard;
+    card?: CreditCard;
+    /**
+     * Address to fill out the form. Address data is not saved. Mutually exclusive with `card`.
+     */
+    address?: Address;
   }
 
   export interface SetAddressesRequest {
@@ -2263,9 +2289,15 @@ export namespace Browser {
      */
     setting: PermissionSetting;
     /**
-     * Origin the permission applies to, all origins if not specified.
+     * Requesting origin the permission applies to, all origins if not specified.
      */
     origin?: string;
+    /**
+     * Embedding origin the permission applies to. It is ignored unless the requesting origin is
+     * present and valid. If the requesting origin is provided but the embedding origin isn't, the
+     * requesting origin is used as the embedding origin.
+     */
+    embeddingOrigin?: string;
     /**
      * Context to override. When omitted, default browser context is used.
      */
@@ -2816,6 +2848,10 @@ export namespace CSS {
      * Associated style declaration.
      */
     style: CSSStyle;
+    /**
+     * The BackendNodeId of the DOM node that constitutes the origin tree scope of this rule.
+     */
+    originTreeScopeNodeId?: DOM.BackendNodeId;
     /**
      * Media list array (for rules involving media queries). The array enumerates media queries
      * starting with the innermost one, going outwards.
@@ -4580,6 +4616,7 @@ export namespace DOM {
     compatibilityMode?: CompatibilityMode;
     assignedSlot?: BackendNode;
     isScrollable?: boolean;
+    affectedByStartingStyles?: boolean;
   }
 
   /**
@@ -5621,6 +5658,20 @@ export namespace DOM {
      * If the node is scrollable.
      */
     isScrollable: boolean;
+  }
+
+  /**
+   * Fired when a node's starting styles changes.
+   */
+  export interface AffectedByStartingStylesFlagUpdatedEvent {
+    /**
+     * The id of the node.
+     */
+    nodeId: DOM.NodeId;
+    /**
+     * If the node has starting styles.
+     */
+    affectedByStartingStyles: boolean;
   }
 
   /**
@@ -8287,9 +8338,9 @@ export namespace IndexedDB {
      */
     objectStoreName: string;
     /**
-     * Index name, empty string for object store data requests.
+     * Index name. If not specified, it performs an object store data request.
      */
-    indexName: string;
+    indexName?: string;
     /**
      * Number of records to skip.
      */
@@ -9917,6 +9968,10 @@ export namespace Network {
      * request corresponding to the main frame.
      */
     isSameSite?: boolean;
+    /**
+     * True when the resource request is ad-related.
+     */
+    isAdRelated?: boolean;
   }
 
   /**
@@ -10485,6 +10540,9 @@ export namespace Network {
     path: string;
     /**
      * Cookie expiration date as the number of seconds since the UNIX epoch.
+     * The value is set to -1 if the expiry date is not set.
+     * The value can be null for values that cannot be represented in
+     * JSON (±Inf).
      */
     expires: number;
     /**
@@ -10951,6 +11009,43 @@ export namespace Network {
     Zstd = 'zstd',
   }
 
+  export interface NetworkConditions {
+    /**
+     * Only matching requests will be affected by these conditions. Patterns use the URLPattern constructor string
+     * syntax (https://urlpattern.spec.whatwg.org/). If the pattern is empty, all requests are matched (including p2p
+     * connections).
+     */
+    urlPattern: string;
+    /**
+     * Minimum latency from request sent to response headers received (ms).
+     */
+    latency: number;
+    /**
+     * Maximal aggregated download throughput (bytes/sec). -1 disables download throttling.
+     */
+    downloadThroughput: number;
+    /**
+     * Maximal aggregated upload throughput (bytes/sec).  -1 disables upload throttling.
+     */
+    uploadThroughput: number;
+    /**
+     * Connection type if known.
+     */
+    connectionType?: ConnectionType;
+    /**
+     * WebRTC packet loss (percent, 0-100). 0 disables packet loss emulation, 100 drops all the packets.
+     */
+    packetLoss?: number;
+    /**
+     * WebRTC packet queue length (packet). 0 removes any queue length limitations.
+     */
+    packetQueueLength?: integer;
+    /**
+     * WebRTC packetReordering feature.
+     */
+    packetReordering?: boolean;
+  }
+
   export const enum DirectSocketDnsQueryType {
     Ipv4 = 'ipv4',
     Ipv6 = 'ipv6',
@@ -11183,6 +11278,13 @@ export namespace Network {
     status: IpProxyStatus;
   }
 
+  export interface SetIPProtectionProxyBypassEnabledRequest {
+    /**
+     * Whether IP Proxy is being bypassed by devtools; false by default.
+     */
+    enabled: boolean;
+  }
+
   export interface SetAcceptedEncodingsRequest {
     /**
      * List of accepted content encodings.
@@ -11307,6 +11409,50 @@ export namespace Network {
      * WebRTC packetReordering feature.
      */
     packetReordering?: boolean;
+  }
+
+  export interface EmulateNetworkConditionsByRuleRequest {
+    /**
+     * True to emulate internet disconnection.
+     */
+    offline: boolean;
+    /**
+     * Configure conditions for matching requests. If multiple entries match a request, the first entry wins.  Global
+     * conditions can be configured by leaving the urlPattern for the conditions empty. These global conditions are
+     * also applied for throttling of p2p connections.
+     */
+    matchedNetworkConditions: NetworkConditions[];
+  }
+
+  export interface EmulateNetworkConditionsByRuleResponse extends ProtocolResponseWithError {
+    /**
+     * An id for each entry in matchedNetworkConditions. The id will be included in the requestWillBeSentExtraInfo for
+     * requests affected by a rule.
+     */
+    ruleIds: string[];
+  }
+
+  export interface OverrideNetworkStateRequest {
+    /**
+     * True to emulate internet disconnection.
+     */
+    offline: boolean;
+    /**
+     * Minimum latency from request sent to response headers received (ms).
+     */
+    latency: number;
+    /**
+     * Maximal aggregated download throughput (bytes/sec). -1 disables download throttling.
+     */
+    downloadThroughput: number;
+    /**
+     * Maximal aggregated upload throughput (bytes/sec).  -1 disables upload throttling.
+     */
+    uploadThroughput: number;
+    /**
+     * Connection type if known.
+     */
+    connectionType?: ConnectionType;
   }
 
   export interface EnableRequest {
@@ -11461,9 +11607,15 @@ export namespace Network {
 
   export interface SetBlockedURLsRequest {
     /**
-     * URL patterns to block. Wildcards ('*') are allowed.
+     * URL patterns to block. Patterns use the URLPattern constructor string syntax
+     * (https://urlpattern.spec.whatwg.org/). Example: `*://*:*\/*.css`.
      */
-    urls: string[];
+    urlPatterns?: string[];
+    /**
+     * URL patterns to block. Wildcards ('*') are allowed.
+     * @deprecated
+     */
+    urls?: string[];
   }
 
   export interface SetBypassServiceWorkerRequest {
@@ -12303,6 +12455,11 @@ export namespace Network {
      * Whether the site has partitioned cookies stored in a partition different than the current one.
      */
     siteHasCookieInOtherPartition?: boolean;
+    /**
+     * The network conditions id if this request was affected by network conditions configured via
+     * emulateNetworkConditionsByRule.
+     */
+    appliedNetworkConditionsId?: string;
   }
 
   /**
@@ -13525,6 +13682,7 @@ export namespace Page {
     DigitalCredentialsCreate = 'digital-credentials-create',
     DigitalCredentialsGet = 'digital-credentials-get',
     DirectSockets = 'direct-sockets',
+    DirectSocketsMulticast = 'direct-sockets-multicast',
     DirectSocketsPrivate = 'direct-sockets-private',
     DisplayCapture = 'display-capture',
     DocumentDomain = 'document-domain',
@@ -14387,8 +14545,10 @@ export namespace Page {
     WebXR = 'WebXR',
     SharedWorker = 'SharedWorker',
     SharedWorkerMessage = 'SharedWorkerMessage',
+    SharedWorkerWithNoActiveClient = 'SharedWorkerWithNoActiveClient',
     WebLocks = 'WebLocks',
     WebHID = 'WebHID',
+    WebBluetooth = 'WebBluetooth',
     WebShare = 'WebShare',
     RequestedStorageAccessGrant = 'RequestedStorageAccessGrant',
     WebNfc = 'WebNfc',
@@ -14411,9 +14571,9 @@ export namespace Page {
     IndexedDBEvent = 'IndexedDBEvent',
     Dummy = 'Dummy',
     JsNetworkRequestReceivedCacheControlNoStoreResource = 'JsNetworkRequestReceivedCacheControlNoStoreResource',
-    WebRTCSticky = 'WebRTCSticky',
-    WebTransportSticky = 'WebTransportSticky',
-    WebSocketSticky = 'WebSocketSticky',
+    WebRTCUsedWithCCNS = 'WebRTCUsedWithCCNS',
+    WebTransportUsedWithCCNS = 'WebTransportUsedWithCCNS',
+    WebSocketUsedWithCCNS = 'WebSocketUsedWithCCNS',
     SmartCard = 'SmartCard',
     LiveMediaStreamTrack = 'LiveMediaStreamTrack',
     UnloadHandler = 'UnloadHandler',
@@ -15945,6 +16105,11 @@ export namespace Preload {
      * @deprecated
      */
     errorMessage?: string;
+    /**
+     * For more details, see:
+     * https://github.com/WICG/nav-speculation/blob/main/speculation-rules-tags.md
+     */
+    tag?: string;
   }
 
   export const enum RuleSetErrorType {
@@ -17244,6 +17409,14 @@ export namespace Storage {
   }
 
   export interface GetStorageKeyForFrameResponse extends ProtocolResponseWithError {
+    storageKey: SerializedStorageKey;
+  }
+
+  export interface GetStorageKeyRequest {
+    frameId?: Page.FrameId;
+  }
+
+  export interface GetStorageKeyResponse extends ProtocolResponseWithError {
     storageKey: SerializedStorageKey;
   }
 
@@ -20369,6 +20542,10 @@ export namespace HeapProfiler {
      */
     samplingInterval?: number;
     /**
+     * Maximum stack depth. The default value is 128.
+     */
+    stackDepth?: number;
+    /**
      * By default, the sampling heap profiler reports only objects which are
      * still alive when the profile is returned via getSamplingProfile or
      * stopSampling, which is useful for determining what functions contribute
@@ -20829,6 +21006,7 @@ export namespace Runtime {
     Dataview = 'dataview',
     Webassemblymemory = 'webassemblymemory',
     Wasmvalue = 'wasmvalue',
+    Trustedtype = 'trustedtype',
   }
 
   /**
@@ -20922,6 +21100,7 @@ export namespace Runtime {
     Dataview = 'dataview',
     Webassemblymemory = 'webassemblymemory',
     Wasmvalue = 'wasmvalue',
+    Trustedtype = 'trustedtype',
   }
 
   /**
@@ -20986,6 +21165,7 @@ export namespace Runtime {
     Dataview = 'dataview',
     Webassemblymemory = 'webassemblymemory',
     Wasmvalue = 'wasmvalue',
+    Trustedtype = 'trustedtype',
   }
 
   export interface PropertyPreview {

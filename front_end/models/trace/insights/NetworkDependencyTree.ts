@@ -1,4 +1,4 @@
-// Copyright 2025 The Chromium Authors. All rights reserved.
+// Copyright 2025 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -204,7 +204,7 @@ function isCritical(request: Types.Events.SyntheticNetworkRequest, context: Insi
   // Requests that have no initiatorRequest are typically ambiguous late-load assets.
   // Even on the off chance they were important, we don't have any parent to display for them.
   const initiatorUrl =
-      request.args.data.initiator?.url || Helpers.Trace.getZeroIndexedStackTraceInEventPayload(request)?.at(0)?.url;
+      request.args.data.initiator?.url || Helpers.Trace.getStackTraceTopCallFrameInEventPayload(request)?.url;
   if (!initiatorUrl) {
     return false;
   }
@@ -457,13 +457,13 @@ export function handleLinkResponseHeader(linkHeaderValue: string): Array<{url: s
   return preconnectedOrigins;
 }
 
-// Export the function for test purpose.
+/** Export the function for test purpose. **/
 export function generatePreconnectedOrigins(
-    parsedTrace: Handlers.Types.ParsedTrace, context: InsightSetContextWithNavigation,
+    data: Handlers.Types.HandlerData, context: InsightSetContextWithNavigation,
     contextRequests: Types.Events.SyntheticNetworkRequest[],
     preconnectCandidates: PreconnectCandidate[]): PreconnectedOrigin[] {
   const preconnectedOrigins: PreconnectedOrigin[] = [];
-  for (const event of parsedTrace.NetworkRequests.linkPreconnectEvents) {
+  for (const event of data.NetworkRequests.linkPreconnectEvents) {
     preconnectedOrigins.push({
       node_id: event.args.data.node_id,
       frame: event.args.data.frame,
@@ -479,7 +479,7 @@ export function generatePreconnectedOrigins(
     });
   }
 
-  const documentRequest = parsedTrace.NetworkRequests.byId.get(context.navigationId);
+  const documentRequest = data.NetworkRequests.byId.get(context.navigationId);
   documentRequest?.args.data.responseHeaders?.forEach(header => {
     if (header.name.toLowerCase() === 'link') {
       const preconnectedOriginsFromResponseHeader = handleLinkResponseHeader(header.value);  // , documentRequest);
@@ -537,7 +537,7 @@ function socketStartTimeIsBelowThreshold(
 }
 
 function candidateRequestsByOrigin(
-    parsedTrace: Handlers.Types.ParsedTrace, mainResource: Types.Events.SyntheticNetworkRequest,
+    data: Handlers.Types.HandlerData, mainResource: Types.Events.SyntheticNetworkRequest,
     contextRequests: Types.Events.SyntheticNetworkRequest[],
     lcpGraphURLs: Set<string>): Map<string, Types.Events.SyntheticNetworkRequest[]> {
   const origins = new Map<string, Types.Events.SyntheticNetworkRequest[]>();
@@ -548,7 +548,7 @@ function candidateRequestsByOrigin(
     }
 
     // Filter out all resources that are loaded by the document. Connections are already early.
-    if (parsedTrace.NetworkRequests.eventToInitiator.get(request) === mainResource) {
+    if (data.NetworkRequests.eventToInitiator.get(request) === mainResource) {
       return;
     }
 
@@ -583,15 +583,15 @@ function candidateRequestsByOrigin(
   return origins;
 }
 
-// Export the function for test purpose.
+/** Export the function for test purpose. **/
 export function generatePreconnectCandidates(
-    parsedTrace: Handlers.Types.ParsedTrace, context: InsightSetContextWithNavigation,
+    data: Handlers.Types.HandlerData, context: InsightSetContextWithNavigation,
     contextRequests: Types.Events.SyntheticNetworkRequest[]): PreconnectCandidate[] {
   if (!context.lantern) {
     return [];
   }
 
-  const documentRequest = parsedTrace.NetworkRequests.byId.get(context.navigationId);
+  const documentRequest = data.NetworkRequests.byId.get(context.navigationId);
   if (!documentRequest) {
     return [];
   }
@@ -612,7 +612,7 @@ export function generatePreconnectCandidates(
     }
   });
 
-  const groupedOrigins = candidateRequestsByOrigin(parsedTrace, documentRequest, contextRequests, lcpGraphURLs);
+  const groupedOrigins = candidateRequestsByOrigin(data, documentRequest, contextRequests, lcpGraphURLs);
 
   let maxWastedLcp = Types.Timing.Milli(0);
   let maxWastedFcp = Types.Timing.Milli(0);
@@ -665,8 +665,12 @@ export function generatePreconnectCandidates(
   return preconnectCandidates.slice(0, TOO_MANY_PRECONNECTS_THRESHOLD);
 }
 
+export function isNetworkDependencyTreeInsight(model: InsightModel): model is NetworkDependencyTreeInsightModel {
+  return model.insightKey === InsightKeys.NETWORK_DEPENDENCY_TREE;
+}
+
 export function generateInsight(
-    parsedTrace: Handlers.Types.ParsedTrace, context: InsightSetContext): NetworkDependencyTreeInsightModel {
+    data: Handlers.Types.HandlerData, context: InsightSetContext): NetworkDependencyTreeInsightModel {
   if (!context.navigation) {
     return finalize({
       rootNodes: [],
@@ -685,11 +689,11 @@ export function generateInsight(
   } = generateNetworkDependencyTree(context);
 
   const isWithinContext = (event: Types.Events.Event): boolean => Helpers.Timing.eventIsInBounds(event, context.bounds);
-  const contextRequests = parsedTrace.NetworkRequests.byTime.filter(isWithinContext);
+  const contextRequests = data.NetworkRequests.byTime.filter(isWithinContext);
 
-  const preconnectCandidates = generatePreconnectCandidates(parsedTrace, context, contextRequests);
+  const preconnectCandidates = generatePreconnectCandidates(data, context, contextRequests);
 
-  const preconnectedOrigins = generatePreconnectedOrigins(parsedTrace, context, contextRequests, preconnectCandidates);
+  const preconnectedOrigins = generatePreconnectedOrigins(data, context, contextRequests, preconnectCandidates);
 
   return finalize({
     rootNodes,

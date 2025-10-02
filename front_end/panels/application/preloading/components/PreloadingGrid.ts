@@ -1,4 +1,4 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 /* eslint-disable rulesdir/no-lit-render-outside-of-view */
@@ -54,7 +54,7 @@ export interface PreloadingGridRow {
   ruleSets: Protocol.Preload.RuleSet[];
 }
 
-// Grid component to show prerendering attempts.
+/** Grid component to show prerendering attempts. **/
 export class PreloadingGrid extends LegacyWrapper.LegacyWrapper.WrappableComponent<UI.Widget.VBox> {
 
   readonly #shadow = this.attachShadow({mode: 'open'});
@@ -81,7 +81,7 @@ export class PreloadingGrid extends LegacyWrapper.LegacyWrapper.WrappableCompone
     render(html`
       <style>${preloadingGridStyles}</style>
       <div class="preloading-container">
-        <devtools-data-grid striped @select=${this.#onPreloadingGridCellFocused}>
+        <devtools-data-grid striped>
           <table>
             <tr>
               <th id="url" weight="40" sortable>${i18n.i18n.lockedString('URL')}</th>
@@ -97,7 +97,7 @@ export class PreloadingGrid extends LegacyWrapper.LegacyWrapper.WrappableCompone
                   (prerenderStatus === PreloadingStatus.FAILURE &&
                   (prefetchStatus === PreloadingStatus.READY || prefetchStatus === PreloadingStatus.SUCCESS));
               const hasError = row.pipeline.getOriginallyTriggered().status === PreloadingStatus.FAILURE;
-              return html`<tr data-id=${row.id}>
+              return html`<tr @select=${() => this.dispatchEvent(new CustomEvent('select', {detail: row.id}))}>
                 <td title=${attempt.key.url}>${this.#urlShort(row, securityOrigin)}</td>
                 <td>${capitalizedAction(attempt.action)}</td>
                 <td>${row.ruleSets.length === 0 ? '' : ruleSetTagOrLocationShort(row.ruleSets[0], pageURL)}</td>
@@ -123,10 +123,6 @@ export class PreloadingGrid extends LegacyWrapper.LegacyWrapper.WrappableCompone
       </div>
     `, this.#shadow, {host: this});
     // clang-format on
-  }
-
-  #onPreloadingGridCellFocused(event: CustomEvent<HTMLElement>): void {
-    this.dispatchEvent(new CustomEvent('select', {detail: event.detail.dataset.id}));
   }
 
   // Shorten URL if a preloading attempt is same-origin.

@@ -1,4 +1,4 @@
-// Copyright 2024 The Chromium Authors. All rights reserved.
+// Copyright 2024 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -103,7 +103,7 @@ export interface ConfigSetting {
 
 let cruxManagerInstance: CrUXManager;
 
-// TODO: Potentially support `TABLET`. Tablet field data will always be `null` until then.
+/** TODO: Potentially support `TABLET`. Tablet field data will always be `null` until then. **/
 export const DEVICE_SCOPE_LIST: DeviceScope[] = ['ALL', 'DESKTOP', 'PHONE'];
 
 const pageScopeList: PageScope[] = ['origin', 'url'];

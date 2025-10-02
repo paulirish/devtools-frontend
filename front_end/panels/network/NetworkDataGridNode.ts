@@ -1,4 +1,4 @@
-// Copyright 2021 The Chromium Authors. All rights reserved.
+// Copyright 2021 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 /* eslint-disable rulesdir/no-imperative-dom-api */
@@ -45,6 +45,7 @@ import * as Protocol from '../../generated/protocol.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import type * as HAR from '../../models/har/har.js';
 import * as Logs from '../../models/logs/logs.js';
+import type * as NetworkTimeCalculator from '../../models/network_time_calculator/network_time_calculator.js';
 import * as NetworkForward from '../../panels/network/forward/forward.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
 import * as IconButton from '../../ui/components/icon_button/icon_button.js';
@@ -54,8 +55,6 @@ import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import {render} from '../../ui/lit/lit.js';
 import {PanelUtils} from '../utils/utils.js';
-
-import type {NetworkTimeCalculator} from './NetworkTimeCalculator.js';
 
 const UIStrings = {
   /**
@@ -234,11 +233,6 @@ const UIStrings = {
    */
   servedFromSignedHttpExchange: 'Served from Signed HTTP Exchange, resource size: {PH1}',
   /**
-   * @description Cell title in Network Data Grid Node of the Network panel. Indicates that the response came from preloaded web bundle. See https://web.dev/web-bundles/
-   * @example {4 B} PH1
-   */
-  servedFromWebBundle: 'Served from Web Bundle, resource size: {PH1}',
-  /**
    * @description Text of a DOM element in Network Data Grid Node of the Network panel
    */
   prefetchCache: '(prefetch cache)',
@@ -279,19 +273,6 @@ const UIStrings = {
    * @description Text describing the depth of a top level node in the network datagrid
    */
   level: 'level 1',
-  /**
-   * @description Text in Network Data Grid Node of the Network panel
-   */
-  webBundleError: 'Web Bundle error',
-  /**
-   * @description Alternative text for the web bundle inner request icon in Network Data Grid Node of the Network panel
-   * Indicates that the response came from preloaded web bundle. See https://web.dev/web-bundles/
-   */
-  webBundleInnerRequest: 'Served from Web Bundle',
-  /**
-   * @description Text in Network Data Grid Node of the Network panel
-   */
-  webBundle: '(Web Bundle)',
   /**
    * @description Tooltip text for subtitles of Time cells in Network request rows. Latency is the time difference
    * between the time a response to a network request is received and the time the request is started.
@@ -380,9 +361,9 @@ export interface NetworkLogViewInterface extends Common.EventTarget.EventTarget<
   addFilmStripFrames(times: number[]): void;
   selectFilmStripFrame(time: number): void;
   clearFilmStripFrame(): void;
-  timeCalculator(): NetworkTimeCalculator;
-  calculator(): NetworkTimeCalculator;
-  setCalculator(x: NetworkTimeCalculator): void;
+  timeCalculator(): NetworkTimeCalculator.NetworkTimeCalculator;
+  calculator(): NetworkTimeCalculator.NetworkTimeCalculator;
+  setCalculator(x: NetworkTimeCalculator.NetworkTimeCalculator): void;
   flatNodesList(): NetworkNode[];
   updateNodeBackground(): void;
   updateNodeSelectedClass(isSelected: boolean): void;
@@ -772,6 +753,24 @@ export class NetworkRequestNode extends NetworkNode {
     return aScore - bScore || aRequest.identityCompare(bRequest);
   }
 
+  static IsAdRelatedComparator(a: NetworkNode, b: NetworkNode): number {
+    // TODO(allada) Handle this properly for group nodes.
+    const aRequest = a.requestOrFirstKnownChildRequest();
+    const bRequest = b.requestOrFirstKnownChildRequest();
+    if (!aRequest || !bRequest) {
+      return !aRequest ? -1 : 1;
+    }
+    const aIsAdRelated = aRequest.isAdRelated();
+    const bIsAdRelated = bRequest.isAdRelated();
+    if (aIsAdRelated > bIsAdRelated) {
+      return 1;
+    }
+    if (bIsAdRelated > aIsAdRelated) {
+      return -1;
+    }
+    return aRequest.identityCompare(bRequest);
+  }
+
   static RequestPropertyComparator(propertyName: string, a: NetworkNode, b: NetworkNode): number {
     // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1039,6 +1038,10 @@ export class NetworkRequestNode extends NetworkNode {
         this.renderAddressSpaceCell(cell, this.requestInternal.remoteAddressSpace());
         break;
       }
+      case 'is-ad-related': {
+        this.setTextAndTitle(cell, this.requestInternal.isAdRelated().toLocaleString());
+        break;
+      }
       case 'cookies': {
         this.setTextAndTitle(cell, this.arrayLength(this.requestInternal.includedRequestCookies()));
         break;
@@ -1181,22 +1184,6 @@ export class NetworkRequestNode extends NetworkNode {
     }
 
     if (columnId === 'name') {
-      const webBundleInnerRequestInfo = this.requestInternal.webBundleInnerRequestInfo();
-      if (webBundleInnerRequestInfo) {
-        const secondIconElement = IconButton.Icon.create('bundle', 'icon');
-        secondIconElement.style.color = 'var(--icon-info)';
-        secondIconElement.title = i18nString(UIStrings.webBundleInnerRequest);
-
-        const networkManager = SDK.NetworkManager.NetworkManager.forRequest(this.requestInternal);
-        if (webBundleInnerRequestInfo.bundleRequestId && networkManager) {
-          cell.appendChild(Components.Linkifier.Linkifier.linkifyRevealable(
-              new NetworkForward.NetworkRequestId.NetworkRequestId(
-                  webBundleInnerRequestInfo.bundleRequestId, networkManager),
-              secondIconElement, undefined, undefined, undefined, 'webbundle-request'));
-        } else {
-          cell.appendChild(secondIconElement);
-        }
-      }
       const name = Platform.StringUtilities.trimMiddle(this.requestInternal.name(), 100);
       const networkManager = SDK.NetworkManager.NetworkManager.forRequest(this.requestInternal);
       UI.UIUtils.createTextChild(cell, networkManager ? networkManager.target().decorateLabel(name) : name);
@@ -1215,12 +1202,8 @@ export class NetworkRequestNode extends NetworkNode {
         'network-dim-cell', !this.isFailed() && (this.requestInternal.cached() || !this.requestInternal.statusCode));
 
     const corsErrorStatus = this.requestInternal.corsErrorStatus();
-    const webBundleErrorMessage = this.requestInternal.webBundleInfo()?.errorMessage ||
-        this.requestInternal.webBundleInnerRequestInfo()?.errorMessage;
-    if (webBundleErrorMessage) {
-      this.setTextAndTitle(cell, i18nString(UIStrings.webBundleError), webBundleErrorMessage);
-    } else if (
-        this.requestInternal.failed && !this.requestInternal.canceled && !this.requestInternal.wasBlocked() &&
+
+    if (this.requestInternal.failed && !this.requestInternal.canceled && !this.requestInternal.wasBlocked() &&
         !corsErrorStatus) {
       const failText = i18nString(UIStrings.failed);
       if (this.requestInternal.localizedFailDescription) {
@@ -1504,10 +1487,6 @@ export class NetworkRequestNode extends NetworkNode {
     } else if (this.requestInternal.redirectSourceSignedExchangeInfoHasNoErrors()) {
       UI.UIUtils.createTextChild(cell, i18n.i18n.lockedString('(signed-exchange)'));
       UI.Tooltip.Tooltip.install(cell, i18nString(UIStrings.servedFromSignedHttpExchange, {PH1: resourceSize}));
-      cell.classList.add('network-dim-cell');
-    } else if (this.requestInternal.webBundleInnerRequestInfo()) {
-      UI.UIUtils.createTextChild(cell, i18nString(UIStrings.webBundle));
-      UI.Tooltip.Tooltip.install(cell, i18nString(UIStrings.servedFromWebBundle, {PH1: resourceSize}));
       cell.classList.add('network-dim-cell');
     } else if (this.requestInternal.fromPrefetchCache()) {
       UI.UIUtils.createTextChild(cell, i18nString(UIStrings.prefetchCache));

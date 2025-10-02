@@ -1,4 +1,4 @@
-// Copyright 2025 The Chromium Authors. All rights reserved.
+// Copyright 2025 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -23,10 +23,6 @@ describeWithEnvironment('AiCodeCompletionTeaserPlaceholder', () => {
   beforeEach(async () => {
     sinon.stub(Host.AidaClient.AidaClient, 'checkAccessPreconditions')
         .resolves(Host.AidaClient.AidaAccessPreconditions.AVAILABLE);
-  });
-
-  afterEach(() => {
-    sinon.restore();
   });
 
   function createEditor(doc: string, teaser: PanelCommon.AiCodeCompletionTeaser): TextEditor.TextEditor.TextEditor {

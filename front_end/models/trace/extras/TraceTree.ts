@@ -1,4 +1,4 @@
-// Copyright 2016 The Chromium Authors. All rights reserved.
+// Copyright 2016 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -668,7 +668,7 @@ export function eventStackFrame(event: Types.Events.Event): Protocol.Runtime.Cal
   return {...topFrame, scriptId: String(topFrame.scriptId) as Protocol.Runtime.ScriptId};
 }
 
-// TODO(paulirish): rename to generateNodeId
+/** TODO(paulirish): rename to generateNodeId **/
 export function generateEventID(event: Types.Events.Event): string {
   if (Types.Events.isProfileCall(event)) {
     const name = SamplesIntegrator.isNativeRuntimeFrame(event.callFrame) ?

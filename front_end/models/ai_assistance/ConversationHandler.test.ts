@@ -1,4 +1,4 @@
-// Copyright 2025 The Chromium Authors. All rights reserved.
+// Copyright 2025 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -7,6 +7,7 @@ import * as Host from '../../core/host/host.js';
 import * as Platform from '../../core/platform/platform.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import * as AiAssistanceModel from '../../models/ai_assistance/ai_assistance.js';
+import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as Trace from '../../models/trace/trace.js';
 import * as AiAssistancePanel from '../../panels/ai_assistance/ai_assistance.js';
 import * as Timeline from '../../panels/timeline/timeline.js';
@@ -198,12 +199,13 @@ describeWithMockConnection('ConversationHandler', () => {
               title: 'Request',
             },
             {
-              text: 'Response Status: 200 \n\nResponse headers:\ncontent-type: bar2\nx-forwarded-for: bar3',
+              text:
+                  'Response Status: 200 \n\nResponse headers:\ncontent-type: bar2\nx-forwarded-for: bar3\n\nResponse body:\n<empty response>',
               title: 'Response',
             },
             {
               text:
-                  'Queued at (timestamp): 0 μs\nStarted at (timestamp): 0 μs\nConnection start (stalled) (duration): -\nDuration (duration): -',
+                  'Queued at (timestamp): 0 s\nStarted at (timestamp): 0 s\nConnection start (stalled) (duration): -\nDuration (duration): -',
               title: 'Timing',
             },
             {
@@ -226,6 +228,9 @@ describeWithMockConnection('ConversationHandler', () => {
       const networkRequest = createNetworkRequest({
         url: urlString`https://a.test`,
       });
+      sinon.stub(networkRequest, 'requestContentData')
+          .resolves(new TextUtils.ContentData.ContentData('', false, 'text/plain'));
+
       UI.Context.Context.instance().setFlavor(SDK.NetworkRequest.NetworkRequest, networkRequest);
       Common.Settings.moduleSetting('ai-assistance-enabled').set(true);
       const aidaClient = mockAidaClient([[{explanation: 'test'}], [{explanation: 'test2'}], [{explanation: 'test3'}]]);
@@ -296,6 +301,9 @@ describeWithMockConnection('ConversationHandler', () => {
       const snackbarShowStub = sinon.stub(Snackbars.Snackbar.Snackbar, 'show');
 
       const request = createNetworkRequest();
+      sinon.stub(request, 'requestContentData')
+          .resolves(new TextUtils.ContentData.ContentData('', false, 'text/plain'));
+
       const networkManager = sinon.createStubInstance(SDK.NetworkManager.NetworkManager, {
         requestForURL: request,
       });
@@ -313,7 +321,7 @@ describeWithMockConnection('ConversationHandler', () => {
       sinon.assert.calledOnceWithExactly(snackbarShowStub, {message: 'DevTools received an external request'});
     });
 
-    it('handles performance insight requests with an insight title', async function() {
+    it('handles performance requests', async function() {
       const conversationHandler = AiAssistanceModel.ConversationHandler.instance({
         aidaClient: mockAidaClient([[{explanation}]]),
         aidaAvailability: Host.AidaClient.AidaAccessPreconditions.AVAILABLE,
@@ -327,29 +335,13 @@ describeWithMockConnection('ConversationHandler', () => {
 
       const generator = await conversationHandler.handleExternalRequest({
         prompt: 'Please help me debug this problem',
-        conversationType: AiAssistanceModel.ConversationType.PERFORMANCE_INSIGHT,
-        insightTitle: 'LCP breakdown',
-        traceModel,
+        conversationType: AiAssistanceModel.ConversationType.PERFORMANCE,
+        data: Timeline.TimelinePanel.TimelinePanel.instance().getOrCreateExternalAIConversationData(),
       });
       let response = await generator.next();
-      assert.strictEqual(response.value.message, 'Analyzing insight: LCP breakdown');
+      assert.strictEqual(response.value.message, 'Analyzing trace');
       response = await generator.next();
       assert.strictEqual(response.value.message, explanation);
-    });
-
-    it('errors for performance insight requests with no insightTitle', async () => {
-      const conversationHandler = AiAssistanceModel.ConversationHandler.instance({
-        aidaClient: mockAidaClient([[{explanation}]]),
-        aidaAvailability: Host.AidaClient.AidaAccessPreconditions.AVAILABLE,
-      });
-      const generator = await conversationHandler.handleExternalRequest({
-        prompt: 'Please help me debug this problem',
-        conversationType: AiAssistanceModel.ConversationType.PERFORMANCE_INSIGHT
-      } as AiAssistanceModel.ExternalPerformanceInsightsRequestParameters);
-      const response = await generator.next();
-      assert.strictEqual(response.value.type, 'error');
-      assert.strictEqual(
-          response.value.message, 'The insightTitle parameter is required for debugging a Performance Insight.');
     });
   });
 });

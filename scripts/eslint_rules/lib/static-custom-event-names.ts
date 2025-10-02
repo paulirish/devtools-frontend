@@ -1,4 +1,4 @@
-// Copyright 2021 The Chromium Authors. All rights reserved.
+// Copyright 2021 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -18,7 +18,7 @@ type RuleFixer = TSESLint.RuleFixer;
 
 // Define message IDs type based on meta.messages
 
-// Define the structure for the return value of findConstructorAndSuperCallAndFirstArgumentToSuper
+/** Define the structure for the return value of findConstructorAndSuperCallAndFirstArgumentToSuper **/
 interface FoundNodes {
   constructor: MethodDefinition|undefined;
   superExpression: ExpressionStatement|undefined;

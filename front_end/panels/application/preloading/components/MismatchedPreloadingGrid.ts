@@ -1,4 +1,4 @@
-// Copyright 2023 The Chromium Authors. All rights reserved.
+// Copyright 2023 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 /* eslint-disable rulesdir/no-lit-render-outside-of-view */
@@ -99,7 +99,7 @@ export interface MismatchedPreloadingGridData {
   rows: MismatchedPreloadingGridRow[];
 }
 
-// Grid component to show prerendering attempts.
+/** Grid component to show prerendering attempts. **/
 export class MismatchedPreloadingGrid extends LegacyWrapper.LegacyWrapper.WrappableComponent<UI.Widget.VBox> {
   readonly #shadow = this.attachShadow({mode: 'open'});
   #data: MismatchedPreloadingGridData|null = null;

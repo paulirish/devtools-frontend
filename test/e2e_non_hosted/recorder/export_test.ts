@@ -1,4 +1,4 @@
-// Copyright 2023 The Chromium Authors. All rights reserved.
+// Copyright 2023 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -19,7 +19,7 @@ describe('Recorder', function() {
   }
 
   describe('Export', () => {
-    // Mock the extension integration part and provide a test impl using RecorderPluginManager.
+    /** Mock the extension integration part and provide a test impl using RecorderPluginManager. **/
     async function createExtension(devToolsPage: DevToolsPage, inspectedPage: InspectedPage) {
       await devToolsPage.evaluate(`
         (async function () {

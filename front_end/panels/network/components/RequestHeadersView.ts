@@ -1,4 +1,4 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 /* eslint-disable rulesdir/no-lit-render-outside-of-view */
@@ -58,10 +58,6 @@ const UIStrings = {
    * @description Text in Request Headers View of the Network panel
    */
   fromSignedexchange: '(from signed-exchange)',
-  /**
-   * @description Text in Request Headers View of the Network panel
-   */
-  fromWebBundle: '(from Web Bundle)',
   /**
    * @description Section header for a list of the main aspects of a http request
    */
@@ -450,8 +446,6 @@ export class RequestHeadersView extends LegacyWrapper.LegacyWrapper.WrappableCom
       comment = i18nString(UIStrings.fromServiceWorker);
     } else if (this.#request.redirectSourceSignedExchangeInfoHasNoErrors()) {
       comment = i18nString(UIStrings.fromSignedexchange);
-    } else if (this.#request.webBundleInnerRequestInfo()) {
-      comment = i18nString(UIStrings.fromWebBundle);
     } else if (this.#request.fromPrefetchCache()) {
       comment = i18nString(UIStrings.fromPrefetchCache);
     } else if (this.#request.cached()) {

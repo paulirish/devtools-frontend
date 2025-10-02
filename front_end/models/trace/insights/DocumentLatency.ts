@@ -1,4 +1,4 @@
-// Copyright 2024 The Chromium Authors. All rights reserved.
+// Copyright 2024 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -81,7 +81,7 @@ const TARGET_MS = 100;
 // Threshold for compression savings.
 const IGNORE_THRESHOLD_IN_BYTES = 1400;
 
-export function isDocumentLatency(x: InsightModel): x is DocumentLatencyInsightModel {
+export function isDocumentLatencyInsight(x: InsightModel): x is DocumentLatencyInsightModel {
   return x.insightKey === 'DocumentLatency';
 }
 
@@ -95,15 +95,14 @@ export type DocumentLatencyInsightModel = InsightModel<typeof UIStrings, {
   },
 }>;
 
-function getServerResponseTime(
-    request: Types.Events.SyntheticNetworkRequest, context: InsightSetContext): Types.Timing.Milli|null {
-  // Prefer the value as given by the Lantern provider.
-  // For PSI, Lighthouse uses this to set a better value for the server response
-  // time. For technical reasons, in Lightrider we do not have `sendEnd` timing
-  // values. See Lighthouse's `asLanternNetworkRequest` function for more.
-  const lanternRequest = context.navigation && context.lantern?.requests.find(r => r.rawRequest === request);
-  if (lanternRequest?.serverResponseTime !== undefined) {
-    return lanternRequest.serverResponseTime as Types.Timing.Milli;
+function getServerResponseTime(request: Types.Events.SyntheticNetworkRequest): Types.Timing.Milli|null {
+  // For technical reasons, Lightrider does not have `sendEnd` timing values. The
+  // closest we can get to the server response time is from a header that Lightrider
+  // sets.
+  // @ts-expect-error
+  const isLightrider = globalThis.isLightrider;
+  if (isLightrider) {
+    return request.args.data.lrServerResponseTime ?? null;
   }
 
   const timing = request.args.data.timing;
@@ -190,17 +189,19 @@ function finalize(partialModel: PartialInsightModel<DocumentLatencyInsightModel>
 }
 
 export function generateInsight(
-    parsedTrace: Handlers.Types.ParsedTrace, context: InsightSetContext): DocumentLatencyInsightModel {
+    data: Handlers.Types.HandlerData, context: InsightSetContext): DocumentLatencyInsightModel {
   if (!context.navigation) {
     return finalize({});
   }
 
-  const documentRequest = parsedTrace.NetworkRequests.byId.get(context.navigationId);
+  const millisToString = context.options.insightTimeFormatters?.milli ?? i18n.TimeUtilities.millisToString;
+
+  const documentRequest = data.NetworkRequests.byId.get(context.navigationId);
   if (!documentRequest) {
     return finalize({warnings: [InsightWarning.NO_DOCUMENT_REQUEST]});
   }
 
-  const serverResponseTime = getServerResponseTime(documentRequest, context);
+  const serverResponseTime = getServerResponseTime(documentRequest);
   if (serverResponseTime === null) {
     throw new Error('missing document request timing');
   }
@@ -212,7 +213,8 @@ export function generateInsight(
     overallSavingsMs = Math.max(serverResponseTime - TARGET_MS, 0);
   }
 
-  const redirectDuration = Math.round(documentRequest.args.data.syntheticData.redirectionDuration / 1000);
+  const redirectDuration =
+      Math.round(documentRequest.args.data.syntheticData.redirectionDuration / 1000) as Types.Timing.Milli;
   overallSavingsMs += redirectDuration;
 
   const metricSavings = {
@@ -237,16 +239,14 @@ export function generateInsight(
         noRedirects: {
           label: noRedirects ? i18nString(UIStrings.passingRedirects) : i18nString(UIStrings.failedRedirects, {
             PH1: documentRequest.args.data.redirects.length,
-            PH2: i18n.TimeUtilities.millisToString(redirectDuration),
+            PH2: millisToString(redirectDuration),
           }),
           value: noRedirects
         },
         serverResponseIsFast: {
           label: serverResponseIsFast ?
-              i18nString(
-                  UIStrings.passingServerResponseTime, {PH1: i18n.TimeUtilities.millisToString(serverResponseTime)}) :
-              i18nString(
-                  UIStrings.failedServerResponseTime, {PH1: i18n.TimeUtilities.millisToString(serverResponseTime)}),
+              i18nString(UIStrings.passingServerResponseTime, {PH1: millisToString(serverResponseTime)}) :
+              i18nString(UIStrings.failedServerResponseTime, {PH1: millisToString(serverResponseTime)}),
           value: serverResponseIsFast
         },
         usesCompression: {

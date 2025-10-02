@@ -1,4 +1,4 @@
-// Copyright 2020 The Chromium Authors. All rights reserved.
+// Copyright 2020 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -59,7 +59,7 @@ export interface PageResource {
   duration: number|null;
 }
 
-// Used for revealing a resource.
+/** Used for revealing a resource. **/
 export class ResourceKey {
   readonly key: string;
 

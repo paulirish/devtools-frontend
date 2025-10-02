@@ -1,4 +1,4 @@
-// Copyright 2021 The Chromium Authors. All rights reserved.
+// Copyright 2021 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 /* eslint-disable rulesdir/no-imperative-dom-api */
@@ -45,6 +45,7 @@ import * as Protocol from '../../generated/protocol.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import * as HAR from '../../models/har/har.js';
 import * as Logs from '../../models/logs/logs.js';
+import * as NetworkTimeCalculator from '../../models/network_time_calculator/network_time_calculator.js';
 import * as Persistence from '../../models/persistence/persistence.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as NetworkForward from '../../panels/network/forward/forward.js';
@@ -70,12 +71,6 @@ import {
 import {NetworkFrameGrouper} from './NetworkFrameGrouper.js';
 import networkLogViewStyles from './networkLogView.css.js';
 import {NetworkLogViewColumns} from './NetworkLogViewColumns.js';
-import {
-  NetworkTimeBoundary,
-  type NetworkTimeCalculator,
-  NetworkTransferDurationCalculator,
-  NetworkTransferTimeCalculator,
-} from './NetworkTimeCalculator.js';
 
 const UIStrings = {
   /**
@@ -518,9 +513,9 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
   private readonly progressBarContainer: Element;
   private readonly networkLogLargeRowsSetting: Common.Settings.Setting<boolean>;
   private rowHeightInternal: number;
-  private readonly timeCalculatorInternal: NetworkTransferTimeCalculator;
-  private readonly durationCalculator: NetworkTransferDurationCalculator;
-  private calculatorInternal: NetworkTransferTimeCalculator;
+  private readonly timeCalculatorInternal: NetworkTimeCalculator.NetworkTransferTimeCalculator;
+  private readonly durationCalculator: NetworkTimeCalculator.NetworkTimeCalculator;
+  private calculatorInternal: NetworkTimeCalculator.NetworkTimeCalculator;
   private readonly columnsInternal: NetworkLogViewColumns;
   private staleRequests: Set<SDK.NetworkRequest.NetworkRequest>;
   private mainRequestLoadTime: number;
@@ -587,8 +582,8 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
     this.rowHeightInternal = 0;
     updateRowHeight.call(this);
 
-    this.timeCalculatorInternal = new NetworkTransferTimeCalculator();
-    this.durationCalculator = new NetworkTransferDurationCalculator();
+    this.timeCalculatorInternal = new NetworkTimeCalculator.NetworkTransferTimeCalculator();
+    this.durationCalculator = new NetworkTimeCalculator.NetworkTransferDurationCalculator();
     this.calculatorInternal = this.timeCalculatorInternal;
 
     this.columnsInternal = new NetworkLogViewColumns(
@@ -1023,7 +1018,7 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
       this.timeCalculatorInternal.setWindow(null);
     } else {
       this.timeFilter = NetworkLogView.requestTimeFilter.bind(null, start, end);
-      this.timeCalculatorInternal.setWindow(new NetworkTimeBoundary(start, end));
+      this.timeCalculatorInternal.setWindow(new NetworkTimeCalculator.NetworkTimeBoundary(start, end));
     }
     this.filterRequests();
   }
@@ -1171,8 +1166,8 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
     return this.dataGrid;
   }
 
-  private dataGridMouseMove(event: Event): void {
-    const mouseEvent = (event as MouseEvent);
+  private dataGridMouseMove(event: MouseEvent): void {
+    const mouseEvent = event;
     const node = (this.dataGrid.dataGridNodeFromNode((mouseEvent.target as Node)));
     const highlightInitiatorChain = mouseEvent.shiftKey;
     this.setHoveredNode(node as NetworkNode, highlightInitiatorChain);
@@ -1335,15 +1330,15 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
     }
   }
 
-  timeCalculator(): NetworkTimeCalculator {
+  timeCalculator(): NetworkTimeCalculator.NetworkTransferTimeCalculator {
     return this.timeCalculatorInternal;
   }
 
-  calculator(): NetworkTimeCalculator {
+  calculator(): NetworkTimeCalculator.NetworkTimeCalculator {
     return this.calculatorInternal;
   }
 
-  setCalculator(x: NetworkTimeCalculator): void {
+  setCalculator(x: NetworkTimeCalculator.NetworkTimeCalculator): void {
     if (!x || this.calculatorInternal === x) {
       return;
     }
@@ -1968,7 +1963,7 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
 
     const progressIndicator = this.progressBarContainer.createChild('devtools-progress');
     await HAR.Writer.Writer.write(stream, this.harRequests(), options, progressIndicator);
-    progressIndicator.done();
+    progressIndicator.done = true;
     void stream.close();
   }
 
@@ -2396,6 +2391,10 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
          Lastly we replace new lines with ^ and TWO new lines because the first
          new line is there to enact the escape command the second is the character
          to escape (in this case new line).
+
+         All other whitespace characters are replaced with a single space, as there
+         is no way to enter their literal values in a command line, and they do break
+         the command allowing for injection.
         */
       const encapsChars = '^"';
       return encapsChars +
@@ -2403,7 +2402,7 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
               .replace(/"/g, '\\"')
               .replace(/[^a-zA-Z0-9\s_\-:=+~'\/.',?;()*`]/g, '^$&')
               .replace(/%(?=[a-zA-Z0-9_])/g, '%^')
-              .replace(/[^\S \r\n]/g, '^$&')
+              .replace(/[^\S \r\n]/g, ' ')
               .replace(/\r?\n|\r/g, '^\n\n') +
           encapsChars;
     }
@@ -2513,10 +2512,12 @@ export class NetworkLogView extends Common.ObjectWrapper.eventMixin<EventTypes, 
           str.replace(/[`\$"]/g, '`$&').replace(/[^\x20-\x7E]/g, char => '$([char]' + char.charCodeAt(0) + ')') + '"';
     }
 
-    // Generate a WebRequestSession object with the UserAgent and Cookie header values.
-    // This is used to pass the user-agent and cookie headers to Invoke-WebRequest because the Invoke-WebRequest
-    // command does not allow setting these headers through the -Headers parameter. See docs at:
-    // https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/invoke-webrequest?view=powershell-7.1#parameters
+    /**
+     * Generate a WebRequestSession object with the UserAgent and Cookie header values.
+     * This is used to pass the user-agent and cookie headers to Invoke-WebRequest because the Invoke-WebRequest
+     * command does not allow setting these headers through the -Headers parameter. See docs at:
+     * https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/invoke-webrequest?view=powershell-7.1#parameters
+     **/
     function generatePowerShellSession(request: SDK.NetworkRequest.NetworkRequest): string|null {
       const requestHeaders = request.requestHeaders();
       const props = [];

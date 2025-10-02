@@ -1,4 +1,4 @@
-// Copyright 2016 The Chromium Authors. All rights reserved.
+// Copyright 2016 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 /* eslint-disable rulesdir/no-imperative-dom-api */
@@ -303,9 +303,7 @@ export class SamplingHeapProfileTypeBase extends
     const profile = await this.stopSampling();
     if (recordedProfile) {
       console.assert(profile !== undefined);
-      // TODO(crbug.com/1172300) Ignored during the jsdoc to ts migration)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      recordedProfile.setProtocolProfile((profile as any));
+      recordedProfile.setProtocolProfile(profile as unknown as Protocol.Profiler.Profile);
       recordedProfile.updateStatus('');
       this.setProfileBeingRecorded(null);
     }
@@ -701,7 +699,7 @@ export class HeapFlameChartDataProvider extends ProfileFlameChartDataProvider {
     const link = linkifier.maybeLinkifyConsoleCallFrame(
         this.heapProfilerModel ? this.heapProfilerModel.target() : null, node.callFrame);
     if (link) {
-      pushRow(i18nString(UIStrings.url), (link.textContent as string));
+      pushRow(i18nString(UIStrings.url), link.textContent);
     }
     linkifier.dispose();
     return ProfileView.buildPopoverTable(popoverInfo);

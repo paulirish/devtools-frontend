@@ -1,4 +1,4 @@
-// Copyright (c) 2015 The Chromium Authors. All rights reserved.
+// Copyright 2015 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 /* eslint-disable rulesdir/no-imperative-dom-api */
@@ -274,7 +274,7 @@ export class NetworkConfigView extends UI.Widget.VBox {
       userAgentUpdateButtonStatusText.textContent = '';
     });
 
-    clientHints.addEventListener('clienthintssubmit', (event: Event) => {
+    clientHints.addEventListener('clienthintssubmit', event => {
       const metaData: Protocol.Emulation.UserAgentMetadata = (event as CustomEvent).detail.value;
       const customUA = customUserAgentSetting.get();
       userAgentMetadataSetting.set(metaData);

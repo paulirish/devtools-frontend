@@ -1,4 +1,4 @@
-// Copyright 2023 The Chromium Authors. All rights reserved.
+// Copyright 2023 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -104,9 +104,9 @@ describe('AI Assistance', function() {
 
   async function turnOnAiAssistance(devtoolsPage: DevToolsPage) {
     // Click on the settings redirect link.
-    await devtoolsPage.click('pierce/.disabled-view button[role=link]');
+    await devtoolsPage.click('pierce/.disabled-view span[role=link]');
     // Enable "AI Assistance" toggle in the settings.
-    await devtoolsPage.click('aria/Enable AI assistance');
+    await devtoolsPage.click('pierce/[data-testid="Enable AI assistance"]');
     // Close settings to come back to the AI Assistance panel.
     await devtoolsPage.click('.dialog-close-button');
   }

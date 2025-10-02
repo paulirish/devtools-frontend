@@ -1,4 +1,4 @@
-// Copyright 2020 The Chromium Authors. All rights reserved.
+// Copyright 2020 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 // Generated from javascript_natives/helpers.js
@@ -116,6 +116,11 @@ export const NativeFunctions = [
     name: "get",
     signatures: [["id"]],
     receivers: ["Clients","BackgroundFetchManager"]
+  },
+  {
+    name: "get",
+    signatures: [["entry"]],
+    receivers: ["RouteMap"]
   },
   {
     name: "set",
@@ -2024,7 +2029,7 @@ export const NativeFunctions = [
   },
   {
     name: "read",
-    signatures: [["?formats"]],
+    signatures: [["?options"]],
     receivers: ["Clipboard"]
   },
   {
@@ -6082,12 +6087,8 @@ export const NativeFunctions = [
     receivers: ["Navigation"]
   },
   {
-    name: "AnimationTrigger",
-    signatures: [["?options"]]
-  },
-  {
     name: "addAnimation",
-    signatures: [["animation"]]
+    signatures: [["animation","action","behavior"]]
   },
   {
     name: "removeAnimation",
@@ -6102,11 +6103,19 @@ export const NativeFunctions = [
     signatures: [["?options"]]
   },
   {
+    name: "EventTrigger",
+    signatures: [["?options"]]
+  },
+  {
     name: "KeyframeEffect",
     signatures: [["source"],["target","keyframes","?options"]]
   },
   {
     name: "ScrollTimeline",
+    signatures: [["?options"]]
+  },
+  {
+    name: "TimelineTrigger",
     signatures: [["?options"]]
   },
   {
@@ -6607,6 +6616,10 @@ export const NativeFunctions = [
     signatures: [["type","?eventInitDict"]]
   },
   {
+    name: "setFormControlRange",
+    signatures: [["element","start","end"]]
+  },
+  {
     name: "MutationObserver",
     signatures: [["callback"]]
   },
@@ -6750,6 +6763,10 @@ export const NativeFunctions = [
   },
   {
     name: "DragEvent",
+    signatures: [["type","?eventInitDict"]]
+  },
+  {
+    name: "EmailVerifiedEvent",
     signatures: [["type","?eventInitDict"]]
   },
   {
@@ -7069,6 +7086,10 @@ export const NativeFunctions = [
     signatures: [["message"]]
   },
   {
+    name: "IntersectionObserver",
+    signatures: [["callback","?options"]]
+  },
+  {
     name: "layoutNextFragment",
     signatures: [["?options"]]
   },
@@ -7205,6 +7226,10 @@ export const NativeFunctions = [
     signatures: [["callback"]]
   },
   {
+    name: "RouteEvent",
+    signatures: [["type"]]
+  },
+  {
     name: "Sanitizer",
     signatures: [["?configuration"]]
   },
@@ -7255,6 +7280,10 @@ export const NativeFunctions = [
   {
     name: "unregisterTool",
     signatures: [["tool_name"]]
+  },
+  {
+    name: "provideContext",
+    signatures: [["params"]]
   },
   {
     name: "SnapEvent",
@@ -7585,11 +7614,11 @@ export const NativeFunctions = [
   },
   {
     name: "drawElement",
-    signatures: [["element","x","y","?options"],["element","x","y","dwidth","dheight","?options"]]
+    signatures: [["element","x","y","?dwidth","?dheight"]]
   },
   {
-    name: "drawHTMLElement",
-    signatures: [["element","x","y","?options"],["element","x","y","dwidth","dheight","?options"]]
+    name: "drawElementImage",
+    signatures: [["element","x","y","?dwidth","?dheight"]]
   },
   {
     name: "setHitTestRegions",
@@ -7957,7 +7986,7 @@ export const NativeFunctions = [
   },
   {
     name: "constant",
-    signatures: [["tensor"],["desc","buffer"]]
+    signatures: [["tensor"],["desc","buffer"],["type","value"]]
   },
   {
     name: "argMin",
@@ -8404,28 +8433,20 @@ export const NativeFunctions = [
     signatures: [["worker","?options","?transfer"]]
   },
   {
-    name: "sendRtp",
-    signatures: [["packet","options"]]
-  },
-  {
     name: "setHeaderExtensionsToNegotiate",
     signatures: [["extensions"]]
   },
   {
-    name: "createProcessor",
-    signatures: [["worker","?options","?transfer"]]
-  },
-  {
-    name: "readReceivedAcks",
-    signatures: [["maxCount"]]
-  },
-  {
-    name: "readSentRtp",
-    signatures: [["maxCount"]]
-  },
-  {
     name: "RTCSessionDescription",
     signatures: [["?descriptionInitDict"]]
+  },
+  {
+    name: "RtcTransport",
+    signatures: [["name"]]
+  },
+  {
+    name: "sendPackets",
+    signatures: [["packets"]]
   },
   {
     name: "revoke",
@@ -8457,7 +8478,7 @@ export const NativeFunctions = [
   },
   {
     name: "submitPrintJob",
-    signatures: [["job_name","document","attributes"]]
+    signatures: [["job_name","document_data","attributes"]]
   },
   {
     name: "PushEvent",
@@ -8814,6 +8835,10 @@ export const NativeFunctions = [
     signatures: [["init"]]
   },
   {
+    name: "VideoFrame",
+    signatures: [["source","?init"],["data","init"]]
+  },
+  {
     name: "clipControlEXT",
     signatures: [["origin","depth"]]
   },
@@ -8878,7 +8903,7 @@ export const NativeFunctions = [
     signatures: [["provokeMode"]]
   },
   {
-    name: "texHTMLElement2D",
+    name: "texElementImage2D",
     signatures: [["target","level","internalformat","format","type","element"]]
   },
   {
@@ -9267,6 +9292,10 @@ export const NativeFunctions = [
   },
   {
     name: "XRInputSourcesChangeEvent",
+    signatures: [["type","eventInitDict"]]
+  },
+  {
+    name: "XRLayerEvent",
     signatures: [["type","eventInitDict"]]
   },
   {

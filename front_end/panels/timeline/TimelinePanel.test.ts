@@ -1,11 +1,11 @@
-// Copyright 2025 The Chromium Authors. All rights reserved.
+// Copyright 2025 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 import * as Common from '../../core/common/common.js';
-import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
+import * as AIAssistance from '../../models/ai_assistance/ai_assistance.js';
 import * as Bindings from '../../models/bindings/bindings.js';
 import type * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as Trace from '../../models/trace/trace.js';
@@ -15,6 +15,7 @@ import {
   describeWithEnvironment,
   registerNoopActions,
 } from '../../testing/EnvironmentHelpers.js';
+import {type StubbedFileManager, stubFileManager} from '../../testing/FileManagerHelpers.js';
 import {TraceLoader} from '../../testing/TraceLoader.js';
 import * as UI from '../../ui/legacy/legacy.js';
 
@@ -64,8 +65,8 @@ describeWithEnvironment('TimelinePanel', function() {
         await TraceLoader.rawEvents(this, 'extension-tracks-and-marks.json.gz') as Trace.Types.Events.Event[];
     await timeline.loadingComplete(events, null, null);
     const tracksBeforeDisablingSetting = timeline.getFlameChart().getMainDataProvider().timelineData().groups;
-    const parsedTrace = traceModel.parsedTrace();
-    const extensionTracksInTrace = parsedTrace?.ExtensionTraceData.extensionTrackData;
+    const data = traceModel.parsedTrace()?.data;
+    const extensionTracksInTrace = data?.ExtensionTraceData.extensionTrackData;
     const extensionTrackInTraceNames = extensionTracksInTrace?.flatMap(
         track => track.isTrackGroup ? [...Object.keys(track.entriesByTrack), track.name] : track.name);
 
@@ -153,16 +154,16 @@ describeWithEnvironment('TimelinePanel', function() {
      async function() {
        const events = await TraceLoader.rawEvents(this, 'web-dev.json.gz') as Trace.Types.Events.Event[];
        await timeline.loadingComplete(events, null, null);
-       const parsedTrace = traceModel.parsedTrace();
-       assert.isOk(parsedTrace?.Meta.traceBounds.min);
+       const data = traceModel.parsedTrace()?.data;
+       assert.isOk(data?.Meta.traceBounds.min);
        const modificationsManager = Timeline.ModificationsManager.ModificationsManager.activeManager();
        assert.isOk(modificationsManager);
        const ariaAlertStub = sinon.spy(UI.ARIAUtils.LiveAnnouncer, 'alert');
        // Add an annotation
        modificationsManager.createAnnotation(
            {
-             bounds: Trace.Helpers.Timing.traceWindowFromMicroSeconds(
-                 parsedTrace.Meta.traceBounds.min, parsedTrace.Meta.traceBounds.max),
+             bounds:
+                 Trace.Helpers.Timing.traceWindowFromMicroSeconds(data.Meta.traceBounds.min, data.Meta.traceBounds.max),
              type: 'TIME_RANGE',
              label: '',
            },
@@ -189,37 +190,33 @@ describeWithEnvironment('TimelinePanel', function() {
 
   it('clears out AI related contexts when the user presses "Clear"', async () => {
     const context = UI.Context.Context.instance();
-    const {AIContext, AICallTree} = Timeline.Utils;
 
-    const callTree = sinon.createStubInstance(AICallTree.AICallTree);
-    context.setFlavor(AIContext.AgentFocus, AIContext.AgentFocus.fromCallTree(callTree));
+    const mockParsedTrace = {insights: new Map()} as Trace.TraceModel.ParsedTrace;
+    context.setFlavor(AIAssistance.AgentFocus, AIAssistance.AgentFocus.fromParsedTrace(mockParsedTrace));
 
     const clearButton = timeline.element.querySelector('[aria-label="Clear"]');
     assert.isOk(clearButton);
     dispatchClickEvent(clearButton);
 
-    assert.isNull(context.flavor(AIContext.AgentFocus));
+    assert.isNull(context.flavor(AIAssistance.AgentFocus));
   });
 
   it('includes the trace metadata when saving to a file', async function() {
     const events = await TraceLoader.rawEvents(this, 'web-dev-with-commit.json.gz') as Trace.Types.Events.Event[];
     const metadata = await TraceLoader.metadata(this, 'web-dev-with-commit.json.gz');
+    const fileManager = stubFileManager();
     await timeline.loadingComplete(events, null, metadata);
-    const fileManager = Workspace.FileManager.FileManager.instance();
-    const saveSpy = sinon.stub(fileManager, 'save').callsFake((): Promise<Workspace.FileManager.SaveCallbackParam> => {
-      return Promise.resolve({});
-    });
-    sinon.stub(fileManager, 'close');
 
     await timeline.saveToFile({
       includeScriptContent: false,
       includeSourceMaps: false,
       addModifications: false,
+      shouldCompress: false,
     });
 
-    sinon.assert.calledOnce(saveSpy);
+    sinon.assert.calledOnce(fileManager.save);
 
-    const [, contentData] = saveSpy.getCall(0).args;
+    const [, contentData] = fileManager.save.getCall(0).args;
 
     // Assert that each value in the metadata of the JSON matches the metadata in memory.
     // We can't do a simple deepEqual() on the two objects as the in-memory
@@ -261,10 +258,10 @@ describeWithEnvironment('TimelinePanel', function() {
         assert.include(message, `### Insight Title: ${title}`);
       }
 
-      assert.include(message, `- Time to first byte: 7.94 ms (6.1% of total LCP time)
-- Resource load delay: 33.16 ms (25.7% of total LCP time)
-- Resource load duration: 14.70 ms (11.4% of total LCP time)
-- Element render delay: 73.41 ms (56.8% of total LCP time)`);
+      assert.include(message, `- Time to first byte: 8\xA0ms (6.1% of total LCP time)
+- Resource load delay: 33\xA0ms (25.7% of total LCP time)
+- Resource load duration: 15\xA0ms (11.4% of total LCP time)
+- Element render delay: 73\xA0ms (56.8% of total LCP time)`);
     });
 
     it('includes information on passing insights under a separate heading', async function() {
@@ -298,33 +295,24 @@ describeWithEnvironment('TimelinePanel', function() {
   });
 
   describe('saveToFile', function() {
-    let fileManager: Workspace.FileManager.FileManager;
+    let fileManager: StubbedFileManager;
     let saveSpy: sinon.SinonStub;
     let closeSpy: sinon.SinonStub;
 
     beforeEach(() => {
-      fileManager = Workspace.FileManager.FileManager.instance();
-      saveSpy = sinon.stub(fileManager, 'save').callsFake((): Promise<Workspace.FileManager.SaveCallbackParam> => {
-        return Promise.resolve({});
-      });
-      closeSpy = sinon.stub(fileManager, 'close');
+      fileManager = stubFileManager();
+      saveSpy = fileManager.save;
+      closeSpy = fileManager.close;
     });
 
     describe('with gz', function() {
-      this.beforeAll(() => {
-        Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.TIMELINE_SAVE_AS_GZ);
-      });
-
-      this.afterAll(() => {
-        Root.Runtime.experiments.disableForTest(Root.Runtime.ExperimentName.TIMELINE_SAVE_AS_GZ);
-      });
-
       it('saves a regular trace file', async function() {
         const {traceEvents, metadata} = await TraceLoader.traceFile(this, 'web-dev.json.gz');
         await timeline.innerSaveToFile(traceEvents, metadata, {
           includeScriptContent: false,
           includeSourceMaps: false,
           addModifications: false,
+          shouldCompress: true,
         });
 
         sinon.assert.calledOnce(saveSpy);
@@ -355,6 +343,7 @@ describeWithEnvironment('TimelinePanel', function() {
           includeScriptContent: false,
           includeSourceMaps: false,
           addModifications: false,
+          shouldCompress: true,
         });
 
         sinon.assert.calledOnce(saveSpy);
@@ -375,6 +364,7 @@ describeWithEnvironment('TimelinePanel', function() {
           includeScriptContent: true,
           includeSourceMaps: false,
           addModifications: false,
+          shouldCompress: true,
         });
 
         sinon.assert.calledOnce(saveSpy);
@@ -394,6 +384,7 @@ describeWithEnvironment('TimelinePanel', function() {
           includeScriptContent: true,
           includeSourceMaps: true,
           addModifications: false,
+          shouldCompress: true,
         });
 
         sinon.assert.calledOnce(saveSpy);
@@ -427,6 +418,7 @@ describeWithEnvironment('TimelinePanel', function() {
           includeScriptContent: false,
           includeSourceMaps: false,
           addModifications: true,
+          shouldCompress: true,
         });
 
         sinon.assert.calledOnce(saveSpy);
@@ -439,6 +431,7 @@ describeWithEnvironment('TimelinePanel', function() {
         assert.strictEqual(file.metadata.modifications.annotations.labelledTimeRanges[0].label, 'Test Annotation');
       });
     });
+
     describe('without gz', function() {
       it('saves a regular trace file', async function() {
         const {traceEvents, metadata} = await TraceLoader.traceFile(this, 'web-dev.json.gz');
@@ -446,6 +439,7 @@ describeWithEnvironment('TimelinePanel', function() {
           includeScriptContent: false,
           includeSourceMaps: false,
           addModifications: false,
+          shouldCompress: false,
         });
 
         sinon.assert.calledOnce(saveSpy);
@@ -469,14 +463,12 @@ describeWithEnvironment('TimelinePanel', function() {
         // 7192505913775043000.8 matches a chrome-extension script in the trace
         let extensionTracesWithContent = traceEvents.filter(value => {
           return value.cat === 'disabled-by-default-devtools.v8-source-rundown-sources' &&
-              `${(value as Trace.Types.Events.V8SourceRundownSourcesScriptCatchupEvent).args.data.isolate}.${
-                  (value as Trace.Types.Events.V8SourceRundownSourcesScriptCatchupEvent).args.data.scriptId}` ===
-              '7192505913775043000.8';
+              `${(value as Trace.Types.Events.RundownScriptSource).args.data.isolate}.${
+                  (value as Trace.Types.Events.RundownScriptSource).args.data.scriptId}` === '7192505913775043000.8';
         });
 
         // loading the trace and verifying the chrome extension script has associated source text
-        let castedEvent =
-            (extensionTracesWithContent[0] as Trace.Types.Events.V8SourceRundownSourcesScriptCatchupEvent);
+        let castedEvent = (extensionTracesWithContent[0] as Trace.Types.Events.RundownScriptSource);
         assert.lengthOf(extensionTracesWithContent, 1);
         assert.isDefined(castedEvent.args.data.sourceText);
 
@@ -484,6 +476,7 @@ describeWithEnvironment('TimelinePanel', function() {
           includeScriptContent: true,
           includeSourceMaps: false,
           addModifications: false,
+          shouldCompress: false,
         });
 
         sinon.assert.calledOnce(saveSpy);
@@ -498,24 +491,22 @@ describeWithEnvironment('TimelinePanel', function() {
         // getting the same trace as before, but this time after saving has happened.
         extensionTracesWithContent = file.traceEvents?.filter(value => {
           return value.cat === 'disabled-by-default-devtools.v8-source-rundown-sources' &&
-              `${(value as Trace.Types.Events.V8SourceRundownSourcesScriptCatchupEvent).args.data.isolate}.${
-                  (value as Trace.Types.Events.V8SourceRundownSourcesScriptCatchupEvent).args.data.scriptId}` ===
-              '7192505913775043000.8';
+              `${(value as Trace.Types.Events.RundownScriptSource).args.data.isolate}.${
+                  (value as Trace.Types.Events.RundownScriptSource).args.data.scriptId}` === '7192505913775043000.8';
         });
 
         // the associated source text is now undefined from the chrome-extension script
-        castedEvent = (extensionTracesWithContent[0] as Trace.Types.Events.V8SourceRundownSourcesScriptCatchupEvent);
+        castedEvent = (extensionTracesWithContent[0] as Trace.Types.Events.RundownScriptSource);
         assert.lengthOf(extensionTracesWithContent, 1);
         assert.isUndefined(castedEvent.args.data.sourceText);
 
         // non-extension script content is still present (7192505913775043000.10)
         extensionTracesWithContent = file.traceEvents?.filter(value => {
           return value.cat === 'disabled-by-default-devtools.v8-source-rundown-sources' &&
-              `${(value as Trace.Types.Events.V8SourceRundownSourcesScriptCatchupEvent).args.data.isolate}.${
-                  (value as Trace.Types.Events.V8SourceRundownSourcesScriptCatchupEvent).args.data.scriptId}` ===
-              '7192505913775043000.10';
+              `${(value as Trace.Types.Events.RundownScriptSource).args.data.isolate}.${
+                  (value as Trace.Types.Events.RundownScriptSource).args.data.scriptId}` === '7192505913775043000.10';
         });
-        castedEvent = (extensionTracesWithContent[0] as Trace.Types.Events.V8SourceRundownSourcesScriptCatchupEvent);
+        castedEvent = (extensionTracesWithContent[0] as Trace.Types.Events.RundownScriptSource);
         assert.lengthOf(extensionTracesWithContent, 1);
         assert.isDefined(castedEvent.args.data.sourceText);
       });
@@ -528,6 +519,7 @@ describeWithEnvironment('TimelinePanel', function() {
           includeScriptContent: true,
           includeSourceMaps: true,
           addModifications: false,
+          shouldCompress: false,
         });
 
         sinon.assert.calledOnce(saveSpy);

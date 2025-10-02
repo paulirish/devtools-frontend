@@ -1,4 +1,4 @@
-// Copyright 2023 The Chromium Authors. All rights reserved.
+// Copyright 2023 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 /* eslint-disable rulesdir/no-imperative-dom-api */
@@ -91,7 +91,8 @@ export class OutermostTargetSelector implements SDK.TargetManager.Observer, UI.S
     this.listItems.insertWithComparator(target, this.#targetComparator());
     this.#toolbarItem.setVisible(this.listItems.length > 1);
 
-    if (target === UI.Context.Context.instance().flavor(SDK.Target.Target)) {
+    const primaryTarget = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
+    if (target === primaryTarget || target === UI.Context.Context.instance().flavor(SDK.Target.Target)) {
       this.#dropDown.selectItem(target);
     }
   }

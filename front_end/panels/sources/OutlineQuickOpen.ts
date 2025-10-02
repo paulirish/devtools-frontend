@@ -1,4 +1,4 @@
-// Copyright 2017 The Chromium Authors. All rights reserved.
+// Copyright 2017 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -44,7 +44,9 @@ export function outline(state: CodeMirror.EditorState): OutlineItem[] {
 
   function subtitleFromParamList(): string {
     while (cursor.name !== 'ParamList') {
-      cursor.nextSibling();
+      if (!cursor.nextSibling()) {
+        break;
+      }
     }
     let parameters = '';
     if (cursor.name === 'ParamList' && cursor.firstChild()) {

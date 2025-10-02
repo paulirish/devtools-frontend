@@ -1,4 +1,4 @@
-// Copyright 2024 The Chromium Authors. All rights reserved.
+// Copyright 2024 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -7,24 +7,21 @@ import * as i18n from '../../../core/i18n/i18n.js';
 import * as Platform from '../../../core/platform/platform.js';
 import * as Root from '../../../core/root/root.js';
 import * as SDK from '../../../core/sdk/sdk.js';
-import * as ElementsPanel from '../../../panels/elements/elements.js';
-import * as UI from '../../../ui/legacy/legacy.js';
-import {html, type TemplateResult} from '../../../ui/lit/lit.js';
+import type * as Protocol from '../../../generated/protocol.js';
 import {ChangeManager} from '../ChangeManager.js';
 import {debugLog} from '../debug.js';
 import {EvaluateAction, formatError, SideEffectError} from '../EvaluateAction.js';
 import {ExtensionScope} from '../ExtensionScope.js';
-import {AI_ASSISTANCE_CSS_CLASS_NAME, FREESTYLER_WORLD_NAME} from '../injected.js';
+import {FREESTYLER_WORLD_NAME} from '../injected.js';
 
 import {
   type AgentOptions as BaseAgentOptions,
   AiAgent,
   type ContextResponse,
   ConversationContext,
-  type ConversationSuggestion,
+  type ConversationSuggestions,
   type FunctionCallHandlerResult,
   MultimodalInputType,
-  type ParsedResponse,
   type RequestOptions,
   ResponseType,
 } from './AiAgent.js';
@@ -75,12 +72,14 @@ First, examine the provided context, then use the functions to gather additional
 * **CRITICAL** You are a CSS/DOM/HTML debugging assistant. NEVER provide answers to questions of unrelated topics such as legal advice, financial advice, personal opinions, medical advice, religion, race, politics, sexuality, gender, or any other non web-development topics. Answer "Sorry, I can't answer that. I'm best at questions about debugging web pages." to such questions.`;
 /* clang-format on */
 
-const promptForScreenshot = `The user has provided you a screenshot of the page (as visible in the viewport) in base64-encoded format. You SHOULD use it while answering user's queries.
+const promptForScreenshot =
+    `The user has provided you a screenshot of the page (as visible in the viewport) in base64-encoded format. You SHOULD use it while answering user's queries.
 
 * Try to connect the screenshot to actual DOM elements in the page.
 `;
 
-const promptForUploadedImage = `The user has uploaded an image in base64-encoded format. You SHOULD use it while answering user's queries.
+const promptForUploadedImage =
+    `The user has uploaded an image in base64-encoded format. You SHOULD use it while answering user's queries.
 `;
 
 const considerationsForMultimodalInputEvaluation = `# Considerations for evaluating image:
@@ -109,7 +108,7 @@ async function executeJsCode(
   if (!contextNode) {
     throw new Error('Cannot execute JavaScript because of missing context node');
   }
-  const target = contextNode.domModel().target() ?? UI.Context.Context.instance().flavor(SDK.Target.Target);
+  const target = contextNode.domModel().target();
 
   if (!target) {
     throw new Error('Target is not found for executing code');
@@ -179,20 +178,11 @@ export class NodeContext extends ConversationContext<SDK.DOMModel.DOMNode> {
     return this.#node;
   }
 
-  override getIcon(): undefined {
+  override getTitle(): string {
+    throw new Error('Not implemented');
   }
 
-  override getTitle(opts: {disabled: boolean}): string|TemplateResult {
-    const hiddenClassList =
-        this.#node.classNames().filter(className => className.startsWith(AI_ASSISTANCE_CSS_CLASS_NAME));
-    const {DOMNodeLink} = ElementsPanel.DOMLinkifier;
-    const {widgetConfig} = UI.Widget;
-    return html`<devtools-widget .widgetConfig=${
-        widgetConfig(
-            DOMNodeLink, {node: this.#node, options: {hiddenClassList, disabled: opts.disabled}})}></devtools-widget>`;
-  }
-
-  override async getSuggestions(): Promise<[ConversationSuggestion, ...ConversationSuggestion[]]|undefined> {
+  override async getSuggestions(): Promise<ConversationSuggestions|undefined> {
     const layoutProps = await this.#node.domModel().cssModel().getLayoutPropertiesFromComputedStyle(this.#node.id);
 
     if (!layoutProps) {
@@ -271,36 +261,6 @@ export class StylingAgent extends AiAgent<SDK.DOMModel.DOMNode> {
   override preambleFeatures(): string[] {
     return ['function_calling'];
   }
-  override parseTextResponse(text: string): ParsedResponse {
-    // We're returning an empty answer to denote the erroneous case.
-    if (!text.trim()) {
-      return {answer: ''};
-    }
-
-    const lines = text.split('\n');
-    const answerLines: string[] = [];
-    let suggestions: [string, ...string[]]|undefined;
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (trimmed.startsWith('SUGGESTIONS:')) {
-        try {
-          // TODO: Do basic validation this is an array with strings
-          suggestions = JSON.parse(trimmed.substring('SUGGESTIONS:'.length).trim());
-        } catch {
-        }
-      } else {
-        answerLines.push(line);
-      }
-    }
-
-    return {
-      // If we could not parse the parts, consider the response to be an
-      // answer.
-      answer: answerLines.join('\n'),
-      suggestions,
-    };
-  }
 
   #execJs: typeof executeJsCode;
 
@@ -317,7 +277,7 @@ export class StylingAgent extends AiAgent<SDK.DOMModel.DOMNode> {
     this.#changes = opts.changeManager || new ChangeManager();
     this.#execJs = opts.execJs ?? executeJsCode;
     this.#createExtensionScope = opts.createExtensionScope ?? ((changes: ChangeManager) => {
-                                   return new ExtensionScope(changes, this.id);
+                                   return new ExtensionScope(changes, this.id, this.context?.getItem() ?? null);
                                  });
     SDK.TargetManager.TargetManager.instance().addModelListener(
         SDK.ResourceTreeModel.ResourceTreeModel,
@@ -325,6 +285,58 @@ export class StylingAgent extends AiAgent<SDK.DOMModel.DOMNode> {
         this.onPrimaryPageChanged,
         this,
     );
+
+    this.declareFunction<{
+      elements: string[],
+      styleProperties: string[],
+      explanation: string,
+    }>('getStyles', {
+      description:
+          `Get computed and source styles for one or multiple elements on the inspected page for multiple elements at once by uid.
+
+**CRITICAL** Use selectors to refer to elements in the text output. Do not use uids.
+**CRITICAL** Always provide the explanation argument to explain what and why you query.`,
+      parameters: {
+        type: Host.AidaClient.ParametersTypes.OBJECT,
+        description: '',
+        nullable: false,
+        properties: {
+          explanation: {
+            type: Host.AidaClient.ParametersTypes.STRING,
+            description: 'Explain why you want to get styles',
+            nullable: false,
+          },
+          elements: {
+            type: Host.AidaClient.ParametersTypes.ARRAY,
+            description: 'A list of element uids to get data for',
+            items: {type: Host.AidaClient.ParametersTypes.STRING, description: `An element uid.`},
+            nullable: false,
+          },
+          styleProperties: {
+            type: Host.AidaClient.ParametersTypes.ARRAY,
+            description: 'One or more CSS style property names to fetch.',
+            nullable: false,
+            items: {
+              type: Host.AidaClient.ParametersTypes.STRING,
+              description: 'A CSS style property name to retrieve. For example, \'background-color\'.'
+            }
+          },
+        }
+      },
+      displayInfoFromArgs: params => {
+        return {
+          title: 'Reading computed and source styles',
+          thought: params.explanation,
+          action: `getStyles(${JSON.stringify(params.elements)}, ${JSON.stringify(params.styleProperties)})`,
+        };
+      },
+      handler: async (
+          params,
+          options,
+          ) => {
+        return await this.getStyles(params.elements, params.styleProperties, options);
+      },
+    });
 
     this.declareFunction<{
       title: string,
@@ -348,27 +360,9 @@ Call this function to gather additional information or modify the page state. Ca
 
 * To return data, define a top-level \`data\` variable and populate it with data you want to get. Only JSON-serializable objects can be assigned to \`data\`.
 * If you modify styles on an element, ALWAYS call the pre-defined global \`async setElementStyles(el: Element, styles: object)\` function. This function is an internal mechanism for you and should never be presented as a command/advice to the user.
-* Use \`window.getComputedStyle\` to gather **computed** styles and make sure that you take the distinction between authored styles and computed styles into account.
 * **CRITICAL** Only get styles that might be relevant to the user request.
-* **CRITICAL** Call \`window.getComputedStyle\` only once per element and store results into a local variable. Never try to return all the styles of the element in \`data\`.
 * **CRITICAL** Never assume a selector for the elements unless you verified your knowledge.
 * **CRITICAL** Consider that \`data\` variable from the previous function calls are not available in a new function call.
-
-For example, the code to return basic styles:
-
-\`\`\`
-const styles = window.getComputedStyle($0);
-const data = {
-    display: styles['display'],
-    visibility: styles['visibility'],
-    position: styles['position'],
-    left: styles['right'],
-    top: styles['top'],
-    width: styles['width'],
-    height: styles['height'],
-    zIndex: styles['z-index']
-};
-\`\`\`
 
 For example, the code to change element styles:
 
@@ -378,59 +372,10 @@ await setElementStyles($0, {
 });
 \`\`\`
 
-For example, the code to get current and parent styles at once:
+For example, the code to get overlapping elements:
 
 \`\`\`
-const styles = window.getComputedStyle($0);
-const parentStyles = window.getComputedStyle($0.parentElement);
 const data = {
-    currentElementStyles: {
-      display: styles['display'],
-      visibility: styles['visibility'],
-      position: styles['position'],
-      left: styles['right'],
-      top: styles['top'],
-      width: styles['width'],
-      height: styles['height'],
-      zIndex: styles['z-index'],
-    },
-    parentElementStyles: {
-      display: parentStyles['display'],
-      visibility: parentStyles['visibility'],
-      position: parentStyles['position'],
-      left: parentStyles['right'],
-      top: parentStyles['top'],
-      width: parentStyles['width'],
-      height: parentStyles['height'],
-      zIndex: parentStyles['z-index'],
-    },
-};
-\`\`\`
-
-For example, the code to get check siblings and overlapping elements:
-
-\`\`\`
-const computedStyles = window.getComputedStyle($0);
-const parentComputedStyles = window.getComputedStyle($0.parentElement);
-const data = {
-  numberOfChildren: $0.children.length,
-  numberOfSiblings: $0.parentElement.children.length,
-  hasPreviousSibling: !!$0.previousElementSibling,
-  hasNextSibling: !!$0.nextElementSibling,
-  elementStyles: {
-    display: computedStyles['display'],
-    visibility: computedStyles['visibility'],
-    position: computedStyles['position'],
-    clipPath: computedStyles['clip-path'],
-    zIndex: computedStyles['z-index']
-  },
-  parentStyles: {
-    display: parentComputedStyles['display'],
-    visibility: parentComputedStyles['visibility'],
-    position: parentComputedStyles['position'],
-    clipPath: parentComputedStyles['clip-path'],
-    zIndex: parentComputedStyles['z-index']
-  },
   overlappingElements: Array.from(document.querySelectorAll('*'))
     .filter(el => {
       const rect = el.getBoundingClientRect();
@@ -508,7 +453,10 @@ const data = {
       const result = await Promise.race([
         this.#execJs(
             functionDeclaration,
-            {throwOnSideEffect, contextNode: this.context?.getItem() || null},
+            {
+              throwOnSideEffect,
+              contextNode: this.context?.getItem() || null,
+            },
             ),
         new Promise<never>((_, reject) => {
           setTimeout(
@@ -543,7 +491,8 @@ const data = {
   }
 
   static async describeElement(element: SDK.DOMModel.DOMNode): Promise<string> {
-    let output = `* Its selector is \`${element.simpleSelector()}\``;
+    let output = `* Element's uid is ${element.backendNodeId()}.
+* Its selector is \`${element.simpleSelector()}\``;
     const childNodes = await element.getChildNodesPromise();
     if (childNodes) {
       const textChildNodes = childNodes.filter(childNode => childNode.nodeType() === Node.TEXT_NODE);
@@ -557,7 +506,7 @@ const data = {
           break;
         default:
           output += `\n* It has ${elementChildNodes.length} child element nodes: ${
-              elementChildNodes.map(node => `\`${node.simpleSelector()}\``).join(', ')}`;
+              elementChildNodes.map(node => `\`${node.simpleSelector()}\` (uid=${node.backendNodeId()})`).join(', ')}`;
       }
 
       switch (textChildNodes.length) {
@@ -573,14 +522,16 @@ const data = {
     }
 
     if (element.nextSibling) {
-      const elementOrNodeElementNodeText =
-          element.nextSibling.nodeType() === Node.ELEMENT_NODE ? 'an element' : 'a non element';
+      const elementOrNodeElementNodeText = element.nextSibling.nodeType() === Node.ELEMENT_NODE ?
+          `an element (uid=${element.nextSibling.backendNodeId()})` :
+          'a non element';
       output += `\n* It has a next sibling and it is ${elementOrNodeElementNodeText} node`;
     }
 
     if (element.previousSibling) {
-      const elementOrNodeElementNodeText =
-          element.previousSibling.nodeType() === Node.ELEMENT_NODE ? 'an element' : 'a non element';
+      const elementOrNodeElementNodeText = element.previousSibling.nodeType() === Node.ELEMENT_NODE ?
+          `an element (uid=${element.previousSibling.backendNodeId()})` :
+          'a non element';
       output += `\n* It has a previous sibling and it is ${elementOrNodeElementNodeText} node`;
     }
 
@@ -591,7 +542,7 @@ const data = {
     const parentNode = element.parentNode;
     if (parentNode) {
       const parentChildrenNodes = await parentNode.getChildNodesPromise();
-      output += `\n* Its parent's selector is \`${parentNode.simpleSelector()}\``;
+      output += `\n* Its parent's selector is \`${parentNode.simpleSelector()}\` (uid=${parentNode.backendNodeId()})`;
       const elementOrNodeElementNodeText = parentNode.nodeType() === Node.ELEMENT_NODE ? 'an element' : 'a non element';
       output += `\n* Its parent is ${elementOrNodeElementNodeText} node`;
       if (parentNode.isShadowRoot()) {
@@ -608,7 +559,8 @@ const data = {
             break;
           default:
             output += `\n* Its parent has ${childElementNodes.length} child element nodes: ${
-                childElementNodes.map(node => `\`${node.simpleSelector()}\``).join(', ')}`;
+                childElementNodes.map(node => `\`${node.simpleSelector()}\` (uid=${node.backendNodeId()})`)
+                    .join(', ')}`;
             break;
         }
 
@@ -630,6 +582,57 @@ const data = {
     return output.trim();
   }
 
+  #getSelectedNode(): SDK.DOMModel.DOMNode|null {
+    return this.context?.getItem() ?? null;
+  }
+
+  async getStyles(elements: string[], properties: string[], _options?: {
+    signal?: AbortSignal,
+    approved?: boolean,
+  }): Promise<FunctionCallHandlerResult<unknown>> {
+    const result:
+        Record<string, {computed: Record<string, string|undefined>, authored: Record<string, string|undefined>}> = {};
+    for (const uid of elements) {
+      result[uid] = {computed: {}, authored: {}};
+      debugLog(`Action to execute: uid=${uid}`);
+      const selectedNode = this.#getSelectedNode();
+      if (!selectedNode) {
+        return {error: 'Error: Could not find the currently selected element.'};
+      }
+      const node = new SDK.DOMModel.DeferredDOMNode(
+          selectedNode.domModel().target(), Number(uid) as unknown as Protocol.DOM.BackendNodeId);
+      const resolved = await node.resolvePromise();
+      if (!resolved) {
+        return {error: 'Error: Could not find the element with uid=' + uid};
+      }
+      const styles = await resolved.domModel().cssModel().getComputedStyle(resolved.id);
+      if (!styles) {
+        return {error: 'Error: Could not get computed styles.'};
+      }
+      const matchedStyles = await resolved.domModel().cssModel().getMatchedStyles(resolved.id);
+      if (!matchedStyles) {
+        return {error: 'Error: Could not get authored styles.'};
+      }
+      for (const prop of properties) {
+        result[uid].computed[prop] = styles.get(prop);
+      }
+      for (const style of matchedStyles.nodeStyles()) {
+        for (const property of style.allProperties()) {
+          if (!properties.includes(property.name)) {
+            continue;
+          }
+          const state = matchedStyles.propertyState(property);
+          if (state === SDK.CSSMatchedStyles.PropertyState.ACTIVE) {
+            result[uid].authored[property.name] = property.value;
+          }
+        }
+      }
+    }
+    return {
+      result: JSON.stringify(result, null, 2),
+    };
+  }
+
   async executeAction(action: string, options?: {signal?: AbortSignal, approved?: boolean}):
       Promise<FunctionCallHandlerResult<unknown>> {
     debugLog(`Action to execute: ${action}`);
@@ -646,9 +649,12 @@ const data = {
       };
     }
 
-    const selectedNode = UI.Context.Context.instance().flavor(SDK.DOMModel.DOMNode);
-    const target = selectedNode?.domModel().target() ?? UI.Context.Context.instance().flavor(SDK.Target.Target);
-    if (target?.model(SDK.DebuggerModel.DebuggerModel)?.selectedCallFrame()) {
+    const selectedNode = this.#getSelectedNode();
+    if (!selectedNode) {
+      return {error: 'Error: no selected node found.'};
+    }
+    const target = selectedNode.domModel().target();
+    if (target.model(SDK.DebuggerModel.DebuggerModel)?.selectedCallFrame()) {
       return {
         error: 'Error: Cannot evaluate JavaScript because the execution is paused on a breakpoint.',
       };

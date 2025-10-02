@@ -1,32 +1,6 @@
-/*
- * Copyright (C) 2011 Google Inc. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are
- * met:
- *
- *     * Redistributions of source code must retain the above copyright
- * notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above
- * copyright notice, this list of conditions and the following disclaimer
- * in the documentation and/or other materials provided with the
- * distribution.
- *     * Neither the name of Google Inc. nor the names of its
- * contributors may be used to endorse or promote products derived from
- * this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
+// Copyright 2011 The Chromium Authors
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
 
 /* eslint-disable rulesdir/no-imperative-dom-api */
 
@@ -1110,6 +1084,8 @@ export class HeapSnapshotConstructorNode extends HeapSnapshotGridNode {
   readonly retainedSize: number;
   readonly classKey: string;
 
+  #numberFormatter = new Intl.NumberFormat(i18n.DevToolsLocale.DevToolsLocale.instance().locale);
+
   constructor(
       dataGrid: HeapSnapshotConstructorsDataGrid, classKey: string,
       aggregate: HeapSnapshotModel.HeapSnapshotModel.Aggregate,
@@ -1128,7 +1104,7 @@ export class HeapSnapshotConstructorNode extends HeapSnapshotGridNode {
     const shallowSizePercent = this.shallowSize / snapshot.totalSize * 100.0;
     this.data = {
       object: this.nameInternal,
-      count: Platform.NumberUtilities.withThousandsSeparator(this.count),
+      count: this.#numberFormatter.format(this.count),
       distance: this.toUIDistance(this.distance),
       shallowSize: i18n.ByteUtilities.formatBytesToKb(this.shallowSize),
       retainedSize: i18n.ByteUtilities.formatBytesToKb(this.retainedSize),
@@ -1169,7 +1145,7 @@ export class HeapSnapshotConstructorNode extends HeapSnapshotGridNode {
   override createCell(columnId: string): HTMLElement {
     const cell = columnId === 'object' ? super.createCell(columnId) : this.createValueCell(columnId);
     if (columnId === 'object' && this.count > 1) {
-      cell.appendChild(UI.Fragment.html`<span class="objects-count">×${this.count}</span>`);
+      cell.appendChild(UI.Fragment.html`<span class="objects-count">×${this.data.count}</span>`);
     }
     return cell;
   }

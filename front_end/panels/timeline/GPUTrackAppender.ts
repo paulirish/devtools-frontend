@@ -1,8 +1,9 @@
-// Copyright 2023 The Chromium Authors. All rights reserved.
+// Copyright 2023 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 import * as i18n from '../../core/i18n/i18n.js';
 import * as Trace from '../../models/trace/trace.js';
+import * as PerfUI from '../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
 
 import {buildGroupStyle, buildTrackHeader} from './AppenderUtils.js';
@@ -27,9 +28,9 @@ export class GPUTrackAppender implements TrackAppender {
   readonly appenderName: TrackAppenderName = 'GPU';
 
   #compatibilityBuilder: CompatibilityTracksAppender;
-  #parsedTrace: Readonly<Trace.Handlers.Types.ParsedTrace>;
+  #parsedTrace: Readonly<Trace.TraceModel.ParsedTrace>;
 
-  constructor(compatibilityBuilder: CompatibilityTracksAppender, parsedTrace: Trace.Handlers.Types.ParsedTrace) {
+  constructor(compatibilityBuilder: CompatibilityTracksAppender, parsedTrace: Trace.TraceModel.ParsedTrace) {
     this.#compatibilityBuilder = compatibilityBuilder;
     this.#parsedTrace = parsedTrace;
   }
@@ -44,7 +45,7 @@ export class GPUTrackAppender implements TrackAppender {
    * appended the track's events.
    */
   appendTrackAtLevel(trackStartLevel: number, expanded?: boolean|undefined): number {
-    const gpuEvents = this.#parsedTrace.GPU.mainGPUThreadTasks;
+    const gpuEvents = this.#parsedTrace.data.GPU.mainGPUThreadTasks;
     if (gpuEvents.length === 0) {
       return trackStartLevel;
     }
@@ -63,7 +64,7 @@ export class GPUTrackAppender implements TrackAppender {
    * @param expanded whether the track should be rendered expanded.
    */
   #appendTrackHeaderAtLevel(currentLevel: number, expanded?: boolean): void {
-    const style = buildGroupStyle({collapsible: false});
+    const style = buildGroupStyle({collapsible: PerfUI.FlameChart.GroupCollapsibleState.NEVER});
     const group = buildTrackHeader(
         VisualLoggingTrackName.GPU, currentLevel, i18nString(UIStrings.gpu), style, /* selectable= */ true, expanded);
     this.#compatibilityBuilder.registerTrackForGroup(group, this);

@@ -1,4 +1,4 @@
-// Copyright 2023 The Chromium Authors. All rights reserved.
+// Copyright 2023 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -445,7 +445,7 @@ export const PrefetchReasonDescription: Record<string, {name: () => Platform.UIS
   PrefetchEvictedAfterBrowsingDataRemoved: {name: i18nLazyString(UIStrings.PrefetchEvictedAfterBrowsingDataRemoved)},
 };
 
-// Decoding PrefetchFinalStatus prefetchAttempt to failure description.
+/** Decoding PrefetchFinalStatus prefetchAttempt to failure description. **/
 export function prefetchFailureReason({prefetchStatus}: SDK.PreloadingModel.PrefetchAttempt): string|null {
   // If you face an error on rolling CDP changes, see
   // https://docs.google.com/document/d/1PnrfowsZMt62PX1EvvTp2Nqs3ji1zrklrAEe1JYbkTk
@@ -534,7 +534,7 @@ export function prefetchFailureReason({prefetchStatus}: SDK.PreloadingModel.Pref
   }
 }
 
-// Detailed failure reason for PrerenderFinalStatus.
+/** Detailed failure reason for PrerenderFinalStatus. **/
 export function prerenderFailureReason(attempt: SDK.PreloadingModel.PrerenderAttempt): string|null {
   // If you face an error on rolling CDP changes, see
   // https://docs.google.com/document/d/1PnrfowsZMt62PX1EvvTp2Nqs3ji1zrklrAEe1JYbkTk
@@ -723,11 +723,8 @@ export function ruleSetLocationShort(
 
 export function ruleSetTagOrLocationShort(
     ruleSet: Protocol.Preload.RuleSet, pageURL: Platform.DevToolsPath.UrlString): string {
-  if (!ruleSet.errorMessage) {
-    const parsedRuleset = JSON.parse(ruleSet['sourceText']);
-    if ('tag' in parsedRuleset) {
-      return '"' + parsedRuleset['tag'] + '"';
-    }
+  if (!ruleSet.errorMessage && ruleSet.tag) {
+    return '"' + ruleSet.tag + '"';
   }
   return ruleSetLocationShort(ruleSet, pageURL);
 }

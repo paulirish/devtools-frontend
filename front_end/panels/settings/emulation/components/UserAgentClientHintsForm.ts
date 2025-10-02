@@ -1,4 +1,4 @@
-// Copyright 2021 The Chromium Authors. All rights reserved.
+// Copyright 2021 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 /* eslint-disable rulesdir/no-lit-render-outside-of-view*/
@@ -585,7 +585,7 @@ export class UserAgentClientHintsForm extends HTMLElement {
         ${i18nString(UIStrings.mobileCheckboxLabel)}
       </label>
     ` :
-                                                           html``;
+                                                           Lit.nothing;
     return html`
       <span class="full-row label">${i18nString(UIStrings.deviceModel)}</span>
       <div class="full-row brand-row" aria-label=${i18nString(UIStrings.deviceProperties)} role="group">

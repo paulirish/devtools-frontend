@@ -1,4 +1,4 @@
-// Copyright 2024 The Chromium Authors. All rights reserved.
+// Copyright 2024 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 /* eslint-disable rulesdir/no-imperative-dom-api */
@@ -6,10 +6,10 @@
 import * as Common from '../../../core/common/common.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as Platform from '../../../core/platform/platform.js';
+import * as AIAssistance from '../../../models/ai_assistance/ai_assistance.js';
 import * as Trace from '../../../models/trace/trace.js';
 import type * as PerfUI from '../../../ui/legacy/components/perf_ui/perf_ui.js';
 import * as VisualLogging from '../../../ui/visual_logging/visual_logging.js';
-import * as Utils from '../utils/utils.js';
 
 import * as Components from './components/components.js';
 
@@ -204,14 +204,16 @@ export interface TimelineCharts {
 }
 
 export interface OverlayEntryQueries {
-  parsedTrace: () => Trace.Handlers.Types.ParsedTrace | null;
+  parsedTrace: () => Trace.TraceModel.ParsedTrace | null;
   isEntryCollapsedByUser: (entry: Trace.Types.Events.Event) => boolean;
   firstVisibleParentForEntry: (entry: Trace.Types.Events.Event) => Trace.Types.Events.Event | null;
 }
 
-// An event dispatched when one of the Annotation Overlays (overlay created by the user,
-// ex. Trace.Types.Overlays.EntryLabel) is removed or updated. When one of the Annotation Overlays is removed or updated,
-// ModificationsManager listens to this event and updates the current annotations.
+/**
+ * An event dispatched when one of the Annotation Overlays (overlay created by the user,
+ * ex. Trace.Types.Overlays.EntryLabel) is removed or updated. When one of the Annotation Overlays is removed or updated,
+ * ModificationsManager listens to this event and updates the current annotations.
+ **/
 export type UpdateAction = 'Remove'|'Update';
 export class AnnotationOverlayActionEvent extends Event {
   static readonly eventName = 'annotationoverlayactionsevent';
@@ -1476,7 +1478,7 @@ export class Overlays extends EventTarget {
         const component = new Components.EntryLabelOverlay.EntryLabelOverlay(overlay.label, shouldDrawLabelBelowEntry);
         // Generate the AI Call Tree for the AI Auto-Annotation feature.
         const parsedTrace = this.#queries.parsedTrace();
-        const callTree = parsedTrace ? Utils.AICallTree.AICallTree.fromEvent(overlay.entry, parsedTrace) : null;
+        const callTree = parsedTrace ? AIAssistance.AICallTree.fromEvent(overlay.entry, parsedTrace) : null;
         component.callTree = callTree;
 
         component.addEventListener(
@@ -1564,7 +1566,7 @@ export class Overlays extends EventTarget {
         return overlayElement;
       }
       case 'TIMINGS_MARKER': {
-        const {color} = Utils.EntryStyles.markerDetailsForEvent(overlay.entries[0]);
+        const {color} = Trace.Styles.markerDetailsForEvent(overlay.entries[0]);
         const markersComponent = this.#createTimingsMarkerElement(overlay);
         overlayElement.appendChild(markersComponent);
         overlayElement.style.backgroundColor = color;
@@ -1633,7 +1635,7 @@ export class Overlays extends EventTarget {
     const markers = document.createElement('div');
     markers.classList.add('markers');
     for (const entry of overlay.entries) {
-      const {color, title} = Utils.EntryStyles.markerDetailsForEvent(entry);
+      const {color, title} = Trace.Styles.markerDetailsForEvent(entry);
       const marker = document.createElement('div');
       marker.classList.add('marker-title');
       marker.textContent = title;

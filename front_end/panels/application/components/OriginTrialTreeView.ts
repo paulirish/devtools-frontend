@@ -1,4 +1,4 @@
-// Copyright 2021 The Chromium Authors. All rights reserved.
+// Copyright 2021 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 /* eslint-disable rulesdir/no-imperative-dom-api */
@@ -109,11 +109,13 @@ customElements.define('devtools-resources-origin-trial-tree-view-badge', Badge);
 
 type TreeNode<DataType> = TreeOutline.TreeOutlineUtils.TreeNode<DataType>;
 
-// The Origin Trial Tree has 4 levels of content:
-// - Origin Trial (has multiple Origin Trial tokens)
-// - Origin Trial Token (has only 1 raw token text)
-// - Fields in Origin Trial Token
-// - Raw Origin Trial Token text (folded because the content is long)
+/**
+ * The Origin Trial Tree has 4 levels of content:
+ * - Origin Trial (has multiple Origin Trial tokens)
+ * - Origin Trial Token (has only 1 raw token text)
+ * - Fields in Origin Trial Token
+ * - Raw Origin Trial Token text (folded because the content is long)
+ **/
 export type OriginTrialTreeNodeData = Protocol.Page.OriginTrial|Protocol.Page.OriginTrialTokenWithStatus|string;
 
 function constructOriginTrialTree(originTrial: Protocol.Page.OriginTrial): TreeNode<OriginTrialTreeNodeData> {

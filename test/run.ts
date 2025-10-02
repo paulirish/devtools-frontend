@@ -1,4 +1,4 @@
-// Copyright 2024 The Chromium Authors. All rights reserved.
+// Copyright 2024 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -190,10 +190,19 @@ class NonHostedMochaTests extends Tests {
     ];
 
     if (options['debug']) {
-      args.unshift('--inspect-brk');
-      console.warn(
-          '\x1b[33mYou need to attach a debugger from chrome://inspect for tests to continue the run in debug mode.\x1b[0m');
-      console.warn('\x1b[33mWhen attached, resume execution in the Sources panel to begin debugging the test.\x1b[0m');
+      // VSCode has issue when starting with '--inspect-brk'
+      // Provide this in the launch.json see
+      // .vscode/devtools-workspace-launch.json
+      if (process.env.VSCODE_DEBUGGER === 'true') {
+        args.unshift('--inspect');
+        console.warn('Attaching to VSCode Debugger automatically');
+      } else {
+        args.unshift('--inspect-brk');
+        console.warn(
+            '\x1b[33mYou need to attach a debugger from chrome://inspect for tests to continue the run in debug mode.\x1b[0m');
+        console.warn(
+            '\x1b[33mWhen attached, resume execution in the Sources panel to begin debugging the test.\x1b[0m');
+      }
     }
     return super.run(
         tests,
@@ -251,8 +260,10 @@ class KarmaTests extends Tests {
   }
 }
 
-// TODO(333423685)
-// - watch
+/**
+ * TODO(333423685)
+ * - watch
+ **/
 function main() {
   const tests: string[] = typeof options['tests'] === 'string' ? [options['tests']] : options['tests'];
   const testKinds = [

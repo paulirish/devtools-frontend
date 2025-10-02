@@ -1,4 +1,4 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -38,9 +38,11 @@ function expectErrors() {
   expectError(/Protocol Error: the message with wrong session id/);
   expectError(/Protocol Error: the message with wrong session id/);
 }
-// Start blocking *.css
-// Ideally this would be done with UI manipulation, but it'd be less reliable AND
-// the designated tests in network-request-blocking-panel_test.ts are skipped by default due to flakiness.
+/**
+ * Start blocking *.css
+ * Ideally this would be done with UI manipulation, but it'd be less reliable AND
+ * the designated tests in network-request-blocking-panel_test.ts are skipped by default due to flakiness.
+ **/
 async function blockCss(devToolsPage: DevToolsPage) {
   await devToolsPage.evaluate(`(async () => {
         const SDK = await import('./core/sdk/sdk.js');

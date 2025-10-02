@@ -1,4 +1,4 @@
-// Copyright 2023 The Chromium Authors. All rights reserved.
+// Copyright 2023 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -19,8 +19,10 @@ export class StateChangedEvent extends Event {
   }
 }
 
-// Exposed as a shortcut to BoundsManager.instance().addEventListener, which
-// also takes care of type-casting the event to StateChangedEvent.
+/**
+ * Exposed as a shortcut to BoundsManager.instance().addEventListener, which
+ * also takes care of type-casting the event to StateChangedEvent.
+ **/
 export function onChange(cb: (event: StateChangedEvent) => void): void {
   BoundsManager.instance().addEventListener(
       StateChangedEvent.eventName,

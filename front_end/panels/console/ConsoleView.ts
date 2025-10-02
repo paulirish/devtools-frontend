@@ -1,4 +1,4 @@
-// Copyright 2020 The Chromium Authors. All rights reserved.
+// Copyright 2020 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 /* eslint-disable rulesdir/no-imperative-dom-api */
@@ -270,12 +270,13 @@ let consoleViewInstance: ConsoleView;
 
 const MIN_HISTORY_LENGTH_FOR_DISABLING_SELF_XSS_WARNING = 5;
 const DISCLAIMER_TOOLTIP_ID = 'console-ai-code-completion-disclaimer-tooltip';
+const SPINNER_TOOLTIP_ID = 'console-ai-code-completion-spinner-tooltip';
 const CITATIONS_TOOLTIP_ID = 'console-ai-code-completion-citations-tooltip';
 
 export class ConsoleView extends UI.Widget.VBox implements
     UI.SearchableView.Searchable, ConsoleViewportProvider,
     SDK.TargetManager.SDKModelObserver<SDK.ConsoleModel.ConsoleModel> {
-  private readonly searchableViewInternal: UI.SearchableView.SearchableView;
+  readonly #searchableView: UI.SearchableView.SearchableView;
   private readonly sidebar: ConsoleSidebar;
   private isSidebarOpen: boolean;
   private filter: ConsoleViewFilter;
@@ -308,7 +309,8 @@ export class ConsoleView extends UI.Widget.VBox implements
   private messagesCountElement: HTMLElement;
   private viewportThrottler: Common.Throttler.Throttler;
   private pendingBatchResize: boolean;
-  private readonly onMessageResizedBound: (e: Common.EventTarget.EventTargetEvent<UI.TreeOutline.TreeElement>) => void;
+  private readonly onMessageResizedBound:
+      (e: Common.EventTarget.EventTargetEvent<HTMLElement|UI.TreeOutline.TreeElement>) => void;
   private readonly promptElement: HTMLElement;
   private readonly linkifier: Components.Linkifier.Linkifier;
   private consoleMessages: ConsoleViewMessage[];
@@ -321,7 +323,7 @@ export class ConsoleView extends UI.Widget.VBox implements
   private buildHiddenCacheTimeout?: number;
   private searchShouldJumpBackwards?: boolean;
   private searchProgressIndicator?: UI.ProgressIndicator.ProgressIndicator;
-  private innerSearchTimeoutId?: number;
+  #searchTimeoutId?: number;
   private muteViewportUpdates?: boolean;
   private waitForScrollTimeout?: number;
   private issueCounter: IssueCounter.IssueCounter.IssueCounter;
@@ -342,10 +344,10 @@ export class ConsoleView extends UI.Widget.VBox implements
     this.setMinimumSize(0, 35);
     this.registerRequiredCSS(consoleViewStyles, objectValueStyles, CodeHighlighter.codeHighlighterStyles);
 
-    this.searchableViewInternal = new UI.SearchableView.SearchableView(this, null);
-    this.searchableViewInternal.element.classList.add('console-searchable-view');
-    this.searchableViewInternal.setPlaceholder(i18nString(UIStrings.findStringInLogs));
-    this.searchableViewInternal.setMinimalSearchQuerySize(0);
+    this.#searchableView = new UI.SearchableView.SearchableView(this, null);
+    this.#searchableView.element.classList.add('console-searchable-view');
+    this.#searchableView.setPlaceholder(i18nString(UIStrings.findStringInLogs));
+    this.#searchableView.setMinimalSearchQuerySize(0);
     this.sidebar = new ConsoleSidebar();
     this.sidebar.addEventListener(Events.FILTER_SELECTED, this.onFilterChanged.bind(this));
     this.isSidebarOpen = false;
@@ -355,7 +357,7 @@ export class ConsoleView extends UI.Widget.VBox implements
     this.consoleToolbarContainer.role = 'toolbar';
     this.splitWidget = new UI.SplitWidget.SplitWidget(
         true /* isVertical */, false /* secondIsSidebar */, 'console.sidebar.width', 100);
-    this.splitWidget.setMainWidget(this.searchableViewInternal);
+    this.splitWidget.setMainWidget(this.#searchableView);
     this.splitWidget.setSidebarWidget(this.sidebar);
     this.splitWidget.show(this.element);
     this.splitWidget.hideSidebar();
@@ -386,7 +388,7 @@ export class ConsoleView extends UI.Widget.VBox implements
       this.filter.setLevelMenuOverridden(this.isSidebarOpen);
       this.onFilterChanged();
     });
-    this.contentsElement = this.searchableViewInternal.element;
+    this.contentsElement = this.#searchableView.element;
     this.element.classList.add('console-view');
 
     this.visibleViewMessages = [];
@@ -522,7 +524,7 @@ export class ConsoleView extends UI.Widget.VBox implements
 
     this.viewportThrottler = new Common.Throttler.Throttler(viewportThrottlerTimeout);
     this.pendingBatchResize = false;
-    this.onMessageResizedBound = (e: Common.EventTarget.EventTargetEvent<UI.TreeOutline.TreeElement>) => {
+    this.onMessageResizedBound = (e: Common.EventTarget.EventTargetEvent<HTMLElement|UI.TreeOutline.TreeElement>) => {
       void this.onMessageResized(e);
     };
 
@@ -623,8 +625,11 @@ export class ConsoleView extends UI.Widget.VBox implements
   }
 
   createAiCodeCompletionSummaryToolbar(): void {
-    this.aiCodeCompletionSummaryToolbar = new AiCodeCompletionSummaryToolbar(
-        {citationsTooltipId: CITATIONS_TOOLTIP_ID, disclaimerTooltipId: DISCLAIMER_TOOLTIP_ID});
+    this.aiCodeCompletionSummaryToolbar = new AiCodeCompletionSummaryToolbar({
+      citationsTooltipId: CITATIONS_TOOLTIP_ID,
+      disclaimerTooltipId: DISCLAIMER_TOOLTIP_ID,
+      spinnerTooltipId: SPINNER_TOOLTIP_ID
+    });
     this.aiCodeCompletionSummaryToolbarContainer = this.element.createChild('div');
     this.aiCodeCompletionSummaryToolbar.show(this.aiCodeCompletionSummaryToolbarContainer, undefined, true);
   }
@@ -652,8 +657,9 @@ export class ConsoleView extends UI.Widget.VBox implements
     this.aiCodeCompletionSummaryToolbar?.setLoading(false);
   }
 
-  static clearConsole(): void {
+  clearConsole(): void {
     SDK.ConsoleModel.ConsoleModel.requestClearMessages();
+    this.prompt.clearAiCodeCompletionCache();
   }
 
   #onIssuesCountUpdate(): void {
@@ -694,11 +700,12 @@ export class ConsoleView extends UI.Widget.VBox implements
   }
 
   searchableView(): UI.SearchableView.SearchableView {
-    return this.searchableViewInternal;
+    return this.#searchableView;
   }
 
   clearHistory(): void {
     this.prompt.history().clear();
+    this.prompt.clearAiCodeCompletionCache();
   }
 
   private consoleHistoryAutocompleteChanged(): void {
@@ -961,7 +968,7 @@ export class ConsoleView extends UI.Widget.VBox implements
           viewMessage,
           !shouldGroupSimilar /* crbug.com/1082963: prevent collapse of same messages when "Group similar" is false */);
       this.updateFilterStatus();
-      this.searchableViewInternal.updateSearchMatchesCount(this.regexMatchRanges.length);
+      this.#searchableView.updateSearchMatchesCount(this.regexMatchRanges.length);
     } else {
       this.needsFullUpdate = true;
     }
@@ -969,7 +976,7 @@ export class ConsoleView extends UI.Widget.VBox implements
     this.scheduleViewportRefresh();
     this.consoleMessageAddedForTest(viewMessage);
 
-    // Figure out whether the message should belong into this group or the parent group based on group end timestamp.
+    /** Figure out whether the message should belong into this group or the parent group based on group end timestamp. **/
     function addToGroup(viewMessage: ConsoleViewMessage, currentGroup: ConsoleGroupViewMessage): void {
       const currentEnd = currentGroup.groupEnd();
       if (currentEnd !== null) {
@@ -1050,25 +1057,20 @@ export class ConsoleView extends UI.Widget.VBox implements
       return;
     }
 
-    // Track any adjacent messages.
-    const originatingMessage = viewMessage.consoleMessage().originatingMessage();
-    const adjacent = Boolean(originatingMessage && lastMessage?.consoleMessage() === originatingMessage);
-    viewMessage.setAdjacentUserCommandResult(adjacent);
-
-    // Ensure any parent groups for this message are shown.
     const currentGroup = viewMessage.consoleGroup();
-    showGroup(currentGroup, this.visibleViewMessages);
 
-    // Determine whether this message should actually be visible.
-    const shouldShowMessage = !currentGroup?.messagesHidden();
-    if (shouldShowMessage) {
+    if (!currentGroup?.messagesHidden()) {
+      const originatingMessage = viewMessage.consoleMessage().originatingMessage();
+      const adjacent = Boolean(originatingMessage && lastMessage?.consoleMessage() === originatingMessage);
+      viewMessage.setAdjacentUserCommandResult(adjacent);
+      showGroup(currentGroup, this.visibleViewMessages);
       this.visibleViewMessages.push(viewMessage);
       this.searchMessage(this.visibleViewMessages.length - 1);
     }
 
     this.messageAppendedForTests();
 
-    // Show the group the message belongs to, and also show parent groups.
+    /** Show the group the message belongs to, and also show parent groups. **/
     function showGroup(currentGroup: ConsoleGroupViewMessage|null, visibleViewMessages: ConsoleViewMessage[]): void {
       if (currentGroup === null) {
         return;
@@ -1112,19 +1114,18 @@ export class ConsoleView extends UI.Widget.VBox implements
     }
   }
 
-  private async onMessageResized(event: Common.EventTarget.EventTargetEvent<UI.TreeOutline.TreeElement>):
+  private async onMessageResized(event: Common.EventTarget.EventTargetEvent<HTMLElement|UI.TreeOutline.TreeElement>):
       Promise<void> {
-    const treeElement = event.data;
-    if (this.pendingBatchResize || !treeElement.treeOutline) {
+    const treeElement = event.data instanceof UI.TreeOutline.TreeElement ? event.data.treeOutline?.element : event.data;
+    if (this.pendingBatchResize || !treeElement) {
       return;
     }
     this.pendingBatchResize = true;
     await Promise.resolve();
-    const treeOutlineElement = treeElement.treeOutline.element;
     this.viewport.setStickToBottom(this.isScrolledToBottom());
     // Scroll, in case mutations moved the element below the visible area.
-    if (treeOutlineElement.offsetHeight <= this.messagesElement.offsetHeight) {
-      treeOutlineElement.scrollIntoViewIfNeeded();
+    if (treeElement.offsetHeight <= this.messagesElement.offsetHeight) {
+      treeElement.scrollIntoViewIfNeeded();
     }
 
     this.pendingBatchResize = false;
@@ -1216,8 +1217,8 @@ export class ConsoleView extends UI.Widget.VBox implements
     const stream = new Bindings.FileUtils.FileOutputStream();
 
     const progressIndicator = document.createElement('devtools-progress');
-    progressIndicator.setTitle(i18nString(UIStrings.writingFile));
-    progressIndicator.setTotalWork(this.itemCount());
+    progressIndicator.title = i18nString(UIStrings.writingFile);
+    progressIndicator.totalWork = this.itemCount();
 
     const chunkSize = 350;
 
@@ -1227,7 +1228,7 @@ export class ConsoleView extends UI.Widget.VBox implements
     this.progressToolbarItem.element.appendChild(progressIndicator);
 
     let messageIndex = 0;
-    while (messageIndex < this.itemCount() && !progressIndicator.isCanceled()) {
+    while (messageIndex < this.itemCount() && !progressIndicator.canceled) {
       const messageContents = [];
       let i;
       for (i = 0; i < chunkSize && i + messageIndex < this.itemCount(); ++i) {
@@ -1236,11 +1237,11 @@ export class ConsoleView extends UI.Widget.VBox implements
       }
       messageIndex += i;
       await stream.write(messageContents.join('\n') + '\n');
-      progressIndicator.setWorked(messageIndex);
+      progressIndicator.worked = messageIndex;
     }
 
     void stream.close();
-    progressIndicator.done();
+    progressIndicator.done = true;
   }
 
   private async copyConsole(): Promise<void> {
@@ -1318,7 +1319,7 @@ export class ConsoleView extends UI.Widget.VBox implements
       }
     }
     this.updateFilterStatus();
-    this.searchableViewInternal.updateSearchMatchesCount(this.regexMatchRanges.length);
+    this.#searchableView.updateSearchMatchesCount(this.regexMatchRanges.length);
     this.jumpToMatch(this.currentMatchRangeIndex);  // Re-highlight current match.
     this.viewport.invalidate();
     this.messagesCountElement.setAttribute(
@@ -1507,7 +1508,7 @@ export class ConsoleView extends UI.Widget.VBox implements
 
   performSearch(searchConfig: UI.SearchableView.SearchConfig, shouldJump: boolean, jumpBackwards?: boolean): void {
     this.onSearchCanceled();
-    this.searchableViewInternal.updateSearchMatchesCount(0);
+    this.#searchableView.updateSearchMatchesCount(0);
 
     this.searchRegex = searchConfig.toSearchRegex(true).regex;
 
@@ -1519,21 +1520,21 @@ export class ConsoleView extends UI.Widget.VBox implements
     }
 
     this.searchProgressIndicator = document.createElement('devtools-progress');
-    this.searchProgressIndicator.setTitle(i18nString(UIStrings.searching));
-    this.searchProgressIndicator.setTotalWork(this.visibleViewMessages.length);
+    this.searchProgressIndicator.title = i18nString(UIStrings.searching);
+    this.searchProgressIndicator.totalWork = this.visibleViewMessages.length;
     this.progressToolbarItem.element.appendChild(this.searchProgressIndicator);
 
-    this.innerSearch(0);
+    this.#search(0);
   }
 
   private cleanupAfterSearch(): void {
     delete this.searchShouldJumpBackwards;
-    if (this.innerSearchTimeoutId) {
-      clearTimeout(this.innerSearchTimeoutId);
-      delete this.innerSearchTimeoutId;
+    if (this.#searchTimeoutId) {
+      clearTimeout(this.#searchTimeoutId);
+      this.#searchTimeoutId = undefined;
     }
     if (this.searchProgressIndicator) {
-      this.searchProgressIndicator.done();
+      this.searchProgressIndicator.done = true;
       delete this.searchProgressIndicator;
     }
   }
@@ -1542,9 +1543,9 @@ export class ConsoleView extends UI.Widget.VBox implements
     // This method is sniffed in tests.
   }
 
-  private innerSearch(index: number): void {
-    delete this.innerSearchTimeoutId;
-    if (this.searchProgressIndicator?.isCanceled()) {
+  #search(index: number): void {
+    this.#searchTimeoutId = undefined;
+    if (this.searchProgressIndicator?.canceled) {
       this.cleanupAfterSearch();
       return;
     }
@@ -1554,7 +1555,7 @@ export class ConsoleView extends UI.Widget.VBox implements
       this.searchMessage(index);
     }
 
-    this.searchableViewInternal.updateSearchMatchesCount(this.regexMatchRanges.length);
+    this.#searchableView.updateSearchMatchesCount(this.regexMatchRanges.length);
     if (typeof this.searchShouldJumpBackwards !== 'undefined' && this.regexMatchRanges.length) {
       this.jumpToMatch(this.searchShouldJumpBackwards ? -1 : 0);
       delete this.searchShouldJumpBackwards;
@@ -1566,9 +1567,9 @@ export class ConsoleView extends UI.Widget.VBox implements
       return;
     }
 
-    this.innerSearchTimeoutId = window.setTimeout(this.innerSearch.bind(this, index), 100);
+    this.#searchTimeoutId = window.setTimeout(this.#search.bind(this, index), 100);
     if (this.searchProgressIndicator) {
-      this.searchProgressIndicator.setWorked(index);
+      this.searchProgressIndicator.worked = index;
     }
   }
 
@@ -1592,6 +1593,10 @@ export class ConsoleView extends UI.Widget.VBox implements
     return true;
   }
 
+  supportsWholeWordSearch(): boolean {
+    return true;
+  }
+
   supportsRegexSearch(): boolean {
     return true;
   }
@@ -1611,7 +1616,7 @@ export class ConsoleView extends UI.Widget.VBox implements
 
     index = Platform.NumberUtilities.mod(index, this.regexMatchRanges.length);
     this.currentMatchRangeIndex = index;
-    this.searchableViewInternal.updateCurrentMatchIndex(index);
+    this.#searchableView.updateCurrentMatchIndex(index);
     matchRange = this.regexMatchRanges[index];
     const message = this.visibleViewMessages[matchRange.messageIndex];
     const highlightNode = message.searchHighlightNode(matchRange.matchIndex);
@@ -1919,7 +1924,7 @@ export class ActionDelegate implements UI.ActionRegistration.ActionDelegate {
         ConsoleView.instance().focusPrompt();
         return true;
       case 'console.clear':
-        ConsoleView.clearConsole();
+        ConsoleView.instance().clearConsole();
         return true;
       case 'console.clear.history':
         ConsoleView.instance().clearHistory();

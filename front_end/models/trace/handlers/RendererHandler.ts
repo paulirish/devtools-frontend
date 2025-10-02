@@ -1,4 +1,4 @@
-// Copyright 2022 The Chromium Authors. All rights reserved.
+// Copyright 2022 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -25,7 +25,7 @@ import type {HandlerName} from './types.js';
  * event type.
  */
 
-const processes = new Map<Types.Events.ProcessID, RendererProcess>();
+let processes = new Map<Types.Events.ProcessID, RendererProcess>();
 
 let entityMappings: HandlerHelpers.EntityMappings = {
   eventsByEntity: new Map<HandlerHelpers.Entity, Types.Events.Event[]>(),
@@ -37,13 +37,13 @@ let entityMappings: HandlerHelpers.EntityMappings = {
 // We track the compositor tile worker thread name events so that at the end we
 // can return these keyed by the process ID. These are used in the frontend to
 // show the user the rasterization thread(s) on the main frame as tracks.
-const compositorTileWorkers = Array<{
+let compositorTileWorkers = Array<{
   pid: Types.Events.ProcessID,
   tid: Types.Events.ThreadID,
 }>();
-const entryToNode = new Map<Types.Events.Event, Helpers.TreeHelpers.TraceEntryNode>();
+let entryToNode = new Map<Types.Events.Event, Helpers.TreeHelpers.TraceEntryNode>();
 
-const completeEventStack: (Types.Events.SyntheticComplete)[] = [];
+let completeEventStack: (Types.Events.SyntheticComplete)[] = [];
 
 let config: Types.Configuration.Configuration = Types.Configuration.defaults();
 
@@ -58,7 +58,7 @@ const makeRendererThread = (): RendererThread => ({
   entries: [],
   profileCalls: [],
   layoutEvents: [],
-  updateLayoutTreeEvents: [],
+  recalcStyleEvents: [],
 });
 
 const getOrCreateRendererProcess =
@@ -75,14 +75,16 @@ export function handleUserConfig(userConfig: Types.Configuration.Configuration):
 }
 
 export function reset(): void {
-  processes.clear();
-  entryToNode.clear();
-  entityMappings.eventsByEntity.clear();
-  entityMappings.entityByEvent.clear();
-  entityMappings.createdEntityCache.clear();
-  entityMappings.entityByUrlCache.clear();
-  completeEventStack.length = 0;
-  compositorTileWorkers.length = 0;
+  processes = new Map();
+  entryToNode = new Map();
+  entityMappings = {
+    eventsByEntity: new Map<HandlerHelpers.Entity, Types.Events.Event[]>(),
+    entityByEvent: new Map<Types.Events.Event, HandlerHelpers.Entity>(),
+    createdEntityCache: new Map<string, HandlerHelpers.Entity>(),
+    entityByUrlCache: new Map<string, HandlerHelpers.Entity>(),
+  };
+  completeEventStack = [];
+  compositorTileWorkers = [];
 }
 
 export function handleEvent(event: Types.Events.Event): void {
@@ -116,10 +118,10 @@ export function handleEvent(event: Types.Events.Event): void {
     thread.layoutEvents.push(event);
   }
 
-  if (Types.Events.isUpdateLayoutTree(event)) {
+  if (Types.Events.isRecalcStyle(event)) {
     const process = getOrCreateRendererProcess(processes, event.pid);
     const thread = getOrCreateRendererThread(process, event.tid);
-    thread.updateLayoutTreeEvents.push(event);
+    thread.recalcStyleEvents.push(event);
   }
 }
 
@@ -138,13 +140,11 @@ export function data(): RendererHandlerData {
     processes,
     compositorTileWorkers: gatherCompositorThreads(),
     entryToNode,
-    // We only shallow clone the data in the processor, so these nested
-    // values need to be manually cloned.
     entityMappings: {
-      entityByEvent: new Map(entityMappings.entityByEvent),
-      eventsByEntity: new Map(entityMappings.eventsByEntity),
-      createdEntityCache: new Map(entityMappings.createdEntityCache),
-      entityByUrlCache: new Map(entityMappings.entityByUrlCache),
+      entityByEvent: entityMappings.entityByEvent,
+      eventsByEntity: entityMappings.eventsByEntity,
+      createdEntityCache: entityMappings.createdEntityCache,
+      entityByUrlCache: entityMappings.entityByUrlCache,
     },
   };
 }
@@ -423,6 +423,6 @@ export interface RendererThread {
   entries: Types.Events.Event[];
   profileCalls: Types.Events.SyntheticProfileCall[];
   layoutEvents: Types.Events.Layout[];
-  updateLayoutTreeEvents: Types.Events.UpdateLayoutTree[];
+  recalcStyleEvents: Types.Events.RecalcStyle[];
   tree?: Helpers.TreeHelpers.TraceEntryTree;
 }

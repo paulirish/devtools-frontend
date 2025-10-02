@@ -1,4 +1,4 @@
-// Copyright 2021 The Chromium Authors. All rights reserved.
+// Copyright 2021 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -9,7 +9,7 @@ import {isModuleScope} from './utils/l10n-helper.ts';
 import {createRule} from './utils/ruleCreator.ts';
 
 type CallExpression = TSESTree.CallExpression;
-// True iff the callExpression is `i18n.i18n.registerUIStrings`.
+/** True iff the callExpression is `i18n.i18n.registerUIStrings`. **/
 function isRegisterUIStringsCall(callExpression: CallExpression): boolean {
   if (callExpression.callee?.type !== 'MemberExpression') {
     return false;

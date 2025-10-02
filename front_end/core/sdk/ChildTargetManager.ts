@@ -1,4 +1,4 @@
-// Copyright 2018 The Chromium Authors. All rights reserved.
+// Copyright 2018 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -12,6 +12,8 @@ import type * as ProtocolClient from '../protocol_client/protocol_client.js';
 import {ParallelConnection} from './Connections.js';
 import {PrimaryPageChangeType, ResourceTreeModel} from './ResourceTreeModel.js';
 import {SDKModel} from './SDKModel.js';
+import {SecurityOriginManager} from './SecurityOriginManager.js';
+import {StorageKeyManager} from './StorageKeyManager.js';
 import {Capability, type Target, Type} from './Target.js';
 import {Events as TargetManagerEvents, TargetManager} from './TargetManager.js';
 
@@ -31,7 +33,7 @@ export class ChildTargetManager extends SDKModel<EventTypes> implements Protocol
   readonly #targetManager: TargetManager;
   #parentTarget: Target;
   readonly #targetAgent: ProtocolProxyApi.TargetApi;
-  readonly #targetInfosInternal = new Map<Protocol.Target.TargetID, Protocol.Target.TargetInfo>();
+  readonly #targetInfos = new Map<Protocol.Target.TargetID, Protocol.Target.TargetInfo>();
   readonly #childTargetsBySessionId = new Map<Protocol.Target.SessionID, Target>();
   readonly #childTargetsById = new Map<Protocol.Target.TargetID|'main', Target>();
   readonly #parallelConnections = new Map<string, ProtocolClient.InspectorBackend.Connection>();
@@ -88,13 +90,13 @@ export class ChildTargetManager extends SDKModel<EventTypes> implements Protocol
   }
 
   targetCreated({targetInfo}: Protocol.Target.TargetCreatedEvent): void {
-    this.#targetInfosInternal.set(targetInfo.targetId, targetInfo);
+    this.#targetInfos.set(targetInfo.targetId, targetInfo);
     this.fireAvailableTargetsChanged();
     this.dispatchEventToListeners(Events.TARGET_CREATED, targetInfo);
   }
 
   targetInfoChanged({targetInfo}: Protocol.Target.TargetInfoChangedEvent): void {
-    this.#targetInfosInternal.set(targetInfo.targetId, targetInfo);
+    this.#targetInfos.set(targetInfo.targetId, targetInfo);
     const target = this.#childTargetsById.get(targetInfo.targetId);
     if (target) {
       void target.setHasCrashed(false);
@@ -114,7 +116,7 @@ export class ChildTargetManager extends SDKModel<EventTypes> implements Protocol
   }
 
   targetDestroyed({targetId}: Protocol.Target.TargetDestroyedEvent): void {
-    this.#targetInfosInternal.delete(targetId);
+    this.#targetInfos.delete(targetId);
     this.fireAvailableTargetsChanged();
     this.dispatchEventToListeners(Events.TARGET_DESTROYED, targetId);
   }
@@ -128,7 +130,7 @@ export class ChildTargetManager extends SDKModel<EventTypes> implements Protocol
 
   private fireAvailableTargetsChanged(): void {
     TargetManager.instance().dispatchEventToListeners(
-        TargetManagerEvents.AVAILABLE_TARGETS_CHANGED, [...this.#targetInfosInternal.values()]);
+        TargetManagerEvents.AVAILABLE_TARGETS_CHANGED, [...this.#targetInfos.values()]);
   }
 
   async getParentTargetId(): Promise<Protocol.Target.TargetID> {
@@ -204,6 +206,39 @@ export class ChildTargetManager extends SDKModel<EventTypes> implements Protocol
     if (waitingForDebugger) {
       void target.runtimeAgent().invoke_runIfWaitingForDebugger();
     }
+
+    // For top-level workers (those not attached to a frame), we need to
+    // initialize their storage context manually. The `Capability.STORAGE` is
+    // only granted in `Target.ts` to workers that are not parented by a frame,
+    // which makes this check safe. Frame-associated workers have their storage
+    // managed by ResourceTreeModel.
+    if (type !== Type.FRAME && target.hasAllCapabilities(Capability.STORAGE)) {
+      await this.initializeStorage(target);
+    }
+  }
+
+  private async initializeStorage(target: Target): Promise<void> {
+    const storageAgent = target.storageAgent();
+    const response = await storageAgent.invoke_getStorageKey({});
+
+    const storageKey = response.storageKey;
+    if (response.getError() || !storageKey) {
+      console.error(`Failed to get storage key for target ${target.id()}: ${response.getError()}`);
+      return;
+    }
+
+    const storageKeyManager = target.model(StorageKeyManager);
+    if (storageKeyManager) {
+      storageKeyManager.setMainStorageKey(storageKey);
+      storageKeyManager.updateStorageKeys(new Set([storageKey]));
+    }
+
+    const securityOriginManager = target.model(SecurityOriginManager);
+    if (securityOriginManager) {
+      const origin = new URL(storageKey).origin;
+      securityOriginManager.setMainSecurityOrigin(origin, '');
+      securityOriginManager.updateSecurityOrigins(new Set([origin]));
+    }
   }
 
   detachedFromTarget({sessionId}: Protocol.Target.DetachedFromTargetEvent): void {
@@ -253,7 +288,7 @@ export class ChildTargetManager extends SDKModel<EventTypes> implements Protocol
   }
 
   targetInfos(): Protocol.Target.TargetInfo[] {
-    return Array.from(this.#targetInfosInternal.values());
+    return Array.from(this.#targetInfos.values());
   }
 
   private static lastAnonymousTargetId = 0;

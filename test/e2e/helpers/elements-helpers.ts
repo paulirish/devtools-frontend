@@ -1,4 +1,4 @@
-// Copyright 2020 The Chromium Authors. All rights reserved.
+// Copyright 2020 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 import {assert} from 'chai';
@@ -8,17 +8,8 @@ import {AsyncScope} from '../../conductor/async-scope.js';
 import type {DevToolsPage} from '../../e2e_non_hosted/shared/frontend-helper.js';
 import type {InspectedPage} from '../../e2e_non_hosted/shared/target-helper.js';
 import {
-  $,
-  $$,
-  click,
-  clickMoreTabsButton,
-  drainFrontendTaskQueue,
-  getTextContent,
-  pressKey,
   step,
-  summonSearchBox,
-  typeText,
-  waitForFunction,
+
 } from '../../shared/helper.js';
 import {getBrowserAndPagesWrappers} from '../../shared/non_hosted_wrappers.js';
 
@@ -55,6 +46,8 @@ const LAYOUT_PANE_TABPANEL_SELECTOR = '[aria-label="Layout panel"]';
 const ADORNER_SELECTOR = 'devtools-adorner';
 export const INACTIVE_GRID_ADORNER_SELECTOR = '[aria-label="Enable grid mode"]';
 export const ACTIVE_GRID_ADORNER_SELECTOR = '[aria-label="Disable grid mode"]';
+export const INACTIVE_STARTING_STYLE_ADORNER_SELECTOR = '[aria-label="Enable @starting-style mode"]';
+export const ACTIVE_STARTING_STYLE_ADORNER_SELECTOR = '[aria-label="Disable @starting-style mode"]';
 const ELEMENT_CHECKBOX_IN_LAYOUT_PANE_SELECTOR = `${LAYOUT_PANE_TABPANEL_SELECTOR} .elements devtools-checkbox`;
 const ELEMENT_STYLE_SECTION_SELECTOR = '[aria-label="element.style, css selector"]';
 const STYLE_QUERY_RULE_TEXT_SELECTOR = '.query-text';
@@ -99,15 +92,14 @@ export const openLayoutPane = async (devToolsPage: DevToolsPage = getBrowserAndP
 
 export const waitForAdorners = async (
     expectedAdorners: Array<{textContent: string, isActive: boolean}>,
-    devToolsPage: DevToolsPage = getBrowserAndPagesWrappers().devToolsPage) => {
+    devToolsPage: DevToolsPage = getBrowserAndPagesWrappers().devToolsPage,
+    activeSelector: string = ACTIVE_GRID_ADORNER_SELECTOR) => {
   await devToolsPage.waitForFunction(async () => {
     const actualAdorners = await devToolsPage.$$(ADORNER_SELECTOR);
     const actualAdornersStates = await Promise.all(actualAdorners.map(n => {
       return n.evaluate((node, activeSelector: string) => {
-        // TODO for now only the grid adorner that can be active. When the flex (or other) adorner can be activated
-        // too we should change the selector passed here crbug.com/1144090.
         return {textContent: node.textContent, isActive: node.matches(activeSelector)};
-      }, ACTIVE_GRID_ADORNER_SELECTOR);
+      }, activeSelector);
     }));
 
     if (actualAdornersStates.length !== expectedAdorners.length) {
@@ -311,7 +303,7 @@ export const focusElementsTree = async (devToolsPage = getBrowserAndPagesWrapper
 
 export const navigateToSidePane = async (paneName: string, devToolsPage?: DevToolsPage) => {
   devToolsPage = devToolsPage || getBrowserAndPagesWrappers().devToolsPage;
-  if ((await $$(`[aria-label="${paneName} panel"]`, undefined, undefined, devToolsPage)).length) {
+  if ((await devToolsPage.$$(`[aria-label="${paneName} panel"]`)).length) {
     return;
   }
   await devToolsPage.click(`[aria-label="${paneName}"]`);
@@ -343,7 +335,7 @@ export const waitForElementsDOMBreakpointsSection =
   let domBreakpointsPane = await devToolsPage.$('DOM Breakpoints', undefined, 'aria');
   if (!domBreakpointsPane) {
     const elementsPanel = await devToolsPage.waitForAria('Elements panel');
-    await clickMoreTabsButton(elementsPanel, devToolsPage);
+    await devToolsPage.clickMoreTabsButton(elementsPanel);
     domBreakpointsPane = await devToolsPage.waitForAria('DOM Breakpoints');
   }
   await devToolsPage.click(DOM_BREAKPOINTS_SECTION_SELECTOR);
@@ -654,14 +646,14 @@ export const getComputedStyleProperties = async (devToolsPage?: DevToolsPage) =>
   return properties;
 };
 
-export const getDisplayedCSSDeclarations = async () => {
-  const cssDeclarations = await $$(CSS_DECLARATION_SELECTOR);
+export const getDisplayedCSSDeclarations = async (devtoolsPage = getBrowserAndPagesWrappers().devToolsPage) => {
+  const cssDeclarations = await devtoolsPage.$$(CSS_DECLARATION_SELECTOR);
   return await Promise.all(cssDeclarations.map(async node => await node.evaluate(n => n.textContent?.trim())));
 };
 
-export const getDisplayedStyleRulesCompact = async () => {
+export const getDisplayedStyleRulesCompact = async (devToolsPage = getBrowserAndPagesWrappers().devToolsPage) => {
   const compactRules = [];
-  for (const rule of await getDisplayedStyleRules()) {
+  for (const rule of await getDisplayedStyleRules(devToolsPage)) {
     compactRules.push(
         {selectorText: rule.selectorText, propertyNames: rule.propertyData.map(data => data.propertyName)});
   }
@@ -709,8 +701,9 @@ export const getDisplayedCSSPropertyData = async (
   return propertyNamesData;
 };
 
-export const getDisplayedCSSPropertyNames = async (propertiesSection: puppeteer.ElementHandle<Element>) => {
-  const cssPropertyNames = await $$(CSS_PROPERTY_NAME_SELECTOR, propertiesSection);
+export const getDisplayedCSSPropertyNames = async (
+    propertiesSection: puppeteer.ElementHandle<Element>, devToolsPage = getBrowserAndPagesWrappers().devToolsPage) => {
+  const cssPropertyNames = await devToolsPage.$$(CSS_PROPERTY_NAME_SELECTOR, propertiesSection);
   const propertyNamesText = (await Promise.all(cssPropertyNames.map(
                                  node => node.evaluate(n => n.textContent),
                                  )))
@@ -751,7 +744,7 @@ export const getColorSwatch = async (
 export const getColorSwatchColor = async (
     parent: puppeteer.ElementHandle<Element>, index: number,
     devToolsPage: DevToolsPage = getBrowserAndPagesWrappers().devToolsPage) => {
-  const swatch = await getColorSwatch(parent, index, devToolsPage);
+  const swatch = await devToolsPage.waitForFunction(() => getColorSwatch(parent, index, devToolsPage));
   return await swatch.evaluate(node => (node as HTMLElement).style.backgroundColor);
 };
 
@@ -793,8 +786,8 @@ export const getHiddenFontEditorButtons = async (devToolsPage = getBrowserAndPag
   return buttons;
 };
 
-export const getStyleSectionSubtitles = async () => {
-  const subtitles = await $$(SECTION_SUBTITLE_SELECTOR);
+export const getStyleSectionSubtitles = async (devToolsPage = getBrowserAndPagesWrappers().devToolsPage) => {
+  const subtitles = await devToolsPage.$$(SECTION_SUBTITLE_SELECTOR);
   return await Promise.all(subtitles.map(node => node.evaluate(n => n.textContent)));
 };
 
@@ -820,7 +813,9 @@ export const getCSSPropertyInRule = async (
 export const focusCSSPropertyValue =
     async (selector: string, propertyName: string, devToolsPage = getBrowserAndPagesWrappers().devToolsPage) => {
   await waitForStyleRule(selector, devToolsPage);
+  await devToolsPage.timeout(100);
   let property = await getCSSPropertyInRule(selector, propertyName, undefined, devToolsPage);
+  assert.isOk(property, `Could not find property ${propertyName} in rule ${selector}`);
   // Clicking on the semicolon element to make sure we don't hit the swatch or other
   // non-editable elements.
   await devToolsPage.click(CSS_PROPERTY_VALUE_SELECTOR + ' + .styles-semicolon', {root: property});
@@ -869,39 +864,43 @@ export async function editCSSProperty(
       undefined, devToolsPage);
 }
 
-// Edit a media or container query rule text for the given styles section
-export async function editQueryRuleText(queryStylesSections: puppeteer.ElementHandle<Element>, newQueryText: string) {
-  await click(STYLE_QUERY_RULE_TEXT_SELECTOR, {root: queryStylesSections});
+/** Edit a media or container query rule text for the given styles section **/
+export async function editQueryRuleText(
+    queryStylesSections: puppeteer.ElementHandle<Element>, newQueryText: string,
+    devToolsPage = getBrowserAndPagesWrappers().devToolsPage) {
+  await devToolsPage.click(STYLE_QUERY_RULE_TEXT_SELECTOR, {root: queryStylesSections});
   // TODO: it should actually wait for rendering to finish.
-  await drainFrontendTaskQueue();
-  await waitForFunction(async () => {
+  await devToolsPage.drainTaskQueue();
+  await devToolsPage.waitForFunction(async () => {
     // Wait until the value element has been marked as a text-prompt.
-    const queryText = await $(STYLE_QUERY_RULE_TEXT_SELECTOR, queryStylesSections);
+    const queryText = await devToolsPage.$(STYLE_QUERY_RULE_TEXT_SELECTOR, queryStylesSections);
     assert.isOk(queryText, 'Could not find any query in the given styles section');
     const check = await queryText.evaluate(node => {
       return node.classList.contains('being-edited') && node.hasAttribute('contenteditable');
     });
     return check;
   });
-  await typeText(newQueryText);
-  await pressKey('Enter');
+  await devToolsPage.typeText(newQueryText);
+  await devToolsPage.pressKey('Enter');
 
   // TODO: it should actually wait for rendering to finish.
-  await drainFrontendTaskQueue();
+  await devToolsPage.drainTaskQueue();
 
-  await waitForFunction(async () => {
+  await devToolsPage.waitForFunction(async () => {
     // Wait until the value element is not a text-prompt anymore.
-    const queryText = await $(STYLE_QUERY_RULE_TEXT_SELECTOR, queryStylesSections);
+    const queryText = await devToolsPage.$(STYLE_QUERY_RULE_TEXT_SELECTOR, queryStylesSections);
     assert.isOk(queryText, 'Could not find any query in the given styles section');
     const check = await queryText.evaluate(node => {
       return !node.classList.contains('being-edited') && !node.hasAttribute('contenteditable');
     });
     return check;
   });
-  await expectVeEvents([
-    veClick('Panel: elements > Pane: styles > Section: style-properties > CSSRuleHeader: container-query'),
-    veChange('Panel: elements > Pane: styles > Section: style-properties > CSSRuleHeader: container-query'),
-  ]);
+  await expectVeEvents(
+      [
+        veClick('Panel: elements > Pane: styles > Section: style-properties > CSSRuleHeader: container-query'),
+        veChange('Panel: elements > Pane: styles > Section: style-properties > CSSRuleHeader: container-query'),
+      ],
+      undefined, devToolsPage);
 }
 
 export async function waitForCSSPropertyValue(
@@ -927,9 +926,10 @@ export async function waitForCSSPropertyValue(
   });
 }
 
-export async function waitForPropertyToHighlight(ruleSelector: string, propertyName: string) {
-  await waitForFunction(async () => {
-    const property = await getCSSPropertyInRule(ruleSelector, propertyName);
+export async function waitForPropertyToHighlight(
+    ruleSelector: string, propertyName: string, devToolsPage = getBrowserAndPagesWrappers().devToolsPage) {
+  await devToolsPage.waitForFunction(async () => {
+    const property = await getCSSPropertyInRule(ruleSelector, propertyName, undefined, devToolsPage);
     assert.isOk(property, `Could not find property ${propertyName} in rule ${ruleSelector}`);
     // StylePropertyHighlighter temporarily highlights the property using the Web Animations API, so the only way to
     // know it's happening is by listing all animations.
@@ -975,6 +975,7 @@ export const navigateToElementsTab = async (devtoolsPage = getBrowserAndPagesWra
   // Open Elements panel
   await devtoolsPage.click('#tab-elements');
   await devtoolsPage.waitFor(ELEMENTS_PANEL_SELECTOR);
+  await devtoolsPage.timeout(100);
   await expectVeEvents([veImpressionForElementsPanel()], undefined, devtoolsPage);
 };
 
@@ -1145,7 +1146,9 @@ export const getPropertiesWithHints =
 
 export const summonAndWaitForSearchBox =
     async (devToolsPage: DevToolsPage = getBrowserAndPagesWrappers().devToolsPage) => {
-  await summonSearchBox(devToolsPage);
+  // Wait for elements to load.
+  await devToolsPage.waitFor('devtools-elements-breadcrumbs');
+  await devToolsPage.summonSearchBox();
   await devToolsPage.waitFor(SEARCH_BOX_SELECTOR);
   await expectVeEvents(
       [
@@ -1162,10 +1165,10 @@ export const summonAndWaitForSearchBox =
       undefined, devToolsPage);
 };
 
-export const assertSearchResultMatchesText = async (text: string, devToolsPage?: DevToolsPage) => {
-  await waitForFunction(async () => {
-    return await getTextContent(SEARCH_RESULTS_MATCHES, undefined, devToolsPage) === text;
-  }, undefined, undefined, devToolsPage);
+export const assertSearchResultMatchesText = async (text: string, devToolsPage: DevToolsPage) => {
+  await devToolsPage.waitForFunction(async () => {
+    return await devToolsPage.getTextContent(SEARCH_RESULTS_MATCHES) === text;
+  });
 };
 
 export const goToResourceAndWaitForStyleSection = async (

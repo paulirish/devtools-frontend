@@ -1,4 +1,4 @@
-// Copyright 2023 The Chromium Authors. All rights reserved.
+// Copyright 2023 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 /* eslint-disable rulesdir/no-lit-render-outside-of-view */
@@ -29,9 +29,11 @@ const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
 
 const IS_DIALOG_SUPPORTED = 'HTMLDialogElement' in globalThis;
 
-// Height in pixels of the dialog's connector. The connector is represented as
-// as a diamond and the height corresponds to half the height of the diamond.
-// (the visible height is only half of the diamond).
+/**
+ * Height in pixels of the dialog's connector. The connector is represented as
+ * as a diamond and the height corresponds to half the height of the diamond.
+ * (the visible height is only half of the diamond).
+ **/
 export const CONNECTOR_HEIGHT = 10;
 const CONNECTOR_WIDTH = 2 * CONNECTOR_HEIGHT;
 
@@ -41,12 +43,14 @@ const DIALOG_ANIMATION_OFFSET = 20;
 export const DIALOG_SIDE_PADDING = 5;
 export const DIALOG_VERTICAL_PADDING = 3;
 
-// If the content of the dialog cannot be completely shown because otherwise
-// the dialog would overflow the window, the dialog's max width and height are
-// set such that the dialog remains inside the visible bounds. In this cases
-// some extra, determined by this constant, is added so that the dialog's borders
-// remain clearly visible. This constant accounts for the padding of the dialog's
-// content (20 px) and a 5px gap left on each extreme of the dialog from the viewport.
+/**
+ * If the content of the dialog cannot be completely shown because otherwise
+ * the dialog would overflow the window, the dialog's max width and height are
+ * set such that the dialog remains inside the visible bounds. In this cases
+ * some extra, determined by this constant, is added so that the dialog's borders
+ * remain clearly visible. This constant accounts for the padding of the dialog's
+ * content (20 px) and a 5px gap left on each extreme of the dialog from the viewport.
+ **/
 export const DIALOG_PADDING_FROM_WINDOW = 3 * CONNECTOR_HEIGHT;
 interface DialogData {
   /**
@@ -142,7 +146,7 @@ export class Dialog extends HTMLElement {
   #isPendingCloseDialog = false;
   #hitArea = new DOMRect(0, 0, 0, 0);
   #dialogClientRect = new DOMRect(0, 0, 0, 0);
-  #bestVerticalPositionInternal: DialogVerticalPosition|null = null;
+  #bestVerticalPosition: DialogVerticalPosition|null = null;
   #bestHorizontalAlignment: DialogHorizontalAlignment|null = null;
   readonly #devtoolsMutationObserver = new MutationObserver(mutations => {
     if (this.#props.expectedMutationsSelector) {
@@ -211,7 +215,7 @@ export class Dialog extends HTMLElement {
   }
 
   get bestVerticalPosition(): DialogVerticalPosition|null {
-    return this.#bestVerticalPositionInternal;
+    return this.#bestVerticalPosition;
   }
 
   get bestHorizontalAlignment(): DialogHorizontalAlignment|null {
@@ -266,6 +270,12 @@ export class Dialog extends HTMLElement {
 
   set state(state: DialogState) {
     this.#props.state = state;
+
+    // Handles teardown process in case dialog is collapsed or disabled
+    if (this.#props.state === DialogState.COLLAPSED || this.#props.state === DialogState.DISABLED) {
+      this.#forceDialogCloseInDevToolsBound();
+    }
+
     this.#onStateChange();
   }
 
@@ -312,12 +322,10 @@ export class Dialog extends HTMLElement {
 
   async setDialogVisible(show: boolean): Promise<void> {
     if (show) {
-      this.state = DialogState.EXPANDED;
       await this.#showDialog();
       return;
     }
 
-    this.state = DialogState.COLLAPSED;
     this.#closeDialog();
   }
 
@@ -472,11 +480,11 @@ export class Dialog extends HTMLElement {
             this.#getBestHorizontalAlignment(absoluteAnchorBounds, devtoolsBounds) :
             this.#props.horizontalAlignment;
 
-        this.#bestVerticalPositionInternal = this.#props.position === DialogVerticalPosition.AUTO ?
+        this.#bestVerticalPosition = this.#props.position === DialogVerticalPosition.AUTO ?
             this.#getBestVerticalPosition(absoluteAnchorBounds, dialogHeight, devtoolsBounds) :
             this.#props.position;
         if (this.#bestHorizontalAlignment === DialogHorizontalAlignment.AUTO ||
-            this.#bestVerticalPositionInternal === DialogVerticalPosition.AUTO) {
+            this.#bestVerticalPosition === DialogVerticalPosition.AUTO) {
           return;
         }
         this.#hitArea.height = anchorBottom - anchorTop + CONNECTOR_HEIGHT;
@@ -538,7 +546,7 @@ export class Dialog extends HTMLElement {
                 this.#bestHorizontalAlignment, `Unknown alignment type: ${this.#bestHorizontalAlignment}`);
         }
 
-        switch (this.#bestVerticalPositionInternal) {
+        switch (this.#bestVerticalPosition) {
           case DialogVerticalPosition.TOP: {
             this.style.setProperty('--dialog-top', '0');
             this.style.setProperty('--dialog-margin', 'auto');
@@ -559,8 +567,7 @@ export class Dialog extends HTMLElement {
             break;
           }
           default:
-            Platform.assertNever(
-                this.#bestVerticalPositionInternal, `Unknown position type: ${this.#bestVerticalPositionInternal}`);
+            Platform.assertNever(this.#bestVerticalPosition, `Unknown position type: ${this.#bestVerticalPosition}`);
         }
 
         dialog.close();
@@ -701,7 +708,7 @@ export class Dialog extends HTMLElement {
       return;
     }
 
-    let dialogContent = html``;
+    let dialogContent: Lit.LitTemplate = Lit.nothing;
 
     // If state is expanded content should be shown, do not render it otherwise.
     if (this.#props.state === DialogState.EXPANDED) {
@@ -775,7 +782,8 @@ export const enum DialogVerticalPosition {
 
 export const enum DialogState {
   EXPANDED = 'expanded',
-  COLLAPSED = 'collapsed'
+  COLLAPSED = 'collapsed',
+  DISABLED = 'disabled'
 }
 
 export const enum DialogHorizontalAlignment {

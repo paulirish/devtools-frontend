@@ -1,4 +1,4 @@
-// Copyright 2019 The Chromium Authors. All rights reserved.
+// Copyright 2019 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -11,10 +11,11 @@ import * as Platform from '../../core/platform/platform.js';
 import * as Root from '../../core/root/root.js';
 import * as SDK from '../../core/sdk/sdk.js';
 import type * as Protocol from '../../generated/protocol.js';
+import * as Geometry from '../../models/geometry/geometry.js';
 import * as TextUtils from '../../models/text_utils/text_utils.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
-import {Directives, html, nothing, render, type TemplateResult} from '../../ui/lit/lit.js';
+import {Directives, html, type LitTemplate, nothing, render, type TemplateResult} from '../../ui/lit/lit.js';
 import * as VisualLogging from '../../ui/visual_logging/visual_logging.js';
 
 import cssOverviewCompletedViewStyles from './cssOverviewCompletedView.css.js';
@@ -280,7 +281,7 @@ export const DEFAULT_VIEW: View = (input, output, target) => {
       <style>${cssOverviewCompletedViewStyles}</style>
       <devtools-split-view direction="column" sidebar-position="first" sidebar-initial-size="200">
         <devtools-widget slot="sidebar" .widgetConfig=${widgetConfig(CSSOverviewSidebarPanel, {
-          minimumSize: new UI.Geometry.Size(100, 25),
+          minimumSize: new Geometry.Size(100, 25),
           items: [
             {name: i18nString(UIStrings.overviewSummary), id: 'summary'},
             {name: i18nString(UIStrings.colors), id: 'colors'},
@@ -518,10 +519,10 @@ function renderContrastIssue(key: string, issues: ContrastIssue[]): TemplateResu
   // clang-format on
 }
 
-function renderColor(section: string, color: string): TemplateResult {
+function renderColor(section: string, color: string): LitTemplate {
   const borderColor = Common.Color.parse(color)?.asLegacyColor();
   if (!borderColor) {
-    return html``;
+    return nothing;
   }
   // clang-format off
   return html`<li>
@@ -1005,9 +1006,9 @@ export class ElementDetailsView extends UI.Widget.Widget {
   }
 }
 
-function renderNode(data: PopulateNodesEventNodeTypes, link?: HTMLElement, showNode?: () => void): TemplateResult {
+function renderNode(data: PopulateNodesEventNodeTypes, link?: HTMLElement, showNode?: () => void): LitTemplate {
   if (!link) {
-    return html``;
+    return nothing;
   }
   return html`
     <td>
