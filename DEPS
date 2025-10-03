@@ -12,19 +12,19 @@ vars = {
   'build_with_chromium': False,
 
   'build_url': 'https://chromium.googlesource.com/chromium/src/build.git',
-  'build_revision': '58de1d33c025bc25bb6932ed41688ed073f33787',
+  'build_revision': '8547cfb0c1f6c1801ff14df6f5d1bcdf0a2182a1',
 
   'buildtools_url': 'https://chromium.googlesource.com/chromium/src/buildtools.git',
-  'buildtools_revision': '02f9e66e820bb27fed124ce2a46c0fb203cf99a6',
+  'buildtools_revision': '2325cd98715bdbd532669717df8ce48cff9dc407',
 
   'depot_tools_url': 'https://chromium.googlesource.com/chromium/tools/depot_tools.git',
-  'depot_tools_revision': '3f15de2ac33315ac4f08c0da2cb723ccf07f8217',
+  'depot_tools_revision': 'e4185d003f9c08cb49edcb593212481db59d9a54',
 
   'inspector_protocol_url': 'https://chromium.googlesource.com/deps/inspector_protocol',
   'inspector_protocol_revision': '1b1bcbbe060e8c8cd8704f00f78978c50991b307',
 
   # Keeping track of the last time we rolled the browser protocol files.
-  'chromium_browser_protocol_revision' : '7e820ee23f1e46a5f03cb6e18b22a5a5120927eb',
+  'chromium_browser_protocol_revision' : 'a30399d46b7914d6e069850de11a91944acf37b1',
 
   'clang_format_url': 'https://chromium.googlesource.com/external/github.com/llvm/llvm-project/clang/tools/clang-format.git',
   'clang_format_revision': '37f6e68a107df43b7d7e044fd36a13cbae3413f2',
@@ -49,7 +49,7 @@ vars = {
   # Chrome version used for tests. It should be regularly updated to
   # match the Canary version listed here:
   # https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json
-  'chrome': '142.0.7444.6',
+  'chrome': '143.0.7448.0',
 
   # 'magic' text to tell depot_tools that git submodules should be accepted but
   # but parity with DEPS file is expected.
