@@ -155,8 +155,13 @@ export class Table extends HTMLElement {
     }
 
     this.#currentHoverIndex = index;
-    // Temporarily selects the row, but only if there is not already a sticky selection.
-    this.#onSelectedRowChanged(rowEl, index, {isHover: true});
+    
+    // Don't toggle overlays on hover, only update visual state
+    if (this.#state && !this.#state.selectionIsSticky) {
+      this.#state.selectedRowEl?.classList.remove('selected');
+      rowEl.classList.add('selected');
+      this.#state.selectedRowEl = rowEl;
+    }
   }
 
   #onClickRow(e: MouseEvent): void {
@@ -192,8 +197,12 @@ export class Table extends HTMLElement {
     }
 
     this.#currentHoverIndex = null;
-    // Unselect the row, unless it's sticky.
-    this.#onSelectedRowChanged(null, null);
+    
+    // Only reset visual state if selection is not sticky
+    if (this.#state && !this.#state.selectionIsSticky) {
+      this.#state.selectedRowEl?.classList.remove('selected');
+      this.#state.selectedRowEl = null;
+    }
   }
 
   #onSelectedRowChanged(rowEl: HTMLElement|null, rowIndex: number|null, opts: {
