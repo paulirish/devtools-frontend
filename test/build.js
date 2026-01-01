@@ -1,0 +1,1 @@
+export default {SOURCE_ROOT: '../../../../', CHECKOUT_ROOT: '../../../../', BUILD_ROOT: '../..', BUILD_WITH_CHROMIUM: false};

@@ -1,0 +1,2 @@
+application/boot-perf.test.js
+panels/performance/trace-load.test.js
