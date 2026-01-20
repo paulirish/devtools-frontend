@@ -14,5 +14,3 @@ echo "Removing out directory..."
 rm -rf out
 
 echo "Cleanup complete."
-
-
