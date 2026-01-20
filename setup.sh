@@ -37,6 +37,9 @@ export PATH="$PWD/third_party/depot_tools:$PATH"
 export DEPOT_TOOLS_UPDATE=0
 export NO_AUTH_BOTO_CONFIG=/dev/null
 
+echo "Running ensure_bootstrap…"
+ensure_bootstrap
+
 # Run gclient sync
 echo "Running gclient sync..."
 gclient sync

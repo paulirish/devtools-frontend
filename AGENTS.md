@@ -53,12 +53,10 @@ Helper scripts have been added to the repository to automate this setup:
 
 *   **Build**: After setup, you can build targets using `autoninja`:
     ```bash
-    export PATH="$PWD/third_party/depot_tools:$PATH"
     autoninja -C out/Default
     ```
 *   **Test**: Run tests using `npm test`:
     ```bash
-    export PATH="$PWD/third_party/depot_tools:$PATH"
     npm test -- front_end/core/platform/StringUtilities.test.ts
     ```
 
