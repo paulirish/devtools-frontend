@@ -7,6 +7,18 @@
 *.rules
 *.sln
 *.stamp
+
+
+# for jules-style temporary files
+.gclient
+.gclient_entries
+.gclient_previous_custom_vars
+.gclient_previous_sync_commits
+.gcs_entries
+.siso_failed_targets
+.cipd
+
+# Continuing..
 *.tmp
 *.vcproj*
 *.vcxproj*
