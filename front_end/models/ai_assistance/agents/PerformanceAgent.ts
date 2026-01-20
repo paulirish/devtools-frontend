@@ -77,37 +77,29 @@ const getGreenDevAdditionalWidgetGuidelines = (): string => {
 
   if (widgetsFromFunctionCalls) {
     return `
-- CRITICAL: You have access to three functions for adding rich, interactive widgets to your response:
-  \`addInsightWidget\`, \`addNetworkRequestWidget\`, and \`addFlameChartWidget\`.
-  You MUST use these functions whenever you refer to a corresponding entity.
+- CRITICAL: You have access to a function for adding rich, interactive widgets to your response: \`addWidget\`.
+  You MUST use this function whenever you refer to a corresponding entity.
 
-- **\`addInsightWidget({insightType: '...'})\`**:
-  - **When to use**: Call this function every time you mention a specific performance insight (e.g., LCP, INP,
-    CLS culprits).
-  - **Purpose**: It embeds an interactive widget that provides a detailed breakdown and visualization of the
-    insight.
-  - **Example**: If you are explaining the causes of a poor LCP score, you MUST also call
-    \`addInsightWidget({insightType: 'LCPBreakdown'})\`. This provides the user with the data to explore
-    alongside your explanation.
-- **\`addNetworkRequestWidget({eventKey: '...'})\`**:
+- **\`addWidget({widget: {type: 'insight', insightType: '...'}})\`**:
+  - **When to use**: Call this function every time you mention a specific performance insight (e.g., LCP, INP, CLS culprits).
+  - **Purpose**: It embeds an interactive widget that provides a detailed breakdown and visualization of the insight.
+  - **Example**: If you are explaining the causes of a poor LCP score, you MUST also call \`addWidget({widget: {type: 'insight', insightType: 'LCPBreakdown'}})\`.
+
+- **\`addWidget({widget: {type: 'network-request', eventKey: '...'}})\`**:
   - **When to use**: Call this function whenever you discuss a specific network request.
-  - **Purpose**: It adds a widget displaying the full details of the network request, such as its timing,
-    headers, and priority.
-  - **Critical**: The eventKey should be the trace event key (only the number, no letters prefix or -) of that
-    script's network request.
-  - **Example**: If you identify a render-blocking script, you MUST also call
-    \`addNetworkRequestWidget({eventKey: '...'})\` with the trace event key (only the number, no letters prefix
-    or -) of that script's network request.
-- **\`addFlameChartWidget({start: ..., end: ...})\`**:
-  - **When to use**: Call this function to highlight a specific time range within the trace, especially when
-    discussing long tasks, specific events, or periods of high activity.
+  - **Purpose**: It adds a widget displaying the full details of the network request, such as its timing, headers, and priority.
+  - **Critical**: The eventKey should be the trace event key (only the number, no letters prefix or -) of that script's network request.
+  - **Example**: If you identify a render-blocking script, you MUST also call \`addWidget({widget: {type: 'network-request', eventKey: '...'}})\`.
+
+- **\`addWidget({widget: {type: 'flamechart', start: ..., end: ...}})\`**:
+  - **When to use**: Call this function to highlight a specific time range within the trace, especially when discussing long tasks, specific events, or periods of high activity.
     - **Purpose**: It embeds a focused flame chart visualization for the given time range (in microseconds).
-    - **Example**: If you find a long task that is blocking the main thread, you MUST also call
-      \`addFlameChartWidget({start: 123456, end: 789012})\`. This provides the user with the data to explore
-      alongside your explanation.
+    - **Example**: If you find a long task that is blocking the main thread, you MUST also call \`addWidget({widget: {type: 'flamechart', start: 123456, end: 789012}})\`.
+
 - **General Rules**:
-  - You MUST call these functions as soon as you identify the entity you are discussing.
+  - You MUST call this function as soon as you identify the entity you are discussing.
   - Do NOT add more than one widget for the same insight, network request, or time range to avoid redundancy.
+  - If you have already shown a widget for any specific insight, network request, or time range, do not show it again.
 `;
   }
 
@@ -790,6 +782,7 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
             nullable: false,
           }
         },
+        required: ['insightSetId', 'insightName']
       },
       displayInfoFromArgs: params => {
         return {
@@ -837,6 +830,7 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
             nullable: false,
           }
         },
+        required: ['eventKey']
       },
       displayInfoFromArgs: params => {
         return {title: lockedString('Looking at trace event…'), action: `getEventByKey('${params.eventKey}')`};
@@ -894,6 +888,7 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
             nullable: false,
           },
         },
+        required: ['min', 'max']
       },
       displayInfoFromArgs: args => {
         return {
@@ -951,6 +946,7 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
             nullable: false,
           },
         },
+        required: ['min', 'max']
       },
       displayInfoFromArgs: args => {
         return {
@@ -1001,6 +997,7 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
             nullable: false,
           },
         },
+        required: ['eventKey']
       },
       displayInfoFromArgs: args => {
         return {title: lockedString('Looking at call tree…'), action: `getDetailedCallTree('${args.eventKey}')`};
@@ -1054,7 +1051,9 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
               description: 'The message the annotation should show to the user.',
               nullable: false,
             },
+
           },
+          required: ['elementId', 'annotationMessage']
         },
         handler: async params => {
           return await this.addElementAnnotation(params.elementId, params.annotationMessage);
@@ -1085,6 +1084,7 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
               nullable: false,
             },
           },
+          required: ['eventKey', 'annotationMessage']
         },
         handler: async params => {
           return await this.addNetworkRequestAnnotation(params.eventKey, params.annotationMessage);
@@ -1116,6 +1116,7 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
             nullable: false,
           },
         },
+        required: ['scriptUrl', 'line', 'column']
       },
       displayInfoFromArgs: args => {
         return {
@@ -1174,6 +1175,7 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
             nullable: false,
           },
         },
+        required: ['url']
       },
       displayInfoFromArgs: args => {
         return {title: lockedString('Looking at resource content…'), action: `getResourceContent('${args.url}')`};
@@ -1228,6 +1230,7 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
               nullable: false,
             }
           },
+          required: ['eventKey']
         },
         displayInfoFromArgs: params => {
           return {title: lockedString('Selecting event…'), action: `selectEventByKey('${params.eventKey}')`};
@@ -1247,104 +1250,106 @@ export class PerformanceAgent extends AiAgent<AgentFocus> {
     }
 
     if (Root.Runtime.hostConfig.devToolsGreenDevUi?.enabled) {
-      this.declareFunction<{insightType: Trace.Insights.Types.InsightKeys}>('addInsightWidget', {
+      this.declareFunction<
+          {
+            type: 'insight' | 'network-request' | 'flamechart',
+            insightType?: Trace.Insights.Types.InsightKeys,
+            eventKey?: number,
+            start?: number,
+            end?: number,
+          },
+          object|{error: string}>('addWidget', {
         description:
-            'Adds an insight widget to the response. When mentioning an insight, call this function to also display an appropriate widget.',
+            'Adds an insight widget to the response. When mentioning an insight, call this function to also display an appropriate widget. Use this as much as possible to provide a better user experience.',
         parameters: {
           type: Host.AidaClient.ParametersTypes.OBJECT,
           description: '',
           nullable: false,
           properties: {
+            type: {
+              type: Host.AidaClient.ParametersTypes.STRING,
+              description: 'The type of the widget to add. Possible values: insight, network-request, flamechart',
+              nullable: false,
+            },
             insightType: {
               type: Host.AidaClient.ParametersTypes.STRING,
-              description:
-                  'The name of the insight. Only use the insight names given in the "Available insights" list.',
-              nullable: false,
+              description: 'The type of the insight widget. Include for insight widgets.',
+              nullable: true,
             },
-          },
-        },
-        handler: async _params => {
-          ArtifactsManager.instance().addArtifact({type: 'insight', insightType: _params.insightType});
-          return {result: {success: true}};
-        },
-      });
-
-      this.declareFunction<{eventKey: string}, object|{error: string}>('addNetworkRequestWidget', {
-        description:
-            'Adds a network request widget to the response. When mentioning a network request, call this function with its trace event key.',
-        parameters: {
-          type: Host.AidaClient.ParametersTypes.OBJECT,
-          description: '',
-          nullable: false,
-          properties: {
             eventKey: {
               type: Host.AidaClient.ParametersTypes.STRING,
-              description: 'The trace event key for the network request.',
-              nullable: false,
+              description: 'The event key for the network request widget. Include for network request widgets.',
+              nullable: true,
             },
-          },
-        },
-        handler: async _params => {
-          const rawTraceEvent =
-              Trace.Helpers.SyntheticEvents.SyntheticEventsManager.getActiveManager().getRawTraceEvents().at(
-                  Number(_params.eventKey));
-          // Get the trace event object if it is available.
-          // If the trace is uploaded, we need to use the synthetic event.
-          if (rawTraceEvent && Trace.Types.Events.isSyntheticNetworkRequest(rawTraceEvent)) {
-            const rawTraceEventId = rawTraceEvent?.args?.data?.requestId;
-            const rawTraceEventUrl = rawTraceEvent?.args?.data?.url;
-            const networkRequest = rawTraceEvent ? Logs.NetworkLog.NetworkLog.instance()
-                                                       .requestsForId(rawTraceEventId)
-                                                       .find(r => r.url() === rawTraceEventUrl) :
-                                                   null;
-            if (networkRequest) {
-              ArtifactsManager.instance().addArtifact({type: 'network-request', request: networkRequest});
-              return {result: {success: true}};
-            }
-          }
-
-          const syntheticRequest =
-              Trace.Helpers.SyntheticEvents.SyntheticEventsManager.getActiveManager().syntheticEventForRawEventIndex(
-                  Number(_params.eventKey));
-
-          if (syntheticRequest && Trace.Types.Events.isSyntheticNetworkRequest(syntheticRequest)) {
-            ArtifactsManager.instance().addArtifact({
-              type: 'network-request',
-              request: syntheticRequest,
-            });
-            return {result: {success: true}};
-          }
-
-          return {result: {error: 'Could not find network request'}};
-        },
-      });
-
-      this.declareFunction<{start: number, end: number}, object|{error: string}>('addFlameChartWidget', {
-        description: 'Adds a flame chart widget to the response.',
-        parameters: {
-          type: Host.AidaClient.ParametersTypes.OBJECT,
-          description: '',
-          nullable: false,
-          properties: {
             start: {
               type: Host.AidaClient.ParametersTypes.INTEGER,
-              description: 'The start time of the flame chart in microseconds.',
-              nullable: false,
+              description: 'The start time for the flame chart widget. Include for flame chart widgets.',
+              nullable: true,
             },
             end: {
               type: Host.AidaClient.ParametersTypes.INTEGER,
-              description: 'The end time of the flame chart in microseconds.',
-              nullable: false,
+              description: 'The end time for the flame chart widget. Include for flame chart widgets.',
+              nullable: true,
             },
           },
+          required: ['type']
         },
-        handler: async _params => {
-          ArtifactsManager.instance().addArtifact({
-            type: 'flamechart',
-            start: Trace.Types.Timing.Micro(_params.start),
-            end: Trace.Types.Timing.Micro(_params.end),
-          });
-          return {result: {success: true}};
+        handler: async params => {
+          switch (params.type) {
+            case 'insight':
+              if (!params.insightType) {
+                return {error: 'Missing insightType for insight widget'};
+              }
+              ArtifactsManager.instance().addArtifact({type: 'insight', insightType: params.insightType});
+              return {result: {success: true}};
+            case 'network-request': {
+              if (!params.eventKey) {
+                return {error: 'Missing eventKey for network-request widget'};
+              }
+              const rawTraceEvent =
+                  Trace.Helpers.SyntheticEvents.SyntheticEventsManager.getActiveManager().getRawTraceEvents().at(
+                      Number(params.eventKey));
+              // Get the trace event object if it is available.
+              // If the trace is uploaded, we need to use the synthetic event.
+              if (rawTraceEvent && Trace.Types.Events.isSyntheticNetworkRequest(rawTraceEvent)) {
+                const rawTraceEventId = rawTraceEvent?.args?.data?.requestId;
+                const rawTraceEventUrl = rawTraceEvent?.args?.data?.url;
+                const networkRequest = rawTraceEvent ? Logs.NetworkLog.NetworkLog.instance()
+                                                           .requestsForId(rawTraceEventId)
+                                                           .find(r => r.url() === rawTraceEventUrl) :
+                                                       null;
+                if (networkRequest) {
+                  ArtifactsManager.instance().addArtifact({type: 'network-request', request: networkRequest});
+                  return {result: {success: true}};
+                }
+              }
+
+              const syntheticRequest = Trace.Helpers.SyntheticEvents.SyntheticEventsManager.getActiveManager()
+                                           .syntheticEventForRawEventIndex(Number(params.eventKey));
+
+              if (syntheticRequest && Trace.Types.Events.isSyntheticNetworkRequest(syntheticRequest)) {
+                ArtifactsManager.instance().addArtifact({
+                  type: 'network-request',
+                  request: syntheticRequest,
+                });
+                return {result: {success: true}};
+              }
+
+              return {result: {error: 'Could not find network request'}};
+            }
+            case 'flamechart':
+              if (params.start === undefined || params.end === undefined) {
+                return {error: 'Missing start or end for flamechart widget'};
+              }
+              ArtifactsManager.instance().addArtifact({
+                type: 'flamechart',
+                start: Trace.Types.Timing.Micro(params.start),
+                end: Trace.Types.Timing.Micro(params.end),
+              });
+              return {result: {success: true}};
+            default:
+              return {error: 'Invalid widget type'};
+          }
         },
       });
     }

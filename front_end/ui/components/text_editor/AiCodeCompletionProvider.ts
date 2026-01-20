@@ -6,12 +6,14 @@ import * as Common from '../../../core/common/common.js';
 import * as Host from '../../../core/host/host.js';
 import * as i18n from '../../../core/i18n/i18n.js';
 import * as AiCodeCompletion from '../../../models/ai_code_completion/ai_code_completion.js';
+import * as AiCodeGeneration from '../../../models/ai_code_generation/ai_code_generation.js';
 import * as PanelCommon from '../../../panels/common/common.js';
 import * as CodeMirror from '../../../third_party/codemirror.next/codemirror.next.js';
 import * as UI from '../../legacy/legacy.js';
 import * as VisualLogging from '../../visual_logging/visual_logging.js';
 
-import {AiCodeCompletionTeaserPlaceholder} from './AiCodeCompletionTeaserPlaceholder.js';
+import {AccessiblePlaceholder} from './AccessiblePlaceholder.js';
+import {type AiCodeGenerationConfig, AiCodeGenerationProvider} from './AiCodeGenerationProvider.js';
 import {
   acceptAiAutoCompleteSuggestion,
   aiAutoCompleteSuggestion,
@@ -46,10 +48,9 @@ export interface AiCodeCompletionConfig {
   };
   onFeatureEnabled: () => void;
   onFeatureDisabled: () => void;
-  onSuggestionAccepted: () => void;
+  onSuggestionAccepted: (citations: Host.AidaClient.Citation[]) => void;
   onRequestTriggered: () => void;
-  // TODO(b/445394511): Move exposing citations to onSuggestionAccepted
-  onResponseReceived: (citations: Host.AidaClient.Citation[]) => void;
+  onResponseReceived: () => void;
   panel: AiCodeCompletion.AiCodeCompletion.ContextFlavor;
 }
 
@@ -67,7 +68,10 @@ export class AiCodeCompletionProvider {
   #teaser?: PanelCommon.AiCodeCompletionTeaser;
   #suggestionRenderingTimeout?: number;
   #editor?: TextEditor;
+  #aiCodeCompletionCitations: Host.AidaClient.Citation[] = [];
   #aiCodeCompletionConfig?: AiCodeCompletionConfig;
+  #aiCodeGenerationConfig?: AiCodeGenerationConfig;
+  #aiCodeGenerationProvider?: AiCodeGenerationProvider;
 
   #boundOnUpdateAiCodeCompletionState = this.#updateAiCodeCompletionState.bind(this);
 
@@ -77,6 +81,18 @@ export class AiCodeCompletionProvider {
       throw new Error('AI code completion feature is not enabled.');
     }
     this.#aiCodeCompletionConfig = aiCodeCompletionConfig;
+    if (AiCodeGeneration.AiCodeGeneration.AiCodeGeneration.isAiCodeGenerationEnabled(devtoolsLocale.locale)) {
+      this.#aiCodeGenerationConfig = {
+        generationContext: {
+          inferenceLanguage: this.#aiCodeCompletionConfig.completionContext.inferenceLanguage,
+        },
+        onSuggestionAccepted: this.#aiCodeCompletionConfig.onSuggestionAccepted.bind(this),
+        onRequestTriggered: this.#aiCodeCompletionConfig.onRequestTriggered.bind(this),
+        onResponseReceived: this.#aiCodeCompletionConfig.onResponseReceived.bind(this),
+        panel: this.#aiCodeCompletionConfig.panel,
+      };
+      this.#aiCodeGenerationProvider = AiCodeGenerationProvider.createInstance(this.#aiCodeGenerationConfig);
+    }
   }
 
   static createInstance(aiCodeCompletionConfig: AiCodeCompletionConfig): AiCodeCompletionProvider {
@@ -84,7 +100,7 @@ export class AiCodeCompletionProvider {
   }
 
   extension(): CodeMirror.Extension[] {
-    return [
+    const extensions = [
       CodeMirror.EditorView.updateListener.of(update => this.#triggerAiCodeCompletion(update)),
       this.#teaserCompartment.of([]),
       aiAutoCompleteSuggestion,
@@ -92,6 +108,10 @@ export class AiCodeCompletionProvider {
       aiAutoCompleteSuggestionState,
       CodeMirror.Prec.highest(CodeMirror.keymap.of(this.#editorKeymap())),
     ];
+    if (this.#aiCodeGenerationProvider) {
+      extensions.push(this.#aiCodeGenerationProvider.extension());
+    }
+    return extensions;
   }
 
   dispose(): void {
@@ -101,6 +121,7 @@ export class AiCodeCompletionProvider {
     Host.AidaClient.HostConfigTracker.instance().removeEventListener(
         Host.AidaClient.Events.AIDA_AVAILABILITY_CHANGED, this.#boundOnUpdateAiCodeCompletionState);
     this.#cleanupAiCodeCompletion();
+    this.#aiCodeGenerationProvider?.dispose();
   }
 
   editorInitialized(editor: TextEditor): void {
@@ -116,6 +137,7 @@ export class AiCodeCompletionProvider {
         Host.AidaClient.Events.AIDA_AVAILABILITY_CHANGED, this.#boundOnUpdateAiCodeCompletionState);
     this.#aiCodeCompletionSetting.addChangeListener(this.#boundOnUpdateAiCodeCompletionState);
     void this.#updateAiCodeCompletionState();
+    this.#aiCodeGenerationProvider?.editorInitialized(editor);
   }
 
   clearCache(): void {
@@ -198,7 +220,7 @@ export class AiCodeCompletionProvider {
           if (suggestion?.rpcGlobalId) {
             this.#aiCodeCompletion?.registerUserAcceptance(suggestion.rpcGlobalId, suggestion.sampleId);
           }
-          this.#aiCodeCompletionConfig?.onSuggestionAccepted();
+          this.#aiCodeCompletionConfig?.onSuggestionAccepted(this.#aiCodeCompletionCitations);
           return true;
         },
       },
@@ -266,9 +288,11 @@ export class AiCodeCompletionProvider {
       prefix: string, suffix: string, cursorPositionAtRequest: number,
       inferenceLanguage?: Host.AidaClient.AidaInferenceLanguage,
       additionalFiles?: Host.AidaClient.AdditionalFile[]): Promise<void> {
+    this.#aiCodeCompletionCitations = [];
+
     if (!this.#aiCodeCompletion) {
       AiCodeCompletion.debugLog('Ai Code Completion is not initialized');
-      this.#aiCodeCompletionConfig?.onResponseReceived([]);
+      this.#aiCodeCompletionConfig?.onResponseReceived();
       Host.userMetrics.actionTaken(Host.UserMetrics.Action.AiCodeCompletionError);
       return;
     }
@@ -283,20 +307,20 @@ export class AiCodeCompletionProvider {
           prefix, suffix, cursorPositionAtRequest, inferenceLanguage, additionalFiles);
 
       if (!completionResponse) {
-        this.#aiCodeCompletionConfig?.onResponseReceived([]);
+        this.#aiCodeCompletionConfig?.onResponseReceived();
         return;
       }
 
       const {response, fromCache} = completionResponse;
 
       if (!response) {
-        this.#aiCodeCompletionConfig?.onResponseReceived([]);
+        this.#aiCodeCompletionConfig?.onResponseReceived();
         return;
       }
 
       const sampleResponse = await this.#generateSampleForRequest(response, prefix, suffix);
       if (!sampleResponse) {
-        this.#aiCodeCompletionConfig?.onResponseReceived([]);
+        this.#aiCodeCompletionConfig?.onResponseReceived();
         return;
       }
 
@@ -310,7 +334,7 @@ export class AiCodeCompletionProvider {
       this.#suggestionRenderingTimeout = window.setTimeout(() => {
         const currentCursorPosition = this.#editor?.editor.state.selection.main.head;
         if (currentCursorPosition !== cursorPositionAtRequest) {
-          this.#aiCodeCompletionConfig?.onResponseReceived([]);
+          this.#aiCodeCompletionConfig?.onResponseReceived();
           return;
         }
         if (this.#aiCodeCompletion) {
@@ -332,11 +356,12 @@ export class AiCodeCompletionProvider {
 
         AiCodeCompletion.debugLog(
             'Suggestion dispatched to the editor', suggestionText, 'at cursor position', cursorPositionAtRequest);
-        this.#aiCodeCompletionConfig?.onResponseReceived(citations);
+        this.#aiCodeCompletionCitations = citations;
+        this.#aiCodeCompletionConfig?.onResponseReceived();
       }, remainingDelay);
     } catch (e) {
       AiCodeCompletion.debugLog('Error while fetching code completion suggestions from AIDA', e);
-      this.#aiCodeCompletionConfig?.onResponseReceived([]);
+      this.#aiCodeCompletionConfig?.onResponseReceived();
       Host.userMetrics.actionTaken(Host.UserMetrics.Action.AiCodeCompletionError);
     }
   }
@@ -501,7 +526,7 @@ function aiCodeCompletionTeaserExtension(teaser: PanelCommon.AiCodeCompletionTea
 
     #addTeaserWidget(pos: number): void {
       this.#teaserDecoration = CodeMirror.Decoration.set([
-        CodeMirror.Decoration.widget({widget: new AiCodeCompletionTeaserPlaceholder(this.teaser), side: 1}).range(pos),
+        CodeMirror.Decoration.widget({widget: new AccessiblePlaceholder(this.teaser), side: 1}).range(pos),
       ]);
     }
   }, {

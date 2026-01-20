@@ -1,6 +1,7 @@
 // Copyright 2023 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+import '../../ui/kit/kit.js';
 
 import * as Common from '../../core/common/common.js';
 import * as Host from '../../core/host/host.js';
@@ -43,9 +44,17 @@ const UIStrings = {
    */
   importRecording: 'Import recording',
   /**
+   * @description The announcement text for screen readers when a recording is imported.
+   */
+  recordingImported: 'Recording imported',
+  /**
    * @description The title of the button that deletes the recording
    */
   deleteRecording: 'Delete recording',
+  /**
+   * @description The announcement text for screen readers when a recording is deleted.
+   */
+  recordingDeleted: 'Recording deleted',
   /**
    * @description The title of the select if user has no saved recordings
    */
@@ -88,6 +97,10 @@ const UIStrings = {
    * panel that is followed by the list of built-in export formats.
    */
   export: 'Export',
+  /**
+   * @description The announcement text for screen readers when a recording is exported successfully.
+   */
+  recordingExported: 'Recording exported',
   /**
    * @description The title of the menu group in the export menu of the Recorder
    * panel that is followed by the list of export formats available via browser
@@ -333,6 +346,7 @@ export class RecorderController extends LitElement {
     this.#setCurrentRecording(await this.#storage.saveRecording(flow));
     this.#setCurrentPage(Pages.RECORDING_PAGE);
     this.#clearError();
+    UI.ARIAUtils.LiveAnnouncer.alert(i18nString(UIStrings.recordingImported));
   }
 
   setCurrentRecordingForTesting(recording: StoredRecording|undefined): void {
@@ -787,6 +801,7 @@ export class RecorderController extends LitElement {
       await this.#storage.deleteRecording(this.currentRecording.storageName);
       this.#screenshotStorage.deleteScreenshotsForRecording(this.currentRecording.storageName);
     }
+    UI.ARIAUtils.LiveAnnouncer.alert(i18nString(UIStrings.recordingDeleted));
     if ((await this.#storage.getRecordings()).length) {
       this.#setCurrentPage(Pages.ALL_RECORDINGS_PAGE);
     } else {
@@ -944,8 +959,10 @@ export class RecorderController extends LitElement {
     const builtInMetric = CONVERTER_ID_TO_METRIC[converter.getId()];
     if (builtInMetric) {
       Host.userMetrics.recordingExported(builtInMetric);
+      UI.ARIAUtils.LiveAnnouncer.alert(i18nString(UIStrings.recordingExported));
     } else if (converter.getId().startsWith(Converters.ExtensionConverter.EXTENSION_PREFIX)) {
       Host.userMetrics.recordingExported(Host.UserMetrics.RecordingExported.TO_EXTENSION);
+      UI.ARIAUtils.LiveAnnouncer.alert(i18nString(UIStrings.recordingExported));
     } else {
       throw new Error('Could not find a metric for the export option with id = ' + id);
     }
@@ -1177,13 +1194,11 @@ export class RecorderController extends LitElement {
         <div class="empty-state-header">${i18nString(UIStrings.header)}</div>
         <div class="empty-state-description">
           <span>${i18nString(UIStrings.recordingDescription)}</span>
-          <x-link
+          <devtools-link
             class="x-link devtools-link"
             href=${RECORDER_EXPLANATION_URL}
-            jslog=${VisualLogging.link()
-                    .track({ click: true, keydown: 'Enter|Space' })
-                    .context('learn-more')}
-          >${i18nString(UIStrings.learnMore)}</x-link>
+            .jslogContext=${'learn-more'}
+          >${i18nString(UIStrings.learnMore)}</devtools-link>
         </div>
         <devtools-button .variant=${Buttons.Button.Variant.TONAL} jslogContext=${Actions.RecorderActions.CREATE_RECORDING} @click=${this.#onCreateNewRecording}>${i18nString(UIStrings.createRecording)}</devtools-button>
       </div>
@@ -1458,9 +1473,9 @@ export class RecorderController extends LitElement {
               }
             ></devtools-button>
             <div class="feedback">
-              <x-link class="x-link" title=${i18nString(UIStrings.sendFeedback)} href=${
+              <devtools-link class="x-link" title=${i18nString(UIStrings.sendFeedback)} href=${
                 FEEDBACK_URL
-              } jslog=${VisualLogging.link('feedback').track({click: true})}>${i18nString(UIStrings.sendFeedback)}</x-link>
+              } .jslogContext=${'feedback'}>${i18nString(UIStrings.sendFeedback)}</devtools-link>
             </div>
             <div class="separator"></div>
             <devtools-shortcut-dialog

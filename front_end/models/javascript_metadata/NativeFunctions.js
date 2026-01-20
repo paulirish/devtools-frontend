@@ -170,7 +170,7 @@ export const NativeFunctions = [
   {
     name: "set",
     signatures: [["key","value"]],
-    receivers: ["Map","WeakMap","CrashReportStorage"]
+    receivers: ["Map","WeakMap","CrashReportContext"]
   },
   {
     name: "set",
@@ -1493,7 +1493,7 @@ export const NativeFunctions = [
   {
     name: "item",
     signatures: [["index"]],
-    receivers: ["CSSRuleList","CSSStyleDeclaration","DOMRectList","DOMStringList","DOMTokenList","FileList","HTMLCollectionBase","HTMLCollectionOf","HTMLSelectElement","MediaList","MimeTypeArray","NamedNodeMap","NodeList","NodeListOf","Plugin","PluginArray","SpeechRecognitionResult","SpeechRecognitionResultList","StyleSheetList","TouchList","HTMLCollection","SpeechGrammarList"]
+    receivers: ["CSSRuleList","CSSStyleDeclaration","DOMRectList","DOMStringList","DOMTokenList","FileList","HTMLCollectionBase","HTMLCollectionOf","HTMLSelectElement","MediaList","MimeTypeArray","NamedNodeMap","NodeList","NodeListOf","Plugin","PluginArray","SpeechRecognitionResult","SpeechRecognitionResultList","StyleSheetList","TouchList","TimelineTriggerRangeList","HTMLCollection","SpeechGrammarList"]
   },
   {
     name: "item",
@@ -1575,7 +1575,7 @@ export const NativeFunctions = [
   {
     name: "delete",
     signatures: [["key"]],
-    receivers: ["Map","WeakMap"]
+    receivers: ["Map","WeakMap","CrashReportContext"]
   },
   {
     name: "delete",
@@ -1997,11 +1997,6 @@ export const NativeFunctions = [
     name: "remove",
     signatures: [["start","end"]],
     receivers: ["SourceBuffer"]
-  },
-  {
-    name: "remove",
-    signatures: [["key"]],
-    receivers: ["CrashReportStorage"]
   },
   {
     name: "remove",
@@ -3863,7 +3858,7 @@ export const NativeFunctions = [
   {
     name: "initialize",
     signatures: [["length"]],
-    receivers: ["CrashReportStorage"]
+    receivers: ["CrashReportContext"]
   },
   {
     name: "initialize",
@@ -6600,6 +6595,14 @@ export const NativeFunctions = [
     signatures: [["html","?options"]]
   },
   {
+    name: "streamAppendHTMLUnsafe",
+    signatures: [["?options"]]
+  },
+  {
+    name: "streamHTMLUnsafe",
+    signatures: [["?options"]]
+  },
+  {
     name: "scrollIntoViewIfNeeded",
     signatures: [["?centerIfNeeded"]]
   },
@@ -7404,6 +7407,18 @@ export const NativeFunctions = [
   {
     name: "queryFeatureSupport",
     signatures: [["feature"]]
+  },
+  {
+    name: "LanguageModelToolCall",
+    signatures: [["init"]]
+  },
+  {
+    name: "LanguageModelToolSuccess",
+    signatures: [["init"]]
+  },
+  {
+    name: "LanguageModelToolError",
+    signatures: [["init"]]
   },
   {
     name: "registerAnimator",
@@ -8917,6 +8932,10 @@ export const NativeFunctions = [
   {
     name: "getFramebufferPixelLocalStorageParameterWEBGL",
     signatures: [["plane","pname"]]
+  },
+  {
+    name: "mapSync",
+    signatures: [["mode","?offset","?size"]]
   },
   {
     name: "mapAsync",

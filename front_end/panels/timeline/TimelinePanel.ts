@@ -212,6 +212,10 @@ const UIStrings = {
    */
   exportingFailed: 'Exporting the trace failed',
   /**
+   * @description Text in Timeline Panel of the Performance panel
+   */
+  initializingTracing: 'Initializing tracing…',
+  /**
    * @description Text to indicate the progress of a trace. Informs the user that we are currently
    * creating a performance trace.
    */
@@ -728,8 +732,9 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
 
   #instantiateNewModel(): Trace.TraceModel.Model {
     const config = Trace.Types.Configuration.defaults();
-    config.showAllEvents = Root.Runtime.experiments.isEnabled('timeline-show-all-events');
-    config.includeRuntimeCallStats = Root.Runtime.experiments.isEnabled('timeline-v8-runtime-call-stats');
+    config.showAllEvents = Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_SHOW_ALL_EVENTS);
+    config.includeRuntimeCallStats =
+        Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_V8_RUNTIME_CALL_STATS);
     config.debugMode = Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_DEBUG_MODE);
 
     const traceEngineModel = Trace.TraceModel.Model.createWithAllHandlers(config);
@@ -1536,6 +1541,7 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
     }
 
     let blob = new Blob(blobParts, {type: 'application/json'});
+    blobParts.length = 0;  // Don't retain this large object for the remaining lifetime of this function.
 
     if (config.shouldCompress) {
       this.statusDialog.updateStatus(i18nString(UIStrings.compressingTraceForDownload));
@@ -1556,8 +1562,9 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
       //  blobParts.join('') === (await gzBlob.arrayBuffer().then(bytes => Common.Gzip.arrayBufferToString(bytes)))
     }
 
+    const blobType = blob.type;  // blob may be reassigned later.
+
     // In some cases Base64.encode() can return undefined; see crbug.com/436482118 for details.
-    // TODO(crbug.com/436482118): understand this edge case and fix the Base64.encode method to not just return undefined.
     let bytesAsB64: string|null = null;
     try {
       // The maximum string length in v8 is `2 ** 29 - 23`, aka 538 MB.
@@ -1565,11 +1572,17 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
       this.statusDialog.updateStatus(i18nString(UIStrings.encodingTraceForDownload));
       this.statusDialog.updateProgressBar(i18nString(UIStrings.encodingTraceForDownload), 100);
       bytesAsB64 = await Common.Base64.encode(blob);
-    } catch {
+      blob = new Blob();  // Don't retain this large object for the remaining lifetime of this function.
+    } catch (err) {
+      if (err instanceof Error && err.message.startsWith('failed to convert to base64')) {
+        // Expected and handled below.
+      } else {
+        throw err;
+      }
     }
 
-    if (bytesAsB64?.length) {
-      const contentData = new TextUtils.ContentData.ContentData(bytesAsB64, /* isBase64=*/ true, blob.type);
+    if (bytesAsB64) {
+      const contentData = new TextUtils.ContentData.ContentData(bytesAsB64, /* isBase64=*/ true, blobType);
       await Workspace.FileManager.FileManager.instance().save(fileName, contentData, /* forceSaveAs=*/ true);
       Workspace.FileManager.FileManager.instance().close(fileName);
     } else {
@@ -1874,6 +1887,7 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
       await SDK.TargetManager.TargetManager.instance().suspendAllTargets('performance-timeline');
       await this.cpuProfiler.startRecording();
 
+      this.statusDialog?.updateStatus(i18nString(UIStrings.tracing));
       this.recordingStarted();
     } catch (e) {
       await this.recordingFailed(e.message);
@@ -1928,7 +1942,6 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
     console.assert(!this.statusDialog, 'Status pane is already opened.');
     this.setState(State.START_PENDING);
     this.showRecordingStarted();
-
     if (this.#isNode) {
       await this.#startCPUProfilingRecording();
     } else {
@@ -2077,7 +2090,7 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
 
   #applyActiveFilters(traceIsGeneric: boolean, exclusiveFilter: Trace.Extras.TraceFilter.TraceFilter|null = null):
       void {
-    if (traceIsGeneric || Root.Runtime.experiments.isEnabled('timeline-show-all-events')) {
+    if (traceIsGeneric || Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.TIMELINE_SHOW_ALL_EVENTS)) {
       return;
     }
 
@@ -2833,7 +2846,7 @@ export class TimelinePanel extends Common.ObjectWrapper.eventMixin<EventTypes, t
         },
         () => this.stopRecording());
     this.statusDialog.showPane(this.statusPaneContainer);
-    this.statusDialog.updateStatus(i18nString(UIStrings.tracing));
+    this.statusDialog.updateStatus(i18nString(UIStrings.initializingTracing));
     this.statusDialog.updateProgressBar(i18nString(UIStrings.bufferUsage), 0);
   }
 

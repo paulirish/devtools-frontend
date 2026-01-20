@@ -12,7 +12,7 @@ import * as CodeMirror from '../../../third_party/codemirror.next/codemirror.nex
 import * as UI from '../../../ui/legacy/legacy.js';
 import * as VisualLogging from '../../visual_logging/visual_logging.js';
 
-import {AiCodeCompletionTeaserPlaceholder} from './AiCodeCompletionTeaserPlaceholder.js';
+import {AccessiblePlaceholder} from './AccessiblePlaceholder.js';
 import {AiCodeGenerationParser} from './AiCodeGenerationParser.js';
 import {
   acceptAiAutoCompleteSuggestion,
@@ -41,21 +41,24 @@ export interface AiCodeGenerationConfig {
   generationContext: {
     inferenceLanguage?: Host.AidaClient.AidaInferenceLanguage,
   };
-  onSuggestionAccepted: () => void;
+  onSuggestionAccepted: (citations: Host.AidaClient.Citation[]) => void;
   onRequestTriggered: () => void;
-  // TODO(b/445394511): Move exposing citations to onSuggestionAccepted
-  onResponseReceived: (citations: Host.AidaClient.Citation[]) => void;
+  onResponseReceived: () => void;
   panel: AiCodeCompletion.AiCodeCompletion.ContextFlavor;
 }
 
 export class AiCodeGenerationProvider {
   #devtoolsLocale: string;
-  #aiCodeCompletionSetting = Common.Settings.Settings.instance().createSetting('ai-code-completion-enabled', false);
+  // 'ai-code-completion-enabled' setting controls both AI code completion and AI code generation.
+  // Since this provider deals with code generation, the field has been named `#aiCodeGenerationEnabledSetting`.
+  #aiCodeGenerationEnabledSetting =
+      Common.Settings.Settings.instance().createSetting('ai-code-completion-enabled', false);
   #generationTeaserCompartment = new CodeMirror.Compartment();
   #generationTeaser: PanelCommon.AiCodeGenerationTeaser.AiCodeGenerationTeaser;
   #editor?: TextEditor;
   #aiCodeGenerationConfig: AiCodeGenerationConfig;
   #aiCodeGeneration?: AiCodeGeneration.AiCodeGeneration.AiCodeGeneration;
+  #aiCodeGenerationCitations: Host.AidaClient.Citation[] = [];
 
   #aidaClient: Host.AidaClient.AidaClient = new Host.AidaClient.AidaClient();
   #boundOnUpdateAiCodeGenerationState = this.#updateAiCodeGenerationState.bind(this);
@@ -92,13 +95,16 @@ export class AiCodeGenerationProvider {
   dispose(): void {
     this.#controller.abort();
     this.#cleanupAiCodeGeneration();
+    this.#aiCodeGenerationEnabledSetting.removeChangeListener(this.#boundOnUpdateAiCodeGenerationState);
+    Host.AidaClient.HostConfigTracker.instance().removeEventListener(
+        Host.AidaClient.Events.AIDA_AVAILABILITY_CHANGED, this.#boundOnUpdateAiCodeGenerationState);
   }
 
   editorInitialized(editor: TextEditor): void {
     this.#editor = editor;
     Host.AidaClient.HostConfigTracker.instance().addEventListener(
         Host.AidaClient.Events.AIDA_AVAILABILITY_CHANGED, this.#boundOnUpdateAiCodeGenerationState);
-    this.#aiCodeCompletionSetting.addChangeListener(this.#boundOnUpdateAiCodeGenerationState);
+    this.#aiCodeGenerationEnabledSetting.addChangeListener(this.#boundOnUpdateAiCodeGenerationState);
     void this.#updateAiCodeGenerationState();
   }
 
@@ -126,7 +132,7 @@ export class AiCodeGenerationProvider {
   async #updateAiCodeGenerationState(): Promise<void> {
     const aidaAvailability = await Host.AidaClient.AidaClient.checkAccessPreconditions();
     const isAvailable = aidaAvailability === Host.AidaClient.AidaAccessPreconditions.AVAILABLE;
-    const isEnabled = this.#aiCodeCompletionSetting.get();
+    const isEnabled = this.#aiCodeGenerationEnabledSetting.get();
     if (isAvailable && isEnabled) {
       this.#setupAiCodeGeneration();
     } else {
@@ -170,7 +176,7 @@ export class AiCodeGenerationProvider {
           if (suggestion?.rpcGlobalId) {
             this.#aiCodeGeneration.registerUserAcceptance(suggestion.rpcGlobalId, suggestion.sampleId);
           }
-          this.#aiCodeGenerationConfig?.onSuggestionAccepted();
+          this.#aiCodeGenerationConfig?.onSuggestionAccepted(this.#aiCodeGenerationCitations);
           return true;
         },
       },
@@ -251,6 +257,7 @@ export class AiCodeGenerationProvider {
       return;
     }
 
+    this.#aiCodeGenerationCitations = [];
     this.#generationTeaser.displayState = PanelCommon.AiCodeGenerationTeaser.AiCodeGenerationTeaserDisplayState.LOADING;
     const cursor = this.#editor.state.selection.main.head;
     const query = AiCodeGenerationParser.extractCommentText(this.#editor.state, cursor);
@@ -272,7 +279,7 @@ export class AiCodeGenerationProvider {
       }
 
       if (!generationResponse || generationResponse.samples.length === 0) {
-        this.#aiCodeGenerationConfig?.onResponseReceived([]);
+        this.#aiCodeGenerationConfig?.onResponseReceived();
         return;
       }
       const topSample = generationResponse.samples[0];
@@ -304,11 +311,16 @@ export class AiCodeGenerationProvider {
 
       AiCodeGeneration.debugLog('Suggestion dispatched to the editor', suggestionText);
       const citations = topSample.attributionMetadata?.citations ?? [];
-      this.#aiCodeGenerationConfig?.onResponseReceived(citations);
+      this.#aiCodeGenerationCitations = citations;
+      this.#aiCodeGenerationConfig?.onResponseReceived();
       return;
     } catch (e) {
+      if (e instanceof Host.DispatchHttpRequestClient.DispatchHttpRequestError &&
+          e.type === Host.DispatchHttpRequestClient.ErrorType.ABORT) {
+        return;
+      }
       AiCodeGeneration.debugLog('Error while fetching code generation suggestions from AIDA', e);
-      this.#aiCodeGenerationConfig?.onResponseReceived([]);
+      this.#aiCodeGenerationConfig?.onResponseReceived();
       Host.userMetrics.actionTaken(Host.UserMetrics.Action.AiCodeGenerationError);
     }
 
@@ -345,13 +357,14 @@ function aiCodeGenerationTeaserExtension(teaser: PanelCommon.AiCodeGenerationTea
       const line = this.#view.state.doc.lineAt(cursorPosition);
 
       const isEmptyLine = line.length === 0;
+      const canShowDiscoveryState =
+          UI.UIUtils.PromotionManager.instance().canShowPromotion(PanelCommon.AiCodeGenerationTeaser.PROMOTION_ID);
       const isComment = Boolean(AiCodeGenerationParser.extractCommentText(this.#view.state, cursorPosition));
       const isCursorAtEndOfLine = cursorPosition >= line.to;
 
-      if ((isEmptyLine) || (isComment && isCursorAtEndOfLine)) {
+      if ((isEmptyLine && canShowDiscoveryState) || (isComment && isCursorAtEndOfLine)) {
         return CodeMirror.Decoration.set([
-          CodeMirror.Decoration.widget({widget: new AiCodeCompletionTeaserPlaceholder(teaser), side: 1})
-              .range(cursorPosition),
+          CodeMirror.Decoration.widget({widget: new AccessiblePlaceholder(teaser), side: 1}).range(cursorPosition),
         ]);
       }
       return CodeMirror.Decoration.none;

@@ -386,6 +386,10 @@ export class NetworkManager extends SDKModel<EventTypes> {
     return await this.#networkAgent.invoke_enableReportingApi({enable});
   }
 
+  async enableDeviceBoundSessions(enable = true): Promise<Promise<Protocol.ProtocolResponseWithError>> {
+    return await this.#networkAgent.invoke_enableDeviceBoundSessions({enable});
+  }
+
   async loadNetworkResource(
       frameId: Protocol.Page.FrameId|null, url: Platform.DevToolsPath.UrlString,
       options: Protocol.Network.LoadNetworkResourceOptions): Promise<Protocol.Network.LoadNetworkResourcePageResult> {
@@ -414,6 +418,8 @@ export enum Events {
   ReportingApiReportAdded = 'ReportingApiReportAdded',
   ReportingApiReportUpdated = 'ReportingApiReportUpdated',
   ReportingApiEndpointsChangedForOrigin = 'ReportingApiEndpointsChangedForOrigin',
+  DeviceBoundSessionsAdded = 'DeviceBoundSessionsAdded',
+  DeviceBoundSessionEventOccurred = 'DeviceBoundSessionEventOccurred',
   /* eslint-enable @typescript-eslint/naming-convention */
 }
 
@@ -445,6 +451,8 @@ export interface EventTypes {
   [Events.ReportingApiReportAdded]: Protocol.Network.ReportingApiReport;
   [Events.ReportingApiReportUpdated]: Protocol.Network.ReportingApiReport;
   [Events.ReportingApiEndpointsChangedForOrigin]: Protocol.Network.ReportingApiEndpointsChangedForOriginEvent;
+  [Events.DeviceBoundSessionsAdded]: Protocol.Network.DeviceBoundSession[];
+  [Events.DeviceBoundSessionEventOccurred]: Protocol.Network.DeviceBoundSessionEventOccurredEvent;
 }
 
 /**
@@ -1554,6 +1562,14 @@ export class NetworkDispatcher implements ProtocolProxyApi.NetworkDispatcher {
     this.#manager.dispatchEventToListeners(Events.ReportingApiEndpointsChangedForOrigin, data);
   }
 
+  deviceBoundSessionsAdded(_params: Protocol.Network.DeviceBoundSessionsAddedEvent): void {
+    this.#manager.dispatchEventToListeners(Events.DeviceBoundSessionsAdded, _params.sessions);
+  }
+
+  deviceBoundSessionEventOccurred(_params: Protocol.Network.DeviceBoundSessionEventOccurredEvent): void {
+    this.#manager.dispatchEventToListeners(Events.DeviceBoundSessionEventOccurred, _params);
+  }
+
   policyUpdated(): void {
   }
 
@@ -1897,10 +1913,10 @@ export class RequestConditions extends Common.ObjectWrapper.ObjectWrapper<Reques
             matchedNetworkConditions.push({ruleIds, urlPattern, conditions});
           }
         }
+      }
 
-        if (globalConditions) {
-          matchedNetworkConditions.push({conditions: globalConditions});
-        }
+      if (globalConditions) {
+        matchedNetworkConditions.push({conditions: globalConditions});
       }
 
       const promises: Array<Promise<unknown>> = [];

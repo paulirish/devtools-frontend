@@ -420,9 +420,6 @@ describeWithMockConnection('PreloadingRuleSetView', () => {
         ruleSetDetailsComponent.contentElement.querySelector('#error-message-text')?.textContent, 'fake error message');
   });
 
-  // TODO(https://crbug.com/1384419): Check that preloading attempts for
-  // the previous page vanish once loaderId is added to events
-  // prefetch/prerenderAttemptUpdated.
   it('clears SpeculationRules for previous pages', async () => {
     const emulator = new NavigationEmulator();
     await emulator.openDevTools();
@@ -1026,8 +1023,8 @@ describeWithMockConnection('PreloadingSummaryView', () => {
     await RenderCoordinator.done();
 
     const usedPreloadingComponent = view.getUsedPreloadingForTest();
-    assert.isNotNull(usedPreloadingComponent.shadowRoot);
+    await usedPreloadingComponent.updateComplete;
 
-    assert.include(usedPreloadingComponent.shadowRoot.textContent, 'This page was successfully prerendered.');
+    assert.include(usedPreloadingComponent.contentElement.textContent, 'This page was successfully prerendered.');
   });
 });

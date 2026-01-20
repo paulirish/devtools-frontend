@@ -257,7 +257,7 @@ export class StylePropertiesSection {
       UI.ARIAUtils.setHidden(this.newStyleRuleToolbar, true);
     }
 
-    if (Root.Runtime.experiments.isEnabled('font-editor') && this.editable) {
+    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.FONT_EDITOR) && this.editable) {
       this.fontEditorToolbar = this.#styleRuleElement.createChild('devtools-toolbar', 'sidebar-pane-section-toolbar');
       this.fontEditorSectionManager = new FontEditorSectionManager(this.parentPane.swatchPopoverHelper(), this);
       this.fontEditorButton =
@@ -406,6 +406,16 @@ export class StylePropertiesSection {
             UI.Widget.WidgetElement<PanelsCommon.DOMLinkifier.DeferredDOMNodeLink>;
         link.widgetConfig =
             UI.Widget.widgetConfig(e => new PanelsCommon.DOMLinkifier.DeferredDOMNodeLink(e, header.ownerNode));
+        link.textContent = label;
+        return link;
+      }
+      if (rule && rule.style.styleSheetId && rule.treeScope) {
+        // Make link for adopted stylesheet.
+        const ownerNode = new SDK.DOMModel.DeferredDOMNode(rule.cssModelInternal.target(), rule.treeScope);
+        const link = document.createElement('devtools-widget') as
+            UI.Widget.WidgetElement<PanelsCommon.DOMLinkifier.DeferredDOMNodeLink>;
+        link.widgetConfig = UI.Widget.widgetConfig(
+            e => new PanelsCommon.DOMLinkifier.DeferredDOMNodeLink(e, ownerNode, undefined, rule.style.styleSheetId));
         link.textContent = label;
         return link;
       }

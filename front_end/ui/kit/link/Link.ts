@@ -39,6 +39,7 @@ export class Link extends HTMLElement {
       this.setAttribute('tabindex', '0');
     }
     this.#setDefaultTitle();
+    this.#onJslogContextChange();
 
     this.setAttribute('role', 'link');
     this.setAttribute('target', '_blank');
@@ -81,15 +82,7 @@ export class Link extends HTMLElement {
   }
 
   #onJslogContextChange(): void {
-    const href = this.href;
-    if (!href) {
-      throw new Error('`href` is a required attribute.');
-    }
-    const urlForContext = new URL(href);
-    urlForContext.search = '';
-    const jslogContext = Platform.StringUtilities.toKebabCase(
-        this.jslogContext ?? urlForContext.toString(),
-    );
+    const jslogContext = this.jslogContext ?? undefined;
     const jslog = VisualLogging.link().track({click: true, keydown: 'Enter|Space'}).context(jslogContext);
     this.setAttribute('jslog', jslog.toString());
   }

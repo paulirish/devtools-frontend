@@ -58,6 +58,7 @@ import * as PanelCommon from '../../panels/common/common.js';
 import * as Snippets from '../../panels/snippets/snippets.js';
 import * as Buttons from '../../ui/components/buttons/buttons.js';
 import * as Snackbar from '../../ui/components/snackbars/snackbars.js';
+import * as UIHelpers from '../../ui/helpers/helpers.js';
 import * as Components from '../../ui/legacy/components/utils/utils.js';
 import * as UI from '../../ui/legacy/legacy.js';
 import * as ThemeSupport from '../../ui/legacy/theme_support/theme_support.js';
@@ -128,6 +129,10 @@ const UIStrings = {
    * @description Notification shown to the user whenever DevTools has finished downloading a local AI model.
    */
   aiModelDownloaded: 'AI model downloaded',
+  /**
+   * @description A title of the menu item in the main menu leading to https://github.com/ChromeDevTools/chrome-devtools-mcp.
+   */
+  getDevToolsMcp: 'Get `DevTools MCP`'
 } as const;
 const str_ = i18n.i18n.registerUIStrings('entrypoints/main/MainImpl.ts', UIStrings);
 const i18nString = i18n.i18n.getLocalizedString.bind(undefined, str_);
@@ -324,58 +329,64 @@ export class MainImpl {
   }
 
   #initializeExperiments(): void {
-    Root.Runtime.experiments.register('capture-node-creation-stacks', 'Capture node creation stacks');
-    Root.Runtime.experiments.register('live-heap-profile', 'Live heap profile', true);
     Root.Runtime.experiments.register(
-        'protocol-monitor', 'Protocol Monitor', undefined,
+        Root.Runtime.ExperimentName.CAPTURE_NODE_CREATION_STACKS, 'Capture node creation stacks');
+    Root.Runtime.experiments.register(Root.Runtime.ExperimentName.LIVE_HEAP_PROFILE, 'Live heap profile');
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.PROTOCOL_MONITOR, 'Protocol Monitor',
         'https://developer.chrome.com/blog/new-in-devtools-92/#protocol-monitor');
-    Root.Runtime.experiments.register('sampling-heap-profiler-timeline', 'Sampling heap profiler timeline', true);
     Root.Runtime.experiments.register(
-        'show-option-tp-expose-internals-in-heap-snapshot', 'Show option to expose internals in heap snapshots');
+        Root.Runtime.ExperimentName.SAMPLING_HEAP_PROFILER_TIMELINE, 'Sampling heap profiler timeline');
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.SHOW_OPTION_TO_EXPOSE_INTERNALS_IN_HEAP_SNAPSHOT,
+        'Show option to expose internals in heap snapshots');
 
     // Timeline
     Root.Runtime.experiments.register(
-        'timeline-invalidation-tracking', 'Performance panel: invalidation tracking', true);
-    Root.Runtime.experiments.register('timeline-show-all-events', 'Performance panel: show all events', true);
+        Root.Runtime.ExperimentName.TIMELINE_INVALIDATION_TRACKING, 'Performance panel: invalidation tracking');
     Root.Runtime.experiments.register(
-        'timeline-v8-runtime-call-stats', 'Performance panel: V8 runtime call stats', true);
+        Root.Runtime.ExperimentName.TIMELINE_SHOW_ALL_EVENTS, 'Performance panel: show all events');
     Root.Runtime.experiments.register(
-        Root.Runtime.ExperimentName.TIMELINE_DEBUG_MODE,
-        'Performance panel: Enable debug mode (trace event details, etc)', true);
+        Root.Runtime.ExperimentName.TIMELINE_V8_RUNTIME_CALL_STATS, 'Performance panel: V8 runtime call stats');
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.TIMELINE_DEBUG_MODE, 'Performance panel: debug mode (trace event details, etc)');
 
     // Debugging
-    Root.Runtime.experiments.register('instrumentation-breakpoints', 'Enable instrumentation breakpoints', true);
-    Root.Runtime.experiments.register('use-source-map-scopes', 'Use scope information from source maps', true);
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.INSTRUMENTATION_BREAKPOINTS, 'Instrumentation breakpoints');
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.USE_SOURCE_MAP_SCOPES, 'Use scope information from source maps');
 
     // Advanced Perceptual Contrast Algorithm.
     Root.Runtime.experiments.register(
-        'apca',
-        'Enable new Advanced Perceptual Contrast Algorithm (APCA) replacing previous contrast ratio and AA/AAA guidelines',
-        undefined, 'https://developer.chrome.com/blog/new-in-devtools-89/#apca');
+        Root.Runtime.ExperimentName.APCA,
+        'Advanced Perceptual Contrast Algorithm (APCA) replacing previous contrast ratio and AA/AAA guidelines',
+        'https://developer.chrome.com/blog/new-in-devtools-89/#apca');
 
     // Full Accessibility Tree
     Root.Runtime.experiments.register(
-        'full-accessibility-tree', 'Enable full accessibility tree view in the Elements panel', undefined,
+        Root.Runtime.ExperimentName.FULL_ACCESSIBILITY_TREE, 'Full accessibility tree view in the Elements panel',
         'https://developer.chrome.com/blog/new-in-devtools-90/#accessibility-tree',
         'https://g.co/devtools/a11y-tree-feedback');
 
     // Font Editor
     Root.Runtime.experiments.register(
-        'font-editor', 'Enable new font editor within the Styles tab', undefined,
+        Root.Runtime.ExperimentName.FONT_EDITOR, 'New font editor in the Styles tab',
         'https://developer.chrome.com/blog/new-in-devtools-89/#font');
 
     // Contrast issues reported via the Issues panel.
     Root.Runtime.experiments.register(
-        'contrast-issues', 'Enable automatic contrast issue reporting via the Issues panel', undefined,
+        Root.Runtime.ExperimentName.CONTRAST_ISSUES, 'Automatic contrast issue reporting via the Issues panel',
         'https://developer.chrome.com/blog/new-in-devtools-90/#low-contrast');
 
     // New cookie features.
-    Root.Runtime.experiments.register('experimental-cookie-features', 'Enable experimental cookie features');
+    Root.Runtime.experiments.register(
+        Root.Runtime.ExperimentName.EXPERIMENTAL_COOKIE_FEATURES, 'Experimental cookie features');
 
     // Change grouping of sources panel to use Authored/Deployed trees
     Root.Runtime.experiments.register(
         Root.Runtime.ExperimentName.AUTHORED_DEPLOYED_GROUPING, 'Group sources into authored and deployed trees',
-        undefined, 'https://goo.gle/authored-deployed', 'https://goo.gle/authored-deployed-feedback');
+        'https://goo.gle/authored-deployed', 'https://goo.gle/authored-deployed-feedback');
 
     // Hide third party code (as determined by ignore lists or source maps)
     Root.Runtime.experiments.register(
@@ -388,7 +399,8 @@ export class MainImpl {
 
     Root.Runtime.experiments.enableExperimentsByDefault([
       Root.Runtime.ExperimentName.FULL_ACCESSIBILITY_TREE,
-      ...(Root.Runtime.Runtime.queryParam('isChromeForTesting') ? ['protocol-monitor'] : []),
+      Root.Runtime.ExperimentName.USE_SOURCE_MAP_SCOPES,
+      ...(Root.Runtime.Runtime.queryParam('isChromeForTesting') ? [Root.Runtime.ExperimentName.PROTOCOL_MONITOR] : []),
     ]);
 
     Root.Runtime.experiments.cleanUpStaleExperiments();
@@ -401,7 +413,7 @@ export class MainImpl {
     if (Host.InspectorFrontendHost.isUnderTest()) {
       const testParam = Root.Runtime.Runtime.queryParam('test');
       if (testParam?.includes('live-line-level-heap-profile.js')) {
-        Root.Runtime.experiments.enableForTest('live-heap-profile');
+        Root.Runtime.experiments.enableForTest(Root.Runtime.ExperimentName.LIVE_HEAP_PROFILE);
       }
     }
 
@@ -413,6 +425,7 @@ export class MainImpl {
       }
     }
   }
+
   async #createAppUI(): Promise<void> {
     MainImpl.time('Main._createAppUI');
 
@@ -670,7 +683,7 @@ export class MainImpl {
           const runnable = await lateInitializationLoader();
           return await runnable.run();
         });
-    if (Root.Runtime.experiments.isEnabled('live-heap-profile')) {
+    if (Root.Runtime.experiments.isEnabled(Root.Runtime.ExperimentName.LIVE_HEAP_PROFILE)) {
       const PerfUI = await import('../../ui/legacy/components/perf_ui/perf_ui.js');
       const setting = 'memory-live-heap-profile';
       if (Common.Settings.Settings.instance().moduleSetting(setting).get()) {
@@ -945,6 +958,15 @@ export class MainMenuItem implements UI.Toolbar.Provider {
 
     contextMenu.defaultSection().appendAction('freestyler.main-menu', undefined, /* optional */ true);
 
+    contextMenu.defaultSection().appendItem(i18nString(UIStrings.getDevToolsMcp), () => {
+      UIHelpers.openInNewTab('https://github.com/ChromeDevTools/chrome-devtools-mcp');
+    }, {
+      additionalElement: UI.UIUtils.maybeCreateNewBadge('get-devtools-mcp'),
+      jslogContext: 'get-devtools-mcp',
+    });
+
+    contextMenu.defaultSection().appendSeparator();
+
     if (dockController.dockSide() === UI.DockController.DockState.UNDOCKED) {
       const mainTarget = SDK.TargetManager.TargetManager.instance().primaryPageTarget();
       if (mainTarget && mainTarget.type() === SDK.Target.Type.FRAME) {
@@ -971,7 +993,6 @@ export class MainMenuItem implements UI.Toolbar.Provider {
       const persistence = viewExtension.persistence();
       const title = viewExtension.title();
       const id = viewExtension.viewId();
-      const promotionId = viewExtension.featurePromotionId();
 
       if (id === 'issues-pane') {
         moreTools.defaultSection().appendItem(title, () => {
@@ -988,14 +1009,9 @@ export class MainMenuItem implements UI.Toolbar.Provider {
         continue;
       }
 
-      let additionalElement = undefined;
-      if (promotionId) {
-        additionalElement = UI.UIUtils.maybeCreateNewBadge(promotionId);
-      }
-
       moreTools.defaultSection().appendItem(title, () => {
         void UI.ViewManager.ViewManager.instance().showView(id, true, false);
-      }, {additionalElement, isPreviewFeature: viewExtension.isPreviewFeature(), jslogContext: id});
+      }, {isPreviewFeature: viewExtension.isPreviewFeature(), jslogContext: id});
     }
 
     const helpSubMenu = contextMenu.footerSection().appendSubMenuItem(i18nString(UIStrings.help), false, 'help');

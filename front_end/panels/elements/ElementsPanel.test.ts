@@ -22,7 +22,7 @@ describeWithMockConnection('ElementsPanel', () => {
   beforeEach(() => {
     stubNoopSettings();
     target = createTarget();
-    Root.Runtime.experiments.register('apca', '');
+    Root.Runtime.experiments.register(Root.Runtime.ExperimentName.APCA, '');
     setMockConnectionResponseHandler('DOM.requestChildNodes', () => ({}));
     setMockConnectionResponseHandler('DOM.getDocument', () => ({
                                                           root: {
@@ -192,7 +192,7 @@ describeWithMockConnection('ElementsPanel', () => {
     const animateOnDOMUpdate = sinon.mock().atLeast(1).returns(undefined);
     Elements.ElementsTreeElement.ElementsTreeElement.animateOnDOMUpdate = animateOnDOMUpdate;
     const stylesSidebarPaneUpdate = sinon.mock().atLeast(1).returns(undefined);
-    panel.stylesWidget.doUpdate = stylesSidebarPaneUpdate;
+    panel.stylesWidget.performUpdate = stylesSidebarPaneUpdate;
 
     await treeOutline.toggleHideElement(selectedNode);
     assert.isTrue(treeOutline.isToggledToHidden(selectedNode));
