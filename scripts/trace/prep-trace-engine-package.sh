@@ -11,8 +11,7 @@ out_dir="./out/TraceEngine"
 dist="$out_dir/dist"  # This doesn't match up with typical obj,gen,resources layout but that's fine!
 
 # Prevent old files from being copied to the dist folder. Yes, this forces a rebuild every time. Got a better idea?
-# rm -rf "$out_dir/gen"
-# TODO ! restore above
+rm -rf "$out_dir/gen"
 
 # export all const enums so they can be used by clients. (perl instead of sed because bsd/gnu sed differ on -i flag)
 perl -pi -e 's/export const enum/export enum/g' "$dtfe"/front_end/models/trace/**/*.ts
